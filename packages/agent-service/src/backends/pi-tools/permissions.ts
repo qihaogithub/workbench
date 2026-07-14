@@ -72,26 +72,39 @@ export function isPathAllowed(
   return false;
 }
 
+export interface CommandPermissionResult {
+  allowed: boolean;
+  reason?: 'denied_command' | 'node_eval_blocked' | 'npm_npx_blocked' | 'not_in_allowed';
+  baseCommand?: string;
+}
+
+export function getCommandPermissionResult(
+  command: string,
+  config: PermissionConfig,
+): CommandPermissionResult {
+  const trimmed = command.trim();
+  if (!trimmed) return { allowed: false, reason: 'not_in_allowed' };
+  const baseCmd = trimmed.split(/\s+/)[0];
+  if (config.deniedCommands.includes(baseCmd)) {
+    return { allowed: false, reason: 'denied_command', baseCommand: baseCmd };
+  }
+  if (baseCmd === "npm" || baseCmd === "npx") {
+    return { allowed: false, reason: 'npm_npx_blocked', baseCommand: baseCmd };
+  }
+  if (baseCmd === "node" && /\s(?:-e|--eval)(?:\s|=|$)/.test(` ${trimmed}`)) {
+    return { allowed: false, reason: 'node_eval_blocked', baseCommand: baseCmd };
+  }
+  if (!config.allowedCommands.includes(baseCmd)) {
+    return { allowed: false, reason: 'not_in_allowed', baseCommand: baseCmd };
+  }
+  return { allowed: true, baseCommand: baseCmd };
+}
+
 export function isCommandAllowed(
   command: string,
   config: PermissionConfig,
 ): boolean {
-  const trimmed = command.trim();
-  if (!trimmed) return false;
-  const baseCmd = trimmed.split(/\s+/)[0];
-  if (config.deniedCommands.includes(baseCmd)) {
-    return false;
-  }
-  if (baseCmd === "npm" || baseCmd === "npx") {
-    return false;
-  }
-  if (baseCmd === "node" && /\s(?:-e|--eval)(?:\s|=|$)/.test(` ${trimmed}`)) {
-    return false;
-  }
-  if (!config.allowedCommands.includes(baseCmd)) {
-    return false;
-  }
-  return true;
+  return getCommandPermissionResult(command, config).allowed;
 }
 
 export function isLiveWorkspaceReadOnlyCommandAllowed(

@@ -21,6 +21,28 @@ const ReadFileParams = Type.Object({
 });
 type ReadFileParams = Static<typeof ReadFileParams>;
 
+/**
+ * 从 workspace-tree.json 快照中解析指定页面文件的 runtimeType。
+ * 用于 writeFile 校验时判断页面是否为原型页，非原型页运行时跳过原型校验。
+ */
+function resolvePageRuntimeType(
+  filePath: string,
+  resources: Record<string, string> | undefined,
+): string | undefined {
+  const match = filePath.match(/^demos\/([^/]+)\//u);
+  if (!match) return undefined;
+  const pageId = match[1];
+  const treeContent = resources?.['workspace-tree.json'];
+  if (!treeContent) return undefined;
+  try {
+    const tree = JSON.parse(treeContent) as { pages?: Array<{ id: string; runtimeType?: string }> };
+    const page = tree.pages?.find((p) => p.id === pageId);
+    return page?.runtimeType;
+  } catch {
+    return undefined;
+  }
+}
+
 export function createReadFileTool(
   config: AgentConfig,
 ): AgentTool<typeof ReadFileParams> {
@@ -317,6 +339,7 @@ export function createWriteFileTool(
         const runtimeValidation = validatePreviewFileWrite(
           args.path,
           args.content,
+          resolvePageRuntimeType(args.path, snapshot?.resources),
         );
         logger.debug({ path: args.path }, "File written successfully");
         const validationText =

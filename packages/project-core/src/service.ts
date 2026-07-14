@@ -5698,17 +5698,6 @@ export class ProjectAdminService {
         "upgrade_to_high_fidelity",
       );
     }
-    if (/\bposition\s*:\s*fixed\b/i.test(css)) {
-      addIssue(
-        {
-          code: "PROTOTYPE_FIXED_POSITION_REQUIRES_ISOLATION",
-          message: "原型页不允许使用 position: fixed",
-          instruction:
-            "需要固定定位覆盖视口时应升级为高保真页；静态布局请改用 absolute、sticky 或普通布局。",
-        },
-        "upgrade_to_high_fidelity",
-      );
-    }
     if (/@import\b/i.test(css)) {
       addIssue(
         {

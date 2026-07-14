@@ -175,14 +175,6 @@ function toPrototypeToolValidation(
       'upgrade_to_high_fidelity',
     );
   }
-  if (/\bposition\s*:\s*fixed\b/i.test(css)) {
-    addIssue(
-      'PROTOTYPE_FIXED_POSITION_REQUIRES_ISOLATION',
-      '原型页不允许使用 position: fixed',
-      '需要固定定位覆盖视口时应升级为高保真页；静态布局请改用 absolute、sticky 或普通布局。',
-      'upgrade_to_high_fidelity',
-    );
-  }
   if (/@import\b/i.test(css)) {
     addIssue(
       'PROTOTYPE_CSS_IMPORT_FORBIDDEN',
@@ -227,6 +219,7 @@ function toPrototypeToolValidation(
 export function validatePreviewFileWrite(
   filePath: string,
   content: string,
+  runtimeType?: string,
 ): ToolRuntimeValidation | undefined {
   const normalizedPath = normalizePath(filePath);
   const demoFile = getDemoFileInfo(normalizedPath);
@@ -267,10 +260,18 @@ export function validatePreviewFileWrite(
   }
 
   if (pageId && demoFile.fileName === 'prototype.html') {
+    // 当页面已升级为高保真运行时，跳过原型页校验
+    if (runtimeType && runtimeType !== 'prototype-html-css') {
+      return { ok: true, file: normalizedPath, pageId, issues: [] };
+    }
     return toPrototypeToolValidation(normalizedPath, pageId, content, '');
   }
 
   if (pageId && demoFile.fileName === 'prototype.css') {
+    // 当页面已升级为高保真运行时，跳过原型页校验
+    if (runtimeType && runtimeType !== 'prototype-html-css') {
+      return { ok: true, file: normalizedPath, pageId, issues: [] };
+    }
     return toPrototypeToolValidation(normalizedPath, pageId, '<div></div>', content);
   }
 

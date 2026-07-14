@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>儿童教育 - React 高保真页面</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; background: #f5f5f5; color: #999; font-size: 14px;
+    }
+    .message { text-align: center; padding: 40px; }
+    .message h2 { font-size: 18px; color: #666; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <div class="message">
+    <h2>🌟 宝贝学堂</h2>
+    <p>此页面已升级为高保真 React 版本</p>
+  </div>
+</body>
+</html><!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🌟 宝贝学堂 - 儿童教育</title>
+  <link rel="stylesheet" href="prototype.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- 顶部状态栏 -->
+    <div class="status-bar">
+      <span>9:41</span>
+      <div class="status-icons">
+        <span>📶</span>
+        <span>📡</span>
+        <span>🔋</span>
+      </div>
+    </div>
+
+    <!-- 顶部导航 -->
+    <header class="header">
+      <button class="icon-btn" aria-label="菜单">☰</button>
+      <h1 class="site-title">🌟 宝贝学堂</h1>
+      <button class="icon-btn">
+        <div class="avatar">🐼</div>
+      </button>
+    </header>
+
+    <!-- 搜索栏 -->
+    <div class="search-bar">
+      <span class="search-icon">🔍</span>
+      <input type="search" class="search-input" placeholder="搜索课程、故事、游戏..." />
+    </div>
+
+    <!-- Banner 轮播 -->
+    <section class="banner">
+      <div class="banner-content">
+        <div class="banner-left">
+          <div class="banner-emoji">🎨</div>
+          <div>
+            <h2 class="banner-title">创意美术课</h2>
+            <p class="banner-desc">激发孩子的想象力</p>
+          </div>
+        </div>
+        <div class="banner-dots">
+          <span class="dot active"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 快捷功能 -->
+    <section class="quick-actions">
+      <div class="action-item">
+        <div class="action-icon" style="background: linear-gradient(135deg, #FFE0B2, #FFCC80);">📖</div>
+        <span class="action-label">绘本故事</span>
+      </div>
+      <div class="action-item">
+        <div class="action-icon" style="background: linear-gradient(135deg, #C8E6C9, #A5D6A7);">🔤</div>
+        <span class="action-label">学字母</span>
+      </div>
+      <div class="action-item">
+        <div class="action-icon" style="background: linear-gradient(135deg, #BBDEFB, #90CAF9);">🔢</div>
+        <span class="action-label">学数数</span>
+      </div>
+      <div class="action-item">
+        <div class="action-icon" style="background: linear-gradient(135deg, #F8BBD0, #F48FB1);">🎵</div>
+        <span class="action-label">儿歌</span>
+      </div>
+      <div class="action-item">
+        <div class="action-icon" style="background: linear-gradient(135deg, #E1BEE7, #CE93D8);">🧩</div>
+        <span class="action-label">小游戏</span>
+      </div>
+    </section>
+
+    <!-- 今日推荐 -->
+    <section class="section">
+      <div class="section-header">
+        <h3 class="section-title">📚 今日推荐</h3>
+        <button class="section-more">更多 ›</button>
+      </div>
+      <div class="recommend-list">
+        <!-- 推荐卡片 1 -->
+        <div class="card">
+          <div class="card-thumb" style="background: linear-gradient(135deg, #FF9A9E, #FAD0C4);">🎯</div>
+          <div class="card-body">
+            <h4 class="card-title">趣味拼音</h4>
+            <p class="card-desc">认识声母韵母，快乐学拼音</p>
+            <div class="card-tags">
+              <span class="tag">3-6岁</span>
+              <span class="tag-count">12节</span>
+            </div>
+          </div>
+        </div>
+        <!-- 推荐卡片 2 -->
+        <div class="card">
+          <div class="card-thumb" style="background: linear-gradient(135deg, #A18CD1, #FBC2EB);">🧮</div>
+          <div class="card-body">
+            <h4 class="card-title">数学启蒙</h4>
+            <p class="card-desc">1-100数字认知与简单加减</p>
+            <div class="card-tags">
+              <span class="tag">4-7岁</span>
+              <span class="tag-count">15节</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 热门课程 -->
+    <section class="section">
+      <div class="section-header">
+        <h3 class="section-title">🔥 热门课程</h3>
+        <button class="section-more">全部 ›</button>
+      </div>
+      <div class="hot-grid">
+        <div class="hot-item">
+          <span class="hot-emoji">🌍</span>
+          <span class="hot-label">探索世界</span>
+        </div>
+        <div class="hot-item">
+          <span class="hot-emoji">🎨</span>
+          <span class="hot-label">创意绘画</span>
+        </div>
+        <div class="hot-item">
+          <span class="hot-emoji">🐯</span>
+          <span class="hot-label">动物世界</span>
+        </div>
+        <div class="hot-item">
+          <span class="hot-emoji">🚀</span>
+          <span class="hot-label">太空探险</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 底部导航 -->
+    <nav class="bottom-nav">
+      <button class="nav-item active">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">首页</span>
+      </button>
+      <button class="nav-item">
+        <span class="nav-icon">📚</span>
+        <span class="nav-label">课程</span>
+      </button>
+      <button class="nav-item">
+        <span class="nav-icon">🎬</span>
+        <span class="nav-label">动画</span>
+      </button>
+      <button class="nav-item">
+        <span class="nav-icon">👤</span>
+        <span class="nav-label">我的</span>
+      </button>
+    </nav>
+  </div>
+</body>
+</html><!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>儿童教育 - React 高保真页面</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; background: #f5f5f5; color: #999; font-size: 14px;
+    }
+    .message { text-align: center; padding: 40px; }
+    .message h2 { font-size: 18px; color: #666; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <div class="message">
+    <h2>🌟 宝贝学堂</h2>
+    <p>此页面已升级为高保真 React 版本</p>
+  </div>
+</body>
+</html><!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🌟 宝贝学堂 - 儿童教育</title>
+  <link rel="stylesheet" href="prototype.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- 顶部状态栏 -->
+    <div class="status-bar">
+      <span>9:41</span>
+      <div class="status-icons">
+        <span>📶</span>
+        <span>📡</span>
+        <span>🔋</span>
+      </div>
+    </div>
+
+    <!-- 顶部导航 -->
+    <header class="header">
+      <button class="icon-btn" aria-label="菜单">☰</button>
+      <h1 class="site-title">🌟 宝贝学堂</h1>
+      <button class="icon-btn">
+        <div class="avatar">🐼</div>
+      </button>
+    </header>
+
+    <!-- 搜索栏 -->
+    <div class="search-bar">
+      <span class="search-icon">🔍</span>
+      <input type="search" class="search-input" placeholder="搜索课程、故事、游戏..." />
+    </div>
+
+    <!-- Banner 轮播 -->
+    <section class="banner">
+      <div class="banner-content">
+        <div class="banner-left">
+          <div class="banner-emoji">🎨</div>
+          <div>
+            <h2 class="banner-title">创意美术课</h2>
+            <p class="banner-desc">激发孩子的想象力</p>
+          </div>
+        </div>
+        <div class="banner-dots">
+          <span class="dot active"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 快捷功能 -->
+    <section class="quick-actions">
+      <div class="action-item">
+        <div class="action-icon" style="background: linear-gradient(135deg, #FFE0B2, #FFCC80);">📖</div>
+        <span class="action-label">绘本故事</span>
+      </div>
+      <div class="action-item">
+        <div class="action-icon" style="background: linear-gradient(135deg, #C8E6C9, #A5D6A7);">🔤</div>
+        <span class="action-label">学字母</span>
+      </div>
+      <div class="action-item">
+        <div class="action-icon" style="background: linear-gradient(135deg, #BBDEFB, #90CAF9);">🔢</div>
+        <span class="action-label">学数数</span>
+      </div>
+      <div class="action-item">
+        <div class="action-icon" style="background: linear-gradient(135deg, #F8BBD0, #F48FB1);">🎵</div>
+        <span class="action-label">儿歌</span>
+      </div>
+      <div class="action-item">
+        <div class="action-icon" style="background: linear-gradient(135deg, #E1BEE7, #CE93D8);">🧩</div>
+        <span class="action-label">小游戏</span>
+      </div>
+    </section>
+
+    <!-- 今日推荐 -->
+    <section class="section">
+      <div class="section-header">
+        <h3 class="section-title">📚 今日推荐</h3>
+        <button class="section-more">更多 ›</button>
+      </div>
+      <div class="recommend-list">
+        <!-- 推荐卡片 1 -->
+        <div class="card">
+          <div class="card-thumb" style="background: linear-gradient(135deg, #FF9A9E, #FAD0C4);">🎯</div>
+          <div class="card-body">
+            <h4 class="card-title">趣味拼音</h4>
+            <p class="card-desc">认识声母韵母，快乐学拼音</p>
+            <div class="card-tags">
+              <span class="tag">3-6岁</span>
+              <span class="tag-count">12节</span>
+            </div>
+          </div>
+        </div>
+        <!-- 推荐卡片 2 -->
+        <div class="card">
+          <div class="card-thumb" style="background: linear-gradient(135deg, #A18CD1, #FBC2EB);">🧮</div>
+          <div class="card-body">
+            <h4 class="card-title">数学启蒙</h4>
+            <p class="card-desc">1-100数字认知与简单加减</p>
+            <div class="card-tags">
+              <span class="tag">4-7岁</span>
+              <span class="tag-count">15节</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 热门课程 -->
+    <section class="section">
+      <div class="section-header">
+        <h3 class="section-title">🔥 热门课程</h3>
+        <button class="section-more">全部 ›</button>
+      </div>
+      <div class="hot-grid">
+        <div class="hot-item">
+          <span class="hot-emoji">🌍</span>
+          <span class="hot-label">探索世界</span>
+        </div>
+        <div class="hot-item">
+          <span class="hot-emoji">🎨</span>
+          <span class="hot-label">创意绘画</span>
+        </div>
+        <div class="hot-item">
+          <span class="hot-emoji">🐯</span>
+          <span class="hot-label">动物世界</span>
+        </div>
+        <div class="hot-item">
+          <span class="hot-emoji">🚀</span>
+          <span class="hot-label">太空探险</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 底部导航 -->
+    <nav class="bottom-nav">
+      <button class="nav-item active">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">首页</span>
+      </button>
+      <button class="nav-item">
+        <span class="nav-icon">📚</span>
+        <span class="nav-label">课程</span>
+      </button>
+      <button class="nav-item">
+        <span class="nav-icon">🎬</span>
+        <span class="nav-label">动画</span>
+      </button>
+      <button class="nav-item">
+        <span class="nav-icon">👤</span>
+        <span class="nav-label">我的</span>
+      </button>
+    </nav>
+  </div>
+</body>
+</html>

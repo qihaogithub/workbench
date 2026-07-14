@@ -5,7 +5,7 @@ import { logger } from '../../utils/logger';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import {
-  isCommandAllowed,
+  getCommandPermissionResult,
   isLiveWorkspaceReadOnlyCommandAllowed,
   DEFAULT_WORKSPACE_PERMISSIONS,
 } from './permissions';
@@ -28,12 +28,20 @@ export function createBashTool(config: AgentConfig): AgentTool<typeof BashParams
     execute: async (toolCallId: string, args: BashParams) => {
       const command = args.command.trim();
 
-      if (!isCommandAllowed(command, permissions)) {
-        const baseCommand = command.split(/\s+/)[0] || '';
-        logger.warn({ command: baseCommand }, 'Command not allowed by permissions');
+      const permResult = getCommandPermissionResult(command, permissions);
+      if (!permResult.allowed) {
+        const baseCommand = permResult.baseCommand || command.split(/\s+/)[0] || '';
+        const detail = permResult.reason === 'node_eval_blocked'
+          ? `"node -e" and "node --eval" are blocked for security reasons. Use readFile/writeFile/editFile tools instead.`
+          : permResult.reason === 'npm_npx_blocked'
+            ? `"npm" and "npx" are not allowed in the workspace sandbox.`
+            : permResult.reason === 'denied_command'
+              ? `command "${baseCommand}" is in the denied list.`
+              : `command "${baseCommand}" is not in the allowed list.`;
+        logger.warn({ command: baseCommand, reason: permResult.reason }, 'Command not allowed by permissions');
         return {
-          content: [{ type: 'text', text: `Error: command "${baseCommand}" is not allowed. Allowed: ${permissions.allowedCommands.join(', ')}. Denied: ${permissions.deniedCommands.join(', ')}` }],
-          details: { command, error: 'permission denied' },
+          content: [{ type: 'text', text: `Error: ${detail} Allowed: ${permissions.allowedCommands.join(', ')}. Denied: ${permissions.deniedCommands.join(', ')}` }],
+          details: { command, error: 'permission denied', reason: permResult.reason },
           isError: true,
         };
       }

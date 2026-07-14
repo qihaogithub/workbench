@@ -289,7 +289,7 @@ async function ensureService(
   const ready = await waitForService(name, url, SERVICE_READY_TIMEOUT_MS);
   if (!ready) {
     console.warn(
-      `[本地准生产预览] 警告: ${name} 在 ${SERVICE_READY_TIMEOUT_MS / 1000}s 内未就绪 (${url})，编辑页可能显示“协同异常”，请检查服务日志。`,
+      `[本地准生产预览] 警告: ${name} 在 ${SERVICE_READY_TIMEOUT_MS / 1000}s 内未就绪 (${url})，编辑页可能显示"协同异常"，请检查服务日志。`,
     );
   } else {
     console.log(`[本地准生产预览] ${name} 已就绪: ${url}`);

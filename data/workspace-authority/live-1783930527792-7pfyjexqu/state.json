@@ -1,14 +1,14 @@
 {
   "workspaceId": "live-1783930527792-7pfyjexqu",
   "projectId": "proj_1783334663364_30hsrv",
-  "revision": 75,
-  "rootHash": "2696c1ea98f42f06eb0b2021a317a512e94829d454ee0ff9e40fde07fef13f93",
+  "revision": 77,
+  "rootHash": "faea4e8329ca7517eca789c8ecb236bd592f8b5708b4602291a2d05013641215",
   "resourceHashes": {
-    ".canvas-layout.json": "97967b7d9d216da8647218025406ed68219ccf7ddbf1d83a7a4a3323b0539cb6",
+    ".canvas-layout.json": "b87e3b911fb486f3c26cb6d4ec8ae6d63877eaa5add181c97701808c76a87b16",
     "demos/contact-section_k8m2/config.schema.json": "ff876d52944893a5b04f14e989f1dec3e7da829ae8f2d353580aea40106cb4d0",
     "demos/contact-section_k8m2/index.tsx": "1db3cf9df1d2c1e575a90d1d88a68c2281b497e2eef63c3a65067a0da7f8d131",
     "demos/product-showcase_a3f2/config.schema.json": "494178e853f7aa3e996a923f4c9826cbf72c639913759ec17e01e83ae2b4ec23",
-    "demos/product-showcase_a3f2/index.tsx": "1fadbb28f1df3bfa20ad4936d38345f3f221c0ae264b0823676f669a7aa3871d",
+    "demos/product-showcase_a3f2/index.tsx": "ab86f2d0b53b7f7bcaa099230a4264c66bff49fe3e590623ebfeea597f954e97",
     "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
     "project.config.schema.json": "8dba6d03955d96c9a14eb24640bee2983b1ca776f2466f8e58d0fc6040f6c599",
     "workspace-tree.json": "ee37187ca28b5f8b288724415601196c32b6087a7e573ea45d84a452f91d6cbc"
@@ -84,7 +84,9 @@
     "133425c1-4a16-4ebe-9faf-49076e015de4": "ea670d9c959e9dd96f81fe0c23df9c4ea0c7a53cd4510b12272ddba77c9d6efd",
     "6b77f656-adf6-4a30-9df3-8ef7c2872ef6": "c389b211f2d22e8ac3276a3569f677f3a7c129d0cfc98bf2cddf3662a76b8d84",
     "dc931237-1085-4dec-899e-28d4f8330d61": "706736c9f373a966fc6aee3abdede101757570877fef710cacdee7ba11a9218b",
-    "c8344761-0708-4468-928a-21fb2044bb88": "0177e71ef4865979107784e5c3e1cb06dbcb787e0af3f67a8aa9da9574c903e2"
+    "c8344761-0708-4468-928a-21fb2044bb88": "0177e71ef4865979107784e5c3e1cb06dbcb787e0af3f67a8aa9da9574c903e2",
+    "f4e50892-b488-4375-8866-762774718fc5": "dc833f620470af59c8f0722c3bb6cd2d6e0e01742a0d6da91ae9df8bb1e97d22",
+    "76dbbcf2-5e67-4955-b170-73085d229147": "92763557dc3323cf204e090efa850d239b1156ab4fc317412f15d1daf8d18faa"
   },
-  "updatedAt": 1784012639244
+  "updatedAt": 1784026029814
 }

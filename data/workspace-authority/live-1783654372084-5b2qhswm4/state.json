@@ -1,10 +1,10 @@
 {
   "workspaceId": "live-1783654372084-5b2qhswm4",
   "projectId": "proj_1783585261167_7h7prw",
-  "revision": 137,
-  "rootHash": "32c238229890cb5f04d3e2fd98c72e694de0b539cab2fbb07a01e32ab29f0cda",
+  "revision": 152,
+  "rootHash": "abd0c145c77585c2018d7e3c8e65bfc5d2f2508b24df3c95eb88a5e52680a1d0",
   "resourceHashes": {
-    ".canvas-layout.json": "ce09eb49a9a694483f27a8fc93c18c48db13d13221d8f6dc8dcec731fc206e7f",
+    ".canvas-layout.json": "1ffa5938efec35bf27759c4b60acec340460827c354185b7c667fc348564f37b",
     "assets/images/kingkong-earn-beans.png": "e62a8de4095c3b5904004db585c6fea7d91eb7d5cb0b15163c4fcec556e6564f",
     "assets/images/kingkong-live.png": "df77e874b7470a4de2a63b8621545d074936e1e208a0628a3d3aa17ba636ebd4",
     "assets/images/kingkong-lucky-draw.png": "6978597803119dd8ca400b696ffb23d8e3a4b0ebafbe06670db9e7e1c919fdd1",
@@ -12,11 +12,12 @@
     "assets/images/kingkong-welfare.png": "5563fd0feb29fc4d4a1836cb797e9315893da6abd650e129c133c69fb2b0f490",
     "assets/images/kingkong-wish.png": "50df2982f049d2ea197bb0ec7d5f2f8803c61eea2af6dff3aff51b9e470a12e9",
     "demos/kids-education_m3k7/config.schema.json": "bb7c33a9374923983615f0adccebe2ad3333dc0d25a192be8af18d801a105164",
-    "demos/kids-education_m3k7/index.tsx": "83510771149c37f536c308d0027836d4fe759afec6fe42e9f28a25c27a89a252",
-    "demos/kids-education_m3k7/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "demos/kids-education_m3k7/prototype.html": "6b960b7d0e87085bac1c959696ad8cd47885eb841900782405422ac2ca036a63",
+    "demos/kids-education_m3k7/index.tsx": "eb1024e99b33b7597479561a9241ec5872b825c9a1278675069e77f6ecaf5e1c",
+    "demos/kids-education_m3k7/prototype.css": "c3dc41fd2b097b1a914ce8b966c8c743441bcfc30f33d475f67b8d0a9481b9a3",
+    "demos/kids-education_m3k7/prototype.html": "edbfcfe09c3bdb42694927fb44016dede2972e3b1dd1cfdefbfb5712a72aec3a",
+    "demos/kids-education_m3k7/prototype.meta.json": "d806eaff075f259e1786fdf0bebd2d93033fa1e1632c9d6b4236729743167a24",
     "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
-    "workspace-tree.json": "f1474a0eadd5055faf3e47805f4657dd205c6885302cd6592ec72913d43d904b"
+    "workspace-tree.json": "00427d5f34db6e59c5523354444f520976c73794ca210bbe6ccc81dd7288867e"
   },
   "mutationPayloads": {
     "d36e17ee-aa2b-469a-a446-ff9db198b381": "c5436bcd0fbe454623b86875955fd5d955486c9cc8425dd6b1330041e7ffe73d",
@@ -144,7 +145,22 @@
     "f2d41a17-dd63-41f9-9b46-a24347fdc560": "5cd3acd6483236199e4df60771994453d422fe0edf7ae8c342d2bff52779ba18",
     "4872a570-d4fa-4cf0-a5e6-004d909632be": "ee08288401382b555c1ac37d1ba99a82aed90f00978932cb084d44dcfdf6a1f0",
     "1772d87a-a4fd-4fc6-90cc-34f64a1ad0cf": "68fd4217d4b54fb9def89233b57f2f7f9661be30b25f2ee8668938e72b06ddeb",
-    "812cccc8-c3eb-4ccf-8cf4-4be1e2ec7383": "544ada768472dd38f6ad15527906bbbb272a10e44c5574cf3fc912ef7e11c16e"
+    "812cccc8-c3eb-4ccf-8cf4-4be1e2ec7383": "544ada768472dd38f6ad15527906bbbb272a10e44c5574cf3fc912ef7e11c16e",
+    "3c428e88-caf7-4d31-8d6d-d37e27b355aa": "70e6740c31f6efa31b06c504ae5a52740c3ad69e436da64278ab7c1c9fc30957",
+    "4e6469e8-ae19-43b2-a964-502a99b9aa97": "ffe7fbc4212d76dbdbf87b9aeb7371af8f57fc1df25565133e3e4e6b36e46dd5",
+    "19177bdb-9fa3-4959-8e8a-48e7e0b2c932": "a5d634fca82df9f58f43f85d6d1c1ec77dc3ad3bdb5f2287254b99f0e1463934",
+    "512781fb-c741-4e6c-ba8b-574460bfaa8c": "64f3b839eff38aaa9c57c90e761798d72aca25b8e1dfcf92ad2e33f923e861cc",
+    "3d4ba7b3-eb2c-4126-89fb-0f79b3c9d1a0": "cf6c764a4c7b26ff7d6b63b82b75c0aa4a32bf512e6841a98c6000c7670a2f28",
+    "92a9093c-0d3a-457f-9374-446bed2f0bd8": "0d022a2f82a9f44949a1d9cb457cc1298a390c9cf90dcf2c4c0239e8fd5966b0",
+    "85f94806-8e2f-4435-afc7-53b6a3f5dd2f": "c99b0623bb5a988e1b6c716cfe2e217418520ca2fa03c9bcaff44a70ff5e8a9f",
+    "c0485d0d-fe9f-476b-84d9-576886d68279": "28cc11e5d0e513a93843690187776b01569e385b53dd1b21ca89c58082bb74a8",
+    "472f88d1-7b68-44b0-8c15-fe992083d344": "553d2eaf436d795bf69ec3e97b43fabd5365746804ce4e473fd51fc67616736f",
+    "aac44863-184d-4436-99c0-a97671235c14": "e1c4c50c905fbf8b91552d1d5f538e5b80253d092d26621bb9dc0efe63e834fa",
+    "e8d1c623-ac52-413e-947b-ecb97457bc90": "d3b0b86cf7c8bb7a7ffcdf9a306d9c3fa9de77f273b26ef09652a231a4690d60",
+    "273aaba6-38c4-49d6-95d2-ee92d4835fdf": "9152beb808096fa7f298592860c14c8597177fdf9680bf1a213a6b9631a14c35",
+    "ceed1a5c-d754-4b1d-b098-f2b432f3cd8b": "2c44e700361f2600169d84ea56fc6796f85f157c32f1e25ffc1de8d9208ed87a",
+    "7d385ff1-7a07-459f-97a8-0129c02e1331": "aca265fbd5925401dd886c48b6e55ccb5178f7ef93832e682e73b9dd48045032",
+    "2922d391-e0d5-411a-b08d-8ef70576683d": "a8afcb00f137b4748d68cee130b97586cd6c1832fc7779cb08cb86e73cb5915f"
   },
-  "updatedAt": 1784017151798
+  "updatedAt": 1784026257139
 }

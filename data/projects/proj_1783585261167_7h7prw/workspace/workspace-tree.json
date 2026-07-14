@@ -4,7 +4,7 @@
     {
       "id": "kids-education_m3k7",
       "name": "儿童教育",
-      "runtimeType": "high-fidelity-react",
+      "runtimeType": "prototype-html-css",
       "order": 1,
       "parentId": null,
       "routeKey": "page"
