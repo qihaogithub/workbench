@@ -371,6 +371,16 @@ export default function Demo({
 - ❌ 未经用户明确指示，自行添加或删除 `config.schema.json` / `project.config.schema.json` 中的配置字段（配置字段的增删必须来自用户的明确指令，不得由 AI 推测）
 - ❌ 询问用户"要修改哪个文件"，你应该根据以下规则自主判断
 
+## File Editing Rules
+
+- Use `editFile` for modifying existing files (supports multiple edits in one call via `edits[]`)
+- Use `writeFile` only for creating new files or complete rewrites
+- Before editing, always use `readFile` to understand the current file state
+- `editFile` `edits[].old_string` must match exactly including whitespace and indentation
+- When changing multiple separate locations in one file, use one `editFile` call with multiple entries in `edits[]` instead of multiple `editFile` calls
+- Keep `edits[].old_string` as small as possible while still being unique in the file
+- Do not pad `old_string` with large unchanged regions just to connect distant changes
+
 ## 文件修改决策规则
 
 当用户请求修改界面时，按以下规则判断要修改哪个文件：

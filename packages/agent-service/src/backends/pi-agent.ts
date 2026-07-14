@@ -390,6 +390,7 @@ export class PiAgentBackend implements IBackendAdapter {
         event,
         sessionId,
       );
+
       return undefined;
     });
     this.unsubFns.push(unsubToolResult);

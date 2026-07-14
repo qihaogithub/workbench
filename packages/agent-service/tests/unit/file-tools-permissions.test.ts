@@ -168,12 +168,14 @@ describe('createEditFileTool - 预览校验反馈', () => {
     const tool = createEditFileTool(mockConfig);
     const result = await tool.execute('id', {
       path: 'demos/home/index.tsx',
-      old_string: "export default function Demo(){ return <div />; }\n",
-      new_string: [
-        "const accentMap = { primary: 'red' };",
-        "export default function Demo(){ return <div />; }",
-        "const accentMap = { primary: 'blue' };",
-      ].join('\n'),
+      edits: [{
+        old_string: "export default function Demo(){ return <div />; }\n",
+        new_string: [
+          "const accentMap = { primary: 'red' };",
+          "export default function Demo(){ return <div />; }",
+          "const accentMap = { primary: 'blue' };",
+        ].join('\n'),
+      }],
     } as any);
 
     expect(result.isError).toBeFalsy();

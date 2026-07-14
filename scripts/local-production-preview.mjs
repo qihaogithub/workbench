@@ -256,21 +256,24 @@ async function ensureService(
   { name, url, filter, autoStart, ports },
   spawnedChildren,
 ) {
-  if (await isServiceHealthy(url)) {
-    console.log(`[本地准生产预览] ${name} 已运行: ${url}`);
-    return;
-  }
-
   if (!autoStart) {
-    console.warn(
-      `[本地准生产预览] 警告: ${name} 不可用 (${url})，相关功能可能不完整。`,
-    );
+    if (await isServiceHealthy(url)) {
+      console.log(`[本地准生产预览] ${name} 已运行: ${url}`);
+    } else {
+      console.warn(
+        `[本地准生产预览] 警告: ${name} 不可用 (${url})，相关功能可能不完整。`,
+      );
+    }
     return;
   }
 
-  console.log(
-    `[本地准生产预览] ${name} 未运行，自动以 dev 模式启动 (${filter})…`,
-  );
+  // 无论服务是否健康，都先关闭再重启，确保使用最新代码。
+  const wasHealthy = await isServiceHealthy(url);
+  if (wasHealthy) {
+    console.log(`[本地准生产预览] ${name} 运行中，关闭以重启…`);
+  } else {
+    console.log(`[本地准生产预览] ${name} 未运行，准备启动 (${filter})…`);
+  }
   for (const port of ports) {
     await freePort(port, `${port} (${name})`);
   }

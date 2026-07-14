@@ -123,8 +123,7 @@ describe("live Workspace file tools", () => {
     });
     const edited = await createEditFileTool(config).execute("edit", {
       path: "demos/home/index.tsx",
-      old_string: "second",
-      new_string: "third",
+      edits: [{ old_string: "second", new_string: "third" }],
     });
 
     expect(written.isError).toBeFalsy();
