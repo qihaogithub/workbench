@@ -313,6 +313,7 @@ export function buildPrototypePreviewHtmlFragment({
         height: ${rootHeight};
         min-height: ${rootMinHeight};
         overflow: ${rootOverflow};
+        transform: translateZ(0);
         background: #fff;
       }
       *, *::before, *::after {

@@ -73,8 +73,8 @@ export const DEFAULT_SKETCH_META: Record<string, unknown> = {
   updatedAt: 0,
 };
 
-export const MAX_PROTOTYPE_HTML_LENGTH = 120_000;
-export const MAX_PROTOTYPE_CSS_LENGTH = 80_000;
+export const MAX_PROTOTYPE_HTML_LENGTH = 200_000;
+export const MAX_PROTOTYPE_CSS_LENGTH = 120_000;
 export const PROTOTYPE_GLOBAL_SELECTOR_RE = /(^|[,{;]\s*)(html|body|:root)\b/i;
 
 export const WORKSPACE_TREE_FILENAME = "workspace-tree.json";

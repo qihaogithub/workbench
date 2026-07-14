@@ -2,15 +2,16 @@
 
 ## 状态总览
 
-| 问题                                                 | 状态          | 摘要                                                                                      |
-| ---------------------------------------------------- | ------------- | ----------------------------------------------------------------------------------------- |
-| 原型→高保真升级后残留文件无法清理                    | 🔴 未修复     | AI 缺少 deleteFile 工具，bash 只读，清空触发校验死锁                                      |
-| 原型页校验死锁：高保真页仍检查原型文件非空           | 🔴 未修复     | agent-service 侧 `validatePreviewFileWrite` 不检查 runtimeType，每次写入均触发原型校验    |
-| bash 沙箱 `node` 允许/拒绝矛盾                       | 🔴 未修复     | `node` 在白名单但 `node -e` 被特殊拦截（`permissions.ts` L88-90），错误信息不区分两种情况 |
-| WORKSPACE_EXTERNAL_DRIFT 导致 listPages 失败         | ✅ 设计预期   | file-tools 已有 drift 自动重试（L195-224, L260-316），系统自动修改后 AI 重试即可恢复      |
-| AI 自动修复循环产生 DUPLICATE_TOP_LEVEL_DECLARATION  | 🟡 已有沉淀   | writeFile 内容拼接检测（file-tools.ts L230-257）已缓解                                    |
-| 截图服务不可用                                       | ✅ 非代码 bug | `missing_context` 是 demoId 未绑定时预期行为；`fetch failed` 是截图服务未启动的环境问题   |
-| 推荐方案：`transform: translateZ(0)` 解除 fixed 限制 | 💡 待实施     | 一行 CSS 让原型页支持 position: fixed，从根源消除升级场景                                 |
+| 问题                                                 | 状态            | 摘要                                                                                      |
+| ---------------------------------------------------- | --------------- | ----------------------------------------------------------------------------------------- |
+| 原型→高保真升级后残留文件无法清理                    | ✅ 已修复       | 新增 `deleteFile` 工具，复用 WMA `delete_path` 操作，支持 AI 删除单文件                |
+| 原型页校验死锁：高保真页仍检查原型文件非空           | ✅ 已修复       | `validatePreviewFileWrite` 已按 runtimeType 分支，非原型页运行时跳过原型校验            |
+| bash 沙箱 `node` 允许/拒绝矛盾                       | ✅ 已修复       | 错误信息已区分白名单拒绝、`node -e` 拦截、npm/npx 拦截、不在白名单四种情况             |
+| WORKSPACE_EXTERNAL_DRIFT 导致 listPages 失败         | ✅ 设计预期     | file-tools 已有 drift 自动重试（L195-224, L260-316），系统自动修改后 AI 重试即可恢复      |
+| AI 自动修复循环产生 DUPLICATE_TOP_LEVEL_DECLARATION  | 🟡 已有沉淀     | writeFile 内容拼接检测（file-tools.ts L230-257）已缓解                                    |
+| 截图服务不可用                                       | ✅ 非代码 bug   | `missing_context` 是 demoId 未绑定时预期行为；`fetch failed` 是截图服务未启动的环境问题   |
+| 推荐方案：`transform: translateZ(0)` 解除 fixed 限制 | ✅ 已实施       | `.prototype-root` 已加 `transform: translateZ(0)`，移除 `PROTOTYPE_FIXED_POSITION_REQUIRES_ISOLATION` 校验 |
+| project-core 原型页体积常量与 agent-service 不一致 | ✅ 已修复     | `MAX_PROTOTYPE_HTML_LENGTH` 统一为 200KB，`MAX_PROTOTYPE_CSS_LENGTH` 统一为 120KB          |
 
 ---
 
@@ -283,9 +284,10 @@ Phase 1 和 Phase 2 可并行实施。
 
 ## 验证状态
 
-- Phase 1-4 方案已设计，待实施
-- 需要验证：`transform: translateZ(0)` 在各种浏览器中对 `position: fixed` 的包含块行为
-- 需要验证：对已有原型页的影响（是否引入回归）
+- Phase 1-4 全部实施完成，已通过 `pnpm check:agent`（378 tests passed）和 `pnpm check:project-core`（53 tests passed）
+- `transform: translateZ(0)` 已在 `.prototype-root` 生效，`position: fixed` 校验已从 project-core 和 agent-service 双侧移除
+- project-core `MAX_PROTOTYPE_HTML_LENGTH` 已统一为 200KB（之前为 120KB），与 agent-service 一致
+- 工具版本号已升至 v20（新增 `deleteFile`）
 
 ## 风险
 

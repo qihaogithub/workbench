@@ -1035,7 +1035,7 @@ describe('PiAgent 工具', () => {
         }),
       });
       
-      expect(tools).toHaveLength(27);
+      expect(tools).toHaveLength(28);
       
       const toolNames = tools.map(tool => tool.name);
       expect(toolNames).toContain('readFile');
@@ -1043,6 +1043,7 @@ describe('PiAgent 工具', () => {
       expect(toolNames).toContain('readUploadedFile');
       expect(toolNames).toContain('editFile');
       expect(toolNames).toContain('writeFile');
+      expect(toolNames).toContain('deleteFile');
       expect(toolNames).toContain('listFiles');
       expect(toolNames).toContain('bash');
       expect(toolNames).toContain('schemaValidate');
@@ -1076,7 +1077,7 @@ describe('PiAgent 工具', () => {
       const { createWorkbenchTools } = await import('../../src/backends/pi-tools');
       const tools = createWorkbenchTools(mockConfig, undefined, { includeDelegateTask: false });
 
-      expect(tools).toHaveLength(26);
+      expect(tools).toHaveLength(27);
       expect(tools.map(tool => tool.name)).not.toContain('delegateTask');
       expect(tools.map(tool => tool.name)).toContain('readUploadedFile');
       expect(tools.map(tool => tool.name)).toContain('requestUserChoice');

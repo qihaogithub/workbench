@@ -793,14 +793,13 @@ describe("ProjectAdminService", () => {
       name: "升级页",
       runtimeType: "prototype-html-css",
       prototypeHtml: '<main><iframe src="https://example.com"></iframe></main>',
-      prototypeCss: ".toolbar { position: fixed; inset: 0; }",
+      prototypeCss: ".toolbar { color: red; }",
     });
     expect(upgrade.runtimeValidation?.ok).toBe(false);
     expect(upgrade.runtimeValidation?.prototypeGate).toMatchObject({
       decision: "upgrade_to_high_fidelity",
       reasonCodes: expect.arrayContaining([
         "PROTOTYPE_EMBED_FORBIDDEN",
-        "PROTOTYPE_FIXED_POSITION_REQUIRES_ISOLATION",
       ]),
     });
   });

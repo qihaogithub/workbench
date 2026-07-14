@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "2922d391-e0d5-411a-b08d-8ef70576683d",
+  "projectId": "proj_1783585261167_7h7prw",
+  "workspaceId": "live-1783654372084-5b2qhswm4",
+  "baseRevision": 0,
+  "revision": 152,
+  "rootHash": "abd0c145c77585c2018d7e3c8e65bfc5d2f2508b24df3c95eb88a5e52680a1d0",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/kids-education_m3k7/index.tsx",
+      "action": "modified",
+      "beforeHash": "eb1024e99b33b7597479561a9241ec5872b825c9a1278675069e77f6ecaf5e1c",
+      "afterHash": "eb1024e99b33b7597479561a9241ec5872b825c9a1278675069e77f6ecaf5e1c"
+    },
+    {
+      "path": "demos/kids-education_m3k7/config.schema.json",
+      "action": "modified",
+      "beforeHash": "bb7c33a9374923983615f0adccebe2ad3333dc0d25a192be8af18d801a105164",
+      "afterHash": "bb7c33a9374923983615f0adccebe2ad3333dc0d25a192be8af18d801a105164"
+    },
+    {
+      "path": "demos/kids-education_m3k7/prototype.html",
+      "action": "modified",
+      "beforeHash": "edbfcfe09c3bdb42694927fb44016dede2972e3b1dd1cfdefbfb5712a72aec3a",
+      "afterHash": "edbfcfe09c3bdb42694927fb44016dede2972e3b1dd1cfdefbfb5712a72aec3a"
+    },
+    {
+      "path": "demos/kids-education_m3k7/prototype.css",
+      "action": "modified",
+      "beforeHash": "c3dc41fd2b097b1a914ce8b966c8c743441bcfc30f33d475f67b8d0a9481b9a3",
+      "afterHash": "c3dc41fd2b097b1a914ce8b966c8c743441bcfc30f33d475f67b8d0a9481b9a3"
+    },
+    {
+      "path": "demos/kids-education_m3k7/prototype.meta.json",
+      "action": "modified",
+      "beforeHash": "d806eaff075f259e1786fdf0bebd2d93033fa1e1632c9d6b4236729743167a24",
+      "afterHash": "d806eaff075f259e1786fdf0bebd2d93033fa1e1632c9d6b4236729743167a24"
+    }
+  ],
+  "committedAt": 1784026257139
+}
