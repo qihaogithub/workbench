@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "contactEmail": {
+      "type": "string",
+      "default": "contact@startech.com",
+      "description": "联系邮箱"
+    },
+    "contactPhone": {
+      "type": "string",
+      "default": "400-888-9999",
+      "description": "联系电话"
+    },
+    "address": {
+      "type": "string",
+      "default": "北京市朝阳区科技大厦 A 座 18 层",
+      "description": "地址"
+    },
+    "workingHours": {
+      "type": "string",
+      "default": "周一至周五 9:00 - 18:00",
+      "description": "工作时间"
+    },
+    "showFooter": {
+      "type": "boolean",
+      "default": true,
+      "description": "是否显示底部版权信息"
+    }
+  },
+  "required": ["contactEmail", "contactPhone"]
+}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "contactEmail": {
+      "type": "string",
+      "default": "contact@startech.com",
+      "description": "联系邮箱"
+    },
+    "contactPhone": {
+      "type": "string",
+      "default": "400-888-9999",
+      "description": "联系电话"
+    },
+    "address": {
+      "type": "string",
+      "default": "北京市朝阳区科技大厦 A 座 18 层",
+      "description": "地址"
+    },
+    "workingHours": {
+      "type": "string",
+      "default": "周一至周五 9:00 - 18:00",
+      "description": "工作时间"
+    },
+    "showFooter": {
+      "type": "boolean",
+      "default": true,
+      "description": "是否显示底部版权信息"
+    }
+  },
+  "required": ["contactEmail", "contactPhone"]
+}
