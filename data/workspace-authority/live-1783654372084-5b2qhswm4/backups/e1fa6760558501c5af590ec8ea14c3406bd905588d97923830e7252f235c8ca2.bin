@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="prototype.css" />
+  <title>欢迎页</title>
+</head>
+<body>
+  <div class="hero">
+    <div class="hero-content">
+      <div class="badge">👋 新版本上线</div>
+      <h1 class="hero-title">让每个想法都闪耀</h1>
+      <p class="hero-subtitle">
+        一个简单、高效的活动创作平台，让每一个想法都能快速落地。
+      </p>
+      <div class="hero-actions">
+        <a href="#" class="btn btn-primary">立即体验</a>
+        <a href="#" class="btn btn-secondary">了解更多</a>
+      </div>
+    </div>
+    <div class="hero-decoration">
+      <div class="shape shape-1"></div>
+      <div class="shape shape-2"></div>
+      <div class="shape shape-3"></div>
+    </div>
+  </div>
+
+  <div class="features">
+    <h2 class="section-title">核心能力</h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🎨</div>
+        <h3>灵活设计</h3>
+        <p>丰富的组件和模板，拖拽式搭建，所见即所得。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>快速发布</h3>
+        <p>一键发布到多端，自动适配不同设备尺寸。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3>数据洞察</h3>
+        <p>实时数据看板，活动效果一目了然。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="cta">
+    <div class="cta-content">
+      <h2>准备好开始了吗？</h2>
+      <p>加入我们，开启你的创作之旅。</p>
+      <a href="#" class="btn btn-primary btn-lg">免费使用</a>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <p>&copy; 2026 OneFlow. All rights reserved.</p>
+  </footer>
+</body>
+</html><!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="prototype.css" />
+  <title>欢迎页</title>
+</head>
+<body>
+  <div class="hero">
+    <div class="hero-content">
+      <div class="badge">👋 新版本上线</div>
+      <h1 class="hero-title">让每个想法都闪耀</h1>
+      <p class="hero-subtitle">
+        一个简单、高效的活动创作平台，让每一个想法都能快速落地。
+      </p>
+      <div class="hero-actions">
+        <a href="#" class="btn btn-primary">立即体验</a>
+        <a href="#" class="btn btn-secondary">了解更多</a>
+      </div>
+    </div>
+    <div class="hero-decoration">
+      <div class="shape shape-1"></div>
+      <div class="shape shape-2"></div>
+      <div class="shape shape-3"></div>
+    </div>
+  </div>
+
+  <div class="features">
+    <h2 class="section-title">核心能力</h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🎨</div>
+        <h3>灵活设计</h3>
+        <p>丰富的组件和模板，拖拽式搭建，所见即所得。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>快速发布</h3>
+        <p>一键发布到多端，自动适配不同设备尺寸。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3>数据洞察</h3>
+        <p>实时数据看板，活动效果一目了然。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="cta">
+    <div class="cta-content">
+      <h2>准备好开始了吗？</h2>
+      <p>加入我们，开启你的创作之旅。</p>
+      <a href="#" class="btn btn-primary btn-lg">免费使用</a>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <p>&copy; 2026 OneFlow. All rights reserved.</p>
+  </footer>
+</body>
+</html><!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="prototype.css" />
+  <title>欢迎页</title>
+</head>
+<body>
+  <div class="hero">
+    <div class="hero-content">
+      <div class="badge">👋 新版本上线</div>
+      <h1 class="hero-title">让每个想法都闪耀</h1>
+      <p class="hero-subtitle">
+        一个简单、高效的活动创作平台，让每一个想法都能快速落地。
+      </p>
+      <div class="hero-actions">
+        <a href="#" class="btn btn-primary">立即体验</a>
+        <a href="#" class="btn btn-secondary">了解更多</a>
+      </div>
+    </div>
+    <div class="hero-decoration">
+      <div class="shape shape-1"></div>
+      <div class="shape shape-2"></div>
+      <div class="shape shape-3"></div>
+    </div>
+  </div>
+
+  <div class="features">
+    <h2 class="section-title">核心能力</h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🎨</div>
+        <h3>灵活设计</h3>
+        <p>丰富的组件和模板，拖拽式搭建，所见即所得。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>快速发布</h3>
+        <p>一键发布到多端，自动适配不同设备尺寸。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3>数据洞察</h3>
+        <p>实时数据看板，活动效果一目了然。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="cta">
+    <div class="cta-content">
+      <h2>准备好开始了吗？</h2>
+      <p>加入我们，开启你的创作之旅。</p>
+      <a href="#" class="btn btn-primary btn-lg">免费使用</a>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <p>&copy; 2026 OneFlow. All rights reserved.</p>
+  </footer>
+</body>
+</html><!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="prototype.css" />
+  <title>欢迎页</title>
+</head>
+<body>
+  <div class="hero">
+    <div class="hero-content">
+      <div class="badge">👋 新版本上线</div>
+      <h1 class="hero-title">让每个想法都闪耀</h1>
+      <p class="hero-subtitle">
+        一个简单、高效的活动创作平台，让每一个想法都能快速落地。
+      </p>
+      <div class="hero-actions">
+        <a href="#" class="btn btn-primary">立即体验</a>
+        <a href="#" class="btn btn-secondary">了解更多</a>
+      </div>
+    </div>
+    <div class="hero-decoration">
+      <div class="shape shape-1"></div>
+      <div class="shape shape-2"></div>
+      <div class="shape shape-3"></div>
+    </div>
+  </div>
+
+  <div class="features">
+    <h2 class="section-title">核心能力</h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🎨</div>
+        <h3>灵活设计</h3>
+        <p>丰富的组件和模板，拖拽式搭建，所见即所得。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>快速发布</h3>
+        <p>一键发布到多端，自动适配不同设备尺寸。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3>数据洞察</h3>
+        <p>实时数据看板，活动效果一目了然。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="cta">
+    <div class="cta-content">
+      <h2>准备好开始了吗？</h2>
+      <p>加入我们，开启你的创作之旅。</p>
+      <a href="#" class="btn btn-primary btn-lg">免费使用</a>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <p>&copy; 2026 OneFlow. All rights reserved.</p>
+  </footer>
+</body>
+</html>

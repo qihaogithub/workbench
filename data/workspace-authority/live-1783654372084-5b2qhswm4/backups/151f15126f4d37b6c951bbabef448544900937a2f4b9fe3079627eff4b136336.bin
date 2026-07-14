@@ -1,0 +1,13 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "welcome-page_a3k7",
+      "name": "欢迎页",
+      "runtimeType": "prototype-html-css",
+      "order": 1,
+      "parentId": null,
+      "routeKey": "page"
+    }
+  ]
+}

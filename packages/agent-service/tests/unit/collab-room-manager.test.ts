@@ -380,7 +380,7 @@ describe("CollabRoomManager", () => {
     });
   });
 
-  it("即使外部写入通知缺失，flush 前也会拒绝旧协同文本覆盖新文件", async () => {
+  it("即使外部写入通知缺失，flush 检测到冲突后也会自愈 baseline 而非拒绝", async () => {
     const manager = new CollabRoomManager(
       new WorkspaceFilePersistence(tempDir),
     );
@@ -390,12 +390,13 @@ describe("CollabRoomManager", () => {
     room.text.insert(0, "stale collab text");
     fs.writeFileSync(pagePath, "ai fixed file", "utf-8");
 
-    await expect(
-      manager.flushWorkspace("proj-1", "ws-1", "session-1"),
-    ).rejects.toMatchObject({ code: "WORKSPACE_RESOURCE_CONFLICT" });
+    // flushWorkspace should succeed (self-heal) instead of throwing
+    const result = await manager.flushWorkspace("proj-1", "ws-1", "session-1");
+    expect(result.status).toBe("flushed");
 
-    expect(room.text.toString()).toBe("stale collab text");
-    expect(room.dirty).toBe(true);
+    // Room should be reloaded from file state
+    expect(room.text.toString()).toBe("ai fixed file");
+    expect(room.dirty).toBe(false);
     expect(fs.readFileSync(pagePath, "utf-8")).toBe("ai fixed file");
   });
 

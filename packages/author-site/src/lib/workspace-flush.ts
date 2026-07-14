@@ -16,7 +16,7 @@ import {
   WorkspaceAuthorityClientError,
 } from "./workspace-authority-client";
 
-export type WorkspaceFlushStatus = "skipped" | "flushed" | "no_active_room";
+export type WorkspaceFlushStatus = "skipped" | "flushed" | "no_active_room" | "partial_failure";
 
 export interface WorkspaceFlushResult {
   status: WorkspaceFlushStatus;
@@ -73,7 +73,7 @@ interface ApiEnvelope<T> {
 }
 
 function isFlushStatus(value: unknown): value is Exclude<WorkspaceFlushStatus, "skipped"> {
-  return value === "flushed" || value === "no_active_room";
+  return value === "flushed" || value === "no_active_room" || value === "partial_failure";
 }
 
 function toApiErrorCode(code: string): ErrorCodeType {
@@ -219,8 +219,20 @@ export async function flushWorkspaceBeforeCriticalAction(
   }
 
   const data = body.data;
+  const status = isFlushStatus(data?.status) ? data.status : "flushed";
+  if (status === "partial_failure") {
+    const failures = (data as any)?.failures;
+    console.warn(
+      "[workspace-flush] partial_failure: some rooms failed to flush",
+      { failures },
+    );
+    throw new WorkspaceFlushError(
+      `协同草稿部分落盘失败${Array.isArray(failures) && failures.length > 0 ? `: ${failures.map((f: { resourcePath?: string; error?: string }) => `${f.resourcePath ?? "unknown"}: ${f.error ?? "unknown error"}`).join("; ")}` : ""}`,
+      { code: "COLLAB_FLUSH_FAILED", status: 502 },
+    );
+  }
   return {
-    status: isFlushStatus(data?.status) ? data.status : "flushed",
+    status,
     flushedRooms: typeof data?.flushedRooms === "number" ? data.flushedRooms : 0,
     revision: typeof data?.revision === "number" ? data.revision : undefined,
   };

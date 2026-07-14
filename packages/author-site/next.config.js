@@ -51,7 +51,7 @@ const nextConfig = {
       bodySizeLimit: "10mb",
     },
     instrumentationHook: true,
-    serverComponentsExternalPackages: ['langium', '@mermaid-js/parser', 'better-sqlite3', 'bcrypt', 'typescript'],
+    serverComponentsExternalPackages: ['langium', '@mermaid-js/parser', 'better-sqlite3', 'typescript'],
   },
   webpack: (config, { isServer }) => {
     config.resolve.extensionAlias = {

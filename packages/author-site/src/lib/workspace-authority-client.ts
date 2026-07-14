@@ -12,61 +12,25 @@ import { isWorkspaceAuthorityApiErrorCode } from "@workbench/shared/contracts";
 
 import { getServerAgentServiceUrl } from "./runtime-config";
 
-interface AuthorityEnvelope<T> {
-  success?: boolean;
-  data?: T;
-  error?: { code?: string; message?: string };
-}
+// Re-export shared types so that existing server-side imports from this
+// module continue to work without changes.
+export type {
+  AuthorityEnvelope,
+  WorkspaceAuthorityHealthView,
+  WorkspaceAuthorityResource,
+  WorkspaceAuthoritySnapshot,
+  WorkspaceBinaryStagingReceipt,
+} from "./workspace-authority-shared";
+export { WorkspaceAuthorityClientError } from "./workspace-authority-shared";
 
-export interface WorkspaceBinaryStagingReceipt {
-  stagingId: string;
-  hash: string;
-  size: number;
-}
-
-export interface WorkspaceAuthoritySnapshot {
-  state: {
-    workspaceId: string;
-    projectId: string;
-    revision: WorkspaceRevision;
-    rootHash: string;
-    resourceHashes: Record<string, string>;
-    updatedAt: number;
-  };
-  resources: Record<string, string>;
-}
-
-export class WorkspaceAuthorityClientError extends Error {
-  constructor(
-    readonly code: WorkspaceAuthorityApiErrorCode,
-    message: string,
-    readonly status: number,
-  ) {
-    super(message);
-    this.name = "WorkspaceAuthorityClientError";
-  }
-}
-
-export interface WorkspaceAuthorityResource {
-  path: string;
-  content: string;
-  hash: string;
-  revision: WorkspaceRevision;
-}
-
-export interface WorkspaceAuthorityHealthView {
-  workspaceId: string;
-  projectId?: string;
-  ready: boolean;
-  revision?: WorkspaceRevision;
-  rootHash?: string;
-  actualRootHash?: string;
-  externalDrift: boolean;
-  queueDepth: number;
-  activeLease: boolean;
-  preparedCount: number;
-  recoveryState: "ready" | "pending";
-}
+import type {
+  AuthorityEnvelope,
+  WorkspaceAuthorityHealthView,
+  WorkspaceAuthorityResource,
+  WorkspaceAuthoritySnapshot,
+  WorkspaceBinaryStagingReceipt,
+} from "./workspace-authority-shared";
+import { WorkspaceAuthorityClientError } from "./workspace-authority-shared";
 
 function authorityUrl(projectId: string, workspaceId: string, suffix: string): string {
   return `${getServerAgentServiceUrl()}/api/workspace-authority/projects/${encodeURIComponent(projectId)}`

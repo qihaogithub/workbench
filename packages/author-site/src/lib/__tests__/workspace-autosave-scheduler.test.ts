@@ -1,5 +1,8 @@
 import { WorkspaceAutosaveScheduler } from "../workspace-autosave-scheduler";
-import type { DirtyResource, MutationResult } from "../workspace-autosave-scheduler";
+import type {
+  DirtyResource,
+  MutationResult,
+} from "../workspace-autosave-scheduler";
 
 function makeResource(overrides: Partial<DirtyResource> = {}): DirtyResource {
   return {
@@ -142,9 +145,10 @@ describe("WorkspaceAutosaveScheduler", () => {
   it("应保证单 in-flight barrier（并发期间新 dirty 进入下一批）", async () => {
     let resolveCommit: ((value: MutationResult) => void) | null = null;
     const commitFn = jest.fn<Promise<MutationResult>, [DirtyResource[]]>(
-      () => new Promise<MutationResult>((resolve) => {
-        resolveCommit = resolve;
-      }),
+      () =>
+        new Promise<MutationResult>((resolve) => {
+          resolveCommit = resolve;
+        }),
     );
     const onCommitted = jest.fn();
 
@@ -226,7 +230,7 @@ describe("WorkspaceAutosaveScheduler", () => {
     scheduler.dispose();
   });
 
-  it("应执行 revision 单调 ack（丢弃更旧回执）", async () => {
+  it("应执行 revision 单调 ack（不回退 appliedRevision，但仍通知完成）", async () => {
     let callCount = 0;
     const commitFn = jest.fn<Promise<MutationResult>, [DirtyResource[]]>(
       async () => {
@@ -252,8 +256,12 @@ describe("WorkspaceAutosaveScheduler", () => {
 
     scheduler.markDirty(makeResource({ path: "b.ts" }));
     await scheduler.flush();
-    // 更旧回执被丢弃，onCommitted 不再被调用
-    expect(onCommitted).toHaveBeenCalledTimes(1);
+    // 更旧回执仍通知完成（清除 saving 状态），但 appliedRevision 不回退
+    expect(onCommitted).toHaveBeenCalledTimes(2);
+    expect(onCommitted).toHaveBeenLastCalledWith({
+      revision: 5,
+      rootHash: "h5",
+    });
     expect(scheduler.getAppliedRevision()).toBe(10);
 
     scheduler.dispose();
@@ -261,7 +269,9 @@ describe("WorkspaceAutosaveScheduler", () => {
 
   it("commitFn 失败时应调用 onError", async () => {
     const commitFn = jest.fn<Promise<MutationResult>, [DirtyResource[]]>(
-      async () => { throw new Error("网络错误"); },
+      async () => {
+        throw new Error("网络错误");
+      },
     );
     const onError = jest.fn();
 
@@ -331,6 +341,42 @@ describe("WorkspaceAutosaveScheduler", () => {
     expect(scheduler.hasDirty()).toBe(false);
     scheduler.markDirty(makeResource());
     expect(scheduler.hasDirty()).toBe(true);
+
+    scheduler.dispose();
+  });
+
+  it("commitFn 抛异常后 isInFlight 应恢复为 false，且后续 markDirty + flush 仍能正常提交", async () => {
+    let callCount = 0;
+    const commitFn = jest.fn(async () => {
+      callCount++;
+      if (callCount === 1) {
+        throw new Error("模拟提交失败");
+      }
+      return { revision: callCount, rootHash: "" };
+    });
+    const onError = jest.fn();
+    const onCommitted = jest.fn();
+
+    const scheduler = new WorkspaceAutosaveScheduler({
+      commitFn,
+      onCommitted,
+      onError,
+    });
+
+    // 第一次提交：应失败
+    scheduler.markDirty(makeResource());
+    await scheduler.flush();
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(scheduler.isInFlight()).toBe(false);
+
+    // 第二次提交：应成功（验证 post-error 恢复）
+    scheduler.markDirty(makeResource());
+    await scheduler.flush();
+
+    expect(commitFn).toHaveBeenCalledTimes(2);
+    expect(onCommitted).toHaveBeenCalledTimes(1);
+    expect(scheduler.isInFlight()).toBe(false);
 
     scheduler.dispose();
   });

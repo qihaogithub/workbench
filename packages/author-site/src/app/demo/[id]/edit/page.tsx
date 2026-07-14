@@ -169,6 +169,7 @@ import {
 } from "./components/SketchEditorEngineHost";
 import { useVisualEditState } from "./hooks/useVisualEditState";
 import { useVersionControl } from "./hooks/useVersionControl";
+import { useWorkspaceAuthorityState } from "./hooks/useWorkspaceAuthorityState";
 import { useCommandHistory } from "./hooks/useCommandHistory";
 import {
   resolveSinglePreviewResourceHistoryTarget,
@@ -794,6 +795,38 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const performanceSamplerRef = useRef<WorkspacePerformanceSampler>(
     new WorkspacePerformanceSampler(),
   );
+
+  // ── Baseline reset handler ─────────────────────────────────────────────────
+  // When the server self-heals a collab room conflict, it broadcasts a
+  // BASELINE_RESET WebSocket message with the new baseline metadata.
+  // This handler only clears the flush error state — baseline reset affects
+  // a single resource, so global pending/unsaved flags are managed by the
+  // authority revision sync logic.
+  const handleBaselineReset = useCallback(
+    (info: {
+      baselineRevision: number;
+      baselineHash: string;
+      resourcePath: string;
+    }) => {
+      console.debug(
+        `[collab] baseline reset for ${info.resourcePath}: rev=${info.baselineRevision}, hash=${info.baselineHash.slice(0, 12)}`,
+      );
+      // Only clear flush error — baseline reset only affects a single resource.
+      // Global pending/unsaved flags are managed by authority revision sync logic.
+      setWorkspaceFlushError(null);
+    },
+    [],
+  );
+  const collabDocumentOptions = useMemo(
+    () => ({ onBaselineReset: handleBaselineReset }),
+    [handleBaselineReset],
+  );
+
+  const authorityState = useWorkspaceAuthorityState({
+    projectId: demoId,
+    workspaceId,
+    sessionId,
+  });
 
   const markWorkspaceChanged = useCallback(() => {
     setHasUnsavedChanges(true);
@@ -1637,6 +1670,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         }
       : null,
     collabUser,
+    collabDocumentOptions,
   );
   const activePrototypeHtmlCollab = useCollabDocument(
     sessionId &&
@@ -1652,6 +1686,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         }
       : null,
     collabUser,
+    collabDocumentOptions,
   );
   const activePrototypeCssCollab = useCollabDocument(
     sessionId &&
@@ -1667,6 +1702,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         }
       : null,
     collabUser,
+    collabDocumentOptions,
   );
   const activeSchemaCollab = useCollabDocument(
     sessionId && workspaceId && activeDemoId
@@ -1679,6 +1715,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         }
       : null,
     collabUser,
+    collabDocumentOptions,
   );
   const activeSketchSceneCollab = useCollabDocument(
     sessionId &&
@@ -1694,6 +1731,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         }
       : null,
     collabUser,
+    collabDocumentOptions,
   );
   const projectSchemaCollab = useCollabDocument(
     sessionId && workspaceId
@@ -1706,6 +1744,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         }
       : null,
     collabUser,
+    collabDocumentOptions,
   );
   const workspaceTreeCollab = useCollabDocument(
     sessionId && workspaceId
@@ -1718,6 +1757,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         }
       : null,
     collabUser,
+    collabDocumentOptions,
   );
   const canvasLayoutCollab = useCollabDocument(
     sessionId && workspaceId
@@ -1730,6 +1770,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         }
       : null,
     collabUser,
+    collabDocumentOptions,
   );
   const activePageCollabStatuses =
     activeDemoRuntimeTypeForCollab === "prototype-html-css"
@@ -4871,6 +4912,7 @@ ${context.details}
       },
       onError: (error: Error) => {
         setWorkspaceFlushError(error.message);
+        setHasPendingWorkspaceFlush(false);
       },
     });
 
@@ -4879,6 +4921,25 @@ ${context.details}
       schedulerRef.current = null;
     };
   }, [sessionId, workspaceId, syncWorkspaceToProject]);
+
+  // ── Authority revision 同步 ─────────────────────────────────────────────
+  useEffect(() => {
+    if (authorityState.committedRevision > 0) {
+      schedulerRef.current?.setAppliedRevision(
+        authorityState.committedRevision,
+      );
+    }
+    if (
+      authorityState.committedRevision > 0 &&
+      authorityState.committedRevision >= workspaceFlushRevisionRef.current &&
+      // hasDirty() 同时检查 dirtyMap 和 pendingNextBatch，
+      // 确保 in-flight 期间累积的变更不会被误判为已同步
+      !schedulerRef.current?.hasDirty()
+    ) {
+      setHasPendingWorkspaceFlush(false);
+      setWorkspaceFlushError(null);
+    }
+  }, [authorityState.committedRevision]);
 
   // ── 在线/离线事件监听 ────────────────────────────────────────────────────
   useEffect(() => {
@@ -4905,6 +4966,10 @@ ${context.details}
     };
   }, [recordDiagnosticEvent]);
 
+  const authoritySynced =
+    authorityState.committedRevision > 0 &&
+    authorityState.committedRevision >= workspaceFlushRevisionRef.current;
+
   const exitSyncStatuses = [
     ...activePageCollabStatuses,
     activeSchemaCollab.status,
@@ -4913,8 +4978,10 @@ ${context.details}
     canvasLayoutCollab.status,
   ];
   const hasExitSyncRisk =
-    hasPendingWorkspaceFlush ||
+    (hasPendingWorkspaceFlush && !authoritySynced) ||
     workspaceFlushError !== null ||
+    (schedulerRef.current?.isInFlight() ?? false) ||
+    (schedulerRef.current?.hasDirty() ?? false) ||
     (hasUnsavedChanges &&
       exitSyncStatuses.some(
         (status) =>
@@ -5854,14 +5921,25 @@ ${context.details}
   // 使用状态机计算保存状态，替换旧的 if/else 链
   const saveStateContext = {
     hasDirtyResources: hasPendingWorkspaceFlush,
-    isMutationInFlight: hasPendingWorkspaceFlush && workspaceFlushRevision > 0,
-    isConnected: browserOnline,
-    hasConflict: false, // TODO: wire from Authority events
-    isCanonicalStale: false, // TODO: wire from canonical sync status
+    isMutationInFlight:
+      hasPendingWorkspaceFlush &&
+      workspaceFlushRevision > 0 &&
+      !authoritySynced,
+    isConnected:
+      browserOnline &&
+      (authorityState.isConnected || authorityState.committedRevision === 0),
+    hasConflict: authorityState.conflict !== null,
+    isCanonicalStale:
+      authorityState.canonicalStatus === "error" ||
+      authorityState.canonicalStatus === "lagging",
     lastSaveError: workspaceFlushError ? new Error(workspaceFlushError) : null,
   };
   const saveState = computeSaveStateFromContext(saveStateContext);
   let collabStatusLabel = getSaveStatusLabel(saveState);
+  // 保存失败覆盖：onError 清除 pending 后状态机返回 "autosaved"，但实际是失败
+  if (saveState === "autosaved" && workspaceFlushError) {
+    collabStatusLabel = "保存失败";
+  }
   // AI 流式更新是 UI 特殊状态，优先于状态机显示
   if (aiIsStreaming && browserOnline) {
     collabStatusLabel = "AI 正在更新";

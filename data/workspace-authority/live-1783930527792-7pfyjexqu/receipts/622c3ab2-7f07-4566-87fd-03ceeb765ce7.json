@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "622c3ab2-7f07-4566-87fd-03ceeb765ce7",
+  "projectId": "proj_1783334663364_30hsrv",
+  "workspaceId": "live-1783930527792-7pfyjexqu",
+  "baseRevision": 32,
+  "revision": 33,
+  "rootHash": "ca3d4816a2a648bf2413113d8b4b068aaf70eee0373e5bb27af4cf46d85801b3",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "demos/product-showcase_a3f2/config.schema.json",
+      "action": "modified",
+      "beforeHash": "b0fd6e802568f9bdb137985877e26159146b818a4b19d468e90339ba7968cecc",
+      "afterHash": "2612d31c33f1c17310b1b4ebf34ec0eba092cb5142d2d7f84a5dcebd01da9ac3"
+    }
+  ],
+  "committedAt": 1783947572077
+}

@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "2f3f43e6-afdb-462b-98bb-93c4925355bf",
+  "projectId": "proj_1783585261167_7h7prw",
+  "workspaceId": "live-1783654372084-5b2qhswm4",
+  "baseRevision": 67,
+  "revision": 71,
+  "rootHash": "983825e8d32ae5144a957286c26dc533f1f187df058ab48b009711bb43ce69da",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/mobile-page_x7k2/prototype.css",
+      "action": "modified",
+      "beforeHash": "4f39d8c48c73c519cf1625492d1d949d6115d2b033aca89568328d89f22bcbd4",
+      "afterHash": "d25e6dcb3e4bfa8d4e87d7d00d4dd9fbda782931da16863cb4c7b4f6fae38538"
+    }
+  ],
+  "committedAt": 1783993896236
+}
