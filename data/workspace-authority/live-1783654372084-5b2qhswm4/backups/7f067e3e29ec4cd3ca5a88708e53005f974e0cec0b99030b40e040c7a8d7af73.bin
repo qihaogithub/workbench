@@ -1,0 +1,13 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "mobile-page_x7k2",
+      "name": "个人主页",
+      "runtimeType": "high-fidelity-react",
+      "order": 1,
+      "parentId": null,
+      "routeKey": "page"
+    }
+  ]
+}

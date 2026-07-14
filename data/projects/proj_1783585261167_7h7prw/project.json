@@ -5,18 +5,12 @@
   "workspacePath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/projects/proj_1783585261167_7h7prw/workspace",
   "demoPages": [
     {
-      "id": "figma_7zwt",
-      "name": "figma",
-      "order": 0,
-      "parentId": null,
-      "routeKey": "figma"
-    },
-    {
-      "id": "growth-bean-mall_x8k2",
-      "name": "growth bean mall",
+      "id": "mobile-page_x7k2",
+      "name": "个人主页",
+      "runtimeType": "prototype-html-css",
       "order": 1,
       "parentId": null,
-      "routeKey": "growth-bean-mall"
+      "routeKey": "page"
     }
   ],
   "demoFolders": [],
@@ -172,11 +166,11 @@
     }
   ],
   "createdAt": 1783585261168,
-  "updatedAt": 1783931616184,
+  "updatedAt": 1783993889076,
   "activeWorkspaceId": "live-1783654372084-5b2qhswm4",
   "activeWorkspaceUpdatedAt": 1783659602211,
   "canonicalSyncedWorkspaceId": "live-1783654372084-5b2qhswm4",
-  "canonicalSyncedAt": 1783931616184,
-  "canonicalSyncedRevision": 10,
-  "canonicalSyncedRootHash": "3c74e7931c1d4fa29086a7b61dfe7bf531372998efe29f27d6e36cde078f3e25"
+  "canonicalSyncedAt": 1783993889076,
+  "canonicalSyncedRevision": 68,
+  "canonicalSyncedRootHash": "3a9b94e12bba7ebacaef2e6b5843467a75b7c56ae682e315932b9d7394405d82"
 }

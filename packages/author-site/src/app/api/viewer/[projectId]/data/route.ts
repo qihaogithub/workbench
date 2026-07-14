@@ -15,6 +15,7 @@ import {
   validateAppGraph,
 } from "@/lib/fs-utils";
 import { type PreviewSize, extractPreviewSize } from "@/lib/preview-size";
+import { getPrototypePreviewSize } from "@/lib/prototype-preview-size";
 import { readCanvasStateFromWorkspace } from "@/lib/canvas-layout-file";
 
 export async function GET(
@@ -68,21 +69,33 @@ export async function GET(
       }
       if (fs.existsSync(prototypeMetaPath)) {
         try {
-          prototypeMeta = JSON.parse(fs.readFileSync(prototypeMetaPath, "utf-8")) as Record<string, unknown>;
+          prototypeMeta = JSON.parse(
+            fs.readFileSync(prototypeMetaPath, "utf-8"),
+          ) as Record<string, unknown>;
         } catch {
           prototypeMeta = undefined;
         }
       }
+      // 原型页面：若 schema 未提供 previewSize，从 prototypeMeta 回退获取
+      if (!previewSize && prototypeMeta) {
+        previewSize = getPrototypePreviewSize(
+          prototypeMeta as import("@workbench/shared").PrototypePageMeta,
+        );
+      }
       if (fs.existsSync(sketchScenePath)) {
         try {
-          sketchScene = JSON.parse(fs.readFileSync(sketchScenePath, "utf-8")) as Record<string, unknown>;
+          sketchScene = JSON.parse(
+            fs.readFileSync(sketchScenePath, "utf-8"),
+          ) as Record<string, unknown>;
         } catch {
           sketchScene = undefined;
         }
       }
       if (fs.existsSync(sketchMetaPath)) {
         try {
-          sketchMeta = JSON.parse(fs.readFileSync(sketchMetaPath, "utf-8")) as Record<string, unknown>;
+          sketchMeta = JSON.parse(
+            fs.readFileSync(sketchMetaPath, "utf-8"),
+          ) as Record<string, unknown>;
         } catch {
           sketchMeta = undefined;
         }
@@ -101,8 +114,10 @@ export async function GET(
       };
     });
 
-    const projectConfigSchema = getProjectConfigSchema(workspacePath) ?? undefined;
-    const projectConfigValues = getProjectConfigValues(workspacePath) ?? undefined;
+    const projectConfigSchema =
+      getProjectConfigSchema(workspacePath) ?? undefined;
+    const projectConfigValues =
+      getProjectConfigValues(workspacePath) ?? undefined;
     const canvasState = readCanvasStateFromWorkspace(workspacePath);
     const appGraph = readAppGraph(workspacePath);
     const appGraphValidation = validateAppGraph(appGraph);
@@ -110,7 +125,11 @@ export async function GET(
     return NextResponse.json(
       createApiSuccess({
         project: project
-          ? { id: project.id, name: project.name, description: project.description }
+          ? {
+              id: project.id,
+              name: project.name,
+              description: project.description,
+            }
           : null,
         demoPages: pages,
         projectConfigSchema,

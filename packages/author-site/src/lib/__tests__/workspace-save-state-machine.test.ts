@@ -8,7 +8,9 @@ import {
   type SaveStateContext,
 } from "../workspace-save-state-machine";
 
-function makeContext(overrides: Partial<SaveStateContext> = {}): SaveStateContext {
+function makeContext(
+  overrides: Partial<SaveStateContext> = {},
+): SaveStateContext {
   return {
     hasDirtyResources: false,
     isMutationInFlight: false,
@@ -39,15 +41,24 @@ describe("workspace-save-state-machine", () => {
     });
 
     it("autosaved → CANONICAL_STALE → canonical-stale", () => {
-      expect(transition("autosaved", "CANONICAL_STALE")).toBe("canonical-stale");
+      expect(transition("autosaved", "CANONICAL_STALE")).toBe(
+        "canonical-stale",
+      );
     });
 
     it("canonical-stale → CANONICAL_SYNCED → autosaved", () => {
-      expect(transition("canonical-stale", "CANONICAL_SYNCED")).toBe("autosaved");
+      expect(transition("canonical-stale", "CANONICAL_SYNCED")).toBe(
+        "autosaved",
+      );
     });
 
     it("任意状态 → DISCONNECT → offline", () => {
-      const nonOfflineStates: SaveState[] = ["editing", "saving", "autosaved", "canonical-stale"];
+      const nonOfflineStates: SaveState[] = [
+        "editing",
+        "saving",
+        "autosaved",
+        "canonical-stale",
+      ];
       for (const state of nonOfflineStates) {
         expect(transition(state, "DISCONNECT")).toBe("offline");
       }
@@ -58,7 +69,12 @@ describe("workspace-save-state-machine", () => {
     });
 
     it("任意状态 → CONFLICT_DETECTED → conflict", () => {
-      const states: SaveState[] = ["editing", "saving", "autosaved", "canonical-stale"];
+      const states: SaveState[] = [
+        "editing",
+        "saving",
+        "autosaved",
+        "canonical-stale",
+      ];
       for (const state of states) {
         expect(transition(state, "CONFLICT_DETECTED")).toBe("conflict");
       }
@@ -99,7 +115,9 @@ describe("workspace-save-state-machine", () => {
       expect(getSaveStatusLabel("autosaved")).toBe("已自动保存");
       expect(getSaveStatusLabel("offline")).toBe("离线（本地草稿已保留）");
       expect(getSaveStatusLabel("conflict")).toBe("存在冲突，需要处理");
-      expect(getSaveStatusLabel("canonical-stale")).toBe("已保存，项目同步异常");
+      expect(getSaveStatusLabel("canonical-stale")).toBe(
+        "已保存，项目同步异常",
+      );
     });
   });
 
@@ -109,48 +127,115 @@ describe("workspace-save-state-machine", () => {
     });
 
     it("有 dirty 应返回 editing", () => {
-      expect(computeSaveStateFromContext(makeContext({ hasDirtyResources: true }))).toBe("editing");
+      expect(
+        computeSaveStateFromContext(makeContext({ hasDirtyResources: true })),
+      ).toBe("editing");
     });
 
     it("mutation in-flight 应返回 saving", () => {
-      expect(computeSaveStateFromContext(makeContext({ isMutationInFlight: true }))).toBe("saving");
+      expect(
+        computeSaveStateFromContext(makeContext({ isMutationInFlight: true })),
+      ).toBe("saving");
     });
 
     it("断开连接应返回 offline", () => {
-      expect(computeSaveStateFromContext(makeContext({ isConnected: false }))).toBe("offline");
+      expect(
+        computeSaveStateFromContext(makeContext({ isConnected: false })),
+      ).toBe("offline");
     });
 
     it("冲突优先级最高", () => {
-      expect(computeSaveStateFromContext(makeContext({
-        hasConflict: true,
-        isConnected: false,
-        isMutationInFlight: true,
-      }))).toBe("conflict");
+      expect(
+        computeSaveStateFromContext(
+          makeContext({
+            hasConflict: true,
+            isConnected: false,
+            isMutationInFlight: true,
+          }),
+        ),
+      ).toBe("conflict");
     });
 
     it("offline 优先级高于 saving", () => {
-      expect(computeSaveStateFromContext(makeContext({
-        isConnected: false,
-        isMutationInFlight: true,
-      }))).toBe("offline");
+      expect(
+        computeSaveStateFromContext(
+          makeContext({
+            isConnected: false,
+            isMutationInFlight: true,
+          }),
+        ),
+      ).toBe("offline");
     });
 
     it("canonical stale 在 saving 之后", () => {
-      expect(computeSaveStateFromContext(makeContext({
-        isCanonicalStale: true,
-      }))).toBe("canonical-stale");
+      expect(
+        computeSaveStateFromContext(
+          makeContext({
+            isCanonicalStale: true,
+          }),
+        ),
+      ).toBe("canonical-stale");
     });
 
     it("已保存但 canonical 异常应返回 canonical-stale（不影响 autosaved）", () => {
       // 这正是 WMA-264 的核心要求：autosave 成功 = autosaved，canonical 异常独立
-      const result = computeSaveStateFromContext(makeContext({
-        hasDirtyResources: false,
-        isMutationInFlight: false,
-        isConnected: true,
-        isCanonicalStale: true,
-      }));
+      const result = computeSaveStateFromContext(
+        makeContext({
+          hasDirtyResources: false,
+          isMutationInFlight: false,
+          isConnected: true,
+          isCanonicalStale: true,
+        }),
+      );
       expect(result).toBe("canonical-stale");
       expect(getSaveStatusLabel(result)).toBe("已保存，项目同步异常");
+    });
+  });
+
+  describe("computeSaveStateFromContext — Authority 感知场景", () => {
+    it("isMutationInFlight=false 且 hasDirtyResources=false 时应返回 autosaved", () => {
+      // 模拟 authoritySynced=true 导致 isMutationInFlight=false 的场景
+      const ctx = makeContext({
+        isMutationInFlight: false,
+        hasDirtyResources: false,
+        isConnected: true,
+      });
+      expect(computeSaveStateFromContext(ctx)).toBe("autosaved");
+    });
+
+    it("hasConflict=true 时应返回 conflict（最高优先级）", () => {
+      const ctx = makeContext({
+        hasConflict: true,
+        isConnected: true,
+        isMutationInFlight: true, // 即使 in-flight，conflict 优先级更高
+      });
+      expect(computeSaveStateFromContext(ctx)).toBe("conflict");
+    });
+
+    it("isCanonicalStale=true 时应返回 canonical-stale", () => {
+      const ctx = makeContext({
+        isCanonicalStale: true,
+        isConnected: true,
+      });
+      expect(computeSaveStateFromContext(ctx)).toBe("canonical-stale");
+    });
+
+    it("isConnected=false 时应返回 offline", () => {
+      const ctx = makeContext({
+        isConnected: false,
+      });
+      expect(computeSaveStateFromContext(ctx)).toBe("offline");
+    });
+
+    it("lastSaveError 存在但 isMutationInFlight=false 时仍返回 autosaved（error 由 page 层覆盖）", () => {
+      // 验证状态机不处理 lastSaveError — 错误标签覆盖在 page.tsx 层
+      const ctx = makeContext({
+        lastSaveError: new Error("sync failed"),
+        isMutationInFlight: false,
+        hasDirtyResources: false,
+        isConnected: true,
+      });
+      expect(computeSaveStateFromContext(ctx)).toBe("autosaved");
     });
   });
 

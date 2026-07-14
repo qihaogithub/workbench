@@ -214,15 +214,16 @@ export class WorkspaceAutosaveScheduler {
     try {
       const result = await this.commitFn(batch);
 
-      // revision 单调 ack：只接受 >= 已应用 revision 的回执
+      // revision 单调 ack：只在回执 revision >= 已应用 revision 时推进 appliedRevision
       if (result.revision >= this.appliedRevision) {
         this.appliedRevision = result.revision;
-        this.onCommitted({
-          revision: result.revision,
-          rootHash: result.rootHash,
-        });
       }
-      // 如果 revision 更旧，静默丢弃回执（不调用 onError）
+      // 无论 revision 新旧，commitFn 成功即表示工作已完成，通知上层清除 saving 状态
+      this.onCommitted({
+        revision: result.revision,
+        rootHash: result.rootHash,
+      });
+      // 如果 revision 更旧，仍通知完成但不回退 appliedRevision
     } catch (error) {
       this.onError(error instanceof Error ? error : new Error(String(error)));
     } finally {

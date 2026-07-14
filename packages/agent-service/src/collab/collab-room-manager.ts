@@ -12,10 +12,7 @@ import type {
   WorkspaceMutationRequest,
 } from "@workbench/shared/contracts";
 import { logger } from "../utils/logger";
-import {
-  registerCollabDraftProvider,
-  WorkspaceMutationAuthorityError,
-} from "../workspace/workspace-mutation-authority";
+import { registerCollabDraftProvider } from "../workspace/workspace-mutation-authority";
 import {
   ResourceFileState,
   WorkspaceFilePersistence,
@@ -24,10 +21,15 @@ import {
 const MESSAGE_SYNC = 0;
 const MESSAGE_AWARENESS = 1;
 const MESSAGE_QUERY_AWARENESS = 3;
+/** Custom message type: server → client baseline-reset notification */
+const MESSAGE_BASELINE_RESET = 5;
 const DEFAULT_SAVE_DEBOUNCE_MS = 1000;
 const DEFAULT_ROOM_IDLE_TTL_MS = 5 * 60_000;
 const DEFAULT_MAX_CONNECTIONS_PER_WORKSPACE = 10;
 const SERVER_RELOAD_ORIGIN = Symbol("collab-server-reload");
+const CONFLICT_BACKOFF_BASE_MS = 60_000;
+const CONFLICT_BACKOFF_THRESHOLD = 3;
+const CONFLICT_BACKOFF_MAX_MS = 4 * 60_000;
 
 interface RoomDescriptor {
   projectId: string;
@@ -60,6 +62,7 @@ interface CollabRoom {
   pendingExternalReload: boolean;
   baselineHash: string;
   baselineRevision: number;
+  consecutiveConflicts: number;
 }
 
 export class CollabRoomManager {
@@ -235,8 +238,9 @@ export class CollabRoomManager {
     sessionId: string,
   ): Promise<{
     flushedRooms: number;
-    status: "flushed" | "no_active_room";
+    status: "flushed" | "no_active_room" | "partial_failure";
     revision: number;
+    failures?: Array<{ roomKey: string; error: string }>;
   }> {
     const validation = this.persistence.validateWorkspaceSession({
       projectId,
@@ -253,17 +257,64 @@ export class CollabRoomManager {
         room.descriptor.workspaceId === workspaceId
       );
     });
+
+    // ── P0-2: flush each room independently, never let one failure block others ──
+    const failures: Array<{ roomKey: string; error: string }> = [];
+    let successCount = 0;
     for (const room of matched) {
-      await this.flushRoom(room);
+      try {
+        await this.flushRoom(room);
+        successCount++;
+        logger.debug(
+          { roomKey: room.key },
+          "flushWorkspace: room flushed successfully",
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.error(
+          { error, roomKey: room.key },
+          "flushWorkspace: room flush failed",
+        );
+        failures.push({ roomKey: room.key, error: message });
+      }
     }
+
     const authorityState = await this.persistence.getAuthorityState({
       projectId,
       workspaceId,
       sessionId,
     });
+
+    if (matched.length === 0) {
+      return {
+        flushedRooms: 0,
+        status: "no_active_room",
+        revision: authorityState.revision,
+      };
+    }
+
+    if (failures.length > 0) {
+      logger.warn(
+        {
+          projectId,
+          workspaceId,
+          totalRooms: matched.length,
+          succeeded: successCount,
+          failed: failures.length,
+        },
+        "flushWorkspace completed with partial failures",
+      );
+      return {
+        flushedRooms: successCount,
+        status: "partial_failure",
+        revision: authorityState.revision,
+        failures,
+      };
+    }
+
     return {
-      flushedRooms: matched.length,
-      status: matched.length > 0 ? "flushed" : "no_active_room",
+      flushedRooms: successCount,
+      status: "flushed",
       revision: authorityState.revision,
     };
   }
@@ -371,6 +422,7 @@ export class CollabRoomManager {
       pendingExternalReload: false,
       baselineHash: initial.hash,
       baselineRevision: authorityState.revision,
+      consecutiveConflicts: 0,
     };
 
     doc.on("update", (update: Uint8Array, origin: unknown) => {
@@ -480,6 +532,26 @@ export class CollabRoomManager {
 
   private scheduleSave(room: CollabRoom): void {
     if (room.saveTimer) clearTimeout(room.saveTimer);
+    // ── P1-1: exponential backoff for rooms with consecutive conflicts ──
+    let delay = this.saveDebounceMs;
+    if (room.consecutiveConflicts >= CONFLICT_BACKOFF_THRESHOLD) {
+      const backoffMultiplier = Math.pow(
+        2,
+        room.consecutiveConflicts - CONFLICT_BACKOFF_THRESHOLD,
+      );
+      delay = Math.min(
+        CONFLICT_BACKOFF_BASE_MS * backoffMultiplier,
+        CONFLICT_BACKOFF_MAX_MS,
+      );
+      logger.info(
+        {
+          roomKey: room.key,
+          consecutiveConflicts: room.consecutiveConflicts,
+          delayMs: delay,
+        },
+        "Applying conflict backoff delay",
+      );
+    }
     room.saveTimer = setTimeout(() => {
       this.flushRoom(room).catch((error) => {
         logger.error(
@@ -487,7 +559,7 @@ export class CollabRoomManager {
           "Failed to save collab room",
         );
       });
-    }, this.saveDebounceMs);
+    }, delay);
   }
 
   private async flushRoom(room: CollabRoom): Promise<void> {
@@ -512,22 +584,62 @@ export class CollabRoomManager {
       }
 
       if (currentState.hash !== room.baselineHash) {
+        // ── P0-1: baseline self-healing on conflict ──
+        // Instead of throwing and keeping dirty state for infinite retries,
+        // reload the room baseline from the latest file state.
+        room.consecutiveConflicts++;
         logger.warn(
           {
             roomKey: room.key,
             resourcePath: room.descriptor.resourcePath,
             baselineRevision: room.baselineRevision,
-          },
-          "Rejected stale collab flush because resource changed outside the room",
-        );
-        throw new WorkspaceMutationAuthorityError(
-          "WORKSPACE_RESOURCE_CONFLICT",
-          "Workspace resource conflict",
-          {
-            path: room.descriptor.resourcePath,
             currentHash: currentState.hash,
+            consecutiveConflicts: room.consecutiveConflicts,
           },
+          "Resource conflict detected — reloading room baseline from file state",
         );
+
+        // Read the latest authority revision for accurate baseline tracking.
+        const authorityState = await this.persistence.getAuthorityState(
+          room.descriptor,
+        );
+
+        // Guard: if new edits arrived during the await above, abort self-heal
+        // to avoid discarding client changes via reloadRoomFromFileState.
+        const currentText = room.text.toString();
+        if (currentText !== roomContent) {
+          logger.info(
+            { roomKey: room.key, resourcePath: room.descriptor.resourcePath },
+            "New edits arrived during conflict resolution, skipping self-heal",
+          );
+          return;
+        }
+
+        this.reloadRoomFromFileState(
+          room,
+          currentState,
+          authorityState.revision,
+        );
+
+        // ── Notify connected clients to reset their dirty state ──
+        // reloadRoomFromFileState → replaceRoomText triggers a yjs update
+        // broadcast to all connections (SERVER_RELOAD_ORIGIN ≠ connection, so
+        // no filtering). This pushes the latest file content to clients.
+        // The BASELINE_RESET message additionally tells clients to clear their
+        // local isDirty / hasPendingWorkspaceFlush flags.
+        this.broadcastBaselineReset(room);
+
+        logger.info(
+          {
+            roomKey: room.key,
+            resourcePath: room.descriptor.resourcePath,
+            newBaselineRevision: authorityState.revision,
+            newBaselineHash: currentState.hash,
+            clientCount: room.connections.size,
+          },
+          "Room baseline reloaded, yjs synced, and BASELINE_RESET sent to all connected clients",
+        );
+        return;
       }
 
       const committed = await this.persistence.commitResource({
@@ -543,6 +655,7 @@ export class CollabRoomManager {
       room.baselineHash = committed.state.hash;
       room.baselineRevision = committed.receipt.revision;
       room.dirty = false;
+      room.consecutiveConflicts = 0;
     } finally {
       room.saving = false;
       if (room.pendingExternalReload) {
@@ -631,6 +744,20 @@ export class CollabRoomManager {
       awarenessProtocol.encodeAwarenessUpdate(awareness, clients),
     );
     this.send(socket, encoding.toUint8Array(encoder));
+  }
+
+  private broadcastBaselineReset(room: CollabRoom): void {
+    if (room.connections.size === 0) return;
+    const encoder = encoding.createEncoder();
+    encoding.writeVarUint(encoder, MESSAGE_BASELINE_RESET);
+    // Payload: baselineRevision (varUint) + baselineHash (varString) + resourcePath (varString)
+    encoding.writeVarUint(encoder, room.baselineRevision);
+    encoding.writeVarString(encoder, room.baselineHash);
+    encoding.writeVarString(encoder, room.descriptor.resourcePath);
+    const payload = encoding.toUint8Array(encoder);
+    for (const connection of room.connections) {
+      this.send(connection.socket, payload);
+    }
   }
 
   private broadcast(

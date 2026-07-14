@@ -10,8 +10,8 @@ import type {
   WorkspaceAuthorityHealthView,
   WorkspaceAuthorityResource,
   WorkspaceAuthoritySnapshot,
-} from "./workspace-authority-client";
-import { WorkspaceAuthorityClientError } from "./workspace-authority-client";
+} from "./workspace-authority-shared";
+import { WorkspaceAuthorityClientError } from "./workspace-authority-shared";
 
 interface Envelope<T> {
   success?: boolean;

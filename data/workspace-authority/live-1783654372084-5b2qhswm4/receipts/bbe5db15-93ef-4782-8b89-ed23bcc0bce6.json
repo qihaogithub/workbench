@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "bbe5db15-93ef-4782-8b89-ed23bcc0bce6",
+  "projectId": "proj_1783585261167_7h7prw",
+  "workspaceId": "live-1783654372084-5b2qhswm4",
+  "baseRevision": 0,
+  "revision": 52,
+  "rootHash": "e12c914a96fb3788e1acfa2302b9e69e6fb0a4c9d8e6f3e1adde0bb245209983",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/welcome-page_a3k7/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "a772abd3554afd18557e9fb8464e596aa657d3508e74725f63fda1917484a0bc",
+      "afterHash": null
+    },
+    {
+      "path": "demos/welcome-page_a3k7/index.tsx",
+      "action": "deleted",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": null
+    },
+    {
+      "path": "demos/welcome-page_a3k7/prototype.css",
+      "action": "deleted",
+      "beforeHash": "8dfb92723269f472df50610250821c751d93ab76a1f1fb33df4587d87997c05f",
+      "afterHash": null
+    },
+    {
+      "path": "demos/welcome-page_a3k7/prototype.html",
+      "action": "deleted",
+      "beforeHash": "afa83897edd6f1eb2e3689a7b559514c27e824227c06d7bdf03f12c228139f19",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "73785371b31d73eeb58b1dd98870a4bcd42d5b3431bbe5543d3b80b1cacca533",
+      "afterHash": "b8f84cb18b1d4fb04f8db0fdb7867802b916f6365d4816c8289777a7893570ab"
+    }
+  ],
+  "committedAt": 1783993670544
+}

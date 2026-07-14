@@ -1,0 +1,12 @@
+{
+  "pages": [
+    {
+      "id": "mobile-page_x7k2",
+      "name": "个人主页",
+      "runtimeType": "prototype-html-css",
+      "order": 1,
+      "parentId": null
+    }
+  ],
+  "folders": []
+}
