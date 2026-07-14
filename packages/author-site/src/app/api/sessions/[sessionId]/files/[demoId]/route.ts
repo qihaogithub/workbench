@@ -15,6 +15,7 @@ import {
   getDemoDirPath,
   getProjectConfigSchema,
   listDemoPages,
+  resolvePageRuntimeType,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { isSketchSceneAuthoringEnabled } from "@/lib/authoring-feature-flags";
@@ -551,8 +552,9 @@ export async function PUT(
 
     let runtimeValidation: RuntimeValidationResult | undefined;
     const pageMeta = listDemoPages(wsPath).find((page) => page.id === demoId);
-    const isPrototypePage = pageMeta?.runtimeType === "prototype-html-css";
-    const isSketchPage = pageMeta?.runtimeType === "sketch-scene";
+    const pageRuntimeType = pageMeta ? resolvePageRuntimeType(getDemoDirPath(wsPath, demoId)) : undefined;
+    const isPrototypePage = pageRuntimeType === "prototype-html-css";
+    const isSketchPage = pageRuntimeType === "sketch-scene";
     const currentFiles =
       isPrototypePage || isSketchPage || parsedSketchPatch
         ? getWorkspaceDemoPageFiles(meta.workspaceId, demoId)

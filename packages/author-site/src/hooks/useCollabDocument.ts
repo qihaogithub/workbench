@@ -35,7 +35,14 @@ export interface CollabPresenceState {
   error: string | null;
 }
 
-const USER_COLORS = ["#2563eb", "#059669", "#dc2626", "#7c3aed", "#ea580c", "#0891b2"];
+const USER_COLORS = [
+  "#2563eb",
+  "#059669",
+  "#dc2626",
+  "#7c3aed",
+  "#ea580c",
+  "#0891b2",
+];
 const OFFLINE_STATUS_DELAY_MS = 5000;
 
 function pickColor(seed: string): string {
@@ -48,8 +55,12 @@ function getCollabBaseUrl(): string {
   const configured = process.env.NEXT_PUBLIC_COLLAB_WS_URL;
   if (configured) return configured.replace(/\/$/, "");
 
-  const agentUrl = process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "http://localhost:3201";
-  return agentUrl.replace(/^http:/, "ws:").replace(/^https:/, "wss:").replace(/\/$/, "");
+  const agentUrl =
+    process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "http://localhost:3201";
+  return agentUrl
+    .replace(/^http:/, "ws:")
+    .replace(/^https:/, "wss:")
+    .replace(/\/$/, "");
 }
 
 function encodeRoomName(resourcePath: string): string {
@@ -115,14 +126,19 @@ export function useCollabDocument(
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
   const [ytext, setYtext] = useState<Y.Text | null>(null);
   const providerRef = useRef<WebsocketProvider | null>(null);
-  const offlineStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const onBaselineResetRef = useRef<((info: BaselineResetInfo) => void) | undefined>(options?.onBaselineReset);
+  const offlineStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const onBaselineResetRef = useRef<
+    ((info: BaselineResetInfo) => void) | undefined
+  >(options?.onBaselineReset);
   onBaselineResetRef.current = options?.onBaselineReset;
   const descriptorProjectId = descriptor?.projectId ?? "";
   const descriptorWorkspaceId = descriptor?.workspaceId ?? "";
   const descriptorSessionId = descriptor?.sessionId ?? "";
   const descriptorResourcePath = descriptor?.resourcePath ?? "";
-  const descriptorKind: CollabRoomDescriptor["kind"] | "" = descriptor?.kind ?? "";
+  const descriptorKind: CollabRoomDescriptor["kind"] | "" =
+    descriptor?.kind ?? "";
   const descriptorKey = descriptor
     ? [
         descriptorProjectId,
@@ -180,9 +196,7 @@ export function useCollabDocument(
     }
 
     clearOfflineStatusTimer();
-    setStatus((current) =>
-      current === "connecting" ? current : "connecting",
-    );
+    setStatus((current) => (current === "connecting" ? current : "connecting"));
     setError((current) => (current === null ? current : null));
 
     const doc = new Y.Doc();
@@ -191,13 +205,18 @@ export function useCollabDocument(
     const endpoint = `${baseUrl}/api/collab/projects/${encodeURIComponent(
       stableDescriptor.projectId,
     )}/workspaces/${encodeURIComponent(stableDescriptor.workspaceId)}`;
-    const nextProvider = new WebsocketProvider(endpoint, encodeRoomName(stableDescriptor.resourcePath), doc, {
-      params: {
-        sessionId: stableDescriptor.sessionId,
-        resourcePath: stableDescriptor.resourcePath,
-        kind: stableDescriptor.kind,
+    const nextProvider = new WebsocketProvider(
+      endpoint,
+      encodeRoomName(stableDescriptor.resourcePath),
+      doc,
+      {
+        params: {
+          sessionId: stableDescriptor.sessionId,
+          resourcePath: stableDescriptor.resourcePath,
+          kind: stableDescriptor.kind,
+        },
       },
-    });
+    );
 
     providerRef.current = nextProvider;
     setProvider(nextProvider);
@@ -219,10 +238,18 @@ export function useCollabDocument(
           const baselineRevision = decoding.readVarUint(decoder);
           const baselineHash = decoding.readVarString(decoder);
           const resourcePath = decoding.readVarString(decoder);
-          onBaselineResetRef.current?.({ baselineRevision, baselineHash, resourcePath });
+          onBaselineResetRef.current?.({
+            baselineRevision,
+            baselineHash,
+            resourcePath,
+          });
         } catch {
           // Malformed payload — still fire callback with empty info
-          onBaselineResetRef.current?.({ baselineRevision: 0, baselineHash: "", resourcePath: "" });
+          onBaselineResetRef.current?.({
+            baselineRevision: 0,
+            baselineHash: "",
+            resourcePath: "",
+          });
         }
       };
     } else {
@@ -246,7 +273,8 @@ export function useCollabDocument(
       userId: collabUser.userId,
       username: collabUser.username,
       color: collabUser.color,
-      activePageId: stableDescriptor.resourcePath.match(/^demos\/([^/]+)\//)?.[1],
+      activePageId:
+        stableDescriptor.resourcePath.match(/^demos\/([^/]+)\//)?.[1],
       resourcePath: stableDescriptor.resourcePath,
       lastActiveAt: Date.now(),
     } satisfies CollabPresence);
@@ -259,7 +287,8 @@ export function useCollabDocument(
         userId: collabUser.userId,
         username: collabUser.username,
         color: collabUser.color,
-        activePageId: stableDescriptor.resourcePath.match(/^demos\/([^/]+)\//)?.[1],
+        activePageId:
+          stableDescriptor.resourcePath.match(/^demos\/([^/]+)\//)?.[1],
         resourcePath: stableDescriptor.resourcePath,
         lastActiveAt: Date.now(),
       } satisfies CollabPresence);
@@ -267,34 +296,45 @@ export function useCollabDocument(
 
     text.observe(handleTextChange);
     nextProvider.awareness.on("change", updatePresence);
-    nextProvider.on("status", ({ status: wsStatus }: { status: "connecting" | "connected" | "disconnected" }) => {
-      if (wsStatus === "connected") {
-        clearOfflineStatusTimer();
-        setStatus((current) => (current === "synced" ? current : "synced"));
-        return;
-      }
-
-      if (wsStatus === "connecting") {
-        clearOfflineStatusTimer();
-        setStatus((current) =>
-          current === "offline" || current === "synced" || current === "saving"
-            ? current
-            : "connecting",
-        );
-        return;
-      }
-
-      clearOfflineStatusTimer();
-      offlineStatusTimerRef.current = setTimeout(() => {
-        if (providerRef.current === nextProvider) {
-          setStatus((current) => (current === "offline" ? current : "offline"));
+    nextProvider.on(
+      "status",
+      ({
+        status: wsStatus,
+      }: {
+        status: "connecting" | "connected" | "disconnected";
+      }) => {
+        if (wsStatus === "connected") {
+          clearOfflineStatusTimer();
+          setStatus((current) => (current === "synced" ? current : "synced"));
+          return;
         }
-        offlineStatusTimerRef.current = null;
-      }, OFFLINE_STATUS_DELAY_MS);
-      setStatus((current) =>
-        current === "synced" || current === "saving" ? current : "connecting",
-      );
-    });
+
+        if (wsStatus === "connecting") {
+          clearOfflineStatusTimer();
+          setStatus((current) =>
+            current === "offline" ||
+            current === "synced" ||
+            current === "saving"
+              ? current
+              : "connecting",
+          );
+          return;
+        }
+
+        clearOfflineStatusTimer();
+        offlineStatusTimerRef.current = setTimeout(() => {
+          if (providerRef.current === nextProvider) {
+            setStatus((current) =>
+              current === "offline" ? current : "offline",
+            );
+          }
+          offlineStatusTimerRef.current = null;
+        }, OFFLINE_STATUS_DELAY_MS);
+        setStatus((current) =>
+          current === "synced" || current === "saving" ? current : "connecting",
+        );
+      },
+    );
     nextProvider.on("sync", (isSynced: boolean) => {
       if (isSynced) {
         clearOfflineStatusTimer();
@@ -319,13 +359,20 @@ export function useCollabDocument(
       doc.destroy();
       if (providerRef.current === nextProvider) providerRef.current = null;
     };
-  }, [collabUser.color, collabUser.userId, collabUser.username, stableDescriptor]);
+  }, [
+    collabUser.color,
+    collabUser.userId,
+    collabUser.username,
+    stableDescriptor,
+  ]);
 
   const flush = useCallback(async () => {
     const current = descriptorRef.current;
     if (!current) return;
     setStatus((prev) => (prev === "offline" ? prev : "saving"));
-    const httpBase = (process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "http://localhost:3201").replace(/\/$/, "");
+    const httpBase = (
+      process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "http://localhost:3201"
+    ).replace(/\/$/, "");
     const params = new URLSearchParams({
       sessionId: current.sessionId,
       resourcePath: current.resourcePath,
@@ -390,7 +437,10 @@ export function useCollabPresence(
   return {
     users: collab.awareness,
     activePageByUser: Object.fromEntries(
-      collab.awareness.map((presence) => [presence.userId, presence.activePageId]),
+      collab.awareness.map((presence) => [
+        presence.userId,
+        presence.activePageId,
+      ]),
     ),
     status: collab.status,
     error: collab.error,

@@ -138,7 +138,6 @@ function readDeletedPageSnapshotMeta(
       id: parsed.id,
       name: parsed.name,
       routeKey: parsed.routeKey,
-      runtimeType: parsed.runtimeType,
       order: parsed.order ?? 0,
       parentId: parsed.parentId ?? null,
     };
@@ -717,6 +716,9 @@ export async function DELETE(
           }),
         ],
       });
+      // P2: clean up empty page directory after Authority delete_path operations
+      const pageDir = getDemoDirPath(ctx.ctx.workspacePath, demoId);
+      fs.rmSync(pageDir, { recursive: true, force: true });
       return NextResponse.json(createApiSuccess(snapshot));
     }
 

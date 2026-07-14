@@ -69,6 +69,7 @@ jest.mock("@/lib/fs-utils", () => ({
   listDemoPages: jest.fn(() => []),
   projectExists: jest.fn(() => true),
   readFoldersMeta: jest.fn(() => []),
+  resolvePageRuntimeType: jest.fn(() => "prototype-html-css" as const),
   sessionExists: jest.fn(() => true),
   getSessionMeta: jest.fn(() => ({
     sessionId: "session-1",
@@ -191,7 +192,6 @@ describe("project demos route live Workspace writes", () => {
         id: "new-page_abcd",
         name: "New Page",
         routeKey: "new-page",
-        runtimeType: "prototype-html-css",
         order: 1,
         parentId: null,
       },

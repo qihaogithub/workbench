@@ -408,6 +408,8 @@ type HistoryEvent =
       version: VersionInfo;
     };
 
+type DemoPage = DemoPageMeta & { runtimeType?: DemoPageRuntimeType; previewSize?: import("@workbench/demo-ui").PreviewSize };
+
 const runtimeTypeLabels: Record<DemoPageRuntimeType, string> = {
   "high-fidelity-react": "高保真 React",
   "prototype-html-css": "HTML/CSS 原型",
@@ -415,7 +417,7 @@ const runtimeTypeLabels: Record<DemoPageRuntimeType, string> = {
 };
 
 function getEffectiveRuntimeType(
-  page?: Pick<DemoPageMeta, "runtimeType"> | null,
+  page?: Pick<DemoPage, "runtimeType"> | null,
 ): DemoPageRuntimeType {
   if (page?.runtimeType === "prototype-html-css") return "prototype-html-css";
   if (page?.runtimeType === "sketch-scene") return "sketch-scene";
@@ -847,8 +849,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   }, []);
 
   // 多页面状态
-  const [demoPages, setDemoPages] = useState<DemoPageMeta[]>([]);
-  const demoPagesRef = useRef<DemoPageMeta[]>([]);
+  const [demoPages, setDemoPages] = useState<DemoPage[]>([]);
+  const demoPagesRef = useRef<DemoPage[]>([]);
   demoPagesRef.current = demoPages;
   const [demoFolders, setDemoFolders] = useState<DemoFolderMeta[]>([]);
   const [activeDemoId, setActiveDemoId] = useState<string>("");
@@ -1104,7 +1106,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   const buildScreenshotPageInput = useCallback(
     (
-      page: DemoPageMeta,
+      page: DemoPage,
       configOverride?: Record<string, unknown>,
       codeOverride?: string,
     ): ScreenshotBatchPageInput | null => {
@@ -2159,9 +2161,11 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 修复指引: ${normalizedDiagnostic.instruction ?? "请修复当前页面代码后确保预览可以重新编译和导入。"}
 
 要求:
+- 修复前必须先用 readFile 读取 demos/${pageId}/index.tsx 的当前完整内容，确保基于磁盘上的最新版本进行修复。
 - 保持页面原有产品意图、视觉结构和配置字段不变。
 - 优先使用 @preview/sdk 的受控能力，避免未登记依赖和不存在的 named import。
 - 如果错误指向重复顶层声明或多个 default export，请删除重复拼接块，只保留一个完整 React 组件模块。
+- 使用 writeFile 时必须输出完整的新文件内容，不要将旧内容与新内容拼接。
 - 修复后不要新增无关文件。${schemaHint}`;
         setTriggerAutoSend({
           kind: "auto_repair",
@@ -2991,7 +2995,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     const normalizePages = (
       pages: Array<
         Pick<
-          DemoPageMeta,
+          DemoPage,
           "id" | "name" | "routeKey" | "runtimeType" | "order" | "parentId"
         >
       >,
@@ -4255,7 +4259,7 @@ ${context.details}
 
   const reconcileRuntimeConversionsAfterAiFiles = useCallback(
     async (input: {
-      pages: DemoPageMeta[];
+      pages: DemoPage[];
       demos?: Record<string, RuntimeConversionFileSnapshot>;
       traceId: string;
     }) => {
@@ -4343,7 +4347,7 @@ ${context.details}
                 ? {
                     ...item,
                     ...(response.meta ?? {}),
-                    runtimeType: response.meta?.runtimeType ?? nextRuntimeType,
+                    runtimeType: nextRuntimeType,
                     previewSize: pagePreviewSizeMap[item.id],
                   }
                 : item,

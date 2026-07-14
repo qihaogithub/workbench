@@ -1265,7 +1265,7 @@ export function PreviewPanel({
   const hasPreviewSource =
     isUrlMode || (typeof code === "string" && code.length > 0);
   const showPreviewLoading =
-    hasPreviewSource && (isCompiling || !contentLoaded);
+    hasPreviewSource && (isCompiling || (!contentLoaded && !compileError && !runtimeError));
   const showPreviewPendingText = showPreviewLoading && !isCompiling;
   const showPlaceholder =
     !!placeholderScreenshotUrl && !contentLoaded && !placeholderFailed;

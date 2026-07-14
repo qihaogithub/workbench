@@ -502,6 +502,13 @@ export async function DELETE(
           }),
         ],
       });
+      // P2: clean up empty page directories after Authority delete_path operations
+      if (deleteContents) {
+        const demosDir = path.join(ctx.workspacePath, "demos");
+        for (const pageId of deletedPageIds) {
+          fs.rmSync(path.join(demosDir, pageId), { recursive: true, force: true });
+        }
+      }
       return NextResponse.json(createApiSuccess({ deletedPageIds }));
     }
 

@@ -32,9 +32,15 @@ import type {
 } from "./workspace-authority-shared";
 import { WorkspaceAuthorityClientError } from "./workspace-authority-shared";
 
-function authorityUrl(projectId: string, workspaceId: string, suffix: string): string {
-  return `${getServerAgentServiceUrl()}/api/workspace-authority/projects/${encodeURIComponent(projectId)}`
-    + `/workspaces/${encodeURIComponent(workspaceId)}${suffix}`;
+function authorityUrl(
+  projectId: string,
+  workspaceId: string,
+  suffix: string,
+): string {
+  return (
+    `${getServerAgentServiceUrl()}/api/workspace-authority/projects/${encodeURIComponent(projectId)}` +
+    `/workspaces/${encodeURIComponent(workspaceId)}${suffix}`
+  );
 }
 
 async function requestAuthorityJson<T>(
@@ -49,10 +55,14 @@ async function requestAuthorityJson<T>(
       503,
     );
   });
-  const body = await response.json().catch(() => ({})) as AuthorityEnvelope<T>;
+  const body = (await response
+    .json()
+    .catch(() => ({}))) as AuthorityEnvelope<T>;
   if (!response.ok || body.success === false || body.data === undefined) {
     throw new WorkspaceAuthorityClientError(
-      isWorkspaceAuthorityApiErrorCode(body.error?.code) ? body.error.code : fallbackCode,
+      isWorkspaceAuthorityApiErrorCode(body.error?.code)
+        ? body.error.code
+        : fallbackCode,
       body.error?.message ?? `Workspace Authority 响应 ${response.status}`,
       response.status || 502,
     );
@@ -66,7 +76,11 @@ export async function getWorkspaceAuthorityState(input: {
   sessionId: string;
 }): Promise<WorkspaceAuthoritySnapshot["state"]> {
   return requestAuthorityJson(
-    authorityUrl(input.projectId, input.workspaceId, `/state?sessionId=${encodeURIComponent(input.sessionId)}`),
+    authorityUrl(
+      input.projectId,
+      input.workspaceId,
+      `/state?sessionId=${encodeURIComponent(input.sessionId)}`,
+    ),
     { method: "GET" },
     "WORKSPACE_MUTATION_FAILED",
   );
@@ -80,7 +94,11 @@ export async function readWorkspaceAuthorityResource(input: {
 }): Promise<WorkspaceAuthorityResource> {
   const resourcePath = input.path.split("/").map(encodeURIComponent).join("/");
   return requestAuthorityJson(
-    authorityUrl(input.projectId, input.workspaceId, `/resources/${resourcePath}?sessionId=${encodeURIComponent(input.sessionId)}`),
+    authorityUrl(
+      input.projectId,
+      input.workspaceId,
+      `/resources/${resourcePath}?sessionId=${encodeURIComponent(input.sessionId)}`,
+    ),
     { method: "GET" },
     "WORKSPACE_RESOURCE_NOT_FOUND",
   );
@@ -93,7 +111,11 @@ export async function getWorkspaceAuthorityEvents(input: {
   afterRevision: WorkspaceRevision;
 }): Promise<WorkspaceMutationCommittedEvent[]> {
   return requestAuthorityJson(
-    authorityUrl(input.projectId, input.workspaceId, `/events?sessionId=${encodeURIComponent(input.sessionId)}&afterRevision=${input.afterRevision}`),
+    authorityUrl(
+      input.projectId,
+      input.workspaceId,
+      `/events?sessionId=${encodeURIComponent(input.sessionId)}&afterRevision=${input.afterRevision}`,
+    ),
     { method: "GET" },
     "WORKSPACE_MUTATION_FAILED",
   );
@@ -106,7 +128,11 @@ export async function getWorkspaceProjectionAcks(input: {
   afterRevision?: WorkspaceRevision;
 }): Promise<WorkspaceProjectionAck[]> {
   return requestAuthorityJson(
-    authorityUrl(input.projectId, input.workspaceId, `/projection-acks?sessionId=${encodeURIComponent(input.sessionId)}&afterRevision=${input.afterRevision ?? 0}`),
+    authorityUrl(
+      input.projectId,
+      input.workspaceId,
+      `/projection-acks?sessionId=${encodeURIComponent(input.sessionId)}&afterRevision=${input.afterRevision ?? 0}`,
+    ),
     { method: "GET" },
     "WORKSPACE_MUTATION_FAILED",
   );
@@ -117,7 +143,11 @@ export async function acknowledgeWorkspaceProjection(
 ): Promise<{ acknowledged: true }> {
   return requestAuthorityJson(
     authorityUrl(ack.projectId, ack.workspaceId, "/projection-ack"),
-    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(ack) },
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(ack),
+    },
     "WORKSPACE_MUTATION_FAILED",
   );
 }
@@ -128,7 +158,11 @@ export async function getWorkspaceAuthorityHealth(input: {
   sessionId: string;
 }): Promise<WorkspaceAuthorityHealthView> {
   return requestAuthorityJson(
-    authorityUrl(input.projectId, input.workspaceId, `/health?sessionId=${encodeURIComponent(input.sessionId)}`),
+    authorityUrl(
+      input.projectId,
+      input.workspaceId,
+      `/health?sessionId=${encodeURIComponent(input.sessionId)}`,
+    ),
     { method: "GET" },
     "WORKSPACE_MUTATION_FAILED",
   );
@@ -141,7 +175,11 @@ export async function reconcileWorkspaceAuthority(input: {
   mode: "adopt" | "restore";
 }): Promise<WorkspaceAuthoritySnapshot["state"]> {
   return requestAuthorityJson(
-    authorityUrl(input.projectId, input.workspaceId, `/reconcile/${input.mode}?sessionId=${encodeURIComponent(input.sessionId)}`),
+    authorityUrl(
+      input.projectId,
+      input.workspaceId,
+      `/reconcile/${input.mode}?sessionId=${encodeURIComponent(input.sessionId)}`,
+    ),
     { method: "POST" },
     "WORKSPACE_MUTATION_FAILED",
   );
@@ -165,10 +203,14 @@ async function executeMutation(
     );
   });
 
-  const body = await response.json().catch(() => ({})) as AuthorityEnvelope<WorkspaceMutationReceipt>;
+  const body = (await response
+    .json()
+    .catch(() => ({}))) as AuthorityEnvelope<WorkspaceMutationReceipt>;
   if (!response.ok || body.success === false || !body.data) {
     throw new WorkspaceAuthorityClientError(
-      isWorkspaceAuthorityApiErrorCode(body.error?.code) ? body.error.code : "WORKSPACE_MUTATION_FAILED",
+      isWorkspaceAuthorityApiErrorCode(body.error?.code)
+        ? body.error.code
+        : "WORKSPACE_MUTATION_FAILED",
       body.error?.message ?? `Workspace Authority 响应 ${response.status}`,
       response.status || 502,
     );
@@ -228,10 +270,14 @@ export async function getWorkspaceAuthoritySnapshot(input: {
     );
   });
 
-  const body = await response.json().catch(() => ({})) as AuthorityEnvelope<WorkspaceAuthoritySnapshot>;
+  const body = (await response
+    .json()
+    .catch(() => ({}))) as AuthorityEnvelope<WorkspaceAuthoritySnapshot>;
   if (!response.ok || body.success === false || !body.data) {
     throw new WorkspaceAuthorityClientError(
-      isWorkspaceAuthorityApiErrorCode(body.error?.code) ? body.error.code : "WORKSPACE_MUTATION_FAILED",
+      isWorkspaceAuthorityApiErrorCode(body.error?.code)
+        ? body.error.code
+        : "WORKSPACE_MUTATION_FAILED",
       body.error?.message ?? `Workspace Authority 响应 ${response.status}`,
       response.status || 502,
     );
@@ -261,10 +307,14 @@ export async function stageWorkspaceBinary(input: {
       503,
     );
   });
-  const body = await response.json().catch(() => ({})) as AuthorityEnvelope<WorkspaceBinaryStagingReceipt>;
+  const body = (await response
+    .json()
+    .catch(() => ({}))) as AuthorityEnvelope<WorkspaceBinaryStagingReceipt>;
   if (!response.ok || body.success === false || !body.data) {
     throw new WorkspaceAuthorityClientError(
-      isWorkspaceAuthorityApiErrorCode(body.error?.code) ? body.error.code : "WORKSPACE_MUTATION_FAILED",
+      isWorkspaceAuthorityApiErrorCode(body.error?.code)
+        ? body.error.code
+        : "WORKSPACE_MUTATION_FAILED",
       body.error?.message ?? `Workspace Authority 响应 ${response.status}`,
       response.status || 502,
     );
@@ -289,13 +339,20 @@ export function createTextWorkspaceMutation(input: {
     baseRevision: 0,
     actor: "author-site",
     reason: input.reason,
-    operations: [{
-      type: "put_text",
-      path: input.path,
-      content: input.content,
-      ...(input.previousContent === null
-        ? { expectedAbsent: true }
-        : { expectedHash: crypto.createHash("sha256").update(input.previousContent).digest("hex") }),
-    }],
+    operations: [
+      {
+        type: "put_text",
+        path: input.path,
+        content: input.content,
+        ...(input.previousContent === null
+          ? { expectedAbsent: true }
+          : {
+              expectedHash: crypto
+                .createHash("sha256")
+                .update(input.previousContent)
+                .digest("hex"),
+            }),
+      },
+    ],
   };
 }

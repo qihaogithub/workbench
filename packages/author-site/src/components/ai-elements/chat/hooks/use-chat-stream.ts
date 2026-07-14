@@ -427,6 +427,7 @@ export function useChatStream(options: UseChatStreamOptions) {
   const queuedMessagesRef = useRef<QueuedChatMessage[]>([]);
   const activeRunRef = useRef(false);
   const activeRunDedupeKeyRef = useRef<string | null>(null);
+  const busyRetryAttemptedRef = useRef(false);
   const drainQueueRef = useRef<() => void>(() => {});
   const previousSessionIdRef = useRef(sessionId);
   const lastPersistAtRef = useRef<number>(0);
@@ -576,6 +577,7 @@ export function useChatStream(options: UseChatStreamOptions) {
     ) => {
       if (!userMessage.trim() || !agentSessionId) return;
       activeRunRef.current = true;
+      busyRetryAttemptedRef.current = false;
 
       const source = runOptions?.source ?? "user";
       const trimmedMessage = userMessage.trim();
@@ -958,6 +960,25 @@ export function useChatStream(options: UseChatStreamOptions) {
 
           onError: (error) => {
             streamService.stopKeepalive();
+            // P5 Layer 3: auto-retry once on AGENT_BUSY
+            if (
+              error.code === "AGENT_BUSY" &&
+              !busyRetryAttemptedRef.current
+            ) {
+              busyRetryAttemptedRef.current = true;
+              streamService.close();
+              completeRunAndDrain();
+              setTimeout(() => {
+                void startMessageRun(
+                  trimmedMessage,
+                  images,
+                  files,
+                  runOptions,
+                  startOptions,
+                );
+              }, 200);
+              return;
+            }
             onDiagnosticEvent?.({
               name: "ai.stream_error",
               traceId,

@@ -221,7 +221,7 @@ export function DemoPageTreeItem({
             pageId={item.id}
             pageName={item.name}
             pageParentId={(item as DemoPageMeta).parentId ?? null}
-            runtimeType={(item as DemoPageMeta).runtimeType}
+            runtimeType={(item as DemoPageMeta & { runtimeType?: DemoPageRuntimeType }).runtimeType}
             folders={folders}
             onRename={() => startEditing(item.id, item.name)}
             onCopy={() => onPageCopy(item.id)}

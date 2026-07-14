@@ -11,7 +11,10 @@ import {
   formatRuntimeValidationInstruction,
   validatePreviewFileWrite,
 } from "./preview-validation";
-import { resolveLiveWorkspaceMutationContext } from "../../workspace/workspace-mutation-authority";
+import {
+  resolveLiveWorkspaceMutationContext,
+  WorkspaceMutationAuthorityError,
+} from "../../workspace/workspace-mutation-authority";
 
 const ReadFileParams = Type.Object({
   path: Type.String({ description: "Relative path to the file to read" }),
@@ -67,12 +70,42 @@ export function createReadFileTool(
         const liveWorkspace = config.workingDir
           ? resolveLiveWorkspaceMutationContext(config.workingDir)
           : null;
-        const snapshot = liveWorkspace
-          ? await liveWorkspace.authority.getSnapshot(
-              liveWorkspace.projectId,
-              liveWorkspace.workspaceId,
-            )
-          : null;
+        let snapshot: Awaited<
+          ReturnType<
+            NonNullable<typeof liveWorkspace>["authority"]["getSnapshot"]
+          >
+        > | null = null;
+        let driftRetryCount = 0;
+        while (true) {
+          try {
+            snapshot = liveWorkspace
+              ? await liveWorkspace.authority.getSnapshot(
+                  liveWorkspace.projectId,
+                  liveWorkspace.workspaceId,
+                )
+              : null;
+            break;
+          } catch (err) {
+            if (
+              err instanceof WorkspaceMutationAuthorityError &&
+              err.code === "WORKSPACE_EXTERNAL_DRIFT" &&
+              liveWorkspace &&
+              driftRetryCount === 0
+            ) {
+              driftRetryCount++;
+              logger.info(
+                { path: args.path },
+                "readFile: EXTERNAL_DRIFT detected, reconciling and retrying",
+              );
+              await liveWorkspace.authority.reconcileAdopt(
+                liveWorkspace.projectId,
+                liveWorkspace.workspaceId,
+              );
+              continue;
+            }
+            throw err;
+          }
+        }
         const content = snapshot
           ? snapshot.resources[args.path]
           : await fs.promises.readFile(filePath, "utf-8");
@@ -132,7 +165,8 @@ export function createWriteFileTool(
   return {
     name: "writeFile",
     label: "Write File",
-    description: "Write content to a file in the workspace",
+    description:
+      "Write the complete new content of a file, replacing the entire existing content. The content parameter must be the full new file, not a combination of old and new content.",
     parameters: WriteFileParams,
     execute: async (toolCallId: string, args: WriteFileParams) => {
       const filePath = path.resolve(config.workingDir || ".", args.path);
@@ -156,43 +190,130 @@ export function createWriteFileTool(
         const liveWorkspace = config.workingDir
           ? resolveLiveWorkspaceMutationContext(config.workingDir)
           : null;
-        const snapshot = liveWorkspace
-          ? await liveWorkspace.authority.getSnapshot(
-              liveWorkspace.projectId,
-              liveWorkspace.workspaceId,
-            )
-          : null;
+        let snapshot;
+        let snapshotDriftRetry = 0;
+        while (true) {
+          try {
+            snapshot = liveWorkspace
+              ? await liveWorkspace.authority.getSnapshot(
+                  liveWorkspace.projectId,
+                  liveWorkspace.workspaceId,
+                )
+              : null;
+            break;
+          } catch (err) {
+            if (
+              err instanceof WorkspaceMutationAuthorityError &&
+              err.code === "WORKSPACE_EXTERNAL_DRIFT" &&
+              liveWorkspace &&
+              snapshotDriftRetry === 0
+            ) {
+              snapshotDriftRetry++;
+              logger.info(
+                { path: args.path },
+                "writeFile getSnapshot: EXTERNAL_DRIFT, reconciling",
+              );
+              await liveWorkspace.authority.reconcileAdopt(
+                liveWorkspace.projectId,
+                liveWorkspace.workspaceId,
+              );
+              continue;
+            }
+            throw err;
+          }
+        }
         const existing = snapshot
           ? (snapshot.resources[args.path] ?? null)
           : await fs.promises.readFile(filePath, "utf-8").catch(() => null);
-        const receipt = liveWorkspace
-          ? await liveWorkspace.authority.mutate({
-              mutationId: crypto.randomUUID(),
-              projectId: liveWorkspace.projectId,
-              workspaceId: liveWorkspace.workspaceId,
-              sessionId: config.sessionId,
-              baseRevision: snapshot!.state.revision,
-              actor: "ai",
-              reason: "agent_write_file",
-              operations: [
-                {
-                  type: "put_text",
-                  path: args.path,
-                  content: args.content,
-                  ...(existing === null
-                    ? { expectedAbsent: true }
-                    : {
-                        expectedHash: crypto
-                          .createHash("sha256")
-                          .update(existing)
-                          .digest("hex"),
-                      }),
-                },
-              ],
-            })
-          : (await fs.promises.mkdir(dir, { recursive: true }),
-            await fs.promises.writeFile(filePath, args.content, "utf-8"),
-            null);
+
+        // Direction A: detect content concatenation before writing
+        if (
+          existing &&
+          args.content.length > existing.length * 1.5 &&
+          args.content.includes(existing) &&
+          args.content.length > 200
+        ) {
+          logger.warn(
+            {
+              path: args.path,
+              contentLength: args.content.length,
+              existingLength: existing.length,
+            },
+            "writeFile: suspected content concatenation detected",
+          );
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Error: suspected content concatenation. The new content (${args.content.length} chars) appears to contain the entire existing content (${existing.length} chars) plus additional text. This usually means the file content was accidentally duplicated. Please use readFile to read the current file content first, then write ONLY the corrected complete new content.`,
+              },
+            ],
+            details: {
+              path: args.path,
+              error: "SUSPECTED_CONTENT_CONCATENATION",
+            },
+            isError: true,
+          };
+        }
+
+        let receipt;
+        let driftRetryCount = 0;
+        while (true) {
+          try {
+            receipt = liveWorkspace
+              ? await liveWorkspace.authority.mutate({
+                  mutationId: crypto.randomUUID(),
+                  projectId: liveWorkspace.projectId,
+                  workspaceId: liveWorkspace.workspaceId,
+                  sessionId: config.sessionId,
+                  baseRevision: snapshot!.state.revision,
+                  actor: "ai",
+                  reason: "agent_write_file",
+                  operations: [
+                    {
+                      type: "put_text",
+                      path: args.path,
+                      content: args.content,
+                      ...(existing === null
+                        ? { expectedAbsent: true }
+                        : {
+                            expectedHash: crypto
+                              .createHash("sha256")
+                              .update(existing)
+                              .digest("hex"),
+                          }),
+                    },
+                  ],
+                })
+              : (await fs.promises.mkdir(dir, { recursive: true }),
+                await fs.promises.writeFile(filePath, args.content, "utf-8"),
+                null);
+            break;
+          } catch (err) {
+            if (
+              err instanceof WorkspaceMutationAuthorityError &&
+              err.code === "WORKSPACE_EXTERNAL_DRIFT" &&
+              liveWorkspace &&
+              driftRetryCount === 0
+            ) {
+              driftRetryCount++;
+              logger.info(
+                { path: args.path },
+                "writeFile: EXTERNAL_DRIFT detected, reconciling and retrying",
+              );
+              await liveWorkspace.authority.reconcileAdopt(
+                liveWorkspace.projectId,
+                liveWorkspace.workspaceId,
+              );
+              snapshot = await liveWorkspace.authority.getSnapshot(
+                liveWorkspace.projectId,
+                liveWorkspace.workspaceId,
+              );
+              continue;
+            }
+            throw err;
+          }
+        }
         const runtimeValidation = validatePreviewFileWrite(
           args.path,
           args.content,
@@ -276,12 +397,38 @@ export function createListFilesTool(
         const liveWorkspace = config.workingDir
           ? resolveLiveWorkspaceMutationContext(config.workingDir)
           : null;
-        const snapshot = liveWorkspace
-          ? await liveWorkspace.authority.getSnapshot(
-              liveWorkspace.projectId,
-              liveWorkspace.workspaceId,
-            )
-          : null;
+        let snapshot;
+        let driftRetryCount = 0;
+        while (true) {
+          try {
+            snapshot = liveWorkspace
+              ? await liveWorkspace.authority.getSnapshot(
+                  liveWorkspace.projectId,
+                  liveWorkspace.workspaceId,
+                )
+              : null;
+            break;
+          } catch (err) {
+            if (
+              err instanceof WorkspaceMutationAuthorityError &&
+              err.code === "WORKSPACE_EXTERNAL_DRIFT" &&
+              liveWorkspace &&
+              driftRetryCount === 0
+            ) {
+              driftRetryCount++;
+              logger.info(
+                { path: args.path || "." },
+                "listFiles: EXTERNAL_DRIFT detected, reconciling and retrying",
+              );
+              await liveWorkspace.authority.reconcileAdopt(
+                liveWorkspace.projectId,
+                liveWorkspace.workspaceId,
+              );
+              continue;
+            }
+            throw err;
+          }
+        }
 
         if (snapshot) {
           const prefix = args.path ? `${args.path.replace(/\/+$/, "")}/` : "";

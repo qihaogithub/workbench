@@ -231,16 +231,10 @@ describe("多 Demo 页面 — fs-utils", () => {
       expect(patched.routeKey).toBe("a");
       expect(patched.order).toBe(5);
 
-      const prototype = writeDemoPageMeta(ws, demoId, {
-        runtimeType: "prototype-html-css",
-      });
-      expect(prototype.runtimeType).toBe("prototype-html-css");
-      expect(readDemoPageMeta(ws, demoId)?.runtimeType).toBe(
-        "prototype-html-css",
-      );
-
-      const stillPrototype = writeDemoPageMeta(ws, demoId, { name: "页面 B" });
-      expect(stillPrototype.runtimeType).toBe("prototype-html-css");
+      // runtimeType 已改为文件系统推断，不再存储在 DemoPageMeta 中
+      const renamed = writeDemoPageMeta(ws, demoId, { name: "页面 B" });
+      expect(renamed.name).toBe("页面 B");
+      expect(renamed.order).toBe(5);
     });
 
     it("重复 routeKey 写入时应自动生成唯一值", () => {

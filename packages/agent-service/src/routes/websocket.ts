@@ -25,7 +25,10 @@ import { getWorkbenchToolCapabilities } from "../backends/pi-tools";
 import type { BaseAgent } from "../core/agent";
 
 function resolveDefaultModelId(): string {
-  const raw = process.env.NEXT_PUBLIC_DEFAULT_MODEL_IDS || process.env.DEFAULT_MODEL || "";
+  const raw =
+    process.env.NEXT_PUBLIC_DEFAULT_MODEL_IDS ||
+    process.env.DEFAULT_MODEL ||
+    "";
   const first = raw.split(",")[0]?.trim();
   return first || "";
 }
@@ -37,7 +40,16 @@ interface StreamParams {
 }
 
 interface ClientMessage {
-  type: "message" | "cancel" | "ping" | "resume" | "set_model" | "get_models" | "permission_response" | "user_choice_response" | "console_data";
+  type:
+    | "message"
+    | "cancel"
+    | "ping"
+    | "resume"
+    | "set_model"
+    | "get_models"
+    | "permission_response"
+    | "user_choice_response"
+    | "console_data";
   id?: string;
   content?: string;
   sessionId?: string;
@@ -50,7 +62,11 @@ interface ClientMessage {
   files?: FileAttachment[];
   /** v3.2: 静态 system prompt 注入（L2 + L4） */
   systemPrompt?: string;
-  entries?: Array<{ level: 'log' | 'warn' | 'error' | 'info' | 'debug'; args: string; timestamp: number }>;
+  entries?: Array<{
+    level: "log" | "warn" | "error" | "info" | "debug";
+    args: string;
+    timestamp: number;
+  }>;
   options?: {
     timeout?: number;
     stream?: boolean;
@@ -91,11 +107,15 @@ function normalizeTimeoutMs(value: unknown): number | null {
   );
 }
 
-export function resolveExplicitMessageTimeoutMs(requestTimeoutMs?: number): number | null {
+export function resolveExplicitMessageTimeoutMs(
+  requestTimeoutMs?: number,
+): number | null {
   return normalizeTimeoutMs(requestTimeoutMs);
 }
 
-async function resolveCurrentModelId(agent: BaseAgent | undefined): Promise<string | null> {
+async function resolveCurrentModelId(
+  agent: BaseAgent | undefined,
+): Promise<string | null> {
   if (!agent || !("getModelInfo" in agent)) return null;
 
   const modelInfo = await (
@@ -167,9 +187,13 @@ export async function registerWebSocketRoutes(
       };
 
       let lastAgentActivityAt = Date.now();
-      const eventRouter = new WebSocketEventRouter(sessionId, sendMessage, () => {
-        lastAgentActivityAt = Date.now();
-      });
+      const eventRouter = new WebSocketEventRouter(
+        sessionId,
+        sendMessage,
+        () => {
+          lastAgentActivityAt = Date.now();
+        },
+      );
 
       const connection: ActiveConnection = {
         socket,
@@ -255,7 +279,13 @@ export async function registerWebSocketRoutes(
                 // 同步会话元数据到全局 SessionStore
                 const sessionStore = getSessionStore();
                 if (!sessionStore.get(sessionId)) {
-                  let workspaceInfo: { path: string; customWorkspace: boolean; type: "user" | "temp" } | undefined;
+                  let workspaceInfo:
+                    | {
+                        path: string;
+                        customWorkspace: boolean;
+                        type: "user" | "temp";
+                      }
+                    | undefined;
                   if (message.workingDir) {
                     workspaceInfo = await workspaceManager.create({
                       workspace: message.workingDir,
@@ -290,7 +320,10 @@ export async function registerWebSocketRoutes(
                     contentLength: message.content.length,
                     workingDir: message.workingDir,
                     demoId: message.demoId,
-                    model: requestedModelId || (await resolveCurrentModelId(agent)) || config.model,
+                    model:
+                      requestedModelId ||
+                      (await resolveCurrentModelId(agent)) ||
+                      config.model,
                   });
                   eventRouter.recordFinish(result);
                   eventRouter.finishMessage();
@@ -322,12 +355,21 @@ export async function registerWebSocketRoutes(
 
               // v3.2: 注入静态 system prompt（必须在 agent.start() 之后，因为 Pi Agent 实例在 start() 时才创建）
               if (message.systemPrompt && agent instanceof BackendAgent) {
-                logger.info({ sessionId, promptLength: message.systemPrompt.length }, 'WebSocket: calling updateSystemPrompt');
+                logger.info(
+                  { sessionId, promptLength: message.systemPrompt.length },
+                  "WebSocket: calling updateSystemPrompt",
+                );
                 await agent.updateSystemPrompt(message.systemPrompt);
               } else if (!message.systemPrompt) {
-                logger.info({ sessionId }, 'WebSocket: no systemPrompt in message, skipping update');
+                logger.info(
+                  { sessionId },
+                  "WebSocket: no systemPrompt in message, skipping update",
+                );
               } else {
-                logger.warn({ sessionId, agentType: agent.constructor.name }, 'WebSocket: agent is not BackendAgent, cannot updateSystemPrompt');
+                logger.warn(
+                  { sessionId, agentType: agent.constructor.name },
+                  "WebSocket: agent is not BackendAgent, cannot updateSystemPrompt",
+                );
               }
 
               sendMessage({
@@ -340,7 +382,8 @@ export async function registerWebSocketRoutes(
               const sessionStore = getSessionStore();
               sessionStore.update(sessionId, {
                 status: "processing",
-                messageCount: (sessionStore.get(sessionId)?.messageCount || 0) + 1,
+                messageCount:
+                  (sessionStore.get(sessionId)?.messageCount || 0) + 1,
               });
 
               const explicitMessageTimeoutMs = resolveExplicitMessageTimeoutMs(
@@ -350,11 +393,16 @@ export async function registerWebSocketRoutes(
                 contentLength: message.content.length,
                 workingDir: message.workingDir,
                 demoId: message.demoId,
-                model: requestedModelId || (await resolveCurrentModelId(agent)) || config.model,
+                model:
+                  requestedModelId ||
+                  (await resolveCurrentModelId(agent)) ||
+                  config.model,
               });
 
               let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
-              let progressHeartbeatHandle: ReturnType<typeof setInterval> | undefined;
+              let progressHeartbeatHandle:
+                | ReturnType<typeof setInterval>
+                | undefined;
 
               try {
                 lastAgentActivityAt = Date.now();
@@ -370,14 +418,11 @@ export async function registerWebSocketRoutes(
                 }, MESSAGE_PROGRESS_HEARTBEAT_INTERVAL_MS);
                 progressHeartbeatHandle.unref?.();
 
-                const sendPromise = agent.sendMessage(
-                  message.content,
-                  {
-                    ...message.options,
-                    images: message.images,
-                    files: message.files,
-                  },
-                );
+                const sendPromise = agent.sendMessage(message.content, {
+                  ...message.options,
+                  images: message.images,
+                  files: message.files,
+                });
 
                 const result: AgentResult = explicitMessageTimeoutMs
                   ? await Promise.race([
@@ -386,7 +431,9 @@ export async function registerWebSocketRoutes(
                         timeoutHandle = setTimeout(() => {
                           const elapsedMs = Date.now() - lastAgentActivityAt;
                           const partialFiles =
-                            agent instanceof BackendAgent ? agent.getFiles() : [];
+                            agent instanceof BackendAgent
+                              ? agent.getFiles()
+                              : [];
                           eventRouter.cancelMessage();
                           agent.cancel();
 
@@ -401,7 +448,10 @@ export async function registerWebSocketRoutes(
 
                           resolve({
                             success: false,
-                            files: partialFiles.length > 0 ? partialFiles : undefined,
+                            files:
+                              partialFiles.length > 0
+                                ? partialFiles
+                                : undefined,
                             error: {
                               code: "MESSAGE_TIMEOUT",
                               message: `消息处理超时（已达到显式上限 ${Math.round(
@@ -416,7 +466,10 @@ export async function registerWebSocketRoutes(
                     ])
                   : await sendPromise;
 
-                if (!result.success && result.error?.code === "MESSAGE_TIMEOUT") {
+                if (
+                  !result.success &&
+                  result.error?.code === "MESSAGE_TIMEOUT"
+                ) {
                   eventRouter.cancelMessage();
                 }
 
@@ -463,7 +516,8 @@ export async function registerWebSocketRoutes(
                 throw error;
               } finally {
                 if (timeoutHandle) clearTimeout(timeoutHandle);
-                if (progressHeartbeatHandle) clearInterval(progressHeartbeatHandle);
+                if (progressHeartbeatHandle)
+                  clearInterval(progressHeartbeatHandle);
                 eventRouter.finishMessage();
               }
             } catch (error) {
@@ -513,7 +567,8 @@ export async function registerWebSocketRoutes(
                 model: currentModelId || DEFAULT_MODEL_ID,
                 toolVersion: getWorkbenchToolCapabilities().toolVersion,
                 backendProviders: getSessionModelConfigs().get(resumeSessionId),
-                externalAuth: getSessionExternalAuthConfigs().get(resumeSessionId),
+                externalAuth:
+                  getSessionExternalAuthConfigs().get(resumeSessionId),
               };
 
               const agent = manager.getOrCreate(resumeSessionId, config);
@@ -625,7 +680,8 @@ export async function registerWebSocketRoutes(
           case "get_models": {
             try {
               let agent = manager.get(sessionId);
-              const sessionBackendProviders = getSessionModelConfigs().get(sessionId);
+              const sessionBackendProviders =
+                getSessionModelConfigs().get(sessionId);
               if (!agent) {
                 const config: AgentConfig = {
                   sessionId,
@@ -652,7 +708,8 @@ export async function registerWebSocketRoutes(
               } else if (sessionBackendProviders) {
                 agent = manager.getOrCreate(sessionId, {
                   ...agent.getConfig(),
-                  workingDir: message.workingDir || agent.getConfig().workingDir,
+                  workingDir:
+                    message.workingDir || agent.getConfig().workingDir,
                   projectId: message.projectId || agent.getConfig().projectId,
                   demoId: message.demoId || agent.getConfig().demoId,
                   toolVersion: getWorkbenchToolCapabilities().toolVersion,
@@ -723,9 +780,10 @@ export async function registerWebSocketRoutes(
           case "permission_response": {
             const permissionId = message.permissionId;
             const optionId = message.optionId;
-            const responseContent = typeof message.responseContent === "string"
-              ? message.responseContent
-              : undefined;
+            const responseContent =
+              typeof message.responseContent === "string"
+                ? message.responseContent
+                : undefined;
             if (!permissionId || !optionId) {
               sendMessage({
                 type: "error",
@@ -738,7 +796,7 @@ export async function registerWebSocketRoutes(
               return;
             }
 
-            const approved = optionId === 'allow_once';
+            const approved = optionId === "allow_once";
             logger.info(
               { sessionId, permissionId, optionId, approved },
               "WebSocket permission_response received",
@@ -747,12 +805,22 @@ export async function registerWebSocketRoutes(
             try {
               const agent = manager.get(sessionId);
               if (agent && agent instanceof BackendAgent) {
-                agent.resolvePermission(permissionId, approved, responseContent);
+                agent.resolvePermission(
+                  permissionId,
+                  approved,
+                  responseContent,
+                );
               } else {
-                logger.warn({ sessionId }, "No agent found for permission_response");
+                logger.warn(
+                  { sessionId },
+                  "No agent found for permission_response",
+                );
               }
             } catch (error) {
-              logger.error({ error, permissionId }, "Failed to resolve permission");
+              logger.error(
+                { error, permissionId },
+                "Failed to resolve permission",
+              );
             }
             break;
           }
@@ -762,8 +830,12 @@ export async function registerWebSocketRoutes(
             const choice = message.choice;
             const validChoice =
               choice?.type === "cancel" ||
-              (choice?.type === "option" && typeof choice.optionId === "string" && choice.optionId.length > 0) ||
-              (choice?.type === "custom" && typeof choice.text === "string" && choice.text.trim().length > 0);
+              (choice?.type === "option" &&
+                typeof choice.optionId === "string" &&
+                choice.optionId.length > 0) ||
+              (choice?.type === "custom" &&
+                typeof choice.text === "string" &&
+                choice.text.trim().length > 0);
 
             if (!requestId || !validChoice) {
               sendMessage({
@@ -788,10 +860,16 @@ export async function registerWebSocketRoutes(
               if (agent && agent instanceof BackendAgent) {
                 agent.resolveUserChoice(requestId, userChoice);
               } else {
-                logger.warn({ sessionId }, "No agent found for user_choice_response");
+                logger.warn(
+                  { sessionId },
+                  "No agent found for user_choice_response",
+                );
               }
             } catch (error) {
-              logger.error({ error, requestId }, "Failed to resolve user choice");
+              logger.error(
+                { error, requestId },
+                "Failed to resolve user choice",
+              );
             }
             break;
           }
@@ -823,24 +901,34 @@ export async function registerWebSocketRoutes(
         );
         if (!hasOtherConnections) {
           const agent = manager.get(sessionId);
-          if (agent && agent.status !== "processing") {
-            logger.info(
-              { sessionId },
-              "No active connections for session, cleaning up agent",
-            );
-            void manager.destroy(sessionId);
-
-            // 清理临时工作空间和会话元数据
-            const sessionStore = getSessionStore();
-            const session = sessionStore.get(sessionId);
-            if (session?.workingDir && session.workspaceType === "temp") {
-              await workspaceManager.cleanup(session.workingDir);
-              snapshotService.clearSnapshot(session.workingDir);
+          if (agent) {
+            // P5 Layer 2: cancel processing agent when last connection closes
+            if (agent instanceof BackendAgent && agent.isBusy()) {
+              logger.info(
+                { sessionId },
+                "Last connection closed while agent is busy, cancelling agent",
+              );
+              await agent.cancel();
             }
-            consoleBuffer.clear(sessionId);
-            getSessionModelConfigs().delete(sessionId);
-            getSessionExternalAuthConfigs().delete(sessionId);
-            sessionStore.delete(sessionId);
+            if (agent.status !== "processing") {
+              logger.info(
+                { sessionId },
+                "No active connections for session, cleaning up agent",
+              );
+              void manager.destroy(sessionId);
+
+              // 清理临时工作空间和会话元数据
+              const sessionStore = getSessionStore();
+              const session = sessionStore.get(sessionId);
+              if (session?.workingDir && session.workspaceType === "temp") {
+                await workspaceManager.cleanup(session.workingDir);
+                snapshotService.clearSnapshot(session.workingDir);
+              }
+              consoleBuffer.clear(sessionId);
+              getSessionModelConfigs().delete(sessionId);
+              getSessionExternalAuthConfigs().delete(sessionId);
+              sessionStore.delete(sessionId);
+            }
           }
         }
       });

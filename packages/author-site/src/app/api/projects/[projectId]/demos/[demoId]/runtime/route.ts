@@ -441,9 +441,7 @@ export async function PUT(
           { status: 500 },
         );
       }
-      updatedMeta = writeDemoPageMeta(wsPath, demoId, {
-        runtimeType: targetRuntimeType,
-      });
+      updatedMeta = writeDemoPageMeta(wsPath, demoId, {});
     }
 
     return NextResponse.json(

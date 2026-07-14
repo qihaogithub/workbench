@@ -3,23 +3,24 @@
 > 面向 AI 编码代理的项目工作指南。目标是让后续代理能快速判断改动边界、选择正确工具、运行合适验证，并避免被历史目录或过期脚本误导。
 
 <!-- CODEGRAPH_START -->
+
 ## CodeGraph
 
 本仓库已配置 CodeGraph MCP server（`codegraph_*` tools）。CodeGraph 是基于 tree-sitter 的代码知识图谱，适合回答结构性问题：符号定义、调用关系、影响范围、文件结构和相关源码上下文。
 
 优先使用 CodeGraph 的场景：
 
-| 问题 | 工具 |
-|---|---|
-| 查找文件或目录结构 | `codegraph_files` |
-| 查找符号定义 | `codegraph_search` |
+| 问题                            | 工具                |
+| ------------------------------- | ------------------- |
+| 查找文件或目录结构              | `codegraph_files`   |
+| 查找符号定义                    | `codegraph_search`  |
 | 理解某个功能、架构或 bug 上下文 | `codegraph_context` |
-| 查看多个相关符号源码 | `codegraph_explore` |
-| 查看单个符号签名、位置或源码 | `codegraph_node` |
-| 查看调用者 | `codegraph_callers` |
-| 查看被调用项 | `codegraph_callees` |
-| 评估变更影响 | `codegraph_impact` |
-| 检查索引状态 | `codegraph_status` |
+| 查看多个相关符号源码            | `codegraph_explore` |
+| 查看单个符号签名、位置或源码    | `codegraph_node`    |
+| 查看调用者                      | `codegraph_callers` |
+| 查看被调用项                    | `codegraph_callees` |
+| 评估变更影响                    | `codegraph_impact`  |
+| 检查索引状态                    | `codegraph_status`  |
 
 使用规则：
 
@@ -30,10 +31,12 @@
 - 文件刚改完时 CodeGraph 可能有约 500ms 索引延迟，不要立刻依赖它验证刚写入的内容。
 
 如果 `.codegraph/` 不存在或工具提示未初始化，先询问用户是否运行 `codegraph init -i`。
+
 <!-- CODEGRAPH_END -->
 
 ## 快速判断
 
+- **项目阶段：未上线，不需要向后兼容。** 可以直接做破坏性变更（重命名接口、删除字段、修改数据格式等），无需迁移脚本或兼容层。
 - 包管理器：`pnpm@8.15.0`
 - Node 要求：`node >=18.0.0`
 - `.npmrc`：`shamefully-hoist=true`
@@ -177,23 +180,23 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h
 
 当前有效 workspace 包：
 
-| 包名 | 路径 | 类型 | 端口 | 测试 |
-|---|---|---|---|---|
-| `@workbench/author-site` | `packages/author-site/` | Next.js 14 App Router | 3200 | Jest + Testing Library |
-| `@workbench/viewer-site` | `packages/viewer-site/` | Next.js 14 App Router | 3300 | 无包内测试脚本 |
-| `@workbench/shared` | `packages/shared/` | 共享类型和常量 | - | 无测试脚本 |
-| `@workbench/sketch-core` | `packages/sketch-core/` | 草图页协议、校验、patch、几何、只读渲染 | - | Vitest |
-| `@workbench/sketch-react` | `packages/sketch-react/` | 草图页 React SDK：画布、工具栏、图层、属性栏和编辑状态 | - | Vitest + Testing Library |
-| `@workbench/sketch-playground` | `packages/sketch-playground/` | 草图 SDK 独立开发与测试 Playground | 3400 | TypeScript + Playwright |
-| `@workbench/agent-service` | `packages/agent-service/` | Fastify + Pi Agent | 3201 | Vitest |
-| `@workbench/agent-client` | `packages/agent-client/` | Client SDK | - | 无测试脚本 |
-| `@workbench/screenshot-service` | `packages/screenshot-service/` | Fastify + Puppeteer | 3202 | Vitest |
-| `@workbench/knowledge-core` | `packages/knowledge-core/` | 知识库领域模型与权限规则 | - | Vitest |
-| `@workbench/knowledge-service` | `packages/knowledge-service/` | Basic 检索、阅读地图、索引任务、知识报告 | - | Vitest |
-| `@workbench/project-core` | `packages/project-core/` | 项目读写领域服务，供 Web API 与 CLI 复用 | - | Vitest |
-| `@workbench/project-scaffold` | `packages/project-scaffold/` | 本地项目包协议与脚手架转换器 | - | Node/tsx 命令 |
-| `@workbench/project-cli` | `packages/project-cli/` | 项目管理 JSON-first CLI | - | Node/tsx 命令 |
-| `@workbench/cli-tools` | `OPS/CLI/` | CLI 测试工具，ESM | - | Node/tsx 命令 |
+| 包名                            | 路径                           | 类型                                                   | 端口 | 测试                     |
+| ------------------------------- | ------------------------------ | ------------------------------------------------------ | ---- | ------------------------ |
+| `@workbench/author-site`        | `packages/author-site/`        | Next.js 14 App Router                                  | 3200 | Jest + Testing Library   |
+| `@workbench/viewer-site`        | `packages/viewer-site/`        | Next.js 14 App Router                                  | 3300 | 无包内测试脚本           |
+| `@workbench/shared`             | `packages/shared/`             | 共享类型和常量                                         | -    | 无测试脚本               |
+| `@workbench/sketch-core`        | `packages/sketch-core/`        | 草图页协议、校验、patch、几何、只读渲染                | -    | Vitest                   |
+| `@workbench/sketch-react`       | `packages/sketch-react/`       | 草图页 React SDK：画布、工具栏、图层、属性栏和编辑状态 | -    | Vitest + Testing Library |
+| `@workbench/sketch-playground`  | `packages/sketch-playground/`  | 草图 SDK 独立开发与测试 Playground                     | 3400 | TypeScript + Playwright  |
+| `@workbench/agent-service`      | `packages/agent-service/`      | Fastify + Pi Agent                                     | 3201 | Vitest                   |
+| `@workbench/agent-client`       | `packages/agent-client/`       | Client SDK                                             | -    | 无测试脚本               |
+| `@workbench/screenshot-service` | `packages/screenshot-service/` | Fastify + Puppeteer                                    | 3202 | Vitest                   |
+| `@workbench/knowledge-core`     | `packages/knowledge-core/`     | 知识库领域模型与权限规则                               | -    | Vitest                   |
+| `@workbench/knowledge-service`  | `packages/knowledge-service/`  | Basic 检索、阅读地图、索引任务、知识报告               | -    | Vitest                   |
+| `@workbench/project-core`       | `packages/project-core/`       | 项目读写领域服务，供 Web API 与 CLI 复用               | -    | Vitest                   |
+| `@workbench/project-scaffold`   | `packages/project-scaffold/`   | 本地项目包协议与脚手架转换器                           | -    | Node/tsx 命令            |
+| `@workbench/project-cli`        | `packages/project-cli/`        | 项目管理 JSON-first CLI                                | -    | Node/tsx 命令            |
+| `@workbench/cli-tools`          | `OPS/CLI/`                     | CLI 测试工具，ESM                                      | -    | Node/tsx 命令            |
 
 `.next/`、`node_modules/`、`coverage/`、`dist/`、`out/`、`test/**/test-outputs/` 都是生成物或依赖目录，不作为源码入口。
 
@@ -395,8 +398,3 @@ Docker：
 - 全仓轻量验证：`pnpm check:all`。该命令不包含真实 LLM、OSS、Docker 或浏览器 E2E。
 
 如果没有运行测试，在最终回复中说明原因和剩余风险。
-
-## 不要做
-- 不要把生成数据、缓存、截图输出或数据库文件纳入提交，除非任务明确要求。
-- 不要把 unrelated dirty changes 回滚、格式化或顺手修掉。
-- 不要新增大型抽象、UI 库、服务依赖或全局配置，除非现有结构确实需要。

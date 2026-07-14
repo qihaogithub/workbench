@@ -151,8 +151,6 @@ export function buildAutoPreviewRepairFingerprint(params: {
 }): string {
   const { projectId, pageId, diagnostic } = params;
   const stableDiagnosticKey =
-    diagnostic.moduleHash ||
-    diagnostic.codeHash ||
     [
       diagnostic.source,
       diagnostic.stage,

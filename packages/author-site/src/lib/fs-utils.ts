@@ -503,10 +503,6 @@ export function writeDemoPageMeta(
     id: existing?.id ?? demoId,
     name: patch.name ?? existing?.name ?? demoId,
     routeKey: nextRouteKey,
-    runtimeType:
-      patch.runtimeType !== undefined
-        ? patch.runtimeType
-        : existing?.runtimeType,
     order: patch.order ?? existing?.order ?? 0,
     parentId:
       patch.parentId !== undefined
@@ -535,27 +531,13 @@ export function listDemoPages(workspacePath: string): DemoPageMeta[] {
 
   for (const page of tree.pages) {
     const dir = path.join(demosDir, page.id);
-    // 当 tree 缺少 runtimeType 时，根据磁盘文件推断而非直接默认 high-fidelity-react
-    let runtimeType: DemoPageRuntimeType | undefined = page.runtimeType;
-    if (!runtimeType) {
-      if (fs.existsSync(path.join(dir, "sketch.scene.json"))) {
-        runtimeType = "sketch-scene";
-      } else if (fs.existsSync(path.join(dir, "prototype.html"))) {
-        runtimeType = "prototype-html-css";
-      } else {
-        runtimeType = "high-fidelity-react";
-      }
-    }
-    const resolvedPage: DemoPageMeta = { ...page, runtimeType };
-    if (
-      fs.existsSync(path.join(dir, "config.schema.json")) &&
-      (runtimeType === "prototype-html-css"
-        ? fs.existsSync(path.join(dir, "prototype.html"))
-        : runtimeType === "sketch-scene"
-          ? fs.existsSync(path.join(dir, "sketch.scene.json"))
-          : fs.existsSync(path.join(dir, "index.tsx")))
-    ) {
-      result.push(resolvedPage);
+    // 根据磁盘文件推断运行时类型，用于校验页面文件完整性
+    const hasSchema = fs.existsSync(path.join(dir, "config.schema.json"));
+    const hasSketch = fs.existsSync(path.join(dir, "sketch.scene.json"));
+    const hasPrototype = fs.existsSync(path.join(dir, "prototype.html"));
+    const hasReact = fs.existsSync(path.join(dir, "index.tsx"));
+    if (hasSchema && (hasSketch || hasPrototype || hasReact)) {
+      result.push(page);
     }
   }
 
@@ -572,17 +554,10 @@ export function listDemoPages(workspacePath: string): DemoPageMeta[] {
     const hasPrototype = fs.existsSync(path.join(dir, "prototype.html"));
     const hasSketchScene = fs.existsSync(path.join(dir, "sketch.scene.json"));
     if (hasSchema && (hasReactCode || hasPrototype || hasSketchScene)) {
-      const runtimeType =
-        !hasReactCode && hasSketchScene
-          ? "sketch-scene"
-          : !hasReactCode && hasPrototype
-            ? "prototype-html-css"
-            : undefined;
       result.push({
         id: entry.name,
         name: entry.name.split("_")[0].replace(/-/g, " "),
         routeKey: makeUniqueRouteKey(entry.name, routeKeys),
-        runtimeType,
         order: result.length,
         parentId: null,
       });
@@ -593,6 +568,15 @@ export function listDemoPages(workspacePath: string): DemoPageMeta[] {
     if (a.order !== b.order) return a.order - b.order;
     return a.id.localeCompare(b.id);
   });
+}
+
+/**
+ * 根据页面目录中的文件推断运行时类型（唯一真相来源是文件系统）。
+ */
+export function resolvePageRuntimeType(pageDir: string): DemoPageRuntimeType {
+  if (fs.existsSync(path.join(pageDir, "sketch.scene.json"))) return "sketch-scene";
+  if (fs.existsSync(path.join(pageDir, "prototype.html"))) return "prototype-html-css";
+  return "high-fidelity-react";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -1842,7 +1826,7 @@ export function createWorkspaceDemoPage(
   workspaceId: string,
   name: string,
   parentId?: string | null,
-  runtimeType?: DemoPageMeta["runtimeType"],
+  runtimeType?: DemoPageRuntimeType,
 ): DemoPageMeta | null {
   const wsPath = findWorkspacePath(workspaceId);
   if (!wsPath) return null;
@@ -1857,7 +1841,7 @@ export function createWorkspaceDemoPage(
   const demoId = generateDemoPageId(name);
   const demoDir = getDemoDirPath(wsPath, demoId);
   fs.mkdirSync(demoDir, { recursive: true });
-  const resolvedRuntimeType: DemoPageMeta["runtimeType"] =
+  const resolvedRuntimeType: DemoPageRuntimeType =
     runtimeType === "high-fidelity-react"
       ? "high-fidelity-react"
       : runtimeType === "sketch-scene"
@@ -1905,10 +1889,6 @@ export function createWorkspaceDemoPage(
       name?.trim() || "新建页面",
       existing.map((page) => page.routeKey).filter(Boolean) as string[],
     ),
-    runtimeType:
-      resolvedRuntimeType === "high-fidelity-react"
-        ? undefined
-        : resolvedRuntimeType,
     order: nextOrder,
     parentId: parentId ?? null,
   };
@@ -2000,7 +1980,6 @@ function readDeletedDemoPageSnapshotMeta(
       id: parsed.id,
       name: parsed.name,
       routeKey: parsed.routeKey,
-      runtimeType: parsed.runtimeType,
       order: parsed.order ?? 0,
       parentId: parsed.parentId ?? null,
     };

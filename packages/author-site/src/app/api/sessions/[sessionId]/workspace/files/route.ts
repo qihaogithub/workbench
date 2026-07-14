@@ -9,6 +9,7 @@ import {
   createApiError,
   findWorkspacePath,
   readDemoPageMeta,
+  resolvePageRuntimeType,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import {
@@ -120,12 +121,9 @@ export async function GET(
     const pageMeta = pageDirectoryMatch
       ? readDemoPageMeta(wsPath, pageDirectoryMatch[1])
       : null;
-    const inferredRuntimeType = pageDirectoryMatch && !pageMeta
-      ? !fs.existsSync(path.join(resolvedPath, "index.tsx")) &&
-          fs.existsSync(path.join(resolvedPath, "prototype.html"))
-        ? "prototype-html-css"
-        : undefined
-      : pageMeta?.runtimeType;
+    const inferredRuntimeType = pageDirectoryMatch
+      ? resolvePageRuntimeType(resolvedPath)
+      : undefined;
 
     for (const entry of entries) {
       if (isHiddenEntry(entry.name, showKnowledge)) continue;

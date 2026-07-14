@@ -364,7 +364,7 @@ export function createConvertSketchPageTool(_config: AgentConfig): AgentTool<typ
     execute: async (_toolCallId: string, args: ConvertSketchPageParams) => ({
       content: [{
         type: 'text',
-        text: `Conversion requested for ${args.pageId} -> ${args.targetRuntimeType}. Generate target files, validate them, then update workspace-tree.json runtimeType.`,
+        text: `Conversion requested for ${args.pageId} -> ${args.targetRuntimeType}. Generate target files and validate them. Runtime type is automatically inferred from files on disk.`,
       }],
       details: {
         pageId: args.pageId,
@@ -372,7 +372,7 @@ export function createConvertSketchPageTool(_config: AgentConfig): AgentTool<typ
         nextActions: [
           'readSketchScene',
           args.targetRuntimeType === 'prototype-html-css' ? 'write demos/<pageId>/prototype.html/css' : 'write demos/<pageId>/index.tsx',
-          'update workspace-tree.json runtimeType only after validation',
+          'ensure target files pass validation',
         ],
       },
     }),
