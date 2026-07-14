@@ -5,12 +5,12 @@
   "workspacePath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/projects/proj_1783585261167_7h7prw/workspace",
   "demoPages": [
     {
-      "id": "mobile-page_x7k2",
-      "name": "mobile page",
-      "order": 0,
+      "id": "kids-education_m3k7",
+      "name": "儿童教育",
+      "runtimeType": "high-fidelity-react",
+      "order": 1,
       "parentId": null,
-      "routeKey": "mobile-page",
-      "runtimeType": "prototype-html-css"
+      "routeKey": "page"
     }
   ],
   "demoFolders": [],
@@ -166,7 +166,11 @@
     }
   ],
   "createdAt": 1783585261168,
-  "updatedAt": 1784000678052,
+  "updatedAt": 1784017115698,
   "activeWorkspaceId": "live-1783654372084-5b2qhswm4",
-  "activeWorkspaceUpdatedAt": 1783659602211
+  "activeWorkspaceUpdatedAt": 1783659602211,
+  "canonicalSyncedWorkspaceId": "live-1783654372084-5b2qhswm4",
+  "canonicalSyncedRevision": 136,
+  "canonicalSyncedRootHash": "69c45a3d93e0807ff80b6499dc01cf41469faea5aa690b955adfd98e0d1145c2",
+  "canonicalSyncedAt": 1784017115698
 }

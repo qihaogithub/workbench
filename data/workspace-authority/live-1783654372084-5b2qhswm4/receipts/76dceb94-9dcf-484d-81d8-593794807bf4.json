@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "76dceb94-9dcf-484d-81d8-593794807bf4",
+  "projectId": "proj_1783585261167_7h7prw",
+  "workspaceId": "live-1783654372084-5b2qhswm4",
+  "baseRevision": 120,
+  "revision": 122,
+  "rootHash": "4e520eb3bb957146afc352631294844063f6815a99b51c8735d4516552259e36",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "demos/kids-education_m3k7/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "bb7c33a9374923983615f0adccebe2ad3333dc0d25a192be8af18d801a105164"
+    }
+  ],
+  "committedAt": 1784015116049
+}

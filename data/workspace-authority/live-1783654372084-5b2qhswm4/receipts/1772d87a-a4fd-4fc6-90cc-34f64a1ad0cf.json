@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "1772d87a-a4fd-4fc6-90cc-34f64a1ad0cf",
+  "projectId": "proj_1783585261167_7h7prw",
+  "workspaceId": "live-1783654372084-5b2qhswm4",
+  "baseRevision": 135,
+  "revision": 136,
+  "rootHash": "69c45a3d93e0807ff80b6499dc01cf41469faea5aa690b955adfd98e0d1145c2",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/kids-education_m3k7/index.tsx",
+      "action": "modified",
+      "beforeHash": "86695d258dfbc3ca26142ed5a3793e9aa0ddece4b2069d586566e7786fd7ed47",
+      "afterHash": "b2fa7711509b32f94cbdd0059216ad62722968635aeedb5d27c58a6d474acae8"
+    }
+  ],
+  "committedAt": 1784017109293
+}

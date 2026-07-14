@@ -2,11 +2,12 @@
   "folders": [],
   "pages": [
     {
-      "id": "mobile-page_x7k2",
-      "name": "mobile page",
-      "order": 0,
+      "id": "kids-education_m3k7",
+      "name": "儿童教育",
+      "runtimeType": "high-fidelity-react",
+      "order": 1,
       "parentId": null,
-      "routeKey": "mobile-page"
+      "routeKey": "page"
     }
   ]
 }

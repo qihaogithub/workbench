@@ -1,0 +1,19 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "contact-section_k8m2",
+      "name": "contact section",
+      "routeKey": "contact-sectionk8m2",
+      "order": 0,
+      "parentId": null
+    },
+    {
+      "id": "product-showcase_a3f2",
+      "name": "product showcase",
+      "routeKey": "product-showcasea3f2",
+      "order": 1,
+      "parentId": null
+    }
+  ]
+}
