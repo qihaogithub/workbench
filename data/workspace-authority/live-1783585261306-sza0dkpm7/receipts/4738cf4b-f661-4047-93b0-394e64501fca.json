@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "4738cf4b-f661-4047-93b0-394e64501fca",
+  "projectId": "proj_1783585261167_7h7prw",
+  "workspaceId": "live-1783585261306-sza0dkpm7",
+  "baseRevision": 0,
+  "revision": 14,
+  "rootHash": "480bcdfd9c54ff8ad494695bf79513f447b50f3e3858f7445bc424a839446a8d",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "assets/images/2c97c1bb1f06-recommend-3.png",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "2c97c1bb1f067d4e80f0d572960c3f1b0a9ecd0bf6e5c0bad86ecb9f76293f65"
+    }
+  ],
+  "committedAt": 1784084124387
+}

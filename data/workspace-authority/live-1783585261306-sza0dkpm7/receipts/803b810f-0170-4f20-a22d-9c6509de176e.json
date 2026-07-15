@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "803b810f-0170-4f20-a22d-9c6509de176e",
+  "projectId": "proj_1783585261167_7h7prw",
+  "workspaceId": "live-1783585261306-sza0dkpm7",
+  "baseRevision": 0,
+  "revision": 11,
+  "rootHash": "807129f6e187caae9d30b9a45dfa59b79f5ffea1fb7ed815fca9ffdac3b834e6",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "assets/images/b5b03d33c0fa-product-1.png",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "b5b03d33c0fa69ca1882833720107846b882e71c748dc7a759c324856f304024"
+    }
+  ],
+  "committedAt": 1784084124291
+}

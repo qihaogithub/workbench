@@ -377,6 +377,26 @@ Docker：
 - 修改 Fastify route 时，确认错误响应结构、CORS、WebSocket 事件和 session 生命周期。
 - screenshot-service 改动要关注 Puppeteer、本地 Chrome、缓存键和截图文件路径。
 
+## pi-agent 官方参考代码
+
+`docs/external/pi-reference/` 是 pi-agent 官方仓库的本地 shallow clone（已加入 `.gitignore`，不入库），用于开发时直接查阅官方实现，无需网络抓取。
+
+关键文件路径：
+
+| 内容                | 路径                                                              |
+| ------------------- | ----------------------------------------------------------------- |
+| 工具实现（read/write/edit/bash/grep/find/ls） | `packages/coding-agent/src/core/tools/`                  |
+| 输出截断（truncateHead/truncateTail）          | `packages/coding-agent/src/core/tools/truncate.ts`         |
+| 文件变更队列（串行化同文件编辑）               | `packages/coding-agent/src/core/tools/file-mutation-queue.ts` |
+| 系统提示词构建                                | `packages/coding-agent/src/core/system-prompt.ts`          |
+| pi-agent-core 框架（AgentTool 接口、Harness）  | `packages/agent-core/src/`                                 |
+
+使用规则：
+
+- 修改 `packages/agent-service/src/backends/pi-tools/` 下的工具实现前，先用 `Read`/`Grep` 查阅官方对应工具的本地源码，确认行为对齐。
+- 差异分析文档 `docs/plans/进行中/AI工具集与pi-agent官方最佳实践差异分析.md` 记录了当前已识别的差距项和优先级。
+- 如需更新官方参考代码：`cd docs/external/pi-reference && git pull --depth 1`。
+
 ## 验证策略
 
 选择最小但足够的验证：
