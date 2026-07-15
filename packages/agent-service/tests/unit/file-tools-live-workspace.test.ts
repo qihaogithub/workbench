@@ -202,4 +202,64 @@ describe("live Workspace file tools", () => {
     expect(result.content[0].text).toContain("id: home");
     expect(result.content[0].text).not.toContain("id: broken");
   });
+
+  it("writeFile 创建新 knowledge/*.md 时透明同步 manifest.json", async () => {
+    const workspacePath = createLiveWorkspace();
+    const config: AgentConfig = {
+      sessionId: "session-1",
+      workingDir: workspacePath,
+    };
+
+    const result = await createWriteFileTool(config).execute("write-kb", {
+      path: "knowledge/test-doc.md",
+      content: "# 测试文档\n\n这是一份测试知识文档。",
+    });
+
+    // writeFile 应成功
+    expect(result.isError).toBeFalsy();
+    expect(result.details).toHaveProperty("knowledgeDocumentCreated", true);
+
+    // .md 文件应已写入工作区
+    const docPath = path.join(workspacePath, "knowledge", "test-doc.md");
+    expect(fs.existsSync(docPath)).toBe(true);
+    expect(fs.readFileSync(docPath, "utf-8")).toContain("测试文档");
+
+    // manifest.json 应已创建并包含新条目
+    const manifestPath = path.join(workspacePath, "knowledge", "manifest.json");
+    expect(fs.existsSync(manifestPath)).toBe(true);
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+    expect(manifest.items).toHaveLength(1);
+    expect(manifest.items[0].fileName).toBe("test-doc.md");
+    expect(manifest.items[0].title).toBe("test-doc");
+    expect(manifest.items[0].source).toBe("user");
+    expect(manifest.items[0].id).toMatch(/^kb_/);
+  });
+
+  it("writeFile 编辑已存在 knowledge/*.md 时不触发 manifest 同步", async () => {
+    const workspacePath = createLiveWorkspace();
+    const config: AgentConfig = {
+      sessionId: "session-1",
+      workingDir: workspacePath,
+    };
+
+    // 先创建文档
+    await createWriteFileTool(config).execute("write-1", {
+      path: "knowledge/existing.md",
+      content: "初始内容",
+    });
+
+    // 再次写入（覆盖）
+    const result = await createWriteFileTool(config).execute("write-2", {
+      path: "knowledge/existing.md",
+      content: "更新内容",
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(result.details).toHaveProperty("knowledgeDocumentCreated", false);
+
+    // manifest 应仍只有 1 个条目
+    const manifestPath = path.join(workspacePath, "knowledge", "manifest.json");
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+    expect(manifest.items).toHaveLength(1);
+  });
 });

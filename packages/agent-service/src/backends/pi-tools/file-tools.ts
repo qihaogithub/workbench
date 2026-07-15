@@ -18,6 +18,74 @@ import {
 import { getCollabRoomManager } from "../../collab/collab-room-manager";
 import { resolveCollabResourceKind } from "../../collab/workspace-file-persistence";
 
+/**
+ * 知识库文档路径正则：匹配 knowledge/ 下的 .md/.markdown/.mdown 文件
+ */
+const KNOWLEDGE_DOC_PATTERN = /^knowledge\/[^/]+\.(md|markdown|mdown)$/i;
+const MANIFEST_PATH = "knowledge/manifest.json";
+
+/**
+ * 当 writeFile 创建新的 knowledge/*.md 文件时，透明同步 manifest.json。
+ * 这是 writeFile 的副作用，AI 无需感知 manifest 更新。
+ *
+ * 返回 true 表示 manifest 同步成功，false 表示跳过（非知识库路径或非新建文件）。
+ */
+async function syncKnowledgeManifest(
+  liveWorkspace: NonNullable<ReturnType<typeof resolveLiveWorkspaceMutationContext>>,
+  snapshot: { resources: Record<string, string> },
+  receiptRevision: number,
+  docPath: string,
+  docContent: string,
+  sessionId?: string,
+): Promise<boolean> {
+  // 读取当前 manifest
+  const manifestRaw = snapshot.resources[MANIFEST_PATH];
+  let manifest: { version: number; items: Array<Record<string, unknown>> };
+  try {
+    manifest = manifestRaw
+      ? JSON.parse(manifestRaw)
+      : { version: 1, items: [] };
+  } catch {
+    manifest = { version: 1, items: [] };
+  }
+
+  const fileName = docPath.split("/").pop() || docPath;
+  const title = fileName.replace(/\.(md|markdown|mdown)$/i, "");
+  const now = new Date().toISOString();
+
+  const newItem = {
+    id: `kb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    title,
+    source: "user",
+    description: title,
+    fileName,
+    addedAt: now,
+    updatedAt: now,
+    sizeBytes: Buffer.byteLength(docContent, "utf-8"),
+  };
+
+  manifest.items.push(newItem);
+
+  await liveWorkspace.authority.mutate({
+    mutationId: crypto.randomUUID(),
+    projectId: liveWorkspace.projectId,
+    workspaceId: liveWorkspace.workspaceId,
+    sessionId,
+    baseRevision: receiptRevision,
+    actor: "ai",
+    reason: "knowledge_document_manifest_sync",
+    operations: [
+      {
+        type: "put_text",
+        path: MANIFEST_PATH,
+        content: JSON.stringify(manifest, null, 2),
+      },
+    ],
+  });
+
+  return true;
+}
+
 const ReadFileParams = Type.Object({
   path: Type.String({ description: "Relative path to the file to read" }),
 });
@@ -356,6 +424,38 @@ export function createWriteFileTool(
           await fs.promises.writeFile(filePath, args.content, "utf-8");
           receipt = null;
         }
+
+        // 透明 manifest 同步：新建 knowledge/*.md 时自动更新 manifest.json
+        let knowledgeDocumentCreated = false;
+        if (
+          liveWorkspace &&
+          receipt &&
+          existing === null &&
+          KNOWLEDGE_DOC_PATTERN.test(args.path)
+        ) {
+          try {
+            knowledgeDocumentCreated = await syncKnowledgeManifest(
+              liveWorkspace,
+              snapshot!,
+              (receipt as { revision: number }).revision,
+              args.path,
+              args.content,
+              config.sessionId,
+            );
+            if (knowledgeDocumentCreated) {
+              logger.info(
+                { path: args.path, manifestPath: MANIFEST_PATH },
+                "writeFile: knowledge manifest synced",
+              );
+            }
+          } catch (manifestErr) {
+            logger.warn(
+              { path: args.path, err: String(manifestErr) },
+              "writeFile: knowledge manifest sync failed (non-fatal)",
+            );
+          }
+        }
+
         const runtimeValidation = validatePreviewFileWrite(
           args.path,
           args.content,
@@ -376,6 +476,7 @@ export function createWriteFileTool(
             size: args.content.length,
             runtimeValidation,
             receipt,
+            knowledgeDocumentCreated,
           },
         };
       } catch (error) {

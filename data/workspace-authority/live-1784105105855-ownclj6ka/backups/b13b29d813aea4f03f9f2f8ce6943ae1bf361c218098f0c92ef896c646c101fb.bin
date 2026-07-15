@@ -1,0 +1,137 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "activity-home_m4x2",
+      "name": "活动入口",
+      "runtimeType": "prototype-html-css",
+      "order": 1,
+      "parentId": null,
+      "routeKey": "page"
+    },
+    {
+      "id": "shadow-guess_n7k1",
+      "name": "残影猜字",
+      "runtimeType": "prototype-html-css",
+      "order": 2,
+      "parentId": null,
+      "routeKey": "page-2"
+    },
+    {
+      "id": "stroke-puzzle_p9v3",
+      "name": "笔画拼字",
+      "runtimeType": "prototype-html-css",
+      "order": 3,
+      "parentId": null,
+      "routeKey": "page-3"
+    },
+    {
+      "id": "result-share_q5w8",
+      "name": "结算分享",
+      "runtimeType": "prototype-html-css",
+      "order": 4,
+      "parentId": null,
+      "routeKey": "page-4"
+    },
+    {
+      "id": "stroke-puzzle-intro_b2d5",
+      "name": "笔画拼字-入口",
+      "runtimeType": "prototype-html-css",
+      "order": 5,
+      "parentId": null,
+      "routeKey": "page-5"
+    },
+    {
+      "id": "stroke-puzzle-pass_f7h3",
+      "name": "笔画拼字-通关",
+      "runtimeType": "prototype-html-css",
+      "order": 6,
+      "parentId": null,
+      "routeKey": "page-6"
+    },
+    {
+      "id": "stroke-puzzle-fail_j9m2",
+      "name": "笔画拼字-超时",
+      "runtimeType": "prototype-html-css",
+      "order": 7,
+      "parentId": null,
+      "routeKey": "page-7"
+    },
+    {
+      "id": "stroke-puzzle-clear_r4t6",
+      "name": "笔画拼字-全部通关",
+      "runtimeType": "prototype-html-css",
+      "order": 8,
+      "parentId": null,
+      "routeKey": "page-8"
+    }
+  ]
+}{
+  "folders": [],
+  "pages": [
+    {
+      "id": "activity-home_m4x2",
+      "name": "活动入口",
+      "runtimeType": "prototype-html-css",
+      "order": 1,
+      "parentId": null,
+      "routeKey": "page"
+    },
+    {
+      "id": "shadow-guess_n7k1",
+      "name": "残影猜字",
+      "runtimeType": "prototype-html-css",
+      "order": 2,
+      "parentId": null,
+      "routeKey": "page-2"
+    },
+    {
+      "id": "stroke-puzzle_p9v3",
+      "name": "笔画拼字",
+      "runtimeType": "prototype-html-css",
+      "order": 3,
+      "parentId": null,
+      "routeKey": "page-3"
+    },
+    {
+      "id": "result-share_q5w8",
+      "name": "结算分享",
+      "runtimeType": "prototype-html-css",
+      "order": 4,
+      "parentId": null,
+      "routeKey": "page-4"
+    },
+    {
+      "id": "stroke-puzzle-intro_b2d5",
+      "name": "笔画拼字-入口",
+      "runtimeType": "prototype-html-css",
+      "order": 5,
+      "parentId": null,
+      "routeKey": "page-5"
+    },
+    {
+      "id": "stroke-puzzle-pass_f7h3",
+      "name": "笔画拼字-通关",
+      "runtimeType": "prototype-html-css",
+      "order": 6,
+      "parentId": null,
+      "routeKey": "page-6"
+    },
+    {
+      "id": "stroke-puzzle-fail_j9m2",
+      "name": "笔画拼字-超时",
+      "runtimeType": "prototype-html-css",
+      "order": 7,
+      "parentId": null,
+      "routeKey": "page-7"
+    },
+    {
+      "id": "stroke-puzzle-clear_r4t6",
+      "name": "笔画拼字-全部通关",
+      "runtimeType": "prototype-html-css",
+      "order": 8,
+      "parentId": null,
+      "routeKey": "page-8"
+    }
+  ]
+}
