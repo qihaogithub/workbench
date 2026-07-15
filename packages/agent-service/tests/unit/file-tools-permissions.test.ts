@@ -3,7 +3,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { createReadFileTool, createWriteFileTool, createListFilesTool } from '../../src/backends/pi-tools/file-tools';
 import { createEditFileTool } from '../../src/backends/pi-tools/edit-file-tool';
-import { createReadFileLinesTool } from '../../src/backends/pi-tools/read-file-lines-tool';
 import { createBashTool } from '../../src/backends/pi-tools/bash-tool';
 import { setSystemKnowledgeSnapshot } from '../../src/config/system-knowledge';
 import type { AgentConfig } from '../../src/core/types';
@@ -18,6 +17,7 @@ vi.mock('fs', () => ({
 }));
 
 vi.mock('child_process', () => ({
+  spawn: vi.fn(),
   exec: vi.fn(),
   execFile: vi.fn(),
 }));
@@ -89,19 +89,6 @@ describe('createReadFileTool - 权限感知', () => {
     const result = await tool.execute('id', { path: 'knowledge/配置系统参考.md' } as any);
     expect(result.isError).toBeFalsy();
     expect(result.content[0].text).toContain('系统知识正文');
-    expect(fs.promises.readFile).not.toHaveBeenCalled();
-  });
-
-  it('系统知识库虚拟文件应支持按行读取', async () => {
-    const tool = createReadFileLinesTool(mockConfig);
-    const result = await tool.execute('id', {
-      path: 'knowledge/配置系统参考.md',
-      startLine: 1,
-      endLine: 1,
-    } as any);
-    expect(result.isError).toBeFalsy();
-    expect(result.content[0].text).toContain('File: knowledge/配置系统参考.md');
-    expect(result.content[0].text).toContain('1→# 配置系统参考');
     expect(fs.promises.readFile).not.toHaveBeenCalled();
   });
 });
@@ -275,7 +262,7 @@ describe('createWorkbenchTools - permissions 透传', () => {
         durationMs: 1,
       }),
     });
-    expect(tools).toHaveLength(28);
+    expect(tools).toHaveLength(27);
     expect(tools.some(t => t.name === 'readUploadedFile')).toBe(true);
     expect(tools.some(t => t.name === 'webRead')).toBe(true);
     expect(tools.some(t => t.name === 'webSearch')).toBe(false);
@@ -302,7 +289,7 @@ describe('createWorkbenchTools - permissions 透传', () => {
       }),
     });
 
-    expect(tools).toHaveLength(29);
+    expect(tools).toHaveLength(28);
     expect(tools.some(t => t.name === 'webSearch')).toBe(true);
     expect(tools.some(t => t.name === 'readUploadedFile')).toBe(true);
     expect(tools.some(t => t.name === 'readPreinstalledSkill')).toBe(true);

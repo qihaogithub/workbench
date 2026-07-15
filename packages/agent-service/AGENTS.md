@@ -80,16 +80,15 @@ tests/
 
 ## Pi Agent 工具集
 
-`src/backends/pi-tools/` 默认暴露 25 个工具；`PI_AGENT_WEB_SEARCH_ENABLED=true` 时额外注册 `webSearch`：
+`src/backends/pi-tools/` 默认暴露 27 个工具；`PI_AGENT_WEB_SEARCH_ENABLED=true` 时额外注册 `webSearch`：
 
 | 工具 | 用途 |
 |:-----|:-----|
-| `readFile` | 读取工作空间内文件 |
-| `readFileWithLines` | 带行号读取文件，支持行范围选择 |
-| `editFile` | 精确编辑文件（old_string/new_string 替换） |
+| `readFile` | 读取工作空间内文件（支持 offset/limit 分页，自动截断 2000 行/50KB） |
+| `editFile` | 精确编辑文件（old_string/new_string 替换，支持 prepareArguments JSON 修复） |
 | `writeFile` | 写入工作空间内文件（变更会被捕获） |
 | `listFiles` | 列出目录文件 |
-| `bash` | Shell 命令（默认白名单：node/ls/cat/head/tail/grep/find/wc/echo；live Workspace 下进一步收紧为只读命令） |
+| `bash` | Shell 命令（支持 timeout 参数，输出截断 2000 行/50KB，支持 AbortSignal 和流式更新） |
 | `schemaValidate` | 校验 config.schema.json 格式 |
 | `saveImage` | 保存图片到图床（SHA256 去重，返回绝对 URL `/api/images/{hash}-{filename}`） |
 | `listImages` | 查询当前项目已上传的图片清单 |

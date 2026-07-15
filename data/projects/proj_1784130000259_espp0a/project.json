@@ -1,0 +1,25 @@
+{
+  "id": "proj_1784130000259_espp0a",
+  "name": "E2E:20260715T153943918Z-hbcgf8:画布退出恢复回归",
+  "category": "__e2e__",
+  "workspacePath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/projects/proj_1784130000259_espp0a/workspace",
+  "demoPages": [
+    {
+      "id": "page_sk41",
+      "name": "首页",
+      "routeKey": "page",
+      "order": 0,
+      "parentId": null
+    }
+  ],
+  "demoFolders": [],
+  "versions": [],
+  "createdAt": 1784130000261,
+  "updatedAt": 1784130012539,
+  "activeWorkspaceId": "live-1784130001844-d9gp1rcef",
+  "activeWorkspaceUpdatedAt": 1784130001853,
+  "canonicalSyncedWorkspaceId": "live-1784130001844-d9gp1rcef",
+  "canonicalSyncedRevision": 2,
+  "canonicalSyncedRootHash": "1b97d652be4c38817bf4a6bd3adaa40d20ff2a25918f3bea4850a57cc91e329c",
+  "canonicalSyncedAt": 1784130012539
+}

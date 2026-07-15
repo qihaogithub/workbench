@@ -414,68 +414,57 @@ test.describe("Workspace Mutation Authority E2E", () => {
   });
 
   // ── Test 4 ──────────────────────────────────────────────────────────────
-  // 场景: 用旧 revision 发起 PUT → 服务端返回 409 → 磁盘内容不被覆盖
-  test("旧浏览器保存产生冲突，磁盘不回退", async ({ page }) => {
-    const conflictMarker = `conflict-${crypto.randomBytes(4).toString("hex")}`;
+  // 场景: 用旧内容发起 PUT → Yjs-First 不再拒绝（无 expectedHash 冲突检测）→ 最后写入胜出
+  // 语义变化: 旧架构下 stale 写入会被 409 拒绝以保护磁盘内容；Yjs-First 移除了
+  // assertExpected()，所有写入都被接受，并发编辑由 Yjs CRDT 在协同房间层合并。
+  test("Yjs-First 下旧浏览器写入不再产生冲突，最后写入胜出", async ({ page }) => {
     const freshMarker = `fresh-${crypto.randomBytes(4).toString("hex")}`;
+    const staleMarker = `stale-${crypto.randomBytes(4).toString("hex")}`;
 
     await openHome(page);
     const { project, sessionId } = await createMutationProject(
       page,
-      "冲突不回退",
+      "Yjs-First无冲突",
     );
 
     const demoPage = await createDemoPage(
       page,
       project.id,
       sessionId,
-      "冲突页",
+      "无冲突页",
     );
     await updateDemoPageCode(page, sessionId, demoPage.id, "base-version");
     await persistWorkspace(page, sessionId);
 
-    // 获取当前最新版本
-    const latestFiles = await getDemoPageFiles(page, sessionId, demoPage.id);
-    expect(latestFiles.code).toContain("base-version");
+    // 获取当前内容快照（用于构造 stale 写入）
+    const baseFiles = await getDemoPageFiles(page, sessionId, demoPage.id);
+    expect(baseFiles.code).toContain("base-version");
 
-    // 先用"新浏览器"写入新版本（推进 revision）
+    // "新浏览器"写入新版本（推进 revision）
     await updateDemoPageCode(page, sessionId, demoPage.id, freshMarker);
     await persistWorkspace(page, sessionId);
 
-    // 模拟"旧浏览器"用过期 revision 提交写入
+    // "旧浏览器"用过期内容发起 PUT
+    // Yjs-First: 不再返回 409，写入被接受（last-write-wins）
     const staleResponse = await page.request.put(
       `/api/sessions/${sessionId}/files/${demoPage.id}`,
       {
         data: {
-          code: `${latestFiles.code}\n// stale-conflict: ${conflictMarker}\n`,
-          schema: latestFiles.schema,
-          // 伪造一个过期的 revision 号，期望服务端拒绝
-          expectedRevision: 0,
+          code: `${baseFiles.code}\n// stale-write: ${staleMarker}\n`,
+          schema: baseFiles.schema,
         },
       },
     );
 
-    // 服务端应返回 409 Conflict
+    // Yjs-First 语义：不再有 409 冲突拒绝
     const staleStatus = staleResponse.status();
-    if (staleStatus === 409) {
-      const body = (await staleResponse.json()) as ApiResult<unknown>;
-      expect(body.success).toBe(false);
-    }
+    expect(staleStatus, "Yjs-First 下 stale 写入应被接受（2xx），不应返回 409").toBeLessThan(400);
 
-    // 重新打开后磁盘内容不应回退到旧版本，freshMarker 应仍在
+    // 最后写入胜出：stale marker 出现在最终内容中
+    // （旧架构下 stale 写入被拒绝，freshMarker 会保留；Yjs-First 下 stale 写入覆盖 freshMarker）
     const reopenedSessionId = await openProjectEditor(page, project);
-    await expectDemoPageContains(page, reopenedSessionId, demoPage.id, [
-      "base-version",
-      freshMarker,
-    ]);
-
-    // stale marker 不应出现在最终版本中
-    await expectDemoPageNotContains(
-      page,
-      reopenedSessionId,
-      demoPage.id,
-      conflictMarker,
-    );
+    const finalFiles = await getDemoPageFiles(page, reopenedSessionId, demoPage.id);
+    expect(finalFiles.code, "Yjs-First 下最后写入的内容应胜出").toContain(staleMarker);
   });
 
   // ── Test 5 ──────────────────────────────────────────────────────────────

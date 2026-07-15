@@ -2,8 +2,13 @@ import { FastifyInstance, FastifyRequest } from "fastify";
 import WebSocket from "ws";
 
 import type { CollabResourceKind } from "@workbench/shared/contracts";
-import { getCollabRoomManager } from "../collab/collab-room-manager";
 import { WorkspaceMutationAuthorityError } from "../workspace/workspace-mutation-authority";
+import {
+  getHocuspocusCollabServer,
+  type RoomDescriptor,
+} from "../collab/hocuspocus-server";
+import { encodeDocumentName } from "../collab/document-name";
+import { logger } from "../utils/logger";
 
 interface CollabParams {
   projectId: string;
@@ -36,7 +41,7 @@ function isResourceKind(value: unknown): value is CollabResourceKind {
 function normalizeDescriptor(
   params: CollabParams,
   query: CollabQuery,
-) {
+): RoomDescriptor | null {
   if (!query.sessionId || !query.resourcePath || !isResourceKind(query.kind)) {
     return null;
   }
@@ -67,9 +72,12 @@ function collabFailure(reply: { status: (statusCode: number) => unknown }, error
 }
 
 export async function registerCollabRoutes(fastify: FastifyInstance): Promise<void> {
-  const mgr = getCollabRoomManager();
-  mgr.startCleanup();
-
+  // ── WebSocket route: delegate to Hocuspocus ───────────────────────────
+  //
+  // Hocuspocus extracts documentName and token from the client's protocol
+  // messages, so the URL path/query are only used for routing and header
+  // extraction. The HocuspocusProvider client sends the JSON-encoded
+  // documentName and sessionId token via the protocol handshake.
   fastify.get<{
     Params: CollabParams;
     Querystring: CollabQuery;
@@ -90,10 +98,13 @@ export async function registerCollabRoutes(fastify: FastifyInstance): Promise<vo
         socket.close(1008, "INVALID_COLLAB_PARAMS");
         return;
       }
-      await getCollabRoomManager().handleConnection(socket, descriptor);
+
+      const server = getHocuspocusCollabServer();
+      server.handleConnection(socket, request.raw);
     },
   );
 
+  // ── HTTP flush: trigger debounced onStoreDocument immediately ──────────
   fastify.post<{
     Params: CollabParams;
     Querystring: CollabQuery;
@@ -107,7 +118,14 @@ export async function registerCollabRoutes(fastify: FastifyInstance): Promise<vo
       }
 
       try {
-        const result = await getCollabRoomManager().flush(descriptor);
+        const server = getHocuspocusCollabServer();
+        const documentName = encodeDocumentName({
+          projectId: descriptor.projectId,
+          workspaceId: descriptor.workspaceId,
+          resourcePath: descriptor.resourcePath,
+          kind: descriptor.kind,
+        });
+        const result = await server.flush(documentName);
         return { success: true, data: result };
       } catch (error) {
         return collabFailure(reply, error);
@@ -115,6 +133,7 @@ export async function registerCollabRoutes(fastify: FastifyInstance): Promise<vo
     },
   );
 
+  // ── HTTP flush-all: flush all rooms in a workspace ────────────────────
   fastify.post<{
     Params: CollabParams;
     Querystring: { sessionId?: string };
@@ -128,13 +147,18 @@ export async function registerCollabRoutes(fastify: FastifyInstance): Promise<vo
       }
 
       try {
-        const result = await getCollabRoomManager().flushWorkspace(
+        const server = getHocuspocusCollabServer();
+        const result = await server.flushWorkspace(
           request.params.projectId,
           request.params.workspaceId,
           sessionId,
         );
         return { success: true, data: result };
       } catch (error) {
+        logger.warn(
+          { error, projectId: request.params.projectId, workspaceId: request.params.workspaceId },
+          "flush-all failed",
+        );
         return collabFailure(reply, error);
       }
     },
@@ -163,7 +187,8 @@ export async function registerCollabRoutes(fastify: FastifyInstance): Promise<vo
       }
 
       try {
-        const result = await getCollabRoomManager().writeToResource(descriptor, content);
+        const server = getHocuspocusCollabServer();
+        const result = await server.writeToResource(descriptor, content);
         return { success: true, data: result };
       } catch (error) {
         return collabFailure(reply, error);

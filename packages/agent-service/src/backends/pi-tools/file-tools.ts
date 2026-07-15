@@ -7,6 +7,7 @@ import type { AgentConfig } from "../../core/types";
 import { logger } from "../../utils/logger";
 import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from "./permissions";
 import { resolveVirtualKnowledgeFile } from "./virtual-knowledge";
+import { truncateHead, formatSize, type TruncationResult } from "./truncate";
 import {
   formatRuntimeValidationInstruction,
   validatePreviewFileWrite,
@@ -15,7 +16,7 @@ import {
   resolveLiveWorkspaceMutationContext,
   WorkspaceMutationAuthorityError,
 } from "../../workspace/workspace-mutation-authority";
-import { getCollabRoomManager } from "../../collab/collab-room-manager";
+import { getHocuspocusCollabServer } from "../../collab/hocuspocus-server";
 import { resolveCollabResourceKind } from "../../collab/workspace-file-persistence";
 
 /**
@@ -88,6 +89,18 @@ async function syncKnowledgeManifest(
 
 const ReadFileParams = Type.Object({
   path: Type.String({ description: "Relative path to the file to read" }),
+  offset: Type.Optional(
+    Type.Number({
+      description:
+        "Line number to start reading from (1-based, default: 1). Use for paginating large files.",
+    }),
+  ),
+  limit: Type.Optional(
+    Type.Number({
+      description:
+        "Maximum number of lines to read (default: 2000). Use with offset to paginate.",
+    }),
+  ),
 });
 type ReadFileParams = Static<typeof ReadFileParams>;
 
@@ -120,7 +133,8 @@ export function createReadFileTool(
   return {
     name: "readFile",
     label: "Read File",
-    description: "Read the contents of a file in the workspace",
+    description:
+      "Read the contents of a file in the workspace. Supports offset/limit for paginating large files. Output is automatically truncated to 2000 lines or 50KB (whichever is reached first); use offset to continue reading.",
     parameters: ReadFileParams,
     execute: async (toolCallId: string, args: ReadFileParams) => {
       const filePath = path.resolve(config.workingDir || ".", args.path);
@@ -213,12 +227,48 @@ export function createReadFileTool(
             isError: true,
           };
         }
+
+        // Apply offset/limit pagination
+        const offset = args.offset && args.offset > 0 ? args.offset : 1;
+        const limit = args.limit && args.limit > 0 ? args.limit : 2000;
+        const allLines = content.split("\n");
+        // Remove trailing empty line from final newline
+        if (content.endsWith("\n")) allLines.pop();
+        const totalLines = allLines.length;
+        const startIdx = Math.min(offset - 1, totalLines);
+        const endIdx = Math.min(startIdx + limit, totalLines);
+        const paginatedContent = allLines.slice(startIdx, endIdx).join("\n");
+
+        // Apply truncation (head truncation — keep the beginning of the paginated range)
+        const truncResult: TruncationResult = truncateHead(paginatedContent, {
+          maxLines: limit,
+        });
+
+        let outputText: string;
+        const startLineDisplay = startIdx + 1;
+        const endLineDisplay = startIdx + truncResult.outputLines;
+
+        if (truncResult.firstLineExceedsLimit) {
+          outputText = `[Line ${startLineDisplay} is ${formatSize(Buffer.byteLength(allLines[startIdx] ?? "", "utf-8"))}, exceeds ${formatSize(truncResult.maxBytes)} limit. Use bash: sed -n '${startLineDisplay}p' ${args.path} | head -c ${truncResult.maxBytes}]`;
+        } else {
+          outputText = truncResult.content;
+          if (truncResult.truncated || endIdx < totalLines) {
+            const nextOffset = startIdx + truncResult.outputLines + 1;
+            outputText += `\n[Showing lines ${startLineDisplay}-${endLineDisplay} of ${totalLines}. Use offset=${nextOffset} to continue.]`;
+          }
+        }
+
         logger.debug({ path: args.path }, "File read successfully");
         return {
-          content: [{ type: "text", text: content }],
+          content: [{ type: "text", text: outputText }],
           details: {
             path: args.path,
             size: content.length,
+            totalLines,
+            offset: startLineDisplay,
+            limit,
+            outputLines: truncResult.outputLines,
+            truncated: truncResult.truncated || endIdx < totalLines,
             ...(snapshot
               ? {
                   revision: snapshot.state.revision,
@@ -327,7 +377,7 @@ export function createWriteFileTool(
           if (resourceKind && config.sessionId) {
             // Yjs-First: route text writes through collab room for CRDT merging
             try {
-              const writeResult = await getCollabRoomManager().writeToResource(
+              const writeResult = await getHocuspocusCollabServer().writeToResource(
                 {
                   projectId: liveWorkspace.projectId,
                   workspaceId: liveWorkspace.workspaceId,
