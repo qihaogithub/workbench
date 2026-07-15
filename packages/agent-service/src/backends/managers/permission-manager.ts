@@ -53,7 +53,7 @@ export class PermissionManager {
    */
   validateToolCall(toolName: string, input: any): { block: boolean; reason: string } | undefined {
     // 路径权限校验
-    if (['readFile', 'readFileWithLines', 'writeFile', 'editFile', 'listFiles'].includes(toolName)) {
+    if (['readFile', 'writeFile', 'editFile', 'listFiles'].includes(toolName)) {
       const targetPath = input?.path || input?.filePath;
       if (
         targetPath &&

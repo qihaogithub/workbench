@@ -14,7 +14,7 @@ import {
   resolveLiveWorkspaceMutationContext,
   WorkspaceMutationAuthorityError,
 } from "../../workspace/workspace-mutation-authority";
-import { getCollabRoomManager } from "../../collab/collab-room-manager";
+import { getHocuspocusCollabServer } from "../../collab/hocuspocus-server";
 import { resolveCollabResourceKind } from "../../collab/workspace-file-persistence";
 
 // ---------------------------------------------------------------------------
@@ -378,6 +378,25 @@ export function createEditFileTool(
     description:
       "Edit a single file using exact text replacement. Supports multiple edits in one call via the edits[] array. Each edits[].old_string must match a unique, non-overlapping region of the original file. Prefer this over writeFile for making targeted changes to existing files, as it preserves the rest of the file and reduces token usage.",
     parameters: EditFileParams,
+    prepareArguments: (args: unknown): EditFileParams => {
+      if (typeof args !== "object" || args === null) {
+        return args as EditFileParams;
+      }
+      const raw = args as Record<string, unknown>;
+      // Some models (e.g. Opus, GLM) occasionally send `edits` as a JSON string
+      // instead of an array. Parse it back to an array so schema validation passes.
+      if (typeof raw.edits === "string") {
+        try {
+          const parsed = JSON.parse(raw.edits);
+          if (Array.isArray(parsed)) {
+            raw.edits = parsed;
+          }
+        } catch {
+          // Leave as-is; schema validation will catch the type mismatch.
+        }
+      }
+      return raw as EditFileParams;
+    },
     execute: async (toolCallId: string, args: EditFileParams) => {
       // 归一化路径：去除前导 ./ 或 /，确保后续所有路径处理一致
       args = { ...args, path: args.path.replace(/^\.?\//, "") };
@@ -497,7 +516,7 @@ export function createEditFileTool(
           if (resourceKind && config.sessionId) {
             // Yjs-First: route text writes through collab room for CRDT merging
             try {
-              const writeResult = await getCollabRoomManager().writeToResource(
+              const writeResult = await getHocuspocusCollabServer().writeToResource(
                 {
                   projectId: liveWorkspace.projectId,
                   workspaceId: liveWorkspace.workspaceId,

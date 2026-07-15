@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Y from "yjs";
-import { WebsocketProvider } from "y-websocket";
+import { HocuspocusProvider } from "@hocuspocus/provider";
 
 import type {
   CollabPresence,
@@ -20,7 +20,7 @@ export interface CollabDocumentState {
   value: string;
   status: CollabSyncStatus;
   awareness: CollabPresence[];
-  provider: WebsocketProvider | null;
+  provider: HocuspocusProvider | null;
   ydoc: Y.Doc | null;
   ytext: Y.Text | null;
   flush: () => Promise<void>;
@@ -50,27 +50,42 @@ function pickColor(seed: string): string {
   return USER_COLORS[hash % USER_COLORS.length];
 }
 
-function getCollabBaseUrl(): string {
+function getCollabWsUrl(
+  projectId: string,
+  workspaceId: string,
+): string {
   const configured = process.env.NEXT_PUBLIC_COLLAB_WS_URL;
   if (configured) return configured.replace(/\/$/, "");
 
   const agentUrl =
     process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "http://localhost:3201";
-  return agentUrl
+  const wsBase = agentUrl
     .replace(/^http:/, "ws:")
     .replace(/^https:/, "wss:")
     .replace(/\/$/, "");
+  return `${wsBase}/api/collab/projects/${encodeURIComponent(
+    projectId,
+  )}/workspaces/${encodeURIComponent(workspaceId)}/room`;
 }
 
-function encodeRoomName(resourcePath: string): string {
-  return btoa(unescape(encodeURIComponent(resourcePath)))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
+/**
+ * Encode the collab room descriptor as the Hocuspocus documentName.
+ * The server's onAuthenticate/onLoadDocument/onStoreDocument hooks parse
+ * this JSON to recover projectId/workspaceId/resourcePath/kind.
+ */
+function encodeCollabDocumentName(
+  descriptor: CollabRoomDescriptor,
+): string {
+  return JSON.stringify({
+    projectId: descriptor.projectId,
+    workspaceId: descriptor.workspaceId,
+    resourcePath: descriptor.resourcePath,
+    kind: descriptor.kind,
+  });
 }
 
-function readPresence(provider: WebsocketProvider | null): CollabPresence[] {
-  if (!provider) return [];
+function readPresence(provider: HocuspocusProvider | null): CollabPresence[] {
+  if (!provider?.awareness) return [];
   const states = Array.from(provider.awareness.getStates().values());
   return states
     .map((state) => state.presence)
@@ -109,10 +124,10 @@ export function useCollabDocument(
   const [status, setStatus] = useState<CollabSyncStatus>("offline");
   const [awareness, setAwareness] = useState<CollabPresence[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [provider, setProvider] = useState<WebsocketProvider | null>(null);
+  const [provider, setProvider] = useState<HocuspocusProvider | null>(null);
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
   const [ytext, setYtext] = useState<Y.Text | null>(null);
-  const providerRef = useRef<WebsocketProvider | null>(null);
+  const providerRef = useRef<HocuspocusProvider | null>(null);
   const offlineStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -184,22 +199,17 @@ export function useCollabDocument(
 
     const doc = new Y.Doc();
     const text = doc.getText("content");
-    const baseUrl = getCollabBaseUrl();
-    const endpoint = `${baseUrl}/api/collab/projects/${encodeURIComponent(
+    const wsUrl = getCollabWsUrl(
       stableDescriptor.projectId,
-    )}/workspaces/${encodeURIComponent(stableDescriptor.workspaceId)}`;
-    const nextProvider = new WebsocketProvider(
-      endpoint,
-      encodeRoomName(stableDescriptor.resourcePath),
-      doc,
-      {
-        params: {
-          sessionId: stableDescriptor.sessionId,
-          resourcePath: stableDescriptor.resourcePath,
-          kind: stableDescriptor.kind,
-        },
-      },
+      stableDescriptor.workspaceId,
     );
+    const documentName = encodeCollabDocumentName(stableDescriptor);
+    const nextProvider = new HocuspocusProvider({
+      url: wsUrl,
+      name: documentName,
+      document: doc,
+      token: stableDescriptor.sessionId,
+    });
 
     providerRef.current = nextProvider;
     setProvider(nextProvider);
@@ -212,12 +222,12 @@ export function useCollabDocument(
         arePresenceListsEqual(current, nextPresence) ? current : nextPresence,
       );
     };
-    nextProvider.awareness.setLocalStateField("user", {
+    nextProvider.setAwarenessField("user", {
       name: collabUser.username,
       color: collabUser.color,
       colorLight: `${collabUser.color}33`,
     });
-    nextProvider.awareness.setLocalStateField("presence", {
+    nextProvider.setAwarenessField("presence", {
       userId: collabUser.userId,
       username: collabUser.username,
       color: collabUser.color,
@@ -231,7 +241,7 @@ export function useCollabDocument(
     const handleTextChange = () => {
       const nextValue = text.toString();
       setValue((current) => (current === nextValue ? current : nextValue));
-      nextProvider.awareness.setLocalStateField("presence", {
+      nextProvider.setAwarenessField("presence", {
         userId: collabUser.userId,
         username: collabUser.username,
         color: collabUser.color,
@@ -243,21 +253,17 @@ export function useCollabDocument(
     };
 
     text.observe(handleTextChange);
-    nextProvider.awareness.on("change", updatePresence);
+    nextProvider.awareness?.on("change", updatePresence);
     nextProvider.on(
       "status",
-      ({
-        status: wsStatus,
-      }: {
-        status: "connecting" | "connected" | "disconnected";
-      }) => {
-        if (wsStatus === "connected") {
+      (event: { status: "connecting" | "connected" | "disconnected" }) => {
+        if (event.status === "connected") {
           clearOfflineStatusTimer();
           setStatus((current) => (current === "synced" ? current : "synced"));
           return;
         }
 
-        if (wsStatus === "connecting") {
+        if (event.status === "connecting") {
           clearOfflineStatusTimer();
           setStatus((current) =>
             current === "offline" ||
@@ -269,6 +275,7 @@ export function useCollabDocument(
           return;
         }
 
+        // disconnected
         clearOfflineStatusTimer();
         offlineStatusTimerRef.current = setTimeout(() => {
           if (providerRef.current === nextProvider) {
@@ -283,18 +290,18 @@ export function useCollabDocument(
         );
       },
     );
-    nextProvider.on("sync", (isSynced: boolean) => {
-      if (isSynced) {
+    nextProvider.on("synced", (event: { state: boolean }) => {
+      if (event.state) {
         clearOfflineStatusTimer();
         const nextValue = text.toString();
         setValue((current) => (current === nextValue ? current : nextValue));
         setStatus((current) => (current === "synced" ? current : "synced"));
       }
     });
-    nextProvider.on("connection-error", () => {
+    nextProvider.on("authenticationFailed", () => {
       clearOfflineStatusTimer();
       setError((current) =>
-        current === "协同连接失败" ? current : "协同连接失败",
+        current === "协同认证失败" ? current : "协同认证失败",
       );
       setStatus((current) => (current === "error" ? current : "error"));
     });
@@ -302,7 +309,7 @@ export function useCollabDocument(
     return () => {
       clearOfflineStatusTimer();
       text.unobserve(handleTextChange);
-      nextProvider.awareness.off("change", updatePresence);
+      nextProvider.awareness?.off("change", updatePresence);
       nextProvider.destroy();
       doc.destroy();
       if (providerRef.current === nextProvider) providerRef.current = null;
@@ -335,7 +342,6 @@ export function useCollabDocument(
         { method: "POST" },
       );
     } catch (networkError) {
-      // 网络不可达（DNS 失败、连接被拒等）：状态转为 error，避免卡在 saving
       setStatus("error");
       throw new Error(
         networkError instanceof Error

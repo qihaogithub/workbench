@@ -259,7 +259,7 @@ export class ToolHookManager {
     }
 
     if (
-      (toolName === "readFile" || toolName === "readFileWithLines") &&
+      toolName === "readFile" &&
       !isError
     ) {
       const readPath = input?.path;

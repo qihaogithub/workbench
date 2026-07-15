@@ -167,7 +167,7 @@ describe('buildStaticSystemPrompt', () => {
     const prompt = buildStaticSystemPrompt();
     expect(prompt).toContain('上下文中只会提供知识库索引，不会提供正文');
     expect(prompt).toContain('标题、描述、分类、标签');
-    expect(prompt).toContain('readFileWithLines');
+    expect(prompt).toContain('readFile');
     expect(prompt).toContain('不要一次性读取全部知识库');
   });
 });

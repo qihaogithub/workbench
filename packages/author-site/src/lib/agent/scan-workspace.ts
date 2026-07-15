@@ -230,7 +230,7 @@ export function scanKnowledgeIndex(workingDir: string): string | null {
     return [
       `项目知识库索引（共 ${userItems.length} 篇，仅含摘要，正文不在上下文中）：`,
       sections.join('\n'),
-      '→ 需要查阅时，请根据标题/描述/分类/标签选择最相关文档，再用 readFile 或 readFileWithLines 读取 knowledge/{文件名}；不要一次性读取全部知识库。',
+      '→ 需要查阅时，请根据标题/描述/分类/标签选择最相关文档，再用 readFile 读取 knowledge/{文件名}；不要一次性读取全部知识库。',
     ].join('\n');
   } catch {
     return null;

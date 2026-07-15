@@ -12,7 +12,6 @@ import {
   createListFilesTool,
 } from "../../src/backends/pi-tools/file-tools";
 import { createListPagesTool } from "../../src/backends/pi-tools/delete-page-tool";
-import { createReadFileLinesTool } from "../../src/backends/pi-tools/read-file-lines-tool";
 import type { AgentConfig } from "../../src/core/types";
 
 const roots: string[] = [];
@@ -89,7 +88,7 @@ afterEach(() => {
 });
 
 describe("live Workspace file tools", () => {
-  it("readFile/readFileWithLines 返回 Authority committed revision 和 hash", async () => {
+  it("readFile 返回 Authority committed revision 和 hash", async () => {
     const workspacePath = createLiveWorkspace();
     const config: AgentConfig = {
       sessionId: "session-1",
@@ -99,14 +98,9 @@ describe("live Workspace file tools", () => {
     const read = await createReadFileTool(config).execute("read", {
       path: "demos/home/index.tsx",
     });
-    const lines = await createReadFileLinesTool(config).execute("lines", {
-      path: "demos/home/index.tsx",
-    });
 
     expect(read.content[0].text).toBe("before");
     expect(read.details).toMatchObject({ revision: 1, hash: hash("before") });
-    expect(lines.content[0].text).toContain("1→before");
-    expect(lines.details).toMatchObject({ revision: 1, hash: hash("before") });
   });
 
   it("writeFile/editFile 从 committed snapshot 取基线并只以 receipt 成功", async () => {
