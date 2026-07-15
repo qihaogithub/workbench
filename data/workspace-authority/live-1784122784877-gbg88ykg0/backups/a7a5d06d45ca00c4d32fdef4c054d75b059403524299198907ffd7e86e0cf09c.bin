@@ -1,0 +1,12 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "page_h7y1",
+      "name": "自动保存页",
+      "routeKey": "page",
+      "order": 0,
+      "parentId": null
+    }
+  ]
+}

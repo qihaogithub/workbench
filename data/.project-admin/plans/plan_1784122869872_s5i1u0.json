@@ -1,0 +1,12 @@
+{
+  "planId": "plan_1784122869872_s5i1u0",
+  "operation": "project_delete",
+  "resourceId": "proj_1784122831525_xggkc9",
+  "impact": [
+    "删除项目 E2E:20260715T133443838Z-6t2hwn:离线草稿保留",
+    "删除 1 个页面",
+    "删除项目工作空间和元数据"
+  ],
+  "reversible": true,
+  "confirmToken": "confirm_1784122869872_0jwj5n"
+}

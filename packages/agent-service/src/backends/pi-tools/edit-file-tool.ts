@@ -379,6 +379,8 @@ export function createEditFileTool(
       "Edit a single file using exact text replacement. Supports multiple edits in one call via the edits[] array. Each edits[].old_string must match a unique, non-overlapping region of the original file. Prefer this over writeFile for making targeted changes to existing files, as it preserves the rest of the file and reduces token usage.",
     parameters: EditFileParams,
     execute: async (toolCallId: string, args: EditFileParams) => {
+      // 归一化路径：去除前导 ./ 或 /，确保后续所有路径处理一致
+      args = { ...args, path: args.path.replace(/^\.?\//, "") };
       const filePath = path.resolve(config.workingDir || ".", args.path);
 
       if (!isPathAllowed(args.path, config.workingDir || "", permissions)) {

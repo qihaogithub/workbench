@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "63ce2dad-0b3d-4ae8-b3b1-c80a3316adcb",
+  "projectId": "proj_1784122506896_bjzk13",
+  "workspaceId": "live-1784122509664-qy1fx153y",
+  "baseRevision": 3,
+  "revision": 4,
+  "rootHash": "82630d882df5f3006af089c1e8844ddf49dee291a63878e0ee753e8749f0ea9b",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/page_5aza/config.schema.json",
+      "action": "modified",
+      "beforeHash": "a0d29e038c5cfc38267e6ecfd72e62fa6e0533aa4d50b6b6bb1946bffe037dcf",
+      "afterHash": "c146223bd8774629d7097a19eb3c073a079dee477bc895e84229e333140f7b5a"
+    }
+  ],
+  "committedAt": 1784122533210
+}

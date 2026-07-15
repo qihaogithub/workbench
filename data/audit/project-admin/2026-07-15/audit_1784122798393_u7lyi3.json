@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1784122798393_u7lyi3",
+  "at": 1784122798393,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1784122798392_4xdmvz",
+  "inputSummary": {
+    "name": "E2E:20260715T133443838Z-6t2hwn:外部漂移检测",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1784122798392_4xdmvz"
+    ]
+  }
+}

@@ -55,7 +55,7 @@ COPY packages/author-site/package.json ./packages/author-site/
 RUN --mount=type=cache,id=workbench-pnpm-store,target=/pnpm/store \
     pnpm install --store-dir /pnpm/store --no-frozen-lockfile --ignore-scripts \
     && pnpm rebuild --store-dir /pnpm/store esbuild \
-    && pnpm --filter @workbench/author-site rebuild --store-dir /pnpm/store bcrypt better-sqlite3
+    && pnpm --filter @workbench/author-site rebuild --store-dir /pnpm/store better-sqlite3
 
 COPY packages/agent-client/ ./packages/agent-client/
 COPY packages/demo-ui/ ./packages/demo-ui/
@@ -82,8 +82,7 @@ COPY --from=builder /app/packages/author-site/.next/standalone ./
 COPY --from=builder /app/packages/author-site/.next/static ./packages/author-site/.next/static
 COPY --from=builder /app/packages/author-site/public ./packages/author-site/public
 COPY --from=builder /app/packages/author-site/scripts/init-db.js ./packages/author-site/scripts/init-db.js
-# bcrypt 原生模块不在 standalone 输出中，需要从 builder 阶段复制
-COPY --from=builder /app/node_modules/.pnpm/bcrypt@6.0.0/node_modules/bcrypt /app/node_modules/.pnpm/bcrypt@6.0.0/node_modules/bcrypt
+# bcryptjs 为纯 JS 实现，无需复制原生模块
 
 EXPOSE 3200
 

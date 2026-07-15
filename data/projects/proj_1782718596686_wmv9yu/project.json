@@ -234,11 +234,13 @@
     }
   ],
   "createdAt": 1782718596693,
-  "updatedAt": 1784079742697,
+  "updatedAt": 1784112459746,
   "activeWorkspaceId": "live-1784079440052-k1a5pvpwc",
-  "activeWorkspaceUpdatedAt": 1784079742343,
+  "activeWorkspaceUpdatedAt": 1784079742698,
   "publishedVersion": "v20",
   "publishedAt": 1783508379087,
   "canonicalSyncedWorkspaceId": "live-1784079440052-k1a5pvpwc",
-  "canonicalSyncedAt": 1784079742558
+  "canonicalSyncedAt": 1784112459746,
+  "canonicalSyncedRevision": 3,
+  "canonicalSyncedRootHash": "fea0ea9883c138c06fa6ccff77b5710d2e17e9171ecdac500466146008b852d9"
 }

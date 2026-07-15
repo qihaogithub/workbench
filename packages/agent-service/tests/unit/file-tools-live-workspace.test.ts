@@ -262,4 +262,28 @@ describe("live Workspace file tools", () => {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
     expect(manifest.items).toHaveLength(1);
   });
+
+  it("writeFile 使用 ./ 前缀路径创建 knowledge 文档时归一化后触发 manifest 同步", async () => {
+    const workspacePath = createLiveWorkspace();
+    const config: AgentConfig = {
+      sessionId: "session-1",
+      workingDir: workspacePath,
+    };
+
+    // ./knowledge/ 前缀路径应被归一化处理
+    const result = await createWriteFileTool(config).execute("write-kb-prefixed", {
+      path: "./knowledge/prefixed-doc.md",
+      content: "# 带前缀路径的文档",
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(result.details).toHaveProperty("knowledgeDocumentCreated", true);
+
+    // manifest.json 应已创建并包含新条目
+    const manifestPath = path.join(workspacePath, "knowledge", "manifest.json");
+    expect(fs.existsSync(manifestPath)).toBe(true);
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+    expect(manifest.items).toHaveLength(1);
+    expect(manifest.items[0].fileName).toBe("prefixed-doc.md");
+  });
 });

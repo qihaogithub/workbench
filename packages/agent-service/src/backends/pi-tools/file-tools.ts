@@ -261,6 +261,8 @@ export function createWriteFileTool(
       "Create a new file or completely overwrite an existing file with the given content. The content parameter must be the full file content, not a combination of old and new content. Prefer editFile for targeted modifications to existing files.",
     parameters: WriteFileParams,
     execute: async (toolCallId: string, args: WriteFileParams) => {
+      // 归一化路径：去除前导 ./ 或 /，确保后续所有路径处理（snapshot 查找、collab room、Authority）一致
+      args = { ...args, path: args.path.replace(/^\.?\//, "") };
       const filePath = path.resolve(config.workingDir || ".", args.path);
       const dir = path.dirname(filePath);
 

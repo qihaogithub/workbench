@@ -1,0 +1,1 @@
+{"type":"object","properties":{"pageCta":{"type":"string","title":"Page Two CTA E2E","default":"page-two-default-e2e"}}}
