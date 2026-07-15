@@ -24,10 +24,11 @@
 
 | 维度 | 官方 | 本项目 |
 |------|------|--------|
-| 参数 | `{path, offset?, limit?}` | `{path}` + 独立 `readFileWithLines` 工具 |
+| 参数 | `{path, offset?, limit?}` | `{path}` + 独立 `readFileWithLines` 工具（`{path, startLine?, endLine?}`） |
 | 大文件处理 | `truncateHead` 截断 + `[Showing lines X-Y. Use offset=N to continue.]` 引导续读 | 返回完整内容，或用 `readFileWithLines` 手动指定行范围 |
+| 参数命名 | `offset`（起始行）/ `limit`（行数） | `startLine`（起始行）/ `endLine`（结束行） |
 
-**影响**：大文件读取时返回完整内容到对话历史，token 消耗高。模型无法按需分段读取。`readFileWithLines` 是独立工具增加了工具数量和理解成本。
+**影响**：大文件读取时返回完整内容到对话历史，token 消耗高。模型无法按需分段读取。`readFileWithLines` 是独立工具增加了工具数量和理解成本。参数命名差异（`offset`/`limit` vs `startLine`/`endLine`）也增加了与官方文档对齐的认知成本。
 
 **建议**：将 `offset`/`limit` 合并到 `readFile`，移除独立的 `readFileWithLines` 工具。
 
@@ -38,9 +39,9 @@
 | 维度 | 官方 | 本项目 |
 |------|------|--------|
 | 截断策略 | 2000 行或 50KB（先到为准），截断后提示续读 | 无截断，返回完整文件内容 |
-| 首行超限 | `[Line 1 is XKB, exceeds 50KB limit. Use bash: sed -n '1p' file | head -c 50000]` | 无处理 |
+| 首行超限 | `[Line N is XKB, exceeds 50KB limit. Use bash: sed -n 'Np' file | head -c 50000]` | 无处理 |
 
-**影响**：大型文件（如打包后的 CSS/JS、长配置）的完整内容会占用大量 token，且可能导致上下文溢出。
+**影响**：大型文件（如打包后的 CSS/JS、长配置）的完整内容会占用大量 token，且可能导致上下文溢出。`readFileWithLines` 可通过 `startLine`/`endLine` 指定行范围部分缓解，但需要模型主动选择该工具并预估行范围，且行范围选择不解决单行超限问题。
 
 **建议**：为 readFile 添加 `truncateHead` 截断，超限后提供续读引导。
 
@@ -98,10 +99,14 @@
 |------|------|--------|
 | JSON 字符串修复 | 模型（Opus 4.6, GLM-5.1）发送 `edits` 为 JSON 字符串时自动 `JSON.parse` | 无处理，依赖 schema 验证报错 |
 | 参数预处理 | 通过 `prepareArguments` 在 schema 验证前修正参数 | 无预处理 |
+| 匹配失败反馈 | 抛出错误，由上层捕获 | 匹配失败时返回文件前 20 行带行号预览，帮助模型自纠正 |
+| 参数命名 | `edits[].oldText` / `edits[].newText`（camelCase） | `edits[].old_string` / `edits[].new_string`（snake_case） |
 
 **影响**：部分模型可能在 tool call 中将 `edits` 数组序列化为字符串而非数组，导致 schema 验证失败。
 
-**评估**：`pi-agent-core` 的 `AgentTool` 接口**支持** `prepareArguments`（`prepareArguments?: (args: unknown) => Static<TParameters>`）。这是可以直接利用的能力。
+**评估**：`pi-agent-core` 的 `AgentTool` 接口**支持** `prepareArguments`（`prepareArguments?: (args: unknown) => Static<TParameters>`）。这是可以直接利用的能力。官方的 `prepareArguments` 还处理 legacy 顶层 `oldText`/`newText` → `edits[]` 的转换，本项目从未有 legacy 接口，无需该部分。
+
+**项目优势**：本项目 editFile 在 "Could not find" 错误中返回文件前 20 行带行号预览（`edit-file-tool.ts:649-678`），帮助模型在不额外调用 readFile 的情况下自纠正。官方无此机制。
 
 **建议**：为 editFile 添加 `prepareArguments`，处理 `edits` 为 JSON 字符串的边界情况。
 
@@ -111,25 +116,29 @@
 
 | 维度 | 官方 | 本项目 |
 |------|------|--------|
-| 返回值 details | `{diff: string, patch: string, firstChangedLine: number}` | `{path, lineNumber, editCount, oldLineCount, newLineCount, usedFuzzyMatch}` |
-| 用途 | TUI 渲染 diff 视图、编辑器导航到变更位置 | 日志和调试 |
+| 返回值 details | `{diff: string, patch: string, firstChangedLine: number}` | `{path, lineNumber, editCount, oldLineCount, newLineCount, usedFuzzyMatch, runtimeValidation, receipt}` |
+| 用途 | TUI 渲染 diff 视图、编辑器导航到变更位置 | 日志、调试、前端预览校验、Authority 回执 |
+| 模糊匹配 | 无（精确匹配或报错） | 支持 `normalizeForFuzzyMatch`（智能引号、Unicode 连字符、特殊空格归一化），匹配失败时保留原始未变行 |
 
 **影响**：无 TUI diff 渲染需求（我们是 Web 前端），但 `firstChangedLine` 对前端定位变更位置有价值。`patch`（unified diff format）可用于版本历史对比。
+
+**项目优势**：本项目 editFile 的模糊匹配（`normalizeForFuzzyMatch`）能容忍模型输出中的智能引号/Unicode 连字符/特殊空格差异，降低因不可见字符差异导致的匹配失败率。官方仅支持精确匹配。
 
 **建议**：低优先级。如需在创作端 UI 中展示 diff，可后续添加。
 
 ---
 
-### 8. 缺少 grep/find/ls 探索工具
+### 8. 缺少 grep/find 专用探索工具
 
 | 维度 | 官方 | 本项目 |
 |------|------|--------|
-| 工具列表 | `grep`（正则搜索）、`find`（文件名/路径搜索）、`ls`（目录列表） | 仅 `listFiles`（目录列表） |
-| 搜索能力 | 专用工具，有截断、权限控制、结构化输出 | 模型需通过 `bash` 执行 `grep`/`find` |
+| 工具列表 | `grep`（正则搜索）、`find`（文件名/路径搜索）、`ls`（目录列表） | `listFiles`（目录列表，对应官方 `ls`）；`grep`/`find` 通过 `bash` 执行 |
+| 搜索能力 | 专用工具，有截断、权限控制、结构化输出（行号、文件路径、上下文） | bash 白名单含 `grep`/`find`/`ls`/`cat`/`head`/`tail`/`wc`，但输出为原始文本，无结构化 |
+| live Workspace 限制 | 无（直接操作文件系统） | live Workspace 模式下 bash 收紧为只读命令，拒绝 `node`/管道/重定向，但 `grep`/`find` 仍可用 |
 
-**影响**：模型通过 bash 执行搜索命令，输出不如专用工具结构化。bash 的权限限制可能阻止部分搜索操作。
+**影响**：模型通过 bash 执行搜索命令，输出不如专用工具结构化（无行号、无上下文行、无截断提示）。在 live Workspace 模式下，管道被禁用意味着 `grep foo | head` 等组合命令不可用，模型只能用单命令搜索。
 
-**评估**：本项目的 workspace 模型（Yjs 协同 + Authority snapshot）与纯文件系统不同。`grep`/`find` 需要在 snapshot 资源上实现，而非直接 `fs` 操作。实现成本较高。
+**评估**：本项目的 workspace 模型（Yjs 协同 + Authority snapshot）与纯文件系统不同。`grep`/`find` 需要在 snapshot 资源上实现，而非直接 `fs` 操作。实现成本较高。`listFiles` 已通过 snapshot 提供目录列表，功能上对应官方 `ls`。
 
 **建议**：中优先级。如果模型频繁通过 bash 搜索文件内容，可考虑添加基于 snapshot 的 `grepContent` 工具。
 
@@ -164,13 +173,15 @@
 
 ---
 
-### 11. AbortSignal 未实际使用
+### 11. AbortSignal 未接入
 
 | 维度 | 官方 | 本项目 |
 |------|------|--------|
-| 信号处理 | 所有工具检查 `signal.aborted`，支持取消进行中的操作 | 工具签名含 `signal` 参数但未使用 |
+| 信号处理 | 所有工具 `execute` 签名声明 `signal?: AbortSignal`，检查 `signal.aborted`，支持取消进行中的操作 | 工具 `execute` 签名仅声明 `(toolCallId, args)`，未声明 `signal` 参数，框架传入的 signal 被忽略 |
 
 **影响**：用户中止（abort）一个正在运行的 agent 时，已启动的文件读写或 bash 命令会继续执行完毕，不会提前终止。
+
+**评估**：`pi-agent-core` 的 `AgentTool.execute` 签名**支持** `signal?: AbortSignal`（第三个参数）。本项目工具的 `execute` 只声明了前两个参数，TypeScript 允许忽略剩余参数，因此 signal 从未被接收。接入只需在 `execute` 签名中补上 `signal?: AbortSignal` 并在关键 await 点检查 `signal?.aborted`。
 
 **建议**：中优先级。为 bash（长命令）和 readFile（大文件）添加 abort 检查。
 
@@ -200,7 +211,7 @@
 | **中** | #3 bash timeout 参数 | 长命令被 30s 硬限制切断 |
 | **中** | #6 editFile prepareArguments | 防止部分模型的 JSON 字符串 edits 导致错误 |
 | **中** | #8 grep/find 探索工具 | 减少模型通过 bash 搜索的间接路径 |
-| **中** | #11 AbortSignal 实际使用 | 中止操作时避免无用的文件/命令执行 |
+| **中** | #11 AbortSignal 接入 | 中止操作时避免无用的文件/命令执行 |
 | **中** | #12 bash onUpdate 流式 | 长命令实时反馈 |
 | **低** | #5 promptGuidelines | 当前 system-prompt.md 手动维护功能等价 |
 | **低** | #7 diff/patch 输出 | 无 TUI 渲染需求 |
@@ -233,7 +244,7 @@
 |------|------|
 | `packages/agent-service/src/backends/pi-tools/edit-file-tool.ts` | editFile 工具实现 |
 | `packages/agent-service/src/backends/pi-tools/file-tools.ts` | readFile/writeFile/listFiles 工具实现 |
-| `packages/agent-service/src/backends/pi-tools/read-file-lines-tool.ts` | readFileWithLines 工具（待合并） |
+| `packages/agent-service/src/backends/pi-tools/read-file-lines-tool.ts` | readFileWithLines 工具（建议合并到 readFile，见 #1） |
 | `packages/agent-service/src/backends/pi-tools/bash-tool.ts` | bash 工具实现 |
 | `packages/agent-service/src/backends/pi-tools/index.ts` | 工具注册入口 |
 | `packages/agent-service/src/backends/pi-agent.ts` | harness 初始化 + system prompt 构建 |

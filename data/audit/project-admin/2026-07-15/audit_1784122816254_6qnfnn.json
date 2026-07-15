@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1784122816254_6qnfnn",
+  "at": 1784122816254,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1784122816252_11d9at",
+  "inputSummary": {
+    "name": "E2E:20260715T133443838Z-6t2hwn:并发编辑",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1784122816252_11d9at"
+    ]
+  }
+}

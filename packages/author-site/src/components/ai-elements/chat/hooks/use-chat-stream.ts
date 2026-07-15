@@ -864,6 +864,21 @@ export function useChatStream(options: UseChatStreamOptions) {
               });
               setStreamContent("");
 
+              // 后备检查：如果 onToolUpdate 未正确触发 knowledge-updated 事件，
+              // 在 onFinish 时遍历所有 tool parts 再检查一次
+              const hasKnowledgeDoc = (currentMsg.parts || []).some(
+                (p) =>
+                  p.type === "tool" &&
+                  (
+                    p.details as {
+                      knowledgeDocumentCreated?: boolean;
+                    } | undefined
+                  )?.knowledgeDocumentCreated,
+              );
+              if (hasKnowledgeDoc) {
+                window.dispatchEvent(new Event("knowledge-updated"));
+              }
+
               // 先清理节流定时器，避免冗余并发写入
               if (throttlePersistTimerRef.current) {
                 clearTimeout(throttlePersistTimerRef.current);
@@ -890,6 +905,19 @@ export function useChatStream(options: UseChatStreamOptions) {
                   }
                 }
                 onFilesChange?.(finalFiles);
+              }
+
+              // 第三层后备：基于 result.files 检测知识文档路径
+              // 不依赖 details.knowledgeDocumentCreated 标志，直接检查文件路径
+              const hasKnowledgeFile = finalFiles.some(
+                (f) =>
+                  f.path &&
+                  /^knowledge\/[^/]+\.(md|markdown|mdown)$/i.test(
+                    f.path.replace(/^\.?\//, ""),
+                  ),
+              );
+              if (hasKnowledgeFile) {
+                window.dispatchEvent(new Event("knowledge-updated"));
               }
 
               // finish.files 是前端唯一的流式文件刷新来源；legacy 文件事件不再作为写入/刷新依据。

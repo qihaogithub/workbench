@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1784122831526_svc3dl",
+  "at": 1784122831526,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1784122831525_xggkc9",
+  "inputSummary": {
+    "name": "E2E:20260715T133443838Z-6t2hwn:离线草稿保留",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1784122831525_xggkc9"
+    ]
+  }
+}
