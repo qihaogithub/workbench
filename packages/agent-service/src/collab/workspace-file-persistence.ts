@@ -3,6 +3,24 @@ import crypto from "crypto";
 import path from "path";
 
 import type { CollabResourceKind } from "@workbench/shared/contracts";
+
+/**
+ * Reverse-lookup: determine the CollabResourceKind from a file path.
+ * Returns null if the path is not a collab-managed resource.
+ */
+export function resolveCollabResourceKind(resourcePath: string): CollabResourceKind | null {
+  const normalized = resourcePath.replace(/\\/g, "/").replace(/^\/+/, "");
+  if (/^demos\/[^/]+\/index\.tsx$/.test(normalized)) return "page-code";
+  if (/^demos\/[^/]+\/prototype\.html$/.test(normalized)) return "page-prototype-html";
+  if (/^demos\/[^/]+\/prototype\.css$/.test(normalized)) return "page-prototype-css";
+  if (/^demos\/[^/]+\/config\.schema\.json$/.test(normalized)) return "page-schema";
+  if (/^demos\/[^/]+\/sketch\.scene\.json$/.test(normalized)) return "page-sketch-scene";
+  if (normalized === "project.config.schema.json") return "project-schema";
+  if (normalized === "workspace-tree.json") return "workspace-tree";
+  if (normalized === ".canvas-layout.json") return "canvas-layout";
+  if (/^knowledge\/[^/]+\.(md|markdown|mdown)$/i.test(normalized)) return "knowledge-document";
+  return null;
+}
 import type {
   WorkspaceMutationCommittedEvent,
   WorkspaceMutationReceipt,
@@ -167,7 +185,8 @@ export class WorkspaceFilePersistence {
     resourcePath: string;
     kind: CollabResourceKind;
     content: string;
-    expectedHash: string;
+    /** @deprecated Yjs-First: expectedHash is no longer used by Authority. */
+    expectedHash?: string;
     baseRevision?: number;
     sessionId?: string;
   }): Promise<ResourceMutationResult> {
@@ -187,7 +206,6 @@ export class WorkspaceFilePersistence {
         type: "put_text",
         path: input.resourcePath,
         content: input.content,
-        expectedHash: input.expectedHash,
       }],
     });
     return { state: this.readResourceState(workspacePath, input.resourcePath, input.kind), receipt };

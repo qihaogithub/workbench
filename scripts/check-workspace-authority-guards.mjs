@@ -942,7 +942,7 @@ requireIncludes(
 );
 requireIncludes(
   workspaceAuthorityTestSource,
-  "mutation 诊断从 received 串到 committed 和 conflicted，不记录源码",
+  "mutation 诊断从 received 串到 committed，不记录源码",
   "workspace authority mutation lifecycle diagnostics test",
 );
 requireIncludes(
@@ -952,7 +952,7 @@ requireIncludes(
 );
 requireIncludes(
   workspaceAuthorityTestSource,
-  "health 持久统计 mutation 冲突并暴露 committed event 订阅者数",
+  "health 持久统计 mutation 并暴露 committed event 订阅者数",
   "workspace authority health conflict and subscriber test",
 );
 requireIncludes(
@@ -1772,20 +1772,16 @@ requireIncludes(
   "isLiveWorkspace(access.workspaceId)",
   "canvas-layout live Workspace authority guard",
 );
+// Yjs-First: canvas-layout POST writes through collab room, not commitWorkspaceMutation
 requireIncludes(
   canvasLayoutRouteSource,
-  "author_canvas_layout_save",
-  "canvas-layout live Workspace authority guard",
-);
-requireIncludes(
-  canvasLayoutRouteSource,
-  "commitWorkspaceMutation",
-  "canvas-layout live Workspace authority guard",
+  "collab",
+  "canvas-layout Yjs-First collab room write guard",
 );
 requireIncludes(
   canvasLayoutRouteTestSource,
-  "保存画布布局时通过 Authority 提交 live Workspace",
-  "canvas-layout live Workspace authority guard test",
+  "保存画布布局时通过 Yjs room 写入 live Workspace",
+  "canvas-layout Yjs-First collab room write test",
 );
 requireIncludes(
   canvasLayoutRouteTestSource,

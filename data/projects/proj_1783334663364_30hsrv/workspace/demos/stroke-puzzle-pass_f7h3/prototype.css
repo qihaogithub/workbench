@@ -1,0 +1,189 @@
+/* ===== 笔画拼字 - 关卡通过页 ===== */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Serif SC', serif;
+  background: #1a1410;
+}
+
+.page {
+  position: relative;
+  min-height: 100vh;
+  max-width: 480px;
+  margin: 0 auto;
+  background: linear-gradient(180deg, #fef7e8 0%, #fdf0d5 40%, #f5d89a 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 24px 40px;
+  overflow: hidden;
+}
+
+/* 顶部状态 */
+.top-bar {
+  width: 100%;
+  padding: 24px 0 0;
+  display: flex;
+  align-items: center;
+}
+
+.level-progress { width: 100%; }
+.progress-label {
+  font-size: 13px;
+  color: #8b7355;
+  margin-bottom: 6px;
+}
+.current-level {
+  font-size: 18px;
+  font-weight: 700;
+  color: #c53d3d;
+}
+.progress-track {
+  width: 100%;
+  height: 6px;
+  background: #e8d5b7;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4caf50, #66bb6a);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+/* 成功主视觉 */
+.pass-hero {
+  text-align: center;
+  margin-top: 36px;
+}
+
+.pass-word {
+  font-size: 120px;
+  font-weight: 900;
+  color: #c53d3d;
+  font-family: 'STKaiti', 'KaiTi', '楷体', serif;
+  text-shadow: 0 6px 20px rgba(197,61,61,0.25);
+  animation: wordReveal 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes wordReveal {
+  from { transform: scale(0.3) rotate(-8deg); opacity: 0; }
+  to { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+.pass-label {
+  margin-top: 8px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #4caf50;
+  letter-spacing: 4px;
+  animation: fadeInUp 0.5s ease 0.2s both;
+}
+
+@keyframes fadeInUp {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* 用时信息 */
+.pass-info {
+  display: flex;
+  gap: 16px;
+  margin-top: 36px;
+  width: 100%;
+}
+
+.info-card {
+  flex: 1;
+  text-align: center;
+  background: rgba(255,255,255,0.6);
+  border: 1px solid #e0c9a6;
+  border-radius: 16px;
+  padding: 16px 12px;
+}
+
+.info-label {
+  font-size: 13px;
+  color: #8b7355;
+  margin-bottom: 8px;
+}
+
+.info-value {
+  font-size: 28px;
+  font-weight: 900;
+  color: #3c1f0e;
+  font-variant-numeric: tabular-nums;
+}
+.info-unit {
+  font-size: 16px;
+  font-weight: 600;
+  color: #b8946e;
+}
+
+/* 按钮 */
+.pass-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin-top: 36px;
+}
+
+.btn-next {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 52px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(180deg, #4caf50, #388e3c);
+  border: none;
+  border-radius: 26px;
+  box-shadow: 0 4px 0 #2e7d32, 0 6px 20px rgba(56,142,60,0.35);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.btn-next:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #2e7d32, 0 3px 12px rgba(56,142,60,0.25);
+}
+
+.btn-arrow {
+  font-size: 20px;
+}
+
+.btn-replay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #8b7355;
+  background: #f5f0e8;
+  border: 2px solid #d4b896;
+  border-radius: 22px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.btn-replay:active {
+  background: #e8d5b7;
+}
+
+/* 底部 */
+.pass-footer {
+  margin-top: 32px;
+  text-align: center;
+}
+.pass-footer p {
+  font-size: 14px;
+  color: #b8946e;
+  font-weight: 500;
+}

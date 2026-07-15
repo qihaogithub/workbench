@@ -390,17 +390,17 @@ describe("CollabRoomManager", () => {
     room.text.insert(0, "stale collab text");
     fs.writeFileSync(pagePath, "ai fixed file", "utf-8");
 
-    // flushWorkspace should succeed (self-heal) instead of throwing
+    // flushWorkspace should succeed (Yjs-First: auto-adopt drift, no rejection)
     const result = await manager.flushWorkspace("proj-1", "ws-1", "session-1");
     expect(result.status).toBe("flushed");
 
-    // Room should be reloaded from file state
-    expect(room.text.toString()).toBe("ai fixed file");
+    // Yjs-First: room content is the authority — file gets room's content
+    expect(room.text.toString()).toBe("stale collab text");
     expect(room.dirty).toBe(false);
-    expect(fs.readFileSync(pagePath, "utf-8")).toBe("ai fixed file");
+    expect(fs.readFileSync(pagePath, "utf-8")).toBe("stale collab text");
   });
 
-  it("AI mutation 前会先 flush 目标资源协同草稿，避免旧 hash 覆盖未落盘内容", async () => {
+  it("AI mutation 前会先 flush 目标资源协同草稿，Yjs-First 不再因旧 hash 冲突", async () => {
     const persistence = new WorkspaceFilePersistence(tempDir);
     const manager = new CollabRoomManager(persistence);
     const room = await createPageRoom(manager);
@@ -408,35 +408,10 @@ describe("CollabRoomManager", () => {
     room.text.delete(0, room.text.length);
     room.text.insert(0, "unsaved collab draft");
 
-    await expect(
-      persistence.commitMutation({
-        mutationId: "ai-commit-after-draft-flush",
-        projectId: "proj-1",
-        workspaceId: "ws-1",
-        sessionId: "session-1",
-        baseRevision: 0,
-        actor: "ai",
-        reason: "test",
-        operations: [
-          {
-            type: "put_text",
-            path: "demos/page-1/index.tsx",
-            content: "ai fixed file",
-            expectedHash: crypto
-              .createHash("sha256")
-              .update("old file")
-              .digest("hex"),
-          },
-        ],
-      }),
-    ).rejects.toMatchObject({ code: "WORKSPACE_RESOURCE_CONFLICT" });
-
-    expect(room.text.toString()).toBe("unsaved collab draft");
-    expect(room.dirty).toBe(false);
-    expect(fs.readFileSync(pagePath, "utf-8")).toBe("unsaved collab draft");
-
-    await persistence.commitMutation({
-      mutationId: "ai-commit-after-draft-reread",
+    // Yjs-First: assertExpected removed — AI mutation succeeds even with stale expectedHash
+    // because flushDraftsForMutation flushes the collab draft first, then the mutation overwrites
+    const receipt = await persistence.commitMutation({
+      mutationId: "ai-commit-after-draft-flush",
       projectId: "proj-1",
       workspaceId: "ws-1",
       sessionId: "session-1",
@@ -450,13 +425,15 @@ describe("CollabRoomManager", () => {
           content: "ai fixed file",
           expectedHash: crypto
             .createHash("sha256")
-            .update("unsaved collab draft")
+            .update("old file")
             .digest("hex"),
         },
       ],
     });
 
-    expect(room.text.toString()).toBe("ai fixed file");
+    expect(receipt.committed).toBe(true);
+    // Yjs-First: room content is NOT replaced — only baseline metadata updated
+    expect(room.text.toString()).toBe("unsaved collab draft");
     expect(room.dirty).toBe(false);
     expect(fs.readFileSync(pagePath, "utf-8")).toBe("ai fixed file");
   });
@@ -472,32 +449,33 @@ describe("CollabRoomManager", () => {
     room.text.delete(0, room.text.length);
     room.text.insert(0, "draft from collab room");
 
-    await expect(
-      liveWorkspace.authority.mutate({
-        mutationId: "pi-tool-commit-after-draft-flush",
-        projectId: liveWorkspace.projectId,
-        workspaceId: liveWorkspace.workspaceId,
-        sessionId: "session-1",
-        baseRevision: 0,
-        actor: "ai",
-        reason: "test",
-        operations: [
-          {
-            type: "put_text",
-            path: "demos/page-1/index.tsx",
-            content: "pi tool content",
-            expectedHash: crypto
-              .createHash("sha256")
-              .update("old file")
-              .digest("hex"),
-          },
-        ],
-      }),
-    ).rejects.toMatchObject({ code: "WORKSPACE_RESOURCE_CONFLICT" });
+    // Yjs-First: assertExpected removed — mutation succeeds even with stale expectedHash
+    const receipt = await liveWorkspace.authority.mutate({
+      mutationId: "pi-tool-commit-after-draft-flush",
+      projectId: liveWorkspace.projectId,
+      workspaceId: liveWorkspace.workspaceId,
+      sessionId: "session-1",
+      baseRevision: 0,
+      actor: "ai",
+      reason: "test",
+      operations: [
+        {
+          type: "put_text",
+          path: "demos/page-1/index.tsx",
+          content: "pi tool content",
+          expectedHash: crypto
+            .createHash("sha256")
+            .update("old file")
+            .digest("hex"),
+        },
+      ],
+    });
 
+    expect(receipt.committed).toBe(true);
+    // Yjs-First: room content is NOT replaced — only baseline metadata updated
     expect(room.text.toString()).toBe("draft from collab room");
     expect(room.dirty).toBe(false);
-    expect(fs.readFileSync(pagePath, "utf-8")).toBe("draft from collab room");
+    expect(fs.readFileSync(pagePath, "utf-8")).toBe("pi tool content");
   });
 
   it("Authority receipt 按确切资源路径更新协同房间，不依赖 legacy 文件事件", async () => {
@@ -527,59 +505,23 @@ describe("CollabRoomManager", () => {
       ],
     });
 
-    expect(room.text.toString()).toBe(content);
+    // Yjs-First: room content is NOT replaced — only baseline metadata updated
+    expect(room.text.toString()).toBe("old file");
     expect(room.dirty).toBe(false);
     expect(fs.readFileSync(pagePath, "utf-8")).toBe(content);
   });
 
-  it("saving 期间到达的外部 mutation 标记 pendingExternalReload，flush 完成后自动补偿 reload", async () => {
+  it("外部 mutation 只更新 baseline 元数据，不替换 room 内容（Yjs-First）", async () => {
     const persistence = new WorkspaceFilePersistence(tempDir);
     const manager = new CollabRoomManager(persistence);
     const room = await createPageRoom(manager);
 
-    // Make the room dirty with new content
-    room.text.delete(0, room.text.length);
-    room.text.insert(0, "dirty draft");
+    // Room starts with "old file" content
+    expect(room.text.toString()).toBe("old file");
 
-    // Mock commitResource: delay, simulate external mutation, then succeed.
-    // We cannot call the real commitResource because the external mutation
-    // changes the file hash before the delayed commit completes.
-    let resolveCommit!: () => void;
-    persistence.commitResource = (() => {
-      return new Promise<{
-        state: { hash: string };
-        receipt: { revision: number };
-      }>((resolve) => {
-        resolveCommit = () =>
-          resolve({
-            state: {
-              hash: crypto
-                .createHash("sha256")
-                .update("dirty draft")
-                .digest("hex"),
-            },
-            receipt: { revision: 3 },
-          });
-      });
-    }) as typeof persistence.commitResource;
-
-    // Start flush (will hang at mocked commitResource)
-    const flushPromise = (
-      manager as unknown as {
-        flushRoom: (room: TestRoom) => Promise<void>;
-      }
-    ).flushRoom(room as TestRoom);
-
-    // Wait for flushRoom to reach the await on commitResource
-    await new Promise((r) => setTimeout(r, 10));
-    expect((room as unknown as { saving: boolean }).saving).toBe(true);
-
-    // The external mutation's onMutationCommitted fires synchronously when
-    // persistence.commitMutation runs; here the file was already written
-    // above, and we simulate the receipt callback by triggering a second
-    // commitMutation that writes the same content.
+    // External mutation writes new content to disk
     await persistence.commitMutation({
-      mutationId: "deferred-reload-test",
+      mutationId: "external-mutation-test",
       projectId: "proj-1",
       workspaceId: "ws-1",
       sessionId: "session-1",
@@ -599,57 +541,38 @@ describe("CollabRoomManager", () => {
       ],
     });
 
-    // Should be marked for deferred reload
-    expect(
-      (room as unknown as { pendingExternalReload: boolean })
-        .pendingExternalReload,
-    ).toBe(true);
-
-    // Let the flush complete
-    resolveCommit();
-    await flushPromise;
-
-    // Compensation should have reloaded from disk (the authoritative mutation content)
-    expect(
-      (room as unknown as { pendingExternalReload: boolean })
-        .pendingExternalReload,
-    ).toBe(false);
-    expect(room.text.toString()).toBe("ai authoritative content");
+    // Yjs-First: room content is NOT replaced — only baseline metadata updated
+    expect(room.text.toString()).toBe("old file");
+    // File on disk has the external content
     expect(fs.readFileSync(pagePath, "utf-8")).toBe("ai authoritative content");
   });
 
-  it("非 saving 状态下到达的外部 mutation 不设置 pendingExternalReload", async () => {
-    const persistence = new WorkspaceFilePersistence(tempDir);
-    const manager = new CollabRoomManager(persistence);
+  it("dirty room flush 覆盖外部文件修改（Yjs-First: room 是唯一内容权威）", async () => {
+    const manager = new CollabRoomManager(
+      new WorkspaceFilePersistence(tempDir),
+    );
     const room = await createPageRoom(manager);
 
-    // External mutation arrives when room is NOT saving
-    await persistence.commitMutation({
-      mutationId: "no-defer-test",
-      projectId: "proj-1",
-      workspaceId: "ws-1",
-      sessionId: "session-1",
-      baseRevision: 0,
-      actor: "ai",
-      reason: "test",
-      operations: [
-        {
-          type: "put_text",
-          path: "demos/page-1/index.tsx",
-          content: "immediate reload content",
-          expectedHash: crypto
-            .createHash("sha256")
-            .update("old file")
-            .digest("hex"),
-        },
-      ],
-    });
+    // User edits the room
+    room.text.delete(0, room.text.length);
+    room.text.insert(0, "user draft");
+    expect(room.dirty).toBe(true);
 
-    // Should reload immediately, no deferred flag
-    expect(
-      (room as unknown as { pendingExternalReload: boolean })
-        .pendingExternalReload,
-    ).toBe(false);
-    expect(room.text.toString()).toBe("immediate reload content");
+    // External direct file write (not through Authority)
+    fs.writeFileSync(pagePath, "external content", "utf-8");
+
+    // Room content is still the user's draft
+    expect(room.text.toString()).toBe("user draft");
+
+    // Flush — room content wins (Yjs-First: room is single content authority)
+    await (
+      manager as unknown as {
+        flushRoom: (room: TestRoom) => Promise<void>;
+      }
+    ).flushRoom(room as TestRoom);
+
+    // File now has the user's draft (room content overwrites external write)
+    expect(fs.readFileSync(pagePath, "utf-8")).toBe("user draft");
+    expect(room.dirty).toBe(false);
   });
 });

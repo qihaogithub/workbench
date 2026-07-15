@@ -6,10 +6,7 @@ import type {
   CanvasState,
   PreviewMode,
 } from "@workbench/demo-ui";
-import {
-  loadCanvasLayout,
-  saveCanvasLayout,
-} from "@workbench/demo-ui";
+import { loadCanvasLayout } from "@workbench/demo-ui";
 
 const DEFAULT_CANVAS_STATE: CanvasState = {
   viewport: { x: 40, y: 40, zoom: 0.5 },
@@ -19,8 +16,6 @@ const DEFAULT_CANVAS_STATE: CanvasState = {
   nodes: {},
   hiddenKnowledgeDocumentIds: [],
 };
-
-const SAVE_DELAY = 700;
 
 interface UseCanvasWorkspaceOptions {
   sessionId?: string;
@@ -107,83 +102,20 @@ export function useCanvasWorkspace({
     };
   }, [sessionId, setCanvasPersistenceDirty]);
 
-  useEffect(() => {
-    if (!sessionId || !projectId || !dirtyRef.current) return;
-
-    const currentSessionId = sessionId;
-    const currentProjectId = projectId;
-    const stateToSave = canvasStateRef.current;
-    const serialized = JSON.stringify(stateToSave);
-    if (serialized === lastPersistedRef.current) {
-      setCanvasPersistenceDirty(false);
-      return;
-    }
-
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-    }
-
-    setSaveStatus("saving");
-    setSaveError(undefined);
-
-    saveTimerRef.current = setTimeout(async () => {
-      try {
-        await saveCanvasLayout(currentSessionId, currentProjectId, stateToSave);
-        lastPersistedRef.current = serialized;
-        setCanvasPersistenceDirty(false);
-        setSaveStatus("saved");
-      } catch (error) {
-        console.warn("[canvas] 保存画布布局失败", {
-          sessionId: currentSessionId,
-          projectId: currentProjectId,
-          error,
-        });
-        setSaveStatus("error");
-        setSaveError(error instanceof Error ? error.message : "保存画布布局失败");
-      }
-    }, SAVE_DELAY);
-
-    return () => {
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
-      }
-    };
-  }, [canvasState, projectId, sessionId, setCanvasPersistenceDirty]);
+  // Yjs-First: canvas layout persistence is handled by the Yjs room
+  // (canvasLayoutCollab). The edit page writes to canvasLayoutCollab.ytext
+  // and the collab room's debounce flush handles persistence.
+  // The HTTP save timer has been removed.
 
   const flushCanvasState = useCallback(async () => {
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
     }
-
-    if (!sessionId || !projectId) return;
-
-    const stateToSave = canvasStateRef.current;
-    const serialized = JSON.stringify(stateToSave);
-    if (serialized === lastPersistedRef.current && !dirtyRef.current) {
-      setCanvasPersistenceDirty(false);
-      return;
-    }
-
-    setSaveStatus("saving");
-    setSaveError(undefined);
-
-    try {
-      await saveCanvasLayout(sessionId, projectId, stateToSave);
-      lastPersistedRef.current = serialized;
-      setCanvasPersistenceDirty(false);
-      setSaveStatus("saved");
-    } catch (error) {
-      console.warn("[canvas] 保存画布布局失败", {
-        sessionId,
-        projectId,
-        error,
-      });
-      setSaveStatus("error");
-      setSaveError(error instanceof Error ? error.message : "保存画布布局失败");
-      throw error;
-    }
-  }, [canvasState, projectId, sessionId, setCanvasPersistenceDirty]);
+    // Yjs-First: just clear local dirty state. Actual persistence is
+    // handled by the collab room flush (flushWorkspaceCollab).
+    setCanvasPersistenceDirty(false);
+  }, [setCanvasPersistenceDirty]);
 
   const updateCanvasState = useCallback((nextState: CanvasState) => {
     canvasStateRef.current = nextState;

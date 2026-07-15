@@ -14,6 +14,8 @@ import {
   resolveLiveWorkspaceMutationContext,
   WorkspaceMutationAuthorityError,
 } from "../../workspace/workspace-mutation-authority";
+import { getCollabRoomManager } from "../../collab/collab-room-manager";
+import { resolveCollabResourceKind } from "../../collab/workspace-file-persistence";
 
 // ---------------------------------------------------------------------------
 // Line ending & BOM utilities (aligned with pi-agent edit-diff.ts)
@@ -486,57 +488,108 @@ export function createEditFileTool(
         const newContent = bom + restoreLineEndings(finalLFContent, originalEnding);
 
         // --- Write back ---
-        const receipt = liveWorkspace
-          ? await (async () => {
-              let mutateDriftRetry = 0;
-              while (true) {
-                try {
-                  return await liveWorkspace.authority.mutate({
-                    mutationId: crypto.randomUUID(),
-                    projectId: liveWorkspace.projectId,
-                    workspaceId: liveWorkspace.workspaceId,
-                    sessionId: config.sessionId,
-                    baseRevision: snapshot!.state.revision,
-                    actor: "ai",
-                    reason: "agent_edit_file",
-                    operations: [
-                      {
-                        type: "put_text",
-                        path: args.path,
-                        content: newContent,
-                        expectedHash: crypto
-                          .createHash("sha256")
-                          .update(rawContent)
-                          .digest("hex"),
-                      },
-                    ],
-                  });
-                } catch (err) {
-                  if (
-                    err instanceof WorkspaceMutationAuthorityError &&
-                    err.code === "WORKSPACE_EXTERNAL_DRIFT" &&
-                    mutateDriftRetry === 0
-                  ) {
-                    mutateDriftRetry++;
-                    logger.info(
-                      { path: args.path },
-                      "editFile mutate: EXTERNAL_DRIFT, reconciling",
-                    );
-                    await liveWorkspace.authority.reconcileAdopt(
-                      liveWorkspace.projectId,
-                      liveWorkspace.workspaceId,
-                    );
-                    snapshot = await liveWorkspace.authority.getSnapshot(
-                      liveWorkspace.projectId,
-                      liveWorkspace.workspaceId,
-                    );
-                    continue;
-                  }
-                  throw err;
+        let receipt;
+        if (liveWorkspace) {
+          const resourceKind = resolveCollabResourceKind(args.path);
+          let collabWriteSucceeded = false;
+          if (resourceKind && config.sessionId) {
+            // Yjs-First: route text writes through collab room for CRDT merging
+            try {
+              const writeResult = await getCollabRoomManager().writeToResource(
+                {
+                  projectId: liveWorkspace.projectId,
+                  workspaceId: liveWorkspace.workspaceId,
+                  sessionId: config.sessionId,
+                  resourcePath: args.path,
+                  kind: resourceKind,
+                },
+                newContent,
+              );
+              receipt = {
+                committed: true as const,
+                mutationId: crypto.randomUUID(),
+                projectId: liveWorkspace.projectId,
+                workspaceId: liveWorkspace.workspaceId,
+                baseRevision: snapshot!.state.revision,
+                revision: writeResult.revision,
+                rootHash: "",
+                actor: "ai" as const,
+                resources: [
+                  {
+                    path: args.path,
+                    action: "modified" as const,
+                    beforeHash: crypto
+                      .createHash("sha256")
+                      .update(rawContent)
+                      .digest("hex"),
+                    afterHash: writeResult.hash,
+                  },
+                ],
+                committedAt: Date.now(),
+              };
+              collabWriteSucceeded = true;
+            } catch (collabErr) {
+              logger.warn(
+                { path: args.path, err: String(collabErr) },
+                "editFile: collab room write failed, falling back to Authority",
+              );
+            }
+          }
+          if (!collabWriteSucceeded) {
+            // Authority path (non-collab resource or collab room unavailable)
+            let mutateDriftRetry = 0;
+            while (true) {
+              try {
+                receipt = await liveWorkspace.authority.mutate({
+                  mutationId: crypto.randomUUID(),
+                  projectId: liveWorkspace.projectId,
+                  workspaceId: liveWorkspace.workspaceId,
+                  sessionId: config.sessionId,
+                  baseRevision: snapshot!.state.revision,
+                  actor: "ai",
+                  reason: "agent_edit_file",
+                  operations: [
+                    {
+                      type: "put_text",
+                      path: args.path,
+                      content: newContent,
+                      expectedHash: crypto
+                        .createHash("sha256")
+                        .update(rawContent)
+                        .digest("hex"),
+                    },
+                  ],
+                });
+                break;
+              } catch (err) {
+                if (
+                  err instanceof WorkspaceMutationAuthorityError &&
+                  err.code === "WORKSPACE_EXTERNAL_DRIFT" &&
+                  mutateDriftRetry === 0
+                ) {
+                  mutateDriftRetry++;
+                  logger.info(
+                    { path: args.path },
+                    "editFile mutate: EXTERNAL_DRIFT, reconciling",
+                  );
+                  await liveWorkspace.authority.reconcileAdopt(
+                    liveWorkspace.projectId,
+                    liveWorkspace.workspaceId,
+                  );
+                  snapshot = await liveWorkspace.authority.getSnapshot(
+                    liveWorkspace.projectId,
+                    liveWorkspace.workspaceId,
+                  );
+                  continue;
                 }
+                throw err;
               }
-            })()
-          : (await fs.promises.writeFile(filePath, newContent, "utf-8"), null);
+            }
+          }
+        } else {
+          await fs.promises.writeFile(filePath, newContent, "utf-8");
+          receipt = null;
+        }
 
         // --- Build result summary ---
         const firstEdit = edits[0];

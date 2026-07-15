@@ -159,8 +159,11 @@ describe("useVisualEditState 智能属性写回", () => {
     expect(applyPrototypeVisualConfig).not.toHaveBeenCalled();
     expect(view.setTabValue).toHaveBeenCalledWith("ai");
     expect(view.setTriggerAutoSend).toHaveBeenCalledTimes(1);
-    expect(view.setTriggerAutoSend.mock.calls[0][0]).toContain("项目级配置项");
-    expect(view.setTriggerAutoSend.mock.calls[0][0]).toContain(
+    const triggerArg = view.setTriggerAutoSend.mock.calls[0][0] as {
+      hiddenPrompt: string;
+    };
+    expect(triggerArg.hiddenPrompt).toContain("项目级配置项");
+    expect(triggerArg.hiddenPrompt).toContain(
       "原型页直接写回暂不支持项目级配置项",
     );
     expect(mockToast).not.toHaveBeenCalled();
@@ -204,10 +207,12 @@ describe("useVisualEditState 智能属性写回", () => {
     });
 
     expect(applyPrototypeVisualPropertyChange).toHaveBeenCalledTimes(1);
-    const prompt = view.setTriggerAutoSend.mock.calls[0][0] as string;
-    expect(prompt).toContain("已直接写回的原型页变更");
-    expect(prompt).toContain("颜色（style:color）已直接写回原型 HTML");
-    expect(prompt).toContain("原型页直接写回只支持文本、图片和颜色配置项");
+    const triggerArg = view.setTriggerAutoSend.mock.calls[0][0] as {
+      hiddenPrompt: string;
+    };
+    expect(triggerArg.hiddenPrompt).toContain("已直接写回的原型页变更");
+    expect(triggerArg.hiddenPrompt).toContain("颜色（style:color）已直接写回原型 HTML");
+    expect(triggerArg.hiddenPrompt).toContain("原型页直接写回只支持文本、图片和颜色配置项");
   });
 
   it("原型页属性直接写回失败时进入 AI 兜底并保留原因", () => {
@@ -241,7 +246,10 @@ describe("useVisualEditState 智能属性写回", () => {
     });
 
     expect(view.setTabValue).toHaveBeenCalledWith("ai");
-    expect(view.setTriggerAutoSend.mock.calls[0][0]).toContain(
+    const triggerArg = view.setTriggerAutoSend.mock.calls[0][0] as {
+      hiddenPrompt: string;
+    };
+    expect(triggerArg.hiddenPrompt).toContain(
       "原型页属性无法直接写回，已准备交给 AI 处理",
     );
     expect(mockToast).not.toHaveBeenCalled();
@@ -398,10 +406,12 @@ describe("useVisualEditState 智能属性写回", () => {
       domPath: "img.deco-bg",
     });
 
-    const prompt = view.setTriggerAutoSend.mock.calls[0][0] as string;
-    expect(prompt).toContain("【已本地化资源】");
-    expect(prompt).toContain("../../assets/images/7007557cac7e-h_e545eaf5.png");
-    expect(prompt).toContain("不要再调用 saveImage 下载这个远程 URL");
-    expect(prompt).toContain("把选中图片 src 改为已本地化资源的页面引用路径");
+    const triggerArg = view.setTriggerAutoSend.mock.calls[0][0] as {
+      hiddenPrompt: string;
+    };
+    expect(triggerArg.hiddenPrompt).toContain("【已本地化资源】");
+    expect(triggerArg.hiddenPrompt).toContain("../../assets/images/7007557cac7e-h_e545eaf5.png");
+    expect(triggerArg.hiddenPrompt).toContain("不要再调用 saveImage 下载这个远程 URL");
+    expect(triggerArg.hiddenPrompt).toContain("把选中图片 src 改为已本地化资源的页面引用路径");
   });
 });

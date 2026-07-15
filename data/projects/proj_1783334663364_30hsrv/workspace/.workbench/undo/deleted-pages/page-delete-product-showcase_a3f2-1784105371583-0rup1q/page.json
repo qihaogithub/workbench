@@ -1,0 +1,8 @@
+{
+  "id": "product-showcase_a3f2",
+  "name": "品牌展示页",
+  "order": 1,
+  "parentId": null,
+  "routeKey": "page",
+  "runtimeType": "prototype-html-css"
+}

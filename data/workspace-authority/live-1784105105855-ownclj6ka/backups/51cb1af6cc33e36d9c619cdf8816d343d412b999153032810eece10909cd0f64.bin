@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>残影猜字</title>
+  <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+  <div class="page">
+    <!-- 顶部状态栏 -->
+    <div class="top-bar">
+      <div class="level-progress">
+        <div class="progress-label">第 <span class="current-level">3</span>/5 关</div>
+        <div class="progress-track">
+          <div class="progress-fill" style="width:60%"></div>
+        </div>
+      </div>
+      <div class="score-display">
+        <span class="score-icon">⭐</span>
+        <span class="score-num">240</span>
+      </div>
+    </div>
+
+    <!-- 标题提示 -->
+    <div class="hint-area">
+      <div class="hint-badge">残影猜字</div>
+      <p class="hint-text">这些残缺的笔画，属于哪个汉字？</p>
+    </div>
+
+    <!-- 残影笔画展示区 -->
+    <div class="shadow-canvas">
+      <!-- 田字格背景 -->
+      <div class="tian-grid">
+        <div class="grid-line h"></div>
+        <div class="grid-line v"></div>
+      </div>
+
+      <!-- 残影笔画 -->
+      <div class="shadow-strokes">
+        <!-- 宝盖头：点 -->
+        <div class="stroke stroke-dian s1">丶</div>
+        <!-- 宝盖头：左点 -->
+        <div class="stroke stroke-dian s2">丶</div>
+        <!-- 宝盖头：横钩 -->
+        <div class="stroke stroke-heng-gou s3"></div>
+        <!-- 底部捺 -->
+        <div class="stroke stroke-na s4"></div>
+      </div>
+
+      <!-- 朦胧遮罩 -->
+      <div class="shadow-veil"></div>
+    </div>
+
+    <!-- 候选字按钮 -->
+    <div class="options">
+      <button class="opt-btn">家</button>
+      <button class="opt-btn">字</button>
+      <button class="opt-btn">安</button>
+      <button class="opt-btn">守</button>
+    </div>
+
+    <!-- 猜对后的反馈层（默认隐藏，用类名切换） -->
+    <div class="feedback-correct">
+      <div class="fb-check">✓</div>
+      <div class="fb-text">正确！</div>
+      <div class="fb-word">家</div>
+    </div>
+  </div>
+</body>
+</html>

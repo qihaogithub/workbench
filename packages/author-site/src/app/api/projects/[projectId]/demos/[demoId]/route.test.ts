@@ -307,7 +307,7 @@ describe("project demo route live Workspace page metadata writes", () => {
       throw new Error("Expected workspace-tree put_text operation");
     }
     expect(JSON.parse(treeOperation.content)).toMatchObject({ pages: [] });
-    expect(fs.existsSync(path.join(workspacePath, "demos", "page-1", "prototype.html"))).toBe(true);
+    expect(fs.existsSync(path.join(workspacePath, "demos", "page-1", "prototype.html"))).toBe(false);
     expect(fs.readFileSync(path.join(workspacePath, "workspace-tree.json"), "utf-8")).toContain("旧名称");
   });
 

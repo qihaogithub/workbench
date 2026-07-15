@@ -811,23 +811,17 @@ function withDiffSummary(
 
 function withPageListSummary(
   result: ProjectAdminResult<{
-    pages: Array<{ runtimeType?: string }>;
+    pages: unknown[];
     folders: unknown[];
   }>,
 ): ProjectAdminResult<unknown> {
   if (!result.ok || !result.data) return result;
-  const runtimeTypes: Record<string, number> = {};
-  for (const page of result.data.pages) {
-    const runtimeType = page.runtimeType ?? "high-fidelity-react";
-    runtimeTypes[runtimeType] = (runtimeTypes[runtimeType] ?? 0) + 1;
-  }
   return {
     ...result,
     data: {
       summary: {
         pages: result.data.pages.length,
         folders: result.data.folders.length,
-        runtimeTypes,
       },
       pages: result.data.pages,
       folders: result.data.folders,

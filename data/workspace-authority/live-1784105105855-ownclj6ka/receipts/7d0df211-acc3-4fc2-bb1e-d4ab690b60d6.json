@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "7d0df211-acc3-4fc2-bb1e-d4ab690b60d6",
+  "projectId": "proj_1783334663364_30hsrv",
+  "workspaceId": "live-1784105105855-ownclj6ka",
+  "baseRevision": 89,
+  "revision": 90,
+  "rootHash": "bbc336bf3d903ed78c743b85afa877101cdd1ccfa25d1f710b2566aa29e9886a",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/stroke-puzzle-intro_b2d5/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "59dae586fd62972e57f5c959b194efb107b46b5f5e442597028dbf05c9203a8a"
+    }
+  ],
+  "committedAt": 1784108058563
+}

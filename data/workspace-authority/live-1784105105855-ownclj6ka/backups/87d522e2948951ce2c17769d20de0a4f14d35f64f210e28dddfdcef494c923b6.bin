@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>全部通关</title>
+  <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+  <div class="page">
+    <!-- 烟花装饰 -->
+    <div class="confetti c1"></div>
+    <div class="confetti c2"></div>
+    <div class="confetti c3"></div>
+    <div class="confetti c4"></div>
+    <div class="confetti c5"></div>
+    <div class="confetti c6"></div>
+
+    <!-- 顶部徽章 -->
+    <div class="clear-header">
+      <div class="header-badge">🏆 全部通关</div>
+      <h1 class="header-title">恭喜过关！</h1>
+      <p class="header-sub">你已掌握这些汉字的笔画结构</p>
+    </div>
+
+    <!-- 通关汉字展示 -->
+    <div class="words-showcase">
+      <div class="word-card">
+        <span class="word-char">大</span>
+        <span class="word-level">第1关</span>
+      </div>
+      <div class="word-card">
+        <span class="word-char">人</span>
+        <span class="word-level">第2关</span>
+      </div>
+      <div class="word-card">
+        <span class="word-char">马</span>
+        <span class="word-level">第3关</span>
+      </div>
+      <div class="word-card">
+        <span class="word-char">家</span>
+        <span class="word-level">第4关</span>
+      </div>
+      <div class="word-card">
+        <span class="word-char">山</span>
+        <span class="word-level">第5关</span>
+      </div>
+    </div>
+
+    <!-- 统计 -->
+    <div class="clear-stats">
+      <div class="stat-item">
+        <span class="stat-val">5/5</span>
+        <span class="stat-label">通关数</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-val">21s</span>
+        <span class="stat-label">最快用时</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-val">100%</span>
+        <span class="stat-label">正确率</span>
+      </div>
+    </div>
+
+    <!-- 叫叫祝贺 -->
+    <div class="celebrate-mascot">
+      <div class="mascot-body">
+        <div class="mascot-face">
+          <div class="mascot-eye left"></div>
+          <div class="mascot-eye right"></div>
+          <div class="mascot-beak"></div>
+          <div class="mascot-comb"></div>
+        </div>
+        <div class="mascot-wing left"></div>
+        <div class="mascot-wing right"></div>
+      </div>
+      <div class="celebrate-speech">你太厉害了！🎉</div>
+    </div>
+
+    <!-- 按钮 -->
+    <div class="clear-actions">
+      <button class="btn-result">
+        <span>查看战绩</span>
+      </button>
+      <button class="btn-replay-all">再玩一次</button>
+    </div>
+  </div>
+</body>
+</html>
