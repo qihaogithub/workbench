@@ -85,11 +85,9 @@
     }
   ],
   "createdAt": 1783585261168,
-  "updatedAt": 1784105087200,
+  "updatedAt": 1783649668707,
   "activeWorkspaceId": "live-1783585261306-sza0dkpm7",
-  "activeWorkspaceUpdatedAt": 1783649668708,
+  "activeWorkspaceUpdatedAt": 1783649668460,
   "canonicalSyncedWorkspaceId": "live-1783585261306-sza0dkpm7",
-  "canonicalSyncedAt": 1784105087200,
-  "canonicalSyncedRevision": 5,
-  "canonicalSyncedRootHash": "0d64235abd5c788dd77fc5490e8c454a434d64bf433f584cf043cde2199342fd"
+  "canonicalSyncedAt": 1783649668686
 }

@@ -5,70 +5,22 @@
   "workspacePath": "/app/data/projects/proj_1783334663364_30hsrv/workspace",
   "demoPages": [
     {
-      "id": "activity-home_m4x2",
-      "name": "activity home",
-      "order": 0,
-      "parentId": null,
-      "routeKey": "activity-home"
-    },
-    {
-      "id": "result-share_q5w8",
-      "name": "result share",
+      "id": "product-showcase_a3f2",
+      "name": "品牌展示页",
       "order": 1,
       "parentId": null,
-      "routeKey": "result-share"
+      "routeKey": "page"
     },
     {
-      "id": "shadow-guess_n7k1",
-      "name": "shadow guess",
+      "id": "contact-section_k8m2",
+      "name": "联系我们页",
       "order": 2,
       "parentId": null,
-      "routeKey": "shadow-guess"
-    },
-    {
-      "id": "stroke-puzzle_p9v3",
-      "name": "stroke puzzle",
-      "order": 3,
-      "parentId": null,
-      "routeKey": "stroke-puzzle"
-    },
-    {
-      "id": "stroke-puzzle-clear_r4t6",
-      "name": "stroke puzzle clear",
-      "routeKey": "stroke-puzzle-clearr",
-      "order": 4,
-      "parentId": null
-    },
-    {
-      "id": "stroke-puzzle-fail_j9m2",
-      "name": "stroke puzzle fail",
-      "routeKey": "stroke-puzzle-failj9",
-      "order": 5,
-      "parentId": null
-    },
-    {
-      "id": "stroke-puzzle-intro_b2d5",
-      "name": "stroke puzzle intro",
-      "routeKey": "stroke-puzzle-introb",
-      "order": 6,
-      "parentId": null
-    },
-    {
-      "id": "stroke-puzzle-pass_f7h3",
-      "name": "stroke puzzle pass",
-      "routeKey": "stroke-puzzle-passf7",
-      "order": 7,
-      "parentId": null
+      "routeKey": "page-2"
     }
   ],
   "demoFolders": [],
   "versions": [],
   "createdAt": 1783334663371,
-  "updatedAt": 1784111301773,
-  "activeWorkspaceId": "live-1784105105855-ownclj6ka",
-  "activeWorkspaceUpdatedAt": 1784105105866,
-  "canonicalSyncedWorkspaceId": "live-1784105105855-ownclj6ka",
-  "canonicalSyncedRevision": 189,
-  "canonicalSyncedRootHash": "1ba1c43a0ecdc861d4dc1e03f8c37b537ed7c04d3d3646eadb35c9d934cfdfcb",
-  "canonicalSyncedAt": 1784111301773
+  "updatedAt": 1783570800969
 }
