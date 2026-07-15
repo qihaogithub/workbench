@@ -143,10 +143,17 @@ delegateTask({
    {
      "$schema": "https://json-schema.org/draft/2020-12/schema",
      "type": "object",
+     "$demo": {
+       "previewSize": {
+         "width": 375,
+         "height": 812
+       }
+     },
      "properties": {},
      "required": []
    }
    ```
+   `previewSize` 的宽高由你根据页面目标设备和内容自行判断填写。
 10. **自检**：新建页面的 `config.schema.json` 中不得包含 `project.config.schema.json` 中已有的字段名
 
 ### 重命名 / 改顺序

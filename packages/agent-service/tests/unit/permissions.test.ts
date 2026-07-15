@@ -43,7 +43,10 @@ describe('isPathAllowed', () => {
   it('拒绝黑名单中的隐藏工作区状态文件', () => {
     expect(isPathAllowed('.workspace.json', WORKSPACE, DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
     expect(isPathAllowed('.session.json', WORKSPACE, DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
-    expect(isPathAllowed('.canvas-layout.json', WORKSPACE, DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
+  });
+
+  it('.canvas-layout.json 不再被 deniedPatterns 拦截（已移除，AI 可编辑画布布局）', () => {
+    expect(isPathAllowed('.canvas-layout.json', WORKSPACE, DEFAULT_WORKSPACE_PERMISSIONS)).toBe(true);
   });
 
   it('拒绝 workingDir 越界访问（..）', () => {

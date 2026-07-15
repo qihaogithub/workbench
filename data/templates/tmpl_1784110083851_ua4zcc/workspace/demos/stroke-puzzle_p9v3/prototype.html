@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>笔画拼字</title>
+  <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+  <div class="page">
+    <!-- 顶部状态栏 -->
+    <div class="top-bar">
+      <div class="level-progress">
+        <div class="progress-label">第 <span class="current-level">3</span>/5 关</div>
+        <div class="progress-track">
+          <div class="progress-fill" style="width:60%"></div>
+        </div>
+      </div>
+      <div class="timer-display">
+        <span class="timer-icon">⏱</span>
+        <span class="timer-num">0:15</span>
+      </div>
+    </div>
+
+    <!-- 目标提示 -->
+    <div class="target-area">
+      <div class="target-badge">笔画拼字</div>
+      <p class="target-text">请用下方笔画拼出：</p>
+      <div class="target-word-placeholder">
+        <span class="target-question">？</span>
+      </div>
+      <p class="target-hint">（提示：一种会飞的动物）</p>
+    </div>
+
+    <!-- 田字格拼字区 -->
+    <div class="puzzle-grid">
+      <div class="tian-bg">
+        <div class="tian-line h"></div>
+        <div class="tian-line v"></div>
+      </div>
+      <!-- 已放入的笔画占位区 -->
+      <div class="placed-strokes">
+        <div class="slot slot-1 empty"></div>
+        <div class="slot slot-2 empty"></div>
+        <div class="slot slot-3 empty"></div>
+        <div class="slot slot-4 empty"></div>
+      </div>
+    </div>
+
+    <!-- 笔画候选区 -->
+    <div class="stroke-pool">
+      <div class="pool-label">点击笔画放入田字格</div>
+      <div class="pool-strokes">
+        <!-- 横折 -->
+        <div class="stroke-chip">
+          <div class="chip-stroke chip-heng-zhe"></div>
+        </div>
+        <!-- 竖折折钩 -->
+        <div class="stroke-chip">
+          <div class="chip-stroke chip-shu-zhe-zhe-gou"></div>
+        </div>
+        <!-- 横 -->
+        <div class="stroke-chip">
+          <div class="chip-stroke chip-heng"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 操作按钮 -->
+    <div class="actions">
+      <button class="btn-undo">撤销</button>
+      <button class="btn-submit">确认</button>
+    </div>
+
+    <!-- 正确反馈 -->
+    <div class="combo-effect">
+      <div class="combo-word">马</div>
+      <div class="combo-text">✧ 拼字正确 ✧</div>
+      <div class="combo-sparks">
+        <span class="spark s1"></span>
+        <span class="spark s2"></span>
+        <span class="spark s3"></span>
+        <span class="spark s4"></span>
+        <span class="spark s5"></span>
+        <span class="spark s6"></span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

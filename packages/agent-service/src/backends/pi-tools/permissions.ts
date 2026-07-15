@@ -31,7 +31,6 @@ export const DEFAULT_WORKSPACE_PERMISSIONS: PermissionConfig = {
     "**/.workbench/**",
     "**/.workspace.json",
     "**/.session.json",
-    "**/.canvas-layout.json",
   ],
   allowedCommands: ["node", "ls", "cat", "head", "tail", "grep", "find", "wc", "echo"],
   deniedCommands: ["rm", "rmdir", "mv", "cp", "mkdir", "sudo", "chmod", "chown"],

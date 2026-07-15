@@ -6,77 +6,69 @@
   "demoPages": [
     {
       "id": "activity-home_m4x2",
-      "name": "活动入口",
-      "runtimeType": "prototype-html-css",
-      "order": 1,
+      "name": "activity home",
+      "order": 0,
       "parentId": null,
-      "routeKey": "page"
-    },
-    {
-      "id": "shadow-guess_n7k1",
-      "name": "残影猜字",
-      "runtimeType": "prototype-html-css",
-      "order": 2,
-      "parentId": null,
-      "routeKey": "page-2"
-    },
-    {
-      "id": "stroke-puzzle_p9v3",
-      "name": "笔画拼字",
-      "runtimeType": "prototype-html-css",
-      "order": 3,
-      "parentId": null,
-      "routeKey": "page-3"
+      "routeKey": "activity-home"
     },
     {
       "id": "result-share_q5w8",
-      "name": "结算分享",
-      "runtimeType": "prototype-html-css",
-      "order": 4,
+      "name": "result share",
+      "order": 1,
       "parentId": null,
-      "routeKey": "page-4"
+      "routeKey": "result-share"
     },
     {
-      "id": "stroke-puzzle-intro_b2d5",
-      "name": "笔画拼字-入口",
-      "runtimeType": "prototype-html-css",
-      "order": 5,
+      "id": "shadow-guess_n7k1",
+      "name": "shadow guess",
+      "order": 2,
       "parentId": null,
-      "routeKey": "page-5"
+      "routeKey": "shadow-guess"
     },
     {
-      "id": "stroke-puzzle-pass_f7h3",
-      "name": "笔画拼字-通关",
-      "runtimeType": "prototype-html-css",
-      "order": 6,
+      "id": "stroke-puzzle_p9v3",
+      "name": "stroke puzzle",
+      "order": 3,
       "parentId": null,
-      "routeKey": "page-6"
-    },
-    {
-      "id": "stroke-puzzle-fail_j9m2",
-      "name": "笔画拼字-超时",
-      "runtimeType": "prototype-html-css",
-      "order": 7,
-      "parentId": null,
-      "routeKey": "page-7"
+      "routeKey": "stroke-puzzle"
     },
     {
       "id": "stroke-puzzle-clear_r4t6",
-      "name": "笔画拼字-全部通关",
-      "runtimeType": "prototype-html-css",
-      "order": 8,
-      "parentId": null,
-      "routeKey": "page-8"
+      "name": "stroke puzzle clear",
+      "routeKey": "stroke-puzzle-clearr",
+      "order": 4,
+      "parentId": null
+    },
+    {
+      "id": "stroke-puzzle-fail_j9m2",
+      "name": "stroke puzzle fail",
+      "routeKey": "stroke-puzzle-failj9",
+      "order": 5,
+      "parentId": null
+    },
+    {
+      "id": "stroke-puzzle-intro_b2d5",
+      "name": "stroke puzzle intro",
+      "routeKey": "stroke-puzzle-introb",
+      "order": 6,
+      "parentId": null
+    },
+    {
+      "id": "stroke-puzzle-pass_f7h3",
+      "name": "stroke puzzle pass",
+      "routeKey": "stroke-puzzle-passf7",
+      "order": 7,
+      "parentId": null
     }
   ],
   "demoFolders": [],
   "versions": [],
   "createdAt": 1783334663371,
-  "updatedAt": 1784108845786,
+  "updatedAt": 1784111301773,
   "activeWorkspaceId": "live-1784105105855-ownclj6ka",
   "activeWorkspaceUpdatedAt": 1784105105866,
   "canonicalSyncedWorkspaceId": "live-1784105105855-ownclj6ka",
-  "canonicalSyncedRevision": 124,
-  "canonicalSyncedRootHash": "518c061ceb4917bc20128962383eb70854f27f4fd1b1bf6bbaecb87356321361",
-  "canonicalSyncedAt": 1784108845786
+  "canonicalSyncedRevision": 189,
+  "canonicalSyncedRootHash": "1ba1c43a0ecdc861d4dc1e03f8c37b537ed7c04d3d3646eadb35c9d934cfdfcb",
+  "canonicalSyncedAt": 1784111301773
 }

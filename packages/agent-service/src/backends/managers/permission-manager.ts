@@ -63,16 +63,9 @@ export class PermissionManager {
       }
     }
 
-    // 知识库写保护
-    if (toolName === 'writeFile' || toolName === 'editFile') {
-      const targetPath = input?.path;
-      if (targetPath && isKnowledgeBasePath(targetPath, this.config.workingDir ?? '')) {
-        return {
-          block: true,
-          reason: 'Knowledge base files are user-managed; AI agents may read them but must not modify them.',
-        };
-      }
-    }
+    // 知识库写保护已移除：AI 可通过 writeFile/editFile 写入 knowledge/ 路径，
+    // writeFile 工具会透明同步 manifest.json。路径安全由 isManagedWorkspaceResource
+    // 白名单和 isPathAllowed 权限层保障。
 
     return undefined;
   }

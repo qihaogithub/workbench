@@ -41,14 +41,12 @@ describe('PermissionManager', () => {
       });
     });
 
-    it('应拦截写向知识库目录的 writeFile', () => {
-      const result = manager.validateToolCall('writeFile', { path: 'knowledge/rules.md' });
-      expect(result?.block).toBe(true);
+    it('应放行写向知识库目录的 writeFile（写保护已移除）', () => {
+      expect(manager.validateToolCall('writeFile', { path: 'knowledge/rules.md' })).toBeUndefined();
     });
 
-    it('应拦截写向知识库目录的 editFile', () => {
-      const result = manager.validateToolCall('editFile', { path: 'knowledge/guide.md' });
-      expect(result?.block).toBe(true);
+    it('应放行写向知识库目录的 editFile（写保护已移除）', () => {
+      expect(manager.validateToolCall('editFile', { path: 'knowledge/guide.md' })).toBeUndefined();
     });
 
     it('对工作空间内普通文件的写操作应放行', () => {

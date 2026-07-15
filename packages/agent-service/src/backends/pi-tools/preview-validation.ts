@@ -277,7 +277,40 @@ export function validatePreviewFileWrite(
 
   if (pageId && demoFile.fileName === 'config.schema.json') {
     try {
-      JSON.parse(content);
+      const parsed = JSON.parse(content) as Record<string, unknown>;
+
+      // 校验 $demo.previewSize 存在性
+      const demo = parsed.$demo;
+      const previewSize =
+        demo != null && typeof demo === 'object' && !Array.isArray(demo)
+          ? (demo as Record<string, unknown>).previewSize
+          : undefined;
+      const hasValidPreviewSize =
+        previewSize != null &&
+        typeof previewSize === 'object' &&
+        !Array.isArray(previewSize) &&
+        ('width' in (previewSize as Record<string, unknown>)) &&
+        ('height' in (previewSize as Record<string, unknown>));
+
+      if (!hasValidPreviewSize) {
+        return {
+          ok: false,
+          file: normalizedPath,
+          pageId,
+          issues: [
+            {
+              file: normalizedPath,
+              pageId,
+              stage: 'schema_contract',
+              code: 'MISSING_PREVIEW_SIZE',
+              severity: 'error',
+              message: 'config.schema.json 缺少 $demo.previewSize 字段（需包含 width 和 height）',
+              instruction: '请在 config.schema.json 中添加 "$demo": { "previewSize": { "width": <数字>, "height": <数字> } }，宽高根据页面目标设备自行判断。',
+            },
+          ],
+        };
+      }
+
       return { ok: true, file: normalizedPath, pageId, issues: [] };
     } catch {
       return {

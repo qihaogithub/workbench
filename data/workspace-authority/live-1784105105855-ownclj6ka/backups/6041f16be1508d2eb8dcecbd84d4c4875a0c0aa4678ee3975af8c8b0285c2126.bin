@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "brandName": {
+      "type": "string",
+      "default": "星辰科技",
+      "description": "品牌名称"
+    },
+    "brandLogo": {
+      "type": "string",
+      "format": "image",
+      "default": "",
+      "description": "品牌 Logo 图片"
+    },
+    "primaryColor": {
+      "type": "string",
+      "format": "color",
+      "default": "#4F46E5",
+      "description": "主题色"
+    },
+    "accentColor": {
+      "type": "string",
+      "format": "color",
+      "default": "#F59E0B",
+      "description": "强调色"
+    },
+    "companySlogan": {
+      "type": "string",
+      "default": "以科技驱动未来，用创新点亮生活",
+      "description": "公司标语"
+    }
+  },
+  "required": ["brandName", "primaryColor"]
+}{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "brandName": {
+      "type": "string",
+      "default": "星辰科技",
+      "description": "品牌名称"
+    },
+    "brandLogo": {
+      "type": "string",
+      "format": "image",
+      "default": "",
+      "description": "品牌 Logo 图片"
+    },
+    "primaryColor": {
+      "type": "string",
+      "format": "color",
+      "default": "#4F46E5",
+      "description": "主题色"
+    },
+    "accentColor": {
+      "type": "string",
+      "format": "color",
+      "default": "#F59E0B",
+      "description": "强调色"
+    },
+    "companySlogan": {
+      "type": "string",
+      "default": "以科技驱动未来，用创新点亮生活",
+      "description": "公司标语"
+    }
+  },
+  "required": ["brandName", "primaryColor"]
+}{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "brandName": {
+      "type": "string",
+      "default": "星辰科技",
+      "description": "品牌名称"
+    },
+    "brandLogo": {
+      "type": "string",
+      "format": "image",
+      "default": "",
+      "description": "品牌 Logo 图片"
+    },
+    "primaryColor": {
+      "type": "string",
+      "format": "color",
+      "default": "#4F46E5",
+      "description": "主题色"
+    },
+    "accentColor": {
+      "type": "string",
+      "format": "color",
+      "default": "#F59E0B",
+      "description": "强调色"
+    },
+    "companySlogan": {
+      "type": "string",
+      "default": "以科技驱动未来，用创新点亮生活",
+      "description": "公司标语"
+    }
+  },
+  "required": ["brandName", "primaryColor"]
+}{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "brandName": {
+      "type": "string",
+      "default": "星辰科技",
+      "description": "品牌名称"
+    },
+    "brandLogo": {
+      "type": "string",
+      "format": "image",
+      "default": "",
+      "description": "品牌 Logo 图片"
+    },
+    "primaryColor": {
+      "type": "string",
+      "format": "color",
+      "default": "#4F46E5",
+      "description": "主题色"
+    },
+    "accentColor": {
+      "type": "string",
+      "format": "color",
+      "default": "#F59E0B",
+      "description": "强调色"
+    },
+    "companySlogan": {
+      "type": "string",
+      "default": "以科技驱动未来，用创新点亮生活",
+      "description": "公司标语"
+    }
+  },
+  "required": ["brandName", "primaryColor"]
+}

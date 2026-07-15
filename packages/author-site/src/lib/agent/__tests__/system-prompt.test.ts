@@ -134,6 +134,14 @@ describe('buildStaticSystemPrompt', () => {
     expect(prompt).toContain('不得因生成页面、样式调整、组件修改、素材替换等原因自行增删配置字段');
   });
 
+  it('默认 schema 模板包含 $demo.previewSize', () => {
+    const prompt = buildStaticSystemPrompt();
+    expect(prompt).toContain('"previewSize"');
+    expect(prompt).toContain('"width": 375');
+    expect(prompt).toContain('"height": 812');
+    expect(prompt).toContain('`previewSize` 的宽高由你根据页面目标设备和内容自行判断填写');
+  });
+
   it('明确说明 HTML/CSS 原型页支持页面级配置绑定', () => {
     const prompt = buildStaticSystemPrompt();
     expect(prompt).toContain('HTML/CSS 原型页和高保真 React 页都支持配置项');

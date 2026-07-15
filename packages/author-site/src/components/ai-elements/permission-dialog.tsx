@@ -62,15 +62,14 @@ export function PermissionDialog({
       <>
         <div className={cn(isInline ? 'px-4 py-2' : '', className)}>
           <ChatCard className="bg-background">
-            <div className="flex flex-wrap items-center gap-3 px-4 py-3">
-              <div className="p-2 rounded-full bg-blue-500/10">
-                <FileText className="h-5 w-5 text-blue-600" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-medium">执行计划待确认</h3>
-                <p className="text-xs text-muted-foreground">
-                  Agent 已制定计划，批准后才会继续执行
-                </p>
+            <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="p-2 rounded-full bg-blue-500/10 shrink-0">
+                  <FileText className="h-5 w-5 text-blue-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-medium truncate">执行计划</h3>
+                </div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <Button size="sm" variant="outline" onClick={() => setIsPlanOpen(true)}>

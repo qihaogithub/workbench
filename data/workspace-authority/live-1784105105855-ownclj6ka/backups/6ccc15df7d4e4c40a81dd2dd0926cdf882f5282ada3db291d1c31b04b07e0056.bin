@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "projectId": "proj_1783334663364_30hsrv",
+  "updatedAt": 1784109061044,
+  "state": {
+    "viewport": {
+      "x": -415.54431752442224,
+      "y": -525.9239654069916,
+      "zoom": 0.5713125102754502
+    },
+    "pages": {
+      "product-showcase_a3f2": {
+        "x": -0.46684698194335433,
+        "y": 0,
+        "width": 375,
+        "height": 2087.5,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "contact-section_k8m2": {
+        "x": 420.574020457214,
+        "y": 0,
+        "width": 375,
+        "height": 1663,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "result-share_q5w8": {
+        "x": 408.4677105286722,
+        "y": 2028.1247556503383,
+        "width": 375,
+        "height": 812,
+        "zIndex": 3,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "stroke-puzzle_p9v3": {
+        "x": 398.0100696199753,
+        "y": 1001.5331409217979,
+        "width": 375,
+        "height": 812,
+        "zIndex": 2,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "shadow-guess_n7k1": {
+        "x": 6.264449509170888,
+        "y": 2028.1247556503383,
+        "width": 375,
+        "height": 812,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "stroke-puzzle-intro_b2d5": {
+        "x": 8.569593170498083,
+        "y": 1001.5331409217977,
+        "width": 375,
+        "height": 812,
+        "zIndex": 4,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "stroke-puzzle-clear_r4t6": {
+        "x": 1650.4193040558607,
+        "y": 1001.5331409217979,
+        "width": 375,
+        "height": 812,
+        "zIndex": 7,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "stroke-puzzle-pass_f7h3": {
+        "x": 1240.8780863865557,
+        "y": 1001.5331409217977,
+        "width": 375,
+        "height": 812,
+        "zIndex": 5,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "stroke-puzzle-fail_j9m2": {
+        "x": 806.4792005492245,
+        "y": 1001.5331409217979,
+        "width": 375,
+        "height": 812,
+        "zIndex": 6,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

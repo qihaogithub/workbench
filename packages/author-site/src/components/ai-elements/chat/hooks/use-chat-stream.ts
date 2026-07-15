@@ -786,6 +786,11 @@ export function useChatStream(options: UseChatStreamOptions) {
               ...prev,
               parts: updateToolPart(prev.parts || [], update),
             }));
+            // 知识库文档创建后通知前端刷新
+            const details = update.details as { knowledgeDocumentCreated?: boolean } | undefined;
+            if (details?.knowledgeDocumentCreated) {
+              window.dispatchEvent(new Event("knowledge-updated"));
+            }
           },
 
           onPermission: (request) => {
