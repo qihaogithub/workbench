@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1784101114334_q5pyf4",
+  "at": 1784101114334,
+  "actor": {
+    "id": "local-codex",
+    "name": "local-codex",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1784101114329_51cu5w",
+  "inputSummary": {
+    "name": "矩阵H5活动",
+    "category": "未分类"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1784101114329_51cu5w"
+    ]
+  }
+}
