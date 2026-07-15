@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "cf1251e9-a2e7-42b6-91c6-851796f47a30",
+  "projectId": "proj_1783585261167_7h7prw",
+  "workspaceId": "live-1783585261306-sza0dkpm7",
+  "baseRevision": 0,
+  "revision": 13,
+  "rootHash": "2b38c6aad9d9a3dfa5993f4e64424e0fde1c6415955d8b295f6986811933aaf2",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "assets/images/70849e9827a1-promo-ad.png",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "70849e9827a1aaf6d756e1c618df5342b8f2ee5976a711395a88f1995393af2a"
+    }
+  ],
+  "committedAt": 1784084124350
+}

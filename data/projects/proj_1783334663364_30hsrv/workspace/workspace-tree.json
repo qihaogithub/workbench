@@ -2,18 +2,18 @@
   "folders": [],
   "pages": [
     {
-      "id": "contact-section_k8m2",
-      "name": "contact section",
-      "order": 0,
-      "parentId": null,
-      "routeKey": "contact-section"
-    },
-    {
       "id": "product-showcase_a3f2",
-      "name": "product showcase",
+      "name": "品牌展示页",
       "order": 1,
       "parentId": null,
-      "routeKey": "product-showcase"
+      "routeKey": "page"
+    },
+    {
+      "id": "contact-section_k8m2",
+      "name": "联系我们页",
+      "order": 2,
+      "parentId": null,
+      "routeKey": "page-2"
     }
   ]
 }

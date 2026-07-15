@@ -1,0 +1,28 @@
+{
+  "id": "commit_1783591669747_lkc815",
+  "projectId": "proj_1783585261167_7h7prw",
+  "parentCommitId": "commit_1783588719644_nmhc8i",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录成长豆商城",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "growth-bean-mall_x8k2",
+      "versionId": "prv_1783591669744_e0qm1i"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "growth-bean-mall_x8k2",
+      "fromVersionId": "prv_1783588719640_1rdegs",
+      "toVersionId": "prv_1783591669744_e0qm1i"
+    }
+  ],
+  "createdAt": 1783591669747,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user"
+  }
+}

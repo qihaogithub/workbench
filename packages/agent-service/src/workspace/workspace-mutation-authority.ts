@@ -15,6 +15,8 @@ import {
   normalizeWorkspaceResourcePath,
 } from "@workbench/shared/contracts";
 
+import { logger } from "../utils/logger";
+
 import {
   appendWorkspaceAuthorityDiagnostic,
   appendWorkspaceProjectionDiagnostic,
@@ -573,7 +575,12 @@ export class WorkspaceMutationAuthority {
           });
           const event: WorkspaceMutationCommittedEvent = { type: "workspace_mutation_committed", receipt };
           WorkspaceMutationAuthority.listenersFor(this.options.dataDir).forEach((listener) => {
-            try { listener(event); } catch { /* observers cannot change committed receipt outcome */ }
+            try { listener(event); } catch (listenerError) {
+              logger.warn(
+                { workspaceId: request.workspaceId, revision: receipt.revision, error: listenerError },
+                "onMutationCommitted listener failed — collab room baseline may be stale",
+              );
+            }
           });
           return receipt;
         } catch (error) {

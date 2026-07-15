@@ -95,6 +95,14 @@ const localEnv = {
     configuredEnv.CORS_ORIGINS ||
     "http://localhost:3200,http://127.0.0.1:3200,http://localhost:3300,http://127.0.0.1:3300",
   HOSTNAME: configuredEnv.HOSTNAME || "0.0.0.0",
+};
+// 移除 PORT，避免父进程 PORT 泄漏到 agent-service / screenshot-service 子进程。
+// author-site 通过 authorEnv 单独设置 PORT。
+delete localEnv.PORT;
+
+/** author-site 专用环境变量，不传递给其他子服务 */
+const authorEnv = {
+  ...localEnv,
   PORT: "3200",
 };
 
@@ -393,7 +401,7 @@ try {
   console.log("[本地准生产预览] 启动 http://localhost:3200");
   const authorChild = spawn(process.execPath, [standaloneServerPath], {
     cwd: PROJECT_DIR,
-    env: localEnv,
+    env: authorEnv,
     stdio: "inherit",
   });
   spawnedChildren.push(authorChild);

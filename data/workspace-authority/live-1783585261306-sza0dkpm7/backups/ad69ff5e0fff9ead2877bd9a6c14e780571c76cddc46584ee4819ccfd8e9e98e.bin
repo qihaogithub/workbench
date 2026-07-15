@@ -1,0 +1,41 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "growth-bean-mall_x8k2",
+      "name": "成长豆商城",
+      "order": 1,
+      "parentId": null,
+      "runtimeType": "prototype-html-css",
+      "routeKey": "page"
+    },
+    {
+      "id": "figma_s4v2",
+      "name": "上滑",
+      "routeKey": "figma",
+      "runtimeType": "prototype-html-css",
+      "order": 2,
+      "parentId": null
+    }
+  ]
+}{
+  "folders": [],
+  "pages": [
+    {
+      "id": "growth-bean-mall_x8k2",
+      "name": "成长豆商城",
+      "order": 1,
+      "parentId": null,
+      "runtimeType": "prototype-html-css",
+      "routeKey": "page"
+    },
+    {
+      "id": "figma_s4v2",
+      "name": "上滑",
+      "routeKey": "figma",
+      "runtimeType": "prototype-html-css",
+      "order": 2,
+      "parentId": null
+    }
+  ]
+}

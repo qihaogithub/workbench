@@ -1,20 +1,20 @@
 {
   "projectId": "proj_1783585261167_7h7prw",
-  "commitId": "commit_1784026557320_7o1dqb",
+  "commitId": "commit_1784084939405_6avl56",
   "materializerVersion": "project-core-content-graph-v1",
   "resources": [
     {
       "kind": "page",
-      "resourceId": "kids-education_m3k7",
-      "versionId": "prv_1784026557318_b7i6yb",
-      "contentHash": "d4971d6b6fba3829cf316bd148f9809334c12dedc57e6da4743b50ba37231ee8",
+      "resourceId": "growth-bean-mall_x8k2",
+      "versionId": "prv_1784084939400_kmr7nc",
+      "contentHash": "e5e9dde8a5f98338590a2cd0eda229eba23150b58e0450db0f0b28c88af78e50",
       "blobRefs": [
         "bb7c33a9374923983615f0adccebe2ad3333dc0d25a192be8af18d801a105164",
-        "edbfcfe09c3bdb42694927fb44016dede2972e3b1dd1cfdefbfb5712a72aec3a",
-        "c3dc41fd2b097b1a914ce8b966c8c743441bcfc30f33d475f67b8d0a9481b9a3",
-        "d806eaff075f259e1786fdf0bebd2d93033fa1e1632c9d6b4236729743167a24"
+        "a9603f03fdd10159f85f2b46e8bf7e76776f0e560f7d6de1d550cc805c62a9f7",
+        "44343f2b3d8ce84762229e3bb04a59d7cf147514dd765462548a323798bd2565",
+        "c905cd7516abdf9c2e5602c1492400a5c8ae9be5a6f16256685e46935e2652ea"
       ]
     }
   ],
-  "updatedAt": 1784026557321
+  "updatedAt": 1784084939406
 }

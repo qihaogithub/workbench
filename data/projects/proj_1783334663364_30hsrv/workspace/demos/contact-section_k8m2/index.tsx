@@ -103,7 +103,7 @@ export default function ContactSection(props: DemoProps) {
               {companySlogan}
             </span>
           )}
-          <h1 className="text-4xl md:text-5xl font-bold mb-4" style={{ color: '#0051FF' }}>联系我们</h1>
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">联系我们</h1>
           <p className="text-lg text-gray-500 max-w-xl mx-auto">
             无论您有任何问题或合作意向，我们都期待与您沟通
           </p>
