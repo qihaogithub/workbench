@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "projectId": "proj_1783334663364_30hsrv",
+  "updatedAt": 1784108115210,
+  "state": {
+    "viewport": {
+      "x": 111.0036945812808,
+      "y": 45,
+      "zoom": 0.9975369458128079
+    },
+    "pages": {
+      "activity-home_m4x2": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 812,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "shadow-guess_n7k1": {
+        "x": 423,
+        "y": 0,
+        "width": 375,
+        "height": 812,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "stroke-puzzle_p9v3": {
+        "x": 846,
+        "y": 0,
+        "width": 375,
+        "height": 812,
+        "zIndex": 2,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

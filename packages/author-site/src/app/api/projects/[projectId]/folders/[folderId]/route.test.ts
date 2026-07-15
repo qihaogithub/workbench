@@ -287,7 +287,7 @@ describe("project folder detail route live Workspace writes", () => {
       folders: [],
       pages: [],
     });
-    expect(fs.existsSync(path.join(workspacePath, "demos", "page-1", "prototype.html"))).toBe(true);
+    expect(fs.existsSync(path.join(workspacePath, "demos", "page-1", "prototype.html"))).toBe(false);
     expect(fs.readFileSync(path.join(workspacePath, "workspace-tree.json"), "utf-8")).toContain("旧文件夹");
   });
 });

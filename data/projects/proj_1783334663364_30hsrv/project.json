@@ -5,22 +5,78 @@
   "workspacePath": "/app/data/projects/proj_1783334663364_30hsrv/workspace",
   "demoPages": [
     {
-      "id": "product-showcase_a3f2",
-      "name": "品牌展示页",
+      "id": "activity-home_m4x2",
+      "name": "活动入口",
+      "runtimeType": "prototype-html-css",
       "order": 1,
       "parentId": null,
       "routeKey": "page"
     },
     {
-      "id": "contact-section_k8m2",
-      "name": "联系我们页",
+      "id": "shadow-guess_n7k1",
+      "name": "残影猜字",
+      "runtimeType": "prototype-html-css",
       "order": 2,
       "parentId": null,
       "routeKey": "page-2"
+    },
+    {
+      "id": "stroke-puzzle_p9v3",
+      "name": "笔画拼字",
+      "runtimeType": "prototype-html-css",
+      "order": 3,
+      "parentId": null,
+      "routeKey": "page-3"
+    },
+    {
+      "id": "result-share_q5w8",
+      "name": "结算分享",
+      "runtimeType": "prototype-html-css",
+      "order": 4,
+      "parentId": null,
+      "routeKey": "page-4"
+    },
+    {
+      "id": "stroke-puzzle-intro_b2d5",
+      "name": "笔画拼字-入口",
+      "runtimeType": "prototype-html-css",
+      "order": 5,
+      "parentId": null,
+      "routeKey": "page-5"
+    },
+    {
+      "id": "stroke-puzzle-pass_f7h3",
+      "name": "笔画拼字-通关",
+      "runtimeType": "prototype-html-css",
+      "order": 6,
+      "parentId": null,
+      "routeKey": "page-6"
+    },
+    {
+      "id": "stroke-puzzle-fail_j9m2",
+      "name": "笔画拼字-超时",
+      "runtimeType": "prototype-html-css",
+      "order": 7,
+      "parentId": null,
+      "routeKey": "page-7"
+    },
+    {
+      "id": "stroke-puzzle-clear_r4t6",
+      "name": "笔画拼字-全部通关",
+      "runtimeType": "prototype-html-css",
+      "order": 8,
+      "parentId": null,
+      "routeKey": "page-8"
     }
   ],
   "demoFolders": [],
   "versions": [],
   "createdAt": 1783334663371,
-  "updatedAt": 1783570800969
+  "updatedAt": 1784108845786,
+  "activeWorkspaceId": "live-1784105105855-ownclj6ka",
+  "activeWorkspaceUpdatedAt": 1784105105866,
+  "canonicalSyncedWorkspaceId": "live-1784105105855-ownclj6ka",
+  "canonicalSyncedRevision": 124,
+  "canonicalSyncedRootHash": "518c061ceb4917bc20128962383eb70854f27f4fd1b1bf6bbaecb87356321361",
+  "canonicalSyncedAt": 1784108845786
 }

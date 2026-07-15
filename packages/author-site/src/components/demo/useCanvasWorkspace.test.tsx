@@ -32,14 +32,11 @@ describe("useCanvasWorkspace", () => {
     window.fetch = originalWindowFetch;
   });
 
-  it("画布布局变更后标记未保存，项目保存确认后清除状态", async () => {
+  it("画布布局变更后标记未保存，flushCanvasState 清除 dirty 但不发送 HTTP（Yjs-First）", async () => {
     const fetchMock = jest.fn(
       async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = getFetchUrl(input);
         if (url.includes("/api/sessions/session_1/canvas-layout")) {
-          if (init?.method === "POST") {
-            return jsonFetchResponse({ success: true, data: {} });
-          }
           return jsonFetchResponse({
             success: true,
             data: { state: null },
@@ -80,24 +77,17 @@ describe("useCanvasWorkspace", () => {
       await result.current.flushCanvasState();
     });
 
-    await waitFor(() => {
-      expect(result.current.hasUnsavedCanvasChanges).toBe(true);
-      expect(result.current.saveStatus).toBe("saved");
-    });
+    // Yjs-First: flushCanvasState 只清除本地 dirty 标记，不发送 HTTP POST
+    // hasUnsavedCanvasChanges 由 markCanvasChangesSaved 清除
+    expect(result.current.hasUnsavedCanvasChanges).toBe(true);
+    expect(result.current.saveStatus).toBe("idle");
 
     const saveCall = fetchMock.mock.calls.find(
       ([input, init]) =>
         getFetchUrl(input).includes("/api/sessions/session_1/canvas-layout") &&
         init?.method === "POST",
     );
-    expect(saveCall).toBeDefined();
-
-    const body = JSON.parse(String(saveCall?.[1]?.body)) as {
-      projectId: string;
-      state: CanvasState;
-    };
-    expect(body.projectId).toBe("project_1");
-    expect(body.state.pages.page_1).toEqual(nextState.pages.page_1);
+    expect(saveCall).toBeUndefined();
 
     act(() => {
       result.current.markCanvasChangesSaved();
@@ -106,14 +96,11 @@ describe("useCanvasWorkspace", () => {
     expect(result.current.hasUnsavedCanvasChanges).toBe(false);
   });
 
-  it("自动保存写入布局后仍保留项目未保存状态", async () => {
+  it("Yjs-First: 画布变更后不会触发自动 HTTP 保存", async () => {
     const fetchMock = jest.fn(
       async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = getFetchUrl(input);
         if (url.includes("/api/sessions/session_1/canvas-layout")) {
-          if (init?.method === "POST") {
-            return jsonFetchResponse({ success: true, data: {} });
-          }
           return jsonFetchResponse({
             success: true,
             data: { state: null },
@@ -148,25 +135,30 @@ describe("useCanvasWorkspace", () => {
 
     expect(result.current.hasUnsavedCanvasChanges).toBe(true);
 
+    // Yjs-First: 不再有 700ms 自动保存定时器
     await act(async () => {
-      jest.advanceTimersByTime(700);
+      jest.advanceTimersByTime(1000);
       await Promise.resolve();
     });
 
-    await waitFor(() => {
-      expect(result.current.saveStatus).toBe("saved");
-    });
+    // saveStatus 保持 idle，不变为 saved
+    expect(result.current.saveStatus).toBe("idle");
     expect(result.current.hasUnsavedCanvasChanges).toBe(true);
+
+    // 不应有 POST 请求
+    const saveCall = fetchMock.mock.calls.find(
+      ([input, init]) =>
+        getFetchUrl(input).includes("/api/sessions/session_1/canvas-layout") &&
+        init?.method === "POST",
+    );
+    expect(saveCall).toBeUndefined();
   });
 
-  it("画布状态更新后立即强制保存时写入最新状态", async () => {
+  it("Yjs-First: flushCanvasState 清除 dirty 但不发送 HTTP POST", async () => {
     const fetchMock = jest.fn(
       async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = getFetchUrl(input);
         if (url.includes("/api/sessions/session_1/canvas-layout")) {
-          if (init?.method === "POST") {
-            return jsonFetchResponse({ success: true, data: {} });
-          }
           return jsonFetchResponse({
             success: true,
             data: { state: null },
@@ -212,18 +204,19 @@ describe("useCanvasWorkspace", () => {
       await result.current.flushCanvasState();
     });
 
+    // Yjs-First: flushCanvasState 不发送 HTTP POST
     const saveCall = fetchMock.mock.calls.find(
       ([input, init]) =>
         getFetchUrl(input).includes("/api/sessions/session_1/canvas-layout") &&
         init?.method === "POST",
     );
-    expect(saveCall).toBeDefined();
+    expect(saveCall).toBeUndefined();
 
-    const body = JSON.parse(String(saveCall?.[1]?.body)) as {
-      state: CanvasState;
-    };
-    expect(body.state.pages.page_1).toEqual(latestState.pages.page_1);
-    const savedTextNode = body.state.nodes?.text_1;
+    // canvas state 仍然保留最新值
+    expect(result.current.canvasState.pages.page_1).toEqual(
+      latestState.pages.page_1,
+    );
+    const savedTextNode = result.current.canvasState.nodes?.text_1;
     expect(savedTextNode?.kind).toBe("text");
     if (savedTextNode?.kind === "text") {
       expect(savedTextNode.text).toBe("立即退出前的文字");

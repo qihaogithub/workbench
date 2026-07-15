@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "478b9646-66ce-4394-8f3a-9b9bcab698a1",
+  "projectId": "proj_1783334663364_30hsrv",
+  "workspaceId": "live-1784105105855-ownclj6ka",
+  "baseRevision": 33,
+  "revision": 37,
+  "rootHash": "c48365933114a4f62b87e170f2cd631ee139a63b3e56df1b1d1cedd4e0c28dbd",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/shadow-guess_n7k1/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "28c60bdc6a2b763d51bcfc71bcdf1c535cb1d34695be1e3208de028c6ce08929"
+    }
+  ],
+  "committedAt": 1784106480644
+}

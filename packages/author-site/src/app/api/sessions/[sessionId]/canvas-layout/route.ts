@@ -13,9 +13,8 @@ import {
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { isLiveWorkspace } from "@/lib/workspace-manager";
+import { getServerAgentServiceUrl } from "@/lib/runtime-config";
 import {
-  commitWorkspaceMutation,
-  createTextWorkspaceMutation,
   WorkspaceAuthorityClientError,
 } from "@/lib/workspace-authority-client";
 import { normalizeCanvasStateLayers } from "@workbench/demo-ui";
@@ -602,19 +601,31 @@ export async function POST(
       access.projectId &&
       isLiveWorkspace(access.workspaceId)
     ) {
-      const layoutPath = getCanvasLayoutPath(access.workspacePath);
-      const previousContent = fs.existsSync(layoutPath)
-        ? fs.readFileSync(layoutPath, "utf-8")
-        : null;
-      receipt = await commitWorkspaceMutation(createTextWorkspaceMutation({
-        projectId: access.projectId,
-        workspaceId: access.workspaceId,
-        sessionId: params.sessionId,
-        path: ".canvas-layout.json",
-        content,
-        previousContent,
-        reason: "author_canvas_layout_save",
-      }));
+      // Yjs-First: write through collab room — this IS the write, no need to
+      // flush first or read expectedHash from disk.
+      const agentServiceUrl = getServerAgentServiceUrl();
+      const writeResponse = await fetch(
+        `${agentServiceUrl}/api/collab/projects/${encodeURIComponent(access.projectId!)}` +
+        `/workspaces/${encodeURIComponent(access.workspaceId!)}/write` +
+        `?sessionId=${encodeURIComponent(params.sessionId)}` +
+        `&resourcePath=${encodeURIComponent(".canvas-layout.json")}` +
+        `&kind=canvas-layout`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content }),
+        },
+      );
+      if (!writeResponse.ok) {
+        const errorBody = await writeResponse.json().catch(() => ({}));
+        throw new WorkspaceAuthorityClientError(
+          errorBody.error?.code || "WORKSPACE_MUTATION_FAILED",
+          errorBody.error?.message || "Yjs room write failed",
+          writeResponse.status,
+        );
+      }
+      const writeData = await writeResponse.json();
+      receipt = writeData.data;
     } else if (access.workspacePath) {
       const workspaceLayoutPath = getCanvasLayoutPath(access.workspacePath);
       fs.mkdirSync(path.dirname(workspaceLayoutPath), { recursive: true });

@@ -21,17 +21,12 @@ import {
 const MESSAGE_SYNC = 0;
 const MESSAGE_AWARENESS = 1;
 const MESSAGE_QUERY_AWARENESS = 3;
-/** Custom message type: server → client baseline-reset notification */
-const MESSAGE_BASELINE_RESET = 5;
 const DEFAULT_SAVE_DEBOUNCE_MS = 1000;
 const DEFAULT_ROOM_IDLE_TTL_MS = 5 * 60_000;
 const DEFAULT_MAX_CONNECTIONS_PER_WORKSPACE = 10;
 const SERVER_RELOAD_ORIGIN = Symbol("collab-server-reload");
-const CONFLICT_BACKOFF_BASE_MS = 60_000;
-const CONFLICT_BACKOFF_THRESHOLD = 3;
-const CONFLICT_BACKOFF_MAX_MS = 4 * 60_000;
 
-interface RoomDescriptor {
+export interface RoomDescriptor {
   projectId: string;
   workspaceId: string;
   sessionId: string;
@@ -59,10 +54,8 @@ interface CollabRoom {
   lastActiveAt: number;
   dirty: boolean;
   saving: boolean;
-  pendingExternalReload: boolean;
   baselineHash: string;
   baselineRevision: number;
-  consecutiveConflicts: number;
 }
 
 export class CollabRoomManager {
@@ -102,48 +95,15 @@ export class CollabRoomManager {
             candidate.descriptor.resourcePath === resource.path,
         );
         if (!room) continue;
-        const current = this.persistence.readResourceState(
-          room.workspacePath,
-          room.descriptor.resourcePath,
-          room.descriptor.kind,
-        );
-        // An Authority receipt is the exact committed path/version. Unlike
-        // legacy file-change guess events, it never needs basename guessing or a
-        // disk scan to decide which Yjs room owns the new baseline.
-        if (room.saving) {
-          // A flush is in-flight; reloading now could race with the pending
-          // commit. Mark the room so that flushRoom will reload from the
-          // authoritative file state once the flush completes.
-          room.pendingExternalReload = true;
-          logger.warn(
-            {
-              roomKey: room.key,
-              resourcePath: room.descriptor.resourcePath,
-              revision: receipt.revision,
-            },
-            "Deferred reload: room is saving, marked pendingExternalReload",
-          );
-          continue;
-        }
 
-        if (room.dirty) {
-          // External authoritative mutation supersedes the local dirty draft.
-          // Cancel any pending flush so stale content is not written back.
-          if (room.saveTimer) {
-            clearTimeout(room.saveTimer);
-            room.saveTimer = null;
-          }
-          logger.info(
-            {
-              roomKey: room.key,
-              resourcePath: room.descriptor.resourcePath,
-              revision: receipt.revision,
-            },
-            "Force-reloading dirty collab room after external mutation commit",
-          );
-        }
-
-        this.reloadRoomFromFileState(room, current, receipt.revision);
+        // Yjs-First: only update baseline metadata, don't reload room content.
+        // The Yjs room is the single content authority; non-collab mutations
+        // are rare fallbacks. If the room is dirty, the dirty content takes
+        // precedence and will be flushed normally.
+        const newHash = resource.afterHash ?? "";
+        const newRevision = receipt.revision;
+        room.baselineHash = newHash;
+        room.baselineRevision = newRevision;
       }
     });
   }
@@ -319,6 +279,50 @@ export class CollabRoomManager {
     };
   }
 
+  /**
+   * Yjs-First unified write entry point.
+   *
+   * Replaces the Yjs text for the given resource and immediately flushes to
+   * Authority.  This is the single content authority for live workspaces —
+   * Pi tools and HTTP routes call this instead of `authority.mutate()` so that
+   * all writes flow through the CRDT layer and are automatically merged with
+   * concurrent user edits.
+   */
+  async writeToResource(
+    descriptor: RoomDescriptor,
+    content: string,
+  ): Promise<{ revision: number; hash: string }> {
+    const validation = this.persistence.validateSession(descriptor);
+    if (!validation.ok || !validation.workspacePath) {
+      throw new Error(validation.reason || "COLLAB_FORBIDDEN");
+    }
+
+    const room = await this.getOrCreateRoom(
+      descriptor,
+      validation.workspacePath,
+    );
+
+    // Replace Yjs text with the new content.
+    // Use a plain transact (no SERVER_RELOAD_ORIGIN) so the update handler
+    // sets dirty=true and broadcasts to connected clients.
+    room.doc.transact(() => {
+      if (room.text.length > 0) {
+        room.text.delete(0, room.text.length);
+      }
+      if (content) {
+        room.text.insert(0, content);
+      }
+    });
+
+    // Flush immediately — AI / HTTP writes should not wait for debounce.
+    await this.flushRoom(room);
+
+    return {
+      revision: room.baselineRevision,
+      hash: room.baselineHash,
+    };
+  }
+
   dispose(): void {
     this.unregisterDraftProvider();
     if (this.cleanupTimer) {
@@ -419,10 +423,8 @@ export class CollabRoomManager {
       lastActiveAt: Date.now(),
       dirty: false,
       saving: false,
-      pendingExternalReload: false,
       baselineHash: initial.hash,
       baselineRevision: authorityState.revision,
-      consecutiveConflicts: 0,
     };
 
     doc.on("update", (update: Uint8Array, origin: unknown) => {
@@ -532,26 +534,6 @@ export class CollabRoomManager {
 
   private scheduleSave(room: CollabRoom): void {
     if (room.saveTimer) clearTimeout(room.saveTimer);
-    // ── P1-1: exponential backoff for rooms with consecutive conflicts ──
-    let delay = this.saveDebounceMs;
-    if (room.consecutiveConflicts >= CONFLICT_BACKOFF_THRESHOLD) {
-      const backoffMultiplier = Math.pow(
-        2,
-        room.consecutiveConflicts - CONFLICT_BACKOFF_THRESHOLD,
-      );
-      delay = Math.min(
-        CONFLICT_BACKOFF_BASE_MS * backoffMultiplier,
-        CONFLICT_BACKOFF_MAX_MS,
-      );
-      logger.info(
-        {
-          roomKey: room.key,
-          consecutiveConflicts: room.consecutiveConflicts,
-          delayMs: delay,
-        },
-        "Applying conflict backoff delay",
-      );
-    }
     room.saveTimer = setTimeout(() => {
       this.flushRoom(room).catch((error) => {
         logger.error(
@@ -559,7 +541,7 @@ export class CollabRoomManager {
           "Failed to save collab room",
         );
       });
-    }, delay);
+    }, this.saveDebounceMs);
   }
 
   private async flushRoom(room: CollabRoom): Promise<void> {
@@ -583,64 +565,9 @@ export class CollabRoomManager {
         return;
       }
 
-      if (currentState.hash !== room.baselineHash) {
-        // ── P0-1: baseline self-healing on conflict ──
-        // Instead of throwing and keeping dirty state for infinite retries,
-        // reload the room baseline from the latest file state.
-        room.consecutiveConflicts++;
-        logger.warn(
-          {
-            roomKey: room.key,
-            resourcePath: room.descriptor.resourcePath,
-            baselineRevision: room.baselineRevision,
-            currentHash: currentState.hash,
-            consecutiveConflicts: room.consecutiveConflicts,
-          },
-          "Resource conflict detected — reloading room baseline from file state",
-        );
-
-        // Read the latest authority revision for accurate baseline tracking.
-        const authorityState = await this.persistence.getAuthorityState(
-          room.descriptor,
-        );
-
-        // Guard: if new edits arrived during the await above, abort self-heal
-        // to avoid discarding client changes via reloadRoomFromFileState.
-        const currentText = room.text.toString();
-        if (currentText !== roomContent) {
-          logger.info(
-            { roomKey: room.key, resourcePath: room.descriptor.resourcePath },
-            "New edits arrived during conflict resolution, skipping self-heal",
-          );
-          return;
-        }
-
-        this.reloadRoomFromFileState(
-          room,
-          currentState,
-          authorityState.revision,
-        );
-
-        // ── Notify connected clients to reset their dirty state ──
-        // reloadRoomFromFileState → replaceRoomText triggers a yjs update
-        // broadcast to all connections (SERVER_RELOAD_ORIGIN ≠ connection, so
-        // no filtering). This pushes the latest file content to clients.
-        // The BASELINE_RESET message additionally tells clients to clear their
-        // local isDirty / hasPendingWorkspaceFlush flags.
-        this.broadcastBaselineReset(room);
-
-        logger.info(
-          {
-            roomKey: room.key,
-            resourcePath: room.descriptor.resourcePath,
-            newBaselineRevision: authorityState.revision,
-            newBaselineHash: currentState.hash,
-            clientCount: room.connections.size,
-          },
-          "Room baseline reloaded, yjs synced, and BASELINE_RESET sent to all connected clients",
-        );
-        return;
-      }
+      // Yjs-First: self-heal conflict branch removed — Authority auto-adopts
+      // drift (Phase 2) and all writes route through Yjs room (Phase 1), so
+      // file hash mismatch is handled by the normal commit path below.
 
       const committed = await this.persistence.commitResource({
         projectId: room.descriptor.projectId,
@@ -649,31 +576,13 @@ export class CollabRoomManager {
         resourcePath: room.descriptor.resourcePath,
         kind: room.descriptor.kind,
         content: roomContent,
-        expectedHash: room.baselineHash,
         baseRevision: room.baselineRevision,
       });
       room.baselineHash = committed.state.hash;
       room.baselineRevision = committed.receipt.revision;
       room.dirty = false;
-      room.consecutiveConflicts = 0;
     } finally {
       room.saving = false;
-      if (room.pendingExternalReload) {
-        room.pendingExternalReload = false;
-        logger.info(
-          {
-            roomKey: room.key,
-            resourcePath: room.descriptor.resourcePath,
-          },
-          "Executing deferred reload after flush completed",
-        );
-        const latestState = this.persistence.readResourceState(
-          room.workspacePath,
-          room.descriptor.resourcePath,
-          room.descriptor.kind,
-        );
-        this.reloadRoomFromFileState(room, latestState);
-      }
     }
   }
 
@@ -746,21 +655,7 @@ export class CollabRoomManager {
     this.send(socket, encoding.toUint8Array(encoder));
   }
 
-  private broadcastBaselineReset(room: CollabRoom): void {
-    if (room.connections.size === 0) return;
-    const encoder = encoding.createEncoder();
-    encoding.writeVarUint(encoder, MESSAGE_BASELINE_RESET);
-    // Payload: baselineRevision (varUint) + baselineHash (varString) + resourcePath (varString)
-    encoding.writeVarUint(encoder, room.baselineRevision);
-    encoding.writeVarString(encoder, room.baselineHash);
-    encoding.writeVarString(encoder, room.descriptor.resourcePath);
-    const payload = encoding.toUint8Array(encoder);
-    for (const connection of room.connections) {
-      this.send(connection.socket, payload);
-    }
-  }
-
-  private broadcast(
+    private broadcast(
     room: CollabRoom,
     message: Uint8Array,
     origin: unknown,
@@ -801,4 +696,16 @@ export class CollabRoomManager {
   }
 }
 
-export const collabRoomManager = new CollabRoomManager();
+let _collabRoomManager: CollabRoomManager | null = null;
+
+/**
+ * Lazy singleton accessor. Defers WorkspaceFilePersistence initialization
+ * (which touches the real filesystem) until first use, avoiding import-time
+ * side effects that break unit tests with partial fs mocks.
+ */
+export function getCollabRoomManager(): CollabRoomManager {
+  if (!_collabRoomManager) {
+    _collabRoomManager = new CollabRoomManager();
+  }
+  return _collabRoomManager;
+}

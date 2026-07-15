@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyRequest } from "fastify";
 import WebSocket from "ws";
 
 import type { CollabResourceKind } from "@workbench/shared/contracts";
-import { collabRoomManager } from "../collab/collab-room-manager";
+import { getCollabRoomManager } from "../collab/collab-room-manager";
 import { WorkspaceMutationAuthorityError } from "../workspace/workspace-mutation-authority";
 
 interface CollabParams {
@@ -67,7 +67,8 @@ function collabFailure(reply: { status: (statusCode: number) => unknown }, error
 }
 
 export async function registerCollabRoutes(fastify: FastifyInstance): Promise<void> {
-  collabRoomManager.startCleanup();
+  const mgr = getCollabRoomManager();
+  mgr.startCleanup();
 
   fastify.get<{
     Params: CollabParams;
@@ -89,7 +90,7 @@ export async function registerCollabRoutes(fastify: FastifyInstance): Promise<vo
         socket.close(1008, "INVALID_COLLAB_PARAMS");
         return;
       }
-      await collabRoomManager.handleConnection(socket, descriptor);
+      await getCollabRoomManager().handleConnection(socket, descriptor);
     },
   );
 
@@ -106,7 +107,7 @@ export async function registerCollabRoutes(fastify: FastifyInstance): Promise<vo
       }
 
       try {
-        const result = await collabRoomManager.flush(descriptor);
+        const result = await getCollabRoomManager().flush(descriptor);
         return { success: true, data: result };
       } catch (error) {
         return collabFailure(reply, error);
@@ -127,11 +128,42 @@ export async function registerCollabRoutes(fastify: FastifyInstance): Promise<vo
       }
 
       try {
-        const result = await collabRoomManager.flushWorkspace(
+        const result = await getCollabRoomManager().flushWorkspace(
           request.params.projectId,
           request.params.workspaceId,
           sessionId,
         );
+        return { success: true, data: result };
+      } catch (error) {
+        return collabFailure(reply, error);
+      }
+    },
+  );
+
+  // ── Yjs-First unified write endpoint ──────────────────────────────────
+  // All non-collab write paths (Pi tools, HTTP routes) write text content
+  // through this endpoint so that the Yjs room is the single content authority.
+  fastify.post<{
+    Params: CollabParams;
+    Querystring: CollabQuery;
+    Body: { content?: string };
+  }>(
+    "/api/collab/projects/:projectId/workspaces/:workspaceId/write",
+    async (request, reply) => {
+      const descriptor = normalizeDescriptor(request.params, request.query);
+      if (!descriptor) {
+        reply.status(400);
+        return { success: false, error: { code: "INVALID_REQUEST", message: "write 参数无效" } };
+      }
+
+      const content = request.body?.content;
+      if (typeof content !== "string") {
+        reply.status(400);
+        return { success: false, error: { code: "INVALID_REQUEST", message: "content 必须为字符串" } };
+      }
+
+      try {
+        const result = await getCollabRoomManager().writeToResource(descriptor, content);
         return { success: true, data: result };
       } catch (error) {
         return collabFailure(reply, error);

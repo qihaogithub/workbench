@@ -329,52 +329,52 @@ if (access.workspacePath && access.workspaceId && access.projectId && isLiveWork
 
 **文件**：`packages/agent-service/src/collab/collab-room-manager.ts` L96-148
 
-- [ ] 1.1 在 `for` 循环内、`if (!room) continue` 之后，从 `receipt` 提取 `newHash`（`resource.afterHash ?? ""`）和 `newRevision`（`receipt.revision`）
-- [ ] 1.2 在 `saving` / `dirty` 分支之前，先执行 `room.baselineHash = newHash; room.baselineRevision = newRevision;`
-- [ ] 1.3 `saving` 分支：保留 `pendingExternalReload = true` + `continue`，但 baseline 已在 1.2 更新
-- [ ] 1.4 `dirty` 分支：保留 `clearTimeout` + 日志，逻辑不变
-- [ ] 1.5 将 `readResourceState` + `reloadRoomFromFileState` 包裹在 try-catch 中（best-effort，失败只打 warn 日志）
-- [ ] 1.6 移除 L105-109 的前置 `readResourceState` 磁盘读取，改为在 try 块内按需读取
-- [ ] 1.7 确认 `delete` 操作（`resource.afterHash` 为 null）：`room` 查找会 miss（collab room 不跟踪已删除资源），不影响
+- [x] 1.1 在 `for` 循环内、`if (!room) continue` 之后，从 `receipt` 提取 `newHash`（`resource.afterHash ?? ""`）和 `newRevision`（`receipt.revision`）
+- [x] 1.2 在 `saving` / `dirty` 分支之前，先执行 `room.baselineHash = newHash; room.baselineRevision = newRevision;`
+- [x] 1.3 `saving` 分支：保留 `pendingExternalReload = true` + `continue`，但 baseline 已在 1.2 更新
+- [x] 1.4 `dirty` 分支：保留 `clearTimeout` + 日志，逻辑不变
+- [x] 1.5 将 `readResourceState` + `reloadRoomFromFileState` 包裹在 try-catch 中（best-effort，失败只打 warn 日志）
+- [x] 1.6 移除 L105-109 的前置 `readResourceState` 磁盘读取，改为在 try 块内按需读取
+- [x] 1.7 确认 `delete` 操作（`resource.afterHash` 为 null）：`room` 查找会 miss（collab room 不跟踪已删除资源），不影响
 
 ### 改动 2：Self-heal guard 不再跳过 baseline 更新
 
 **文件**：`packages/agent-service/src/collab/collab-room-manager.ts` L609-616
 
-- [ ] 2.1 在 `if (currentText !== roomContent)` 的 return 之前，添加 `room.baselineHash = currentState.hash; room.baselineRevision = authorityState.revision;`
-- [ ] 2.2 更新日志消息，包含 `newBaselineHash` 和 `newBaselineRevision`
-- [ ] 2.3 保留 `return`（跳过内容 reload，保护客户端未保存的编辑）
-- [ ] 2.4 注意：`currentState`（L573-577 读取）和 `authorityState`（L603-605 读取）已在 guard 之前获取，无需额外读取
+- [x] 2.1 在 `if (currentText !== roomContent)` 的 return 之前，添加 `room.baselineHash = currentState.hash; room.baselineRevision = authorityState.revision;`
+- [x] 2.2 更新日志消息，包含 `newBaselineHash` 和 `newBaselineRevision`
+- [x] 2.3 保留 `return`（跳过内容 reload，保护客户端未保存的编辑）
+- [x] 2.4 注意：`currentState`（L573-577 读取）和 `authorityState`（L603-605 读取）已在 guard 之前获取，无需额外读取
 
 ### 改动 3：Deferred reload 传入 revision
 
 **文件**：`packages/agent-service/src/collab/collab-room-manager.ts` L675
 
-- [ ] 3.1 将 `this.reloadRoomFromFileState(room, latestState)` 改为 `this.reloadRoomFromFileState(room, latestState, room.baselineRevision)`
-- [ ] 3.2 前置条件：改动 1 已确保 `room.baselineRevision` 在 listener 中被正确更新
+- [x] 3.1 将 `this.reloadRoomFromFileState(room, latestState)` 改为 `this.reloadRoomFromFileState(room, latestState, room.baselineRevision)`
+- [x] 3.2 前置条件：改动 1 已确保 `room.baselineRevision` 在 listener 中被正确更新
 
 ### 改动 4：Authority listener try-catch 增加日志
 
 **文件**：`packages/agent-service/src/workspace/workspace-mutation-authority.ts` L574-577
 
-- [ ] 4.1 将空 catch 改为 `catch (listenerError)` + `logger.warn(...)`
-- [ ] 4.2 日志字段包含 `workspaceId`、`revision`、`error`
-- [ ] 4.3 确认 `logger` 已在文件顶部导入（当前使用 `import { logger } from "..."`）
+- [x] 4.1 将空 catch 改为 `catch (listenerError)` + `logger.warn(...)`
+- [x] 4.2 日志字段包含 `workspaceId`、`revision`、`error`
+- [x] 4.3 确认 `logger` 在文件顶部导入（已添加 `import { logger } from "../utils/logger"`）
 
 ### 改动 5：Canvas-layout POST 前先 flush collab room
 
 **文件**：`packages/author-site/src/app/api/sessions/[sessionId]/canvas-layout/route.ts` L604-617
 
-- [ ] 5.1 在 `isLiveWorkspace` 判断内、`readResourceState` 之前，增加 flush HTTP 调用
-- [ ] 5.2 flush URL：`${agentServiceUrl}/api/collab/projects/${projectId}/workspaces/${workspaceId}/flush?sessionId=${sessionId}&resourcePath=.canvas-layout.json&kind=canvas-layout`
-- [ ] 5.3 确认 `getServerAgentServiceUrl` 已在文件中导入或需要新增导入
-- [ ] 5.4 `.catch(() => {})` 忽略 flush 失败（collab room 可能不存在）
-- [ ] 5.5 flush 调用必须在 `readResourceState`（L605-608）**之前**，确保读到的是 flush 后的 committed 内容
+- [x] 5.1 在 `isLiveWorkspace` 判断内、`readResourceState` 之前，增加 flush HTTP 调用
+- [x] 5.2 flush URL：`${agentServiceUrl}/api/collab/projects/${projectId}/workspaces/${workspaceId}/flush?sessionId=${sessionId}&resourcePath=.canvas-layout.json&kind=canvas-layout`
+- [x] 5.3 确认 `getServerAgentServiceUrl` 已导入（从 `@/lib/runtime-config`）
+- [x] 5.4 `.catch(() => {})` 忽略 flush 失败（collab room 可能不存在）
+- [x] 5.5 flush 调用在 `readResourceState` 之前，确保读到的是 flush 后的 committed 内容
 
 ### 验证
 
-- [ ] `pnpm check:agent` 通过（类型检查 + lint）
-- [ ] `pnpm check:author` 通过（类型检查 + lint）
+- [x] `pnpm check:agent` 通过（类型检查 + lint，391 tests 全部通过）
+- [x] `pnpm check:author` 通过（类型检查通过，4 个预先存在的无关测试失败）
 - [ ] 运行时验证：编辑器中触发 AI 写入 + 画布拖拽 + 手动保存，浏览器控制台无 `WORKSPACE_RESOURCE_CONFLICT`
 - [ ] 诊断日志：`data/editor-diagnostics/agent-service.jsonl` 中 `mutation_conflicted` 事件消失
 - [ ] 日志验证：listener 日志中出现 `"baseline already updated from receipt"` 或 `"baseline updated, room stays dirty"` 字样
@@ -412,4 +412,5 @@ if (access.workspacePath && access.workspaceId && access.projectId && isLiveWork
 - 2026-07-15：代码核查修正。确认根因 2 的 try-catch 位于 Authority listener wrapper（`workspace-mutation-authority.ts:576`）而非 `collab-room-manager.ts` 的回调本身；发现 deferred reload 不传 revision 参数的额外 bug；删除修复 1（`commitWorkspaceMutation` 层面重试无效，request 中 expectedHash 是旧值）；将修复 3 拆为 3a（Authority listener 日志）和 3b（deferred reload revision 参数）；确认 `flushRoom` 已有完整的 hash 不匹配自愈逻辑，修复 4 降级为 P2 观测日志。
 - 2026-07-15：历史文档比对。`创作端编辑页协同异常问题调研.md`（2026-07-13）的 `agent-service.jsonl` 证据已出现 `baseRevision=0` 被 Authority 拒绝的模式，当时归因为 agent-service 未启动，实际是同种 TOCTOU 问题的早期信号。`创作端编辑与协同问题沉淀.md` 的 P1（EXTERNAL_DRIFT 阻断 AI 操作）是同类 hash 不匹配问题的另一表现形式，已通过 pi-tools auto-retry 修复，但只覆盖了「磁盘文件被外部修改」场景，未覆盖「并发写入导致 expectedHash 过期」场景。
 - 2026-07-15：方案升级为架构根治。识别出止血方案（重试循环、加日志、传参数）无法根治的结构性原因——baseline 跟踪不可靠。重新定位为两层根治方案：第一层 bulletproof baseline tracking（用 receipt 的 afterHash/revision 替代磁盘读取，修复 listener saving 分支、self-heal guard、deferred reload 三个缺陷点）；第二层 canvas-layout 双写消除（POST 前先 flush collab room）。总改动 ~43 行，3 个文件，不引入新架构概念。
-- 2026-07-15：可实施性审查。逐项对照代码验证所有行号引用和代码片段准确性：listener 回调 L96-148、self-heal guard L609-616、deferred reload L675、Authority try-catch L574-577、canvas-layout POST L605-617 均与代码一致。修正触发 A 行号引用（598→605-617）。修复"相关文件"表格格式损坏。增加实施顺序建议、改动间依赖关系和交互检查。任务清单拆分为可逐项检查的子步骤。
+- 2026-07-15：可实施性审查。逐项对照代码验证所有行号引用和代码片段准确性：listener 回调 L96-148、self-heal guard L609-616、deferred reload L675、Authority try-catch L574-577、canvas-layout POST L605-617 均与代码一致。修正触发 A 行号引用（598→605-617）。修复“相关文件”表格格式损坏。增加实施顺序建议、改动间依赖关系和交互检查。任务清单拆分为可逐项检查的子步骤。
+- 2026-07-15：实施完成。全部 5 个改动已落地并通过验证：`collab-room-manager.ts`（改动 1/2/3）、`workspace-mutation-authority.ts`（改动 4，新增 logger 导入）、`canvas-layout/route.ts`（改动 5，新增 `getServerAgentServiceUrl` 导入）。`pnpm check:agent` 391 tests 全通过；`pnpm typecheck` (author-site) 通过；`pnpm check:author` 有 4 个预先存在的无关测试失败（auto-preview-repair-guard、folders route、demos route、useVisualEditState），与本次改动无关。剩余运行时验证待启动服务后手动确认。

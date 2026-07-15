@@ -158,6 +158,8 @@ export function buildAutoPreviewRepairFingerprint(params: {
       diagnostic.file,
       diagnostic.moduleName,
       diagnostic.importName,
+      diagnostic.codeHash,
+      diagnostic.moduleHash,
       diagnostic.message,
     ]
       .map(normalizeFingerprintPart)

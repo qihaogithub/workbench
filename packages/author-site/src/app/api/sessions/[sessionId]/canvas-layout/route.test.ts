@@ -72,16 +72,8 @@ describe("canvas layout route", () => {
     global.fetch = jest.fn(async () => TestResponse.json({
       success: true,
       data: {
-        committed: true,
-        mutationId: "mutation-test",
-        projectId: "project-test",
-        workspaceId: "workspace-test",
-        baseRevision: 0,
         revision: 2,
-        rootHash: "root-hash",
-        actor: "author-site",
-        resources: [],
-        committedAt: Date.now(),
+        hash: "hash-test",
       },
     })) as unknown as typeof fetch;
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "canvas-layout-route-"));
@@ -108,7 +100,7 @@ describe("canvas layout route", () => {
     jest.resetModules();
   });
 
-  it("保存画布布局时通过 Authority 提交 live Workspace，并保留 session 恢复缓存", async () => {
+  it("保存画布布局时通过 Yjs room 写入 live Workspace，并保留 session 恢复缓存", async () => {
     const fsUtils = await import("@/lib/fs-utils");
     const sessionManager = await import("@/lib/session-manager");
     const { GET, POST } = await import("./route");
@@ -237,7 +229,7 @@ describe("canvas layout route", () => {
     expect(fs.existsSync(sessionLayoutPath)).toBe(true);
     expect(fs.existsSync(workspaceLayoutPath)).toBe(false);
     expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining(`/projects/${encodeURIComponent(project.id)}/workspaces/${encodeURIComponent(session.workspaceId)}/mutate`),
+      expect.stringContaining(`/api/collab/projects/${encodeURIComponent(project.id)}/workspaces/${encodeURIComponent(session.workspaceId)}/write`),
       expect.objectContaining({ method: "POST" }),
     );
 

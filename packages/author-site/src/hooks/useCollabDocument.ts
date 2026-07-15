@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
-import * as decoding from "lib0/decoding";
 
 import type {
   CollabPresence,
@@ -102,21 +101,9 @@ function arePresenceListsEqual(
   );
 }
 
-export interface BaselineResetInfo {
-  baselineRevision: number;
-  baselineHash: string;
-  resourcePath: string;
-}
-
-export interface CollabDocumentOptions {
-  /** Called when the server sends a BASELINE_RESET message after conflict self-healing */
-  onBaselineReset?: (info: BaselineResetInfo) => void;
-}
-
 export function useCollabDocument(
   descriptor: CollabRoomDescriptor | null,
   user?: Partial<CollabUser>,
-  options?: CollabDocumentOptions,
 ): CollabDocumentState {
   const [value, setValue] = useState("");
   const [status, setStatus] = useState<CollabSyncStatus>("offline");
@@ -129,10 +116,6 @@ export function useCollabDocument(
   const offlineStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
-  const onBaselineResetRef = useRef<
-    ((info: BaselineResetInfo) => void) | undefined
-  >(options?.onBaselineReset);
-  onBaselineResetRef.current = options?.onBaselineReset;
   const descriptorProjectId = descriptor?.projectId ?? "";
   const descriptorWorkspaceId = descriptor?.workspaceId ?? "";
   const descriptorSessionId = descriptor?.sessionId ?? "";
@@ -222,41 +205,6 @@ export function useCollabDocument(
     setProvider(nextProvider);
     setYdoc(doc);
     setYtext(text);
-
-    // ── Register custom message handler for server BASELINE_RESET (type 5) ──
-    // When the server self-heals a conflict, it broadcasts a MESSAGE_BASELINE_RESET
-    // to all connected clients with the new baseline metadata.
-    // The client decodes the payload and clears its local dirty state.
-    const MESSAGE_BASELINE_RESET = 5;
-    const providerAny = nextProvider as any;
-    if (Array.isArray(providerAny.messageHandlers)) {
-      providerAny.messageHandlers[MESSAGE_BASELINE_RESET] = (
-        _encoder: unknown,
-        decoder: { pos: number; arr: Uint8Array },
-      ) => {
-        try {
-          const baselineRevision = decoding.readVarUint(decoder);
-          const baselineHash = decoding.readVarString(decoder);
-          const resourcePath = decoding.readVarString(decoder);
-          onBaselineResetRef.current?.({
-            baselineRevision,
-            baselineHash,
-            resourcePath,
-          });
-        } catch {
-          // Malformed payload — still fire callback with empty info
-          onBaselineResetRef.current?.({
-            baselineRevision: 0,
-            baselineHash: "",
-            resourcePath: "",
-          });
-        }
-      };
-    } else {
-      console.warn(
-        "[collab] y-websocket messageHandlers not an array, BASELINE_RESET handler not registered",
-      );
-    }
 
     const updatePresence = () => {
       const nextPresence = readPresence(nextProvider);

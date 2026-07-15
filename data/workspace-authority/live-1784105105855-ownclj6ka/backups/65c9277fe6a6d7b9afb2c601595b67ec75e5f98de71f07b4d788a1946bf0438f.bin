@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "projectId": "proj_1783334663364_30hsrv",
+  "updatedAt": 1784107996787,
+  "state": {
+    "viewport": {
+      "x": -41.91704570168463,
+      "y": 69.56354722263018,
+      "zoom": 0.5193750093413179
+    },
+    "pages": {
+      "product-showcase_a3f2": {
+        "x": -0.46684698194335433,
+        "y": 0,
+        "width": 375,
+        "height": 2087.5,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "contact-section_k8m2": {
+        "x": 420.574020457214,
+        "y": 0,
+        "width": 375,
+        "height": 1663,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "result-share_q5w8": {
+        "x": 1401.5875951284233,
+        "y": 3.552713678800501e-15,
+        "width": 375,
+        "height": 812,
+        "zIndex": 3,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "stroke-puzzle_p9v3": {
+        "x": 937.4383253841338,
+        "y": 1.4210854715202004e-14,
+        "width": 375,
+        "height": 812,
+        "zIndex": 2,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "shadow-guess_n7k1": {
+        "x": 479.4329109951609,
+        "y": 1.4210854715202004e-14,
+        "width": 375,
+        "height": 812,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

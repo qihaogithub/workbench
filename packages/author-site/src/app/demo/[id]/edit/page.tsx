@@ -79,10 +79,6 @@ import {
   computeSaveStateFromContext,
   getSaveStatusLabel,
 } from "@/lib/workspace-save-state-machine";
-import {
-  WorkspaceAutosaveScheduler,
-  type DirtyResource,
-} from "@/lib/workspace-autosave-scheduler";
 import { PreviewProjectionTracker } from "@/lib/preview-projection-tracker";
 import { WorkspacePerformanceSampler } from "@/lib/workspace-performance-sampling";
 import { Button } from "@/components/ui/button";
@@ -789,39 +785,18 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [userAuthoringPreferences, setUserAuthoringPreferences] = useState<
     UserAuthoringPreferences | undefined
   >(undefined);
-  // ── Workspace Authority 模块实例 ────────────────────────────────────────
-  const schedulerRef = useRef<WorkspaceAutosaveScheduler | null>(null);
+  // ── Workspace sync refs（Yjs-First: 替代 AutosaveScheduler）──────────
+  const syncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncInFlightRef = useRef(false);
+  const scheduleWorkspaceSyncRef = useRef<() => void>(() => {});
+  const flushSyncWorkspaceRef = useRef<() => Promise<void>>(
+    () => Promise.resolve(),
+  );
   const previewTrackerRef = useRef<PreviewProjectionTracker>(
     new PreviewProjectionTracker(),
   );
   const performanceSamplerRef = useRef<WorkspacePerformanceSampler>(
     new WorkspacePerformanceSampler(),
-  );
-
-  // ── Baseline reset handler ─────────────────────────────────────────────────
-  // When the server self-heals a collab room conflict, it broadcasts a
-  // BASELINE_RESET WebSocket message with the new baseline metadata.
-  // This handler only clears the flush error state — baseline reset affects
-  // a single resource, so global pending/unsaved flags are managed by the
-  // authority revision sync logic.
-  const handleBaselineReset = useCallback(
-    (info: {
-      baselineRevision: number;
-      baselineHash: string;
-      resourcePath: string;
-    }) => {
-      console.debug(
-        `[collab] baseline reset for ${info.resourcePath}: rev=${info.baselineRevision}, hash=${info.baselineHash.slice(0, 12)}`,
-      );
-      // Only clear flush error — baseline reset only affects a single resource.
-      // Global pending/unsaved flags are managed by authority revision sync logic.
-      setWorkspaceFlushError(null);
-    },
-    [],
-  );
-  const collabDocumentOptions = useMemo(
-    () => ({ onBaselineReset: handleBaselineReset }),
-    [handleBaselineReset],
   );
 
   const authorityState = useWorkspaceAuthorityState({
@@ -839,13 +814,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       workspaceFlushRevisionRef.current = next;
       return next;
     });
-    // 通知调度器有 workspace 级别变更（使用哨兵资源触发 flush）
-    schedulerRef.current?.markDirty({
-      path: "__workspace__",
-      content: "",
-      hash: String(Date.now()),
-      kind: "workspace-flush",
-    });
+    // Yjs-First: 触发 debounced workspace sync（替代 AutosaveScheduler）
+    scheduleWorkspaceSyncRef.current();
   }, []);
 
   // 多页面状态
@@ -1672,7 +1642,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         }
       : null,
     collabUser,
-    collabDocumentOptions,
   );
   const activePrototypeHtmlCollab = useCollabDocument(
     sessionId &&
@@ -1688,7 +1657,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         }
       : null,
     collabUser,
-    collabDocumentOptions,
   );
   const activePrototypeCssCollab = useCollabDocument(
     sessionId &&
@@ -1704,7 +1672,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         }
       : null,
     collabUser,
-    collabDocumentOptions,
   );
   const activeSchemaCollab = useCollabDocument(
     sessionId && workspaceId && activeDemoId
@@ -1717,7 +1684,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         }
       : null,
     collabUser,
-    collabDocumentOptions,
   );
   const activeSketchSceneCollab = useCollabDocument(
     sessionId &&
@@ -1733,7 +1699,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         }
       : null,
     collabUser,
-    collabDocumentOptions,
   );
   const projectSchemaCollab = useCollabDocument(
     sessionId && workspaceId
@@ -1746,7 +1711,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         }
       : null,
     collabUser,
-    collabDocumentOptions,
   );
   const workspaceTreeCollab = useCollabDocument(
     sessionId && workspaceId
@@ -1759,7 +1723,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         }
       : null,
     collabUser,
-    collabDocumentOptions,
   );
   const canvasLayoutCollab = useCollabDocument(
     sessionId && workspaceId
@@ -1772,7 +1735,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         }
       : null,
     collabUser,
-    collabDocumentOptions,
   );
   const activePageCollabStatuses =
     activeDemoRuntimeTypeForCollab === "prototype-html-css"
@@ -4851,9 +4813,8 @@ ${context.details}
 
     const startedAt = Date.now();
     try {
-      // 先 flush 调度器队列中的待提交资源，再执行完整同步流水线
-      await schedulerRef.current?.flush();
-      await syncWorkspaceToProject();
+      // Yjs-First: 直接执行完整同步流水线（scheduler 已移除）
+      await flushSyncWorkspaceRef.current();
       if (workspaceFlushRevisionRef.current === revisionAtStart) {
         setHasPendingWorkspaceFlush(false);
         setWorkspaceFlushError(null);
@@ -4893,52 +4854,71 @@ ${context.details}
     workspaceId,
   ]);
 
-  // ── WorkspaceAutosaveScheduler 初始化 ────────────────────────────────────
-  // 调度器包装 syncWorkspaceToProject 3 步流水线，不替换其内部逻辑。
+  // ── Yjs-First: workspace sync debounce + flush（替代 AutosaveScheduler）────
+  const scheduleWorkspaceSync = useCallback(() => {
+    if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
+    syncDebounceRef.current = setTimeout(() => {
+      syncDebounceRef.current = null;
+      if (syncInFlightRef.current) return;
+      syncInFlightRef.current = true;
+      void (async () => {
+        try {
+          const startedAt = Date.now();
+          await syncWorkspaceToProject();
+          performanceSamplerRef.current.sampleCommitLatency(Date.now() - startedAt);
+          setHasPendingWorkspaceFlush(false);
+          setWorkspaceFlushError(null);
+        } catch (error) {
+          setWorkspaceFlushError(error instanceof Error ? error.message : String(error));
+          setHasPendingWorkspaceFlush(false);
+        } finally {
+          syncInFlightRef.current = false;
+        }
+      })();
+    }, 800);
+  }, [syncWorkspaceToProject]);
+  scheduleWorkspaceSyncRef.current = scheduleWorkspaceSync;
+
+  const flushSyncWorkspace = useCallback(async () => {
+    if (syncDebounceRef.current) {
+      clearTimeout(syncDebounceRef.current);
+      syncDebounceRef.current = null;
+    }
+    if (syncInFlightRef.current) return;
+    syncInFlightRef.current = true;
+    try {
+      const startedAt = Date.now();
+      await syncWorkspaceToProject();
+      performanceSamplerRef.current.sampleCommitLatency(Date.now() - startedAt);
+      setHasPendingWorkspaceFlush(false);
+      setWorkspaceFlushError(null);
+    } catch (error) {
+      setWorkspaceFlushError(error instanceof Error ? error.message : String(error));
+      setHasPendingWorkspaceFlush(false);
+    } finally {
+      syncInFlightRef.current = false;
+    }
+  }, [syncWorkspaceToProject]);
+  flushSyncWorkspaceRef.current = flushSyncWorkspace;
+
+  // Cleanup debounce timer on unmount
   useEffect(() => {
-    if (!sessionId || !workspaceId) return;
-
-    schedulerRef.current = new WorkspaceAutosaveScheduler({
-      debounceMs: 800,
-      maxWaitMs: 3000,
-      commitFn: async (_resources: DirtyResource[]) => {
-        const commitStartedAt = Date.now();
-        await syncWorkspaceToProject();
-        const commitLatencyMs = Date.now() - commitStartedAt;
-        performanceSamplerRef.current.sampleCommitLatency(commitLatencyMs);
-        const nextRevision = workspaceFlushRevisionRef.current;
-        return { revision: nextRevision, rootHash: "" };
-      },
-      onCommitted: (receipt) => {
-        setWorkspaceFlushRevision((prev) => Math.max(prev, receipt.revision));
-        setHasPendingWorkspaceFlush(false);
-        setWorkspaceFlushError(null);
-      },
-      onError: (error: Error) => {
-        setWorkspaceFlushError(error.message);
-        setHasPendingWorkspaceFlush(false);
-      },
-    });
-
     return () => {
-      schedulerRef.current?.dispose();
-      schedulerRef.current = null;
+      if (syncDebounceRef.current) {
+        clearTimeout(syncDebounceRef.current);
+        syncDebounceRef.current = null;
+      }
     };
-  }, [sessionId, workspaceId, syncWorkspaceToProject]);
+  }, []);
 
   // ── Authority revision 同步 ─────────────────────────────────────────────
   useEffect(() => {
-    if (authorityState.committedRevision > 0) {
-      schedulerRef.current?.setAppliedRevision(
-        authorityState.committedRevision,
-      );
-    }
     if (
       authorityState.committedRevision > 0 &&
       authorityState.committedRevision >= workspaceFlushRevisionRef.current &&
-      // hasDirty() 同时检查 dirtyMap 和 pendingNextBatch，
-      // 确保 in-flight 期间累积的变更不会被误判为已同步
-      !schedulerRef.current?.hasDirty()
+      // Yjs-First: 检查 debounce timer 和 in-flight 状态
+      syncDebounceRef.current === null &&
+      !syncInFlightRef.current
     ) {
       setHasPendingWorkspaceFlush(false);
       setWorkspaceFlushError(null);
@@ -4950,8 +4930,8 @@ ${context.details}
     if (typeof navigator === "undefined") return;
 
     const handleOnline = () => {
-      // 重连时触发一次调度器 flush，将离线期间累积的 dirty 资源提交
-      void schedulerRef.current?.flush();
+      // 重连时触发一次 workspace sync flush
+      void flushSyncWorkspaceRef.current();
     };
     const handleOffline = () => {
       // 离线时记录诊断事件，不做主动操作（调度器会停止提交）
@@ -4984,8 +4964,8 @@ ${context.details}
   const hasExitSyncRisk =
     (hasPendingWorkspaceFlush && !authoritySynced) ||
     workspaceFlushError !== null ||
-    (schedulerRef.current?.isInFlight() ?? false) ||
-    (schedulerRef.current?.hasDirty() ?? false) ||
+    syncInFlightRef.current ||
+    syncDebounceRef.current !== null ||
     (hasUnsavedChanges &&
       exitSyncStatuses.some(
         (status) =>
@@ -5014,8 +4994,8 @@ ${context.details}
     if (hasUnsavedCanvasChanges) {
       await flushCanvasState();
     }
-    // 退出前先 flush 调度器队列中的待提交资源
-    await schedulerRef.current?.flush();
+    // Yjs-First: flush debounce 队列中的待提交资源
+    await flushSyncWorkspaceRef.current();
     try {
       if (hasPendingWorkspaceFlush) {
         await syncWorkspaceToProject();

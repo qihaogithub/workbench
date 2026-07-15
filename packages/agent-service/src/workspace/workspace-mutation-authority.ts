@@ -291,21 +291,29 @@ export class WorkspaceMutationAuthority {
       const workspacePath = this.workspacePath(workspaceId);
       const state = this.readState(workspaceId) ?? this.ensureBootstrap(projectId, workspaceId);
       if (state.projectId !== projectId) throw new WorkspaceMutationAuthorityError("WORKSPACE_NOT_FOUND");
-      const resourceHashes = this.readResourceHashes(workspacePath);
-      const rootHash = this.rootHash(resourceHashes);
-      if (rootHash === state.rootHash) return state;
-      this.persistCommittedBackups(workspaceId, workspacePath, resourceHashes);
-      const reconciled: WorkspaceAuthorityState = {
-        ...state,
-        revision: state.revision + 1,
-        rootHash,
-        resourceHashes,
-        updatedAt: Date.now(),
-      };
-      this.writeJsonAtomic(this.statePath(workspaceId), reconciled);
-      this.appendJournal(workspaceId, { type: "reconciled", mode: "adopt", at: reconciled.updatedAt, revision: reconciled.revision });
-      return reconciled;
+      return this.reconcileAdoptInline(state, workspacePath, workspaceId);
     }));
+  }
+
+  /**
+   * Inline reconcile-adopt that does NOT acquire serial/lease.
+   * Used inside mutate() which already holds the serial queue and lease.
+   */
+  private reconcileAdoptInline(state: WorkspaceAuthorityState, workspacePath: string, workspaceId: string): WorkspaceAuthorityState {
+    const resourceHashes = this.readResourceHashes(workspacePath);
+    const rootHash = this.rootHash(resourceHashes);
+    if (rootHash === state.rootHash) return state;
+    this.persistCommittedBackups(workspaceId, workspacePath, resourceHashes);
+    const reconciled: WorkspaceAuthorityState = {
+      ...state,
+      revision: state.revision + 1,
+      rootHash,
+      resourceHashes,
+      updatedAt: Date.now(),
+    };
+    this.writeJsonAtomic(this.statePath(workspaceId), reconciled);
+    this.appendJournal(workspaceId, { type: "reconciled", mode: "adopt", at: reconciled.updatedAt, revision: reconciled.revision });
+    return reconciled;
   }
 
   /** Explicitly discards detected on-disk drift and restores the last committed state. */
@@ -485,7 +493,7 @@ export class WorkspaceMutationAuthority {
       const queuedAt = Date.now();
       return await this.serial(request.workspaceId, async () => this.withLease(request.workspaceId, async () => {
         const queueWaitMs = Date.now() - queuedAt;
-        const state = this.ensureBootstrap(request.projectId, request.workspaceId);
+        let state = this.ensureBootstrap(request.projectId, request.workspaceId);
         if (state.projectId !== request.projectId) throw new WorkspaceMutationAuthorityError("WORKSPACE_NOT_FOUND");
         const payloadHash = hashWorkspaceContent(JSON.stringify(request));
         const receiptPath = this.receiptPath(request.workspaceId, request.mutationId);
@@ -514,7 +522,15 @@ export class WorkspaceMutationAuthority {
         const workspacePath = this.workspacePath(request.workspaceId);
         const actual = this.readResourceHashes(workspacePath);
         if (this.rootHash(actual) !== state.rootHash) {
-          throw new WorkspaceMutationAuthorityError("WORKSPACE_EXTERNAL_DRIFT");
+          // Yjs-First: auto-adopt filesystem reality instead of rejecting with
+          // WORKSPACE_EXTERNAL_DRIFT. The Yjs room is the single content authority;
+          // any drift means the filesystem was modified outside the normal path
+          // (e.g. crash recovery) and should be adopted as the new baseline.
+          logger.warn(
+            { workspaceId: request.workspaceId, mutationId: request.mutationId },
+            "mutate: EXTERNAL_DRIFT detected, auto-adopting filesystem state",
+          );
+          state = this.reconcileAdoptInline(state, workspacePath, request.workspaceId);
         }
         const prepared = this.prepare(request, payloadHash, state, workspacePath);
         this.appendJournal(request.workspaceId, { type: "prepared", at: Date.now(), mutationId: request.mutationId, prepared });
@@ -726,7 +742,6 @@ export class WorkspaceMutationAuthority {
       }
       if (operation.type === "put_text") {
         assertManagedWorkspaceTextWrite(operation.path, operation.content);
-        this.assertExpected(before[operation.path], operation.expectedHash, operation.expectedAbsent, operation.path);
       } else if (operation.type === "put_binary") {
         if (!operation.path.startsWith("assets/") || !/^[0-9a-f-]{36}$/i.test(operation.stagingId) || operation.size <= 0 || operation.size > 20 * 1024 * 1024) {
           throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
@@ -737,13 +752,10 @@ export class WorkspaceMutationAuthority {
         if (content.length !== operation.size || hashWorkspaceContent(content) !== operation.hash) {
           throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
         }
-        this.assertExpected(before[operation.path], operation.expectedHash, operation.expectedAbsent, operation.path);
-      } else if (operation.type === "delete_path") {
-        this.assertExpected(before[operation.path], operation.expectedHash, false, operation.path);
-      } else {
-        this.assertExpected(before[operation.from], operation.expectedHash, false, operation.from);
-        this.assertExpected(before[operation.to], undefined, operation.expectedTargetAbsent, operation.to);
       }
+      // Yjs-First: assertExpected() removed for all operation types — Authority no
+      // longer does per-resource hash conflict detection. All writes are routed
+      // through the Yjs room, which handles CRDT merging.
     }
     // A stale base is harmless only when every targeted resource still matched.
     if (request.baseRevision > state.revision) throw new WorkspaceMutationAuthorityError("WORKSPACE_RESOURCE_CONFLICT");

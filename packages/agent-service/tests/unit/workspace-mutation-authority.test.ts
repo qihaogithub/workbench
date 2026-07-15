@@ -29,7 +29,7 @@ afterEach(() => {
 });
 
 describe("WorkspaceMutationAuthority", () => {
-  it("提交 receipt 后才发布事件，并拒绝旧 hash 覆盖", async () => {
+  it("提交 receipt 后才发布事件，Yjs-First 不再拒绝旧 hash 覆盖", async () => {
     const { authority, workspacePath } = createAuthority();
     const events: string[] = [];
     authority.onCommitted(({ receipt }) => {
@@ -45,10 +45,14 @@ describe("WorkspaceMutationAuthority", () => {
     expect(receipt.revision).toBe(2);
     expect(fs.readFileSync(path.join(workspacePath, "demos/home/index.tsx"), "utf-8")).toBe("after");
     expect(events).toEqual(["mutation-1"]);
-    await expect(authority.mutate({
+    // Yjs-First: assertExpected() removed — stale expectedHash no longer causes rejection
+    const receipt2 = await authority.mutate({
       mutationId: "mutation-2", projectId: "project-1", workspaceId: "workspace-1", baseRevision: 1,
       actor: "collab", reason: "stale", operations: [{ type: "put_text", path: "demos/home/index.tsx", content: "stale", expectedHash: hash("before") }],
-    })).rejects.toMatchObject({ code: "WORKSPACE_RESOURCE_CONFLICT" } satisfies Partial<WorkspaceMutationAuthorityError>);
+    });
+    expect(receipt2.revision).toBe(3);
+    expect(fs.readFileSync(path.join(workspacePath, "demos/home/index.tsx"), "utf-8")).toBe("stale");
+    expect(events).toEqual(["mutation-1", "mutation-2"]);
   });
 
   it("允许旧 revision 在目标资源 hash 未变化时安全 rebase", async () => {
@@ -127,23 +131,23 @@ describe("WorkspaceMutationAuthority", () => {
     expect(fs.statSync(targetPath).mtimeMs).toBe(beforeMtime);
   });
 
-  it("mutation 诊断从 received 串到 committed 和 conflicted，不记录源码", async () => {
+  it("mutation 诊断从 received 串到 committed，不记录源码", async () => {
     const { authority, workspacePath } = createAuthority();
     await authority.mutate({
       mutationId: "diagnostic-commit", projectId: "project-1", workspaceId: "workspace-1", sessionId: "session-1", baseRevision: 1,
       actor: "ai", reason: "test", operations: [{ type: "put_text", path: "demos/home/index.tsx", content: "diagnostic-secret-content", expectedHash: hash("before") }],
     });
-    await expect(authority.mutate({
-      mutationId: "diagnostic-conflict", projectId: "project-1", workspaceId: "workspace-1", sessionId: "session-1", baseRevision: 1,
+    // Yjs-First: stale expectedHash no longer causes conflict — both mutations commit
+    await authority.mutate({
+      mutationId: "diagnostic-commit-2", projectId: "project-1", workspaceId: "workspace-1", sessionId: "session-1", baseRevision: 1,
       actor: "collab", reason: "test", operations: [{ type: "put_text", path: "demos/home/index.tsx", content: "stale-secret-content", expectedHash: hash("before") }],
-    })).rejects.toMatchObject({ code: "WORKSPACE_RESOURCE_CONFLICT" });
+    });
 
     const diagnosticsPath = path.join(path.dirname(workspacePath), "data", "editor-diagnostics", "agent-service.jsonl");
     const diagnostics = fs.readFileSync(diagnosticsPath, "utf-8");
     expect(diagnostics).toContain('"eventType":"workspace.mutation_received"');
     expect(diagnostics).toContain('"eventType":"workspace.mutation_prepared"');
     expect(diagnostics).toContain('"eventType":"workspace.mutation_committed"');
-    expect(diagnostics).toContain('"eventType":"workspace.mutation_conflicted"');
     expect(diagnostics).not.toContain("diagnostic-secret-content");
     expect(diagnostics).not.toContain("stale-secret-content");
     const events = diagnostics.trim().split("\n").map((line) => JSON.parse(line) as {
@@ -390,22 +394,24 @@ describe("WorkspaceMutationAuthority", () => {
     expect(drifted.actualRootHash).not.toBe(drifted.rootHash);
   });
 
-  it("health 持久统计 mutation 冲突并暴露 committed event 订阅者数", async () => {
+  it("health 持久统计 mutation 并暴露 committed event 订阅者数", async () => {
     const { authority, workspacePath } = createAuthority();
     await authority.bootstrap("project-1", "workspace-1");
     const unsubscribe = authority.onCommitted(() => undefined);
     expect(authority.getHealth("project-1", "workspace-1").eventSubscriberCount).toBe(1);
 
-    await expect(authority.mutate({
-      mutationId: "health-conflict", projectId: "project-1", workspaceId: "workspace-1", baseRevision: 1,
+    // Yjs-First: stale expectedHash no longer causes conflict — mutation commits
+    const receipt = await authority.mutate({
+      mutationId: "health-commit", projectId: "project-1", workspaceId: "workspace-1", baseRevision: 1,
       actor: "ai", reason: "test", operations: [{ type: "put_text", path: "demos/home/index.tsx", content: "stale", expectedHash: hash("not-current") }],
-    })).rejects.toMatchObject({ code: "WORKSPACE_RESOURCE_CONFLICT" });
+    });
+    expect(receipt.committed).toBe(true);
 
     const restarted = new WorkspaceMutationAuthority({
       dataDir: path.join(path.dirname(workspacePath), "data"),
       resolveWorkspacePath: (workspaceId) => workspaceId === "workspace-1" ? workspacePath : null,
     });
-    expect(restarted.getHealth("project-1", "workspace-1").conflictCount).toBe(1);
+    expect(restarted.getHealth("project-1", "workspace-1").conflictCount).toBe(0);
     unsubscribe();
     expect(restarted.getHealth("project-1", "workspace-1").eventSubscriberCount).toBe(0);
   });

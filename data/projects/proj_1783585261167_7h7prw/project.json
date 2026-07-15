@@ -85,11 +85,11 @@
     }
   ],
   "createdAt": 1783585261168,
-  "updatedAt": 1784084940828,
+  "updatedAt": 1784105087200,
   "activeWorkspaceId": "live-1783585261306-sza0dkpm7",
   "activeWorkspaceUpdatedAt": 1783649668708,
   "canonicalSyncedWorkspaceId": "live-1783585261306-sza0dkpm7",
-  "canonicalSyncedRevision": 26,
-  "canonicalSyncedRootHash": "681d221f8643a20385ad48d2bca4dcdca370e45d8c910cc72ad5c14c8ada32f3",
-  "canonicalSyncedAt": 1784084940828
+  "canonicalSyncedAt": 1784105087200,
+  "canonicalSyncedRevision": 5,
+  "canonicalSyncedRootHash": "0d64235abd5c788dd77fc5490e8c454a434d64bf433f584cf043cde2199342fd"
 }
