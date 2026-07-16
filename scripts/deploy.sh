@@ -472,11 +472,28 @@ if [ "${DEPLOY_BUILD_MODE}" = "local" ]; then
 
     for service in ${DEPLOY_SERVICES}; do
         echo -e "${BLUE}📦 本地构建服务: ${service}${NC}"
-        docker compose --env-file "${DEPLOY_ENV_FILE}" build \
-            --build-arg GIT_COMMIT="${GIT_COMMIT}" \
-            --build-arg GIT_BRANCH="${GIT_BRANCH}" \
-            --build-arg BUILD_TIME="${BUILD_TIME}" \
-            "${service}"
+
+        if [ "${service}" = "screenshot-service" ]; then
+            # docker compose build 不支持 --platform，跨架构缓存会导致镜像平台不匹配
+            # 使用 docker buildx build 显式指定目标平台
+            debian_mirror="${DEBIAN_MIRROR:-http://mirrors.aliyun.com/debian}"
+            echo -e "${BLUE}🧱 buildx 构建 screenshot-service (platform=${DEPLOY_IMAGE_PLATFORM})${NC}"
+            docker buildx build \
+                --platform "${DEPLOY_IMAGE_PLATFORM}" \
+                --output "type=docker,name=workbench-screenshot-service:latest" \
+                -f docker/screenshot-service/Dockerfile \
+                --build-arg DEBIAN_MIRROR="${debian_mirror}" \
+                --build-arg GIT_COMMIT="${GIT_COMMIT}" \
+                --build-arg GIT_BRANCH="${GIT_BRANCH}" \
+                --build-arg BUILD_TIME="${BUILD_TIME}" \
+                .
+        else
+            docker compose --env-file "${DEPLOY_ENV_FILE}" build \
+                --build-arg GIT_COMMIT="${GIT_COMMIT}" \
+                --build-arg GIT_BRANCH="${GIT_BRANCH}" \
+                --build-arg BUILD_TIME="${BUILD_TIME}" \
+                "${service}"
+        fi
 
         image="$(image_for_service "${service}")"
         if ! docker image inspect "${image}" >/dev/null 2>&1; then

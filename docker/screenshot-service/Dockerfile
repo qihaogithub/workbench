@@ -1,4 +1,4 @@
-FROM node:20-bookworm-slim AS builder
+FROM --platform=$BUILDPLATFORM node:20-bookworm-slim AS builder
 
 RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
 
@@ -18,7 +18,7 @@ COPY packages/screenshot-service/ ./packages/screenshot-service/
 
 RUN pnpm --filter @workbench/screenshot-service build:docker
 
-FROM node:20-bookworm-slim
+FROM --platform=$TARGETPLATFORM node:20-bookworm-slim
 
 WORKDIR /app
 
