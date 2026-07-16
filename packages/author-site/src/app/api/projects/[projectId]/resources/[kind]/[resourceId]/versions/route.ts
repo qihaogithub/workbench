@@ -197,9 +197,19 @@ export async function POST(
     },
   );
   if (!result.ok || !result.data) {
+    const isValidationError =
+      (result.error?.code as string) === "VALIDATION_BLOCKED";
     return NextResponse.json(
-      createApiError("FILE_WRITE_ERROR", result.error?.message ?? "创建资源版本失败"),
-      { status: 500 },
+      createApiError(
+        isValidationError ? "VALIDATION_ERROR" : "FILE_WRITE_ERROR",
+        result.error?.message ?? "创建资源版本失败",
+        result.validation
+          ? { validation: result.validation }
+          : result.error?.details,
+      ),
+      {
+        status: isValidationError ? 422 : 500,
+      },
     );
   }
   return NextResponse.json(createApiSuccess(result.data), { status: 201 });

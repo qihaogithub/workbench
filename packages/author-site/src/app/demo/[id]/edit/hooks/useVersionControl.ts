@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef, type MutableRefObject } from "react";
 import { useToast } from "@/components/ui/toast-provider";
 import { flushWorkspaceCollab } from "@/lib/client-workspace-flush";
-import { projectApiClient } from "@/lib/project-api";
+import { projectApiClient, ProjectApiError } from "@/lib/project-api";
 import type {
   DemoFiles,
   DemoPageMeta,
@@ -404,9 +404,26 @@ export function useVersionControl(params: UseVersionControlParams) {
       loadPageVersionHistories();
       return true;
     } catch (error) {
+      let errorMessage =
+        error instanceof Error ? error.message : "未知错误";
+      if (error instanceof ProjectApiError && error.details) {
+        const details = error.details as { validation?: { issues?: Array<{ message: string; severity?: string; code?: string }> } };
+        const validationIssues = details.validation?.issues;
+        if (validationIssues && validationIssues.length > 0) {
+          const blockingIssues = validationIssues.filter(
+            (issue) => issue.severity === "blocking",
+          );
+          const issuesToShow = blockingIssues.length > 0
+            ? blockingIssues
+            : validationIssues;
+          errorMessage = issuesToShow
+            .map((issue) => issue.message)
+            .join("；");
+        }
+      }
       toast({
         title: "命名版本失败",
-        description: error instanceof Error ? error.message : "未知错误",
+        description: errorMessage,
         variant: "destructive",
       });
       return false;
