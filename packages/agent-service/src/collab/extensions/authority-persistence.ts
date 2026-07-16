@@ -40,7 +40,8 @@ export class AuthorityPersistenceExtension implements Extension {
     if (!ctx?.ok) return;
 
     const text = data.document.getText("content");
-    if (text.length > 0) return;
+    const textLenBefore = text.length;
+    if (textLenBefore > 0) return;
 
     const state = this.persistence.readResourceState(
       ctx.workspacePath,
@@ -71,7 +72,25 @@ export class AuthorityPersistenceExtension implements Extension {
     }
 
     const text = data.document.getText("content");
-    const roomContent = text.toString();
+    let roomContent = text.toString();
+
+    // Defense-in-depth: 如果 Yjs room 内容已经是自拼接重复，截断为前半段。
+    // 这不应在正常流程中发生，但作为最后防线避免重复内容落盘。
+    if (isContentDuplicated(roomContent)) {
+      const lines = roomContent.split("\n");
+      const half = lines.length / 2;
+      const deduped = lines.slice(0, half).join("\n");
+      logger.warn(
+        `onStoreDocument: detected duplicated room content, ` +
+          `resource=${ctx.resourcePath}, ` +
+          `beforeLines=${lines.length}, afterLines=${half}, ` +
+          `trimming to first half`,
+      );
+      roomContent = deduped;
+      // 同步修正 Yjs room 内容，避免下次 onStoreDocument 再次检测到重复
+      text.delete(0, text.length);
+      text.insert(0, deduped);
+    }
 
     const currentState = this.persistence.readResourceState(
       ctx.workspacePath,
@@ -107,4 +126,19 @@ export class AuthorityPersistenceExtension implements Extension {
       throw error;
     }
   }
+}
+
+/**
+ * Detect whether content is an exact self-concatenation (duplicated).
+ * Checks if the second half of the line array equals the first half.
+ */
+function isContentDuplicated(content: string): boolean {
+  if (!content) return false;
+  const lines = content.split("\n");
+  if (lines.length < 2 || lines.length % 2 !== 0) return false;
+  const half = lines.length / 2;
+  for (let i = 0; i < half; i++) {
+    if (lines[i] !== lines[half + i]) return false;
+  }
+  return true;
 }

@@ -525,12 +525,22 @@ function replaceCollabText(
     toString: () => string;
     delete: (index: number, length: number) => void;
     insert: (index: number, text: string) => void;
+    doc?: { transact: (fn: () => void) => void } | null;
   } | null,
   value: string,
 ): void {
   if (!ytext || ytext.toString() === value) return;
-  ytext.delete(0, ytext.toString().length);
-  if (value) ytext.insert(0, value);
+  // 用 transaction 包裹 delete + insert，确保它们作为单个 Yjs update 传播。
+  // 避免中间空态在 sync 过程中被服务端误判为"需要插入磁盘内容"。
+  const apply = () => {
+    ytext.delete(0, ytext.toString().length);
+    if (value) ytext.insert(0, value);
+  };
+  if (ytext.doc) {
+    ytext.doc.transact(apply);
+  } else {
+    apply();
+  }
 }
 
 function isAiFileChangeRefreshTarget(normalizedPath: string): boolean {

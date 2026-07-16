@@ -258,8 +258,12 @@ export function useCollabDocument(
       "status",
       (event: { status: "connecting" | "connected" | "disconnected" }) => {
         if (event.status === "connected") {
+          // "connected" 只表示 WebSocket 已建立，Yjs sync 尚未完成。
+          // 不能在此设置 status="synced"，否则 page.tsx 的 useEffect 会在
+          // ytext 仍为空时触发 replaceCollabText，与服务端 onLoadDocument
+          // 的磁盘内容插入叠加，导致 Yjs CRDT 合并出重复内容。
+          // 正确的 "synced" 状态由下方 "synced" 事件处理器设置。
           clearOfflineStatusTimer();
-          setStatus((current) => (current === "synced" ? current : "synced"));
           return;
         }
 

@@ -95,6 +95,20 @@ interface ApiResponse<T> {
 }
 
 /**
+ * 项目管理 API 错误
+ */
+export class ProjectApiError extends Error {
+  code: string;
+  details?: unknown;
+  constructor(code: string, message: string, details?: unknown) {
+    super(message);
+    this.name = "ProjectApiError";
+    this.code = code;
+    this.details = details;
+  }
+}
+
+/**
  * 项目管理 API 客户端
  */
 export class ProjectApiClient {
@@ -155,7 +169,11 @@ export class ProjectApiClient {
       },
     );
     if (!response.success || !response.data) {
-      throw new Error(response.error?.message || '创建页面版本失败');
+      throw new ProjectApiError(
+        response.error?.code || 'FILE_WRITE_ERROR',
+        response.error?.message || '创建页面版本失败',
+        response.error?.details,
+      );
     }
     return pageVersionInfoFromResource(response.data);
   }
