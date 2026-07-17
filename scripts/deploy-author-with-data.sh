@@ -6,13 +6,13 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SERVER_IP="${SERVER_IP:-10.131.75.39}"
 SERVER_PORT="${SERVER_PORT:-22}"
 SERVER_USER="${SERVER_USER:-jojo}"
-REMOTE_DIR="${REMOTE_DIR:-/opt/workbench}"
+REMOTE_DIR="${REMOTE_DIR:-/Users/jojo/Documents/workbench}"
 # 认证方式：默认使用密码登录（SSH_PASSWORD），置空则回退到 SSH 私钥（SSH_KEY）
 SSH_PASSWORD="${SSH_PASSWORD:-123456}"
 SSH_KEY="${SSH_KEY:-${HOME}/.ssh/figma-mirror-deploy-key}"
 LOCAL_DATA_DIR="${LOCAL_DATA_DIR:-${PROJECT_DIR}/data}"
-REMOTE_BACKUP_DIR="${REMOTE_BACKUP_DIR:-/opt/workbench-data-backups}"
-REMOTE_STAGING_ROOT="${REMOTE_STAGING_ROOT:-/opt/workbench-data-staging}"
+REMOTE_BACKUP_DIR="${REMOTE_BACKUP_DIR:-/Users/jojo/workbench-data-backups}"
+REMOTE_STAGING_ROOT="${REMOTE_STAGING_ROOT:-/Users/jojo/workbench-data-staging}"
 LEGACY_DATA_VOLUME="${LEGACY_DATA_VOLUME:-opencode-workbench_app-data}"
 
 GREEN='\033[0;32m'

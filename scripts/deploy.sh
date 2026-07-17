@@ -6,7 +6,7 @@ set -e
 SERVER_IP="${SERVER_IP:-10.131.75.39}"
 SERVER_PORT="${SERVER_PORT:-22}"
 SERVER_USER="${SERVER_USER:-jojo}"
-REMOTE_DIR="${REMOTE_DIR:-/opt/workbench}"
+REMOTE_DIR="${REMOTE_DIR:-/Users/jojo/Documents/workbench}"
 
 # 本地路径
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -17,9 +17,10 @@ LOCAL_ENV_FILE="${PROJECT_DIR}/.env.docker"
 DEPLOY_ENV_FILE="${PROJECT_DIR}/.deploy.env"
 
 # 部署范围与构建资源保护。
-# 默认跳过 screenshot-service，避免 Chromium 系统依赖安装拖垮正式机。
-DEPLOY_SERVICES="${DEPLOY_SERVICES:-agent-service author-site viewer-site}"
-INCLUDE_SCREENSHOT_SERVICE="${INCLUDE_SCREENSHOT_SERVICE:-false}"
+# 默认包含 screenshot-service；如需临时跳过截图服务，设置 INCLUDE_SCREENSHOT_SERVICE=false
+# 或显式指定 DEPLOY_SERVICES 不含 screenshot-service。
+DEPLOY_SERVICES="${DEPLOY_SERVICES:-agent-service author-site viewer-site screenshot-service}"
+INCLUDE_SCREENSHOT_SERVICE="${INCLUDE_SCREENSHOT_SERVICE:-true}"
 COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-1}"
 DEPLOY_SYNC_MODE="${DEPLOY_SYNC_MODE:-full}"
 DEPLOY_BUILD_MODE="${DEPLOY_BUILD_MODE:-local}"

@@ -86,9 +86,7 @@ services:
     restart: unless-stopped
 
   screenshot-service:
-    profiles:
-      - screenshot
-    platform: ${SCREENSHOT_SERVICE_PLATFORM:-linux/amd64}
+    # 默认随 compose 一起启动，并跟随宿主机原生平台构建（Apple 芯片下即 arm64，避免 amd64 模拟拖慢/崩溃）
     build:
       context: .
       dockerfile: docker/screenshot-service/Dockerfile
