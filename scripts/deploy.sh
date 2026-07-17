@@ -2,14 +2,17 @@
 set -e
 
 # ================= 配置部分 =================
-SERVER_IP="10.130.33.131"
-SERVER_PORT="22"
-SERVER_USER="root"
-REMOTE_DIR="/opt/workbench"
+# 正式环境服务器（均可用同名环境变量覆盖）
+SERVER_IP="${SERVER_IP:-10.131.75.39}"
+SERVER_PORT="${SERVER_PORT:-22}"
+SERVER_USER="${SERVER_USER:-jojo}"
+REMOTE_DIR="${REMOTE_DIR:-/opt/workbench}"
 
 # 本地路径
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SSH_KEY="${HOME}/.ssh/figma-mirror-deploy-key"
+# 认证方式：默认使用密码登录（SSH_PASSWORD），置空则回退到 SSH 私钥（SSH_KEY）
+SSH_PASSWORD="${SSH_PASSWORD:-123456}"
+SSH_KEY="${SSH_KEY:-${HOME}/.ssh/figma-mirror-deploy-key}"
 LOCAL_ENV_FILE="${PROJECT_DIR}/.env.docker"
 DEPLOY_ENV_FILE="${PROJECT_DIR}/.deploy.env"
 
@@ -33,7 +36,26 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
+# ================= SSH / Rsync 认证封装 =================
+# 统一走 SSH_CMD（数组）与 RSYNC_RSH（字符串）两个入口，屏蔽密码/私钥差异。
+SSH_OPTS=(-p "${SERVER_PORT}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10)
+if [ -n "${SSH_PASSWORD}" ]; then
+    if ! command -v sshpass >/dev/null 2>&1; then
+        echo -e "${RED}❌ 使用密码登录需要 sshpass，请先安装（macOS: brew install sshpass）${NC}"
+        echo -e "${YELLOW}   或置空 SSH_PASSWORD 改用 SSH 私钥登录。${NC}"
+        exit 1
+    fi
+    SSH_CMD=(sshpass -p "${SSH_PASSWORD}" ssh "${SSH_OPTS[@]}")
+    RSYNC_RSH="sshpass -p ${SSH_PASSWORD} ssh ${SSH_OPTS[*]}"
+    AUTH_DESC="密码登录 user=${SERVER_USER}"
+else
+    SSH_CMD=(ssh "${SSH_OPTS[@]}" -i "${SSH_KEY}")
+    RSYNC_RSH="ssh ${SSH_OPTS[*]} -i ${SSH_KEY}"
+    AUTH_DESC="SSH 私钥登录 ${SSH_KEY}"
+fi
+
 echo -e "${BLUE}🚀 开始一键部署流程...${NC}"
+echo -e "${BLUE}🎯 目标服务器: ${SERVER_USER}@${SERVER_IP}:${SERVER_PORT} (${AUTH_DESC})${NC}"
 
 # ================= 0. 生成部署环境文件 =================
 if [ ! -f "${LOCAL_ENV_FILE}" ]; then
@@ -193,16 +215,16 @@ corepack pnpm check:workspace-authority
 corepack pnpm check:workspace-deploy-compose
 echo -e "${GREEN}✅ Workspace Authority 静态部署前检查通过${NC}"
 
-# ================= 1. 检查 SSH Key =================
-echo -e "${BLUE}🔍 [1/4] 检查 SSH 连接...${NC}"
-if [ ! -f "${SSH_KEY}" ]; then
+# ================= 1. 检查 SSH 连接 =================
+echo -e "${BLUE}🔍 [1/4] 检查 SSH 连接 (${AUTH_DESC})...${NC}"
+if [ -z "${SSH_PASSWORD}" ] && [ ! -f "${SSH_KEY}" ]; then
     echo -e "${RED}❌ SSH 私钥不存在: ${SSH_KEY}${NC}"
-    echo -e "${YELLOW}   请先配置 SSH 免密登录，确保 ssh root@${SERVER_IP} 可以直接连接${NC}"
+    echo -e "${YELLOW}   请设置 SSH_PASSWORD 使用密码登录，或配置私钥确保 ssh ${SERVER_USER}@${SERVER_IP} 可直接连接${NC}"
     exit 1
 fi
 
 # 验证 SSH 连接
-if ! ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" -o ConnectTimeout=5 -o StrictHostKeyChecking=no "${SERVER_USER}@${SERVER_IP}" "echo ok" >/dev/null 2>&1; then
+if ! "${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" "echo ok" >/dev/null 2>&1; then
     echo -e "${RED}❌ SSH 连接失败: ${SERVER_USER}@${SERVER_IP}${NC}"
     exit 1
 fi
@@ -223,16 +245,16 @@ if [[ "${DEPLOY_APP_DATA_DIR}" == *"'"* ]] || [[ "${DEPLOY_APP_DATA_DIR}" == *$'
 fi
 
 echo -e "${BLUE}🔍 检查远端 live Workspace Authority 状态...${NC}"
-if ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" -o StrictHostKeyChecking=no "${SERVER_USER}@${SERVER_IP}" "command -v node >/dev/null 2>&1"; then
-    if ! ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" -o StrictHostKeyChecking=no "${SERVER_USER}@${SERVER_IP}" \
+if "${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" "command -v node >/dev/null 2>&1"; then
+    if ! "${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" \
         "node - --data-dir '${DEPLOY_APP_DATA_DIR}' --json" \
         < "${PROJECT_DIR}/scripts/check-workspace-deploy-preflight.mjs"; then
         echo -e "${RED}❌ 远端 Workspace Authority 部署前检查未通过${NC}"
         exit 1
     fi
-elif ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" -o StrictHostKeyChecking=no "${SERVER_USER}@${SERVER_IP}" \
+elif "${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" \
     "cd '${REMOTE_DIR}' && docker compose --env-file .env.docker ps --status running -q agent-service | grep -q ."; then
-    if ! ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" -o StrictHostKeyChecking=no "${SERVER_USER}@${SERVER_IP}" \
+    if ! "${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" \
         "cd '${REMOTE_DIR}' && docker compose --env-file .env.docker exec -T agent-service node - --data-dir /app/data --json" \
         < "${PROJECT_DIR}/scripts/check-workspace-deploy-preflight.mjs"; then
         echo -e "${RED}❌ 远端 Workspace Authority 部署前检查未通过${NC}"
@@ -259,7 +281,7 @@ fi
 # ================= 2. 预检远程 Docker 镜像源 =================
 echo -e "${BLUE}🔍 [2/4] 检查远程 Docker 镜像源配置...${NC}"
 
-REMOTE_DAEMON_JSON="$(ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
+REMOTE_DAEMON_JSON="$("${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" "
     if [ -f /etc/docker/daemon.json ]; then
         cat /etc/docker/daemon.json
     fi
@@ -431,7 +453,7 @@ fi
 
 rsync -avz --progress --delete \
     "${rsync_excludes[@]}" \
-    -e "ssh -p ${SERVER_PORT} -i ${SSH_KEY} -o StrictHostKeyChecking=no" \
+    -e "${RSYNC_RSH}" \
     ./ \
     "${SERVER_USER}@${SERVER_IP}:${REMOTE_DIR}/"
 
@@ -441,7 +463,7 @@ echo -e "${GREEN}✅ 代码同步完成${NC}"
 if [ "${DEPLOY_BUILD_MODE}" = "local" ]; then
     echo -e "${BLUE}🔄 [4/4] 本地构建镜像、上传并启动服务...${NC}"
 
-    ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
+    "${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" "
         set -e
         cd ${REMOTE_DIR}
 
@@ -507,11 +529,11 @@ if [ "${DEPLOY_BUILD_MODE}" = "local" ]; then
 
     echo -e "${BLUE}📤 上传镜像归档到服务器: ${REMOTE_IMAGE_DIR}${NC}"
     rsync -avz --progress \
-        -e "ssh -p ${SERVER_PORT} -i ${SSH_KEY} -o StrictHostKeyChecking=no" \
+        -e "${RSYNC_RSH}" \
         "${LOCAL_IMAGE_DIR}/" \
         "${SERVER_USER}@${SERVER_IP}:${REMOTE_IMAGE_DIR}/"
 
-    ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
+    "${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" "
         set -e
         cd ${REMOTE_DIR}
 
@@ -550,7 +572,7 @@ if [ "${DEPLOY_BUILD_MODE}" = "local" ]; then
 else
     echo -e "${BLUE}🔄 [4/4] 远程构建并启动服务...${NC}"
 
-    ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
+    "${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" "
         set -e
         cd ${REMOTE_DIR}
 
@@ -610,7 +632,7 @@ fi
 # ================= 5. 部署后自检 =================
 echo -e "${BLUE}🩺 部署后自检...${NC}"
 
-ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" "${SERVER_USER}@${SERVER_IP}" "
+"${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" "
     set -e
     cd ${REMOTE_DIR}
 
