@@ -20,7 +20,7 @@ import { ChatInput } from "./chat/chat-input";
 import type { PermissionRequest } from "./chat/services/stream-service";
 import type { StreamService } from "./chat/services/stream-service";
 import type { ActiveViewContext } from "@/lib/agent/active-view-context";
-import { X, FileText, ArrowDown, Clock } from "lucide-react";
+import { X, FileText, ArrowDown } from "lucide-react";
 
 export interface AutoRepairTrigger {
   kind: "auto_repair";
@@ -473,19 +473,15 @@ export function AIChat({
       )}
 
       {isStreaming && silenceSeconds != null && silenceSeconds >= 60 && (
-        <div
-          className={`flex items-center gap-2 px-4 py-2 text-sm rounded-md mx-2 ${
-            silenceSeconds >= 180
-              ? "bg-red-500/10 border border-red-500/20 text-red-300"
-              : "bg-yellow-500/10 border border-yellow-500/20 text-yellow-300"
-          }`}
-        >
-          <Clock className="h-4 w-4 flex-shrink-0" />
-          <span>
-            {silenceSeconds >= 180
-              ? `AI 处理时间过长（${silenceSeconds} 秒），建议取消后重试`
-              : `AI 已持续处理 ${silenceSeconds} 秒…`}
-          </span>
+        <div className="flex items-center gap-1.5 px-4 pb-1 text-xs text-muted-foreground">
+          <span
+            className={`inline-block h-1.5 w-1.5 rounded-full ${
+              silenceSeconds >= 180
+                ? "bg-red-500 animate-pulse"
+                : "bg-yellow-500/70"
+            }`}
+          />
+          <span>已运行 {silenceSeconds} 秒</span>
         </div>
       )}
 

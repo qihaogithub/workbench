@@ -93,12 +93,10 @@ export async function registerCollabRoutes(fastify: FastifyInstance): Promise<vo
       socket: WebSocket,
       request: FastifyRequest<{ Params: CollabParams; Querystring: CollabQuery }>,
     ) => {
-      const descriptor = normalizeDescriptor(request.params, request.query);
-      if (!descriptor) {
-        socket.close(1008, "INVALID_COLLAB_PARAMS");
-        return;
-      }
-
+      // HocuspocusProvider 客户端通过 WebSocket 协议消息传递 documentName
+      // 和 token（sessionId），不通过 URL query 参数传递。会话校验由
+      // SessionAuthExtension.onAuthenticate 在协议层完成，此处无需也无法
+      // 从 request.query 提取 descriptor。
       const server = getHocuspocusCollabServer();
       server.handleConnection(socket, request.raw);
     },

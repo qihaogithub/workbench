@@ -476,17 +476,30 @@ export function useVersionControl(params: UseVersionControlParams) {
             throw new Error("自动保存页面文件失败");
           }
 
-          await projectApiClient.createPageVersion(
-            demoId,
-            latestSnapshotRef.current.activeDemoId,
-            {
-              sessionId,
-              note: checkpointNote,
-              sketchPatchSummary: getSketchPatchSummary?.(
-                latestSnapshotRef.current.activeDemoId,
-              ),
-            },
-          );
+          // 版本创建失败不阻断后续 checkpoint 记录和 UI 状态收尾。
+          // 场景：Schema 校验失败时页面文件已写入成功，仅版本快照缺失，
+          // 不应导致 UI 卡在"连接中"状态。
+          try {
+            await projectApiClient.createPageVersion(
+              demoId,
+              latestSnapshotRef.current.activeDemoId,
+              {
+                sessionId,
+                note: checkpointNote,
+                sketchPatchSummary: getSketchPatchSummary?.(
+                  latestSnapshotRef.current.activeDemoId,
+                ),
+              },
+            );
+          } catch (versionError) {
+            // 增强日志：展开 details 以获取具体 Schema 校验失败信息
+            const errDetails = (versionError as { details?: unknown }).details;
+            console.warn("[auto-checkpoint] createPageVersion failed:", {
+              name: versionError instanceof Error ? versionError.name : "Unknown",
+              message: versionError instanceof Error ? versionError.message : String(versionError),
+              details: errDetails,
+            });
+          }
         }
 
         const checkpointRes = await fetch(`/api/sessions/${sessionId}/checkpoint`, {
@@ -511,7 +524,13 @@ export function useVersionControl(params: UseVersionControlParams) {
         await Promise.all([loadVersionHistory(), loadPageVersionHistories()]);
         return true;
       } catch (error) {
-        console.warn("[auto-checkpoint] failed:", error);
+        // 增强日志：展开 details 以获取具体校验失败信息
+        const errDetails = (error as { details?: unknown }).details;
+        console.warn("[auto-checkpoint] failed:", {
+          name: error instanceof Error ? error.name : "Unknown",
+          message: error instanceof Error ? error.message : String(error),
+          details: errDetails,
+        });
         return false;
       } finally {
         autoCheckpointInFlightRef.current = false;
