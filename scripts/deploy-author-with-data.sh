@@ -3,10 +3,12 @@ set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-SERVER_IP="${SERVER_IP:-10.130.33.131}"
+SERVER_IP="${SERVER_IP:-10.131.75.39}"
 SERVER_PORT="${SERVER_PORT:-22}"
-SERVER_USER="${SERVER_USER:-root}"
+SERVER_USER="${SERVER_USER:-jojo}"
 REMOTE_DIR="${REMOTE_DIR:-/opt/workbench}"
+# 认证方式：默认使用密码登录（SSH_PASSWORD），置空则回退到 SSH 私钥（SSH_KEY）
+SSH_PASSWORD="${SSH_PASSWORD:-123456}"
 SSH_KEY="${SSH_KEY:-${HOME}/.ssh/figma-mirror-deploy-key}"
 LOCAL_DATA_DIR="${LOCAL_DATA_DIR:-${PROJECT_DIR}/data}"
 REMOTE_BACKUP_DIR="${REMOTE_BACKUP_DIR:-/opt/workbench-data-backups}"
@@ -51,7 +53,7 @@ print_usage() {
   -h, --help                              显示帮助
 
 可覆盖环境变量:
-  SERVER_IP SERVER_PORT SERVER_USER REMOTE_DIR SSH_KEY LOCAL_DATA_DIR
+  SERVER_IP SERVER_PORT SERVER_USER REMOTE_DIR SSH_PASSWORD SSH_KEY LOCAL_DATA_DIR
   REMOTE_BACKUP_DIR REMOTE_STAGING_ROOT LEGACY_DATA_VOLUME
 EOF
 }
@@ -72,16 +74,31 @@ log_error() {
     echo -e "${RED}$*${NC}" >&2
 }
 
+# ================= SSH / Rsync 认证封装 =================
+# 统一走 SSH_CMD（数组）与 RSYNC_RSH（字符串），屏蔽密码/私钥差异。
+SSH_OPTS=(-p "${SERVER_PORT}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10)
+if [ -n "${SSH_PASSWORD}" ]; then
+    if ! command -v sshpass >/dev/null 2>&1; then
+        log_error "❌ 使用密码登录需要 sshpass，请先安装（macOS: brew install sshpass），或置空 SSH_PASSWORD 改用私钥"
+        exit 1
+    fi
+    SSH_CMD=(sshpass -p "${SSH_PASSWORD}" ssh "${SSH_OPTS[@]}")
+    RSYNC_RSH="sshpass -p ${SSH_PASSWORD} ssh ${SSH_OPTS[*]}"
+else
+    SSH_CMD=(ssh "${SSH_OPTS[@]}" -i "${SSH_KEY}")
+    RSYNC_RSH="ssh ${SSH_OPTS[*]} -i ${SSH_KEY}"
+fi
+
 ssh_base() {
-    ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" -o StrictHostKeyChecking=no "${SERVER_USER}@${SERVER_IP}" "$@"
+    "${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" "$@"
 }
 
 run_remote_script() {
-    ssh -p "${SERVER_PORT}" -i "${SSH_KEY}" -o StrictHostKeyChecking=no "${SERVER_USER}@${SERVER_IP}" bash -s -- "$@"
+    "${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" bash -s -- "$@"
 }
 
 require_local_inputs() {
-    if [ ! -f "${SSH_KEY}" ]; then
+    if [ -z "${SSH_PASSWORD}" ] && [ ! -f "${SSH_KEY}" ]; then
         log_error "❌ SSH 私钥不存在: ${SSH_KEY}"
         exit 1
     fi
@@ -237,7 +254,7 @@ upload_staging() {
     ssh_base "mkdir -p '${staging_path}'"
 
     rsync -az --delete --stats \
-        -e "ssh -p ${SERVER_PORT} -i ${SSH_KEY} -o StrictHostKeyChecking=no" \
+        -e "${RSYNC_RSH}" \
         "${LOCAL_DATA_DIR}/" \
         "${SERVER_USER}@${SERVER_IP}:${staging_path}/"
 
