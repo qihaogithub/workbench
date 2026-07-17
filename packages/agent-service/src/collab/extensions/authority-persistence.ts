@@ -76,14 +76,12 @@ export class AuthorityPersistenceExtension implements Extension {
 
     // Defense-in-depth: 如果 Yjs room 内容已经是自拼接重复，截断为前半段。
     // 这不应在正常流程中发生，但作为最后防线避免重复内容落盘。
-    if (isContentDuplicated(roomContent)) {
-      const lines = roomContent.split("\n");
-      const half = lines.length / 2;
-      const deduped = lines.slice(0, half).join("\n");
+    const deduped = deduplicateContent(roomContent);
+    if (deduped !== null) {
       logger.warn(
         `onStoreDocument: detected duplicated room content, ` +
           `resource=${ctx.resourcePath}, ` +
-          `beforeLines=${lines.length}, afterLines=${half}, ` +
+          `beforeLen=${roomContent.length}, afterLen=${deduped.length}, ` +
           `trimming to first half`,
       );
       roomContent = deduped;
@@ -129,16 +127,89 @@ export class AuthorityPersistenceExtension implements Extension {
 }
 
 /**
- * Detect whether content is an exact self-concatenation (duplicated).
- * Checks if the second half of the line array equals the first half.
+ * 检测并消除自拼接重复内容。
+ *
+ * 支持两种检测方式：
+ * 1. 行级重复：前半段行与后半段行完全一致（支持偶数和奇数行数）
+ * 2. JSON 对象级重复：两个相同的 JSON 对象拼接（{...}{...}）
+ *
+ * 返回去重后的内容，或 null 表示未检测到重复。
  */
-function isContentDuplicated(content: string): boolean {
-  if (!content) return false;
+function deduplicateContent(content: string): string | null {
+  if (!content) return null;
+
+  // 方法 1: 行级重复检测（支持偶数和奇数行数）
   const lines = content.split("\n");
-  if (lines.length < 2 || lines.length % 2 !== 0) return false;
-  const half = lines.length / 2;
-  for (let i = 0; i < half; i++) {
-    if (lines[i] !== lines[half + i]) return false;
+  if (lines.length >= 4) {
+    const half = Math.floor(lines.length / 2);
+    // 偶数行：前半段 == 后半段
+    if (lines.length % 2 === 0) {
+      let allMatch = true;
+      for (let i = 0; i < half; i++) {
+        if (lines[i] !== lines[half + i]) {
+          allMatch = false;
+          break;
+        }
+      }
+      if (allMatch) return lines.slice(0, half).join("\n");
+    }
+    // 奇数行：前 half 行 == 后 half 行（跳过中间一行，处理尾部多余换行）
+    if (lines.length % 2 === 1 && half >= 2) {
+      let allMatch = true;
+      for (let i = 0; i < half; i++) {
+        if (lines[i] !== lines[half + 1 + i]) {
+          allMatch = false;
+          break;
+        }
+      }
+      if (allMatch) return lines.slice(0, half).join("\n");
+    }
   }
-  return true;
+
+  // 方法 2: JSON 对象级重复检测
+  // 场景：两个完整 JSON 对象拼接（{...}{...}），行级检测可能因行数不匹配而漏检
+  const start = content.indexOf("{");
+  if (start === -1) return null;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  let firstEnd = -1;
+  for (let i = start; i < content.length; i++) {
+    const ch = content[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) {
+        firstEnd = i + 1;
+        break;
+      }
+    }
+  }
+  if (firstEnd === -1) return null;
+  const firstObj = content.slice(start, firstEnd);
+  const remaining = content.slice(firstEnd).trim();
+  if (!remaining || !remaining.startsWith("{")) return null;
+  try {
+    const first = JSON.parse(firstObj);
+    const second = JSON.parse(remaining);
+    if (JSON.stringify(first) === JSON.stringify(second)) {
+      return firstObj;
+    }
+  } catch {
+    // 解析失败，不是 JSON 重复
+  }
+  return null;
 }

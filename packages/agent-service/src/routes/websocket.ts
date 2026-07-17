@@ -507,6 +507,23 @@ export async function registerWebSocketRoutes(
                 getSessionStore().update(sessionId, {
                   status: result.success ? "ready" : "error",
                 });
+
+                // Rate-limit 后销毁 Agent，下次消息创建全新 Agent（清空膨胀的对话历史）
+                if (
+                  !result.success &&
+                  result.error?.code === "RATE_LIMIT_EXCEEDED"
+                ) {
+                  logger.warn(
+                    { sessionId },
+                    "Rate limit exceeded, destroying agent to reset conversation history",
+                  );
+                  void manager.destroy(sessionId).catch((err) => {
+                    logger.error(
+                      { sessionId, error: String(err) },
+                      "Failed to destroy agent after rate limit",
+                    );
+                  });
+                }
               } catch (error) {
                 eventRouter.recordError({
                   code: "MESSAGE_SEND_ERROR",

@@ -44,6 +44,11 @@ function extractCode(error: unknown): string | undefined {
 }
 
 function classifyAiError(code: string | undefined, message: string): AiErrorCategory {
+  // 优先根据结构化错误码分类，不再仅依赖文本匹配
+  if (code === "RATE_LIMIT_EXCEEDED") return "quota";
+  if (code === "MESSAGE_TIMEOUT") return "timeout";
+  if (code === "AGENT_BUSY") return "busy";
+
   const haystack = `${code || ""} ${message}`.toLowerCase();
   if (
     haystack.includes("agent_busy") ||

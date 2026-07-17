@@ -86,10 +86,34 @@ export class HocuspocusCollabServer {
       headers: new Headers(request.headers as Record<string, string>),
     });
 
-    this.hocuspocus.handleConnection(
+    // Hocuspocus's handleConnection returns a ClientConnection that does NOT
+    // set up its own WebSocket event listeners. The integration layer must
+    // forward 'message' and 'close' events to it manually. This mirrors the
+    // pattern used by Hocuspocus's built-in Server (crossws hooks).
+    const clientConnection = this.hocuspocus.handleConnection(
       socket as unknown as WebSocketLike,
       webRequest,
     );
+
+    socket.on("message", (data: Buffer | ArrayBuffer | Buffer[]) => {
+      let bytes: Uint8Array;
+      if (Buffer.isBuffer(data)) {
+        bytes = data;
+      } else if (Array.isArray(data)) {
+        bytes = Buffer.concat(data);
+      } else {
+        bytes = new Uint8Array(data);
+      }
+      clientConnection.handleMessage(bytes);
+    });
+
+    socket.on("close", (code: number, reason: Buffer) => {
+      clientConnection.handleClose({ code, reason: reason.toString() });
+    });
+
+    socket.on("error", (error: Error) => {
+      logger.error({ error }, "collab WebSocket error");
+    });
   }
 
   /**

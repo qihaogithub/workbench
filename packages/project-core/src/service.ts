@@ -5311,9 +5311,10 @@ export class ProjectAdminService {
 
   private readProjectConfig(workspacePath: string): string | null {
     const configPath = path.join(workspacePath, PROJECT_CONFIG_FILENAME);
-    return fs.existsSync(configPath)
-      ? fs.readFileSync(configPath, "utf-8")
-      : null;
+    if (!fs.existsSync(configPath)) return null;
+    const content = fs.readFileSync(configPath, "utf-8");
+    // 空文件视为无项目级 Schema，与文件不存在同等处理
+    return content.trim() || null;
   }
 
   private readProjectConfigValues(
@@ -5938,8 +5939,15 @@ export class ProjectAdminService {
     resourceId: string,
     issues: ValidationResult["issues"],
   ): { properties?: Record<string, unknown> } | null {
-    try {
-      const parsed = JSON.parse(schema) as {
+    // 空字符串或纯空白视为无 Schema，不产生 blocking issue。
+    // 场景：Yjs flush 可能写入空文件、AI 创建页面时可能产生空 schema。
+    if (!schema.trim()) {
+      return { properties: {} };
+    }
+    const tryParse = (
+      raw: string,
+    ): { properties?: Record<string, unknown> } => {
+      const parsed = JSON.parse(raw) as {
         properties?: unknown;
         type?: unknown;
       };
@@ -5963,7 +5971,21 @@ export class ProjectAdminService {
             ? (parsed.properties as Record<string, unknown>)
             : {},
       };
+    };
+    try {
+      return tryParse(schema);
     } catch {
+      // 直接解析失败，尝试提取第一个完整的 JSON 对象后重试。
+      // 场景：Yjs flush 可能导致文件内容被重复写入（{...}{...}），
+      // 或文件末尾有非 JSON 字符。提取首个 JSON 对象后重试解析。
+      const firstObj = this.extractFirstJsonObject(schema);
+      if (firstObj && firstObj !== schema.trim()) {
+        try {
+          return tryParse(firstObj);
+        } catch {
+          // 提取后仍无法解析，继续报错
+        }
+      }
       issues.push({
         code: "INVALID_JSON",
         message: `${resourceId} 不是合法 JSON`,
@@ -5972,6 +5994,45 @@ export class ProjectAdminService {
       });
       return null;
     }
+  }
+
+  /**
+   * 从可能包含重复/损坏内容的字符串中提取第一个完整的 JSON 对象。
+   *
+   * 通过跟踪花括号深度和字符串字面量来定位第一个闭合的 `{...}`。
+   * 处理场景：
+   * - 重复拼接：`{...}{...}` → 返回第一个 `{...}`
+   * - 尾部碎片：`{...}garbage` → 返回第一个 `{...}`
+   * - 前导垃圾：`garbage{...}` → 返回第一个 `{...}`
+   */
+  private extractFirstJsonObject(text: string): string | null {
+    const start = text.indexOf("{");
+    if (start === -1) return null;
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (ch === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (inString) continue;
+      if (ch === "{") depth++;
+      else if (ch === "}") {
+        depth--;
+        if (depth === 0) return text.slice(start, i + 1);
+      }
+    }
+    return null;
   }
 
   private validateTree(tree: WorkspaceTree): ValidationResult {
