@@ -2,6 +2,7 @@ import { BaseAgent } from "./agent";
 import {
   AgentConfig,
   AgentResult,
+  ErrorCode,
   SendMessageOptions,
   UserChoiceResponse,
 } from "./types";
@@ -34,6 +35,24 @@ function isRateLimitError(error: unknown): boolean {
     msg.includes("429") ||
     msg.includes("too many requests") ||
     msg.includes("quota")
+  );
+}
+
+/**
+ * 识别 LLM API 上下文窗口溢出错误。
+ *
+ * 触发场景：模型返回 400 + "maximum context length ... tokens, requested ..."，
+ * 通常因为多轮对话历史累积或单轮注入过多上下文（如 L3 页面源码内嵌）。
+ *
+ * 这类错误不可重试——保留历史继续重试只会让 token 数继续膨胀。
+ * 必须由上层销毁 agent 清空历史，或引导用户新建对话。
+ */
+function isContextOverflowError(error: unknown): boolean {
+  const msg = getErrorMessage(error, "").toLowerCase();
+  return (
+    msg.includes("maximum context length") ||
+    msg.includes("context length exceeded") ||
+    msg.includes("context window exceeded")
   );
 }
 
@@ -302,23 +321,34 @@ export class BackendAgent extends BaseAgent {
       this.setStatus("error");
       const responseDebug = this.backend.getLastResponseDebug?.();
       const rateLimited = isRateLimitError(error);
+      const contextOverflow = isContextOverflowError(error);
       logger.error(
         {
           sessionId: this.sessionId,
           durationMs: Date.now() - startTime,
           error: getErrorMessage(error),
           rateLimited,
+          contextOverflow,
         },
         "sendMessage end error",
       );
+      // 上下文溢出优先于 rate limit 判断：不可重试，必须由上层销毁 agent 清空历史
+      const errorCode: ErrorCode = contextOverflow
+        ? "CONTEXT_OVERFLOW"
+        : rateLimited
+          ? "RATE_LIMIT_EXCEEDED"
+          : "MESSAGE_SEND_ERROR";
+      const errorMessage = contextOverflow
+        ? "对话内容过长，已超出模型上下文上限。请新建对话继续。"
+        : rateLimited
+          ? "AI 服务额度或频率受限，请稍后重试。"
+          : getErrorMessage(error);
       return {
         success: false,
         error: {
-          code: rateLimited ? "RATE_LIMIT_EXCEEDED" : "MESSAGE_SEND_ERROR",
-          message: rateLimited
-            ? "AI 服务额度或频率受限，请稍后重试。"
-            : getErrorMessage(error),
-          retryable: true,
+          code: errorCode,
+          message: errorMessage,
+          retryable: !contextOverflow,
         },
         metadata: responseDebug
           ? { emptyResponseDebug: responseDebug }

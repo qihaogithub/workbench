@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { logger } from "../utils/logger";
 import { discoverLiveWorkspaces } from "./workspace-authority-migration";
 import { WorkspaceMutationAuthority } from "./workspace-mutation-authority";
 
@@ -62,7 +63,11 @@ export async function recoverWorkspaceAuthoritiesOnStartup(dataDir: string): Pro
     currentStatus.skippedUnregisteredCount = workspaces.filter((workspace) => !registeredWorkspaceIds.includes(workspace.workspaceId)).length;
     for (const workspaceId of registeredWorkspaceIds) {
       const workspace = workspaceById.get(workspaceId);
-      if (!workspace) throw new Error(`WORKSPACE_NOT_FOUND:${workspaceId}`);
+      if (!workspace) {
+        logger.warn({ workspaceId }, "Skipping recovery: workspace data not found, authority entry may be stale");
+        currentStatus.skippedUnregisteredCount++;
+        continue;
+      }
       const authority = new WorkspaceMutationAuthority({
         dataDir: resolvedDataDir,
         resolveWorkspacePath: (workspaceId) => workspaceId === workspace.workspaceId ? workspace.workspacePath : null,

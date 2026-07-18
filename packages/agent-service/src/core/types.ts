@@ -31,6 +31,7 @@ export type ErrorCode =
   | "MESSAGE_TIMEOUT"
   | "FILE_ACCESS_DENIED"
   | "RATE_LIMIT_EXCEEDED"
+  | "CONTEXT_OVERFLOW"
   | "INTERNAL_ERROR";
 
 // ============================================================

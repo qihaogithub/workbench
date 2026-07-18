@@ -31,4 +31,22 @@ describe('normalizeAiError', () => {
     expect(result.category).toBe('busy');
     expect(result.userMessage).toBe('上一轮 AI 请求仍在运行，请等待完成或先取消后再发送。');
   });
+
+  it('将结构化 CONTEXT_OVERFLOW 错误码映射为上下文溢出提示', () => {
+    const result = normalizeAiError({
+      code: 'CONTEXT_OVERFLOW',
+      message: 'maximum context length 1048565 tokens, requested 1161677',
+    });
+    expect(result.category).toBe('context_overflow');
+    expect(result.userMessage).toBe('对话内容过长，已超出模型上下文上限。请新建对话继续；当前对话的历史和结果已保留。');
+  });
+
+  it('将 LLM API 400 文本中的 maximum context length 兜底识别为上下文溢出', () => {
+    // 后端未打 CONTEXT_OVERFLOW code 时，前端应通过文本兜底识别
+    const result = normalizeAiError(
+      new Error('400 maximum context length 1048565 tokens, requested 1161677'),
+    );
+    expect(result.category).toBe('context_overflow');
+    expect(result.userMessage).toBe('对话内容过长，已超出模型上下文上限。请新建对话继续；当前对话的历史和结果已保留。');
+  });
 });
