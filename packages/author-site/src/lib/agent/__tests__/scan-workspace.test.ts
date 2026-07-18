@@ -150,18 +150,25 @@ describe('scanWorkspaceContext', () => {
     expect(pageList).toContain('demos/home/config.schema.json');
   });
 
-  it('页面数 ≤ 2 时，pageList 包含 index.tsx 和 config.schema.json 的文件内容', () => {
-    const demosDir = path.join(tmpDir, 'demos');
-    const aDir = path.join(demosDir, 'a');
-    fs.mkdirSync(aDir, { recursive: true });
-    fs.writeFileSync(path.join(aDir, 'index.tsx'), 'export default function A() { return <div>A</div>; }');
-    fs.writeFileSync(path.join(aDir, 'config.schema.json'), '{"type":"object"}');
+  it('pageList 只包含页面元数据，不嵌入源码文件内容（无论页面数）', () => {
+    // 历史上页面数 ≤ 2 时会嵌入完整源码，导致 L3 上下文膨胀引发溢出；
+    // 现已改为只暴露元数据，源码由 Agent 通过 readFile 按需读取。
+    createDemoPage('a', 'export default function A() { return <div>A</div>; }', '{"type":"object"}');
+    createDemoPage('b', '// b-code', '{"type":"object"}');
     const ctx = scanWorkspaceContext(tmpDir);
-    expect(ctx.pageList).toContain('export default function A()');
-    expect(ctx.pageList).toContain('"type":"object"');
+    const pageList = normalizeSeparators(ctx.pageList);
+    // 元数据应存在
+    expect(pageList).toContain('id: `a`');
+    expect(pageList).toContain('runtimeType: `high-fidelity-react`');
+    expect(pageList).toContain('demos/a/index.tsx');
+    expect(pageList).toContain('demos/a/config.schema.json');
+    // 源码内容不应被嵌入
+    expect(ctx.pageList).not.toContain('export default function A()');
+    expect(ctx.pageList).not.toContain('"type":"object"');
+    expect(ctx.pageList).not.toContain('// b-code');
   });
 
-  it('原型页上下文展示 runtimeType 与 prototype.html/css，而不是 index.tsx', () => {
+  it('原型页 pageList 展示 runtimeType 与源码路径，但不嵌入源码内容', () => {
     createPrototypePage(
       'prototype_a',
       '<main><h1 data-bind-text="title">默认标题</h1></main>',
@@ -175,9 +182,10 @@ describe('scanWorkspaceContext', () => {
     expect(pageList).toContain('demos/prototype_a/prototype.html');
     expect(pageList).toContain('demos/prototype_a/prototype.css');
     expect(pageList).not.toContain('demos/prototype_a/index.tsx');
-    expect(pageList).toContain('data-bind-text="title"');
-    expect(pageList).toContain('.hero { color: red; }');
-    expect(pageList).toContain('"title"');
+    // 源码内容不应被嵌入
+    expect(ctx.pageList).not.toContain('data-bind-text="title"');
+    expect(ctx.pageList).not.toContain('.hero { color: red; }');
+    expect(ctx.pageList).not.toContain('"title"');
   });
 
   it('默认不把手绘页面暴露给 AI 工作区上下文', () => {
@@ -192,7 +200,7 @@ describe('scanWorkspaceContext', () => {
     expect(ctx.pageList).not.toContain('手绘页面');
   });
 
-  it('页面数 > 2 时，pageList 不包含文件内容（避免 L3 过大）', () => {
+  it('页面数 > 2 时 pageList 仍列出所有页面元数据但不嵌入源码', () => {
     const demosDir = path.join(tmpDir, 'demos');
     for (const id of ['a', 'b', 'c']) {
       const dir = path.join(demosDir, id);
@@ -201,21 +209,14 @@ describe('scanWorkspaceContext', () => {
       fs.writeFileSync(path.join(dir, 'config.schema.json'), `{"id":"${id}"}`);
     }
     const ctx = scanWorkspaceContext(tmpDir);
+    // 源码内容不应被嵌入
     expect(ctx.pageList).not.toContain('// code for a');
     expect(ctx.pageList).not.toContain('// code for b');
     expect(ctx.pageList).not.toContain('// code for c');
+    // 元数据应存在
     const pageList = normalizeSeparators(ctx.pageList);
     expect(pageList).toContain('demos/a/index.tsx');
     expect(pageList).toContain('demos/c/config.schema.json');
-  });
-
-  it('页面数恰好为 2 时仍嵌入文件内容', () => {
-    for (const id of ['x', 'y']) {
-      createDemoPage(id, `// ${id}-code`);
-    }
-    const ctx = scanWorkspaceContext(tmpDir);
-    expect(ctx.pageList).toContain('// x-code');
-    expect(ctx.pageList).toContain('// y-code');
   });
 
   it('扫描画布文本语义节点并生成 Agent 可读摘要', () => {

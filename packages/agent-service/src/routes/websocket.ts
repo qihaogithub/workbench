@@ -508,19 +508,21 @@ export async function registerWebSocketRoutes(
                   status: result.success ? "ready" : "error",
                 });
 
-                // Rate-limit 后销毁 Agent，下次消息创建全新 Agent（清空膨胀的对话历史）
-                if (
+                // Rate-limit 或上下文溢出后销毁 Agent，下次消息创建全新 Agent（清空膨胀的对话历史）
+                // 上下文溢出不可重试：保留历史继续发送只会让 token 数继续膨胀
+                const shouldResetHistory =
                   !result.success &&
-                  result.error?.code === "RATE_LIMIT_EXCEEDED"
-                ) {
+                  (result.error?.code === "RATE_LIMIT_EXCEEDED" ||
+                    result.error?.code === "CONTEXT_OVERFLOW");
+                if (shouldResetHistory) {
                   logger.warn(
-                    { sessionId },
-                    "Rate limit exceeded, destroying agent to reset conversation history",
+                    { sessionId, errorCode: result.error?.code },
+                    "Destroying agent to reset conversation history",
                   );
                   void manager.destroy(sessionId).catch((err) => {
                     logger.error(
                       { sessionId, error: String(err) },
-                      "Failed to destroy agent after rate limit",
+                      "Failed to destroy agent after history reset trigger",
                     );
                   });
                 }

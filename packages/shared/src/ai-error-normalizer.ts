@@ -5,6 +5,7 @@ export type AiErrorCategory =
   | "quota"
   | "busy"
   | "cancelled"
+  | "context_overflow"
   | "server"
   | "unknown";
 
@@ -48,8 +49,18 @@ function classifyAiError(code: string | undefined, message: string): AiErrorCate
   if (code === "RATE_LIMIT_EXCEEDED") return "quota";
   if (code === "MESSAGE_TIMEOUT") return "timeout";
   if (code === "AGENT_BUSY") return "busy";
+  if (code === "CONTEXT_OVERFLOW") return "context_overflow";
 
   const haystack = `${code || ""} ${message}`.toLowerCase();
+  // 上下文溢出（文本兜底：LLM API 400 错误中的 "maximum context length" 等）
+  // 必须在其他文本匹配之前判断，避免被 server/unknown 等宽泛分类吞掉
+  if (
+    haystack.includes("maximum context length") ||
+    haystack.includes("context length exceeded") ||
+    haystack.includes("context window exceeded")
+  ) {
+    return "context_overflow";
+  }
   if (
     haystack.includes("agent_busy") ||
     haystack.includes("currently processing") ||
@@ -135,6 +146,8 @@ function userMessageForCategory(
       return "上一轮 AI 请求仍在运行，请等待完成或先取消后再发送。";
     case "cancelled":
       return "本次 AI 请求已取消，可以重新发送。";
+    case "context_overflow":
+      return "对话内容过长，已超出模型上下文上限。请新建对话继续；当前对话的历史和结果已保留。";
     case "server":
       return "AI 服务暂时异常，请稍后重试。";
     case "unknown":

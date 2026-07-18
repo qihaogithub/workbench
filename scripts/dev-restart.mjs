@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { rmSync } from "node:fs";
 import { resolve } from "node:path";
+import { platform } from "node:os";
 
 const PORTS = [3200, 3201, 3202, 3300];
 const SHUTDOWN_WAIT_MS = 1500;
@@ -9,6 +10,7 @@ const NEXT_CACHE_DIRS = [
   resolve("packages/viewer-site/.next"),
 ];
 const clearCache = process.argv.slice(2).includes("--clear-cache");
+const isWin = platform() === "win32";
 
 const unknownArgs = process.argv
   .slice(2)
@@ -24,6 +26,13 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const unique = (values) => [...new Set(values)];
 
 function findListeningPids(port) {
+  if (isWin) {
+    return findListeningPidsWin(port);
+  }
+  return findListeningPidsUnix(port);
+}
+
+function findListeningPidsUnix(port) {
   const result = spawnSync("lsof", ["-tiTCP:" + port, "-sTCP:LISTEN"], {
     encoding: "utf8",
   });
@@ -46,6 +55,30 @@ function findListeningPids(port) {
     .filter(Number.isInteger);
 }
 
+function findListeningPidsWin(port) {
+  const result = spawnSync("netstat", ["-ano"], { encoding: "utf8" });
+  if (result.error) {
+    throw result.error;
+  }
+
+  const lines = result.stdout.split(/\r?\n/);
+  const pids = new Set();
+  const portPattern = new RegExp(`:${port}\\s`);
+
+  for (const line of lines) {
+    if (!line.includes("LISTENING")) continue;
+    if (!portPattern.test(line)) continue;
+
+    const parts = line.trim().split(/\s+/);
+    const pid = Number.parseInt(parts[parts.length - 1], 10);
+    if (Number.isInteger(pid) && pid > 0) {
+      pids.add(pid);
+    }
+  }
+
+  return [...pids];
+}
+
 function isRunning(pid) {
   try {
     process.kill(pid, 0);
@@ -63,6 +96,14 @@ async function terminatePids(pids) {
 
   console.log(`[dev-restart] Releasing occupied dev ports, PIDs: ${pids.join(", ")}`);
 
+  if (isWin) {
+    return terminatePidsWin(pids);
+  }
+
+  return terminatePidsUnix(pids);
+}
+
+async function terminatePidsUnix(pids) {
   for (const pid of pids) {
     try {
       process.kill(pid, "SIGTERM");
@@ -84,6 +125,19 @@ async function terminatePids(pids) {
         console.warn(`[dev-restart] Failed to SIGKILL ${pid}: ${error.message}`);
       }
     }
+  }
+}
+
+async function terminatePidsWin(pids) {
+  const result = spawnSync("taskkill", ["/F", "/PID", ...pids.map(String)], {
+    encoding: "utf8",
+  });
+
+  if (result.error) {
+    console.warn(`[dev-restart] taskkill failed: ${result.error.message}`);
+  } else if (result.status !== 0) {
+    // taskkill returns non-zero if some PIDs are already gone, which is fine
+    console.log(`[dev-restart] taskkill output: ${result.stderr || result.stdout}`.trim());
   }
 }
 
@@ -115,6 +169,7 @@ function cleanNextCaches() {
 function startDevServices() {
   const child = spawn("corepack", ["pnpm", "run", "dev:services"], {
     stdio: "inherit",
+    shell: isWin,
   });
 
   const forwardSignal = (signal) => {

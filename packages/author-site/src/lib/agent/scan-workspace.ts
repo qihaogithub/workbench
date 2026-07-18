@@ -7,8 +7,6 @@ import { listDemoPages, resolvePageRuntimeType } from "../fs-utils";
 import { readWorkspaceKnowledgeManifest } from "../knowledge/builtin-documents";
 import { SKETCH_SCENE_AUTHORING_ENABLED } from "../authoring-feature-flags";
 
-const MAX_INLINE_PAGES = 2;
-
 interface PageInfo {
   id: string;
   name: string;
@@ -16,33 +14,6 @@ interface PageInfo {
   runtimeType: "prototype-html-css" | "high-fidelity-react" | "sketch-scene";
   sourcePaths: string[];
   schemaPath: string;
-  sourceContents?: Array<{ path: string; content: string }>;
-  schemaContent?: string;
-}
-
-function readPageFiles(workingDir: string, page: PageInfo): PageInfo {
-  const sourceContents: Array<{ path: string; content: string }> = [];
-  for (const sourcePath of page.sourcePaths) {
-    try {
-      sourceContents.push({
-        path: sourcePath,
-        content: fs.readFileSync(path.join(workingDir, sourcePath), "utf-8"),
-      });
-    } catch {
-      /* 读取失败跳过该源码文件 */
-    }
-  }
-  if (sourceContents.length > 0) page.sourceContents = sourceContents;
-
-  try {
-    page.schemaContent = fs.readFileSync(
-      path.join(workingDir, page.schemaPath),
-      "utf-8",
-    );
-  } catch {
-    /* 读取失败保持 undefined */
-  }
-  return page;
 }
 
 function formatPageList(pages: PageInfo[]): string {
@@ -58,26 +29,6 @@ function formatPageList(pages: PageInfo[]): string {
         ...p.sourcePaths.map((sourcePath) => `  - 源码: \`${sourcePath}\``),
         `  - config.schema.json: \`${p.schemaPath}\``,
       ];
-      if (p.sourceContents !== undefined) {
-        for (const source of p.sourceContents) {
-          lines.push(`  - ${source.path} 内容：`);
-          lines.push(
-            source.content
-              .split("\n")
-              .map((l) => `    ${l}`)
-              .join("\n"),
-          );
-        }
-      }
-      if (p.schemaContent !== undefined) {
-        lines.push("  - 配置内容：");
-        lines.push(
-          p.schemaContent
-            .split("\n")
-            .map((l) => `    ${l}`)
-            .join("\n"),
-        );
-      }
       return lines.join("\n");
     })
     .join("\n\n");
@@ -136,12 +87,9 @@ export function scanWorkspaceContext(workingDir: string): SystemPromptContext {
     });
   }
 
-  // 页面数 ≤ 2 时直接读文件内容嵌入 L3（> 2 时全部不嵌入，避免 L3 过大）
-  if (pages.length > 0 && pages.length <= MAX_INLINE_PAGES) {
-    for (const page of pages) {
-      readPageFiles(workingDir, page);
-    }
-  }
+  // 仅暴露页面元数据（名称、类型、路径），源码由 Agent 通过 readFile 按需读取。
+  // 历史上曾在页面数 ≤ 2 时嵌入完整源码，但 Agent 始终可用 readFile 按需读取，
+  // 预嵌入是冗余且每轮重复发送，曾导致两页项目 L3 上下文达数十万字节引发溢出。
 
   const hasProjectConfig = fs.existsSync(
     path.join(workingDir, "project.config.schema.json"),
