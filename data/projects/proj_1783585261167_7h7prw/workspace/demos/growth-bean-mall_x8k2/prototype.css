@@ -13,9 +13,9 @@ body {
 .page {
   background: white;
   width: 375px;
-  min-height: 812px;
+  min-height: 100vh;
   position: relative;
-  overflow: hidden;
+  overflow-y: auto;
   padding-bottom: 64px;
 }
 
