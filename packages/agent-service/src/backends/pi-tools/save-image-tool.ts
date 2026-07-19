@@ -22,6 +22,13 @@ const URL_DOWNLOAD_TIMEOUT = 10_000;
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
+const BATCH_MAX_CONCURRENT = 5;
+
+const BatchUrlItem = Type.Object({
+  url: Type.String({ description: '图片 URL' }),
+  filename: Type.Optional(Type.String({ description: '保存文件名，如 product.png，不提供则从 URL 自动提取' })),
+});
+
 const SaveImageParams = Type.Object({
   source: Type.Union([
     Type.Literal('assetId'),
@@ -34,6 +41,9 @@ const SaveImageParams = Type.Object({
   data: Type.Optional(Type.String({
     description:
       '图片数据：source=base64 时为 Base64 编码字符串；source=url 时为图片 URL；source=sessionAsset 时可传 session asset URL',
+  })),
+  urls: Type.Optional(Type.Array(BatchUrlItem, {
+    description: '批量下载：source=url 时可一次下载多张图片，每个元素包含 url 和可选 filename。与 data 互斥，优先使用 urls',
   })),
   filename: Type.Optional(Type.String({
     description: '保存的文件名，如 product.png',
@@ -104,7 +114,10 @@ function resolveSessionAssetPath(dataDir: string, urlString: string): {
   return { filePath, filename };
 }
 
-function downloadImageFromUrl(urlString: string): Promise<{
+function downloadImageFromUrl(
+  urlString: string,
+  signal?: AbortSignal,
+): Promise<{
   buffer?: Buffer;
   error?: string;
   errorCode?: string;
@@ -128,18 +141,48 @@ function downloadImageFromUrl(urlString: string): Promise<{
 
   const MAX_REDIRECTS = 3;
 
+  const internalController = new AbortController();
+  const dnsTimeout = setTimeout(() => internalController.abort(), URL_DOWNLOAD_TIMEOUT);
+
+  if (signal) {
+    if (signal.aborted) {
+      clearTimeout(dnsTimeout);
+      return Promise.resolve({ error: 'Download cancelled', errorCode: 'download_cancelled' });
+    }
+    signal.addEventListener('abort', () => internalController.abort(), { once: true });
+  }
+
   function doDownload(url: string, redirectCount: number): Promise<{
     buffer?: Buffer;
     error?: string;
     errorCode?: string;
   }> {
     return new Promise((resolve) => {
+      if (internalController.signal.aborted) {
+        clearTimeout(dnsTimeout);
+        resolve({
+          error: 'Download cancelled',
+          errorCode: 'download_cancelled',
+        });
+        return;
+      }
+
       const client = url.startsWith('https') ? https : http;
 
       const req = client.get(
         url,
-        { timeout: URL_DOWNLOAD_TIMEOUT },
+        { timeout: URL_DOWNLOAD_TIMEOUT, signal: internalController.signal },
         (res) => {
+          if (internalController.signal.aborted) {
+            res.destroy();
+            clearTimeout(dnsTimeout);
+            resolve({
+              error: 'Download cancelled',
+              errorCode: 'download_cancelled',
+            });
+            return;
+          }
+
           if (
             res.statusCode &&
             res.statusCode >= 300 &&
@@ -208,6 +251,21 @@ function downloadImageFromUrl(urlString: string): Promise<{
         },
       );
 
+      const onAbort = () => {
+        req.destroy();
+        clearTimeout(dnsTimeout);
+        resolve({
+          error: 'Download cancelled',
+          errorCode: 'download_cancelled',
+        });
+      };
+
+      if (internalController.signal.aborted) {
+        onAbort();
+        return;
+      }
+      internalController.signal.addEventListener('abort', onAbort, { once: true });
+
       req.on('timeout', () => {
         req.destroy();
         resolve({
@@ -225,7 +283,9 @@ function downloadImageFromUrl(urlString: string): Promise<{
     });
   }
 
-  return doDownload(urlString, 0);
+  return doDownload(urlString, 0).finally(() => {
+    clearTimeout(dnsTimeout);
+  });
 }
 
 function computeSha256(buffer: Buffer): string {
@@ -238,14 +298,223 @@ function ensureDir(dir: string): void {
   }
 }
 
+interface SaveBufferResult {
+  success: boolean;
+  workspacePath?: string;
+  relativePathFromPage?: string;
+  storedFilename?: string;
+  size?: number;
+  format?: string;
+  sha256?: string;
+  error?: string;
+  reused?: boolean;
+}
+
+async function saveImageBuffer(
+  buffer: Buffer,
+  filename: string,
+  source: string,
+  originalUrl: string | undefined,
+  workspaceDir: string,
+  manifestProjectId: string | null,
+  sessionId: string,
+): Promise<SaveBufferResult> {
+  if (buffer.length > MAX_FILE_SIZE) {
+    const sizeMB = (buffer.length / 1024 / 1024).toFixed(1);
+    logger.warn({ filename, size: buffer.length }, 'saveImage: file too large');
+    return { success: false, error: `Image too large (${sizeMB}MB > 10MB limit)` };
+  }
+
+  const ext = path.extname(filename).slice(1).toLowerCase();
+  if (!SUPPORTED_FORMATS.has(ext)) {
+    return { success: false, error: `Unsupported image format ".${ext}". Supported: ${[...SUPPORTED_FORMATS].join(', ')}` };
+  }
+
+  const sha256 = computeSha256(buffer);
+  const hashPrefix = sha256.slice(0, 12);
+  const storedFilename = `${hashPrefix}-${filename}`;
+
+  const assetsDir = getWorkspaceAssetsDir(workspaceDir);
+  const storedPath = path.join(assetsDir, storedFilename);
+  const workspacePath = getWorkspaceAssetPath(storedFilename);
+  const relativePathFromPage = getDemoRelativeAssetPath(storedFilename);
+
+  let reused = false;
+
+  try {
+    const liveWorkspace = resolveLiveWorkspaceMutationContext(workspaceDir);
+    let receipt: unknown = null;
+    if (liveWorkspace) {
+      const previousHash = fs.existsSync(storedPath) ? computeSha256(fs.readFileSync(storedPath)) : null;
+      if (previousHash === sha256) {
+        reused = true;
+        logger.debug({ storedFilename, sha256: hashPrefix }, 'saveImage: file already exists (hash match), reusing');
+      } else {
+        const staged = await liveWorkspace.authority.stageBinary(liveWorkspace.projectId, liveWorkspace.workspaceId, buffer);
+        receipt = await liveWorkspace.authority.mutate({
+          mutationId: crypto.randomUUID(),
+          projectId: liveWorkspace.projectId,
+          workspaceId: liveWorkspace.workspaceId,
+          sessionId,
+          baseRevision: 0,
+          actor: 'ai',
+          reason: 'agent_save_image',
+          operations: [{
+            type: 'put_binary',
+            path: workspacePath,
+            stagingId: staged.stagingId,
+            hash: staged.hash,
+            size: staged.size,
+            ...(previousHash === null ? { expectedAbsent: true } : { expectedHash: previousHash }),
+          }],
+        });
+        logger.debug({ storedFilename, size: buffer.length, source, sha256: hashPrefix, revision: (receipt as { revision?: number }).revision }, 'Image committed by Workspace Authority');
+      }
+    } else {
+      ensureDir(assetsDir);
+      if (fs.existsSync(storedPath)) {
+        reused = true;
+        logger.debug({ storedFilename, sha256: hashPrefix }, 'saveImage: file already exists, reusing');
+      } else {
+        await fs.promises.writeFile(storedPath, buffer);
+        logger.debug({ storedFilename, size: buffer.length, source, sha256: hashPrefix, workingDir: workspaceDir }, 'Image saved to isolated project workspace');
+      }
+    }
+
+    if (manifestProjectId) {
+      const entry: ProjectImageEntry = {
+        id: hashPrefix,
+        filename: storedFilename,
+        url: workspacePath,
+        size: buffer.length,
+        format: ext,
+        createdAt: Date.now(),
+        createdBy: 'ai',
+        contentHash: sha256,
+        mimeType: `image/${ext === 'jpg' ? 'jpeg' : ext}`,
+        originalUrl,
+        sourceType: source === 'session_asset' ? 'session_asset' : 'remote_url',
+      };
+      try {
+        addProjectImageManifestEntry(manifestProjectId, entry);
+      } catch (manifestError) {
+        logger.warn({ projectId: manifestProjectId, error: manifestError }, 'saveImage: failed to update project image manifest');
+      }
+    }
+
+    return {
+      success: true,
+      workspacePath,
+      relativePathFromPage,
+      storedFilename,
+      size: buffer.length,
+      format: ext,
+      sha256: hashPrefix,
+      reused,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    logger.error({ path: storedFilename, error: message }, 'Failed to save image');
+    return { success: false, error: `Error saving image: ${message}` };
+  }
+}
+
+interface BatchUrlItem {
+  url: string;
+  filename?: string;
+}
+
+interface BatchSaveResult {
+  url: string;
+  success: boolean;
+  filename?: string;
+  workspacePath?: string;
+  relativePathFromPage?: string;
+  size?: number;
+  format?: string;
+  sha256?: string;
+  error?: string;
+  reused?: boolean;
+}
+
+async function saveImageBatch(
+  items: BatchUrlItem[],
+  signal: AbortSignal | undefined,
+  workspaceDir: string,
+  manifestProjectId: string | null,
+  sessionId: string,
+): Promise<BatchSaveResult[]> {
+  const results: BatchSaveResult[] = [];
+  const queue = [...items];
+
+  async function processNext() {
+    while (queue.length > 0) {
+      if (signal?.aborted) break;
+      const item = queue.shift()!;
+      const result: BatchSaveResult = { url: item.url, success: false };
+
+      if (signal?.aborted) {
+        result.error = 'Download cancelled';
+        results.push(result);
+        continue;
+      }
+
+      const downloadResult = await downloadImageFromUrl(item.url, signal);
+      if (downloadResult.error) {
+        logger.warn({ url: item.url, error: downloadResult.error }, 'saveImage batch: URL download failed');
+        result.error = downloadResult.error;
+        results.push(result);
+        continue;
+      }
+
+      const filename = item.filename?.trim() || getFilenameFromUrl(item.url) || 'image.png';
+      if (!/^[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$/.test(filename)) {
+        result.error = `Invalid filename "${filename}" from URL`;
+        results.push(result);
+        continue;
+      }
+
+      const saveResult = await saveImageBuffer(
+        downloadResult.buffer!,
+        filename,
+        'url',
+        item.url,
+        workspaceDir,
+        manifestProjectId,
+        sessionId,
+      );
+
+      if (saveResult.success) {
+        result.success = true;
+        result.filename = saveResult.storedFilename;
+        result.workspacePath = saveResult.workspacePath;
+        result.relativePathFromPage = saveResult.relativePathFromPage;
+        result.size = saveResult.size;
+        result.format = saveResult.format;
+        result.sha256 = saveResult.sha256;
+        result.reused = saveResult.reused;
+      } else {
+        result.error = saveResult.error;
+      }
+
+      results.push(result);
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(BATCH_MAX_CONCURRENT, items.length) }, () => processNext());
+  await Promise.all(workers);
+
+  return results;
+}
+
 export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveImageParams> {
   return {
     name: 'saveImage',
     label: 'Save Image',
     description:
-      'Save or reuse an image in the current project workspace. Prefer source=assetId or source=sessionAsset when a platform-managed asset already exists; base64 and url are fallbacks. The image is stored locally under assets/images/{hash}-{filename}. Use ../../assets/images/{hash}-{filename} from files inside demos/{pageId}/. Supports png, jpg, jpeg, gif, webp, svg formats. Max 10MB per image.',
+      'Save or reuse images in the current project workspace. For a single URL image set source=url and provide data (the URL). For batch downloading multiple images at once, set source=url and provide urls array with {url, filename?} items — all downloads run concurrently (max 5 at a time). Prefer source=assetId or source=sessionAsset when a platform-managed asset already exists; base64 and url are fallbacks. Images are stored locally under assets/images/{hash}-{filename}. Use ../../assets/images/{hash}-{filename} from files inside demos/{pageId}/. Supports png, jpg, jpeg, gif, webp, svg formats. Max 10MB per image.',
     parameters: SaveImageParams,
-    execute: async (toolCallId: string, args: SaveImageParams) => {
+    execute: async (toolCallId: string, args: SaveImageParams, signal?: AbortSignal) => {
       const { source } = args;
 
       const workspaceDir = config.workingDir ? path.resolve(config.workingDir) : '';
@@ -370,9 +639,54 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
           };
         }
         buffer = await fs.promises.readFile(resolved.filePath);
+      } else if (source === 'url' && args.urls && args.urls.length > 0) {
+        const batchResults = await saveImageBatch(
+          args.urls.map((item) => ({ url: item.url, filename: item.filename })),
+          signal,
+          workspaceDir,
+          manifestProjectId,
+          config.sessionId,
+        );
+
+        const successCount = batchResults.filter((r) => r.success).length;
+        const failCount = batchResults.filter((r) => !r.success).length;
+        const items = batchResults.map((r) => {
+          if (r.success) {
+            const reused = r.reused ? ' (已存在，复用)' : '';
+            return `${r.url} → ${r.workspacePath}${reused} [引用: ${r.relativePathFromPage}]`;
+          }
+          return `${r.url} → 失败: ${r.error}`;
+        });
+
+        let text = `批量下载完成: ${successCount} 成功, ${failCount} 失败\n${items.join('\n')}`;
+        if (failCount === 0) {
+          text += `\n\n所有图片已保存到 assets/images/ 目录，页面文件中使用 ../../assets/images/{hash}-{filename} 引用。`;
+        }
+
+        return {
+          content: [{ type: 'text', text }],
+          details: {
+            batch: true,
+            total: batchResults.length,
+            success: successCount,
+            failed: failCount,
+            results: batchResults.map((r) => ({
+              url: r.url,
+              success: r.success,
+              filename: r.filename,
+              workspacePath: r.workspacePath,
+              relativePathFromPage: r.relativePathFromPage,
+              size: r.size,
+              format: r.format,
+              sha256: r.sha256,
+              error: r.error,
+              reused: r.reused,
+            })),
+          },
+        };
       } else {
         const data = args.data ?? '';
-        const urlResult = await downloadImageFromUrl(data);
+        const urlResult = await downloadImageFromUrl(data, signal);
         if (urlResult.error) {
           logger.warn({ url: data, error: urlResult.error }, 'saveImage: URL download failed');
           return {
@@ -384,109 +698,44 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
         buffer = urlResult.buffer!;
       }
 
-      if (buffer.length > MAX_FILE_SIZE) {
-        const sizeMB = (buffer.length / 1024 / 1024).toFixed(1);
-        logger.warn({ filename, size: buffer.length }, 'saveImage: file too large');
+      const saveResult = await saveImageBuffer(
+        buffer,
+        filename,
+        source === 'sessionAsset' ? 'session_asset' : source,
+        source === 'url' ? args.data : source === 'sessionAsset' ? (args.url ?? args.data) : undefined,
+        workspaceDir,
+        manifestProjectId,
+        config.sessionId,
+      );
+
+      if (!saveResult.success) {
         return {
-          content: [{ type: 'text', text: `Error: Image too large (${sizeMB}MB > 10MB limit)` }],
-          details: { error: 'file_too_large' },
+          content: [{ type: 'text', text: `Error: ${saveResult.error}` }],
+          details: { error: 'save_failed' },
           isError: true,
         };
       }
 
-      const sha256 = computeSha256(buffer);
-      const hashPrefix = sha256.slice(0, 12);
-      const storedFilename = `${hashPrefix}-${filename}`;
-
-      const assetsDir = getWorkspaceAssetsDir(workspaceDir);
-      const storedPath = path.join(assetsDir, storedFilename);
-      const workspacePath = getWorkspaceAssetPath(storedFilename);
-      const relativePathFromPage = getDemoRelativeAssetPath(storedFilename);
-
-      try {
-        const liveWorkspace = resolveLiveWorkspaceMutationContext(workspaceDir);
-        let receipt: unknown = null;
-        if (liveWorkspace) {
-          const previousHash = fs.existsSync(storedPath) ? computeSha256(fs.readFileSync(storedPath)) : null;
-          const staged = await liveWorkspace.authority.stageBinary(liveWorkspace.projectId, liveWorkspace.workspaceId, buffer);
-          receipt = await liveWorkspace.authority.mutate({
-            mutationId: crypto.randomUUID(),
-            projectId: liveWorkspace.projectId,
-            workspaceId: liveWorkspace.workspaceId,
-            sessionId: config.sessionId,
-            baseRevision: 0,
-            actor: 'ai',
-            reason: 'agent_save_image',
-            operations: [{
-              type: 'put_binary',
-              path: workspacePath,
-              stagingId: staged.stagingId,
-              hash: staged.hash,
-              size: staged.size,
-              ...(previousHash === null ? { expectedAbsent: true } : { expectedHash: previousHash }),
-            }],
-          });
-          logger.debug({ storedFilename, size: buffer.length, source, sha256: hashPrefix, revision: (receipt as { revision?: number }).revision }, 'Image committed by Workspace Authority');
-        } else {
-          ensureDir(assetsDir);
-          if (fs.existsSync(storedPath)) {
-            logger.debug({ storedFilename, sha256: hashPrefix }, 'saveImage: file already exists, reusing');
-          } else {
-            await fs.promises.writeFile(storedPath, buffer);
-            logger.debug({ storedFilename, size: buffer.length, source, sha256: hashPrefix, workingDir: workspaceDir }, 'Image saved to isolated project workspace');
-          }
-        }
-
-        if (manifestProjectId) {
-          const entry: ProjectImageEntry = {
-            id: hashPrefix,
-            filename: storedFilename,
-            url: workspacePath,
-            size: buffer.length,
-            format: ext,
-            createdAt: Date.now(),
-            createdBy: 'ai',
-            contentHash: sha256,
-            mimeType: `image/${ext === 'jpg' ? 'jpeg' : ext}`,
-            originalUrl: source === 'url' ? args.data : source === 'sessionAsset' ? (args.url ?? args.data) : undefined,
-            sourceType: source === 'sessionAsset' ? 'session_asset' : source === 'url' ? 'remote_url' : 'upload',
-          };
-          try {
-            addProjectImageManifestEntry(manifestProjectId, entry);
-          } catch (manifestError) {
-            logger.warn({ projectId: manifestProjectId, error: manifestError }, 'saveImage: failed to update project image manifest');
-          }
-        }
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Image saved locally: ${workspacePath}. From page files use ${relativePathFromPage}`,
-            },
-          ],
-          details: {
-            url: workspacePath,
-            path: workspacePath,
-            filename: storedFilename,
-            relativePathFromPage,
-            absolutePath: storedPath,
-            size: buffer.length,
-            format: ext,
-            source,
-            sha256: hashPrefix,
-            receipt,
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Image saved locally: ${saveResult.workspacePath}. From page files use ${saveResult.relativePathFromPage}`,
           },
-        };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        logger.error({ path: storedFilename, error: message }, 'Failed to save image');
-        return {
-          content: [{ type: 'text', text: `Error saving image: ${message}` }],
-          details: { path: storedFilename, error: 'save_failed' },
-          isError: true,
-        };
-      }
+        ],
+        details: {
+          url: saveResult.workspacePath,
+          path: saveResult.workspacePath,
+          filename: saveResult.storedFilename,
+          relativePathFromPage: saveResult.relativePathFromPage,
+          absolutePath: path.join(getWorkspaceAssetsDir(workspaceDir), saveResult.storedFilename!),
+          size: saveResult.size,
+          format: saveResult.format,
+          source,
+          sha256: saveResult.sha256,
+          reused: saveResult.reused,
+        },
+      };
     },
   };
 }

@@ -1074,6 +1074,10 @@ export function useChatStream(options: UseChatStreamOptions) {
             setCurrentMessage(DEFAULT_CURRENT_MESSAGE);
             stopSilenceTracking();
             completeRunAndDrain();
+            void persistMessages(
+              sessionId,
+              messagesRef.current.filter((m) => !m.queueStatus),
+            ).catch(() => {});
           },
         });
 
@@ -1594,6 +1598,10 @@ export function useChatStream(options: UseChatStreamOptions) {
         parts: [],
       });
       completeRunAndDrain();
+      void persistMessages(
+        sessionId,
+        messagesRef.current.filter((m) => !m.queueStatus),
+      ).catch(() => {});
     },
     [
       setMessages,
