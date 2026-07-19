@@ -1,0 +1,557 @@
+/* 全局样式 */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  background: #f5f5f5;
+  font-family: "PingFang SC", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+.page {
+  background: white;
+  width: 375px;
+  height: 100vh;
+  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 64px;
+  -webkit-overflow-scrolling: touch;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.page::-webkit-scrollbar {
+  display: none;
+}
+
+/* ===== 导航栏 ===== */
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  background: rgba(255,255,255,0.9);
+}
+
+.status-bar {
+  height: 44px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 20px;
+}
+.time { font-size: 14px; font-weight: 600; }
+.status-svg { fill: black; }
+
+.nav-bar {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.nav-back {
+  position: absolute;
+  left: 0; top: 0;
+  width: 44px; height: 44px;
+  border: none; background: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; padding: 0;
+}
+
+.nav-title {
+  font-size: 18px; font-weight: 500;
+  color: black;
+}
+
+.nav-more {
+  position: absolute;
+  right: 0; top: 0;
+  width: 44px; height: 44px;
+  border: none; background: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; padding: 0;
+}
+
+/* ===== 学豆余额 ===== */
+.bean-balance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 20px;
+  background: rgba(255,183,106,0.15);
+  margin: 0 20px;
+  border-radius: 16px;
+}
+
+.bean-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bean-label { font-size: 12px; color: #6B2D03; }
+
+.bean-svg { flex-shrink: 0; }
+
+.bean-amount {
+  font-size: 18px; font-weight: 600;
+  color: #FF9045;
+  font-family: "Baloo 2", "Baloo", sans-serif;
+}
+
+.bean-arrow { color: #FF9045; font-size: 14px; }
+
+.help-btn {
+  width: 24px; height: 24px;
+  border: 1px solid #ECCEAF;
+  border-radius: 50%;
+  background: none;
+  color: #ECCEAF;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+/* ===== 金刚区 ===== */
+.kingkong-zone {
+  margin: 0;
+  position: relative;
+  height: 67px;
+}
+
+.kingkong-scroll {
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  padding: 0 20px;
+  height: 55px;
+  align-items: flex-end;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.kingkong-scroll::-webkit-scrollbar { display: none; }
+
+.kingkong-item {
+  flex-shrink: 0;
+  width: 64px;
+  height: 55px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  position: relative;
+}
+
+.kingkong-icon {
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  background: #f0f0f0;
+}
+
+.kingkong-item > span:first-of-type {
+  font-size: 11px; color: #666;
+  white-space: nowrap;
+}
+
+.kingkong-item span {
+  font-size: 11px; color: #666;
+  white-space: nowrap;
+}
+
+/* 上新气泡 - Figma 气泡样式（带小尖尖） */
+.badge-new {
+  position: absolute;
+  top: -2px;
+  right: 2px;
+  background: none;
+  font-size: 10px; color: #544300;
+  padding: 0;
+  border-radius: 0;
+  line-height: 1.4;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.badge-new::before {
+  content: '上新';
+  background: #FCDA00;
+  padding: 2px 5px;
+  border-radius: 80px;
+  font-size: 10px;
+  color: #544300;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.badge-new::after {
+  content: '';
+  display: block;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 3px solid #FCDA00;
+  margin-top: 0px;
+  margin-right: 2px;
+  align-self: flex-end;
+}
+
+.kingkong-indicator {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  position: absolute;
+  bottom: 4px;
+  left: 0;
+  right: 0;
+}
+
+.indicator-track {
+  width: 32px; height: 4px;
+  background: #D9D9D9;
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+}
+
+.indicator-active {
+  position: absolute;
+  left: 0;
+  width: 20px; height: 4px;
+  background: #FCDA00;
+  border-radius: 2px;
+}
+
+/* ===== 学豆余额区域下方间距 ===== */
+.bean-balance + .kingkong-zone {
+  margin-top: 8px;
+}
+
+/* ===== 推荐区 ===== */
+.recommend-section {
+  display: flex;
+  gap: 8px;
+  padding: 12px 20px;
+}
+
+.recommend-card {
+  flex: 1;
+  background: #F8F7F7;
+  border-radius: 10px;
+  padding: 8px;
+  text-align: center;
+  box-shadow: 0px 0px 20px rgba(0,0,0,0.03);
+  outline: 1px solid #F5F4F4;
+  outline-offset: -1px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.rec-title {
+  font-size: 14px; font-weight: 500;
+  color: #404040;
+  line-height: 21px;
+}
+
+.rec-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.rec-icon {
+  width: 44px; height: 44px;
+  border-radius: 8px;
+  background: #ffe0c0;
+}
+
+.rec-tag {
+  font-size: 12px; color: #FF9045;
+  white-space: nowrap;
+}
+
+.rec-price {
+  font-size: 12px; font-weight: 600;
+  color: #FF9045;
+  font-family: "Baloo 2", "Baloo", sans-serif;
+}
+
+/* ===== 分类筛选 ===== */
+.filter-section {
+  position: sticky;
+  top: 88px;
+  z-index: 99;
+  background: white;
+  border-top: 0.6px solid #E0DFDF;
+  height: auto;
+  overflow: clip;
+}
+
+.category-tabs {
+  display: flex;
+  gap: 24px;
+  padding: 10px 20px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  white-space: nowrap;
+}
+.category-tabs::-webkit-scrollbar { display: none; }
+
+.cat-tab {
+  font-size: 16px;
+  font-weight: 400;
+  color: #666;
+  white-space: nowrap;
+  padding-bottom: 6px;
+  line-height: 24px;
+}
+.cat-tab.active {
+  color: #404040;
+  font-weight: 500;
+  border-bottom: 2px solid #FCDA00;
+}
+
+.price-filters {
+  display: flex;
+  gap: 8px;
+  padding: 6px 20px 6px;
+  overflow-x: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.08);
+}
+.price-filters::-webkit-scrollbar { display: none; }
+
+.price-chip {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid #E0DFDF;
+  font-size: 12px; color: #666;
+  white-space: nowrap;
+}
+.price-chip.active {
+  background: #FCDA00;
+  color: #544300;
+  border-color: #FCDA00;
+}
+
+/* ===== 背景渐变 ===== */
+.section-bg {
+  height: 12px;
+  background: linear-gradient(180deg, white 0%, #F5F5F5 100%);
+}
+
+/* ===== 商品列表 ===== */
+.product-list {
+  padding: 0 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.product-row {
+  display: flex;
+  gap: 6px;
+}
+
+/* --- 商品卡片 --- */
+.product-card {
+  flex: 1;
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.product-card-empty {
+  background: transparent;
+  border-radius: 0;
+  min-height: 1px;
+}
+
+.product-img {
+  width: 100%;
+  height: 169px;
+}
+
+.product-info {
+  padding: 6px;
+}
+
+.product-tags-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.product-name {
+  font-size: 14px; font-weight: 500;
+  color: #666;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.product-price-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bean-svg-sm {
+  flex-shrink: 0;
+}
+
+.product-price {
+  font-size: 18px; font-weight: 600;
+  color: #FF9045;
+  font-family: "Baloo 2", "Baloo", sans-serif;
+}
+
+.product-old-price {
+  font-size: 12px; color: #B2B2B2;
+  text-decoration: line-through;
+}
+
+.product-sold {
+  font-size: 12px; color: #B2B2B2;
+  margin-left: auto;
+}
+
+/* --- 标签 --- */
+.tag {
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 10px; color: white;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+.tag-new { background: #55CC3D; }
+.tag-special { background: #ED704A; }
+
+/* --- 分享专区角标 --- */
+.badge-share {
+  position: absolute;
+  top: 0; right: 8px;
+  background: #FF8031;
+  color: white;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 2px;
+  border: 2px solid white;
+  z-index: 10;
+}
+
+/* ===== 活动卡片 ===== */
+.promo-card {
+  flex: 1;
+  background: #FFF4ED;
+  border-radius: 10px;
+  padding: 14px;
+  min-height: 238px;
+  display: flex;
+  flex-direction: column;
+}
+
+.promo-tag {
+  font-size: 10px; color: #A66A29;
+  background: white;
+  border: 1px solid #CDA285;
+  border-radius: 20px;
+  padding: 2px 8px;
+  display: inline-block;
+  width: fit-content;
+  margin-bottom: 8px;
+}
+
+.promo-title {
+  font-size: 28px; font-weight: 800;
+  color: #FE9627;
+  line-height: 1.2;
+}
+
+.promo-subtitle {
+  font-size: 20px; font-weight: 800;
+  color: #99491B;
+  line-height: 1.2;
+  margin-bottom: 8px;
+}
+
+.promo-btn {
+  background: #FCDA00;
+  border: none;
+  border-radius: 25px;
+  padding: 6px 26px;
+  font-size: 16px; font-weight: 500;
+  color: #6B430B;
+  cursor: pointer;
+  width: fit-content;
+  margin-top: auto;
+}
+
+/* ===== 邀请好友横幅 ===== */
+.invite-banner {
+  background: #FFEDED;
+  border-radius: 16px;
+  padding: 16px 20px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.invite-highlight {
+  color: #FE9627;
+  font-size: 18px; font-weight: 800;
+}
+
+.invite-dark {
+  color: #99491B;
+  font-size: 18px; font-weight: 800;
+}
+
+.invite-sub {
+  font-size: 12px; color: #A66A29;
+  background: white;
+  border: 1px solid #CDA285;
+  border-radius: 999px;
+  padding: 2px 11px;
+  display: inline-block;
+  margin-top: 4px;
+  letter-spacing: 2px;
+}
+
+/* ===== 购物车 ===== */
+.cart-btn {
+  position: absolute;
+  bottom: 40px; left: 50%;
+  transform: translateX(-50%);
+  margin-left: -140px;
+  z-index: 200;
+}
+
+.cart-icon {
+  width: 50px; height: 50px;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.12);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  border: 2px solid white;
+}

@@ -587,22 +587,32 @@ async function runWorkspaceSyncStep<T>(
   }
 }
 
+const WORKSPACE_SYNC_PHASE_LABELS: Record<WorkspaceSyncPhase, string> = {
+  "persist-active-page": "页面暂存异常",
+  "collab-flush": "协同落盘异常",
+  "persist-workspace": "项目同步异常",
+};
+
 function getWorkspaceSyncErrorDetails(error: unknown): {
   message: string;
   phase?: WorkspaceSyncPhase;
   errorCode?: string;
   httpStatus?: number;
+  /** 用户可读的错误标签，包含失败阶段信息 */
+  label: string;
 } {
   const message = error instanceof Error ? error.message : "协同草稿同步失败";
   if (error instanceof WorkspaceSyncStepError) {
+    const phaseLabel = WORKSPACE_SYNC_PHASE_LABELS[error.phase] ?? error.phase;
     return {
       message,
       phase: error.phase,
       errorCode: error.code,
       httpStatus: error.status,
+      label: `保存失败：${phaseLabel}`,
     };
   }
-  return { message };
+  return { message, label: "保存失败" };
 }
 
 function serializeCanvasLayout(projectId: string, state: CanvasState): string {
@@ -4840,8 +4850,7 @@ ${context.details}
       });
     } catch (error) {
       const errorDetails = getWorkspaceSyncErrorDetails(error);
-      const message = errorDetails.message;
-      setWorkspaceFlushError(message);
+      setWorkspaceFlushError(errorDetails.label);
       recordDiagnosticEvent({
         category: "autosave",
         name: "autosave.flush_before_ai_send_failed",
@@ -4872,21 +4881,56 @@ ${context.details}
       if (syncInFlightRef.current) return;
       syncInFlightRef.current = true;
       void (async () => {
+        const traceId = createDiagnosticTraceId("autosave");
+        const startedAt = Date.now();
+        const revisionAtStart = workspaceFlushRevisionRef.current;
+        recordDiagnosticEvent({
+          category: "autosave",
+          name: "autosave.sync_started",
+          traceId,
+          details: {
+            trigger: "debounced",
+            revision: revisionAtStart,
+          },
+        });
         try {
-          const startedAt = Date.now();
           await syncWorkspaceToProject();
-          performanceSamplerRef.current.sampleCommitLatency(Date.now() - startedAt);
+          const elapsedMs = Date.now() - startedAt;
+          performanceSamplerRef.current.sampleCommitLatency(elapsedMs);
           setHasPendingWorkspaceFlush(false);
           setWorkspaceFlushError(null);
+          recordDiagnosticEvent({
+            category: "autosave",
+            name: "autosave.sync_succeeded",
+            traceId,
+            details: {
+              trigger: "debounced",
+              revision: revisionAtStart,
+              elapsedMs,
+            },
+          });
         } catch (error) {
-          setWorkspaceFlushError(error instanceof Error ? error.message : String(error));
+          const errorDetails = getWorkspaceSyncErrorDetails(error);
+          setWorkspaceFlushError(errorDetails.label);
           setHasPendingWorkspaceFlush(false);
+          recordDiagnosticEvent({
+            category: "autosave",
+            name: "autosave.sync_failed",
+            traceId,
+            level: "error",
+            details: {
+              trigger: "debounced",
+              revision: revisionAtStart,
+              elapsedMs: Date.now() - startedAt,
+              ...errorDetails,
+            },
+          });
         } finally {
           syncInFlightRef.current = false;
         }
       })();
     }, 800);
-  }, [syncWorkspaceToProject]);
+  }, [syncWorkspaceToProject, createDiagnosticTraceId, recordDiagnosticEvent]);
   scheduleWorkspaceSyncRef.current = scheduleWorkspaceSync;
 
   const flushSyncWorkspace = useCallback(async () => {
@@ -4896,19 +4940,55 @@ ${context.details}
     }
     if (syncInFlightRef.current) return;
     syncInFlightRef.current = true;
+    const traceId = createDiagnosticTraceId("autosave-flush");
+    const startedAt = Date.now();
+    const revisionAtStart = workspaceFlushRevisionRef.current;
+    recordDiagnosticEvent({
+      category: "autosave",
+      name: "autosave.sync_started",
+      traceId,
+      details: {
+        trigger: "manual",
+        revision: revisionAtStart,
+        caller: "flushSyncWorkspace",
+      },
+    });
     try {
-      const startedAt = Date.now();
       await syncWorkspaceToProject();
-      performanceSamplerRef.current.sampleCommitLatency(Date.now() - startedAt);
+      const elapsedMs = Date.now() - startedAt;
+      performanceSamplerRef.current.sampleCommitLatency(elapsedMs);
       setHasPendingWorkspaceFlush(false);
       setWorkspaceFlushError(null);
+      recordDiagnosticEvent({
+        category: "autosave",
+        name: "autosave.sync_succeeded",
+        traceId,
+        details: {
+          trigger: "manual",
+          revision: revisionAtStart,
+          elapsedMs,
+        },
+      });
     } catch (error) {
-      setWorkspaceFlushError(error instanceof Error ? error.message : String(error));
+      const errorDetails = getWorkspaceSyncErrorDetails(error);
+      setWorkspaceFlushError(errorDetails.label);
       setHasPendingWorkspaceFlush(false);
+      recordDiagnosticEvent({
+        category: "autosave",
+        name: "autosave.sync_failed",
+        traceId,
+        level: "error",
+        details: {
+          trigger: "manual",
+          revision: revisionAtStart,
+          elapsedMs: Date.now() - startedAt,
+          ...errorDetails,
+        },
+      });
     } finally {
       syncInFlightRef.current = false;
     }
-  }, [syncWorkspaceToProject]);
+  }, [syncWorkspaceToProject, createDiagnosticTraceId, recordDiagnosticEvent]);
   flushSyncWorkspaceRef.current = flushSyncWorkspace;
 
   // Cleanup debounce timer on unmount
@@ -5037,7 +5117,7 @@ ${context.details}
           ...errorDetails,
         },
       });
-      setWorkspaceFlushError(errorDetails.message);
+      setWorkspaceFlushError(errorDetails.label);
       throw error;
     }
   }, [
@@ -5932,7 +6012,7 @@ ${context.details}
   let collabStatusLabel = getSaveStatusLabel(saveState);
   // 保存失败覆盖：onError 清除 pending 后状态机返回 "autosaved"，但实际是失败
   if (saveState === "autosaved" && workspaceFlushError) {
-    collabStatusLabel = "保存失败";
+    collabStatusLabel = workspaceFlushError;
   }
   // AI 流式更新是 UI 特殊状态，优先于状态机显示
   if (aiIsStreaming && browserOnline) {

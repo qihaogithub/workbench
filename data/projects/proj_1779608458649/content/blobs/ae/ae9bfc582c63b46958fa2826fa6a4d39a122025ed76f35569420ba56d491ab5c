@@ -1,0 +1,80 @@
+<div class="page-wrapper">
+  <!-- 状态栏 & 导航栏 -->
+  <div class="nav-bar">
+    <img src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/pad/pad状态栏和导航栏.png" alt="nav-status" class="nav-image">
+  </div>
+
+  <!-- 主要内容区域 -->
+  <div class="main-content">
+    <!-- Banner 广告图 -->
+    <div class="banner-wrapper">
+      <img src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/banner.png" alt="banner" class="banner-image" data-bind-src="bannerImage">
+    </div>
+
+    <!-- 服务内容 -->
+    <div class="service-section">
+      <!-- 标题区 -->
+      <div class="title-row">
+        <span class="service-title">全年系统包-L1</span>
+        <div class="teacher-info">
+          <span class="teacher-label">苹果指导师</span>
+          <img src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/指导师头像.png" alt="teacher" class="teacher-avatar">
+        </div>
+      </div>
+
+      <!-- 功能入口列表 - 两行布局 -->
+      <div class="feature-list">
+        <!-- 第一行：两个卡片 -->
+        <div class="feature-row">
+          <div class="feature-card">
+            <div class="feature-left">
+              <img src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/icon.png" alt="" class="feature-icon">
+              <span class="feature-name">学习报告</span>
+            </div>
+            <div class="feature-right">
+              <span class="feature-status">3篇报告未读</span>
+              <svg class="chevron-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffa66b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 18l6-6-6-6"></path>
+              </svg>
+            </div>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-left">
+              <img src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/icon-1.png" alt="" class="feature-icon">
+              <span class="feature-name">活动挑战</span>
+            </div>
+            <div class="feature-right">
+              <svg class="chevron-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffa66b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 18l6-6-6-6"></path>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- 第二行：一个全宽卡片 -->
+        <div class="feature-row">
+          <div class="feature-card feature-card-full">
+            <div class="feature-left">
+              <img src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/学习页/课后/icon-2.png" alt="" class="feature-icon">
+              <span class="feature-name">随堂故事</span>
+            </div>
+            <div class="feature-right">
+              <svg class="chevron-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffa66b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 18l6-6-6-6"></path>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部链接 -->
+      <div class="bottom-link">
+        <span class="bottom-link-text">查看往期课程</span>
+        <svg class="chevron-icon chevron-gray" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e0dfdf" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 18l6-6-6-6"></path>
+        </svg>
+      </div>
+    </div>
+  </div>
+</div>

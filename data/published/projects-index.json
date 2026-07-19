@@ -1,6 +1,13 @@
 {
   "projects": [
     {
+      "id": "proj_1783585261167_7h7prw",
+      "name": "成长豆商城",
+      "publishedAt": 1784383774537,
+      "publishedVersion": "v7",
+      "demoCount": 2
+    },
+    {
       "id": "proj_1782718595285_h4lda7",
       "name": "我的页面",
       "description": "资源预览",
@@ -45,5 +52,5 @@
       "demoCount": 2
     }
   ],
-  "generatedAt": 1784372562499
+  "generatedAt": 1784389140240
 }

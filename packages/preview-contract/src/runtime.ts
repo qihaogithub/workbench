@@ -1,6 +1,20 @@
-import * as LucideIcons from "lucide-react";
 import * as ts from "typescript";
 import { PREVIEW_DEPENDENCY_POLICY } from "./rules.js";
+
+let _LUCIDE_EXPORTS: Set<string> | undefined;
+
+function getLucideExports(): Set<string> {
+  if (_LUCIDE_EXPORTS) return _LUCIDE_EXPORTS;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const LucideIcons = require("lucide-react");
+    _LUCIDE_EXPORTS = new Set(Object.keys(LucideIcons));
+  } catch {
+    // lucide-react 不在当前运行时可用（如 agent-service 后端上下文），回退空集合
+    _LUCIDE_EXPORTS = new Set<string>();
+  }
+  return _LUCIDE_EXPORTS;
+}
 export {
   PREVIEW_CONTRACT_VERSION,
   PREVIEW_DEPENDENCY_POLICY,
@@ -74,7 +88,7 @@ export class PreviewRuntimeContractError extends Error {
   }
 }
 
-const LUCIDE_EXPORTS = new Set(Object.keys(LucideIcons));
+const LUCIDE_EXPORTS = getLucideExports();
 
 const MODULE_PARSE_TARGET = ts.ScriptTarget.ES2022;
 const MODULE_PARSE_KIND = ts.ModuleKind.ESNext;

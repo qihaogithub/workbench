@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "projectId": "proj_1784130000259_espp0a",
+  "updatedAt": 1784389058971,
+  "state": {
+    "viewport": {
+      "x": 271.0772783251232,
+      "y": 35.94999999999999,
+      "zoom": 0.7969211822660098
+    },
+    "pages": {},
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "hiddenKnowledgeDocumentIds": [],
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    }
+  }
+}

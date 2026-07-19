@@ -1,0 +1,10 @@
+{
+  "description": "课后服务手机版原型",
+  "previewSize": {
+    "width": 375,
+    "height": 812
+  },
+  "configFields": [
+    "serviceTitle"
+  ]
+}

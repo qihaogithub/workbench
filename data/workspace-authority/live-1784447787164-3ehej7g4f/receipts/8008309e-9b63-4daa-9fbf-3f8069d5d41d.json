@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "8008309e-9b63-4daa-9fbf-3f8069d5d41d",
+  "projectId": "proj_1783334663364_30hsrv",
+  "workspaceId": "live-1784447787164-3ehej7g4f",
+  "baseRevision": 0,
+  "revision": 19,
+  "rootHash": "2b702b0f56fa3dcdd1667ba396f8f53b1d2b6b5fb619c4b1d9b3ccf1e8be1da0",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "project.config.values.json",
+      "action": "modified",
+      "beforeHash": "206c9b51031022d84b77f57bbfa1cb07008d8da45e95ab771472f9798a397b55",
+      "afterHash": "d52287964466a4498a6c7dfa2a46adc6431f139f4f1ce30f51a562b40773f0e6"
+    }
+  ],
+  "committedAt": 1784447803021
+}

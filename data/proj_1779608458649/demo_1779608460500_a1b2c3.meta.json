@@ -1,0 +1,71 @@
+{
+  "generatedAt": "2026-07-18T15:39:17.135Z",
+  "elapsed": 876,
+  "history": [],
+  "variants": {
+    "6da97a25d455d93f:fast": {
+      "variant": "fast",
+      "generatedAt": "2026-07-19T07:56:03.149Z",
+      "elapsed": 920,
+      "renderBox": {
+        "width": 375,
+        "height": 812,
+        "viewportWidth": 375,
+        "viewportHeight": 812,
+        "bodyWidth": 375,
+        "bodyHeight": 812,
+        "documentWidth": 375,
+        "documentHeight": 812,
+        "fullPage": true
+      }
+    },
+    "cc89ea6e2489a6af:fast": {
+      "variant": "fast",
+      "generatedAt": "2026-07-18T15:54:18.295Z",
+      "elapsed": 941,
+      "renderBox": {
+        "width": 375,
+        "height": 812,
+        "viewportWidth": 375,
+        "viewportHeight": 812,
+        "bodyWidth": 375,
+        "bodyHeight": 812,
+        "documentWidth": 375,
+        "documentHeight": 812,
+        "fullPage": true
+      }
+    },
+    "3a38fce595c858f9:fast": {
+      "variant": "fast",
+      "generatedAt": "2026-07-18T15:40:15.341Z",
+      "elapsed": 248,
+      "renderBox": {
+        "width": 375,
+        "height": 812,
+        "viewportWidth": 375,
+        "viewportHeight": 812,
+        "bodyWidth": 375,
+        "bodyHeight": 812,
+        "documentWidth": 375,
+        "documentHeight": 812,
+        "fullPage": true
+      }
+    },
+    "f363e7eca922f153:fast": {
+      "variant": "fast",
+      "generatedAt": "2026-07-18T15:39:17.135Z",
+      "elapsed": 876,
+      "renderBox": {
+        "width": 375,
+        "height": 812,
+        "viewportWidth": 375,
+        "viewportHeight": 812,
+        "bodyWidth": 375,
+        "bodyHeight": 812,
+        "documentWidth": 375,
+        "documentHeight": 812,
+        "fullPage": true
+      }
+    }
+  }
+}

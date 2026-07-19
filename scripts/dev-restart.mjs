@@ -129,7 +129,9 @@ async function terminatePidsUnix(pids) {
 }
 
 async function terminatePidsWin(pids) {
-  const result = spawnSync("taskkill", ["/F", "/PID", ...pids.map(String)], {
+  // Windows: taskkill 要求每个 PID 前单独加 /PID
+  const args = ["/F", ...pids.flatMap((pid) => ["/PID", String(pid)])];
+  const result = spawnSync("taskkill", args, {
     encoding: "utf8",
   });
 
