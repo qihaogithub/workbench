@@ -234,13 +234,13 @@
     }
   ],
   "createdAt": 1782718596693,
-  "updatedAt": 1784112459746,
-  "activeWorkspaceId": "live-1784079440052-k1a5pvpwc",
-  "activeWorkspaceUpdatedAt": 1784079742698,
+  "updatedAt": 1784447658873,
+  "activeWorkspaceId": "live-1784389142847-og67m87s6",
+  "activeWorkspaceUpdatedAt": 1784389142881,
   "publishedVersion": "v20",
   "publishedAt": 1783508379087,
-  "canonicalSyncedWorkspaceId": "live-1784079440052-k1a5pvpwc",
-  "canonicalSyncedAt": 1784112459746,
+  "canonicalSyncedWorkspaceId": "live-1784389142847-og67m87s6",
   "canonicalSyncedRevision": 3,
-  "canonicalSyncedRootHash": "fea0ea9883c138c06fa6ccff77b5710d2e17e9171ecdac500466146008b852d9"
+  "canonicalSyncedRootHash": "2357b1f8502069f446593dae479525d1c249bfdc5d9b93a0d1aa1805db267498",
+  "canonicalSyncedAt": 1784447658873
 }

@@ -1,0 +1,21 @@
+{
+  "id": "commit_1784383774535_hnjkp7",
+  "projectId": "proj_1783585261167_7h7prw",
+  "parentCommitId": "commit_1784383546962_uxcwtp",
+  "visibility": "protected",
+  "intent": "publish",
+  "title": "发布项目 v7",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "growth-bean-mall_x8k2",
+      "versionId": "prv_1784383546942_dn1ah5"
+    }
+  ],
+  "changedResources": [],
+  "createdAt": 1784383774535,
+  "createdBy": "Author Site",
+  "audit": {
+    "actorType": "user"
+  }
+}

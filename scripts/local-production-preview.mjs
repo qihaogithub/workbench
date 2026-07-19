@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -111,6 +111,7 @@ function run(command, commandArgs, options = {}) {
     cwd: PROJECT_DIR,
     env: localEnv,
     stdio: "inherit",
+    shell: process.platform === "win32",
     ...options,
   });
 
@@ -123,13 +124,62 @@ function run(command, commandArgs, options = {}) {
 }
 
 function findListeningPids(port) {
+  if (process.platform === "win32") {
+    // Windows: 使用 netstat -ano 检测 LISTENING 状态的 PID
+    try {
+      const result = spawnSync("netstat", ["-ano"], { encoding: "utf8" });
+      if (!result.error) {
+        const pids = [];
+        const pattern = new RegExp(`:${port}\\s+\\S+\\s+LISTENING\\s+(\\d+)`, "i");
+        for (const line of result.stdout.split("\n")) {
+          const match = line.match(pattern);
+          if (match) {
+            pids.push(Number.parseInt(match[1], 10));
+          }
+        }
+        return pids.filter(Number.isInteger);
+      }
+    } catch {
+      // fallthrough
+    }
+
+    // Fallback: PowerShell Get-NetTCPConnection
+    try {
+      const result = spawnSync(
+        "powershell",
+        [
+          "-NoProfile",
+          "-Command",
+          `Get-NetTCPConnection -LocalPort ${port} -State Listen | Select-Object -ExpandProperty OwningProcess`,
+        ],
+        { encoding: "utf8" },
+      );
+      if (!result.error && result.status === 0 && result.stdout.trim()) {
+        return result.stdout
+          .split(/\s+/)
+          .filter(Boolean)
+          .map(Number)
+          .filter(Number.isInteger);
+      }
+    } catch {
+      // fallthrough
+    }
+
+    // 都不可用：记录警告并返回空数组，避免阻塞流程
+    console.warn(
+      `[本地准生产预览] 警告: 无法在 Windows 上检测端口 ${port} 占用，跳过端口释放。若 ${port} 端口被占用请手动关闭。`,
+    );
+    return [];
+  }
+
+  // Unix / macOS: 使用 lsof
   const result = spawnSync("lsof", [`-tiTCP:${port}`, "-sTCP:LISTEN"], {
     encoding: "utf8",
   });
 
   if (result.error) {
     if (result.error.code === "ENOENT") {
-      throw new Error("未找到 lsof，无法安全释放 3200 端口");
+      throw new Error("未找到 lsof，无法安全释放端口");
     }
     throw result.error;
   }
@@ -201,6 +251,54 @@ async function freePort(port, label = `${port}`, timeoutMs = 10_000) {
     throw new Error(
       `${label} 端口在 ${timeoutMs / 1000}s 内未释放，残留 PID(s): ${remaining.join(", ")}`,
     );
+  }
+}
+
+/**
+ * 清理残留的 workspace authority lease 文件。
+ * 如果 lease 中记录的 PID 已不存在，说明是上次崩溃遗留，安全删除。
+ */
+function cleanStaleWorkspaceLeases() {
+  const leasesDir = resolve(localEnv.DATA_DIR, "workspace-authority", "leases");
+  if (!existsSync(leasesDir)) return;
+
+  let cleaned = 0;
+  for (const entry of readdirSync(leasesDir)) {
+    if (!entry.endsWith(".lock")) continue;
+    const lockPath = resolve(leasesDir, entry);
+    try {
+      const content = readFileSync(lockPath, "utf8").trim();
+      const separatorIndex = content.indexOf(":");
+      if (separatorIndex === -1) {
+        // 格式异常，直接清理
+        rmSync(lockPath, { force: true });
+        cleaned++;
+        continue;
+      }
+      const pidStr = content.slice(0, separatorIndex);
+      const pid = Number.parseInt(pidStr, 10);
+      if (!Number.isInteger(pid) || pid <= 0) {
+        rmSync(lockPath, { force: true });
+        cleaned++;
+        continue;
+      }
+      // 检查 PID 是否仍在运行
+      if (!isRunning(pid)) {
+        rmSync(lockPath, { force: true });
+        cleaned++;
+      }
+    } catch {
+      // 读取或解析失败时尝试删除
+      try {
+        rmSync(lockPath, { force: true });
+        cleaned++;
+      } catch {
+        // 忽略无法删除的文件
+      }
+    }
+  }
+  if (cleaned > 0) {
+    console.log(`[本地准生产预览] 清理了 ${cleaned} 个残留 workspace authority lease`);
   }
 }
 
@@ -290,6 +388,7 @@ async function ensureService(
     cwd: PROJECT_DIR,
     env: localEnv,
     stdio: "inherit",
+    shell: process.platform === "win32",
   });
   spawnedChildren.push(child);
   child.once("exit", () => {
@@ -357,6 +456,7 @@ if (args.has("--dry-run")) {
 }
 
 try {
+  cleanStaleWorkspaceLeases();
   await stopLocalAuthorProcesses();
 
   const spawnedChildren = [];

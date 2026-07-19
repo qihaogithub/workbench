@@ -16,6 +16,44 @@ import {
   WorkspaceAuthorityClientError,
 } from "./workspace-authority-client";
 
+import { appendEditorDiagnosticEvents } from "./editor-diagnostics/store";
+
+function createFlushDiagnosticId(): string {
+  const ts = Date.now();
+  const rand = Math.random().toString(36).slice(2, 10);
+  return `ws-flush-${ts}-${rand}`;
+}
+
+function emitWorkspaceDiagnostic(
+  eventType: string,
+  options: {
+    projectId: string;
+    workspaceId?: string | null;
+    sessionId: string;
+  },
+  level: "info" | "warn" | "error" = "info",
+  extra: Record<string, unknown> = {},
+): void {
+  try {
+    const event = {
+      id: createFlushDiagnosticId(),
+      editorSessionId: `server-${options.sessionId}`,
+      projectId: options.projectId,
+      sessionId: options.sessionId,
+      workspaceId: options.workspaceId ?? undefined,
+      timestamp: Date.now(),
+      category: "workspace" as const,
+      name: eventType,
+      level,
+      details: extra,
+    };
+    // Fire-and-forget to avoid blocking critical flush path
+    appendEditorDiagnosticEvents([event]).catch(() => {});
+  } catch {
+    // Never let diagnostic failures affect the flush path
+  }
+}
+
 export type WorkspaceFlushStatus =
   | "skipped"
   | "flushed"
@@ -216,6 +254,18 @@ export async function flushWorkspaceBeforeCriticalAction(
 
   renewEditSession(options.sessionId);
 
+  const startedAt = Date.now();
+  emitWorkspaceDiagnostic(
+    "workspace.flush_started",
+    {
+      projectId: options.projectId,
+      workspaceId: options.workspaceId,
+      sessionId: options.sessionId,
+    },
+    "info",
+    { startedAt },
+  );
+
   const params = new URLSearchParams({ sessionId: options.sessionId });
   const response = await fetch(
     `${getServerAgentServiceUrl()}/api/collab/projects/${encodeURIComponent(
@@ -223,14 +273,45 @@ export async function flushWorkspaceBeforeCriticalAction(
     )}/workspaces/${encodeURIComponent(options.workspaceId)}/flush-all?${params.toString()}`,
     { method: "POST" },
   ).catch((error: unknown) => {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.warn("[workspace-flush] agent-service unreachable", error);
+    emitWorkspaceDiagnostic(
+      "workspace.flush_failed",
+      {
+        projectId: options.projectId,
+        workspaceId: options.workspaceId,
+        sessionId: options.sessionId,
+      },
+      "error",
+      {
+        reason: "agent_unreachable",
+        error: errorMessage,
+        elapsedMs: Date.now() - startedAt,
+      },
+    );
     throw new WorkspaceFlushError(
       "协同草稿落盘服务不可用，请确认 agent-service 已启动",
     );
   });
 
+  const elapsedMs = Date.now() - startedAt;
   const body = parseFlushEnvelope(await response.json().catch(() => ({})));
   if (!response.ok || body.success === false) {
+    emitWorkspaceDiagnostic(
+      "workspace.flush_failed",
+      {
+        projectId: options.projectId,
+        workspaceId: options.workspaceId,
+        sessionId: options.sessionId,
+      },
+      "error",
+      {
+        httpStatus: response.status || 502,
+        errorCode: body.error?.code,
+        errorMessage: body.error?.message,
+        elapsedMs,
+      },
+    );
     throw new WorkspaceFlushError(body.error?.message ?? "协同草稿落盘失败", {
       code: normalizeAgentFlushErrorCode(body.error?.code, body.error?.message),
       status: response.status || 502,
@@ -245,11 +326,43 @@ export async function flushWorkspaceBeforeCriticalAction(
       "[workspace-flush] partial_failure: some rooms failed to flush",
       { failures },
     );
+    emitWorkspaceDiagnostic(
+      "workspace.flush_failed",
+      {
+        projectId: options.projectId,
+        workspaceId: options.workspaceId,
+        sessionId: options.sessionId,
+      },
+      "error",
+      {
+        status: "partial_failure",
+        flushedRooms: data?.flushedRooms,
+        failures: Array.isArray(failures) ? failures : undefined,
+        elapsedMs,
+      },
+    );
     throw new WorkspaceFlushError(
       `协同草稿部分落盘失败${Array.isArray(failures) && failures.length > 0 ? `: ${failures.map((f: { resourcePath?: string; error?: string }) => `${f.resourcePath ?? "unknown"}: ${f.error ?? "unknown error"}`).join("; ")}` : ""}`,
       { code: "COLLAB_FLUSH_FAILED", status: 502 },
     );
   }
+
+  emitWorkspaceDiagnostic(
+    "workspace.flush_succeeded",
+    {
+      projectId: options.projectId,
+      workspaceId: options.workspaceId,
+      sessionId: options.sessionId,
+    },
+    "info",
+    {
+      status,
+      flushedRooms: typeof data?.flushedRooms === "number" ? data.flushedRooms : 0,
+      revision: typeof data?.revision === "number" ? data.revision : undefined,
+      elapsedMs,
+    },
+  );
+
   return {
     status,
     flushedRooms:
@@ -262,6 +375,20 @@ export async function flushAndSyncProjectWorkspace(
   options: WorkspaceFlushOptions,
 ): Promise<WorkspaceFlushResult & { workspacePath?: string }> {
   const flushResult = await flushWorkspaceBeforeCriticalAction(options);
+
+  emitWorkspaceDiagnostic(
+    "workspace.canonical_sync_started",
+    {
+      projectId: options.projectId,
+      workspaceId: options.workspaceId,
+      sessionId: options.sessionId,
+    },
+    "info",
+    {
+      targetRevision: flushResult.revision,
+    },
+  );
+
   const syncMetadata = await ensureCanonicalRevision(options, {
     revision: flushResult.revision,
   });
@@ -286,6 +413,21 @@ export async function flushAndSyncProjectWorkspace(
     });
   }
   if (!synced.success) {
+    emitWorkspaceDiagnostic(
+      "workspace.canonical_sync_failed",
+      {
+        projectId: options.projectId,
+        workspaceId: options.workspaceId,
+        sessionId: options.sessionId,
+      },
+      "error",
+      {
+        error: synced.error,
+        errorCode: synced.code,
+        revision: syncMetadata?.revision,
+        rootHash: syncMetadata?.rootHash,
+      },
+    );
     throw new WorkspaceFlushError(synced.error || "同步项目当前工作区失败", {
       code: synced.code || "FILE_WRITE_ERROR",
       status: synced.code === "WORKSPACE_STALE" ? 409 : 500,
@@ -303,6 +445,22 @@ export async function flushAndSyncProjectWorkspace(
       throw error;
     }
   }
+
+  emitWorkspaceDiagnostic(
+    "workspace.canonical_sync_succeeded",
+    {
+      projectId: options.projectId,
+      workspaceId: options.workspaceId,
+      sessionId: options.sessionId,
+    },
+    "info",
+    {
+      canonicalRevision: syncMetadata?.revision,
+      canonicalRootHash: syncMetadata?.rootHash,
+      workspacePath: synced.workspacePath,
+    },
+  );
+
   return {
     ...flushResult,
     workspacePath: synced.workspacePath,

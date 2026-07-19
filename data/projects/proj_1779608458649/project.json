@@ -142,12 +142,29 @@
       "snapshotPath": "/app/data/snapshots/proj_1779608458649/v14",
       "fileCount": 16,
       "note": "发布快照"
+    },
+    {
+      "versionId": "v15",
+      "type": "auto_checkpoint",
+      "savedAt": 1784389629613,
+      "savedBy": "qihao",
+      "sessionId": "session-1784389156079-2epu7gfxz",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\opencode-workbench\\data\\snapshots\\proj_1779608458649\\v15",
+      "fileCount": 16,
+      "workspaceId": "live-1784389156022-ikp6iydyk",
+      "workspaceRevision": 18,
+      "workspaceRootHash": "cb9daddadaa394d723b8a30461cddfe26137fd684997e44ba457a1b4bc4afe1a",
+      "note": "停止编辑后自动保存记录"
     }
   ],
   "createdAt": 1779608458652,
-  "updatedAt": 1783584101738,
+  "updatedAt": 1784390064061,
+  "activeWorkspaceId": "live-1784389156022-ikp6iydyk",
+  "activeWorkspaceUpdatedAt": 1784389629622,
+  "canonicalSyncedWorkspaceId": "live-1784389156022-ikp6iydyk",
+  "canonicalSyncedRevision": 22,
+  "canonicalSyncedRootHash": "07dece8b7ab73419db198897a3ac3b5c498df4eee40fc92a66522a2be4fbfc43",
+  "canonicalSyncedAt": 1784390064061,
   "publishedVersion": "v14",
-  "publishedAt": 1783418226770,
-  "activeWorkspaceId": "live-1783584101724-vvnn1ep2e",
-  "activeWorkspaceUpdatedAt": 1783584101738
+  "publishedAt": 1783418226770
 }

@@ -1,0 +1,25 @@
+{
+  "committed": true,
+  "mutationId": "2d1a457b-a6d1-42cc-926c-6aa2ad82ecd5",
+  "projectId": "proj_1782718596686_wmv9yu",
+  "workspaceId": "live-1784389142847-og67m87s6",
+  "baseRevision": 0,
+  "revision": 3,
+  "rootHash": "2357b1f8502069f446593dae479525d1c249bfdc5d9b93a0d1aa1805db267498",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/phone-popup_k8m2/index.tsx",
+      "action": "modified",
+      "beforeHash": "63487dc93c2c09731705ce9e0d40719fbd1466637ead5d58e7d0310024414e65",
+      "afterHash": "63487dc93c2c09731705ce9e0d40719fbd1466637ead5d58e7d0310024414e65"
+    },
+    {
+      "path": "demos/phone-popup_k8m2/config.schema.json",
+      "action": "modified",
+      "beforeHash": "6db481904c6f82a891ca93004db4a2594ae73022cfa9e47e98fae0cb76c409a1",
+      "afterHash": "6db481904c6f82a891ca93004db4a2594ae73022cfa9e47e98fae0cb76c409a1"
+    }
+  ],
+  "committedAt": 1784447658084
+}

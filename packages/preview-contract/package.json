@@ -19,7 +19,7 @@
   "dependencies": {
     "lucide-react": "^0.323.0",
     "sucrase": "^3.35.1",
-    "typescript": "^5.3.3"
+    "typescript": "^5.9.3"
   },
   "devDependencies": {
     "@types/node": "^20.11.16",
