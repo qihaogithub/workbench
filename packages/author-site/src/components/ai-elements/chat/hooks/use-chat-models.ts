@@ -9,7 +9,6 @@ import {
   applyModelConfigsAsync,
   buildFullModelId,
   resolveCurrentModel,
-  UNCONFIGURED_DEFAULT,
   type ResolvedModel,
   type ThinkingDepth,
 } from "@/lib/ai-models";
@@ -20,6 +19,7 @@ export interface ModelState {
   models: ResolvedModel[];
   canSwitch: boolean;
   isLoading: boolean;
+  imageDescriptionEnabled: boolean;
 }
 
 const INITIAL_MODEL_STATE: ModelState = {
@@ -28,6 +28,7 @@ const INITIAL_MODEL_STATE: ModelState = {
   models: [],
   canSwitch: false,
   isLoading: true,
+  imageDescriptionEnabled: false,
 };
 
 interface UseChatModelsOptions {
@@ -217,9 +218,10 @@ export function useChatModels(options: UseChatModelsOptions) {
       unrefTimer(modelKeepaliveTimerRef.current);
 
       stream.on("models", async (event: StreamEvent) => {
-        const models = event.models
+        const result = event.models
           ? await applyModelConfigsAsync(event.models)
-          : [];
+          : { models: [], imageDescriptionEnabled: false };
+        const models = result.models;
         const resolved = resolveCurrentModel(
           event.currentModelId || "",
           models,
@@ -240,6 +242,7 @@ export function useChatModels(options: UseChatModelsOptions) {
           models: models.length > 0 ? models : prev.models,
           canSwitch: event.canSwitch ?? prev.canSwitch,
           isLoading: preferred?.isApplying ?? false,
+          imageDescriptionEnabled: result.imageDescriptionEnabled,
         }));
 
         if (models.length > 0) {
@@ -360,9 +363,10 @@ export function useChatModels(options: UseChatModelsOptions) {
   );
 
   const handleModelsEvent = useCallback(async (event: StreamEvent) => {
-    const models = event.models
+    const result = event.models
       ? await applyModelConfigsAsync(event.models)
-      : [];
+      : { models: [], imageDescriptionEnabled: false };
+    const models = result.models;
     const resolved = resolveCurrentModel(event.currentModelId || "", models);
     const preferred = applyPreferredModelToSession(
       models,
@@ -379,6 +383,7 @@ export function useChatModels(options: UseChatModelsOptions) {
       models: models.length > 0 ? models : prev.models,
       canSwitch: event.canSwitch ?? prev.canSwitch,
       isLoading: preferred?.isApplying ?? false,
+      imageDescriptionEnabled: result.imageDescriptionEnabled,
     }));
   }, [applyPreferredModelToSession]);
 
@@ -394,7 +399,8 @@ export function useChatModels(options: UseChatModelsOptions) {
     (m) => m.id === modelState.currentModelId,
   );
   const currentSupportsImages =
-    currentModel?.supportsImages ?? UNCONFIGURED_DEFAULT.supportsImages;
+    currentModel?.supportsImages === true ||
+    modelState.imageDescriptionEnabled;
   const currentAvailableDepths = currentModel?.supportsThinkingDepth
     ? currentModel.availableDepths
     : [];
