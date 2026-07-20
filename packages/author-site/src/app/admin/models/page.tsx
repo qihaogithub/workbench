@@ -48,8 +48,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
-  pushImageDescriptionConfig,
-  fetchImageDescriptionConfig,
   type ImageDescriptionConfig,
 } from "@/lib/agent-providers";
 import type { BackendProvider, BackendProvidersConfig } from "@workbench/shared";
@@ -1684,16 +1682,14 @@ function ImageDescriberTab() {
   const [config, setConfig] = useState<ImageDescriptionConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [pushResult, setPushResult] = useState<string | null>(null);
   const [availableModels, setAvailableModels] = useState<AvailableModel[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
 
   const [enabled, setEnabled] = useState(true);
   const [visionModelId, setVisionModelId] = useState("");
-  const [timeout, setTimeout_] = useState(10000);
+  const [timeout, setTimeout_] = useState(60000);
   const [maxCacheSize, setMaxCacheSize] = useState(500);
 
   const fetchAvailableModels = useCallback(async () => {
@@ -1763,43 +1759,16 @@ function ImageDescriberTab() {
     const body = await res.json();
 
     if (body.success) {
-      setSuccess("配置已保存");
+      const imgMsg = body.imagePushResult?.ok
+        ? "，已同步至 agent-service"
+        : body.imagePushResult
+          ? ` (agent-service 同步: ${body.imagePushResult.message})`
+          : "";
+      setSuccess("配置已保存" + imgMsg);
     } else {
       setError(body?.error?.message || "保存失败");
     }
     setSaving(false);
-  };
-
-  const handlePushToAgent = async () => {
-    setSyncing(true);
-    setPushResult(null);
-
-    const res = await pushImageDescriptionConfig({
-      enabled,
-      visionModelId,
-      timeout,
-      maxCacheSize,
-    });
-
-    setPushResult(res.ok ? "已推送到 agent-service" : res.message);
-    setSyncing(false);
-  };
-
-  const handleFetchFromAgent = async () => {
-    setSyncing(true);
-    setPushResult(null);
-
-    const res = await fetchImageDescriptionConfig();
-    if (res.ok && res.config) {
-      setEnabled(res.config.enabled ?? true);
-      setVisionModelId(res.config.visionModelId || "");
-      setTimeout_(res.config.timeout || 10000);
-      setMaxCacheSize(res.config.maxCacheSize || 500);
-      setPushResult("已从 agent-service 拉取当前配置");
-    } else {
-      setPushResult(res.message || "拉取失败");
-    }
-    setSyncing(false);
   };
 
   if (loading) {
@@ -1823,17 +1792,6 @@ function ImageDescriberTab() {
         <div className="flex items-center gap-2 p-3 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
           <CheckCircle2 className="h-4 w-4 shrink-0" />
           {success}
-        </div>
-      )}
-      {pushResult && (
-        <div className={cn(
-          "flex items-center gap-2 p-3 rounded-md border text-sm",
-          pushResult.startsWith("已")
-            ? "bg-blue-500/10 border-blue-500/20 text-blue-400"
-            : "bg-amber-500/10 border-amber-500/20 text-amber-400"
-        )}>
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          {pushResult}
         </div>
       )}
 
@@ -1907,29 +1865,12 @@ function ImageDescriberTab() {
       <div className="flex items-center gap-3">
         <Button
           onClick={handleSave}
-          disabled={saving || syncing}
+          disabled={saving}
           className="bg-indigo-600 hover:bg-indigo-700 text-white"
         >
           {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
           <Save className="h-4 w-4 mr-2" />
           保存
-        </Button>
-        <Button
-          variant="secondary"
-          onClick={handlePushToAgent}
-          disabled={saving || syncing}
-        >
-          {syncing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          <RefreshCw className="h-4 w-4 mr-2" />
-          推送到 agent-service
-        </Button>
-        <Button
-          variant="ghost"
-          onClick={handleFetchFromAgent}
-          disabled={saving || syncing}
-          className="text-neutral-400"
-        >
-          从 agent-service 拉取
         </Button>
       </div>
     </div>

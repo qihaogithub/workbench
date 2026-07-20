@@ -32,6 +32,9 @@ services:
       - FIGMA_MCP_URL=${FIGMA_MCP_URL:-}
       - FIGMA_MCP_REGION=${FIGMA_MCP_REGION:-}
       - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-}
+      - IMAGE_DESCRIPTION_ENABLED=${IMAGE_DESCRIPTION_ENABLED:-false}
+      - IMAGE_DESCRIPTION_MODEL=${IMAGE_DESCRIPTION_MODEL:-}
+      - IMAGE_DESCRIPTION_TIMEOUT=${IMAGE_DESCRIPTION_TIMEOUT:-60000}
     volumes:
       - ${APP_DATA_DIR:-/opt/workbench/data}:/app/data
     cpus: "1.0"
@@ -81,7 +84,7 @@ services:
     depends_on:
       - agent-service
     cpus: "1.0"
-    mem_limit: 1g
+    mem_limit: 2g
     pids_limit: 512
     restart: unless-stopped
 

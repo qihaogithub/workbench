@@ -15,6 +15,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminRequest } from "@/lib/admin-auth";
+import { pushImageDescriptionConfig } from "@/lib/agent-providers";
 import { syncBackendProvidersConfigToAgent } from "@/lib/backend-providers-sync";
 import { readDbConfig, writeDbConfig } from "@/lib/db-config";
 import { invalidateConfigCache } from "@/lib/model-config";
@@ -361,11 +362,20 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    // 如果包含 imageDescription 字段,推送到 agent-service
+    let imagePushResult: { ok: boolean; message: string } | null = null;
+    if (body.imageDescription !== undefined) {
+      imagePushResult = await pushImageDescriptionConfig(
+        updatedConfig.imageDescription,
+      );
+    }
+
     return NextResponse.json({
       success: true,
       message: "配置已保存",
       data: updatedConfig,
       agentPushResult: pushResult,
+      imagePushResult,
     });
   } catch (error) {
     console.error("[API] Failed to update model config:", error);

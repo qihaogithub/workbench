@@ -23,8 +23,10 @@ import {
 } from "../services/image-describer";
 
 let _imageDescriberConfigUpdater: ((config: Partial<ImageDescriberConfig>) => void) | null = null;
+let _latestImageDescriberConfig: Partial<ImageDescriberConfig> = {};
 
 export function updateImageDescriberConfig(config: Partial<ImageDescriberConfig>): void {
+  _latestImageDescriberConfig = { ..._latestImageDescriberConfig, ...config };
   _imageDescriberConfigUpdater?.(config);
 }
 
@@ -164,6 +166,9 @@ export class PiAgentBackend implements IBackendAdapter {
     this.imageDescriber = new ImageDescriber({}, (request) =>
       this.describeImageWithVisionModel(request),
     );
+    if (Object.keys(_latestImageDescriberConfig).length > 0) {
+      this.imageDescriber.updateConfig(_latestImageDescriberConfig);
+    }
     _imageDescriberConfigUpdater = (config) => {
       this.imageDescriber.updateConfig(config);
       _currentImageDescriberConfig = this.imageDescriber.getConfig();
@@ -324,11 +329,13 @@ export class PiAgentBackend implements IBackendAdapter {
         choices?: Array<{
           message?: {
             content?: string | Array<{ type?: string; text?: string }>;
+            reasoning?: string;
           };
         }>;
       };
-      const content = payload.choices?.[0]?.message?.content;
-      if (typeof content === "string") {
+      const msg = payload.choices?.[0]?.message;
+      const content = msg?.content;
+      if (typeof content === "string" && content) {
         return content;
       }
       if (Array.isArray(content)) {
@@ -337,6 +344,13 @@ export class PiAgentBackend implements IBackendAdapter {
           .map((item) => item.text)
           .join("");
       }
+      if (msg?.reasoning) {
+        return msg.reasoning;
+      }
+      logger.warn(
+        { modelId: model.id, samplePayload: JSON.stringify(msg).slice(0, 500) },
+        "Vision model response content type unexpected",
+      );
       return "";
     }
 
