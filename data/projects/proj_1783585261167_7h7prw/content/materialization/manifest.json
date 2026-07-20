@@ -1,20 +1,20 @@
 {
   "projectId": "proj_1783585261167_7h7prw",
-  "commitId": "commit_1784383546962_uxcwtp",
+  "commitId": "commit_1784472712715_0fx9q7",
   "materializerVersion": "project-core-content-graph-v1",
   "resources": [
     {
       "kind": "page",
       "resourceId": "growth-bean-mall_x8k2",
-      "versionId": "prv_1784383546942_dn1ah5",
-      "contentHash": "a5e32a47f814b12eea6cf27d99c83ec8d8ec8896e8977b84e16f4d47020975e9",
+      "versionId": "prv_1784472712712_h5siry",
+      "contentHash": "55ce91d8642a52dae2857cbe89fa07731539dc40f3dee2114d4cdd558fcd25c0",
       "blobRefs": [
-        "4bdc01a3d68ed400a57f44e1284f5e13bebea3c50bc2daf0a92a916d950b00a2",
-        "d10e751737684d163b1ee1c147339daac87e5edce8fc019e467e3d81de73b969",
-        "e5d9281c8616b5a4a3d645cf616f2dc60465b92e335eaf332415240fe8ff662e",
+        "bb7c33a9374923983615f0adccebe2ad3333dc0d25a192be8af18d801a105164",
+        "3b66767a48e08597e1faf5c13e65d2392bc2c731dd61bef61e450fc6bc9dbee8",
+        "ffbe6fbb7d2f023132048ed1b646e5067cdbaaa5f5d9c9861bb2cae9a60dc0a9",
         "c905cd7516abdf9c2e5602c1492400a5c8ae9be5a6f16256685e46935e2652ea"
       ]
     }
   ],
-  "updatedAt": 1784383546965
+  "updatedAt": 1784472712716
 }

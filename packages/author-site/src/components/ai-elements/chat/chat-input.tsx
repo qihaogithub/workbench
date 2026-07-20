@@ -165,6 +165,7 @@ interface ChatInputProps {
   models: ResolvedModel[];
   canSwitch: boolean;
   isModelLoading: boolean;
+  supportsImages?: boolean;
 }
 
 export function ChatInput({
@@ -181,6 +182,7 @@ export function ChatInput({
   models,
   canSwitch,
   isModelLoading,
+  supportsImages,
 }: ChatInputProps) {
   const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -258,6 +260,7 @@ export function ChatInput({
       className="flex-shrink-0"
       globalDrop
       multiple
+      supportsImages={supportsImages}
     >
       <PromptInputHeader>
         <PromptInputAttachmentsDisplay />

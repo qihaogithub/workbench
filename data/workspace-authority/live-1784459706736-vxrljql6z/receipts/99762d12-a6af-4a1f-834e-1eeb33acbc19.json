@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "99762d12-a6af-4a1f-834e-1eeb33acbc19",
+  "projectId": "proj_1783585261167_7h7prw",
+  "workspaceId": "live-1784459706736-vxrljql6z",
+  "baseRevision": 0,
+  "revision": 16,
+  "rootHash": "7a6c52b4dfc614de537c0d62f5bab5b43d023cc4890784a72ba18097e0bf269f",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "assets/images/2c97c1bb1f06-rec-earn.png",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "2c97c1bb1f067d4e80f0d572960c3f1b0a9ecd0bf6e5c0bad86ecb9f76293f65"
+    }
+  ],
+  "committedAt": 1784466278412
+}

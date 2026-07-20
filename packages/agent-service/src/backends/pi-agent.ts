@@ -18,8 +18,23 @@ import {
 } from "./preinstalled-skills";
 import {
   ImageDescriber,
+  type ImageDescriberConfig,
   type VisionDescribeRequest,
 } from "../services/image-describer";
+
+let _imageDescriberConfigUpdater: ((config: Partial<ImageDescriberConfig>) => void) | null = null;
+
+export function updateImageDescriberConfig(config: Partial<ImageDescriberConfig>): void {
+  _imageDescriberConfigUpdater?.(config);
+}
+
+export function getImageDescriberConfig(): ImageDescriberConfig | null {
+  return _imageDescriberConfigUpdater
+    ? _currentImageDescriberConfig
+    : null;
+}
+
+let _currentImageDescriberConfig: ImageDescriberConfig | null = null;
 import { logger } from "../utils/logger";
 import {
   getAgentHarness,
@@ -149,6 +164,11 @@ export class PiAgentBackend implements IBackendAdapter {
     this.imageDescriber = new ImageDescriber({}, (request) =>
       this.describeImageWithVisionModel(request),
     );
+    _imageDescriberConfigUpdater = (config) => {
+      this.imageDescriber.updateConfig(config);
+      _currentImageDescriberConfig = this.imageDescriber.getConfig();
+    };
+    _currentImageDescriberConfig = this.imageDescriber.getConfig();
   }
 
   private areSubagentsEnabled(): boolean {
@@ -249,7 +269,11 @@ export class PiAgentBackend implements IBackendAdapter {
   ): Promise<string> {
     await loadPiAgentDeps();
 
-    const model = this.modelManager.getVisionModel(request.modelId);
+    const visionModelId = request.modelId.trim()
+      ? request.modelId
+      : this.modelManager.getModel().id;
+
+    const model = this.modelManager.getVisionModel(visionModelId);
     if (model.baseUrl) {
       const auth = await this.modelManager.getApiKeyAndHeaders(model);
       if (!auth?.apiKey) {

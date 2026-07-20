@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 
+import { ToastProviderWrapper } from "@/components/ui/toast-provider";
 import {
   PromptInput,
   PromptInputBody,
@@ -7,6 +8,10 @@ import {
   PromptInputSubmit,
   PromptInputTextarea,
 } from "../prompt-input";
+
+function renderWithToast(ui: React.ReactElement) {
+  return render(<ToastProviderWrapper>{ui}</ToastProviderWrapper>);
+}
 
 describe("PromptInputTextarea", () => {
   beforeEach(() => {
@@ -33,7 +38,7 @@ describe("PromptInputTextarea", () => {
         return this.value.split("\n").length > 3 ? 180 : 72;
       });
 
-    render(
+    renderWithToast(
       <PromptInput>
         <PromptInputBody>
           <PromptInputTextarea minHeight={40} maxHeight={120} />
@@ -55,7 +60,7 @@ describe("PromptInputTextarea", () => {
   it("streaming 状态下仍允许输入并按 Enter 提交", () => {
     const onSubmit = jest.fn();
 
-    render(
+    renderWithToast(
       <PromptInput status="streaming" onSubmit={onSubmit}>
         <PromptInputBody>
           <PromptInputTextarea />
@@ -79,7 +84,7 @@ describe("PromptInputTextarea", () => {
     const onSubmit = jest.fn();
     const onCancel = jest.fn();
 
-    render(
+    renderWithToast(
       <PromptInput status="streaming" onSubmit={onSubmit} onCancel={onCancel}>
         <PromptInputBody>
           <PromptInputTextarea />
@@ -108,7 +113,7 @@ describe("PromptInputTextarea", () => {
     const image = new File(["image"], "screen.png", { type: "image/png" });
     const video = new File(["video"], "clip.mp4", { type: "video/mp4" });
 
-    const { container } = render(
+    const { container } = renderWithToast(
       <PromptInput accept="image/*" globalDrop onSubmit={onSubmit}>
         <PromptInputBody>
           <PromptInputTextarea />

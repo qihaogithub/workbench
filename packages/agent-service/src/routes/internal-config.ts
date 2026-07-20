@@ -7,6 +7,8 @@
  * 端点：
  * - POST /internal/backend-providers  设置完整配置
  * - GET  /internal/backend-providers  获取当前配置（用于调试/验证）
+ * - GET  /internal/image-description  获取识图配置
+ * - PUT  /internal/image-description  更新识图配置
  */
 
 import { createHash } from "crypto";
@@ -27,6 +29,13 @@ import {
 } from "../config/system-knowledge";
 import { getAgentManager } from "../core/agent-manager";
 import { logger } from "../utils/logger";
+import {
+  type ImageDescriberConfig,
+} from "../services/image-describer";
+import {
+  updateImageDescriberConfig,
+  getImageDescriberConfig,
+} from "../backends/pi-agent";
 import type {
   BackendProvidersConfig,
   ExternalAuthSessionConfig,
@@ -658,5 +667,62 @@ export async function registerInternalConfigRoutes(fastify: FastifyInstance) {
     },
   );
 
-  logger.info("内部配置同步路由已注册: backend-providers + knowledge-documents");
+  fastify.get(
+    "/internal/image-description",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      if (!checkToken(request, reply)) return;
+
+      const config = getImageDescriberConfig();
+      if (!config) {
+        return reply.code(503).send({
+          success: false,
+          error: {
+            code: "NOT_INITIALIZED",
+            message: "ImageDescriber 尚未初始化",
+          },
+        });
+      }
+
+      return reply.send({ success: true, data: config });
+    },
+  );
+
+  fastify.put(
+    "/internal/image-description",
+    async (
+      request: FastifyRequest<{
+        Body: Partial<ImageDescriberConfig>;
+      }>,
+      reply: FastifyReply,
+    ) => {
+      if (!checkToken(request, reply)) return;
+
+      const body = request.body as Partial<ImageDescriberConfig> & Record<string, unknown>;
+      const allowedKeys: (keyof ImageDescriberConfig)[] = [
+        "enabled",
+        "visionModelId",
+        "describePrompt",
+        "maxCacheSize",
+        "timeout",
+      ];
+      const config: Partial<ImageDescriberConfig> = {};
+      for (const key of allowedKeys) {
+        if (key in body) {
+          (config as Record<string, unknown>)[key] = body[key as string];
+        }
+      }
+
+      updateImageDescriberConfig(config);
+      const updated = getImageDescriberConfig();
+
+      logger.info(
+        { config: { ...updated, describePrompt: updated?.describePrompt?.slice(0, 40) + "..." } },
+        "Image description config updated via internal API",
+      );
+
+      return reply.send({ success: true, data: updated });
+    },
+  );
+
+  logger.info("内部配置同步路由已注册: backend-providers + knowledge-documents + image-description");
 }

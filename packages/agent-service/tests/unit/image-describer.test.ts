@@ -23,7 +23,7 @@ describe('ImageDescriber', () => {
 
   it('未启用时应抛出配置错误', async () => {
     const describeWithVision = vi.fn();
-    const describer = new ImageDescriber({}, describeWithVision);
+    const describer = new ImageDescriber({ enabled: false }, describeWithVision);
 
     await expect(describer.describe([image])).rejects.toMatchObject({
       name: 'ImageDescriptionError',
@@ -32,18 +32,20 @@ describe('ImageDescriber', () => {
     expect(describeWithVision).not.toHaveBeenCalled();
   });
 
-  it('启用但未配置识图模型时应抛出配置错误', async () => {
-    const describeWithVision = vi.fn();
+  it('启用时即使未显式配置识图模型也应调用 vision 描述函数（由上层回退到主模型）', async () => {
+    const describeWithVision = vi.fn().mockResolvedValue('一个 UI 截图');
     const describer = new ImageDescriber(
       { enabled: true, visionModelId: '' },
       describeWithVision,
     );
 
-    await expect(describer.describe([image])).rejects.toMatchObject({
-      name: 'ImageDescriptionError',
-      code: 'VISION_MODEL_NOT_CONFIGURED',
-    } satisfies Partial<ImageDescriptionError>);
-    expect(describeWithVision).not.toHaveBeenCalled();
+    await expect(describer.describe([image])).resolves.toBe('一个 UI 截图');
+    expect(describeWithVision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        image,
+        modelId: '',
+      }),
+    );
   });
 
   it('应调用 vision 描述函数并格式化结果', async () => {

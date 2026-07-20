@@ -42,6 +42,12 @@ function getDefaultConfig() {
       nameFilters,
     },
     multimodalModels: [] as string[],
+    imageDescription: {
+      enabled: true,
+      visionModelId: "",
+      timeout: 10000,
+      maxCacheSize: 500,
+    },
     lastSyncedToEnv: Date.now(),
   };
 }
@@ -235,7 +241,8 @@ export async function PUT(request: NextRequest) {
     if (
       body.frontend === undefined &&
       body.backendProviders === undefined &&
-      body.multimodalModels === undefined
+      body.multimodalModels === undefined &&
+      body.imageDescription === undefined
     ) {
       return NextResponse.json(
         {
@@ -243,7 +250,7 @@ export async function PUT(request: NextRequest) {
           error: {
             code: "INVALID_CONFIG",
             message:
-              "请求体至少需要包含 frontend、backendProviders 或 multimodalModels 字段之一",
+              "请求体至少需要包含 frontend、backendProviders、multimodalModels 或 imageDescription 字段之一",
           },
         },
         { status: 400 },
@@ -271,6 +278,27 @@ export async function PUT(request: NextRequest) {
     // 单独处理 multimodalModels
     if (Array.isArray(body.multimodalModels)) {
       updatedConfig.multimodalModels = body.multimodalModels;
+    }
+
+    // 单独处理 imageDescription: 合并已有配置，支持部分更新
+    if (body.imageDescription !== undefined) {
+      if (typeof body.imageDescription !== "object" || body.imageDescription === null) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "INVALID_CONFIG",
+              message: "imageDescription 字段必须是对象",
+            },
+          },
+          { status: 400 },
+        );
+      }
+      const existingImg = existingConfig.imageDescription || {};
+      updatedConfig.imageDescription = {
+        ...existingImg,
+        ...body.imageDescription,
+      };
     }
 
     // 当保存 backendProviders 时，自动将供应商 ID 前缀同步到 frontend.autoEnableRules

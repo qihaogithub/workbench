@@ -36,6 +36,7 @@ export function getWorkspaceAuthorityStartupRecoveryStatus(): WorkspaceAuthority
 
 export async function recoverWorkspaceAuthoritiesOnStartup(dataDir: string): Promise<WorkspaceAuthorityStartupRecoveryStatus> {
   const resolvedDataDir = path.resolve(dataDir);
+  let staleCleanupCount = 0;
   currentStatus = {
     state: "recovering",
     scannedWorkspaceCount: 0,
@@ -66,6 +67,12 @@ export async function recoverWorkspaceAuthoritiesOnStartup(dataDir: string): Pro
       if (!workspace) {
         logger.warn({ workspaceId }, "Skipping recovery: workspace data not found, authority entry may be stale");
         currentStatus.skippedUnregisteredCount++;
+        const staleDir = path.join(authorityRoot, workspaceId);
+        if (fs.existsSync(staleDir)) {
+          fs.rmSync(staleDir, { recursive: true, force: true });
+          staleCleanupCount++;
+          logger.info({ workspaceId }, "Cleaned up stale Workspace Authority entry");
+        }
         continue;
       }
       const authority = new WorkspaceMutationAuthority({
@@ -79,7 +86,10 @@ export async function recoverWorkspaceAuthoritiesOnStartup(dataDir: string): Pro
       currentStatus.rolledBackCount += result.rolledBackCount;
       currentStatus.committedCleanupCount += result.committedCleanupCount;
     }
-    currentStatus = { ...currentStatus, state: "ready", completedAt: Date.now() };
+    currentStatus = { ...currentStatus, state: "ready", completedAt: Date.now(), skippedUnregisteredCount: currentStatus.skippedUnregisteredCount };
+    if (staleCleanupCount > 0) {
+      logger.info({ staleCleanupCount }, "Cleaned up stale Workspace Authority entries during startup recovery");
+    }
     return getWorkspaceAuthorityStartupRecoveryStatus();
   } catch (error) {
     currentStatus = {
