@@ -774,6 +774,11 @@ describe('PiAgentBackend', () => {
       Object.defineProperty(backend, 'harness', {
         value: { prompt: vi.fn() },
       });
+      Object.defineProperty(backend, 'imageDescriber', {
+        value: {
+          isAvailable: () => false,
+        },
+      });
 
       await expect(
         backend.sendMessage('请看图', {

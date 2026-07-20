@@ -3,6 +3,7 @@
 import { cn } from '@/lib/utils'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
+import { useToast } from '@/components/ui/toast-provider'
 import {
   Select,
   SelectContent,
@@ -52,6 +53,7 @@ interface PromptInputContextValue {
   maxFiles?: number
   maxSize?: number
   accept?: string
+  supportsImages?: boolean
 }
 
 const PromptInputContext = React.createContext<PromptInputContextValue | null>(
@@ -128,6 +130,7 @@ interface PromptInputProps
   accept?: string
   globalDrop?: boolean
   multiple?: boolean
+  supportsImages?: boolean
 }
 
 export function PromptInput({
@@ -140,6 +143,7 @@ export function PromptInput({
   accept = '*/*',
   globalDrop = false,
   multiple = true,
+  supportsImages = true,
   className,
   ...props
 }: PromptInputProps) {
@@ -253,6 +257,7 @@ export function PromptInput({
     maxFiles,
     maxSize,
     accept,
+    supportsImages,
   }
 
   return (
@@ -339,6 +344,8 @@ export function PromptInputTextarea({
     }
   }
 
+  const { toast } = useToast()
+
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = Array.from(e.clipboardData.items)
     const imageFiles: File[] = []
@@ -350,6 +357,13 @@ export function PromptInputTextarea({
     }
     if (imageFiles.length > 0) {
       e.preventDefault()
+      if (!context.supportsImages) {
+        toast({
+          title: '当前模型不支持图片处理',
+          description: '请联系管理员在管理后台启用识图代理功能，或切换为多模态模型。',
+        })
+        return
+      }
       context.addFiles(imageFiles)
     }
   }
@@ -579,6 +593,10 @@ export function PromptInputAddImage({
 }) {
   const context = usePromptInput()
   const inputRef = React.useRef<HTMLInputElement>(null)
+
+  if (!context.supportsImages) {
+    return null
+  }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])

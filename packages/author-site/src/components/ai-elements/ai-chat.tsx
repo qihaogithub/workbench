@@ -205,6 +205,7 @@ export function AIChat({
   const {
     modelState,
     currentAvailableDepths,
+    currentSupportsImages,
     handleModelChange,
     handleDepthChange,
     handleModelsEvent,
@@ -508,6 +509,7 @@ export function AIChat({
         models={modelState.models}
         canSwitch={modelState.canSwitch}
         isModelLoading={modelState.isLoading}
+        supportsImages={currentSupportsImages}
       />
 
       <HistoryDialog

@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "be36fd58-b037-48c9-89f9-62782ed8e7b8",
+  "projectId": "proj_1783585261167_7h7prw",
+  "workspaceId": "live-1784459706736-vxrljql6z",
+  "baseRevision": 0,
+  "revision": 5,
+  "rootHash": "36b56e1ceff6b1ef0ca86a1ee655d1e56beb69e53ce1dc0f83e71973b6bfb540",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/growth-bean-mall_x8k2/prototype.css",
+      "action": "modified",
+      "beforeHash": "4aebbe6a7e15263fb342c84a561c5e7f56001418f4911537e798609735b3e7bb",
+      "afterHash": "29d1f668a8d683bb9effac02dee06e2d89b8e78d58ac6001d83c116b4e3b8649"
+    }
+  ],
+  "committedAt": 1784464971770
+}

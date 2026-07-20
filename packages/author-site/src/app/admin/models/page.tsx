@@ -11,6 +11,7 @@ import {
   GripVertical,
   Star,
   Image as ImageIcon,
+  Eye,
   Plus,
   X,
   Sparkles,
@@ -46,6 +47,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import {
+  pushImageDescriptionConfig,
+  fetchImageDescriptionConfig,
+  type ImageDescriptionConfig,
+} from "@/lib/agent-providers";
 import type { BackendProvider, BackendProvidersConfig } from "@workbench/shared";
 
 /* ============================================================
@@ -263,11 +269,23 @@ export default function ModelsPage() {
           )}
         >
           <Sparkles className="h-4 w-4" />
-          模型白名单
+           模型白名单
+        </button>
+        <button
+          onClick={() => handleTabChange("image-desc")}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors",
+            activeTab === "image-desc"
+              ? "bg-neutral-700 text-neutral-50"
+              : "text-neutral-400 hover:text-neutral-200",
+          )}
+        >
+          <Eye className="h-4 w-4" />
+          识图配置
         </button>
       </div>
 
-      {activeTab === "providers" ? <SuppliersTab /> : <ModelConfigTab />}
+      {activeTab === "providers" ? <SuppliersTab /> : activeTab === "image-desc" ? <ImageDescriberTab /> : <ModelConfigTab />}
     </div>
   );
 }
@@ -1652,6 +1670,266 @@ function RuleInput({
         >
           <Plus className="h-4 w-4 mr-1" />
           添加
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   识图配置 Tab
+   ============================================================ */
+
+function ImageDescriberTab() {
+  const [config, setConfig] = useState<ImageDescriptionConfig | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [pushResult, setPushResult] = useState<string | null>(null);
+  const [availableModels, setAvailableModels] = useState<AvailableModel[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
+
+  const [enabled, setEnabled] = useState(true);
+  const [visionModelId, setVisionModelId] = useState("");
+  const [timeout, setTimeout_] = useState(10000);
+  const [maxCacheSize, setMaxCacheSize] = useState(500);
+
+  const fetchAvailableModels = useCallback(async () => {
+    try {
+      setLoadingModels(true);
+      const res = await fetch("/api/admin/available-models");
+      const body = await res.json();
+      if (res.ok && body.success) {
+        const models: AvailableModel[] = (body.data?.models || []).map(
+          (m: { id: string; label?: string; group?: string }) => ({
+            id: m.id,
+            label: m.label || m.id,
+            group: m.group || extractGroup(m.id),
+            supportsImages: true,
+            supportsThinkingDepth: false,
+          }),
+        );
+        setAvailableModels(models);
+      }
+    } catch {
+      // non-critical, dropdown may be empty
+    } finally {
+      setLoadingModels(false);
+    }
+  }, []);
+
+  const loadConfig = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    await fetchAvailableModels();
+
+    const res = await fetch("/api/admin/model-config", {
+      headers: { "x-admin-token": localStorage.getItem("admin_token") || "" },
+    });
+    const body = await res.json();
+
+    if (body.success && body.data?.imageDescription) {
+      const c = body.data.imageDescription;
+      setConfig(c);
+      setEnabled(c.enabled ?? true);
+      setVisionModelId(c.visionModelId || "");
+      setTimeout_(c.timeout || 10000);
+      setMaxCacheSize(c.maxCacheSize || 500);
+    }
+    setLoading(false);
+  }, [fetchAvailableModels]);
+
+  useEffect(() => {
+    loadConfig();
+  }, [loadConfig]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+
+    const res = await fetch("/api/admin/model-config", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-token": localStorage.getItem("admin_token") || "",
+      },
+      body: JSON.stringify({
+        imageDescription: { enabled, visionModelId, timeout, maxCacheSize },
+      }),
+    });
+    const body = await res.json();
+
+    if (body.success) {
+      setSuccess("配置已保存");
+    } else {
+      setError(body?.error?.message || "保存失败");
+    }
+    setSaving(false);
+  };
+
+  const handlePushToAgent = async () => {
+    setSyncing(true);
+    setPushResult(null);
+
+    const res = await pushImageDescriptionConfig({
+      enabled,
+      visionModelId,
+      timeout,
+      maxCacheSize,
+    });
+
+    setPushResult(res.ok ? "已推送到 agent-service" : res.message);
+    setSyncing(false);
+  };
+
+  const handleFetchFromAgent = async () => {
+    setSyncing(true);
+    setPushResult(null);
+
+    const res = await fetchImageDescriptionConfig();
+    if (res.ok && res.config) {
+      setEnabled(res.config.enabled ?? true);
+      setVisionModelId(res.config.visionModelId || "");
+      setTimeout_(res.config.timeout || 10000);
+      setMaxCacheSize(res.config.maxCacheSize || 500);
+      setPushResult("已从 agent-service 拉取当前配置");
+    } else {
+      setPushResult(res.message || "拉取失败");
+    }
+    setSyncing(false);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-neutral-400 py-8">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        加载中...
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {error && (
+        <div className="flex items-center gap-2 p-3 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="flex items-center gap-2 p-3 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          {success}
+        </div>
+      )}
+      {pushResult && (
+        <div className={cn(
+          "flex items-center gap-2 p-3 rounded-md border text-sm",
+          pushResult.startsWith("已")
+            ? "bg-blue-500/10 border-blue-500/20 text-blue-400"
+            : "bg-amber-500/10 border-amber-500/20 text-amber-400"
+        )}>
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {pushResult}
+        </div>
+      )}
+
+      <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-6 space-y-5">
+        <div>
+          <h3 className="text-lg font-semibold text-neutral-50 mb-1">识图代理配置</h3>
+          <p className="text-sm text-neutral-400">
+            当用户使用的模型不支持图片输入时，通过识图模型将图片转为文字描述再发送给主模型。
+            默认已启用，留空识图模型则自动使用当前主模型进行识图。
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between py-2">
+          <div>
+            <p className="text-sm font-medium text-neutral-200">启用识图代理</p>
+            <p className="text-xs text-neutral-500">关闭后非多模态模型将无法处理图片</p>
+          </div>
+          <Switch checked={enabled} onCheckedChange={setEnabled} />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-neutral-300">识图模型</label>
+          <select
+            value={visionModelId}
+            onChange={(e) => setVisionModelId(e.target.value)}
+            className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/20"
+          >
+            <option value="">留空 — 自动使用当前主模型</option>
+            {availableModels.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+              </option>
+            ))}
+            {visionModelId && !availableModels.find((m) => m.id === visionModelId) && (
+              <option value={visionModelId}>{visionModelId} (自定义)</option>
+            )}
+          </select>
+          {loadingModels && (
+            <p className="text-xs text-neutral-500 flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              加载模型列表...
+            </p>
+          )}
+          <p className="text-xs text-neutral-500">
+            选择用于将图片转为文字描述的模型。留空则自动回退到当前主模型。
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-neutral-300">超时 (毫秒)</label>
+            <Input
+              type="number"
+              value={timeout}
+              onChange={(e) => setTimeout_(Number(e.target.value) || 10000)}
+              className="bg-neutral-900 border-neutral-700 text-neutral-200"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-neutral-300">缓存条目数</label>
+            <Input
+              type="number"
+              value={maxCacheSize}
+              onChange={(e) => setMaxCacheSize(Number(e.target.value) || 500)}
+              className="bg-neutral-900 border-neutral-700 text-neutral-200"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <Button
+          onClick={handleSave}
+          disabled={saving || syncing}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white"
+        >
+          {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          <Save className="h-4 w-4 mr-2" />
+          保存
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={handlePushToAgent}
+          disabled={saving || syncing}
+        >
+          {syncing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          <RefreshCw className="h-4 w-4 mr-2" />
+          推送到 agent-service
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={handleFetchFromAgent}
+          disabled={saving || syncing}
+          className="text-neutral-400"
+        >
+          从 agent-service 拉取
         </Button>
       </div>
     </div>

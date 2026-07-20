@@ -99,11 +99,20 @@ export function getSessionPath(sessionId: string, projectId?: string): string {
   return foundPath || path.join(SESSIONS_DIR, sessionId);
 }
 
+const sessionPathCache = new Map<string, { path: string | null; at: number }>();
+const SESSION_PATH_CACHE_TTL = 60_000;
+
 export function findSessionPath(sessionId: string): string | null {
+  const cached = sessionPathCache.get(sessionId);
+  if (cached && Date.now() - cached.at < SESSION_PATH_CACHE_TTL) {
+    return cached.path;
+  }
+
   console.log(`[findSessionPath] 查找 session: ${sessionId}`);
 
   if (!fs.existsSync(SESSIONS_DIR)) {
     console.error(`[findSessionPath] SESSIONS_DIR 不存在: ${SESSIONS_DIR}`);
+    sessionPathCache.set(sessionId, { path: null, at: Date.now() });
     return null;
   }
 
@@ -122,6 +131,7 @@ export function findSessionPath(sessionId: string): string | null {
     const directPath = path.join(level1Path, sessionId);
     if (fs.existsSync(directPath) && fs.statSync(directPath).isDirectory()) {
       console.log(`[findSessionPath] 找到 session (旧结构): ${directPath}`);
+      sessionPathCache.set(sessionId, { path: directPath, at: Date.now() });
       return directPath;
     }
 
@@ -141,6 +151,7 @@ export function findSessionPath(sessionId: string): string | null {
         console.log(
           `[findSessionPath] 找到 session (新结构-目录名): ${sessionPathByName}`,
         );
+        sessionPathCache.set(sessionId, { path: sessionPathByName, at: Date.now() });
         return sessionPathByName;
       }
 
@@ -159,6 +170,7 @@ export function findSessionPath(sessionId: string): string | null {
               console.log(
                 `[findSessionPath] 找到 session (新结构-meta): ${level3Path}`,
               );
+              sessionPathCache.set(sessionId, { path: level3Path, at: Date.now() });
               return level3Path;
             }
           } catch {
@@ -170,6 +182,7 @@ export function findSessionPath(sessionId: string): string | null {
   }
 
   console.error(`[findSessionPath] 未找到 session: ${sessionId}`);
+  sessionPathCache.set(sessionId, { path: null, at: Date.now() });
   return null;
 }
 

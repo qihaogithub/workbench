@@ -1,0 +1,14 @@
+{
+  "id": "f93012c1-37cd-4187-ae4d-847172442daa",
+  "name": "商场首页.html",
+  "mimeType": "text/html",
+  "size": 97571,
+  "textExtracted": true,
+  "textPreview": "<!DOCTYPE html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Figma Export</title>\n  <style>\n    /* Reset default margins */\n    * {\n      margin: 0;\n      padding: 0;\n      box-sizing: border-box;\n    }\n    \n    body {\n      min-height: 100vh;\n      display: flex;\n      justify-content: center;\n      align-items: flex-start;\n      padding: 20px;\n      background-color: #f5f5f5;\n    }\n    \n    /* Figma export",
+  "lineCount": 639,
+  "truncated": false,
+  "originalFilename": "商场首页.html",
+  "storedFilename": "____.html",
+  "sha256": "bfe6b6ba1716a9fbef9952ce0cbfed25e2abc6a8122e605326d9d143f238bb3c",
+  "createdAt": "2026-07-19T13:04:15.442Z"
+}

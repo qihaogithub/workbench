@@ -190,6 +190,14 @@ export class WorkspaceMutationAuthority {
     return this.serial(workspaceId, async () => this.withLease(workspaceId, async () => this.ensureBootstrap(projectId, workspaceId)));
   }
 
+  removeAuthority(workspaceId: string): void {
+    const dir = this.authorityDir(workspaceId);
+    if (fs.existsSync(dir)) {
+      fs.rmSync(dir, { recursive: true, force: true });
+      logger.info({ workspaceId }, "Workspace Authority 目录已清理");
+    }
+  }
+
   async recover(projectId: string, workspaceId: string): Promise<WorkspaceAuthorityRecoveryResult> {
     return this.serial(workspaceId, async () => this.withLease(workspaceId, async () => {
       const workspacePath = this.workspacePath(workspaceId);

@@ -1,0 +1,21 @@
+{
+  "id": "commit_1784473152203_9meak3",
+  "projectId": "proj_1783585261167_7h7prw",
+  "parentCommitId": "commit_1784472712715_0fx9q7",
+  "visibility": "protected",
+  "intent": "publish",
+  "title": "发布项目 v8",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "growth-bean-mall_x8k2",
+      "versionId": "prv_1784472712712_h5siry"
+    }
+  ],
+  "changedResources": [],
+  "createdAt": 1784473152203,
+  "createdBy": "Author Site",
+  "audit": {
+    "actorType": "user"
+  }
+}

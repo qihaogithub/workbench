@@ -137,15 +137,21 @@ describe("Workspace Authority startup recovery", () => {
     expect(getWorkspaceAuthorityStartupRecoveryStatus().state).toBe("failed");
   });
 
-  it("孤立 Authority state 没有 live Workspace 时阻止启动", async () => {
+  it("孤立 Authority state 没有 live Workspace 时自动清理陈旧条目", async () => {
     const fixture = createLiveWorkspace();
     await fixture.authority.bootstrap(fixture.projectId, fixture.workspaceId);
+    const authorityDir = path.join(fixture.dataDir, "workspace-authority", fixture.workspaceId);
+    expect(fs.existsSync(authorityDir)).toBe(true);
     fs.rmSync(fixture.workspacePath, { recursive: true, force: true });
 
-    await expect(recoverWorkspaceAuthoritiesOnStartup(fixture.dataDir)).rejects.toThrow(`WORKSPACE_NOT_FOUND:${fixture.workspaceId}`);
-    expect(getWorkspaceAuthorityStartupRecoveryStatus()).toMatchObject({
-      state: "failed",
+    const status = await recoverWorkspaceAuthoritiesOnStartup(fixture.dataDir);
+    expect(status).toMatchObject({
+      state: "ready",
+      scannedWorkspaceCount: 0,
       registeredWorkspaceCount: 1,
+      skippedUnregisteredCount: 1,
     });
+    expect(fs.existsSync(authorityDir)).toBe(false);
+    expect(getWorkspaceAuthorityStartupRecoveryStatus().state).toBe("ready");
   });
 });

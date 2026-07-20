@@ -1,0 +1,22 @@
+{
+  "currentHash": "c479b6540797440e",
+  "generatedAt": "2026-07-19T12:39:39.596Z",
+  "elapsed": 24899,
+  "history": [
+    "c479b6540797440e"
+  ],
+  "renderBoxes": {
+    "c479b6540797440e": {
+      "width": 375,
+      "height": 2119,
+      "viewportWidth": 375,
+      "viewportHeight": 812,
+      "bodyWidth": 375,
+      "bodyHeight": 2119,
+      "documentWidth": 375,
+      "documentHeight": 2119,
+      "fullPage": true
+    }
+  },
+  "variants": {}
+}

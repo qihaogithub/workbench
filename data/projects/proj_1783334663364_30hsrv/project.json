@@ -22,7 +22,11 @@
   "demoFolders": [],
   "versions": [],
   "createdAt": 1783334663371,
-  "updatedAt": 1784447806541,
-  "activeWorkspaceId": "live-1784447787164-3ehej7g4f",
-  "activeWorkspaceUpdatedAt": 1784447787194
+  "updatedAt": 1784466229050,
+  "activeWorkspaceId": "live-1784459697404-ldu29ss1h",
+  "activeWorkspaceUpdatedAt": 1784459697410,
+  "canonicalSyncedWorkspaceId": "live-1784459697404-ldu29ss1h",
+  "canonicalSyncedRevision": 10,
+  "canonicalSyncedRootHash": "c73547836d162ed45a735c206fb306918e768219e6214c5be0c8ae48a7ed2de7",
+  "canonicalSyncedAt": 1784466229050
 }

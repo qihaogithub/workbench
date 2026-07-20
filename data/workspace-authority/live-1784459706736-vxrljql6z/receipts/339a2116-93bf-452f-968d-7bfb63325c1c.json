@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "339a2116-93bf-452f-968d-7bfb63325c1c",
+  "projectId": "proj_1783585261167_7h7prw",
+  "workspaceId": "live-1784459706736-vxrljql6z",
+  "baseRevision": 0,
+  "revision": 13,
+  "rootHash": "11961287b6a132286a03bfbccd112b4a703984d86408737d34abce0768b130e7",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "assets/images/f88701df91cd-kingkong-03.png",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "f88701df91cdc146a175dd31640f5d4b793979c87e8a947ad3e7c4a492c1a6fd"
+    }
+  ],
+  "committedAt": 1784466277904
+}

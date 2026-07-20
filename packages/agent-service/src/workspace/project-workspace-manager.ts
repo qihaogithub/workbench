@@ -296,6 +296,26 @@ export class ProjectWorkspaceManager {
       await fs.promises.rm(sessionsDir, { recursive: true, force: true });
     }
 
+    // 清理 Workspace Authority 条目
+    const workspaceAuthorityDir = path.join(BASE_DIR, 'workspace-authority');
+    if (fs.existsSync(workspaceAuthorityDir)) {
+      const entries = await fs.promises.readdir(workspaceAuthorityDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory() || entry.name === 'leases') continue;
+        const statePath = path.join(workspaceAuthorityDir, entry.name, 'state.json');
+        if (!fs.existsSync(statePath)) continue;
+        try {
+          const state = JSON.parse(await fs.promises.readFile(statePath, 'utf-8'));
+          if (state.projectId === projectId) {
+            await fs.promises.rm(path.join(workspaceAuthorityDir, entry.name), { recursive: true, force: true });
+            logger.info({ workspaceId: entry.name, projectId }, '已清理工作空间 Authority 条目');
+          }
+        } catch {
+          // 忽略无法解析的 state.json
+        }
+      }
+    }
+
     logger.info({ projectId }, '项目已删除');
   }
 
