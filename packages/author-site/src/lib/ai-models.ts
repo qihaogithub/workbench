@@ -298,7 +298,7 @@ export function applyModelConfigs(
  */
 export async function applyModelConfigsAsync(
   raw: Array<{ id: string; label: string }>,
-): Promise<ResolvedModel[]> {
+): Promise<{ models: ResolvedModel[]; imageDescriptionEnabled: boolean }> {
   let configData: {
     enabledModels?: string[];
     autoEnableRules?: Array<{ type: "prefix" | "nameFilter"; value: string }>;
@@ -307,6 +307,7 @@ export async function applyModelConfigsAsync(
     nameFilters: string[];
     multimodalModels: string[];
   };
+  let imageDescriptionEnabled = false;
 
   try {
     const res = await fetch("/api/models/config");
@@ -320,21 +321,21 @@ export async function applyModelConfigsAsync(
         nameFilters: data.frontend?.nameFilters ?? [],
         multimodalModels: data.multimodalModels ?? [],
       };
+      imageDescriptionEnabled =
+        data.imageDescription?.enabled === true;
     } else {
       configData = getEnvFallbackConfig();
     }
   } catch {
-    // API 不可用时 fallback 到环境变量
     configData = getEnvFallbackConfig();
   }
 
-  // 从配置构建完整的模型配置表(含动态白名单前缀)
   const configs = buildModelConfigsFromData(configData.allowedPrefixes);
   const blacklist = parseBlacklistFromConfig(configData.blacklist);
   const nameFilters = parseNameFiltersFromConfig(configData.nameFilters);
   const multimodalSet = new Set(configData.multimodalModels);
 
-  return applyModelConfigsWithFullData(raw, {
+  const models = applyModelConfigsWithFullData(raw, {
     configs,
     blacklist,
     nameFilters,
@@ -342,6 +343,8 @@ export async function applyModelConfigsAsync(
     enabledModels: configData.enabledModels,
     autoEnableRules: configData.autoEnableRules,
   });
+
+  return { models, imageDescriptionEnabled };
 }
 
 /**

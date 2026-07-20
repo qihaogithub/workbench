@@ -10,6 +10,7 @@
 import { readDbConfig } from "./db-config";
 import { getModelEnvConfig } from "./runtime-config";
 import type { BackendProvidersConfig } from "@workbench/shared";
+import type { ImageDescriptionConfig } from "./agent-providers";
 
 const CONFIG_ID = "model_config";
 const CACHE_TTL = 60 * 1000; // 1 分钟缓存
@@ -50,6 +51,7 @@ export interface ModelConfigData {
    * 字段缺失时视为空(agent-service 走 .env PI_AGENT_PROVIDERS fallback)
    */
   backendProviders?: BackendProvidersConfig;
+  imageDescription?: ImageDescriptionConfig;
 }
 
 let cachedConfig: CachedConfig | null = null;
@@ -96,6 +98,10 @@ function normalizeConfig(dbConfig: Record<string, any>): ModelConfigData {
     dbConfig.backendProviders &&
     Array.isArray(dbConfig.backendProviders.providers)
       ? (dbConfig.backendProviders as BackendProvidersConfig)
+      : undefined;
+  const imageDescription: ImageDescriptionConfig | undefined =
+    dbConfig.imageDescription && typeof dbConfig.imageDescription === "object"
+      ? (dbConfig.imageDescription as ImageDescriptionConfig)
       : undefined;
 
   // 读取新结构
@@ -159,6 +165,7 @@ function normalizeConfig(dbConfig: Record<string, any>): ModelConfigData {
     },
     multimodalModels,
     backendProviders,
+    imageDescription,
   };
 }
 
