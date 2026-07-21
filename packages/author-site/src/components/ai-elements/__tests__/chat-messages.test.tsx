@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 
-import { ChatMessages } from "../chat/chat-messages";
-import type { ChatMessage } from "../message";
+import { ChatMessages } from "@workbench/ai-chat-shared/chat/chat-messages";
+import type { ChatMessage } from "@workbench/ai-chat-shared/message";
 
 jest.mock(
   "streamdown",

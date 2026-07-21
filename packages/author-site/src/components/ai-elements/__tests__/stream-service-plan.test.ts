@@ -1,4 +1,4 @@
-import { StreamService } from "../chat/services/stream-service";
+import { StreamService } from "@workbench/ai-chat-shared/chat/services/stream-service";
 
 describe("StreamService plan event", () => {
   afterEach(() => {

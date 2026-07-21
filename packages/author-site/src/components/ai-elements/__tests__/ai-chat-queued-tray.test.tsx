@@ -1,8 +1,8 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import { AIChat } from "../ai-chat";
-import type { ChatMessage } from "../message";
+import { AIChat } from "@workbench/ai-chat-shared/ai-chat";
+import type { ChatMessage } from "@workbench/ai-chat-shared/message";
 
 const handleCancelQueuedMessage = jest.fn();
 
@@ -21,11 +21,11 @@ jest.mock("@streamdown/mermaid", () => ({ mermaid: {} }), { virtual: true });
 jest.mock("@streamdown/math", () => ({ math: {} }), { virtual: true });
 jest.mock("@streamdown/cjk", () => ({ cjk: {} }), { virtual: true });
 
-jest.mock("@/components/ui/toast-provider", () => ({
+jest.mock("@workbench/ai-chat-shared/ui/toast-provider", () => ({
   useToast: () => ({ toast: jest.fn() }),
 }));
 
-jest.mock("../chat/hooks/use-chat-models", () => ({
+jest.mock("@workbench/ai-chat-shared/chat/hooks/use-chat-models", () => ({
   useChatModels: () => ({
     modelState: {
       currentModelId: "deepseek-v4-flash",
@@ -43,7 +43,7 @@ jest.mock("../chat/hooks/use-chat-models", () => ({
   }),
 }));
 
-jest.mock("../chat/hooks/use-chat-stream", () => ({
+jest.mock("@workbench/ai-chat-shared/chat/hooks/use-chat-stream", () => ({
   useChatStream: () => ({
     plan: { items: [], fallbackText: "" },
     pendingPermissionRequest: null,

@@ -5,18 +5,11 @@ import { getSystemKnowledgeSnapshot } from "../config/system-knowledge";
 
 const MAX_TEXT_CHARS = 12000;
 const MAX_INLINE_PAGES = 2;
-const MAX_HISTORY_ITEMS = 8;
-
-export interface ViewerAiHistoryMessage {
-  role: "user" | "assistant";
-  content: string;
-}
 
 export interface ViewerAiContextInput {
   project: Project;
   activePageId?: string;
   activeConfig?: Record<string, unknown>;
-  history?: ViewerAiHistoryMessage[];
 }
 
 function readTextIfExists(filePath: string): string | null {
@@ -142,23 +135,8 @@ function formatKnowledgeIndex(workspacePath: string): string {
   return sections.join("\n\n") || "（暂无知识库索引）";
 }
 
-function formatHistory(history?: ViewerAiHistoryMessage[]): string {
-  const safeHistory = (history || [])
-    .filter((item) =>
-      (item.role === "user" || item.role === "assistant") &&
-      typeof item.content === "string" &&
-      item.content.trim().length > 0,
-    )
-    .slice(-MAX_HISTORY_ITEMS);
-
-  if (safeHistory.length === 0) return "（暂无历史对话）";
-  return safeHistory
-    .map((item) => `${item.role === "user" ? "使用者" : "AI"}：${truncateText(item.content.trim(), 2000)}`)
-    .join("\n\n");
-}
-
 export function buildViewerAiPromptContext(input: ViewerAiContextInput): string {
-  const { project, activePageId, activeConfig, history } = input;
+  const { project, activePageId, activeConfig } = input;
   const pages = listWorkspacePages(project);
   const activePage = pages.find((page) => page.id === activePageId) || pages[0];
   const projectConfigSchema = readTextIfExists(path.join(project.workspacePath, "project.config.schema.json"));
@@ -200,9 +178,6 @@ export function buildViewerAiPromptContext(input: ViewerAiContextInput): string 
     "",
     "## 知识库索引",
     formatKnowledgeIndex(project.workspacePath),
-    "",
-    "## 最近本地对话历史",
-    formatHistory(history),
     "",
     "[系统上下文结束]",
   ].join("\n");

@@ -1,4 +1,5 @@
 import type {
+  AgentMode,
   AgentResult,
   AgentInfo,
   SessionListResponse,
@@ -13,15 +14,23 @@ import type {
 export interface AgentClientConfig {
   baseUrl: string;
   apiKey?: string;
+  /** 行为模式，默认 "workbench"；viewer-readonly 会随请求/连接透传给 agent-service */
+  mode?: AgentMode;
 }
 
 export class AgentClient {
   private baseUrl: string;
   private apiKey?: string;
+  private mode: AgentMode;
 
   constructor(config: AgentClientConfig) {
     this.baseUrl = config.baseUrl.replace(/\/+$/, "");
     this.apiKey = config.apiKey;
+    this.mode = config.mode ?? "workbench";
+  }
+
+  getMode(): AgentMode {
+    return this.mode;
   }
 
   private getHeaders(): Record<string, string> {
@@ -67,6 +76,8 @@ export class AgentClient {
       method: "POST",
       body: JSON.stringify({
         content,
+        mode: options?.options?.mode ?? this.mode,
+        viewerContext: options?.options?.viewerContext,
         projectId: options?.projectId,
         demoId: options?.demoId,
         workingDir: options?.workingDir,
@@ -197,7 +208,12 @@ export class AgentClient {
 
   stream(sessionId: string): AgentStream {
     const wsUrl = this.baseUrl.replace(/^http/, "ws");
-    return new AgentStream(`${wsUrl}/api/agent/${sessionId}/stream`);
+    const query =
+      this.mode === "viewer-readonly" ? `?mode=${this.mode}` : "";
+    return new AgentStream(
+      `${wsUrl}/api/agent/${sessionId}/stream${query}`,
+      this.mode,
+    );
   }
 }
 
@@ -277,6 +293,7 @@ export interface ToolCapabilities {
 export class AgentStream {
   private ws: WebSocket | null = null;
   private url: string;
+  private mode: import("./types").AgentMode;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
@@ -284,8 +301,9 @@ export class AgentStream {
     new Map();
   private autoReconnect = true;
 
-  constructor(url: string) {
+  constructor(url: string, mode: import("./types").AgentMode = "workbench") {
     this.url = url;
+    this.mode = mode;
     this.connect();
   }
 
@@ -349,6 +367,8 @@ export class AgentStream {
         type: "message",
         id: id || `msg-${Date.now()}`,
         content,
+        mode: options?.mode ?? this.mode,
+        viewerContext: options?.viewerContext,
         workingDir: options?.workingDir,
         projectId: options?.projectId,
         demoId: options?.demoId,
@@ -357,6 +377,49 @@ export class AgentStream {
         files: options?.files,
         systemPrompt: options?.systemPrompt,
         options,
+      }),
+    );
+  }
+
+  /** WebSocket 是否处于可发送状态 */
+  isOpen(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN;
+  }
+
+  /** 请求可用模型列表；响应通过 "models" 事件返回 */
+  requestModels(options?: {
+    workingDir?: string;
+    projectId?: string;
+    demoId?: string;
+  }): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      this.emit("error", {
+        type: "error",
+        error: { code: "NOT_CONNECTED", message: "WebSocket is not connected" },
+      });
+      return;
+    }
+
+    this.ws.send(
+      JSON.stringify({
+        type: "get_models",
+        mode: this.mode,
+        workingDir: options?.workingDir,
+        projectId: options?.projectId,
+        demoId: options?.demoId,
+      }),
+    );
+  }
+
+  /** 切换当前会话模型；确认通过 "models" 事件返回 */
+  setModel(modelId: string, id?: string): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+
+    this.ws.send(
+      JSON.stringify({
+        type: "set_model",
+        id,
+        modelId,
       }),
     );
   }

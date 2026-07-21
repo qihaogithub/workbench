@@ -56,7 +56,7 @@ import { getDefaultValues, getPreviewSize } from "@/lib/validator";
 import type { PreviewSize } from "@workbench/demo-ui";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { ViewerAiDrawer } from "@/components/ViewerAiDrawer";
+import { ViewerAiPanel } from "@/components/ViewerAiPanel";
 
 type SortOption = "newest" | "oldest" | "name";
 type ProjectListItem = ProjectsIndex["projects"][number];
@@ -955,11 +955,12 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
       />
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {project && activePage && (
-          <ViewerAiDrawer
+          <ViewerAiPanel
             open={aiDrawerOpen}
             projectId={projectId}
-            project={project}
+            projectName={project.name}
             activePageId={activePage.id}
+            activePageName={activePage.name}
             activeConfig={configData}
             onOpenChange={setAiDrawerOpen}
           />

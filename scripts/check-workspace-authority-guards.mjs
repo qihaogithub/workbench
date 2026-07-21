@@ -1880,10 +1880,10 @@ requireIncludes(
 
 const projectApiSource = read("packages/author-site/src/lib/project-api.ts");
 const chatStreamServiceSource = read(
-  "packages/author-site/src/components/ai-elements/chat/services/stream-service.ts",
+  "packages/ai-chat-shared/src/chat/services/stream-service.ts",
 );
 const chatStreamHookSource = read(
-  "packages/author-site/src/components/ai-elements/chat/hooks/use-chat-stream.ts",
+  "packages/ai-chat-shared/src/chat/hooks/use-chat-stream.ts",
 );
 const agentClientSource = read("packages/agent-client/src/client.ts");
 const agentProjectsRouteSource = read(

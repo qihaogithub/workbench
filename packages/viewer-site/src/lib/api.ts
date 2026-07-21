@@ -1,5 +1,5 @@
 import type { SketchSceneDocument } from "@workbench/sketch-core";
-import { normalizeAiError, type ImageAttachment, type DemoFolderMeta } from "@workbench/shared";
+import type { DemoFolderMeta } from "@workbench/shared";
 import type { CanvasState } from "@workbench/demo-ui";
 
 export type PublishedPageRuntimeType =
@@ -68,7 +68,6 @@ export interface ProjectsIndex {
 const DATA_BASE =
   process.env.NEXT_PUBLIC_DATA_BASE ||
   (process.env.NODE_ENV === "development" ? "http://localhost:3200" : "");
-const AGENT_SERVICE_BASE = process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "";
 
 async function fetchJson<T>(path: string): Promise<T> {
   const res = await fetch(`${DATA_BASE}${path}`, { cache: "no-store" });
@@ -150,92 +149,3 @@ export function getPublishedFileUrl(
   return `${DATA_BASE}/data/${projectId}/${filePath}`;
 }
 
-export interface ViewerAiHistoryMessage {
-  role: "user" | "assistant";
-  content: string;
-}
-
-export interface ViewerAiChatRequest {
-  projectId: string;
-  sessionId?: string;
-  message: string;
-  model?: string;
-  activePageId?: string;
-  activeConfig?: Record<string, unknown>;
-  history?: ViewerAiHistoryMessage[];
-  images?: ImageAttachment[];
-}
-
-export interface ViewerAiChatResponse {
-  sessionId: string;
-  answer: string;
-  metadata?: Record<string, unknown>;
-}
-
-export async function askViewerAi(
-  request: ViewerAiChatRequest,
-): Promise<ViewerAiChatResponse> {
-  let res: Response;
-  try {
-    res = await fetch(`${AGENT_SERVICE_BASE}/api/viewer-ai/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(request),
-    });
-  } catch (error) {
-    throw new Error(normalizeAiError(error).userMessage);
-  }
-  const payload = await res.json().catch(() => null) as
-    | { success: true; data: ViewerAiChatResponse }
-    | { success: false; error?: { message?: string } }
-    | null;
-
-  if (!res.ok || !payload || !payload.success) {
-    throw new Error(
-      payload && "error" in payload && payload.error?.message
-        ? normalizeAiError(payload.error).userMessage
-        : `AI 问答失败: ${res.status} ${res.statusText}`,
-    );
-  }
-
-  return payload.data;
-}
-
-export interface ViewerAiModel {
-  id: string;
-  label: string;
-  group?: string;
-  provider?: string;
-}
-
-export async function getViewerAiModels(): Promise<{
-  models: ViewerAiModel[];
-  currentModelId: string | null;
-  canSwitch: boolean;
-}> {
-  try {
-    const res = await fetch(`${AGENT_SERVICE_BASE}/models`, { cache: "no-store" });
-    const payload = await res.json().catch(() => null) as
-      | {
-          success: true;
-          data: {
-            models: ViewerAiModel[];
-            currentModelId: string | null;
-            canSwitch: boolean;
-          };
-        }
-      | { success: false; error?: { message?: string } }
-      | null;
-
-    if (!res.ok || !payload || !payload.success) {
-      throw new Error(
-        payload && "error" in payload && payload.error?.message
-          ? payload.error.message
-          : `模型列表加载失败: ${res.status} ${res.statusText}`,
-      );
-    }
-    return payload.data;
-  } catch (error) {
-    throw new Error(normalizeAiError(error).userMessage);
-  }
-}

@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 
-import { HistoryDialog } from "../history-dialog";
+import { HistoryDialog } from "@workbench/ai-chat-shared/history-dialog";
 
 describe("HistoryDialog 布局", () => {
   const fetchMock = jest.fn();

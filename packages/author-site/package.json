@@ -59,6 +59,7 @@
     "@uiw/codemirror-theme-vscode": "^4.25.10",
     "@uiw/react-codemirror": "^4.25.10",
     "@workbench/agent-client": "workspace:*",
+    "@workbench/ai-chat-shared": "workspace:*",
     "@workbench/demo-ui": "workspace:*",
     "@workbench/knowledge-service": "workspace:*",
     "@workbench/preview-contract": "workspace:*",

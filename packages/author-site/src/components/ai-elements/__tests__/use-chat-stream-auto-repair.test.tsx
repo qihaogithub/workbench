@@ -1,25 +1,25 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 
-import type { ChatMessage } from "../message";
-import { useChatStream } from "../chat/hooks/use-chat-stream";
+import type { ChatMessage } from "@workbench/ai-chat-shared/message";
+import { useChatStream } from "@workbench/ai-chat-shared/chat/hooks/use-chat-stream";
 import {
   persistMessages,
   updateSessionTitle,
-} from "../chat/services/message-service";
+} from "@workbench/ai-chat-shared/chat/services/message-service";
 
 const mockSendMessage = jest.fn();
 
-jest.mock("../chat/services/message-service", () => ({
+jest.mock("@workbench/ai-chat-shared/chat/services/message-service", () => ({
   persistMessages: jest.fn().mockResolvedValue(undefined),
   updateSessionTitle: jest.fn().mockResolvedValue(undefined),
   fetchSessionFiles: jest.fn().mockResolvedValue(null),
 }));
 
-jest.mock("@/lib/agent/active-view-context", () => ({
+jest.mock("@workbench/ai-chat-shared/lib/active-view-context", () => ({
   buildActiveViewContextPrefix: jest.fn(() => ""),
 }));
 
-jest.mock("../chat/services/stream-service", () => {
+jest.mock("@workbench/ai-chat-shared/chat/services/stream-service", () => {
   class MissingTransactionalDeleteToolsError extends Error {}
 
   class StreamService {
@@ -145,6 +145,9 @@ describe("useChatStream 自动修复发送", () => {
         undefined,
         undefined,
         undefined,
+        undefined,
+        undefined,
+        undefined,
       );
     });
   });
@@ -199,6 +202,9 @@ describe("useChatStream 自动修复发送", () => {
     await waitFor(() => {
       expect(mockSendMessage).toHaveBeenCalledWith(
         "隐藏的完整技术错误",
+        undefined,
+        undefined,
+        undefined,
         undefined,
         undefined,
         undefined,
@@ -286,6 +292,9 @@ describe("useChatStream 自动修复发送", () => {
     await waitFor(() => {
       expect(mockSendMessage).toHaveBeenCalledWith(
         "第一条",
+        undefined,
+        undefined,
+        undefined,
         undefined,
         undefined,
         undefined,
@@ -593,6 +602,9 @@ describe("useChatStream 自动修复发送", () => {
         undefined,
         undefined,
         "deepseek/deepseek-v4-pro",
+        undefined,
+        undefined,
+        undefined,
       );
     });
   });

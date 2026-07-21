@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useCallback, useEffect } from "react";
-import type { StreamService } from "@/components/ai-elements/chat/services/stream-service";
+import type { StreamService } from "@workbench/ai-chat-shared";
 import type { ConsoleLogPayload } from "@workbench/demo-ui";
 
 const MAX_ENTRIES = 500;

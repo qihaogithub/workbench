@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, type MutableRefObject, type RefObject } from "react";
 import { useToast } from "@/components/ui/toast-provider";
-import type { AutoRepairTrigger, VisualPropertyAutoSend } from "@/components/ai-elements/ai-chat";
+import type { AutoRepairTrigger, VisualPropertyAutoSend } from "@/components/ai-elements";
 import type {
   VisualAnnotation,
   VisualEditPatch,

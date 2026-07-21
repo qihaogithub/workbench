@@ -1,5 +1,14 @@
 export type AgentType = 'pi-agent';
 
+/** Agent 行为模式：workbench 为创作端全量工具，viewer-readonly 为浏览端只读工具 */
+export type AgentMode = 'workbench' | 'viewer-readonly';
+
+/** viewer-readonly 模式下随消息上报的浏览端上下文 */
+export interface ViewerContext {
+  activePageId?: string;
+  activeConfig?: Record<string, unknown>;
+}
+
 export type AgentStatus =
   | 'initializing'
   | 'ready'
@@ -90,6 +99,10 @@ export interface SendMessageOptions {
    * 注：L3 动态上下文已拼到 content 字段头部
    */
   systemPrompt?: string;
+  /** 行为模式；通常由 AgentClient/AgentStream 按配置自动注入，无需手动传 */
+  mode?: AgentMode;
+  /** viewer-readonly 模式下的浏览端上下文（服务端用于拼接只读问答上下文） */
+  viewerContext?: ViewerContext;
   context?: {
     files?: string[];
     presetRules?: string;

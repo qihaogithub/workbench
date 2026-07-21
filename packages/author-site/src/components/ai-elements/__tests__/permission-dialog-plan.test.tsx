@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import { PermissionDialog } from "../permission-dialog";
+import { PermissionDialog } from "@workbench/ai-chat-shared/permission-dialog";
 
 jest.mock("@workbench/demo-ui", () => ({
   DocumentEditor: ({
@@ -81,7 +81,7 @@ describe("PermissionDialog 计划审批", () => {
       />,
     );
 
-    expect(screen.getByText("执行计划待确认")).toBeInTheDocument();
+    expect(screen.getByText("执行计划")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "查看计划" }));
 
     const textarea = screen.getByLabelText("计划 Markdown 编辑器");

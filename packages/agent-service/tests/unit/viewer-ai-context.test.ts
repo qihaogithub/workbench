@@ -84,10 +84,6 @@ describe('viewer AI context', () => {
       project,
       activePageId: 'home',
       activeConfig: { title: '自定义标题' },
-      history: [
-        { role: 'user', content: '这个页面是什么？' },
-        { role: 'assistant', content: '这是首页。' },
-      ],
     });
 
     expect(context).toContain('测试项目');
@@ -96,7 +92,6 @@ describe('viewer AI context', () => {
     expect(context).toContain('用户偏好：回答要简洁。');
     expect(context).toContain('使用说明');
     expect(context).toContain('配置系统参考');
-    expect(context).toContain('最近本地对话历史');
   });
 
   it('system prompt 应明确只读边界和非技术用户风格', () => {
