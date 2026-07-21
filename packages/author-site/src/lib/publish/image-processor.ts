@@ -12,15 +12,36 @@ import {
   scanImageReferences,
 } from './image-scanner';
 
+export interface ImageLocalizationOptions {
+  /** 完全跳过外部图片下载，外部 URL 保持原样写入产物 */
+  skip?: boolean;
+  /** 单张外部图片下载超时（毫秒） */
+  timeoutMs?: number;
+  /** 外部图片并发下载数 */
+  concurrency?: number;
+}
+
+export interface ImageProcessOutcome {
+  url: string;
+  kind: "external" | "local";
+  success: boolean;
+  skipped?: boolean;
+  reason?: string;
+}
+
 export interface ImageProcessResult {
   success: boolean;
   urlMap: Map<string, string>;
   errors: UploadResult[];
   imageCount: number;
+  /** 逐图结果（按去重后的引用），供干跑报告与错误详情使用 */
+  outcomes: ImageProcessOutcome[];
 }
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 const MAX_REDIRECTS = 3;
+const DEFAULT_IMAGE_TIMEOUT_MS = 10_000;
+const DEFAULT_IMAGE_CONCURRENCY = 4;
 const ALLOWED_CONTENT_TYPES = new Map([
   ['image/png', '.png'],
   ['image/jpeg', '.jpg'],
@@ -152,10 +173,14 @@ function copyLocalImage(
 
 async function fetchExternalImage(
   rawUrl: string,
+  timeoutMs: number,
   redirectCount = 0,
 ): Promise<{ buffer: Buffer; ext: string }> {
   const url = await assertPublicHttpUrl(rawUrl);
-  const response = await fetch(url, { redirect: 'manual' });
+  const response = await fetch(url, {
+    redirect: 'manual',
+    signal: AbortSignal.timeout(timeoutMs),
+  });
 
   if (
     response.status >= 300 &&
@@ -166,7 +191,7 @@ async function fetchExternalImage(
       throw new Error('TOO_MANY_REDIRECTS');
     }
     const nextUrl = new URL(response.headers.get('location') || '', url);
-    return fetchExternalImage(nextUrl.toString(), redirectCount + 1);
+    return fetchExternalImage(nextUrl.toString(), timeoutMs, redirectCount + 1);
   }
 
   if (!response.ok) {
@@ -189,9 +214,10 @@ async function fetchExternalImage(
 async function downloadExternalImage(
   ref: ImageReference,
   context: PublishContext,
+  timeoutMs: number,
 ): Promise<UploadResult> {
   try {
-    const { buffer, ext } = await fetchExternalImage(ref.originalPath);
+    const { buffer, ext } = await fetchExternalImage(ref.originalPath, timeoutMs);
     const filename = `${hashBuffer(buffer).slice(0, 24)}${ext}`;
     const assetDir = ensureAssetDir(context.publishDir);
     fs.writeFileSync(path.join(assetDir, filename), buffer);
@@ -203,15 +229,43 @@ async function downloadExternalImage(
       success: true,
     };
   } catch (error) {
+    const reason =
+      error instanceof Error
+        ? error.name === 'TimeoutError'
+          ? `TIMEOUT_${timeoutMs}MS`
+          : error.message
+        : 'DOWNLOAD_FAILED';
     return {
       localPath: ref.originalPath,
       ossUrl: '',
       ossKey: '',
       size: 0,
       success: false,
-      error: error instanceof Error ? error.message : 'DOWNLOAD_FAILED',
+      error: reason,
     };
   }
+}
+
+/** 简单并发池：以固定并发度执行任务，保序返回 */
+async function runWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  run: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+  const workers = Array.from(
+    { length: Math.max(1, Math.min(concurrency, items.length)) },
+    async () => {
+      while (cursor < items.length) {
+        const index = cursor;
+        cursor += 1;
+        results[index] = await run(items[index], index);
+      }
+    },
+  );
+  await Promise.all(workers);
+  return results;
 }
 
 function isPublishableReference(ref: ImageReference): boolean {
@@ -225,52 +279,127 @@ function isPublishableReference(ref: ImageReference): boolean {
 
 export async function processImagesForPublish(
   context: PublishContext,
+  options: ImageLocalizationOptions = {},
 ): Promise<ImageProcessResult> {
   const { workspacePath, onProgress } = context;
+  const timeoutMs = options.timeoutMs ?? DEFAULT_IMAGE_TIMEOUT_MS;
+  const concurrency = options.concurrency ?? DEFAULT_IMAGE_CONCURRENCY;
 
   onProgress?.(0, 100, '扫描图片引用...');
   const references = scanImageReferences(workspacePath).filter(isPublishableReference);
 
   if (references.length === 0) {
     onProgress?.(100, 100, '未发现需要本地化的图片引用');
-    return { success: true, urlMap: new Map(), errors: [], imageCount: 0 };
+    return { success: true, urlMap: new Map(), errors: [], imageCount: 0, outcomes: [] };
+  }
+
+  // 按去重键分组：外部引用按 URL、本地引用按绝对路径，同一资源只处理一次
+  const uniqueRefs = new Map<string, ImageReference>();
+  for (const ref of references) {
+    const key = isExternalImageUrl(ref.originalPath)
+      ? ref.originalPath
+      : ref.absolutePath;
+    if (!uniqueRefs.has(key)) uniqueRefs.set(key, ref);
   }
 
   const urlMap = new Map<string, string>();
   const errors: UploadResult[] = [];
-  const cache = new Map<string, UploadResult>();
+  const outcomes: ImageProcessOutcome[] = [];
 
-  for (let index = 0; index < references.length; index += 1) {
-    const ref = references[index];
-    const cacheKey = ref.absolutePath;
-    const cached = cache.get(cacheKey);
-    const result = cached || (isExternalImageUrl(ref.originalPath)
-      ? await downloadExternalImage(ref, context)
-      : copyLocalImage(ref, context));
-    cache.set(cacheKey, result);
+  const externalRefs = [...uniqueRefs.values()].filter((ref) =>
+    isExternalImageUrl(ref.originalPath),
+  );
+  const localRefs = [...uniqueRefs.values()].filter(
+    (ref) => !isExternalImageUrl(ref.originalPath),
+  );
 
-    if (result.success) {
-      urlMap.set(ref.originalPath, result.ossUrl);
-    } else {
-      if (isExternalImageUrl(ref.originalPath)) {
+  if (options.skip) {
+    onProgress?.(10, 100, `跳过 ${externalRefs.length} 张外部图片下载`);
+    for (const ref of externalRefs) {
+      outcomes.push({
+        url: ref.originalPath,
+        kind: 'external',
+        success: false,
+        skipped: true,
+        reason: 'SKIPPED',
+      });
+    }
+  } else if (externalRefs.length > 0) {
+    let finished = 0;
+    const results = await runWithConcurrency(
+      externalRefs,
+      concurrency,
+      async (ref) => {
+        const result = await downloadExternalImage(ref, context, timeoutMs);
+        finished += 1;
+        const percent = 10 + Math.floor((finished / externalRefs.length) * 70);
+        onProgress?.(
+          percent,
+          100,
+          `本地化外部图片 ${finished}/${externalRefs.length}...`,
+        );
+        return result;
+      },
+    );
+    results.forEach((result, index) => {
+      const ref = externalRefs[index];
+      if (result.success) {
+        urlMap.set(ref.originalPath, result.ossUrl);
+        outcomes.push({ url: ref.originalPath, kind: 'external', success: true });
+      } else {
+        // 外部图片失败不阻断发布，产物保留原 URL
         console.warn(
           `[publish] 外部图片本地化失败，发布产物将保留原 URL: ${ref.originalPath} (${result.error || 'UNKNOWN'})`,
         );
-      } else {
-        errors.push({ ...result, localPath: ref.originalPath });
+        outcomes.push({
+          url: ref.originalPath,
+          kind: 'external',
+          success: false,
+          reason: result.error || 'UNKNOWN',
+        });
       }
-    }
-
-    const percent = 10 + Math.floor(((index + 1) / references.length) * 80);
-    onProgress?.(percent, 100, `本地化图片 ${index + 1}/${references.length}...`);
+    });
   }
 
-  onProgress?.(100, 100, `图片本地化完成（成功: ${urlMap.size}, 阻断失败: ${errors.length}）`);
+  for (const ref of localRefs) {
+    const result = copyLocalImage(ref, context);
+    if (result.success) {
+      urlMap.set(ref.originalPath, result.ossUrl);
+      outcomes.push({ url: ref.originalPath, kind: 'local', success: true });
+    } else {
+      errors.push({ ...result, localPath: ref.originalPath });
+      outcomes.push({
+        url: ref.originalPath,
+        kind: 'local',
+        success: false,
+        reason: result.error || 'UNKNOWN',
+      });
+    }
+  }
+
+  // 同一资源的其余引用路径也要写入 urlMap，保证替换覆盖所有出现位置
+  for (const ref of references) {
+    if (urlMap.has(ref.originalPath)) continue;
+    const key = isExternalImageUrl(ref.originalPath)
+      ? ref.originalPath
+      : ref.absolutePath;
+    const canonical = uniqueRefs.get(key);
+    if (canonical && urlMap.has(canonical.originalPath)) {
+      urlMap.set(ref.originalPath, urlMap.get(canonical.originalPath) as string);
+    }
+  }
+
+  onProgress?.(
+    100,
+    100,
+    `图片本地化完成（成功: ${urlMap.size}, 阻断失败: ${errors.length}）`,
+  );
 
   return {
     success: errors.length === 0,
     urlMap,
     errors,
-    imageCount: references.length,
+    imageCount: uniqueRefs.size,
+    outcomes,
   };
 }

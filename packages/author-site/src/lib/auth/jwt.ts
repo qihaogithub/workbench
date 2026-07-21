@@ -5,19 +5,22 @@ const SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || "change-me-in-production",
 );
 
+/** token 有效期，createToken、cookie maxAge 与 CLI 返回的 expiresAt 共用同一来源 */
+export const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 export interface UserPayload {
   userId: string;
   username: string;
 }
 
 /**
- * 创建 JWT token（7 天过期）
+ * 创建 JWT token（TOKEN_TTL_MS 过期）
  */
 export async function createToken(payload: UserPayload): Promise<string> {
   return new SignJWT(payload as any)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("7d")
+    .setExpirationTime(Math.floor((Date.now() + TOKEN_TTL_MS) / 1000))
     .sign(SECRET);
 }
 
@@ -50,7 +53,7 @@ export function setAuthCookie(token: string): void {
     httpOnly: true,
     secure: useSecureCookie,
     sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60,
+    maxAge: TOKEN_TTL_MS / 1000,
     path: "/",
   });
 }

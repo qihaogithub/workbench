@@ -158,6 +158,16 @@ import {
   ok,
   fail,
 } from "./utils.js";
+import {
+  cleanProjectWorkspaces,
+  fixProjectWorkspaceReferences,
+  listProjectWorkspaces,
+} from "./workspace-admin.js";
+import {
+  backupAndResetContentGraphStorage,
+  readContentGraphAdminStatus,
+  restoreContentGraphStorage,
+} from "./content-graph-admin.js";
 
 interface CanonicalWorkspaceProof {
   workspaceId?: string;
@@ -1657,6 +1667,191 @@ export class ProjectAdminService {
     });
   }
 
+  workspaceList(
+    projectId: string,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<ReturnType<typeof listProjectWorkspaces>> {
+    const access = this.requireProjectAccess(projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    const project = this.readProject(projectId);
+    if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
+    return ok(listProjectWorkspaces(this.dataDir, projectId));
+  }
+
+  workspaceClean(
+    projectId: string,
+    options: { force?: boolean; includeExpired?: boolean } = {},
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<ReturnType<typeof cleanProjectWorkspaces>> {
+    if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    const access = this.requireProjectAccess(projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    if (!this.readProject(projectId)) return fail("PROJECT_NOT_FOUND", "项目不存在");
+    const result = cleanProjectWorkspaces(this.dataDir, projectId, options);
+    const auditId = options.force
+      ? this.audit("workspace_clean", actor, "L2", true, {
+          projectId,
+          diffSummary: {
+            deleted: result.removed.map((item) => `workspace:${item.workspaceId}`),
+          },
+        })
+      : undefined;
+    return ok(result, {
+      auditId,
+      diffSummary: {
+        deleted: result.removed.map((item) => `workspace:${item.workspaceId}`),
+      },
+      nextActions:
+        !options.force && result.candidates.length > 0
+          ? [`ow workspace clean ${projectId} --force --json`]
+          : undefined,
+    });
+  }
+
+  workspaceFix(
+    projectId: string,
+    options: { force?: boolean } = {},
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<NonNullable<ReturnType<typeof fixProjectWorkspaceReferences>>> {
+    if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    const access = this.requireProjectAccess(projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    const result = fixProjectWorkspaceReferences(this.dataDir, projectId, options);
+    if (!result) return fail("PROJECT_NOT_FOUND", "项目不存在");
+    const auditId = options.force && result.fixed.length > 0
+      ? this.audit("workspace_fix", actor, "L1", true, {
+          projectId,
+          diffSummary: { updated: result.fixed.map((field) => `project.${field}`) },
+        })
+      : undefined;
+    return ok(result, {
+      auditId,
+      diffSummary: { updated: result.fixed.map((field) => `project.${field}`) },
+    });
+  }
+
+  contentGraphStatus(
+    projectId: string,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<ReturnType<typeof readContentGraphAdminStatus>> {
+    const access = this.requireProjectAccess(projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    if (!this.readProject(projectId)) return fail("PROJECT_NOT_FOUND", "项目不存在");
+    return ok(readContentGraphAdminStatus(this.dataDir, projectId));
+  }
+
+  contentGraphReset(
+    projectId: string,
+    options: { force?: boolean } = {},
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<{
+    projectId: string;
+    dryRun: boolean;
+    previous: ReturnType<typeof readContentGraphAdminStatus>;
+    backupPath?: string;
+    newHeadCommitId?: string;
+    resourceCount: number;
+  }> {
+    if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    const access = this.requireProjectAccess(projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    if (!this.readProject(projectId)) return fail("PROJECT_NOT_FOUND", "项目不存在");
+    const workspacePath = this.projectWorkspacePath(projectId);
+    const tree = this.readWorkspaceTree(workspacePath);
+    const knowledgeManifest = this.readKnowledgeManifest(workspacePath);
+    const resourceCount = tree.pages.length + knowledgeManifest.items.length;
+    const previous = readContentGraphAdminStatus(this.dataDir, projectId);
+    if (!options.force) {
+      return ok({ projectId, dryRun: true, previous, resourceCount }, {
+        warnings: ["content-graph reset 会重建提交历史；加 --force 才会执行，并会先备份旧 content/"],
+        nextActions: [`ow content-graph reset ${projectId} --force --json`],
+      });
+    }
+
+    const storage = backupAndResetContentGraphStorage(this.dataDir, projectId);
+    try {
+      const versions: ResourceVersion[] = [];
+      for (const page of tree.pages) {
+        const files = this.readPageFiles(workspacePath, page.id);
+        if (!files) continue;
+        versions.push(
+          this.createPageResourceVersion({
+            projectId,
+            page,
+            files,
+            versionId: nowId("prv"),
+            actor,
+            source: "system",
+            note: "从 canonical workspace 重建内容图",
+          }),
+        );
+      }
+      for (const item of knowledgeManifest.items) {
+        const content = this.knowledgeItemContent(workspacePath, item);
+        if (content === null) continue;
+        versions.push(
+          this.createKnowledgeResourceVersion({
+            projectId,
+            item,
+            content,
+            versionId: nowId("krv"),
+            actor,
+            source: "system",
+            note: "从 canonical workspace 重建内容图",
+          }),
+        );
+      }
+      const pointers: ResourcePointer[] = versions.map((version) => ({
+        kind: version.kind,
+        resourceId: version.resourceId,
+        versionId: version.id,
+      }));
+      const commit = this.createContentCommit({
+        projectId,
+        visibility: "protected",
+        intent: "system",
+        title: "从 canonical workspace 重建内容图",
+        pointers,
+        changedResources: versions.map((version) => ({
+          kind: version.kind,
+          resourceId: version.resourceId,
+          toVersionId: version.id,
+        })),
+        actor,
+      });
+      this.writeMaterializationManifest(projectId, commit.id, versions);
+      this.writeContentState(projectId, {
+        projectId,
+        headCommitId: commit.id,
+        materializationStatus: "ready",
+        materializedCommitId: commit.id,
+        updatedAt: Date.now(),
+      });
+      const auditId = this.audit("content_graph_reset", actor, "L3", true, {
+        projectId,
+        diffSummary: { updated: ["content/"] },
+      });
+      return ok({
+        projectId,
+        dryRun: false,
+        previous,
+        backupPath: storage.backupPath,
+        newHeadCommitId: commit.id,
+        resourceCount: versions.length,
+      }, {
+        auditId,
+        diffSummary: { updated: ["content/"] },
+        nextActions: [`ow content-graph status ${projectId} --json`],
+      });
+    } catch (error) {
+      restoreContentGraphStorage(storage.contentDir, storage.backupPath);
+      return fail(
+        "CONTENT_GRAPH_RESET_FAILED",
+        `重建内容图失败，已恢复原数据：${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
   projectCreatePublishCommit(
     input: ProjectPublishCommitInput,
     actor = this.defaultActor(),
@@ -2059,6 +2254,8 @@ export class ProjectAdminService {
         ? "sketch-scene"
         : input.runtimeType === "prototype-html-css"
           ? "prototype-html-css"
+          : input.runtimeType === "high-fidelity-react"
+            ? "high-fidelity-react"
           : input.sketchScene
             ? "sketch-scene"
             : input.prototypeHtml

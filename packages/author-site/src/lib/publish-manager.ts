@@ -34,7 +34,10 @@ import {
   PREVIEW_RUNTIME_MANIFEST_VERSION,
   shouldUsePreviewRuntimeCdn,
 } from "@/lib/preview-runtime-manifest";
-import { processImagesForPublish } from "@/lib/publish/image-processor";
+import {
+  processImagesForPublish,
+  type ImageLocalizationOptions,
+} from "@/lib/publish/image-processor";
 import { replacePathsInContent } from "@/lib/publish/path-replacer";
 import type { PublishContext } from "@/lib/publish/types";
 
@@ -144,6 +147,66 @@ export interface PublishResult {
 export interface CloudflareSyncResult {
   success: boolean;
   message: string;
+}
+
+/** 发布失败时抛出的结构化错误，details 会透传到 API 响应供 CLI 呈现 */
+export class PublishError extends Error {
+  constructor(
+    public readonly code:
+      | "PROJECT_NOT_FOUND"
+      | "NO_CONTENT_TO_PUBLISH"
+      | "SNAPSHOT_CREATE_ERROR"
+      | "IMAGE_LOCALIZATION_FAILED"
+      | "PUBLISH_COMPILE_FAILED",
+    message: string,
+    public readonly details?: unknown,
+  ) {
+    super(message);
+    this.name = "PublishError";
+  }
+}
+
+export interface PublishPageCompileIssue {
+  pageId: string;
+  name: string;
+  message: string;
+}
+
+export interface PublishDryRunReport {
+  dryRun: true;
+  projectId: string;
+  summary: {
+    totalPages: number;
+    compiledPages: number;
+    totalImages: number;
+    localizedImages: number;
+    failedImages: number;
+    skippedImages: number;
+  };
+  pages: Array<{
+    pageId: string;
+    name: string;
+    runtimeType?: DemoPageRuntimeType;
+    compile: { passed: boolean; message?: string };
+  }>;
+  images: Array<{
+    url: string;
+    kind: "external" | "local";
+    success: boolean;
+    skipped?: boolean;
+    reason?: string;
+  }>;
+  duration: number;
+}
+
+export interface PublishOptions {
+  onProgress?: (percent: number, message: string) => void;
+  workspaceId?: string;
+  workspaceRevision?: number;
+  workspaceRootHash?: string;
+  /** 干跑：走完整发布管线但不写入正式目录、不建快照/commit、不更新项目 meta */
+  dryRun?: boolean;
+  imageOptions?: ImageLocalizationOptions;
 }
 
 export function getPublishedDir(): string {
@@ -288,31 +351,39 @@ function copyPageScreenshotForPublish(
 
 export async function publishProject(
   projectId: string,
-  options?: {
-    onProgress?: (percent: number, message: string) => void;
-    workspaceId?: string;
-    workspaceRevision?: number;
-    workspaceRootHash?: string;
-  },
-): Promise<PublishResult> {
+  options?: PublishOptions & { dryRun?: false },
+): Promise<PublishResult>;
+export async function publishProject(
+  projectId: string,
+  options: PublishOptions & { dryRun: true },
+): Promise<PublishDryRunReport>;
+export async function publishProject(
+  projectId: string,
+  options?: PublishOptions,
+): Promise<PublishResult | PublishDryRunReport>;
+export async function publishProject(
+  projectId: string,
+  options?: PublishOptions,
+): Promise<PublishResult | PublishDryRunReport> {
   const startTime = Date.now();
   const onProgress = options?.onProgress;
+  const dryRun = options?.dryRun === true;
   const assetCacheBustParam = `v=${encodeURIComponent(String(startTime))}`;
 
   if (!projectExists(projectId)) {
-    throw new Error("PROJECT_NOT_FOUND");
+    throw new PublishError("PROJECT_NOT_FOUND", "项目不存在");
   }
 
   let project = readProjectMeta(projectId);
   if (!project) {
-    throw new Error("PROJECT_NOT_FOUND");
+    throw new PublishError("PROJECT_NOT_FOUND", "项目不存在");
   }
 
   const workspacePath = path.join(getProjectPath(projectId), "workspace");
   const demoPages = listDemoPages(workspacePath);
 
   if (demoPages.length === 0) {
-    throw new Error("NO_CONTENT_TO_PUBLISH");
+    throw new PublishError("NO_CONTENT_TO_PUBLISH", "项目没有可发布的Demo页面");
   }
 
   const finalPublishedProjectDir = path.join(PUBLISHED_DIR, projectId);
@@ -328,6 +399,10 @@ export async function publishProject(
   fs.mkdirSync(publishedProjectDir, { recursive: true });
   fs.mkdirSync(path.join(publishedProjectDir, "demos"), { recursive: true });
 
+  const cleanupTmpDir = () => {
+    fs.rmSync(publishedProjectDir, { recursive: true, force: true });
+  };
+
   onProgress?.(0, "正在处理图片资源...");
   const publishContext: PublishContext = {
     projectId,
@@ -337,21 +412,30 @@ export async function publishProject(
       onProgress?.(percent, message);
     },
   };
-  const imageResult = await processImagesForPublish(publishContext);
+  const imageResult = await processImagesForPublish(
+    publishContext,
+    options?.imageOptions,
+  );
   urlMap = imageResult.urlMap;
-  if (!imageResult.success) {
-    console.warn(
-      `[publish] ${imageResult.errors.length} 张图片本地化失败:`,
-      imageResult.errors
-        .map((e) => `${e.localPath}:${e.error || "UNKNOWN"}`)
-        .join(", "),
+  if (!imageResult.success && !dryRun) {
+    cleanupTmpDir();
+    throw new PublishError(
+      "IMAGE_LOCALIZATION_FAILED",
+      `发布失败：${imageResult.errors.length} 个本地图片资源不可用`,
+      {
+        images: imageResult.errors.map((item) => ({
+          url: item.localPath,
+          reason: item.error || "UNKNOWN",
+        })),
+      },
     );
-    throw new Error("IMAGE_LOCALIZATION_FAILED");
   }
 
   onProgress?.(10, "正在编译页面...");
 
   const publishedDemoPages: PublishedDemoPage[] = [];
+  const compileIssues: PublishPageCompileIssue[] = [];
+  const dryRunPages: PublishDryRunReport["pages"] = [];
 
   const projectConfigSchema = getProjectConfigSchema(workspacePath);
   const projectConfigDefaults = projectConfigSchema
@@ -469,6 +553,12 @@ export async function publishProject(
           ? `demos/${page.id}/prototype.meta.json`
           : undefined,
       });
+      dryRunPages.push({
+        pageId: page.id,
+        name: page.name,
+        runtimeType,
+        compile: { passed: true },
+      });
 
       const pagePercent =
         10 + Math.floor(((i + 1) / Math.max(totalPages, 1)) * 80);
@@ -522,6 +612,12 @@ export async function publishProject(
           ? `demos/${page.id}/sketch.meta.json`
           : undefined,
       });
+      dryRunPages.push({
+        pageId: page.id,
+        name: page.name,
+        runtimeType,
+        compile: { passed: true },
+      });
 
       const pagePercent =
         10 + Math.floor(((i + 1) / Math.max(totalPages, 1)) * 80);
@@ -532,11 +628,31 @@ export async function publishProject(
     if (!fs.existsSync(codePath)) continue;
 
     const tsxSource = fs.readFileSync(codePath, "utf-8");
-    const compileResult = compileCode(
-      tsxSource,
-      project.lockedDependencies,
-      compileRuntimeOptions,
-    );
+    let compileResult: ReturnType<typeof compileCode>;
+    try {
+      compileResult = compileCode(
+        tsxSource,
+        project.lockedDependencies,
+        compileRuntimeOptions,
+      );
+    } catch (error) {
+      // 收集所有页面的编译错误后统一抛出，避免只暴露第一个错误
+      const message = error instanceof Error ? error.message : String(error);
+      compileIssues.push({ pageId: page.id, name: page.name, message });
+      dryRunPages.push({
+        pageId: page.id,
+        name: page.name,
+        runtimeType,
+        compile: { passed: false, message },
+      });
+      continue;
+    }
+    dryRunPages.push({
+      pageId: page.id,
+      name: page.name,
+      runtimeType,
+      compile: { passed: true },
+    });
 
     const replacedCode =
       urlMap.size > 0
@@ -589,8 +705,53 @@ export async function publishProject(
     onProgress?.(pagePercent, `编译页面 ${i + 1}/${totalPages}...`);
   }
 
+  if (compileIssues.length > 0 && !dryRun) {
+    cleanupTmpDir();
+    throw new PublishError(
+      "PUBLISH_COMPILE_FAILED",
+      `发布失败：${compileIssues.length} 个页面编译错误`,
+      {
+        pages: compileIssues.map((issue) => ({
+          pageId: issue.pageId,
+          name: issue.name,
+          errors: [{ message: issue.message }],
+        })),
+      },
+    );
+  }
+
+  if (dryRun) {
+    const failedImages = imageResult.outcomes.filter(
+      (outcome) => !outcome.success && !outcome.skipped,
+    );
+    const skippedImages = imageResult.outcomes.filter(
+      (outcome) => outcome.skipped,
+    );
+    const report: PublishDryRunReport = {
+      dryRun: true,
+      projectId,
+      summary: {
+        totalPages: dryRunPages.length,
+        compiledPages: dryRunPages.filter((item) => item.compile.passed).length,
+        totalImages: imageResult.outcomes.length,
+        localizedImages: imageResult.outcomes.filter(
+          (outcome) => outcome.success,
+        ).length,
+        failedImages: failedImages.length,
+        skippedImages: skippedImages.length,
+      },
+      pages: dryRunPages,
+      images: imageResult.outcomes,
+      duration: Date.now() - startTime,
+    };
+    cleanupTmpDir();
+    onProgress?.(100, "干跑完成（未写入发布产物）");
+    return report;
+  }
+
   if (publishedDemoPages.length === 0) {
-    throw new Error("NO_CONTENT_TO_PUBLISH");
+    cleanupTmpDir();
+    throw new PublishError("NO_CONTENT_TO_PUBLISH", "项目没有可发布的Demo页面");
   }
 
   if (projectConfigSchema) {
@@ -636,11 +797,13 @@ export async function publishProject(
     workspaceRootHash: options?.workspaceRootHash,
   });
   if (!snapshotResult.success || !snapshotResult.version) {
-    throw new Error("SNAPSHOT_CREATE_ERROR");
+    cleanupTmpDir();
+    throw new PublishError("SNAPSHOT_CREATE_ERROR", "创建发布快照失败");
   }
   project = readProjectMeta(projectId);
   if (!project) {
-    throw new Error("PROJECT_NOT_FOUND");
+    cleanupTmpDir();
+    throw new PublishError("PROJECT_NOT_FOUND", "项目不存在");
   }
 
   const currentVersion = snapshotResult.version.versionId;

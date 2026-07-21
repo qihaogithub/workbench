@@ -145,6 +145,25 @@ describe("ProjectAdminService", () => {
     expect(detail.data?.versions).toHaveLength(1);
   });
 
+  it("显式创建高保真页时即使未传代码也保留指定运行时", () => {
+    const created = service.createProject({ name: "高保真项目" });
+    const edit = service.beginEdit(created.data?.id ?? "");
+    const transaction = edit.data as EditTransaction;
+
+    const page = service.createPage({
+      editId: transaction.editId,
+      name: "高保真页",
+      runtimeType: "high-fidelity-react",
+    });
+
+    expect(page.ok).toBe(true);
+    const pageId = (page.data as PageDetail).meta.id;
+    const pageDir = path.join(transaction.workspacePath, "demos", pageId);
+    expect(resolvePageRuntimeType(pageDir)).toBe("high-fidelity-react");
+    expect(fs.existsSync(path.join(pageDir, "index.tsx"))).toBe(true);
+    expect(fs.existsSync(path.join(pageDir, "prototype.html"))).toBe(false);
+  });
+
   it("拒绝 Project Core 直接写入 live Workspace 元数据标记的事务", () => {
     const created = service.createProject({ name: "live 事务项目" });
     const edit = service.beginEdit(created.data?.id ?? "");

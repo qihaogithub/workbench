@@ -972,7 +972,7 @@ requireIncludes(
 );
 requireIncludes(
   workspaceAuthorityStartupRecoveryTestSource,
-  "孤立 Authority state 没有 live Workspace 时阻止启动",
+  "孤立 Authority state 没有 live Workspace 时自动清理陈旧条目",
   "workspace authority orphan state startup failure test",
 );
 for (const eventType of [

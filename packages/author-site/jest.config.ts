@@ -30,6 +30,8 @@ const config: Config = {
     '^\\./internal-types\\.js$': '<rootDir>/../project-core/src/internal-types.ts',
     '^\\./utils\\.js$': '<rootDir>/../project-core/src/utils.ts',
     '^\\./types\\.js$': '<rootDir>/../project-core/src/types.ts',
+    '^\\./workspace-admin\\.js$': '<rootDir>/../project-core/src/workspace-admin.ts',
+    '^\\./content-graph-admin\\.js$': '<rootDir>/../project-core/src/content-graph-admin.ts',
     '^\\./local-preview-dev-server\\.js$': '<rootDir>/../project-scaffold/src/local-preview-dev-server.ts',
     '^\\./rules\\.js$': '<rootDir>/../preview-contract/src/rules.ts',
     '^\\./runtime\\.js$': '<rootDir>/../preview-contract/src/runtime.ts',

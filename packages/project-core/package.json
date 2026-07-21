@@ -16,8 +16,9 @@
   "dependencies": {
     "@workbench/knowledge-service": "workspace:*",
     "@workbench/preview-contract": "workspace:*",
+    "@workbench/shared": "workspace:*",
     "@workbench/sketch-core": "workspace:*",
-    "@workbench/shared": "workspace:*"
+    "tar": "^7.4.3"
   },
   "devDependencies": {
     "@types/node": "^20.11.16",
