@@ -117,3 +117,11 @@ export { AgentProcessGroup } from "./agent-process-group";
 export { PermissionDialog } from "./permission-dialog";
 
 export { UserChoiceCard } from "./user-choice-card";
+
+export {
+  readLocalChatSessions,
+  writeLocalChatSession,
+  deleteLocalChatSession,
+  deriveLocalChatTitle,
+  type LocalChatSession,
+} from "./chat/services/local-history-service";

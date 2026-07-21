@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Button } from "../ui/button";
 import {
   PromptInput,
@@ -9,7 +9,6 @@ import {
   PromptInputFooter,
   PromptInputTools,
   PromptInputSubmit,
-  PromptInputAddImage,
   PromptInputHeader,
   usePromptInputAttachments,
   type PromptInputMessage,
@@ -22,13 +21,14 @@ import {
   Attachments,
 } from "../attachments";
 import { ModelSelectWithGuard } from "./model-select-with-guard";
-import { History, Paperclip } from "lucide-react";
+import { FileText, History, Image, Plus } from "lucide-react";
 import { cn } from "../lib/utils";
+import { getConfiguredAgentClient } from "../config";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import type { ResolvedModel, ThinkingDepth } from "../lib/ai-models";
-import type { ApiResponse, FileAttachment, ImageAttachment } from "@workbench/agent-client";
+import type { FileAttachment, ImageAttachment } from "@workbench/agent-client";
 
-const AI_FILE_ACCEPT = [
-  "image/*",
+const AI_ATTACHMENT_ACCEPT = [
   ".txt",
   ".md",
   ".markdown",
@@ -66,6 +66,7 @@ const AI_FILE_ACCEPT = [
   ".pdf",
   ".docx",
 ].join(",");
+const AI_FILE_ACCEPT = `image/*,${AI_ATTACHMENT_ACCEPT}`;
 
 const AI_FILE_MAX_SIZE = 20 * 1024 * 1024;
 const AI_FILE_MAX_COUNT = 5;
@@ -87,38 +88,94 @@ async function uploadFileAttachment(
   agentSessionId: string,
   file: File,
 ): Promise<FileAttachment> {
-  const formData = new FormData();
-  formData.append("file", file);
-  const response = await fetch(
-    `/api/sessions/${encodeURIComponent(agentSessionId)}/ai-attachments`,
-    {
-      method: "POST",
-      body: formData,
-    },
+  const payload = await getConfiguredAgentClient().uploadAttachment(
+    agentSessionId,
+    file,
   );
-  const payload = (await response.json()) as ApiResponse<FileAttachment>;
-  if (!response.ok || !payload.success) {
-    throw new Error(
-      payload.success ? "文件上传失败" : payload.error.message,
-    );
+  if (!payload.success) {
+    throw new Error(payload.error.message);
   }
   return payload.data;
 }
 
-function PromptInputAddFile() {
+function PromptInputAddMenu({
+  supportsImages,
+  supportsFiles,
+}: {
+  supportsImages: boolean;
+  supportsFiles: boolean;
+}) {
   const attachments = usePromptInputAttachments();
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [open, setOpen] = useState(false);
+
+  const addSelectedFiles = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length > 0) attachments.add(files);
+    event.target.value = "";
+    setOpen(false);
+  };
+
+  if (!supportsImages && !supportsFiles) return null;
+
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      className="h-8 w-8"
-      onClick={attachments.openFileDialog}
-      aria-label="添加文件"
-      title="添加文件"
-    >
-      <Paperclip className="h-4 w-4" />
-    </Button>
+    <>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 cursor-pointer"
+            aria-label="添加图片或附件"
+            title="添加图片或附件"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent side="top" className="w-40">
+          {supportsImages && (
+            <button
+              type="button"
+              className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => imageInputRef.current?.click()}
+            >
+              <Image className="h-4 w-4" />
+              添加图片
+            </button>
+          )}
+          {supportsFiles && (
+            <button
+              type="button"
+              className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <FileText className="h-4 w-4" />
+              添加附件
+            </button>
+          )}
+        </PopoverContent>
+      </Popover>
+      <input
+        ref={imageInputRef}
+        type="file"
+        multiple
+        accept="image/*"
+        onChange={addSelectedFiles}
+        className="hidden"
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept={AI_ATTACHMENT_ACCEPT}
+        onChange={addSelectedFiles}
+        className="hidden"
+      />
+    </>
   );
 }
 
@@ -285,8 +342,10 @@ export function ChatInput({
       </PromptInputBody>
       <PromptInputFooter>
         <PromptInputTools>
-          <PromptInputAddImage />
-          {supportsFiles && <PromptInputAddFile />}
+          <PromptInputAddMenu
+            supportsImages={Boolean(supportsImages)}
+            supportsFiles={supportsFiles}
+          />
           {supportsHistory && (
             <Button
               variant="ghost"

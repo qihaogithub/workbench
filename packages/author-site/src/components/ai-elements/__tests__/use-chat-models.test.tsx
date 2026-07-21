@@ -46,6 +46,11 @@ class MockAgentStream {
     );
   }
 
+  setModel(modelId: string) {
+    if (!this.isOpen()) return;
+    this.ws.send(JSON.stringify({ type: "set_model", modelId }));
+  }
+
   private readonly handlers = new Map<string, Set<StreamHandler>>();
 
   on(event: string, handler: StreamHandler) {
@@ -301,5 +306,37 @@ describe("useChatModels", () => {
 
     unmount();
     jest.useRealTimers();
+  });
+
+  it("浏览端直接展示 Agent 服务返回的可用模型", async () => {
+    const { result, unmount } = renderHook(() =>
+      useChatModels({
+        agentSessionId: "viewer-session",
+        projectId: "project-1",
+        mode: "viewer-readonly",
+      }),
+    );
+
+    await waitFor(() => expect(mockStreams.get("viewer-session")).toBeDefined());
+    const stream = mockStreams.get("viewer-session")!;
+
+    await act(async () => {
+      await stream.emit("models", {
+        models: [{ id: "xjjj/viewer-model", label: "Viewer Model" }],
+        currentModelId: "xjjj/viewer-model",
+        canSwitch: true,
+      });
+    });
+
+    await waitFor(() =>
+      expect(result.current.modelState.models).toEqual([
+        expect.objectContaining({
+          id: "xjjj/viewer-model",
+          label: "Viewer Model",
+        }),
+      ]),
+    );
+    expect(global.fetch).not.toHaveBeenCalled();
+    unmount();
   });
 });

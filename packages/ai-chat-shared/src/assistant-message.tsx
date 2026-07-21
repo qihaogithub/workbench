@@ -55,6 +55,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "./ui/dialog";
+import { DotmSquare4 } from "./ui/dotm-square-4";
 
 interface AssistantMessageProps {
   content?: string;
@@ -1085,48 +1086,9 @@ function SubagentStatusBar({
   );
 }
 
-const WORKING_DOT_PATH = [
-  1, 2, 3, 8, 13, 18, 23, 22, 21, 16, 11, 6, 5, 10, 15, 20, 12, 7, 0,
-] as const;
-
-const WORKING_DOT_ORDER: Map<number, number> = new Map<number, number>(
-  WORKING_DOT_PATH.map((dotIndex, order): [number, number] => [
-    dotIndex,
-    order,
-  ]),
-);
-
-function DotMatrixWorkingIndicator() {
-  return (
-    <div className="grid grid-cols-5 gap-[2px]" aria-hidden="true">
-      {Array.from({ length: 25 }, (_, index) => {
-        const order = WORKING_DOT_ORDER.get(index);
-        return (
-          <span
-            key={index}
-            data-testid="ai-working-dot"
-            className={cn(
-              "ai-working-dot h-[3px] w-[3px] rounded-full",
-              order === undefined && "ai-working-dot-idle",
-              order === 0 && "ai-working-dot-current",
-            )}
-            style={
-              order === undefined
-                ? undefined
-                : { animationDelay: `${order * -76}ms` }
-            }
-          />
-        );
-      })}
-    </div>
-  );
-}
-
 function RunProgressPanel({ inline = false }: { inline?: boolean }) {
   return (
     <div
-      role="status"
-      aria-label="AI 正在处理"
       data-testid="ai-working-indicator"
       className={cn(
         "flex justify-start",
@@ -1135,7 +1097,13 @@ function RunProgressPanel({ inline = false }: { inline?: boolean }) {
           : "px-1 py-0.5",
       )}
     >
-      <DotMatrixWorkingIndicator />
+      <DotmSquare4
+        ariaLabel="AI 正在处理"
+        size={16}
+        dotSize={2}
+        color="currentColor"
+        className="text-muted-foreground"
+      />
     </div>
   );
 }

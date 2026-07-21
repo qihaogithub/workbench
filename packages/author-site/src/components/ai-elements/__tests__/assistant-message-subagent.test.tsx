@@ -396,9 +396,11 @@ describe("AssistantMessage 子 Agent 展示", () => {
     expect(
       screen.getByRole("status", { name: "AI 正在处理" }),
     ).toBeInTheDocument();
-    const dots = screen.getAllByTestId("ai-working-dot");
+    const indicator = screen.getByRole("status", { name: "AI 正在处理" });
+    expect(indicator).toHaveClass("dmx-root");
+    const dots = indicator.querySelectorAll(".dmx-dot");
     expect(dots).toHaveLength(25);
-    expect(dots[0]).toHaveClass("h-[3px]", "w-[3px]");
+    expect(dots[0]).toHaveStyle({ width: "2px", height: "2px" });
     expect(screen.queryByText("思考中...")).not.toBeInTheDocument();
     expect(screen.queryByText("模型响应")).not.toBeInTheDocument();
     expect(screen.queryByText("日志")).not.toBeInTheDocument();

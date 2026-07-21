@@ -7,6 +7,7 @@ import Fastify from "fastify";
 import websocket from "@fastify/websocket";
 import rateLimit from "@fastify/rate-limit";
 import cors from "@fastify/cors";
+import multipart from "@fastify/multipart";
 
 import { loadConfig } from "./utils/config";
 import { getLogger } from "./utils/logger";
@@ -60,6 +61,9 @@ async function start() {
     credentials: true,
   });
   await fastify.register(websocket);
+  await fastify.register(multipart, {
+    limits: { files: 1, fileSize: 20 * 1024 * 1024 },
+  });
   await fastify.register(rateLimit, {
     max: config.rateLimit.max,
     timeWindow: config.rateLimit.windowMs,

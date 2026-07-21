@@ -13,6 +13,7 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
+      "@/components/*": ["./src/*"],
       "@/components/ui/*": ["./src/ui/*"],
       "@/lib/utils": ["./src/lib/utils"]
     }

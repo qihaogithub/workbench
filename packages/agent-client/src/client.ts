@@ -106,6 +106,25 @@ export class AgentClient {
     );
   }
 
+  async uploadAttachment(
+    sessionId: string,
+    file: File,
+  ): Promise<ApiResponse<import("./types").FileAttachment>> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const headers: Record<string, string> = {};
+    if (this.apiKey) {
+      headers["X-API-Key"] = this.apiKey;
+    }
+    const response = await fetch(
+      `${this.baseUrl}/api/agent/${encodeURIComponent(sessionId)}/attachments`,
+      { method: "POST", headers, body: formData },
+    );
+    return response.json() as Promise<
+      ApiResponse<import("./types").FileAttachment>
+    >;
+  }
+
   async getFiles(
     sessionId: string,
     includeContent = false,

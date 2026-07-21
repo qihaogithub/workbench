@@ -10,12 +10,22 @@ WORKDIR /app
 
 ARG NEXT_PUBLIC_AGENT_SERVICE_URL=http://localhost:3201
 ARG NEXT_PUBLIC_DATA_BASE=
+ARG NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES=custom/
+ARG NEXT_PUBLIC_MODEL_BLACKLIST=
+ARG NEXT_PUBLIC_DEFAULT_MODEL_IDS=
+ARG NEXT_PUBLIC_MODEL_NAME_FILTERS=
 
 ENV NEXT_PUBLIC_AGENT_SERVICE_URL=${NEXT_PUBLIC_AGENT_SERVICE_URL}
 ENV NEXT_PUBLIC_DATA_BASE=${NEXT_PUBLIC_DATA_BASE}
+ENV NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES=${NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES}
+ENV NEXT_PUBLIC_MODEL_BLACKLIST=${NEXT_PUBLIC_MODEL_BLACKLIST}
+ENV NEXT_PUBLIC_DEFAULT_MODEL_IDS=${NEXT_PUBLIC_DEFAULT_MODEL_IDS}
+ENV NEXT_PUBLIC_MODEL_NAME_FILTERS=${NEXT_PUBLIC_MODEL_NAME_FILTERS}
 ENV CI=true
 
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY packages/agent-client/package.json ./packages/agent-client/
+COPY packages/ai-chat-shared/package.json ./packages/ai-chat-shared/
 COPY packages/demo-ui/package.json ./packages/demo-ui/
 COPY packages/sketch-core/package.json ./packages/sketch-core/
 COPY packages/sketch-react/package.json ./packages/sketch-react/
@@ -26,6 +36,8 @@ RUN --mount=type=cache,id=workbench-pnpm-store,target=/pnpm/store \
     pnpm install --store-dir /pnpm/store --no-frozen-lockfile --ignore-scripts \
     && pnpm rebuild --store-dir /pnpm/store esbuild
 
+COPY packages/agent-client/ ./packages/agent-client/
+COPY packages/ai-chat-shared/ ./packages/ai-chat-shared/
 COPY packages/demo-ui/ ./packages/demo-ui/
 COPY packages/sketch-core/ ./packages/sketch-core/
 COPY packages/sketch-react/ ./packages/sketch-react/
