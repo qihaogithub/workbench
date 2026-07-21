@@ -1,0 +1,25 @@
+{
+  "committed": true,
+  "mutationId": "3b57da8a-abe4-41ae-bc05-bb1baa9de195",
+  "projectId": "proj_1784122506896_bjzk13",
+  "workspaceId": "live-1784122509664-qy1fx153y",
+  "baseRevision": 0,
+  "revision": 3,
+  "rootHash": "bcd79235eca570168826da320fec5a54f0b86b50cecca17465ccecb560b14da5",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_5aza/index.tsx",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "03e0f95e4daca3264a7924d8bf79da5d693442950e777aa20f68a06520fdd714"
+    },
+    {
+      "path": "demos/page_5aza/config.schema.json",
+      "action": "modified",
+      "beforeHash": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+      "afterHash": "a0d29e038c5cfc38267e6ecfd72e62fa6e0533aa4d50b6b6bb1946bffe037dcf"
+    }
+  ],
+  "committedAt": 1784122514262
+}

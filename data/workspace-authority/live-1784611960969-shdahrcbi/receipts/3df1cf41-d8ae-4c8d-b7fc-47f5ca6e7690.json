@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "3df1cf41-d8ae-4c8d-b7fc-47f5ca6e7690",
+  "projectId": "proj_1779608460378",
+  "workspaceId": "live-1784611960969-shdahrcbi",
+  "baseRevision": 0,
+  "revision": 8,
+  "rootHash": "67de3cc7ae52f1f7b2194317d0791dc93cb3702ca84fc8b1de87fe772c5960f3",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "assets/images/000db583d36b-subject-meiyu.png",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "000db583d36b8dc1b5e2d0457b40cec556180c7efe927dcf94899480ca012f8b"
+    }
+  ],
+  "committedAt": 1784613358433
+}

@@ -1,0 +1,27 @@
+{
+  "workspaceId": "live-1784122816300-gb33fjhvc",
+  "projectId": "proj_1784122816252_11d9at",
+  "revision": 7,
+  "rootHash": "22ccb9b2a77e5fa3b0b6dedc6bb545800718d7830699110c12f917a3c6c0cb20",
+  "resourceHashes": {
+    "demos/a_i42k/config.schema.json": "481d186ad66581870748181918192d35fb27942b4a96b8412ef8e58746ef7c80",
+    "demos/a_i42k/index.tsx": "ea8aa1b6789e57c7c97e6956d0943fe1344267a184a70fb6fd461853d226debe",
+    "demos/a_i42k/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "demos/a_i42k/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
+    "demos/b_ovd0/config.schema.json": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+    "demos/b_ovd0/index.tsx": "b0cf15b2f33f335f830d920c0dbb3c0a431caa399135dc48fdc0e334ebfd3b53",
+    "demos/b_ovd0/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "demos/b_ovd0/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
+    "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
+    "workspace-tree.json": "cbf7332b7247c81484f6799fadf3b9be4453f840948f26591478acea7731a51b"
+  },
+  "mutationPayloads": {
+    "6b7e4862-9670-47b5-8427-86a00a2794a8": "b2139e213066a20e58fc821e97784fc3623ff44aec4cb2e5f13f550429b59fe4",
+    "98be14f8-a1d9-4760-8c55-523c9e4b9856": "0320388bd4dceee328278a3a750c75d38c7cbdeb1be0fbe86f1691aade5b24f3",
+    "5f3f7782-7748-482f-80d9-ddf4cf0612de": "4c27b8f1780e0fa827c768787da8c68dbb24cabf596068d4e124ca820940f3b0",
+    "47ed9bb9-ce7d-419f-814e-732ee1430fbe": "660d4c01dfaea8ee1f838545e4c57077365e4dfd9aea08be9a498c2cc060a673",
+    "e214d728-b572-42e2-9c4d-cd9aded1a756": "37fe35013e69e97fd94914f3068ae368d6db543918c88083eb6d8142250aa904",
+    "66778697-5bb7-4477-9e9c-4c0af899fda7": "f8fcf6bc25740ef2c45f487873fba536bd5af90e8f3499791361e3f38cd150b7"
+  },
+  "updatedAt": 1784122827020
+}

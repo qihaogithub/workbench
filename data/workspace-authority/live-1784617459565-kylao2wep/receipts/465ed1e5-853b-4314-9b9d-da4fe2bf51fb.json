@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "465ed1e5-853b-4314-9b9d-da4fe2bf51fb",
+  "projectId": "proj_1779608460372",
+  "workspaceId": "live-1784617459565-kylao2wep",
+  "baseRevision": 0,
+  "revision": 2,
+  "rootHash": "95c6b598748fc836ceedb5a22ad04fd954ed9dd9e8e8355d3cbaa6e3b1d1c81e",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": ".canvas-layout.json",
+      "action": "modified",
+      "beforeHash": "5c4c28c33a0761aeeec6b21d50c591deb2bf3422b36a4b0b67b97df5db338ab8",
+      "afterHash": "bca9a3d21a2c36c1c3611e3eea70c7042e0f96ee32ce98667c2002d203681d20"
+    }
+  ],
+  "committedAt": 1784617462385
+}

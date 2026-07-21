@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "07aec7e2-189d-4ad9-97d7-7fe68b6b7ad7",
+  "projectId": "proj_1779608460378",
+  "workspaceId": "live-1784611960969-shdahrcbi",
+  "baseRevision": 0,
+  "revision": 9,
+  "rootHash": "daa1c58b0753467cf07e1c13f3116fa06a719f8d129b636d35def5eef41d1c18",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "assets/images/553c7398a55b-subject-yuedu.png",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "553c7398a55b6fcc7c89b7260e5cdfff7eec01973acc8279851f0967e087db5c"
+    }
+  ],
+  "committedAt": 1784613358700
+}

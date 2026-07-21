@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "a71ba130-d842-4750-9c9c-e4a19531ab51",
+  "projectId": "proj_1779608460378",
+  "workspaceId": "live-1784611960969-shdahrcbi",
+  "baseRevision": 0,
+  "revision": 19,
+  "rootHash": "b7d5eb4ffbdc08e57a26013adc8e03392ca083b4aeb68513bc08532d08b8ef67",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "assets/images/ff56667adcca-tab-bar-phone.png",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "ff56667adcca1c73fa7ac98719b27e035e38ed5b79e1a7e4cb75d98715ab4bf3"
+    }
+  ],
+  "committedAt": 1784613369463
+}

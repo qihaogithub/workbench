@@ -1,0 +1,10 @@
+<main class="wc-page is-dim">
+  <img class="hero-title" src="../../assets/football/home/hero-title-figma.webp" alt="叫叫阅读足球季，为球队助威">
+  <section class="dialog-card" aria-label="球队详情弹窗">
+    <h1 class="team-name">墨西哥</h1>
+    <div class="team-sub">绿茵斗士</div>
+    <div class="team-stage"><img src="../../assets/football/cheer-dialog/ip/墨西哥.webp" alt="墨西哥球队形象"></div>
+    <button class="yellow-btn">确认助威</button>
+    <button class="plain-close">关闭</button>
+  </section>
+</main>

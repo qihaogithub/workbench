@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "3457e13e-f1b8-45e7-b43a-962bf6fa9aa8",
+  "projectId": "proj_1784101114329_51cu5w",
+  "workspaceId": "live-1784101114618-5pcuiirdv",
+  "baseRevision": 2,
+  "revision": 3,
+  "rootHash": "5a17b6d2274c42bb4633f574ed34e21ab023c154993866d1c31d99bae5ca6546",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "knowledge/manifest.json",
+      "action": "modified",
+      "beforeHash": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
+      "afterHash": "8c3d5ea81023914eb5b63e8531788b8c2f474d56fe5d2f289ab6c17486348b6b"
+    }
+  ],
+  "committedAt": 1784112802309
+}

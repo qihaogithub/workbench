@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "cc66de1f-fc71-4020-baaf-0ccb3bd8015a",
+  "projectId": "proj_1779608460378",
+  "workspaceId": "live-1784611960969-shdahrcbi",
+  "baseRevision": 0,
+  "revision": 14,
+  "rootHash": "fc3eaf3b25ce642499b21f8703e0349089c7486bd46c8d8b7f351ecf79780eec",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "assets/images/5b45c3abc443-banner-fg-vector.png",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "5b45c3abc443cc0fddccbdbcef4e9f05d8c46847c3e1e1447814de337154e1ad"
+    }
+  ],
+  "committedAt": 1784613364368
+}

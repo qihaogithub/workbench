@@ -36,6 +36,7 @@
     "@workbench/shared": "workspace:*",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
+    "katex": "^0.16.0",
     "lucide-react": "^0.323.0",
     "streamdown": "^2.5.0",
     "tailwind-merge": "^2.2.1"

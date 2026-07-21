@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$demo": {
+    "previewSize": {
+      "width": 375,
+      "height": 812
+    }
+  },
+  "title": "底部弹窗 - 手机版配置",
+  "type": "object",
+  "properties": {}
+}

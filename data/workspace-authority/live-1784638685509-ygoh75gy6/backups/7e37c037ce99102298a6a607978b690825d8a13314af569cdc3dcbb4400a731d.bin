@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "底部弹窗 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "popupImage": {
+      "type": "string",
+      "format": "image",
+      "title": "弹窗配图",
+      "description": "两个Demo共用的弹窗展示图片",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/底部广告弹窗/配图.png"
+    },
+    "mainButtonText": {
+      "type": "string",
+      "title": "主按钮文案",
+      "description": "弹窗黄色主按钮文字，手机和平板共用",
+      "default": "去看看"
+    },
+    "secondaryButtonText": {
+      "type": "string",
+      "title": "次按钮文案",
+      "description": "弹窗底部次要操作文字，手机和平板共用",
+      "default": "下次再说"
+    }
+  }
+}

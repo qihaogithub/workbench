@@ -1,0 +1,34 @@
+{
+  "workspaceId": "live-1784543698570-ej92zojov",
+  "projectId": "proj_1782718595285_h4lda7",
+  "revision": 2,
+  "rootHash": "df4e4f4657bda5ea564484fb813a4c8afb480b2257e1f11504a15381d4c0fb38",
+  "resourceHashes": {
+    ".canvas-layout.json": "53230d0cd32f89a913fce8672ceaca2b925ceab40ea203973e4b9c7789de0f09",
+    "assets/images/117ceac1eaa0-invite02.png": "117ceac1eaa033e17539a10a944c9710642fc480ce42bcabcc523aa59fd5afcd",
+    "assets/images/7007557cac7e-h_e545eaf5.png": "7007557cac7e1dddc6c02849099f56646901f619fcc1f9986c698c74ce4b86b6",
+    "assets/images/86993f38f70d-mall02.png": "86993f38f70db063c8e1dee224b5bb74f4329c701143587d58b6d1b467c3e592",
+    "assets/images/899808618d85-mall01.png": "899808618d856a2456baa42de5be28b8df217f3685aed5a54c33782cbdc2ad33",
+    "assets/images/8e2535e297bb-invite01.png": "8e2535e297bb278c4f2dd606473643ee9dc11d7f9414d75bbaac1e11c0df32c8",
+    "assets/images/tmp_1783565883072": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "assets/images/tmp_1783565914683": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "demos/demo_71dt/config.schema.json": "b022ea18e3f9daf08c0c54768a735fbf71e9b4d19f8f95d50464d8621be35df8",
+    "demos/demo_71dt/index.tsx": "800b4e266d387f9018bcb70eb1a9d30e44d9ea1d0d805fc73b90a89a0e4e80a0",
+    "demos/demo_71dt/prototype.css": "c536c955bce8f57bd3d6fcdf789379294cf84d8b7b6f4e71e2111debacaeeb0f",
+    "demos/demo_71dt/prototype.html": "b40cf77d15067e7e07d5af61df5521cc1e63580a18d413e3d3f7ff8025193573",
+    "demos/demo_71dt/prototype.meta.json": "acddc239f3bca589759b777047318512812ee46169ab1a701858136ac5252b95",
+    "demos/demo_omrf/config.schema.json": "281b9ec59a12f41b6de1e18d9f6ed83af8726b0c63877b5625c4a8f4960f69d8",
+    "demos/demo_omrf/index.tsx": "4af5a89953ef44665a9424bc2bd8d394bda9255ee71c62eb34e025057e1acf87",
+    "demos/demo_omrf/prototype.css": "e1b1855deb5a4f4b08d040189db9ec50e3212f80a75750772467ff7f82415fa8",
+    "demos/demo_omrf/prototype.html": "6d5b6e443184a68fe36d225758a8fe5e71f664b3c76515ffdbbcfd4cab07bdea",
+    "demos/demo_omrf/prototype.meta.json": "2b2692ea9cb9594ba7ab6dc68814a49184bf362207f3281055b1092316c95b2e",
+    "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
+    "project.config.schema.json": "02f4de24b8a5ea161660e7162ed1f16339b0c4c1c54bf8f6638266ac6dbbda68",
+    "project.config.values.json": "a222169890bcf310cf48771fdadf5cdb3a5278e81229aabbf35d3c53cdfbcb44",
+    "workspace-tree.json": "dc25a22237ddbbac65251d459fac5965f8c6ab31af3b9880f49e1d853e77d02d"
+  },
+  "mutationPayloads": {
+    "8fd2e7c9-68a7-4828-92d5-f0f817ad3eb7": "cb5213882c875af757891bee088f4b90f8e4de6400fe5f50f0ce43e2902e9caf"
+  },
+  "updatedAt": 1784543806043
+}

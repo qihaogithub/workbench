@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "43986ec6-3e35-4bb6-a935-017667e7888a",
+  "projectId": "proj_1779608460378",
+  "workspaceId": "live-1784611960969-shdahrcbi",
+  "baseRevision": 0,
+  "revision": 5,
+  "rootHash": "7b381d3d70db7e06a9c01f61ad0ba6ca593e75dee6c65c113e0556db53bdbcf0",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "assets/images/c4b42023de90-subject-yizhi.png",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "c4b42023de903cbf569e7fa26971d58b9d9952043c42141a18822785ed3ae7d4"
+    }
+  ],
+  "committedAt": 1784613358384
+}

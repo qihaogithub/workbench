@@ -1,0 +1,508 @@
+{
+  "version": 1,
+  "projectId": "proj_1783185620923_o5e6rr",
+  "updatedAt": 1784544111853,
+  "state": {
+    "viewport": {
+      "x": 433.62449476922427,
+      "y": 169.85573905652018,
+      "zoom": 0.39406669006590794
+    },
+    "pages": {
+      "worldcup_02_active_no_vote": {
+        "x": -760,
+        "y": -56,
+        "width": 375,
+        "height": 1650,
+        "sizeMode": "custom",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_01_upcoming_home": {
+        "x": -337,
+        "y": -56,
+        "width": 375,
+        "height": 812,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_03_active_voted": {
+        "x": 86,
+        "y": -56,
+        "width": 375,
+        "height": 812,
+        "zIndex": 2,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_04_active_chance_used": {
+        "x": 509,
+        "y": -56,
+        "width": 375,
+        "height": 812,
+        "zIndex": 3,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_05_active_with_prizes": {
+        "x": 932,
+        "y": -56,
+        "width": 375,
+        "height": 812,
+        "zIndex": 4,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_06_ended_pending": {
+        "x": 1355,
+        "y": -56,
+        "width": 375,
+        "height": 812,
+        "zIndex": 5,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_06_ended_skin_unlocked": {
+        "x": 1778,
+        "y": -56,
+        "width": 375,
+        "height": 812,
+        "zIndex": 6,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_07_ended_lost": {
+        "x": 2201,
+        "y": -56,
+        "width": 375,
+        "height": 812,
+        "zIndex": 7,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_08_prize_drawer_empty": {
+        "x": 2632,
+        "y": -56,
+        "width": 375,
+        "height": 812,
+        "zIndex": 8,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_09_prize_drawer_with_prizes": {
+        "x": 3072,
+        "y": -56,
+        "width": 375,
+        "height": 812,
+        "zIndex": 9,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_10_team_dialog": {
+        "x": -760,
+        "y": 2032,
+        "width": 375,
+        "height": 812,
+        "zIndex": 10,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_11_team_success": {
+        "x": -337,
+        "y": 2032,
+        "width": 375,
+        "height": 812,
+        "zIndex": 11,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_13_draw_drawing": {
+        "x": 1891.0430325105208,
+        "y": -320.35852754482147,
+        "width": 375,
+        "height": 812,
+        "zIndex": 13,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_14_draw_miss": {
+        "x": 1259.3534831590096,
+        "y": -313.09711867784637,
+        "width": 371.64651684099056,
+        "height": 804.7385911330249,
+        "sizeMode": "custom",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_12_share_dialog": {
+        "x": -1410.2097290956162,
+        "y": 3651.012262250618,
+        "width": 375,
+        "height": 812,
+        "zIndex": 12,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_15_draw_vip": {
+        "x": 1073.4330548503035,
+        "y": 2301.399989484777,
+        "width": 375,
+        "height": 812,
+        "zIndex": 15,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_16_draw_trial": {
+        "x": 1561.4330548503035,
+        "y": 2301.399989484777,
+        "width": 375,
+        "height": 812,
+        "zIndex": 18,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_15_draw_gold": {
+        "x": 2065.4330548503035,
+        "y": 2301.399989484777,
+        "width": 375,
+        "height": 812,
+        "zIndex": 16,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_16_draw_plush": {
+        "x": 2577.4330548503035,
+        "y": 2301.399989484777,
+        "width": 375,
+        "height": 812,
+        "zIndex": 17,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_18_address_confirm": {
+        "x": 1256,
+        "y": 4264,
+        "width": 375,
+        "height": 812,
+        "zIndex": 21,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_19_preview_vip": {
+        "x": 1768,
+        "y": 4264,
+        "width": 375,
+        "height": 812,
+        "zIndex": 24,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_20_preview_plush": {
+        "x": 2280,
+        "y": 4264,
+        "width": 375,
+        "height": 812,
+        "zIndex": 27,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_18_activation_vip": {
+        "x": 2792,
+        "y": 4264,
+        "width": 375,
+        "height": 812,
+        "zIndex": 22,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_19_preview_trial": {
+        "x": 3304,
+        "y": 4264,
+        "width": 375,
+        "height": 812,
+        "zIndex": 25,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_20_rule_dialog": {
+        "x": 3816,
+        "y": 4264,
+        "width": 375,
+        "height": 812,
+        "zIndex": 28,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_19_preview_skin": {
+        "x": 4328,
+        "y": 4264,
+        "width": 375,
+        "height": 812,
+        "zIndex": 23,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_19_preview_gold": {
+        "x": 4840,
+        "y": 4264,
+        "width": 375,
+        "height": 812,
+        "zIndex": 26,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_20_feedback_drawer": {
+        "x": 5352,
+        "y": 4264,
+        "width": 375,
+        "height": 812,
+        "zIndex": 29,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_17_address_empty": {
+        "x": -760,
+        "y": 5208,
+        "width": 375,
+        "height": 812,
+        "zIndex": 19,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_18_address_filled": {
+        "x": -272,
+        "y": 5208,
+        "width": 375,
+        "height": 812,
+        "zIndex": 20,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_20_feedback_error": {
+        "x": 232,
+        "y": 5208,
+        "width": 375,
+        "height": 812,
+        "zIndex": 30,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_20_feedback_sent": {
+        "x": 655,
+        "y": 5208,
+        "width": 375,
+        "height": 812,
+        "zIndex": 31,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_22_age_gate_confirm": {
+        "x": -760,
+        "y": 6376,
+        "width": 375,
+        "height": 812,
+        "zIndex": 33,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_23_age_gate_blocked": {
+        "x": -272,
+        "y": 6376,
+        "width": 375,
+        "height": 812,
+        "zIndex": 34,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_21_active_teams_section": {
+        "x": -760,
+        "y": 7472,
+        "width": 375,
+        "height": 812,
+        "zIndex": 32,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_24_loading_page": {
+        "x": -272,
+        "y": 7472,
+        "width": 375,
+        "height": 812,
+        "zIndex": 35,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_25_outside_browser_guide": {
+        "x": 184,
+        "y": 7472,
+        "width": 375,
+        "height": 812,
+        "zIndex": 36,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "worldcup_26_outside_wechat_guide": {
+        "x": 632,
+        "y": 7472,
+        "width": 375,
+        "height": 812,
+        "zIndex": 37,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "pageGroups": {
+      "page-group-ce49f183-3adb-439c-94db-0e5249f232b6": {
+        "id": "page-group-ce49f183-3adb-439c-94db-0e5249f232b6",
+        "kind": "page-group",
+        "title": "已结束-未达标 等 8 个页面",
+        "pages": [
+          {
+            "id": "worldcup_07_ended_lost",
+            "pageId": "worldcup_07_ended_lost",
+            "title": "已结束-未达标"
+          },
+          {
+            "id": "worldcup_06_ended_skin_unlocked",
+            "pageId": "worldcup_06_ended_skin_unlocked",
+            "title": "已结束-冠军皮肤达标"
+          },
+          {
+            "id": "worldcup_03_active_voted",
+            "pageId": "worldcup_03_active_voted",
+            "title": "进行中-已投票待抽奖"
+          },
+          {
+            "id": "worldcup_04_active_chance_used",
+            "pageId": "worldcup_04_active_chance_used",
+            "title": "进行中-今日机会已用完"
+          },
+          {
+            "id": "worldcup_05_active_with_prizes",
+            "pageId": "worldcup_05_active_with_prizes",
+            "title": "进行中-已有奖品"
+          },
+          {
+            "id": "worldcup_06_ended_pending",
+            "pageId": "worldcup_06_ended_pending",
+            "title": "已结束-冠军待揭晓"
+          },
+          {
+            "id": "worldcup_02_active_no_vote",
+            "pageId": "worldcup_02_active_no_vote",
+            "title": "进行中-未投票首页"
+          },
+          {
+            "id": "worldcup_01_upcoming_home",
+            "pageId": "worldcup_01_upcoming_home",
+            "title": "预热期首页"
+          }
+        ],
+        "activePageId": "worldcup_07_ended_lost",
+        "layout": {
+          "x": -800.6210262515999,
+          "y": -350.75518645880146,
+          "width": 369.45085275659835,
+          "height": 1921.8100673793958,
+          "zIndex": 38
+        },
+        "directoryCollapsed": false,
+        "createdAt": 1783337634754,
+        "updatedAt": 1783354832673
+      },
+      "page-group-8a8f7c86-5119-4527-88b4-e48d1787cc4e": {
+        "id": "page-group-8a8f7c86-5119-4527-88b4-e48d1787cc4e",
+        "kind": "page-group",
+        "title": "我的奖品-空状态 等 2 个页面",
+        "pages": [
+          {
+            "id": "worldcup_08_prize_drawer_empty",
+            "pageId": "worldcup_08_prize_drawer_empty",
+            "title": "我的奖品-空状态"
+          },
+          {
+            "id": "worldcup_09_prize_drawer_with_prizes",
+            "pageId": "worldcup_09_prize_drawer_with_prizes",
+            "title": "我的奖品-已有奖品"
+          }
+        ],
+        "activePageId": "worldcup_08_prize_drawer_empty",
+        "layout": {
+          "x": -231.263988453734,
+          "y": -329.66773497609546,
+          "width": 375,
+          "height": 812,
+          "zIndex": 39,
+          "sizeMode": "preview",
+          "previewSizeKey": "375x812"
+        },
+        "createdAt": 1783343969961,
+        "updatedAt": 1784544105160
+      },
+      "page-group-1dcca28b-9b30-4689-96a3-d2f376dd1f1c": {
+        "id": "page-group-1dcca28b-9b30-4689-96a3-d2f376dd1f1c",
+        "kind": "page-group",
+        "title": "抽奖结果-VIP 等 4 个页面",
+        "pages": [
+          {
+            "id": "worldcup_15_draw_vip",
+            "pageId": "worldcup_15_draw_vip",
+            "title": "抽奖结果-VIP"
+          },
+          {
+            "id": "worldcup_16_draw_trial",
+            "pageId": "worldcup_16_draw_trial",
+            "title": "抽奖结果-体验课"
+          },
+          {
+            "id": "worldcup_15_draw_gold",
+            "pageId": "worldcup_15_draw_gold",
+            "title": "抽奖结果-金片"
+          },
+          {
+            "id": "worldcup_16_draw_plush",
+            "pageId": "worldcup_16_draw_plush",
+            "title": "抽奖结果-公仔"
+          }
+        ],
+        "activePageId": "worldcup_15_draw_vip",
+        "layout": {
+          "x": 411.0087128949704,
+          "y": -313.09711867784637,
+          "width": 352.0415392033991,
+          "height": 762.2872795550935,
+          "zIndex": 40,
+          "sizeMode": "preview",
+          "previewSizeKey": "375x812"
+        },
+        "createdAt": 1783354591518,
+        "updatedAt": 1784544111846
+      }
+    },
+    "hiddenPageIds": [
+      "worldcup_07_ended_lost",
+      "worldcup_06_ended_skin_unlocked",
+      "worldcup_03_active_voted",
+      "worldcup_04_active_chance_used",
+      "worldcup_05_active_with_prizes",
+      "worldcup_06_ended_pending",
+      "worldcup_02_active_no_vote",
+      "worldcup_01_upcoming_home",
+      "worldcup_08_prize_drawer_empty",
+      "worldcup_09_prize_drawer_with_prizes",
+      "worldcup_15_draw_vip",
+      "worldcup_16_draw_trial",
+      "worldcup_15_draw_gold",
+      "worldcup_16_draw_plush"
+    ],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

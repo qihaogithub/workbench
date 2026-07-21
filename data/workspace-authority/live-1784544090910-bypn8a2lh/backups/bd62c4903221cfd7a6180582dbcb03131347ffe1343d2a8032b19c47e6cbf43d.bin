@@ -1,0 +1,17 @@
+<main class="wc-screen ">
+  <div class="top-art" aria-hidden="true">
+    <img class="hero-title" src="../../assets/football/home/hero-title-figma.webp" alt="">
+  </div>
+  <section class="modal-layer" aria-label="分享活动弹窗">
+    <div class="dialog">
+      <span class="pill-label">分享活动</span>
+      <button class="close-circle" aria-label="关闭"></button>
+      <h1>邀请好友一起助威</h1>
+      <p>跳转到分享页面即可增加 1 次抽奖机会，每人每天最多额外获得 5 次。</p>
+      <div class="action-row">
+        <button class="primary-btn">分享给好友</button>
+        <button class="secondary-btn">分享朋友圈</button>
+      </div>
+    </div>
+  </section>
+</main>

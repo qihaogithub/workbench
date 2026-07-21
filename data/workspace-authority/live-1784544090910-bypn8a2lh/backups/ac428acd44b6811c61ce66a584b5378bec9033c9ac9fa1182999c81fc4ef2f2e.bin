@@ -1,0 +1,13 @@
+<main class="wc-page is-dim">
+  <img class="hero-title" src="../../assets/football/home/hero-title-figma.webp" alt="叫叫阅读足球季，为球队助威">
+  <section class="form-sheet" aria-label="收货地址">
+    <button class="sheet-close" aria-label="关闭"></button>
+    <h1>收货地址</h1>
+    <div class="form-note"><strong>足球冠军叫叫公仔</strong><br>请填写真实有效地址，工作人员将在活动结束后安排寄送。</div>
+    <div class="field"><label>收件人姓名</label><span class="input">测试收件人</span></div>
+    <div class="field"><label>收件人电话</label><span class="input">13800138000</span></div>
+    <div class="field"><label>省 / 市 / 区</label><div class="select-row"><span>四川省</span><span>成都市</span><span>武侯区</span></div></div>
+    <div class="field"><label>详细地址</label><span class="textarea">天府大道中段 101 号</span></div>
+    <button class="yellow-btn">提交地址</button>
+  </section>
+</main>

@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "b2e938fc-4eee-4b39-8a99-f49f7b04681b",
+  "projectId": "proj_1779608460378",
+  "workspaceId": "live-1784611960969-shdahrcbi",
+  "baseRevision": 0,
+  "revision": 22,
+  "rootHash": "9822a56064132a9fed5076e212deda879562750685e2036c8603c312d7262b45",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "assets/images/af164cffc0bf-pad-subjects.png",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "af164cffc0bf9f5f466c166f3d2a698989a079313a7d0e38ed610cb597a5e192"
+    }
+  ],
+  "committedAt": 1784613374523
+}
