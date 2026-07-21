@@ -1,0 +1,19 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "page_r472",
+      "name": "保留页面",
+      "routeKey": "page",
+      "order": 0,
+      "parentId": null
+    },
+    {
+      "id": "page_c0pv",
+      "name": "画布待删除页面",
+      "routeKey": "page-2",
+      "order": 1,
+      "parentId": null
+    }
+  ]
+}

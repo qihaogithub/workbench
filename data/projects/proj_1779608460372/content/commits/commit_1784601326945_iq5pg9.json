@@ -1,0 +1,36 @@
+{
+  "id": "commit_1784601326945_iq5pg9",
+  "projectId": "proj_1779608460372",
+  "parentCommitId": "commit_1784601031956_aoliw0",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录手机",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "demo_1779608460501_abc123",
+      "versionId": "prv_1784601326944_kmdyq8"
+    },
+    {
+      "kind": "page",
+      "resourceId": "demo_1779608460502_def456",
+      "versionId": "prv_1783352710779_mnbiz1"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "demo_1779608460501_abc123",
+      "fromVersionId": "prv_1784601022006_xyggqb",
+      "toVersionId": "prv_1784601326944_kmdyq8"
+    }
+  ],
+  "createdAt": 1784601326945,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1784544066830-utro4txxp",
+    "workspaceRevision": 19,
+    "workspaceRootHash": "c6b78b55c25d35922f46bd92934f0e5e04b92c1dc27ea9a37bdbf3e1c7f4c633"
+  }
+}

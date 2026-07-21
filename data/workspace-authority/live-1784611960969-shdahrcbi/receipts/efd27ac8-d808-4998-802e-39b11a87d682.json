@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "efd27ac8-d808-4998-802e-39b11a87d682",
+  "projectId": "proj_1779608460378",
+  "workspaceId": "live-1784611960969-shdahrcbi",
+  "baseRevision": 0,
+  "revision": 24,
+  "rootHash": "0a2a7d8259b4f82d51721ecccc9f18638d802057d4bd3e7a05ed657d1d9e5e47",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "assets/images/6893e44cb515-pad-banner-fg.png",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "6893e44cb515130b13bb450d3986e8f0c5be157237ea26e4262bad4b9e99ca96"
+    }
+  ],
+  "committedAt": 1784613374856
+}

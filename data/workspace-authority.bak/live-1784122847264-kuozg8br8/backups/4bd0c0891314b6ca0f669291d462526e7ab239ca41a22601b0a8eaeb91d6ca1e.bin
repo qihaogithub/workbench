@@ -1,0 +1,12 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "page_astd",
+      "name": "输入页",
+      "routeKey": "page",
+      "order": 0,
+      "parentId": null
+    }
+  ]
+}

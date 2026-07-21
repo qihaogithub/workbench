@@ -1,0 +1,12 @@
+{
+  "workspaceId": "live-1784544084330-5fvbn8zxv",
+  "projectId": "proj_1784101114329_51cu5w",
+  "revision": 1,
+  "rootHash": "178bec3192793eb95e773b2898198ba3fe0fbea348a3ec91473d6f021730a535",
+  "resourceHashes": {
+    "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
+    "workspace-tree.json": "b8f84cb18b1d4fb04f8db0fdb7867802b916f6365d4816c8289777a7893570ab"
+  },
+  "mutationPayloads": {},
+  "updatedAt": 1784544084534
+}

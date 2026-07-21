@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "844704c0-3b66-4218-a16d-8475c9afdc73",
+  "projectId": "proj_1784122701301_2yhumt",
+  "workspaceId": "live-1784122701319-jf0t4aq9n",
+  "baseRevision": 5,
+  "revision": 7,
+  "rootHash": "be52944557b2bd33de0a53ee4c2cd982a5ac458941776fffbdfdf25b2a59aa05",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/page_qcln/index.tsx",
+      "action": "modified",
+      "beforeHash": "7c14bb3d1f93d182fcb8760f126356aa94c8632dd54b8d6949274777260935a5",
+      "afterHash": "2fcc2ae53c34b53f2ca8ccd40f67968a5d8f0ae341541c3c3d6d158837558728"
+    }
+  ],
+  "committedAt": 1784122726582
+}

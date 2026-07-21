@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Figma Export</title>
+  <style>
+    /* Reset default margins */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    
+    /* Figma export container */
+    .figma-export {
+      background: white;
+      width: 375px;
+      height: 812px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+  </style>
+</head>
+<body>
+  <div class="figma-export">
+<style>[data-figma-scrollbar-hide="true"]{-ms-overflow-style:none;scrollbar-width:none;}[data-figma-scrollbar-hide="true"]::-webkit-scrollbar{display:none;width:0;height:0;}</style>
+<div data-layer="iPhone 8" class="Iphone8" style="width: 375px; height: 812px; position: relative; background: white; overflow: hidden">
+  <div data-layer="信息流-320" class="320" style="width: 375px; left: 0px; top: 0px; position: absolute; background: white; overflow: hidden; flex-direction: column; justify-content: center; align-items: center; display: inline-flex">
+    <img src="https://img.onlywnn.cn/figma/h_d9e0a2b8.png" alt="static layer" data-layer="#static 手机·首推位" class="Static" style="position: relative; width: 375px; height: 88px; object-fit: cover" data-figma-id="161:15391" />
+    <div data-layer="Frame 3465706" class="Frame3465706" style="align-self: stretch; flex-shrink: 0; padding-left: 20px; padding-right: 20px; position: relative; flex-direction: column; justify-content: flex-start; align-items: flex-start; display: flex">
+      <div data-layer="无标题的常规卡片间距" data-property-1="竖版" data-文字="true" style="width: 335px; height: 16px; flex-shrink: 0; position: relative; opacity: 0; background: #F5F4F4">
+        <div data-layer="无标题的常规卡片间距（竖版）=16" class="16" style="left: 77px; top: -1px; position: absolute; text-align: center; justify-content: center; display: flex; flex-direction: column; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--灰-灰---3, #E0DFDF); font-size: 12px; font-family: PingFang SC; font-weight: 500; white-space: nowrap">无标题的常规卡片间距（竖版）=16</div>
+      </div>
+      <div data-figma-scrollbar-hide="true" data-layer="科目图标/手机" style="width: 335px; flex-shrink: 0; position: relative; justify-content: flex-start; align-items: center; gap: 11px; display: inline-flex; overflow-x: auto; overflow-y: hidden; -ms-overflow-style: none; scrollbar-width: none">
+        <div data-layer="科目" style="width: 58.20px; flex-shrink: 0; padding-top: 4px; padding-bottom: 8px; position: relative; background: #FFF3EB; box-shadow: 0px -2px 4px #FFEDE0 inset; overflow: hidden; border-top-left-radius: 12px; border-top-right-radius: 12px; border-bottom-right-radius: 24px; border-bottom-left-radius: 12px; flex-direction: column; justify-content: center; align-items: center; gap: 2px; display: inline-flex">
+          <img src="https://img.onlywnn.cn/figma/h_88468d29.png" alt="static layer" data-layer="#static 品牌-科目已选中" data-property-1="阅读" class="Static" style="position: relative; width: 32px; height: 32px; object-fit: cover" data-figma-id="I161:15395;5191:115521" />
+          <div data-layer="阅读" style="flex-shrink: 0; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--主-橙---6, #6B2D03); font-size: 12px; font-family: PingFang SC; font-weight: 400; line-height: 18px; white-space: nowrap">阅读</div>
+        </div>
+        <div data-layer="科目" style="width: 58.20px; flex-shrink: 0; padding-top: 4px; padding-bottom: 8px; position: relative; background: #EAF9FF; box-shadow: 0px -2px 4px #E0F6FF inset; overflow: hidden; border-top-left-radius: 12px; border-top-right-radius: 12px; border-bottom-right-radius: 24px; border-bottom-left-radius: 12px; flex-direction: column; justify-content: center; align-items: center; gap: 2px; display: inline-flex">
+          <img src="https://img.onlywnn.cn/figma/h_740b37e5.png" alt="static layer" data-layer="#static 品牌-科目已选中" data-property-1="益智" class="Static" style="position: relative; width: 32px; height: 32px; object-fit: cover" data-figma-id="I161:15395;5191:115524" />
+          <div data-layer="阅读" style="flex-shrink: 0; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--主-蓝---6, #004161); font-size: 12px; font-family: PingFang SC; font-weight: 400; line-height: 18px; white-space: nowrap">益智</div>
+        </div>
+        <div data-layer="科目" style="width: 58.20px; flex-shrink: 0; padding-top: 4px; padding-bottom: 8px; position: relative; background: #F9F5FF; box-shadow: 0px -2px 4px #F3EBFF inset; overflow: hidden; border-top-left-radius: 12px; border-top-right-radius: 12px; border-bottom-right-radius: 24px; border-bottom-left-radius: 12px; flex-direction: column; justify-content: center; align-items: center; gap: 2px; display: inline-flex">
+          <img src="https://img.onlywnn.cn/figma/h_d952c4e8.png" alt="static layer" data-layer="#static 品牌-科目已选中" data-property-1="美育" class="Static" style="position: relative; width: 32px; height: 32px; object-fit: cover" data-figma-id="I161:15395;5191:115527" />
+          <div data-layer="阅读" style="flex-shrink: 0; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--主-紫---6, #452270); font-size: 12px; font-family: PingFang SC; font-weight: 400; line-height: 18px; white-space: nowrap">美育</div>
+        </div>
+        <div data-layer="科目" style="width: 58.20px; flex-shrink: 0; padding-top: 4px; padding-bottom: 8px; position: relative; background: #EEFCEB; box-shadow: 0px -2px 4px #E5FAE0 inset; overflow: hidden; border-top-left-radius: 12px; border-top-right-radius: 12px; border-bottom-right-radius: 24px; border-bottom-left-radius: 12px; flex-direction: column; justify-content: center; align-items: center; gap: 2px; display: inline-flex">
+          <img src="https://img.onlywnn.cn/figma/h_60458a5a.png" alt="static layer" data-layer="#static 品牌-科目已选中" data-property-1="小作家" class="Static" style="position: relative; width: 32px; height: 32px; object-fit: cover" data-figma-id="I161:15395;5191:115530" />
+          <div data-layer="阅读" style="flex-shrink: 0; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--主-绿---6, #0E5200); font-size: 12px; font-family: PingFang SC; font-weight: 400; line-height: 18px; white-space: nowrap">写作</div>
+        </div>
+        <div data-layer="科目" style="width: 58.20px; flex-shrink: 0; padding-top: 4px; padding-bottom: 8px; position: relative; background: #FFF0F3; box-shadow: 0px -2px 4px #FFE5EB inset; overflow: hidden; border-top-left-radius: 12px; border-top-right-radius: 12px; border-bottom-right-radius: 24px; border-bottom-left-radius: 12px; flex-direction: column; justify-content: center; align-items: center; gap: 2px; display: inline-flex">
+          <img src="https://img.onlywnn.cn/figma/h_c503e1c6.png" alt="static layer" data-layer="#static 品牌-科目已选中" data-property-1="英语" class="Static" style="position: relative; width: 32px; height: 32px; object-fit: cover" data-figma-id="I161:15395;5191:115533" />
+          <div data-layer="阅读" style="flex-shrink: 0; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--主-粉---6, #780A23); font-size: 12px; font-family: PingFang SC; font-weight: 400; line-height: 18px; white-space: nowrap">英语</div>
+        </div>
+        <div data-layer="科目" style="width: 58.20px; flex-shrink: 0; padding-top: 4px; padding-bottom: 8px; position: relative; background: #FCF9DE; box-shadow: 0px -2px 4px #FAF6CC inset; overflow: hidden; border-top-left-radius: 12px; border-top-right-radius: 12px; border-bottom-right-radius: 24px; border-bottom-left-radius: 12px; flex-direction: column; justify-content: center; align-items: center; gap: 2px; display: inline-flex">
+          <div data-layer="品牌-科目已选中" data-property-1="专题" style="width: 32px; height: 32px; flex-shrink: 0; position: relative; overflow: hidden">
+            <div data-layer="Group 1804" class="Group1804" style="width: 27.27px; height: 28.80px; left: 1.31px; top: 3.42px; position: absolute; transform: rotate(-7deg); transform-origin: top left">
+              <div data-layer="鸡头形状" style="width: 23.84px; height: 25.40px; left: 3.66px; top: 3.55px; position: absolute; opacity: 0.40; background: #FFD738; box-shadow: 4.145456790924072px 4.145456790924072px 4.145456790924072px; filter: blur(2.07px)"></div>
+              <div data-layer="鸡头形状" style="width: 23.84px; height: 25.40px; left: 2.97px; top: 2.86px; position: absolute; background: #FFD738"></div>
+              <div data-layer="Path-4" class="Path4" style="width: 4.26px; height: 3.05px; left: 12.60px; top: 16.90px; position: absolute; transform: rotate(-7deg); transform-origin: top left; background: #F2994B"></div>
+              <div data-layer="Oval" class="Oval" style="width: 2.57px; height: 4.04px; left: 8.29px; top: 15.51px; position: absolute; transform: rotate(-7deg); transform-origin: top left; background: #B6774B"></div>
+              <div data-layer="Oval-Copy-6" class="OvalCopy6" style="width: 2.57px; height: 4.04px; left: 18.50px; top: 14.30px; position: absolute; transform: rotate(-7deg); transform-origin: top left; background: #B6774B"></div>
+            </div>
+          </div>
+          <div data-layer="阅读" style="flex-shrink: 0; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--主-粉---6, #780A23); font-size: 12px; font-family: PingFang SC; font-weight: 400; line-height: 18px; white-space: nowrap">其他</div>
+        </div>
+      </div>
+      <div data-layer="banner" class="Banner" style="width: 335px; height: 192px; flex-shrink: 0; position: relative; overflow: hidden">
+        <div data-layer="背景" style="width: 335px; height: 172px; left: 0px; top: 20px; position: absolute; background: linear-gradient(180deg, #FFD6EC 0%, #FDEFF7 100%); overflow: hidden; border-radius: 16px">
+          <img data-layer="Vector" class="Vector" style="width: 626px; height: 174px; left: -144.98px; top: -1.25px; position: absolute" src="https://img.onlywnn.cn/figma/h_27bd847c.png" />
+        </div>
+        <img data-layer="前景 1" class="1" style="width: 624px; height: 192px; left: -143.98px; top: 0.25px; position: absolute" src="https://img.onlywnn.cn/figma/h_49c3925.png" />
+      </div>
+      <div data-layer="无标题的常规卡片间距" data-property-1="竖版" data-文字="true" style="width: 335px; height: 16px; flex-shrink: 0; position: relative; opacity: 0; background: #F5F4F4">
+        <div data-layer="无标题的常规卡片间距（竖版）=16" class="16" style="left: 77px; top: -1px; position: absolute; text-align: center; justify-content: center; display: flex; flex-direction: column; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--灰-灰---3, #E0DFDF); font-size: 12px; font-family: PingFang SC; font-weight: 500; white-space: nowrap">无标题的常规卡片间距（竖版）=16</div>
+      </div>
+      <div data-layer="小banner" class="Banner" style="flex-shrink: 0; position: relative; justify-content: flex-start; align-items: flex-start; gap: 8px; display: inline-flex">
+        <img data-layer="image 109" class="Image109" style="width: 162.50px; height: 92px; flex-shrink: 0; position: relative" src="https://img.onlywnn.cn/figma/h_afbdf012.png" />
+        <img data-layer="image 110" class="Image110" style="width: 162.50px; height: 92px; flex-shrink: 0; position: relative" src="https://img.onlywnn.cn/figma/h_ea536e2d.png" />
+        <img data-layer="image 111" class="Image111" style="width: 162.50px; height: 92px; flex-shrink: 0; position: relative" src="https://img.onlywnn.cn/figma/h_54877a4c.png" />
+        <img data-layer="image 112" class="Image112" style="width: 162.50px; height: 92px; flex-shrink: 0; position: relative" src="https://img.onlywnn.cn/figma/h_762c6b71.png" />
+        <img data-layer="image 113" class="Image113" style="width: 162.50px; height: 92px; flex-shrink: 0; position: relative" src="https://img.onlywnn.cn/figma/h_3be0b370.png" />
+        <img data-layer="image 114" class="Image114" style="width: 162.50px; height: 92px; flex-shrink: 0; position: relative" src="https://img.onlywnn.cn/figma/h_f4868f75.png" />
+      </div>
+      <div data-layer="模块标题" style="width: 335px; flex-shrink: 0; padding-top: 24px; position: relative; flex-direction: column; justify-content: flex-end; align-items: flex-start; display: flex">
+        <div data-layer="Frame 3465549" class="Frame3465549" style="align-self: stretch; flex-shrink: 0; padding-left: 4px; padding-right: 4px; position: relative; justify-content: space-between; align-items: center; display: inline-flex">
+          <div data-layer="服务中心" style="flex-grow: 1; flex-basis: 0px; min-width: 0px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--灰-灰---6, #404040); font-size: 18px; font-family: PingFang SC; font-weight: 500; line-height: 27px; word-wrap: break-word">免费试一试</div>
+          <div data-layer="Auto Layout Horizontal" data-property-1="展开" class="AutoLayoutHorizontal" style="height: 24px; flex-shrink: 0; padding-left: 12px; padding-right: 6px; position: relative; border-radius: 99px; outline: 1px #F5F4F4 solid; outline-offset: -1px; justify-content: center; align-items: center; gap: 2px; display: flex">
+            <div data-layer="K1学什么？" class="K1" style="flex-shrink: 0; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--灰-灰---4, #B2B2B2); font-size: 14px; font-family: PingFang SC; font-weight: 400; line-height: 30px; letter-spacing: 1.20px; white-space: nowrap">K1学什么？</div>
+            <div data-svg-wrapper data-layer="箭头" data-property-1="2.5" style="position: relative">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M2.29289 5.12135C1.93241 5.48184 1.90468 6.04907 2.2097 6.44136L2.29289 6.53557L5.87868 10.1214C7.00339 11.2461 8.79895 11.2911 9.97733 10.2563L10.1213 10.1214L13.7071 6.53557C14.0976 6.14504 14.0976 5.51188 13.7071 5.12135C13.3466 4.76087 12.7794 4.73314 12.3871 5.03817L12.2929 5.12135L8.70711 8.70714C8.34662 9.06762 7.77939 9.09535 7.3871 8.79033L7.29289 8.70714L3.70711 5.12135C3.31658 4.73083 2.68342 4.73083 2.29289 5.12135Z" fill="#B3B3B3"/>
+              <rect y="16" width="16" height="16" transform="rotate(-90 0 16)" fill="black" fill-opacity="0.01"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+      <img src="https://img.onlywnn.cn/figma/h_f9228c0.png" alt="static layer" data-layer="#static 一健领课卡片" class="Static" style="position: relative; width: 335px; height: 293px; object-fit: cover" data-figma-id="161:15403" />
+    </div>
+  </div>
+  <img src="https://img.onlywnn.cn/figma/h_c4f6ba41.png" alt="static layer" data-layer="#static Frame 65775" class="StaticFrame65775" style="left: 0px; top: 722px; position: absolute; width: 375px; height: 90px; object-fit: cover" data-figma-id="88:23871" />
+</div>
+  </div>
+</body>
+</html>

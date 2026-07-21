@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "307e020f-6308-42ef-97d9-624dbc24d614",
+  "projectId": "proj_1779608460378",
+  "workspaceId": "live-1784611960969-shdahrcbi",
+  "baseRevision": 0,
+  "revision": 15,
+  "rootHash": "b5a905fdb379b7eba175e7b28b4d33b442ec281f498ca3c004696da30f4b4f4d",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "assets/images/b472281280cf-mini-banner-6.png",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "b472281280cf736428d48942c409fc5de8a01ce979596ba62b73dc61b01260dc"
+    }
+  ],
+  "committedAt": 1784613369268
+}

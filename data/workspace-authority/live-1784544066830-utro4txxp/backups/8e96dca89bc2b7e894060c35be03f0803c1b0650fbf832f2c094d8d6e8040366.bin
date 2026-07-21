@@ -1,0 +1,6 @@
+{
+  "name": "底部弹窗 - 手机版原型",
+  "originalSource": "index.tsx",
+  "convertedAt": "2026-06-29",
+  "description": "手机底部广告弹窗 HTML/CSS 原型，保留原 React 组件的视觉结构与配置字段绑定"
+}

@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "32d78aed-6429-4289-b34b-52bc08791f6a",
+  "projectId": "proj_1779608460378",
+  "workspaceId": "live-1784611960969-shdahrcbi",
+  "baseRevision": 0,
+  "revision": 29,
+  "rootHash": "c60d9cd0ddaca815cd29280d79e00e02817aab669cb0150e1428651bb8341f55",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "assets/images/1a9aaecb82ea-pad-bottom-course.png",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "1a9aaecb82ead288ceaa6862cb1174a3ff7d4606d4c93487c4e366ea57820f23"
+    }
+  ],
+  "committedAt": 1784613380249
+}

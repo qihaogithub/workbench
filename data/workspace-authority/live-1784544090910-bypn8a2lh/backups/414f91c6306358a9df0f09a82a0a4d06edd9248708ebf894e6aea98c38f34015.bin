@@ -1,0 +1,6 @@
+<main class="loading-screen" aria-label="活动加载页">
+  <div class="loading-content">
+    <img src="../../assets/football/loading-three-kids.gif" alt="加载中">
+    <div class="progress-track"><span class="progress-fill"></span></div>
+  </div>
+</main>

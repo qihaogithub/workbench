@@ -1,0 +1,12 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "page_sk41",
+      "name": "首页",
+      "routeKey": "page",
+      "order": 0,
+      "parentId": null
+    }
+  ]
+}

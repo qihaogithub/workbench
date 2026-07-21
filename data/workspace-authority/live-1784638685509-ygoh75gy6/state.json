@@ -1,0 +1,29 @@
+{
+  "workspaceId": "live-1784638685509-ygoh75gy6",
+  "projectId": "proj_1779608460372",
+  "revision": 4,
+  "rootHash": "5ffb3b2091ac66e13d49d134ff93b8ffcdecdf71d0e26ec8350028c2e06e4102",
+  "resourceHashes": {
+    ".canvas-layout.json": "5c4c28c33a0761aeeec6b21d50c591deb2bf3422b36a4b0b67b97df5db338ab8",
+    "demos/demo_1779608460501_abc123/config.schema.json": "7f4d2104f4290a4ce1191ea0bb8147f62da374f4aaec2aa24a0e3de00e6c0dc2",
+    "demos/demo_1779608460501_abc123/index.tsx": "98e010c7971991145b0641108ce28ffb99773bbdb2b9aed5085c67b99d257869",
+    "demos/demo_1779608460501_abc123/prototype.css": "9142449e68ed91a4d81b256267b46fa8951dd52037ffe642af8032c02d7f7dff",
+    "demos/demo_1779608460501_abc123/prototype.html": "35feb4190e54a1dc6a310fbe05c7fb53d4ecf7ed28e4c83f0979efbe8e35083f",
+    "demos/demo_1779608460501_abc123/prototype.meta.json": "8e96dca89bc2b7e894060c35be03f0803c1b0650fbf832f2c094d8d6e8040366",
+    "demos/demo_1779608460502_def456/config.schema.json": "5f32433c35206f85c58c0a80f184367503fe98ee7bf1aee8b0249aac730286dd",
+    "demos/demo_1779608460502_def456/index.tsx": "86e57ffe85720c3230fef9bb44987b79d0e7051e65de24758729d065ecae9223",
+    "demos/demo_1779608460502_def456/prototype.css": "bf206d454a20f907cc589ea4bcdc3081677b13815abb5dd16e7d14ee36aa97aa",
+    "demos/demo_1779608460502_def456/prototype.html": "a1b7204c3371b72528894634422b351ab2fef679ff011d590f9579b77bfb5fb8",
+    "demos/demo_1779608460502_def456/prototype.meta.json": "656c84c203628768bea4113cd5ed8e9480851160677a45450eae0f1636acceaa",
+    "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
+    "project.config.schema.json": "7e37c037ce99102298a6a607978b690825d8a13314af569cdc3dcbb4400a731d",
+    "project.config.values.json": "8b71a9d2ed16eb9553940f887f42a670fa64ee72e82cd79346cecb21065a103d",
+    "workspace-tree.json": "a9bccd1075d22e6dad91bdf95c8f0f45ac5c3699b8817e93d1ded64ffc7aa5b1"
+  },
+  "mutationPayloads": {
+    "03198ee4-5da4-45d0-a37e-ca4c4125766f": "43e688dd771f0b60df96a0eced20f8afa9b1b6f26bd3d21de21bcb73d17a5072",
+    "7acf9703-aadf-4abd-a357-dd2ffa54ef69": "a8031b6e8f0c74b50124a73d2365daf88137d070ae66ed1e6fe91e574d1ab91d",
+    "34301fb4-31f3-476b-a06c-cee512863375": "4e5ba7f8db5e6b607494c0bfd7225882a973e8fb9ede00441e361dddd93e81db"
+  },
+  "updatedAt": 1784643559139
+}

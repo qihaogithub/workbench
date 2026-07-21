@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "8ab69654-c136-4e81-8870-3c6d86a0ac45",
+  "projectId": "proj_1779608460378",
+  "workspaceId": "live-1784611960969-shdahrcbi",
+  "baseRevision": 0,
+  "revision": 7,
+  "rootHash": "b246aacf92c507e7a635763a5e67d0fbf6e50040f065a637c757e362ac8eab19",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "assets/images/361da27ba0c6-subject-xiezuo.png",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "361da27ba0c6e8ccf08f74d61f3f1a721ba5da01d50fde1d64e1e3abf430e170"
+    }
+  ],
+  "committedAt": 1784613358421
+}

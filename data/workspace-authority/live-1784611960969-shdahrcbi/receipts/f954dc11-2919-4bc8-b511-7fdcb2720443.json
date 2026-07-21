@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "f954dc11-2919-4bc8-b511-7fdcb2720443",
+  "projectId": "proj_1779608460378",
+  "workspaceId": "live-1784611960969-shdahrcbi",
+  "baseRevision": 0,
+  "revision": 21,
+  "rootHash": "7e12ae86df4982f64549681fb46d847d2ce8c7dc3bbf527a30efa22e06d63cf7",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "assets/images/69f2b94bee11-pad-course-card-1.png",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "69f2b94bee11defde841a9402478f7f837dd739e4a696fa245e1deb35c433b59"
+    }
+  ],
+  "committedAt": 1784613374494
+}

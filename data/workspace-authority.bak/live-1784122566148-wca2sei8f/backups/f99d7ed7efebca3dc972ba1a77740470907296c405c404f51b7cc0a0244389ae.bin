@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "properties": {
+    "autosaveSchemaMarker": {
+      "type": "string",
+      "title": "自动保存 Schema 457c87",
+      "default": "autosave-regression-schema: 457c87"
+    }
+  }
+}

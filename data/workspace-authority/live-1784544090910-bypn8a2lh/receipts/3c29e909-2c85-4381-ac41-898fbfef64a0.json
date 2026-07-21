@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "3c29e909-2c85-4381-ac41-898fbfef64a0",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "workspaceId": "live-1784544090910-bypn8a2lh",
+  "baseRevision": 0,
+  "revision": 16,
+  "rootHash": "7d2c9b95a3b0c6b0816e328db880c5e071d8196e85f3a063cb539743b296cee3",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/worldcup_05_active_with_prizes/index.tsx",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/worldcup_05_active_with_prizes/config.schema.json",
+      "action": "modified",
+      "beforeHash": "ee02fa1b65c43b367157ec31dbbde5ce5d1ac28c259fcff26055d31b097f17d2",
+      "afterHash": "ee02fa1b65c43b367157ec31dbbde5ce5d1ac28c259fcff26055d31b097f17d2"
+    },
+    {
+      "path": "demos/worldcup_05_active_with_prizes/prototype.html",
+      "action": "modified",
+      "beforeHash": "11c7b296e47f4285cf767b2e38b4f7c14c192e9dcbedff8f7927c1f24753f22d",
+      "afterHash": "11c7b296e47f4285cf767b2e38b4f7c14c192e9dcbedff8f7927c1f24753f22d"
+    },
+    {
+      "path": "demos/worldcup_05_active_with_prizes/prototype.css",
+      "action": "modified",
+      "beforeHash": "50b35e95ed41be6e545b22c29f992c940b89b87c322c3ddfe49a5e3b8aa97e3d",
+      "afterHash": "50b35e95ed41be6e545b22c29f992c940b89b87c322c3ddfe49a5e3b8aa97e3d"
+    },
+    {
+      "path": "demos/worldcup_05_active_with_prizes/prototype.meta.json",
+      "action": "modified",
+      "beforeHash": "286444b4cbb2fd486db3dd36548312f0585a310900f77b3956ddf14d9d124947",
+      "afterHash": "25375e4239e01834c425533f40f682d0c1857bfb03ca43aaa4e0773ae27698e1"
+    }
+  ],
+  "committedAt": 1784544185553
+}

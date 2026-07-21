@@ -1,0 +1,43 @@
+{
+  "id": "prv_1784601326944_kmdyq8",
+  "projectId": "proj_1779608460372",
+  "kind": "page",
+  "resourceId": "demo_1779608460501_abc123",
+  "workspaceId": "live-1784544066830-utro4txxp",
+  "workspaceRevision": 19,
+  "workspaceRootHash": "c6b78b55c25d35922f46bd92934f0e5e04b92c1dc27ea9a37bdbf3e1c7f4c633",
+  "previousVersionId": "prv_1784601022006_xyggqb",
+  "contentHash": "6202d699ffb3f363ed37e11315c1283aa2fcfb42ab9aeb6eb0f750df7f22fe65",
+  "blobRefs": [
+    "ca09ae46d14bca062c8e68c1cb6bb599f545e6100a9f87b34c5b1ca4287d4b4d",
+    "cb3a191179d4c3a0a3feb8c90639c1ebcdac7e301e5a93dd678514600fd9a71e",
+    "1dedeaf138364e1e502ae6e22718150f7dc03daa5b237feffd88bbe401ccd6a7",
+    "8e96dca89bc2b7e894060c35be03f0803c1b0650fbf832f2c094d8d6e8040366"
+  ],
+  "metadata": {
+    "page": {
+      "id": "demo_1779608460501_abc123",
+      "name": "手机",
+      "routeKey": "demo",
+      "runtimeType": "prototype-html-css",
+      "order": 0,
+      "parentId": null
+    },
+    "files": {
+      "schema": "ca09ae46d14bca062c8e68c1cb6bb599f545e6100a9f87b34c5b1ca4287d4b4d",
+      "prototypeHtml": "cb3a191179d4c3a0a3feb8c90639c1ebcdac7e301e5a93dd678514600fd9a71e",
+      "prototypeCss": "1dedeaf138364e1e502ae6e22718150f7dc03daa5b237feffd88bbe401ccd6a7",
+      "prototypeMeta": "8e96dca89bc2b7e894060c35be03f0803c1b0650fbf832f2c094d8d6e8040366"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1784601326945,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录手机"
+}
