@@ -67,6 +67,7 @@ fi
 
 python3 - "${LOCAL_ENV_FILE}" "${DEPLOY_ENV_FILE}" <<'PY'
 import sys
+import re
 
 env_path = sys.argv[1]
 out_path = sys.argv[2]
@@ -92,6 +93,21 @@ for key, value in defaults.items():
     if key not in values:
         order.append(key)
         values[key] = value
+
+# 展开 ${VAR} 引用（支持多层嵌套，如 A=${B} → B=${C} → A=最终值）
+def _expand_refs(val, vars_dict):
+    prev = None
+    while prev != val:
+        prev = val
+        val = re.sub(
+            r'\$\{([A-Za-z_][A-Za-z0-9_]*)\}',
+            lambda m: vars_dict.get(m.group(1), m.group(0)),
+            val,
+        )
+    return val
+
+for key in values:
+    values[key] = _expand_refs(values[key], values)
 
 internal_api_token = values.get("INTERNAL_API_TOKEN", "").strip()
 if not internal_api_token:
