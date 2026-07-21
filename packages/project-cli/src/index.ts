@@ -48,6 +48,31 @@ import {
   ProjectWorkspaceAuthorityClient,
   ProjectWorkspaceAuthorityClientError,
 } from "./workspace-authority-client.js";
+import {
+  login as authLogin,
+  logout as authLogout,
+  remoteAdd,
+  remoteList,
+  remoteRemove,
+  remoteUse,
+  whoami as authWhoami,
+  diagnoseRemote,
+} from "./auth-commands.js";
+import {
+  RemoteApiError,
+  remoteJson,
+  remoteTokenWarnings,
+  resolveRemoteTarget,
+  type RemoteTarget,
+  type RemoteTargetArgs,
+} from "./remote-api.js";
+import { RemoteConfigError } from "./remote-config.js";
+import { formatPublishErrorDetails } from "./error-format.js";
+import {
+  syncDiff,
+  syncPull,
+  syncPush,
+} from "./sync-commands.js";
 
 type JsonObject = Record<string, unknown>;
 type CommandResult = ProjectAdminResult<unknown> | JsonObject | string;
@@ -1445,65 +1470,122 @@ function withPublishAccessSummary(
   };
 }
 
+function remoteTargetArgs(args: JsonObject): RemoteTargetArgs {
+  // 裸 --remote（parseScalar 解析为 true）表示使用默认远程
+  const remoteRaw = args.remote;
+  return {
+    remote: typeof remoteRaw === "string" ? remoteRaw : undefined,
+    authorSiteUrl: optionalStringArg(args, "authorSiteUrl"),
+    authToken: optionalStringArg(args, "authToken"),
+  };
+}
+
+function hasRemoteSignal(args: JsonObject): boolean {
+  return (
+    hasArg(args, "remote") ||
+    Boolean(optionalStringArg(args, "authorSiteUrl")) ||
+    Boolean(process.env.AUTHOR_SITE_URL)
+  );
+}
+
+function remoteErrorToResult<T>(error: unknown): ProjectAdminResult<T> {
+  if (error instanceof RemoteApiError) {
+    return {
+      ok: false,
+      error: {
+        code: error.code,
+        message: error.message,
+        recoverable: true,
+        details: error.details,
+      },
+      nextActions: error.nextActions.length > 0 ? error.nextActions : undefined,
+    };
+  }
+  if (error instanceof RemoteConfigError) {
+    return cliFail(error.code, error.message);
+  }
+  throw error;
+}
+
 async function publishViaAuthorSite(
   projectId: string,
   args: JsonObject,
 ): Promise<ProjectAdminResult<AuthorSitePublishResult>> {
-  const authorSiteUrl =
-    optionalStringArg(args, "authorSiteUrl") ?? process.env.AUTHOR_SITE_URL;
-  const authToken =
-    optionalStringArg(args, "authToken") ?? process.env.AUTHOR_SITE_AUTH_TOKEN;
-  if (!authorSiteUrl) {
-    return cliFail("AUTHOR_SITE_URL_MISSING", "未配置 author-site 地址", {
-      nextActions: ["传入 --author-site-url <url> 或设置 AUTHOR_SITE_URL"],
-    });
-  }
-  if (!authToken) {
-    return cliFail(
-      "AUTHOR_SITE_AUTH_TOKEN_MISSING",
-      "未配置 author-site 登录 token",
-      {
-        nextActions: [
-          "传入 --auth-token <auth_token> 或设置 AUTHOR_SITE_AUTH_TOKEN",
-        ],
-      },
-    );
+  let target: RemoteTarget;
+  try {
+    target = resolveRemoteTarget(remoteTargetArgs(args));
+  } catch (error) {
+    return remoteErrorToResult(error);
   }
 
-  const response = await fetch(
-    `${normalizeBaseUrl(authorSiteUrl)}/api/projects/${encodeURIComponent(projectId)}/publish`,
-    {
-      method: "POST",
-      headers: {
-        Cookie: `auth_token=${encodeURIComponent(authToken)}`,
-      },
-    },
-  );
-  const payload =
-    (await response.json()) as ApiResponse<AuthorSitePublishResult>;
-  if (!response.ok || !payload.success || !payload.data) {
-    return cliFail(
-      payload.error?.code ?? `HTTP_${response.status}`,
-      payload.error?.message ?? "author-site 发布失败",
+  try {
+    const { status, payload } = await remoteJson<AuthorSitePublishResult>(
+      target,
+      `/api/projects/${encodeURIComponent(projectId)}/publish`,
       {
-        nextActions: [
-          "确认 author-site 正在运行",
-          "确认 auth token 未过期",
-          `ow publish check ${projectId} --json`,
-        ],
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildPublishRequestBody(args)),
       },
     );
-  }
-  const data = withPublishAccessSummary(payload.data, args);
-  return {
-    ok: true,
-    data,
-    warnings:
-      data.cloudflareSync && !data.cloudflareSync.success
+    if (status < 200 || status >= 300 || !payload.success || !payload.data) {
+      const detailSummary = formatPublishErrorDetails(payload.error?.details);
+      return {
+        ok: false,
+        error: {
+          code: payload.error?.code ?? `HTTP_${status}`,
+          message: payload.error?.message ?? "author-site 发布失败",
+          recoverable: true,
+          details: payload.error?.details,
+        },
+        warnings: detailSummary.length > 0 ? detailSummary : undefined,
+        nextActions: [
+          "确认 author-site 正在运行",
+          "确认登录凭证有效（ow whoami --json）",
+          `ow publish check ${projectId} --json`,
+        ],
+      };
+    }
+    if ((payload.data as { dryRun?: boolean }).dryRun === true) {
+      const dryRunWarnings = remoteTokenWarnings(target);
+      return {
+        ok: true,
+        data: payload.data,
+        warnings: dryRunWarnings.length > 0 ? dryRunWarnings : undefined,
+        nextActions: [
+          `确认干跑报告无误后正式发布：ow publish project ${projectId}${target.remoteName ? ` --remote ${target.remoteName}` : ""}`,
+        ],
+      };
+    }
+    const data = withPublishAccessSummary(payload.data, args);
+    const warnings = [
+      ...remoteTokenWarnings(target),
+      ...(data.cloudflareSync && !data.cloudflareSync.success
         ? [data.cloudflareSync.message]
-        : undefined,
-    nextActions: [`ow publish status ${projectId} --json`],
-  };
+        : []),
+    ];
+    return {
+      ok: true,
+      data,
+      warnings: warnings.length > 0 ? warnings : undefined,
+      nextActions: [`ow publish status ${projectId} --json`],
+    };
+  } catch (error) {
+    return remoteErrorToResult(error);
+  }
+}
+
+function buildPublishRequestBody(args: JsonObject): JsonObject {
+  const body: JsonObject = {};
+  if (booleanArg(args, "dryRun")) body.dryRun = true;
+  const imageOptions: JsonObject = {};
+  if (booleanArg(args, "skipImageLocalization")) imageOptions.skip = true;
+  const timeoutMs = numberArg(args, "imageTimeout");
+  if (timeoutMs !== undefined) imageOptions.timeoutMs = timeoutMs;
+  const concurrency = numberArg(args, "imageConcurrency");
+  if (concurrency !== undefined) imageOptions.concurrency = concurrency;
+  if (Object.keys(imageOptions).length > 0) body.imageOptions = imageOptions;
+  return body;
 }
 
 function helpText(): string {
@@ -1535,17 +1617,23 @@ register(
   ["capabilities", "admin_capabilities"],
 );
 
-register("doctor", "诊断本地 CLI 环境", (_args, _pos, { service, actor }) => ({
-  ok: true,
-  data: {
-    cwd: process.cwd(),
-    dataDir: service.dataDir,
-    actor,
-    node: process.version,
-    package: "@workbench/project-cli",
-  },
-  nextActions: ["project list --json", "template list --json"],
-}));
+register("doctor", "诊断本地 CLI 环境与已配置远程", async (args, _pos, { service, actor }) => {
+  const remote = await diagnoseRemote(remoteTargetArgs(args));
+  return {
+    ok: remote.ok,
+    data: {
+      cwd: process.cwd(),
+      dataDir: service.dataDir,
+      actor,
+      node: process.version,
+      package: "@workbench/project-cli",
+      remote: remote.data,
+    },
+    warnings: remote.warnings,
+    nextActions: remote.nextActions ?? ["project list --json", "template list --json"],
+    ...(remote.error ? { error: remote.error } : {}),
+  };
+});
 
 register("commands", "列出 CLI 命令", () => ({
   ok: true,
@@ -1555,6 +1643,110 @@ register("commands", "列出 CLI 命令", () => ({
     description,
   })),
 }));
+
+register(
+  "remote add",
+  "注册远程 author-site",
+  (args, pos) =>
+    remoteAdd(stringArg(args, "name", pos[0]), stringArg(args, "url", pos[1])),
+  ["remote_add"],
+);
+
+register(
+  "remote remove",
+  "删除远程 author-site 配置",
+  (args, pos) => remoteRemove(stringArg(args, "name", pos[0])),
+  ["remote_remove", "remote rm"],
+);
+
+register(
+  "remote use",
+  "切换默认远程",
+  (args, pos) => remoteUse(stringArg(args, "name", pos[0])),
+  ["remote_use"],
+);
+
+register("remote list", "列出已配置远程", () => remoteList(), [
+  "remote_list",
+  "remote ls",
+]);
+
+register(
+  "login",
+  "登录远程 author-site 并缓存凭证",
+  async (args) =>
+    authLogin({
+      remote: optionalStringArg(args, "remote"),
+      username: optionalStringArg(args, "username"),
+      password: optionalStringArg(args, "password"),
+    }),
+  ["auth login"],
+);
+
+register(
+  "logout",
+  "清除远程 author-site 登录凭证",
+  (args) => authLogout({ remote: optionalStringArg(args, "remote") }),
+  ["auth logout"],
+);
+
+register(
+  "whoami",
+  "显示当前远程登录身份",
+  (args) => authWhoami(remoteTargetArgs(args)),
+  ["auth whoami"],
+);
+
+register(
+  "sync push",
+  "将本地原始项目目录同步到远程 author-site",
+  async (args, pos, { service }) => {
+    try {
+      return await syncPush({
+        ...remoteTargetArgs(args),
+        dataDir: service.dataDir,
+        projectId: stringArg(args, "projectId", pos[0]),
+      });
+    } catch (error) {
+      return remoteErrorToResult(error);
+    }
+  },
+  ["sync_push"],
+);
+
+register(
+  "sync pull",
+  "从远程 author-site 拉取原始项目目录并备份覆盖本地",
+  async (args, pos, { service }) => {
+    try {
+      return await syncPull({
+        ...remoteTargetArgs(args),
+        dataDir: service.dataDir,
+        projectId: stringArg(args, "projectId", pos[0]),
+      });
+    } catch (error) {
+      return remoteErrorToResult(error);
+    }
+  },
+  ["sync_pull"],
+);
+
+register(
+  "sync diff",
+  "对比本地与远程原始项目文件清单",
+  async (args, pos, { service }) => {
+    try {
+      return await syncDiff({
+        ...remoteTargetArgs(args),
+        dataDir: service.dataDir,
+        projectId: stringArg(args, "projectId", pos[0]),
+      });
+    } catch (error) {
+      return remoteErrorToResult(error);
+    }
+  },
+  ["sync_diff"],
+);
 
 register(
   "help input",
@@ -1997,6 +2189,61 @@ register(
       actor,
     ),
   ["project_content_gc"],
+);
+
+register(
+  "workspace list",
+  "列出项目 canonical、live 与 branch workspace",
+  (args, pos, { service, actor }) =>
+    service.workspaceList(stringArg(args, "projectId", pos[0]), actor),
+  ["workspace_list"],
+);
+
+register(
+  "workspace clean",
+  "清理未引用 workspace（默认 dry-run，--force 执行）",
+  (args, pos, { service, actor }) =>
+    service.workspaceClean(
+      stringArg(args, "projectId", pos[0]),
+      {
+        force: booleanArg(args, "force"),
+        includeExpired: booleanArg(args, "all"),
+      },
+      actor,
+    ),
+  ["workspace_clean"],
+);
+
+register(
+  "workspace fix",
+  "诊断并修复安全的 workspace 悬空引用（默认 dry-run）",
+  (args, pos, { service, actor }) =>
+    service.workspaceFix(
+      stringArg(args, "projectId", pos[0]),
+      { force: booleanArg(args, "force") },
+      actor,
+    ),
+  ["workspace_fix"],
+);
+
+register(
+  "content-graph status",
+  "查看项目内容图 head、物化状态与提交数量",
+  (args, pos, { service, actor }) =>
+    service.contentGraphStatus(stringArg(args, "projectId", pos[0]), actor),
+  ["content_graph_status"],
+);
+
+register(
+  "content-graph reset",
+  "从 canonical workspace 备份并重建内容图（默认 dry-run）",
+  (args, pos, { service, actor }) =>
+    service.contentGraphReset(
+      stringArg(args, "projectId", pos[0]),
+      { force: booleanArg(args, "force") },
+      actor,
+    ),
+  ["content_graph_reset"],
 );
 
 register(
@@ -2885,14 +3132,23 @@ register(
 
 register(
   "publish project",
-  "发布项目",
+  "发布项目（--remote/--dry-run 走 author-site 发布管线）",
   async (args, pos, { service, actor }) => {
     const projectId = stringArg(args, "projectId", pos[0]);
-    if (
-      optionalStringArg(args, "authorSiteUrl") ||
-      process.env.AUTHOR_SITE_URL
-    ) {
+    if (hasRemoteSignal(args)) {
       return publishViaAuthorSite(projectId, args);
+    }
+    if (booleanArg(args, "dryRun")) {
+      return cliFail(
+        "REMOTE_REQUIRED",
+        "--dry-run 需要走 author-site 发布管线",
+        {
+          nextActions: [
+            `ow publish project ${projectId} --dry-run --remote <name>`,
+            "或设置 AUTHOR_SITE_URL 环境变量",
+          ],
+        },
+      );
     }
     const result = service.publishProject(projectId, actor);
     return result.ok
@@ -2900,7 +3156,7 @@ register(
           ...result,
           nextActions: [
             ...(result.nextActions ?? []),
-            "配置 AUTHOR_SITE_URL 和 AUTHOR_SITE_AUTH_TOKEN 后可调用 author-site 正式发布产物链路",
+            "配置远程后可走 author-site 正式发布产物链路：ow remote add <name> <url> && ow login",
           ],
         }
       : result;

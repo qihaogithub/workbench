@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { publishProject } from '@/lib/publish-manager';
+import { publishProject, PublishError } from '@/lib/publish-manager';
 import {
   createApiSuccess,
   createApiError,
   getWorkspaceMeta,
   readProjectMeta,
+  writeProjectMeta,
 } from '@/lib/fs-utils';
 import { getAuthCookie, verifyToken } from '@/lib/auth/jwt';
 import {
@@ -19,6 +20,30 @@ import {
 interface PublishRequestBody {
   sessionId?: unknown;
   workspaceId?: unknown;
+  dryRun?: unknown;
+  imageOptions?: unknown;
+}
+
+interface ParsedImageOptions {
+  skip?: boolean;
+  timeoutMs?: number;
+  concurrency?: number;
+}
+
+function parseImageOptions(value: unknown): ParsedImageOptions | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+  const raw = value as Record<string, unknown>;
+  const options: ParsedImageOptions = {};
+  if (raw.skip === true) options.skip = true;
+  if (typeof raw.timeoutMs === 'number' && raw.timeoutMs >= 1000) {
+    options.timeoutMs = Math.min(raw.timeoutMs, 120_000);
+  }
+  if (typeof raw.concurrency === 'number' && raw.concurrency >= 1) {
+    options.concurrency = Math.min(Math.floor(raw.concurrency), 16);
+  }
+  return Object.keys(options).length > 0 ? options : undefined;
 }
 
 function readNonEmptyString(value: unknown): string | undefined {
@@ -112,6 +137,19 @@ export async function POST(
       }
     } else {
       const project = readProjectMeta(params.projectId);
+      // 治本修复：activeWorkspaceId 指向已删除的 workspace 时，旧逻辑会让同步前置检查
+      // 恒不满足、发布永远 400。此处视为无活跃工作区，清理悬空引用后放行。
+      if (
+        project?.activeWorkspaceId &&
+        !getWorkspaceMeta(project.activeWorkspaceId)
+      ) {
+        console.warn(
+          `[publish] activeWorkspaceId ${project.activeWorkspaceId} 指向不存在的 workspace，已自动清理`,
+        );
+        delete project.activeWorkspaceId;
+        delete project.activeWorkspaceUpdatedAt;
+        writeProjectMeta(params.projectId, project);
+      }
       const activeUpdatedAt = project?.activeWorkspaceId
         ? getWorkspaceMeta(project.activeWorkspaceId)?.updatedAt ??
           project.activeWorkspaceUpdatedAt ??
@@ -131,29 +169,39 @@ export async function POST(
       sessionId = undefined;
     }
 
-    const result = workspaceProof
-      ? await publishProject(params.projectId, workspaceProof)
-      : await publishProject(params.projectId);
+    const imageOptions = parseImageOptions(body.imageOptions);
+    const publishOptions: Parameters<typeof publishProject>[1] = {
+      ...(workspaceProof ?? {}),
+      ...(body.dryRun === true ? { dryRun: true as const } : {}),
+      ...(imageOptions ? { imageOptions } : {}),
+    };
+    const result =
+      Object.keys(publishOptions).length > 0
+        ? await publishProject(params.projectId, publishOptions)
+        : await publishProject(params.projectId);
     return NextResponse.json(createApiSuccess(result));
   } catch (error) {
-    if (error instanceof Error) {
-      if (error.message === 'PROJECT_NOT_FOUND') {
-        return NextResponse.json(createApiError('PROJECT_NOT_FOUND'), { status: 404 });
-      }
-      if (error.message === 'NO_CONTENT_TO_PUBLISH') {
-        return NextResponse.json(createApiError('NO_CONTENT_TO_PUBLISH', '项目没有可发布的Demo页面'), { status: 400 });
-      }
-      if (error.message === 'SNAPSHOT_CREATE_ERROR') {
-        return NextResponse.json(createApiError('SNAPSHOT_CREATE_ERROR', '创建发布快照失败'), { status: 500 });
-      }
-      if (error.message === 'IMAGE_LOCALIZATION_FAILED') {
-        return NextResponse.json(
-          createApiError('PUBLISH_FAILED', '发布图片资源本地化失败，请检查外部图片是否可访问后重试'),
-          { status: 400 },
-        );
-      }
+    if (error instanceof PublishError) {
+      const status =
+        error.code === 'PROJECT_NOT_FOUND'
+          ? 404
+          : error.code === 'SNAPSHOT_CREATE_ERROR'
+            ? 500
+            : 400;
+      return NextResponse.json(
+        createApiError(error.code, error.message, error.details),
+        { status },
+      );
     }
     console.error('发布失败:', error);
-    return NextResponse.json(createApiError('PUBLISH_FAILED'), { status: 500 });
+    return NextResponse.json(
+      createApiError(
+        'PUBLISH_FAILED',
+        error instanceof Error && error.message
+          ? `发布失败：${error.message}`
+          : undefined,
+      ),
+      { status: 500 },
+    );
   }
 }

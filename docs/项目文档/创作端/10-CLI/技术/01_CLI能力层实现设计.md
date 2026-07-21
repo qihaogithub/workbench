@@ -8,21 +8,31 @@ covers:
   - packages/project-cli/scripts/run-tests.mjs
   - packages/project-cli/package.json
   - packages/project-cli/src/index.ts
+  - packages/project-cli/src/auth-commands.ts
+  - packages/project-cli/src/remote-api.ts
+  - packages/project-cli/src/remote-config.ts
+  - packages/project-cli/src/sync-commands.ts
   - packages/project-cli/src/cli.test.ts
   - packages/project-cli/src/cli-all-commands.test.ts
   - packages/project-cli/AGENTS.md
   - packages/project-core/src/service.ts
+  - packages/project-core/src/project-transfer.ts
+  - packages/project-core/src/workspace-admin.ts
+  - packages/project-core/src/content-graph-admin.ts
   - packages/project-core/src/types.ts
   - packages/project-core/src/__tests__/service.test.ts
   - scripts/check-workspace-authority-guards.mjs
   - packages/preview-contract/src/index.ts
+  - packages/author-site/src/app/api/projects/[projectId]/export/route.ts
+  - packages/author-site/src/app/api/projects/[projectId]/import/route.ts
+  - packages/author-site/src/app/api/projects/[projectId]/publish/route.ts
   - package.json
 ---
 
 # CLI 能力层实现设计
 
-> 更新日期：2026-07-14
-> 更新说明：v2.2 补齐 project-core WorkspaceMutationPort 防线和 OPS CLI workspace-authority 命令组。
+> 更新日期：2026-07-21
+> 更新说明：v2.3 补齐远程鉴权、整项目同步、发布 dry-run 与安全维护命令。
 
 ## 技术定位
 
@@ -53,6 +63,8 @@ CLI 命令按能力域分组：
 | 分组                         | 说明                                                                                                                                |
 | :--------------------------- | :---------------------------------------------------------------------------------------------------------------------------------- |
 | `admin`                      | 查看能力、项目锁定和解锁                                                                                                            |
+| `remote` / 鉴权           | 管理远程地址、默认远程、登录凭证和当前身份                                                                              |
+| `sync`                       | 比较、推送和拉取整个项目存储                                                                                                  |
 | `doctor` / `commands`        | 环境诊断和命令自检                                                                                                                  |
 | `help` / `recipe` / `report` | 输入契约说明、Agent 工作流配方和运行证据包                                                                                          |
 | `project`                    | 项目列表、详情、创建、拉取、更新、复制、分类 / 创作偏好元数据、封面、删除、内容图提交列表、物化检查、旧数据导入和 blob 清理 dry-run |
@@ -66,8 +78,25 @@ CLI 命令按能力域分组：
 | `publish`                    | 发布前检查、正式发布、发布状态、回滚和产物摘要                                                                                      |
 | `ai`                         | AI 会话摘要、运行日志、工作区上下文和在线消息发送                                                                                   |
 | `audit`                      | 审计列表和审计详情                                                                                                                  |
+| `workspace` / `content-graph` | 工作区清点、安全清理、悬空引用修复和内容图诊断重建                                                               |
 
 本地项目包相关的 `validate`、`diff`、`upgrade` 和 `submit` 放在顶层命令，便于代理进入脚手架目录后直接执行。
+
+## 远程鉴权与整项目同步
+
+CLI 把多远程配置和凭证保存在独立的用户级配置中，文件权限限制为当前用户可读写。环境变量仍可以临时覆盖远程和 token，便于 CI 使用；命令输出不返回 token 原文。登录由 author-site 会话接口返回可供 CLI 保存的 token 和到期时间，后续远程请求统一通过 Cookie 携带。
+
+`sync diff` 只比较本地与远程的文件清单、大小和内容哈希。`sync push` 先把本地项目目录打成 gzip 归档，再交给 author-site 导入；`sync pull` 从 author-site 下载同格式归档，再由 project-core 替换本地项目。归档层拒绝越界路径、项目 ID 不一致和超限请求；导入先备份旧项目，失败时恢复，成功后重置不可跨环境沿用的活跃工作区证明。
+
+author-site 的导出端点既能返回归档，也能返回用于 diff 的清单；导入端点仅接受已登录请求并对请求体设置大小上限。这两个端点只做 HTTP 适配，安全检查、备份和原子替换由 project-core 统一完成。
+
+`doctor` 在本地检查之外执行短超时的远程可达性检查，并在存在凭证时验证会话。未配置远程仍是合法的纯本地模式；远程不可达、凭证失效或即将过期则通过结构化警告和下一步建议呈现。
+
+## 安全维护命令
+
+`workspace list` 合并项目基准、live、branch 工作区和活跃会话引用，用于判断哪些目录仍被使用。`workspace clean` 默认只返回候选项，只有 `--force` 才删除已证明未被引用的分支工作区；过期工作区还需显式选择扩大范围。`workspace fix` 同样默认只诊断，仅自动清理“项目指向了不存在工作区”这类可证明安全的悬空引用，Authority proof 或物化差异只作报告。
+
+`content-graph status` 读取 head、commit 数量和物化状态。`content-graph reset` 默认 dry-run；显式执行时先备份 `content/`，再从 canonical workspace 重建页面和知识文档的资源版本、受保护提交和物化记录。任一阶段失败都恢复备份，成功和失败结果都通过 project-core 的审计边界呈现。
 
 高噪声命令支持摘要输出。`asset list --summary`、`edit diff --summary`、`page list --summary`、`diff --summary` 和 `project validate-runtime --summary` 会保留完整可追溯对象，同时增加面向代理的数量、体积、运行时类型和问题计数，避免代理为了判断状态读取过长列表。
 

@@ -9,7 +9,14 @@ import { buildProjectCli } from "./build.mjs";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const testOutputDir = path.join(packageRoot, "dist", "tests");
-const tests = ["cli.test.ts", "cli-all-commands.test.ts", "workspace-authority-client.test.ts"];
+const tests = [
+  "cli.test.ts",
+  "cli-all-commands.test.ts",
+  "workspace-authority-client.test.ts",
+  "remote-auth.test.ts",
+  "sync-commands.test.ts",
+  "remote-doctor.test.ts",
+];
 
 await buildProjectCli({ force: true });
 fs.mkdirSync(testOutputDir, { recursive: true });

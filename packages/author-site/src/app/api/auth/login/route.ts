@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyUserPassword } from "@/lib/user";
-import { createToken, setAuthCookie } from "@/lib/auth/jwt";
+import { createToken, setAuthCookie, TOKEN_TTL_MS } from "@/lib/auth/jwt";
 import { createApiError, createApiSuccess } from "@/lib/fs-utils";
 
 export async function POST(request: NextRequest) {
   try {
-    const { username, password } = await request.json();
+    const { username, password, includeToken } = await request.json();
     const normalizedUsername =
       typeof username === "string" ? username.trim() : username;
 
@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const issuedAt = Date.now();
     const token = await createToken({
       userId: user.id,
       username: user.username,
@@ -33,6 +34,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       createApiSuccess({
         user: { id: user.id, username: user.username },
+        // CLI 等非浏览器客户端无法读取 httpOnly cookie，显式请求时在 body 返回 token
+        ...(includeToken === true
+          ? { token, expiresAt: issuedAt + TOKEN_TTL_MS }
+          : {}),
       }),
     );
   } catch (error) {

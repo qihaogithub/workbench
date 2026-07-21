@@ -97,7 +97,9 @@ function createSessionFixture(projectId: string): string {
 }
 
 const originalRole = process.env.PROJECT_ADMIN_ROLE;
+const originalCliConfig = process.env.WORKBENCH_CLI_CONFIG;
 process.env.PROJECT_ADMIN_ROLE = "admin";
+process.env.WORKBENCH_CLI_CONFIG = path.join(tempDir, "cli-config.json");
 
 try {
   await runCommand("doctor", ["doctor"]);
@@ -120,6 +122,26 @@ try {
   ]);
   const projectId = dataOf<{ id: string }>(created).id;
   assert.match(projectId, /^proj_/);
+
+  await runCommand("remote add", ["remote", "add", "test", "http://127.0.0.1:1"]);
+  await runCommand("remote list", ["remote", "list"]);
+  await runCommand("remote use", ["remote", "use", "test"]);
+  await runCommand("whoami", ["whoami"]);
+  await runCommand("login", ["login"], { expectedStatus: 1, expectOk: false });
+  await runCommand("logout", ["logout"]);
+  await runCommand("sync push", ["sync", "push", projectId], {
+    expectedStatus: 1,
+    expectOk: false,
+  });
+  await runCommand("sync pull", ["sync", "pull", projectId], {
+    expectedStatus: 1,
+    expectOk: false,
+  });
+  await runCommand("sync diff", ["sync", "diff", projectId], {
+    expectedStatus: 1,
+    expectOk: false,
+  });
+  await runCommand("remote remove", ["remote", "remove", "test"]);
 
   await runCommand("project list", ["project", "list"]);
   const fetched = await runCommand("project get", ["project", "get", projectId]);
@@ -592,6 +614,11 @@ try {
 
   await runCommand("admin lock-project", ["admin", "lock-project", projectId]);
   await runCommand("admin unlock-project", ["admin", "unlock-project", projectId]);
+  await runCommand("workspace list", ["workspace", "list", projectId]);
+  await runCommand("workspace clean", ["workspace", "clean", projectId]);
+  await runCommand("workspace fix", ["workspace", "fix", projectId]);
+  await runCommand("content-graph status", ["content-graph", "status", projectId]);
+  await runCommand("content-graph reset", ["content-graph", "reset", projectId]);
 
   const importSourceDir = path.join(tempDir, "import-source");
   fs.mkdirSync(path.join(importSourceDir, "assets"), { recursive: true });
@@ -662,5 +689,7 @@ try {
 } finally {
   if (originalRole === undefined) delete process.env.PROJECT_ADMIN_ROLE;
   else process.env.PROJECT_ADMIN_ROLE = originalRole;
+  if (originalCliConfig === undefined) delete process.env.WORKBENCH_CLI_CONFIG;
+  else process.env.WORKBENCH_CLI_CONFIG = originalCliConfig;
   fs.rmSync(tempDir, { recursive: true, force: true });
 }

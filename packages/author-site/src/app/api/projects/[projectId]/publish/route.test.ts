@@ -36,6 +36,7 @@ jest.mock("@/lib/fs-utils", () => ({
     canonicalSyncedAt: undefined,
   })),
   saveProjectConfigValues: jest.fn(),
+  writeProjectMeta: jest.fn(),
 }));
 
 jest.mock("@/lib/session-manager", () => ({
@@ -82,15 +83,28 @@ jest.mock("@/lib/workspace-flush", () => ({
   })),
 }));
 
-jest.mock("@/lib/publish-manager", () => ({
-  publishProject: jest.fn(async (projectId: string) => ({
-    projectId,
-    publishedVersion: "v1",
-    publishedAt: 100,
-    demoCount: 1,
-    duration: 10,
-  })),
-}));
+jest.mock("@/lib/publish-manager", () => {
+  class MockPublishError extends Error {
+    constructor(
+      public readonly code: string,
+      message: string,
+      public readonly details?: unknown,
+    ) {
+      super(message);
+      this.name = "PublishError";
+    }
+  }
+  return {
+    PublishError: MockPublishError,
+    publishProject: jest.fn(async (projectId: string) => ({
+      projectId,
+      publishedVersion: "v1",
+      publishedAt: 100,
+      demoCount: 1,
+      duration: 10,
+    })),
+  };
+});
 
 class TestResponse {
   status: number;
@@ -229,6 +243,73 @@ describe("project publish route", () => {
     expect(sessionManager.createEditSession).not.toHaveBeenCalled();
     expect(workspaceFlush.flushAndSyncProjectWorkspace).not.toHaveBeenCalled();
     expect(publishManager.publishProject).toHaveBeenCalledWith("project-1");
+  });
+
+  it("activeWorkspaceId 指向已删除 workspace 时自动清理悬空引用并放行发布", async () => {
+    const { POST } = await import("./route");
+    const fsUtils = await import("@/lib/fs-utils");
+    const publishManager = await import("@/lib/publish-manager");
+    // 悬空场景：project.json 记录的 activeWorkspaceId 已不存在，
+    // 且 canonicalSyncedWorkspaceId 与其不一致（旧逻辑会永远 400 死循环）
+    jest.mocked(fsUtils.readProjectMeta).mockReturnValueOnce({
+      id: "project-1",
+      name: "测试项目",
+      activeWorkspaceId: "workspace-deleted",
+      activeWorkspaceUpdatedAt: 999,
+      canonicalSyncedWorkspaceId: "workspace-other",
+      canonicalSyncedAt: 1,
+    } as unknown as ReturnType<typeof fsUtils.readProjectMeta>);
+    jest
+      .mocked(fsUtils.getWorkspaceMeta)
+      .mockReturnValueOnce(
+        null as unknown as ReturnType<typeof fsUtils.getWorkspaceMeta>,
+      );
+
+    const response = await POST(jsonRequest({}), {
+      params: { projectId: "project-1" },
+    });
+    const body = (await response.json()) as { success: boolean };
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(fsUtils.writeProjectMeta).toHaveBeenCalledWith(
+      "project-1",
+      expect.not.objectContaining({ activeWorkspaceId: expect.anything() }),
+    );
+    expect(publishManager.publishProject).toHaveBeenCalledWith("project-1");
+  });
+
+  it("publishProject 抛出 PublishError 时透传 code/message/details", async () => {
+    const { POST } = await import("./route");
+    const publishManager = await import("@/lib/publish-manager");
+    const details = {
+      pages: [
+        {
+          pageId: "demo_x",
+          name: "广场页面-平板",
+          errors: [{ message: "顶层声明 PadSquare 重复" }],
+        },
+      ],
+    };
+    jest.mocked(publishManager.publishProject).mockRejectedValueOnce(
+      new publishManager.PublishError(
+        "PUBLISH_COMPILE_FAILED",
+        "发布失败：1 个页面编译错误",
+        details,
+      ),
+    );
+
+    const response = await POST(jsonRequest({}), {
+      params: { projectId: "project-1" },
+    });
+    const body = (await response.json()) as {
+      success: boolean;
+      error: { code: string; message: string; details?: unknown };
+    };
+
+    expect(response.status).toBe(400);
+    expect(body.success).toBe(false);
+    expect(body.error.code).toBe("PUBLISH_COMPILE_FAILED");
   });
 
   it("发布前不再绕过同步边界补写共享配置运行值到 canonical workspace", async () => {
