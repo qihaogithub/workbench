@@ -166,6 +166,67 @@ describe("PrototypePagePreview", () => {
     }
   });
 
+  it("单页原型页传入 allowScroll 时设计画板根节点可纵向滚动", async () => {
+    const widthSpy = jest
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(500);
+    const heightSpy = jest
+      .spyOn(HTMLElement.prototype, "clientHeight", "get")
+      .mockReturnValue(700);
+
+    try {
+      const { container } = render(
+        React.createElement(PrototypePagePreview, {
+          html: `<section style="height: 2000px">超高内容</section>`,
+          css: "",
+          previewSize: { width: 375, height: 812 },
+          allowScroll: true,
+        }),
+      );
+
+      await waitFor(() => {
+        const host = container.querySelector("[data-prototype-preview]");
+        const styleText =
+          host?.shadowRoot?.querySelector("style")?.textContent ?? "";
+        expect(styleText).toContain("overflow: auto");
+        expect(styleText).not.toContain("overflow: hidden");
+      });
+    } finally {
+      widthSpy.mockRestore();
+      heightSpy.mockRestore();
+    }
+  });
+
+  it("单页原型页默认不允许滚动时设计画板根节点裁剪超高内容", async () => {
+    const widthSpy = jest
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(500);
+    const heightSpy = jest
+      .spyOn(HTMLElement.prototype, "clientHeight", "get")
+      .mockReturnValue(700);
+
+    try {
+      const { container } = render(
+        React.createElement(PrototypePagePreview, {
+          html: `<section style="height: 2000px">超高内容</section>`,
+          css: "",
+          previewSize: { width: 375, height: 812 },
+        }),
+      );
+
+      await waitFor(() => {
+        const host = container.querySelector("[data-prototype-preview]");
+        const styleText =
+          host?.shadowRoot?.querySelector("style")?.textContent ?? "";
+        expect(styleText).toContain("overflow: hidden");
+        expect(styleText).not.toContain("overflow: auto");
+      });
+    } finally {
+      widthSpy.mockRestore();
+      heightSpy.mockRestore();
+    }
+  });
+
   it("画布原型页调整页面框时保持设计画板整体等比缩放", async () => {
     const widthSpy = jest
       .spyOn(HTMLElement.prototype, "clientWidth", "get")

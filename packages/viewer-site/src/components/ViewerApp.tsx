@@ -1085,6 +1085,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                     css={activePage.prototypeCss}
                     configData={configData}
                     previewSize={previewSize ?? activePage.previewSize}
+                    allowScroll
                   />
                 ) : activePage?.runtimeType === "sketch-scene" ? (
                   <div className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-md border bg-background shadow-sm">
