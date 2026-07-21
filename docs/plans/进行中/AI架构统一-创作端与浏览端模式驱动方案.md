@@ -436,3 +436,42 @@ clientInstance = new AgentClient({
 | **修改** | `packages/viewer-site/src/components/ViewerApp.tsx` — 集成替换 |
 | **修改** | `packages/viewer-site/src/lib/api.ts` — 移除 AI 相关代码 |
 | **修改** | 根 `package.json` — check:ai-chat-shared 脚本；`pnpm-lock.yaml` |
+
+---
+
+## 7. 体验对齐增量设计（2026-07-21）
+
+### 7.1 目标与范围
+
+在不改变 `viewer-readonly` 只读权限边界的前提下，补齐创作端与浏览端 AI 对话的可见体验差异：两端使用同一款点阵运行指示器、同一个附件入口、同一套模型选择；浏览端增加图片、文件附件和项目级本地历史。
+
+### 7.2 交互设计
+
+- AI 开始处理且尚未产生可见内容时显示 `@dotmatrix/dotm-square-4`；产生流式内容后，运行指示器继续以内联形式显示。组件与样式归属 `@workbench/ai-chat-shared`，不依赖任一宿主的全局 CSS。
+- 输入区只保留一个加号按钮。点击后弹出气泡菜单，提供“添加图片”和“添加附件”两项；图片选择器只接受 `image/*`，附件选择器只接受支持的非图片格式，拖拽仍按 MIME 自动分流。
+- 模型选择器在两端始终占据一致位置；浏览端沿用 WebSocket `get_models` / `set_model`，不另建模型接口。
+- 浏览端历史按 `projectId` 存入当前浏览器 localStorage。历史入口、新建与切换交互复用共享组件；每个项目独立保存，刷新后可恢复，不承诺跨浏览器或跨设备同步。
+
+### 7.3 附件数据流
+
+- 图片继续以 base64 图片附件随消息发送。
+- 非图片文件统一上传到 agent-service 的会话级临时附件接口，再把返回的安全元数据随消息发送；创作端与浏览端不再依赖 author-site 专属上传地址。
+- agent-service 继续使用会话隔离、类型/大小限制与 `readUploadedFile` 只读工具；浏览端只读模式不获得任何工作区写权限。
+
+### 7.4 组件边界
+
+- `ai-chat-shared` 负责点阵组件、加号菜单、选择器与宿主无关的历史存储接口。
+- `AIChat` 通过 history adapter 使用创作端服务端历史或浏览端 localStorage 历史，避免在展示组件内散落 mode 判断。
+- agent-service 仅补齐临时附件 HTTP 接口；viewer-site 保持薄壳，只传 `projectId`、会话回调和 mode。
+
+### 7.5 错误与可访问性
+
+- 上传失败、格式不支持和超限错误保留在输入区内展示，不发送缺附件的消息。
+- 加号菜单支持键盘导航、可见焦点、Esc 关闭和点击外部关闭；按钮提供明确 `aria-label`。
+- 点阵动画遵守 `prefers-reduced-motion`，减弱动态但保留处理状态。
+
+### 7.6 验证
+
+- 组件测试覆盖点阵渲染、加号菜单的图片/附件分流、浏览端历史保存与恢复、viewer 模式下模型入口可见。
+- agent-service 测试覆盖附件上传的会话隔离、类型和大小校验。
+- 运行 `check:ai-chat-shared`、`check:author`、`check:viewer`、`check:agent`；服务可用时补充两端浏览器手动回归。
