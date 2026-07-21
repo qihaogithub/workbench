@@ -1,8 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import { UserChoiceCard } from "../user-choice-card";
-import type { MessagePart } from "../message";
+import { UserChoiceCard } from "@workbench/ai-chat-shared/user-choice-card";
+import type { MessagePart } from "@workbench/ai-chat-shared/message";
 
 const pendingPart: Extract<MessagePart, { type: "user_choice" }> = {
   type: "user_choice",

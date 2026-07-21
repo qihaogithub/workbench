@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 
-import { useChatMessages } from "../chat/hooks/use-chat-messages";
+import { useChatMessages } from "@workbench/ai-chat-shared/chat/hooks/use-chat-messages";
 
 describe("useChatMessages", () => {
   it("受控 streaming 状态在同一轮旧闭包内从 true 回到 false 时仍通知父层", () => {

@@ -21,6 +21,8 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
+      "@workbench/ai-chat-shared": ["../ai-chat-shared/src/index.ts"],
+      "@workbench/ai-chat-shared/*": ["../ai-chat-shared/src/*"],
       "@workbench/project-core": ["../project-core/src"],
       "@workbench/preview-contract": ["../preview-contract/src"],
       "@workbench/preview-contract/*": ["../preview-contract/src/*"],

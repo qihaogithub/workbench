@@ -12,6 +12,8 @@ const nextConfig = {
       (process.env.NODE_ENV === "production" ? "inline" : "fixed"),
   },
   transpilePackages: [
+    "@workbench/agent-client",
+    "@workbench/ai-chat-shared",
     "@workbench/demo-ui",
     "@workbench/sketch-core",
     "@workbench/sketch-react",

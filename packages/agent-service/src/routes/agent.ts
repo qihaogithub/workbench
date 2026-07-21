@@ -13,6 +13,14 @@ import { AgentConfig, FileAttachment, ImageAttachment } from '../core/types';
 import { logger } from '../utils/logger';
 import type { WorkspaceInfo } from '@workbench/shared/contracts';
 import { getWorkbenchToolCapabilities } from '../backends/pi-tools';
+import {
+  buildViewerAiSystemPrompt,
+  buildViewerReadonlyContent,
+  normalizeAgentMode,
+  resolveViewerReadonlySession,
+  type ViewerContextPayload,
+  type ViewerReadonlySession,
+} from '../services/viewer-readonly-mode';
 
 interface SessionParams {
   sessionId: string;
@@ -25,12 +33,17 @@ interface SendMessageBody {
   workingDir?: string;
   customWorkspace?: boolean;
   model?: string;
+  /** 行为模式：viewer-readonly 时服务端强制只读工具集与系统提示词 */
+  mode?: string;
+  /** viewer-readonly 模式下的浏览端上下文 */
+  viewerContext?: ViewerContextPayload;
   images?: ImageAttachment[];
   files?: FileAttachment[];
   /**
    * v3.2: 静态 system prompt 注入（L2 + L4）
    * author-site 端通过 buildStaticSystemPrompt() 生成
    * 注：L3 动态上下文已拼到 content 字段头部
+   * viewer-readonly 模式下忽略
    */
   systemPrompt?: string;
   options?: {
@@ -115,9 +128,40 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
       }
 
       try {
+        const mode = normalizeAgentMode(request.body.mode);
+
+        let viewerSession: ViewerReadonlySession | null = null;
+        if (mode === 'viewer-readonly') {
+          if (!projectId) {
+            return reply.code(400).send({
+              success: false,
+              error: {
+                code: 'INVALID_PARAMS',
+                message: 'viewer-readonly 模式需要 projectId',
+              },
+            });
+          }
+          try {
+            viewerSession = await resolveViewerReadonlySession(
+              projectId,
+              request.body.viewerContext,
+            );
+          } catch (error) {
+            if (error instanceof Error && error.message === 'PROJECT_NOT_FOUND') {
+              return reply.code(404).send({
+                success: false,
+                error: { code: 'PROJECT_NOT_FOUND', message: '项目不存在' },
+              });
+            }
+            throw error;
+          }
+        }
+
         let workspaceInfo: WorkspaceInfo | undefined;
 
-        if (workingDir) {
+        if (mode === 'viewer-readonly') {
+          // viewer-readonly 的 workingDir 指向项目工作空间，不走临时工作空间机制
+        } else if (workingDir) {
           workspaceInfo = await workspaceManager.create({
             workspace: workingDir,
             customWorkspace,
@@ -142,6 +186,8 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
           toolVersion: getWorkbenchToolCapabilities().toolVersion,
           backendProviders: getSessionModelConfigs().get(sessionId),
           externalAuth: getSessionExternalAuthConfigs().get(sessionId),
+          // viewer-readonly：服务端强制 workingDir/toolMode/permissions，忽略客户端同名字段
+          ...(viewerSession ? viewerSession.configPatch : {}),
         };
 
         const agent = manager.getOrCreate(sessionId, config);
@@ -187,7 +233,10 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
         }
 
         // v3.2: 注入静态 system prompt（必须在 agent.start() 之后，因为 Pi Agent 实例在 start() 时才创建）
-        if (systemPrompt && agent instanceof BackendAgent) {
+        // viewer-readonly：忽略客户端 systemPrompt，服务端强制只读系统提示词
+        if (viewerSession && agent instanceof BackendAgent) {
+          await agent.updateSystemPrompt(buildViewerAiSystemPrompt());
+        } else if (systemPrompt && agent instanceof BackendAgent) {
           await agent.updateSystemPrompt(systemPrompt);
         }
 
@@ -196,7 +245,16 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
           messageCount: (sessionStore.get(sessionId)?.messageCount || 0) + 1,
         });
 
-        const result = await agent.sendMessage(content, {
+        // viewer-readonly：服务端拼接只读问答上下文
+        const outgoingContent = viewerSession
+          ? buildViewerReadonlyContent(
+              viewerSession.project,
+              request.body.viewerContext,
+              content,
+            )
+          : content;
+
+        const result = await agent.sendMessage(outgoingContent, {
           ...options,
           images,
           files,

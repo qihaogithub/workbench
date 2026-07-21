@@ -2,13 +2,28 @@
 
 ## 当前状态
 
-方案设计完成，待评审后实施。
+已实施完成（2026-07-21）。全部六个 Phase 落地：agent-client mode 支持、agent-service 统一路由（viewer-ai 专用路由已删除）、`@workbench/ai-chat-shared` 共享包（31 个组件 + 17 个 ui 原语 + ai-models/active-view-context）、viewer-site 流式接入（ViewerAiPanel）、author-site re-export 适配。
+
+验证结论：agent-service 388 测试全绿（含新增 viewer-readonly-mode 测试）、author-site 909 测试全绿、viewer-site typecheck + next build 通过、agent-client / ai-chat-shared typecheck 通过、其余包级检查通过。`check:workspace-authority` 与 `check:project-cli` 两项失败经 HEAD worktree 复跑确认为既有问题（与本改造无关），已记录到《测试与工程质量问题沉淀》。
+
+剩余事项：浏览端/创作端真实服务下的手动全流程回归（需启动 author/agent/viewer 服务）与 `pnpm test:e2e`；部署环境确认 agent-service `CORS_ORIGINS` 含 viewer origin。
 
 ## 当前结论
 
 通过 `mode` 参数驱动实现三层统一（通信层、后端层、UI 层），消除创作端和浏览端 AI 功能的两套独立代码路径。
 
 **核心原则：以创作端体验为基准，浏览端向创作端靠齐。** 当前创作端拥有更优的流式通信、完整的工具调用可视化和一致的交互体验，改造方向是在保持架构统一的前提下，让浏览端获得与之对等的能力（仅通过 mode 限制读写权限，不降低体验质量）。
+
+**2026-07-21 校正摘要**（基于代码核对，原方案的主要修正点）：
+
+1. ai-elements 实为 **31 个源文件、约 1.03 万行**（原文档写 43 个组件），并额外依赖 7 个 shadcn/ui 原语、`cn()`、`ai-models.ts`（738 行）、`active-view-context.ts`、`system-prompt.ts`。
+2. `AgentStream.getModels` / `AgentClient.getModelInfo` **不存在**；模型列表实际通过 WS `get_models` 消息 → `models` 事件获取（`use-chat-models` 已封装，但用 `(stream as any).ws` hack，本次在 AgentStream 上补 `requestModels()` 方法消除）。
+3. message-service **不是基于 localStorage**，而是调用 author-site 的 `/api/sessions/*` HTTP API 做服务端持久化；localStorage 仅存于 use-chat-models 的模型偏好。
+4. 浏览端上下文改为**服务端注入**：mode=viewer-readonly 时由 agent-service 强制 systemPrompt/permissions/toolMode，并按 projectId 解析 workingDir、自动拼接 `buildViewerAiPromptContext`。客户端不再构建/回传上下文，原方案 2.4.3 中 viewer 侧 AiContextProvider（`fetchSimpleSystemPrompt`/`fetchViewerContext`）取消 —— 更简单且不给客户端伪造上下文的机会。
+5. `system-prompt.ts` 依赖 `.md` 文件 import（webpack loader）和 `@workbench/preview-contract`，**留在 author-site**，通过注入接口传给共享包；`ai-models.ts` 与 `active-view-context.ts` 除 ai-elements 外几乎无引用，随包整体迁移。
+6. `AgentConfig.toolMode`、`createWorkbenchTools({ mode: "viewer-readonly" })`、agent-manager 的 toolMode 变化重建逻辑**均已存在**，后端统一的地基比原方案预估的更成熟。
+7. agent-service WS 在最后一个连接关闭时已自动销毁 agent 并清理临时工作空间（websocket.ts close handler），浏览端"关抽屉即清理"依赖该现有行为，`destroySession` 仅为兜底。
+8. viewer-ai-context.ts 原地保留（agent-service 没有独立 prompt 模块，无需移动文件）。
 
 ---
 
@@ -21,18 +36,19 @@
 | 维度 | 创作端 | 浏览端 |
 |------|--------|--------|
 | 通信方式 | WebSocket 流式 + HTTP fallback | HTTP POST 同步 |
-| UI 组件 | 43 个组件（`ai-elements/`） | 1 个组件（`ViewerAiDrawer.tsx`） |
+| UI 组件 | 31 个源文件约 1.03 万行（`ai-elements/`） | 1 个组件（`ViewerAiDrawer.tsx`，771 行） |
 | Client SDK | `@workbench/agent-client` | 裸 `fetch` |
 | 后端路由 | `/api/agent/:sessionId/*` | `/api/viewer-ai/chat` |
-| 工具集 | 27+ 工具 | 3 个只读工具 |
-| 会话管理 | 服务端持久化 | 每次临时 sessionId |
+| 工具集 | 27+ 工具（toolMode=workbench） | 3 个只读工具（readFile/listFiles/knowledgeReport） |
+| 会话管理 | 服务端持久化（`/api/sessions/*`） | 每次临时 sessionId + 客户端回传 history |
 | 流式输出 | 支持 | 不支持 |
 | 工具调用可视化 | 完整（思维链、计划面板、工具卡片） | 无 |
+| 模型列表获取 | WS `get_models` → `models` 事件 | HTTP `GET /models` |
 
 ### 1.2 问题
 
 - 两套独立代码路径，维护成本翻倍
-- 浏览端体验远落后于创作端（无流式、无工具展示、无模型切换）
+- 浏览端体验远落后于创作端（无流式、无工具展示）
 - 未来新增 AI 能力需要在两端各自实现
 - 实际差异仅在于"可读写 vs 只读"，不应产生如此大的架构分叉
 
@@ -72,283 +88,200 @@ mode: "workbench"                       mode: "viewer-readonly"
 
 | 层 | 改什么 | 目标 |
 |----|--------|------|
-| `@workbench/agent-client` | 新增 `mode` 配置参数 | 两端统一使用同一种通信方式 |
+| `@workbench/agent-client` | 新增 `mode` 配置参数 + `requestModels()` | 两端统一使用同一种通信方式 |
 | `agent-service` | 去掉 `/api/viewer-ai/chat` 专用路由，统一走 `/api/agent/*` | 消除后端路由分叉 |
 | `@workbench/ai-chat-shared` | 新建共享 UI 包 | 两端统一 UI 组件 |
 
 ### 2.2 `@workbench/agent-client` 改造
 
-当前 `AgentClient` 和 `AgentStream` 没有 mode 概念。改造目标：
+当前 `AgentClientConfig` 只有 `baseUrl`/`apiKey`。改造：
 
 ```typescript
-// AgentClientConfig 扩展
 export interface AgentClientConfig {
   baseUrl: string;
   apiKey?: string;
   mode?: "workbench" | "viewer-readonly"; // 默认 "workbench"
 }
-
-// AgentClient 构造函数透传 mode
-constructor(config: AgentClientConfig) {
-  this.baseUrl = config.baseUrl.replace(/\/+$/, "");
-  this.apiKey = config.apiKey;
-  this.mode = config.mode ?? "workbench";
-}
-
-// mode 影响行为：
-// - sendMessage 时自动注入 mode 字段到请求体
-// - stream() 时在 WebSocket URL 上附加 mode query param
-// - AgentStream 根据 mode 过滤不应出现的事件日志级别
 ```
 
-**不需要改的：**
-- AgentStream 的事件类型（`stream/thought/tool_call/tool_call_update/plan/permission_request/user_choice_request`）两端共用
-- AgentClient 的 API 方法签名不变
+mode 影响的行为（client 层只透传，不做逻辑分支）：
 
-**关键点：** mode 只影响后端行为，client 层只是透传。浏览端同样会收到 `tool_call` 和 `thought` 事件，只是工具内容限定为只读工具。
+- `sendMessage()` 请求体自动注入 `mode` 字段
+- `stream()` 在 WebSocket URL 上附加 `?mode=` query param（连接级默认值，服务端对 `get_models` 等无消息体字段的指令也能拿到 mode）
+- `AgentStream.send()` 的每条消息体带 `mode` 与可选 `viewerContext`（`SendMessageOptions` 扩展）
+
+**同步补齐：** `AgentStream.requestModels(options?)` 方法，封装现有 `get_models` WS 消息（消除 use-chat-models 中 `(stream as any).ws` 的越界访问）。
+
+**不需要改的：** AgentStream 的事件类型（`stream/thought/tool_call/tool_call_update/plan/permission_request/user_choice_request/models`）两端共用；浏览端同样会收到 `tool_call` 和 `thought` 事件，只是工具限定为只读工具。
 
 ### 2.3 agent-service 后端统一
 
 #### 2.3.1 路由合并
 
-**移除：** `POST /api/viewer-ai/chat` 及 `registerViewerAiRoutes` 整个函数。
+**移除：** `POST /api/viewer-ai/chat` 及 `registerViewerAiRoutes`（`routes/viewer-ai.ts` 整个文件、`routes/index.ts` 的注册）。
 
-**改造：** 现有的 `POST /api/agent/:sessionId/message` 和 WebSocket `/api/agent/:sessionId/stream` 接收 `mode` 参数：
-
-```typescript
-// POST /api/agent/:sessionId/message 请求体扩展
-interface SendMessageBody {
-  content: string;
-  mode?: "workbench" | "viewer-readonly";
-  demoId?: string;
-  workingDir?: string;
-  model?: string;
-  images?: ImageAttachment[];
-  // ... 现有字段不变
-}
-```
-
-#### 2.3.2 mode → AgentConfig 映射
-
-在 agent 创建/配置时根据 mode 分发：
+**改造：** `POST /api/agent/:sessionId/message` 的 `SendMessageBody` 与 WS `/api/agent/:sessionId/stream` 的 `ClientMessage` 扩展：
 
 ```typescript
-function buildAgentConfig(mode: "workbench" | "viewer-readonly"): Partial<AgentConfig> {
-  if (mode === "viewer-readonly") {
-    return {
-      toolMode: "viewer-readonly",
-      permissions: {
-        allowedPaths: ["workspace-tree.json", "project.config.schema.json", "memory.md", "demos/**", "knowledge/**"],
-        deniedPatterns: ["**/*.env", "**/.git/**", "**/node_modules/**", "**/.session.json", "**/.workspace.json"],
-        allowedCommands: [],
-        deniedCommands: ["*"],
-      },
-    };
-  }
-  // workbench 模式保持现有逻辑
-  return {
-    toolMode: "workbench",
-    // 现有权限配置不变
+{
+  mode?: "workbench" | "viewer-readonly";   // 默认 workbench
+  viewerContext?: {                          // 仅 viewer-readonly 使用
+    activePageId?: string;
+    activeConfig?: Record<string, unknown>;
   };
 }
 ```
 
-#### 2.3.3 System Prompt 选择
+WS 连接 URL 支持 `?mode=` query 作为连接级默认；单条消息体里的 `mode` 优先。`message` 与 `get_models` 两个分支都按 mode 构建 AgentConfig。
 
-根据 mode 选择不同的 prompt 构建策略：
+#### 2.3.2 mode → AgentConfig 映射（服务端强制，不信任客户端）
 
-| mode | system prompt 构建 | 上下文构建 |
-|------|-------------------|-----------|
-| `workbench` | 创作端多层体系（L2 静态 + L3 动态工作空间 + L4 用户约束 + L5 能力约束） | 工作空间扫描 + 活跃视图 |
-| `viewer-readonly` | `buildViewerAiSystemPrompt()`（现有函数保留，只是调用入口从专用路由改为通用路由） | `buildViewerAiPromptContext()`（现有函数保留） |
+`mode === "viewer-readonly"` 时：
 
-#### 2.3.4 移除内容
+- `workingDir`：**忽略客户端传入**，由 `projectId` 经 `projectWorkspaceManager.getProject()` 解析出 `project.workspacePath`（缺 projectId 即报错）
+- `toolMode: "viewer-readonly"`（`createWorkbenchTools` 已支持，只注册 readFile/listFiles/knowledgeReport）
+- `toolVersion`：`getViewerReadonlyToolCapabilities().toolVersion`
+- `permissions`：沿用现 viewer-ai.ts 的清单——allowedPaths: `workspace-tree.json`、`project.config.schema.json`、`memory.md`、`demos`、`demos/**`、`knowledge`、`knowledge/**`；deniedPatterns: `**/*.env`、`**/*.env.*`、`**/.git`、`**/.git/**`、`**/node_modules`、`**/node_modules/**`、`**/.session.json`、`**/.workspace.json`；`allowedCommands: []`、`deniedCommands: ["*"]`
+- systemPrompt：**忽略客户端传入的 `systemPrompt` 字段**，强制 `buildViewerAiSystemPrompt()`
+- 上下文：服务端每条消息自动调用 `buildViewerAiPromptContext({ project, activePageId, activeConfig })` 拼接到 content 前（与现有 HTTP 行为一致；`history` 字段不再需要——WS 会话存续期间 Pi Agent 自身保留对话历史）
 
-| 移除项 | 说明 |
-|--------|------|
-| `registerViewerAiRoutes` | 整个函数及 `viewer-ai.ts` 路由文件 |
-| `POST /api/viewer-ai/chat` 路由 | 统一到 `/api/agent/:sessionId/message` |
-| viewer-site 直接调用 `/models` 获取模型列表 | 浏览端通过 agent-client 的 `AgentStream.getModels` 事件或 `AgentClient.getModelInfo` 获取 |
+`mode === "workbench"`（或缺省）保持现有逻辑完全不变。
 
-#### 2.3.5 保留内容
+**安全边界说明：** mode 由客户端声明。现状下 agent-service 的 `/api/agent/*` 本就无鉴权直连（CORS 只约束浏览器），viewer-readonly 是"客户端自愿降权"，统一路由不引入比现状更大的攻击面；正式上线前的服务端鉴权/网关校验是独立课题。
 
-| 保留项 | 说明 |
-|--------|------|
-| `buildViewerAiPromptContext()` | viewer-readonly 的上下文构建逻辑，移动到通用 prompt 构建模块 |
-| `buildViewerAiSystemPrompt()` | viewer-readonly 的系统提示词 |
-| `getViewerReadonlyToolCapabilities()` | 只读工具集能力声明，由 toolMode 参数触发 |
-| `createWorkbenchTools(..., { mode: "viewer-readonly" })` | 工具集按 mode 分支，已存在 |
+#### 2.3.3 保留与移除
+
+| 项 | 处理 |
+|----|------|
+| `services/viewer-ai-context.ts`（`buildViewerAiPromptContext` / `buildViewerAiSystemPrompt`） | **原地保留**，调用方从专用路由改为统一路由；`ViewerAiHistoryMessage` 类型与 history 拼接逻辑随 HTTP 模式废弃可删 |
+| `getViewerReadonlyToolCapabilities()` | 保留，统一路由使用 |
+| `routes/viewer-ai.ts` | 删除 |
+| viewer-site 直接调 `GET /models` | 删除，浏览端改用 WS `get_models`（`use-chat-models` Hook 已封装该流程）；`GET /models` 路由本身保留（他处仍可用） |
+| `tests/unit/viewer-ai-context.test.ts` | 保留（context 构建逻辑未变） |
 
 ### 2.4 `@workbench/ai-chat-shared` 共享 UI 包
 
-#### 2.4.1 包结构
+#### 2.4.1 包内容（迁移自 author-site）
+
+`packages/author-site/src/components/ai-elements/` 全部 31 个源文件按原目录结构迁移（`__tests__/` 除外），并内聚以下依赖：
 
 ```
 packages/ai-chat-shared/
 ├── package.json              # @workbench/ai-chat-shared
 ├── tsconfig.json
-├── src/
-│   ├── index.ts              # 统一导出
-│   ├── ai-chat.tsx            # AIChat 主组件（从 author-site 迁移）
-│   ├── assistant-message.tsx   # AI 助手消息气泡
-│   ├── message.tsx            # 通用消息
-│   ├── conversation.tsx       # 对话容器
-│   ├── chain-of-thought.tsx   # 思维链展示
-│   ├── reasoning.tsx          # 推理过程折叠
-│   ├── tool.tsx               # 工具调用卡片
-│   ├── timeline.tsx           # 执行时间线
-│   ├── agent-process-group.tsx # 执行阶段组
-│   ├── user-choice-card.tsx   # 用户选择题卡片
-│   ├── chat-card.tsx          # 对话历史卡片
-│   ├── history-dialog.tsx     # 对话历史管理
-│   ├── attachments.tsx        # 附件预览
-│   ├── prompt-input.tsx       # 通用输入框
-│   ├── chat/
-│   │   ├── chat-messages.tsx   # 消息列表
-│   │   ├── chat-input.tsx     # 输入框
-│   │   ├── chat-plan.tsx      # 计划面板
-│   │   ├── hooks/
-│   │   │   ├── use-chat-stream.ts    # WebSocket 流式 Hook
-│   │   │   ├── use-chat-messages.ts  # 消息状态管理
-│   │   │   └── use-chat-models.ts    # 模型选择
-│   │   ├── services/
-│   │   │   ├── stream-service.ts     # StreamService 类
-│   │   │   └── message-service.ts    # 消息持久化
-│   │   └── utils/
-│   │       ├── chat-stream-utils.ts  # 流式消息工具
-│   │       └── chat-file-utils.ts    # 文件变更工具
-│   └── permission-dialog.tsx # 权限确认弹窗
+└── src/
+    ├── index.ts              # 原 ai-elements/index.ts 导出面 + 配置入口
+    ├── config.ts             # configureAiChatShared() 宿主注入点（见 2.4.3）
+    ├── lib/
+    │   ├── utils.ts          # cn()（自带，不依赖宿主 @/lib/utils）
+    │   ├── ai-models.ts      # 整体迁自 author-site/src/lib/ai-models.ts（738 行，含 NEXT_PUBLIC_* 环境变量读取，transpilePackages 下正常内联）
+    │   └── active-view-context.ts  # 迁自 author-site/src/lib/agent/active-view-context.ts（纯类型+纯函数）
+    ├── ui/                   # 自带 shadcn 原语：button/dialog/collapsible/textarea/badge/avatar/toast-provider（复制自 author-site）
+    ├── ai-chat.tsx           # + 31 个组件文件，目录结构保持：
+    ├── assistant-message.tsx #   message/conversation/chain-of-thought/reasoning/tool/
+    ├── ...                   #   timeline/agent-process-group/user-choice-card/chat-card/
+    └── chat/                 #   history-dialog/attachments/prompt-input/permission-dialog/
+        ├── chat-messages.tsx #   mutation-status-badge/split-by-fenced-code/split-content-renderer
+        ├── chat-input.tsx    #   chat/{chat-messages,chat-input,chat-plan,model-select-with-guard,types}
+        ├── ...               #   chat/hooks/{use-chat-stream,use-chat-messages,use-chat-models}
+        └── ...               #   chat/services/{stream-service,message-service}
+                              #   chat/utils/{chat-stream-utils,chat-file-utils}
 ```
 
-**迁移策略：**
-
-1. 从 `packages/author-site/src/components/ai-elements/` 完整复制组件到新包
-2. 将 author-site 特定的依赖（如 `@/lib/agent/system-prompt`）参数化，通过 props 或 context 注入
-3. author-site 和 viewer-site 从 `@workbench/ai-chat-shared` 导入组件，删除原 `ai-elements/` 目录或改为 re-export
+**不迁移、留在 author-site 的：** `lib/agent/system-prompt.ts`（依赖 `.md` import 与 `@workbench/preview-contract`）→ 经注入接口传入；`ai-elements/__tests__/`（15 个测试文件）→ 留在 author-site jest 体系内，改 import 路径。
 
 #### 2.4.2 组件 mode 适配
 
-共享组件接收 `mode` prop 控制行为差异：
+`AIChat` 新增 `mode?: "workbench" | "viewer-readonly"` prop（默认 workbench），随 use-chat-stream → StreamService → AgentStream 消息体透传。
+
+**设计原则：** 组件不做 `mode === "workbench" ? <X/> : null` 式条件渲染，依赖后端不发送相应事件自然隐藏（viewer 模式后端不会发 permission_request、不会有文件变更）。仅以下纯前端行为按 mode 分支：
+
+| mode 分支点 | workbench | viewer-readonly |
+|------------|-----------|-----------------|
+| 输入框附件 | 文件+图片 | 仅图片 |
+| 消息持久化（message-service 调 `/api/sessions/*`） | 执行 | 跳过（viewer 无此 API，会话即弃） |
+| 创作端上下文构建（workspace-context 拉取 + 静态 systemPrompt） | 执行 | 跳过（服务端注入） |
+
+后端行为差异（自然生效，无需前端分支）：计划面板、权限弹窗、文件变更列表在 viewer 模式不会收到对应事件；模型切换、对话历史（会话内）两端一致。
+
+#### 2.4.3 宿主注入机制
+
+共享包不 import 任何 `@/...` 宿主路径。模块级配置一次注入：
 
 ```typescript
-interface AIChatProps {
-  mode: "workbench" | "viewer-readonly";
-  agentClient: AgentClient;
-  sessionId: string;
-  // ... 通用 props
+// ai-chat-shared/src/config.ts
+export interface AiChatSharedConfig {
+  getAgentClient: () => AgentClient;          // 必配：stream-service 建连/查询能力用
+  authorContext?: {                            // 仅 author-site 配置
+    buildStaticSystemPrompt(toolCapabilities?): string;
+    fetchContextPrefix(workingDir): Promise<{ l3; memory; knowledgeIndex }>;
+  };
 }
+export function configureAiChatShared(config: AiChatSharedConfig): void;
 ```
 
-**mode 控制的 UI 差异：**
-
-| UI 元素 | workbench | viewer-readonly |
-|---------|-----------|-----------------|
-| 计划面板（PlanPanel） | 显示 | 显示（只读工具也会有简单计划） |
-| 权限确认弹窗 | 显示 | 永远不会触发（后端不发出该事件，组件保持可渲染即可） |
-| 工具调用详情 | 显示全部工具 | 显示（仅 readFile/listFiles/knowledgeReport） |
-| 文件变更列表 | 显示 | 不会出现 |
-| 输入框附件 | 支持文件+图片 | 仅支持图片 |
-| 模型切换 | 支持 | 支持 |
-| 对话历史管理 | 支持 | 支持（标签页生命周期） |
-
-**设计原则：** 组件不根据 mode 做条件渲染（`mode === "workbench" ? <PlanPanel /> : null`），而是依赖后端不发送相应事件来自然隐藏。只有输入框附件这种纯粹前端行为才需要 mode 判断。
-
-#### 2.4.3 Context 注入机制
-
-author-site 和 viewer-site 的 system prompt 构建逻辑完全不同，通过 `AiContextProvider` 注入：
-
-```typescript
-// ai-chat-shared 定义接口
-interface AiContextProvider {
-  getSystemPrompt(): Promise<string>;
-  getDynamicContext(): Promise<string>;
-}
-
-// author-site 实现
-const authorContextProvider: AiContextProvider = {
-  getSystemPrompt: () => buildStaticSystemPrompt(),
-  getDynamicContext: () => buildDynamicContextPrefix(workingDir),
-};
-
-// viewer-site 实现
-const viewerContextProvider: AiContextProvider = {
-  getSystemPrompt: () => fetchSimpleSystemPrompt(),  // 调用 agent-service 获取
-  getDynamicContext: () => fetchViewerContext(projectId, activePageId),
-};
-```
+- author-site 在模块初始化处调用，传入 `getAgentClient()`（带 apiKey）与 system-prompt 构建函数
+- viewer-site 只传 `getAgentClient()`（mode: viewer-readonly 的实例）
+- `authorContext` 未配置时 stream-service 走"无静态 prompt、无 L3 前缀"路径（即 viewer 模式）
 
 ### 2.5 viewer-site 改造
 
-#### 2.5.1 新增依赖
+#### 2.5.1 新增依赖与构建配置
 
-```json
-{
-  "dependencies": {
-    "@workbench/agent-client": "workspace:*",
-    "@workbench/ai-chat-shared": "workspace:*"
-  }
-}
-```
+- `package.json` dependencies：`@workbench/agent-client`、`@workbench/ai-chat-shared`（`workspace:*`）
+- `next.config.js` transpilePackages：追加上述两个包
+- `tailwind.config.ts` content：追加 `./node_modules/@workbench/ai-chat-shared/src/**/*.{js,ts,jsx,tsx,mdx}`（已有 shared/demo-ui 先例）
+- 环境变量：复用 `NEXT_PUBLIC_AGENT_SERVICE_URL`；模型过滤如需与创作端一致可配 `NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES` 等（ai-models.ts 读取）
 
 #### 2.5.2 替换 ViewerAiDrawer
 
-当前 `ViewerAiDrawer.tsx`（771 行自包含组件）替换为使用 `@workbench/ai-chat-shared` 的 `AIChat` 组件。
-
-`ViewerApp.tsx` 中 AI 抽屉的引用改为：
+删除 `ViewerAiDrawer.tsx`（771 行），新建薄壳 `ViewerAiPanel.tsx`：抽屉容器 + 头部由 viewer 自持，内容区渲染共享包 `AIChat`：
 
 ```tsx
-import { AIChat } from "@workbench/ai-chat-shared";
-import { AgentClient } from "@workbench/agent-client";
-
 const agentClient = new AgentClient({
   baseUrl: process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "",
   mode: "viewer-readonly",
 });
+configureAiChatShared({ getAgentClient: () => agentClient });
 
-// 在触发 AI 时创建 sessionId
+// 打开抽屉时生成，关闭即弃
 const sessionId = `viewer-${projectId}-${Date.now()}`;
 
 <AIChat
   mode="viewer-readonly"
-  agentClient={agentClient}
   sessionId={sessionId}
+  agentSessionId={sessionId}
   projectId={projectId}
-  contextProvider={viewerContextProvider}
+  viewerContext={{ activePageId, activeConfig }}
 />
 ```
 
+`ViewerApp.tsx` 现有集成点（`open/projectId/project/activePageId/activeConfig/onOpenChange`）替换为新组件。
+
 #### 2.5.3 会话生命周期
 
-- 打开抽屉时创建 sessionId
-- 关闭抽屉时销毁 session（调用 `agentClient.destroySession(sessionId)`）
-- 历史消息通过 `use-chat-messages` Hook 缓存在内存中，标签页刷新即丢失
-- 不需要 localStorage 持久化
+- 打开抽屉时创建 sessionId 并建立 WS
+- 关闭抽屉时关闭 WS —— agent-service 在最后一个连接关闭时**已有**自动清理逻辑（销毁 agent、清理临时 workspace、会话元数据）；`destroySession()` 调用作为兜底
+- 历史消息仅存组件内存，刷新即丢；不做 localStorage 持久化，不保留旧 `ViewerAiChatHistory` localStorage 数据（未上线，无兼容负担）
 
 #### 2.5.4 删除内容
 
 | 删除项 | 说明 |
 |--------|------|
 | `packages/viewer-site/src/components/ViewerAiDrawer.tsx` | 完整删除 771 行 |
-| `packages/viewer-site/src/lib/api.ts` 中的 `askViewerAi`、`getViewerAiModels` 及 `ViewerAiChatRequest`/`ViewerAiChatResponse`/`ViewerAiHistoryMessage`/`ViewerAiModel` 类型 | 替换为 agent-client |
-| `packages/viewer-site/src/lib/api.ts` 中的 `AGENT_SERVICE_BASE` 常量 | 替换为 agent-client 的 baseUrl |
+| `api.ts` 中 `askViewerAi`、`getViewerAiModels` 及 `ViewerAiChatRequest`/`ViewerAiChatResponse`/`ViewerAiHistoryMessage`/`ViewerAiModel` 类型、`AGENT_SERVICE_BASE` 常量 | 替换为 agent-client |
 
 ### 2.6 author-site 适配
 
-#### 2.6.1 组件迁移
+#### 2.6.1 组件迁移后的引用处理
 
-`packages/author-site/src/components/ai-elements/` 中的组件迁移到 `@workbench/ai-chat-shared` 后：
+- `src/components/ai-elements/` 目录删除组件源文件，保留 `index.ts` 作为 re-export（`export * from "@workbench/ai-chat-shared"`），目录内 `__tests__/` 原地保留
+- 深路径 import 共 5 个文件 7 处（`edit/page.tsx`、`useVisualEditState.ts`、`useConsoleBuffer.ts(+test)`、`sanitize-hydrated-messages.ts` 及 `edit/page.tsx` 对 `ai-chat`/`stream-service` 的子路径引用）改为从 `@workbench/ai-chat-shared` 导入
+- `src/lib/ai-models.ts`、`src/lib/agent/active-view-context.ts` 删除，引用处（`edit/page.tsx`、`app/api/ai/chat/route.ts`、`lib/__tests__/ai-models.test.ts`）改从共享包导入
+- `__tests__/` 内 `@/components/ai-elements/...`、`@/lib/agent/active-view-context` 等 import/mock 路径同步更新
+- jest 配置：确认 `@workbench/ai-chat-shared` 可被解析与转换（moduleNameMapper 或 transformIgnorePatterns，与现有 `@workbench/agent-client` 的处理方式对齐）
 
-1. author-site 从 `@workbench/ai-chat-shared` 重新导入
-2. `ai-elements/` 目录改为 re-export：
-   ```typescript
-   // packages/author-site/src/components/ai-elements/index.ts
-   export * from "@workbench/ai-chat-shared";
-   ```
-   或直接删除目录、更新所有 import 路径。
-
-#### 2.6.2 agent-client 适配
-
-给 `getAgentClient()` 传入 `mode: "workbench"`：
+#### 2.6.2 注入与显式 mode
 
 ```typescript
 // packages/author-site/src/lib/agent-client.ts
@@ -358,6 +291,8 @@ clientInstance = new AgentClient({
   mode: "workbench", // 显式声明
 });
 ```
+
+在 author-site 聊天入口（或 lib 初始化处）调用 `configureAiChatShared({ getAgentClient, authorContext: { buildStaticSystemPrompt, fetchContextPrefix } })`，其中 fetchContextPrefix 封装现有 `/api/agent/workspace-context` 拉取（该函数从 stream-service 中移出到 author-site 侧）。
 
 ---
 
@@ -369,35 +304,39 @@ clientInstance = new AgentClient({
 用户点击"AI 问答"
   → viewer-site 创建 AgentClient(mode: "viewer-readonly")
   → 生成 sessionId: "viewer-{projectId}-{timestamp}"
-  → 渲染 AIChat(mode: "viewer-readonly")
+  → 渲染 AIChat(mode: "viewer-readonly", viewerContext)
 
 用户输入问题并发送
   → AIChat → StreamService → AgentStream WS 连接
       ws://agent-service/api/agent/{sessionId}/stream?mode=viewer-readonly
+  → WS message 体: { content, mode: "viewer-readonly", projectId,
+                     viewerContext: { activePageId, activeConfig }, images? }
   → agent-service 检查 mode === "viewer-readonly"
-      → toolMode = "viewer-readonly"
-      → tools = [readFile, listFiles, knowledgeReport]
-      → permissions = { deniedCommands: ["*"], allowedPaths: [...] }
-      → systemPrompt = buildViewerAiSystemPrompt()
-  → Pi Agent 开始处理
-      → WebSocket 事件流回传:
-          thought → 思考过程
-          tool_call(readFile) → 读取文件
-          tool_result → 读取结果
-          stream → 流式文本输出
-  → AIChat 组件渲染：消息气泡、思维链、工具调用卡片、流式文本
+      → workingDir = projectWorkspaceManager.getProject(projectId).workspacePath
+      → toolMode = "viewer-readonly"（tools = readFile/listFiles/knowledgeReport）
+      → permissions = 只读白名单 + deniedCommands: ["*"]
+      → systemPrompt = buildViewerAiSystemPrompt()（忽略客户端字段）
+      → content = buildViewerAiPromptContext(...) + 用户问题
+  → Pi Agent 处理，WS 事件流回传:
+      thought → 思考过程
+      tool_call(readFile) / tool_call_update → 工具卡片
+      stream → 流式文本
+      finish → 完成
+  → AIChat 渲染：消息气泡、思维链、工具调用卡片、流式文本
+
+模型列表/切换
+  → AgentStream.requestModels() → models 事件；set_model 消息切换
 
 用户关闭抽屉
-  → destroySession(sessionId)
-  → agent-service 清理会话资源
+  → 关闭 WS → agent-service 自动销毁 agent 并清理（现有行为）
 ```
 
 ### 3.2 创作端 AI 对话（保持不变）
 
 ```
-用户输入 → AIChat(mode: "workbench") → AgentStream → 
-agent-service(toolMode: "workbench", 27 tools) → 
-Pi Agent → 完整事件流 → AIChat 渲染
+用户输入 → AIChat(mode: "workbench") → StreamService（authorContext 注入
+静态 systemPrompt + L3 前缀）→ AgentStream → agent-service(toolMode:
+"workbench", 27+ tools) → Pi Agent → 完整事件流 → AIChat 渲染
 ```
 
 ---
@@ -406,56 +345,51 @@ Pi Agent → 完整事件流 → AIChat 渲染
 
 ### Phase 1: agent-client 改造
 
-- [ ] `agent-client` 新增 `mode` 配置参数（`AgentClientConfig.mode`）
-- [ ] `AgentClient.sendMessage()` 请求体中携带 `mode`
-- [ ] `AgentClient.stream()` WebSocket URL 附加 `mode` query param
-- [ ] TypeScript 类型更新
-- [ ] agent-client typecheck 通过
+- [x] `AgentClientConfig.mode` 新增
+- [x] `sendMessage()` 请求体携带 `mode`
+- [x] `stream()` WebSocket URL 附加 `?mode=` query
+- [x] `AgentStream.send()`/`SendMessageOptions` 支持 `mode`、`viewerContext`
+- [x] `AgentStream.requestModels()` 封装 `get_models`
+- [x] agent-client typecheck 通过
 
 ### Phase 2: agent-service 统一
 
-- [ ] `POST /api/agent/:sessionId/message` 路由接收 `mode` 参数
-- [ ] WebSocket `/api/agent/:sessionId/stream` 连接接收 `mode` 参数
-- [ ] 根据 mode 构建 AgentConfig（toolMode、permissions、prompt context）
-- [ ] viewer-readonly 的 context 构建逻辑移到通用 prompt 模块
-- [ ] 删除 `registerViewerAiRoutes` 和 `viewer-ai.ts`
-- [ ] 删除 `POST /api/viewer-ai/chat` 路由
-- [ ] agent-service 所有测试通过
-- [ ] agent-service typecheck 通过
+- [x] WS `ClientMessage` 与 HTTP `SendMessageBody` 接收 `mode`/`viewerContext`；WS URL query 连接级 mode
+- [x] viewer-readonly 分支：projectId→workingDir 解析、toolMode/permissions/toolVersion、强制 systemPrompt、服务端拼接上下文（`message` 与 `get_models` 分支）
+- [x] 删除 `routes/viewer-ai.ts` 与注册
+- [x] `viewer-ai-context.ts` 清理 history 相关（HTTP 模式遗留）
+- [x] 新增统一路由 viewer-readonly 行为测试
+- [x] `pnpm check:agent` 通过
 
 ### Phase 3: 共享 UI 包
 
-- [ ] 新建 `packages/ai-chat-shared/` 包（`@workbench/ai-chat-shared`）
-- [ ] 从 author-site `ai-elements/` 迁移核心组件到新包
-- [ ] 参数化 author-site 特定依赖（system prompt 构建、context provider）
-- [ ] 定义 `AiContextProvider` 接口
-- [ ] 新增 `AIChat.mode` prop
-- [ ] ai-chat-shared typecheck 通过
+- [x] 新建 `packages/ai-chat-shared/`（package.json/tsconfig）
+- [x] 迁移 31 个组件文件 + 自带 ui 原语 + `lib/utils`/`ai-models`/`active-view-context`
+- [x] `config.ts` 注入点：`getAgentClient` + `authorContext`
+- [x] stream-service/message-service/use-chat-stream 去除 `@/` 依赖，接入注入与 mode 分支
+- [x] `AIChat` 新增 `mode`/`viewerContext` props
+- [x] 根 package.json 增加 `check:ai-chat-shared`；typecheck 通过
 
 ### Phase 4: viewer-site 改造
 
-- [ ] 添加 `@workbench/agent-client` 和 `@workbench/ai-chat-shared` 依赖
-- [ ] 实现 viewer-site 的 `AiContextProvider`
-- [ ] 删除 `ViewerAiDrawer.tsx`
-- [ ] 删除 `api.ts` 中 AI 相关函数和类型
-- [ ] `ViewerApp.tsx` 集成 `AIChat` 组件
-- [ ] viewer-site typecheck + build 通过
+- [x] 依赖 + transpilePackages + tailwind content
+- [x] `ViewerAiPanel.tsx` 集成 AIChat；`ViewerApp.tsx` 替换
+- [x] 删除 `ViewerAiDrawer.tsx` 与 `api.ts` AI 相关代码
+- [x] `pnpm check:viewer` + `pnpm build:viewer` 通过
 
 ### Phase 5: author-site 适配
 
-- [ ] 删除 `packages/author-site/src/components/ai-elements/` 目录
-- [ ] 更新所有 import 指向 `@workbench/ai-chat-shared`
-- [ ] `getAgentClient()` 显式传入 `mode: "workbench"`
-- [ ] 实现 author-site 的 `AiContextProvider`
-- [ ] author-site typecheck + test 通过
+- [x] `ai-elements/` 改 re-export，深路径引用与 lib 引用更新（7 处 + ai-models/active-view-context 引用处）
+- [x] `getAgentClient()` 显式 `mode: "workbench"`；`configureAiChatShared` 注入
+- [x] `__tests__` import/mock 路径更新；jest 解析共享包
+- [x] `pnpm check:author` 通过
 
 ### Phase 6: 全栈验证
 
-- [ ] 创作端全流程回归（打开项目 → AI 对话 → 文件修改 → 权限确认 → 预览）
-- [ ] 浏览端全流程验证（浏览项目 → AI 问答 → 流式输出 → 工具调用展示 → 关闭抽屉清理）
-- [ ] `pnpm check:all` 全仓通过
-- [ ] `pnpm test:e2e` 回归通过
-- [ ] 确认 agent-service 日志中无 `/api/viewer-ai/chat` 残留调用
+- [x] `pnpm check:all` 除两项既有失败（workspace-authority 门禁、project-cli 测试，均经 HEAD 复跑确认与本改造无关）外全部通过
+- [ ] 创作端/浏览端手动或 E2E 回归（服务可用时：`pnpm test:e2e`）——待服务启动后执行
+- [x] 确认 agent-service 无 `/api/viewer-ai/chat` 残留引用
+- [x] 同步 `docs/项目文档/` 相关模块文档
 
 ---
 
@@ -465,15 +399,17 @@ Pi Agent → 完整事件流 → AIChat 渲染
 
 | 风险 | 影响 | 缓解 |
 |------|------|------|
-| ai-elements 组件迁移到新包时发现隐含的 author-site 依赖 | 迁移工作量大 | 先做依赖分析，对耦合紧密的组件优先重构接口 |
-| viewer-readonly context 构建依赖 projectWorkspaceManager 的文件读取 | 合并路由后需确保 workspaces 仍可访问 | 在通用路由中保留 projectId → workingDir 映射 |
-| 共享 UI 包的 message-service 基于 localStorage 实现 | viewer-site 不需要持久化 | 通过 props 注入持久化策略或默认不持久化 |
+| ai-elements 内硬编码 author-site 相对路径 API（`/api/sessions/*` 持久化、`/api/agent/workspace-context`、`/api/agent/:id/rollback`） | viewer 环境下这些请求 404 | 持久化与上下文拉取按 mode/注入跳过；rollback 仅在文件变更 UI 触发，viewer 无文件变更事件，天然不触达 |
+| use-chat-stream（1790 行）含大量创作端逻辑（auto-repair、console 转发、诊断事件、代码/схema 回传） | viewer 复用时空转或异常 | 这些均由可选 props/回调驱动，viewer 不传即为 no-op；迁移时逐一核对无硬依赖 |
+| author-site 编辑页（核心功能）import 路径大迁移 | 回归风险 | 保留 `ai-elements/index.ts` re-export 壳，深路径引用仅 7 处；check:author + 全量 jest 兜底 |
+| viewer-readonly 上下文每条消息重复拼接 | 多轮对话 token 膨胀（上限 12KB/条） | 与现状（HTTP 每次全量重发）一致，不劣化；后续可优化为首条全量+后续增量 |
+| viewer-site 对 agent-service 的 CORS/WS 直连 | 部署环境 CORS_ORIGINS 未含 viewer origin 时失败 | 现有 viewer-ai HTTP 已同源直连（说明已配置）；验证清单确认 |
 
-### 5.2 待确认
+### 5.2 待确认（不阻塞实施的后续项）
 
-- `@workbench/ai-chat-shared` 是否需要依赖 `@workbench/shared`（类型复用）
-- viewer-site 的 AgentStream 连接是否需要与 author-site 不同的心跳/超时配置
-- 是否需要保留 `ViewerAiChatHistory` localStorage 兼容（平滑过渡）
+- 共享包测试基建：15 个组件测试暂留 author-site jest，后续是否迁至共享包 Vitest（对齐 sketch-react 模式）
+- 正式上线前 agent-service 的鉴权/网关层（mode 声明的信任边界收紧）
+- viewer 多轮长对话的上下文注入增量化
 
 ---
 
@@ -481,20 +417,22 @@ Pi Agent → 完整事件流 → AIChat 渲染
 
 | 操作 | 文件 |
 |------|------|
-| **修改** | `packages/agent-client/src/client.ts` — 新增 mode 参数 |
-| **修改** | `packages/agent-client/src/types.ts` — 类型扩展 |
-| **修改** | `packages/agent-client/package.json` — 版本号 bump |
-| **修改** | `packages/agent-service/src/routes/agent.ts` — 接收 mode 参数 |
-| **修改** | `packages/agent-service/src/routes/websocket.ts` — 接收 mode 参数 |
-| **修改** | `packages/agent-service/src/routes/index.ts` — 移除 viewer-ai 路由注册 |
+| **修改** | `packages/agent-client/src/client.ts` — mode 参数、URL query、requestModels |
+| **修改** | `packages/agent-client/src/types.ts` — SendMessageOptions 扩展 |
+| **修改** | `packages/agent-service/src/routes/agent.ts` — SendMessageBody.mode/viewerContext |
+| **修改** | `packages/agent-service/src/routes/websocket.ts` — ClientMessage.mode/viewerContext、连接级 query、viewer-readonly 分支 |
+| **修改** | `packages/agent-service/src/routes/index.ts` — 移除 viewer-ai 注册 |
 | **删除** | `packages/agent-service/src/routes/viewer-ai.ts` |
-| **移动** | `packages/agent-service/src/services/viewer-ai-context.ts` → promopt 模块内（保留逻辑） |
-| **新建** | `packages/ai-chat-shared/` — 完整新包 |
-| **修改** | `packages/author-site/src/lib/agent-client.ts` — 显式 mode |
-| **删除** | `packages/author-site/src/components/ai-elements/` — 迁移到共享包 |
-| **修改** | `packages/author-site/package.json` — 新增依赖 |
-| **修改** | `packages/viewer-site/package.json` — 新增依赖 |
+| **修改** | `packages/agent-service/src/services/viewer-ai-context.ts` — 原地保留，清理 history 遗留 |
+| **新建** | `packages/ai-chat-shared/` — 完整新包（31 组件 + ui 原语 + lib） |
+| **删除** | `packages/author-site/src/components/ai-elements/*` 组件源文件（保留 index.ts re-export 与 `__tests__/`） |
+| **删除** | `packages/author-site/src/lib/ai-models.ts`、`src/lib/agent/active-view-context.ts`（迁入共享包） |
+| **修改** | `packages/author-site/src/lib/agent-client.ts` — 显式 mode + configureAiChatShared |
+| **修改** | author-site 深路径引用 5 文件、`app/api/ai/chat/route.ts`、相关测试 import |
+| **修改** | `packages/author-site/package.json`、`next.config.js`、jest 配置 — 新依赖与转换 |
+| **修改** | `packages/viewer-site/package.json`、`next.config.js`、`tailwind.config.ts` — 新依赖与扫描 |
 | **删除** | `packages/viewer-site/src/components/ViewerAiDrawer.tsx` |
-| **修改** | `packages/viewer-site/src/components/ViewerApp.tsx` — 集成 AIChat |
+| **新建** | `packages/viewer-site/src/components/ViewerAiPanel.tsx` — AIChat 薄壳 |
+| **修改** | `packages/viewer-site/src/components/ViewerApp.tsx` — 集成替换 |
 | **修改** | `packages/viewer-site/src/lib/api.ts` — 移除 AI 相关代码 |
-| **修改** | `pnpm-lock.yaml` — 锁文件更新 |
+| **修改** | 根 `package.json` — check:ai-chat-shared 脚本；`pnpm-lock.yaml` |

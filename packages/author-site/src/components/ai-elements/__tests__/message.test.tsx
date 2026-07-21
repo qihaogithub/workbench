@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import { Message } from "../message";
+import { Message } from "@workbench/ai-chat-shared/message";
 
 jest.mock(
   "streamdown",

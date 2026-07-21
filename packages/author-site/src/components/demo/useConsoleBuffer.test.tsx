@@ -3,7 +3,7 @@
 import { renderHook, act } from "@testing-library/react";
 import type { RefObject } from "react";
 import { useConsoleBuffer } from "./useConsoleBuffer";
-import type { StreamService } from "@/components/ai-elements/chat/services/stream-service";
+import type { StreamService } from "@workbench/ai-chat-shared";
 import type { ConsoleLogPayload } from "@workbench/demo-ui";
 
 describe("useConsoleBuffer", () => {

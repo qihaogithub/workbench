@@ -6,7 +6,7 @@ import { scanWorkspaceContext, readMemoryContent } from '@/lib/agent/scan-worksp
 import {
   buildActiveViewContextPrefix,
   type ActiveViewContext,
-} from '@/lib/agent/active-view-context';
+} from '@workbench/ai-chat-shared';
 
 // v3.2: 静态 system prompt 缓存在 module 顶部（应用启动后不再变）
 // 缓存收益：每次 sendMessage 都不变 → LLM API prompt caching 100% 命中

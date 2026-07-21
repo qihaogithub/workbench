@@ -5,7 +5,7 @@ import {
   computeMutationBadgeStatus,
   type MutationReceiptInfo,
   type ProjectionAckInfo,
-} from "../mutation-status-badge";
+} from "@workbench/ai-chat-shared/mutation-status-badge";
 
 describe("MutationStatusBadge", () => {
   describe("computeMutationBadgeStatus", () => {

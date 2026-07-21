@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 
-import { useChatModels } from "../chat/hooks/use-chat-models";
+import { useChatModels } from "@workbench/ai-chat-shared/chat/hooks/use-chat-models";
 
 type StreamHandler = (event: Record<string, unknown>) => void | Promise<void>;
 
@@ -23,6 +23,27 @@ class MockAgentStream {
 
   open() {
     this.ws.readyState = OPEN_READY_STATE;
+  }
+
+  isOpen() {
+    return this.ws.readyState === OPEN_READY_STATE;
+  }
+
+  requestModels(options?: {
+    workingDir?: string;
+    projectId?: string;
+    demoId?: string;
+  }) {
+    if (!this.isOpen()) return;
+    this.ws.send(
+      JSON.stringify({
+        type: "get_models",
+        mode: "workbench",
+        workingDir: options?.workingDir,
+        projectId: options?.projectId,
+        demoId: options?.demoId,
+      }),
+    );
   }
 
   private readonly handlers = new Map<string, Set<StreamHandler>>();
@@ -55,10 +76,12 @@ const mockStream = jest.fn((sessionId: string) => {
   return stream;
 });
 
-jest.mock("@/lib/agent-client", () => ({
-  getAgentClient: () => ({
+jest.mock("@workbench/ai-chat-shared/config", () => ({
+  configureAiChatShared: jest.fn(),
+  getConfiguredAgentClient: () => ({
     stream: mockStream,
   }),
+  getAuthorContextIntegration: () => null,
 }));
 
 describe("useChatModels", () => {
@@ -219,7 +242,7 @@ describe("useChatModels", () => {
 
     await waitFor(() =>
       expect(stream.ws.send).toHaveBeenCalledWith(
-        JSON.stringify({ type: "get_models", workingDir: "/tmp/workspace" }),
+        JSON.stringify({ type: "get_models", mode: "workbench", workingDir: "/tmp/workspace" }),
       ),
     );
 
@@ -244,7 +267,7 @@ describe("useChatModels", () => {
       jest.advanceTimersByTime(50);
     });
     expect(stream.ws.send).not.toHaveBeenCalledWith(
-      JSON.stringify({ type: "get_models", workingDir: "/tmp/workspace" }),
+      JSON.stringify({ type: "get_models", mode: "workbench", workingDir: "/tmp/workspace" }),
     );
 
     stream.open();
@@ -253,7 +276,7 @@ describe("useChatModels", () => {
     });
 
     expect(stream.ws.send).toHaveBeenCalledWith(
-      JSON.stringify({ type: "get_models", workingDir: "/tmp/workspace" }),
+      JSON.stringify({ type: "get_models", mode: "workbench", workingDir: "/tmp/workspace" }),
     );
 
     unmount();

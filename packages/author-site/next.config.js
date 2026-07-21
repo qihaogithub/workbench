@@ -36,6 +36,7 @@ const nextConfig = {
   },
   transpilePackages: [
     "@workbench/agent-client",
+    "@workbench/ai-chat-shared",
     "@workbench/demo-ui",
     "@workbench/knowledge-core",
     "@workbench/knowledge-service",

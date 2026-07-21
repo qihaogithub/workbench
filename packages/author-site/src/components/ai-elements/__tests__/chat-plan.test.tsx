@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 
-import { ChatPlan } from "../chat/chat-plan";
+import { ChatPlan } from "@workbench/ai-chat-shared/chat/chat-plan";
 
 describe("ChatPlan", () => {
   it("展示结构化计划的四种状态", () => {

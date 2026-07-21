@@ -1,5 +1,19 @@
-import { persistMessages } from "../chat/services/message-service";
-import type { ChatMessage } from "../message";
+import { persistMessages } from "@workbench/ai-chat-shared/chat/services/message-service";
+import type { ChatMessage } from "@workbench/ai-chat-shared/message";
+
+// 会话持久化以 authorContext 配置为开关（viewer 宿主未配置时跳过），测试中模拟创作端已配置
+jest.mock("@workbench/ai-chat-shared/config", () => ({
+  configureAiChatShared: jest.fn(),
+  getConfiguredAgentClient: jest.fn(),
+  getAuthorContextIntegration: () => ({
+    buildStaticSystemPrompt: () => "",
+    fetchContextPrefix: async () => ({
+      l3: "",
+      memoryPrefix: null,
+      knowledgePrefix: null,
+    }),
+  }),
+}));
 
 describe("message-service", () => {
   const originalFetch = global.fetch;

@@ -91,9 +91,9 @@ import {
   AIChat,
   type AutoRepairTrigger,
   type VisualPropertyAutoSend,
-} from "@/components/ai-elements/ai-chat";
-import { type ChatMessage } from "@/components/ai-elements";
-import type { StreamService } from "@/components/ai-elements/chat/services/stream-service";
+  type ChatMessage,
+  type StreamService,
+} from "@/components/ai-elements";
 import { getAgentClient } from "@/lib/agent-client";
 import { useConsoleBuffer } from "@/components/demo/useConsoleBuffer";
 import { useEditorDiagnostics } from "@/components/demo/useEditorDiagnostics";
@@ -202,7 +202,7 @@ import type {
 } from "@workbench/shared";
 import { projectApiClient } from "@/lib/project-api";
 import { resolveSketchEditorEngine } from "@/lib/sketch-editor-engine";
-import type { ActiveViewContext } from "@/lib/agent/active-view-context";
+import type { ActiveViewContext } from "@/components/ai-elements";
 import { sanitizeHydratedMessages } from "@/lib/sanitize-hydrated-messages";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";

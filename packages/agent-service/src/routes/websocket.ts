@@ -22,6 +22,16 @@ import { workspaceManager } from "../workspace/workspace-manager";
 import { snapshotService } from "../session/snapshot-service";
 import { consoleBuffer } from "../session/console-buffer";
 import { getWorkbenchToolCapabilities } from "../backends/pi-tools";
+import {
+  buildViewerAiSystemPrompt,
+  buildViewerReadonlyContent,
+  normalizeAgentMode,
+  resolveViewerReadonlySession,
+  VIEWER_READONLY_PERMISSIONS,
+  type AgentMode,
+  type ViewerContextPayload,
+  type ViewerReadonlySession,
+} from "../services/viewer-readonly-mode";
 import type { BaseAgent } from "../core/agent";
 
 function resolveDefaultModelId(): string {
@@ -37,6 +47,10 @@ const DEFAULT_MODEL_ID = resolveDefaultModelId();
 
 interface StreamParams {
   sessionId: string;
+}
+
+interface StreamQuery {
+  mode?: string;
 }
 
 interface ClientMessage {
@@ -58,9 +72,13 @@ interface ClientMessage {
   workingDir?: string;
   projectId?: string;
   demoId?: string;
+  /** 行为模式：viewer-readonly 时服务端强制只读工具集与系统提示词 */
+  mode?: string;
+  /** viewer-readonly 模式下的浏览端上下文 */
+  viewerContext?: ViewerContextPayload;
   images?: ImageAttachment[];
   files?: FileAttachment[];
-  /** v3.2: 静态 system prompt 注入（L2 + L4） */
+  /** v3.2: 静态 system prompt 注入（L2 + L4）；viewer-readonly 模式下忽略 */
   systemPrompt?: string;
   entries?: Array<{
     level: "log" | "warn" | "error" | "info" | "debug";
@@ -160,7 +178,7 @@ export async function registerWebSocketRoutes(
 
   setInterval(heartbeat, HEARTBEAT_INTERVAL);
 
-  fastify.get<{ Params: StreamParams }>(
+  fastify.get<{ Params: StreamParams; Querystring: StreamQuery }>(
     "/api/agent/:sessionId/stream",
     {
       websocket: true,
@@ -170,13 +188,15 @@ export async function registerWebSocketRoutes(
     },
     async (
       socket: WebSocket,
-      request: FastifyRequest<{ Params: StreamParams }>,
+      request: FastifyRequest<{ Params: StreamParams; Querystring: StreamQuery }>,
     ) => {
       const { sessionId } = request.params;
       const connectionId = `${sessionId}-${Date.now()}`;
+      // 连接级 mode 默认值；单条消息体里的 mode 优先
+      const connectionMode: AgentMode = normalizeAgentMode(request.query?.mode);
 
       logger.info(
-        { sessionId, connectionId },
+        { sessionId, connectionId, mode: connectionMode },
         "WebSocket connection established",
       );
 
@@ -249,6 +269,46 @@ export async function registerWebSocketRoutes(
             );
 
             try {
+              const mode: AgentMode = message.mode
+                ? normalizeAgentMode(message.mode)
+                : connectionMode;
+
+              let viewerSession: ViewerReadonlySession | null = null;
+              if (mode === "viewer-readonly") {
+                if (!message.projectId) {
+                  sendMessage({
+                    type: "error",
+                    id: message.id || "unknown",
+                    error: {
+                      code: "INVALID_PARAMS",
+                      message: "viewer-readonly 模式需要 projectId",
+                    },
+                  });
+                  return;
+                }
+                try {
+                  viewerSession = await resolveViewerReadonlySession(
+                    message.projectId,
+                    message.viewerContext,
+                  );
+                } catch (error) {
+                  const notFound =
+                    error instanceof Error &&
+                    error.message === "PROJECT_NOT_FOUND";
+                  sendMessage({
+                    type: "error",
+                    id: message.id || "unknown",
+                    error: {
+                      code: notFound ? "PROJECT_NOT_FOUND" : "INTERNAL_ERROR",
+                      message: notFound
+                        ? "项目不存在"
+                        : "浏览端会话初始化失败",
+                    },
+                  });
+                  return;
+                }
+              }
+
               const existingAgent = manager.get(sessionId);
               const currentModelId = await resolveCurrentModelId(existingAgent);
               const requestedModelId = normalizeModelId(message.model);
@@ -262,6 +322,8 @@ export async function registerWebSocketRoutes(
                 toolVersion: getWorkbenchToolCapabilities().toolVersion,
                 backendProviders: getSessionModelConfigs().get(sessionId),
                 externalAuth: getSessionExternalAuthConfigs().get(sessionId),
+                // viewer-readonly：服务端强制 workingDir/toolMode/permissions，忽略客户端同名字段
+                ...(viewerSession ? viewerSession.configPatch : {}),
               };
 
               const agent = manager.getOrCreate(sessionId, config);
@@ -286,7 +348,8 @@ export async function registerWebSocketRoutes(
                         type: "user" | "temp";
                       }
                     | undefined;
-                  if (message.workingDir) {
+                  // viewer-readonly 的 workingDir 指向项目工作空间，不走临时工作空间机制
+                  if (message.workingDir && mode !== "viewer-readonly") {
                     workspaceInfo = await workspaceManager.create({
                       workspace: message.workingDir,
                     });
@@ -298,7 +361,7 @@ export async function registerWebSocketRoutes(
 
                   sessionStore.create(sessionId, {
                     ...config,
-                    workingDir: workspaceInfo?.path || message.workingDir,
+                    workingDir: workspaceInfo?.path || config.workingDir,
                     workspaceMeta: workspaceInfo
                       ? {
                           workingDir: workspaceInfo.path,
@@ -354,7 +417,10 @@ export async function registerWebSocketRoutes(
               }
 
               // v3.2: 注入静态 system prompt（必须在 agent.start() 之后，因为 Pi Agent 实例在 start() 时才创建）
-              if (message.systemPrompt && agent instanceof BackendAgent) {
+              // viewer-readonly：忽略客户端 systemPrompt，服务端强制只读系统提示词
+              if (mode === "viewer-readonly" && agent instanceof BackendAgent) {
+                await agent.updateSystemPrompt(buildViewerAiSystemPrompt());
+              } else if (message.systemPrompt && agent instanceof BackendAgent) {
                 logger.info(
                   { sessionId, promptLength: message.systemPrompt.length },
                   "WebSocket: calling updateSystemPrompt",
@@ -418,7 +484,16 @@ export async function registerWebSocketRoutes(
                 }, MESSAGE_PROGRESS_HEARTBEAT_INTERVAL_MS);
                 progressHeartbeatHandle.unref?.();
 
-                const sendPromise = agent.sendMessage(message.content, {
+                // viewer-readonly：服务端拼接只读问答上下文（页面/配置/记忆/知识库索引）
+                const outgoingContent = viewerSession
+                  ? buildViewerReadonlyContent(
+                      viewerSession.project,
+                      message.viewerContext,
+                      message.content,
+                    )
+                  : message.content;
+
+                const sendPromise = agent.sendMessage(outgoingContent, {
                   ...message.options,
                   images: message.images,
                   files: message.files,
@@ -698,6 +773,40 @@ export async function registerWebSocketRoutes(
 
           case "get_models": {
             try {
+              const mode: AgentMode = message.mode
+                ? normalizeAgentMode(message.mode)
+                : connectionMode;
+
+              let viewerPatch: ViewerReadonlySession["configPatch"] | null =
+                null;
+              if (mode === "viewer-readonly") {
+                if (message.projectId) {
+                  try {
+                    viewerPatch = (
+                      await resolveViewerReadonlySession(
+                        message.projectId,
+                        message.viewerContext,
+                      )
+                    ).configPatch;
+                  } catch (error) {
+                    logger.warn(
+                      { sessionId, projectId: message.projectId, error },
+                      "get_models: viewer 项目解析失败，使用只读兜底配置",
+                    );
+                  }
+                }
+                // 项目解析失败或缺 projectId 时仍强制只读工具集，避免创建全权 Agent
+                if (!viewerPatch) {
+                  viewerPatch = {
+                    workingDir: process.cwd(),
+                    demoId: message.demoId,
+                    toolMode: "viewer-readonly",
+                    toolVersion: getWorkbenchToolCapabilities().toolVersion,
+                    permissions: VIEWER_READONLY_PERMISSIONS,
+                  };
+                }
+              }
+
               let agent = manager.get(sessionId);
               const sessionBackendProviders =
                 getSessionModelConfigs().get(sessionId);
@@ -711,6 +820,7 @@ export async function registerWebSocketRoutes(
                   toolVersion: getWorkbenchToolCapabilities().toolVersion,
                   backendProviders: sessionBackendProviders,
                   externalAuth: getSessionExternalAuthConfigs().get(sessionId),
+                  ...(viewerPatch ?? {}),
                 };
                 agent = manager.getOrCreate(sessionId, config);
 

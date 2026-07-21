@@ -5,7 +5,6 @@ import { registerProjectRoutes } from "./projects";
 import { registerValidateRoutes } from "./validate";
 import { registerModelsRoutes } from "./models";
 import { registerInternalConfigRoutes } from "./internal-config";
-import { registerViewerAiRoutes } from "./viewer-ai";
 import { registerCollabRoutes } from "./collab";
 import { registerWorkspaceAuthorityRoutes } from "./workspace-authority";
 
@@ -18,5 +17,4 @@ export async function registerRoutes(fastify: FastifyInstance) {
   await registerValidateRoutes(fastify);
   await registerModelsRoutes(fastify);
   await registerInternalConfigRoutes(fastify);
-  await registerViewerAiRoutes(fastify);
 }

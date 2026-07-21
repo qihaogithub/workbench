@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 
 import { ToastProviderWrapper, useToast } from "./toast-provider";
 
-jest.mock("@/components/ui/toast", () => {
+jest.mock("@workbench/ai-chat-shared/ui/toast", () => {
   const React = require("react");
 
   return {

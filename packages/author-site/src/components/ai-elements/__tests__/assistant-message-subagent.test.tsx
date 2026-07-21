@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
-import { AssistantMessage } from "../assistant-message";
-import { Tool } from "../tool";
+import { AssistantMessage } from "@workbench/ai-chat-shared/assistant-message";
+import { Tool } from "@workbench/ai-chat-shared/tool";
 
 jest.mock(
   "streamdown",

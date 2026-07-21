@@ -1,6 +1,8 @@
 # AI 对话模块 - 索引
 
-> 更新日期：2026-07-10
+> 更新日期：2026-07-21
+>
+> 组件位置说明：2026-07-21 起，AI 对话 UI 组件（原 `packages/author-site/src/components/ai-elements/`）整体迁移至共享包 `packages/ai-chat-shared/`（`@workbench/ai-chat-shared`），供创作端与使用端共用；author-site 保留 `ai-elements/index.ts` re-export 壳并在加载时注入创作端集成（AgentClient、静态 system prompt、L3/L4 上下文拉取，见 `src/lib/ai-chat-setup.ts`）。本模块技术文档中出现的 `ai-elements/` 源码路径按共享包内对应路径理解。
 
 ## 文档列表
 

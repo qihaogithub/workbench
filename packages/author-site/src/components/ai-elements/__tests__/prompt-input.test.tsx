@@ -7,7 +7,7 @@ import {
   PromptInputFooter,
   PromptInputSubmit,
   PromptInputTextarea,
-} from "../prompt-input";
+} from "@workbench/ai-chat-shared/prompt-input";
 
 function renderWithToast(ui: React.ReactElement) {
   return render(<ToastProviderWrapper>{ui}</ToastProviderWrapper>);

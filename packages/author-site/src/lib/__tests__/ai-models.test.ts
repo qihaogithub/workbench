@@ -7,7 +7,7 @@ import {
   buildModelConfigs,
   MODEL_CONFIGS,
   applyModelConfigsWithFullData,
-} from "@/lib/ai-models";
+} from "@workbench/ai-chat-shared";
 
 describe("matchesId", () => {
   it("字符串 matcher 走前缀匹配", () => {

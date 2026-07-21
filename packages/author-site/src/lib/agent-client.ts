@@ -12,6 +12,7 @@ export function getAgentClient(): AgentClient {
     clientInstance = new AgentClient({
       baseUrl: getAgentServiceUrl(),
       apiKey: getAgentServiceApiKey(),
+      mode: 'workbench', // 显式声明创作端全量工具模式
     });
   }
   return clientInstance;

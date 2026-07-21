@@ -7,6 +7,7 @@ const config: Config = {
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
     './node_modules/@workbench/shared/src/**/*.{js,ts,jsx,tsx,mdx}',
+    './node_modules/@workbench/ai-chat-shared/src/**/*.{js,ts,jsx,tsx,mdx}',
     './node_modules/@workbench/demo-ui/src/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
