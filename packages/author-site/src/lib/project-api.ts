@@ -14,6 +14,7 @@ import type {
 import type {
   RuntimeValidationResult,
   SketchPatchVersionSummary,
+  ProjectRestoreResult,
 } from '@workbench/project-core';
 
 import { getBrowserAgentServiceUrl } from './runtime-config';
@@ -207,6 +208,24 @@ export class ProjectApiClient {
     );
     if (!response.success || !response.data) {
       throw new Error(response.error?.message || '恢复页面版本失败');
+    }
+    return response.data;
+  }
+
+  async restoreProjectVersion(
+    projectId: string,
+    versionId: string,
+    request?: { sessionId?: string; workspaceId?: string },
+  ): Promise<ProjectRestoreResult> {
+    const response = await this.localRequest<ProjectRestoreResult>(
+      `/api/projects/${projectId}/versions/${versionId}/restore`,
+      {
+        method: 'POST',
+        body: JSON.stringify(request ?? {}),
+      },
+    );
+    if (!response.success || !response.data) {
+      throw new Error(response.error?.message || '恢复项目版本失败');
     }
     return response.data;
   }

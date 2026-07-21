@@ -317,6 +317,13 @@ export interface PageRestoreResult {
   files: DemoFiles;
 }
 
+export interface ProjectRestoreResult {
+  success: true;
+  newVersionId: string;
+  restoredVersionId: string;
+  restoredAt: number;
+}
+
 export interface PreviewPlan {
   planId: string;
   operation: string;

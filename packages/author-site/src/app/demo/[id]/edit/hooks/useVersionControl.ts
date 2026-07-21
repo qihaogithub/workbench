@@ -313,6 +313,39 @@ export function useVersionControl(params: UseVersionControlParams) {
     }
   };
 
+  const handleRestoreProjectVersion = async (version: VersionInfo) => {
+    if (
+      !confirm(
+        `确定要将项目恢复到版本 ${version.versionId} 吗？所有页面的当前修改都将丢失。`,
+      )
+    ) {
+      return;
+    }
+
+    setRestoring(version.versionId);
+    try {
+      await projectApiClient.restoreProjectVersion(
+        demoId,
+        version.versionId,
+        { sessionId, workspaceId },
+      );
+      toast({
+        title: "项目恢复成功",
+        description: `已从版本 ${version.versionId} 恢复并生成新版本`,
+      });
+      await Promise.all([loadVersionHistory(), loadPageVersionHistories()]);
+      window.location.reload();
+    } catch (err) {
+      toast({
+        title: "项目恢复失败",
+        description: err instanceof Error ? err.message : "恢复项目版本失败",
+        variant: "destructive",
+      });
+    } finally {
+      setRestoring(null);
+    }
+  };
+
   const handleCreateVersion = async (): Promise<boolean> => {
     if (!sessionId) {
       console.error("[handleCreateVersion] sessionId 为空!");
@@ -624,6 +657,7 @@ export function useVersionControl(params: UseVersionControlParams) {
     handlePublish,
     handlePreviewPageVersion,
     handleRestorePageVersion,
+    handleRestoreProjectVersion,
     handleCreateVersion,
   };
 }

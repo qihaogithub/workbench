@@ -58,6 +58,7 @@ import type {
   PageVersionDetail,
   PageVersionHistory,
   PageRestoreResult,
+  ProjectRestoreResult,
   BlobGarbageCollectResult,
   MaterializationResult,
   ProjectCommitHistory,
@@ -3040,6 +3041,102 @@ export class ProjectAdminService {
           notes: [`生成版本 ${version.versionId}`, `生成资源提交 ${commit.id}`],
         },
         validation,
+        nextActions: ["project_get"],
+      },
+    );
+  }
+
+  restoreProjectVersion(
+    projectId: string,
+    versionId: string,
+    actor = this.defaultActor(),
+    options: {
+      workspaceId?: string;
+      workspaceRevision?: number;
+      workspaceRootHash?: string;
+    } = {},
+  ): ProjectAdminResult<ProjectRestoreResult> {
+    if (actor.role === "readonly")
+      return fail("FORBIDDEN", "当前操作者没有写权限");
+    const access = this.requireProjectAccess(projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    if (this.isProjectLocked(projectId) && actor.role !== "admin") {
+      return fail("PROJECT_LOCKED", "项目已被管理员锁定，当前不能恢复项目版本");
+    }
+    const project = this.readProject(projectId);
+    if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
+    const version = project.versions.find((v) => v.versionId === versionId);
+    if (!version)
+      return fail("VERSION_NOT_FOUND", `项目版本 ${versionId} 不存在`);
+    if (!fs.existsSync(version.snapshotPath))
+      return fail(
+        "VERSION_SNAPSHOT_MISSING",
+        `项目版本快照已丢失: ${versionId}`,
+      );
+
+    const workspacePath = this.projectWorkspacePath(projectId);
+    fs.rmSync(workspacePath, { recursive: true, force: true });
+    copyWorkspaceWithoutRuntimeMetadata(version.snapshotPath, workspacePath);
+
+    const restoredAt = Date.now();
+    const newVersion = this.createProjectVersion(
+      project,
+      workspacePath,
+      actor.name,
+      `restore-${versionId}`,
+      `从项目版本 ${versionId} 恢复`,
+      "restore_snapshot",
+      {
+        workspaceId: options.workspaceId,
+        workspaceRevision: options.workspaceRevision,
+        workspaceRootHash: options.workspaceRootHash,
+      },
+    );
+    const tree = this.readWorkspaceTree(workspacePath);
+    const updatedProject: Project = {
+      ...project,
+      workspacePath,
+      activeWorkspaceId: undefined,
+      activeWorkspaceUpdatedAt: undefined,
+      canonicalSyncedWorkspaceId: undefined,
+      canonicalSyncedRevision: undefined,
+      canonicalSyncedRootHash: undefined,
+      canonicalSyncedAt: restoredAt,
+      demoPages: sortPages(tree.pages),
+      demoFolders: tree.folders,
+      versions: this.compactProjectVersions([
+        ...project.versions,
+        newVersion,
+      ]),
+      updatedAt: restoredAt,
+    };
+    this.writeProject(projectId, updatedProject);
+    const auditId = this.audit("project_restore_version", actor, "L2", true, {
+      projectId,
+      diffSummary: {
+        updated: [],
+        notes: [
+          `从版本 ${versionId} 恢复整个项目`,
+          `生成新版本 ${newVersion.versionId}`,
+        ],
+      },
+    });
+    return ok(
+      {
+        success: true,
+        newVersionId: newVersion.versionId,
+        restoredVersionId: versionId,
+        restoredAt,
+      },
+      {
+        auditId,
+        diffSummary: {
+          updated: [],
+          notes: [
+            `从版本 ${versionId} 恢复整个项目`,
+            `生成新版本 ${newVersion.versionId}`,
+          ],
+        },
         nextActions: ["project_get"],
       },
     );
