@@ -2730,6 +2730,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     handlePublish,
     handlePreviewPageVersion,
     handleRestorePageVersion,
+    handleRestoreProjectVersion,
     hasPendingChanges,
     hasPublishableChanges,
     publishButtonDisabled,
@@ -6825,6 +6826,29 @@ ${context.details}
                                         size="sm"
                                         onClick={() =>
                                           handleRestorePageVersion(
+                                            event.version,
+                                          )
+                                        }
+                                        disabled={
+                                          restoring === event.version.versionId
+                                        }
+                                        className="h-7 gap-1 px-2 text-xs opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                                      >
+                                        {restoring ===
+                                        event.version.versionId ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <RotateCcw className="h-3 w-3" />
+                                        )}
+                                         恢复
+                                      </Button>
+                                    )}
+                                    {event.kind !== "page" && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() =>
+                                          handleRestoreProjectVersion(
                                             event.version,
                                           )
                                         }
