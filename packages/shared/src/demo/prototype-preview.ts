@@ -9,6 +9,11 @@ export interface PrototypePreviewDocumentInput {
   configData?: Record<string, unknown>;
   previewSize?: PrototypePreviewSize;
   assetRewrite?: PrototypeAssetRewriteContext;
+  /**
+   * 单页预览等场景允许设计画板内部纵向滚动，查看超出设计高度的内容。
+   * 仅在传入 previewSize（固定设计尺寸）时生效；画布与截图不传，保持裁剪到设计高度。
+   */
+  allowScroll?: boolean;
 }
 
 export interface PrototypeAssetRewriteContext {
@@ -275,14 +280,29 @@ export function buildPrototypePreviewHtmlFragment({
   configData = {},
   previewSize,
   assetRewrite,
+  allowScroll = false,
 }: PrototypePreviewDocumentInput): string {
   const designWidth = parseSizeValue(previewSize?.width, 375);
   const designHeight = parseSizeValue(previewSize?.height, 812);
   const shouldScaleToPreviewSize = previewSize != null;
+  // 固定设计尺寸下，.prototype-root 的 height + overflow 决定超高内容是被裁剪还是可滚动。
+  // allowScroll 时改为 auto，让设计画板内部纵向滚动，与 React 高保真页 iframe 内滚动一致。
+  const allowRootScroll = shouldScaleToPreviewSize && allowScroll;
   const rootWidth = shouldScaleToPreviewSize ? `${designWidth}px` : "100%";
   const rootHeight = shouldScaleToPreviewSize ? `${designHeight}px` : "100%";
   const rootMinHeight = shouldScaleToPreviewSize ? `${designHeight}px` : "100%";
-  const rootOverflow = shouldScaleToPreviewSize ? "hidden" : "visible";
+  const rootOverflow = shouldScaleToPreviewSize
+    ? allowRootScroll
+      ? "auto"
+      : "hidden"
+    : "visible";
+  // 滚动时隐藏滚动条，与预览容器、React 页保持一致的无滚动条观感。
+  const rootScrollbarStyle = allowRootScroll
+    ? "scrollbar-width: none; -ms-overflow-style: none;"
+    : "";
+  const rootScrollbarWebkitCss = allowRootScroll
+    ? ":host::-webkit-scrollbar, .prototype-root::-webkit-scrollbar { display: none; }"
+    : "";
   const safeHtml = applyPrototypeTextBindings(
     rewritePrototypeAssetUrls(sanitizePrototypeHtml(html), assetRewrite),
     configData,
@@ -303,6 +323,7 @@ export function buildPrototypePreviewHtmlFragment({
         height: ${rootHeight};
         min-height: ${rootMinHeight};
         overflow: ${rootOverflow};
+        ${rootScrollbarStyle}
         background: #fff;
         color: #111827;
         font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -313,9 +334,11 @@ export function buildPrototypePreviewHtmlFragment({
         height: ${rootHeight};
         min-height: ${rootMinHeight};
         overflow: ${rootOverflow};
+        ${rootScrollbarStyle}
         transform: translateZ(0);
         background: #fff;
       }
+      ${rootScrollbarWebkitCss}
       *, *::before, *::after {
         box-sizing: border-box;
       }

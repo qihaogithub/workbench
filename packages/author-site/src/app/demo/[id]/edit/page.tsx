@@ -7345,6 +7345,7 @@ ${context.details}
                           sessionId={sessionId}
                           demoId={activeDemoId}
                           previewSize={activePreviewSize}
+                          allowScroll
                           visualEditMode={propertyPanelActive}
                           visualHoverNodeId={
                             propertyPanelActive ? visualPanelHoverNodeId : null

@@ -27,6 +27,8 @@ export interface PrototypePagePreviewProps {
   fillContainer?: boolean;
   containerSizeOverride?: PreviewContainerSize;
   effectiveHeight?: number;
+  /** 单页预览允许设计画板内部纵向滚动查看超高内容；画布/截图保持裁剪 */
+  allowScroll?: boolean;
   className?: string;
   visualEditMode?: boolean;
   visualHoverNodeId?: string | null;
@@ -253,6 +255,7 @@ export function PrototypePagePreview({
   fillContainer = false,
   containerSizeOverride,
   effectiveHeight,
+  allowScroll = false,
   className,
   visualEditMode = false,
   visualHoverNodeId,
@@ -342,6 +345,7 @@ export function PrototypePagePreview({
       css,
       configData,
       assetRewrite,
+      allowScroll,
       previewSize: shouldScaleToPreviewSize
         ? { width: designWidth, height: designHeight }
         : undefined,
@@ -352,6 +356,7 @@ export function PrototypePagePreview({
       applyPropertyChanges(root, visualPropertyChanges);
     }
   }, [
+    allowScroll,
     configData,
     css,
     designHeight,
