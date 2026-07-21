@@ -475,3 +475,13 @@ clientInstance = new AgentClient({
 - 组件测试覆盖点阵渲染、加号菜单的图片/附件分流、浏览端历史保存与恢复、viewer 模式下模型入口可见。
 - agent-service 测试覆盖附件上传的会话隔离、类型和大小校验。
 - 运行 `check:ai-chat-shared`、`check:author`、`check:viewer`、`check:agent`；服务可用时补充两端浏览器手动回归。
+
+### 7.7 实施结果
+
+- [x] 使用 registry 原版 `@dotmatrix/dotm-square-4` 替换旧自绘等待态，并移除创作端遗留全局动画。
+- [x] 双端输入区统一为加号气泡菜单，支持图片与非图片文件分流。
+- [x] agent-client 与 agent-service 增加统一会话附件上传链路，支持类型、大小和会话路径校验。
+- [x] 浏览端补齐模型选择、图片/文件附件、历史入口和按项目隔离的 localStorage 会话恢复。
+- [x] viewer/author Docker 构建补齐共享 workspace 包，viewer 构建参数补齐模型筛选环境变量。
+- [x] `check:ai-chat-shared`、`check:author`、`check:viewer`、`check:agent` 通过；viewer 生产构建通过。
+- [ ] 双端浏览器手动回归仍需在完整服务与模型配置可用时执行。

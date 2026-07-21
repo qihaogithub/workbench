@@ -128,42 +128,6 @@
   }
 }
 
-@keyframes ai-working-dot-matrix {
-  0%,
-  100% {
-    opacity: 0.16;
-    transform: scale(0.72);
-    background-color: hsl(var(--foreground) / 0.28);
-    box-shadow: none;
-  }
-
-  8% {
-    opacity: 1;
-    transform: scale(1);
-    background-color: hsl(var(--foreground) / 0.92);
-    box-shadow: 0 0 6px hsl(var(--foreground) / 0.24);
-  }
-
-  18% {
-    opacity: 0.42;
-    transform: scale(0.86);
-    background-color: hsl(var(--foreground) / 0.52);
-    box-shadow: 0 0 3px hsl(var(--foreground) / 0.12);
-  }
-}
-
-.ai-working-dot {
-  background-color: hsl(var(--foreground) / 0.22);
-  opacity: 0.18;
-  transform: scale(0.72);
-  animation: ai-working-dot-matrix 1.45s linear infinite;
-  will-change: opacity, transform, background-color, box-shadow;
-}
-
-.ai-working-dot-idle {
-  animation: none;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .oneflow-wordmark {
     animation: none;
@@ -174,16 +138,6 @@
     will-change: auto;
   }
 
-  .ai-working-dot {
-    animation: none;
-    will-change: auto;
-  }
-
-  .ai-working-dot-current {
-    opacity: 1;
-    transform: scale(1);
-    background-color: hsl(var(--foreground) / 0.92);
-  }
 }
 
 /* ============================================

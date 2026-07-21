@@ -1,14 +1,21 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MessageCircle, Plus, X } from "lucide-react";
 import { AgentClient } from "@workbench/agent-client";
 import {
   AIChat,
   configureAiChatShared,
   ToastProviderWrapper,
+  deleteLocalChatSession,
+  deriveLocalChatTitle,
+  readLocalChatSessions,
+  writeLocalChatSession,
+  type ChatMessage,
+  type LocalChatSession,
 } from "@workbench/ai-chat-shared";
 import { Button } from "@/components/ui/button";
+import { ViewerAiHistoryDialog } from "./ViewerAiHistoryDialog";
 
 const agentClient = new AgentClient({
   baseUrl: process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "",
@@ -44,9 +51,45 @@ export function ViewerAiPanel({
   const [sessionId, setSessionId] = useState(() =>
     createViewerSessionId(projectId),
   );
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historySessions, setHistorySessions] = useState<LocalChatSession[]>([]);
+  const createdAtRef = useRef(Date.now());
   // 首次打开后再挂载 AIChat，避免未使用 AI 时建立 WebSocket 连接
   const hasOpenedRef = useRef(false);
   if (open) hasOpenedRef.current = true;
+
+  const refreshHistory = useCallback(() => {
+    setHistorySessions(readLocalChatSessions(projectId));
+  }, [projectId]);
+
+  useEffect(() => {
+    const sessions = readLocalChatSessions(projectId);
+    setHistorySessions(sessions);
+    const latest = sessions[0];
+    if (latest) {
+      setSessionId(latest.sessionId);
+      setMessages(latest.messages);
+      createdAtRef.current = latest.createdAt;
+    } else {
+      setSessionId(createViewerSessionId(projectId));
+      setMessages([]);
+      createdAtRef.current = Date.now();
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    if (messages.length === 0) return;
+    writeLocalChatSession({
+      sessionId,
+      projectId,
+      title: deriveLocalChatTitle(messages),
+      createdAt: createdAtRef.current,
+      updatedAt: Date.now(),
+      messages,
+    });
+    refreshHistory();
+  }, [messages, projectId, refreshHistory, sessionId]);
 
   const viewerContext = useMemo(
     () => ({ activePageId, activeConfig }),
@@ -56,9 +99,32 @@ export function ViewerAiPanel({
   const handleNewSession = useCallback(() => {
     const previousSessionId = sessionId;
     setSessionId(createViewerSessionId(projectId));
+    setMessages([]);
+    createdAtRef.current = Date.now();
+    setHistoryOpen(false);
     // 旧会话兜底销毁（WS 断开时服务端也会自动清理）
     void agentClient.destroySession(previousSessionId).catch(() => {});
   }, [projectId, sessionId]);
+
+  const handleSelectHistory = useCallback((session: LocalChatSession) => {
+    setSessionId(session.sessionId);
+    setMessages(session.messages);
+    createdAtRef.current = session.createdAt;
+    setHistoryOpen(false);
+  }, []);
+
+  const handleDeleteHistory = useCallback(
+    (targetSessionId: string) => {
+      deleteLocalChatSession(projectId, targetSessionId);
+      if (targetSessionId === sessionId) {
+        setSessionId(createViewerSessionId(projectId));
+        setMessages([]);
+        createdAtRef.current = Date.now();
+      }
+      refreshHistory();
+    },
+    [projectId, refreshHistory, sessionId],
+  );
 
   return (
     <aside
@@ -108,10 +174,25 @@ export function ViewerAiPanel({
               agentSessionId={sessionId}
               projectId={projectId}
               viewerContext={viewerContext}
+              externalMessages={messages}
+              onMessagesChange={setMessages}
+              onHistoryOpen={() => {
+                refreshHistory();
+                setHistoryOpen(true);
+              }}
             />
           </ToastProviderWrapper>
         )}
       </div>
+      <ViewerAiHistoryDialog
+        open={historyOpen}
+        sessions={historySessions}
+        currentSessionId={sessionId}
+        onOpenChange={setHistoryOpen}
+        onSelect={handleSelectHistory}
+        onDelete={handleDeleteHistory}
+        onNew={handleNewSession}
+      />
     </aside>
   );
 }

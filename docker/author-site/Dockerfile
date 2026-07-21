@@ -41,6 +41,7 @@ ENV CI=true
 
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY packages/agent-client/package.json ./packages/agent-client/
+COPY packages/ai-chat-shared/package.json ./packages/ai-chat-shared/
 COPY packages/demo-ui/package.json ./packages/demo-ui/
 COPY packages/knowledge-core/package.json ./packages/knowledge-core/
 COPY packages/knowledge-service/package.json ./packages/knowledge-service/
@@ -58,6 +59,7 @@ RUN --mount=type=cache,id=workbench-pnpm-store,target=/pnpm/store \
     && pnpm --filter @workbench/author-site rebuild --store-dir /pnpm/store better-sqlite3
 
 COPY packages/agent-client/ ./packages/agent-client/
+COPY packages/ai-chat-shared/ ./packages/ai-chat-shared/
 COPY packages/demo-ui/ ./packages/demo-ui/
 COPY packages/knowledge-core/ ./packages/knowledge-core/
 COPY packages/knowledge-service/ ./packages/knowledge-service/

@@ -7,11 +7,13 @@ import {
 } from "@workbench/agent-client";
 import {
   applyModelConfigsAsync,
+  applyViewerModelConfigs,
   buildFullModelId,
   resolveCurrentModel,
   type ResolvedModel,
   type ThinkingDepth,
 } from "../../lib/ai-models";
+import type { AgentMode } from "@workbench/agent-client";
 import { getConfiguredAgentClient } from "../../config";
 
 export interface ModelState {
@@ -39,6 +41,7 @@ interface UseChatModelsOptions {
   projectId?: string;
   onSessionChange?: () => void;
   persistenceKey?: string;
+  mode?: AgentMode;
 }
 
 interface PersistedModelPreference {
@@ -113,7 +116,13 @@ function writePersistedPreference(
 }
 
 export function useChatModels(options: UseChatModelsOptions) {
-  const { agentSessionId, workingDir, projectId, persistenceKey } = options;
+  const {
+    agentSessionId,
+    workingDir,
+    projectId,
+    persistenceKey,
+    mode = "workbench",
+  } = options;
 
   const [modelState, setModelState] = useState<ModelState>(INITIAL_MODEL_STATE);
   const modelStreamRef = useRef<AgentStream | null>(null);
@@ -134,11 +143,23 @@ export function useChatModels(options: UseChatModelsOptions) {
   }, [persistenceKey]);
 
   const sendSetModel = useCallback((fullModelId: string) => {
-    const ws = (modelStreamRef.current as any)?.ws;
-    if (ws?.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "set_model", modelId: fullModelId }));
-    }
+    modelStreamRef.current?.setModel(fullModelId);
   }, []);
+
+  const resolveModels = useCallback(
+    async (event: StreamEvent) => {
+      if (mode === "viewer-readonly") {
+        return {
+          models: applyViewerModelConfigs(event.models || []),
+          imageDescriptionEnabled: true,
+        };
+      }
+      return event.models
+        ? applyModelConfigsAsync(event.models)
+        : { models: [], imageDescriptionEnabled: false };
+    },
+    [mode],
+  );
 
   const applyPreferredModelToSession = useCallback(
     (models: ResolvedModel[], eventCurrentModelId: string) => {
@@ -217,9 +238,7 @@ export function useChatModels(options: UseChatModelsOptions) {
       unrefTimer(modelKeepaliveTimerRef.current);
 
       stream.on("models", async (event: StreamEvent) => {
-        const result = event.models
-          ? await applyModelConfigsAsync(event.models)
-          : { models: [], imageDescriptionEnabled: false };
+        const result = await resolveModels(event);
         const models = result.models;
         const resolved = resolveCurrentModel(
           event.currentModelId || "",
@@ -290,7 +309,14 @@ export function useChatModels(options: UseChatModelsOptions) {
         modelStreamRef.current = null;
       }
     };
-  }, [agentSessionId, workingDir, applyPreferredModelToSession]);
+  }, [
+    agentSessionId,
+    workingDir,
+    projectId,
+    mode,
+    applyPreferredModelToSession,
+    resolveModels,
+  ]);
 
   const handleModelChange = useCallback(
     (baseModelId: string) => {
@@ -362,9 +388,7 @@ export function useChatModels(options: UseChatModelsOptions) {
   );
 
   const handleModelsEvent = useCallback(async (event: StreamEvent) => {
-    const result = event.models
-      ? await applyModelConfigsAsync(event.models)
-      : { models: [], imageDescriptionEnabled: false };
+    const result = await resolveModels(event);
     const models = result.models;
     const resolved = resolveCurrentModel(event.currentModelId || "", models);
     const preferred = applyPreferredModelToSession(
@@ -384,7 +408,7 @@ export function useChatModels(options: UseChatModelsOptions) {
       isLoading: preferred?.isApplying ?? false,
       imageDescriptionEnabled: result.imageDescriptionEnabled,
     }));
-  }, [applyPreferredModelToSession]);
+  }, [applyPreferredModelToSession, resolveModels]);
 
   const handleModelError = useCallback(() => {
     setModelState((prev) => ({ ...prev, isLoading: false }));

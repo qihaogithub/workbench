@@ -310,6 +310,21 @@ export function applyModelConfigs(
 }
 
 /**
+ * 浏览端直接展示 agent-service 已按当前会话返回的可用模型。
+ * 该列表已经过服务端供应商配置约束，不应再依赖 viewer-site 不存在的
+ * author-site `/api/models/config` 接口做第二次过滤。
+ */
+export function applyViewerModelConfigs(
+  raw: Array<{ id: string; label: string }>,
+): ResolvedModel[] {
+  return applyModelConfigsWithFullData(raw, {
+    configs: [{ matcher: /.*/ }],
+    blacklist: new Set<string>(),
+    nameFilters: [],
+  });
+}
+
+/**
  * 异步版本: 通过 API 从数据库读取完整配置并应用
  *
  * 包含白名单前缀、黑名单、名称过滤器、启用列表等全部配置

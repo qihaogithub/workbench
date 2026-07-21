@@ -146,6 +146,8 @@ interface AIChatProps {
   beforeSend?: () => Promise<void> | void;
   /** 外部 StreamService 引用，用于控制台数据转发等场景 */
   externalStreamServiceRef?: React.MutableRefObject<StreamService | null>;
+  /** 由宿主接管历史入口；viewer-site 使用项目级本地历史。 */
+  onHistoryOpen?: () => void;
 }
 
 export function AIChat({
@@ -179,6 +181,7 @@ export function AIChat({
   onDiagnosticEvent,
   beforeSend,
   externalStreamServiceRef,
+  onHistoryOpen,
 }: AIChatProps) {
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -224,6 +227,7 @@ export function AIChat({
     workingDir,
     projectId,
     persistenceKey: modelPersistenceKey,
+    mode,
   });
 
   const selectedModelId = useMemo(
@@ -371,8 +375,12 @@ export function AIChat({
       toast({ title: "AI 输出中，无法切换对话" });
       return;
     }
+    if (onHistoryOpen) {
+      onHistoryOpen();
+      return;
+    }
     setHistoryDialogOpen(true);
-  }, [isStreaming, toast]);
+  }, [isStreaming, onHistoryOpen, toast]);
 
   useEffect(() => {
     if (triggerAutoSend && !isStreaming) {
@@ -520,9 +528,9 @@ export function AIChat({
         models={modelState.models}
         canSwitch={modelState.canSwitch}
         isModelLoading={modelState.isLoading}
-        supportsImages={currentSupportsImages}
-        supportsFiles={mode !== "viewer-readonly"}
-        supportsHistory={mode !== "viewer-readonly"}
+        supportsImages={mode === "viewer-readonly" || currentSupportsImages}
+        supportsFiles
+        supportsHistory={mode !== "viewer-readonly" || Boolean(onHistoryOpen)}
       />
 
       {mode !== "viewer-readonly" && (

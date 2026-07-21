@@ -7,10 +7,12 @@ import { registerModelsRoutes } from "./models";
 import { registerInternalConfigRoutes } from "./internal-config";
 import { registerCollabRoutes } from "./collab";
 import { registerWorkspaceAuthorityRoutes } from "./workspace-authority";
+import { registerAttachmentRoutes } from "./attachments";
 
 export async function registerRoutes(fastify: FastifyInstance) {
   await registerAgentRoutes(fastify);
   await registerWebSocketRoutes(fastify);
+  await registerAttachmentRoutes(fastify);
   await registerCollabRoutes(fastify);
   await registerWorkspaceAuthorityRoutes(fastify);
   await registerProjectRoutes(fastify);
