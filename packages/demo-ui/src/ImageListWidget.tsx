@@ -132,11 +132,6 @@ export function ImageListWidget({
 
   const doUpload = useCallback(
     async (file: File, skipDimensionCheck = false) => {
-      if (!sessionId) {
-        setUploadError('请先创建 Session');
-        return;
-      }
-
       if (file.size > maxSize) {
         setUploadError(`文件大小超过 ${maxSize / 1024 / 1024}MB 限制`);
         return;
@@ -160,23 +155,34 @@ export function ImageListWidget({
       setUploadError('');
 
       try {
-        const formData = new FormData();
-        formData.append('file', file);
+        let url: string;
+        if (sessionId) {
+          const formData = new FormData();
+          formData.append('file', file);
 
-        const res = await fetch(`/api/sessions/${sessionId}/assets/upload`, {
-          method: 'POST',
-          body: formData,
-        });
+          const res = await fetch(`/api/sessions/${sessionId}/assets/upload`, {
+            method: 'POST',
+            body: formData,
+          });
 
-        const data = await res.json();
+          const data = await res.json();
 
-        if (!data.success) {
-          setUploadError(data.error?.message || '上传失败');
-          return;
+          if (!data.success) {
+            setUploadError(data.error?.message || '上传失败');
+            return;
+          }
+          url = data.data.url;
+        } else {
+          url = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => reject(new Error('读取文件失败'));
+            reader.readAsDataURL(file);
+          });
         }
 
         const newItem: ImageItem = {
-          url: data.data.url,
+          url,
           alt: file.name,
         };
 

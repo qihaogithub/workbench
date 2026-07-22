@@ -1,4 +1,4 @@
-import {jsx as _jsx, jsxs as _jsxs} from 'https://esm.sh/react@18.3.1/jsx-runtime';
+import {jsx as _jsx, jsxs as _jsxs} from "/data/proj_1779608460378/preview-runtime/vendor/react-jsx-runtime.js";
 
 const subjects = [
   { key: 'yuedu', label: '阅读', icon: 'https://r2-asset-worker.qihaogo.workers.dev/figma/h_a9956e79.png', bgClass: 'bg-[#fff2ea]', shadow: 'shadow-[inset_0px_-2px_4px_0px_rgba(255,237,224,1.00)]', textColor: 'text-[#6b2d03]' },

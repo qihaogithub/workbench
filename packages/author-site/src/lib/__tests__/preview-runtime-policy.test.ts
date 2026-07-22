@@ -124,14 +124,14 @@ describe("AI 页面预览运行时策略", () => {
     expect(() => new Function(visualEditScript)).not.toThrow();
   });
 
-  it("iframe 中 Tailwind CDN 脚本不阻塞页面 body 解析", () => {
+  it("iframe 默认从本地预览运行时加载 Tailwind，避免刷新受外部 CDN 波动影响", () => {
     const html = generateIframeHtml();
 
     expect(html).toContain(
-      '<script async src="https://cdn.jsdelivr.net/npm/tailwindcss-cdn@3.4.10/tailwindcss.min.js"></script>',
+      '<script async src="/preview-runtime/vendor/tailwindcss.js"></script>',
     );
     expect(html).not.toContain(
-      '<script src="https://cdn.jsdelivr.net/npm/tailwindcss-cdn@3.4.10/tailwindcss.min.js"></script>',
+      "cdn.jsdelivr.net/npm/tailwindcss-cdn",
     );
   });
 
@@ -193,6 +193,9 @@ describe("AI 页面预览运行时策略", () => {
     expect(html).toContain(
       '"svgaplayerweb": "/data/proj-runtime/preview-runtime/vendor/svgaplayerweb.js"',
     );
+    expect(html).toContain(
+      '<script async src="/data/proj-runtime/preview-runtime/vendor/tailwindcss.js"></script>',
+    );
     expect(html).not.toContain("/preview-runtime/preview-runtime/");
   });
 
@@ -204,6 +207,9 @@ describe("AI 页面预览运行时策略", () => {
       '"svgaplayerweb": "/preview-runtime/vendor/svgaplayerweb.js"',
     );
     expect(cdnHtml).toContain('"svgaplayerweb": "https://esm.sh/svgaplayerweb@2.3.1"');
+    expect(cdnHtml).toContain(
+      '<script async src="https://cdn.jsdelivr.net/npm/tailwindcss-cdn@3.4.10/tailwindcss.min.js"></script>',
+    );
   });
 
   it("拒绝未登记 npm 依赖", () => {
