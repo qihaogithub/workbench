@@ -2,7 +2,7 @@
   "id": "proj_1783334663364_30hsrv",
   "name": "测试",
   "category": "测试",
-  "workspacePath": "/app/data/projects/proj_1783334663364_30hsrv/workspace",
+  "workspacePath": "/Users/henryhuang/sift-project/祁昊/OneFlow/data/projects/proj_1783334663364_30hsrv/workspace",
   "demoPages": [
     {
       "id": "product-showcase_a3f2",
@@ -20,13 +20,18 @@
     }
   ],
   "demoFolders": [],
-  "versions": [],
+  "versions": [
+    {
+      "versionId": "v1",
+      "type": "named_version",
+      "savedAt": 1784727551780,
+      "savedBy": "henryhuang",
+      "sessionId": "edit_1784727486959_ms5e2k",
+      "snapshotPath": "/Users/henryhuang/sift-project/祁昊/OneFlow/data/snapshots/proj_1783334663364_30hsrv/v1",
+      "fileCount": 11
+    }
+  ],
   "createdAt": 1783334663371,
-  "updatedAt": 1784466229050,
-  "activeWorkspaceId": "live-1784459697404-ldu29ss1h",
-  "activeWorkspaceUpdatedAt": 1784459697410,
-  "canonicalSyncedWorkspaceId": "live-1784459697404-ldu29ss1h",
-  "canonicalSyncedRevision": 10,
-  "canonicalSyncedRootHash": "c73547836d162ed45a735c206fb306918e768219e6214c5be0c8ae48a7ed2de7",
-  "canonicalSyncedAt": 1784466229050
+  "updatedAt": 1784727551805,
+  "canonicalSyncedAt": 1784727551805
 }

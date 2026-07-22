@@ -956,6 +956,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {project && activePage && (
           <ViewerAiPanel
+            key={projectId}
             open={aiDrawerOpen}
             projectId={projectId}
             projectName={project.name}

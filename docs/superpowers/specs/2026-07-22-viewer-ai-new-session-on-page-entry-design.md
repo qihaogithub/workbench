@@ -14,7 +14,7 @@
 
 ## 实现设计
 
-`ViewerAiPanel` 的 `projectId` effect 仍读取项目历史列表，用于填充历史弹窗；但不再把最近一条历史写入当前 `sessionId` 和 `messages`。effect 每次因 `projectId` 变化运行时，均生成新的 viewer 会话 ID、清空消息并重置创建时间。
+`ViewerAiPanel` 的 `projectId` effect 仍读取项目历史列表，用于填充历史弹窗；但不再把最近一条历史写入当前 `sessionId` 和 `messages`。面板由父组件使用 `projectId` 作为 React key，进入或切换项目时通过重新挂载生成新的 viewer 会话 ID、空消息和创建时间。
 
 `ViewerApp` 继续常驻挂载 `ViewerAiPanel`，`open` 仅控制侧栏显示。因此同页收起再打开不会触发初始化 effect，也不会丢失当前 React state。
 

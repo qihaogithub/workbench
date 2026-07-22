@@ -34,7 +34,7 @@
     "check:project-cli": "corepack pnpm --filter @workbench/preview-contract typecheck && corepack pnpm --filter @workbench/preview-contract test && corepack pnpm --filter @workbench/project-cli typecheck && corepack pnpm --filter @workbench/project-cli test",
     "check:knowledge-core": "corepack pnpm --filter @workbench/knowledge-core typecheck && corepack pnpm --filter @workbench/knowledge-core test",
     "check:knowledge-service": "corepack pnpm --filter @workbench/knowledge-service typecheck && corepack pnpm --filter @workbench/knowledge-service test",
-    "check:viewer": "corepack pnpm --filter @workbench/viewer-site typecheck && node scripts/check-viewer-contracts.mjs",
+    "check:viewer": "corepack pnpm --filter @workbench/viewer-site typecheck && corepack pnpm --filter @workbench/viewer-site test && node scripts/check-viewer-contracts.mjs",
     "check:demo-ui": "corepack pnpm --filter @workbench/demo-ui typecheck",
     "check:agent-client": "corepack pnpm --filter @workbench/agent-client typecheck",
     "check:ai-chat-shared": "corepack pnpm --filter @workbench/ai-chat-shared typecheck",
@@ -90,6 +90,7 @@
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "svgaplayerweb": "2.3.1",
+    "tailwindcss-cdn": "3.4.10",
     "typescript": "^5.3.3"
   },
   "pnpm": {
