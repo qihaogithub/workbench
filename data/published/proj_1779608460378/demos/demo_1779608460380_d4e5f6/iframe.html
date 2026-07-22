@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+
   <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="dns-prefetch" href="https://esm.sh">
   <style>
@@ -15,20 +15,25 @@
   <script type="importmap">
   {
     "imports": {
-      "react": "https://esm.sh/react@18.3.1",
-      "react-dom": "https://esm.sh/react-dom@18.3.1/client",
-      "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
-      "react/jsx-dev-runtime": "https://esm.sh/react@18.3.1/jsx-dev-runtime"
-    }
+      "react": "/data/proj_1779608460378/preview-runtime/vendor/react.js",
+      "react-dom": "/data/proj_1779608460378/preview-runtime/vendor/react-dom.js",
+      "react-dom/client": "/data/proj_1779608460378/preview-runtime/vendor/react-dom-client.js",
+      "react/jsx-runtime": "/data/proj_1779608460378/preview-runtime/vendor/react-jsx-runtime.js",
+      "react/jsx-dev-runtime": "/data/proj_1779608460378/preview-runtime/vendor/react-jsx-dev-runtime.js",
+      "lucide-react": "/data/proj_1779608460378/preview-runtime/vendor/lucide-react.js",
+      "framer-motion": "/data/proj_1779608460378/preview-runtime/vendor/framer-motion.js",
+      "svgaplayerweb": "/data/proj_1779608460378/preview-runtime/vendor/svgaplayerweb.js",
+      "@preview/sdk": "/data/proj_1779608460378/preview-runtime/vendor/preview-sdk.js"
+}
   }
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/tailwindcss-cdn@3.4.10/tailwindcss.min.js"></script>
+  <script async src="/data/proj_1779608460378/preview-runtime/vendor/tailwindcss.js"></script>
 </head>
 <body>
   <div id="root"></div>
 
   <script type="module">
-    
+
 (function() {
   const _orig = {
     log: console.log.bind(console),
@@ -59,9 +64,9 @@
   });
 })();
 
-    
+
 (function() {
-  var state = { enabled: false, selectedNodeId: null, annotations: [] };
+  var state = { enabled: false, hoverNodeId: null, selectedNodeId: null, hiddenNodeIds: [], annotations: [], propertyChanges: [] };
   var hoverBox = null;
   var selectedBox = null;
   var label = null;
@@ -80,7 +85,12 @@
   var textDraftValue = null;
   var suppressStyleRestoreOnHide = false;
   var editingAnnotationId = null;
+  var hiddenNodeOriginalDisplays = {};
   var lastHoverId = null;
+  var appliedPropertyOriginals = {};
+  var selectionCycleSignature = '';
+  var selectionCycleIndex = -1;
+  var visualOverlayRedrawFrame = null;
 
   function ensureLayer() {
     if (!hoverBox) {
@@ -178,6 +188,14 @@
     return true;
   }
 
+  function normalizeEditableTarget(el) {
+    if (!el || el.nodeType !== 1) return null;
+    if (el.ownerSVGElement) {
+      return el.closest && el.closest('svg') ? el.closest('svg') : el.ownerSVGElement;
+    }
+    return el;
+  }
+
   function getDomPath(el) {
     var parts = [];
     var node = el;
@@ -210,14 +228,18 @@
   function getNodeInfo(el) {
     var rect = el.getBoundingClientRect();
     var domPath = getDomPath(el);
-    var text = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+    var ownText = getOwnText(el);
+    var aggregateText = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+    var text = el.children.length === 0 ? aggregateText : ownText;
     if (text.length > 180) text = text.slice(0, 177) + '...';
     var className = '';
     if (el instanceof HTMLElement && el.className) {
       className = typeof el.className === 'string' ? el.className : String(el.className);
     }
-    var caps = ['annotate'];
+    var caps = ['annotate', 'style'];
     if (text && el.children.length === 0) caps.push('text');
+    if (el instanceof HTMLImageElement || el.getAttribute('src')) caps.push('image');
+    if (el instanceof HTMLAnchorElement || el.getAttribute('href')) caps.push('link');
     if (className) caps.push('className');
     caps.push('structure');
     var style = window.getComputedStyle ? window.getComputedStyle(el) : null;
@@ -241,7 +263,43 @@
       computedStyle: style ? {
         color: style.color || undefined,
         backgroundColor: style.backgroundColor || undefined,
-        borderColor: style.borderColor || undefined
+        backgroundImage: style.backgroundImage || undefined,
+        borderColor: style.borderColor || undefined,
+        borderWidth: style.borderWidth || undefined,
+        borderStyle: style.borderStyle || undefined,
+        borderRadius: style.borderRadius || undefined,
+        borderTopLeftRadius: style.borderTopLeftRadius || undefined,
+        borderTopRightRadius: style.borderTopRightRadius || undefined,
+        borderBottomRightRadius: style.borderBottomRightRadius || undefined,
+        borderBottomLeftRadius: style.borderBottomLeftRadius || undefined,
+        boxShadow: style.boxShadow || undefined,
+        boxSizing: style.boxSizing || undefined,
+        filter: style.filter || undefined,
+        overflow: style.overflow || undefined,
+        opacity: style.opacity || undefined,
+        fontFamily: style.fontFamily || undefined,
+        fontSize: style.fontSize || undefined,
+        fontWeight: style.fontWeight || undefined,
+        lineHeight: style.lineHeight || undefined,
+        letterSpacing: style.letterSpacing || undefined,
+        textAlign: style.textAlign || undefined,
+        width: style.width || undefined,
+        height: style.height || undefined,
+        padding: style.padding || undefined,
+        paddingTop: style.paddingTop || undefined,
+        paddingRight: style.paddingRight || undefined,
+        paddingBottom: style.paddingBottom || undefined,
+        paddingLeft: style.paddingLeft || undefined,
+        margin: style.margin || undefined,
+        marginTop: style.marginTop || undefined,
+        marginRight: style.marginRight || undefined,
+        marginBottom: style.marginBottom || undefined,
+        marginLeft: style.marginLeft || undefined,
+        display: style.display || undefined,
+        flexDirection: style.flexDirection || undefined,
+        justifyContent: style.justifyContent || undefined,
+        alignItems: style.alignItems || undefined,
+        gap: style.gap || undefined
       } : undefined,
       sourceFile: el.getAttribute('data-source-file') || undefined,
       sourceStart: Number(el.getAttribute('data-source-start')) || undefined,
@@ -284,6 +342,106 @@
     return el;
   }
 
+  function getElementForChange(change) {
+    if (!change) return null;
+    return getElementForNode({
+      domPath: change.domPath,
+      nodeId: change.nodeId
+    });
+  }
+
+  function getChangeKey(change) {
+    return [change.domPath || change.nodeId || '', change.kind || 'style', change.property || ''].join('::');
+  }
+
+  function restoreAppliedPropertyChanges() {
+    Object.keys(appliedPropertyOriginals).forEach(function(key) {
+      var original = appliedPropertyOriginals[key];
+      if (!original || !original.element) return;
+      if (original.kind === 'text') {
+        original.element.textContent = original.value || '';
+      } else if (original.kind === 'attribute') {
+        if (original.value == null) original.element.removeAttribute(original.property);
+        else original.element.setAttribute(original.property, original.value);
+      } else {
+        original.element.style[original.property] = original.value || '';
+      }
+    });
+    appliedPropertyOriginals = {};
+  }
+
+  function restoreHiddenNodes() {
+    Object.keys(hiddenNodeOriginalDisplays).forEach(function(key) {
+      var original = hiddenNodeOriginalDisplays[key];
+      if (!original || !original.element) return;
+      original.element.style.display = original.display || '';
+      original.element.removeAttribute('data-visual-hidden');
+    });
+    hiddenNodeOriginalDisplays = {};
+  }
+
+  function applyHiddenNodes() {
+    restoreHiddenNodes();
+    (state.hiddenNodeIds || []).forEach(function(nodeId) {
+      if (!nodeId) return;
+      var el = getElementByPath(nodeId);
+      if (!el) {
+        try {
+          el = document.querySelector('[data-visual-node-id="' + String(nodeId).replace(/"/g, '\\"') + '"]');
+        } catch (_err) {
+          el = null;
+        }
+      }
+      if (!el) return;
+      hiddenNodeOriginalDisplays[nodeId] = {
+        element: el,
+        display: el.style.display || ''
+      };
+      el.setAttribute('data-visual-hidden', 'true');
+      el.style.setProperty('display', 'none', 'important');
+    });
+  }
+
+  function applyPropertyChanges() {
+    restoreAppliedPropertyChanges();
+    (state.propertyChanges || []).forEach(function(change) {
+      var el = getElementForChange(change);
+      if (!el || !change || typeof change.property !== 'string') return;
+      var key = getChangeKey(change);
+      if (change.kind === 'text') {
+        appliedPropertyOriginals[key] = {
+          kind: 'text',
+          element: el,
+          property: change.property,
+          value: el.textContent || ''
+        };
+        el.textContent = change.value || '';
+        return;
+      }
+      if (change.kind === 'attribute') {
+        var attrName = change.property;
+        appliedPropertyOriginals[key] = {
+          kind: 'attribute',
+          element: el,
+          property: attrName,
+          value: el.getAttribute(attrName)
+        };
+        if (change.value == null || change.value === '') el.removeAttribute(attrName);
+        else el.setAttribute(attrName, change.value);
+        return;
+      }
+      appliedPropertyOriginals[key] = {
+        kind: 'style',
+        element: el,
+        property: change.property,
+        value: el.style[change.property] || ''
+      };
+      el.style[change.property] = normalizeStyleValue(change.property, change.value);
+    });
+    redrawSelection();
+    redrawHoverFromState();
+  }
+
   function getOwnText(el) {
     if (!el) return '';
     var text = '';
@@ -318,6 +476,7 @@
       property === 'fontSize' ||
       property === 'fontWeight' ||
       property === 'lineHeight' ||
+      property === 'letterSpacing' ||
       property === 'textAlign';
   }
 
@@ -333,11 +492,30 @@
     if ((property === 'fontSize' ||
       property === 'width' ||
       property === 'height' ||
+      property === 'paddingTop' ||
+      property === 'paddingRight' ||
+      property === 'paddingBottom' ||
+      property === 'paddingLeft' ||
       property === 'padding' ||
+      property === 'marginTop' ||
+      property === 'marginRight' ||
+      property === 'marginBottom' ||
+      property === 'marginLeft' ||
       property === 'margin' ||
       property === 'gap' ||
+      property === 'borderWidth' ||
       property === 'borderRadius' ||
+      property === 'borderTopLeftRadius' ||
+      property === 'borderTopRightRadius' ||
+      property === 'borderBottomRightRadius' ||
+      property === 'borderBottomLeftRadius' ||
+      property === 'letterSpacing' ||
       property === 'lineHeight') && /^\d+(\.\d+)?$/.test(trimmed)) return trimmed + 'px';
+    if (property === 'opacity' && /^\d+(\.\d+)?%?$/.test(trimmed)) {
+      var numeric = Number(trimmed.replace('%', ''));
+      if (numeric > 1) return String(Math.max(0, Math.min(100, numeric)) / 100);
+      return String(Math.max(0, Math.min(1, numeric)));
+    }
     return trimmed;
   }
 
@@ -677,7 +855,6 @@
     if (hoverBox) hoverBox.style.display = 'none';
     if (label) label.style.display = 'none';
     lastHoverId = null;
-    window.parent.postMessage({ type: 'VISUAL_HOVER', node: null }, '*');
   }
 
   function hideCommentBubble() {
@@ -780,6 +957,45 @@
     drawBox(selectedBox, getNodeInfo(selected));
   }
 
+  function redrawHoverFromState() {
+    ensureLayer();
+    var hoverNodeId = state.hoverNodeId || lastHoverId;
+    if (!hoverNodeId) {
+      if (hoverBox) hoverBox.style.display = 'none';
+      if (label) label.style.display = 'none';
+      return;
+    }
+    var hovered = getElementByPath(hoverNodeId);
+    if (!hovered) {
+      try {
+        hovered = document.querySelector('[data-visual-node-id="' + hoverNodeId.replace(/"/g, '\\"') + '"]');
+      } catch (_err) {
+        hovered = null;
+      }
+    }
+    if (!hovered || !isEditableElement(hovered)) {
+      if (hoverBox) hoverBox.style.display = 'none';
+      if (label) label.style.display = 'none';
+      return;
+    }
+    var node = getNodeInfo(hovered);
+    drawBox(hoverBox, node);
+    drawLabel(node);
+  }
+
+  function scheduleVisualOverlayRedraw() {
+    if (!state.enabled || visualOverlayRedrawFrame != null) return;
+    visualOverlayRedrawFrame = requestAnimationFrame(function() {
+      visualOverlayRedrawFrame = null;
+      redrawSelection();
+      redrawHoverFromState();
+      renderAnnotations();
+      if (commentBubble && commentBubble.style.display !== 'none' && commentNode) {
+        positionCommentBubble(commentNode, false);
+      }
+    });
+  }
+
   function renderAnnotations() {
     ensureLayer();
     if (!annotationLayer) return;
@@ -812,7 +1028,10 @@
     state = {
       enabled: !!next.enabled,
       annotationMode: !!next.annotationMode,
+      hoverNodeId: next.hoverNodeId || null,
       selectedNodeId: next.selectedNodeId || null,
+      hiddenNodeIds: Array.isArray(next.hiddenNodeIds) ? next.hiddenNodeIds : [],
+      propertyChanges: Array.isArray(next.propertyChanges) ? next.propertyChanges : [],
       annotations: Array.isArray(next.annotations) ? next.annotations : []
     };
     ensureLayer();
@@ -821,17 +1040,140 @@
       hideCommentBubble();
       if (selectedBox) selectedBox.style.display = 'none';
     }
+    applyPropertyChanges();
+    applyHiddenNodes();
     redrawSelection();
+    redrawHoverFromState();
     renderAnnotations();
   }
 
   function closestEditable(target) {
-    var el = target && target.nodeType === 1 ? target : target && target.parentElement;
+    var raw = target && target.nodeType === 1 ? target : target && target.parentElement;
+    var el = normalizeEditableTarget(raw);
     while (el && el !== document.body) {
       if (isEditableElement(el)) return el;
       el = el.parentElement;
     }
     return null;
+  }
+
+  function collectElementStack(clientX, clientY, fallbackEl) {
+    var elements = [];
+    if (document.elementsFromPoint) {
+      elements = document.elementsFromPoint(clientX, clientY);
+    }
+    if ((!elements || elements.length === 0) && fallbackEl) {
+      var node = fallbackEl;
+      while (node && node !== document.body) {
+        elements.push(node);
+        node = node.parentElement;
+      }
+    }
+    var seen = {};
+    var editable = [];
+    (elements || []).forEach(function(item) {
+      var normalized = normalizeEditableTarget(item);
+      if (!normalized || !isEditableElement(normalized)) return;
+      var path = getDomPath(normalized);
+      if (!path || seen[path]) return;
+      seen[path] = true;
+      editable.push(getNodeInfo(normalized));
+    });
+    return editable.reverse();
+  }
+
+  function chooseNodeFromStack(stack, event) {
+    if (!stack || stack.length === 0) return null;
+    var signature = stack.map(function(item) { return item.domPath; }).join('|');
+    var shouldCycle = !!(event && (event.metaKey || event.ctrlKey));
+    if (shouldCycle && selectionCycleSignature === signature) {
+      selectionCycleIndex = (selectionCycleIndex - 1 + stack.length) % stack.length;
+    } else {
+      selectionCycleSignature = signature;
+      selectionCycleIndex = stack.length - 1;
+    }
+    if (!shouldCycle) selectionCycleSignature = '';
+    return stack[selectionCycleIndex] || stack[stack.length - 1];
+  }
+
+  function moveSelectedNodeToStackEnd(stack, selected) {
+    if (!selected) return stack || [];
+    return (stack || []).filter(function(item) {
+      return item.domPath !== selected.domPath;
+    }).concat([selected]);
+  }
+
+  function collectAncestorNodeStack(element) {
+    var stack = [];
+    var current = element;
+    while (current && current !== document.body) {
+      if (isEditableElement(current)) stack.unshift(getNodeInfo(current));
+      current = current.parentElement;
+    }
+    return stack;
+  }
+
+  function reportKeyboardSelection(element) {
+    if (!element || !isEditableElement(element)) return false;
+    var node = getNodeInfo(element);
+    var stack = collectAncestorNodeStack(element);
+    state.selectedNodeId = node.domPath;
+    drawBox(selectedBox, node);
+    window.parent.postMessage({ type: 'VISUAL_SELECT', node: node, nodeStack: stack }, '*');
+    return true;
+  }
+
+  function buildVisualNodeTree(rootEl, options) {
+    var maxNodes = options && options.maxNodes ? options.maxNodes : 220;
+    var count = 0;
+
+    function walk(el) {
+      if (!el || !isEditableElement(el) || count >= maxNodes) return null;
+      count += 1;
+      var info = getNodeInfo(el);
+      var children = [];
+      var child = el.firstElementChild;
+      while (child && count < maxNodes) {
+        var childTree = walk(child);
+        if (childTree) children.push(childTree);
+        child = child.nextElementSibling;
+      }
+      info.children = children;
+      return info;
+    }
+
+    return walk(rootEl);
+  }
+
+  function collectVisualNodeTree(rootEl, options) {
+    var roots = [];
+    var maxNodes = options && options.maxNodes ? options.maxNodes : 260;
+    var count = 0;
+
+    function walk(el) {
+      if (!el || count >= maxNodes) return null;
+      if (!isEditableElement(el)) return null;
+      count += 1;
+      var info = getNodeInfo(el);
+      var children = [];
+      var child = el.firstElementChild;
+      while (child && count < maxNodes) {
+        var childTree = walk(child);
+        if (childTree) children.push(childTree);
+        child = child.nextElementSibling;
+      }
+      info.children = children;
+      return info;
+    }
+
+    var root = rootEl || document.body;
+    var child = root.firstElementChild;
+    while (child && count < maxNodes) {
+      var tree = walk(child);
+      if (tree) roots.push(tree);
+      child = child.nextElementSibling;
+    }
+    return roots;
   }
 
   function resolveAnnotationTarget(el) {
@@ -845,7 +1187,7 @@
     return el;
   }
 
-  document.addEventListener('mousemove', function(event) {
+  document.addEventListener('pointerover', function(event) {
     if (!state.enabled) return;
     var el = closestEditable(event.target);
     if (state.annotationMode) el = resolveAnnotationTarget(el);
@@ -853,12 +1195,45 @@
       clearHover();
       return;
     }
+    var hoverId = el.getAttribute('data-visual-node-id') || getDomPath(el);
+    if (hoverId === lastHoverId) return;
+    lastHoverId = hoverId;
     var node = getNodeInfo(el);
-    if (node.nodeId === lastHoverId) return;
-    lastHoverId = node.nodeId;
     drawBox(hoverBox, node);
     drawLabel(node);
-    window.parent.postMessage({ type: 'VISUAL_HOVER', node: node }, '*');
+  }, true);
+
+  document.addEventListener('pointerout', function(event) {
+    if (!state.enabled) return;
+    if (event.relatedTarget && document.documentElement.contains(event.relatedTarget)) return;
+    clearHover();
+  }, true);
+
+  document.addEventListener('keydown', function(event) {
+    if (!state.enabled || state.annotationMode) return;
+    var eventTarget = event.target;
+    if (eventTarget && eventTarget.closest && eventTarget.closest('input,textarea,select,[contenteditable="true"]')) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      state.selectedNodeId = null;
+      if (selectedBox) selectedBox.style.display = 'none';
+      window.parent.postMessage({ type: 'VISUAL_SELECT', node: null, nodeStack: [] }, '*');
+      return;
+    }
+    if (!state.selectedNodeId) return;
+    var selected = getElementByPath(state.selectedNodeId);
+    if (!selected) return;
+    var next = null;
+    if (event.key === 'Enter') {
+      next = event.shiftKey ? selected.parentElement : selected.firstElementChild;
+    } else if (event.key === 'Tab') {
+      next = event.shiftKey ? selected.previousElementSibling : selected.nextElementSibling;
+    } else {
+      return;
+    }
+    next = normalizeEditableTarget(next);
+    if (!next || !reportKeyboardSelection(next)) return;
+    event.preventDefault();
   }, true);
 
   document.addEventListener('click', function(event) {
@@ -874,18 +1249,51 @@
     event.preventDefault();
     event.stopPropagation();
     if (!el) {
-      window.parent.postMessage({ type: 'VISUAL_SELECT', node: null }, '*');
+      window.parent.postMessage({ type: 'VISUAL_SELECT', node: null, nodeStack: [] }, '*');
       return;
     }
-    var node = getNodeInfo(el);
+    var stack = collectElementStack(event.clientX, event.clientY, el);
+    var node = chooseNodeFromStack(stack, event) || getNodeInfo(el);
+    stack = moveSelectedNodeToStackEnd(stack, node);
     state.selectedNodeId = node.domPath;
     drawBox(selectedBox, node);
     if (state.annotationMode) {
       showCommentBubble(node);
-      window.parent.postMessage({ type: 'VISUAL_SELECT', node: node }, '*');
+      window.parent.postMessage({ type: 'VISUAL_SELECT', node: node, nodeStack: stack }, '*');
       return;
     }
-    window.parent.postMessage({ type: 'VISUAL_SELECT', node: node }, '*');
+    window.parent.postMessage({ type: 'VISUAL_SELECT', node: node, nodeStack: stack }, '*');
+  }, true);
+
+  document.addEventListener('contextmenu', function(event) {
+    if (!state.enabled || state.annotationMode) return;
+    if (isOverlay(event.target)) return;
+    var el = closestEditable(event.target);
+    event.preventDefault();
+    event.stopPropagation();
+    if (!el) {
+      window.parent.postMessage({
+        type: 'VISUAL_SELECT',
+        node: null,
+        nodeStack: [],
+        openLayerPicker: true,
+        contextMenuPoint: { x: event.clientX, y: event.clientY }
+      }, '*');
+      return;
+    }
+    var stack = collectElementStack(event.clientX, event.clientY, el);
+    var node = stack.length > 0 ? stack[stack.length - 1] : getNodeInfo(el);
+    stack = moveSelectedNodeToStackEnd(stack, node);
+    state.selectedNodeId = node.domPath;
+    drawBox(selectedBox, node);
+    window.parent.postMessage({
+      type: 'VISUAL_SELECT',
+      node: node,
+      nodeStack: stack,
+      nodeTree: buildVisualNodeTree(el, { maxNodes: 160 }),
+      openLayerPicker: true,
+      contextMenuPoint: { x: event.clientX, y: event.clientY }
+    }, '*');
   }, true);
 
   window.addEventListener('blur', function() {
@@ -896,6 +1304,13 @@
       dismissCommentBubble({ deleteEmptyAnnotation: true });
     }, 0);
   });
+
+  document.addEventListener('scroll', scheduleVisualOverlayRedraw, true);
+  window.addEventListener('resize', scheduleVisualOverlayRedraw);
+  if (typeof ResizeObserver !== 'undefined') {
+    var visualResizeObserver = new ResizeObserver(scheduleVisualOverlayRedraw);
+    visualResizeObserver.observe(document.body);
+  }
 
   document.addEventListener('dblclick', function(event) {
     if (!state.enabled) return;
@@ -912,20 +1327,43 @@
     window.parent.postMessage({ type: 'VISUAL_INLINE_EDIT', payload: { node: getNodeInfo(el), before: before, after: after } }, '*');
   }, true);
 
-  window.__VISUAL_EDIT__ = { setState: setState, redrawSelection: redrawSelection, renderAnnotations: renderAnnotations };
+  window.__VISUAL_EDIT__ = {
+    setState: setState,
+    redrawSelection: redrawSelection,
+    renderAnnotations: renderAnnotations,
+    applyPropertyChanges: applyPropertyChanges,
+    collectVisualNodeTree: function() {
+      return collectVisualNodeTree(document.body, { maxNodes: 260 });
+    }
+  };
 })();
 
 
-    import React from 'https://esm.sh/react@18.3.1';
-    import ReactDOM from 'https://esm.sh/react-dom@18.3.1/client';
+    import React from 'react';
+    import ReactDOM from 'react-dom/client';
 
     let currentRoot = null;
     let currentConfig = {"bigBannerForeground":"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_前景图.png","bigBannerBackground":"https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_背景图.png","miniBanners":["https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D01.png","https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D02.png","https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D05.png","https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D04.png","https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/小banner/Property%201%3D06.png"]};
+    let currentAppState = {};
+    let currentRouteParams = {};
     let currentComponent = null;
     let updateVersion = 0;
+    let currentRequestId = null;
     let isSleeping = false;
 
     window.__DEMO_PROPS__ = currentConfig;
+    window.__APP_STATE__ = currentAppState;
+    window.__ROUTE_PARAMS__ = currentRouteParams;
+
+    function updateAppRuntime(appState, routeParams) {
+      currentAppState = appState && typeof appState === 'object' && !Array.isArray(appState) ? appState : {};
+      currentRouteParams = routeParams && typeof routeParams === 'object' && !Array.isArray(routeParams) ? routeParams : {};
+      window.__APP_STATE__ = currentAppState;
+      window.__ROUTE_PARAMS__ = currentRouteParams;
+      window.dispatchEvent(new CustomEvent('PREVIEW_APP_RUNTIME_UPDATE', {
+        detail: { appState: currentAppState, routeParams: currentRouteParams }
+      }));
+    }
 
     class ErrorBoundary extends React.Component {
       constructor(props) {
@@ -967,6 +1405,15 @@
       }
     }
 
+    function RenderCommitReporter(props) {
+      React.useLayoutEffect(function() {
+        if (props.version !== updateVersion || props.requestId !== currentRequestId) return;
+        reportRuntimeTiming('render_committed', { version: props.version });
+        window.parent.postMessage({ type: 'LOADED', requestId: props.requestId }, '*');
+      }, [props.version, props.requestId]);
+      return null;
+    }
+
     function renderComponent() {
       if (!currentComponent) return;
       const container = document.getElementById('root');
@@ -974,11 +1421,25 @@
       if (!currentRoot) {
         currentRoot = ReactDOM.createRoot(container);
       }
+      const renderVersion = updateVersion;
+      const renderRequestId = currentRequestId;
       currentRoot.render(
-        React.createElement(ErrorBoundary, null,
-          React.createElement(currentComponent, currentConfig)
+        React.createElement(ErrorBoundary, { key: renderVersion },
+          React.createElement(React.Fragment, null,
+            React.createElement(currentComponent, currentConfig),
+            React.createElement(RenderCommitReporter, {
+              version: renderVersion,
+              requestId: renderRequestId
+            })
+          )
         )
       );
+      reportRuntimeTiming('render_invoked', { version: updateVersion });
+      setTimeout(function() {
+        if (window.__VISUAL_EDIT__ && window.__VISUAL_EDIT__.applyPropertyChanges) {
+          window.__VISUAL_EDIT__.applyPropertyChanges();
+        }
+      }, 0);
     }
 
     function updateCssLinks(cssUrls) {
@@ -992,7 +1453,7 @@
       });
     }
 
-    
+
     function reportRuntimeError(payload) {
       const safePayload = payload || {};
       try {
@@ -1005,20 +1466,84 @@
           timestamp: Date.now()
         }));
       } catch (_err) {}
-      window.parent.postMessage({ type: 'RUNTIME_ERROR', ...safePayload }, '*');
+      window.parent.postMessage({ type: 'RUNTIME_ERROR', requestId: currentRequestId, ...safePayload }, '*');
+    }
+
+    function reportRuntimeTiming(stage, details) {
+      try {
+        var now = performance.now();
+        var payload = Object.assign({
+          source: 'preview-runtime',
+          stage: stage,
+          sinceShellStart: Math.round(now - shellStartedAt),
+          requestId: currentRequestId
+        }, details || {});
+        try { console.info('[PreviewRuntime]', payload); } catch (_consoleErr) {}
+        window.parent.postMessage({
+          type: 'CONSOLE_LOG',
+          payload: {
+            level: 'info',
+            args: JSON.stringify(payload),
+            timestamp: Date.now()
+          }
+        }, '*');
+      } catch (_err) {}
+    }
+
+    function summarizeResourceTimings() {
+      try {
+        var entries = performance.getEntriesByType('resource') || [];
+        var relevant = entries
+          .filter(function(entry) {
+            return entry.name.indexOf('https://esm.sh') === 0 ||
+              entry.name.indexOf('https://cdn.jsdelivr.net/') === 0 ||
+              entry.name.indexOf('blob:') === 0;
+          })
+          .slice(-12)
+          .map(function(entry) {
+            return {
+              name: entry.name
+                .replace('https://esm.sh', '<cdn>')
+                .replace('https://cdn.jsdelivr.net/', '<jsdelivr>/')
+                .slice(0, 180),
+              initiatorType: entry.initiatorType,
+              durationMs: Math.round(entry.duration),
+              startMs: Math.round(entry.startTime),
+              transferSize: entry.transferSize || 0,
+              encodedBodySize: entry.encodedBodySize || 0
+            };
+          });
+        return {
+          count: entries.length,
+          relevantCount: relevant.length,
+          relevant: relevant
+        };
+      } catch (err) {
+        return { error: err && err.message ? err.message : String(err) };
+      }
     }
 
     function loadModuleFromCode(code, thisVersion) {
       const blob = new Blob([code], { type: 'application/javascript' });
       const moduleUrl = URL.createObjectURL(blob);
+      var importStart = performance.now();
+      reportRuntimeTiming('module_import_start', {
+        version: thisVersion,
+        codeBytes: code.length
+      });
       import(moduleUrl)
         .then((module) => {
           if (thisVersion !== updateVersion) return;
           currentComponent = module.default || null;
-          renderComponent();
+          reportRuntimeTiming('module_import_done', {
+            version: thisVersion,
+            importMs: Math.round(performance.now() - importStart),
+            hasDefaultExport: !!module.default,
+            resources: summarizeResourceTimings()
+          });
           URL.revokeObjectURL(moduleUrl);
           if (module.default) {
-            window.parent.postMessage({ type: 'LOADED' }, '*');
+            renderComponent();
           } else {
             reportRuntimeError({ stage: 'component_export', error: '模块没有默认导出（export default）' });
           }
@@ -1029,10 +1554,43 @@
         });
     }
 
+    function loadModuleFromUrl(moduleUrl, thisVersion) {
+      var importStart = performance.now();
+      reportRuntimeTiming('module_import_start', {
+        version: thisVersion,
+        codeUrl: moduleUrl
+      });
+      import(moduleUrl)
+        .then((module) => {
+          if (thisVersion !== updateVersion) return;
+          currentComponent = module.default || null;
+          reportRuntimeTiming('module_import_done', {
+            version: thisVersion,
+            importMs: Math.round(performance.now() - importStart),
+            hasDefaultExport: !!module.default,
+            resources: summarizeResourceTimings()
+          });
+          if (module.default) {
+            renderComponent();
+          } else {
+            reportRuntimeError({ stage: 'component_export', error: '模块没有默认导出（export default）' });
+          }
+        })
+        .catch((err) => {
+          if (thisVersion !== updateVersion) return;
+          reportRuntimeError({ stage: 'dependency_import', error: err.message, stack: err.stack });
+        });
+    }
+    const shellStartedAt = performance.now();
+    reportRuntimeTiming('shell_start', {
+      cdnBase: 'https://esm.sh',
+      resources: summarizeResourceTimings()
+    });
+
     window.addEventListener('message', (event) => {
       if (event.source !== window.parent) return;
 
-      const { type, code, configData: newConfigData, cssImports: newCssImports, isUrl } = event.data;
+      const { type, code, moduleUrl, configData: newConfigData, cssImports: newCssImports, appState, routeParams, requestId, isUrl } = event.data;
 
       if (type === 'SLEEP') {
         isSleeping = true;
@@ -1042,41 +1600,35 @@
       if (type === 'WAKE') {
         isSleeping = false;
         requestAnimationFrame(function() {
-          window.parent.postMessage({ type: 'RESIZE', height: document.body.getBoundingClientRect().height }, '*');
+          window.parent.postMessage({ type: 'RESIZE', height: document.body.getBoundingClientRect().height, requestId: currentRequestId }, '*');
         });
         return;
       }
 
-      
-      if (type === 'UPDATE_CODE') {
+
+      if (type === 'UPDATE_CODE' || type === 'UPDATE_MODULE') {
+        var isModuleUrl = type === 'UPDATE_MODULE' || !!isUrl;
+        var incomingCode = moduleUrl || code;
+        currentRequestId = typeof requestId === 'number' ? requestId : null;
+        reportRuntimeTiming('update_code_received', { isUrl: isModuleUrl });
         currentConfig = newConfigData || {};
         window.__DEMO_PROPS__ = currentConfig;
+        updateAppRuntime(appState, routeParams);
         updateCssLinks(newCssImports || []);
 
         const thisVersion = ++updateVersion;
 
-        if (isUrl) {
-          fetch(code)
-            .then(res => {
-              if (!res.ok) throw new Error('加载预编译代码失败: ' + res.status);
-              return res.text();
-            })
-            .then(jsCode => {
-              if (thisVersion !== updateVersion) return;
-              loadModuleFromCode(jsCode, thisVersion);
-            })
-            .catch((err) => {
-              if (thisVersion !== updateVersion) return;
-              reportRuntimeError({ stage: 'dependency_import', error: err.message });
-            });
+        if (isModuleUrl) {
+          loadModuleFromUrl(incomingCode, thisVersion);
         } else {
-          loadModuleFromCode(code, thisVersion);
+          loadModuleFromCode(incomingCode, thisVersion);
         }
       }
 
       if (type === 'UPDATE_CONFIG') {
         currentConfig = newConfigData || {};
         window.__DEMO_PROPS__ = currentConfig;
+        updateAppRuntime(appState, routeParams);
         if (currentComponent) {
           renderComponent();
         }
@@ -1115,7 +1667,7 @@
                   sizes2[key2] = { width: Math.round(rect.width), height: Math.round(rect.height) };
                 }
               }
-              window.parent.postMessage({ type: 'POSITIONABLE_SIZES_RESULT', sizes: sizes2 }, '*');
+              window.parent.postMessage({ type: 'POSITIONABLE_SIZES_RESULT', sizes: sizes2, requestId: currentRequestId }, '*');
             }
             if (pendingImages.length > 0) {
               // 等待所有图片加载完成后再测量
@@ -1142,7 +1694,7 @@
               measureAndReport();
             }
           } catch (err) {
-            window.parent.postMessage({ type: 'POSITIONABLE_SIZES_RESULT', sizes: {} }, '*');
+            window.parent.postMessage({ type: 'POSITIONABLE_SIZES_RESULT', sizes: {}, requestId: currentRequestId }, '*');
           }
         });
       }
@@ -1228,21 +1780,9 @@
       if (type === 'COLLECT_VISUAL_NODE_TREE') {
         if (isSleeping) return;
         try {
-          var nodes = [];
-          var allVisualNodes = document.body.querySelectorAll('*');
-          for (var vn = 0; vn < allVisualNodes.length; vn++) {
-            var candidate = allVisualNodes[vn];
-            if (candidate && candidate.getBoundingClientRect) {
-              var r = candidate.getBoundingClientRect();
-              if (r.width > 0 && r.height > 0 && candidate !== document.body && candidate !== document.documentElement) {
-                nodes.push({
-                  tagName: candidate.tagName.toLowerCase(),
-                  textContent: (candidate.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80),
-                  className: candidate instanceof HTMLElement ? candidate.className.toString() : undefined
-                });
-              }
-            }
-          }
+          var nodes = window.__VISUAL_EDIT__ && window.__VISUAL_EDIT__.collectVisualNodeTree
+            ? window.__VISUAL_EDIT__.collectVisualNodeTree()
+            : [];
           window.parent.postMessage({ type: 'VISUAL_NODE_TREE_RESULT', nodes: nodes }, '*');
         } catch (err) {
           window.parent.postMessage({ type: 'VISUAL_NODE_TREE_RESULT', nodes: [] }, '*');
@@ -1254,7 +1794,7 @@
       if (isSleeping) return;
       for (const entry of entries) {
         const height = entry.contentRect.height;
-        window.parent.postMessage({ type: 'RESIZE', height }, '*');
+        window.parent.postMessage({ type: 'RESIZE', height, requestId: currentRequestId }, '*');
       }
     });
     resizeObserver.observe(document.body);
@@ -1275,23 +1815,41 @@
       });
     });
 
+    reportRuntimeTiming('ready_sent');
     window.parent.postMessage({ type: 'READY' }, '*');
 
-    const initialCode = "import {jsxs as _jsxs, jsx as _jsx} from 'https://esm.sh/react@18.3.1/jsx-runtime';\n\n\n\nexport default function PadSquare(props) {\n  const {\n    bigBannerForeground = 'https://uiweb.oss-cn-chengdu.aliyuncs.com/img/广场页/大banner/banner_前景图.png',\n  } = props;\n\n  return (\n    _jsxs('div', {\n      className: \"w-[1024px] h-[768px] relative bg-white overflow-hidden\"    ,\n      style: {\n        fontFamily: '-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif',\n      },\n children: [\n      _jsx('style', { children: `\n        .figma-scrollbar-hide {\n          -ms-overflow-style: none;\n          scrollbar-width: none;\n        }\n        .figma-scrollbar-hide::-webkit-scrollbar {\n          display: none;\n          width: 0;\n          height: 0;\n        }\n      `})\n\n      /* 顶部状态栏 */\n      , _jsx('img', {\n        src: \"https://r2-asset-worker.qihaogo.workers.dev/figma/h_569f7368.png\",\n        alt: \"status bar\" ,\n        className: \"left-0 top-0 absolute object-cover max-w-none\"    ,\n        style: { width: 1023, height: 58 },}\n      )\n\n      /* 内容区域 */\n      , _jsxs('div', { className: \"w-[1023.10px] px-[36.15px] left-0 top-[57.84px] absolute inline-flex flex-col justify-start items-start gap-5\"         , children: [\n\n        /* 科目选择 - 参考设计图 */\n        _jsx('img', {\n          src: \"https://r2-asset-worker.qihaogo.workers.dev/figma/h_b2570ead.png\",\n          alt: \"subjects\",\n          className: \"object-cover max-w-none\" ,\n          style: { width: 951, height: 54 },}\n        )\n\n        /* 大Banner - 使用项目级配置的前景图 */\n        , _jsxs('div', { className: \"w-[950px] h-[291.93px] shrink-0 relative overflow-hidden\"    , children: [\n          _jsx('div', { className: \"w-[951.82px] h-[261.52px] left-[-1.22px] top-[30.41px] absolute bg-gradient-to-b from-[#ffd5ec] to-[#fceef6] rounded-3xl overflow-hidden\"         , children: \n            _jsx('img', {\n              className: \"w-[948.78px] h-[265.17px] left-[1.22px] top-[-3.65px] absolute max-w-none\"     ,\n              src: \"https://r2-asset-worker.qihaogo.workers.dev/figma/h_df5192e8.png\",\n              alt: \"banner-bg-deco\",\n              style: { width: 949, height: 265 },}\n            )\n          })\n          , _jsx('img', {\n            className: \"w-[948.78px] h-[291.93px] left-[1.40px] top-[0.38px] absolute max-w-none\"     ,\n            src: bigBannerForeground,\n            alt: \"banner-fg\",\n            style: { width: 949, height: 292 },}\n          )\n        ]})\n\n        /* 横滑领课卡片 - 6张课程卡片 */\n        , _jsxs('div', { className: \"shrink-0 inline-flex justify-start items-start gap-[14.91px] overflow-x-auto figma-scrollbar-hide\"      , children: [\n          _jsx('img', {\n            className: \"w-[219.62px] h-[123.54px] shrink-0 max-w-none\"   ,\n            src: \"https://r2-asset-worker.qihaogo.workers.dev/figma/h_526b8a8b.png\",\n            alt: \"course-card-1\",\n            style: { width: 220, height: 124 },}\n          )\n          , _jsx('img', {\n            className: \"w-[219.62px] h-[123.54px] shrink-0 max-w-none\"   ,\n            src: \"https://r2-asset-worker.qihaogo.workers.dev/figma/h_71cc80a5.png\",\n            alt: \"course-card-2\",\n            style: { width: 220, height: 124 },}\n          )\n          , _jsx('img', {\n            className: \"w-[219.62px] h-[123.54px] shrink-0 max-w-none\"   ,\n            src: \"https://r2-asset-worker.qihaogo.workers.dev/figma/h_b9ff3ad5.png\",\n            alt: \"course-card-3\",\n            style: { width: 220, height: 124 },}\n          )\n          , _jsx('img', {\n            className: \"w-[219.62px] h-[123.54px] shrink-0 max-w-none\"   ,\n            src: \"https://r2-asset-worker.qihaogo.workers.dev/figma/h_c7fa7da1.png\",\n            alt: \"course-card-4\",\n            style: { width: 220, height: 124 },}\n          )\n          , _jsx('img', {\n            className: \"w-[219.62px] h-[123.54px] shrink-0 max-w-none\"   ,\n            src: \"https://r2-asset-worker.qihaogo.workers.dev/figma/h_744e2e57.png\",\n            alt: \"course-card-5\",\n            style: { width: 220, height: 124 },}\n          )\n          , _jsx('img', {\n            className: \"w-[219.62px] h-[123.54px] shrink-0 max-w-none\"   ,\n            src: \"https://r2-asset-worker.qihaogo.workers.dev/figma/h_8946e15c.png\",\n            alt: \"course-card-6\",\n            style: { width: 220, height: 124 },}\n          )\n        ]})\n\n        /* 底部课程卡片区 */\n        , _jsx('img', {\n          src: \"https://r2-asset-worker.qihaogo.workers.dev/figma/h_c925e908.png\",\n          alt: \"course-section\",\n          className: \"relative object-cover max-w-none\"  ,\n          style: { width: 951, height: 228 },}\n        )\n      ]})\n\n      /* 底部标签栏 */\n      , _jsx('img', {\n        src: \"https://r2-asset-worker.qihaogo.workers.dev/figma/h_ccadf0df.png\",\n        alt: \"tabBar\",\n        className: \"left-0 top-[706px] absolute object-cover max-w-none\"    ,\n        style: { width: 1024, height: 62 },}\n      )\n    ]})\n  );\n}";
+    const initialCode = null;
+    const initialCodeUrl = "/data/proj_1779608460378/demos/demo_1779608460380_d4e5f6/compiled.js?v=1784729599889";
     if (initialCode) {
       window.__DEMO_PROPS__ = currentConfig;
       const blob = new Blob([initialCode], { type: 'application/javascript' });
       const moduleUrl = URL.createObjectURL(blob);
+      var initialImportStart = performance.now();
+      reportRuntimeTiming('module_import_start', {
+        version: updateVersion,
+        codeBytes: initialCode.length,
+        initial: true
+      });
       import(moduleUrl)
         .then((module) => {
           currentComponent = module.default;
+          reportRuntimeTiming('module_import_done', {
+            version: updateVersion,
+            importMs: Math.round(performance.now() - initialImportStart),
+            hasDefaultExport: !!module.default,
+            initial: true,
+            resources: summarizeResourceTimings()
+          });
           renderComponent();
           URL.revokeObjectURL(moduleUrl);
-          window.parent.postMessage({ type: 'COMPONENT_READY' }, '*');
+          window.parent.postMessage({ type: 'COMPONENT_READY', requestId: currentRequestId }, '*');
         })
         .catch((err) => {
           reportRuntimeError({ stage: 'dependency_import', error: err.message });
         });
+    } else if (initialCodeUrl) {
+      window.__DEMO_PROPS__ = currentConfig;
+      loadModuleFromUrl(initialCodeUrl, updateVersion);
     }
   </script>
 </body>

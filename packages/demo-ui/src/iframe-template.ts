@@ -1400,6 +1400,12 @@ export function generateIframeHtml(
   } = options;
   const cdnBase = cdnBaseUrl || DEFAULT_CDN_BASE;
   const runtimeImports = buildRuntimeImports(cdnBase, runtimeBaseUrl, useCdnRuntime);
+  const tailwindRuntimeUrl = useCdnRuntime
+    ? "https://cdn.jsdelivr.net/npm/tailwindcss-cdn@3.4.10/tailwindcss.min.js"
+    : resolveRuntimeUrl(
+        `${PREVIEW_RUNTIME_PATH_PREFIX}/vendor/tailwindcss.js`,
+        runtimeBaseUrl,
+      );
 
   const cssLinks = generateCssLinks(cssImports, cdnBase);
   const initialCode = compiledCode ? JSON.stringify(compiledCode) : "null";
@@ -1619,7 +1625,7 @@ ${cssLinks}
     "imports": ${JSON.stringify(runtimeImports, null, 6)}
   }
   </script>
-  <script async src="https://cdn.jsdelivr.net/npm/tailwindcss-cdn@3.4.10/tailwindcss.min.js"></script>
+  <script async src="${tailwindRuntimeUrl}"></script>
 </head>
 <body>
   <div id="root"></div>
@@ -1742,8 +1748,8 @@ ${cssLinks}
       });
     }
 
-    ${loadModuleFn}
-    ${loadModuleFromUrlFn}
+    ${loadModuleFn.trim()}
+    ${loadModuleFromUrlFn.trim()}
     const shellStartedAt = performance.now();
     reportRuntimeTiming('shell_start', {
       cdnBase: '${cdnBase}',

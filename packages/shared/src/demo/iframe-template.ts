@@ -11,6 +11,7 @@ export interface IframeTemplateOptions {
 }
 
 const DEFAULT_CDN_BASE = "https://esm.sh";
+const PREVIEW_RUNTIME_PATH_PREFIX = "/preview-runtime";
 const DEFAULT_RUNTIME_IMPORTS: Record<string, string> = {
   react: "/preview-runtime/vendor/react.js",
   "react-dom": "/preview-runtime/vendor/react-dom.js",
@@ -928,6 +929,12 @@ function resolveRuntimeUrl(url: string, runtimeBaseUrl?: string): string {
   }
   if (!runtimeBaseUrl) return url;
   const base = runtimeBaseUrl.replace(/\/+$/, "");
+  if (
+    base.endsWith(PREVIEW_RUNTIME_PATH_PREFIX) &&
+    url.startsWith(`${PREVIEW_RUNTIME_PATH_PREFIX}/`)
+  ) {
+    return `${base}${url.slice(PREVIEW_RUNTIME_PATH_PREFIX.length)}`;
+  }
   return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
 }
 
@@ -974,6 +981,12 @@ export function generateIframeHtml(
   } = options;
   const cdnBase = cdnBaseUrl || DEFAULT_CDN_BASE;
   const runtimeImports = buildRuntimeImports(cdnBase, runtimeBaseUrl, useCdnRuntime);
+  const tailwindRuntimeUrl = useCdnRuntime
+    ? "https://cdn.jsdelivr.net/npm/tailwindcss-cdn@3.4.10/tailwindcss.min.js"
+    : resolveRuntimeUrl(
+        `${PREVIEW_RUNTIME_PATH_PREFIX}/vendor/tailwindcss.js`,
+        runtimeBaseUrl,
+      );
 
   const cssLinks = generateCssLinks(cssImports, cdnBase);
   const initialCode = compiledCode ? JSON.stringify(compiledCode) : "null";
@@ -1190,7 +1203,7 @@ ${cssLinks}
     "imports": ${JSON.stringify(runtimeImports, null, 6)}
   }
   </script>
-  <script async src="https://cdn.jsdelivr.net/npm/tailwindcss-cdn@3.4.10/tailwindcss.min.js"></script>
+  <script async src="${tailwindRuntimeUrl}"></script>
 </head>
 <body>
   <div id="root"></div>
@@ -1303,8 +1316,8 @@ ${cssLinks}
       });
     }
 
-    ${loadModuleFn}
-    ${loadModuleFromUrlFn}
+    ${loadModuleFn.trim()}
+    ${loadModuleFromUrlFn.trim()}
     const shellStartedAt = performance.now();
     reportRuntimeTiming('shell_start', {
       cdnBase: '${cdnBase}',

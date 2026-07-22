@@ -129,16 +129,29 @@ export class AuthorityPersistenceExtension implements Extension {
 /**
  * 检测并消除自拼接重复内容。
  *
- * 支持两种检测方式：
- * 1. 行级重复：前半段行与后半段行完全一致（支持偶数和奇数行数）
- * 2. JSON 对象级重复：两个相同的 JSON 对象拼接（{...}{...}）
+ * 支持三种检测方式：
+ * 1. 字符级重复：前半段与后半段完全一致，并递归收敛 4、8 等多次重复
+ * 2. 行级重复：兼容副本之间额外出现一行分隔的历史内容
+ * 3. JSON 对象级重复：两个相同的 JSON 对象拼接（{...}{...}）
  *
  * 返回去重后的内容，或 null 表示未检测到重复。
  */
-function deduplicateContent(content: string): string | null {
+export function deduplicateContent(content: string): string | null {
   if (!content) return null;
 
-  // 方法 1: 行级重复检测（支持偶数和奇数行数）
+  // 方法 1: 直接按原始字符串切半。源码通常以换行结尾，使用 split("\n")
+  // 会多出一个空行并错过最常见的 content + content 形态。
+  let exactDeduped = content;
+  let exactDuplicateFound = false;
+  while (exactDeduped.length % 2 === 0) {
+    const half = exactDeduped.length / 2;
+    if (exactDeduped.slice(0, half) !== exactDeduped.slice(half)) break;
+    exactDeduped = exactDeduped.slice(0, half);
+    exactDuplicateFound = true;
+  }
+  if (exactDuplicateFound) return exactDeduped;
+
+  // 方法 2: 行级重复检测（兼容副本之间存在额外分隔行）
   const lines = content.split("\n");
   if (lines.length >= 4) {
     const half = Math.floor(lines.length / 2);
@@ -166,7 +179,7 @@ function deduplicateContent(content: string): string | null {
     }
   }
 
-  // 方法 2: JSON 对象级重复检测
+  // 方法 3: JSON 对象级重复检测
   // 场景：两个完整 JSON 对象拼接（{...}{...}），行级检测可能因行数不匹配而漏检
   const start = content.indexOf("{");
   if (start === -1) return null;

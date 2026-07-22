@@ -1,6 +1,6 @@
 {
   "version": "2026-06-preview-runtime-v4",
-  "generatedAt": "2026-07-12T04:58:02.114Z",
+  "generatedAt": "2026-07-22T14:10:56.197Z",
   "imports": {
     "react": "/preview-runtime/vendor/react.js",
     "react-dom": "/preview-runtime/vendor/react-dom.js",
@@ -61,6 +61,10 @@
       "hash": "ef59f50aa92040b6",
       "bytes": 914
     },
+    "vendor/tailwindcss.js": {
+      "hash": "2f0570ef81afaa41",
+      "bytes": 366531
+    },
     "vendor/preview-sdk.js": {
       "hash": "8a9ff832d9d8b9f8",
       "bytes": 11511
@@ -71,6 +75,7 @@
     "react-dom": "18.3.1",
     "lucide-react": "0.323.0",
     "framer-motion": "12.38.0",
-    "svgaplayerweb": "2.3.1"
+    "svgaplayerweb": "2.3.1",
+    "tailwindcss-cdn": "3.4.10"
   }
 }
