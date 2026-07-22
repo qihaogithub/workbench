@@ -60,12 +60,8 @@ import {
   isEditableTarget,
 } from "./canvas-clipboard";
 import {
-  SNAP_THRESHOLD,
   PAGE_GROUP_DIRECTORY_WIDTH,
   PAGE_GROUP_DIRECTORY_GAP,
-  PAGE_GROUP_MIN_WIDTH,
-  PAGE_GROUP_MIN_HEIGHT,
-  PAGE_GROUP_EDGE_HIT_SIZE,
   getVisiblePageIds,
   getCanvasLayoutSignature,
   areStringListsEqual,
@@ -90,7 +86,6 @@ import type {
   PreviewCanvasProps,
   CanvasState,
   CanvasPageLayout,
-  CanvasViewportState,
   AlignmentGuide,
   CanvasToolMode,
   CanvasFreeNode,
@@ -1739,8 +1734,6 @@ export function PreviewCanvas({
       const { layout: alignedLayout, guides } = computeAlignment(
         layout,
         otherLayouts,
-        !!edge,
-        edge,
       );
 
       setAlignmentGuides(guides);

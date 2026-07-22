@@ -6143,7 +6143,6 @@ export class ProjectAdminService {
     projectSchema?: string | null,
   ): ValidationResult {
     const files = this.readPageFiles(workspacePath, pageId);
-    const page = this.findPage(workspacePath, pageId);
     const issues: ValidationResult["issues"] = [];
     if (!files) {
       issues.push({

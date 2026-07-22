@@ -5,7 +5,10 @@ import {
   PreviewRuntimeContractError,
   validatePreviewRuntimeContract,
 } from "../preview-dependency-policy";
-import { generateIframeHtml } from "@workbench/demo-ui/iframe-template";
+import {
+  generateIframeHtml,
+  visualEditScript,
+} from "@workbench/demo-ui/iframe-template";
 
 describe("AI 页面预览运行时策略", () => {
   it("仅在 React 提交成功后发送 LOADED 并按版本重置错误边界", () => {
@@ -104,6 +107,21 @@ describe("AI 页面预览运行时策略", () => {
     expect(html).toContain("window.__VISUAL_EDIT__.collectVisualNodeTree()");
     expect(html).toContain("type === 'COLLECT_VISUAL_NODE_TREE'");
     expect(html).toContain("type: 'VISUAL_NODE_TREE_RESULT'");
+  });
+
+  it("iframe 可视化点选按目标变化预选、循环候选并随滚动重绘", () => {
+    const html = generateIframeHtml();
+
+    expect(html).toContain("document.addEventListener('pointerover'");
+    expect(html).toContain("event.metaKey || event.ctrlKey");
+    expect(html).toContain("document.addEventListener('keydown'");
+    expect(html).toContain("event.key === 'Enter'");
+    expect(html).toContain("event.key === 'Tab'");
+    expect(html).toContain(
+      "document.addEventListener('scroll', scheduleVisualOverlayRedraw, true)",
+    );
+    expect(html).toContain("window.addEventListener('resize', scheduleVisualOverlayRedraw)");
+    expect(() => new Function(visualEditScript)).not.toThrow();
   });
 
   it("iframe 中 Tailwind CDN 脚本不阻塞页面 body 解析", () => {

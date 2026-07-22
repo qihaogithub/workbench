@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { WidgetProps } from '@rjsf/utils';
 import { Upload, Repeat, Trash2, Loader2, AlertTriangle } from 'lucide-react';
 import { cn } from './utils';
@@ -120,11 +120,8 @@ export interface FileUploadWidgetProps {
 
 export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
   const {
-    id,
     value,
     onChange,
-    label,
-    required,
     disabled,
   } = props as any;
 
@@ -253,10 +250,6 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
     onChange(defaultValue || '');
     setError('');
   }, [sessionId, value, onChange, defaultValue]);
-
-  const isValueFromUpload = useMemo(() => {
-    return typeof value === 'string' && value.startsWith('/api/sessions/');
-  }, [value]);
 
   return (
     <div className="space-y-2">

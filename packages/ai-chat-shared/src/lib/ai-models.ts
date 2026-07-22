@@ -448,7 +448,6 @@ export function applyModelConfigsWithFullData(
     nameFilters,
     multimodalSet,
     enabledModels,
-    autoEnableRules,
   } = data;
 
   const useEnabledList = Array.isArray(enabledModels);

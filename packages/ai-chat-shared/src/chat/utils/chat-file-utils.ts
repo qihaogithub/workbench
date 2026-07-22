@@ -1,5 +1,3 @@
-import type { MessagePart } from "../../message";
-
 const CODE_FILE_EXTENSIONS = [
   "index.tsx",
   "index.ts",

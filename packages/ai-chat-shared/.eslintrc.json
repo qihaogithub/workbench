@@ -1,0 +1,12 @@
+{
+  "extends": "../../.eslintrc.base.json",
+  "env": { "browser": true, "es2022": true },
+  "parserOptions": {
+    "ecmaFeatures": { "jsx": true }
+  },
+  "rules": {
+    "@typescript-eslint/no-unused-vars": "warn",
+    "no-empty": "warn",
+    "@typescript-eslint/no-var-requires": "warn"
+  }
+}
