@@ -80,6 +80,29 @@ describe("useVisualEditState 智能属性写回", () => {
     global.fetch = jest.fn();
   });
 
+  it("重复选择同一 DOM 路径时刷新节点文本与样式快照", () => {
+    const view = renderVisualEditState();
+    const first = createNode();
+    const updated = createNode({
+      textContent: "更新后的标题",
+      computedStyle: {
+        color: "rgb(220, 38, 38)",
+        backgroundColor: "rgba(0, 0, 0, 0)",
+      },
+    });
+
+    act(() => {
+      view.result.current.handleVisualSelect(first);
+      view.result.current.handleVisualSelect(updated);
+    });
+
+    expect(view.result.current.selectedVisualNode).toMatchObject({
+      domPath: "main > h1",
+      textContent: "更新后的标题",
+      computedStyle: { color: "rgb(220, 38, 38)" },
+    });
+  });
+
   it("原型页页面级文本配置项可直接写回，不触发 AI", () => {
     const applyPrototypeVisualConfig = jest.fn(() => ({
       ok: true as const,

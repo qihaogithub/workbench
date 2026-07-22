@@ -2,17 +2,10 @@
 
 import { cn } from "./lib/utils";
 import type { ImageAttachment } from "@workbench/agent-client";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import {
-  Bot,
-  User,
-  Copy,
-  Check,
   CheckCircle2,
   AlertTriangle,
   RotateCcw,
-  ThumbsUp,
-  ThumbsDown,
   Pencil,
   X,
   MessageSquareText,
@@ -20,11 +13,8 @@ import {
   FileText,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
-import { Button } from "./ui/button";
 import { ChatCard, ChatCardDetailDialog } from "./chat-card";
 import { Streamdown } from "streamdown";
-import { Tool } from "./tool";
-import { Reasoning } from "./reasoning";
 import { AssistantMessage } from "./assistant-message";
 
 function formatFileSize(bytes?: number) {
@@ -181,13 +171,10 @@ export function Message({
   className,
   isStreaming = false,
   onEditResend,
-  allMessages,
-  setMessages,
   handleSend,
   onCancelQueuedMessage,
 }: MessageProps) {
   const isUser = message.role === "user";
-  const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -212,14 +199,6 @@ export function Message({
       );
     }
   }, [editing]);
-
-  const handleCopy = async () => {
-    if (message.content) {
-      await navigator.clipboard.writeText(message.content);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
 
   if (message.role === "system" && message.kind === "auto_repair" && message.autoRepair) {
     return (
@@ -564,54 +543,5 @@ function AutoRepairMessage({
         </div>
       </ChatCard>
     </div>
-  );
-}
-
-// 文件附件组件
-function FileAttachment({
-  file,
-}: {
-  file: NonNullable<ChatMessage["files"]>[number];
-}) {
-  const formatFileSize = (bytes?: number) => {
-    if (!bytes) return "";
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
-  const getFileIcon = (name: string) => {
-    const ext = name.split(".").pop()?.toLowerCase();
-    const iconMap: Record<string, string> = {
-      pdf: "📄",
-      doc: "📝",
-      docx: "📝",
-      txt: "📃",
-      zip: "📦",
-      rar: "📦",
-      jpg: "🖼️",
-      jpeg: "🖼️",
-      png: "🖼️",
-      gif: "🖼️",
-    };
-    return iconMap[ext || ""] || "📎";
-  };
-
-  return (
-    <a
-      href={file.url}
-      download={file.name}
-      className="flex items-center gap-2 p-2 bg-muted/50 hover:bg-muted rounded-lg transition-colors cursor-pointer"
-    >
-      <span className="text-lg">{getFileIcon(file.name)}</span>
-      <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium truncate">{file.name}</p>
-        {file.size && (
-          <p className="text-xs text-muted-foreground">
-            {formatFileSize(file.size)}
-          </p>
-        )}
-      </div>
-    </a>
   );
 }

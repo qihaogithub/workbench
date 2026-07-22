@@ -17,7 +17,6 @@ import type {
   ProjectBaseVersion,
   VersionInfo,
   WorkspaceRevision,
-  WorkspaceMutationActor,
   WorkspaceMutationRequest,
   WorkspaceMutationReceipt,
   WorkspaceMutationOperation,

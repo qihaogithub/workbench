@@ -3,7 +3,6 @@ import type { MessagePart } from "../../message";
 export function updateTextPart(
   parts: MessagePart[],
   content: string,
-  accumulatedContent: string,
 ): MessagePart[] {
   const newParts = [...parts];
   const lastPart = newParts[newParts.length - 1];

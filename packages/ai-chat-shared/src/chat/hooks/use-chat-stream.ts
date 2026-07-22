@@ -747,7 +747,6 @@ export function useChatStream(options: UseChatStreamOptions) {
               parts: updateTextPart(
                 prev.parts || [],
                 content,
-                accumulatedContent,
               ),
             }));
             // 流式回复过程中节流持久化中间状态

@@ -5,7 +5,7 @@ import {
   sanitizePrototypeHtml,
 } from "@workbench/demo-ui";
 import React from "react";
-import { render, waitFor } from "@testing-library/react";
+import { fireEvent, render, waitFor } from "@testing-library/react";
 
 describe("PrototypePagePreview", () => {
   it("清理原型页 HTML 中的脚本、内联事件和 javascript URL", () => {
@@ -48,6 +48,132 @@ describe("PrototypePagePreview", () => {
     expect(shadow?.querySelector("h1")?.textContent).toBe("配置标题");
     expect(shadow?.querySelector("p")?.textContent).toBe("配置摘要");
     expect((shadow?.querySelector("span") as HTMLElement | null)?.style.color).toBe("rgb(37, 99, 235)");
+  });
+
+  it("可从 SVG 子节点选中语义 SVG 图层并即时显示悬停框", () => {
+    const onVisualSelect = jest.fn();
+    const { container } = render(
+      React.createElement(PrototypePagePreview, {
+        html: `<button data-ow-id="icon-button"><svg data-ow-id="arrow-icon" viewBox="0 0 24 24"><path d="M4 12h16" /></svg></button>`,
+        css: "",
+        visualEditMode: true,
+        onVisualSelect,
+      }),
+    );
+
+    const host = container.querySelector("[data-prototype-preview]");
+    const shadow = host?.shadowRoot;
+    const path = shadow?.querySelector("path");
+    const svg = shadow?.querySelector("svg");
+    expect(path).not.toBeNull();
+    expect(svg).not.toBeNull();
+
+    fireEvent.pointerOver(path!);
+    expect(svg).toHaveAttribute("data-prototype-hovered", "true");
+
+    fireEvent.click(path!);
+    expect(onVisualSelect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nodeId: "arrow-icon",
+        tagName: "svg",
+      }),
+    );
+  });
+
+  it("Cmd/Ctrl 连续点击可从最具体图层向父级循环选择", () => {
+    const onVisualSelect = jest.fn();
+    const { container } = render(
+      React.createElement(PrototypePagePreview, {
+        html: `<button data-ow-id="cta"><span data-ow-id="cta-label">立即开始</span></button>`,
+        css: "",
+        visualEditMode: true,
+        onVisualSelect,
+      }),
+    );
+
+    const host = container.querySelector("[data-prototype-preview]");
+    const span = host?.shadowRoot?.querySelector("span");
+    expect(span).not.toBeNull();
+
+    fireEvent.click(span!, { ctrlKey: true, clientX: 12, clientY: 12 });
+    fireEvent.click(span!, { ctrlKey: true, clientX: 12, clientY: 12 });
+
+    expect(onVisualSelect).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ nodeId: "cta-label" }),
+    );
+    expect(onVisualSelect).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ nodeId: "cta" }),
+    );
+  });
+
+  it("Cmd/Ctrl 连续点击可循环选择同一位置的重叠图层", () => {
+    const onVisualSelect = jest.fn();
+    const { container } = render(
+      React.createElement(PrototypePagePreview, {
+        html: `<section><div data-ow-id="back">底层</div><div data-ow-id="front">顶层</div></section>`,
+        css: "",
+        visualEditMode: true,
+        onVisualSelect,
+      }),
+    );
+
+    const host = container.querySelector("[data-prototype-preview]");
+    const shadow = host?.shadowRoot;
+    const root = shadow?.querySelector(".prototype-root");
+    const back = shadow?.querySelector("[data-ow-id='back']");
+    const front = shadow?.querySelector("[data-ow-id='front']");
+    expect(root).not.toBeNull();
+    expect(back).not.toBeNull();
+    expect(front).not.toBeNull();
+
+    Object.defineProperty(shadow, "elementsFromPoint", {
+      configurable: true,
+      value: () => [front, back, root],
+    });
+
+    fireEvent.click(front!, { ctrlKey: true, clientX: 24, clientY: 24 });
+    fireEvent.click(front!, { ctrlKey: true, clientX: 24, clientY: 24 });
+
+    expect(onVisualSelect).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ nodeId: "front" }),
+    );
+    expect(onVisualSelect).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ nodeId: "back" }),
+    );
+  });
+
+  it("选中后可用 Enter、Shift+Enter 和 Tab 在图层结构中导航", () => {
+    const onVisualSelect = jest.fn();
+    const { container } = render(
+      React.createElement(PrototypePagePreview, {
+        html: `<section data-ow-id="section"><button data-ow-id="first"><span data-ow-id="label">按钮</span></button><button data-ow-id="second">下一项</button></section>`,
+        css: "",
+        visualEditMode: true,
+        onVisualSelect,
+      }),
+    );
+
+    const host = container.querySelector("[data-prototype-preview]");
+    const label = host?.shadowRoot?.querySelector("[data-ow-id='label']");
+    expect(host).not.toBeNull();
+    expect(label).not.toBeNull();
+
+    fireEvent.click(label!);
+    fireEvent.keyDown(host!, { key: "Enter", shiftKey: true });
+    fireEvent.keyDown(host!, { key: "Tab" });
+
+    expect(onVisualSelect).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ nodeId: "first" }),
+    );
+    expect(onVisualSelect).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ nodeId: "second" }),
+    );
   });
 
   it("支持按图层临时隐藏原型页节点", () => {
