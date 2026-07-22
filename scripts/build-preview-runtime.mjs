@@ -133,6 +133,17 @@ async function buildVendorEntries() {
   return { builtEntries, builtFiles };
 }
 
+async function copyTailwindRuntime(files) {
+  const sourcePath = path.join(repoRoot, "node_modules/tailwindcss-cdn/tailwindcss.js");
+  const outputPath = path.join(vendorDir, "tailwindcss.js");
+  await cp(sourcePath, outputPath);
+  const content = await readFile(outputPath, "utf8");
+  files["vendor/tailwindcss.js"] = {
+    hash: digest(content),
+    bytes: Buffer.byteLength(content),
+  };
+}
+
 async function main() {
   await rm(tmpDir, { recursive: true, force: true });
   await mkdir(tmpDir, { recursive: true });
@@ -145,6 +156,7 @@ async function main() {
   const { builtEntries, builtFiles } = await buildVendorEntries();
   Object.assign(imports, builtEntries);
   Object.assign(files, builtFiles);
+  await copyTailwindRuntime(files);
 
   imports["@preview/sdk"] = "/preview-runtime/vendor/preview-sdk.js";
   const sdkSource = `
@@ -344,6 +356,7 @@ export function Carousel(props) {
       "lucide-react": await readPackageVersion("lucide-react"),
       "framer-motion": await readPackageVersion("framer-motion"),
       "svgaplayerweb": await readPackageVersion("svgaplayerweb"),
+      "tailwindcss-cdn": await readPackageVersion("tailwindcss-cdn"),
     },
   };
   const manifest = {

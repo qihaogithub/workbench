@@ -22,14 +22,6 @@
   "demoFolders": [],
   "versions": [
     {
-      "versionId": "v15",
-      "savedAt": 1780455443343,
-      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
-      "sessionId": "session-1780455025144-raz6lzzhr",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v15",
-      "fileCount": 7
-    },
-    {
       "versionId": "v16",
       "savedAt": 1780455466668,
       "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
@@ -425,6 +417,16 @@
       "sessionId": "session-1782404806357-yb3dw1b6s",
       "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v65",
       "fileCount": 9
+    },
+    {
+      "versionId": "v66",
+      "type": "publish_snapshot",
+      "savedAt": 1784729600183,
+      "savedBy": "system",
+      "sessionId": "publish-1784729600168",
+      "snapshotPath": "/Users/henryhuang/sift-project/祁昊/OneFlow/data/snapshots/proj_1779608460378/v66",
+      "fileCount": 8,
+      "note": "发布快照"
     }
   ],
   "pageVersions": {
@@ -511,9 +513,9 @@
     ]
   },
   "createdAt": 1779608460378,
-  "updatedAt": 1783061612233,
-  "publishedVersion": "v65",
-  "publishedAt": 1782405323927,
+  "updatedAt": 1784729600183,
+  "publishedVersion": "v66",
+  "publishedAt": 1784729600211,
   "activeWorkspaceId": "live-1783060678418-zpt5a4gbi",
   "activeWorkspaceUpdatedAt": 1783060678424,
   "canonicalSyncedWorkspaceId": "live-1783060678418-zpt5a4gbi",

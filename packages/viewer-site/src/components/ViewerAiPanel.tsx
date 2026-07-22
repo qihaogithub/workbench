@@ -66,16 +66,6 @@ export function ViewerAiPanel({
   useEffect(() => {
     const sessions = readLocalChatSessions(projectId);
     setHistorySessions(sessions);
-    const latest = sessions[0];
-    if (latest) {
-      setSessionId(latest.sessionId);
-      setMessages(latest.messages);
-      createdAtRef.current = latest.createdAt;
-    } else {
-      setSessionId(createViewerSessionId(projectId));
-      setMessages([]);
-      createdAtRef.current = Date.now();
-    }
   }, [projectId]);
 
   useEffect(() => {

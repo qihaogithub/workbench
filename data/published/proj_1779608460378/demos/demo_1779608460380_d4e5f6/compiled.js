@@ -1,4 +1,4 @@
-import {jsxs as _jsxs, jsx as _jsx} from 'https://esm.sh/react@18.3.1/jsx-runtime';
+import {jsxs as _jsxs, jsx as _jsx} from "/data/proj_1779608460378/preview-runtime/vendor/react-jsx-runtime.js";
 
 
 
