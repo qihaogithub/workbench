@@ -52,6 +52,7 @@ export interface PreviewDiagnostic {
   importName?: string;
   codeHash?: string;
   moduleHash?: string;
+  requestId?: number;
 }
 
 export type PreviewDiagnosticError = Error & {
@@ -105,7 +106,7 @@ export interface PreviewPanelProps {
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
   onAppAction?: (action: AppActionPayload & { pageId?: string }) => void;
   onContentHeightChange?: (contentHeight: number) => void;
-  onContentLoaded?: () => void;
+  onContentLoaded?: (details?: { requestId: number }) => void;
   activityState?: "active" | "sleeping";
   effectiveHeight?: number;
   onPositionableSizes?: (sizes: Record<string, PositionableSizeItem>) => void;

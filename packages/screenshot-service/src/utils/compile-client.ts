@@ -34,10 +34,14 @@ export class CompileServiceError extends Error {
 export async function compileCode(
   code: string,
   sessionId?: string,
+  demoId?: string,
 ): Promise<CompileResult> {
   const body: Record<string, unknown> = { code };
   if (sessionId) {
     body.sessionId = sessionId;
+  }
+  if (demoId) {
+    body.demoId = demoId;
   }
 
   const url = `${config.authorSiteUrl}/api/compile`;

@@ -614,6 +614,103 @@ describe("screenshot routes", () => {
     await app.close();
   });
 
+  it("React 截图编译携带页面上下文且直接执行编译代码", async () => {
+    const compileCode = vi.fn(async () => ({
+      compiledCode: `export default function Demo(){return "compiled-inline"}`,
+      cssImports: [],
+      moduleUrl: "/api/preview-modules/stale.js",
+    }));
+    const renderPage = vi.fn(async () => ({
+      buffer: Buffer.from("png"),
+      renderBox,
+      queueWaitMs: 0,
+      renderMs: 1,
+      renderTimings,
+    }));
+    vi.doMock("../src/utils/compile-client", () => ({ compileCode }));
+    vi.doMock("../src/utils/browser-pool", () => ({
+      getBrowserPool: () => ({ renderPage }),
+    }));
+    vi.doMock("../src/utils/screenshot-store", () => ({
+      computeScreenshotHash: vi.fn(() => "1111111111111111"),
+      screenshotExists: vi.fn(async () => false),
+      readScreenshotRenderBox: vi.fn(),
+      readScreenshot: vi.fn(),
+      writeScreenshot: vi.fn(),
+      cleanupOldScreenshots: vi.fn(async () => {}),
+    }));
+
+    const app = await createApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/screenshots/generate",
+      payload: {
+        projectId: "proj_1",
+        pageId: "page_1",
+        sessionId: "session_1",
+        code: "export default function Demo() { return null; }",
+        configData: {},
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(compileCode).toHaveBeenCalledWith(
+      "export default function Demo() { return null; }",
+      "session_1",
+      "page_1",
+    );
+    expect(renderPage.mock.calls[0]?.[0]).toContain("compiled-inline");
+    expect(renderPage.mock.calls[0]?.[0]).not.toContain("stale.js");
+    await app.close();
+  });
+
+  it("原型页截图按 session 和 pageId 改写相对资产", async () => {
+    const renderPage = vi.fn(async () => ({
+      buffer: Buffer.from("png"),
+      renderBox,
+      queueWaitMs: 0,
+      renderMs: 1,
+      renderTimings,
+    }));
+    vi.doMock("../src/utils/compile-client", () => ({ compileCode: vi.fn() }));
+    vi.doMock("../src/utils/browser-pool", () => ({
+      getBrowserPool: () => ({ renderPage }),
+    }));
+    vi.doMock("../src/utils/screenshot-store", () => ({
+      computeScreenshotHash: vi.fn(() => "1111111111111111"),
+      screenshotExists: vi.fn(async () => false),
+      readScreenshotRenderBox: vi.fn(),
+      readScreenshot: vi.fn(),
+      writeScreenshot: vi.fn(),
+      cleanupOldScreenshots: vi.fn(async () => {}),
+    }));
+
+    const app = await createApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/screenshots/generate",
+      payload: {
+        projectId: "proj_1",
+        pageId: "prototype_1",
+        sessionId: "session_1",
+        runtimeType: "prototype-html-css",
+        prototypeHtml: '<img src="../../assets/images/hero.png">',
+        prototypeCss: 'main{background:url("../../assets/images/bg.png")}',
+        configData: {},
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const renderedHtml = renderPage.mock.calls[0]?.[0] ?? "";
+    expect(renderedHtml).toContain(
+      "http://localhost:3200/api/sessions/session_1/workspace/assets/images/hero.png",
+    );
+    expect(renderedHtml).toContain(
+      "http://localhost:3200/api/sessions/session_1/workspace/assets/images/bg.png",
+    );
+    await app.close();
+  });
+
   it("文件接口按 hash 精确读取并使用不可变缓存", async () => {
     const readScreenshot = vi.fn(async () => Buffer.from("png"));
     vi.doMock("../src/utils/compile-client", () => ({

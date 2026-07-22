@@ -374,6 +374,7 @@ const EVENT_PAYLOAD_ALLOWLIST: Record<string, readonly string[]> = {
     "importName",
     "moduleHash",
     "codeHash",
+    "requestId",
   ],
   "preview.runtime_error": ["errorName", "errorMessage", "line", "column", "stackHash"],
   "page.sketch_patch_rejected": [

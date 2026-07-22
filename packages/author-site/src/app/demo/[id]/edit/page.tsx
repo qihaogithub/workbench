@@ -1062,6 +1062,23 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     [pageScreenshots, pagePreviewSizeMap],
   );
 
+  const activePreviewScreenshotUrl = useMemo(() => {
+    const state = pageScreenshots[activeDemoId];
+    if (!state?.screenshotUrl || !state.hash || !state.expectedHash) {
+      return undefined;
+    }
+    if (state.hash !== state.expectedHash) return undefined;
+    if (
+      !isCanvasScreenshotRenderBoxCompatible(
+        state.renderBox,
+        pagePreviewSizeMap[activeDemoId],
+      )
+    ) {
+      return undefined;
+    }
+    return state.screenshotUrl;
+  }, [activeDemoId, pagePreviewSizeMap, pageScreenshots]);
+
   const getScreenshotPriority = useCallback(
     (pageId: string): ScreenshotPriority => {
       if (pageId === (canvasEditingPageId ?? activeDemoId)) {
@@ -1999,7 +2016,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           details: {
             level: entry.level,
             stage: payload.stage,
-            sinceStart: payload.sinceStart,
+            sinceStart: payload.sinceStart ?? payload.sinceShellStart,
             requestId: payload.requestId,
             pageId: activeDemoIdRef.current,
           },
@@ -7410,18 +7427,19 @@ ${context.details}
                           configData={configData}
                           previewSize={activePreviewSize}
                           placeholderScreenshotUrl={
-                            pageScreenshots[activeDemoId]?.screenshotUrl
+                            activePreviewScreenshotUrl
                           }
                           onConsoleEntry={handleDiagnosticConsoleEntry}
                           onError={handlePreviewError}
                           isAutoRepairing={isAutoRepairing}
-                          onContentLoaded={() => {
+                          onContentLoaded={(details) => {
                             recordDiagnosticEvent({
                               category: "preview",
                               name: "preview.content_loaded",
                               details: {
                                 pageId: activeDemoId,
                                 mode: "single",
+                                requestId: details?.requestId,
                               },
                             });
                             setSinglePreviewLoaded((current) =>

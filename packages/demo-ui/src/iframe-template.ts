@@ -1319,7 +1319,8 @@ export function generateIframeHtml(
         var payload = Object.assign({
           source: 'preview-runtime',
           stage: stage,
-          sinceShellStart: Math.round(now - shellStartedAt)
+          sinceShellStart: Math.round(now - shellStartedAt),
+          requestId: currentRequestId
         }, details || {});
         try { console.info('[PreviewRuntime]', payload); } catch (_consoleErr) {}
         window.parent.postMessage({
@@ -1384,10 +1385,9 @@ export function generateIframeHtml(
             hasDefaultExport: !!module.default,
             resources: summarizeResourceTimings()
           });
-          renderComponent();
           URL.revokeObjectURL(moduleUrl);
           if (module.default) {
-            window.parent.postMessage({ type: 'LOADED', requestId: currentRequestId }, '*');
+            renderComponent();
           } else {
             reportRuntimeError({ stage: 'component_export', error: '模块没有默认导出（export default）' });
           }
@@ -1415,9 +1415,8 @@ export function generateIframeHtml(
             hasDefaultExport: !!module.default,
             resources: summarizeResourceTimings()
           });
-          renderComponent();
           if (module.default) {
-            window.parent.postMessage({ type: 'LOADED', requestId: currentRequestId }, '*');
+            renderComponent();
           } else {
             reportRuntimeError({ stage: 'component_export', error: '模块没有默认导出（export default）' });
           }
@@ -1477,10 +1476,9 @@ export function generateIframeHtml(
               hasDefaultExport: !!module.default,
               resources: summarizeResourceTimings()
             });
-            renderComponent();
             URL.revokeObjectURL(moduleUrl);
             if (module.default) {
-              window.parent.postMessage({ type: 'LOADED', requestId: currentRequestId }, '*');
+              renderComponent();
             } else {
               reportRuntimeError({ stage: 'component_export', error: '模块没有默认导出（export default）' });
             }
@@ -1587,6 +1585,15 @@ ${cssLinks}
       }
     }
 
+    function RenderCommitReporter(props) {
+      React.useLayoutEffect(function() {
+        if (props.version !== updateVersion || props.requestId !== currentRequestId) return;
+        reportRuntimeTiming('render_committed', { version: props.version });
+        window.parent.postMessage({ type: 'LOADED', requestId: props.requestId }, '*');
+      }, [props.version, props.requestId]);
+      return null;
+    }
+
     function renderComponent() {
       if (!currentComponent) return;
       const container = document.getElementById('root');
@@ -1594,9 +1601,17 @@ ${cssLinks}
       if (!currentRoot) {
         currentRoot = ReactDOM.createRoot(container);
       }
+      const renderVersion = updateVersion;
+      const renderRequestId = currentRequestId;
       currentRoot.render(
-        React.createElement(ErrorBoundary, null,
-          React.createElement(currentComponent, currentConfig)
+        React.createElement(ErrorBoundary, { key: renderVersion },
+          React.createElement(React.Fragment, null,
+            React.createElement(currentComponent, currentConfig),
+            React.createElement(RenderCommitReporter, {
+              version: renderVersion,
+              requestId: renderRequestId
+            })
+          )
         )
       );
       reportRuntimeTiming('render_invoked', { version: updateVersion });

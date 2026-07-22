@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useReducer,
+} from "react";
 import type {
   PreviewDiagnostic,
   PreviewDiagnosticError,
@@ -18,8 +24,16 @@ import { generateIframeHtml } from "./iframe-template";
 import { getCachedCompile, setCachedCompile } from "./compile-cache";
 import { computePreviewScale } from "./preview-scale";
 import { resolvePreviewConfigAssetUrls } from "./preview-config-utils";
+import {
+  INITIAL_PREVIEW_REQUEST_STATE,
+  isPreviewRequestPending,
+  previewRequestReducer,
+} from "./preview-lifecycle";
 const DEFAULT_PREVIEW_CDN_BASE = "https://esm.sh";
 const NO_ACTIVE_PREVIEW_REQUEST_ID = -1;
+const COMPILE_DEADLINE_MS = 15_000;
+const SHELL_DEADLINE_MS = 10_000;
+const RENDER_DEADLINE_MS = 15_000;
 
 interface VisualContextMenuState {
   x: number;
@@ -298,6 +312,12 @@ export function PreviewPanel({
   const [iframeSrcUrl, setIframeSrcUrl] = useState<string | null>(null);
   const [contentLoaded, setContentLoaded] = useState(false);
   const [placeholderFailed, setPlaceholderFailed] = useState(false);
+  const [requestState, dispatchRequest] = useReducer(
+    previewRequestReducer,
+    INITIAL_PREVIEW_REQUEST_STATE,
+  );
+  const [retryVersion, setRetryVersion] = useState(0);
+  const compileAbortControllerRef = useRef<AbortController | null>(null);
   const [visualContextMenu, setVisualContextMenu] =
     useState<VisualContextMenuState | null>(null);
   const containerSizeRef = useRef({ width: 0, height: 0 });
@@ -372,6 +392,11 @@ export function PreviewPanel({
         source: "preview-runtime",
         stage,
         sinceStart,
+        requestId:
+          activePreviewRequestIdRef.current > 0
+            ? activePreviewRequestIdRef.current
+            : undefined,
+        pageId: demoId,
         ...details,
       };
       if (typeof console !== "undefined") {
@@ -383,7 +408,7 @@ export function PreviewPanel({
         timestamp: Date.now(),
       });
     },
-    [],
+    [demoId],
   );
 
   const updateContainerSize = useCallback((width: number, height: number) => {
@@ -469,6 +494,7 @@ export function PreviewPanel({
         },
         "*",
       );
+      dispatchRequest({ type: "RENDERING", requestId });
     },
     [sessionId, demoId, reportTiming],
   );
@@ -522,6 +548,7 @@ export function PreviewPanel({
         },
         "*",
       );
+      dispatchRequest({ type: "RENDERING", requestId });
     },
     [sessionId, demoId, reportTiming, sendUpdateCodeUrl],
   );
@@ -671,6 +698,7 @@ export function PreviewPanel({
       const requestId = nextPreviewRequestIdRef.current + 1;
       nextPreviewRequestIdRef.current = requestId;
       activePreviewRequestIdRef.current = requestId;
+      dispatchRequest({ type: "START", requestId, phase: "waiting-shell" });
 
       setNullableStringStateIfChanged(setCompileError, null);
       setNullableStringStateIfChanged(setRuntimeError, null);
@@ -691,6 +719,7 @@ export function PreviewPanel({
 
     if (code !== undefined && !code) {
       activePreviewRequestIdRef.current = NO_ACTIVE_PREVIEW_REQUEST_ID;
+      dispatchRequest({ type: "RESET" });
       setBooleanStateIfChanged(setContentLoaded, false);
       setBooleanStateIfChanged(setIsCompiling, false);
       setNullableStringStateIfChanged(setCompileError, null);
@@ -702,6 +731,7 @@ export function PreviewPanel({
 
     if (!sessionId && (!code || !validCode)) {
       activePreviewRequestIdRef.current = NO_ACTIVE_PREVIEW_REQUEST_ID;
+      dispatchRequest({ type: "RESET" });
       setBooleanStateIfChanged(setContentLoaded, false);
       setBooleanStateIfChanged(setIsCompiling, false);
       setNullableStringStateIfChanged(setCompileError, null);
@@ -713,8 +743,12 @@ export function PreviewPanel({
     const requestId = nextPreviewRequestIdRef.current + 1;
     nextPreviewRequestIdRef.current = requestId;
     activePreviewRequestIdRef.current = requestId;
+    dispatchRequest({ type: "START", requestId });
 
     let cancelled = false;
+    compileAbortControllerRef.current?.abort();
+    const abortController = new AbortController();
+    compileAbortControllerRef.current = abortController;
     if (typeof performance !== "undefined") {
       compileStartRef.current = performance.now();
       if (timingStartRef.current === 0) {
@@ -743,6 +777,11 @@ export function PreviewPanel({
                 : undefined;
             reportTiming("compile_done", { cacheHit: true, compileMs });
             setLastSuccessfulResult(compileResult);
+            dispatchRequest({
+              type: "COMPILED",
+              requestId,
+              shellReady: iframeReadyRef.current,
+            });
             const currentConfig = configDataRef.current || {};
             if (iframeReadyRef.current) {
               sendUpdateCode(compileResult, currentConfig, requestId);
@@ -765,6 +804,7 @@ export function PreviewPanel({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
+          signal: abortController.signal,
         });
 
         const result = await readCompileResponse(response);
@@ -792,8 +832,10 @@ export function PreviewPanel({
             importName: issue?.importName,
             codeHash: result.error?.details?.codeHash,
             moduleHash: result.error?.details?.moduleHash,
+            requestId,
           };
           setNullableStringStateIfChanged(setCompileError, message);
+          dispatchRequest({ type: "FAIL", requestId, error: message });
           onErrorRef.current?.(
             createPreviewDiagnosticError(message, diagnostic),
           );
@@ -815,6 +857,11 @@ export function PreviewPanel({
             : undefined;
         reportTiming("compile_done", { cacheHit: false, compileMs });
         setLastSuccessfulResult(compileResult);
+        dispatchRequest({
+          type: "COMPILED",
+          requestId,
+          shellReady: iframeReadyRef.current,
+        });
 
         // 写入编译缓存
         if (sessionId && demoId) {
@@ -831,6 +878,7 @@ export function PreviewPanel({
         setBooleanStateIfChanged(setIsCompiling, false);
       } catch (err) {
         if (cancelled) return;
+        if (err instanceof DOMException && err.name === "AbortError") return;
         const message = err instanceof Error ? err.message : "编译失败";
         const diagnostic: PreviewDiagnostic = {
           source: "post_generation_validation",
@@ -838,10 +886,12 @@ export function PreviewPanel({
           pageId: demoId,
           file: demoId ? `demos/${demoId}/index.tsx` : undefined,
           message,
+          requestId,
           instruction:
             "请修复 TSX/JSX 语法错误，保留一个完整的 React 组件模块后重新生成。",
         };
         setNullableStringStateIfChanged(setCompileError, message);
+        dispatchRequest({ type: "FAIL", requestId, error: message });
         onErrorRef.current?.(createPreviewDiagnosticError(message, diagnostic));
         setPendingCompileResult(null);
         setBooleanStateIfChanged(setIsCompiling, false);
@@ -857,6 +907,8 @@ export function PreviewPanel({
 
     return () => {
       cancelled = true;
+      abortController.abort();
+      dispatchRequest({ type: "CANCEL", requestId });
     };
   }, [
     code,
@@ -869,7 +921,55 @@ export function PreviewPanel({
     sendUpdateCode,
     sendUpdateCodeUrl,
     reportTiming,
+    retryVersion,
   ]);
+
+  useEffect(() => {
+    if (isSleeping || !isPreviewRequestPending(requestState.phase)) return;
+
+    const deadline =
+      requestState.phase === "compiling"
+        ? COMPILE_DEADLINE_MS
+        : requestState.phase === "waiting-shell"
+          ? SHELL_DEADLINE_MS
+          : RENDER_DEADLINE_MS;
+    const stage =
+      requestState.phase === "compiling"
+        ? "compile"
+        : requestState.phase === "waiting-shell"
+          ? "shell"
+          : "render";
+    const timer = window.setTimeout(() => {
+      if (activePreviewRequestIdRef.current !== requestState.requestId) return;
+      const message = `预览${stage === "compile" ? "编译" : stage === "shell" ? "容器启动" : "渲染"}超时`;
+      compileAbortControllerRef.current?.abort();
+      setBooleanStateIfChanged(setIsCompiling, false);
+      if (stage === "compile") {
+        setNullableStringStateIfChanged(setCompileError, message);
+      } else {
+        setNullableStringStateIfChanged(setRuntimeError, message);
+      }
+      dispatchRequest({
+        type: "TIMEOUT",
+        requestId: requestState.requestId,
+        error: message,
+      });
+      reportTiming(`${stage}_timeout`, { deadlineMs: deadline });
+      onErrorRef.current?.(
+        createPreviewDiagnosticError(message, {
+          source: stage === "compile" ? "post_generation_validation" : "preview_runtime",
+          stage: `${stage}_timeout`,
+          pageId: demoId,
+          file: demoId ? `demos/${demoId}/index.tsx` : undefined,
+          message,
+          requestId: requestState.requestId,
+          instruction: "请重试预览；若持续失败，请查看诊断以确认编译服务、预览容器或模块加载状态。",
+        }),
+      );
+    }, deadline);
+
+    return () => window.clearTimeout(timer);
+  }, [demoId, isSleeping, reportTiming, requestState]);
 
   useEffect(() => {
     if (!iframeReady) return;
@@ -997,8 +1097,9 @@ export function PreviewPanel({
           });
           setNullableStringStateIfChanged(setRuntimeError, null);
           setBooleanStateIfChanged(setContentLoaded, true);
+          dispatchRequest({ type: "READY", requestId });
           if (!contentLoaded) {
-            onContentLoaded?.();
+            onContentLoaded?.({ requestId });
           }
           sendCollectPositionableSizes();
           break;
@@ -1013,6 +1114,7 @@ export function PreviewPanel({
           {
             const message = error || "组件运行时发生错误";
             setNullableStringStateIfChanged(setRuntimeError, message);
+            dispatchRequest({ type: "FAIL", requestId, error: message });
             onErrorRef.current?.(
               createPreviewDiagnosticError(message, {
                 source: "preview_runtime",
@@ -1020,6 +1122,7 @@ export function PreviewPanel({
                 pageId: demoId,
                 file: demoId ? `demos/${demoId}/index.tsx` : undefined,
                 message,
+                requestId,
                 instruction:
                   "请优先检查当前页面的 import、默认导出和渲染逻辑；图标和基础能力优先使用 @preview/sdk。",
               }),
@@ -1265,12 +1368,18 @@ export function PreviewPanel({
   const hasPreviewSource =
     isUrlMode || (typeof code === "string" && code.length > 0);
   const showPreviewLoading =
-    hasPreviewSource && (isCompiling || (!contentLoaded && !compileError && !runtimeError));
+    hasPreviewSource && isPreviewRequestPending(requestState.phase);
   const showPreviewPendingText = showPreviewLoading && !isCompiling;
   const showPlaceholder =
     !!placeholderScreenshotUrl && !contentLoaded && !placeholderFailed;
   const showLoadingOverlay = showPreviewLoading && !showPlaceholder;
   const showEmptyPreview = !hasPreviewSource && !compileError && !runtimeError;
+  const terminalError = requestState.error || compileError || runtimeError;
+  const showTerminalError =
+    !!terminalError &&
+    !isCompiling &&
+    !isAutoRepairing &&
+    (requestState.phase === "failed" || requestState.phase === "timed-out");
 
   useEffect(() => {
     if (!visualEditMode) {
@@ -1356,6 +1465,24 @@ export function PreviewPanel({
           <p className="text-sm font-medium text-muted-foreground">
             正在修复预览
           </p>
+        </div>
+      )}
+
+      {showTerminalError && (
+        <div className="absolute inset-0 z-30 m-2 flex items-center justify-center rounded-lg border border-destructive/30 bg-background/95 p-4 text-center">
+          <div className="max-w-sm space-y-3">
+            <p className="text-sm font-semibold text-foreground">
+              {requestState.phase === "timed-out" ? "预览加载超时" : "预览加载失败"}
+            </p>
+            <p className="text-xs text-muted-foreground">{terminalError}</p>
+            <button
+              type="button"
+              className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
+              onClick={() => setRetryVersion((current) => current + 1)}
+            >
+              重试预览
+            </button>
+          </div>
         </div>
       )}
 

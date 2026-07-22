@@ -1067,10 +1067,9 @@ export function generateIframeHtml(
             hasDefaultExport: !!module.default,
             resources: summarizeResourceTimings()
           });
-          renderComponent();
           URL.revokeObjectURL(moduleUrl);
           if (module.default) {
-            window.parent.postMessage({ type: 'LOADED' }, '*');
+            renderComponent();
           } else {
             reportRuntimeError({ stage: 'component_export', error: '模块没有默认导出（export default）' });
           }
@@ -1098,9 +1097,8 @@ export function generateIframeHtml(
             hasDefaultExport: !!module.default,
             resources: summarizeResourceTimings()
           });
-          renderComponent();
           if (module.default) {
-            window.parent.postMessage({ type: 'LOADED' }, '*');
+            renderComponent();
           } else {
             reportRuntimeError({ stage: 'component_export', error: '模块没有默认导出（export default）' });
           }
@@ -1158,10 +1156,9 @@ export function generateIframeHtml(
               hasDefaultExport: !!module.default,
               resources: summarizeResourceTimings()
             });
-            renderComponent();
             URL.revokeObjectURL(moduleUrl);
             if (module.default) {
-              window.parent.postMessage({ type: 'LOADED' }, '*');
+              renderComponent();
             } else {
               reportRuntimeError({ stage: 'component_export', error: '模块没有默认导出（export default）' });
             }
@@ -1267,6 +1264,15 @@ ${cssLinks}
       }
     }
 
+    function RenderCommitReporter(props) {
+      React.useLayoutEffect(function() {
+        if (props.version !== updateVersion) return;
+        reportRuntimeTiming('render_committed', { version: props.version });
+        window.parent.postMessage({ type: 'LOADED' }, '*');
+      }, [props.version]);
+      return null;
+    }
+
     function renderComponent() {
       if (!currentComponent) return;
       const container = document.getElementById('root');
@@ -1274,9 +1280,13 @@ ${cssLinks}
       if (!currentRoot) {
         currentRoot = ReactDOM.createRoot(container);
       }
+      const renderVersion = updateVersion;
       currentRoot.render(
-        React.createElement(ErrorBoundary, null,
-          React.createElement(currentComponent, currentConfig)
+        React.createElement(ErrorBoundary, { key: renderVersion },
+          React.createElement(React.Fragment, null,
+            React.createElement(currentComponent, currentConfig),
+            React.createElement(RenderCommitReporter, { version: renderVersion })
+          )
         )
       );
       reportRuntimeTiming('render_invoked', { version: updateVersion });
