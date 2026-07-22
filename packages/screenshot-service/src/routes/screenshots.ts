@@ -716,14 +716,14 @@ async function generateScreenshotUncached(
 
   if (snapshotInput.runtimeType === "high-fidelity-react") {
     const compileCache = getCompileCache();
-    const cacheScope = sessionId || "global";
+    const cacheScope = `${sessionId || "global"}:${pageId}`;
     const compileStart = Date.now();
     let compileResult = compileCache.get(snapshotInput.code, cacheScope);
     compileHit = Boolean(compileResult);
 
     if (!compileResult) {
       try {
-        compileResult = await compileCode(snapshotInput.code, sessionId);
+        compileResult = await compileCode(snapshotInput.code, sessionId, pageId);
         compileCache.set(snapshotInput.code, compileResult, cacheScope);
       } catch (error) {
         throw new ScreenshotError(
@@ -736,8 +736,7 @@ async function generateScreenshotUncached(
     compileMs = Date.now() - compileStart;
 
     html = generateIframeHtml({
-      compiledCode: compileResult.moduleUrl ? undefined : compileResult.compiledCode,
-      compiledCodeUrl: compileResult.moduleUrl,
+      compiledCode: compileResult.compiledCode,
       cssImports: compileResult.cssImports,
       configData: snapshotInput.configData,
       cdnBaseUrl: config.cdnBaseUrl,
@@ -752,6 +751,11 @@ async function generateScreenshotUncached(
       css: snapshotInput.prototypeCss,
       configData: snapshotInput.configData,
       previewSize: snapshotInput.previewSize ?? { width, height },
+      assetRewrite: {
+        sessionId,
+        demoId: pageId,
+        origin: config.authorSiteUrl,
+      },
     });
   } else {
     html = buildSketchScenePreviewDocumentHtml({

@@ -1,4 +1,7 @@
-import { rewriteLocalAssetPaths } from '@/lib/rewrite-local-paths';
+import {
+  rewriteCompiledLocalAssetPaths,
+  rewriteLocalAssetPaths,
+} from '@/lib/rewrite-local-paths';
 
 describe('rewriteLocalAssetPaths', () => {
   const sessionId = 'test-session-123';
@@ -87,6 +90,43 @@ describe('rewriteLocalAssetPaths', () => {
       expect(result).toContain(`/api/sessions/${sessionId}/workspace/demos/demo_abc/images/a.png`);
       expect(result).toContain(`/api/sessions/${sessionId}/workspace/demos/demo_abc/images/b.jpg`);
       expect(result).toContain(`/api/sessions/${sessionId}/workspace/demos/demo_abc/images/c.webp`);
+    });
+  });
+
+  describe('编译结果改写', () => {
+    it('重新计算模块 hash 且不污染原编译缓存对象', () => {
+      const original = {
+        compiledCode: `_jsx("img", { src: '../../assets/images/hero.png' })`,
+        dependencies: [],
+        cssImports: [],
+        moduleHash: 'original-hash',
+      };
+
+      const rewritten = rewriteCompiledLocalAssetPaths(
+        original,
+        'demo_abc',
+        sessionId,
+      );
+
+      expect(rewritten).not.toBe(original);
+      expect(rewritten.compiledCode).toContain(
+        `/api/sessions/${sessionId}/workspace/assets/images/hero.png`,
+      );
+      expect(rewritten.moduleHash).toMatch(/^[a-f0-9]{64}$/);
+      expect(original.compiledCode).toContain('../../assets/images/hero.png');
+      expect(original.moduleHash).toBe('original-hash');
+    });
+
+    it('没有页面上下文或没有改写时复用原结果', () => {
+      const original = {
+        compiledCode: `_jsx("div", { children: 'ok' })`,
+        dependencies: [],
+        cssImports: [],
+        moduleHash: 'original-hash',
+      };
+
+      expect(rewriteCompiledLocalAssetPaths(original, undefined, sessionId)).toBe(original);
+      expect(rewriteCompiledLocalAssetPaths(original, 'demo_abc', sessionId)).toBe(original);
     });
   });
 });

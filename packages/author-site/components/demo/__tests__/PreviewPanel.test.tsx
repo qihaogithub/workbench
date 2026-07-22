@@ -83,6 +83,47 @@ describe("PreviewPanel", () => {
     });
   });
 
+  it("普通编译错误应显示可操作终态且结束 loading", async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({ success: false, error: { message: "语法错误: 第3行" } }),
+    );
+
+    render(<PreviewPanel code={mockCode} configData={{ title: "Test" }} />);
+
+    expect(await screen.findByText("预览加载失败")).toBeInTheDocument();
+    expect(screen.getByText("语法错误: 第3行")).toBeInTheDocument();
+    const retryButton = screen.getByRole("button", { name: "重试预览" });
+    expect(retryButton).toBeInTheDocument();
+    expect(
+      screen.queryByRole("status", { name: "预览加载中" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(retryButton);
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2));
+  });
+
+  it("编译无回执时应进入超时终态", async () => {
+    jest.useFakeTimers();
+    mockFetch.mockReturnValue(new Promise(() => {}));
+
+    try {
+      render(<PreviewPanel code={mockCode} configData={{ title: "Test" }} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(20_000);
+        await Promise.resolve();
+      });
+
+      expect(screen.getByText("预览加载超时")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "重试预览" })).toBeInTheDocument();
+      expect(
+        screen.queryByRole("status", { name: "预览加载中" }),
+      ).not.toBeInTheDocument();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("编译错误诊断应保留页面和源码定位信息", async () => {
     const onError = jest.fn();
     mockFetch.mockResolvedValue(

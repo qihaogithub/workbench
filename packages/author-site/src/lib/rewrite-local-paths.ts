@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 function resolveRelativePath(relativePath: string, basePath: string): string {
   const isAbsolute = basePath.startsWith('/');
   const parts = basePath.split('/').filter(p => p !== '');
@@ -45,4 +47,30 @@ export function rewriteLocalAssetPaths(
   });
 
   return result;
+}
+
+export function rewriteCompiledLocalAssetPaths<T extends CompiledAssetResult>(
+  result: T,
+  demoId: string | undefined,
+  sessionId: string | undefined,
+): T {
+  if (!demoId || !sessionId) return result;
+
+  const compiledCode = rewriteLocalAssetPaths(
+    result.compiledCode,
+    `demos/${demoId}/`,
+    sessionId,
+  );
+  if (compiledCode === result.compiledCode) return result;
+
+  return {
+    ...result,
+    compiledCode,
+    moduleHash: createHash('sha256').update(compiledCode).digest('hex'),
+  };
+}
+
+interface CompiledAssetResult {
+  compiledCode: string;
+  moduleHash: string;
 }

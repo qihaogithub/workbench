@@ -5,6 +5,7 @@ import { compileCode, compileSession, resolveDependencyVersions } from '@/lib/co
 import { PreviewRuntimeContractError } from '@/lib/preview-dependency-policy';
 import { registerPreviewModule } from '@/lib/preview-module-store';
 import { shouldUsePreviewRuntimeCdn } from '@/lib/preview-runtime-manifest';
+import { rewriteCompiledLocalAssetPaths } from '@/lib/rewrite-local-paths';
 
 export async function POST(request: NextRequest) {
   const startedAt = Date.now();
@@ -78,9 +79,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (result && sessionId && typeof sessionId === 'string') {
-      // 图片已通过图床绝对 URL 直接访问，无需路径重写
-    }
+    result = rewriteCompiledLocalAssetPaths(
+      result,
+      typeof demoId === 'string' ? demoId : undefined,
+      typeof sessionId === 'string' ? sessionId : undefined,
+    );
 
     registerPreviewModule(result.moduleHash, result.compiledCode);
     const resultWithModuleUrl = {

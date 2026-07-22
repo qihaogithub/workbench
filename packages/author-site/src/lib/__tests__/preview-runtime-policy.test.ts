@@ -8,6 +8,17 @@ import {
 import { generateIframeHtml } from "@workbench/demo-ui/iframe-template";
 
 describe("AI 页面预览运行时策略", () => {
+  it("仅在 React 提交成功后发送 LOADED 并按版本重置错误边界", () => {
+    const html = generateIframeHtml();
+
+    expect(html).toContain("function RenderCommitReporter");
+    expect(html).toContain("React.useLayoutEffect");
+    expect(html).toContain("key: renderVersion");
+    expect(
+      html.match(/window\.parent\.postMessage\(\{ type: 'LOADED'/g),
+    ).toHaveLength(1);
+  });
+
   it("将 @preview/sdk 映射为受控虚拟模块", () => {
     const result = compileCode(`
       import { Icon, Button, trigger, useRouteParams } from "@preview/sdk";
