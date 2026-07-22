@@ -493,9 +493,6 @@ export function CanvasPageItem({
   zoomRef.current = zoom;
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const designHeight = parsePreviewSizeValue(page.previewSize?.height, 812);
-  const designWidth = parsePreviewSizeValue(page.previewSize?.width, 375);
-
   const canInteract = editable && toolMode === "select";
   const showEdgeHandles =
     (isHovering || selected) && canInteract && !isDragging && !isResizing;

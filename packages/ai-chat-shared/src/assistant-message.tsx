@@ -11,8 +11,6 @@ import {
 } from "react";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
-import { mermaid } from "@streamdown/mermaid";
-import { math } from "@streamdown/math";
 import { cjk } from "@streamdown/cjk";
 import "katex/dist/katex.min.css";
 import {

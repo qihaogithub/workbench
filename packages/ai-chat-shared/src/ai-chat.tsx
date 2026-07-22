@@ -14,11 +14,10 @@ import { buildFullModelId } from "./lib/ai-models";
 import { ChatMessages } from "./chat/chat-messages";
 import { ChatPlan } from "./chat/chat-plan";
 import { ChatInput } from "./chat/chat-input";
-import type { PermissionRequest } from "./chat/services/stream-service";
 import type { StreamService } from "./chat/services/stream-service";
 import type { ActiveViewContext } from "./lib/active-view-context";
 import type { AgentMode, ViewerContext } from "@workbench/agent-client";
-import { X, FileText, ArrowDown } from "lucide-react";
+import { X, FileText } from "lucide-react";
 
 export interface AutoRepairTrigger {
   kind: "auto_repair";
@@ -221,7 +220,6 @@ export function AIChat({
     handleDepthChange,
     handleModelsEvent,
     handleModelError,
-    resetModelState,
   } = useChatModels({
     agentSessionId,
     workingDir,
@@ -347,7 +345,7 @@ export function AIChat({
       if (behavior === "instant") {
         isAutoScrollingRef.current = false;
       } else {
-        const timer = setTimeout(() => {
+        setTimeout(() => {
           isAutoScrollingRef.current = false;
         }, 400);
       }

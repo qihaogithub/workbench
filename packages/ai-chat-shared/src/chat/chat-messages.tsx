@@ -58,7 +58,7 @@ class MessageErrorBoundary extends React.Component<
     };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  componentDidCatch(error: Error, _errorInfo: React.ErrorInfo) {
     const errorType = classifyRenderError(error);
     console.warn(
       `[MessageErrorBoundary][${errorType}] 消息渲染失败`,
@@ -212,7 +212,6 @@ export function ChatMessages({
   onRollback,
   externalAuthSessionId,
   onEditResend,
-  messagesRef,
   setMessages,
   handleSend,
   onUserChoiceResponse,

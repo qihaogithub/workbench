@@ -4,8 +4,6 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import {
   applyPrototypeBindings,
   buildPrototypePreviewHtmlFragment,
-  sanitizePrototypeCss,
-  sanitizePrototypeHtml,
 } from "@workbench/shared";
 import { cn } from "./utils";
 import { computePreviewScale } from "./preview-scale";
@@ -35,11 +33,25 @@ export interface PrototypePagePreviewProps {
   selectedVisualNodeId?: string | null;
   hiddenVisualNodeIds?: string[];
   visualPropertyChanges?: VisualPropertyChange[];
-  onVisualHover?: (node: VisualNodeInfo | null) => void;
   onVisualSelect?: (node: VisualNodeInfo | null) => void;
   onVisualSelectStack?: (nodes: VisualNodeInfo[]) => void;
   visualNodeTreeRequestKey?: number;
   onVisualNodeTreeChange?: (nodes: VisualNodeTreeItem[]) => void;
+}
+
+type VisualElement = HTMLElement | SVGElement;
+
+function isVisualElement(value: unknown): value is VisualElement {
+  return value instanceof HTMLElement || value instanceof SVGElement;
+}
+
+function resolveVisualEventTarget(target: EventTarget | null, root: Element): VisualElement | null {
+  if (!isVisualElement(target) || !root.contains(target)) return null;
+  if (target instanceof SVGElement) {
+    const svg = target.closest("svg");
+    return isVisualElement(svg) ? svg : target;
+  }
+  return target;
 }
 
 function normalizeMeasuredSize(value: number): number {
@@ -76,43 +88,52 @@ function getDomPath(element: Element, root: Element): string {
   return parts.length ? `prototype-root > ${parts.join(" > ")}` : "prototype-root";
 }
 
-function getElementByVisualId(root: ParentNode, id?: string | null): HTMLElement | null {
+function getElementByVisualId(root: ParentNode, id?: string | null): VisualElement | null {
   if (!id) return null;
   const escaped = typeof CSS !== "undefined" && CSS.escape ? CSS.escape(id) : id.replace(/"/g, '\\"');
-  return root.querySelector<HTMLElement>(`[data-ow-id="${escaped}"]`);
+  const element = root.querySelector(`[data-ow-id="${escaped}"]`);
+  return isVisualElement(element) ? element : null;
 }
 
-function queryByDomPath(root: ParentNode, domPath?: string | null): HTMLElement | null {
+function queryByDomPath(root: ParentNode, domPath?: string | null): VisualElement | null {
   if (!domPath) return null;
   const selector = domPath.replace(/^prototype-root\s*>\s*/, "");
   if (!selector || selector === "prototype-root") {
     return root.querySelector<HTMLElement>(".prototype-root");
   }
   try {
-    return root.querySelector<HTMLElement>(selector);
+    const element = root.querySelector(selector);
+    return isVisualElement(element) ? element : null;
   } catch {
     return null;
   }
 }
 
-function getNodeInfo(element: HTMLElement, root: Element): VisualNodeInfo {
+function getNodeInfo(element: VisualElement, root: Element): VisualNodeInfo {
   const rect = element.getBoundingClientRect();
   const ownText = getOwnText(element);
-  const aggregateText = (element.innerText || element.textContent || "").replace(/\s+/g, " ").trim();
+  const aggregateText = (
+    (element instanceof HTMLElement ? element.innerText : "") ||
+    element.textContent ||
+    ""
+  )
+    .replace(/\s+/g, " ")
+    .trim();
   const text = (element.children.length === 0 ? aggregateText : ownText).slice(0, 180);
   const style = window.getComputedStyle(element);
   const domPath = getDomPath(element, root);
+  const className = element.getAttribute("class")?.trim() || undefined;
   const caps: VisualNodeInfo["editCapabilities"] = ["annotate", "style", "structure"];
   if (text && element.children.length === 0) caps.push("text");
   if (element instanceof HTMLImageElement || element.getAttribute("src")) caps.push("image");
   if (element instanceof HTMLAnchorElement || element.getAttribute("href")) caps.push("link");
-  if (element.className) caps.push("className");
+  if (className) caps.push("className");
 
   return {
     nodeId: element.getAttribute("data-ow-id") || domPath,
     tagName: element.tagName.toLowerCase(),
     componentName: element.tagName.toLowerCase(),
-    className: typeof element.className === "string" ? element.className || undefined : undefined,
+    className,
     textContent: text || undefined,
     domPath,
     parentPath: element.parentElement ? getDomPath(element.parentElement, root) : undefined,
@@ -170,14 +191,63 @@ function getNodeInfo(element: HTMLElement, root: Element): VisualNodeInfo {
   };
 }
 
-function buildNodeStack(element: HTMLElement, root: Element): VisualNodeInfo[] {
-  const stack: VisualNodeInfo[] = [];
-  let current: HTMLElement | null = element;
+function collectPointNodeStack(
+  shadow: ShadowRoot,
+  target: VisualElement,
+  root: Element,
+  clientX: number,
+  clientY: number,
+): VisualNodeInfo[] {
+  const ancestry: VisualElement[] = [];
+  let current: Element | null = target;
   while (current && current !== root) {
-    stack.unshift(getNodeInfo(current, root));
+    if (isVisualElement(current)) ancestry.unshift(current);
+    current = current.parentElement;
+  }
+
+  const pointShadow = shadow as ShadowRoot & {
+    elementsFromPoint?: (x: number, y: number) => Element[];
+  };
+  const pointElements = pointShadow.elementsFromPoint?.(clientX, clientY) ?? [];
+  const visualHits = pointElements
+    .map((element) => resolveVisualEventTarget(element, root))
+    .filter((element): element is VisualElement => !!element && element !== root)
+    .reverse();
+
+  const ordered: VisualElement[] = [];
+  [...ancestry, ...visualHits].forEach((element) => {
+    const domPath = getDomPath(element, root);
+    const previousIndex = ordered.findIndex(
+      (candidate) => getDomPath(candidate, root) === domPath,
+    );
+    if (previousIndex >= 0) ordered.splice(previousIndex, 1);
+    ordered.push(element);
+  });
+
+  return ordered.map((element) => getNodeInfo(element, root));
+}
+
+function collectAncestorNodeStack(
+  element: VisualElement,
+  root: Element,
+): VisualNodeInfo[] {
+  const stack: VisualNodeInfo[] = [];
+  let current: Element | null = element;
+  while (current && current !== root) {
+    if (isVisualElement(current)) stack.unshift(getNodeInfo(current, root));
     current = current.parentElement;
   }
   return stack;
+}
+
+function moveSelectedNodeToStackEnd(
+  stack: VisualNodeInfo[],
+  selected: VisualNodeInfo,
+): VisualNodeInfo[] {
+  return [
+    ...stack.filter((node) => node.domPath !== selected.domPath),
+    selected,
+  ];
 }
 
 function normalizeStyleValue(property: string, value: string): string {
@@ -236,11 +306,11 @@ function applyPropertyChanges(root: ParentNode, changes: VisualPropertyChange[])
   }
 }
 
-function buildNodeTree(element: HTMLElement, root: Element): VisualNodeTreeItem {
+function buildNodeTree(element: VisualElement, root: Element): VisualNodeTreeItem {
   return {
     ...getNodeInfo(element, root),
     children: Array.from(element.children)
-      .filter((child): child is HTMLElement => child instanceof HTMLElement)
+      .filter(isVisualElement)
       .map((child) => buildNodeTree(child, root)),
   };
 }
@@ -262,7 +332,6 @@ export function PrototypePagePreview({
   selectedVisualNodeId,
   hiddenVisualNodeIds = [],
   visualPropertyChanges = [],
-  onVisualHover,
   onVisualSelect,
   onVisualSelectStack,
   visualNodeTreeRequestKey,
@@ -373,9 +442,11 @@ export function PrototypePagePreview({
     if (!shadow || !onVisualNodeTreeChange || visualNodeTreeRequestKey == null) return;
     const root = shadow.querySelector<HTMLElement>(".prototype-root");
     if (!root) return;
-    onVisualNodeTreeChange(Array.from(root.children)
-      .filter((child): child is HTMLElement => child instanceof HTMLElement)
-      .map((child) => buildNodeTree(child, root)));
+    onVisualNodeTreeChange(
+      Array.from(root.children)
+        .filter(isVisualElement)
+        .map((child) => buildNodeTree(child, root)),
+    );
   }, [onVisualNodeTreeChange, visualNodeTreeRequestKey]);
 
   useEffect(() => {
@@ -418,35 +489,118 @@ export function PrototypePagePreview({
     if (!shadow || !visualEditMode) return;
     const root = shadow.querySelector<HTMLElement>(".prototype-root");
     if (!root) return;
+    const host = hostRef.current;
+    if (!host) return;
 
-    const handlePointerMove = (event: Event) => {
-      const target = event.composedPath()[0];
-      if (!(target instanceof HTMLElement) || !root.contains(target)) {
-        onVisualHover?.(null);
-        return;
-      }
-      onVisualHover?.(getNodeInfo(target, root));
+    let hoveredElement: VisualElement | null = null;
+    let activeSelectedElement =
+      getElementByVisualId(root, selectedVisualNodeId) ||
+      queryByDomPath(root, selectedVisualNodeId);
+    let cycleSignature = "";
+    let cycleIndex = -1;
+
+    const setHoveredElement = (element: VisualElement | null) => {
+      if (hoveredElement === element) return;
+      hoveredElement?.removeAttribute("data-prototype-hovered");
+      hoveredElement = element;
+      hoveredElement?.setAttribute("data-prototype-hovered", "true");
+    };
+
+    const handlePointerOver = (event: Event) => {
+      const target = resolveVisualEventTarget(event.composedPath()[0] ?? null, root);
+      setHoveredElement(target);
     };
     const handleClick = (event: Event) => {
-      const target = event.composedPath()[0];
-      if (!(target instanceof HTMLElement) || !root.contains(target)) return;
+      const mouseEvent = event as MouseEvent;
+      const target = resolveVisualEventTarget(event.composedPath()[0] ?? null, root);
+      if (!target) return;
       event.preventDefault();
       event.stopPropagation();
-      const node = getNodeInfo(target, root);
-      onVisualSelect?.(node);
-      onVisualSelectStack?.(buildNodeStack(target, root));
-    };
-    const handlePointerLeave = () => onVisualHover?.(null);
+      const stack = collectPointNodeStack(
+        shadow,
+        target,
+        root,
+        mouseEvent.clientX,
+        mouseEvent.clientY,
+      );
+      if (stack.length === 0) return;
 
-    shadow.addEventListener("pointermove", handlePointerMove);
+      const nextSignature = stack.map((node) => node.domPath).join("|");
+      const shouldCycle = mouseEvent.metaKey || mouseEvent.ctrlKey;
+      if (shouldCycle && cycleSignature === nextSignature) {
+        cycleIndex = (cycleIndex - 1 + stack.length) % stack.length;
+      } else {
+        cycleSignature = nextSignature;
+        cycleIndex = stack.length - 1;
+      }
+      if (!shouldCycle) cycleSignature = "";
+
+      const node = stack[cycleIndex] ?? stack[stack.length - 1];
+      activeSelectedElement =
+        getElementByVisualId(root, node.nodeId) ||
+        queryByDomPath(root, node.domPath);
+      setHoveredElement(null);
+      onVisualSelect?.(node);
+      onVisualSelectStack?.(moveSelectedNodeToStackEnd(stack, node));
+      host.focus({ preventScroll: true });
+    };
+    const handlePointerLeave = () => setHoveredElement(null);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const eventTarget = event.target;
+      if (
+        eventTarget instanceof Element &&
+        eventTarget.closest("input,textarea,select,[contenteditable='true']")
+      ) {
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        activeSelectedElement = null;
+        onVisualSelect?.(null);
+        onVisualSelectStack?.([]);
+        return;
+      }
+      if (!activeSelectedElement) return;
+
+      let next: Element | null = null;
+      if (event.key === "Enter") {
+        next = event.shiftKey
+          ? activeSelectedElement.parentElement
+          : activeSelectedElement.firstElementChild;
+      } else if (event.key === "Tab") {
+        next = event.shiftKey
+          ? activeSelectedElement.previousElementSibling
+          : activeSelectedElement.nextElementSibling;
+      } else {
+        return;
+      }
+
+      const visualTarget = resolveVisualEventTarget(next, root);
+      if (!visualTarget || visualTarget === root) return;
+      event.preventDefault();
+      activeSelectedElement = visualTarget;
+      const node = getNodeInfo(visualTarget, root);
+      onVisualSelect?.(node);
+      onVisualSelectStack?.(collectAncestorNodeStack(visualTarget, root));
+    };
+
+    shadow.addEventListener("pointerover", handlePointerOver);
     shadow.addEventListener("click", handleClick, true);
     shadow.addEventListener("pointerleave", handlePointerLeave);
+    host.addEventListener("keydown", handleKeyDown);
     return () => {
-      shadow.removeEventListener("pointermove", handlePointerMove);
+      setHoveredElement(null);
+      shadow.removeEventListener("pointerover", handlePointerOver);
       shadow.removeEventListener("click", handleClick, true);
       shadow.removeEventListener("pointerleave", handlePointerLeave);
+      host.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onVisualHover, onVisualSelect, onVisualSelectStack, visualEditMode]);
+  }, [
+    onVisualSelect,
+    onVisualSelectStack,
+    selectedVisualNodeId,
+    visualEditMode,
+  ]);
 
   const previewHost = (
     <div
@@ -456,6 +610,7 @@ export function PrototypePagePreview({
         !shouldScaleToPreviewSize && className,
       )}
       data-prototype-preview
+      tabIndex={visualEditMode ? 0 : undefined}
     />
   );
 

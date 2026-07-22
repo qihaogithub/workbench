@@ -167,7 +167,6 @@ export function createBashTool(config: AgentConfig): AgentTool<typeof BashParams
 
           let outputText = truncResult.content;
           if (truncResult.truncated) {
-            const startLine = truncResult.totalLines - truncResult.outputLines + 1;
             outputText = `[Showing last ${truncResult.outputLines} lines / ${formatSize(truncResult.outputBytes)} of ${truncResult.totalLines} lines / ${formatSize(truncResult.totalBytes)}.]\n${outputText}`;
           }
 

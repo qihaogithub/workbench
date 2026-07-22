@@ -168,7 +168,6 @@ export class BackendAgent extends BaseAgent {
     );
 
     let inactivityTimer: ReturnType<typeof setTimeout> | undefined;
-    let absoluteTimer: ReturnType<typeof setTimeout> | undefined;
     let timedOut = false;
 
     const resetInactivityTimer = () => {
@@ -198,7 +197,7 @@ export class BackendAgent extends BaseAgent {
     resetInactivityTimer();
 
     // 启动绝对超时定时器（永不重置）
-    absoluteTimer = setTimeout(() => {
+    const absoluteTimer = setTimeout(() => {
       logger.warn(
         { sessionId: this.sessionId, absoluteMs: ABSOLUTE_TIMEOUT_MS },
         "Absolute timeout fired, calling cancel()",

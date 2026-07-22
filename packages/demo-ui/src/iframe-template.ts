@@ -57,7 +57,7 @@ const consoleInterceptScript = `
 })();
 `;
 
-const visualEditScript = `
+export const visualEditScript = `
 (function() {
   var state = { enabled: false, hoverNodeId: null, selectedNodeId: null, hiddenNodeIds: [], annotations: [], propertyChanges: [] };
   var hoverBox = null;
@@ -81,6 +81,9 @@ const visualEditScript = `
   var hiddenNodeOriginalDisplays = {};
   var lastHoverId = null;
   var appliedPropertyOriginals = {};
+  var selectionCycleSignature = '';
+  var selectionCycleIndex = -1;
+  var visualOverlayRedrawFrame = null;
 
   function ensureLayer() {
     if (!hoverBox) {
@@ -176,6 +179,14 @@ const visualEditScript = `
     var rect = el.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return false;
     return true;
+  }
+
+  function normalizeEditableTarget(el) {
+    if (!el || el.nodeType !== 1) return null;
+    if (el.ownerSVGElement) {
+      return el.closest && el.closest('svg') ? el.closest('svg') : el.ownerSVGElement;
+    }
+    return el;
   }
 
   function getDomPath(el) {
@@ -837,7 +848,6 @@ const visualEditScript = `
     if (hoverBox) hoverBox.style.display = 'none';
     if (label) label.style.display = 'none';
     lastHoverId = null;
-    window.parent.postMessage({ type: 'VISUAL_HOVER', node: null }, '*');
   }
 
   function hideCommentBubble() {
@@ -942,15 +952,16 @@ const visualEditScript = `
 
   function redrawHoverFromState() {
     ensureLayer();
-    if (!state.hoverNodeId) {
+    var hoverNodeId = state.hoverNodeId || lastHoverId;
+    if (!hoverNodeId) {
       if (hoverBox) hoverBox.style.display = 'none';
       if (label) label.style.display = 'none';
       return;
     }
-    var hovered = getElementByPath(state.hoverNodeId);
+    var hovered = getElementByPath(hoverNodeId);
     if (!hovered) {
       try {
-        hovered = document.querySelector('[data-visual-node-id="' + state.hoverNodeId.replace(/"/g, '\\\\"') + '"]');
+        hovered = document.querySelector('[data-visual-node-id="' + hoverNodeId.replace(/"/g, '\\\\"') + '"]');
       } catch (_err) {
         hovered = null;
       }
@@ -963,6 +974,19 @@ const visualEditScript = `
     var node = getNodeInfo(hovered);
     drawBox(hoverBox, node);
     drawLabel(node);
+  }
+
+  function scheduleVisualOverlayRedraw() {
+    if (!state.enabled || visualOverlayRedrawFrame != null) return;
+    visualOverlayRedrawFrame = requestAnimationFrame(function() {
+      visualOverlayRedrawFrame = null;
+      redrawSelection();
+      redrawHoverFromState();
+      renderAnnotations();
+      if (commentBubble && commentBubble.style.display !== 'none' && commentNode) {
+        positionCommentBubble(commentNode, false);
+      }
+    });
   }
 
   function renderAnnotations() {
@@ -1017,7 +1041,8 @@ const visualEditScript = `
   }
 
   function closestEditable(target) {
-    var el = target && target.nodeType === 1 ? target : target && target.parentElement;
+    var raw = target && target.nodeType === 1 ? target : target && target.parentElement;
+    var el = normalizeEditableTarget(raw);
     while (el && el !== document.body) {
       if (isEditableElement(el)) return el;
       el = el.parentElement;
@@ -1040,13 +1065,55 @@ const visualEditScript = `
     var seen = {};
     var editable = [];
     (elements || []).forEach(function(item) {
-      if (!item || !isEditableElement(item)) return;
-      var path = getDomPath(item);
+      var normalized = normalizeEditableTarget(item);
+      if (!normalized || !isEditableElement(normalized)) return;
+      var path = getDomPath(normalized);
       if (!path || seen[path]) return;
       seen[path] = true;
-      editable.push(getNodeInfo(item));
+      editable.push(getNodeInfo(normalized));
     });
     return editable.reverse();
+  }
+
+  function chooseNodeFromStack(stack, event) {
+    if (!stack || stack.length === 0) return null;
+    var signature = stack.map(function(item) { return item.domPath; }).join('|');
+    var shouldCycle = !!(event && (event.metaKey || event.ctrlKey));
+    if (shouldCycle && selectionCycleSignature === signature) {
+      selectionCycleIndex = (selectionCycleIndex - 1 + stack.length) % stack.length;
+    } else {
+      selectionCycleSignature = signature;
+      selectionCycleIndex = stack.length - 1;
+    }
+    if (!shouldCycle) selectionCycleSignature = '';
+    return stack[selectionCycleIndex] || stack[stack.length - 1];
+  }
+
+  function moveSelectedNodeToStackEnd(stack, selected) {
+    if (!selected) return stack || [];
+    return (stack || []).filter(function(item) {
+      return item.domPath !== selected.domPath;
+    }).concat([selected]);
+  }
+
+  function collectAncestorNodeStack(element) {
+    var stack = [];
+    var current = element;
+    while (current && current !== document.body) {
+      if (isEditableElement(current)) stack.unshift(getNodeInfo(current));
+      current = current.parentElement;
+    }
+    return stack;
+  }
+
+  function reportKeyboardSelection(element) {
+    if (!element || !isEditableElement(element)) return false;
+    var node = getNodeInfo(element);
+    var stack = collectAncestorNodeStack(element);
+    state.selectedNodeId = node.domPath;
+    drawBox(selectedBox, node);
+    window.parent.postMessage({ type: 'VISUAL_SELECT', node: node, nodeStack: stack }, '*');
+    return true;
   }
 
   function buildVisualNodeTree(rootEl, options) {
@@ -1113,7 +1180,7 @@ const visualEditScript = `
     return el;
   }
 
-  document.addEventListener('mousemove', function(event) {
+  document.addEventListener('pointerover', function(event) {
     if (!state.enabled) return;
     var el = closestEditable(event.target);
     if (state.annotationMode) el = resolveAnnotationTarget(el);
@@ -1121,12 +1188,45 @@ const visualEditScript = `
       clearHover();
       return;
     }
+    var hoverId = el.getAttribute('data-visual-node-id') || getDomPath(el);
+    if (hoverId === lastHoverId) return;
+    lastHoverId = hoverId;
     var node = getNodeInfo(el);
-    if (node.nodeId === lastHoverId) return;
-    lastHoverId = node.nodeId;
     drawBox(hoverBox, node);
     drawLabel(node);
-    window.parent.postMessage({ type: 'VISUAL_HOVER', node: node }, '*');
+  }, true);
+
+  document.addEventListener('pointerout', function(event) {
+    if (!state.enabled) return;
+    if (event.relatedTarget && document.documentElement.contains(event.relatedTarget)) return;
+    clearHover();
+  }, true);
+
+  document.addEventListener('keydown', function(event) {
+    if (!state.enabled || state.annotationMode) return;
+    var eventTarget = event.target;
+    if (eventTarget && eventTarget.closest && eventTarget.closest('input,textarea,select,[contenteditable="true"]')) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      state.selectedNodeId = null;
+      if (selectedBox) selectedBox.style.display = 'none';
+      window.parent.postMessage({ type: 'VISUAL_SELECT', node: null, nodeStack: [] }, '*');
+      return;
+    }
+    if (!state.selectedNodeId) return;
+    var selected = getElementByPath(state.selectedNodeId);
+    if (!selected) return;
+    var next = null;
+    if (event.key === 'Enter') {
+      next = event.shiftKey ? selected.parentElement : selected.firstElementChild;
+    } else if (event.key === 'Tab') {
+      next = event.shiftKey ? selected.previousElementSibling : selected.nextElementSibling;
+    } else {
+      return;
+    }
+    next = normalizeEditableTarget(next);
+    if (!next || !reportKeyboardSelection(next)) return;
+    event.preventDefault();
   }, true);
 
   document.addEventListener('click', function(event) {
@@ -1146,7 +1246,8 @@ const visualEditScript = `
       return;
     }
     var stack = collectElementStack(event.clientX, event.clientY, el);
-    var node = stack.length > 0 ? stack[stack.length - 1] : getNodeInfo(el);
+    var node = chooseNodeFromStack(stack, event) || getNodeInfo(el);
+    stack = moveSelectedNodeToStackEnd(stack, node);
     state.selectedNodeId = node.domPath;
     drawBox(selectedBox, node);
     if (state.annotationMode) {
@@ -1175,6 +1276,7 @@ const visualEditScript = `
     }
     var stack = collectElementStack(event.clientX, event.clientY, el);
     var node = stack.length > 0 ? stack[stack.length - 1] : getNodeInfo(el);
+    stack = moveSelectedNodeToStackEnd(stack, node);
     state.selectedNodeId = node.domPath;
     drawBox(selectedBox, node);
     window.parent.postMessage({
@@ -1195,6 +1297,13 @@ const visualEditScript = `
       dismissCommentBubble({ deleteEmptyAnnotation: true });
     }, 0);
   });
+
+  document.addEventListener('scroll', scheduleVisualOverlayRedraw, true);
+  window.addEventListener('resize', scheduleVisualOverlayRedraw);
+  if (typeof ResizeObserver !== 'undefined') {
+    var visualResizeObserver = new ResizeObserver(scheduleVisualOverlayRedraw);
+    visualResizeObserver.observe(document.body);
+  }
 
   document.addEventListener('dblclick', function(event) {
     if (!state.enabled) return;

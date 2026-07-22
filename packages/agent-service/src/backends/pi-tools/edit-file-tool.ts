@@ -438,7 +438,7 @@ export function createEditFileTool(
           ? resolveLiveWorkspaceMutationContext(config.workingDir)
           : null;
         let snapshotDriftRetry = 0;
-        while (true) {
+        for (;;) {
           try {
             snapshot = liveWorkspace
               ? await liveWorkspace.authority.getSnapshot(
@@ -559,7 +559,7 @@ export function createEditFileTool(
           if (!collabWriteSucceeded) {
             // Authority path (non-collab resource or collab room unavailable)
             let mutateDriftRetry = 0;
-            while (true) {
+            for (;;) {
               try {
                 receipt = await liveWorkspace.authority.mutate({
                   mutationId: crypto.randomUUID(),

@@ -6,7 +6,7 @@ let _LUCIDE_EXPORTS: Set<string> | undefined;
 function getLucideExports(): Set<string> {
   if (_LUCIDE_EXPORTS) return _LUCIDE_EXPORTS;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const LucideIcons = require("lucide-react");
     _LUCIDE_EXPORTS = new Set(Object.keys(LucideIcons));
   } catch {

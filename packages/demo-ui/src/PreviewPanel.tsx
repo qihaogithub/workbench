@@ -280,7 +280,6 @@ export function PreviewPanel({
   hiddenVisualNodeIds = [],
   visualPropertyChanges = [],
   visualAnnotations = [],
-  onVisualHover,
   onVisualSelect,
   onVisualSelectStack,
   visualNodeTreeRequestKey,
@@ -1178,10 +1177,6 @@ export function PreviewPanel({
           );
           break;
 
-        case "VISUAL_HOVER":
-          onVisualHover?.(event.data?.node ?? null);
-          break;
-
         case "VISUAL_SELECT":
           onVisualSelect?.(event.data?.node ?? null);
           if (Array.isArray(event.data?.nodeStack)) {
@@ -1256,7 +1251,6 @@ export function PreviewPanel({
     sendCollectPositionableSizes,
     sendVisualEditState,
     sendCollectVisualNodeTree,
-    onVisualHover,
     onVisualSelect,
     onVisualSelectStack,
     onVisualNodeTreeChange,

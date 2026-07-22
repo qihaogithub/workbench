@@ -84,7 +84,7 @@ export function createDeleteFileTool(
 
         let snapshot;
         let snapshotDriftRetry = 0;
-        while (true) {
+        for (;;) {
           try {
             snapshot = liveWorkspace
               ? await liveWorkspace.authority.getSnapshot(
@@ -135,7 +135,7 @@ export function createDeleteFileTool(
 
         if (liveWorkspace) {
           let driftRetryCount = 0;
-          while (true) {
+          for (;;) {
             try {
               await liveWorkspace.authority.mutate({
                 mutationId: crypto.randomUUID(),
