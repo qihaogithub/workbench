@@ -108,7 +108,7 @@ interface ReasoningTriggerProps extends React.ComponentProps<
 function ReasoningTrigger({
   getThinkingMessage,
   className,
-  children,
+  children: _children,
   ...props
 }: ReasoningTriggerProps) {
   const { isStreaming, isOpen, duration } = useReasoning();

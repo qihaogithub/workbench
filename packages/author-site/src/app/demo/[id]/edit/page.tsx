@@ -1635,7 +1635,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [triggerAutoSend, setTriggerAutoSend] = useState<
     string | AutoRepairTrigger | VisualPropertyAutoSend | null
   >(null);
-  // visualEditMode and related state moved to useVisualEditState hook
 
   // 自动修复是否正在进行中：待发送的 auto_repair 触发 或 消息列表中存在 running 状态的 autoRepair
   const isAutoRepairing =
@@ -2480,11 +2479,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     applyPrototypeVisualConfig: applyActivePrototypeVisualConfig,
   });
   const {
-    hoveredVisualNode,
-    setHoveredVisualNode,
     selectedVisualNode,
     setSelectedVisualNode,
     visualNodeStack,
+    setVisualNodeStack,
     visualPanelHoverNodeId,
     setVisualPanelHoverNodeId,
     visualPropertyChanges,
@@ -7374,18 +7372,8 @@ ${context.details}
                           }
                           hiddenVisualNodeIds={hiddenVisualNodeIds}
                           visualPropertyChanges={visualPropertyChanges}
-                          onVisualHover={setHoveredVisualNode}
                           onVisualSelect={handleVisualSelect}
-                          onVisualSelectStack={(nodes) => {
-                            if (nodes.length > 0) {
-                              handleVisualSelect(
-                                nodes[nodes.length - 1],
-                                nodes,
-                              );
-                            } else {
-                              handleVisualSelect(null, []);
-                            }
-                          }}
+                          onVisualSelectStack={setVisualNodeStack}
                           visualNodeTreeRequestKey={visualLayerTreeRequestKey}
                           onVisualNodeTreeChange={setVisualLayerTreeNodes}
                         />
@@ -7467,18 +7455,8 @@ ${context.details}
                           hiddenVisualNodeIds={hiddenVisualNodeIds}
                           visualPropertyChanges={visualPropertyChanges}
                           visualAnnotations={visualAnnotations}
-                          onVisualHover={setHoveredVisualNode}
                           onVisualSelect={handleVisualSelect}
-                          onVisualSelectStack={(nodes) => {
-                            if (nodes.length > 0) {
-                              handleVisualSelect(
-                                nodes[nodes.length - 1],
-                                nodes,
-                              );
-                            } else {
-                              handleVisualSelect(null, []);
-                            }
-                          }}
+                          onVisualSelectStack={setVisualNodeStack}
                           visualNodeTreeRequestKey={visualLayerTreeRequestKey}
                           onVisualNodeTreeChange={setVisualLayerTreeNodes}
                           staticPrototypeRequestKey={staticPrototypeRequestKey}

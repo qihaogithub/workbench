@@ -31,7 +31,7 @@ export type SubagentRunner = (
 
 export function createDelegateTaskTool(
   runner: SubagentRunner,
-  config: AgentConfig,
+  _config: AgentConfig,
 ): AgentTool<typeof DelegateTaskParams> {
   return {
     name: "delegateTask",

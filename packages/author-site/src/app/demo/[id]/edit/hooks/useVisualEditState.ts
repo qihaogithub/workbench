@@ -138,26 +138,6 @@ function getNodeSummary(node: VisualNodeInfo): string {
   return `<${node.tagName}> ${node.domPath}${text}${cls}`;
 }
 
-function getVisualNodeIdentity(node: VisualNodeInfo | null): string | null {
-  if (!node) return null;
-  return node.domPath || node.nodeId;
-}
-
-function isSameVisualNode(
-  current: VisualNodeInfo | null,
-  next: VisualNodeInfo | null,
-): boolean {
-  return getVisualNodeIdentity(current) === getVisualNodeIdentity(next);
-}
-
-function isSameVisualNodeStack(
-  current: VisualNodeInfo[],
-  next: VisualNodeInfo[],
-): boolean {
-  if (current.length !== next.length) return false;
-  return current.every((node, index) => isSameVisualNode(node, next[index] ?? null));
-}
-
 function formatChangeValue(change: VisualPropertyChange): string {
   if (change.resource) {
     const parts = [
@@ -457,10 +437,7 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
   } = params;
   const { toast } = useToast();
 
-  const [visualEditMode, setVisualEditMode] = useState(false);
   const [visualAnnotationMode, setVisualAnnotationMode] = useState(false);
-  const [hoveredVisualNode, setHoveredVisualNode] =
-    useState<VisualNodeInfo | null>(null);
   const [selectedVisualNode, setSelectedVisualNode] =
     useState<VisualNodeInfo | null>(null);
   const [visualNodeStack, setVisualNodeStack] = useState<VisualNodeInfo[]>([]);
@@ -592,10 +569,8 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
   const handleVisualSelect = useCallback(
     (node: VisualNodeInfo | null, nodeStack?: VisualNodeInfo[]) => {
       const nextStack = nodeStack ?? (node ? [node] : []);
-      setSelectedVisualNode((current) => (isSameVisualNode(current, node) ? current : node));
-      setVisualNodeStack((current) =>
-        isSameVisualNodeStack(current, nextStack) ? current : nextStack,
-      );
+      setSelectedVisualNode(node);
+      setVisualNodeStack(nextStack);
       setVisualPanelHoverNodeId((current) => (current === null ? current : null));
       if (!node) return;
 
@@ -607,7 +582,7 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
   );
 
   const handleVisualStackSelect = useCallback((node: VisualNodeInfo) => {
-    setSelectedVisualNode((current) => (isSameVisualNode(current, node) ? current : node));
+    setSelectedVisualNode(node);
     setVisualPanelHoverNodeId((current) => (current === null ? current : null));
   }, []);
 
@@ -1165,18 +1140,14 @@ ${effectiveInstructionForPrompt || "无"}
   const handleStartVisualConfig = useCallback(() => {
     if (visualConfigMode) {
       setVisualConfigMode(false);
-      setVisualEditMode(false);
       setVisualConfigNode(null);
       setSelectedVisualNode(null);
-      setHoveredVisualNode(null);
       return;
     }
 
     setVisualConfigMode(true);
     setVisualAnnotationMode(false);
-    setVisualEditMode(true);
     setSelectedVisualNode(null);
-    setHoveredVisualNode(null);
     setVisualConfigError(null);
   }, [visualConfigMode]);
 
@@ -1342,11 +1313,9 @@ ${message}
         return;
       }
       setVisualAnnotationMode(false);
-      setVisualEditMode(false);
       setVisualConfigMode(false);
       setVisualConfigNode(null);
       setSelectedVisualNode(null);
-      setHoveredVisualNode(null);
       setVisualAnnotations((prev) => prev.filter((item) => item.resolved));
       return;
     }
@@ -1355,9 +1324,7 @@ ${message}
     setVisualAnnotationMode(next);
     setVisualConfigMode(false);
     setVisualConfigNode(null);
-    setVisualEditMode(next);
     setSelectedVisualNode(null);
-    setHoveredVisualNode(null);
   }, [visualAnnotationMode, visualAnnotations]);
 
   const handleSendVisualAnnotationsToAI = useCallback(() => {
@@ -1400,7 +1367,6 @@ ${context}
     setTabValue("ai");
     setTriggerAutoSend(prompt);
     setVisualAnnotationMode(false);
-    setVisualEditMode(false);
     setSelectedVisualNode(null);
     setVisualAnnotations((prev) =>
       prev.map((item) =>
@@ -1542,12 +1508,8 @@ ${context}
 
   return {
     // State
-    visualEditMode,
-    setVisualEditMode,
     visualAnnotationMode,
     setVisualAnnotationMode,
-    hoveredVisualNode,
-    setHoveredVisualNode,
     selectedVisualNode,
     setSelectedVisualNode,
     visualNodeStack,

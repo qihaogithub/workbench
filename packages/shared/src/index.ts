@@ -1,6 +1,5 @@
 import type {
   ProjectAuthoringPreferences,
-  UserAuthoringPreferences,
   WorkspaceRevision,
 } from "./workspace";
 

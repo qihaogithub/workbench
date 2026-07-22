@@ -5,8 +5,6 @@ import {
   FileText,
   Terminal,
   Edit3,
-  FolderOpen,
-  Search,
   Code,
   Loader2,
   ChevronDown,

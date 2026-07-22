@@ -7,7 +7,6 @@ import type {
   ProjectAdminResult,
   TemplateMetaInput,
   ValidationIssue,
-  WorkspaceMutationPort,
 } from "../../project-core/src/types.js";
 import { ProjectAdminService } from "../../project-core/src/service.js";
 import { LOCAL_PREVIEW_DEV_SERVER_SCRIPT } from "./local-preview-dev-server.js";
@@ -147,29 +146,6 @@ function readJson<T>(filePath: string): T | null {
   } catch {
     return null;
   }
-}
-
-function readText(projectDir: string, relativePath: string): string {
-  return fs.readFileSync(path.join(projectDir, relativePath), "utf-8");
-}
-
-function readOptionalText(
-  projectDir: string,
-  relativePath: string | undefined,
-): string | undefined {
-  if (!relativePath) return undefined;
-  const filePath = path.join(projectDir, relativePath);
-  return fs.existsSync(filePath)
-    ? fs.readFileSync(filePath, "utf-8")
-    : undefined;
-}
-
-function readOptionalJson<T>(
-  projectDir: string,
-  relativePath: string | undefined,
-): T | undefined {
-  if (!relativePath) return undefined;
-  return readJson<T>(path.join(projectDir, relativePath)) ?? undefined;
 }
 
 function pageRuntimeType(

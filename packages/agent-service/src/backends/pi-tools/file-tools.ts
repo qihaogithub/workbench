@@ -182,7 +182,7 @@ export function createReadFileTool(
           >
         > | null = null;
         let driftRetryCount = 0;
-        while (true) {
+        for (;;) {
           try {
             snapshot = liveWorkspace
               ? await liveWorkspace.authority.getSnapshot(
@@ -336,7 +336,7 @@ export function createWriteFileTool(
           : null;
         let snapshot;
         let snapshotDriftRetry = 0;
-        while (true) {
+        for (;;) {
           try {
             snapshot = liveWorkspace
               ? await liveWorkspace.authority.getSnapshot(
@@ -419,7 +419,7 @@ export function createWriteFileTool(
           if (!collabWriteSucceeded) {
             // Authority path (non-collab resource or collab room unavailable)
             let driftRetryCount = 0;
-            while (true) {
+            for (;;) {
               try {
                 receipt = await liveWorkspace.authority.mutate({
                   mutationId: crypto.randomUUID(),
@@ -595,7 +595,7 @@ export function createListFilesTool(
           : null;
         let snapshot;
         let driftRetryCount = 0;
-        while (true) {
+        for (;;) {
           try {
             snapshot = liveWorkspace
               ? await liveWorkspace.authority.getSnapshot(

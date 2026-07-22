@@ -145,8 +145,6 @@ function getAlignmentPoints(layout: CanvasPageLayout): AlignmentPoint[] {
 export function computeAlignment(
   movingLayout: CanvasPageLayout,
   otherLayouts: CanvasPageLayout[],
-  isResizing: boolean,
-  edge?: string,
 ): { layout: CanvasPageLayout; guides: AlignmentGuide[] } {
   const guides: AlignmentGuide[] = [];
   let snappedX: number | undefined;
