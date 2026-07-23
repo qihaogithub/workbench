@@ -8,7 +8,6 @@ import {
   type CSSProperties,
   type SyntheticEvent,
 } from "react";
-import Link from "next/link";
 import {
   Copy,
   FolderPen,
@@ -19,6 +18,7 @@ import {
   Repeat2,
   Save,
   Trash2,
+  Tag,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,7 +28,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { DemoMeta, ProjectTemplateMeta } from "@workbench/shared";
+import type { DemoMeta } from "@workbench/shared";
 
 const DEFAULT_CATEGORY = "未分类";
 const MAX_SCREENSHOT_COVER_ITEMS = 10;
@@ -45,17 +45,7 @@ interface DemoCardProps {
   onRename: (demo: DemoMeta) => void;
   onChangeCategory: (demo: DemoMeta) => void;
   onChangeCover: (demo: DemoMeta) => void;
-}
-
-interface TemplateProjectCardProps {
-  template: ProjectTemplateMeta;
-  screenshotRevision?: number;
-  onDuplicate: (template: ProjectTemplateMeta) => void;
-  onRename: (template: ProjectTemplateMeta) => void;
-  onChangeCategory: (template: ProjectTemplateMeta) => void;
-  onChangeCover: (template: ProjectTemplateMeta) => void;
-  onConvertToProject: (template: ProjectTemplateMeta) => void;
-  onDelete: (template: ProjectTemplateMeta) => void;
+  onConvertToProject: (demo: DemoMeta) => void;
 }
 
 function formatShortDate(timestamp: number): string {
@@ -390,6 +380,7 @@ export function DemoCard({
   onRename,
   onChangeCategory,
   onChangeCover,
+  onConvertToProject,
 }: DemoCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const editHref = `/demo/${demo.id}/edit`;
@@ -434,6 +425,15 @@ export function DemoCard({
                 >
                   <Lock className="h-3 w-3" />
                   锁定
+                </Badge>
+              )}
+              {demo.projectType === "template" && (
+                <Badge
+                  variant="secondary"
+                  className="shrink-0 gap-1 px-1.5 py-0 text-[10px]"
+                >
+                  <Tag className="h-3 w-3" />
+                  模板
                 </Badge>
               )}
             </div>
@@ -515,7 +515,20 @@ export function DemoCard({
               <Save className="mr-2 h-3.5 w-3.5" />
               设为模板
             </DropdownMenuItem>
-          ) : null}
+          ) : (
+            <DropdownMenuItem
+              className="text-xs"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setMenuOpen(false);
+                onConvertToProject(demo);
+              }}
+            >
+              <Repeat2 className="mr-2 h-3.5 w-3.5" />
+              转为普通项目
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem
             className="text-xs"
             onClick={(e) => {
@@ -535,161 +548,6 @@ export function DemoCard({
               e.stopPropagation();
               setMenuOpen(false);
               onDelete(demo.id);
-            }}
-          >
-            <Trash2 className="mr-2 h-3.5 w-3.5" />
-            删除
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  );
-}
-
-export function TemplateProjectCard({
-  template,
-  screenshotRevision,
-  onDuplicate,
-  onRename,
-  onChangeCategory,
-  onChangeCover,
-  onConvertToProject,
-  onDelete,
-}: TemplateProjectCardProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  return (
-    <div className="group relative">
-      <Link
-        href={`/demo/${template.sourceProjectId}/edit`}
-        aria-label={`打开模板 ${template.name}`}
-        className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <Card className="cursor-pointer overflow-hidden border border-border/50 bg-card transition-all duration-300 hover:border-border/80">
-          <div className="relative aspect-video overflow-hidden bg-gradient-to-br from-muted/80 to-muted">
-            {template.thumbnail ? (
-              <img
-                src={template.thumbnail}
-                alt={template.name}
-                className="h-full w-full object-contain"
-              />
-            ) : template.demoPages && template.demoPages.length > 0 ? (
-              <div className="h-full w-full">
-                <ScreenshotCover
-                  demo={{ ...template, category: template.category }}
-                  screenshotRevision={screenshotRevision}
-                />
-              </div>
-            ) : (
-              <PlaceholderIcon />
-            )}
-            <Badge className="absolute left-3 top-3 px-2 py-0.5 text-[11px]">
-              模板
-            </Badge>
-          </div>
-
-          <CardContent className="p-4">
-            <div className="flex min-w-0 items-center gap-2 pr-9">
-              <h3 className="truncate text-base font-medium text-foreground">
-                {template.name}
-              </h3>
-            </div>
-            <div className="mt-2 flex min-w-0 items-center gap-2 pr-9 text-xs text-muted-foreground">
-              <Badge
-                variant="secondary"
-                className="shrink-0 px-1.5 py-0 text-[10px]"
-              >
-                {formatCategoryPath(template.category)}
-              </Badge>
-              <span className="shrink-0 whitespace-nowrap">
-                {formatShortDate(template.updatedAt)}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-      </Link>
-      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-        <DropdownMenuTrigger asChild>
-          <button
-            aria-label={`打开模板 ${template.name} 的更多操作`}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setMenuOpen(true);
-            }}
-            className="absolute bottom-4 right-4 z-10 flex h-7 w-7 items-center justify-center rounded-md opacity-0 transition-colors duration-200 hover:bg-accent group-hover:opacity-100 focus:opacity-100"
-          >
-            <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-36">
-          <DropdownMenuItem
-            className="text-xs"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setMenuOpen(false);
-              onDuplicate(template);
-            }}
-          >
-            <Copy className="mr-2 h-3.5 w-3.5" />
-            使用此模板新建
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="text-xs"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setMenuOpen(false);
-              onRename(template);
-            }}
-          >
-            <Pencil className="mr-2 h-3.5 w-3.5" />
-            修改名称
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="text-xs"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setMenuOpen(false);
-              onChangeCategory(template);
-            }}
-          >
-            <FolderPen className="mr-2 h-3.5 w-3.5" />
-            修改分类
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="text-xs"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setMenuOpen(false);
-              onChangeCover(template);
-            }}
-          >
-            <Image className="mr-2 h-3.5 w-3.5" />
-            修改封面
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="text-xs"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setMenuOpen(false);
-              onConvertToProject(template);
-            }}
-          >
-            <Repeat2 className="mr-2 h-3.5 w-3.5" />
-            转为普通项目
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="text-xs text-destructive focus:text-destructive"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setMenuOpen(false);
-              onDelete(template);
             }}
           >
             <Trash2 className="mr-2 h-3.5 w-3.5" />

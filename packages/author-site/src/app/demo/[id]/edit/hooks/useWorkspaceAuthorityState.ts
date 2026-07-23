@@ -163,7 +163,6 @@ export function useWorkspaceAuthorityState(
                 ...next,
                 committedRevision: newRevision,
                 committedRootHash: committedEvent.receipt.rootHash,
-                isConnected: true,
               };
               lastPolledRevisionRef.current = newRevision;
             }
@@ -179,6 +178,13 @@ export function useWorkspaceAuthorityState(
               previewStatus: ack.status === "applied" ? "applied" : "failed",
             };
           }
+        }
+
+        // 轮询成功即表示与 Authority 连接正常，恢复 isConnected。
+        // 此前仅在遇到新 committed 事件时才置 true，导致一次轮询失败后
+        // 即使后续轮询成功也会因无新事件而永久停留在 offline。
+        if (!next.isConnected) {
+          next = { ...next, isConnected: true };
         }
 
         return next;
