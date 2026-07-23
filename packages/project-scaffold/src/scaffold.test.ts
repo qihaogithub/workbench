@@ -610,29 +610,10 @@ try {
   assert.equal(template.data?.sourceWorkspaceRootHash, "scaffold-root-hash");
   const templateId = template.data?.id ?? "";
   assert.ok(templateId);
-  const templateReadingMap = JSON.parse(
-    fs.readFileSync(
-      path.join(
-        tempDir,
-        "knowledge",
-        "templates",
-        templateId,
-        "reading-map.json",
-      ),
-      "utf-8",
-    ),
-  ) as {
-    overview: { knowledgeCount: number };
-    structure: { knowledgeDocuments: Array<{ title: string; path: string }> };
-  };
-  assert.equal(templateReadingMap.overview.knowledgeCount, 1);
+  assert.equal(templateId, projectId);
   assert.equal(
-    templateReadingMap.structure.knowledgeDocuments[0]?.title,
-    "活动规则",
-  );
-  assert.equal(
-    templateReadingMap.structure.knowledgeDocuments[0]?.path,
-    "knowledge/活动规则.md",
+    service.getProject(projectId).data?.project.projectType,
+    "template",
   );
 
   const templateDir = path.join(tempDir, "template-local-project");

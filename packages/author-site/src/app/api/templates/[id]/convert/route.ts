@@ -4,6 +4,7 @@ import {
   getProjectAdminService,
   projectAdminResponse,
 } from "@/lib/project-admin-service";
+import { reconcileTemplateKnowledge } from "@/lib/knowledge-service";
 
 export async function POST(
   _request: Request,
@@ -12,6 +13,7 @@ export async function POST(
   try {
     const result = getProjectAdminService().convertTemplateToProject(params.id);
     if (!result.ok) return projectAdminResponse(result);
+    await reconcileTemplateKnowledge();
 
     return NextResponse.json(createApiSuccess(result.data));
   } catch (error) {

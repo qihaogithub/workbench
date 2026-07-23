@@ -1,10 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 
 import { setSystemKnowledgeSnapshot } from "../../src/config/system-knowledge";
 import { createKnowledgeReportTool } from "../../src/backends/pi-tools/knowledge-report-tool";
+import { createReadKnowledgeSourceTool } from "../../src/backends/pi-tools/read-knowledge-source-tool";
 
 describe("knowledgeReport tool", () => {
   let tempDir: string;
@@ -93,5 +94,131 @@ describe("knowledgeReport tool", () => {
 
     expect(result.content[0]?.text).not.toContain("当前项目采用三轮开奖");
     expect(result.content[0]?.text).toContain("未找到当前主体可用资料");
+  });
+
+  it("作者侧报告附加其他模板项目来源并使用 projectId 排除当前项目", async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchMock = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as {
+        currentProjectId?: string;
+      };
+      expect(body.currentProjectId).toBe("project-current");
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            hits: [
+              {
+                sourceRef: "knowledge://chunk_1234567890abcdef12345678",
+                projectId: "project-template",
+                projectName: "客服模板",
+                documentId: "document-1",
+                title: "退款口径",
+                path: "knowledge/退款口径.md",
+                kind: "knowledge-document",
+                revision: 8,
+                rootHash: "root-8",
+                snippet: "超过七天不可退款",
+                score: -1,
+              },
+            ],
+          },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+    try {
+      const tool = createKnowledgeReportTool({
+        sessionId: "session-template-search",
+        projectId: "project-current",
+        demoId: "page-current",
+        workingDir: tempDir,
+      });
+
+      const result = await tool.execute("call-template", {
+        question: "退款规则是什么？",
+      });
+
+      expect(result.content[0]?.text).toContain("其他模板项目参考");
+      expect(result.content[0]?.text).toContain("客服模板 / 退款口径");
+      expect(result.content[0]?.text).toContain(
+        "knowledge://chunk_1234567890abcdef12345678",
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("按知识报告返回的不透明引用读取模板项目完整原文", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            source: {
+              sourceRef: "knowledge://chunk_1234567890abcdef12345678",
+              projectId: "project-template",
+              projectName: "客服模板",
+              documentId: "document-1",
+              title: "退款口径",
+              path: "knowledge/退款口径.md",
+              kind: "knowledge-document",
+              revision: 8,
+              rootHash: "root-8",
+              content: "# 退款口径\n\n超过七天不可退款。",
+            },
+          },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    ) as typeof fetch;
+    try {
+      const result = await createReadKnowledgeSourceTool().execute(
+        "call-read-source",
+        { sourceRef: "knowledge://chunk_1234567890abcdef12345678" },
+      );
+
+      expect(result.isError).toBeUndefined();
+      expect(result.content[0]?.text).toContain("客服模板");
+      expect(result.content[0]?.text).toContain("超过七天不可退款");
+      expect(result.details).toMatchObject({
+        projectId: "project-template",
+        revision: 8,
+        rootHash: "root-8",
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("原文引用失效时返回明确错误", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          success: false,
+          error: {
+            code: "KNOWLEDGE_SOURCE_NOT_FOUND",
+            message: "知识来源不存在",
+          },
+        }),
+        { status: 404, headers: { "content-type": "application/json" } },
+      ),
+    ) as typeof fetch;
+    try {
+      const result = await createReadKnowledgeSourceTool().execute(
+        "call-missing-source",
+        { sourceRef: "knowledge://chunk_000000000000000000000000" },
+      );
+
+      expect(result.isError).toBe(true);
+      expect(result.details).toEqual({
+        error: "KNOWLEDGE_SOURCE_NOT_FOUND",
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });

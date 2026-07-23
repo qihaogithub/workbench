@@ -6,19 +6,29 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts",
+    "./sqlite-catalog": "./src/sqlite-catalog.ts"
   },
   "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "build:docker": "esbuild src/server.ts --bundle --platform=node --target=node20 --outdir=dist --format=cjs --packages=external",
+    "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
     "@workbench/knowledge-core": "workspace:*",
-    "@workbench/shared": "workspace:*"
+    "better-sqlite3": "12.11.1",
+    "fastify": "^4.26.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.11.16",
+    "esbuild": "^0.20.2",
+    "tsx": "^4.0.0",
     "typescript": "^5.3.3",
     "vitest": "^1.6.1"
   }

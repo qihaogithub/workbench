@@ -2316,7 +2316,7 @@ register(
 
 register(
   "template create-from-project",
-  "将项目保存为模板快照",
+  "将现有项目标记为模板项目",
   (args, pos, { service, actor }) =>
     service.createTemplateFromProject(
       stringArg(args, "projectId", pos[0]),
@@ -2419,7 +2419,7 @@ register(
 
 register(
   "template submit",
-  "提交本地项目包并保存为模板快照",
+  "提交本地项目包并将项目标记为模板项目",
   async (args, pos, { service, actor }) => {
     const projectDir = stringArg(args, "dir", pos[0] ?? process.cwd());
     const resolvedDir = path.resolve(projectDir);

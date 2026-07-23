@@ -68,7 +68,7 @@ test("compose preflight requires shared DATA_DIR and explicit single-instance Au
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "workspace-compose-preflight-"));
   const composePath = path.join(root, "docker-compose.yml");
   try {
-    fs.writeFileSync(composePath, `services:\n${["agent-service", "author-site", "screenshot-service"].map((service) => `  ${service}:\n    environment:\n      - DATA_DIR=/app/data\n${service === "agent-service" ? "      - WORKSPACE_AUTHORITY_INSTANCE_MODE=single\n      - WORKSPACE_AUTHORITY_REPLICA_COUNT=1\n" : ""}    volumes:\n      - \${APP_DATA_DIR:-/opt/workbench/data}:/app/data\n`).join("")}`);
+    fs.writeFileSync(composePath, `services:\n${["knowledge-service", "agent-service", "author-site", "screenshot-service"].map((service) => `  ${service}:\n${service === "knowledge-service" ? "    expose:\n      - \"3203\"\n" : ""}    environment:\n      - DATA_DIR=/app/data\n${["agent-service", "author-site"].includes(service) ? "      - KNOWLEDGE_SERVICE_URL=http://knowledge-service:3203\n" : ""}${service === "agent-service" ? "      - WORKSPACE_AUTHORITY_INSTANCE_MODE=single\n      - WORKSPACE_AUTHORITY_REPLICA_COUNT=1\n" : ""}    volumes:\n      - \${APP_DATA_DIR:-/opt/workbench/data}:/app/data\n`).join("")}`);
     assert.equal(checkComposeDataDir(composePath).passed, true);
     fs.appendFileSync(composePath, "  unrelated:\n    image: noop\n");
     const source = fs.readFileSync(composePath, "utf-8").replace("DATA_DIR=/app/data", "DATA_DIR=/tmp/other");
@@ -83,12 +83,48 @@ test("compose preflight rejects missing policy and agent-service replicas greate
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "workspace-compose-replicas-"));
   const composePath = path.join(root, "docker-compose.yml");
   try {
-    const service = (name, extra = "") => `  ${name}:\n    environment:\n      - DATA_DIR=/app/data\n${extra}    volumes:\n      - \${APP_DATA_DIR:-/opt/workbench/data}:/app/data\n`;
-    fs.writeFileSync(composePath, `services:\n${service("agent-service", "    deploy:\n      replicas: 2\n")}${service("author-site")}${service("screenshot-service")}`);
+    const service = (name, extra = "") => `  ${name}:\n${name === "knowledge-service" ? "    expose:\n      - \"3203\"\n" : ""}    environment:\n      - DATA_DIR=/app/data\n${["agent-service", "author-site"].includes(name) ? "      - KNOWLEDGE_SERVICE_URL=http://knowledge-service:3203\n" : ""}${extra}    volumes:\n      - \${APP_DATA_DIR:-/opt/workbench/data}:/app/data\n`;
+    fs.writeFileSync(composePath, `services:\n${service("knowledge-service")}${service("agent-service", "    deploy:\n      replicas: 2\n")}${service("author-site")}${service("screenshot-service")}`);
     const result = checkComposeDataDir(composePath);
     assert.equal(result.passed, false);
     assert.equal(result.issues.some((entry) => entry.code === "WORKSPACE_AUTHORITY_INSTANCE_POLICY_MISSING"), true);
     assert.equal(result.issues.some((entry) => entry.code === "WORKSPACE_AUTHORITY_MULTI_INSTANCE_UNSUPPORTED"), true);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("compose preflight rejects externally exposed or replicated SQLite knowledge service", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "knowledge-compose-preflight-"));
+  const composePath = path.join(root, "docker-compose.yml");
+  try {
+    const shared = "    environment:\n      - DATA_DIR=/app/data\n    volumes:\n      - ${APP_DATA_DIR:-/opt/workbench/data}:/app/data\n";
+    fs.writeFileSync(composePath, `services:
+  knowledge-service:
+    ports:
+      - "3203:3203"
+    deploy:
+      replicas: 2
+${shared}  agent-service:
+    environment:
+      - DATA_DIR=/app/data
+      - KNOWLEDGE_SERVICE_URL=http://knowledge-service:3203
+      - WORKSPACE_AUTHORITY_INSTANCE_MODE=single
+      - WORKSPACE_AUTHORITY_REPLICA_COUNT=1
+    volumes:
+      - \${APP_DATA_DIR:-/opt/workbench/data}:/app/data
+  author-site:
+    environment:
+      - DATA_DIR=/app/data
+      - KNOWLEDGE_SERVICE_URL=http://knowledge-service:3203
+    volumes:
+      - \${APP_DATA_DIR:-/opt/workbench/data}:/app/data
+  screenshot-service:
+${shared}`);
+    const result = checkComposeDataDir(composePath);
+    assert.equal(result.passed, false);
+    assert.equal(result.issues.some((entry) => entry.code === "KNOWLEDGE_SERVICE_EXPOSURE_INVALID"), true);
+    assert.equal(result.issues.some((entry) => entry.code === "KNOWLEDGE_SERVICE_MULTI_INSTANCE_UNSUPPORTED"), true);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

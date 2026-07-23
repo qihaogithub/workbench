@@ -19,12 +19,12 @@ DEPLOY_ENV_FILE="${PROJECT_DIR}/.deploy.env"
 # 部署范围与构建资源保护。
 # 默认包含 screenshot-service；如需临时跳过截图服务，设置 INCLUDE_SCREENSHOT_SERVICE=false
 # 或显式指定 DEPLOY_SERVICES 不含 screenshot-service。
-DEPLOY_SERVICES="${DEPLOY_SERVICES:-agent-service author-site viewer-site screenshot-service}"
+DEPLOY_SERVICES="${DEPLOY_SERVICES:-knowledge-service agent-service author-site viewer-site screenshot-service}"
 INCLUDE_SCREENSHOT_SERVICE="${INCLUDE_SCREENSHOT_SERVICE:-true}"
 COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-1}"
 DEPLOY_SYNC_MODE="${DEPLOY_SYNC_MODE:-full}"
 DEPLOY_BUILD_MODE="${DEPLOY_BUILD_MODE:-local}"
-DEPLOY_IMAGE_PLATFORM="${DEPLOY_IMAGE_PLATFORM:-linux/amd64}"
+DEPLOY_IMAGE_PLATFORM="${DEPLOY_IMAGE_PLATFORM:-linux/arm64}"
 REMOTE_IMAGE_DIR_BASE="${REMOTE_IMAGE_DIR_BASE:-/tmp/workbench-deploy-images}"
 REMOTE_BUILD_MIN_MEM_AVAILABLE_MB="${REMOTE_BUILD_MIN_MEM_AVAILABLE_MB:-3072}"
 REMOTE_BUILD_MAX_LOAD="${REMOTE_BUILD_MAX_LOAD:-4.0}"
@@ -148,11 +148,11 @@ fi
 
 for service in ${DEPLOY_SERVICES}; do
     case "${service}" in
-        agent-service|author-site|screenshot-service|viewer-site)
+        knowledge-service|agent-service|author-site|screenshot-service|viewer-site)
             ;;
         *)
             echo -e "${RED}❌ 不支持的部署服务名: ${service}${NC}"
-            echo -e "${YELLOW}   允许值: agent-service author-site screenshot-service viewer-site${NC}"
+            echo -e "${YELLOW}   允许值: knowledge-service agent-service author-site screenshot-service viewer-site${NC}"
             exit 1
             ;;
     esac
@@ -202,6 +202,7 @@ esac
 
 image_for_service() {
     case "$1" in
+        knowledge-service) echo "workbench-knowledge-service" ;;
         agent-service) echo "workbench-agent-service" ;;
         author-site) echo "workbench-author-site" ;;
         screenshot-service) echo "workbench-screenshot-service" ;;
@@ -368,6 +369,10 @@ if [ "${DEPLOY_SYNC_MODE}" = "targeted" ]; then
 
     for service in ${DEPLOY_SERVICES}; do
         case "${service}" in
+            knowledge-service)
+                add_required_package "knowledge-core"
+                add_required_package "knowledge-service"
+                ;;
             agent-service)
                 add_required_package "agent-service"
                 add_required_package "knowledge-core"
@@ -445,6 +450,7 @@ if [ "${DEPLOY_SYNC_MODE}" = "targeted" ]; then
         local dockerfile
         local package_name
         case "${service}" in
+            knowledge-service) dockerfile="docker/knowledge-service/Dockerfile" ;;
             agent-service) dockerfile="docker/agent-service/Dockerfile" ;;
             author-site) dockerfile="docker/author-site/Dockerfile" ;;
             screenshot-service) dockerfile="docker/screenshot-service/Dockerfile" ;;
@@ -559,6 +565,7 @@ if [ "${DEPLOY_BUILD_MODE}" = "local" ]; then
 
         image_for_service() {
             case \"\$1\" in
+                knowledge-service) echo 'workbench-knowledge-service' ;;
                 agent-service) echo 'workbench-agent-service' ;;
                 author-site) echo 'workbench-author-site' ;;
                 screenshot-service) echo 'workbench-screenshot-service' ;;
@@ -664,6 +671,7 @@ echo -e "${BLUE}🩺 部署后自检...${NC}"
 
     container_for_service() {
         case \"\$1\" in
+            knowledge-service) echo 'workbench-knowledge-service-1' ;;
             agent-service) echo 'workbench-agent-service-1' ;;
             author-site) echo 'workbench-author-site-1' ;;
             screenshot-service) echo 'workbench-screenshot-service-1' ;;
@@ -730,7 +738,7 @@ echo -e "${BLUE}🩺 部署后自检...${NC}"
         all_healthy=true
         for service in \${DEPLOY_SERVICES}; do
             case \"\$service\" in
-                agent-service|author-site|screenshot-service) ;;
+                knowledge-service|agent-service|author-site|screenshot-service) ;;
                 *) continue ;;
             esac
             name=\$(container_for_service \"\$service\")
@@ -747,7 +755,7 @@ echo -e "${BLUE}🩺 部署后自检...${NC}"
             echo '❌ 健康检查超时'
             for service in \${DEPLOY_SERVICES}; do
                 case \"\$service\" in
-                    agent-service|author-site|screenshot-service) ;;
+                    knowledge-service|agent-service|author-site|screenshot-service) ;;
                     *) continue ;;
                 esac
                 check_container_healthy \"\$(container_for_service \"\$service\")\"
@@ -760,7 +768,7 @@ echo -e "${BLUE}🩺 部署后自检...${NC}"
     # 健康检查
     for service in \${DEPLOY_SERVICES}; do
         case \"\$service\" in
-            agent-service|author-site|screenshot-service) ;;
+            knowledge-service|agent-service|author-site|screenshot-service) ;;
             *) continue ;;
         esac
         check_container_healthy \"\$(container_for_service \"\$service\")\"

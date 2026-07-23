@@ -1,4 +1,30 @@
 services:
+  knowledge-service:
+    build:
+      context: .
+      dockerfile: docker/knowledge-service/Dockerfile
+    expose:
+      - "3203"
+    environment:
+      - PORT=3203
+      - HOST=0.0.0.0
+      - DATA_DIR=/app/data
+      - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-}
+      - KNOWLEDGE_RECONCILE_INTERVAL_MS=${KNOWLEDGE_RECONCILE_INTERVAL_MS:-5000}
+      - KNOWLEDGE_BACKUP_INTERVAL_MS=${KNOWLEDGE_BACKUP_INTERVAL_MS:-86400000}
+      - KNOWLEDGE_BACKUP_RETENTION_DAYS=${KNOWLEDGE_BACKUP_RETENTION_DAYS:-7}
+    volumes:
+      - ${APP_DATA_DIR:-/opt/workbench/data}:/app/data
+    cpus: "1.0"
+    mem_limit: 1g
+    pids_limit: 256
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3203/health').then(async r=>r.ok&&(await r.json()).status==='ok'?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   agent-service:
     build:
       context: .
@@ -32,11 +58,15 @@ services:
       - FIGMA_MCP_URL=${FIGMA_MCP_URL:-}
       - FIGMA_MCP_REGION=${FIGMA_MCP_REGION:-}
       - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-}
+      - KNOWLEDGE_SERVICE_URL=http://knowledge-service:3203
       - IMAGE_DESCRIPTION_ENABLED=${IMAGE_DESCRIPTION_ENABLED:-false}
       - IMAGE_DESCRIPTION_MODEL=${IMAGE_DESCRIPTION_MODEL:-}
       - IMAGE_DESCRIPTION_TIMEOUT=${IMAGE_DESCRIPTION_TIMEOUT:-60000}
     volumes:
       - ${APP_DATA_DIR:-/opt/workbench/data}:/app/data
+    depends_on:
+      knowledge-service:
+        condition: service_healthy
     cpus: "1.0"
     mem_limit: 1g
     pids_limit: 512
@@ -61,6 +91,7 @@ services:
       - PORT=3200
       - HOSTNAME=0.0.0.0
       - AGENT_SERVICE_URL=http://agent-service:3201
+      - KNOWLEDGE_SERVICE_URL=http://knowledge-service:3203
       - NEXT_PUBLIC_AGENT_SERVICE_URL=${NEXT_PUBLIC_AGENT_SERVICE_URL:-http://localhost:3201}
       - SCREENSHOT_SERVICE_URL=http://screenshot-service:3202
       - NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES=${NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES:-custom/}
@@ -83,6 +114,7 @@ services:
       - ${APP_DATA_DIR:-/opt/workbench/data}:/app/data
     depends_on:
       - agent-service
+      - knowledge-service
     cpus: "1.0"
     mem_limit: 2g
     pids_limit: 512

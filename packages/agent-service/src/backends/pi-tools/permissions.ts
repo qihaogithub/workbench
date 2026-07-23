@@ -53,7 +53,8 @@ export function isPathAllowed(
     return false;
   }
 
-  const relativePath = path.relative(workDirResolved, resolved).replace(/\\/g, "/");
+  const relativePath =
+    path.relative(workDirResolved, resolved).replace(/\\/g, "/") || ".";
   const normalizedResolved = resolved.replace(/\\/g, "/");
 
   for (const pattern of config.deniedPatterns) {

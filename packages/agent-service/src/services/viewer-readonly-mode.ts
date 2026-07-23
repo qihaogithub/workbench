@@ -23,6 +23,7 @@ export function normalizeAgentMode(value: unknown): AgentMode {
 /** 浏览端只读权限：白名单文件 + 全量禁止命令，服务端强制，不信任客户端 */
 export const VIEWER_READONLY_PERMISSIONS: AgentConfig["permissions"] = {
   allowedPaths: [
+    ".",
     "workspace-tree.json",
     "project.config.schema.json",
     "memory.md",

@@ -74,7 +74,8 @@ export function SaveTemplateDialog({
           <DialogHeader>
             <DialogTitle>保存为模板</DialogTitle>
             <DialogDescription>
-              将当前项目复制为独立模板，后续创建项目时可以直接复用。
+              将当前项目标记为模板。项目仍可继续编辑和发布，并会进入 Agent
+              可查阅的总知识库。
             </DialogDescription>
           </DialogHeader>
 

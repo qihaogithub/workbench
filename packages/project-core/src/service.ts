@@ -3,10 +3,6 @@ import crypto from "node:crypto";
 import path from "node:path";
 
 import {
-  KnowledgeFileStore,
-  indexTemplateSnapshot,
-} from "@workbench/knowledge-service";
-import {
   PreviewRuntimeContractError,
   type RuntimeContractIssue,
 } from "@workbench/preview-contract/runtime";
@@ -183,7 +179,6 @@ interface WorkspaceMetadataFile {
 export class ProjectAdminService {
   readonly dataDir: string;
   readonly projectsDir: string;
-  readonly templatesDir: string;
   readonly workspacesDir: string;
   readonly snapshotsDir: string;
   readonly publishedDir: string;
@@ -198,7 +193,6 @@ export class ProjectAdminService {
   constructor(private readonly config: ProjectAdminConfig = {}) {
     this.dataDir = config.dataDir ?? getProjectAdminDataDir();
     this.projectsDir = path.join(this.dataDir, "projects");
-    this.templatesDir = path.join(this.dataDir, "templates");
     this.workspacesDir = path.join(this.dataDir, "workspaces");
     this.snapshotsDir = path.join(this.dataDir, "snapshots");
     this.publishedDir = path.join(this.dataDir, "published");
@@ -215,7 +209,6 @@ export class ProjectAdminService {
     [
       this.dataDir,
       this.projectsDir,
-      this.templatesDir,
       this.workspacesDir,
       this.snapshotsDir,
       this.sessionsDir,
@@ -363,6 +356,9 @@ export class ProjectAdminService {
       projects.push({
         id: entry.name,
         name: project.name,
+        projectType: project.projectType,
+        templateSettings: project.templateSettings,
+        sourceTemplateProjectId: project.sourceTemplateProjectId,
         category: normalizeProjectCategory(project.category),
         description: project.description,
         authoringPreferences: project.authoringPreferences,
@@ -533,6 +529,7 @@ export class ProjectAdminService {
         {
           id: "dry-run",
           name,
+          projectType: "standard",
           category,
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -551,15 +548,23 @@ export class ProjectAdminService {
     const workspacePath = path.join(projectPath, "workspace");
     ensureDir(projectPath);
 
-    if (input.templateId) {
-      const templateWorkspace = path.join(
-        this.getTemplatePath(input.templateId),
-        "workspace",
-      );
-      if (!fs.existsSync(templateWorkspace)) {
-        return fail("TEMPLATE_NOT_FOUND", "模板不存在");
+    const sourceProjectId = input.templateId ?? input.sourceProjectId;
+    if (sourceProjectId) {
+      const sourceProject = this.readProject(sourceProjectId);
+      if (!sourceProject) {
+        return fail(
+          input.templateId ? "TEMPLATE_NOT_FOUND" : "PROJECT_NOT_FOUND",
+          input.templateId ? "模板不存在" : "源项目不存在",
+        );
       }
-      copyWorkspace(templateWorkspace, workspacePath);
+      if (input.templateId && sourceProject.projectType !== "template") {
+        return fail("TEMPLATE_NOT_FOUND", "指定项目不是模板项目");
+      }
+      const sourceWorkspace = this.projectWorkspacePath(sourceProjectId);
+      if (!fs.existsSync(sourceWorkspace)) {
+        return fail("FILE_READ_ERROR", "源项目工作区不存在");
+      }
+      copyWorkspace(sourceWorkspace, workspacePath);
     } else {
       ensureDir(path.join(workspacePath, "demos"));
       this.writeWorkspaceTree(workspacePath, { pages: [], folders: [] });
@@ -570,6 +575,8 @@ export class ProjectAdminService {
     const project: Project = {
       id: projectId,
       name,
+      projectType: "standard",
+      sourceTemplateProjectId: input.templateId,
       category,
       description: input.description,
       authoringPreferences: input.authoringPreferences,
@@ -585,6 +592,8 @@ export class ProjectAdminService {
     const result: DemoMeta = {
       id: projectId,
       name,
+      projectType: project.projectType,
+      sourceTemplateProjectId: project.sourceTemplateProjectId,
       category,
       authoringPreferences: project.authoringPreferences,
       createdAt: stats.birthtimeMs,
@@ -594,7 +603,12 @@ export class ProjectAdminService {
     };
     const auditId = this.audit("project_create", actor, "L1", true, {
       projectId,
-      inputSummary: { name, category, templateId: input.templateId },
+      inputSummary: {
+        name,
+        category,
+        templateId: input.templateId,
+        sourceProjectId: input.sourceProjectId,
+      },
       diffSummary: { created: [`project:${projectId}`] },
     });
     return ok(result, {
@@ -630,6 +644,17 @@ export class ProjectAdminService {
       next.description = input.description;
       diff.updated?.push("project.description");
     }
+    if (input.projectType !== undefined) {
+      next.projectType = input.projectType;
+      if (input.projectType === "standard") {
+        next.templateSettings = undefined;
+      }
+      diff.updated?.push("project.projectType");
+    }
+    if (input.templateSettings !== undefined) {
+      next.templateSettings = input.templateSettings;
+      diff.updated?.push("project.templateSettings");
+    }
     if (input.authoringPreferences !== undefined) {
       next.authoringPreferences = input.authoringPreferences;
       diff.updated?.push("project.authoringPreferences");
@@ -655,24 +680,15 @@ export class ProjectAdminService {
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     const source = this.readProject(projectId);
     if (!source) return fail("PROJECT_NOT_FOUND", "项目不存在");
-    const templateId = this.createTemplateSnapshot(projectId, {
-      category: "临时复制",
-      name: `${source.name} copy source`,
-      description: "项目复制临时快照",
-    });
-    const created = this.createProject(
+    return this.createProject(
       {
         name: name ?? `${source.name} 副本`,
         category: normalizeProjectCategory(category ?? source.category),
-        templateId,
+        description: source.description,
+        sourceProjectId: projectId,
       },
       actor,
     );
-    fs.rmSync(this.getTemplatePath(templateId), {
-      recursive: true,
-      force: true,
-    });
-    return created;
   }
 
   deleteProjectPreview(
@@ -747,12 +763,13 @@ export class ProjectAdminService {
   ): ProjectAdminResult<ProjectTemplateMeta[]> {
     this.ensureDirs();
     const templates: ProjectTemplateMeta[] = [];
-    for (const entry of fs.readdirSync(this.templatesDir, {
+    for (const entry of fs.readdirSync(this.projectsDir, {
       withFileTypes: true,
     })) {
       if (!entry.isDirectory()) continue;
-      const meta = this.readTemplate(entry.name);
-      if (meta) templates.push(meta);
+      const project = this.readProject(entry.name);
+      if (project?.projectType !== "template") continue;
+      templates.push(this.projectToTemplateMeta(project));
     }
     const filtered = templates.filter((template) => {
       if (filter.scope && template.scope !== filter.scope) return false;
@@ -774,9 +791,11 @@ export class ProjectAdminService {
   }
 
   getTemplate(templateId: string): ProjectAdminResult<ProjectTemplateMeta> {
-    const template = this.readTemplate(templateId);
-    if (!template) return fail("TEMPLATE_NOT_FOUND", "模板不存在");
-    return ok(template);
+    const project = this.readProject(templateId);
+    if (!project || project.projectType !== "template") {
+      return fail("TEMPLATE_NOT_FOUND", "模板不存在");
+    }
+    return ok(this.projectToTemplateMeta(project));
   }
 
   createTemplateFromProject(
@@ -813,9 +832,22 @@ export class ProjectAdminService {
         },
       );
     }
-    const templateId = this.createTemplateSnapshot(projectId, input);
-    const template = this.readTemplate(templateId);
-    if (!template) return fail("FILE_WRITE_ERROR", "模板写入失败");
+    const now = Date.now();
+    const updated: Project = {
+      ...project,
+      name: input.name.trim() || project.name,
+      category: normalizeProjectCategory(input.category),
+      projectType: "template",
+      templateSettings: {
+        description: input.description.trim(),
+        scope: input.scope ?? (input.official ? "official" : "team"),
+        official: input.official ?? false,
+      },
+      thumbnail: input.thumbnail ?? project.thumbnail,
+      updatedAt: now,
+    };
+    this.writeProject(projectId, updated);
+    const template = this.projectToTemplateMeta(updated);
     const auditId = this.audit(
       "template_create_from_project",
       actor,
@@ -823,13 +855,13 @@ export class ProjectAdminService {
       true,
       {
         projectId,
-        resourceId: templateId,
-        diffSummary: { created: [`template:${templateId}`] },
+        resourceId: projectId,
+        diffSummary: { updated: [`project:${projectId}.projectType`] },
       },
     );
     return ok(template, {
       auditId,
-      diffSummary: { created: [`template:${templateId}`] },
+      diffSummary: { updated: [`project:${projectId}.projectType`] },
     });
   }
 
@@ -840,21 +872,36 @@ export class ProjectAdminService {
   ): ProjectAdminResult<ProjectTemplateMeta> {
     if (actor.role === "readonly")
       return fail("FORBIDDEN", "当前操作者没有写权限");
-    const template = this.readTemplate(templateId);
-    if (!template) return fail("TEMPLATE_NOT_FOUND", "模板不存在");
-    const updated: ProjectTemplateMeta = {
-      ...template,
-      category: input.category?.trim() || template.category,
-      name: input.name?.trim() || template.name,
-      description: input.description?.trim() || template.description,
+    const project = this.readProject(templateId);
+    if (!project || project.projectType !== "template") {
+      return fail("TEMPLATE_NOT_FOUND", "模板不存在");
+    }
+    const currentSettings = project.templateSettings ?? {
+      description: project.description ?? "",
+      scope: "team" as const,
+      official: false,
+    };
+    const updatedProject: Project = {
+      ...project,
+      category: input.category?.trim()
+        ? normalizeProjectCategory(input.category)
+        : project.category,
+      name: input.name?.trim() || project.name,
+      templateSettings: {
+        description:
+          input.description !== undefined
+            ? input.description.trim()
+            : currentSettings.description,
+        scope: input.scope ?? currentSettings.scope,
+        official: input.official ?? currentSettings.official,
+      },
       thumbnail: Object.prototype.hasOwnProperty.call(input, "thumbnail")
         ? input.thumbnail
-        : template.thumbnail,
-      scope: input.scope ?? template.scope,
-      official: input.official ?? template.official,
+        : project.thumbnail,
       updatedAt: Date.now(),
     };
-    this.writeTemplate(templateId, updated);
+    this.writeProject(templateId, updatedProject);
+    const updated = this.projectToTemplateMeta(updatedProject);
     const auditId = this.audit("template_update_meta", actor, "L1", true, {
       resourceId: templateId,
       diffSummary: { updated: [`template:${templateId}`] },
@@ -871,14 +918,15 @@ export class ProjectAdminService {
     this.ensureDirs();
     const templateIds = templateId
       ? [templateId]
-      : fs
-          .readdirSync(this.templatesDir, { withFileTypes: true })
-          .filter((entry) => entry.isDirectory())
-          .map((entry) => entry.name);
+      : (this.listTemplates().data ?? []).map((template) => template.id);
     const items = templateIds.map((id) => {
-      const template = this.readTemplate(id);
+      const project = this.readProject(id);
+      const template =
+        project?.projectType === "template"
+          ? this.projectToTemplateMeta(project)
+          : null;
       const issues: ValidationResult["issues"] = [];
-      const workspacePath = path.join(this.getTemplatePath(id), "workspace");
+      const workspacePath = this.projectWorkspacePath(id);
       if (!template) {
         issues.push({
           code: "TEMPLATE_META_INVALID",
@@ -939,14 +987,17 @@ export class ProjectAdminService {
   }
 
   deleteTemplatePreview(templateId: string): ProjectAdminResult<PreviewPlan> {
-    const template = this.readTemplate(templateId);
-    if (!template) return fail("TEMPLATE_NOT_FOUND", "模板不存在");
+    const project = this.readProject(templateId);
+    if (!project || project.projectType !== "template") {
+      return fail("TEMPLATE_NOT_FOUND", "模板不存在");
+    }
     return ok(
       this.createPlan("template_delete", templateId, [
-        `删除模板 ${template.name}`,
-        "不会删除已从该模板创建的项目",
+        `删除模板项目 ${project.name}`,
+        "删除项目工作区、发布产物和模板知识索引",
+        "不会删除已从该模板创建的其他项目",
       ]),
-      { diffSummary: { deleted: [`template:${templateId}`] } },
+      { diffSummary: { deleted: [`project:${templateId}`] } },
     );
   }
 
@@ -964,17 +1015,23 @@ export class ProjectAdminService {
     if (plan.confirmToken !== confirmToken) {
       return fail("CONFIRMATION_REQUIRED", "确认 token 不匹配");
     }
-    fs.rmSync(this.getTemplatePath(plan.resourceId), {
+    const project = this.readProject(plan.resourceId);
+    if (!project || project.projectType !== "template") {
+      return fail("TEMPLATE_NOT_FOUND", "模板不存在");
+    }
+    fs.rmSync(this.getProjectPath(plan.resourceId), {
       recursive: true,
       force: true,
     });
+    this.deletePublishedProjectArtifact(plan.resourceId);
     const auditId = this.audit("template_delete_execute", actor, "L3", true, {
+      projectId: plan.resourceId,
       resourceId: plan.resourceId,
-      diffSummary: { deleted: [`template:${plan.resourceId}`] },
+      diffSummary: { deleted: [`project:${plan.resourceId}`] },
     });
     return ok(
       { deleted: true, templateId: plan.resourceId },
-      { auditId, diffSummary: { deleted: [`template:${plan.resourceId}`] } },
+      { auditId, diffSummary: { deleted: [`project:${plan.resourceId}`] } },
     );
   }
 
@@ -984,43 +1041,37 @@ export class ProjectAdminService {
   ): ProjectAdminResult<DemoMeta> {
     if (actor.role === "readonly")
       return fail("FORBIDDEN", "当前操作者没有写权限");
-    const template = this.readTemplate(templateId);
-    if (!template) return fail("TEMPLATE_NOT_FOUND", "模板不存在");
-
-    const created = this.createProject(
-      {
-        name: template.name,
-        category: template.category,
-        description: template.description,
-        templateId,
-      },
-      actor,
-    );
-    if (!created.ok || !created.data) return created;
-
-    fs.rmSync(this.getTemplatePath(templateId), {
-      recursive: true,
-      force: true,
-    });
+    const project = this.readProject(templateId);
+    if (!project || project.projectType !== "template") {
+      return fail("TEMPLATE_NOT_FOUND", "模板不存在");
+    }
+    const updated: Project = {
+      ...project,
+      projectType: "standard",
+      templateSettings: undefined,
+      updatedAt: Date.now(),
+    };
+    this.writeProject(templateId, updated);
+    const result = this.projectToDemoMeta(updated);
     const auditId = this.audit(
       "template_convert_to_project",
       actor,
       "L2",
       true,
       {
-        projectId: created.data.id,
+        projectId: templateId,
         resourceId: templateId,
         diffSummary: {
-          created: [`project:${created.data.id}`],
           deleted: [`template:${templateId}`],
+          updated: [`project:${templateId}.projectType`],
         },
       },
     );
-    return ok(created.data, {
+    return ok(result, {
       auditId,
       diffSummary: {
-        created: [`project:${created.data.id}`],
         deleted: [`template:${templateId}`],
+        updated: [`project:${templateId}.projectType`],
       },
       nextActions: ["project_get", "template_list"],
     });
@@ -4758,10 +4809,6 @@ export class ProjectAdminService {
     return path.join(this.projectsDir, safeId(projectId, "project"));
   }
 
-  private getTemplatePath(templateId: string): string {
-    return path.join(this.templatesDir, safeId(templateId, "template"));
-  }
-
   private projectWorkspacePath(projectId: string): string {
     return path.join(this.getProjectPath(projectId), "workspace");
   }
@@ -5289,6 +5336,27 @@ export class ProjectAdminService {
     return {
       id: parsed.id ?? projectId,
       name: parsed.name ?? projectId,
+      projectType:
+        parsed.projectType === "template" ? "template" : "standard",
+      templateSettings:
+        parsed.projectType === "template" && parsed.templateSettings
+          ? {
+              description:
+                typeof parsed.templateSettings.description === "string"
+                  ? parsed.templateSettings.description
+                  : parsed.description ?? "",
+              scope:
+                parsed.templateSettings.scope === "personal" ||
+                parsed.templateSettings.scope === "official"
+                  ? parsed.templateSettings.scope
+                  : "team",
+              official: parsed.templateSettings.official === true,
+            }
+          : undefined,
+      sourceTemplateProjectId:
+        typeof parsed.sourceTemplateProjectId === "string"
+          ? parsed.sourceTemplateProjectId
+          : undefined,
       category: normalizeProjectCategory(parsed.category),
       description: parsed.description,
       workspacePath:
@@ -5339,97 +5407,49 @@ export class ProjectAdminService {
     );
   }
 
-  private readTemplate(templateId: string): ProjectTemplateMeta | null {
-    const parsed = readJsonFile<Partial<ProjectTemplateMeta>>(
-      path.join(this.getTemplatePath(templateId), "template.json"),
-    );
-    if (
-      !parsed?.id ||
-      !parsed.sourceProjectId ||
-      !parsed.category ||
-      !parsed.name ||
-      !parsed.description
-    ) {
-      return null;
-    }
+  private projectToTemplateMeta(project: Project): ProjectTemplateMeta {
+    const settings = project.templateSettings ?? {
+      description: project.description ?? "",
+      scope: "team" as const,
+      official: false,
+    };
     return {
-      id: parsed.id,
-      sourceProjectId: parsed.sourceProjectId,
-      sourceWorkspaceId:
-        typeof parsed.sourceWorkspaceId === "string"
-          ? parsed.sourceWorkspaceId
-          : undefined,
+      id: project.id,
+      sourceProjectId: project.id,
+      sourceWorkspaceId: project.canonicalSyncedWorkspaceId,
       sourceWorkspaceRevision:
-        typeof parsed.sourceWorkspaceRevision === "number"
-          ? parsed.sourceWorkspaceRevision
-          : undefined,
-      sourceWorkspaceRootHash:
-        typeof parsed.sourceWorkspaceRootHash === "string"
-          ? parsed.sourceWorkspaceRootHash
-          : undefined,
-      category: parsed.category,
-      name: parsed.name,
-      description: parsed.description,
-      thumbnail: parsed.thumbnail,
-      scope: parsed.scope,
-      official: parsed.official,
-      demoCount: parsed.demoCount ?? parsed.demoPages?.length ?? 0,
-      demoPages: parsed.demoPages,
-      createdAt: parsed.createdAt ?? Date.now(),
-      updatedAt: parsed.updatedAt ?? parsed.createdAt ?? Date.now(),
+        project.canonicalSyncedRevision === undefined
+          ? undefined
+          : Number(project.canonicalSyncedRevision),
+      sourceWorkspaceRootHash: project.canonicalSyncedRootHash,
+      category: normalizeProjectCategory(project.category),
+      name: project.name,
+      description: settings.description,
+      thumbnail: project.thumbnail,
+      scope: settings.scope,
+      official: settings.official,
+      demoCount: project.demoPages.length,
+      demoPages: sortPages(project.demoPages),
+      createdAt: project.createdAt,
+      updatedAt: project.updatedAt,
     };
   }
 
-  private writeTemplate(
-    templateId: string,
-    template: ProjectTemplateMeta,
-  ): void {
-    writeJsonFile(
-      path.join(this.getTemplatePath(templateId), "template.json"),
-      template,
-    );
-  }
-
-  private createTemplateSnapshot(
-    projectId: string,
-    input: TemplateMetaInput,
-  ): string {
-    const project = this.readProject(projectId);
-    if (!project) throw new Error("PROJECT_NOT_FOUND");
-    const proof = this.requireCanonicalWorkspaceProof(project, "保存为模板");
-    if (!proof.ok) throw new Error(proof.error?.code ?? "WORKSPACE_STALE");
-    const templateId = nowId("tmpl");
-    const templatePath = this.getTemplatePath(templateId);
-    const templateWorkspacePath = path.join(templatePath, "workspace");
-    ensureDir(templatePath);
-    copyWorkspace(this.projectWorkspacePath(projectId), templateWorkspacePath);
-    const tree = this.readWorkspaceTree(templateWorkspacePath);
-    const now = Date.now();
-    const template: ProjectTemplateMeta = {
-      id: templateId,
-      sourceProjectId: projectId,
-      sourceWorkspaceId: proof.data?.workspaceId,
-      sourceWorkspaceRevision: proof.data?.workspaceRevision,
-      sourceWorkspaceRootHash: proof.data?.workspaceRootHash,
-      category: input.category.trim(),
-      name: input.name.trim(),
-      description: input.description.trim(),
-      thumbnail: input.thumbnail ?? project.thumbnail,
-      scope: input.scope ?? (input.official ? "official" : "team"),
-      official: input.official ?? false,
-      demoCount: tree.pages.length,
-      demoPages: sortPages(tree.pages),
-      createdAt: now,
-      updatedAt: now,
+  private projectToDemoMeta(project: Project): DemoMeta {
+    return {
+      id: project.id,
+      name: project.name,
+      projectType: project.projectType,
+      templateSettings: project.templateSettings,
+      sourceTemplateProjectId: project.sourceTemplateProjectId,
+      category: normalizeProjectCategory(project.category),
+      createdAt: project.createdAt,
+      updatedAt: project.updatedAt,
+      thumbnail: project.thumbnail,
+      authoringPreferences: project.authoringPreferences,
+      demoCount: project.demoPages.length,
+      demoPages: sortPages(project.demoPages),
     };
-    this.writeTemplate(templateId, template);
-    indexTemplateSnapshot(new KnowledgeFileStore({ dataDir: this.dataDir }), {
-      templateId,
-      templateName: template.name,
-      templateDescription: template.description,
-      workspacePath: templateWorkspacePath,
-    });
-    return templateId;
   }
 
   private readWorkspaceTree(workspacePath: string): WorkspaceTree {

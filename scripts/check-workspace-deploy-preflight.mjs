@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const WRITER_SERVICES = ["agent-service", "author-site", "screenshot-service"];
+const WRITER_SERVICES = ["knowledge-service", "agent-service", "author-site", "screenshot-service"];
 
 function hashContent(content) {
   return crypto.createHash("sha256").update(content).digest("hex");
@@ -208,6 +208,23 @@ export function checkComposeDataDir(composePath) {
     if (!/\$\{APP_DATA_DIR(?::-[^}]*)?\}:\/app\/data(?:\s|$)/m.test(block)) {
       issues.push(issue("COMPOSE_DATA_VOLUME_MISMATCH", "service must mount shared APP_DATA_DIR at /app/data", { serviceName }));
     }
+    if (serviceName === "knowledge-service") {
+      if (!block.includes("expose:") || /^\s+ports:\s*$/m.test(block)) {
+        issues.push(issue(
+          "KNOWLEDGE_SERVICE_EXPOSURE_INVALID",
+          "knowledge-service must remain an internal-only compose service",
+          { serviceName },
+        ));
+      }
+      const replicaMatch = block.match(/^\s+replicas:\s*([0-9]+)\s*$/m);
+      if (replicaMatch && Number(replicaMatch[1]) !== 1) {
+        issues.push(issue(
+          "KNOWLEDGE_SERVICE_MULTI_INSTANCE_UNSUPPORTED",
+          "knowledge-service replicas must remain 1 while SQLite is the catalog store",
+          { serviceName, replicas: Number(replicaMatch[1]) },
+        ));
+      }
+    }
     if (serviceName === "agent-service") {
       if (!block.includes("WORKSPACE_AUTHORITY_INSTANCE_MODE=single") || !block.includes("WORKSPACE_AUTHORITY_REPLICA_COUNT=1")) {
         issues.push(issue(
@@ -224,6 +241,16 @@ export function checkComposeDataDir(composePath) {
           { serviceName, replicas: Number(replicaMatch[1]) },
         ));
       }
+    }
+  }
+  for (const serviceName of ["agent-service", "author-site"]) {
+    const block = serviceBlock(composeSource, serviceName);
+    if (block && !block.includes("KNOWLEDGE_SERVICE_URL=http://knowledge-service:3203")) {
+      issues.push(issue(
+        "KNOWLEDGE_SERVICE_URL_MISSING",
+        "service must use the internal knowledge-service endpoint",
+        { serviceName },
+      ));
     }
   }
   return { passed: issues.length === 0, composePath: path.resolve(composePath), issues };

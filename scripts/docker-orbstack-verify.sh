@@ -9,6 +9,7 @@ Usage:
   scripts/docker-orbstack-verify.sh [--with-screenshot]
 
 Checks the local OrbStack HTTP surface:
+  knowledge-service  container health (internal-only)
   author-site  http://localhost:3200
   agent-service http://localhost:3201/health
   viewer-site  http://localhost:3300
@@ -85,6 +86,16 @@ check_json_status() {
 check_http_status "author-site" "http://localhost:3200" "200"
 check_json_status "agent-service" "http://localhost:3201/health"
 check_http_status "viewer-site" "http://localhost:3300" "200"
+
+knowledge_health="$(
+    docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \
+        workbench-knowledge-service-1 2>/dev/null || true
+)"
+if [ "${knowledge_health}" != "healthy" ]; then
+    echo "knowledge-service failed: expected container health=healthy, got ${knowledge_health:-missing}" >&2
+    exit 1
+fi
+echo "knowledge-service ok: container health=healthy"
 
 if [ "${with_screenshot}" = true ]; then
     check_json_status "screenshot-service" "http://localhost:3202/health"
