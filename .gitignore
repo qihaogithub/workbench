@@ -13,11 +13,7 @@ out
 .worktrees
 .qoder
 /test/**/test-outputs/
-/data/agent-run-logs/
-/data/screenshots/
-/data/workspaces/
-/data/sessions/
-/data/snapshots/
+/data/
 memory.md
 
 # 官方参考代码（只读，不入库）
