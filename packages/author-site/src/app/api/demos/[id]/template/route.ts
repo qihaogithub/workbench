@@ -4,6 +4,7 @@ import {
   getProjectAdminService,
   projectAdminResponse,
 } from "@/lib/project-admin-service";
+import { reconcileTemplateKnowledge } from "@/lib/knowledge-service";
 
 export async function POST(
   request: NextRequest,
@@ -36,6 +37,7 @@ export async function POST(
       name,
       description,
     });
+    if (result.ok) await reconcileTemplateKnowledge();
 
     return projectAdminResponse(result, 201);
   } catch (error) {

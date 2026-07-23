@@ -45,8 +45,8 @@ importers:
   OPS/CLI:
     dependencies:
       better-sqlite3:
-        specifier: 11.7.0
-        version: 11.7.0
+        specifier: 12.11.1
+        version: 12.11.1
       chalk:
         specifier: ^5.3.0
         version: 5.6.2
@@ -468,8 +468,8 @@ importers:
         specifier: ^3.0.3
         version: 3.0.3
       better-sqlite3:
-        specifier: 11.7.0
-        version: 11.7.0
+        specifier: 12.11.1
+        version: 12.11.1
       class-variance-authority:
         specifier: ^0.7.0
         version: 0.7.1
@@ -730,13 +730,25 @@ importers:
       '@workbench/knowledge-core':
         specifier: workspace:*
         version: link:../knowledge-core
-      '@workbench/shared':
-        specifier: workspace:*
-        version: link:../shared
+      better-sqlite3:
+        specifier: 12.11.1
+        version: 12.11.1
+      fastify:
+        specifier: ^4.26.0
+        version: 4.29.1
     devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
       '@types/node':
         specifier: ^20.11.16
         version: 20.19.37
+      esbuild:
+        specifier: ^0.20.2
+        version: 0.20.2
+      tsx:
+        specifier: ^4.0.0
+        version: 4.21.0
       typescript:
         specifier: ^5.3.3
         version: 5.9.3
@@ -7084,8 +7096,9 @@ packages:
     hasBin: true
     dev: false
 
-  /better-sqlite3@11.7.0:
-    resolution: {integrity: sha512-mXpa5jnIKKHeoGzBrUJrc65cXFKcILGZpU3FXR0pradUEm9MA7UZz02qfEejaMcm9iXrSOCenwwYMJ/tZ1y5Ig==}
+  /better-sqlite3@12.11.1:
+    resolution: {integrity: sha512-dq9AtApgg5PGFtBzPFSBl3HZQjHok5gaQCM6zh2Yk0aSmDCs1CbnVI8/HgASQkNKsWFpseIO9beg5xxpYhbIfA==}
+    engines: {node: 20.x || 22.x || 23.x || 24.x || 25.x || 26.x}
     requiresBuild: true
     dependencies:
       bindings: 1.5.0

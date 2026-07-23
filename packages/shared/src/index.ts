@@ -1,5 +1,7 @@
 import type {
   ProjectAuthoringPreferences,
+  ProjectTemplateSettings,
+  ProjectType,
   WorkspaceRevision,
 } from "./workspace";
 
@@ -60,6 +62,9 @@ export interface PrototypePageMeta {
 export interface DemoMeta {
   id: string;
   name: string;
+  projectType?: ProjectType;
+  templateSettings?: ProjectTemplateSettings;
+  sourceTemplateProjectId?: string;
   category?: string;
   createdAt: number;
   updatedAt: number;
@@ -78,6 +83,7 @@ export interface DemoMeta {
 
 export interface ProjectTemplateMeta {
   id: string;
+  /** 兼容模板 API；新模型下始终与 id 相同。 */
   sourceProjectId: string;
   sourceWorkspaceId?: string;
   sourceWorkspaceRevision?: WorkspaceRevision;

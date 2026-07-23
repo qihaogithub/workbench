@@ -4,6 +4,7 @@ import {
   getProjectAdminService,
   projectAdminResponse,
 } from "@/lib/project-admin-service";
+import { reconcileTemplateKnowledge } from "@/lib/knowledge-service";
 
 export async function PATCH(
   request: Request,
@@ -45,6 +46,7 @@ export async function PATCH(
       category: typeof category === "string" ? category.trim() : undefined,
     });
     if (!result.ok) return projectAdminResponse(result);
+    await reconcileTemplateKnowledge();
 
     return NextResponse.json(createApiSuccess(result.data));
   } catch (error) {
@@ -70,6 +72,7 @@ export async function DELETE(
       preview.data.confirmToken,
     );
     if (!result.ok) return projectAdminResponse(result);
+    await reconcileTemplateKnowledge();
 
     return NextResponse.json(createApiSuccess(null));
   } catch (error) {

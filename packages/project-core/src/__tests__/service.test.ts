@@ -1414,19 +1414,13 @@ describe("ProjectAdminService", () => {
       official: true,
     });
     expect(template.ok).toBe(true);
+    expect(template.data?.id).toBe(created.data?.id);
+    expect(template.data?.sourceProjectId).toBe(created.data?.id);
     expect(template.data?.scope).toBe("official");
     expect(template.data?.official).toBe(true);
     expect(
-      fs.existsSync(
-        path.join(
-          tempDir,
-          "knowledge",
-          "templates",
-          template.data?.id ?? "",
-          "reading-map.json",
-        ),
-      ),
-    ).toBe(true);
+      service.getProject(created.data?.id ?? "").data?.project.projectType,
+    ).toBe("template");
 
     const officialList = service.listTemplates({
       scope: "official",
@@ -1543,7 +1537,7 @@ describe("ProjectAdminService", () => {
     expect(rolledBack.data?.publishedVersion).toBe("v3");
   });
 
-  it("支持将模板快照转为普通项目并移除模板", () => {
+  it("支持将模板项目转为普通项目且保持项目标识不变", () => {
     const source = service.createProject({
       name: "模板源项目",
       category: "活动",
@@ -1590,6 +1584,7 @@ describe("ProjectAdminService", () => {
     const converted = service.convertTemplateToProject(template.data?.id ?? "");
 
     expect(converted.ok).toBe(true);
+    expect(converted.data?.id).toBe(projectId);
     expect(converted.data?.name).toBe("可转换模板");
     expect(converted.data?.category).toBe("营销模板");
     expect(service.getTemplate(template.data?.id ?? "").ok).toBe(false);

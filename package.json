@@ -5,10 +5,11 @@
   "scripts": {
     "dev": "node scripts/dev-restart.mjs",
     "dev:repair": "node scripts/dev-restart.mjs --clear-cache",
-    "dev:services": "concurrently -n author,agent,viewer,sshot -c blue,green,cyan,yellow \"corepack pnpm --filter @workbench/author-site dev\" \"corepack pnpm --filter @workbench/agent-service dev\" \"corepack pnpm --filter @workbench/viewer-site dev\" \"corepack pnpm --filter @workbench/screenshot-service dev\"",
+    "dev:services": "concurrently -n author,agent,knowledge,viewer,sshot -c blue,green,magenta,cyan,yellow \"corepack pnpm --filter @workbench/author-site dev\" \"corepack pnpm --filter @workbench/agent-service dev\" \"corepack pnpm --filter @workbench/knowledge-service dev\" \"corepack pnpm --filter @workbench/viewer-site dev\" \"corepack pnpm --filter @workbench/screenshot-service dev\"",
     "dev:author": "corepack pnpm --filter @workbench/author-site dev",
     "dev:preview": "concurrently -n author,sshot -c blue,yellow \"corepack pnpm --filter @workbench/author-site dev\" \"corepack pnpm --filter @workbench/screenshot-service dev\"",
     "dev:agent": "corepack pnpm --filter @workbench/agent-service dev",
+    "dev:knowledge": "corepack pnpm --filter @workbench/knowledge-service dev",
     "dev:viewer": "corepack pnpm --filter @workbench/viewer-site dev",
     "dev:sketch": "corepack pnpm --filter @workbench/sketch-playground dev",
     "dev:screenshot": "corepack pnpm --filter @workbench/screenshot-service dev",
@@ -79,7 +80,9 @@
     "test:prototype-canvas-fixtures": "node scripts/development/create-prototype-canvas-performance-fixtures.mjs",
     "test:prototype-canvas-performance": "node scripts/development/measure-prototype-canvas-performance.mjs",
     "test:knowledge-validation": "node scripts/development/knowledge-validation-suite.mjs metrics",
-    "test:knowledge-validation:run": "node scripts/development/knowledge-validation-suite.mjs run"
+    "test:knowledge-validation:run": "node scripts/development/knowledge-validation-suite.mjs run",
+    "migrate:legacy-templates": "node scripts/migrate-legacy-template-projects.mjs",
+    "test:legacy-template-migration": "node --test scripts/migrate-legacy-template-projects.test.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.42.0",
@@ -100,6 +103,6 @@
   },
   "packageManager": "pnpm@8.15.0",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   }
 }
