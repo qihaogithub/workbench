@@ -262,7 +262,7 @@ describe('createWorkbenchTools - permissions 透传', () => {
         durationMs: 1,
       }),
     });
-    expect(tools).toHaveLength(27);
+    expect(tools).toHaveLength(28);
     expect(tools.some(t => t.name === 'readUploadedFile')).toBe(true);
     expect(tools.some(t => t.name === 'webRead')).toBe(true);
     expect(tools.some(t => t.name === 'webSearch')).toBe(false);
@@ -289,7 +289,7 @@ describe('createWorkbenchTools - permissions 透传', () => {
       }),
     });
 
-    expect(tools).toHaveLength(28);
+    expect(tools).toHaveLength(29);
     expect(tools.some(t => t.name === 'webSearch')).toBe(true);
     expect(tools.some(t => t.name === 'readUploadedFile')).toBe(true);
     expect(tools.some(t => t.name === 'readPreinstalledSkill')).toBe(true);

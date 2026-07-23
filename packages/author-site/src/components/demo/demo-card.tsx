@@ -502,18 +502,20 @@ export function DemoCard({
             <Image className="mr-2 h-3.5 w-3.5" />
             修改封面
           </DropdownMenuItem>
-          <DropdownMenuItem
-            className="text-xs"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setMenuOpen(false);
-              onSaveAsTemplate(demo);
-            }}
-          >
-            <Save className="mr-2 h-3.5 w-3.5" />
-            保存为模板
-          </DropdownMenuItem>
+          {demo.projectType !== "template" ? (
+            <DropdownMenuItem
+              className="text-xs"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setMenuOpen(false);
+                onSaveAsTemplate(demo);
+              }}
+            >
+              <Save className="mr-2 h-3.5 w-3.5" />
+              设为模板
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem
             className="text-xs"
             onClick={(e) => {

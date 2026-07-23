@@ -583,6 +583,7 @@ export interface CreateProjectInput {
   name: string;
   category?: string;
   templateId?: string;
+  sourceProjectId?: string;
   description?: string;
   authoringPreferences?: ProjectAuthoringPreferences;
   dryRun?: boolean;
@@ -593,6 +594,8 @@ export interface UpdateProjectInput {
   name?: string;
   category?: string;
   description?: string;
+  projectType?: Project["projectType"];
+  templateSettings?: Project["templateSettings"];
   authoringPreferences?: ProjectAuthoringPreferences;
   dryRun?: boolean;
 }

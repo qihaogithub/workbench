@@ -20,7 +20,7 @@ Options:
   -h, --help          Show this help.
 
 Default build scope:
-  agent-service author-site viewer-site
+  knowledge-service agent-service author-site viewer-site
 
 Default build mode is serial to keep local OrbStack builds predictable and avoid
 several clean pnpm installs competing for registry bandwidth.
@@ -64,10 +64,9 @@ export NEXT_PUBLIC_AGENT_SERVICE_URL="${NEXT_PUBLIC_AGENT_SERVICE_URL:-http://lo
 export NEXT_PUBLIC_SCREENSHOT_SERVICE_URL="${NEXT_PUBLIC_SCREENSHOT_SERVICE_URL:-http://localhost:3202}"
 export NEXT_PUBLIC_DATA_BASE="${NEXT_PUBLIC_DATA_BASE:-}"
 export CORS_ORIGINS="${CORS_ORIGINS:-http://localhost:3200,http://localhost:3300,http://127.0.0.1:3200,http://127.0.0.1:3300}"
-export SCREENSHOT_SERVICE_PLATFORM="${SCREENSHOT_SERVICE_PLATFORM:-linux/amd64}"
 export PUPPETEER_DISABLE_SANDBOX="${PUPPETEER_DISABLE_SANDBOX:-true}"
 
-services=(agent-service author-site viewer-site)
+services=(knowledge-service agent-service author-site viewer-site)
 compose_args=(--env-file "${ENV_FILE}")
 build_options=()
 

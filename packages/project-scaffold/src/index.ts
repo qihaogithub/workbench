@@ -50,6 +50,8 @@ interface LocalProjectManifest {
   schemaVersion: 1;
   scaffoldVersion: string;
   projectId: string;
+  projectType?: "standard" | "template";
+  sourceTemplateProjectId?: string;
   baseVersion: string;
   workspaceId?: string;
   workspaceRevision?: number;
@@ -906,6 +908,9 @@ export function exportProjectScaffoldEntries(
     schemaVersion: 1,
     scaffoldVersion: SCAFFOLD_VERSION,
     projectId: projectPackage.data.project.id,
+    projectType: projectPackage.data.project.projectType,
+    sourceTemplateProjectId:
+      projectPackage.data.project.sourceTemplateProjectId,
     baseVersion: projectPackage.data.baseVersion,
     workspaceId: projectPackage.data.workspaceId,
     workspaceRevision: projectPackage.data.workspaceRevision,
@@ -1941,7 +1946,7 @@ export function submitTemplateScaffold(
   if (!template.ok || !template.data) {
     return fail(
       template.error?.code ?? "TEMPLATE_CREATE_FAILED",
-      template.error?.message ?? "模板快照创建失败",
+      template.error?.message ?? "项目设为模板失败",
       {
         validation: template.validation,
         nextActions: template.nextActions,

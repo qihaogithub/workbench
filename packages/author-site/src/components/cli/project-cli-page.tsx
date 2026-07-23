@@ -68,7 +68,7 @@ export function ProjectCliPage({
             <h2 className="text-xl font-semibold">能力范围</h2>
             <div className="grid gap-3 sm:grid-cols-2">
               {[
-                ["项目与模板", "创建、复制、删除预览、模板快照、推荐和健康检查。"],
+                ["项目与模板", "创建、复制、删除预览、模板项目标记、推荐和健康检查。"],
                 ["页面与文件夹", "事务内创建、重命名、排序、移动和批量删除。"],
                 ["配置与校验", "项目级 Schema、页面 Schema、冲突检查和候选生成。"],
                 ["资产与预览", "图片上传、替换、引用扫描、预览入口和健康检查。"],

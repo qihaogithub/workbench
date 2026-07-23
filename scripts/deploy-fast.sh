@@ -8,20 +8,22 @@ print_usage() {
 用法:
   scripts/deploy-fast.sh author
   scripts/deploy-fast.sh agent
+  scripts/deploy-fast.sh knowledge
   scripts/deploy-fast.sh viewer
   scripts/deploy-fast.sh author viewer
   scripts/deploy-fast.sh shot
 
 默认启用 targeted sync，只同步目标服务构建所需的 workspace 包。
-默认启用本地构建：在本机生成 linux/amd64 镜像，上传到服务器后只执行 docker load + recreate。
+默认启用本地构建：在本机生成 linux/arm64 镜像，上传到服务器后只执行 docker load + recreate。
 
 短名:
   author      -> author-site
   agent       -> agent-service
+  knowledge   -> knowledge-service
   viewer      -> viewer-site
   shot        -> screenshot-service
   screenshot  -> screenshot-service
-  core        -> agent-service author-site viewer-site
+  core        -> knowledge-service agent-service author-site viewer-site
 
 选项:
   --targeted-sync  只同步目标服务需要的包（默认）
@@ -70,6 +72,9 @@ for target in "$@"; do
         agent|agent-service)
             services+=("agent-service")
             ;;
+        knowledge|knowledge-service)
+            services+=("knowledge-service")
+            ;;
         viewer|viewer-site)
             services+=("viewer-site")
             ;;
@@ -77,7 +82,7 @@ for target in "$@"; do
             services+=("screenshot-service")
             ;;
         core)
-            services+=("agent-service" "author-site" "viewer-site")
+            services+=("knowledge-service" "agent-service" "author-site" "viewer-site")
             ;;
         *)
             echo "不支持的部署目标: ${target}" >&2

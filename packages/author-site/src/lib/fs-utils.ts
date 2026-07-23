@@ -870,6 +870,8 @@ function createProjectFromTemplate(name: string, templateId: string): DemoMeta {
   const project: Project = {
     id: projectId,
     name: name || template.name || projectId,
+    projectType: "standard",
+    sourceTemplateProjectId: templateId,
     description: template.description,
     workspacePath,
     demoPages,
@@ -932,6 +934,7 @@ export function createProject(name: string, templateId?: string): DemoMeta {
   const project: Project = {
     id: projectId,
     name: name || projectId,
+    projectType: "standard",
     workspacePath,
     demoPages,
     demoFolders: [],
@@ -1090,6 +1093,8 @@ export function readProjectMeta(projectId: string): Project | null {
       ...parsed,
       id: parsed.id ?? projectId,
       name: parsed.name ?? projectId,
+      projectType:
+        parsed.projectType === "template" ? "template" : "standard",
       workspacePath:
         parsed.workspacePath ?? path.join(projectPath, "workspace"),
       demoPages,
