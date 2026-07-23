@@ -227,6 +227,7 @@ interface ChatInputProps {
   supportsFiles?: boolean;
   /** 是否显示历史会话入口（依赖 author-site 会话持久化）；viewer-readonly 场景传 false */
   supportsHistory?: boolean;
+  imageDescriptionEnabled?: boolean;
 }
 
 export function ChatInput({
@@ -246,6 +247,7 @@ export function ChatInput({
   supportsImages,
   supportsFiles = true,
   supportsHistory = true,
+  imageDescriptionEnabled = false,
 }: ChatInputProps) {
   const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -369,6 +371,7 @@ export function ChatInput({
             onModelChange={onModelChange}
             onDepthChange={onDepthChange}
             isLoading={isModelLoading}
+            imageDescriptionEnabled={imageDescriptionEnabled}
           />
         </PromptInputTools>
         <PromptInputSubmit />

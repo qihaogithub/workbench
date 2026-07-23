@@ -18,7 +18,6 @@ import {
   findWorkspacePath,
   readFoldersMeta,
   generateDemoPageId,
-  resolvePageRuntimeType,
   generateRouteKey,
   DEFAULT_DEMO_CODE,
   DEFAULT_DEMO_SCHEMA,
@@ -390,7 +389,7 @@ export async function POST(
           : 0;
       const demoId = generateDemoPageId(name.trim());
       const resolvedRuntimeType = sourceMeta
-        ? resolvePageRuntimeType(getDemoDirPath(wsPath, sourcePageId!))
+        ? sourceMeta.runtimeType
         : resolveNewPageRuntimeType(runtimeType);
       demoMeta = {
         id: demoId,
@@ -403,6 +402,7 @@ export async function POST(
         ),
         order: nextOrder,
         parentId: effectiveParentId,
+        runtimeType: resolvedRuntimeType,
       };
       const operations = sourcePageId
         ? buildCopyPageOperations({

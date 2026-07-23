@@ -9,7 +9,6 @@ import {
   createApiError,
   findWorkspacePath,
   readDemoPageMeta,
-  resolvePageRuntimeType,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import {
@@ -121,9 +120,7 @@ export async function GET(
     const pageMeta = pageDirectoryMatch
       ? readDemoPageMeta(wsPath, pageDirectoryMatch[1])
       : null;
-    const inferredRuntimeType = pageDirectoryMatch
-      ? resolvePageRuntimeType(resolvedPath)
-      : undefined;
+    const inferredRuntimeType = pageMeta?.runtimeType;
 
     for (const entry of entries) {
       if (isHiddenEntry(entry.name, showKnowledge)) continue;

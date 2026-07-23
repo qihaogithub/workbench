@@ -71,6 +71,22 @@ describe('isPathAllowed', () => {
     expect(isPathAllowed('demos', WORKSPACE, DEFAULT_WORKSPACE_PERMISSIONS)).toBe(true);
   });
 
+  it('listFiles 必须能列出根目录（relativePath 为空字符串时规范为 "."）', () => {
+    expect(isPathAllowed('.', WORKSPACE, DEFAULT_WORKSPACE_PERMISSIONS)).toBe(true);
+  });
+
+  it('根目录 "." 不能绕过 deny patterns（敏感文件仍被拒）', () => {
+    const restrictedConfig = {
+      allowedPaths: ['.'],
+      deniedPatterns: ['**/*.env', '**/.git/**', '**/node_modules/**'],
+      allowedCommands: [],
+      deniedCommands: [],
+    };
+    expect(isPathAllowed('.', WORKSPACE, restrictedConfig)).toBe(true);
+    expect(isPathAllowed('.env', WORKSPACE, restrictedConfig)).toBe(false);
+    expect(isPathAllowed('.git/config', WORKSPACE, restrictedConfig)).toBe(false);
+  });
+
   it('黑名单优先于白名单（deny 优先于 allow）', () => {
     const config = {
       ...DEFAULT_WORKSPACE_PERMISSIONS,

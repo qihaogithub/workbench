@@ -34,6 +34,10 @@ describe('viewer-readonly mode', () => {
     expect(normalizeAgentMode(123)).toBe('workbench');
   });
 
+  it('只读权限应允许枚举根目录', () => {
+    expect(VIEWER_READONLY_PERMISSIONS?.allowedPaths).toContain('.');
+  });
+
   it('只读权限应禁止全部命令且不放行敏感文件', () => {
     expect(VIEWER_READONLY_PERMISSIONS?.deniedCommands).toEqual(['*']);
     expect(VIEWER_READONLY_PERMISSIONS?.allowedCommands).toEqual([]);

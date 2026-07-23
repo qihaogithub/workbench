@@ -1,6 +1,10 @@
 # syntax=docker/dockerfile:1.7
 FROM node:20-bookworm-slim AS builder
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
 
 WORKDIR /app

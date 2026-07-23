@@ -8,8 +8,10 @@ import {
   ChevronRight,
   ArrowDown,
   ArrowRight,
+  Info,
   Sparkles,
   GripVertical,
+  Move,
 } from "lucide-react";
 import { cn } from "./utils";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +27,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
 import {
   Collapsible,
@@ -179,6 +187,8 @@ function parseSchemaToFields(schema: string): FieldGroup[] {
     const required = parsed.required || [];
 
     const groups: Record<string, FieldConfig[]> = {};
+    const ungrouped: FieldConfig[] = [];
+
     Object.entries(properties).forEach(([key, prop]: [string, any]) => {
       const uiOptions = isPlainRecord(prop["ui:options"]) ? prop["ui:options"] : undefined;
       const field: FieldConfig = {
@@ -641,6 +651,7 @@ function FieldGroupSection({
   group,
   formData,
   onChange,
+  isFirst,
   sessionId,
   readonly,
   onNoteClick,
@@ -648,6 +659,7 @@ function FieldGroupSection({
   group: FieldGroup;
   formData: Record<string, unknown>;
   onChange: (key: string, value: unknown) => void;
+  isFirst?: boolean;
   sessionId?: string;
   readonly?: boolean;
   onNoteClick: (fieldKey: string) => void;
@@ -1562,6 +1574,7 @@ export function ConfigForm({
                 group={group}
                 formData={effectiveFormData}
                 onChange={handleFieldChange}
+                isFirst={index === 0}
                 sessionId={sessionId}
                 readonly={readonly}
                 onNoteClick={handleNoteClick}

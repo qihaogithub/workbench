@@ -14,7 +14,6 @@ import {
   projectExists,
   getDataDir,
   readAppGraph,
-  resolvePageRuntimeType,
 } from "@/lib/fs-utils";
 import { type PreviewSize, extractPreviewSize } from "@/lib/preview-size";
 import { extractSchemaDefaults } from "@/lib/schema-defaults";
@@ -469,7 +468,7 @@ export async function publishProject(
     const prototypeMetaPath = path.join(demoDir, "prototype.meta.json");
     const sketchScenePath = path.join(demoDir, "sketch.scene.json");
     const sketchMetaPath = path.join(demoDir, "sketch.meta.json");
-    const runtimeType = resolvePageRuntimeType(demoDir);
+    const runtimeType = page.runtimeType;
 
     const demoPublishDir = path.join(publishedProjectDir, "demos", page.id);
     fs.mkdirSync(demoPublishDir, { recursive: true });

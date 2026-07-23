@@ -92,6 +92,7 @@ export function ImageListWidget({
   value = [],
   onChange,
   maxItems: propMaxItems,
+  title = '图片列表',
   sessionId,
   options = {},
 }: ImageListWidgetProps) {
