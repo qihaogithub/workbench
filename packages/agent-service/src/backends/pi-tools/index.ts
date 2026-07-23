@@ -15,6 +15,7 @@ import { createGetConsoleLogsTool } from "./console-tool";
 import { createCaptureScreenshotTool } from "./screenshot-tool";
 import { createListImagesTool } from "./list-images-tool";
 import { createKnowledgeReportTool } from "./knowledge-report-tool";
+import { createReadKnowledgeSourceTool } from "./read-knowledge-source-tool";
 import { createReadPreinstalledSkillTool } from "./read-preinstalled-skill-tool";
 import { createArrangeCanvasPagesTool } from "./canvas-layout-tool";
 import { createDingtalkTool } from "./dingtalk-tool";
@@ -48,7 +49,7 @@ import {
 } from "./delete-page-tool";
 import { createDelegateTaskTool, type SubagentRunner } from "./subagent-tool";
 
-export const WORKBENCH_TOOL_VERSION = 22;
+export const WORKBENCH_TOOL_VERSION = 23;
 
 const SKETCH_SCENE_TOOLS_ENABLED =
   process.env.PI_AGENT_SKETCH_TOOLS_ENABLED === "true";
@@ -94,6 +95,7 @@ export function createWorkbenchTools(
     createCaptureScreenshotTool(config),
     createListImagesTool(config),
     createKnowledgeReportTool(config),
+    createReadKnowledgeSourceTool(),
     createReadPreinstalledSkillTool(),
     createArrangeCanvasPagesTool(config),
     ...(SKETCH_SCENE_TOOLS_ENABLED

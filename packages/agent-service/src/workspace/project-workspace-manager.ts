@@ -202,6 +202,7 @@ export class ProjectWorkspaceManager {
     const project: Project = {
       id: projectId,
       name: request.name,
+      projectType: "standard",
       description: request.description,
       workspacePath,
       demoPages: [],

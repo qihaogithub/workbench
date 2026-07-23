@@ -551,10 +551,19 @@ try {
     "--description",
     "从本地项目包提交",
   ]);
+  const deleteTemplateProject = await runCommand("project duplicate", [
+    "project",
+    "duplicate",
+    projectId,
+    "待删除模板项目",
+  ]);
+  const deleteTemplateProjectId = dataOf<{ id: string }>(
+    deleteTemplateProject,
+  ).id;
   const deleteTemplate = await runCommand("template create-from-project", [
     "template",
     "create-from-project",
-    projectId,
+    deleteTemplateProjectId,
     "--category",
     "测试模板",
     "--name",

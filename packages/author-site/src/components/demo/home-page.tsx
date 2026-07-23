@@ -531,8 +531,9 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
     if (response.success) {
       toast({
         title: "保存成功",
-        description: `模板「${input.name}」已创建`,
+        description: `项目「${input.name}」已设为模板`,
       });
+      revalidate();
       revalidateTemplates();
     } else {
       toast({
@@ -571,8 +572,9 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
     if (response.success) {
       toast({
         title: "删除成功",
-        description: `模板「${templateDeleteTarget.name}」已删除`,
+        description: `模板项目「${templateDeleteTarget.name}」已删除`,
       });
+      revalidate();
       revalidateTemplates();
     } else {
       toast({

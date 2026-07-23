@@ -38,7 +38,7 @@
 
 - **项目阶段：未上线，不需要向后兼容。** 可以直接做破坏性变更（重命名接口、删除字段、修改数据格式等），无需迁移脚本或兼容层。
 - 包管理器：`pnpm@8.15.0`
-- Node 要求：`node >=18.0.0`
+- Node 要求：`node >=20.0.0`
 - `.npmrc`：`shamefully-hoist=true`
 - Workspace：`packages/*` 和 `OPS/CLI`
 - 前端：Next.js 14 App Router、Tailwind CSS、shadcn/ui、lucide-react

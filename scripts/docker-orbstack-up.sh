@@ -20,7 +20,7 @@ Options:
   -h, --help          Show this help.
 
 Default startup scope:
-  agent-service author-site viewer-site
+  knowledge-service agent-service author-site viewer-site
 EOF
 }
 
@@ -68,10 +68,9 @@ export NEXT_PUBLIC_WEB_URL="${NEXT_PUBLIC_WEB_URL:-http://localhost:3200}"
 export NEXT_PUBLIC_DATA_BASE="${NEXT_PUBLIC_DATA_BASE:-}"
 export CORS_ORIGINS="${CORS_ORIGINS:-http://localhost:3200,http://localhost:3300,http://127.0.0.1:3200,http://127.0.0.1:3300}"
 export FIGMA_OAUTH_REDIRECT_URI="${FIGMA_OAUTH_REDIRECT_URI:-http://localhost:3200/api/user/external-auth/figma/callback}"
-export SCREENSHOT_SERVICE_PLATFORM="${SCREENSHOT_SERVICE_PLATFORM:-linux/amd64}"
 export PUPPETEER_DISABLE_SANDBOX="${PUPPETEER_DISABLE_SANDBOX:-true}"
 
-services=(agent-service author-site viewer-site)
+services=(knowledge-service agent-service author-site viewer-site)
 compose_args=(--env-file "${ENV_FILE}")
 
 if [ "${with_screenshot}" = true ]; then

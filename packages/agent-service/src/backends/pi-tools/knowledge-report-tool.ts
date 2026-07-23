@@ -6,6 +6,10 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import {
   BasicRetrievalBackend,
 } from "@workbench/knowledge-service";
+import {
+  KnowledgeServiceClient,
+  type KnowledgeSearchHit,
+} from "@workbench/knowledge-service/client";
 import type {
   AccessContext,
   KnowledgeItem,
@@ -58,21 +62,44 @@ export function createKnowledgeReportTool(
       }
 
       const context = createAccessContext(config, mode);
+      const projectId = config.projectId ?? config.demoId ?? "current-project";
       const backend = new BasicRetrievalBackend([
         ...systemKnowledgeItems(),
-        ...workspaceKnowledgeItems(workingDir, config.demoId ?? "current-project"),
+        ...workspaceKnowledgeItems(workingDir, projectId),
       ]);
       const report = backend.report({
         question: args.question,
         context,
         riskHints: ["涉及配置、Schema、系统规则或业务规则时，主 AI 应继续读取原文确认。"],
       });
+      const templateHits =
+        mode === "workbench"
+          ? await searchTemplateLibrary(args.question, projectId)
+          : [];
 
       return {
-        content: [{ type: "text", text: formatReport(report) }],
+        content: [
+          {
+            type: "text",
+            text: [
+              formatReport(report),
+              formatTemplateReferences(templateHits),
+            ].join("\n\n"),
+          },
+        ],
         details: {
           reportId: report.id,
-          sources: report.sections.sources,
+          sources: [
+            ...report.sections.sources,
+            ...templateHits.map((hit) => ({
+              path: hit.sourceRef,
+              sourceType: "template-library",
+              trustLevel: "reference-sample",
+              projectId: hit.projectId,
+              revision: hit.revision,
+              rootHash: hit.rootHash,
+            })),
+          ],
           missing: report.sections.missing,
         },
       };
@@ -88,7 +115,7 @@ function createAccessContext(
     return {
       principalType: "viewer-ai",
       principalId: config.sessionId,
-      tenantScope: { projectId: config.demoId },
+      tenantScope: { projectId: config.projectId ?? config.demoId },
       surface: "viewer",
       purpose: "readonly-qa",
       capabilities: ["search", "readSummary", "related", "report"],
@@ -98,7 +125,7 @@ function createAccessContext(
   return {
     principalType: "author-ai",
     principalId: config.sessionId,
-    tenantScope: { projectId: config.demoId },
+    tenantScope: { projectId: config.projectId ?? config.demoId },
     surface: "agent-service",
     purpose: "edit-assist",
     capabilities: ["search", "readSummary", "readOriginal", "related", "report"],
@@ -224,6 +251,39 @@ function formatReport(report: ReturnType<BasicRetrievalBackend["report"]>): stri
       ? report.sections.risks.map((item) => `- ${item}`)
       : ["- 无"]),
   ];
+  return lines.join("\n");
+}
+
+async function searchTemplateLibrary(
+  question: string,
+  currentProjectId: string,
+): Promise<KnowledgeSearchHit[]> {
+  try {
+    return await new KnowledgeServiceClient().search({
+      query: question,
+      currentProjectId,
+      limit: 8,
+    });
+  } catch {
+    return [];
+  }
+}
+
+function formatTemplateReferences(hits: KnowledgeSearchHit[]): string {
+  const lines = [
+    "## 其他模板项目参考",
+    "以下内容仅作为跨项目参考；与当前项目冲突时，以当前项目资料为准。",
+  ];
+  if (hits.length === 0) {
+    lines.push("- 未找到相关模板资料，或独立知识服务暂不可用。");
+    return lines.join("\n");
+  }
+  for (const hit of hits) {
+    lines.push(
+      `- ${hit.projectName} / ${hit.title}（revision ${hit.revision}）：${hit.snippet}`,
+      `  来源：${hit.sourceRef}`,
+    );
+  }
   return lines.join("\n");
 }
 

@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import type { Project } from '@workbench/shared/contracts';
+import { createListFilesTool } from '../../src/backends/pi-tools/file-tools';
 import {
   buildViewerReadonlyContent,
   normalizeAgentMode,
@@ -40,6 +41,29 @@ describe('viewer-readonly mode', () => {
     expect(VIEWER_READONLY_PERMISSIONS?.deniedPatterns).toContain('**/.git/**');
     expect(VIEWER_READONLY_PERMISSIONS?.allowedPaths).toContain('demos/**');
     expect(VIEWER_READONLY_PERMISSIONS?.allowedPaths).toContain('knowledge/**');
+  });
+
+  it('listFiles 省略 path 时应能列出工作区根目录', async () => {
+    const tempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'viewer-readonly-list-files-'),
+    );
+    try {
+      fs.mkdirSync(path.join(tempDir, 'demos'));
+      fs.writeFileSync(path.join(tempDir, 'workspace-tree.json'), '{}', 'utf-8');
+      const tool = createListFilesTool({
+        sessionId: 'viewer-list-files',
+        workingDir: tempDir,
+        permissions: VIEWER_READONLY_PERMISSIONS,
+      });
+
+      const result = await tool.execute('tool-call', {});
+
+      expect(result.isError).toBeFalsy();
+      expect(result.content[0]?.text).toContain('directory: demos');
+      expect(result.content[0]?.text).toContain('file: workspace-tree.json');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   it('buildViewerReadonlyContent 应拼接系统上下文与使用者问题', () => {

@@ -264,9 +264,20 @@ export function isDemoFolder(item: DemoPageItem): item is DemoFolderMeta {
 /**
  * 项目定义
  */
+export type ProjectType = "standard" | "template";
+
+export interface ProjectTemplateSettings {
+  description: string;
+  scope: "personal" | "team" | "official";
+  official: boolean;
+}
+
 export interface Project {
   id: string; // 项目唯一标识
   name: string; // 项目名称
+  projectType: ProjectType; // 模板是项目类型，不是独立快照实体
+  templateSettings?: ProjectTemplateSettings; // 仅模板项目使用的展示与范围信息
+  sourceTemplateProjectId?: string; // 从哪个模板项目创建
   category?: string; // 首页项目分类
   description?: string; // 项目描述
   workspacePath: string; // 项目基准工作区绝对路径（canonical Workspace）
