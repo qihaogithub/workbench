@@ -14,7 +14,6 @@ import {
   updateDemo,
   updateProjectTemplate,
   useDemos,
-  useProjectTemplates,
 } from "@/lib/api";
 
 const mockRouterPush = jest.fn();
@@ -39,13 +38,9 @@ jest.mock("@/lib/api", () => ({
   updateProjectTemplate: jest.fn(),
   uploadTemplateCover: jest.fn(),
   useDemos: jest.fn(),
-  useProjectTemplates: jest.fn(),
 }));
 
 const mockUseDemos = useDemos as jest.MockedFunction<typeof useDemos>;
-const mockUseProjectTemplates = useProjectTemplates as jest.MockedFunction<
-  typeof useProjectTemplates
->;
 const mockCreateDemo = createDemo as jest.MockedFunction<typeof createDemo>;
 const mockConvertProjectTemplate = convertProjectTemplate as jest.MockedFunction<
   typeof convertProjectTemplate
@@ -66,19 +61,14 @@ const demos = [
     updatedAt: 2,
     demoPages: [],
   },
-];
-
-const templates = [
   {
     id: "tmpl-1",
-    sourceProjectId: "proj-1",
-    category: "知识库验证",
     name: "验证模板",
-    description: "用于验证知识库流程",
-    demoCount: 1,
-    demoPages: [],
+    category: "知识库验证",
+    projectType: "template" as const,
     createdAt: 1,
     updatedAt: 2,
+    demoPages: [],
   },
 ];
 
@@ -86,12 +76,6 @@ describe("HomePage", () => {
   beforeEach(() => {
     mockUseDemos.mockReturnValue({
       demos,
-      isLoading: false,
-      error: null,
-      revalidate: jest.fn(),
-    });
-    mockUseProjectTemplates.mockReturnValue({
-      templates,
       isLoading: false,
       error: null,
       revalidate: jest.fn(),
@@ -114,7 +98,16 @@ describe("HomePage", () => {
     });
     mockUpdateProjectTemplate.mockResolvedValue({
       success: true,
-      data: { ...templates[0], name: "更新后模板", category: "新模板分类" },
+      data: {
+        id: "tmpl-1",
+        name: "更新后模板",
+        category: "新模板分类",
+        sourceProjectId: "tmpl-1",
+        description: "",
+        demoCount: 0,
+        createdAt: 1,
+        updatedAt: 2,
+      },
     });
   });
 
@@ -265,66 +258,36 @@ describe("HomePage", () => {
     expect(screen.getByRole("button", { name: "创建项目" })).toBeDisabled();
   });
 
-  it("模板更多菜单中使用此模板新建会带上输入的项目分类", async () => {
-    render(<HomePage initialDemos={demos} />);
-
-    fireEvent.click(screen.getByRole("button", { name: /知识库验证/ }));
-    fireEvent.click(
-      screen.getByRole("button", { name: "打开模板 验证模板 的更多操作" }),
-    );
-    fireEvent.click(
-      await screen.findByRole("menuitem", { name: /使用此模板新建/ }),
-    );
-    fireEvent.change(screen.getByLabelText("项目名称"), {
-      target: { value: "模板生成项目" },
-    });
-    fireEvent.click(screen.getByLabelText("项目分类"));
-    fireEvent.click(await screen.findByRole("button", { name: "自定义分类" }));
-    fireEvent.change(screen.getByLabelText("项目分类"), {
-      target: { value: "模板项目" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "创建项目" }));
-
-    await waitFor(() => {
-      expect(mockCreateDemo).toHaveBeenCalledWith(
-        "模板生成项目",
-        "模板项目",
-        "tmpl-1",
-      );
-    });
-  });
-
-  it("模板更多菜单提供名称、分类、封面、转普通项目、删除和新建入口", async () => {
+  it("模板更多菜单提供名称、分类、封面、转普通项目、复制当前项目和删除入口", async () => {
     render(<HomePage initialDemos={demos} />);
 
     fireEvent.click(
-      screen.getByRole("button", { name: "打开模板 验证模板 的更多操作" }),
+      screen.getByRole("button", { name: "打开项目 验证模板 的更多操作" }),
     );
 
     const menuItems = await screen.findAllByRole("menuitem");
     expect(menuItems.map((item) => item.textContent)).toEqual([
-      "使用此模板新建",
       "修改名称",
       "修改分类",
       "修改封面",
       "转为普通项目",
+      "复制当前项目",
       "删除",
     ]);
     expect(screen.getByRole("menuitem", { name: /修改名称/ })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /修改分类/ })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /修改封面/ })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /转为普通项目/ })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: /使用此模板新建/ })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /复制当前项目/ })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /^删除$/ })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: /保存为模板/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: /复制当前项目/ })).not.toBeInTheDocument();
   });
 
   it("模板更多菜单支持转为普通项目", async () => {
     render(<HomePage initialDemos={demos} />);
 
     fireEvent.click(
-      screen.getByRole("button", { name: "打开模板 验证模板 的更多操作" }),
+      screen.getByRole("button", { name: "打开项目 验证模板 的更多操作" }),
     );
     fireEvent.click(
       await screen.findByRole("menuitem", { name: /转为普通项目/ }),
@@ -345,7 +308,7 @@ describe("HomePage", () => {
     render(<HomePage initialDemos={demos} />);
 
     fireEvent.click(
-      screen.getByRole("button", { name: "打开模板 验证模板 的更多操作" }),
+      screen.getByRole("button", { name: "打开项目 验证模板 的更多操作" }),
     );
     fireEvent.click(await screen.findByRole("menuitem", { name: /修改名称/ }));
     fireEvent.change(screen.getByLabelText("项目名称"), {
@@ -360,7 +323,7 @@ describe("HomePage", () => {
     });
 
     fireEvent.click(
-      screen.getByRole("button", { name: "打开模板 验证模板 的更多操作" }),
+      screen.getByRole("button", { name: "打开项目 验证模板 的更多操作" }),
     );
     fireEvent.click(await screen.findByRole("menuitem", { name: /修改分类/ }));
     fireEvent.click(screen.getByLabelText("项目分类"));

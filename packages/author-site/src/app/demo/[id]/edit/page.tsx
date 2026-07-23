@@ -122,8 +122,7 @@ import {
   ArrowLeft,
   Users,
   Download,
-  Undo2,
-  Redo2,
+  Share2,
 } from "lucide-react";
 import {
   Select,
@@ -144,6 +143,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { CoverImageDialog } from "@/components/cover-image-dialog";
+import { ShareDialog } from "@/components/share/ShareDialog";
 import { DemoPageTree } from "@/components/demo/DemoPageTree";
 import { WorkspaceFileTree } from "@/components/demo/WorkspaceFileTree";
 import { WorkspaceCodeDialog } from "@/components/demo/WorkspaceCodeDialog";
@@ -789,6 +789,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [nameDraft, setNameDraft] = useState("");
   const [coverDialogOpen, setCoverDialogOpen] = useState(false);
   const [showExitDialog, setShowExitDialog] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [hasPendingWorkspaceFlush, setHasPendingWorkspaceFlush] =
     useState(false);
@@ -6087,32 +6088,15 @@ ${context.details}
           </Button>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 rounded-md border p-0.5">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              title="撤回 (Cmd/Ctrl+Z)"
-              disabled={!canUndo}
-              onClick={() => {
-                void undo();
-              }}
-            >
-              <Undo2 className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              title="重做 (Cmd/Ctrl+Shift+Z / Cmd/Ctrl+Y)"
-              disabled={!canRedo}
-              onClick={() => {
-                void redo();
-              }}
-            >
-              <Redo2 className="h-3.5 w-3.5" />
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            title="分享"
+            onClick={() => setShowShareDialog(true)}
+          >
+            <Share2 className="h-5 w-5" />
+          </Button>
           {diagnosticsEnabled && (
             <Button
               variant="ghost"
@@ -7952,6 +7936,13 @@ ${context.details}
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ShareDialog
+        projectId={demoId}
+        open={showShareDialog}
+        onOpenChange={setShowShareDialog}
+      />
+
     </div>
   );
 }

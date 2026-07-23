@@ -179,6 +179,38 @@ describe("useWorkspaceAuthorityState", () => {
     });
   });
 
+  it("轮询失败后，后续成功轮询应恢复 isConnected = true", async () => {
+    const { result } = renderHook(() => useWorkspaceAuthorityState(BASE_OPTIONS));
+
+    await act(async () => {
+      jest.advanceTimersByTime(0);
+    });
+
+    await waitFor(() => {
+      expect(result.current.isConnected).toBe(true);
+    });
+
+    // 模拟一次轮询失败（瞬时网络抖动）
+    mockReadEvents.mockRejectedValueOnce(new Error("transient error"));
+
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+    });
+
+    await waitFor(() => {
+      expect(result.current.isConnected).toBe(false);
+    });
+
+    // 后续轮询成功但无新事件，应恢复 isConnected
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+    });
+
+    await waitFor(() => {
+      expect(result.current.isConnected).toBe(true);
+    });
+  });
+
   it("ackPreview 应更新 previewAppliedRevision", async () => {
     const { result } = renderHook(() => useWorkspaceAuthorityState(BASE_OPTIONS));
 

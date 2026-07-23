@@ -4,8 +4,6 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ChevronDown,
-  ChevronRight,
   FilePlus,
   Folder,
   LayoutGrid,
@@ -16,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { CoverImageDialog } from "@/components/cover-image-dialog";
-import { DemoCard, TemplateProjectCard } from "@/components/demo/demo-card";
+import { DemoCard } from "@/components/demo/demo-card";
 import { DeleteConfirmDialog } from "@/components/demo/delete-confirm-dialog";
 import {
   ProjectNameCategoryDialog,
@@ -38,25 +36,21 @@ import {
   updateDemo,
   uploadTemplateCover,
   useDemos,
-  useProjectTemplates,
 } from "@/lib/api";
-import type { DemoMeta, ProjectTemplateMeta } from "@workbench/shared";
+import type { DemoMeta } from "@workbench/shared";
 
 const DEFAULT_CATEGORY = "未分类";
 type SelectedNav =
   | { type: "all" }
-  | { type: "project-category"; category: string; exact?: boolean }
-  | { type: "templates" }
-  | { type: "template-category"; category: string; exact?: boolean };
+  | { type: "project-category"; category: string; exact?: boolean };
+
+type ProjectFilter = "all" | "templates";
 
 type DialogAction =
   | { type: "blank" }
   | { type: "duplicate-project"; project: DemoMeta }
-  | { type: "duplicate-template"; template: ProjectTemplateMeta }
   | { type: "rename-project"; project: DemoMeta }
   | { type: "change-category"; project: DemoMeta }
-  | { type: "rename-template"; template: ProjectTemplateMeta }
-  | { type: "change-template-category"; template: ProjectTemplateMeta }
   | null;
 
 function normalizeCategory(category?: string): string {
@@ -216,42 +210,29 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
   const { demos, error, revalidate } = useDemos({
     fallbackData: initialDemos,
   });
-  const { templates, revalidate: revalidateTemplates } = useProjectTemplates();
   const { toast } = useToast();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedNav, setSelectedNav] = useState<SelectedNav>({ type: "all" });
-  const [templatesExpanded, setTemplatesExpanded] = useState(true);
+  const [projectFilter, setProjectFilter] = useState<ProjectFilter>("all");
   const [dialogAction, setDialogAction] = useState<DialogAction>(null);
   const [isSubmittingDialog, setIsSubmittingDialog] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DemoMeta | null>(null);
-  const [templateDeleteTarget, setTemplateDeleteTarget] =
-    useState<ProjectTemplateMeta | null>(null);
   const [templateTarget, setTemplateTarget] = useState<DemoMeta | null>(null);
   const [coverTarget, setCoverTarget] = useState<DemoMeta | null>(null);
-  const [templateCoverTarget, setTemplateCoverTarget] =
-    useState<ProjectTemplateMeta | null>(null);
   const [screenshotRevision, setScreenshotRevision] = useState(0);
 
   const projectCategories = useMemo(
     () => uniqueCategories(demos.map((demo) => normalizeCategory(demo.category))),
     [demos],
   );
-  const templateCategories = useMemo(
-    () => uniqueCategories(templates.map((template) => template.category)),
-    [templates],
-  );
   const categoryOptions = useMemo(
-    () => uniqueCategories([...projectCategories, ...templateCategories]),
-    [projectCategories, templateCategories],
+    () => projectCategories,
+    [projectCategories],
   );
   const projectCategoryTree = useMemo(
     () => buildCategoryTree(projectCategories),
     [projectCategories],
-  );
-  const templateCategoryTree = useMemo(
-    () => buildCategoryTree(templateCategories),
-    [templateCategories],
   );
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -262,45 +243,17 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
         selectedNav.type === "all" ||
         (selectedNav.type === "project-category" &&
           matchesCategorySelection(category, selectedNav));
+      const matchesFilter =
+        projectFilter === "all" || demo.projectType === "template";
       const matchesSearch =
         !normalizedQuery ||
         [demo.name, category, formatCategoryPath(category)]
           .join(" ")
           .toLowerCase()
           .includes(normalizedQuery);
-      return matchesNav && matchesSearch;
+      return matchesNav && matchesFilter && matchesSearch;
     });
-  }, [demos, normalizedQuery, selectedNav]);
-
-  const filteredTemplates = useMemo(() => {
-    return templates.filter((template) => {
-      const matchesNav =
-        selectedNav.type === "all" ||
-        selectedNav.type === "templates" ||
-        (selectedNav.type === "template-category" &&
-          matchesCategorySelection(template.category, selectedNav));
-      const matchesSearch =
-        !normalizedQuery ||
-        [
-          template.name,
-          template.description,
-          template.category,
-          formatCategoryPath(template.category),
-        ]
-          .join(" ")
-          .toLowerCase()
-          .includes(normalizedQuery);
-      return matchesNav && matchesSearch;
-    });
-  }, [normalizedQuery, selectedNav, templates]);
-
-  const showProjects =
-    selectedNav.type === "all" || selectedNav.type === "project-category";
-  const showTemplates =
-    selectedNav.type === "all" ||
-    selectedNav.type === "templates" || selectedNav.type === "template-category";
-  const shouldRenderTemplateSection =
-    selectedNav.type !== "all" || filteredTemplates.length > 0;
+  }, [demos, normalizedQuery, selectedNav, projectFilter]);
 
   // 为无封面的项目自动补生缺失截图
   const ensureTriggeredRef = useRef(false);
@@ -383,36 +336,18 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
     });
   };
 
-  const handleDuplicateTemplate = async (
-    template: ProjectTemplateMeta,
-    input: ProjectNameCategoryValue,
-  ) => {
-    const response = await createDemo(input.name, input.category, template.id);
-    if (response.success) {
-      toast({
-        title: "创建成功",
-        description: `已基于模板「${template.name}」创建项目`,
-      });
-      router.push(`/demo/${response.data.id}/edit`);
-      return;
-    }
-
-    toast({
-      variant: "destructive",
-      title: "创建失败",
-      description: response.error.message,
-    });
-  };
-
   const handleRenameProject = async (
     project: DemoMeta,
     input: ProjectNameCategoryValue,
   ) => {
-    const response = await updateDemo(project.id, { name: input.name });
+    const isTemplate = project.projectType === "template";
+    const response = isTemplate
+      ? await updateProjectTemplate(project.id, { name: input.name })
+      : await updateDemo(project.id, { name: input.name });
     if (response.success) {
       toast({
         title: "更新成功",
-        description: `项目已重命名为「${input.name}」`,
+        description: `已重命名为「${input.name}」`,
       });
       revalidate();
       return;
@@ -429,59 +364,16 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
     project: DemoMeta,
     input: ProjectNameCategoryValue,
   ) => {
-    const response = await updateDemo(project.id, { category: input.category });
+    const isTemplate = project.projectType === "template";
+    const response = isTemplate
+      ? await updateProjectTemplate(project.id, { category: input.category })
+      : await updateDemo(project.id, { category: input.category });
     if (response.success) {
       toast({
         title: "更新成功",
-        description: `项目已移动到「${input.category}」`,
+        description: `已移动到「${input.category}」`,
       });
       revalidate();
-      return;
-    }
-
-    toast({
-      variant: "destructive",
-      title: "更新失败",
-      description: response.error.message,
-    });
-  };
-
-  const handleRenameTemplate = async (
-    template: ProjectTemplateMeta,
-    input: ProjectNameCategoryValue,
-  ) => {
-    const response = await updateProjectTemplate(template.id, {
-      name: input.name,
-    });
-    if (response.success) {
-      toast({
-        title: "更新成功",
-        description: `模板已重命名为「${input.name}」`,
-      });
-      revalidateTemplates();
-      return;
-    }
-
-    toast({
-      variant: "destructive",
-      title: "更新失败",
-      description: response.error.message,
-    });
-  };
-
-  const handleChangeTemplateCategory = async (
-    template: ProjectTemplateMeta,
-    input: ProjectNameCategoryValue,
-  ) => {
-    const response = await updateProjectTemplate(template.id, {
-      category: input.category,
-    });
-    if (response.success) {
-      toast({
-        title: "更新成功",
-        description: `模板已移动到「${input.category}」`,
-      });
-      revalidateTemplates();
       return;
     }
 
@@ -500,14 +392,8 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
         await handleCreateBlank(input);
       } else if (dialogAction.type === "duplicate-project") {
         await handleDuplicateProject(dialogAction.project, input);
-      } else if (dialogAction.type === "duplicate-template") {
-        await handleDuplicateTemplate(dialogAction.template, input);
       } else if (dialogAction.type === "rename-project") {
         await handleRenameProject(dialogAction.project, input);
-      } else if (dialogAction.type === "rename-template") {
-        await handleRenameTemplate(dialogAction.template, input);
-      } else if (dialogAction.type === "change-template-category") {
-        await handleChangeTemplateCategory(dialogAction.template, input);
       } else if (dialogAction.type === "change-category") {
         await handleChangeCategory(dialogAction.project, input);
       } else {
@@ -534,7 +420,6 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
         description: `项目「${input.name}」已设为模板`,
       });
       revalidate();
-      revalidateTemplates();
     } else {
       toast({
         variant: "destructive",
@@ -548,11 +433,14 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
   const handleDelete = async () => {
     if (!deleteTarget) return;
 
-    const response = await deleteDemo(deleteTarget.id);
+    const isTemplate = deleteTarget.projectType === "template";
+    const response = isTemplate
+      ? await deleteProjectTemplate(deleteTarget.id)
+      : await deleteDemo(deleteTarget.id);
     if (response.success) {
       toast({
         title: "删除成功",
-        description: `项目「${deleteTarget.name}」已删除`,
+        description: `「${deleteTarget.name}」已删除`,
       });
       revalidate();
     } else {
@@ -565,36 +453,14 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
     setDeleteTarget(null);
   };
 
-  const handleDeleteTemplate = async () => {
-    if (!templateDeleteTarget) return;
-
-    const response = await deleteProjectTemplate(templateDeleteTarget.id);
-    if (response.success) {
-      toast({
-        title: "删除成功",
-        description: `模板项目「${templateDeleteTarget.name}」已删除`,
-      });
-      revalidate();
-      revalidateTemplates();
-    } else {
-      toast({
-        variant: "destructive",
-        title: "删除失败",
-        description: response.error.message,
-      });
-    }
-    setTemplateDeleteTarget(null);
-  };
-
-  const handleConvertTemplateToProject = async (template: ProjectTemplateMeta) => {
-    const response = await convertProjectTemplate(template.id);
+  const handleConvertTemplateToProject = async (demo: DemoMeta) => {
+    const response = await convertProjectTemplate(demo.id);
     if (response.success) {
       toast({
         title: "转换成功",
-        description: `模板「${template.name}」已转为普通项目`,
+        description: `「${demo.name}」已转为普通项目`,
       });
       revalidate();
-      revalidateTemplates();
       return;
     }
 
@@ -607,79 +473,48 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
 
   const dialogTitle =
     dialogAction?.type === "rename-project"
-      ? "修改项目名称"
-      : dialogAction?.type === "rename-template"
-        ? "修改模板名称"
+      ? "修改名称"
       : dialogAction?.type === "change-category"
-        ? "修改项目分类"
-        : dialogAction?.type === "change-template-category"
-          ? "修改模板分类"
-          : dialogAction?.type === "duplicate-project"
-      ? "复制当前项目"
-      : dialogAction?.type === "duplicate-template"
-        ? "使用此模板新建"
-        : "新建空白项目";
+        ? "修改分类"
+        : dialogAction?.type === "duplicate-project"
+          ? "复制当前项目"
+          : "新建空白项目";
   const dialogDescription =
     dialogAction?.type === "rename-project"
       ? `更新「${dialogAction.project.name}」的显示名称。`
-      : dialogAction?.type === "rename-template"
-        ? `更新模板「${dialogAction.template.name}」的显示名称。`
       : dialogAction?.type === "change-category"
         ? `更新「${dialogAction.project.name}」所在的首页分类。`
-        : dialogAction?.type === "change-template-category"
-          ? `更新模板「${dialogAction.template.name}」所在的首页分类。`
         : dialogAction?.type === "duplicate-project"
-      ? `将复制「${dialogAction.project.name}」为独立项目。`
-      : dialogAction?.type === "duplicate-template"
-        ? `将使用模板「${dialogAction.template.name}」创建独立项目。`
-        : "创建一个不包含页面的空白项目。";
+          ? `将复制「${dialogAction.project.name}」为独立项目。`
+          : "创建一个不包含页面的空白项目。";
   const dialogDefaultName =
     dialogAction?.type === "rename-project"
       ? dialogAction.project.name
-      : dialogAction?.type === "rename-template"
-        ? dialogAction.template.name
       : dialogAction?.type === "change-category"
         ? dialogAction.project.name
-        : dialogAction?.type === "change-template-category"
-          ? dialogAction.template.name
         : dialogAction?.type === "duplicate-project"
-      ? `${dialogAction.project.name} 副本`
-      : dialogAction?.type === "duplicate-template"
-        ? dialogAction.template.name
-        : "";
+          ? `${dialogAction.project.name} 副本`
+          : "";
   const dialogDefaultCategory =
     dialogAction?.type === "rename-project"
       ? normalizeCategory(dialogAction.project.category)
-      : dialogAction?.type === "rename-template"
-        ? normalizeCategory(dialogAction.template.category)
       : dialogAction?.type === "change-category"
         ? normalizeCategory(dialogAction.project.category)
-        : dialogAction?.type === "change-template-category"
-          ? normalizeCategory(dialogAction.template.category)
         : dialogAction?.type === "duplicate-project"
-      ? normalizeCategory(dialogAction.project.category)
-      : dialogAction?.type === "duplicate-template"
-        ? normalizeCategory(dialogAction.template.category)
-        : DEFAULT_CATEGORY;
+          ? normalizeCategory(dialogAction.project.category)
+          : DEFAULT_CATEGORY;
   const dialogFields =
-    dialogAction?.type === "rename-project" ||
-    dialogAction?.type === "rename-template"
+    dialogAction?.type === "rename-project"
       ? "name"
-      : dialogAction?.type === "change-category" ||
-          dialogAction?.type === "change-template-category"
+      : dialogAction?.type === "change-category"
         ? "category"
         : "both";
   const dialogSubmitLabel =
     dialogAction?.type === "blank"
       ? "创建项目"
-      : dialogAction?.type === "rename-project" ||
-          dialogAction?.type === "rename-template" ||
-          dialogAction?.type === "change-category" ||
-          dialogAction?.type === "change-template-category"
+      : dialogAction?.type === "rename-project" || dialogAction?.type === "change-category"
         ? "保存"
-        : dialogAction?.type === "duplicate-project"
-          ? "复制项目"
-        : "创建项目";
+        : "复制项目";
   if (error) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
@@ -803,109 +638,39 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
                   ))}
                 </div>
               ))}
-              <button
-                type="button"
-                onClick={() => {
-                  setTemplatesExpanded((current) => !current);
-                  setSelectedNav({ type: "templates" });
-                }}
-                className={cn(
-                  "flex h-9 w-full min-w-max items-center gap-2 rounded-md px-3 text-left text-sm transition-colors hover:bg-accent md:min-w-0",
-                  selectedNav.type === "templates" ||
-                    selectedNav.type === "template-category"
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground",
-                )}
-              >
-                {templatesExpanded ? (
-                  <ChevronDown className="h-4 w-4 shrink-0" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 shrink-0" />
-                )}
-                <span className="min-w-0 flex-1 truncate">模板</span>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {templates.length}
-                </span>
-              </button>
-              {templatesExpanded &&
-                templateCategoryTree.map((category) => (
-                  <div key={category.value} className="min-w-max md:min-w-0">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setSelectedNav({
-                        type: "template-category",
-                        category: category.value,
-                      })
-                    }
-                    className={cn(
-                      "flex h-8 min-w-max items-center gap-2 rounded-md px-3 text-left text-sm transition-colors hover:bg-accent md:ml-5 md:min-w-0",
-                      selectedNav.type === "template-category" &&
-                        selectedNav.category === category.value &&
-                        !selectedNav.exact
-                        ? "bg-accent text-accent-foreground"
-                        : "text-muted-foreground",
-                    )}
-                  >
-                    <span className="min-w-0 flex-1 truncate">
-                      {category.label}
-                    </span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {
-                        templates.filter(
-                          (template) =>
-                            matchesCategorySelection(template.category, {
-                              category: category.value,
-                            }),
-                        ).length
-                      }
-                    </span>
-                  </button>
-                    {category.children.map((child) => (
-                      <button
-                        key={child.value}
-                        type="button"
-                        onClick={() =>
-                          setSelectedNav({
-                            type: "template-category",
-                            category: child.value,
-                            exact: true,
-                          })
-                        }
-                        className={cn(
-                          "mt-1 flex h-8 min-w-max items-center gap-2 rounded-md px-3 text-left text-sm transition-colors hover:bg-accent md:ml-9 md:min-w-0",
-                          selectedNav.type === "template-category" &&
-                            selectedNav.category === child.value &&
-                            selectedNav.exact
-                            ? "bg-accent text-accent-foreground"
-                            : "text-muted-foreground",
-                        )}
-                      >
-                        <span className="min-w-0 flex-1 truncate">
-                          {child.label}
-                        </span>
-                        <span className="shrink-0 text-xs text-muted-foreground">
-                          {
-                            templates.filter((template) =>
-                              matchesCategorySelection(template.category, {
-                                category: child.value,
-                                exact: true,
-                              }),
-                            ).length
-                          }
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                ))}
             </nav>
           </aside>
 
-          <section className="min-w-0 space-y-8">
-            {showProjects && (
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                <BlankProjectCard onClick={() => setDialogAction({ type: "blank" })} />
-                {filteredDemos.map((demo) => (
+          <section className="min-w-0 space-y-4">
+            <div className="sticky top-24 z-10 flex items-center gap-2 border-b bg-background pb-3">
+              <button
+                type="button"
+                onClick={() => setProjectFilter("all")}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  projectFilter === "all"
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground hover:bg-accent/50",
+                )}
+              >
+                全部
+              </button>
+              <button
+                type="button"
+                onClick={() => setProjectFilter("templates")}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  projectFilter === "templates"
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground hover:bg-accent/50",
+                )}
+              >
+                模板
+              </button>
+            </div>
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <BlankProjectCard onClick={() => setDialogAction({ type: "blank" })} />
+              {filteredDemos.map((demo) => (
                   <DemoCard
                     key={demo.id}
                     demo={demo}
@@ -922,51 +687,12 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
                       setDialogAction({ type: "change-category", project: demo })
                     }
                     onChangeCover={() => setCoverTarget(demo)}
+                    onConvertToProject={() =>
+                      handleConvertTemplateToProject(demo)
+                    }
                   />
                 ))}
-              </div>
-            )}
-
-            {showTemplates && shouldRenderTemplateSection && (
-              <div className="space-y-4">
-                {filteredTemplates.length === 0 ? (
-                  <div className="flex min-h-[240px] items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
-                    {searchQuery ? "没有找到匹配的模板" : "暂无模板"}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {filteredTemplates.map((template) => (
-                      <TemplateProjectCard
-                        key={template.id}
-                        template={template}
-                        screenshotRevision={screenshotRevision}
-                        onDuplicate={(item) =>
-                          setDialogAction({
-                            type: "duplicate-template",
-                            template: item,
-                          })
-                        }
-                        onRename={(item) =>
-                          setDialogAction({
-                            type: "rename-template",
-                            template: item,
-                          })
-                        }
-                        onChangeCategory={(item) =>
-                          setDialogAction({
-                            type: "change-template-category",
-                            template: item,
-                          })
-                        }
-                        onChangeCover={(item) => setTemplateCoverTarget(item)}
-                        onConvertToProject={handleConvertTemplateToProject}
-                        onDelete={(item) => setTemplateDeleteTarget(item)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+            </div>
           </section>
         </div>
 
@@ -998,13 +724,6 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
           demoName={deleteTarget?.name || ""}
         />
 
-        <DeleteConfirmDialog
-          open={!!templateDeleteTarget}
-          onOpenChange={(open) => !open && setTemplateDeleteTarget(null)}
-          onConfirm={handleDeleteTemplate}
-          demoName={templateDeleteTarget?.name || ""}
-        />
-
         {coverTarget && (
           <CoverImageDialog
             open={!!coverTarget}
@@ -1015,21 +734,16 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
               revalidate();
               setCoverTarget(null);
             }}
-          />
-        )}
-
-        {templateCoverTarget && (
-          <CoverImageDialog
-            open={!!templateCoverTarget}
-            onOpenChange={(open) => !open && setTemplateCoverTarget(null)}
-            projectId={templateCoverTarget.id}
-            currentThumbnail={templateCoverTarget.thumbnail}
-            onUpload={(file) => uploadTemplateCover(templateCoverTarget.id, file)}
-            onDelete={() => deleteTemplateCover(templateCoverTarget.id)}
-            onThumbnailChange={() => {
-              revalidateTemplates();
-              setTemplateCoverTarget(null);
-            }}
+            onUpload={
+              coverTarget.projectType === "template"
+                ? (file) => uploadTemplateCover(coverTarget.id, file)
+                : undefined
+            }
+            onDelete={
+              coverTarget.projectType === "template"
+                ? () => deleteTemplateCover(coverTarget.id)
+                : undefined
+            }
           />
         )}
       </main>

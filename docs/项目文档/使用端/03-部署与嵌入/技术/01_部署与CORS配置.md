@@ -128,6 +128,7 @@ Docker viewer 镜像通过 nginx 把宿主 `data/published` 只读挂载到 `/da
 - `/data/projects.json` 映射到 `data/published/projects-index.json`，供项目列表读取。
 - `/data/{projectId}/project.json` 和 `/data/{projectId}/demos/{pageId}/iframe.html` 走 HTML/JSON 静态映射并返回 `Cache-Control: no-store`，确保重新发布后浏览端能立即读到最新项目数据和 iframe shell。
 - 截图、schema、图片资源走通用 `/data/` 静态映射。
+- `/api/screenshots/` 代理到 `author-site:3200`，使 `NEXT_PUBLIC_DATA_BASE` 为空（同源静态部署）时浏览端动态截图兜底请求能到达 author-side 的 screenshots file 路由，覆盖发布产物缺 `screenshotPath` 的旧项目。
 - `/data/{projectId}/demos/{pageId}/compiled.js` 走单独的正则映射并设置长期不可变缓存。该 location 必须用正则捕获拼出 alias 目标，不能在同一个正则 location 中组合 `alias` 和 `rewrite`；否则 nginx 会在请求 demo JS 时返回 500，导致发布 iframe 空白。
 
 发布 iframe 中的页面模块通过 `/data/{projectId}/demos/{pageId}/compiled.js?v={publishBatch}` 直接 dynamic import，和 `project.json` 中的 `compiledJsPath` 保持一致；`iframeHtmlPath` 同样带发布批次参数。文件落盘路径不包含查询参数，查询参数只用于让浏览器绕开上一版 iframe 与 JS 的缓存。`compiled.js` 必须能从 viewer 同源返回 `application/javascript`，并带 `Access-Control-Allow-Origin: *`，以支持 iframe 和外部嵌入场景。
