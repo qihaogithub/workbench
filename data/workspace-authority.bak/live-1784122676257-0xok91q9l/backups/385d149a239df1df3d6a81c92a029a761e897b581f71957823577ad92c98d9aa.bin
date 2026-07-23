@@ -1,1 +1,0 @@
-{"type":"object","properties":{"marker":{"type":"string","title":"共享项目标记","default":"shared-regression"}}}
