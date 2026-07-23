@@ -529,6 +529,7 @@ export function AIChat({
         supportsImages={mode === "viewer-readonly" || currentSupportsImages}
         supportsFiles
         supportsHistory={mode !== "viewer-readonly" || Boolean(onHistoryOpen)}
+        imageDescriptionEnabled={modelState.imageDescriptionEnabled}
       />
 
       {mode !== "viewer-readonly" && (

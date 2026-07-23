@@ -212,20 +212,41 @@ export function createReadFileTool(
             throw err;
           }
         }
-        const content = snapshot
-          ? snapshot.resources[args.path]
-          : await fs.promises.readFile(filePath, "utf-8");
+        let content: string | undefined;
+        let fromAuthority = false;
+        let authorityRevision: number | undefined;
+        let authorityHash: string | undefined;
+        if (snapshot) {
+          content = snapshot.resources[args.path];
+          if (content !== undefined) {
+            fromAuthority = true;
+            authorityRevision = snapshot.state.revision;
+            authorityHash = snapshot.state.resourceHashes[args.path];
+          }
+        }
+        if (content === undefined && !snapshot) {
+          content = await fs.promises.readFile(filePath, "utf-8");
+        }
         if (content === undefined) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `Error reading file: ${args.path} is not a committed text resource`,
-              },
-            ],
-            details: { path: args.path, error: "WORKSPACE_RESOURCE_NOT_FOUND" },
-            isError: true,
-          };
+          // File not found in Authority snapshot; try filesystem as fallback
+          try {
+            content = await fs.promises.readFile(filePath, "utf-8");
+            logger.debug(
+              { path: args.path },
+              "readFile: file not in Authority snapshot, read from filesystem",
+            );
+          } catch (fsError) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Error reading file: ${args.path} is not found`,
+                },
+              ],
+              details: { path: args.path, error: "WORKSPACE_RESOURCE_NOT_FOUND" },
+              isError: true,
+            };
+          }
         }
 
         // Apply offset/limit pagination
@@ -269,10 +290,10 @@ export function createReadFileTool(
             limit,
             outputLines: truncResult.outputLines,
             truncated: truncResult.truncated || endIdx < totalLines,
-            ...(snapshot
+            ...(fromAuthority
               ? {
-                  revision: snapshot.state.revision,
-                  hash: snapshot.state.resourceHashes[args.path],
+                  revision: authorityRevision!,
+                  hash: authorityHash,
                 }
               : {}),
           },
@@ -573,15 +594,19 @@ export function createListFilesTool(
       if (
         !isPathAllowed(args.path || ".", config.workingDir || "", permissions)
       ) {
+        const reason =
+          config.workingDir
+            ? `path "${args.path || "."}" is not allowed by workspace permissions`
+            : "working directory not configured; please open a project editing session first";
         logger.warn(
-          { path: args.path || "." },
-          "listFiles denied by permissions",
+          { path: args.path || ".", hasWorkingDir: !!config.workingDir },
+          `listFiles denied: ${reason}`,
         );
         return {
           content: [
             {
               type: "text",
-              text: `Error: path "${args.path || "."}" is not allowed by workspace permissions`,
+              text: `Error: ${reason}`,
             },
           ],
           details: { path: args.path || ".", error: "permission denied" },
@@ -640,29 +665,35 @@ export function createListFilesTool(
               slashIndex < 0 ? remainder : remainder.slice(0, slashIndex);
             if (name) seen.add(name);
           }
-          const result = Array.from(seen)
-            .sort()
-            .map((name) => {
-              const entryPath = prefix ? `${prefix}${name}` : name;
-              const type =
-                snapshot.resources[entryPath] !== undefined
-                  ? "file"
-                  : "directory";
-              return `${type}: ${name}`;
-            })
-            .join("\n");
+          if (seen.size > 0) {
+            const result = Array.from(seen)
+              .sort()
+              .map((name) => {
+                const entryPath = prefix ? `${prefix}${name}` : name;
+                const type =
+                  snapshot.resources[entryPath] !== undefined
+                    ? "file"
+                    : "directory";
+                return `${type}: ${name}`;
+              })
+              .join("\n");
+            logger.debug(
+              { path: args.path || ".", revision: snapshot.state.revision },
+              "Directory listed from Authority snapshot",
+            );
+            return {
+              content: [{ type: "text", text: result }],
+              details: {
+                path: args.path || ".",
+                entries: seen.size,
+                revision: snapshot.state.revision,
+              },
+            };
+          }
           logger.debug(
-            { path: args.path || ".", revision: snapshot.state.revision },
-            "Directory listed from Authority snapshot",
+            { path: args.path || "." },
+            "Authority snapshot has no resources for this path, falling back to filesystem",
           );
-          return {
-            content: [{ type: "text", text: result || "Directory is empty" }],
-            details: {
-              path: args.path || ".",
-              entries: seen.size,
-              revision: snapshot.state.revision,
-            },
-          };
         }
 
         const entries = await fs.promises.readdir(dirPath, {

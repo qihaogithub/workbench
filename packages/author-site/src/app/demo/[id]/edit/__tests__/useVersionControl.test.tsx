@@ -89,7 +89,7 @@ describe("useVersionControl", () => {
         code: "export default function Demo() {}",
         schema: "{}",
         validationResult: { isValid: true, errors: [] },
-        demoPages: [{ id: "page-1", name: "首页", order: 0, parentId: null }],
+        demoPages: [{ id: "page-1", name: "首页", order: 0, parentId: null, runtimeType: "high-fidelity-react" as const }],
         hasUnsavedChanges: true,
         hasUnsavedCanvasChanges: false,
         isSaving: false,

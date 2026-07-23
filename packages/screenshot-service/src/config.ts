@@ -12,7 +12,7 @@ export const config = {
 
   dataDir:
     process.env.DATA_DIR ||
-    path.resolve(__dirname, "../../../data/screenshots"),
+    path.resolve(__dirname, "../../../data"),
 
   // Puppeteer
   puppeteerExecutablePath: process.env.PUPPETEER_EXECUTABLE_PATH || "",

@@ -15,7 +15,6 @@ import {
   updateWorkspaceDemoFiles,
   listWorkspaceDemoPages,
   readFoldersMeta,
-  resolvePageRuntimeType,
   getDemoDirPath,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
@@ -99,11 +98,7 @@ export async function GET(
       );
     }
 
-    const rawDemoPages = listWorkspaceDemoPages(sessionMeta.workspaceId);
-    const demoPages = rawDemoPages.map((page) => ({
-      ...page,
-      runtimeType: resolvePageRuntimeType(getDemoDirPath(workspacePath, page.id)),
-    }));
+    const demoPages = listWorkspaceDemoPages(sessionMeta.workspaceId);
     const demoFolders = readFoldersMeta(workspacePath);
 
     return NextResponse.json(

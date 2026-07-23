@@ -33,6 +33,13 @@ export function replacePathsInContent(
     return fullMatch;
   });
 
+  for (const [from, to] of urlMap) {
+    if (from !== to) {
+      const escaped = from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      result = result.replaceAll(new RegExp(escaped, "g"), to);
+    }
+  }
+
   return result;
 }
 

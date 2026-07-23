@@ -140,6 +140,7 @@ function readDeletedPageSnapshotMeta(
       routeKey: parsed.routeKey,
       order: parsed.order ?? 0,
       parentId: parsed.parentId ?? null,
+      runtimeType: parsed.runtimeType ?? "high-fidelity-react",
     };
   } catch {
     return null;

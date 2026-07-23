@@ -46,7 +46,7 @@ export function computeScreenshotHash(
 }
 
 function getProjectDir(projectId: string): string {
-  return path.join(config.dataDir, projectId);
+  return path.join(config.dataDir, "screenshots", projectId);
 }
 
 function getScreenshotPath(

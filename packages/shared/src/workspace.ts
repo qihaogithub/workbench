@@ -104,7 +104,7 @@ export interface ResourceVersion {
   metadata: Record<string, unknown>;
   runtime: {
     schemaVersion: number;
-    runtimeType?: string;
+    runtimeType?: DemoPageRuntimeType;
     previewContractVersion?: string;
     materializerVersion: string;
     migrationStatus?: "native";
@@ -180,6 +180,7 @@ export interface DemoPageMeta {
   routeKey?: string; // 页面稳定语义标识，供应用逻辑图、AI 和工程交接使用
   order: number; // 在页面列表中的展示顺序（小者在前）
   parentId: string | null; // 所属文件夹 ID，null 表示根级
+  runtimeType: DemoPageRuntimeType; // 页面运行时类型，创建时写入，读取时缺失则从文件系统推断补全
 }
 
 export interface AppGraphPageNode {

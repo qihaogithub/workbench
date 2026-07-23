@@ -103,6 +103,7 @@ jest.mock("@/lib/fs-utils", () => ({
     {
       id: "page-sketch",
       name: "手绘页",
+      runtimeType: "sketch-scene" as const,
     },
   ]),
   resolvePageRuntimeType: jest.fn(() => "sketch-scene" as const),

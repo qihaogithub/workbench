@@ -404,7 +404,7 @@ type HistoryEvent =
       version: VersionInfo;
     };
 
-type DemoPage = DemoPageMeta & { runtimeType?: DemoPageRuntimeType; previewSize?: import("@workbench/demo-ui").PreviewSize };
+type DemoPage = DemoPageMeta & { previewSize?: import("@workbench/demo-ui").PreviewSize };
 
 const runtimeTypeLabels: Record<DemoPageRuntimeType, string> = {
   "high-fidelity-react": "高保真 React",
@@ -4335,10 +4335,7 @@ ${context.details}
               prototypeMeta: files.prototypeMeta,
             },
           );
-          const nextRuntimeType =
-            conversion.targetRuntimeType === "prototype-html-css"
-              ? "prototype-html-css"
-              : undefined;
+          const nextRuntimeType = conversion.targetRuntimeType;
           setDemoPages((current) =>
             current.map((item) =>
               item.id === conversion.pageId
@@ -4643,9 +4640,11 @@ ${context.details}
           demos: multi.demos,
           traceId,
         });
-        toast({
-          title: pageIdentityChanged ? "页面列表已刷新" : "页面结构已更新",
-        });
+        if (pageIdentityChanged) {
+          toast({
+            title: "页面列表已刷新",
+          });
+        }
       } catch (error) {
         recordDiagnosticEvent({
           category: "ai",

@@ -375,11 +375,13 @@ function migrateLegacyToTree(workspacePath: string): WorkspaceTree {
       if (fs.existsSync(legacyMetaPath)) {
         try {
           const m = JSON.parse(fs.readFileSync(legacyMetaPath, "utf-8"));
+          const dir = path.join(demosDir, entry.name);
           pages.push({
             id: (m.id as string) || entry.name,
             name: (m.name as string) || entry.name,
             order: typeof m.order === "number" ? m.order : pages.length,
             parentId: (m.parentId ?? null) as string | null,
+            runtimeType: resolvePageRuntimeType(dir),
           });
         } catch {
           /* ignore */
@@ -396,6 +398,7 @@ function migrateLegacyToTree(workspacePath: string): WorkspaceTree {
             name: entry.name.split("_")[0].replace(/-/g, " "),
             order: pages.length,
             parentId: null,
+            runtimeType: resolvePageRuntimeType(dir),
           });
         }
       }
@@ -419,9 +422,23 @@ export function readWorkspaceTree(workspacePath: string): WorkspaceTree {
   if (fs.existsSync(treePath)) {
     try {
       const parsed = JSON.parse(fs.readFileSync(treePath, "utf-8"));
+      const demosDir = path.join(workspacePath, "demos");
+      const rawPages: DemoPageMeta[] = Array.isArray(parsed?.pages)
+        ? parsed.pages
+        : [];
+      const pages = rawPages.map((page) =>
+        page.runtimeType
+          ? page
+          : {
+              ...page,
+              runtimeType: resolvePageRuntimeType(
+                path.join(demosDir, page.id),
+              ),
+            },
+      );
       const tree = {
         folders: Array.isArray(parsed?.folders) ? parsed.folders : [],
-        pages: Array.isArray(parsed?.pages) ? parsed.pages : [],
+        pages,
       };
       const normalized = normalizeWorkspacePagesRouteKeys(tree.pages);
       if (normalized.changed) {
@@ -508,6 +525,7 @@ export function writeDemoPageMeta(
       patch.parentId !== undefined
         ? patch.parentId
         : (existing?.parentId ?? null),
+    runtimeType: patch.runtimeType ?? existing?.runtimeType ?? "high-fidelity-react",
   };
   if (existingIdx !== -1) {
     tree.pages[existingIdx] = merged;
@@ -554,12 +572,18 @@ export function listDemoPages(workspacePath: string): DemoPageMeta[] {
     const hasPrototype = fs.existsSync(path.join(dir, "prototype.html"));
     const hasSketchScene = fs.existsSync(path.join(dir, "sketch.scene.json"));
     if (hasSchema && (hasReactCode || hasPrototype || hasSketchScene)) {
+      const inferredRuntimeType: DemoPageRuntimeType = hasSketchScene
+        ? "sketch-scene"
+        : hasPrototype
+          ? "prototype-html-css"
+          : "high-fidelity-react";
       result.push({
         id: entry.name,
         name: entry.name.split("_")[0].replace(/-/g, " "),
         routeKey: makeUniqueRouteKey(entry.name, routeKeys),
         order: result.length,
         parentId: null,
+        runtimeType: inferredRuntimeType,
       });
     }
   }
@@ -927,6 +951,7 @@ export function createProject(name: string, templateId?: string): DemoMeta {
         name: demoId,
         order: index,
         parentId: null,
+        runtimeType: resolvePageRuntimeType(getDemoDirPath(workspacePath, demoId)),
       }
     );
   });
@@ -1780,6 +1805,7 @@ export function createWorkspaceDemoPage(
     ),
     order: nextOrder,
     parentId: parentId ?? null,
+    runtimeType: resolvedRuntimeType,
   };
 
   writeDemoPageMeta(wsPath, demoId, meta);
@@ -1822,6 +1848,7 @@ export function copyWorkspaceDemoPage(
     ),
     order: nextOrder,
     parentId: sourceMeta?.parentId ?? null,
+    runtimeType: sourceMeta?.runtimeType ?? resolvePageRuntimeType(sourceDir),
   };
 
   writeDemoPageMeta(wsPath, demoId, meta);
@@ -1871,6 +1898,7 @@ function readDeletedDemoPageSnapshotMeta(
       routeKey: parsed.routeKey,
       order: parsed.order ?? 0,
       parentId: parsed.parentId ?? null,
+      runtimeType: parsed.runtimeType ?? "high-fidelity-react",
     };
   } catch {
     return null;
