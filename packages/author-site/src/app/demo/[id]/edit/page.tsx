@@ -7,7 +7,6 @@ import {
   PrototypePagePreview,
   SketchPagePreview,
   PreviewCanvas,
-  LayerTreeMenu,
   PageConfigPanel,
   BUILT_IN_CONFIG_CATEGORIES,
   extractPrototypeConfigBindingKeys,
@@ -163,7 +162,7 @@ import {
   SketchEditorEngineToolbar,
   useSketchEditorEngineHost,
 } from "./components/SketchEditorEngineHost";
-import { useVisualEditState } from "./hooks/useVisualEditState";
+import { useVisualEditState, buildVisualSelectionPrompt } from "./hooks/useVisualEditState";
 import { useVersionControl } from "./hooks/useVersionControl";
 import { useWorkspaceAuthorityState } from "./hooks/useWorkspaceAuthorityState";
 import { useCommandHistory } from "./hooks/useCommandHistory";
@@ -206,8 +205,6 @@ import type { ActiveViewContext } from "@/components/ai-elements";
 import { sanitizeHydratedMessages } from "@/lib/sanitize-hydrated-messages";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
-
-const VISUAL_PROPERTY_DRAWER_ANIMATION_MS = 200;
 
 interface DemoEditPageProps {
   params: {
@@ -1628,10 +1625,11 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   const [errorBannerVisible, setErrorBannerVisible] = useState(false);
   const [tabValue, setTabValue] = useState("ai");
-  const [visualPropertyDrawerOpen, setVisualPropertyDrawerOpen] =
-    useState(false);
-  const [visualPropertyDrawerMounted, setVisualPropertyDrawerMounted] =
-    useState(false);
+  const [rightPanelTab, setRightPanelTab] = useState<"edit" | "config">(
+    "edit",
+  );
+  const [aiPickerActive, setAiPickerActive] = useState(false);
+  const [chatInputInsert, setChatInputInsert] = useState<string | null>(null);
   const [fileView, setFileView] = useState<"doc" | "code">("doc");
   const [triggerAutoSend, setTriggerAutoSend] = useState<
     string | AutoRepairTrigger | VisualPropertyAutoSend | null
@@ -2545,9 +2543,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     handleCreateVisualAnnotation,
   } = visualEditState;
 
-  const [visualLayerTreeOpen, setVisualLayerTreeOpen] = useState(false);
-  const [visualLayerDrawerMounted, setVisualLayerDrawerMounted] =
-    useState(false);
   const [visualLayerTreeRequestKey, setVisualLayerTreeRequestKey] = useState(0);
   const [visualLayerTreeNodes, setVisualLayerTreeNodes] = useState<
     VisualNodeTreeItem[]
@@ -2556,8 +2551,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [staticPrototypeRequestKey, setStaticPrototypeRequestKey] = useState(0);
   const pendingStaticPrototypeConversionRef =
     useRef<RuntimeConversionState | null>(null);
-  const propertyPanelActive =
-    previewMode === "single" && visualPropertyDrawerOpen;
   const hasPendingVisualPropertyWork =
     visualPendingPropertyChanges.length > 0 ||
     visualPendingConfigMarks.length > 0 ||
@@ -2575,15 +2568,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   }, [activeDemoId, demoPages, previewMode]);
 
   useEffect(() => {
-    if (propertyPanelActive) return;
-    setVisualPanelHoverNodeId(null);
-    setVisualLayerTreeOpen((current) => (current ? false : current));
-  }, [propertyPanelActive, setVisualPanelHoverNodeId]);
-
-  useEffect(() => {
     setVisualLayerTreeNodes((current) => (current.length === 0 ? current : []));
     setHiddenVisualNodeIds((current) => (current.length === 0 ? current : []));
-    setVisualLayerTreeOpen((current) => (current ? false : current));
   }, [activeDemoId]);
 
   const handleToggleVisualNodeHidden = useCallback((node: VisualNodeInfo) => {
@@ -4199,7 +4185,6 @@ ${context.details}
     async (pageId: string) => {
       if (!confirmDiscardVisualPropertyWork()) return;
       handleClearVisualProperties();
-      setVisualLayerTreeOpen(false);
       setVisualPanelHoverNodeId(null);
       await handleConfigPanelPageSelect(pageId);
     },
@@ -4220,7 +4205,6 @@ ${context.details}
       if (!confirmDiscardVisualPropertyWork()) return;
       handleClearVisualProperties();
       handleVisualSelect(null, []);
-      setVisualLayerTreeOpen(false);
       setVisualPanelHoverNodeId(null);
       setSinglePreviewTarget({ kind: "document", documentNodeId });
     },
@@ -5328,8 +5312,14 @@ ${context.details}
   const singlePreviewViewingDocument =
     previewMode === "single" &&
     effectiveSinglePreviewTarget?.kind === "document";
-  const visualLayerDrawerActive =
-    propertyPanelActive && visualLayerTreeOpen && !singlePreviewViewingDocument;
+  const visualEditActive =
+    previewMode === "single" && !singlePreviewViewingDocument;
+
+  useEffect(() => {
+    if (previewMode !== "single" || singlePreviewViewingDocument) return;
+    setVisualPanelHoverNodeId(null);
+  }, [previewMode, singlePreviewViewingDocument, setVisualPanelHoverNodeId]);
+
   const activeSketchEditorEngine = resolveSketchEditorEngine({
     enginePreference: projectAuthoringPreferences?.sketchEditorEngine,
     userEnginePreference: userAuthoringPreferences?.sketchEditorEngine,
@@ -5345,71 +5335,20 @@ ${context.details}
     onSceneChange: handleSketchSceneChange,
   });
   const sketchLayerDrawerActive = nativeSketchEditingActive;
-  const layerDrawerMounted =
-    (visualLayerDrawerMounted && !singlePreviewViewingDocument) ||
-    sketchLayerDrawerActive;
-  const layerDrawerActive = visualLayerDrawerActive || sketchLayerDrawerActive;
-
-  useEffect(() => {
-    if (visualPropertyDrawerOpen && !singlePreviewViewingDocument) {
-      setVisualPropertyDrawerMounted(true);
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setVisualPropertyDrawerMounted(false);
-    }, VISUAL_PROPERTY_DRAWER_ANIMATION_MS);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [singlePreviewViewingDocument, visualPropertyDrawerOpen]);
-
-  useEffect(() => {
-    if (visualLayerDrawerActive) {
-      setVisualLayerDrawerMounted(true);
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setVisualLayerDrawerMounted(false);
-    }, VISUAL_PROPERTY_DRAWER_ANIMATION_MS);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [visualLayerDrawerActive]);
-
-  const handleOpenVisualEditMode = useCallback(() => {
-    if (singlePreviewViewingDocument) return;
-    setVisualPropertyDrawerOpen(true);
-    setVisualLayerTreeOpen(true);
-    setVisualLayerTreeRequestKey((key) => key + 1);
-  }, [singlePreviewViewingDocument]);
-
-  const handleCloseVisualEditMode = useCallback(() => {
-    if (hasPendingVisualPropertyWork) {
-      if (!confirmDiscardVisualPropertyWork()) return;
-      handleClearVisualProperties();
-    }
-    setVisualPropertyDrawerOpen(false);
-    setVisualLayerTreeOpen(false);
-    setVisualPanelHoverNodeId(null);
-  }, [
-    confirmDiscardVisualPropertyWork,
-    handleClearVisualProperties,
-    hasPendingVisualPropertyWork,
-    setVisualPanelHoverNodeId,
-  ]);
 
   const handleSubmitVisualDraftAction = useCallback(() => {
-    const actionKind = visualDraftAction?.kind;
     handleSendVisualPropertiesToAI();
-    if (actionKind !== "send") return;
-    setVisualPropertyDrawerOpen(false);
-    setVisualLayerTreeOpen(false);
-    setVisualPanelHoverNodeId(null);
-  }, [
-    handleSendVisualPropertiesToAI,
-    setVisualPanelHoverNodeId,
-    visualDraftAction?.kind,
-  ]);
+  }, [handleSendVisualPropertiesToAI]);
+
+  const handleVisualSelectWithPicker = useCallback(
+    (node: VisualNodeInfo | null, nodeStack?: VisualNodeInfo[]) => {
+      handleVisualSelect(node, nodeStack);
+      if (aiPickerActive && node && activeDemoId) {
+        setChatInputInsert(buildVisualSelectionPrompt(node, activeDemoId));
+      }
+    },
+    [aiPickerActive, handleVisualSelect, activeDemoId],
+  );
 
   const visualPropertyDrawerTargetRef = useRef({
     activeDemoId,
@@ -5429,15 +5368,14 @@ ${context.details}
       singlePreviewViewingDocument,
     };
 
-    if (!targetChanged || !visualPropertyDrawerOpen) return;
-    setVisualPropertyDrawerOpen(false);
-    setVisualLayerTreeOpen(false);
+    if (!targetChanged) return;
+    setRightPanelTab("edit");
+    setAiPickerActive(false);
     setVisualPanelHoverNodeId(null);
   }, [
     activeDemoId,
     previewMode,
     singlePreviewViewingDocument,
-    visualPropertyDrawerOpen,
   ]);
   const singlePreviewHistoryTarget = useMemo(
     () =>
@@ -6428,6 +6366,10 @@ ${context.details}
                     setTriggerAutoSend(null);
                     handleVisualPropertyAutoSendHandled();
                   }}
+                  pickerActive={aiPickerActive}
+                  onTogglePicker={() => setAiPickerActive((v) => !v)}
+                  chatInputInsert={chatInputInsert}
+                  onChatInputInsertHandled={() => setChatInputInsert(null)}
                   externalStreamServiceRef={streamServiceRef}
                   errorBanner={
                     errorBannerVisible && validationResult.errors.length > 0 ? (
@@ -6879,14 +6821,8 @@ ${context.details}
                 </div>
               </TabsContent>
             </Tabs>
-            {layerDrawerMounted && (
-              <div
-                className={`absolute inset-0 z-20 flex flex-col border-r bg-card shadow-2xl transition-[opacity,transform] duration-200 ease-out will-change-transform motion-reduce:transform-none motion-reduce:transition-none ${
-                  layerDrawerActive
-                    ? "translate-x-0 opacity-100"
-                    : "pointer-events-none -translate-x-full opacity-0"
-                }`}
-              >
+            {sketchLayerDrawerActive && (
+              <div className="absolute inset-0 z-20 flex flex-col border-r bg-card shadow-2xl">
                 <div className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
                   <div className="flex min-w-0 items-center gap-2">
                     <Layers className="h-4 w-4 text-muted-foreground" />
@@ -6894,30 +6830,10 @@ ${context.details}
                   </div>
                 </div>
                 <div className="min-h-0 flex-1 overflow-hidden p-2">
-                  {sketchLayerDrawerActive ? (
-                    <SketchEditorEngineLayerPanel
-                      host={sketchEditorHost}
-                      scene={activeSketchScene}
-                    />
-                  ) : (
-                    <LayerTreeMenu
-                      title="当前页面图层"
-                      nodes={visualLayerTreeNodes}
-                      className="h-full w-full rounded-none border-0 bg-transparent p-0 shadow-none"
-                      scrollClassName="layer-tree-menu-scrollbar max-h-[calc(100vh-180px)]"
-                      selectedNodeId={
-                        selectedVisualNode?.domPath ||
-                        selectedVisualNode?.nodeId ||
-                        null
-                      }
-                      emptyText="正在采集页面图层..."
-                      hiddenNodeIds={hiddenVisualNodeIds}
-                      getNodeBadgeCount={getVisualNodeChangeCount}
-                      onHoverNodeIdChange={setVisualPanelHoverNodeId}
-                      onSelectNode={handleVisualSelect}
-                      onToggleNodeHidden={handleToggleVisualNodeHidden}
-                    />
-                  )}
+                  <SketchEditorEngineLayerPanel
+                    host={sketchEditorHost}
+                    scene={activeSketchScene}
+                  />
                 </div>
               </div>
             )}
@@ -7110,62 +7026,20 @@ ${context.details}
                       </button>
                     </div>
                     <div className="flex-1" />
-                    {visualDraftAction &&
-                    activeDemoPage?.runtimeType !== "sketch-scene" &&
-                    propertyPanelActive ? (
-                      <VisualDraftActionBar
-                        action={visualDraftAction}
-                        disabled={visualSendDisabled}
-                        onPrimary={handleSubmitVisualDraftAction}
-                        onCancel={handleCloseVisualEditMode}
-                      />
-                    ) : (
+                    {activeDemoPage?.runtimeType === "sketch-scene" && (
                       <Button
                         type="button"
                         variant="outline"
                         size="icon"
                         className={`h-7 w-7 ${
-                          activeDemoPage?.runtimeType === "sketch-scene"
-                            ? sketchEditing
-                              ? "border-emerald-500/80 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-200"
-                              : ""
-                            : propertyPanelActive
-                              ? "border-emerald-500/80 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-200"
-                              : ""
+                          sketchEditing
+                            ? "border-emerald-500/80 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-200"
+                            : ""
                         }`}
-                        disabled={singlePreviewViewingDocument}
-                        title={
-                          singlePreviewViewingDocument
-                            ? "文档视图不可选择"
-                            : activeDemoPage?.runtimeType === "sketch-scene"
-                              ? sketchEditing
-                                ? "退出手绘编辑"
-                                : "手绘编辑"
-                              : propertyPanelActive
-                                ? "退出选择"
-                                : "选择"
-                        }
-                        aria-label={
-                          activeDemoPage?.runtimeType === "sketch-scene"
-                            ? "手绘编辑"
-                            : "选择"
-                        }
-                        aria-pressed={
-                          activeDemoPage?.runtimeType === "sketch-scene"
-                            ? sketchEditing
-                            : propertyPanelActive
-                        }
-                        onClick={() => {
-                          if (activeDemoPage?.runtimeType === "sketch-scene") {
-                            setSketchEditing((current) => !current);
-                          } else {
-                            if (propertyPanelActive) {
-                              handleCloseVisualEditMode();
-                            } else {
-                              handleOpenVisualEditMode();
-                            }
-                          }
-                        }}
+                        title={sketchEditing ? "退出手绘编辑" : "手绘编辑"}
+                        aria-label="手绘编辑"
+                        aria-pressed={sketchEditing}
+                        onClick={() => setSketchEditing((current) => !current)}
                       >
                         <MousePointer2 className="h-3.5 w-3.5" />
                       </Button>
@@ -7305,7 +7179,6 @@ ${context.details}
                       onClick={(event) => {
                         if (event.target !== event.currentTarget) return;
                         handleVisualSelect(null, []);
-                        setVisualLayerTreeOpen(false);
                         setVisualPanelHoverNodeId(null);
                       }}
                     >
@@ -7344,9 +7217,9 @@ ${context.details}
                           demoId={activeDemoId}
                           previewSize={activePreviewSize}
                           allowScroll
-                          visualEditMode={propertyPanelActive}
+                          visualEditMode={visualEditActive}
                           visualHoverNodeId={
-                            propertyPanelActive ? visualPanelHoverNodeId : null
+                            visualEditActive ? visualPanelHoverNodeId : null
                           }
                           selectedVisualNodeId={
                             selectedVisualNode?.domPath ||
@@ -7354,8 +7227,9 @@ ${context.details}
                             null
                           }
                           hiddenVisualNodeIds={hiddenVisualNodeIds}
+                          visualLayerTreeNodes={visualLayerTreeNodes}
                           visualPropertyChanges={visualPropertyChanges}
-                          onVisualSelect={handleVisualSelect}
+                          onVisualSelect={handleVisualSelectWithPicker}
                           onVisualSelectStack={setVisualNodeStack}
                           visualNodeTreeRequestKey={visualLayerTreeRequestKey}
                           onVisualNodeTreeChange={setVisualLayerTreeNodes}
@@ -7426,9 +7300,9 @@ ${context.details}
                             // TODO: 采集投影延迟采样（需要记录预览开始加载时间戳）
                           }}
                           onPositionableSizes={handlePositionableSizes}
-                          visualEditMode={propertyPanelActive}
+                          visualEditMode={visualEditActive}
                           visualHoverNodeId={
-                            propertyPanelActive ? visualPanelHoverNodeId : null
+                            visualEditActive ? visualPanelHoverNodeId : null
                           }
                           selectedVisualNodeId={
                             selectedVisualNode?.domPath ||
@@ -7438,7 +7312,7 @@ ${context.details}
                           hiddenVisualNodeIds={hiddenVisualNodeIds}
                           visualPropertyChanges={visualPropertyChanges}
                           visualAnnotations={visualAnnotations}
-                          onVisualSelect={handleVisualSelect}
+                          onVisualSelect={handleVisualSelectWithPicker}
                           onVisualSelectStack={setVisualNodeStack}
                           visualNodeTreeRequestKey={visualLayerTreeRequestKey}
                           onVisualNodeTreeChange={setVisualLayerTreeNodes}
@@ -7508,66 +7382,81 @@ ${context.details}
             <ResizablePanel className="relative flex flex-col overflow-hidden border-l bg-card">
               {previewMode === "single" ? (
                 <>
-                  <PageConfigPanel
-                    pages={demoPages.map((page) => ({
-                      id: page.id,
-                      name: page.name,
-                      order: page.order,
-                      schema:
-                        pageSchemaMap[page.id] ||
-                        (page.id === activeDemoId ? schema : undefined),
-                      configData: configDataMap[page.id],
-                      projectConfigBindings:
-                        page.runtimeType === "prototype-html-css"
-                          ? extractPrototypeConfigBindingKeys(
-                              pagePrototypeMap[page.id]?.html,
-                            )
-                          : undefined,
-                    }))}
-                    activePageId={activeDemoId}
-                    detailPageId={activeDemoId}
-                    onDetailPageIdChange={(pageId) => {
-                      setConfigPanelDetailPageId(pageId);
-                    }}
-                    onPageSelect={handleConfigPanelPageSelect}
-                    projectConfigSchema={projectConfigSchema}
-                    onProjectConfigChange={handleProjectConfigPanelChange}
-                    onProjectSchemaChange={handleProjectSchemaChange}
-                    onPageConfigChange={handlePageConfigPanelChange}
-                    onPageSchemaChange={handlePageSchemaChange}
-                    sessionId={sessionId}
-                    positionableItemSizes={positionableItemSizes}
-                    hideDetailHeader
-                  />
-                  {visualPropertyDrawerMounted &&
-                    !singlePreviewViewingDocument && (
-                      <div
-                        className={`absolute inset-0 z-20 flex flex-col border-l bg-card shadow-2xl transition-[opacity,transform] duration-200 ease-out will-change-transform ${
-                          propertyPanelActive
-                            ? "translate-x-0 opacity-100"
-                            : "pointer-events-none translate-x-full opacity-0"
-                        } motion-reduce:transform-none motion-reduce:transition-none`}
-                      >
-                        <VisualPropertyPanel
-                          selectedNode={selectedVisualNode}
-                          sessionId={sessionId}
-                          projectId={demoId}
-                          pageId={activeDemoId}
-                          runtimeType={activeDemoPage?.runtimeType}
-                          propertyChanges={visualPropertyChanges}
-                          configMarks={visualConfigMarks}
-                          aiInstruction={visualAiInstruction}
-                          usedConfigKeys={visualConfigUsedKeys}
-                          onPropertyChange={handleVisualPropertyChange}
-                          onRestoreProperty={handleRestoreVisualProperty}
-                          onClearChanges={handleClearSelectedVisualProperties}
-                          onMarkConfig={handleMarkVisualConfig}
-                          onUpdateConfigMark={handleUpdateVisualConfigMark}
-                          onRemoveConfigMark={handleRemoveVisualConfigMark}
-                          onAiInstructionChange={setVisualAiInstruction}
-                        />
-                      </div>
-                    )}
+                  <Tabs
+                    value={rightPanelTab}
+                    onValueChange={(v) =>
+                      setRightPanelTab(v as "edit" | "config")
+                    }
+                    className="flex h-full flex-col"
+                  >
+                    <TabsList className="grid w-full grid-cols-2 shrink-0">
+                      <TabsTrigger value="edit">编辑</TabsTrigger>
+                      <TabsTrigger value="config">配置</TabsTrigger>
+                    </TabsList>
+                    <TabsContent
+                      value="edit"
+                      className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
+                    >
+                      <VisualPropertyPanel
+                        selectedNode={selectedVisualNode}
+                        sessionId={sessionId}
+                        projectId={demoId}
+                        pageId={activeDemoId}
+                        runtimeType={activeDemoPage?.runtimeType}
+                        propertyChanges={visualPropertyChanges}
+                        configMarks={visualConfigMarks}
+                        aiInstruction={visualAiInstruction}
+                        usedConfigKeys={visualConfigUsedKeys}
+                        onPropertyChange={handleVisualPropertyChange}
+                        onRestoreProperty={handleRestoreVisualProperty}
+                        onClearChanges={handleClearSelectedVisualProperties}
+                        onMarkConfig={handleMarkVisualConfig}
+                        onUpdateConfigMark={handleUpdateVisualConfigMark}
+                        onRemoveConfigMark={handleRemoveVisualConfigMark}
+                        onAiInstructionChange={setVisualAiInstruction}
+                        draftAction={visualDraftAction}
+                        draftActionDisabled={visualSendDisabled}
+                        onDraftActionPrimary={handleSubmitVisualDraftAction}
+                        onDraftActionCancel={handleClearVisualProperties}
+                      />
+                    </TabsContent>
+                    <TabsContent
+                      value="config"
+                      className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
+                    >
+                      <PageConfigPanel
+                        pages={demoPages.map((page) => ({
+                          id: page.id,
+                          name: page.name,
+                          order: page.order,
+                          schema:
+                            pageSchemaMap[page.id] ||
+                            (page.id === activeDemoId ? schema : undefined),
+                          configData: configDataMap[page.id],
+                          projectConfigBindings:
+                            page.runtimeType === "prototype-html-css"
+                              ? extractPrototypeConfigBindingKeys(
+                                  pagePrototypeMap[page.id]?.html,
+                                )
+                              : undefined,
+                        }))}
+                        activePageId={activeDemoId}
+                        detailPageId={activeDemoId}
+                        onDetailPageIdChange={(pageId) => {
+                          setConfigPanelDetailPageId(pageId);
+                        }}
+                        onPageSelect={handleConfigPanelPageSelect}
+                        projectConfigSchema={projectConfigSchema}
+                        onProjectConfigChange={handleProjectConfigPanelChange}
+                        onProjectSchemaChange={handleProjectSchemaChange}
+                        onPageConfigChange={handlePageConfigPanelChange}
+                        onPageSchemaChange={handlePageSchemaChange}
+                        sessionId={sessionId}
+                        positionableItemSizes={positionableItemSizes}
+                        hideDetailHeader
+                      />
+                    </TabsContent>
+                  </Tabs>
                   {sketchLayerDrawerActive && (
                     <div className="absolute inset-0 z-20 flex flex-col border-l bg-card shadow-2xl">
                       <SketchEditorEngineInspectorPanel

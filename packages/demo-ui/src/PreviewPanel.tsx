@@ -278,6 +278,7 @@ export function PreviewPanel({
   visualHoverNodeId,
   selectedVisualNodeId,
   hiddenVisualNodeIds = [],
+  visualLayerTreeNodes,
   visualPropertyChanges = [],
   visualAnnotations = [],
   onVisualSelect,
@@ -1197,11 +1198,15 @@ export function PreviewPanel({
                   Array.isArray(event.data.nodeTree.children)
                     ? (event.data.nodeTree as VisualNodeTreeItem)
                     : null;
+                const menuTree =
+                  visualLayerTreeNodes && visualLayerTreeNodes.length > 0
+                    ? visualLayerTreeNodes
+                    : nodeTree
+                      ? [nodeTree]
+                      : buildVisualTreeFromStack(nodeStack);
                 setVisualContextMenu({
                   ...position,
-                  tree: nodeTree
-                    ? [nodeTree]
-                    : buildVisualTreeFromStack(nodeStack),
+                  tree: menuTree,
                 });
               } else {
                 closeVisualContextMenu();
@@ -1554,7 +1559,7 @@ export function PreviewPanel({
                 <LayerTreeMenu
                   title="预览区图层"
                   nodes={visualContextMenu.tree}
-                  scrollClassName="layer-tree-menu-scrollbar"
+                  scrollClassName="layer-tree-menu-scrollbar max-h-[320px]"
                   selectedNodeId={selectedVisualNodeId}
                   onHoverNodeIdChange={updateVisualContextHover}
                   onSelectNode={(node, path) => {

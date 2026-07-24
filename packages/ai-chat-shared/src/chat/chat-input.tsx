@@ -21,7 +21,7 @@ import {
   Attachments,
 } from "../attachments";
 import { ModelSelectWithGuard } from "./model-select-with-guard";
-import { FileText, History, Image, Plus } from "lucide-react";
+import { FileText, History, Image, MousePointer2, Plus } from "lucide-react";
 import { cn } from "../lib/utils";
 import { getConfiguredAgentClient } from "../config";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
@@ -228,6 +228,10 @@ interface ChatInputProps {
   /** 是否显示历史会话入口（依赖 author-site 会话持久化）；viewer-readonly 场景传 false */
   supportsHistory?: boolean;
   imageDescriptionEnabled?: boolean;
+  pickerActive?: boolean;
+  onTogglePicker?: () => void;
+  externalInsertText?: string | null;
+  onExternalInsertTextHandled?: () => void;
 }
 
 export function ChatInput({
@@ -248,6 +252,10 @@ export function ChatInput({
   supportsFiles = true,
   supportsHistory = true,
   imageDescriptionEnabled = false,
+  pickerActive,
+  onTogglePicker,
+  externalInsertText,
+  onExternalInsertTextHandled,
 }: ChatInputProps) {
   const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -326,6 +334,8 @@ export function ChatInput({
       globalDrop
       multiple
       supportsImages={supportsImages}
+      externalInsertText={externalInsertText}
+      onExternalInsertTextHandled={onExternalInsertTextHandled}
     >
       <PromptInputHeader>
         <PromptInputAttachmentsDisplay />
@@ -348,6 +358,17 @@ export function ChatInput({
             supportsImages={Boolean(supportsImages)}
             supportsFiles={supportsFiles}
           />
+          {onTogglePicker && (
+            <Button
+              variant={pickerActive ? "default" : "ghost"}
+              size="icon"
+              className="h-8 w-8"
+              onClick={onTogglePicker}
+              title="选择页面元素插入对话"
+            >
+              <MousePointer2 className="h-4 w-4" />
+            </Button>
+          )}
           {supportsHistory && (
             <Button
               variant="ghost"

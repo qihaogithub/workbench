@@ -147,6 +147,10 @@ interface AIChatProps {
   externalStreamServiceRef?: React.MutableRefObject<StreamService | null>;
   /** 由宿主接管历史入口；viewer-site 使用项目级本地历史。 */
   onHistoryOpen?: () => void;
+  pickerActive?: boolean;
+  onTogglePicker?: () => void;
+  chatInputInsert?: string | null;
+  onChatInputInsertHandled?: () => void;
 }
 
 export function AIChat({
@@ -181,6 +185,10 @@ export function AIChat({
   beforeSend,
   externalStreamServiceRef,
   onHistoryOpen,
+  pickerActive,
+  onTogglePicker,
+  chatInputInsert,
+  onChatInputInsertHandled,
 }: AIChatProps) {
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -530,6 +538,10 @@ export function AIChat({
         supportsFiles
         supportsHistory={mode !== "viewer-readonly" || Boolean(onHistoryOpen)}
         imageDescriptionEnabled={modelState.imageDescriptionEnabled}
+        pickerActive={pickerActive}
+        onTogglePicker={onTogglePicker}
+        externalInsertText={chatInputInsert}
+        onExternalInsertTextHandled={onChatInputInsertHandled}
       />
 
       {mode !== "viewer-readonly" && (
