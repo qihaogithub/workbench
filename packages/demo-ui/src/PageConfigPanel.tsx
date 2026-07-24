@@ -6,6 +6,7 @@ import {
   ChevronRight,
   FileText,
   ListFilter,
+  Save,
   Settings,
 } from "lucide-react";
 import { ConfigForm } from "./ConfigForm";
@@ -16,6 +17,15 @@ import {
 } from "./config-categories";
 import { cn } from "./utils";
 import type { PositionableSizeItem } from "./types";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export interface PageConfigPanelPage {
   id: string;
@@ -37,6 +47,7 @@ interface PageConfigPanelProps {
   onProjectSchemaChange?: (schema: string) => void;
   onPageConfigChange?: (pageId: string, data: Record<string, unknown>) => void;
   onPageSchemaChange?: (pageId: string, schema: string) => void;
+  onSaveAsDefaults?: (pageId: string) => void;
   readonly?: boolean;
   sessionId?: string;
   positionableItemSizes?: Record<string, PositionableSizeItem>;
@@ -149,6 +160,7 @@ export function PageConfigPanel({
   onProjectSchemaChange,
   onPageConfigChange,
   onPageSchemaChange,
+  onSaveAsDefaults,
   readonly,
   sessionId,
   positionableItemSizes,
@@ -161,6 +173,7 @@ export function PageConfigPanel({
   >(null);
   const [configCategoryFilter, setConfigCategoryFilter] = useState("");
   const [showSharedAffectedPages, setShowSharedAffectedPages] = useState(false);
+  const [showSaveDefaultsDialog, setShowSaveDefaultsDialog] = useState(false);
   const effectiveDetailPageId =
     detailPageId === undefined ? internalDetailPageId : detailPageId;
   const sortedPages = useMemo(() => getSortedPages(pages), [pages]);
@@ -333,6 +346,10 @@ export function PageConfigPanel({
     selectedProjectCount > 0 && !!selectedProjectConfigSchema;
   const showPageConfig = pageCount > 0 && !!selectedPage.schema;
   const configData = selectedPage.configData ?? {};
+  const saveDefaultsEnabled =
+    !readonly &&
+    !!selectedPage?.schema &&
+    Object.keys(configData).length > 0;
 
   return (
     <div className={cn("flex h-full flex-col bg-card", className)}>
@@ -417,6 +434,19 @@ export function PageConfigPanel({
                   <FileText className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm font-semibold">本页配置</span>
                 </div>
+                {!readonly && onSaveAsDefaults && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1 px-2 text-xs"
+                    disabled={!saveDefaultsEnabled}
+                    onClick={() => setShowSaveDefaultsDialog(true)}
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    保存为默认值
+                  </Button>
+                )}
               </div>
               <ConfigScopeWrapper scope="page" hideHeader>
                 <ConfigForm
@@ -447,6 +477,37 @@ export function PageConfigPanel({
           )}
         </div>
       </div>
+
+      <Dialog open={showSaveDefaultsDialog} onOpenChange={setShowSaveDefaultsDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>保存为默认配置</DialogTitle>
+            <DialogDescription>
+              将使用当前本页配置覆盖默认配置，新项目或新增页面将使用新默认值。确认保存？
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowSaveDefaultsDialog(false)}
+            >
+              取消
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                if (selectedPage) {
+                  onSaveAsDefaults?.(selectedPage.id);
+                }
+                setShowSaveDefaultsDialog(false);
+              }}
+            >
+              确认
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

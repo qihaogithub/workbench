@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useCallback, useRef } from 'react';
-import { Trash2, Plus, Loader2, AlertTriangle, ZoomIn } from 'lucide-react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
+import { Trash2, Plus, Loader2, AlertTriangle, ZoomIn, Undo2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -77,6 +77,7 @@ export interface ImageListWidgetProps {
   maxItems?: number;
   title?: string;
   sessionId?: string;
+  defaultValue?: ImageItem[];
   options?: {
     accept?: string;
     maxSize?: number;
@@ -94,6 +95,7 @@ export function ImageListWidget({
   maxItems: propMaxItems,
   title = '图片列表',
   sessionId,
+  defaultValue,
   options = {},
 }: ImageListWidgetProps) {
   const maxItems = propMaxItems ?? options.maxItems ?? 20;
@@ -233,9 +235,31 @@ export function ImageListWidget({
 
   const canAddMore = value.length < maxItems;
 
+  const needsRestore = useMemo(() => {
+    if (!defaultValue || defaultValue.length === 0) return false;
+    if (value.length !== defaultValue.length) return true;
+    return defaultValue.some((d, i) => d.url !== value[i]?.url);
+  }, [defaultValue, value]);
+
+  const handleRestore = useCallback(() => {
+    onChange([...defaultValue!]);
+  }, [defaultValue, onChange]);
+
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-2">
+        {needsRestore && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleRestore}
+            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <Undo2 className="w-3.5 h-3.5 mr-1" />
+            恢复默认
+          </Button>
+        )}
         <span className="text-xs text-muted-foreground">
           {value.length} / {maxItems}
         </span>

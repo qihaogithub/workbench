@@ -2,12 +2,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as https from 'https';
 import * as http from 'http';
-import * as crypto from 'crypto';
 import { Type, type Static } from 'typebox';
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type { AgentConfig } from '../../core/types';
 import { logger } from '../../utils/logger';
-import { resolveLiveWorkspaceMutationContext } from '../../workspace/workspace-mutation-authority';
 import {
   addProjectImageManifestEntry,
   findProjectImageManifestEntry,
@@ -15,6 +13,9 @@ import {
   resolveProjectImageManifestProjectId,
   type ProjectImageEntry,
 } from './project-image-manifest';
+import {
+  uploadToGlobalImageStore,
+} from './global-image-store';
 
 const SUPPORTED_FORMATS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']);
 
@@ -62,18 +63,6 @@ const SaveImageParams = Type.Object({
 });
 
 type SaveImageParams = Static<typeof SaveImageParams>;
-
-function getWorkspaceAssetsDir(workingDir: string): string {
-  return path.join(path.resolve(workingDir), 'assets', 'images');
-}
-
-function getWorkspaceAssetPath(storedFilename: string): string {
-  return `assets/images/${storedFilename}`;
-}
-
-function getDemoRelativeAssetPath(storedFilename: string): string {
-  return `../../assets/images/${storedFilename}`;
-}
 
 function getDemoRelativeAssetPathFromWorkspacePath(workspacePath: string): string {
   return `../../${workspacePath}`;
@@ -288,18 +277,10 @@ function downloadImageFromUrl(
   });
 }
 
-function computeSha256(buffer: Buffer): string {
-  return crypto.createHash('sha256').update(buffer).digest('hex');
-}
-
-function ensureDir(dir: string): void {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-}
-
 interface SaveBufferResult {
   success: boolean;
+  imageId?: string;
+  url?: string;
   workspacePath?: string;
   relativePathFromPage?: string;
   storedFilename?: string;
@@ -315,108 +296,61 @@ async function saveImageBuffer(
   filename: string,
   source: string,
   originalUrl: string | undefined,
-  workspaceDir: string,
+  _workspaceDir: string,
   manifestProjectId: string | null,
-  sessionId: string,
+  _sessionId: string,
 ): Promise<SaveBufferResult> {
-  if (buffer.length > MAX_FILE_SIZE) {
-    const sizeMB = (buffer.length / 1024 / 1024).toFixed(1);
-    logger.warn({ filename, size: buffer.length }, 'saveImage: file too large');
-    return { success: false, error: `Image too large (${sizeMB}MB > 10MB limit)` };
+  const sourceType =
+    source === 'session_asset' ? 'session_asset' as const
+    : source === 'base64' ? 'ai_generated' as const
+    : 'remote_url' as const;
+
+  const result = uploadToGlobalImageStore({
+    buffer,
+    filename,
+    sourceType,
+    sourceUrl: originalUrl,
+    projectId: manifestProjectId ?? undefined,
+    createdBy: 'ai-agent',
+  });
+
+  if (!result.success) {
+    return { success: false, error: result.error };
   }
 
-  const ext = path.extname(filename).slice(1).toLowerCase();
-  if (!SUPPORTED_FORMATS.has(ext)) {
-    return { success: false, error: `Unsupported image format ".${ext}". Supported: ${[...SUPPORTED_FORMATS].join(', ')}` };
-  }
-
-  const sha256 = computeSha256(buffer);
-  const hashPrefix = sha256.slice(0, 12);
-  const storedFilename = `${hashPrefix}-${filename}`;
-
-  const assetsDir = getWorkspaceAssetsDir(workspaceDir);
-  const storedPath = path.join(assetsDir, storedFilename);
-  const workspacePath = getWorkspaceAssetPath(storedFilename);
-  const relativePathFromPage = getDemoRelativeAssetPath(storedFilename);
-
-  let reused = false;
-
-  try {
-    const liveWorkspace = resolveLiveWorkspaceMutationContext(workspaceDir);
-    let receipt: unknown = null;
-    if (liveWorkspace) {
-      const previousHash = fs.existsSync(storedPath) ? computeSha256(fs.readFileSync(storedPath)) : null;
-      if (previousHash === sha256) {
-        reused = true;
-        logger.debug({ storedFilename, sha256: hashPrefix }, 'saveImage: file already exists (hash match), reusing');
-      } else {
-        const staged = await liveWorkspace.authority.stageBinary(liveWorkspace.projectId, liveWorkspace.workspaceId, buffer);
-        receipt = await liveWorkspace.authority.mutate({
-          mutationId: crypto.randomUUID(),
-          projectId: liveWorkspace.projectId,
-          workspaceId: liveWorkspace.workspaceId,
-          sessionId,
-          baseRevision: 0,
-          actor: 'ai',
-          reason: 'agent_save_image',
-          operations: [{
-            type: 'put_binary',
-            path: workspacePath,
-            stagingId: staged.stagingId,
-            hash: staged.hash,
-            size: staged.size,
-            ...(previousHash === null ? { expectedAbsent: true } : { expectedHash: previousHash }),
-          }],
-        });
-        logger.debug({ storedFilename, size: buffer.length, source, sha256: hashPrefix, revision: (receipt as { revision?: number }).revision }, 'Image committed by Workspace Authority');
-      }
-    } else {
-      ensureDir(assetsDir);
-      if (fs.existsSync(storedPath)) {
-        reused = true;
-        logger.debug({ storedFilename, sha256: hashPrefix }, 'saveImage: file already exists, reusing');
-      } else {
-        await fs.promises.writeFile(storedPath, buffer);
-        logger.debug({ storedFilename, size: buffer.length, source, sha256: hashPrefix, workingDir: workspaceDir }, 'Image saved to isolated project workspace');
-      }
-    }
-
-    if (manifestProjectId) {
-      const entry: ProjectImageEntry = {
-        id: hashPrefix,
-        filename: storedFilename,
-        url: workspacePath,
-        size: buffer.length,
-        format: ext,
-        createdAt: Date.now(),
-        createdBy: 'ai',
-        contentHash: sha256,
-        mimeType: `image/${ext === 'jpg' ? 'jpeg' : ext}`,
-        originalUrl,
-        sourceType: source === 'session_asset' ? 'session_asset' : 'remote_url',
-      };
-      try {
-        addProjectImageManifestEntry(manifestProjectId, entry);
-      } catch (manifestError) {
-        logger.warn({ projectId: manifestProjectId, error: manifestError }, 'saveImage: failed to update project image manifest');
-      }
-    }
-
-    return {
-      success: true,
-      workspacePath,
-      relativePathFromPage,
-      storedFilename,
-      size: buffer.length,
-      format: ext,
-      sha256: hashPrefix,
-      reused,
+  if (manifestProjectId) {
+    const entry: ProjectImageEntry = {
+      id: result.sha256.slice(0, 12),
+      filename: result.filename,
+      url: result.url,
+      size: result.sizeBytes,
+      format: path.extname(filename).slice(1).toLowerCase(),
+      createdAt: Date.now(),
+      createdBy: 'ai',
+      contentHash: result.sha256,
+      mimeType: result.mimeType,
+      originalUrl,
+      sourceType: source === 'session_asset' ? 'session_asset' : 'remote_url',
     };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    logger.error({ path: storedFilename, error: message }, 'Failed to save image');
-    return { success: false, error: `Error saving image: ${message}` };
+    try {
+      addProjectImageManifestEntry(manifestProjectId, entry);
+    } catch (manifestError) {
+      logger.warn({ projectId: manifestProjectId, error: manifestError }, 'saveImage: failed to update project image manifest');
+    }
   }
+
+  return {
+    success: true,
+    imageId: result.imageId,
+    url: result.url,
+    workspacePath: result.url,
+    relativePathFromPage: result.url,
+    storedFilename: result.filename,
+    size: result.sizeBytes,
+    format: path.extname(filename).slice(1).toLowerCase(),
+    sha256: result.sha256.slice(0, 12),
+    reused: result.deduplicated,
+  };
 }
 
 interface BatchUrlItem {
@@ -512,7 +446,7 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
     name: 'saveImage',
     label: 'Save Image',
     description:
-      'Save or reuse images in the current project workspace. For a single URL image set source=url and provide data (the URL). For batch downloading multiple images at once, set source=url and provide urls array with {url, filename?} items — all downloads run concurrently (max 5 at a time). Prefer source=assetId or source=sessionAsset when a platform-managed asset already exists; base64 and url are fallbacks. Images are stored locally under assets/images/{hash}-{filename}. Use ../../assets/images/{hash}-{filename} from files inside demos/{pageId}/. Supports png, jpg, jpeg, gif, webp, svg formats. Max 10MB per image.',
+      'Save or reuse images to the global image store. For a single URL image set source=url and provide data (the URL). For batch downloading multiple images at once, set source=url and provide urls array with {url, filename?} items — all downloads run concurrently (max 5 at a time). Prefer source=assetId or source=sessionAsset when a platform-managed asset already exists; base64 and url are fallbacks. Images are stored in the global image store with durable URLs. Use /api/images/{imageId} directly in page code (img src) and config.schema.json defaults. Supports png, jpg, jpeg, gif, webp, svg formats. Max 10MB per image.',
     parameters: SaveImageParams,
     execute: async (toolCallId: string, args: SaveImageParams, signal?: AbortSignal) => {
       const { source } = args;
@@ -565,7 +499,7 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
           content: [
             {
               type: 'text',
-              text: `Image already available locally: ${workspacePath}. From page files use ${getDemoRelativeAssetPathFromWorkspacePath(workspacePath)}`,
+              text: `Image already available: ${workspacePath}. Use ${getDemoRelativeAssetPathFromWorkspacePath(workspacePath)} in page files or /api/images/{imageId} for config schema defaults.`,
             },
           ],
           details: {
@@ -653,14 +587,14 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
         const items = batchResults.map((r) => {
           if (r.success) {
             const reused = r.reused ? ' (已存在，复用)' : '';
-            return `${r.url} → ${r.workspacePath}${reused} [引用: ${r.relativePathFromPage}]`;
+            return `${r.url} → ${r.workspacePath}${reused}`;
           }
           return `${r.url} → 失败: ${r.error}`;
         });
 
         let text = `批量下载完成: ${successCount} 成功, ${failCount} 失败\n${items.join('\n')}`;
         if (failCount === 0) {
-          text += `\n\n所有图片已保存到 assets/images/ 目录，页面文件中使用 ../../assets/images/{hash}-{filename} 引用。`;
+          text += `\n\n所有图片已保存到全局图床，页面代码和 config.schema.json 中直接使用 /api/images/{imageId} 引用。`;
         }
 
         return {
@@ -720,15 +654,15 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
         content: [
           {
             type: 'text',
-            text: `Image saved locally: ${saveResult.workspacePath}. From page files use ${saveResult.relativePathFromPage}`,
+            text: `Image saved: ${saveResult.url}${saveResult.reused ? ' (已存在，复用)' : ''}. Use ${saveResult.url} in page code (img src) and config.schema.json defaults.`,
           },
         ],
         details: {
+          imageId: saveResult.imageId,
           url: saveResult.workspacePath,
           path: saveResult.workspacePath,
           filename: saveResult.storedFilename,
           relativePathFromPage: saveResult.relativePathFromPage,
-          absolutePath: path.join(getWorkspaceAssetsDir(workspaceDir), saveResult.storedFilename!),
           size: saveResult.size,
           format: saveResult.format,
           source,

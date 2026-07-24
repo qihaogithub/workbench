@@ -290,15 +290,17 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
               >
                 <Repeat className="w-4 h-4" />
               </button>
-              <button
-                type="button"
-                onClick={handleClear}
-                disabled={disabled || isUploading}
-                className="p-2 rounded-full bg-background/90 text-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-50"
-                aria-label="删除图片"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              {!(defaultValue && value === defaultValue) && (
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  disabled={disabled || isUploading}
+                  className="p-2 rounded-full bg-background/90 text-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-50"
+                  aria-label="删除图片"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
         ) : (

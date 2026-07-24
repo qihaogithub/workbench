@@ -14,6 +14,7 @@ import { buildFullModelId } from "./lib/ai-models";
 import { ChatMessages } from "./chat/chat-messages";
 import { ChatPlan } from "./chat/chat-plan";
 import { ChatInput } from "./chat/chat-input";
+import type { ProjectReference } from "./chat/inline-tag-input";
 import type { StreamService } from "./chat/services/stream-service";
 import type { ActiveViewContext } from "./lib/active-view-context";
 import type { AgentMode, ViewerContext } from "@workbench/agent-client";
@@ -147,10 +148,9 @@ interface AIChatProps {
   externalStreamServiceRef?: React.MutableRefObject<StreamService | null>;
   /** 由宿主接管历史入口；viewer-site 使用项目级本地历史。 */
   onHistoryOpen?: () => void;
-  pickerActive?: boolean;
-  onTogglePicker?: () => void;
-  chatInputInsert?: string | null;
-  onChatInputInsertHandled?: () => void;
+  selectedElement?: import("./chat/element-selection-chip").ChatElementRef | null;
+  onRemoveElement?: () => void;
+  projects?: ProjectReference[];
 }
 
 export function AIChat({
@@ -185,10 +185,9 @@ export function AIChat({
   beforeSend,
   externalStreamServiceRef,
   onHistoryOpen,
-  pickerActive,
-  onTogglePicker,
-  chatInputInsert,
-  onChatInputInsertHandled,
+  selectedElement,
+  onRemoveElement,
+  projects,
 }: AIChatProps) {
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -538,10 +537,9 @@ export function AIChat({
         supportsFiles
         supportsHistory={mode !== "viewer-readonly" || Boolean(onHistoryOpen)}
         imageDescriptionEnabled={modelState.imageDescriptionEnabled}
-        pickerActive={pickerActive}
-        onTogglePicker={onTogglePicker}
-        externalInsertText={chatInputInsert}
-        onExternalInsertTextHandled={onChatInputInsertHandled}
+        selectedElement={selectedElement}
+        onRemoveElement={onRemoveElement}
+        projects={projects}
       />
 
       {mode !== "viewer-readonly" && (

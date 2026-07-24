@@ -106,6 +106,13 @@ export {
 } from "./PageConfigPanel";
 export type { PageConfigPanelPage } from "./PageConfigPanel";
 export { ConfigForm } from "./ConfigForm";
+export { parseSchemaToFields } from "./schema-parser";
+export type {
+  FieldConfig,
+  FieldGroup,
+  OneOfConfig,
+  OneOfVariant,
+} from "./schema-parser";
 export { PreviewPanel } from "./PreviewPanel";
 export {
   INITIAL_PREVIEW_REQUEST_STATE,

@@ -1,11 +1,10 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "../ui/button";
 import {
   PromptInput,
   PromptInputBody,
-  PromptInputTextarea,
   PromptInputFooter,
   PromptInputTools,
   PromptInputSubmit,
@@ -21,12 +20,20 @@ import {
   Attachments,
 } from "../attachments";
 import { ModelSelectWithGuard } from "./model-select-with-guard";
-import { FileText, History, Image, MousePointer2, Plus } from "lucide-react";
+import { FileText, FolderKanban, History, Image, Plus } from "lucide-react";
 import { cn } from "../lib/utils";
 import { getConfiguredAgentClient } from "../config";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import type { ResolvedModel, ThinkingDepth } from "../lib/ai-models";
 import type { FileAttachment, ImageAttachment } from "@workbench/agent-client";
+import { type ChatElementRef } from "./element-selection-chip";
+import {
+  InlineTagInput,
+  type InlineTagInputHandle,
+  type ProjectReference,
+} from "./inline-tag-input";
+import { ProjectReferencePicker } from "./project-reference-picker";
+import { AttachmentManagerDialog } from "./attachment-manager-dialog";
 
 const AI_ATTACHMENT_ACCEPT = [
   ".txt",
@@ -69,7 +76,7 @@ const AI_ATTACHMENT_ACCEPT = [
 const AI_FILE_ACCEPT = `image/*,${AI_ATTACHMENT_ACCEPT}`;
 
 const AI_FILE_MAX_SIZE = 20 * 1024 * 1024;
-const AI_FILE_MAX_COUNT = 5;
+const AI_FILE_MAX_COUNT = 30;
 const AI_FILE_MAX_TOTAL_SIZE = 50 * 1024 * 1024;
 
 function fileToBase64(file: File): Promise<string> {
@@ -101,9 +108,13 @@ async function uploadFileAttachment(
 function PromptInputAddMenu({
   supportsImages,
   supportsFiles,
+  hasProjects,
+  onOpenProjectPicker,
 }: {
   supportsImages: boolean;
   supportsFiles: boolean;
+  hasProjects: boolean;
+  onOpenProjectPicker: () => void;
 }) {
   const attachments = usePromptInputAttachments();
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -119,7 +130,7 @@ function PromptInputAddMenu({
     setOpen(false);
   };
 
-  if (!supportsImages && !supportsFiles) return null;
+  if (!supportsImages && !supportsFiles && !hasProjects) return null;
 
   return (
     <>
@@ -157,6 +168,19 @@ function PromptInputAddMenu({
               添加附件
             </button>
           )}
+          {hasProjects && (
+            <button
+              type="button"
+              className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => {
+                setOpen(false);
+                onOpenProjectPicker();
+              }}
+            >
+              <FolderKanban className="h-4 w-4" />
+              引用其他项目
+            </button>
+          )}
         </PopoverContent>
       </Popover>
       <input
@@ -179,27 +203,56 @@ function PromptInputAddMenu({
   );
 }
 
-const PromptInputAttachmentsDisplay = () => {
+const VISIBLE_ATTACHMENT_COUNT = 4;
+
+const PromptInputAttachmentsDisplay = ({
+  onOpenManager,
+}: {
+  onOpenManager: () => void;
+}) => {
   const attachments = usePromptInputAttachments();
 
   if (attachments.files.length === 0) {
     return null;
   }
 
+  const visibleFiles = attachments.files.slice(0, VISIBLE_ATTACHMENT_COUNT);
+  const overflow = attachments.files.length - VISIBLE_ATTACHMENT_COUNT;
+  const imageCount = attachments.files.filter((f) =>
+    f.type.startsWith("image/"),
+  ).length;
+  const hasOtherFiles = attachments.files.length !== imageCount;
+
+  const overflowLabel = hasOtherFiles
+    ? `+${overflow} 个附件`
+    : `+${overflow} 张图片`;
+
   return (
-    <Attachments variant="inline">
-      {attachments.files.map((attachment) => (
-        <Attachment
-          data={attachment}
-          key={attachment.id}
-          onRemove={() => attachments.remove(attachment.id)}
+    <div className="flex items-start gap-2">
+      <Attachments variant="inline">
+        {visibleFiles.map((attachment) => (
+          <Attachment
+            data={attachment}
+            key={attachment.id}
+            onRemove={() => attachments.remove(attachment.id)}
+          >
+            <AttachmentPreview />
+            <AttachmentInfo className="max-w-[160px]" />
+            <AttachmentRemove />
+          </Attachment>
+        ))}
+      </Attachments>
+      {overflow > 0 && (
+        <button
+          type="button"
+          className="flex-shrink-0 mt-0.5 inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors"
+          onClick={onOpenManager}
         >
-          <AttachmentPreview />
-          <AttachmentInfo className="max-w-[160px]" />
-          <AttachmentRemove />
-        </Attachment>
-      ))}
-    </Attachments>
+          <Image className="h-3 w-3" />
+          {overflowLabel}
+        </button>
+      )}
+    </div>
   );
 };
 
@@ -223,15 +276,12 @@ interface ChatInputProps {
   canSwitch: boolean;
   isModelLoading: boolean;
   supportsImages?: boolean;
-  /** 是否支持文件附件（依赖 author-site 上传 API）；viewer-readonly 场景传 false */
   supportsFiles?: boolean;
-  /** 是否显示历史会话入口（依赖 author-site 会话持久化）；viewer-readonly 场景传 false */
   supportsHistory?: boolean;
   imageDescriptionEnabled?: boolean;
-  pickerActive?: boolean;
-  onTogglePicker?: () => void;
-  externalInsertText?: string | null;
-  onExternalInsertTextHandled?: () => void;
+  selectedElement?: ChatElementRef | null;
+  onRemoveElement?: () => void;
+  projects?: ProjectReference[];
 }
 
 export function ChatInput({
@@ -252,19 +302,39 @@ export function ChatInput({
   supportsFiles = true,
   supportsHistory = true,
   imageDescriptionEnabled = false,
-  pickerActive,
-  onTogglePicker,
-  externalInsertText,
-  onExternalInsertTextHandled,
+  selectedElement,
+  onRemoveElement,
+  projects,
 }: ChatInputProps) {
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
+  const [attachmentManagerOpen, setAttachmentManagerOpen] = useState(false);
+  const attachments = usePromptInputAttachments();
+  const inputRef = useRef<InlineTagInputHandle | null>(null);
+  const prevElementIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (selectedElement && selectedElement.id !== prevElementIdRef.current) {
+      prevElementIdRef.current = selectedElement.id;
+      inputRef.current?.insertTag({
+        id: selectedElement.id,
+        type: "element",
+        label: selectedElement.label,
+        context: selectedElement.context,
+      });
+      onRemoveElement?.();
+    }
+  }, [selectedElement, onRemoveElement]);
 
   const handleSubmit = useCallback(
     async (message: PromptInputMessage) => {
+      const tagValue = inputRef.current?.getValue();
+      const tags = tagValue?.tags ?? [];
       const hasText = Boolean(message.text);
       const hasAttachments = Boolean(message.files?.length);
+      const hasTags = tags.length > 0;
 
-      if (!(hasText || hasAttachments)) {
+      if (!(hasText || hasAttachments || hasTags)) {
         return;
       }
 
@@ -312,8 +382,23 @@ export function ChatInput({
             : "请读取并分析这些附件文件"
           : "处理附件图片";
 
+      const baseText = message.text || fallbackMessage;
+
+      const tagContexts = tags
+        .map(
+          (tag) =>
+            `[引用${tag.type === "project" ? "项目" : "元素"}: ${tag.label}]\n${tag.context}`,
+        )
+        .join("\n\n");
+
+      const userMessage = tagContexts
+        ? `${tagContexts}\n\n${baseText}`
+        : baseText;
+
+      inputRef.current?.clear();
+
       onSubmit(
-        message.text || fallbackMessage,
+        userMessage,
         images.length > 0 ? images : undefined,
         undefined,
         files.length > 0 ? files : undefined,
@@ -334,11 +419,11 @@ export function ChatInput({
       globalDrop
       multiple
       supportsImages={supportsImages}
-      externalInsertText={externalInsertText}
-      onExternalInsertTextHandled={onExternalInsertTextHandled}
     >
       <PromptInputHeader>
-        <PromptInputAttachmentsDisplay />
+        <PromptInputAttachmentsDisplay
+          onOpenManager={() => setAttachmentManagerOpen(true)}
+        />
         {uploadError && (
           <div className="w-full rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             {uploadError}
@@ -346,8 +431,9 @@ export function ChatInput({
         )}
       </PromptInputHeader>
       <PromptInputBody>
-        <PromptInputTextarea
-          placeholder="输入指令，按 Enter 发送..."
+        <InlineTagInput
+          controller={inputRef}
+          placeholder="输入指令，⌘↵ / Ctrl↵ 发送..."
           minHeight={40}
           maxHeight={140}
         />
@@ -357,18 +443,9 @@ export function ChatInput({
           <PromptInputAddMenu
             supportsImages={Boolean(supportsImages)}
             supportsFiles={supportsFiles}
+            hasProjects={Boolean(projects && projects.length > 0)}
+            onOpenProjectPicker={() => setProjectPickerOpen(true)}
           />
-          {onTogglePicker && (
-            <Button
-              variant={pickerActive ? "default" : "ghost"}
-              size="icon"
-              className="h-8 w-8"
-              onClick={onTogglePicker}
-              title="选择页面元素插入对话"
-            >
-              <MousePointer2 className="h-4 w-4" />
-            </Button>
-          )}
           {supportsHistory && (
             <Button
               variant="ghost"
@@ -397,6 +474,29 @@ export function ChatInput({
         </PromptInputTools>
         <PromptInputSubmit />
       </PromptInputFooter>
+      {projects && projects.length > 0 && (
+        <ProjectReferencePicker
+          open={projectPickerOpen}
+          onOpenChange={setProjectPickerOpen}
+          projects={projects}
+          onSelect={(project) => {
+            inputRef.current?.insertTag({
+              id: `proj-${project.id}-${Date.now()}`,
+              type: "project",
+              label: project.name,
+              context: `项目名称: ${project.name}\n项目ID: ${project.id}`,
+            });
+            inputRef.current?.focus();
+          }}
+        />
+      )}
+      <AttachmentManagerDialog
+        open={attachmentManagerOpen}
+        onOpenChange={setAttachmentManagerOpen}
+        files={attachments.files}
+        onAddFiles={(newFiles) => attachments.add(newFiles)}
+        onRemoveFile={(id) => attachments.remove(id)}
+      />
     </PromptInput>
   );
 }

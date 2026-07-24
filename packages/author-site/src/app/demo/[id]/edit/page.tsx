@@ -92,6 +92,7 @@ import {
   type VisualPropertyAutoSend,
   type ChatMessage,
   type StreamService,
+  type ChatElementRef,
 } from "@/components/ai-elements";
 import { getAgentClient } from "@/lib/agent-client";
 import { useConsoleBuffer } from "@/components/demo/useConsoleBuffer";
@@ -162,7 +163,7 @@ import {
   SketchEditorEngineToolbar,
   useSketchEditorEngineHost,
 } from "./components/SketchEditorEngineHost";
-import { useVisualEditState, buildVisualSelectionPrompt } from "./hooks/useVisualEditState";
+import { useVisualEditState, getNodeLabel, buildVisualSelectionPrompt } from "./hooks/useVisualEditState";
 import { useVersionControl } from "./hooks/useVersionControl";
 import { useWorkspaceAuthorityState } from "./hooks/useWorkspaceAuthorityState";
 import { useCommandHistory } from "./hooks/useCommandHistory";
@@ -200,6 +201,7 @@ import type {
   UserAuthoringPreferences,
 } from "@workbench/shared";
 import { projectApiClient } from "@/lib/project-api";
+import { useDemos } from "@/lib/api";
 import { resolveSketchEditorEngine } from "@/lib/sketch-editor-engine";
 import type { ActiveViewContext } from "@/components/ai-elements";
 import { sanitizeHydratedMessages } from "@/lib/sanitize-hydrated-messages";
@@ -787,6 +789,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [coverDialogOpen, setCoverDialogOpen] = useState(false);
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [saveVersionDialogOpen, setSaveVersionDialogOpen] = useState(false);
+  const [versionNameInput, setVersionNameInput] = useState("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [hasPendingWorkspaceFlush, setHasPendingWorkspaceFlush] =
     useState(false);
@@ -1628,8 +1632,21 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [rightPanelTab, setRightPanelTab] = useState<"edit" | "config">(
     "edit",
   );
-  const [aiPickerActive, setAiPickerActive] = useState(false);
-  const [chatInputInsert, setChatInputInsert] = useState<string | null>(null);
+  const [chatElement, setChatElement] =
+    useState<ChatElementRef | null>(null);
+  const { demos } = useDemos();
+  const projectReferences = useMemo(
+    () =>
+      demos.map((d) => ({
+        id: d.id,
+        name: d.name,
+        category: d.category,
+        thumbnail: d.thumbnail,
+        demoCount: d.demoCount,
+        updatedAt: d.updatedAt,
+      })),
+    [demos],
+  );
   const [fileView, setFileView] = useState<"doc" | "code">("doc");
   const [triggerAutoSend, setTriggerAutoSend] = useState<
     string | AutoRepairTrigger | VisualPropertyAutoSend | null
@@ -3602,6 +3619,46 @@ ${context.details}
     [handleSchemaChange],
   );
 
+  const handleSaveAsDefaults = useCallback(
+    (pageId: string) => {
+      const currentSchema = pageSchemaMapRef.current[pageId];
+      const currentConfig = configDataMapRef.current[pageId];
+      if (!currentSchema || !currentConfig) {
+        toast({ title: "保存失败", description: "未找到配置数据", variant: "destructive" });
+        return;
+      }
+
+      try {
+        const schemaObj = JSON.parse(currentSchema);
+        if (!schemaObj.properties || typeof schemaObj.properties !== "object") {
+          toast({ title: "保存失败", description: "Schema 中无 properties 定义", variant: "destructive" });
+          return;
+        }
+
+        const metaKeys = new Set(["__order", "__orderH", "__positions"]);
+        let updatedCount = 0;
+        for (const [key, value] of Object.entries(currentConfig)) {
+          if (metaKeys.has(key)) continue;
+          if (!(key in schemaObj.properties)) continue;
+          if (
+            schemaObj.properties[key] &&
+            typeof schemaObj.properties[key] === "object"
+          ) {
+            schemaObj.properties[key].default = value;
+            updatedCount++;
+          }
+        }
+
+        const newSchema = JSON.stringify(schemaObj, null, 2);
+        handlePageSchemaChange(pageId, newSchema);
+        toast({ title: "默认配置已更新", description: `已更新 ${updatedCount} 个字段的默认值` });
+      } catch {
+        toast({ title: "保存失败", description: "无法解析当前 Schema", variant: "destructive" });
+      }
+    },
+    [handlePageSchemaChange, toast],
+  );
+
   // 安全合并项目级 + 页面级 Schema 默认值
   const getSafeMergedDefaults = useCallback(
     (pageSchema: string, projectSchemaOverride?: string) => {
@@ -4552,7 +4609,16 @@ ${context.details}
         setPageCodes(codes);
         setPagePrototypeMap(prototypes);
         setPageSketchMap(sketches);
-        setConfigDataMap(allDefaults);
+        setConfigDataMap((prev) => {
+          const merged: Record<string, Record<string, unknown>> = {};
+          for (const pageId of Object.keys(allDefaults)) {
+            merged[pageId] = {
+              ...allDefaults[pageId],
+              ...(prev[pageId] || {}),
+            };
+          }
+          return merged;
+        });
         setPageSchemaMap((prev) => mergeLoadedPageSchemas(prev, schemas));
         setPagePreviewSizeMap(previewSizeMap);
 
@@ -5313,7 +5379,9 @@ ${context.details}
     previewMode === "single" &&
     effectiveSinglePreviewTarget?.kind === "document";
   const visualEditActive =
-    previewMode === "single" && !singlePreviewViewingDocument;
+    previewMode === "single" &&
+    !singlePreviewViewingDocument &&
+    rightPanelTab === "edit";
 
   useEffect(() => {
     if (previewMode !== "single" || singlePreviewViewingDocument) return;
@@ -5340,15 +5408,16 @@ ${context.details}
     handleSendVisualPropertiesToAI();
   }, [handleSendVisualPropertiesToAI]);
 
-  const handleVisualSelectWithPicker = useCallback(
-    (node: VisualNodeInfo | null, nodeStack?: VisualNodeInfo[]) => {
-      handleVisualSelect(node, nodeStack);
-      if (aiPickerActive && node && activeDemoId) {
-        setChatInputInsert(buildVisualSelectionPrompt(node, activeDemoId));
-      }
-    },
-    [aiPickerActive, handleVisualSelect, activeDemoId],
-  );
+  const handleAddToChat = useCallback(() => {
+    if (!selectedVisualNode || !activeDemoId) return;
+    const label = getNodeLabel(selectedVisualNode);
+    const context = buildVisualSelectionPrompt(selectedVisualNode, activeDemoId);
+    setChatElement({
+      id: `elem-${Date.now()}`,
+      label,
+      context,
+    });
+  }, [selectedVisualNode, activeDemoId]);
 
   const visualPropertyDrawerTargetRef = useRef({
     activeDemoId,
@@ -5369,8 +5438,6 @@ ${context.details}
     };
 
     if (!targetChanged) return;
-    setRightPanelTab("edit");
-    setAiPickerActive(false);
     setVisualPanelHoverNodeId(null);
   }, [
     activeDemoId,
@@ -6172,9 +6239,11 @@ ${context.details}
 
               <TabsContent
                 value="ai"
+                forceMount
                 className="flex-1 flex flex-col mt-0 min-h-0 min-w-0 data-[state=inactive]:hidden"
               >
                 <AIChat
+                  key={agentSessionId}
                   sessionId={sessionId}
                   agentSessionId={agentSessionId}
                   workingDir={workspacePath || undefined}
@@ -6366,10 +6435,9 @@ ${context.details}
                     setTriggerAutoSend(null);
                     handleVisualPropertyAutoSendHandled();
                   }}
-                  pickerActive={aiPickerActive}
-                  onTogglePicker={() => setAiPickerActive((v) => !v)}
-                  chatInputInsert={chatInputInsert}
-                  onChatInputInsertHandled={() => setChatInputInsert(null)}
+                  selectedElement={chatElement}
+                  onRemoveElement={() => setChatElement(null)}
+                  projects={projectReferences}
                   externalStreamServiceRef={streamServiceRef}
                   errorBanner={
                     errorBannerVisible && validationResult.errors.length > 0 ? (
@@ -6665,7 +6733,7 @@ ${context.details}
                     <div className="flex items-center gap-2">
                       <Button
                         size="sm"
-                        onClick={handleCreateVersion}
+                        onClick={() => setSaveVersionDialogOpen(true)}
                         disabled={isSaving || !hasPendingChanges}
                         className="h-8 gap-1.5"
                       >
@@ -6677,7 +6745,7 @@ ${context.details}
                         ) : (
                           <>
                             <History className="h-3.5 w-3.5" />
-                            命名此版本
+                            保存为版本
                           </>
                         )}
                       </Button>
@@ -7229,7 +7297,7 @@ ${context.details}
                           hiddenVisualNodeIds={hiddenVisualNodeIds}
                           visualLayerTreeNodes={visualLayerTreeNodes}
                           visualPropertyChanges={visualPropertyChanges}
-                          onVisualSelect={handleVisualSelectWithPicker}
+                          onVisualSelect={handleVisualSelect}
                           onVisualSelectStack={setVisualNodeStack}
                           visualNodeTreeRequestKey={visualLayerTreeRequestKey}
                           onVisualNodeTreeChange={setVisualLayerTreeNodes}
@@ -7310,9 +7378,10 @@ ${context.details}
                             null
                           }
                           hiddenVisualNodeIds={hiddenVisualNodeIds}
+                          visualLayerTreeNodes={visualLayerTreeNodes}
                           visualPropertyChanges={visualPropertyChanges}
                           visualAnnotations={visualAnnotations}
-                          onVisualSelect={handleVisualSelectWithPicker}
+                          onVisualSelect={handleVisualSelect}
                           onVisualSelectStack={setVisualNodeStack}
                           visualNodeTreeRequestKey={visualLayerTreeRequestKey}
                           onVisualNodeTreeChange={setVisualLayerTreeNodes}
@@ -7418,6 +7487,7 @@ ${context.details}
                         draftActionDisabled={visualSendDisabled}
                         onDraftActionPrimary={handleSubmitVisualDraftAction}
                         onDraftActionCancel={handleClearVisualProperties}
+                        onAddToChat={handleAddToChat}
                       />
                     </TabsContent>
                     <TabsContent
@@ -7451,6 +7521,7 @@ ${context.details}
                         onProjectSchemaChange={handleProjectSchemaChange}
                         onPageConfigChange={handlePageConfigPanelChange}
                         onPageSchemaChange={handlePageSchemaChange}
+                        onSaveAsDefaults={handleSaveAsDefaults}
                         sessionId={sessionId}
                         positionableItemSizes={positionableItemSizes}
                         hideDetailHeader
@@ -7502,6 +7573,7 @@ ${context.details}
                   onProjectSchemaChange={handleProjectSchemaChange}
                   onPageConfigChange={handlePageConfigPanelChange}
                   onPageSchemaChange={handlePageSchemaChange}
+                  onSaveAsDefaults={handleSaveAsDefaults}
                   sessionId={sessionId}
                   positionableItemSizes={positionableItemSizes}
                 />
@@ -7805,6 +7877,56 @@ ${context.details}
                 恢复到此版本
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={saveVersionDialogOpen} onOpenChange={setSaveVersionDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>保存为版本</DialogTitle>
+            <DialogDescription>
+              为当前项目状态创建一个命名版本，方便后续追溯和恢复。不填写则使用默认名称。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2 py-4">
+            <Label htmlFor="version-name">版本名称（可选）</Label>
+            <Input
+              id="version-name"
+              value={versionNameInput}
+              onChange={(e) => setVersionNameInput(e.target.value)}
+              placeholder="例如：v1.0、首页改版、修复样式问题"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  setSaveVersionDialogOpen(false);
+                  void handleCreateVersion(versionNameInput || undefined);
+                  setVersionNameInput("");
+                }
+              }}
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setSaveVersionDialogOpen(false);
+                setVersionNameInput("");
+              }}
+            >
+              取消
+            </Button>
+            <Button
+              onClick={() => {
+                setSaveVersionDialogOpen(false);
+                void handleCreateVersion(versionNameInput || undefined);
+                setVersionNameInput("");
+              }}
+            >
+              保存版本
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
