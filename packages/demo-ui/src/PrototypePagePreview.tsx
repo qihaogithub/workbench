@@ -32,6 +32,7 @@ export interface PrototypePagePreviewProps {
   visualHoverNodeId?: string | null;
   selectedVisualNodeId?: string | null;
   hiddenVisualNodeIds?: string[];
+  visualLayerTreeNodes?: VisualNodeTreeItem[];
   visualPropertyChanges?: VisualPropertyChange[];
   onVisualSelect?: (node: VisualNodeInfo | null) => void;
   onVisualSelectStack?: (nodes: VisualNodeInfo[]) => void;
@@ -331,6 +332,7 @@ export function PrototypePagePreview({
   visualHoverNodeId,
   selectedVisualNodeId,
   hiddenVisualNodeIds = [],
+  visualLayerTreeNodes,
   visualPropertyChanges = [],
   onVisualSelect,
   onVisualSelectStack,

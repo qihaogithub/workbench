@@ -61,7 +61,8 @@ import {
   type VisualPropertyChangeKind,
 } from "@workbench/demo-ui";
 import { localizeSelectedImageAsset } from "../image-localization";
-import type { VisualConfigMark } from "../hooks/useVisualEditState";
+import type { VisualConfigMark, VisualDraftActionState } from "../hooks/useVisualEditState";
+import { VisualDraftActionBar } from "./VisualDraftActionBar";
 
 interface VisualPropertyPanelProps {
   selectedNode: VisualNodeInfo | null;
@@ -97,6 +98,10 @@ interface VisualPropertyPanelProps {
   ) => void;
   onRemoveConfigMark: (markId: string) => void;
   onAiInstructionChange: (value: string) => void;
+  draftAction?: VisualDraftActionState | null;
+  draftActionDisabled?: boolean;
+  onDraftActionPrimary?: () => void;
+  onDraftActionCancel?: () => void;
 }
 
 type Option = { value: string; label: string; icon?: ReactNode };
@@ -543,6 +548,10 @@ export function VisualPropertyPanel({
   onUpdateConfigMark,
   onRemoveConfigMark,
   onAiInstructionChange,
+  draftAction,
+  draftActionDisabled,
+  onDraftActionPrimary,
+  onDraftActionCancel,
 }: VisualPropertyPanelProps) {
   const [uploadingChangeId, setUploadingChangeId] = useState<string | null>(null);
   const [localizingChangeId, setLocalizingChangeId] = useState<string | null>(null);
@@ -682,13 +691,10 @@ export function VisualPropertyPanel({
           <h2 className="text-sm font-medium">属性编辑</h2>
         </div>
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-          <MousePointer2 className="h-8 w-8 text-muted-foreground" />
-          <div>
-            <p className="text-sm font-medium">点击左侧预览选择对象</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              右侧会显示当前点击位置的图层和可编辑属性。
-            </p>
-          </div>
+          <MousePointer2 className="h-8 w-8 text-muted-foreground/50" />
+          <p className="text-sm text-muted-foreground">
+            点击预览区元素查看属性
+          </p>
         </div>
       </div>
     );
@@ -1960,6 +1966,17 @@ export function VisualPropertyPanel({
       </ScrollArea>
 
       {renderConfigMarkDialog()}
+
+      {draftAction && onDraftActionPrimary && onDraftActionCancel && (
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t px-3 py-2">
+          <VisualDraftActionBar
+            action={draftAction}
+            disabled={draftActionDisabled}
+            onPrimary={onDraftActionPrimary}
+            onCancel={onDraftActionCancel}
+          />
+        </div>
+      )}
     </div>
   );
 }

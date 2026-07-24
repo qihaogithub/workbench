@@ -260,6 +260,22 @@ function resolveVisualDraftActionState(params: {
   };
 }
 
+export function buildVisualSelectionPrompt(
+  node: VisualNodeInfo,
+  projectId: string,
+): string {
+  return `请只针对当前可视化选区提出修改建议，不要静默扩大范围。
+
+【当前选区】
+- 元素：<${node.tagName}>
+- DOM 路径：${node.domPath}
+- className：${node.className || "无"}
+- 文本：${node.textContent || "无"}
+- 页面文件：demos/${projectId}/index.tsx
+
+请给出可审阅的局部修改建议；如果必须修改选区外代码，请明确说明影响范围。`;
+}
+
 function getChangeSignature(change: VisualPropertyChange): string {
   return JSON.stringify({
     id: change.id,
@@ -1492,16 +1508,10 @@ ${context}
       toast({ title: "请先在预览区选择一个元素" });
       return;
     }
-    const prompt = `请只针对当前可视化选区提出修改建议，不要静默扩大范围。
-
-【当前选区】
-- 元素：<${selectedVisualNode.tagName}>
-- DOM 路径：${selectedVisualNode.domPath}
-- className：${selectedVisualNode.className || "无"}
-- 文本：${selectedVisualNode.textContent || "无"}
-- 页面文件：demos/${activeDemoIdRef.current}/index.tsx
-
-请给出可审阅的局部修改建议；如果必须修改选区外代码，请明确说明影响范围。`;
+    const prompt = buildVisualSelectionPrompt(
+      selectedVisualNode,
+      activeDemoIdRef.current,
+    );
     setTabValue("ai");
     setTriggerAutoSend(prompt);
   }, [selectedVisualNode, activeDemoIdRef, setTabValue, setTriggerAutoSend, toast]);

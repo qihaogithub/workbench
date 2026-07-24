@@ -114,6 +114,7 @@ export interface PreviewPanelProps {
   visualHoverNodeId?: string | null;
   selectedVisualNodeId?: string | null;
   hiddenVisualNodeIds?: string[];
+  visualLayerTreeNodes?: VisualNodeTreeItem[];
   visualPropertyChanges?: VisualPropertyChange[];
   visualAnnotations?: VisualAnnotation[];
   onVisualSelect?: (node: VisualNodeInfo | null) => void;
