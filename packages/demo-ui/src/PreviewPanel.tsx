@@ -1408,6 +1408,7 @@ export function PreviewPanel({
             cdnBaseUrl: resolvedCdnBaseUrl,
             runtimeBaseUrl: window.location.origin,
             useCdnRuntime: runtimeSource === "cdn",
+            configData: configDataRef.current || {},
           }),
         )}`;
     setIframeSrcUrl((current) => (current === url ? current : url));

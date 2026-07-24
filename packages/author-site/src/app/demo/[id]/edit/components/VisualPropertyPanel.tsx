@@ -102,6 +102,7 @@ interface VisualPropertyPanelProps {
   draftActionDisabled?: boolean;
   onDraftActionPrimary?: () => void;
   onDraftActionCancel?: () => void;
+  onAddToChat?: () => void;
 }
 
 type Option = { value: string; label: string; icon?: ReactNode };
@@ -552,6 +553,7 @@ export function VisualPropertyPanel({
   draftActionDisabled,
   onDraftActionPrimary,
   onDraftActionCancel,
+  onAddToChat,
 }: VisualPropertyPanelProps) {
   const [uploadingChangeId, setUploadingChangeId] = useState<string | null>(null);
   const [localizingChangeId, setLocalizingChangeId] = useState<string | null>(null);
@@ -1659,12 +1661,29 @@ export function VisualPropertyPanel({
   return (
     <div className="flex h-full flex-col bg-card">
       <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
-        <h2 className="text-sm font-medium">属性编辑</h2>
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <h2 className="text-sm font-medium shrink-0">属性编辑</h2>
+          <span className="truncate text-xs text-muted-foreground">
+            {getLayerName(selectedNode)}
+          </span>
+          {onAddToChat && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2 text-xs"
+              onClick={onAddToChat}
+            >
+              <Plus className="mr-1 h-3 w-3" />
+              添加到对话
+            </Button>
+          )}
+        </div>
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="h-7 px-2 text-xs"
+          className="h-7 px-2 text-xs shrink-0"
           disabled={selectedNodeChangeCount === 0}
           onClick={onClearChanges}
         >

@@ -273,7 +273,47 @@ export function buildVisualSelectionPrompt(
 - 文本：${node.textContent || "无"}
 - 页面文件：demos/${projectId}/index.tsx
 
-请给出可审阅的局部修改建议；如果必须修改选区外代码，请明确说明影响范围。`;
+ 请给出可审阅的局部修改建议；如果必须修改选区外代码，请明确说明影响范围。`;
+}
+
+export function getNodeLabel(node: VisualNodeInfo): string {
+  if (node.editCapabilities.includes("image") || node.attrs?.src || node.attrs?.currentSrc) return "图片";
+  if (node.attrs?.ariaLabel) return node.attrs.ariaLabel;
+  if (node.attrs?.role === "button") return node.textContent || "按钮";
+  if (node.attrs?.role === "dialog") return "弹窗";
+  if (node.attrs?.role === "navigation") return "导航";
+  if (node.editCapabilities.includes("text") && node.textContent) return node.textContent;
+  if (node.componentName && node.componentName !== node.tagName) {
+    const name = node.componentName.replace(/([a-z])([A-Z])/g, "$1 $2").trim();
+    if (!/^(div|span)$/i.test(name)) return name;
+  }
+  if (node.attrs?.href) return "链接";
+  const tagName = node.tagName.toLowerCase();
+  const cls = node.className?.toLowerCase() ?? "";
+  if (tagName === "button") return node.textContent || "按钮";
+  if (tagName === "a") return node.textContent || "链接";
+  if (tagName === "input") return "输入框";
+  if (tagName === "textarea") return "多行输入";
+  if (tagName === "select") return "选择框";
+  if (/^h[1-6]$/.test(tagName)) return node.textContent || "标题";
+  if (tagName === "p") return node.textContent || "段落";
+  if (tagName === "label") return node.textContent || "标签";
+  if (tagName === "nav") return "导航";
+  if (tagName === "header") return "页眉";
+  if (tagName === "footer") return "页脚";
+  if (tagName === "main") return "页面主体";
+  if (tagName === "section") return "页面区块";
+  if (tagName === "article") return "内容卡片";
+  if (tagName === "ul" || tagName === "ol") return "列表";
+  if (tagName === "li") return "列表项";
+  if (tagName === "form") return "表单";
+  if (cls.includes("modal") || cls.includes("dialog") || cls.includes("popover")) return "弹窗";
+  if (cls.includes("card") || cls.includes("panel")) return "卡片";
+  if (cls.includes("button") || cls.includes("action") || cls.includes("cta")) return "操作区";
+  if (cls.includes("content") || cls.includes("body")) return "内容区域";
+  if (cls.includes("container") || cls.includes("wrapper")) return "容器";
+  if (tagName === "span") return "文本";
+  return "内容区域";
 }
 
 function getChangeSignature(change: VisualPropertyChange): string {

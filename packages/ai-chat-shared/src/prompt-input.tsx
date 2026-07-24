@@ -131,8 +131,6 @@ interface PromptInputProps
   globalDrop?: boolean
   multiple?: boolean
   supportsImages?: boolean
-  externalInsertText?: string | null
-  onExternalInsertTextHandled?: () => void
 }
 
 export function PromptInput({
@@ -146,8 +144,6 @@ export function PromptInput({
   globalDrop = false,
   multiple = true,
   supportsImages = true,
-  externalInsertText,
-  onExternalInsertTextHandled,
   className,
   ...props
 }: PromptInputProps) {
@@ -159,13 +155,6 @@ export function PromptInput({
   React.useEffect(() => {
     setInternalStatus(status)
   }, [status])
-
-  React.useEffect(() => {
-    if (externalInsertText) {
-      setText((prev) => (prev ? `${prev}\n${externalInsertText}` : externalInsertText))
-      onExternalInsertTextHandled?.()
-    }
-  }, [externalInsertText, onExternalInsertTextHandled])
 
   const addFiles = React.useCallback(
     (newFiles: File[]) => {

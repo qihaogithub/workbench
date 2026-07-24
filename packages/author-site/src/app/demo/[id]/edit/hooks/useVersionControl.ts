@@ -346,11 +346,11 @@ export function useVersionControl(params: UseVersionControlParams) {
     }
   };
 
-  const handleCreateVersion = async (): Promise<boolean> => {
+  const handleCreateVersion = async (versionName?: string): Promise<boolean> => {
     if (!sessionId) {
       console.error("[handleCreateVersion] sessionId 为空!");
       toast({
-        title: "命名版本失败",
+        title: "保存版本失败",
         description: "Session 未创建，请刷新页面重试",
         variant: "destructive",
       });
@@ -360,8 +360,8 @@ export function useVersionControl(params: UseVersionControlParams) {
     if (!activeDemoId) {
       console.error("[handleCreateVersion] activeDemoId 为空!");
       toast({
-        title: "命名版本失败",
-        description: "未选中页面，请先选择要命名的页面",
+        title: "保存版本失败",
+        description: "未选中页面，请先选择要保存的页面",
         variant: "destructive",
       });
       return false;
@@ -377,8 +377,8 @@ export function useVersionControl(params: UseVersionControlParams) {
 
       if (errors.length > 0) {
         toast({
-          title: "命名版本失败：存在语法错误",
-          description: `发现 ${errors.length} 个错误，需要先修复后才能命名版本`,
+          title: "保存版本失败：存在语法错误",
+          description: `发现 ${errors.length} 个错误，需要先修复后才能保存版本`,
           variant: "destructive",
         });
       } else if (warnings.length > 0) {
@@ -410,7 +410,7 @@ export function useVersionControl(params: UseVersionControlParams) {
       const activePage = demoPages.find((page) => page.id === activeDemoId);
       await projectApiClient.createPageVersion(demoId, activeDemoId, {
         sessionId,
-        note: activePage ? `修改了${activePage.name}` : "修改了页面",
+        note: versionName?.trim() || (activePage ? `修改了${activePage.name}` : "修改了页面"),
         sketchPatchSummary: getSketchPatchSummary?.(activeDemoId),
       });
 
@@ -425,7 +425,7 @@ export function useVersionControl(params: UseVersionControlParams) {
       }
 
       toast({
-        title: "已命名此版本",
+        title: "已保存为版本",
         description: "当前内容已记录到历史记录",
       });
 
@@ -455,7 +455,7 @@ export function useVersionControl(params: UseVersionControlParams) {
         }
       }
       toast({
-        title: "命名版本失败",
+        title: "保存版本失败",
         description: errorMessage,
         variant: "destructive",
       });

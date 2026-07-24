@@ -85,6 +85,21 @@ export {
 } from "./attachments";
 
 export {
+  ElementSelectionChip,
+  type ChatElementRef,
+} from "./chat/element-selection-chip";
+
+export {
+  InlineTagInput,
+  type InlineTagInputHandle,
+  type InlineTagInputValue,
+  type InlineTag,
+  type ProjectReference,
+} from "./chat/inline-tag-input";
+
+export { ProjectReferencePicker } from "./chat/project-reference-picker";
+
+export {
   Reasoning,
   ReasoningDisplay,
   ReasoningTrigger,
