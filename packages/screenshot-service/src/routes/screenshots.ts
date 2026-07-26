@@ -736,7 +736,7 @@ async function generateScreenshotUncached(
     compileMs = Date.now() - compileStart;
 
     html = generateIframeHtml({
-      compiledCode: compileResult.compiledCode,
+      compiledCodeUrl: compileResult.moduleUrl,
       cssImports: compileResult.cssImports,
       configData: snapshotInput.configData,
       cdnBaseUrl: config.cdnBaseUrl,

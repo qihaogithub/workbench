@@ -2,6 +2,7 @@ export interface OneOfVariant {
   title: string;
   value: string | number;
   fields: FieldConfig[];
+  maxItems?: number;
 }
 
 export interface OneOfConfig {
@@ -220,10 +221,15 @@ function resolveOneOf(items: Record<string, unknown>): OneOfConfig | undefined {
     }
     const value = props[discriminator]?.const;
     if (value === undefined || value === null) continue;
+
+    const demo = isPlainRecord(variant.$demo) ? variant.$demo as Record<string, unknown> : undefined;
+    const maxItems = demo && typeof demo.maxItems === "number" ? demo.maxItems as number : undefined;
+
     variants.push({
       title: (variant.title as string) || String(value),
       value: value as string | number,
       fields: parseProperties(variantProps, (variant.required as string[]) || []),
+      maxItems: maxItems !== undefined ? maxItems : undefined,
     });
   }
 

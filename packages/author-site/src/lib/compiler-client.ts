@@ -49,7 +49,7 @@ export async function compileCode(code: string): Promise<CompileResult> {
       compileCache.delete(firstKey);
     }
   }
-  compileCache.set(cacheKey, { ...data, moduleUrl: undefined });
+  compileCache.set(cacheKey, data);
 
   return data;
 }
