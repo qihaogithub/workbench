@@ -204,13 +204,25 @@ export interface ArrayFieldGroupProps {
 
 function AddMenu({
   field,
+  value,
   onSelect,
 }: {
   field: FieldConfig;
+  value: Record<string, unknown>[];
   onSelect: (variantValue?: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  function countByType(items: Record<string, unknown>[], discriminator: string, variantValue: unknown): number {
+    return items.filter((item) => item[discriminator] === variantValue).length;
+  }
+
+  const hasAllLimited = field.oneOf?.variants.every((variant) => {
+    if (!variant.maxItems || variant.maxItems <= 0) return false;
+    const count = countByType(value, field.oneOf!.discriminator, variant.value);
+    return count >= variant.maxItems;
+  });
 
   if (field.oneOf && field.oneOf.variants.length > 1) {
     return (
@@ -221,6 +233,7 @@ function AddMenu({
           className="h-7 text-xs"
           onClick={() => setOpen((v) => !v)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
+          disabled={hasAllLimited}
         >
           <Plus className="h-3 w-3 mr-1" />
           添加{field.title || "项目"}
@@ -228,26 +241,45 @@ function AddMenu({
         {open && (
           <div
             ref={menuRef}
-            className="absolute bottom-full left-0 mb-1 min-w-[120px] bg-popover border border-border rounded-md shadow-md z-50 py-1"
+            className="absolute bottom-full left-0 mb-1 min-w-[160px] bg-popover border border-border rounded-md shadow-md z-50 py-1"
           >
-            {field.oneOf.variants.map((variant) => (
-              <button
-                key={String(variant.value)}
-                type="button"
-                className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors cursor-pointer"
-                onClick={() => {
-                  onSelect(String(variant.value));
-                  setOpen(false);
-                }}
-              >
-                {variant.title}
-              </button>
-            ))}
+            {field.oneOf.variants.map((variant) => {
+              const atLimit = variant.maxItems != null && variant.maxItems > 0
+                && countByType(value, field.oneOf!.discriminator, variant.value) >= variant.maxItems;
+              return (
+                <button
+                  key={String(variant.value)}
+                  type="button"
+                  className={cn(
+                    "w-full text-left px-3 py-1.5 text-xs transition-colors",
+                    atLimit
+                      ? "text-muted-foreground/50 cursor-not-allowed"
+                      : "hover:bg-accent cursor-pointer"
+                  )}
+                  disabled={atLimit}
+                  onClick={() => {
+                    if (!atLimit) {
+                      onSelect(String(variant.value));
+                      setOpen(false);
+                    }
+                  }}
+                >
+                  {variant.title}
+                  {variant.maxItems != null && variant.maxItems > 0 && (
+                    <span className="ml-1 text-muted-foreground/60">
+                      ({countByType(value, field.oneOf!.discriminator, variant.value)}/{variant.maxItems})
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
     );
   }
+
+  if (hasAllLimited) return null;
 
   return (
     <Button
@@ -479,7 +511,7 @@ export function ArrayFieldGroup({
 
       {canAdd && !readonly && (
         <div className="flex justify-center pt-1">
-          <AddMenu field={field} onSelect={handleAdd} />
+          <AddMenu field={field} value={value} onSelect={handleAdd} />
         </div>
       )}
     </div>

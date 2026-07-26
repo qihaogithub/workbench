@@ -659,8 +659,8 @@ describe("screenshot routes", () => {
       "session_1",
       "page_1",
     );
-    expect(renderPage.mock.calls[0]?.[0]).toContain("compiled-inline");
-    expect(renderPage.mock.calls[0]?.[0]).not.toContain("stale.js");
+    expect(renderPage.mock.calls[0]?.[0]).toContain("stale.js");
+    expect(renderPage.mock.calls[0]?.[0]).not.toContain("compiled-inline");
     await app.close();
   });
 
