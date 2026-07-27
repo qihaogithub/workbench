@@ -147,10 +147,12 @@ export class StreamService {
   private messageInFlight = false;
   private readyFallbackTimer: NodeJS.Timeout | null = null;
   private keepaliveTimer: NodeJS.Timeout | null = null;
+  private reconnectTimer: NodeJS.Timeout | null = null;
   private hasInjectedMemory = false;
   private readonly mode: AgentMode;
-  private static readonly KEEPALIVE_INTERVAL_MS = 25000; // 每25秒发送一次ping
+  private static readonly KEEPALIVE_INTERVAL_MS = 25000;
   private static readonly READY_FINISH_FALLBACK_DELAY_MS = 1000;
+  private static readonly RECONNECT_GRACE_MS = 10000; // 断连后等待重连的最大时间
 
   constructor(options?: { mode?: AgentMode }) {
     this.mode = options?.mode ?? "workbench";
@@ -355,6 +357,7 @@ export class StreamService {
 
   close(): void {
     this.stopKeepalive();
+    this.clearReconnectTimer();
     if (this.stream) {
       // P5 Layer 1: send cancel frame before closing if a message is in flight
       const ws = (this.stream as any)?.ws;
@@ -402,6 +405,12 @@ export class StreamService {
     this.messageInFlight = false;
     this.clearReadyFallbackTimer();
     this.handlers.onFinish?.(result);
+  }
+
+  private clearReconnectTimer(): void {
+    if (!this.reconnectTimer) return;
+    clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
   }
 
   private clearReadyFallbackTimer(): void {
@@ -458,10 +467,36 @@ export class StreamService {
         this.connectionEstablished = true;
         this.messageInFlight = true;
         this.clearReadyFallbackTimer();
+        this.clearReconnectTimer();
+        return;
+      }
+      if (event.status === "connected") {
+        this.connectionEstablished = true;
+        this.clearReconnectTimer();
         return;
       }
       if (event.status === "ready") {
         this.scheduleReadyFinishFallback(streamId);
+        return;
+      }
+      // AgentStream 内置自动重连：断连后 N 秒内重连成功则静默恢复，超时则报错
+      if (event.status === "disconnected" && this.messageInFlight) {
+        this.stopKeepalive();
+        this.clearReconnectTimer();
+        this.reconnectTimer = setTimeout(() => {
+          this.reconnectTimer = null;
+          if (
+            this.currentSessionId !== streamId ||
+            this.finishDelivered ||
+            !this.messageInFlight
+          ) {
+            return;
+          }
+          this.handlers.onError?.({
+            message: "WebSocket 连接中断且重连超时，请重试。",
+            code: "TRANSPORT_DISCONNECTED",
+          });
+        }, StreamService.RECONNECT_GRACE_MS);
       }
     });
 

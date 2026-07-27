@@ -211,7 +211,7 @@ export function ProjectReferencePicker({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl h-[540px] flex flex-col p-0">
+      <DialogContent className="max-w-4xl max-h-[85vh] h-[540px] flex flex-col p-0">
         <DialogHeader className="px-5 pt-5 pb-0 shrink-0">
           <DialogTitle className="text-base">引用其他项目</DialogTitle>
         </DialogHeader>

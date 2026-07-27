@@ -22,6 +22,7 @@ import type {
 import { LayerTreeMenu } from "./LayerTreeMenu";
 import { generateIframeHtml } from "./iframe-template";
 import { getCachedCompile, setCachedCompile } from "./compile-cache";
+import { setPageTypeLimits } from "./type-limits-store";
 import { computePreviewScale } from "./preview-scale";
 import { resolvePreviewConfigAssetUrls } from "./preview-config-utils";
 import {
@@ -82,6 +83,7 @@ interface CompileResult {
   cssImports: string[];
   moduleHash?: string;
   moduleUrl?: string;
+  typeLimits?: Record<string, number>;
 }
 
 interface CompileApiResponse {
@@ -1051,6 +1053,12 @@ export function PreviewPanel({
     sendUpdateConfig,
     sendVisualEditState,
   ]);
+
+  useEffect(() => {
+    if (lastSuccessfulResult?.typeLimits) {
+      setPageTypeLimits(lastSuccessfulResult.typeLimits);
+    }
+  }, [lastSuccessfulResult]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {

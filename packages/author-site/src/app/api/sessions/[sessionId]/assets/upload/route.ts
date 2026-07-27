@@ -3,10 +3,11 @@ import {
   sessionExists,
   createApiSuccess,
   createApiError,
-  generateAssetFilename,
-  saveSessionAsset,
+  getSessionMeta,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
+import { uploadImage } from "@/lib/image-store";
+import { addProjectImage, type ProjectImage } from "@/lib/project-images";
 
 const ALLOWED_MIME_TYPES = [
   "image/jpeg",
@@ -71,6 +72,9 @@ export async function POST(
       );
     }
 
+    const meta = getSessionMeta(sessionId);
+    const projectId = meta?.demoId;
+
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
 
@@ -97,23 +101,49 @@ export async function POST(
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    const filename = generateAssetFilename(file.name);
 
-    const result = saveSessionAsset(sessionId, filename, buffer);
+    const result = await uploadImage({
+      buffer,
+      filename: file.name,
+      sourceType: "user_upload",
+      projectId,
+      createdBy: payload.userId,
+    });
 
     if (!result.success) {
       return NextResponse.json(
-        createApiError("UPLOAD_FAILED", result.error),
+        createApiError("UPLOAD_FAILED", result.error.message),
         { status: 500 },
       );
+    }
+
+    if (projectId) {
+      const projectImage: ProjectImage = {
+        id: result.sha256.slice(0, 12),
+        filename: result.filename,
+        url: result.url,
+        size: result.sizeBytes,
+        format: result.filename.split(".").pop() || "png",
+        createdAt: Date.now(),
+        createdBy: "user",
+        contentHash: result.sha256,
+        mimeType: result.mimeType,
+        sourceType: "upload",
+      };
+      try {
+        addProjectImage(projectId, projectImage);
+      } catch (manifestError) {
+        console.error("Failed to update project image manifest:", manifestError);
+      }
     }
 
     return NextResponse.json(
       createApiSuccess({
         url: result.url,
-        filename,
-        size: file.size,
-        mimeType: file.type,
+        imageId: result.imageId,
+        filename: result.filename,
+        size: result.sizeBytes,
+        mimeType: result.mimeType,
       }),
     );
   } catch (error) {

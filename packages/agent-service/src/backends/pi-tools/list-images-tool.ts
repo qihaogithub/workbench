@@ -49,10 +49,12 @@ export function createListImagesTool(config: AgentConfig): AgentTool {
         }
 
         const imageList = manifest.images
-          .map(
-            (img) =>
-              `- ${img.filename} → ${img.url} (${img.format}, ${(img.size / 1024).toFixed(1)}KB, added by ${img.createdBy})`,
-          )
+          .map((img) => {
+            const imageIdMatch = img.url?.match(/\/api\/images\/(img_[a-zA-Z0-9_-]+)/);
+            const imageId = imageIdMatch ? imageIdMatch[1] : undefined;
+            const idPart = imageId ? ` imageId=${imageId}` : "";
+            return `- ${img.filename} → ${img.url} (${img.format}, ${(img.size / 1024).toFixed(1)}KB, added by ${img.createdBy})${idPart}`;
+          })
           .join('\n');
 
         return {

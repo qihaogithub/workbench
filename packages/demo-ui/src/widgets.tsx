@@ -4,6 +4,7 @@ import { useMemo, useState, useCallback, useRef } from 'react';
 import { WidgetProps } from '@rjsf/utils';
 import { Upload, Repeat, Trash2, Loader2, AlertTriangle } from 'lucide-react';
 import { cn } from './utils';
+import { resolveConfigImageSrc } from './preview-config-utils';
 import {
   Dialog,
   DialogContent,
@@ -250,7 +251,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
     if (sessionId && typeof value === 'string' && value.startsWith('/api/sessions/')) {
       await deleteServerFile(sessionId, value);
     }
-    onChange(defaultValue || '');
+    onChange(defaultValue ?? undefined);
     setError('');
   }, [sessionId, value, onChange, defaultValue]);
 
@@ -272,7 +273,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
         {value ? (
           <div className="relative w-[80px] h-[80px] rounded-lg border border-border overflow-hidden bg-muted shrink-0 group">
             <img
-              src={value}
+              src={resolveConfigImageSrc(value, sessionId)}
               alt="Preview"
               className="w-full h-full object-cover"
               onError={(e) => {

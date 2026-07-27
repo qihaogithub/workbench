@@ -256,6 +256,25 @@ const PromptInputAttachmentsDisplay = ({
   );
 };
 
+const AttachmentManagerDialogGate = ({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) => {
+  const attachments = usePromptInputAttachments();
+  return (
+    <AttachmentManagerDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      files={attachments.files}
+      onAddFiles={(newFiles) => attachments.add(newFiles)}
+      onRemoveFile={(id) => attachments.remove(id)}
+    />
+  );
+};
+
 interface ChatInputProps {
   onSubmit: (
     message: string,
@@ -309,7 +328,6 @@ export function ChatInput({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
   const [attachmentManagerOpen, setAttachmentManagerOpen] = useState(false);
-  const attachments = usePromptInputAttachments();
   const inputRef = useRef<InlineTagInputHandle | null>(null);
   const prevElementIdRef = useRef<string | null>(null);
 
@@ -490,12 +508,9 @@ export function ChatInput({
           }}
         />
       )}
-      <AttachmentManagerDialog
+      <AttachmentManagerDialogGate
         open={attachmentManagerOpen}
         onOpenChange={setAttachmentManagerOpen}
-        files={attachments.files}
-        onAddFiles={(newFiles) => attachments.add(newFiles)}
-        onRemoveFile={(id) => attachments.remove(id)}
       />
     </PromptInput>
   );

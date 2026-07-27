@@ -23,6 +23,7 @@ export interface CompileResult {
   cssImports: string[];
   moduleHash: string;
   moduleUrl?: string;
+  typeLimits?: Record<string, number>;
 }
 
 // 服务端编译缓存

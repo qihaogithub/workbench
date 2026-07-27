@@ -1,5 +1,5 @@
 import type { SketchSceneDocument } from "@workbench/sketch-core";
-import type { DemoFolderMeta } from "@workbench/shared";
+import type { DemoFolderMeta, DemoPageMeta, DemoPageRuntimeType } from "@workbench/shared";
 import type { CanvasState } from "@workbench/demo-ui";
 
 export type PublishedPageRuntimeType =
@@ -65,7 +65,7 @@ export interface ProjectsIndex {
   generatedAt: number;
 }
 
-const DATA_BASE =
+export const DATA_BASE =
   process.env.NEXT_PUBLIC_DATA_BASE ||
   (process.env.NODE_ENV === "development" ? "http://localhost:3200" : "");
 
@@ -147,5 +147,122 @@ export function getPublishedFileUrl(
   filePath: string,
 ): string {
   return `${DATA_BASE}/data/${projectId}/${filePath}`;
+}
+
+let authToken: string | null = null;
+
+export function setAuthToken(token: string | null) {
+  authToken = token;
+}
+
+export function getAuthToken(): string | null {
+  return authToken;
+}
+
+export async function login(
+  username: string,
+  password: string,
+): Promise<{ token: string; userId: string; expiresAt: number } | null> {
+  const res = await fetch(`${DATA_BASE}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password, includeToken: true }),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as any).error?.message || "登录失败");
+  }
+  const body = await res.json();
+  if (!body.success) {
+    throw new Error(body.error?.message || "登录失败");
+  }
+  return {
+    token: body.data.token,
+    userId: body.data.user.id,
+    expiresAt: body.data.expiresAt,
+  };
+}
+
+async function apiFetch<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string> || {}),
+  };
+  if (authToken) {
+    headers["X-Auth-Token"] = authToken;
+  }
+  const res = await fetch(`${DATA_BASE}${path}`, {
+    ...options,
+    headers,
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as any).error?.message || `请求失败 (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function createDemoPage(
+  projectId: string,
+  name: string,
+  sessionId: string,
+  runtimeType?: DemoPageRuntimeType,
+): Promise<DemoPageMeta> {
+  const body = await apiFetch<{ success: boolean; data: DemoPageMeta }>(
+    `/api/projects/${projectId}/demos`,
+    {
+      method: "POST",
+      body: JSON.stringify({ sessionId, name, runtimeType }),
+    },
+  );
+  return body.data;
+}
+
+export async function reorderDemoPages(
+  projectId: string,
+  sessionId: string,
+  pages: Array<{ id: string; order: number; parentId: string | null }>,
+): Promise<void> {
+  await apiFetch(
+    `/api/projects/${projectId}/demo-pages/reorder`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ sessionId, pages }),
+    },
+  );
+}
+
+export async function switchPageRuntime(
+  projectId: string,
+  demoId: string,
+  sessionId: string,
+  targetRuntimeType: DemoPageRuntimeType,
+): Promise<DemoPageMeta> {
+  const body = await apiFetch<{ success: boolean; data: { meta: DemoPageMeta } }>(
+    `/api/projects/${projectId}/demos/${demoId}/runtime`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ sessionId, targetRuntimeType }),
+    },
+  );
+  return body.data.meta;
+}
+
+export async function deleteDemoPage(
+  projectId: string,
+  demoId: string,
+  sessionId: string,
+): Promise<void> {
+  await apiFetch(
+    `/api/projects/${projectId}/demos/${demoId}?sessionId=${encodeURIComponent(sessionId)}`,
+    {
+      method: "DELETE",
+    },
+  );
 }
 

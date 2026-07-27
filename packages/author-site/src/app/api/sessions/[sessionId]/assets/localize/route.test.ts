@@ -40,12 +40,8 @@ jest.mock("@/lib/project-images", () => ({
   addProjectImage: jest.fn(),
 }));
 
-const commitWorkspaceMutation = jest.fn();
-const stageWorkspaceBinary = jest.fn();
-
-jest.mock("@/lib/workspace-authority-client", () => ({
-  commitWorkspaceMutation,
-  stageWorkspaceBinary,
+jest.mock("@/lib/image-store", () => ({
+  uploadImage: jest.fn(),
 }));
 
 class TestResponse {
@@ -80,19 +76,6 @@ describe("selected image localize route", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    stageWorkspaceBinary.mockResolvedValue({
-      stagingId: "staging-1",
-      hash: "asset-hash",
-      size: Buffer.from("image-bytes").length,
-    });
-    commitWorkspaceMutation.mockResolvedValue({
-      mutationId: "mutation-1",
-      projectId: "project-1",
-      workspaceId: "workspace-1",
-      revision: 2,
-      resources: [],
-      committedAt: 1,
-    });
     global.Response = TestResponse as unknown as typeof Response;
   });
 
@@ -100,9 +83,21 @@ describe("selected image localize route", () => {
     global.Response = originalResponse;
   });
 
-  it("使用浏览器 Blob 通过 Authority 提交 workspace asset 并登记项目图片", async () => {
+  it("使用浏览器 Blob 通过全局图床上传并登记项目图片", async () => {
     const fs = await import("fs");
     const projectImages = await import("@/lib/project-images");
+    const { uploadImage } = await import("@/lib/image-store");
+    const mockImageId = "img_X6PCUSgDPtHw4Q";
+    (uploadImage as jest.Mock).mockResolvedValue({
+      success: true,
+      imageId: mockImageId,
+      url: `/api/images/${mockImageId}`,
+      sha256: "a".repeat(64),
+      filename: "hero.png",
+      sizeBytes: Buffer.from("image-bytes").length,
+      mimeType: "image/png",
+      deduplicated: false,
+    });
     const { POST } = await import("./route");
     const dataBase64 = Buffer.from("image-bytes").toString("base64");
 
@@ -131,32 +126,17 @@ describe("selected image localize route", () => {
     expect(body).toMatchObject({
       success: true,
       data: {
-        workspacePath: expect.stringMatching(/^assets\/images\/[a-f0-9]{12}-hero\.png$/),
-        relativePathFromPage: expect.stringMatching(/^\.\.\/\.\.\/assets\/images\/[a-f0-9]{12}-hero\.png$/),
+        workspacePath: `/api/images/${mockImageId}`,
+        relativePathFromPage: `/api/images/${mockImageId}`,
         sourceType: "browser_blob",
         mimeType: "image/png",
       },
     });
-    expect(stageWorkspaceBinary).toHaveBeenCalledWith(expect.objectContaining({
+    expect(uploadImage).toHaveBeenCalledWith(expect.objectContaining({
+      buffer: Buffer.from("image-bytes"),
+      sourceType: "user_upload",
       projectId: "project-1",
-      workspaceId: "workspace-1",
-      sessionId: "session-1",
-      content: Buffer.from("image-bytes"),
-    }));
-    expect(commitWorkspaceMutation).toHaveBeenCalledWith(expect.objectContaining({
-      projectId: "project-1",
-      workspaceId: "workspace-1",
-      sessionId: "session-1",
-      actor: "author-site",
-      reason: "localize_selected_asset",
-      operations: [expect.objectContaining({
-        type: "put_binary",
-        path: expect.stringMatching(/^assets\/images\/[a-f0-9]{12}-hero\.png$/),
-        stagingId: "staging-1",
-        hash: "asset-hash",
-        size: Buffer.from("image-bytes").length,
-        expectedAbsent: true,
-      })],
+      createdBy: "user-1",
     }));
     expect(fs.writeFileSync).not.toHaveBeenCalled();
     expect(projectImages.addProjectImage).toHaveBeenCalledWith(
@@ -164,7 +144,7 @@ describe("selected image localize route", () => {
       expect.objectContaining({
         createdBy: "user",
         sourceType: "browser_blob",
-        url: expect.stringMatching(/^assets\/images\/[a-f0-9]{12}-hero\.png$/),
+        url: `/api/images/${mockImageId}`,
       }),
     );
   });
@@ -172,6 +152,7 @@ describe("selected image localize route", () => {
   it("浏览器不可读且远程 URL 为本地地址时要求上传原图", async () => {
     const fs = await import("fs");
     const projectImages = await import("@/lib/project-images");
+    const { uploadImage } = await import("@/lib/image-store");
     const { POST } = await import("./route");
 
     const response = await POST(
@@ -201,7 +182,7 @@ describe("selected image localize route", () => {
       },
     });
     expect(fs.writeFileSync).not.toHaveBeenCalled();
-    expect(commitWorkspaceMutation).not.toHaveBeenCalled();
+    expect(uploadImage).not.toHaveBeenCalled();
     expect(projectImages.addProjectImage).not.toHaveBeenCalled();
   });
 });

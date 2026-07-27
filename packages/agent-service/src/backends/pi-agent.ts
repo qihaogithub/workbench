@@ -38,6 +38,7 @@ export function getImageDescriberConfig(): ImageDescriberConfig | null {
 
 let _currentImageDescriberConfig: ImageDescriberConfig | null = null;
 import { logger } from "../utils/logger";
+import { withLlmRetry } from "../utils/retry-utils";
 import {
   getAgentHarness,
   getNodeExecutionEnv,
@@ -58,6 +59,14 @@ import { normalizeImageAttachments } from "../utils/image-attachments";
 import { serializeErrorForLog } from "../utils/error-utils";
 import { listUploadedFileAttachments } from "../utils/uploaded-file-attachments";
 import { resolveLiveWorkspaceMutationContext } from "../workspace/workspace-mutation-authority";
+import {
+  uploadToGlobalImageStore,
+} from "./pi-tools/global-image-store";
+import {
+  addProjectImageManifestEntry,
+  resolveProjectImageManifestProjectId,
+  type ProjectImageEntry,
+} from "./pi-tools/project-image-manifest";
 
 function formatRuntimeToolsForPrompt(
   activeTools: Array<{ name?: string; description?: string }>,
@@ -287,43 +296,63 @@ export class PiAgentBackend implements IBackendAdapter {
         );
       }
 
-      const response = await fetch(
-        `${model.baseUrl.replace(/\/$/, "")}/chat/completions`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${auth.apiKey}`,
-            ...(auth.headers || {}),
-          },
-          body: JSON.stringify({
-            model: model.id,
-            messages: [
-              {
-                role: "user",
-                content: [
-                  { type: "text", text: request.prompt },
+      const response = await withLlmRetry(
+        async () => {
+          const res = await fetch(
+            `${model.baseUrl.replace(/\/$/, "")}/chat/completions`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${auth.apiKey}`,
+                ...(auth.headers || {}),
+              },
+              body: JSON.stringify({
+                model: model.id,
+                messages: [
                   {
-                    type: "image_url",
-                    image_url: {
-                      url: `data:${request.image.mimeType};base64,${request.image.data}`,
-                    },
+                    role: "user",
+                    content: [
+                      { type: "text", text: request.prompt },
+                      {
+                        type: "image_url",
+                        image_url: {
+                          url: `data:${request.image.mimeType};base64,${request.image.data}`,
+                        },
+                      },
+                    ],
                   },
                 ],
-              },
-            ],
-            max_tokens: 300,
-          }),
-          signal: request.signal,
+                max_tokens: 300,
+              }),
+              signal: request.signal,
+            },
+          );
+
+          if (!res.ok) {
+            const body = await res.text().catch(() => "");
+            throw Object.assign(
+              new Error(`Vision model request failed: ${res.status} ${body}`),
+              { status: res.status },
+            );
+          }
+
+          return res;
+        },
+        {},
+        (error, meta) => {
+          if (request.signal.aborted) throw error;
+          logger.warn(
+            {
+              attempt: meta.attempt + 1,
+              maxRetries: meta.maxRetries,
+              waitMs: meta.waitMs,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            "Vision model API error, retrying after backoff",
+          );
         },
       );
-
-      if (!response.ok) {
-        const body = await response.text().catch(() => "");
-        throw new Error(
-          `Vision model request failed: ${response.status} ${body}`,
-        );
-      }
 
       const payload = (await response.json()) as {
         choices?: Array<{
@@ -599,7 +628,22 @@ Keep the final response concise: summarize what you changed, what you verified, 
         );
       });
 
-      const result = await Promise.race([harness.prompt(prompt), abortPromise]);
+      const result = await withLlmRetry(
+        () => Promise.race([harness.prompt(prompt), abortPromise]),
+        {},
+        (error, meta) => {
+          if (controller.signal.aborted) throw error;
+          logger.warn(
+            {
+              attempt: meta.attempt + 1,
+              maxRetries: meta.maxRetries,
+              waitMs: meta.waitMs,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            "Subagent LLM API error, retrying after backoff",
+          );
+        },
+      );
 
       const errorMessage = extractAssistantErrorMessage(result);
       const content = extractAssistantText(result);
@@ -696,7 +740,64 @@ Keep the final response concise: summarize what you changed, what you verified, 
       : content;
     let imageContent: any[] | undefined;
 
+    let autoPersistText = "";
+
     if (images && images.length > 0) {
+      try {
+        const projectId = resolveProjectImageManifestProjectId(this.config);
+        const persisted: Array<{ imageId: string; url: string }> = [];
+
+        for (let i = 0; i < images.length; i++) {
+          const img = images[i];
+          try {
+            const buffer = Buffer.from(img.data, "base64");
+            const ext = img.mimeType.replace("image/", "") === "jpeg" ? "jpg" : img.mimeType.replace("image/", "");
+            const uploadResult = uploadToGlobalImageStore({
+              buffer,
+              filename: `image_${Date.now()}_${i}.${ext}`,
+              sourceType: "user_upload",
+              projectId: projectId ?? undefined,
+              createdBy: "ai-agent",
+            });
+
+            if (uploadResult.success) {
+              persisted.push({ imageId: uploadResult.imageId, url: uploadResult.url });
+
+              if (projectId) {
+                try {
+                  const entry: ProjectImageEntry = {
+                    id: uploadResult.sha256.slice(0, 12),
+                    filename: uploadResult.filename,
+                    url: uploadResult.url,
+                    size: uploadResult.sizeBytes,
+                    format: ext,
+                    createdAt: Date.now(),
+                    createdBy: "ai",
+                    contentHash: uploadResult.sha256,
+                    mimeType: uploadResult.mimeType,
+                    sourceType: "upload",
+                  };
+                  addProjectImageManifestEntry(projectId, entry);
+                } catch (manifestError) {
+                  logger.warn({ projectId, error: manifestError }, "auto-persist: failed to update project image manifest");
+                }
+              }
+            } else {
+              logger.warn({ error: uploadResult.error, index: i }, "auto-persist: failed to save image to global store");
+            }
+          } catch (imgError) {
+            logger.warn({ error: imgError, index: i }, "auto-persist: exception while persisting image");
+          }
+        }
+
+        if (persisted.length > 0) {
+          const lines = persisted.map((img) => `- imageId: ${img.imageId}, 引用: ${img.url}`).join("\n");
+          autoPersistText = `[图片已自动入库] 你可以在页面代码和 config.schema.json 中直接使用这些 URL 引用图片：\n${lines}\n\n`;
+        }
+      } catch (persistError) {
+        logger.warn({ error: persistError }, "auto-persist: overall process failed");
+      }
+
       if (modelSupportsImages) {
         imageContent = images.map((img) => ({
           type: "image" as const,
@@ -717,7 +818,11 @@ Keep the final response concise: summarize what you changed, what you verified, 
           );
         }
 
-        logger.info(
+    if (autoPersistText) {
+      promptContent = autoPersistText + promptContent;
+    }
+
+    logger.info(
           { imageCount: images.length, modelId: model.id },
           "Triggering image pre-description for non-vision model",
         );

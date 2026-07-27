@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import {
+import React, {
   useState,
   useMemo,
   useRef,
@@ -9,6 +9,7 @@ import {
   useCallback,
   type CSSProperties,
   type SyntheticEvent,
+  type ErrorInfo,
 } from "react";
 import Image from "next/image";
 import {
@@ -22,23 +23,40 @@ import {
   FileText,
   Map as MapIcon,
   MessageCircle,
+  Plus,
+  ChevronUp,
+  ChevronDown,
+  Trash2,
+  ArrowLeftRight,
+  LogIn,
+  LogOut,
+  Loader2,
 } from "lucide-react";
 import {
   getProjects,
   getProjectData,
   getDemoSchema,
   getDataUrl,
+  DATA_BASE,
   getThumbnailUrl,
   getScreenshotFileUrl,
   getScreenshotFileMetaUrl,
   getCompiledJsUrl,
   getPublishedFileUrl,
+  login,
+  setAuthToken,
+  getAuthToken,
+  createDemoPage,
+  reorderDemoPages,
+  switchPageRuntime,
+  deleteDemoPage,
 } from "@/lib/api";
 import type {
   ProjectsIndex,
   PublishedProject,
   PublishedDemoPage,
 } from "@/lib/api";
+import type { DemoPageRuntimeType } from "@workbench/shared";
 import {
   extractPrototypeConfigBindingKeys,
   PreviewPanel,
@@ -56,6 +74,25 @@ import { getDefaultValues, getPreviewSize } from "@/lib/validator";
 import type { PreviewSize } from "@workbench/demo-ui";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ViewerAiPanel } from "@/components/ViewerAiPanel";
 
 type SortOption = "newest" | "oldest" | "name";
@@ -65,12 +102,48 @@ const MAX_SCREENSHOT_COVER_ITEMS = 10;
 const DEFAULT_SCREENSHOT_ASPECT_RATIO = 9 / 16;
 const MIN_SCREENSHOT_ASPECT_RATIO = 0.45;
 const MAX_SCREENSHOT_ASPECT_RATIO = 1.8;
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico)(\?[^'")\s]*)?$/i;
 
 const sortOptions: { value: SortOption; label: string }[] = [
   { value: "newest", label: "最新更新" },
   { value: "oldest", label: "最早更新" },
   { value: "name", label: "名称" },
 ];
+
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("[ViewerApp ErrorBoundary]", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex items-center justify-center h-full p-8">
+          <div className="max-w-lg text-center space-y-4">
+            <p className="text-sm font-semibold text-destructive">
+              页面渲染错误
+            </p>
+            <pre className="text-xs text-left bg-muted p-3 rounded overflow-auto max-h-64 whitespace-pre-wrap">
+              {this.state.error?.message}
+              {"\n\n"}
+              {this.state.error?.stack}
+            </pre>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function parsePath(pathname: string): {
   view: "list" | "project";
@@ -85,25 +158,47 @@ function mergeConfigDefaults(
   projectSchema?: string,
   pageSchema?: string,
   projectValues?: Record<string, unknown>,
+  projectId?: string,
 ): Record<string, unknown> {
   const projectDefaults = projectSchema ? getDefaultValues(projectSchema) : {};
   const pageDefaults = pageSchema ? getDefaultValues(pageSchema) : {};
-  return resolvePublishedConfigAssetUrls({
-    ...projectDefaults,
-    ...pageDefaults,
-    ...projectValues,
-  });
+  return resolvePublishedConfigAssetUrls(
+    {
+      ...projectDefaults,
+      ...pageDefaults,
+      ...projectValues,
+    },
+    { projectId },
+  );
 }
 
 function resolvePublishedConfigAssetUrls(
   data: Record<string, unknown>,
+  options?: { projectId?: string },
 ): Record<string, unknown> {
+  function resolveImageUrl(value: string): string {
+    if (options?.projectId && /^\.\.?\/[^'")\s]*$/.test(value) && IMAGE_EXT_RE.test(value)) {
+      const parts = "demos/_".split("/");
+      for (const part of value.split("/")) {
+        if (part === "." || part === "") continue;
+        if (part === "..") {
+          parts.pop();
+        } else {
+          parts.push(part);
+        }
+      }
+      const resolved = parts.join("/");
+      return `${DATA_BASE}/api/projects/${options.projectId}/images/${resolved}`;
+    }
+    return value;
+  }
+
   function walk(value: unknown): unknown {
     if (typeof value === "string") {
       if (value.startsWith("/data/")) {
         return getDataUrl(value);
       }
-      return value;
+      return resolveImageUrl(value);
     }
     if (Array.isArray(value)) {
       return value.map(walk);
@@ -751,6 +846,14 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
     viewport: { x: 40, y: 40, zoom: 0.5 },
     pages: {},
   });
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [loginDialogOpen, setLoginDialogOpen] = useState(false);
+  const [loginUsername, setLoginUsername] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  const isLoggedIn = sessionId != null;
 
   useEffect(() => {
     getProjectData(projectId)
@@ -783,6 +886,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                   data.projectConfigSchema,
                   schemaStr,
                   data.projectConfigValues,
+                  projectId,
                 );
                 initialConfigMap[page.id] = defaults;
               } catch {
@@ -790,6 +894,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                   data.projectConfigSchema,
                   undefined,
                   data.projectConfigValues,
+                  projectId,
                 );
               }
             } else {
@@ -797,21 +902,12 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                 data.projectConfigSchema,
                 undefined,
                 data.projectConfigValues,
+                projectId,
               );
             }
           }
 
           const firstPage = data.demoPages[0];
-          const saved = localStorage.getItem(
-            `config:${projectId}:${firstPage.id}`,
-          );
-          if (saved) {
-            try {
-              const parsed = JSON.parse(saved);
-              const defaults = initialConfigMap[firstPage.id] || {};
-              initialConfigMap[firstPage.id] = { ...defaults, ...parsed };
-            } catch {}
-          }
 
           setConfigData(initialConfigMap[firstPage.id] || {});
           if (schemaMap[firstPage.id]) {
@@ -851,21 +947,29 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const handleConfigChange = useCallback(
     (newData: Record<string, unknown>) => {
       setConfigData((prev) => {
-        const merged = { ...prev, ...newData };
-        try {
-          localStorage.setItem(
-            `config:${projectId}:${activePageId}`,
-            JSON.stringify(merged),
-          );
-        } catch {}
+        const merged = { ...prev };
+        for (const [key, val] of Object.entries(newData)) {
+          if (val === null || val === undefined) {
+            delete merged[key];
+          } else {
+            merged[key] = val;
+          }
+        }
         return merged;
       });
-      setConfigDataMap((prev) => ({
-        ...prev,
-        [activePageId]: { ...(prev[activePageId] ?? {}), ...newData },
-      }));
+      setConfigDataMap((prev) => {
+        const pageConfig = { ...(prev[activePageId] ?? {}) };
+        for (const [key, val] of Object.entries(newData)) {
+          if (val === null || val === undefined) {
+            delete pageConfig[key];
+          } else {
+            pageConfig[key] = val;
+          }
+        }
+        return { ...prev, [activePageId]: pageConfig };
+      });
     },
-    [projectId, activePageId],
+    [activePageId],
   );
 
   const handlePageConfigChange = useCallback(
@@ -907,6 +1011,125 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
       return next;
     });
   }, []);
+
+  const handleLogin = useCallback(async () => {
+    setLoginError("");
+    setLoginLoading(true);
+    try {
+      const result = await login(loginUsername, loginPassword);
+      if (result) {
+        setAuthToken(result.token);
+        setSessionId(result.userId);
+        setLoginDialogOpen(false);
+        setLoginUsername("");
+        setLoginPassword("");
+      }
+    } catch (err: any) {
+      setLoginError(err.message || "登录失败");
+    } finally {
+      setLoginLoading(false);
+    }
+  }, [loginUsername, loginPassword]);
+
+  const handleLogout = useCallback(() => {
+    setAuthToken(null);
+    setSessionId(null);
+  }, []);
+
+  const handleAddPage = useCallback(async () => {
+    if (!sessionId || !project) return;
+    try {
+      await createDemoPage(projectId, "新页面", sessionId);
+      const updatedProject = await getProjectData(projectId);
+      setProject(updatedProject);
+      const newPage = updatedProject.demoPages.find(
+        (p) => !project.demoPages.find((op) => op.id === p.id)
+      );
+      if (newPage) {
+        setActivePageId(newPage.id);
+        if (newPage.schemaPath) {
+          try {
+            const schema = await getDemoSchema(projectId, newPage.schemaPath);
+            const schemaStr = JSON.stringify(schema);
+            const defaults = mergeConfigDefaults(
+              updatedProject.projectConfigSchema,
+              schemaStr,
+              updatedProject.projectConfigValues,
+              projectId,
+            );
+            setConfigData(defaults);
+            setConfigDataMap((prev) => ({ ...prev, [newPage.id]: defaults }));
+            setPageSchemaMap((prev) => ({ ...prev, [newPage.id]: schemaStr }));
+            setPreviewSize(getPreviewSize(schemaStr));
+          } catch {
+            setConfigData({});
+            setConfigDataMap((prev) => ({ ...prev, [newPage.id]: {} }));
+          }
+        } else {
+          setConfigData({});
+          setConfigDataMap((prev) => ({ ...prev, [newPage.id]: {} }));
+        }
+      }
+    } catch (err: any) {
+      console.error("添加页面失败:", err);
+    }
+  }, [sessionId, project, projectId]);
+
+  const handleDeletePage = useCallback(async (pageId: string) => {
+    if (!sessionId || !project) return;
+    try {
+      await deleteDemoPage(projectId, pageId, sessionId);
+      const updatedProject = await getProjectData(projectId);
+      setProject(updatedProject);
+      if (activePageId === pageId && updatedProject.demoPages.length > 0) {
+        setActivePageId(updatedProject.demoPages[0].id);
+      }
+      setConfigDataMap((prev) => {
+        const next = { ...prev };
+        delete next[pageId];
+        return next;
+      });
+    } catch (err: any) {
+      console.error("删除页面失败:", err);
+    }
+  }, [sessionId, project, projectId, activePageId]);
+
+  const handleMovePage = useCallback(async (pageId: string, direction: "up" | "down") => {
+    if (!sessionId || !project) return;
+    const pages = [...project.demoPages].sort((a, b) => a.order - b.order);
+    const idx = pages.findIndex((p) => p.id === pageId);
+    if (idx === -1) return;
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= pages.length) return;
+
+    const reordered = [...pages];
+    const temp = reordered[idx]!.order;
+    reordered[idx]!.order = reordered[targetIdx]!.order;
+    reordered[targetIdx]!.order = temp;
+
+    try {
+      await reorderDemoPages(
+        projectId,
+        sessionId,
+        reordered.map((p) => ({ id: p.id, order: p.order, parentId: p.parentId })),
+      );
+      const updatedProject = await getProjectData(projectId);
+      setProject(updatedProject);
+    } catch (err: any) {
+      console.error("移动页面失败:", err);
+    }
+  }, [sessionId, project, projectId]);
+
+  const handleRuntimeSwitch = useCallback(async (pageId: string, targetType: DemoPageRuntimeType) => {
+    if (!sessionId || !project) return;
+    try {
+      await switchPageRuntime(projectId, pageId, sessionId, targetType);
+      const updatedProject = await getProjectData(projectId);
+      setProject(updatedProject);
+    } catch (err: any) {
+      console.error("切换模块类型失败:", err);
+    }
+  }, [sessionId, project, projectId]);
 
   if (isLoading) {
     return (
@@ -952,8 +1175,12 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
       <Header
         name={project.name}
         onBack={() => router.push("/")}
+        isLoggedIn={isLoggedIn}
+        onLoginClick={() => setLoginDialogOpen(true)}
+        onLogoutClick={handleLogout}
       />
-      <div className="flex-1 flex min-h-0 overflow-hidden">
+      <ErrorBoundary>
+        <div className="flex-1 flex min-h-0 overflow-hidden">
         {project && activePage && (
           <ViewerAiPanel
             key={projectId}
@@ -966,7 +1193,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
             onOpenChange={setAiDrawerOpen}
           />
         )}
-        {previewMode !== "canvas" && project.demoPages.length > 1 && (
+        {previewMode !== "canvas" && (project.demoPages.length > 1 || isLoggedIn) && (
           <div className="w-56 border-r border-border shrink-0 flex flex-col">
             <style>{`
               @keyframes dir-flash {
@@ -977,20 +1204,42 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                 animation: dir-flash 0.3s ease-in-out 3;
               }
             `}</style>
-            <div className="px-3 py-2.5 border-b border-border">
+            <div className="px-3 py-2.5 border-b border-border flex items-center justify-between">
               <h2 className="text-xs font-medium text-muted-foreground">
                 页面目录
               </h2>
+              {isLoggedIn && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={handleAddPage}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p className="text-xs">添加页面</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
             </div>
             <ScrollArea className="flex-1">
               <div className="p-2 space-y-0.5">
-                <TreeList
+                <PageManagerList
                   items={tree}
                   activePageId={activePageId}
                   expandedFolders={expandedFolders}
                   onPageClick={handlePageChange}
                   onToggleFolder={toggleFolder}
                   flashPageId={flashDirectoryId}
+                  isLoggedIn={isLoggedIn}
+                  onDeletePage={handleDeletePage}
+                  onMovePage={handleMovePage}
+                  onRuntimeSwitch={handleRuntimeSwitch}
+                  demoPages={project.demoPages}
                 />
               </div>
             </ScrollArea>
@@ -999,7 +1248,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
 
         <div className="flex-1 min-w-0 overflow-hidden">
           <div className="flex flex-col h-full">
-            {project.demoPages.length > 1 && (
+            {project.demoPages.length >= 1 && (
               <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0">
                 <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
                   <button
@@ -1132,12 +1381,12 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
               projectConfigSchema={project.projectConfigSchema}
               onProjectConfigChange={handleProjectConfigChange}
               onPageConfigChange={handlePageConfigChange}
-              readonly
               hideDetailHeader={previewMode === "single"}
             />
           </div>
         )}
       </div>
+      </ErrorBoundary>
       {!aiDrawerOpen && (
         <Button
           type="button"
@@ -1149,17 +1398,65 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
           <MessageCircle className="h-5 w-5" />
         </Button>
       )}
+
+      <Dialog open={loginDialogOpen} onOpenChange={setLoginDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>登录创作端</DialogTitle>
+            <DialogDescription>
+              使用创作端账号登录以管理页面模块
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Input
+                placeholder="用户名"
+                value={loginUsername}
+                onChange={(e) => setLoginUsername(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              />
+              <Input
+                type="password"
+                placeholder="密码"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              />
+            </div>
+            {loginError && (
+              <p className="text-xs text-destructive">{loginError}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setLoginDialogOpen(false)}
+            >
+              取消
+            </Button>
+            <Button onClick={handleLogin} disabled={loginLoading}>
+              {loginLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              登录
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function TreeList({
+function PageManagerList({
   items,
   activePageId,
   expandedFolders,
   onPageClick,
   onToggleFolder,
   flashPageId,
+  isLoggedIn,
+  onDeletePage,
+  onMovePage,
+  onRuntimeSwitch,
+  demoPages,
   depth = 0,
 }: {
   items: TreeItem[];
@@ -1168,11 +1465,18 @@ function TreeList({
   onPageClick: (pageId: string) => void;
   onToggleFolder: (folderId: string) => void;
   flashPageId: string | null;
+  isLoggedIn: boolean;
+  onDeletePage: (pageId: string) => void;
+  onMovePage: (pageId: string, direction: "up" | "down") => void;
+  onRuntimeSwitch: (pageId: string, targetType: DemoPageRuntimeType) => void;
+  demoPages: PublishedDemoPage[];
   depth?: number;
 }) {
+  const sortedPages = [...demoPages].sort((a, b) => a.order - b.order);
+
   return (
     <>
-      {items.map((item) => {
+      {items.map((item, idx) => {
         if (item.type === "folder") {
           const isExpanded = expandedFolders.has(item.id);
           return (
@@ -1192,13 +1496,18 @@ function TreeList({
                 </span>
               </button>
               {isExpanded && item.children && (
-                <TreeList
+                <PageManagerList
                   items={item.children}
                   activePageId={activePageId}
                   expandedFolders={expandedFolders}
                   onPageClick={onPageClick}
                   onToggleFolder={onToggleFolder}
                   flashPageId={flashPageId}
+                  isLoggedIn={isLoggedIn}
+                  onDeletePage={onDeletePage}
+                  onMovePage={onMovePage}
+                  onRuntimeSwitch={onRuntimeSwitch}
+                  demoPages={demoPages}
                   depth={depth + 1}
                 />
               )}
@@ -1206,20 +1515,140 @@ function TreeList({
           );
         }
 
+        const pageIdx = sortedPages.findIndex((p) => p.id === item.id);
+        const isFirst = pageIdx === 0;
+        const isLast = pageIdx === sortedPages.length - 1;
+        const pageRuntime = item.page?.runtimeType || "high-fidelity-react";
+
+        const runtimeTypeLabel: Record<string, string> = {
+          "high-fidelity-react": "高保真",
+          "prototype-html-css": "HTML原型",
+          "sketch-scene": "手绘",
+        };
+
         return (
-          <button
+          <div
             key={item.id}
-            onClick={() => onPageClick(item.id)}
-            className={`flex items-center gap-1.5 w-full text-left px-2 py-1.5 rounded-md text-sm transition-colors ${
+            className={`flex items-center group rounded-md text-sm transition-colors ${
               item.id === activePageId
                 ? "bg-primary/10 text-primary border border-primary/20"
                 : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
             } ${item.id === flashPageId ? "animate-dir-flash" : ""}`}
-            style={{ paddingLeft: `${depth * 16 + 8}px` }}
+            style={{ paddingLeft: `${depth * 16 + 4}px` }}
           >
-            <FileText className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate text-xs">{item.name}</span>
-          </button>
+            <button
+              onClick={() => onPageClick(item.id)}
+              className="flex items-center gap-1.5 flex-1 min-w-0 text-left px-1 py-1.5"
+            >
+              <FileText className="h-3.5 w-3.5 shrink-0" />
+              <div className="min-w-0">
+                <span className="truncate text-xs block">{item.name}</span>
+                <span className="text-[10px] opacity-60 block">
+                  {runtimeTypeLabel[pageRuntime] || pageRuntime}
+                </span>
+              </div>
+            </button>
+            {isLoggedIn && (
+              <div className="flex items-center shrink-0 pr-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5"
+                    >
+                      <ArrowLeftRight className="h-3 w-3" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-36 p-1" align="end">
+                    <div className="space-y-0.5">
+                      <button
+                        className={`w-full flex items-center gap-1.5 rounded-sm px-2 py-1.5 text-xs hover:bg-accent ${
+                          pageRuntime === "high-fidelity-react" ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+                        }`}
+                        onClick={() => onRuntimeSwitch(item.id, "high-fidelity-react")}
+                        disabled={pageRuntime === "high-fidelity-react"}
+                      >
+                        <FileCode className="h-3.5 w-3.5" />
+                        高保真
+                      </button>
+                      <button
+                        className={`w-full flex items-center gap-1.5 rounded-sm px-2 py-1.5 text-xs hover:bg-accent ${
+                          pageRuntime === "prototype-html-css" ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+                        }`}
+                        onClick={() => onRuntimeSwitch(item.id, "prototype-html-css")}
+                        disabled={pageRuntime === "prototype-html-css"}
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        HTML原型
+                      </button>
+                      <button
+                        className={`w-full flex items-center gap-1.5 rounded-sm px-2 py-1.5 text-xs hover:bg-accent ${
+                          pageRuntime === "sketch-scene" ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+                        }`}
+                        onClick={() => onRuntimeSwitch(item.id, "sketch-scene")}
+                        disabled={pageRuntime === "sketch-scene"}
+                      >
+                        <ChevronRight className="h-3.5 w-3.5" />
+                        手绘
+                      </button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5"
+                      onClick={() => onMovePage(item.id, "up")}
+                      disabled={isFirst}
+                    >
+                      <ChevronUp className="h-3 w-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p className="text-xs">上移</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5"
+                      onClick={() => onMovePage(item.id, "down")}
+                      disabled={isLast}
+                    >
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p className="text-xs">下移</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5 text-destructive hover:text-destructive"
+                      onClick={() => {
+                        if (window.confirm(`确定要删除「${item.name}」吗？`)) {
+                          onDeletePage(item.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p className="text-xs">删除</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            )}
+          </div>
         );
       })}
     </>
@@ -1229,9 +1658,15 @@ function TreeList({
 function Header({
   name,
   onBack,
+  isLoggedIn,
+  onLoginClick,
+  onLogoutClick,
 }: {
   name: string;
   onBack: () => void;
+  isLoggedIn?: boolean;
+  onLoginClick?: () => void;
+  onLogoutClick?: () => void;
 }) {
   return (
     <header className="flex items-center h-12 px-4 border-b border-border shrink-0 gap-3">
@@ -1244,6 +1679,41 @@ function Header({
       </button>
       {name && <h1 className="text-sm font-semibold">{name}</h1>}
       <div className="flex-1" />
+      {onLoginClick !== undefined && (
+        isLoggedIn ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={onLogoutClick}
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p className="text-xs">退出登录</p>
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={onLoginClick}
+              >
+                <LogIn className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p className="text-xs">登录以管理页面</p>
+            </TooltipContent>
+          </Tooltip>
+        )
+      )}
     </header>
   );
 }

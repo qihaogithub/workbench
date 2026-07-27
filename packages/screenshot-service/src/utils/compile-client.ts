@@ -6,6 +6,7 @@ export interface CompileResult {
   dependencies?: string[];
   moduleHash?: string;
   moduleUrl?: string;
+  typeLimits?: Record<string, number>;
 }
 
 export interface CompileServiceErrorDetails {
@@ -77,5 +78,6 @@ export async function compileCode(
     dependencies: result.data.dependencies,
     moduleHash: result.data.moduleHash,
     moduleUrl: result.data.moduleUrl,
+    typeLimits: result.data.typeLimits,
   };
 }

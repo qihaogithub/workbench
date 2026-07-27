@@ -38,7 +38,8 @@ export function isProjectLocalImageReference(value: string): boolean {
   return (
     value.startsWith("../../assets/") ||
     value.startsWith("../assets/") ||
-    value.startsWith("/api/sessions/")
+    value.startsWith("/api/sessions/") ||
+    value.startsWith("/api/images/")
   );
 }
 

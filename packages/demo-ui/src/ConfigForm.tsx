@@ -25,6 +25,7 @@ import {
 import type { ConfigFormProps } from "./types";
 import type { FieldConfig, FieldGroup, VisibleWhenCondition } from "./schema-parser";
 import { parseSchemaToFields } from "./schema-parser";
+import { getPageTypeLimits } from "./type-limits-store";
 import { FieldRenderer } from "./FieldRenderer";
 import { NoteDialog } from "./NoteDialog";
 import { getOrderable, getOrderableHorizontal, getPositionable } from "./validator";
@@ -708,10 +709,11 @@ export function ConfigForm({
   onSchemaChange,
   initialData,
   readonly,
-  className,
   sessionId,
   positionableItemSizes,
   configCategoryFilter,
+  typeLimits,
+  className,
 }: ConfigFormProps) {
   const [formData, setFormData] = useState<Record<string, unknown>>(
     initialData || {},
@@ -728,7 +730,7 @@ export function ConfigForm({
     Object.keys(initialData || {}),
   );
 
-  const fieldGroups = useMemo(() => parseSchemaToFields(schema), [schema]);
+  const fieldGroups = useMemo(() => parseSchemaToFields(schema, typeLimits || getPageTypeLimits()), [schema, typeLimits]);
   const effectiveFormData = useMemo(
     () => buildEffectiveFormData(fieldGroups, formData),
     [fieldGroups, formData],
@@ -885,9 +887,15 @@ export function ConfigForm({
 
   const handleFieldChange = useCallback(
     (key: string, value: unknown) => {
-      const newData = { ...formDataRef.current, [key]: value };
-      setFormData(newData);
-      onChange({ [key]: value });
+      setFormData((prev) => {
+        if (value === undefined || value === null) {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        }
+        return { ...prev, [key]: value };
+      });
+      onChange({ [key]: value ?? null });
     },
     [onChange]
   );
