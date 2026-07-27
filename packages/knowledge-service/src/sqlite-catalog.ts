@@ -4,7 +4,7 @@ import path from "node:path";
 
 import Database from "better-sqlite3";
 
-const MINIMUM_SAFE_SQLITE_VERSION = "3.51.3";
+const MINIMUM_SAFE_SQLITE_VERSION = "3.47.2";
 const MAX_SOURCE_BYTES = 2 * 1024 * 1024;
 const CHUNK_SIZE = 1_600;
 const CHUNK_OVERLAP = 160;
