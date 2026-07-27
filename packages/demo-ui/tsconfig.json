@@ -16,6 +16,6 @@
       "@/*": ["../author-site/src/*"]
     }
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "vitest.setup.ts", "vitest.config.ts"],
   "exclude": ["node_modules", "dist"]
 }

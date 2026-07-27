@@ -2,10 +2,19 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { PreviewPanel, ConfigForm, ConfigScopeWrapper, isSchemaEmpty } from "../../../../../components/demo";
-import type { PreviewSize } from "../../../../../components/demo";
+import {
+  SinglePagePreview,
+  ConfigForm,
+  ConfigScopeWrapper,
+  isSchemaEmpty,
+} from "../../../../../components/demo";
+import type {
+  CanvasPageRuntimeType,
+  PreviewSize,
+  PreviewStagePage,
+} from "../../../../../components/demo";
 import { mergeConfigToProps } from "@/lib/runtime-props";
-import { getDefaultValues, getPreviewSize } from "../../../../../lib/validator";
+import { getDefaultValues } from "../../../../../lib/validator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Settings, Loader2 } from "lucide-react";
 import type {
@@ -27,6 +36,12 @@ interface ViewerDemoPage {
   code: string;
   schema?: string;
   previewSize?: PreviewSize;
+  runtimeType?: CanvasPageRuntimeType;
+  prototypeHtml?: string;
+  prototypeCss?: string;
+  prototypeMeta?: Record<string, unknown>;
+  sketchScene?: Record<string, unknown>;
+  sketchMeta?: Record<string, unknown>;
 }
 
 interface ViewerData {
@@ -100,7 +115,6 @@ export default function ViewerDemoPage() {
   const [configData, setConfigData] = useState<Record<string, unknown>>({});
   const [appState, setAppState] = useState<Record<string, unknown>>({});
   const [routeParams, setRouteParams] = useState<Record<string, unknown>>({});
-  const [previewSize, setPreviewSize] = useState<PreviewSize | undefined>();
   const [sessionId, setSessionId] = useState<string | undefined>();
 
   const urlConfigDataRef = useRef<Record<string, unknown> | null>(null);
@@ -168,7 +182,6 @@ export default function ViewerDemoPage() {
           const urlConfig = urlConfigDataRef.current;
           const merged = urlConfig ? { ...defaults, ...urlConfig } : defaults;
           setConfigData(merged);
-          setPreviewSize(getPreviewSize(page.schema));
         } else if (urlConfigDataRef.current) {
           setConfigData(urlConfigDataRef.current);
         }
@@ -258,7 +271,6 @@ export default function ViewerDemoPage() {
         data.projectConfigValues,
       );
       setConfigData(defaults);
-      setPreviewSize(getPreviewSize(page.schema));
     }
   }, [data, getSafeMergedDefaults, syncBrowserUrl]);
 
@@ -314,6 +326,35 @@ export default function ViewerDemoPage() {
 
   const currentPage = data.demoPages.find((p) => p.id === activeDemoId);
   const currentPageSchema = currentPage?.schema;
+  let previewStagePage: PreviewStagePage | undefined;
+  if (currentPage) {
+    const runtimeType = currentPage.runtimeType ?? "high-fidelity-react";
+    const runtimeData =
+      runtimeType === "prototype-html-css"
+        ? {
+            prototypeHtml: currentPage.prototypeHtml,
+            prototypeCss: currentPage.prototypeCss,
+            prototypeMeta: currentPage.prototypeMeta,
+          }
+        : runtimeType === "sketch-scene"
+          ? {
+              sketchScene: currentPage.sketchScene
+                ? JSON.stringify(currentPage.sketchScene)
+                : undefined,
+              sketchMeta: currentPage.sketchMeta,
+            }
+          : { code: currentPage.code };
+    previewStagePage = {
+      id: currentPage.id,
+      name: currentPage.name,
+      order: currentPage.order,
+      runtimeType,
+      ...runtimeData,
+      configData,
+      schema: currentPage.schema,
+      previewSize: currentPage.previewSize,
+    };
+  }
 
   const hasProjectConfig = !isSchemaEmpty(data.projectConfigSchema);
   const hasPageConfig = !isSchemaEmpty(currentPageSchema);
@@ -364,27 +405,16 @@ export default function ViewerDemoPage() {
               <Settings className="h-3.5 w-3.5" />
             </button>
           )}
-          <div
-            className="p-4 h-full overflow-y-auto preview-single-scroll"
-            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-          >
-            <style>{`
-              .preview-single-scroll::-webkit-scrollbar {
-                display: none;
-              }
-            `}</style>
-            {currentPage && (
-              <PreviewPanel
-                code={currentPage.code}
-                demoId={currentPage.id}
-                configData={configData}
-                appState={appState}
-                routeParams={routeParams}
-                previewSize={previewSize}
-                onAppAction={handleAppAction}
-              />
-            )}
-          </div>
+          <SinglePagePreview
+            page={previewStagePage}
+            rendererProps={{
+              highFidelity: {
+                appState,
+                routeParams,
+                onAppAction: handleAppAction,
+              },
+            }}
+          />
         </div>
 
         {configVisible && showConfig && (

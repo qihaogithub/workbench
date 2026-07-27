@@ -3,10 +3,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
-  PreviewPanel,
-  PrototypePagePreview,
-  SketchPagePreview,
-  PreviewCanvas,
+  PreviewStage,
   PageConfigPanel,
   BUILT_IN_CONFIG_CATEGORIES,
   extractPrototypeConfigBindingKeys,
@@ -15,6 +12,7 @@ import {
 } from "../../../../../components/demo";
 import type {
   PositionableSizeItem,
+  PreviewStagePage,
   PreviewSize,
   ScreenshotRenderBox,
   VisualNodeInfo,
@@ -110,7 +108,6 @@ import {
   Copy,
   MousePointer2,
   FileText,
-  Map as MapIcon,
   Upload,
   CheckCircle,
   History,
@@ -5355,30 +5352,56 @@ ${context.details}
   );
 
   const activeDemoPage = demoPages.find((page) => page.id === activeDemoId);
-  const activePreviewSize = useMemo(() => {
-    if (activeDemoId) {
-      const schemaForActivePage = pageSchemaMap[activeDemoId];
-      const sizeFromSchema = schemaForActivePage
-        ? getPreviewSize(schemaForActivePage)
-        : undefined;
-      const sizeFromPrototypeMeta = getPrototypePreviewSize(
-        pagePrototypeMap[activeDemoId]?.meta,
-      );
-      return (
-        sizeFromSchema ??
-        pagePreviewSizeMap[activeDemoId] ??
-        sizeFromPrototypeMeta ??
-        previewSize
-      );
-    }
-    return schema ? (getPreviewSize(schema) ?? previewSize) : previewSize;
+  const previewStagePages = useMemo<PreviewStagePage[]>(() => {
+    const activeCodePageId =
+      pageCodes[activeDemoId] === code ? activeDemoId : undefined;
+
+    return demoPages.map((page) => {
+      const runtimeData =
+        page.runtimeType === "prototype-html-css"
+          ? {
+              prototypeHtml: pagePrototypeMap[page.id]?.html,
+              prototypeCss: pagePrototypeMap[page.id]?.css,
+              prototypeMeta: pagePrototypeMap[page.id]?.meta,
+            }
+          : page.runtimeType === "sketch-scene"
+            ? {
+                sketchScene: pageSketchMap[page.id]?.scene,
+                sketchMeta: pageSketchMap[page.id]?.meta,
+              }
+            : {
+                code: resolvePreviewPageCode({
+                  pageId: page.id,
+                  pageCodes,
+                  activeCodePageId,
+                  activeCode: code,
+                }),
+              };
+
+      return {
+        id: page.id,
+        name: page.name,
+        runtimeType: page.runtimeType,
+        order: page.order,
+        ...runtimeData,
+        configData: configDataMap[page.id],
+        schema: pageSchemaMap[page.id],
+        previewSize: pagePreviewSizeMap[page.id],
+        fallbackPreviewSize:
+          page.id === activeDemoId ? previewSize : undefined,
+      };
+    });
   }, [
     activeDemoId,
+    code,
+    configDataMap,
+    demoPages,
+    pageCodes,
     pagePreviewSizeMap,
     pagePrototypeMap,
+    pageSketchMap,
     pageSchemaMap,
     previewSize,
-    schema,
   ]);
   const activeSinglePreviewDocumentNode = useMemo(() => {
     if (singlePreviewTarget?.kind !== "document") return undefined;
@@ -6925,235 +6948,102 @@ ${context.details}
           </ResizablePanel>
           <ResizablePanel className="relative border rounded-lg overflow-hidden bg-background shadow-sm flex flex-col">
             <div className="flex-1 overflow-hidden">
-              {previewMode === "canvas" ? (
-                <div className="flex flex-col h-full">
-                  <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0">
-                    <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSinglePreviewTarget(
-                            activeDemoId
-                              ? { kind: "page", pageId: activeDemoId }
-                              : null,
-                          );
-                          setPreviewMode("single");
-                        }}
-                        className="inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors text-muted-foreground hover:text-foreground"
-                      >
-                        <FileText className="h-3.5 w-3.5" />
-                        单页
-                      </button>
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors bg-accent text-accent-foreground"
-                      >
-                        <MapIcon className="h-3.5 w-3.5" />
-                        画布
-                      </button>
-                    </div>
-                    <div className="flex-1" />
-                  </div>
-                  <div className="flex-1 overflow-hidden">
-                    <PreviewCanvas
-                      editable
-                      sessionId={sessionId}
-                      projectId={demoId}
-                      pages={demoPages.map((p) => ({
-                        id: p.id,
-                        name: p.name,
-                        runtimeType: p.runtimeType,
-                        order: p.order,
-                        code: resolvePreviewPageCode({
-                          pageId: p.id,
-                          pageCodes,
-                          activeCodePageId:
-                            pageCodes[activeDemoId] === code
-                              ? activeDemoId
-                              : undefined,
-                          activeCode: code,
-                        }),
-                        prototypeHtml: pagePrototypeMap[p.id]?.html,
-                        prototypeCss: pagePrototypeMap[p.id]?.css,
-                        prototypeMeta: pagePrototypeMap[p.id]?.meta,
-                        sketchScene: pageSketchMap[p.id]?.scene,
-                        sketchMeta: pageSketchMap[p.id]?.meta,
-                        configData: configDataMap[p.id],
-                        previewSize: pagePreviewSizeMap[p.id],
-                      }))}
-                      canvasState={canvasState}
-                      onCanvasStateChange={setCanvasState}
-                      onRequestDeletePages={requestDeletePages}
-                      onRequestPastePages={handlePastePages}
-                      onRuntimeConversionRequest={
-                        handleRequestRuntimeConversion
-                      }
-                      focusPageId={focusCanvasPageId}
-                      onVisiblePageIdsChange={setVisibleCanvasPageIds}
-                      editingPageId={canvasEditingPageId ?? undefined}
-                      screenshotUrls={canvasScreenshotUrls}
-                      screenshotRenderBoxes={canvasScreenshotRenderBoxes}
-                      onConsoleEntry={handleDiagnosticConsoleEntry}
-                      onError={handlePreviewError}
-                      onPositionableSizes={handlePositionableSizes}
-                      knowledgeDocuments={canvasKnowledgeDocuments}
-                      fitToScreenOnMount={fitCanvasToScreenOnMount}
-                      onFitToScreenOnMountComplete={
-                        handleInitialCanvasFitComplete
-                      }
-                      onCreateKnowledgeDocument={createCanvasKnowledgeDocument}
-                      onUpdateKnowledgeDocument={updateCanvasKnowledgeDocument}
-                      onReadKnowledgeDocument={readCanvasKnowledgeDocument}
-                      onPageConfigEdit={(pageId) => {
-                        rememberActivePageSchema();
-                        setCanvasEditingPageId(pageId);
-                        setConfigPanelDetailPageId(pageId);
-                        setConfigPanelOverviewRequested(false);
-                        setActiveDemoId(pageId);
-                        activeDemoIdRef.current = pageId;
-                        if (sessionId) {
-                          fetch(`/api/sessions/${sessionId}/files/${pageId}`)
-                            .then((res) => res.json())
-                            .then((data) => {
-                              if (data.success) {
-                                const prototypeMeta = data.data
-                                  .prototypeMeta as
-                                  | PrototypePageMeta
-                                  | undefined;
-                                setPageCodes((prev) => ({
-                                  ...prev,
-                                  [pageId]: data.data.code,
-                                }));
-                                if (
-                                  data.data.prototypeHtml !== undefined ||
-                                  data.data.prototypeCss !== undefined
-                                ) {
-                                  setPagePrototypeMap((prev) => ({
-                                    ...prev,
-                                    [pageId]: {
-                                      html: data.data.prototypeHtml,
-                                      css: data.data.prototypeCss,
-                                      meta: prototypeMeta,
-                                    },
-                                  }));
-                                }
-                                setCode(data.data.code);
-                                setSchema(data.data.schema);
-                                updatePageSchemaMapFromLoad(
-                                  pageId,
-                                  data.data.schema,
-                                );
-                                setEditorContent(
-                                  buildFigmaText(
-                                    data.data.code,
-                                    data.data.schema,
-                                  ),
-                                );
-                                setConfigDataMap((prev) => {
-                                  if (prev[pageId]) return prev;
-                                  const defaults = getSafeMergedDefaults(
-                                    data.data.schema,
-                                  );
-                                  return { ...prev, [pageId]: defaults };
-                                });
-                                const size =
-                                  getPreviewSize(data.data.schema) ??
-                                  getPrototypePreviewSize(prototypeMeta);
-                                if (size) {
-                                  setPagePreviewSizeMap((prev) => ({
-                                    ...prev,
-                                    [pageId]: size,
-                                  }));
-                                }
-                                setPreviewSize(size);
-                              }
-                            })
-                            .catch((err) =>
-                              console.error("加载页面失败:", err),
-                            );
-                        }
-                      }}
-                      onCanvasClick={() => {
-                        clearCanvasSelection();
-                        setCanvasEditingPageId(null);
-                        setConfigPanelDetailPageId(null);
-                        setConfigPanelOverviewRequested(true);
-                      }}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col h-full">
-                  <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0">
-                    <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors bg-accent text-accent-foreground"
-                      >
-                        <FileText className="h-3.5 w-3.5" />
-                        单页
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!confirmDiscardVisualPropertyWork()) return;
-                          handleClearVisualProperties();
-                          if (!initialCanvasFitRequestedRef.current) {
-                            initialCanvasFitRequestedRef.current = true;
-                            setFitCanvasToScreenOnMount(true);
+              <style>{`
+                .layer-tree-menu-scrollbar {
+                  scrollbar-width: thin;
+                  scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent;
+                }
+                .layer-tree-menu-scrollbar::-webkit-scrollbar {
+                  width: 6px;
+                }
+                .layer-tree-menu-scrollbar::-webkit-scrollbar-track {
+                  background: transparent;
+                }
+                .layer-tree-menu-scrollbar::-webkit-scrollbar-thumb {
+                  background: hsl(var(--muted-foreground) / 0.35);
+                  border-radius: 999px;
+                }
+                .layer-tree-menu-scrollbar::-webkit-scrollbar-thumb:hover {
+                  background: hsl(var(--muted-foreground) / 0.55);
+                }
+              `}</style>
+              <PreviewStage
+                pages={previewStagePages}
+                activePageId={activeDemoId}
+                onActivePageChange={(pageId) =>
+                  handleSinglePreviewSelectChange(`page:${pageId}`)
+                }
+                previewMode={previewMode}
+                onPreviewModeChange={(nextMode) => {
+                  if (nextMode === previewMode) return;
+                  if (nextMode === "single") {
+                    setSinglePreviewTarget(
+                      activeDemoId
+                        ? { kind: "page", pageId: activeDemoId }
+                        : null,
+                    );
+                    setPreviewMode("single");
+                    return;
+                  }
+                  if (!confirmDiscardVisualPropertyWork()) return;
+                  handleClearVisualProperties();
+                  if (!initialCanvasFitRequestedRef.current) {
+                    initialCanvasFitRequestedRef.current = true;
+                    setFitCanvasToScreenOnMount(true);
+                  }
+                  setPreviewMode("canvas");
+                }}
+                canvasState={canvasState}
+                onCanvasStateChange={setCanvasState}
+                interactionMode="editor"
+                selectorSlot={
+                  previewMode === "single" &&
+                  (demoPages.length > 0 ||
+                    singlePreviewDocumentNodes.length > 0) ? (
+                    <>
+                      {activeDemoPage?.runtimeType === "sketch-scene" && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className={`h-7 w-7 ${
+                            sketchEditing
+                              ? "border-emerald-500/80 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-200"
+                              : ""
+                          }`}
+                          title={sketchEditing ? "退出手绘编辑" : "手绘编辑"}
+                          aria-label="手绘编辑"
+                          aria-pressed={sketchEditing}
+                          onClick={() =>
+                            setSketchEditing((current) => !current)
                           }
-                          setPreviewMode("canvas");
-                        }}
-                        className="inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors text-muted-foreground hover:text-foreground"
-                      >
-                        <MapIcon className="h-3.5 w-3.5" />
-                        画布
-                      </button>
-                    </div>
-                    <div className="flex-1" />
-                    {activeDemoPage?.runtimeType === "sketch-scene" && (
+                        >
+                          <MousePointer2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                       <Button
                         type="button"
                         variant="outline"
                         size="icon"
-                        className={`h-7 w-7 ${
-                          sketchEditing
-                            ? "border-emerald-500/80 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-200"
-                            : ""
-                        }`}
-                        title={sketchEditing ? "退出手绘编辑" : "手绘编辑"}
-                        aria-label="手绘编辑"
-                        aria-pressed={sketchEditing}
-                        onClick={() => setSketchEditing((current) => !current)}
+                        className="h-7 w-7"
+                        disabled={
+                          !singlePreviewHistoryTarget ||
+                          singlePreviewHistoryPreparing
+                        }
+                        onClick={() => void handleOpenSinglePreviewHistory()}
+                        title={
+                          singlePreviewHistoryTarget
+                            ? `${singlePreviewHistoryTarget.title} 历史`
+                            : "当前对象没有可用历史"
+                        }
+                        aria-label="查看当前对象历史"
                       >
-                        <MousePointer2 className="h-3.5 w-3.5" />
+                        {singlePreviewHistoryPreparing ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <History className="h-3.5 w-3.5" />
+                        )}
                       </Button>
-                    )}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-7 w-7"
-                      disabled={
-                        !singlePreviewHistoryTarget ||
-                        singlePreviewHistoryPreparing
-                      }
-                      onClick={() => void handleOpenSinglePreviewHistory()}
-                      title={
-                        singlePreviewHistoryTarget
-                          ? `${singlePreviewHistoryTarget.title} 历史`
-                          : "当前对象没有可用历史"
-                      }
-                      aria-label="查看当前对象历史"
-                    >
-                      {singlePreviewHistoryPreparing ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <History className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
-                    {(demoPages.length > 0 ||
-                      singlePreviewDocumentNodes.length > 0) && (
                       <select
                         value={singlePreviewSelectValue}
                         onChange={(event) =>
@@ -7184,91 +7074,305 @@ ${context.details}
                           </optgroup>
                         )}
                       </select>
-                    )}
-                    {activeRuntimeConversion &&
-                      !singlePreviewViewingDocument && (
-                        <div className="flex min-w-0 items-center gap-1">
-                          <Badge
-                            variant={
-                              activeRuntimeConversion.status === "failed"
-                                ? "destructive"
-                                : activeRuntimeConversion.status === "completed"
-                                  ? "secondary"
-                                  : "outline"
-                            }
-                            className="h-6 max-w-[180px] rounded-md px-2 text-[11px] font-normal"
-                            title={activeRuntimeConversion.message}
-                          >
-                            {(activeRuntimeConversion.status === "running" ||
-                              activeRuntimeConversion.status ===
-                                "applying") && (
-                              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                            )}
-                            {activeRuntimeConversion.status === "completed"
-                              ? "转换完成"
-                              : activeRuntimeConversion.status === "failed"
-                                ? "转换失败"
-                                : "转换中"}
-                          </Badge>
-                          {activeRuntimeConversion.status === "failed" && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2 text-xs"
-                              onClick={() =>
-                                handleRequestRuntimeConversion(
-                                  activeRuntimeConversion.pageId,
-                                  activeRuntimeConversion.targetRuntimeType,
-                                )
-                              }
-                              title={
-                                activeRuntimeConversion.message || "重试转换"
-                              }
-                            >
-                              <RefreshCw className="mr-1 h-3 w-3" />
-                              重试
-                            </Button>
-                          )}
-                        </div>
+                    </>
+                  ) : undefined
+                }
+                toolbarTrailing={
+                  previewMode === "single" &&
+                  activeRuntimeConversion &&
+                  !singlePreviewViewingDocument ? (
+                    <div className="flex min-w-0 items-center gap-1">
+                      <Badge
+                        variant={
+                          activeRuntimeConversion.status === "failed"
+                            ? "destructive"
+                            : activeRuntimeConversion.status === "completed"
+                              ? "secondary"
+                              : "outline"
+                        }
+                        className="h-6 max-w-[180px] rounded-md px-2 text-[11px] font-normal"
+                        title={activeRuntimeConversion.message}
+                      >
+                        {(activeRuntimeConversion.status === "running" ||
+                          activeRuntimeConversion.status === "applying") && (
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        )}
+                        {activeRuntimeConversion.status === "completed"
+                          ? "转换完成"
+                          : activeRuntimeConversion.status === "failed"
+                            ? "转换失败"
+                            : "转换中"}
+                      </Badge>
+                      {activeRuntimeConversion.status === "failed" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() =>
+                            handleRequestRuntimeConversion(
+                              activeRuntimeConversion.pageId,
+                              activeRuntimeConversion.targetRuntimeType,
+                            )
+                          }
+                          title={
+                            activeRuntimeConversion.message || "重试转换"
+                          }
+                        >
+                          <RefreshCw className="mr-1 h-3 w-3" />
+                          重试
+                        </Button>
                       )}
-                  </div>
-                  <div className="relative flex-1 min-h-0">
-                    <style>{`
-                      .preview-single-scroll::-webkit-scrollbar {
-                        display: none;
-                      }
-                      .layer-tree-menu-scrollbar {
-                        scrollbar-width: thin;
-                        scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent;
-                      }
-                      .layer-tree-menu-scrollbar::-webkit-scrollbar {
-                        width: 6px;
-                      }
-                      .layer-tree-menu-scrollbar::-webkit-scrollbar-track {
-                        background: transparent;
-                      }
-                      .layer-tree-menu-scrollbar::-webkit-scrollbar-thumb {
-                        background: hsl(var(--muted-foreground) / 0.35);
-                        border-radius: 999px;
-                      }
-                      .layer-tree-menu-scrollbar::-webkit-scrollbar-thumb:hover {
-                        background: hsl(var(--muted-foreground) / 0.55);
-                      }
-                    `}</style>
-                    <div
-                      className="preview-single-scroll h-full overflow-y-auto p-4"
-                      style={{
-                        scrollbarWidth: "none",
-                        msOverflowStyle: "none",
-                      }}
-                      onClick={(event) => {
-                        if (event.target !== event.currentTarget) return;
-                        handleVisualSelect(null, []);
-                        setVisualPanelHoverNodeId(null);
-                      }}
-                    >
-                      {singlePreviewViewingDocument &&
-                      activeSinglePreviewDocumentNode ? (
+                    </div>
+                  ) : undefined
+                }
+                singlePageProps={{
+                  emptyState: (
+                    <div className="flex h-full min-h-[320px] items-center justify-center rounded-md border border-dashed bg-muted/20 px-6 text-center">
+                      <div className="max-w-sm">
+                        <FileText className="mx-auto mb-3 h-9 w-9 text-muted-foreground/60" />
+                        <p className="text-sm font-medium text-foreground">
+                          暂无页面
+                        </p>
+                        <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                          请在左侧页面列表点击“添加页面”，或让 AI 创建新页面。
+                        </p>
+                      </div>
+                    </div>
+                  ),
+                  onBackgroundClick: () => {
+                    handleVisualSelect(null, []);
+                    setVisualPanelHoverNodeId(null);
+                  },
+                  rendererProps: {
+                    prototype: {
+                      sessionId,
+                      demoId: activeDemoId,
+                      allowScroll: true,
+                      visualEditMode: visualEditActive,
+                      visualHoverNodeId: visualEditActive
+                        ? visualPanelHoverNodeId
+                        : null,
+                      selectedVisualNodeId:
+                        selectedVisualNode?.domPath ||
+                        selectedVisualNode?.nodeId ||
+                        null,
+                      hiddenVisualNodeIds,
+                      visualLayerTreeNodes,
+                      visualPropertyChanges,
+                      onVisualSelect: handleVisualSelect,
+                      onVisualSelectStack: setVisualNodeStack,
+                      visualNodeTreeRequestKey: visualLayerTreeRequestKey,
+                      onVisualNodeTreeChange: setVisualLayerTreeNodes,
+                    },
+                    sketch: {
+                      fillContainer: true,
+                    },
+                    highFidelity: {
+                      sessionId,
+                      demoId: activeDemoId,
+                      placeholderScreenshotUrl: activePreviewScreenshotUrl,
+                      onConsoleEntry: handleDiagnosticConsoleEntry,
+                      onError: handlePreviewError,
+                      isAutoRepairing,
+                      onContentLoaded: (details) => {
+                        recordDiagnosticEvent({
+                          category: "preview",
+                          name: "preview.content_loaded",
+                          details: {
+                            pageId: activeDemoId,
+                            mode: "single",
+                            requestId: details?.requestId,
+                          },
+                        });
+                        setSinglePreviewLoaded((current) =>
+                          current ? current : true,
+                        );
+                        const ackRevision =
+                          workspaceFlushRevisionRef.current;
+                        previewTrackerRef.current.ackPreview(
+                          ackRevision,
+                          "active-preview",
+                        );
+                      },
+                      onPositionableSizes: handlePositionableSizes,
+                      visualEditMode: visualEditActive,
+                      visualHoverNodeId: visualEditActive
+                        ? visualPanelHoverNodeId
+                        : null,
+                      selectedVisualNodeId:
+                        selectedVisualNode?.domPath ||
+                        selectedVisualNode?.nodeId ||
+                        null,
+                      hiddenVisualNodeIds,
+                      visualLayerTreeNodes,
+                      visualPropertyChanges,
+                      visualAnnotations,
+                      onVisualSelect: handleVisualSelect,
+                      onVisualSelectStack: setVisualNodeStack,
+                      visualNodeTreeRequestKey: visualLayerTreeRequestKey,
+                      onVisualNodeTreeChange: setVisualLayerTreeNodes,
+                      staticPrototypeRequestKey,
+                      onStaticPrototypeSnapshot:
+                        handleStaticPrototypeSnapshot,
+                      onVisualInlineEdit: handleVisualInlineEdit,
+                      visualAnnotationMode: false,
+                      onVisualAnnotationCreate: (
+                        node,
+                        text,
+                        annotationId,
+                        styleChanges,
+                      ) => {
+                        setSelectedVisualNode(node);
+                        const trimmedText = text?.trim() ?? "";
+                        const hasStyleChanges =
+                          !!styleChanges && styleChanges.length > 0;
+                        if (
+                          annotationId &&
+                          !trimmedText &&
+                          !hasStyleChanges
+                        ) {
+                          setVisualAnnotations((prev) =>
+                            prev.filter(
+                              (annotation) =>
+                                annotation.id !== annotationId,
+                            ),
+                          );
+                          return;
+                        }
+                        if (trimmedText || hasStyleChanges) {
+                          if (annotationId) {
+                            setVisualAnnotations((prev) =>
+                              prev.map((annotation) =>
+                                annotation.id === annotationId
+                                  ? {
+                                      ...annotation,
+                                      nodeId: node.nodeId,
+                                      domPath: node.domPath,
+                                      text: trimmedText || "样式修改",
+                                      styleChanges,
+                                    }
+                                  : annotation,
+                              ),
+                            );
+                          } else {
+                            handleCreateVisualAnnotation(
+                              trimmedText,
+                              node,
+                              styleChanges,
+                            );
+                          }
+                        }
+                      },
+                    },
+                  },
+                }}
+                canvasProps={{
+                  editable: true,
+                  sessionId,
+                  projectId: demoId,
+                  onRequestDeletePages: requestDeletePages,
+                  onRequestPastePages: handlePastePages,
+                  onRuntimeConversionRequest: handleRequestRuntimeConversion,
+                  focusPageId: focusCanvasPageId,
+                  onVisiblePageIdsChange: setVisibleCanvasPageIds,
+                  editingPageId: canvasEditingPageId ?? undefined,
+                  screenshotUrls: canvasScreenshotUrls,
+                  screenshotRenderBoxes: canvasScreenshotRenderBoxes,
+                  onConsoleEntry: handleDiagnosticConsoleEntry,
+                  onError: handlePreviewError,
+                  onPositionableSizes: handlePositionableSizes,
+                  knowledgeDocuments: canvasKnowledgeDocuments,
+                  fitToScreenOnMount: fitCanvasToScreenOnMount,
+                  onFitToScreenOnMountComplete:
+                    handleInitialCanvasFitComplete,
+                  onCreateKnowledgeDocument: createCanvasKnowledgeDocument,
+                  onUpdateKnowledgeDocument: updateCanvasKnowledgeDocument,
+                  onReadKnowledgeDocument: readCanvasKnowledgeDocument,
+                  onPageConfigEdit: (pageId) => {
+                    rememberActivePageSchema();
+                    setCanvasEditingPageId(pageId);
+                    setConfigPanelDetailPageId(pageId);
+                    setConfigPanelOverviewRequested(false);
+                    setActiveDemoId(pageId);
+                    activeDemoIdRef.current = pageId;
+                    if (sessionId) {
+                      fetch(`/api/sessions/${sessionId}/files/${pageId}`)
+                        .then((res) => res.json())
+                        .then((data) => {
+                          if (data.success) {
+                            const prototypeMeta = data.data.prototypeMeta as
+                              | PrototypePageMeta
+                              | undefined;
+                            setPageCodes((prev) => ({
+                              ...prev,
+                              [pageId]: data.data.code,
+                            }));
+                            if (
+                              data.data.prototypeHtml !== undefined ||
+                              data.data.prototypeCss !== undefined
+                            ) {
+                              setPagePrototypeMap((prev) => ({
+                                ...prev,
+                                [pageId]: {
+                                  html: data.data.prototypeHtml,
+                                  css: data.data.prototypeCss,
+                                  meta: prototypeMeta,
+                                },
+                              }));
+                            }
+                            setCode(data.data.code);
+                            setSchema(data.data.schema);
+                            updatePageSchemaMapFromLoad(
+                              pageId,
+                              data.data.schema,
+                            );
+                            setEditorContent(
+                              buildFigmaText(
+                                data.data.code,
+                                data.data.schema,
+                              ),
+                            );
+                            setConfigDataMap((prev) => {
+                              if (prev[pageId]) return prev;
+                              const defaults = getSafeMergedDefaults(
+                                data.data.schema,
+                              );
+                              return { ...prev, [pageId]: defaults };
+                            });
+                            const size =
+                              getPreviewSize(data.data.schema) ??
+                              getPrototypePreviewSize(prototypeMeta);
+                            if (size) {
+                              setPagePreviewSizeMap((prev) => ({
+                                ...prev,
+                                [pageId]: size,
+                              }));
+                            }
+                            setPreviewSize(size);
+                          }
+                        })
+                        .catch((err) =>
+                          console.error("加载页面失败:", err),
+                        );
+                    }
+                  },
+                  onCanvasClick: () => {
+                    clearCanvasSelection();
+                    setCanvasEditingPageId(null);
+                    setConfigPanelDetailPageId(null);
+                    setConfigPanelOverviewRequested(true);
+                  },
+                }}
+                renderSingleContent={({
+                  activePage,
+                  resolvedPreviewSize,
+                }) => {
+                  if (
+                    singlePreviewViewingDocument &&
+                    activeSinglePreviewDocumentNode
+                  ) {
+                    return (
+                      <div className="h-full overflow-y-auto p-4">
                         <div className="mx-auto flex h-full max-w-4xl flex-col overflow-hidden rounded-md border bg-background shadow-sm">
                           <CanvasDocumentContent
                             node={activeSinglePreviewDocumentNode}
@@ -7279,188 +7383,35 @@ ${context.details}
                             }
                           />
                         </div>
-                      ) : !activeDemoId ? (
-                        <div className="flex h-full min-h-[320px] items-center justify-center rounded-md border border-dashed bg-muted/20 px-6 text-center">
-                          <div className="max-w-sm">
-                            <FileText className="mx-auto mb-3 h-9 w-9 text-muted-foreground/60" />
-                            <p className="text-sm font-medium text-foreground">
-                              暂无页面
-                            </p>
-                            <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                              请在左侧页面列表点击“添加页面”，或让 AI
-                              创建新页面。
-                            </p>
-                          </div>
-                        </div>
-                      ) : activeDemoPage?.runtimeType ===
-                        "prototype-html-css" ? (
-                        <PrototypePagePreview
-                          html={pagePrototypeMap[activeDemoId]?.html}
-                          css={pagePrototypeMap[activeDemoId]?.css}
-                          configData={configData}
-                          sessionId={sessionId}
-                          demoId={activeDemoId}
-                          previewSize={activePreviewSize}
-                          allowScroll
-                          visualEditMode={visualEditActive}
-                          visualHoverNodeId={
-                            visualEditActive ? visualPanelHoverNodeId : null
-                          }
-                          selectedVisualNodeId={
-                            selectedVisualNode?.domPath ||
-                            selectedVisualNode?.nodeId ||
-                            null
-                          }
-                          hiddenVisualNodeIds={hiddenVisualNodeIds}
-                          visualLayerTreeNodes={visualLayerTreeNodes}
-                          visualPropertyChanges={visualPropertyChanges}
-                          onVisualSelect={handleVisualSelect}
-                          onVisualSelectStack={setVisualNodeStack}
-                          visualNodeTreeRequestKey={visualLayerTreeRequestKey}
-                          onVisualNodeTreeChange={setVisualLayerTreeNodes}
-                        />
-                      ) : activeDemoPage?.runtimeType === "sketch-scene" ? (
+                      </div>
+                    );
+                  }
+                  if (
+                    activePage?.runtimeType === "sketch-scene" &&
+                    sketchEditing
+                  ) {
+                    return (
+                      <div className="h-full overflow-y-auto p-4">
                         <div className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-md border bg-background shadow-sm">
                           <div className="min-h-0 flex-1 overflow-hidden">
-                            {sketchEditing ? (
-                              <SketchEditorEngineStage
-                                host={sketchEditorHost}
-                                scene={activeSketchScene}
-                                configData={configData}
-                                previewSize={activePreviewSize}
-                              />
-                            ) : (
-                              <SketchPagePreview
-                                scene={pageSketchMap[activeDemoId]?.scene}
-                                configData={configData}
-                                previewSize={activePreviewSize}
-                                fillContainer
-                              />
-                            )}
-                          </div>
-                          {sketchEditing ? (
-                            <SketchEditorEngineToolbar
+                            <SketchEditorEngineStage
                               host={sketchEditorHost}
                               scene={activeSketchScene}
+                              configData={configData}
+                              previewSize={resolvedPreviewSize}
                             />
-                          ) : null}
+                          </div>
+                          <SketchEditorEngineToolbar
+                            host={sketchEditorHost}
+                            scene={activeSketchScene}
+                          />
                         </div>
-                      ) : (
-                        <PreviewPanel
-                          code={
-                            activeDemoId
-                              ? (pageCodes[activeDemoId] ?? "")
-                              : code
-                          }
-                          sessionId={sessionId}
-                          demoId={activeDemoId}
-                          configData={configData}
-                          previewSize={activePreviewSize}
-                          placeholderScreenshotUrl={
-                            activePreviewScreenshotUrl
-                          }
-                          onConsoleEntry={handleDiagnosticConsoleEntry}
-                          onError={handlePreviewError}
-                          isAutoRepairing={isAutoRepairing}
-                          onContentLoaded={(details) => {
-                            recordDiagnosticEvent({
-                              category: "preview",
-                              name: "preview.content_loaded",
-                              details: {
-                                pageId: activeDemoId,
-                                mode: "single",
-                                requestId: details?.requestId,
-                              },
-                            });
-                            setSinglePreviewLoaded((current) =>
-                              current ? current : true,
-                            );
-                            // 通知预览投影跟踪器预览已成功加载
-                            const ackRevision =
-                              workspaceFlushRevisionRef.current;
-                            previewTrackerRef.current.ackPreview(
-                              ackRevision,
-                              "active-preview",
-                            );
-                            // TODO: 采集投影延迟采样（需要记录预览开始加载时间戳）
-                          }}
-                          onPositionableSizes={handlePositionableSizes}
-                          visualEditMode={visualEditActive}
-                          visualHoverNodeId={
-                            visualEditActive ? visualPanelHoverNodeId : null
-                          }
-                          selectedVisualNodeId={
-                            selectedVisualNode?.domPath ||
-                            selectedVisualNode?.nodeId ||
-                            null
-                          }
-                          hiddenVisualNodeIds={hiddenVisualNodeIds}
-                          visualLayerTreeNodes={visualLayerTreeNodes}
-                          visualPropertyChanges={visualPropertyChanges}
-                          visualAnnotations={visualAnnotations}
-                          onVisualSelect={handleVisualSelect}
-                          onVisualSelectStack={setVisualNodeStack}
-                          visualNodeTreeRequestKey={visualLayerTreeRequestKey}
-                          onVisualNodeTreeChange={setVisualLayerTreeNodes}
-                          staticPrototypeRequestKey={staticPrototypeRequestKey}
-                          onStaticPrototypeSnapshot={
-                            handleStaticPrototypeSnapshot
-                          }
-                          onVisualInlineEdit={handleVisualInlineEdit}
-                          visualAnnotationMode={false}
-                          onVisualAnnotationCreate={(
-                            node,
-                            text,
-                            annotationId,
-                            styleChanges,
-                          ) => {
-                            setSelectedVisualNode(node);
-                            const trimmedText = text?.trim() ?? "";
-                            const hasStyleChanges =
-                              !!styleChanges && styleChanges.length > 0;
-                            if (
-                              annotationId &&
-                              !trimmedText &&
-                              !hasStyleChanges
-                            ) {
-                              setVisualAnnotations((prev) =>
-                                prev.filter(
-                                  (annotation) =>
-                                    annotation.id !== annotationId,
-                                ),
-                              );
-                              return;
-                            }
-                            if (trimmedText || hasStyleChanges) {
-                              if (annotationId) {
-                                setVisualAnnotations((prev) =>
-                                  prev.map((annotation) =>
-                                    annotation.id === annotationId
-                                      ? {
-                                          ...annotation,
-                                          nodeId: node.nodeId,
-                                          domPath: node.domPath,
-                                          text: trimmedText || "样式修改",
-                                          styleChanges,
-                                        }
-                                      : annotation,
-                                  ),
-                                );
-                              } else {
-                                handleCreateVisualAnnotation(
-                                  trimmedText,
-                                  node,
-                                  styleChanges,
-                                );
-                              }
-                            }
-                          }}
-                        />
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
+                      </div>
+                    );
+                  }
+                  return undefined;
+                }}
+              />
             </div>
           </ResizablePanel>
 

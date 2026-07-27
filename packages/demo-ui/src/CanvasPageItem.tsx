@@ -12,6 +12,7 @@ import { PreviewPanel } from "./PreviewPanel";
 import { PrototypePagePreview } from "./PrototypePagePreview";
 import { SketchPagePreview } from "./SketchPagePreview";
 import { IframePreviewFrame } from "./IframePreviewFrame";
+import { resolvePagePreviewRenderer } from "./preview-stage-resolver";
 import type {
   CanvasPageLayout,
   CanvasPageData,
@@ -306,10 +307,14 @@ export function CanvasPagePreviewContent({
 
   const shouldRenderIframe =
     renderMode === "iframe" || renderMode === "sleeping-iframe";
+  const resolvedRenderer = resolvePagePreviewRenderer({
+    ...page,
+    runtimeType: page.runtimeType ?? "high-fidelity-react",
+  });
   const shouldRenderPrototype =
-    renderMode === "prototype" && page.runtimeType === "prototype-html-css";
+    renderMode === "prototype" && resolvedRenderer === "prototype";
   const shouldRenderSketch =
-    renderMode === "prototype" && page.runtimeType === "sketch-scene";
+    renderMode === "prototype" && resolvedRenderer === "sketch";
   const shouldRenderScreenshot =
     !!screenshotUrl &&
     (renderMode === "screenshot" ||
@@ -350,38 +355,42 @@ export function CanvasPagePreviewContent({
           <SketchPagePreview
             scene={page.sketchScene}
             configData={page.configData}
-            previewSize={page.previewSize}
-            fillContainer
-          />
-        </div>
-      )}
-
-      {shouldRenderIframe && page.iframeUrl && (
-        <div
-          className="absolute inset-0 h-full w-full overflow-hidden bg-white shadow-md transition-opacity duration-200 ease-out"
-          style={{
-            opacity: showIframeContent ? 1 : 0,
-            pointerEvents: "none",
-          }}
-        >
-          <IframePreviewFrame
-            title={page.name}
-            src={page.iframeUrl}
             previewSize={resolvedPreviewSize}
             fillContainer
-            containerSizeOverride={containerSizeOverride}
-            sandbox="allow-scripts"
-            configData={page.configData}
-            sessionId={sessionId}
-            demoId={page.id}
-            onLoad={handleIframeContentLoaded}
-            effectiveHeight={iframeEffectiveHeight}
-            onContentHeightChange={handleContentHeightChange}
           />
         </div>
       )}
 
-      {shouldRenderIframe && !page.iframeUrl && (
+      {shouldRenderIframe &&
+        resolvedRenderer === "published-iframe" &&
+        page.iframeUrl && (
+          <div
+            className="absolute inset-0 h-full w-full overflow-hidden bg-white shadow-md transition-opacity duration-200 ease-out"
+            style={{
+              opacity: showIframeContent ? 1 : 0,
+              pointerEvents: "none",
+            }}
+          >
+            <IframePreviewFrame
+              title={page.name}
+              src={page.iframeUrl}
+              previewSize={resolvedPreviewSize}
+              fillContainer
+              containerSizeOverride={containerSizeOverride}
+              sandbox="allow-scripts"
+              configData={page.configData}
+              sessionId={sessionId}
+              demoId={page.id}
+              onLoad={handleIframeContentLoaded}
+              effectiveHeight={iframeEffectiveHeight}
+              onContentHeightChange={handleContentHeightChange}
+            />
+          </div>
+        )}
+
+      {shouldRenderIframe &&
+        resolvedRenderer !== "published-iframe" &&
+        resolvedRenderer !== "empty" && (
         <div
           className="absolute inset-0 h-full w-full transition-opacity duration-200 ease-out"
           style={{
