@@ -3659,6 +3659,23 @@ ${context.details}
     [handlePageSchemaChange, toast],
   );
 
+  const handleRestoreDefaults = useCallback(
+    (pageId: string) => {
+      const pageSchema = pageSchemaMapRef.current[pageId];
+      if (!pageSchema) return;
+      try {
+        const mergedDefaults = mergeConfigToProps(
+          projectConfigSchemaRef.current,
+          pageSchema,
+        );
+        handlePageConfigPanelChange(pageId, mergedDefaults);
+      } catch {
+        // Schema 冲突等异常场景静默忽略
+      }
+    },
+    [handlePageConfigPanelChange],
+  );
+
   // 安全合并项目级 + 页面级 Schema 默认值
   const getSafeMergedDefaults = useCallback(
     (pageSchema: string, projectSchemaOverride?: string) => {
@@ -7522,6 +7539,7 @@ ${context.details}
                         onPageConfigChange={handlePageConfigPanelChange}
                         onPageSchemaChange={handlePageSchemaChange}
                         onSaveAsDefaults={handleSaveAsDefaults}
+                        onRestoreDefaults={handleRestoreDefaults}
                         sessionId={sessionId}
                         positionableItemSizes={positionableItemSizes}
                         hideDetailHeader
@@ -7574,6 +7592,7 @@ ${context.details}
                   onPageConfigChange={handlePageConfigPanelChange}
                   onPageSchemaChange={handlePageSchemaChange}
                   onSaveAsDefaults={handleSaveAsDefaults}
+                  onRestoreDefaults={handleRestoreDefaults}
                   sessionId={sessionId}
                   positionableItemSizes={positionableItemSizes}
                 />

@@ -1000,6 +1000,24 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
     [],
   );
 
+  const handleRestoreDefaults = useCallback(
+    (pageId: string) => {
+      if (!project) return;
+      const pageSchema = pageSchemaMap[pageId];
+      const defaults = mergeConfigDefaults(
+        project.projectConfigSchema,
+        pageSchema,
+        project.projectConfigValues,
+        projectId,
+      );
+      setConfigDataMap((prev) => ({ ...prev, [pageId]: defaults }));
+      if (pageId === activePageId) {
+        setConfigData(defaults);
+      }
+    },
+    [project, pageSchemaMap, projectId, activePageId],
+  );
+
   const toggleFolder = useCallback((folderId: string) => {
     setExpandedFolders((prev) => {
       const next = new Set(prev);
@@ -1381,6 +1399,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
               projectConfigSchema={project.projectConfigSchema}
               onProjectConfigChange={handleProjectConfigChange}
               onPageConfigChange={handlePageConfigChange}
+              onRestoreDefaults={handleRestoreDefaults}
               hideDetailHeader={previewMode === "single"}
             />
           </div>

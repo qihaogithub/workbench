@@ -6,6 +6,7 @@ import {
   ChevronRight,
   FileText,
   ListFilter,
+  RotateCcw,
   Save,
   Settings,
 } from "lucide-react";
@@ -48,6 +49,7 @@ interface PageConfigPanelProps {
   onPageConfigChange?: (pageId: string, data: Record<string, unknown>) => void;
   onPageSchemaChange?: (pageId: string, schema: string) => void;
   onSaveAsDefaults?: (pageId: string) => void;
+  onRestoreDefaults?: (pageId: string) => void;
   readonly?: boolean;
   sessionId?: string;
   positionableItemSizes?: Record<string, PositionableSizeItem>;
@@ -162,6 +164,7 @@ export function PageConfigPanel({
   onPageConfigChange,
   onPageSchemaChange,
   onSaveAsDefaults,
+  onRestoreDefaults,
   readonly,
   sessionId,
   positionableItemSizes,
@@ -176,6 +179,7 @@ export function PageConfigPanel({
   const [configCategoryFilter, setConfigCategoryFilter] = useState("");
   const [showSharedAffectedPages, setShowSharedAffectedPages] = useState(false);
   const [showSaveDefaultsDialog, setShowSaveDefaultsDialog] = useState(false);
+  const [showRestoreDefaultsDialog, setShowRestoreDefaultsDialog] = useState(false);
   const effectiveDetailPageId =
     detailPageId === undefined ? internalDetailPageId : detailPageId;
   const sortedPages = useMemo(() => getSortedPages(pages), [pages]);
@@ -437,19 +441,33 @@ export function PageConfigPanel({
                   <FileText className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm font-semibold">本页配置</span>
                 </div>
-                {!readonly && onSaveAsDefaults && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 gap-1 px-2 text-xs"
-                    disabled={!saveDefaultsEnabled}
-                    onClick={() => setShowSaveDefaultsDialog(true)}
-                  >
-                    <Save className="h-3.5 w-3.5" />
-                    保存为默认值
-                  </Button>
-                )}
+                <div className="flex items-center gap-1">
+                  {onRestoreDefaults && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 gap-1 px-2 text-xs"
+                      onClick={() => setShowRestoreDefaultsDialog(true)}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      恢复默认值
+                    </Button>
+                  )}
+                  {!readonly && onSaveAsDefaults && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 gap-1 px-2 text-xs"
+                      disabled={!saveDefaultsEnabled}
+                      onClick={() => setShowSaveDefaultsDialog(true)}
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                      保存为默认值
+                    </Button>
+                  )}
+                </div>
               </div>
               <ConfigScopeWrapper scope="page" hideHeader>
                 <ConfigForm
@@ -509,9 +527,40 @@ export function PageConfigPanel({
             >
               确认
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog open={showRestoreDefaultsDialog} onOpenChange={setShowRestoreDefaultsDialog}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>恢复默认配置</DialogTitle>
+          <DialogDescription>
+            将当前页面配置恢复为初始默认值，所有修改将丢失。确认恢复？
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowRestoreDefaultsDialog(false)}
+          >
+            取消
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => {
+              if (selectedPage) {
+                onRestoreDefaults?.(selectedPage.id);
+              }
+              setShowRestoreDefaultsDialog(false);
+            }}
+          >
+            确认恢复
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     </div>
   );
 }
