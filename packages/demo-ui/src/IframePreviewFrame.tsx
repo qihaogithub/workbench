@@ -145,22 +145,6 @@ export function IframePreviewFrame({
   }, [effectiveHeight, onContentHeightChange]);
 
   const handleLoad = useCallback(() => {
-    try {
-      const doc = iframeRef.current?.contentDocument;
-      if (doc) {
-        const style = doc.createElement("style");
-        style.textContent = `
-          html {
-            scrollbar-width: none !important;
-            -ms-overflow-style: none !important;
-          }
-          html::-webkit-scrollbar {
-            display: none !important;
-          }
-        `;
-        doc.head.appendChild(style);
-      }
-    } catch {}
     onLoad?.();
     syncIframeConfig();
   }, [onLoad, syncIframeConfig]);
