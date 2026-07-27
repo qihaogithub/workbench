@@ -43,7 +43,7 @@ export function IframePreviewFrame({
   className,
   fillContainer = false,
   containerSizeOverride,
-  sandbox = "allow-scripts",
+  sandbox = "allow-scripts allow-same-origin",
   configData,
   sessionId,
   demoId,
@@ -147,6 +147,18 @@ export function IframePreviewFrame({
   const handleLoad = useCallback(() => {
     onLoad?.();
     syncIframeConfig();
+
+    // 兼容性注入：旧项目发布的 iframe.html 可能不包含最新 Shell 模板的
+    // 滚动条隐藏样式，这里兜底隐藏滚动条但不改变 overflow 行为，保留滚动能力。
+    const doc = iframeRef.current?.contentDocument;
+    if (doc && doc.head) {
+      const style = doc.createElement("style");
+      style.textContent = `
+        ::-webkit-scrollbar { display: none; }
+        html, body { scrollbar-width: none; -ms-overflow-style: none; }
+      `;
+      doc.head.appendChild(style);
+    }
   }, [onLoad, syncIframeConfig]);
 
   return (

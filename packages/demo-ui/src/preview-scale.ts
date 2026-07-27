@@ -158,15 +158,17 @@ export function computePreviewScale(
     displayHeight = availableWidth / aspectRatio;
   }
 
-  const scale = displayWidth / designWidth;
+  const scale = Math.min(1, displayWidth / designWidth);
+  const wrapperWidth = designWidth * scale;
+  const wrapperHeight = designHeight * scale;
 
   return {
     designWidth,
     designHeight,
     scale,
     wrapperStyle: {
-      width: displayWidth,
-      height: displayHeight,
+      width: wrapperWidth,
+      height: wrapperHeight,
       margin: "auto",
       position: "relative",
       overflow: "hidden",

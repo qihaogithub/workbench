@@ -72,6 +72,7 @@ import {
 } from "@/components/demo";
 import { getDefaultValues, getPreviewSize } from "@/lib/validator";
 import type { PreviewSize } from "@workbench/demo-ui";
+import { getPrototypePreviewSize } from "@workbench/demo-ui";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1352,7 +1353,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                     html={activePage.prototypeHtml}
                     css={activePage.prototypeCss}
                     configData={configData}
-                    previewSize={previewSize ?? activePage.previewSize}
+                    previewSize={previewSize ?? activePage.previewSize ?? getPrototypePreviewSize(activePage.prototypeMeta)}
                     allowScroll
                   />
                 ) : activePage?.runtimeType === "sketch-scene" ? (

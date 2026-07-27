@@ -301,6 +301,18 @@ pnpm --filter @workbench/project-cli test
 - `scripts/development/` 只放开发期诊断、复现、采样和报告生成脚本；脚本可以调用 Playwright，但不作为正式回归用例的长期维护位置。
 - 当某个 `scripts/development/` 脚本需要长期纳入回归验证时，应迁移或补写为 `test/` 下的 Playwright spec，并通过根目录 `package.json` 暴露清晰的测试命令。
 
+## 浏览器自动化工具
+
+**优先使用 ego-lite / ego-browser，不再使用 Playwright 进行日常浏览器自动化。**
+
+- 需要浏览器访问、截图、数据抓取、表单操作、登录态复用等任务时，使用 `ego-browser`。
+- Playwright 仅保留给现有的 E2E 回归测试套件（`test/创作端E2E回归测试/`、`test/sketch-playground/`），不用于新的浏览器自动化任务。
+- `ego-browser` 命令由 macOS App `ego lite` 提供，位于 `~/.local/bin/ego-browser`。
+- **环境要求**：确保 `~/.local/bin` 在 PATH 中。验证命令：`export PATH="$HOME/.local/bin:$PATH" && command -v ego-browser`。
+- **基本调用方式**：通过 `Bash` 工具执行 `ego-browser nodejs <<'EOF' ... EOF` heredoc。所有 helpers（`useOrCreateTaskSpace`、`snapshotText`、`click`、`fillInput`、`captureScreenshot`、`js`、`cdp` 等）在 heredoc 中预加载。
+- 技能文档位于 `~/.local/share/ego/ego-skills/SKILL.md`（通过 `~/.agents/skills/ego-browser` 链接），包含完整的 helper 列表和工作流说明。
+- ego-browser 的优势：复用用户登录态、独立 Task Space 不干扰前台标签、代码优先（JavaScript 函数直接调用）比 CLI 驱动更快。
+
 ## 关键架构
 
 Auth：
