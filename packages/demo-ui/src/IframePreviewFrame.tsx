@@ -18,6 +18,8 @@ export interface IframePreviewFrameProps {
   sessionId?: string;
   demoId?: string;
   onLoad?: () => void;
+  effectiveHeight?: number;
+  onContentHeightChange?: (height: number) => void;
 }
 
 function getIframeOrigin(src: string): string | undefined {
@@ -46,12 +48,16 @@ export function IframePreviewFrame({
   sessionId,
   demoId,
   onLoad,
+  effectiveHeight,
+  onContentHeightChange,
 }: IframePreviewFrameProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [containerHeight, setContainerHeight] = useState(0);
+  const [measuredContentHeight, setMeasuredContentHeight] = useState<number | undefined>(undefined);
   const hasContainerSizeOverride = containerSizeOverride != null;
+  const resolvedEffectiveHeight = effectiveHeight ?? measuredContentHeight;
 
   const updateContainerSize = useCallback((width: number, height: number) => {
     const nextWidth = normalizeMeasuredSize(width);
@@ -100,6 +106,7 @@ export function IframePreviewFrame({
     effectiveContainerWidth,
     effectiveContainerHeight,
     fillContainer,
+    resolvedEffectiveHeight,
   );
 
   const syncIframeConfig = useCallback(() => {
@@ -119,7 +126,41 @@ export function IframePreviewFrame({
     syncIframeConfig();
   }, [syncIframeConfig]);
 
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.source !== iframeRef.current?.contentWindow) return;
+      if (
+        event.data?.type === "RESIZE" &&
+        typeof event.data?.height === "number"
+      ) {
+        const height = event.data.height as number;
+        if (effectiveHeight == null) {
+          setMeasuredContentHeight(height);
+        }
+        onContentHeightChange?.(height);
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [effectiveHeight, onContentHeightChange]);
+
   const handleLoad = useCallback(() => {
+    try {
+      const doc = iframeRef.current?.contentDocument;
+      if (doc) {
+        const style = doc.createElement("style");
+        style.textContent = `
+          html {
+            scrollbar-width: none !important;
+            -ms-overflow-style: none !important;
+          }
+          html::-webkit-scrollbar {
+            display: none !important;
+          }
+        `;
+        doc.head.appendChild(style);
+      }
+    } catch {}
     onLoad?.();
     syncIframeConfig();
   }, [onLoad, syncIframeConfig]);
@@ -129,6 +170,11 @@ export function IframePreviewFrame({
       ref={containerRef}
       className={cn("flex h-full w-full items-center justify-center", className)}
     >
+      <style>{`
+        .iframe-preview-frame::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
       <div
         style={wrapperStyle}
         className={fillContainer ? "relative" : "relative rounded-lg border border-border"}
@@ -138,8 +184,12 @@ export function IframePreviewFrame({
           title={title}
           src={src}
           sandbox={sandbox}
-          style={contentStyle}
-          className="bg-white"
+          style={{
+            ...contentStyle,
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
+          }}
+          className="bg-white iframe-preview-frame"
           onLoad={handleLoad}
         />
       </div>

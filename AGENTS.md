@@ -363,27 +363,6 @@ Docker：
 - 测试描述使用中文。
 - agent-service 导入顺序：Node 内置模块、外部依赖、内部相对路径。
 
-### config.schema.json 约定
-
-`oneOf` 变体可通过 `$demo.maxItems` 声明该类型最多可添加几个实例：
-
-```json
-{
-  "items": {
-    "oneOf": [
-      { "title": "图片模块", "properties": { "type": { "const": "image" } } },
-      { "title": "视频模块", "$demo": { "maxItems": 1 }, "properties": { "type": { "const": "video" } } },
-      { "title": "进度模块", "$demo": { "maxItems": 1 }, "properties": { "type": { "const": "progress" } } }
-    ]
-  }
-}
-```
-
-- `maxItems: 1` → 配置面板下拉菜单显示 `(1/1)`，已满变体灰显禁用
-- 不声明或 `maxItems: 0` → 不限制数量
-- 生成含"各只能添加一个"等数量约束的 schema 时，必须同步添加 `$demo.maxItems`
-- `$demo` 是项目已有的 JSON Schema 扩展键，`$demo.previewSize` 等已广泛使用
-
 ## 前端改动
 
 - 优先复用现有组件、Tailwind token 和 `cn()`。

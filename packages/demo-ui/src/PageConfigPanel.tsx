@@ -54,6 +54,7 @@ interface PageConfigPanelProps {
   className?: string;
   title?: string;
   hideDetailHeader?: boolean;
+  typeLimits?: Record<string, number>;
 }
 
 function getSortedPages(pages: PageConfigPanelPage[]) {
@@ -167,6 +168,7 @@ export function PageConfigPanel({
   className,
   title = "配置面板",
   hideDetailHeader = false,
+  typeLimits,
 }: PageConfigPanelProps) {
   const [internalDetailPageId, setInternalDetailPageId] = useState<
     string | null
@@ -422,6 +424,7 @@ export function PageConfigPanel({
                   sessionId={sessionId}
                   readonly={readonly}
                   configCategoryFilter={configCategoryFilter}
+                  typeLimits={typeLimits}
                 />
               </ConfigScopeWrapper>
             </section>
@@ -461,6 +464,7 @@ export function PageConfigPanel({
                   positionableItemSizes={positionableItemSizes}
                   readonly={readonly}
                   configCategoryFilter={configCategoryFilter}
+                  typeLimits={typeLimits}
                 />
               </ConfigScopeWrapper>
             </section>

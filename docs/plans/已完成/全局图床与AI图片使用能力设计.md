@@ -240,13 +240,15 @@ GET /api/images/img_abc123
 
 ### 5. 迁移策略
 
-| 阶段 | 内容 | 风险 |
-|------|------|------|
-| **Phase 1** | 实现全局图床核心（存储 + manifest + API），更新 saveImage 工具 | 新图不再写入 workspace 文件系统 |
-| **Phase 2** | 改造 `POST /api/sessions/:sessionId/assets/upload` 走全局图床 | FileUploadWidget 返回 `/api/images/{id}` URL |
-| **Phase 3** | 实现消息自动入库 | 需确保图床 API 已上线 |
-| **Phase 4** | 后台迁移脚本：扫描所有 `workspace/assets/images/` → SHA256 → 入全局图床 → images.json 加 `imageId` | 旧文件不删，双写期间可能重复引用 |
-| **Phase 5** | 全量验证后，清理旧 `workspace/assets/images/` 文件和可简化的路径重写代码 | 需确保所有引用已迁移 |
+| 阶段 | 内容 | 风险 | 状态 |
+|------|------|------|------|
+| **Phase 1** | 实现全局图床核心（存储 + manifest + API），更新 saveImage 工具 | 新图不再写入 workspace 文件系统 | ✅ 已完成 |
+| **Phase 2** | 改造 `POST /api/sessions/:sessionId/assets/upload` 和 `/assets/localize` 走全局图床 | FileUploadWidget 返回 `/api/images/{id}` URL | ✅ 已完成 |
+| **Phase 3** | 实现消息自动入库 | 需确保图床 API 已上线 | ✅ 已完成 |
+| **Phase 4** | 工作区代理 `GET /workspace/[...path]` fallback 到全局图床 | 存量兼容 | ✅ 已完成 |
+| **Phase 5** | listImages 输出加 imageId 字段 | 低风险 | ✅ 已完成 |
+| **Phase 6** | 后台迁移脚本：扫描所有 `workspace/assets/images/` → SHA256 → 入全局图床 → images.json 加 `imageId` | 旧文件不删，双写期间可能重复引用 | ⏳ 待实施 |
+| **Phase 7** | 全量验证后，清理旧 `workspace/assets/images/` 文件和可简化的路径重写代码 | 需确保所有引用已迁移 | ⏳ 远期 |
 
 ---
 

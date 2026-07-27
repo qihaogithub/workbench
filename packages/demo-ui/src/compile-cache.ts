@@ -1,9 +1,10 @@
 interface CompileResult {
-  compiledCode: string
-  dependencies: string[]
-  cssImports: string[]
-  moduleHash?: string
-  moduleUrl?: string
+  compiledCode: string;
+  dependencies: string[];
+  cssImports: string[];
+  moduleHash?: string;
+  moduleUrl?: string;
+  typeLimits?: Record<string, number>;
 }
 
 interface CacheEntry {

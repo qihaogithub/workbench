@@ -1,23 +1,21 @@
 import crypto from "crypto";
 import dns from "dns/promises";
-import fs from "fs";
+import path from "path";
 import http from "http";
 import https from "https";
 import net from "net";
-import path from "path";
 import { NextRequest, NextResponse } from "next/server";
 
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import {
   createApiError,
   createApiSuccess,
-  findWorkspacePath,
   getSessionMeta,
   isSessionExpired,
   sessionExists,
 } from "@/lib/fs-utils";
 import { addProjectImage, type ProjectImage } from "@/lib/project-images";
-import { commitWorkspaceMutation, stageWorkspaceBinary } from "@/lib/workspace-authority-client";
+import { uploadImage } from "@/lib/image-store";
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 const URL_DOWNLOAD_TIMEOUT_MS = 10_000;
@@ -345,74 +343,59 @@ export async function POST(
       extensionFromMime(image.mimeType) ||
       extensionFromUrl(originalUrl) ||
       ".png";
-    const filename = `${hashPrefix}-${filenameStemFromUrl(originalUrl)}${ext}`;
-    const workspaceAssetPath = `assets/images/${filename}`;
-    const workspacePath = findWorkspacePath(meta.workspaceId);
-    if (!workspacePath) {
-      return NextResponse.json(createApiError("FILE_READ_ERROR", "工作空间路径不存在"), { status: 500 });
-    }
-    const absoluteAssetPath = path.resolve(workspacePath, workspaceAssetPath);
-    if (!absoluteAssetPath.startsWith(`${path.resolve(workspacePath)}${path.sep}`)) {
-      return NextResponse.json(createApiError("FORBIDDEN", "禁止读取工作空间外路径"), { status: 403 });
-    }
-    const previousHash = fs.existsSync(absoluteAssetPath)
-      ? contentHash(fs.readFileSync(absoluteAssetPath))
-      : null;
-    const staged = await stageWorkspaceBinary({
+    const filename = `${filenameStemFromUrl(originalUrl)}${ext}`;
+
+    const uploadResult = await uploadImage({
+      buffer: image.buffer,
+      filename,
+      sourceType: sourceType === "remote_url" ? "remote_url" : "user_upload",
+      sourceUrl: originalUrl || undefined,
       projectId: meta.demoId,
-      workspaceId: meta.workspaceId,
-      sessionId,
-      content: image.buffer,
-    });
-    const receipt = await commitWorkspaceMutation({
-      mutationId: crypto.randomUUID(),
-      projectId: meta.demoId,
-      workspaceId: meta.workspaceId,
-      sessionId,
-      baseRevision: 0,
-      actor: "author-site",
-      reason: "localize_selected_asset",
-      operations: [{
-        type: "put_binary",
-        path: workspaceAssetPath,
-        stagingId: staged.stagingId,
-        hash: staged.hash,
-        size: staged.size,
-        ...(previousHash === null ? { expectedAbsent: true } : { expectedHash: previousHash }),
-      }],
+      createdBy: payload.userId,
     });
 
-    const relativePathFromPage = `../../${workspaceAssetPath}`;
-    const assetId = `asset_${hashPrefix}`;
-    const projectImage: ProjectImage = {
-      id: hashPrefix,
-      filename,
-      url: workspaceAssetPath,
-      size: image.buffer.length,
-      format: ext.slice(1),
-      createdAt: Date.now(),
-      createdBy: "user",
-      contentHash: hash,
-      mimeType: image.mimeType,
-      originalUrl: originalUrl || undefined,
-      sourceType,
-    };
-    addProjectImage(meta.demoId, projectImage);
+    if (!uploadResult.success) {
+      return NextResponse.json(
+        createApiError("UPLOAD_FAILED", uploadResult.error.message),
+        { status: 500 },
+      );
+    }
+
+    if (meta.demoId) {
+      const projectImage: ProjectImage = {
+        id: hashPrefix,
+        filename,
+        url: uploadResult.url,
+        size: uploadResult.sizeBytes,
+        format: ext.slice(1),
+        createdAt: Date.now(),
+        createdBy: "user",
+        contentHash: hash,
+        mimeType: uploadResult.mimeType,
+        originalUrl: originalUrl || undefined,
+        sourceType,
+      };
+      try {
+        addProjectImage(meta.demoId, projectImage);
+      } catch (manifestError) {
+        console.error("Failed to update project image manifest:", manifestError);
+      }
+    }
 
     return NextResponse.json(
       createApiSuccess({
-        assetId,
+        assetId: `asset_${hashPrefix}`,
+        imageId: uploadResult.imageId,
         contentHash: hash,
-        workspacePath: workspaceAssetPath,
-        relativePathFromPage,
-        editPreviewUrl: `/api/sessions/${sessionId}/workspace/${workspaceAssetPath}`,
-        mimeType: image.mimeType,
-        size: image.buffer.length,
+        workspacePath: uploadResult.url,
+        relativePathFromPage: uploadResult.url,
+        editPreviewUrl: uploadResult.url,
+        mimeType: uploadResult.mimeType,
+        size: uploadResult.sizeBytes,
         sourceType,
         originalUrl: originalUrl || undefined,
         pageId: typeof body.pageId === "string" ? body.pageId : undefined,
         runtimeType: typeof body.runtimeType === "string" ? body.runtimeType : undefined,
-        receipt,
       }),
     );
   } catch (error) {

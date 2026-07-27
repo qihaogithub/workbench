@@ -250,7 +250,7 @@ function resolveChildren(
   return parseProperties(itemProps, required);
 }
 
-export function parseSchemaToFields(schema: string): FieldGroup[] {
+export function parseSchemaToFields(schema: string, typeLimits?: Record<string, number>): FieldGroup[] {
   try {
     const parsed = JSON.parse(schema);
     const properties = parsed.properties || {};
@@ -301,6 +301,12 @@ export function parseSchemaToFields(schema: string): FieldGroup[] {
         ) {
           const oneOf = resolveOneOf(items);
           if (oneOf) {
+            if (typeLimits) {
+              for (const variant of oneOf.variants) {
+                const limit = typeLimits[variant.value];
+                if (limit != null) variant.maxItems = limit;
+              }
+            }
             field.oneOf = oneOf;
           } else {
             const children = resolveChildren(items);

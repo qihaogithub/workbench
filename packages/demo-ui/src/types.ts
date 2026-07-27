@@ -151,6 +151,7 @@ export interface ConfigFormProps {
   sessionId?: string;
   positionableItemSizes?: Record<string, PositionableSizeItem>;
   configCategoryFilter?: string;
+  typeLimits?: Record<string, number>;
 }
 
 export type PreviewMode = "single" | "canvas";

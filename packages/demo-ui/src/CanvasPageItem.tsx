@@ -375,6 +375,8 @@ export function CanvasPagePreviewContent({
             sessionId={sessionId}
             demoId={page.id}
             onLoad={handleIframeContentLoaded}
+            effectiveHeight={iframeEffectiveHeight}
+            onContentHeightChange={handleContentHeightChange}
           />
         </div>
       )}

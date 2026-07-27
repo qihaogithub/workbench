@@ -3,6 +3,8 @@
 import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { Trash2, Plus, Loader2, AlertTriangle, ZoomIn, Undo2 } from 'lucide-react';
 
+import { resolveConfigImageSrc } from './preview-config-utils';
+
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -272,7 +274,7 @@ export function ImageListWidget({
             className="relative w-[80px] h-[80px] rounded-lg border border-border bg-muted overflow-hidden group shrink-0"
           >
             <img
-              src={item.url}
+              src={resolveConfigImageSrc(item.url, sessionId)}
               alt={item.alt || '图片'}
               className="w-full h-full object-cover"
               onError={(e) => {

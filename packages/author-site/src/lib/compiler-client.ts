@@ -4,6 +4,7 @@ export interface CompileResult {
   cssImports?: string[];
   moduleHash?: string;
   moduleUrl?: string;
+  typeLimits?: Record<string, number>;
 }
 
 export interface CompileError {
