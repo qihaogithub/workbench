@@ -45,8 +45,8 @@ importers:
   OPS/CLI:
     dependencies:
       better-sqlite3:
-        specifier: 12.11.1
-        version: 12.11.1
+        specifier: 11.7.0
+        version: 11.7.0
       chalk:
         specifier: ^5.3.0
         version: 5.6.2
@@ -471,8 +471,8 @@ importers:
         specifier: ^3.0.3
         version: 3.0.3
       better-sqlite3:
-        specifier: 12.11.1
-        version: 12.11.1
+        specifier: 11.7.0
+        version: 11.7.0
       class-variance-authority:
         specifier: ^0.7.0
         version: 0.7.1
@@ -734,8 +734,8 @@ importers:
         specifier: workspace:*
         version: link:../knowledge-core
       better-sqlite3:
-        specifier: 12.11.1
-        version: 12.11.1
+        specifier: 11.7.0
+        version: 11.7.0
       fastify:
         specifier: ^4.26.0
         version: 4.29.1
@@ -3564,6 +3564,7 @@ packages:
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
+    libc: [glibc]
     requiresBuild: true
     optional: true
 
@@ -3572,6 +3573,7 @@ packages:
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
+    libc: [musl]
     requiresBuild: true
     optional: true
 
@@ -3580,6 +3582,7 @@ packages:
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
+    libc: [glibc]
     requiresBuild: true
     optional: true
 
@@ -3588,6 +3591,7 @@ packages:
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
+    libc: [musl]
     requiresBuild: true
     optional: true
 
@@ -7099,9 +7103,8 @@ packages:
     hasBin: true
     dev: false
 
-  /better-sqlite3@12.11.1:
-    resolution: {integrity: sha512-dq9AtApgg5PGFtBzPFSBl3HZQjHok5gaQCM6zh2Yk0aSmDCs1CbnVI8/HgASQkNKsWFpseIO9beg5xxpYhbIfA==}
-    engines: {node: 20.x || 22.x || 23.x || 24.x || 25.x || 26.x}
+  /better-sqlite3@11.7.0:
+    resolution: {integrity: sha512-mXpa5jnIKKHeoGzBrUJrc65cXFKcILGZpU3FXR0pradUEm9MA7UZz02qfEejaMcm9iXrSOCenwwYMJ/tZ1y5Ig==}
     requiresBuild: true
     dependencies:
       bindings: 1.5.0
