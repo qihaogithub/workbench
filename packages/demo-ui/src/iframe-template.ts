@@ -1616,16 +1616,11 @@ export function generateIframeHtml(
   <link rel="dns-prefetch" href="${cdnBase}">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { overflow: hidden; }
     body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; background-color: #ffffff; }
     #root { min-height: 100vh; }
 
-    ::-webkit-scrollbar { width: 4px; height: 4px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.2); border-radius: 2px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.35); }
-
-    * { scrollbar-width: thin; scrollbar-color: rgba(0, 0, 0, 0.2) transparent; }
+    ::-webkit-scrollbar { display: none; }
+    html, body { scrollbar-width: none; -ms-overflow-style: none; }
   </style>
 ${cssLinks}
   <script type="importmap">

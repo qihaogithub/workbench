@@ -63,6 +63,7 @@ export {
   getPreviewSize,
   isSchemaEmpty,
 } from "./validator";
+export { getPrototypePreviewSize } from "./prototype-preview-size";
 export {
   BUILT_IN_CONFIG_CATEGORIES,
   configFieldMatchesCategoryFilter,
