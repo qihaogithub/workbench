@@ -2055,6 +2055,14 @@ const workspaceWriteAllowlist = new Map([
     "scripts/development/test-ai-workspace-refresh.mjs",
     "development report output only",
   ],
+  [
+    "scripts/migrate-legacy-template-projects.mjs",
+    "legacy template migration operates on data/templates and data/projects outside live Workspace",
+  ],
+  [
+    "scripts/migrate-legacy-template-projects.test.mjs",
+    "isolated temporary migration test fixtures only",
+  ],
 ]);
 
 const scannedWriteFiles = [

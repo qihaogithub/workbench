@@ -44,6 +44,42 @@ jest.mock("@/lib/image-store", () => ({
   uploadImage: jest.fn(),
 }));
 
+const stageWorkspaceBinary = jest.fn(async () => ({
+  stagingId: "stage-1",
+  hash: "hash-1",
+  size: 10,
+}));
+const commitWorkspaceMutation = jest.fn(async () => ({
+  committed: true,
+  mutationId: "mutation-test",
+  projectId: "project-1",
+  workspaceId: "workspace-1",
+  baseRevision: 0,
+  revision: 2,
+  rootHash: "root-hash",
+  actor: "author-site",
+  resources: [],
+  committedAt: Date.now(),
+}));
+class MockWorkspaceAuthorityClientError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+jest.mock("@/lib/workspace-authority-client", () => ({
+  stageWorkspaceBinary,
+  commitWorkspaceMutation,
+  WorkspaceAuthorityClientError: MockWorkspaceAuthorityClientError,
+}));
+
+jest.mock("@/lib/live-workspace-route-context", () => ({
+  isLiveWorkspacePath: jest.fn(() => true),
+}));
+
 class TestResponse {
   status: number;
   headers: Headers;
@@ -83,7 +119,7 @@ describe("selected image localize route", () => {
     global.Response = originalResponse;
   });
 
-  it("使用浏览器 Blob 通过全局图床上传并登记项目图片", async () => {
+  it("使用浏览器 Blob 通过 Authority 提交 workspace asset 并登记项目图片", async () => {
     const fs = await import("fs");
     const projectImages = await import("@/lib/project-images");
     const { uploadImage } = await import("@/lib/image-store");
@@ -139,6 +175,20 @@ describe("selected image localize route", () => {
       createdBy: "user-1",
     }));
     expect(fs.writeFileSync).not.toHaveBeenCalled();
+    expect(stageWorkspaceBinary).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: "project-1",
+        workspaceId: "workspace-1",
+        sessionId: "session-1",
+        content: Buffer.from("image-bytes"),
+      }),
+    );
+    expect(commitWorkspaceMutation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reason: "localize_selected_asset",
+        operations: [expect.objectContaining({ type: "put_binary" })],
+      }),
+    );
     expect(projectImages.addProjectImage).toHaveBeenCalledWith(
       "project-1",
       expect.objectContaining({

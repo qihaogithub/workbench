@@ -76,7 +76,7 @@ function toToolIssue(file: string, pageId: string, issue: RuntimeContractIssue):
   return { ...issue, pageId, file };
 }
 
-const MAX_PROTOTYPE_HTML_LENGTH = 200_000;
+const MAX_PROTOTYPE_HTML_LENGTH = 2_000_000;
 const MAX_PROTOTYPE_CSS_LENGTH = 120_000;
 const PROTOTYPE_GLOBAL_SELECTOR_RE = /(^|[,{;]\s*)(html|body|:root)\b/i;
 
@@ -122,7 +122,7 @@ function toPrototypeToolValidation(
   if (html.length > MAX_PROTOTYPE_HTML_LENGTH) {
     addIssue(
       'PROTOTYPE_HTML_TOO_LARGE',
-      '原型页 HTML 超过 MVP 限制',
+      `HTML 过大（${html.length}/${MAX_PROTOTYPE_HTML_LENGTH} 字符）`,
       '请压缩 HTML 结构，避免一次写入过大的页面内容。',
       'repair_prototype',
     );
@@ -130,7 +130,7 @@ function toPrototypeToolValidation(
   if (css.length > MAX_PROTOTYPE_CSS_LENGTH) {
     addIssue(
       'PROTOTYPE_CSS_TOO_LARGE',
-      '原型页 CSS 超过 MVP 限制',
+      `CSS 过大（${css.length}/${MAX_PROTOTYPE_CSS_LENGTH} 字符）`,
       '请压缩 CSS，移除不必要的样式规则。',
       'repair_prototype',
     );

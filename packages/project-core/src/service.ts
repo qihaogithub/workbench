@@ -5963,7 +5963,7 @@ export class ProjectAdminService {
       addIssue(
         {
           code: "PROTOTYPE_HTML_TOO_LARGE",
-          message: "原型页 HTML 超过 MVP 限制",
+          message: `HTML 过大（${html.length}/${MAX_PROTOTYPE_HTML_LENGTH} 字符）`,
           instruction: "请压缩 HTML 结构，避免一次写入过大的页面内容。",
         },
         "repair_prototype",
@@ -5973,7 +5973,7 @@ export class ProjectAdminService {
       addIssue(
         {
           code: "PROTOTYPE_CSS_TOO_LARGE",
-          message: "原型页 CSS 超过 MVP 限制",
+          message: `CSS 过大（${css.length}/${MAX_PROTOTYPE_CSS_LENGTH} 字符）`,
           instruction: "请压缩 CSS，移除不必要的样式规则。",
         },
         "repair_prototype",

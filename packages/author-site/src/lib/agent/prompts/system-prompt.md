@@ -353,6 +353,42 @@ export default function Demo({
 - 用户明确要求配置项时，每个属性有合理的 default 值
 - 用户明确要求配置项时，充分利用配置系统能力：图片字段用 `format: "image"`、颜色字段用 `format: "color"`、枚举用 `enum` + `enumNames`
 - **图片尺寸校验**：只有当用户明确要求图片配置项且图片有明确尺寸要求时，才在 `ui:options` 中添加 `minWidth`/`minHeight`/`maxWidth`/`maxHeight` 约束
+- **模块数量限制**：当配置字段为模块数组（`type: "array"` + `items.oneOf`）时，若某模块类型有数量上限，在该 variant 上声明 `"$demo": { "maxItems": N }`（单例模块写 `1`）；未声明 `maxItems` 的模块类型视为不限数量。声明后配置面板会自动置灰添加按钮并显示 `(n/max)`，**页面代码无需再为该类型编写去重逻辑**；`default` 数组中各类型的数量也必须符合 `maxItems` 约束。`$demo.maxItems` 是模块数量元数据，不属于“配置字段增删”，创建模块数组时应主动声明，无需用户逐条指示：
+
+```json
+{
+  "modules": {
+    "type": "array",
+    "title": "模块列表",
+    "items": {
+      "oneOf": [
+        {
+          "title": "图片模块",
+          "properties": { "type": { "const": "image" }, "imageUrl": { "type": "string", "format": "image", "title": "图片" } },
+          "required": ["type"]
+        },
+        {
+          "title": "视频模块",
+          "$demo": { "maxItems": 1 },
+          "properties": { "type": { "const": "video" }, "videoCover": { "type": "string", "format": "image", "title": "视频封面" } },
+          "required": ["type"]
+        },
+        {
+          "title": "进度模块",
+          "$demo": { "maxItems": 1 },
+          "properties": { "type": { "const": "progress" }, "progressBgTop": { "type": "string", "format": "image", "title": "进度背景-上" } },
+          "required": ["type"]
+        }
+      ]
+    },
+    "default": [
+      { "type": "image", "imageUrl": "" },
+      { "type": "progress", "progressBgTop": "" },
+      { "type": "video", "videoCover": "" }
+    ]
+  }
+}
+```
 
 ## 知识库查阅
 

@@ -106,7 +106,8 @@ export function normalizeCanvasPageLayout(
     return {
       ...layout,
       width: size.width,
-      height: Math.max(layout.height, size.height),
+      // 保留内容驱动持久化的高度（可能低于设计高度），不再顶回设计高度
+      height: layout.height,
       sizeMode: "preview",
       previewSizeKey,
     };
@@ -156,10 +157,6 @@ export function resolveCanvasContentHeightLayout(
   measuredWidth?: number,
 ): CanvasPageLayout | null {
   const size = resolveCanvasPageSize(page.previewSize);
-  if (contentHeight <= size.height) {
-    return null;
-  }
-
   const previewSizeKey = getCanvasPreviewSizeKey(page.previewSize);
   const sourceWidth =
     measuredWidth && Number.isFinite(measuredWidth) && measuredWidth > 0

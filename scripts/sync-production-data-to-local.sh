@@ -187,7 +187,7 @@ echo "APP_DATA_DIR=$app_data_dir"
 test -d "$app_data_dir"
 du -sh "$app_data_dir"
 find "$app_data_dir" -maxdepth 1 -mindepth 1 | wc -l
-find "$app_data_dir" -maxdepth 1 -mindepth 1 -printf '%f\n' | sort
+find "$app_data_dir" -maxdepth 1 -mindepth 1 -exec basename {} \; | sort
 REMOTE
 }
 
