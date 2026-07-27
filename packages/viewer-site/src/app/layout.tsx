@@ -14,7 +14,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-CN" className="h-full">
-      <body className="h-full antialiased">
+      <body className="h-full overflow-hidden antialiased">
         <TooltipProvider>{children}</TooltipProvider>
       </body>
     </html>
