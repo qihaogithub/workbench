@@ -1376,7 +1376,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
           </div>
         </div>
 
-        {hasSchema && (
+        {hasSchema && !aiDrawerOpen && (
           <div className="w-80 border-l border-border shrink-0 flex flex-col">
             <PageConfigPanel
               pages={project.demoPages.map((page) => ({
