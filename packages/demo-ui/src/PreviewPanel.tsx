@@ -133,24 +133,6 @@ async function readCompileResponse(
   throw new Error(`编译服务返回非 JSON 响应（${status}）${suffix}`);
 }
 
-function hideIframeScrollbar(iframe: HTMLIFrameElement) {
-  try {
-    const doc = iframe.contentDocument;
-    if (!doc) return;
-    const style = doc.createElement("style");
-    style.textContent = `
-      html {
-        scrollbar-width: none !important;
-        -ms-overflow-style: none !important;
-      }
-      html::-webkit-scrollbar {
-        display: none !important;
-      }
-    `;
-    doc.head.appendChild(style);
-  } catch {}
-}
-
 function sanitizeStaticPrototypeElement(root: HTMLElement) {
   const blockedSelectors = "script, iframe, embed, object";
   root.querySelectorAll(blockedSelectors).forEach((node) => node.remove());
@@ -1365,7 +1347,6 @@ export function PreviewPanel({
 
     const handleLoad = () => {
       reportTiming("iframe_load_event");
-      hideIframeScrollbar(iframe);
     };
 
     iframe.addEventListener("load", handleLoad);

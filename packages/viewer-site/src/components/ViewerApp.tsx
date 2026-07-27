@@ -1189,7 +1189,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
     : "";
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-background">
+    <div className="flex flex-col h-full">
       <Header
         name={project.name}
         onBack={() => router.push("/")}
@@ -1265,7 +1265,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
         )}
 
         <div className="flex-1 min-w-0 overflow-hidden">
-          <div className="flex flex-col h-full">
+    <div className="flex flex-col h-screen overflow-hidden bg-background">
             {project.demoPages.length >= 1 && (
               <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0">
                 <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
