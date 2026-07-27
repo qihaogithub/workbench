@@ -748,12 +748,17 @@ export async function PUT(
         },
       );
       if (!runtimeValidation.ok) {
+        const failureReason = runtimeValidation.issues
+          .map((issue) => issue.message)
+          .filter(Boolean)
+          .join("；");
+        const baseMessage = isSketchPage
+          ? "手绘页面校验未通过，暂不保存"
+          : "原型页校验未通过，暂不保存";
         return NextResponse.json(
           createApiError(
             "VALIDATION_ERROR",
-            isSketchPage
-              ? "手绘页面校验未通过，暂不保存页面文件"
-              : "原型页校验未通过，暂不保存页面文件",
+            failureReason ? `${baseMessage}：${failureReason}` : baseMessage,
             { runtimeValidation },
           ),
           { status: 422 },

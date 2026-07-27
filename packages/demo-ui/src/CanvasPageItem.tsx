@@ -76,6 +76,8 @@ interface CanvasPagePreviewContentProps {
 
 const MIN_SIZE = 100;
 const MAX_SIZE = 2000;
+// 内容高度测量下限：低于该值视为初始空白/加载态，忽略以避免卡片塌陷闪烁
+const MIN_MEASURED_CONTENT_HEIGHT = 50;
 const EDGE_HIT_SIZE = 8; // 边框热区宽度（px）
 const CORNER_HIT_SIZE = 16; // 角点判定范围（px）
 const PAGE_LABEL_SCREEN_FONT_SIZE = 12;
@@ -234,14 +236,18 @@ export function CanvasPagePreviewContent({
 
   const handleContentHeightChange = useCallback(
     (newContentHeight: number, measuredWidth?: number) => {
+      // 过滤初始空白/加载态的极小测量值，避免卡片先塌陷再回弹
+      if (newContentHeight < MIN_MEASURED_CONTENT_HEIGHT) return;
+
       const designHeight = parsePreviewSizeValue(page.previewSize?.height, 812);
 
-      if (newContentHeight <= designHeight) {
-        if (contentHeight !== null) setContentHeight(null);
-        return;
+      // 高于设计高度时记录测量值用于抬升 iframe 渲染高度；否则清空
+      if (newContentHeight > designHeight) {
+        setContentHeight(newContentHeight);
+      } else {
+        setContentHeight(null);
       }
 
-      setContentHeight(newContentHeight);
       const currentLayout = layoutRef.current;
       const nextLayout = resolveCanvasContentHeightLayout(
         page,
@@ -252,7 +258,7 @@ export function CanvasPagePreviewContent({
 
       if (nextLayout) onLayoutChange?.(page.id, nextLayout);
     },
-    [page, onLayoutChange, contentHeight],
+    [page, onLayoutChange],
   );
 
   const handleScreenshotLoad = useCallback(() => {
@@ -279,7 +285,7 @@ export function CanvasPagePreviewContent({
     layoutDerivedContentHeight,
   );
   const iframeEffectiveHeight =
-    effectiveHeight > designHeight + 1 ? effectiveHeight : undefined;
+    Math.abs(effectiveHeight - designHeight) > 1 ? effectiveHeight : undefined;
   const containerSizeOverride = {
     width: Math.max(layout.width, 1),
     height: Math.max(layout.height, 1),

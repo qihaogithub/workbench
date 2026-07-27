@@ -35,8 +35,10 @@ export function computePreviewScale(
   const effectiveSize = size ?? DEFAULT_PREVIEW_SIZE;
   const designWidth = parseSizeValue(effectiveSize.width) ?? 375;
   const designHeight = parseSizeValue(effectiveSize.height) ?? 812;
-  const useEffectiveHeight = effectiveHeight != null && effectiveHeight > designHeight;
-  const contentHeight = useEffectiveHeight ? effectiveHeight : designHeight;
+  const useEffectiveHeight = effectiveHeight != null && effectiveHeight !== designHeight;
+  // 内容高于设计高度时抬升渲染高度；低于时仍保持设计高度渲染（由外层裁剪），
+  // 以保留页面内 100vh 语义并避免测量反馈回路
+  const contentHeight = useEffectiveHeight ? Math.max(designHeight, effectiveHeight) : designHeight;
 
   if (fillContainer) {
     if (containerWidth && containerHeight) {

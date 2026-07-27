@@ -84,9 +84,17 @@ describe("canvas layout normalization", () => {
       height: 821.2045058359861,
     };
 
+    // 内容高度等于设计高度时，将过期尺寸归一化回设计尺寸（而非用过期宽度放大）
     expect(
       resolveCanvasContentHeightLayout(page, staleLayout, 749, 1133),
-    ).toBeNull();
+    ).toEqual({
+      x: 0,
+      y: 0,
+      width: 1133,
+      height: 749,
+      sizeMode: "preview",
+      previewSizeKey: "1133x749",
+    });
 
     expect(
       resolveCanvasContentHeightLayout(page, staleLayout, 900, 1133),
@@ -98,5 +106,42 @@ describe("canvas layout normalization", () => {
       sizeMode: "preview",
       previewSizeKey: "1133x749",
     });
+  });
+
+  it("内容高度小于设计高度时布局收缩到内容高度", () => {
+    const page = makePage("short");
+    const layout: CanvasPageLayout = {
+      x: 0,
+      y: 0,
+      width: 1133,
+      height: 749,
+      sizeMode: "preview",
+      previewSizeKey: getCanvasPreviewSizeKey(page.previewSize),
+    };
+
+    expect(resolveCanvasContentHeightLayout(page, layout, 500, 1133)).toEqual({
+      x: 0,
+      y: 0,
+      width: 1133,
+      height: 500,
+      sizeMode: "preview",
+      previewSizeKey: "1133x749",
+    });
+  });
+
+  it("内容高度等于设计高度且布局已正确时不产生空更新", () => {
+    const page = makePage("exact");
+    const layout: CanvasPageLayout = {
+      x: 0,
+      y: 0,
+      width: 1133,
+      height: 749,
+      sizeMode: "preview",
+      previewSizeKey: getCanvasPreviewSizeKey(page.previewSize),
+    };
+
+    expect(
+      resolveCanvasContentHeightLayout(page, layout, 749, 1133),
+    ).toBeNull();
   });
 });

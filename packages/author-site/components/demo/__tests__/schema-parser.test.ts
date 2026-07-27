@@ -303,4 +303,65 @@ describe("parseSchemaToFields", () => {
     expect(field.children).toHaveLength(1);
     expect(field.children![0].key).toBe("label");
   });
+
+  it("schema 声明的 $demo.maxItems 优先于代码探测的 typeLimits", () => {
+    const schema = JSON.stringify({
+      type: "object",
+      properties: {
+        modules: {
+          type: "array",
+          title: "模块列表",
+          items: {
+            type: "object",
+            oneOf: [
+              {
+                title: "视频模块",
+                $demo: { maxItems: 1 },
+                properties: { type: { const: "video" } },
+                required: ["type"],
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    // 代码探测出 video 限制为 5，schema 声明为 1，应以 schema 为准
+    const groups = parseSchemaToFields(schema, { video: 5 });
+    const oneOf = groups[0].fields[0].oneOf!;
+    expect(oneOf.variants[0].maxItems).toBe(1);
+  });
+
+  it("schema 未声明 $demo.maxItems 时，代码探测的 typeLimits 正常兜底", () => {
+    const schema = JSON.stringify({
+      type: "object",
+      properties: {
+        modules: {
+          type: "array",
+          title: "模块列表",
+          items: {
+            type: "object",
+            oneOf: [
+              {
+                title: "视频模块",
+                properties: { type: { const: "video" } },
+                required: ["type"],
+              },
+              {
+                title: "图片模块",
+                properties: { type: { const: "image" } },
+                required: ["type"],
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    // 仅 video 被代码探测出限制，image 未探测到
+    const groups = parseSchemaToFields(schema, { video: 1 });
+    const oneOf = groups[0].fields[0].oneOf!;
+    expect(oneOf.variants[0].maxItems).toBe(1);
+    expect(oneOf.variants[1].maxItems).toBeUndefined();
+  });
 });

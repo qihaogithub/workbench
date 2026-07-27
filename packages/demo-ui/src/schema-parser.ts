@@ -303,8 +303,11 @@ export function parseSchemaToFields(schema: string, typeLimits?: Record<string, 
           if (oneOf) {
             if (typeLimits) {
               for (const variant of oneOf.variants) {
-                const limit = typeLimits[variant.value];
-                if (limit != null) variant.maxItems = limit;
+                // schema 声明的 $demo.maxItems 是单一真相源；代码探测值仅在未声明时兜底
+                if (variant.maxItems == null) {
+                  const limit = typeLimits[variant.value];
+                  if (limit != null) variant.maxItems = limit;
+                }
               }
             }
             field.oneOf = oneOf;

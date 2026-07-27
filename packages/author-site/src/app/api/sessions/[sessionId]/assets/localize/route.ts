@@ -16,6 +16,13 @@ import {
 } from "@/lib/fs-utils";
 import { addProjectImage, type ProjectImage } from "@/lib/project-images";
 import { uploadImage } from "@/lib/image-store";
+import {
+  stageWorkspaceBinary,
+  commitWorkspaceMutation,
+  WorkspaceAuthorityClientError,
+} from "@/lib/workspace-authority-client";
+import { isLiveWorkspacePath } from "@/lib/live-workspace-route-context";
+import { findWorkspacePath } from "@/lib/fs-utils";
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 const URL_DOWNLOAD_TIMEOUT_MS = 10_000;
@@ -379,6 +386,44 @@ export async function POST(
         addProjectImage(meta.demoId, projectImage);
       } catch (manifestError) {
         console.error("Failed to update project image manifest:", manifestError);
+      }
+    }
+
+    // Live Workspace: write through Authority (stage binary + commit mutation)
+    if (meta.workspaceId) {
+      const wsPath = findWorkspacePath(meta.workspaceId);
+      if (wsPath && isLiveWorkspacePath(wsPath)) {
+        try {
+          const stagingReceipt = await stageWorkspaceBinary({
+            projectId: meta.demoId,
+            workspaceId: meta.workspaceId,
+            sessionId,
+            content: image.buffer,
+          });
+          await commitWorkspaceMutation({
+            mutationId: crypto.randomUUID(),
+            projectId: meta.demoId,
+            workspaceId: meta.workspaceId,
+            sessionId,
+            baseRevision: 0,
+            actor: "author-site",
+            reason: "localize_selected_asset",
+            operations: [{
+              type: "put_binary",
+              path: `assets/images/${filename}`,
+              stagingId: stagingReceipt.stagingId,
+              hash: stagingReceipt.hash,
+              size: stagingReceipt.size,
+              expectedAbsent: true,
+            }],
+          });
+        } catch (authorityError) {
+          if (authorityError instanceof WorkspaceAuthorityClientError) {
+            console.error("Workspace Authority failed for asset localize:", authorityError);
+          } else {
+            throw authorityError;
+          }
+        }
       }
     }
 

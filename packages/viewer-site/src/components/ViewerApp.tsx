@@ -1257,7 +1257,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
 
         <div className="flex-1 min-w-0 overflow-hidden">
           <PreviewStage
-            className="h-screen bg-background"
+            className="h-full bg-background"
             pages={previewStagePages}
             activePageId={activePageId}
             onActivePageChange={handlePageChange}

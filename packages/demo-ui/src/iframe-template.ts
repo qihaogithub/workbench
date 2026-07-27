@@ -1617,7 +1617,6 @@ export function generateIframeHtml(
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; background-color: #ffffff; }
-    #root { min-height: 100vh; }
 
     ::-webkit-scrollbar { display: none; }
     html, body { scrollbar-width: none; -ms-overflow-style: none; }
