@@ -1503,6 +1503,11 @@ export function PreviewPanel({
           clearVisualSelection();
         }}
       >
+        <style>{`
+          .preview-panel-iframe::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
         {iframeSrcUrl && (
           <div
             style={wrapperStyle}
@@ -1550,10 +1555,13 @@ export function PreviewPanel({
               ref={iframeRef}
               sandbox="allow-scripts allow-same-origin"
               src={iframeSrcUrl}
+              className="preview-panel-iframe"
               style={{
                 ...contentStyle,
                 opacity: contentLoaded ? 1 : 0,
                 transition: "opacity 0.2s ease-in-out",
+                scrollbarWidth: "none",
+                msOverflowStyle: "none",
               }}
               title="预览"
             />
