@@ -36,7 +36,7 @@
     "check:knowledge-core": "corepack pnpm --filter @workbench/knowledge-core typecheck && corepack pnpm --filter @workbench/knowledge-core test",
     "check:knowledge-service": "corepack pnpm --filter @workbench/knowledge-service typecheck && corepack pnpm --filter @workbench/knowledge-service test",
     "check:viewer": "corepack pnpm --filter @workbench/viewer-site typecheck && corepack pnpm --filter @workbench/viewer-site test && node scripts/check-viewer-contracts.mjs",
-    "check:demo-ui": "corepack pnpm --filter @workbench/demo-ui typecheck",
+    "check:demo-ui": "corepack pnpm --filter @workbench/demo-ui typecheck && corepack pnpm --filter @workbench/demo-ui test",
     "check:agent-client": "corepack pnpm --filter @workbench/agent-client typecheck",
     "check:ai-chat-shared": "corepack pnpm --filter @workbench/ai-chat-shared typecheck",
     "check:sketch-core": "corepack pnpm --filter @workbench/sketch-core typecheck && corepack pnpm --filter @workbench/sketch-core test",

@@ -4,11 +4,15 @@ export type {
   PreviewSize,
   CanvasToolMode,
   CanvasInteractionMode,
+  CanvasPageRuntimeType,
   CanvasState,
   CanvasPageData,
   CanvasViewportState,
   CanvasPageLayout,
   PreviewCanvasProps,
+  PreviewStagePage,
+  PreviewStageProps,
+  SinglePagePreviewProps,
 } from "@workbench/demo-ui";
 export {
   PreviewPanel,
@@ -40,6 +44,9 @@ export {
   generateIframeHtml,
   buildIframeHtml,
   PreviewCanvas,
+  PreviewStage,
+  PreviewStageToolbar,
+  SinglePagePreview,
   PrototypePagePreview,
   IframePreviewFrame,
   CanvasViewport,
@@ -61,4 +68,6 @@ export type {
   FileUploadWidgetProps,
   DemoMeta,
   DemoSchema,
+  PreviewStageRenderContext,
+  SinglePageRendererProps,
 } from "@workbench/demo-ui";

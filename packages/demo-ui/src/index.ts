@@ -49,6 +49,16 @@ export type {
   VisualStyleChange,
   AppActionPayload,
 } from "./types";
+export type { IframePreviewFrameProps } from "./IframePreviewFrame";
+export type { PrototypePagePreviewProps } from "./PrototypePagePreview";
+export type { SketchPagePreviewProps } from "./SketchPagePreview";
+export type {
+  PreviewStagePage,
+  SinglePageRendererProps,
+  SinglePagePreviewProps,
+  PreviewStageRenderContext,
+  PreviewStageProps,
+} from "./preview-stage-types";
 export type {
   IframeOutMessageType,
   IframeInMessageType,
@@ -115,6 +125,17 @@ export type {
   OneOfVariant,
 } from "./schema-parser";
 export { PreviewPanel } from "./PreviewPanel";
+export { SinglePagePreview } from "./SinglePagePreview";
+export {
+  normalizePreviewStagePage,
+  normalizePreviewStagePages,
+  resolvePagePreviewRenderer,
+  resolvePreviewStageSize,
+} from "./preview-stage-resolver";
+export type { PagePreviewRendererKind } from "./preview-stage-resolver";
+export { PreviewStageToolbar } from "./PreviewStageToolbar";
+export type { PreviewStageToolbarProps } from "./PreviewStageToolbar";
+export { PreviewStage } from "./PreviewStage";
 export {
   INITIAL_PREVIEW_REQUEST_STATE,
   isPreviewRequestPending,

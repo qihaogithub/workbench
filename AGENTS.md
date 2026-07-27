@@ -186,6 +186,7 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h
 | ------------------------------- | ------------------------------ | ------------------------------------------------------ | ---- | ------------------------ |
 | `@workbench/author-site`        | `packages/author-site/`        | Next.js 14 App Router                                  | 3200 | Jest + Testing Library   |
 | `@workbench/viewer-site`        | `packages/viewer-site/`        | Next.js 14 App Router                                  | 3300 | 无包内测试脚本           |
+| `@workbench/demo-ui`            | `packages/demo-ui/`            | 创作端与使用端共享预览组件                             | -    | Vitest + Testing Library |
 | `@workbench/shared`             | `packages/shared/`             | 共享类型和常量                                         | -    | 无测试脚本               |
 | `@workbench/sketch-core`        | `packages/sketch-core/`        | 草图页协议、校验、patch、几何、只读渲染                | -    | Vitest                   |
 | `@workbench/sketch-react`       | `packages/sketch-react/`       | 草图页 React SDK：画布、工具栏、图层、属性栏和编辑状态 | -    | Vitest + Testing Library |
@@ -224,6 +225,7 @@ pnpm lint
 pnpm typecheck
 pnpm typecheck:viewer
 pnpm check:author
+pnpm check:demo-ui
 pnpm check:agent
 pnpm check:screenshot
 pnpm check:sketch-core
@@ -274,6 +276,10 @@ pnpm --filter @workbench/sketch-playground typecheck
 # viewer-site
 pnpm --filter @workbench/viewer-site typecheck
 pnpm --filter @workbench/viewer-site build
+
+# demo-ui
+pnpm --filter @workbench/demo-ui typecheck
+pnpm --filter @workbench/demo-ui test
 
 # project-core
 pnpm --filter @workbench/project-core typecheck
@@ -416,6 +422,7 @@ Docker：
 选择最小但足够的验证：
 
 - author-site UI 或 API：`pnpm check:author`；只需要类型检查时可用 `pnpm typecheck`。
+- demo-ui：`pnpm check:demo-ui`；若改动共享预览入口，还需按消费者运行 `pnpm check:author` 和 `pnpm check:viewer`。
 - viewer-site：`pnpm check:viewer`，必要时 `pnpm build:viewer`。
 - sketch-core：`pnpm check:sketch-core`。
 - sketch-react：`pnpm check:sketch-react`；如果改动影响 author-site 草图编辑态，也运行 `pnpm check:author` 和 `pnpm test:e2e -- sketch-page-regression.spec.ts`。

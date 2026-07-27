@@ -709,6 +709,12 @@ importers:
         specifier: ^2.2.0
         version: 2.6.1
     devDependencies:
+      '@testing-library/jest-dom':
+        specifier: ^6.9.1
+        version: 6.9.1
+      '@testing-library/react':
+        specifier: ^16.3.2
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@18.3.7)(@types/react@18.3.28)(react-dom@18.3.1)(react@18.3.1)
       '@types/markdown-it':
         specifier: ^14.1.2
         version: 14.1.2
@@ -718,6 +724,12 @@ importers:
       '@types/react-dom':
         specifier: ^18.2.18
         version: 18.3.7(@types/react@18.3.28)
+      jsdom:
+        specifier: ^26.1.0
+        version: 26.1.0
+      vitest:
+        specifier: ^1.6.1
+        version: 1.6.1(jsdom@26.1.0)
 
   packages/knowledge-core:
     devDependencies:
@@ -726,7 +738,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^1.6.1
-        version: 1.6.1(@types/node@20.19.37)
+        version: 1.6.1(jsdom@26.1.0)
 
   packages/knowledge-service:
     dependencies:
@@ -998,7 +1010,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^1.6.1
-        version: 1.6.1(@types/node@20.19.37)
+        version: 1.6.1(jsdom@26.1.0)
 
   packages/viewer-site:
     dependencies:
@@ -10744,7 +10756,7 @@ packages:
       whatwg-encoding: 3.1.1
       whatwg-mimetype: 4.0.0
       whatwg-url: 14.2.0
-      ws: 8.20.0
+      ws: 8.21.0
       xml-name-validator: 5.0.0
     transitivePeerDependencies:
       - bufferutil
@@ -14947,6 +14959,63 @@ packages:
       - terser
     dev: true
 
+  /vitest@1.6.1(jsdom@26.1.0):
+    resolution: {integrity: sha512-Ljb1cnSJSivGN0LqXd/zmDbWEM0RNNg2t1QW/XUhYl/qPqyu7CsqeWtqQXHVaJsecLPuDoak2oJcZN2QoRIOag==}
+    engines: {node: ^18.0.0 || >=20.0.0}
+    hasBin: true
+    peerDependencies:
+      '@edge-runtime/vm': '*'
+      '@types/node': ^18.0.0 || >=20.0.0
+      '@vitest/browser': 1.6.1
+      '@vitest/ui': 1.6.1
+      happy-dom: '*'
+      jsdom: '*'
+    peerDependenciesMeta:
+      '@edge-runtime/vm':
+        optional: true
+      '@types/node':
+        optional: true
+      '@vitest/browser':
+        optional: true
+      '@vitest/ui':
+        optional: true
+      happy-dom:
+        optional: true
+      jsdom:
+        optional: true
+    dependencies:
+      '@vitest/expect': 1.6.1
+      '@vitest/runner': 1.6.1
+      '@vitest/snapshot': 1.6.1
+      '@vitest/spy': 1.6.1
+      '@vitest/utils': 1.6.1
+      acorn-walk: 8.3.5
+      chai: 4.5.0
+      debug: 4.4.3
+      execa: 8.0.1
+      jsdom: 26.1.0
+      local-pkg: 0.5.1
+      magic-string: 0.30.21
+      pathe: 1.1.2
+      picocolors: 1.1.1
+      std-env: 3.10.0
+      strip-literal: 2.1.1
+      tinybench: 2.9.0
+      tinypool: 0.8.4
+      vite: 5.4.21(@types/node@20.19.37)
+      vite-node: 1.6.1(@types/node@20.19.37)
+      why-is-node-running: 2.3.0
+    transitivePeerDependencies:
+      - less
+      - lightningcss
+      - sass
+      - sass-embedded
+      - stylus
+      - sugarss
+      - supports-color
+      - terser
+    dev: true
+
   /vitest@2.1.9(@types/node@20.19.37):
     resolution: {integrity: sha512-MSmPM9REYqDGBI8439mA4mWhV5sKmDlBKWIYbA3lRb2PTHACE0mgKwA8yQ2xq9vxDTuk4iPrECBAEW2aoFXY0Q==}
     engines: {node: ^18.0.0 || >=20.0.0}
@@ -15217,6 +15286,7 @@ packages:
         optional: true
       utf-8-validate:
         optional: true
+    dev: false
 
   /ws@8.21.0:
     resolution: {integrity: sha512-Vsp28b7DRcimFQvrqu2Wek3z1iYxDCWqHYB8Qsnk/S4RfaCQzPGPyBNuVjJV3cd6UiKtUtp6sNM77gWvzcCH+g==}
@@ -15229,7 +15299,6 @@ packages:
         optional: true
       utf-8-validate:
         optional: true
-    dev: false
 
   /xml-name-validator@5.0.0:
     resolution: {integrity: sha512-EvGK8EJ3DhaHfbRlETOWAS5pO9MZITeauHKJyb8wyajUfQUenkIg2MvLDTZ4T/TgIcm3HU0TFBgWWboAZ30UHg==}

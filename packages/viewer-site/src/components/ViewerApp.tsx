@@ -21,7 +21,6 @@ import {
   ArrowLeft,
   ChevronRight,
   FileText,
-  Map as MapIcon,
   MessageCircle,
   Plus,
   ChevronUp,
@@ -41,7 +40,6 @@ import {
   getThumbnailUrl,
   getScreenshotFileUrl,
   getScreenshotFileMetaUrl,
-  getCompiledJsUrl,
   getPublishedFileUrl,
   login,
   setAuthToken,
@@ -51,6 +49,7 @@ import {
   switchPageRuntime,
   deleteDemoPage,
 } from "@/lib/api";
+import { createPublishedPreviewStagePage } from "@/lib/preview-stage-adapter";
 import type {
   ProjectsIndex,
   PublishedProject,
@@ -59,20 +58,18 @@ import type {
 import type { DemoPageRuntimeType } from "@workbench/shared";
 import {
   extractPrototypeConfigBindingKeys,
-  PreviewPanel,
   PageConfigPanel,
-  PrototypePagePreview,
-  SketchPagePreview,
-  IframePreviewFrame,
+  PreviewStage,
 } from "@/components/demo";
-import { PreviewCanvas } from "@/components/demo";
-import type { PreviewMode, CanvasState } from "@/components/demo";
+import type {
+  PreviewMode,
+  CanvasState,
+  PreviewStagePage,
+} from "@/components/demo";
 import {
   isSchemaEmpty,
 } from "@/components/demo";
-import { getDefaultValues, getPreviewSize } from "@/lib/validator";
-import type { PreviewSize } from "@workbench/demo-ui";
-import { getPrototypePreviewSize } from "@workbench/demo-ui";
+import { getDefaultValues } from "@/lib/validator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -838,7 +835,6 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const [pageSchemaMap, setPageSchemaMap] = useState<Record<string, string>>(
     {},
   );
-  const [previewSize, setPreviewSize] = useState<PreviewSize | undefined>();
   const [flashDirectoryId, setFlashDirectoryId] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("canvas");
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
@@ -911,9 +907,6 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
           const firstPage = data.demoPages[0];
 
           setConfigData(initialConfigMap[firstPage.id] || {});
-          if (schemaMap[firstPage.id]) {
-            setPreviewSize(getPreviewSize(schemaMap[firstPage.id]));
-          }
         }
 
         setConfigDataMap(initialConfigMap);
@@ -933,16 +926,8 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
         setConfigData(pageConfig);
       }
 
-      const schema = pageSchemaMap[pageId];
-      if (schema) {
-        setPreviewSize(getPreviewSize(schema));
-      } else {
-        // schema 不可用时，使用页面自带的 previewSize 作为 fallback
-        const page = project.demoPages.find((p) => p.id === pageId);
-        setPreviewSize(page?.previewSize ?? undefined);
-      }
     },
-    [project, configDataMap, pageSchemaMap],
+    [project, configDataMap],
   );
 
   const handleConfigChange = useCallback(
@@ -1079,7 +1064,6 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
             setConfigData(defaults);
             setConfigDataMap((prev) => ({ ...prev, [newPage.id]: defaults }));
             setPageSchemaMap((prev) => ({ ...prev, [newPage.id]: schemaStr }));
-            setPreviewSize(getPreviewSize(schemaStr));
           } catch {
             setConfigData({});
             setConfigDataMap((prev) => ({ ...prev, [newPage.id]: {} }));
@@ -1150,6 +1134,19 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
     }
   }, [sessionId, project, projectId]);
 
+  const previewStagePages = useMemo<PreviewStagePage[]>(
+    () =>
+      (project?.demoPages ?? []).map((page) =>
+        createPublishedPreviewStagePage({
+          projectId,
+          page,
+          configData: configDataMap[page.id],
+          schema: pageSchemaMap[page.id],
+        }),
+      ),
+    [configDataMap, pageSchemaMap, project, projectId],
+  );
+
   if (isLoading) {
     return (
       <div className="flex flex-col h-full">
@@ -1181,13 +1178,6 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const hasPageConfig = !isSchemaEmpty(activePageSchema);
   const hasSchema = hasProjectConfig || hasPageConfig;
   const hasBothScopes = hasProjectConfig && hasPageConfig;
-
-  const compiledUrl = activePage?.compiledJsPath
-    ? getCompiledJsUrl(projectId, activePage.compiledJsPath)
-    : "";
-  const activeIframeUrl = activePage?.iframeHtmlPath
-    ? getPublishedFileUrl(projectId, activePage.iframeHtmlPath)
-    : "";
 
   return (
     <div className="flex flex-col h-full">
@@ -1266,115 +1256,25 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
         )}
 
         <div className="flex-1 min-w-0 overflow-hidden">
-    <div className="flex flex-col h-screen overflow-hidden bg-background">
-            {project.demoPages.length >= 1 && (
-              <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0">
-                <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setPreviewMode("single")}
-                    className={`inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors ${
-                      previewMode === "single"
-                        ? "bg-accent text-accent-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <FileText className="h-3.5 w-3.5" />
-                    单页
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewMode("canvas")}
-                    className={`inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors ${
-                      previewMode === "canvas"
-                        ? "bg-accent text-accent-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <MapIcon className="h-3.5 w-3.5" />
-                    画布
-                  </button>
-                </div>
-                <div className="flex-1" />
-              </div>
-            )}
-            {previewMode === "canvas" ? (
-              <div className="flex-1 overflow-hidden">
-                <PreviewCanvas
-                  interactionMode="viewer"
-                  projectId={projectId}
-                  pages={project.demoPages.map((p) => ({
-                    id: p.id,
-                    name: p.name,
-                    order: p.order,
-                    runtimeType: p.runtimeType,
-                    compiledJsUrl: p.compiledJsPath
-                      ? getCompiledJsUrl(projectId, p.compiledJsPath)
-                      : undefined,
-                    iframeUrl: p.iframeHtmlPath
-                      ? getPublishedFileUrl(projectId, p.iframeHtmlPath)
-                      : undefined,
-                    prototypeHtml: p.prototypeHtml,
-                    prototypeCss: p.prototypeCss,
-                    prototypeMeta: p.prototypeMeta,
-                    sketchScene: p.sketchScene
-                      ? JSON.stringify(p.sketchScene)
-                      : undefined,
-                    sketchMeta: p.sketchMeta,
-                    configData: configDataMap[p.id],
-                    previewSize: p.previewSize,
-                  }))}
-                  canvasState={canvasState}
-                  onCanvasStateChange={setCanvasState}
-                  onPageConfigEdit={(pageId) => {
-                    handlePageChange(pageId);
-                    setConfigPanelDetailPageId(pageId);
-                  }}
-                />
-              </div>
-            ) : (
-              <div
-                className="preview-single-scroll h-full flex-1 overflow-y-auto p-4"
-                style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-              >
-                <style>{`
-                  .preview-single-scroll::-webkit-scrollbar { display: none; }
-                `}</style>
-                {activeIframeUrl ? (
-                  <IframePreviewFrame
-                    src={activeIframeUrl}
-                    title={activePage?.name ?? "页面预览"}
-                    previewSize={previewSize ?? activePage?.previewSize}
-                    configData={configData}
-                    demoId={activePage?.id}
-                  />
-                ) : activePage?.runtimeType === "prototype-html-css" ? (
-                  <PrototypePagePreview
-                    html={activePage.prototypeHtml}
-                    css={activePage.prototypeCss}
-                    configData={configData}
-                    previewSize={previewSize ?? activePage.previewSize ?? getPrototypePreviewSize(activePage.prototypeMeta)}
-                    allowScroll
-                  />
-                ) : activePage?.runtimeType === "sketch-scene" ? (
-                  <div className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-md border bg-background shadow-sm">
-                    <SketchPagePreview
-                      scene={activePage.sketchScene}
-                      configData={configData}
-                      previewSize={previewSize ?? activePage.previewSize}
-                      fillContainer
-                    />
-                  </div>
-                ) : activePage ? (
-                  <PreviewPanel
-                    compiledJsUrl={compiledUrl}
-                    configData={configData}
-                    previewSize={previewSize ?? activePage.previewSize}
-                  />
-                ) : null}
-              </div>
-            )}
-          </div>
+          <PreviewStage
+            className="h-screen bg-background"
+            pages={previewStagePages}
+            activePageId={activePageId}
+            onActivePageChange={handlePageChange}
+            previewMode={previewMode}
+            onPreviewModeChange={setPreviewMode}
+            canvasState={canvasState}
+            onCanvasStateChange={setCanvasState}
+            interactionMode="viewer"
+            showToolbar={project.demoPages.length >= 1}
+            canvasProps={{
+              projectId,
+              onPageConfigEdit: (pageId) => {
+                handlePageChange(pageId);
+                setConfigPanelDetailPageId(pageId);
+              },
+            }}
+          />
         </div>
 
         {hasSchema && (

@@ -1,11 +1,17 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { PreviewPanel, PreviewCanvas, PageConfigPanel, isSchemaEmpty } from "../../../../components/demo";
-import type { PreviewMode, PreviewSize, CanvasState } from "../../../../components/demo";
+import { PreviewStage, PageConfigPanel, isSchemaEmpty } from "../../../../components/demo";
+import type {
+  PreviewMode,
+  PreviewSize,
+  CanvasState,
+  CanvasPageRuntimeType,
+  PreviewStagePage,
+} from "../../../../components/demo";
 import { mergeConfigToProps } from "@/lib/runtime-props";
-import { getDefaultValues, getPreviewSize } from "../../../../lib/validator";
+import { getDefaultValues } from "../../../../lib/validator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 import {
@@ -28,6 +34,12 @@ interface ViewerDemoPage {
   code: string;
   schema?: string;
   previewSize?: PreviewSize;
+  runtimeType?: CanvasPageRuntimeType;
+  prototypeHtml?: string;
+  prototypeCss?: string;
+  prototypeMeta?: Record<string, unknown>;
+  sketchScene?: Record<string, unknown>;
+  sketchMeta?: Record<string, unknown>;
 }
 
 interface ViewerData {
@@ -111,7 +123,6 @@ export default function ViewerProjectPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [configData, setConfigData] = useState<Record<string, unknown>>({});
   const [configDataMap, setConfigDataMap] = useState<Record<string, Record<string, unknown>>>({});
-  const [previewSize, setPreviewSize] = useState<PreviewSize | undefined>();
   const [canvasState, setCanvasState] = useState<CanvasState>({
     viewport: { x: 40, y: 40, zoom: 0.5 },
     pages: {},
@@ -197,7 +208,6 @@ export default function ViewerProjectPage() {
             const merged = urlConfig ? { ...defaults, ...urlConfig } : defaults;
             setConfigData(merged);
             initialConfigDataMap[initialPageId] = merged;
-            setPreviewSize(getPreviewSize(activePage.schema));
           } else if (urlConfigDataRef.current) {
             setConfigData(urlConfigDataRef.current);
           }
@@ -319,10 +329,43 @@ export default function ViewerProjectPage() {
           if (prev[pageId]) return prev;
           return { ...prev, [pageId]: defaults };
         });
-        setPreviewSize(getPreviewSize(page.schema));
       }
     },
     [data, getSafeMergedDefaults]
+  );
+
+  const previewStagePages = useMemo<PreviewStagePage[]>(
+    () =>
+      (data?.demoPages ?? []).map((page) => {
+        const runtimeType = page.runtimeType ?? "high-fidelity-react";
+        const runtimeData =
+          runtimeType === "prototype-html-css"
+            ? {
+                prototypeHtml: page.prototypeHtml,
+                prototypeCss: page.prototypeCss,
+                prototypeMeta: page.prototypeMeta,
+              }
+            : runtimeType === "sketch-scene"
+              ? {
+                  sketchScene: page.sketchScene
+                    ? JSON.stringify(page.sketchScene)
+                    : undefined,
+                  sketchMeta: page.sketchMeta,
+                }
+              : { code: page.code };
+
+        return {
+          id: page.id,
+          name: page.name,
+          order: page.order,
+          runtimeType,
+          ...runtimeData,
+          configData: configDataMap[page.id],
+          schema: page.schema,
+          previewSize: page.previewSize,
+        };
+      }),
+    [configDataMap, data],
   );
 
   if (isLoading) {
@@ -349,14 +392,6 @@ export default function ViewerProjectPage() {
   const activePage = data.demoPages.find((p) => p.id === activeDemoId);
   const activePageSchema = activePage?.schema;
   const hasMultiplePages = data.demoPages.length > 1;
-
-  const gridPages = data.demoPages.map((p) => ({
-    id: p.id,
-    name: p.name,
-    order: p.order,
-    previewSize: p.previewSize,
-    code: p.code,
-  }));
 
   const hasProjectConfig = !isSchemaEmpty(data.projectConfigSchema);
   const hasPageConfig = !isSchemaEmpty(activePageSchema);
@@ -434,54 +469,36 @@ export default function ViewerProjectPage() {
             </PopoverContent>
           </Popover>
 
-          {previewMode === "canvas" ? (
-            <PreviewCanvas
-              interactionMode="viewer"
-              projectId={projectId}
-              pages={gridPages.map((p) => ({
-                id: p.id,
-                name: p.name,
-                order: p.order,
-                code: data?.demoPages.find((d) => d.id === p.id)?.code,
-                configData: configDataMap[p.id],
-                previewSize: p.previewSize,
-              }))}
-              canvasState={canvasState}
-              onCanvasStateChange={setCanvasState}
-              editingPageId={canvasConfigMode === "onclick" ? canvasSelectedPageId ?? undefined : undefined}
-              onPageConfigEdit={(pageId) => {
+          <PreviewStage
+            pages={previewStagePages}
+            activePageId={activeDemoId}
+            onActivePageChange={handlePageChange}
+            previewMode={previewMode}
+            onPreviewModeChange={setPreviewMode}
+            canvasState={canvasState}
+            onCanvasStateChange={setCanvasState}
+            interactionMode="viewer"
+            showToolbar={false}
+            canvasProps={{
+              projectId,
+              editingPageId:
+                canvasConfigMode === "onclick"
+                  ? canvasSelectedPageId ?? undefined
+                  : undefined,
+              onPageConfigEdit: (pageId) => {
                 handlePageChange(pageId);
                 setConfigPanelDetailPageId(pageId);
                 if (canvasConfigMode === "onclick") {
                   setCanvasSelectedPageId(pageId);
                 }
-              }}
-              onCanvasClick={() => {
+              },
+              onCanvasClick: () => {
                 if (canvasConfigMode === "onclick") {
                   setCanvasSelectedPageId(null);
                 }
-              }}
-            />
-          ) : (
-            <div
-              className="p-4 h-full overflow-y-auto preview-single-scroll"
-              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-            >
-              <style>{`
-                .preview-single-scroll::-webkit-scrollbar {
-                  display: none;
-                }
-              `}</style>
-              {activePage && (
-                <PreviewPanel
-                  code={activePage.code}
-                  demoId={activePage.id}
-                  configData={configData}
-                  previewSize={previewSize}
-                />
-              )}
-            </div>
-          )}
+              },
+            }}
+          />
         </div>
 
         {showConfig && hasAnyConfig && (
