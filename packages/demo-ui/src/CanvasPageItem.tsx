@@ -241,12 +241,7 @@ export function CanvasPagePreviewContent({
 
       const designHeight = parsePreviewSizeValue(page.previewSize?.height, 812);
 
-      // 高于设计高度时记录测量值用于抬升 iframe 渲染高度；否则清空
-      if (newContentHeight > designHeight) {
-        setContentHeight(newContentHeight);
-      } else {
-        setContentHeight(null);
-      }
+      setContentHeight(newContentHeight);
 
       const currentLayout = layoutRef.current;
       const nextLayout = resolveCanvasContentHeightLayout(

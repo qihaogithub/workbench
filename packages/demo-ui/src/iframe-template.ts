@@ -1652,6 +1652,27 @@ ${cssLinks}
     window.__APP_STATE__ = currentAppState;
     window.__ROUTE_PARAMS__ = currentRouteParams;
 
+    // 测量页面完整内容高度（可能超过当前视口/设计高度）。
+    // 仅靠 body 的 contentRect 在页面使用 h-screen / height:100vh 时会被钉死在视口高度，
+    // 导致超出部分无法上报，画布卡片无法展示完整页面。这里取三者最大值：
+    // 1) body 自身高度；2) body 直接子元素的最大下边缘；3) 文档可滚动高度（内容溢出视口时）。
+    // 当内容未溢出视口时不采用 scrollHeight，以保留“内容变矮时卡片收缩”的行为。
+    function measureFullContentHeight() {
+      var bodyRect = document.body.getBoundingClientRect();
+      var height = bodyRect.height;
+      var children = document.body.children;
+      for (var i = 0; i < children.length; i++) {
+        var bottom = children[i].getBoundingClientRect().bottom - bodyRect.top;
+        if (bottom > height) height = bottom;
+      }
+      var scrollHeight = document.documentElement.scrollHeight || 0;
+      var viewportHeight = window.innerHeight || 0;
+      if (scrollHeight > viewportHeight + 1 && scrollHeight > height) {
+        height = scrollHeight;
+      }
+      return Math.round(height);
+    }
+
     function updateAppRuntime(appState, routeParams) {
       currentAppState = appState && typeof appState === 'object' && !Array.isArray(appState) ? appState : {};
       currentRouteParams = routeParams && typeof routeParams === 'object' && !Array.isArray(routeParams) ? routeParams : {};
@@ -1771,7 +1792,7 @@ ${cssLinks}
       if (type === 'WAKE') {
         isSleeping = false;
         requestAnimationFrame(function() {
-          window.parent.postMessage({ type: 'RESIZE', height: document.body.getBoundingClientRect().height, requestId: currentRequestId }, '*');
+          window.parent.postMessage({ type: 'RESIZE', height: measureFullContentHeight(), requestId: currentRequestId }, '*');
         });
         return;
       }
@@ -1943,12 +1964,10 @@ ${cssLinks}
       }
     });
 
-    const resizeObserver = new ResizeObserver((entries) => {
+    const resizeObserver = new ResizeObserver(() => {
       if (isSleeping) return;
-      for (const entry of entries) {
-        const height = entry.contentRect.height;
-        window.parent.postMessage({ type: 'RESIZE', height, requestId: currentRequestId }, '*');
-      }
+      const height = measureFullContentHeight();
+      window.parent.postMessage({ type: 'RESIZE', height, requestId: currentRequestId }, '*');
     });
     resizeObserver.observe(document.body);
 
