@@ -13,6 +13,7 @@ import {
   readWorkspaceProjectionAcksFromBrowser,
   acknowledgeWorkspaceProjectionFromBrowser,
 } from "@/lib/workspace-authority-browser-client";
+import { WorkspaceAuthorityClientError } from "@/lib/workspace-authority-shared";
 
 export interface WorkspaceAuthorityConflict {
   resourcePath: string;
@@ -113,8 +114,11 @@ export function useWorkspaceAuthorityState(
         isConnected: true,
       }));
       lastPolledRevisionRef.current = snapshot.revision;
-    } catch {
+    } catch (error: unknown) {
       if (!mountedRef.current) return;
+      if (error instanceof WorkspaceAuthorityClientError && error.status === 401) {
+        return;
+      }
       setState((prev) => ({
         ...prev,
         isConnected: false,
@@ -144,13 +148,11 @@ export function useWorkspaceAuthorityState(
       setState((prev) => {
         let next = prev;
 
-        // 处理 mutation committed 事件
         for (const event of events) {
           if (event.type === "workspace_mutation_committed") {
             const committedEvent = event as WorkspaceMutationCommittedEvent;
             const newRevision = committedEvent.receipt.revision;
 
-            // gap 检测：revision 跳跃
             if (
               lastPolledRevisionRef.current > 0 &&
               newRevision > lastPolledRevisionRef.current + 1
@@ -169,7 +171,6 @@ export function useWorkspaceAuthorityState(
           }
         }
 
-        // 处理 projection ack 事件
         for (const ack of acks) {
           if (ack.revision > next.previewAppliedRevision) {
             next = {
@@ -180,17 +181,17 @@ export function useWorkspaceAuthorityState(
           }
         }
 
-        // 轮询成功即表示与 Authority 连接正常，恢复 isConnected。
-        // 此前仅在遇到新 committed 事件时才置 true，导致一次轮询失败后
-        // 即使后续轮询成功也会因无新事件而永久停留在 offline。
         if (!next.isConnected) {
           next = { ...next, isConnected: true };
         }
 
         return next;
       });
-    } catch {
+    } catch (error: unknown) {
       if (!mountedRef.current) return;
+      if (error instanceof WorkspaceAuthorityClientError && error.status === 401) {
+        return;
+      }
       setState((prev) => ({
         ...prev,
         isConnected: false,

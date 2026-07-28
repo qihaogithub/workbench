@@ -417,7 +417,7 @@ export function useVersionControl(params: UseVersionControlParams) {
       const saveRes2 = await fetch(`/api/sessions/${sessionId}/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ note: versionName?.trim() || undefined }),
       });
 
       if (!saveRes2.ok) {

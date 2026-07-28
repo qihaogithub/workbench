@@ -379,7 +379,7 @@ type HistoryEvent =
   | {
       id: string;
       kind: "project";
-      title: "命名版本" | "发布快照" | "自动保存记录" | "恢复项目";
+      title: string;
       savedAt: number;
       savedBy: string;
       version: VersionInfo;
@@ -6006,7 +6006,7 @@ ${context.details}
               : version.sessionId === "restore" ||
                   version.note?.includes("恢复")
                 ? "恢复项目"
-                : "命名版本",
+                : version.note || "命名版本",
         savedAt: version.savedAt,
         savedBy: getVersionSavedBy(version.savedBy),
         version,

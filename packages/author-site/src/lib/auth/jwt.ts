@@ -1,9 +1,11 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
-const SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "change-me-in-production",
-);
+function getSecret(): Uint8Array {
+  return new TextEncoder().encode(
+    process.env.JWT_SECRET || "change-me-in-production",
+  );
+}
 
 /** token 有效期，createToken、cookie maxAge 与 CLI 返回的 expiresAt 共用同一来源 */
 export const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -21,7 +23,7 @@ export async function createToken(payload: UserPayload): Promise<string> {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(Math.floor((Date.now() + TOKEN_TTL_MS) / 1000))
-    .sign(SECRET);
+    .sign(getSecret());
 }
 
 /**
@@ -29,7 +31,7 @@ export async function createToken(payload: UserPayload): Promise<string> {
  */
 export async function verifyToken(token: string): Promise<UserPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, SECRET);
+    const { payload } = await jwtVerify(token, getSecret());
     return payload as unknown as UserPayload;
   } catch {
     return null;
