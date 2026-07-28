@@ -145,12 +145,29 @@ export function ImportFromFigmaDialog({
         parsed.kind === "prototype" ? "prototype-html-css" : undefined,
       );
       if (parsed.kind === "prototype") {
-        await projectApiClient.updateDemoPageFiles(projectId, page.id, sessionId, {
+        const result = await projectApiClient.updateDemoPageFiles(projectId, page.id, sessionId, {
           prototypeHtml: parsed.prototypeHtml,
           prototypeCss: parsed.prototypeCss,
           prototypeMeta: parsed.prototypeMeta,
           schema: EMPTY_FIGMA_CONFIG_SCHEMA,
+          localizeImages: true,
         });
+        if (result.imageLocalization && result.imageLocalization.failed > 0) {
+          const { succeeded, failed, failures } = result.imageLocalization;
+          if (succeeded === 0) {
+            toast({
+              title: "图片本地化失败",
+              description: "所有图片仍指向外部链接，可能在未来失效。",
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "部分图片未本地化",
+              description: `${succeeded} 张已本地化，${failed} 张仍使用原始链接，可能在未来失效。`,
+              variant: "destructive",
+            });
+          }
+        }
       } else {
         await projectApiClient.updateDemoPageFiles(projectId, page.id, sessionId, {
           code: parsed.code,
