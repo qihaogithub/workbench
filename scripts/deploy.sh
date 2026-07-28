@@ -58,6 +58,9 @@ fi
 echo -e "${BLUE}🚀 开始一键部署流程...${NC}"
 echo -e "${BLUE}🎯 目标服务器: ${SERVER_USER}@${SERVER_IP}:${SERVER_PORT} (${AUTH_DESC})${NC}"
 
+# macOS 远程 SSH 非交互式 session 可能缺少 Docker/Node 路径，统一补全
+REMOTE_PATH_PREFIX="/usr/local/bin:/opt/homebrew/bin:/Applications/OrbStack.app/Contents/MacOS/xbin"
+
 # ================= 0. 生成部署环境文件 =================
 if [ ! -f "${LOCAL_ENV_FILE}" ]; then
     echo -e "${RED}❌ 未找到环境变量文件: ${LOCAL_ENV_FILE}${NC}"
@@ -263,17 +266,17 @@ if [[ "${DEPLOY_APP_DATA_DIR}" == *"'"* ]] || [[ "${DEPLOY_APP_DATA_DIR}" == *$'
 fi
 
 echo -e "${BLUE}🔍 检查远端 live Workspace Authority 状态...${NC}"
-if "${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" "command -v node >/dev/null 2>&1"; then
+if "${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" "bash -c 'export PATH=${REMOTE_PATH_PREFIX}:\$PATH && command -v node >/dev/null 2>&1'"; then
     if ! "${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" \
-        "node - --data-dir '${DEPLOY_APP_DATA_DIR}' --json" \
+        "bash -c 'export PATH=${REMOTE_PATH_PREFIX}:\$PATH && node - --data-dir ${DEPLOY_APP_DATA_DIR} --json'" \
         < "${PROJECT_DIR}/scripts/check-workspace-deploy-preflight.mjs"; then
         echo -e "${RED}❌ 远端 Workspace Authority 部署前检查未通过${NC}"
         exit 1
     fi
 elif "${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" \
-    "cd '${REMOTE_DIR}' && docker compose --env-file .env.docker ps --status running -q agent-service | grep -q ."; then
+    "bash -c 'export PATH=${REMOTE_PATH_PREFIX}:\$PATH && cd ${REMOTE_DIR} && docker compose --env-file .env.docker ps --status running -q agent-service | grep -q .'"; then
     if ! "${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" \
-        "cd '${REMOTE_DIR}' && docker compose --env-file .env.docker exec -T agent-service node - --data-dir /app/data --json" \
+        "bash -c 'export PATH=${REMOTE_PATH_PREFIX}:\$PATH && cd ${REMOTE_DIR} && docker compose --env-file .env.docker exec -T agent-service node - --data-dir /app/data --json'" \
         < "${PROJECT_DIR}/scripts/check-workspace-deploy-preflight.mjs"; then
         echo -e "${RED}❌ 远端 Workspace Authority 部署前检查未通过${NC}"
         exit 1
@@ -486,27 +489,28 @@ echo -e "${GREEN}✅ 代码同步完成${NC}"
 if [ "${DEPLOY_BUILD_MODE}" = "local" ]; then
     echo -e "${BLUE}🔄 [4/4] 本地构建镜像、上传并启动服务...${NC}"
 
-    "${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" "
-        set -e
-        cd ${REMOTE_DIR}
+    "${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" bash -s <<REMOTE_SCRIPT
+set -e
+export PATH=${REMOTE_PATH_PREFIX}:\$PATH
+cd ${REMOTE_DIR}
 
-        cp -f .deploy.env .env.docker
-        APP_DATA_DIR=\$(awk -F= '\$1 == \"APP_DATA_DIR\" { print substr(\$0, index(\$0, \"=\") + 1); exit }' .env.docker)
-        APP_DATA_DIR=\${APP_DATA_DIR:-/opt/workbench/data}
-        echo \"📁 APP_DATA_DIR=\${APP_DATA_DIR}\"
-        if [ ! -d \"\${APP_DATA_DIR}\" ]; then
-            if [ '${ALLOW_CREATE_APP_DATA_DIR}' = 'true' ]; then
-                mkdir -p \"\${APP_DATA_DIR}\"
-                echo \"⚠️  已创建空 APP_DATA_DIR: \${APP_DATA_DIR}\"
-            else
-                echo \"❌ APP_DATA_DIR 不存在: \${APP_DATA_DIR}\"
-                echo \"   普通部署不会自动创建空 data 目录，避免正式环境切到空数据。\"
-                echo \"   请先恢复/同步 data，或确认首次部署后使用 ALLOW_CREATE_APP_DATA_DIR=true。\"
-                exit 1
-            fi
-        fi
-        mkdir -p '${REMOTE_IMAGE_DIR}'
-    "
+cp -f .deploy.env .env.docker
+APP_DATA_DIR=\$(awk -F= '\$1 == "APP_DATA_DIR" { print substr(\$0, index(\$0, "=") + 1); exit }' .env.docker)
+APP_DATA_DIR=\${APP_DATA_DIR:-/opt/workbench/data}
+echo "📁 APP_DATA_DIR=\${APP_DATA_DIR}"
+if [ ! -d "\${APP_DATA_DIR}" ]; then
+    if [ '${ALLOW_CREATE_APP_DATA_DIR}' = 'true' ]; then
+        mkdir -p "\${APP_DATA_DIR}"
+        echo "⚠️  已创建空 APP_DATA_DIR: \${APP_DATA_DIR}"
+    else
+        echo "❌ APP_DATA_DIR 不存在: \${APP_DATA_DIR}"
+        echo "   普通部署不会自动创建空 data 目录，避免正式环境切到空数据。"
+        echo "   请先恢复/同步 data，或确认首次部署后使用 ALLOW_CREATE_APP_DATA_DIR=true。"
+        exit 1
+    fi
+fi
+mkdir -p '${REMOTE_IMAGE_DIR}'
+REMOTE_SCRIPT
 
     mkdir -p "${LOCAL_IMAGE_DIR}"
     export COMPOSE_PARALLEL_LIMIT
@@ -556,306 +560,314 @@ if [ "${DEPLOY_BUILD_MODE}" = "local" ]; then
         "${LOCAL_IMAGE_DIR}/" \
         "${SERVER_USER}@${SERVER_IP}:${REMOTE_IMAGE_DIR}/"
 
-    "${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" "
-        set -e
-        cd ${REMOTE_DIR}
+    "${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" bash -s <<REMOTE_SCRIPT
+set -e
+export PATH=${REMOTE_PATH_PREFIX}:\$PATH
+cd ${REMOTE_DIR}
 
-        DEPLOY_SERVICES='${DEPLOY_SERVICES}'
-        REMOTE_IMAGE_DIR='${REMOTE_IMAGE_DIR}'
+DEPLOY_SERVICES='${DEPLOY_SERVICES}'
+REMOTE_IMAGE_DIR='${REMOTE_IMAGE_DIR}'
 
-        image_for_service() {
-            case \"\$1\" in
-                knowledge-service) echo 'workbench-knowledge-service' ;;
-                agent-service) echo 'workbench-agent-service' ;;
-                author-site) echo 'workbench-author-site' ;;
-                screenshot-service) echo 'workbench-screenshot-service' ;;
-                viewer-site) echo 'workbench-viewer-site' ;;
-                *) echo \"\" ;;
-            esac
-        }
+image_for_service() {
+    case "\$1" in
+        knowledge-service) echo 'workbench-knowledge-service' ;;
+        agent-service) echo 'workbench-agent-service' ;;
+        author-site) echo 'workbench-author-site' ;;
+        screenshot-service) echo 'workbench-screenshot-service' ;;
+        viewer-site) echo 'workbench-viewer-site' ;;
+        *) echo "" ;;
+    esac
+}
 
-        for service in \${DEPLOY_SERVICES}; do
-            archive=\"\${REMOTE_IMAGE_DIR}/\${service}.tar.gz\"
-            image=\$(image_for_service \"\${service}\")
-            if [ ! -f \"\${archive}\" ]; then
-                echo \"❌ 服务器缺少镜像归档: \${archive}\"
-                exit 1
-            fi
+for service in \${DEPLOY_SERVICES}; do
+    archive="\${REMOTE_IMAGE_DIR}/\${service}.tar.gz"
+    image=\$(image_for_service "\${service}")
+    if [ ! -f "\${archive}" ]; then
+        echo "❌ 服务器缺少镜像归档: \${archive}"
+        exit 1
+    fi
 
-            echo \"📥 加载镜像: \${image}\"
-            gzip -dc \"\${archive}\" | docker load
+    echo "📥 加载镜像: \${image}"
+    gzip -dc "\${archive}" | docker load
 
-            echo \"🚀 重启服务: \${service}\"
-            docker compose --env-file .env.docker up -d --force-recreate --no-deps --no-build \
-                \"\${service}\"
-        done
+    echo "🚀 重启服务: \${service}"
+    docker compose --env-file .env.docker up -d --force-recreate --no-deps --no-build \
+        "\${service}"
+done
 
-        rm -rf \"\${REMOTE_IMAGE_DIR}\"
-        echo \"✅ 已启动服务: \${DEPLOY_SERVICES}\"
-    "
+rm -rf "\${REMOTE_IMAGE_DIR}"
+echo "✅ 已启动服务: \${DEPLOY_SERVICES}"
+REMOTE_SCRIPT
 else
     echo -e "${BLUE}🔄 [4/4] 远程构建并启动服务...${NC}"
 
-    "${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" "
-        set -e
-        cd ${REMOTE_DIR}
+    "${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" bash -s <<REMOTE_SCRIPT
+set -e
+export PATH=${REMOTE_PATH_PREFIX}:\$PATH
+cd ${REMOTE_DIR}
 
-        cp -f .deploy.env .env.docker
-        APP_DATA_DIR=\$(awk -F= '\$1 == \"APP_DATA_DIR\" { print substr(\$0, index(\$0, \"=\") + 1); exit }' .env.docker)
-        APP_DATA_DIR=\${APP_DATA_DIR:-/opt/workbench/data}
-        echo \"📁 APP_DATA_DIR=\${APP_DATA_DIR}\"
-        if [ ! -d \"\${APP_DATA_DIR}\" ]; then
-            if [ '${ALLOW_CREATE_APP_DATA_DIR}' = 'true' ]; then
-                mkdir -p \"\${APP_DATA_DIR}\"
-                echo \"⚠️  已创建空 APP_DATA_DIR: \${APP_DATA_DIR}\"
-            else
-                echo \"❌ APP_DATA_DIR 不存在: \${APP_DATA_DIR}\"
-                echo \"   普通部署不会自动创建空 data 目录，避免正式环境切到空数据。\"
-                echo \"   请先恢复/同步 data，或确认首次部署后使用 ALLOW_CREATE_APP_DATA_DIR=true。\"
-                exit 1
-            fi
-        fi
+cp -f .deploy.env .env.docker
+APP_DATA_DIR=\$(awk -F= '\$1 == "APP_DATA_DIR" { print substr(\$0, index(\$0, "=") + 1); exit }' .env.docker)
+APP_DATA_DIR=\${APP_DATA_DIR:-/opt/workbench/data}
+echo "📁 APP_DATA_DIR=\${APP_DATA_DIR}"
+if [ ! -d "\${APP_DATA_DIR}" ]; then
+    if [ '${ALLOW_CREATE_APP_DATA_DIR}' = 'true' ]; then
+        mkdir -p "\${APP_DATA_DIR}"
+        echo "⚠️  已创建空 APP_DATA_DIR: \${APP_DATA_DIR}"
+    else
+        echo "❌ APP_DATA_DIR 不存在: \${APP_DATA_DIR}"
+        echo "   普通部署不会自动创建空 data 目录，避免正式环境切到空数据。"
+        echo "   请先恢复/同步 data，或确认首次部署后使用 ALLOW_CREATE_APP_DATA_DIR=true。"
+        exit 1
+    fi
+fi
 
-        mem_available_mb=\$(awk '/MemAvailable/ { print int(\$2 / 1024); exit }' /proc/meminfo)
-        load1=\$(awk '{ print \$1 }' /proc/loadavg)
-        echo \"🧯 远程构建预检: MemAvailable=\${mem_available_mb}MB Load1=\${load1}\"
-        if [ \"\${mem_available_mb}\" -lt '${REMOTE_BUILD_MIN_MEM_AVAILABLE_MB}' ]; then
-            echo \"❌ 远程可用内存不足，拒绝在正式机上构建。需要 >= ${REMOTE_BUILD_MIN_MEM_AVAILABLE_MB}MB。\"
-            echo \"   推荐使用默认 DEPLOY_BUILD_MODE=local，或低峰期再显式 --remote-build。\"
-            exit 1
-        fi
-        if awk -v load=\"\${load1}\" -v max='${REMOTE_BUILD_MAX_LOAD}' 'BEGIN { exit !(load > max) }'; then
-            echo \"❌ 远程负载过高，拒绝在正式机上构建。当前 Load1=\${load1}，上限=${REMOTE_BUILD_MAX_LOAD}。\"
-            echo \"   推荐使用默认 DEPLOY_BUILD_MODE=local，或低峰期再显式 --remote-build。\"
-            exit 1
-        fi
+if [ -f /proc/meminfo ]; then
+    mem_available_mb=\$(awk '/MemAvailable/ { print int(\$2 / 1024); exit }' /proc/meminfo)
+    load1=\$(awk '{ print \$1 }' /proc/loadavg)
+else
+    mem_available_mb=\$(sysctl -n hw.memsize 2>/dev/null | awk '{ print int(\$1 / 1024 / 1024); exit }' || echo 99999)
+    load1=\$(sysctl -n vm.loadavg 2>/dev/null | awk '{ print \$2 }' || echo 0)
+fi
+echo "🧯 远程构建预检: MemAvailable=\${mem_available_mb}MB Load1=\${load1}"
+if [ "\${mem_available_mb}" -lt '${REMOTE_BUILD_MIN_MEM_AVAILABLE_MB}' ]; then
+    echo "❌ 远程可用内存不足，拒绝在正式机上构建。需要 >= ${REMOTE_BUILD_MIN_MEM_AVAILABLE_MB}MB。"
+    echo "   推荐使用默认 DEPLOY_BUILD_MODE=local，或低峰期再显式 --remote-build。"
+    exit 1
+fi
+if awk -v load="\${load1}" -v max='${REMOTE_BUILD_MAX_LOAD}' 'BEGIN { exit !(load > max) }'; then
+    echo "❌ 远程负载过高，拒绝在正式机上构建。当前 Load1=\${load1}，上限=${REMOTE_BUILD_MAX_LOAD}。"
+    echo "   推荐使用默认 DEPLOY_BUILD_MODE=local，或低峰期再显式 --remote-build。"
+    exit 1
+fi
 
-        export COMPOSE_PARALLEL_LIMIT='${COMPOSE_PARALLEL_LIMIT}'
-        DEPLOY_SERVICES='${DEPLOY_SERVICES}'
+export COMPOSE_PARALLEL_LIMIT='${COMPOSE_PARALLEL_LIMIT}'
+DEPLOY_SERVICES='${DEPLOY_SERVICES}'
 
-        echo \"📦 构建服务: \${DEPLOY_SERVICES}\"
-        echo \"🧯 COMPOSE_PARALLEL_LIMIT=\${COMPOSE_PARALLEL_LIMIT}\"
+echo "📦 构建服务: \${DEPLOY_SERVICES}"
+echo "🧯 COMPOSE_PARALLEL_LIMIT=\${COMPOSE_PARALLEL_LIMIT}"
 
-        for service in \${DEPLOY_SERVICES}; do
-            echo \"📦 构建服务: \${service}\"
-            docker compose --env-file .env.docker build \
-                --build-arg GIT_COMMIT='${GIT_COMMIT}' \
-                --build-arg GIT_BRANCH='${GIT_BRANCH}' \
-                --build-arg BUILD_TIME='${BUILD_TIME}' \
-                \"\${service}\"
+for service in \${DEPLOY_SERVICES}; do
+    echo "📦 构建服务: \${service}"
+    docker compose --env-file .env.docker build \\
+        --build-arg GIT_COMMIT='${GIT_COMMIT}' \\
+        --build-arg GIT_BRANCH='${GIT_BRANCH}' \\
+        --build-arg BUILD_TIME='${BUILD_TIME}' \\
+        "\${service}"
 
-            echo \"🚀 重启服务: \${service}\"
-            docker compose --env-file .env.docker up -d --force-recreate --no-deps --no-build \
-                \"\${service}\"
-        done
+    echo "🚀 重启服务: \${service}"
+    docker compose --env-file .env.docker up -d --force-recreate --no-deps --no-build \\
+        "\${service}"
+done
 
-        echo \"✅ 已启动服务: \${DEPLOY_SERVICES}\"
-    "
+echo "✅ 已启动服务: \${DEPLOY_SERVICES}"
+REMOTE_SCRIPT
 fi
 
 # ================= 5. 部署后自检 =================
 echo -e "${BLUE}🩺 部署后自检...${NC}"
 
-"${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" "
-    set -e
-    cd ${REMOTE_DIR}
+"${SSH_CMD[@]}" "${SERVER_USER}@${SERVER_IP}" bash -s <<REMOTE_SCRIPT
+set -e
+export PATH=${REMOTE_PATH_PREFIX}:\$PATH
+cd ${REMOTE_DIR}
 
-    DEPLOY_SERVICES='${DEPLOY_SERVICES}'
+DEPLOY_SERVICES='${DEPLOY_SERVICES}'
 
-    service_in_deploy() {
-        case \" \${DEPLOY_SERVICES} \" in
-            *\" \$1 \"*) return 0 ;;
-            *) return 1 ;;
-        esac
-    }
+service_in_deploy() {
+    case " \${DEPLOY_SERVICES} " in
+        *" \$1 "*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
 
-    container_for_service() {
-        case \"\$1\" in
-            knowledge-service) echo 'workbench-knowledge-service-1' ;;
-            agent-service) echo 'workbench-agent-service-1' ;;
-            author-site) echo 'workbench-author-site-1' ;;
-            screenshot-service) echo 'workbench-screenshot-service-1' ;;
-            viewer-site) echo 'workbench-viewer-site-1' ;;
-            *) echo \"\" ;;
-        esac
-    }
+container_for_service() {
+    case "\$1" in
+        knowledge-service) echo 'workbench-knowledge-service-1' ;;
+        agent-service) echo 'workbench-agent-service-1' ;;
+        author-site) echo 'workbench-author-site-1' ;;
+        screenshot-service) echo 'workbench-screenshot-service-1' ;;
+        viewer-site) echo 'workbench-viewer-site-1' ;;
+        *) echo "" ;;
+    esac
+}
 
-    check_container_running() {
-        local name=\"\$1\"
-        local status
-        status=\$(docker inspect -f '{{.State.Status}}' \"\$name\" 2>/dev/null || echo 'missing')
-        if [ \"\$status\" != 'running' ]; then
-            echo \"❌ 容器未运行: \$name (status=\$status)\"
-            docker logs --tail=80 \"\$name\" 2>/dev/null || true
-            exit 1
-        fi
-        echo \"✅ 容器运行正常: \$name\"
-    }
+check_container_running() {
+    local name="\$1"
+    local status
+    status=\$(docker inspect -f '{{.State.Status}}' "\$name" 2>/dev/null || echo 'missing')
+    if [ "\$status" != 'running' ]; then
+        echo "❌ 容器未运行: \$name (status=\$status)"
+        docker logs --tail=80 "\$name" 2>/dev/null || true
+        exit 1
+    fi
+    echo "✅ 容器运行正常: \$name"
+}
 
-    check_container_healthy() {
-        local name=\"\$1\"
-        local health
-        health=\$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \"\$name\" 2>/dev/null || echo 'missing')
-        if [ \"\$health\" != 'healthy' ]; then
-            echo \"❌ 容器健康检查失败: \$name (health=\$health)\"
-            docker logs --tail=80 \"\$name\" 2>/dev/null || true
-            exit 1
-        fi
-        echo \"✅ 容器健康正常: \$name\"
-    }
+check_container_healthy() {
+    local name="\$1"
+    local health
+    health=\$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "\$name" 2>/dev/null || echo 'missing')
+    if [ "\$health" != 'healthy' ]; then
+        echo "❌ 容器健康检查失败: \$name (health=\$health)"
+        docker logs --tail=80 "\$name" 2>/dev/null || true
+        exit 1
+    fi
+    echo "✅ 容器健康正常: \$name"
+}
 
-    # 等待容器启动（最多 60 秒）
-    echo '⏳ 等待容器启动...'
-    for i in \$(seq 1 60); do
-        all_running=true
-        for service in \${DEPLOY_SERVICES}; do
-            name=\$(container_for_service \"\$service\")
-            status=\$(docker inspect -f '{{.State.Status}}' \"\$name\" 2>/dev/null || echo 'missing')
-            if [ \"\$status\" != 'running' ]; then
-                all_running=false
-                break
-            fi
-        done
-        if [ \"\$all_running\" = true ]; then
+# 等待容器启动（最多 60 秒）
+echo '⏳ 等待容器启动...'
+for i in \$(seq 1 60); do
+    all_running=true
+    for service in \${DEPLOY_SERVICES}; do
+        name=\$(container_for_service "\$service")
+        status=\$(docker inspect -f '{{.State.Status}}' "\$name" 2>/dev/null || echo 'missing')
+        if [ "\$status" != 'running' ]; then
+            all_running=false
             break
         fi
-        if [ \"\$i\" -eq 60 ]; then
-            echo '❌ 容器启动超时'
-            docker compose ps
-            exit 1
-        fi
-        sleep 1
     done
+    if [ "\$all_running" = true ]; then
+        break
+    fi
+    if [ "\$i" -eq 60 ]; then
+        echo '❌ 容器启动超时'
+        docker compose ps
+        exit 1
+    fi
+    sleep 1
+done
 
-    # 检查容器运行状态
+# 检查容器运行状态
+for service in \${DEPLOY_SERVICES}; do
+    check_container_running "\$(container_for_service "\$service")"
+done
+
+# 等待健康检查（最多 90 秒）
+echo '⏳ 等待健康检查...'
+for i in \$(seq 1 90); do
+    all_healthy=true
     for service in \${DEPLOY_SERVICES}; do
-        check_container_running \"\$(container_for_service \"\$service\")\"
-    done
-
-    # 等待健康检查（最多 90 秒）
-    echo '⏳ 等待健康检查...'
-    for i in \$(seq 1 90); do
-        all_healthy=true
-        for service in \${DEPLOY_SERVICES}; do
-            case \"\$service\" in
-                knowledge-service|agent-service|author-site|screenshot-service) ;;
-                *) continue ;;
-            esac
-            name=\$(container_for_service \"\$service\")
-            health=\$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \"\$name\" 2>/dev/null || echo 'missing')
-            if [ \"\$health\" != 'healthy' ]; then
-                all_healthy=false
-                break
-            fi
-        done
-        if [ \"\$all_healthy\" = true ]; then
-            break
-        fi
-        if [ \"\$i\" -eq 90 ]; then
-            echo '❌ 健康检查超时'
-            for service in \${DEPLOY_SERVICES}; do
-                case \"\$service\" in
-                    knowledge-service|agent-service|author-site|screenshot-service) ;;
-                    *) continue ;;
-                esac
-                check_container_healthy \"\$(container_for_service \"\$service\")\"
-            done
-            exit 1
-        fi
-        sleep 1
-    done
-
-    # 健康检查
-    for service in \${DEPLOY_SERVICES}; do
-        case \"\$service\" in
+        case "\$service" in
             knowledge-service|agent-service|author-site|screenshot-service) ;;
             *) continue ;;
         esac
-        check_container_healthy \"\$(container_for_service \"\$service\")\"
+        name=\$(container_for_service "\$service")
+        health=\$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "\$name" 2>/dev/null || echo 'missing')
+        if [ "\$health" != 'healthy' ]; then
+            all_healthy=false
+            break
+        fi
     done
-
-    # API 端点检查（重试 30 秒）
-    if service_in_deploy author-site; then
-        for i in \$(seq 1 30); do
-            if curl -fsS http://127.0.0.1:3200 >/dev/null 2>&1; then
-                echo '✅ author-site 健康检查通过'
-                break
-            fi
-            if [ \"\$i\" -eq 30 ]; then
-                echo '❌ author-site 健康检查失败: http://127.0.0.1:3200'
-                docker logs --tail=120 workbench-author-site-1 2>/dev/null || true
-                exit 1
-            fi
-            sleep 1
-        done
+    if [ "\$all_healthy" = true ]; then
+        break
     fi
-
-    if service_in_deploy agent-service; then
-        for i in \$(seq 1 30); do
-            if curl -fsS http://127.0.0.1:3201/health >/dev/null 2>&1; then
-                echo '✅ agent-service 健康检查通过'
-                break
-            fi
-            if [ \"\$i\" -eq 30 ]; then
-                echo '❌ agent-service 健康检查失败: http://127.0.0.1:3201/health'
-                docker logs --tail=120 workbench-agent-service-1 2>/dev/null || true
-                exit 1
-            fi
-            sleep 1
+    if [ "\$i" -eq 90 ]; then
+        echo '❌ 健康检查超时'
+        for service in \${DEPLOY_SERVICES}; do
+            case "\$service" in
+                knowledge-service|agent-service|author-site|screenshot-service) ;;
+                *) continue ;;
+            esac
+            check_container_healthy "\$(container_for_service "\$service")"
         done
+        exit 1
     fi
+    sleep 1
+done
 
-    if service_in_deploy author-site || service_in_deploy agent-service; then
-        internal_api_token=\$(awk -F= '\$1 == \"INTERNAL_API_TOKEN\" { print substr(\$0, index(\$0, \"=\") + 1); exit }' .env.docker)
-        if [ -z \"\$internal_api_token\" ]; then
-            echo '❌ .env.docker 缺少 INTERNAL_API_TOKEN，管理后台模型配置无法同步到 agent-service'
+# 健康检查
+for service in \${DEPLOY_SERVICES}; do
+    case "\$service" in
+        knowledge-service|agent-service|author-site|screenshot-service) ;;
+        *) continue ;;
+    esac
+    check_container_healthy "\$(container_for_service "\$service")"
+done
+
+# API 端点检查（重试 30 秒）
+if service_in_deploy author-site; then
+    for i in \$(seq 1 30); do
+        if curl -fsS http://127.0.0.1:3200 >/dev/null 2>&1; then
+            echo '✅ author-site 健康检查通过'
+            break
+        fi
+        if [ "\$i" -eq 30 ]; then
+            echo '❌ author-site 健康检查失败: http://127.0.0.1:3200'
+            docker logs --tail=120 workbench-author-site-1 2>/dev/null || true
             exit 1
         fi
+        sleep 1
+    done
+fi
 
-        for i in \$(seq 1 30); do
-            if curl -fsS -H \"x-internal-token: \${internal_api_token}\" http://127.0.0.1:3201/internal/backend-providers >/dev/null 2>&1; then
-                echo '✅ agent-service 内部模型配置接口鉴权通过'
-                break
-            fi
-            if [ \"\$i\" -eq 30 ]; then
-                echo '❌ agent-service 内部模型配置接口鉴权失败，请确认 author-site 与 agent-service 使用同一个 INTERNAL_API_TOKEN'
-                docker logs --tail=120 workbench-agent-service-1 2>/dev/null || true
-                exit 1
-            fi
-            sleep 1
-        done
+if service_in_deploy agent-service; then
+    for i in \$(seq 1 30); do
+        if curl -fsS http://127.0.0.1:3201/health >/dev/null 2>&1; then
+            echo '✅ agent-service 健康检查通过'
+            break
+        fi
+        if [ "\$i" -eq 30 ]; then
+            echo '❌ agent-service 健康检查失败: http://127.0.0.1:3201/health'
+            docker logs --tail=120 workbench-agent-service-1 2>/dev/null || true
+            exit 1
+        fi
+        sleep 1
+    done
+fi
+
+if service_in_deploy author-site || service_in_deploy agent-service; then
+    internal_api_token=\$(awk -F= '\$1 == "INTERNAL_API_TOKEN" { print substr(\$0, index(\$0, "=") + 1); exit }' .env.docker)
+    if [ -z "\$internal_api_token" ]; then
+        echo '❌ .env.docker 缺少 INTERNAL_API_TOKEN，管理后台模型配置无法同步到 agent-service'
+        exit 1
     fi
 
-    if service_in_deploy screenshot-service; then
-        for i in \$(seq 1 30); do
-            if curl -fsS http://127.0.0.1:3202/health >/dev/null 2>&1; then
-                echo '✅ screenshot-service 健康检查通过'
-                break
-            fi
-            if [ \"\$i\" -eq 30 ]; then
-                echo '❌ screenshot-service 健康检查失败: http://127.0.0.1:3202/health'
-                docker logs --tail=120 workbench-screenshot-service-1 2>/dev/null || true
-                exit 1
-            fi
-            sleep 1
-        done
-    fi
+    for i in \$(seq 1 30); do
+        if curl -fsS -H "x-internal-token: \${internal_api_token}" http://127.0.0.1:3201/internal/backend-providers >/dev/null 2>&1; then
+            echo '✅ agent-service 内部模型配置接口鉴权通过'
+            break
+        fi
+        if [ "\$i" -eq 30 ]; then
+            echo '❌ agent-service 内部模型配置接口鉴权失败，请确认 author-site 与 agent-service 使用同一个 INTERNAL_API_TOKEN'
+            docker logs --tail=120 workbench-agent-service-1 2>/dev/null || true
+            exit 1
+        fi
+        sleep 1
+    done
+fi
 
-    if service_in_deploy viewer-site; then
-        for i in \$(seq 1 30); do
-            if curl -fsS http://127.0.0.1:3300 >/dev/null 2>&1; then
-                echo '✅ viewer-site 健康检查通过'
-                break
-            fi
-            if [ \"\$i\" -eq 30 ]; then
-                echo '❌ viewer-site 健康检查失败: http://127.0.0.1:3300'
-                docker logs --tail=120 workbench-viewer-site-1 2>/dev/null || true
-                exit 1
-            fi
-            sleep 1
-        done
-    fi
-"
+if service_in_deploy screenshot-service; then
+    for i in \$(seq 1 30); do
+        if curl -fsS http://127.0.0.1:3202/health >/dev/null 2>&1; then
+            echo '✅ screenshot-service 健康检查通过'
+            break
+        fi
+        if [ "\$i" -eq 30 ]; then
+            echo '❌ screenshot-service 健康检查失败: http://127.0.0.1:3202/health'
+            docker logs --tail=120 workbench-screenshot-service-1 2>/dev/null || true
+            exit 1
+        fi
+        sleep 1
+    done
+fi
+
+if service_in_deploy viewer-site; then
+    for i in \$(seq 1 30); do
+        if curl -fsS http://127.0.0.1:3300 >/dev/null 2>&1; then
+            echo '✅ viewer-site 健康检查通过'
+            break
+        fi
+        if [ "\$i" -eq 30 ]; then
+            echo '❌ viewer-site 健康检查失败: http://127.0.0.1:3300'
+            docker logs --tail=120 workbench-viewer-site-1 2>/dev/null || true
+            exit 1
+        fi
+        sleep 1
+    done
+fi
+REMOTE_SCRIPT
 
 echo ""
 echo -e "${GREEN}🎉 部署成功（含自检）！${NC}"
