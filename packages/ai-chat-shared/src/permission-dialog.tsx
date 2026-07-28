@@ -110,7 +110,6 @@ export function PermissionDialog({
                   onChange={setEditablePlan}
                   format="markdown"
                   placeholder="编辑执行计划..."
-                  className="min-h-[420px]"
                 />
               </div>
 
