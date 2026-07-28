@@ -81,6 +81,23 @@ export interface SwitchSessionDemoPageRuntimeResponse {
   runtimeValidation: RuntimeValidationResult;
 }
 
+export interface ImageLocalizationFailure {
+  originalUrl: string;
+  reason: string;
+}
+
+export interface ImageLocalizationResult {
+  total: number;
+  succeeded: number;
+  failed: number;
+  failures: ImageLocalizationFailure[];
+}
+
+export interface UpdateDemoPageFilesResult {
+  runtimeValidation?: RuntimeValidationResult;
+  imageLocalization?: ImageLocalizationResult;
+}
+
 /**
  * API 响应类型
  */
@@ -295,10 +312,11 @@ export class ProjectApiClient {
       prototypeHtml?: string;
       prototypeCss?: string;
       prototypeMeta?: PrototypePageMeta;
+      localizeImages?: boolean;
     },
-  ): Promise<void> {
+  ): Promise<UpdateDemoPageFilesResult> {
     void projectId;
-    const response = await this.localRequest<null>(
+    const response = await this.localRequest<UpdateDemoPageFilesResult>(
       `/api/sessions/${sessionId}/files/${demoId}`,
       {
         method: 'PUT',
@@ -308,6 +326,7 @@ export class ProjectApiClient {
     if (!response.success) {
       throw new Error(response.error?.message || '更新页面文件失败');
     }
+    return response.data ?? {};
   }
 
   /**

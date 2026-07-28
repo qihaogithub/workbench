@@ -35,6 +35,7 @@ import {
   type SketchScenePatchOperation,
 } from "@workbench/shared";
 import type { RuntimeValidationResult } from "@workbench/project-core";
+import { localizeHtmlImages, type ImageLocalizationResult } from "@/lib/image-localizer";
 
 type SketchPatchPayload = {
   baseSceneKey?: string;
@@ -374,6 +375,7 @@ export async function PUT(
       sketchMeta,
       sketchPatch,
       diagnosticContext,
+      localizeImages,
     } = body as {
       code?: string;
       schema?: string;
@@ -384,6 +386,7 @@ export async function PUT(
       sketchMeta?: unknown;
       sketchPatch?: unknown;
       diagnosticContext?: unknown;
+      localizeImages?: boolean;
     };
     const sketchPatchDiagnosticContext =
       parseSketchPatchDiagnosticContext(diagnosticContext);
@@ -495,6 +498,35 @@ export async function PUT(
         createApiError("FORBIDDEN", "手绘页面功能暂未在创作端开放"),
         { status: 403 },
       );
+    }
+
+    let prototypeHtmlForWrite = prototypeHtml;
+    let imageLocalizationResult: ImageLocalizationResult | undefined;
+    if (
+      typeof prototypeHtml === "string" &&
+      localizeImages !== false
+    ) {
+      try {
+        const localized = await localizeHtmlImages(prototypeHtml, meta.demoId);
+        prototypeHtmlForWrite = localized.html;
+        imageLocalizationResult = localized.result;
+      } catch (err) {
+        console.error(
+          "[sessions/files] image localization error",
+          err instanceof Error ? err.message : err,
+        );
+        imageLocalizationResult = {
+          total: 0,
+          succeeded: 0,
+          failed: 1,
+          failures: [
+            {
+              originalUrl: "(unknown)",
+              reason: err instanceof Error ? err.message : "未知错误",
+            },
+          ],
+        };
+      }
     }
 
     const wsPath = findWorkspacePath(meta.workspaceId);
@@ -736,7 +768,7 @@ export async function PUT(
           ...currentFiles,
           code: code ?? currentFiles.code,
           schema: schema ?? currentFiles.schema,
-          prototypeHtml: prototypeHtml ?? currentFiles.prototypeHtml,
+          prototypeHtml: prototypeHtmlForWrite ?? currentFiles.prototypeHtml,
           prototypeCss: prototypeCss ?? currentFiles.prototypeCss,
           prototypeMeta:
             (prototypeMeta as PrototypePageMeta | undefined) ??
@@ -784,8 +816,8 @@ export async function PUT(
         addTextOperation(demoResourcePath("index.tsx"), code);
       if (typeof schema === "string")
         addTextOperation(demoResourcePath("config.schema.json"), schema);
-      if (typeof prototypeHtml === "string")
-        addTextOperation(demoResourcePath("prototype.html"), prototypeHtml);
+      if (typeof prototypeHtmlForWrite === "string")
+        addTextOperation(demoResourcePath("prototype.html"), prototypeHtmlForWrite);
       if (typeof prototypeCss === "string")
         addTextOperation(demoResourcePath("prototype.css"), prototypeCss);
       if (prototypeMeta) {
@@ -829,7 +861,7 @@ export async function PUT(
       const success = updateWorkspaceDemoFiles(meta.workspaceId, demoId, {
         code,
         schema,
-        prototypeHtml,
+        prototypeHtml: prototypeHtmlForWrite,
         prototypeCss,
         prototypeMeta: prototypeMeta as PrototypePageMeta | undefined,
         sketchScene: sketchSceneForWrite,
@@ -843,8 +875,12 @@ export async function PUT(
       }
     }
 
+    const responseData: Record<string, unknown> = {};
+    if (runtimeValidation) responseData.runtimeValidation = runtimeValidation;
+    if (imageLocalizationResult) responseData.imageLocalization = imageLocalizationResult;
+
     return NextResponse.json(
-      createApiSuccess(runtimeValidation ? { runtimeValidation } : null),
+      createApiSuccess(Object.keys(responseData).length > 0 ? responseData : null),
     );
   } catch (error) {
     if (error instanceof WorkspaceAuthorityClientError)
