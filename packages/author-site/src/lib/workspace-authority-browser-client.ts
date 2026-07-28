@@ -32,13 +32,17 @@ async function request<T>(
   init: RequestInit,
   fallback: WorkspaceAuthorityApiErrorCode,
 ): Promise<T> {
-  const response = await fetch(url, init).catch((error: unknown) => {
+  let response: Response;
+  try {
+    response = await fetch(url, init);
+  } catch (error: unknown) {
     throw new WorkspaceAuthorityClientError(
       "WORKSPACE_AUTHORITY_NOT_READY",
       error instanceof Error ? error.message : "Workspace Authority 不可用",
       503,
     );
-  });
+  }
+
   const body = (await response.json().catch(() => ({}))) as Envelope<T>;
   if (!response.ok || body.success === false || body.data === undefined) {
     throw new WorkspaceAuthorityClientError(
