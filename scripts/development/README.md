@@ -8,9 +8,12 @@
 
 | 脚本 | 根目录快捷命令 | 用途 |
 |---|---|---|
-| `detect-sync-status-flap.mjs` | `pnpm test:sync-status-flap` | 用 Playwright 打开编辑页，采样协同同步状态，并调用 Workspace flush 探针复现“同步失败”或连接状态抖动。 |
+| `detect-sync-status-flap.mjs` | `pnpm test:sync-status-flap` | 用 Playwright 打开编辑页，采样协同同步状态，并调用 Workspace flush 探针复现"同步失败"或连接状态抖动。 |
 | `create-prototype-canvas-performance-fixtures.mjs` | `pnpm test:prototype-canvas-fixtures` | 通过 Project CLI 创建 20 页 HTML/CSS 原型与 20 页高保真 React 性能基线项目，输出可用于采样的项目 ID。 |
 | `measure-prototype-canvas-performance.mjs` | `pnpm test:prototype-canvas-performance` | 用 Playwright 采样创作端画布首屏、滚动、缩放、DOM 数量和 iframe/prototype 数量，生成可对比的性能基线 JSON。 |
+| `measure-edit-page-load.mjs` | `pnpm measure:edit-page-load` | 用 ego-browser 测量编辑页冷/热加载耗时、加载中持续时间和返回首页耗时。 |
+| `measure-edit-page-unmount.mjs` | `pnpm measure:unmount` | 用 ego-browser + CDP 测量编辑页 unmount 清理耗时（导航到首页总时间减去首页自身加载时间）。 |
+| `measure-click-to-preview.mjs` | `pnpm measure:click-to-preview` | 用 ego-browser 自动化点击页面树，测量点击到预览 iframe 更新的端到端延迟。 |
 | `knowledge-validation-suite.mjs` | `pnpm test:knowledge-validation` / `pnpm test:knowledge-validation:run` | 通过 Project CLI 构造知识库验证场景、创建模板、实例化项目，并可选调用 Agent 评估知识库回答质量。 |
 | `test-ai-workspace-refresh.mjs` | `pnpm test:ai-workspace-refresh` | 验证 AI 写入 `demos/` 文件后，author-site 是否能刷新工作区状态，并运行相关 agent-service 单测。 |
 
@@ -253,6 +256,107 @@ node scripts/development/test-ai-workspace-refresh.mjs
 - 报告：`tmp/ai-workspace-refresh-test/report.json`
 
 如果静态检查失败，或相关单测失败，脚本会以非零状态退出。
+
+## measure-edit-page-load.mjs
+
+### 功能
+
+用 ego-browser 测量创作端编辑页的完整加载流程：
+
+1. 冷加载：从首次导航到编辑页到"加载中…"消失的时间
+2. 返回首页：从编辑页导航回首页的耗时
+3. 热加载：从首页再次导航回编辑页的耗时
+
+输出 JSON 格式结果和可读摘要。
+
+### 运行方式
+
+```bash
+pnpm measure:edit-page-load [projectId]
+```
+
+### 常用环境变量
+
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `BASE_URL` | `http://localhost:3200` | 创作端地址 |
+| `PROJECT_ID` | `data/projects/` 下第一个 | 项目 ID |
+| `NO_LOGIN` | — | 设为 `1` 跳过自动登录 |
+
+## measure-edit-page-unmount.mjs
+
+### 功能
+
+用 ego-browser + CDP Performance API 精确测量编辑页 unmount 清理耗时。原理：
+
+1. 导航到编辑页，等待完全加载
+2. 触发导航到首页，记录时间戳
+3. 从首页的 `performance.getEntriesByType('navigation')` 获取首页自身加载时间
+4. `unmount ≈ 总耗时 - 首页加载时间`
+
+自动运行多轮（可配置），输出 min/avg/max 汇总。
+
+### 运行方式
+
+```bash
+# 默认 3 次采样
+pnpm measure:unmount [projectId]
+
+# 5 次采样
+RUNS=5 PROJECT_ID=<projectId> pnpm measure:unmount
+```
+
+### 常用环境变量
+
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `BASE_URL` | `http://localhost:3200` | 创作端地址 |
+| `PROJECT_ID` | `data/projects/` 下第一个 | 项目 ID |
+| `RUNS` | `3` | 重复测量次数 |
+| `NO_LOGIN` | — | 设为 `1` 跳过自动登录 |
+
+### 输出解读
+
+| unmount 估算 | 含义 |
+|-------------|------|
+| < 200ms | 正常 |
+| 200-500ms | 中等，effect cleanup 有一定开销 |
+| > 500ms | 偏高，建议排查 iframe/ResizeObserver/WebSocket 清理效率 |
+| > 1000ms | 严重，存在同步阻塞式清理 |
+
+## measure-click-to-preview.mjs
+
+### 功能
+
+用 ego-browser 自动化点击页面树中的页面项，测量从点击到预览 iframe 更新的端到端延迟。需要项目至少有 2 个页面。
+
+### 运行方式
+
+```bash
+# 默认 5 次点击
+pnpm measure:click-to-preview [projectId]
+
+# 10 次点击
+CLICKS=10 PROJECT_ID=<projectId> pnpm measure:click-to-preview
+```
+
+### 常用环境变量
+
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `BASE_URL` | `http://localhost:3200` | 创作端地址 |
+| `PROJECT_ID` | `data/projects/` 下第一个 | 项目 ID |
+| `CLICKS` | `5` | 点击次数 |
+| `NO_LOGIN` | — | 设为 `1` 跳过自动登录 |
+
+### 输出解读
+
+| p95 延迟 | 含义 |
+|----------|------|
+| < 500ms | 正常 |
+| 500-1000ms | 可接受 |
+| 1000-2000ms | 偏高，体感有延迟 |
+| > 2000ms | 严重，存在明显点击延迟 |
 
 ## 使用注意事项
 

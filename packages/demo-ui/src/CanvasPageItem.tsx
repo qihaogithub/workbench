@@ -251,7 +251,9 @@ export function CanvasPagePreviewContent({
         measuredWidth,
       );
 
-      if (nextLayout) onLayoutChange?.(page.id, nextLayout);
+      if (nextLayout) {
+        onLayoutChange?.(page.id, nextLayout);
+      }
     },
     [page, onLayoutChange, contentHeight],
   );

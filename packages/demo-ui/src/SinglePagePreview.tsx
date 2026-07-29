@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 
 import { IframePreviewFrame } from "./IframePreviewFrame";
 import { PreviewPanel } from "./PreviewPanel";
@@ -21,14 +21,17 @@ function DefaultEmptyState() {
   );
 }
 
-export function SinglePagePreview({
+function SinglePagePreviewInternal({
   page,
   rendererProps,
   emptyState,
   className,
   onBackgroundClick,
 }: SinglePagePreviewProps) {
-  const previewSize = page ? resolvePreviewStageSize(page) : undefined;
+  const previewSize = useMemo(
+    () => (page ? resolvePreviewStageSize(page) : undefined),
+    [page?.schema, page?.previewSize, page?.prototypeMeta, page?.fallbackPreviewSize],
+  );
   const renderer = page ? resolvePagePreviewRenderer(page) : "empty";
 
   let content: React.ReactNode = emptyState ?? <DefaultEmptyState />;
@@ -108,4 +111,29 @@ export function SinglePagePreview({
     </div>
   );
 }
+
+function areSinglePagePreviewPropsEqual(
+  prev: SinglePagePreviewProps,
+  next: SinglePagePreviewProps,
+): boolean {
+  if (prev.page === next.page) return true;
+  const p = prev.page;
+  const n = next.page;
+  if (!p || !n) return p === n;
+  return (
+    p.id === n.id &&
+    p.code === n.code &&
+    p.compiledJsUrl === n.compiledJsUrl &&
+    p.prototypeHtml === n.prototypeHtml &&
+    p.prototypeCss === n.prototypeCss &&
+    p.configData === n.configData &&
+    p.previewSize === n.previewSize &&
+    p.runtimeType === n.runtimeType
+  );
+}
+
+export const SinglePagePreview = React.memo(
+  SinglePagePreviewInternal,
+  areSinglePagePreviewPropsEqual,
+);
 
