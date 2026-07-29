@@ -2400,7 +2400,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   const applyActivePrototypeVisualPropertyChange = useCallback(
     (
-      node: Pick<VisualNodeInfo, "nodeId" | "domPath">,
+      node: VisualNodeInfo,
       property: string,
       value: string,
       kind: VisualPropertyChangeKind,
@@ -3170,8 +3170,12 @@ ${context.details}
       try {
         setIsLoading(true);
 
-        // 并行获取项目名称
-        const demosRes = await fetch("/api/demos");
+        // 并行获取项目列表和用户偏好
+        const [demosRes, userAuthoringPreferencesRes] = await Promise.all([
+          fetch("/api/demos"),
+          fetch("/api/user/authoring-preferences"),
+        ]);
+
         const demosData = await demosRes.json();
         if (demosData.success) {
           const demo = demosData.data.find(
@@ -3189,9 +3193,6 @@ ${context.details}
           }
         }
 
-        const userAuthoringPreferencesRes = await fetch(
-          "/api/user/authoring-preferences",
-        );
         if (userAuthoringPreferencesRes.ok) {
           const userAuthoringPreferencesData =
             await userAuthoringPreferencesRes.json();
@@ -6196,7 +6197,7 @@ ${context.details}
               }}
               disabled={publishButtonDisabled}
               variant={!publishButtonDisabled ? "default" : "outline"}
-              className="gap-2 rounded-r-none"
+              className={`gap-2 ${publishStatus === "published" ? "rounded-r-none" : ""}`}
             >
               {publishing ? (
                 <>
@@ -7948,6 +7949,12 @@ ${context.details}
         </DialogContent>
       </Dialog>
 
+      <ShareDialog
+        projectId={demoId}
+        open={showShareDialog}
+        onOpenChange={setShowShareDialog}
+      />
+
       <Dialog open={showUnpublishDialog} onOpenChange={setShowUnpublishDialog}>
         <DialogContent>
           <DialogHeader>
@@ -7980,12 +7987,6 @@ ${context.details}
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <ShareDialog
-        projectId={demoId}
-        open={showShareDialog}
-        onOpenChange={setShowShareDialog}
-      />
 
     </div>
   );

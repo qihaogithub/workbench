@@ -234,7 +234,7 @@ function setNullableStringStateIfChanged(
   setter((current) => (current === value ? current : value));
 }
 
-export function PreviewPanel({
+function PreviewPanelInternal({
   code,
   sessionId,
   demoId,
@@ -1580,3 +1580,28 @@ export function PreviewPanel({
     </>
   );
 }
+
+function arePreviewPanelPropsEqual(
+  prev: PreviewPanelProps,
+  next: PreviewPanelProps,
+): boolean {
+  if (prev.fillContainer || next.fillContainer) return false;
+  return (
+    prev.code === next.code &&
+    prev.compiledJsUrl === next.compiledJsUrl &&
+    prev.previewSize === next.previewSize &&
+    prev.configData === next.configData &&
+    prev.demoId === next.demoId &&
+    prev.sessionId === next.sessionId &&
+    prev.placeholderScreenshotUrl === next.placeholderScreenshotUrl &&
+    prev.activityState === next.activityState &&
+    prev.visualEditMode === next.visualEditMode &&
+    prev.visualAnnotationMode === next.visualAnnotationMode &&
+    prev.isAutoRepairing === next.isAutoRepairing
+  );
+}
+
+export const PreviewPanel = React.memo(
+  PreviewPanelInternal,
+  arePreviewPanelPropsEqual,
+);
