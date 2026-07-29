@@ -296,7 +296,7 @@ git diff eb49452f^..eb49452f --stat | grep -E '\.tsx?$'
 | **P0** | `SinglePagePreview` 中 `resolvePreviewStageSize` 加 `useMemo` | 稳定 previewSize 返回值引用，使 React.memo 能正确比较 | 减少因 previewSize 新对象导致的无效重渲染 | ✅ 已完成 (2026-07-29) |
 | **P1** | `loadDemo` 并行化前两个 API 调用 | `/api/demos` 和 `/api/user/authoring-preferences` 同时发起 | 节省 ~50ms 初始加载 | ✅ 已完成 (2026-07-29) |
 | **P1** | `previewStagePages` 减少 deps | 移除 `code`（不影响预览结构），稳定 `configDataMap` 引用 | 减少不必要的 useMemo 重算 | ❌ 取消（`code` 移除会导致 active page 预览代码滞后一帧） |
-| **P2** | 代码分割 `DemoEditPage` | 按 `docs/plans/进行中/创作端编辑页代码分割优化方案.md` 拆分 | 减少单次渲染重评估的代码量 | 待实施 |
+| **P2** | 代码分割 `DemoEditPage` | 用 `next/dynamic({ ssr: false })` 惰性加载 PreviewStage、AIChat、PageConfigPanel、SketchEditor 面板、5 个 Dialog、VisualPropertyPanel、KnowledgePanel、DemoPageTree、WorkspaceFileTree | 编辑页 chunk 318→211 KB（-34%），First Load JS 1.34→1.13 MB（-16%） | ✅ 已完成 (2026-07-29) |
 
 ### 首页慢
 
@@ -331,12 +331,36 @@ git diff eb49452f^..eb49452f --stat | grep -E '\.tsx?$'
 - **`previewStagePages` 移除 `code` 依赖**：取消，因为 `code` 变化时 `pageCodes[activeDemoId]` 由异步 effect 更新，移除会导致 active page 预览滞后一帧
 - **`PreviewStage` 加 `React.memo`**：取消，因为 `PreviewStage` 仅 86 行且 props 中 `singlePageProps` 等 JSX 对象每次渲染都是新引用，memo 难以生效。重渲染级联已在 `SinglePagePreview` 和 `PreviewPanel` 两层拦截
 
+### P2 代码分割（2026-07-29）
+
+将 16 个重组件改为 `next/dynamic({ ssr: false, loading: () => null })` 惰性加载：
+
+| 组件 | 类别 | 分割理由 |
+|------|------|----------|
+| `PreviewStage` | 预览 | 最重组件（iframe 编译 + 画布），browser-only |
+| `AIChat` | AI 对话 | 流式 SSE + Markdown + 工具 UI，browser-only |
+| `PageConfigPanel` | 配置 | 表单密集 + schema 渲染 + widgets |
+| `VisualPropertyPanel` | 可视化编辑 | 条件渲染（single + edit tab） |
+| `SketchEditorEngineStage/Toolbar/LayerPanel/InspectorPanel` | 草图编辑 | 条件渲染（sketch-scene），hook 保持静态 |
+| `DemoPageTree` / `WorkspaceFileTree` / `KnowledgePanel` | 侧栏 | 文件树/知识面板，Tab 内渲染 |
+| `CoverImageDialog` / `ShareDialog` / `WorkspaceCodeDialog` / `KnowledgeDocDialog` / `ResourceHistoryDialog` | 弹窗 | 条件渲染，仅用户操作时打开 |
+
+同时删除了 `VisualDraftActionBar` 的无效 import（dead code）。
+
+**构建产物对比**：
+
+| 指标 | 优化前 | 优化后 | 变化 |
+|------|--------|--------|------|
+| 编辑页 page chunk | 318 KB | 211 KB | -107 KB (-34%) |
+| First Load JS | 1.34 MB | 1.13 MB | -210 KB (-16%) |
+
 ### 验证结果
 
 - `check:author` typecheck 通过
-- `check:author` test：971 passed / 1 failed（Figma OAuth 回调 URL，环境相关预存失败）
+- `check:author` test：976 passed / 1 failed（Figma OAuth 回调 URL，环境相关预存失败）
 - `check:demo-ui` typecheck：非 test 文件 0 错误；test 文件预存 matcher 类型错误（`PreviewStage.test.tsx`、`SinglePagePreview.test.tsx`，非本次引入）
 - `check:demo-ui` test：预存 vitest 配置错误（`Cannot set property testPath`），15 个 test 全部受影响（非本次引入）
+- `pnpm --filter @workbench/author-site build` 通过，chunk 分割生效
 - 已移除 5 个文件中的 `console.count` 调试语句（PreviewPanel、SinglePagePreview、PreviewStage、CanvasPageItem、PrototypePagePreview）
 
 ### 测量脚本修复（2026-07-29）
