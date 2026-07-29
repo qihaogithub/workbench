@@ -101,6 +101,7 @@ export function useVersionControl(params: UseVersionControlParams) {
 
   const [publishStatus, setPublishStatus] = useState<PublishStatus>(null);
   const [publishing, setPublishing] = useState(false);
+  const [unpublishing, setUnpublishing] = useState(false);
   const [versionHistory, setVersionHistory] =
     useState<VersionHistoryResponse | null>(null);
   const [pageVersionHistories, setPageVersionHistories] = useState<
@@ -240,6 +241,27 @@ export function useVersionControl(params: UseVersionControlParams) {
       });
     } finally {
       setPublishing(false);
+    }
+  };
+
+  const handleUnpublish = async () => {
+    setUnpublishing(true);
+    try {
+      await projectApiClient.unpublishProject(demoId);
+      setPublishStatus("never_published");
+      setPublishedVersion(null);
+      toast({
+        description: "已撤销发布",
+      });
+    } catch (err) {
+      toast({
+        title: "撤销发布失败",
+        description:
+          err instanceof Error ? err.message : "撤销发布失败",
+        variant: "destructive",
+      });
+    } finally {
+      setUnpublishing(false);
     }
   };
 
@@ -638,6 +660,7 @@ export function useVersionControl(params: UseVersionControlParams) {
     publishStatus,
     setPublishStatus,
     publishing,
+    unpublishing,
     versionHistory,
     pageVersionHistories,
     restoring,
@@ -655,6 +678,7 @@ export function useVersionControl(params: UseVersionControlParams) {
     loadVersionHistory,
     loadPageVersionHistories,
     handlePublish,
+    handleUnpublish,
     handlePreviewPageVersion,
     handleRestorePageVersion,
     handleRestoreProjectVersion,

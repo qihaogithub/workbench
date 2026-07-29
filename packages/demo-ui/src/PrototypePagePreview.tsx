@@ -28,6 +28,7 @@ export interface PrototypePagePreviewProps {
   /** 单页预览允许设计画板内部纵向滚动查看超高内容；画布/截图保持裁剪 */
   allowScroll?: boolean;
   className?: string;
+  onContentHeightChange?: (height: number) => void;
   visualEditMode?: boolean;
   visualHoverNodeId?: string | null;
   selectedVisualNodeId?: string | null;
@@ -328,6 +329,7 @@ export function PrototypePagePreview({
   effectiveHeight,
   allowScroll = false,
   className,
+  onContentHeightChange,
   visualEditMode = false,
   visualHoverNodeId,
   selectedVisualNodeId,
@@ -420,6 +422,7 @@ export function PrototypePagePreview({
       previewSize: shouldScaleToPreviewSize
         ? { width: designWidth, height: designHeight }
         : undefined,
+      constrainHeight: shouldScaleToPreviewSize ? !fillContainer : undefined,
     });
     const root = shadow.querySelector(".prototype-root");
     if (root) {
@@ -433,11 +436,31 @@ export function PrototypePagePreview({
     designHeight,
     designWidth,
     demoId,
+    fillContainer,
     html,
     sessionId,
     shouldScaleToPreviewSize,
     visualPropertyChanges,
   ]);
+
+  useLayoutEffect(() => {
+    if (!onContentHeightChange || !shouldScaleToPreviewSize) return;
+    const shadow = shadowRef.current;
+    if (!shadow) return;
+    const root = shadow.querySelector<HTMLElement>(".prototype-root");
+    if (!root) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const height = entry.contentRect.height;
+        if (Number.isFinite(height) && height > 0) {
+          onContentHeightChange(height);
+        }
+      }
+    });
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [onContentHeightChange, shouldScaleToPreviewSize]);
 
   useEffect(() => {
     const shadow = shadowRef.current;

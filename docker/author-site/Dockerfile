@@ -86,6 +86,8 @@ COPY --from=builder /app/packages/author-site/.next/standalone ./
 COPY --from=builder /app/packages/author-site/.next/static ./packages/author-site/.next/static
 COPY --from=builder /app/packages/author-site/public ./packages/author-site/public
 COPY --from=builder /app/packages/author-site/scripts/init-db.js ./packages/author-site/scripts/init-db.js
+COPY docker/author-site/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 # bcryptjs 为纯 JS 实现，无需复制原生模块
 
 EXPOSE 3200
@@ -93,4 +95,4 @@ EXPOSE 3200
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
   CMD node -e "fetch('http://localhost:3200').then(r=>process.exit(0)).catch(()=>process.exit(1))"
 
-CMD ["node", "packages/author-site/server.js"]
+CMD ["/entrypoint.sh"]

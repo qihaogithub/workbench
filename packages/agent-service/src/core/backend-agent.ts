@@ -9,34 +9,12 @@ import {
 import { IBackendAdapter } from "../backends/base";
 import { logger } from "../utils/logger";
 import { getErrorMessage } from "../utils/error-utils";
+import {
+  isRateLimitError,
+  isRetryableLlmError,
+  withLlmRetry,
+} from "../utils/retry-utils";
 import { INACTIVITY_TIMEOUT_MS, ABSOLUTE_TIMEOUT_MS } from "./timeouts";
-
-// ============================================================
-// LLM API 调用重试与错误分类
-// ============================================================
-
-const MAX_LLM_RETRIES = 2;
-const INITIAL_RETRY_DELAY_MS = 1000;
-const MAX_RETRY_DELAY_MS = 10_000;
-
-function getErrorStatus(error: unknown): number | undefined {
-  if (!error || typeof error !== "object") return undefined;
-  const record = error as Record<string, unknown>;
-  const status = record.status ?? record.statusCode;
-  return typeof status === "number" ? status : undefined;
-}
-
-function isRateLimitError(error: unknown): boolean {
-  if (getErrorStatus(error) === 429) return true;
-  const msg = getErrorMessage(error, "").toLowerCase();
-  return (
-    msg.includes("rate limit") ||
-    msg.includes("rate_limit") ||
-    msg.includes("429") ||
-    msg.includes("too many requests") ||
-    msg.includes("quota")
-  );
-}
 
 /**
  * 识别 LLM API 上下文窗口溢出错误。
@@ -54,41 +32,6 @@ function isContextOverflowError(error: unknown): boolean {
     msg.includes("context length exceeded") ||
     msg.includes("context window exceeded")
   );
-}
-
-function isRetryableLlmError(error: unknown): boolean {
-  if (isRateLimitError(error)) return true;
-  const status = getErrorStatus(error);
-  if (status && status >= 500 && status <= 599) return true;
-  const msg = getErrorMessage(error, "").toLowerCase();
-  return (
-    msg.includes("timeout") ||
-    msg.includes("timed out") ||
-    msg.includes("econnreset") ||
-    msg.includes("econnrefused") ||
-    msg.includes("fetch failed") ||
-    msg.includes("network") ||
-    msg.includes("connection error")
-  );
-}
-
-function getRetryAfterMs(error: unknown): number | null {
-  if (!error || typeof error !== "object") return null;
-  const record = error as Record<string, unknown>;
-  const retryAfter = record.retryAfter ?? record["retry-after"];
-  if (typeof retryAfter === "number") return retryAfter * 1000;
-  if (typeof retryAfter === "string") {
-    const seconds = parseInt(retryAfter, 10);
-    if (!Number.isNaN(seconds)) return seconds * 1000;
-  }
-  return null;
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms);
-    timer.unref?.();
-  });
 }
 
 interface BackendWithModelSupport extends IBackendAdapter {
@@ -218,47 +161,30 @@ export class BackendAgent extends BaseAgent {
       }
 
       // LLM API 调用重试：对 429/5xx/超时等可恢复错误自动重试
-      let resultContent: string;
-      let llmAttempt = 0;
-      for (;;) {
-        try {
-          resultContent = await this.backend.sendMessage(content, {
+      const resultContent = await withLlmRetry(
+        () =>
+          this.backend.sendMessage(content, {
             stream: options?.stream,
             images: options?.images,
             files: options?.files,
-          });
-          break;
-        } catch (error) {
-          // 超时或 cancel 后不再重试
+          }),
+        {},
+        (error, meta) => {
+          // 超时或 cancel 后不再重试，立即向上抛出
           if (timedOut || !this.busy) throw error;
-          if (llmAttempt >= MAX_LLM_RETRIES || !isRetryableLlmError(error))
-            throw error;
-
-          // 指数退避 + 抖动；429 优先读取 Retry-After
-          const baseDelay = Math.min(
-            INITIAL_RETRY_DELAY_MS * Math.pow(2, llmAttempt),
-            MAX_RETRY_DELAY_MS,
-          );
-          const jitter = Math.random() * baseDelay * 0.5;
-          const retryAfter = getRetryAfterMs(error);
-          const waitMs = retryAfter ?? Math.round(baseDelay + jitter);
-
           logger.warn(
             {
               sessionId: this.sessionId,
-              attempt: llmAttempt + 1,
-              maxRetries: MAX_LLM_RETRIES,
-              waitMs,
+              attempt: meta.attempt + 1,
+              maxRetries: meta.maxRetries,
+              waitMs: meta.waitMs,
               error: getErrorMessage(error),
               isRateLimit: isRateLimitError(error),
             },
             "LLM API error, retrying after backoff",
           );
-
-          await sleep(waitMs);
-          llmAttempt++;
-        }
-      }
+        },
+      );
 
       // 竞态防护：cancel() 触发 abort 但 harness.prompt() 仍正常 resolve
       if (timedOut) {

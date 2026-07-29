@@ -462,7 +462,7 @@ export interface UseVisualEditStateParams {
   setTriggerAutoSend: React.Dispatch<React.SetStateAction<string | AutoRepairTrigger | VisualPropertyAutoSend | null>>;
   isPrototypeVisualPage?: () => boolean;
   applyPrototypeVisualPropertyChange?: (
-    node: VisualNodeInfo,
+    node: Pick<VisualNodeInfo, "nodeId" | "domPath">,
     property: string,
     value: string,
     kind: VisualPropertyChangeKind,
@@ -714,12 +714,27 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
       return;
     }
 
+    if (
+      visualPendingPropertyChanges.length > 0 &&
+      isPrototypeVisualPage?.() &&
+      applyPrototypeVisualPropertyChange
+    ) {
+      for (const change of visualPendingPropertyChanges) {
+        applyPrototypeVisualPropertyChange(
+          change,
+          change.property,
+          change.previousValue ?? "",
+          change.kind,
+        );
+      }
+    }
+
     setVisualPropertyChanges([]);
     setVisualConfigMarks([]);
     setPrototypePropertyApplyStatus({});
     setVisualAiInstruction("");
     setVisualPropertySubmission(EMPTY_VISUAL_PROPERTY_SUBMISSION);
-  }, [visualPropertySubmission]);
+  }, [visualPropertySubmission, visualPendingPropertyChanges, isPrototypeVisualPage, applyPrototypeVisualPropertyChange]);
 
   const handleClearSelectedVisualProperties = useCallback(() => {
     if (!selectedVisualNode) return;

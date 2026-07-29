@@ -9,6 +9,7 @@ import {
 } from "react";
 import { cn } from "../lib/utils";
 import { usePromptInput } from "../prompt-input";
+import { useToast } from "../ui/toast-provider";
 
 export interface InlineTag {
   id: string;
@@ -173,6 +174,7 @@ export function InlineTagInput({
   const tagsMapRef = useRef<Map<string, InlineTag>>(new Map());
   const isComposingRef = useRef(false);
   const promptCtx = usePromptInput();
+  const { toast } = useToast();
   const [, forceRender] = useState(0);
 
   const syncToPromptInput = useCallback(() => {
@@ -354,6 +356,26 @@ export function InlineTagInput({
 
   const handlePaste = useCallback(
     (e: React.ClipboardEvent<HTMLDivElement>) => {
+      const items = Array.from(e.clipboardData.items)
+      const imageFiles: File[] = []
+      for (const item of items) {
+        if (item.kind === 'file' && item.type.startsWith('image/')) {
+          const file = item.getAsFile()
+          if (file) imageFiles.push(file)
+        }
+      }
+      if (imageFiles.length > 0) {
+        e.preventDefault()
+        if (!promptCtx.supportsImages) {
+          toast({
+            title: '当前模型不支持图片处理',
+            description: '请联系管理员在管理后台启用识图代理功能，或切换为多模态模型。',
+          })
+          return
+        }
+        promptCtx.addFiles(imageFiles)
+        return
+      }
       e.preventDefault();
       const text = e.clipboardData.getData("text/plain");
       if (text) {
@@ -361,7 +383,7 @@ export function InlineTagInput({
         syncToPromptInput();
       }
     },
-    [syncToPromptInput],
+    [syncToPromptInput, promptCtx, toast],
   );
 
   const handleCompositionStart = useCallback(() => {

@@ -362,9 +362,30 @@ Screenshot 服务：
 
 Docker：
 
-- `docker-compose.yml` 包含 agent-service、author-site、screenshot-service、viewer-site。
+- `docker-compose.yml` 包含 agent-service、author-site、screenshot-service、viewer-site、knowledge-service。
 - viewer-site 当前没有配置 profile，默认随 compose 一起启动。
 - 部署脚本：`scripts/deploy.sh`。
+- Docker 环境：OrbStack（macOS）。国内 Docker Hub 直连不通，需通过 Clash 代理拉取镜像。
+
+OrbStack 代理配置（开发必备）：
+
+OrbStack `network_proxy` 如果在 VM 启动前就指向宿主机桥接 IP（`192.168.139.3`），会导致 VM 启不动（桥接由 OrbStack 自己创建，启动时尚未就绪，死锁）。解决方案是**运行时注入**：
+
+```bash
+# 正常开发时保持 none（VM 总能启动）
+orb config set network_proxy none
+
+# 需要拉镜像/重新构建时，一行注入代理即可生效（无需重启）
+orb config set network_proxy "http://192.168.139.3:7892"
+
+# 重建部署完成后可恢复（可选，但推荐恢复以避免下次重启卡死）
+orb config set network_proxy none
+```
+
+前提条件：
+- Clash（mihomo-party）必须开启 Allow LAN，监听 `0.0.0.0:7892`（混合端口，需支持 HTTPS CONNECT）
+- `~/.orbstack/config/docker.json` 应保持干净（`{}`），不要混入 `http-proxy` 字段（OrbStack 不会用 Docker daemon 级代理配置）
+- 所有国内免费 Docker Hub 镜像源（daocloud、dockerhub.icu、163、aliyun、1ms.run 等）已全部失效，不要折腾
 
 ## 代码约定
 

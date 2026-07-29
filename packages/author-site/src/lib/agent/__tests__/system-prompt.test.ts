@@ -16,7 +16,7 @@ describe('buildStaticSystemPrompt', () => {
     const prompt = buildStaticSystemPrompt();
     expect(prompt).toContain('OneFlow Authoring Agent');
     expect(prompt).toContain('OneFlow 创作工作流助手');
-    expect(prompt).toContain('页面管理操作');
+    expect(prompt).toContain('页面生命周期操作');
     expect(prompt).toContain('项目级配置管理');
     expect(prompt).toContain('禁止行为');
   });
@@ -40,7 +40,6 @@ describe('buildStaticSystemPrompt', () => {
 
   it('不包含 L3 章节（工作空间结构 / 页面信息）', () => {
     const prompt = buildStaticSystemPrompt();
-    // L2 中"禁止行为"含"工作空间目录外"是合理的；这里只验证 L3 独有标题"页面信息"与"包含 N 个页面"占位结构
     expect(prompt).not.toContain('## 页面信息');
     expect(prompt).not.toMatch(/包含 \{\{PAGE_COUNT\}\} 个页面/);
   });
@@ -49,62 +48,6 @@ describe('buildStaticSystemPrompt', () => {
     const a = buildStaticSystemPrompt();
     const b = buildStaticSystemPrompt();
     expect(a).toBe(b);
-  });
-  it('delete page rules use transactional tools when available', () => {
-    const prompt = buildStaticSystemPrompt({
-      toolNames: ['listPages', 'previewDeletePages', 'executeDeletePagePlan', 'deletePage', 'deletePages'],
-    });
-    expect(prompt).toContain('listPages');
-    expect(prompt).toContain('不要根据页面名称、显示顺序或路径片段猜测页面 ID');
-    expect(prompt).toContain('previewDeletePages');
-    expect(prompt).toContain('executeDeletePagePlan');
-    expect(prompt).toContain('mode: "nameIncludes"');
-    expect(prompt).toContain('目标数量大于 1 时，只能走 `previewDeletePages` → `executeDeletePagePlan`');
-    expect(prompt).toContain('可以删除最后一个页面');
-    expect(prompt).not.toContain('无法删除最后一个页面');
-  });
-
-  it('delete page rules fall back to deletePages when transaction tools are unavailable', () => {
-    const prompt = buildStaticSystemPrompt({
-      toolNames: ['listPages', 'deletePage', 'deletePages'],
-    });
-
-    expect(prompt).toContain('当前 Agent Service 尚未提供事务化删除工具');
-    expect(prompt).toContain('deletePages({');
-    expect(prompt).not.toContain('previewDeletePages({');
-    expect(prompt).toContain('可以删除最后一个页面');
-    expect(prompt).not.toContain('项目至少保留一个页面');
-  });
-
-  it('delete page rules disable deletion when delete tools are unavailable', () => {
-    const prompt = buildStaticSystemPrompt({
-      toolNames: ['listPages'],
-    });
-
-    expect(prompt).toContain('当前 Agent Service 没有提供页面删除工具');
-    expect(prompt).toContain('你不能删除页面，也不能声称已经删除页面');
-    expect(prompt).not.toContain('executeDeletePagePlan({');
-  });
-
-  it('canvas layout rules use arrangeCanvasPages when available', () => {
-    const prompt = buildStaticSystemPrompt({
-      toolNames: ['arrangeCanvasPages', 'listPages'],
-    });
-
-    expect(prompt).toContain('画布管理');
-    expect(prompt).toContain('arrangeCanvasPages({');
-    expect(prompt).toContain('不要用 `writeFile`、`editFile`、`bash` 或 `node` 直接创建、修改或覆盖 `.canvas-layout.json`');
-    expect(prompt).toContain('页面 ID 必须来自 `listPages`');
-  });
-
-  it('canvas layout rules disable canvas changes when tool is unavailable', () => {
-    const prompt = buildStaticSystemPrompt({
-      toolNames: ['listPages'],
-    });
-
-    expect(prompt).toContain('当前 Agent Service 没有提供画布布局工具');
-    expect(prompt).toContain('你不能整理、排列或修改画布中的页面位置和尺寸');
-    expect(prompt).not.toContain('arrangeCanvasPages({');
   });
 
   it('明确告知创作端 agent 可以委派子 Agent', () => {
@@ -123,23 +66,19 @@ describe('buildStaticSystemPrompt', () => {
 
   it('约束新建页面时不得自行添加配置项', () => {
     const prompt = buildStaticSystemPrompt();
-    expect(prompt).toContain('如果用户没有明确要求配置项，必须写入空配置 schema');
-    expect(prompt).toContain('不能从页面内容中自行抽取配置字段');
-    expect(prompt).toContain('HTML/CSS 原型页是创作端 AI 的默认实现方式');
-    expect(prompt).toContain('原型页写入 `prototype.html` / `prototype.css`，高保真页写入 `index.tsx`');
+    // 创建页面的详细配置约束已移入 page-lifecycle skill，基座保留 Tier 1 配置规则
+    expect(prompt).toContain('默认在 `demos/` 下创建 HTML/CSS 原型页目录');
     expect(prompt).toContain('runtimeType: "prototype-html-css"');
-    expect(prompt).toContain('"properties": {}');
-    expect(prompt).toContain('"required": []');
-    expect(prompt).toContain('如果 schema 没有配置字段，Props 必须为空');
+    expect(prompt).toContain('properties` 必须为空对象');
+    expect(prompt).toContain('required` 必须为空数组');
     expect(prompt).toContain('不得因生成页面、样式调整、组件修改、素材替换等原因自行增删配置字段');
   });
 
-  it('默认 schema 模板包含 $demo.previewSize', () => {
+  it('默认 schema 模板 previewSize 已迁移到 page-lifecycle skill', () => {
     const prompt = buildStaticSystemPrompt();
-    expect(prompt).toContain('"previewSize"');
-    expect(prompt).toContain('"width": 375');
-    expect(prompt).toContain('"height": 812');
-    expect(prompt).toContain('`previewSize` 的宽高由你根据页面目标设备和内容自行判断填写');
+    // previewSize 模板完整定义已移入 page-lifecycle skill，基座仅保留配置项约束规则
+    expect(prompt).toContain('config.schema.json');
+    expect(prompt).toContain('页面生命周期操作');
   });
 
   it('明确说明 HTML/CSS 原型页支持页面级配置绑定', () => {
@@ -150,8 +89,6 @@ describe('buildStaticSystemPrompt', () => {
     expect(prompt).toContain('data-bind-text');
     expect(prompt).toContain('data-bind-src');
     expect(prompt).toContain('{{fieldKey}}');
-    expect(prompt).toContain('给原型页添加配置项时，应在 `config.schema.json` 中添加字段');
-    expect(prompt).toContain('`prototype.html` 的目标元素上补齐对应 `data-bind-*` 或 `{{fieldKey}}` 绑定');
   });
 
   it('包含共享 preview contract 生成的页面运行规则', () => {
@@ -169,6 +106,66 @@ describe('buildStaticSystemPrompt', () => {
     expect(prompt).toContain('标题、描述、分类、标签');
     expect(prompt).toContain('readFile');
     expect(prompt).toContain('不要一次性读取全部知识库');
+  });
+
+  it('外部协作工具（Figma/钉钉）规则保留在基座 Tier 1', () => {
+    const prompt = buildStaticSystemPrompt();
+    expect(prompt).toContain('外部协作工具');
+    expect(prompt).toContain('Figma MCP');
+    expect(prompt).toContain('钉钉 dws');
+    expect(prompt).toContain('不要改用全局 token');
+  });
+
+  it('包含按需 Skill 参考章节', () => {
+    const prompt = buildStaticSystemPrompt();
+    expect(prompt).toContain('按需 Skill 参考');
+    expect(prompt).toContain('page-lifecycle');
+    expect(prompt).toContain('page-deletion');
+    expect(prompt).toContain('react-high-fidelity');
+    expect(prompt).toContain('page-runtime-conversion');
+    expect(prompt).toContain('image-handling');
+    expect(prompt).toContain('preview-tools');
+    expect(prompt).toContain('memory-maintenance');
+  });
+
+  it('Tier 2 页面生命周期操作包含显式 readPreinstalledSkill 加载指令', () => {
+    const prompt = buildStaticSystemPrompt();
+    expect(prompt).toContain("readPreinstalledSkill({ name: 'page-lifecycle' })");
+    expect(prompt).toContain("readPreinstalledSkill({ name: 'page-deletion' })");
+    expect(prompt).toContain("readPreinstalledSkill({ name: 'react-high-fidelity' })");
+    expect(prompt).toContain("readPreinstalledSkill({ name: 'page-runtime-conversion' })");
+  });
+
+  it('Tier 2 页面运行时转换包含不适用场景说明', () => {
+    const prompt = buildStaticSystemPrompt();
+    expect(prompt).toContain('此规则仅适用于用户显式触发运行时类型切换');
+    expect(prompt).toContain('不适用于新建或重写页面');
+  });
+
+  it('高保真 React 页规范包含与转换场景的互斥声明', () => {
+    const prompt = buildStaticSystemPrompt();
+    expect(prompt).toContain('本规范仅适用于「新建」或「重写」React 页');
+    expect(prompt).toContain('页面运行时类型转换（prototype ↔ high-fidelity-react）不适用本规范');
+    expect(prompt).toContain('转换场景见 `page-runtime-conversion` skill');
+  });
+
+  it('不包含已迁移到 skill 的完整规则详情', () => {
+    const prompt = buildStaticSystemPrompt();
+    // 不再硬编码完整的删除页面规则（如 previewDeletePages 参数用法）
+    expect(prompt).not.toContain('mode: "nameIncludes"');
+    // 不再硬编码完整的画布管理规则
+    expect(prompt).not.toContain('arrangeCanvasPages({');
+    // 不再硬编码预览调试工具详情
+    expect(prompt).not.toContain('getConsoleLogs({ level:');
+    // 不再硬编码截图工具详情
+    expect(prompt).not.toContain('captureScreenshot({ width:');
+  });
+
+  it('页面删除基座保留最小约束', () => {
+    const prompt = buildStaticSystemPrompt();
+    expect(prompt).toContain('删除前必须先调 `listPages` 获取精确 ID');
+    expect(prompt).toContain('不要根据名称猜测');
+    expect(prompt).toContain('不要用 `bash`/`writeFile`/`editFile` 手动删除');
   });
 });
 

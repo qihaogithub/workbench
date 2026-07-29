@@ -1542,9 +1542,16 @@ ${cssLinks}
       }
     });
 
+    var lastResizeTime = 0;
+    var lastReportedHeight = 0;
     const resizeObserver = new ResizeObserver(() => {
       if (isSleeping) return;
+      var now = Date.now();
+      if (now - lastResizeTime < 50) return;
+      lastResizeTime = now;
       const height = measureFullContentHeight();
+      if (Math.abs(height - lastReportedHeight) <= 1) return;
+      lastReportedHeight = height;
       window.parent.postMessage({ type: 'RESIZE', height }, '*');
     });
     resizeObserver.observe(document.body);

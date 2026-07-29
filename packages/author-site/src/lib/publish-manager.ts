@@ -921,6 +921,22 @@ export function regenerateProjectsIndex(): void {
   );
 }
 
+export function unpublishProject(projectId: string): void {
+  const projectDir = path.join(PUBLISHED_DIR, projectId);
+  if (fs.existsSync(projectDir)) {
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+
+  regenerateProjectsIndex();
+
+  const project = readProjectMeta(projectId);
+  if (project) {
+    project.publishedVersion = undefined;
+    project.publishedAt = undefined;
+    writeProjectMeta(projectId, project);
+  }
+}
+
 export function getPublishStatus(projectId: string): {
   projectId: string;
   publishedVersion: string | null;

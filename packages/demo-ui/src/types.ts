@@ -388,10 +388,6 @@ export interface PreviewCanvasProps {
   onCanvasStateChange: (state: CanvasState) => void;
   onRequestDeletePages?: (pageIds: string[]) => void | Promise<void>;
   onPageConfigEdit?: (pageId: string) => void;
-  onRuntimeConversionRequest?: (
-    pageId: string,
-    targetRuntimeType: CanvasPageRuntimeType,
-  ) => void;
   onCanvasClick?: () => void;
   className?: string;
   editingPageId?: string;

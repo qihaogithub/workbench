@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Trash2 } from "lucide-react";
 import { CanvasSelectionBox } from "./CanvasSelectionBox";
 import {
@@ -16,7 +17,6 @@ import { resolvePagePreviewRenderer } from "./preview-stage-resolver";
 import type {
   CanvasPageLayout,
   CanvasPageData,
-  CanvasPageRuntimeType,
   ConsoleLogPayload,
   CanvasToolMode,
   CanvasPageRenderMode,
@@ -40,10 +40,6 @@ interface CanvasPageItemProps {
   selected?: boolean;
   onLayoutChange?: (pageId: string, layout: CanvasPageLayout) => void;
   onConfigEdit?: (pageId: string, event?: React.PointerEvent) => void; // 保留接口，viewer 模式可能需要
-  onRuntimeConversionRequest?: (
-    pageId: string,
-    targetRuntimeType: CanvasPageRuntimeType,
-  ) => void;
   onRequestDelete?: (pageId: string) => void;
   className?: string;
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
@@ -241,7 +237,11 @@ export function CanvasPagePreviewContent({
 
       const designHeight = parsePreviewSizeValue(page.previewSize?.height, 812);
 
-      setContentHeight(newContentHeight);
+      if (newContentHeight > designHeight) {
+        setContentHeight(newContentHeight);
+      } else if (contentHeight !== null) {
+        setContentHeight(null);
+      }
 
       const currentLayout = layoutRef.current;
       const nextLayout = resolveCanvasContentHeightLayout(
@@ -253,7 +253,7 @@ export function CanvasPagePreviewContent({
 
       if (nextLayout) onLayoutChange?.(page.id, nextLayout);
     },
-    [page, onLayoutChange],
+    [page, onLayoutChange, contentHeight],
   );
 
   const handleScreenshotLoad = useCallback(() => {
@@ -347,6 +347,7 @@ export function CanvasPagePreviewContent({
             fillContainer
             containerSizeOverride={containerSizeOverride}
             effectiveHeight={iframeEffectiveHeight}
+            onContentHeightChange={handleContentHeightChange}
           />
         </div>
       )}
@@ -466,7 +467,6 @@ export function CanvasPageItem({
   selected = false,
   onLayoutChange,
   onConfigEdit,
-  onRuntimeConversionRequest,
   onRequestDelete,
   onConsoleEntry,
   onError,
@@ -485,12 +485,6 @@ export function CanvasPageItem({
     x: number;
     y: number;
   } | null>(null);
-  const targetRuntimeType: CanvasPageRuntimeType =
-    page.runtimeType === "prototype-html-css"
-      ? "high-fidelity-react"
-      : page.runtimeType === "sketch-scene"
-        ? "prototype-html-css"
-      : "prototype-html-css";
   // 截图加载完成后，静态截图可作为轻量渲染路径。
   const startPosRef = useRef({ x: 0, y: 0 });
   const layoutStartRef = useRef<CanvasPageLayout>({
@@ -860,75 +854,63 @@ export function CanvasPageItem({
       )}
 
       {/* 右键菜单 */}
-      {contextMenu && (
-        <>
-          {/* 遮罩层 */}
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setContextMenu(null)}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              setContextMenu(null);
-            }}
-          />
-          {/* 菜单 */}
-          <div
-            className="fixed z-50 bg-popover border rounded-lg shadow-lg py-1 min-w-[8rem]"
-            style={{ left: contextMenu.x, top: contextMenu.y }}
-          >
-            <button
-              type="button"
-              className="w-full px-3 py-1.5 text-sm text-left hover:bg-muted"
-              onClick={() => {
-                // 重置大小：将页面宽高恢复为设计尺寸
-                const defaultSize = page.previewSize
-                  ? {
-                      width: Number(page.previewSize.width) || 375,
-                      height: Number(page.previewSize.height) || 812,
-                    }
-                  : { width: 375, height: 812 };
-                onLayoutChange?.(page.id, {
-                  ...layout,
-                  width: defaultSize.width,
-                  height: defaultSize.height,
-                  sizeMode: "preview",
-                  previewSizeKey: getCanvasPreviewSizeKey(page.previewSize),
-                });
+      {contextMenu &&
+        createPortal(
+          <>
+            {/* 遮罩层 */}
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setContextMenu(null)}
+              onContextMenu={(e) => {
+                e.preventDefault();
                 setContextMenu(null);
               }}
+            />
+            {/* 菜单 */}
+            <div
+              className="fixed z-50 bg-popover border rounded-lg shadow-lg py-1 min-w-[8rem]"
+              style={{ left: contextMenu.x, top: contextMenu.y }}
             >
-              重置大小
-            </button>
-            {onRuntimeConversionRequest && (
               <button
                 type="button"
-                className="w-full border-t px-3 py-1.5 text-left text-sm hover:bg-muted"
+                className="w-full px-3 py-1.5 text-sm text-left hover:bg-muted"
                 onClick={() => {
-                  onRuntimeConversionRequest(page.id, targetRuntimeType);
+                  // 重置大小：将页面宽高恢复为设计尺寸
+                  const defaultSize = page.previewSize
+                    ? {
+                        width: Number(page.previewSize.width) || 375,
+                        height: Number(page.previewSize.height) || 812,
+                      }
+                    : { width: 375, height: 812 };
+                  onLayoutChange?.(page.id, {
+                    ...layout,
+                    width: defaultSize.width,
+                    height: defaultSize.height,
+                    sizeMode: "preview",
+                    previewSizeKey: getCanvasPreviewSizeKey(page.previewSize),
+                  });
                   setContextMenu(null);
                 }}
               >
-                {targetRuntimeType === "prototype-html-css"
-                  ? "AI 转 HTML/CSS 原型"
-                  : "AI 转高保真页"}
+                重置大小
               </button>
-            )}
-            {onRequestDelete && (
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 border-t px-3 py-1.5 text-left text-sm text-destructive hover:bg-muted"
-                onClick={() => {
-                  onRequestDelete(page.id);
-                  setContextMenu(null);
-                }}
-              >
-                <Trash2 className="h-4 w-4" />
-                删除页面
-              </button>
-            )}
-          </div>
-        </>
-      )}
+              {onRequestDelete && (
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 border-t px-3 py-1.5 text-left text-sm text-destructive hover:bg-muted"
+                  onClick={() => {
+                    onRequestDelete(page.id);
+                    setContextMenu(null);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  删除页面
+                </button>
+              )}
+            </div>
+          </>,
+          document.body,
+        )}
     </div>
   );
 }

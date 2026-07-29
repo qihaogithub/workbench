@@ -56,6 +56,8 @@ const piAgentMocks = vi.hoisted(() => {
 const fsMocks = vi.hoisted(() => ({
   existsSync: vi.fn(() => true),
   readFileSync: vi.fn(() => 'edited file content'),
+  readdirSync: vi.fn(() => ['design-taste-frontend']),
+  statSync: vi.fn(() => ({ isDirectory: () => true })),
   promises: {
     readFile: vi.fn(),
     writeFile: vi.fn(),

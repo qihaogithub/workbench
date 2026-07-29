@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { publishProject, PublishError } from '@/lib/publish-manager';
+import { publishProject, unpublishProject, PublishError } from '@/lib/publish-manager';
 import {
   createApiSuccess,
   createApiError,
@@ -199,6 +199,37 @@ export async function POST(
         'PUBLISH_FAILED',
         error instanceof Error && error.message
           ? `发布失败：${error.message}`
+          : undefined,
+      ),
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: { projectId: string } },
+) {
+  try {
+    const token = getAuthCookie();
+    if (!token) {
+      return NextResponse.json(createApiError('UNAUTHORIZED', '未登录'), { status: 401 });
+    }
+
+    const payload = await verifyToken(token);
+    if (!payload) {
+      return NextResponse.json(createApiError('UNAUTHORIZED', '登录已过期'), { status: 401 });
+    }
+
+    unpublishProject(params.projectId);
+    return NextResponse.json(createApiSuccess({ projectId: params.projectId }));
+  } catch (error) {
+    console.error('撤销发布失败:', error);
+    return NextResponse.json(
+      createApiError(
+        'UNPUBLISH_FAILED',
+        error instanceof Error && error.message
+          ? `撤销发布失败：${error.message}`
           : undefined,
       ),
       { status: 500 },
