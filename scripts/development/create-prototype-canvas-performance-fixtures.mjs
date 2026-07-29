@@ -240,11 +240,11 @@ try {
     projects: {
       prototype: {
         projectId: prototypeProjectId,
-        editUrl: `http://localhost:3200/demo/${prototypeProjectId}/edit`,
+        editUrl: `http://localhost:4200/demo/${prototypeProjectId}/edit`,
       },
       highFidelity: {
         projectId: highFidelityProjectId,
-        editUrl: `http://localhost:3200/demo/${highFidelityProjectId}/edit`,
+        editUrl: `http://localhost:4200/demo/${highFidelityProjectId}/edit`,
       },
     },
   }, null, 2));

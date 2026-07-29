@@ -53,6 +53,7 @@ interface PersistedModelPreference {
 const MODEL_PREFERENCE_STORAGE_PREFIX = "workbench:ai-model:";
 const MODEL_STREAM_KEEPALIVE_INTERVAL_MS = 25_000;
 const MODEL_STREAM_READY_REQUEST_DELAY_MS = 50;
+const MODEL_LOADING_TIMEOUT_MS = 30_000;
 
 interface TimerWithUnref {
   unref: () => void;
@@ -130,6 +131,7 @@ export function useChatModels(options: UseChatModelsOptions) {
   const modelRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const modelKeepaliveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const modelReadyRequestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const modelLoadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const preferredModelRef = useRef<{
     fullModelId: string;
     baseModelId: string;
@@ -225,6 +227,13 @@ export function useChatModels(options: UseChatModelsOptions) {
           connected = true;
           requestInitialModels();
         }
+        if (event.status === "disconnected") {
+          // AgentStream 重连次数耗尽后不会再尝试连接,直接用兜底配置停止加载
+          setModelState((prev) => ({
+            ...prev,
+            isLoading: false,
+          }));
+        }
       });
 
       modelReadyRequestTimerRef.current = setTimeout(
@@ -236,6 +245,15 @@ export function useChatModels(options: UseChatModelsOptions) {
         stream.ping();
       }, MODEL_STREAM_KEEPALIVE_INTERVAL_MS);
       unrefTimer(modelKeepaliveTimerRef.current);
+      modelLoadingTimeoutRef.current = setTimeout(() => {
+        setModelState((prev) => {
+          if (prev.models.length === 0 && prev.isLoading) {
+            return { ...prev, isLoading: false };
+          }
+          return prev;
+        });
+      }, MODEL_LOADING_TIMEOUT_MS);
+      unrefTimer(modelLoadingTimeoutRef.current);
 
       stream.on("models", async (event: StreamEvent) => {
         const result = await resolveModels(event);
@@ -281,7 +299,9 @@ export function useChatModels(options: UseChatModelsOptions) {
       stream.on("error", (event: StreamEvent) => {
         const isModelError =
           event.error?.code === "SESSION_NOT_FOUND" ||
-          event.error?.code === "GET_MODELS_ERROR";
+          event.error?.code === "GET_MODELS_ERROR" ||
+          event.error?.code === "CONNECTION_ERROR" ||
+          event.error?.code === "NOT_CONNECTED";
         if (isModelError) {
           setModelState((prev) => ({ ...prev, isLoading: false }));
         }
@@ -303,6 +323,10 @@ export function useChatModels(options: UseChatModelsOptions) {
       if (modelRetryTimerRef.current) {
         clearTimeout(modelRetryTimerRef.current);
         modelRetryTimerRef.current = null;
+      }
+      if (modelLoadingTimeoutRef.current) {
+        clearTimeout(modelLoadingTimeoutRef.current);
+        modelLoadingTimeoutRef.current = null;
       }
       if (modelStreamRef.current) {
         modelStreamRef.current.close();

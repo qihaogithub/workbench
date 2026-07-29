@@ -81,7 +81,7 @@ node scripts/development/detect-sync-status-flap.mjs
 | `--list-projects` | 列出本地项目候选并退出。 |
 | `--project-id <id>` | 指定项目 ID，脚本会拼成 `<base-url>/demo/<id>/edit`。 |
 | `--url <url>` | 直接指定编辑页 URL，优先级高于 `--project-id`。 |
-| `--base-url <url>` | 指定 author-site 地址，默认 `http://localhost:3200`。 |
+| `--base-url <url>` | 指定 author-site 地址，默认 `http://localhost:4200`。 |
 | `--duration <ms>` | 指定采样总时长。 |
 | `--sample-ms <ms>` | 指定采样间隔。 |
 | `--headed` / `--headless` | 切换可视/无头浏览器。 |
@@ -93,7 +93,7 @@ node scripts/development/detect-sync-status-flap.mjs
 
 ```bash
 pnpm test:sync-status-flap -- --project-id proj_1779608460375 --duration 30000
-pnpm test:sync-status-flap -- --url http://localhost:3200/demo/proj_1779608460375/edit --headed
+pnpm test:sync-status-flap -- --url http://localhost:4200/demo/proj_1779608460375/edit --headed
 pnpm test:sync-status-flap -- --project-id proj_1779608460375 --flush-only
 ```
 
@@ -102,7 +102,7 @@ pnpm test:sync-status-flap -- --project-id proj_1779608460375 --flush-only
 | 变量 | 默认值 | 说明 |
 |---|---|---|
 | `SYNC_STATUS_URL` | 自动选择 `data/projects` 中最近更新的项目 | 要检测的编辑页地址。 |
-| `SYNC_STATUS_BASE_URL` | `http://localhost:3200` | 未指定 URL 时使用的 author-site 地址。 |
+| `SYNC_STATUS_BASE_URL` | `http://localhost:4200` | 未指定 URL 时使用的 author-site 地址。 |
 | `SYNC_STATUS_SAMPLE_MS` | `500` | 采样间隔，单位毫秒。 |
 | `SYNC_STATUS_DURATION_MS` | `20000` | 总采样时长，单位毫秒。 |
 | `HEADLESS` | 非 `0` 时无头运行 | 设置为 `0` 可打开可视浏览器窗口。 |
@@ -141,7 +141,7 @@ pnpm test:prototype-canvas-fixtures
 
 ```bash
 pnpm test:prototype-canvas-performance -- --project-id proj_1782980494805_klfp75 --label prototype-20
-pnpm test:prototype-canvas-performance -- --url http://localhost:3200/demo/proj_xxx/edit --label iframe-20
+pnpm test:prototype-canvas-performance -- --url http://localhost:4200/demo/proj_xxx/edit --label iframe-20
 ```
 
 ### 常用参数
@@ -150,7 +150,7 @@ pnpm test:prototype-canvas-performance -- --url http://localhost:3200/demo/proj_
 |---|---|
 | `--project-id <id>` | 指定项目 ID，脚本会拼成 `<base-url>/demo/<id>/edit`。 |
 | `--url <url>` | 直接指定编辑页 URL，优先级高于 `--project-id`。 |
-| `--base-url <url>` | 指定 author-site 地址，默认 `http://localhost:3200`。 |
+| `--base-url <url>` | 指定 author-site 地址，默认 `http://localhost:4200`。 |
 | `--label <name>` | 报告标签，用于区分 `prototype-20`、`iframe-20`、`screenshot-20` 等场景。 |
 | `--expected-pages <n>` | 记录期望页面数，默认 `20`。 |
 | `--sample-ms <ms>` | RAF 采样时长，默认 `2000`。 |
@@ -202,7 +202,7 @@ node scripts/development/knowledge-validation-suite.mjs metrics --project-id <pr
 带 Agent 质量评估：
 
 ```bash
-node scripts/development/knowledge-validation-suite.mjs ai --project-id <projectId> --agent-url http://localhost:3201
+node scripts/development/knowledge-validation-suite.mjs ai --project-id <projectId> --agent-url http://localhost:4201
 ```
 
 ### 常用参数
@@ -279,7 +279,7 @@ pnpm measure:edit-page-load [projectId]
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
-| `BASE_URL` | `http://localhost:3200` | 创作端地址 |
+| `BASE_URL` | `http://localhost:4200` | 创作端地址 |
 | `PROJECT_ID` | `data/projects/` 下第一个 | 项目 ID |
 | `NO_LOGIN` | — | 设为 `1` 跳过自动登录 |
 
@@ -310,7 +310,7 @@ RUNS=5 PROJECT_ID=<projectId> pnpm measure:unmount
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
-| `BASE_URL` | `http://localhost:3200` | 创作端地址 |
+| `BASE_URL` | `http://localhost:4200` | 创作端地址 |
 | `PROJECT_ID` | `data/projects/` 下第一个 | 项目 ID |
 | `RUNS` | `3` | 重复测量次数 |
 | `NO_LOGIN` | — | 设为 `1` 跳过自动登录 |
@@ -344,7 +344,7 @@ CLICKS=10 PROJECT_ID=<projectId> pnpm measure:click-to-preview
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
-| `BASE_URL` | `http://localhost:3200` | 创作端地址 |
+| `BASE_URL` | `http://localhost:4200` | 创作端地址 |
 | `PROJECT_ID` | `data/projects/` 下第一个 | 项目 ID |
 | `CLICKS` | `5` | 点击次数 |
 | `NO_LOGIN` | — | 设为 `1` 跳过自动登录 |

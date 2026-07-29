@@ -435,7 +435,7 @@ if (process.env.OW_DEV_ONCE === "1") {
   process.exit(0);
 }
 
-const port = Number(process.env.PORT || process.env.OW_DEV_PORT || 4173);
+const port = Number(process.env.PORT || process.env.OW_DEV_PORT || 6173);
 createPreviewServer().listen(port, () => {
   console.log("workbench local preview: http://localhost:" + port);
 });

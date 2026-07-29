@@ -1,7 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import dotenv from "dotenv";
 import Fastify from "fastify";
+
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
+dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 
 import {
   SqliteKnowledgeCatalog,
@@ -18,7 +22,7 @@ interface ReadBody {
   sourceRef?: unknown;
 }
 
-const port = numberEnv("PORT", 3203);
+const port = numberEnv("PORT", 4203);
 const host = process.env.HOST ?? "0.0.0.0";
 const dataDir = path.resolve(process.env.DATA_DIR ?? "data");
 const reconcileIntervalMs = numberEnv(

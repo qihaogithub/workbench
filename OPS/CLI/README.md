@@ -18,7 +18,7 @@ pnpm install
 pnpm dev:agent
 ```
 
-服务默认运行在 `http://localhost:3201`
+服务默认运行在 `http://localhost:4201`
 
 ### 2. 检查服务状态
 
@@ -55,7 +55,7 @@ pnpm dev health
   运行时间: 5m 23s
   活跃 Agent 数量: 0
 
-服务地址: http://localhost:3201
+服务地址: http://localhost:4201
 ```
 
 ---
@@ -553,7 +553,7 @@ cd E:\重要文件\Programming\1_Work\workbench工作台
 pnpm dev:agent
 
 # 检查服务地址
-pnpm dev health -u http://localhost:3201
+pnpm dev health -u http://localhost:4201
 ```
 
 ### 问题 2: "No active session"

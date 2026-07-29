@@ -8,6 +8,7 @@ const config: Config = {
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './node_modules/@workbench/shared/src/**/*.{js,ts,jsx,tsx,mdx}',
+    './node_modules/@workbench/ai-chat-shared/src/**/*.{js,ts,jsx,tsx,mdx}',
     './node_modules/@workbench/demo-ui/src/**/*.{js,ts,jsx,tsx,mdx}',
     './node_modules/streamdown/dist/**/*.js',
     './node_modules/@streamdown/code/dist/**/*.js',

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,12 +10,11 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast-provider";
 import { parseFigmaImportContent } from "../../../lib/markdown-parser";
 import type { DemoPageMeta } from "@workbench/shared";
 import { projectApiClient } from "@/lib/project-api";
-import { Clipboard, Loader2, Upload } from "lucide-react";
+import { Loader2, Upload, FileText, X, CheckCircle2, AlertCircle } from "lucide-react";
 
 const EMPTY_FIGMA_CONFIG_SCHEMA = JSON.stringify({
   type: "object",
@@ -25,6 +24,21 @@ const EMPTY_FIGMA_CONFIG_SCHEMA = JSON.stringify({
 function getImportedPageName(filename: string): string {
   const name = filename.replace(/\.html?$/i, "").trim();
   return name || "从Figma导入的页面";
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+type FileImportStatus = "idle" | "importing" | "success" | "error";
+
+interface FileEntry {
+  file: File;
+  id: string;
+  status: FileImportStatus;
+  errorMessage?: string;
 }
 
 interface ImportFromFigmaDialogProps {
@@ -42,228 +56,351 @@ export function ImportFromFigmaDialog({
   sessionId,
   onPageCreated,
 }: ImportFromFigmaDialogProps) {
-  const [content, setContent] = useState("");
-  const [uploadedPageName, setUploadedPageName] = useState<string | null>(null);
+  const [files, setFiles] = useState<FileEntry[]>([]);
   const [isImporting, setIsImporting] = useState(false);
-  const [isReadingClipboard, setIsReadingClipboard] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
 
-  const handlePasteFromClipboard = async () => {
-    if (!navigator.clipboard?.readText) {
-      toast({
-        title: "无法读取剪贴板",
-        description: "当前浏览器不支持剪贴板读取，请直接粘贴到输入框。",
-        variant: "destructive",
-      });
-      return;
-    }
+  const resetState = useCallback(() => {
+    setFiles([]);
+    setIsImporting(false);
+    setIsDragging(false);
+  }, []);
 
-    setIsReadingClipboard(true);
-    try {
-      const text = await navigator.clipboard.readText();
-      if (!text.trim()) {
-        toast({ title: "剪贴板为空", description: "没有可导入的 HTML 或 Markdown 内容。" });
-        return;
-      }
-      setContent(text);
-      setUploadedPageName(null);
-      toast({ title: "已读取剪贴板", description: "内容已填入导入框。" });
-    } catch (err) {
-      toast({
-        title: "读取剪贴板失败",
-        description: err instanceof Error ? err.message : "请检查浏览器剪贴板权限。",
-        variant: "destructive",
-      });
-    } finally {
-      setIsReadingClipboard(false);
-    }
-  };
-
-  const handleUploadHtmlFile = async (file: File | undefined) => {
-    if (!file) return;
-    const filename = file.name.toLowerCase();
-    if (!filename.endsWith(".html") && !filename.endsWith(".htm") && file.type !== "text/html") {
-      toast({
-        title: "文件类型不支持",
-        description: "请选择 .html 或 .htm 文件。",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const text = await file.text();
-      if (!text.trim()) {
-        toast({
-          title: "HTML 文件为空",
-          description: "请选择包含 Figma 导出代码的 HTML 文件。",
-          variant: "destructive",
+  const validateAndAppendFiles = useCallback(
+    (newFiles: File[]) => {
+      const validFiles: FileEntry[] = [];
+      for (const file of newFiles) {
+        const filename = file.name.toLowerCase();
+        if (
+          !filename.endsWith(".html") &&
+          !filename.endsWith(".htm") &&
+          file.type !== "text/html"
+        ) {
+          toast({
+            title: "跳过不支持的文件",
+            description: `${file.name} 不是 .html/.htm 文件，已跳过。`,
+            variant: "destructive",
+          });
+          continue;
+        }
+        if (files.some((f) => f.file.name === file.name && f.file.size === file.size)) {
+          continue;
+        }
+        validFiles.push({
+          file,
+          id: `${file.name}-${file.size}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          status: "idle" as FileImportStatus,
         });
-        return;
       }
-      setContent(text);
-      setUploadedPageName(getImportedPageName(file.name));
-      toast({ title: "HTML 文件已读取", description: `已载入 ${file.name}` });
-    } catch (err) {
-      toast({
-        title: "读取文件失败",
-        description: err instanceof Error ? err.message : "无法读取所选 HTML 文件。",
-        variant: "destructive",
-      });
-    } finally {
+      if (validFiles.length > 0) {
+        setFiles((prev) => [...prev, ...validFiles]);
+      }
+    },
+    [files, toast],
+  );
+
+  const handleFileChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      if (event.target.files && event.target.files.length > 0) {
+        validateAndAppendFiles(Array.from(event.target.files));
+      }
       if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };
+    },
+    [validateAndAppendFiles],
+  );
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        validateAndAppendFiles(Array.from(e.dataTransfer.files));
+      }
+    },
+    [validateAndAppendFiles],
+  );
+
+  const removeFile = useCallback((id: string) => {
+    setFiles((prev) => prev.filter((f) => f.id !== id));
+  }, []);
+
+  const updateFileStatus = useCallback(
+    (id: string, status: FileImportStatus, errorMessage?: string) => {
+      setFiles((prev) =>
+        prev.map((f) => (f.id === id ? { ...f, status, errorMessage } : f)),
+      );
+    },
+    [],
+  );
 
   const handleImport = async () => {
-    const trimmed = content.trim();
-    if (!trimmed) return;
+    if (files.length === 0) return;
 
     if (!sessionId) {
       toast({ title: "未创建 Session", description: "请先进入编辑模式", variant: "destructive" });
       return;
     }
 
-    const parsed = parseFigmaImportContent(trimmed);
-    if (!parsed.success) {
-      toast({
-        title: "格式解析失败",
-        description: parsed.error || "请确认内容为 Figma 插件导出的 HTML 或旧版 Markdown 格式",
-        variant: "destructive",
-      });
-      return;
+    setIsImporting(true);
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < files.length; i++) {
+      const entry = files[i];
+      updateFileStatus(entry.id, "importing");
+
+      try {
+        const text = await entry.file.text();
+        if (!text.trim()) {
+          updateFileStatus(entry.id, "error", "文件为空");
+          failCount++;
+          continue;
+        }
+
+        const parsed = parseFigmaImportContent(text.trim());
+        if (!parsed.success) {
+          updateFileStatus(entry.id, "error", parsed.error || "格式解析失败");
+          failCount++;
+          continue;
+        }
+
+        const pageName = getImportedPageName(entry.file.name);
+        const page = await projectApiClient.createDemoPage(
+          projectId,
+          pageName,
+          sessionId,
+          undefined,
+          parsed.kind === "prototype" ? "prototype-html-css" : undefined,
+        );
+
+        if (parsed.kind === "prototype") {
+          const result = await projectApiClient.updateDemoPageFiles(projectId, page.id, sessionId, {
+            prototypeHtml: parsed.prototypeHtml,
+            prototypeCss: parsed.prototypeCss,
+            prototypeMeta: parsed.prototypeMeta,
+            schema: EMPTY_FIGMA_CONFIG_SCHEMA,
+            localizeImages: true,
+          });
+          if (result.imageLocalization && result.imageLocalization.failed > 0) {
+            updateFileStatus(entry.id, "success", `${result.imageLocalization.failed} 张图片未本地化`);
+          } else {
+            updateFileStatus(entry.id, "success");
+          }
+        } else {
+          await projectApiClient.updateDemoPageFiles(projectId, page.id, sessionId, {
+            code: parsed.code,
+            schema: parsed.schema,
+          });
+          updateFileStatus(entry.id, "success");
+        }
+
+        onPageCreated(page);
+        successCount++;
+      } catch (err) {
+        updateFileStatus(entry.id, "error", err instanceof Error ? err.message : "未知错误");
+        failCount++;
+      }
     }
 
-    setIsImporting(true);
-    try {
-      const page = await projectApiClient.createDemoPage(
-        projectId,
-        uploadedPageName ?? "从Figma导入的页面",
-        sessionId,
-        undefined,
-        parsed.kind === "prototype" ? "prototype-html-css" : undefined,
-      );
-      if (parsed.kind === "prototype") {
-        const result = await projectApiClient.updateDemoPageFiles(projectId, page.id, sessionId, {
-          prototypeHtml: parsed.prototypeHtml,
-          prototypeCss: parsed.prototypeCss,
-          prototypeMeta: parsed.prototypeMeta,
-          schema: EMPTY_FIGMA_CONFIG_SCHEMA,
-          localizeImages: true,
-        });
-        if (result.imageLocalization && result.imageLocalization.failed > 0) {
-          const { succeeded, failed, failures } = result.imageLocalization;
-          if (succeeded === 0) {
-            toast({
-              title: "图片本地化失败",
-              description: "所有图片仍指向外部链接，可能在未来失效。",
-              variant: "destructive",
-            });
-          } else {
-            toast({
-              title: "部分图片未本地化",
-              description: `${succeeded} 张已本地化，${failed} 张仍使用原始链接，可能在未来失效。`,
-              variant: "destructive",
-            });
-          }
-        }
-      } else {
-        await projectApiClient.updateDemoPageFiles(projectId, page.id, sessionId, {
-          code: parsed.code,
-          schema: parsed.schema,
-        });
-      }
-      onPageCreated(page);
-      toast({ title: "导入成功", description: `已创建页面「${page.name}」` });
-      setContent("");
-      setUploadedPageName(null);
-      onOpenChange(false);
-    } catch (err) {
+    if (successCount > 0) {
       toast({
-        title: "导入失败",
-        description: err instanceof Error ? err.message : "未知错误",
-        variant: "destructive",
+        title: "批量导入完成",
+        description: `成功导入 ${successCount} 个页面${failCount > 0 ? `，${failCount} 个失败` : ""}`,
       });
-    } finally {
-      setIsImporting(false);
+    }
+
+    setIsImporting(false);
+    resetState();
+    onOpenChange(false);
+  };
+
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open) resetState();
+      onOpenChange(open);
+    },
+    [onOpenChange, resetState],
+  );
+
+  const statusIcon = (status: FileImportStatus) => {
+    switch (status) {
+      case "importing":
+        return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
+      case "success":
+        return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
+      case "error":
+        return <AlertCircle className="h-4 w-4 text-destructive" />;
+      default:
+        return <FileText className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
+  const statusLabel = (entry: FileEntry) => {
+    switch (entry.status) {
+      case "importing":
+        return <span className="text-xs text-blue-500">导入中...</span>;
+      case "success":
+        return (
+          <span className="text-xs text-emerald-600">
+            {entry.errorMessage || "已导入"}
+          </span>
+        );
+      case "error":
+        return (
+          <span className="text-xs text-destructive truncate max-w-[160px]">
+            {entry.errorMessage || "导入失败"}
+          </span>
+        );
+      default:
+        return (
+          <span className="text-xs text-muted-foreground">
+            {formatFileSize(entry.file.size)}
+          </span>
+        );
+    }
+  };
+
+  const idleCount = files.filter((f) => f.status === "idle").length;
+  const importedCount = files.filter((f) => f.status === "success").length;
+  const errorCount = files.filter((f) => f.status === "error").length;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>从 Figma 导入</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5" />
+            从 Figma 导入
+          </DialogTitle>
           <DialogDescription>
-            将 Figma 插件导出的 HTML 代码粘贴到下方，或直接从剪贴板/HTML 文件载入；旧版 Markdown 导出仍可继续导入。
+            拖拽或点击上传 Figma 插件导出的 HTML 文件，支持批量导入多个页面
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            onClick={handlePasteFromClipboard}
-            disabled={isImporting || isReadingClipboard}
-          >
-            {isReadingClipboard ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Clipboard className="h-4 w-4" />
-            )}
-            读取剪贴板
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isImporting}
-          >
-            <Upload className="h-4 w-4" />
-            上传 HTML
-          </Button>
+
+        <div
+          className={`group relative rounded-xl border-2 border-dashed p-6 text-center transition-all duration-200 ${
+            isDragging
+              ? "scale-[1.02] border-primary bg-primary/10 shadow-lg"
+              : files.length > 0
+                ? "border-muted-foreground/20 bg-muted/20 p-4"
+                : "border-muted-foreground/25 hover:border-primary/40 hover:bg-muted/10"
+          }`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
           <input
             ref={fileInputRef}
             type="file"
             accept=".html,.htm,text/html"
+            multiple
             className="hidden"
-            onChange={(event) => {
-              void handleUploadHtmlFile(event.target.files?.[0]);
-            }}
+            onChange={handleFileChange}
           />
+          {isDragging ? (
+            <div className="flex flex-col items-center gap-2">
+              <Upload className="h-10 w-10 animate-bounce text-primary" />
+              <p className="text-sm font-medium text-primary">释放文件以添加</p>
+            </div>
+          ) : files.length > 0 ? (
+            <button
+              type="button"
+              className="flex w-full items-center justify-center gap-2 rounded-lg py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isImporting}
+            >
+              <Upload className="h-4 w-4" />
+              继续添加文件
+            </button>
+          ) : (
+            <div className="flex flex-col items-center gap-3">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted transition-colors group-hover:bg-primary/10">
+                <Upload className="h-6 w-6 text-muted-foreground transition-colors group-hover:text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  拖拽 HTML 文件到此处，或
+                  <button
+                    type="button"
+                    className="mx-1 font-medium text-primary underline underline-offset-2 hover:text-primary/80"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isImporting}
+                  >
+                    点击上传
+                  </button>
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground/50">支持 .html、.htm 格式</p>
+              </div>
+            </div>
+          )}
         </div>
-        <Textarea
-          autoFocus
-          placeholder={`<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <title>Figma Export</title>
-</head>
-<body>
-  <div class="figma-export">...</div>
-</body>
-</html>
 
-<!-- 也兼容旧版 # Workbench Export Markdown -->`}
-          value={content}
-          onChange={(e) => {
-            setContent(e.target.value);
-            setUploadedPageName(null);
-          }}
-          className="min-h-[200px] font-mono text-sm"
-        />
+        {files.length > 0 && (
+          <div className="max-h-[220px] overflow-y-auto rounded-lg border bg-card">
+            {importedCount > 0 && (
+              <div className="border-b px-3 py-1.5">
+                <span className="text-xs text-muted-foreground">
+                  已导入 {importedCount} 个，失败 {errorCount} 个
+                </span>
+              </div>
+            )}
+            <div className="divide-y">
+              {files.map((entry) => (
+                <div
+                  key={entry.id}
+                  className={`flex items-center gap-3 px-3 py-2.5 text-sm transition-colors ${
+                    entry.status === "importing" ? "bg-blue-50/50" : ""
+                  }`}
+                >
+                  {statusIcon(entry.status)}
+                  <div className="flex-1 min-w-0">
+                    <span className="truncate block text-sm">{entry.file.name}</span>
+                    {statusLabel(entry)}
+                  </div>
+                  {entry.status === "idle" && !isImporting && (
+                    <button
+                      type="button"
+                      className="shrink-0 rounded p-0.5 text-muted-foreground/60 transition-colors hover:bg-muted hover:text-destructive"
+                      onClick={() => removeFile(entry.id)}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isImporting}>
+          <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isImporting}>
             取消
           </Button>
-          <Button onClick={handleImport} disabled={!content.trim() || isImporting}>
-            {isImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            导入并创建页面
+          <Button onClick={handleImport} disabled={files.length === 0 || isImporting || idleCount === 0}>
+            {isImporting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                导入中...
+              </>
+            ) : (
+              `导入并创建页面 (${idleCount})`
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

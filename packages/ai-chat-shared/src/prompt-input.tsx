@@ -8,6 +8,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from './ui/select'
@@ -684,38 +685,47 @@ export function PromptInputModelSelect({
   const groupEntries = Array.from(groups.entries())
 
   return (
-    <select
+    <Select
       value={currentModelId}
-      onChange={(event) => onModelChange(event.target.value)}
+      onValueChange={onModelChange}
       disabled={!canSwitch || isLoading || context.status !== 'idle'}
-      aria-label="选择模型"
-      className={cn(
-        'h-8 w-auto min-w-[100px] max-w-[150px] rounded-md border-none bg-transparent px-2 text-xs text-foreground shadow-none outline-none focus:ring-0',
-        (!canSwitch || isLoading || context.status !== 'idle') &&
-          'cursor-not-allowed opacity-50',
-      )}
     >
-      {isLoading && !currentModel ? (
-        <option value={currentModelId}>{displayLabel}</option>
-      ) : null}
-      {groupEntries.map(([group, groupModels]) =>
-        group ? (
-          <optgroup key={group} label={group}>
-            {groupModels.map((model) => (
-              <option key={model.id} value={model.id}>
+      <SelectTrigger
+        aria-label="选择模型"
+        className={cn(
+          'h-8 w-auto max-w-[160px] border-none bg-transparent px-2 text-xs text-foreground shadow-none hover:bg-transparent focus:ring-0 [&>span]:truncate',
+          (!canSwitch || isLoading || context.status !== 'idle') &&
+            'cursor-not-allowed opacity-50',
+        )}
+      >
+        <SelectValue>
+          {isLoading && !currentModel ? '模型...' : displayLabel}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        {isLoading && !currentModel ? (
+          <SelectItem value={currentModelId}>{displayLabel}</SelectItem>
+        ) : null}
+        {groupEntries.map(([group, groupModels]) =>
+          group ? (
+            <React.Fragment key={group}>
+              <SelectLabel>{group}</SelectLabel>
+              {groupModels.map((model) => (
+                <SelectItem key={model.id} value={model.id}>
+                  {model.label}
+                </SelectItem>
+              ))}
+            </React.Fragment>
+          ) : (
+            groupModels.map((model) => (
+              <SelectItem key={model.id} value={model.id}>
                 {model.label}
-              </option>
-            ))}
-          </optgroup>
-        ) : (
-          groupModels.map((model) => (
-            <option key={model.id} value={model.id}>
-              {model.label}
-            </option>
-          ))
-        ),
-      )}
-    </select>
+              </SelectItem>
+            ))
+          ),
+        )}
+      </SelectContent>
+    </Select>
   )
 }
 

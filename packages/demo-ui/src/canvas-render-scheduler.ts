@@ -110,11 +110,6 @@ export function computeCanvasRenderModes({
       continue;
     }
 
-    if (screenshotUrls?.[page.id]) {
-      modes[page.id] = "screenshot";
-      continue;
-    }
-
     iframeCandidates.push({
       id: page.id,
       distance: getPageDistanceToViewportCenter(
@@ -151,7 +146,11 @@ export function computeCanvasRenderModes({
   const sleepingPageIdSet = new Set(sleepingPageIds);
   for (const { id } of iframeCandidates) {
     if (modes[id]) continue;
-    modes[id] = sleepingPageIdSet.has(id) ? "sleeping-iframe" : "loading";
+    if (sleepingPageIdSet.has(id)) {
+      modes[id] = "sleeping-iframe";
+      continue;
+    }
+    modes[id] = screenshotUrls?.[id] ? "screenshot" : "loading";
   }
 
   return {

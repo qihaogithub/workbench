@@ -269,7 +269,7 @@ try {
     diff,
     commitVersion: commit.version?.versionId,
     runtime,
-    editUrl: `http://localhost:3200/demo/${projectId}/edit`,
+    editUrl: `http://localhost:4200/demo/${projectId}/edit`,
     configuredPages: [
       "prototype_mvp_01",
       "prototype_mvp_02",

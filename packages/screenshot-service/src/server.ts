@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import path from "path";
 
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 
 import Fastify from "fastify";
@@ -27,10 +28,10 @@ async function start() {
   const allowedOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(",")
     : [
-        "http://localhost:3200",
-        "http://127.0.0.1:3200",
-        "http://localhost:3300",
-        "http://127.0.0.1:3300",
+        "http://localhost:4200",
+        "http://127.0.0.1:4200",
+        "http://localhost:4300",
+        "http://127.0.0.1:4300",
       ];
 
   await fastify.register(cors, {

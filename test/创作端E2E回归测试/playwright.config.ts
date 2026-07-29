@@ -9,7 +9,7 @@ if (!fs.existsSync(outputRoot)) {
   fs.mkdirSync(outputRoot, { recursive: true });
 }
 
-const baseURL = process.env.E2E_BASE_URL ?? 'http://localhost:3200';
+const baseURL = process.env.E2E_BASE_URL ?? 'http://localhost:4200';
 
 export default defineConfig({
   testDir: './',

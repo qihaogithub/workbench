@@ -703,10 +703,10 @@ describe("screenshot routes", () => {
     expect(response.statusCode).toBe(200);
     const renderedHtml = renderPage.mock.calls[0]?.[0] ?? "";
     expect(renderedHtml).toContain(
-      "http://localhost:3200/api/sessions/session_1/workspace/assets/images/hero.png",
+      "http://localhost:4200/api/sessions/session_1/workspace/assets/images/hero.png",
     );
     expect(renderedHtml).toContain(
-      "http://localhost:3200/api/sessions/session_1/workspace/assets/images/bg.png",
+      "http://localhost:4200/api/sessions/session_1/workspace/assets/images/bg.png",
     );
     await app.close();
   });

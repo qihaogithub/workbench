@@ -1,12 +1,12 @@
 import path from "path";
 
 export const config = {
-  port: parseInt(process.env.PORT || "3202", 10),
+  port: parseInt(process.env.PORT || "4202", 10),
   host: process.env.HOST || "0.0.0.0",
   logLevel: process.env.LOG_LEVEL || "info",
 
   authorSiteUrl:
-    process.env.AUTHOR_SITE_URL || "http://localhost:3200",
+    process.env.AUTHOR_SITE_URL || "http://localhost:4200",
   cdnBaseUrl: process.env.CDN_BASE_URL || "https://esm.sh",
   previewRuntimeSource: process.env.PREVIEW_RUNTIME_SOURCE || "local",
 

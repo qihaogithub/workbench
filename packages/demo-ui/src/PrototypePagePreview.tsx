@@ -429,6 +429,18 @@ export function PrototypePagePreview({
       applyPrototypeBindings(root, configData, assetRewrite);
       applyPropertyChanges(root, visualPropertyChanges);
     }
+
+    if (!onContentHeightChange || !shouldScaleToPreviewSize || !root) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const height = entry.contentRect.height;
+        if (Number.isFinite(height) && height > 0) {
+          onContentHeightChange(height);
+        }
+      }
+    });
+    observer.observe(root);
+    return () => observer.disconnect();
   }, [
     allowScroll,
     configData,
@@ -441,26 +453,8 @@ export function PrototypePagePreview({
     sessionId,
     shouldScaleToPreviewSize,
     visualPropertyChanges,
+    onContentHeightChange,
   ]);
-
-  useLayoutEffect(() => {
-    if (!onContentHeightChange || !shouldScaleToPreviewSize) return;
-    const shadow = shadowRef.current;
-    if (!shadow) return;
-    const root = shadow.querySelector<HTMLElement>(".prototype-root");
-    if (!root) return;
-
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const height = entry.contentRect.height;
-        if (Number.isFinite(height) && height > 0) {
-          onContentHeightChange(height);
-        }
-      }
-    });
-    observer.observe(root);
-    return () => observer.disconnect();
-  }, [onContentHeightChange, shouldScaleToPreviewSize]);
 
   useEffect(() => {
     const shadow = shadowRef.current;

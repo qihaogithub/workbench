@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const defaultBaseUrl = 'http://localhost:3200';
+const defaultBaseUrl = 'http://localhost:4200';
 
 function printUsage() {
   console.log(`Usage:

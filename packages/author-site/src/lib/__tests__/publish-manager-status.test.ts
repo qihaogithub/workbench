@@ -54,7 +54,6 @@ beforeAll(() => {
   jest.resetModules();
   getPublishStatus = require("../publish-manager").getPublishStatus;
   publishProject = require("../publish-manager").publishProject;
-  unpublishProject = require("../publish-manager").unpublishProject;
 });
 
 function setupPublishableProject(projectId: string) {
@@ -114,63 +113,6 @@ afterAll(() => {
   if (tempDir && fs.existsSync(tempDir)) {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
-});
-
-describe("unpublishProject", () => {
-  it("撤销发布应删除发布产物目录", async () => {
-    setupPublishableProject("proj-unpublish-delete");
-    await publishProject("proj-unpublish-delete");
-    const publishedDir = path.join(tempDir, "published", "proj-unpublish-delete");
-    expect(fs.existsSync(publishedDir)).toBe(true);
-
-    unpublishProject("proj-unpublish-delete");
-
-    expect(fs.existsSync(publishedDir)).toBe(false);
-  });
-
-  it("撤销发布应从 projects-index.json 中移除条目", async () => {
-    setupPublishableProject("proj-unpublish-index");
-    await publishProject("proj-unpublish-index");
-
-    unpublishProject("proj-unpublish-index");
-
-    const index = JSON.parse(
-      fs.readFileSync(path.join(tempDir, "published", "projects-index.json"), "utf-8"),
-    ) as { projects: Array<{ id: string }> };
-    expect(index.projects.map((p) => p.id)).not.toContain("proj-unpublish-index");
-  });
-
-  it("撤销发布应清除项目的 publishedVersion 和 publishedAt", async () => {
-    setupPublishableProject("proj-unpublish-meta");
-    await publishProject("proj-unpublish-meta");
-
-    unpublishProject("proj-unpublish-meta");
-
-    const project = JSON.parse(
-      fs.readFileSync(
-        path.join(tempDir, "projects", "proj-unpublish-meta", "project.json"),
-        "utf-8",
-      ),
-    );
-    expect(project.publishedVersion).toBeUndefined();
-    expect(project.publishedAt).toBeUndefined();
-  });
-
-  it("撤销发布后 getPublishStatus 应返回 never_published", async () => {
-    setupPublishableProject("proj-unpublish-status");
-    await publishProject("proj-unpublish-status");
-
-    unpublishProject("proj-unpublish-status");
-
-    const status = getPublishStatus("proj-unpublish-status");
-    expect(status.status).toBe("never_published");
-    expect(status.publishedVersion).toBeNull();
-  });
-
-  it("撤销未发布的项目不应报错", () => {
-    setupPublishableProject("proj-unpublish-never");
-    expect(() => unpublishProject("proj-unpublish-never")).not.toThrow();
-  });
 });
 
 describe("getPublishStatus", () => {
@@ -526,3 +468,136 @@ describe("getPublishStatus", () => {
     );
   });
 });
+
+describe("unpublishProject", () => {
+  let tempDir: string;
+  let unpublishProjectFn: typeof import("../publish-manager").unpublishProject;
+  let publishProjectFn: typeof import("../publish-manager").publishProject;
+  let getPublishStatusFn: typeof import("../publish-manager").getPublishStatus;
+
+  beforeEach(async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "unpublish-test-"));
+    const dataDir = path.join(tempDir, "data");
+    process.env.DATA_DIR = dataDir;
+    fs.mkdirSync(path.join(dataDir, "projects"), { recursive: true });
+    fs.mkdirSync(path.join(dataDir, "published"), { recursive: true });
+
+    jest.resetModules();
+    const mod = await import("../publish-manager");
+    unpublishProjectFn = mod.unpublishProject;
+    publishProjectFn = mod.publishProject;
+    getPublishStatusFn = mod.getPublishStatus;
+  });
+
+  afterEach(() => {
+    delete process.env.DATA_DIR;
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it("撤销发布后应删除 published 目录", async () => {
+    const projectId = "proj-unpublish";
+    setupProjectInTemp(tempDir, projectId);
+    await publishProjectFn(projectId);
+
+    const publishedDir = path.join(tempDir, "data", "published", projectId);
+    expect(fs.existsSync(publishedDir)).toBe(true);
+
+    await unpublishProjectFn(projectId);
+
+    expect(fs.existsSync(publishedDir)).toBe(false);
+  });
+
+  it("撤销发布后应从 projects-index.json 移除条目", async () => {
+    const projectId = "proj-unpublish-index";
+    setupProjectInTemp(tempDir, projectId);
+    await publishProjectFn(projectId);
+
+    await unpublishProjectFn(projectId);
+
+    const index = JSON.parse(
+      fs.readFileSync(
+        path.join(tempDir, "data", "published", "projects-index.json"),
+        "utf-8",
+      ),
+    ) as { projects: Array<{ id: string }> };
+    expect(index.projects.map((p) => p.id)).not.toContain(projectId);
+  });
+
+  it("撤销发布后项目中 publishedVersion 和 publishedAt 被清除", async () => {
+    const projectId = "proj-unpublish-meta";
+    setupProjectInTemp(tempDir, projectId);
+    await publishProjectFn(projectId);
+
+    await unpublishProjectFn(projectId);
+
+    const projectPath = path.join(tempDir, "data", "projects", projectId, "project.json");
+    const project = JSON.parse(fs.readFileSync(projectPath, "utf-8"));
+    expect(project.publishedVersion).toBeUndefined();
+    expect(project.publishedAt).toBeUndefined();
+  });
+
+  it("撤销发布后状态返回 never_published", async () => {
+    const projectId = "proj-unpublish-status";
+    setupProjectInTemp(tempDir, projectId);
+    await publishProjectFn(projectId);
+    await unpublishProjectFn(projectId);
+
+    const status = await getPublishStatusFn(projectId);
+    expect(status.status).toBe("never_published");
+  });
+
+  it("对未发布项目调用撤销发布不报错", () => {
+    const projectId = "proj-unpublish-idempotent";
+    setupProjectInTemp(tempDir, projectId);
+
+    expect(() => unpublishProjectFn(projectId)).not.toThrow();
+  });
+});
+
+function setupProjectInTemp(baseDir: string, projectId: string) {
+  const projectDir = path.join(baseDir, "data", "projects", projectId);
+  fs.mkdirSync(projectDir, { recursive: true });
+
+  const workspaceDir = path.join(projectDir, "workspace");
+  const demoDir = path.join(workspaceDir, "demos", "home");
+  fs.mkdirSync(demoDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(demoDir, "index.tsx"),
+    "export default function Demo() { return <div>hello</div>; }",
+    "utf-8",
+  );
+  fs.writeFileSync(
+    path.join(demoDir, "config.schema.json"),
+    JSON.stringify({ type: "object", properties: {} }),
+    "utf-8",
+  );
+  fs.writeFileSync(
+    path.join(workspaceDir, "workspace-tree.json"),
+    JSON.stringify({
+      folders: [],
+      pages: [{ id: "home", name: "首页", order: 0, parentId: null }],
+    }),
+    "utf-8",
+  );
+  fs.writeFileSync(
+    path.join(workspaceDir, "app.graph.json"),
+    JSON.stringify({ version: 1, entry: "home", pages: {}, actions: [], state: {} }),
+    "utf-8",
+  );
+
+  const project = {
+    id: projectId,
+    name: "测试项目",
+    workspacePath: workspaceDir,
+    demoPages: [{ id: "home", name: "首页", order: 0, parentId: null }],
+    demoFolders: [],
+    versions: [],
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  const projectJsonPath = path.join(projectDir, "project.json");
+  fs.writeFileSync(projectJsonPath, JSON.stringify(project, null, 2), "utf-8");
+
+  return projectDir;
+}

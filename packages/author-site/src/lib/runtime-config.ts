@@ -1,5 +1,5 @@
-export const DEFAULT_AGENT_SERVICE_URL = "http://localhost:3201";
-export const DEFAULT_SCREENSHOT_SERVICE_URL = "http://localhost:3202";
+export const DEFAULT_AGENT_SERVICE_URL = "http://localhost:4201";
+export const DEFAULT_SCREENSHOT_SERVICE_URL = "http://localhost:4202";
 export const DEFAULT_SCREENSHOT_PROXY_TIMEOUT_MS = 30000;
 
 export interface ModelEnvConfig {

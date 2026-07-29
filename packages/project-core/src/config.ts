@@ -3,8 +3,8 @@ import path from "node:path";
 
 import type { ProjectAdminActor } from "./types.js";
 
-export const DEFAULT_AGENT_SERVICE_URL = "http://localhost:3201";
-export const DEFAULT_SCREENSHOT_SERVICE_URL = "http://localhost:3202";
+export const DEFAULT_AGENT_SERVICE_URL = "http://localhost:4201";
+export const DEFAULT_SCREENSHOT_SERVICE_URL = "http://localhost:4202";
 export const DEFAULT_PROJECT_ADMIN_MAX_BATCH_SIZE = 20;
 
 function trimTrailingSlashes(value: string): string {

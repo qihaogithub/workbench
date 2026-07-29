@@ -31,7 +31,7 @@ function resolveUrl(args) {
   if (!projectId) {
     throw new Error("Missing --url or --project-id");
   }
-  const baseUrl = args["base-url"] ?? process.env.PROTOTYPE_CANVAS_BASE_URL ?? "http://localhost:3200";
+  const baseUrl = args["base-url"] ?? process.env.PROTOTYPE_CANVAS_BASE_URL ?? "http://localhost:4200";
   return `${String(baseUrl).replace(/\/$/, "")}/demo/${encodeURIComponent(projectId)}/edit`;
 }
 

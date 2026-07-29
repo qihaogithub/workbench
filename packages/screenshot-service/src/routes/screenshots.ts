@@ -756,6 +756,7 @@ async function generateScreenshotUncached(
         demoId: pageId,
         origin: config.authorSiteUrl,
       },
+      constrainHeight: false,
     });
   } else {
     html = buildSketchScenePreviewDocumentHtml({

@@ -9,7 +9,7 @@
  *   node scripts/development/measure-edit-page-load.mjs [projectId]
  *
  * 环境变量:
- *   BASE_URL  — 创作端地址（默认 http://localhost:3200）
+ *   BASE_URL  — 创作端地址（默认 http://localhost:4200）
  *   PROJECT_ID — 项目 ID（默认取 data/projects/ 下第一个）
  *   USERNAME / PASSWORD — 登录凭据（默认 qihao / 130015）
  *   NO_LOGIN — 设为 1 跳过自动登录
@@ -23,7 +23,7 @@
 import { execSync } from "child_process";
 import { readdirSync } from "fs";
 
-const BASE_URL = process.env.BASE_URL || "http://localhost:3200";
+const BASE_URL = process.env.BASE_URL || "http://localhost:4200";
 const USERNAME = process.env.USERNAME || "qihao";
 const PASSWORD = process.env.PASSWORD || "130015";
 const SKIP_LOGIN = process.env.NO_LOGIN === "1";

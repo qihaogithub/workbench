@@ -21,12 +21,12 @@ export interface ServiceConfig {
 
 export function loadConfig(): ServiceConfig {
   return {
-    port: parseInt(process.env.PORT || "3201", 10),
+    port: parseInt(process.env.PORT || "4201", 10),
     host: process.env.HOST || "0.0.0.0",
     logLevel: process.env.LOG_LEVEL || "info",
     internalApiToken: process.env.INTERNAL_API_TOKEN || "",
     screenshotServiceUrl:
-      process.env.SCREENSHOT_SERVICE_URL || "http://localhost:3202",
+      process.env.SCREENSHOT_SERVICE_URL || "http://localhost:4202",
     piAgent: {
       provider: process.env.PI_AGENT_PROVIDER || "anthropic",
       apiKey: process.env.PI_AGENT_API_KEY || "",

@@ -7,12 +7,12 @@ export default defineConfig({
     timeout: 10_000,
   },
   use: {
-    baseURL: "http://127.0.0.1:3400",
+    baseURL: "http://127.0.0.1:4400",
     trace: "retain-on-failure",
   },
   webServer: {
     command: "corepack pnpm --filter @workbench/sketch-playground dev",
-    url: "http://127.0.0.1:3400",
+    url: "http://127.0.0.1:4400",
     reuseExistingServer: true,
     timeout: 120_000,
   },

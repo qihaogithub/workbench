@@ -299,7 +299,7 @@ pnpm --filter @workbench/project-cli test
 ## Playwright E2E
 
 - 配置文件在 `test/创作端E2E回归测试/playwright.config.ts`，不是根目录默认配置。
-- baseURL 是 `http://localhost:3200`。
+- baseURL 是 `http://localhost:4200`。
 - 前置条件：author-site 等相关服务已启动；首次运行需要 `pnpm playwright install chromium`。
 - 运行命令：`pnpm test:e2e`、`pnpm test:e2e:ui`、`pnpm test:e2e:headed`。根脚本已显式指定 Playwright 配置文件。
 - 草图 SDK playground 的独立浏览器冒烟使用 `pnpm test:e2e:sketch-playground`，配置在 `test/sketch-playground/playwright.config.ts`，会自动启动 `pnpm dev:sketch`。

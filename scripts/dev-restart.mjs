@@ -3,7 +3,7 @@ import { rmSync } from "node:fs";
 import { resolve } from "node:path";
 import { platform } from "node:os";
 
-const PORTS = [3200, 3201, 3202, 3300];
+const PORTS = [4200, 4201, 4202, 4300];
 const SHUTDOWN_WAIT_MS = 1500;
 const NEXT_CACHE_DIRS = [
   resolve("packages/author-site/.next"),

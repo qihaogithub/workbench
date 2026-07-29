@@ -6195,14 +6195,32 @@ ${context.details}
           </Button>
         </div>
         <div className="flex items-center gap-3">
+          <div className="hidden items-center gap-2 rounded-md border px-2 py-1 text-xs text-muted-foreground md:flex">
+            <Users className="h-3.5 w-3.5" />
+            <span>{collabStatusLabel}</span>
+            {collabUsers.length > 0 && (
+              <div className="flex -space-x-1">
+                {collabUsers.slice(0, 4).map((presence) => (
+                  <span
+                    key={`${presence.userId}-${presence.resourcePath}`}
+                    className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-background text-[10px] font-medium text-white"
+                    title={presence.username}
+                    style={{ backgroundColor: presence.color }}
+                  >
+                    {presence.username.slice(0, 1).toUpperCase()}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
           <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
+            variant="outline"
+            className="gap-2"
             title="分享"
             onClick={() => setShowShareDialog(true)}
           >
-            <Share2 className="h-5 w-5" />
+            <Share2 className="h-4 w-4" />
+            分享
           </Button>
           {diagnosticsEnabled && (
             <Button
@@ -6236,24 +6254,6 @@ ${context.details}
               <span>诊断</span>
             </Button>
           )}
-          <div className="hidden items-center gap-2 rounded-md border px-2 py-1 text-xs text-muted-foreground md:flex">
-            <Users className="h-3.5 w-3.5" />
-            <span>{collabStatusLabel}</span>
-            {collabUsers.length > 0 && (
-              <div className="flex -space-x-1">
-                {collabUsers.slice(0, 4).map((presence) => (
-                  <span
-                    key={`${presence.userId}-${presence.resourcePath}`}
-                    className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-background text-[10px] font-medium text-white"
-                    title={presence.username}
-                    style={{ backgroundColor: presence.color }}
-                  >
-                    {presence.username.slice(0, 1).toUpperCase()}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
           <div className="flex items-center">
             <Button
               onClick={async () => {

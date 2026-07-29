@@ -526,10 +526,13 @@ export function AssistantMessage({
   const showActionBar = Boolean(allTextContent) || (isStreaming && !showRunProgressPanel);
 
   const handleCopy = async () => {
-    if (allTextContent) {
+    if (!allTextContent) return;
+    try {
       await navigator.clipboard.writeText(allTextContent);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard not available
     }
   };
 

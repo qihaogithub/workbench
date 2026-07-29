@@ -219,6 +219,7 @@ export function useWorkspaceAuthorityState(
     if (!enabled) return;
 
     const interval = setInterval(() => {
+      if (document.hidden) return;
       void pollEvents();
     }, pollIntervalMs);
 
