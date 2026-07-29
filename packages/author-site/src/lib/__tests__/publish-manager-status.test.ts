@@ -5,6 +5,7 @@ import os from "os";
 let tempDir: string;
 let getPublishStatus: typeof import("../publish-manager").getPublishStatus;
 let publishProject: typeof import("../publish-manager").publishProject;
+let unpublishProject: typeof import("../publish-manager").unpublishProject;
 
 function setupProject(
   projectId: string,
@@ -53,6 +54,7 @@ beforeAll(() => {
   jest.resetModules();
   getPublishStatus = require("../publish-manager").getPublishStatus;
   publishProject = require("../publish-manager").publishProject;
+  unpublishProject = require("../publish-manager").unpublishProject;
 });
 
 function setupPublishableProject(projectId: string) {
@@ -112,6 +114,63 @@ afterAll(() => {
   if (tempDir && fs.existsSync(tempDir)) {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
+});
+
+describe("unpublishProject", () => {
+  it("撤销发布应删除发布产物目录", async () => {
+    setupPublishableProject("proj-unpublish-delete");
+    await publishProject("proj-unpublish-delete");
+    const publishedDir = path.join(tempDir, "published", "proj-unpublish-delete");
+    expect(fs.existsSync(publishedDir)).toBe(true);
+
+    unpublishProject("proj-unpublish-delete");
+
+    expect(fs.existsSync(publishedDir)).toBe(false);
+  });
+
+  it("撤销发布应从 projects-index.json 中移除条目", async () => {
+    setupPublishableProject("proj-unpublish-index");
+    await publishProject("proj-unpublish-index");
+
+    unpublishProject("proj-unpublish-index");
+
+    const index = JSON.parse(
+      fs.readFileSync(path.join(tempDir, "published", "projects-index.json"), "utf-8"),
+    ) as { projects: Array<{ id: string }> };
+    expect(index.projects.map((p) => p.id)).not.toContain("proj-unpublish-index");
+  });
+
+  it("撤销发布应清除项目的 publishedVersion 和 publishedAt", async () => {
+    setupPublishableProject("proj-unpublish-meta");
+    await publishProject("proj-unpublish-meta");
+
+    unpublishProject("proj-unpublish-meta");
+
+    const project = JSON.parse(
+      fs.readFileSync(
+        path.join(tempDir, "projects", "proj-unpublish-meta", "project.json"),
+        "utf-8",
+      ),
+    );
+    expect(project.publishedVersion).toBeUndefined();
+    expect(project.publishedAt).toBeUndefined();
+  });
+
+  it("撤销发布后 getPublishStatus 应返回 never_published", async () => {
+    setupPublishableProject("proj-unpublish-status");
+    await publishProject("proj-unpublish-status");
+
+    unpublishProject("proj-unpublish-status");
+
+    const status = getPublishStatus("proj-unpublish-status");
+    expect(status.status).toBe("never_published");
+    expect(status.publishedVersion).toBeNull();
+  });
+
+  it("撤销未发布的项目不应报错", () => {
+    setupPublishableProject("proj-unpublish-never");
+    expect(() => unpublishProject("proj-unpublish-never")).not.toThrow();
+  });
 });
 
 describe("getPublishStatus", () => {

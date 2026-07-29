@@ -446,7 +446,6 @@ export function PreviewCanvas({
   onCanvasStateChange,
   onRequestDeletePages,
   onPageConfigEdit,
-  onRuntimeConversionRequest,
   onCanvasClick,
   className,
   editingPageId,
@@ -2992,7 +2991,6 @@ export function PreviewCanvas({
                     ? (pageId) => void onRequestDeletePages([pageId])
                     : undefined
                 }
-                onRuntimeConversionRequest={onRuntimeConversionRequest}
                 onConsoleEntry={onConsoleEntry}
                 onError={onError}
                 onDragStart={handleDragStart}

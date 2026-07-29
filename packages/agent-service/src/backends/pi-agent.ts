@@ -1049,8 +1049,12 @@ Keep the final response concise: summarize what you changed, what you verified, 
       this.currentSystemPrompt ||
       "# Workbench AI 编码助手\n\n等待 system prompt 注入...";
     const runtimeTools = formatRuntimeToolsForPrompt(context.activeTools || []);
+    const toolNames = (context.activeTools || [])
+      .map((t: any) => t.name)
+      .filter((n: unknown): n is string => typeof n === 'string');
     const preinstalledSkills = formatPreinstalledSkillsForPrompt(
       context.resources?.skills || [],
+      toolNames,
     );
     return [basePrompt, runtimeTools, preinstalledSkills]
       .filter(Boolean)

@@ -79,6 +79,11 @@ import {
 import { PreviewProjectionTracker } from "@/lib/preview-projection-tracker";
 import { WorkspacePerformanceSampler } from "@/lib/workspace-performance-sampling";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useToast } from "@/components/ui/toast-provider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -424,7 +429,8 @@ function buildRuntimeConversionPrompt(input: {
 }): string {
   const sourceLabel = runtimeTypeLabels[input.sourceRuntimeType];
   const targetLabel = runtimeTypeLabels[input.targetRuntimeType];
-  const base = `请把当前页面从「${sourceLabel}」转换为「${targetLabel}」，并保持产品意图、页面结构、配置字段和视觉层级一致。
+
+  return `请把当前页面从「${sourceLabel}」转换为「${targetLabel}」，并保持产品意图、页面结构、配置字段和视觉层级一致。
 
 页面名称: ${input.pageName}
 页面 ID: ${input.pageId}
@@ -434,7 +440,6 @@ function buildRuntimeConversionPrompt(input: {
 - demos/${input.pageId}/config.schema.json
 - demos/${input.pageId}/prototype.html
 - demos/${input.pageId}/prototype.css
-- demos/${input.pageId}/prototype.meta.json
 - workspace-tree.json
 
 通用要求:
@@ -442,26 +447,9 @@ function buildRuntimeConversionPrompt(input: {
 - 目标运行时文件生成完成并自检通过后，再更新 workspace-tree.json 中该页面的 runtimeType。
 - 保留源运行时文件作为回退，不要删除 index.tsx、prototype.html 或 prototype.css。
 - 不要新增无关页面、文件夹或依赖。
-- 转换后检查目标运行时的配置 Schema 仍是合法 JSON。`;
+- 转换后检查目标运行时的配置 Schema 仍是合法 JSON。
 
-  if (input.targetRuntimeType === "prototype-html-css") {
-    return `${base}
-
-HTML/CSS 原型页目标:
-- 从 demos/${input.pageId}/index.tsx 和 config.schema.json 提取可静态表达的界面。
-- 写入 demos/${input.pageId}/prototype.html 和 demos/${input.pageId}/prototype.css。
-- prototype.html 只保留页面主体结构，不要包含远程 script、远程 stylesheet、iframe 或内联事件处理器。
-- prototype.css 内联必要样式，不要通过 @import 拉取远程资源。
-- workspace-tree.json 中该页面 runtimeType 设置为 "prototype-html-css"。`;
-  }
-
-  return `${base}
-
-高保真 React 页目标:
-- 从 demos/${input.pageId}/prototype.html、prototype.css 和 config.schema.json 还原为可交互 React 页面。
-- 写入 demos/${input.pageId}/index.tsx，必要时同步更新 config.schema.json。
-- React 代码必须使用当前项目已支持的导入和 @preview/sdk 约定，不要引入未登记依赖。
-- workspace-tree.json 中该页面 runtimeType 设置为 "high-fidelity-react"。`;
+先用 readPreinstalledSkill({ name: 'page-runtime-conversion' }) 读取完整转换规范，按其中的视觉 ground truth 约束、分运行时细则和自检清单执行。`;
 }
 type ScreenshotBatchScope = "all" | "canvas-initial";
 
@@ -786,6 +774,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [coverDialogOpen, setCoverDialogOpen] = useState(false);
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [showUnpublishDialog, setShowUnpublishDialog] = useState(false);
   const [saveVersionDialogOpen, setSaveVersionDialogOpen] = useState(false);
   const [versionNameInput, setVersionNameInput] = useState("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -1818,7 +1807,12 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       focusedPageName: focusedPage?.name,
       focusedPagePaths: focusedPageId
         ? {
-            index: `demos/${focusedPageId}/index.tsx`,
+            index:
+              focusedPage?.runtimeType === "prototype-html-css"
+                ? `demos/${focusedPageId}/prototype.html`
+                : focusedPage?.runtimeType === "sketch-scene"
+                  ? `demos/${focusedPageId}/sketch.scene.json`
+                  : `demos/${focusedPageId}/index.tsx`,
             schema: `demos/${focusedPageId}/config.schema.json`,
           }
         : undefined,
@@ -2406,7 +2400,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   const applyActivePrototypeVisualPropertyChange = useCallback(
     (
-      node: VisualNodeInfo,
+      node: Pick<VisualNodeInfo, "nodeId" | "domPath">,
       property: string,
       value: string,
       kind: VisualPropertyChangeKind,
@@ -2735,6 +2729,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     publishStatus,
     setPublishStatus,
     publishing,
+    unpublishing,
     versionHistory,
     pageVersionHistories,
     restoring,
@@ -2744,6 +2739,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     loadVersionHistory,
     loadPageVersionHistories,
     handlePublish,
+    handleUnpublish,
     handlePreviewPageVersion,
     handleRestorePageVersion,
     handleRestoreProjectVersion,
@@ -4778,6 +4774,7 @@ ${context.details}
           prototypeMeta: pagePrototypeMapRef.current[activeDemoId]?.meta,
           sketchScene: pageSketchMapRef.current[activeDemoId]?.scene,
           sketchMeta: pageSketchMapRef.current[activeDemoId]?.meta,
+          localizeImages: false,
         }),
       },
     );
@@ -6192,31 +6189,65 @@ ${context.details}
               </div>
             )}
           </div>
-          <Button
-            onClick={async () => {
-              await handlePublish();
-            }}
-            disabled={publishButtonDisabled}
-            variant={!publishButtonDisabled ? "default" : "outline"}
-            className="gap-2"
-          >
-            {publishing ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {publishingButtonText}
-              </>
-            ) : publishStatus === "published" ? (
-              <>
-                <CheckCircle className="h-4 w-4" />
-                已发布
-              </>
-            ) : (
-              <>
-                <Upload className="h-4 w-4" />
-                {publishButtonText}
-              </>
+          <div className="flex items-center">
+            <Button
+              onClick={async () => {
+                await handlePublish();
+              }}
+              disabled={publishButtonDisabled}
+              variant={!publishButtonDisabled ? "default" : "outline"}
+              className="gap-2 rounded-r-none"
+            >
+              {publishing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {publishingButtonText}
+                </>
+              ) : publishStatus === "published" ? (
+                <>
+                  <CheckCircle className="h-4 w-4" />
+                  已发布
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4" />
+                  {publishButtonText}
+                </>
+              )}
+            </Button>
+            {publishStatus === "published" && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={!publishButtonDisabled ? "default" : "outline"}
+                    size="icon"
+                    className="rounded-l-none border-l-0"
+                    disabled={unpublishing}
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-40 p-1" align="end">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start text-destructive hover:text-destructive"
+                    disabled={unpublishing}
+                    onClick={() => setShowUnpublishDialog(true)}
+                  >
+                    {unpublishing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        撤销中...
+                      </>
+                    ) : (
+                      "撤销发布"
+                    )}
+                  </Button>
+                </PopoverContent>
+              </Popover>
             )}
-          </Button>
+          </div>
         </div>
       </div>
 
@@ -7272,7 +7303,6 @@ ${context.details}
                   projectId: demoId,
                   onRequestDeletePages: requestDeletePages,
                   onRequestPastePages: handlePastePages,
-                  onRuntimeConversionRequest: handleRequestRuntimeConversion,
                   focusPageId: focusCanvasPageId,
                   onVisiblePageIdsChange: setVisibleCanvasPageIds,
                   editingPageId: canvasEditingPageId ?? undefined,
@@ -7914,6 +7944,39 @@ ${context.details}
               仍然退出
             </Button>
             <Button onClick={handleStayOnPage}>继续编辑</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showUnpublishDialog} onOpenChange={setShowUnpublishDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>撤销发布</DialogTitle>
+            <DialogDescription>
+              撤销后，使用端将无法访问该项目。确认撤销？
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowUnpublishDialog(false)}>
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={unpublishing}
+              onClick={async () => {
+                await handleUnpublish();
+                setShowUnpublishDialog(false);
+              }}
+            >
+              {unpublishing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  撤销中...
+                </>
+              ) : (
+                "撤销发布"
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

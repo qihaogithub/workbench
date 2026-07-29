@@ -504,7 +504,7 @@ export async function PUT(
     let imageLocalizationResult: ImageLocalizationResult | undefined;
     if (
       typeof prototypeHtml === "string" &&
-      localizeImages !== false
+      localizeImages === true
     ) {
       try {
         const localized = await localizeHtmlImages(prototypeHtml, meta.demoId);

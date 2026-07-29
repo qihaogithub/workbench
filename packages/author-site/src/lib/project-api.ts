@@ -576,6 +576,17 @@ export class ProjectApiClient {
     return response.data;
   }
 
+  async unpublishProject(projectId: string): Promise<{ projectId: string }> {
+    const response = await this.localRequest<{ projectId: string }>(
+      `/api/projects/${projectId}/publish`,
+      { method: 'DELETE' },
+    );
+    if (!response.success || !response.data) {
+      throw new Error(response.error?.message || '撤销发布失败');
+    }
+    return response.data;
+  }
+
   // ============ Session 文件（多页面） ============
 
   /**
