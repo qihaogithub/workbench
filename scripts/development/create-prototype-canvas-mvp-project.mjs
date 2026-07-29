@@ -211,7 +211,7 @@ try {
   runOw(["edit", "commit", edit.editId, "--note", "创建 30 个 HTML/CSS 原型页画布体验项目"]);
   runOw(["project", "validate-runtime", project.id]);
 
-  const url = `http://localhost:3200/demo/${project.id}/edit`;
+  const url = `http://localhost:4200/demo/${project.id}/edit`;
   console.log(JSON.stringify({
     ok: true,
     projectId: project.id,

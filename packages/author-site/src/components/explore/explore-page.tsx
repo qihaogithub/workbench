@@ -81,16 +81,32 @@ export function ExplorePage() {
   }, [])
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setParticles((prev) =>
-        prev.map((p) => ({
-          ...p,
-          x: (p.x + p.speedX + 100) % 100,
-          y: (p.y + p.speedY + 100) % 100,
-        }))
-      )
-    }, 50)
-    return () => clearInterval(interval)
+    let rafId: number | null = null
+    let lastTime = 0
+    const FRAME_INTERVAL = 67 // ~15fps
+
+    const tick = (time: number) => {
+      if (document.hidden) {
+        rafId = requestAnimationFrame(tick)
+        return
+      }
+      if (time - lastTime >= FRAME_INTERVAL) {
+        lastTime = time
+        setParticles((prev) =>
+          prev.map((p) => ({
+            ...p,
+            x: (p.x + p.speedX + 100) % 100,
+            y: (p.y + p.speedY + 100) % 100,
+          }))
+        )
+      }
+      rafId = requestAnimationFrame(tick)
+    }
+
+    rafId = requestAnimationFrame(tick)
+    return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId)
+    }
   }, [])
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {

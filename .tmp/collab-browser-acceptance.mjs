@@ -5,8 +5,8 @@ import WebSocket from "ws";
 
 globalThis.WebSocket = WebSocket;
 
-const AUTHOR_URL = process.env.E2E_BASE_URL ?? "http://localhost:3200";
-const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_SERVICE_URL ?? "http://localhost:3201";
+const AUTHOR_URL = process.env.E2E_BASE_URL ?? "http://localhost:4200";
+const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_SERVICE_URL ?? "http://localhost:4201";
 const COLLAB_WS_URL = AGENT_URL.replace(/^http:/, "ws:").replace(/^https:/, "wss:");
 const USERNAME = process.env.E2E_USER ?? "qihao";
 const PASSWORD = process.env.E2E_PASSWORD ?? "130015";

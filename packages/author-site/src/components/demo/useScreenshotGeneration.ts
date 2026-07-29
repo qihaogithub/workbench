@@ -12,7 +12,7 @@ import type { ScreenshotRenderBox } from "@workbench/demo-ui";
 import type { PageSnapshotInput } from "@workbench/shared";
 
 const POLL_INTERVAL = 1500;
-const MIN_POLL_INTERVAL_MS = 300;
+const MIN_POLL_INTERVAL_MS = 1000;
 const MAX_POLL_INTERVAL_MS = 5_000;
 const MAX_POLL_DURATION_MS = 60_000;
 const MAX_POLL_FAILURES = 3;
@@ -328,6 +328,11 @@ export function useScreenshotGeneration(
           normalizeRetryAfterMs(retryAfterMs),
         );
       };
+
+      if (document.hidden) {
+        scheduleNextPoll();
+        return;
+      }
 
       if (
         pollStartedAtRef.current &&

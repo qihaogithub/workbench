@@ -29,7 +29,7 @@ program
   .name("ops-cli")
   .description("CLI 诊断工具 - 测试与诊断 AI Agent 服务")
   .version("2.1.0")
-  .option("-u, --url <url>", "Agent Service 地址", "http://localhost:3201")
+  .option("-u, --url <url>", "Agent Service 地址", "http://localhost:4201")
   .option("--json", "以 JSON 格式输出（供 Agent 程序化解析）");
 
 function getJsonMode(): boolean {

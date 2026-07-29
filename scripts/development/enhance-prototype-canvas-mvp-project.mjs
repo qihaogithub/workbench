@@ -558,7 +558,7 @@ try {
     diff: diff.data,
     commit: commit.data,
     runtime: runtime.data,
-    editUrl: `http://localhost:3200/demo/${projectId}/edit`,
+    editUrl: `http://localhost:4200/demo/${projectId}/edit`,
     prototypePageCount: 30,
     highFidelityPageIds: highFidelityPages.map((page) => page.pageId),
   }, null, 2));

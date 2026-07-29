@@ -15,7 +15,7 @@ pnpm dev:agent
 
 等待服务启动,应该看到类似输出:
 ```
-Agent Service running on http://localhost:3201
+Agent Service running on http://localhost:4201
 ```
 
 ### 步骤 2: 检查服务状态
@@ -39,7 +39,7 @@ npx tsx src/index.ts health
   运行时间: 2m 15s
   活跃 Agent 数量: 0
 
-服务地址: http://localhost:3201
+服务地址: http://localhost:4201
 ```
 
 ### 步骤 3: 发送测试消息

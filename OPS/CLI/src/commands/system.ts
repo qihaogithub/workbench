@@ -15,8 +15,8 @@ import type { SystemCheckResult, HealthStatus } from "../types.js";
 
 const BACKENDS: string[] = []; // Pi Agent 已内置，无需检查外部 CLI
 const PROJECT_ROOT = join(import.meta.dirname, "../../../../");
-const AGENT_SERVICE_PORT = 3201;
-const AUTHOR_SITE_PORT = 3200;
+const AGENT_SERVICE_PORT = 4201;
+const AUTHOR_SITE_PORT = 4200;
 const CHECK_PORTS = [AGENT_SERVICE_PORT, AUTHOR_SITE_PORT];
 
 export async function systemCheck(

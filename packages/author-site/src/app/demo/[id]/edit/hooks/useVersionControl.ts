@@ -652,8 +652,8 @@ export function useVersionControl(params: UseVersionControlParams) {
     publishing ||
     publishStatus === null ||
     (!hasPendingChanges && !hasPublishableChanges);
-  const publishButtonText = hasPendingChanges ? "同步并发布" : "发布";
-  const publishingButtonText = hasPendingChanges ? "同步并发布中..." : "发布中...";
+  const publishButtonText = "发布";
+  const publishingButtonText = "发布中...";
 
   return {
     // State

@@ -1121,7 +1121,6 @@ function PreviewPanelInternal({
           break;
 
         case "RESIZE":
-          if (!isCurrentPreviewRequest) return;
           if (typeof event.data?.height === "number") {
             onContentHeightChange?.(event.data.height);
           }

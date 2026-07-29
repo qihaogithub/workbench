@@ -4,9 +4,9 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const PROJECT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const AUTHOR_PORT = 3200;
-const AGENT_PORT = 3201;
-const SCREENSHOT_PORT = 3202;
+const AUTHOR_PORT = 4200;
+const AGENT_PORT = 4201;
+const SCREENSHOT_PORT = 4202;
 const SHUTDOWN_WAIT_MS = 1500;
 const SERVICE_READY_TIMEOUT_MS = 45_000;
 const args = new Set(process.argv.slice(2).filter((arg) => arg !== "--"));
@@ -51,8 +51,8 @@ function printUsage() {
 行为:
   1. 停止本项目的本地 Docker author-site，释放 3200 端口。
   2. 保留 .next 构建缓存，使用当前工作区源码执行 author-site production build。
-  3. 检测 agent-service (3201) 和 screenshot-service (3202)，未运行时自动以 dev 模式启动。
-  4. 只有构建成功才启动 http://localhost:3200。
+  3. 检测 agent-service (4201) 和 screenshot-service (4202)，未运行时自动以 dev 模式启动。
+  4. 只有构建成功才启动 http://localhost:4200。
 
 选项:
   --build-only       仅构建当前源码，不启动任何服务
@@ -82,18 +82,18 @@ const configuredEnv = {
 const localEnv = {
   ...configuredEnv,
   DATA_DIR: configuredEnv.DATA_DIR || resolve(PROJECT_DIR, "data"),
-  AGENT_SERVICE_URL: configuredEnv.AGENT_SERVICE_URL || "http://localhost:3201",
+  AGENT_SERVICE_URL: configuredEnv.AGENT_SERVICE_URL || "http://localhost:4201",
   SCREENSHOT_SERVICE_URL:
-    configuredEnv.SCREENSHOT_SERVICE_URL || "http://localhost:3202",
+    configuredEnv.SCREENSHOT_SERVICE_URL || "http://localhost:4202",
   NEXT_PUBLIC_AGENT_SERVICE_URL:
-    configuredEnv.NEXT_PUBLIC_AGENT_SERVICE_URL || "http://localhost:3201",
+    configuredEnv.NEXT_PUBLIC_AGENT_SERVICE_URL || "http://localhost:4201",
   NEXT_PUBLIC_SCREENSHOT_SERVICE_URL:
-    configuredEnv.NEXT_PUBLIC_SCREENSHOT_SERVICE_URL || "http://localhost:3202",
+    configuredEnv.NEXT_PUBLIC_SCREENSHOT_SERVICE_URL || "http://localhost:4202",
   NEXT_PUBLIC_WEB_URL:
-    configuredEnv.NEXT_PUBLIC_WEB_URL || "http://localhost:3200",
+    configuredEnv.NEXT_PUBLIC_WEB_URL || "http://localhost:4200",
   CORS_ORIGINS:
     configuredEnv.CORS_ORIGINS ||
-    "http://localhost:3200,http://127.0.0.1:3200,http://localhost:3300,http://127.0.0.1:3300",
+    "http://localhost:4200,http://127.0.0.1:4200,http://localhost:4300,http://127.0.0.1:4300",
   HOSTNAME: configuredEnv.HOSTNAME || "0.0.0.0",
 };
 // 移除 PORT，避免父进程 PORT 泄漏到 agent-service / screenshot-service 子进程。
@@ -103,7 +103,7 @@ delete localEnv.PORT;
 /** author-site 专用环境变量，不传递给其他子服务 */
 const authorEnv = {
   ...localEnv,
-  PORT: "3200",
+  PORT: "4200",
 };
 
 function run(command, commandArgs, options = {}) {
@@ -319,12 +319,12 @@ async function stopLocalAuthorProcesses() {
   }
 
   if (findListeningPids(AUTHOR_PORT).length === 0) {
-    console.log("[本地准生产预览] 3200 端口已空闲。");
+    console.log("[本地准生产预览] 4200 端口已空闲。");
     return;
   }
 
-  await freePort(AUTHOR_PORT, "3200");
-  console.log("[本地准生产预览] 3200 端口已空闲。");
+  await freePort(AUTHOR_PORT, "4200");
+  console.log("[本地准生产预览] 4200 端口已空闲。");
 }
 
 async function isServiceHealthy(url) {
@@ -438,19 +438,19 @@ function prepareStandaloneRuntime() {
 
 if (args.has("--dry-run")) {
   console.log("[本地准生产预览] 计划:");
-  console.log("- 停止本项目 Docker author-site 和 3200 端口现有进程");
+  console.log("- 停止本项目 Docker author-site 和 4200 端口现有进程");
   if (!args.has("--no-agent")) {
-    console.log("- 检测 agent-service (3201)，未运行时自动以 dev 模式启动");
+    console.log("- 检测 agent-service (4201)，未运行时自动以 dev 模式启动");
   }
   if (!args.has("--no-screenshot")) {
     console.log(
-      "- 检测 screenshot-service (3202)，未运行时自动以 dev 模式启动",
+      "- 检测 screenshot-service (4202)，未运行时自动以 dev 模式启动",
     );
   }
   console.log("- 保留 packages/author-site/.next 缓存");
   console.log("- 使用当前工作区执行 author-site production build");
   if (!args.has("--build-only")) {
-    console.log("- 构建成功后启动 http://localhost:3200");
+    console.log("- 构建成功后启动 http://localhost:4200");
   }
   process.exit(0);
 }
@@ -495,10 +495,10 @@ try {
     process.exit(0);
   }
 
-  // 启动 author-site 前再次释放 3200，防止构建期间端口被重新占用。
-  await freePort(AUTHOR_PORT, "3200");
+  // 启动 author-site 前再次释放 4200，防止构建期间端口被重新占用。
+  await freePort(AUTHOR_PORT, "4200");
 
-  console.log("[本地准生产预览] 启动 http://localhost:3200");
+  console.log("[本地准生产预览] 启动 http://localhost:4200");
   const authorChild = spawn(process.execPath, [standaloneServerPath], {
     cwd: PROJECT_DIR,
     env: authorEnv,

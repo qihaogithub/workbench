@@ -404,15 +404,19 @@ export function buildPrototypePreviewDocumentHtml(
   input: PrototypePreviewDocumentInput,
 ): string {
   const fragment = buildPrototypePreviewHtmlFragment(input);
+  const origin = input.assetRewrite?.origin;
+  const baseTag = origin ? `<base href="${origin}/">` : "";
 
   return `<!doctype html>
 <html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    ${baseTag}
     <style>
       html, body, #root {
-        margin: 0;
+        margin: 0 !important;
+        padding: 0 !important;
         width: 100%;
         min-height: 100%;
         background: #fff;
