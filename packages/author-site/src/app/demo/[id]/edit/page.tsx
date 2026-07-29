@@ -2,9 +2,8 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
-  PreviewStage,
-  PageConfigPanel,
   BUILT_IN_CONFIG_CATEGORIES,
   extractPrototypeConfigBindingKeys,
   invalidateCompileCache,
@@ -89,13 +88,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import {
-  AIChat,
-  type AutoRepairTrigger,
-  type VisualPropertyAutoSend,
-  type ChatMessage,
-  type StreamService,
-  type ChatElementRef,
+import type {
+  AutoRepairTrigger,
+  VisualPropertyAutoSend,
+  ChatMessage,
+  StreamService,
+  ChatElementRef,
 } from "@/components/ai-elements";
 import { getAgentClient } from "@/lib/agent-client";
 import { useConsoleBuffer } from "@/components/demo/useConsoleBuffer";
@@ -134,7 +132,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ErrorBanner } from "@/components/demo/ErrorBanner";
-import { VisualDraftActionBar } from "./components/VisualDraftActionBar";
 import {
   Dialog,
   DialogContent,
@@ -144,27 +141,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { CoverImageDialog } from "@/components/cover-image-dialog";
-import { ShareDialog } from "@/components/share/ShareDialog";
-import { DemoPageTree } from "@/components/demo/DemoPageTree";
-import { WorkspaceFileTree } from "@/components/demo/WorkspaceFileTree";
-import { WorkspaceCodeDialog } from "@/components/demo/WorkspaceCodeDialog";
-import { KnowledgePanel } from "@/components/demo/KnowledgePanel";
-import {
-  KnowledgeDocDialog,
-  type KnowledgeItem,
-  type KnowledgeDocDialogMode,
+import type {
+  KnowledgeItem,
+  KnowledgeDocDialogMode,
 } from "@/components/demo/KnowledgeDocDialog";
-import { ResourceHistoryDialog } from "@/components/demo/ResourceHistoryDialog";
 import { useCollabDocument } from "@/hooks/useCollabDocument";
-import { VisualPropertyPanel } from "./components/VisualPropertyPanel";
-import {
-  SketchEditorEngineInspectorPanel,
-  SketchEditorEngineLayerPanel,
-  SketchEditorEngineStage,
-  SketchEditorEngineToolbar,
-  useSketchEditorEngineHost,
-} from "./components/SketchEditorEngineHost";
+import { useSketchEditorEngineHost } from "./components/SketchEditorEngineHost";
 import { useVisualEditState, getNodeLabel, buildVisualSelectionPrompt } from "./hooks/useVisualEditState";
 import { useVersionControl } from "./hooks/useVersionControl";
 import { useWorkspaceAuthorityState } from "./hooks/useWorkspaceAuthorityState";
@@ -209,6 +191,88 @@ import type { ActiveViewContext } from "@/components/ai-elements";
 import { sanitizeHydratedMessages } from "@/lib/sanitize-hydrated-messages";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
+
+const PreviewStage = dynamic(
+  () =>
+    import("../../../../../components/demo").then((m) => m.PreviewStage),
+  { ssr: false, loading: () => null },
+);
+const PageConfigPanel = dynamic(
+  () =>
+    import("../../../../../components/demo").then((m) => m.PageConfigPanel),
+  { ssr: false, loading: () => null },
+);
+const AIChat = dynamic(
+  () => import("@/components/ai-elements").then((m) => m.AIChat),
+  { ssr: false, loading: () => null },
+);
+const VisualPropertyPanel = dynamic(
+  () => import("./components/VisualPropertyPanel").then((m) => m.VisualPropertyPanel),
+  { ssr: false, loading: () => null },
+);
+const SketchEditorEngineStage = dynamic(
+  () =>
+    import("./components/SketchEditorEngineHost").then(
+      (m) => m.SketchEditorEngineStage,
+    ),
+  { ssr: false, loading: () => null },
+);
+const SketchEditorEngineToolbar = dynamic(
+  () =>
+    import("./components/SketchEditorEngineHost").then(
+      (m) => m.SketchEditorEngineToolbar,
+    ),
+  { ssr: false, loading: () => null },
+);
+const SketchEditorEngineLayerPanel = dynamic(
+  () =>
+    import("./components/SketchEditorEngineHost").then(
+      (m) => m.SketchEditorEngineLayerPanel,
+    ),
+  { ssr: false, loading: () => null },
+);
+const SketchEditorEngineInspectorPanel = dynamic(
+  () =>
+    import("./components/SketchEditorEngineHost").then(
+      (m) => m.SketchEditorEngineInspectorPanel,
+    ),
+  { ssr: false, loading: () => null },
+);
+const CoverImageDialog = dynamic(
+  () => import("@/components/cover-image-dialog").then((m) => m.CoverImageDialog),
+  { ssr: false, loading: () => null },
+);
+const ShareDialog = dynamic(
+  () => import("@/components/share/ShareDialog").then((m) => m.ShareDialog),
+  { ssr: false, loading: () => null },
+);
+const DemoPageTree = dynamic(
+  () => import("@/components/demo/DemoPageTree").then((m) => m.DemoPageTree),
+  { ssr: false, loading: () => null },
+);
+const WorkspaceFileTree = dynamic(
+  () => import("@/components/demo/WorkspaceFileTree").then((m) => m.WorkspaceFileTree),
+  { ssr: false, loading: () => null },
+);
+const WorkspaceCodeDialog = dynamic(
+  () => import("@/components/demo/WorkspaceCodeDialog").then((m) => m.WorkspaceCodeDialog),
+  { ssr: false, loading: () => null },
+);
+const KnowledgePanel = dynamic(
+  () => import("@/components/demo/KnowledgePanel").then((m) => m.KnowledgePanel),
+  { ssr: false, loading: () => null },
+);
+const KnowledgeDocDialog = dynamic(
+  () => import("@/components/demo/KnowledgeDocDialog").then((m) => m.KnowledgeDocDialog),
+  { ssr: false, loading: () => null },
+);
+const ResourceHistoryDialog = dynamic(
+  () =>
+    import("@/components/demo/ResourceHistoryDialog").then(
+      (m) => m.ResourceHistoryDialog,
+    ),
+  { ssr: false, loading: () => null },
+);
 
 interface DemoEditPageProps {
   params: {
