@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
+import { createPortal } from "react-dom";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import {
@@ -5395,6 +5396,19 @@ export function SketchEditorCanvas({
   const [focusedGroupId, setFocusedGroupId] = React.useState<string | null>(null);
   const [contextMenu, setContextMenu] = React.useState<ContextMenuState | null>(null);
   const contextMenuRef = React.useRef<HTMLDivElement>(null);
+  const [contextMenuPos, setContextMenuPos] = React.useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  React.useLayoutEffect(() => {
+    if (!contextMenu) return;
+    const el = contextMenuRef.current;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const w = el?.offsetWidth ?? 144;
+    const h = el?.offsetHeight ?? 400;
+    setContextMenuPos({
+      x: Math.max(8, Math.min(contextMenu.x, vw - w - 8)),
+      y: Math.max(8, Math.min(contextMenu.y, vh - h - 8)),
+    });
+  }, [contextMenu]);
   const [commandPaletteOpen, setCommandPaletteOpen] = React.useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = React.useState(false);
   const [clipboardVersion, setClipboardVersion] = React.useState(0);
@@ -6543,11 +6557,8 @@ export function SketchEditorCanvas({
         } else if (!controller.selection.nodeIds.length) {
           return;
         }
-        const rect = containerRef.current?.getBoundingClientRect();
-        setContextMenu({
-          x: rect ? event.clientX - rect.left : event.clientX,
-          y: rect ? event.clientY - rect.top : event.clientY,
-        });
+        setContextMenu({ x: event.clientX, y: event.clientY });
+        setContextMenuPos({ x: event.clientX, y: event.clientY });
       }}
     >
       <input
@@ -7001,19 +7012,20 @@ export function SketchEditorCanvas({
           </>
         ) : null}
       </div>
-      {contextMenu ? (
-        <div
-          ref={contextMenuRef}
-          role="menu"
-          aria-label="草图右键菜单"
-          className="absolute z-30 min-w-36 overflow-hidden rounded-md border border-border bg-card py-1 text-sm text-foreground shadow-2xl"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-          onPointerDown={(event) => {
-            event.stopPropagation();
-            activateSketchKeyboardScope(controller);
-          }}
-          onClick={(event) => event.stopPropagation()}
-        >
+      {contextMenu && typeof document !== "undefined" ? (
+        createPortal(
+          <div
+            ref={contextMenuRef}
+            role="menu"
+            aria-label="草图右键菜单"
+            className="fixed z-[9999] min-w-36 overflow-hidden rounded-md border border-border bg-card py-1 text-sm text-foreground shadow-2xl"
+            style={{ left: contextMenuPos.x, top: contextMenuPos.y }}
+            onPointerDown={(event) => {
+              event.stopPropagation();
+              activateSketchKeyboardScope(controller);
+            }}
+            onClick={(event) => event.stopPropagation()}
+          >
           <ContextMenuButton
             label="复制"
             disabled={!editableSelectedNodes.length}
@@ -7108,7 +7120,9 @@ export function SketchEditorCanvas({
             disabled={!canUngroupSelection}
             onClick={() => runContextMenuAction(() => ungroupSelected(scene, controller))}
           />
-        </div>
+          </div>,
+          document.body,
+        )
       ) : null}
     </div>
   );

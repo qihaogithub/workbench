@@ -32,8 +32,6 @@ function renderChatMessages({
       messages={messages}
       currentMessage={currentMessage}
       isStreaming={isStreaming}
-      isUserScrolling={false}
-      onScrollToBottom={jest.fn()}
       onRegenerate={jest.fn()}
       onExternalAuthConnected={jest.fn()}
       onRollback={jest.fn()}

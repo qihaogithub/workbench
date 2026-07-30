@@ -12,7 +12,8 @@
     "./demo/sketch-scene": "./src/demo/sketch-scene.ts"
   },
   "dependencies": {
-    "@workbench/sketch-core": "workspace:*"
+    "@workbench/sketch-core": "workspace:*",
+    "acorn": "^8.18.0"
   },
   "scripts": {
     "lint": "eslint src --ext .ts"

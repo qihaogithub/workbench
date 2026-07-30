@@ -578,11 +578,13 @@ export class StreamService {
         event.error?.code === "SESSION_NOT_FOUND" ||
         event.error?.code === "GET_MODELS_ERROR";
       if (isModelError) {
+        this.clearReadyFallbackTimer();
         this.handlers.onError?.({
           message: event.error?.message || "Model error",
           code: event.error?.code,
           files: event.files,
         });
+        this.close();
         return;
       }
 
@@ -608,6 +610,8 @@ export class StreamService {
         code: event.error?.code,
         files: event.files,
       });
+      this.clearReadyFallbackTimer();
+      this.close();
     });
   }
 }
