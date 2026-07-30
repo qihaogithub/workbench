@@ -72,8 +72,6 @@ export interface PositionItem {
 
 export interface DemoMeta {
   previewSize?: PreviewSize;
-  orderable?: string[];
-  orderableHorizontal?: string[];
   positionable?: PositionableConfig;
   [key: string]: unknown;
 }

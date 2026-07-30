@@ -85,6 +85,9 @@ import type {
   UpdateProjectInput,
   ValidationResult,
   VerifySummary,
+  ScreenshotRefreshInput,
+  ScreenshotRefreshPageResult,
+  ScreenshotRefreshResult,
   VisualCheckInput,
   VisualCheckPageResult,
   VisualCheckResult,
@@ -4375,6 +4378,114 @@ export class ProjectAdminService {
       screenshotService,
       authorSite: "not_checked",
       serviceUrl,
+    });
+  }
+
+  async refreshScreenshots(
+    input: ScreenshotRefreshInput,
+    actor = this.defaultActor(),
+  ): Promise<ProjectAdminResult<ScreenshotRefreshResult>> {
+    const access = this.requireProjectAccess(input.projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    const project = this.readProject(input.projectId);
+    if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
+
+    const workspacePath = this.projectWorkspacePath(input.projectId);
+    const tree = this.readWorkspaceTree(workspacePath);
+    const selectedPages = input.pages && input.pages.length > 0
+      ? tree.pages.filter((p) => input.pages?.includes(p.id))
+      : tree.pages;
+
+    if (selectedPages.length === 0) {
+      return fail("NO_PAGES", "项目没有可截图的页面");
+    }
+
+    const serviceUrl = this.getScreenshotServiceUrl();
+    const results: ScreenshotRefreshPageResult[] = [];
+
+    for (const page of selectedPages) {
+      const files = this.readPageFiles(workspacePath, page.id);
+      if (!files) {
+        results.push({ pageId: page.id, runtimeType: page.runtimeType, ok: false, error: "页面文件读取失败" });
+        continue;
+      }
+
+      let snapshotPayload: Record<string, unknown>;
+      const runtimeType = page.runtimeType || "high-fidelity-react";
+
+      if (runtimeType === "prototype-html-css") {
+        snapshotPayload = {
+          runtimeType: "prototype-html-css",
+          prototypeHtml: files.prototypeHtml || "",
+          prototypeCss: files.prototypeCss || "",
+          prototypeMeta: files.prototypeMeta,
+        };
+      } else if (runtimeType === "sketch-scene") {
+        let sketchScene: unknown;
+        try {
+          sketchScene = files.sketchScene ? JSON.parse(files.sketchScene) : null;
+        } catch {
+          results.push({ pageId: page.id, runtimeType, ok: false, error: "草图场景数据解析失败" });
+          continue;
+        }
+        snapshotPayload = {
+          runtimeType: "sketch-scene",
+          sketchScene,
+          sketchMeta: files.sketchMeta,
+        };
+      } else {
+        snapshotPayload = {
+          runtimeType: "high-fidelity-react",
+          code: files.code || "",
+        };
+      }
+
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 60000);
+        const response = await fetch(`${serviceUrl}/api/screenshots/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId: input.projectId,
+            pageId: page.id,
+            ...snapshotPayload,
+            fullPage: true,
+            force: true,
+            priority: "thumbnail",
+            renderMode: "strict",
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+
+        const body = await response.json();
+        if (body.success && body.data) {
+          results.push({
+            pageId: page.id,
+            runtimeType,
+            ok: true,
+            hash: body.data.hash,
+            elapsed: body.data.elapsed,
+          });
+        } else {
+          results.push({
+            pageId: page.id,
+            runtimeType,
+            ok: false,
+            error: body.error?.message || body.error?.code || "截图生成失败",
+          });
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "请求截图服务失败";
+        results.push({ pageId: page.id, runtimeType, ok: false, error: message });
+      }
+    }
+
+    return ok({ projectId: input.projectId, pages: results }, {
+      warnings: results.some((r) => !r.ok)
+        ? ["部分页面截图刷新失败，详见结果"]
+        : undefined,
     });
   }
 

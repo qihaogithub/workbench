@@ -9,6 +9,7 @@ import type {
   CollabRoomDescriptor,
   CollabSyncStatus,
 } from "@workbench/shared";
+import { getBrowserAgentServiceUrl } from "@/lib/runtime-config";
 
 export interface CollabUser {
   userId: string;
@@ -57,8 +58,7 @@ function getCollabWsUrl(
   const configured = process.env.NEXT_PUBLIC_COLLAB_WS_URL;
   if (configured) return configured.replace(/\/$/, "");
 
-  const agentUrl =
-    process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "http://localhost:3201";
+  const agentUrl = getBrowserAgentServiceUrl();
   const wsBase = agentUrl
     .replace(/^http:/, "ws:")
     .replace(/^https:/, "wss:")
@@ -329,9 +329,7 @@ export function useCollabDocument(
     const current = descriptorRef.current;
     if (!current) return;
     setStatus((prev) => (prev === "offline" ? prev : "saving"));
-    const httpBase = (
-      process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "http://localhost:3201"
-    ).replace(/\/$/, "");
+    const httpBase = getBrowserAgentServiceUrl();
     const params = new URLSearchParams({
       sessionId: current.sessionId,
       resourcePath: current.resourcePath,

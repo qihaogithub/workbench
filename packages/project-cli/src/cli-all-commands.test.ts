@@ -466,6 +466,21 @@ try {
   const visualDir = path.join(tempDir, "visual-check");
   const visualCheck = await runCommand("project visual-check", ["project", "visual-check", projectId, "--output", visualDir]);
   assert.ok(fs.existsSync(dataOf<{ reportPath: string }>(visualCheck).reportPath));
+
+  const originalScreenshotFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    if (typeof url === "string" && url.includes("/api/screenshots/generate")) {
+      return Response.json({
+        success: true,
+        data: { hash: "testhash123456", elapsed: 1000, url: "/test.png" },
+      });
+    }
+    return originalScreenshotFetch(url, init);
+  }) as typeof fetch;
+  await runCommand("project screenshot-refresh", ["project", "screenshot-refresh", projectId]);
+  await runCommand("project screenshot-refresh page", ["project", "screenshot-refresh", projectId, "--pages", pageId]);
+  globalThis.fetch = originalScreenshotFetch;
+
   await runCommand("report agent-run", [
     "report",
     "agent-run",

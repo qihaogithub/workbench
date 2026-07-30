@@ -296,7 +296,7 @@ export function FieldRenderer({
 
       return (
         <Select
-          value={currentValue?.toString()}
+          value={currentValue?.toString() || undefined}
           onValueChange={(val: string) => {
             const index = field.enum!.indexOf(val as any);
             onChange(index >= 0 ? field.enum![index] : val);
@@ -306,14 +306,19 @@ export function FieldRenderer({
             <SelectValue placeholder="请选择">{displayValue}</SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {field.enum.map((item, idx) => {
-              const itemValue = item?.toString() || "";
-              return (
-                <SelectItem key={idx} value={itemValue}>
-                  {field.enumNames?.[idx] || itemValue}
-                </SelectItem>
-              );
-            })}
+            {field.enum
+              .filter((item) => {
+                const v = item?.toString();
+                return v !== undefined && v !== "";
+              })
+              .map((item, idx) => {
+                const itemValue = item!.toString();
+                return (
+                  <SelectItem key={idx} value={itemValue}>
+                    {field.enumNames?.[idx] || itemValue}
+                  </SelectItem>
+                );
+              })}
           </SelectContent>
         </Select>
       );

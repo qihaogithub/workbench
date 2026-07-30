@@ -26,7 +26,7 @@ export class SchemaConflictError extends Error {
   }
 }
 
-const RESERVED_CONFIG_KEYS = new Set(["__order", "__orderH", "__positions"]);
+const RESERVED_CONFIG_KEYS = new Set(["__positions"]);
 
 function isReservedConfigKey(key: string): boolean {
   return RESERVED_CONFIG_KEYS.has(key);

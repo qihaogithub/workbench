@@ -6,6 +6,7 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./comment": "./src/comment/index.ts",
     "./iframe-template": "./src/iframe-template.ts"
   },
   "peerDependencies": {

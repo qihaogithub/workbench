@@ -25,6 +25,7 @@ import {
   recoverWorkspaceAuthoritiesOnStartup,
 } from "./workspace/workspace-authority-startup-recovery";
 import { assertWorkspaceAuthorityInstancePolicy } from "./workspace/workspace-authority-instance-policy";
+import { recoverCommentTasksOnStartup } from "./routes/comment-ai-task";
 
 const config = loadConfig();
 const logger = getLogger();
@@ -88,6 +89,11 @@ async function start() {
 
   const recovery = await recoverWorkspaceAuthoritiesOnStartup(getDefaultDataDir());
   logger.info({ recovery }, "Workspace Authority startup recovery completed");
+
+  // 评论 @AI 任务队列启动恢复（重新入队 pending/超时的评论任务）
+  recoverCommentTasksOnStartup().catch((err) => {
+    logger.warn({ err }, "Comment task startup recovery failed");
+  });
 
   await registerRoutes(fastify);
 

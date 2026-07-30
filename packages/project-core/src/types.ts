@@ -468,6 +468,25 @@ export interface VisualCheckResult {
   };
 }
 
+export interface ScreenshotRefreshInput {
+  projectId: string;
+  pages?: string[];
+}
+
+export interface ScreenshotRefreshPageResult {
+  pageId: string;
+  runtimeType: DemoPageRuntimeType;
+  ok: boolean;
+  hash?: string;
+  error?: string;
+  elapsed?: number;
+}
+
+export interface ScreenshotRefreshResult {
+  projectId: string;
+  pages: ScreenshotRefreshPageResult[];
+}
+
 export interface AgentRunReportInput {
   projectId?: string;
   editId?: string;

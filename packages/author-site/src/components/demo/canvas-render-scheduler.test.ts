@@ -53,7 +53,7 @@ describe("computeCanvasRenderModes", () => {
     expect(result.sleepingPageIds).toEqual([]);
   });
 
-  it("6 页及以上时选中页始终 active，截图页保持 screenshot", () => {
+  it("6 页及以上时选中页始终 active，最近页进入 iframe", () => {
     const pages = Array.from({ length: 6 }, (_, index) =>
       makePage(`page_${index + 1}`),
     );
@@ -77,7 +77,7 @@ describe("computeCanvasRenderModes", () => {
     });
 
     expect(result.modes.page_2).toBe("iframe");
-    expect(result.modes.page_3).toBe("screenshot");
+    expect(result.modes.page_3).toBe("iframe");
     expect(result.activePageIds).toContain("page_2");
   });
 
@@ -198,7 +198,7 @@ describe("computeCanvasRenderModes", () => {
     expect(result.activePageIds).toHaveLength(4);
   });
 
-  it("大项目 HTML/CSS 原型页有有效截图时使用 screenshot 且不占用 iframe 预算", () => {
+  it("大项目 HTML/CSS 原型页始终使用 prototype 不消费截图", () => {
     const pages = [
       { ...makePage("prototype_1"), runtimeType: "prototype-html-css" as const },
       { ...makePage("prototype_2"), runtimeType: "prototype-html-css" as const },
@@ -221,7 +221,7 @@ describe("computeCanvasRenderModes", () => {
       maxSleepingIframes: 0,
     });
 
-    expect(result.modes.prototype_1).toBe("screenshot");
+    expect(result.modes.prototype_1).toBe("prototype");
     expect(result.modes.prototype_2).toBe("prototype");
     expect(result.activePageIds.every((pageId) => pageId.startsWith("react_"))).toBe(true);
     expect(result.activePageIds).toHaveLength(2);

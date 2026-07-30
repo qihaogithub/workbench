@@ -17,16 +17,6 @@ function extractDefaults(
 }
 
 /**
- * Extract the __order array from schema $demo.orderable or from property keys.
- */
-function extractOrder(schema: DemoSchema, propertyKeys: string[]): string[] {
-  if (schema.$demo?.orderable && Array.isArray(schema.$demo.orderable)) {
-    return schema.$demo.orderable;
-  }
-  return propertyKeys;
-}
-
-/**
  * Merge existing config data with new schema defaults.
  *
  * Rules:
@@ -34,7 +24,6 @@ function extractOrder(schema: DemoSchema, propertyKeys: string[]): string[] {
  * - Removed fields (in existing config but not in schema) → remove from config
  * - Existing fields still in schema → preserve user value
  * - Field type changed (old value incompatible with new schema type) → use new default
- * - __order metadata always comes from current schema
  */
 export function mergeSchemaDefaults(
   existingConfig: Record<string, unknown>,
@@ -55,8 +44,6 @@ export function mergeSchemaDefaults(
 
   // Add all schema fields: use existing value if present and compatible, otherwise use default
   for (const key of schemaKeys) {
-    if (key === "__order") continue;
-
     const propDef = properties[key] as Record<string, unknown>;
     const existingValue = existingConfig[key];
 
@@ -64,27 +51,10 @@ export function mergeSchemaDefaults(
       existingValue !== undefined &&
       isTypeCompatible(existingValue, propDef)
     ) {
-      // Preserve user's existing value
       merged[key] = existingValue;
     } else if (defaults[key] !== undefined) {
-      // Use schema default for new or incompatible fields
       merged[key] = defaults[key];
     }
-    // If no default and no existing value, skip the field
-  }
-
-  // Add __order from schema
-  const order = extractOrder(
-    parsedSchema,
-    schemaKeys.filter((k) => k !== "__order"),
-  );
-  if (order.length > 0) {
-    merged.__order = order;
-  }
-
-  // Add __orderH from schema
-  if (parsedSchema.$demo?.orderableHorizontal && Array.isArray(parsedSchema.$demo.orderableHorizontal)) {
-    merged.__orderH = parsedSchema.$demo.orderableHorizontal;
   }
 
   // Add __positions from schema

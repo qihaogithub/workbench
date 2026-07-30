@@ -27,11 +27,11 @@ function applyCorsHeaders(headers: Headers, origin: string) {
   headers.set("Access-Control-Allow-Origin", origin);
   headers.set(
     "Access-Control-Allow-Methods",
-    "GET, POST, PUT, DELETE, OPTIONS",
+    "GET, POST, PUT, PATCH, DELETE, OPTIONS",
   );
   headers.set(
     "Access-Control-Allow-Headers",
-    "Content-Type, Authorization",
+    "Content-Type, Authorization, X-Auth-Token",
   );
   headers.set("Access-Control-Allow-Credentials", "true");
 }
@@ -40,6 +40,7 @@ function applyPublicModuleCorsHeaders(headers: Headers) {
   headers.set("Access-Control-Allow-Origin", "*");
   headers.set("Access-Control-Allow-Methods", "GET, OPTIONS");
   headers.set("Access-Control-Allow-Headers", "Content-Type");
+  headers.set("Access-Control-Allow-Private-Network", "true");
 }
 
 export async function middleware(request: NextRequest) {

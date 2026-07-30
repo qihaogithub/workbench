@@ -62,21 +62,15 @@ services:
       - IMAGE_DESCRIPTION_ENABLED=${IMAGE_DESCRIPTION_ENABLED:-false}
       - IMAGE_DESCRIPTION_MODEL=${IMAGE_DESCRIPTION_MODEL:-}
       - IMAGE_DESCRIPTION_TIMEOUT=${IMAGE_DESCRIPTION_TIMEOUT:-60000}
-      - NODE_OPTIONS=--max-old-space-size=3072
     volumes:
       - ${APP_DATA_DIR:-/opt/workbench/data}:/app/data
     depends_on:
       knowledge-service:
         condition: service_healthy
     cpus: "1.0"
-    mem_limit: 2g
+    mem_limit: 1g
     pids_limit: 512
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:3201/health').then(async r=>r.ok&&(await r.json()).status==='ok'?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   author-site:
     build:
@@ -117,16 +111,13 @@ services:
       - FIGMA_OAUTH_SCOPES=${FIGMA_OAUTH_SCOPES:-}
       - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-}
       - ADMIN_SECRET=${ADMIN_SECRET:-}
-      - NODE_OPTIONS=--max-old-space-size=2048
     volumes:
       - ${APP_DATA_DIR:-/opt/workbench/data}:/app/data
     depends_on:
-      agent-service:
-        condition: service_healthy
-      knowledge-service:
-        condition: service_healthy
-    cpus: "2.0"
-    mem_limit: 3g
+      - agent-service
+      - knowledge-service
+    cpus: "1.0"
+    mem_limit: 2g
     pids_limit: 512
     restart: unless-stopped
 

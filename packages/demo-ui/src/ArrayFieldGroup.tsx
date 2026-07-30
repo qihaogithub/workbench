@@ -160,7 +160,7 @@ function ArrayItemHeader({
 
       {field.oneOf && (
         <Select
-          value={String(item[field.oneOf.discriminator] ?? "")}
+          value={String(item[field.oneOf.discriminator] ?? "") || undefined}
           onValueChange={onTypeChange}
           disabled={readonly}
         >
@@ -168,11 +168,13 @@ function ArrayItemHeader({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {field.oneOf.variants.map((v) => (
-              <SelectItem key={String(v.value)} value={String(v.value)}>
-                {v.title}
-              </SelectItem>
-            ))}
+            {field.oneOf.variants
+              .filter((v) => String(v.value) !== "")
+              .map((v) => (
+                <SelectItem key={String(v.value)} value={String(v.value)}>
+                  {v.title}
+                </SelectItem>
+              ))}
           </SelectContent>
         </Select>
       )}

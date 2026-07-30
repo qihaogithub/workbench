@@ -27,16 +27,6 @@ export function getDefaultValues(schema: string): Record<string, unknown> {
       }
     }
 
-    const orderable = getOrderable(schema);
-    if (orderable) {
-      defaults.__order = [...orderable];
-    }
-
-    const orderableH = getOrderableHorizontal(schema);
-    if (orderableH) {
-      defaults.__orderH = [...orderableH];
-    }
-
     const positionable = getPositionable(schema);
     if (positionable) {
       const positions: Record<string, PositionItem> = {};
@@ -99,44 +89,6 @@ export function getPreviewSize(schema: string): PreviewSize | undefined {
     }
 
     return Object.keys(size).length > 0 ? size : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-export function getOrderable(schema: string): string[] | undefined {
-  try {
-    const parsed = JSON.parse(schema);
-
-    const orderable = parsed.$demo?.orderable;
-    if (!Array.isArray(orderable) || orderable.length < 2) {
-      return undefined;
-    }
-
-    const validKeys = orderable.filter(
-      (key): key is string => typeof key === "string",
-    );
-
-    return validKeys.length >= 2 ? validKeys : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-export function getOrderableHorizontal(schema: string): string[] | undefined {
-  try {
-    const parsed = JSON.parse(schema);
-
-    const orderableH = parsed.$demo?.orderableHorizontal;
-    if (!Array.isArray(orderableH) || orderableH.length < 2) {
-      return undefined;
-    }
-
-    const validKeys = orderableH.filter(
-      (key): key is string => typeof key === "string",
-    );
-
-    return validKeys.length >= 2 ? validKeys : undefined;
   } catch {
     return undefined;
   }

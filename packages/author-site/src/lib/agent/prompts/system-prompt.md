@@ -213,7 +213,37 @@ delegateTask({
 - 用户明确要求配置项时，每个属性有合理的 default 值
 - 用户明确要求配置项时，充分利用配置系统能力：图片字段用 `format: "image"`、颜色字段用 `format: "color"`、枚举用 `enum` + `enumNames`
 - **图片尺寸校验**：只有当用户明确要求图片配置项且图片有明确尺寸要求时，才在 `ui:options` 中添加 `minWidth`/`minHeight`/`maxWidth`/`maxHeight` 约束
-- **模块数量限制**：当配置字段为模块数组（`type: "array"` + `items.oneOf`）时，若某模块类型有数量上限，在该 variant 上声明 `"$demo": { "maxItems": N }`（单例模块写 `1`）；未声明 `maxItems` 的模块类型视为不限数量。声明后配置面板会自动置灰添加按钮并显示 `(n/max)`，**页面代码无需再为该类型编写去重逻辑**；`default` 数组中各类型的数量也必须符合 `maxItems` 约束。`$demo.maxItems` 是模块数量元数据，不属于"配置字段增删"，创建模块数组时应主动声明，无需用户逐条指示：
+- **元素自由定位（`$demo.positionable`）**：当用户需要可视化拖拽调整页面元素位置时使用。在 schema 根级 `$demo` 中声明 `positionable` 对象，包含 `items`（必填，可定位元素名数组）、`defaults`（可选，各元素默认坐标）和 `size`（可选，容器尺寸，缺省使用 `previewSize` 或 800×600）。声明后配置面板出现"元素定位"区域，含等比缩略画布（最大 280×200px，显示网格线），用户可拖拽标记块或输入精确 X/Y 坐标。定位数据以 `__positions` prop 注入组件代码：
+```json
+{
+  "$demo": {
+    "positionable": {
+      "items": ["logo", "title", "ctaButton"],
+      "defaults": { "logo": { "x": 16, "y": 20 }, "title": { "x": 100, "y": 80 }, "ctaButton": { "x": 120, "y": 200 } },
+      "size": { "width": 375, "height": 600 }
+    }
+  }
+}
+```
+组件代码读取 `__positions`：
+```tsx
+const { __positions } = props as Record<string, unknown>;
+const pos = __positions as Record<string, { x: number; y: number }>;
+// 使用 absolute 定位渲染元素：style={{ position: 'absolute', left: pos.logo.x, top: pos.logo.y }}
+```
+
+- **模块数组拖拽排序（`$demo.sortable`）**：当模块数组（`type: "array"` + `items.oneOf`）需要用户在配置面板通过拖拽手柄调整模块顺序时，在数组字段上声明 `"$demo": { "sortable": true }`。声明后配置面板每个模块项左侧出现拖拽手柄，用户可上下拖拽排序。**页面代码直接按数组顺序渲染即可，无需额外排序逻辑**：
+
+```json
+"modules": {
+  "type": "array",
+  "title": "模块列表",
+  "$demo": { "sortable": true },
+  "items": { ... }
+}
+```
+
+- **模块数量限制（`$demo.maxItems`）**：与 `sortable` 配合使用。当某模块类型有数量上限，在该 variant 上声明 `"$demo": { "maxItems": N }`（单例模块写 `1`）；未声明 `maxItems` 的模块类型视为不限数量。声明后配置面板会自动置灰添加按钮并显示 `(n/max)`，**页面代码无需再为该类型编写去重逻辑**；`default` 数组中各类型的数量也必须符合 `maxItems` 约束。`$demo.maxItems` 是模块数量元数据，不属于"配置字段增删"，创建模块数组时应主动声明，无需用户逐条指示。完整示例（sortable + maxItems）：
 
 ```json
 {

@@ -7,6 +7,7 @@ import { useToast } from './ui/toast-provider'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectLabel,
   SelectTrigger,
@@ -686,7 +687,7 @@ export function PromptInputModelSelect({
 
   return (
     <Select
-      value={currentModelId}
+      value={currentModelId || undefined}
       onValueChange={onModelChange}
       disabled={!canSwitch || isLoading || context.status !== 'idle'}
     >
@@ -703,21 +704,21 @@ export function PromptInputModelSelect({
         </SelectValue>
       </SelectTrigger>
       <SelectContent>
-        {isLoading && !currentModel ? (
+        {isLoading && !currentModel && currentModelId ? (
           <SelectItem value={currentModelId}>{displayLabel}</SelectItem>
         ) : null}
         {groupEntries.map(([group, groupModels]) =>
           group ? (
-            <React.Fragment key={group}>
+            <SelectGroup key={group}>
               <SelectLabel>{group}</SelectLabel>
-              {groupModels.map((model) => (
+              {groupModels.filter((m) => m.id !== "").map((model) => (
                 <SelectItem key={model.id} value={model.id}>
                   {model.label}
                 </SelectItem>
               ))}
-            </React.Fragment>
+            </SelectGroup>
           ) : (
-            groupModels.map((model) => (
+            groupModels.filter((m) => m.id !== "").map((model) => (
               <SelectItem key={model.id} value={model.id}>
                 {model.label}
               </SelectItem>

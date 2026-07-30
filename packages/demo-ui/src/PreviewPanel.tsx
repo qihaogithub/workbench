@@ -275,6 +275,7 @@ function PreviewPanelInternal({
   onVisualAnnotationCreate,
   isAutoRepairing,
 }: PreviewPanelProps) {
+  console.count("[perf] PreviewPanel render");
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);
@@ -1121,6 +1122,7 @@ function PreviewPanelInternal({
           break;
 
         case "RESIZE":
+          if (!isCurrentPreviewRequest) return;
           if (typeof event.data?.height === "number") {
             onContentHeightChange?.(event.data.height);
           }

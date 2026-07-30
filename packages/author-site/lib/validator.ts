@@ -18,8 +18,6 @@ export {
 } from "@workbench/shared";
 
 export {
-  getOrderable,
-  getOrderableHorizontal,
   getPositionable,
   getDefaultValues,
   getPreviewSize,

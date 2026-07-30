@@ -10,6 +10,16 @@ import {
   visualEditScript,
 } from "@workbench/demo-ui/iframe-template";
 
+function injectVisualEditScript() {
+  const script = document.createElement("script");
+  script.textContent = visualEditScript;
+  document.body.appendChild(script);
+}
+
+function mockBoundingRect(rect: Partial<DOMRect>) {
+  Element.prototype.getBoundingClientRect = jest.fn(() => rect as DOMRect);
+}
+
 describe("AI 页面预览运行时策略", () => {
   it("仅在 React 提交成功后发送 LOADED 并按版本重置错误边界", () => {
     const html = generateIframeHtml();
@@ -291,6 +301,47 @@ describe("AI 页面预览运行时策略", () => {
         moduleName: "lucide-react",
         importName: "Soccer",
       }),
+    );
+  });
+
+  it("iframe 可视化编辑选中元素后显示选中框和标签", () => {
+    document.body.innerHTML = `<div id="root"><button class="btn" data-visual-node-id="btn1">点击我</button></div>`;
+    injectVisualEditScript();
+    mockBoundingRect({ x: 100, y: 100, width: 80, height: 32 });
+    const button = document.querySelector("button")!;
+
+    expect((window as any).__VISUAL_EDIT__).toBeDefined();
+    (window as any).__VISUAL_EDIT__.setState({ enabled: true });
+
+    window.parent.postMessage = jest.fn();
+    button.click();
+
+    const selectedBox = document.querySelector('[data-visual-overlay="selected"]') as HTMLElement | null;
+    const label = document.querySelector('[data-visual-overlay="label"]') as HTMLElement | null;
+    expect(selectedBox?.style.display).toBe("block");
+    expect(label?.style.display).toBe("block");
+    expect(label?.textContent).toContain("button");
+  });
+
+  it("iframe 可视化编辑点击空白处取消选中", () => {
+    document.body.innerHTML = `<div id="root"><button class="btn" data-visual-node-id="btn1">点击我</button></div>`;
+    injectVisualEditScript();
+    mockBoundingRect({ x: 100, y: 100, width: 80, height: 32 });
+    const button = document.querySelector("button")!;
+
+    expect((window as any).__VISUAL_EDIT__).toBeDefined();
+    (window as any).__VISUAL_EDIT__.setState({ enabled: true });
+
+    const postMessageMock = jest.fn();
+    window.parent.postMessage = postMessageMock;
+    button.click();
+    expect((document.querySelector('[data-visual-overlay="selected"]') as HTMLElement | null)?.style.display).toBe("block");
+
+    document.body.click();
+    expect((document.querySelector('[data-visual-overlay="selected"]') as HTMLElement | null)?.style.display).toBe("none");
+    expect(postMessageMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ type: "VISUAL_SELECT", node: null }),
+      "*",
     );
   });
 });

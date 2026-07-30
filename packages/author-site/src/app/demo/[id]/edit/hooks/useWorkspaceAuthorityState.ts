@@ -97,6 +97,9 @@ export function useWorkspaceAuthorityState(
   /** 跟踪上次拉取事件时的 revision，用于 gap 检测 */
   const lastPolledRevisionRef = useRef<number>(0);
   const mountedRef = useRef(true);
+  /** 连续失败计数，避免单次瞬态错误导致离线误报 */
+  const consecutiveFailuresRef = useRef(0);
+  const CONSECUTIVE_FAILURE_THRESHOLD = 2;
 
   const fetchState = useCallback(async () => {
     try {
@@ -126,24 +129,47 @@ export function useWorkspaceAuthorityState(
     }
   }, [projectId, workspaceId, sessionId]);
 
+  const pollProjectionAcks = useCallback(async () => {
+    try {
+      const afterRevision = lastPolledRevisionRef.current as WorkspaceRevision;
+      const acks = await readWorkspaceProjectionAcksFromBrowser({
+        projectId,
+        workspaceId,
+        sessionId,
+        afterRevision,
+      });
+      if (!mountedRef.current) return;
+
+      setState((prev) => {
+        let next = prev;
+        for (const ack of acks) {
+          if (ack.revision > next.previewAppliedRevision) {
+            next = {
+              ...next,
+              previewAppliedRevision: ack.revision,
+              previewStatus: ack.status === "applied" ? "applied" : "failed",
+            };
+          }
+        }
+        return next;
+      });
+    } catch {
+      // projection-acks 获取失败不影响连接状态，下次轮询重试
+    }
+  }, [projectId, workspaceId, sessionId]);
+
   const pollEvents = useCallback(async () => {
     try {
       const afterRevision = lastPolledRevisionRef.current as WorkspaceRevision;
-      const [events, acks] = await Promise.all([
-        readWorkspaceAuthorityEventsFromBrowser({
-          projectId,
-          workspaceId,
-          sessionId,
-          afterRevision,
-        }),
-        readWorkspaceProjectionAcksFromBrowser({
-          projectId,
-          workspaceId,
-          sessionId,
-          afterRevision,
-        }),
-      ]);
+      const events = await readWorkspaceAuthorityEventsFromBrowser({
+        projectId,
+        workspaceId,
+        sessionId,
+        afterRevision,
+      });
       if (!mountedRef.current) return;
+
+      consecutiveFailuresRef.current = 0;
 
       setState((prev) => {
         let next = prev;
@@ -171,16 +197,6 @@ export function useWorkspaceAuthorityState(
           }
         }
 
-        for (const ack of acks) {
-          if (ack.revision > next.previewAppliedRevision) {
-            next = {
-              ...next,
-              previewAppliedRevision: ack.revision,
-              previewStatus: ack.status === "applied" ? "applied" : "failed",
-            };
-          }
-        }
-
         if (!next.isConnected) {
           next = { ...next, isConnected: true };
         }
@@ -192,17 +208,21 @@ export function useWorkspaceAuthorityState(
       if (error instanceof WorkspaceAuthorityClientError && error.status === 401) {
         return;
       }
-      setState((prev) => ({
-        ...prev,
-        isConnected: false,
-      }));
+      consecutiveFailuresRef.current += 1;
+      if (consecutiveFailuresRef.current >= CONSECUTIVE_FAILURE_THRESHOLD) {
+        setState((prev) => ({
+          ...prev,
+          isConnected: false,
+        }));
+      }
     }
   }, [projectId, workspaceId, sessionId]);
 
   const refresh = useCallback(async () => {
     await fetchState();
     await pollEvents();
-  }, [fetchState, pollEvents]);
+    void pollProjectionAcks();
+  }, [fetchState, pollEvents, pollProjectionAcks]);
 
   // 初始拉取
   useEffect(() => {
@@ -221,10 +241,11 @@ export function useWorkspaceAuthorityState(
     const interval = setInterval(() => {
       if (document.hidden) return;
       void pollEvents();
+      void pollProjectionAcks();
     }, pollIntervalMs);
 
     return () => clearInterval(interval);
-  }, [enabled, pollIntervalMs, pollEvents]);
+  }, [enabled, pollIntervalMs, pollEvents, pollProjectionAcks]);
 
   const markDraftChanged = useCallback(() => {
     setState((prev) => ({

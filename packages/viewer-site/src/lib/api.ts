@@ -162,7 +162,7 @@ export function getAuthToken(): string | null {
 export async function login(
   username: string,
   password: string,
-): Promise<{ token: string; userId: string; expiresAt: number } | null> {
+): Promise<{ token: string; userId: string; username: string; expiresAt: number } | null> {
   const res = await fetch(`${DATA_BASE}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -180,6 +180,7 @@ export async function login(
   return {
     token: body.data.token,
     userId: body.data.user.id,
+    username: body.data.user.username,
     expiresAt: body.data.expiresAt,
   };
 }

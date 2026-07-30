@@ -108,6 +108,46 @@ describe("PrototypePagePreview", () => {
     );
   });
 
+  it("选中元素时显示带标签名的浮动标签", () => {
+    const onVisualSelect = jest.fn();
+    const { container } = render(
+      React.createElement(PrototypePagePreview, {
+        html: `<button data-ow-id="cta"><span data-ow-id="cta-label">立即开始</span></button>`,
+        css: "",
+        visualEditMode: true,
+        selectedVisualNodeId: "cta-label",
+        onVisualSelect,
+      }),
+    );
+
+    const host = container.querySelector("[data-prototype-preview]");
+    const shadow = host?.shadowRoot;
+    const label = shadow?.querySelector("[data-prototype-selected-label]") as HTMLElement | null;
+    expect(label).not.toBeNull();
+    expect(label?.style.display).toBe("block");
+    expect(label?.textContent).toContain("span");
+  });
+
+  it("点击原型根节点空白处取消选中", () => {
+    const onVisualSelect = jest.fn();
+    const { container } = render(
+      React.createElement(PrototypePagePreview, {
+        html: `<button data-ow-id="cta">立即开始</button>`,
+        css: "",
+        visualEditMode: true,
+        selectedVisualNodeId: "cta",
+        onVisualSelect,
+      }),
+    );
+
+    const host = container.querySelector("[data-prototype-preview]");
+    const root = host?.shadowRoot?.querySelector(".prototype-root");
+    expect(root).not.toBeNull();
+
+    fireEvent.click(root!);
+    expect(onVisualSelect).toHaveBeenCalledWith(null);
+  });
+
   it("Cmd/Ctrl 连续点击可循环选择同一位置的重叠图层", () => {
     const onVisualSelect = jest.fn();
     const { container } = render(

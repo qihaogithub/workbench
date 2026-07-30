@@ -16,9 +16,10 @@ import {
 } from "@workbench/ai-chat-shared";
 import { Button } from "@/components/ui/button";
 import { ViewerAiHistoryDialog } from "./ViewerAiHistoryDialog";
+import { getBrowserAgentServiceUrl } from "@/lib/runtime-config";
 
 const agentClient = new AgentClient({
-  baseUrl: process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || "",
+  baseUrl: getBrowserAgentServiceUrl(),
   mode: "viewer-readonly",
 });
 

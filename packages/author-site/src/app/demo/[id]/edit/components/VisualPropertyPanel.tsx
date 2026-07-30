@@ -1858,7 +1858,9 @@ export function VisualPropertyPanel({
                               <SelectValue placeholder="选择" />
                             </SelectTrigger>
                             <SelectContent>
-                              {(spec.options ?? []).map((option) => (
+                              {(spec.options ?? [])
+                                .filter((option) => option.value !== "")
+                                .map((option) => (
                                 <SelectItem key={option.value} value={option.value}>
                                   {option.label}
                                 </SelectItem>

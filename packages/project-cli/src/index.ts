@@ -1916,6 +1916,20 @@ register(
 );
 
 register(
+  "project screenshot-refresh",
+  "强制刷新项目的浏览器截图（调用 screenshot-service）",
+  async (args, pos, { service, actor }) =>
+    service.refreshScreenshots(
+      {
+        projectId: stringArg(args, "projectId", pos[0]),
+        pages: stringArrayArg(args, "pages"),
+      },
+      actor,
+    ),
+  ["project_screenshot_refresh", "screenshot_refresh"],
+);
+
+register(
   "project import-prototype",
   "从外部目录导入 HTML/CSS 原型项目工作流",
   async (args, _pos, { service, actor }) => {

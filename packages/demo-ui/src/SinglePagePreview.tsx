@@ -28,6 +28,7 @@ function SinglePagePreviewInternal({
   className,
   onBackgroundClick,
 }: SinglePagePreviewProps) {
+  console.count("[perf] SinglePagePreview render");
   const previewSize = useMemo(
     () => (page ? resolvePreviewStageSize(page) : undefined),
     [page?.schema, page?.previewSize, page?.prototypeMeta, page?.fallbackPreviewSize],
