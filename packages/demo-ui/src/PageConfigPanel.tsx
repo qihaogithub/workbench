@@ -451,7 +451,7 @@ export function PageConfigPanel({
                       onClick={() => setShowRestoreDefaultsDialog(true)}
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
-                      恢复默认值
+                      恢复
                     </Button>
                   )}
                   {!readonly && onSaveAsDefaults && (
@@ -464,7 +464,7 @@ export function PageConfigPanel({
                       onClick={() => setShowSaveDefaultsDialog(true)}
                     >
                       <Save className="h-3.5 w-3.5" />
-                      保存为默认值
+                      保存
                     </Button>
                   )}
                 </div>

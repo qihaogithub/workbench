@@ -21,7 +21,7 @@ FROM node:20-bookworm AS runtime-deps
 WORKDIR /app
 
 RUN npm init -y \
-    && npm install --omit=dev fastify@4.29.1 better-sqlite3@12.11.1 \
+    && npm install --omit=dev fastify@4.29.1 better-sqlite3@12.11.1 dotenv@17.4.2 \
     && npm cache clean --force
 
 FROM node:20-bookworm-slim

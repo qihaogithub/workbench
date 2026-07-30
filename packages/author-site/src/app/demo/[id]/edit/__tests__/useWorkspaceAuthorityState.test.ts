@@ -179,7 +179,7 @@ describe("useWorkspaceAuthorityState", () => {
     });
   });
 
-  it("轮询失败后，后续成功轮询应恢复 isConnected = true", async () => {
+  it("单次轮询失败不应标记离线，连续两次失败后才标记", async () => {
     const { result } = renderHook(() => useWorkspaceAuthorityState(BASE_OPTIONS));
 
     await act(async () => {
@@ -190,7 +190,18 @@ describe("useWorkspaceAuthorityState", () => {
       expect(result.current.isConnected).toBe(true);
     });
 
-    // 模拟一次轮询失败（瞬时网络抖动）
+    // 第一次轮询失败（瞬时网络抖动），不应标记离线
+    mockReadEvents.mockRejectedValueOnce(new Error("transient error"));
+
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+    });
+
+    await waitFor(() => {
+      expect(result.current.isConnected).toBe(true);
+    });
+
+    // 第二次轮询失败，达到阈值后标记离线
     mockReadEvents.mockRejectedValueOnce(new Error("transient error"));
 
     await act(async () => {
@@ -201,7 +212,7 @@ describe("useWorkspaceAuthorityState", () => {
       expect(result.current.isConnected).toBe(false);
     });
 
-    // 后续轮询成功但无新事件，应恢复 isConnected
+    // 后续轮询成功，应恢复 isConnected
     await act(async () => {
       jest.advanceTimersByTime(1000);
     });

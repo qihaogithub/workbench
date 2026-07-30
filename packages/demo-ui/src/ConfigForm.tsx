@@ -1,18 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
-import {
-  ChevronDown,
-  ChevronUp,
-  ChevronLeft,
-  ChevronRight,
-  ArrowDown,
-  ArrowRight,
-  Info,
-  Sparkles,
-  GripVertical,
-  Move,
-} from "lucide-react";
+import { ChevronDown, Info, Sparkles } from "lucide-react";
 import { cn } from "./utils";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -28,26 +17,8 @@ import { parseSchemaToFields } from "./schema-parser";
 import { getPageTypeLimits } from "./type-limits-store";
 import { FieldRenderer } from "./FieldRenderer";
 import { NoteDialog } from "./NoteDialog";
-import { getOrderable, getOrderableHorizontal, getPositionable } from "./validator";
+import { getPositionable } from "./validator";
 import { Button } from "@/components/ui/button";
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-  horizontalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { configFieldMatchesCategoryFilter } from "./config-categories";
 
 function isFieldVisible(
@@ -166,299 +137,6 @@ function FieldGroupSection({
                 onNoteClick={onNoteClick}
               />
             ))}
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
-    </div>
-  );
-}
-
-function SortableItem({
-  id,
-  title,
-  index,
-  total,
-  onMoveBackward,
-  onMoveForward,
-  direction = "vertical",
-}: {
-  id: string;
-  title: string;
-  index: number;
-  total: number;
-  onMoveBackward: () => void;
-  onMoveForward: () => void;
-  direction?: "vertical" | "horizontal";
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  const BackwardIcon = direction === "vertical" ? ChevronUp : ChevronLeft;
-  const ForwardIcon = direction === "vertical" ? ChevronDown : ChevronRight;
-
-  if (direction === "horizontal") {
-    return (
-      <div
-        ref={setNodeRef}
-        style={style}
-        className={`group inline-flex items-center gap-1.5 py-1.5 px-3 rounded-lg border transition-all duration-150 ${
-          isDragging
-            ? "bg-accent/50 shadow-sm border-accent"
-            : "bg-muted/30 border-border/50 hover:bg-muted/50 hover:border-border"
-        }`}
-      >
-        <button
-          type="button"
-          className="cursor-grab active:cursor-grabbing text-muted-foreground/30 hover:text-muted-foreground shrink-0 touch-none"
-          {...attributes}
-          {...listeners}
-        >
-          <GripVertical className="h-3.5 w-3.5" />
-        </button>
-        <span className="text-xs font-medium text-foreground truncate max-w-[80px]">
-          {title}
-        </span>
-        <div className="flex items-center gap-0 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-5 w-5"
-            disabled={index === 0}
-            onClick={(e) => {
-              e.stopPropagation();
-              onMoveBackward();
-            }}
-          >
-            <BackwardIcon className="h-3 w-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-5 w-5"
-            disabled={index === total - 1}
-            onClick={(e) => {
-              e.stopPropagation();
-              onMoveForward();
-            }}
-          >
-            <ForwardIcon className="h-3 w-3" />
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`group flex items-center gap-2 py-2 px-2 rounded-lg border transition-all duration-150 ${
-        isDragging
-          ? "bg-accent/50 shadow-md border-accent"
-          : "bg-muted/30 border-border/50 hover:bg-muted/50 hover:border-border"
-      }`}
-    >
-      <button
-        type="button"
-        className="cursor-grab active:cursor-grabbing text-muted-foreground/30 hover:text-muted-foreground shrink-0 touch-none p-0.5"
-        {...attributes}
-        {...listeners}
-      >
-        <GripVertical className="h-4 w-4" />
-      </button>
-      <span className="flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold shrink-0">
-        {index + 1}
-      </span>
-      <span className="text-xs font-medium text-foreground flex-1 truncate">
-        {title}
-      </span>
-      <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-5 w-5"
-          disabled={index === 0}
-          onClick={(e) => {
-            e.stopPropagation();
-            onMoveBackward();
-          }}
-        >
-          <BackwardIcon className="h-3 w-3" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-5 w-5"
-          disabled={index === total - 1}
-          onClick={(e) => {
-            e.stopPropagation();
-            onMoveForward();
-          }}
-        >
-          <ForwardIcon className="h-3 w-3" />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function OrderControl({
-  orderable,
-  order,
-  defaultOrder,
-  titleMap,
-  onOrderChange,
-  direction = "vertical",
-}: {
-  orderable: string[];
-  order: string[];
-  defaultOrder: string[];
-  titleMap: Record<string, string>;
-  onOrderChange: (newOrder: string[]) => void;
-  direction?: "vertical" | "horizontal";
-}) {
-  const [open, setOpen] = useState(true);
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    }),
-  );
-
-  const handleMoveBackward = (index: number) => {
-    if (index <= 0) return;
-    const newOrder = [...order];
-    [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
-    onOrderChange(newOrder);
-  };
-
-  const handleMoveForward = (index: number) => {
-    if (index >= order.length - 1) return;
-    const newOrder = [...order];
-    [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
-    onOrderChange(newOrder);
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    const oldIndex = order.indexOf(active.id as string);
-    const newIndex = order.indexOf(over.id as string);
-    if (oldIndex === -1 || newIndex === -1) return;
-
-    onOrderChange(arrayMove(order, oldIndex, newIndex));
-  };
-
-  const handleReset = () => {
-    onOrderChange([...defaultOrder]);
-  };
-
-  const isDefault = order.join(",") === defaultOrder.join(",");
-  const sectionTitle = direction === "vertical" ? "组件排序" : "横向排序";
-  const strategy = direction === "vertical" ? verticalListSortingStrategy : horizontalListSortingStrategy;
-  const DirectionIcon = direction === "vertical" ? ArrowDown : ArrowRight;
-  const directionLabel = direction === "vertical" ? "从上到下排列" : "从左到右排列";
-
-  return (
-    <div className="py-2">
-      <Collapsible open={open} onOpenChange={setOpen}>
-        <CollapsibleTrigger asChild>
-          <div className="flex items-center gap-2 py-1.5 cursor-pointer hover:bg-accent/30 rounded-sm transition-colors">
-            <span>
-              {open ? (
-                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform rotate-180" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
-              )}
-            </span>
-            <h3 className="text-sm font-medium text-muted-foreground">{sectionTitle}</h3>
-            <Badge variant="secondary" className="text-xs h-5 font-normal px-1.5 min-w-[20px] justify-center">
-              {orderable.length}
-            </Badge>
-          </div>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="pl-4 pr-2 pt-1 pb-2">
-            {/* Direction indicator */}
-            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60 mb-2">
-              <DirectionIcon className="h-3 w-3" />
-              <span>{directionLabel}</span>
-            </div>
-
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={order}
-                strategy={strategy}
-              >
-                {direction === "vertical" ? (
-                  <div className="space-y-1">
-                    {order.map((key, index) => (
-                      <SortableItem
-                        key={key}
-                        id={key}
-                        title={titleMap[key] || key}
-                        index={index}
-                        total={order.length}
-                        onMoveBackward={() => handleMoveBackward(index)}
-                        onMoveForward={() => handleMoveForward(index)}
-                        direction="vertical"
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex flex-wrap items-center gap-1">
-                    {order.map((key, index) => (
-                      <div key={key} className="flex items-center gap-1">
-                        {index > 0 && (
-                          <span className="text-muted-foreground/30 text-[10px] select-none">→</span>
-                        )}
-                        <SortableItem
-                          id={key}
-                          title={titleMap[key] || key}
-                          index={index}
-                          total={order.length}
-                          onMoveBackward={() => handleMoveBackward(index)}
-                          onMoveForward={() => handleMoveForward(index)}
-                          direction="horizontal"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </SortableContext>
-            </DndContext>
-            {!isDefault && (
-              <div className="pt-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs text-muted-foreground hover:text-foreground"
-                  onClick={handleReset}
-                >
-                  恢复默认顺序
-                </Button>
-              </div>
-            )}
           </div>
         </CollapsibleContent>
       </Collapsible>
@@ -749,8 +427,6 @@ export function ConfigForm({
     [fieldGroups, effectiveFormData, configCategoryFilter],
   );
 
-  const orderable = useMemo(() => getOrderable(schema), [schema]);
-  const orderableH = useMemo(() => getOrderableHorizontal(schema), [schema]);
   const positionable = useMemo(() => getPositionable(schema), [schema]);
   const showLayoutControls = !configCategoryFilter;
 
@@ -779,27 +455,7 @@ export function ConfigForm({
     }
   }, [schema]);
 
-  const titleMap = useMemo(() => buildTitleMap(orderable), [orderable, buildTitleMap]);
-  const titleMapH = useMemo(() => buildTitleMap(orderableH), [orderableH, buildTitleMap]);
   const titleMapPos = useMemo(() => buildTitleMap(positionable?.items), [positionable, buildTitleMap]);
-
-  const currentOrder = useMemo(() => {
-    if (!orderable) return [];
-    const existing = formData.__order as string[] | undefined;
-    if (Array.isArray(existing) && existing.length === orderable.length) {
-      return existing;
-    }
-    return [...orderable];
-  }, [orderable, formData.__order]);
-
-  const currentOrderH = useMemo(() => {
-    if (!orderableH) return [];
-    const existing = formData.__orderH as string[] | undefined;
-    if (Array.isArray(existing) && existing.length === orderableH.length) {
-      return existing;
-    }
-    return [...orderableH];
-  }, [orderableH, formData.__orderH]);
 
   const currentPositions = useMemo(() => {
     if (!positionable) return {};
@@ -900,18 +556,6 @@ export function ConfigForm({
     [onChange]
   );
 
-  const handleOrderChange = useCallback((newOrder: string[]) => {
-    const newData = { ...formDataRef.current, __order: newOrder };
-    setFormData(newData);
-    onChange({ __order: newOrder });
-  }, [onChange]);
-
-  const handleOrderHChange = useCallback((newOrder: string[]) => {
-    const newData = { ...formDataRef.current, __orderH: newOrder };
-    setFormData(newData);
-    onChange({ __orderH: newOrder });
-  }, [onChange]);
-
   const handlePositionsChange = useCallback((newPositions: Record<string, { x: number; y: number }>) => {
     const newData = { ...formDataRef.current, __positions: newPositions };
     setFormData(newData);
@@ -969,16 +613,10 @@ export function ConfigForm({
     return null;
   }, [noteDialogField, visibleFieldGroups]);
 
-  const hasVisibleOrderable =
-    showLayoutControls && !!orderable && orderable.length >= 2;
-  const hasVisibleOrderableH =
-    showLayoutControls && !!orderableH && orderableH.length >= 2;
   const hasVisiblePositionable =
     showLayoutControls && !!positionable && positionable.items.length >= 1;
   const hasVisibleConfig =
     visibleFieldGroups.length > 0 ||
-    hasVisibleOrderable ||
-    hasVisibleOrderableH ||
     hasVisiblePositionable;
 
   if (!hasVisibleConfig) {
@@ -1006,32 +644,6 @@ export function ConfigForm({
     <div className={cn("h-full", className)}>
       <div className="h-full overflow-y-auto">
         <div className="px-1 pb-4">
-          {hasVisibleOrderable && (
-            <>
-              <OrderControl
-                orderable={orderable!}
-                order={currentOrder}
-                defaultOrder={orderable!}
-                titleMap={titleMap}
-                onOrderChange={handleOrderChange}
-                direction="vertical"
-              />
-              <Separator className="my-2" />
-            </>
-          )}
-          {hasVisibleOrderableH && (
-            <>
-              <OrderControl
-                orderable={orderableH!}
-                order={currentOrderH}
-                defaultOrder={orderableH!}
-                titleMap={titleMapH}
-                onOrderChange={handleOrderHChange}
-                direction="horizontal"
-              />
-              <Separator className="my-2" />
-            </>
-          )}
           {hasVisiblePositionable && (
             <>
               <PositionControl

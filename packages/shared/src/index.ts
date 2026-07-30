@@ -269,6 +269,8 @@ export const ErrorCode = {
   FOLDER_DEPTH_EXCEEDED: "FOLDER_DEPTH_EXCEEDED",
   CIRCULAR_REFERENCE: "CIRCULAR_REFERENCE",
   NO_CONTENT_TO_PUBLISH: "NO_CONTENT_TO_PUBLISH",
+  COMMENT_NOT_FOUND: "COMMENT_NOT_FOUND",
+  UNPUBLISH_FAILED: "UNPUBLISH_FAILED",
   PUBLISH_FAILED: "PUBLISH_FAILED",
   PUBLISH_COMPILE_FAILED: "PUBLISH_COMPILE_FAILED",
   IMAGE_LOCALIZATION_FAILED: "IMAGE_LOCALIZATION_FAILED",
@@ -277,7 +279,6 @@ export const ErrorCode = {
   IMPORT_WRITE_FAILED: "IMPORT_WRITE_FAILED",
   PROJECT_EXPORT_FAILED: "PROJECT_EXPORT_FAILED",
   PROJECT_IMPORT_FAILED: "PROJECT_IMPORT_FAILED",
-  UNPUBLISH_FAILED: "UNPUBLISH_FAILED",
 } as const;
 
 export type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -311,6 +312,8 @@ export const ERROR_MESSAGES: Record<ErrorCodeType, string> = {
   FOLDER_DEPTH_EXCEEDED: "文件夹嵌套不能超过 3 层",
   CIRCULAR_REFERENCE: "不能将文件夹移动到自身或其子文件夹中",
   NO_CONTENT_TO_PUBLISH: "项目没有可发布的Demo页面",
+  COMMENT_NOT_FOUND: "评论不存在",
+  UNPUBLISH_FAILED: "撤销发布失败",
   PUBLISH_FAILED: "发布失败",
   PUBLISH_COMPILE_FAILED: "发布失败：页面编译错误",
   IMAGE_LOCALIZATION_FAILED: "发布图片资源本地化失败",
@@ -319,7 +322,6 @@ export const ERROR_MESSAGES: Record<ErrorCodeType, string> = {
   IMPORT_WRITE_FAILED: "导入项目写入失败",
   PROJECT_EXPORT_FAILED: "导出项目失败",
   PROJECT_IMPORT_FAILED: "导入项目失败",
-  UNPUBLISH_FAILED: "撤销发布失败",
 };
 
 export * from "./workspace";
@@ -329,6 +331,7 @@ export * from "./knowledge";
 export * from "./external-auth";
 export * from "./diagnostics";
 export * from "./ai-error-normalizer";
+export * from "./comment";
 
 /** 图片附件，Base64 编码 */
 export interface ImageAttachment {

@@ -64,10 +64,11 @@ export type {
   IframeInMessageType,
   ConsoleLogPayload,
   PositionableSizeItem as IframePositionableSizeItem,
+  CommentClickPayload,
+  CommentViewStatePayload,
+  ElementLocationResultPayload,
 } from "./iframe-types";
 export {
-  getOrderable,
-  getOrderableHorizontal,
   getPositionable,
   getDefaultValues,
   getPreviewSize,
@@ -174,6 +175,29 @@ export type { FileUploadWidgetOptions, FileUploadWidgetProps } from "./widgets";
 export { ImageListWidget } from "./ImageListWidget";
 export type { ImageItem, ImageListWidgetProps } from "./ImageListWidget";
 export { generateIframeHtml, buildIframeHtml } from "./iframe-template";
+export {
+  CommentLayer,
+  CommentPin,
+  CommentThreadPopover,
+  CommentCreatePopover,
+  MentionPicker,
+  MentionTextarea,
+  MentionContent,
+  CommentSidebar,
+  CommentPanel,
+  useComments,
+  threadMentionsUser,
+} from "./comment";
+export type {
+  CommentApiAdapter,
+  CommentFilter,
+  CommentLayerProps,
+  CreateCommentInput,
+  AddReplyInput,
+  IframeViewState,
+  MentionCandidate,
+  CommentPanelProps,
+} from "./comment";
 export { PreviewCanvas } from "./PreviewCanvas";
 export { CanvasViewport } from "./CanvasViewport";
 export { CanvasPageItem, CanvasPagePreviewContent } from "./CanvasPageItem";

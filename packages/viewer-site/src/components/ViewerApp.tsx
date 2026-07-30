@@ -60,12 +60,23 @@ import {
   extractPrototypeConfigBindingKeys,
   PageConfigPanel,
   PreviewStage,
+  CommentLayer,
+  CommentPanel,
+  useComments,
 } from "@/components/demo";
 import type {
   PreviewMode,
   CanvasState,
   PreviewStagePage,
 } from "@/components/demo";
+import {
+  createCommentApi,
+  recordProjectVisit,
+  getCommentWsUrl,
+  getAnonymousId,
+  getAnonymousDisplayName,
+} from "@/lib/comment-api";
+import type { CommentAuthor } from "@workbench/shared";
 import {
   isSchemaEmpty,
 } from "@/components/demo";
@@ -91,6 +102,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { ViewerAiPanel } from "@/components/ViewerAiPanel";
 
 type SortOption = "newest" | "oldest" | "name";
@@ -839,11 +856,15 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const [previewMode, setPreviewMode] = useState<PreviewMode>("canvas");
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const [configPanelDetailPageId, setConfigPanelDetailPageId] = useState<string | null>(null);
+  const [rightPanelTab, setRightPanelTab] = useState<"config" | "comments">("config");
+  const [commentModeActive, setCommentModeActive] = useState(false);
+  const [activeCommentThreadId, setActiveCommentThreadId] = useState<string | null>(null);
   const [canvasState, setCanvasState] = useState<CanvasState>({
     viewport: { x: 40, y: 40, zoom: 0.5 },
     pages: {},
   });
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionUsername, setSessionUsername] = useState<string | null>(null);
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -851,6 +872,48 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const [loginLoading, setLoginLoading] = useState(false);
 
   const isLoggedIn = sessionId != null;
+
+  // 评论功能：API 适配器 + WS 地址 + 当前作者身份
+  const commentApi = useMemo(() => createCommentApi(projectId), [projectId]);
+  const commentWsUrl = useMemo(() => getCommentWsUrl(), []);
+  const commentsData = useComments({
+    projectId,
+    pageId: activePageId,
+    api: commentApi,
+    wsUrl: commentWsUrl,
+  });
+  const unresolvedCommentCount = commentsData.threads.filter(
+    (t) => !t.resolved,
+  ).length;
+  const commentUser = useMemo<CommentAuthor | null>(() => {
+    if (isLoggedIn && sessionId) {
+      return {
+        id: sessionId,
+        name: sessionUsername || "用户",
+        isAnonymous: false,
+      };
+    }
+    return {
+      id: getAnonymousId(),
+      name: getAnonymousDisplayName(),
+      isAnonymous: true,
+    };
+  }, [isLoggedIn, sessionId, sessionUsername]);
+
+  // 已登录用户打开项目时记录访问（供 @候选人列表使用）
+  useEffect(() => {
+    if (isLoggedIn && project) {
+      void recordProjectVisit(projectId);
+    }
+  }, [isLoggedIn, project, projectId]);
+
+  // 画布模式不支持评论，切换时退出评论模式
+  useEffect(() => {
+    if (previewMode === "canvas") {
+      setCommentModeActive(false);
+      setActiveCommentThreadId(null);
+    }
+  }, [previewMode]);
 
   useEffect(() => {
     getProjectData(projectId)
@@ -1024,9 +1087,12 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
       if (result) {
         setAuthToken(result.token);
         setSessionId(result.userId);
+        setSessionUsername(result.username);
         setLoginDialogOpen(false);
         setLoginUsername("");
         setLoginPassword("");
+        // 登录成功后记录访问（供 @候选人列表使用）
+        void recordProjectVisit(projectId);
       }
     } catch (err: any) {
       setLoginError(err.message || "登录失败");
@@ -1038,6 +1104,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const handleLogout = useCallback(() => {
     setAuthToken(null);
     setSessionId(null);
+    setSessionUsername(null);
   }, []);
 
   const handleAddPage = useCallback(async () => {
@@ -1179,6 +1246,47 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const hasSchema = hasProjectConfig || hasPageConfig;
   const hasBothScopes = hasProjectConfig && hasPageConfig;
 
+  const configPanel = (
+    <PageConfigPanel
+      pages={project.demoPages.map((page) => ({
+        id: page.id,
+        name: page.name,
+        order: page.order,
+        schema: pageSchemaMap[page.id],
+        configData: configDataMap[page.id],
+        projectConfigBindings:
+          page.runtimeType === "prototype-html-css"
+            ? extractPrototypeConfigBindingKeys(page.prototypeHtml)
+            : undefined,
+      }))}
+      activePageId={activePageId}
+      detailPageId={
+        previewMode === "single" ? activePageId : configPanelDetailPageId
+      }
+      onDetailPageIdChange={setConfigPanelDetailPageId}
+      onPageSelect={handlePageChange}
+      projectConfigSchema={project.projectConfigSchema}
+      onProjectConfigChange={handleProjectConfigChange}
+      onPageConfigChange={handlePageConfigChange}
+      onRestoreDefaults={handleRestoreDefaults}
+      hideDetailHeader={previewMode === "single"}
+    />
+  );
+
+  const commentsPanel = (
+    <CommentPanel
+      threads={commentsData.threads}
+      currentUserId={commentUser?.id}
+      activeThreadId={activeCommentThreadId}
+      onSelectThread={(id) => {
+        setActiveCommentThreadId(id);
+        setCommentModeActive(false);
+      }}
+      commentMode={commentModeActive}
+      onCommentModeChange={setCommentModeActive}
+    />
+  );
+
   return (
     <div className="flex flex-col h-full">
       <Header
@@ -1256,54 +1364,92 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
         )}
 
         <div className="flex-1 min-w-0 overflow-hidden">
-          <PreviewStage
-            className="h-full bg-background"
-            pages={previewStagePages}
-            activePageId={activePageId}
-            onActivePageChange={handlePageChange}
-            previewMode={previewMode}
-            onPreviewModeChange={setPreviewMode}
-            canvasState={canvasState}
-            onCanvasStateChange={setCanvasState}
-            interactionMode="viewer"
-            showToolbar={project.demoPages.length >= 1}
-            canvasProps={{
-              projectId,
-              onPageConfigEdit: (pageId) => {
-                handlePageChange(pageId);
-                setConfigPanelDetailPageId(pageId);
-              },
-            }}
-          />
+          <CommentLayer
+            projectId={projectId}
+            pageId={activePageId}
+            api={commentApi}
+            wsUrl={commentWsUrl}
+            currentUser={commentUser}
+            canMentionAgent={false}
+            disabled={previewMode === "canvas"}
+            showToggle={false}
+            commentMode={commentModeActive}
+            onCommentModeChange={setCommentModeActive}
+            activeThreadId={activeCommentThreadId}
+            onActiveThreadChange={setActiveCommentThreadId}
+            threads={commentsData.threads}
+            onCreateComment={commentsData.createComment}
+            onAddReply={commentsData.addReply}
+            onSetResolved={commentsData.setResolved}
+            onDeleteThread={commentsData.deleteThread}
+            onDeleteReply={commentsData.deleteReply}
+          >
+            <PreviewStage
+              className="h-full bg-background"
+              pages={previewStagePages}
+              activePageId={activePageId}
+              onActivePageChange={handlePageChange}
+              previewMode={previewMode}
+              onPreviewModeChange={setPreviewMode}
+              canvasState={canvasState}
+              onCanvasStateChange={setCanvasState}
+              interactionMode="viewer"
+              showToolbar={project.demoPages.length >= 1}
+              canvasProps={{
+                projectId,
+                onPageConfigEdit: (pageId) => {
+                  handlePageChange(pageId);
+                  setConfigPanelDetailPageId(pageId);
+                },
+              }}
+            />
+          </CommentLayer>
         </div>
 
-        {hasSchema && (
+        {previewMode === "single" ? (
           <div className="w-80 border-l border-border shrink-0 flex flex-col">
-            <PageConfigPanel
-              pages={project.demoPages.map((page) => ({
-                id: page.id,
-                name: page.name,
-                order: page.order,
-                schema: pageSchemaMap[page.id],
-                configData: configDataMap[page.id],
-                projectConfigBindings:
-                  page.runtimeType === "prototype-html-css"
-                    ? extractPrototypeConfigBindingKeys(page.prototypeHtml)
-                    : undefined,
-              }))}
-              activePageId={activePageId}
-              detailPageId={
-                previewMode === "single" ? activePageId : configPanelDetailPageId
-              }
-              onDetailPageIdChange={setConfigPanelDetailPageId}
-              onPageSelect={handlePageChange}
-              projectConfigSchema={project.projectConfigSchema}
-              onProjectConfigChange={handleProjectConfigChange}
-              onPageConfigChange={handlePageConfigChange}
-              onRestoreDefaults={handleRestoreDefaults}
-              hideDetailHeader={previewMode === "single"}
-            />
+            {hasSchema ? (
+              <Tabs
+                value={rightPanelTab}
+                onValueChange={(v) =>
+                  setRightPanelTab(v as "config" | "comments")
+                }
+                className="flex h-full flex-col"
+              >
+                <TabsList className="grid w-full grid-cols-2 shrink-0">
+                  <TabsTrigger value="config">配置</TabsTrigger>
+                  <TabsTrigger value="comments">
+                    评论
+                    {unresolvedCommentCount > 0 && (
+                      <span className="ml-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[9px] font-semibold text-white">
+                        {unresolvedCommentCount}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent
+                  value="config"
+                  className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
+                >
+                  {configPanel}
+                </TabsContent>
+                <TabsContent
+                  value="comments"
+                  className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
+                >
+                  {commentsPanel}
+                </TabsContent>
+              </Tabs>
+            ) : (
+              commentsPanel
+            )}
           </div>
+        ) : (
+          hasSchema && (
+            <div className="w-80 border-l border-border shrink-0 flex flex-col">
+              {configPanel}
+            </div>
+          )
         )}
       </div>
       </ErrorBoundary>

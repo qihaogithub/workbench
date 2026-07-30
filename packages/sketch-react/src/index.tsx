@@ -5394,6 +5394,7 @@ export function SketchEditorCanvas({
   const [hoveredNodeId, setHoveredNodeId] = React.useState<string | null>(null);
   const [focusedGroupId, setFocusedGroupId] = React.useState<string | null>(null);
   const [contextMenu, setContextMenu] = React.useState<ContextMenuState | null>(null);
+  const contextMenuRef = React.useRef<HTMLDivElement>(null);
   const [commandPaletteOpen, setCommandPaletteOpen] = React.useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = React.useState(false);
   const [clipboardVersion, setClipboardVersion] = React.useState(0);
@@ -5480,6 +5481,17 @@ export function SketchEditorCanvas({
       controller.setInlineTextSelection(null);
     }
   }, [controller]);
+
+  React.useEffect(() => {
+    if (!contextMenu) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(event.target as Node)) {
+        setContextMenu(null);
+      }
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [contextMenu]);
 
   const updateInlineTextSelection = React.useCallback((element: HTMLTextAreaElement, nodeId: string) => {
     controller.setInlineTextSelection({
@@ -6617,6 +6629,7 @@ export function SketchEditorCanvas({
           transformOrigin: "0 0",
         }}
         onPointerDown={(event) => {
+        setContextMenu(null);
         if (mode !== "edit") return;
         activateSketchKeyboardScope(controller);
         updateHoveredNodeId(null);
@@ -6990,6 +7003,7 @@ export function SketchEditorCanvas({
       </div>
       {contextMenu ? (
         <div
+          ref={contextMenuRef}
           role="menu"
           aria-label="草图右键菜单"
           className="absolute z-30 min-w-36 overflow-hidden rounded-md border border-border bg-card py-1 text-sm text-foreground shadow-2xl"

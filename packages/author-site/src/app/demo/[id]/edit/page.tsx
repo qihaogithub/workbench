@@ -19,11 +19,15 @@ import type {
   VisualPropertyChangeKind,
 } from "../../../../../components/demo";
 import type {
+  CommentAuthor,
   DemoPageRuntimeType,
   ProjectAuthoringPreferences,
   PrototypePageMeta,
   SketchSceneDocument,
 } from "@workbench/shared";
+import { createAuthorCommentApi } from "@/lib/comment-api-client";
+import { useComments } from "@workbench/demo-ui/comment";
+import { getBrowserAgentServiceUrl } from "@/lib/runtime-config";
 import {
   createDefaultSketchScene,
   parseSketchSceneDocument,
@@ -195,6 +199,16 @@ import { zhCN } from "date-fns/locale";
 const PreviewStage = dynamic(
   () =>
     import("../../../../../components/demo").then((m) => m.PreviewStage),
+  { ssr: false, loading: () => null },
+);
+const CommentLayer = dynamic(
+  () =>
+    import("../../../../../components/demo").then((m) => m.CommentLayer),
+  { ssr: false, loading: () => null },
+);
+const CommentPanel = dynamic(
+  () =>
+    import("../../../../../components/demo").then((m) => m.CommentPanel),
   { ssr: false, loading: () => null },
 );
 const PageConfigPanel = dynamic(
@@ -1239,6 +1253,11 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       };
 
       return demoPages
+        .filter(
+          (p) =>
+            p.runtimeType !== "prototype-html-css" &&
+            p.runtimeType !== "sketch-scene",
+        )
         .flatMap((p, index) => {
           const snapshotInput = buildScreenshotPageInput(p);
           if (!snapshotInput) return [];
@@ -1342,6 +1361,13 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         const config = configOverride ?? configDataMapRef.current[pageId] ?? {};
         const page = demoPages.find((item) => item.id === pageId);
         if (!page) {
+          delete timers[pageId];
+          return;
+        }
+        if (
+          page.runtimeType === "prototype-html-css" ||
+          page.runtimeType === "sketch-scene"
+        ) {
           delete timers[pageId];
           return;
         }
@@ -1679,9 +1705,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   const [errorBannerVisible, setErrorBannerVisible] = useState(false);
   const [tabValue, setTabValue] = useState("ai");
-  const [rightPanelTab, setRightPanelTab] = useState<"edit" | "config">(
-    "edit",
-  );
+  const [rightPanelTab, setRightPanelTab] = useState<
+    "edit" | "config" | "comments"
+  >("edit");
   const [chatElement, setChatElement] =
     useState<ChatElementRef | null>(null);
   const { demos } = useDemos();
@@ -1719,6 +1745,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   // publishStatus, versionHistory, and related state moved to useVersionControl hook
   const [currentUsername, setCurrentUsername] = useState<string>("");
+  const [currentUserId, setCurrentUserId] = useState<string>("");
   const collabUser = useMemo(
     () => ({
       userId: sessionId || "anonymous",
@@ -1726,6 +1753,42 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     }),
     [currentUsername, sessionId],
   );
+
+  // 评论功能：API 适配器 + WS 地址 + 当前作者身份（创作端可 @AI）
+  const commentApi = useMemo(() => createAuthorCommentApi(demoId), [demoId]);
+  const commentWsUrl = useMemo(
+    () => `${getBrowserAgentServiceUrl().replace(/^http/, "ws")}/ws/comments`,
+    [],
+  );
+  const commentUser = useMemo<CommentAuthor | null>(() => {
+    if (!currentUserId) return null;
+    return {
+      id: currentUserId,
+      name: currentUsername || "当前用户",
+      isAnonymous: false,
+    };
+  }, [currentUserId, currentUsername]);
+  // 评论状态：页面级统一管理，CommentLayer（预览区）与右侧栏评论 tab 共享
+  const [commentModeActive, setCommentModeActive] = useState(false);
+  const [activeCommentThreadId, setActiveCommentThreadId] = useState<
+    string | null
+  >(null);
+  const commentsData = useComments({
+    projectId: demoId,
+    pageId: activeDemoId,
+    api: commentApi,
+    wsUrl: commentWsUrl,
+  });
+  const unresolvedCommentCount = commentsData.threads.filter(
+    (t) => !t.resolved,
+  ).length;
+  // 画布模式不支持评论，切换时退出评论模式
+  useEffect(() => {
+    if (previewMode === "canvas") {
+      setCommentModeActive(false);
+      setActiveCommentThreadId(null);
+    }
+  }, [previewMode]);
   const activeDemoRuntimeTypeForCollab = demoPages.find(
     (page) => page.id === activeDemoId,
   )?.runtimeType;
@@ -3693,7 +3756,7 @@ ${context.details}
           return;
         }
 
-        const metaKeys = new Set(["__order", "__orderH", "__positions"]);
+        const metaKeys = new Set(["__positions"]);
         let updatedCount = 0;
         for (const [key, value] of Object.entries(currentConfig)) {
           if (metaKeys.has(key)) continue;
@@ -4810,8 +4873,13 @@ ${context.details}
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.success && data.data?.username) {
-          setCurrentUsername((current) =>
+          setCurrentUsername((current: string) =>
             current === data.data.username ? current : data.data.username,
+          );
+        }
+        if (data?.success && data.data?.id) {
+          setCurrentUserId((current: string) =>
+            current === data.data.id ? current : data.data.id,
           );
         }
       })
@@ -5483,7 +5551,8 @@ ${context.details}
   const visualEditActive =
     previewMode === "single" &&
     !singlePreviewViewingDocument &&
-    rightPanelTab === "edit";
+    rightPanelTab === "edit" &&
+    !commentModeActive;
 
   useEffect(() => {
     if (previewMode !== "single" || singlePreviewViewingDocument) return;
@@ -7063,6 +7132,26 @@ ${context.details}
                   background: hsl(var(--muted-foreground) / 0.55);
                 }
               `}</style>
+              <CommentLayer
+                projectId={demoId}
+                pageId={activeDemoId}
+                api={commentApi}
+                wsUrl={commentWsUrl}
+                currentUser={commentUser}
+                canMentionAgent
+                disabled={previewMode === "canvas"}
+                showToggle={false}
+                commentMode={commentModeActive}
+                onCommentModeChange={setCommentModeActive}
+                activeThreadId={activeCommentThreadId}
+                onActiveThreadChange={setActiveCommentThreadId}
+                threads={commentsData.threads}
+                onCreateComment={commentsData.createComment}
+                onAddReply={commentsData.addReply}
+                onSetResolved={commentsData.setResolved}
+                onDeleteThread={commentsData.deleteThread}
+                onDeleteReply={commentsData.deleteReply}
+              >
               <PreviewStage
                 pages={previewStagePages}
                 activePageId={activeDemoId}
@@ -7507,6 +7596,7 @@ ${context.details}
                   return undefined;
                 }}
               />
+              </CommentLayer>
             </div>
           </ResizablePanel>
 
@@ -7517,13 +7607,21 @@ ${context.details}
                   <Tabs
                     value={rightPanelTab}
                     onValueChange={(v) =>
-                      setRightPanelTab(v as "edit" | "config")
+                      setRightPanelTab(v as "edit" | "config" | "comments")
                     }
                     className="flex h-full flex-col"
                   >
-                    <TabsList className="grid w-full grid-cols-2 shrink-0">
+                    <TabsList className="grid w-full grid-cols-3 shrink-0">
                       <TabsTrigger value="edit">编辑</TabsTrigger>
                       <TabsTrigger value="config">配置</TabsTrigger>
+                      <TabsTrigger value="comments">
+                        评论
+                        {unresolvedCommentCount > 0 && (
+                          <span className="ml-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[9px] font-semibold text-white">
+                            {unresolvedCommentCount}
+                          </span>
+                        )}
+                      </TabsTrigger>
                     </TabsList>
                     <TabsContent
                       value="edit"
@@ -7589,6 +7687,22 @@ ${context.details}
                         sessionId={sessionId}
                         positionableItemSizes={positionableItemSizes}
                         hideDetailHeader
+                      />
+                    </TabsContent>
+                    <TabsContent
+                      value="comments"
+                      className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
+                    >
+                      <CommentPanel
+                        threads={commentsData.threads}
+                        currentUserId={currentUserId || undefined}
+                        activeThreadId={activeCommentThreadId}
+                        onSelectThread={(id) => {
+                          setActiveCommentThreadId(id);
+                          setCommentModeActive(false);
+                        }}
+                        commentMode={commentModeActive}
+                        onCommentModeChange={setCommentModeActive}
                       />
                     </TabsContent>
                   </Tabs>

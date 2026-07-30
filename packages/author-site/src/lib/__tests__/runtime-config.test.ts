@@ -1,4 +1,5 @@
 import {
+  AGENT_SERVICE_PORT,
   DEFAULT_AGENT_SERVICE_URL,
   DEFAULT_SCREENSHOT_SERVICE_URL,
   getBrowserAgentServiceUrl,
@@ -30,9 +31,12 @@ describe("runtime-config", () => {
     process.env = originalEnv;
   });
 
-  it("为 agent-service URL 提供服务端和浏览器默认值", () => {
+  it("为 agent-service URL 提供服务端默认值，浏览器端从 window.location 推导", () => {
     expect(getServerAgentServiceUrl()).toBe(DEFAULT_AGENT_SERVICE_URL);
-    expect(getBrowserAgentServiceUrl()).toBe(DEFAULT_AGENT_SERVICE_URL);
+    // jsdom 环境下 window.location.hostname 为 localhost
+    expect(getBrowserAgentServiceUrl()).toBe(
+      `http://localhost:${AGENT_SERVICE_PORT}`,
+    );
   });
 
   it("读取并规整 agent-service URL", () => {
@@ -41,6 +45,17 @@ describe("runtime-config", () => {
 
     expect(getServerAgentServiceUrl()).toBe("http://agent.local");
     expect(getBrowserAgentServiceUrl()).toBe("http://agent.public");
+  });
+
+  it("浏览器环境未配置时从 window.location 自动推导 agent-service URL", () => {
+    // jsdom 环境已有 window.location，验证自动推导逻辑
+    expect(getBrowserAgentServiceUrl()).toBe(
+      `http://localhost:${AGENT_SERVICE_PORT}`,
+    );
+
+    // 显式配置优先于自动推导
+    process.env.NEXT_PUBLIC_AGENT_SERVICE_URL = "http://custom:9999";
+    expect(getBrowserAgentServiceUrl()).toBe("http://custom:9999");
   });
 
   it("开发环境缺省使用 dev internal token，生产环境缺省为空", () => {

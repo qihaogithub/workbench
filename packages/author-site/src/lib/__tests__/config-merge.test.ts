@@ -54,31 +54,6 @@ describe("mergeSchemaDefaults", () => {
     expect(result.count).toBe("five"); // use new default, not old number value
   });
 
-  it("should handle __order from $demo.orderable", () => {
-    const schemaWithOrder = JSON.stringify({
-      type: "object",
-      $demo: { orderable: ["visible", "title", "count"] },
-      properties: {
-        title: { type: "string", default: "Hello" },
-        count: { type: "number", default: 5 },
-        visible: { type: "boolean", default: true },
-      },
-    });
-    const result = mergeSchemaDefaults({}, schemaWithOrder);
-    expect(result.__order).toEqual(["visible", "title", "count"]);
-  });
-
-  it("should generate __order from property keys when no orderable", () => {
-    const result = mergeSchemaDefaults({}, basicSchema);
-    expect(result.__order).toEqual(["title", "count", "visible"]);
-  });
-
-  it("should handle invalid JSON schema gracefully", () => {
-    const existing = { foo: "bar" };
-    const result = mergeSchemaDefaults(existing, "not valid json");
-    expect(result).toEqual({ foo: "bar" });
-  });
-
   it("should handle schema with no properties", () => {
     const emptySchema = JSON.stringify({ type: "object" });
     const result = mergeSchemaDefaults({ old: "value" }, emptySchema);

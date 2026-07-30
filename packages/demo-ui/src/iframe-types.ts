@@ -13,7 +13,10 @@ export type IframeOutMessageType =
   | 'VISUAL_SELECT'
   | 'VISUAL_INLINE_EDIT'
   | 'VISUAL_ANNOTATION_CREATE'
-  | 'VISUAL_NODE_TREE_RESULT';
+  | 'VISUAL_NODE_TREE_RESULT'
+  | 'COMMENT_CLICK'
+  | 'COMMENT_VIEW_STATE'
+  | 'ELEMENT_LOCATION_RESULT';
 
 /** 父窗口 → iframe 消息类型 */
 export type IframeInMessageType =
@@ -24,7 +27,10 @@ export type IframeInMessageType =
   | 'COLLECT_THUMBNAIL_LAYOUT'
   | 'COLLECT_POSITIONABLE_SIZES'
   | 'UPDATE_VISUAL_EDIT_STATE'
-  | 'COLLECT_VISUAL_NODE_TREE';
+  | 'COLLECT_VISUAL_NODE_TREE'
+  | 'ENTER_COMMENT_MODE'
+  | 'EXIT_COMMENT_MODE'
+  | 'LOCATE_ELEMENT';
 
 /** positionable 元素尺寸数据 */
 export interface PositionableSizeItem {
@@ -163,6 +169,43 @@ export interface VisualInlineEditPayload {
   node: VisualNodeInfo;
   before: string;
   after: string;
+}
+
+/** 评论模式下点击页面内容的消息 payload（iframe → 父窗口） */
+export interface CommentClickPayload {
+  /** 点击位置（相对 iframe 视口） */
+  x: number;
+  y: number;
+  /** 当前滚动偏移 */
+  scrollX: number;
+  scrollY: number;
+  /** 文档完整尺寸（用于归一化 pin 坐标） */
+  docWidth: number;
+  docHeight: number;
+  viewportWidth: number;
+  viewportHeight: number;
+  /** 点击位置下方最内层元素信息；点击在空白区域时为 null */
+  node: VisualNodeInfo | null;
+  /** 点击元素的 outerHTML 前 300 字符（node 非空时提供） */
+  outerHtml?: string;
+}
+
+/** iframe 当前视图状态（滚动/文档尺寸），用于评论 pin 跟随定位（iframe → 父窗口） */
+export interface CommentViewStatePayload {
+  scrollX: number;
+  scrollY: number;
+  docWidth: number;
+  docHeight: number;
+  viewportWidth: number;
+  viewportHeight: number;
+}
+
+/** LOCATE_ELEMENT 查询结果（iframe → 父窗口） */
+export interface ElementLocationResultPayload {
+  requestId?: string;
+  domPath: string | null;
+  found: boolean;
+  rect: VisualNodeRect | null;
 }
 
 export interface VisualEditPatch {

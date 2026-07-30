@@ -95,7 +95,7 @@ export function computeCanvasRenderModes({
       modes[pageId] = "prototype";
       continue;
     }
-    modes[pageId] = screenshotUrls?.[pageId] ? "screenshot" : "prototype";
+    modes[pageId] = "prototype";
   }
 
   for (const page of runtimePages) {

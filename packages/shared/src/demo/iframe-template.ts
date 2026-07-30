@@ -1337,6 +1337,18 @@ ${cssLinks}
         var bottom = children[i].getBoundingClientRect().bottom - bodyRect.top;
         if (bottom > height) height = bottom;
       }
+      var root = document.getElementById('root');
+      if (root) {
+        var rc = root.children;
+        var rootMaxBottom = 0;
+        for (var i = 0; i < rc.length; i++) {
+          var rcb = rc[i].getBoundingClientRect().bottom - bodyRect.top;
+          if (rcb > rootMaxBottom) rootMaxBottom = rcb;
+        }
+        if (rootMaxBottom > 0 && rootMaxBottom < height) {
+          height = rootMaxBottom;
+        }
+      }
       var scrollHeight = document.documentElement.scrollHeight || 0;
       var viewportHeight = window.innerHeight || 0;
       if (scrollHeight > viewportHeight + 1 && scrollHeight > height) {

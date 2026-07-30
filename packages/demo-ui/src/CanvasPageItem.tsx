@@ -227,8 +227,6 @@ export function CanvasPagePreviewContent({
   const [screenshotLoaded, setScreenshotLoaded] = useState(false);
   const [iframeContentLoaded, setIframeContentLoaded] = useState(false);
   const [contentHeight, setContentHeight] = useState<number | null>(null);
-  const contentHeightRef = useRef(contentHeight);
-  contentHeightRef.current = contentHeight;
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
 
@@ -241,7 +239,7 @@ export function CanvasPagePreviewContent({
 
       if (newContentHeight > designHeight) {
         setContentHeight(newContentHeight);
-      } else if (contentHeightRef.current !== null) {
+      } else if (contentHeight !== null) {
         setContentHeight(null);
       }
 
@@ -254,10 +252,11 @@ export function CanvasPagePreviewContent({
       );
 
       if (nextLayout) {
+        console.count("[perf] CanvasPageItem onLayoutChange");
         onLayoutChange?.(page.id, nextLayout);
       }
     },
-    [page, onLayoutChange],
+    [page, onLayoutChange, contentHeight],
   );
 
   const handleScreenshotLoad = useCallback(() => {

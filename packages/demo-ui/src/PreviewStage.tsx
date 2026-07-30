@@ -30,6 +30,7 @@ export function PreviewStage({
   renderSingleContent,
   className,
 }: PreviewStageProps) {
+  console.count("[perf] PreviewStage render");
   const normalizedPages = useMemo(
     () => normalizePreviewStagePages(pages),
     [pages],

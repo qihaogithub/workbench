@@ -1,4 +1,6 @@
 export const DEFAULT_AGENT_SERVICE_URL = "http://localhost:4201";
+/** 浏览器端自动推导时使用的 agent-service 端口（Docker 部署标准端口） */
+export const AGENT_SERVICE_PORT = "3201";
 export const DEFAULT_SCREENSHOT_SERVICE_URL = "http://localhost:4202";
 export const DEFAULT_SCREENSHOT_PROXY_TIMEOUT_MS = 30000;
 
@@ -26,9 +28,15 @@ function parseIntegerEnv(value: string | undefined, fallback: number): number {
 }
 
 export function getBrowserAgentServiceUrl(): string {
-  return trimTrailingSlashes(
-    process.env.NEXT_PUBLIC_AGENT_SERVICE_URL || DEFAULT_AGENT_SERVICE_URL,
-  );
+  // 显式配置优先（开发环境 .env 或反向代理等特殊拓扑）
+  const configured = process.env.NEXT_PUBLIC_AGENT_SERVICE_URL;
+  if (configured) return trimTrailingSlashes(configured);
+  // 浏览器环境：从当前页面 hostname 自动推导，同主机 + 固定端口
+  // 使同一 Docker 镜像在任意 IP/域名下均可正常工作
+  if (typeof window !== "undefined") {
+    return `${window.location.protocol}//${window.location.hostname}:${AGENT_SERVICE_PORT}`;
+  }
+  return DEFAULT_AGENT_SERVICE_URL;
 }
 
 export function getServerAgentServiceUrl(): string {

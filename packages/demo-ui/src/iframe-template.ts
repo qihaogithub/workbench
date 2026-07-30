@@ -95,7 +95,7 @@ export const visualEditScript = `
     if (!selectedBox) {
       selectedBox = document.createElement('div');
       selectedBox.setAttribute('data-visual-overlay', 'selected');
-      selectedBox.style.cssText = 'position:fixed;display:none;pointer-events:none;border:2px solid #2563eb;background:rgba(37,99,235,0.08);z-index:2147483001;';
+      selectedBox.style.cssText = 'position:fixed;display:none;pointer-events:none;border:2px solid #2563eb;background:rgba(37,99,235,0.08);box-shadow:0 0 0 4px rgba(37,99,235,0.15);z-index:2147483001;';
       document.body.appendChild(selectedBox);
     }
     if (!label) {
@@ -303,9 +303,11 @@ export const visualEditScript = `
     };
   }
 
-  function drawBox(box, node) {
+  function drawBox(kind, node) {
     ensureLayer();
-    if (!box || !node) return;
+    if (!node) return;
+    var box = kind === 'hover' ? hoverBox : selectedBox;
+    if (!box) return;
     box.style.display = 'block';
     box.style.left = node.rect.x + 'px';
     box.style.top = node.rect.y + 'px';
@@ -552,7 +554,7 @@ export const visualEditScript = `
       var nextNode = getNodeInfo(commentElement);
       commentNode = nextNode;
       state.selectedNodeId = nextNode.domPath;
-      drawBox(selectedBox, nextNode);
+      drawBox('selected', nextNode);
     }
   }
 
@@ -652,7 +654,7 @@ export const visualEditScript = `
       if (commentElement) {
         var nextNode = getNodeInfo(commentElement);
         commentNode = nextNode;
-        drawBox(selectedBox, nextNode);
+        drawBox('selected', nextNode);
       }
     });
     row.appendChild(labelNode);
@@ -816,7 +818,7 @@ export const visualEditScript = `
     if (commentNode) {
       var nextNode = getNodeInfo(commentElement);
       commentNode = nextNode;
-      drawBox(selectedBox, nextNode);
+      drawBox('selected', nextNode);
     }
   }
 
@@ -846,8 +848,8 @@ export const visualEditScript = `
 
   function clearHover() {
     if (hoverBox) hoverBox.style.display = 'none';
-    if (label) label.style.display = 'none';
     lastHoverId = null;
+    updateLabel();
   }
 
   function hideCommentBubble() {
@@ -939,15 +941,50 @@ export const visualEditScript = `
     ensureLayer();
     if (!state.selectedNodeId) {
       if (selectedBox) selectedBox.style.display = 'none';
+      updateLabel();
       return;
     }
     var selected = getElementByPath(state.selectedNodeId);
     if (!selected) selected = document.querySelector('[data-visual-node-id="' + state.selectedNodeId.replace(/"/g, '\\\\"') + '"]');
     if (!selected || !isEditableElement(selected)) {
       if (selectedBox) selectedBox.style.display = 'none';
+      updateLabel();
       return;
     }
-    drawBox(selectedBox, getNodeInfo(selected));
+    drawBox('selected', getNodeInfo(selected));
+    updateLabel();
+  }
+
+  function updateLabel() {
+    ensureLayer();
+    if (!state.enabled) {
+      if (label) label.style.display = 'none';
+      return;
+    }
+    var hoverNodeId = state.hoverNodeId || lastHoverId;
+    if (hoverNodeId) {
+      var hovered = getElementByPath(hoverNodeId);
+      if (!hovered) {
+        try {
+          hovered = document.querySelector('[data-visual-node-id="' + hoverNodeId.replace(/"/g, '\\\\"') + '"]');
+        } catch (_err) {
+          hovered = null;
+        }
+      }
+      if (hovered && isEditableElement(hovered)) {
+        drawLabel(getNodeInfo(hovered));
+        return;
+      }
+    }
+    if (state.selectedNodeId) {
+      var selected = getElementByPath(state.selectedNodeId);
+      if (!selected) selected = document.querySelector('[data-visual-node-id="' + state.selectedNodeId.replace(/"/g, '\\\\"') + '"]');
+      if (selected && isEditableElement(selected)) {
+        drawLabel(getNodeInfo(selected));
+        return;
+      }
+    }
+    if (label) label.style.display = 'none';
   }
 
   function redrawHoverFromState() {
@@ -955,7 +992,7 @@ export const visualEditScript = `
     var hoverNodeId = state.hoverNodeId || lastHoverId;
     if (!hoverNodeId) {
       if (hoverBox) hoverBox.style.display = 'none';
-      if (label) label.style.display = 'none';
+      updateLabel();
       return;
     }
     var hovered = getElementByPath(hoverNodeId);
@@ -968,12 +1005,12 @@ export const visualEditScript = `
     }
     if (!hovered || !isEditableElement(hovered)) {
       if (hoverBox) hoverBox.style.display = 'none';
-      if (label) label.style.display = 'none';
+      updateLabel();
       return;
     }
     var node = getNodeInfo(hovered);
-    drawBox(hoverBox, node);
-    drawLabel(node);
+    drawBox('hover', node);
+    updateLabel();
   }
 
   function scheduleVisualOverlayRedraw() {
@@ -1111,7 +1148,7 @@ export const visualEditScript = `
     var node = getNodeInfo(element);
     var stack = collectAncestorNodeStack(element);
     state.selectedNodeId = node.domPath;
-    drawBox(selectedBox, node);
+    drawBox('selected', node);
     window.parent.postMessage({ type: 'VISUAL_SELECT', node: node, nodeStack: stack }, '*');
     return true;
   }
@@ -1192,8 +1229,8 @@ export const visualEditScript = `
     if (hoverId === lastHoverId) return;
     lastHoverId = hoverId;
     var node = getNodeInfo(el);
-    drawBox(hoverBox, node);
-    drawLabel(node);
+    drawBox('hover', node);
+    updateLabel();
   }, true);
 
   document.addEventListener('pointerout', function(event) {
@@ -1210,6 +1247,7 @@ export const visualEditScript = `
       event.preventDefault();
       state.selectedNodeId = null;
       if (selectedBox) selectedBox.style.display = 'none';
+      updateLabel();
       window.parent.postMessage({ type: 'VISUAL_SELECT', node: null, nodeStack: [] }, '*');
       return;
     }
@@ -1242,6 +1280,9 @@ export const visualEditScript = `
     event.preventDefault();
     event.stopPropagation();
     if (!el) {
+      state.selectedNodeId = null;
+      if (selectedBox) selectedBox.style.display = 'none';
+      updateLabel();
       window.parent.postMessage({ type: 'VISUAL_SELECT', node: null, nodeStack: [] }, '*');
       return;
     }
@@ -1249,7 +1290,8 @@ export const visualEditScript = `
     var node = chooseNodeFromStack(stack, event) || getNodeInfo(el);
     stack = moveSelectedNodeToStackEnd(stack, node);
     state.selectedNodeId = node.domPath;
-    drawBox(selectedBox, node);
+    drawBox('selected', node);
+    updateLabel();
     if (state.annotationMode) {
       showCommentBubble(node);
       window.parent.postMessage({ type: 'VISUAL_SELECT', node: node, nodeStack: stack }, '*');
@@ -1265,6 +1307,9 @@ export const visualEditScript = `
     event.preventDefault();
     event.stopPropagation();
     if (!el) {
+      state.selectedNodeId = null;
+      if (selectedBox) selectedBox.style.display = 'none';
+      updateLabel();
       window.parent.postMessage({
         type: 'VISUAL_SELECT',
         node: null,
@@ -1278,7 +1323,8 @@ export const visualEditScript = `
     var node = stack.length > 0 ? stack[stack.length - 1] : getNodeInfo(el);
     stack = moveSelectedNodeToStackEnd(stack, node);
     state.selectedNodeId = node.domPath;
-    drawBox(selectedBox, node);
+    drawBox('selected', node);
+    updateLabel();
     window.parent.postMessage({
       type: 'VISUAL_SELECT',
       node: node,
@@ -1327,8 +1373,195 @@ export const visualEditScript = `
     applyPropertyChanges: applyPropertyChanges,
     collectVisualNodeTree: function() {
       return collectVisualNodeTree(document.body, { maxNodes: 260 });
-    }
+    },
+    getNodeInfo: getNodeInfo,
+    getDomPath: getDomPath,
+    resolveElementByPath: getElementByPath
   };
+})();
+`;
+
+/**
+ * 评论模式运行时脚本
+ *
+ * 独立于视觉编辑（visualEditScript），不依赖 state.enabled，
+ * 因此浏览端（未开启视觉编辑）也能使用评论功能。
+ *
+ * 父→子消息：
+ *   ENTER_COMMENT_MODE / EXIT_COMMENT_MODE：开关评论模式（十字光标 + 悬停高亮）
+ *   LOCATE_ELEMENT：按 domPath 查询元素当前位置，回 ELEMENT_LOCATION_RESULT
+ * 子→父消息：
+ *   COMMENT_CLICK：评论模式下点击，携带坐标 + 该位置最内层元素的 VisualNodeInfo
+ *   COMMENT_VIEW_STATE：当前滚动/文档尺寸（常驻上报，用于 pin 跟随定位）
+ *   ELEMENT_LOCATION_RESULT：LOCATE_ELEMENT 的查询结果
+ */
+export const commentModeScript = `
+(function() {
+  var commentMode = false;
+  var hoverOutline = null;
+  var lastHoverEl = null;
+  var viewStateTimer = null;
+
+  function getDocSize() {
+    return {
+      docWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth, window.innerWidth),
+      docHeight: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight, window.innerHeight)
+    };
+  }
+
+  function postViewState() {
+    var size = getDocSize();
+    window.parent.postMessage({
+      type: 'COMMENT_VIEW_STATE',
+      scrollX: window.scrollX || window.pageXOffset || 0,
+      scrollY: window.scrollY || window.pageYOffset || 0,
+      docWidth: size.docWidth,
+      docHeight: size.docHeight,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight
+    }, '*');
+  }
+
+  function scheduleViewState() {
+    if (viewStateTimer) return;
+    viewStateTimer = setTimeout(function() {
+      viewStateTimer = null;
+      postViewState();
+    }, 80);
+  }
+
+  window.addEventListener('scroll', scheduleViewState, true);
+  window.addEventListener('resize', scheduleViewState);
+
+  function isCommentOverlay(el) {
+    return !!(el && el.getAttribute && el.getAttribute('data-comment-overlay'));
+  }
+
+  function ensureOutline() {
+    if (hoverOutline) return hoverOutline;
+    hoverOutline = document.createElement('div');
+    hoverOutline.setAttribute('data-comment-overlay', 'true');
+    var s = hoverOutline.style;
+    s.position = 'fixed';
+    s.pointerEvents = 'none';
+    s.border = '2px solid rgba(59,130,246,0.85)';
+    s.background = 'rgba(59,130,246,0.08)';
+    s.borderRadius = '3px';
+    s.zIndex = '2147483646';
+    s.display = 'none';
+    s.boxSizing = 'border-box';
+    s.transition = 'all 0.08s ease-out';
+    document.documentElement.appendChild(hoverOutline);
+    return hoverOutline;
+  }
+
+  function clearOutline() {
+    if (hoverOutline) hoverOutline.style.display = 'none';
+    lastHoverEl = null;
+  }
+
+  function pickElement(el) {
+    var node = el;
+    while (node && node !== document.body && node !== document.documentElement) {
+      if (!isCommentOverlay(node)) return node;
+      node = node.parentElement;
+    }
+    return null;
+  }
+
+  function setCursor(on) {
+    try {
+      document.documentElement.style.cursor = on ? 'crosshair' : '';
+      document.body.style.cursor = on ? 'crosshair' : '';
+    } catch (_e) {}
+  }
+
+  function enterCommentMode() {
+    commentMode = true;
+    setCursor(true);
+    postViewState();
+  }
+
+  function exitCommentMode() {
+    commentMode = false;
+    setCursor(false);
+    clearOutline();
+  }
+
+  document.addEventListener('pointermove', function(event) {
+    if (!commentMode) return;
+    var el = pickElement(document.elementFromPoint(event.clientX, event.clientY));
+    if (!el) { clearOutline(); return; }
+    if (el === lastHoverEl) return;
+    lastHoverEl = el;
+    var rect = el.getBoundingClientRect();
+    var outline = ensureOutline();
+    outline.style.display = 'block';
+    outline.style.left = rect.x + 'px';
+    outline.style.top = rect.y + 'px';
+    outline.style.width = rect.width + 'px';
+    outline.style.height = rect.height + 'px';
+  }, true);
+
+  document.addEventListener('click', function(event) {
+    if (!commentMode) return;
+    if (isCommentOverlay(event.target)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    var el = pickElement(event.target);
+    var node = null;
+    var outerHtml = undefined;
+    if (el) {
+      if (window.__VISUAL_EDIT__ && window.__VISUAL_EDIT__.getNodeInfo) {
+        try { node = window.__VISUAL_EDIT__.getNodeInfo(el); } catch (_e) { node = null; }
+      }
+      try { if (el.outerHTML) outerHtml = el.outerHTML.slice(0, 300); } catch (_e) {}
+    }
+    window.parent.postMessage({
+      type: 'COMMENT_CLICK',
+      x: event.clientX,
+      y: event.clientY,
+      scrollX: window.scrollX || window.pageXOffset || 0,
+      scrollY: window.scrollY || window.pageYOffset || 0,
+      docWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth, window.innerWidth),
+      docHeight: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight, window.innerHeight),
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+      node: node,
+      outerHtml: outerHtml
+    }, '*');
+  }, true);
+
+  window.addEventListener('message', function(event) {
+    if (event.source !== window.parent) return;
+    var data = event.data || {};
+    if (data.type === 'ENTER_COMMENT_MODE') { enterCommentMode(); return; }
+    if (data.type === 'EXIT_COMMENT_MODE') { exitCommentMode(); return; }
+    if (data.type === 'LOCATE_ELEMENT') {
+      var domPath = data.domPath;
+      var result = { type: 'ELEMENT_LOCATION_RESULT', requestId: data.requestId, domPath: domPath || null, found: false, rect: null };
+      if (domPath && window.__VISUAL_EDIT__ && window.__VISUAL_EDIT__.resolveElementByPath) {
+        try {
+          var el = window.__VISUAL_EDIT__.resolveElementByPath(domPath);
+          if (el) {
+            var rect = el.getBoundingClientRect();
+            if (rect.width > 0 || rect.height > 0) {
+              result.found = true;
+              result.rect = { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+            }
+          }
+        } catch (_e) {}
+      }
+      window.parent.postMessage(result, '*');
+    }
+  });
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', postViewState);
+  } else {
+    postViewState();
+  }
+  window.addEventListener('load', postViewState);
 })();
 `;
 
@@ -1635,6 +1868,7 @@ ${cssLinks}
   <script type="module">
     ${consoleInterceptScript}
     ${visualEditScript}
+    ${commentModeScript}
 
     import React from 'react';
     import ReactDOM from 'react-dom/client';
@@ -1657,21 +1891,34 @@ ${cssLinks}
     // 导致超出部分无法上报，画布卡片无法展示完整页面。这里取三者最大值：
     // 1) body 自身高度；2) body 直接子元素的最大下边缘；3) 文档可滚动高度（内容溢出视口时）。
     // 当内容未溢出视口时不采用 scrollHeight，以保留“内容变矮时卡片收缩”的行为。
-    function measureFullContentHeight() {
-      var bodyRect = document.body.getBoundingClientRect();
-      var height = bodyRect.height;
-      var children = document.body.children;
-      for (var i = 0; i < children.length; i++) {
-        var bottom = children[i].getBoundingClientRect().bottom - bodyRect.top;
-        if (bottom > height) height = bottom;
+      function measureFullContentHeight() {
+        var bodyRect = document.body.getBoundingClientRect();
+        var height = bodyRect.height;
+        var children = document.body.children;
+        for (var i = 0; i < children.length; i++) {
+          var bottom = children[i].getBoundingClientRect().bottom - bodyRect.top;
+          if (bottom > height) height = bottom;
+        }
+        // 穿透 #root 以绕过父级 height:100% 导致的容器膨胀
+        var root = document.getElementById('root');
+        if (root) {
+          var rc = root.children;
+          var rootMaxBottom = 0;
+          for (var i = 0; i < rc.length; i++) {
+            var rcb = rc[i].getBoundingClientRect().bottom - bodyRect.top;
+            if (rcb > rootMaxBottom) rootMaxBottom = rcb;
+          }
+          if (rootMaxBottom > 0 && rootMaxBottom < height) {
+            height = rootMaxBottom;
+          }
+        }
+        var scrollHeight = document.documentElement.scrollHeight || 0;
+        var viewportHeight = window.innerHeight || 0;
+        if (scrollHeight > viewportHeight + 1 && scrollHeight > height) {
+          height = scrollHeight;
+        }
+        return Math.round(height);
       }
-      var scrollHeight = document.documentElement.scrollHeight || 0;
-      var viewportHeight = window.innerHeight || 0;
-      if (scrollHeight > viewportHeight + 1 && scrollHeight > height) {
-        height = scrollHeight;
-      }
-      return Math.round(height);
-    }
 
     function updateAppRuntime(appState, routeParams) {
       currentAppState = appState && typeof appState === 'object' && !Array.isArray(appState) ? appState : {};
@@ -1753,6 +2000,12 @@ ${cssLinks}
         )
       );
       reportRuntimeTiming('render_invoked', { version: updateVersion });
+      requestAnimationFrame(function() {
+        var h = measureFullContentHeight();
+        if (h >= 50) {
+          window.parent.postMessage({ type: 'RESIZE', height: h, requestId: currentRequestId }, '*');
+        }
+      });
       setTimeout(function() {
         if (window.__VISUAL_EDIT__ && window.__VISUAL_EDIT__.applyPropertyChanges) {
           window.__VISUAL_EDIT__.applyPropertyChanges();

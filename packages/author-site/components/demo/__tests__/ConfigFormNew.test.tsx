@@ -46,8 +46,6 @@ const mockSchema = JSON.stringify({
 const positionSchema = JSON.stringify({
   type: 'object',
   $demo: {
-    orderable: ['header', 'content'],
-    orderableHorizontal: ['navHome', 'navAbout'],
     previewSize: { width: 320, height: 240 },
     positionable: {
       items: ['badgeA', 'badgeB'],
@@ -58,10 +56,6 @@ const positionSchema = JSON.stringify({
     },
   },
   properties: {
-    header: { type: 'string', title: '页头', default: 'Header' },
-    content: { type: 'string', title: '内容', default: 'Content' },
-    navHome: { type: 'string', title: '首页', default: '首页' },
-    navAbout: { type: 'string', title: '关于', default: '关于' },
     badgeA: { type: 'string', title: '徽章A', default: 'A' },
     badgeB: { type: 'string', title: '徽章B', default: 'B' },
   },
@@ -223,7 +217,7 @@ describe('ConfigFormNew', () => {
     expect(switches.length).toBeGreaterThan(0);
   });
 
-  it('应渲染横向排序和元素定位控件，并同步位置输入变更', () => {
+  it('应渲染元素定位控件，并同步位置输入变更', () => {
     const handleChange = jest.fn();
 
     renderConfigForm(
@@ -231,8 +225,6 @@ describe('ConfigFormNew', () => {
         schema={positionSchema}
         onChange={handleChange}
         initialData={{
-          __order: ['header', 'content'],
-          __orderH: ['navHome', 'navAbout'],
           __positions: {
             badgeA: { x: 10, y: 20 },
             badgeB: { x: 60, y: 80 },
@@ -241,10 +233,7 @@ describe('ConfigFormNew', () => {
       />,
     );
 
-    expect(screen.getByText('组件排序')).toBeInTheDocument();
-    expect(screen.getByText('横向排序')).toBeInTheDocument();
     expect(screen.getByText('元素定位')).toBeInTheDocument();
-    expect(screen.getAllByText('首页').length).toBeGreaterThan(0);
     expect(screen.getAllByText('徽章A').length).toBeGreaterThan(0);
 
     const xInputs = screen.getAllByDisplayValue('10');

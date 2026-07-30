@@ -48,8 +48,14 @@ import {
   type PermissionHandler,
 } from "./delete-page-tool";
 import { createDelegateTaskTool, type SubagentRunner } from "./subagent-tool";
+import {
+  createReadCommentsTool,
+  createInspectElementTool,
+  createReplyCommentTool,
+  createResolveCommentTool,
+} from "./comment-tools";
 
-export const WORKBENCH_TOOL_VERSION = 23;
+export const WORKBENCH_TOOL_VERSION = 24;
 
 const SKETCH_SCENE_TOOLS_ENABLED =
   process.env.PI_AGENT_SKETCH_TOOLS_ENABLED === "true";
@@ -127,6 +133,10 @@ export function createWorkbenchTools(
     ),
     createDeletePageTool(config, permissionHandler),
     createDeletePagesTool(config, permissionHandler),
+    createReadCommentsTool(config),
+    createInspectElementTool(config),
+    createReplyCommentTool(config),
+    createResolveCommentTool(config),
   ];
 
   if (options.includeDelegateTask !== false && options.subagentRunner) {

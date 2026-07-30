@@ -193,6 +193,43 @@ function getNodeInfo(element: VisualElement, root: Element): VisualNodeInfo {
   };
 }
 
+function formatSelectedLabel(element: VisualElement): string {
+  const tag = element.tagName.toLowerCase();
+  const className = element.getAttribute("class")?.trim().split(/\s+/).slice(0, 2).join(".");
+  const text = (element.textContent || "").replace(/\s+/g, " ").trim().slice(0, 24);
+  const parts: string[] = [tag];
+  if (className) parts.push(`.${className}`);
+  if (text) parts.push(` "${text}"`);
+  return parts.join("");
+}
+
+function updateSelectedLabel(
+  shadow: ShadowRoot,
+  host: HTMLElement,
+  element: VisualElement | null,
+) {
+  const label = shadow.querySelector<HTMLElement>("[data-prototype-selected-label]");
+  if (!label) return;
+  if (!element) {
+    label.style.display = "none";
+    return;
+  }
+  const rect = element.getBoundingClientRect();
+  const hostRect = host.getBoundingClientRect();
+  label.style.display = "block";
+  label.style.left = `${Math.max(4, rect.left - hostRect.left)}px`;
+  label.style.top = `${Math.max(4, rect.top - hostRect.top - 24)}px`;
+  label.textContent = formatSelectedLabel(element);
+}
+
+function resolveLabelElement(shadow: ShadowRoot): VisualElement | null {
+  const hovered = shadow.querySelector("[data-prototype-hovered]");
+  if (hovered && isVisualElement(hovered)) return hovered;
+  const selected = shadow.querySelector("[data-prototype-selected]");
+  if (selected && isVisualElement(selected)) return selected;
+  return null;
+}
+
 function collectPointNodeStack(
   shadow: ShadowRoot,
   target: VisualElement,
@@ -429,18 +466,6 @@ export function PrototypePagePreview({
       applyPrototypeBindings(root, configData, assetRewrite);
       applyPropertyChanges(root, visualPropertyChanges);
     }
-
-    if (!onContentHeightChange || !shouldScaleToPreviewSize || !root) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const height = entry.contentRect.height;
-        if (Number.isFinite(height) && height > 0) {
-          onContentHeightChange(height);
-        }
-      }
-    });
-    observer.observe(root);
-    return () => observer.disconnect();
   }, [
     allowScroll,
     configData,
@@ -453,8 +478,27 @@ export function PrototypePagePreview({
     sessionId,
     shouldScaleToPreviewSize,
     visualPropertyChanges,
-    onContentHeightChange,
   ]);
+
+  useLayoutEffect(() => {
+    if (!onContentHeightChange || !shouldScaleToPreviewSize) return;
+    const shadow = shadowRef.current;
+    if (!shadow) return;
+    const root = shadow.querySelector<HTMLElement>(".prototype-root");
+    if (!root) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const height = entry.contentRect.height;
+        if (Number.isFinite(height) && height > 0) {
+          console.count("[perf] PrototypePagePreview ResizeObserver fire");
+          onContentHeightChange(height);
+        }
+      }
+    });
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [onContentHeightChange, shouldScaleToPreviewSize]);
 
   useEffect(() => {
     const shadow = shadowRef.current;
@@ -481,7 +525,24 @@ export function PrototypePagePreview({
     selected?.setAttribute("data-prototype-selected", "true");
     const hovered = getElementByVisualId(root, visualHoverNodeId) || queryByDomPath(root, visualHoverNodeId);
     hovered?.setAttribute("data-prototype-hovered", "true");
+    const host = hostRef.current;
+    if (host) {
+      updateSelectedLabel(shadow, host, resolveLabelElement(shadow));
+    }
   }, [selectedVisualNodeId, visualHoverNodeId]);
+
+  useEffect(() => {
+    const shadow = shadowRef.current;
+    const host = hostRef.current;
+    if (!shadow || !host) return;
+    const update = () => updateSelectedLabel(shadow, host, resolveLabelElement(shadow));
+    host.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      host.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, []);
 
   useEffect(() => {
     const shadow = shadowRef.current;
@@ -532,7 +593,15 @@ export function PrototypePagePreview({
     const handleClick = (event: Event) => {
       const mouseEvent = event as MouseEvent;
       const target = resolveVisualEventTarget(event.composedPath()[0] ?? null, root);
-      if (!target) return;
+      if (!target || target === root) {
+        event.preventDefault();
+        event.stopPropagation();
+        activeSelectedElement = null;
+        setHoveredElement(null);
+        onVisualSelect?.(null);
+        onVisualSelectStack?.([]);
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
       const stack = collectPointNodeStack(

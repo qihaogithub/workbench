@@ -54,6 +54,9 @@ export {
   CanvasToolbar,
   PageSkeleton,
   saveCanvasLayout,
+  CommentLayer,
+  CommentPanel,
+  useComments,
 } from "@workbench/demo-ui";
 export { SketchPagePreview } from "@workbench/sketch-react/preview";
 export type {
@@ -70,4 +73,7 @@ export type {
   DemoSchema,
   PreviewStageRenderContext,
   SinglePageRendererProps,
+  CommentLayerProps,
+  CommentApiAdapter,
+  MentionCandidate,
 } from "@workbench/demo-ui";
