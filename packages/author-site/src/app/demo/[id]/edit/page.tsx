@@ -129,6 +129,11 @@ import {
   Share2,
 } from "lucide-react";
 import {
+  MessageSquare,
+  SlidersHorizontal,
+  SquarePen,
+} from "lucide-react";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -7611,11 +7616,28 @@ ${context.details}
                     }
                     className="flex h-full flex-col"
                   >
-                    <TabsList className="grid w-full grid-cols-3 shrink-0">
-                      <TabsTrigger value="edit">编辑</TabsTrigger>
-                      <TabsTrigger value="config">配置</TabsTrigger>
-                      <TabsTrigger value="comments">
-                        评论
+                    <TabsList className="w-full justify-start gap-2 rounded-none border-b px-2 h-12 bg-transparent">
+                      <TabsTrigger
+                        value="edit"
+                        title="编辑"
+                        className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                      >
+                        <SquarePen className="h-4 w-4" />
+                        {rightPanelTab === "edit" && <span>编辑</span>}
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="config"
+                        title="配置"
+                        className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                      >
+                        <SlidersHorizontal className="h-4 w-4" />
+                        {rightPanelTab === "config" && <span>配置</span>}
+                      </TabsTrigger>
+                      <TabsTrigger value="comments" title="评论"
+                        className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                        {rightPanelTab === "comments" && <span>评论</span>}
                         {unresolvedCommentCount > 0 && (
                           <span className="ml-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[9px] font-semibold text-white">
                             {unresolvedCommentCount}

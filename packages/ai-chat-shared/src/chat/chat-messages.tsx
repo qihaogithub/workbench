@@ -5,7 +5,7 @@ import type { ImageAttachment } from "@workbench/agent-client";
 import type { UserChoiceResponse } from "./services/stream-service";
 import { Message, type ChatMessage } from "../message";
 import { AssistantMessage } from "../assistant-message";
-import { Bot, ArrowDown, RefreshCw, MessageSquare } from "lucide-react";
+import { Bot, RefreshCw, MessageSquare } from "lucide-react";
 import { cn } from "../lib/utils";
 import { ChatCard } from "../chat-card";
 
@@ -166,8 +166,6 @@ interface ChatMessagesProps {
   messages: ChatMessage[];
   currentMessage: ChatMessage;
   isStreaming: boolean;
-  isUserScrolling: boolean;
-  onScrollToBottom: () => void;
   onRegenerate: (targetAssistantId: string) => void;
   onExternalAuthConnected: (targetAssistantId: string) => void;
   onRollback: (targetAssistantId: string) => void;
@@ -205,8 +203,6 @@ export function ChatMessages({
   messages,
   currentMessage,
   isStreaming,
-  isUserScrolling,
-  onScrollToBottom,
   onRegenerate,
   onExternalAuthConnected,
   onRollback,
@@ -323,18 +319,6 @@ export function ChatMessages({
             onUserChoiceResponse={onUserChoiceResponse}
           />
         </MessageErrorBoundary>
-      )}
-
-      {isUserScrolling && isStreaming && (
-        <div className="sticky bottom-0 flex justify-center pb-2">
-          <button
-            onClick={onScrollToBottom}
-            className="bg-primary text-primary-foreground px-4 py-1.5 rounded-full shadow-lg text-sm flex items-center gap-1.5 z-10 hover:bg-primary/90 transition-colors"
-          >
-            <ArrowDown className="h-3.5 w-3.5" />
-            回到底部
-          </button>
-        </div>
       )}
 
       <div ref={messagesEndRef} />

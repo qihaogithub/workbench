@@ -18,7 +18,7 @@ import type { ProjectReference } from "./chat/inline-tag-input";
 import type { StreamService } from "./chat/services/stream-service";
 import type { ActiveViewContext } from "./lib/active-view-context";
 import type { AgentMode, ViewerContext } from "@workbench/agent-client";
-import { X, FileText } from "lucide-react";
+import { X, FileText, ArrowDown } from "lucide-react";
 
 export interface AutoRepairTrigger {
   kind: "auto_repair";
@@ -424,14 +424,12 @@ export function AIChat({
 
   return (
     <div className="flex flex-col h-full">
-      <Conversation className="flex-1 min-h-0">
+      <Conversation className="flex-1 min-h-0 relative">
         <ConversationContent ref={scrollContainerRef} onScroll={handleScroll}>
           <ChatMessages
             messages={messages}
             currentMessage={currentMessage}
             isStreaming={isStreaming}
-            isUserScrolling={isUserScrolling}
-            onScrollToBottom={scrollToBottom}
             onRegenerate={handleRegenerate}
             onExternalAuthConnected={handleRegenerate}
             onRollback={handleRollback}
@@ -451,6 +449,15 @@ export function AIChat({
             />
           )}
         </ConversationContent>
+        {isUserScrolling && isStreaming && (
+          <button
+            onClick={scrollToBottom}
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-[#2a2a2a]/85 hover:bg-[#3a3a3a]/90 text-white p-2 rounded-full shadow-lg z-10 transition-colors"
+            aria-label="回到底部"
+          >
+            <ArrowDown className="h-4 w-4" />
+          </button>
+        )}
       </Conversation>
 
       {memoryUpdateFiles.length > 0 && (
