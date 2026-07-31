@@ -18,6 +18,7 @@ import {
   getWorkspaceMultiDemoFiles,
   syncProjectDemoPagesFromWorkspace,
   listDemoPages,
+  registerSessionPath,
 } from "./fs-utils";
 import {
   getOrCreateProjectActiveWorkspace,
@@ -462,6 +463,7 @@ export async function createEditSession(
   const sessionPath = path.join(sessionDir, sessionId);
 
   fs.mkdirSync(sessionPath, { recursive: true });
+  registerSessionPath(sessionId, sessionPath);
 
   const latestVersion = getLatestVersion(projectId);
 

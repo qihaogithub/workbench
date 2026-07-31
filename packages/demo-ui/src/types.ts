@@ -137,6 +137,20 @@ export interface PreviewPanelProps {
   ) => void;
   /** 当前是否有自动修复正在进行中，控制"正在修复预览"覆盖层的显示 */
   isAutoRepairing?: boolean;
+  /** 位置编辑模式配置，设置 enabled: true 进入编辑模式 */
+  positionEditMode?: PositionEditMode;
+  /** 位置编辑模式下的置灰开关状态 */
+  positionEditDimming?: boolean;
+  /** 位置编辑模式下元素拖拽结果回调 */
+  onPositionChange?: (key: string, x: number, y: number) => void;
+  /** 位置编辑模式退出回调 */
+  onPositionEditExit?: () => void;
+}
+
+export interface PositionEditMode {
+  enabled: boolean;
+  items: string[];
+  positions: Record<string, { x: number; y: number }>;
 }
 
 export interface ConfigFormProps {
@@ -150,6 +164,11 @@ export interface ConfigFormProps {
   positionableItemSizes?: Record<string, PositionableSizeItem>;
   configCategoryFilter?: string;
   typeLimits?: Record<string, number>;
+  onEnterPositionEdit?: (items: string[], positions: Record<string, { x: number; y: number }>) => void;
+  onExitPositionEdit?: () => void;
+  positionEditActive?: boolean;
+  positionEditDimming?: boolean;
+  onTogglePositionDimming?: () => void;
 }
 
 export type PreviewMode = "single" | "canvas";

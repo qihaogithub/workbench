@@ -53,7 +53,8 @@ export function createListImagesTool(config: AgentConfig): AgentTool {
             const imageIdMatch = img.url?.match(/\/api\/images\/(img_[a-zA-Z0-9_-]+)/);
             const imageId = imageIdMatch ? imageIdMatch[1] : undefined;
             const idPart = imageId ? ` imageId=${imageId}` : "";
-            return `- ${img.filename} → ${img.url} (${img.format}, ${(img.size / 1024).toFixed(1)}KB, added by ${img.createdBy})${idPart}`;
+            const dims = img.width != null && img.height != null ? `, ${img.width}×${img.height}` : "";
+            return `- ${img.filename} → ${img.url} (${img.format}, ${(img.size / 1024).toFixed(1)}KB${dims}, added by ${img.createdBy})${idPart}`;
           })
           .join('\n');
 

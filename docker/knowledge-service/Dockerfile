@@ -1,4 +1,4 @@
-FROM node:20-bookworm AS builder
+FROM node:20-bookworm-slim AS builder
 
 RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
 
@@ -16,7 +16,11 @@ COPY packages/knowledge-service/ ./packages/knowledge-service/
 
 RUN pnpm --filter @workbench/knowledge-service build:docker
 
-FROM node:20-bookworm AS runtime-deps
+FROM node:20-bookworm-slim AS runtime-deps
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

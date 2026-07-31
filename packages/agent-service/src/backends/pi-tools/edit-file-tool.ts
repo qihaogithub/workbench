@@ -16,6 +16,7 @@ import {
 } from "../../workspace/workspace-mutation-authority";
 import { getHocuspocusCollabServer } from "../../collab/hocuspocus-server";
 import { resolveCollabResourceKind } from "../../collab/workspace-file-persistence";
+import { compileConfigTs } from "@workbench/shared";
 
 // ---------------------------------------------------------------------------
 // Line ending & BOM utilities (aligned with pi-agent edit-diff.ts)
@@ -642,11 +643,76 @@ export function createEditFileTool(
         );
         const validationText =
           formatRuntimeValidationInstruction(runtimeValidation);
+
+        let schemaCompileError: string | undefined;
+        const configTsMatch = args.path.match(
+          /^(demos\/[^/]+\/|project\.)config\.ts$/,
+        );
+        if (configTsMatch) {
+          const schemaPath = configTsMatch[1]
+            ? `${configTsMatch[1]}config.schema.json`
+            : "project.config.schema.json";
+          try {
+            const compiled = compileConfigTs(newContent);
+            if (liveWorkspace && receipt) {
+              const existingSchema = snapshot?.resources?.[schemaPath] ?? null;
+              await liveWorkspace.authority.mutate({
+                mutationId: crypto.randomUUID(),
+                projectId: liveWorkspace.projectId,
+                workspaceId: liveWorkspace.workspaceId,
+                sessionId: config.sessionId,
+                baseRevision: receipt.revision,
+                actor: "ai",
+                reason: "compile_config_ts_to_schema",
+                operations: [
+                  {
+                    type: "put_text",
+                    path: schemaPath,
+                    content: compiled,
+                    ...(existingSchema === null
+                      ? { expectedAbsent: true }
+                      : {
+                          expectedHash: crypto
+                            .createHash("sha256")
+                            .update(existingSchema)
+                            .digest("hex"),
+                        }),
+                  },
+                ],
+              });
+            } else {
+              const fullPath = path.resolve(
+                config.workingDir || ".",
+                schemaPath,
+              );
+              await fs.promises.mkdir(path.dirname(fullPath), {
+                recursive: true,
+              });
+              await fs.promises.writeFile(fullPath, compiled, "utf-8");
+            }
+            logger.info(
+              { configPath: args.path, schemaPath },
+              "config.ts compiled to config.schema.json via editFile",
+            );
+          } catch (err) {
+            logger.warn(
+              { err: String(err), path: args.path },
+              "config.ts compilation failed in editFile",
+            );
+            schemaCompileError =
+              err instanceof Error ? err.message : String(err);
+          }
+        }
+
+        const schemaCompileText = schemaCompileError
+          ? `\n\n⚠️ config.ts 编译 config.schema.json 失败: ${schemaCompileError}\n已保存 config.ts 但未更新 config.schema.json，请检查 config.ts 格式。`
+          : "";
+
         return {
           content: [
             {
               type: "text",
-              text: `Successfully replaced ${edits.length} block(s) in ${args.path} starting at line ${lineNumber} (${totalOldLines} line(s) replaced with ${totalNewLines} line(s))${fuzzyNote}${validationText}`,
+              text: `Successfully replaced ${edits.length} block(s) in ${args.path} starting at line ${lineNumber} (${totalOldLines} line(s) replaced with ${totalNewLines} line(s))${fuzzyNote}${validationText}${schemaCompileText}`,
             },
           ],
           details: {
@@ -658,6 +724,7 @@ export function createEditFileTool(
             usedFuzzyMatch,
             runtimeValidation,
             receipt,
+            schemaCompileError,
           },
         };
       } catch (error) {

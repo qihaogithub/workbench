@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
-import { ChevronDown, Info, Sparkles } from "lucide-react";
+import { ChevronDown, Info, Pencil, Sparkles } from "lucide-react";
 import { cn } from "./utils";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -152,6 +152,11 @@ function PositionControl({
   onPositionsChange,
   previewSize,
   itemSizes,
+  onEnterPositionEdit,
+  onExitPositionEdit,
+  positionEditActive,
+  dimming,
+  onToggleDimming,
 }: {
   positionable: { items: string[]; defaults?: Record<string, { x: number; y: number }>; size?: { width: number; height: number } };
   positions: Record<string, { x: number; y: number }>;
@@ -160,62 +165,20 @@ function PositionControl({
   onPositionsChange: (newPositions: Record<string, { x: number; y: number }>) => void;
   previewSize?: { width?: number | string; height?: number | string };
   itemSizes?: Record<string, { width: number; height: number }>;
+  onEnterPositionEdit?: (items: string[], positions: Record<string, { x: number; y: number }>) => void;
+  onExitPositionEdit?: () => void;
+  positionEditActive?: boolean;
+  dimming?: boolean;
+  onToggleDimming?: () => void;
 }) {
   const [open, setOpen] = useState(true);
-  const [draggingKey, setDraggingKey] = useState<string | null>(null);
-  const canvasRef = useRef<HTMLDivElement>(null);
 
-  // Calculate canvas dimensions based on positionable.size if provided, otherwise previewSize
-  const MAX_CANVAS_WIDTH = 280;
-  const MAX_CANVAS_HEIGHT = 200;
   const containerWidth =
     positionable.size?.width ??
     (typeof previewSize?.width === "number" ? previewSize.width : 800);
   const containerHeight =
     positionable.size?.height ??
     (typeof previewSize?.height === "number" ? previewSize.height : 600);
-  const aspectRatio = containerWidth / containerHeight;
-
-  let CANVAS_WIDTH: number, CANVAS_HEIGHT: number;
-  if (MAX_CANVAS_WIDTH / aspectRatio <= MAX_CANVAS_HEIGHT) {
-    CANVAS_WIDTH = MAX_CANVAS_WIDTH;
-    CANVAS_HEIGHT = Math.round(MAX_CANVAS_WIDTH / aspectRatio);
-  } else {
-    CANVAS_HEIGHT = MAX_CANVAS_HEIGHT;
-    CANVAS_WIDTH = Math.round(MAX_CANVAS_HEIGHT * aspectRatio);
-  }
-
-  // Scale factor: canvas pixels → container pixels
-  const scaleFactor = CANVAS_WIDTH / containerWidth;
-
-  const handleCanvasMouseDown = (key: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    setDraggingKey(key);
-  };
-
-  const handleCanvasMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      if (!draggingKey || !canvasRef.current) return;
-      const rect = canvasRef.current.getBoundingClientRect();
-      const canvasX = Math.max(0, Math.min(e.clientX - rect.left, CANVAS_WIDTH));
-      const canvasY = Math.max(0, Math.min(e.clientY - rect.top, CANVAS_HEIGHT));
-      let x = Math.round(canvasX / scaleFactor);
-      let y = Math.round(canvasY / scaleFactor);
-      // 根据元素尺寸约束有效拖拽范围
-      const elementWidth = itemSizes?.[draggingKey]?.width ?? 0;
-      const elementHeight = itemSizes?.[draggingKey]?.height ?? 0;
-      const maxX = containerWidth - elementWidth;
-      const maxY = containerHeight - elementHeight;
-      x = Math.max(0, Math.min(x, maxX));
-      y = Math.max(0, Math.min(y, maxY));
-      onPositionsChange({ ...positions, [draggingKey]: { x, y } });
-    },
-    [draggingKey, positions, onPositionsChange, scaleFactor, CANVAS_WIDTH, CANVAS_HEIGHT, containerWidth, containerHeight, itemSizes],
-  );
-
-  const handleCanvasMouseUp = useCallback(() => {
-    setDraggingKey(null);
-  }, []);
 
   const handleCoordChange = (key: string, axis: "x" | "y", value: string) => {
     const num = parseInt(value, 10);
@@ -237,11 +200,15 @@ function PositionControl({
     onPositionsChange(reset);
   };
 
-  const isDefault = JSON.stringify(positions) === JSON.stringify(defaultPositions);
+  const handleToggleEdit = () => {
+    if (positionEditActive) {
+      onExitPositionEdit?.();
+    } else {
+      onEnterPositionEdit?.(positionable.items, positions);
+    }
+  };
 
-  // Grid lines at regular intervals in container space (100px)
-  const gridInterval = 100;
-  const canvasGridInterval = gridInterval * scaleFactor;
+  const isDefault = JSON.stringify(positions) === JSON.stringify(defaultPositions);
 
   return (
     <div className="py-2">
@@ -263,68 +230,49 @@ function PositionControl({
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="pl-4 pr-2 pt-1 pb-2 space-y-2">
-            {/* Container info */}
-            <div className="flex items-center justify-between text-[10px] text-muted-foreground/60">
-              <span>容器: {containerWidth} × {containerHeight} px</span>
-              <span>坐标相对于容器左上角</span>
-            </div>
-
-            {/* Mini canvas (scaled representation of the parent container) */}
-            <div
-              ref={canvasRef}
-              className="relative border border-border rounded-md bg-muted/20 cursor-crosshair"
-              style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
-              onMouseMove={handleCanvasMouseMove}
-              onMouseUp={handleCanvasMouseUp}
-              onMouseLeave={handleCanvasMouseUp}
-            >
-              {/* Grid lines (based on container space) */}
-              <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: 0.15 }}>
-                {Array.from({ length: Math.floor(containerWidth / gridInterval) }, (_, i) => (
-                  <line key={`v${i}`} x1={(i + 1) * canvasGridInterval} y1={0} x2={(i + 1) * canvasGridInterval} y2={CANVAS_HEIGHT} stroke="currentColor" strokeWidth={0.5} />
-                ))}
-                {Array.from({ length: Math.floor(containerHeight / gridInterval) }, (_, i) => (
-                  <line key={`h${i}`} x1={0} y1={(i + 1) * canvasGridInterval} x2={CANVAS_WIDTH} y2={(i + 1) * canvasGridInterval} stroke="currentColor" strokeWidth={0.5} />
-                ))}
-              </svg>
-
-              {/* Draggable items (positions scaled from container to canvas) */}
-              {positionable.items.map((key) => {
-                const pos = positions[key] || { x: 0, y: 0 };
-                const canvasX = pos.x * scaleFactor;
-                const canvasY = pos.y * scaleFactor;
-                const size = itemSizes?.[key];
-                // 按比例渲染元素实际形状
-                const canvasW = size ? size.width * scaleFactor : undefined;
-                const canvasH = size ? size.height * scaleFactor : undefined;
-                const hasSize = size && size.width > 0 && size.height > 0;
-                return (
-                  <div
-                    key={key}
-                    className={`absolute flex items-center justify-center text-[10px] font-medium border cursor-grab active:cursor-grabbing select-none transition-shadow ${
-                      draggingKey === key
-                        ? "bg-primary/20 text-primary border-primary shadow-md z-10"
-                        : "bg-background/80 text-foreground border-border shadow-sm hover:border-primary/50"
-                    }`}
-                    style={{
-                      left: canvasX,
-                      top: canvasY,
-                      ...(hasSize ? { width: canvasW, height: canvasH } : { padding: '2px 6px' }),
-                      borderRadius: 2,
-                    }}
-                    onMouseDown={(e) => handleCanvasMouseDown(key, e)}
-                  >
-                    {hasSize ? (
-                      <span className="truncate overflow-hidden text-center leading-none" style={{ fontSize: Math.min(10, (canvasW ?? 60) / (titleMap[key]?.length ?? 4) * 1.5) }}>{titleMap[key] || key}</span>
-                    ) : (
-                      <span className="truncate max-w-[60px]">{titleMap[key] || key}</span>
-                    )}
+            {/* 模式状态栏 + 编辑位置按钮 */}
+            <div className="space-y-2">
+              {positionEditActive && (
+                <div className="flex items-center justify-between gap-2 bg-accent/20 rounded px-2 py-1.5">
+                  <span className="text-xs font-medium text-foreground">位置编辑中</span>
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-1 text-[10px] text-muted-foreground cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={dimming ?? true}
+                        onChange={() => onToggleDimming?.()}
+                        className="h-3 w-3 cursor-pointer accent-primary"
+                      />
+                      置灰
+                    </label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 text-xs px-2"
+                      onClick={() => onExitPositionEdit?.()}
+                    >
+                      完成
+                    </Button>
                   </div>
-                );
-              })}
+                </div>
+              )}
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground/60">
+                <span>容器: {containerWidth} × {containerHeight} px</span>
+                {!positionEditActive && onEnterPositionEdit && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 text-xs px-2"
+                    onClick={handleToggleEdit}
+                  >
+                    <Pencil className="h-3 w-3 mr-1" />
+                    编辑
+                  </Button>
+                )}
+              </div>
             </div>
 
-            {/* Coordinate inputs */}
+            {/* 坐标输入 */}
             <div className="space-y-1">
               {positionable.items.map((key) => {
                 const pos = positions[key] || { x: 0, y: 0 };
@@ -392,6 +340,11 @@ export function ConfigForm({
   configCategoryFilter,
   typeLimits,
   className,
+  onEnterPositionEdit,
+  onExitPositionEdit,
+  positionEditActive,
+  positionEditDimming,
+  onTogglePositionDimming,
 }: ConfigFormProps) {
   const [formData, setFormData] = useState<Record<string, unknown>>(
     initialData || {},
@@ -493,6 +446,13 @@ export function ConfigForm({
             merged[key] = value;
             changed = true;
           }
+        }
+        if (
+          "__positions" in initialData &&
+          !areConfigValuesEqual(prev.__positions, initialData.__positions)
+        ) {
+          merged.__positions = initialData.__positions;
+          changed = true;
         }
         if (!changed) return prev;
         console.log(
@@ -654,6 +614,11 @@ export function ConfigForm({
                 onPositionsChange={handlePositionsChange}
                 previewSize={previewSize}
                 itemSizes={positionableItemSizes}
+                onEnterPositionEdit={onEnterPositionEdit}
+                onExitPositionEdit={onExitPositionEdit}
+                positionEditActive={positionEditActive}
+                dimming={positionEditDimming}
+                onToggleDimming={onTogglePositionDimming}
               />
               <Separator className="my-2" />
             </>

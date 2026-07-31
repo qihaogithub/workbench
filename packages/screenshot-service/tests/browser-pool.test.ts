@@ -66,20 +66,20 @@ describe("BrowserPool", () => {
 
     const { getBrowserPool } = await import("../src/utils/browser-pool");
     const pool = getBrowserPool();
-    const tasks = Array.from({ length: 4 }, () =>
+    const tasks = Array.from({ length: 5 }, () =>
       pool.renderPage("<div id=\"root\">ok</div>", 100, 100, false),
     );
 
     const results = await Promise.all(tasks);
 
-    expect(results).toHaveLength(4);
+    expect(results).toHaveLength(5);
     expect(results[0].renderTimings).toMatchObject({
       browserMs: expect.any(Number),
       pageCreateMs: expect.any(Number),
       setContentMs: expect.any(Number),
       screenshotMs: expect.any(Number),
     });
-    expect(counters.max).toBeLessThanOrEqual(3);
+    expect(counters.max).toBeLessThanOrEqual(4);
   });
 
   it("队列等待超过阈值时返回 QUEUE_TIMEOUT", async () => {
@@ -99,12 +99,12 @@ describe("BrowserPool", () => {
 
     const { getBrowserPool } = await import("../src/utils/browser-pool");
     const pool = getBrowserPool();
-    const tasks = Array.from({ length: 4 }, () =>
+    const tasks = Array.from({ length: 5 }, () =>
       pool.renderPage("<div id=\"root\">ok</div>", 100, 100, false),
     );
 
-    await expect(tasks[3]).rejects.toMatchObject({ code: "QUEUE_TIMEOUT" });
-    await Promise.allSettled(tasks.slice(0, 3));
+    await expect(tasks[4]).rejects.toMatchObject({ code: "QUEUE_TIMEOUT" });
+    await Promise.allSettled(tasks.slice(0, 4));
   });
 
   it("队列有空位时优先执行高优先级截图任务", async () => {
@@ -154,7 +154,7 @@ describe("BrowserPool", () => {
 
     const { getBrowserPool } = await import("../src/utils/browser-pool");
     const pool = getBrowserPool();
-    const blockingTasks = Array.from({ length: 3 }, (_, index) =>
+    const blockingTasks = Array.from({ length: 4 }, (_, index) =>
       pool.renderPage(`<div id="root">blocking-${index}</div>`, 100, 100, false),
     );
     const backgroundTask = pool.renderPage(
@@ -173,7 +173,7 @@ describe("BrowserPool", () => {
     );
 
     await vi.waitFor(() => {
-      expect(setContentOrder).toHaveLength(3);
+      expect(setContentOrder).toHaveLength(4);
     });
     releaseBlockingTasks?.();
     await Promise.all([...blockingTasks, backgroundTask, activeTask]);

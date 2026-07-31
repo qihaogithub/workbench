@@ -31,6 +31,13 @@ export class MissingTransactionalDeleteToolsError extends Error {
   }
 }
 
+function extractRawUserMessage(message: string): string {
+  const marker = "[历史结束]";
+  const idx = message.lastIndexOf(marker);
+  if (idx === -1) return message;
+  return message.slice(idx + marker.length).trimStart();
+}
+
 function isBulkPageDeletionRequest(message: string): boolean {
   return (
     /删|删除|清理/.test(message) &&
@@ -246,8 +253,9 @@ export class StreamService {
     }
 
     const toolCapabilities = await fetchToolCapabilities();
+    const rawUserMessage = extractRawUserMessage(message);
     if (
-      isBulkPageDeletionRequest(message) &&
+      isBulkPageDeletionRequest(rawUserMessage) &&
       !hasTransactionalDeleteTools(toolCapabilities)
     ) {
       throw new MissingTransactionalDeleteToolsError();

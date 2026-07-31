@@ -33,6 +33,7 @@ import {
 const DEFAULT_PREVIEW_CDN_BASE = "https://esm.sh";
 const NO_ACTIVE_PREVIEW_REQUEST_ID = -1;
 const COMPILE_DEADLINE_MS = 15_000;
+const COMPILE_DEBOUNCE_MS = 250;
 const SHELL_DEADLINE_MS = 10_000;
 const RENDER_DEADLINE_MS = 15_000;
 
@@ -274,6 +275,10 @@ function PreviewPanelInternal({
   onVisualInlineEdit,
   onVisualAnnotationCreate,
   isAutoRepairing,
+  positionEditMode,
+  positionEditDimming,
+  onPositionChange,
+  onPositionEditExit,
 }: PreviewPanelProps) {
   console.count("[perf] PreviewPanel render");
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -347,6 +352,8 @@ function PreviewPanelInternal({
 
   const configDataRef = useRef(configData);
   configDataRef.current = configData;
+  const positionEditDimmingRef = useRef(positionEditDimming);
+  positionEditDimmingRef.current = positionEditDimming;
   const appStateRef = useRef(appState);
   appStateRef.current = appState;
   const routeParamsRef = useRef(routeParams);
@@ -357,6 +364,8 @@ function PreviewPanelInternal({
   onErrorRef.current = onError;
   const onConsoleEntryRef = useRef(onConsoleEntry);
   onConsoleEntryRef.current = onConsoleEntry;
+  const prevPositionEditEnabledRef = useRef(positionEditMode?.enabled ?? false);
+  const skipConfigUpdateOnExitRef = useRef(false);
 
   const isSleeping = activityState === "sleeping";
   const resolvedCdnBaseUrl = getPreviewCdnBaseUrl(cdnBaseUrl);
@@ -888,9 +897,10 @@ function PreviewPanelInternal({
       }
     };
 
-    compile();
+    const debounceTimer = setTimeout(compile, COMPILE_DEBOUNCE_MS);
 
     return () => {
+      clearTimeout(debounceTimer);
       cancelled = true;
       abortController.abort();
       dispatchRequest({ type: "CANCEL", requestId });
@@ -956,8 +966,58 @@ function PreviewPanelInternal({
     return () => window.clearTimeout(timer);
   }, [demoId, isSleeping, reportTiming, requestState]);
 
+  // 位置编辑模式进入/退出（在 configData effect 之前声明，确保 EXIT_POSITION_EDIT
+  // 先于 UPDATE_CONFIG 到达 iframe，iframe 先清理 dimming/data-pos-key 再重渲染）
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe || !iframe.contentWindow) return;
+    if (activityState === "sleeping") return;
+
+    const wasEnabled = prevPositionEditEnabledRef.current;
+    const isEnabled = positionEditMode?.enabled ?? false;
+    prevPositionEditEnabledRef.current = isEnabled;
+
+    if (isEnabled) {
+      iframe.contentWindow.postMessage(
+        {
+          type: "ENTER_POSITION_EDIT",
+          items: positionEditMode!.items,
+          positions: positionEditMode!.positions,
+        },
+        "*",
+      );
+    } else if (wasEnabled) {
+      skipConfigUpdateOnExitRef.current = true;
+      iframe.contentWindow.postMessage({ type: "EXIT_POSITION_EDIT" }, "*");
+      if (iframeReadyRef.current) {
+        sendUpdateConfig(configDataRef.current || {});
+      }
+    }
+  }, [positionEditMode, activityState, sendUpdateConfig]);
+
   useEffect(() => {
     if (!iframeReady) return;
+
+    // 退出位置编辑模式时的 UPDATE_CONFIG 已由 positionEditMode effect 发送，避免重复
+    if (skipConfigUpdateOnExitRef.current) {
+      skipConfigUpdateOnExitRef.current = false;
+      return;
+    }
+
+    // 位置编辑模式下：发送轻量 APPLY_POSITIONS 替代全量 UPDATE_CONFIG
+    if (positionEditMode?.enabled) {
+      const positions = configData?.__positions as Record<string, { x: number; y: number }> | undefined;
+      if (positions) {
+        const iframe = iframeRef.current;
+        if (iframe && iframe.contentWindow) {
+          iframe.contentWindow.postMessage(
+            { type: "APPLY_POSITIONS", positions },
+            "*",
+          );
+        }
+      }
+      return;
+    }
 
     if (isUrlMode && compiledJsUrl) {
       sendUpdateConfig(configData || {});
@@ -990,6 +1050,7 @@ function PreviewPanelInternal({
     contentLoaded,
     onPositionableSizes,
     sendCollectPositionableSizes,
+    positionEditMode,
   ]);
 
   useEffect(() => {
@@ -1226,6 +1287,22 @@ function PreviewPanelInternal({
             );
           }
           break;
+
+        case "POSITION_CHANGE":
+          if (typeof event.data?.key === "string") {
+            onPositionChange?.(
+              event.data.key,
+              Number(event.data.x) || 0,
+              Number(event.data.y) || 0,
+            );
+          }
+          break;
+
+        case "POSITION_EDIT_READY":
+          if (event.data?.active === false) {
+            onPositionEditExit?.();
+          }
+          break;
       }
     };
 
@@ -1341,6 +1418,17 @@ function PreviewPanelInternal({
       parent = parent.parentElement;
     }
   }, [previewSize, demoId]);
+
+  // 置灰开关变化时，通知 iframe 切换置灰 CSS
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe || !iframe.contentWindow) return;
+    if (!positionEditMode?.enabled) return;
+    iframe.contentWindow.postMessage(
+      { type: "TOGGLE_POSITION_DIMMING", enabled: positionEditDimming ?? true },
+      "*",
+    );
+  }, [positionEditDimming, positionEditMode]);
 
   useEffect(() => {
     const iframe = iframeRef.current;

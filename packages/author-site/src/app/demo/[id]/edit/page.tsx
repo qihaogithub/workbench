@@ -828,6 +828,34 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     [],
   );
 
+  const [positionEditMode, setPositionEditMode] = useState<{
+    enabled: boolean;
+    items: string[];
+    positions: Record<string, { x: number; y: number }>;
+  }>({ enabled: false, items: [], positions: {} });
+
+  const [positionEditDimming, setPositionEditDimming] = useState(true);
+
+  const handleEnterPositionEdit = useCallback(
+    (items: string[], positions: Record<string, { x: number; y: number }>) => {
+      setPositionEditMode({ enabled: true, items, positions });
+      setPositionEditDimming(true);
+    },
+    [],
+  );
+
+  const handleExitPositionEdit = useCallback(() => {
+    setPositionEditMode({ enabled: false, items: [], positions: {} });
+  }, []);
+
+  const handleTogglePositionDimming = useCallback(() => {
+    setPositionEditDimming((prev) => !prev);
+  }, []);
+
+  const handlePageConfigPanelChangeRef = useRef<
+    (pageId: string, data: Record<string, unknown>) => void
+  >(() => {});
+
   const [validationResult, setValidationResult] = useState<ValidationResult>({
     isValid: true,
     errors: [],
@@ -3669,6 +3697,21 @@ ${context.details}
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [demoPages, pageCodes],
+  );
+
+  handlePageConfigPanelChangeRef.current = handlePageConfigPanelChange;
+
+  const handlePositionChange = useCallback(
+    (key: string, x: number, y: number) => {
+      const pageId = activeDemoIdRef.current;
+      if (!pageId) return;
+      const currentConfig = configDataMapRef.current[pageId] || {};
+      const currentPositions =
+        (currentConfig.__positions as Record<string, { x: number; y: number }>) || {};
+      const newPositions = { ...currentPositions, [key]: { x, y } };
+      handlePageConfigPanelChangeRef.current(pageId, { __positions: newPositions });
+    },
+    [],
   );
 
   const handleProjectConfigPanelChange = useCallback(
@@ -7453,6 +7496,10 @@ ${context.details}
                           }
                         }
                       },
+                      positionEditMode,
+                      positionEditDimming,
+                      onPositionChange: handlePositionChange,
+                      onPositionEditExit: handleExitPositionEdit,
                     },
                   },
                 }}
@@ -7709,6 +7756,11 @@ ${context.details}
                         sessionId={sessionId}
                         positionableItemSizes={positionableItemSizes}
                         hideDetailHeader
+                        onEnterPositionEdit={handleEnterPositionEdit}
+                        onExitPositionEdit={handleExitPositionEdit}
+                        positionEditActive={positionEditMode.enabled}
+                        positionEditDimming={positionEditDimming}
+                        onTogglePositionDimming={handleTogglePositionDimming}
                       />
                     </TabsContent>
                     <TabsContent
@@ -7777,6 +7829,11 @@ ${context.details}
                   onRestoreDefaults={handleRestoreDefaults}
                   sessionId={sessionId}
                   positionableItemSizes={positionableItemSizes}
+                  onEnterPositionEdit={handleEnterPositionEdit}
+                  onExitPositionEdit={handleExitPositionEdit}
+                  positionEditActive={positionEditMode.enabled}
+                  positionEditDimming={positionEditDimming}
+                  onTogglePositionDimming={handleTogglePositionDimming}
                 />
               )}
             </ResizablePanel>

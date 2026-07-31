@@ -332,6 +332,7 @@ export * from "./external-auth";
 export * from "./diagnostics";
 export * from "./ai-error-normalizer";
 export * from "./comment";
+export { compileConfigTs, ConfigCompileError, decompileSchema } from "./config-compiler";
 
 /** 图片附件，Base64 编码 */
 export interface ImageAttachment {

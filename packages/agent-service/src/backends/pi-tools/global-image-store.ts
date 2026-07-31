@@ -47,6 +47,8 @@ export interface UploadImageResult {
   sha256: string;
   filename: string;
   sizeBytes: number;
+  width?: number;
+  height?: number;
   mimeType: string;
   deduplicated: boolean;
 }
@@ -206,6 +208,8 @@ export function uploadToGlobalImageStore(params: {
       sha256: existing.sha256,
       filename: existing.filename,
       sizeBytes: existing.sizeBytes,
+      width: existing.width,
+      height: existing.height,
       mimeType: existing.mimeType,
       deduplicated: true,
     };
@@ -248,6 +252,8 @@ export function uploadToGlobalImageStore(params: {
     sha256,
     filename,
     sizeBytes: buffer.length,
+    width: dimensions.width,
+    height: dimensions.height,
     mimeType,
     deduplicated: false,
   };

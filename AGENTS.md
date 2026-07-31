@@ -2,6 +2,12 @@
 
 > 面向 AI 编码代理的项目工作指南。目标是让后续代理能快速判断改动边界、选择正确工具、运行合适验证，并避免被历史目录或过期脚本误导。
 
+## 设备记忆
+
+根目录 `memory.md` 是设备级记忆文件，不在 git 中追踪（已在 `.gitignore`）。每台设备从 `memory.example.md` 复制并填入本地特有内容（命令别名、已知坑点、个人偏好等）。
+
+AI agent 在启动任务前应优先读取 `memory.md`（如果存在），以获取本机特有上下文。
+
 <!-- CODEGRAPH_START -->
 
 ## CodeGraph
@@ -369,21 +375,33 @@ Docker：
 
 OrbStack 代理配置（开发必备）：
 
-OrbStack `network_proxy` 如果在 VM 启动前就指向宿主机桥接 IP（`192.168.139.3`），会导致 VM 启不动（桥接由 OrbStack 自己创建，启动时尚未就绪，死锁）。解决方案是**运行时注入**：
+OrbStack `network_proxy` 如果在 VM 启动前就指向宿主机桥接 IP（`192.168.139.3`），会导致 VM 启不动（桥接由 OrbStack 自己创建，启动时尚未就绪，死锁）。使用 launchd 自动代理守护进程根治：
 
 ```bash
-# 正常开发时保持 none（VM 总能启动）
+# 查看代理守护状态
+launchctl list | grep orbstack-proxy
+
+# 日志
+tail -f ~/.local/state/orbstack-proxy-watch.log
+```
+
+工作原理：
+- `~/Library/LaunchAgents/com.workbench.orbstack-proxy.plist` 注册了 launchd 用户代理
+- `~/.local/bin/orbstack-proxy-watch.sh` 每 5 秒检测 `~/.orbstack/run/docker.sock`
+- Docker 运行时 → 自动设置 `network_proxy`；Docker 停止时 → 自动恢复 `none`
+- 避免 VM 重启时因持久化代理配置导致死锁
+
+手动覆盖代理（临时）：
+```bash
+# 临时关闭（10 秒内自动恢复）
 orb config set network_proxy none
 
-# 需要拉镜像/重新构建时，一行注入代理即可生效（无需重启）
-orb config set network_proxy "http://192.168.139.3:7892"
-
-# 重建部署完成后可恢复（可选，但推荐恢复以避免下次重启卡死）
-orb config set network_proxy none
+# 临时切换代理地址
+orb config set network_proxy "http://192.168.139.3:7890"
 ```
 
 前提条件：
-- Clash（mihomo-party）必须开启 Allow LAN，监听 `0.0.0.0:7892`（混合端口，需支持 HTTPS CONNECT）
+- Clash（mihomo-party）必须开启 Allow LAN，监听 `0.0.0.0:7890`（混合端口，需支持 HTTPS CONNECT）
 - `~/.orbstack/config/docker.json` 应保持干净（`{}`），不要混入 `http-proxy` 字段（OrbStack 不会用 Docker daemon 级代理配置）
 - 所有国内免费 Docker Hub 镜像源（daocloud、dockerhub.icu、163、aliyun、1ms.run 等）已全部失效，不要折腾
 

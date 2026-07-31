@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as path from 'path';
+import * as fs from 'fs';
 import { PermissionManager, isKnowledgeBasePath } from '../../src/backends/managers/permission-manager';
 import type { AgentConfig, AgentEvent } from '../../src/core/types';
 
@@ -51,6 +52,43 @@ describe('PermissionManager', () => {
 
     it('对工作空间内普通文件的写操作应放行', () => {
       expect(manager.validateToolCall('writeFile', { path: 'demos/page.tsx' })).toBeUndefined();
+    });
+
+    it('应拦截 writeFile 到被 config.ts 遮蔽的 config.schema.json', () => {
+      const result = manager.validateToolCall('writeFile', {
+        path: 'demos/page-1/config.schema.json',
+      });
+      expect(result).toEqual({
+        block: true,
+        reason: expect.stringContaining('config.ts'),
+      });
+    });
+
+    it('应拦截 editFile 到被 config.ts 遮蔽的 config.schema.json', () => {
+      const result = manager.validateToolCall('editFile', {
+        path: 'demos/page-1/config.schema.json',
+      });
+      expect(result).toEqual({
+        block: true,
+        reason: expect.stringContaining('config.ts'),
+      });
+    });
+
+    it('当 config.ts 不存在时应放行 writeFile 到 config.schema.json', () => {
+      (fs.existsSync as any).mockReturnValueOnce(false);
+      expect(
+        manager.validateToolCall('writeFile', {
+          path: 'demos/page-1/config.schema.json',
+        }),
+      ).toBeUndefined();
+    });
+
+    it('应放行 readFile 到被遮蔽的 config.schema.json（允许参考）', () => {
+      expect(
+        manager.validateToolCall('readFile', {
+          path: 'demos/page-1/config.schema.json',
+        }),
+      ).toBeUndefined();
     });
   });
 
