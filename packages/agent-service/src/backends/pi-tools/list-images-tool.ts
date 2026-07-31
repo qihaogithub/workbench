@@ -7,7 +7,9 @@ import {
   getProjectImageManifestPath,
   readProjectImageManifest,
   resolveProjectImageManifestProjectId,
+  addProjectImageManifestEntry,
 } from './project-image-manifest';
+import { findImageDimensionsBySha256 } from './global-image-store';
 
 const ListImagesParams = Type.Object({});
 
@@ -48,13 +50,42 @@ export function createListImagesTool(config: AgentConfig): AgentTool {
           };
         }
 
-        const imageList = manifest.images
+        let enriched = false;
+        const images = manifest.images.map((img) => {
+          if (img.width == null || img.height == null) {
+            const dims = img.contentHash
+              ? findImageDimensionsBySha256(img.contentHash)
+              : {};
+            if (dims.width != null && dims.height != null) {
+              img.width = dims.width;
+              img.height = dims.height;
+              enriched = true;
+            }
+          }
+          return img;
+        });
+
+        if (enriched) {
+          try {
+            for (const img of images) {
+              addProjectImageManifestEntry(manifestProjectId, img);
+            }
+          } catch (writeError) {
+            logger.warn(
+              { projectId: manifestProjectId, error: writeError },
+              'listImages: failed to persist enriched dimensions to manifest',
+            );
+          }
+        }
+
+        const imageList = images
           .map((img) => {
             const imageIdMatch = img.url?.match(/\/api\/images\/(img_[a-zA-Z0-9_-]+)/);
             const imageId = imageIdMatch ? imageIdMatch[1] : undefined;
             const idPart = imageId ? ` imageId=${imageId}` : "";
             const dims = img.width != null && img.height != null ? `, ${img.width}×${img.height}` : "";
-            return `- ${img.filename} → ${img.url} (${img.format}, ${(img.size / 1024).toFixed(1)}KB${dims}, added by ${img.createdBy})${idPart}`;
+            const alt = img.alt ? ` 内容：${img.alt}` : "";
+            return `- ${img.filename} → ${img.url} (${img.format}, ${(img.size / 1024).toFixed(1)}KB${dims}, added by ${img.createdBy})${idPart}${alt}`;
           })
           .join('\n');
 
@@ -62,10 +93,10 @@ export function createListImagesTool(config: AgentConfig): AgentTool {
           content: [
             {
               type: 'text',
-              text: `Project images (${manifest.images.length} total):\n${imageList}`,
+              text: `Project images (${images.length} total):\n${imageList}`,
             },
           ],
-          details: { images: manifest.images },
+          details: { images },
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';

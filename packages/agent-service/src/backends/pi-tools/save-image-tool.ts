@@ -16,6 +16,7 @@ import {
 import {
   uploadToGlobalImageStore,
 } from './global-image-store';
+import { describeImageAlt } from '../../services/image-alt-generator';
 
 const SUPPORTED_FORMATS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']);
 
@@ -289,6 +290,7 @@ interface SaveBufferResult {
   sha256?: string;
   width?: number;
   height?: number;
+  alt?: string;
   error?: string;
   reused?: boolean;
 }
@@ -320,9 +322,34 @@ async function saveImageBuffer(
     return { success: false, error: result.error };
   }
 
+  let alt: string | undefined;
+
   if (manifestProjectId) {
+    const entryId = result.sha256.slice(0, 12);
+    const existingManifestEntry = findProjectImageManifestEntry(manifestProjectId, entryId);
+
+    alt = existingManifestEntry?.alt
+      || (await (async () => {
+        const base64Data = buffer.toString('base64');
+        const ext = path.extname(filename).slice(1).toLowerCase();
+        const mimeType = {
+          png: 'image/png',
+          jpg: 'image/jpeg',
+          jpeg: 'image/jpeg',
+          gif: 'image/gif',
+          webp: 'image/webp',
+          svg: 'image/svg+xml',
+        }[ext] || 'image/png';
+
+        return await describeImageAlt({
+          data: base64Data,
+          mimeType,
+          name: filename,
+        }) ?? undefined;
+      })());
+
     const entry: ProjectImageEntry = {
-      id: result.sha256.slice(0, 12),
+      id: entryId,
       filename: result.filename,
       url: result.url,
       size: result.sizeBytes,
@@ -335,6 +362,7 @@ async function saveImageBuffer(
       mimeType: result.mimeType,
       originalUrl,
       sourceType: source === 'session_asset' ? 'session_asset' : 'remote_url',
+      alt,
     };
     try {
       addProjectImageManifestEntry(manifestProjectId, entry);
@@ -355,6 +383,7 @@ async function saveImageBuffer(
     sha256: result.sha256.slice(0, 12),
     width: result.width,
     height: result.height,
+    alt,
     reused: result.deduplicated,
   };
 }
@@ -373,6 +402,7 @@ interface BatchSaveResult {
   size?: number;
   format?: string;
   sha256?: string;
+  alt?: string;
   error?: string;
   reused?: boolean;
 }
@@ -432,6 +462,7 @@ async function saveImageBatch(
         result.size = saveResult.size;
         result.format = saveResult.format;
         result.sha256 = saveResult.sha256;
+        result.alt = saveResult.alt;
         result.reused = saveResult.reused;
       } else {
         result.error = saveResult.error;
@@ -501,11 +532,37 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
             isError: true,
           };
         }
+
+        let assetAlt = entry.alt;
+        if (!assetAlt) {
+          try {
+            const buffer = await fs.promises.readFile(absolutePath);
+            const base64 = buffer.toString('base64');
+            const ext = path.extname(workspacePath).slice(1).toLowerCase();
+            const mimeType = {
+              png: 'image/png',
+              jpg: 'image/jpeg',
+              jpeg: 'image/jpeg',
+              gif: 'image/gif',
+              webp: 'image/webp',
+              svg: 'image/svg+xml',
+            }[ext] || 'image/png';
+            assetAlt = await describeImageAlt({ data: base64, mimeType, name: path.basename(workspacePath) }) ?? undefined;
+            if (assetAlt) {
+              entry.alt = assetAlt;
+              addProjectImageManifestEntry(manifestProjectId, entry);
+            }
+          } catch (err) {
+            logger.warn({ assetId, error: err }, 'saveImage: failed to generate alt for existing asset');
+          }
+        }
+
+        const altNote = assetAlt ? ` 图片内容：${assetAlt}` : '';
         return {
           content: [
             {
               type: 'text',
-              text: `Image already available: ${workspacePath}. Use ${getDemoRelativeAssetPathFromWorkspacePath(workspacePath)} in page files or /api/images/{imageId} for config schema defaults.`,
+              text: `Image already available: ${workspacePath}. Use ${getDemoRelativeAssetPathFromWorkspacePath(workspacePath)} in page files or /api/images/{imageId} for config schema defaults.${altNote}`,
             },
           ],
           details: {
@@ -520,6 +577,7 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
             source,
             sha256: entry.contentHash?.slice(0, 12) ?? entry.id,
             contentHash: entry.contentHash,
+            alt: assetAlt,
           },
         };
       }
@@ -619,6 +677,7 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
               size: r.size,
               format: r.format,
               sha256: r.sha256,
+              alt: r.alt,
               error: r.error,
               reused: r.reused,
             })),
@@ -660,7 +719,7 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
         content: [
           {
             type: 'text',
-            text: `Image saved: ${saveResult.url}${saveResult.reused ? ' (已存在，复用)' : ''}. Use ${saveResult.url} in page code (img src) and config.schema.json defaults.`,
+            text: `Image saved: ${saveResult.url}${saveResult.reused ? ' (已存在，复用)' : ''}. Use ${saveResult.url} in page code (img src) and config.schema.json defaults.${saveResult.alt ? ` 图片内容：${saveResult.alt}` : ''}`,
           },
         ],
         details: {
@@ -675,6 +734,7 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
           height: saveResult.height,
           source,
           sha256: saveResult.sha256,
+          alt: saveResult.alt,
           reused: saveResult.reused,
         },
       };
