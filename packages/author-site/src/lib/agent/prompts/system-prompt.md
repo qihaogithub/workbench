@@ -186,7 +186,7 @@ delegateTask({
 - 页面源码位于 `demos/{demoId}/prototype.html` 和 `demos/{demoId}/prototype.css`
 - 默认用语义 HTML + CSS 完成布局、视觉、响应式和 CSS 动效
 - 不写 `<script>`、内联事件处理器、`javascript:` URL 或需要任意 JS 执行的代码
-- 图片、链接和样式引用使用工作区内安全资源路径
+- 图片、链接和样式引用使用工作区内安全资源路径；`<img>` 标签必须带 `alt` 属性（值从 `saveImage` 返回或 `listImages` 查询获取）
 - 用户明确要求配置项时，同步维护 `config.schema.json`，并在 `prototype.html` 使用 `{{fieldKey}}` 或 `data-bind-*` 绑定
 - 原型页校验返回 `repair_prototype` 时，优先保留原型页并修复 HTML/CSS；只有返回或确认 `upgrade_to_high_fidelity` 时才切换高保真页
 
@@ -382,6 +382,19 @@ const pos = __positions as Record<string, { x: number; y: number }>;
 
 - 每次对话开始时，memory.md 内容会自动注入到首条消息中
 - 如需更新记忆，先用 `readPreinstalledSkill({ name: 'memory-maintenance' })` 读取完整维护规则
+
+## 项目公约 (convention.md)
+
+- 项目公约是用户维护的项目法律，AI 必须严格遵守
+- 每条消息都会自动注入项目公约（workspace/convention.md）和当前操作页面的公约（demos/{pageId}/convention.md）
+- 项目公约优先于本 prompt 中的通用规范（公约有明确要求时，以公约为准）
+
+### 公约修改限制
+
+- ❌ 禁止自动修改、整理、压缩、删除公约文件
+- ❌ 禁止在未收到用户明确指令时写入 convention.md
+- ✅ 仅在用户明确要求时（如"帮我写条公约"、"整理页面公约"、"润色这条公约"）才可编辑公约文件
+- 编辑公约时仅修改用户指定的部分，不要擅自改动其他内容
 
 ## 页面运行时类型转换
 

@@ -21,6 +21,7 @@ import {
   type ImageDescriberConfig,
   type VisionDescribeRequest,
 } from "../services/image-describer";
+import { setImageAltDescriber } from "../services/image-alt-generator";
 
 let _imageDescriberConfigUpdater: ((config: Partial<ImageDescriberConfig>) => void) | null = null;
 let _latestImageDescriberConfig: Partial<ImageDescriberConfig> = {};
@@ -183,6 +184,11 @@ export class PiAgentBackend implements IBackendAdapter {
       _currentImageDescriberConfig = this.imageDescriber.getConfig();
     };
     _currentImageDescriberConfig = this.imageDescriber.getConfig();
+
+    setImageAltDescriber(async (image) => {
+      const desc = await this.imageDescriber.describe([image]);
+      return desc || null;
+    });
   }
 
   private areSubagentsEnabled(): boolean {

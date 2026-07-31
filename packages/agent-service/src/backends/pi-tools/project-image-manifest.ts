@@ -17,6 +17,7 @@ export interface ProjectImageEntry {
   mimeType?: string;
   originalUrl?: string;
   sourceType?: 'browser_blob' | 'upload' | 'session_asset' | 'workspace_asset' | 'r2_worker' | 'remote_url';
+  alt?: string;
 }
 
 export interface ProjectImageManifest {
