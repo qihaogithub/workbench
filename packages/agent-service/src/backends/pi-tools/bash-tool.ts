@@ -7,6 +7,7 @@ import {
   getCommandPermissionResult,
   isLiveWorkspaceReadOnlyCommandAllowed,
   DEFAULT_WORKSPACE_PERMISSIONS,
+  getCommandPermissionDescription,
 } from './permissions';
 import { resolveLiveWorkspaceMutationContext } from '../../workspace/workspace-mutation-authority';
 import { truncateTail, formatSize } from './truncate';
@@ -40,10 +41,11 @@ type BashParams = Static<typeof BashParams>;
 
 export function createBashTool(config: AgentConfig): AgentTool<typeof BashParams> {
   const permissions = config.permissions ?? DEFAULT_WORKSPACE_PERMISSIONS;
+  const permDesc = getCommandPermissionDescription(permissions);
   return {
     name: 'bash',
     label: 'Bash',
-    description: 'Execute a shell command in the workspace. Output is automatically truncated to the last 2000 lines or 50KB. Use the timeout parameter for long-running commands.',
+    description: `Execute a shell command in the workspace. ${permDesc} Output is automatically truncated to the last 2000 lines or 50KB. Use the timeout parameter for long-running commands.`,
     parameters: BashParams,
     execute: async (
       toolCallId: string,
@@ -65,7 +67,7 @@ export function createBashTool(config: AgentConfig): AgentTool<typeof BashParams
               : `command "${baseCommand}" is not in the allowed list.`;
         logger.warn({ command: baseCommand, reason: permResult.reason }, 'Command not allowed by permissions');
         return {
-          content: [{ type: 'text', text: `Error: ${detail} Allowed: ${permissions.allowedCommands.join(', ')}. Denied: ${permissions.deniedCommands.join(', ')}` }],
+          content: [{ type: 'text', text: `Error: ${detail} ${permDesc}` }],
           details: { command, error: 'permission denied', reason: permResult.reason },
           isError: true,
         };

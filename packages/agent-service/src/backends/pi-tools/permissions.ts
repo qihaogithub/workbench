@@ -11,11 +11,13 @@ export const DEFAULT_WORKSPACE_PERMISSIONS: PermissionConfig = {
   allowedPaths: [
     "**",
     "demos/*/index.tsx",
+    "demos/*/config.ts",
     "demos/*/config.schema.json",
     "project.config.schema.json",
     "workspace-tree.json",
     "AGENTS.md",
     "index.tsx",
+    "config.ts",
     "config.schema.json",
   ],
   deniedPatterns: [
@@ -32,7 +34,7 @@ export const DEFAULT_WORKSPACE_PERMISSIONS: PermissionConfig = {
     "**/.workspace.json",
     "**/.session.json",
   ],
-  allowedCommands: ["node", "ls", "cat", "head", "tail", "grep", "find", "wc", "echo"],
+  allowedCommands: ["node", "ls", "cat", "head", "tail", "grep", "find", "wc", "echo", "curl"],
   deniedCommands: ["rm", "rmdir", "mv", "cp", "mkdir", "sudo", "chmod", "chown"],
 };
 
@@ -76,6 +78,10 @@ export interface CommandPermissionResult {
   allowed: boolean;
   reason?: 'denied_command' | 'node_eval_blocked' | 'npm_npx_blocked' | 'not_in_allowed';
   baseCommand?: string;
+}
+
+export function getCommandPermissionDescription(config: PermissionConfig): string {
+  return `Allowed commands: ${config.allowedCommands.join(', ')}. Blocked: ${config.deniedCommands.join(', ')}, npm, npx, node -e.`;
 }
 
 export function getCommandPermissionResult(

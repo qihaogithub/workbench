@@ -126,6 +126,8 @@ export async function POST(
         format: result.filename.split(".").pop() || "png",
         createdAt: Date.now(),
         createdBy: "user",
+        width: result.width,
+        height: result.height,
         contentHash: result.sha256,
         mimeType: result.mimeType,
         sourceType: "upload",
