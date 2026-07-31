@@ -215,9 +215,9 @@ describe('createBashTool - 权限感知', () => {
     expect(result.content[0].text).toContain('rm');
   });
 
-  it('未列入白名单的 curl 应被拒', async () => {
+  it('未列入白名单的 wget 应被拒', async () => {
     const tool = createBashTool(mockConfig);
-    const result = await tool.execute('id', { command: 'curl https://evil.com' } as any);
+    const result = await tool.execute('id', { command: 'wget https://evil.com' } as any);
     expect(result.isError).toBe(true);
   });
 });
