@@ -95,15 +95,16 @@ system prompt 末尾，在静态 `system-prompt.md` 和 `generatePreviewAuthorin
 
 ### 刷新时机
 
-用户编辑公约保存后，前端需要触发 `updateSystemPrompt` 重传 system prompt，确保 Agent 立即感知公约变更。
+公约变更后，前端**无需**触发专门的 `updateSystemPrompt` 事件。`systemPrompt` 在每条消息中都会随 `stream.send()` 传入 agent-service（含最新拼接的公约内容），下一条消息即生效。
 
 ### 实现路径
 
 1. `scan-workspace.ts` 新增 `readConventionContent(workingDir)` 和 `readPageConventionContent(workingDir, pageId)`
 2. `system-prompt.ts` 新增 `buildConventionPrefix(content)` 和 `buildPageConventionPrefix(content)`
-3. `buildStaticSystemPrompt()` 接受可选的公约内容参数，拼接到 system prompt 末尾
-4. `fetchContextPrefix()` 在 `ai-chat-setup.ts` 中同时读取公约内容，随 L3/L4 一并返回
-5. `stream-service.ts` 在 `sendMessage` 时将公约内容传递给 `buildStaticSystemPrompt()`，由 author-site 侧拼接完成后发送给 agent-service
+3. `workspace-context` API route 新增 `pageId` 参数，返回 `conventionContent` 和 `pageConventionContent`
+4. `ai-chat-setup.ts` 中 `fetchContextPrefix()` 接受可选 `pageId` 参数，读取公约内容后调用 `buildConventionPrefix()` 等返回 `conventionPrefix` 字段
+5. `AuthorContextIntegration.fetchContextPrefix` 返回值类型新增 `conventionPrefix: string | null`
+6. `stream-service.ts` 在 `sendMessage` 时，将 `demoId` 传给 `fetchContextPrefix`，拿到 `conventionPrefix` 后拼接到 `systemPrompt` 末尾再发给 agent-service
 
 ### 与现有 L3 上下文的关系
 
@@ -181,7 +182,7 @@ system prompt 末尾，在静态 `system-prompt.md` 和 `generatePreviewAuthorin
 | 页面创建 | 不自动创建页面公约，首次编辑时写入 |
 | 页面删除 | `deletePage` 流程自然删除 `demos/{pageId}/` 目录，公约文件随之一同删除 |
 | 项目克隆/模板复制 | 和 `memory.md` 一样，公约文件不参与克隆 |
-| 用户编辑保存 | 前端触发 `updateSystemPrompt` 重传 |
+| 用户编辑保存 | 下一条消息自动携带最新公约（systemPrompt 每条消息都重传） |
 | 项目无公约 | 注入段不显示（不显示空模板） |
 | 页面无公约 | 注入段显示"（本页面暂未设置公约）" |
 
@@ -192,11 +193,13 @@ system prompt 末尾，在静态 `system-prompt.md` 和 `generatePreviewAuthorin
 | `packages/author-site/src/lib/fs-utils.ts` | 修改 | 新增 `CONVENTION_FILENAME` 常量、`ensureConventionFile()` |
 | `packages/author-site/src/lib/workspace-file-utils.ts` | 修改 | `isFileEditable()` 增加 `convention.md` |
 | `packages/author-site/src/lib/agent/scan-workspace.ts` | 修改 | 新增 `readConventionContent()`、`readPageConventionContent()` |
-| `packages/author-site/src/lib/agent/system-prompt.ts` | 修改 | 新增 `buildConventionPrefix()`，`buildStaticSystemPrompt()` 接受公约参数 |
+| `packages/author-site/src/lib/agent/system-prompt.ts` | 修改 | 新增 `buildConventionPrefix()`、`buildPageConventionPrefix()` |
 | `packages/author-site/src/lib/agent/prompts/system-prompt.md` | 修改 | 新增"项目公约"段落 |
-| `packages/author-site/src/lib/ai-chat-setup.ts` | 修改 | `fetchContextPrefix()` 返回公约字段 |
+| `packages/author-site/src/lib/ai-chat-setup.ts` | 修改 | `fetchContextPrefix()` 接受 `pageId`，返回 `conventionPrefix` |
 | `packages/author-site/src/app/api/agent/workspace-context/route.ts` | 修改 | 返回公约内容，新增 `pageId` 参数 |
-| `packages/ai-chat-shared/src/chat/services/stream-service.ts` | 修改 | 注入公约到 system prompt |
+| `packages/ai-chat-shared/src/config.ts` | 修改 | `AuthorContextIntegration.fetchContextPrefix` 返回值新增 `conventionPrefix` |
+| `packages/ai-chat-shared/src/chat/services/stream-service.ts` | 修改 | 将 `demoId` 传入 `fetchContextPrefix`，拼接 `conventionPrefix` 到 `systemPrompt` |
+| `packages/agent-service/src/preinstalled-skills/memory-maintenance/SKILL.md` | 修改 | 补充公约与记忆的区别说明 |
 | `packages/author-site/src/components/demo/KnowledgePanel.tsx` | 修改 | 新增"项目公约"横幅 |
 | `packages/author-site/src/components/demo/MemoryMarkdownEditor.tsx` | 重命名 | → `WorkspaceMarkdownEditor.tsx` |
 | `packages/author-site/src/app/demo/[id]/edit/page.tsx` | 修改 | 新增公约选择/编辑 handler |
