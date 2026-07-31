@@ -143,7 +143,7 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 | `CORS_ORIGINS`                       | 逗号分隔的 URL                   | 允许的跨域来源                                                             |
 | `SCREENSHOT_SERVICE_URL`             | `http://screenshot-service:3202` | author-site 调用截图服务的 Docker 内网地址                                 |
 | `KNOWLEDGE_SERVICE_URL`              | `http://knowledge-service:3203`  | author-site/agent-service 调用独立知识服务的 Docker 内网地址                |
-| `KNOWLEDGE_RECONCILE_INTERVAL_MS`    | `5000`                           | 模板项目周期协调间隔                                                       |
+| `KNOWLEDGE_RECONCILE_INTERVAL_MS`    | `60000`                          | 模板项目周期协调间隔                                                       |
 | `KNOWLEDGE_BACKUP_INTERVAL_MS`       | `86400000`                       | SQLite 在线备份间隔                                                        |
 | `KNOWLEDGE_BACKUP_RETENTION_DAYS`    | `7`                              | 知识索引备份保留天数                                                       |
 | `NEXT_PUBLIC_AGENT_SERVICE_URL`      | 局域网或公网 URL                 | author-site/viewer-site 浏览器端访问 agent-service                         |

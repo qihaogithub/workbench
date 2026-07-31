@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "build:docker": "esbuild src/server.ts --bundle --platform=node --target=node20 --outdir=dist --format=cjs --external:fastify --external:@fastify/cors --external:pino --external:pino-pretty --external:puppeteer-core",
+    "build:docker": "esbuild src/server.ts --bundle --platform=node --target=node20 --outdir=dist --format=cjs --external:fastify --external:@fastify/cors --external:@fastify/rate-limit --external:pino --external:pino-pretty --external:puppeteer-core",
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -16,8 +16,9 @@
   },
   "dependencies": {
     "@fastify/cors": "^9.0.0",
-    "@workbench/sketch-core": "workspace:*",
+    "@fastify/rate-limit": "^9.0.0",
     "@workbench/shared": "workspace:*",
+    "@workbench/sketch-core": "workspace:*",
     "dotenv": "^17.4.2",
     "fastify": "^4.26.0",
     "pino": "^8.0.0",

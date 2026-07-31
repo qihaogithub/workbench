@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as fs from 'fs';
 
 import type { AgentConfig, AgentEvent } from '../../core/types';
 import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from '../pi-tools/permissions';
@@ -19,6 +20,22 @@ export function isKnowledgeBasePath(filePath: string, workingDir: string): boole
   return normalized === 'knowledge' ||
          normalized.startsWith('knowledge/') ||
          normalized.startsWith('knowledge\\');
+}
+
+/**
+ * 当同目录存在 config.ts 时，config.schema.json 是编译产物。
+ * AI 不应直接编辑编译产物，应编辑源文件 config.ts。
+ */
+function isShadowedSchemaJson(filePath: string, workingDir: string): boolean {
+  const resolved = path.resolve(workingDir, filePath);
+  const normalized = resolved.replace(/\\/g, '/');
+  if (!normalized.endsWith('/config.schema.json')) return false;
+  const configTsPath = normalized.replace(/config\.schema\.json$/, 'config.ts');
+  try {
+    return fs.existsSync(configTsPath);
+  } catch {
+    return false;
+  }
 }
 
 interface PendingPermission {
@@ -66,6 +83,21 @@ export class PermissionManager {
     // 知识库写保护已移除：AI 可通过 writeFile/editFile 写入 knowledge/ 路径，
     // writeFile 工具会透明同步 manifest.json。路径安全由 isManagedWorkspaceResource
     // 白名单和 isPathAllowed 权限层保障。
+
+    // 编译产物写保护：config.schema.json 被同目录 config.ts "遮蔽"时，禁止写入编译产物
+    if (['writeFile', 'editFile'].includes(toolName)) {
+      const writePath = input?.path || input?.filePath;
+      if (
+        writePath &&
+        isShadowedSchemaJson(writePath, this.config.workingDir ?? '')
+      ) {
+        const configTsRef = writePath.replace(/config\.schema\.json$/, 'config.ts');
+        return {
+          block: true,
+          reason: `Cannot write to "${writePath}": this file is compiled from config.ts. Please edit "${configTsRef}" instead.`,
+        };
+      }
+    }
 
     return undefined;
   }

@@ -21,7 +21,10 @@ export const config = {
     width: 375,
     height: 812,
   },
-  maxConcurrentPages: 3,
+  maxConcurrentPages: parseInt(
+    process.env.SCREENSHOT_MAX_CONCURRENT_PAGES || "4",
+    10,
+  ),
   screenshotTimeout: 15000,
   screenshotQueueTimeout: parseInt(
     process.env.SCREENSHOT_QUEUE_TIMEOUT_MS || "30000",

@@ -32,6 +32,8 @@ export interface ProjectImage {
   format: string;
   createdAt: number;
   createdBy: 'user' | 'ai' | 'figma';
+  width?: number;
+  height?: number;
   contentHash?: string;
   mimeType?: string;
   originalUrl?: string;

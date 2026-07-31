@@ -38,6 +38,7 @@ export type {
   PositionableConfig,
   PositionItem,
   PositionableSizeItem,
+  PositionEditMode,
   VisualAnnotation,
   VisualEditPatch,
   VisualInlineEditPayload,

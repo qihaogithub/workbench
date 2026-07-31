@@ -16,7 +16,9 @@ export type IframeOutMessageType =
   | 'VISUAL_NODE_TREE_RESULT'
   | 'COMMENT_CLICK'
   | 'COMMENT_VIEW_STATE'
-  | 'ELEMENT_LOCATION_RESULT';
+  | 'ELEMENT_LOCATION_RESULT'
+  | 'POSITION_CHANGE'
+  | 'POSITION_EDIT_READY';
 
 /** 父窗口 → iframe 消息类型 */
 export type IframeInMessageType =
@@ -30,7 +32,11 @@ export type IframeInMessageType =
   | 'COLLECT_VISUAL_NODE_TREE'
   | 'ENTER_COMMENT_MODE'
   | 'EXIT_COMMENT_MODE'
-  | 'LOCATE_ELEMENT';
+  | 'LOCATE_ELEMENT'
+  | 'ENTER_POSITION_EDIT'
+  | 'EXIT_POSITION_EDIT'
+  | 'TOGGLE_POSITION_DIMMING'
+  | 'APPLY_POSITIONS';
 
 /** positionable 元素尺寸数据 */
 export interface PositionableSizeItem {
@@ -225,4 +231,16 @@ export interface VisualEditPatch {
   node?: VisualNodeInfo;
   annotationId?: string;
   error?: string;
+}
+
+/** 位置编辑模式下元素拖拽结果（iframe → 父窗口） */
+export interface PositionChangePayload {
+  key: string;
+  x: number;
+  y: number;
+}
+
+/** 位置编辑模式下父窗口下发位置更新（父窗口 → iframe） */
+export interface ApplyPositionsPayload {
+  positions: Record<string, { x: number; y: number }>;
 }

@@ -155,6 +155,65 @@ describe("live Workspace file tools", () => {
     expect(readdirSpy).not.toHaveBeenCalled();
   });
 
+  it("listFiles 隐藏 config.schema.json 当同目录存在 config.ts（Authority snapshot 路径）", async () => {
+    const workspacePath = createLiveWorkspace();
+    // 添加 config.ts
+    fs.writeFileSync(
+      path.join(workspacePath, "demos", "home", "config.ts"),
+      "const t = {}",
+      "utf-8",
+    );
+    const config: AgentConfig = {
+      sessionId: "session-1",
+      workingDir: workspacePath,
+    };
+    const readdirSpy = vi.spyOn(fs.promises, "readdir");
+
+    const result = await createListFilesTool(config).execute("list", {
+      path: "demos/home",
+    });
+
+    // Authority 应检测到外部漂移并 reconciliation 纳入 config.ts
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0].text).toContain("file: config.ts");
+    expect(result.content[0].text).not.toContain("config.schema.json");
+    expect(result.content[0].text).toContain("file: index.tsx");
+    expect(readdirSpy).not.toHaveBeenCalled();
+  });
+
+  it("listFiles 通过文件系统兜底隐藏 config.schema.json 当 Authority 不可用", async () => {
+    const workspacePath = createLiveWorkspace();
+    // 移除 scope 使 resolveLiveWorkspaceMutationContext 返回 null
+    fs.writeFileSync(
+      path.join(workspacePath, ".workspace.json"),
+      JSON.stringify({
+        workspaceId: "workspace-1",
+        projectId: "project-1",
+        scope: "legacy",
+        status: "active",
+      }),
+    );
+    // 添加 config.ts
+    fs.writeFileSync(
+      path.join(workspacePath, "demos", "home", "config.ts"),
+      "const t = {}",
+      "utf-8",
+    );
+    const config: AgentConfig = {
+      sessionId: "session-1",
+      workingDir: workspacePath,
+    };
+
+    const result = await createListFilesTool(config).execute("list", {
+      path: "demos/home",
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0].text).toContain("config.ts");
+    expect(result.content[0].text).not.toContain("config.schema.json");
+    expect(result.content[0].text).toContain("index.tsx");
+  });
+
   it("listPages 在 live Workspace 下从 Authority snapshot 读取页面列表", async () => {
     const workspacePath = createLiveWorkspaceWithPages();
     const config: AgentConfig = {

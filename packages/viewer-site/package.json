@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -H 0.0.0.0",
     "build": "corepack pnpm --workspace-root build:preview-runtime && next build",
     "preview-runtime:build": "corepack pnpm --workspace-root build:preview-runtime",
     "start": "next start",
@@ -16,6 +16,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@radix-ui/react-collapsible": "^1.1.12",
+    "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-dialog": "^1.0.5",
     "@radix-ui/react-label": "^2.0.2",
     "@radix-ui/react-popover": "^1.1.15",

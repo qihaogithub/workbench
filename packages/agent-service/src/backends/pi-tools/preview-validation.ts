@@ -1,5 +1,6 @@
 import { PreviewRuntimeContractError, type RuntimeContractIssue } from '@workbench/preview-contract/runtime';
 import { compilePreviewPageSource } from '@workbench/preview-contract/compiler';
+import { compileConfigTs, ConfigCompileError } from '@workbench/shared';
 
 type ToolRuntimeValidationStage = RuntimeContractIssue['stage'] | 'prototype_contract';
 type PrototypeGateDecision =
@@ -62,7 +63,7 @@ export function formatRuntimeValidationInstruction(
 }
 
 function getDemoFileInfo(filePath: string): { pageId: string; fileName: string } | undefined {
-  const match = filePath.match(/^demos\/([^/]+)\/(index\.tsx|config\.schema\.json|prototype\.html|prototype\.css)$/u);
+  const match = filePath.match(/^demos\/([^/]+)\/(index\.tsx|config\.schema\.json|config\.ts|prototype\.html|prototype\.css)$/u);
   return match?.[1] && match?.[2]
     ? { pageId: match[1], fileName: match[2] }
     : undefined;
@@ -279,7 +280,6 @@ export function validatePreviewFileWrite(
     try {
       const parsed = JSON.parse(content) as Record<string, unknown>;
 
-      // 校验 $demo.previewSize 存在性
       const demo = parsed.$demo;
       const previewSize =
         demo != null && typeof demo === 'object' && !Array.isArray(demo)
@@ -326,6 +326,82 @@ export function validatePreviewFileWrite(
             severity: 'error',
             message: '页面配置 schema 不是合法 JSON',
             instruction: '请修复 config.schema.json 的 JSON 语法；如果页面不需要配置字段，保留空 properties 对象。',
+          },
+        ],
+      };
+    }
+  }
+
+  if (pageId && demoFile.fileName === 'config.ts') {
+    try {
+      const compiled = compileConfigTs(content);
+      const parsed = JSON.parse(compiled) as Record<string, unknown>;
+
+      const demo = parsed.$demo;
+      const previewSize =
+        demo != null && typeof demo === 'object' && !Array.isArray(demo)
+          ? (demo as Record<string, unknown>).previewSize
+          : undefined;
+      const hasValidPreviewSize =
+        previewSize != null &&
+        typeof previewSize === 'object' &&
+        !Array.isArray(previewSize) &&
+        ('width' in (previewSize as Record<string, unknown>)) &&
+        ('height' in (previewSize as Record<string, unknown>));
+
+      if (!hasValidPreviewSize) {
+        return {
+          ok: false,
+          file: normalizedPath,
+          pageId,
+          issues: [
+            {
+              file: normalizedPath,
+              pageId,
+              stage: 'schema_contract',
+              code: 'MISSING_PREVIEW_SIZE',
+              severity: 'error',
+              message: 'config.ts 编译后缺少 $preview 字段（需包含 width 和 height）',
+              instruction: '请在 config.ts 中添加 $preview: { width: <数字>, height: <数字> }，宽高根据页面目标设备自行判断。',
+            },
+          ],
+        };
+      }
+
+      return { ok: true, file: normalizedPath, pageId, issues: [] };
+    } catch (err) {
+      if (err instanceof ConfigCompileError) {
+        return {
+          ok: false,
+          file: normalizedPath,
+          pageId,
+          issues: [
+            {
+              file: normalizedPath,
+              pageId,
+              stage: 'schema_contract',
+              code: err.code,
+              severity: 'error',
+              message: `config.ts 编译错误 (行 ${err.line}, 列 ${err.column}): ${err.message}`,
+              instruction: err.suggestion || '请修复 config.ts 中的语法或类型错误后重新写入。',
+            },
+          ],
+        };
+      }
+
+      return {
+        ok: false,
+        file: normalizedPath,
+        pageId,
+        issues: [
+          {
+            file: normalizedPath,
+            pageId,
+            stage: 'schema_contract',
+            code: 'CONFIG_TS_COMPILE_FAILED',
+            severity: 'error',
+            message: `config.ts 编译失败: ${err instanceof Error ? err.message : 'Unknown error'}`,
+            instruction: '请修复 config.ts 后重新写入。',
           },
         ],
       };

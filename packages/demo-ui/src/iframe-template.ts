@@ -1565,6 +1565,310 @@ export const commentModeScript = `
 })();
 `;
 
+/**
+ * 位置编辑模式脚本（iframe 内执行）。
+ *
+ * 独立于视觉编辑（visualEditScript）和评论模式（commentModeScript），
+ * 提供在预览内直接拖拽元素调整位置的所见即所得体验。
+ *
+ * 父→子消息：
+ *   ENTER_POSITION_EDIT { items, positions }：激活位置编辑模式
+ *   EXIT_POSITION_EDIT：退出位置编辑模式
+ * 子→父消息：
+ *   POSITION_CHANGE { key, x, y }：拖拽完成后报告新坐标
+ *   POSITION_EDIT_READY：编辑模式已激活（用于初始位置同步）
+ */
+export const positionEditScript = `
+(function() {
+  var editing = false;
+  var editItems = [];
+  var editPositions = {};
+  var dimming = true;
+  var dragTarget = null;
+  var dragStartX = 0;
+  var dragStartY = 0;
+  var dragOrigLeft = 0;
+  var dragOrigTop = 0;
+  var containerEl = null;
+
+  function getContainer() {
+    if (containerEl) return containerEl;
+    var root = document.getElementById('root');
+    if (root && root.firstElementChild) {
+      containerEl = root.firstElementChild;
+    } else {
+      containerEl = document.body;
+    }
+    return containerEl;
+  }
+
+  function injectPosKey(items, positions) {
+    var root = document.getElementById('root');
+    if (!root) { console.warn('[pos-edit] injectPosKey: #root not found'); return; }
+    var container = getContainer();
+    var containerRect = container.getBoundingClientRect();
+    var all = root.querySelectorAll('*');
+    var assigned = {};
+    var absoluteCount = 0;
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i];
+      if (el.hasAttribute('data-pos-key')) continue;
+      var cs = window.getComputedStyle(el);
+      if (cs.position !== 'absolute') continue;
+      absoluteCount++;
+      var rect = el.getBoundingClientRect();
+      var elLeft = Math.round(rect.left - containerRect.left);
+      var elTop = Math.round(rect.top - containerRect.top);
+      for (var j = 0; j < items.length; j++) {
+        var key = items[j];
+        if (assigned[key]) continue;
+        var pos = positions[key] || { x: 0, y: 0 };
+        if (Math.abs(elLeft - pos.x) <= 3 && Math.abs(elTop - pos.y) <= 3) {
+          el.setAttribute('data-pos-key', key);
+          assigned[key] = true;
+          console.log('[pos-edit] injectPosKey: matched', key, 'at', elLeft, elTop, '(expected', pos.x, pos.y, ')');
+          break;
+        }
+      }
+    }
+    var matched = Object.keys(assigned);
+    var unmatched = [];
+    for (var k = 0; k < items.length; k++) {
+      if (!assigned[items[k]]) unmatched.push(items[k]);
+    }
+    console.log('[pos-edit] injectPosKey: scanned', absoluteCount, 'absolute elements, matched', matched.length + '/' + items.length, matched);
+    if (unmatched.length > 0) {
+      console.warn('[pos-edit] injectPosKey: unmatched keys:', unmatched, 'container rect:', containerRect.width + 'x' + containerRect.height);
+      // 尝试放宽匹配：打印所有 absolute 元素的位置
+      for (var m = 0; m < all.length; m++) {
+        var mel = all[m];
+        if (mel.hasAttribute('data-pos-key')) continue;
+        var mcs = window.getComputedStyle(mel);
+        if (mcs.position !== 'absolute') continue;
+        var mrect = mel.getBoundingClientRect();
+        console.log('[pos-edit] absolute element:', mel.tagName, 'rect:', Math.round(mrect.left - containerRect.left), Math.round(mrect.top - containerRect.top), Math.round(mrect.width), Math.round(mrect.height));
+      }
+    }
+  }
+
+  function cleanupPosKey(items) {
+    for (var i = 0; i < items.length; i++) {
+      var els = document.querySelectorAll('[data-pos-key="' + items[i] + '"]');
+      for (var j = 0; j < els.length; j++) {
+        els[j].removeAttribute('data-pos-key');
+        els[j].style.cursor = '';
+      }
+    }
+  }
+
+  function setDimCSS(on) {
+    if (on) {
+      document.body.classList.add('position-editing');
+      document.body.classList.add('position-editing-dimming');
+      applyElementDimming();
+    } else {
+      document.body.classList.remove('position-editing');
+      document.body.classList.remove('position-editing-dimming');
+      clearElementDimming();
+    }
+  }
+
+  function applyElementDimming() {
+    clearElementDimming();
+    var all = document.body.querySelectorAll('*');
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i];
+      if (el.id === 'root') continue;
+      if (el.hasAttribute('data-pos-key')) continue;
+      if (el.querySelector('[data-pos-key]')) continue;
+      el.style.setProperty('opacity', '0.3', 'important');
+      el.classList.add('pos-dimmed');
+    }
+  }
+
+  function clearElementDimming() {
+    var dimmed = document.body.querySelectorAll('.pos-dimmed');
+    for (var i = 0; i < dimmed.length; i++) {
+      dimmed[i].style.removeProperty('opacity');
+      dimmed[i].classList.remove('pos-dimmed');
+    }
+  }
+
+  function setGrabCursors(on) {
+    var els = document.querySelectorAll('[data-pos-key]');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      var key = el.getAttribute('data-pos-key');
+      if (!key || editItems.indexOf(key) === -1) continue;
+      el.style.cursor = on ? 'grab' : '';
+    }
+  }
+
+  function applyPosition(key, x, y) {
+    var el = document.querySelector('[data-pos-key="' + key + '"]');
+    if (!el) return;
+    var container = getContainer();
+    var containerRect = container.getBoundingClientRect();
+    var elRect = el.getBoundingClientRect();
+    // 清除现有 transform，基于 DOM 原始位置（style.left/top）计算偏移
+    el.style.transform = '';
+    var currentLeft = elRect.left - containerRect.left;
+    var currentTop = elRect.top - containerRect.top;
+    var offsetX = x - currentLeft;
+    var offsetY = y - currentTop;
+    if (offsetX !== 0 || offsetY !== 0) {
+      el.style.transform = 'translate(' + offsetX + 'px, ' + offsetY + 'px)';
+    }
+  }
+
+  function exit() {
+    editing = false;
+    setGrabCursors(false);
+    setDimCSS(false);
+    cleanupPosKey(editItems);
+    window.parent.postMessage({ type: 'POSITION_EDIT_READY', active: false }, '*');
+  }
+
+  function enter(items, positions) {
+    editItems = items;
+    editPositions = positions;
+    injectPosKey(items, positions);
+    editing = true;
+    setGrabCursors(true);
+    if (dimming) {
+      setDimCSS(true);
+    }
+    window.parent.postMessage({ type: 'POSITION_EDIT_READY', active: true }, '*');
+  }
+
+  document.addEventListener('pointerdown', function(event) {
+    if (!editing) return;
+    var hit = getTopMostPosKeyElement(event.clientX, event.clientY);
+    if (!hit) return;
+    event.preventDefault();
+    dragTarget = hit.el;
+    dragTarget.setPointerCapture(event.pointerId);
+    dragTarget.style.cursor = 'grabbing';
+    dragStartX = event.clientX;
+    dragStartY = event.clientY;
+    var rect = dragTarget.getBoundingClientRect();
+    dragOrigLeft = rect.left - getContainer().getBoundingClientRect().left;
+    dragOrigTop = rect.top - getContainer().getBoundingClientRect().top;
+    dragTarget.style.transform = dragTarget.style.transform || '';
+    var children = dragTarget.querySelectorAll('*');
+    for (var c = 0; c < children.length; c++) {
+      children[c].style.pointerEvents = 'none';
+    }
+    dragTarget.setAttribute('data-pos-dragging', 'true');
+  }, true);
+
+  document.addEventListener('pointermove', function(event) {
+    if (!editing || !dragTarget) return;
+    var deltaX = event.clientX - dragStartX;
+    var deltaY = event.clientY - dragStartY;
+    var targetRect = dragTarget.getBoundingClientRect();
+    var result = constrainToContainer(targetRect, deltaX, deltaY);
+    var offsetX = result.constrainedLeft - dragOrigLeft;
+    var offsetY = result.constrainedTop - dragOrigTop;
+    dragTarget.style.transform = 'translate(' + offsetX + 'px, ' + offsetY + 'px)';
+  }, true);
+
+  document.addEventListener('pointerup', function(event) {
+    if (!dragTarget) return;
+    var key = dragTarget.getAttribute('data-pos-key');
+    var children = dragTarget.querySelectorAll('*');
+    for (var c = 0; c < children.length; c++) {
+      children[c].style.pointerEvents = '';
+    }
+    dragTarget.style.cursor = 'grab';
+    dragTarget.removeAttribute('data-pos-dragging');
+
+    var transform = dragTarget.style.transform || '';
+    var match = transform.match(/translate\\(([-\\d.]+)px,\\s*([-\\d.]+)px\\)/);
+    var finalX = dragOrigLeft;
+    var finalY = dragOrigTop;
+    if (match) {
+      finalX += parseFloat(match[1]);
+      finalY += parseFloat(match[2]);
+    }
+    finalX = Math.round(Math.max(0, finalX));
+    finalY = Math.round(Math.max(0, finalY));
+
+    dragTarget.style.transform = '';
+    dragTarget = null;
+
+    window.parent.postMessage({
+      type: 'POSITION_CHANGE',
+      key: key,
+      x: finalX,
+      y: finalY
+    }, '*');
+  }, true);
+
+  document.addEventListener('pointercancel', function() {
+    if (dragTarget) {
+      var children = dragTarget.querySelectorAll('*');
+      for (var c = 0; c < children.length; c++) {
+        children[c].style.pointerEvents = '';
+      }
+      dragTarget.style.cursor = 'grab';
+      dragTarget.style.transform = '';
+      dragTarget.removeAttribute('data-pos-dragging');
+      dragTarget = null;
+    }
+  }, true);
+
+  window.addEventListener('message', function(event) {
+    if (event.source !== window.parent) return;
+    var data = event.data || {};
+    if (data.type === 'ENTER_POSITION_EDIT') {
+      data.items && data.positions && enter(data.items, data.positions);
+      return;
+    }
+    if (data.type === 'EXIT_POSITION_EDIT') {
+      exit();
+      return;
+    }
+    if (data.type === 'TOGGLE_POSITION_DIMMING') {
+      dimming = !!data.enabled;
+      if (editing) setDimCSS(dimming);
+      return;
+    }
+    if (data.type === 'APPLY_POSITIONS') {
+      var posMap = data.positions || {};
+      for (var k in posMap) {
+        if (posMap.hasOwnProperty(k)) {
+          applyPosition(k, posMap[k].x, posMap[k].y);
+        }
+      }
+      return;
+    }
+  });
+
+  function constrainToContainer(targetRect, deltaX, deltaY) {
+    var container = getContainer();
+    var containerRect = container.getBoundingClientRect();
+    var newLeft = dragOrigLeft + deltaX;
+    var newTop = dragOrigTop + deltaY;
+    newLeft = Math.max(0, Math.min(newLeft, containerRect.width - targetRect.width));
+    newTop = Math.max(0, Math.min(newTop, containerRect.height - targetRect.height));
+    return { constrainedLeft: newLeft, constrainedTop: newTop };
+  }
+
+  function getTopMostPosKeyElement(x, y) {
+    var els = document.elementsFromPoint(x, y);
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      if (el.hasAttribute && el.hasAttribute('data-pos-key')) {
+        var key = el.getAttribute('data-pos-key');
+        if (editItems.indexOf(key) !== -1) return { el: el, key: key };
+      }
+    }
+    return null;
+  }
+})();
+`;
+
 function generateCssLinks(cssImports: string[], cdnBase: string): string {
   if (!cssImports.length) return "";
   return cssImports
@@ -1869,6 +2173,7 @@ ${cssLinks}
     ${consoleInterceptScript}
     ${visualEditScript}
     ${commentModeScript}
+    ${positionEditScript}
 
     import React from 'react';
     import ReactDOM from 'react-dom/client';

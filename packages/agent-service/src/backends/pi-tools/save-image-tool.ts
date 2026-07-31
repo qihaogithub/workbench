@@ -287,6 +287,8 @@ interface SaveBufferResult {
   size?: number;
   format?: string;
   sha256?: string;
+  width?: number;
+  height?: number;
   error?: string;
   reused?: boolean;
 }
@@ -327,6 +329,8 @@ async function saveImageBuffer(
       format: path.extname(filename).slice(1).toLowerCase(),
       createdAt: Date.now(),
       createdBy: 'ai',
+      width: result.width,
+      height: result.height,
       contentHash: result.sha256,
       mimeType: result.mimeType,
       originalUrl,
@@ -349,6 +353,8 @@ async function saveImageBuffer(
     size: result.sizeBytes,
     format: path.extname(filename).slice(1).toLowerCase(),
     sha256: result.sha256.slice(0, 12),
+    width: result.width,
+    height: result.height,
     reused: result.deduplicated,
   };
 }
@@ -665,6 +671,8 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
           relativePathFromPage: saveResult.relativePathFromPage,
           size: saveResult.size,
           format: saveResult.format,
+          width: saveResult.width,
+          height: saveResult.height,
           source,
           sha256: saveResult.sha256,
           reused: saveResult.reused,

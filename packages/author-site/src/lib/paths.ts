@@ -49,6 +49,8 @@ export function getWorkspacesDir(): string {
   return WORKSPACES_DIR;
 }
 
+let sessionIndexInitialized = false;
+
 export function ensureDirsExist(): void {
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -67,6 +69,10 @@ export function ensureDirsExist(): void {
   }
   if (!fs.existsSync(SNAPSHOTS_DIR)) {
     fs.mkdirSync(SNAPSHOTS_DIR, { recursive: true });
+  }
+  if (!sessionIndexInitialized) {
+    sessionIndexInitialized = true;
+    initSessionPathIndex();
   }
 }
 
@@ -100,7 +106,46 @@ export function getSessionPath(sessionId: string, projectId?: string): string {
 }
 
 const sessionPathCache = new Map<string, { path: string | null; at: number }>();
-const SESSION_PATH_CACHE_TTL = 60_000;
+const SESSION_PATH_CACHE_TTL = 5 * 60_000;
+
+const sessionPathIndex = new Map<string, string>();
+
+export function registerSessionPath(sessionId: string, sessionPath: string): void {
+  sessionPathIndex.set(sessionId, sessionPath);
+}
+
+export function unregisterSessionPath(sessionId: string): void {
+  sessionPathIndex.delete(sessionId);
+  sessionPathCache.delete(sessionId);
+}
+
+export function initSessionPathIndex(): void {
+  if (!fs.existsSync(SESSIONS_DIR)) return;
+  const entries = fs.readdirSync(SESSIONS_DIR, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const level1Path = path.join(SESSIONS_DIR, entry.name);
+    const subEntries = fs.readdirSync(level1Path, { withFileTypes: true });
+    for (const sub of subEntries) {
+      if (!sub.isDirectory()) continue;
+      const subPath = path.join(level1Path, sub.name);
+      const leafEntries = fs.readdirSync(subPath, { withFileTypes: true });
+      for (const leaf of leafEntries) {
+        if (!leaf.isDirectory()) continue;
+        const sessionDir = path.join(subPath, leaf.name);
+        const metaPath = path.join(sessionDir, ".session.json");
+        if (fs.existsSync(metaPath)) {
+          try {
+            const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+            if (meta.sessionId) {
+              sessionPathIndex.set(meta.sessionId, sessionDir);
+            }
+          } catch { /* skip */ }
+        }
+      }
+    }
+  }
+}
 
 export function findSessionPath(sessionId: string): string | null {
   const cached = sessionPathCache.get(sessionId);
@@ -108,54 +153,50 @@ export function findSessionPath(sessionId: string): string | null {
     return cached.path;
   }
 
-  console.log(`[findSessionPath] 查找 session: ${sessionId}`);
+  const indexed = sessionPathIndex.get(sessionId);
+  if (indexed && fs.existsSync(indexed)) {
+    sessionPathCache.set(sessionId, { path: indexed, at: Date.now() });
+    return indexed;
+  }
+  if (indexed) {
+    sessionPathIndex.delete(sessionId);
+  }
 
   if (!fs.existsSync(SESSIONS_DIR)) {
-    console.error(`[findSessionPath] SESSIONS_DIR 不存在: ${SESSIONS_DIR}`);
     sessionPathCache.set(sessionId, { path: null, at: Date.now() });
     return null;
   }
 
-  console.log(`[findSessionPath] SESSIONS_DIR: ${SESSIONS_DIR}`);
-
-  // 先尝试新结构: {userId}/{projectId}/{sessionId}/
   const level1Entries = fs.readdirSync(SESSIONS_DIR, { withFileTypes: true });
-  console.log(`[findSessionPath] level1 目录数: ${level1Entries.length}`);
 
   for (const level1 of level1Entries) {
     if (!level1.isDirectory()) continue;
 
     const level1Path = path.join(SESSIONS_DIR, level1.name);
 
-    // 直接检查是否为目标 session（兼容旧结构）
     const directPath = path.join(level1Path, sessionId);
     if (fs.existsSync(directPath) && fs.statSync(directPath).isDirectory()) {
-      console.log(`[findSessionPath] 找到 session (旧结构): ${directPath}`);
+      sessionPathIndex.set(sessionId, directPath);
       sessionPathCache.set(sessionId, { path: directPath, at: Date.now() });
       return directPath;
     }
 
-    // 检查第二层（新结构: {userId}/{projectId}/{sessionId}/）
     const level2Entries = fs.readdirSync(level1Path, { withFileTypes: true });
     for (const level2 of level2Entries) {
       if (!level2.isDirectory()) continue;
 
       const level2Path = path.join(level1Path, level2.name);
 
-      // 先检查目录名是否匹配
       const sessionPathByName = path.join(level2Path, sessionId);
       if (
         fs.existsSync(sessionPathByName) &&
         fs.statSync(sessionPathByName).isDirectory()
       ) {
-        console.log(
-          `[findSessionPath] 找到 session (新结构-目录名): ${sessionPathByName}`,
-        );
+        sessionPathIndex.set(sessionId, sessionPathByName);
         sessionPathCache.set(sessionId, { path: sessionPathByName, at: Date.now() });
         return sessionPathByName;
       }
 
-      // 遍历第三层，检查 .session.json 中的 sessionId 字段
       const level3Entries = fs.readdirSync(level2Path, { withFileTypes: true });
       for (const level3 of level3Entries) {
         if (!level3.isDirectory()) continue;
@@ -166,10 +207,10 @@ export function findSessionPath(sessionId: string): string | null {
         if (fs.existsSync(metaPath)) {
           try {
             const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+            if (meta.sessionId) {
+              sessionPathIndex.set(meta.sessionId, level3Path);
+            }
             if (meta.sessionId === sessionId) {
-              console.log(
-                `[findSessionPath] 找到 session (新结构-meta): ${level3Path}`,
-              );
               sessionPathCache.set(sessionId, { path: level3Path, at: Date.now() });
               return level3Path;
             }
@@ -181,7 +222,6 @@ export function findSessionPath(sessionId: string): string | null {
     }
   }
 
-  console.error(`[findSessionPath] 未找到 session: ${sessionId}`);
   sessionPathCache.set(sessionId, { path: null, at: Date.now() });
   return null;
 }

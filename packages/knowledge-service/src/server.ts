@@ -1,8 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import dotenv from "dotenv";
 import Fastify from "fastify";
+
+const __filename = typeof __filename !== "undefined" ? __filename : fileURLToPath(import.meta.url);
+const __dirname = typeof __dirname !== "undefined" ? __dirname : path.dirname(fileURLToPath(import.meta.url));
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
@@ -27,7 +31,7 @@ const host = process.env.HOST ?? "0.0.0.0";
 const dataDir = path.resolve(process.env.DATA_DIR ?? "data");
 const reconcileIntervalMs = numberEnv(
   "KNOWLEDGE_RECONCILE_INTERVAL_MS",
-  5_000,
+  60_000,
 );
 const backupIntervalMs = numberEnv(
   "KNOWLEDGE_BACKUP_INTERVAL_MS",

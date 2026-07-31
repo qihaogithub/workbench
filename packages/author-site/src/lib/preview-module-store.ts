@@ -41,12 +41,21 @@ function pruneFileCache(): void {
 }
 
 export function registerPreviewModule(hash: string, code: string): void {
+  ensurePreviewModulesDir();
+  const modulePath = getPreviewModulePath(hash);
+
+  if (fs.existsSync(modulePath)) {
+    if (modules.has(hash)) {
+      modules.delete(hash);
+    }
+    modules.set(hash, code);
+    return;
+  }
+
   if (modules.has(hash)) {
     modules.delete(hash);
   }
   modules.set(hash, code);
-  ensurePreviewModulesDir();
-  const modulePath = getPreviewModulePath(hash);
   const tempPath = `${modulePath}.${process.pid}.${Date.now()}.tmp`;
   fs.writeFileSync(tempPath, code, "utf-8");
   fs.renameSync(tempPath, modulePath);

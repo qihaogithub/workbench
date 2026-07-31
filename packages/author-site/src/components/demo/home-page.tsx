@@ -533,8 +533,9 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 w-full border-b border-border bg-background">
-        <div className="container flex h-16 items-center px-4">
+      <header className="sticky top-0 z-50 w-full bg-background pb-4">
+        <div className="border-b border-border">
+          <div className="container flex h-16 items-center px-4">
           <div className="mr-8 flex items-center">
             <span className="oneflow-wordmark text-lg font-semibold tracking-tight">
               OneFlow
@@ -560,12 +561,13 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
             </Button>
             <SettingsButton />
           </div>
+          </div>
         </div>
       </header>
 
       <main className="container px-4 pb-8">
         <div className="grid gap-6 md:grid-cols-[220px_minmax(0,1fr)]">
-          <aside className="min-w-0 md:sticky md:top-16 md:self-start">
+          <aside className="min-w-0 md:sticky md:top-20 md:self-start">
             <nav
               aria-label="项目目录"
               className="flex gap-2 overflow-x-auto border-b pb-3 md:flex-col md:overflow-visible md:border-b-0 md:pb-0"
@@ -642,7 +644,7 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
           </aside>
 
           <section className="min-w-0 space-y-4">
-            <div className="sticky top-16 z-10 flex items-center gap-2 border-b bg-background pb-3">
+            <div className="sticky top-20 z-10 flex items-center gap-2 border-b bg-background pb-3">
               <button
                 type="button"
                 onClick={() => setProjectFilter("all")}

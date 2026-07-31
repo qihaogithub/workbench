@@ -11,6 +11,8 @@ export interface ProjectImageEntry {
   format: string;
   createdAt: number;
   createdBy: 'user' | 'ai' | 'figma' | 'system';
+  width?: number;
+  height?: number;
   contentHash?: string;
   mimeType?: string;
   originalUrl?: string;

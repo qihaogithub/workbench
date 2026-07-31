@@ -42,6 +42,9 @@ import {
   getSessionPath,
   projectExists,
   sessionExists,
+  findSessionPath,
+  registerSessionPath,
+  unregisterSessionPath,
 } from "./paths";
 import {
   generatePageSlug,
@@ -1031,29 +1034,20 @@ export function createSession(projectId: string): SessionMeta {
 }
 
 export function getSessionMeta(sessionId: string): SessionMeta | null {
-  console.log(`[getSessionMeta] 获取 session 元数据: ${sessionId}`);
-
-  if (!sessionExists(sessionId)) {
-    console.error(`[getSessionMeta] session 不存在: ${sessionId}`);
+  const sessionPath = findSessionPath(sessionId);
+  if (!sessionPath) {
     return null;
   }
 
-  const sessionPath = getSessionPath(sessionId);
-  console.log(`[getSessionMeta] sessionPath: ${sessionPath}`);
-
   const metaPath = path.join(sessionPath, ".session.json");
-  console.log(`[getSessionMeta] metaPath: ${metaPath}`);
 
   if (!fs.existsSync(metaPath)) {
-    console.error(`[getSessionMeta] .session.json 文件不存在: ${metaPath}`);
     return null;
   }
 
   const content = fs.readFileSync(metaPath, "utf-8");
-  console.log(`[getSessionMeta] .session.json 内容: ${content}`);
 
   const meta = JSON.parse(content) as SessionMeta;
-  console.log(`[getSessionMeta] 解析后的元数据:`, meta);
 
   return meta;
 }
@@ -1062,6 +1056,8 @@ export function deleteSession(sessionId: string): boolean {
   if (!sessionExists(sessionId)) {
     return false;
   }
+
+  unregisterSessionPath(sessionId);
 
   const sessionPath = getSessionPath(sessionId);
 

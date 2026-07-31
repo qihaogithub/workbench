@@ -58,6 +58,7 @@ export class WorkspaceResourceRegistry {
     if (/^demos\/[^/]+\/prototype\.css$/.test(normalized)) return { kind: "page-prototype-css", text: true, maxBytes: TEXT_MAX_BYTES, validation: "text" };
     if (/^demos\/[^/]+\/prototype\.meta\.json$/.test(normalized)) return { kind: "page-prototype-meta", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
     if (/^demos\/[^/]+\/config\.schema\.json$/.test(normalized)) return { kind: "page-schema", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
+    if (/^demos\/[^/]+\/config\.ts$/.test(normalized)) return { kind: "page-schema", text: true, maxBytes: TEXT_MAX_BYTES, validation: "text" };
     if (/^demos\/[^/]+\/sketch\.scene\.json$/.test(normalized)) return { kind: "page-sketch-scene", text: true, maxBytes: TEXT_MAX_BYTES, validation: "sketch-scene" };
     if (/^demos\/[^/]+\/sketch\.meta\.json$/.test(normalized)) return { kind: "page-sketch-meta", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
     if (normalized === "project.config.schema.json") return { kind: "project-schema", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };

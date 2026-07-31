@@ -6,6 +6,7 @@ dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
 
 import { config } from "./config";
 import { registerRoutes } from "./routes";
@@ -39,6 +40,18 @@ async function start() {
     methods: ["GET", "POST", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
+  });
+
+  await fastify.register(rateLimit, {
+    max: 60,
+    timeWindow: "10 seconds",
+    errorResponseBuilder: () => ({
+      success: false,
+      error: {
+        code: "TOO_MANY_REQUESTS",
+        message: "请求过于频繁，请稍后重试",
+      },
+    }),
   });
 
   await registerRoutes(fastify);

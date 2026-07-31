@@ -1,6 +1,6 @@
 ---
 name: page-lifecycle
-description: 创建/重命名/排序页面和文件夹的完整规则：目录命名、默认文件结构、workspace-tree.json 编辑、配置项约束。触发词：创建新页面、新建 demo、重命名页面、调整页面顺序、创建文件夹、移动页面到文件夹。不适用于页面删除或运行时类型转换。
+description: 创建/重命名/排序页面和文件夹的完整规则：目录命名、默认文件结构、workspace-tree.json 编辑、配置项约束。触发词：创建新页面、新建 demo、重命名页面、调整页面顺序、创建文件夹、移动页面到文件夹。不适用于页面删除或运行时类型转换。重要：config.schema.json 是 config.ts 的编译产物，AI 应始终编辑 config.ts，不要直接编辑 config.schema.json。
 ---
 
 # 页面生命周期操作
@@ -14,34 +14,59 @@ description: 创建/重命名/排序页面和文件夹的完整规则：目录�
 2. 默认创建 HTML/CSS 原型页。默认目录中创建三个文件：
    - `prototype.html` — 页面 HTML 结构
    - `prototype.css` — 页面 CSS 样式
-   - `config.schema.json` — 页面配置定义；如果用户没有明确要求配置项，必须写入空配置 schema，不能从页面内容中自行抽取配置字段
+   - `config.ts` — 页面配置定义（AI 友好的 TS 对象字面量格式）；如果用户没有明确要求配置项，必须写入空配置，不能从页面内容中自行抽取配置字段
+   - ⚠️ 不要创建 `config.schema.json`，它是 `config.ts` 的编译产物，写入 `config.ts` 后系统会自动生成
 
 ### 默认 runtime 选择策略
 
 - HTML/CSS 原型页是创作端 AI 的默认实现方式
 - 只有当用户明确要求 React/高保真实现，或需求必须依赖原型页禁止/不支持的能力（例如任意 JavaScript 执行、复杂第三方 JS 播放器、需要 React 状态组件生态的交互）时，才创建或切换为 `high-fidelity-react`
-- 选择 `high-fidelity-react` 时，目录中创建 `index.tsx` 和 `config.schema.json`；不要同时保留同一轮生成的 `prototype.html/css` 作为有效页面源码
+- 选择 `high-fidelity-react` 时，目录中创建 `index.tsx` 和 `config.ts`；不要同时保留同一轮生成的 `prototype.html/css` 作为有效页面源码
 
-### 默认 config.schema.json 模板
+### 默认 config.ts 模板
 
-用户没有明确提出配置项时，`config.schema.json` 使用空属性集合：
+用户没有明确提出配置项时，`config.ts` 使用空配置对象：
 
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "$demo": {
-    "previewSize": {
-      "width": 375,
-      "height": 812
-    }
-  },
-  "properties": {},
-  "required": []
-}
+```typescript
+export default {
+  $preview: { width: 375, height: 812 },
+};
 ```
 
-`previewSize` 的宽高由你根据页面目标设备和内容自行判断填写。
+`$preview` 的宽高由你根据页面目标设备和内容自行判断填写。
+
+如果用户明确要求配置项，使用以下格式定义字段（按分组组织）：
+
+```typescript
+export default {
+  $preview: { width: 375, height: 812 },
+
+  "分组名称": {
+    fieldName: { type: "string", title: "显示名称", default: "默认值" },
+    count: { type: "number", title: "数量", default: 0 },
+    enabled: { type: "boolean", title: "启用", default: true },
+    bgColor: { type: "color", title: "背景颜色", default: "#ffffff" },
+    logo: { type: "image", title: "Logo", accept: "image/*" },
+    mode: { type: "enum", title: "模式", enum: ["a", "b"], enumNames: ["模式A", "模式B"], default: "a" },
+  },
+
+  "列表": {
+    items: {
+      type: "array",
+      title: "列表项",
+      variants: {
+        text: {
+          title: "文本项",
+          content: { type: "text", title: "文本内容", default: "" },
+        },
+      },
+      default: [],
+    },
+  },
+};
+```
+
+支持的类型：`string`、`number`、`integer`、`boolean`、`text`（长文本）、`color`、`image`、`imageList`、`richtext`、`enum`、`array`。
 
 ### workspace-tree.json 追加规则
 
@@ -64,11 +89,11 @@ description: 创建/重命名/排序页面和文件夹的完整规则：目录�
 
 ### 配置项约束
 
-新建页面时，标题、文案、图片、颜色、按钮、布局等内容默认都应直接写在当前运行时源码中：原型页写入 `prototype.html` / `prototype.css`，高保真页写入 `index.tsx`。只有用户明确说"添加配置项"、"这个要可配置"、"加一个字段"等配置诉求时，才可以在 `config.schema.json` 中添加对应字段。
+新建页面时，标题、文案、图片、颜色、按钮、布局等内容默认都应直接写在当前运行时源码中：原型页写入 `prototype.html` / `prototype.css`，高保真页写入 `index.tsx`。只有用户明确说"添加配置项"、"这个要可配置"、"加一个字段"等配置诉求时，才可以在 `config.ts` 中添加对应字段。
 
 ### 自检规则
 
-新建页面的 `config.schema.json` 中不得包含 `project.config.schema.json` 中已有的字段名。
+新建页面的 `config.ts` 中不得包含 `project.config.ts` 中已有的字段名。
 
 ## 重命名 / 改顺序
 

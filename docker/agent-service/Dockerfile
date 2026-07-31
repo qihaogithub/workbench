@@ -1,9 +1,21 @@
-# syntax=docker/dockerfile:1.7
 FROM node:20-bookworm-slim AS builder
 
-RUN apt-get update \
+ARG DEBIAN_MIRROR=
+
+RUN if [ -n "$DEBIAN_MIRROR" ]; then \
+      find /etc/apt -type f \( -name 'sources.list' -o -name '*.sources' \) -print0 \
+        | xargs -0 sed -i \
+          -e "s|http://deb.debian.org/debian|${DEBIAN_MIRROR}|g" \
+          -e "s|http://deb.debian.org/debian-security|${DEBIAN_MIRROR}-security|g" \
+          -e "s|http://security.debian.org/debian-security|${DEBIAN_MIRROR}-security|g"; \
+    fi \
+    && apt-get update \
     && apt-get install -y --no-install-recommends python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
+
+ARG NPM_REGISTRY=https://registry.npmmirror.com
+ENV COREPACK_NPM_REGISTRY=${NPM_REGISTRY}
+ENV npm_config_disturl=https://npmmirror.com/mirrors/node
 
 RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
 
@@ -30,6 +42,9 @@ COPY packages/agent-service/ ./packages/agent-service/
 RUN pnpm --filter @workbench/agent-service build:docker
 
 FROM node:20-bookworm-slim
+
+ARG NPM_REGISTRY=https://registry.npmmirror.com
+ENV npm_config_registry=${NPM_REGISTRY}
 
 WORKDIR /app
 

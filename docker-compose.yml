@@ -10,7 +10,7 @@ services:
       - HOST=0.0.0.0
       - DATA_DIR=/app/data
       - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-}
-      - KNOWLEDGE_RECONCILE_INTERVAL_MS=${KNOWLEDGE_RECONCILE_INTERVAL_MS:-5000}
+      - KNOWLEDGE_RECONCILE_INTERVAL_MS=${KNOWLEDGE_RECONCILE_INTERVAL_MS:-60000}
       - KNOWLEDGE_BACKUP_INTERVAL_MS=${KNOWLEDGE_BACKUP_INTERVAL_MS:-86400000}
       - KNOWLEDGE_BACKUP_RETENTION_DAYS=${KNOWLEDGE_BACKUP_RETENTION_DAYS:-7}
     volumes:
@@ -138,12 +138,13 @@ services:
       - PUPPETEER_DISABLE_SANDBOX=${PUPPETEER_DISABLE_SANDBOX:-true}
       - DATA_DIR=/app/data
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3200,http://localhost:3300}
+      - SCREENSHOT_MAX_CONCURRENT_PAGES=${SCREENSHOT_MAX_CONCURRENT_PAGES:-4}
     volumes:
       - ${APP_DATA_DIR:-/opt/workbench/data}:/app/data
     depends_on:
       - author-site
-    cpus: "1.0"
-    mem_limit: 1536m
+    cpus: "2.5"
+    mem_limit: 2048m
     pids_limit: 768
     shm_size: 256m
     restart: unless-stopped

@@ -57,6 +57,11 @@ interface PageConfigPanelProps {
   title?: string;
   hideDetailHeader?: boolean;
   typeLimits?: Record<string, number>;
+  onEnterPositionEdit?: (items: string[], positions: Record<string, { x: number; y: number }>) => void;
+  onExitPositionEdit?: () => void;
+  positionEditActive?: boolean;
+  positionEditDimming?: boolean;
+  onTogglePositionDimming?: () => void;
 }
 
 function getSortedPages(pages: PageConfigPanelPage[]) {
@@ -172,6 +177,11 @@ export function PageConfigPanel({
   title = "配置面板",
   hideDetailHeader = false,
   typeLimits,
+  onEnterPositionEdit,
+  onExitPositionEdit,
+  positionEditActive,
+  positionEditDimming,
+  onTogglePositionDimming,
 }: PageConfigPanelProps) {
   const [internalDetailPageId, setInternalDetailPageId] = useState<
     string | null
@@ -483,6 +493,11 @@ export function PageConfigPanel({
                   readonly={readonly}
                   configCategoryFilter={configCategoryFilter}
                   typeLimits={typeLimits}
+                  onEnterPositionEdit={onEnterPositionEdit}
+                  onExitPositionEdit={onExitPositionEdit}
+                  positionEditActive={positionEditActive}
+                  positionEditDimming={positionEditDimming}
+                  onTogglePositionDimming={onTogglePositionDimming}
                 />
               </ConfigScopeWrapper>
             </section>

@@ -6547,6 +6547,7 @@ export function SketchEditorCanvas({
         if (mode !== "edit") return;
         event.preventDefault();
         activateSketchKeyboardScope(controller);
+        releasePointerCapture();
         const target = event.target as Element;
         const nodeId = getSketchTargetNodeId(target);
         if (nodeId) {
@@ -7014,12 +7015,22 @@ export function SketchEditorCanvas({
       </div>
       {contextMenu && typeof document !== "undefined" ? (
         createPortal(
+          <>
+          <div
+            aria-hidden
+            onPointerDown={(event) => {
+              event.stopPropagation();
+              setContextMenu(null);
+            }}
+            className="fixed inset-0 cursor-default"
+            style={{ zIndex: 9998 }}
+          />
           <div
             ref={contextMenuRef}
             role="menu"
             aria-label="草图右键菜单"
-            className="fixed z-[9999] min-w-36 overflow-hidden rounded-md border border-border bg-card py-1 text-sm text-foreground shadow-2xl"
-            style={{ left: contextMenuPos.x, top: contextMenuPos.y }}
+            className="fixed min-w-36 overflow-hidden rounded-md border border-border bg-card py-1 text-sm text-foreground shadow-2xl"
+            style={{ left: contextMenuPos.x, top: contextMenuPos.y, zIndex: 9999 }}
             onPointerDown={(event) => {
               event.stopPropagation();
               activateSketchKeyboardScope(controller);
@@ -7120,7 +7131,8 @@ export function SketchEditorCanvas({
             disabled={!canUngroupSelection}
             onClick={() => runContextMenuAction(() => ungroupSelected(scene, controller))}
           />
-          </div>,
+          </div>
+          </>,
           document.body,
         )
       ) : null}
