@@ -13,6 +13,8 @@ const VALID_TYPES = new Set([
   "array",
   "richtext",
   "enum",
+  "cascade",
+  "position",
 ]);
 
 const TYPE_META_KEYS = new Set([
@@ -306,21 +308,62 @@ function compileFieldDescriptor(
       result["ui:widget"] = "richtext";
       break;
     case "enum":
-      result.type = "string";
+      if (field.multiple === true) {
+        result.type = "array";
+        result["ui:widget"] = "multiselect";
+        result.items = { type: "string" };
+      } else {
+        result.type = "string";
+      }
       break;
     case "array":
       result.type = "array";
       break;
+    case "cascade":
+      result.type = "array";
+      result["ui:widget"] = "cascade";
+      break;
+    case "position":
+      result.type = "object";
+      break;
+  }
+
+  if (configType === "position") {
+    const posDefault = field.default as { x?: number; y?: number } | undefined;
+    result.properties = {
+      x: { type: "number", default: posDefault?.x ?? 0 },
+      y: { type: "number", default: posDefault?.y ?? 0 },
+    };
+    const posInfo: Record<string, unknown> = {};
+    if (field.key) posInfo.key = field.key;
+    if (field.size) posInfo.size = field.size;
+    if (Object.keys(posInfo).length > 0) {
+      if (!result.$demo) result.$demo = {};
+      (result.$demo as Record<string, unknown>).positionable = posInfo;
+    }
   }
 
   for (const [k, v] of Object.entries(field)) {
     if (k === "type") continue;
+    if (configType === "position" && (k === "key" || k === "size" || k === "default")) continue;
     if (k === "title") result.title = v;
     else if (k === "default") result.default = v;
     else if (k === "required") continue;
     else if (k === "description") result.description = v;
-    else if (k === "enum") result.enum = v;
-    else if (k === "enumNames") result.enumNames = v;
+    else if (k === "enum") {
+      if (configType === "enum" && field.multiple) {
+        ((result.items as Record<string, unknown>) || (result.items = {} as Record<string, unknown>)).enum = v;
+      } else {
+        result.enum = v;
+      }
+    }
+    else if (k === "enumNames") {
+      if (configType === "enum" && field.multiple) {
+        ((result.items as Record<string, unknown>) || (result.items = {} as Record<string, unknown>)).enumNames = v;
+      } else {
+        result.enumNames = v;
+      }
+    }
     else if (k === "min") result.minimum = v;
     else if (k === "max") result.maximum = v;
     else if (k === "maxLength") result.maxLength = v;
@@ -328,6 +371,10 @@ function compileFieldDescriptor(
       result.format = v;
     } else if (k === "widget" && configType !== "richtext") {
       result["ui:widget"] = v;
+    } else if (k === "options") {
+      uiOptions.cascadeOptions = v;
+    } else if (k === "multiple") {
+      continue;
     } else if (k === "note") {
       if (!result.$demo) result.$demo = {};
       (result.$demo as Record<string, unknown>).note = v;
@@ -398,13 +445,13 @@ function compileOneOfVariantsForArray(
     required.push("type");
 
     for (const [fk, fv] of Object.entries(v)) {
-      if (fk === "title") continue;
-      if (fk.startsWith("_")) {
-        if (fk === "_maxItems") {
-          variantDemo.maxItems = fv;
+        if (fk === "title") continue;
+        if (fk.startsWith("_")) {
+          if (fk === "_maxItems") {
+            variantDemo.maxItems = fv;
+          }
+          continue;
         }
-        continue;
-      }
       if (fk === "_fixed") continue;
       const compiled = compileFieldDescriptor(fk, fv as Record<string, unknown>);
       props[fk] = compiled.result;
@@ -483,11 +530,6 @@ function transformToJsonSchema(
     if (topKey === "$preview") {
       const pv = topValue as Record<string, unknown>;
       demo.previewSize = { width: pv.width, height: pv.height };
-      continue;
-    }
-
-    if (topKey === "$positionable") {
-      demo.positionable = topValue;
       continue;
     }
 
@@ -639,6 +681,8 @@ function reverseType(field: Record<string, unknown>): string {
   const uiWidget = field["ui:widget"] as string | undefined;
 
   if (type === "array") {
+    if (uiWidget === "multiselect") return "enum";
+    if (uiWidget === "cascade") return "cascade";
     const items = field.items as Record<string, unknown> | undefined;
     if (items && items.type === "string" && !items.properties && !items.oneOf) {
       return "imageList";
@@ -661,6 +705,11 @@ function reverseType(field: Record<string, unknown>): string {
     return "string";
   }
 
+  if (type === "object") {
+    const demo = field.$demo as Record<string, unknown> | undefined;
+    if (demo?.positionable) return "position";
+  }
+
   return type || "string";
 }
 
@@ -675,11 +724,18 @@ function reverseFieldMeta(
   if (field.default !== undefined) result.default = field.default;
   if (field.description !== undefined) result.description = field.description;
 
-  if (field.enum !== undefined && resolvedType === "enum") {
-    result.enum = field.enum;
-  }
-  if (field.enumNames !== undefined && resolvedType === "enum") {
-    result.enumNames = field.enumNames;
+  if (resolvedType === "enum") {
+    if (field.type === "array") {
+      const items = field.items as Record<string, unknown> | undefined;
+      if (items) {
+        if (items.enum !== undefined) result.enum = items.enum;
+        if (items.enumNames !== undefined) result.enumNames = items.enumNames;
+      }
+      result.multiple = true;
+    } else {
+      if (field.enum !== undefined) result.enum = field.enum;
+      if (field.enumNames !== undefined) result.enumNames = field.enumNames;
+    }
   }
 
   if (field.minimum !== undefined) result.min = field.minimum;
@@ -689,29 +745,46 @@ function reverseFieldMeta(
     result.maxLength = field.maxLength;
   }
 
+  if (resolvedType === "position") {
+    const props = field.properties as Record<string, Record<string, unknown>> | undefined;
+    const xDefault = props?.x?.default as number | undefined;
+    const yDefault = props?.y?.default as number | undefined;
+    if (xDefault !== undefined || yDefault !== undefined) {
+      result.default = { x: xDefault ?? 0, y: yDefault ?? 0 };
+    }
+    const demo = field.$demo as Record<string, unknown> | undefined;
+    const pos = demo?.positionable as Record<string, unknown> | undefined;
+    if (pos?.key) result.key = pos.key;
+    if (pos?.size) result.size = pos.size;
+  }
+
   if (field.format !== undefined && resolvedType !== "color" && resolvedType !== "image") {
     result.format = field.format;
   }
 
   const uiWidget = field["ui:widget"] as string | undefined;
-  if (uiWidget !== undefined && resolvedType !== "richtext") {
+  if (uiWidget !== undefined && resolvedType !== "richtext" && resolvedType !== "enum" && resolvedType !== "cascade") {
     result.widget = uiWidget;
   }
 
   const uiOptions = field["ui:options"] as Record<string, unknown> | undefined;
   if (uiOptions) {
-    if (uiOptions.accept !== undefined) result.accept = uiOptions.accept;
-    if (uiOptions.maxSize !== undefined) result.maxSize = uiOptions.maxSize;
-    if (uiOptions.minWidth !== undefined) result.minWidth = uiOptions.minWidth;
-    if (uiOptions.minHeight !== undefined) result.minHeight = uiOptions.minHeight;
-    if (uiOptions.maxWidth !== undefined) result.maxWidth = uiOptions.maxWidth;
-    if (uiOptions.maxHeight !== undefined) result.maxHeight = uiOptions.maxHeight;
-    if (uiOptions.maxItems !== undefined) result.maxItems = uiOptions.maxItems;
-    if (uiOptions.collapsed !== undefined) result.collapsed = uiOptions.collapsed;
-    if (uiOptions.itemTitleField !== undefined) result.itemTitleField = uiOptions.itemTitleField;
-    if (uiOptions.category !== undefined) result.category = uiOptions.category;
-    if (uiOptions.visibleWhen !== undefined) result.visibleWhen = uiOptions.visibleWhen;
-    if (uiOptions.fixed !== undefined) result._fixed = uiOptions.fixed;
+    if (resolvedType === "cascade") {
+      if (uiOptions.cascadeOptions !== undefined) result.options = uiOptions.cascadeOptions;
+    } else {
+      if (uiOptions.accept !== undefined) result.accept = uiOptions.accept;
+      if (uiOptions.maxSize !== undefined) result.maxSize = uiOptions.maxSize;
+      if (uiOptions.minWidth !== undefined) result.minWidth = uiOptions.minWidth;
+      if (uiOptions.minHeight !== undefined) result.minHeight = uiOptions.minHeight;
+      if (uiOptions.maxWidth !== undefined) result.maxWidth = uiOptions.maxWidth;
+      if (uiOptions.maxHeight !== undefined) result.maxHeight = uiOptions.maxHeight;
+      if (uiOptions.maxItems !== undefined) result.maxItems = uiOptions.maxItems;
+      if (uiOptions.collapsed !== undefined) result.collapsed = uiOptions.collapsed;
+      if (uiOptions.itemTitleField !== undefined) result.itemTitleField = uiOptions.itemTitleField;
+      if (uiOptions.category !== undefined) result.category = uiOptions.category;
+      if (uiOptions.visibleWhen !== undefined) result.visibleWhen = uiOptions.visibleWhen;
+      if (uiOptions.fixed !== undefined) result._fixed = uiOptions.fixed;
+    }
   }
 
   const demo = field.$demo as Record<string, unknown> | undefined;
@@ -826,9 +899,6 @@ export function decompileSchema(schemaJson: string): string {
     if (demo.previewSize) {
       const ps = demo.previewSize as Record<string, unknown>;
       config.$preview = { width: ps.width, height: ps.height };
-    }
-    if (demo.positionable) {
-      config.$positionable = demo.positionable;
     }
   }
 

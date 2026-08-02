@@ -1,4 +1,4 @@
-import type { PreviewSize, PositionableConfig, PositionItem } from "./types";
+import type { PreviewSize } from "./types";
 
 export function isSchemaEmpty(schema?: string | null): boolean {
   if (!schema) return true;
@@ -25,15 +25,6 @@ export function getDefaultValues(schema: string): Record<string, unknown> {
           defaults[key] = prop.default;
         }
       }
-    }
-
-    const positionable = getPositionable(schema);
-    if (positionable) {
-      const positions: Record<string, PositionItem> = {};
-      for (const key of positionable.items) {
-        positions[key] = positionable.defaults?.[key] || { x: 0, y: 0 };
-      }
-      defaults.__positions = positions;
     }
 
     return defaults;
@@ -89,54 +80,6 @@ export function getPreviewSize(schema: string): PreviewSize | undefined {
     }
 
     return Object.keys(size).length > 0 ? size : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-export function getPositionable(
-  schema: string,
-): PositionableConfig | undefined {
-  try {
-    const parsed = JSON.parse(schema);
-
-    const positionable = parsed.$demo?.positionable;
-    if (!positionable || !Array.isArray(positionable.items) || positionable.items.length < 1) {
-      return undefined;
-    }
-
-    const validItems = positionable.items.filter(
-      (key: unknown): key is string => typeof key === "string",
-    );
-
-    if (validItems.length < 1) return undefined;
-
-    const defaults: Record<string, PositionItem> = {};
-    if (positionable.defaults && typeof positionable.defaults === "object") {
-      for (const [key, val] of Object.entries(positionable.defaults)) {
-        if (
-          val &&
-          typeof val === "object" &&
-          typeof (val as Record<string, unknown>).x === "number" &&
-          typeof (val as Record<string, unknown>).y === "number"
-        ) {
-          defaults[key] = { x: (val as { x: number; y: number }).x, y: (val as { x: number; y: number }).y };
-        }
-      }
-    }
-
-    const size =
-      positionable.size &&
-      typeof positionable.size === "object" &&
-      typeof (positionable.size as Record<string, unknown>).width === "number" &&
-      typeof (positionable.size as Record<string, unknown>).height === "number"
-        ? {
-            width: (positionable.size as { width: number }).width,
-            height: (positionable.size as { height: number }).height,
-          }
-        : undefined;
-
-    return { items: validItems, defaults, size };
   } catch {
     return undefined;
   }

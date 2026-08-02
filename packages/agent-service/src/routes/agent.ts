@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import rateLimit from '@fastify/rate-limit';
 import { createAgentBusyResult, getAgentManager } from '../core/agent-manager';
 import { BackendAgent } from '../core/backend-agent';
 import { getSessionModelConfigs } from '../config/session-model-configs';
@@ -100,18 +101,27 @@ interface DiscardFilesBody {
 }
 
 export async function registerAgentRoutes(fastify: FastifyInstance) {
-  const manager = getAgentManager();
+  await fastify.register(async (scoped) => {
+    await scoped.register(rateLimit, {
+      max: 60,
+      timeWindow: 60000,
+      keyGenerator: (request) => {
+        return request.ip;
+      },
+    });
+
+    const manager = getAgentManager();
 
   const sessionStore = getSessionStore();
 
-  fastify.get('/api/tools/capabilities', async (_request, reply: FastifyReply) => {
+  scoped.get('/api/tools/capabilities', async (_request, reply: FastifyReply) => {
     return reply.send({
       success: true,
       data: getWorkbenchToolCapabilities(),
     });
   });
 
-  fastify.post<{ Params: SessionParams; Body: SendMessageBody }>(
+  scoped.post<{ Params: SessionParams; Body: SendMessageBody }>(
     '/api/agent/:sessionId/message',
     async (request: FastifyRequest<{ Params: SessionParams; Body: SendMessageBody }>, reply: FastifyReply) => {
       const { sessionId } = request.params;
@@ -303,7 +313,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.get<{ Params: SessionParams }>(
+  scoped.get<{ Params: SessionParams }>(
     '/api/agent/:sessionId',
     async (request: FastifyRequest<{ Params: SessionParams }>, reply: FastifyReply) => {
       const { sessionId } = request.params;
@@ -326,7 +336,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.delete<{ Params: SessionParams }>(
+  scoped.delete<{ Params: SessionParams }>(
     '/api/agent/:sessionId',
     async (request: FastifyRequest<{ Params: SessionParams }>, reply: FastifyReply) => {
       const { sessionId } = request.params;
@@ -354,7 +364,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.get<{ Params: SessionParams; Querystring: { includeContent?: string } }>(
+  scoped.get<{ Params: SessionParams; Querystring: { includeContent?: string } }>(
     '/api/agent/:sessionId/files',
     async (request: FastifyRequest<{ Params: SessionParams; Querystring: { includeContent?: string } }>, reply: FastifyReply) => {
       const { sessionId } = request.params;
@@ -398,7 +408,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.get<{ Querystring: ListSessionsQuery }>(
+  scoped.get<{ Querystring: ListSessionsQuery }>(
     '/api/sessions',
     async (request: FastifyRequest<{ Querystring: ListSessionsQuery }>, reply: FastifyReply) => {
       const { status, limit, offset } = request.query;
@@ -423,7 +433,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.post<{ Params: SessionParams; Body: RollbackBody }>(
+  scoped.post<{ Params: SessionParams; Body: RollbackBody }>(
     '/api/agent/:sessionId/rollback',
     async (request: FastifyRequest<{ Params: SessionParams; Body: RollbackBody }>, reply: FastifyReply) => {
       const { sessionId } = request.params;
@@ -522,7 +532,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
     },
   );
 
-  fastify.get<{ Params: SessionParams }>(
+  scoped.get<{ Params: SessionParams }>(
     '/api/agent/:sessionId/workspace',
     async (request: FastifyRequest<{ Params: SessionParams }>, reply: FastifyReply) => {
       const { sessionId } = request.params;
@@ -553,7 +563,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.put<{ Params: SessionParams; Body: UpdateWorkspaceBody }>(
+  scoped.put<{ Params: SessionParams; Body: UpdateWorkspaceBody }>(
     '/api/agent/:sessionId/workspace',
     async (request: FastifyRequest<{ Params: SessionParams; Body: UpdateWorkspaceBody }>, reply: FastifyReply) => {
       const { sessionId } = request.params;
@@ -611,7 +621,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.post<{ Params: SessionParams; Body: StageFilesBody }>(
+  scoped.post<{ Params: SessionParams; Body: StageFilesBody }>(
     '/api/agent/:sessionId/files/stage',
     async (request: FastifyRequest<{ Params: SessionParams; Body: StageFilesBody }>, reply: FastifyReply) => {
       const { sessionId } = request.params;
@@ -657,7 +667,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.post<{ Params: SessionParams; Body: DiscardFilesBody }>(
+  scoped.post<{ Params: SessionParams; Body: DiscardFilesBody }>(
     '/api/agent/:sessionId/files/discard',
     async (request: FastifyRequest<{ Params: SessionParams; Body: DiscardFilesBody }>, reply: FastifyReply) => {
       const { sessionId } = request.params;
@@ -702,4 +712,5 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
       });
     }
   );
+  });
 }

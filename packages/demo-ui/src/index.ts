@@ -39,6 +39,9 @@ export type {
   PositionItem,
   PositionableSizeItem,
   PositionEditMode,
+  PositionEditBoundary,
+  PositionEditBoundaryAbsolute,
+  PositionEditBoundaryPadding,
   VisualAnnotation,
   VisualEditPatch,
   VisualInlineEditPayload,
@@ -70,7 +73,6 @@ export type {
   ElementLocationResultPayload,
 } from "./iframe-types";
 export {
-  getPositionable,
   getDefaultValues,
   getPreviewSize,
   isSchemaEmpty,
@@ -125,6 +127,7 @@ export type {
   FieldGroup,
   OneOfConfig,
   OneOfVariant,
+  CascadeOption,
 } from "./schema-parser";
 export { PreviewPanel } from "./PreviewPanel";
 export { SinglePagePreview } from "./SinglePagePreview";

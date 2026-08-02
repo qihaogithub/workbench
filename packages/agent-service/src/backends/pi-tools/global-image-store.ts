@@ -123,6 +123,17 @@ function readManifest(): ImageStoreManifest {
   }
 }
 
+export function findImageDimensionsBySha256(
+  sha256: string,
+): { width?: number; height?: number } {
+  const manifest = readManifest();
+  const entry = manifest.images.find((img) => img.sha256 === sha256);
+  if (entry && entry.width != null && entry.height != null) {
+    return { width: entry.width, height: entry.height };
+  }
+  return {};
+}
+
 function writeManifest(manifest: ImageStoreManifest): void {
   const blobsDir = getBlobsDir();
   if (!fs.existsSync(blobsDir)) {

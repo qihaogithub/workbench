@@ -10,6 +10,12 @@ export interface OneOfConfig {
   variants: OneOfVariant[];
 }
 
+export interface CascadeOption {
+  value: string;
+  label: string;
+  children?: CascadeOption[];
+}
+
 export interface FieldConfig {
   key: string;
   title: string;
@@ -31,6 +37,9 @@ export interface FieldConfig {
   itemsType?: string;
   children?: FieldConfig[];
   oneOf?: OneOfConfig;
+  multiple?: boolean;
+  options?: CascadeOption[];
+  positionable?: { key?: string; size?: { width: number; height: number } };
 }
 
 export interface FieldGroup {
@@ -182,6 +191,31 @@ function parseProperties(
         | string
         | undefined,
     };
+
+    if (prop["ui:widget"] === "multiselect") {
+      const items = prop.items as Record<string, unknown> | undefined;
+      if (items) {
+        field.enum = items.enum as unknown[] | undefined;
+        field.enumNames = items.enumNames as string[] | undefined;
+      }
+      field.multiple = true;
+    }
+
+    if (prop["ui:widget"] === "cascade") {
+      field.options = uiOptions?.cascadeOptions as CascadeOption[] | undefined;
+    }
+
+    if (prop.type === "object") {
+      const demo = (prop as Record<string, unknown>).$demo as Record<string, unknown> | undefined;
+      if (demo?.positionable && typeof demo.positionable === "object") {
+        const pos = demo.positionable as Record<string, unknown>;
+        field.positionable = {
+          key: typeof pos.key === "string" ? pos.key : undefined,
+          size: pos.size as { width: number; height: number } | undefined,
+        };
+      }
+    }
+
     return field;
   });
 }
@@ -292,6 +326,30 @@ export function parseSchemaToFields(schema: string, typeLimits?: Record<string, 
             | string
             | undefined,
         };
+
+        if (prop["ui:widget"] === "multiselect") {
+          const propItems = prop.items as Record<string, unknown> | undefined;
+          if (propItems) {
+            field.enum = propItems.enum as unknown[] | undefined;
+            field.enumNames = propItems.enumNames as string[] | undefined;
+          }
+          field.multiple = true;
+        }
+
+        if (prop["ui:widget"] === "cascade") {
+          field.options = uiOptions?.cascadeOptions as CascadeOption[] | undefined;
+        }
+
+        if (prop.type === "object") {
+          const pdemo = prop.$demo as Record<string, unknown> | undefined;
+          if (pdemo?.positionable && typeof pdemo.positionable === "object") {
+            const pos = pdemo.positionable as Record<string, unknown>;
+            field.positionable = {
+              key: typeof pos.key === "string" ? pos.key : undefined,
+              size: pos.size as { width: number; height: number } | undefined,
+            };
+          }
+        }
 
         const items = prop.items as Record<string, unknown> | undefined;
         if (

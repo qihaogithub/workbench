@@ -377,6 +377,8 @@ export async function POST(
         format: ext.slice(1),
         createdAt: Date.now(),
         createdBy: "user",
+        width: uploadResult.width,
+        height: uploadResult.height,
         contentHash: hash,
         mimeType: uploadResult.mimeType,
         originalUrl: originalUrl || undefined,

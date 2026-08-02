@@ -40,7 +40,7 @@ export function loadConfig(): ServiceConfig {
       ),
     },
     rateLimit: {
-      max: parseInt(process.env.RATE_LIMIT_MAX || "100", 10),
+      max: parseInt(process.env.RATE_LIMIT_MAX || "500", 10),
       windowMs: parseInt(process.env.RATE_LIMIT_WINDOW || "60000", 10),
     },
   };

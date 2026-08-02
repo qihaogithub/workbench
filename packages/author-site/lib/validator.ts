@@ -18,7 +18,6 @@ export {
 } from "@workbench/shared";
 
 export {
-  getPositionable,
   getDefaultValues,
   getPreviewSize,
 } from "@workbench/demo-ui";

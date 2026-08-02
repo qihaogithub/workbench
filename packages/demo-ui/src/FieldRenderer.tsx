@@ -5,6 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { useEffect, useRef } from "react";
 import {
   Select,
   SelectContent,
@@ -18,7 +19,34 @@ import { ImageListWidget, type ImageItem } from "./ImageListWidget";
 import { NoteButton } from "./NoteButton";
 import { NotePreview, stripHtml } from "./NotePreview";
 import { ArrayFieldGroup } from "./ArrayFieldGroup";
+import { MultiSelect } from "./MultiSelect";
+import { CascadeSelect } from "./CascadeSelect";
 import type { FieldConfig } from "./schema-parser";
+import { createContext, useContext, useMemo } from "react";
+import { Pencil } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+export interface PositionFieldEntry {
+  posKey: string;
+  fieldPath: string;
+  currentValue: { x: number; y: number };
+  containerSize?: { width: number; height: number };
+}
+
+export interface PositionConfigContextValue {
+  registerPositionField(entry: PositionFieldEntry): () => void;
+  requestPositionEdit(): void;
+  exitPositionEdit(): void;
+  positionEditActive: boolean;
+  dimming: boolean;
+  onToggleDimming?: () => void;
+}
+
+export const PositionConfigContext = createContext<PositionConfigContextValue | null>(null);
+
+export function usePositionConfig(): PositionConfigContextValue | null {
+  return useContext(PositionConfigContext);
+}
 
 function normalizeImageDefaults(raw: unknown): ImageItem[] | undefined {
   if (!raw) return undefined;
@@ -41,6 +69,7 @@ export function FieldRenderer({
   readonly,
   onNoteClick,
   embedded,
+  fieldPath,
 }: {
   field: FieldConfig;
   value: unknown;
@@ -49,6 +78,7 @@ export function FieldRenderer({
   readonly?: boolean;
   onNoteClick?: (fieldKey: string) => void;
   embedded?: boolean;
+  fieldPath?: string;
 }) {
   const renderInput = () => {
     if (field.uiWidget === "file" || field.uiWidget === "image") {
@@ -108,6 +138,31 @@ export function FieldRenderer({
           placeholder={`请输入${field.title}`}
           rows={5}
           className="resize-y min-h-[100px]"
+        />
+      );
+    }
+
+    if (field.uiWidget === "multiselect") {
+      const enumValues = field.enum as string[] | undefined;
+      const options = (enumValues || []).map((v, i) => ({
+        value: v,
+        label: field.enumNames?.[i] ?? v,
+      }));
+      return (
+        <MultiSelect
+          options={options}
+          value={(value as string[]) || []}
+          onChange={(v) => onChange(v)}
+        />
+      );
+    }
+
+    if (field.uiWidget === "cascade") {
+      return (
+        <CascadeSelect
+          options={field.options || []}
+          value={(value as string[]) || []}
+          onChange={(v) => onChange(v)}
         />
       );
     }
@@ -337,6 +392,17 @@ export function FieldRenderer({
       );
     }
 
+    if (field.positionable) {
+      return (
+        <PositionFieldInput
+          field={field}
+          value={value as { x: number; y: number } | undefined}
+          onChange={onChange}
+          fieldPath={fieldPath}
+        />
+      );
+    }
+
     return (
       <Input
         type="text"
@@ -356,7 +422,8 @@ export function FieldRenderer({
     field.uiWidget === "richtext" ||
     field.format === "image" ||
     field.type === "array" ||
-    (field.maxLength !== undefined && field.maxLength > 100);
+    (field.maxLength !== undefined && field.maxLength > 100) ||
+    !!field.positionable;
 
   const isTextareaField =
     field.uiWidget === "richtext" ||
@@ -395,6 +462,82 @@ export function FieldRenderer({
       <div className={isComplexField ? "w-full" : "flex-1 min-w-0"}>
         {renderInput()}
       </div>
+    </div>
+  );
+}
+
+function PositionFieldInput({
+  field,
+  value,
+  onChange,
+  fieldPath,
+}: {
+  field: FieldConfig;
+  value: { x: number; y: number } | undefined;
+  onChange: (value: unknown) => void;
+  fieldPath?: string;
+}) {
+  const posConfig = usePositionConfig();
+  const pos = value || { x: 0, y: 0 };
+  const posKey = field.positionable?.key || field.key;
+  const containerWidth = field.positionable?.size?.width ?? 0;
+  const containerHeight = field.positionable?.size?.height ?? 0;
+
+  useEffect(() => {
+    if (!posConfig || !fieldPath) return;
+    return posConfig.registerPositionField({
+      posKey,
+      fieldPath,
+      currentValue: pos,
+      containerSize: field.positionable?.size,
+    });
+  }, [posConfig, posKey, fieldPath, pos.x, pos.y, field.positionable?.size]);
+
+  const handleCoordChange = (axis: "x" | "y", val: string) => {
+    const num = parseInt(val, 10);
+    if (isNaN(num)) return;
+    const maxVal = axis === "x" ? containerWidth : containerHeight;
+    const bounded = containerWidth > 0 || containerHeight > 0
+      ? Math.max(0, maxVal > 0 ? Math.min(num, maxVal) : num)
+      : num;
+    onChange({ ...pos, [axis]: bounded });
+  };
+
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <div className="flex items-center gap-1">
+        <span className="text-muted-foreground/60 w-3">X</span>
+        <Input
+          type="number"
+          value={pos.x}
+          onChange={(e) => handleCoordChange("x", e.target.value)}
+          className="h-6 w-16 text-xs px-1.5"
+          min={0}
+          max={containerWidth > 0 ? containerWidth : undefined}
+        />
+      </div>
+      <div className="flex items-center gap-1">
+        <span className="text-muted-foreground/60 w-3">Y</span>
+        <Input
+          type="number"
+          value={pos.y}
+          onChange={(e) => handleCoordChange("y", e.target.value)}
+          className="h-6 w-16 text-xs px-1.5"
+          min={0}
+          max={containerHeight > 0 ? containerHeight : undefined}
+        />
+      </div>
+      {posConfig && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-6 text-xs px-2 shrink-0"
+          onClick={() => posConfig.requestPositionEdit()}
+        >
+          <Pencil className="h-3 w-3 mr-1" />
+          拖动
+        </Button>
+      )}
     </div>
   );
 }

@@ -48,6 +48,8 @@ export default {
     bgColor: { type: "color", title: "背景颜色", default: "#ffffff" },
     logo: { type: "image", title: "Logo", accept: "image/*" },
     mode: { type: "enum", title: "模式", enum: ["a", "b"], enumNames: ["模式A", "模式B"], default: "a" },
+    tags: { type: "enum", title: "标签", enum: ["tech", "design"], enumNames: ["技术", "设计"], multiple: true, default: ["tech"] },
+    region: { type: "cascade", title: "地区", default: ["zhejiang", "hangzhou"], options: [{ value: "zhejiang", label: "浙江", children: [{ value: "hangzhou", label: "杭州" }] }] },
   },
 
   "列表": {
@@ -59,6 +61,16 @@ export default {
           title: "文本项",
           content: { type: "text", title: "文本内容", default: "" },
         },
+        image: {
+          title: "图片项",
+          pic: { type: "image", title: "图片" },
+          caption: { type: "string", title: "说明", default: "" },
+        },
+        colorBlock: {
+          title: "色块",
+          label: { type: "string", title: "标签", default: "" },
+          value: { type: "color", title: "颜色", default: "#6366f1" },
+        },
       },
       default: [],
     },
@@ -66,7 +78,30 @@ export default {
 };
 ```
 
-支持的类型：`string`、`number`、`integer`、`boolean`、`text`（长文本）、`color`、`image`、`imageList`、`richtext`、`enum`、`array`。
+支持的类型：`string`、`number`、`integer`、`boolean`、`text`（长文本）、`color`、`image`、`imageList`、`richtext`、`enum`、`cascade`、`array`。
+
+**枚举多选**：`type: "enum"` 添加 `multiple: true` 即可切换为多选模式（checkbox 组），`default` 值为 `string[]`，页面 props 中该字段值为 `string[]`。
+
+**级联选择**：`type: "cascade"` 用于层级数据选择（如省市区），通过 `options` 声明嵌套选项树，`default` 为 `string[]`（从根到叶值路径），页面 props 中该字段值为 `string[]`。第一期只支持 2 级。
+
+**所有 12 种配置类型均可作为 `variants` 变体键值**，每个变体可以包含任意数量和组合的类型字段。常用模块变体示例：字符串模块（`label: string` + `value: string`）、数字模块（`label: string` + `value: number`）、开关模块（`label: string` + `value: boolean`）、颜色模块（`label: string` + `value: color`）、选项模块（`label: string` + `value: enum`）、富文本模块（`content: richtext`）、多图模块（`items: imageList`）、定位模块（`text`/`pic` + `x/y` 坐标）。
+
+### 条件表单（visibleWhen）
+
+字段可以通过 `visibleWhen` 声明条件显隐，当另一个字段的值等于指定值时，该字段才显示：
+
+```typescript
+"样式配置": {
+  mode: { type: "enum", title: "展示模式", enum: ["text", "image"], enumNames: ["文本", "图片"], default: "text" },
+  textContent: { type: "string", title: "文本内容", default: "", visibleWhen: { field: "mode", equals: "text" } },
+  imageUrl: { type: "image", title: "图片地址", visibleWhen: { field: "mode", equals: "image" } },
+}
+```
+
+规则：
+- `visibleWhen` 不是配置数据，不注入页面 props，仅控制配置面板中的字段显隐
+- 适用于 enum 联动、boolean 开关联动等场景
+- 被隐藏字段的当前值不会丢失，重新显示后恢复
 
 ### workspace-tree.json 追加规则
 

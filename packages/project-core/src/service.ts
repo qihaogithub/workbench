@@ -179,6 +179,46 @@ interface WorkspaceMetadataFile {
   [key: string]: unknown;
 }
 
+function readImageDimensions(
+  buffer: Buffer,
+  ext: string,
+): { width?: number; height?: number } {
+  try {
+    if (ext === "png" && buffer.length > 24) {
+      return {
+        width: buffer.readUInt32BE(16),
+        height: buffer.readUInt32BE(20),
+      };
+    }
+    if (ext === "jpg" || ext === "jpeg") {
+      let offset = 2;
+      while (offset < buffer.length - 2) {
+        if (buffer[offset] !== 0xff) break;
+        const marker = buffer[offset + 1];
+        if (marker === 0xc0 || marker === 0xc2) {
+          if (offset + 9 < buffer.length) {
+            return {
+              height: buffer.readUInt16BE(offset + 5),
+              width: buffer.readUInt16BE(offset + 7),
+            };
+          }
+          break;
+        }
+        offset += 2 + buffer.readUInt16BE(offset + 2);
+      }
+    }
+    if (ext === "gif" && buffer.length > 10) {
+      return {
+        width: buffer.readUInt16LE(6),
+        height: buffer.readUInt16LE(8),
+      };
+    }
+  } catch {
+    // dimensions are optional
+  }
+  return {};
+}
+
 export class ProjectAdminService {
   readonly dataDir: string;
   readonly projectsDir: string;
@@ -3840,6 +3880,10 @@ export class ProjectAdminService {
     if (!existed) {
       fs.writeFileSync(targetPath, buffer);
     }
+    const dims = readImageDimensions(
+      buffer,
+      path.extname(relativePath).slice(1).toLowerCase(),
+    );
     this.upsertProjectImageRegistry(transaction.data.projectId, {
       id: contentHash.slice(0, 12),
       filename: path.basename(relativePath),
@@ -3848,6 +3892,8 @@ export class ProjectAdminService {
       format: path.extname(relativePath).slice(1).toLowerCase(),
       createdAt: summary.createdAt ?? Date.now(),
       createdBy: summary.createdBy ?? "user",
+      width: dims.width,
+      height: dims.height,
       contentHash,
       mimeType: input.mimeType,
       originalUrl: input.originalUrl,

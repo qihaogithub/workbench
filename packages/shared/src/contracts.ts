@@ -183,11 +183,13 @@ export function normalizeWorkspaceResourcePath(resourcePath: string): string | n
 export function isManagedWorkspaceResource(resourcePath: string): boolean {
   const normalized = normalizeWorkspaceResourcePath(resourcePath);
   return Boolean(normalized && (
-    /^demos\/[^/]+\/(index\.tsx|prototype\.(html|css|meta\.json)|config\.(schema\.json|ts)|sketch\.(scene|meta)\.json)$/.test(normalized)
+    /^demos\/[^/]+\/(index\.tsx|prototype\.(html|css|meta\.json)|config\.(schema\.json|ts)|sketch\.(scene|meta)\.json|convention\.md)$/.test(normalized)
     || normalized === "project.config.schema.json"
     || normalized === "project.config.values.json"
     || normalized === "workspace-tree.json"
     || normalized === ".canvas-layout.json"
+    || normalized === "convention.md"
+    || normalized === "memory.md"
     || normalized === "knowledge/manifest.json"
     || /^knowledge\/[^/]+\.(md|markdown|mdown)$/i.test(normalized)
     || /^assets\/.+/.test(normalized)

@@ -9,6 +9,7 @@ import {
   createApiError,
   findWorkspacePath,
   ensureMemoryFile,
+  ensureConventionFile,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { isFileEditable } from "@/lib/workspace-file-utils";
@@ -132,6 +133,10 @@ export async function GET(
 
     if (relativePath === "memory.md" && !isLiveWorkspace(meta.workspaceId)) {
       ensureMemoryFile(wsPath);
+    }
+
+    if (relativePath === "convention.md") {
+      ensureConventionFile(wsPath);
     }
 
     if (!fs.existsSync(absolutePath)) {
@@ -259,11 +264,17 @@ export async function PUT(
       });
     }
 
-    if (!fs.existsSync(absolutePath)) {
-      return NextResponse.json(
-        createApiError("FILE_READ_ERROR", "文件不存在"),
-        { status: 404 },
-      );
+    const fileExists = fs.existsSync(absolutePath);
+
+    if (!fileExists) {
+      // 对可编辑白名单内的文件，允许首次创建（如页面公约）
+      const parentDir = path.dirname(absolutePath);
+      if (!fs.existsSync(parentDir)) {
+        return NextResponse.json(
+          createApiError("FILE_READ_ERROR", "父目录不存在"),
+          { status: 404 },
+        );
+      }
     }
 
     const body = await request.json().catch(() => null);
@@ -274,7 +285,9 @@ export async function PUT(
       );
     }
 
-    const previousContent = fs.readFileSync(absolutePath, "utf-8");
+    const previousContent = fileExists
+      ? fs.readFileSync(absolutePath, "utf-8")
+      : null;
     const receipt = await commitWorkspaceMutation(createTextWorkspaceMutation({
       projectId: meta.demoId,
       workspaceId: meta.workspaceId,

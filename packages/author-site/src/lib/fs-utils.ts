@@ -321,6 +321,7 @@ export const DEFAULT_DEMO_SCHEMA = JSON.stringify(
 const WORKSPACE_TREE_FILENAME = "workspace-tree.json";
 const APP_GRAPH_FILENAME = "app.graph.json";
 const MEMORY_FILENAME = "memory.md";
+const CONVENTION_FILENAME = "convention.md";
 
 function getWorkspaceTreePath(workspacePath: string): string {
   return path.join(workspacePath, WORKSPACE_TREE_FILENAME);
@@ -835,6 +836,7 @@ export function ensureWorkspaceFiles(workspacePath: string): {
   // 确保知识库目录存在并清理历史 system 条目
   ensureKnowledgeDir(workspacePath);
   ensureMemoryFile(workspacePath);
+  ensureConventionFile(workspacePath);
 
   const existing: string[] = [];
   for (const entry of fs.readdirSync(demosDir, { withFileTypes: true })) {
@@ -872,6 +874,24 @@ export function ensureMemoryFile(workspacePath: string): void {
   if (fs.existsSync(memoryPath)) return;
 
   fs.writeFileSync(memoryPath, buildInitialMemoryContent(), "utf-8");
+}
+
+function buildInitialConventionContent(): string {
+  return `# 项目公约
+
+> 项目级的创作约定，AI 必须严格遵守。由用户维护。
+
+## 通用约定
+
+- （在此记录项目级的通用约定）
+`;
+}
+
+export function ensureConventionFile(workspacePath: string): void {
+  const conventionPath = path.join(workspacePath, CONVENTION_FILENAME);
+  if (fs.existsSync(conventionPath)) return;
+
+  fs.writeFileSync(conventionPath, buildInitialConventionContent(), "utf-8");
 }
 
 function createProjectFromTemplate(name: string, templateId: string): DemoMeta {
