@@ -26,46 +26,8 @@ export class SchemaConflictError extends Error {
   }
 }
 
-const RESERVED_CONFIG_KEYS = new Set(["__positions"]);
-
-function isReservedConfigKey(key: string): boolean {
-  return RESERVED_CONFIG_KEYS.has(key);
-}
-
 function readSchemaDefaults(schema: string | undefined): Record<string, unknown> {
   return schema ? getDefaultValues(schema) : {};
-}
-
-function mergeRuntimeDefaults(
-  projectDefaults: Record<string, unknown>,
-  pageDefaults: Record<string, unknown>,
-): Record<string, unknown> {
-  const merged: Record<string, unknown> = {
-    ...projectDefaults,
-    ...pageDefaults,
-  };
-
-  const projectPositions = projectDefaults.__positions;
-  const pagePositions = pageDefaults.__positions;
-  if (
-    projectPositions &&
-    typeof projectPositions === "object" &&
-    !Array.isArray(projectPositions)
-  ) {
-    merged.__positions = { ...(projectPositions as Record<string, unknown>) };
-  }
-  if (
-    pagePositions &&
-    typeof pagePositions === "object" &&
-    !Array.isArray(pagePositions)
-  ) {
-    merged.__positions = {
-      ...((merged.__positions as Record<string, unknown> | undefined) ?? {}),
-      ...(pagePositions as Record<string, unknown>),
-    };
-  }
-
-  return merged;
 }
 
 /**
@@ -84,13 +46,16 @@ export function mergeConfigToProps(
 
   const projectKeys = new Set(Object.keys(projectDefaults));
   const overlapping = Object.keys(pageDefaults).filter(
-    (k) => projectKeys.has(k) && !isReservedConfigKey(k),
+    (k) => projectKeys.has(k),
   );
   if (overlapping.length > 0) {
     throw new SchemaConflictError(overlapping);
   }
 
-  return mergeRuntimeDefaults(projectDefaults, pageDefaults);
+  return {
+    ...projectDefaults,
+    ...pageDefaults,
+  };
 }
 
 /**
@@ -157,13 +122,6 @@ export function mergeConfigWithUserValues(
       // 使用新默认值
       result[key] = newValue;
     }
-  }
-
-  for (const key of RESERVED_CONFIG_KEYS) {
-    if (newDefaults[key] === undefined && currentConfig[key] === undefined) {
-      continue;
-    }
-    result[key] = currentConfig[key] ?? newDefaults[key];
   }
 
   return result;

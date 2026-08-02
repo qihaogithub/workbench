@@ -2,17 +2,17 @@
 
 import { DocumentEditor } from "@workbench/demo-ui";
 
-interface MemoryMarkdownEditorProps {
+interface WorkspaceMarkdownEditorProps {
   value: string;
   onChange: (md: string) => void;
   readOnly?: boolean;
 }
 
-export function MemoryMarkdownEditor({
+export function WorkspaceMarkdownEditor({
   value,
   onChange,
   readOnly = false,
-}: MemoryMarkdownEditorProps) {
+}: WorkspaceMarkdownEditorProps) {
   return (
     <DocumentEditor
       value={value}

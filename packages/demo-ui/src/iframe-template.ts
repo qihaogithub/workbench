@@ -1589,16 +1589,14 @@ export const positionEditScript = `
   var dragStartY = 0;
   var dragOrigLeft = 0;
   var dragOrigTop = 0;
+  var dragAccumTx = 0;
+  var dragAccumTy = 0;
   var containerEl = null;
+  var editBoundaries = null;
 
   function getContainer() {
     if (containerEl) return containerEl;
-    var root = document.getElementById('root');
-    if (root && root.firstElementChild) {
-      containerEl = root.firstElementChild;
-    } else {
-      containerEl = document.body;
-    }
+    containerEl = document.getElementById('root') || document.body;
     return containerEl;
   }
 
@@ -1610,6 +1608,7 @@ export const positionEditScript = `
     var all = root.querySelectorAll('*');
     var assigned = {};
     var absoluteCount = 0;
+    var boundingBoxMatched = 0;
     for (var i = 0; i < all.length; i++) {
       var el = all[i];
       if (el.hasAttribute('data-pos-key')) continue;
@@ -1617,8 +1616,10 @@ export const positionEditScript = `
       if (cs.position !== 'absolute') continue;
       absoluteCount++;
       var rect = el.getBoundingClientRect();
-      var elLeft = Math.round(rect.left - containerRect.left);
-      var elTop = Math.round(rect.top - containerRect.top);
+      var op = el.offsetParent;
+      var opRect = op ? op.getBoundingClientRect() : containerRect;
+      var elLeft = Math.round(rect.left - opRect.left);
+      var elTop = Math.round(rect.top - opRect.top);
       for (var j = 0; j < items.length; j++) {
         var key = items[j];
         if (assigned[key]) continue;
@@ -1626,20 +1627,21 @@ export const positionEditScript = `
         if (Math.abs(elLeft - pos.x) <= 3 && Math.abs(elTop - pos.y) <= 3) {
           el.setAttribute('data-pos-key', key);
           assigned[key] = true;
+          boundingBoxMatched++;
           console.log('[pos-edit] injectPosKey: matched', key, 'at', elLeft, elTop, '(expected', pos.x, pos.y, ')');
           break;
         }
       }
     }
-    var matched = Object.keys(assigned);
+
     var unmatched = [];
     for (var k = 0; k < items.length; k++) {
       if (!assigned[items[k]]) unmatched.push(items[k]);
     }
-    console.log('[pos-edit] injectPosKey: scanned', absoluteCount, 'absolute elements, matched', matched.length + '/' + items.length, matched);
+
+    // bounding box 匹配失败时，回退到 computed style left/top
     if (unmatched.length > 0) {
-      console.warn('[pos-edit] injectPosKey: unmatched keys:', unmatched, 'container rect:', containerRect.width + 'x' + containerRect.height);
-      // 尝试放宽匹配：打印所有 absolute 元素的位置
+      console.warn('[pos-edit] injectPosKey: bounding box matched', boundingBoxMatched + '/' + items.length, 'unmatched:', unmatched);
       for (var m = 0; m < all.length; m++) {
         var mel = all[m];
         if (mel.hasAttribute('data-pos-key')) continue;
@@ -1648,6 +1650,38 @@ export const positionEditScript = `
         var mrect = mel.getBoundingClientRect();
         console.log('[pos-edit] absolute element:', mel.tagName, 'rect:', Math.round(mrect.left - containerRect.left), Math.round(mrect.top - containerRect.top), Math.round(mrect.width), Math.round(mrect.height));
       }
+
+      // 回退：使用 computed style left/top
+      for (var f = 0; f < all.length; f++) {
+        var fel = all[f];
+        if (fel.hasAttribute('data-pos-key')) continue;
+        var fcs = window.getComputedStyle(fel);
+        if (fcs.position !== 'absolute') continue;
+        var fleft = parseInt(fcs.left, 10);
+        var ftop = parseInt(fcs.top, 10);
+        if (isNaN(fleft) || isNaN(ftop)) continue;
+        for (var u = 0; u < unmatched.length; u++) {
+          var ukey = unmatched[u];
+          if (assigned[ukey]) continue;
+          var upos = positions[ukey] || { x: 0, y: 0 };
+          if (Math.abs(fleft - upos.x) <= 3 && Math.abs(ftop - upos.y) <= 3) {
+            fel.setAttribute('data-pos-key', ukey);
+            assigned[ukey] = true;
+            console.log('[pos-edit] injectPosKey: fallback matched', ukey, 'via computed style left/top:', fleft, ftop, '(expected', upos.x, upos.y, ')');
+            break;
+          }
+        }
+      }
+    }
+
+    var matched = Object.keys(assigned);
+    var finalUnmatched = [];
+    for (var z = 0; z < items.length; z++) {
+      if (!assigned[items[z]]) finalUnmatched.push(items[z]);
+    }
+    console.log('[pos-edit] injectPosKey: scanned', absoluteCount, 'absolute elements, matched', matched.length + '/' + items.length, matched);
+    if (finalUnmatched.length > 0) {
+      console.warn('[pos-edit] injectPosKey: still unmatched after fallback:', finalUnmatched, 'container:', container.tagName, container.id || '(no id)');
     }
   }
 
@@ -1706,38 +1740,82 @@ export const positionEditScript = `
 
   function applyPosition(key, x, y) {
     var el = document.querySelector('[data-pos-key="' + key + '"]');
-    if (!el) return;
+    if (!el) { console.warn('[pos-edit] applyPosition: no element with data-pos-key="' + key + '"'); return; }
     var container = getContainer();
     var containerRect = container.getBoundingClientRect();
-    var elRect = el.getBoundingClientRect();
-    // 清除现有 transform，基于 DOM 原始位置（style.left/top）计算偏移
     el.style.transform = '';
-    var currentLeft = elRect.left - containerRect.left;
-    var currentTop = elRect.top - containerRect.top;
-    var offsetX = x - currentLeft;
-    var offsetY = y - currentTop;
-    if (offsetX !== 0 || offsetY !== 0) {
-      el.style.transform = 'translate(' + offsetX + 'px, ' + offsetY + 'px)';
+    var elRect = el.getBoundingClientRect();
+
+    var op = el.offsetParent || container;
+    var opRect = op.getBoundingClientRect();
+
+    var containerCurrentLeft = elRect.left - containerRect.left;
+    var containerCurrentTop = elRect.top - containerRect.top;
+
+    var containerTargetX = x + (opRect.left - containerRect.left);
+    var containerTargetY = y + (opRect.top - containerRect.top);
+
+    var b = editBoundaries ? editBoundaries[key] : null;
+    if (!b) {
+      containerTargetX = Math.max(0, Math.min(containerTargetX, containerRect.width - elRect.width));
+      containerTargetY = Math.max(0, Math.min(containerTargetY, containerRect.height - elRect.height));
+    } else if (b.mode === 'absolute') {
+      containerTargetX = Math.max(b.left, Math.min(containerTargetX, b.right - elRect.width));
+      containerTargetY = Math.max(b.top, Math.min(containerTargetY, b.bottom - elRect.height));
+    } else {
+      containerTargetX = Math.max(b.left, Math.min(containerTargetX, containerRect.width - elRect.width - b.right));
+      containerTargetY = Math.max(b.top, Math.min(containerTargetY, containerRect.height - elRect.height - b.bottom));
+    }
+
+    var offsetX = containerTargetX - containerCurrentLeft;
+    var offsetY = containerTargetY - containerCurrentTop;
+    var roundedOX = Math.round(offsetX);
+    var roundedOY = Math.round(offsetY);
+    if (Math.abs(roundedOX) > 0 || Math.abs(roundedOY) > 0) {
+      el.style.transform = 'translate(' + roundedOX + 'px, ' + roundedOY + 'px)';
+      console.log('[pos-edit] applyPosition:', key, 'target:', x, y, 'current:', Math.round(elRect.left - opRect.left), Math.round(elRect.top - opRect.top), 'offset:', roundedOX, roundedOY);
     }
   }
 
   function exit() {
     editing = false;
+    editBoundaries = null;
     setGrabCursors(false);
     setDimCSS(false);
+    clearAllTransforms();
     cleanupPosKey(editItems);
+    containerEl = null;
+    dragTarget = null;
+    dragAccumTx = 0;
+    dragAccumTy = 0;
+    console.log('[pos-edit] exit complete');
     window.parent.postMessage({ type: 'POSITION_EDIT_READY', active: false }, '*');
   }
 
-  function enter(items, positions) {
+  function clearAllTransforms() {
+    for (var i = 0; i < editItems.length; i++) {
+      var el = document.querySelector('[data-pos-key="' + editItems[i] + '"]');
+      if (el) el.style.transform = '';
+    }
+  }
+
+  function enter(items, positions, boundary) {
+    console.log('[pos-edit] enter called, items:', JSON.stringify(items), 'positions:', JSON.stringify(positions), 'editing was:', editing, 'boundary:', boundary ? Object.keys(boundary).length + ' keys' : 'none');
+    if (editing) {
+      console.warn('[pos-edit] enter called while already editing, re-entering');
+      exit();
+    }
     editItems = items;
     editPositions = positions;
+    editBoundaries = boundary || null;
     injectPosKey(items, positions);
     editing = true;
     setGrabCursors(true);
     if (dimming) {
+      console.log('[pos-edit] applying dimming');
       setDimCSS(true);
     }
+    console.log('[pos-edit] enter done, editing:', editing, 'grabCursorCount:', document.querySelectorAll('[data-pos-key]').length);
     window.parent.postMessage({ type: 'POSITION_EDIT_READY', active: true }, '*');
   }
 
@@ -1754,6 +1832,10 @@ export const positionEditScript = `
     var rect = dragTarget.getBoundingClientRect();
     dragOrigLeft = rect.left - getContainer().getBoundingClientRect().left;
     dragOrigTop = rect.top - getContainer().getBoundingClientRect().top;
+    var t = dragTarget.style.transform || '';
+    var m = t.match(/translate\\(([-\\d.]+)px,\\s*([-\\d.]+)px\\)/);
+    dragAccumTx = m ? parseFloat(m[1]) : 0;
+    dragAccumTy = m ? parseFloat(m[2]) : 0;
     dragTarget.style.transform = dragTarget.style.transform || '';
     var children = dragTarget.querySelectorAll('*');
     for (var c = 0; c < children.length; c++) {
@@ -1767,15 +1849,39 @@ export const positionEditScript = `
     var deltaX = event.clientX - dragStartX;
     var deltaY = event.clientY - dragStartY;
     var targetRect = dragTarget.getBoundingClientRect();
-    var result = constrainToContainer(targetRect, deltaX, deltaY);
+    var key = dragTarget.getAttribute('data-pos-key');
+    var result = constrainToBoundary(key, targetRect, deltaX, deltaY);
     var offsetX = result.constrainedLeft - dragOrigLeft;
     var offsetY = result.constrainedTop - dragOrigTop;
-    dragTarget.style.transform = 'translate(' + offsetX + 'px, ' + offsetY + 'px)';
+    dragTarget.style.transform = 'translate(' + (dragAccumTx + offsetX) + 'px, ' + (dragAccumTy + offsetY) + 'px)';
   }, true);
 
   document.addEventListener('pointerup', function(event) {
     if (!dragTarget) return;
     var key = dragTarget.getAttribute('data-pos-key');
+    var targetRect = dragTarget.getBoundingClientRect();
+    var containerRect = getContainer().getBoundingClientRect();
+    var finalRect = dragTarget.getBoundingClientRect();
+    var containerX = Math.round(finalRect.left - containerRect.left);
+    var containerY = Math.round(finalRect.top - containerRect.top);
+
+    var b = editBoundaries ? editBoundaries[key] : null;
+    if (!b) {
+      containerX = Math.max(0, Math.min(containerX, containerRect.width - targetRect.width));
+      containerY = Math.max(0, Math.min(containerY, containerRect.height - targetRect.height));
+    } else if (b.mode === 'absolute') {
+      containerX = Math.max(b.left, Math.min(containerX, b.right - targetRect.width));
+      containerY = Math.max(b.top, Math.min(containerY, b.bottom - targetRect.height));
+    } else {
+      containerX = Math.max(b.left, Math.min(containerX, containerRect.width - targetRect.width - b.right));
+      containerY = Math.max(b.top, Math.min(containerY, containerRect.height - targetRect.height - b.bottom));
+    }
+
+    var op = dragTarget.offsetParent;
+    var opRect = op ? op.getBoundingClientRect() : containerRect;
+    var finalX = Math.round(containerX + containerRect.left - opRect.left);
+    var finalY = Math.round(containerY + containerRect.top - opRect.top);
+
     var children = dragTarget.querySelectorAll('*');
     for (var c = 0; c < children.length; c++) {
       children[c].style.pointerEvents = '';
@@ -1783,18 +1889,6 @@ export const positionEditScript = `
     dragTarget.style.cursor = 'grab';
     dragTarget.removeAttribute('data-pos-dragging');
 
-    var transform = dragTarget.style.transform || '';
-    var match = transform.match(/translate\\(([-\\d.]+)px,\\s*([-\\d.]+)px\\)/);
-    var finalX = dragOrigLeft;
-    var finalY = dragOrigTop;
-    if (match) {
-      finalX += parseFloat(match[1]);
-      finalY += parseFloat(match[2]);
-    }
-    finalX = Math.round(Math.max(0, finalX));
-    finalY = Math.round(Math.max(0, finalY));
-
-    dragTarget.style.transform = '';
     dragTarget = null;
 
     window.parent.postMessage({
@@ -1822,10 +1916,20 @@ export const positionEditScript = `
     if (event.source !== window.parent) return;
     var data = event.data || {};
     if (data.type === 'ENTER_POSITION_EDIT') {
-      data.items && data.positions && enter(data.items, data.positions);
+      console.log('[pos-edit] received ENTER_POSITION_EDIT, items:', (data.items || []).length, 'positions keys:', Object.keys(data.positions || {}).length, 'boundary:', data.boundary ? Object.keys(data.boundary).length + ' keys' : 'none');
+      try {
+        if (data.items && data.positions) {
+          enter(data.items, data.positions, data.boundary);
+        } else {
+          console.warn('[pos-edit] ENTER_POSITION_EDIT missing items or positions, items:', data.items, 'positions:', data.positions);
+        }
+      } catch (err) {
+        console.error('[pos-edit] ENTER_POSITION_EDIT handler error:', err);
+      }
       return;
     }
     if (data.type === 'EXIT_POSITION_EDIT') {
+      console.log('[pos-edit] received EXIT_POSITION_EDIT, editing was:', editing);
       exit();
       return;
     }
@@ -1835,6 +1939,7 @@ export const positionEditScript = `
       return;
     }
     if (data.type === 'APPLY_POSITIONS') {
+      console.log('[pos-edit] received APPLY_POSITIONS, editing:', editing, 'keys:', Object.keys(data.positions || {}));
       var posMap = data.positions || {};
       for (var k in posMap) {
         if (posMap.hasOwnProperty(k)) {
@@ -1845,13 +1950,39 @@ export const positionEditScript = `
     }
   });
 
-  function constrainToContainer(targetRect, deltaX, deltaY) {
+  function constrainToBoundary(key, targetRect, deltaX, deltaY) {
     var container = getContainer();
     var containerRect = container.getBoundingClientRect();
     var newLeft = dragOrigLeft + deltaX;
     var newTop = dragOrigTop + deltaY;
-    newLeft = Math.max(0, Math.min(newLeft, containerRect.width - targetRect.width));
-    newTop = Math.max(0, Math.min(newTop, containerRect.height - targetRect.height));
+
+    var b = editBoundaries ? editBoundaries[key] : null;
+
+    if (!b) {
+      newLeft = Math.max(0, Math.min(newLeft, containerRect.width - targetRect.width));
+      newTop = Math.max(0, Math.min(newTop, containerRect.height - targetRect.height));
+      return { constrainedLeft: newLeft, constrainedTop: newTop };
+    }
+
+    var minLeft, maxLeft, minTop, maxTop;
+
+    if (b.mode === 'absolute') {
+      minLeft = b.left;
+      maxLeft = b.right - targetRect.width;
+      minTop = b.top;
+      maxTop = b.bottom - targetRect.height;
+    } else {
+      minLeft = b.left;
+      maxLeft = containerRect.width - targetRect.width - b.right;
+      minTop = b.top;
+      maxTop = containerRect.height - targetRect.height - b.bottom;
+    }
+
+    if (minLeft > maxLeft) minLeft = maxLeft;
+    if (minTop > maxTop) minTop = maxTop;
+
+    newLeft = Math.max(minLeft, Math.min(newLeft, maxLeft));
+    newTop = Math.max(minTop, Math.min(newTop, maxTop));
     return { constrainedLeft: newLeft, constrainedTop: newTop };
   }
 

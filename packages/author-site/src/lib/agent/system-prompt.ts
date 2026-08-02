@@ -62,3 +62,37 @@ export function buildMemoryPrefix(content: string): string {
 export function buildKnowledgeIndexPrefix(content: string): string {
   return `\n\n${content}\n`;
 }
+
+const MAX_CONVENTION_LENGTH = 8000;
+
+/**
+ * 将项目公约内容格式化为 L2 system prompt 后缀
+ * 内容为空时返回 null，超长时截断
+ */
+export function buildConventionPrefix(content: string | null): string | null {
+  if (!content || !content.trim()) return null;
+  let text = `\n\n## 项目公约（必须遵守）\n\n${content}`;
+  if (text.length > MAX_CONVENTION_LENGTH) {
+    text = text.slice(0, MAX_CONVENTION_LENGTH);
+    text += "\n\n（公约内容已截断，完整公约请读取对应 convention.md）";
+  }
+  return text;
+}
+
+/**
+ * 将页面公约内容格式化为 L2 system prompt 后缀
+ * 内容为空时返回提示文本
+ */
+export function buildPageConventionPrefix(
+  content: string | null,
+): string | null {
+  if (!content || !content.trim()) {
+    return "\n\n## 当前页面公约（必须遵守）\n\n（本页面暂未设置公约）";
+  }
+  let text = `\n\n## 当前页面公约（必须遵守）\n\n${content}`;
+  if (text.length > MAX_CONVENTION_LENGTH) {
+    text = text.slice(0, MAX_CONVENTION_LENGTH);
+    text += "\n\n（公约内容已截断，完整公约请读取对应 convention.md）";
+  }
+  return text;
+}

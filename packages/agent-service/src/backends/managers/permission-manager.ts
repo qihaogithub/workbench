@@ -84,17 +84,18 @@ export class PermissionManager {
     // writeFile 工具会透明同步 manifest.json。路径安全由 isManagedWorkspaceResource
     // 白名单和 isPathAllowed 权限层保障。
 
-    // 编译产物写保护：config.schema.json 被同目录 config.ts "遮蔽"时，禁止写入编译产物
-    if (['writeFile', 'editFile'].includes(toolName)) {
-      const writePath = input?.path || input?.filePath;
+    // 编译产物读/写保护：config.schema.json 被同目录 config.ts "遮蔽"时，禁止读写编译产物
+    if (['readFile', 'writeFile', 'editFile'].includes(toolName)) {
+      const targetPath = input?.path || input?.filePath;
       if (
-        writePath &&
-        isShadowedSchemaJson(writePath, this.config.workingDir ?? '')
+        targetPath &&
+        isShadowedSchemaJson(targetPath, this.config.workingDir ?? '')
       ) {
-        const configTsRef = writePath.replace(/config\.schema\.json$/, 'config.ts');
+        const configTsRef = targetPath.replace(/config\.schema\.json$/, 'config.ts');
+        const action = toolName === 'readFile' ? 'read' : 'write to';
         return {
           block: true,
-          reason: `Cannot write to "${writePath}": this file is compiled from config.ts. Please edit "${configTsRef}" instead.`,
+          reason: `Cannot ${action} "${targetPath}": this file is compiled from config.ts. Please edit "${configTsRef}" instead.`,
         };
       }
     }

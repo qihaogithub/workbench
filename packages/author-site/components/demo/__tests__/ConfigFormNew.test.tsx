@@ -47,17 +47,21 @@ const positionSchema = JSON.stringify({
   type: 'object',
   $demo: {
     previewSize: { width: 320, height: 240 },
-    positionable: {
-      items: ['badgeA', 'badgeB'],
-      defaults: {
-        badgeA: { x: 10, y: 20 },
-        badgeB: { x: 60, y: 80 },
-      },
-    },
   },
   properties: {
     badgeA: { type: 'string', title: '徽章A', default: 'A' },
     badgeB: { type: 'string', title: '徽章B', default: 'B' },
+    position: {
+      type: 'object',
+      title: '位置',
+      properties: {
+        x: { type: 'number', default: 10 },
+        y: { type: 'number', default: 20 },
+      },
+      $demo: {
+        positionable: { key: 'badge', size: { width: 320, height: 240 } },
+      },
+    },
   },
 });
 
@@ -217,7 +221,7 @@ describe('ConfigFormNew', () => {
     expect(switches.length).toBeGreaterThan(0);
   });
 
-  it('应渲染元素定位控件，并同步位置输入变更', () => {
+  it('应渲染位置字段并同步坐标输入变更', () => {
     const handleChange = jest.fn();
 
     renderConfigForm(
@@ -225,25 +229,20 @@ describe('ConfigFormNew', () => {
         schema={positionSchema}
         onChange={handleChange}
         initialData={{
-          __positions: {
-            badgeA: { x: 10, y: 20 },
-            badgeB: { x: 60, y: 80 },
-          },
+          badgeA: 'A',
+          badgeB: 'B',
+          position: { x: 10, y: 20 },
         }}
       />,
     );
 
-    expect(screen.getByText('元素定位')).toBeInTheDocument();
-    expect(screen.getAllByText('徽章A').length).toBeGreaterThan(0);
+    expect(screen.getByText('位置')).toBeInTheDocument();
 
     const xInputs = screen.getAllByDisplayValue('10');
     fireEvent.change(xInputs[0], { target: { value: '35' } });
 
     expect(handleChange).toHaveBeenCalledWith({
-      __positions: {
-        badgeA: { x: 35, y: 20 },
-        badgeB: { x: 60, y: 80 },
-      },
+      position: { x: 35, y: 20 },
     });
   });
 });

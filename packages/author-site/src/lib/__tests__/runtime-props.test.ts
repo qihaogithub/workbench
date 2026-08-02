@@ -83,67 +83,6 @@ describe("运行时 Props 合并", () => {
     const props = mergeConfigToProps(undefined, pageSchema);
     expect(props).toEqual({ flag: false, count: 0, text: "" });
   });
-
-  it("应注入定位默认元数据", () => {
-    const pageSchema = JSON.stringify({
-      $demo: {
-        positionable: {
-          items: ["badgeA", "badgeB"],
-          defaults: {
-            badgeA: { x: 12, y: 24 },
-          },
-        },
-      },
-      properties: {
-        badgeA: { type: "string", default: "A" },
-        badgeB: { type: "string", default: "B" },
-      },
-    });
-
-    const props = mergeConfigToProps(undefined, pageSchema);
-
-    expect(props.__positions).toEqual({
-      badgeA: { x: 12, y: 24 },
-      badgeB: { x: 0, y: 0 },
-    });
-  });
-
-  it("项目级与页面级隐藏定位元数据应合并且不触发字段冲突", () => {
-    const projectSchema = JSON.stringify({
-      $demo: {
-        positionable: {
-          items: ["globalBadge"],
-          defaults: {
-            globalBadge: { x: 10, y: 20 },
-          },
-        },
-      },
-      properties: {
-        theme: { type: "string", default: "dark" },
-      },
-    });
-    const pageSchema = JSON.stringify({
-      $demo: {
-        positionable: {
-          items: ["pageBadge"],
-          defaults: {
-            pageBadge: { x: 30, y: 40 },
-          },
-        },
-      },
-      properties: {
-        title: { type: "string", default: "Hello" },
-      },
-    });
-
-    const props = mergeConfigToProps(projectSchema, pageSchema);
-
-    expect(props).toMatchObject({ theme: "dark", title: "Hello" });
-    expect(props.__positions).toEqual({
-      globalBadge: { x: 10, y: 20 },
-      pageBadge: { x: 30, y: 40 },
-    });
-  });
 });
 
 describe("mergeConfigWithUserValues", () => {

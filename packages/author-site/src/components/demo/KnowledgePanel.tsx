@@ -23,6 +23,7 @@ import {
   Brain,
   Upload,
   History,
+  ScrollText,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -41,6 +42,7 @@ interface KnowledgePanelProps {
   onDocCreated?: (item: KnowledgeItem) => void;
   onDocHistory?: (item: KnowledgeItem) => void;
   onMemorySelect?: () => void;
+  onConventionSelect?: () => void;
   onItemsChange?: (items: KnowledgeItem[]) => void;
 }
 
@@ -53,6 +55,7 @@ export function KnowledgePanel({
   onDocCreated,
   onDocHistory,
   onMemorySelect,
+  onConventionSelect,
   onItemsChange,
 }: KnowledgePanelProps) {
   const { toast } = useToast();
@@ -197,6 +200,25 @@ export function KnowledgePanel({
             <div className="text-sm font-medium text-foreground">AI 记忆</div>
             <div className="text-[11px] text-muted-foreground truncate">
               记录 AI 对项目的理解和偏好
+            </div>
+          </div>
+          <Eye className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        </div>
+      </div>
+
+      {/* 项目公约横幅 */}
+      <div
+        className="mx-3 mt-2 px-3 py-2.5 rounded-lg border bg-muted/40 dark:bg-muted/20 border-border/60 cursor-pointer hover:bg-muted/60 dark:hover:bg-muted/30 transition-colors"
+        onClick={() => onConventionSelect?.()}
+      >
+        <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center h-7 w-7 rounded-md bg-muted dark:bg-muted">
+            <ScrollText className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-foreground">项目公约</div>
+            <div className="text-[11px] text-muted-foreground truncate">
+              定义项目必须遵守的约定
             </div>
           </div>
           <Eye className="h-3.5 w-3.5 text-muted-foreground shrink-0" />

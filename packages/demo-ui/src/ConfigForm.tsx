@@ -1,10 +1,8 @@
 "use client";
 
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
-import { ChevronDown, Info, Pencil, Sparkles } from "lucide-react";
+import { ChevronDown, Sparkles } from "lucide-react";
 import { cn } from "./utils";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import {
   Collapsible,
@@ -15,10 +13,8 @@ import type { ConfigFormProps } from "./types";
 import type { FieldConfig, FieldGroup, VisibleWhenCondition } from "./schema-parser";
 import { parseSchemaToFields } from "./schema-parser";
 import { getPageTypeLimits } from "./type-limits-store";
-import { FieldRenderer } from "./FieldRenderer";
+import { FieldRenderer, PositionConfigContext, type PositionConfigContextValue, type PositionFieldEntry } from "./FieldRenderer";
 import { NoteDialog } from "./NoteDialog";
-import { getPositionable } from "./validator";
-import { Button } from "@/components/ui/button";
 import { configFieldMatchesCategoryFilter } from "./config-categories";
 
 function isFieldVisible(
@@ -82,14 +78,6 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function formatFieldName(key: string): string {
-  return key
-    .replace(/([A-Z])/g, " $1")
-    .replace(/_/g, " ")
-    .replace(/^./, (s) => s.toUpperCase())
-    .trim();
-}
-
 function FieldGroupSection({
   group,
   formData,
@@ -135,193 +123,9 @@ function FieldGroupSection({
                 sessionId={sessionId}
                 readonly={readonly}
                 onNoteClick={onNoteClick}
+                fieldPath={field.key}
               />
             ))}
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
-    </div>
-  );
-}
-
-function PositionControl({
-  positionable,
-  positions,
-  defaultPositions,
-  titleMap,
-  onPositionsChange,
-  previewSize,
-  itemSizes,
-  onEnterPositionEdit,
-  onExitPositionEdit,
-  positionEditActive,
-  dimming,
-  onToggleDimming,
-}: {
-  positionable: { items: string[]; defaults?: Record<string, { x: number; y: number }>; size?: { width: number; height: number } };
-  positions: Record<string, { x: number; y: number }>;
-  defaultPositions: Record<string, { x: number; y: number }>;
-  titleMap: Record<string, string>;
-  onPositionsChange: (newPositions: Record<string, { x: number; y: number }>) => void;
-  previewSize?: { width?: number | string; height?: number | string };
-  itemSizes?: Record<string, { width: number; height: number }>;
-  onEnterPositionEdit?: (items: string[], positions: Record<string, { x: number; y: number }>) => void;
-  onExitPositionEdit?: () => void;
-  positionEditActive?: boolean;
-  dimming?: boolean;
-  onToggleDimming?: () => void;
-}) {
-  const [open, setOpen] = useState(true);
-
-  const containerWidth =
-    positionable.size?.width ??
-    (typeof previewSize?.width === "number" ? previewSize.width : 800);
-  const containerHeight =
-    positionable.size?.height ??
-    (typeof previewSize?.height === "number" ? previewSize.height : 600);
-
-  const handleCoordChange = (key: string, axis: "x" | "y", value: string) => {
-    const num = parseInt(value, 10);
-    if (isNaN(num)) return;
-    const elementWidth = itemSizes?.[key]?.width ?? 0;
-    const elementHeight = itemSizes?.[key]?.height ?? 0;
-    const maxVal = axis === "x" ? containerWidth - elementWidth : containerHeight - elementHeight;
-    onPositionsChange({
-      ...positions,
-      [key]: { ...positions[key], [axis]: Math.max(0, Math.min(num, maxVal)) },
-    });
-  };
-
-  const handleReset = () => {
-    const reset: Record<string, { x: number; y: number }> = {};
-    for (const key of positionable.items) {
-      reset[key] = defaultPositions[key] || { x: 0, y: 0 };
-    }
-    onPositionsChange(reset);
-  };
-
-  const handleToggleEdit = () => {
-    if (positionEditActive) {
-      onExitPositionEdit?.();
-    } else {
-      onEnterPositionEdit?.(positionable.items, positions);
-    }
-  };
-
-  const isDefault = JSON.stringify(positions) === JSON.stringify(defaultPositions);
-
-  return (
-    <div className="py-2">
-      <Collapsible open={open} onOpenChange={setOpen}>
-        <CollapsibleTrigger asChild>
-          <div className="flex items-center gap-2 py-1.5 cursor-pointer hover:bg-accent/30 rounded-sm transition-colors">
-            <span>
-              {open ? (
-                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform rotate-180" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
-              )}
-            </span>
-            <h3 className="text-sm font-medium text-muted-foreground">元素定位</h3>
-            <Badge variant="secondary" className="text-xs h-5 font-normal px-1.5 min-w-[20px] justify-center">
-              {positionable.items.length}
-            </Badge>
-          </div>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="pl-4 pr-2 pt-1 pb-2 space-y-2">
-            {/* 模式状态栏 + 编辑位置按钮 */}
-            <div className="space-y-2">
-              {positionEditActive && (
-                <div className="flex items-center justify-between gap-2 bg-accent/20 rounded px-2 py-1.5">
-                  <span className="text-xs font-medium text-foreground">位置编辑中</span>
-                  <div className="flex items-center gap-2">
-                    <label className="flex items-center gap-1 text-[10px] text-muted-foreground cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={dimming ?? true}
-                        onChange={() => onToggleDimming?.()}
-                        className="h-3 w-3 cursor-pointer accent-primary"
-                      />
-                      置灰
-                    </label>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-6 text-xs px-2"
-                      onClick={() => onExitPositionEdit?.()}
-                    >
-                      完成
-                    </Button>
-                  </div>
-                </div>
-              )}
-              <div className="flex items-center justify-between text-[10px] text-muted-foreground/60">
-                <span>容器: {containerWidth} × {containerHeight} px</span>
-                {!positionEditActive && onEnterPositionEdit && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-6 text-xs px-2"
-                    onClick={handleToggleEdit}
-                  >
-                    <Pencil className="h-3 w-3 mr-1" />
-                    编辑
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {/* 坐标输入 */}
-            <div className="space-y-1">
-              {positionable.items.map((key) => {
-                const pos = positions[key] || { x: 0, y: 0 };
-                const elementWidth = itemSizes?.[key]?.width ?? 0;
-                const elementHeight = itemSizes?.[key]?.height ?? 0;
-                const maxX = containerWidth - elementWidth;
-                const maxY = containerHeight - elementHeight;
-                return (
-                  <div key={key} className="flex items-center gap-2 text-xs">
-                    <span className="text-muted-foreground w-[70px] truncate" title={titleMap[key] || key}>
-                      {titleMap[key] || key}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-muted-foreground/60 w-3">X</span>
-                      <Input
-                        type="number"
-                        value={pos.x}
-                        onChange={(e) => handleCoordChange(key, "x", e.target.value)}
-                        className="h-6 w-16 text-xs px-1.5"
-                        min={0}
-                        max={maxX}
-                      />
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="text-muted-foreground/60 w-3">Y</span>
-                      <Input
-                        type="number"
-                        value={pos.y}
-                        onChange={(e) => handleCoordChange(key, "y", e.target.value)}
-                        className="h-6 w-16 text-xs px-1.5"
-                        min={0}
-                        max={maxY}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {!isDefault && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs text-muted-foreground hover:text-foreground"
-                onClick={handleReset}
-              >
-                恢复默认位置
-              </Button>
-            )}
           </div>
         </CollapsibleContent>
       </Collapsible>
@@ -336,7 +140,6 @@ export function ConfigForm({
   initialData,
   readonly,
   sessionId,
-  positionableItemSizes,
   configCategoryFilter,
   typeLimits,
   className,
@@ -380,9 +183,6 @@ export function ConfigForm({
     [fieldGroups, effectiveFormData, configCategoryFilter],
   );
 
-  const positionable = useMemo(() => getPositionable(schema), [schema]);
-  const showLayoutControls = !configCategoryFilter;
-
   const previewSize = useMemo(() => {
     try {
       const parsed = JSON.parse(schema);
@@ -392,42 +192,53 @@ export function ConfigForm({
     }
   }, [schema]);
 
-  const buildTitleMap = useCallback((keys: string[] | undefined) => {
-    if (!keys) return {};
-    try {
-      const parsed = JSON.parse(schema);
-      const properties = parsed.properties || {};
-      const map: Record<string, string> = {};
-      for (const key of keys) {
-        const prop = properties[key] as { title?: string } | undefined;
-        map[key] = prop?.title || formatFieldName(key);
-      }
-      return map;
-    } catch {
-      return {};
-    }
-  }, [schema]);
+  const positionRegistryRef = useRef(new Map<string, PositionFieldEntry>());
+  const positionEditActiveRef = useRef(false);
 
-  const titleMapPos = useMemo(() => buildTitleMap(positionable?.items), [positionable, buildTitleMap]);
+  const registerPositionField = useCallback((entry: PositionFieldEntry) => {
+    positionRegistryRef.current.set(entry.posKey, entry);
+    return () => {
+      positionRegistryRef.current.delete(entry.posKey);
+    };
+  }, []);
 
-  const currentPositions = useMemo(() => {
-    if (!positionable) return {};
-    const existing = formData.__positions as Record<string, { x: number; y: number }> | undefined;
-    const result: Record<string, { x: number; y: number }> = {};
-    for (const key of positionable.items) {
-      result[key] = existing?.[key] || positionable.defaults?.[key] || { x: 0, y: 0 };
+  const requestPositionEdit = useCallback(() => {
+    const entries = Array.from(positionRegistryRef.current.values());
+    const posKeys: string[] = entries.map((e) => e.posKey);
+    const positions: Record<string, { x: number; y: number }> = {};
+    const posKeyMap: Record<string, string> = {};
+    for (const entry of entries) {
+      positions[entry.posKey] = entry.currentValue;
+      posKeyMap[entry.posKey] = entry.fieldPath;
     }
-    return result;
-  }, [positionable, formData.__positions]);
+    positionEditActiveRef.current = true;
+    onEnterPositionEdit?.(posKeys, positions, posKeyMap);
+  }, [onEnterPositionEdit]);
 
-  const defaultPositions = useMemo(() => {
-    if (!positionable) return {};
-    const result: Record<string, { x: number; y: number }> = {};
-    for (const key of positionable.items) {
-      result[key] = positionable.defaults?.[key] || { x: 0, y: 0 };
-    }
-    return result;
-  }, [positionable]);
+  const exitPositionEdit = useCallback(() => {
+    positionEditActiveRef.current = false;
+    onExitPositionEdit?.();
+  }, [onExitPositionEdit]);
+
+  const positionConfigValue = useMemo((): PositionConfigContextValue => {
+    return {
+      registerPositionField,
+      requestPositionEdit,
+      exitPositionEdit,
+      positionEditActive: positionEditActive ?? false,
+      dimming: positionEditDimming ?? false,
+      onToggleDimming: onTogglePositionDimming,
+    };
+  }, [
+    registerPositionField,
+    requestPositionEdit,
+    exitPositionEdit,
+    positionEditActive,
+    positionEditDimming,
+    onTogglePositionDimming,
+  ]);
+
+  const hasPositionEdit = !!onEnterPositionEdit; 
 
   console.log(
     "[ConfigForm] Parsed field groups:",
@@ -437,7 +248,6 @@ export function ConfigForm({
 
   useEffect(() => {
     if (initialData && Object.keys(initialData).length > 0) {
-      console.log("[ConfigForm] initialData changed, syncing...");
       setFormData((prev) => {
         const merged = { ...prev };
         let changed = false;
@@ -447,18 +257,7 @@ export function ConfigForm({
             changed = true;
           }
         }
-        if (
-          "__positions" in initialData &&
-          !areConfigValuesEqual(prev.__positions, initialData.__positions)
-        ) {
-          merged.__positions = initialData.__positions;
-          changed = true;
-        }
         if (!changed) return prev;
-        console.log(
-          "[ConfigForm] Merged formData after initialData sync:",
-          merged,
-        );
         return merged;
       });
     }
@@ -516,12 +315,6 @@ export function ConfigForm({
     [onChange]
   );
 
-  const handlePositionsChange = useCallback((newPositions: Record<string, { x: number; y: number }>) => {
-    const newData = { ...formDataRef.current, __positions: newPositions };
-    setFormData(newData);
-    onChange({ __positions: newPositions });
-  }, [onChange]);
-
   const updateSchemaNote = useCallback(
     (fieldKey: string, noteHtml: string) => {
       if (!onSchemaChange || !schema) return;
@@ -573,13 +366,7 @@ export function ConfigForm({
     return null;
   }, [noteDialogField, visibleFieldGroups]);
 
-  const hasVisiblePositionable =
-    showLayoutControls && !!positionable && positionable.items.length >= 1;
-  const hasVisibleConfig =
-    visibleFieldGroups.length > 0 ||
-    hasVisiblePositionable;
-
-  if (!hasVisibleConfig) {
+  if (visibleFieldGroups.length === 0) {
     return (
       <div
         className={cn(
@@ -601,58 +388,41 @@ export function ConfigForm({
   }
 
   return (
-    <div className={cn("h-full", className)}>
-      <div className="h-full overflow-y-auto">
-        <div className="px-1 pb-4">
-          {hasVisiblePositionable && (
-            <>
-              <PositionControl
-                positionable={positionable!}
-                positions={currentPositions}
-                defaultPositions={defaultPositions}
-                titleMap={titleMapPos}
-                onPositionsChange={handlePositionsChange}
-                previewSize={previewSize}
-                itemSizes={positionableItemSizes}
-                onEnterPositionEdit={onEnterPositionEdit}
-                onExitPositionEdit={onExitPositionEdit}
-                positionEditActive={positionEditActive}
-                dimming={positionEditDimming}
-                onToggleDimming={onTogglePositionDimming}
-              />
-              <Separator className="my-2" />
-            </>
-          )}
-          {visibleFieldGroups.map((group, index) => (
-            <div key={index}>
-              {index > 0 && <Separator className="my-2" />}
-              <FieldGroupSection
-                group={group}
-                formData={effectiveFormData}
-                onChange={handleFieldChange}
-                isFirst={index === 0}
-                sessionId={sessionId}
-                readonly={readonly}
-                onNoteClick={handleNoteClick}
-              />
-            </div>
-          ))}
+    <PositionConfigContext.Provider value={positionConfigValue}>
+      <div className={cn("h-full", className)}>
+        <div className="h-full overflow-y-auto">
+          <div className="px-1 pb-4">
+            {visibleFieldGroups.map((group, index) => (
+              <div key={index}>
+                {index > 0 && <Separator className="my-2" />}
+                <FieldGroupSection
+                  group={group}
+                  formData={effectiveFormData}
+                  onChange={handleFieldChange}
+                  isFirst={index === 0}
+                  sessionId={sessionId}
+                  readonly={readonly}
+                  onNoteClick={handleNoteClick}
+                />
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {currentNoteField && (
-        <NoteDialog
-          open={!!noteDialogField}
-          onOpenChange={(open) => {
-            if (!open) setNoteDialogField(null);
-          }}
-          fieldTitle={currentNoteField.title}
-          noteHtml={currentNoteField.note || ""}
-          readonly={readonly}
-          onSave={(html) => updateSchemaNote(currentNoteField.key, html)}
-          onDelete={() => deleteSchemaNote(currentNoteField.key)}
-        />
-      )}
-    </div>
+        {currentNoteField ? (
+          <NoteDialog
+            open={!!noteDialogField}
+            onOpenChange={(open) => {
+              if (!open) setNoteDialogField(null);
+            }}
+            fieldTitle={currentNoteField.title}
+            noteHtml={currentNoteField.note || ""}
+            readonly={readonly}
+            onSave={(html) => updateSchemaNote(currentNoteField.key, html)}
+            onDelete={() => deleteSchemaNote(currentNoteField.key)}
+          />
+        ) : null}
+      </div>
+    </PositionConfigContext.Provider>
   );
 }

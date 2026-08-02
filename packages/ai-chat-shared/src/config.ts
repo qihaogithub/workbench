@@ -8,14 +8,20 @@ export interface AuthorContextIntegration {
   /** 构建 L2+L5 静态 system prompt（author-site 的 buildStaticSystemPrompt） */
   buildStaticSystemPrompt(toolCapabilities: { toolNames?: string[] }): string;
   /**
-   * 拉取并构建 L3 动态上下文前缀、L4 记忆前缀与知识库索引前缀
+   * 拉取并构建 L3 动态上下文前缀、L4 记忆前缀、知识库索引前缀与公约前缀
    * （author-site 侧封装 workspace-context API 与各 build*Prefix 函数）。
-   * 三项均为可直接拼接到 user content 前的最终字符串。
+   * l3/memoryPrefix/knowledgePrefix 为可直接拼接到 user content 前的内容。
+   * conventionPrefix/pageConventionPrefix 为 L2 system prompt 后缀。
    */
-  fetchContextPrefix(workingDir: string): Promise<{
+  fetchContextPrefix(
+    workingDir: string,
+    pageId?: string,
+  ): Promise<{
     l3: string;
     memoryPrefix: string | null;
     knowledgePrefix: string | null;
+    conventionPrefix: string | null;
+    pageConventionPrefix: string | null;
   }>;
 }
 

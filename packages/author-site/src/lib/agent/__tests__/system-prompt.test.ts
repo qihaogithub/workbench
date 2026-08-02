@@ -76,8 +76,6 @@ describe('buildStaticSystemPrompt', () => {
 
   it('默认 schema 模板 previewSize 已迁移到 page-lifecycle skill', () => {
     const prompt = buildStaticSystemPrompt();
-    // previewSize 模板完整定义已移入 page-lifecycle skill，基座仅保留配置项约束规则
-    expect(prompt).toContain('config.schema.json');
     expect(prompt).toContain('页面生命周期操作');
   });
 

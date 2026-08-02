@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useMemo } from "react";
 
 import { IframePreviewFrame } from "./IframePreviewFrame";
@@ -117,6 +116,7 @@ function areSinglePagePreviewPropsEqual(
   prev: SinglePagePreviewProps,
   next: SinglePagePreviewProps,
 ): boolean {
+  if (prev.rendererProps !== next.rendererProps) return false;
   if (prev.page === next.page) return true;
   const p = prev.page;
   const n = next.page;

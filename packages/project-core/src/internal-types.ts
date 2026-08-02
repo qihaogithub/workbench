@@ -26,6 +26,8 @@ export interface ProjectImageManifestEntry {
   format: string;
   createdAt: number;
   createdBy: AssetCreatedBy;
+  width?: number;
+  height?: number;
   contentHash?: string;
   mimeType?: string;
   originalUrl?: string;

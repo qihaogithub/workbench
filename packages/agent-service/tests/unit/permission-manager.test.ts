@@ -83,12 +83,15 @@ describe('PermissionManager', () => {
       ).toBeUndefined();
     });
 
-    it('应放行 readFile 到被遮蔽的 config.schema.json（允许参考）', () => {
+    it('应拦截 readFile 到被遮蔽的 config.schema.json（应改读 config.ts）', () => {
       expect(
         manager.validateToolCall('readFile', {
           path: 'demos/page-1/config.schema.json',
         }),
-      ).toBeUndefined();
+      ).toEqual({
+        block: true,
+        reason: 'Cannot read "demos/page-1/config.schema.json": this file is compiled from config.ts. Please edit "demos/page-1/config.ts" instead.',
+      });
     });
   });
 

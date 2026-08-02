@@ -453,6 +453,9 @@ export function ArrayFieldGroup({
               {value.map((item, index) => {
                 const isOpen = openItems.has(index);
                 const visibleFields = getVisibleFields(item);
+                const discriminator = field.oneOf?.discriminator;
+                const itemType = discriminator ? String(item[discriminator] ?? "") : "";
+                const variantTypePrefix = itemType ? `[${itemType}]` : "";
 
                 return (
                   <div key={index} className="space-y-1">
@@ -471,23 +474,30 @@ export function ArrayFieldGroup({
                     <Collapsible open={isOpen}>
                       <CollapsibleContent>
                         <div className="pl-6 pr-2 pt-1 pb-2 space-y-1 bg-muted/10 rounded-b-md">
-                          {visibleFields.map((childField) => (
-                            <FieldRenderer
-                              key={childField.key}
-                              field={childField}
-                              value={item[childField.key]}
-                              onChange={(val) =>
-                                handleItemFieldChange(
-                                  index,
-                                  childField.key,
-                                  val,
-                                )
-                              }
-                              sessionId={sessionId}
-                              readonly={readonly}
-                              embedded
-                            />
-                          ))}
+                          {visibleFields.length === 0 ? (
+                            <div className="py-2 text-center">
+                              <p className="text-[10px] text-muted-foreground">无配置项</p>
+                            </div>
+                          ) : (
+                            visibleFields.map((childField) => (
+                              <FieldRenderer
+                                key={childField.key}
+                                field={childField}
+                                value={item[childField.key]}
+                                onChange={(val) =>
+                                  handleItemFieldChange(
+                                    index,
+                                    childField.key,
+                                    val,
+                                  )
+                                }
+                                sessionId={sessionId}
+                                readonly={readonly}
+                                embedded
+                                fieldPath={`${field.key}[${index}]${variantTypePrefix}.${childField.key}`}
+                              />
+                            ))
+                          )}
                         </div>
                       </CollapsibleContent>
                     </Collapsible>

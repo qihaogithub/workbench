@@ -261,23 +261,31 @@ export class StreamService {
       throw new MissingTransactionalDeleteToolsError();
     }
     const authorContext = getAuthorContextIntegration();
-    const systemPrompt = authorContext?.buildStaticSystemPrompt({
+    let systemPrompt = authorContext?.buildStaticSystemPrompt({
       toolNames: toolCapabilities?.toolNames || [],
     });
 
     // v3.2: 异步获取 L3 上下文 + L4 记忆（通过宿主注入的 API）→ 拼到 user content 前面
     // L3 走 user message 前缀（不进 system prompt），L2 + L5 走 systemPrompt 字段
     // L4 记忆仅在首条消息注入
+    // 公约注入 L2 system prompt 末尾
     const activeViewPrefix = buildActiveViewContextPrefix(activeViewContext);
     let finalContent = activeViewPrefix
       ? `${activeViewPrefix}${message}`
       : message;
+    const hasDemoId = typeof demoId === "string" && demoId.length > 0;
     if (workingDir && authorContext) {
       // 重试一次：首次失败时常见原因是 dev server 刚启动 / API 路由首次编译
-      let ctx = await authorContext.fetchContextPrefix(workingDir);
+      let ctx = await authorContext.fetchContextPrefix(
+        workingDir,
+        hasDemoId ? demoId : undefined,
+      );
       if (!ctx.l3 && !ctx.memoryPrefix && !ctx.knowledgePrefix) {
         await new Promise((r) => setTimeout(r, 200));
-        ctx = await authorContext.fetchContextPrefix(workingDir);
+        ctx = await authorContext.fetchContextPrefix(
+          workingDir,
+          hasDemoId ? demoId : undefined,
+        );
       }
       if (ctx.l3) {
         // 知识库索引：每条消息都注入（与 L3 同频，因为知识库可能被用户更新）
@@ -293,6 +301,16 @@ export class StreamService {
         console.warn(
           "[StreamService] L3 上下文两次获取均失败，AI 将无法感知工作空间状态",
         );
+      }
+      // 公约注入 L2 system prompt 末尾
+      const conventionSuffix = [
+        ctx.conventionPrefix,
+        ctx.pageConventionPrefix,
+      ]
+        .filter(Boolean)
+        .join("");
+      if (conventionSuffix && systemPrompt) {
+        systemPrompt = `${systemPrompt}${conventionSuffix}`;
       }
     }
 

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { scanWorkspaceContext, readMemoryContent, scanKnowledgeIndex } from '@/lib/agent/scan-workspace';
+import { scanWorkspaceContext, readMemoryContent, scanKnowledgeIndex, readConventionContent, readPageConventionContent } from '@/lib/agent/scan-workspace';
 
 export async function GET(request: NextRequest) {
   const workingDir = request.nextUrl.searchParams.get('workingDir');
+  const pageId = request.nextUrl.searchParams.get('pageId') || undefined;
   if (!workingDir) {
     return NextResponse.json(
       { success: false, error: { code: 'INVALID_REQUEST', message: 'workingDir 必填' } },
@@ -29,12 +30,20 @@ export async function GET(request: NextRequest) {
       treeExists,
       demosExists,
       demosDirEntries,
+      pageId,
     });
 
     const context = scanWorkspaceContext(workingDir);
     const memoryContent = readMemoryContent(workingDir);
     const knowledgeIndex = scanKnowledgeIndex(workingDir);
-    return NextResponse.json({ success: true, data: { ...context, memoryContent, knowledgeIndex } });
+    const conventionContent = readConventionContent(workingDir);
+    const pageConventionContent = pageId
+      ? readPageConventionContent(workingDir, pageId)
+      : null;
+    return NextResponse.json({
+      success: true,
+      data: { ...context, memoryContent, knowledgeIndex, conventionContent, pageConventionContent },
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('[workspace-context] 扫描失败:', { workingDir, error: message });

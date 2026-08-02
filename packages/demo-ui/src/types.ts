@@ -151,7 +151,29 @@ export interface PositionEditMode {
   enabled: boolean;
   items: string[];
   positions: Record<string, { x: number; y: number }>;
+  /** 按 position key 指定的拖动边界。未在 map 中的 key 退化为全容器约束。整体缺省时所有元素退化为全容器约束。 */
+  boundary?: Record<string, PositionEditBoundary>;
 }
+
+export interface PositionEditBoundaryAbsolute {
+  mode: "absolute";
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+export interface PositionEditBoundaryPadding {
+  mode: "padding";
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+export type PositionEditBoundary =
+  | PositionEditBoundaryAbsolute
+  | PositionEditBoundaryPadding;
 
 export interface ConfigFormProps {
   schema: string;
@@ -161,10 +183,9 @@ export interface ConfigFormProps {
   readonly?: boolean;
   className?: string;
   sessionId?: string;
-  positionableItemSizes?: Record<string, PositionableSizeItem>;
   configCategoryFilter?: string;
   typeLimits?: Record<string, number>;
-  onEnterPositionEdit?: (items: string[], positions: Record<string, { x: number; y: number }>) => void;
+  onEnterPositionEdit?: (posKeys: string[], positions: Record<string, { x: number; y: number }>, posKeyMap: Record<string, string>) => void;
   onExitPositionEdit?: () => void;
   positionEditActive?: boolean;
   positionEditDimming?: boolean;

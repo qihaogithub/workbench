@@ -41,7 +41,7 @@ RUN if [ -n "$DEBIAN_MIRROR" ]; then \
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 
-RUN npm install --no-save fastify @fastify/cors pino pino-pretty puppeteer-core
+RUN npm install --no-save fastify @fastify/cors @fastify/rate-limit pino pino-pretty puppeteer-core
 
 COPY --from=builder /app/packages/screenshot-service/dist/server.js ./server.js
 

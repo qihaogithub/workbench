@@ -277,6 +277,10 @@ const WorkspaceCodeDialog = dynamic(
   () => import("@/components/demo/WorkspaceCodeDialog").then((m) => m.WorkspaceCodeDialog),
   { ssr: false, loading: () => null },
 );
+const ConventionDialog = dynamic(
+  () => import("@/components/demo/ConventionDialog").then((m) => m.ConventionDialog),
+  { ssr: false, loading: () => null },
+);
 const KnowledgePanel = dynamic(
   () => import("@/components/demo/KnowledgePanel").then((m) => m.KnowledgePanel),
   { ssr: false, loading: () => null },
@@ -723,6 +727,30 @@ function arePositionableSizesEqual(
   });
 }
 
+function setNestedValue(
+  obj: Record<string, unknown>,
+  path: string,
+  value: unknown,
+): Record<string, unknown> {
+  const keys = path.replace(/\[(\d+)\]/g, ".$1").split(".");
+  const result = { ...obj };
+  let current: Record<string, unknown> = result;
+  for (let i = 0; i < keys.length - 1; i++) {
+    const key = keys[i];
+    const existing = current[key];
+    if (Array.isArray(existing)) {
+      current[key] = [...existing];
+    } else if (typeof existing === "object" && existing !== null) {
+      current[key] = { ...(existing as Record<string, unknown>) };
+    } else {
+      current[key] = {};
+    }
+    current = current[key] as Record<string, unknown>;
+  }
+  current[keys[keys.length - 1]] = value;
+  return result;
+}
+
 function getCanvasContentHistorySignature(state: CanvasState): string {
   return JSON.stringify({
     pages: state.pages ?? {},
@@ -832,13 +860,22 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     enabled: boolean;
     items: string[];
     positions: Record<string, { x: number; y: number }>;
+    boundary?: Record<string, { mode: "absolute" | "padding"; left: number; top: number; right: number; bottom: number }>;
   }>({ enabled: false, items: [], positions: {} });
 
   const [positionEditDimming, setPositionEditDimming] = useState(true);
 
+  const posKeyMapRef = useRef<Record<string, string>>({});
+
   const handleEnterPositionEdit = useCallback(
-    (items: string[], positions: Record<string, { x: number; y: number }>) => {
-      setPositionEditMode({ enabled: true, items, positions });
+    (
+      items: string[],
+      positions: Record<string, { x: number; y: number }>,
+      posKeyMap: Record<string, string>,
+      boundary?: Record<string, { mode: "absolute" | "padding"; left: number; top: number; right: number; bottom: number }>,
+    ) => {
+      posKeyMapRef.current = posKeyMap;
+      setPositionEditMode({ enabled: true, items, positions, boundary });
       setPositionEditDimming(true);
     },
     [],
@@ -1495,6 +1532,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     content: string;
     editable: boolean;
   }>({ filePath: "", content: "", editable: false });
+
+  // 公约弹窗状态
+  const [conventionDialogOpen, setConventionDialogOpen] = useState(false);
 
   // 知识库文档弹窗状态
   const [kbDocDialogOpen, setKbDocDialogOpen] = useState(false);
@@ -3705,11 +3745,11 @@ ${context.details}
     (key: string, x: number, y: number) => {
       const pageId = activeDemoIdRef.current;
       if (!pageId) return;
+      const fieldPath = posKeyMapRef.current[key];
+      if (!fieldPath) return;
       const currentConfig = configDataMapRef.current[pageId] || {};
-      const currentPositions =
-        (currentConfig.__positions as Record<string, { x: number; y: number }>) || {};
-      const newPositions = { ...currentPositions, [key]: { x, y } };
-      handlePageConfigPanelChangeRef.current(pageId, { __positions: newPositions });
+      const newConfig = setNestedValue(currentConfig, fieldPath, { x, y });
+      handlePageConfigPanelChangeRef.current(pageId, newConfig);
     },
     [],
   );
@@ -3804,7 +3844,7 @@ ${context.details}
           return;
         }
 
-        const metaKeys = new Set(["__positions"]);
+        const metaKeys = new Set<string>();
         let updatedCount = 0;
         for (const [key, value] of Object.entries(currentConfig)) {
           if (metaKeys.has(key)) continue;
@@ -6777,6 +6817,9 @@ ${context.details}
                           });
                         }
                       }}
+                      onConventionSelect={() => {
+                        setConventionDialogOpen(true);
+                      }}
                     />
                   ) : (
                     <WorkspaceFileTree
@@ -7754,7 +7797,6 @@ ${context.details}
                         onSaveAsDefaults={handleSaveAsDefaults}
                         onRestoreDefaults={handleRestoreDefaults}
                         sessionId={sessionId}
-                        positionableItemSizes={positionableItemSizes}
                         hideDetailHeader
                         onEnterPositionEdit={handleEnterPositionEdit}
                         onExitPositionEdit={handleExitPositionEdit}
@@ -7828,7 +7870,6 @@ ${context.details}
                   onSaveAsDefaults={handleSaveAsDefaults}
                   onRestoreDefaults={handleRestoreDefaults}
                   sessionId={sessionId}
-                  positionableItemSizes={positionableItemSizes}
                   onEnterPositionEdit={handleEnterPositionEdit}
                   onExitPositionEdit={handleExitPositionEdit}
                   positionEditActive={positionEditMode.enabled}
@@ -8026,6 +8067,13 @@ ${context.details}
         onSaved={({ filePath, content }) => {
           handleWorkspaceFileSaved(filePath, content);
         }}
+      />
+
+      <ConventionDialog
+        open={conventionDialogOpen}
+        onOpenChange={setConventionDialogOpen}
+        sessionId={sessionId || ""}
+        pages={demoPages.map((p) => ({ id: p.id, name: p.name }))}
       />
 
       <KnowledgeDocDialog

@@ -331,7 +331,7 @@ export function buildPrototypePreviewHtmlFragment({
         rewrittenCss,
         designWidth,
         designHeight,
-        !constrainHeight,
+        false,
       )
     : rewrittenCss;
 

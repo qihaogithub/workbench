@@ -184,3 +184,51 @@ export function scanKnowledgeIndex(workingDir: string): string | null {
     return null;
   }
 }
+
+/**
+ * 读取工作区根目录的 convention.md 内容
+ * 容错：文件不存在或读取失败时返回 null
+ */
+export function readConventionContent(workingDir: string): string | null {
+  const conventionPath = path.join(workingDir, "convention.md");
+  try {
+    if (!fs.existsSync(conventionPath)) {
+      return null;
+    }
+    const content = fs.readFileSync(conventionPath, "utf-8").trim();
+    if (!content) {
+      return null;
+    }
+    return content;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 读取指定页面的 convention.md 内容
+ * 容错：文件不存在或读取失败时返回 null
+ */
+export function readPageConventionContent(
+  workingDir: string,
+  pageId: string,
+): string | null {
+  const pageConventionPath = path.join(
+    workingDir,
+    "demos",
+    pageId,
+    "convention.md",
+  );
+  try {
+    if (!fs.existsSync(pageConventionPath)) {
+      return null;
+    }
+    const content = fs.readFileSync(pageConventionPath, "utf-8").trim();
+    if (!content) {
+      return null;
+    }
+    return content;
+  } catch {
+    return null;
+  }
+}

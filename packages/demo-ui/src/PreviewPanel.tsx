@@ -366,6 +366,7 @@ function PreviewPanelInternal({
   onConsoleEntryRef.current = onConsoleEntry;
   const prevPositionEditEnabledRef = useRef(positionEditMode?.enabled ?? false);
   const skipConfigUpdateOnExitRef = useRef(false);
+  const justEnteredPositionEditRef = useRef(false);
 
   const isSleeping = activityState === "sleeping";
   const resolvedCdnBaseUrl = getPreviewCdnBaseUrl(cdnBaseUrl);
@@ -978,11 +979,13 @@ function PreviewPanelInternal({
     prevPositionEditEnabledRef.current = isEnabled;
 
     if (isEnabled) {
+      justEnteredPositionEditRef.current = true;
       iframe.contentWindow.postMessage(
         {
           type: "ENTER_POSITION_EDIT",
           items: positionEditMode!.items,
           positions: positionEditMode!.positions,
+          boundary: positionEditMode!.boundary,
         },
         "*",
       );
@@ -1005,7 +1008,12 @@ function PreviewPanelInternal({
     }
 
     // 位置编辑模式下：发送轻量 APPLY_POSITIONS 替代全量 UPDATE_CONFIG
+    // 刚进入编辑模式时跳过（避免 applyPosition 因 DOM 与 config 位置差异施加不必要的 transform）
     if (positionEditMode?.enabled) {
+      if (justEnteredPositionEditRef.current) {
+        justEnteredPositionEditRef.current = false;
+        return;
+      }
       const positions = configData?.__positions as Record<string, { x: number; y: number }> | undefined;
       if (positions) {
         const iframe = iframeRef.current;
@@ -1686,7 +1694,11 @@ function arePreviewPanelPropsEqual(
     prev.activityState === next.activityState &&
     prev.visualEditMode === next.visualEditMode &&
     prev.visualAnnotationMode === next.visualAnnotationMode &&
-    prev.isAutoRepairing === next.isAutoRepairing
+    prev.isAutoRepairing === next.isAutoRepairing &&
+    prev.positionEditMode === next.positionEditMode &&
+    prev.positionEditDimming === next.positionEditDimming &&
+    prev.onPositionChange === next.onPositionChange &&
+    prev.onPositionEditExit === next.onPositionEditExit
   );
 }
 

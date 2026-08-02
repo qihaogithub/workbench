@@ -52,12 +52,11 @@ interface PageConfigPanelProps {
   onRestoreDefaults?: (pageId: string) => void;
   readonly?: boolean;
   sessionId?: string;
-  positionableItemSizes?: Record<string, PositionableSizeItem>;
   className?: string;
   title?: string;
   hideDetailHeader?: boolean;
   typeLimits?: Record<string, number>;
-  onEnterPositionEdit?: (items: string[], positions: Record<string, { x: number; y: number }>) => void;
+  onEnterPositionEdit?: (posKeys: string[], positions: Record<string, { x: number; y: number }>, posKeyMap: Record<string, string>) => void;
   onExitPositionEdit?: () => void;
   positionEditActive?: boolean;
   positionEditDimming?: boolean;
@@ -172,7 +171,6 @@ export function PageConfigPanel({
   onRestoreDefaults,
   readonly,
   sessionId,
-  positionableItemSizes,
   className,
   title = "配置面板",
   hideDetailHeader = false,
@@ -489,7 +487,6 @@ export function PageConfigPanel({
                   }
                   initialData={configData}
                   sessionId={sessionId}
-                  positionableItemSizes={positionableItemSizes}
                   readonly={readonly}
                   configCategoryFilter={configCategoryFilter}
                   typeLimits={typeLimits}

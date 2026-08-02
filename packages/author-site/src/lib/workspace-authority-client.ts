@@ -188,34 +188,58 @@ export async function reconcileWorkspaceAuthority(input: {
 async function executeMutation(
   request: WorkspaceMutationRequest,
 ): Promise<WorkspaceMutationReceipt> {
-  const response = await fetch(
-    `${getServerAgentServiceUrl()}/api/workspace-authority/projects/${encodeURIComponent(request.projectId)}/workspaces/${encodeURIComponent(request.workspaceId)}/mutate`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(request),
-    },
-  ).catch((error: unknown) => {
-    throw new WorkspaceAuthorityClientError(
-      "WORKSPACE_AUTHORITY_NOT_READY",
-      error instanceof Error ? error.message : "Workspace Authority 不可用",
-      503,
-    );
-  });
+  const maxRetries = 3;
+  let lastError: unknown;
 
-  const body = (await response
-    .json()
-    .catch(() => ({}))) as AuthorityEnvelope<WorkspaceMutationReceipt>;
-  if (!response.ok || body.success === false || !body.data) {
-    throw new WorkspaceAuthorityClientError(
-      isWorkspaceAuthorityApiErrorCode(body.error?.code)
-        ? body.error.code
-        : "WORKSPACE_MUTATION_FAILED",
-      body.error?.message ?? `Workspace Authority 响应 ${response.status}`,
-      response.status || 502,
-    );
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    if (attempt > 0) {
+      const delay = Math.min(1000 * 2 ** (attempt - 1), 4000);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+
+    const response = await fetch(
+      `${getServerAgentServiceUrl()}/api/workspace-authority/projects/${encodeURIComponent(request.projectId)}/workspaces/${encodeURIComponent(request.workspaceId)}/mutate`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      },
+    ).catch((error: unknown) => {
+      lastError = new WorkspaceAuthorityClientError(
+        "WORKSPACE_AUTHORITY_NOT_READY",
+        error instanceof Error ? error.message : "Workspace Authority 不可用",
+        503,
+      );
+      return undefined;
+    });
+
+    if (!response) continue;
+
+    if (response.status === 429) {
+      lastError = new WorkspaceAuthorityClientError(
+        "WORKSPACE_MUTATION_FAILED",
+        "Workspace Authority 请求过于频繁，正在重试",
+        429,
+      );
+      continue;
+    }
+
+    const body = (await response
+      .json()
+      .catch(() => ({}))) as AuthorityEnvelope<WorkspaceMutationReceipt>;
+    if (!response.ok || body.success === false || !body.data) {
+      throw new WorkspaceAuthorityClientError(
+        isWorkspaceAuthorityApiErrorCode(body.error?.code)
+          ? body.error.code
+          : "WORKSPACE_MUTATION_FAILED",
+        body.error?.message ?? `Workspace Authority 响应 ${response.status}`,
+        response.status || 502,
+      );
+    }
+    return body.data;
   }
-  return body.data;
+
+  throw lastError;
 }
 
 /**

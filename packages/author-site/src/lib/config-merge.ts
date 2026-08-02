@@ -57,18 +57,6 @@ export function mergeSchemaDefaults(
     }
   }
 
-  // Add __positions from schema
-  if (parsedSchema.$demo?.positionable && typeof parsedSchema.$demo.positionable === "object") {
-    const posConfig = parsedSchema.$demo.positionable as { items?: string[]; defaults?: Record<string, { x: number; y: number }> };
-    if (Array.isArray(posConfig.items)) {
-      const positions: Record<string, { x: number; y: number }> = {};
-      for (const key of posConfig.items) {
-        positions[key] = posConfig.defaults?.[key] || { x: 0, y: 0 };
-      }
-      merged.__positions = positions;
-    }
-  }
-
   return merged;
 }
 

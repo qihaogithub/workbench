@@ -10,9 +10,12 @@ export type WorkspaceResourceKind =
   | "page-schema"
   | "page-sketch-scene"
   | "page-sketch-meta"
+  | "page-convention"
   | "project-schema"
   | "project-config-values"
   | "workspace-tree"
+  | "workspace-convention"
+  | "workspace-memory"
   | "canvas-layout"
   | "knowledge-document"
   | "knowledge-manifest"
@@ -61,9 +64,12 @@ export class WorkspaceResourceRegistry {
     if (/^demos\/[^/]+\/config\.ts$/.test(normalized)) return { kind: "page-schema", text: true, maxBytes: TEXT_MAX_BYTES, validation: "text" };
     if (/^demos\/[^/]+\/sketch\.scene\.json$/.test(normalized)) return { kind: "page-sketch-scene", text: true, maxBytes: TEXT_MAX_BYTES, validation: "sketch-scene" };
     if (/^demos\/[^/]+\/sketch\.meta\.json$/.test(normalized)) return { kind: "page-sketch-meta", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
+    if (/^demos\/[^/]+\/convention\.md$/.test(normalized)) return { kind: "page-convention", text: true, maxBytes: TEXT_MAX_BYTES, validation: "text" };
     if (normalized === "project.config.schema.json") return { kind: "project-schema", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
     if (normalized === "project.config.values.json") return { kind: "project-config-values", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
     if (normalized === "workspace-tree.json") return { kind: "workspace-tree", text: true, maxBytes: TEXT_MAX_BYTES, validation: "workspace-tree" };
+    if (normalized === "convention.md") return { kind: "workspace-convention", text: true, maxBytes: TEXT_MAX_BYTES, validation: "text" };
+    if (normalized === "memory.md") return { kind: "workspace-memory", text: true, maxBytes: TEXT_MAX_BYTES, validation: "text" };
     if (normalized === ".canvas-layout.json") return { kind: "canvas-layout", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
     if (/^knowledge\/[^/]+\.(md|markdown|mdown)$/i.test(normalized)) return { kind: "knowledge-document", text: true, maxBytes: TEXT_MAX_BYTES, validation: "text" };
     if (normalized === "knowledge/manifest.json") return { kind: "knowledge-manifest", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
