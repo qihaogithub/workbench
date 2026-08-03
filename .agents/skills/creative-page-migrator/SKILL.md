@@ -25,7 +25,7 @@ Screenshots are allowed only as references or verification artifacts. If the sou
 
 3. Choose the target runtime deliberately:
    - Use `prototype-html-css` for static/safe HTML/CSS pages where layout fidelity is the goal and arbitrary JS is not required.
-   - Use `high-fidelity-react` when the page needs React state, event logic, data-driven behavior, lifecycle behavior, or unsupported prototype capabilities.
+   - Use `high-fidelity-react` when the page needs React state, event logic, data-driven behavior, lifecycle behavior, unsupported prototype capabilities, or when the config schema requires composite types (array/imageList/richtext/cascade/enum multi-select/position) that prototype pages cannot consume.
    - Use `sketch-scene` only for actual editable scene-document pages, not as a shortcut for web page migration.
 
 4. Implement from structure, not pixels:

@@ -50,6 +50,12 @@ export {
   sanitizePrototypeCss,
   sanitizePrototypeHtml,
 } from "./demo/prototype-preview";
+export {
+  checkConfigSchemaAgainstPrototype,
+} from "./demo/config-runtime-compatibility";
+export type {
+  ConfigRuntimeCompatibilityResult,
+} from "./demo/config-runtime-compatibility";
 
 export interface PrototypePageMeta {
   width?: number;
@@ -114,6 +120,7 @@ export interface DemoFiles {
   prototypeMeta?: PrototypePageMeta;
   sketchScene?: string;
   sketchMeta?: Record<string, unknown>;
+  configValues?: Record<string, unknown>;
 }
 
 interface PageSnapshotBaseInput {
@@ -332,7 +339,7 @@ export * from "./external-auth";
 export * from "./diagnostics";
 export * from "./ai-error-normalizer";
 export * from "./comment";
-export { compileConfigTs, ConfigCompileError, decompileSchema } from "./config-compiler";
+
 
 /** 图片附件，Base64 编码 */
 export interface ImageAttachment {

@@ -8,7 +8,6 @@ import { logger } from "../../utils/logger";
 import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from "./permissions";
 import { resolveVirtualKnowledgeFile } from "./virtual-knowledge";
 import { truncateHead, formatSize, type TruncationResult } from "./truncate";
-import { compileConfigTs } from "@workbench/shared";
 import {
   formatRuntimeValidationInstruction,
   validatePreviewFileWrite,
@@ -109,7 +108,7 @@ type ReadFileParams = Static<typeof ReadFileParams>;
  * 从 workspace-tree.json 快照中解析指定页面文件的 runtimeType。
  * 用于 writeFile 校验时判断页面是否为原型页，非原型页运行时跳过原型校验。
  */
-function resolvePageRuntimeType(
+export function resolvePageRuntimeType(
   filePath: string,
   resources: Record<string, string> | undefined,
 ): string | undefined {
@@ -540,75 +539,11 @@ export function createWriteFileTool(
         const validationText =
           formatRuntimeValidationInstruction(runtimeValidation);
 
-        let schemaCompileError: string | undefined;
-        const configTsMatch = args.path.match(
-          /^(demos\/[^/]+\/|project\.)config\.ts$/,
-        );
-        if (configTsMatch) {
-          const schemaPath = configTsMatch[1]
-            ? `${configTsMatch[1]}config.schema.json`
-            : "project.config.schema.json";
-          try {
-            const compiled = compileConfigTs(args.content);
-            if (liveWorkspace && receipt) {
-              const existingSchema = snapshot?.resources?.[schemaPath] ?? null;
-              await liveWorkspace.authority.mutate({
-                mutationId: crypto.randomUUID(),
-                projectId: liveWorkspace.projectId,
-                workspaceId: liveWorkspace.workspaceId,
-                sessionId: config.sessionId,
-                baseRevision: receipt.revision,
-                actor: "ai",
-                reason: "compile_config_ts_to_schema",
-                operations: [
-                  {
-                    type: "put_text",
-                    path: schemaPath,
-                    content: compiled,
-                    ...(existingSchema === null
-                      ? { expectedAbsent: true }
-                      : {
-                          expectedHash: crypto
-                            .createHash("sha256")
-                            .update(existingSchema)
-                            .digest("hex"),
-                        }),
-                  },
-                ],
-              });
-            } else {
-              const fullPath = path.resolve(
-                config.workingDir || ".",
-                schemaPath,
-              );
-              await fs.promises.mkdir(path.dirname(fullPath), {
-                recursive: true,
-              });
-              await fs.promises.writeFile(fullPath, compiled, "utf-8");
-            }
-            logger.info(
-              { configPath: args.path, schemaPath },
-              "config.ts compiled to config.schema.json",
-            );
-          } catch (err) {
-            logger.warn(
-              { err: String(err), path: args.path },
-              "config.ts compilation failed",
-            );
-            schemaCompileError =
-              err instanceof Error ? err.message : String(err);
-          }
-        }
-
-        const schemaCompileText = schemaCompileError
-          ? `\n\n⚠️ config.ts 编译 config.schema.json 失败: ${schemaCompileError}\n已保存 config.ts 但未更新 config.schema.json，请检查 config.ts 格式。`
-          : "";
-
         return {
           content: [
             {
               type: "text",
-              text: `Successfully wrote to ${args.path}${validationText}${schemaCompileText}`,
+              text: `Successfully wrote to ${args.path}${validationText}`,
             },
           ],
           details: {
@@ -617,7 +552,6 @@ export function createWriteFileTool(
             runtimeValidation,
             receipt,
             knowledgeDocumentCreated,
-            schemaCompileError,
           },
         };
       } catch (error) {
@@ -743,41 +677,6 @@ export function createListFilesTool(
             if (name) seen.add(name);
           }
           if (seen.size > 0) {
-            const configTsInSeen = seen.has("config.ts");
-            const configSchemaJsonInSeen = seen.has("config.schema.json");
-            const configTsOnFs = configSchemaJsonInSeen && !configTsInSeen
-              ? (() => {
-                  try {
-                    const checkPath = path.join(dirPath, "config.ts");
-                    const exists = fs.existsSync(checkPath);
-                    logger.info(
-                      { checkPath, exists, dirPath, argsPath: args.path },
-                      "listFiles: filesystem fallback check for config.ts",
-                    );
-                    return exists;
-                  } catch {
-                    return false;
-                  }
-                })()
-              : false;
-            const hasConfigTs = configTsInSeen || configTsOnFs;
-            logger.info(
-              {
-                prefix,
-                seenSize: seen.size,
-                seen: [...seen],
-                configTsInSeen,
-                configSchemaJsonInSeen,
-                configTsOnFs,
-                hasConfigTs,
-                dirPath,
-              },
-              "listFiles: config.schema.json hide decision",
-            );
-            if (seen.has("config.schema.json") && hasConfigTs) {
-              logger.info({}, "listFiles: hiding config.schema.json");
-              seen.delete("config.schema.json");
-            }
             const result = Array.from(seen)
               .sort()
               .map((name) => {
@@ -815,23 +714,7 @@ export function createListFilesTool(
         const entries = await fs.promises.readdir(dirPath, {
           withFileTypes: true,
         });
-        const hasConfigTs = entries.some(
-          (e) => !e.isDirectory() && e.name === "config.ts",
-        );
-        const hasConfigSchemaJson = entries.some(
-          (e) => !e.isDirectory() && e.name === "config.schema.json",
-        );
-        logger.info(
-          { dirPath, hasConfigTs, hasConfigSchemaJson, entryNames: entries.map(e => e.name) },
-          "listFiles: filesystem hide decision",
-        );
         const result = entries
-          .filter((entry) => {
-            if (hasConfigTs && !entry.isDirectory() && entry.name === "config.schema.json") {
-              return false;
-            }
-            return true;
-          })
           .map((entry) => {
             const type = entry.isDirectory() ? "directory" : "file";
             return `${type}: ${entry.name}`;

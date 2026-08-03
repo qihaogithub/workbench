@@ -56,7 +56,7 @@ export interface VisibleWhenCondition {
   equals: VisibleWhenValue;
 }
 
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
+export function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
@@ -143,6 +143,67 @@ function detectGroup(key: string, prop: { format?: string }): string {
   return "基础配置";
 }
 
+function hasPositionable(prop: Record<string, unknown>): boolean {
+  const demo = prop.$demo as Record<string, unknown> | undefined;
+  return !!(demo?.positionable);
+}
+
+export function flattenSchema(parsed: Record<string, unknown>): Record<string, unknown> {
+  const properties = parsed.properties;
+  if (!isPlainRecord(properties)) return parsed;
+
+  const flatProperties: Record<string, unknown> = {};
+  const topRequired = new Set(
+    Array.isArray(parsed.required) ? (parsed.required as string[]) : [],
+  );
+  let hasNestedGroups = false;
+
+  for (const [key, prop] of Object.entries(properties)) {
+    const propObj = prop as Record<string, unknown>;
+
+    if (
+      propObj.type === "object" &&
+      isPlainRecord(propObj.properties) &&
+      !hasPositionable(propObj)
+    ) {
+      hasNestedGroups = true;
+      const nestedPropKeys = Object.keys(propObj.properties as Record<string, unknown>);
+      if (nestedPropKeys.length === 0) {
+        continue;
+      }
+      const nestedProps = propObj.properties as Record<string, Record<string, unknown>>;
+      const nestedRequired = Array.isArray(propObj.required)
+        ? (propObj.required as string[])
+        : [];
+      const groupTitle = typeof propObj.title === "string" ? propObj.title : key;
+
+      for (const [nestedKey, nestedProp] of Object.entries(nestedProps)) {
+        const nestedObj = { ...nestedProp };
+        const existingUi = isPlainRecord(nestedObj["ui:options"])
+          ? { ...(nestedObj["ui:options"] as Record<string, unknown>) }
+          : {};
+        existingUi.group = groupTitle;
+        nestedObj["ui:options"] = existingUi;
+        flatProperties[nestedKey] = nestedObj;
+
+        if (nestedRequired.includes(nestedKey)) {
+          topRequired.add(nestedKey);
+        }
+      }
+    } else {
+      flatProperties[key] = propObj;
+    }
+  }
+
+  if (!hasNestedGroups) return parsed;
+
+  return {
+    ...parsed,
+    properties: flatProperties,
+    required: [...topRequired],
+  };
+}
+
 function getGroupColor(index: number): string {
   const colors = [
     "from-blue-500 to-cyan-500",
@@ -165,7 +226,7 @@ function parseProperties(
       : undefined;
     const field: FieldConfig = {
       key,
-      title: (prop.title as string) || formatFieldName(key),
+      title: typeof prop.title === "string" ? prop.title : formatFieldName(key),
       type: (prop.type as string) || "string",
       description: prop.description as string | undefined,
       required: required.includes(key),
@@ -182,7 +243,7 @@ function parseProperties(
         typeof uiOptions?.category === "string"
           ? uiOptions.category.trim()
           : undefined,
-      visibleWhen: parseVisibleWhen(uiOptions?.visibleWhen),
+      visibleWhen: parseVisibleWhen(uiOptions?.visibleWhen) || parseVisibleWhen(prop.visibleWhen),
       note: (prop as Record<string, unknown>).$demo
         ? ((prop as Record<string, unknown>).$demo as Record<string, unknown>)
             ?.note as string | undefined
@@ -205,6 +266,20 @@ function parseProperties(
       field.options = uiOptions?.cascadeOptions as CascadeOption[] | undefined;
     }
 
+    if (prop.type === "enum" && prop.multiple === true) {
+      field.uiWidget = "multiselect";
+      field.multiple = true;
+    }
+
+    if (prop.type === "cascade" && Array.isArray(prop.options)) {
+      field.uiWidget = "cascade";
+      field.options = prop.options as CascadeOption[];
+    }
+
+    if (prop.type === "imageList") {
+      field.uiWidget = "imageList";
+    }
+
     if (prop.type === "object") {
       const demo = (prop as Record<string, unknown>).$demo as Record<string, unknown> | undefined;
       if (demo?.positionable && typeof demo.positionable === "object") {
@@ -214,6 +289,13 @@ function parseProperties(
           size: pos.size as { width: number; height: number } | undefined,
         };
       }
+    }
+
+    if (prop.type === "position") {
+      field.positionable = {
+        key: typeof prop.key === "string" ? prop.key : undefined,
+        size: prop.size as { width: number; height: number } | undefined,
+      };
     }
 
     return field;
@@ -287,8 +369,9 @@ function resolveChildren(
 export function parseSchemaToFields(schema: string, typeLimits?: Record<string, number>): FieldGroup[] {
   try {
     const parsed = JSON.parse(schema);
-    const properties = parsed.properties || {};
-    const required = parsed.required || [];
+    const flattened = flattenSchema(parsed);
+    const properties = (flattened.properties || {}) as Record<string, unknown>;
+    const required = (flattened.required || []) as string[];
 
     const groups: Record<string, FieldConfig[]> = {};
 
@@ -299,7 +382,7 @@ export function parseSchemaToFields(schema: string, typeLimits?: Record<string, 
           : undefined;
         const field: FieldConfig = {
           key,
-          title: (prop.title as string) || formatFieldName(key),
+title: typeof prop.title === "string" ? prop.title : formatFieldName(key),
           type: (prop.type as string) || "string",
           description: prop.description as string | undefined,
           required: required.includes(key),
@@ -316,7 +399,7 @@ export function parseSchemaToFields(schema: string, typeLimits?: Record<string, 
             typeof uiOptions?.category === "string"
               ? uiOptions.category.trim()
               : undefined,
-          visibleWhen: parseVisibleWhen(uiOptions?.visibleWhen),
+          visibleWhen: parseVisibleWhen(uiOptions?.visibleWhen) || parseVisibleWhen(prop.visibleWhen),
           note: prop.$demo
             ? (prop.$demo as Record<string, unknown>)?.note as
                 | string
@@ -340,6 +423,16 @@ export function parseSchemaToFields(schema: string, typeLimits?: Record<string, 
           field.options = uiOptions?.cascadeOptions as CascadeOption[] | undefined;
         }
 
+        if (prop.type === "enum" && prop.multiple === true) {
+          field.uiWidget = "multiselect";
+          field.multiple = true;
+        }
+
+        if (prop.type === "cascade" && Array.isArray(prop.options)) {
+          field.uiWidget = "cascade";
+          field.options = prop.options as CascadeOption[];
+        }
+
         if (prop.type === "object") {
           const pdemo = prop.$demo as Record<string, unknown> | undefined;
           if (pdemo?.positionable && typeof pdemo.positionable === "object") {
@@ -351,11 +444,18 @@ export function parseSchemaToFields(schema: string, typeLimits?: Record<string, 
           }
         }
 
+        if (prop.type === "position") {
+          field.positionable = {
+            key: typeof prop.key === "string" ? prop.key : undefined,
+            size: prop.size as { width: number; height: number } | undefined,
+          };
+        }
+
         const items = prop.items as Record<string, unknown> | undefined;
         if (
           field.type === "array" &&
           items &&
-          items.type === "object"
+          (items.type === "object" || items.oneOf || items.properties)
         ) {
           const oneOf = resolveOneOf(items);
           if (oneOf) {
@@ -377,12 +477,12 @@ export function parseSchemaToFields(schema: string, typeLimits?: Record<string, 
           }
         }
 
-        const explicitGroup =
-          typeof uiOptions?.group === "string"
-            ? uiOptions.group.trim()
-            : "";
-        const groupName =
-          explicitGroup || detectGroup(key, prop);
+        const explicitGroup = uiOptions && typeof uiOptions.group === "string"
+          ? uiOptions.group.trim()
+          : undefined;
+        const groupName = explicitGroup !== undefined
+          ? explicitGroup
+          : detectGroup(key, prop);
         if (!groups[groupName]) {
           groups[groupName] = [];
         }

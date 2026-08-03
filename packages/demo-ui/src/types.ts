@@ -252,6 +252,9 @@ export interface CanvasPageData {
   sketchScene?: string;
   sketchMeta?: Record<string, unknown>;
   configData?: Record<string, unknown>;
+  schema?: string;                    // config.schema.json 原始 JSON 字符串
+  isReference?: boolean;              // 是否为引用页
+  sourceProjectId?: string;           // 引用页的源项目 ID
   previewSize?: PreviewSize;
   order: number;
 }
@@ -455,6 +458,15 @@ export interface PreviewCanvasProps {
     pageLayouts: Record<string, CanvasPageLayout>;
     pageGroups: CanvasPageGroup[];
   }) => Promise<{ pageIdMapping: Map<string, string> }>;
+  /** 跨项目粘贴时创建引用页 */
+  onRequestCreateReferences?: (input: {
+    pages: CanvasPageData[];
+    pageLayouts: Record<string, CanvasPageLayout>;
+    pageGroups: CanvasPageGroup[];
+    sourceProjectId: string;
+  }) => Promise<{ pageIdMapping: Map<string, string> }>;
+  /** 查看引用页的源项目 */
+  onViewSource?: (pageId: string) => void;
 }
 
 export interface PreviewState {

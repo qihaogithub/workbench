@@ -9,11 +9,11 @@
     "./contracts": "./src/contracts.ts",
     "./demo/iframe-template": "./src/demo/iframe-template.ts",
     "./demo/prototype-preview": "./src/demo/prototype-preview.ts",
-    "./demo/sketch-scene": "./src/demo/sketch-scene.ts"
+    "./demo/sketch-scene": "./src/demo/sketch-scene.ts",
+    "./demo/config-runtime-compatibility": "./src/demo/config-runtime-compatibility.ts"
   },
   "dependencies": {
-    "@workbench/sketch-core": "workspace:*",
-    "acorn": "^8.18.0"
+    "@workbench/sketch-core": "workspace:*"
   },
   "scripts": {
     "lint": "eslint src --ext .ts"

@@ -1,6 +1,6 @@
 import { PreviewRuntimeContractError, type RuntimeContractIssue } from '@workbench/preview-contract/runtime';
 import { compilePreviewPageSource } from '@workbench/preview-contract/compiler';
-import { compileConfigTs, ConfigCompileError } from '@workbench/shared';
+import { checkConfigSchemaAgainstPrototype } from '@workbench/shared/demo/config-runtime-compatibility';
 
 type ToolRuntimeValidationStage = RuntimeContractIssue['stage'] | 'prototype_contract';
 type PrototypeGateDecision =
@@ -311,6 +311,36 @@ export function validatePreviewFileWrite(
         };
       }
 
+      // 高保真页全类型支持，跳过复合类型检查
+      if (runtimeType && runtimeType !== 'prototype-html-css') {
+        return { ok: true, file: normalizedPath, pageId, issues: [] };
+      }
+
+      // 原型页（或未知 runtimeType）检查复合类型配置
+      const compatibility = checkConfigSchemaAgainstPrototype(parsed);
+      if (!compatibility.supported) {
+        const issues: ToolRuntimeValidationIssue[] = compatibility.unsupportedFields.map((field) => ({
+          file: normalizedPath,
+          pageId,
+          stage: 'schema_contract',
+          code: 'PROTOTYPE_CONFIG_TYPE_UNSUPPORTED',
+          severity: 'error',
+          message: `config.schema.json 中字段 "${field.path}" 使用了原型页不支持的配置类型（${field.type}）`,
+          instruction: field.reason + '。请升级页面为高保真 React 页。',
+        }));
+        return {
+          ok: false,
+          file: normalizedPath,
+          pageId,
+          issues,
+          prototypeGate: {
+            decision: 'upgrade_to_high_fidelity',
+            reasonCodes: ['PROTOTYPE_CONFIG_TYPE_UNSUPPORTED'],
+            summary: `config.schema.json 包含原型页不可消费的配置类型：${compatibility.unsupportedFields.map((f) => `${f.path}（${f.type}）`).join('、')}`,
+          },
+        };
+      }
+
       return { ok: true, file: normalizedPath, pageId, issues: [] };
     } catch {
       return {
@@ -326,82 +356,6 @@ export function validatePreviewFileWrite(
             severity: 'error',
             message: '页面配置 schema 不是合法 JSON',
             instruction: '请修复 config.schema.json 的 JSON 语法；如果页面不需要配置字段，保留空 properties 对象。',
-          },
-        ],
-      };
-    }
-  }
-
-  if (pageId && demoFile.fileName === 'config.ts') {
-    try {
-      const compiled = compileConfigTs(content);
-      const parsed = JSON.parse(compiled) as Record<string, unknown>;
-
-      const demo = parsed.$demo;
-      const previewSize =
-        demo != null && typeof demo === 'object' && !Array.isArray(demo)
-          ? (demo as Record<string, unknown>).previewSize
-          : undefined;
-      const hasValidPreviewSize =
-        previewSize != null &&
-        typeof previewSize === 'object' &&
-        !Array.isArray(previewSize) &&
-        ('width' in (previewSize as Record<string, unknown>)) &&
-        ('height' in (previewSize as Record<string, unknown>));
-
-      if (!hasValidPreviewSize) {
-        return {
-          ok: false,
-          file: normalizedPath,
-          pageId,
-          issues: [
-            {
-              file: normalizedPath,
-              pageId,
-              stage: 'schema_contract',
-              code: 'MISSING_PREVIEW_SIZE',
-              severity: 'error',
-              message: 'config.ts 编译后缺少 $preview 字段（需包含 width 和 height）',
-              instruction: '请在 config.ts 中添加 $preview: { width: <数字>, height: <数字> }，宽高根据页面目标设备自行判断。',
-            },
-          ],
-        };
-      }
-
-      return { ok: true, file: normalizedPath, pageId, issues: [] };
-    } catch (err) {
-      if (err instanceof ConfigCompileError) {
-        return {
-          ok: false,
-          file: normalizedPath,
-          pageId,
-          issues: [
-            {
-              file: normalizedPath,
-              pageId,
-              stage: 'schema_contract',
-              code: err.code,
-              severity: 'error',
-              message: `config.ts 编译错误 (行 ${err.line}, 列 ${err.column}): ${err.message}`,
-              instruction: err.suggestion || '请修复 config.ts 中的语法或类型错误后重新写入。',
-            },
-          ],
-        };
-      }
-
-      return {
-        ok: false,
-        file: normalizedPath,
-        pageId,
-        issues: [
-          {
-            file: normalizedPath,
-            pageId,
-            stage: 'schema_contract',
-            code: 'CONFIG_TS_COMPILE_FAILED',
-            severity: 'error',
-            message: `config.ts 编译失败: ${err instanceof Error ? err.message : 'Unknown error'}`,
-            instruction: '请修复 config.ts 后重新写入。',
           },
         ],
       };

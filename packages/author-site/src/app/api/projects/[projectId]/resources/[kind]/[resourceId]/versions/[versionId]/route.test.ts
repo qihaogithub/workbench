@@ -39,6 +39,7 @@ describe("resource version detail route", () => {
   const commitWorkspaceMutation = jest.fn();
   const updateWorkspaceDemoFiles = jest.fn();
   const markWorkspaceBasedOnVersion = jest.fn();
+  const createProjectVersionSnapshot = jest.fn();
   let tempDir: string;
   let workspacePath: string;
 
@@ -105,6 +106,10 @@ describe("resource version detail route", () => {
     });
     updateWorkspaceDemoFiles.mockReturnValue(true);
     markWorkspaceBasedOnVersion.mockReturnValue(true);
+    createProjectVersionSnapshot.mockReturnValue({
+      success: true,
+      version: { versionId: "v-restore-1" },
+    });
     jest.doMock("@workbench/project-core", () => ({
       ProjectAdminService: jest.fn(() => ({
         restorePageVersion,
@@ -159,6 +164,7 @@ describe("resource version detail route", () => {
       markWorkspaceBasedOnVersion,
       sessionExists: jest.fn(() => true),
       updateWorkspaceDemoFiles,
+      createProjectVersionSnapshot,
     }));
     jest.doMock("@/lib/workspace-flush", () => ({
       flushAndSyncProjectWorkspace,
@@ -205,7 +211,7 @@ describe("resource version detail route", () => {
     jest.resetModules();
   });
 
-  it("live Workspace 恢复页面版本时通过 Authority 提交且不直接同步 canonical", async () => {
+  it("live Workspace 恢复页面版本时通过 Authority 提交并创建快照版本", async () => {
     const { POST } = await import("./route");
 
     const response = await POST(
@@ -225,7 +231,7 @@ describe("resource version detail route", () => {
     expect(body).toEqual({
       success: true,
       data: expect.objectContaining({
-        newVersionId: "prv_1",
+        newVersionId: "v-restore-1",
         files: expect.objectContaining({
           code: "export default function Demo(){ return <div>restored</div>; }",
         }),
@@ -237,8 +243,24 @@ describe("resource version detail route", () => {
       sessionId: "session-1",
     });
     expect(restorePageVersion).not.toHaveBeenCalled();
-    expect(updateWorkspaceDemoFiles).not.toHaveBeenCalled();
-    expect(markWorkspaceBasedOnVersion).not.toHaveBeenCalled();
+    expect(updateWorkspaceDemoFiles).toHaveBeenCalledWith(
+      "live-workspace",
+      "page-1",
+      expect.objectContaining({
+        code: "export default function Demo(){ return <div>restored</div>; }",
+      }),
+    );
+    expect(createProjectVersionSnapshot).toHaveBeenCalledWith(
+      "project-1",
+      "测试用户",
+      expect.objectContaining({
+        sessionId: "session-1",
+        note: "从页面版本 prv_1 恢复",
+        type: "restore_snapshot",
+        sourceWorkspacePath: workspacePath,
+      }),
+    );
+    expect(markWorkspaceBasedOnVersion).toHaveBeenCalledWith("live-workspace", "v-restore-1");
     expect(flushAndSyncProjectWorkspace).not.toHaveBeenCalled();
 
     expect(commitWorkspaceMutation).toHaveBeenCalledTimes(1);

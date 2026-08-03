@@ -36,7 +36,6 @@ import {
   useScreenshotGeneration,
   type ScreenshotBatchPageInput,
   type ScreenshotPriority,
-  type ScreenshotRenderMode,
 } from "@/components/demo/useScreenshotGeneration";
 import { useCanvasWorkspace } from "@/components/demo/useCanvasWorkspace";
 import {
@@ -751,6 +750,67 @@ function setNestedValue(
   return result;
 }
 
+function getSchemaGroupKeys(schema: string): Set<string> {
+  try {
+    const parsed = JSON.parse(schema);
+    const props = parsed.properties;
+    if (!props || typeof props !== "object" || Array.isArray(props)) return new Set();
+    const groups = new Set<string>();
+    for (const [key, prop] of Object.entries(props)) {
+      const p = prop as Record<string, unknown>;
+      if (p?.type === "object" && p?.properties && !(p.$demo as Record<string, unknown>)?.positionable) {
+        groups.add(key);
+      }
+    }
+    return groups;
+  } catch {
+    return new Set();
+  }
+}
+
+function flattenNestedDelta(
+  data: Record<string, unknown>,
+  schema: string,
+  nestedPriority = false,
+): Record<string, unknown> {
+  const groupKeys = getSchemaGroupKeys(schema);
+  const result: Record<string, unknown> = {};
+
+  if (nestedPriority) {
+    // 旧格式向后兼容：嵌套值是实际用户修改，扁平值是残留的 Schema 默认值
+    for (const groupKey of groupKeys) {
+      const groupVal = data[groupKey];
+      if (groupVal && typeof groupVal === "object" && !Array.isArray(groupVal)) {
+        Object.assign(result, groupVal as Record<string, unknown>);
+      }
+    }
+    for (const [key, value] of Object.entries(data)) {
+      if (groupKeys.has(key)) continue;
+      if (!(key in result)) {
+        result[key] = value;
+      }
+    }
+  } else {
+    // 新格式/合并态：扁平值优先，嵌套值仅填充空缺
+    for (const [key, value] of Object.entries(data)) {
+      if (groupKeys.has(key)) continue;
+      result[key] = value;
+    }
+    for (const groupKey of groupKeys) {
+      const groupVal = data[groupKey];
+      if (groupVal && typeof groupVal === "object" && !Array.isArray(groupVal)) {
+        for (const [nestedKey, nestedValue] of Object.entries(groupVal as Record<string, unknown>)) {
+          if (!(nestedKey in result)) {
+            result[nestedKey] = nestedValue;
+          }
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
 function getCanvasContentHistorySignature(state: CanvasState): string {
   return JSON.stringify({
     pages: state.pages ?? {},
@@ -1237,16 +1297,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     ],
   );
 
-  const getScreenshotRenderMode = useCallback(
-    (pageId: string): ScreenshotRenderMode => {
-      const priority = getScreenshotPriority(pageId);
-      return priority === "active" || priority === "visible"
-        ? "fast"
-        : "strict";
-    },
-    [getScreenshotPriority],
-  );
-
   const buildScreenshotPageInput = useCallback(
     (
       page: DemoPage,
@@ -1340,7 +1390,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           ) {
             return [];
           }
-          const renderMode = getScreenshotRenderMode(p.id);
+          const renderMode: "strict" = "strict";
           return [
             {
               ...snapshotInput,
@@ -1365,7 +1415,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       buildScreenshotPageInput,
       configDataMap,
       demoPages,
-      getScreenshotRenderMode,
       getScreenshotPriority,
       pageCodes,
       pageScreenshots,
@@ -1413,6 +1462,31 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       return queued;
     },
     [demoId, sessionId, toast],
+  );
+  const pageConfigPersistTimersRef = useRef<
+    Record<string, ReturnType<typeof setTimeout>>
+  >({});
+  const persistPageConfigValues = useCallback(
+    (pageId: string, values: Record<string, unknown>) => {
+      if (!sessionId) return;
+      const timers = pageConfigPersistTimersRef.current;
+      if (timers[pageId]) clearTimeout(timers[pageId]);
+      timers[pageId] = setTimeout(async () => {
+        try {
+          await fetch(
+            `/api/sessions/${sessionId}/files/${pageId}`,
+            {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ configValues: values }),
+            },
+          );
+        } catch {
+          // 静默失败，不影响用户操作
+        }
+      }, 500);
+    },
+    [sessionId],
   );
   const screenshotRegenerateTimerRef = useRef<
     Record<string, ReturnType<typeof setTimeout>>
@@ -1464,7 +1538,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           height,
           CANVAS_SCREENSHOT_FULL_PAGE,
           getScreenshotPriority(pageId),
-          getScreenshotRenderMode(pageId),
+          "strict" as const,
           pageScreenshots[pageId]?.renderBox?.height,
         );
         delete timers[pageId];
@@ -1474,7 +1548,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       buildScreenshotPageInput,
       demoPages,
       getScreenshotPriority,
-      getScreenshotRenderMode,
       pageScreenshots,
       regeneratePageSnapshot,
       pagePreviewSizeMap,
@@ -3535,6 +3608,7 @@ ${context.details}
               prototypeMeta?: PrototypePageMeta;
               sketchScene?: string;
               sketchMeta?: Record<string, unknown>;
+              configValues?: Record<string, unknown>;
             },
           ][]) {
             allDefaults[pageId] = getSafeMergedDefaults(
@@ -3545,6 +3619,15 @@ ${context.details}
               ...allDefaults[pageId],
               ...loadedProjectConfigValues,
             };
+            if (demo.configValues) {
+              const flatPageConfig = demo.schema
+                ? flattenNestedDelta(demo.configValues, demo.schema, true)
+                : demo.configValues;
+              allDefaults[pageId] = {
+                ...allDefaults[pageId],
+                ...flatPageConfig,
+              };
+            }
             schemas[pageId] = demo.schema;
             codes[pageId] = demo.code;
             if (
@@ -3706,11 +3789,14 @@ ${context.details}
   const handlePageConfigPanelChange = useCallback(
     (pageId: string, data: Record<string, unknown>) => {
       invalidatePageScreenshot(pageId);
+      const schema = pageSchemaMapRef.current[pageId];
+      const dataClean = schema ? flattenNestedDelta(data, schema, false) : data;
+      const prevClean = schema
+        ? flattenNestedDelta(configDataMapRef.current[pageId] ?? {}, schema, true)
+        : (configDataMapRef.current[pageId] ?? {});
+      const nextPageConfig = { ...prevClean, ...dataClean };
+      persistPageConfigValues(pageId, nextPageConfig);
       setConfigDataMap((prev) => {
-        const nextPageConfig = {
-          ...(prev[pageId] ?? {}),
-          ...data,
-        };
         const next = {
           ...prev,
           [pageId]: nextPageConfig,
@@ -3736,7 +3822,8 @@ ${context.details}
       });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [demoPages, pageCodes],
+    [demoPages, pageCodes, persistPageConfigValues],
+
   );
 
   handlePageConfigPanelChangeRef.current = handlePageConfigPanelChange;
@@ -3967,6 +4054,67 @@ ${context.details}
       scheduleScreenshotRegenerate,
     ],
   );
+
+  const handleProjectSaveAsDefaults = useCallback(() => {
+    const currentSchema = projectConfigSchemaRef.current;
+    const currentConfig = projectConfigValuesRef.current;
+    if (!currentSchema || !currentConfig) {
+      toast({
+        title: "保存失败",
+        description: "未找到配置数据",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const schemaObj = JSON.parse(currentSchema);
+      if (!schemaObj.properties || typeof schemaObj.properties !== "object") {
+        toast({
+          title: "保存失败",
+          description: "Schema 中无 properties 定义",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      let updatedCount = 0;
+      for (const [key, value] of Object.entries(currentConfig)) {
+        if (!(key in schemaObj.properties)) continue;
+        if (
+          schemaObj.properties[key] &&
+          typeof schemaObj.properties[key] === "object"
+        ) {
+          schemaObj.properties[key].default = value;
+          updatedCount++;
+        }
+      }
+
+      const newSchema = JSON.stringify(schemaObj, null, 2);
+      handleProjectSchemaChange(newSchema);
+      toast({
+        title: "默认配置已更新",
+        description: `已更新 ${updatedCount} 个字段的默认值`,
+      });
+    } catch {
+      toast({
+        title: "保存失败",
+        description: "无法解析当前 Schema",
+        variant: "destructive",
+      });
+    }
+  }, [handleProjectSchemaChange, toast]);
+
+  const handleProjectRestoreDefaults = useCallback(() => {
+    const projectSchema = projectConfigSchemaRef.current;
+    if (!projectSchema) return;
+    try {
+      const projectDefaults = getDefaultValues(projectSchema);
+      handleProjectConfigPanelChange(projectDefaults);
+    } catch {
+      // Schema 冲突等异常场景静默忽略
+    }
+  }, [handleProjectConfigPanelChange]);
 
   const updatePageSchemaMapFromLoad = useCallback(
     (pageId: string, loadedSchema: string) => {
@@ -4425,9 +4573,9 @@ ${context.details}
           if (srcPage.prototypeCss) files.prototypeCss = srcPage.prototypeCss;
           if (srcPage.prototypeMeta)
             files.prototypeMeta = srcPage.prototypeMeta;
-          // configData 作为 schema 传入
-          if (srcPage.configData) {
-            files.schema = JSON.stringify(srcPage.configData, null, 2);
+          // schema 从源页面的 config.schema.json 原始内容写入
+          if (srcPage.schema) {
+            files.schema = srcPage.schema;
           }
           // 如果源页面没有 code 但有 sketchScene，通过文件更新接口写入
           if (srcPage.sketchScene) {
@@ -4462,6 +4610,64 @@ ${context.details}
       return { pageIdMapping };
     },
     [demoId, sessionId, handleWorkspaceTreeChanged, toast],
+  );
+
+  // 创建引用页
+  const handleCreateReferences = useCallback(
+    async (input: {
+      pages: CanvasPageData[];
+      pageLayouts: Record<string, CanvasPageLayout>;
+      pageGroups: CanvasPageGroup[];
+      sourceProjectId: string;
+    }): Promise<{ pageIdMapping: Map<string, string> }> => {
+      const pageIdMapping = new Map<string, string>();
+      if (!sessionId) return { pageIdMapping };
+
+      try {
+        const sourcePageIds = input.pages.map((p) => p.id);
+        const newPages = await projectApiClient.createReferencePages(
+          demoId,
+          input.sourceProjectId,
+          sourcePageIds,
+          sessionId,
+        );
+
+        newPages.forEach((newPage, index) => {
+          pageIdMapping.set(input.pages[index]?.id ?? "", newPage.id);
+        });
+
+        setDemoPages((current) =>
+          [...current, ...newPages].sort((a, b) => a.order - b.order),
+        );
+        handleWorkspaceTreeChanged();
+        toast({
+          title:
+            newPages.length === 1
+              ? `已引用页面「${newPages[0].name}」`
+              : `已引用 ${newPages.length} 个页面`,
+        });
+      } catch (err) {
+        console.error("创建引用页失败:", err);
+        toast({
+          title: "创建引用页失败",
+          variant: "destructive",
+        });
+      }
+
+      return { pageIdMapping };
+    },
+    [demoId, sessionId, handleWorkspaceTreeChanged, toast, projectApiClient],
+  );
+
+  // 查看引用页源项目
+  const handleViewSourcePage = useCallback(
+    (pageId: string) => {
+      const page = demoPages.find((p) => p.id === pageId);
+      if (page?.reference?.sourceProjectId) {
+        router.push(`/demo/${page.reference.sourceProjectId}/edit`);
+      }
+    },
+    [demoPages, router],
   );
 
   const handleSinglePreviewPageSelect = useCallback(
@@ -7552,6 +7758,8 @@ ${context.details}
                   projectId: demoId,
                   onRequestDeletePages: requestDeletePages,
                   onRequestPastePages: handlePastePages,
+                  onRequestCreateReferences: handleCreateReferences,
+                  onViewSource: handleViewSourcePage,
                   focusPageId: focusCanvasPageId,
                   onVisiblePageIdsChange: setVisibleCanvasPageIds,
                   editingPageId: canvasEditingPageId ?? undefined,
@@ -7796,6 +8004,8 @@ ${context.details}
                         onPageSchemaChange={handlePageSchemaChange}
                         onSaveAsDefaults={handleSaveAsDefaults}
                         onRestoreDefaults={handleRestoreDefaults}
+                        onProjectSaveAsDefaults={handleProjectSaveAsDefaults}
+                        onProjectRestoreDefaults={handleProjectRestoreDefaults}
                         sessionId={sessionId}
                         hideDetailHeader
                         onEnterPositionEdit={handleEnterPositionEdit}
@@ -7869,6 +8079,8 @@ ${context.details}
                   onPageSchemaChange={handlePageSchemaChange}
                   onSaveAsDefaults={handleSaveAsDefaults}
                   onRestoreDefaults={handleRestoreDefaults}
+                  onProjectSaveAsDefaults={handleProjectSaveAsDefaults}
+                  onProjectRestoreDefaults={handleProjectRestoreDefaults}
                   sessionId={sessionId}
                   onEnterPositionEdit={handleEnterPositionEdit}
                   onExitPositionEdit={handleExitPositionEdit}

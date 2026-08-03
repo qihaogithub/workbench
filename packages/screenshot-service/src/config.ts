@@ -45,6 +45,10 @@ export const config = {
 
   // Cache
   compileCacheMaxEntries: 200,
+  compileCacheMaxAgeMs: parseInt(
+    process.env.COMPILE_CACHE_MAX_AGE_MS || "1500000",
+    10,
+  ), // 25 minutes — must be shorter than preview-module TTL (30 min)
 
   // Screenshot version (bump to force cache invalidation)
   snapshotVersion: 1,

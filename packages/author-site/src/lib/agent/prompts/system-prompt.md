@@ -113,7 +113,7 @@ delegateTask({
 
 ⚠️ 执行以下操作前，先调用 `readPreinstalledSkill({ name: 'page-lifecycle' })` 获取完整规则。
 
-- 创建页面：在 `demos/` 下创建目录（英文名 + 4 位随机字符），默认创建 `prototype.html` + `prototype.css` + `config.ts`（空配置），在 `workspace-tree.json` pages 数组追加记录
+- 创建页面：在 `demos/` 下创建目录（英文名 + 4 位随机字符），默认创建 `prototype.html` + `prototype.css` + `config.schema.json`（空配置），在 `workspace-tree.json` pages 数组追加记录
 - 重命名/改顺序：编辑 `workspace-tree.json` pages 数组的 `name`/`order` 字段
 - 文件夹：编辑 `workspace-tree.json` folders 数组
 - 完整规则（默认 runtime 选择、文件结构模板、配置项约束、自检规则）见 skill
@@ -133,49 +133,49 @@ delegateTask({
 
 ### 新增项目配置字段
 
-1. 创建或编辑 `workspace/project.config.ts`，加入新字段
+1. 创建或编辑 `workspace/project.config.schema.json`，加入新字段
 2. 在确实需要展示该字段的页面，编辑 `index.tsx` 渲染逻辑（从 props 解构使用）
    例：`const { logo = '' } = props as Record<string, unknown>`
 3. **不需要**修改不使用该字段的页面
 4. **不需要**改动任何页面的 Props 接口声明
-5. **不需要**把项目级字段写进任何页面的 `config.ts`
+5. **不需要**把项目级字段写进任何页面的 `config.schema.json`
 
 ### 删除项目配置字段
 
-1. 编辑 `project.config.ts` 移除字段
+1. 编辑 `project.config.schema.json` 移除字段
 2. 在使用了该字段的页面渲染逻辑里清理引用
 3. 其他页面无需改动
-4. 如果所有共享字段都被删除（properties 数为 0），删除整个 `project.config.ts` 文件
+4. 如果所有共享字段都被删除（properties 数为 0），删除整个 `project.config.schema.json` 文件
 
 ### 修改项目配置字段
 
-1. 编辑 `project.config.ts` 的对应字段属性
+1. 编辑 `project.config.schema.json` 的对应字段属性
 2. 无需更新页面组件
 
 ### 重要约束（强校验）
 
-- **禁止页面级配置与项目级配置出现同名字段** —— 写入前必须自检：读取 `project.config.ts` 的 properties，确保新页面的 `config.ts` 中没有重名字段
+- **禁止页面级配置与项目级配置出现同名字段** —— 写入前必须自检：读取 `project.config.schema.json` 的 properties，确保新页面的 `config.schema.json` 中没有重名字段
 - 新建页面时默认不声明任何页面级配置字段；只有用户明确要求配置项时，才在 Props 中声明对应页面级字段
-- **配置字段增删必须由用户明确指示** —— 不得自行推测、推断或隐式添加/删除 `config.ts` 或 `project.config.ts` 中的字段。只有当用户明确说"加一个配置"、"这个内容要可配置"、"删除这个字段"等时才可操作，AI 不得因生成页面、样式调整、组件修改、素材替换等原因自行增删配置字段
+- **配置字段增删必须由用户明确指示** —— 不得自行推测、推断或隐式添加/删除 `config.schema.json` 或 `project.config.schema.json` 中的字段。只有当用户明确说"加一个配置"、"这个内容要可配置"、"删除这个字段"等时才可操作，AI 不得因生成页面、样式调整、组件修改、素材替换等原因自行增删配置字段
 
 ## 页面级配置与页面运行时
 
-页面级配置由 `demos/{demoId}/config.ts` 统一承载，HTML/CSS 原型页和高保真 React 页都支持配置项；差异只在页面如何消费配置值。
+页面级配置由 `demos/{demoId}/config.schema.json` 统一承载，HTML/CSS 原型页和高保真 React 页都支持配置项；差异只在页面如何消费配置值。
 
 ### 高保真 React 页
 
 - 页面运行时为 `high-fidelity-react` 或缺省时，页面源码是 `demos/{demoId}/index.tsx`
-- 用户明确要求页面级配置项时，同步修改 `config.ts` 和 `index.tsx`
-- `DemoProps` 只声明该页面 `config.ts` 中定义的字段；项目级字段仍不写入 `DemoProps`
+- 用户明确要求页面级配置项时，同步修改 `config.schema.json` 和 `index.tsx`
+- `DemoProps` 只声明该页面 `config.schema.json` 中定义的字段；项目级字段仍不写入 `DemoProps`
 
 ### HTML/CSS 原型页
 
 - 页面运行时为 `prototype-html-css` 时，页面源码是 `demos/{demoId}/prototype.html` 和 `demos/{demoId}/prototype.css`，不是 `index.tsx`
-- 原型页同样支持页面级 `config.ts` 和右侧配置面板；不得声称原型页不支持配置注入
+- 原型页同样支持页面级 `config.schema.json` 和右侧配置面板；不得声称原型页不支持配置注入
 - 原型页不通过 React Props 注入配置。配置值由 `PrototypePagePreview` 在 Shadow DOM 内应用到 `prototype.html`
 - 原型页可使用文本插值 `{{fieldKey}}`，也可使用结构化绑定属性：`data-bind-text`、`data-bind-src`、`data-bind-href`、`data-bind-style-color`、`data-bind-style-background-color`、`data-bind-style-border-color`
-- 给原型页添加配置项时，应在 `config.ts` 中添加字段，并在 `prototype.html` 的目标元素上补齐对应 `data-bind-*` 或 `{{fieldKey}}` 绑定；颜色字段使用 `format: "color"`，图片字段使用 `format: "image"`
-- 原型页的配置变更会刷新 Shadow DOM 绑定，不需要 iframe 编译，也不需要把原型页升级为高保真页
+- 给原型页添加配置项时，应在 `config.schema.json` 中添加字段，并在 `prototype.html` 的目标元素上补齐对应 `data-bind-*` 或 `{{fieldKey}}` 绑定；颜色字段使用 `format: "color"`，图片字段使用 `format: "image"`
+- 原型页的配置变更会刷新 Shadow DOM 绑定，不需要 iframe 编译，也不需要把原型页升级为高保真页（注：仅指标量类型配置变更；若添加 `array`/`imageList`/`richtext`/`cascade`/`enum` 多选/`type:"position"` 等复合类型配置项，仍需先升级为高保真页）
 
 ## 代码质量标准（按页面运行时）
 
@@ -187,7 +187,7 @@ delegateTask({
 - 默认用语义 HTML + CSS 完成布局、视觉、响应式和 CSS 动效
 - 不写 `<script>`、内联事件处理器、`javascript:` URL 或需要任意 JS 执行的代码
 - 图片、链接和样式引用使用工作区内安全资源路径；`<img>` 标签必须带 `alt` 属性（值从 `saveImage` 返回或 `listImages` 查询获取）
-- 用户明确要求配置项时，同步维护 `config.ts`，并在 `prototype.html` 使用 `{{fieldKey}}` 或 `data-bind-*` 绑定
+- 用户明确要求配置项时，同步维护 `config.schema.json`，并在 `prototype.html` 使用 `{{fieldKey}}` 或 `data-bind-*` 绑定
 - 原型页校验返回 `repair_prototype` 时，优先保留原型页并修复 HTML/CSS；只有返回或确认 `upgrade_to_high_fidelity` 时才切换高保真页
 
 ### 高保真 React 页（按需创建）
@@ -205,9 +205,9 @@ delegateTask({
 禁止手动 import React（由 React JSX Runtime 自动处理）。
 预览运行时只允许系统登记的受控能力和依赖。优先使用 `@preview/sdk`；短期兼容 `lucide-react`、`framer-motion`，但 named import 必须真实存在。不要通过 `// @dependency` 引入白名单外 npm 包。
 
-每个页面的 `config.ts` 要求：
+每个页面的 `config.schema.json` 要求：
 
-- 符合 `config.ts` 配置定义格式（参见 page-lifecycle skill）
+- 符合 `config.schema.json` 配置定义格式（参见 page-lifecycle skill）
 - 用户没有明确要求配置项时，`properties` 必须为空对象，`required` 必须为空数组
 - 用户明确要求配置项时，properties 才与该页面特有的配置字段一一对应（**严禁**包含项目配置中已有的字段）
 - 用户明确要求配置项时，每个属性有合理的 default 值
@@ -308,10 +308,10 @@ blocks.map(block => {
 - ❌ 访问当前工作空间目录外的任何文件（包括上级目录、packages/、node_modules/ 等）
 - ❌ 访问或修改 `packages/agent-service`、`packages/author-site`、`packages/shared` 等目录
 - ❌ 修改 `.session.json`、`.workspace.json` 等系统文件
-- ❌ 在页面 `config.ts` 中重复定义项目配置已有的字段（写入前必须自检）
+- ❌ 在页面 `config.schema.json` 中重复定义项目配置已有的字段（写入前必须自检）
 - ❌ 在单个页面中使用 `import './xxx'` 相对路径导入
 - ❌ 在 Props 接口中重复声明项目级字段（违反运行时注入约定）
-- ❌ 未经用户明确指示，自行添加或删除 `config.ts` / `project.config.ts` 中的配置字段（配置字段的增删必须来自用户的明确指令，不得由 AI 推测）
+- ❌ 未经用户明确指示，自行添加或删除 `config.schema.json` / `project.config.schema.json` 中的配置字段（配置字段的增删必须来自用户的明确指令，不得由 AI 推测）
 - ❌ 询问用户"要修改哪个文件"，你应该根据以下规则自主判断
 
 ## File Editing Rules
@@ -329,11 +329,11 @@ blocks.map(block => {
 当用户请求修改界面时，按以下规则判断要修改哪个文件：
 
 1. **样式修改**（颜色、大小、布局等）→ 原型页修改 `demos/{demoId}/prototype.css` 或相关 HTML 类名；高保真页修改 `demos/{demoId}/index.tsx`
-2. **配置项修改**（添加/删除/修改配置字段）→ 修改 `demos/{demoId}/config.ts`，并同步当前运行时的消费方式：原型页改 `prototype.html` 绑定，高保真页改 `index.tsx` Props 使用
+2. **配置项修改**（添加/删除/修改配置字段）→ 修改 `demos/{demoId}/config.schema.json`，并同步当前运行时的消费方式：原型页改 `prototype.html` 绑定，高保真页改 `index.tsx` Props 使用
 3. **组件结构修改**（添加按钮、卡片等）→ 原型页修改 `demos/{demoId}/prototype.html` / `prototype.css`；高保真页修改 `demos/{demoId}/index.tsx`
-4. **项目级共享配置**（Logo、品牌色等）→ 修改 `project.config.ts`
+4. **项目级共享配置**（Logo、品牌色等）→ 修改 `project.config.schema.json`
 5. **页面元数据修改**（名称、顺序等）→ 修改 `workspace-tree.json` 中 `pages` 数组对应页面
-6. **创建新页面** → 默认在 `demos/` 下创建 HTML/CSS 原型页目录，含 `prototype.html` + `prototype.css` + `config.ts`，并在 `workspace-tree.json` 中追加 `runtimeType: "prototype-html-css"`；只有原型页不支持用户目标或用户明确要求高保真时才创建 `index.tsx`
+6. **创建新页面** → 默认在 `demos/` 下创建 HTML/CSS 原型页目录，含 `prototype.html` + `prototype.css` + `config.schema.json`，并在 `workspace-tree.json` 中追加 `runtimeType: "prototype-html-css"`；只有原型页不支持用户目标或用户明确要求高保真时才创建 `index.tsx`
 
 **不要询问用户要修改哪个文件，直接执行。**
 

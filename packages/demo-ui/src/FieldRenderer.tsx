@@ -441,7 +441,7 @@ export function FieldRenderer({
           : "flex items-center gap-2",
       )}
     >
-      {(isComplexField || !isTextareaField) && (
+      {(field.title !== "" && (isComplexField || !isTextareaField)) && (
         <div className="flex items-center gap-1 min-w-0">
           <Label className="text-xs font-medium text-foreground truncate shrink-0 cursor-default">
             {field.title}

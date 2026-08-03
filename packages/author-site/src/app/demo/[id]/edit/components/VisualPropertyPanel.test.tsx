@@ -190,6 +190,33 @@ describe("VisualPropertyPanel 配置项入口", () => {
     const configBar = screen.getByRole("button", { name: /文字颜色 textColor/ });
     expect(configBar).toBeInTheDocument();
     fireEvent.click(configBar);
-    expect(screen.getByDisplayValue("textColor")).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toHaveTextContent("配置项设置");
+    expect(screen.getByDisplayValue("文字颜色")).toBeInTheDocument();
+  });
+
+  it("点击已有配置项的属性标签可重新编辑并更新默认值", () => {
+    const opacityConfigMark: VisualConfigMark = {
+      id: "config-mark-2",
+      changeId: "body > div:nth-child(1):style:opacity",
+      nodeId: "node-1",
+      domPath: "body > div:nth-child(1)",
+      kind: "style",
+      property: "opacity",
+      label: "不透明度",
+      fieldTitle: "不透明度",
+      fieldKey: "opacity",
+      defaultValue: "80",
+      category: "设计",
+      scope: "page",
+    };
+    const onUpdateConfigMark = jest.fn();
+    renderPanel({ configMarks: [opacityConfigMark], onUpdateConfigMark });
+
+    fireEvent.click(screen.getByRole("button", { name: "不透明度编辑配置项" }));
+
+    expect(screen.getByRole("dialog")).toHaveTextContent("配置项设置");
+    expect(onUpdateConfigMark).toHaveBeenCalledWith("config-mark-2", { defaultValue: "100" });
+    expect(screen.getByDisplayValue("不透明度")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("80")).toBeInTheDocument();
   });
 });

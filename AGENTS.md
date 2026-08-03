@@ -42,7 +42,7 @@ AI agent 在启动任务前应优先读取 `memory.md`（如果存在），以�
 
 ## 快速判断
 
-- **项目阶段：未上线，不需要向后兼容。** 可以直接做破坏性变更（重命名接口、删除字段、修改数据格式等），无需迁移脚本或兼容层。
+- **项目阶段：未上线，不需要向后兼容。** 可以直接做破坏性变更（重命名接口、删除字段、修改数据格式等），无需迁移脚本或兼容层。不要为了兼容旧数据格式（如旧版 config.schema.json 的字段写法、废弃的类型键、历史 AI 生成的非标准 schema 等）添加额外代码分支或映射逻辑——修复数据本身比在代码层兜底更干净。
 - 包管理器：`pnpm@8.15.0`
 - Node 要求：`node >=20.0.0`
 - `.npmrc`：`shamefully-hoist=true`
@@ -190,22 +190,26 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h
 
 | 包名                            | 路径                           | 类型                                                   | 端口 | 测试                     |
 | ------------------------------- | ------------------------------ | ------------------------------------------------------ | ---- | ------------------------ |
-| `@workbench/author-site`        | `packages/author-site/`        | Next.js 14 App Router                                  | 3200 | Jest + Testing Library   |
-| `@workbench/viewer-site`        | `packages/viewer-site/`        | Next.js 14 App Router                                  | 3300 | 无包内测试脚本           |
+| `@workbench/author-site`        | `packages/author-site/`        | Next.js 14 App Router                                  | 4200 | Jest + Testing Library   |
+| `@workbench/viewer-site`        | `packages/viewer-site/`        | Next.js 14 App Router                                  | 4300 | 无包内测试脚本           |
 | `@workbench/demo-ui`            | `packages/demo-ui/`            | 创作端与使用端共享预览组件                             | -    | Vitest + Testing Library |
 | `@workbench/shared`             | `packages/shared/`             | 共享类型和常量                                         | -    | 无测试脚本               |
 | `@workbench/sketch-core`        | `packages/sketch-core/`        | 草图页协议、校验、patch、几何、只读渲染                | -    | Vitest                   |
 | `@workbench/sketch-react`       | `packages/sketch-react/`       | 草图页 React SDK：画布、工具栏、图层、属性栏和编辑状态 | -    | Vitest + Testing Library |
 | `@workbench/sketch-playground`  | `packages/sketch-playground/`  | 草图 SDK 独立开发与测试 Playground                     | 3400 | TypeScript + Playwright  |
-| `@workbench/agent-service`      | `packages/agent-service/`      | Fastify + Pi Agent                                     | 3201 | Vitest                   |
+| `@workbench/agent-service`      | `packages/agent-service/`      | Fastify + Pi Agent                                     | 4201 | Vitest                   |
 | `@workbench/agent-client`       | `packages/agent-client/`       | Client SDK                                             | -    | 无测试脚本               |
-| `@workbench/screenshot-service` | `packages/screenshot-service/` | Fastify + Puppeteer                                    | 3202 | Vitest                   |
+| `@workbench/screenshot-service` | `packages/screenshot-service/` | Fastify + Puppeteer                                    | 4202 | Vitest                   |
 | `@workbench/knowledge-core`     | `packages/knowledge-core/`     | 知识库领域模型与权限规则                               | -    | Vitest                   |
-| `@workbench/knowledge-service`  | `packages/knowledge-service/`  | Basic 检索、阅读地图、索引任务、知识报告               | -    | Vitest                   |
+| `@workbench/knowledge-service`  | `packages/knowledge-service/`  | Basic 检索、阅读地图、索引任务、知识报告               | 4203 | Vitest                   |
 | `@workbench/project-core`       | `packages/project-core/`       | 项目读写领域服务，供 Web API 与 CLI 复用               | -    | Vitest                   |
 | `@workbench/project-scaffold`   | `packages/project-scaffold/`   | 本地项目包协议与脚手架转换器                           | -    | Node/tsx 命令            |
 | `@workbench/project-cli`        | `packages/project-cli/`        | 项目管理 JSON-first CLI                                | -    | Node/tsx 命令            |
 | `@workbench/cli-tools`          | `OPS/CLI/`                     | CLI 测试工具，ESM                                      | -    | Node/tsx 命令            |
+
+端口说明：本地 dev 端口是 4200-4300 段（author 4200 / agent 4201 / screenshot 4202 / knowledge 4203 / viewer 4300），全部默认绑定 `0.0.0.0` 支持局域网访问；Docker 部署使用 3200-3300 段，见 `docker-compose.yml`，不要混用。
+
+viewer-site dev 端口注意：Next.js 14 的 `next dev` 在加载 `.env` 之前解析端口，`.env` 里的 `PORT=4300` 不生效，必须显式 `-p 4300`（已写在 dev 脚本中）；`.env` 的 PORT 仅作约定记录。
 
 `.next/`、`node_modules/`、`coverage/`、`dist/`、`out/`、`test/**/test-outputs/` 都是生成物或依赖目录，不作为源码入口。
 

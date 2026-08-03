@@ -712,74 +712,89 @@ async function generateScreenshotUncached(
 ): Promise<GenerateScreenshotResult> {
   let compileMs = 0;
   let compileHit = false;
-  let html: string;
+  let forceRecompile = false;
 
-  if (snapshotInput.runtimeType === "high-fidelity-react") {
-    const compileCache = getCompileCache();
-    const cacheScope = `${sessionId || "global"}:${pageId}`;
-    const compileStart = Date.now();
-    let compileResult = compileCache.get(snapshotInput.code, cacheScope);
-    compileHit = Boolean(compileResult);
-
-    if (!compileResult) {
-      try {
-        compileResult = await compileCode(snapshotInput.code, sessionId, pageId);
-        compileCache.set(snapshotInput.code, compileResult, cacheScope);
-      } catch (error) {
-        throw new ScreenshotError(
-          "COMPILE_ERROR",
-          `代码编译失败: ${getErrorMessage(error)}`,
-          error,
-        );
+  async function compileAndRender(): Promise<Awaited<ReturnType<typeof pool.renderPage>>> {
+    let html: string;
+    if (snapshotInput.runtimeType === "high-fidelity-react") {
+      const compileCache = getCompileCache();
+      const cacheScope = `${sessionId || "global"}:${pageId}`;
+      const compileStart = Date.now();
+      if (forceRecompile) {
+        compileCache.deleteByCode(snapshotInput.code, cacheScope);
       }
+      let compileResult = compileCache.get(snapshotInput.code, cacheScope);
+      compileHit = Boolean(compileResult);
+      if (!compileResult) {
+        try {
+          compileResult = await compileCode(snapshotInput.code, sessionId, pageId);
+          compileCache.set(snapshotInput.code, compileResult, cacheScope);
+        } catch (error) {
+          throw new ScreenshotError(
+            "COMPILE_ERROR",
+            `代码编译失败: ${getErrorMessage(error)}`,
+            error,
+          );
+        }
+      }
+      compileMs = Date.now() - compileStart;
+      html = generateIframeHtml({
+        compiledCodeUrl: compileResult.moduleUrl,
+        cssImports: compileResult.cssImports,
+        configData: snapshotInput.configData,
+        cdnBaseUrl: config.cdnBaseUrl,
+        runtimeBaseUrl: config.authorSiteUrl,
+        useCdnRuntime: config.previewRuntimeSource === "cdn",
+        supportUrlMode: true,
+        baseOrigin: config.authorSiteUrl,
+      });
+    } else if (snapshotInput.runtimeType === "prototype-html-css") {
+      html = buildPrototypePreviewDocumentHtml({
+        html: snapshotInput.prototypeHtml,
+        css: snapshotInput.prototypeCss,
+        configData: snapshotInput.configData,
+        previewSize: snapshotInput.previewSize ?? { width, height },
+        assetRewrite: {
+          sessionId,
+          demoId: pageId,
+          origin: config.authorSiteUrl,
+        },
+        constrainHeight: false,
+      });
+    } else {
+      html = buildSketchScenePreviewDocumentHtml({
+        scene: snapshotInput.sketchScene,
+        configData: snapshotInput.configData,
+        previewSize: { width, height },
+      });
     }
-    compileMs = Date.now() - compileStart;
-
-    html = generateIframeHtml({
-      compiledCodeUrl: compileResult.moduleUrl,
-      cssImports: compileResult.cssImports,
-      configData: snapshotInput.configData,
-      cdnBaseUrl: config.cdnBaseUrl,
-      runtimeBaseUrl: config.authorSiteUrl,
-      useCdnRuntime: config.previewRuntimeSource === "cdn",
-      supportUrlMode: true,
-      baseOrigin: config.authorSiteUrl,
-    });
-  } else if (snapshotInput.runtimeType === "prototype-html-css") {
-    html = buildPrototypePreviewDocumentHtml({
-      html: snapshotInput.prototypeHtml,
-      css: snapshotInput.prototypeCss,
-      configData: snapshotInput.configData,
-      previewSize: snapshotInput.previewSize ?? { width, height },
-      assetRewrite: {
-        sessionId,
-        demoId: pageId,
-        origin: config.authorSiteUrl,
-      },
-      constrainHeight: false,
-    });
-  } else {
-    html = buildSketchScenePreviewDocumentHtml({
-      scene: snapshotInput.sketchScene,
-      configData: snapshotInput.configData,
-      previewSize: {
-        width,
-        height,
-      },
-    });
+    return pool.renderPage(
+      html,
+      width,
+      height,
+      fullPage,
+      priority,
+      renderMode,
+      measuredHeight,
+    );
   }
 
-  // Render screenshot
   const pool = getBrowserPool();
-  const renderResult = await pool.renderPage(
-    html,
-    width,
-    height,
-    fullPage,
-    priority,
-    renderMode,
-    measuredHeight,
-  );
+  let renderResult: Awaited<ReturnType<typeof pool.renderPage>>;
+  try {
+    renderResult = await compileAndRender();
+  } catch (err) {
+    if (err instanceof ScreenshotError &&
+        err.code === "RUNTIME_ERROR" &&
+        err.message.includes("dynamically imported module") &&
+        compileHit) {
+      forceRecompile = true;
+      compileHit = false;
+      renderResult = await compileAndRender();
+    } else {
+      throw err;
+    }
+  }
 
   // Save to disk
   const writeStart = Date.now();

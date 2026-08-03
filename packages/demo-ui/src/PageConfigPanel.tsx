@@ -50,6 +50,8 @@ interface PageConfigPanelProps {
   onPageSchemaChange?: (pageId: string, schema: string) => void;
   onSaveAsDefaults?: (pageId: string) => void;
   onRestoreDefaults?: (pageId: string) => void;
+  onProjectSaveAsDefaults?: () => void;
+  onProjectRestoreDefaults?: () => void;
   readonly?: boolean;
   sessionId?: string;
   className?: string;
@@ -169,6 +171,8 @@ export function PageConfigPanel({
   onPageSchemaChange,
   onSaveAsDefaults,
   onRestoreDefaults,
+  onProjectSaveAsDefaults,
+  onProjectRestoreDefaults,
   readonly,
   sessionId,
   className,
@@ -186,8 +190,12 @@ export function PageConfigPanel({
   >(null);
   const [configCategoryFilter, setConfigCategoryFilter] = useState("");
   const [showSharedAffectedPages, setShowSharedAffectedPages] = useState(false);
-  const [showSaveDefaultsDialog, setShowSaveDefaultsDialog] = useState(false);
-  const [showRestoreDefaultsDialog, setShowRestoreDefaultsDialog] = useState(false);
+  const [saveDefaultsScope, setSaveDefaultsScope] = useState<
+    "page" | "project" | null
+  >(null);
+  const [restoreDefaultsScope, setRestoreDefaultsScope] = useState<
+    "page" | "project" | null
+  >(null);
   const effectiveDetailPageId =
     detailPageId === undefined ? internalDetailPageId : detailPageId;
   const sortedPages = useMemo(() => getSortedPages(pages), [pages]);
@@ -364,6 +372,10 @@ export function PageConfigPanel({
     !readonly &&
     !!selectedPage?.schema &&
     Object.keys(configData).length > 0;
+  const saveProjectDefaultsEnabled =
+    !readonly &&
+    !!selectedProjectConfigSchema &&
+    Object.keys(configData).length > 0;
 
   return (
     <div className={cn("flex h-full flex-col bg-card", className)}>
@@ -400,14 +412,41 @@ export function PageConfigPanel({
                   <Settings className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm font-semibold">共享配置</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowSharedAffectedPages((current) => !current)}
-                  className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  aria-expanded={showSharedAffectedPages}
-                >
-                  影响 {sharedAffectedPages.length} 个页面
-                </button>
+                <div className="flex items-center gap-1">
+                  {onProjectRestoreDefaults && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 gap-1 px-2 text-xs"
+                      onClick={() => setRestoreDefaultsScope("project")}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      恢复
+                    </Button>
+                  )}
+                  {!readonly && onProjectSaveAsDefaults && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 gap-1 px-2 text-xs"
+                      disabled={!saveProjectDefaultsEnabled}
+                      onClick={() => setSaveDefaultsScope("project")}
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                      保存
+                    </Button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowSharedAffectedPages((current) => !current)}
+                    className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-expanded={showSharedAffectedPages}
+                  >
+                    影响 {sharedAffectedPages.length} 个页面
+                  </button>
+                </div>
               </div>
               {showSharedAffectedPages && (
                 <div className="mb-2 rounded-md border border-border bg-muted/30 px-3 py-2">
@@ -456,7 +495,7 @@ export function PageConfigPanel({
                       variant="outline"
                       size="sm"
                       className="h-7 gap-1 px-2 text-xs"
-                      onClick={() => setShowRestoreDefaultsDialog(true)}
+                      onClick={() => setRestoreDefaultsScope("page")}
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
                       恢复
@@ -469,7 +508,7 @@ export function PageConfigPanel({
                       size="sm"
                       className="h-7 gap-1 px-2 text-xs"
                       disabled={!saveDefaultsEnabled}
-                      onClick={() => setShowSaveDefaultsDialog(true)}
+                      onClick={() => setSaveDefaultsScope("page")}
                     >
                       <Save className="h-3.5 w-3.5" />
                       保存
@@ -512,67 +551,85 @@ export function PageConfigPanel({
         </div>
       </div>
 
-      <Dialog open={showSaveDefaultsDialog} onOpenChange={setShowSaveDefaultsDialog}>
+      <Dialog
+        open={saveDefaultsScope !== null}
+        onOpenChange={(open) => {
+          if (!open) setSaveDefaultsScope(null);
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>保存为默认配置</DialogTitle>
             <DialogDescription>
-              将使用当前本页配置覆盖默认配置，新项目或新增页面将使用新默认值。确认保存？
+              {saveDefaultsScope === "project"
+                ? "将使用当前共享配置值覆盖项目级默认配置，所有页面将使用新默认值。确认保存？"
+                : "将使用当前本页配置覆盖默认配置，新项目或新增页面将使用新默认值。确认保存？"}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setShowSaveDefaultsDialog(false)}
+              onClick={() => setSaveDefaultsScope(null)}
             >
               取消
             </Button>
             <Button
               size="sm"
               onClick={() => {
-                if (selectedPage) {
+                if (saveDefaultsScope === "project") {
+                  onProjectSaveAsDefaults?.();
+                } else if (saveDefaultsScope === "page" && selectedPage) {
                   onSaveAsDefaults?.(selectedPage.id);
                 }
-                setShowSaveDefaultsDialog(false);
+                setSaveDefaultsScope(null);
               }}
             >
               确认
             </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-    <Dialog open={showRestoreDefaultsDialog} onOpenChange={setShowRestoreDefaultsDialog}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>恢复默认配置</DialogTitle>
-          <DialogDescription>
-            将当前页面配置恢复为初始默认值，所有修改将丢失。确认恢复？
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowRestoreDefaultsDialog(false)}
-          >
-            取消
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => {
-              if (selectedPage) {
-                onRestoreDefaults?.(selectedPage.id);
-              }
-              setShowRestoreDefaultsDialog(false);
-            }}
-          >
-            确认恢复
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <Dialog
+        open={restoreDefaultsScope !== null}
+        onOpenChange={(open) => {
+          if (!open) setRestoreDefaultsScope(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>恢复默认配置</DialogTitle>
+            <DialogDescription>
+              {restoreDefaultsScope === "project"
+                ? "将共享配置值恢复为项目级初始默认值，所有修改将丢失。确认恢复？"
+                : "将当前页面配置恢复为初始默认值，所有修改将丢失。确认恢复？"}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRestoreDefaultsScope(null)}
+            >
+              取消
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                if (restoreDefaultsScope === "project") {
+                  onProjectRestoreDefaults?.();
+                } else if (restoreDefaultsScope === "page" && selectedPage) {
+                  onRestoreDefaults?.(selectedPage.id);
+                }
+                setRestoreDefaultsScope(null);
+              }}
+            >
+              确认恢复
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

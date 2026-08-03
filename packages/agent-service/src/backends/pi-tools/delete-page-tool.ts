@@ -8,22 +8,22 @@ import type { AgentConfig } from "../../core/types";
 import { logger } from "../../utils/logger";
 import { resolveLiveWorkspaceMutationContext } from "../../workspace/workspace-mutation-authority";
 import type { WorkspaceAuthoritySnapshot } from "../../workspace/workspace-mutation-authority";
+import {
+  WORKSPACE_TREE_FILENAME,
+  type WorkspacePage,
+  type WorkspaceTree,
+  isSafePageId,
+  getPageDir,
+  getWorkspaceTreePath,
+  isCompletePageDir,
+  isCompletePageDirFromSnapshot,
+  formatPageEntry,
+  readWorkspaceTree,
+  listPages,
+} from "./workspace-page-utils";
 
 const PERMISSION_TIMEOUT_MS = 60_000;
 const DELETION_PLAN_TTL_MS = 5 * 60_000;
-const WORKSPACE_TREE_FILENAME = "workspace-tree.json";
-
-interface WorkspacePage {
-  id: string;
-  name: string;
-  order: number;
-  parentId: string | null;
-}
-
-interface WorkspaceTree {
-  folders: unknown[];
-  pages: WorkspacePage[];
-}
 
 export interface DeletedPageChange {
   pageId: string;
@@ -182,42 +182,6 @@ function getWorkingDir(config: AgentConfig): string | null {
   return config.workingDir ? path.resolve(config.workingDir) : null;
 }
 
-function getWorkspaceTreePath(workingDir: string): string {
-  return path.join(workingDir, WORKSPACE_TREE_FILENAME);
-}
-
-function getPageDir(workingDir: string, pageId: string): string {
-  return path.join(workingDir, "demos", pageId);
-}
-
-function isSafePageId(pageId: string): boolean {
-  return /^[A-Za-z0-9_-]+$/.test(pageId) && !pageId.includes("..");
-}
-
-function isCompletePageDir(workingDir: string, pageId: string): boolean {
-  const pageDir = getPageDir(workingDir, pageId);
-  return (
-    fs.existsSync(pageDir) &&
-    fs.existsSync(path.join(pageDir, "index.tsx")) &&
-    fs.existsSync(path.join(pageDir, "config.schema.json"))
-  );
-}
-
-function readWorkspaceTree(workingDir: string): WorkspaceTree {
-  const treePath = getWorkspaceTreePath(workingDir);
-  if (!fs.existsSync(treePath)) {
-    return { folders: [], pages: [] };
-  }
-
-  const parsed = JSON.parse(
-    fs.readFileSync(treePath, "utf-8"),
-  ) as Partial<WorkspaceTree>;
-  return {
-    folders: Array.isArray(parsed.folders) ? parsed.folders : [],
-    pages: Array.isArray(parsed.pages) ? parsed.pages : [],
-  };
-}
-
 function getTreeSignature(workingDir: string): string {
   const treePath = getWorkspaceTreePath(workingDir);
   const content = fs.existsSync(treePath)
@@ -232,15 +196,6 @@ function writeWorkspaceTree(workingDir: string, tree: WorkspaceTree): void {
     JSON.stringify(tree, null, 2),
     "utf-8",
   );
-}
-
-function listPages(workingDir: string): WorkspacePage[] {
-  const tree = readWorkspaceTree(workingDir);
-  return tree.pages
-    .filter(
-      (page) => isSafePageId(page.id) && isCompletePageDir(workingDir, page.id),
-    )
-    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
 }
 
 function listPagesFromSnapshot(
@@ -263,10 +218,11 @@ function listPagesFromSnapshot(
   return tree.pages
     .filter((page) => {
       if (!isSafePageId(page.id)) return false;
-      const hasIndex = `demos/${page.id}/index.tsx` in snapshot.resources;
-      const hasSchema =
-        `demos/${page.id}/config.schema.json` in snapshot.resources;
-      return hasIndex && hasSchema;
+      return isCompletePageDirFromSnapshot(
+        snapshot.resources,
+        page.id,
+        page.runtimeType,
+      );
     })
     .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
 }
@@ -275,8 +231,10 @@ function formatPages(pages: WorkspacePage[]): string {
   if (pages.length === 0) return "No pages found.";
   return pages
     .map((page) => {
-      const indexPath = `demos/${page.id}/index.tsx`;
-      const schemaPath = `demos/${page.id}/config.schema.json`;
+      const { indexPath, schemaPath } = formatPageEntry(
+        page.id,
+        page.runtimeType,
+      );
       return `- id: ${page.id}\n  name: ${page.name}\n  indexPath: ${indexPath}\n  schemaPath: ${schemaPath}`;
     })
     .join("\n");
@@ -416,7 +374,7 @@ async function deleteOnePage(
 
   const tree = readWorkspaceTree(workingDir);
   const existing = tree.pages.find((page) => page.id === pageId);
-  if (!existing || !isCompletePageDir(workingDir, pageId)) {
+  if (!existing || !isCompletePageDir(workingDir, pageId, existing.runtimeType)) {
     return {
       ok: false as const,
       result: missingPageResult(workingDir, pageId, pageName),
@@ -672,13 +630,15 @@ export function createListPagesTool(
         return {
           content: [{ type: "text" as const, text: formatPages(pages) }],
           details: {
-            pages: pages.map((page) => ({
-              id: page.id,
-              name: page.name,
-              indexPath: `demos/${page.id}/index.tsx`,
-              schemaPath: `demos/${page.id}/config.schema.json`,
-            })),
-            ...(snapshot ? { revision: snapshot.state.revision } : {}),
+            pages: pages.map((page) => {
+              const { indexPath, schemaPath } = formatPageEntry(
+                page.id,
+                page.runtimeType,
+              );
+              return { id: page.id, name: page.name, indexPath, schemaPath };
+            }),
+            snapshotRevision: snapshot?.state.revision,
+            pageCount: pages.length,
           },
         };
       } catch (error) {

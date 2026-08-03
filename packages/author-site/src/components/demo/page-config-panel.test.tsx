@@ -314,6 +314,106 @@ describe("PageConfigPanel", () => {
     expect(screen.queryByText("主视觉图")).not.toBeInTheDocument();
     expect(screen.queryByText("标题")).not.toBeInTheDocument();
   });
+
+  it("共享配置区块展示恢复与保存按钮，并调用对应回调", () => {
+    const onProjectSaveAsDefaults = jest.fn();
+    const onProjectRestoreDefaults = jest.fn();
+    render(
+      <PageConfigPanel
+        pages={[
+          {
+            id: "page_a",
+            name: "页面 A",
+            order: 0,
+            schema: pageSchema,
+            configData: { logo: "logo.png", theme: "dark", title: "标题" },
+          },
+        ]}
+        activePageId="page_a"
+        detailPageId="page_a"
+        hideDetailHeader
+        projectConfigSchema={sharedSchema}
+        onProjectSaveAsDefaults={onProjectSaveAsDefaults}
+        onProjectRestoreDefaults={onProjectRestoreDefaults}
+      />,
+    );
+
+    expect(screen.getByText("共享配置")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "影响 1 个页面" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "恢复" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "保存" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "恢复" }));
+    expect(screen.getByText("恢复默认配置")).toBeInTheDocument();
+    expect(screen.getByText(/共享配置值恢复为项目级初始默认值/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
+    expect(onProjectRestoreDefaults).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("恢复默认配置")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    expect(screen.getByText("保存为默认配置")).toBeInTheDocument();
+    expect(screen.getByText(/共享配置值覆盖项目级默认配置/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "确认" }));
+    expect(onProjectSaveAsDefaults).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("保存为默认配置")).not.toBeInTheDocument();
+  });
+
+  it("未传入共享配置回调时不展示恢复与保存按钮", () => {
+    render(
+      <PageConfigPanel
+        pages={[
+          {
+            id: "page_a",
+            name: "页面 A",
+            order: 0,
+            schema: pageSchema,
+            configData: {},
+          },
+        ]}
+        activePageId="page_a"
+        detailPageId="page_a"
+        hideDetailHeader
+        projectConfigSchema={sharedSchema}
+        readonly
+      />,
+    );
+
+    expect(screen.getByText("共享配置")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "恢复" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
+  });
+
+  it("只读模式下共享配置区块隐藏保存按钮，恢复按钮仍可操作", () => {
+    const onProjectRestoreDefaults = jest.fn();
+    render(
+      <PageConfigPanel
+        pages={[
+          {
+            id: "page_a",
+            name: "页面 A",
+            order: 0,
+            schema: pageSchema,
+            configData: { logo: "logo.png" },
+          },
+        ]}
+        activePageId="page_a"
+        detailPageId="page_a"
+        hideDetailHeader
+        projectConfigSchema={sharedSchema}
+        readonly
+        onProjectRestoreDefaults={onProjectRestoreDefaults}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "恢复" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "恢复" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
+    expect(onProjectRestoreDefaults).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("ConfigForm 条件显示", () => {
@@ -392,5 +492,52 @@ describe("ConfigForm 条件显示", () => {
     expect(screen.getByText("SVGA动画文件")).toBeInTheDocument();
     expect(screen.queryByText("弹窗图片")).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("intro.svga")).toBeInTheDocument();
+  });
+});
+
+describe("ConfigForm 空标题", () => {
+  const emptyTitleSchema = JSON.stringify({
+    type: "object",
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    properties: {
+      modules: {
+        type: "object",
+        title: "",
+        properties: {
+          items: {
+            type: "array",
+            title: "",
+            description: "描述文字",
+            items: {
+              type: "object",
+              oneOf: [
+                {
+                  title: "图片模块",
+                  properties: {
+                    type: { const: "image", type: "string", title: "模块类型" },
+                    imageUrl: { type: "string", title: "图片", format: "image" },
+                  },
+                  required: ["type"],
+                },
+              ],
+            },
+            default: [
+              { type: "image", imageUrl: "https://example.com/img.png" },
+            ],
+          },
+        },
+      },
+    },
+    required: [],
+  });
+
+  it("空标题分组不渲染分组标题，空标题字段不渲染字段标签", () => {
+    render(<ConfigForm schema={emptyTitleSchema} onChange={() => {}} />);
+
+    expect(screen.queryByText("基础配置")).not.toBeInTheDocument();
+    expect(screen.queryByText("modules")).not.toBeInTheDocument();
+    expect(screen.queryByText("Items")).not.toBeInTheDocument();
+    expect(screen.queryByText("描述文字")).not.toBeInTheDocument();
+    expect(screen.getAllByText("图片模块").length).toBeGreaterThan(0);
   });
 });

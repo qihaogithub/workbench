@@ -29,6 +29,12 @@ const CaptureScreenshotParams = Type.Object({
       default: true,
     }),
   ),
+  pageId: Type.Optional(
+    Type.String({
+      description:
+        "Exact page ID to screenshot. If omitted, screenshots the user's currently focused page.",
+    }),
+  ),
 });
 
 type CaptureScreenshotParams = Static<typeof CaptureScreenshotParams>;
@@ -253,7 +259,7 @@ export function createCaptureScreenshotTool(
     parameters: CaptureScreenshotParams,
     execute: async (_toolCallId: string, args: CaptureScreenshotParams) => {
       const workingDir = config.workingDir;
-      const demoId = config.demoId;
+      const demoId = args.pageId ?? config.demoId;
 
       if (!workingDir || !demoId) {
         return {

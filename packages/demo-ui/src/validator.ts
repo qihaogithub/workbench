@@ -1,4 +1,5 @@
 import type { PreviewSize } from "./types";
+import { flattenSchema } from "./schema-parser";
 
 export function isSchemaEmpty(schema?: string | null): boolean {
   if (!schema) return true;
@@ -16,10 +17,11 @@ export function isSchemaEmpty(schema?: string | null): boolean {
 export function getDefaultValues(schema: string): Record<string, unknown> {
   try {
     const parsed = JSON.parse(schema);
+    const flattened = flattenSchema(parsed);
     const defaults: Record<string, unknown> = {};
 
-    if (parsed.properties && typeof parsed.properties === "object") {
-      for (const [key, value] of Object.entries(parsed.properties)) {
+    if (flattened.properties && typeof flattened.properties === "object") {
+      for (const [key, value] of Object.entries(flattened.properties)) {
         const prop = value as { default?: unknown };
         if (prop.default !== undefined) {
           defaults[key] = prop.default;

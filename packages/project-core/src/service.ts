@@ -8,6 +8,7 @@ import {
 } from "@workbench/preview-contract/runtime";
 import { compilePreviewPageSource } from "@workbench/preview-contract/compiler";
 import { validateSketchSceneDocument } from "@workbench/sketch-core";
+import { checkConfigSchemaAgainstPrototype } from "@workbench/shared/demo/config-runtime-compatibility";
 import type {
   DemoFiles,
   DemoFolderMeta,
@@ -5618,9 +5619,8 @@ export class ProjectAdminService {
   }
 
   private readWorkspaceTree(workspacePath: string): WorkspaceTree {
-    const parsed = readJsonFile<Partial<WorkspaceTree>>(
-      path.join(workspacePath, WORKSPACE_TREE_FILENAME),
-    );
+    const filePath = path.join(workspacePath, WORKSPACE_TREE_FILENAME);
+    const parsed = readJsonFile<Partial<WorkspaceTree>>(filePath);
     if (parsed) {
       const demosDir = path.join(workspacePath, "demos");
       const rawPages = Array.isArray(parsed.pages) ? parsed.pages : [];
@@ -5639,6 +5639,13 @@ export class ProjectAdminService {
         pages: normalizePagesRouteKeys(pages),
       };
     }
+
+    if (fs.existsSync(filePath)) {
+      throw new Error(
+        `workspace-tree.json 解析失败，文件可能已损坏。请检查文件格式。`,
+      );
+    }
+
     const pages: DemoPageMeta[] = [];
     const demosDir = path.join(workspacePath, "demos");
     if (fs.existsSync(demosDir)) {
@@ -6057,6 +6064,7 @@ export class ProjectAdminService {
         pageId,
         files.prototypeHtml ?? "",
         files.prototypeCss ?? "",
+        files.schema,
       );
     }
     if (runtimeType === "sketch-scene") {
@@ -6085,6 +6093,7 @@ export class ProjectAdminService {
     pageId: string,
     html: string,
     css: string,
+    schema?: string,
   ): RuntimeValidationResult {
     const issues: RuntimeValidationIssue[] = [];
     const repairReasonCodes: string[] = [];
@@ -6211,6 +6220,22 @@ export class ProjectAdminService {
       );
     }
 
+    if (schema) {
+      const compatibility = checkConfigSchemaAgainstPrototype(schema);
+      if (!compatibility.supported) {
+        for (const field of compatibility.unsupportedFields) {
+          addIssue(
+            {
+              code: "PROTOTYPE_CONFIG_TYPE_UNSUPPORTED",
+              message: `config.schema.json 中字段 "${field.path}" 使用了原型页不支持的配置类型（${field.type}）`,
+              instruction: field.reason + "。请升级页面为高保真 React 页。",
+            },
+            "upgrade_to_high_fidelity",
+          );
+        }
+      }
+    }
+
     const decision: PrototypeGateDecision =
       upgradeReasonCodes.length > 0
         ? "upgrade_to_high_fidelity"
@@ -6225,7 +6250,9 @@ export class ProjectAdminService {
         ? "HTML/CSS 原型页可安全内嵌渲染。"
         : decision === "repair_prototype"
           ? "HTML/CSS 原型页存在可自动修复的问题，修复后可继续按原型页保存。"
-          : "页面触碰运行时隔离红线，应升级为高保真页。";
+          : upgradeReasonCodes.includes("PROTOTYPE_CONFIG_TYPE_UNSUPPORTED")
+            ? "config.schema.json 包含原型页不可消费的配置类型，应升级为高保真页。"
+            : "页面触碰运行时隔离红线，应升级为高保真页。";
 
     return {
       ok: issues.length === 0,

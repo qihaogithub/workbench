@@ -376,6 +376,7 @@ export async function PUT(
       sketchPatch,
       diagnosticContext,
       localizeImages,
+      configValues,
     } = body as {
       code?: string;
       schema?: string;
@@ -387,6 +388,7 @@ export async function PUT(
       sketchPatch?: unknown;
       diagnosticContext?: unknown;
       localizeImages?: boolean;
+      configValues?: Record<string, unknown>;
     };
     const sketchPatchDiagnosticContext =
       parseSketchPatchDiagnosticContext(diagnosticContext);
@@ -400,7 +402,8 @@ export async function PUT(
       prototypeMeta === undefined &&
       sketchScene === undefined &&
       sketchMeta === undefined &&
-      sketchPatch === undefined
+      sketchPatch === undefined &&
+      configValues === undefined
     ) {
       return NextResponse.json(
         createApiError(
@@ -838,6 +841,12 @@ export async function PUT(
           JSON.stringify(sketchMeta, null, 2),
         );
       }
+      if (configValues) {
+        addTextOperation(
+          demoResourcePath("config.values.json"),
+          JSON.stringify(configValues, null, 2),
+        );
+      }
 
       if (operations.length === 0) {
         return NextResponse.json(
@@ -866,6 +875,7 @@ export async function PUT(
         prototypeMeta: prototypeMeta as PrototypePageMeta | undefined,
         sketchScene: sketchSceneForWrite,
         sketchMeta: sketchMeta as Record<string, unknown> | undefined,
+        configValues,
       });
       if (!success) {
         return NextResponse.json(

@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { CanvasViewport } from "./CanvasViewport";
 import { CanvasPageItem, CanvasPagePreviewContent } from "./CanvasPageItem";
+import { PasteOptionsModal } from "./PasteOptionsModal";
+import type { CanvasClipboardData } from "./canvas-clipboard";
 import { CanvasFreeNodeItem } from "./CanvasFreeNodeItem";
 import { CanvasSelectionBox } from "./CanvasSelectionBox";
 import { CanvasToolbar } from "./CanvasToolbar";
@@ -463,6 +465,8 @@ export function PreviewCanvas({
   onUpdateKnowledgeDocument,
   onReadKnowledgeDocument,
   onRequestPastePages,
+  onRequestCreateReferences,
+  onViewSource,
 }: PreviewCanvasProps) {
   const resolvedInteractionMode =
     interactionMode ?? (editable ? "editor" : "readonly");
@@ -502,6 +506,14 @@ export function PreviewCanvas({
   );
   const [selectedPageIds, setSelectedPageIds] = useState<string[]>([]);
   const pendingImageFilesRef = useRef<File[]>([]);
+
+  // 跨项目粘贴选择器状态
+  const [pendingPasteModal, setPendingPasteModal] = useState<{
+    pages: CanvasPageData[];
+    pageLayouts: Record<string, CanvasPageLayout>;
+    pageGroups: CanvasPageGroup[];
+    sourceProjectId: string;
+  } | null>(null);
 
   // 工具模式状态
   const [toolMode, setToolMode] = useState<CanvasToolMode>("select");
@@ -899,6 +911,114 @@ export function PreviewCanvas({
     },
     [effectiveToolMode, isEditorMode, onPageConfigEdit],
   );
+
+  // 粘贴选择器回调
+  const handlePasteAsCopy = useCallback(() => {
+    const data = pendingPasteModal;
+    if (!data || !onRequestPastePages) return;
+    setPendingPasteModal(null);
+    void onRequestPastePages({
+      pages: data.pages,
+      pageLayouts: data.pageLayouts,
+      pageGroups: data.pageGroups,
+    }).then(({ pageIdMapping }) => {
+      updateState((prev) => {
+        const nextPages = { ...prev.pages };
+        pageIdMapping.forEach((newId, oldId) => {
+          const layout = data.pageLayouts[oldId];
+          if (layout) nextPages[newId] = layout;
+        });
+        const nextGroups = { ...(prev.pageGroups ?? {}) };
+        for (const oldGroup of data.pageGroups) {
+          const newGroupPages = oldGroup.pages.map((entry) => ({
+            ...entry,
+            pageId: pageIdMapping.get(entry.pageId) ?? entry.pageId,
+          }));
+          const newActivePageId =
+            pageIdMapping.get(oldGroup.activePageId) ??
+            oldGroup.activePageId;
+          const groupId = `page-group-${crypto.randomUUID()}`;
+          nextGroups[groupId] = {
+            ...oldGroup,
+            id: groupId,
+            pages: newGroupPages,
+            activePageId: newActivePageId,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          };
+        }
+        return {
+          ...prev,
+          pages: nextPages,
+          pageGroups:
+            Object.keys(nextGroups).length > 0
+              ? nextGroups
+              : prev.pageGroups,
+        };
+      });
+      const newPageIds = Array.from(pageIdMapping.values());
+      setSelectedPageIds(newPageIds);
+      setSelectedNodeId(null);
+      setSelectedDocumentNodeIds([]);
+      setSelectedPageGroupIds([]);
+    });
+  }, [pendingPasteModal, onRequestPastePages]);
+
+  const handlePasteAsReference = useCallback(() => {
+    const data = pendingPasteModal;
+    if (!data || !onRequestCreateReferences) return;
+    setPendingPasteModal(null);
+    void onRequestCreateReferences({
+      pages: data.pages,
+      pageLayouts: data.pageLayouts,
+      pageGroups: data.pageGroups,
+      sourceProjectId: data.sourceProjectId,
+    }).then(({ pageIdMapping }) => {
+      updateState((prev) => {
+        const nextPages = { ...prev.pages };
+        pageIdMapping.forEach((newId, oldId) => {
+          const layout = data.pageLayouts[oldId];
+          if (layout) nextPages[newId] = { ...layout, zIndex: layout.zIndex };
+        });
+        const nextGroups = { ...(prev.pageGroups ?? {}) };
+        for (const oldGroup of data.pageGroups) {
+          const newGroupPages = oldGroup.pages.map((entry) => ({
+            ...entry,
+            pageId: pageIdMapping.get(entry.pageId) ?? entry.pageId,
+          }));
+          const newActivePageId =
+            pageIdMapping.get(oldGroup.activePageId) ??
+            oldGroup.activePageId;
+          const groupId = `page-group-${crypto.randomUUID()}`;
+          nextGroups[groupId] = {
+            ...oldGroup,
+            id: groupId,
+            pages: newGroupPages,
+            activePageId: newActivePageId,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          };
+        }
+        return {
+          ...prev,
+          pages: nextPages,
+          pageGroups:
+            Object.keys(nextGroups).length > 0
+              ? nextGroups
+              : prev.pageGroups,
+        };
+      });
+      const newPageIds = Array.from(pageIdMapping.values());
+      setSelectedPageIds(newPageIds);
+      setSelectedNodeId(null);
+      setSelectedDocumentNodeIds([]);
+      setSelectedPageGroupIds([]);
+    });
+  }, [pendingPasteModal, onRequestCreateReferences]);
+
+  const handlePasteCancel = useCallback(() => {
+    setPendingPasteModal(null);
+  }, []);
 
   const handleNodeSelect = useCallback(
     (nodeId: string, event?: React.PointerEvent | React.MouseEvent) => {
@@ -1584,55 +1704,68 @@ export function PreviewCanvas({
           };
         }
 
-        void onRequestPastePages({
-          pages: clipboardData.pages,
-          pageLayouts: shiftedPageLayouts,
-          pageGroups: clipboardData.pageGroups,
-        }).then(({ pageIdMapping }) => {
-          // 将新页面布局写入画布状态
-          updateState((prev) => {
-            const nextPages = { ...prev.pages };
-            pageIdMapping.forEach((newId, oldId) => {
-              const layout = shiftedPageLayouts[oldId];
-              if (layout) nextPages[newId] = layout;
-            });
-            // 更新页面组中的 pageId 引用
-            const nextGroups = { ...(prev.pageGroups ?? {}) };
-            for (const oldGroup of clipboardData.pageGroups) {
-              const newGroupPages = oldGroup.pages.map((entry) => ({
-                ...entry,
-                pageId: pageIdMapping.get(entry.pageId) ?? entry.pageId,
-              }));
-              const newActivePageId =
-                pageIdMapping.get(oldGroup.activePageId) ??
-                oldGroup.activePageId;
-              const groupId = `page-group-${crypto.randomUUID()}`;
-              nextGroups[groupId] = {
-                ...oldGroup,
-                id: groupId,
-                pages: newGroupPages,
-                activePageId: newActivePageId,
-                createdAt: now,
-                updatedAt: now,
-              };
-            }
-            return {
-              ...prev,
-              pages: nextPages,
-              pageGroups:
-                Object.keys(nextGroups).length > 0
-                  ? nextGroups
-                  : prev.pageGroups,
-            };
-          });
+        // 判断是否为跨项目粘贴
+        const isCrossProject =
+          clipboardData.sourceProjectId &&
+          clipboardData.sourceProjectId !== projectId;
 
-          // 选中新粘贴的页面
-          const newPageIds = Array.from(pageIdMapping.values());
-          setSelectedPageIds(newPageIds);
-          setSelectedNodeId(null);
-          setSelectedDocumentNodeIds([]);
-          setSelectedPageGroupIds([]);
-        });
+        if (isCrossProject && onRequestCreateReferences) {
+          // 跨项目：弹出选择器，暂存粘贴数据
+          setPendingPasteModal({
+            pages: clipboardData.pages,
+            pageLayouts: shiftedPageLayouts,
+            pageGroups: clipboardData.pageGroups,
+            sourceProjectId: clipboardData.sourceProjectId ?? "",
+          });
+        } else {
+          // 同项目：直接粘贴为副本
+          void onRequestPastePages({
+            pages: clipboardData.pages,
+            pageLayouts: shiftedPageLayouts,
+            pageGroups: clipboardData.pageGroups,
+          }).then(({ pageIdMapping }) => {
+            // 将新页面布局写入画布状态
+            updateState((prev) => {
+              const nextPages = { ...prev.pages };
+              pageIdMapping.forEach((newId, oldId) => {
+                const layout = shiftedPageLayouts[oldId];
+                if (layout) nextPages[newId] = layout;
+              });
+              const nextGroups = { ...(prev.pageGroups ?? {}) };
+              for (const oldGroup of clipboardData.pageGroups) {
+                const newGroupPages = oldGroup.pages.map((entry) => ({
+                  ...entry,
+                  pageId: pageIdMapping.get(entry.pageId) ?? entry.pageId,
+                }));
+                const newActivePageId =
+                  pageIdMapping.get(oldGroup.activePageId) ??
+                  oldGroup.activePageId;
+                const groupId = `page-group-${crypto.randomUUID()}`;
+                nextGroups[groupId] = {
+                  ...oldGroup,
+                  id: groupId,
+                  pages: newGroupPages,
+                  activePageId: newActivePageId,
+                  createdAt: now,
+                  updatedAt: now,
+                };
+              }
+              return {
+                ...prev,
+                pages: nextPages,
+                pageGroups:
+                  Object.keys(nextGroups).length > 0
+                    ? nextGroups
+                    : prev.pageGroups,
+              };
+            });
+            const newPageIds = Array.from(pageIdMapping.values());
+            setSelectedPageIds(newPageIds);
+            setSelectedNodeId(null);
+            setSelectedDocumentNodeIds([]);
+            setSelectedPageGroupIds([]);
+          });
+        }
       }
 
       // 选中粘贴的节点（如果有节点且无页面）
@@ -2991,6 +3124,8 @@ export function PreviewCanvas({
                     ? (pageId) => void onRequestDeletePages([pageId])
                     : undefined
                 }
+                onViewSource={onViewSource}
+                brokenReference={page.isReference && !page.code && !page.prototypeHtml && !page.sketchScene}
                 onConsoleEntry={onConsoleEntry}
                 onError={onError}
                 onDragStart={handleDragStart}
@@ -3143,6 +3278,14 @@ export function PreviewCanvas({
           </div>
         </div>
       )}
+
+      <PasteOptionsModal
+        open={pendingPasteModal !== null}
+        pageCount={pendingPasteModal?.pages.length ?? 0}
+        onSelectCopy={handlePasteAsCopy}
+        onSelectReference={handlePasteAsReference}
+        onCancel={handlePasteCancel}
+      />
     </div>
   );
 }

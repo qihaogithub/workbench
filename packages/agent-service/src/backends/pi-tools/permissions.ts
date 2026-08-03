@@ -11,13 +11,11 @@ export const DEFAULT_WORKSPACE_PERMISSIONS: PermissionConfig = {
   allowedPaths: [
     "**",
     "demos/*/index.tsx",
-    "demos/*/config.ts",
     "demos/*/config.schema.json",
     "project.config.schema.json",
     "workspace-tree.json",
     "AGENTS.md",
     "index.tsx",
-    "config.ts",
     "config.schema.json",
   ],
   deniedPatterns: [

@@ -1570,6 +1570,7 @@ export function getWorkspaceMultiDemoFiles(
       const prototypeMetaPath = path.join(dir, "prototype.meta.json");
       const sketchScenePath = path.join(dir, "sketch.scene.json");
       const sketchMetaPath = path.join(dir, "sketch.meta.json");
+      const configValuesPath = path.join(dir, "config.values.json");
       if (
         fs.existsSync(schemaPath) &&
         (fs.existsSync(codePath) ||
@@ -1601,6 +1602,11 @@ export function getWorkspaceMultiDemoFiles(
                 unknown
               >)
             : undefined,
+          configValues: fs.existsSync(configValuesPath)
+            ? (JSON.parse(
+                fs.readFileSync(configValuesPath, "utf-8"),
+              ) as Record<string, unknown>)
+            : undefined,
         };
       }
     }
@@ -1629,6 +1635,7 @@ export function getWorkspaceDemoPageFiles(
   const prototypeMetaPath = path.join(demoDir, "prototype.meta.json");
   const sketchScenePath = path.join(demoDir, "sketch.scene.json");
   const sketchMetaPath = path.join(demoDir, "sketch.meta.json");
+  const configValuesPath = path.join(demoDir, "config.values.json");
 
   if (
     !fs.existsSync(schemaPath) ||
@@ -1659,6 +1666,11 @@ export function getWorkspaceDemoPageFiles(
           string,
           unknown
         >)
+      : undefined,
+    configValues: fs.existsSync(configValuesPath)
+      ? (JSON.parse(
+          fs.readFileSync(configValuesPath, "utf-8"),
+        ) as Record<string, unknown>)
       : undefined,
   };
 }
@@ -1722,6 +1734,13 @@ export function updateWorkspaceDemoFiles(
     fs.writeFileSync(
       path.join(demoDir, "sketch.meta.json"),
       JSON.stringify(files.sketchMeta, null, 2),
+      "utf-8",
+    );
+  }
+  if (files.configValues) {
+    fs.writeFileSync(
+      path.join(demoDir, "config.values.json"),
+      JSON.stringify(files.configValues, null, 2),
       "utf-8",
     );
   }

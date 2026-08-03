@@ -211,6 +211,9 @@ export function InlineTagInput({
 
       const tagSpan = document.createElement("span");
       tagSpan.setAttribute(TAG_DATA_ATTR, tag.id);
+      tagSpan.dataset.tagType = tag.type;
+      tagSpan.dataset.tagLabel = tag.label;
+      tagSpan.dataset.tagContext = tag.context;
       tagSpan.contentEditable = "false";
       tagSpan.className = cn(
         "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium align-middle select-none cursor-default group",
