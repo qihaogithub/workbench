@@ -27,7 +27,7 @@
 
 简化规则：**值为数组或对象、需要结构化消费的 → 升级；标量 → 保持**。`object` 作为分组容器时递归展开检查子字段，本身不报。
 
-形态说明：`imageList` 既可作为 `type: "imageList"`，也可作为 `ui:widget: "imageList"`（Layer 1 控件覆盖）出现，两种形态均判定为复合类型；`ui:widget` / `format` 本身不触发，仅当 `ui:widget` 指向多值控件（如 `imageList`）时按复合类型处理。
+形态说明：`imageList` 在 SKILL.md 中列为 agent 概念层的"支持类型"，但 JSON Schema 中实际表示为 `ui:widget: "imageList"`（Layer 1 控件覆盖），而非 `type: "imageList"`。兼容性检查函数需同时检查 `type === "imageList"`（agent 可能写错）和 `ui:widget === "imageList"`（标准写法）。`$demo.sortable` 是文档约定（schema-parser 不解析，ArrayFieldGroup 对所有 oneOf 数组无条件启用拖拽），但 `array` 本身已触发升级，`$demo.sortable` 仅作额外标注。`ui:widget` / `format` 本身不触发，仅当 `ui:widget` 指向多值控件（如 `imageList`）时按复合类型处理。
 
 升级门槛：只有用户诉求本质必须用复合类型时才升级；能用标量类型（`string`/`number`/`color`/`image`/`enum` 单选）表达的诉求保持原型页，不为升级而升级。
 
@@ -60,10 +60,13 @@ checkConfigSchemaAgainstPrototype(schema: string | Record<string, unknown>): {
 - 指令文案复用现有 `formatRuntimeValidationInstruction` 的 upgrade 格式（"Regenerate this page as high-fidelity React: write index.tsx, keep config.schema.json valid..."），summary 列出具体字段与原因
 - 写入顺序自然兼容：先建 `index.tsx` + 更新 runtimeType 再写 config → 跳过（预防路径）；先写 config → gate 兜底要求升级（兜底路径）
 
-### 3. project-core 接线（`service.ts` `validateRuntime`）
+### 3. project-core 接线（`service.ts` `validatePrototypePageSource`）
 
-- 找到 config.schema.json 校验入口，接入同一共享判定函数，同规则产出 `upgrade_to_high_fidelity`
-- 使 Web API 校验、`ow validate-runtime`、publish check 与 agent 写入拦截行为一致
+- `validatePrototypePageSource`（line 6084）当前签名只有 `(pageId, html, css)`，不接收 schema。需修改：
+  1. 签名追加 `schema?: string` 参数
+  2. `validatePageFilesRuntime`（line 6056）传入 `files.schema`
+  3. 内部新增分支：`schema` 存在时调用共享判定函数，同规则产出 `upgrade_to_high_fidelity`
+- 修改后使 Web API 校验、`ow validate-runtime`、publish check 与 agent 写入拦截行为一致
 
 ### 4. 规则文档（预防层）
 
@@ -81,9 +84,7 @@ checkConfigSchemaAgainstPrototype(schema: string | Record<string, unknown>): {
 
 ## 验证命令
 
-- `pnpm check:shared 相关`（check:author / check:agent / check:screenshot / check:viewer）
-- `pnpm check:agent`
-- `pnpm check:project-core`
+- `pnpm check:author && pnpm check:agent && pnpm check:project-core`（shared 无独立 check 命令，通过消费者间接验证）
 
 ## 范围外
 
