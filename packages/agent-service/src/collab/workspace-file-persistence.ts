@@ -14,7 +14,6 @@ export function resolveCollabResourceKind(resourcePath: string): CollabResourceK
   if (/^demos\/[^/]+\/prototype\.html$/.test(normalized)) return "page-prototype-html";
   if (/^demos\/[^/]+\/prototype\.css$/.test(normalized)) return "page-prototype-css";
   if (/^demos\/[^/]+\/config\.schema\.json$/.test(normalized)) return "page-schema";
-  if (/^demos\/[^/]+\/config\.ts$/.test(normalized)) return "page-schema";
   if (/^demos\/[^/]+\/sketch\.scene\.json$/.test(normalized)) return "page-sketch-scene";
   if (normalized === "project.config.schema.json") return "project-schema";
   if (normalized === "workspace-tree.json") return "workspace-tree";

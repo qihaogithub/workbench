@@ -5,14 +5,20 @@ import type { CompileResult } from "./compile-client";
 interface CacheEntry {
   result: CompileResult;
   codeHash: string;
+  createdAt: number;
 }
 
 class CompileCache {
   private cache = new Map<string, CacheEntry>();
   private maxEntries: number;
+  private maxAgeMs: number;
 
-  constructor(maxEntries: number = config.compileCacheMaxEntries) {
+  constructor(
+    maxEntries: number = config.compileCacheMaxEntries,
+    maxAgeMs: number = config.compileCacheMaxAgeMs,
+  ) {
     this.maxEntries = maxEntries;
+    this.maxAgeMs = maxAgeMs;
   }
 
   private hash(code: string, cacheScope = "default"): string {
@@ -28,6 +34,10 @@ class CompileCache {
     const key = this.hash(code, cacheScope);
     const entry = this.cache.get(key);
     if (entry) {
+      if (Date.now() - entry.createdAt > this.maxAgeMs) {
+        this.cache.delete(key);
+        return null;
+      }
       // Move to end (LRU)
       this.cache.delete(key);
       this.cache.set(key, entry);
@@ -47,7 +57,16 @@ class CompileCache {
       }
     }
 
-    this.cache.set(key, { result, codeHash: key });
+    this.cache.set(key, {
+      result,
+      codeHash: key,
+      createdAt: Date.now(),
+    });
+  }
+
+  deleteByCode(code: string, cacheScope?: string): boolean {
+    const key = this.hash(code, cacheScope);
+    return this.cache.delete(key);
   }
 
   clear(): void {

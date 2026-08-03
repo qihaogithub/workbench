@@ -16,6 +16,7 @@ description: 高保真 React 页的完整编码规范：DemoProps 声明、@prev
 - 导出默认组件
 - 代码完整可运行，包含必要的 import
 - 所有代码在单一文件中，不使用 `import './xxx'`
+- 复合类型配置（`array`/`imageList`/`richtext`/`cascade`/`enum` 多选/`type: "position"`）只能由高保真页消费，原型页不支持
 
 ## DemoProps 接口示例
 

@@ -36,6 +36,10 @@ interface DimensionOptions {
   minHeight?: number;
   maxWidth?: number;
   maxHeight?: number;
+  widthOperator?: string;
+  widthValue?: number;
+  heightOperator?: string;
+  heightValue?: number;
 }
 
 function validateImageDimensions(
@@ -49,6 +53,26 @@ function validateImageDimensions(
   if (minHeight && actual.height < minHeight) parts.push(`高度小于 ${minHeight}px`);
   if (maxWidth && actual.width > maxWidth) parts.push(`宽度大于 ${maxWidth}px`);
   if (maxHeight && actual.height > maxHeight) parts.push(`高度大于 ${maxHeight}px`);
+
+  if (options.widthOperator && typeof options.widthValue === 'number') {
+    const w = actual.width;
+    const v = options.widthValue;
+    if (options.widthOperator === '>' && !(w > v)) parts.push(`宽度不大于 ${v}px`);
+    else if (options.widthOperator === '<' && !(w < v)) parts.push(`宽度不小于 ${v}px`);
+    else if (options.widthOperator === '=' && w !== v) parts.push(`宽度不等于 ${v}px`);
+    else if (options.widthOperator === '≥' && !(w >= v)) parts.push(`宽度小于 ${v}px`);
+    else if (options.widthOperator === '≤' && !(w <= v)) parts.push(`宽度大于 ${v}px`);
+  }
+
+  if (options.heightOperator && typeof options.heightValue === 'number') {
+    const h = actual.height;
+    const v = options.heightValue;
+    if (options.heightOperator === '>' && !(h > v)) parts.push(`高度不大于 ${v}px`);
+    else if (options.heightOperator === '<' && !(h < v)) parts.push(`高度不小于 ${v}px`);
+    else if (options.heightOperator === '=' && h !== v) parts.push(`高度不等于 ${v}px`);
+    else if (options.heightOperator === '≥' && !(h >= v)) parts.push(`高度小于 ${v}px`);
+    else if (options.heightOperator === '≤' && !(h <= v)) parts.push(`高度大于 ${v}px`);
+  }
 
   if (parts.length === 0) return { valid: true, message: '' };
   return {
@@ -105,6 +129,10 @@ export interface FileUploadWidgetOptions {
   minHeight?: number;
   maxWidth?: number;
   maxHeight?: number;
+  widthOperator?: ">" | "=" | "<" | "≥" | "≤";
+  widthValue?: number;
+  heightOperator?: ">" | "=" | "<" | "≥" | "≤";
+  heightValue?: number;
 }
 
 export interface FileUploadWidgetProps {
@@ -150,9 +178,17 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
     minHeight: rawOptions.minHeight,
     maxWidth: rawOptions.maxWidth,
     maxHeight: rawOptions.maxHeight,
+    widthOperator: rawOptions.widthOperator,
+    widthValue: rawOptions.widthValue,
+    heightOperator: rawOptions.heightOperator,
+    heightValue: rawOptions.heightValue,
   };
 
-  const hasDimensionCheck = Object.values(dimensionOptions).some((v) => typeof v === 'number');
+  const hasDimensionCheck = Object.values(dimensionOptions).some((v) => typeof v === 'number') ||
+    Object.values({
+      wo: dimensionOptions.widthOperator,
+      ho: dimensionOptions.heightOperator,
+    }).some((v) => typeof v === 'string' && v.length > 0);
 
   const doUpload = useCallback(
     async (file: File, skipDimensionCheck = false) => {

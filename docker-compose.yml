@@ -29,6 +29,8 @@ services:
     build:
       context: .
       dockerfile: docker/agent-service/Dockerfile
+      args:
+        - DEBIAN_MIRROR=${DEBIAN_MIRROR:-http://mirrors.aliyun.com/debian}
     ports:
       - "3201:3201"
     environment:

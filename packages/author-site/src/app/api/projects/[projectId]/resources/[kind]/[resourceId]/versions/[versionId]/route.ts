@@ -11,6 +11,7 @@ import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import {
   createApiError,
   createApiSuccess,
+  createProjectVersionSnapshot,
   findWorkspacePath,
   getDataDir,
   getDemoDirPath,
@@ -130,6 +131,9 @@ function createRestorePageVersionOperations(input: {
     add("index.tsx", input.files.code);
   }
   add("config.schema.json", input.files.schema);
+  if (input.files.configValues) {
+    add("config.values.json", JSON.stringify(input.files.configValues, null, 2));
+  }
   return operations;
 }
 
@@ -331,9 +335,22 @@ export async function POST(
         if (error instanceof WorkspaceAuthorityClientError) return createMutationErrorResponse(error);
         throw error;
       }
+      updateWorkspaceDemoFiles(restoreWorkspaceId, params.resourceId, files);
+      const snapshotResult = createProjectVersionSnapshot(
+        params.projectId,
+        actor.name,
+        {
+          sessionId: body.sessionId,
+          note: `从页面版本 ${params.versionId} 恢复`,
+          type: "restore_snapshot",
+          sourceWorkspacePath: restoreWorkspacePath,
+        },
+      );
+      const newVersionId = snapshotResult.version?.versionId ?? params.versionId;
+      markWorkspaceBasedOnVersion(restoreWorkspaceId, newVersionId);
       return NextResponse.json(createApiSuccess({
         success: true,
-        newVersionId: params.versionId,
+        newVersionId,
         restoredAt: Date.now(),
         files,
       }));

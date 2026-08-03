@@ -330,6 +330,66 @@ export class ProjectApiClient {
   }
 
   /**
+   * 批量创建引用页
+   */
+  async createReferencePages(
+    projectId: string,
+    sourceProjectId: string,
+    sourcePageIds: string[],
+    sessionId: string,
+  ): Promise<DemoPageMeta[]> {
+    const response = await this.localRequest<DemoPageMeta[]>(
+      `/api/projects/${projectId}/reference-pages`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ sourceProjectId, sourcePageIds, sessionId }),
+      }
+    );
+    if (!response.success || !response.data) {
+      throw new Error(response.error?.message || '创建引用页失败');
+    }
+    return response.data;
+  }
+
+  /**
+   * 获取引用页内容（从源项目解析）
+   */
+  async getReferencePageContent(
+    projectId: string,
+    pageId: string,
+    sessionId: string,
+  ): Promise<{
+    code?: string;
+    schema?: string;
+    configData?: Record<string, unknown>;
+    runtimeType?: string;
+    prototypeHtml?: string;
+    prototypeCss?: string;
+    prototypeMeta?: Record<string, unknown>;
+    sketchScene?: string;
+    sketchMeta?: Record<string, unknown>;
+  }> {
+    const response = await this.localRequest<{
+      code?: string;
+      schema?: string;
+      configData?: Record<string, unknown>;
+      runtimeType?: string;
+      prototypeHtml?: string;
+      prototypeCss?: string;
+      prototypeMeta?: Record<string, unknown>;
+      sketchScene?: string;
+      sketchMeta?: Record<string, unknown>;
+    }>(
+      `/api/projects/${projectId}/reference-page/${pageId}?sessionId=${sessionId}`,
+      { method: 'GET' },
+    );
+    if (!response.success || !response.data) {
+      throw new Error(response.error?.message || '获取引用页内容失败');
+    }
+    return response.data;
+  }
+
+  /**
    * 修改 Demo 页面元数据（name / order / parentId）
    */
   async patchDemoPageMeta(

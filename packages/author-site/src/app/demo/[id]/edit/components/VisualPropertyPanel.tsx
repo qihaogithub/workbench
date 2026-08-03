@@ -94,7 +94,7 @@ interface VisualPropertyPanelProps {
   ) => void;
   onUpdateConfigMark: (
     markId: string,
-    patch: Partial<Pick<VisualConfigMark, "fieldTitle" | "fieldKey" | "defaultValue" | "category" | "scope">>,
+    patch: Partial<Pick<VisualConfigMark, "fieldTitle" | "fieldKey" | "defaultValue" | "category" | "scope" | "imageWidthOperator" | "imageWidthValue" | "imageHeightOperator" | "imageHeightValue">>,
   ) => void;
   onRemoveConfigMark: (markId: string) => void;
   onAiInstructionChange: (value: string) => void;
@@ -825,7 +825,10 @@ export function VisualPropertyPanel({
     value: string,
   ) => {
     const changeId = getChangeId(selectedNode, spec.property, spec.kind);
-    if (!getConfigMarkForSpec(spec)) {
+    const existing = getConfigMarkForSpec(spec);
+    if (existing) {
+      onUpdateConfigMark(existing.id, { defaultValue: value });
+    } else {
       onMarkConfig(selectedNode, spec.property, spec.label, value, spec.kind);
     }
     setEditingConfigChangeId(changeId);
@@ -981,7 +984,7 @@ export function VisualPropertyPanel({
 
   const renderConfigMarkDialog = () => {
     const mark = editingConfigMark;
-    const hasConflict = mark ? usedConfigKeys.includes(mark.fieldKey.trim()) : false;
+    const isImage = mark?.property === "src";
     return (
       <Dialog
         open={editingConfigChangeId !== null}
@@ -1016,25 +1019,6 @@ export function VisualPropertyPanel({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">字段 key</Label>
-                <Input
-                  value={mark.fieldKey}
-                  className={cn(
-                    "h-8 font-mono text-xs",
-                    hasConflict ? "border-destructive focus-visible:ring-destructive" : "",
-                  )}
-                  placeholder="字段标识"
-                  onChange={(event) =>
-                    onUpdateConfigMark(mark.id, { fieldKey: event.target.value })
-                  }
-                />
-                {hasConflict && (
-                  <p className="text-xs text-destructive">
-                    字段 key 与已有配置冲突，请调整后再发送。
-                  </p>
-                )}
-              </div>
-              <div className="space-y-1.5">
                 <Label className="text-xs">默认值</Label>
                 <Input
                   value={mark.defaultValue}
@@ -1045,6 +1029,83 @@ export function VisualPropertyPanel({
                   }
                 />
               </div>
+              {isImage && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs">尺寸限制</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex items-center gap-1">
+                      <span className="w-5 shrink-0 text-center text-xs font-medium text-muted-foreground">W</span>
+                      <Select
+                        value={mark.imageWidthOperator ?? " "}
+                        onValueChange={(value) =>
+                          onUpdateConfigMark(mark.id, {
+                            imageWidthOperator: (value === " " ? undefined : value) as VisualConfigMark["imageWidthOperator"],
+                          })
+                        }
+                      >
+                        <SelectTrigger className="h-8 w-16 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value=" ">-</SelectItem>
+                          <SelectItem value=">">{">"}</SelectItem>
+                          <SelectItem value="=">{"="}</SelectItem>
+                          <SelectItem value="<">{"<"}</SelectItem>
+                          <SelectItem value="≥">{"≥"}</SelectItem>
+                          <SelectItem value="≤">{"≤"}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={mark.imageWidthValue ?? ""}
+                        className="h-8 flex-1 font-mono text-xs"
+                        placeholder="px"
+                        onChange={(event) =>
+                          onUpdateConfigMark(mark.id, {
+                            imageWidthValue: event.target.value ? Number(event.target.value) : undefined,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="w-5 shrink-0 text-center text-xs font-medium text-muted-foreground">H</span>
+                      <Select
+                        value={mark.imageHeightOperator ?? " "}
+                        onValueChange={(value) =>
+                          onUpdateConfigMark(mark.id, {
+                            imageHeightOperator: (value === " " ? undefined : value) as VisualConfigMark["imageHeightOperator"],
+                          })
+                        }
+                      >
+                        <SelectTrigger className="h-8 w-16 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value=" ">-</SelectItem>
+                          <SelectItem value=">">{">"}</SelectItem>
+                          <SelectItem value="=">{"="}</SelectItem>
+                          <SelectItem value="<">{"<"}</SelectItem>
+                          <SelectItem value="≥">{"≥"}</SelectItem>
+                          <SelectItem value="≤">{"≤"}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={mark.imageHeightValue ?? ""}
+                        className="h-8 flex-1 font-mono text-xs"
+                        placeholder="px"
+                        onChange={(event) =>
+                          onUpdateConfigMark(mark.id, {
+                            imageHeightValue: event.target.value ? Number(event.target.value) : undefined,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="space-y-1.5">
                 <Label className="text-xs">分类</Label>
                 <Input

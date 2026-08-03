@@ -53,46 +53,6 @@ describe('PermissionManager', () => {
     it('对工作空间内普通文件的写操作应放行', () => {
       expect(manager.validateToolCall('writeFile', { path: 'demos/page.tsx' })).toBeUndefined();
     });
-
-    it('应拦截 writeFile 到被 config.ts 遮蔽的 config.schema.json', () => {
-      const result = manager.validateToolCall('writeFile', {
-        path: 'demos/page-1/config.schema.json',
-      });
-      expect(result).toEqual({
-        block: true,
-        reason: expect.stringContaining('config.ts'),
-      });
-    });
-
-    it('应拦截 editFile 到被 config.ts 遮蔽的 config.schema.json', () => {
-      const result = manager.validateToolCall('editFile', {
-        path: 'demos/page-1/config.schema.json',
-      });
-      expect(result).toEqual({
-        block: true,
-        reason: expect.stringContaining('config.ts'),
-      });
-    });
-
-    it('当 config.ts 不存在时应放行 writeFile 到 config.schema.json', () => {
-      (fs.existsSync as any).mockReturnValueOnce(false);
-      expect(
-        manager.validateToolCall('writeFile', {
-          path: 'demos/page-1/config.schema.json',
-        }),
-      ).toBeUndefined();
-    });
-
-    it('应拦截 readFile 到被遮蔽的 config.schema.json（应改读 config.ts）', () => {
-      expect(
-        manager.validateToolCall('readFile', {
-          path: 'demos/page-1/config.schema.json',
-        }),
-      ).toEqual({
-        block: true,
-        reason: 'Cannot read "demos/page-1/config.schema.json": this file is compiled from config.ts. Please edit "demos/page-1/config.ts" instead.',
-      });
-    });
   });
 
   describe('requestPermission / resolvePermission', () => {

@@ -84,6 +84,10 @@ export interface VisualConfigMark {
   defaultValue: string;
   category?: string;
   scope: "page" | "project";
+  imageWidthOperator?: ">" | "=" | "<" | "≥" | "≤";
+  imageWidthValue?: number;
+  imageHeightOperator?: ">" | "=" | "<" | "≥" | "≤";
+  imageHeightValue?: number;
 }
 
 export type VisualPropertySubmissionStatus =
@@ -417,6 +421,10 @@ function createPrototypeConfigTargetFromMark(
       title: mark.fieldTitle.trim(),
       defaultValue: mark.defaultValue,
       category: mark.category?.trim(),
+      imageWidthOperator: mark.imageWidthOperator,
+      imageWidthValue: mark.imageWidthValue,
+      imageHeightOperator: mark.imageHeightOperator,
+      imageHeightValue: mark.imageHeightValue,
     };
   }
   if (
@@ -773,7 +781,7 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
   );
 
   const handleUpdateVisualConfigMark = useCallback(
-    (markId: string, patch: Partial<Pick<VisualConfigMark, "fieldTitle" | "fieldKey" | "defaultValue" | "category" | "scope">>) => {
+    (markId: string, patch: Partial<Pick<VisualConfigMark, "fieldTitle" | "fieldKey" | "defaultValue" | "category" | "scope" | "imageWidthOperator" | "imageWidthValue" | "imageHeightOperator" | "imageHeightValue">>) => {
       setVisualConfigMarks((prev) =>
         prev.map((item) => (item.id === markId ? { ...item, ...patch } : item)),
       );

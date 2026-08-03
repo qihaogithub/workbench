@@ -236,3 +236,4 @@ export {
   isEditableTarget,
 } from "./canvas-clipboard";
 export type { CanvasClipboardData } from "./canvas-clipboard";
+export { PasteOptionsModal } from "./PasteOptionsModal";

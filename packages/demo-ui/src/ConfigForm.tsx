@@ -78,6 +78,46 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function computeFlattenPathMap(schema: string): Record<string, string> {
+  try {
+    const parsed = JSON.parse(schema);
+    const properties = parsed.properties;
+    if (!properties || typeof properties !== "object" || Array.isArray(properties)) return {};
+    const map: Record<string, string> = {};
+    for (const [key, prop] of Object.entries(properties)) {
+      const p = prop as any;
+      if (p?.type === "object" && p?.properties && typeof p.properties === "object" && !Array.isArray(p.properties)) {
+        if (p.$demo?.positionable) continue;
+        for (const nestedKey of Object.keys(p.properties)) {
+          map[nestedKey] = key;
+        }
+      }
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+function flattenInitialData(
+  data: Record<string, unknown>,
+  pathMap: Record<string, string>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  const parentKeys = new Set(Object.values(pathMap));
+  for (const [key, value] of Object.entries(data)) {
+    if (parentKeys.has(key) && isPlainRecord(value)) {
+      const nested = value as Record<string, unknown>;
+      for (const [nestedKey, nestedValue] of Object.entries(nested)) {
+        result[nestedKey] = nestedValue;
+      }
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
 function FieldGroupSection({
   group,
   formData,
@@ -96,6 +136,27 @@ function FieldGroupSection({
   onNoteClick: (fieldKey: string) => void;
 }) {
   const [open, setOpen] = useState(true);
+
+  if (group.title === "") {
+    return (
+      <div className="py-2">
+        <div className="space-y-1 px-2 pt-1 pb-1">
+          {group.fields.map((field) => (
+            <FieldRenderer
+              key={field.key}
+              field={field}
+              value={formData[field.key]}
+              onChange={(value) => onChange(field.key, value)}
+              sessionId={sessionId}
+              readonly={readonly}
+              onNoteClick={onNoteClick}
+              fieldPath={field.key}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="py-2">
@@ -150,12 +211,20 @@ export function ConfigForm({
   onTogglePositionDimming,
 }: ConfigFormProps) {
   const [formData, setFormData] = useState<Record<string, unknown>>(
-    initialData || {},
+    () => {
+      if (!initialData) return {};
+      const pathMap = computeFlattenPathMap(schema);
+      return flattenInitialData(initialData, pathMap);
+    },
   );
-  const formDataRef = useRef(formData);
-  formDataRef.current = formData;
 
   const [noteDialogField, setNoteDialogField] = useState<string | null>(null);
+
+  const flattenPathMap = useMemo(() => computeFlattenPathMap(schema), [schema]);
+  const flattenedInitialData = useMemo(
+    () => (initialData ? flattenInitialData(initialData, flattenPathMap) : undefined),
+    [initialData, flattenPathMap],
+  );
 
   console.log(
     "[ConfigForm] Rendered with schema length:",
@@ -247,11 +316,11 @@ export function ConfigForm({
   );
 
   useEffect(() => {
-    if (initialData && Object.keys(initialData).length > 0) {
+    if (flattenedInitialData && Object.keys(flattenedInitialData).length > 0) {
       setFormData((prev) => {
         const merged = { ...prev };
         let changed = false;
-        for (const [key, value] of Object.entries(initialData)) {
+        for (const [key, value] of Object.entries(flattenedInitialData)) {
           if (!(key in merged)) {
             merged[key] = value;
             changed = true;
@@ -261,44 +330,22 @@ export function ConfigForm({
         return merged;
       });
     }
-  }, [initialData]);
+  }, [flattenedInitialData]);
 
   useEffect(() => {
     console.log("[ConfigForm] Schema changed, reinitializing form...");
     if (schema) {
-      try {
-        const parsed = JSON.parse(schema);
-        console.log(
-          "[ConfigForm] Schema parsed successfully, keys:",
-          Object.keys(parsed.properties || {}),
-        );
-        const properties = parsed.properties || {};
-        const required = parsed.required || [];
-
-        const newDefaults: Record<string, unknown> = {};
-        Object.entries(properties).forEach(([key, prop]: [string, any]) => {
-          newDefaults[key] =
-            prop.default ?? (required.includes(key) ? "" : undefined);
-        });
-
-        console.log("[ConfigForm] New defaults from schema:", newDefaults);
-        setFormData((prev) => {
-          const merged = {
-            ...newDefaults,
-            ...prev,
-          };
-          if (areConfigRecordsEqual(prev, merged)) return prev;
-          console.log(
-            "[ConfigForm] Merged formData after schema change:",
-            merged,
-          );
-          return merged;
-        });
-      } catch (e) {
-        console.warn("[ConfigForm] Failed to parse schema for form reset:", e);
-      }
+      const newDefaults = buildEffectiveFormData(fieldGroups, {});
+      const hasDefaults = Object.keys(newDefaults).length > 0;
+      if (!hasDefaults) return;
+      setFormData((prev) => {
+        const merged = { ...newDefaults, ...prev };
+        if (areConfigRecordsEqual(prev, merged)) return prev;
+        console.log("[ConfigForm] Merged formData after schema change:", merged);
+        return merged;
+      });
     }
-  }, [schema]);
+  }, [schema, fieldGroups]);
 
   const handleFieldChange = useCallback(
     (key: string, value: unknown) => {

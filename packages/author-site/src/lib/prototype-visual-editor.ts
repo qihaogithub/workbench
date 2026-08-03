@@ -13,6 +13,10 @@ export interface PrototypeVisualConfigTarget {
   defaultValue: string;
   category?: string;
   colorProperty?: "color" | "backgroundColor" | "borderColor";
+  imageWidthOperator?: ">" | "=" | "<" | "≥" | "≤";
+  imageWidthValue?: number;
+  imageHeightOperator?: ">" | "=" | "<" | "≥" | "≤";
+  imageHeightValue?: number;
 }
 
 export type PrototypeVisualEditResult =
@@ -183,9 +187,23 @@ function createSchemaProperty(target: PrototypeVisualConfigTarget): Record<strin
   };
   if (target.kind === "image") property.format = "image";
   if (target.kind === "color") property.format = "color";
+  const uiOptions: Record<string, unknown> = {};
   const category = normalizeCategory(target.category);
   if (category) {
-    property["ui:options"] = { category };
+    uiOptions.category = category;
+  }
+  if (target.kind === "image") {
+    if (target.imageWidthOperator && typeof target.imageWidthValue === "number") {
+      uiOptions.widthOperator = target.imageWidthOperator;
+      uiOptions.widthValue = target.imageWidthValue;
+    }
+    if (target.imageHeightOperator && typeof target.imageHeightValue === "number") {
+      uiOptions.heightOperator = target.imageHeightOperator;
+      uiOptions.heightValue = target.imageHeightValue;
+    }
+  }
+  if (Object.keys(uiOptions).length > 0) {
+    property["ui:options"] = uiOptions;
   }
   return property;
 }

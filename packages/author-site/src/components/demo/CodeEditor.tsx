@@ -71,6 +71,7 @@ export function CodeEditor({
       extensions={extensions}
       theme={vscodeDark}
       height={height}
+      style={{ height: '100%' }}
       readOnly={readOnly}
       basicSetup={{
         lineNumbers: true,

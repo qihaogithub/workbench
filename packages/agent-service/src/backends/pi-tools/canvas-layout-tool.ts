@@ -6,8 +6,18 @@ import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type { AgentConfig } from '../../core/types';
 import { logger } from '../../utils/logger';
 import { resolveLiveWorkspaceMutationContext } from '../../workspace/workspace-mutation-authority';
+import {
+  WORKSPACE_TREE_FILENAME,
+  type WorkspacePage,
+  type WorkspaceTree,
+  isSafePageId,
+  getPageDir,
+  getWorkspaceTreePath,
+  isCompletePageDir,
+  readWorkspaceTree,
+  listPages,
+} from './workspace-page-utils';
 
-const WORKSPACE_TREE_FILENAME = 'workspace-tree.json';
 const CANVAS_LAYOUT_FILENAME = '.canvas-layout.json';
 const DEFAULT_PAGE_SIZE = { width: 375, height: 812 };
 const DEFAULT_VIEWPORT_SIZE = { width: 1440, height: 900 };
@@ -18,18 +28,6 @@ const AUTO_LAYOUT_GRID_SIZE = 8;
 const AUTO_LAYOUT_ROW_THRESHOLD_RATIO = 0.35;
 const AUTO_LAYOUT_MAX_ROW_THRESHOLD = 180;
 const AUTO_LAYOUT_COLUMN_ALIGN_THRESHOLD = 140;
-
-interface WorkspacePage {
-  id: string;
-  name: string;
-  order: number;
-  parentId: string | null;
-}
-
-interface WorkspaceTree {
-  folders: unknown[];
-  pages: WorkspacePage[];
-}
 
 interface PreviewSize {
   width?: number | string;
@@ -139,53 +137,12 @@ function getWorkingDir(config: AgentConfig): string | null {
   return config.workingDir ? path.resolve(config.workingDir) : null;
 }
 
-function getWorkspaceTreePath(workingDir: string): string {
-  return path.join(workingDir, WORKSPACE_TREE_FILENAME);
-}
-
 function getCanvasLayoutPath(workingDir: string): string {
   return path.join(workingDir, CANVAS_LAYOUT_FILENAME);
 }
 
-function getPageDir(workingDir: string, pageId: string): string {
-  return path.join(workingDir, 'demos', pageId);
-}
-
-function isSafePageId(pageId: string): boolean {
-  return /^[A-Za-z0-9_-]+$/.test(pageId) && !pageId.includes('..');
-}
-
-function isCompletePageDir(workingDir: string, pageId: string): boolean {
-  const pageDir = getPageDir(workingDir, pageId);
-  return (
-    fs.existsSync(pageDir) &&
-    fs.existsSync(path.join(pageDir, 'index.tsx')) &&
-    fs.existsSync(path.join(pageDir, 'config.schema.json'))
-  );
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function readWorkspaceTree(workingDir: string): WorkspaceTree {
-  const treePath = getWorkspaceTreePath(workingDir);
-  if (!fs.existsSync(treePath)) {
-    return { folders: [], pages: [] };
-  }
-
-  const parsed = JSON.parse(fs.readFileSync(treePath, 'utf-8')) as Partial<WorkspaceTree>;
-  return {
-    folders: Array.isArray(parsed.folders) ? parsed.folders : [],
-    pages: Array.isArray(parsed.pages) ? parsed.pages : [],
-  };
-}
-
-function listPages(workingDir: string): WorkspacePage[] {
-  const tree = readWorkspaceTree(workingDir);
-  return tree.pages
-    .filter((page) => isSafePageId(page.id) && isCompletePageDir(workingDir, page.id))
-    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
 }
 
 function readPreviewSize(workingDir: string, pageId: string): PreviewSize | undefined {

@@ -5,11 +5,17 @@ import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import Fastify from "fastify";
 
-const __filename = typeof __filename !== "undefined" ? __filename : fileURLToPath(import.meta.url);
-const __dirname = typeof __dirname !== "undefined" ? __dirname : path.dirname(fileURLToPath(import.meta.url));
+const currentFile =
+  typeof __filename !== "undefined"
+    ? __filename
+    : fileURLToPath(import.meta.url);
+const currentDir =
+  typeof __dirname !== "undefined"
+    ? __dirname
+    : path.dirname(currentFile);
 
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
-dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
+dotenv.config({ path: path.resolve(currentDir, "../.env") });
+dotenv.config({ path: path.resolve(currentDir, "../../../.env") });
 
 import {
   SqliteKnowledgeCatalog,
