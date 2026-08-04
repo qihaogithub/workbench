@@ -420,12 +420,13 @@ export function createCaptureScreenshotTool(
         const buffer = Buffer.from(await imageResponse.arrayBuffer());
         const base64 = buffer.toString("base64");
         const sizeKB = Math.round(buffer.length / 1024);
+        const screenshotUrl = `${serviceUrl}/api/screenshots/file/${projectId}/${demoId}`;
 
         return {
           content: [
             {
               type: "text" as const,
-              text: `Screenshot captured (${width}x${height}${fullPage ? ", full page" : ""}, ${sizeKB}KB).`,
+              text: `Screenshot captured (${width}x${height}${fullPage ? ", full page" : ""}, ${sizeKB}KB). URL: ${screenshotUrl}`,
             },
             {
               type: "image" as const,
@@ -440,6 +441,7 @@ export function createCaptureScreenshotTool(
             height,
             fullPage,
             sizeKB,
+            screenshotUrl,
             cached: result.data.cached ?? false,
             elapsed: result.data.elapsed,
             hash: result.data.hash,

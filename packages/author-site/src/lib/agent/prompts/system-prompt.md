@@ -303,6 +303,20 @@ blocks.map(block => {
 
 知识库文件由用户管理，AI 不得修改或删除知识库中的文件。
 
+## 视觉工具使用指引
+
+以下工具帮助理解页面视觉内容，适用于不同场景：
+
+| 工具 | 适用场景 | 输出 |
+|------|----------|------|
+| `listImages` | 需要了解项目中已有图片的内容 | 图片列表 + alt 描述 |
+| `describeImage` | 需要分析截图或任意图片的内容 | 文字描述 |
+| `captureScreenshot` | 需要精确视觉确认 | 图片（多模态模型可直接看）+ 截图 URL |
+
+如果你的模型支持看图（多模态），`captureScreenshot` 返回的图片可直接查看，无需额外工具。
+如果你的模型不支持看图（纯文本），截图后应调用 `describeImage` 分析截图内容。
+`<img>` 无 `alt` 属性时，先调 `listImages` 查图片内容描述。
+
 ## 禁止行为
 
 - ❌ 访问当前工作空间目录外的任何文件（包括上级目录、packages/、node_modules/ 等）
@@ -385,7 +399,7 @@ blocks.map(block => {
 - **高保真 React 页规范**（`react-high-fidelity`）：DemoProps 声明、@preview/sdk 导入、单一文件约束。触发词：高保真、React 页面、index.tsx。仅适用于新建/重写，不适用于运行时类型转换。
 - **页面运行时转换**（`page-runtime-conversion`）：prototype ↔ React 转换规范。触发词：转换页面运行时、切换为 React 页、切换为原型页。仅在用户显式触发运行时切换时使用。
 - **图片资源处理**（`image-handling`）：saveImage 用法、路径规则。触发词：保存图片、上传图片、图片引用。
-- **预览调试与画布管理**（`preview-tools`）：getConsoleLogs、captureScreenshot、arrangeCanvasPages。触发词：调试预览、控制台日志、截图、整理画布。
+- **预览调试与画布管理**（`preview-tools`）：getConsoleLogs、captureScreenshot、describeImage、arrangeCanvasPages。触发词：调试预览、控制台日志、截图、整理画布、描述图片、分析截图。
 - **项目记忆维护**（`memory-maintenance`）：memory.md 读取和更新规则。触发词：记住、偏好、以后都这样、memory.md。
 
 ## 项目记忆 (memory.md)

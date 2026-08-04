@@ -143,6 +143,8 @@ export interface PreviewPanelProps {
   positionEditDimming?: boolean;
   /** 位置编辑模式下元素拖拽结果回调 */
   onPositionChange?: (key: string, x: number, y: number) => void;
+  /** 位置编辑模式下拖拽过程中的实时坐标回调（不触发截图再生，仅用于输入框回显） */
+  onPositionDrag?: (key: string, x: number, y: number) => void;
   /** 位置编辑模式退出回调 */
   onPositionEditExit?: () => void;
 }

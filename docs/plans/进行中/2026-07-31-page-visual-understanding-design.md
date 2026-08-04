@@ -1,11 +1,14 @@
 # 页面视觉语义理解 — 设计文档
 
 > 日期：2026-07-31
-> 状态：已确认，待实施
+> 最后更新：2026-08-03
+> 状态：Phase A3 实施中
 
 ## 背景
 
 用户用视觉语言描述页面（"那个蓝色横幅"、"右下角按钮"），Agent 只能看到代码（`<img src="abc123-banner.png">`、`<div className="flex...">`），存在语义鸿沟。尤其当页面内容是大量图片时，纯代码无法让 Agent 准确理解页面。
+
+此外，纯文本模型无法直接"看到"截图和图片内容，需要视觉模型代劳理解。
 
 ## 目标
 
@@ -13,30 +16,31 @@
 
 ## 方案概述
 
-采用行业最佳实践组合：图片 `alt` 自动生成（Phase A）+ 无障碍树视图（Phase B），分两阶段落地。
+采用三阶段方案：
 
-两阶段天然衔接：Phase A 产生的 `alt` 文本在 Phase B 的无障碍树中自动表现为图片节点的 `name` 字段，Agent 无论走代码阅读还是走无障碍树视图，都能看到图片语义。
+- **Phase A：图片语义理解** — 图片保存时自动生成 alt、图片列表展示 alt、`describeImage` 工具让 AI 主动分析任意图片
+- **Phase B：无障碍树视图** — 用 `readPageStructure` 获取页面布局文本化视图
+- **Phase C：系统提示词** — 统一指引 Agent 何时使用哪个工具
 
 ```
 Phase A                          Phase B
 ━━━━━━━━━━━━━━━━━━━━            ━━━━━━━━━━━━━━━━━━━━
 saveImage(图片)                  readPageStructure(pageId)
-    │                                 │
-    ├─ 同步返回 URL                   ├─ 编译页面
-    └─ 异步 → 识图模型                ├─ Puppeteer 渲染
-            │                        ├─ CDP getFullAXTree
-            ▼                        └─ 压缩格式化
-        alt: "蓝色横幅"                     │
-            │                              ▼
-            └──────────────→    [image] 蓝色横幅，白字"欢迎"
-                               [button] 立即体验
-                               [heading 1] 我们的产品
-                               [text] 这是产品简介文字...
+describeImage(url)                  │
+    │                                 ├─ 编译页面
+    ├─ 调用视觉模型                     ├─ Puppeteer 渲染
+    ├─ 返回文字描述                     ├─ CDP getFullAXTree
+    │                                 └─ 压缩格式化
+    ▼                                       ▼
+alt: "蓝色横幅"              [image] 蓝色横幅，白字"欢迎"
+                             [button] 立即体验
+                             [heading 1] 我们的产品
+                             [text] 这是产品简介文字...
 ```
 
-## Phase A：图片 `alt` 自动生成
+## Phase A：图片语义理解
 
-### A1. `saveImage` 流程改造
+### A1. `saveImage` 流程改造（已实施）
 
 当前流程：
 ```
@@ -66,7 +70,7 @@ saveImage(base64/url/assetId)
 - 如果图片包含文字，引用原文
 ```
 
-### A2. `listImages` 增强
+### A2. `listImages` 增强（已实施）
 
 返回增加 `alt` 字段：
 
@@ -75,26 +79,61 @@ saveImage(base64/url/assetId)
 增强：{ hash, url, filename, mimeType, sourceType, alt: "蓝色横幅，白字'欢迎'" }
 ```
 
-### A3. 系统提示词更新
+### A3. `describeImage` 工具（本次实施）
 
-- **生成新页面时**：Agent 写入 `<img>` 必须带 `alt` 属性，值从 `saveImage` 返回或 `listImages` 查询获取
-- **读取现有页面时**：Agent 读到无 `alt` 的 `<img>`，先调 `listImages` 查图片内容
+新增工具 `describeImage(imageUrl)`，让 AI 能主动调用视觉模型分析任意图片。
 
-### A4. 存量图片回填
+#### 工具定义
 
-可选单次脚本：对现有项目中无 `alt` 的图片跑视觉模型补全。
+```typescript
+工具名: describeImage
+参数: { imageUrl: string }
+描述: "使用视觉模型分析图片内容，返回文字描述。适用于：纯文本模型无法直接看图时分析截图内容、识别图片中的文字和 UI 元素。"
+```
 
-### A5. 涉及文件
+#### 执行流程
+
+```
+AI 调用 describeImage({ imageUrl: "http://screenshot-service/..." })
+  ├── 1. 通过 imageUrl 下载图片
+  ├── 2. 构造 ImageAttachment
+  ├── 3. 调用 ImageDescriber.describe() 获取描述
+  └── 4. 返回文字描述
+```
+
+#### 条件注册
+
+- **主模型为多模态**（`input` 包含 `"image"`）：不注册 `describeImage`，模型直接看截图
+- **主模型为纯文本 + ImageDescriber 已配置视觉模型**：注册 `describeImage`，AI 可主动调用
+- **主模型为纯文本 + ImageDescriber 未配置**：不注册，无法看图
+
+#### 交互流程
+
+```
+多模态模型场景：
+  captureScreenshot → 返回 {type:"image"} + 截图 URL
+  → 模型直接看图片 → 回复用户
+
+纯文本模型场景：
+  captureScreenshot → 返回文字 + 截图 URL → 模型看不到图片
+  → 主动调用 describeImage({imageUrl:"..."}) → 视觉模型描述 → 回复用户
+```
+
+#### 涉及文件
 
 | 文件 | 改动 |
 |------|------|
-| `packages/agent-service/src/backends/pi-tools/save-image-tool.ts` | 增加异步 alt 生成逻辑 |
-| `packages/agent-service/src/backends/pi-tools/list-images-tool.ts` | 返回增加 `alt` 字段 |
-| `packages/agent-service/src/backends/pi-tools/project-image-manifest.ts` | 元数据增加 `alt` 字段 |
-| `packages/agent-service/src/services/image-describer.ts` | 复用，无需改动 |
-| `packages/author-site/src/lib/agent/prompts/system-prompt.md` | 增加 `<img alt>` 规则 |
+| `packages/agent-service/src/backends/pi-tools/describe-image-tool.ts` | 新建，工具实现 |
+| `packages/agent-service/src/backends/pi-tools/index.ts` | 条件注册新工具 |
+| `packages/agent-service/src/backends/pi-tools/screenshot-tool.ts` | 返回截图 URL |
+| `packages/agent-service/src/backends/pi-agent.ts` | 根据模型能力传入 ImageDescriber |
+| `packages/author-site/src/lib/agent/prompts/system-prompt.md` | 增加视觉工具指引 |
 
-## Phase B：无障碍树工具 `readPageStructure`
+### A4. 系统提示词更新（本次实施）
+
+参见系统提示词调整章节。
+
+## Phase B：无障碍树工具 `readPageStructure`（待实施）
 
 ### B1. 工具定义
 
@@ -196,34 +235,45 @@ screenshot-service POST /api/accessibility/:projectId/:pageId
 
 ## 系统提示词调整
 
-三个视觉相关工具的定位在系统提示词中明确区分：
+### 视觉工具使用指引
+
+在系统提示词中新增段落，明确三种视觉相关工具的定位：
 
 | 工具 | 适用场景 | 输出 |
 |------|----------|------|
-| `readFile(index.tsx)` | 需要读代码逻辑、修改代码 | 完整源码 |
-| `readPageStructure(pageId)` | 需要快速了解页面布局和元素 | 结构化文本 ~500 token |
-| `captureScreenshot` | 需要精确视觉确认、检查样式细节 | base64 图片 |
+| `listImages` | 需要了解项目中已有图片的内容 | 图片列表 + alt 描述 |
+| `describeImage` | 需要分析截图或任意图片的内容 | 文字描述 |
+| `captureScreenshot` | 需要精确视觉确认 | 图片（多模态模型可直接看）+ 截图 URL |
 
 Agent 行为指引：
-- 用户描述视觉特征（"那个蓝色按钮"、"第一张图"）→ 先调 `readPageStructure`
+- 如果你的模型支持看图（多模态），`captureScreenshot` 返回的图片可直接查看，无需额外工具
+- 如果你的模型不支持看图（纯文本），截图后应调用 `describeImage` 分析截图内容
 - `<img>` 无 `alt` 属性 → 调 `listImages` 查图片内容描述
-- 需要精确定位或颜色/间距等细节 → 调 `captureScreenshot` 查看实际渲染
+
+### 按需 Skill 更新
+
+`preview-tools` 描述增加 `describeImage`：
+- **预览调试与画布管理**（`preview-tools`）：getConsoleLogs、captureScreenshot、describeImage、arrangeCanvasPages。触发词：调试预览、控制台日志、截图、整理画布、描述图片、分析截图。
 
 ## 兼容性与破坏性变更
 
 - 无破坏性变更
 - 对已有 Agent 行为透明：新增工具，不修改已有工具签名
 - 截图工具 `captureScreenshot` 保留作为视觉确认兜底
+- `describeImage` 工具在纯文本模型下注册，多模态模型下不注册
 
 ## 验证方式
 
 | 阶段 | 验证 |
 |------|------|
-| Phase A | `pnpm check:agent` + 单元测试验证 `saveImage` 异步 alt 生成 + `listImages` 返回 alt |
+| Phase A1/A2 | `pnpm check:agent` + 单元测试验证 `saveImage` 异步 alt 生成 + `listImages` 返回 alt |
+| Phase A3 | `pnpm check:agent` + 验证 `describeImage` 工具注册/描述准确性 |
 | Phase B | `pnpm check:screenshot` + `pnpm check:agent` + 集成测试验证 `readPageStructure` 端到端流程 |
 
 ## 实施顺序
 
-1. Phase A：`alt` 自动生成
-2. Phase B：`readPageStructure` 工具
-3. 系统提示词更新（两阶段统一调整）
+1. ✅ Phase A1：`alt` 自动生成（已实施）
+2. ✅ Phase A2：`listImages` 增强（已实施）
+3. 🔄 Phase A3：`describeImage` 工具（实施中）
+4. 🔄 Phase A4：系统提示词更新（实施中）
+5. ⏳ Phase B：`readPageStructure` 工具（待实施）

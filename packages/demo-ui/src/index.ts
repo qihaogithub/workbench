@@ -173,7 +173,6 @@ export {
   customWidgets,
   ColorPickerWidget,
   FileUploadWidget,
-  RichTextWidget,
 } from "./widgets";
 export type { FileUploadWidgetOptions, FileUploadWidgetProps } from "./widgets";
 export { ImageListWidget } from "./ImageListWidget";

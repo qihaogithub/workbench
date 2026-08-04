@@ -533,6 +533,7 @@ export function createWriteFileTool(
           args.path,
           args.content,
           resolvePageRuntimeType(args.path, snapshot?.resources),
+          (receipt as { revision?: number } | null)?.revision,
         );
         logger.debug({ path: args.path }, "File written successfully");
 

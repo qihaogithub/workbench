@@ -30,7 +30,6 @@ export {
   customWidgets,
   ColorPickerWidget,
   FileUploadWidget,
-  RichTextWidget,
   ImageListWidget,
   getCachedCompile,
   setCachedCompile,

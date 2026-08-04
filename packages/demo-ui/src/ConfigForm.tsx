@@ -321,7 +321,7 @@ export function ConfigForm({
         const merged = { ...prev };
         let changed = false;
         for (const [key, value] of Object.entries(flattenedInitialData)) {
-          if (!(key in merged)) {
+          if (!(key in merged) || !areConfigValuesEqual(merged[key], value)) {
             merged[key] = value;
             changed = true;
           }

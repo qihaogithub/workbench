@@ -61,6 +61,7 @@ export interface RuntimeContractIssue {
   importName?: string;
   message: string;
   instruction: string;
+  sourceRevision?: number;
 }
 
 export interface RuntimeContractValidation {
@@ -388,21 +389,86 @@ function diagnosticMessageTextToString(message: ts.Diagnostic["messageText"]): s
     : ts.flattenDiagnosticMessageText(message, "\n");
 }
 
-function createCompileIssue(message: string): RuntimeContractIssue {
+function createCompileIssue(message: string, suggestion?: string): RuntimeContractIssue {
+  const instruction = suggestion || '请修复 TSX/JSX 语法错误，保留一个完整的 React 组件模块后重新生成。';
   return {
     stage: "compile_transform",
     code: "COMPILE_TRANSFORM_FAILED",
     severity: "error",
     message: `页面源码无法完成 TSX/JSX 转换：${message}`,
-    instruction: "请修复 TSX/JSX 语法错误，保留一个完整的 React 组件模块后重新生成。",
+    instruction,
   };
 }
 
-export function createCompileTransformIssue(error: unknown): RuntimeContractIssue {
+export interface CompileErrorContext {
+  source?: string;
+  sourceName?: string;
+}
+
+export function createCompileTransformIssue(
+  error: unknown,
+  context?: CompileErrorContext,
+): RuntimeContractIssue {
   if (error instanceof Error && error.message.trim()) {
-    return createCompileIssue(error.message.trim());
+    const rawMessage = error.message.trim();
+    const enriched = enrichCompileError(rawMessage, context);
+    return createCompileIssue(enriched.message, enriched.suggestion);
   }
   return createCompileIssue("未知编译错误");
+}
+
+function enrichCompileError(
+  rawMessage: string,
+  context?: CompileErrorContext,
+): { message: string; suggestion: string } {
+  const lineMatch = rawMessage.match(/\((\d+):(\d+)\)$/);
+  const line = lineMatch ? parseInt(lineMatch[1], 10) : undefined;
+  const col = lineMatch ? parseInt(lineMatch[2], 10) : undefined;
+
+  let suggestion = '';
+  let category = '';
+
+  if (/Unexpected token/i.test(rawMessage)) {
+    category = '语法错误';
+    suggestion = '检查 JSX 标签是否闭合、大括号 {} 是否匹配、引号是否正确嵌套。';
+  } else if (/Cannot find name/i.test(rawMessage)) {
+    category = '未定义标识符';
+    suggestion = '检查变量名拼写，确认变量已在作用域内声明或导入。';
+  } else if (/Duplicate identifier/i.test(rawMessage)) {
+    category = '重复声明';
+    suggestion = '移除重复的声明，确保每个变量名只声明一次。';
+  } else if (/Cannot find module/i.test(rawMessage)) {
+    category = '模块未找到';
+    suggestion = '检查导入路径是否正确，确认模块名称拼写无误。';
+  } else if (/Expected.*corresponding/i.test(rawMessage) || /JSX.*closing/i.test(rawMessage)) {
+    category = 'JSX 标签不匹配';
+    suggestion = '检查 JSX 标签的闭合关系，确保每个开始标签都有对应的结束标签。';
+  } else if (/Expected.*from/i.test(rawMessage) || /Expected.*import/i.test(rawMessage)) {
+    category = '导入语句错误';
+    suggestion = '检查 import 语句格式，确保使用了正确的导入语法。';
+  } else if (/Type.*not assignable/i.test(rawMessage)) {
+    category = '类型不匹配';
+    suggestion = '检查变量或属性类型是否与预期类型一致。';
+  }
+
+  let codeContext = '';
+  if (context?.source && line) {
+    const lines = context.source.split('\n');
+    const start = Math.max(0, line - 4);
+    const end = Math.min(lines.length, line + 2);
+    const snippet = lines.slice(start, end).map((l, i) => {
+      const lineNum = start + i + 1;
+      const marker = lineNum === line ? ' >' : '  ';
+      return `${marker} ${lineNum} | ${l}`;
+    }).join('\n');
+    codeContext = `\n\n上下文代码：\n${snippet}`;
+  }
+
+  const tag = category ? `[${category}] ` : '';
+  return {
+    message: `${tag}${rawMessage}${codeContext}`,
+    suggestion: suggestion || '请修复 TSX/JSX 语法错误，保留一个完整的 React 组件模块后重新生成。',
+  };
 }
 
 function createModuleParseIssue(message: string): RuntimeContractIssue {

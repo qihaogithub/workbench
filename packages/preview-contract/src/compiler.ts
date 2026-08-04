@@ -5,6 +5,7 @@ import {
   assertPreviewRuntimeContract,
   assertCompiledPreviewModule,
   createCompileTransformIssue,
+  type CompileErrorContext,
   extractImports,
   PreviewRuntimeContractError,
   rewriteImportsWithResolver,
@@ -62,7 +63,8 @@ export function compilePreviewPageSource(
       production: true,
     });
   } catch (error) {
-    throw new PreviewRuntimeContractError([createCompileTransformIssue(error)]);
+    const context: CompileErrorContext = { source: wrappedSource };
+    throw new PreviewRuntimeContractError([createCompileTransformIssue(error, context)]);
   }
   const dependencies = extractImports(transformed.code);
   const cssImports = dependencies.filter(isCssImport);

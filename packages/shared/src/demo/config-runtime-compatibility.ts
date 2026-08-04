@@ -21,7 +21,7 @@ function isUnsupportedType(type: unknown): type is string {
 
 function isUnsupportedUiWidget(uiWidget: unknown): uiWidget is string {
   return typeof uiWidget === 'string' && (
-    uiWidget === 'imageList' || uiWidget === 'richtext' || uiWidget === 'cascade'
+    uiWidget === 'imageList' || uiWidget === 'cascade'
   );
 }
 
