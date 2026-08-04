@@ -719,12 +719,25 @@ export function AssistantMessage({
 
         if (block.type === "image") {
           return (
-            <img
-              key={`image-${index}`}
-              src={block.url}
-              alt={block.alt}
-              className="max-w-full rounded-md"
-            />
+            <Dialog key={`image-dialog-${index}`}>
+              <DialogTrigger asChild>
+                <img
+                  src={block.url}
+                  alt={block.alt}
+                  className="max-h-72 max-w-full cursor-zoom-in rounded-md object-contain"
+                />
+              </DialogTrigger>
+              <DialogContent
+                aria-describedby={undefined}
+                className="grid max-h-[88vh] w-auto max-w-[92vw] place-items-center gap-0 overflow-hidden border-0 bg-background/95 p-4"
+              >
+                <img
+                  src={block.url}
+                  alt={block.alt}
+                  className="max-h-[84vh] max-w-[88vw] rounded-md object-contain"
+                />
+              </DialogContent>
+            </Dialog>
           );
         }
 
