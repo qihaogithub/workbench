@@ -5,7 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Select,
   SelectContent,
@@ -23,8 +23,15 @@ import { MultiSelect } from "./MultiSelect";
 import { CascadeSelect } from "./CascadeSelect";
 import type { FieldConfig } from "./schema-parser";
 import { createContext, useContext, useMemo } from "react";
-import { Pencil } from "lucide-react";
+import { Check, Edit3, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { DocumentEditor } from "./DocumentEditor";
 
 export interface PositionFieldEntry {
   posKey: string;
@@ -126,18 +133,6 @@ export function FieldRenderer({
           sessionId={sessionId}
           options={field.uiOptions as any}
           defaultValue={normalizeImageDefaults(field.default)}
-        />
-      );
-    }
-
-    if (field.uiWidget === "richtext") {
-      return (
-        <Textarea
-          value={(value as string) || ""}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={`请输入${field.title}`}
-          rows={5}
-          className="resize-y min-h-[100px]"
         />
       );
     }
@@ -321,9 +316,52 @@ export function FieldRenderer({
                 onValueChange={(vals: number[]) => onChange(vals[0])}
               />
             </div>
+</div>
+  );
+}
+
+function RichTextInput({
+  value,
+  onChange,
+  field,
+  readonly,
+}: {
+  value: unknown;
+  onChange: (value: unknown) => void;
+  field: FieldConfig;
+  readonly?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setOpen(true)}
+        disabled={readonly}
+      >
+        <Edit3 className="h-3 w-3 mr-1" />
+        编辑
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{field.title}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0">
+            <DocumentEditor
+              value={(value as string) || ""}
+              onChange={(v) => onChange(v)}
+              format="markdown"
+              readOnly={readonly}
+            />
           </div>
-        );
-      }
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
 
       return (
         <Input
@@ -379,6 +417,29 @@ export function FieldRenderer({
       );
     }
 
+    if (field.type === "richtext") {
+      return (
+        <RichTextInput
+          value={value}
+          onChange={onChange}
+          field={field}
+          readonly={readonly}
+        />
+      );
+    }
+
+    if (field.type === "text") {
+      return (
+        <Textarea
+          value={(value as string) || ""}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={`请输入${field.title}`}
+          rows={3}
+          className="resize-y min-h-[80px]"
+        />
+      );
+    }
+
     if (field.maxLength && field.maxLength > 100) {
       return (
         <Textarea
@@ -419,14 +480,15 @@ export function FieldRenderer({
     field.uiWidget === "file" ||
     field.uiWidget === "image" ||
     field.uiWidget === "imageList" ||
-    field.uiWidget === "richtext" ||
     field.format === "image" ||
     field.type === "array" ||
+    field.type === "richtext" ||
+    field.type === "text" ||
     (field.maxLength !== undefined && field.maxLength > 100) ||
     !!field.positionable;
 
   const isTextareaField =
-    field.uiWidget === "richtext" ||
+    field.type === "text" ||
     (field.maxLength !== undefined && field.maxLength > 100);
 
   const hasNote = !embedded && !!field.note && !!stripHtml(field.note);
@@ -527,17 +589,76 @@ function PositionFieldInput({
           max={containerHeight > 0 ? containerHeight : undefined}
         />
       </div>
-      {posConfig && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-6 text-xs px-2 shrink-0"
-          onClick={() => posConfig.requestPositionEdit()}
-        >
-          <Pencil className="h-3 w-3 mr-1" />
-          拖动
-        </Button>
-      )}
+      {posConfig && (() => {
+        const isEditing = posConfig.positionEditActive;
+        return (
+          <>
+            <Button
+              variant={isEditing ? "default" : "outline"}
+              size="sm"
+              className="h-6 text-xs px-2 shrink-0"
+              onClick={() => isEditing ? posConfig.exitPositionEdit() : posConfig.requestPositionEdit()}
+            >
+              {isEditing ? <Check className="h-3 w-3 mr-1" /> : <Pencil className="h-3 w-3 mr-1" />}
+              {isEditing ? "完成" : "拖动"}
+            </Button>
+            {isEditing && posConfig.onToggleDimming && (
+              <label className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer shrink-0 select-none">
+                <input
+                  type="checkbox"
+                  checked={posConfig.dimming}
+                  onChange={posConfig.onToggleDimming}
+                  className="h-3 w-3"
+                />
+                透明
+              </label>
+            )}
+          </>
+        );
+      })()}
+    </div>
+  );
+}
+
+function RichTextInput({
+  value,
+  onChange,
+  field,
+  readonly,
+}: {
+  value: unknown;
+  onChange: (value: unknown) => void;
+  field: FieldConfig;
+  readonly?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setOpen(true)}
+        disabled={readonly}
+      >
+        <Edit3 className="h-3 w-3 mr-1" />
+        编辑
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{field.title}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0">
+            <DocumentEditor
+              value={(value as string) || ""}
+              onChange={(v) => onChange(v)}
+              format="markdown"
+              readOnly={readonly}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

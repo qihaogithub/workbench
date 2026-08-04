@@ -234,7 +234,23 @@ export class PiAgentBackend implements IBackendAdapter {
       this.sessionRepo = new InMemorySessionRepoCtor();
       this.session = await this.sessionRepo.create();
 
-      // 3. 创建工具（传入 deletePage 权限确认回调 + 计划审批回调 + 子 Agent runner）
+      // 3. 获取模型
+      const model = this.modelManager.getModel();
+      const resources = { skills: getPreinstalledSkills() };
+
+      logger.info(
+        { modelId: model.id, provider: model.provider, baseUrl: model.baseUrl },
+        "Pi Agent model configured",
+      );
+
+      // 4. 创建工具（传入 deletePage 权限确认回调 + 计划审批回调 + 子 Agent runner + 识图工具）
+      const modelSupportsImages =
+        Array.isArray(model?.input) && model.input.includes("image");
+      const imageDescriber =
+        !modelSupportsImages && this.imageDescriber.isAvailable()
+          ? this.imageDescriber
+          : undefined;
+
       const tools = createWorkbenchTools(
         this.config,
         this.permissionManager.requestPermission,
@@ -244,16 +260,8 @@ export class PiAgentBackend implements IBackendAdapter {
           subagentRunner: (params, signal) => this.runSubagent(params, signal),
           planApprovalHandler: this.permissionManager.requestPlanApproval,
           userChoiceHandler: this.userInteractionManager.requestUserChoice,
+          imageDescriber,
         },
-      );
-
-      // 4. 获取模型
-      const model = this.modelManager.getModel();
-      const resources = { skills: getPreinstalledSkills() };
-
-      logger.info(
-        { modelId: model.id, provider: model.provider, baseUrl: model.baseUrl },
-        "Pi Agent model configured",
       );
 
       // 5. 创建 AgentHarness

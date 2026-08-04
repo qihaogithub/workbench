@@ -278,6 +278,7 @@ function PreviewPanelInternal({
   positionEditMode,
   positionEditDimming,
   onPositionChange,
+  onPositionDrag,
   onPositionEditExit,
 }: PreviewPanelProps) {
   console.count("[perf] PreviewPanel render");
@@ -1296,6 +1297,16 @@ function PreviewPanelInternal({
           }
           break;
 
+        case "POSITION_DRAG":
+          if (typeof event.data?.key === "string") {
+            onPositionDrag?.(
+              event.data.key,
+              Number(event.data.x) || 0,
+              Number(event.data.y) || 0,
+            );
+          }
+          break;
+
         case "POSITION_CHANGE":
           if (typeof event.data?.key === "string") {
             onPositionChange?.(
@@ -1698,6 +1709,7 @@ function arePreviewPanelPropsEqual(
     prev.positionEditMode === next.positionEditMode &&
     prev.positionEditDimming === next.positionEditDimming &&
     prev.onPositionChange === next.onPositionChange &&
+    prev.onPositionDrag === next.onPositionDrag &&
     prev.onPositionEditExit === next.onPositionEditExit
   );
 }

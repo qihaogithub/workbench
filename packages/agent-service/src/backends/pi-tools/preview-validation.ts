@@ -24,6 +24,7 @@ interface ToolRuntimeValidationIssue {
   severity: 'error' | 'warning';
   moduleName?: string;
   importName?: string;
+  sourceRevision?: number;
 }
 
 export interface ToolRuntimeValidation {
@@ -59,7 +60,13 @@ export function formatRuntimeValidationInstruction(
         : ''
     : '';
 
-  return `\n\nPreview validation failed. Continue fixing this page before ending the task:${gateInstruction}\n${JSON.stringify(runtimeValidation, null, 2)}`;
+  const errorCount = runtimeValidation.issues.filter((i) => i.severity === 'error').length;
+  const warningCount = runtimeValidation.issues.filter((i) => i.severity === 'warning').length;
+  const scopeNote = errorCount > 1
+    ? `\n\n⚠️ 当前存在 ${errorCount} 个错误、${warningCount} 个警告。请优先修复原始问题，避免扩大修改范围。`
+    : '';
+
+  return `\n\nPreview validation failed. Continue fixing this page before ending the task:${gateInstruction}${scopeNote}\n${JSON.stringify(runtimeValidation, null, 2)}`;
 }
 
 function getDemoFileInfo(filePath: string): { pageId: string; fileName: string } | undefined {
@@ -73,8 +80,10 @@ function normalizePath(filePath: string): string {
   return filePath.split('\\').join('/');
 }
 
-function toToolIssue(file: string, pageId: string, issue: RuntimeContractIssue): ToolRuntimeValidationIssue {
-  return { ...issue, pageId, file };
+function toToolIssue(file: string, pageId: string, issue: RuntimeContractIssue, sourceRevision?: number): ToolRuntimeValidationIssue {
+  const result: ToolRuntimeValidationIssue = { ...issue, pageId, file };
+  if (sourceRevision !== undefined) result.sourceRevision = sourceRevision;
+  return result;
 }
 
 const MAX_PROTOTYPE_HTML_LENGTH = 2_000_000;
@@ -221,6 +230,7 @@ export function validatePreviewFileWrite(
   filePath: string,
   content: string,
   runtimeType?: string,
+  sourceRevision?: number,
 ): ToolRuntimeValidation | undefined {
   const normalizedPath = normalizePath(filePath);
   const demoFile = getDemoFileInfo(normalizedPath);
@@ -238,24 +248,24 @@ export function validatePreviewFileWrite(
           ok: false,
           file: normalizedPath,
           pageId,
-          issues: error.issues.map((issue) => toToolIssue(normalizedPath, pageId, issue)),
+          issues: error.issues.map((issue) => toToolIssue(normalizedPath, pageId, issue, sourceRevision)),
         };
       }
+      const inlineIssue: ToolRuntimeValidationIssue = {
+        file: normalizedPath,
+        pageId,
+        stage: 'compile_transform',
+        code: 'COMPILE_TRANSFORM_FAILED',
+        severity: 'error',
+        message: error instanceof Error ? error.message : '页面源码编译失败',
+        instruction: '请修复 TSX/JSX 语法错误，保留一个完整的 React 组件模块后重新生成。',
+      };
+      if (sourceRevision !== undefined) inlineIssue.sourceRevision = sourceRevision;
       return {
         ok: false,
         file: normalizedPath,
         pageId,
-        issues: [
-          {
-            file: normalizedPath,
-            pageId,
-            stage: 'compile_transform',
-            code: 'COMPILE_TRANSFORM_FAILED',
-            severity: 'error',
-            message: error instanceof Error ? error.message : '页面源码编译失败',
-            instruction: '请修复 TSX/JSX 语法错误，保留一个完整的 React 组件模块后重新生成。',
-          },
-        ],
+        issues: [inlineIssue],
       };
     }
   }

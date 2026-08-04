@@ -18,6 +18,7 @@ export type IframeOutMessageType =
   | 'COMMENT_VIEW_STATE'
   | 'ELEMENT_LOCATION_RESULT'
   | 'POSITION_CHANGE'
+  | 'POSITION_DRAG'
   | 'POSITION_EDIT_READY';
 
 /** 父窗口 → iframe 消息类型 */

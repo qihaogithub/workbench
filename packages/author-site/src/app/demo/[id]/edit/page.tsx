@@ -771,43 +771,19 @@ function getSchemaGroupKeys(schema: string): Set<string> {
 function flattenNestedDelta(
   data: Record<string, unknown>,
   schema: string,
-  nestedPriority = false,
 ): Record<string, unknown> {
   const groupKeys = getSchemaGroupKeys(schema);
   const result: Record<string, unknown> = {};
-
-  if (nestedPriority) {
-    // 旧格式向后兼容：嵌套值是实际用户修改，扁平值是残留的 Schema 默认值
-    for (const groupKey of groupKeys) {
-      const groupVal = data[groupKey];
-      if (groupVal && typeof groupVal === "object" && !Array.isArray(groupVal)) {
-        Object.assign(result, groupVal as Record<string, unknown>);
-      }
-    }
-    for (const [key, value] of Object.entries(data)) {
-      if (groupKeys.has(key)) continue;
-      if (!(key in result)) {
-        result[key] = value;
-      }
-    }
-  } else {
-    // 新格式/合并态：扁平值优先，嵌套值仅填充空缺
-    for (const [key, value] of Object.entries(data)) {
-      if (groupKeys.has(key)) continue;
-      result[key] = value;
-    }
-    for (const groupKey of groupKeys) {
-      const groupVal = data[groupKey];
-      if (groupVal && typeof groupVal === "object" && !Array.isArray(groupVal)) {
-        for (const [nestedKey, nestedValue] of Object.entries(groupVal as Record<string, unknown>)) {
-          if (!(nestedKey in result)) {
-            result[nestedKey] = nestedValue;
-          }
-        }
-      }
+  for (const groupKey of groupKeys) {
+    const groupVal = data[groupKey];
+    if (groupVal && typeof groupVal === "object" && !Array.isArray(groupVal)) {
+      Object.assign(result, groupVal as Record<string, unknown>);
     }
   }
-
+  Object.assign(result, data);
+  for (const groupKey of groupKeys) {
+    delete result[groupKey];
+  }
   return result;
 }
 
@@ -3619,14 +3595,12 @@ ${context.details}
               ...allDefaults[pageId],
               ...loadedProjectConfigValues,
             };
-            if (demo.configValues) {
-              const flatPageConfig = demo.schema
-                ? flattenNestedDelta(demo.configValues, demo.schema, true)
-                : demo.configValues;
-              allDefaults[pageId] = {
-                ...allDefaults[pageId],
-                ...flatPageConfig,
-              };
+            allDefaults[pageId] = {
+              ...allDefaults[pageId],
+              ...(demo.configValues ?? {}),
+            };
+            if (demo.schema) {
+              allDefaults[pageId] = flattenNestedDelta(allDefaults[pageId], demo.schema);
             }
             schemas[pageId] = demo.schema;
             codes[pageId] = demo.code;
@@ -3790,9 +3764,9 @@ ${context.details}
     (pageId: string, data: Record<string, unknown>) => {
       invalidatePageScreenshot(pageId);
       const schema = pageSchemaMapRef.current[pageId];
-      const dataClean = schema ? flattenNestedDelta(data, schema, false) : data;
+      const dataClean = schema ? flattenNestedDelta(data, schema) : data;
       const prevClean = schema
-        ? flattenNestedDelta(configDataMapRef.current[pageId] ?? {}, schema, true)
+        ? flattenNestedDelta(configDataMapRef.current[pageId] ?? {}, schema)
         : (configDataMapRef.current[pageId] ?? {});
       const nextPageConfig = { ...prevClean, ...dataClean };
       persistPageConfigValues(pageId, nextPageConfig);
@@ -3837,6 +3811,20 @@ ${context.details}
       const currentConfig = configDataMapRef.current[pageId] || {};
       const newConfig = setNestedValue(currentConfig, fieldPath, { x, y });
       handlePageConfigPanelChangeRef.current(pageId, newConfig);
+    },
+    [],
+  );
+
+  const handlePositionDrag = useCallback(
+    (key: string, x: number, y: number) => {
+      const pageId = activeDemoIdRef.current;
+      if (!pageId) return;
+      const fieldPath = posKeyMapRef.current[key];
+      if (!fieldPath) return;
+      setConfigDataMap((prev) => {
+        const currentConfig = prev[pageId] || {};
+        return { ...prev, [pageId]: setNestedValue(currentConfig, fieldPath, { x, y }) };
+      });
     },
     [],
   );
@@ -6442,7 +6430,7 @@ ${context.details}
       (version): HistoryEvent => ({
         id: `page-${version.demoId}-${version.versionId}`,
         kind: "page",
-        title: `修改了${version.demoName || version.demoId}`,
+        title: version.note || `修改了${version.demoName || version.demoId}`,
         savedAt: version.savedAt,
         version,
       }),
@@ -7748,6 +7736,7 @@ ${context.details}
                       positionEditMode,
                       positionEditDimming,
                       onPositionChange: handlePositionChange,
+                      onPositionDrag: handlePositionDrag,
                       onPositionEditExit: handleExitPositionEdit,
                     },
                   },

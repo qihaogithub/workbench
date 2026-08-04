@@ -110,7 +110,7 @@ export class ImageDescriber {
   }
 
   isAvailable(): boolean {
-    return this.config.enabled;
+    return this.config.enabled && !!this.config.visionModelId;
   }
 
   getConfig(): ImageDescriberConfig {

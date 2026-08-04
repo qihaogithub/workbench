@@ -1585,6 +1585,7 @@ export const positionEditScript = `
   var editPositions = {};
   var dimming = true;
   var dragTarget = null;
+  var _lastPosDragSend = 0;
   var dragStartX = 0;
   var dragStartY = 0;
   var dragOrigLeft = 0;
@@ -1715,7 +1716,7 @@ export const positionEditScript = `
       if (el.id === 'root') continue;
       if (el.hasAttribute('data-pos-key')) continue;
       if (el.querySelector('[data-pos-key]')) continue;
-      el.style.setProperty('opacity', '0.3', 'important');
+      el.style.setProperty('opacity', '0.5', 'important');
       el.classList.add('pos-dimmed');
     }
   }
@@ -1854,6 +1855,20 @@ export const positionEditScript = `
     var offsetX = result.constrainedLeft - dragOrigLeft;
     var offsetY = result.constrainedTop - dragOrigTop;
     dragTarget.style.transform = 'translate(' + (dragAccumTx + offsetX) + 'px, ' + (dragAccumTy + offsetY) + 'px)';
+
+    var now = performance.now();
+    if (now - _lastPosDragSend >= 16) {
+      _lastPosDragSend = now;
+      var containerRect = getContainer().getBoundingClientRect();
+      var op2 = dragTarget.offsetParent;
+      var opRect2 = op2 ? op2.getBoundingClientRect() : containerRect;
+      window.parent.postMessage({
+        type: 'POSITION_DRAG',
+        key: key,
+        x: Math.round(result.constrainedLeft + containerRect.left - opRect2.left),
+        y: Math.round(result.constrainedTop + containerRect.top - opRect2.top)
+      }, '*');
+    }
   }, true);
 
   document.addEventListener('pointerup', function(event) {
@@ -2284,7 +2299,7 @@ export function generateIframeHtml(
   <link rel="dns-prefetch" href="${cdnBase}">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; background-color: #ffffff; }
+    body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif; line-height: 1.5; background-color: #ffffff; }
 
     ::-webkit-scrollbar { display: none; }
     html, body { scrollbar-width: none; -ms-overflow-style: none; }

@@ -6,6 +6,11 @@ import { getDataDir } from "@/lib/fs-utils";
 import { extractPreviewSize, type PreviewSize } from "@/lib/preview-size";
 import { getScreenshotServiceUrl } from "@/lib/runtime-config";
 import { extractSchemaDefaults } from "@/lib/schema-defaults";
+import {
+  readImageUrlMap,
+  resolveCodeImagePaths,
+  resolveConfigDataImagePaths,
+} from "@/lib/ensure-image-resolver";
 import type {
   DemoPageRuntimeType,
   PageSnapshotInput,
@@ -255,6 +260,7 @@ async function readProjectThumbnailPages(
     path.join(workspacePath, "project.config.schema.json"),
   );
   const runtimeTypes = await readWorkspaceRuntimeTypes(workspacePath);
+  const imageMap = await readImageUrlMap(workspacePath);
   const pages: ThumbnailPageInput[] = [];
 
   for (const entry of fs.readdirSync(demosPath, { withFileTypes: true })) {
@@ -296,7 +302,10 @@ async function readProjectThumbnailPages(
       : undefined;
     const common = {
       pageId: entry.name,
-      configData: { ...projectDefaults, ...pageDefaults },
+      configData: resolveConfigDataImagePaths(
+        { ...projectDefaults, ...pageDefaults },
+        imageMap,
+      ),
       previewSize,
       width,
       height,
@@ -347,7 +356,7 @@ async function readProjectThumbnailPages(
           : {
               ...common,
               runtimeType: "high-fidelity-react",
-              code: code ?? "",
+              code: code ? resolveCodeImagePaths(code, imageMap) : "",
             },
     );
   }

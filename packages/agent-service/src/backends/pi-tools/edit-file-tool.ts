@@ -636,6 +636,7 @@ export function createEditFileTool(
           args.path,
           newContent,
           resolvePageRuntimeType(args.path, snapshot?.resources),
+          (receipt as { revision?: number } | null)?.revision,
         );
         const fuzzyNote = usedFuzzyMatch ? " (fuzzy match used)" : "";
         logger.debug(

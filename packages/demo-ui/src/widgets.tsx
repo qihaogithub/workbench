@@ -399,28 +399,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
   );
 }
 
-export function RichTextWidget(props: WidgetProps) {
-  const { id, value, onChange, label, required } = props;
-
-  return (
-    <div className="mb-4">
-      <label htmlFor={id} className="block text-sm font-medium text-foreground mb-1">
-        {label}
-        {required && <span className="text-destructive ml-1">*</span>}
-      </label>
-      <textarea
-        id={id}
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
-        rows={4}
-        className="w-full px-3 py-2 text-sm bg-input border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring resize-none"
-      />
-    </div>
-  );
-}
-
 export const customWidgets = {
   color: ColorPickerWidget,
   file: FileUploadWidget,
-  richtext: RichTextWidget,
 };
