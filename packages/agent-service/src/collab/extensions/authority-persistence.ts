@@ -2,7 +2,9 @@ import type { Extension } from "@hocuspocus/server";
 import * as Y from "yjs";
 
 import type { CollabConnectionContext } from "./session-auth";
+import type { CollabDocumentName } from "../document-name";
 import type { WorkspaceFilePersistence } from "../workspace-file-persistence";
+import type { CollabStateStore } from "../collab-state-store";
 import { logger } from "../../utils/logger";
 
 /**
@@ -12,9 +14,12 @@ import { logger } from "../../utils/logger";
  * `CollabRoomManager.getOrCreateRoom` (initial content load) and
  * `CollabRoomManager.flushRoom` (debounced save).
  *
- * - `onLoadDocument`: reads the file from disk and seeds the Yjs text.
+ * - `onLoadDocument`: restores persisted Yjs state (collab-state) to preserve
+ *   CRDT item identity across room recreation. Falls back to seeding from disk
+ *   text when no persisted state exists (first run / legacy data).
  * - `onStoreDocument`: reads the Yjs text and commits it to Authority via
- *   `persistence.commitResource()` (actor: "collab", reason: "collab_autosave").
+ *   `persistence.commitResource()` (actor: "collab", reason: "collab_autosave"),
+ *   then persists the Yjs state so the room can safely recreate on next start.
  *
  * The Yjs room is the single content authority (Yjs-First architecture),
  * so non-collab writes must route through the Yjs doc via
@@ -23,14 +28,17 @@ import { logger } from "../../utils/logger";
 export class AuthorityPersistenceExtension implements Extension {
   priority = 100;
 
-  constructor(private readonly persistence: WorkspaceFilePersistence) {}
+  constructor(
+    private readonly persistence: WorkspaceFilePersistence,
+    private readonly stateStore?: CollabStateStore,
+  ) {}
 
   /**
-   * Seed the Yjs document with the current file content on first load.
+   * Restore persisted Yjs state, or seed from disk text on first run.
    *
-   * Runs once per document lifecycle (when the document is created in
-   * memory, not on every connection). If the file does not exist yet
-   * (new resource), the Yjs text stays empty until a client writes to it.
+   * Preserving Yjs item identities across room recreation prevents the
+   * classic Yjs replication bug where two independent insertions of the
+   * same text get concatenated on reconnect (2/3/4/8 copies).
    */
   async onLoadDocument(data: {
     document: Y.Doc;
@@ -40,8 +48,53 @@ export class AuthorityPersistenceExtension implements Extension {
     if (!ctx?.ok) return;
 
     const text = data.document.getText("content");
-    const textLenBefore = text.length;
-    if (textLenBefore > 0) return;
+    if (text.length > 0) return;
+
+    const descriptor: CollabDocumentName = {
+      projectId: ctx.projectId,
+      workspaceId: ctx.workspaceId,
+      resourcePath: ctx.resourcePath,
+      kind: ctx.kind as never,
+    };
+
+    const savedState =
+      this.stateStore?.load(ctx.workspaceId, descriptor) ?? null;
+
+    if (savedState) {
+      try {
+        Y.applyUpdate(data.document, savedState);
+
+        const state = this.persistence.readResourceState(
+          ctx.workspacePath,
+          ctx.resourcePath,
+          ctx.kind as never,
+        );
+
+        if (state.content && text.toString() !== state.content) {
+          logger.warn(
+            {
+              workspaceId: ctx.workspaceId,
+              resourcePath: ctx.resourcePath,
+            },
+            "onLoadDocument: restored Yjs state diverged from disk, resetting to disk",
+          );
+          text.delete(0, text.length);
+          text.insert(0, state.content);
+          this.stateStore?.save(
+            ctx.workspaceId,
+            descriptor,
+            Y.encodeStateAsUpdate(data.document),
+          );
+        }
+        return;
+      } catch (error) {
+        logger.error(
+          { error, workspaceId: ctx.workspaceId, resourcePath: ctx.resourcePath },
+          "onLoadDocument: failed to restore Yjs state, falling back to disk seed",
+        );
+        this.stateStore?.deleteWorkspace(ctx.workspaceId);
+      }
+    }
 
     const state = this.persistence.readResourceState(
       ctx.workspacePath,
@@ -51,41 +104,43 @@ export class AuthorityPersistenceExtension implements Extension {
 
     if (state.content) {
       text.insert(0, state.content);
+      this.stateStore?.save(
+        ctx.workspaceId,
+        descriptor,
+        Y.encodeStateAsUpdate(data.document),
+      );
     }
   }
 
   /**
-   * Persist the Yjs text content to Authority.
+   * Persist the Yjs text content to Authority and save Yjs state.
    *
    * Called by Hocuspocus after the configured debounce window. Skips
    * no-op writes (file content unchanged) to avoid unnecessary mutation
    * events. Uses `baseRevision: 0` because the Yjs room is the single
-   * authority and the Authority auto-adopts drift (Phase 2).
+   * authority and the Authority auto-adopts drift.
    */
   async onStoreDocument(data: {
     document: Y.Doc;
     lastContext: CollabConnectionContext | null;
   }): Promise<void> {
     const ctx = data.lastContext;
-    if (!ctx?.ok) {
-      return;
-    }
+    if (!ctx?.ok) return;
 
     const text = data.document.getText("content");
     let roomContent = text.toString();
 
-    // Defense-in-depth: 如果 Yjs room 内容已经是自拼接重复，截断为前半段。
-    // 这不应在正常流程中发生，但作为最后防线避免重复内容落盘。
     const deduped = deduplicateContent(roomContent);
     if (deduped !== null) {
       logger.warn(
-        `onStoreDocument: detected duplicated room content, ` +
-          `resource=${ctx.resourcePath}, ` +
-          `beforeLen=${roomContent.length}, afterLen=${deduped.length}, ` +
-          `trimming to first half`,
+        {
+          resourcePath: ctx.resourcePath,
+          beforeLen: roomContent.length,
+          afterLen: deduped.length,
+        },
+        "onStoreDocument: detected duplicated room content, trimming",
       );
       roomContent = deduped;
-      // 同步修正 Yjs room 内容，避免下次 onStoreDocument 再次检测到重复
       text.delete(0, text.length);
       text.insert(0, deduped);
     }
@@ -96,8 +151,10 @@ export class AuthorityPersistenceExtension implements Extension {
       ctx.kind as never,
     );
 
-    // Skip no-op writes — file already matches room content.
     if (currentState.content === roomContent) {
+      if (this.stateStore) {
+        this.persistState(data.document, ctx);
+      }
       return;
     }
 
@@ -111,6 +168,10 @@ export class AuthorityPersistenceExtension implements Extension {
         content: roomContent,
         baseRevision: 0,
       });
+
+      if (this.stateStore) {
+        this.persistState(data.document, ctx);
+      }
     } catch (error) {
       logger.error(
         {
@@ -124,23 +185,61 @@ export class AuthorityPersistenceExtension implements Extension {
       throw error;
     }
   }
+
+  private persistState(
+    document: Y.Doc,
+    ctx: CollabConnectionContext,
+  ): void {
+    try {
+      this.stateStore!.save(
+        ctx.workspaceId,
+        {
+          projectId: ctx.projectId,
+          workspaceId: ctx.workspaceId,
+          resourcePath: ctx.resourcePath,
+          kind: ctx.kind as never,
+        },
+        Y.encodeStateAsUpdate(document),
+      );
+    } catch (error) {
+      logger.error(
+        { error, workspaceId: ctx.workspaceId, resourcePath: ctx.resourcePath },
+        "AuthorityPersistenceExtension: failed to persist Yjs state",
+      );
+    }
+  }
 }
 
 /**
  * 检测并消除自拼接重复内容。
  *
  * 支持三种检测方式：
- * 1. 字符级重复：前半段与后半段完全一致，并递归收敛 4、8 等多次重复
+ * 1. 字符级 N 份重复：内容 = unit.repeat(N)，通过寻找最小重复周期收敛
  * 2. 行级重复：兼容副本之间额外出现一行分隔的历史内容
  * 3. JSON 对象级重复：两个相同的 JSON 对象拼接（{...}{...}）
  *
- * 返回去重后的内容，或 null 表示未检测到重复。
+ * 返回去重后的单份内容，或 null 表示未检测到重复。
  */
 export function deduplicateContent(content: string): string | null {
   if (!content) return null;
 
-  // 方法 1: 直接按原始字符串切半。源码通常以换行结尾，使用 split("\n")
-  // 会多出一个空行并错过最常见的 content + content 形态。
+  // 方法 0: 寻找最小字符串周期（覆盖 N 份重复，含 3/5/6/7 等非幂次）
+  // 从大 N 到小 N，确保收敛到最小 unit
+  for (let n = 8; n >= 2; n--) {
+    if (content.length % n !== 0) continue;
+    const unitLen = content.length / n;
+    const unit = content.slice(0, unitLen);
+    let allMatch = true;
+    for (let i = 1; i < n; i++) {
+      if (content.slice(i * unitLen, (i + 1) * unitLen) !== unit) {
+        allMatch = false;
+        break;
+      }
+    }
+    if (allMatch) return unit;
+  }
+
+  // 方法 1: 直接按原始字符串切半（兼容旧逻辑）
   let exactDeduped = content;
   let exactDuplicateFound = false;
   while (exactDeduped.length % 2 === 0) {
@@ -155,7 +254,6 @@ export function deduplicateContent(content: string): string | null {
   const lines = content.split("\n");
   if (lines.length >= 4) {
     const half = Math.floor(lines.length / 2);
-    // 偶数行：前半段 == 后半段
     if (lines.length % 2 === 0) {
       let allMatch = true;
       for (let i = 0; i < half; i++) {
@@ -166,7 +264,6 @@ export function deduplicateContent(content: string): string | null {
       }
       if (allMatch) return lines.slice(0, half).join("\n");
     }
-    // 奇数行：前 half 行 == 后 half 行（跳过中间一行，处理尾部多余换行）
     if (lines.length % 2 === 1 && half >= 2) {
       let allMatch = true;
       for (let i = 0; i < half; i++) {
@@ -180,7 +277,6 @@ export function deduplicateContent(content: string): string | null {
   }
 
   // 方法 3: JSON 对象级重复检测
-  // 场景：两个完整 JSON 对象拼接（{...}{...}），行级检测可能因行数不匹配而漏检
   const start = content.indexOf("{");
   if (start === -1) return null;
   let depth = 0;

@@ -361,6 +361,7 @@ Agent 后端：
 - 后端实现位于 `packages/agent-service/src/backends/pi-agent.ts` 和 `packages/agent-service/src/backends/pi-tools/`。
 - Pi Agent 通过 `@earendil-works/pi-agent-core` 进程内嵌入，不依赖 workbench Server 或外部 CLI 子进程。
 - 模型配置通过 `PI_AGENT_*` 环境变量提供。
+- 编辑重发时，前端通过 WS 消息 `resync_history` 触发服务端历史重同步：销毁旧 agent → 重建 → 逐条调 `appendHistoryMessage(role, content)` 写入 session。`IBackendAdapter`、`BaseAgent`、`BackendAgent` 均有 `appendHistoryMessage` 方法。
 
 Screenshot 服务：
 
@@ -431,6 +432,7 @@ orb config set network_proxy "http://192.168.139.3:7890"
 - 不要为单个页面引入新的状态管理或 UI 框架。
 - 修改交互流时，同步检查 API client、SWR key、loading/error 状态和移动端布局。
 - 涉及登录、项目、会话、模型配置时，要检查 middleware、API route 和前端调用是否一致。
+- AI 对话内联图片：前端在 `onFinish` 时调用 `extractImageUrlsFromParts`（`packages/ai-chat-shared/src/chat/utils/chat-stream-utils.ts`）扫描 assistant 文本中的 `/api/images/` 和 `/api/screenshots/file/` URL，自动拆分为 `image` parts 内联渲染，不需要后端协议变更。`AssistantMessage` 和 `Message` 组件均已支持渲染 `image` part。系统提示词中已包含「使用 Markdown 图片语法展示图片」的指令，与前端后处理互补。
 
 ## 后端改动
 

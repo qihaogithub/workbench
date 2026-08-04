@@ -147,6 +147,11 @@ function latestVersionId(projectId: string): string {
   return getLatestVersion(projectId)?.versionId || "v0";
 }
 
+function parseVersionNumber(versionId: string): number {
+  const match = /^v(\d+)$/.exec(versionId);
+  return match ? Number(match[1]) : 0;
+}
+
 function isWorkspaceBasedOnLatest(projectId: string, meta: WorkspaceMeta | null): boolean {
   const latest = latestVersionId(projectId);
   if (!meta?.baseVersion) return latest === "v0";
@@ -420,6 +425,29 @@ export function syncActiveWorkspaceToCanonical(
     requestedWorkspaceId: effectiveWorkspaceId,
     baseVersion: sourceMeta?.baseVersion ?? null,
   };
+  if (
+    sourceMeta?.baseVersion &&
+    parseVersionNumber(sourceMeta.baseVersion) > parseVersionNumber(latestVersionId(projectId))
+  ) {
+    const latest = latestVersionId(projectId);
+    const healedFrom = sourceMeta.baseVersion;
+    markWorkspaceBasedOnVersion(effectiveWorkspaceId, latest);
+    sourceMeta.baseVersion = latest;
+    appendServerEditorDiagnosticEvent({
+      level: "warn",
+      eventGroup: "workspace",
+      eventType: "workspace.canonical_materialization_auto_healed",
+      projectId,
+      workspaceId: effectiveWorkspaceId,
+      operationId: `canonical:${projectId}:${effectiveWorkspaceId}:${diagnosticContext.revision ?? "legacy"}`,
+      traceId: `canonical:${projectId}:${effectiveWorkspaceId}:${diagnosticContext.revision ?? "legacy"}`,
+      payload: {
+        phase: "canonical-materialization",
+        autoHealedFrom: healedFrom,
+        autoHealedTo: latest,
+      },
+    });
+  }
   if (!isWorkspaceBasedOnLatest(projectId, sourceMeta)) {
     recordWorkspaceSyncDiagnostic("workspace.canonical_materialization_failed", syncContext, {
       level: "error",

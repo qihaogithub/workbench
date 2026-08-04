@@ -26,4 +26,9 @@ export interface IBackendAdapter {
    * 不重建 Agent，保留 messages 历史
    */
   updateSystemPrompt?(newPrompt: string): Promise<void>;
+  /**
+   * 向服务端会话中追加一条历史消息（用于编辑重发时重建 session 历史）。
+   * 不触发 LLM 调用，仅写入 session 存储。
+   */
+  appendHistoryMessage?(role: string, content: string): Promise<void>;
 }

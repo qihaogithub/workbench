@@ -187,12 +187,12 @@ function writeScreenshotCache(
   );
   fs.writeFileSync(
     path.join(screenshotDir, `${options.pageId}.${hash}.png`),
-    Buffer.alloc(options.hashSize ?? 10_000),
+    Buffer.alloc(options.hashSize ?? 25_000),
   );
   if (options.writeCurrent ?? true) {
     fs.writeFileSync(
       path.join(screenshotDir, `${options.pageId}.png`),
-      Buffer.alloc(options.currentSize ?? 10_000),
+      Buffer.alloc(options.currentSize ?? 25_000),
     );
   }
 }

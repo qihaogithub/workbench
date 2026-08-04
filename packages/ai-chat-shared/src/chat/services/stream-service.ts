@@ -381,6 +381,51 @@ export class StreamService {
     }
   }
 
+  /**
+   * 重同步服务端会话历史（编辑重发时使用）。
+   * 创建临时 AgentStream 连接，发送保留的历史消息，
+   * 等待服务端返回 ready 后关闭连接。
+   */
+  async resyncHistory(
+    agentSessionId: string,
+    messages: Array<{ role: string; content: string }>,
+  ): Promise<void> {
+    const agentClient = getConfiguredAgentClient();
+    const stream = agentClient.stream(agentSessionId);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          stream.off("status", onStatus);
+          stream.off("error", onError);
+          reject(new Error("resync_history 连接超时"));
+        }, 10000);
+
+        const onStatus = (event: any) => {
+          if (event.status === "connected") {
+            clearTimeout(timeout);
+            stream.off("status", onStatus);
+            stream.off("error", onError);
+            resolve();
+          }
+        };
+
+        const onError = (event: any) => {
+          clearTimeout(timeout);
+          stream.off("status", onStatus);
+          stream.off("error", onError);
+          reject(new Error(event.error?.message || "resync_history 连接失败"));
+        };
+
+        stream.on("status", onStatus);
+        stream.on("error", onError);
+      });
+
+      await stream.resyncHistory(agentSessionId, messages);
+    } finally {
+      stream.close();
+    }
+  }
+
   close(): void {
     this.stopKeepalive();
     this.clearReconnectTimer();

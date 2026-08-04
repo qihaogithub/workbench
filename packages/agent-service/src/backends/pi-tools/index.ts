@@ -13,8 +13,6 @@ import { createSchemaValidateTool } from "./schema-tool";
 import { createSaveImageTool } from "./save-image-tool";
 import { createGetConsoleLogsTool } from "./console-tool";
 import { createCaptureScreenshotTool } from "./screenshot-tool";
-import { createDescribeImageTool } from "./describe-image-tool";
-import type { ImageDescriber } from "../../services/image-describer";
 import { createListImagesTool } from "./list-images-tool";
 import { createKnowledgeReportTool } from "./knowledge-report-tool";
 import { createReadKnowledgeSourceTool } from "./read-knowledge-source-tool";
@@ -73,7 +71,6 @@ export interface WorkbenchToolsOptions {
   includeUserChoice?: boolean;
   userChoiceHandler?: UserChoiceHandler;
   mode?: "workbench" | "viewer-readonly";
-  imageDescriber?: ImageDescriber;
 }
 
 export function createWorkbenchTools(
@@ -141,10 +138,6 @@ export function createWorkbenchTools(
     createReplyCommentTool(config),
     createResolveCommentTool(config),
   ];
-
-  if (options.imageDescriber?.isAvailable()) {
-    tools.push(createDescribeImageTool(config, options.imageDescriber));
-  }
 
   if (options.includeDelegateTask !== false && options.subagentRunner) {
     tools.push(createDelegateTaskTool(options.subagentRunner, config));

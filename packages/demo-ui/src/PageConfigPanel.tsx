@@ -562,7 +562,7 @@ export function PageConfigPanel({
             <DialogTitle>保存为默认配置</DialogTitle>
             <DialogDescription>
               {saveDefaultsScope === "project"
-                ? "将使用当前共享配置值覆盖项目级默认配置，所有页面将使用新默认值。确认保存？"
+                ? `将使用当前共享配置值覆盖项目级默认配置，影响 ${sharedAffectedPages.length} 个页面，所有页面将使用新默认值。确认保存？`
                 : "将使用当前本页配置覆盖默认配置，新项目或新增页面将使用新默认值。确认保存？"}
             </DialogDescription>
           </DialogHeader>

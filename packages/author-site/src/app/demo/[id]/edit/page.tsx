@@ -952,6 +952,21 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     resetCommandHistory();
   }, [resetCommandHistory, sessionId]);
 
+  // ── Session 续期：每 30 分钟续一次，避免 2h 到期后保存/协同失效 ─────
+  const sessionRenewIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    if (!sessionId) return;
+    if (sessionRenewIntervalRef.current) clearInterval(sessionRenewIntervalRef.current);
+    const renew = () => {
+      fetch(`/api/sessions/${sessionId}/renew`, { method: "POST" }).catch(() => {});
+    };
+    renew();
+    sessionRenewIntervalRef.current = setInterval(renew, 30 * 60 * 1000);
+    return () => {
+      if (sessionRenewIntervalRef.current) clearInterval(sessionRenewIntervalRef.current);
+    };
+  }, [sessionId]);
+
   const [demoName, setDemoName] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
@@ -1199,6 +1214,18 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     enabled: true, // 截图常驻生成，不再仅限画布模式
     pageIds: screenshotPageIds,
   });
+  // ── 截图再生：集中标记 + 持久化管线后统一触发 ──
+  const structuralDirtyPageIdsRef = useRef<Set<string>>(new Set());
+  const pendingPrototypeScreenshotPageIdsRef = useRef<Set<string>>(new Set());
+
+  const markScreenshotDirty = useCallback(
+    (pageId: string) => {
+      invalidatePageScreenshot(pageId);
+      structuralDirtyPageIdsRef.current.add(pageId);
+    },
+    [invalidatePageScreenshot],
+  );
+
   const canvasScreenshotUrls = useMemo(
     () =>
       Object.fromEntries(
@@ -1529,6 +1556,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       pagePreviewSizeMap,
     ],
   );
+  const scheduleScreenshotRegenerateRef =
+    useRef<typeof scheduleScreenshotRegenerate>(scheduleScreenshotRegenerate);
+  scheduleScreenshotRegenerateRef.current = scheduleScreenshotRegenerate;
 
   const regenerateCanvasScreenshots = useCallback(async () => {
     const available = await checkServiceHealth();
@@ -1544,6 +1574,39 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     checkServiceHealth,
     demoPages,
     startBatchGeneration,
+  ]);
+
+  const flushPendingPrototypeScreenshots = useCallback(() => {
+    const pageIds = [...pendingPrototypeScreenshotPageIdsRef.current];
+    pendingPrototypeScreenshotPageIdsRef.current.clear();
+    for (const pageId of pageIds) {
+      const page = demoPages.find((item) => item.id === pageId);
+      if (!page) continue;
+      const config = configDataMapRef.current[pageId] ?? {};
+      const snapshotInput = buildScreenshotPageInput(page, config);
+      if (!snapshotInput) continue;
+      const { width, height } = getScreenshotRequestSize(
+        pagePreviewSizeMap[pageId],
+      );
+      const priority = getScreenshotPriority(pageId);
+      regeneratePageSnapshot(
+        pageId,
+        snapshotInput as Parameters<typeof regeneratePageSnapshot>[1],
+        width,
+        height,
+        CANVAS_SCREENSHOT_FULL_PAGE,
+        priority,
+        "strict" as const,
+        pageScreenshots[pageId]?.renderBox?.height,
+      );
+    }
+  }, [
+    demoPages,
+    buildScreenshotPageInput,
+    pagePreviewSizeMap,
+    getScreenshotPriority,
+    regeneratePageSnapshot,
+    pageScreenshots,
   ]);
 
   // 首屏优先加载单页 iframe；批量截图延后到预览 ready 或用户进入画布后。
@@ -2630,20 +2693,14 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           html,
         },
       }));
-      invalidatePageScreenshot(pageId);
-      scheduleScreenshotRegenerate(
-        pageId,
-        undefined,
-        configDataMapRef.current[pageId],
-      );
+      markScreenshotDirty(pageId);
       persistPrototypePageDraft(pageId, { html });
       markWorkspaceChanged();
     },
     [
-      invalidatePageScreenshot,
+      markScreenshotDirty,
       markWorkspaceChanged,
       persistPrototypePageDraft,
-      scheduleScreenshotRegenerate,
     ],
   );
 
@@ -2973,6 +3030,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         throw new Error("共享配置保存失败，请重试后再发布");
       }
     },
+    onSaveComplete: flushPendingPrototypeScreenshots,
   });
   const {
     publishStatus,
@@ -3003,6 +3061,22 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  const handleCreateVersionWithScreenshot = useCallback(
+    async (versionName?: string) => {
+      const result = await handleCreateVersion(versionName);
+      if (result) {
+        flushPendingPrototypeScreenshots();
+      }
+      return result;
+    },
+    [handleCreateVersion, flushPendingPrototypeScreenshots],
+  );
+
+  const handlePublishWithScreenshot = useCallback(async () => {
+    await handlePublish();
+    flushPendingPrototypeScreenshots();
+  }, [handlePublish, flushPendingPrototypeScreenshots]);
 
   useEffect(() => {
     if (activeCodeCollab.status !== "synced") return;
@@ -3072,12 +3146,12 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         html: activePrototypeHtmlCollab.value,
       },
     }));
-    invalidatePageScreenshot(currentPageId);
+    markScreenshotDirty(currentPageId);
   }, [
     activePrototypeHtmlCollab.status,
     activePrototypeHtmlCollab.value,
     activePrototypeHtmlCollab.ytext,
-    invalidatePageScreenshot,
+    markScreenshotDirty,
   ]);
 
   useEffect(() => {
@@ -3104,12 +3178,12 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         css: activePrototypeCssCollab.value,
       },
     }));
-    invalidatePageScreenshot(currentPageId);
+    markScreenshotDirty(currentPageId);
   }, [
     activePrototypeCssCollab.status,
     activePrototypeCssCollab.value,
     activePrototypeCssCollab.ytext,
-    invalidatePageScreenshot,
+    markScreenshotDirty,
   ]);
 
   useEffect(() => {
@@ -3142,18 +3216,12 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         scene: activeSketchSceneCollab.value,
       },
     }));
-    invalidatePageScreenshot(currentPageId);
-    scheduleScreenshotRegenerate(
-      currentPageId,
-      undefined,
-      configDataMapRef.current[currentPageId],
-    );
+    markScreenshotDirty(currentPageId);
   }, [
     activeSketchSceneCollab.status,
     activeSketchSceneCollab.value,
     activeSketchSceneCollab.ytext,
-    invalidatePageScreenshot,
-    scheduleScreenshotRegenerate,
+    markScreenshotDirty,
   ]);
 
   useEffect(() => {
@@ -3707,7 +3775,7 @@ ${context.details}
     setSchema(parsed.schema);
 
     const currentPageId = activeDemoIdRef.current;
-    invalidatePageScreenshot(currentPageId);
+    markScreenshotDirty(currentPageId);
     const defaults = getSafeMergedDefaults(parsed.schema);
     setConfigDataMap((prev) => ({
       ...prev,
@@ -3728,76 +3796,25 @@ ${context.details}
       ...defaults,
       ...(configDataMapRef.current[currentPageId] ?? {}),
     };
-    // 代码变更后立即失效旧截图，并 debounce 3s 触发截图再生
-    scheduleScreenshotRegenerate(currentPageId, parsed.code, nextConfig);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleConfigChange = useCallback((data: Record<string, unknown>) => {
-    const currentPageId = activeDemoIdRef.current;
-    invalidatePageScreenshot(currentPageId);
-    setConfigDataMap((prev) => {
-      const nextPageConfig = {
-        ...(prev[currentPageId] ?? {}),
-        ...data,
-      };
-      const next = {
-        ...prev,
-        [currentPageId]: nextPageConfig,
-      };
-      // 配置变更后立即失效旧截图，并 debounce 3s 触发截图再生
-      const currentCode = codeRef.current;
-      const currentPage = demoPages.find((page) => page.id === currentPageId);
-      if (currentCode || currentPage?.runtimeType === "prototype-html-css") {
-        scheduleScreenshotRegenerate(
-          currentPageId,
-          currentCode || undefined,
-          nextPageConfig,
-        );
-      }
-      return next;
-    });
+    // 代码变更后标记截图脏，持久化管线完成后再触发截图再生
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handlePageConfigPanelChange = useCallback(
     (pageId: string, data: Record<string, unknown>) => {
-      invalidatePageScreenshot(pageId);
       const schema = pageSchemaMapRef.current[pageId];
       const dataClean = schema ? flattenNestedDelta(data, schema) : data;
       const prevClean = schema
         ? flattenNestedDelta(configDataMapRef.current[pageId] ?? {}, schema)
         : (configDataMapRef.current[pageId] ?? {});
       const nextPageConfig = { ...prevClean, ...dataClean };
-      persistPageConfigValues(pageId, nextPageConfig);
-      setConfigDataMap((prev) => {
-        const next = {
-          ...prev,
-          [pageId]: nextPageConfig,
-        };
-        const currentCode = resolvePreviewPageCode({
-          pageId,
-          pageCodes,
-          activeCodePageId:
-            pageCodes[activeDemoIdRef.current] === codeRef.current
-              ? activeDemoIdRef.current
-              : undefined,
-          activeCode: codeRef.current,
-        });
-        const page = demoPages.find((item) => item.id === pageId);
-        if (currentCode || page?.runtimeType === "prototype-html-css") {
-          scheduleScreenshotRegenerate(
-            pageId,
-            currentCode || undefined,
-            nextPageConfig,
-          );
-        }
-        return next;
-      });
+      setConfigDataMap((prev) => ({
+        ...prev,
+        [pageId]: nextPageConfig,
+      }));
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [demoPages, pageCodes, persistPageConfigValues],
-
+    [],
   );
 
   handlePageConfigPanelChangeRef.current = handlePageConfigPanelChange;
@@ -3836,9 +3853,6 @@ ${context.details}
         ...data,
       };
       setProjectConfigValues(nextProjectConfigValues);
-      void persistProjectConfigValues(nextProjectConfigValues);
-      const affectedPageIds = demoPages.map((page) => page.id);
-      invalidatePageScreenshots(affectedPageIds);
       setConfigDataMap((prev) => {
         const next = { ...prev };
         for (const pageId of Object.keys(next)) {
@@ -3849,32 +3863,10 @@ ${context.details}
             next[page.id] = { ...data };
           }
         }
-        for (const page of demoPages) {
-          const pageCode = resolvePreviewPageCode({
-            pageId: page.id,
-            pageCodes,
-            activeCodePageId:
-              pageCodes[activeDemoId] === code ? activeDemoId : undefined,
-            activeCode: code,
-          });
-          if (!pageCode && page.runtimeType !== "prototype-html-css") continue;
-          scheduleScreenshotRegenerate(
-            page.id,
-            pageCode || undefined,
-            next[page.id],
-          );
-        }
         return next;
       });
     },
-    [
-      code,
-      demoPages,
-      invalidatePageScreenshots,
-      pageCodes,
-      persistProjectConfigValues,
-      scheduleScreenshotRegenerate,
-    ],
+    [demoPages],
   );
 
   const handleSchemaChange = useCallback(
@@ -3935,12 +3927,13 @@ ${context.details}
 
         const newSchema = JSON.stringify(schemaObj, null, 2);
         handlePageSchemaChange(pageId, newSchema);
-        toast({ title: "默认配置已更新", description: `已更新 ${updatedCount} 个字段的默认值` });
+        persistPageConfigValues(pageId, currentConfig);
+        toast({ title: "配置已保存", description: `已更新 ${updatedCount} 个字段的默认值` });
       } catch {
         toast({ title: "保存失败", description: "无法解析当前 Schema", variant: "destructive" });
       }
     },
-    [handlePageSchemaChange, toast],
+    [handlePageSchemaChange, persistPageConfigValues, toast],
   );
 
   const handleRestoreDefaults = useCallback(
@@ -3990,7 +3983,9 @@ ${context.details}
       projectConfigSchemaRef.current = newSchema;
 
       const affectedPageIds = demoPages.map((page) => page.id);
-      invalidatePageScreenshots(affectedPageIds);
+      for (const pageId of affectedPageIds) {
+        markScreenshotDirty(pageId);
+      }
       setConfigDataMap((prev) => {
         const next = { ...prev };
         for (const page of demoPages) {
@@ -4008,25 +4003,6 @@ ${context.details}
             previousDefaults,
           );
         }
-
-        for (const page of demoPages) {
-          const pageCode = resolvePreviewPageCode({
-            pageId: page.id,
-            pageCodes,
-            activeCodePageId:
-              pageCodes[activeDemoIdRef.current] === codeRef.current
-                ? activeDemoIdRef.current
-                : undefined,
-            activeCode: codeRef.current,
-          });
-          if (!pageCode && page.runtimeType !== "prototype-html-css") continue;
-          scheduleScreenshotRegenerate(
-            page.id,
-            pageCode || undefined,
-            next[page.id],
-          );
-        }
-
         return next;
       });
 
@@ -4035,11 +4011,9 @@ ${context.details}
     [
       demoPages,
       getSafeMergedDefaults,
-      invalidatePageScreenshots,
+      markScreenshotDirty,
       markWorkspaceChanged,
-      pageCodes,
       projectSchemaCollab.ytext,
-      scheduleScreenshotRegenerate,
     ],
   );
 
@@ -4080,8 +4054,9 @@ ${context.details}
 
       const newSchema = JSON.stringify(schemaObj, null, 2);
       handleProjectSchemaChange(newSchema);
+      void persistProjectConfigValues(currentConfig);
       toast({
-        title: "默认配置已更新",
+        title: "共享配置已保存",
         description: `已更新 ${updatedCount} 个字段的默认值`,
       });
     } catch {
@@ -4091,7 +4066,7 @@ ${context.details}
         variant: "destructive",
       });
     }
-  }, [handleProjectSchemaChange, toast]);
+  }, [handleProjectSchemaChange, persistProjectConfigValues, toast]);
 
   const handleProjectRestoreDefaults = useCallback(() => {
     const projectSchema = projectConfigSchemaRef.current;
@@ -5043,6 +5018,9 @@ ${context.details}
         setPagePreviewSizeMap(previewSizeMap);
 
         markWorkspaceChanged();
+        for (const pageId of pageIds) {
+          markScreenshotDirty(pageId);
+        }
         recordDiagnosticEvent({
           category: "ai",
           name: "ai.files_change_marked_workspace_dirty",
@@ -5139,6 +5117,7 @@ ${context.details}
       applyDemoSnapshot,
       createDiagnosticTraceId,
       handleWorkspaceTreeChanged,
+      markScreenshotDirty,
       markWorkspaceChanged,
       previewMode,
       projectSchemaCollab.ytext,
@@ -5229,20 +5208,14 @@ ${context.details}
           scene: sceneText,
         },
       }));
-      invalidatePageScreenshot(activeDemoId);
+      markScreenshotDirty(activeDemoId);
       markWorkspaceChanged();
-      scheduleScreenshotRegenerate(
-        activeDemoId,
-        undefined,
-        configDataMapRef.current[activeDemoId],
-      );
     },
     [
       activeDemoId,
       activeSketchSceneCollab.ytext,
-      invalidatePageScreenshot,
+      markScreenshotDirty,
       markWorkspaceChanged,
-      scheduleScreenshotRegenerate,
       setPageSketchMap,
     ],
   );
@@ -5391,6 +5364,21 @@ ${context.details}
           performanceSamplerRef.current.sampleCommitLatency(elapsedMs);
           setHasPendingWorkspaceFlush(false);
           setWorkspaceFlushError(null);
+          // Post-sync: regenerate screenshots for structurally dirty pages
+          const dirtyPages = [...structuralDirtyPageIdsRef.current];
+          structuralDirtyPageIdsRef.current.clear();
+          for (const pageId of dirtyPages) {
+            const page = demoPages.find((item) => item.id === pageId);
+            if (
+              page &&
+              (page.runtimeType === "prototype-html-css" ||
+                page.runtimeType === "sketch-scene")
+            ) {
+              pendingPrototypeScreenshotPageIdsRef.current.add(pageId);
+            } else {
+              scheduleScreenshotRegenerateRef.current(pageId);
+            }
+          }
           recordDiagnosticEvent({
             category: "autosave",
             name: "autosave.sync_succeeded",
@@ -5716,7 +5704,7 @@ ${context.details}
 
       if (demoId && demoId === activeDemoId) {
         if (fileType === "prototypeHtml" || fileType === "prototypeCss") {
-          invalidatePageScreenshot(demoId);
+          markScreenshotDirty(demoId);
           setPagePrototypeMap((prev) => ({
             ...prev,
             [demoId]: {
@@ -5724,13 +5712,8 @@ ${context.details}
               [fileType === "prototypeHtml" ? "html" : "css"]: content,
             },
           }));
-          scheduleScreenshotRegenerate(
-            demoId,
-            undefined,
-            configDataMapRef.current[demoId],
-          );
         } else if (fileType === "sketchScene") {
-          invalidatePageScreenshot(demoId);
+          markScreenshotDirty(demoId);
           setPageSketchMap((prev) => ({
             ...prev,
             [demoId]: {
@@ -5738,11 +5721,6 @@ ${context.details}
               scene: content,
             },
           }));
-          scheduleScreenshotRegenerate(
-            demoId,
-            undefined,
-            configDataMapRef.current[demoId],
-          );
         } else {
           applyDemoSnapshot({
             [fileType === "code" ? "code" : "schema"]: content,
@@ -5755,9 +5733,8 @@ ${context.details}
     [
       activeDemoId,
       applyDemoSnapshot,
-      invalidatePageScreenshot,
+      markScreenshotDirty,
       markWorkspaceChanged,
-      scheduleScreenshotRegenerate,
       setPagePrototypeMap,
       setPageSketchMap,
     ],
@@ -6608,7 +6585,7 @@ ${context.details}
           <div className="flex items-center">
             <Button
               onClick={async () => {
-                await handlePublish();
+await handlePublishWithScreenshot();
               }}
               disabled={publishButtonDisabled}
               variant={!publishButtonDisabled ? "default" : "outline"}
@@ -8408,7 +8385,7 @@ ${context.details}
                 if (e.key === "Enter") {
                   e.preventDefault();
                   setSaveVersionDialogOpen(false);
-                  void handleCreateVersion(versionNameInput || undefined);
+void handleCreateVersionWithScreenshot(versionNameInput || undefined);
                   setVersionNameInput("");
                 }
               }}
@@ -8428,7 +8405,7 @@ ${context.details}
             <Button
               onClick={() => {
                 setSaveVersionDialogOpen(false);
-                void handleCreateVersion(versionNameInput || undefined);
+                void handleCreateVersionWithScreenshot(versionNameInput || undefined);
                 setVersionNameInput("");
               }}
             >

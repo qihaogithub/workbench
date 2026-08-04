@@ -1,9 +1,9 @@
 # AIChat 分层架构 - 技术文档
 
-> 版本：v1.2
+> 版本：v1.3
 > 创建日期：2026-05-11
-> 更新日期：2026-07-04
-> 更新说明：补充消息发送时显式携带当前模型 ID 的链路
+> 更新日期：2026-08-04
+> 更新说明：补充编辑消息重发数据流，新增 resync_history 协议和 appendHistoryMessage 后端方法
 > 关联需求：[AI对话\_需求文档.md](../AI对话_需求文档.md)
 > 上层文档：[INDEX.md](../INDEX.md)
 
@@ -211,6 +211,32 @@ UI 子组件只负责渲染，不包含业务逻辑。
 权限对话框 → useChatStream.handlePermissionResponse
   → StreamService.sendPermissionResponse（通过消息流 WebSocket 发送）
 ```
+
+### 4.4 编辑消息重发
+
+```
+用户编辑消息 → handleEditResend
+  → 截断消息列表（保留编辑消息之前的所有历史）
+  → 持久化截断后的消息列表
+  → StreamService.connect（建立临时 WebSocket）
+  → streamService.resyncHistory（发送保留的历史消息列表）
+    → agent-client AgentStream.resyncHistory（发送 { type: "resync_history", messages }）
+    → 服务端处理：
+        1. 获取当前 agent 配置
+        2. destroy 旧 agent
+        3. 重建 agent（getOrCreate + start）
+        4. 逐条 appendHistoryMessage（以正确 role 写入 session）
+        5. 回复 { type: "status", status: "ready" }
+  → 关闭临时 WebSocket
+  → handleSend(newContent, images, { skipHistoryPrefix: true })
+    → 正常消息发送流程（不注入历史文本前缀）
+```
+
+关键设计：
+- 编辑重发时，服务端 agent 被销毁重建，旧会话历史不残留
+- 保留的历史消息通过 `appendHistoryMessage` 以正确 role（user/assistant）写入新 session
+- 前端不注入 `buildConversationHistoryPrefix`，避免与重播的服务端历史重复
+- 重同步失败时回退到仅通过前端文本前缀提供上下文，不阻塞用户发送
 
 ## 五、关键设计决策
 

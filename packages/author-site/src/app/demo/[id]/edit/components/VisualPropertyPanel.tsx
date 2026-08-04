@@ -2050,7 +2050,7 @@ export function VisualPropertyPanel({
       {renderConfigMarkDialog()}
 
       {draftAction && onDraftActionPrimary && onDraftActionCancel && (
-        <div className="flex shrink-0 items-center justify-end gap-2 border-t px-3 py-2">
+        <div className="flex shrink-0 items-center justify-between border-t bg-background px-4 py-3 shadow-[0_-2px_8px_rgba(0,0,0,0.1)]">
           <VisualDraftActionBar
             action={draftAction}
             disabled={draftActionDisabled}

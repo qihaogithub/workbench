@@ -1607,11 +1607,11 @@ function PreviewPanelInternal({
             }
           >
             {showPlaceholder && (
-              <div className="absolute inset-0 z-10 bg-muted/30 flex items-center justify-center rounded-lg pointer-events-none overflow-hidden">
+              <div className="absolute inset-0 z-10 bg-muted/30 flex items-start justify-center rounded-lg pointer-events-none overflow-y-auto">
                 <img
                   src={placeholderScreenshotUrl}
                   alt="preview placeholder"
-                  className="h-full w-full object-contain"
+                  className="w-full"
                   draggable={false}
                   onError={() =>
                     setBooleanStateIfChanged(setPlaceholderFailed, true)

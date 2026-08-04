@@ -63,7 +63,8 @@ interface ClientMessage {
     | "get_models"
     | "permission_response"
     | "user_choice_response"
-    | "console_data";
+    | "console_data"
+    | "resync_history";
   id?: string;
   content?: string;
   sessionId?: string;
@@ -98,6 +99,8 @@ interface ClientMessage {
   /** user_choice_response: 需求确认响应 */
   requestId?: string;
   choice?: UserChoiceResponse;
+  /** resync_history: 重同步历史消息列表 */
+  messages?: Array<{ role: string; content: string }>;
 }
 
 interface ActiveConnection {
@@ -1001,6 +1004,83 @@ export async function registerWebSocketRoutes(
               );
             }
             break;
+          }
+
+          case "resync_history": {
+            const { id: resyncId, messages } = message;
+            if (!Array.isArray(messages)) {
+              sendMessage({
+                type: "error",
+                id: resyncId || "unknown",
+                error: {
+                  code: "INVALID_PARAMS",
+                  message: "resync_history 需要 messages 数组",
+                },
+              });
+              return;
+            }
+
+            logger.info(
+              { sessionId, messageCount: messages.length },
+              "WebSocket resync_history received",
+            );
+
+            try {
+              const existingAgent = manager.get(sessionId);
+              if (!existingAgent) {
+                sendMessage({
+                  type: "error",
+                  id: resyncId || "unknown",
+                  error: {
+                    code: "AGENT_NOT_FOUND",
+                    message: "会话不存在，请先发送消息",
+                  },
+                });
+                return;
+              }
+
+              const config = existingAgent.getConfig();
+              await manager.destroy(sessionId);
+
+              const agent = manager.getOrCreate(sessionId, config);
+              eventRouter.bindAgent(agent);
+              if (agent.status === "initializing") {
+                await agent.start();
+              }
+
+              for (const msg of messages) {
+                if (msg.role && msg.content) {
+                  await agent.appendHistoryMessage(msg.role, msg.content);
+                }
+              }
+
+              logger.info(
+                { sessionId, replayedCount: messages.length },
+                "resync_history completed",
+              );
+            } catch (error) {
+              logger.error(
+                { error, sessionId },
+                "resync_history failed",
+              );
+              sendMessage({
+                type: "error",
+                id: resyncId || "unknown",
+                error: {
+                  code: "RESYNC_FAILED",
+                  message: "重同步历史失败",
+                },
+              });
+              return;
+            }
+
+            sendMessage({
+              type: "status",
+              id: resyncId,
+              sessionId,
+              status: "ready",
+            });
+            return;
           }
 
           default: {

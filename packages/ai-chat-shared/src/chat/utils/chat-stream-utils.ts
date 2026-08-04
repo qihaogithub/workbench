@@ -173,3 +173,44 @@ export function parseToolCallFromEvent(event: any): ToolCallEvent {
     timestamp: event.timestamp,
   };
 }
+
+/**
+ * 扫描文本 parts 中的图片 URL，将文本内容拆分为 text + image 交替的 parts。
+ * 匹配 /api/images/ 和 /api/screenshots/file/ 路径。
+ */
+const IMAGE_URL_PATTERN = /\/api\/(?:images\/[a-zA-Z0-9_\-\.]+|screenshots\/file\/[a-zA-Z0-9_\/\-\.\=]+)(?:\?t=\d+)?/g;
+
+export function extractImageUrlsFromParts(parts: MessagePart[]): MessagePart[] {
+  const result: MessagePart[] = [];
+
+  for (const part of parts) {
+    if (part.type !== "text") {
+      result.push(part);
+      continue;
+    }
+
+    const content = part.content;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    let found = false;
+
+    IMAGE_URL_PATTERN.lastIndex = 0;
+
+    while ((match = IMAGE_URL_PATTERN.exec(content)) !== null) {
+      found = true;
+      if (match.index > lastIndex) {
+        result.push({ type: "text", content: content.slice(lastIndex, match.index) });
+      }
+      result.push({ type: "image", url: match[0] });
+      lastIndex = match.index + match[0].length;
+    }
+
+    if (!found) {
+      result.push(part);
+    } else if (lastIndex < content.length) {
+      result.push({ type: "text", content: content.slice(lastIndex) });
+    }
+  }
+
+  return result;
+}

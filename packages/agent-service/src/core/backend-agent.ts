@@ -353,6 +353,14 @@ export class BackendAgent extends BaseAgent {
     }
   }
 
+  async appendHistoryMessage(role: string, content: string): Promise<void> {
+    if (this.backend.appendHistoryMessage) {
+      await this.backend.appendHistoryMessage(role, content);
+    } else {
+      throw new Error("appendHistoryMessage not supported by backend");
+    }
+  }
+
   updateConfig(config: Partial<AgentConfig>): void {
     let changed = false;
 

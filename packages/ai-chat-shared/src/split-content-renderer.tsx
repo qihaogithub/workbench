@@ -9,6 +9,7 @@ import { cjk } from "@streamdown/cjk";
 import "katex/dist/katex.min.css";
 import { cn } from "./lib/utils";
 import { splitByFencedCode } from "./split-by-fenced-code";
+import { useToast } from "./ui/toast-provider";
 
 interface SplitContentRendererProps {
   content: string;
@@ -72,6 +73,7 @@ function CollapsibleCodeBlock({
 }: CollapsibleCodeBlockProps) {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [copied, setCopied] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!isStreaming) {
@@ -86,14 +88,32 @@ function CollapsibleCodeBlock({
   }, [isStreaming]);
 
   const handleCopy = useCallback(async () => {
+    let copied = false;
     try {
       await navigator.clipboard.writeText(code);
+      copied = true;
+    } catch {
+      try {
+        const textarea = document.createElement("textarea");
+        textarea.value = code;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+        copied = true;
+      } catch {
+        // both methods failed
+      }
+    }
+    if (copied) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // clipboard not available
+    } else {
+      toast({ title: "复制失败", variant: "destructive" });
     }
-  }, [code]);
+  }, [code, toast]);
 
   const lines = code.split("\n").filter(Boolean).length;
   const langDisplay = language || "文本";

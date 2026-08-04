@@ -443,6 +443,61 @@ export class AgentStream {
     );
   }
 
+  /**
+   * 重同步服务端会话历史。
+   * 先销毁服务端 agent，再以正确 role 逐条重播保留的历史消息。
+   * 返回 Promise，在服务端返回 status:ready 且 id 匹配时 resolve。
+   */
+  async resyncHistory(
+    sessionId: string,
+    messages: Array<{ role: string; content: string }>,
+  ): Promise<void> {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      throw new Error("WebSocket is not connected");
+    }
+
+    return new Promise((resolve, reject) => {
+      const id = `resync-${Date.now()}`;
+      const timeout = setTimeout(() => {
+        this.off("status", onStatus);
+        this.off("error", onError);
+        reject(new Error("resync_history timeout"));
+      }, 10000);
+
+      const onStatus = (event: StreamEvent) => {
+        if ((event as any).id === id && event.status === "ready") {
+          clearTimeout(timeout);
+          this.off("status", onStatus);
+          this.off("error", onError);
+          resolve();
+        }
+      };
+
+      const onError = (event: StreamEvent) => {
+        clearTimeout(timeout);
+        this.off("status", onStatus);
+        this.off("error", onError);
+        reject(
+          new Error(
+            (event as any).error?.message || "resync_history failed",
+          ),
+        );
+      };
+
+      this.on("status", onStatus);
+      this.on("error", onError);
+
+      this.ws!.send(
+        JSON.stringify({
+          type: "resync_history",
+          id,
+          sessionId,
+          messages,
+        }),
+      );
+    });
+  }
+
   cancel(messageId: string): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 

@@ -11,6 +11,7 @@ import { AuthorityPersistenceExtension } from "./extensions/authority-persistenc
 import { SessionAuthExtension } from "./extensions/session-auth";
 import type { CollabConnectionContext } from "./extensions/session-auth";
 import { WorkspaceFilePersistence } from "./workspace-file-persistence";
+import { CollabStateStore } from "./collab-state-store";
 import { registerCollabDraftProvider } from "../workspace/workspace-mutation-authority";
 
 const DEFAULT_SAVE_DEBOUNCE_MS = 1000;
@@ -46,6 +47,8 @@ export class HocuspocusCollabServer {
   constructor(persistence = new WorkspaceFilePersistence()) {
     this.persistence = persistence;
 
+    const stateStore = new CollabStateStore(persistence.dataDir);
+
     this.hocuspocus = new Hocuspocus<CollabConnectionContext>({
       name: "workbench-collab",
       debounce: Number(
@@ -57,7 +60,7 @@ export class HocuspocusCollabServer {
       unloadImmediately: true,
       extensions: [
         new SessionAuthExtension(persistence),
-        new AuthorityPersistenceExtension(persistence),
+        new AuthorityPersistenceExtension(persistence, stateStore),
       ],
     });
 
