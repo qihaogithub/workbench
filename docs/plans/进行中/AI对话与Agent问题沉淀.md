@@ -34,6 +34,7 @@
 
 ## 已完成 / 已有沉淀（仅索引）
 
+- 附件上传 "Failed to fetch"（2026-08）：Docker 容器误用 `.env`（dev 端口 CORS 白名单）启动而非 `.deploy.env`，agent-service CORS 预检不返回 `access-control-allow-origin`，非图片附件（HTTP POST `/api/agent/:sessionId/attachments`）被浏览器拦截；图片/文字走 WebSocket 不受影响。已用 `docker compose --env-file .deploy.env up -d` 重建容器修复并浏览器实测通过。排查要点：curl 预检看 `access-control-allow-origin`；`docker inspect <容器> | grep CORS_ORIGINS` 核对实际生效值
 - EXTERNAL_DRIFT 自动重试 → `原型页升级死锁与AI工具链问题沉淀.md` P4
 - 自动修复循环 + DUPLICATE_TOP_LEVEL_DECLARATION → 已有修复
 - bash 沙箱 `node -e` 矛盾 → 已有修复
