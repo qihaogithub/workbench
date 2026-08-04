@@ -18,6 +18,10 @@ jest.mock("@streamdown/mermaid", () => ({ mermaid: {} }), { virtual: true });
 jest.mock("@streamdown/math", () => ({ math: {} }), { virtual: true });
 jest.mock("@streamdown/cjk", () => ({ cjk: {} }), { virtual: true });
 
+jest.mock("@workbench/ai-chat-shared/ui/toast-provider", () => ({
+  useToast: () => ({ toast: jest.fn() }),
+}));
+
 describe("AssistantMessage 子 Agent 展示", () => {
   afterEach(() => {
     jest.restoreAllMocks();

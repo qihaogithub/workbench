@@ -9,6 +9,7 @@ import {
   useCallback,
   type ComponentType,
 } from "react";
+import { useToast } from "./ui/toast-provider";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
 import { cjk } from "@streamdown/cjk";
@@ -363,6 +364,7 @@ export function AssistantMessage({
   externalAuthSessionId,
 }: AssistantMessageProps) {
   const [copied, setCopied] = useState(false);
+  const { toast } = useToast();
 
   const normalizedParts: MessagePart[] = useMemo(() => {
     const parts_copy = parts ? [...parts] : [];
@@ -527,12 +529,30 @@ export function AssistantMessage({
 
   const handleCopy = async () => {
     if (!allTextContent) return;
+    let copied = false;
     try {
       await navigator.clipboard.writeText(allTextContent);
+      copied = true;
+    } catch {
+      try {
+        const textarea = document.createElement("textarea");
+        textarea.value = allTextContent;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+        copied = true;
+      } catch {
+        // both methods failed
+      }
+    }
+    if (copied) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // clipboard not available
+    } else {
+      toast({ title: "复制失败", variant: "destructive" });
     }
   };
 

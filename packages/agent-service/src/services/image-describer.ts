@@ -147,6 +147,25 @@ export class ImageDescriber {
     return this.formatDescriptions(descriptions);
   }
 
+  async describeOrThrow(images: ImageAttachment[], prompt?: string): Promise<string> {
+    if (!this.config.enabled) {
+      throw new ImageDescriptionError(
+        "IMAGE_DESCRIPTION_DISABLED",
+        "当前模型不支持图片处理，且图片预描述功能未启用。请联系管理员配置识图模型。",
+      );
+    }
+
+    if (images.length === 0) {
+      return "";
+    }
+
+    const results = await Promise.all(
+      images.map((image) => this.describeOneOrThrow(image, prompt)),
+    );
+
+    return this.formatDescriptions(results);
+  }
+
   clearCache(): void {
     this.cache.clear();
     this.hitCount = 0;
@@ -177,6 +196,44 @@ export class ImageDescriber {
     const description = await this.callVisionModel(image);
     this.updateCache(hash, description);
     return { hash, description, fromCache: false };
+  }
+
+  private async describeOneOrThrow(image: ImageAttachment, prompt?: string): Promise<ImageDescription> {
+    const hash = this.computeHash(image.data);
+
+    if (prompt) {
+      return { hash, description: await this.callVisionModelOrThrow(image, prompt), fromCache: false };
+    }
+
+    const cached = this.cache.get(hash);
+
+    if (cached !== undefined) {
+      this.hitCount++;
+      this.cache.delete(hash);
+      this.cache.set(hash, cached);
+      return { hash, description: cached, fromCache: true };
+    }
+
+    this.missCount++;
+    const description = await this.callVisionModelOrThrow(image);
+    this.updateCache(hash, description);
+    return { hash, description, fromCache: false };
+  }
+
+  private async callVisionModelOrThrow(image: ImageAttachment, promptOverride?: string): Promise<string> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
+
+    try {
+      return await this.describeWithVision({
+        image,
+        modelId: this.config.visionModelId,
+        prompt: promptOverride ?? this.config.describePrompt,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
   private computeHash(base64Data: string): string {

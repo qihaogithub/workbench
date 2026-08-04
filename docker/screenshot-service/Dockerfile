@@ -36,6 +36,7 @@ RUN if [ -n "$DEBIAN_MIRROR" ]; then \
     && apt-get install -y --no-install-recommends \
     chromium \
     chromium-sandbox \
+    fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium

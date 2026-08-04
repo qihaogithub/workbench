@@ -14,8 +14,27 @@ const DelegateTaskParams = Type.Object({
         "Optional extra context, constraints, or files the subagent should consider",
     }),
   ),
+  model: Type.Optional(
+    Type.Union([Type.Literal("inherit"), Type.Literal("vision")], {
+      description:
+        'Model for the subagent. "inherit" (default) uses the same model as the main agent. "vision" uses the configured vision model for image analysis. Use "vision" when your main model cannot see images but you need visual understanding of screenshots or images.',
+    }),
+  ),
+  images: Type.Optional(
+    Type.Array(Type.String(), {
+      description:
+        'Image URLs for the subagent to analyze. Only effective when model is "vision". URLs must be absolute (e.g., from captureScreenshot, saveImage, or listImages results). The subagent will receive these images as visual input.',
+    }),
+  ),
 });
 type DelegateTaskParams = Static<typeof DelegateTaskParams>;
+
+export interface SubagentRunnerParams {
+  task: string;
+  context?: string;
+  model?: "inherit" | "vision";
+  imageUrls?: string[];
+}
 
 export interface SubagentRunResult {
   success: boolean;
@@ -25,7 +44,7 @@ export interface SubagentRunResult {
 }
 
 export type SubagentRunner = (
-  params: DelegateTaskParams,
+  params: SubagentRunnerParams,
   signal?: AbortSignal,
 ) => Promise<SubagentRunResult>;
 
@@ -37,7 +56,7 @@ export function createDelegateTaskTool(
     name: "delegateTask",
     label: "Delegate Task",
     description:
-      "Delegate a self-contained investigation or implementation task to a short-lived subagent. The subagent works in the same workspace, may edit files, and returns a concise result.",
+      "Delegate a self-contained task to a short-lived subagent. The subagent works in the same workspace, may edit files, and returns a concise result. Use model: 'vision' + images to let a vision-model subagent analyze screenshots or images when your main model cannot see images.",
     parameters: DelegateTaskParams,
     executionMode: "parallel",
     execute: async (
@@ -55,7 +74,15 @@ export function createDelegateTaskTool(
       }
 
       try {
-        const result = await runner({ task, context: args.context }, signal);
+        const result = await runner(
+          {
+            task,
+            context: args.context,
+            model: args.model,
+            imageUrls: args.images,
+          },
+          signal,
+        );
         return {
           content: [
             {

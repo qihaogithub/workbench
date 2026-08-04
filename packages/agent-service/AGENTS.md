@@ -201,6 +201,7 @@ export interface IBackendAdapter {
   setPromptTimeout?(seconds: number): void;
   cancelPrompt?(): void;
   getWorkingDir?(): string | null;
+  appendHistoryMessage?(role: string, content: string): Promise<void>;
 }
 ```
 
@@ -280,6 +281,7 @@ pnpm typecheck
   - `EventMapper`：AgentHarness 底层事件 → 应用层 AgentEvent 的映射
 - **文件操作**：`ToolHookManager` 在 `tool_result` hook 中捕获 `writeFile/editFile` 变更
 - **路径安全**：`PermissionManager.validateToolCall` 拦截 `readFile/writeFile/listFiles` 的越权访问
+- **编辑重发历史重同步**：WS 消息 `resync_history` 触发服务端销毁旧 agent → 重建 → 逐条 `appendHistoryMessage(role, content)` 写入 session。参见 `src/routes/websocket.ts` 的 `case "resync_history"`。`IBackendAdapter`、`BaseAgent`、`BackendAgent` 和 `PiAgentBackend` 均有 `appendHistoryMessage` 方法。
 
 ## 相关文档
 

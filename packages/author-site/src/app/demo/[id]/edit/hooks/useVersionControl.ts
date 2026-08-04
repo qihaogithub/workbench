@@ -64,6 +64,7 @@ export interface UseVersionControlParams {
   setHasUnsavedChanges: React.Dispatch<React.SetStateAction<boolean>>;
   setIsSaving: React.Dispatch<React.SetStateAction<boolean>>;
   beforePublish?: () => Promise<void>;
+  onSaveComplete?: () => void;
   getSketchPatchSummary?: (
     pageId: string,
   ) => SketchPatchVersionSummary | undefined;
@@ -96,6 +97,7 @@ export function useVersionControl(params: UseVersionControlParams) {
     setIsSaving,
     beforePublish,
     getSketchPatchSummary,
+    onSaveComplete,
   } = params;
   const { toast } = useToast();
 
@@ -228,6 +230,7 @@ export function useVersionControl(params: UseVersionControlParams) {
       });
       setPublishStatus("published");
       setPublishedVersion(publishResult.publishedVersion);
+      onSaveComplete?.();
       toast({
         title: "发布成功",
         description: `版本 ${publishResult.publishedVersion} 已发布到预览端，共 ${publishResult.demoCount} 个页面`,
@@ -454,6 +457,7 @@ export function useVersionControl(params: UseVersionControlParams) {
       setHasUnsavedChanges(false);
       markCanvasChangesSaved();
       setPublishStatus("unpublished_changes");
+      onSaveComplete?.();
 
       loadVersionHistory();
       loadPageVersionHistories();
@@ -576,6 +580,7 @@ export function useVersionControl(params: UseVersionControlParams) {
         setHasUnsavedChanges(false);
         markCanvasChangesSaved();
         setPublishStatus("unpublished_changes");
+        onSaveComplete?.();
         await Promise.all([loadVersionHistory(), loadPageVersionHistories()]);
         return true;
       } catch (error) {
@@ -603,6 +608,7 @@ export function useVersionControl(params: UseVersionControlParams) {
       sessionId,
       setHasUnsavedChanges,
       workspaceId,
+      onSaveComplete,
     ],
   );
 

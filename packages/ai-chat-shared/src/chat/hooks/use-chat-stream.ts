@@ -20,9 +20,10 @@ import {
 } from "../services/stream-service";
 import type { PlanItem, PlanItemStatus, PlanState } from "../chat-plan";
 import {
-  updateTextPart,
   addThoughtPart,
   addToolPart,
+  extractImageUrlsFromParts,
+  updateTextPart,
   updateToolPart,
 } from "../utils/chat-stream-utils";
 import {
@@ -206,6 +207,7 @@ interface SendMessageRunOptions {
 interface StartMessageRunOptions {
   appendDisplayMessage?: boolean;
   displayMessageId?: string;
+  skipHistoryPrefix?: boolean;
 }
 
 interface QueuedChatMessage {
@@ -593,9 +595,9 @@ export function useChatStream(options: UseChatStreamOptions) {
       const traceId = `ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const isSystemAutoRepair = source === "system_auto_repair";
       const isVisualProperty = source === "visual_property";
-      const conversationHistoryPrefix = buildConversationHistoryPrefix(
-        messagesRef.current,
-      );
+      const conversationHistoryPrefix = startOptions.skipHistoryPrefix
+        ? ""
+        : buildConversationHistoryPrefix(messagesRef.current);
       const outboundMessage = conversationHistoryPrefix
         ? `${conversationHistoryPrefix}${userMessage}`
         : userMessage;
@@ -845,6 +847,7 @@ export function useChatStream(options: UseChatStreamOptions) {
               const currentMsg = currentMessageRef.current;
               const hasStructuredParts =
                 currentMsg.parts !== undefined && currentMsg.parts.length > 0;
+              const finalParts = extractImageUrlsFromParts(currentMsg.parts || []);
               const assistantMessage: ChatMessage = {
                 id: currentMsg.id || assistantMessageId,
                 role: "assistant",
@@ -852,7 +855,7 @@ export function useChatStream(options: UseChatStreamOptions) {
                   accumulatedContent ||
                   result.content ||
                   (hasStructuredParts ? "" : "抱歉，我没有收到有效的回复。"),
-                parts: currentMsg.parts,
+                parts: finalParts,
               };
 
               const messagesWithAutoRepairStatus = updateAutoRepairStatus(
@@ -1363,6 +1366,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       images?: ImageAttachment[],
       runOptions?: SendMessageRunOptions,
       files?: FileAttachment[],
+      startOptions?: StartMessageRunOptions,
     ) => {
       const trimmedMessage = userMessage.trim();
       if (!trimmedMessage || !agentSessionId) return;
@@ -1470,7 +1474,7 @@ export function useChatStream(options: UseChatStreamOptions) {
         return;
       }
 
-      void startMessageRun(trimmedMessage, images, files, runOptions);
+      void startMessageRun(trimmedMessage, images, files, runOptions, startOptions);
     },
     [
       agentSessionId,
@@ -1704,7 +1708,7 @@ export function useChatStream(options: UseChatStreamOptions) {
   );
 
   const handleEditResend = useCallback(
-    (targetMessageId: string, newContent: string) => {
+    async (targetMessageId: string, newContent: string) => {
       if (!newContent.trim()) return;
 
       const msgs = messagesRef.current;
@@ -1738,9 +1742,26 @@ export function useChatStream(options: UseChatStreamOptions) {
               .filter((img): img is ImageAttachment => img !== undefined)
           : undefined;
 
-      handleSend(newContent, images);
+      // 重同步服务端历史：保留截断后的消息以正确 role 写入 session
+      try {
+        const syncService = new StreamService({ mode });
+        await syncService.connect(agentSessionId, sessionId);
+        await syncService.resyncHistory(
+          agentSessionId,
+          truncated
+            .filter((m) => m.role === "user" || m.role === "assistant")
+            .map((m) => ({ role: m.role, content: m.content })),
+        );
+        syncService.close();
+      } catch (error) {
+        console.error("resyncHistory failed, falling back to prefix-only", error);
+      }
+
+      handleSend(newContent, images, undefined, undefined, {
+        skipHistoryPrefix: true,
+      });
     },
-    [messagesRef, setMessages, sessionId, handleSend],
+    [messagesRef, setMessages, sessionId, agentSessionId, handleSend, mode],
   );
 
   return {

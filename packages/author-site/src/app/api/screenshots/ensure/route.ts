@@ -21,7 +21,7 @@ import type {
 const DATA_DIR = getDataDir();
 const PROJECTS_DIR = path.join(DATA_DIR, "projects");
 const SCREENSHOTS_DIR = path.join(DATA_DIR, "screenshots");
-const MIN_HEALTHY_SCREENSHOT_BYTES = 8 * 1024;
+const MIN_HEALTHY_SCREENSHOT_BYTES = 20 * 1024;
 
 // --- Asset inlining for screenshot rendering ---
 

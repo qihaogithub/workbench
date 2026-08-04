@@ -243,13 +243,7 @@ export class PiAgentBackend implements IBackendAdapter {
         "Pi Agent model configured",
       );
 
-      // 4. 创建工具（传入 deletePage 权限确认回调 + 计划审批回调 + 子 Agent runner + 识图工具）
-      const modelSupportsImages =
-        Array.isArray(model?.input) && model.input.includes("image");
-      const imageDescriber =
-        !modelSupportsImages && this.imageDescriber.isAvailable()
-          ? this.imageDescriber
-          : undefined;
+      // 4. 创建工具（传入 deletePage 权限确认回调 + 计划审批回调 + 子 Agent runner）
 
       const tools = createWorkbenchTools(
         this.config,
@@ -260,7 +254,6 @@ export class PiAgentBackend implements IBackendAdapter {
           subagentRunner: (params, signal) => this.runSubagent(params, signal),
           planApprovalHandler: this.permissionManager.requestPlanApproval,
           userChoiceHandler: this.userInteractionManager.requestUserChoice,
-          imageDescriber,
         },
       );
 
@@ -428,11 +421,8 @@ export class PiAgentBackend implements IBackendAdapter {
         images: [
           {
             type: "image" as const,
-            source: {
-              type: "base64" as const,
-              media_type: request.image.mimeType,
-              data: request.image.data,
-            },
+            data: request.image.data,
+            mimeType: request.image.mimeType,
           },
         ],
       });
@@ -509,7 +499,7 @@ Keep the final response concise: summarize what you changed, what you verified, 
   }
 
   private async runSubagent(
-    params: { task: string; context?: string },
+    params: { task: string; context?: string; model?: "inherit" | "vision"; imageUrls?: string[] },
     signal?: AbortSignal,
   ): Promise<SubagentRunResult> {
     if (!this.areSubagentsEnabled()) {
@@ -565,7 +555,55 @@ Keep the final response concise: summarize what you changed, what you verified, 
           includeUserChoice: false,
         },
       );
-      const model = this.modelManager.getModel();
+      let model: any;
+      let imageParts: any[] | undefined;
+
+      if (params.model === "vision") {
+        const visionModelId = this.imageDescriber.getConfig().visionModelId;
+        if (!visionModelId) {
+          return {
+            success: false,
+            content: "识图模型未配置，请在管理后台设置识图模型",
+            durationMs: Date.now() - startedAt,
+          };
+        }
+        model = this.modelManager.getVisionModel(visionModelId);
+
+        if (params.imageUrls && params.imageUrls.length > 0) {
+          imageParts = [];
+          for (const url of params.imageUrls) {
+            try {
+              const fetchRes = await fetch(url);
+              if (!fetchRes.ok) {
+                return {
+                  success: false,
+                  content: `下载图片失败: ${url} (HTTP ${fetchRes.status})`,
+                  durationMs: Date.now() - startedAt,
+                };
+              }
+              const buffer = Buffer.from(await fetchRes.arrayBuffer());
+              const mimeType =
+                fetchRes.headers.get("content-type") || "image/png";
+              imageParts.push({
+                type: "image" as const,
+                data: buffer.toString("base64"),
+                mimeType: mimeType,
+              });
+            } catch (e) {
+              const message =
+                e instanceof Error ? e.message : "Unknown error";
+              return {
+                success: false,
+                content: `下载图片失败: ${url} (${message})`,
+                durationMs: Date.now() - startedAt,
+              };
+            }
+          }
+        }
+      } else {
+        model = this.modelManager.getModel();
+      }
+
       const resources = { skills: getPreinstalledSkills() };
 
       harness = new AgentHarnessCtor({
@@ -643,7 +681,7 @@ Keep the final response concise: summarize what you changed, what you verified, 
       });
 
       const result = await withLlmRetry(
-        () => Promise.race([harness.prompt(prompt), abortPromise]),
+        () => Promise.race([harness.prompt(prompt, { images: imageParts }), abortPromise]),
         {},
         (error, meta) => {
           if (controller.signal.aborted) throw error;
@@ -817,11 +855,8 @@ Keep the final response concise: summarize what you changed, what you verified, 
       if (modelSupportsImages) {
         imageContent = images.map((img) => ({
           type: "image" as const,
-          source: {
-            type: "base64" as const,
-            media_type: img.mimeType,
-            data: img.data,
-          },
+          data: img.data,
+          mimeType: img.mimeType,
         }));
       } else {
         if (!this.imageDescriber.isAvailable()) {
@@ -981,6 +1016,15 @@ Keep the final response concise: summarize what you changed, what you verified, 
     const model = this.modelManager.getModel();
     await this.harness.setModel(model);
     logger.info({ modelId }, "Model switched at runtime");
+  }
+
+  async appendHistoryMessage(role: string, content: string): Promise<void> {
+    if (!this.harness) throw new Error("Agent not initialized");
+    await this.harness.appendMessage({
+      role: role as "user" | "assistant",
+      content: [{ type: "text", text: content }],
+      timestamp: Date.now(),
+    } as any);
   }
 
   async getModelInfo(): Promise<{

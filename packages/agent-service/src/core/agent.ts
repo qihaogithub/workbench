@@ -63,6 +63,7 @@ export abstract class BaseAgent extends EventEmitter {
   abstract cancel(): void;
   abstract kill(): Promise<void>;
   abstract updateConfig(config: Partial<AgentConfig>): void;
+  abstract appendHistoryMessage(role: string, content: string): Promise<void>;
 
   getConfig(): AgentConfig {
     return { ...this.config };
