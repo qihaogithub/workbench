@@ -2227,4 +2227,101 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
       });
     });
   });
+
+  describe("粘贴 HTML 代码创建页面", () => {
+    function HtmlPasteCanvas({
+      onRequestPasteHtmlContent,
+      interactionMode = "editor",
+    }: {
+      onRequestPasteHtmlContent?: (html: string) => void | Promise<void>;
+      interactionMode?: "editor" | "viewer";
+    }) {
+      const [state, setState] = useState<CanvasState>({
+        viewport: { x: 40, y: 40, zoom: 0.5 },
+        pages: {
+          page_1: { x: 100, y: 120, width: 375, height: 812 },
+        },
+        nodes: {},
+      });
+
+      return (
+        <>
+          <PreviewCanvas
+            interactionMode={interactionMode}
+            pages={[
+              {
+                id: "page_1",
+                name: "页面一",
+                order: 0,
+                code: "export default function Demo(){return null}",
+                previewSize: { width: 375, height: 812 },
+              },
+            ]}
+            canvasState={state}
+            onCanvasStateChange={setState}
+            onRequestPasteHtmlContent={onRequestPasteHtmlContent}
+          />
+          <output data-testid="canvas-state">{JSON.stringify(state)}</output>
+        </>
+      );
+    }
+
+    function makeClipboardData(text: string) {
+      return {
+        getData: jest.fn(() => text),
+        files: [],
+        items: [],
+      } as unknown as DataTransfer;
+    }
+
+    it("编辑器模式粘贴 HTML 代码时触发 onRequestPasteHtmlContent", () => {
+      const onRequestPasteHtmlContent = jest.fn();
+      render(
+        <HtmlPasteCanvas
+          onRequestPasteHtmlContent={onRequestPasteHtmlContent}
+        />,
+      );
+      const canvas = screen.getByLabelText("画布工作区");
+      const html = `<!DOCTYPE html>\n<html><body><div class="figma-export" style="width:375px;height:812px">首页</div></body></html>`;
+
+      fireEvent.paste(canvas, { clipboardData: makeClipboardData(html) });
+
+      expect(onRequestPasteHtmlContent).toHaveBeenCalledWith(html);
+    });
+
+    it("粘贴非 HTML 文本不触发 onRequestPasteHtmlContent", () => {
+      const onRequestPasteHtmlContent = jest.fn();
+      render(
+        <HtmlPasteCanvas
+          onRequestPasteHtmlContent={onRequestPasteHtmlContent}
+        />,
+      );
+      const canvas = screen.getByLabelText("画布工作区");
+
+      fireEvent.paste(canvas, {
+        clipboardData: makeClipboardData("这是一段普通文本"),
+      });
+
+      expect(onRequestPasteHtmlContent).not.toHaveBeenCalled();
+    });
+
+    it("viewer 模式粘贴 HTML 不触发创建页面", () => {
+      const onRequestPasteHtmlContent = jest.fn();
+      render(
+        <HtmlPasteCanvas
+          interactionMode="viewer"
+          onRequestPasteHtmlContent={onRequestPasteHtmlContent}
+        />,
+      );
+      const canvas = screen.getByLabelText("画布工作区");
+
+      fireEvent.paste(canvas, {
+        clipboardData: makeClipboardData(
+          "<html><body><div>内容</div></body></html>",
+        ),
+      });
+
+      expect(onRequestPasteHtmlContent).not.toHaveBeenCalled();
+    });
+  });
 });

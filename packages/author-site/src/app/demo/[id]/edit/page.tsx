@@ -193,6 +193,7 @@ import type {
   UserAuthoringPreferences,
 } from "@workbench/shared";
 import { projectApiClient } from "@/lib/project-api";
+import { parseFigmaImportContent } from "../../../../../lib/markdown-parser";
 import { useDemos } from "@/lib/api";
 import { resolveSketchEditorEngine } from "@/lib/sketch-editor-engine";
 import type { ActiveViewContext } from "@/components/ai-elements";
@@ -4575,6 +4576,71 @@ ${context.details}
     [demoId, sessionId, handleWorkspaceTreeChanged, toast],
   );
 
+  // 画布粘贴 HTML 代码创建页面
+  const handlePasteHtmlContent = useCallback(
+    async (html: string) => {
+      if (!sessionId) {
+        toast({
+          title: "未创建 Session",
+          description: "请先进入编辑模式",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const parsed = parseFigmaImportContent(html.trim());
+      if (!parsed.success) {
+        toast({
+          title: "粘贴的代码无法识别",
+          description:
+            parsed.error || "请复制 Figma 导出的 HTML 代码后重试",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      try {
+        const page = await projectApiClient.createDemoPage(
+          demoId,
+          "从剪贴板导入的页面",
+          sessionId,
+          undefined,
+          parsed.kind === "prototype" ? "prototype-html-css" : undefined,
+        );
+
+        if (parsed.kind === "prototype") {
+          await projectApiClient.updateDemoPageFiles(
+            demoId,
+            page.id,
+            sessionId,
+            {
+              prototypeHtml: parsed.prototypeHtml,
+              prototypeCss: parsed.prototypeCss,
+              prototypeMeta: parsed.prototypeMeta,
+              schema: JSON.stringify({ type: "object", properties: {} }),
+              localizeImages: true,
+            },
+          );
+        } else {
+          await projectApiClient.updateDemoPageFiles(demoId, page.id, sessionId, {
+            code: parsed.code,
+            schema: parsed.schema,
+          });
+        }
+
+        setDemoPages((current) =>
+          [...current, page].sort((a, b) => a.order - b.order),
+        );
+        handleWorkspaceTreeChanged();
+        toast({ title: `已粘贴页面「${page.name}」` });
+      } catch (err) {
+        console.error("粘贴 HTML 创建页面失败:", err);
+        toast({ title: "创建页面失败", variant: "destructive" });
+      }
+    },
+    [demoId, sessionId, handleWorkspaceTreeChanged, toast],
+  );
+
   // 创建引用页
   const handleCreateReferences = useCallback(
     async (input: {
@@ -7725,6 +7791,7 @@ await handlePublishWithScreenshot();
                   onRequestDeletePages: requestDeletePages,
                   onRequestPastePages: handlePastePages,
                   onRequestCreateReferences: handleCreateReferences,
+                  onRequestPasteHtmlContent: handlePasteHtmlContent,
                   onViewSource: handleViewSourcePage,
                   focusPageId: focusCanvasPageId,
                   onVisiblePageIdsChange: setVisibleCanvasPageIds,

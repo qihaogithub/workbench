@@ -460,6 +460,8 @@ export interface PreviewCanvasProps {
     pageLayouts: Record<string, CanvasPageLayout>;
     pageGroups: CanvasPageGroup[];
   }) => Promise<{ pageIdMapping: Map<string, string> }>;
+  /** 画布粘贴 HTML 代码时触发，由父组件解析并创建页面 */
+  onRequestPasteHtmlContent?: (html: string) => void | Promise<void>;
   /** 跨项目粘贴时创建引用页 */
   onRequestCreateReferences?: (input: {
     pages: CanvasPageData[];
