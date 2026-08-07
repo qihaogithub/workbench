@@ -1281,7 +1281,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
         projectConfigBindings:
           page.runtimeType === "prototype-html-css"
             ? extractPrototypeConfigBindingKeys(page.prototypeHtml)
-            : undefined,
+            : [],
       }))}
       activePageId={activePageId}
       detailPageId={

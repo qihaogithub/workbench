@@ -8278,7 +8278,7 @@ await handlePublishWithScreenshot();
                               ? extractPrototypeConfigBindingKeys(
                                   pagePrototypeMap[page.id]?.html,
                                 )
-                              : undefined,
+                              : [],
                         }))}
                         activePageId={activeDemoId}
                         detailPageId={activeDemoId}
@@ -8345,7 +8345,7 @@ await handlePublishWithScreenshot();
                         ? extractPrototypeConfigBindingKeys(
                             pagePrototypeMap[page.id]?.html,
                           )
-                        : undefined,
+                        : [],
                   }))}
                   activePageId={activeDemoId}
                   detailPageId={

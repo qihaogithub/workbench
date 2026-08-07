@@ -95,6 +95,8 @@ function getScopedProjectConfigSchema(
   schema: string | undefined,
   bindings: string[] | undefined,
 ): string | undefined {
+  // bindings 为 undefined 表示未提供绑定信息（兼容：视为展示全部共享配置）；
+  // 调用方对不消费共享配置的页面应显式传入 []，从而不展示共享配置区块。
   if (!schema || bindings === undefined) return schema;
 
   try {
