@@ -124,6 +124,29 @@ export function renderNoteMarkdown(markdown: string): string {
   return sanitizeNoteHtml(html);
 }
 
+const REQUIREMENT_REF_REGEX = /@\[([^\]]+)\]\(([^)]+)\)/g;
+
+/**
+ * 将页面配置要求 Markdown 渲染为已清洗的安全 HTML。
+ * 行内软引用 `@[名称](key)` 会被渲染为 chip（`span.pr-ref`，携带 `data-ref-key`），
+ * 供前端通过事件委托绑定点击跳转到对应配置项。
+ */
+export function renderPageRequirementsMarkdown(markdown: string): string {
+  if (!markdown) return "";
+  const withChips = markdown.replace(
+    REQUIREMENT_REF_REGEX,
+    (_match, name: string, key: string) =>
+      `<span class="pr-ref" data-ref-key="${escapeHtml(key)}">${escapeHtml(name)}</span>`,
+  );
+  let html: string;
+  try {
+    html = md.render(withChips);
+  } catch {
+    html = escapeHtml(markdown).replace(/\n/g, "<br>");
+  }
+  return sanitizeNoteHtml(html);
+}
+
 /** 从 Markdown 备注中提取纯文本，用于空值判断与摘要截断 */
 export function stripMarkdown(markdown: string): string {
   return markdown

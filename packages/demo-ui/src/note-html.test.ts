@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   sanitizeNoteHtml,
   renderNoteMarkdown,
+  renderPageRequirementsMarkdown,
   stripMarkdown,
 } from "./note-html";
 
@@ -52,6 +53,25 @@ describe("renderNoteMarkdown", () => {
 
   it("空内容返回空字符串", () => {
     expect(renderNoteMarkdown("")).toBe("");
+  });
+});
+
+describe("renderPageRequirementsMarkdown", () => {
+  it("把行内软引用渲染为携带 data-ref-key 的 chip", () => {
+    const html = renderPageRequirementsMarkdown(
+      "@[页面标题](title) 需突出显示。",
+    );
+    expect(html).toContain('<span class="pr-ref" data-ref-key="title">');
+    expect(html).toContain("页面标题");
+  });
+
+  it("普通 Markdown 链接不被渲染为 chip", () => {
+    const html = renderPageRequirementsMarkdown("[普通链接](https://a.com)");
+    expect(html).not.toContain("pr-ref");
+  });
+
+  it("空内容返回空字符串", () => {
+    expect(renderPageRequirementsMarkdown("")).toBe("");
   });
 });
 

@@ -31,6 +31,11 @@ import type {
   WorkspaceTree,
 } from "@workbench/shared/contracts";
 
+import {
+  parsePageRequirementsRefs,
+  type PageRequirementRef,
+} from "@workbench/shared/demo/page-requirements";
+
 import type {
   AuditEvent,
   AuditLevel,
@@ -2894,6 +2899,75 @@ export class ProjectAdminService {
     );
   }
 
+  getPageRequirements(
+    editId: string,
+    pageId: string,
+  ): ProjectAdminResult<{ requirements: string }> {
+    const transaction = this.requireEditable(editId);
+    if (!transaction.ok || !transaction.data)
+      return fail("EDIT_NOT_FOUND", "编辑事务不存在");
+    const workspacePath = transaction.data.workspacePath;
+    const demoDir = this.pageDir(workspacePath, pageId);
+    if (!fs.existsSync(path.join(demoDir, "config.schema.json")))
+      return fail("DEMO_PAGE_NOT_FOUND", "页面不存在");
+    const requirementsPath = path.join(demoDir, "requirements.md");
+    const requirements = fs.existsSync(requirementsPath)
+      ? fs.readFileSync(requirementsPath, "utf-8")
+      : "";
+    return ok({ requirements });
+  }
+
+  updatePageRequirements(
+    editId: string,
+    pageId: string,
+    requirements: string,
+  ): ProjectAdminResult<{ pageId: string; requirements: string }> {
+    const transaction = this.requireEditable(editId);
+    if (!transaction.ok || !transaction.data)
+      return fail("EDIT_NOT_FOUND", "编辑事务不存在");
+    if (typeof requirements !== "string" || requirements.length > 20000)
+      return fail("INVALID_REQUEST", "配置要求内容非法或超出长度限制");
+    const workspacePath = transaction.data.workspacePath;
+    const demoDir = this.pageDir(workspacePath, pageId);
+    if (!fs.existsSync(path.join(demoDir, "config.schema.json")))
+      return fail("DEMO_PAGE_NOT_FOUND", "页面不存在");
+    const writeAllowed = this.assertTransactionWorkspaceWriteAllowed(
+      transaction.data,
+      "update_page_requirements",
+    );
+    if (!writeAllowed.ok)
+      return fail(
+        writeAllowed.error?.code ?? "WORKSPACE_AUTHORITY_REQUIRED",
+        writeAllowed.error?.message ?? "Workspace 写入被拒绝",
+      );
+    ensureDir(demoDir);
+    fs.writeFileSync(path.join(demoDir, "requirements.md"), requirements, "utf-8");
+    return ok({ pageId, requirements });
+  }
+
+listPageRequirements(
+    editId: string,
+  ): ProjectAdminResult<{ pageId: string; pageName: string; refs: PageRequirementRef[] }[]> {
+    const transaction = this.requireEditable(editId);
+    if (!transaction.ok || !transaction.data)
+      return fail("EDIT_NOT_FOUND", "编辑事务不存在");
+    const workspacePath = transaction.data.workspacePath;
+    const tree = this.readWorkspaceTree(workspacePath);
+    const result: { pageId: string; pageName: string; refs: PageRequirementRef[] }[] = [];
+    for (const page of tree.pages) {
+      const demoDir = this.pageDir(workspacePath, page.id);
+      const reqPath = path.join(demoDir, "requirements.md");
+      if (!fs.existsSync(reqPath)) continue;
+      const markdown = fs.readFileSync(reqPath, "utf-8");
+      result.push({
+        pageId: page.id,
+        pageName: page.name,
+        refs: parsePageRequirementsRefs(markdown),
+      });
+    }
+    return ok(result);
+  }
+
   createPageVersion(
     input: PageVersionCreateInput,
     actor = this.defaultActor(),
@@ -5290,6 +5364,9 @@ export class ProjectAdminService {
     } else {
       fileRefs.code = this.writeBlob(projectId, files.code);
     }
+    if (typeof files.requirements === "string") {
+      fileRefs.requirements = this.writeBlob(projectId, files.requirements);
+    }
     return {
       page,
       files: fileRefs,
@@ -5379,6 +5456,7 @@ export class ProjectAdminService {
     );
     const sketchScene = this.readBlob(version.projectId, files.sketchScene);
     const sketchMetaText = this.readBlob(version.projectId, files.sketchMeta);
+    const requirements = this.readBlob(version.projectId, files.requirements);
     if (prototypeHtml !== undefined) result.prototypeHtml = prototypeHtml;
     if (prototypeCss !== undefined) result.prototypeCss = prototypeCss;
     if (prototypeMetaText !== undefined) {
@@ -5388,6 +5466,7 @@ export class ProjectAdminService {
     if (sketchMetaText !== undefined) {
       result.sketchMeta = JSON.parse(sketchMetaText) as Record<string, unknown>;
     }
+    if (requirements !== undefined) result.requirements = requirements;
     return result;
   }
 
@@ -5803,6 +5882,10 @@ export class ProjectAdminService {
     if (fs.existsSync(sketchMetaPath)) {
       files.sketchMeta =
         readJsonFile<Record<string, unknown>>(sketchMetaPath) ?? undefined;
+    }
+    const requirementsPath = path.join(demoDir, "requirements.md");
+    if (fs.existsSync(requirementsPath)) {
+      files.requirements = fs.readFileSync(requirementsPath, "utf-8");
     }
     return files;
   }
