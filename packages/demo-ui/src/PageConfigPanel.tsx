@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
+  ChevronDown,
   ChevronRight,
   FileText,
   ListFilter,
@@ -12,6 +13,9 @@ import {
 } from "lucide-react";
 import { ConfigForm } from "./ConfigForm";
 import { ConfigScopeWrapper } from "./ConfigScopeWrapper";
+import { PageRequirements } from "./PageRequirements";
+import { RichTextEditor } from "./RichTextEditor";
+import { parseSchemaToFields } from "./schema-parser";
 import {
   getAvailableConfigCategories,
   getSchemaFieldCountByCategory,
@@ -63,6 +67,12 @@ interface PageConfigPanelProps {
   positionEditActive?: boolean;
   positionEditDimming?: boolean;
   onTogglePositionDimming?: () => void;
+  /** 当前页面的配置要求（页面配置要求文档，Markdown，含行内软引用）。 */
+  requirements?: string;
+  /** 保存配置要求时回调（由宿主 PUT 持久化）。 */
+  onRequirementsChange?: (markdown: string) => void;
+  /** 配置要求加载中。 */
+  requirementsLoading?: boolean;
 }
 
 function getSortedPages(pages: PageConfigPanelPage[]) {
@@ -89,6 +99,74 @@ export function extractPrototypeConfigBindingKeys(html?: string | null): string[
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * 折叠区：标题栏（展开/收起 + 动作）+ 可折叠内容。
+ * 内容不做独立滚动，随面板整体滚动；`open` 由父级控制。
+ */
+function PanelSection({
+  icon: Icon,
+  title,
+  open,
+  onToggle,
+  actions,
+  children,
+}: {
+  icon: React.ElementType;
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  actions?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="flex flex-col">
+      <div className="flex items-center justify-between gap-2 border-b pb-2">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {open ? (
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+          )}
+          <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="text-sm font-semibold">{title}</span>
+        </button>
+        {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
+      </div>
+      {open && <div className="flex flex-col">{children}</div>}
+    </section>
+  );
+}
+
+/** 从页面 schema 提取配置引用候选（key + title/字段名）。 */
+function getReferenceCandidates(schema: string | undefined): {
+  key: string;
+  label: string;
+}[] {
+  if (!schema) return [];
+  try {
+    const candidates: { key: string; label: string }[] = [];
+    for (const group of parseSchemaToFields(schema)) {
+      for (const field of group.fields) {
+        candidates.push({
+          key: field.key,
+          label:
+            typeof field.title === "string" && field.title.trim()
+              ? field.title
+              : field.key,
+        });
+      }
+    }
+    return candidates;
+  } catch {
+    return [];
+  }
 }
 
 function getScopedProjectConfigSchema(
@@ -186,12 +264,19 @@ export function PageConfigPanel({
   positionEditActive,
   positionEditDimming,
   onTogglePositionDimming,
+  requirements,
+  onRequirementsChange,
+  requirementsLoading,
 }: PageConfigPanelProps) {
   const [internalDetailPageId, setInternalDetailPageId] = useState<
     string | null
   >(null);
   const [configCategoryFilter, setConfigCategoryFilter] = useState("");
   const [showSharedAffectedPages, setShowSharedAffectedPages] = useState(false);
+  const [configSectionOpen, setConfigSectionOpen] = useState(true);
+  const [requirementsSectionOpen, setRequirementsSectionOpen] = useState(true);
+  const [editingRequirements, setEditingRequirements] = useState(false);
+  const [requirementsDraft, setRequirementsDraft] = useState("");
   const [saveDefaultsScope, setSaveDefaultsScope] = useState<
     "page" | "project" | null
   >(null);
@@ -261,6 +346,11 @@ export function PageConfigPanel({
   useEffect(() => {
     setShowSharedAffectedPages(false);
   }, [effectiveDetailPageId, configCategoryFilter]);
+
+  useEffect(() => {
+    setEditingRequirements(false);
+    setRequirementsDraft(requirements ?? "");
+  }, [effectiveDetailPageId, requirements]);
 
   const openPageDetail = (pageId: string) => {
     onPageSelect?.(pageId);
@@ -407,7 +497,13 @@ export function PageConfigPanel({
       )}
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         <div className="flex flex-col gap-4">
-          {showSharedConfig && (
+          <PanelSection
+            icon={Settings}
+            title="配置项"
+            open={configSectionOpen}
+            onToggle={() => setConfigSectionOpen((current) => !current)}
+          >
+            {showSharedConfig && (
             <section className="flex flex-col">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
@@ -550,6 +646,90 @@ export function PageConfigPanel({
               </p>
             </div>
           )}
+          </PanelSection>
+
+          <PanelSection
+            icon={FileText}
+            title="资源规范"
+            open={requirementsSectionOpen}
+            onToggle={() => setRequirementsSectionOpen((current) => !current)}
+            actions={
+              requirementsLoading ? null : editingRequirements ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => {
+                      setEditingRequirements(false);
+                      setRequirementsDraft(requirements ?? "");
+                    }}
+                  >
+                    取消
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-7 gap-1 px-2 text-xs"
+                    onClick={() => {
+                      onRequirementsChange?.(requirementsDraft);
+                      setEditingRequirements(false);
+                    }}
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    保存
+                  </Button>
+                </>
+              ) : !readonly && onRequirementsChange ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1 px-2 text-xs"
+                  onClick={() => {
+                    setRequirementsDraft(requirements ?? "");
+                    setEditingRequirements(true);
+                  }}
+                >
+                  编辑
+                </Button>
+              ) : null
+            }
+          >
+            {requirementsLoading ? (
+              <div className="py-4 text-xs text-muted-foreground">
+                加载中...
+              </div>
+            ) : editingRequirements ? (
+              <div className="flex flex-col gap-2 pt-2">
+                <RichTextEditor
+                  content={requirementsDraft}
+                  onChange={setRequirementsDraft}
+                  referenceCandidates={getReferenceCandidates(
+                    selectedPage.schema,
+                  )}
+                />
+                <p className="text-xs text-muted-foreground">
+                  输入 @ 或使用工具栏「插入引用」选择当前页配置项，以 @[名称](key) 形式引用。
+                </p>
+              </div>
+            ) : requirements && requirements.trim() ? (
+              <div className="pt-2">
+                <PageRequirements markdown={requirements} />
+              </div>
+            ) : (
+              <div className="flex min-h-[120px] flex-col items-center justify-center px-4 text-center">
+                <FileText className="mb-2 h-6 w-6 text-muted-foreground/50" />
+                <p className="text-sm text-muted-foreground">暂无资源规范</p>
+                {!readonly && onRequirementsChange && (
+                  <p className="mt-1 text-xs text-muted-foreground/70">
+                    点击右上角「编辑」添加页面配置要求
+                  </p>
+                )}
+              </div>
+            )}
+          </PanelSection>
         </div>
       </div>
 

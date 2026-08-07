@@ -878,6 +878,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   );
   const pageSchemaMapRef = useRef(pageSchemaMap);
   pageSchemaMapRef.current = pageSchemaMap;
+  const [requirementsMap, setRequirementsMap] = useState<
+    Record<string, string>
+  >({});
+  const [requirementsLoading, setRequirementsLoading] = useState(false);
   const [pageCodes, setPageCodes] = useState<Record<string, string>>({});
   const [pagePrototypeMap, setPagePrototypeMap] = useState<
     Record<
@@ -1070,6 +1074,13 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     useState<SinglePreviewTarget | null>(null);
   const activeDemoIdRef = useRef(activeDemoId);
   activeDemoIdRef.current = activeDemoId;
+  useEffect(() => {
+    if (activeDemoId) {
+      loadPageRequirements(activeDemoId);
+    }
+    // 切换页面时重新加载该页配置要求
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDemoId]);
   const suppressNextCanvasCollabPushRef = useRef(false);
   const [projectConfigSchema, setProjectConfigSchema] = useState<
     string | undefined
@@ -3862,6 +3873,50 @@ ${context.details}
   );
 
   handlePageConfigPanelChangeRef.current = handlePageConfigPanelChange;
+
+  const loadPageRequirements = useCallback(
+    async (pageId: string) => {
+      if (!sessionId) return;
+      setRequirementsLoading(true);
+      try {
+        const response = await fetch(
+          `/api/projects/${demoId}/demos/${pageId}/requirements?sessionId=${encodeURIComponent(sessionId)}`,
+        );
+        const data = await response.json().catch(() => null);
+        if (response.ok && data?.success) {
+          setRequirementsMap((prev) => ({
+            ...prev,
+            [pageId]: data.data?.requirements ?? "",
+          }));
+        }
+      } catch {
+        // 读取失败不阻断编辑，配置要求保持为空
+      } finally {
+        setRequirementsLoading(false);
+      }
+    },
+    [demoId, sessionId],
+  );
+
+  const handlePageRequirementsChange = useCallback(
+    async (pageId: string, markdown: string) => {
+      if (!sessionId) return;
+      setRequirementsMap((prev) => ({ ...prev, [pageId]: markdown }));
+      try {
+        await fetch(
+          `/api/projects/${demoId}/demos/${pageId}/requirements`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId, requirements: markdown }),
+          },
+        );
+      } catch {
+        // 静默失败，下次进入编辑态仍可重新保存
+      }
+    },
+    [demoId, sessionId],
+  );
 
   const handlePositionChange = useCallback(
     (key: string, x: number, y: number) => {
@@ -8313,6 +8368,11 @@ await handlePublishWithScreenshot();
                         positionEditActive={positionEditMode.enabled}
                         positionEditDimming={positionEditDimming}
                         onTogglePositionDimming={handleTogglePositionDimming}
+                        requirements={requirementsMap[activeDemoId] ?? ""}
+                        onRequirementsChange={(markdown) =>
+                          handlePageRequirementsChange(activeDemoId, markdown)
+                        }
+                        requirementsLoading={requirementsLoading}
                       />
                     </TabsContent>
                     <TabsContent
@@ -8387,6 +8447,17 @@ await handlePublishWithScreenshot();
                   positionEditActive={positionEditMode.enabled}
                   positionEditDimming={positionEditDimming}
                   onTogglePositionDimming={handleTogglePositionDimming}
+                  requirements={
+                    requirementsMap[configPanelDetailPageId ?? activeDemoId] ??
+                    ""
+                  }
+                  onRequirementsChange={(markdown) =>
+                    handlePageRequirementsChange(
+                      configPanelDetailPageId ?? activeDemoId,
+                      markdown,
+                    )
+                  }
+                  requirementsLoading={requirementsLoading}
                 />
               )}
             </ResizablePanel>

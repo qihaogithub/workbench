@@ -42,7 +42,9 @@ import {
   SeparatorHorizontal,
   Underline as UnderlineIcon,
   Video as VideoIcon,
+  AtSign,
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Toggle } from "@/components/ui/toggle";
 import {
   Tooltip,
@@ -59,6 +61,11 @@ export type DocumentUploadHandler = (
   file: File,
 ) => Promise<{ url: string; kind: "image" | "video" | "file" }>;
 
+export interface ConfigReferenceCandidate {
+  key: string;
+  label: string;
+}
+
 export interface DocumentEditorProps {
   value: string;
   onChange: (value: string) => void;
@@ -70,6 +77,8 @@ export interface DocumentEditorProps {
   uploadHandler?: DocumentUploadHandler;
   /** markdown 预览态的安全清洗器，未提供时原样输出 */
   previewSanitizer?: (html: string) => string;
+  /** 提供时，工具栏显示「插入引用」按钮，选择后插入 @[label](key)。 */
+  referenceCandidates?: ConfigReferenceCandidate[];
   className?: string;
 }
 
@@ -301,6 +310,7 @@ export function DocumentEditor({
   htmlSanitizer,
   uploadHandler,
   previewSanitizer,
+  referenceCandidates,
   className,
 }: DocumentEditorProps) {
   const [previewMode, setPreviewMode] = useState(false);
@@ -454,6 +464,19 @@ export function DocumentEditor({
       } finally {
         setUploading(false);
       }
+    },
+    [editor],
+  );
+
+  const handleInsertReference = useCallback(
+    (candidate: ConfigReferenceCandidate) => {
+      if (!editor) return;
+      const text = `@[${candidate.label}](${candidate.key})`;
+      editor
+        .chain()
+        .focus()
+        .insertContent({ type: "text", text })
+        .run();
     },
     [editor],
   );
@@ -612,6 +635,40 @@ export function DocumentEditor({
               tooltip="插入附件"
               onFile={handleMediaUpload}
             />
+          </>
+        )}
+
+        {format === "markdown" && referenceCandidates && referenceCandidates.length > 0 && !readOnly && !previewMode && (
+          <>
+            <ToolbarSeparator />
+            <Popover>
+              <PopoverTrigger asChild>
+                <ToolbarButton
+                  icon={AtSign}
+                  tooltip="插入配置引用"
+                  onClick={() => {}}
+                />
+              </PopoverTrigger>
+              <PopoverContent
+                align="start"
+                side="bottom"
+                className="max-h-64 w-56 overflow-y-auto p-1 scrollbar-thin"
+              >
+                <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
+                  选择配置项
+                </div>
+                {referenceCandidates.map((candidate) => (
+                  <button
+                    key={candidate.key}
+                    type="button"
+                    onClick={() => handleInsertReference(candidate)}
+                    className="block w-full cursor-pointer truncate rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {candidate.label}
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
           </>
         )}
 

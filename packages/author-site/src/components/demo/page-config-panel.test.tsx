@@ -5,6 +5,7 @@ import {
   extractPrototypeConfigBindingKeys,
   PageConfigPanel,
 } from "@workbench/demo-ui";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const sharedSchema = JSON.stringify({
   type: "object",
@@ -539,5 +540,85 @@ describe("ConfigForm 空标题", () => {
     expect(screen.queryByText("Items")).not.toBeInTheDocument();
     expect(screen.queryByText("描述文字")).not.toBeInTheDocument();
     expect(screen.getAllByText("图片模块").length).toBeGreaterThan(0);
+  });
+});
+
+describe("PageConfigPanel 配置项与资源规范折叠区", () => {
+  const pageSchema = JSON.stringify({
+    type: "object",
+    properties: {
+      title: { type: "string", title: "标题" },
+    },
+  });
+
+  it("配置项与资源规范折叠区默认展开，资源规范空态展示", () => {
+    render(
+      <PageConfigPanel
+        pages={[{ id: "page_a", name: "页面 A", order: 0, schema: pageSchema, configData: {} }]}
+        activePageId="page_a"
+        detailPageId="page_a"
+        hideDetailHeader
+        readonly
+      />,
+    );
+
+    expect(screen.getByText("配置项")).toBeInTheDocument();
+    expect(screen.getByText("本页配置")).toBeInTheDocument();
+    expect(screen.getByText("资源规范")).toBeInTheDocument();
+    expect(screen.getByText("暂无资源规范")).toBeInTheDocument();
+  });
+
+  it("readonly 时资源规范不显示编辑按钮", () => {
+    render(
+      <PageConfigPanel
+        pages={[{ id: "page_a", name: "页面 A", order: 0, schema: pageSchema, configData: {} }]}
+        activePageId="page_a"
+        detailPageId="page_a"
+        hideDetailHeader
+        readonly
+        requirements=""
+      />,
+    );
+
+    expect(screen.getByText("资源规范")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "编辑" })).not.toBeInTheDocument();
+  });
+
+  it("非只读且有保存回调时资源规范显示编辑，可进入编辑态", () => {
+    const onRequirementsChange = jest.fn();
+    render(
+      <TooltipProvider>
+        <PageConfigPanel
+          pages={[{ id: "page_a", name: "页面 A", order: 0, schema: pageSchema, configData: {} }]}
+          activePageId="page_a"
+          detailPageId="page_a"
+          hideDetailHeader
+          requirements=""
+          onRequirementsChange={onRequirementsChange}
+        />
+      </TooltipProvider>,
+    );
+
+    const editButton = screen.getByRole("button", { name: "编辑" });
+    expect(editButton).toBeInTheDocument();
+    fireEvent.click(editButton);
+    expect(screen.getByRole("button", { name: "保存" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "取消" })).toBeInTheDocument();
+  });
+
+  it("有配置要求内容时渲染只读内容且不显示编辑（readonly）", () => {
+    render(
+      <PageConfigPanel
+        pages={[{ id: "page_a", name: "页面 A", order: 0, schema: pageSchema, configData: {} }]}
+        activePageId="page_a"
+        detailPageId="page_a"
+        hideDetailHeader
+        readonly
+        requirements="# 交互要求\n\n@[标题](title) 需突出显示。"
+      />,
+    );
+
+    expect(screen.queryByText("暂无资源规范")).not.toBeInTheDocument();
+    expect(screen.getByText("交互要求", { exact: false })).toBeInTheDocument();
   });
 });
