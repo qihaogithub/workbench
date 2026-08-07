@@ -160,6 +160,56 @@ describe('ModelManager', () => {
     });
   });
 
+  describe('getVisionModel', () => {
+    it('visionModelId 为 provider/裸模型时按后缀匹配回写完整模型 ID', () => {
+      const configWithVision: AgentConfig = {
+        sessionId: 'test-session',
+        backendProviders: {
+          providers: [
+            {
+              id: 'OmniRoute',
+              models: ['jojo/deepseek-v4-flash-0731', 'jojo/Qwen3.6-35B-A3B-FP8'],
+              apiKey: 'sk-test',
+              baseURL: 'http://gateway:20128/v1',
+            },
+          ],
+          activeProviderId: 'OmniRoute',
+        },
+      };
+      const m = new ModelManager(configWithVision);
+      const model = m.getVisionModel('OmniRoute/Qwen3.6-35B-A3B-FP8');
+      expect(model.id).toBe('jojo/Qwen3.6-35B-A3B-FP8');
+      expect(model.baseUrl).toBe('http://gateway:20128/v1');
+      expect(model.provider).toBe('OmniRoute');
+    });
+
+    it('visionModelId 已是完整模型 ID 时原样保留', () => {
+      const configWithVision: AgentConfig = {
+        sessionId: 'test-session',
+        backendProviders: {
+          providers: [
+            {
+              id: 'OmniRoute',
+              models: ['jojo/deepseek-v4-flash-0731', 'jojo/Qwen3.6-35B-A3B-FP8'],
+              apiKey: 'sk-test',
+              baseURL: 'http://gateway:20128/v1',
+            },
+          ],
+          activeProviderId: 'OmniRoute',
+        },
+      };
+      const m = new ModelManager(configWithVision);
+      const model = m.getVisionModel('OmniRoute/jojo/Qwen3.6-35B-A3B-FP8');
+      expect(model.id).toBe('jojo/Qwen3.6-35B-A3B-FP8');
+    });
+
+    it('provider 无模型列表时不作改写，原样返回', () => {
+      const m = new ModelManager(config);
+      const model = m.getVisionModel('anthropic/claude-sonnet-4-20250514');
+      expect(model.id).toBe('claude-sonnet-4-20250514');
+    });
+  });
+
   describe('getApiKeyAndHeaders', () => {
     it('应从 providerConfig 解析 apiKey', async () => {
       const configWithProviders: AgentConfig = {

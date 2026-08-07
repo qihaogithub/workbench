@@ -31,14 +31,17 @@ import {
   Heading1,
   Heading2,
   Heading3,
+  Image as ImageIcon,
   Italic,
   Link as LinkIcon,
   List,
   ListOrdered,
+  Paperclip,
   Quote,
   RemoveFormatting,
   SeparatorHorizontal,
   Underline as UnderlineIcon,
+  Video as VideoIcon,
 } from "lucide-react";
 import { Toggle } from "@/components/ui/toggle";
 import {
@@ -52,6 +55,10 @@ const md = new MarkdownIt({ html: true, linkify: false, typographer: false });
 
 export type DocumentEditorFormat = "markdown" | "html";
 
+export type DocumentUploadHandler = (
+  file: File,
+) => Promise<{ url: string; kind: "image" | "video" | "file" }>;
+
 export interface DocumentEditorProps {
   value: string;
   onChange: (value: string) => void;
@@ -59,6 +66,10 @@ export interface DocumentEditorProps {
   readOnly?: boolean;
   placeholder?: string;
   htmlSanitizer?: (html: string) => string;
+  /** markdown 模式下提供时，工具栏显示图片/视频/附件插入按钮 */
+  uploadHandler?: DocumentUploadHandler;
+  /** markdown 预览态的安全清洗器，未提供时原样输出 */
+  previewSanitizer?: (html: string) => string;
   className?: string;
 }
 
@@ -97,6 +108,40 @@ function ToolbarButton({
 
 function ToolbarSeparator() {
   return <div className="w-px h-4 bg-border mx-1" />;
+}
+
+function MediaInsertButton({
+  icon: Icon,
+  tooltip,
+  accept,
+  onFile,
+}: {
+  icon: React.ElementType;
+  tooltip: string;
+  accept?: string;
+  onFile: (file: File) => void | Promise<void>;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <ToolbarButton
+        icon={Icon}
+        tooltip={tooltip}
+        onClick={() => fileInputRef.current?.click()}
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={accept}
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onFile(file);
+          e.target.value = "";
+        }}
+      />
+    </>
+  );
 }
 
 function markdownToHtml(mdText: string): string {
@@ -254,12 +299,17 @@ export function DocumentEditor({
   readOnly = false,
   placeholder,
   htmlSanitizer,
+  uploadHandler,
+  previewSanitizer,
   className,
 }: DocumentEditorProps) {
   const [previewMode, setPreviewMode] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const isInitializedRef = useRef(false);
   const valueRef = useRef(value);
   valueRef.current = value;
+  const uploadHandlerRef = useRef(uploadHandler);
+  uploadHandlerRef.current = uploadHandler;
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -375,6 +425,38 @@ export function DocumentEditor({
       .setLink({ href: url })
       .run();
   }, [editor]);
+
+  const handleMediaUpload = useCallback(
+    async (file: File) => {
+      const handler = uploadHandlerRef.current;
+      if (!handler || !editor) return;
+      setUploading(true);
+      try {
+        const { url, kind } = await handler(file);
+        const name = file.name || "附件";
+        let markdown: string;
+        if (kind === "image") {
+          markdown = `\n![${name}](${url})\n`;
+        } else if (kind === "video") {
+          markdown = `\n<video controls src="${url}"></video>\n`;
+        } else {
+          markdown = `\n[${name}](${url})\n`;
+        }
+        editor
+          .chain()
+          .focus()
+          .insertContent({ type: "text", text: markdown })
+          .run();
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "上传失败，请重试";
+        window.alert(message);
+      } finally {
+        setUploading(false);
+      }
+    },
+    [editor],
+  );
 
   if (!editor) return null;
 
@@ -510,6 +592,29 @@ export function DocumentEditor({
           disabled={readOnly || previewMode}
         />
 
+        {format === "markdown" && uploadHandler && !readOnly && !previewMode && (
+          <>
+            <ToolbarSeparator />
+            <MediaInsertButton
+              icon={ImageIcon}
+              tooltip="插入图片"
+              accept="image/*"
+              onFile={handleMediaUpload}
+            />
+            <MediaInsertButton
+              icon={VideoIcon}
+              tooltip="插入视频"
+              accept="video/*"
+              onFile={handleMediaUpload}
+            />
+            <MediaInsertButton
+              icon={Paperclip}
+              tooltip="插入附件"
+              onFile={handleMediaUpload}
+            />
+          </>
+        )}
+
         <div className="flex-1" />
 
         <ToolbarButton
@@ -525,7 +630,10 @@ export function DocumentEditor({
           <div
             className="markdown-editor-content min-h-[200px] px-3 py-2 text-sm overflow-y-auto scrollbar-thin"
             dangerouslySetInnerHTML={{
-              __html: markdownToHtml(value || "（无内容）"),
+              __html: previewSanitizer
+                ? previewSanitizer(markdownToHtml(value || "")) ||
+                  "<p>（无内容）</p>"
+                : markdownToHtml(value || "（无内容）"),
             }}
           />
         ) : (
@@ -545,6 +653,7 @@ export function DocumentEditor({
 
       <div className="px-3 py-1 border-t bg-muted/20 text-xs text-muted-foreground">
         {format === "markdown" ? "Markdown" : "HTML"} · {charCount} 字符
+        {uploading && <span className="ml-2 text-primary">上传中...</span>}
       </div>
     </div>
   );

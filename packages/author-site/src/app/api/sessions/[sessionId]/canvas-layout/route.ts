@@ -64,6 +64,11 @@ function parseLayout(value: unknown): CanvasPageLayout | null {
   if (width <= 0 || height <= 0) {
     return null;
   }
+  // 防止 Chrome scrollHeight 上限（2^24 ≈ 16,777,216）被持久化为高度
+  const MAX_PAGE_HEIGHT = 50000;
+  if (height > MAX_PAGE_HEIGHT || width > MAX_PAGE_HEIGHT) {
+    return null;
+  }
 
   return {
     x,

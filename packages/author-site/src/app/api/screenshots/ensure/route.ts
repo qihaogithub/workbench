@@ -120,6 +120,7 @@ async function inlinePrototypeAssets(
 
 interface EnsureRequest {
   projectId: string;
+  force?: boolean;
 }
 
 interface ScreenshotMeta {
@@ -251,6 +252,7 @@ async function hasHealthyScreenshotCache(
 
 async function readProjectThumbnailPages(
   projectId: string,
+  force = false,
 ): Promise<ThumbnailPageInput[]> {
   const workspacePath = path.join(PROJECTS_DIR, projectId, "workspace");
   const demosPath = path.join(workspacePath, "demos");
@@ -312,7 +314,7 @@ async function readProjectThumbnailPages(
       fullPage: true,
       priority: "thumbnail",
       renderMode: "strict",
-      force: !(await hasHealthyScreenshotCache(projectId, entry.name)),
+      force: force || !(await hasHealthyScreenshotCache(projectId, entry.name)),
     } as const;
 
     // Inline relative image assets as base64 data URIs so that the
@@ -395,7 +397,7 @@ function toResponsePage(page: ThumbnailPageInput): {
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as EnsureRequest;
-    const { projectId } = body;
+    const { projectId, force = false } = body;
 
     if (!projectId) {
       return NextResponse.json(
@@ -418,7 +420,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const pages = await readProjectThumbnailPages(projectId);
+    const pages = await readProjectThumbnailPages(projectId, force);
     if (pages.length === 0) {
       return NextResponse.json({
         success: true,

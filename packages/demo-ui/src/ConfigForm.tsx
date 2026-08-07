@@ -463,9 +463,9 @@ export function ConfigForm({
               if (!open) setNoteDialogField(null);
             }}
             fieldTitle={currentNoteField.title}
-            noteHtml={currentNoteField.note || ""}
+            note={currentNoteField.note || ""}
             readonly={readonly}
-            onSave={(html) => updateSchemaNote(currentNoteField.key, html)}
+            onSave={(markdown) => updateSchemaNote(currentNoteField.key, markdown)}
             onDelete={() => deleteSchemaNote(currentNoteField.key)}
           />
         ) : null}

@@ -1864,7 +1864,7 @@ function ImageDescriberTab() {
             <option value="">留空 — 自动使用当前主模型</option>
             {availableModels.map((m) => (
               <option key={m.id} value={m.id}>
-                {m.label}
+                {m.group ? `${m.group} / ${m.label}` : m.label}
               </option>
             ))}
             {visionModelId && !availableModels.find((m) => m.id === visionModelId) && (

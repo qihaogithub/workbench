@@ -13,7 +13,7 @@ import { useToast } from "../ui/toast-provider";
 
 export interface InlineTag {
   id: string;
-  type: "project" | "element";
+  type: "project" | "element" | "page";
   label: string;
   context: string;
 }
@@ -37,9 +37,10 @@ export interface InlineTagInputHandle {
   clear(): void;
   focus(): void;
   getValue(): InlineTagInputValue;
+  getSegments(): InputSegment[];
 }
 
-type InputSegment =
+export type InputSegment =
   | { type: "text"; value: string }
   | { type: "tag"; tag: InlineTag };
 
@@ -219,14 +220,18 @@ export function InlineTagInput({
         "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium align-middle select-none cursor-default group",
         tag.type === "project"
           ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
-          : "bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300",
+          : tag.type === "element"
+            ? "bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300"
+            : "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
       );
 
       const iconSpan = document.createElement("span");
       iconSpan.className = "shrink-0 flex items-center";
       tagSpan.appendChild(iconSpan);
 
-      const atText = document.createTextNode(`@${tag.label}`);
+      const atText = document.createTextNode(
+        tag.type === "page" ? tag.label : `@${tag.label}`,
+      );
       tagSpan.appendChild(atText);
 
       const removeBtn = document.createElement("span");
@@ -278,6 +283,12 @@ export function InlineTagInput({
     return extractValue(segments);
   }, []);
 
+  const getSegments = useCallback((): InputSegment[] => {
+    const editor = editorRef.current;
+    if (!editor) return [];
+    return extractSegments(editor);
+  }, []);
+
   useImperativeHandle(
     controller,
     () => ({
@@ -285,8 +296,9 @@ export function InlineTagInput({
       clear,
       focus: () => editorRef.current?.focus(),
       getValue,
+      getSegments,
     }),
-    [insertTag, clear, getValue],
+    [insertTag, clear, getValue, getSegments],
   );
 
   useEffect(() => {

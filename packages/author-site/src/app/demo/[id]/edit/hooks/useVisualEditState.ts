@@ -268,16 +268,14 @@ export function buildVisualSelectionPrompt(
   node: VisualNodeInfo,
   projectId: string,
 ): string {
-  return `请只针对当前可视化选区提出修改建议，不要静默扩大范围。
+  return `当前预览区选中的元素：
 
 【当前选区】
-- 元素：<${node.tagName}>
+- 元素：\`<${node.tagName}>\`
 - DOM 路径：${node.domPath}
 - className：${node.className || "无"}
 - 文本：${node.textContent || "无"}
-- 页面文件：demos/${projectId}/index.tsx
-
- 请给出可审阅的局部修改建议；如果必须修改选区外代码，请明确说明影响范围。`;
+- 页面文件：demos/${projectId}/index.tsx`;
 }
 
 export function getNodeLabel(node: VisualNodeInfo): string {

@@ -1,7 +1,10 @@
 {
-  "version": "2026-06-preview-runtime-v4",
-  "generatedAt": "2026-07-22T14:10:56.197Z",
+  "version": "2026-06-preview-runtime-v5",
+  "generatedAt": "2026-08-06T00:44:07.155Z",
   "imports": {
+    "lottie-web": "/preview-runtime/vendor/lottie-web.js",
+    "@rive-app/canvas": "/preview-runtime/vendor/rive-app-canvas.js",
+    "@esotericsoftware/spine-webgl": "/preview-runtime/vendor/spine-webgl.js",
     "react": "/preview-runtime/vendor/react.js",
     "react-dom": "/preview-runtime/vendor/react-dom.js",
     "react-dom/client": "/preview-runtime/vendor/react-dom-client.js",
@@ -13,61 +16,77 @@
     "@preview/sdk": "/preview-runtime/vendor/preview-sdk.js"
   },
   "files": {
+    "vendor/lottie-web.js": {
+      "hash": "c683bc1f25e0d40f",
+      "bytes": 308337
+    },
+    "vendor/rive-app-canvas.js": {
+      "hash": "5d67ffcd925b2e03",
+      "bytes": 153728
+    },
+    "vendor/spine-webgl.js": {
+      "hash": "9a74a9774a96fc45",
+      "bytes": 229881
+    },
     "vendor/react.js": {
-      "hash": "27a497f3ddc2533c",
-      "bytes": 201
+      "hash": "75188a29c714caae",
+      "bytes": 377
     },
     "vendor/react-dom.js": {
-      "hash": "ff967e30dd939237",
+      "hash": "b7913800f9e20da8",
       "bytes": 228
     },
     "vendor/react-dom-client.js": {
-      "hash": "6fa869cb0e02337c",
+      "hash": "c522f3e0c3595656",
       "bytes": 332
     },
-    "vendor/chunks/chunk-F6675YMV.js": {
-      "hash": "f31ceacd7c955d14",
+    "vendor/chunks/chunk-2Y5MXMYR.js": {
+      "hash": "fd8a544ccb45e537",
       "bytes": 134374
     },
     "vendor/react-jsx-runtime.js": {
-      "hash": "614f6ab932617af5",
+      "hash": "06b6949ab06312bc",
       "bytes": 263
     },
     "vendor/react-jsx-dev-runtime.js": {
-      "hash": "ad2a7dd064c5c4b6",
+      "hash": "6252e0746d8dc801",
       "bytes": 662
     },
     "vendor/lucide-react.js": {
-      "hash": "bbf76edeab132a5c",
+      "hash": "66cc5476ad559c1a",
       "bytes": 794295
     },
     "vendor/framer-motion.js": {
-      "hash": "b48a10d2bf9c483f",
+      "hash": "bdcebe052a65cf61",
       "bytes": 180741
     },
-    "vendor/chunks/chunk-SKAZGOYB.js": {
-      "hash": "40c3983f9b5ad06d",
+    "vendor/chunks/chunk-FX5VQGRB.js": {
+      "hash": "9d42daaad6dfb1e9",
       "bytes": 1083
     },
-    "vendor/chunks/chunk-3ZCDBDZF.js": {
-      "hash": "be993e4a8dfc0cdb",
+    "vendor/chunks/chunk-3PH352JX.js": {
+      "hash": "17c43c8625c0871b",
       "bytes": 6868
     },
     "vendor/svgaplayerweb.js": {
-      "hash": "71d0141a6a8a0149",
+      "hash": "3b578881f8229577",
       "bytes": 123489
     },
-    "vendor/chunks/chunk-3LQ24N6V.js": {
-      "hash": "ef59f50aa92040b6",
-      "bytes": 914
+    "vendor/chunks/chunk-UFN2LDR4.js": {
+      "hash": "3b2fde7f79aa3c21",
+      "bytes": 1061
     },
     "vendor/tailwindcss.js": {
       "hash": "2f0570ef81afaa41",
       "bytes": 366531
     },
+    "vendor/rive.wasm": {
+      "hash": "0a4b12ad03c9c21b",
+      "bytes": 1927601
+    },
     "vendor/preview-sdk.js": {
-      "hash": "8a9ff832d9d8b9f8",
-      "bytes": 11511
+      "hash": "1a88292eb9ad8c3a",
+      "bytes": 19872
     }
   },
   "packages": {
@@ -76,6 +95,9 @@
     "lucide-react": "0.323.0",
     "framer-motion": "12.38.0",
     "svgaplayerweb": "2.3.1",
+    "lottie-web": "5.13.0",
+    "@rive-app/canvas": "2.38.1",
+    "@esotericsoftware/spine-webgl": "4.2.112",
     "tailwindcss-cdn": "3.4.10"
   }
 }

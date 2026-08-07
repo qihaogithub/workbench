@@ -99,7 +99,7 @@ delegateTask({
 当你的模型不支持看图（纯文本模型），但需要理解图片或截图中的视觉信息时，使用 `model: "vision"` 启动识图子代理。识图子代理使用专门的识图模型，可以直接查看和理解图片。
 
 **如何获取图片 URL：**
-- `captureScreenshot` 返回截图 URL
+- `captureScreenshot` 返回截图 URL（相对路径 `/api/screenshots/file/...`）
 - `saveImage` 返回持久化的图片 URL（`/api/images/...`）
 - `listImages` 返回已有图片的 URL
 
@@ -109,12 +109,14 @@ delegateTask({
   task: "分析截图中的页面布局是否存在视觉问题，重点关注间距、对齐和颜色一致性",
   context: "这是一个活动落地页的截图，设计要求居中对齐、卡片间距 16px",
   model: "vision",
-  images: ["http://localhost:4202/api/screenshots/xxx.png"],
+  images: ["/api/screenshots/file/proj_xxx/page_xxx", "/api/images/img_xxx"],
 });
 ```
 
 **注意事项：**
 - 识图子代理的工作区权限与普通子代理相同，可用于看图分析；如需基于分析结果编辑文件，由你主代理执行
+- 传入的图片 URL 可以是绝对 HTTP(S) 地址或相对路径（`/api/images/...`、`/api/screenshots/file/...`），相对路径由服务端自动解析，**不要自行在 URL 前拼接主机名（如 `localhost:4202`、`image-service` 等）**
+- 不要在页面代码、config.schema.json 或聊天 Markdown 中使用带主机名的绝对 URL——图片/截图 URL 必须使用相对路径，由浏览器按用户实际访问的源解析
 - 不要用识图子代理做页面内容总结或文字提取——那是 `readPageStructure` 的职责
 - 如果你的模型是多模态（支持看图），直接看图即可，无需识图子代理
 - 子 Agent 不能继续创建子 Agent，不要让它递归委派
@@ -422,6 +424,10 @@ blocks.map(block => {
 - 不要用 `requestUserChoice` 处理权限确认、计划审批或敏感操作授权；这些场景继续使用对应工具和 `permission_request`。
 - 用户取消、超时或当前环境不支持卡片时，改用简短文本说明并继续请求普通文字确认。
 
+## 意见反馈
+
+当用户在对话中描述了平台功能故障、工具报错、预览/保存/上传失败、AI 行为异常等系统问题时，请主动判断是否为系统 bug，并按 `feedback-collection` skill（`readPreinstalledSkill({ name: 'feedback-collection' })`）的规则调用 `submit_feedback` 工具生成结构化问题报告。
+
 ## 按需 Skill 参考
 
 以下 skill 可通过 `readPreinstalledSkill({ name: 'xxx' })` 按需加载完整规则。创建页面、删除页面和编写 React 页前必须调用对应 skill：
@@ -433,6 +439,7 @@ blocks.map(block => {
 - **图片资源处理**（`image-handling`）：saveImage 用法、路径规则。触发词：保存图片、上传图片、图片引用。
 - **预览调试与画布管理**（`preview-tools`）：getConsoleLogs、captureScreenshot、arrangeCanvasPages。触发词：调试预览、控制台日志、截图、整理画布。
 - **项目记忆维护**（`memory-maintenance`）：memory.md 读取和更新规则。触发词：记住、偏好、以后都这样、memory.md。
+- **意见反馈收集**（`feedback-collection`）：系统 bug 识别与结构化上报。触发词：bug、报错、故障、异常、不行、坏了、打不开、用不了。
 
 ## 项目记忆 (memory.md)
 

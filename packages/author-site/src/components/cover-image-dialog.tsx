@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/toast-provider'
-import { uploadCover, deleteCover } from '@/lib/api'
+import { uploadCover, deleteCover, refreshScreenshots } from '@/lib/api'
 import { ImagePlus, Trash2, RefreshCcw, Loader2 } from 'lucide-react'
 import type { ApiResponse } from '@workbench/shared'
 
@@ -37,6 +37,7 @@ export function CoverImageDialog({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [isDragOver, setIsDragOver] = useState(false)
 
   const handleFileSelect = useCallback(
@@ -110,13 +111,45 @@ export function CoverImageDialog({
     [handleFileSelect],
   )
 
-  const isProcessing = isUploading || isDeleting
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true)
+    try {
+      const result = await refreshScreenshots(projectId)
+      if (result.success) {
+        toast({ title: '缩略图刷新已触发', description: `正在重新生成 ${result.data.total} 个页面的截图` })
+      } else {
+        toast({ title: '刷新失败', description: result.error.message, variant: 'destructive' })
+      }
+    } catch {
+      toast({ title: '刷新失败', description: '网络错误', variant: 'destructive' })
+    } finally {
+      setIsRefreshing(false)
+    }
+  }, [projectId, toast])
+
+  const isProcessing = isUploading || isDeleting || isRefreshing
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>设置封面图</DialogTitle>
+          <div className="flex items-center gap-2">
+            <DialogTitle>设置封面图</DialogTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 text-xs text-muted-foreground hover:text-foreground"
+              onClick={handleRefresh}
+              disabled={isProcessing}
+            >
+              {isRefreshing ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCcw className="h-3.5 w-3.5" />
+              )}
+              刷新默认缩略图
+            </Button>
+          </div>
           <DialogDescription>
             上传自定义封面图，用于首页项目卡片展示
           </DialogDescription>

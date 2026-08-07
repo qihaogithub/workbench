@@ -45,10 +45,19 @@ function validateImageDimensions(
   const { minWidth, minHeight, maxWidth, maxHeight } = options;
   const parts: string[] = [];
 
-  if (minWidth && actual.width < minWidth) parts.push(`宽度小于 ${minWidth}px`);
-  if (minHeight && actual.height < minHeight) parts.push(`高度小于 ${minHeight}px`);
-  if (maxWidth && actual.width > maxWidth) parts.push(`宽度大于 ${maxWidth}px`);
-  if (maxHeight && actual.height > maxHeight) parts.push(`高度大于 ${maxHeight}px`);
+  if (minWidth && maxWidth && minWidth === maxWidth) {
+    if (actual.width !== minWidth) parts.push(`宽度=${minWidth}px`);
+  } else {
+    if (minWidth && actual.width < minWidth) parts.push(`宽度≥${minWidth}px`);
+    if (maxWidth && actual.width > maxWidth) parts.push(`宽度≤${maxWidth}px`);
+  }
+
+  if (minHeight && maxHeight && minHeight === maxHeight) {
+    if (actual.height !== minHeight) parts.push(`高度=${minHeight}px`);
+  } else {
+    if (minHeight && actual.height < minHeight) parts.push(`高度≥${minHeight}px`);
+    if (maxHeight && actual.height > maxHeight) parts.push(`高度≤${maxHeight}px`);
+  }
 
   if (parts.length === 0) return { valid: true, message: '' };
   return {

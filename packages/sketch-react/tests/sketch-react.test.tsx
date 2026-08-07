@@ -5338,6 +5338,18 @@ describe("sketch-react", () => {
     });
   });
 
+  it("does not capture the pointer or start a drag on right-click", () => {
+    render(<ControlledEditor />);
+
+    const stage = getCanvasStage();
+    const captureSpy = vi.fn();
+    Object.defineProperty(stage, "setPointerCapture", { configurable: true, value: captureSpy });
+
+    fireEvent.pointerDown(stage, { button: 2, pointerId: 7, clientX: 120, clientY: 120 });
+
+    expect(captureSpy).not.toHaveBeenCalled();
+  });
+
   it("shows export and copy actions in the canvas context menu without changing scene data", async () => {
     render(<ControlledEditor />);
 

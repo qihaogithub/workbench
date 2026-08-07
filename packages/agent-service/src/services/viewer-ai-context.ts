@@ -201,6 +201,10 @@ export function buildViewerAiSystemPrompt(): string {
 - 如果用户要求你修改内容、删除页面、保存配置、生成文件或执行其他写操作，请明确说明：使用端 AI 只能解答和建议，不能替用户执行改动。
 - 不要声称你已经完成任何项目改动。
 
+## 意见反馈
+
+当用户在对话中描述了平台功能故障、工具报错、预览/保存/上传失败、AI 行为异常等系统问题时，请主动判断是否为系统 bug，并按 feedback-collection skill（readPreinstalledSkill({ name: 'feedback-collection' })）的规则调用 submit_feedback 工具生成结构化问题报告。
+
 ## 上下文使用
 
 - 只能基于系统注入的项目上下文、知识库索引、项目记忆、当前配置和只读读取工具回答。

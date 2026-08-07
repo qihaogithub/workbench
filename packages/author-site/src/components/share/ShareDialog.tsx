@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,10 +12,11 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast-provider";
 import { projectApiClient, ProjectApiError } from "@/lib/project-api";
+import { getViewerBaseUrl } from "@/lib/viewer-url";
 import { Copy, Loader2, Share2 } from "lucide-react";
 
 type ShareTab = "edit" | "view";
-type PublishState = "idle" | "publishing" | "published" | "error";
+type PublishState = "idle" | "checking" | "publishing" | "published" | "error";
 
 interface ShareDialogProps {
   projectId: string;
@@ -23,21 +24,12 @@ interface ShareDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-function getViewerBaseUrl(): string {
-  if (typeof window === "undefined") return "";
-  const viewerUrl = process.env.NEXT_PUBLIC_VIEWER_URL;
-  if (viewerUrl) return viewerUrl;
-  if (window.location.hostname === "localhost") {
-    return "http://localhost:3300";
-  }
-  return "";
-}
-
 export function ShareDialog({ projectId, open, onOpenChange }: ShareDialogProps) {
   const [activeTab, setActiveTab] = useState<ShareTab>("edit");
   const [publishState, setPublishState] = useState<PublishState>("idle");
   const [publishError, setPublishError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const linkInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const editLink =
@@ -59,13 +51,8 @@ export function ShareDialog({ projectId, open, onOpenChange }: ShareDialogProps)
     }
   }, [open]);
 
-  useEffect(() => {
-    if (open && activeTab === "view") {
-      checkPublishStatus();
-    }
-  }, [open, activeTab]);
-
   const checkPublishStatus = useCallback(async () => {
+    setPublishState("checking");
     try {
       const status = await projectApiClient.getPublishStatus(projectId);
       if (status.status === "published") {
@@ -78,6 +65,17 @@ export function ShareDialog({ projectId, open, onOpenChange }: ShareDialogProps)
       setPublishError("无法获取发布状态");
     }
   }, [projectId]);
+
+  const handleTabChange = useCallback(
+    (value: string) => {
+      const tab = value as ShareTab;
+      setActiveTab(tab);
+      if (tab === "view") {
+        void checkPublishStatus();
+      }
+    },
+    [checkPublishStatus],
+  );
 
   const handlePublish = useCallback(async () => {
     setPublishState("publishing");
@@ -96,15 +94,46 @@ export function ShareDialog({ projectId, open, onOpenChange }: ShareDialogProps)
   }, [projectId]);
 
   const handleCopy = useCallback(
-    async (link: string) => {
-      try {
-        await navigator.clipboard.writeText(link);
+    (link: string) => {
+      const copyViaInput = (): boolean => {
+        const input = linkInputRef.current;
+        if (!input) return false;
+        try {
+          input.focus();
+          input.select();
+          input.setSelectionRange(0, 99999);
+          return document.execCommand("copy");
+        } catch {
+          return false;
+        }
+      };
+
+      const showSuccess = () => {
         setCopied(true);
         toast({ title: "已复制" });
         setTimeout(() => setCopied(false), 1500);
-      } catch {
+      };
+
+      const showError = () => {
         toast({ title: "复制失败，请手动复制", variant: "destructive" });
+      };
+
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard
+          .writeText(link)
+          .then(showSuccess)
+          .catch(() => {
+            if (copyViaInput()) showSuccess();
+            else showError();
+          });
+        return;
       }
+
+      // 非安全上下文（HTTP LAN）下使用 execCommand。
+      // 必须选中弹窗内已渲染的 Input（处于 Dialog focus scope 内），
+      // 新建并 focus 一个挂在 body 下的 textarea 会被焦点陷阱抢回焦点导致复制失败。
+      if (copyViaInput()) showSuccess();
+      else showError();
     },
     [toast],
   );
@@ -117,10 +146,7 @@ export function ShareDialog({ projectId, open, onOpenChange }: ShareDialogProps)
         <DialogHeader>
           <DialogTitle>分享</DialogTitle>
         </DialogHeader>
-        <Tabs
-          value={activeTab}
-          onValueChange={(v) => setActiveTab(v as ShareTab)}
-        >
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsList className="w-full">
             <TabsTrigger value="edit" className="flex-1">
               编辑链接
@@ -131,10 +157,13 @@ export function ShareDialog({ projectId, open, onOpenChange }: ShareDialogProps)
           </TabsList>
         </Tabs>
         <div className="mt-4 space-y-3">
-          {activeTab === "view" && publishState === "publishing" ? (
+          {activeTab === "view" &&
+          (publishState === "checking" || publishState === "publishing") ? (
             <div className="flex flex-col items-center gap-2 py-2 text-sm text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin" />
-              <span>发布中...</span>
+              <span>
+                {publishState === "publishing" ? "发布中..." : "检查发布状态中..."}
+              </span>
             </div>
           ) : activeTab === "view" && publishState !== "published" ? (
             <div className="space-y-3">
@@ -162,6 +191,7 @@ export function ShareDialog({ projectId, open, onOpenChange }: ShareDialogProps)
           ) : (
             <div className="flex items-center gap-2">
               <Input
+                ref={linkInputRef}
                 readOnly
                 value={currentLink}
                 className="flex-1 font-mono text-xs"

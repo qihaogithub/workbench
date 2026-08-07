@@ -10,6 +10,19 @@ overrides:
 importers:
 
   .:
+    dependencies:
+      '@esotericsoftware/spine-webgl':
+        specifier: 4.2.112
+        version: 4.2.112
+      '@rive-app/canvas':
+        specifier: 2.38.1
+        version: 2.38.1
+      lottie-web:
+        specifier: 5.13.0
+        version: 5.13.0
+      yauzl:
+        specifier: ^3.4.0
+        version: 3.4.0
     devDependencies:
       '@playwright/test':
         specifier: ^1.42.0
@@ -591,6 +604,9 @@ importers:
       '@types/react-dom':
         specifier: ^18.2.18
         version: 18.3.7(@types/react@18.3.28)
+      '@types/yauzl':
+        specifier: ^2.10.3
+        version: 2.10.3
       autoprefixer:
         specifier: ^10.4.17
         version: 10.4.27(postcss@8.5.8)
@@ -2843,6 +2859,16 @@ packages:
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
     dev: true
 
+  /@esotericsoftware/spine-core@4.2.112:
+    resolution: {integrity: sha512-6MXHr1V5u1GkhhOmL4QFd3CerxsFHvKKiTs4AQAckau5Lp1Tw19TOBb2bUX7WSlXUPmmLRI6w/DMZSQUBDFPUA==}
+    dev: false
+
+  /@esotericsoftware/spine-webgl@4.2.112:
+    resolution: {integrity: sha512-/CW26RSYQ+fGt9p77CgGqVaAWfeTkBTfd7vxX2ZDY6nHm6ac7s+MPtsQ3cm9ZmveWpNEeOM8pQEhudWQEuqPgw==}
+    dependencies:
+      '@esotericsoftware/spine-core': 4.2.112
+    dev: false
+
   /@fastify/ajv-compiler@3.6.0:
     resolution: {integrity: sha512-LwdXQJjmMD+GwLOkP7TVC68qa+pSSogeWWmznRJ/coyTcfe9qA05AHFSe1eZFwK6q+xVRpChnvFUkf1iYaSZsQ==}
     dependencies:
@@ -4703,6 +4729,10 @@ packages:
     resolution: {integrity: sha512-HPwpGIzkl28mWyZqG52jiqDJ12waP11Pa1lGoiyUkIEuMLBP0oeK/C89esbXrxsky5we7dfd8U58nm0SgAWpVw==}
     dev: false
 
+  /@rive-app/canvas@2.38.1:
+    resolution: {integrity: sha512-iK5HH2N1ZtkgbGV9nkIEyTv6j7Zbx6tVns/y6a8Yk+hPPnQl8XO5RS6gMM4V2NNmyvQ9PnAmnZDNaZCJUtaU8g==}
+    dev: false
+
   /@rjsf/core@6.4.2(@rjsf/utils@6.4.2)(react@18.3.1):
     resolution: {integrity: sha512-TsN2PNqsO92d6/Tt+Sq4XgXtpXgzNRShL/pYYrnAluwf3n87TvE1huJpHgH6c/wD7eRFOYT4e7I0GxqiVos/VQ==}
     engines: {node: '>=20'}
@@ -6042,8 +6072,6 @@ packages:
     requiresBuild: true
     dependencies:
       '@types/node': 20.19.37
-    dev: false
-    optional: true
 
   /@typescript-eslint/eslint-plugin@6.21.0(@typescript-eslint/parser@6.21.0)(eslint@8.57.1)(typescript@5.9.3):
     resolution: {integrity: sha512-oy9+hTPCUFpngkEZUSzbf9MxI65wbKFoQYsgPdILTfbUldp5ovUuphZVe4i30emU9M/kP+T64Di0mxl7dSw3MA==}
@@ -11050,6 +11078,10 @@ packages:
       underscore: 1.13.8
     dev: false
 
+  /lottie-web@5.13.0:
+    resolution: {integrity: sha512-+gfBXl6sxXMPe8tKQm7qzLnUy5DUPJPKIyRHwtpCpyUEYjHYRJC/5gjUvdkuO2c3JllrPtHXH5UJJK8LRYl5yQ==}
+    dev: false
+
   /loupe@2.3.7:
     resolution: {integrity: sha512-zSMINGVYkdpYSOBmLi0D1Uo7JU9nVdQKrHxC8eYlV+9YKK9WePqAlL7lSlorG/U2Fw1w0hTBmaa/jrQ3UbPHtA==}
     dependencies:
@@ -15419,6 +15451,13 @@ packages:
     dependencies:
       buffer-crc32: 0.2.13
       fd-slicer: 1.1.0
+    dev: false
+
+  /yauzl@3.4.0:
+    resolution: {integrity: sha512-jIH9yLR9wqr0wOS0TpBvo/g/2UgZH5qePVbjgRliiF0BYvOZyaBknKsF+x9Iht0O6sqgnB93rCICdOZFecJuDw==}
+    engines: {node: '>=12'}
+    dependencies:
+      pend: 1.2.0
     dev: false
 
   /yjs@13.6.31:

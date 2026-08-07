@@ -94,9 +94,19 @@ vi.mock('@earendil-works/pi-ai', () => ({
   getModels: () => [],
 }));
 
+const imageStoreTestMocks = vi.hoisted(() => ({
+  uploadToGlobalImageStore: vi.fn(() => ({ success: false, error: 'mocked' })),
+  readGlobalImageById: vi.fn(() => ({ success: false, error: 'not found' })),
+}));
+
+vi.mock('../../src/backends/pi-tools/global-image-store', () => imageStoreTestMocks);
+
+import { uploadToGlobalImageStore } from '../../src/backends/pi-tools/global-image-store';
+
 describe('PiAgentBackend', () => {
   const mockConfig: AgentConfig = {
     sessionId: 'test-session',
+    projectId: 'test-project',
     workingDir: '/tmp/test-workspace',
     piAgent: {
       provider: 'anthropic',
@@ -294,9 +304,10 @@ describe('PiAgentBackend', () => {
       ).resolves.toBe('ok');
 
       const promptContent = prompt.mock.calls[0][0] as string;
-      expect(promptContent).toContain('当前会话已有以下只读文件附件');
+      expect(promptContent).toContain('【上传文件】');
+      expect(promptContent).toContain('【历史附件】');
       expect(promptContent).toContain('attachmentId: att-history');
-      expect(promptContent).toContain('来源: 当前会话历史附件');
+      expect(promptContent).toContain('历史附件');
       expect(promptContent).toContain('商城首页.html');
     });
 
@@ -706,6 +717,130 @@ describe('PiAgentBackend', () => {
       expect(piAgentMocks.envs[0].cleanup).toHaveBeenCalled();
       expect(piAgentMocks.harnesses[0].abort).toHaveBeenCalled();
     });
+
+    it('vision 模式下载 /api/images/ 应从本地图床读取', async () => {
+      vi.mocked(imageStoreTestMocks.readGlobalImageById).mockReturnValue({
+        success: true,
+        data: Buffer.from('test-image-data').toString('base64'),
+        mimeType: 'image/png',
+        filename: 'test.png',
+        sizeBytes: 100,
+      });
+
+      process.env.IMAGE_DESCRIPTION_ENABLED = 'true';
+      process.env.IMAGE_DESCRIPTION_MODEL = 'custom/vision-model';
+
+      const backend = new PiAgentBackend(textOnlyImageConfig);
+      Object.defineProperty(backend, 'imageDescriber', {
+        value: {
+          getConfig: () => ({ visionModelId: 'custom/vision-model' }),
+        },
+      });
+
+      const result = await (backend as any).runSubagent({
+        task: '分析图片',
+        model: 'vision',
+        imageUrls: ['/api/images/img_test123'],
+      });
+
+      expect(result.success).toBe(true);
+      expect(imageStoreTestMocks.readGlobalImageById).toHaveBeenCalledWith('img_test123');
+    });
+
+    it('vision 模式 /api/images/ 图片不存在时应返回可读错误', async () => {
+      vi.mocked(imageStoreTestMocks.readGlobalImageById).mockReturnValue({
+        success: false,
+        error: 'Image not found: img_notfound',
+      });
+
+      process.env.IMAGE_DESCRIPTION_ENABLED = 'true';
+      process.env.IMAGE_DESCRIPTION_MODEL = 'custom/vision-model';
+
+      const backend = new PiAgentBackend(textOnlyImageConfig);
+      Object.defineProperty(backend, 'imageDescriber', {
+        value: {
+          getConfig: () => ({ visionModelId: 'custom/vision-model' }),
+        },
+      });
+
+      const result = await (backend as any).runSubagent({
+        task: '分析图片',
+        model: 'vision',
+        imageUrls: ['/api/images/img_notfound'],
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.content).toContain('下载图片失败');
+      expect(result.content).toContain('/api/images/img_notfound');
+      expect(result.content).toContain('Image not found');
+    });
+
+    it('vision 模式 /api/screenshots/ 应使用 screenshotServiceUrl 解析', async () => {
+      const originalScreenshotUrl = process.env.SCREENSHOT_SERVICE_URL;
+      process.env.SCREENSHOT_SERVICE_URL = 'http://test-shot-service';
+      process.env.IMAGE_DESCRIPTION_ENABLED = 'true';
+      process.env.IMAGE_DESCRIPTION_MODEL = 'custom/vision-model';
+
+      const originalFetch = global.fetch;
+      const png = Buffer.from('screenshot-png');
+      global.fetch = vi.fn().mockResolvedValue(
+        new Response(png, { status: 200, headers: { 'Content-Type': 'image/png' } }),
+      );
+
+      const backend = new PiAgentBackend(textOnlyImageConfig);
+      Object.defineProperty(backend, 'imageDescriber', {
+        value: {
+          getConfig: () => ({ visionModelId: 'custom/vision-model' }),
+        },
+      });
+
+      const result = await (backend as any).runSubagent({
+        task: '分析截图',
+        model: 'vision',
+        imageUrls: ['/api/screenshots/file/proj_1/page_1'],
+      });
+
+      expect(result.success).toBe(true);
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://test-shot-service/api/screenshots/file/proj_1/page_1',
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
+
+      global.fetch = originalFetch;
+      process.env.SCREENSHOT_SERVICE_URL = originalScreenshotUrl;
+    });
+
+    it('vision 模式绝对 URL 直接 fetch', async () => {
+      process.env.IMAGE_DESCRIPTION_ENABLED = 'true';
+      process.env.IMAGE_DESCRIPTION_MODEL = 'custom/vision-model';
+
+      const originalFetch = global.fetch;
+      const png = Buffer.from('external-image');
+      global.fetch = vi.fn().mockResolvedValue(
+        new Response(png, { status: 200, headers: { 'Content-Type': 'image/png' } }),
+      );
+
+      const backend = new PiAgentBackend(textOnlyImageConfig);
+      Object.defineProperty(backend, 'imageDescriber', {
+        value: {
+          getConfig: () => ({ visionModelId: 'custom/vision-model' }),
+        },
+      });
+
+      const result = await (backend as any).runSubagent({
+        task: '分析外部图片',
+        model: 'vision',
+        imageUrls: ['https://example.com/img.png'],
+      });
+
+      expect(result.success).toBe(true);
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://example.com/img.png',
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
+
+      global.fetch = originalFetch;
+    });
   });
 
   describe('超时控制', () => {
@@ -741,35 +876,38 @@ describe('PiAgentBackend', () => {
     });
   });
 
-  describe('图片预描述', () => {
-    const textOnlyConfig: AgentConfig = {
-      sessionId: 'test-session',
-      workingDir: '/tmp/test-workspace',
-      backendProviders: {
-        providers: [
-          {
-            id: 'custom',
-            name: 'Custom',
-            baseURL: 'https://api.example.com/v1',
-            apiKey: 'sk-test',
-            models: ['text-model'],
-            defaultModel: 'text-model',
-            enabled: true,
-          },
-        ],
-        activeProviderId: 'custom',
-        activeModelId: 'custom/text-model',
-      },
-    };
+  const textOnlyImageConfig: AgentConfig = {
+    sessionId: 'test-session',
+    workingDir: '/tmp/test-workspace',
+    backendProviders: {
+      providers: [
+        {
+          id: 'custom',
+          name: 'Custom',
+          baseURL: 'https://api.example.com/v1',
+          apiKey: 'sk-test',
+          models: ['text-model'],
+          defaultModel: 'text-model',
+          enabled: true,
+        },
+      ],
+      activeProviderId: 'custom',
+      activeModelId: 'custom/text-model',
+    },
+  };
 
-    const multimodalConfig: AgentConfig = {
-      ...textOnlyConfig,
-      backendProviders: {
-        ...textOnlyConfig.backendProviders!,
-        activeModelId: 'custom/text-model',
-        multimodalModels: ['custom/text-model'],
-      },
-    };
+  const multimodalImageConfig: AgentConfig = {
+    ...textOnlyImageConfig,
+    backendProviders: {
+      ...textOnlyImageConfig.backendProviders!,
+      activeModelId: 'custom/text-model',
+      multimodalModels: ['custom/text-model'],
+    },
+  };
+
+  describe('图片预描述', () => {
+    const textOnlyConfig = textOnlyImageConfig;
+    const multimodalConfig = multimodalImageConfig;
 
     it('非多模态模型收到图片且未配置预描述时应报错', async () => {
       const backend = new PiAgentBackend(textOnlyConfig);
@@ -819,7 +957,7 @@ describe('PiAgentBackend', () => {
       ).resolves.toBe('ok');
 
       expect(prompt).toHaveBeenCalledWith(
-        '【图片内容】图片里有一个红色提交按钮\n\n【用户问题】这个按钮有什么问题？',
+        '【图片内容】图片里有一个红色提交按钮\n\n【用户问题】这个按钮有什么问题？\n\n[图片 screen.png 未能自动入库]\n\n',
         { images: undefined },
       );
     });
@@ -841,7 +979,7 @@ describe('PiAgentBackend', () => {
         }),
       ).resolves.toBe('ok');
 
-      expect(prompt).toHaveBeenCalledWith('请看图', {
+      expect(prompt).toHaveBeenCalledWith('请看图\n[图片 screen.png 未能自动入库]\n\n', {
         images: [
           {
             type: 'image',
@@ -871,7 +1009,7 @@ describe('PiAgentBackend', () => {
         }),
       ).resolves.toBe('ok');
 
-      expect(prompt).toHaveBeenCalledWith('请看图', {
+      expect(prompt).toHaveBeenCalledWith('请看图\n[图片 screen.jpg 未能自动入库]\n\n', {
         images: [
           {
             type: 'image',
@@ -932,14 +1070,99 @@ describe('PiAgentBackend', () => {
       );
       expect(prompt).toHaveBeenNthCalledWith(
         1,
-        '【图片内容】图片展示了一个设置面板\n\n【用户问题】说明这个界面',
+        '【图片内容】图片展示了一个设置面板\n\n【用户问题】说明这个界面\n\n[图片 settings.png 未能自动入库]\n\n',
         { images: undefined },
       );
       expect(prompt).toHaveBeenNthCalledWith(
         2,
-        '【图片内容】图片展示了一个设置面板\n\n【用户问题】再次说明这个界面',
+        '【图片内容】图片展示了一个设置面板\n\n【用户问题】再次说明这个界面\n\n[图片 settings.png 未能自动入库]\n\n',
         { images: undefined },
       );
+    });
+  });
+
+  describe('图片自动入库 URL 文本注入', () => {
+    it('vision 模型发送图片时 promptContent 应包含 autoPersistText', async () => {
+      vi.mocked(uploadToGlobalImageStore).mockReturnValue({
+        success: true,
+        imageId: 'img_abc123',
+        url: '/api/images/img_abc123',
+        sha256: 'a'.repeat(64),
+        filename: 'test.png',
+        sizeBytes: 1024,
+        mimeType: 'image/png',
+        deduplicated: false,
+      });
+
+      const prompt = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
+      const backend = new PiAgentBackend(multimodalImageConfig);
+      Object.defineProperty(backend, 'harness', { value: { prompt } });
+
+      await backend.sendMessage('请看图', {
+        images: [
+          {
+            data: Buffer.from('image').toString('base64'),
+            mimeType: 'image/png',
+            name: 'screen.png',
+          },
+        ],
+      });
+
+      expect(prompt).toHaveBeenCalledTimes(1);
+      const [promptText, opts] = prompt.mock.calls[0];
+      expect(promptText).toContain('[图片已自动入库]');
+      expect(promptText).toContain('img_abc123');
+      expect(promptText).toContain('/api/images/img_abc123');
+      expect(promptText).toContain('readUserImage');
+      expect(opts.images).toHaveLength(1);
+      expect(opts.images[0]).toMatchObject({
+        type: 'image',
+        mimeType: 'image/png',
+      });
+    });
+
+    it('非 vision 模型发送图片时应同时包含描述和 URL 文本', async () => {
+      vi.mocked(uploadToGlobalImageStore).mockReturnValue({
+        success: true,
+        imageId: 'img_def456',
+        url: '/api/images/img_def456',
+        sha256: 'b'.repeat(64),
+        filename: 'test.png',
+        sizeBytes: 1024,
+        mimeType: 'image/png',
+        deduplicated: false,
+      });
+
+      const prompt = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
+      const backend = new PiAgentBackend(textOnlyImageConfig);
+      Object.defineProperty(backend, 'harness', { value: { prompt } });
+      Object.defineProperty(backend, 'imageDescriber', {
+        value: {
+          isAvailable: () => true,
+          describe: vi.fn().mockResolvedValue('图片里有一个红色按钮'),
+        },
+      });
+
+      await backend.sendMessage('这个按钮有什么问题？', {
+        images: [
+          {
+            data: Buffer.from('image').toString('base64'),
+            mimeType: 'image/png',
+            name: 'screen.png',
+          },
+        ],
+      });
+
+      expect(prompt).toHaveBeenCalledTimes(1);
+      const [promptText] = prompt.mock.calls[0];
+      expect(promptText).toContain('【图片内容】');
+      expect(promptText).toContain('图片里有一个红色按钮');
+      expect(promptText).toContain('[图片已自动入库]');
+      expect(promptText).toContain('img_def456');
+      expect(promptText).toContain('/api/images/img_def456');
+      expect(promptText).toContain('【用户问题】');
+      expect(promptText).toContain('这个按钮有什么问题？');
+      expect(promptText).not.toContain('readUserImage');
     });
   });
 });
@@ -1036,7 +1259,7 @@ describe('PiAgent 工具', () => {
         }),
       });
       
-      expect(tools).toHaveLength(32);
+      expect(tools).toHaveLength(34);
 
       const toolNames = tools.map(tool => tool.name);
       expect(toolNames).toContain('readFile');
@@ -1082,7 +1305,7 @@ describe('PiAgent 工具', () => {
       const { createWorkbenchTools } = await import('../../src/backends/pi-tools');
       const tools = createWorkbenchTools(mockConfig, undefined, { includeDelegateTask: false });
 
-      expect(tools).toHaveLength(31);
+      expect(tools).toHaveLength(33);
       expect(tools.map(tool => tool.name)).not.toContain('delegateTask');
       expect(tools.map(tool => tool.name)).toContain('readUploadedFile');
       expect(tools.map(tool => tool.name)).toContain('requestUserChoice');
@@ -1171,6 +1394,7 @@ describe('PiAgent 工具', () => {
         'readFile',
         'listFiles',
         'knowledgeReport',
+        'submit_feedback',
       ]);
       expect(capabilities.toolNames).not.toContain('webRead');
       expect(capabilities.toolNames).not.toContain('writeFile');

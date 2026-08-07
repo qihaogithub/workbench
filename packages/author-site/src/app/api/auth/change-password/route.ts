@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import { verifyToken, clearAuthCookie } from "@/lib/auth/jwt";
+import { getAuthCookie, verifyToken, clearAuthCookie } from "@/lib/auth/jwt";
 import { updateUserPassword, logPasswordReset } from "@/lib/user";
 import { validatePassword } from "@/lib/auth/password";
 import { createApiSuccess, createApiError } from "@/lib/fs-utils";
-import { cookies } from "next/headers";
 
 export async function POST(request: Request) {
-  const token = cookies().get("auth_token")?.value;
+  const token = getAuthCookie();
   const user = token ? await verifyToken(token) : null;
 
   if (!user) {

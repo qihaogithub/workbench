@@ -148,6 +148,7 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 | `KNOWLEDGE_BACKUP_RETENTION_DAYS`    | `7`                              | 知识索引备份保留天数                                                       |
 | `NEXT_PUBLIC_AGENT_SERVICE_URL`      | 局域网或公网 URL                 | author-site/viewer-site 浏览器端访问 agent-service                         |
 | `NEXT_PUBLIC_SCREENSHOT_SERVICE_URL` | 局域网或公网 URL                 | author-site 浏览器端访问 screenshot-service                                |
+| `NEXT_PUBLIC_VIEWER_URL`             | 局域网或公网 URL                 | author-site 首页「浏览端」入口与分享弹窗使用的浏览端基址；未配置时按端口推导（3200→3300） |
 | `NEXT_PUBLIC_DATA_BASE`              | `/data` 或外部数据基址           | viewer-site 静态导出时的数据基址                                           |
 | `FIGMA_OAUTH_CLIENT_ID`              | Figma OAuth app client id        | author-site 启动用户级 Figma 授权                                          |
 | `FIGMA_OAUTH_CLIENT_SECRET`          | Figma OAuth app client secret    | author-site 交换和刷新 Figma OAuth token                                   |
@@ -168,6 +169,7 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 | `APP_DATA_DIR`                       | `/opt/workbench/data`                                             | 宿主机持久数据目录，绑定到容器 `/app/data`          |
 | `NEXT_PUBLIC_AGENT_SERVICE_URL`      | `http://10.130.33.131:3201`                                       | **局域网 IP**，浏览器端使用                         |
 | `NEXT_PUBLIC_SCREENSHOT_SERVICE_URL` | `http://10.130.33.131:3202`                                       | **局域网 IP**，浏览器端使用                         |
+| `NEXT_PUBLIC_VIEWER_URL`             | `http://10.130.33.131:3300`                                       | **局域网 IP**，浏览器端访问浏览端                     |
 | `NEXT_PUBLIC_DATA_BASE`              | `/data`                                                           | viewer-site 静态导出的数据基址                      |
 | `NEXT_PUBLIC_WEB_URL`                | `http://10.130.33.131:3200`                                       | **局域网 IP**，浏览器端使用                         |
 | `CORS_ORIGINS`                       | `http://10.130.33.131:3200,...`                                   | 包含局域网 IP                                       |

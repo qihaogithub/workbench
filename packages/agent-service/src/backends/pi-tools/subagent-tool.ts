@@ -23,7 +23,7 @@ const DelegateTaskParams = Type.Object({
   images: Type.Optional(
     Type.Array(Type.String(), {
       description:
-        'Image URLs for the subagent to analyze. Only effective when model is "vision". URLs must be absolute (e.g., from captureScreenshot, saveImage, or listImages results). The subagent will receive these images as visual input.',
+        'Image URLs for the subagent to analyze. Only effective when model is "vision". Supports absolute URLs and relative paths (/api/images/..., /api/screenshots/file/...). Relative paths are automatically resolved by the server. Obtain URLs from captureScreenshot, saveImage, or listImages results.',
     }),
   ),
 });

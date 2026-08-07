@@ -17,7 +17,8 @@ import { cn } from "./utils";
 import { FileUploadWidget } from "./widgets";
 import { ImageListWidget, type ImageItem } from "./ImageListWidget";
 import { NoteButton } from "./NoteButton";
-import { NotePreview, stripHtml } from "./NotePreview";
+import { NotePreview } from "./NotePreview";
+import { stripMarkdown } from "./note-html";
 import { ArrayFieldGroup } from "./ArrayFieldGroup";
 import { MultiSelect } from "./MultiSelect";
 import { CascadeSelect } from "./CascadeSelect";
@@ -162,7 +163,7 @@ export function FieldRenderer({
       );
     }
 
-    if (field.format === "image") {
+    if (field.format === "image" || field.format === "file") {
       return (
         <FileUploadWidget
           value={value as string}
@@ -481,6 +482,7 @@ function RichTextInput({
     field.uiWidget === "image" ||
     field.uiWidget === "imageList" ||
     field.format === "image" ||
+    field.format === "file" ||
     field.type === "array" ||
     field.type === "richtext" ||
     field.type === "text" ||
@@ -491,7 +493,7 @@ function RichTextInput({
     field.type === "text" ||
     (field.maxLength !== undefined && field.maxLength > 100);
 
-  const hasNote = !embedded && !!field.note && !!stripHtml(field.note);
+  const hasNote = !embedded && !!field.note && !!stripMarkdown(field.note);
   const showNoteButton = !embedded && !!onNoteClick && (hasNote || !readonly);
 
   return (
@@ -519,7 +521,7 @@ function RichTextInput({
         </div>
       )}
       {hasNote && isComplexField && (
-        <NotePreview noteHtml={field.note!} />
+        <NotePreview markdown={field.note!} />
       )}
       <div className={isComplexField ? "w-full" : "flex-1 min-w-0"}>
         {renderInput()}

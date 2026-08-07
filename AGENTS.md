@@ -410,6 +410,12 @@ orb config set network_proxy "http://192.168.139.3:7890"
 - `~/.orbstack/config/docker.json` 应保持干净（`{}`），不要混入 `http-proxy` 字段（OrbStack 不会用 Docker daemon 级代理配置）
 - 所有国内免费 Docker Hub 镜像源（daocloud、dockerhub.icu、163、aliyun、1ms.run 等）已全部失效，不要折腾
 
+Docker 栈启动注意事项：
+
+- `docker compose up` 默认读取根目录 `.env`，该文件是 dev 端口（4200-4300）的 CORS 白名单。**Docker 栈必须使用 `--env-file .env.docker` 启动**，否则 agent-service 的 CORS 白名单会错配为 dev 端口，导致浏览器端附件上传等跨域请求被拦截（"Failed to fetch"）。聊天正常是因为走 WebSocket（不受 CORS 限制）。
+- 正确启动命令：`docker compose --env-file .env.docker up -d`（或经过 deploy.sh 生成的 `.deploy.env`）。
+- 验证 CORS 是否生效：`docker inspect workbench-agent-service-1 | grep CORS_ORIGINS` 应含 3200/3300；curl 带 `Origin: http://localhost:3200` POST 附件应返回 `access-control-allow-origin`。
+
 ## 代码约定
 
 - TypeScript 使用 `strict: true`。

@@ -209,16 +209,52 @@ describe("AI 页面预览运行时策略", () => {
     expect(html).not.toContain("/preview-runtime/preview-runtime/");
   });
 
-  it("iframe import map 包含 @preview/sdk 内部依赖的 SVGA 运行时", () => {
+  it("iframe import map 包含三种动画运行时", () => {
     const html = generateIframeHtml();
-    const cdnHtml = generateIframeHtml({ useCdnRuntime: true });
 
     expect(html).toContain(
-      '"svgaplayerweb": "/preview-runtime/vendor/svgaplayerweb.js"',
+      '"lottie-web": "/preview-runtime/vendor/lottie-web.js"',
     );
-    expect(cdnHtml).toContain('"svgaplayerweb": "https://esm.sh/svgaplayerweb@2.3.1"');
-    expect(cdnHtml).toContain(
-      '<script async src="https://cdn.jsdelivr.net/npm/tailwindcss-cdn@3.4.10/tailwindcss.min.js"></script>',
+    expect(html).toContain(
+      '"@rive-app/canvas": "/preview-runtime/vendor/rive-app-canvas.js"',
+    );
+    expect(html).toContain(
+      '"@esotericsoftware/spine-webgl": "/preview-runtime/vendor/spine-webgl.js"',
+    );
+  });
+
+  it("CDN 回退模式包含 lottie 和 rive 映射，不包含 spine", () => {
+    const cdnHtml = generateIframeHtml({ useCdnRuntime: true });
+
+    expect(cdnHtml).toContain('"lottie-web": "https://esm.sh/lottie-web@5.13.0"');
+    expect(cdnHtml).toContain('"@rive-app/canvas": "https://esm.sh/@rive-app/canvas@2.38.1"');
+    expect(cdnHtml).not.toContain('"@esotericsoftware/spine-webgl": "https://esm.sh/');
+  });
+
+  it("SDK 源码包含三个动画播放器组件", () => {
+    const runtimeDir = path.join(process.cwd(), "public", "preview-runtime", "vendor");
+    const previewSdk = fs.readFileSync(path.join(runtimeDir, "preview-sdk.js"), "utf8");
+
+    expect(previewSdk).toContain("LottiePlayer");
+    expect(previewSdk).toContain("RivePlayer");
+    expect(previewSdk).toContain("SpinePlayer");
+    expect(previewSdk).toContain('import("lottie-web")');
+    expect(previewSdk).toContain('import("@rive-app/canvas")');
+    expect(previewSdk).toContain('import("@esotericsoftware/spine-webgl")');
+  });
+
+  it("发布产物挂载时包含动画运行时映射", () => {
+    const runtimeBaseUrl = "/data/proj-runtime/preview-runtime";
+    const html = generateIframeHtml({ runtimeBaseUrl });
+
+    expect(html).toContain(
+      '"lottie-web": "/data/proj-runtime/preview-runtime/vendor/lottie-web.js"',
+    );
+    expect(html).toContain(
+      '"@rive-app/canvas": "/data/proj-runtime/preview-runtime/vendor/rive-app-canvas.js"',
+    );
+    expect(html).toContain(
+      '"@esotericsoftware/spine-webgl": "/data/proj-runtime/preview-runtime/vendor/spine-webgl.js"',
     );
   });
 

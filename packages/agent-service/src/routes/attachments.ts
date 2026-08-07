@@ -3,17 +3,26 @@ import type { FastifyInstance } from "fastify";
 import {
   AI_ATTACHMENT_MAX_FILE_SIZE,
   AttachmentUploadError,
+  deleteUploadedFileAttachment,
   saveUploadedFileAttachment,
-} from "../utils/save-uploaded-file-attachment";
+} from "../utils/uploaded-file-attachments";
 import { sendApiError, sendApiSuccess } from "./api-response";
 
 export async function registerAttachmentRoutes(
   fastify: FastifyInstance,
 ): Promise<void> {
-  fastify.post<{ Params: { sessionId: string } }>(
+  fastify.post<{ Params: { sessionId: string }; Querystring: { projectId?: string } }>(
     "/api/agent/:sessionId/attachments",
     async (request, reply) => {
       try {
+        const projectId = request.query.projectId;
+        if (!projectId) {
+          return sendApiError(reply, 400, {
+            code: "INVALID_REQUEST",
+            message: "缺少 projectId 参数",
+          });
+        }
+
         const file = await request.file({
           limits: { files: 1, fileSize: AI_ATTACHMENT_MAX_FILE_SIZE },
         });
@@ -24,7 +33,7 @@ export async function registerAttachmentRoutes(
           });
         }
         const attachment = await saveUploadedFileAttachment({
-          sessionId: request.params.sessionId,
+          projectId,
           filename: file.filename,
           mimeType: file.mimetype,
           buffer: await file.toBuffer(),
@@ -47,6 +56,31 @@ export async function registerAttachmentRoutes(
         return sendApiError(reply, isLimitError ? 413 : 500, {
           code: isLimitError ? "FILE_TOO_LARGE" : "ATTACHMENT_UPLOAD_FAILED",
           message: isLimitError ? "文件大小超过 20MB 限制" : "文件上传失败",
+        });
+      }
+    },
+  );
+
+  fastify.delete<{
+    Params: { attachmentId: string };
+    Querystring: { projectId?: string };
+  }>(
+    "/api/agent/attachments/:attachmentId",
+    async (request, reply) => {
+      try {
+        const projectId = request.query.projectId;
+        if (!projectId) {
+          return sendApiError(reply, 400, {
+            code: "INVALID_REQUEST",
+            message: "缺少 projectId 参数",
+          });
+        }
+        await deleteUploadedFileAttachment(projectId, request.params.attachmentId);
+        return sendApiSuccess(reply, { deleted: true });
+      } catch (error) {
+        return sendApiError(reply, 500, {
+          code: "ATTACHMENT_DELETE_FAILED",
+          message: error instanceof Error ? error.message : "删除附件失败",
         });
       }
     },

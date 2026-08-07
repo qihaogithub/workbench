@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 
 import { ChatMessages } from "@workbench/ai-chat-shared/chat/chat-messages";
 import type { ChatMessage } from "@workbench/ai-chat-shared/message";
+import { ToastProviderWrapper } from "@workbench/ai-chat-shared";
 
 jest.mock(
   "streamdown",
@@ -28,19 +29,21 @@ function renderChatMessages({
   isStreaming?: boolean;
 }) {
   return render(
-    <ChatMessages
-      messages={messages}
-      currentMessage={currentMessage}
-      isStreaming={isStreaming}
-      onRegenerate={jest.fn()}
-      onExternalAuthConnected={jest.fn()}
-      onRollback={jest.fn()}
-      onEditResend={jest.fn()}
-      messagesRef={{ current: messages }}
-      setMessages={jest.fn()}
-      handleSend={jest.fn()}
-      onUserChoiceResponse={jest.fn()}
-    />,
+    <ToastProviderWrapper>
+      <ChatMessages
+        messages={messages}
+        currentMessage={currentMessage}
+        isStreaming={isStreaming}
+        onRegenerate={jest.fn()}
+        onExternalAuthConnected={jest.fn()}
+        onRollback={jest.fn()}
+        onEditResend={jest.fn()}
+        messagesRef={{ current: messages }}
+        setMessages={jest.fn()}
+        handleSend={jest.fn()}
+        onUserChoiceResponse={jest.fn()}
+      />
+    </ToastProviderWrapper>,
   );
 }
 

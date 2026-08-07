@@ -80,12 +80,12 @@ export function SettingsButton() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [checking, setChecking] = useState(false);
-  const [providerId, setProviderId] = useState("custom");
-  const [providerName, setProviderName] = useState("自定义模型");
-  const [baseURL, setBaseURL] = useState("");
+  const [providerId, setProviderId] = useState("jojo");
+  const [providerName, setProviderName] = useState("叫叫");
+  const [baseURL, setBaseURL] = useState("https://token.xjjj.co/v1");
   const [apiKey, setApiKey] = useState("");
   const [hasApiKey, setHasApiKey] = useState(false);
-  const [modelsText, setModelsText] = useState("");
+  const [modelsText, setModelsText] = useState("deepseek-v4-flash-0731");
   const [defaultModel, setDefaultModel] = useState("");
   const [loadingModelConfig, setLoadingModelConfig] = useState(false);
   const [externalProviders, setExternalProviders] = useState<ExternalProviderStatus[]>([]);
@@ -335,12 +335,12 @@ export function SettingsButton() {
       });
       const data = await res.json();
       if (data.success) {
-        setProviderId("custom");
-        setProviderName("自定义模型");
-        setBaseURL("");
+        setProviderId("jojo");
+        setProviderName("叫叫");
+        setBaseURL("https://token.xjjj.co/v1");
         setApiKey("");
         setHasApiKey(false);
-        setModelsText("");
+        setModelsText("deepseek-v4-flash-0731");
         setDefaultModel("");
         toast({ title: "AI 模型配置已清空" });
         setView("main");
@@ -538,7 +538,7 @@ export function SettingsButton() {
                     <Input
                       value={providerId}
                       onChange={(e) => setProviderId(e.target.value)}
-                      placeholder="custom"
+                      placeholder="jojo"
                       disabled={submitting || loadingModelConfig}
                     />
                   </div>
@@ -547,7 +547,7 @@ export function SettingsButton() {
                     <Input
                       value={providerName}
                       onChange={(e) => setProviderName(e.target.value)}
-                      placeholder="自定义模型"
+                      placeholder="叫叫"
                       disabled={submitting || loadingModelConfig}
                     />
                   </div>
@@ -557,7 +557,7 @@ export function SettingsButton() {
                   <Input
                     value={baseURL}
                     onChange={(e) => setBaseURL(e.target.value)}
-                    placeholder="https://api.example.com/v1"
+                    placeholder="https://token.xjjj.co/v1"
                     disabled={submitting || loadingModelConfig}
                   />
                 </div>
@@ -576,7 +576,7 @@ export function SettingsButton() {
                   <textarea
                     value={modelsText}
                     onChange={(e) => setModelsText(e.target.value)}
-                    placeholder={"gpt-4o\ngpt-4o-mini"}
+                    placeholder={"deepseek-v4-flash-0731\ngpt-4o-mini"}
                     disabled={submitting || loadingModelConfig}
                     className="min-h-[112px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                   />
