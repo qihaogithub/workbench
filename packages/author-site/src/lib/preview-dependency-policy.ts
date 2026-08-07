@@ -549,6 +549,7 @@ export function SpinePlayer(props) {
   const canvasRef = React.useRef(null);
   const [failed, setFailed] = React.useState(false);
   const hasSrc = !!(skeleton && atlas && texture);
+  const isBinary = !!skeleton && (/\.skel(\.bytes)?$/.test(skeleton) || skeleton.indexOf('.skel') !== -1);
 
   React.useEffect(() => {
     const container = containerRef.current;
@@ -556,11 +557,12 @@ export function SpinePlayer(props) {
 
     let disposed = false;
     let gl = null;
-    let renderer = null;
+    let sceneRenderer = null;
     let skeletonObj = null;
     let state = null;
     let animFrame = null;
     let lastTime = 0;
+    let assetManager = null;
     container.innerHTML = '';
     setFailed(false);
 
@@ -572,78 +574,103 @@ export function SpinePlayer(props) {
     canvasRef.current = canvas;
 
     function render() {
-      if (!gl || !renderer || !skeletonObj || !state) return;
+      if (!gl || !sceneRenderer || !skeletonObj || !state) return;
       const w = canvas.clientWidth || canvas.width || 300;
       const h = canvas.clientHeight || canvas.height || 300;
       if (canvas.width !== w || canvas.height !== h) {
-        canvas.width = w; canvas.height = h; gl.viewport(0, 0, w, h);
+        canvas.width = w; canvas.height = h; sceneRenderer.camera.setViewport(w, h);
       }
-      gl.clearColor(0, 0, 0, 0);
-      gl.clear(gl.COLOR_BUFFER_BIT);
       const now = Date.now() / 1000;
       const delta = lastTime ? now - lastTime : 0;
       lastTime = now;
       if (delta > 0 && delta < 1) {
         state.update(delta);
         state.apply(skeletonObj);
-        skeletonObj.updateWorldTransform();
+        skeletonObj.updateWorldTransform(delta);
       }
-      renderer.draw(skeletonObj);
+      sceneRenderer.begin();
+      sceneRenderer.drawSkeleton(skeletonObj);
+      sceneRenderer.end();
       animFrame = requestAnimationFrame(render);
     }
 
-    function setup(Spine) {
-      if (disposed) return;
+    function importRuntime(version) {
+      const is42 = typeof version === 'string' && version.indexOf('4.2') === 0;
+      return is42 ? import('@esotericsoftware/spine-webgl-42') : import('@esotericsoftware/spine-webgl');
+    }
+
+    function sniffVersion(buf) {
       try {
-        gl = canvas.getContext('webgl', { alpha: true }) || canvas.getContext('experimental-webgl', { alpha: true });
-        if (!gl) throw new Error('WebGL not available');
-
-        const assetManager = new Spine.AssetManager(gl);
-        assetManager.loadText(atlas);
-        assetManager.loadText(skeleton);
-        assetManager.loadTexture(texture);
-
-        function onLoaded() {
-          if (disposed || !gl) return;
-          try {
-            const atlasData = new Spine.TextureAtlas(assetManager.get(atlas), (path) => assetManager.get(texture));
-            const loader = new Spine.AtlasAttachmentLoader(atlasData);
-            const isJson = skeleton.endsWith('.json') || skeleton.indexOf('.json') !== -1;
-            const skeletonData = isJson
-              ? new Spine.SkeletonJson(loader).readSkeletonData(assetManager.get(skeleton))
-              : new Spine.SkeletonBinary(loader).readSkeletonData(assetManager.get(skeleton));
-            skeletonObj = new Spine.Skeleton(skeletonData);
-            const stateData = new Spine.AnimationStateData(skeletonData);
-            state = new Spine.AnimationState(stateData);
-            if (animation && skeletonData.findAnimation(animation)) state.setAnimation(0, animation, loop);
-            else if (skeletonData.animations && skeletonData.animations.length > 0) state.setAnimation(0, skeletonData.animations[0].name, loop);
-            renderer = new Spine.SkeletonRenderer(gl);
-            lastTime = 0;
-            render();
-          } catch (e) {
-            if (!disposed) { setFailed(true); if (onError) onError(e); }
-          }
+        const bytes = new Uint8Array(buf);
+        if (isBinary && bytes.length > 9) {
+          const len = bytes[8];
+          if (len > 0 && len < 64) return new TextDecoder().decode(bytes.subarray(9, 9 + len));
         }
-
-        assetManager.loadAll();
-        if (assetManager.isLoadingComplete()) {
-          onLoaded();
-        } else {
-          const check = setInterval(() => {
-            if (assetManager.isLoadingComplete()) {
-              clearInterval(check);
-              onLoaded();
-            }
-          }, 50);
+        if (!isBinary && buf.byteLength > 0) {
+          const obj = JSON.parse(new TextDecoder().decode(buf));
+          if (obj && obj.skeleton && typeof obj.skeleton.spine === 'string') return obj.skeleton.spine;
         }
+      } catch (e) {}
+      return null;
+    }
+
+    function onLoaded(Spine, rawSkeleton) {
+      if (disposed || !gl) return;
+      try {
+        const atlasData = assetManager.get(atlas);
+        const loader = new Spine.AtlasAttachmentLoader(atlasData);
+        const skeletonData = isBinary
+          ? new Spine.SkeletonBinary(loader).readSkeletonData(rawSkeleton)
+          : new Spine.SkeletonJson(loader).readSkeletonData(new TextDecoder().decode(rawSkeleton));
+        skeletonObj = new Spine.Skeleton(skeletonData);
+        const stateData = new Spine.AnimationStateData(skeletonData);
+        state = new Spine.AnimationState(stateData);
+        if (animation && skeletonData.findAnimation(animation)) state.setAnimation(0, animation, loop);
+        else if (skeletonData.animations && skeletonData.animations.length > 0) state.setAnimation(0, skeletonData.animations[0].name, loop);
+        sceneRenderer = new Spine.SceneRenderer(canvas, gl, false);
+        lastTime = 0;
+        render();
       } catch (e) {
         if (!disposed) { setFailed(true); if (onError) onError(e); }
       }
     }
 
-    import('@esotericsoftware/spine-webgl').then((mod) => { setup(mod); }).catch((e) => {
-      if (!disposed) { setFailed(true); if (onError) onError(e); }
-    });
+    function setup(Spine, rawSkeleton) {
+      if (disposed) return;
+      try {
+        gl = canvas.getContext('webgl', { alpha: true }) || canvas.getContext('experimental-webgl', { alpha: true });
+        if (!gl) throw new Error('WebGL not available');
+        assetManager = new Spine.AssetManager(gl);
+        assetManager.loadTextureAtlas(atlas);
+        function schedule() {
+          if (assetManager.isLoadingComplete()) onLoaded(Spine, rawSkeleton);
+          else {
+            const check = setInterval(() => {
+              if (assetManager.isLoadingComplete()) {
+                clearInterval(check);
+                onLoaded(Spine, rawSkeleton);
+              }
+            }, 50);
+          }
+        }
+        assetManager.loadAll();
+        schedule();
+      } catch (e) {
+        if (!disposed) { setFailed(true); if (onError) onError(e); }
+      }
+    }
+
+    fetch(skeleton, { credentials: 'same-origin' })
+      .then((response) => response.arrayBuffer())
+      .then((buf) => {
+        if (disposed) return;
+        return importRuntime(sniffVersion(buf)).then((mod) => setup(mod, buf)).catch((e) => {
+          if (!disposed) { setFailed(true); if (onError) onError(e); }
+        });
+      })
+      .catch((e) => {
+        if (!disposed) { setFailed(true); if (onError) onError(e); }
+      });
 
     return () => {
       disposed = true;
@@ -654,7 +681,7 @@ export function SpinePlayer(props) {
       }
       if (containerRef.current) containerRef.current.innerHTML = '';
     };
-  }, [skeleton, atlas, texture, animation, loop, hasSrc, onError]);
+  }, [skeleton, atlas, texture, animation, loop, hasSrc, isBinary, onError]);
 
   if (!hasSrc || failed) {
     return fallback ? React.createElement('div', { className: cx('flex items-center justify-center overflow-hidden', className), style, ...rest }, fallback) : null;

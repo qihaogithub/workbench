@@ -525,7 +525,7 @@ export function PageConfigPanel({
           >
             {showSharedConfig && (
               <section className="flex flex-col">
-                <div className="mb-2 flex items-center gap-2">
+                <div className="mb-3 mt-2 flex items-center gap-2 pl-5">
                   <span className="text-sm font-semibold">共享配置</span>
                   {sharedAffectedPages.length > 0 && (
                     <Popover>
@@ -577,7 +577,7 @@ export function PageConfigPanel({
 
             {showPageConfig && (
               <section className="flex flex-col">
-                <div className="mb-2 flex items-center gap-2">
+                <div className="mb-3 mt-2 flex items-center gap-2 pl-5">
                   <span className="text-sm font-semibold">本页配置</span>
                 </div>
                 <ConfigScopeWrapper scope="page" hideHeader>

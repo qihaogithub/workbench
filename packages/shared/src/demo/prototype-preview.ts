@@ -50,7 +50,7 @@ const SCRIPT_TAG_RE = /<\s*script\b[^>]*>[\s\S]*?<\s*\/\s*script\s*>/gi;
 const INLINE_EVENT_RE = /\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 const JAVASCRIPT_URL_RE = /javascript\s*:/gi;
 const DANGEROUS_CSS_RE = /@import\b|expression\s*\(|behavior\s*:/gi;
-const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico|svga|lottie|riv|skel|atlas)(\?[^'")\s]*)?$/i;
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico|svga|lottie|riv|skel(?:\.bytes)?|atlas(?:\.txt)?)(\?[^'")\s]*)?$/i;
 const HTML_ASSET_ATTR_RE = /\b(src|href|poster)=("|')([^"']+)(\2)/gi;
 const CSS_URL_RE = /url\((["']?)([^"'`)]+)(\1)\)/gi;
 

@@ -45,6 +45,11 @@ export function DocumentView({
   const contentRef = useRef(content);
   contentRef.current = content;
 
+  const onItemsChangeRef = useRef(onItemsChange);
+  onItemsChangeRef.current = onItemsChange;
+  const onItemsLoadedRef = useRef(onItemsLoaded);
+  onItemsLoadedRef.current = onItemsLoaded;
+
   const userItems = useMemo(
     () => items.filter((item) => item.source !== "system"),
     [items],
@@ -65,15 +70,15 @@ export function DocumentView({
       const data = await res.json();
       if (data.success) {
         setItems(data.data);
-        onItemsChange?.(data.data);
-        onItemsLoaded?.(data.data);
+        onItemsChangeRef.current?.(data.data);
+        onItemsLoadedRef.current?.(data.data);
       }
     } catch {
       // 静默失败
     } finally {
       setLoading(false);
     }
-  }, [workingDir, projectId, sessionId, onItemsChange, onItemsLoaded]);
+  }, [workingDir, projectId, sessionId]);
 
   useEffect(() => {
     fetchItems();

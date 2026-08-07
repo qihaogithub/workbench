@@ -74,6 +74,49 @@ describe("selectSpinePackage 选择自洽的 Spine 三元组", () => {
     fs.rmSync(path.dirname(files["a.json"]), { recursive: true, force: true });
   });
 
+  it("Flutter/Unity 导出：识别 .skel.bytes + .atlas.txt", () => {
+    const files = writeFiles({
+      "star_second.skel.bytes": "binary",
+      "star_second.atlas.txt": "star_second.png\nsize:348,1032\nfilter:Linear,Linear\n",
+      "star_second.png": "png",
+    });
+    const sel = selectSpinePackage(files);
+    expect(sel).toEqual({
+      skeleton: files["star_second.skel.bytes"],
+      atlas: files["star_second.atlas.txt"],
+      texture: files["star_second.png"],
+    });
+    fs.rmSync(path.dirname(files["star_second.skel.bytes"]), { recursive: true, force: true });
+  });
+
+  it("zip 混入音频/系统文件时仍选出自洽的 .skel.bytes 包", () => {
+    const files = writeFiles({
+      "medal.skel.bytes": "binary",
+      "medal.atlas.txt": "medal.png\nsize:512,512\n",
+      "medal.png": "png",
+      "medal.mp3": "audio",
+      ".DS_Store": "x",
+    });
+    const sel = selectSpinePackage(files);
+    expect(sel!.skeleton).toBe(files["medal.skel.bytes"]);
+    expect(sel!.atlas).toBe(files["medal.atlas.txt"]);
+    expect(sel!.texture).toBe(files["medal.png"]);
+    fs.rmSync(path.dirname(files["medal.skel.bytes"]), { recursive: true, force: true });
+  });
+
+  it("标准 .skel 与 .skel.bytes 并存时按前缀匹配挑选", () => {
+    const files = writeFiles({
+      "hero-basic.skel": "binary",
+      "hero-pro.skel.bytes": "binary",
+      "hero-pro.atlas.txt": "hero-pro.png\nsize:256,256\n",
+      "hero-pro.png": "png",
+    });
+    const sel = selectSpinePackage(files);
+    expect(sel!.skeleton).toBe(files["hero-pro.skel.bytes"]);
+    expect(sel!.atlas).toBe(files["hero-pro.atlas.txt"]);
+    fs.rmSync(path.dirname(files["hero-basic.skel"]), { recursive: true, force: true });
+  });
+
   it("图集引用的纹理缺失时不选该包", () => {
     const files = writeFiles({
       "a.skel": "b",

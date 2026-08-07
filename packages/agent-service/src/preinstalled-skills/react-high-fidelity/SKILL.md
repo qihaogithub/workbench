@@ -124,7 +124,13 @@ import { RivePlayer } from "@preview/sdk";
 
 ### SpinePlayer
 
-播放 Spine `.skel`/`.json` 骨骼动画。素材需打包为 `.zip` 上传（内含 `.skel`/`.json` + `.atlas` + `.png`），上传后 zip 服务端自动解压返回各文件 URL。
+播放 Spine 骨骼动画。素材需打包为 `.zip` 上传（内含骨架 + 图集 + 纹理），上传后 zip 服务端自动解压返回各文件 URL。
+
+支持的素材命名与版本：
+- 骨架：`.skel`（二进制）、`.skel.bytes`（Flutter/Unity 导出）、`.json`（JSON 格式）。
+- 图集：`.atlas`、`.atlas.txt`（Flutter/Unity 导出）。
+- 纹理：`.png`。
+- 版本：Spine Editor 4.2 与 4.3 素材格式不兼容，运行时自动按素材版本选择（4.2 用内置 `spine-webgl-42`，4.3 用 `spine-webgl`），无需用户/agent 干预。
 
 ```tsx
 import { SpinePlayer } from "@preview/sdk";
@@ -141,8 +147,8 @@ import { SpinePlayer } from "@preview/sdk";
 
 | Props | 类型 | 默认值 | 说明 |
 |-------|------|--------|------|
-| `skeleton` | string | - | `.skel` 或 `.json` 骨架文件 URL |
-| `atlas` | string | - | `.atlas` 图集文件 URL |
+| `skeleton` | string | - | `.skel`/`.skel.bytes` 或 `.json` 骨架文件 URL |
+| `atlas` | string | - | `.atlas`/`.atlas.txt` 图集文件 URL |
 | `texture` | string | - | `.png` 纹理文件 URL |
 | `animation` | string | - | 指定播放的动画名（不填默认第一条） |
 | `loop` | boolean | true | 是否循环 |

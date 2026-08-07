@@ -371,6 +371,13 @@ Screenshot 服务：
 - 截图存储在 `data/screenshots/`。
 - 支持同步单页截图、异步批量截图、LRU 编译缓存和文件系统截图缓存。
 
+Spine 动画运行时（`@preview/sdk` 的 `SpinePlayer`）：
+
+- **双运行时版本自动适配**：Spine 4.2 与 4.3 的二进制/JSON 素材格式互不兼容，单一 runtime 无法覆盖。根 `package.json` 同时依赖 `@esotericsoftware/spine-webgl@4.3.13`（vendor `spine-webgl.js`）与别名 `@esotericsoftware/spine-webgl-42`（`npm:@esotericsoftware/spine-webgl@4.2.112`，vendor `spine-webgl-42.js`）。`SpinePlayer` 先 fetch 骨架嗅探版本（JSON 读 `skeleton.spine`；二进制读字节 [8] 长度 + 后续版本串），按 `4.2` 前缀动态 `import('@esotericsoftware/spine-webgl-42')`，否则 `import('@esotericsoftware/spine-webgl')`。
+- **加载与渲染要点**：二进制骨架（`.skel`/`.skel.bytes`）必须用 `assetManager.loadBinary`（`loadText` 会按 UTF-8 破坏二进制）；JSON 用 `loadText` 后以字符串解析；图集用 `assetManager.loadTextureAtlas(atlas)`（手动构造 `TextureAtlas` 的 loader 无法绑定纹理）；渲染用 `SceneRenderer`（`begin/drawSkeleton/end`），并给 `skeleton.updateWorldTransform(delta)` 传帧 delta（4.2 需要，否则抛 `physics is undefined`）。
+- **素材命名**：支持标准 `.skel`/`.atlas`/`.json` 与 Flutter/Unity 导出的 `.skel.bytes`/`.atlas.txt`。zip 上传由 `app/api/sessions/[sessionId]/assets/upload/extract-spine-package.ts` 的 `selectSpinePackage` 按图集引用纹理 + 骨架前缀匹配选出自洽三元组。
+- SDK 源码三处事实源需同步：`scripts/build-preview-runtime.mjs` 的 `sdkSource`、`packages/author-site/src/lib/preview-dependency-policy.ts`（data-URI 兜底）、构建产物 `public/preview-runtime/vendor/preview-sdk.js`（由 `pnpm build:preview-runtime` 重生成，勿手改）。
+
 Docker：
 
 - `docker-compose.yml` 包含 agent-service、author-site、screenshot-service、viewer-site、knowledge-service。

@@ -12,8 +12,11 @@ importers:
   .:
     dependencies:
       '@esotericsoftware/spine-webgl':
-        specifier: 4.2.112
-        version: 4.2.112
+        specifier: 4.3.13
+        version: 4.3.13
+      '@esotericsoftware/spine-webgl-42':
+        specifier: npm:@esotericsoftware/spine-webgl@4.2.112
+        version: /@esotericsoftware/spine-webgl@4.2.112
       '@rive-app/canvas':
         specifier: 2.38.1
         version: 2.38.1
@@ -2863,10 +2866,20 @@ packages:
     resolution: {integrity: sha512-6MXHr1V5u1GkhhOmL4QFd3CerxsFHvKKiTs4AQAckau5Lp1Tw19TOBb2bUX7WSlXUPmmLRI6w/DMZSQUBDFPUA==}
     dev: false
 
+  /@esotericsoftware/spine-core@4.3.13:
+    resolution: {integrity: sha512-iGs/40qOWSQYicABebDzFSwFOS1Nsm0dCCS8sGqbpVuThRKdLYeI1cVJpmATSpEmtcetEABTmh97NoBnt7XLDw==}
+    dev: false
+
   /@esotericsoftware/spine-webgl@4.2.112:
     resolution: {integrity: sha512-/CW26RSYQ+fGt9p77CgGqVaAWfeTkBTfd7vxX2ZDY6nHm6ac7s+MPtsQ3cm9ZmveWpNEeOM8pQEhudWQEuqPgw==}
     dependencies:
       '@esotericsoftware/spine-core': 4.2.112
+    dev: false
+
+  /@esotericsoftware/spine-webgl@4.3.13:
+    resolution: {integrity: sha512-VdMtDU03HcoUfLlt0FXBzSvh53nLS7Hej0ibJ3kCuDf5hftAsDAiwZhhS6Ze+5nDCGrkNzPmssZcT+96FoOjIQ==}
+    dependencies:
+      '@esotericsoftware/spine-core': 4.3.13
     dev: false
 
   /@fastify/ajv-compiler@3.6.0:

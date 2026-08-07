@@ -162,7 +162,7 @@ function FieldGroupSection({
     <div className="py-2">
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger asChild>
-          <div className="flex items-center gap-2 py-1.5 cursor-pointer hover:bg-accent/30 rounded-sm transition-colors">
+          <div className="flex items-center gap-1 py-1.5 cursor-pointer hover:bg-accent/30 rounded-sm transition-colors">
             <span>
               {open ? (
                 <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform rotate-180" />
@@ -174,7 +174,7 @@ function FieldGroupSection({
           </div>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="space-y-1 pl-6 pr-2 pt-1 pb-1">
+          <div className="space-y-1 pl-5 pr-2 pt-1 pb-1">
             {group.fields.map((field) => (
               <FieldRenderer
                 key={field.key}

@@ -411,6 +411,10 @@ export function PrototypePagePreview({
   const containerRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const shadowRef = useRef<ShadowRoot | null>(null);
+  // 内容高度回调保持最新引用，避免其身份变化触发下方测量 effect 重建 shadow DOM。
+  // 重建会导致可滚动容器裁解除失效、root 瞬时回到一屏高度，进而与上报高度形成正反馈闪烁。
+  const onContentHeightChangeRef = useRef(onContentHeightChange);
+  onContentHeightChangeRef.current = onContentHeightChange;
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -509,16 +513,18 @@ export function PrototypePagePreview({
       applyPrototypeBindings(root, configData, assetRewrite);
       applyPropertyChanges(root, visualPropertyChanges);
     }
-    if (!onContentHeightChange || !shouldScaleToPreviewSize || !root) return;
+    if (!onContentHeightChangeRef.current || !shouldScaleToPreviewSize || !root) return;
+    const reportHeight = (height: number) => {
+      if (Number.isFinite(height) && height > 0) {
+        onContentHeightChangeRef.current?.(height);
+      }
+    };
     // 先解除可滚动容器的裁剪，让 root 长到完整内容高度，ResizeObserver 才会上报正确高度。
     expandVerticalClippedElements(root);
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        const height = entry.contentRect.height;
-        if (Number.isFinite(height) && height > 0) {
-          console.count("[perf] PrototypePagePreview ResizeObserver fire");
-          onContentHeightChange(height);
-        }
+        console.count("[perf] PrototypePagePreview ResizeObserver fire");
+        reportHeight(entry.contentRect.height);
       }
     });
     observer.observe(root);
@@ -527,10 +533,7 @@ export function PrototypePagePreview({
       document.fonts.ready.then(() => {
         if (!root.isConnected) return;
         expandVerticalClippedElements(root);
-        const fontHeight = root.scrollHeight;
-        if (Number.isFinite(fontHeight) && fontHeight > 0) {
-          onContentHeightChange(fontHeight);
-        }
+        reportHeight(root.scrollHeight);
       });
     }
     // 初始上报兜底：ResizeObserver 的首帧回调在部分浏览器/容器缩放场景下可能不触发，
@@ -538,10 +541,7 @@ export function PrototypePagePreview({
     // 这里在渲染后异步上报一次初始内容高度（scrollHeight 为元素自身坐标，不受画布 transform 缩放影响）。
     requestAnimationFrame(function () {
       if (root.isConnected) {
-        const initHeight = root.scrollHeight;
-        if (Number.isFinite(initHeight) && initHeight > 0) {
-          onContentHeightChange(initHeight);
-        }
+        reportHeight(root.scrollHeight);
       }
     });
     return () => observer.disconnect();
@@ -549,12 +549,9 @@ export function PrototypePagePreview({
     allowScroll,
     configData,
     css,
-    designHeight,
-    designWidth,
     demoId,
     fillContainer,
     html,
-    onContentHeightChange,
     sessionId,
     shouldScaleToPreviewSize,
     visualPropertyChanges,

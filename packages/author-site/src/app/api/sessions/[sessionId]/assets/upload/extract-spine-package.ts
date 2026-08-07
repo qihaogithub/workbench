@@ -1,10 +1,28 @@
 import fs from "fs";
 import path from "path";
 
-export const ANIMATION_ASSET_EXTS = new Set([".json", ".skel", ".atlas", ".png"]);
+export const ANIMATION_ASSET_EXTS = new Set([".json", ".skel", ".atlas", ".png", ".bytes", ".txt"]);
 
+// 骨架文件名：标准 `.skel`/`.json`，以及 Flutter/Unity 导出的 `.skel.bytes`
+export function isSkeletonFile(filename: string): boolean {
+  const lower = filename.toLowerCase();
+  return lower.endsWith(".skel.bytes") || lower.endsWith(".skel") || lower.endsWith(".json");
+}
+
+// 图集文件名：标准 `.atlas` 以及 Flutter/Unity 导出的 `.atlas.txt`
+export function isAtlasFile(filename: string): boolean {
+  const lower = filename.toLowerCase();
+  return lower.endsWith(".atlas.txt") || lower.endsWith(".atlas");
+}
+
+// 去掉骨架/图集的多段扩展名得到主干名，用于前缀匹配。
+// 例如 medal.atlas.txt → medal、medal.skel.bytes → medal、spineboy-pro.skel → spineboy-pro。
 function fileStem(filename: string): string {
-  return path.basename(filename).replace(/\.[^.]+$/, "");
+  const base = path.basename(filename);
+  const lower = base.toLowerCase();
+  if (lower.endsWith(".skel.bytes")) return base.slice(0, -".skel.bytes".length);
+  if (lower.endsWith(".atlas.txt")) return base.slice(0, -".atlas.txt".length);
+  return base.replace(/\.[^.]+$/, "");
 }
 
 // 解析 .atlas 声明的第一张纹理名（图集第一页首行）。多页图集仅取首张，
@@ -44,17 +62,15 @@ export function selectSpinePackage(
   files: Record<string, string>,
 ): { skeleton: string; atlas: string; texture: string } | null {
   const allNames = Object.keys(files);
-  const skelNames = allNames.filter((f) => f.toLowerCase().endsWith(".skel"));
-  const jsonNames = allNames.filter((f) => f.toLowerCase().endsWith(".json"));
-  const skeletonNames = skelNames.length > 0 ? skelNames : jsonNames;
-  const atlasNames = allNames.filter((f) => f.toLowerCase().endsWith(".atlas"));
+  const skeletonNames = allNames.filter(isSkeletonFile);
+  const atlasNames = allNames.filter(isAtlasFile);
   if (skeletonNames.length === 0 || atlasNames.length === 0) return null;
 
   let best: { skeleton: string; atlas: string; texture: string } | null = null;
   let bestScore: number[] | null = null;
 
   for (const skeletonName of skeletonNames) {
-    const skeletonStem = fileStem(skeletonName);
+    const skeletonStem = fileStem(skeletonName).toLowerCase();
     for (const atlasName of atlasNames) {
       // 图集引用纹理必须已解压，否则这套包不可用
       const atlasText = fs.readFileSync(files[atlasName], "utf8");
@@ -64,11 +80,12 @@ export function selectSpinePackage(
 
       const a = atlasMatchScore(skeletonStem, fileStem(atlasName).toLowerCase());
       // 图集匹配 > 骨架 .skel 优先 > 骨架文件名更长（更完整）> 骨架字典序稳定
+      const usesBinarySkeleton = skeletonName.toLowerCase().endsWith(".skel") || skeletonName.toLowerCase().endsWith(".skel.bytes");
       const score: number[] = [
         a[0],
         a[1],
         a[2],
-        skelNames.length > 0 && skeletonName.toLowerCase().endsWith(".skel") ? 1 : 0,
+        usesBinarySkeleton ? 1 : 0,
         -skeletonStem.length,
       ];
       if (!bestScore || cmpTuple(score, bestScore) > 0) {
