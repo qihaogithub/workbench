@@ -30,6 +30,7 @@ import {
   LogIn,
   LogOut,
   Loader2,
+  Bug,
 } from "lucide-react";
 import {
   getProjects,
@@ -108,6 +109,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import { FeedbackPage } from "@/components/FeedbackPage";
 import { ViewerAiPanel } from "@/components/ViewerAiPanel";
 
 type SortOption = "newest" | "oldest" | "name";
@@ -289,6 +291,7 @@ function PageScreenshotCell({
   className,
   style,
   onAspectRatio,
+  publishedVersion,
 }: {
   projectId: string;
   page: { id: string; name: string; screenshotPath?: string };
@@ -297,14 +300,18 @@ function PageScreenshotCell({
   className?: string;
   style?: CSSProperties;
   onAspectRatio?: (pageId: string, aspectRatio: number) => void;
+  publishedVersion?: string;
 }) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    const cacheBust = publishedVersion
+      ? `?v=${encodeURIComponent(publishedVersion)}`
+      : "";
     const staticImageUrl = page.screenshotPath
-      ? getPublishedFileUrl(projectId, page.screenshotPath)
+      ? `${getPublishedFileUrl(projectId, page.screenshotPath)}${cacheBust}`
       : null;
     const directImageUrl = staticImageUrl ?? getScreenshotFileUrl(projectId, page.id);
     const metaUrl = getScreenshotFileMetaUrl(projectId, page.id);
@@ -345,7 +352,7 @@ function PageScreenshotCell({
     return () => {
       cancelled = true;
     };
-  }, [projectId, page.id, page.screenshotPath]);
+  }, [projectId, page.id, page.screenshotPath, publishedVersion]);
 
   const handleError = useCallback(() => {
     setFailed(true);
@@ -425,9 +432,11 @@ function PagePreviewPlaceholder({ label }: { label: string }) {
 function ScreenshotCover({
   projectId,
   pages,
+  publishedVersion,
 }: {
   projectId: string;
   pages: Array<{ id: string; name: string; screenshotPath?: string }>;
+  publishedVersion?: string;
 }) {
   const [aspectRatios, setAspectRatios] = useState<Record<string, number>>({});
   const displayPages = pages.slice(0, MAX_SCREENSHOT_COVER_ITEMS);
@@ -528,6 +537,7 @@ function ScreenshotCover({
                     isLast && extraCount > 0 ? `+${extraCount}` : undefined
                   }
                   onAspectRatio={handleAspectRatio}
+                  publishedVersion={publishedVersion}
                 />
               );
             })}
@@ -579,7 +589,13 @@ function ProjectCover({ project }: { project: ProjectListItem }) {
 
   const pages = projectData?.demoPages ?? [];
   if (pages.length > 0) {
-    return <ScreenshotCover projectId={project.id} pages={pages} />;
+    return (
+      <ScreenshotCover
+        projectId={project.id}
+        pages={pages}
+        publishedVersion={projectData?.publishedVersion}
+      />
+    );
   }
 
   return <PlaceholderIcon />;
@@ -660,6 +676,14 @@ function ProjectListPage() {
           </div>
 
           <div className="flex-1 flex items-center justify-end gap-2">
+            <button
+              onClick={() => router.push("/feedback")}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+              title="意见反馈"
+            >
+              <Bug className="h-4 w-4" />
+              反馈
+            </button>
             <div className="relative flex items-center">
               <Search className="absolute left-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
               <input
@@ -1797,6 +1821,10 @@ function Header({
 export default function ViewerApp() {
   const pathname = usePathname();
   const { view, projectId } = parsePath(pathname);
+
+  if (pathname === "/feedback" || pathname === "/feedback/") {
+    return <FeedbackPage />;
+  }
 
   switch (view) {
     case "list":

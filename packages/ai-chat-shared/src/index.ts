@@ -87,6 +87,7 @@ export {
 export {
   ElementSelectionChip,
   type ChatElementRef,
+  type ChatPageRef,
 } from "./chat/element-selection-chip";
 
 export {

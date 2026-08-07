@@ -50,7 +50,7 @@ const SCRIPT_TAG_RE = /<\s*script\b[^>]*>[\s\S]*?<\s*\/\s*script\s*>/gi;
 const INLINE_EVENT_RE = /\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 const JAVASCRIPT_URL_RE = /javascript\s*:/gi;
 const DANGEROUS_CSS_RE = /@import\b|expression\s*\(|behavior\s*:/gi;
-const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico|svga)(\?[^'")\s]*)?$/i;
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico|svga|lottie|riv|skel|atlas)(\?[^'")\s]*)?$/i;
 const HTML_ASSET_ATTR_RE = /\b(src|href|poster)=("|')([^"']+)(\2)/gi;
 const CSS_URL_RE = /url\((["']?)([^"'`)]+)(\1)\)/gi;
 
@@ -68,6 +68,43 @@ export function sanitizePrototypeCss(css: string): string {
     .replace(DANGEROUS_CSS_RE, "");
 }
 
+const VIEWPORT_LENGTH_UNIT_RE =
+  /\b(-?\d*\.?\d+)(vmin|vmax|vw|vh|svw|svh|dvw|dvh|lvw|lvh)\b/gi;
+
+function resolveViewportUnitBasis(
+  unit: string,
+  designWidth: number,
+  designHeight: number,
+): number | null {
+  switch (unit) {
+    case "vw":
+    case "svw":
+    case "dvw":
+    case "lvw":
+      return designWidth;
+    case "vh":
+    case "svh":
+    case "dvh":
+    case "lvh":
+      return designHeight;
+    case "vmin": {
+      return Math.min(designWidth, designHeight);
+    }
+    case "vmax": {
+      return Math.max(designWidth, designHeight);
+    }
+    default:
+      return null;
+  }
+}
+
+/**
+ * 把 CSS 中的视口长度单位归一化为设计尺寸对应的 px。
+ *
+ * 目标是锁定"渲染视口"：无论容器/卡片多高，`vh` 族（含 small/dynamic/large 视口
+ * 单位 svh/dvh/lvh/vw/dvw/lvw）始终解析为 designWidth/designHeight，避免画布
+ * 把测量到的高度回填进视口后，整屏页（100vh / min-h-screen）被正反馈撑成异常高度。
+ */
 export function normalizePrototypeViewportUnits(
   css: string,
   designWidth: number,
@@ -75,20 +112,18 @@ export function normalizePrototypeViewportUnits(
   skipVh?: boolean,
 ): string {
   return css.replace(
-    /(-?\d*\.?\d+)(vmin|vmax|vw|vh)\b/gi,
+    VIEWPORT_LENGTH_UNIT_RE,
     (match, value: string, unit: string) => {
       const numeric = Number(value);
       if (!Number.isFinite(numeric)) return match;
       const normalizedUnit = unit.toLowerCase();
-      if (skipVh && normalizedUnit === "vh") return match;
-      const basis =
-        normalizedUnit === "vw"
-          ? designWidth
-          : normalizedUnit === "vh"
-            ? designHeight
-            : normalizedUnit === "vmin"
-              ? Math.min(designWidth, designHeight)
-              : Math.max(designWidth, designHeight);
+      if (skipVh && normalizedUnit.endsWith("vh")) return match;
+      const basis = resolveViewportUnitBasis(
+        normalizedUnit,
+        designWidth,
+        designHeight,
+      );
+      if (basis === null) return match;
       return `${(numeric / 100) * basis}px`;
     },
   );

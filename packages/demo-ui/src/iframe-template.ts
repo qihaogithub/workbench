@@ -20,6 +20,9 @@ const DEFAULT_RUNTIME_IMPORTS: Record<string, string> = {
   "lucide-react": "/preview-runtime/vendor/lucide-react.js",
   "framer-motion": "/preview-runtime/vendor/framer-motion.js",
   "svgaplayerweb": "/preview-runtime/vendor/svgaplayerweb.js",
+  "lottie-web": "/preview-runtime/vendor/lottie-web.js",
+  "@rive-app/canvas": "/preview-runtime/vendor/rive-app-canvas.js",
+  "@esotericsoftware/spine-webgl": "/preview-runtime/vendor/spine-webgl.js",
   "@preview/sdk": "/preview-runtime/vendor/preview-sdk.js",
 };
 
@@ -2055,6 +2058,8 @@ function buildRuntimeImports(
       "lucide-react": `${cdnBase}/lucide-react@0.323.0?deps=react@18.3.1,react-dom@18.3.1`,
       "framer-motion": `${cdnBase}/framer-motion@12.38.0?deps=react@18.3.1,react-dom@18.3.1`,
       "svgaplayerweb": `${cdnBase}/svgaplayerweb@2.3.1`,
+      "lottie-web": `${cdnBase}/lottie-web@5.13.0`,
+      "@rive-app/canvas": `${cdnBase}/@rive-app/canvas@2.38.1`,
       "@preview/sdk": resolveRuntimeUrl(DEFAULT_RUNTIME_IMPORTS["@preview/sdk"], runtimeBaseUrl),
     };
   }
@@ -2337,6 +2342,10 @@ ${cssLinks}
     window.__APP_STATE__ = currentAppState;
     window.__ROUTE_PARAMS__ = currentRouteParams;
 
+    // 画布可按页面完整内容高度显示卡片，最多到 MAX_PAGE_HEIGHT（50000）。
+    // 这里与画布上限保持一致，保证单次测量请求的高度不会超过画布能展示的上限，
+    // 避免异常测量值（如 Chrome 把 scrollHeight clamp 到 2^24）反向撑爆渲染视口。
+    var MAX_CONTENT_HEIGHT = 50000;
     // 测量页面完整内容高度（可能超过当前视口/设计高度）。
     // 仅靠 body 的 contentRect 在页面使用 h-screen / height:100vh 时会被钉死在视口高度，
     // 导致超出部分无法上报，画布卡片无法展示完整页面。这里取三者最大值：
@@ -2365,8 +2374,17 @@ ${cssLinks}
         }
         var scrollHeight = document.documentElement.scrollHeight || 0;
         var viewportHeight = window.innerHeight || 0;
-        if (scrollHeight > viewportHeight + 1 && scrollHeight > height) {
+        // 当 viewportHeight 本身已经被异常高度撑大时（Chrome 会把 scrollHeight
+        // clamp 到 2^24 ≈ 16,777,216），scrollHeight 也会是同一个天文数字。
+        // 此时不应采用 scrollHeight，只信任基于元素位置的实际测量结果。
+        var viewportReasonable = viewportHeight < MAX_CONTENT_HEIGHT;
+        if (viewportReasonable && scrollHeight > viewportHeight + 1 && scrollHeight > height) {
           height = scrollHeight;
+        }
+        // 防御性兜底：无论视口是否正常，最终上报高度都不得超过画布上限，
+        // 防止单次异常测量（2^24 clamp、瞬时膨胀）把渲染视口/卡片撑爆。
+        if (height > MAX_CONTENT_HEIGHT) {
+          height = MAX_CONTENT_HEIGHT;
         }
         return Math.round(height);
       }
@@ -2681,6 +2699,19 @@ ${cssLinks}
       window.parent.postMessage({ type: 'RESIZE', height, requestId: currentRequestId }, '*');
     });
     resizeObserver.observe(document.body);
+
+    // 字体加载完成后重测：字体下发会改变文本度量与换行，可能导致布局高度变化。
+    // body 的 ResizeObserver 通常能捕获，这里再显式兜底一次，避免卡片高度过期。
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(function() {
+        if (isSleeping) return;
+        var h = measureFullContentHeight();
+        if (Math.abs(h - lastReportedHeight) > 1) {
+          lastReportedHeight = h;
+          window.parent.postMessage({ type: 'RESIZE', height: h, requestId: currentRequestId }, '*');
+        }
+      });
+    }
 
     window.addEventListener('error', (event) => {
       reportRuntimeError({

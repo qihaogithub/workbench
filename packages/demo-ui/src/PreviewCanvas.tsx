@@ -17,6 +17,7 @@ import {
   BetweenHorizontalStart,
   BetweenVerticalStart,
   Combine,
+  MessageSquarePlus,
   Trash2,
 } from "lucide-react";
 import { CanvasViewport } from "./CanvasViewport";
@@ -422,6 +423,13 @@ function CanvasPageGroupItem({
             onConsoleEntry={onConsoleEntry}
             onError={onError}
             onPositionableSizes={onPositionableSizes}
+            onLayoutChange={(pageId, nextLayout) => {
+              onLayoutChange(group.id, {
+                ...group.layout,
+                width: nextLayout.width,
+                height: nextLayout.height,
+              })
+            }}
           />
         ) : (
           <div className="flex h-full items-center justify-center bg-muted/35 text-sm text-muted-foreground">
@@ -438,6 +446,27 @@ function CanvasPageGroupItem({
   );
 }
 
+/** 判断剪贴板文本是否为 Figma 导出的 HTML 页面代码 */
+function looksLikeHtmlImport(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  if (/^<!doctype\s+html\b/i.test(trimmed)) return true;
+  if (/<html[\s>]/i.test(trimmed)) return true;
+  return /<(body|main|section|div|style|svg|img)[\s>]/i.test(trimmed);
+}
+
+/** 从系统剪贴板提取 HTML 代码，非 HTML 内容返回 null */
+function extractHtmlImportFromClipboard(
+  clipboardData: DataTransfer | null,
+): string | null {
+  if (!clipboardData) return null;
+  const plain = clipboardData.getData("text/plain");
+  if (plain && looksLikeHtmlImport(plain)) return plain;
+  const html = clipboardData.getData("text/html");
+  if (html && looksLikeHtmlImport(html)) return html;
+  return null;
+}
+
 export function PreviewCanvas({
   editable = false,
   interactionMode,
@@ -447,6 +476,7 @@ export function PreviewCanvas({
   canvasState: externalState,
   onCanvasStateChange,
   onRequestDeletePages,
+  onAddPagesToChat,
   onPageConfigEdit,
   onCanvasClick,
   className,
@@ -467,6 +497,7 @@ export function PreviewCanvas({
   onRequestPastePages,
   onRequestCreateReferences,
   onViewSource,
+  onRequestPasteHtmlContent,
 }: PreviewCanvasProps) {
   const resolvedInteractionMode =
     interactionMode ?? (editable ? "editor" : "readonly");
@@ -2907,9 +2938,18 @@ export function PreviewCanvas({
           event.clipboardData.files,
           event.clipboardData.items,
         );
-        if (files.length === 0) return;
-        event.preventDefault();
-        handleAddImportFiles(files);
+        if (files.length > 0) {
+          event.preventDefault();
+          handleAddImportFiles(files);
+          return;
+        }
+        if (onRequestPasteHtmlContent) {
+          const html = extractHtmlImportFromClipboard(event.clipboardData);
+          if (html) {
+            event.preventDefault();
+            void onRequestPasteHtmlContent(html);
+          }
+        }
       }}
     >
       {canInteractWithViewport && (
@@ -3015,6 +3055,19 @@ export function PreviewCanvas({
               >
                 <Combine className="h-4 w-4" />
                 合并页面
+              </button>
+            </>
+          )}
+          {onAddPagesToChat && selectedPageIds.length > 0 && (
+            <>
+              <div className="mx-1 h-5 w-px bg-border" />
+              <button
+                type="button"
+                className="flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => onAddPagesToChat(selectedPageIds)}
+              >
+                <MessageSquarePlus className="h-4 w-4" />
+                添加到对话
               </button>
             </>
           )}

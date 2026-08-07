@@ -473,6 +473,23 @@ test("sketch playground runs commands from the canvas context menu", async ({ pa
     .toBe(1);
 });
 
+test("sketch playground canvas right-click leaves the page interactive and closes on outside click", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('[data-sketch-node-label="card"]').click({ button: "right" });
+  const menu = page.getByRole("menu", { name: "草图右键菜单" });
+  await expect(menu).toBeVisible();
+
+  await menu.getByRole("menuitem", { name: "置顶", exact: true }).click();
+  await expect(menu).toBeHidden();
+
+  await page.locator('[data-sketch-node-label="card"]').click({ button: "right" });
+  await expect(page.getByRole("menu", { name: "草图右键菜单" })).toBeVisible();
+
+  await page.mouse.click(10, 10);
+  await expect(page.getByRole("menu", { name: "草图右键菜单" })).toBeHidden();
+});
+
 test("sketch playground runs commands from the layer context menu", async ({ page }) => {
   await page.goto("/");
 

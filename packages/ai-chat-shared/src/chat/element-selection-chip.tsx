@@ -9,6 +9,12 @@ export interface ChatElementRef {
   context: string;
 }
 
+export interface ChatPageRef {
+  id: string;
+  label: string;
+  context: string;
+}
+
 interface ElementSelectionChipProps {
   element: ChatElementRef;
   onRemove: () => void;

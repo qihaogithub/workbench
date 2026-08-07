@@ -6,6 +6,7 @@ import {
   buildPrototypePreviewHtmlFragment,
 } from "@workbench/shared";
 import { cn } from "./utils";
+import { LayerTreeMenu } from "./LayerTreeMenu";
 import { computePreviewScale } from "./preview-scale";
 import type {
   PreviewSize,
@@ -37,6 +38,7 @@ export interface PrototypePagePreviewProps {
   visualPropertyChanges?: VisualPropertyChange[];
   onVisualSelect?: (node: VisualNodeInfo | null) => void;
   onVisualSelectStack?: (nodes: VisualNodeInfo[]) => void;
+  onToggleNodeHidden?: (node: VisualNodeInfo) => void;
   visualNodeTreeRequestKey?: number;
   onVisualNodeTreeChange?: (nodes: VisualNodeTreeItem[]) => void;
 }
@@ -59,6 +61,25 @@ function resolveVisualEventTarget(target: EventTarget | null, root: Element): Vi
 function normalizeMeasuredSize(value: number): number {
   if (!Number.isFinite(value) || value <= 0) return 0;
   return Math.round(value);
+}
+
+// 画布中展示"完整内容"：可滚动页面（如手机端内容超出设计画板、由作者用固定高度 +
+// overflow 裁剪的容器装起来）在画布卡片里应透出全部内容，而不是只在内部滚动一屏。
+// 这里自底向上把"纵向裁剪且内容确实溢出"的容器解除裁剪（overflow:visible + height:auto），
+// 让 .prototype-root 自然长到完整内容高度，再由 ResizeObserver 上报给画布。
+// 平铺正好一屏的固定页（contentHeight == clientHeight）不会被改动，幻灯片等不被误展开。
+function expandVerticalClippedElements(root: Element) {
+  const elements = Array.from(root.querySelectorAll("*"));
+  for (let i = elements.length - 1; i >= 0; i--) {
+    const el = elements[i];
+    if (!(el instanceof HTMLElement)) continue;
+    const overflowY = getComputedStyle(el).overflowY;
+    const clipsVertical =
+      overflowY === "auto" || overflowY === "scroll" || overflowY === "hidden";
+    if (!clipsVertical || el.scrollHeight <= el.clientHeight + 1) continue;
+    el.style.overflow = "visible";
+    el.style.height = "auto";
+  }
 }
 
 function getOwnText(element: Element): string {
@@ -216,9 +237,17 @@ function updateSelectedLabel(
   }
   const rect = element.getBoundingClientRect();
   const hostRect = host.getBoundingClientRect();
+  // 标签位于被 transform: scale() 包裹的 Shadow DOM 中，position:fixed 退化为相对
+  // transform 祖先定位。getBoundingClientRect 差值已含缩放，需除回 scale，避免偏移被
+  // 二次叠加导致标签偏离元素边界（与高保真 iframe 视觉对齐）。
+  const scaledParent = host.parentElement;
+  const scale =
+    scaledParent && scaledParent.offsetWidth > 0
+      ? scaledParent.getBoundingClientRect().width / scaledParent.offsetWidth
+      : 1;
   label.style.display = "block";
-  label.style.left = `${Math.max(4, rect.left - hostRect.left)}px`;
-  label.style.top = `${Math.max(4, rect.top - hostRect.top - 24)}px`;
+  label.style.left = `${Math.max(4, (rect.left - hostRect.left) / scale)}px`;
+  label.style.top = `${Math.max(4, (rect.top - hostRect.top) / scale - 24)}px`;
   label.textContent = formatSelectedLabel(element);
 }
 
@@ -375,12 +404,18 @@ export function PrototypePagePreview({
   visualPropertyChanges = [],
   onVisualSelect,
   onVisualSelectStack,
+  onToggleNodeHidden,
   visualNodeTreeRequestKey,
   onVisualNodeTreeChange,
 }: PrototypePagePreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const shadowRef = useRef<ShadowRoot | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    tree: VisualNodeTreeItem;
+  } | null>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const [containerHeight, setContainerHeight] = useState<number>(0);
   const shouldScaleToPreviewSize = previewSize != null;
@@ -438,6 +473,14 @@ export function PrototypePagePreview({
     effectiveHeight,
   );
 
+  // 归一化视口单位、以及 .prototype-root 的固定设计画板尺寸，必须使用页面的
+  // 真实设计尺寸（previewSize），而不是 computePreviewScale 返回的 designHeight。
+  // 在 fillContainer + effectiveHeight 场景下，computePreviewScale 会把 designHeight
+  // 抬升为内容高度（max(设计高, effectiveHeight)），若用它作为设计基准，会让
+  // 100vh 被归一化成过高的像素值，导致整屏页被画布自身的测量高度反向撑高。
+  const fragmentDesignWidth = previewSize?.width;
+  const fragmentDesignHeight = previewSize?.height;
+
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
@@ -457,7 +500,7 @@ export function PrototypePagePreview({
       assetRewrite,
       allowScroll,
       previewSize: shouldScaleToPreviewSize
-        ? { width: designWidth, height: designHeight }
+        ? { width: fragmentDesignWidth, height: fragmentDesignHeight }
         : undefined,
       constrainHeight: shouldScaleToPreviewSize ? !fillContainer : undefined,
     });
@@ -466,27 +509,9 @@ export function PrototypePagePreview({
       applyPrototypeBindings(root, configData, assetRewrite);
       applyPropertyChanges(root, visualPropertyChanges);
     }
-  }, [
-    allowScroll,
-    configData,
-    css,
-    designHeight,
-    designWidth,
-    demoId,
-    fillContainer,
-    html,
-    sessionId,
-    shouldScaleToPreviewSize,
-    visualPropertyChanges,
-  ]);
-
-  useLayoutEffect(() => {
-    if (!onContentHeightChange || !shouldScaleToPreviewSize) return;
-    const shadow = shadowRef.current;
-    if (!shadow) return;
-    const root = shadow.querySelector<HTMLElement>(".prototype-root");
-    if (!root) return;
-
+    if (!onContentHeightChange || !shouldScaleToPreviewSize || !root) return;
+    // 先解除可滚动容器的裁剪，让 root 长到完整内容高度，ResizeObserver 才会上报正确高度。
+    expandVerticalClippedElements(root);
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const height = entry.contentRect.height;
@@ -497,8 +522,43 @@ export function PrototypePagePreview({
       }
     });
     observer.observe(root);
+    // 字体加载可能改变内容高度；加载完成后重测一次，避免卡片停留在字体加载前的高度。
+    if (document.fonts?.ready) {
+      document.fonts.ready.then(() => {
+        if (!root.isConnected) return;
+        expandVerticalClippedElements(root);
+        const fontHeight = root.scrollHeight;
+        if (Number.isFinite(fontHeight) && fontHeight > 0) {
+          onContentHeightChange(fontHeight);
+        }
+      });
+    }
+    // 初始上报兜底：ResizeObserver 的首帧回调在部分浏览器/容器缩放场景下可能不触发，
+    // 导致稳定高度的页面永远不把真实内容高度上报给画布，卡片停留在历史持久化高度。
+    // 这里在渲染后异步上报一次初始内容高度（scrollHeight 为元素自身坐标，不受画布 transform 缩放影响）。
+    requestAnimationFrame(function () {
+      if (root.isConnected) {
+        const initHeight = root.scrollHeight;
+        if (Number.isFinite(initHeight) && initHeight > 0) {
+          onContentHeightChange(initHeight);
+        }
+      }
+    });
     return () => observer.disconnect();
-  }, [onContentHeightChange, shouldScaleToPreviewSize]);
+  }, [
+    allowScroll,
+    configData,
+    css,
+    designHeight,
+    designWidth,
+    demoId,
+    fillContainer,
+    html,
+    onContentHeightChange,
+    sessionId,
+    shouldScaleToPreviewSize,
+    visualPropertyChanges,
+  ]);
 
   useEffect(() => {
     const shadow = shadowRef.current;
@@ -591,6 +651,7 @@ export function PrototypePagePreview({
       setHoveredElement(target);
     };
     const handleClick = (event: Event) => {
+      setContextMenu(null);
       const mouseEvent = event as MouseEvent;
       const target = resolveVisualEventTarget(event.composedPath()[0] ?? null, root);
       if (!target || target === root) {
@@ -643,6 +704,7 @@ export function PrototypePagePreview({
       }
       if (event.key === "Escape") {
         event.preventDefault();
+        setContextMenu(null);
         activeSelectedElement = null;
         onVisualSelect?.(null);
         onVisualSelectStack?.([]);
@@ -671,24 +733,93 @@ export function PrototypePagePreview({
       onVisualSelect?.(node);
       onVisualSelectStack?.(collectAncestorNodeStack(visualTarget, root));
     };
+    const handleContextMenu = (event: Event) => {
+      const mouseEvent = event as MouseEvent;
+      const target = resolveVisualEventTarget(event.composedPath()[0] ?? null, root);
+      if (target && target !== root) {
+        event.preventDefault();
+        event.stopPropagation();
+        const stack = collectPointNodeStack(
+          shadow,
+          target,
+          root,
+          mouseEvent.clientX,
+          mouseEvent.clientY,
+        );
+        const node = stack[stack.length - 1] ?? getNodeInfo(target, root);
+        activeSelectedElement =
+          getElementByVisualId(root, node.nodeId) ||
+          queryByDomPath(root, node.domPath);
+        if (node) {
+          onVisualSelect?.(node);
+          onVisualSelectStack?.(moveSelectedNodeToStackEnd(stack, node));
+        }
+        const tree = buildNodeTree(target, root);
+        const container = containerRef.current;
+        if (container) {
+          const containerRect = container.getBoundingClientRect();
+          const menuWidth = 236;
+          const menuHeight = 320;
+          const rawX = mouseEvent.clientX - containerRect.left;
+          const rawY = mouseEvent.clientY - containerRect.top;
+          const maxX = Math.max(8, containerRect.width - menuWidth);
+          const maxY = Math.max(8, containerRect.height - menuHeight);
+          setContextMenu({
+            x: Math.min(Math.max(rawX, 8), maxX),
+            y: Math.min(Math.max(rawY, 8), maxY),
+            tree,
+          });
+        }
+      } else {
+        setContextMenu(null);
+      }
+    };
 
     shadow.addEventListener("pointerover", handlePointerOver);
     shadow.addEventListener("click", handleClick, true);
     shadow.addEventListener("pointerleave", handlePointerLeave);
+    shadow.addEventListener("contextmenu", handleContextMenu, true);
     host.addEventListener("keydown", handleKeyDown);
     return () => {
       setHoveredElement(null);
+      setContextMenu(null);
       shadow.removeEventListener("pointerover", handlePointerOver);
       shadow.removeEventListener("click", handleClick, true);
       shadow.removeEventListener("pointerleave", handlePointerLeave);
+      shadow.removeEventListener("contextmenu", handleContextMenu, true);
       host.removeEventListener("keydown", handleKeyDown);
     };
   }, [
     onVisualSelect,
     onVisualSelectStack,
+    onToggleNodeHidden,
     selectedVisualNodeId,
     visualEditMode,
   ]);
+
+  const renderContextMenu = () => {
+    if (!visualEditMode || !contextMenu) return null;
+    return (
+      <div
+        className="absolute z-30"
+        style={{ left: contextMenu.x, top: contextMenu.y }}
+      >
+        <LayerTreeMenu
+          title="预览区图层"
+          nodes={[contextMenu.tree]}
+          scrollClassName="layer-tree-menu-scrollbar max-h-[320px]"
+          selectedNodeId={selectedVisualNodeId}
+          hiddenNodeIds={hiddenVisualNodeIds}
+          onToggleNodeHidden={onToggleNodeHidden}
+          onSelectNode={(node, path) => {
+            onVisualSelect?.(node);
+            onVisualSelectStack?.(path);
+            setContextMenu(null);
+          }}
+        />
+      </div>
+    );
+  };
 
   const previewHost = (
     <div
@@ -697,26 +828,38 @@ export function PrototypePagePreview({
         "h-full w-full overflow-auto bg-white",
         !shouldScaleToPreviewSize && className,
       )}
+      style={shouldScaleToPreviewSize ? { scrollbarWidth: "none", msOverflowStyle: "none" } as React.CSSProperties : undefined}
       data-prototype-preview
       tabIndex={visualEditMode ? 0 : undefined}
     />
   );
 
   if (!shouldScaleToPreviewSize) {
-    return previewHost;
+    return (
+      <div className="relative h-full w-full">
+        {previewHost}
+        {renderContextMenu()}
+      </div>
+    );
   }
 
   return (
     <div
       ref={containerRef}
-      className={cn("flex h-full w-full items-center justify-center", className)}
+      className={cn("relative flex h-full w-full items-center justify-center", className)}
     >
+      <style>{`
+        [data-prototype-preview]::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
       <div
         style={wrapperStyle}
         className={fillContainer ? "relative" : "relative rounded-lg border border-border bg-white shadow-sm"}
       >
         <div style={contentStyle}>{previewHost}</div>
       </div>
+      {renderContextMenu()}
     </div>
   );
 }

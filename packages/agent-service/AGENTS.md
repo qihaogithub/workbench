@@ -92,6 +92,7 @@ tests/
 | `schemaValidate` | 校验 config.schema.json 格式 |
 | `saveImage` | 保存图片到图床（SHA256 去重，返回绝对 URL `/api/images/{hash}-{filename}`） |
 | `listImages` | 查询当前项目已上传的图片清单 |
+| `readUserImage` | 按 imageId 从全局图床回读图片内容（仅在模型支持图片时使用，返回图片像素内容） |
 | `getConsoleLogs` | 获取页面控制台日志 |
 | `captureScreenshot` | 捕获页面截图 |
 | `readPreinstalledSkill` | 按名称读取 agent-service 内置的预装 Skill 全文 |
@@ -282,6 +283,7 @@ pnpm typecheck
 - **文件操作**：`ToolHookManager` 在 `tool_result` hook 中捕获 `writeFile/editFile` 变更
 - **路径安全**：`PermissionManager.validateToolCall` 拦截 `readFile/writeFile/listFiles` 的越权访问
 - **编辑重发历史重同步**：WS 消息 `resync_history` 触发服务端销毁旧 agent → 重建 → 逐条 `appendHistoryMessage(role, content)` 写入 session。参见 `src/routes/websocket.ts` 的 `case "resync_history"`。`IBackendAdapter`、`BaseAgent`、`BackendAgent` 和 `PiAgentBackend` 均有 `appendHistoryMessage` 方法。
+- **图片上下文策略**：用户上传的图片仅在发送当轮以原始像素进入 LLM 上下文；之后每轮通过 `context` hook（`stripExpiredImageParts`，`src/utils/image-context-strip.ts`）剥离所有历史消息（含 user、assistant、toolResult）中的 image part，仅保留入库 URL 引用文本。`readUserImage` 工具可让模型按需从全局图床重新加载历史图片。非 vision 模型路径不受此策略影响（图片已转为文字描述）。
 
 ## 相关文档
 

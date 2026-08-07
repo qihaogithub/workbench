@@ -9,7 +9,7 @@ covers:
 
 # Pi Agent 子 Agent
 
-> 更新日期：2026-06-27
+> 更新日期：2026-08-05
 
 ## 一、定位
 
@@ -53,3 +53,13 @@ Pi Agent 子 Agent 是主 Agent 的内部委派能力。它不新增 HTTP 或 We
 | `PI_AGENT_SUBAGENT_TIMEOUT` | `120000` | 单次子 Agent 任务超时时间，单位毫秒 |
 
 前端状态展示区分两个层级：“待主 Agent 汇总”表示某个子 Agent 已返回但主 Agent 仍在继续处理；“已完成”表示整轮消息已经结束后，该委派任务随消息一起归档。
+
+## 五、识图子代理
+
+当主 Agent 为纯文本模型时，通过 `delegateTask({ model: "vision", images: [...] })` 将图片交由识图子代理分析。图片 URL 解析规则：
+
+- `/api/images/{imageId}` → 从本地全局图床直接读取（`readGlobalImageById`），零 HTTP。
+- `/api/screenshots/file/{projectId}/{pageId}` → 用 `SCREENSHOT_SERVICE_URL` 归一化成绝对地址后服务端 fetch。
+- 其他 http(s) URL → 直接 fetch，加 `AbortSignal` 超时。
+
+**设计不变式**：模型上下文里出现的图片/截图 URL 一律使用相对路径（`/api/images/...`、`/api/screenshots/file/...`），由浏览器按用户实际访问的源解析。绝对 URL 只用于服务端内部取数，绝不暴露给模型和用户。

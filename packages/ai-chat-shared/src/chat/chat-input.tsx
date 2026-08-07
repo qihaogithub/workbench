@@ -26,14 +26,16 @@ import { getConfiguredAgentClient } from "../config";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import type { ResolvedModel, ThinkingDepth } from "../lib/ai-models";
 import type { FileAttachment, ImageAttachment } from "@workbench/agent-client";
-import { type ChatElementRef } from "./element-selection-chip";
+import { type ChatElementRef, type ChatPageRef } from "./element-selection-chip";
 import {
   InlineTagInput,
+  type InlineTag,
   type InlineTagInputHandle,
   type ProjectReference,
 } from "./inline-tag-input";
 import { ProjectReferencePicker } from "./project-reference-picker";
 import { AttachmentManagerDialog } from "./attachment-manager-dialog";
+import type { SendMessageRunOptions } from "./hooks/use-chat-stream";
 
 const AI_ATTACHMENT_ACCEPT = [
   ".txt",
@@ -93,10 +95,12 @@ function fileToBase64(file: File): Promise<string> {
 
 async function uploadFileAttachment(
   agentSessionId: string,
+  projectId: string,
   file: File,
 ): Promise<FileAttachment> {
   const payload = await getConfiguredAgentClient().uploadAttachment(
     agentSessionId,
+    projectId,
     file,
   );
   if (!payload.success) {
@@ -275,16 +279,27 @@ const AttachmentManagerDialogGate = ({
   );
 };
 
+const AddFilesCapturer = ({
+  addFilesRef,
+}: {
+  addFilesRef: React.MutableRefObject<((files: File[]) => void) | null>;
+}) => {
+  const { add } = usePromptInputAttachments();
+  addFilesRef.current = add;
+  return null;
+};
+
 interface ChatInputProps {
   onSubmit: (
     message: string,
     images?: ImageAttachment[],
-    runOptions?: undefined,
+    runOptions?: SendMessageRunOptions,
     files?: FileAttachment[],
   ) => void;
   onCancel: () => void;
   isStreaming: boolean;
   agentSessionId: string;
+  projectId?: string;
   onHistoryClick: () => void;
   onModelChange: (modelId: string) => void;
   onDepthChange: (depth: ThinkingDepth) => void;
@@ -300,6 +315,9 @@ interface ChatInputProps {
   imageDescriptionEnabled?: boolean;
   selectedElement?: ChatElementRef | null;
   onRemoveElement?: () => void;
+  /** 画布多选页面引用，插入为多个紫色 @页面名 标签 */
+  selectedPages?: ChatPageRef[];
+  onRemovePages?: () => void;
   projects?: ProjectReference[];
 }
 
@@ -308,6 +326,7 @@ export function ChatInput({
   onCancel,
   isStreaming,
   agentSessionId,
+  projectId,
   onHistoryClick,
   onModelChange,
   onDepthChange,
@@ -323,6 +342,8 @@ export function ChatInput({
   imageDescriptionEnabled = false,
   selectedElement,
   onRemoveElement,
+  selectedPages,
+  onRemovePages,
   projects,
 }: ChatInputProps) {
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -330,6 +351,8 @@ export function ChatInput({
   const [attachmentManagerOpen, setAttachmentManagerOpen] = useState(false);
   const inputRef = useRef<InlineTagInputHandle | null>(null);
   const prevElementIdRef = useRef<string | null>(null);
+  const prevPagesIdRef = useRef<string | null>(null);
+  const addFilesRef = useRef<((files: File[]) => void) | null>(null);
 
   useEffect(() => {
     if (selectedElement && selectedElement.id !== prevElementIdRef.current) {
@@ -344,13 +367,50 @@ export function ChatInput({
     }
   }, [selectedElement, onRemoveElement]);
 
+  useEffect(() => {
+    if (selectedPages && selectedPages.length > 0) {
+      const key = selectedPages.map((p) => p.id).join(",");
+      if (key === prevPagesIdRef.current) return;
+      prevPagesIdRef.current = key;
+      selectedPages.forEach((page) => {
+        inputRef.current?.insertTag({
+          id: page.id,
+          type: "page",
+          label: page.label,
+          context: page.context,
+        });
+      });
+      onRemovePages?.();
+    }
+  }, [selectedPages, onRemovePages]);
+
   const handleSubmit = useCallback(
     async (message: PromptInputMessage) => {
-      const tagValue = inputRef.current?.getValue();
-      const tags = tagValue?.tags ?? [];
+      const segments = inputRef.current?.getSegments() ?? [];
+      const tags: Array<{ tag: InlineTag; ref: string }> = [];
+      let elementCount = 0;
+      let projectCount = 0;
+      let pageCount = 0;
+      const messageParts: string[] = [];
+
+      for (const seg of segments) {
+        if (seg.type === "text") {
+          messageParts.push(seg.value);
+        } else {
+          const ref =
+            seg.tag.type === "project"
+              ? `[引用项目${++projectCount}]`
+              : seg.tag.type === "element"
+                ? `[引用元素${++elementCount}]`
+                : `[引用页面${++pageCount}]`;
+          tags.push({ tag: seg.tag, ref });
+          messageParts.push(ref);
+        }
+      }
+
       const hasText = Boolean(message.text);
-      const hasAttachments = Boolean(message.files?.length);
       const hasTags = tags.length > 0;
+      const hasAttachments = Boolean(message.files?.length);
 
       if (!(hasText || hasAttachments || hasTags)) {
         return;
@@ -380,17 +440,44 @@ export function ChatInput({
             if (file.type.startsWith("image/")) {
               const base64 = await fileToBase64(file.file);
               images.push({ data: base64, mimeType: file.type, name: file.name });
+              // 图片也持久化为聊天附件，供文件栏「对话文件」查看
+              if (!agentSessionId) {
+                throw new Error("AI 会话尚未初始化，无法上传图片");
+              }
+              if (!projectId) {
+                throw new Error("项目 ID 缺失，无法上传图片");
+              }
+              files.push(
+                await uploadFileAttachment(agentSessionId, projectId, file.file),
+              );
             } else {
               if (!agentSessionId) {
                 throw new Error("AI 会话尚未初始化，无法上传文件");
               }
-              files.push(await uploadFileAttachment(agentSessionId, file.file));
+              if (!projectId) {
+                throw new Error("项目 ID 缺失，无法上传文件");
+              }
+              files.push(await uploadFileAttachment(agentSessionId, projectId, file.file));
             }
           }
         } catch (error) {
-          setUploadError(error instanceof Error ? error.message : "文件上传失败");
+          const fileObjects = message.files
+            .filter((f) => f.file)
+            .map((f) => f.file!);
+          if (fileObjects.length > 0) {
+            addFilesRef.current?.(fileObjects);
+          }
+          if (error instanceof TypeError) {
+            setUploadError("附件上传失败：无法连接 AI 服务，请稍后重试");
+          } else {
+            setUploadError(error instanceof Error ? error.message : "文件上传失败");
+          }
           return;
         }
+      }
+
+      if (files.length > 0) {
+        window.dispatchEvent(new Event("chat-attachments-updated"));
       }
 
       const fallbackMessage =
@@ -400,25 +487,59 @@ export function ChatInput({
             : "请读取并分析这些附件文件"
           : "处理附件图片";
 
-      const baseText = message.text || fallbackMessage;
+      const baseText = message.text || (hasTags ? "请根据引用内容给出修改建议" : fallbackMessage);
 
       const tagContexts = tags
         .map(
-          (tag) =>
-            `[引用${tag.type === "project" ? "项目" : "元素"}: ${tag.label}]\n${tag.context}`,
+          ({ tag, ref }) =>
+            `${ref}: ${tag.label}]\n${tag.context}`,
         )
         .join("\n\n");
 
-      const userMessage = tagContexts
-        ? `${tagContexts}\n\n${baseText}`
+      const userMessage = hasTags
+        ? `${tagContexts}\n\n${messageParts.join("")}`
         : baseText;
+
+      const inlineRefs = hasTags
+        ? {
+            tags: tags.map((t) => ({
+              id: t.tag.id,
+              type: t.tag.type as "element" | "project" | "page",
+              label: t.tag.label,
+              context: t.tag.context,
+            })),
+            text: baseText,
+            segments: segments.map(
+              (
+                seg,
+              ):
+                | { type: "text"; value: string }
+                | {
+                    type: "tag";
+                    id?: string;
+                    kind: "element" | "project" | "page";
+                    label: string;
+                    context: string;
+                  } =>
+                seg.type === "text"
+                  ? { type: "text", value: seg.value }
+                  : {
+                      type: "tag",
+                      id: seg.tag.id,
+                      kind: seg.tag.type,
+                      label: seg.tag.label,
+                      context: seg.tag.context,
+                    },
+            ),
+          }
+        : undefined;
 
       inputRef.current?.clear();
 
       onSubmit(
         userMessage,
         images.length > 0 ? images : undefined,
-        undefined,
+        inlineRefs ? { inlineRefs } : undefined,
         files.length > 0 ? files : undefined,
       );
     },
@@ -438,6 +559,7 @@ export function ChatInput({
       multiple
       supportsImages={supportsImages}
     >
+      <AddFilesCapturer addFilesRef={addFilesRef} />
       <PromptInputHeader>
         <PromptInputAttachmentsDisplay
           onOpenManager={() => setAttachmentManagerOpen(true)}

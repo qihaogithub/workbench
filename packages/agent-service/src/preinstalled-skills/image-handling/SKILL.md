@@ -7,27 +7,16 @@ description: 图片资源保存、引用和路径规则。触发词：保存图�
 
 ## 保存用户上传的图片
 
-使用 `saveImage` 工具可将图片保存到工作区，支持两种来源：
+用户通过聊天内联上传/粘贴的图片，**系统会自动保存到图床**。系统提示中会包含 `[图片已自动入库]` 文本，列出每张图片的 `imageId` 和引用 URL（`/api/images/img_xxx`）。**无需调用 `saveImage` 保存这些图片**，直接使用提示中的 URL 即可。
 
-### 来源 1：文件上传（Base64）
+如果需要在页面中引用图片，使用系统提示中提供的 `/api/images/img_xxx` URL；如需回顾图片内容，调用 `readUserImage` 并传入 `imageId`。
 
-1. 消息的 `images` 字段包含 `{ data: Base64字符串, name: 文件名 }`
-2. 调用 `saveImage`（source="base64"）保存到工作区
-3. `data` 字段不含 `data:image/xxx;base64,` 前缀，直接传入即可
-4. 保存后图片位于项目本地 `assets/images/{hash}-{filename}`；在 `demos/{pageId}/` 内的页面文件中引用时使用 `../../assets/images/{hash}-{filename}`
+`saveImage` 工具仅在以下场景使用：
 
-```typescript
-saveImage({
-  source: "base64",
-  data: "iVBORw0KGgo...",
-  filename: "product.png",
-});
-```
+### 来源 1：从外部 URL 下载图片
 
-### 来源 2：图片 URL
-
-1. 调用 `saveImage`（source="url"）下载并保存
-2. 工具会自动下载、验证并保存到工作区
+1. 调用 `saveImage`（source="url"）下载并保存到图床
+2. 工具会自动下载、验证并保存
 3. URL 来源仅允许 http/https 协议，下载超时 10 秒，最大 10MB，会校验 Content-Type
 
 ```typescript

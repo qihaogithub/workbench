@@ -19,20 +19,20 @@ export function createReadUploadedFileTool(
     name: "readUploadedFile",
     label: "Read Uploaded File",
     description:
-      "Read text extracted from a user-uploaded file attachment in the current AI session. Use this for PDFs, DOCX, CSV, markdown, JSON, code, and text files uploaded with the user's message.",
+      "Read text extracted from a user-uploaded file attachment in the current project. Use this for PDFs, DOCX, CSV, markdown, JSON, code, and text files uploaded with the user's message.",
     parameters: ReadUploadedFileParams,
     execute: async (_toolCallId: string, args: ReadUploadedFileParams) => {
-      if (!config.sessionId) {
+      if (!config.projectId) {
         return {
-          content: [{ type: "text", text: "Error: sessionId is required to read uploaded files." }],
-          details: { error: "missing sessionId" },
+          content: [{ type: "text", text: "Error: projectId is required to read uploaded files." }],
+          details: { error: "missing projectId" },
           isError: true,
         };
       }
 
       try {
         const { metadata, text } = await readUploadedFileAttachment(
-          config.sessionId,
+          config.projectId,
           args.attachmentId,
         );
         if (!metadata.textExtracted || !text.trim()) {

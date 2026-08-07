@@ -150,6 +150,9 @@ interface AIChatProps {
   onHistoryOpen?: () => void;
   selectedElement?: import("./chat/element-selection-chip").ChatElementRef | null;
   onRemoveElement?: () => void;
+  /** 画布多选页面引用 */
+  selectedPages?: import("./chat/element-selection-chip").ChatPageRef[];
+  onRemovePages?: () => void;
   projects?: ProjectReference[];
 }
 
@@ -187,6 +190,8 @@ export function AIChat({
   onHistoryOpen,
   selectedElement,
   onRemoveElement,
+  selectedPages,
+  onRemovePages,
   projects,
 }: AIChatProps) {
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
@@ -531,6 +536,7 @@ export function AIChat({
         onCancel={handleCancelStream}
         isStreaming={isStreaming}
         agentSessionId={agentSessionId}
+        projectId={projectId}
         onHistoryClick={handleHistoryClick}
         onModelChange={handleModelChange}
         onDepthChange={handleDepthChange}
@@ -546,6 +552,8 @@ export function AIChat({
         imageDescriptionEnabled={modelState.imageDescriptionEnabled}
         selectedElement={selectedElement}
         onRemoveElement={onRemoveElement}
+        selectedPages={selectedPages}
+        onRemovePages={onRemovePages}
         projects={projects}
       />
 

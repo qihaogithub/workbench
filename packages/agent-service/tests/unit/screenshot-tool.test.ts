@@ -70,6 +70,9 @@ describe('createCaptureScreenshotTool', () => {
     const result = await tool.execute('tool_call_1', { width: 400, height: 800, fullPage: true });
 
     expect(result.isError).toBeFalsy();
+    expect(result.content[0].text).toContain('Screenshot captured');
+    expect(result.content[0].text).toContain('/api/screenshots/file/proj_test/demo_test');
+    expect(result.content[0].text).not.toContain('http://shot.local');
     expect(result.content[1]).toEqual({
       type: 'image',
       data: png.toString('base64'),

@@ -1017,7 +1017,7 @@ function walkLocalFiles(dir: string): string[] {
 }
 
 function includeFile(filePath: string, include: string | undefined): boolean {
-  if (!include) return /\.(png|jpe?g|gif|webp|svg|svga)$/i.test(filePath);
+  if (!include) return /\.(png|jpe?g|gif|webp|svg|svga|lottie|riv|skel|atlas|zip)$/i.test(filePath);
   const parts = include
     .split(",")
     .map((item) => item.trim())
