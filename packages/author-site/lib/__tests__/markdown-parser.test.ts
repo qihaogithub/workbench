@@ -444,6 +444,28 @@ describe('parseFigmaImportContent', () => {
         height: 812,
         generatedBy: 'figma-import',
       })
+      expect(result.title).toBe('Figma Export')
+    }
+  })
+
+  it('应提取 <title> 作为页面名，无 title 时返回 undefined', () => {
+    const input = `<!DOCTYPE html>
+<html>
+<head><title>  商场首页  </title><style>.figma-export{width:375px;height:812px}</style></head>
+<body><div class="figma-export" style="width:375px;height:812px">x</div></body>
+</html>`
+
+    const result = parseFigmaImportContent(input)
+
+    expect(result.success).toBe(true)
+    expect(result.kind).toBe('prototype')
+    if (result.success && result.kind === 'prototype') {
+      expect(result.title).toBe('商场首页')
+    }
+
+    const withoutTitle = parseFigmaImportContent(`<!DOCTYPE html><html><body><div class="figma-export" style="width:375px;height:812px">x</div></body></html>`)
+    if (withoutTitle.success && withoutTitle.kind === 'prototype') {
+      expect(withoutTitle.title).toBeUndefined()
     }
   })
 
