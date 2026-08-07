@@ -56,6 +56,16 @@ export {
 export type {
   ConfigRuntimeCompatibilityResult,
 } from "./demo/config-runtime-compatibility";
+export {
+  parsePageRequirementsRefs,
+  findPageRequirementRefMatches,
+  resolvePageRequirementRefs,
+  inferPageRequirementTitle,
+} from "./demo/page-requirements";
+export type {
+  PageRequirementRef,
+  ResolvedPageRequirementRef,
+} from "./demo/page-requirements";
 
 export interface PrototypePageMeta {
   width?: number;
@@ -121,6 +131,8 @@ export interface DemoFiles {
   sketchScene?: string;
   sketchMeta?: Record<string, unknown>;
   configValues?: Record<string, unknown>;
+  /** 页面配置要求文档（Markdown，含行内软引用 @[名称](config_key)）。 */
+  requirements?: string;
 }
 
 interface PageSnapshotBaseInput {

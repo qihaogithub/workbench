@@ -167,9 +167,11 @@ export { NoteDialog } from "./NoteDialog";
 export { NotePreview, stripHtml } from "./NotePreview";
 export {
   renderNoteMarkdown,
+  renderPageRequirementsMarkdown,
   stripMarkdown,
   sanitizeNoteHtml,
 } from "./note-html";
+export { PageRequirements } from "./PageRequirements";
 export { DocumentEditor } from "./DocumentEditor";
 export type {
   DocumentEditorFormat,

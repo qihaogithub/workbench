@@ -16,6 +16,7 @@ export interface ResourceBlobMap {
   sketchScene?: string;
   sketchMeta?: string;
   markdown?: string;
+  requirements?: string;
 }
 
 export interface ProjectImageManifestEntry {

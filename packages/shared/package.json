@@ -10,7 +10,8 @@
     "./demo/iframe-template": "./src/demo/iframe-template.ts",
     "./demo/prototype-preview": "./src/demo/prototype-preview.ts",
     "./demo/sketch-scene": "./src/demo/sketch-scene.ts",
-    "./demo/config-runtime-compatibility": "./src/demo/config-runtime-compatibility.ts"
+    "./demo/config-runtime-compatibility": "./src/demo/config-runtime-compatibility.ts",
+    "./demo/page-requirements": "./src/demo/page-requirements.ts"
   },
   "dependencies": {
     "@workbench/sketch-core": "workspace:*"
