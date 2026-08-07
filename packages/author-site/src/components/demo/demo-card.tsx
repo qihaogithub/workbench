@@ -21,6 +21,7 @@ import {
   Trash2,
   Tag,
 } from "lucide-react";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -390,7 +391,7 @@ export function DemoCard({
 
   return (
     <div className="group relative">
-      <a
+      <Link
         href={editHref}
         aria-label={`打开项目 ${demo.name}`}
         className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -453,7 +454,7 @@ export function DemoCard({
             </div>
           </CardContent>
         </Card>
-      </a>
+      </Link>
       <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger asChild>
           <button

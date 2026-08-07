@@ -26,6 +26,7 @@ export function PreviewStage({
   showToolbar = true,
   showDefaultPageSelector = false,
   selectorSlot,
+  toolbarCenter,
   toolbarTrailing,
   renderSingleContent,
   className,
@@ -62,14 +63,16 @@ export function PreviewStage({
           activePageId={activePageId}
           onActivePageChange={onActivePageChange}
           previewMode={previewMode}
-          onPreviewModeChange={onPreviewModeChange}
           showDefaultPageSelector={showDefaultPageSelector}
           selectorSlot={selectorSlot}
+          center={toolbarCenter}
           trailing={toolbarTrailing}
         />
       )}
       <div className="min-h-0 flex-1 overflow-hidden">
-        {previewMode === "canvas" ? (
+        {previewMode === "document" ? (
+          singleContent
+        ) : previewMode === "canvas" ? (
           <PreviewCanvas
             {...canvasProps}
             pages={normalizedPages}

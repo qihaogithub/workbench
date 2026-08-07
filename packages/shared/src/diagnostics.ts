@@ -28,7 +28,7 @@ export interface LegacyEditorDiagnosticContext {
   sessionId?: string;
   workspaceId?: string;
   activePageId?: string;
-  previewMode?: "single" | "canvas";
+  previewMode?: "single" | "canvas" | "document";
 }
 
 export interface LegacyEditorDiagnosticEvent extends LegacyEditorDiagnosticContext {

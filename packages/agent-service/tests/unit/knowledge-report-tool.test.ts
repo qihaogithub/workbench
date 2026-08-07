@@ -221,4 +221,101 @@ describe("knowledgeReport tool", () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  it("引用项目 ref:// 按受控 per-file 读取原文", async () => {
+    const tempProject = fs.mkdtempSync(path.join(os.tmpdir(), "ref-src-"));
+    const projectId = "proj_ref_1";
+    const workspacePath = path.join(tempProject, "projects", projectId, "workspace");
+    fs.mkdirSync(path.join(workspacePath, "demos", "page-1"), { recursive: true });
+    fs.writeFileSync(
+      path.join(workspacePath, "project.json"),
+      JSON.stringify({ projectType: "standard" }),
+      "utf-8",
+    );
+    fs.writeFileSync(
+      path.join(workspacePath, "demos", "page-1", "index.tsx"),
+      "export default () => <div>被引用项目页面原文</div>",
+      "utf-8",
+    );
+    const originalDataDir = process.env.DATA_DIR;
+    process.env.DATA_DIR = tempProject;
+    try {
+      const tool = createReadKnowledgeSourceTool({
+        sessionId: "session-ref",
+        referencedProjects: [{ projectId, label: "被引用项目" }],
+      });
+      const result = await tool.execute("call-ref", {
+        sourceRef: `ref://project/${projectId}/demos/page-1/index.tsx`,
+      });
+      expect(result.isError).toBeUndefined();
+      expect(result.content[0]?.text).toContain("被引用项目页面原文");
+      expect(result.details).toMatchObject({ projectId });
+    } finally {
+      if (originalDataDir === undefined) delete process.env.DATA_DIR;
+      else process.env.DATA_DIR = originalDataDir;
+      fs.rmSync(tempProject, { recursive: true, force: true });
+    }
+  });
+
+  it("knowledgeReport 注入被引用项目阅读地图并给出 sourceRef 读取指引", async () => {
+    const tempProject = fs.mkdtempSync(path.join(os.tmpdir(), "ref-report-"));
+    const projectId = "proj_ref_report";
+    const workspacePath = path.join(tempProject, "projects", projectId, "workspace");
+    fs.mkdirSync(path.join(workspacePath, "demos", "page-hero"), { recursive: true });
+    fs.writeFileSync(
+      path.join(workspacePath, "project.json"),
+      JSON.stringify({ projectType: "standard" }),
+      "utf-8",
+    );
+    fs.writeFileSync(
+      path.join(workspacePath, "demos", "page-hero", "index.tsx"),
+      "export default () => <div>头图页原文</div>",
+      "utf-8",
+    );
+    const originalDataDir = process.env.DATA_DIR;
+    process.env.DATA_DIR = tempProject;
+    try {
+      const tool = createKnowledgeReportTool({
+        sessionId: "session-ref-report",
+        workingDir: tempDir,
+        referencedProjects: [{ projectId, label: "学习页头图" }],
+      });
+      const result = await tool.execute("call-ref-report", {
+        question: "头图页怎么实现的？",
+      });
+      expect(result.isError).toBeUndefined();
+      expect(result.content[0]?.text).toContain("引用项目读取指引");
+      expect(result.content[0]?.text).toContain(
+        `ref://project/${projectId}/demos/page-hero/index.tsx`,
+      );
+      expect(result.content[0]?.text).toContain("不要尝试用 readFile");
+      const sources = (result.details as { sources?: Array<{ path: string }> }).sources ?? [];
+      expect(
+        sources.some((s) => s.path === `ref://project/${projectId}/demos/page-hero/index.tsx`),
+      ).toBe(true);
+    } finally {
+      if (originalDataDir === undefined) delete process.env.DATA_DIR;
+      else process.env.DATA_DIR = originalDataDir;
+      fs.rmSync(tempProject, { recursive: true, force: true });
+    }
+  });
+
+  it("未授权引用时 readKnowledgeSource 拒绝越权项目", async () => {
+    const originalDataDir = process.env.DATA_DIR;
+    process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "ref-deny-"));
+    try {
+      const tool = createReadKnowledgeSourceTool({
+        sessionId: "session-noauth",
+        referencedProjects: [{ projectId: "allowed", label: "允许" }],
+      });
+      const result = await tool.execute("call-deny", {
+        sourceRef: "ref://project/other/demos/page-1/index.tsx",
+      });
+      expect(result.isError).toBe(true);
+      expect(result.details?.error).toBe("REFERENCE_PROJECT_NOT_AUTHORIZED");
+    } finally {
+      if (originalDataDir === undefined) delete process.env.DATA_DIR;
+      else process.env.DATA_DIR = originalDataDir;
+    }
+  });
 });

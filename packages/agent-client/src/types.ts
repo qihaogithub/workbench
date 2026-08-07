@@ -91,6 +91,8 @@ export interface SendMessageOptions {
   workingDir?: string;
   projectId?: string;
   demoId?: string;
+  /** 当前消息引用的跨项目（引用项目） */
+  referencedProjects?: Array<{ projectId: string; label?: string }>;
   images?: ImageAttachment[];
   files?: FileAttachment[];
   /**

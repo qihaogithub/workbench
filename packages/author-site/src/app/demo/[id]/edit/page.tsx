@@ -8,9 +8,11 @@ import {
   extractPrototypeConfigBindingKeys,
   invalidateCompileCache,
   isSchemaEmpty,
+  PreviewModeSwitcher,
 } from "../../../../../components/demo";
 import type {
   PositionableSizeItem,
+  PreviewMode,
   PreviewStagePage,
   PreviewSize,
   ScreenshotRenderBox,
@@ -106,7 +108,6 @@ import { ResizablePanelGroup, ResizablePanel } from "@/components/ui/resizable";
 import {
   Bot,
   Layers,
-  FileCode2,
   Loader2,
   ImageIcon,
   Trash2,
@@ -127,6 +128,8 @@ import {
   Users,
   Download,
   Share2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   MessageSquare,
@@ -136,7 +139,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -286,8 +291,8 @@ const ConventionDialog = dynamic(
   () => import("@/components/demo/ConventionDialog").then((m) => m.ConventionDialog),
   { ssr: false, loading: () => null },
 );
-const KnowledgePanel = dynamic(
-  () => import("@/components/demo/KnowledgePanel").then((m) => m.KnowledgePanel),
+const DocumentView = dynamic(
+  () => import("@/components/demo/DocumentView").then((m) => m.DocumentView),
   { ssr: false, loading: () => null },
 );
 const KnowledgeDocDialog = dynamic(
@@ -1950,7 +1955,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       })),
     [demos],
   );
-  const [fileView, setFileView] = useState<"doc" | "code">("doc");
   const [triggerAutoSend, setTriggerAutoSend] = useState<
     string | AutoRepairTrigger | VisualPropertyAutoSend | null
   >(null);
@@ -6209,6 +6213,39 @@ ${context.details}
     [handleSinglePreviewDocumentSelect, handleSinglePreviewPageSelect],
   );
 
+  const singlePreviewNavigableItems = useMemo(() => {
+    const items: { value: string; group: "页面" | "文档"; label: string }[] =
+      [];
+    for (const page of demoPages) {
+      items.push({ value: `page:${page.id}`, group: "页面", label: page.name });
+    }
+    for (const node of singlePreviewDocumentNodes) {
+      items.push({
+        value: `document:${node.id}`,
+        group: "文档",
+        label: node.title,
+      });
+    }
+    return items;
+  }, [demoPages, singlePreviewDocumentNodes]);
+  const singlePreviewCurrentIndex = singlePreviewNavigableItems.findIndex(
+    (item) => item.value === singlePreviewSelectValue,
+  );
+  const handleSinglePreviewPrev = useCallback(() => {
+    const index = singlePreviewCurrentIndex;
+    if (index <= 0) return;
+    handleSinglePreviewSelectChange(
+      singlePreviewNavigableItems[index - 1].value,
+    );
+  }, [handleSinglePreviewSelectChange, singlePreviewCurrentIndex, singlePreviewNavigableItems]);
+  const handleSinglePreviewNext = useCallback(() => {
+    const index = singlePreviewCurrentIndex;
+    if (index < 0 || index >= singlePreviewNavigableItems.length - 1) return;
+    handleSinglePreviewSelectChange(
+      singlePreviewNavigableItems[index + 1].value,
+    );
+  }, [handleSinglePreviewSelectChange, singlePreviewCurrentIndex, singlePreviewNavigableItems]);
+
   const handleSinglePreviewResourceRestored = useCallback(async () => {
     if (!singlePreviewHistoryTarget) return;
 
@@ -6616,7 +6653,42 @@ ${context.details}
   const hasAnyConfig = showProjectConfig || showPageConfig;
   const isConfigPanelVisible =
     (previewMode === "single" && !singlePreviewViewingDocument) ||
-    (previewMode === "canvas" && hasAnyConfig);
+    (previewMode === "canvas" && hasAnyConfig) ||
+    previewMode === "document";
+  const handlePreviewModeChange = useCallback(
+    (nextMode: PreviewMode) => {
+      if (nextMode === previewMode) return;
+      if (nextMode === "single") {
+        setSinglePreviewTarget(
+          activeDemoId
+            ? { kind: "page", pageId: activeDemoId }
+            : null,
+        );
+        setPreviewMode("single");
+        return;
+      }
+      if (nextMode === "document") {
+        setPreviewMode("document");
+        return;
+      }
+      if (!confirmDiscardVisualPropertyWork()) return;
+      handleClearVisualProperties();
+      if (!initialCanvasFitRequestedRef.current) {
+        initialCanvasFitRequestedRef.current = true;
+        setFitCanvasToScreenOnMount(true);
+      }
+      setPreviewMode("canvas");
+    },
+    [
+      previewMode,
+      activeDemoId,
+      setSinglePreviewTarget,
+      setPreviewMode,
+      confirmDiscardVisualPropertyWork,
+      handleClearVisualProperties,
+      setFitCanvasToScreenOnMount,
+    ],
+  );
   const visualConfigUsedKeys = getSchemaPropertyKeys(
     schema,
     projectConfigSchema,
@@ -6776,10 +6848,90 @@ ${context.details}
     (presence) => presence.userId !== sessionId,
   );
 
+  const toolbarCenter =
+    previewMode === "single" &&
+    (demoPages.length > 0 || singlePreviewDocumentNodes.length > 0) ? (
+      <div className="flex items-center gap-1.5">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          disabled={
+            singlePreviewNavigableItems.length === 0 ||
+            singlePreviewCurrentIndex <= 0
+          }
+          onClick={handleSinglePreviewPrev}
+          title="上一页"
+          aria-label="上一页"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <Select
+          value={singlePreviewSelectValue || undefined}
+          onValueChange={handleSinglePreviewSelectChange}
+        >
+          <SelectTrigger
+            aria-label="选择预览对象"
+            className="h-7 min-w-[6rem] justify-start gap-0 rounded-md border-transparent bg-transparent px-2 text-xs font-medium text-foreground shadow-none data-[placeholder]:text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:ring-0"
+          >
+            <SelectValue placeholder="选择页面" />
+          </SelectTrigger>
+          <SelectContent>
+            {singlePreviewNavigableItems.filter(
+              (item) => item.group === "页面",
+            ).length > 0 && (
+              <SelectGroup>
+                <SelectLabel>页面</SelectLabel>
+                {singlePreviewNavigableItems
+                  .filter((item) => item.group === "页面")
+                  .map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+              </SelectGroup>
+            )}
+            {singlePreviewNavigableItems.filter(
+              (item) => item.group === "文档",
+            ).length > 0 && (
+              <SelectGroup>
+                <SelectLabel>文档</SelectLabel>
+                {singlePreviewNavigableItems
+                  .filter((item) => item.group === "文档")
+                  .map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+              </SelectGroup>
+            )}
+          </SelectContent>
+        </Select>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          disabled={
+            singlePreviewNavigableItems.length === 0 ||
+            singlePreviewCurrentIndex < 0 ||
+            singlePreviewCurrentIndex >=
+              singlePreviewNavigableItems.length - 1
+          }
+          onClick={handleSinglePreviewNext}
+          title="下一页"
+          aria-label="下一页"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+    ) : undefined;
+
   return (
     <div className="flex flex-col h-screen bg-background">
-      <div className="flex items-center justify-between px-6 py-4 border-b bg-card">
-        <div className="flex items-center gap-4">
+      <div className="flex items-center px-6 py-4 border-b bg-card">
+        <div className="flex flex-1 items-center gap-4">
           <Button
             variant="ghost"
             size="icon"
@@ -6817,7 +6969,13 @@ ${context.details}
             <span className="text-xs">设置封面</span>
           </Button>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-1 items-center justify-center">
+          <PreviewModeSwitcher
+            mode={previewMode}
+            onModeChange={handlePreviewModeChange}
+          />
+        </div>
+        <div className="flex flex-1 items-center justify-end gap-3">
           <div className="hidden items-center gap-2 rounded-md border px-2 py-1 text-xs text-muted-foreground md:flex">
             <Users className="h-3.5 w-3.5" />
             <span>{collabStatusLabel}</span>
@@ -6962,29 +7120,31 @@ await handlePublishWithScreenshot();
                   <Bot className="h-4 w-4" />
                   {tabValue === "ai" && <span>AI 对话</span>}
                 </TabsTrigger>
-                <TabsTrigger
-                  value="pages"
-                  title="页面"
-                  className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
-                >
-                  <Layers className="h-4 w-4" />
-                  {tabValue === "pages" && <span>页面</span>}
-                  {tabValue === "pages" && demoPages.length > 0 && (
-                    <Badge
-                      variant="secondary"
-                      className="ml-1 text-[10px] h-4 px-1"
-                    >
-                      {demoPages.length}
-                    </Badge>
-                  )}
-                </TabsTrigger>
+                {previewMode !== "document" && (
+                  <TabsTrigger
+                    value="pages"
+                    title="页面"
+                    className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                  >
+                    <Layers className="h-4 w-4" />
+                    {tabValue === "pages" && <span>页面</span>}
+                    {tabValue === "pages" && demoPages.length > 0 && (
+                      <Badge
+                        variant="secondary"
+                        className="ml-1 text-[10px] h-4 px-1"
+                      >
+                        {demoPages.length}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                )}
                 <TabsTrigger
                   value="code"
-                  title="文件"
+                  title="代码"
                   className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
                 >
                   <FolderOpen className="h-4 w-4" />
-                  {tabValue === "code" && <span>文件</span>}
+                  {tabValue === "code" && <span>代码</span>}
                 </TabsTrigger>
                 <TabsTrigger
                   value="history"
@@ -7218,87 +7378,30 @@ await handlePublishWithScreenshot();
                 value="code"
                 className="flex-1 flex flex-col mt-0 min-h-0 min-w-0 data-[state=inactive]:hidden overflow-hidden"
               >
-                <div className="flex items-center justify-center gap-1 px-3 py-2 border-b">
-                  <div className="flex items-center gap-1 rounded-md border border-border p-0.5 w-full max-w-[200px]">
-                    <button
-                      type="button"
-                      onClick={() => setFileView("doc")}
-                      className={`flex-1 justify-center inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors ${fileView === "doc" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                    >
-                      <FileText className="h-3.5 w-3.5" />
-                      文档
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFileView("code")}
-                      className={`flex-1 justify-center inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors ${fileView === "code" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                    >
-                      <FileCode2 className="h-3.5 w-3.5" />
-                      代码
-                    </button>
-                  </div>
-                </div>
                 <div className="flex-1 min-h-0 overflow-hidden">
-                  {fileView === "doc" ? (
-                    <KnowledgePanel
-                      workingDir={workspacePath || undefined}
-                      projectId={demoId}
-                      sessionId={sessionId}
-                      onItemsChange={setKnowledgeItems}
-                      onDocCreated={upsertKnowledgeItem}
-                      onDocHistory={(item) => setKbHistoryItem(item)}
-                      onDocSelect={(item, mode) => {
-                        setKbDocDialogItem(item);
-                        setKbDocDialogMode(mode);
-                        setKbDocDialogOpen(true);
-                      }}
-                      onDocAdd={() => {
-                        setKbDocDialogItem(null);
-                        setKbDocDialogMode("add");
-                        setKbDocDialogOpen(true);
-                      }}
-                      onMemorySelect={async () => {
-                        if (!sessionId) return;
-                        try {
-                          const res = await fetch(
-                            `/api/sessions/${sessionId}/workspace/files/${encodeURIComponent("memory.md")}`,
+                  <WorkspaceFileTree
+                    sessionId={sessionId}
+                    showKnowledge={true}
+                    onFileSelect={async (filePath, editable) => {
+                      try {
+                        if (filePath.startsWith(".ai-attachments/")) {
+                          const attachmentId = filePath.split("/")[1];
+                          const metaRes = await fetch(
+                            `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(attachmentId)}`,
                           );
-                          const data = await res.json();
-                          if (data.success) {
-                            setWsCodeDialogData({
-                              filePath: data.data.path,
-                              content: data.data.content,
-                              editable: data.data.editable,
-                            });
-                            setWsCodeDialogOpen(true);
-                          } else {
-                            toast({
-                              title: "加载文件失败",
-                              description: data.error?.message,
-                              variant: "destructive",
-                            });
-                          }
-                        } catch {
-                          toast({
-                            title: "加载文件失败",
-                            variant: "destructive",
-                          });
-                        }
-                      }}
-                      onConventionSelect={() => {
-                        setConventionDialogOpen(true);
-                      }}
-                      onChatFileSelect={async (attachment) => {
-                        try {
-                          if (attachment.mimeType?.startsWith("image/")) {
+                          const metaData = await metaRes.json();
+                          if (
+                            metaData.success &&
+                            metaData.data.metadata?.mimeType?.startsWith("image/")
+                          ) {
                             window.open(
-                              `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(attachment.id)}&raw=1`,
+                              `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(attachmentId)}&raw=1`,
                               "_blank",
                             );
                             return;
                           }
                           const res = await fetch(
-                            `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(attachment.id)}`,
+                            `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(attachmentId)}`,
                           );
                           const data = await res.json();
                           if (data.success) {
@@ -7315,83 +7418,34 @@ await handlePublishWithScreenshot();
                               variant: "destructive",
                             });
                           }
-                        } catch {
-                          toast({
-                            title: "加载聊天文件失败",
-                            variant: "destructive",
-                          });
+                          return;
                         }
-                      }}
-                    />
-                  ) : (
-                    <WorkspaceFileTree
-                      sessionId={sessionId}
-                      showKnowledge={true}
-                      onFileSelect={async (filePath, editable) => {
-                        try {
-                          if (filePath.startsWith(".ai-attachments/")) {
-                            const attachmentId = filePath.split("/")[1];
-                            const metaRes = await fetch(
-                              `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(attachmentId)}`,
-                            );
-                            const metaData = await metaRes.json();
-                            if (
-                              metaData.success &&
-                              metaData.data.metadata?.mimeType?.startsWith("image/")
-                            ) {
-                              window.open(
-                                `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(attachmentId)}&raw=1`,
-                                "_blank",
-                              );
-                              return;
-                            }
-                            const res = await fetch(
-                              `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(attachmentId)}`,
-                            );
-                            const data = await res.json();
-                            if (data.success) {
-                              setWsCodeDialogData({
-                                filePath: data.data.metadata.name,
-                                content: data.data.text,
-                                editable: false,
-                              });
-                              setWsCodeDialogOpen(true);
-                            } else {
-                              toast({
-                                title: "加载聊天文件失败",
-                                description: data.error?.message,
-                                variant: "destructive",
-                              });
-                            }
-                            return;
-                          }
-                          const res = await fetch(
-                            `/api/sessions/${sessionId}/workspace/files/${encodeURIComponent(filePath)}`,
-                          );
-                          const data = await res.json();
-                          if (data.success) {
-                            setWsCodeDialogData({
-                              filePath: data.data.path,
-                              content: data.data.content,
-                              editable: data.data.editable,
-                            });
-                            setWsCodeDialogOpen(true);
-                          } else {
-                            toast({
-                              title: "加载文件失败",
-                              description: data.error?.message,
-                              variant: "destructive",
-                            });
-                          }
-                        } catch {
+                        const res = await fetch(
+                          `/api/sessions/${sessionId}/workspace/files/${encodeURIComponent(filePath)}`,
+                        );
+                        const data = await res.json();
+                        if (data.success) {
+                          setWsCodeDialogData({
+                            filePath: data.data.path,
+                            content: data.data.content,
+                            editable: data.data.editable,
+                          });
+                          setWsCodeDialogOpen(true);
+                        } else {
                           toast({
                             title: "加载文件失败",
+                            description: data.error?.message,
                             variant: "destructive",
                           });
                         }
-                      }}
-                    />
-                  )}
+                      } catch {
+                        toast({
+                          title: "加载文件失败",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                  />
                 </div>
               </TabsContent>
 
@@ -7742,6 +7796,22 @@ await handlePublishWithScreenshot();
           </ResizablePanel>
           <ResizablePanel className="relative border rounded-lg overflow-hidden bg-background shadow-sm flex flex-col">
             <div className="flex-1 overflow-hidden">
+              {previewMode === "document" ? (
+                <DocumentView
+                  workingDir={workspacePath || undefined}
+                  projectId={demoId}
+                  sessionId={sessionId}
+                  onItemsChange={setKnowledgeItems}
+                  onItemsLoaded={(items) => setKnowledgeItems(items)}
+                  onDocHistory={(item) => setKbHistoryItem(item)}
+                  onAddRequest={() => {
+                    setKbDocDialogItem(null);
+                    setKbDocDialogMode("add");
+                    setKbDocDialogOpen(true);
+                  }}
+                />
+              ) : (
+              <>
               <style>{`
                 .layer-tree-menu-scrollbar {
                   scrollbar-width: thin;
@@ -7788,25 +7858,7 @@ await handlePublishWithScreenshot();
                   handleSinglePreviewSelectChange(`page:${pageId}`)
                 }
                 previewMode={previewMode}
-                onPreviewModeChange={(nextMode) => {
-                  if (nextMode === previewMode) return;
-                  if (nextMode === "single") {
-                    setSinglePreviewTarget(
-                      activeDemoId
-                        ? { kind: "page", pageId: activeDemoId }
-                        : null,
-                    );
-                    setPreviewMode("single");
-                    return;
-                  }
-                  if (!confirmDiscardVisualPropertyWork()) return;
-                  handleClearVisualProperties();
-                  if (!initialCanvasFitRequestedRef.current) {
-                    initialCanvasFitRequestedRef.current = true;
-                    setFitCanvasToScreenOnMount(true);
-                  }
-                  setPreviewMode("canvas");
-                }}
+                onPreviewModeChange={handlePreviewModeChange}
                 canvasState={canvasState}
                 onCanvasStateChange={setCanvasState}
                 interactionMode="editor"
@@ -7858,39 +7910,10 @@ await handlePublishWithScreenshot();
                           <History className="h-3.5 w-3.5" />
                         )}
                       </Button>
-                      <select
-                        value={singlePreviewSelectValue}
-                        onChange={(event) =>
-                          handleSinglePreviewSelectChange(event.target.value)
-                        }
-                        aria-label="选择预览对象"
-                        className="h-7 w-44 rounded-md border border-input bg-background px-2 text-xs text-foreground shadow-sm outline-none focus:ring-1 focus:ring-ring"
-                      >
-                        {demoPages.length > 0 && (
-                          <optgroup label="页面">
-                            {demoPages.map((page) => (
-                              <option key={page.id} value={`page:${page.id}`}>
-                                {page.name}
-                              </option>
-                            ))}
-                          </optgroup>
-                        )}
-                        {singlePreviewDocumentNodes.length > 0 && (
-                          <optgroup label="文档">
-                            {singlePreviewDocumentNodes.map((node) => (
-                              <option
-                                key={node.id}
-                                value={`document:${node.id}`}
-                              >
-                                {node.title}
-                              </option>
-                            ))}
-                          </optgroup>
-                        )}
-                      </select>
                     </>
                   ) : undefined
                 }
+                toolbarCenter={toolbarCenter}
                 toolbarTrailing={
                   previewMode === "single" &&
                   activeRuntimeConversion &&
@@ -8239,12 +8262,26 @@ await handlePublishWithScreenshot();
                 }}
               />
               </CommentLayer>
+              </>
+              )}
             </div>
           </ResizablePanel>
 
           {isConfigPanelVisible && (
             <ResizablePanel className="relative flex flex-col overflow-hidden border-l bg-card">
-              {previewMode === "single" ? (
+              {previewMode === "document" ? (
+                <CommentPanel
+                  threads={commentsData.threads}
+                  currentUserId={currentUserId || undefined}
+                  activeThreadId={activeCommentThreadId}
+                  onSelectThread={(id) => {
+                    setActiveCommentThreadId(id);
+                    setCommentModeActive(false);
+                  }}
+                  commentMode={commentModeActive}
+                  onCommentModeChange={setCommentModeActive}
+                />
+              ) : previewMode === "single" ? (
                 <>
                   <Tabs
                     value={rightPanelTab}

@@ -43,6 +43,8 @@ export interface AgentConfig {
   workingDir?: string;
   projectId?: string;
   demoId?: string;
+  /** 当前消息引用的跨项目（引用项目），用于 knowledgeReport 注入 + readKnowledgeSource 受控读取 */
+  referencedProjects?: ReferencedProject[];
   model?: string;
   toolMode?: "workbench" | "viewer-readonly";
   toolVersion?: number;
@@ -52,6 +54,11 @@ export interface AgentConfig {
   externalAuth?: ExternalAuthSessionConfig;
 
   piAgent?: PiAgentConfig;
+}
+
+export interface ReferencedProject {
+  projectId: string;
+  label?: string;
 }
 
 export interface PiAgentConfig {

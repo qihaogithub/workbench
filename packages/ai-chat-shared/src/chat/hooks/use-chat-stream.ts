@@ -205,6 +205,41 @@ export interface SendMessageRunOptions {
   inlineRefs?: NonNullable<ChatMessage["inlineRefs"]>;
 }
 
+/**
+ * 从 inlineRefs 中提取被引用项目（project 类型 tag）。
+ * 项目 tag id 形如 `proj-{projectId}-{timestamp}`，context 含 `项目ID: {projectId}`。
+ */
+export function extractReferencedProjects(
+  inlineRefs?: NonNullable<ChatMessage["inlineRefs"]>,
+): Array<{ projectId: string; label?: string }> {
+  const result: Array<{ projectId: string; label?: string }> = [];
+  const seen = new Set<string>();
+  for (const tag of inlineRefs?.tags ?? []) {
+    if (tag.type !== "project") continue;
+    const projectId = extractProjectIdFromTag(tag);
+    if (!projectId || seen.has(projectId)) continue;
+    seen.add(projectId);
+    result.push({ projectId, label: tag.label });
+  }
+  return result;
+}
+
+function extractProjectIdFromTag(tag: {
+  id?: string;
+  label: string;
+  context: string;
+}): string | null {
+  // context 优先：`项目ID: proj_xxx`
+  const contextMatch = tag.context.match(/项目ID:\s*([A-Za-z0-9_-]+)/);
+  if (contextMatch?.[1]) return contextMatch[1];
+  // 回退：id 形如 `proj-{projectId}-{timestamp}`
+  if (tag.id) {
+    const idMatch = tag.id.match(/^proj-(proj_[A-Za-z0-9_-]+)/);
+    if (idMatch?.[1]) return idMatch[1];
+  }
+  return null;
+}
+
 interface StartMessageRunOptions {
   appendDisplayMessage?: boolean;
   displayMessageId?: string;
@@ -624,6 +659,10 @@ export function useChatStream(options: UseChatStreamOptions) {
       const outboundMessage = conversationHistoryPrefix
         ? `${conversationHistoryPrefix}${userMessage}`
         : userMessage;
+      const referencedProjects = (() => {
+        const refs = extractReferencedProjects(runOptions?.inlineRefs);
+        return refs.length > 0 ? refs : undefined;
+      })();
       activeRunDedupeKeyRef.current = isSystemAutoRepair
         ? createSystemAutoRepairDedupeKey(
             runOptions?.displayMessage?.title || DEFAULT_AUTO_REPAIR_TITLE,
@@ -1131,6 +1170,7 @@ export function useChatStream(options: UseChatStreamOptions) {
           projectId,
           files?.length ? files : undefined,
           viewerContext,
+          referencedProjects,
         );
         onDiagnosticEvent?.({
           name: "ai.message_sent",

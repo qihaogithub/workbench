@@ -148,6 +148,7 @@ describe("useChatStream 自动修复发送", () => {
         undefined,
         undefined,
         undefined,
+        undefined,
       );
     });
   });
@@ -200,8 +201,9 @@ describe("useChatStream 自动修复发送", () => {
     });
 
     await waitFor(() => {
-      expect(mockSendMessage).toHaveBeenCalledWith(
+expect(mockSendMessage).toHaveBeenCalledWith(
         "隐藏的完整技术错误",
+        undefined,
         undefined,
         undefined,
         undefined,
@@ -290,8 +292,9 @@ describe("useChatStream 自动修复发送", () => {
     }
 
     await waitFor(() => {
-      expect(mockSendMessage).toHaveBeenCalledWith(
+expect(mockSendMessage).toHaveBeenCalledWith(
         "第一条",
+        undefined,
         undefined,
         undefined,
         undefined,
@@ -595,13 +598,14 @@ describe("useChatStream 自动修复发送", () => {
     });
 
     await waitFor(() => {
-      expect(mockSendMessage).toHaveBeenCalledWith(
+expect(mockSendMessage).toHaveBeenCalledWith(
         "测试模型选择",
         "/tmp/workspace",
         undefined,
         undefined,
         undefined,
         "deepseek/deepseek-v4-pro",
+        undefined,
         undefined,
         undefined,
         undefined,

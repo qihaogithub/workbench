@@ -132,7 +132,9 @@ export class AgentManager implements IAgentManager {
       current.demoId !== newConfig.demoId ||
       current.toolMode !== newConfig.toolMode ||
       JSON.stringify(current.backendProviders ?? null) !==
-        JSON.stringify(newConfig.backendProviders ?? null)
+        JSON.stringify(newConfig.backendProviders ?? null) ||
+      JSON.stringify(current.referencedProjects ?? null) !==
+        JSON.stringify(newConfig.referencedProjects ?? null)
     );
   }
 

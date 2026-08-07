@@ -1,7 +1,6 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { FileText, Map as MapIcon } from "lucide-react";
 
 import type { PreviewStagePage } from "./preview-stage-types";
 import type { PreviewMode } from "./types";
@@ -12,9 +11,10 @@ export interface PreviewStageToolbarProps {
   activePageId?: string;
   onActivePageChange: (pageId: string) => void;
   previewMode: PreviewMode;
-  onPreviewModeChange: (mode: PreviewMode) => void;
+  onPreviewModeChange?: (mode: PreviewMode) => void;
   showDefaultPageSelector?: boolean;
   selectorSlot?: ReactNode;
+  center?: ReactNode;
   trailing?: ReactNode;
   className?: string;
 }
@@ -24,9 +24,9 @@ export function PreviewStageToolbar({
   activePageId,
   onActivePageChange,
   previewMode,
-  onPreviewModeChange,
   showDefaultPageSelector = false,
   selectorSlot,
+  center,
   trailing,
   className,
 }: PreviewStageToolbarProps) {
@@ -66,41 +66,16 @@ export function PreviewStageToolbar({
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center gap-2 border-b px-3 py-2",
+        "relative flex shrink-0 items-center gap-2 border-b px-3 py-2",
         className,
       )}
     >
-      <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
-        <button
-          type="button"
-          data-preview-mode="single"
-          onClick={() => onPreviewModeChange("single")}
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors",
-            previewMode === "single"
-              ? "bg-accent text-accent-foreground"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          <FileText className="h-3.5 w-3.5" />
-          单页
-        </button>
-        <button
-          type="button"
-          data-preview-mode="canvas"
-          onClick={() => onPreviewModeChange("canvas")}
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors",
-            previewMode === "canvas"
-              ? "bg-accent text-accent-foreground"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          <MapIcon className="h-3.5 w-3.5" />
-          画布
-        </button>
-      </div>
       <div className="flex-1" />
+      {center && (
+        <div className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center">
+          <div className="pointer-events-auto">{center}</div>
+        </div>
+      )}
       {selector}
       {trailing}
     </div>

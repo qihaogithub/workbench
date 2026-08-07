@@ -74,6 +74,7 @@ export interface PreviewStageProps {
   showToolbar?: boolean;
   showDefaultPageSelector?: boolean;
   selectorSlot?: ReactNode;
+  toolbarCenter?: ReactNode;
   toolbarTrailing?: ReactNode;
   renderSingleContent?: (
     context: PreviewStageRenderContext,

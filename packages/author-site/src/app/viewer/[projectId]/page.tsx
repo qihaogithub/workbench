@@ -2,7 +2,12 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { PreviewStage, PageConfigPanel, isSchemaEmpty } from "../../../../components/demo";
+import {
+  PreviewStage,
+  PageConfigPanel,
+  PreviewModeSwitcher,
+  isSchemaEmpty,
+} from "../../../../components/demo";
 import type {
   PreviewMode,
   PreviewSize,
@@ -15,16 +20,8 @@ import { getDefaultValues } from "../../../../lib/validator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 import {
-  FileText,
-  Map,
-  Settings,
   Loader2,
 } from "lucide-react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 
 interface ViewerDemoPage {
   id: string;
@@ -120,7 +117,6 @@ export default function ViewerProjectPage() {
   const [previewMode, setPreviewMode] = useState<PreviewMode>(
     modeParam === "single" ? "single" : "canvas"
   );
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [configData, setConfigData] = useState<Record<string, unknown>>({});
   const [configDataMap, setConfigDataMap] = useState<Record<string, Record<string, unknown>>>({});
   const [canvasState, setCanvasState] = useState<CanvasState>({
@@ -402,6 +398,15 @@ export default function ViewerProjectPage() {
 
   return (
     <div className="flex flex-col h-screen bg-background">
+      {showModeSwitch && (
+        <header className="flex h-12 shrink-0 items-center justify-center border-b border-border px-4">
+          <PreviewModeSwitcher
+            mode={previewMode}
+            onModeChange={setPreviewMode}
+            modes={["single", "canvas"]}
+          />
+        </header>
+      )}
       <div className="flex flex-1 overflow-hidden">
         {showPageList && previewMode !== "canvas" && hasMultiplePages && (
           <div className="w-48 border-r shrink-0 flex flex-col">
@@ -429,46 +434,6 @@ export default function ViewerProjectPage() {
         )}
 
         <div className="flex-1 overflow-hidden relative" style={{ backgroundColor: previewBackground }}>
-          {/* 悬浮设置按钮 */}
-          <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
-            <PopoverTrigger asChild>
-              <button className="absolute top-3 right-3 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-background/90 border shadow-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
-                <Settings className="h-3.5 w-3.5" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-56 p-3">
-              {showModeSwitch && (
-                <div className="space-y-2">
-                  <span className="text-xs font-medium text-muted-foreground">预览模式</span>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => setPreviewMode("single")}
-                      className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors ${
-                        previewMode === "single"
-                          ? "bg-accent text-accent-foreground"
-                          : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                      }`}
-                    >
-                      <FileText className="h-3.5 w-3.5" />
-                      单页
-                    </button>
-                    <button
-                      onClick={() => setPreviewMode("canvas")}
-                      className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors ${
-                        previewMode === "canvas"
-                          ? "bg-accent text-accent-foreground"
-                          : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                      }`}
-                    >
-                      <Map className="h-3.5 w-3.5" />
-                      画布
-                    </button>
-                  </div>
-                </div>
-              )}
-            </PopoverContent>
-          </Popover>
-
           <PreviewStage
             pages={previewStagePages}
             activePageId={activeDemoId}
