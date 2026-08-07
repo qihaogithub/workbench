@@ -163,12 +163,18 @@ export {
 export { NoteButton } from "./NoteButton";
 export { NoteDialog } from "./NoteDialog";
 export { NotePreview, stripHtml } from "./NotePreview";
+export {
+  renderNoteMarkdown,
+  stripMarkdown,
+  sanitizeNoteHtml,
+} from "./note-html";
 export { DocumentEditor } from "./DocumentEditor";
 export type {
   DocumentEditorFormat,
   DocumentEditorProps,
+  DocumentUploadHandler,
 } from "./DocumentEditor";
-export { RichTextEditor, sanitizeNoteHtml } from "./RichTextEditor";
+export { RichTextEditor } from "./RichTextEditor";
 export {
   customWidgets,
   ColorPickerWidget,
