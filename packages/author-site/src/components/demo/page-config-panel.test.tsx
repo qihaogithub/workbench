@@ -141,8 +141,8 @@ describe("PageConfigPanel", () => {
     expect(screen.getByText("共享配置")).toBeInTheDocument();
     expect(screen.queryByText("影响多个页面")).not.toBeInTheDocument();
     expect(screen.queryByText("仅当前页面")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "影响 2 个页面" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "影响 2 个页面" }));
+    expect(screen.getByRole("button", { name: "2" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "2" }));
     expect(screen.getByText("受影响页面")).toBeInTheDocument();
     expect(screen.getAllByText("页面 A").length).toBeGreaterThan(0);
     expect(screen.getAllByText("页面 B").length).toBeGreaterThan(0);
@@ -218,7 +218,7 @@ describe("PageConfigPanel", () => {
     fireEvent.click(screen.getByText("页面 A"));
 
     expect(screen.getByText("共享配置")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "影响 1 个页面" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "1" })).toBeInTheDocument();
     expect(screen.getByText("Logo")).toBeInTheDocument();
     expect(screen.queryByText("主题")).not.toBeInTheDocument();
     expect(screen.getByText("本页配置")).toBeInTheDocument();
@@ -316,52 +316,49 @@ describe("PageConfigPanel", () => {
     expect(screen.queryByText("标题")).not.toBeInTheDocument();
   });
 
-  it("共享配置区块展示恢复与保存按钮，并调用对应回调", () => {
-    const onProjectSaveAsDefaults = jest.fn();
-    const onProjectRestoreDefaults = jest.fn();
+  it("配置项折叠区展示恢复与保存按钮并调用页面级回调", () => {
+    const onSaveAsDefaults = jest.fn();
+    const onRestoreDefaults = jest.fn();
     render(
-      <PageConfigPanel
-        pages={[
-          {
-            id: "page_a",
-            name: "页面 A",
-            order: 0,
-            schema: pageSchema,
-            configData: { logo: "logo.png", theme: "dark", title: "标题" },
-          },
-        ]}
-        activePageId="page_a"
-        detailPageId="page_a"
-        hideDetailHeader
-        projectConfigSchema={sharedSchema}
-        onProjectSaveAsDefaults={onProjectSaveAsDefaults}
-        onProjectRestoreDefaults={onProjectRestoreDefaults}
-      />,
+      <TooltipProvider>
+        <PageConfigPanel
+          pages={[
+            {
+              id: "page_a",
+              name: "页面 A",
+              order: 0,
+              schema: pageSchema,
+              configData: { title: "标题" },
+            },
+          ]}
+          activePageId="page_a"
+          detailPageId="page_a"
+          hideDetailHeader
+          onSaveAsDefaults={onSaveAsDefaults}
+          onRestoreDefaults={onRestoreDefaults}
+        />
+      </TooltipProvider>,
     );
 
-    expect(screen.getByText("共享配置")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "影响 1 个页面" }),
-    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "恢复" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "保存" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "恢复" }));
     expect(screen.getByText("恢复默认配置")).toBeInTheDocument();
-    expect(screen.getByText(/共享配置值恢复为项目级初始默认值/)).toBeInTheDocument();
+    expect(screen.getByText(/当前页面配置恢复为初始默认值/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
-    expect(onProjectRestoreDefaults).toHaveBeenCalledTimes(1);
+    expect(onRestoreDefaults).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("恢复默认配置")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     expect(screen.getByText("保存为默认配置")).toBeInTheDocument();
-    expect(screen.getByText(/共享配置值覆盖项目级默认配置/)).toBeInTheDocument();
+    expect(screen.getByText(/当前本页配置覆盖默认配置/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "确认" }));
-    expect(onProjectSaveAsDefaults).toHaveBeenCalledTimes(1);
+    expect(onSaveAsDefaults).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("保存为默认配置")).not.toBeInTheDocument();
   });
 
-  it("未传入共享配置回调时不展示恢复与保存按钮", () => {
+  it("未传入配置项回调时不展示恢复与保存按钮", () => {
     render(
       <PageConfigPanel
         pages={[
@@ -382,12 +379,13 @@ describe("PageConfigPanel", () => {
     );
 
     expect(screen.getByText("共享配置")).toBeInTheDocument();
+    expect(screen.getByText("本页配置")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "恢复" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
   });
 
-  it("只读模式下共享配置区块隐藏保存按钮，恢复按钮仍可操作", () => {
-    const onProjectRestoreDefaults = jest.fn();
+  it("只读模式隐藏配置项折叠区的保存按钮，恢复按钮仍可操作", () => {
+    const onRestoreDefaults = jest.fn();
     render(
       <PageConfigPanel
         pages={[
@@ -396,15 +394,15 @@ describe("PageConfigPanel", () => {
             name: "页面 A",
             order: 0,
             schema: pageSchema,
-            configData: { logo: "logo.png" },
+            configData: { title: "标题" },
           },
         ]}
         activePageId="page_a"
         detailPageId="page_a"
         hideDetailHeader
-        projectConfigSchema={sharedSchema}
+        onRestoreDefaults={onRestoreDefaults}
+        onSaveAsDefaults={() => {}}
         readonly
-        onProjectRestoreDefaults={onProjectRestoreDefaults}
       />,
     );
 
@@ -413,7 +411,7 @@ describe("PageConfigPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "恢复" }));
     fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
-    expect(onProjectRestoreDefaults).toHaveBeenCalledTimes(1);
+    expect(onRestoreDefaults).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -620,5 +618,40 @@ describe("PageConfigPanel 配置项与资源规范折叠区", () => {
 
     expect(screen.queryByText("暂无资源规范")).not.toBeInTheDocument();
     expect(screen.getByText("交互要求", { exact: false })).toBeInTheDocument();
+  });
+
+  it("共享配置受影响页面数徽标点击后弹出列表，点击页面名跳转", () => {
+    const onPageSelect = jest.fn();
+    render(
+      <PageConfigPanel
+        pages={[
+          {
+            id: "page_a",
+            name: "页面 A",
+            order: 0,
+            schema: pageSchema,
+            configData: {},
+          },
+          {
+            id: "page_b",
+            name: "页面 B",
+            order: 1,
+            schema: "",
+            configData: {},
+          },
+        ]}
+        activePageId="page_a"
+        detailPageId="page_a"
+        hideDetailHeader
+        projectConfigSchema={sharedSchema}
+        readonly
+        onPageSelect={onPageSelect}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "2" }));
+    expect(screen.getByText("受影响页面")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("页面 B"));
+    expect(onPageSelect).toHaveBeenCalledWith("page_b");
   });
 });

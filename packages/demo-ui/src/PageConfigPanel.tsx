@@ -9,7 +9,6 @@ import {
   ListFilter,
   RotateCcw,
   Save,
-  Settings,
 } from "lucide-react";
 import { ConfigForm } from "./ConfigForm";
 import { ConfigScopeWrapper } from "./ConfigScopeWrapper";
@@ -31,6 +30,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 export interface PageConfigPanelPage {
   id: string;
@@ -106,14 +110,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * 内容不做独立滚动，随面板整体滚动；`open` 由父级控制。
  */
 function PanelSection({
-  icon: Icon,
   title,
   open,
   onToggle,
   actions,
   children,
 }: {
-  icon: React.ElementType;
   title: string;
   open: boolean;
   onToggle: () => void;
@@ -127,14 +129,13 @@ function PanelSection({
           type="button"
           onClick={onToggle}
           aria-expanded={open}
-          className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 rounded-md px-1 py-1 text-left transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {open ? (
             <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
           ) : (
             <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
           )}
-          <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
           <span className="text-sm font-semibold">{title}</span>
         </button>
         {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
@@ -272,7 +273,6 @@ export function PageConfigPanel({
     string | null
   >(null);
   const [configCategoryFilter, setConfigCategoryFilter] = useState("");
-  const [showSharedAffectedPages, setShowSharedAffectedPages] = useState(false);
   const [configSectionOpen, setConfigSectionOpen] = useState(true);
   const [requirementsSectionOpen, setRequirementsSectionOpen] = useState(true);
   const [editingRequirements, setEditingRequirements] = useState(false);
@@ -342,10 +342,6 @@ export function PageConfigPanel({
         .map(({ page }) => page),
     [configCategoryFilter, scopedPages],
   );
-
-  useEffect(() => {
-    setShowSharedAffectedPages(false);
-  }, [effectiveDetailPageId, configCategoryFilter]);
 
   useEffect(() => {
     setEditingRequirements(false);
@@ -464,10 +460,6 @@ export function PageConfigPanel({
     !readonly &&
     !!selectedPage?.schema &&
     Object.keys(configData).length > 0;
-  const saveProjectDefaultsEnabled =
-    !readonly &&
-    !!selectedProjectConfigSchema &&
-    Object.keys(configData).length > 0;
 
   return (
     <div className={cn("flex h-full flex-col bg-card", className)}>
@@ -498,123 +490,97 @@ export function PageConfigPanel({
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         <div className="flex flex-col gap-4">
           <PanelSection
-            icon={Settings}
             title="配置项"
             open={configSectionOpen}
             onToggle={() => setConfigSectionOpen((current) => !current)}
+            actions={
+              <>
+                {onRestoreDefaults && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1 px-2 text-xs"
+                    onClick={() => setRestoreDefaultsScope("page")}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    恢复
+                  </Button>
+                )}
+                {!readonly && onSaveAsDefaults && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1 px-2 text-xs"
+                    disabled={!saveDefaultsEnabled}
+                    onClick={() => setSaveDefaultsScope("page")}
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    保存
+                  </Button>
+                )}
+              </>
+            }
           >
             {showSharedConfig && (
-            <section className="flex flex-col">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Settings className="h-4 w-4 text-muted-foreground" />
+              <section className="flex flex-col">
+                <div className="mb-2 flex items-center gap-2">
                   <span className="text-sm font-semibold">共享配置</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  {onProjectRestoreDefaults && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 gap-1 px-2 text-xs"
-                      onClick={() => setRestoreDefaultsScope("project")}
-                    >
-                      <RotateCcw className="h-3.5 w-3.5" />
-                      恢复
-                    </Button>
-                  )}
-                  {!readonly && onProjectSaveAsDefaults && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 gap-1 px-2 text-xs"
-                      disabled={!saveProjectDefaultsEnabled}
-                      onClick={() => setSaveDefaultsScope("project")}
-                    >
-                      <Save className="h-3.5 w-3.5" />
-                      保存
-                    </Button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setShowSharedAffectedPages((current) => !current)}
-                    className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    aria-expanded={showSharedAffectedPages}
-                  >
-                    影响 {sharedAffectedPages.length} 个页面
-                  </button>
-                </div>
-              </div>
-              {showSharedAffectedPages && (
-                <div className="mb-2 rounded-md border border-border bg-muted/30 px-3 py-2">
-                  <div className="mb-1 text-xs text-muted-foreground">
-                    受影响页面
-                  </div>
-                  <ul className="space-y-1">
-                    {sharedAffectedPages.map((page) => (
-                      <li
-                        key={page.id}
-                        className="truncate text-xs text-foreground/80"
+                  {sharedAffectedPages.length > 0 && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className="cursor-pointer rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          {sharedAffectedPages.length}
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        align="start"
+                        side="bottom"
+                        className="w-56 p-1"
                       >
-                        {page.name}
-                      </li>
-                    ))}
-                  </ul>
+                        <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
+                          受影响页面
+                        </div>
+                        {sharedAffectedPages.map((page) => (
+                          <button
+                            key={page.id}
+                            type="button"
+                            onClick={() => onPageSelect?.(page.id)}
+                            className="block w-full cursor-pointer truncate rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            {page.name}
+                          </button>
+                        ))}
+                      </PopoverContent>
+                    </Popover>
+                  )}
                 </div>
-              )}
-              <ConfigScopeWrapper scope="project" hideHeader>
-                <ConfigForm
-                  key={`project-${selectedPage.id}-${selectedProjectConfigSchema}`}
-                  schema={selectedProjectConfigSchema!}
-                  onChange={(data) => onProjectConfigChange?.(data)}
-                  onSchemaChange={onProjectSchemaChange}
-                  initialData={configData}
-                  sessionId={sessionId}
-                  readonly={readonly}
-                  configCategoryFilter={configCategoryFilter}
-                  typeLimits={typeLimits}
-                />
-              </ConfigScopeWrapper>
-            </section>
-          )}
+                <ConfigScopeWrapper scope="project" hideHeader>
+                  <ConfigForm
+                    key={`project-${selectedPage.id}-${selectedProjectConfigSchema}`}
+                    schema={selectedProjectConfigSchema!}
+                    onChange={(data) => onProjectConfigChange?.(data)}
+                    onSchemaChange={onProjectSchemaChange}
+                    initialData={configData}
+                    sessionId={sessionId}
+                    readonly={readonly}
+                    configCategoryFilter={configCategoryFilter}
+                    typeLimits={typeLimits}
+                  />
+                </ConfigScopeWrapper>
+              </section>
+            )}
 
-          {showPageConfig && (
-            <section className="flex flex-col">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
+            {showPageConfig && (
+              <section className="flex flex-col">
+                <div className="mb-2 flex items-center gap-2">
                   <span className="text-sm font-semibold">本页配置</span>
                 </div>
-                <div className="flex items-center gap-1">
-                  {onRestoreDefaults && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 gap-1 px-2 text-xs"
-                      onClick={() => setRestoreDefaultsScope("page")}
-                    >
-                      <RotateCcw className="h-3.5 w-3.5" />
-                      恢复
-                    </Button>
-                  )}
-                  {!readonly && onSaveAsDefaults && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 gap-1 px-2 text-xs"
-                      disabled={!saveDefaultsEnabled}
-                      onClick={() => setSaveDefaultsScope("page")}
-                    >
-                      <Save className="h-3.5 w-3.5" />
-                      保存
-                    </Button>
-                  )}
-                </div>
-              </div>
-              <ConfigScopeWrapper scope="page" hideHeader>
+                <ConfigScopeWrapper scope="page" hideHeader>
                 <ConfigForm
                   key={`page-${selectedPage.id}-${selectedPage.schema}`}
                   schema={selectedPage.schema!}
@@ -649,7 +615,6 @@ export function PageConfigPanel({
           </PanelSection>
 
           <PanelSection
-            icon={FileText}
             title="资源规范"
             open={requirementsSectionOpen}
             onToggle={() => setRequirementsSectionOpen((current) => !current)}
