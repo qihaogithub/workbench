@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { ChevronDown, Eye, EyeOff } from "lucide-react";
 
 import type { VisualNodeInfo, VisualNodeTreeItem } from "./iframe-types";
+import { cn } from "./utils";
 
 interface LayerTreeMenuProps {
   nodes: VisualNodeTreeItem[];
@@ -17,6 +18,11 @@ interface LayerTreeMenuProps {
   onSelectNode?: (node: VisualNodeInfo, path: VisualNodeInfo[]) => void;
   onToggleNodeHidden?: (node: VisualNodeInfo) => void;
   onHoverNodeIdChange?: (nodeId: string | null) => void;
+  /** menu: 浮动右键菜单；panel: 嵌入侧边栏的完整面板 */
+  variant?: "menu" | "panel";
+  /** panel 变体下的折叠状态 */
+  collapsed?: boolean;
+  onHeaderToggle?: () => void;
 }
 
 interface LayerTreeMenuItem {
@@ -94,6 +100,9 @@ export function LayerTreeMenu({
   onSelectNode,
   onToggleNodeHidden,
   onHoverNodeIdChange,
+  variant = "menu",
+  collapsed = false,
+  onHeaderToggle,
 }: LayerTreeMenuProps) {
   const itemRefs = useRef(new Map<string, HTMLDivElement>());
   const items = useMemo(() => flattenLayerTree(nodes), [nodes]);
@@ -115,6 +124,141 @@ export function LayerTreeMenu({
     });
   }, [selectedItemKey]);
 
+  const header = (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-2 text-[11px] font-medium text-muted-foreground",
+        variant === "panel" ? "px-2 py-2" : "px-2 py-1.5",
+      )}
+    >
+      <span>{title}</span>
+      <span>{items.length} 个</span>
+    </div>
+  );
+
+  const renderItems = (list: LayerTreeMenuItem[]) =>
+    list.map(({ node, depth, path }) => {
+      const active =
+        node.domPath === selectedNodeId || node.nodeId === selectedNodeId;
+      const label = getLayerTreeNodeLabel(node);
+      const badgeCount = getNodeBadgeCount?.(node) ?? 0;
+      const secondary =
+        node.textContent && node.textContent !== label
+          ? node.textContent
+          : node.tagName.toLowerCase();
+
+      const hidden =
+        hiddenNodeIdSet.has(node.domPath) || hiddenNodeIdSet.has(node.nodeId);
+
+      return (
+        <div
+          key={node.domPath}
+          ref={(element) => {
+            if (element) {
+              itemRefs.current.set(node.domPath, element);
+            } else {
+              itemRefs.current.delete(node.domPath);
+            }
+          }}
+          className={[
+            "grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded px-2 py-2 text-left text-xs transition-colors",
+            active ? "bg-primary/10 text-primary" : "hover:bg-muted focus-within:bg-muted",
+            hidden ? "opacity-55" : "",
+          ].join(" ")}
+          role={variant === "menu" ? "menuitem" : "treeitem"}
+          style={{ paddingLeft: `${8 + Math.min(depth, 8) * 14}px` }}
+          onMouseEnter={() => onHoverNodeIdChange?.(node.domPath)}
+        >
+          <button
+            type="button"
+            className="min-w-0 text-left focus-visible:outline-none"
+            onClick={() => onSelectNode?.(node, path)}
+            onFocus={() => onHoverNodeIdChange?.(node.domPath)}
+          >
+            <span className="block truncate font-medium">{label}</span>
+            <span className="block truncate text-[10px] text-muted-foreground">
+              {secondary}
+            </span>
+          </button>
+          <span className="flex items-center gap-1">
+            {badgeCount > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full border border-primary/70 bg-primary text-[10px] font-medium text-primary-foreground">
+                {badgeCount}
+              </span>
+            )}
+            {onToggleNodeHidden && (
+              <button
+                type="button"
+                className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                title={hidden ? "临时显示图层" : "临时隐藏图层"}
+                aria-label={hidden ? "临时显示图层" : "临时隐藏图层"}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onToggleNodeHidden(node);
+                }}
+                onFocus={() => onHoverNodeIdChange?.(node.domPath)}
+              >
+                {hidden ? (
+                  <EyeOff className="h-3.5 w-3.5" />
+                ) : (
+                  <Eye className="h-3.5 w-3.5" />
+                )}
+              </button>
+            )}
+          </span>
+        </div>
+      );
+    });
+
+  if (variant === "panel") {
+    return (
+      <div
+        className={cn(
+          "flex min-h-0 flex-col overflow-hidden",
+          className,
+        )}
+      >
+        {onHeaderToggle ? (
+          <button
+            type="button"
+            aria-expanded={!collapsed}
+            className="flex w-full cursor-pointer items-center justify-between gap-2 px-2 py-2 text-left text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={onHeaderToggle}
+          >
+            <span className="flex items-center gap-1.5">
+              <ChevronDown
+                className={cn(
+                  "h-3.5 w-3.5 transition-transform",
+                  collapsed ? "-rotate-90" : "",
+                )}
+              />
+              {title}
+            </span>
+            <span>{items.length} 个</span>
+          </button>
+        ) : (
+          header
+        )}
+        {!collapsed && (
+          <>
+            <div className="h-px bg-border" />
+            {items.length === 0 ? (
+              <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                {emptyText}
+              </div>
+            ) : (
+              <div
+                className={`min-h-0 flex-1 overflow-y-auto ${scrollClassName}`}
+              >
+                {renderItems(items)}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
       role="menu"
@@ -123,91 +267,14 @@ export function LayerTreeMenu({
       onMouseLeave={() => onHoverNodeIdChange?.(null)}
       onContextMenu={(event) => event.preventDefault()}
     >
-      <div className="flex items-center justify-between gap-2 px-2 py-1.5 text-[11px] font-medium text-muted-foreground">
-        <span>{title}</span>
-        <span>{items.length} 个</span>
-      </div>
+      {header}
       {items.length === 0 ? (
         <div className="px-2 py-4 text-center text-xs text-muted-foreground">
           {emptyText}
         </div>
       ) : (
         <div className={`max-h-72 overflow-y-auto ${scrollClassName}`}>
-          {items.map(({ node, depth, path }) => {
-            const active =
-              node.domPath === selectedNodeId || node.nodeId === selectedNodeId;
-            const label = getLayerTreeNodeLabel(node);
-            const badgeCount = getNodeBadgeCount?.(node) ?? 0;
-            const secondary =
-              node.textContent && node.textContent !== label
-                ? node.textContent
-                : node.tagName.toLowerCase();
-
-            const hidden =
-              hiddenNodeIdSet.has(node.domPath) ||
-              hiddenNodeIdSet.has(node.nodeId);
-
-            return (
-              <div
-                key={node.domPath}
-                ref={(element) => {
-                  if (element) {
-                    itemRefs.current.set(node.domPath, element);
-                  } else {
-                    itemRefs.current.delete(node.domPath);
-                  }
-                }}
-                role="menuitem"
-                className={[
-                  "grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded px-2 py-2 text-left text-xs transition-colors",
-                  active
-                    ? "bg-primary/10 text-primary"
-                    : "hover:bg-muted focus-within:bg-muted",
-                  hidden ? "opacity-55" : "",
-                ].join(" ")}
-                style={{ paddingLeft: `${8 + Math.min(depth, 8) * 14}px` }}
-                onMouseEnter={() => onHoverNodeIdChange?.(node.domPath)}
-              >
-                <button
-                  type="button"
-                  className="min-w-0 text-left focus-visible:outline-none"
-                  onClick={() => onSelectNode?.(node, path)}
-                  onFocus={() => onHoverNodeIdChange?.(node.domPath)}
-                >
-                  <span className="block truncate font-medium">{label}</span>
-                  <span className="block truncate text-[10px] text-muted-foreground">
-                    {secondary}
-                  </span>
-                </button>
-                <span className="flex items-center gap-1">
-                  {badgeCount > 0 && (
-                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full border border-primary/70 bg-primary text-[10px] font-medium text-primary-foreground">
-                      {badgeCount}
-                    </span>
-                  )}
-                  {onToggleNodeHidden && (
-                    <button
-                      type="button"
-                      className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      title={hidden ? "临时显示图层" : "临时隐藏图层"}
-                      aria-label={hidden ? "临时显示图层" : "临时隐藏图层"}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onToggleNodeHidden(node);
-                      }}
-                      onFocus={() => onHoverNodeIdChange?.(node.domPath)}
-                    >
-                      {hidden ? (
-                        <EyeOff className="h-3.5 w-3.5" />
-                      ) : (
-                        <Eye className="h-3.5 w-3.5" />
-                      )}
-                    </button>
-                  )}
-                </span>
-              </div>
-            );
-          })}
+          {renderItems(items)}
         </div>
       )}
     </div>

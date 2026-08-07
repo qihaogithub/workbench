@@ -40,6 +40,10 @@ jest.mock("@/lib/api", () => ({
   useDemos: jest.fn(),
 }));
 
+jest.mock("@/lib/viewer-url", () => ({
+  getViewerBaseUrl: jest.fn(() => "http://10.131.75.39:4300"),
+}));
+
 const mockUseDemos = useDemos as jest.MockedFunction<typeof useDemos>;
 const mockCreateDemo = createDemo as jest.MockedFunction<typeof createDemo>;
 const mockConvertProjectTemplate = convertProjectTemplate as jest.MockedFunction<
@@ -123,6 +127,47 @@ describe("HomePage", () => {
       "href",
       "/demo/proj-1/edit",
     );
+  });
+
+  it("header 中展示 Figma 插件按钮并链接到 /figma-plugin", () => {
+    render(<HomePage initialDemos={demos} />);
+
+    expect(screen.getByRole("link", { name: "Figma 插件" })).toHaveAttribute(
+      "href",
+      "/figma-plugin",
+    );
+  });
+
+  it("header 中展示浏览端按钮并新窗口打开浏览端", () => {
+    const openSpy = jest.spyOn(window, "open").mockImplementation(() => null);
+    render(<HomePage initialDemos={demos} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "浏览端" }));
+
+    expect(openSpy).toHaveBeenCalledWith(
+      "http://10.131.75.39:4300",
+      "_blank",
+      "noopener,noreferrer",
+    );
+    openSpy.mockRestore();
+  });
+
+  it("普通项目更多菜单点击分享会打开分享对话框", async () => {
+    render(<HomePage initialDemos={demos} />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "打开项目 活动页 的更多操作" }),
+    );
+    fireEvent.click(await screen.findByRole("menuitem", { name: /分享/ }));
+
+    expect(screen.getByText("分享")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "编辑链接" })).toHaveAttribute(
+      "data-state",
+      "active",
+    );
+    expect(
+      screen.getByDisplayValue(/http:\/\/localhost\/demo\/proj-1\/edit/),
+    ).toBeInTheDocument();
   });
 
   it("无手动封面的项目会触发截图 ensure 并使用 hash meta 缩略图", async () => {
@@ -267,6 +312,7 @@ describe("HomePage", () => {
 
     const menuItems = await screen.findAllByRole("menuitem");
     expect(menuItems.map((item) => item.textContent)).toEqual([
+      "分享",
       "修改名称",
       "修改分类",
       "修改封面",
@@ -274,6 +320,7 @@ describe("HomePage", () => {
       "复制当前项目",
       "删除",
     ]);
+    expect(screen.getByRole("menuitem", { name: /分享/ })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /修改名称/ })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /修改分类/ })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /修改封面/ })).toBeInTheDocument();

@@ -35,6 +35,14 @@ export function sanitizeHydratedMessages(raw: unknown[]): ChatMessage[] {
         }
       }
 
+      // 归一化 inlineRefs.tags
+      if (sanitized.inlineRefs && typeof sanitized.inlineRefs === "object") {
+        const refs = sanitized.inlineRefs as Record<string, unknown>;
+        if (!Array.isArray(refs.tags)) {
+          refs.tags = [];
+        }
+      }
+
       return sanitized as unknown as ChatMessage;
     });
 }

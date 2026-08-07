@@ -14,6 +14,7 @@ import { createSaveImageTool } from "./save-image-tool";
 import { createGetConsoleLogsTool } from "./console-tool";
 import { createCaptureScreenshotTool } from "./screenshot-tool";
 import { createListImagesTool } from "./list-images-tool";
+import { createReadUserImageTool } from "./read-user-image-tool";
 import { createKnowledgeReportTool } from "./knowledge-report-tool";
 import { createReadKnowledgeSourceTool } from "./read-knowledge-source-tool";
 import { createReadPreinstalledSkillTool } from "./read-preinstalled-skill-tool";
@@ -54,8 +55,9 @@ import {
   createReplyCommentTool,
   createResolveCommentTool,
 } from "./comment-tools";
+import { createSubmitFeedbackTool } from "./feedback-tool";
 
-export const WORKBENCH_TOOL_VERSION = 24;
+export const WORKBENCH_TOOL_VERSION = 26;
 
 const SKETCH_SCENE_TOOLS_ENABLED =
   process.env.PI_AGENT_SKETCH_TOOLS_ENABLED === "true";
@@ -83,6 +85,7 @@ export function createWorkbenchTools(
       createReadFileTool(config),
       createListFilesTool(config),
       createKnowledgeReportTool(config, { mode: "viewer-readonly" }),
+      createSubmitFeedbackTool(config, "viewer-readonly"),
     ];
   }
 
@@ -100,6 +103,7 @@ export function createWorkbenchTools(
     createGetConsoleLogsTool(config),
     createCaptureScreenshotTool(config),
     createListImagesTool(config),
+    createReadUserImageTool(),
     createKnowledgeReportTool(config),
     createReadKnowledgeSourceTool(),
     createReadPreinstalledSkillTool(),
@@ -137,6 +141,7 @@ export function createWorkbenchTools(
     createInspectElementTool(config),
     createReplyCommentTool(config),
     createResolveCommentTool(config),
+    createSubmitFeedbackTool(config, "workbench"),
   ];
 
   if (options.includeDelegateTask !== false && options.subagentRunner) {

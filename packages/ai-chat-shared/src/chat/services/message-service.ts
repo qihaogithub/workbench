@@ -22,6 +22,7 @@ export async function persistMessages(
       kind: m.kind,
       content: m.content,
       autoRepair: m.autoRepair,
+      inlineRefs: m.inlineRefs,
       parts: m.parts,
       reasoning: m.reasoning,
       reasonings: m.reasonings,

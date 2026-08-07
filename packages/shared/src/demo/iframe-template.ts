@@ -21,6 +21,9 @@ const DEFAULT_RUNTIME_IMPORTS: Record<string, string> = {
   "lucide-react": "/preview-runtime/vendor/lucide-react.js",
   "framer-motion": "/preview-runtime/vendor/framer-motion.js",
   "svgaplayerweb": "/preview-runtime/vendor/svgaplayerweb.js",
+  "lottie-web": "/preview-runtime/vendor/lottie-web.js",
+  "@rive-app/canvas": "/preview-runtime/vendor/rive-app-canvas.js",
+  "@esotericsoftware/spine-webgl": "/preview-runtime/vendor/spine-webgl.js",
   "@preview/sdk": "/preview-runtime/vendor/preview-sdk.js",
 };
 
@@ -953,6 +956,8 @@ function buildRuntimeImports(
       "lucide-react": `${cdnBase}/lucide-react@0.323.0?deps=react@18.3.1,react-dom@18.3.1`,
       "framer-motion": `${cdnBase}/framer-motion@12.38.0?deps=react@18.3.1,react-dom@18.3.1`,
       "svgaplayerweb": `${cdnBase}/svgaplayerweb@2.3.1`,
+      "lottie-web": `${cdnBase}/lottie-web@5.13.0`,
+      "@rive-app/canvas": `${cdnBase}/@rive-app/canvas@2.38.1`,
       "@preview/sdk": resolveRuntimeUrl(DEFAULT_RUNTIME_IMPORTS["@preview/sdk"], runtimeBaseUrl),
     };
   }

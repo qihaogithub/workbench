@@ -17,6 +17,7 @@ import {
   Pencil,
   Repeat2,
   Save,
+  Share2,
   Trash2,
   Tag,
 } from "lucide-react";
@@ -45,6 +46,7 @@ interface DemoCardProps {
   onRename: (demo: DemoMeta) => void;
   onChangeCategory: (demo: DemoMeta) => void;
   onChangeCover: (demo: DemoMeta) => void;
+  onShare: (demo: DemoMeta) => void;
   onConvertToProject: (demo: DemoMeta) => void;
 }
 
@@ -380,6 +382,7 @@ export function DemoCard({
   onRename,
   onChangeCategory,
   onChangeCover,
+  onShare,
   onConvertToProject,
 }: DemoCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -466,6 +469,18 @@ export function DemoCard({
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-36">
+          <DropdownMenuItem
+            className="text-xs"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setMenuOpen(false);
+              onShare(demo);
+            }}
+          >
+            <Share2 className="mr-2 h-3.5 w-3.5" />
+            分享
+          </DropdownMenuItem>
           <DropdownMenuItem
             className="text-xs"
             onClick={(e) => {

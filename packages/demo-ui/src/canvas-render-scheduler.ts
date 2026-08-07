@@ -65,6 +65,14 @@ export function computeCanvasRenderModes({
       )
       .map((page) => page.id),
   );
+  const snapshotPageIds = new Set(
+    pages
+      .filter(
+        (page) =>
+          !!page.snapshotHtml && page.snapshotQuality !== "failed",
+      )
+      .map((page) => page.id),
+  );
   const runtimePages = pages.filter((page) => !prototypePageIds.has(page.id));
 
   if (pages.length < MIN_CANVAS_SCREENSHOT_PAGE_COUNT) {
@@ -150,7 +158,9 @@ export function computeCanvasRenderModes({
       modes[id] = "sleeping-iframe";
       continue;
     }
-    modes[id] = screenshotUrls?.[id] ? "screenshot" : "loading";
+    modes[id] = (screenshotUrls?.[id] || snapshotPageIds.has(id))
+      ? "screenshot"
+      : "loading";
   }
 
   return {

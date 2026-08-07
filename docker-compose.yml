@@ -85,6 +85,7 @@ services:
         - NEXT_PUBLIC_MODEL_NAME_FILTERS=${NEXT_PUBLIC_MODEL_NAME_FILTERS:-}
         - NEXT_PUBLIC_AGENT_SERVICE_URL=${NEXT_PUBLIC_AGENT_SERVICE_URL:-http://localhost:3201}
         - NEXT_PUBLIC_SCREENSHOT_SERVICE_URL=${NEXT_PUBLIC_SCREENSHOT_SERVICE_URL:-http://localhost:3202}
+        - NEXT_PUBLIC_VIEWER_URL=${NEXT_PUBLIC_VIEWER_URL:-http://localhost:3300}
         - JWT_SECRET=${JWT_SECRET:-change-this-in-production}
         - DEBIAN_MIRROR=${DEBIAN_MIRROR:-http://mirrors.aliyun.com/debian}
         - NPM_REGISTRY=${NPM_REGISTRY:-https://registry.npmmirror.com}
@@ -102,7 +103,9 @@ services:
       - NEXT_PUBLIC_DEFAULT_MODEL_IDS=${NEXT_PUBLIC_DEFAULT_MODEL_IDS:-}
       - NEXT_PUBLIC_MODEL_NAME_FILTERS=${NEXT_PUBLIC_MODEL_NAME_FILTERS:-}
       - NEXT_PUBLIC_SCREENSHOT_SERVICE_URL=${NEXT_PUBLIC_SCREENSHOT_SERVICE_URL:-http://localhost:3202}
+      - NEXT_PUBLIC_VIEWER_URL=${NEXT_PUBLIC_VIEWER_URL:-http://localhost:3300}
       - JWT_SECRET=${JWT_SECRET:-change-this-in-production}
+      - AUTH_COOKIE_NAME=${AUTH_COOKIE_NAME:-auth_token_docker}
       - USE_SECURE_COOKIE=${USE_SECURE_COOKIE:-false}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3200,http://localhost:3300}
       - DATA_DIR=/app/data

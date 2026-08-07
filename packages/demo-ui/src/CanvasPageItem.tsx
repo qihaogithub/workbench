@@ -319,14 +319,20 @@ export function CanvasPagePreviewContent({
     renderMode === "prototype" && resolvedRenderer === "prototype";
   const shouldRenderSketch =
     renderMode === "prototype" && resolvedRenderer === "sketch";
+  const shouldRenderSnapshot =
+    (renderMode === "screenshot" ||
+      renderMode === "sleeping-iframe") &&
+    !!page.snapshotHtml &&
+    page.snapshotQuality !== "failed";
   const shouldRenderScreenshot =
+    !shouldRenderSnapshot &&
     !!screenshotUrl &&
     (renderMode === "screenshot" ||
       renderMode === "iframe" ||
       renderMode === "sleeping-iframe");
   const shouldRenderLoading =
     renderMode === "loading" ||
-    (renderMode === "sleeping-iframe" && !screenshotUrl);
+    (renderMode === "sleeping-iframe" && !screenshotUrl && !shouldRenderSnapshot);
   const keepScreenshotVisible =
     shouldRenderScreenshot &&
     (renderMode === "screenshot" ||
@@ -422,6 +428,33 @@ export function CanvasPagePreviewContent({
             effectiveHeight={iframeEffectiveHeight}
             onPositionableSizes={onPositionableSizes}
           />
+        </div>
+      )}
+
+      {shouldRenderSnapshot && (
+        <div
+          className="absolute inset-0 h-full w-full overflow-hidden bg-white shadow-md pointer-events-none transition-opacity duration-200 ease-out"
+          style={{
+            opacity: renderMode === "screenshot" || !iframeContentLoaded ? 1 : 0,
+          }}
+        >
+          <PrototypePagePreview
+            html={page.snapshotHtml}
+            css={page.snapshotCss}
+            configData={page.configData}
+            sessionId={sessionId}
+            demoId={page.id}
+            previewSize={resolvedPreviewSize}
+            fillContainer
+            containerSizeOverride={containerSizeOverride}
+            effectiveHeight={iframeEffectiveHeight}
+            onContentHeightChange={handleContentHeightChange}
+          />
+          {page.snapshotQuality === "partial" && (
+            <div className="absolute bottom-1 right-1 z-10 rounded bg-amber-500/80 px-1 py-0.5 text-[10px] text-white">
+              静态快照
+            </div>
+          )}
         </div>
       )}
 

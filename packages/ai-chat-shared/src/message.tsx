@@ -11,17 +11,83 @@ import {
   MessageSquareText,
   Wrench,
   FileText,
+  MousePointer2,
+  FolderKanban,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { ChatCard, ChatCardDetailDialog } from "./chat-card";
 import { Streamdown } from "streamdown";
 import { AssistantMessage } from "./assistant-message";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "./ui/dialog";
 
 function formatFileSize(bytes?: number) {
   if (!bytes) return "";
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+type InlineRefTagData = {
+  id?: string;
+  type: "element" | "project" | "page";
+  label: string;
+  context: string;
+};
+
+function InlineRefTag({ tag }: { tag: InlineRefTagData }) {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity select-none",
+            tag.type === "project"
+              ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+              : tag.type === "element"
+                ? "bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300"
+                : "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
+          )}
+        >
+          {tag.type === "element" ? (
+            <MousePointer2 className="h-3 w-3" />
+          ) : tag.type === "page" ? (
+            <FileText className="h-3 w-3" />
+          ) : (
+            <FolderKanban className="h-3 w-3" />
+          )}
+          {tag.type === "page" ? tag.label : `@${tag.label}`}
+        </button>
+      </DialogTrigger>
+      <DialogContent className="flex max-h-[82vh] w-[calc(100vw-2rem)] max-w-2xl flex-col overflow-hidden p-0">
+        <DialogHeader className="shrink-0 border-b border-border px-5 py-4 pr-12">
+          <DialogTitle className="text-base leading-6">
+            {tag.type === "element"
+              ? "元素引用"
+              : tag.type === "page"
+                ? "页面引用"
+                : "项目引用"}{" "}
+            · {tag.label}
+          </DialogTitle>
+          <DialogDescription className="text-sm leading-5">
+            发送给 AI 的引用上下文
+          </DialogDescription>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-auto bg-muted/30 p-4">
+          <pre className="whitespace-pre-wrap break-words rounded-lg border border-border/70 bg-background p-3 text-xs leading-5 text-foreground">
+            {tag.context}
+          </pre>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 /**
@@ -107,6 +173,27 @@ export interface ChatMessage {
     title: string;
     summary: string;
     hiddenPrompt: string;
+  };
+  /** @标签引用（元素/页面/项目），展示时替代原始 content 渲染为标签胶囊，点击查看 context。 */
+  inlineRefs?: {
+    tags: Array<{
+      id?: string;
+      type: "element" | "project" | "page";
+      label: string;
+      context: string;
+    }>;
+    text: string;
+    /** 有序分段，保留标签在原文中的插入位置；缺失时回退为 tags + text 的头部聚合展示。 */
+    segments?: Array<
+      | { type: "text"; value: string }
+      | {
+          type: "tag";
+          id?: string;
+          kind: "element" | "project" | "page";
+          label: string;
+          context: string;
+        }
+    >;
   };
   /** 有序的内容块数组（推荐） */
   parts?: MessagePart[];
@@ -330,7 +417,67 @@ export function Message({
             ))}
           </div>
         )}
-        {isVisualAnnotationMessage && (
+        {message.inlineRefs?.tags?.length ? (
+          <div className="max-w-[80%] min-w-0 rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm bg-muted text-foreground border border-border/50 group/user-msg relative">
+            {message.inlineRefs.segments && message.inlineRefs.segments.length > 0 ? (
+              <p className="text-sm whitespace-pre-wrap break-words">
+                {message.inlineRefs.segments.map((seg, i) =>
+                  seg.type === "tag" ? (
+                    <InlineRefTag
+                      key={seg.id ?? `seg-tag-${i}`}
+                      tag={{
+                        id: seg.id,
+                        type: seg.kind,
+                        label: seg.label,
+                        context: seg.context,
+                      }}
+                    />
+                  ) : (
+                    <span key={`seg-text-${i}`}>{seg.value}</span>
+                  ),
+                )}
+              </p>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                  {message.inlineRefs.tags.map((tag, i) => (
+                    <InlineRefTag key={tag.id ?? `tag-${i}`} tag={tag} />
+                  ))}
+                </div>
+                {message.inlineRefs.text && (
+                  <p className="text-sm whitespace-pre-wrap break-words">{message.inlineRefs.text}</p>
+                )}
+              </>
+            )}
+            {message.queueStatus && (
+              <div className="mt-2 flex items-center justify-end gap-2 border-t border-border/50 pt-2 text-xs text-muted-foreground">
+                <span>{message.queueStatus === "queued" ? "等待发送" : "正在发送"}</span>
+                {message.queueStatus === "queued" && message.queueId && onCancelQueuedMessage && (
+                  <button
+                    type="button"
+                    onClick={() => onCancelQueuedMessage(message.queueId!)}
+                    className="inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-xs transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    <X className="h-3 w-3" />
+                    取消
+                  </button>
+                )}
+              </div>
+            )}
+            {!message.queueStatus && !isStreaming && onEditResend && message.id && (
+              <button
+                onClick={() => {
+                  setEditContent(message.content);
+                  setEditing(true);
+                }}
+                className="absolute -top-2 -left-2 p-1 rounded-full bg-background border border-border opacity-0 group-hover/user-msg:opacity-100 transition-opacity hover:bg-muted"
+                title="编辑"
+              >
+                <Pencil className="h-3 w-3 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+        ) : isVisualAnnotationMessage ? (
           <div className="max-w-[80%] rounded-2xl rounded-tr-sm border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-sm text-foreground">
             <div className="flex items-start gap-3">
               <div className="mt-0.5 rounded-full bg-blue-500/20 p-1.5 text-blue-400">
@@ -346,8 +493,7 @@ export function Message({
               </div>
             </div>
           </div>
-        )}
-        {message.content && !isVisualAnnotationMessage && (
+        ) : message.content ? (
           <div className="max-w-[80%] min-w-0 rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm bg-muted text-foreground border border-border/50 group/user-msg relative">
             <div
               data-testid="user-message-markdown"
@@ -385,7 +531,7 @@ export function Message({
               </button>
             )}
           </div>
-        )}
+        ) : null}
       </div>
     );
   }

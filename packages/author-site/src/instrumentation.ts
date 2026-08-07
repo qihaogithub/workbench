@@ -14,6 +14,7 @@ export async function register() {
     const { cleanupAllExpiredSessions } = await import('@/lib/session-manager');
     const { cleanupOrphanWorkspaces } = await import('@/lib/workspace-manager');
     const { scheduleStartupBackendProvidersSync } = await import('@/lib/backend-providers-sync');
+    const { scheduleStartupImageDescriptionSync } = await import('@/lib/image-description-sync');
 
     // 启动时立即执行一次清理
     try {
@@ -30,6 +31,7 @@ export async function register() {
     }
 
     scheduleStartupBackendProvidersSync();
+    scheduleStartupImageDescriptionSync();
 
     // 每 30 分钟执行一次全局清理
     cleanupInterval = setInterval(() => {

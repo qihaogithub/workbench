@@ -1,11 +1,13 @@
 import fs from 'fs';
 import path from 'path';
+import { getImageInfo } from '@/lib/image-store';
 import type { ImageReference } from './types';
 
 const IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|webp|svg)$/i;
 
 const API_IMAGE_PREFIX = '/api/images/';
 const SESSION_ASSET_RE = /^\/api\/sessions\/([^/]+)\/assets\/([^/?#]+)(?:[?#].*)?$/;
+const API_IMAGE_ID_RE = /^img_[A-Za-z0-9_-]+$/;
 
 function stripUrlSuffix(p: string): string {
   return p.split(/[?#]/, 1)[0] ?? p;
@@ -25,7 +27,9 @@ function isExternalImageUrl(p: string): boolean {
 }
 
 function isApiImagePath(p: string): boolean {
-  return p.startsWith(API_IMAGE_PREFIX) && IMAGE_EXTENSIONS.test(stripUrlSuffix(p));
+  if (!p.startsWith(API_IMAGE_PREFIX)) return false;
+  const rest = stripUrlSuffix(p).slice(API_IMAGE_PREFIX.length);
+  return IMAGE_EXTENSIONS.test(rest) || API_IMAGE_ID_RE.test(rest);
 }
 
 function isSessionAssetPath(p: string): boolean {
@@ -54,6 +58,11 @@ function resolvePath(relativePath: string, sourceFile: string): string {
 
 function resolveApiImagePath(apiPath: string): string {
   const filename = stripUrlSuffix(apiPath).slice(API_IMAGE_PREFIX.length);
+  const info = getImageInfo(filename);
+  if (info) {
+    const ext = path.extname(info.filename).slice(1) || 'png';
+    return path.join(getDataDir(), 'image-store', 'blobs', `${info.sha256.slice(0, 16)}.${ext}`);
+  }
   return path.join(getDataDir(), 'images', filename);
 }
 
@@ -145,6 +154,11 @@ function extractImageReferences(
     addReference(references, match[1], sourceFile, 'external-url');
   }
 
+  const quotedApiImageIdRegex = /["'](\/api\/images\/img_[A-Za-z0-9_-]+)["']/g;
+  while ((match = quotedApiImageIdRegex.exec(content)) !== null) {
+    addReference(references, match[1], sourceFile, 'img-src');
+  }
+
   const quotedImagePathRegex = /["']((?:\/api\/sessions\/[^"']+\/assets\/|\/api\/images\/|(?:\.{1,2}\/|\/)?[^"']*\/)?[^"']+\.(?:png|jpe?g|gif|webp|svg)(?:[?#][^"']*)?)["']/gi;
   while ((match = quotedImagePathRegex.exec(content)) !== null) {
     addReference(references, match[1], sourceFile, 'img-src');
@@ -221,7 +235,7 @@ export function scanImageReferences(
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         walkDir(fullPath);
-      } else if (/\.(tsx|jsx|css|html)$/i.test(entry.name)) {
+      } else if (/\.(tsx|jsx|css|html)$/i.test(entry.name) || entry.name === 'config.schema.json') {
         const content = fs.readFileSync(fullPath, 'utf-8');
         const refs = extractImageReferences(content, fullPath);
         references.push(...refs);

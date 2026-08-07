@@ -414,9 +414,252 @@ export function Confetti(props) {
   );
 }
 
-export function Lottie(props) {
-  const { className, label = '动画' } = props || {};
-  return React.createElement('div', { className: cx('flex items-center justify-center rounded-lg bg-neutral-100 text-sm text-neutral-500', className) }, label);
+export function LottiePlayer(props) {
+  const { src, loop = true, autoplay = true, renderer = 'svg', fallback = null, onError, className, style, ...rest } = props || {};
+  const containerRef = React.useRef(null);
+  const [failed, setFailed] = React.useState(false);
+  const [ready, setReady] = React.useState(false);
+
+  React.useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !src) return undefined;
+
+    let disposed = false;
+    let animation = null;
+    container.innerHTML = '';
+    setFailed(false);
+    setReady(false);
+
+    import('lottie-web').then((mod) => {
+      if (disposed) return;
+      const L = mod.default || mod;
+      try {
+        animation = L.loadAnimation({
+          container,
+          path: src,
+          renderer,
+          loop,
+          autoplay,
+        });
+        setReady(true);
+      } catch (e) {
+        if (!disposed) {
+          setFailed(true);
+          if (onError) onError(e);
+        }
+      }
+    }).catch((e) => {
+      if (!disposed) {
+        setFailed(true);
+        if (onError) onError(e);
+      }
+    });
+
+    return () => {
+      disposed = true;
+      if (animation) {
+        try { animation.destroy(); } catch (e) {}
+      }
+      if (containerRef.current) containerRef.current.innerHTML = '';
+    };
+  }, [src, loop, autoplay, renderer, onError]);
+
+  if (!src || failed) {
+    return fallback ? React.createElement('div', { className: cx('flex items-center justify-center overflow-hidden', className), style, ...rest }, fallback) : null;
+  }
+  return React.createElement('div', { ref: containerRef, className: cx('overflow-hidden', className), style, ...rest });
+}
+
+export function RivePlayer(props) {
+  const { src, fit = 'cover', alignment = 'center', autoplay = true, fallback = null, onError, className, style, ...rest } = props || {};
+  const containerRef = React.useRef(null);
+  const riveRef = React.useRef(null);
+  const [failed, setFailed] = React.useState(false);
+
+  React.useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !src) return undefined;
+
+    let disposed = false;
+    let riveInstance = null;
+    container.innerHTML = '';
+    setFailed(false);
+
+    const canvas = document.createElement('canvas');
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    canvas.style.display = 'block';
+    container.appendChild(canvas);
+
+    const ro = new ResizeObserver(() => {
+      if (riveRef.current) {
+        try { riveRef.current.resizeDrawingSurfaceToCanvas(); } catch (e) {}
+      }
+    });
+    ro.observe(container);
+
+    import('@rive-app/canvas').then((mod) => {
+      if (disposed) return;
+      const R = mod.default || mod;
+      try {
+        riveInstance = new R({
+          src,
+          canvas,
+          autoplay,
+          locateFile: (f) => '/preview-runtime/vendor/' + f,
+        });
+        if (riveInstance && R.Fit && R.Alignment) {
+          if (typeof riveInstance.setFit === 'function') riveInstance.setFit(R.Fit[fit] || R.Fit.cover);
+          if (typeof riveInstance.setAlignment === 'function') riveInstance.setAlignment(R.Alignment[alignment] || R.Alignment.center);
+        }
+        riveRef.current = riveInstance;
+      } catch (e) {
+        if (!disposed) {
+          setFailed(true);
+          if (onError) onError(e);
+        }
+      }
+    }).catch((e) => {
+      if (!disposed) {
+        setFailed(true);
+        if (onError) onError(e);
+      }
+    });
+
+    return () => {
+      disposed = true;
+      ro.disconnect();
+      if (riveRef.current) {
+        try { riveRef.current.cleanup(); } catch (e) {}
+      }
+      riveRef.current = null;
+      if (containerRef.current) containerRef.current.innerHTML = '';
+    };
+  }, [src, fit, alignment, autoplay, onError]);
+
+  if (!src || failed) {
+    return fallback ? React.createElement('div', { className: cx('flex items-center justify-center overflow-hidden', className), style, ...rest }, fallback) : null;
+  }
+  return React.createElement('div', { ref: containerRef, className: cx('overflow-hidden', className), style, ...rest });
+}
+
+export function SpinePlayer(props) {
+  const { skeleton, atlas, texture, animation, loop = true, fallback, onError, className, style, ...rest } = props || {};
+  const containerRef = React.useRef(null);
+  const canvasRef = React.useRef(null);
+  const [failed, setFailed] = React.useState(false);
+  const hasSrc = !!(skeleton && atlas && texture);
+
+  React.useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !hasSrc) return undefined;
+
+    let disposed = false;
+    let gl = null;
+    let renderer = null;
+    let skeletonObj = null;
+    let state = null;
+    let animFrame = null;
+    let lastTime = 0;
+    container.innerHTML = '';
+    setFailed(false);
+
+    const canvas = document.createElement('canvas');
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    canvas.style.display = 'block';
+    container.appendChild(canvas);
+    canvasRef.current = canvas;
+
+    function render() {
+      if (!gl || !renderer || !skeletonObj || !state) return;
+      const w = canvas.clientWidth || canvas.width || 300;
+      const h = canvas.clientHeight || canvas.height || 300;
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w; canvas.height = h; gl.viewport(0, 0, w, h);
+      }
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      const now = Date.now() / 1000;
+      const delta = lastTime ? now - lastTime : 0;
+      lastTime = now;
+      if (delta > 0 && delta < 1) {
+        state.update(delta);
+        state.apply(skeletonObj);
+        skeletonObj.updateWorldTransform();
+      }
+      renderer.draw(skeletonObj);
+      animFrame = requestAnimationFrame(render);
+    }
+
+    function setup(Spine) {
+      if (disposed) return;
+      try {
+        gl = canvas.getContext('webgl', { alpha: true }) || canvas.getContext('experimental-webgl', { alpha: true });
+        if (!gl) throw new Error('WebGL not available');
+
+        const assetManager = new Spine.AssetManager(gl);
+        assetManager.loadText(atlas);
+        assetManager.loadText(skeleton);
+        assetManager.loadTexture(texture);
+
+        function onLoaded() {
+          if (disposed || !gl) return;
+          try {
+            const atlasData = new Spine.TextureAtlas(assetManager.get(atlas), (path) => assetManager.get(texture));
+            const loader = new Spine.AtlasAttachmentLoader(atlasData);
+            const isJson = skeleton.endsWith('.json') || skeleton.indexOf('.json') !== -1;
+            const skeletonData = isJson
+              ? new Spine.SkeletonJson(loader).readSkeletonData(assetManager.get(skeleton))
+              : new Spine.SkeletonBinary(loader).readSkeletonData(assetManager.get(skeleton));
+            skeletonObj = new Spine.Skeleton(skeletonData);
+            const stateData = new Spine.AnimationStateData(skeletonData);
+            state = new Spine.AnimationState(stateData);
+            if (animation && skeletonData.findAnimation(animation)) state.setAnimation(0, animation, loop);
+            else if (skeletonData.animations && skeletonData.animations.length > 0) state.setAnimation(0, skeletonData.animations[0].name, loop);
+            renderer = new Spine.SkeletonRenderer(gl);
+            lastTime = 0;
+            render();
+          } catch (e) {
+            if (!disposed) { setFailed(true); if (onError) onError(e); }
+          }
+        }
+
+        assetManager.loadAll();
+        if (assetManager.isLoadingComplete()) {
+          onLoaded();
+        } else {
+          const check = setInterval(() => {
+            if (assetManager.isLoadingComplete()) {
+              clearInterval(check);
+              onLoaded();
+            }
+          }, 50);
+        }
+      } catch (e) {
+        if (!disposed) { setFailed(true); if (onError) onError(e); }
+      }
+    }
+
+    import('@esotericsoftware/spine-webgl').then((mod) => { setup(mod); }).catch((e) => {
+      if (!disposed) { setFailed(true); if (onError) onError(e); }
+    });
+
+    return () => {
+      disposed = true;
+      if (animFrame) cancelAnimationFrame(animFrame);
+      if (gl) {
+        const ext = gl.getExtension('WEBGL_lose_context');
+        if (ext) ext.loseContext();
+      }
+      if (containerRef.current) containerRef.current.innerHTML = '';
+    };
+  }, [skeleton, atlas, texture, animation, loop, hasSrc, onError]);
+
+  if (!hasSrc || failed) {
+    return fallback ? React.createElement('div', { className: cx('flex items-center justify-center overflow-hidden', className), style, ...rest }, fallback) : null;
+  }
+  return React.createElement('div', { ref: containerRef, className: cx('overflow-hidden', className), style, ...rest });
 }
 
 export function MediaViz(props) {

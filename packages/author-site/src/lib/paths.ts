@@ -24,6 +24,8 @@ export const WORKSPACES_DIR =
   process.env.WORKSPACES_DIR || path.join(DATA_DIR, "workspaces");
 export const SNAPSHOTS_DIR =
   process.env.SNAPSHOTS_DIR || path.join(DATA_DIR, "snapshots");
+export const FEEDBACK_DIR =
+  process.env.FEEDBACK_DIR || path.join(DATA_DIR, "feedback");
 
 export function getDataDir(): string {
   return DATA_DIR;
@@ -69,6 +71,9 @@ export function ensureDirsExist(): void {
   }
   if (!fs.existsSync(SNAPSHOTS_DIR)) {
     fs.mkdirSync(SNAPSHOTS_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(FEEDBACK_DIR)) {
+    fs.mkdirSync(FEEDBACK_DIR, { recursive: true });
   }
   if (!sessionIndexInitialized) {
     sessionIndexInitialized = true;

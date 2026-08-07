@@ -163,7 +163,7 @@ export function FieldRenderer({
       );
     }
 
-    if (field.format === "image") {
+    if (field.format === "image" || field.format === "file") {
       return (
         <FileUploadWidget
           value={value as string}
@@ -482,6 +482,7 @@ function RichTextInput({
     field.uiWidget === "image" ||
     field.uiWidget === "imageList" ||
     field.format === "image" ||
+    field.format === "file" ||
     field.type === "array" ||
     field.type === "richtext" ||
     field.type === "text" ||

@@ -436,7 +436,15 @@ export async function publishProject(
   const compileIssues: PublishPageCompileIssue[] = [];
   const dryRunPages: PublishDryRunReport["pages"] = [];
 
-  const projectConfigSchema = getProjectConfigSchema(workspacePath);
+  const rawProjectConfigSchema = getProjectConfigSchema(workspacePath);
+  const projectConfigSchema =
+    rawProjectConfigSchema && urlMap.size > 0
+      ? replacePathsInContent(
+          rawProjectConfigSchema,
+          urlMap,
+          path.join(workspacePath, "project.config.schema.json"),
+        )
+      : rawProjectConfigSchema;
   const projectConfigDefaults = projectConfigSchema
     ? extractSchemaDefaults(projectConfigSchema)
     : {};
@@ -482,7 +490,11 @@ export async function publishProject(
     let pageConfigData: Record<string, unknown> = {};
     let schemaPublishPath: string | undefined;
     if (fs.existsSync(schemaPath)) {
-      const schemaContent = fs.readFileSync(schemaPath, "utf-8");
+      const rawSchemaContent = fs.readFileSync(schemaPath, "utf-8");
+      const schemaContent =
+        urlMap.size > 0
+          ? replacePathsInContent(rawSchemaContent, urlMap, schemaPath)
+          : rawSchemaContent;
       fs.writeFileSync(path.join(demoPublishDir, "schema.json"), schemaContent);
       previewSize = extractPreviewSize(schemaContent);
       pageConfigData = extractSchemaDefaults(schemaContent);
@@ -660,11 +672,14 @@ export async function publishProject(
 
     fs.writeFileSync(path.join(demoPublishDir, "compiled.js"), replacedCode);
 
-    const mergedConfigData = {
-      ...projectConfigDefaults,
-      ...pageConfigData,
-      ...projectConfigValues,
-    };
+    const mergedConfigData = replaceConfigValueAssetUrls(
+      {
+        ...projectConfigDefaults,
+        ...pageConfigData,
+        ...projectConfigValues,
+      },
+      urlMap,
+    ) as Record<string, unknown>;
 
     const compiledJsPath = `demos/${page.id}/compiled.js`;
     const compiledJsUrlPath = `${compiledJsPath}?${assetCacheBustParam}`;

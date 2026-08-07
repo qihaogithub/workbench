@@ -7,6 +7,10 @@ function getSecret(): Uint8Array {
   );
 }
 
+export function getAuthCookieName(): string {
+  return process.env.AUTH_COOKIE_NAME || "auth_token";
+}
+
 /** token 有效期，createToken、cookie maxAge 与 CLI 返回的 expiresAt 共用同一来源 */
 export const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -51,7 +55,7 @@ export function setAuthCookie(token: string): void {
   const useSecureCookie =
     isProduction && process.env.USE_SECURE_COOKIE !== "false";
 
-  cookies().set("auth_token", token, {
+  cookies().set(getAuthCookieName(), token, {
     httpOnly: true,
     secure: useSecureCookie,
     sameSite: "lax",
@@ -64,12 +68,12 @@ export function setAuthCookie(token: string): void {
  * 获取认证 Cookie
  */
 export function getAuthCookie(): string | undefined {
-  return cookies().get("auth_token")?.value;
+  return cookies().get(getAuthCookieName())?.value;
 }
 
 /**
  * 清除认证 Cookie（登出）
  */
 export function clearAuthCookie(): void {
-  cookies().delete("auth_token");
+  cookies().delete(getAuthCookieName());
 }

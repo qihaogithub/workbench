@@ -17,6 +17,7 @@ import {
   BetweenHorizontalStart,
   BetweenVerticalStart,
   Combine,
+  MessageSquarePlus,
   Trash2,
 } from "lucide-react";
 import { CanvasViewport } from "./CanvasViewport";
@@ -422,6 +423,13 @@ function CanvasPageGroupItem({
             onConsoleEntry={onConsoleEntry}
             onError={onError}
             onPositionableSizes={onPositionableSizes}
+            onLayoutChange={(pageId, nextLayout) => {
+              onLayoutChange(group.id, {
+                ...group.layout,
+                width: nextLayout.width,
+                height: nextLayout.height,
+              })
+            }}
           />
         ) : (
           <div className="flex h-full items-center justify-center bg-muted/35 text-sm text-muted-foreground">
@@ -468,6 +476,7 @@ export function PreviewCanvas({
   canvasState: externalState,
   onCanvasStateChange,
   onRequestDeletePages,
+  onAddPagesToChat,
   onPageConfigEdit,
   onCanvasClick,
   className,
@@ -3046,6 +3055,19 @@ export function PreviewCanvas({
               >
                 <Combine className="h-4 w-4" />
                 合并页面
+              </button>
+            </>
+          )}
+          {onAddPagesToChat && selectedPageIds.length > 0 && (
+            <>
+              <div className="mx-1 h-5 w-px bg-border" />
+              <button
+                type="button"
+                className="flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => onAddPagesToChat(selectedPageIds)}
+              >
+                <MessageSquarePlus className="h-4 w-4" />
+                添加到对话
               </button>
             </>
           )}

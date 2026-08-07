@@ -108,6 +108,7 @@ export class AgentClient {
 
   async uploadAttachment(
     sessionId: string,
+    projectId: string,
     file: File,
   ): Promise<ApiResponse<import("./types").FileAttachment>> {
     const formData = new FormData();
@@ -116,10 +117,15 @@ export class AgentClient {
     if (this.apiKey) {
       headers["X-API-Key"] = this.apiKey;
     }
-    const response = await fetch(
+    const url = new URL(
       `${this.baseUrl}/api/agent/${encodeURIComponent(sessionId)}/attachments`,
-      { method: "POST", headers, body: formData },
     );
+    url.searchParams.set("projectId", projectId);
+    const response = await fetch(url.toString(), {
+      method: "POST",
+      headers,
+      body: formData,
+    });
     return response.json() as Promise<
       ApiResponse<import("./types").FileAttachment>
     >;

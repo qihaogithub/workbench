@@ -281,6 +281,12 @@ export function getOrCreateProjectActiveWorkspace(
           demoId: projectId,
           updatedAt: meta.updatedAt ?? Date.now(),
         });
+      } else if (!meta.projectId) {
+        writeWorkspaceMeta(project.activeWorkspaceId, {
+          ...meta,
+          projectId,
+          demoId: projectId,
+        });
       }
       if (isWorkspaceBasedOnLatest(projectId, meta)) {
         const demos = getWorkspaceMultiDemoFiles(project.activeWorkspaceId) ?? {

@@ -41,6 +41,12 @@ export async function GET(
       ".webp": "image/webp",
       ".svg": "image/svg+xml",
       ".svga": "application/octet-stream",
+      ".lottie": "application/octet-stream",
+      ".riv": "application/octet-stream",
+      ".json": "application/json",
+      ".skel": "application/octet-stream",
+      ".atlas": "application/octet-stream",
+      ".zip": "application/octet-stream",
     };
     const contentType = mimeTypes[ext] || "application/octet-stream";
 

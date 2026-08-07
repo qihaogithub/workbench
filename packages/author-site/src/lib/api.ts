@@ -253,6 +253,18 @@ export async function deleteCover(
   return response
 }
 
+export async function refreshScreenshots(
+  projectId: string,
+): Promise<ApiResponse<{ generated: number; total: number; pages: Array<{ pageId: string; force: boolean }> }>> {
+  const response = await fetch('/api/screenshots/ensure', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId, force: true }),
+  }).then((res) => res.json())
+
+  return response
+}
+
 export async function uploadTemplateCover(
   templateId: string,
   file: File,
@@ -284,4 +296,66 @@ export async function deleteTemplateCover(
   }
 
   return response
+}
+
+// ============================================================
+// 意见反馈 API
+// ============================================================
+
+import type { FeedbackItem } from '@workbench/shared'
+
+export function useFeedback(options?: {
+  status?: string
+  category?: string
+  severity?: string
+}) {
+  const params = new URLSearchParams()
+  if (options?.status) params.set('status', options.status)
+  if (options?.category) params.set('category', options.category)
+  if (options?.severity) params.set('severity', options.severity)
+  const query = params.toString()
+  const url = `/api/feedback${query ? `?${query}` : ''}`
+
+  const { data, error, isLoading, mutate: revalidate } = useSWR(
+    url,
+    () => fetcher<FeedbackItem[]>(url),
+    { revalidateOnFocus: false },
+  )
+
+  const items = data?.success ? data.data : []
+  const apiError = data?.success === false ? data.error : null
+
+  return { items, isLoading, error: error || apiError, revalidate }
+}
+
+export async function createFeedback(input: {
+  category: string
+  severity: string
+  tags?: string[]
+  title?: string
+  content: string
+  contact?: string
+}): Promise<ApiResponse<FeedbackItem>> {
+  return fetch('/api/feedback', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  }).then((res) => res.json())
+}
+
+export async function updateFeedbackStatus(
+  id: string,
+  status: string,
+): Promise<ApiResponse<FeedbackItem>> {
+  return fetch(`/api/feedback/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  }).then((res) => res.json())
+}
+
+export async function deleteFeedback(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
+  return fetch(`/api/feedback/${id}`, {
+    method: 'DELETE',
+  }).then((res) => res.json())
 }

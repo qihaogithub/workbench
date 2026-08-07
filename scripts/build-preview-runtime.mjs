@@ -14,7 +14,18 @@ const manifestPath = path.join(outDir, "manifest.json");
 const entries = {
   react: {
     file: "react.js",
-    source: `import React from "react"; export default React; export * from "react";`,
+    source: `import React from "react";
+export default React;
+export const {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+  useContext,
+  useReducer,
+  useLayoutEffect,
+} = React;`,
   },
   "react-dom": {
     file: "react-dom.js",
@@ -54,6 +65,18 @@ export const Parser = SVGA.Parser;
 export const Player = SVGA.Player;
 export const autoload = SVGA.autoload;
 export default SVGA;`,
+  },
+  "lottie-web": {
+    file: "lottie-web.js",
+    source: `import Lottie from "lottie-web"; export default Lottie;`,
+  },
+  "@rive-app/canvas": {
+    file: "rive-app-canvas.js",
+    source: `import * as rive from "@rive-app/canvas"; export default rive;`,
+  },
+  "@esotericsoftware/spine-webgl": {
+    file: "spine-webgl.js",
+    source: `export * from "@esotericsoftware/spine-webgl";`,
   },
 };
 
@@ -144,6 +167,17 @@ async function copyTailwindRuntime(files) {
   };
 }
 
+async function copyWasmAssets(files) {
+  const riveWasmSource = path.join(repoRoot, "node_modules/@rive-app/canvas/rive.wasm");
+  const riveWasmDest = path.join(vendorDir, "rive.wasm");
+  await cp(riveWasmSource, riveWasmDest);
+  const riveWasmContent = await readFile(riveWasmDest);
+  files["vendor/rive.wasm"] = {
+    hash: digest(riveWasmContent),
+    bytes: riveWasmContent.length,
+  };
+}
+
 async function main() {
   await rm(tmpDir, { recursive: true, force: true });
   await mkdir(tmpDir, { recursive: true });
@@ -157,6 +191,7 @@ async function main() {
   Object.assign(imports, builtEntries);
   Object.assign(files, builtFiles);
   await copyTailwindRuntime(files);
+  await copyWasmAssets(files);
 
   imports["@preview/sdk"] = "/preview-runtime/vendor/preview-sdk.js";
   const sdkSource = `
@@ -323,9 +358,160 @@ export function Confetti(props) {
   const { count = 18, className } = props || {};
   return React.createElement("div", { className: cx("pointer-events-none absolute inset-0 overflow-hidden", className), "aria-hidden": true }, Array.from({ length: count }).map((_, index) => React.createElement("span", { key: index, className: "absolute block h-2 w-2 rounded-sm", style: { left: (index * 37 % 100) + "%", top: (index * 19 % 70) + "%", background: ["#ef4444", "#f59e0b", "#22c55e", "#3b82f6"][index % 4], transform: "rotate(" + (index * 29 % 360) + "deg)" } })));
 }
-export function Lottie(props) {
-  const { className, label = "动画" } = props || {};
-  return React.createElement("div", { className: cx("flex items-center justify-center rounded-lg bg-neutral-100 text-sm text-neutral-500", className) }, label);
+export function LottiePlayer(props) {
+  const { src, loop = true, autoplay = true, renderer = "svg", fallback = null, onError, className, style, ...rest } = props || {};
+  const containerRef = React.useRef(null);
+  const [failed, setFailed] = React.useState(false);
+  const [ready, setReady] = React.useState(false);
+  React.useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !src) return undefined;
+    let disposed = false;
+    let animation = null;
+    container.innerHTML = "";
+    setFailed(false);
+    setReady(false);
+    import("lottie-web").then(function(mod) {
+      if (disposed) return;
+      var L = mod.default || mod;
+      try {
+        animation = L.loadAnimation({ container: container, path: src, renderer: renderer, loop: loop, autoplay: autoplay });
+        setReady(true);
+      } catch (e) { if (!disposed) { setFailed(true); if (onError) onError(e); } }
+    }).catch(function(e) { if (!disposed) { setFailed(true); if (onError) onError(e); } });
+    return function() {
+      disposed = true;
+      if (animation) { try { animation.destroy(); } catch (e) {} }
+      if (containerRef.current) containerRef.current.innerHTML = "";
+    };
+  }, [src, loop, autoplay, renderer, onError]);
+  if (!src || failed) return fallback ? React.createElement("div", { className: cx("flex items-center justify-center overflow-hidden", className), style, ...rest }, fallback) : null;
+  return React.createElement("div", { ref: containerRef, className: cx("overflow-hidden", className), style, ...rest });
+}
+export function RivePlayer(props) {
+  const { src, fit = "cover", alignment = "center", autoplay = true, fallback = null, onError, className, style, ...rest } = props || {};
+  const containerRef = React.useRef(null);
+  const riveRef = React.useRef(null);
+  const [failed, setFailed] = React.useState(false);
+  React.useEffect(() => {
+    var container = containerRef.current;
+    if (!container || !src) return undefined;
+    var disposed = false;
+    var riveInstance = null;
+    container.innerHTML = "";
+    setFailed(false);
+    var canvas = document.createElement("canvas");
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
+    canvas.style.display = "block";
+    container.appendChild(canvas);
+    var ro = new ResizeObserver(function() { if (riveRef.current) { try { riveRef.current.resizeDrawingSurfaceToCanvas(); } catch (e) {} } });
+    ro.observe(container);
+    import("@rive-app/canvas").then(function(mod) {
+      if (disposed) return;
+      var ns = (mod && mod.default) || mod;
+      var R = (ns && ns.Rive) || ns;
+      try {
+        riveInstance = new R({ src: src, canvas: canvas, autoplay: autoplay, locateFile: function(f) { return "/preview-runtime/vendor/" + f; } });
+        if (riveInstance && ns.Fit && ns.Alignment) {
+          if (typeof riveInstance.setFit === "function") riveInstance.setFit(ns.Fit[fit] || ns.Fit.cover);
+          if (typeof riveInstance.setAlignment === "function") riveInstance.setAlignment(ns.Alignment[alignment] || ns.Alignment.center);
+        }
+        riveRef.current = riveInstance;
+      } catch (e) { if (!disposed) { setFailed(true); if (onError) onError(e); } }
+    }).catch(function(e) { if (!disposed) { setFailed(true); if (onError) onError(e); } });
+    return function() {
+      disposed = true;
+      ro.disconnect();
+      if (riveRef.current) { try { riveRef.current.cleanup(); } catch (e) {} }
+      riveRef.current = null;
+      if (containerRef.current) containerRef.current.innerHTML = "";
+    };
+  }, [src, fit, alignment, autoplay, onError]);
+  if (!src || failed) return fallback ? React.createElement("div", { className: cx("flex items-center justify-center overflow-hidden", className), style, ...rest }, fallback) : null;
+  return React.createElement("div", { ref: containerRef, className: cx("overflow-hidden", className), style, ...rest });
+}
+export function SpinePlayer(props) {
+  var skeleton = props.skeleton, atlas = props.atlas, texture = props.texture, animation = props.animation, _a = props.loop, loop = _a === void 0 ? true : _a, fallback = props.fallback, onError = props.onError, className = props.className, style = props.style, rest = void 0;
+  if (rest === void 0) rest = {};
+  for (var k in props) { if (!{skeleton:1,atlas:1,texture:1,animation:1,loop:1,fallback:1,onError:1,className:1,style:1}[k]) rest[k] = props[k]; }
+  var containerRef = React.useRef(null);
+  var canvasRef = React.useRef(null);
+  var _b = React.useState(false), failed = _b[0], setFailed = _b[1];
+  var hasSrc = skeleton && atlas && texture;
+  React.useEffect(function() {
+    var container = containerRef.current;
+    if (!container || !hasSrc) return undefined;
+    var disposed = false;
+    var gl = null;
+    var renderer = null;
+    var skeletonObj = null;
+    var state = null;
+    var animFrame = null;
+    var lastTime = 0;
+    container.innerHTML = "";
+    setFailed(false);
+    var canvas = document.createElement("canvas");
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
+    canvas.style.display = "block";
+    container.appendChild(canvas);
+    canvasRef.current = canvas;
+    function render() {
+      if (!gl || !renderer || !skeletonObj || !state) return;
+      var w = canvas.clientWidth || canvas.width || 300;
+      var h = canvas.clientHeight || canvas.height || 300;
+      if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; gl.viewport(0, 0, w, h); }
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      var now = Date.now() / 1000;
+      var delta = lastTime ? now - lastTime : 0;
+      lastTime = now;
+      if (delta > 0 && delta < 1) { state.update(delta); state.apply(skeletonObj); skeletonObj.updateWorldTransform(); }
+      renderer.draw(skeletonObj);
+      animFrame = requestAnimationFrame(render);
+    }
+    function setup(Spine) {
+      if (disposed) return;
+      try {
+        gl = canvas.getContext("webgl", { alpha: true }) || canvas.getContext("experimental-webgl", { alpha: true });
+        if (!gl) throw new Error("WebGL not available");
+        var assetManager = new Spine.AssetManager(gl);
+        assetManager.loadText(atlas);
+        assetManager.loadText(skeleton);
+        assetManager.loadTexture(texture);
+        function onLoaded() {
+          if (disposed || !gl) return;
+          try {
+            var atlasData = new Spine.TextureAtlas(assetManager.get(atlas), function(path) { return assetManager.get(texture); });
+            var loader = new Spine.AtlasAttachmentLoader(atlasData);
+            var isJson = skeleton.endsWith(".json") || skeleton.indexOf(".json") !== -1;
+            var skeletonData = isJson ? new Spine.SkeletonJson(loader).readSkeletonData(assetManager.get(skeleton)) : new Spine.SkeletonBinary(loader).readSkeletonData(assetManager.get(skeleton));
+            skeletonObj = new Spine.Skeleton(skeletonData);
+            var stateData = new Spine.AnimationStateData(skeletonData);
+            state = new Spine.AnimationState(stateData);
+            if (animation && skeletonData.findAnimation(animation)) state.setAnimation(0, animation, loop);
+            else if (skeletonData.animations && skeletonData.animations.length > 0) state.setAnimation(0, skeletonData.animations[0].name, loop);
+            renderer = new Spine.SkeletonRenderer(gl);
+            lastTime = 0;
+            render();
+          } catch (e) { if (!disposed) { setFailed(true); if (onError) onError(e); } }
+        }
+        assetManager.loadAll();
+        if (assetManager.isLoadingComplete()) onLoaded();
+        else { var check = setInterval(function() { if (assetManager.isLoadingComplete()) { clearInterval(check); onLoaded(); } }, 50); }
+      } catch (e) { if (!disposed) { setFailed(true); if (onError) onError(e); } }
+    }
+    import("@esotericsoftware/spine-webgl").then(function(mod) { setup(mod); }).catch(function(e) { if (!disposed) { setFailed(true); if (onError) onError(e); } });
+    return function() {
+      disposed = true;
+      if (animFrame) cancelAnimationFrame(animFrame);
+      if (gl) { var ext = gl.getExtension("WEBGL_lose_context"); if (ext) ext.loseContext(); }
+      if (containerRef.current) containerRef.current.innerHTML = "";
+    };
+  }, [skeleton, atlas, texture, animation, loop, hasSrc, onError]);
+  if (!hasSrc || failed) return fallback ? React.createElement("div", { className: cx("flex items-center justify-center overflow-hidden", className), style, ...rest }, fallback) : null;
+  return React.createElement("div", { ref: containerRef, className: cx("overflow-hidden", className), style, ...rest });
 }
 export function MediaViz(props) {
   const { bars = 16, className } = props || {};
@@ -347,7 +533,7 @@ export function Carousel(props) {
   };
 
   const manifestContent = {
-    version: "2026-06-preview-runtime-v4",
+    version: "2026-06-preview-runtime-v5",
     imports,
     files,
     packages: {
@@ -356,6 +542,9 @@ export function Carousel(props) {
       "lucide-react": await readPackageVersion("lucide-react"),
       "framer-motion": await readPackageVersion("framer-motion"),
       "svgaplayerweb": await readPackageVersion("svgaplayerweb"),
+      "lottie-web": await readPackageVersion("lottie-web"),
+      "@rive-app/canvas": await readPackageVersion("@rive-app/canvas"),
+      "@esotericsoftware/spine-webgl": await readPackageVersion("@esotericsoftware/spine-webgl"),
       "tailwindcss-cdn": await readPackageVersion("tailwindcss-cdn"),
     },
   };

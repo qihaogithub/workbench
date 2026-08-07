@@ -66,6 +66,13 @@ describe('isApiImagePath', () => {
 
   it('/api/images/ 路径但无图片扩展名返回 false', () => {
     expect(isApiImagePath('/api/images/data.json')).toBe(false);
+    expect(isApiImagePath('/api/images/upload')).toBe(false);
+  });
+
+  it('image-store img_* 无扩展名 ID 返回 true', () => {
+    expect(isApiImagePath('/api/images/img_58Nvlmtce0YIpQ')).toBe(true);
+    expect(isApiImagePath('/api/images/img__idWmfdsgepgkw')).toBe(true);
+    expect(isApiImagePath('/api/images/img_9svWLq4_hZ0KsQ')).toBe(true);
   });
 });
 
@@ -184,6 +191,43 @@ describe('extractImageReferences', () => {
     expect(refs).toHaveLength(0);
   });
 
+  it('提取 TSX 对象字面量中的 image-store img_* URL', () => {
+    const content = `const HEADER_DEFAULTS = {
+  reading: '/api/images/img_58Nvlmtce0YIpQ',
+  thinking: '/api/images/img_1CNWpq51stui3Q',
+};`;
+    const refs = extractImageReferences(content, sourceFile);
+    expect(refs).toHaveLength(2);
+    expect(refs).toContainEqual(expect.objectContaining({
+      originalPath: '/api/images/img_58Nvlmtce0YIpQ',
+      type: 'img-src',
+    }));
+    expect(refs).toContainEqual(expect.objectContaining({
+      originalPath: '/api/images/img_1CNWpq51stui3Q',
+      type: 'img-src',
+    }));
+  });
+
+  it('提取 JSON schema 默认值中的 image-store img_* URL', () => {
+    const content = '{"default": "/api/images/img_Grm_4OiH8TOVeA", "format": "image"}';
+    const refs = extractImageReferences(content, '/workspace/project.config.schema.json');
+    expect(refs).toHaveLength(1);
+    expect(refs[0]).toMatchObject({
+      originalPath: '/api/images/img_Grm_4OiH8TOVeA',
+      type: 'img-src',
+    });
+  });
+
+  it('提取 <img> 标签中的 image-store img_* URL', () => {
+    const content = '<img src="/api/images/img_deKzx8a6wOXVCQ" alt="背景" />';
+    const refs = extractImageReferences(content, sourceFile);
+    expect(refs).toHaveLength(1);
+    expect(refs[0]).toMatchObject({
+      originalPath: '/api/images/img_deKzx8a6wOXVCQ',
+      type: 'img-src',
+    });
+  });
+
   it('提取多种类型引用（含图床路径）', () => {
     const content = `
       import hero from "./images/hero.png";
@@ -258,6 +302,53 @@ describe('scanImageReferences', () => {
       }));
       expect(refs).not.toContainEqual(expect.objectContaining({
         originalPath: 'https://cdn.example.com/old-popup.png',
+      }));
+    } finally {
+      fs.rmSync(workspacePath, { recursive: true, force: true });
+    }
+  });
+
+  it('扫描 demo tsx 中的 image-store img_* 引用', () => {
+    const workspacePath = fs.mkdtempSync(path.join(os.tmpdir(), 'image-scan-'));
+    try {
+      const demoDir = path.join(workspacePath, 'demos', 'home');
+      fs.mkdirSync(demoDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(demoDir, 'index.tsx'),
+        'const SUBJECTS = [{ ui: "/api/images/img__idWmfdsgepgkw" }];',
+        'utf-8',
+      );
+      const refs = scanImageReferences(workspacePath);
+      expect(refs).toContainEqual(expect.objectContaining({
+        originalPath: '/api/images/img__idWmfdsgepgkw',
+        sourceFile: path.join(demoDir, 'index.tsx'),
+      }));
+    } finally {
+      fs.rmSync(workspacePath, { recursive: true, force: true });
+    }
+  });
+
+  it('扫描 project.config.schema.json 中的 image-store img_* 默认值', () => {
+    const workspacePath = fs.mkdtempSync(path.join(os.tmpdir(), 'image-scan-'));
+    try {
+      fs.mkdirSync(path.join(workspacePath, 'demos'), { recursive: true });
+      fs.writeFileSync(
+        path.join(workspacePath, 'project.config.schema.json'),
+        JSON.stringify({
+          type: 'object',
+          properties: {
+            headerBg: {
+              type: 'string',
+              default: '/api/images/img_58Nvlmtce0YIpQ',
+            },
+          },
+        }),
+        'utf-8',
+      );
+      const refs = scanImageReferences(workspacePath);
+      expect(refs).toContainEqual(expect.objectContaining({
+        originalPath: '/api/images/img_58Nvlmtce0YIpQ',
+        sourceFile: path.join(workspacePath, 'project.config.schema.json'),
       }));
     } finally {
       fs.rmSync(workspacePath, { recursive: true, force: true });

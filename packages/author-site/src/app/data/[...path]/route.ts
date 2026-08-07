@@ -15,6 +15,11 @@ const MIME_TYPES: Record<string, string> = {
   ".jpeg": "image/jpeg",
   ".svg": "image/svg+xml",
   ".svga": "application/octet-stream",
+  ".lottie": "application/octet-stream",
+  ".riv": "application/octet-stream",
+  ".skel": "application/octet-stream",
+  ".atlas": "application/octet-stream",
+  ".zip": "application/octet-stream",
   ".webp": "image/webp",
 };
 

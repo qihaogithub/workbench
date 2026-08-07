@@ -6646,6 +6646,10 @@ export function SketchEditorCanvas({
         activateSketchKeyboardScope(controller);
         updateHoveredNodeId(null);
         setImageFitEditNodeId(null);
+        if (typeof event.button === "number" && event.button !== 0) {
+          event.preventDefault();
+          return;
+        }
         if (isSpacePanning) return;
           const target = event.target as Element;
           const nodeId = getSketchTargetNodeId(target);

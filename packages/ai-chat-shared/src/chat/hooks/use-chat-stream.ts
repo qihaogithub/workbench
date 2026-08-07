@@ -198,16 +198,18 @@ function isBulkPageDeletionRequest(message: string): boolean {
   );
 }
 
-interface SendMessageRunOptions {
+export interface SendMessageRunOptions {
   source?: "user" | "system_auto_repair" | "visual_property";
   displayMessage?: NonNullable<ChatMessage["autoRepair"]>;
   visualPropertyDisplayMessage?: NonNullable<ChatMessage["visualProperty"]>;
+  inlineRefs?: NonNullable<ChatMessage["inlineRefs"]>;
 }
 
 interface StartMessageRunOptions {
   appendDisplayMessage?: boolean;
   displayMessageId?: string;
   skipHistoryPrefix?: boolean;
+  skipUserMessageDisplay?: boolean;
 }
 
 interface QueuedChatMessage {
@@ -244,6 +246,27 @@ function buildAttachmentParts(
       textExtracted: file.textExtracted,
     })) || []),
   ];
+}
+
+function extractImagesFromMessage(
+  message: ChatMessage,
+): ImageAttachment[] | undefined {
+  const imageParts = message.parts?.filter((p) => p.type === "image") || [];
+  if (imageParts.length === 0) return undefined;
+  return imageParts
+    .map((p) => {
+      if (p.type !== "image") return undefined;
+      const match = p.url.match(/^data:(.+);base64,(.+)$/);
+      if (match) {
+        return {
+          mimeType: match[1],
+          data: match[2],
+          name: "image",
+        } as ImageAttachment;
+      }
+      return undefined;
+    })
+    .filter((img): img is ImageAttachment => img !== undefined);
 }
 
 function getErrorDiagnosticDetails(
@@ -634,55 +657,58 @@ export function useChatStream(options: UseChatStreamOptions) {
         },
       });
 
-      if (startOptions.appendDisplayMessage !== false) {
-        setMessages((prev) => {
-          const nextMessage: ChatMessage = isSystemAutoRepair
-            ? {
-                id: autoRepairMessageId,
-                role: "system",
-                kind: "auto_repair",
-                content:
-                  runOptions?.displayMessage?.title ||
-                  DEFAULT_AUTO_REPAIR_TITLE,
-                autoRepair: {
-                  status: "running",
-                  title:
+      if (!startOptions.skipUserMessageDisplay) {
+        if (startOptions.appendDisplayMessage !== false) {
+          setMessages((prev) => {
+            const nextMessage: ChatMessage = isSystemAutoRepair
+              ? {
+                  id: autoRepairMessageId,
+                  role: "system",
+                  kind: "auto_repair",
+                  content:
                     runOptions?.displayMessage?.title ||
                     DEFAULT_AUTO_REPAIR_TITLE,
-                  summary:
-                    runOptions?.displayMessage?.summary ||
-                    "AI 将尝试恢复当前页面预览",
-                  debugDetail: runOptions?.displayMessage?.debugDetail,
-                  hiddenPrompt: trimmedMessage,
-                },
-              }
-            : isVisualProperty
-              ? {
-                  id: displayMessageId,
-                  role: "user",
-                  content: trimmedMessage,
-                  visualProperty: runOptions?.visualPropertyDisplayMessage ?? {
-                    title: "可视化修改已发送给 AI",
-                    summary: "AI 将根据当前选区和属性变更修改页面。",
+                  autoRepair: {
+                    status: "running",
+                    title:
+                      runOptions?.displayMessage?.title ||
+                      DEFAULT_AUTO_REPAIR_TITLE,
+                    summary:
+                      runOptions?.displayMessage?.summary ||
+                      "AI 将尝试恢复当前页面预览",
+                    debugDetail: runOptions?.displayMessage?.debugDetail,
                     hiddenPrompt: trimmedMessage,
                   },
                 }
-              : {
-                  id: displayMessageId,
-                  role: "user",
-                  content: trimmedMessage,
-                  parts: buildAttachmentParts(images, files),
-                };
-          return [...prev, nextMessage];
-        });
-      } else if (startOptions.displayMessageId) {
-        setMessages((prev) =>
-          prev.map((message) =>
-            message.id === startOptions.displayMessageId
-              ? { ...message, queueStatus: undefined, queueId: undefined }
-              : message,
-          ),
-        );
+              : isVisualProperty
+                ? {
+                    id: displayMessageId,
+                    role: "user",
+                    content: trimmedMessage,
+                    visualProperty: runOptions?.visualPropertyDisplayMessage ?? {
+                      title: "可视化修改已发送给 AI",
+                      summary: "AI 将根据当前选区和属性变更修改页面。",
+                      hiddenPrompt: trimmedMessage,
+                    },
+                  }
+                : {
+                    id: displayMessageId,
+                    role: "user",
+                    content: trimmedMessage,
+                    inlineRefs: runOptions?.inlineRefs,
+                    parts: buildAttachmentParts(images, files),
+                  };
+            return [...prev, nextMessage];
+          });
+        } else if (startOptions.displayMessageId) {
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === startOptions.displayMessageId
+                ? { ...message, queueStatus: undefined, queueId: undefined }
+                : message,
+            ),
+          );
+        }
       }
 
       // 用户消息加入 state 后立即持久化（fire-and-forget）
@@ -1468,6 +1494,7 @@ export function useChatStream(options: UseChatStreamOptions) {
                   content: trimmedMessage,
                   queueId,
                   queueStatus: "queued",
+                  inlineRefs: runOptions?.inlineRefs,
                   parts: buildAttachmentParts(images, files),
                 },
         ]);
@@ -1589,9 +1616,10 @@ export function useChatStream(options: UseChatStreamOptions) {
   );
 
   const handleRegenerate = useCallback(
-    (targetAssistantId: string) => {
+    async (targetAssistantId: string) => {
       const msgs = messagesRef.current;
       const targetIndex = msgs.findIndex((m) => m.id === targetAssistantId);
+
       if (targetIndex < 1) {
         const currentAssistantId = currentMessageRef.current?.id;
         if (currentAssistantId !== targetAssistantId) return;
@@ -1613,27 +1641,27 @@ export function useChatStream(options: UseChatStreamOptions) {
           parts: [],
         });
 
-        const imageParts =
-          userMsg.parts?.filter((p) => p.type === "image") || [];
-        const images: ImageAttachment[] | undefined =
-          imageParts.length > 0
-            ? imageParts
-                .map((p) => {
-                  if (p.type !== "image") return undefined;
-                  const match = p.url.match(/^data:(.+);base64,(.+)$/);
-                  if (match) {
-                    return {
-                      mimeType: match[1],
-                      data: match[2],
-                      name: "image",
-                    } as ImageAttachment;
-                  }
-                  return undefined;
-                })
-                .filter((img): img is ImageAttachment => img !== undefined)
-            : undefined;
+        const truncated = msgs;
+        const images = extractImagesFromMessage(userMsg);
 
-        handleSend(userMsg.content, images);
+        try {
+          const syncService = new StreamService({ mode });
+          await syncService.connect(agentSessionId, sessionId);
+          await syncService.resyncHistory(
+            agentSessionId,
+            truncated
+              .filter((m) => m.role === "user" || m.role === "assistant")
+              .map((m) => ({ role: m.role, content: m.content })),
+          );
+          syncService.close();
+        } catch (error) {
+          console.error("resyncHistory failed, falling back to prefix-only", error);
+        }
+
+        handleSend(userMsg.content, images, undefined, undefined, {
+          skipHistoryPrefix: true,
+          skipUserMessageDisplay: true,
+        });
         return;
       }
 
@@ -1650,26 +1678,26 @@ export function useChatStream(options: UseChatStreamOptions) {
         truncated.filter((m) => !m.queueStatus),
       ).catch(() => {});
 
-      const imageParts = userMsg.parts?.filter((p) => p.type === "image") || [];
-      const images: ImageAttachment[] | undefined =
-        imageParts.length > 0
-          ? imageParts
-              .map((p) => {
-                if (p.type !== "image") return undefined;
-                const match = p.url.match(/^data:(.+);base64,(.+)$/);
-                if (match) {
-                  return {
-                    mimeType: match[1],
-                    data: match[2],
-                    name: "image",
-                  } as ImageAttachment;
-                }
-                return undefined;
-              })
-              .filter((img): img is ImageAttachment => img !== undefined)
-          : undefined;
+      const images = extractImagesFromMessage(userMsg);
 
-      handleSend(userMsg.content, images);
+      try {
+        const syncService = new StreamService({ mode });
+        await syncService.connect(agentSessionId, sessionId);
+        await syncService.resyncHistory(
+          agentSessionId,
+          truncated
+            .filter((m) => m.role === "user" || m.role === "assistant")
+            .map((m) => ({ role: m.role, content: m.content })),
+        );
+        syncService.close();
+      } catch (error) {
+        console.error("resyncHistory failed, falling back to prefix-only", error);
+      }
+
+      handleSend(userMsg.content, images, undefined, undefined, {
+        skipHistoryPrefix: true,
+        skipUserMessageDisplay: true,
+      });
     },
     [
       currentMessageRef,
@@ -1681,6 +1709,8 @@ export function useChatStream(options: UseChatStreamOptions) {
       sessionId,
       stopSilenceTracking,
       handleSend,
+      agentSessionId,
+      mode,
     ],
   );
 
@@ -1723,24 +1753,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       ).catch(() => {});
 
       const msg = msgs[msgIndex];
-      const imageParts = msg.parts?.filter((p) => p.type === "image") || [];
-      const images: ImageAttachment[] | undefined =
-        imageParts.length > 0
-          ? imageParts
-              .map((p) => {
-                if (p.type !== "image") return undefined;
-                const match = p.url.match(/^data:(.+);base64,(.+)$/);
-                if (match) {
-                  return {
-                    mimeType: match[1],
-                    data: match[2],
-                    name: "image",
-                  } as ImageAttachment;
-                }
-                return undefined;
-              })
-              .filter((img): img is ImageAttachment => img !== undefined)
-          : undefined;
+      const images = extractImagesFromMessage(msg);
 
       // 重同步服务端历史：保留截断后的消息以正确 role 写入 session
       try {
