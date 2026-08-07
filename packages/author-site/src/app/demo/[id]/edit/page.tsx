@@ -4659,6 +4659,7 @@ ${context.details}
         return;
       }
 
+      toast({ title: "正在从剪贴板创建页面…" });
       try {
         const page = await projectApiClient.createDemoPage(
           demoId,
@@ -4694,8 +4695,14 @@ ${context.details}
         handleWorkspaceTreeChanged();
         toast({ title: `已粘贴页面「${page.name}」` });
       } catch (err) {
+        const reason =
+          err instanceof Error && err.message ? err.message : "未知错误";
         console.error("粘贴 HTML 创建页面失败:", err);
-        toast({ title: "创建页面失败", variant: "destructive" });
+        toast({
+          title: "创建页面失败",
+          description: `${reason}，请确认 Figma 导入服务可用后重试`,
+          variant: "destructive",
+        });
       }
     },
     [demoId, sessionId, handleWorkspaceTreeChanged, toast],
