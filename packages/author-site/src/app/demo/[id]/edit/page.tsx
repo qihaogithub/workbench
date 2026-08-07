@@ -6873,7 +6873,7 @@ ${context.details}
         >
           <SelectTrigger
             aria-label="选择预览对象"
-            className="h-7 min-w-[6rem] justify-start gap-0 rounded-md border-transparent bg-transparent px-2 text-xs font-medium text-foreground shadow-none data-[placeholder]:text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:ring-0"
+            className="h-7 w-auto flex-[0_1_auto] justify-start gap-0 rounded-md border-transparent bg-transparent px-2 text-xs font-medium text-foreground shadow-none data-[placeholder]:text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:ring-0"
           >
             <SelectValue placeholder="选择页面" />
           </SelectTrigger>

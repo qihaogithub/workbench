@@ -15,7 +15,7 @@ export const PREVIEW_DEPENDENCY_POLICY: Record<string, PreviewDependencyDefiniti
   "svgaplayerweb": { version: "2.3.1", kind: "internal" },
   "lottie-web": { version: "5.13.0", kind: "internal" },
   "@rive-app/canvas": { version: "2.38.1", kind: "internal" },
-  "@esotericsoftware/spine-webgl": { version: "4.2.112", kind: "internal" },
+  "@esotericsoftware/spine-webgl": { version: "4.3.13", kind: "internal" },
   "@preview/sdk": { version: PREVIEW_CONTRACT_VERSION, kind: "sdk" },
 };
 

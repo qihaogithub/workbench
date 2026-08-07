@@ -24,6 +24,7 @@ const DEFAULT_RUNTIME_IMPORTS: Record<string, string> = {
   "lottie-web": "/preview-runtime/vendor/lottie-web.js",
   "@rive-app/canvas": "/preview-runtime/vendor/rive-app-canvas.js",
   "@esotericsoftware/spine-webgl": "/preview-runtime/vendor/spine-webgl.js",
+  "@esotericsoftware/spine-webgl-42": "/preview-runtime/vendor/spine-webgl-42.js",
   "@preview/sdk": "/preview-runtime/vendor/preview-sdk.js",
 };
 

@@ -1,10 +1,11 @@
 {
-  "version": "2026-06-preview-runtime-v5",
-  "generatedAt": "2026-08-06T00:44:07.155Z",
+  "version": "2026-06-preview-runtime-v6",
+  "generatedAt": "2026-08-07T09:53:37.422Z",
   "imports": {
     "lottie-web": "/preview-runtime/vendor/lottie-web.js",
     "@rive-app/canvas": "/preview-runtime/vendor/rive-app-canvas.js",
     "@esotericsoftware/spine-webgl": "/preview-runtime/vendor/spine-webgl.js",
+    "@esotericsoftware/spine-webgl-42": "/preview-runtime/vendor/spine-webgl-42.js",
     "react": "/preview-runtime/vendor/react.js",
     "react-dom": "/preview-runtime/vendor/react-dom.js",
     "react-dom/client": "/preview-runtime/vendor/react-dom-client.js",
@@ -25,6 +26,10 @@
       "bytes": 153728
     },
     "vendor/spine-webgl.js": {
+      "hash": "9092d559d319471f",
+      "bytes": 257717
+    },
+    "vendor/spine-webgl-42.js": {
       "hash": "9a74a9774a96fc45",
       "bytes": 229881
     },
@@ -85,8 +90,8 @@
       "bytes": 1927601
     },
     "vendor/preview-sdk.js": {
-      "hash": "1a88292eb9ad8c3a",
-      "bytes": 19872
+      "hash": "4a1b256099096736",
+      "bytes": 20922
     }
   },
   "packages": {
@@ -97,7 +102,8 @@
     "svgaplayerweb": "2.3.1",
     "lottie-web": "5.13.0",
     "@rive-app/canvas": "2.38.1",
-    "@esotericsoftware/spine-webgl": "4.2.112",
+    "@esotericsoftware/spine-webgl": "4.3.13",
+    "@esotericsoftware/spine-webgl-42": "4.2.112",
     "tailwindcss-cdn": "3.4.10"
   }
 }

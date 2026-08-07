@@ -29,7 +29,7 @@ export function PreviewModeSwitcher({
   return (
     <div
       className={cn(
-        "flex items-center gap-1 rounded-md border border-border bg-background p-0.5",
+        "flex items-center gap-1 rounded-md border border-border bg-background p-1",
         className,
       )}
     >
@@ -45,13 +45,13 @@ export function PreviewModeSwitcher({
             aria-pressed={active}
             onClick={() => onModeChange(item)}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs transition-colors",
+              "inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-sm transition-colors",
               active
                 ? "bg-accent text-accent-foreground"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
-            <Icon className="h-3.5 w-3.5" />
+            <Icon className="h-4 w-4" />
             {meta.label}
           </button>
         );

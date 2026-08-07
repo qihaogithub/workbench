@@ -60,7 +60,15 @@
 - [x] viewer-site：Header 切换
 - [x] author-site `/viewer/[projectId]`：切换迁移到 Header
 - [x] 文档更新
-- [ ] 验证（typecheck/test）
+- [x] 验证（author typecheck/test、viewer typecheck 通过；demo-ui typecheck/test 为预存环境故障）
+- [x] 修复：文档视图目录「始终在加载中」（`DocumentView` 不稳定回调导致无限重取，见下）
+
+## Bug 修复记录：文档视图目录始终在加载中
+
+- 现象：切换到文档视图后，目录区一直显示加载 spinner，不出现文档列表。
+- 根因：`DocumentView` 的 `fetchItems` `useCallback` 依赖 `onItemsLoaded`（父组件传入的内联箭头函数，每次渲染新身份）。父编辑页渲染频繁，导致 `fetchItems` 每次渲染都重建，挂载 effect 与 `knowledge-updated` 监听 effect 随之反复执行，`setLoading(true)` 被不断重置，目录始终停在加载态。
+- 修复：`DocumentView` 用 `useRef` 持有 `onItemsChange`/`onItemsLoaded`，`fetchItems` 只依赖 `[workingDir, projectId, sessionId]`，回调变化不再触发重取。
+- 验证：浏览器实测切换文档视图，目录正常渲染（空库显示「暂无文档」），仅 StrictMode 双请求，不再无限重取。
 
 ## 验证方式
 

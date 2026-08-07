@@ -7015,7 +7015,7 @@ listPageRequirements(
     if (path.isAbsolute(normalized) || normalized.startsWith("..")) {
       throw new Error("INVALID_ASSET_PATH");
     }
-    if (!/\.(png|jpe?g|gif|webp|svg|svga|lottie|riv|skel|atlas|zip)$/i.test(normalized)) {
+    if (!/\.(png|jpe?g|gif|webp|svg|svga|lottie|riv|skel(?:\.bytes)?|atlas(?:\.txt)?|zip)$/i.test(normalized)) {
       throw new Error("INVALID_FILE_TYPE");
     }
     return normalized;
@@ -7109,7 +7109,7 @@ listPageRequirements(
     const registryByPath = new Map(registry.map((image) => [image.url, image]));
     const assets: AssetSummary[] = [];
     for (const file of this.walkFiles(workspacePath)) {
-      if (/\.(png|jpe?g|gif|webp|svg|svga|lottie|riv|skel|atlas|zip)$/i.test(file)) {
+      if (/\.(png|jpe?g|gif|webp|svg|svga|lottie|riv|skel(?:\.bytes)?|atlas(?:\.txt)?|zip)$/i.test(file)) {
         const relative = path
           .relative(workspacePath, file)
           .split(path.sep)
@@ -7148,7 +7148,7 @@ listPageRequirements(
       .join("\n");
     const references = new Set<string>();
     const assetReferencePattern =
-      /(?:["'(]|url\()\s*(assets\/[^"')\s]+\.(?:png|jpe?g|gif|webp|svg|svga|lottie|riv|skel|atlas|zip))/gi;
+      /(?:["'(]|url\()\s*(assets\/[^"')\s]+\.(?:png|jpe?g|gif|webp|svg|svga|lottie|riv|skel(?:\.bytes)?|atlas(?:\.txt)?|zip))/gi;
     for (const match of content.matchAll(assetReferencePattern)) {
       if (match[1]) references.add(match[1]);
     }

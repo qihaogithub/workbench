@@ -17,7 +17,7 @@ function resolveRelativePath(relativePath: string, basePath: string): string {
   return (isAbsolute ? '/' : '') + parts.join('/');
 }
 
-const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico|svga|lottie|riv|skel|atlas)(\?[^'"`\s)]*)?$/i;
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico|svga|lottie|riv|skel(?:\.bytes)?|atlas(?:\.txt)?)(\?[^'"`\s)]*)?$/i;
 
 function resolveRewriteTarget(
   relativePath: string,

@@ -106,7 +106,8 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@esotericsoftware/spine-webgl": "4.2.112",
+    "@esotericsoftware/spine-webgl": "4.3.13",
+    "@esotericsoftware/spine-webgl-42": "npm:@esotericsoftware/spine-webgl@4.2.112",
     "@rive-app/canvas": "2.38.1",
     "lottie-web": "5.13.0",
     "yauzl": "^3.4.0"

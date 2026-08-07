@@ -333,7 +333,7 @@ const handleClear = useCallback(async () => {
       <div className="flex items-start gap-3">
         {value ? (
           typeof value === 'object' ? (
-            <div className="w-[80px] h-[80px] rounded-lg border border-border overflow-hidden bg-muted shrink-0 flex flex-col items-center justify-center gap-1 group">
+            <div className="relative w-[80px] h-[80px] rounded-lg border border-border overflow-hidden bg-muted shrink-0 flex flex-col items-center justify-center gap-1 group">
               <FileArchive className="w-5 h-5 text-muted-foreground" />
               <span className="text-[9px] text-muted-foreground px-1 text-center leading-tight">Spine 素材包</span>
               <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
