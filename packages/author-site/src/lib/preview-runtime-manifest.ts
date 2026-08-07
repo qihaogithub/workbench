@@ -14,7 +14,7 @@ export interface PreviewRuntimeResolveOptions {
   preferCdn?: boolean;
 }
 
-export const PREVIEW_RUNTIME_MANIFEST_VERSION = "2026-06-preview-runtime-v4";
+export const PREVIEW_RUNTIME_MANIFEST_VERSION = "2026-06-preview-runtime-v5";
 
 export const DEFAULT_PREVIEW_RUNTIME_IMPORTS: Record<string, string> = {
   react: "/preview-runtime/vendor/react.js",
@@ -25,6 +25,9 @@ export const DEFAULT_PREVIEW_RUNTIME_IMPORTS: Record<string, string> = {
   "lucide-react": "/preview-runtime/vendor/lucide-react.js",
   "framer-motion": "/preview-runtime/vendor/framer-motion.js",
   "svgaplayerweb": "/preview-runtime/vendor/svgaplayerweb.js",
+  "lottie-web": "/preview-runtime/vendor/lottie-web.js",
+  "@rive-app/canvas": "/preview-runtime/vendor/rive-app-canvas.js",
+  "@esotericsoftware/spine-webgl": "/preview-runtime/vendor/spine-webgl.js",
   "@preview/sdk": "/preview-runtime/vendor/preview-sdk.js",
 };
 

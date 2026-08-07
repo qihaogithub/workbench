@@ -339,6 +339,7 @@ export * from "./external-auth";
 export * from "./diagnostics";
 export * from "./ai-error-normalizer";
 export * from "./comment";
+export * from "./feedback";
 
 
 /** 图片附件，Base64 编码 */

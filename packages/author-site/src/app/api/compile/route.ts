@@ -6,6 +6,7 @@ import { PreviewRuntimeContractError } from '@/lib/preview-dependency-policy';
 import { registerPreviewModule } from '@/lib/preview-module-store';
 import { shouldUsePreviewRuntimeCdn } from '@/lib/preview-runtime-manifest';
 import { rewriteCompiledLocalAssetPaths } from '@/lib/rewrite-local-paths';
+import { getProjectImages } from '@/lib/project-images';
 
 export async function POST(request: NextRequest) {
   const startedAt = Date.now();
@@ -79,10 +80,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    let imageManifest: Map<string, string> | undefined;
+    if (projectId) {
+      try {
+        const projectImages = getProjectImages(projectId);
+        if (projectImages.length > 0) {
+          imageManifest = new Map(
+            projectImages
+              .filter((img) => img.url && img.filename)
+              .map((img) => [img.filename, img.url]),
+          );
+        }
+      } catch {
+        // 忽略 manifest 读取错误，fallback 到 workspace URL
+      }
+    }
+
     result = rewriteCompiledLocalAssetPaths(
       result,
       typeof demoId === 'string' ? demoId : undefined,
       typeof sessionId === 'string' ? sessionId : undefined,
+      imageManifest,
     );
 
     registerPreviewModule(result.moduleHash, result.compiledCode);

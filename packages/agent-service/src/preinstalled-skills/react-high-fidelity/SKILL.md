@@ -12,6 +12,7 @@ description: 高保真 React 页的完整编码规范：DemoProps 声明、@prev
 - 项目级字段不在 Props 接口中声明，使用时从 props 解构（运行时注入）
 - 使用 Tailwind CSS 进行样式设计
 - 页面图标、按钮、卡片、弹窗、图片、倒计时、进度条、常见动效、图表、庆祝效果、轮播等优先从 `@preview/sdk` 导入
+- SVGA 动画使用 `SvgaPlayer`，Lottie 动画使用 `LottiePlayer`，Rive 动画使用 `RivePlayer`，Spine 动画使用 `SpinePlayer`
 - 图标优先使用 `<Icon name="browser" />`、`<Icon name="football" />` 这类语义名称，不要臆造 `lucide-react` named import
 - 导出默认组件
 - 代码完整可运行，包含必要的 import
@@ -55,3 +56,105 @@ export default function Demo({
 ## 与页面运行时转换的边界
 
 本规范仅适用于**新建或重写 React 页面**。当用户触发页面运行时类型转换（prototype ↔ high-fidelity-react）时，应使用 `page-runtime-conversion` skill，其规则与本规范不同：转换场景以源页面视觉为 ground truth，不得用 @preview/sdk 通用组件替换自定义视觉。
+
+## 动画组件
+
+### LottiePlayer
+
+播放 Lottie `.json` 动画素材。素材通过配置字段上传。
+
+```tsx
+import { LottiePlayer } from "@preview/sdk";
+
+<LottiePlayer
+  src={lottieSrc}
+  loop={true}
+  autoplay={true}
+  renderer="svg"
+  fallback={<div>动画加载中...</div>}
+/>
+```
+
+| Props | 类型 | 默认值 | 说明 |
+|-------|------|--------|------|
+| `src` | string | - | Lottie `.json` 素材 URL |
+| `loop` | boolean | true | 是否循环 |
+| `autoplay` | boolean | true | 自动播放 |
+| `renderer` | string | "svg" | 渲染器类型 |
+| `fallback` | ReactNode | null | 加载失败或 src 为空时展示 |
+| `onError` | function | - | 加载失败回调 |
+| `className` | string | - | 容器 class |
+| `style` | object | - | 容器样式 |
+
+Schema 配置示例（`mediaType` 枚举 + `FileUploadWidget`）：
+
+```json
+{
+  "mediaType": { "type": "string", "enum": ["image", "lottie", "rive", "spine"], "default": "image" },
+  "lottieSrc": { "type": "string", "format": "file", "ui:options": { "accept": ".json", "visibleWhen": { "field": "mediaType", "equals": "lottie" } } }
+}
+```
+
+### RivePlayer
+
+播放 Rive `.riv` 动画素材。素材通过配置字段上传。
+
+```tsx
+import { RivePlayer } from "@preview/sdk";
+
+<RivePlayer
+  src={riveSrc}
+  fit="cover"
+  alignment="center"
+  autoplay={true}
+  fallback={<div>动画加载中...</div>}
+/>
+```
+
+| Props | 类型 | 默认值 | 说明 |
+|-------|------|--------|------|
+| `src` | string | - | Rive `.riv` 素材 URL |
+| `fit` | string | "cover" | 填充方式 |
+| `alignment` | string | "center" | 对齐方式 |
+| `autoplay` | boolean | true | 自动播放 |
+| `fallback` | ReactNode | null | 加载失败或 src 为空时展示 |
+| `onError` | function | - | 加载失败回调 |
+| `className` | string | - | 容器 class |
+| `style` | object | - | 容器样式 |
+
+### SpinePlayer
+
+播放 Spine `.skel`/`.json` 骨骼动画。素材需打包为 `.zip` 上传（内含 `.skel`/`.json` + `.atlas` + `.png`），上传后 zip 服务端自动解压返回各文件 URL。
+
+```tsx
+import { SpinePlayer } from "@preview/sdk";
+
+<SpinePlayer
+  skeleton={spineFiles.skeleton}
+  atlas={spineFiles.atlas}
+  texture={spineFiles.texture}
+  animation="idle"
+  loop={true}
+  fallback={<div>动画加载中...</div>}
+/>
+```
+
+| Props | 类型 | 默认值 | 说明 |
+|-------|------|--------|------|
+| `skeleton` | string | - | `.skel` 或 `.json` 骨架文件 URL |
+| `atlas` | string | - | `.atlas` 图集文件 URL |
+| `texture` | string | - | `.png` 纹理文件 URL |
+| `animation` | string | - | 指定播放的动画名（不填默认第一条） |
+| `loop` | boolean | true | 是否循环 |
+| `fallback` | ReactNode | null | 加载失败或必填字段缺失时展示 |
+| `onError` | function | - | 加载失败回调 |
+| `className` | string | - | 容器 class |
+| `style` | object | - | 容器样式 |
+
+Schema 配置示例：
+
+```json
+{
+  "spineSrc": { "type": "string", "format": "file", "ui:options": { "accept": ".zip", "visibleWhen": { "field": "mediaType", "equals": "spine" } } }
+}
+```

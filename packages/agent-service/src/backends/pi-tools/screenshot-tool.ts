@@ -420,7 +420,7 @@ export function createCaptureScreenshotTool(
         const buffer = Buffer.from(await imageResponse.arrayBuffer());
         const base64 = buffer.toString("base64");
         const sizeKB = Math.round(buffer.length / 1024);
-        const screenshotUrl = `${serviceUrl}/api/screenshots/file/${projectId}/${demoId}`;
+        const screenshotUrl = `/api/screenshots/file/${projectId}/${demoId}`;
 
         return {
           content: [

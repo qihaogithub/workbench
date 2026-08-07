@@ -11,6 +11,7 @@ import {
   UserChoiceResponse,
 } from "../core/types";
 import { createWorkbenchTools, type SubagentRunResult } from "./pi-tools";
+import { stripExpiredImageParts } from "../utils/image-context-strip";
 import type { PreinstalledSkill } from "./preinstalled-skills";
 import {
   formatPreinstalledSkillsForPrompt,
@@ -58,9 +59,14 @@ import {
 } from "./managers/assistant-text-utils";
 import { normalizeImageAttachments } from "../utils/image-attachments";
 import { serializeErrorForLog } from "../utils/error-utils";
-import { listUploadedFileAttachments } from "../utils/uploaded-file-attachments";
-import { resolveLiveWorkspaceMutationContext } from "../workspace/workspace-mutation-authority";
 import {
+  listUploadedFileAttachments,
+  type StoredUploadedFileAttachment,
+} from "../utils/uploaded-file-attachments";
+import { resolveLiveWorkspaceMutationContext } from "../workspace/workspace-mutation-authority";
+import { loadConfig } from "../utils/config";
+import {
+  readGlobalImageById,
   uploadToGlobalImageStore,
 } from "./pi-tools/global-image-store";
 import {
@@ -97,17 +103,48 @@ function formatRuntimeToolsForPrompt(
   ].join("\n");
 }
 
-function formatUploadedFilesForPrompt(
+function resolveUrlPathname(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      return parsed.pathname;
+    }
+  } catch {
+    // not a valid absolute URL — treat as relative path
+  }
+  return url;
+}
+
+const MAX_HISTORICAL_FILES_FOR_PROMPT = 20;
+
+export function formatUploadedFilesForPrompt(
   files?: FileAttachment[],
   currentFileIds = new Set<string>(),
 ): string {
   if (!files || files.length === 0) return "";
 
-  const lines = files.map((file, index) => {
+  const current: FileAttachment[] = [];
+  const historical: FileAttachment[] = [];
+  for (const file of files) {
+    if (currentFileIds.has(file.id)) current.push(file);
+    else historical.push(file);
+  }
+
+  // 历史附件按内容去重（sha256 优先，退化为 name+size）
+  const seen = new Set<string>();
+  const dedupedHistorical: FileAttachment[] = [];
+  for (const file of historical) {
+    const stored = file as StoredUploadedFileAttachment;
+    const key = stored.sha256
+      ? `sha:${stored.sha256}`
+      : `${file.name}:${file.size}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    dedupedHistorical.push(file);
+  }
+
+  const renderFile = (file: FileAttachment, source: string, index: number) => {
     const status = file.textExtracted ? "可读取" : "未提取到文本";
-    const source = currentFileIds.has(file.id)
-      ? "本轮上传"
-      : "当前会话历史附件";
     const preview = file.textPreview
       ? `\n  预览：${file.textPreview.replace(/\s+/g, " ").slice(0, 240)}`
       : "";
@@ -124,13 +161,36 @@ function formatUploadedFilesForPrompt(
     ]
       .filter(Boolean)
       .join("\n");
-  });
+  };
+
+  const sections: string[] = [];
+  if (current.length > 0) {
+    sections.push(
+      "【本轮上传】",
+      ...current.map((file, index) => renderFile(file, "本轮上传", index)),
+    );
+  }
+
+  if (dedupedHistorical.length > 0) {
+    const capped = dedupedHistorical.slice(0, MAX_HISTORICAL_FILES_FOR_PROMPT);
+    sections.push(
+      "【历史附件】",
+      "以下为项目之前上传的历史附件（已按内容去重，仅作引用参考，不是本轮用户发送的内容）。",
+      ...capped.map((file, index) => renderFile(file, "历史附件", index)),
+    );
+    if (dedupedHistorical.length > MAX_HISTORICAL_FILES_FOR_PROMPT) {
+      sections.push(
+        `（另有 ${dedupedHistorical.length - MAX_HISTORICAL_FILES_FOR_PROMPT} 个历史附件未展示，需要时可通过 readUploadedFile 读取）`,
+      );
+    }
+  }
 
   return [
     "【上传文件】",
-    "当前会话已有以下只读文件附件（包含本轮和之前消息上传的文件）。需要查看文件内容时，必须调用 `readUploadedFile`，传入对应 attachmentId；不要使用文件名猜 attachmentId，也不要猜测未读取的文件内容。这些附件不是项目素材，也不在 workspace 中。",
+    "当前项目存在以下只读文件附件。需要查看文件内容时，必须调用 `readUploadedFile`，传入对应 attachmentId；不要使用文件名猜 attachmentId，也不要猜测未读取的文件内容。这些附件不是项目素材，也不在 workspace 中。",
+    "当用户问「我发了什么 / 复述一遍 / 本轮上传了什么」时，以【本轮上传】为准作答；【历史附件】是之前轮次上传的引用参考。",
     "",
-    ...lines,
+    ...sections,
     "",
     "【用户问题】",
   ].join("\n");
@@ -465,6 +525,11 @@ export class PiAgentBackend implements IBackendAdapter {
       return undefined;
     });
     this.unsubFns.push(unsubToolResult);
+
+    const unsubContext = this.harness.on("context", (event: any) => ({
+      messages: stripExpiredImageParts(event.messages),
+    }));
+    this.unsubFns.push(unsubContext);
   }
 
   /**
@@ -571,19 +636,49 @@ Keep the final response concise: summarize what you changed, what you verified, 
 
         if (params.imageUrls && params.imageUrls.length > 0) {
           imageParts = [];
+          const screenshotServiceUrl = loadConfig().screenshotServiceUrl.replace(/\/+$/, "");
           for (const url of params.imageUrls) {
             try {
-              const fetchRes = await fetch(url);
-              if (!fetchRes.ok) {
-                return {
-                  success: false,
-                  content: `下载图片失败: ${url} (HTTP ${fetchRes.status})`,
-                  durationMs: Date.now() - startedAt,
-                };
+              let buffer: Buffer;
+              let mimeType: string;
+
+              const urlPath = resolveUrlPathname(url);
+
+              // /api/images/... → read from local global store (no HTTP)
+              const imageMatch = urlPath.match(/^\/api\/images\/(.+)$/);
+              if (imageMatch) {
+                const result = readGlobalImageById(imageMatch[1]);
+                if (!result.success) {
+                  return {
+                    success: false,
+                    content: `下载图片失败: ${url} (${result.error})`,
+                    durationMs: Date.now() - startedAt,
+                  };
+                }
+                buffer = Buffer.from(result.data, "base64");
+                mimeType = result.mimeType;
+              } else {
+                // /api/screenshots/file/... → resolve via screenshotServiceUrl
+                const screenshotMatch = urlPath.startsWith("/api/screenshots/file/");
+                const resolvedUrl = screenshotMatch
+                  ? `${screenshotServiceUrl}${urlPath}`
+                  : url;
+
+                const fetchRes = await fetch(resolvedUrl, {
+                  signal: controller.signal,
+                });
+                if (!fetchRes.ok) {
+                  return {
+                    success: false,
+                    content: `下载图片失败: ${url} (HTTP ${fetchRes.status})`,
+                    durationMs: Date.now() - startedAt,
+                  };
+                }
+                buffer = Buffer.from(await fetchRes.arrayBuffer());
+                mimeType =
+                  fetchRes.headers.get("content-type") || "image/png";
               }
-              const buffer = Buffer.from(await fetchRes.arrayBuffer());
-              const mimeType =
-                fetchRes.headers.get("content-type") || "image/png";
+
               imageParts.push({
                 type: "image" as const,
                 data: buffer.toString("base64"),
@@ -766,14 +861,14 @@ Keep the final response concise: summarize what you changed, what you verified, 
     const currentFiles = options?.files || [];
     const currentFileIds = new Set(currentFiles.map((file) => file.id));
     let sessionFiles: FileAttachment[] = [];
-    if (this.config.sessionId) {
+    if (this.config.projectId) {
       try {
-        sessionFiles = await listUploadedFileAttachments(this.config.sessionId);
+        sessionFiles = await listUploadedFileAttachments(this.config.projectId);
       } catch (error) {
         logger.warn(
           {
             error: serializeErrorForLog(error),
-            sessionId: this.config.sessionId,
+            projectId: this.config.projectId,
           },
           "Failed to list uploaded file attachments for prompt context",
         );
@@ -798,6 +893,7 @@ Keep the final response concise: summarize what you changed, what you verified, 
       try {
         const projectId = resolveProjectImageManifestProjectId(this.config);
         const persisted: Array<{ imageId: string; url: string }> = [];
+        const failedNames: string[] = [];
 
         for (let i = 0; i < images.length; i++) {
           const img = images[i];
@@ -838,15 +934,24 @@ Keep the final response concise: summarize what you changed, what you verified, 
               }
             } else {
               logger.warn({ error: uploadResult.error, index: i }, "auto-persist: failed to save image to global store");
+              failedNames.push(img.name || `#${i}`);
             }
           } catch (imgError) {
             logger.warn({ error: imgError, index: i }, "auto-persist: exception while persisting image");
+            failedNames.push(img.name || `#${i}`);
           }
         }
 
         if (persisted.length > 0) {
-          const lines = persisted.map((img) => `- imageId: ${img.imageId}, 引用: ${img.url}`).join("\n");
-          autoPersistText = `[图片已自动入库] 你可以在页面代码和 config.schema.json 中直接使用这些 URL 引用图片：\n${lines}\n\n`;
+          const lines = persisted.map((img) => `- imageId: ${img.imageId}, URL: ${img.url}`).join("\n");
+          const hint = modelSupportsImages
+            ? "需要重新查看图片内容时可调用 readUserImage 传入 imageId。\n"
+            : "";
+          autoPersistText = `[图片已自动入库] 用户上传的图片已自动保存到图床，无需调用 saveImage 再次保存。直接在代码中使用以下 URL 引用即可：\n${hint}\n${lines}\n\n`;
+        }
+        if (failedNames.length > 0) {
+          const failedLines = failedNames.map((n) => `[图片 ${n} 未能自动入库]`).join("\n");
+          autoPersistText = autoPersistText ? autoPersistText + failedLines + "\n\n" : failedLines + "\n\n";
         }
       } catch (persistError) {
         logger.warn({ error: persistError }, "auto-persist: overall process failed");
@@ -858,6 +963,9 @@ Keep the final response concise: summarize what you changed, what you verified, 
           data: img.data,
           mimeType: img.mimeType,
         }));
+        if (autoPersistText) {
+          promptContent = promptContent + "\n" + autoPersistText;
+        }
       } else {
         if (!this.imageDescriber.isAvailable()) {
           logger.warn(
@@ -869,19 +977,19 @@ Keep the final response concise: summarize what you changed, what you verified, 
           );
         }
 
-    if (autoPersistText) {
-      promptContent = autoPersistText + promptContent;
-    }
-
     logger.info(
           { imageCount: images.length, modelId: model.id },
           "Triggering image pre-description for non-vision model",
         );
 
         const imageDescription = await this.imageDescriber.describe(images);
-        promptContent = uploadedFilesPrefix
-          ? `【图片内容】${imageDescription}\n\n${uploadedFilesPrefix}${content}`
-          : `【图片内容】${imageDescription}\n\n【用户问题】${content}`;
+        const prefix = uploadedFilesPrefix
+          ? `${uploadedFilesPrefix}${content}`
+          : `【用户问题】${content}`;
+        promptContent = `【图片内容】${imageDescription}\n\n${prefix}`;
+        if (autoPersistText) {
+          promptContent = promptContent + "\n\n" + autoPersistText;
+        }
       }
     }
 

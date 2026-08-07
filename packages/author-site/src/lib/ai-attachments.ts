@@ -1,239 +1,137 @@
-import crypto from "crypto";
-import fs from "fs";
 import path from "path";
+import fs from "fs";
+import { DATA_DIR } from "./paths";
 
-import type { FileAttachment } from "@workbench/agent-client";
+/**
+ * 聊天文件（.ai-attachments）读取工具。
+ * 附件持久化在 data/projects/{projectId}/.ai-attachments/{attachmentId}/，
+ * 每个附件目录包含 manifest.json + text.txt + 原始文件。
+ * 本模块仅用于 author-site 侧读取/删除，上传与写入仍由 agent-service 负责。
+ */
 
-const MAX_EXTRACTED_TEXT_CHARS = 300_000;
-const TEXT_PREVIEW_CHARS = 500;
-
-export const AI_ATTACHMENT_MAX_FILE_SIZE = 20 * 1024 * 1024;
-export const AI_ATTACHMENT_MAX_FILES_PER_MESSAGE = 5;
-export const AI_ATTACHMENT_MAX_TOTAL_SIZE = 50 * 1024 * 1024;
-
-const TEXT_EXTENSIONS = new Set([
-  ".txt",
-  ".md",
-  ".markdown",
-  ".json",
-  ".csv",
-  ".ts",
-  ".tsx",
-  ".js",
-  ".jsx",
-  ".mjs",
-  ".cjs",
-  ".css",
-  ".scss",
-  ".sass",
-  ".less",
-  ".html",
-  ".htm",
-  ".xml",
-  ".yaml",
-  ".yml",
-  ".py",
-  ".java",
-  ".go",
-  ".rs",
-  ".php",
-  ".rb",
-  ".swift",
-  ".kt",
-  ".kts",
-  ".sql",
-  ".sh",
-  ".toml",
-  ".ini",
-  ".log",
-]);
-
-const DOCUMENT_EXTENSIONS = new Set([".pdf", ".docx"]);
-
-export const AI_ATTACHMENT_ALLOWED_EXTENSIONS = new Set([
-  ...TEXT_EXTENSIONS,
-  ...DOCUMENT_EXTENSIONS,
-]);
-
-interface StoredAiAttachmentManifest extends FileAttachment {
-  originalFilename: string;
-  storedFilename: string;
-  sha256: string;
-  createdAt: string;
-}
-
-function findProjectRoot(startDir: string): string {
-  let dir = startDir;
-  while (dir !== path.dirname(dir)) {
-    if (fs.existsSync(path.join(dir, "pnpm-workspace.yaml"))) {
-      return dir;
-    }
-    dir = path.dirname(dir);
-  }
-  return startDir;
-}
-
-function getDataDir(): string {
-  return process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), "data");
-}
-
-function getAiAttachmentsDir(): string {
-  return path.join(getDataDir(), "ai-attachments");
-}
-
-function sanitizePathSegment(value: string, fallback: string): string {
-  const sanitized = value.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 160);
-  return sanitized || fallback;
-}
-
-function getFileExtension(filename: string): string {
-  const dotIndex = filename.lastIndexOf(".");
-  if (dotIndex < 0) return "";
-  return filename.slice(dotIndex).toLowerCase();
-}
-
-function normalizeText(text: string): string {
-  return text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
-}
-
-function summarizeExtractedText(rawText: string): {
-  text: string;
-  textPreview: string;
-  lineCount: number;
-  truncated: boolean;
-} {
-  const normalized = normalizeText(rawText).trim();
-  const truncated = normalized.length > MAX_EXTRACTED_TEXT_CHARS;
-  const text = truncated
-    ? normalized.slice(0, MAX_EXTRACTED_TEXT_CHARS)
-    : normalized;
-  return {
-    text,
-    textPreview: text.slice(0, TEXT_PREVIEW_CHARS),
-    lineCount: text.length > 0 ? text.split("\n").length : 0,
-    truncated,
-  };
-}
-
-export function validateAiAttachmentFile(file: File): {
-  ok: true;
-  extension: string;
-} | {
-  ok: false;
-  code: "INVALID_FILE_TYPE" | "FILE_TOO_LARGE";
-  message: string;
-} {
-  const extension = getFileExtension(file.name);
-  if (!AI_ATTACHMENT_ALLOWED_EXTENSIONS.has(extension)) {
-    return {
-      ok: false,
-      code: "INVALID_FILE_TYPE",
-      message: `不支持的文件类型: ${extension || file.type || "unknown"}`,
-    };
-  }
-  if (file.size > AI_ATTACHMENT_MAX_FILE_SIZE) {
-    return {
-      ok: false,
-      code: "FILE_TOO_LARGE",
-      message: `文件大小超过 ${AI_ATTACHMENT_MAX_FILE_SIZE / 1024 / 1024}MB 限制`,
-    };
-  }
-  return { ok: true, extension };
-}
-
-async function extractPdfText(buffer: Buffer): Promise<string> {
-  const { PDFParse } = await import("pdf-parse");
-  const parser = new PDFParse({ data: buffer });
-  try {
-    const result = await parser.getText();
-    return result.text || "";
-  } finally {
-    await parser.destroy();
-  }
-}
-
-async function extractDocxText(buffer: Buffer): Promise<string> {
-  const mammoth = await import("mammoth");
-  const result = await mammoth.extractRawText({ buffer });
-  return result.value || "";
-}
-
-export async function extractAiAttachmentText(
-  buffer: Buffer,
-  extension: string,
-): Promise<{
+export interface ChatAttachmentMeta {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
   textExtracted: boolean;
-  text: string;
   textPreview?: string;
   lineCount?: number;
   truncated?: boolean;
-}> {
-  let rawText = "";
-  if (extension === ".pdf") {
-    rawText = await extractPdfText(buffer);
-  } else if (extension === ".docx") {
-    rawText = await extractDocxText(buffer);
-  } else if (TEXT_EXTENSIONS.has(extension)) {
-    rawText = buffer.toString("utf-8");
-  }
-
-  const summary = summarizeExtractedText(rawText);
-  return {
-    textExtracted: summary.text.length > 0,
-    text: summary.text,
-    textPreview: summary.textPreview || undefined,
-    lineCount: summary.lineCount,
-    truncated: summary.truncated,
-  };
+  originalFilename?: string;
+  storedFilename?: string;
+  sha256?: string;
+  createdAt?: string;
 }
 
-export async function saveAiAttachment(
-  sessionId: string,
-  file: File,
-): Promise<FileAttachment> {
-  const validation = validateAiAttachmentFile(file);
-  if (!validation.ok) {
-    throw Object.assign(new Error(validation.message), {
-      code: validation.code,
-      status: validation.code === "FILE_TOO_LARGE" ? 413 : 400,
-    });
+const ATTACHMENTS_DIR_NAME = ".ai-attachments";
+
+function resolveAttachmentsDir(projectId: string): string {
+  return path.join(DATA_DIR, "projects", projectId, ATTACHMENTS_DIR_NAME);
+}
+
+function resolveAttachmentDir(projectId: string, attachmentId: string): string {
+  const base = resolveAttachmentsDir(projectId);
+  const dir = path.resolve(base, attachmentId);
+  if (!dir.startsWith(base + path.sep)) {
+    throw new Error("attachment path escaped project directory");
   }
+  return dir;
+}
 
-  const bytes = await file.arrayBuffer();
-  const buffer = Buffer.from(bytes);
-  const attachmentId = crypto.randomUUID();
-  const safeSessionId = sanitizePathSegment(sessionId, "session");
-  const safeFilename = sanitizePathSegment(file.name, "attachment");
-  const attachmentDir = path.join(getAiAttachmentsDir(), safeSessionId, attachmentId);
-  await fs.promises.mkdir(attachmentDir, { recursive: true });
-
-  const extracted = await extractAiAttachmentText(buffer, validation.extension);
-  await fs.promises.writeFile(path.join(attachmentDir, safeFilename), buffer);
-  await fs.promises.writeFile(path.join(attachmentDir, "text.txt"), extracted.text, "utf-8");
-
-  const metadata: FileAttachment = {
-    id: attachmentId,
-    name: file.name,
-    mimeType: file.type || "application/octet-stream",
-    size: file.size,
-    textExtracted: extracted.textExtracted,
-    textPreview: extracted.textPreview,
-    lineCount: extracted.lineCount,
-    truncated: extracted.truncated,
-  };
-
-  const manifest: StoredAiAttachmentManifest = {
-    ...metadata,
-    originalFilename: file.name,
-    storedFilename: safeFilename,
-    sha256: crypto.createHash("sha256").update(buffer).digest("hex"),
-    createdAt: new Date().toISOString(),
-  };
-  await fs.promises.writeFile(
-    path.join(attachmentDir, "manifest.json"),
-    JSON.stringify(manifest, null, 2),
-    "utf-8",
+function readManifest(
+  projectId: string,
+  attachmentId: string,
+): ChatAttachmentMeta | null {
+  const manifestPath = path.join(
+    resolveAttachmentDir(projectId, attachmentId),
+    "manifest.json",
   );
+  try {
+    if (!fs.existsSync(manifestPath)) return null;
+    return JSON.parse(fs.readFileSync(manifestPath, "utf-8")) as ChatAttachmentMeta;
+  } catch {
+    return null;
+  }
+}
 
-  return metadata;
+export function listChatAttachments(
+  projectId: string,
+): ChatAttachmentMeta[] {
+  const dir = resolveAttachmentsDir(projectId);
+  if (!fs.existsSync(dir)) return [];
+
+  const attachments: ChatAttachmentMeta[] = [];
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const meta = readManifest(projectId, entry.name);
+    if (meta && meta.id === entry.name) {
+      attachments.push(meta);
+    }
+  }
+  attachments.sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
+  return attachments;
+}
+
+export function readChatAttachment(
+  projectId: string,
+  attachmentId: string,
+): { metadata: ChatAttachmentMeta; text: string } | null {
+  const metadata = readManifest(projectId, attachmentId);
+  if (!metadata) return null;
+  const textPath = path.join(
+    resolveAttachmentDir(projectId, attachmentId),
+    "text.txt",
+  );
+  let text = "";
+  try {
+    if (fs.existsSync(textPath)) {
+      text = fs.readFileSync(textPath, "utf-8");
+    }
+  } catch {
+    text = "";
+  }
+  return { metadata, text };
+}
+
+export function deleteChatAttachment(
+  projectId: string,
+  attachmentId: string,
+): boolean {
+  const dir = resolveAttachmentDir(projectId, attachmentId);
+  if (!fs.existsSync(dir)) return false;
+  fs.rmSync(dir, { recursive: true, force: true });
+  return true;
+}
+
+export function deleteChatAttachments(
+  projectId: string,
+  attachmentIds: string[],
+): number {
+  let deleted = 0;
+  for (const id of attachmentIds) {
+    if (deleteChatAttachment(projectId, id)) deleted++;
+  }
+  return deleted;
+}
+
+/** 读取附件原始文件（图片等二进制），返回 buffer 与元数据 */
+export function readChatAttachmentFile(
+  projectId: string,
+  attachmentId: string,
+): { metadata: ChatAttachmentMeta; buffer: Buffer; mimeType: string } | null {
+  const metadata = readManifest(projectId, attachmentId);
+  if (!metadata) return null;
+  const storedFilename = metadata.storedFilename || metadata.name;
+  const filePath = path.join(
+    resolveAttachmentDir(projectId, attachmentId),
+    storedFilename,
+  );
+  if (!fs.existsSync(filePath)) return null;
+  return {
+    metadata,
+    buffer: fs.readFileSync(filePath),
+    mimeType: metadata.mimeType || "application/octet-stream",
+  };
 }

@@ -85,7 +85,8 @@ export function createListImagesTool(config: AgentConfig): AgentTool {
             const idPart = imageId ? ` imageId=${imageId}` : "";
             const dims = img.width != null && img.height != null ? `, ${img.width}×${img.height}` : "";
             const alt = img.alt ? ` 内容：${img.alt}` : "";
-            return `- ${img.filename} → ${img.url} (${img.format}, ${(img.size / 1024).toFixed(1)}KB${dims}, added by ${img.createdBy})${idPart}${alt}`;
+            const createdAt = img.createdAt ? new Date(img.createdAt).toISOString() : "";
+            return `- ${img.filename} → ${img.url} (${img.format}, ${(img.size / 1024).toFixed(1)}KB${dims}, added by ${img.createdBy}, at ${createdAt})${idPart}${alt}`;
           })
           .join('\n');
 

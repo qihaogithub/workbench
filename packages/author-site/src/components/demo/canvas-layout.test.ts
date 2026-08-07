@@ -144,4 +144,38 @@ describe("canvas layout normalization", () => {
       resolveCanvasContentHeightLayout(page, layout, 749, 1133),
     ).toBeNull();
   });
+
+  it("删除页面后：未固化的页面会随索引变化漂移", () => {
+    const pages = [makePage("a"), makePage("b"), makePage("c")];
+    // 没有任何显式布局，全部依赖索引兜底
+    const before = normalizeCanvasPageLayouts(pages, {});
+
+    // 删除中间页后，c 的索引从 2 变为 1，位置随之变化
+    const afterDelete = normalizeCanvasPageLayouts(
+      [makePage("a"), makePage("c")],
+      {},
+    );
+    const cBefore = before.c;
+    const cAfter = afterDelete.c;
+    expect(cBefore?.x).not.toBe(cAfter?.x);
+  });
+
+  it("删除页面前固化剩余页面的有效位置，删除后位置保持不变", () => {
+    const pages = [makePage("a"), makePage("b"), makePage("c")];
+    // 固化前：部分页面没有显式布局，落在索引兜底上
+    const frozen = normalizeCanvasPageLayouts(pages, {
+      a: { x: 100, y: 200, width: 1133, height: 749, zIndex: 0 },
+    });
+
+    // 删除 b 后，以固化后的布局为准，c 的位置不再漂移
+    const afterDelete = normalizeCanvasPageLayouts(
+      [makePage("a"), makePage("c")],
+      { a: frozen.a, c: frozen.c },
+    );
+    expect(afterDelete.a).toMatchObject({ x: 100, y: 200 });
+    expect(afterDelete.c).toMatchObject({
+      x: frozen.c?.x,
+      y: frozen.c?.y,
+    });
+  });
 });

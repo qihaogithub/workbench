@@ -30,39 +30,42 @@ export function WorkspaceFileTree({
   const [error, setError] = useState<string | null>(null);
 
   // 加载根目录
+  const loadRoot = useCallback(async () => {
+    setLoadingPaths(new Set([""]));
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/sessions/${sessionId}/workspace/files?path=&showKnowledge=${showKnowledge}`,
+      );
+      const data = await res.json();
+      if (!data.success) {
+        setError(data.error?.message || "加载文件树失败");
+        return;
+      }
+      setRootTree(data.data);
+      setLoadedPaths(new Set([""]));
+    } catch {
+      setError("网络错误，请稍后重试");
+    } finally {
+      setLoadingPaths(new Set());
+    }
+  }, [sessionId, showKnowledge]);
+
   useEffect(() => {
     if (!sessionId) return;
-
-    let cancelled = false;
-
-    const loadRoot = async () => {
-      setLoadingPaths(new Set([""]));
-      setError(null);
-      try {
-        const res = await fetch(
-          `/api/sessions/${sessionId}/workspace/files?path=&showKnowledge=${showKnowledge}`,
-        );
-        const data = await res.json();
-        if (cancelled) return;
-
-        if (data.success) {
-          setRootTree(data.data);
-          setLoadedPaths(new Set([""]));
-        } else {
-          setError(data.error?.message || "加载文件树失败");
-        }
-      } catch {
-        if (!cancelled) setError("网络错误，请稍后重试");
-      } finally {
-        if (!cancelled) setLoadingPaths(new Set());
-      }
-    };
-
     loadRoot();
-    return () => {
-      cancelled = true;
+  }, [sessionId, showKnowledge, loadRoot]);
+
+  // 聊天文件更新后自动刷新根目录
+  useEffect(() => {
+    if (!sessionId) return;
+    const handler = () => {
+      setLoadedPaths(new Set());
+      loadRoot();
     };
-  }, [sessionId, showKnowledge]);
+    window.addEventListener("chat-attachments-updated", handler);
+    return () => window.removeEventListener("chat-attachments-updated", handler);
+  }, [sessionId, loadRoot]);
 
   // 懒加载子目录
   const loadChildren = useCallback(

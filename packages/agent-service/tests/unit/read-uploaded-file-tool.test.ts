@@ -20,7 +20,7 @@ describe("readUploadedFile tool", () => {
   });
 
   function writeAttachment(
-    sessionId: string,
+    projectId: string,
     attachmentId: string,
     options: {
       textExtracted?: boolean;
@@ -30,7 +30,7 @@ describe("readUploadedFile tool", () => {
     } = {},
   ): void {
     const text = options.text ?? "one\ntwo\nthree";
-    const dir = path.join(dataDir, "ai-attachments", sessionId, attachmentId);
+    const dir = path.join(dataDir, "projects", projectId, ".ai-attachments", attachmentId);
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(
       path.join(dir, "manifest.json"),
@@ -47,9 +47,9 @@ describe("readUploadedFile tool", () => {
     fs.writeFileSync(path.join(dir, "text.txt"), text, "utf-8");
   }
 
-  it("按 attachmentId 读取当前会话上传文件文本", async () => {
-    writeAttachment("session-a", "att-1");
-    const tool = createReadUploadedFileTool({ sessionId: "session-a" });
+  it("按 attachmentId 读取项目上传文件文本", async () => {
+    writeAttachment("proj-a", "att-1");
+    const tool = createReadUploadedFileTool({ sessionId: "session-a", projectId: "proj-a" });
 
     const result = await tool.execute("tool-1", {
       attachmentId: "att-1",
@@ -63,11 +63,11 @@ describe("readUploadedFile tool", () => {
     expect(result.content[0].text).toContain("3->three");
   });
 
-  it("列出当前会话已上传文件 manifest", async () => {
-    writeAttachment("session-a", "att-1", { name: "first.md" });
-    writeAttachment("session-a", "att-2", { name: "second.csv" });
+  it("列出项目已上传文件 manifest", async () => {
+    writeAttachment("proj-a", "att-1", { name: "first.md" });
+    writeAttachment("proj-a", "att-2", { name: "second.csv" });
 
-    const attachments = await listUploadedFileAttachments("session-a");
+    const attachments = await listUploadedFileAttachments("proj-a");
 
     expect(attachments.map((attachment) => attachment.id)).toEqual([
       "att-1",
@@ -88,8 +88,9 @@ describe("readUploadedFile tool", () => {
     const attachmentDir = path.join(
       repoDir,
       "data",
-      "ai-attachments",
-      "session-a",
+      "projects",
+      "proj-a",
+      ".ai-attachments",
       "att-1",
     );
     fs.mkdirSync(attachmentDir, { recursive: true });
@@ -109,7 +110,7 @@ describe("readUploadedFile tool", () => {
 
     try {
       process.chdir(packageDir);
-      const tool = createReadUploadedFileTool({ sessionId: "session-a" });
+      const tool = createReadUploadedFileTool({ sessionId: "session-a", projectId: "proj-a" });
 
       const result = await tool.execute("tool-1", {
         attachmentId: "att-1",
@@ -124,13 +125,13 @@ describe("readUploadedFile tool", () => {
   });
 
   it("返回无可提取文本的附件错误", async () => {
-    writeAttachment("session-a", "att-1", {
+    writeAttachment("proj-a", "att-1", {
       name: "scan.pdf",
       mimeType: "application/pdf",
       textExtracted: false,
       text: "",
     });
-    const tool = createReadUploadedFileTool({ sessionId: "session-a" });
+    const tool = createReadUploadedFileTool({ sessionId: "session-a", projectId: "proj-a" });
 
     const result = await tool.execute("tool-1", {
       attachmentId: "att-1",
@@ -141,7 +142,7 @@ describe("readUploadedFile tool", () => {
   });
 
   it("拒绝非法 attachmentId 路径", async () => {
-    const tool = createReadUploadedFileTool({ sessionId: "session-a" });
+    const tool = createReadUploadedFileTool({ sessionId: "session-a", projectId: "proj-a" });
 
     const result = await tool.execute("tool-1", {
       attachmentId: "../att-1",
@@ -149,5 +150,16 @@ describe("readUploadedFile tool", () => {
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("Error reading uploaded file");
+  });
+
+  it("缺少 projectId 时返回错误", async () => {
+    const tool = createReadUploadedFileTool({ sessionId: "session-a" });
+
+    const result = await tool.execute("tool-1", {
+      attachmentId: "att-1",
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("projectId is required");
   });
 });

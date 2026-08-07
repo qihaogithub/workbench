@@ -5,6 +5,7 @@ import type {
 } from "./types";
 
 const DEFAULT_PAGE_SIZE = { width: 375, height: 812 };
+const MAX_PAGE_HEIGHT = 50000;
 const INITIAL_LAYOUT_COLUMNS = 3;
 const INITIAL_LAYOUT_GAP = 40;
 const AUTO_LAYOUT_GAP = 48;
@@ -107,7 +108,7 @@ export function normalizeCanvasPageLayout(
       ...layout,
       width: size.width,
       // 保留内容驱动持久化的高度（可能低于设计高度），不再顶回设计高度
-      height: layout.height,
+      height: Math.min(layout.height, MAX_PAGE_HEIGHT),
       sizeMode: "preview",
       previewSizeKey,
     };
@@ -166,7 +167,7 @@ export function resolveCanvasContentHeightLayout(
     layout.sizeMode === "custom" && layout.previewSizeKey === previewSizeKey;
   const targetWidth = isCurrentCustomSize ? layout.width : size.width;
   const scale = targetWidth / sourceWidth;
-  const nextHeight = contentHeight * scale;
+  const nextHeight = Math.min(contentHeight * scale, MAX_PAGE_HEIGHT);
 
   if (
     Math.abs(targetWidth - layout.width) < 1 &&

@@ -12,6 +12,7 @@ import type {
   PreviewDiagnosticError,
   PreviewPanelProps,
   PositionableSizeItem,
+  SnapshotRejectionReason,
 } from "./types";
 import type {
   AppActionPayload,
@@ -155,8 +156,11 @@ function sanitizeStaticPrototypeElement(root: HTMLElement) {
   });
 }
 
-function extractStaticPrototypeCss(doc: Document): string {
+function extractStaticPrototypeCss(
+  doc: Document,
+): { css: string; hasCrossOriginFailures: boolean } {
   const chunks: string[] = [];
+  let hasCrossOriginFailures = false;
   doc.querySelectorAll("style").forEach((style) => {
     if (style.textContent?.trim()) {
       chunks.push(style.textContent.trim());
@@ -171,16 +175,25 @@ function extractStaticPrototypeCss(doc: Document): string {
         chunks.push(rules.join("\n"));
       }
     } catch {
-      // Cross-origin stylesheets cannot be read; prototype validation will decide
-      // whether the remaining static output is usable.
+      hasCrossOriginFailures = true;
     }
   }
-  return Array.from(new Set(chunks)).join("\n\n");
+  return {
+    css: Array.from(new Set(chunks)).join("\n\n"),
+    hasCrossOriginFailures,
+  };
+}
+
+interface StaticPrototypeSnapshotResult {
+  ok: true;
+  html: string;
+  css: string;
+  rejectionReasons: SnapshotRejectionReason[];
 }
 
 function extractStaticPrototypeSnapshot(
   iframe: HTMLIFrameElement | null,
-): { ok: true; html: string; css: string } | { ok: false; error: string } {
+): StaticPrototypeSnapshotResult | { ok: false; error: string } {
   try {
     const doc = iframe?.contentDocument;
     if (!doc) {
@@ -195,6 +208,24 @@ function extractStaticPrototypeSnapshot(
     }
     const clone = sourceRoot.cloneNode(true) as HTMLElement;
     sanitizeStaticPrototypeElement(clone);
+
+    const rejectionReasons: SnapshotRejectionReason[] = [];
+
+    if (clone.querySelector("canvas")) {
+      rejectionReasons.push("canvas");
+    }
+
+    if (clone.querySelector("video")) {
+      rejectionReasons.push("video");
+    }
+
+    checkShadowDom(clone, rejectionReasons);
+
+    const { css, hasCrossOriginFailures } = extractStaticPrototypeCss(doc);
+    if (hasCrossOriginFailures) {
+      rejectionReasons.push("cross-origin-css");
+    }
+
     const html = clone.innerHTML.trim();
     if (!html) {
       return { ok: false, error: "预览根节点为空" };
@@ -202,13 +233,26 @@ function extractStaticPrototypeSnapshot(
     return {
       ok: true,
       html,
-      css: extractStaticPrototypeCss(doc),
+      css,
+      rejectionReasons,
     };
   } catch (error) {
     return {
       ok: false,
       error: error instanceof Error ? error.message : "预览 DOM 静态化失败",
     };
+  }
+}
+
+function checkShadowDom(root: Element, reasons: SnapshotRejectionReason[]) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+  let node = walker.nextNode() as Element | null;
+  while (node) {
+    if (node.shadowRoot) {
+      reasons.push("shadow-dom");
+      return;
+    }
+    node = walker.nextNode() as Element | null;
   }
 }
 
@@ -1370,9 +1414,9 @@ function PreviewPanelInternal({
 
   useEffect(() => {
     if (visualNodeTreeRequestKey == null) return;
-    if (!iframeReadyRef.current) return;
+    if (!iframeReady) return;
     sendCollectVisualNodeTree();
-  }, [sendCollectVisualNodeTree, visualNodeTreeRequestKey]);
+  }, [sendCollectVisualNodeTree, visualNodeTreeRequestKey, iframeReady]);
 
   useEffect(() => {
     if (staticPrototypeRequestKey == null) return;

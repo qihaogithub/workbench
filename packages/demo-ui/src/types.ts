@@ -122,7 +122,7 @@ export interface PreviewPanelProps {
   staticPrototypeRequestKey?: number;
   onStaticPrototypeSnapshot?: (
     result:
-      | { ok: true; html: string; css: string }
+      | { ok: true; html: string; css: string; rejectionReasons: SnapshotRejectionReason[] }
       | { ok: false; error: string },
   ) => void;
   /** @deprecated 右键图层菜单已由 PreviewPanel 在预览位置内渲染，仅保留兼容旧调用方。 */
@@ -241,6 +241,14 @@ export type CanvasPageRuntimeType =
   | "high-fidelity-react"
   | "sketch-scene";
 
+export type SnapshotRejectionReason =
+  | "cross-origin-css"
+  | "canvas"
+  | "shadow-dom"
+  | "video";
+
+export type SnapshotQuality = "good" | "partial" | "failed";
+
 export interface CanvasPageData {
   id: string;
   name: string;
@@ -259,6 +267,11 @@ export interface CanvasPageData {
   sourceProjectId?: string;           // 引用页的源项目 ID
   previewSize?: PreviewSize;
   order: number;
+  snapshotHtml?: string;
+  snapshotCss?: string;
+  snapshotHash?: string;
+  snapshotQuality?: SnapshotQuality;
+  snapshotRejectionReasons?: SnapshotRejectionReason[];
 }
 
 export interface CanvasPageGroupEntry {
@@ -430,6 +443,8 @@ export interface PreviewCanvasProps {
   canvasState: CanvasState;
   onCanvasStateChange: (state: CanvasState) => void;
   onRequestDeletePages?: (pageIds: string[]) => void | Promise<void>;
+  /** 画布选中的页面添加到 AI 对话 */
+  onAddPagesToChat?: (pageIds: string[]) => void;
   onPageConfigEdit?: (pageId: string) => void;
   onCanvasClick?: () => void;
   className?: string;

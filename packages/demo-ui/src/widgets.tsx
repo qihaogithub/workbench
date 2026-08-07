@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useCallback, useRef } from 'react';
 import { WidgetProps } from '@rjsf/utils';
-import { Upload, Repeat, Trash2, Loader2, AlertTriangle } from 'lucide-react';
+import { Upload, Repeat, Trash2, Loader2, AlertTriangle, FileArchive } from 'lucide-react';
 import { cn } from './utils';
 import { resolveConfigImageSrc } from './preview-config-utils';
 import {
@@ -49,29 +49,38 @@ function validateImageDimensions(
   const { minWidth, minHeight, maxWidth, maxHeight } = options;
   const parts: string[] = [];
 
-  if (minWidth && actual.width < minWidth) parts.push(`宽度小于 ${minWidth}px`);
-  if (minHeight && actual.height < minHeight) parts.push(`高度小于 ${minHeight}px`);
-  if (maxWidth && actual.width > maxWidth) parts.push(`宽度大于 ${maxWidth}px`);
-  if (maxHeight && actual.height > maxHeight) parts.push(`高度大于 ${maxHeight}px`);
+  if (minWidth && maxWidth && minWidth === maxWidth) {
+    if (actual.width !== minWidth) parts.push(`宽度=${minWidth}px`);
+  } else {
+    if (minWidth && actual.width < minWidth) parts.push(`宽度≥${minWidth}px`);
+    if (maxWidth && actual.width > maxWidth) parts.push(`宽度≤${maxWidth}px`);
+  }
+
+  if (minHeight && maxHeight && minHeight === maxHeight) {
+    if (actual.height !== minHeight) parts.push(`高度=${minHeight}px`);
+  } else {
+    if (minHeight && actual.height < minHeight) parts.push(`高度≥${minHeight}px`);
+    if (maxHeight && actual.height > maxHeight) parts.push(`高度≤${maxHeight}px`);
+  }
 
   if (options.widthOperator && typeof options.widthValue === 'number') {
     const w = actual.width;
     const v = options.widthValue;
-    if (options.widthOperator === '>' && !(w > v)) parts.push(`宽度不大于 ${v}px`);
-    else if (options.widthOperator === '<' && !(w < v)) parts.push(`宽度不小于 ${v}px`);
-    else if (options.widthOperator === '=' && w !== v) parts.push(`宽度不等于 ${v}px`);
-    else if (options.widthOperator === '≥' && !(w >= v)) parts.push(`宽度小于 ${v}px`);
-    else if (options.widthOperator === '≤' && !(w <= v)) parts.push(`宽度大于 ${v}px`);
+    if (options.widthOperator === '>' && !(w > v)) parts.push(`宽度>${v}px`);
+    else if (options.widthOperator === '<' && !(w < v)) parts.push(`宽度<${v}px`);
+    else if (options.widthOperator === '=' && w !== v) parts.push(`宽度=${v}px`);
+    else if (options.widthOperator === '≥' && !(w >= v)) parts.push(`宽度≥${v}px`);
+    else if (options.widthOperator === '≤' && !(w <= v)) parts.push(`宽度≤${v}px`);
   }
 
   if (options.heightOperator && typeof options.heightValue === 'number') {
     const h = actual.height;
     const v = options.heightValue;
-    if (options.heightOperator === '>' && !(h > v)) parts.push(`高度不大于 ${v}px`);
-    else if (options.heightOperator === '<' && !(h < v)) parts.push(`高度不小于 ${v}px`);
-    else if (options.heightOperator === '=' && h !== v) parts.push(`高度不等于 ${v}px`);
-    else if (options.heightOperator === '≥' && !(h >= v)) parts.push(`高度小于 ${v}px`);
-    else if (options.heightOperator === '≤' && !(h <= v)) parts.push(`高度大于 ${v}px`);
+    if (options.heightOperator === '>' && !(h > v)) parts.push(`高度>${v}px`);
+    else if (options.heightOperator === '<' && !(h < v)) parts.push(`高度<${v}px`);
+    else if (options.heightOperator === '=' && h !== v) parts.push(`高度=${v}px`);
+    else if (options.heightOperator === '≥' && !(h >= v)) parts.push(`高度≥${v}px`);
+    else if (options.heightOperator === '≤' && !(h <= v)) parts.push(`高度≤${v}px`);
   }
 
   if (parts.length === 0) return { valid: true, message: '' };
@@ -135,10 +144,16 @@ export interface FileUploadWidgetOptions {
   heightValue?: number;
 }
 
+export interface SpineBundle {
+  skeleton: string;
+  atlas: string;
+  texture: string;
+}
+
 export interface FileUploadWidgetProps {
   id?: string;
-  value?: string;
-  onChange: (value: string | undefined) => void;
+  value?: string | SpineBundle;
+  onChange: (value: string | SpineBundle | undefined) => void;
   label?: string;
   required?: boolean;
   disabled?: boolean;
@@ -231,11 +246,16 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
             return;
           }
 
+          const isBundle =
+            data.data &&
+            typeof data.data === 'object' &&
+            (data.data as SpineBundle).skeleton !== undefined;
+
           if (typeof value === 'string' && value.startsWith('/api/sessions/')) {
             await deleteServerFile(sessionId, value);
           }
 
-          onChange(data.data.url);
+          onChange(isBundle ? (data.data as SpineBundle) : data.data.url);
         } else {
           const dataUrl = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
@@ -283,15 +303,20 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
     [handleFileSelect]
   );
 
-  const handleClear = useCallback(async () => {
+const handleClear = useCallback(async () => {
+    if (sessionId && typeof value === 'object' && value !== null) {
+      // Spine bundle：清空字段即可，zip 解压文件留在 workspace（由项目资产收集统一管理）
+      onChange(defaultValue ?? undefined);
+      return;
+    }
     if (sessionId && typeof value === 'string' && value.startsWith('/api/sessions/')) {
       await deleteServerFile(sessionId, value);
     }
     onChange(defaultValue ?? undefined);
-    setError('');
   }, [sessionId, value, onChange, defaultValue]);
 
   const isValueFromUpload = useMemo(() => {
+    if (typeof value === 'object' && value !== null) return true;
     return typeof value === 'string' && value.startsWith('/api/sessions/');
   }, [value]);
 
@@ -307,39 +332,68 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
       />
       <div className="flex items-start gap-3">
         {value ? (
-          <div className="relative w-[80px] h-[80px] rounded-lg border border-border overflow-hidden bg-muted shrink-0 group">
-            <img
-              src={resolveConfigImageSrc(value, sessionId)}
-              alt="Preview"
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-                (e.target as HTMLImageElement).parentElement!.classList.add('flex', 'items-center', 'justify-center');
-              }}
-            />
-            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={disabled || isUploading}
-                className="p-2 rounded-full bg-background/90 text-foreground hover:bg-primary hover:text-primary-foreground transition-colors disabled:opacity-50"
-                aria-label="替换图片"
-              >
-                <Repeat className="w-4 h-4" />
-              </button>
-              {!(defaultValue && value === defaultValue) && (
+          typeof value === 'object' ? (
+            <div className="w-[80px] h-[80px] rounded-lg border border-border overflow-hidden bg-muted shrink-0 flex flex-col items-center justify-center gap-1 group">
+              <FileArchive className="w-5 h-5 text-muted-foreground" />
+              <span className="text-[9px] text-muted-foreground px-1 text-center leading-tight">Spine 素材包</span>
+              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                 <button
                   type="button"
-                  onClick={handleClear}
+                  onClick={() => fileInputRef.current?.click()}
                   disabled={disabled || isUploading}
-                  className="p-2 rounded-full bg-background/90 text-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-50"
-                  aria-label="删除图片"
+                  className="p-2 rounded-full bg-background/90 text-foreground hover:bg-primary hover:text-primary-foreground transition-colors disabled:opacity-50"
+                  aria-label="替换压缩包"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Repeat className="w-4 h-4" />
                 </button>
-              )}
+                {!(defaultValue && value === defaultValue) && (
+                  <button
+                    type="button"
+                    onClick={handleClear}
+                    disabled={disabled || isUploading}
+                    className="p-2 rounded-full bg-background/90 text-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-50"
+                    aria-label="删除压缩包"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="relative w-[80px] h-[80px] rounded-lg border border-border overflow-hidden bg-muted shrink-0 group">
+              <img
+                src={resolveConfigImageSrc(value, sessionId)}
+                alt="Preview"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                  (e.target as HTMLImageElement).parentElement!.classList.add('flex', 'items-center', 'justify-center');
+                }}
+              />
+              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={disabled || isUploading}
+                  className="p-2 rounded-full bg-background/90 text-foreground hover:bg-primary hover:text-primary-foreground transition-colors disabled:opacity-50"
+                  aria-label="替换图片"
+                >
+                  <Repeat className="w-4 h-4" />
+                </button>
+                {!(defaultValue && value === defaultValue) && (
+                  <button
+                    type="button"
+                    onClick={handleClear}
+                    disabled={disabled || isUploading}
+                    className="p-2 rounded-full bg-background/90 text-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-50"
+                    aria-label="删除图片"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )
         ) : (
           <div
             onDrop={handleDrop}

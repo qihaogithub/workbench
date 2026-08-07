@@ -269,3 +269,58 @@ export function uploadToGlobalImageStore(params: {
     deduplicated: false,
   };
 }
+
+export function normalizeImageId(raw: string): string {
+  return raw.replace(/^\/api\/images\//, '');
+}
+
+export interface ReadImageResult {
+  success: true;
+  data: string;
+  mimeType: string;
+  filename: string;
+  sizeBytes: number;
+}
+
+export interface ReadImageError {
+  success: false;
+  error: string;
+}
+
+export function readGlobalImageById(
+  imageId: string,
+): ReadImageResult | ReadImageError {
+  const normalizedId = normalizeImageId(imageId);
+  const manifest = readManifest();
+  const entry = manifest.images.find((img) => img.id === normalizedId);
+  if (!entry) {
+    return { success: false, error: `Image not found: ${normalizedId}` };
+  }
+
+  const ext = getExt(entry.filename);
+  const blobFilename = `${entry.sha256.slice(0, 16)}.${ext}`;
+  const blobPath = path.join(getBlobsDir(), blobFilename);
+
+  if (!fs.existsSync(blobPath)) {
+    return {
+      success: false,
+      error: `Blob file missing: ${blobFilename}`,
+    };
+  }
+
+  try {
+    const buffer = fs.readFileSync(blobPath);
+    return {
+      success: true,
+      data: buffer.toString("base64"),
+      mimeType: entry.mimeType,
+      filename: entry.filename,
+      sizeBytes: entry.sizeBytes,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: `Failed to read blob: ${err instanceof Error ? err.message : "unknown"}`,
+    };
+  }
+}

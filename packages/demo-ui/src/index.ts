@@ -23,6 +23,8 @@ export type {
   CanvasScreenshotState,
   CanvasPageRenderMode,
   ScreenshotRenderBox,
+  SnapshotRejectionReason,
+  SnapshotQuality,
   PreviewCanvasProps,
   CanvasFreeNodeKind,
   CanvasFreeNodeBase,

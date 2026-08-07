@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { verifyToken } from "@/lib/auth/jwt";
+import { verifyToken, getAuthCookieName } from "@/lib/auth/jwt";
 import {
   verifyAdminSecret,
   setAdminCookie,
@@ -31,7 +31,7 @@ function applyCorsHeaders(headers: Headers, origin: string) {
   );
   headers.set(
     "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-Auth-Token",
+    "Content-Type, Authorization, X-Auth-Token, x-anonymous-id, x-anonymous-name",
   );
   headers.set("Access-Control-Allow-Credentials", "true");
 }
@@ -44,7 +44,7 @@ function applyPublicModuleCorsHeaders(headers: Headers) {
 }
 
 export async function middleware(request: NextRequest) {
-  const token = request.cookies.get("auth_token")?.value;
+  const token = request.cookies.get(getAuthCookieName())?.value;
   const user = token ? await verifyToken(token) : null;
   const pathname = request.nextUrl.pathname;
   const origin = request.headers.get("origin");

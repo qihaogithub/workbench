@@ -4,11 +4,14 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  ExternalLink,
+  Figma,
   FilePlus,
   Folder,
   LayoutGrid,
   Search,
   Terminal,
+  MessageSquareText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,8 +25,10 @@ import {
 } from "@/components/demo/project-name-category-dialog";
 import { SaveTemplateDialog } from "@/components/demo/save-template-dialog";
 import { SettingsButton } from "@/components/settings/settings-button";
+import { ShareDialog } from "@/components/share/ShareDialog";
 import { useToast } from "@/components/ui/toast-provider";
 import { cn } from "@/lib/utils";
+import { getViewerBaseUrl } from "@/lib/viewer-url";
 import {
   createDemo,
   convertProjectTemplate,
@@ -220,6 +225,7 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
   const [deleteTarget, setDeleteTarget] = useState<DemoMeta | null>(null);
   const [templateTarget, setTemplateTarget] = useState<DemoMeta | null>(null);
   const [coverTarget, setCoverTarget] = useState<DemoMeta | null>(null);
+  const [shareTarget, setShareTarget] = useState<DemoMeta | null>(null);
   const [screenshotRevision, setScreenshotRevision] = useState(0);
 
   const projectCategories = useMemo(
@@ -453,6 +459,19 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
     setDeleteTarget(null);
   };
 
+  const handleOpenViewer = () => {
+    const url = getViewerBaseUrl();
+    if (!url) {
+      toast({
+        variant: "destructive",
+        title: "无法打开浏览端",
+        description: "未配置浏览端地址",
+      });
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
   const handleConvertTemplateToProject = async (demo: DemoMeta) => {
     const response = await convertProjectTemplate(demo.id);
     if (response.success) {
@@ -554,9 +573,31 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
 
           <div className="ml-auto flex items-center gap-2">
             <Button asChild variant="outline" size="sm" className="gap-2">
+              <Link href="/figma-plugin">
+                <Figma className="h-4 w-4" />
+                Figma 插件
+              </Link>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              title="打开浏览端"
+              onClick={handleOpenViewer}
+            >
+              <ExternalLink className="h-4 w-4" />
+              浏览端
+            </Button>
+            <Button asChild variant="outline" size="sm" className="gap-2">
               <Link href="/cli">
                 <Terminal className="h-4 w-4" />
                 CLI
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm" className="gap-2">
+              <Link href="/feedback">
+                <MessageSquareText className="h-4 w-4" />
+                反馈
               </Link>
             </Button>
             <SettingsButton />
@@ -689,6 +730,7 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
                       setDialogAction({ type: "change-category", project: demo })
                     }
                     onChangeCover={() => setCoverTarget(demo)}
+                    onShare={() => setShareTarget(demo)}
                     onConvertToProject={() =>
                       handleConvertTemplateToProject(demo)
                     }
@@ -724,6 +766,12 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
           onOpenChange={(open) => !open && setDeleteTarget(null)}
           onConfirm={handleDelete}
           demoName={deleteTarget?.name || ""}
+        />
+
+        <ShareDialog
+          projectId={shareTarget?.id ?? ""}
+          open={!!shareTarget}
+          onOpenChange={(open) => !open && setShareTarget(null)}
         />
 
         {coverTarget && (

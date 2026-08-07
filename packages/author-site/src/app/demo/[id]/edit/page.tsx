@@ -97,6 +97,7 @@ import type {
   ChatMessage,
   StreamService,
   ChatElementRef,
+  ChatPageRef,
 } from "@/components/ai-elements";
 import { getAgentClient } from "@/lib/agent-client";
 import { useConsoleBuffer } from "@/components/demo/useConsoleBuffer";
@@ -155,6 +156,7 @@ import type {
 } from "@/components/demo/KnowledgeDocDialog";
 import { useCollabDocument } from "@/hooks/useCollabDocument";
 import { useSketchEditorEngineHost } from "./components/SketchEditorEngineHost";
+import { VisualEditSidebar } from "./components/VisualEditSidebar";
 import { useVisualEditState, getNodeLabel, buildVisualSelectionPrompt } from "./hooks/useVisualEditState";
 import { useVersionControl } from "./hooks/useVersionControl";
 import { useWorkspaceAuthorityState } from "./hooks/useWorkspaceAuthorityState";
@@ -167,6 +169,7 @@ import {
   CanvasDocumentContent,
   getAnnotationsFromCanvasState,
   getCanvasDocumentEntries,
+  normalizeCanvasPageLayouts,
   useCanvasDocumentMarkdown,
   withCanvasAnnotationNodes,
 } from "@workbench/demo-ui";
@@ -180,6 +183,8 @@ import type {
   CanvasPageLayout,
   CanvasPageGroup,
   PreviewDiagnosticError,
+  SnapshotQuality,
+  SnapshotRejectionReason,
 } from "@workbench/demo-ui";
 import type {
   DemoFiles,
@@ -709,6 +714,26 @@ function parseCanvasLayoutState(value: string): CanvasState | null {
   }
 }
 
+function nextPageLayoutsDiffer(
+  current: Record<string, CanvasPageLayout>,
+  next: Record<string, CanvasPageLayout>,
+): boolean {
+  const currentKeys = Object.keys(current);
+  const nextKeys = Object.keys(next);
+  if (currentKeys.length !== nextKeys.length) return true;
+  return nextKeys.some((pageId) => {
+    const cur = current[pageId];
+    const nxt = next[pageId];
+    if (!cur || !nxt) return true;
+    return (
+      cur.x !== nxt.x ||
+      cur.y !== nxt.y ||
+      cur.width !== nxt.width ||
+      cur.height !== nxt.height
+    );
+  });
+}
+
 function arePositionableSizesEqual(
   current: Record<string, PositionableSizeItem>,
   next: Record<string, PositionableSizeItem>,
@@ -973,6 +998,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [nameDraft, setNameDraft] = useState("");
   const [coverDialogOpen, setCoverDialogOpen] = useState(false);
   const [showExitDialog, setShowExitDialog] = useState(false);
+  const [exitState, setExitState] = useState<"saving" | "confirm">("saving");
+  const [exitErrorLabel, setExitErrorLabel] = useState<string | null>(null);
+  const exitHandlingRef = useRef(false);
+  const exitCancelledRef = useRef(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [showUnpublishDialog, setShowUnpublishDialog] = useState(false);
   const [saveVersionDialogOpen, setSaveVersionDialogOpen] = useState(false);
@@ -1896,6 +1925,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   >("edit");
   const [chatElement, setChatElement] =
     useState<ChatElementRef | null>(null);
+  const [chatPageRefs, setChatPageRefs] = useState<ChatPageRef[]>([]);
   const { demos } = useDemos();
   const projectReferences = useMemo(
     () =>
@@ -2866,6 +2896,18 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [staticPrototypeRequestKey, setStaticPrototypeRequestKey] = useState(0);
   const pendingStaticPrototypeConversionRef =
     useRef<RuntimeConversionState | null>(null);
+  const [pageSnapshots, setPageSnapshots] = useState<
+    Record<
+      string,
+      {
+        html: string;
+        css: string;
+        quality: SnapshotQuality;
+        rejectionReasons: SnapshotRejectionReason[];
+      }
+    >
+  >({});
+  const pendingSnapshotPageIdRef = useRef<string | null>(null);
   const hasPendingVisualPropertyWork =
     visualPendingPropertyChanges.length > 0 ||
     visualPendingConfigMarks.length > 0 ||
@@ -2885,6 +2927,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   useEffect(() => {
     setVisualLayerTreeNodes((current) => (current.length === 0 ? current : []));
     setHiddenVisualNodeIds((current) => (current.length === 0 ? current : []));
+    setVisualLayerTreeRequestKey((key) => key + 1);
   }, [activeDemoId]);
 
   const handleToggleVisualNodeHidden = useCallback((node: VisualNodeInfo) => {
@@ -4368,6 +4411,23 @@ ${context.details}
       clearPageLocalCaches(pageIds);
       handleWorkspaceTreeChanged();
 
+      // 删除页面会改变剩余页面的索引。若某些页面没有显式保存的画布布局，
+      // 它们会回退到基于索引的初始布局（computeInitialCanvasLayout），导致位置漂移。
+      // 因此在删除前，先把剩余页面的当前有效位置固化进 canvasState.pages。
+      const currentState = canvasStateRef.current;
+      const effectiveLayouts = normalizeCanvasPageLayouts(
+        previousPages,
+        currentState.pages,
+      );
+      const nextPages: Record<string, CanvasPageLayout> = {};
+      for (const page of remaining) {
+        const layout = effectiveLayouts[page.id];
+        if (layout) nextPages[page.id] = layout;
+      }
+      if (nextPageLayoutsDiffer(currentState.pages, nextPages)) {
+        setCanvasState({ ...currentState, pages: nextPages });
+      }
+
       if (deleted.has(activeDemoIdRef.current)) {
         const nextPage = remaining[0];
         if (nextPage) {
@@ -4383,7 +4443,7 @@ ${context.details}
         }
       }
     },
-    [clearPageLocalCaches, handleWorkspaceTreeChanged],
+    [clearPageLocalCaches, handleWorkspaceTreeChanged, setCanvasState],
   );
 
   const restoreDeletedPageSnapshot = useCallback(
@@ -5597,19 +5657,20 @@ ${context.details}
     workspaceTreeCollab.status,
     canvasLayoutCollab.status,
   ];
-  const hasExitSyncRisk =
+  const hasGenuineExitBlock =
     (hasPendingWorkspaceFlush && !authoritySynced) ||
     workspaceFlushError !== null ||
-    syncInFlightRef.current ||
-    syncDebounceRef.current !== null ||
     (hasUnsavedChanges &&
       exitSyncStatuses.some(
-        (status) =>
-          status === "error" ||
-          status === "offline" ||
-          status === "saving" ||
-          status === "connecting",
+        (status) => status === "error" || status === "offline",
       ));
+
+  const hasPendingExitWork =
+    hasUnsavedCanvasChanges ||
+    hasPendingWorkspaceFlush ||
+    hasUnsavedChanges ||
+    syncInFlightRef.current ||
+    syncDebounceRef.current !== null;
 
   const flushBeforeExit = useCallback(async () => {
     const shouldPersistWorkspace =
@@ -5680,27 +5741,73 @@ ${context.details}
   ]);
 
   const handleBackClick = useCallback(async () => {
-    if (hasExitSyncRisk) {
-      setShowExitDialog(true);
-      return;
-    }
+    if (exitHandlingRef.current) return;
+    exitHandlingRef.current = true;
+    exitCancelledRef.current = false;
+
+    const finishExit = () => {
+      exitHandlingRef.current = false;
+      if (exitCancelledRef.current) return;
+      router.push("/");
+    };
 
     try {
+      if (hasGenuineExitBlock) {
+        setExitErrorLabel(
+          workspaceFlushError ?? "最新修改尚未确认同步完成",
+        );
+        setExitState("confirm");
+        setShowExitDialog(true);
+        return;
+      }
+
+      if (!hasPendingExitWork) {
+        finishExit();
+        return;
+      }
+
+      setExitErrorLabel(null);
+      setExitState("saving");
+      setShowExitDialog(true);
       await flushBeforeExit();
-      router.push("/");
+      finishExit();
     } catch (error) {
       console.warn("[Exit] Failed to flush before exit:", error);
+      setExitErrorLabel(
+        error instanceof Error ? error.message : "保存失败，请重试或直接退出",
+      );
+      setExitState("confirm");
       setShowExitDialog(true);
+    } finally {
+      exitHandlingRef.current = false;
     }
-  }, [flushBeforeExit, hasExitSyncRisk, router]);
+  }, [
+    flushBeforeExit,
+    hasGenuineExitBlock,
+    hasPendingExitWork,
+    router,
+    workspaceFlushError,
+  ]);
 
   const handleStayOnPage = () => {
+    exitHandlingRef.current = false;
+    exitCancelledRef.current = true;
     setShowExitDialog(false);
   };
 
   const handleDirectExit = () => {
+    exitHandlingRef.current = false;
+    exitCancelledRef.current = false;
     setShowExitDialog(false);
     router.push("/");
+  };
+
+  const handleExitDialogOpenChange = (open: boolean) => {
+    if (!open) {
+      exitHandlingRef.current = false;
+      exitCancelledRef.current = true;
+    }
+    setShowExitDialog(open);
   };
 
   // 处理 AI 代码更新 — 通过 applyDemoSnapshot 统一应用
@@ -5833,6 +5940,17 @@ ${context.details}
                 }),
               };
 
+      const snapshot = pageSnapshots[page.id];
+      const prototypeSnapshot =
+        page.runtimeType === "prototype-html-css" && pagePrototypeMap[page.id]
+          ? {
+              snapshotHtml: pagePrototypeMap[page.id].html,
+              snapshotCss: pagePrototypeMap[page.id].css,
+              snapshotQuality: "good" as SnapshotQuality,
+              snapshotRejectionReasons: [],
+            }
+          : undefined;
+
       return {
         id: page.id,
         name: page.name,
@@ -5844,6 +5962,7 @@ ${context.details}
         previewSize: pagePreviewSizeMap[page.id],
         fallbackPreviewSize:
           page.id === activeDemoId ? previewSize : undefined,
+        ...(snapshot || prototypeSnapshot),
       };
     });
   }, [
@@ -5856,6 +5975,7 @@ ${context.details}
     pagePrototypeMap,
     pageSketchMap,
     pageSchemaMap,
+    pageSnapshots,
     previewSize,
   ]);
   const activeSinglePreviewDocumentNode = useMemo(() => {
@@ -5914,6 +6034,24 @@ ${context.details}
       context,
     });
   }, [selectedVisualNode, activeDemoId]);
+
+  const handleAddPagesToChat = useCallback((pageIds: string[]) => {
+    if (pageIds.length === 0) return;
+    const uniquePageIds = Array.from(new Set(pageIds)).filter(Boolean);
+    const refs = uniquePageIds
+      .map((pageId) => {
+        const page = demoPagesRef.current.find((item) => item.id === pageId);
+        if (!page) return null;
+        return {
+          id: `page-${pageId}`,
+          label: page.name,
+          context: `当前项目的页面：${page.name}\n- 页面ID: ${pageId}\n- 页面名称: ${page.name}\n- 源码文件: demos/${pageId}/index.tsx`,
+        };
+      })
+      .filter((page): page is ChatPageRef => page !== null);
+    if (refs.length === 0) return;
+    setChatPageRefs(refs);
+  }, []);
 
   const visualPropertyDrawerTargetRef = useRef({
     activeDemoId,
@@ -6252,12 +6390,37 @@ ${context.details}
   const handleStaticPrototypeSnapshot = useCallback(
     async (
       result:
-        | { ok: true; html: string; css: string }
+        | {
+            ok: true;
+            html: string;
+            css: string;
+            rejectionReasons: SnapshotRejectionReason[];
+          }
         | { ok: false; error: string },
     ) => {
       const conversion = pendingStaticPrototypeConversionRef.current;
       pendingStaticPrototypeConversionRef.current = null;
-      if (!conversion || !sessionId) return;
+
+      if (!conversion) {
+        const pageId = pendingSnapshotPageIdRef.current;
+        pendingSnapshotPageIdRef.current = null;
+        if (result.ok && pageId) {
+          const quality: SnapshotQuality =
+            result.rejectionReasons.length === 0 ? "good" : "partial";
+          setPageSnapshots((prev) => ({
+            ...prev,
+            [pageId]: {
+              html: result.html,
+              css: result.css,
+              quality,
+              rejectionReasons: result.rejectionReasons,
+            },
+          }));
+        }
+        return;
+      }
+
+      if (!sessionId) return;
 
       if (!result.ok) {
         recordDiagnosticEvent({
@@ -6967,6 +7130,8 @@ await handlePublishWithScreenshot();
                   }}
                   selectedElement={chatElement}
                   onRemoveElement={() => setChatElement(null)}
+                  selectedPages={chatPageRefs}
+                  onRemovePages={() => setChatPageRefs([])}
                   projects={projectReferences}
                   externalStreamServiceRef={streamServiceRef}
                   errorBanner={
@@ -7057,6 +7222,40 @@ await handlePublishWithScreenshot();
                       onConventionSelect={() => {
                         setConventionDialogOpen(true);
                       }}
+                      onChatFileSelect={async (attachment) => {
+                        try {
+                          if (attachment.mimeType?.startsWith("image/")) {
+                            window.open(
+                              `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(attachment.id)}&raw=1`,
+                              "_blank",
+                            );
+                            return;
+                          }
+                          const res = await fetch(
+                            `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(attachment.id)}`,
+                          );
+                          const data = await res.json();
+                          if (data.success) {
+                            setWsCodeDialogData({
+                              filePath: data.data.metadata.name,
+                              content: data.data.text,
+                              editable: false,
+                            });
+                            setWsCodeDialogOpen(true);
+                          } else {
+                            toast({
+                              title: "加载聊天文件失败",
+                              description: data.error?.message,
+                              variant: "destructive",
+                            });
+                          }
+                        } catch {
+                          toast({
+                            title: "加载聊天文件失败",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
                     />
                   ) : (
                     <WorkspaceFileTree
@@ -7064,6 +7263,42 @@ await handlePublishWithScreenshot();
                       showKnowledge={true}
                       onFileSelect={async (filePath, editable) => {
                         try {
+                          if (filePath.startsWith(".ai-attachments/")) {
+                            const attachmentId = filePath.split("/")[1];
+                            const metaRes = await fetch(
+                              `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(attachmentId)}`,
+                            );
+                            const metaData = await metaRes.json();
+                            if (
+                              metaData.success &&
+                              metaData.data.metadata?.mimeType?.startsWith("image/")
+                            ) {
+                              window.open(
+                                `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(attachmentId)}&raw=1`,
+                                "_blank",
+                              );
+                              return;
+                            }
+                            const res = await fetch(
+                              `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(attachmentId)}`,
+                            );
+                            const data = await res.json();
+                            if (data.success) {
+                              setWsCodeDialogData({
+                                filePath: data.data.metadata.name,
+                                content: data.data.text,
+                                editable: false,
+                              });
+                              setWsCodeDialogOpen(true);
+                            } else {
+                              toast({
+                                title: "加载聊天文件失败",
+                                description: data.error?.message,
+                                variant: "destructive",
+                              });
+                            }
+                            return;
+                          }
                           const res = await fetch(
                             `/api/sessions/${sessionId}/workspace/files/${encodeURIComponent(filePath)}`,
                           );
@@ -7674,6 +7909,7 @@ await handlePublishWithScreenshot();
                       visualPropertyChanges,
                       onVisualSelect: handleVisualSelect,
                       onVisualSelectStack: setVisualNodeStack,
+                      onToggleNodeHidden: handleToggleVisualNodeHidden,
                       visualNodeTreeRequestKey: visualLayerTreeRequestKey,
                       onVisualNodeTreeChange: setVisualLayerTreeNodes,
                     },
@@ -7706,6 +7942,9 @@ await handlePublishWithScreenshot();
                           ackRevision,
                           "active-preview",
                         );
+                        pendingSnapshotPageIdRef.current =
+                          activeDemoIdRef.current;
+                        setStaticPrototypeRequestKey((key) => key + 1);
                       },
                       onPositionableSizes: handlePositionableSizes,
                       visualEditMode: visualEditActive,
@@ -7789,6 +8028,7 @@ await handlePublishWithScreenshot();
                   sessionId,
                   projectId: demoId,
                   onRequestDeletePages: requestDeletePages,
+                  onAddPagesToChat: handleAddPagesToChat,
                   onRequestPastePages: handlePastePages,
                   onRequestCreateReferences: handleCreateReferences,
                   onRequestPasteHtmlContent: handlePasteHtmlContent,
@@ -7980,29 +8220,45 @@ await handlePublishWithScreenshot();
                       value="edit"
                       className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
                     >
-                      <VisualPropertyPanel
-                        selectedNode={selectedVisualNode}
-                        sessionId={sessionId}
-                        projectId={demoId}
-                        pageId={activeDemoId}
-                        runtimeType={activeDemoPage?.runtimeType}
-                        propertyChanges={visualPropertyChanges}
-                        configMarks={visualConfigMarks}
-                        aiInstruction={visualAiInstruction}
-                        usedConfigKeys={visualConfigUsedKeys}
-                        onPropertyChange={handleVisualPropertyChange}
-                        onRestoreProperty={handleRestoreVisualProperty}
-                        onClearChanges={handleClearSelectedVisualProperties}
-                        onMarkConfig={handleMarkVisualConfig}
-                        onUpdateConfigMark={handleUpdateVisualConfigMark}
-                        onRemoveConfigMark={handleRemoveVisualConfigMark}
-                        onAiInstructionChange={setVisualAiInstruction}
-                        draftAction={visualDraftAction}
-                        draftActionDisabled={visualSendDisabled}
-                        onDraftActionPrimary={handleSubmitVisualDraftAction}
-                        onDraftActionCancel={handleClearVisualProperties}
-                        onAddToChat={handleAddToChat}
-                      />
+                      <VisualEditSidebar
+                        layerNodes={visualLayerTreeNodes}
+                        selectedNodeId={
+                          selectedVisualNode?.domPath ||
+                          selectedVisualNode?.nodeId ||
+                          null
+                        }
+                        hiddenNodeIds={hiddenVisualNodeIds}
+                        getNodeBadgeCount={getVisualNodeChangeCount}
+                        onSelectLayer={(node, path) => {
+                          handleVisualSelect(node, path);
+                        }}
+                        onToggleNodeHidden={handleToggleVisualNodeHidden}
+                        onHoverLayerNodeId={setVisualPanelHoverNodeId}
+                      >
+                        <VisualPropertyPanel
+                          selectedNode={selectedVisualNode}
+                          sessionId={sessionId}
+                          projectId={demoId}
+                          pageId={activeDemoId}
+                          runtimeType={activeDemoPage?.runtimeType}
+                          propertyChanges={visualPropertyChanges}
+                          configMarks={visualConfigMarks}
+                          aiInstruction={visualAiInstruction}
+                          usedConfigKeys={visualConfigUsedKeys}
+                          onPropertyChange={handleVisualPropertyChange}
+                          onRestoreProperty={handleRestoreVisualProperty}
+                          onClearChanges={handleClearSelectedVisualProperties}
+                          onMarkConfig={handleMarkVisualConfig}
+                          onUpdateConfigMark={handleUpdateVisualConfigMark}
+                          onRemoveConfigMark={handleRemoveVisualConfigMark}
+                          onAiInstructionChange={setVisualAiInstruction}
+                          draftAction={visualDraftAction}
+                          draftActionDisabled={visualSendDisabled}
+                          onDraftActionPrimary={handleSubmitVisualDraftAction}
+                          onDraftActionCancel={handleClearVisualProperties}
+                          onAddToChat={handleAddToChat}
+                        />
+                      </VisualEditSidebar>
                     </TabsContent>
                     <TabsContent
                       value="config"
@@ -8482,19 +8738,30 @@ void handleCreateVersionWithScreenshot(versionNameInput || undefined);
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showExitDialog} onOpenChange={setShowExitDialog}>
+      <Dialog open={showExitDialog} onOpenChange={handleExitDialogOpenChange}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>修改仍在同步</DialogTitle>
-            <DialogDescription>
-              最新修改尚未确认同步完成。网络恢复或同步完成后可安全退出。
+            <DialogTitle>
+              {exitState === "saving" ? "正在保存" : "保存未完成"}
+            </DialogTitle>
+            <DialogDescription className="flex items-center gap-2">
+              {exitState === "saving" ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  正在保存最新修改，完成后将自动返回首页。
+                </>
+              ) : (
+                exitErrorLabel ?? "最新修改尚未确认同步完成。"
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={handleDirectExit}>
-              仍然退出
+              {exitState === "saving" ? "直接退出" : "仍然退出"}
             </Button>
-            <Button onClick={handleStayOnPage}>继续编辑</Button>
+            <Button onClick={handleStayOnPage}>
+              {exitState === "saving" ? "关闭" : "继续编辑"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

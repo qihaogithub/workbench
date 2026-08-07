@@ -15,7 +15,43 @@ import {
   isHiddenEntry,
   isVisiblePageRuntimeFile,
 } from "@/lib/workspace-file-utils";
+import { getWorkspaceMeta } from "@/lib/workspace-meta";
+import { DATA_DIR } from "@/lib/paths";
 import type { WorkspaceFileNode } from "@/lib/workspace-file-utils";
+
+const ATTACHMENTS_DIR_NAME = ".ai-attachments";
+
+function listProjectAttachments(projectId: string): WorkspaceFileNode[] {
+  const attachmentsDir = path.join(DATA_DIR, "projects", projectId, ATTACHMENTS_DIR_NAME);
+  if (!fs.existsSync(attachmentsDir)) return [];
+
+  const entries = fs.readdirSync(attachmentsDir, { withFileTypes: true });
+  const children: WorkspaceFileNode[] = [];
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const manifestPath = path.join(attachmentsDir, entry.name, "manifest.json");
+    if (!fs.existsSync(manifestPath)) continue;
+    try {
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8")) as {
+        name: string;
+        size: number;
+        mimeType: string;
+      };
+      children.push({
+        path: `${ATTACHMENTS_DIR_NAME}/${entry.name}`,
+        type: "file",
+        name: manifest.name || entry.name,
+        size: manifest.size,
+      });
+    } catch {
+      continue;
+    }
+  }
+
+  children.sort((a, b) => a.name.localeCompare(b.name));
+  return children;
+}
 
 /**
  * GET /api/sessions/{sessionId}/workspace/files?path={relativePath}
@@ -83,12 +119,38 @@ export async function GET(
       );
     }
 
-    // 解析请求的子路径
     const { searchParams } = new URL(request.url);
     const relativePath = searchParams.get("path") || "";
     const showKnowledge = searchParams.get("showKnowledge") === "true";
 
-    // 安全校验：防止路径遍历
+    const wsMeta = getWorkspaceMeta(meta.workspaceId);
+    const projectId = wsMeta?.projectId;
+
+    if (relativePath.startsWith(ATTACHMENTS_DIR_NAME)) {
+      if (!projectId) {
+        return NextResponse.json(
+          createApiError("FILE_READ_ERROR", "项目 ID 缺失，无法读取聊天附件"),
+          { status: 400 },
+        );
+      }
+
+      if (relativePath === ATTACHMENTS_DIR_NAME) {
+        const children = listProjectAttachments(projectId);
+        const result: WorkspaceFileNode = {
+          path: ATTACHMENTS_DIR_NAME,
+          type: "directory",
+          name: "聊天文件",
+          children,
+        };
+        return NextResponse.json(createApiSuccess(result));
+      }
+
+      return NextResponse.json(
+        createApiError("FILE_READ_ERROR", "聊天附件不支持子目录浏览"),
+        { status: 400 },
+      );
+    }
+
     const resolvedPath = path.resolve(wsPath, relativePath);
     if (!resolvedPath.startsWith(wsPath)) {
       return NextResponse.json(
@@ -113,7 +175,6 @@ export async function GET(
       );
     }
 
-    // 读取目录内容（仅一层）
     const entries = fs.readdirSync(resolvedPath, { withFileTypes: true });
     const children: WorkspaceFileNode[] = [];
     const pageDirectoryMatch = relativePath.match(/^demos\/([^/]+)$/);
@@ -159,7 +220,18 @@ export async function GET(
       }
     }
 
-    // 排序：目录在前，文件在后；同类按字母序
+    if (projectId && (relativePath === "" || relativePath === "/")) {
+      const attachmentChildren = listProjectAttachments(projectId);
+      if (attachmentChildren.length > 0) {
+        children.push({
+          path: ATTACHMENTS_DIR_NAME,
+          type: "directory",
+          name: "聊天文件",
+          children: attachmentChildren,
+        });
+      }
+    }
+
     children.sort((a, b) => {
       if (a.type !== b.type) return a.type === "directory" ? -1 : 1;
       return a.name.localeCompare(b.name);
