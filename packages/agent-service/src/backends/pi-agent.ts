@@ -1163,6 +1163,9 @@ Keep the final response concise: summarize what you changed, what you verified, 
     if (config.permissions !== undefined) {
       this.config.permissions = config.permissions;
     }
+    if (config.referencedProjects !== undefined) {
+      this.config.referencedProjects = config.referencedProjects;
+    }
   }
 
   setPromptTimeout(seconds: number): void {
@@ -1224,9 +1227,30 @@ Keep the final response concise: summarize what you changed, what you verified, 
       context.resources?.skills || [],
       toolNames,
     );
-    return [basePrompt, runtimeTools, preinstalledSkills]
+    const referenceGuidance = this.buildReferenceGuidance();
+    return [basePrompt, referenceGuidance, runtimeTools, preinstalledSkills]
       .filter(Boolean)
       .join("\n\n");
+  }
+
+  /**
+   * P0：引用自动注入指引。当用户引用了跨项目时，提示主 AI 通过
+   * knowledgeReport 发现内容、readKnowledgeSource 读取原文，避免误用 readFile。
+   */
+  private buildReferenceGuidance(): string {
+    const referenced = this.config.referencedProjects ?? [];
+    if (referenced.length === 0) return "";
+    const labels = referenced
+      .map((r) => `${r.label || r.projectId}（${r.projectId}）`)
+      .join("、");
+    return [
+      "## 引用项目读取指引",
+      `用户在本轮引用了项目：${labels}。`,
+      "这些项目的内容已作为可读知识通过 `knowledgeReport` 提供。如果需要读取被引用项目的页面/配置/知识原文：",
+      "1. 先调用 `knowledgeReport` 检索被引用项目内容，报告会返回对应条目的 `sourceRef`。",
+      "2. 再用 `readKnowledgeSource` 传入该 `sourceRef` 读取原文。",
+      "**不要用 `readFile` 读取工作区外的路径（会被权限模型拒绝）。**",
+    ].join("\n");
   }
 
   async updateSystemPrompt(newPrompt: string): Promise<void> {

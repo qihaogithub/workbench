@@ -77,7 +77,7 @@ function renderStage(
 }
 
 describe("PreviewStage", () => {
-  it("渲染规范化后的单页并发出受控切换请求", () => {
+  it("渲染规范化后的单页并支持页面选择", () => {
     const { onActivePageChange, onPreviewModeChange } = renderStage();
 
     expect(screen.getByTestId("single-preview")).toHaveTextContent(
@@ -87,10 +87,7 @@ describe("PreviewStage", () => {
       target: { value: "page-a" },
     });
     expect(onActivePageChange).toHaveBeenCalledWith("page-a");
-
-    fireEvent.click(screen.getByRole("button", { name: "画布" }));
-    expect(onPreviewModeChange).toHaveBeenCalledWith("canvas");
-    expect(screen.getByTestId("single-preview")).toBeInTheDocument();
+    expect(onPreviewModeChange).not.toHaveBeenCalled();
   });
 
   it.each(["readonly", "viewer", "editor"] as const)(

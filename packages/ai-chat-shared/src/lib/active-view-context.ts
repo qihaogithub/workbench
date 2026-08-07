@@ -1,5 +1,5 @@
 export interface ActiveViewContext {
-  previewMode?: "single" | "canvas";
+  previewMode?: "single" | "canvas" | "document";
   activePageId?: string;
   activePageName?: string;
   focusedPageId?: string;

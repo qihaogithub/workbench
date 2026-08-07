@@ -142,6 +142,8 @@ export {
 export type { PagePreviewRendererKind } from "./preview-stage-resolver";
 export { PreviewStageToolbar } from "./PreviewStageToolbar";
 export type { PreviewStageToolbarProps } from "./PreviewStageToolbar";
+export { PreviewModeSwitcher } from "./PreviewModeSwitcher";
+export type { PreviewModeSwitcherProps } from "./PreviewModeSwitcher";
 export { PreviewStage } from "./PreviewStage";
 export {
   INITIAL_PREVIEW_REQUEST_STATE,

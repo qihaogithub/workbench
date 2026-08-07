@@ -397,6 +397,7 @@ export class AgentStream {
         workingDir: options?.workingDir,
         projectId: options?.projectId,
         demoId: options?.demoId,
+        referencedProjects: options?.referencedProjects,
         model: options?.model,
         images: options?.images,
         files: options?.files,

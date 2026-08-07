@@ -194,7 +194,7 @@ export interface ConfigFormProps {
   onTogglePositionDimming?: () => void;
 }
 
-export type PreviewMode = "single" | "canvas";
+export type PreviewMode = "single" | "canvas" | "document";
 
 /** 画布工具模式：hand=拖动工具（仅平移画布），select=选择工具（可移动/缩放页面） */
 export type CanvasToolMode = "hand" | "select" | "text" | "image";

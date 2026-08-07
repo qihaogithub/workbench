@@ -73,6 +73,8 @@ interface ClientMessage {
   workingDir?: string;
   projectId?: string;
   demoId?: string;
+  /** 当前消息引用的跨项目（引用项目） */
+  referencedProjects?: Array<{ projectId: string; label?: string }>;
   /** 行为模式：viewer-readonly 时服务端强制只读工具集与系统提示词 */
   mode?: string;
   /** viewer-readonly 模式下的浏览端上下文 */
@@ -321,6 +323,7 @@ export async function registerWebSocketRoutes(
                 workingDir: message.workingDir,
                 projectId: message.projectId,
                 demoId: message.demoId,
+                referencedProjects: message.referencedProjects,
                 model: requestedModelId || currentModelId || DEFAULT_MODEL_ID,
                 toolVersion: getWorkbenchToolCapabilities().toolVersion,
                 backendProviders: getSessionModelConfigs().get(sessionId),
@@ -661,6 +664,7 @@ export async function registerWebSocketRoutes(
                 workingDir: message.workingDir,
                 projectId: message.projectId,
                 demoId: message.demoId,
+                referencedProjects: message.referencedProjects,
                 model: currentModelId || DEFAULT_MODEL_ID,
                 toolVersion: getWorkbenchToolCapabilities().toolVersion,
                 backendProviders: getSessionModelConfigs().get(resumeSessionId),

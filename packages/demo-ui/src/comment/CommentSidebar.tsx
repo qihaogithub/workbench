@@ -20,6 +20,8 @@ export interface CommentSidebarProps {
   onSelectThread: (threadId: string) => void;
   /** 关闭回调；不传则不显示关闭按钮（如嵌入右侧栏 tab 时） */
   onClose?: () => void;
+  /** 是否显示顶部标题栏（标题 + 未解决数量）；嵌入已有标题的容器时可隐藏 */
+  showHeader?: boolean;
   className?: string;
 }
 
@@ -35,6 +37,7 @@ export function CommentSidebar({
   activeThreadId,
   onSelectThread,
   onClose,
+  showHeader = true,
   className,
 }: CommentSidebarProps) {
   const [filter, setFilter] = useState<CommentFilter>("all");
@@ -52,25 +55,27 @@ export function CommentSidebar({
 
   return (
     <div className={cn("flex h-full flex-col bg-background", className)}>
-      <div className="flex items-center justify-between border-b border-border px-3 py-2">
-        <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-          <MessageSquare className="h-3.5 w-3.5" />
-          评论
-          <span className="rounded-full bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
-            {threads.filter((t) => !t.resolved).length}
+      {showHeader && (
+        <div className="flex items-center justify-between border-b border-border px-3 py-2">
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+            <MessageSquare className="h-3.5 w-3.5" />
+            评论
+            <span className="rounded-full bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
+              {threads.filter((t) => !t.resolved).length}
+            </span>
           </span>
-        </span>
-        {onClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            title="关闭评论列表"
-            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        )}
-      </div>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              title="关闭评论列表"
+              className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* 筛选 */}
       <div className="flex gap-1 border-b border-border px-3 py-2">

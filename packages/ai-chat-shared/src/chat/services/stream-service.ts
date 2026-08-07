@@ -232,6 +232,7 @@ export class StreamService {
     projectId?: string,
     files?: FileAttachment[],
     viewerContext?: ViewerContext,
+    referencedProjects?: Array<{ projectId: string; label?: string }>,
   ): Promise<void> {
     if (!this.stream) {
       throw new Error("Stream not connected");
@@ -245,6 +246,7 @@ export class StreamService {
         stream: true,
         projectId,
         demoId,
+        referencedProjects,
         model: modelId,
         images,
         viewerContext,
@@ -320,6 +322,7 @@ export class StreamService {
       workingDir,
       projectId,
       demoId,
+      referencedProjects,
       model: modelId,
       images,
       files,

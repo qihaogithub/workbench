@@ -17,6 +17,13 @@ import type {
 
 import type { AgentConfig } from "../../core/types";
 import { getSystemKnowledgeSnapshot } from "../../config/system-knowledge";
+import {
+  type ReferencedProjectRef,
+  buildReferenceSourceRef,
+  referenceEntriesToKnowledgeItems,
+  resolveDataDir,
+  resolveReferencedProject,
+} from "./reference-resolver";
 
 const KnowledgeReportParams = Type.Object({
   question: Type.String({ description: "Question or task that needs a knowledge report" }),
@@ -63,9 +70,16 @@ export function createKnowledgeReportTool(
 
       const context = createAccessContext(config, mode);
       const projectId = config.projectId ?? config.demoId ?? "current-project";
+      const referencedItems = resolveReferencedKnowledgeItems(
+        (config.referencedProjects ?? []).map((r) => ({
+          projectId: r.projectId,
+          label: r.label,
+        })),
+      );
       const backend = new BasicRetrievalBackend([
         ...systemKnowledgeItems(),
         ...workspaceKnowledgeItems(workingDir, projectId),
+        ...referencedItems,
       ]);
       const report = backend.report({
         question: args.question,
@@ -76,6 +90,13 @@ export function createKnowledgeReportTool(
         mode === "workbench"
           ? await searchTemplateLibrary(args.question, projectId)
           : [];
+      const referencedEntries = referencedItems.map((item) => ({
+        path: buildReferenceSourceRef(item.sourceId, item.readPath),
+        sourceType: "linked-template",
+        trustLevel: item.trustLevel,
+        projectId: item.sourceId,
+        readPath: item.readPath,
+      }));
 
       return {
         content: [
@@ -84,6 +105,7 @@ export function createKnowledgeReportTool(
             text: [
               formatReport(report),
               formatTemplateReferences(templateHits),
+              formatReferencedReferences(referencedItems),
             ].join("\n\n"),
           },
         ],
@@ -99,12 +121,23 @@ export function createKnowledgeReportTool(
               revision: hit.revision,
               rootHash: hit.rootHash,
             })),
+            ...referencedEntries,
           ],
           missing: report.sections.missing,
         },
       };
     },
   };
+}
+
+function resolveReferencedKnowledgeItems(
+  referenced: ReferencedProjectRef[],
+): ReturnType<typeof referenceEntriesToKnowledgeItems> {
+  if (referenced.length === 0) return [];
+  const dataDir = resolveDataDir();
+  return referenced.flatMap((ref) =>
+    referenceEntriesToKnowledgeItems(resolveReferencedProject(dataDir, ref)),
+  );
 }
 
 function createAccessContext(
@@ -251,6 +284,24 @@ function formatReport(report: ReturnType<BasicRetrievalBackend["report"]>): stri
       ? report.sections.risks.map((item) => `- ${item}`)
       : ["- 无"]),
   ];
+  return lines.join("\n");
+}
+
+export function formatReferencedReferences(
+  items: ReturnType<typeof referenceEntriesToKnowledgeItems>,
+): string {
+  if (items.length === 0) return "";
+  const lines = [
+    "## 引用项目读取指引",
+    "用户引用了跨项目内容，已通过 knowledgeReport 注入为可读知识。读取原文请使用 readKnowledgeSource 工具，并传入对应 sourceRef。",
+    "不要尝试用 readFile 读取工作区外的路径（会被权限模型拒绝）。",
+  ];
+  for (const item of items) {
+    lines.push(
+      `- ${item.title}（${item.sourceType} / ${item.trustLevel}）：${item.summary}`,
+      `  sourceRef：${buildReferenceSourceRef(item.sourceId, item.readPath)}`,
+    );
+  }
   return lines.join("\n");
 }
 

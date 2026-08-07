@@ -105,7 +105,7 @@ export function createWorkbenchTools(
     createListImagesTool(config),
     createReadUserImageTool(),
     createKnowledgeReportTool(config),
-    createReadKnowledgeSourceTool(),
+    createReadKnowledgeSourceTool(config),
     createReadPreinstalledSkillTool(),
     createArrangeCanvasPagesTool(config),
     ...(SKETCH_SCENE_TOOLS_ENABLED

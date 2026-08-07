@@ -5,7 +5,7 @@ export type SketchEditorEngine = "native";
 export type ResolveSketchEditorEngineInput = {
   enginePreference?: SketchEditorEnginePreference;
   userEnginePreference?: SketchEditorEnginePreference;
-  previewMode: "single" | "canvas";
+  previewMode: "single" | "canvas" | "document";
   runtimeType?: string;
   sketchEditing: boolean;
   viewingDocument: boolean;

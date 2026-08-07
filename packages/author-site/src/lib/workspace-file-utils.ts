@@ -48,7 +48,7 @@ const HIDDEN_ENTRIES = new Set([
   ".folders.json",
 ]);
 
-/** 在文档视图模式下额外隐藏的目录（由 KnowledgePanel 管理） */
+/** 在文档视图（showKnowledge=false）下额外隐藏的目录，由文档视图中间栏目录接管 */
 const DOC_VIEW_HIDDEN_ENTRIES = new Set([
   "knowledge",
 ]);
@@ -56,7 +56,7 @@ const DOC_VIEW_HIDDEN_ENTRIES = new Set([
 /**
  * 判断文件/目录是否应在文件树中隐藏
  * @param name 文件/目录名
- * @param showKnowledge 是否显示 knowledge 目录（代码视图模式下为 true）
+ * @param showKnowledge 是否显示 knowledge 目录（「代码」tab 展示 AGENT 实际工作目录，为 true）
  */
 export function isHiddenEntry(name: string, showKnowledge = false): boolean {
   if (HIDDEN_ENTRIES.has(name)) return true;

@@ -2,8 +2,10 @@
 covers:
   - packages/agent-service/src/backends/pi-tools/knowledge-report-tool.ts
   - packages/agent-service/src/backends/pi-tools/read-knowledge-source-tool.ts
+  - packages/agent-service/src/backends/pi-tools/reference-resolver.ts
   - packages/agent-service/src/backends/pi-tools/index.ts
   - packages/agent-service/tests/unit/knowledge-report-tool.test.ts
+  - packages/agent-service/tests/unit/reference-resolver.test.ts
   - packages/knowledge-service/src/client.ts
 ---
 
@@ -51,10 +53,24 @@ covers:
 
 工具不接受项目路径参数，也不允许 Agent 直接读取其他项目工作空间，从而把跨项目访问控制留在知识服务边界内。引用失效或服务不可用时必须返回明确错误，不能回退为任意文件读取。
 
+## 五·A、引用项目（跨项目读取）
+
+创作端 AI 对话通过「引用项目」把模板或普通项目作为上下文（如"把这个项目两个页面复制过来"）。实现遵循原则：
+
+- **知识库仍只含模板项目**：普通项目引用绝不写入持久 catalog，只在会话内按需读取。
+- **统一读取入口**：`readKnowledgeSource` 是唯一工具，按 `sourceRef` 前缀分发：
+  - `knowledge://...` → 走 knowledge-service catalog（模板，既有路径）。
+  - `ref://project/{projectId}/{相对路径}` → 受控 per-file 读取被引用项目工作区文件。
+- **发现层**：`knowledgeReport` 在系统规则 + 当前项目之外，注入被引用项目的阅读地图条目（`sourceType = linked-template`，`trustLevel = default-reference`，`visibility = project-agent`），并在报告中给出「引用项目读取指引」与每个条目的 `sourceRef`。
+- **受控读取**：`reference-resolver.ts` 的 `readReferencedProjectFile` 仅允许读取 `data/projects/{projectId}/workspace` 内文件，杜绝路径穿越；未授权项目（不在当前会话 `referencedProjects` 集合内）返回明确错误。
+- **前端透传**：创作端把消息 `inlineRefs` 中的 project 类型 tag 解析为 `referencedProjects`（`{projectId, label}`），经 WS 传给 agent-service，写入 `AgentConfig.referencedProjects`。
+
+使用端只读模式不接入引用项目读取。
+
 ## 六、故障降级
 
 独立服务不可用时，`knowledgeReport` 仍返回系统规则和当前项目知识报告，只省略其他模板项目参考。模板检索故障不能中断当前项目的 AI 编辑流程。
 
 ## 七、工具能力版本
 
-Agent Service 的工具能力由 `createWorkbenchTools()` 统一注册。当前工作台工具版本为 23；工作台模式同时注册 `knowledgeReport` 和 `readKnowledgeSource`，viewer 只读模式不注册跨模板原文读取工具。
+Agent Service 的工具能力由 `createWorkbenchTools()` 统一注册。当前工作台工具版本为 26；工作台模式同时注册 `knowledgeReport` 和 `readKnowledgeSource`，viewer 只读模式不注册跨模板原文读取工具。

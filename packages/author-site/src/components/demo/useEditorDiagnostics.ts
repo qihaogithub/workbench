@@ -19,7 +19,7 @@ interface UseEditorDiagnosticsOptions {
   sessionId?: string;
   workspaceId?: string;
   activePageId?: string;
-  previewMode?: "single" | "canvas";
+  previewMode?: "single" | "canvas" | "document";
   getSnapshot?: () => Record<string, unknown>;
 }
 

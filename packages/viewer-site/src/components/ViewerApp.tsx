@@ -61,6 +61,7 @@ import {
   extractPrototypeConfigBindingKeys,
   PageConfigPanel,
   PreviewStage,
+  PreviewModeSwitcher,
   CommentLayer,
   CommentPanel,
   useComments,
@@ -1319,6 +1320,8 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
         isLoggedIn={isLoggedIn}
         onLoginClick={() => setLoginDialogOpen(true)}
         onLogoutClick={handleLogout}
+        previewMode={previewMode}
+        onPreviewModeChange={setPreviewMode}
       />
       <ErrorBoundary>
         <div className="flex-1 flex min-h-0 overflow-hidden">
@@ -1761,12 +1764,16 @@ function Header({
   isLoggedIn,
   onLoginClick,
   onLogoutClick,
+  previewMode,
+  onPreviewModeChange,
 }: {
   name: string;
   onBack: () => void;
   isLoggedIn?: boolean;
   onLoginClick?: () => void;
   onLogoutClick?: () => void;
+  previewMode?: PreviewMode;
+  onPreviewModeChange?: (mode: PreviewMode) => void;
 }) {
   return (
     <header className="flex items-center h-12 px-4 border-b border-border shrink-0 gap-3">
@@ -1779,6 +1786,13 @@ function Header({
       </button>
       {name && <h1 className="text-sm font-semibold">{name}</h1>}
       <div className="flex-1" />
+      {previewMode !== undefined && onPreviewModeChange !== undefined && (
+        <PreviewModeSwitcher
+          mode={previewMode}
+          onModeChange={onPreviewModeChange}
+          modes={["single", "canvas"]}
+        />
+      )}
       {onLoginClick !== undefined && (
         isLoggedIn ? (
           <Tooltip>

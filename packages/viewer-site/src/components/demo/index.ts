@@ -42,6 +42,7 @@ export {
   PreviewCanvas,
   PreviewStage,
   PreviewStageToolbar,
+  PreviewModeSwitcher,
   SinglePagePreview,
   PrototypePagePreview,
   IframePreviewFrame,
