@@ -4661,9 +4661,13 @@ ${context.details}
 
       toast({ title: "正在从剪贴板创建页面…" });
       try {
+        const pageName =
+          parsed.kind === "prototype"
+            ? parsed.title?.trim() || "从剪贴板导入的页面"
+            : "从剪贴板导入的页面";
         const page = await projectApiClient.createDemoPage(
           demoId,
-          "从剪贴板导入的页面",
+          pageName,
           sessionId,
           undefined,
           parsed.kind === "prototype" ? "prototype-html-css" : undefined,

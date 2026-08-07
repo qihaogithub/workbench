@@ -33,6 +33,7 @@ export type ParsedFigmaImportContent =
       prototypeHtml: string;
       prototypeCss: string;
       prototypeMeta?: { width: number; height: number; generatedBy: string };
+      title?: string;
       success: true;
     }
   | {
@@ -61,6 +62,17 @@ function parsePositivePixels(value: string | undefined): number | undefined {
   if (!value) return undefined;
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+/**
+ * 提取 HTML 文档 <title> 标签的实际标题，用于作为导入页面的默认名称。
+ * 无 <title> 或内容为空时返回 undefined，由调用方回退到默认名称。
+ */
+export function extractHtmlTitle(html: string): string | undefined {
+  const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  if (!match) return undefined;
+  const title = match[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/, "$1").trim();
+  return title || undefined;
 }
 
 /**
@@ -311,6 +323,7 @@ export function parseFigmaImportContent(text: string): ParsedFigmaImportContent 
       prototypeHtml: trimmedText,
       prototypeCss: "",
       prototypeMeta: extractFigmaPrototypeMeta(trimmedText),
+      title: extractHtmlTitle(trimmedText),
       success: true,
     };
   }
