@@ -304,6 +304,8 @@ IMAGE_DESCRIPTION_MODEL=jojo/gpt-4o
 - 若可，优先实现简化方案（前置并行生成 → 主 Agent 直接引用真实 imageId），跳过 Phase 3/4 的延迟 URL 复杂度。
 - 若确需动态补图，再按本方案 Phase 3/4 推进。
 
+> **决策结论（2026-08-08）**：确认采用**前置批量生成（简化）**。绝大多数建页面场景中图片素材清单可在设计前由主 Agent 规划齐全，主 Agent 通过 `delegateTask`（`subagentType: "image"` + `model: "vision"`）委派图片子 Agent 前置批量生成/抠图，子 Agent 返回真实 imageId，主 Agent 直接引用。暂不实现 Phase 3 的 DrawingManager 异步生命周期与 Phase 4 的延迟 URL / 预览自动轮询 / 发布 finalize。若后续出现"边设计边动态补图"需求，再按文档 Phase 3/4 推进。
+
 ### Phase 1：`generateImage` 工具 + 图床落库
 
 - 新增 `generate-image-tool.ts`，调 `IMAGE_GEN_*` API，存到全局图床
@@ -311,12 +313,16 @@ IMAGE_DESCRIPTION_MODEL=jojo/gpt-4o
 - 新增依赖：无（直接 fetch 调 API）
 - 测试：mock API 调用 + 图床写入
 
+> **状态（2026-08-08）**：✅ 已实现。`generate-image-tool.ts` 支持 b64_json/url 双来源、会话配额（`IMAGE_GEN_MAX_PER_SESSION`）、重试（含 `IMAGE_GEN_MAX_RETRIES`）、尺寸选择、多变体，写入全局图床并注册项目图片清单。配置在**管理后台「绘图配置」**（`/admin/models?tab=image-gen`）维护，保存后经 `PUT /internal/image-gen` 推送到 agent-service 运行时单例（`src/services/image-gen-config.ts`），环境变量仅作默认值。测试 `tests/unit/generate-image-tool.test.ts`、`tests/unit/image-gen-config.test.ts`。
+
 ### Phase 2：`extractImageElement` 工具
 
 - 新增 `extract-image-element-tool.ts` + `image-segmenter.ts`
 - 新增依赖：`sharp`、`@xenova/transformers`
 - 先确认本包 esbuild/Docker 已支持 `sharp`/`onnxruntime-node` 原生模块；否则评估独立轻服务路径
 - 测试：mock CLIPSeg + sharp，覆盖正常/未找到/softEdge/invert
+
+> **状态（2026-08-08）**：✅ 已实现。`image-segmenter.ts` 用 CLIPSeg（`Xenova/clipseg-rd64-refined`）懒加载单例做零样本语义分割，输出原图尺寸 8-bit mask；`extract-image-element-tool.ts` 用 sharp 做 softEdge 羽化 / invert 反选 / RGB+mask 合成透明 PNG，落全局图床并注册清单。esbuild build 已加 `--external:sharp --external:@xenova/transformers`，Dockerfile runtime 阶段已安装两者。测试 `tests/unit/extract-image-element-tool.test.ts`。
 
 ### Phase 3：DrawingManager + 异步子 Agent
 
@@ -327,12 +333,16 @@ IMAGE_DESCRIPTION_MODEL=jojo/gpt-4o
 - PermissionManager 收紧子 Agent `writeFile` 作用域到 `data/image-agent-results/`
 - 测试：子 Agent 自主循环、重试逻辑、配额、生命周期独立于主会话
 
+> **状态（2026-08-08）**：⏸ 暂缓。前置批量生成方案下主 Agent 通过现有 `delegateTask`（`subagentType: "image"`）同步委派图片子 Agent，采用 `runSubagent` 现有生命周期，无需 DrawingManager 独立存活。图片子 Agent 工具集已通过 `createWorkbenchTools({ imageSubagent: true })` 定向注册（仅 generateImage/extractImageElement/saveImage/listImages/readUserImage/readFile/writeFile），并使用 vision 模型 + 专属 system prompt 自我评判。**可见性门控**：`delegateTask` 的 `subagentType: "image"` 参数/描述仅在绘图配置启用时对主 Agent 暴露，未启用时主 Agent 不知道图片子 Agent 存在，模型强行传入也会被工具层拒绝。若后续改为异步延迟 URL，再回到本阶段。
+
 ### Phase 4：延迟 URL + 自动显示 + finalize
 
 - author-site 路由 `/api/images/gen/{taskId}/{artboardName}`（读共享结果清单，响应 `Cache-Control: no-store`）
 - 预览运行时注入轮询脚本
 - **publish 前 finalize**：页面临时 URL 重写为真实 imageId，未完成则拒绝发布
 - 端到端验证：主 Agent 发任务 → 子 Agent 生成 → 页面自动显示 → 发布重写
+
+> **状态（2026-08-08）**：⏸ 暂缓（随 Phase 3 简化方案一并推迟）。
 
 ## 风险与边界
 

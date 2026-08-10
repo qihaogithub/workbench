@@ -63,6 +63,8 @@ export function PreviewStageToolbar({
           )
         : null;
 
+  if (!selector && !center && !trailing) return null;
+
   return (
     <div
       className={cn(

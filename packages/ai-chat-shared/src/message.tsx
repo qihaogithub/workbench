@@ -17,6 +17,8 @@ import {
 import { useState, useRef, useEffect } from "react";
 import { ChatCard, ChatCardDetailDialog } from "./chat-card";
 import { Streamdown } from "streamdown";
+import { code } from "@streamdown/code";
+import { cjk } from "@streamdown/cjk";
 import { AssistantMessage } from "./assistant-message";
 import {
   Dialog,
@@ -499,7 +501,10 @@ export function Message({
               data-testid="user-message-markdown"
               className="min-w-0 max-w-none break-words [&_*]:break-words [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto"
             >
-              <Streamdown controls={{ table: false, code: true }}>
+              <Streamdown
+                plugins={{ code, cjk }}
+                controls={{ table: false, code: true }}
+              >
                 {message.content}
               </Streamdown>
             </div>

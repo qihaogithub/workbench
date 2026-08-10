@@ -1,5 +1,5 @@
 import type { SketchSceneDocument } from "@workbench/sketch-core";
-import type { DemoFolderMeta, DemoPageMeta, DemoPageRuntimeType } from "@workbench/shared";
+import type { DemoFolderMeta, DemoPageMeta, DemoPageRuntimeType, KnowledgeIndexItem } from "@workbench/shared";
 import type { CanvasState } from "@workbench/demo-ui";
 
 export type PublishedPageRuntimeType =
@@ -50,6 +50,7 @@ export interface PublishedProject {
   projectConfigSchema?: string;
   projectConfigValues?: Record<string, unknown>;
   canvasState?: CanvasState;
+  knowledge?: KnowledgeIndexItem[];
 }
 
 export interface ProjectsIndex {
@@ -86,6 +87,14 @@ async function fetchJson<T>(path: string): Promise<T> {
   return res.json();
 }
 
+async function fetchText(path: string): Promise<string> {
+  const res = await fetch(`${DATA_BASE}${path}`, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`文档加载失败: ${res.status} ${res.statusText}`);
+  }
+  return res.text();
+}
+
 export async function getProjects(): Promise<ProjectsIndex> {
   return fetchJson<ProjectsIndex>("/data/projects.json");
 }
@@ -103,6 +112,16 @@ export async function getDemoSchema(
   return fetchJson<Record<string, unknown>>(
     `/data/${projectId}/${schemaPath}`,
   );
+}
+
+export async function getKnowledgeDocContent(
+  projectId: string,
+  fileName: string,
+): Promise<string> {
+  const content = await fetchText(
+    `/data/${projectId}/knowledge/${encodeURIComponent(fileName)}`,
+  );
+  return content;
 }
 
 export function getDataUrl(path: string): string {

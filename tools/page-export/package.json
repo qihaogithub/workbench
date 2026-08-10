@@ -1,0 +1,16 @@
+{
+  "name": "@workbench/page-export",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "page-export": "./bin/export.mjs"
+  },
+  "scripts": {
+    "export": "node bin/export.mjs",
+    "normalize": "node bin/normalize.mjs"
+  },
+  "dependencies": {
+    "single-file-cli": "2.0.83"
+  }
+}

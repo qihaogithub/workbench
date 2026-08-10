@@ -63,3 +63,13 @@ Pi Agent 子 Agent 是主 Agent 的内部委派能力。它不新增 HTTP 或 We
 - 其他 http(s) URL → 直接 fetch，加 `AbortSignal` 超时。
 
 **设计不变式**：模型上下文里出现的图片/截图 URL 一律使用相对路径（`/api/images/...`、`/api/screenshots/file/...`），由浏览器按用户实际访问的源解析。绝对 URL 只用于服务端内部取数，绝不暴露给模型和用户。
+
+## 六、图片子 Agent
+
+`delegateTask` 支持 `subagentType: "image"` 启动定向图片子 Agent。它与通用子 Agent 的差异：
+
+- 工具集只包含图像相关工具（`generateImage`、`extractImageElement`、`saveImage`、`listImages`、`readUserImage`、`readFile`、`writeFile`），不含页面编辑、删除等主 Agent 工具。
+- 强制使用识图模型（`IMAGE_DESCRIPTION_MODEL`），使子 Agent 能回看自己生成的图并自我评判质量。
+- 使用专门的图片子 Agent system prompt，引导“生成 → 回看 → 不满意重试 → 满意继续”的自主循环。
+
+图片子 Agent 用于“前置批量生成”场景：主 Agent 在设计前规划图片清单，一次性委派子 Agent 批量生成/抠图，直接消费返回的真实 imageId，不做异步延迟 URL。详见 [图片生成与抠图工具](../../docs/项目文档/创作端/05-AI对话/技术/10_图片生成与抠图工具.md)。

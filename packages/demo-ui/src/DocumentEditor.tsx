@@ -184,10 +184,6 @@ function looksLikeMarkdown(text: string): boolean {
   );
 }
 
-function htmlToPlainText(html: string): string {
-  return html.replace(/<[^>]*>/g, "").trim();
-}
-
 function escapeMarkdownTableCell(value: string): string {
   const escaped = value
     .replace(/\\/g, "\\\\")
@@ -485,13 +481,11 @@ export function DocumentEditor({
 
   const previewHtml =
     format === "html" ? (htmlSanitizer ? htmlSanitizer(value) : value) : "";
-  const charCount =
-    format === "html" ? htmlToPlainText(previewHtml).length : value.length;
 
   return (
     <div
       className={cn(
-        "border rounded-md overflow-hidden flex flex-col h-full",
+        "flex flex-col h-full",
         className,
       )}
     >
@@ -708,10 +702,6 @@ export function DocumentEditor({
         />
       )}
 
-      <div className="px-3 py-1 border-t bg-muted/20 text-xs text-muted-foreground">
-        {format === "markdown" ? "Markdown" : "HTML"} · {charCount} 字符
-        {uploading && <span className="ml-2 text-primary">上传中...</span>}
-      </div>
     </div>
   );
 }
