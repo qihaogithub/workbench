@@ -235,12 +235,28 @@ export async function createReply(
 
   thread.replies.push(reply);
   thread.updatedAt = Date.now();
+
+  // 回复 @AI → 重新入队该线程（pending），与建评论时 @AI 行为一致
+  const hasAgentMention = input.mentions?.some((m) => m.type === "agent");
+  if (hasAgentMention) {
+    thread.aiTaskStatus = "pending";
+  }
+
   writeCommentStore(input.projectId, data);
   await notifyWsEvent(input.projectId, {
     type: "comment:replied",
     threadId: thread.id,
     reply,
   });
+
+  if (hasAgentMention) {
+    await notifyWsEvent(input.projectId, {
+      type: "comment:ai-status",
+      threadId: thread.id,
+      aiTaskStatus: "pending",
+    });
+    await enqueueAiTask(input.projectId, thread.id);
+  }
 
   return { thread, reply };
 }

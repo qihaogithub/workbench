@@ -30,6 +30,10 @@ src/
 │   │   ├── bash-tool.ts    # Shell 白名单（11 个只读命令）
 │   │   ├── schema-tool.ts  # config.schema.json 校验
 │   │   ├── save-image-tool.ts # 图片保存工具（图床 + SHA256 去重）
+│   │   ├── generate-image-tool.ts # 文生图工具（IMAGE_GEN_* API，仅图片子 Agent）
+│   │   ├── extract-image-element-tool.ts # 语义抠图工具（CLIPSeg + sharp，仅图片子 Agent）
+│   │   ├── image-segmenter.ts # CLIPSeg 懒加载单例（零样本文本-图像分割）
+│   │   ├── image-store-register.ts # 图片注册到项目 manifest 的共享 helper
 │   │   ├── console-tool.ts # 页面控制台日志获取工具
 │   │   ├── list-images-tool.ts # 项目图片清单查询
 │   │   ├── screenshot-tool.ts # 页面截图捕获工具
@@ -93,6 +97,8 @@ tests/
 | `saveImage` | 保存图片到图床（SHA256 去重，返回绝对 URL `/api/images/{hash}-{filename}`） |
 | `listImages` | 查询当前项目已上传的图片清单 |
 | `readUserImage` | 按 imageId 从全局图床回读图片内容（仅在模型支持图片时使用，返回图片像素内容） |
+| `generateImage` | 文生图（仅图片子 Agent 工具集）：调 `IMAGE_GEN_*` API，b64_json/url → 全局图床，支持尺寸/多变体/配额/重试 |
+| `extractImageElement` | 语义抠图（仅图片子 Agent 工具集）：CLIPSeg 零样本文本-图像分割 + sharp 合成透明 PNG，支持 softEdge/invert/threshold |
 | `getConsoleLogs` | 获取页面控制台日志 |
 | `captureScreenshot` | 捕获页面截图 |
 | `readPreinstalledSkill` | 按名称读取 agent-service 内置的预装 Skill 全文 |
@@ -101,7 +107,7 @@ tests/
 | `listPages` | 查询工作空间页面清单 |
 | `deletePage` | 删除单个页面（需要权限确认） |
 | `deletePages` | 批量删除页面（需要权限确认） |
-| `delegateTask` | 将独立任务委派给短生命周期子 Agent，子 Agent 可读写允许范围内文件，结果和文件变更回传主 Agent；live Workspace 下禁用，避免绕过 Workspace Mutation Authority |
+| `delegateTask` | 将独立任务委派给短生命周期子 Agent，子 Agent 可读写允许范围内文件，结果和文件变更回传主 Agent；live Workspace 下禁用，避免绕过 Workspace Mutation Authority。`subagentType: "image"` 时启动定向图片子 Agent（仅图像工具 + vision 模型），用于前置批量生成/抠图 |
 
 ### Shell 白名单
 
@@ -133,6 +139,19 @@ BRAVE_SEARCH_API_KEY=                 # Brave Search API key（免费额度方�
 PI_AGENT_WEB_SEARCH_TIMEOUT_MS=10000  # webSearch 单次请求超时
 PI_AGENT_WEB_SEARCH_CACHE_TTL_MS=600000 # webSearch 进程内缓存 TTL
 PI_AGENT_PREINSTALLED_SKILLS_DIR=     # 可选：覆盖预装 Skill 目录，默认使用随包发布的 preinstalled-skills
+
+# 图像子 Agent（文生图/抠图，`generateImage`/`extractImageElement` 工具）
+# 配置来源：管理后台「绘图配置」优先（PUT /internal/image-gen 覆盖内存），
+# 以下环境变量仅作未配置时的默认值
+IMAGE_GEN_ENABLED=false               # 总开关（默认关闭）
+IMAGE_GEN_API_KEY=sk-...              # 图像生成 API key（OpenAI 兼容）
+IMAGE_GEN_BASE_URL=https://xxx/v1     # 图像生成 baseURL（OpenAI 兼容 /v1，默认 OpenAI）
+IMAGE_GEN_MODEL=dall-e-3             # 图像生成模型
+IMAGE_GEN_TIMEOUT_MS=60000            # 单次生成超时
+IMAGE_GEN_MAX_PER_SESSION=30          # 每会话最大生成数
+IMAGE_GEN_MAX_RETRIES=3               # 失败重试次数
+IMAGE_GEN_CONCURRENCY=2               # 并发池（当前图片子 Agent 走 delegateTask 同步，暂未使用）
+IMAGE_GEN_MAX_PROMPT_LEN=1000         # prompt 最大字符数
 ```
 
 完整配置加载逻辑见 `src/utils/config.ts`。
@@ -284,6 +303,8 @@ pnpm typecheck
 - **路径安全**：`PermissionManager.validateToolCall` 拦截 `readFile/writeFile/listFiles` 的越权访问
 - **编辑重发历史重同步**：WS 消息 `resync_history` 触发服务端销毁旧 agent → 重建 → 逐条 `appendHistoryMessage(role, content)` 写入 session。参见 `src/routes/websocket.ts` 的 `case "resync_history"`。`IBackendAdapter`、`BaseAgent`、`BackendAgent` 和 `PiAgentBackend` 均有 `appendHistoryMessage` 方法。
 - **图片上下文策略**：用户上传的图片仅在发送当轮以原始像素进入 LLM 上下文；之后每轮通过 `context` hook（`stripExpiredImageParts`，`src/utils/image-context-strip.ts`）剥离所有历史消息（含 user、assistant、toolResult）中的 image part，仅保留入库 URL 引用文本。`readUserImage` 工具可让模型按需从全局图床重新加载历史图片。非 vision 模型路径不受此策略影响（图片已转为文字描述）。
+- **图片子 Agent**：`delegateTask` 支持 `subagentType: "image"` 启动定向图片子 Agent，工具集仅含 generateImage/extractImageElement/saveImage/listImages/readUserImage/readFile/writeFile（`createWorkbenchTools({ imageSubagent: true })`），并强制使用 vision 模型（`IMAGE_DESCRIPTION_MODEL`）+ 专属 system prompt 自我评判（generateImage → readUserImage → 不满意重试 → 满意继续）。**两个图像工具仅注册给图片子 Agent，主 Agent 工具集中不包含。** **可见性门控**：`delegateTask` 的 `subagentType: "image"` 参数/描述仅在绘图配置启用时对主 Agent 暴露（`createDelegateTaskTool` 的 `imageSubagentEnabled` 来自 `getImageGenConfig().enabled`）；未启用时主 Agent 不知道图片子 Agent，模型强行传入会被工具层拒绝（`image_subagent_disabled`）。 方案采用"前置批量生成"简化版：主 Agent 在设计前规划图片清单，一次性委派子 Agent 批量生成，直接引用真实 imageId，不做异步延迟 URL。`generateImage` 会话配额用模块级 `sessionGenCounts` 计数（`getImageGenSessionCount`/`resetImageGenSessionCount`）。CLIPSeg 模型懒加载单例（`resetClipSegSingleton` 可重置），sharp 与 @xenova/transformers 均为 esbuild `--external`、Docker runtime 安装。
+- **绘图配置来源**：图像生成配置（`src/services/image-gen-config.ts` 运行时单例）由管理后台「绘图配置」推送（`PUT /internal/image-gen`，`src/routes/internal-config.ts`）覆盖内存，环境变量仅作默认值。`generateImage`/`extractImageElement` 缺席配置时返回明确错误。
 
 ## 相关文档
 

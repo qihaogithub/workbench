@@ -24,6 +24,7 @@ import type {
   DemoPageRuntimeType,
   DemoFolderMeta,
   AppGraph,
+  KnowledgeIndexItem,
 } from "@workbench/shared";
 import { ProjectAdminService } from "@workbench/project-core";
 import type { CanvasState } from "@workbench/demo-ui";
@@ -42,6 +43,38 @@ import type { PublishContext } from "@/lib/publish/types";
 
 const PUBLISHED_DIR = path.join(getDataDir(), "published");
 const SCREENSHOTS_DIR = path.join(getDataDir(), "screenshots");
+
+/** 读取工作区知识库 manifest，返回可直接发布的元数据 */
+export function readKnowledgeManifestForPublish(
+  workspacePath: string,
+): KnowledgeIndexItem[] | undefined {
+  const manifestPath = path.join(workspacePath, "knowledge", "manifest.json");
+  if (!fs.existsSync(manifestPath)) return undefined;
+  try {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+    if (!Array.isArray(manifest.items)) return undefined;
+    return manifest.items as KnowledgeIndexItem[];
+  } catch {
+    return undefined;
+  }
+}
+
+/** 将工作区知识库目录整体复制到发布目录，返回 manifest 元数据 */
+function copyKnowledgeForPublish(
+  workspacePath: string,
+  publishedProjectDir: string,
+): KnowledgeIndexItem[] | undefined {
+  const knowledgeDir = path.join(workspacePath, "knowledge");
+  if (!fs.existsSync(knowledgeDir)) return undefined;
+  const items = readKnowledgeManifestForPublish(workspacePath);
+  if (!items) return undefined;
+  fs.cpSync(
+    knowledgeDir,
+    path.join(publishedProjectDir, "knowledge"),
+    { recursive: true },
+  );
+  return items;
+}
 
 function resolvePublishThumbnailSource(thumbnail: string): string | undefined {
   const candidates: string[] = [];
@@ -113,6 +146,7 @@ export interface PublishedProject {
   projectConfigSchema?: string;
   projectConfigValues?: Record<string, unknown>;
   canvasState?: CanvasState;
+  knowledge?: KnowledgeIndexItem[];
   previewRuntime?: {
     version: string;
     source: "local" | "cdn";
@@ -454,6 +488,7 @@ export async function publishProject(
   );
   const canvasState = readCanvasStateFromWorkspace(workspacePath);
   const appGraph = readAppGraph(workspacePath);
+  const knowledge = copyKnowledgeForPublish(workspacePath, publishedProjectDir);
 
   const viewerBaseUrl = getViewerBaseUrl();
   const totalPages = demoPages.length;
@@ -857,6 +892,7 @@ export async function publishProject(
         ? projectConfigValues
         : undefined,
     canvasState,
+    knowledge,
     previewRuntime: {
       version: PREVIEW_RUNTIME_MANIFEST_VERSION,
       source: useCdnRuntime ? "cdn" : "local",

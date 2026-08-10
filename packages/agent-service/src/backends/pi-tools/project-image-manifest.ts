@@ -16,7 +16,7 @@ export interface ProjectImageEntry {
   contentHash?: string;
   mimeType?: string;
   originalUrl?: string;
-  sourceType?: 'browser_blob' | 'upload' | 'session_asset' | 'workspace_asset' | 'r2_worker' | 'remote_url';
+  sourceType?: 'browser_blob' | 'upload' | 'session_asset' | 'workspace_asset' | 'r2_worker' | 'remote_url' | 'ai_generated';
   alt?: string;
 }
 

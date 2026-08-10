@@ -112,6 +112,7 @@ import {
 } from "@/components/ui/tabs";
 import { FeedbackPage } from "@/components/FeedbackPage";
 import { ViewerAiPanel } from "@/components/ViewerAiPanel";
+import { ViewerDocumentView } from "@/components/ViewerDocumentView";
 
 type SortOption = "newest" | "oldest" | "name";
 type ProjectListItem = ProjectsIndex["projects"][number];
@@ -1337,7 +1338,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
             onOpenChange={setAiDrawerOpen}
           />
         )}
-        {previewMode !== "canvas" && (project.demoPages.length > 1 || isLoggedIn) && (
+        {previewMode === "single" && (project.demoPages.length > 1 || isLoggedIn) && (
           <div className="w-56 border-r border-border shrink-0 flex flex-col">
             <style>{`
               @keyframes dir-flash {
@@ -1391,6 +1392,12 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
         )}
 
         <div className="flex-1 min-w-0 overflow-hidden">
+          {previewMode === "document" ? (
+            <ViewerDocumentView
+              projectId={projectId}
+              items={project.knowledge ?? []}
+            />
+          ) : (
           <CommentLayer
             projectId={projectId}
             pageId={activePageId}
@@ -1431,9 +1438,10 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
               }}
             />
           </CommentLayer>
+          )}
         </div>
 
-        {previewMode === "single" ? (
+        {previewMode === "document" ? null : previewMode === "single" ? (
           <div className="w-80 border-l border-border shrink-0 flex flex-col">
             {hasSchema ? (
               <Tabs
@@ -1776,23 +1784,27 @@ function Header({
   onPreviewModeChange?: (mode: PreviewMode) => void;
 }) {
   return (
-    <header className="flex items-center h-12 px-4 border-b border-border shrink-0 gap-3">
-      <button
-        onClick={onBack}
-        className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        <span className="text-sm">返回</span>
-      </button>
-      {name && <h1 className="text-sm font-semibold">{name}</h1>}
-      <div className="flex-1" />
+    <header className="grid grid-cols-[1fr_auto_1fr] items-center h-14 px-4 border-b border-border shrink-0 gap-3">
+      <div className="flex items-center gap-3 min-w-0">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors shrink-0"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span className="text-sm">返回</span>
+        </button>
+        {name && <h1 className="text-sm font-semibold truncate">{name}</h1>}
+      </div>
       {previewMode !== undefined && onPreviewModeChange !== undefined && (
-        <PreviewModeSwitcher
-          mode={previewMode}
-          onModeChange={onPreviewModeChange}
-          modes={["single", "canvas"]}
-        />
+        <div className="flex justify-center">
+          <PreviewModeSwitcher
+            mode={previewMode}
+            onModeChange={onPreviewModeChange}
+            modes={["single", "canvas", "document"]}
+          />
+        </div>
       )}
+      <div className="flex items-center justify-end">
       {onLoginClick !== undefined && (
         isLoggedIn ? (
           <Tooltip>
@@ -1828,6 +1840,7 @@ function Header({
           </Tooltip>
         )
       )}
+      </div>
     </header>
   );
 }

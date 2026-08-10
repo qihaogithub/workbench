@@ -172,6 +172,18 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h
 
 `OPS/` 用于维护项目内工程诊断工具、Codex 定时任务和维护型自动任务上下文。进入 `OPS/` 前先读 `OPS/AGENTS.md`，再根据实际子目录读取 `OPS/CLI/AGENTS.md` 或 `OPS/automations/AGENTS.md`。
 
+## 页面导出工具（tools/page-export/）
+
+`tools/page-export/` 是把开发项目（Next.js/Vite/React SPA）页面批量导出为创作端原型页的独立工具，与 `OPS/`、`packages/` 平级。方案文档见 `docs/plans/远期规划/创作端开发项目模式方案/页面导出工具方案.md`，使用说明见 `tools/page-export/README.md`，项目级 skill 在 `.agents/skills/export-pages/`。
+
+关键事实：
+
+- 渲染引擎是 `single-file-cli@2.0.83`（AGPL 许可，仅内部评审流程使用），驱动系统 Chrome；依赖已声明在根 `package.json` 与 `tools/page-export/package.json`。
+- 受保护页面登录 cookie 必须用 `--browser-cookies-file`（JSON，只给 `url`），不能用逗号串格式（`domain`+`url` 冲突导致 cookie 不生效）。
+- 大 SPA 页面必须开 single-file 的 `--remove-unused-styles` / `--remove-unused-fonts` / `--remove-hidden-elements`，否则 CSS 超 `MAX_PROTOTYPE_CSS_LENGTH`（120KB）。
+- 导入 `ow project import-prototype` 需显式 `--data-dir <repo>/data`，否则在 `--source` 目录运行时 dataDir 解析错误。
+- normalize 进度日志走 stderr，stdout 只输出 JSON。
+
 `OPS/automations/` 用于维护 Codex 定时任务和维护型自动任务的运行上下文，包括 context、runbook 和当前状态账本。它的目标读者是自动任务中的 AI，优先保证可执行、可复查和低噪声更新。
 
 维护规则：
@@ -261,7 +273,7 @@ pnpm test:e2e:headed
 ```bash
 # author-site
 pnpm --filter @workbench/author-site test
-pnpm --filter @workbench/author-site test -- --testPathPattern="file.test.ts"
+pnpm --filter @workbench/author-site test -- --testPathPatterns="file.test.ts"
 pnpm --filter @workbench/author-site test:watch
 pnpm --filter @workbench/author-site db:init
 

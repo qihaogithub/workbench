@@ -15,7 +15,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminRequest } from "@/lib/admin-auth";
-import { pushImageDescriptionConfig } from "@/lib/agent-providers";
+import { pushImageDescriptionConfig, pushImageGenConfig } from "@/lib/agent-providers";
 import { syncBackendProvidersConfigToAgent } from "@/lib/backend-providers-sync";
 import { readDbConfig, writeDbConfig } from "@/lib/db-config";
 import { invalidateConfigCache } from "@/lib/model-config";
@@ -48,6 +48,17 @@ function getDefaultConfig() {
       visionModelId: "",
       timeout: 10000,
       maxCacheSize: 500,
+    },
+    imageGen: {
+      enabled: false,
+      apiKey: "",
+      baseUrl: "https://api.openai.com/v1",
+      model: "dall-e-3",
+      timeoutMs: 60000,
+      maxPerSession: 30,
+      maxRetries: 3,
+      concurrency: 2,
+      maxPromptLen: 1000,
     },
     lastSyncedToEnv: Date.now(),
   };
@@ -243,7 +254,8 @@ export async function PUT(request: NextRequest) {
       body.frontend === undefined &&
       body.backendProviders === undefined &&
       body.multimodalModels === undefined &&
-      body.imageDescription === undefined
+      body.imageDescription === undefined &&
+      body.imageGen === undefined
     ) {
       return NextResponse.json(
         {
@@ -251,7 +263,7 @@ export async function PUT(request: NextRequest) {
           error: {
             code: "INVALID_CONFIG",
             message:
-              "请求体至少需要包含 frontend、backendProviders、multimodalModels 或 imageDescription 字段之一",
+              "请求体至少需要包含 frontend、backendProviders、multimodalModels、imageDescription 或 imageGen 字段之一",
           },
         },
         { status: 400 },
@@ -299,6 +311,27 @@ export async function PUT(request: NextRequest) {
       updatedConfig.imageDescription = {
         ...existingImg,
         ...body.imageDescription,
+      };
+    }
+
+    // 单独处理 imageGen: 合并已有配置，支持部分更新
+    if (body.imageGen !== undefined) {
+      if (typeof body.imageGen !== "object" || body.imageGen === null) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "INVALID_CONFIG",
+              message: "imageGen 字段必须是对象",
+            },
+          },
+          { status: 400 },
+        );
+      }
+      const existingGen = existingConfig.imageGen || {};
+      updatedConfig.imageGen = {
+        ...existingGen,
+        ...body.imageGen,
       };
     }
 
@@ -370,12 +403,19 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    // 如果包含 imageGen 字段,推送到 agent-service
+    let imageGenPushResult: { ok: boolean; message: string } | null = null;
+    if (body.imageGen !== undefined) {
+      imageGenPushResult = await pushImageGenConfig(updatedConfig.imageGen);
+    }
+
     return NextResponse.json({
       success: true,
       message: "配置已保存",
       data: updatedConfig,
       agentPushResult: pushResult,
       imagePushResult,
+      imageGenPushResult,
     });
   } catch (error) {
     console.error("[API] Failed to update model config:", error);

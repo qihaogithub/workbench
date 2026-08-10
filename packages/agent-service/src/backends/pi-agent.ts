@@ -545,7 +545,22 @@ export class PiAgentBackend implements IBackendAdapter {
 
   private buildSubagentSystemPrompt(context?: {
     resources?: { skills?: PreinstalledSkill[] };
-  }): string {
+  }, subagentType?: "general" | "image"): string {
+    if (subagentType === "image") {
+      return [
+        "# Image Subagent Mode",
+        "",
+        "You are a dedicated image expert working for the main agent. You generate and curate images for a web page.",
+        "Workflow: read the delegated task and any page context with readFile, then for each required image:",
+        "1. Use generateImage to create it (prompt, size, filename). The result gives you imageId and URL.",
+        "2. Use readUserImage to visually review the generated image with your vision model.",
+        "3. If unsatisfied, regenerate with an improved prompt (up to a few retries).",
+        "4. If the task needs a cutout, use extractImageElement to extract a subject from an image.",
+        "5. Use listImages to check existing images and avoid duplicates.",
+        "",
+        "Return a concise summary: for each image, its imageId/URL and whether you were satisfied with it. Do not spawn subagents.",
+      ].join("\n");
+    }
     const basePrompt = this.currentSystemPrompt || "# Workbench AI 编码助手";
     const preinstalledSkills = formatPreinstalledSkillsForPrompt(
       context?.resources?.skills || [],
@@ -564,7 +579,7 @@ Keep the final response concise: summarize what you changed, what you verified, 
   }
 
   private async runSubagent(
-    params: { task: string; context?: string; model?: "inherit" | "vision"; imageUrls?: string[] },
+    params: { task: string; context?: string; model?: "inherit" | "vision"; imageUrls?: string[]; subagentType?: "general" | "image" },
     signal?: AbortSignal,
   ): Promise<SubagentRunResult> {
     if (!this.areSubagentsEnabled()) {
@@ -618,12 +633,13 @@ Keep the final response concise: summarize what you changed, what you verified, 
           includeDelegateTask: false,
           includePlanApproval: false,
           includeUserChoice: false,
+          imageSubagent: params.subagentType === "image",
         },
       );
       let model: any;
       let imageParts: any[] | undefined;
 
-      if (params.model === "vision") {
+      if (params.model === "vision" || params.subagentType === "image") {
         const visionModelId = this.imageDescriber.getConfig().visionModelId;
         if (!visionModelId) {
           return {
@@ -709,7 +725,7 @@ Keep the final response concise: summarize what you changed, what you verified, 
         model,
         systemPrompt: (context: {
           resources?: { skills?: PreinstalledSkill[] };
-        }) => this.buildSubagentSystemPrompt(context),
+        }) => this.buildSubagentSystemPrompt(context, params.subagentType),
         getApiKeyAndHeaders: (model: any) =>
           this.modelManager.getApiKeyAndHeaders(model),
         thinkingLevel: "off",

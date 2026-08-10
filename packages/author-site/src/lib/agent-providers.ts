@@ -396,3 +396,84 @@ export async function fetchImageDescriptionConfig(): Promise<{
     };
   }
 }
+
+export interface ImageGenConfig {
+  enabled: boolean;
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+  timeoutMs: number;
+  maxPerSession: number;
+  maxRetries: number;
+  concurrency: number;
+  maxPromptLen: number;
+}
+
+export async function pushImageGenConfig(
+  config: Partial<ImageGenConfig>,
+): Promise<PushResult> {
+  const internalToken = getInternalApiToken();
+  if (!internalToken) {
+    return { ok: false, message: "INTERNAL_API_TOKEN 未配置" };
+  }
+
+  try {
+    const res = await fetch(
+      `${getServerAgentServiceUrl()}/internal/image-gen`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Internal-Token": internalToken,
+        },
+        body: JSON.stringify(config),
+      },
+    );
+
+    const body = await res.json().catch(() => null);
+    if (!res.ok || !body?.success) {
+      return {
+        ok: false,
+        message: body?.error?.message || `agent-service 响应 ${res.status}`,
+        data: body,
+      };
+    }
+    return { ok: true, message: "绘图配置已推送到 agent-service", data: body.data };
+  } catch (err) {
+    return {
+      ok: false,
+      message: `推送绘图配置失败: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+export async function fetchImageGenConfig(): Promise<{
+  ok: boolean;
+  config?: ImageGenConfig;
+  message?: string;
+}> {
+  const internalToken = getInternalApiToken();
+  if (!internalToken) {
+    return { ok: false, message: "INTERNAL_API_TOKEN 未配置" };
+  }
+
+  try {
+    const res = await fetch(
+      `${getServerAgentServiceUrl()}/internal/image-gen`,
+      {
+        method: "GET",
+        headers: { "X-Internal-Token": internalToken },
+      },
+    );
+    const body = await res.json().catch(() => null);
+    if (!res.ok || !body?.success) {
+      return { ok: false, message: body?.error?.message || "拉取绘图配置失败" };
+    }
+    return { ok: true, config: body.data };
+  } catch (err) {
+    return {
+      ok: false,
+      message: `拉取绘图配置失败: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}

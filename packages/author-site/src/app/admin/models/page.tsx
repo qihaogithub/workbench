@@ -49,6 +49,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
   type ImageDescriptionConfig,
+  type ImageGenConfig,
 } from "@/lib/agent-providers";
 import type { BackendProvider, BackendProvidersConfig } from "@workbench/shared";
 
@@ -321,9 +322,21 @@ export default function ModelsPage() {
           <Eye className="h-4 w-4" />
           识图配置
         </button>
+        <button
+          onClick={() => handleTabChange("image-gen")}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors",
+            activeTab === "image-gen"
+              ? "bg-neutral-700 text-neutral-50"
+              : "text-neutral-400 hover:text-neutral-200",
+          )}
+        >
+          <ImageIcon className="h-4 w-4" />
+          绘图配置
+        </button>
       </div>
 
-      {activeTab === "providers" ? <SuppliersTab /> : activeTab === "image-desc" ? <ImageDescriberTab /> : <ModelConfigTab />}
+      {activeTab === "providers" ? <SuppliersTab /> : activeTab === "image-desc" ? <ImageDescriberTab /> : activeTab === "image-gen" ? <ImageGenTab /> : <ModelConfigTab />}
     </div>
   );
 }
@@ -1898,6 +1911,224 @@ function ImageDescriberTab() {
               type="number"
               value={maxCacheSize}
               onChange={(e) => setMaxCacheSize(Number(e.target.value) || 500)}
+              className="bg-neutral-900 border-neutral-700 text-neutral-200"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   绘图配置 Tab
+   ============================================================ */
+
+function ImageGenTab() {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [enabled, setEnabled] = useState(false);
+  const [apiKey, setApiKey] = useState("");
+  const [baseUrl, setBaseUrl] = useState("https://api.openai.com/v1");
+  const [model, setModel] = useState("dall-e-3");
+  const [timeoutMs, setTimeoutMs] = useState(60000);
+  const [maxPerSession, setMaxPerSession] = useState(30);
+  const [maxRetries, setMaxRetries] = useState(3);
+  const [maxPromptLen, setMaxPromptLen] = useState(1000);
+
+  const loadConfig = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/model-config", {
+        headers: { "x-admin-token": localStorage.getItem("admin_token") || "" },
+      });
+      const body = await res.json();
+      if (body.success && body.data?.imageGen) {
+        const c = body.data.imageGen as ImageGenConfig;
+        setEnabled(Boolean(c.enabled));
+        setApiKey(c.apiKey || "");
+        setBaseUrl(c.baseUrl || "https://api.openai.com/v1");
+        setModel(c.model || "dall-e-3");
+        setTimeoutMs(c.timeoutMs || 60000);
+        setMaxPerSession(c.maxPerSession ?? 30);
+        setMaxRetries(c.maxRetries ?? 3);
+        setMaxPromptLen(c.maxPromptLen || 1000);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "加载配置失败");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadConfig();
+  }, [loadConfig]);
+
+  const doSave = useCallback(async () => {
+    const res = await fetch("/api/admin/model-config", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-token": localStorage.getItem("admin_token") || "",
+      },
+      body: JSON.stringify({
+        imageGen: {
+          enabled,
+          apiKey,
+          baseUrl,
+          model,
+          timeoutMs,
+          maxPerSession,
+          maxRetries,
+          maxPromptLen,
+        },
+      }),
+    });
+    const body = await res.json();
+    if (body.success) {
+      const genMsg = body.imageGenPushResult?.ok
+        ? "，已同步至 agent-service"
+        : body.imageGenPushResult
+          ? ` (agent-service 同步: ${body.imageGenPushResult.message})`
+          : "";
+      return { ok: true, message: "配置已保存" + genMsg };
+    }
+    return { ok: false, message: body?.error?.message || "保存失败" };
+  }, [enabled, apiKey, baseUrl, model, timeoutMs, maxPerSession, maxRetries, maxPromptLen]);
+
+  const { autoSaveState, autoSaveMessage } = useAutoSave(
+    doSave,
+    [enabled, apiKey, baseUrl, model, timeoutMs, maxPerSession, maxRetries, maxPromptLen],
+    500,
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-neutral-400 py-8">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        加载中...
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {(autoSaveState === "error" || error) && (
+        <div className="flex items-center gap-2 p-3 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {autoSaveMessage || error}
+        </div>
+      )}
+      {autoSaveState === "saved" && autoSaveMessage && (
+        <div className="flex items-center gap-2 p-3 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          {autoSaveMessage}
+        </div>
+      )}
+
+      <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-6 space-y-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-neutral-50 mb-1">图像生成配置</h3>
+            <p className="text-sm text-neutral-400">
+              为 AI 提供文生图能力。启用后，主 Agent 可通过图片子 Agent 生成页面素材。
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {autoSaveState === "saving" && (
+              <span className="text-xs text-neutral-500 flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                保存中...
+              </span>
+            )}
+            {autoSaveState === "saved" && (
+              <span className="text-xs text-emerald-400 flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3" />
+                已保存
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between py-2">
+          <div>
+            <p className="text-sm font-medium text-neutral-200">启用图像生成</p>
+            <p className="text-xs text-neutral-500">关闭后 AI 无法生成页面图片素材</p>
+          </div>
+          <Switch checked={enabled} onCheckedChange={setEnabled} />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-neutral-300">API Key</label>
+          <Input
+            type="password"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder="sk-..."
+            className="bg-neutral-900 border-neutral-700 text-neutral-200 placeholder:text-neutral-500"
+          />
+          <p className="text-xs text-neutral-500">图像生成接口的 API Key（OpenAI 兼容）</p>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-neutral-300">Base URL</label>
+          <Input
+            value={baseUrl}
+            onChange={(e) => setBaseUrl(e.target.value)}
+            placeholder="https://xxx/v1"
+            className="bg-neutral-900 border-neutral-700 text-neutral-200 placeholder:text-neutral-500"
+          />
+          <p className="text-xs text-neutral-500">OpenAI 兼容 baseURL，例如 https://api.openai.com/v1</p>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-neutral-300">生成模型</label>
+          <Input
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            placeholder="dall-e-3"
+            className="bg-neutral-900 border-neutral-700 text-neutral-200 placeholder:text-neutral-500"
+          />
+          <p className="text-xs text-neutral-500">用于文生图的模型 ID，如 dall-e-3、gpt-image-1</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-neutral-300">单次生成超时 (毫秒)</label>
+            <Input
+              type="number"
+              value={timeoutMs}
+              onChange={(e) => setTimeoutMs(Number(e.target.value) || 60000)}
+              className="bg-neutral-900 border-neutral-700 text-neutral-200"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-neutral-300">每会话最大生成数</label>
+            <Input
+              type="number"
+              value={maxPerSession}
+              onChange={(e) => setMaxPerSession(Number(e.target.value) || 30)}
+              className="bg-neutral-900 border-neutral-700 text-neutral-200"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-neutral-300">失败重试次数</label>
+            <Input
+              type="number"
+              value={maxRetries}
+              onChange={(e) => setMaxRetries(Number(e.target.value) || 3)}
+              className="bg-neutral-900 border-neutral-700 text-neutral-200"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-neutral-300">Prompt 最大字符数</label>
+            <Input
+              type="number"
+              value={maxPromptLen}
+              onChange={(e) => setMaxPromptLen(Number(e.target.value) || 1000)}
               className="bg-neutral-900 border-neutral-700 text-neutral-200"
             />
           </div>

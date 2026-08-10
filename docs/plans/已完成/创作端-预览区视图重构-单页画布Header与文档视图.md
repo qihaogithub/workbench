@@ -62,6 +62,9 @@
 - [x] 文档更新
 - [x] 验证（author typecheck/test、viewer typecheck 通过；demo-ui typecheck/test 为预存环境故障）
 - [x] 修复：文档视图目录「始终在加载中」（`DocumentView` 不稳定回调导致无限重取，见下）
+- [x] 增强：文档视图目录复刻原 `KnowledgePanel` 结构，新增「AI 记忆 / 项目公约 / 对话文件」入口（`onMemorySelect`/`onConventionSelect`/`onChatFileSelect` 委托编辑页处理），并拉取对话附件列表
+- [x] 调整：AI 记忆 / 项目公约改为列表项样式（Brain/ScrollText 图标），点击在右侧编辑器内打开并编辑保存（走 workspace files 的 `memory.md`/`convention.md`），不再弹窗；移除 `onMemorySelect`/`onConventionSelect` 与 `ConventionDialog` 死代码
+- [x] 再调整：项目公约改为可折叠文件夹（amber FolderOpen），内含项目公约（根）与各页面公约子项，右侧内联编辑（`convention.md` / `demos/{pageId}/convention.md`）；悬停加号弹出「项目公约 / 页面公约」菜单，选页面公约弹窗再选页面；从编辑页传入 `pages`
 
 ## Bug 修复记录：文档视图目录始终在加载中
 

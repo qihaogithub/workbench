@@ -92,6 +92,7 @@
     "lucide-react": "^0.323.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
+    "single-file-cli": "2.0.83",
     "svgaplayerweb": "2.3.1",
     "tailwindcss-cdn": "3.4.10",
     "typescript": "^5.3.3"

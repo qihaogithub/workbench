@@ -36,6 +36,11 @@ import {
   updateImageDescriberConfig,
   getImageDescriberConfig,
 } from "../backends/pi-agent";
+import {
+  getImageGenConfig,
+  updateImageGenConfig,
+  type ImageGenRuntimeConfig,
+} from "../services/image-gen-config";
 import type {
   BackendProvidersConfig,
   ExternalAuthSessionConfig,
@@ -724,5 +729,66 @@ export async function registerInternalConfigRoutes(fastify: FastifyInstance) {
     },
   );
 
-  logger.info("内部配置同步路由已注册: backend-providers + knowledge-documents + image-description");
+  fastify.get(
+    "/internal/image-gen",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      if (!checkToken(request, reply)) return;
+
+      const config = getImageGenConfig();
+      return reply.send({
+        success: true,
+        data: maskImageGenApiKey(config),
+      });
+    },
+  );
+
+  fastify.put(
+    "/internal/image-gen",
+    async (
+      request: FastifyRequest<{
+        Body: Partial<ImageGenRuntimeConfig>;
+      }>,
+      reply: FastifyReply,
+    ) => {
+      if (!checkToken(request, reply)) return;
+
+      const body = request.body as Partial<ImageGenRuntimeConfig> & Record<string, unknown>;
+      const allowedKeys: (keyof ImageGenRuntimeConfig)[] = [
+        "enabled",
+        "apiKey",
+        "baseUrl",
+        "model",
+        "timeoutMs",
+        "maxPerSession",
+        "maxRetries",
+        "concurrency",
+        "maxPromptLen",
+      ];
+      const config: Partial<ImageGenRuntimeConfig> = {};
+      for (const key of allowedKeys) {
+        if (key in body) {
+          (config as Record<string, unknown>)[key] = body[key];
+        }
+      }
+
+      const updated = updateImageGenConfig(config);
+      return reply.send({ success: true, data: maskImageGenApiKey(updated) });
+    },
+  );
+
+  logger.info("内部配置同步路由已注册: backend-providers + knowledge-documents + image-description + image-gen");
+}
+
+/**
+ * 脱敏 imageGen apiKey，避免 GET 返回时泄漏密钥
+ */
+function maskImageGenApiKey(config: ImageGenRuntimeConfig): ImageGenRuntimeConfig & {
+  hasApiKey: boolean;
+} {
+  const masked = { ...config };
+  const key = config.apiKey;
+  if (key) {
+    masked.apiKey = `${key.slice(0, 4)}...(${key.length})`;
+  }
+  return { ...masked, hasApiKey: Boolean(config.apiKey) };
 }

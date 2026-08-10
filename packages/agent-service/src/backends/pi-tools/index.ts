@@ -49,6 +49,9 @@ import {
   type PermissionHandler,
 } from "./delete-page-tool";
 import { createDelegateTaskTool, type SubagentRunner } from "./subagent-tool";
+import { createGenerateImageTool } from "./generate-image-tool";
+import { createExtractImageElementTool } from "./extract-image-element-tool";
+import { getImageGenConfig } from "../../services/image-gen-config";
 import {
   createReadCommentsTool,
   createInspectElementTool,
@@ -57,7 +60,7 @@ import {
 } from "./comment-tools";
 import { createSubmitFeedbackTool } from "./feedback-tool";
 
-export const WORKBENCH_TOOL_VERSION = 26;
+export const WORKBENCH_TOOL_VERSION = 27;
 
 const SKETCH_SCENE_TOOLS_ENABLED =
   process.env.PI_AGENT_SKETCH_TOOLS_ENABLED === "true";
@@ -73,6 +76,8 @@ export interface WorkbenchToolsOptions {
   includeUserChoice?: boolean;
   userChoiceHandler?: UserChoiceHandler;
   mode?: "workbench" | "viewer-readonly";
+  /** 图片子 Agent 定向工具集：只包含图像相关工具 */
+  imageSubagent?: boolean;
 }
 
 export function createWorkbenchTools(
@@ -86,6 +91,19 @@ export function createWorkbenchTools(
       createListFilesTool(config),
       createKnowledgeReportTool(config, { mode: "viewer-readonly" }),
       createSubmitFeedbackTool(config, "viewer-readonly"),
+    ];
+  }
+
+  if (options.imageSubagent) {
+    return [
+      createReadFileTool(config),
+      createWriteFileTool(config),
+      createListFilesTool(config),
+      createSaveImageTool(config),
+      createListImagesTool(config),
+      createReadUserImageTool(),
+      createGenerateImageTool(config),
+      createExtractImageElementTool(config),
     ];
   }
 
@@ -145,7 +163,11 @@ export function createWorkbenchTools(
   ];
 
   if (options.includeDelegateTask !== false && options.subagentRunner) {
-    tools.push(createDelegateTaskTool(options.subagentRunner, config));
+    tools.push(
+      createDelegateTaskTool(options.subagentRunner, config, {
+        imageSubagentEnabled: getImageGenConfig().enabled,
+      }),
+    );
   }
 
   return tools;

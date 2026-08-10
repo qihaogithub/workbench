@@ -287,10 +287,6 @@ const WorkspaceCodeDialog = dynamic(
   () => import("@/components/demo/WorkspaceCodeDialog").then((m) => m.WorkspaceCodeDialog),
   { ssr: false, loading: () => null },
 );
-const ConventionDialog = dynamic(
-  () => import("@/components/demo/ConventionDialog").then((m) => m.ConventionDialog),
-  { ssr: false, loading: () => null },
-);
 const DocumentView = dynamic(
   () => import("@/components/demo/DocumentView").then((m) => m.DocumentView),
   { ssr: false, loading: () => null },
@@ -1691,9 +1687,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     editable: boolean;
   }>({ filePath: "", content: "", editable: false });
 
-  // 公约弹窗状态
-  const [conventionDialogOpen, setConventionDialogOpen] = useState(false);
-
   // 知识库文档弹窗状态
   const [kbDocDialogOpen, setKbDocDialogOpen] = useState(false);
   const [kbDocDialogMode, setKbDocDialogMode] =
@@ -1721,6 +1714,104 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       return [...current, item];
     });
   }, []);
+
+  // 对话/聊天附件类型
+  interface ChatAttachment {
+    id: string;
+    name: string;
+    mimeType: string;
+    size: number;
+    textExtracted: boolean;
+    textPreview?: string;
+    createdAt?: string;
+  }
+
+  const handleConvertChatToKnowledge = useCallback(
+    async (file: ChatAttachment) => {
+      if (!workspacePath || !sessionId) return;
+      if (
+        !confirm(`将「${file.name}」转为知识库文件？转为知识库后将删除原聊天附件。`)
+      )
+        return;
+      try {
+        const contentRes = await fetch(
+          `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(file.id)}`,
+        );
+        const contentData = await contentRes.json();
+        if (!contentData.success) {
+          toast({
+            title: "转换失败",
+            description: contentData.error?.message,
+            variant: "destructive",
+          });
+          return;
+        }
+        const title = file.name.replace(/\.(md|markdown|txt|text|json|csv)$/i, "");
+        const params = new URLSearchParams({ workingDir: workspacePath });
+        if (demoId) params.set("projectId", demoId);
+        if (sessionId) params.set("sessionId", sessionId);
+        const createRes = await fetch(
+          `/api/knowledge?${params.toString()}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: title || file.name,
+              description: `从聊天附件转换: ${file.name}`,
+              content: contentData.data.text || "",
+            }),
+          },
+        );
+        const createData = await createRes.json();
+        if (!createData.success) {
+          toast({
+            title: "转换失败",
+            description: createData.error?.message,
+            variant: "destructive",
+          });
+          return;
+        }
+        await fetch(
+          `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(file.id)}`,
+          { method: "DELETE" },
+        );
+        toast({ title: "已转为知识库文件" });
+        upsertKnowledgeItem(createData.data);
+        window.dispatchEvent(new Event("knowledge-updated"));
+        window.dispatchEvent(new Event("chat-attachments-updated"));
+      } catch {
+        toast({ title: "转换失败", variant: "destructive" });
+      }
+    },
+    [workspacePath, sessionId, demoId, toast, upsertKnowledgeItem],
+  );
+
+  const handleDeleteChatFile = useCallback(
+    async (file: ChatAttachment) => {
+      if (!sessionId) return;
+      if (!confirm(`确定要删除聊天附件「${file.name}」吗？`)) return;
+      try {
+        const res = await fetch(
+          `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(file.id)}`,
+          { method: "DELETE" },
+        );
+        const data = await res.json();
+        if (data.success) {
+          toast({ title: "删除成功" });
+          window.dispatchEvent(new Event("chat-attachments-updated"));
+        } else {
+          toast({
+            title: "删除失败",
+            description: data.error?.message,
+            variant: "destructive",
+          });
+        }
+      } catch {
+        toast({ title: "删除失败", variant: "destructive" });
+      }
+    },
+    [sessionId, toast],
+  );
 
   const canvasKnowledgeDocuments = useMemo(
     () =>
@@ -7801,6 +7892,7 @@ await handlePublishWithScreenshot();
                   workingDir={workspacePath || undefined}
                   projectId={demoId}
                   sessionId={sessionId}
+                  pages={demoPages.map((p) => ({ id: p.id, name: p.name }))}
                   onItemsChange={setKnowledgeItems}
                   onItemsLoaded={(items) => setKnowledgeItems(items)}
                   onDocHistory={(item) => setKbHistoryItem(item)}
@@ -7808,6 +7900,45 @@ await handlePublishWithScreenshot();
                     setKbDocDialogItem(null);
                     setKbDocDialogMode("add");
                     setKbDocDialogOpen(true);
+                  }}
+                  onChatFileSelect={async (attachment) => {
+                    try {
+                      if (attachment.mimeType?.startsWith("image/")) {
+                        window.open(
+                          `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(attachment.id)}&raw=1`,
+                          "_blank",
+                        );
+                        return;
+                      }
+                      const res = await fetch(
+                        `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(attachment.id)}`,
+                      );
+                      const data = await res.json();
+                      if (data.success) {
+                        setWsCodeDialogData({
+                          filePath: data.data.metadata.name,
+                          content: data.data.text,
+                          editable: false,
+                        });
+                        setWsCodeDialogOpen(true);
+                      } else {
+                        toast({
+                          title: "查看附件失败",
+                          description: data.error?.message,
+                          variant: "destructive",
+                        });
+                      }
+                    } catch {
+                      toast({
+                        title: "查看附件失败",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                  onChatFileConvert={handleConvertChatToKnowledge}
+                  onChatFileDelete={handleDeleteChatFile}
+                  onDocDeleted={() => {
+                    window.dispatchEvent(new Event("knowledge-updated"));
                   }}
                 />
               ) : (
@@ -8687,13 +8818,6 @@ await handlePublishWithScreenshot();
         onSaved={({ filePath, content }) => {
           handleWorkspaceFileSaved(filePath, content);
         }}
-      />
-
-      <ConventionDialog
-        open={conventionDialogOpen}
-        onOpenChange={setConventionDialogOpen}
-        sessionId={sessionId || ""}
-        pages={demoPages.map((p) => ({ id: p.id, name: p.name }))}
       />
 
       <KnowledgeDocDialog

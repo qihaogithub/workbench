@@ -63,20 +63,39 @@ function normalizeMeasuredSize(value: number): number {
   return Math.round(value);
 }
 
-// 画布中展示"完整内容"：可滚动页面（如手机端内容超出设计画板、由作者用固定高度 +
-// overflow 裁剪的容器装起来）在画布卡片里应透出全部内容，而不是只在内部滚动一屏。
-// 这里自底向上把"纵向裁剪且内容确实溢出"的容器解除裁剪（overflow:visible + height:auto），
-// 让 .prototype-root 自然长到完整内容高度，再由 ResizeObserver 上报给画布。
-// 平铺正好一屏的固定页（contentHeight == clientHeight）不会被改动，幻灯片等不被误展开。
+// 画布中展示"完整内容"：只有当页面存在显式滚动容器（overflowY: auto/scroll 且内容确实溢出）
+// 时才打开裁剪链，让 .prototype-root 长到完整内容高度，再由 ResizeObserver 上报给画布。
+// 纯 overflow:hidden 的固定设计页（如固定高度裁剪面板、整屏幻灯片）是作者意图，一律不展开，
+// 否则会误展开本应裁剪的内容、并把吸底栏（absolute 相对画布框）挤出底部。
+// 展开集合 = 所有显式滚动容器 + 其祖先中确为裁剪的容器（overflowY !== visible），
+// 以便打开包裹完整内容的画布框，吸底栏随帧一起钉到完整内容底部。
 function expandVerticalClippedElements(root: Element) {
   const elements = Array.from(root.querySelectorAll("*"));
-  for (let i = elements.length - 1; i >= 0; i--) {
-    const el = elements[i];
-    if (!(el instanceof HTMLElement)) continue;
+  const scrollRoots = elements.filter((el): el is HTMLElement => {
+    if (!(el instanceof HTMLElement)) return false;
     const overflowY = getComputedStyle(el).overflowY;
-    const clipsVertical =
-      overflowY === "auto" || overflowY === "scroll" || overflowY === "hidden";
-    if (!clipsVertical || el.scrollHeight <= el.clientHeight + 1) continue;
+    return (
+      (overflowY === "auto" || overflowY === "scroll") &&
+      el.scrollHeight > el.clientHeight + 1
+    );
+  });
+  // 守卫：页面没有任何显式滚动容器，说明是固定设计页，尊重 overflow:hidden 的裁剪，不展开。
+  if (scrollRoots.length === 0) return;
+
+  const toExpand = new Set<HTMLElement>(scrollRoots);
+  for (const scrollRoot of scrollRoots) {
+    let ancestor = scrollRoot.parentElement;
+    while (ancestor && ancestor !== root) {
+      if (
+        ancestor instanceof HTMLElement &&
+        getComputedStyle(ancestor).overflowY !== "visible"
+      ) {
+        toExpand.add(ancestor);
+      }
+      ancestor = ancestor.parentElement;
+    }
+  }
+  for (const el of toExpand) {
     el.style.overflow = "visible";
     el.style.height = "auto";
   }
@@ -524,7 +543,11 @@ export function PrototypePagePreview({
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         console.count("[perf] PrototypePagePreview ResizeObserver fire");
-        reportHeight(entry.contentRect.height);
+        // 必须上报内容跨度（scrollHeight）而非容器盒高（contentRect.height）：
+        // 固定设计高度（如 .figma-export 812px）内溢出的内容会让两者不一致，若上报盒高
+        // 会与 rAF/fonts 的 scrollHeight 口径互相打架，导致卡片在"实际高度/一屏高度"间闪烁。
+        const target = entry.target as HTMLElement;
+        reportHeight(target.scrollHeight);
       }
     });
     observer.observe(root);
