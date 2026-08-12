@@ -314,7 +314,6 @@ export function KnowledgeDocDialog({
               <DocumentEditor
                 value={addContent}
                 onChange={setAddContent}
-                format="markdown"
               />
             </div>
           </div>
@@ -344,7 +343,6 @@ export function KnowledgeDocDialog({
                   replaceCollabText(collab.ytext, nextValue);
                 }
               }}
-              format="markdown"
             />
           </div>
           {collabDescriptor && (

@@ -76,6 +76,10 @@ class BackendProvidersManager {
           models: item.models.map((m: unknown) => String(m)),
           defaultModel: item.defaultModel ? String(item.defaultModel) : undefined,
           enabled: item.enabled !== false,
+          contextWindow:
+            typeof item.contextWindow === "number" ? item.contextWindow : undefined,
+          maxTokens:
+            typeof item.maxTokens === "number" ? item.maxTokens : undefined,
         });
       }
 

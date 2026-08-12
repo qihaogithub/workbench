@@ -10,12 +10,14 @@ let NodeExecutionEnv: any;
 let InMemorySessionRepo: any;
 let getModel: any;
 let getModels: any;
+let estimateContextTokens: any;
 
 export async function loadPiAgentDeps(): Promise<void> {
   if (!AgentHarness) {
     const piAgentCore = await import('@earendil-works/pi-agent-core');
     AgentHarness = piAgentCore.AgentHarness;
     InMemorySessionRepo = piAgentCore.InMemorySessionRepo;
+    estimateContextTokens = piAgentCore.estimateContextTokens;
 
     const piAgentCoreNode = await import('@earendil-works/pi-agent-core/node');
     NodeExecutionEnv = piAgentCoreNode.NodeExecutionEnv;
@@ -44,4 +46,8 @@ export function getGetModel(): any {
 
 export function getGetModels(): any {
   return getModels;
+}
+
+export function getEstimateContextTokens(): any {
+  return estimateContextTokens;
 }

@@ -3,6 +3,8 @@ import {
   createCommentThread,
   createReply,
   readCommentStore,
+  updateCommentThread,
+  updateReply,
 } from "./comment-store";
 import type { CommentMention } from "@workbench/shared";
 
@@ -148,5 +150,59 @@ describe("createReply @AI 触发任务", () => {
 describe("readCommentStore 兜底", () => {
   it("文件不存在时返回空线程列表", () => {
     expect(readCommentStore("no-such")).toEqual({ threads: [] });
+  });
+});
+
+describe("编辑评论与回复", () => {
+  function enqueueCallsForEdit() {
+    const fetchMock = global.fetch as jest.Mock;
+    return fetchMock.mock.calls.filter((call: [string]) =>
+      (call[0] as string).includes("/internal/comments/ai-task"),
+    );
+  }
+
+  async function createThreadForEdit() {
+    return createCommentThread({
+      projectId: "p1",
+      pageId: "page-1",
+      anchor: { domPath: "body > div", tagName: "div" },
+      pin: { xRatio: 0.5, yRatio: 0.5 },
+      content: "请修改按钮颜色",
+      author,
+    });
+  }
+
+  it("保存主评论的正文和提及列表", async () => {
+    const thread = await createThreadForEdit();
+    const updated = await updateCommentThread("p1", thread.id, {
+      content: "请改为深色 @AI 助手",
+      mentions: [agentMention],
+    });
+
+    expect(updated).toMatchObject({
+      content: "请改为深色 @AI 助手",
+      mentions: [agentMention],
+      aiTaskStatus: "pending",
+    });
+    expect(enqueueCallsForEdit()).toHaveLength(1);
+  });
+
+  it("保存回复的正文和提及列表", async () => {
+    const thread = await createThreadForEdit();
+    const created = await createReply({
+      projectId: "p1",
+      threadId: thread.id,
+      content: "初始回复",
+      author,
+    });
+    const updated = await updateReply("p1", thread.id, created!.reply.id, {
+      content: "修改后的回复 @张三",
+      mentions: [userMention],
+    });
+
+    expect(updated?.reply).toMatchObject({
+      content: "修改后的回复 @张三",
+      mentions: [userMention],
+    });
   });
 });

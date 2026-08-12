@@ -48,15 +48,15 @@ function renderChatMessages({
 }
 
 describe("ChatMessages 流式占位", () => {
-  it("等待首个 assistant 输出时展示处理中点阵", () => {
+  it("等待首个 assistant 输出时展示处理中点阵", async () => {
     renderChatMessages({
       messages: [{ id: "user-1", role: "user", content: "创建页面" }],
     });
 
-    expect(screen.getByTestId("ai-working-indicator")).toBeInTheDocument();
+    expect(await screen.findByTestId("ai-working-indicator")).toBeInTheDocument();
   });
 
-  it("最终 assistant 消息已落入历史后不再渲染空处理中占位", () => {
+  it("最终 assistant 消息已落入历史后不再渲染空处理中占位", async () => {
     renderChatMessages({
       messages: [
         { id: "user-1", role: "user", content: "创建页面" },
@@ -64,7 +64,7 @@ describe("ChatMessages 流式占位", () => {
       ],
     });
 
-    expect(screen.getByText("页面已创建")).toBeInTheDocument();
+    expect(await screen.findByText("页面已创建")).toBeInTheDocument();
     expect(screen.queryByTestId("ai-working-indicator")).not.toBeInTheDocument();
   });
 });

@@ -253,6 +253,7 @@ export interface StreamEvent {
     | "finish"
     | "pong"
     | "status"
+    | "context_compacted"
     | "permission_request"
     | "user_choice_request"
     | "models";
@@ -308,6 +309,12 @@ export interface StreamEvent {
   }>;
   currentModelId?: string;
   canSwitch?: boolean;
+  contextCompaction?: {
+    reason: "preflight" | "overflow_recovery";
+    tokensBefore: number;
+    contextWindow: number;
+    durationMs: number;
+  };
 }
 
 export interface ToolCapabilities {

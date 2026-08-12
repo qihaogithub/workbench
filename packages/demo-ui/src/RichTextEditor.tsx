@@ -32,9 +32,7 @@ export function RichTextEditor({
     <DocumentEditor
       value={content}
       onChange={onChange}
-      format="markdown"
       uploadHandler={uploadHandler}
-      previewSanitizer={sanitizeNoteHtml}
       referenceCandidates={referenceCandidates}
     />
   );

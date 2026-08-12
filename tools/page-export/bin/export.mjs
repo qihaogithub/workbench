@@ -230,9 +230,20 @@ async function main() {
     console.error(`[auth] 已登录 ${args.username}，cookie -> ${cookieFile}`);
   }
 
-  // 3. 渲染
+  // 3. 渲染（或 B 路径：静态源码直接净化，不经 headless Chrome）
+  const staticDir = args.static ? path.resolve(args.static) : null;
   for (const route of routes) {
     const outFile = path.join(htmlDir, `${route.file}.html`);
+    if (staticDir) {
+      const srcFile = path.join(staticDir, `${route.file}.html`);
+      if (!fs.existsSync(srcFile)) {
+        console.error(`[static] 缺少源文件 ${route.routeKey}: ${srcFile}`);
+        continue;
+      }
+      fs.copyFileSync(srcFile, outFile);
+      console.error(`[static] ${route.routeKey} -> 复制源码 ${srcFile}`);
+      continue;
+    }
     try {
       const bytes = runSingleFile(route.url, outFile, cookieFile);
       console.error(`[render] ${route.routeKey} -> ${bytes} bytes`);

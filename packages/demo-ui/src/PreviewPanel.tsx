@@ -1207,6 +1207,10 @@ function PreviewPanelInternal({
             onContentLoaded?.({ requestId });
           }
           sendCollectPositionableSizes();
+          // 固定 iframe 外壳在页面切换期间保持 READY；此前图层树请求会落在
+          // 新组件挂载前的空壳 DOM。组件实际渲染完成后再采集一次，确保图层
+          // 列表对应当前 React 页面。
+          sendCollectVisualNodeTree();
           break;
 
         case "COMPONENT_READY":

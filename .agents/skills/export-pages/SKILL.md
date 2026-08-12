@@ -76,9 +76,25 @@ corepack pnpm ow project import-prototype --source . --manifest @./manifest.json
 | `PROTOTYPE_GLOBAL_SELECTOR_FORBIDDEN` | normalize should localize `html/body/:root`; if it reappears, report it. |
 | Missing Chrome | Set `CHROME_BIN` or install Chrome. |
 
-## Review Opinion Backflow (P1, not implemented)
+## Review Opinion Backflow (P1)
 
-The 创作端 annotation→AI review loop on prototype pages and the routeKey-based opinion export are P1 work, tracked in `docs/plans/远期规划/创作端开发项目模式方案/页面导出工具方案.md`. The `data-route` anchors injected by normalize are the prepared contract for that backflow; do not strip them.
+The 创作端 annotation→AI review loop now works end-to-end for exported prototype pages:
+
+- **批注闭环**：创作端单页预览原型页（`PrototypePagePreview`）已接通批注交互（批注图钉 + 输入浮层），批注模式和发送给 AI 已挂载到预览工具栏；AI prompt 按页面运行时类型分流到 `prototype.html` / `prototype.css`。
+- **意见回流**：用 `export-opinions.mjs` 读 `data/projects/<projectId>/comments.json`，按 `routeKey`（来自 `data-route` 锚点 / 项目 demoPages）导出评审意见 JSON：
+  ```bash
+  node tools/page-export/bin/export-opinions.mjs --project <projectId> --data-dir <repo>/data --output opinions.json
+  ```
+  单条意见：`{ pageId, routeKey, threadId, anchor: { domPath, pin }, text, createdAt, resolved, status }`。
+
+**消费流程（agent 在开发项目执行）**：
+1. 读取 `opinions.json`，按 `routeKey` 定位开发项目对应路由源码。
+2. 逐条消费意见：`anchor.domPath` 是创作端快照 DOM 定位，仅作视觉参考；`text` 是评审正文；据此定位源码并落地修改。
+3. 处理完一条后，把该条 `threadId` 标记为已回写（可回写 `resolved: true`），与下次导出形成循环。
+
+`data-route` 锚点由 normalize 注入，是回流主键；不要在开发项目侧剥离。
+
+## Final Response
 
 ## Final Response
 

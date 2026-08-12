@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "build:docker": "esbuild src/server.ts --bundle --platform=node --target=node20 --outdir=dist --format=cjs --external:fastify --external:@fastify/cors --external:@fastify/rate-limit --external:pino --external:pino-pretty --external:puppeteer-core",
+    "build:docker": "esbuild src/server.ts --bundle --platform=node --target=node24 --outdir=dist --format=cjs --external:fastify --external:@fastify/cors --external:@fastify/rate-limit --external:pino --external:pino-pretty --external:puppeteer-core",
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest",

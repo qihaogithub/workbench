@@ -15,7 +15,8 @@ import type {
   CommentApiAdapter,
   CreateCommentInput,
   MentionCandidate,
-} from "@workbench/demo-ui";
+  UpdateCommentContentInput,
+} from "@workbench/demo-ui/comment";
 import type { CommentReply, CommentThread, ProjectVisitor } from "@workbench/shared";
 
 interface ApiEnvelope<T> {
@@ -72,6 +73,20 @@ export function createAuthorCommentApi(projectId: string): CommentApiAdapter {
       return data.reply;
     },
 
+    async updateComment(threadId: string, input: UpdateCommentContentInput): Promise<CommentThread> {
+      const data = await commentRequest<{ thread: CommentThread }>(`${base}/${encodeURIComponent(threadId)}`, {
+        method: "PATCH", body: JSON.stringify(input),
+      });
+      return data.thread;
+    },
+
+    async updateReply(threadId: string, replyId: string, input: UpdateCommentContentInput): Promise<CommentReply> {
+      const data = await commentRequest<{ reply: CommentReply }>(`${base}/${encodeURIComponent(threadId)}/replies/${encodeURIComponent(replyId)}`, {
+        method: "PATCH", body: JSON.stringify(input),
+      });
+      return data.reply;
+    },
+
     async setResolved(threadId: string, resolved: boolean): Promise<void> {
       await commentRequest<{ thread: CommentThread }>(
         `${base}/${encodeURIComponent(threadId)}`,
@@ -90,6 +105,13 @@ export function createAuthorCommentApi(projectId: string): CommentApiAdapter {
       await commentRequest<{ deleted: boolean }>(
         `${base}/${encodeURIComponent(threadId)}/replies/${encodeURIComponent(replyId)}`,
         { method: "DELETE" },
+      );
+    },
+
+    async retryAiTask(threadId: string): Promise<void> {
+      await commentRequest<{ thread: CommentThread }>(
+        `${base}/${encodeURIComponent(threadId)}/retry-ai`,
+        { method: "POST", body: JSON.stringify({}) },
       );
     },
 

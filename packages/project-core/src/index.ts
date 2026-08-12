@@ -26,3 +26,11 @@ export type {
   WorkspaceRootManifest,
 } from "./workspace-resource-registry";
 export type * from "./types";
+export {
+  applyPageDesignSpecSync,
+  buildPageDesignSpecSyncWrites,
+} from "./page-design-spec-sync";
+export type {
+  PageDesignSpecSyncInput,
+  PageDesignSpecSyncWrite,
+} from "./page-design-spec-sync";

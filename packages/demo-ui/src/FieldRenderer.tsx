@@ -354,7 +354,6 @@ function RichTextInput({
             <DocumentEditor
               value={(value as string) || ""}
               onChange={(v) => onChange(v)}
-              format="markdown"
               readOnly={readonly}
             />
           </div>
@@ -655,7 +654,6 @@ function RichTextInput({
             <DocumentEditor
               value={(value as string) || ""}
               onChange={(v) => onChange(v)}
-              format="markdown"
               readOnly={readonly}
             />
           </div>

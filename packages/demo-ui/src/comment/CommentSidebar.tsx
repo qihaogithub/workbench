@@ -9,6 +9,7 @@ import { useMemo, useState } from "react";
 import { Bot, CheckCircle2, MessageSquare, X } from "lucide-react";
 import type { CommentThread } from "@workbench/shared";
 import { cn } from "../utils";
+import { AI_STATUS_LABEL } from "./comment-status";
 import { MentionContent } from "./MentionPicker";
 import { threadMentionsUser } from "./useComments";
 import type { CommentFilter } from "./types";
@@ -131,9 +132,14 @@ export function CommentSidebar({
                   {thread.author.name}
                 </span>
                 {thread.aiTaskStatus && !thread.resolved && (
-                  <span className="ml-auto flex items-center gap-0.5 rounded bg-violet-500/15 px-1 py-0.5 text-[9px] text-violet-500">
+                  <span
+                    className={cn(
+                      "ml-auto flex items-center gap-0.5 rounded px-1 py-0.5 text-[9px]",
+                      AI_STATUS_LABEL[thread.aiTaskStatus].className,
+                    )}
+                  >
                     <Bot className="h-2.5 w-2.5" />
-                    {thread.aiTaskStatus}
+                    {AI_STATUS_LABEL[thread.aiTaskStatus].text}
                   </span>
                 )}
                 {thread.resolved && (

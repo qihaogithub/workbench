@@ -202,7 +202,6 @@ export function ConventionDialog({
                   key={`${activeKey}-${open}`}
                   value={content}
                   onChange={setContent}
-                  format="markdown"
                 />
               </div>
             )}

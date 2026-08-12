@@ -147,6 +147,54 @@ describe("VisualPropertyPanel 布局控件", () => {
       "120px",
     );
   });
+
+  it("支持从紧凑内边距切换为 Figma 式四边独立编辑", () => {
+    const onPropertyChange = jest.fn();
+    renderPanel({ onPropertyChange });
+
+    fireEvent.click(screen.getByRole("button", { name: "单独设置四边内边距" }));
+    fireEvent.change(screen.getByLabelText("上内边距"), {
+      target: { value: "12" },
+    });
+
+    expect(onPropertyChange).toHaveBeenCalledWith(
+      selectedNode,
+      "paddingTop",
+      "上内边距",
+      "12",
+      "style",
+      undefined,
+    );
+  });
+
+  it("边框存在时提供四边独立宽度编辑", () => {
+    const onPropertyChange = jest.fn();
+    renderPanel({
+      onPropertyChange,
+      selectedNode: {
+        ...selectedNode,
+        computedStyle: {
+          ...selectedNode.computedStyle,
+          borderStyle: "solid",
+          borderWidth: "1px",
+          borderColor: "#111111",
+        },
+      },
+    });
+
+    fireEvent.change(screen.getByLabelText("右边框"), {
+      target: { value: "2" },
+    });
+
+    expect(onPropertyChange).toHaveBeenCalledWith(
+      expect.any(Object),
+      "borderRightWidth",
+      "右边框",
+      "2",
+      "style",
+      undefined,
+    );
+  });
 });
 
 describe("VisualPropertyPanel 配置项入口", () => {

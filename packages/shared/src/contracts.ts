@@ -192,6 +192,8 @@ export function isManagedWorkspaceResource(resourcePath: string): boolean {
     || normalized === "memory.md"
     || normalized === "knowledge/manifest.json"
     || /^knowledge\/[^/]+\.(md|markdown|mdown)$/i.test(normalized)
+    || normalized === "design-spec/manifest.json"
+    || /^design-spec\/spec-[^/]+\.json$/.test(normalized)
     || /^assets\/.+/.test(normalized)
   ));
 }

@@ -244,7 +244,10 @@ export function createWorkspace(
 
 export function getOrCreateProjectActiveWorkspace(
   projectId: string,
-  options: { migrationWorkspaceId?: string | null } = {},
+  options: {
+    migrationWorkspaceId?: string | null;
+    includeFiles?: boolean;
+  } = {},
 ): CreateWorkspaceResult {
   if (!projectExists(projectId)) {
     throw new Error(`Project "${projectId}" 不存在`);
@@ -289,10 +292,12 @@ export function getOrCreateProjectActiveWorkspace(
         });
       }
       if (isWorkspaceBasedOnLatest(projectId, meta)) {
-        const demos = getWorkspaceMultiDemoFiles(project.activeWorkspaceId) ?? {
-          demos: {},
-          projectConfigSchema: undefined,
-        };
+        const demos = options.includeFiles === false
+          ? { demos: {}, projectConfigSchema: undefined }
+          : getWorkspaceMultiDemoFiles(project.activeWorkspaceId) ?? {
+              demos: {},
+              projectConfigSchema: undefined,
+            };
         return {
           workspaceId: project.activeWorkspaceId,
           workspacePath: activePath,
@@ -332,10 +337,12 @@ export function getOrCreateProjectActiveWorkspace(
     updatedAt: now,
   });
 
-  const demos = getWorkspaceMultiDemoFiles(workspaceId) ?? {
-    demos: {},
-    projectConfigSchema: undefined,
-  };
+  const demos = options.includeFiles === false
+    ? { demos: {}, projectConfigSchema: undefined }
+    : getWorkspaceMultiDemoFiles(workspaceId) ?? {
+        demos: {},
+        projectConfigSchema: undefined,
+      };
   return {
     workspaceId,
     workspacePath,

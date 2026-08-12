@@ -559,6 +559,7 @@ export function VisualPropertyPanel({
   const [localizingChangeId, setLocalizingChangeId] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [cornerRadiusExpanded, setCornerRadiusExpanded] = useState(false);
+  const [paddingExpanded, setPaddingExpanded] = useState(false);
   const [editingConfigChangeId, setEditingConfigChangeId] = useState<string | null>(null);
   const specsBySection = useMemo(() => {
     if (!selectedNode) return [];
@@ -963,7 +964,7 @@ export function VisualPropertyPanel({
     const specByProperty = new Map(POSITION_SPECS.map((spec) => [spec.property, spec]));
 
     return (
-      <section key="位置" className="border-b bg-card">
+      <section key="位置" className="border-b border-border/80 bg-card">
         <div className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-foreground">
           {getGroupIcon("位置")}
           位置
@@ -1237,7 +1238,7 @@ export function VisualPropertyPanel({
     );
 
     return (
-      <section key="布局" className="border-b bg-card">
+      <section key="布局" className="border-b border-border/80 bg-card">
         <div className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-foreground">
           {getGroupIcon("布局")}
           布局
@@ -1342,13 +1343,22 @@ export function VisualPropertyPanel({
           </div>
 
           <div className="space-y-1.5">
-            <div className="flex items-center">
+            <div className="flex items-center justify-between gap-2">
               {renderConfigMarkLabel(
                 { property: "paddingLeft", label: "左右内边距", kind: "style" },
                 paddingXValue,
                 undefined,
                 "内边距",
               )}
+              <button
+                type="button"
+                className="flex h-5 w-5 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                title={paddingExpanded ? "合并四边内边距" : "单独设置四边内边距"}
+                aria-label={paddingExpanded ? "合并四边内边距" : "单独设置四边内边距"}
+                onClick={() => setPaddingExpanded((value) => !value)}
+              >
+                {paddingExpanded ? <Link2 className="h-3.5 w-3.5" /> : <Grid3X3 className="h-3.5 w-3.5" />}
+              </button>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="relative">
@@ -1388,6 +1398,29 @@ export function VisualPropertyPanel({
                 </span>
               </div>
             </div>
+            {paddingExpanded && (
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  ["paddingTop", "上内边距", "T"],
+                  ["paddingRight", "右内边距", "R"],
+                  ["paddingBottom", "下内边距", "B"],
+                  ["paddingLeft", "左内边距", "L"],
+                ] as const).map(([property, label, shortLabel]) => (
+                  <div key={property} className="relative">
+                    <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground">
+                      {shortLabel}
+                    </span>
+                    <Input
+                      value={getStyleNumberValue(property)}
+                      aria-label={label}
+                      className="h-8 pl-6 pr-7 font-mono text-xs"
+                      onChange={(event) => applyStyleValue(property, label, event.target.value)}
+                    />
+                    <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] text-muted-foreground">px</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-between gap-3">
@@ -1423,7 +1456,7 @@ export function VisualPropertyPanel({
     };
 
     return (
-      <section key="外观" className="border-b bg-card">
+      <section key="外观" className="border-b border-border/80 bg-card">
         <div className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-foreground">
           {getGroupIcon("外观")}
           外观
@@ -1516,7 +1549,7 @@ export function VisualPropertyPanel({
     };
 
     return (
-      <section key="边框" className="border-b bg-card">
+      <section key="边框" className="border-b border-border/80 bg-card">
         <div className="flex items-center justify-between px-3 py-2">
           <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
             {getGroupIcon("边框")}
@@ -1574,6 +1607,36 @@ export function VisualPropertyPanel({
                 </span>
               </div>
             </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center">
+                {renderConfigMarkLabel(
+                  { property: "borderWidth", label: "描边各边", kind: "style" },
+                  borderWidthValue,
+                  undefined,
+                  "各边",
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  ["borderTopWidth", "上边框", "T"],
+                  ["borderRightWidth", "右边框", "R"],
+                  ["borderBottomWidth", "下边框", "B"],
+                  ["borderLeftWidth", "左边框", "L"],
+                ] as const).map(([property, label, shortLabel]) => (
+                  <div key={property} className="relative">
+                    <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground">{shortLabel}</span>
+                    <Input
+                      value={getStyleNumberValue(property) || borderWidthValue}
+                      aria-label={label}
+                      className="h-8 pl-6 pr-7 font-mono text-xs"
+                      onChange={(event) => applyStyleValue(property, label, event.target.value)}
+                    />
+                    <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] text-muted-foreground">px</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </section>
@@ -1591,11 +1654,11 @@ export function VisualPropertyPanel({
     const value = change?.value ?? currentValue;
 
     return (
-      <section key="背景" className="border-b bg-card">
+      <section key="背景" className="border-b border-border/80 bg-card">
         <div className="flex items-center justify-between px-3 py-2">
           <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
             {getGroupIcon("背景")}
-            背景
+            填充
           </div>
           {!hasBackgroundColor && (
             <Button
@@ -1603,7 +1666,7 @@ export function VisualPropertyPanel({
               variant="ghost"
               size="icon"
               className="h-6 w-6"
-              title="添加背景"
+              title="添加填充"
               onClick={addBackground}
             >
               <Plus className="h-3.5 w-3.5" />
@@ -1645,11 +1708,11 @@ export function VisualPropertyPanel({
     };
 
     return (
-      <section key="阴影与模糊" className="border-b bg-card">
+      <section key="阴影与模糊" className="border-b border-border/80 bg-card">
         <div className="flex items-center justify-between px-3 py-2">
           <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
             {getGroupIcon("阴影与模糊")}
-            阴影与模糊
+            效果
           </div>
           {!hasVisibleEffect && (
             <Button

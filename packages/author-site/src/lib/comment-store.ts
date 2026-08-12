@@ -11,6 +11,7 @@ import type {
   CommentReply,
   CommentStoreData,
   CommentAiTaskStatus,
+  CommentMention,
   CommentWsEvent,
 } from "@workbench/shared";
 import { getProjectPath } from "./paths";
@@ -153,6 +154,7 @@ export async function createCommentThread(
 export interface UpdateCommentInput {
   resolved?: boolean;
   content?: string;
+  mentions?: CommentMention[];
   aiTaskStatus?: CommentAiTaskStatus;
 }
 
@@ -171,9 +173,16 @@ export async function updateCommentThread(
   if (updates.content !== undefined) {
     thread.content = updates.content;
   }
+  const hadAgentMention = thread.mentions?.some((mention) => mention.type === "agent") ?? false;
+  if (updates.mentions !== undefined) {
+    thread.mentions = updates.mentions;
+  }
   if (updates.aiTaskStatus !== undefined) {
     thread.aiTaskStatus = updates.aiTaskStatus;
   }
+  const hasAgentMention = thread.mentions?.some((mention) => mention.type === "agent") ?? false;
+  const shouldEnqueueAgent = updates.mentions !== undefined && hasAgentMention && !hadAgentMention;
+  if (shouldEnqueueAgent) thread.aiTaskStatus = "pending";
   thread.updatedAt = Date.now();
 
   writeCommentStore(projectId, data);
@@ -191,6 +200,12 @@ export async function updateCommentThread(
       threadId,
       aiTaskStatus: updates.aiTaskStatus,
     });
+  }
+  await notifyWsEvent(projectId, { type: "comment:updated", thread });
+
+  if (shouldEnqueueAgent) {
+    await notifyWsEvent(projectId, { type: "comment:ai-status", threadId, aiTaskStatus: "pending" });
+    await enqueueAiTask(projectId, threadId);
   }
 
   return thread;
@@ -279,6 +294,32 @@ export async function deleteReply(
   return true;
 }
 
+export async function updateReply(
+  projectId: string,
+  threadId: string,
+  replyId: string,
+  updates: { content: string; mentions?: CommentMention[] },
+): Promise<{ thread: CommentThread; reply: CommentReply } | null> {
+  const data = readCommentStore(projectId);
+  const thread = data.threads.find((candidate) => candidate.id === threadId);
+  const reply = thread?.replies.find((candidate) => candidate.id === replyId);
+  if (!thread || !reply) return null;
+
+  const hadAgentMention = reply.mentions?.some((mention) => mention.type === "agent") ?? false;
+  reply.content = updates.content;
+  reply.mentions = updates.mentions;
+  thread.updatedAt = Date.now();
+  const hasAgentMention = reply.mentions?.some((mention) => mention.type === "agent") ?? false;
+  if (hasAgentMention && !hadAgentMention) thread.aiTaskStatus = "pending";
+  writeCommentStore(projectId, data);
+  await notifyWsEvent(projectId, { type: "comment:updated", thread });
+  if (hasAgentMention && !hadAgentMention) {
+    await notifyWsEvent(projectId, { type: "comment:ai-status", threadId, aiTaskStatus: "pending" });
+    await enqueueAiTask(projectId, threadId);
+  }
+  return { thread, reply };
+}
+
 /**
  * 获取所有待 AI 处理的评论（aiTaskStatus = "pending"）
  */
@@ -287,6 +328,32 @@ export function getPendingAiComments(projectId: string): CommentThread[] {
   return threads
     .filter((t) => t.aiTaskStatus === "pending")
     .sort((a, b) => a.createdAt - b.createdAt);
+}
+
+/**
+ * @AI 任务失败后重试：将线程状态置回 pending 并重新入队。
+ * 供作者点击「重试」时调用。
+ */
+export async function retryAiTask(
+  projectId: string,
+  threadId: string,
+): Promise<CommentThread | null> {
+  const data = readCommentStore(projectId);
+  const thread = data.threads.find((t) => t.id === threadId);
+  if (!thread) return null;
+  if (thread.aiTaskStatus !== "failed") return thread;
+
+  thread.aiTaskStatus = "pending";
+  thread.updatedAt = Date.now();
+  writeCommentStore(projectId, data);
+
+  await notifyWsEvent(projectId, {
+    type: "comment:ai-status",
+    threadId,
+    aiTaskStatus: "pending",
+  });
+  await enqueueAiTask(projectId, threadId);
+  return thread;
 }
 
 /**

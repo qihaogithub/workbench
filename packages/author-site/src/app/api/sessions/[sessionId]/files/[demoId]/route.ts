@@ -35,6 +35,7 @@ import {
   type SketchScenePatchOperation,
 } from "@workbench/shared";
 import type { RuntimeValidationResult } from "@workbench/project-core";
+import { applyPageDesignSpecSync } from "@workbench/project-core/page-design-spec-sync";
 import { localizeHtmlImages, type ImageLocalizationResult } from "@/lib/image-localizer";
 
 type SketchPatchPayload = {
@@ -882,6 +883,15 @@ export async function PUT(
           createApiError("FILE_WRITE_ERROR", "更新页面文件失败"),
           { status: 500 },
         );
+      }
+      if (typeof schema === "string") {
+        const page = listDemoPages(wsPath).find((candidate) => candidate.id === demoId);
+        applyPageDesignSpecSync({
+          workspacePath: wsPath,
+          pageId: demoId,
+          pageName: page?.name ?? demoId,
+          schema,
+        });
       }
     }
 

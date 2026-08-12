@@ -14,6 +14,8 @@ import type {
   VisualNodeInfo,
   VisualNodeTreeItem,
   VisualPropertyChange,
+  VisualAnnotation,
+  VisualStyleChange,
 } from "./types";
 
 export interface PrototypePagePreviewProps {
@@ -41,6 +43,14 @@ export interface PrototypePagePreviewProps {
   onToggleNodeHidden?: (node: VisualNodeInfo) => void;
   visualNodeTreeRequestKey?: number;
   onVisualNodeTreeChange?: (nodes: VisualNodeTreeItem[]) => void;
+  visualAnnotations?: VisualAnnotation[];
+  visualAnnotationMode?: boolean;
+  onVisualAnnotationCreate?: (
+    node: VisualNodeInfo,
+    text?: string,
+    annotationId?: string,
+    styleChanges?: VisualStyleChange[],
+  ) => void;
 }
 
 type VisualElement = HTMLElement | SVGElement;
@@ -426,6 +436,9 @@ export function PrototypePagePreview({
   onToggleNodeHidden,
   visualNodeTreeRequestKey,
   onVisualNodeTreeChange,
+  visualAnnotations = [],
+  visualAnnotationMode = false,
+  onVisualAnnotationCreate,
 }: PrototypePagePreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -438,6 +451,12 @@ export function PrototypePagePreview({
     x: number;
     y: number;
     tree: VisualNodeTreeItem;
+  } | null>(null);
+  const [annotationDraft, setAnnotationDraft] = useState<{
+    node: VisualNodeInfo;
+    annotationId?: string;
+    text: string;
+    rect: { x: number; y: number; width: number; height: number };
   } | null>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const [containerHeight, setContainerHeight] = useState<number>(0);
@@ -646,6 +665,78 @@ export function PrototypePagePreview({
 
   useEffect(() => {
     const shadow = shadowRef.current;
+    if (!shadow) return;
+    shadow.querySelectorAll("[data-prototype-annotation-pin]").forEach((pin) => pin.remove());
+    if (!visualEditMode) return;
+    const root = shadow.querySelector<HTMLElement>(".prototype-root");
+    if (!root) return;
+    visualAnnotations.forEach((annotation) => {
+      if (annotation.resolved) return;
+      const element = queryByDomPath(root, annotation.domPath);
+      if (!element) return;
+      const rect = element.getBoundingClientRect();
+      const pin = document.createElement("button");
+      pin.type = "button";
+      pin.setAttribute("data-prototype-annotation-pin", "true");
+      pin.title = annotation.text || "批注";
+      pin.style.cssText = `position:absolute;pointer-events:auto;width:24px;height:24px;border-radius:999px;border:3px solid #fff;background:#f59e0b;font-size:0;cursor:pointer;box-shadow:0 2px 8px rgba(15,23,42,.25);left:${Math.max(2, rect.right - 12)}px;top:${Math.max(2, rect.top - 12)}px;z-index:200;`;
+      pin.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const container = containerRef.current;
+        const containerRect = container?.getBoundingClientRect();
+        setAnnotationDraft({
+          node: {
+            nodeId: annotation.nodeId,
+            domPath: annotation.domPath,
+            tagName: "",
+            textContent: annotation.text,
+            rect: {
+              x: rect.left,
+              y: rect.top,
+              width: rect.width,
+              height: rect.height,
+            },
+            editCapabilities: ["annotate"],
+          },
+          annotationId: annotation.id,
+          text: annotation.text,
+          rect: {
+            x: (rect?.left ?? 0) - (containerRect?.left ?? 0),
+            y: (rect?.top ?? 0) - (containerRect?.top ?? 0),
+            width: rect?.width ?? 0,
+            height: rect?.height ?? 0,
+          },
+        });
+        hostRef.current?.focus({ preventScroll: true });
+      });
+      root.appendChild(pin);
+    });
+  }, [configData, css, html, visualAnnotations, visualEditMode, visualPropertyChanges]);
+
+  useEffect(() => {
+    const shadow = shadowRef.current;
+    if (!shadow) return;
+    const styleId = "prototype-visual-selection-cursor";
+    shadow.getElementById(styleId)?.remove();
+    if (!visualEditMode || visualAnnotationMode) return;
+
+    const style = document.createElement("style");
+    style.id = styleId;
+    style.textContent = `
+      .prototype-root *, .prototype-root {
+        cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M4 2.5 4.1 18l4.45-4.2 3.1 6.2 3.15-1.58-3.1-6.2 6.2-.18L4 2.5Z' fill='%23111827' stroke='white' stroke-width='1.6' stroke-linejoin='round'/%3E%3Ccircle cx='18.2' cy='18.2' r='3' fill='%233b82f6' stroke='white' stroke-width='1.2'/%3E%3C/svg%3E") 4 3, default !important;
+      }
+      [data-prototype-annotation-pin], [data-prototype-annotation-pin] * {
+        cursor: pointer !important;
+      }
+    `;
+    shadow.appendChild(style);
+    return () => style.remove();
+  }, [visualAnnotationMode, visualEditMode]);
+
+  useEffect(() => {
+    const shadow = shadowRef.current;
     if (!shadow || !visualEditMode) return;
     const root = shadow.querySelector<HTMLElement>(".prototype-root");
     if (!root) return;
@@ -671,6 +762,10 @@ export function PrototypePagePreview({
       setHoveredElement(target);
     };
     const handleClick = (event: Event) => {
+      const pinnedElement = (event.composedPath()[0] as Element | null)?.closest(
+        "[data-prototype-annotation-pin]",
+      );
+      if (pinnedElement) return;
       setContextMenu(null);
       const mouseEvent = event as MouseEvent;
       const target = resolveVisualEventTarget(event.composedPath()[0] ?? null, root);
@@ -712,6 +807,24 @@ export function PrototypePagePreview({
       onVisualSelect?.(node);
       onVisualSelectStack?.(moveSelectedNodeToStackEnd(stack, node));
       host.focus({ preventScroll: true });
+
+      if (visualAnnotationMode) {
+        const container = containerRef.current;
+        const containerRect = container?.getBoundingClientRect();
+        const targetEl = getElementByVisualId(root, node.nodeId) ||
+          queryByDomPath(root, node.domPath);
+        const rect = targetEl?.getBoundingClientRect();
+        setAnnotationDraft({
+          node,
+          text: "",
+          rect: {
+            x: (rect?.left ?? 0) - (containerRect?.left ?? 0),
+            y: (rect?.top ?? 0) - (containerRect?.top ?? 0),
+            width: rect?.width ?? 0,
+            height: rect?.height ?? 0,
+          },
+        });
+      }
     };
     const handlePointerLeave = () => setHoveredElement(null);
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -814,6 +927,7 @@ export function PrototypePagePreview({
     onVisualSelectStack,
     onToggleNodeHidden,
     selectedVisualNodeId,
+    visualAnnotationMode,
     visualEditMode,
   ]);
 
@@ -841,6 +955,69 @@ export function PrototypePagePreview({
     );
   };
 
+  const renderAnnotationBubble = () => {
+    if (!visualEditMode || !annotationDraft) return null;
+    const bubbleWidth = 280;
+    const estimatedHeight = 96;
+    const ownerWidth = containerRef.current?.clientWidth ?? 320;
+    const ownerHeight = containerRef.current?.clientHeight ?? 240;
+    const left = Math.max(
+      8,
+      Math.min(
+        ownerWidth - bubbleWidth - 8,
+        annotationDraft.rect.x + annotationDraft.rect.width / 2 - bubbleWidth / 2,
+      ),
+    );
+    const below = annotationDraft.rect.y + annotationDraft.rect.height + 8;
+    const top =
+      below + estimatedHeight < ownerHeight
+        ? below
+        : Math.max(8, annotationDraft.rect.y - estimatedHeight - 8);
+    return (
+      <div
+        data-prototype-annotation-draft="true"
+        className="absolute z-40 flex w-[280px] flex-col overflow-hidden rounded-xl border border-border bg-background shadow-lg"
+        style={{ left, top }}
+      >
+        <div className="flex items-center gap-2 p-2">
+          <input
+            autoFocus
+            value={annotationDraft.text}
+            placeholder="描述这些更改..."
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+            onChange={(event) =>
+              setAnnotationDraft((current) =>
+                current ? { ...current, text: event.target.value } : current,
+              )
+            }
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setAnnotationDraft(null);
+              }
+            }}
+          />
+          <button
+            type="button"
+            title="添加批注"
+            className="flex h-6 w-6 items-center justify-center rounded-full bg-foreground text-sm font-semibold text-background"
+            onClick={() => {
+              const draft = annotationDraft;
+              if (!draft) return;
+              const trimmed = draft.text.trim();
+              if (trimmed || draft.annotationId) {
+                onVisualAnnotationCreate?.(draft.node, trimmed, draft.annotationId);
+              }
+              setAnnotationDraft(null);
+            }}
+          >
+            +
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   const previewHost = (
     <div
       ref={hostRef}
@@ -859,6 +1036,7 @@ export function PrototypePagePreview({
       <div className="relative h-full w-full">
         {previewHost}
         {renderContextMenu()}
+        {renderAnnotationBubble()}
       </div>
     );
   }
@@ -880,6 +1058,7 @@ export function PrototypePagePreview({
         <div style={contentStyle}>{previewHost}</div>
       </div>
       {renderContextMenu()}
+      {renderAnnotationBubble()}
     </div>
   );
 }

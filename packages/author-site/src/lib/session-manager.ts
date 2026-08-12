@@ -69,14 +69,8 @@ export interface CreateSessionResult {
   workspaceScope: "live" | "branch" | "snapshot-source" | "legacy";
   isSharedWorkspace: boolean;
   workspacePath: string;
-  /** 第一个 demo 页面的代码（兼容字段，Stage 2 将由前端切换为 demos 字段） */
-  code: string;
-  /** 第一个 demo 页面的 Schema（兼容字段） */
-  schema: string;
   /** @deprecated 兼容旧调用方，等同于 workspacePath */
   tempWorkspace: string;
-  /** 多页面文件集合 + 项目级配置 Schema */
-  demos: MultiDemoFiles;
 }
 
 /** 从 MultiDemoFiles 提取第一个 demo 的 code/schema，便于 Stage 1 兼容旧调用方 */
@@ -429,7 +423,6 @@ export async function createEditSession(
 
   let workspaceId: string;
   let workspacePath: string;
-  let demos: MultiDemoFiles;
   let workspaceScope: CreateSessionResult["workspaceScope"] = "live";
 
   if (existingWorkspaceId) {
@@ -440,23 +433,16 @@ export async function createEditSession(
     workspaceId = existingWorkspaceId;
     workspacePath = wsPath;
     workspaceScope = isLiveWorkspace(existingWorkspaceId) ? "live" : "branch";
-    demos = getWorkspaceMultiDemoFiles(existingWorkspaceId) ?? {
-      demos: {},
-      projectConfigSchema: undefined,
-    };
   } else {
     const wsResult = getOrCreateProjectActiveWorkspace(projectId, {
       migrationWorkspaceId: findActiveWorkspace(userId, projectId),
+      includeFiles: false,
     });
     workspaceId = wsResult.workspaceId;
     workspacePath = wsResult.workspacePath;
-    demos = wsResult.demos;
     workspaceScope = wsResult.workspaceScope ?? "live";
     rebindProjectEditingSessionsToWorkspace(projectId, workspaceId);
   }
-
-  const sortedPageIds = listDemoPages(workspacePath).map(p => p.id);
-  const { code, schema } = pickFirstDemoFiles(demos, sortedPageIds);
 
   const sessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
   const sessionDir = getProjectSessionDir(userId, projectId);
@@ -490,10 +476,7 @@ export async function createEditSession(
     workspaceScope,
     isSharedWorkspace: workspaceScope === "live",
     workspacePath,
-    code,
-    schema,
     tempWorkspace: workspacePath,
-    demos,
   };
 }
 

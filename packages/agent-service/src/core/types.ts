@@ -181,6 +181,7 @@ export type EventType =
   | "error"
   | "finish"
   | "status"
+  | "context_compacted"
   | "permission_request"
   | "user_choice_request";
 
@@ -238,6 +239,15 @@ export interface StatusEvent {
   type: "status";
   sessionId: string;
   status: AgentStatus;
+}
+
+export interface ContextCompactedEvent {
+  type: "context_compacted";
+  sessionId: string;
+  reason: "preflight" | "overflow_recovery";
+  tokensBefore: number;
+  contextWindow: number;
+  durationMs: number;
 }
 
 export interface RunSummaryEvent {
@@ -322,6 +332,7 @@ export type AgentEvent =
   | ErrorEvent
   | FinishEvent
   | StatusEvent
+  | ContextCompactedEvent
   | RunSummaryEvent
   | PermissionRequestEvent
   | UserChoiceRequestEvent

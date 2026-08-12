@@ -1,0 +1,56 @@
+<h2>Markdown 编辑器优化方向</h2>
+<p class="subtitle">我已对比当前项目实现与 Milkdown 官方 Playground。请选择更接近你预期的方向；它决定我们是做视觉打磨，还是切换上层编辑器能力。</p>
+
+<div class="cards">
+  <div class="card" data-choice="crepe" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:18px;background:#f8fafc">
+      <div style="margin:auto;max-width:440px;border:1px solid #e2e8f0;border-radius:14px;background:white;padding:22px 34px;box-shadow:0 12px 32px rgba(15,23,42,.08)">
+        <div style="font-size:30px;font-weight:750;color:#172033;margin-bottom:14px">项目设计说明</div>
+        <div style="color:#475569;line-height:1.75">像官方 Playground 一样，直接采用 Milkdown Crepe：成熟的块菜单、图片工具、链接编辑、代码块与表格交互。</div>
+        <div style="display:flex;gap:8px;margin-top:18px">
+          <span style="border:1px solid #cbd5e1;border-radius:8px;padding:6px 10px;color:#334155">＋ 块菜单</span>
+          <span style="border:1px solid #cbd5e1;border-radius:8px;padding:6px 10px;color:#334155">拖拽</span>
+          <span style="border:1px solid #cbd5e1;border-radius:8px;padding:6px 10px;color:#334155">图片操作</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A · Crepe 优先（推荐）</h3>
+      <p>最接近官方演示，删除大部分自研原生 UI 适配层；保留项目特有的上传和配置引用能力。体验上限最高，迁移与回归成本中等。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="hybrid" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:18px;background:#111827">
+      <div style="margin:auto;max-width:440px;border:1px solid #334155;border-radius:10px;background:#0f172a;padding:18px 24px;color:#e5e7eb">
+        <div style="display:flex;gap:6px;border-bottom:1px solid #334155;padding-bottom:10px;margin-bottom:16px">
+          <span style="border-radius:6px;background:#334155;padding:5px 8px">B</span><span style="padding:5px 8px">I</span><span style="padding:5px 8px">链接</span><span style="margin-left:auto;color:#94a3b8;padding:5px">已保存</span>
+        </div>
+        <div style="font-size:25px;font-weight:700;margin-bottom:12px">项目设计说明</div>
+        <div style="color:#cbd5e1;line-height:1.7">保留现有 Milkdown Kit 架构，补齐版式、悬浮菜单、键盘行为、选区与块操作。</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B · 现有架构深度打磨</h3>
+      <p>继续维护自定义 slash / tooltip / block provider，逐项追平官方体验。改动更局部，但长期维护量最大，容易继续出现细节差异。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="minimal" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:18px;background:#f5f5f4">
+      <div style="margin:auto;max-width:440px;background:white;padding:28px 40px;border-left:3px solid #d6d3d1">
+        <div style="font-family:Georgia,serif;font-size:29px;color:#292524;margin-bottom:14px">项目设计说明</div>
+        <div style="font-family:Georgia,serif;color:#57534e;line-height:1.8">只修正内容宽度、字体层级、间距、焦点和菜单样式，让阅读与书写更舒服。</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C · 轻量视觉优化</h3>
+      <p>不改编辑器能力，只调整 typography、留白、颜色和浮层外观。风险最低、见效最快，但不会解决菜单能力与复杂块交互差距。</p>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:22px">
+  <div class="label">初步审计结论</div>
+  <p>当前实现并不是官方 Playground 使用的 Crepe，而是 Milkdown Kit 加自研 slash、选区工具条和块手柄。正文只设置了 <code>text-sm / px-3 / py-2 / min-height</code>，缺少系统化排版主题；斜杠菜单无搜索与键盘高亮，链接仍用浏览器 prompt，表格按钮是字符图标，块手柄也只有拖拽而没有块级操作。这些共同造成“能编辑，但不像完整产品”的感受。</p>
+</div>

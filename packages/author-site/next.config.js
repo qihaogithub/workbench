@@ -27,6 +27,12 @@ if (fs.existsSync(rootEnvPath)) {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  // 仅影响 next dev：在首页、截图接口与编辑页间切换时保留已编译路由，
+  // 避免默认的短暂缓冲窗口导致重复编译。
+  onDemandEntries: {
+    maxInactiveAge: 5 * 60 * 1000,
+    pagesBufferLength: 12,
+  },
   env: {
     NEXT_PUBLIC_PREVIEW_CDN_BASE_URL:
       process.env.CDN_BASE_URL || "https://esm.sh",

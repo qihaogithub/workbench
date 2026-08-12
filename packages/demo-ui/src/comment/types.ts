@@ -36,6 +36,12 @@ export interface AddReplyInput {
   mentions?: CommentMention[];
 }
 
+/** 编辑评论或回复时可更新的内容。 */
+export interface UpdateCommentContentInput {
+  content: string;
+  mentions?: CommentMention[];
+}
+
 /**
  * 评论 REST API 适配器。
  * 由宿主（viewer-site / author-site）实现，屏蔽鉴权与跨域细节。
@@ -47,12 +53,18 @@ export interface CommentApiAdapter {
   createComment(input: CreateCommentInput): Promise<CommentThread>;
   /** 添加回复 */
   addReply(threadId: string, input: AddReplyInput): Promise<CommentReply>;
+  /** 编辑主评论 */
+  updateComment(threadId: string, input: UpdateCommentContentInput): Promise<CommentThread>;
+  /** 编辑回复 */
+  updateReply(threadId: string, replyId: string, input: UpdateCommentContentInput): Promise<CommentReply>;
   /** 标记解决 / 重新打开 */
   setResolved(threadId: string, resolved: boolean): Promise<void>;
   /** 删除线程 */
   deleteThread(threadId: string): Promise<void>;
   /** 删除回复 */
   deleteReply(threadId: string, replyId: string): Promise<void>;
+  /** @AI 任务失败后重试（重新入队） */
+  retryAiTask?(threadId: string): Promise<void>;
   /** @候选人列表（浏览端为访问者；创作端可含 AI） */
   listMentionCandidates(): Promise<MentionCandidate[]>;
 }
@@ -103,12 +115,20 @@ export interface CommentLayerProps {
   onCreateComment?: (input: CreateCommentInput) => Promise<CommentThread>;
   /** 外部添加回复 */
   onAddReply?: (threadId: string, input: AddReplyInput) => Promise<CommentReply>;
+  /** 外部编辑主评论 */
+  onUpdateComment?: (threadId: string, input: UpdateCommentContentInput) => Promise<CommentThread>;
+  /** 外部编辑回复 */
+  onUpdateReply?: (threadId: string, replyId: string, input: UpdateCommentContentInput) => Promise<CommentReply>;
   /** 外部设置解决状态 */
   onSetResolved?: (threadId: string, resolved: boolean) => Promise<void>;
   /** 外部删除线程 */
   onDeleteThread?: (threadId: string) => Promise<void>;
   /** 外部删除回复 */
   onDeleteReply?: (threadId: string, replyId: string) => Promise<void>;
+  /** @AI 失败后重试（重新入队） */
+  onRetryAiTask?: (threadId: string) => Promise<void>;
+  /** 是否显示预览区评论标记，默认 true。 */
+  showPins?: boolean;
 }
 
 /** 评论创建/定位所需的 iframe 视图状态 */

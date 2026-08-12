@@ -14,6 +14,7 @@ const piAgentMocks = vi.hoisted(() => {
     handlers = new Map<string, (event: any) => any>();
     subscriber?: (event: any) => void;
     abort = vi.fn().mockResolvedValue({ aborted: true });
+    compact = vi.fn().mockResolvedValue({ tokensBefore: 104000 });
 
     constructor(options: any) {
       this.options = options;
@@ -78,6 +79,7 @@ vi.mock('@earendil-works/pi-agent-core', () => ({
       return {};
     }
   },
+  estimateContextTokens: () => ({ tokens: 0 }),
 }));
 
 vi.mock('@earendil-works/pi-agent-core/node', () => ({
@@ -193,6 +195,44 @@ describe('PiAgentBackend', () => {
   });
 
   describe('消息发送', () => {
+    it('在发送前达到安全阈值时压缩历史上下文', async () => {
+      const backend = new PiAgentBackend(mockConfig);
+      await backend.start();
+      const harness = piAgentMocks.harnesses[0];
+      (backend as any).session = {
+        buildContext: vi.fn().mockResolvedValue({
+          messages: [{ role: 'user', content: 'earlier context' }],
+        }),
+      };
+      harness.prompt = vi.fn().mockResolvedValue({ content: 'ok' });
+
+      await expect(backend.sendMessage('x'.repeat(420_000))).resolves.toBe('ok');
+
+      expect(harness.compact).toHaveBeenCalledTimes(1);
+      expect(harness.prompt).toHaveBeenCalledTimes(1);
+    });
+
+    it('上下文溢出后仅压缩并重试原请求一次', async () => {
+      const backend = new PiAgentBackend(mockConfig);
+      await backend.start();
+      const harness = piAgentMocks.harnesses[0];
+      (backend as any).session = {
+        buildContext: vi.fn().mockResolvedValue({
+          messages: [{ role: 'user', content: 'earlier context' }],
+        }),
+      };
+      harness.prompt = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('maximum context length exceeded'))
+        .mockResolvedValueOnce({ content: 'recovered' });
+
+      await expect(backend.sendMessage('retry this')).resolves.toBe('recovered');
+
+      expect(harness.compact).toHaveBeenCalledTimes(1);
+      expect(harness.prompt).toHaveBeenCalledTimes(2);
+      expect(harness.prompt.mock.calls[1]).toEqual(harness.prompt.mock.calls[0]);
+    });
+
     it('应提取字符串形式的 AssistantMessage content', async () => {
       const backend = new PiAgentBackend(mockConfig);
 

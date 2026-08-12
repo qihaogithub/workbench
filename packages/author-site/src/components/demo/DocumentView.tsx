@@ -15,9 +15,9 @@ import {
   MoreVertical,
   Pencil,
   Plus,
-  Save,
   ScrollText,
   Trash2,
+  Upload,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -38,7 +38,13 @@ import {
 } from "@/components/ui/dialog";
 import { DocumentEditor } from "@workbench/demo-ui";
 import type { KnowledgeItem } from "./KnowledgeDocDialog";
+import { DesignSpecEditor } from "./DesignSpecEditor";
+import type { DesignSpecMeta } from "@/lib/design-specs";
 import { cn } from "@/lib/utils";
+import {
+  getKnowledgeUploadTitle,
+  isSupportedKnowledgeUpload,
+} from "./document-view-knowledge";
 
 interface ChatAttachment {
   id: string;
@@ -55,12 +61,13 @@ export interface PageItem {
   name: string;
 }
 
-/** 右侧编辑区当前打开的目标：知识库文档 / AI 记忆 / 项目公约 / 页面公约 */
+/** 右侧编辑区当前打开的目标：知识库文档 / AI 记忆 / 项目公约 / 页面公约 / 设计规范 */
 type ActiveTarget =
   | { kind: "knowledge"; item: KnowledgeItem }
   | { kind: "memory" }
   | { kind: "convention" }
-  | { kind: "pageConvention"; page: PageItem };
+  | { kind: "pageConvention"; page: PageItem }
+  | { kind: "designSpec"; doc: DesignSpecMeta };
 
 /** 解析 workspace files 接口中的路径（memory/convention/pageConvention） */
 function resolveWorkspaceFilePath(target: ActiveTarget): string | null {
@@ -68,6 +75,28 @@ function resolveWorkspaceFilePath(target: ActiveTarget): string | null {
   if (target.kind === "convention") return "convention.md";
   if (target.kind === "pageConvention") return `demos/${target.page.id}/convention.md`;
   return null;
+}
+
+function buildInitialConventionContent(target: ActiveTarget): string {
+  if (target.kind === "convention") {
+    return `# 项目公约
+
+> 项目级的创作约定，AI 必须严格遵守。由用户维护。
+
+## 通用约定
+
+- （在此记录项目级的通用约定）
+`;
+  }
+
+  return `# 页面公约
+
+> 仅适用于当前页面的创作约定，AI 必须严格遵守。由用户维护。
+
+## 页面约定
+
+- （在此记录当前页面的约定）
+`;
 }
 
 export interface DocumentViewProps {
@@ -78,7 +107,6 @@ export interface DocumentViewProps {
   onItemsChange?: (items: KnowledgeItem[]) => void;
   onItemsLoaded?: (items: KnowledgeItem[]) => void;
   onDocHistory?: (item: KnowledgeItem) => void;
-  onAddRequest?: () => void;
   onChatFileSelect?: (file: ChatAttachment) => void;
   onChatFileConvert?: (file: ChatAttachment) => void;
   onChatFileDelete?: (file: ChatAttachment) => void;
@@ -93,7 +121,6 @@ export function DocumentView({
   onItemsChange,
   onItemsLoaded,
   onDocHistory,
-  onAddRequest,
   onChatFileSelect,
   onChatFileConvert,
   onChatFileDelete,
@@ -105,16 +132,22 @@ export function DocumentView({
   const [activeTarget, setActiveTarget] = useState<ActiveTarget | null>(null);
   const [content, setContent] = useState("");
   const [contentLoading, setContentLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
   const [userExpanded, setUserExpanded] = useState(true);
   const [conventionExpanded, setConventionExpanded] = useState(true);
+  const [existingConventionPaths, setExistingConventionPaths] = useState<Set<string>>(
+    new Set(),
+  );
   const [pagePickerOpen, setPagePickerOpen] = useState(false);
   const [chatFiles, setChatFiles] = useState<ChatAttachment[]>([]);
   const [chatFilesLoading, setChatFilesLoading] = useState(false);
   const [chatExpanded, setChatExpanded] = useState(true);
-  const contentRef = useRef(content);
-  contentRef.current = content;
+  const [designSpecs, setDesignSpecs] = useState<DesignSpecMeta[]>([]);
+  const [designSpecsLoading, setDesignSpecsLoading] = useState(false);
+  const [designSpecExpanded, setDesignSpecExpanded] = useState(true);
+  const [knowledgeMenuOpen, setKnowledgeMenuOpen] = useState(false);
+  const [renamingKnowledgeId, setRenamingKnowledgeId] = useState<string | null>(null);
+  const [renamingKnowledgeTitle, setRenamingKnowledgeTitle] = useState("");
+  const knowledgeUploadInputRef = useRef<HTMLInputElement>(null);
 
   const onItemsChangeRef = useRef(onItemsChange);
   onItemsChangeRef.current = onItemsChange;
@@ -163,6 +196,23 @@ export function DocumentView({
     }
   }, [sessionId]);
 
+  const fetchDesignSpecs = useCallback(async () => {
+    if (!workingDir) return;
+    setDesignSpecsLoading(true);
+    try {
+      const params = new URLSearchParams({ workingDir });
+      if (sessionId) params.set("sessionId", sessionId);
+      if (projectId) params.set("projectId", projectId);
+      const res = await fetch(`/api/design-specs?${params.toString()}`);
+      const data = await res.json();
+      if (data.success) setDesignSpecs(data.data || []);
+    } catch {
+      // 静默失败
+    } finally {
+      setDesignSpecsLoading(false);
+    }
+  }, [workingDir, sessionId, projectId]);
+
   useEffect(() => {
     fetchItems();
   }, [fetchItems]);
@@ -172,17 +222,55 @@ export function DocumentView({
   }, [fetchChatFiles]);
 
   useEffect(() => {
+    fetchDesignSpecs();
+  }, [fetchDesignSpecs]);
+
+  const fetchExistingConventions = useCallback(async () => {
+    if (!sessionId) {
+      setExistingConventionPaths(new Set());
+      return;
+    }
+    const paths = [
+      "convention.md",
+      ...pages.map((page) => `demos/${page.id}/convention.md`),
+    ];
+    const existing = await Promise.all(
+      paths.map(async (filePath) => {
+        try {
+          const res = await fetch(
+            `/api/sessions/${sessionId}/workspace/files/${encodeURIComponent(filePath)}`,
+          );
+          const data = await res.json();
+          return data.success ? filePath : null;
+        } catch {
+          return null;
+        }
+      }),
+    );
+    setExistingConventionPaths(
+      new Set(existing.filter((filePath): filePath is string => filePath !== null)),
+    );
+  }, [pages, sessionId]);
+
+  useEffect(() => {
+    fetchExistingConventions();
+  }, [fetchExistingConventions]);
+
+  useEffect(() => {
     const handler = () => {
       fetchItems();
       fetchChatFiles();
+      fetchDesignSpecs();
     };
     window.addEventListener("knowledge-updated", handler);
     window.addEventListener("chat-attachments-updated", handler);
+    window.addEventListener("design-spec-updated", handler);
     return () => {
       window.removeEventListener("knowledge-updated", handler);
       window.removeEventListener("chat-attachments-updated", handler);
+      window.removeEventListener("design-spec-updated", handler);
     };
-  }, [fetchItems, fetchChatFiles]);
+  }, [fetchItems, fetchChatFiles, fetchDesignSpecs]);
 
   // 默认选中第一个用户文档
   useEffect(() => {
@@ -191,6 +279,122 @@ export function DocumentView({
     }
   }, [activeTarget, userItems, loading]);
 
+  /** 把指定目标的 markdown 内容写回服务端 */
+  const saveTarget = useCallback(
+    async (target: ActiveTarget, markdown: string) => {
+      try {
+        if (target.kind === "knowledge") {
+          if (!workingDir) return false;
+          const params = new URLSearchParams({ workingDir });
+          if (projectId) params.set("projectId", projectId);
+          if (sessionId) params.set("sessionId", sessionId);
+          const res = await fetch(
+            `/api/knowledge/${target.item.id}?${params.toString()}`,
+            {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ content: markdown }),
+            },
+          );
+          const data = await res.json();
+          if (data.success) {
+            onItemsChange?.(data.data ? [data.data] : []);
+            window.dispatchEvent(new Event("knowledge-updated"));
+            return true;
+          }
+          throw new Error(data.error?.message || "保存失败");
+        } else {
+          if (!sessionId) return false;
+          const filePath = resolveWorkspaceFilePath(target);
+          if (!filePath) return false;
+          const res = await fetch(
+            `/api/sessions/${sessionId}/workspace/files/${encodeURIComponent(filePath)}`,
+            {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ content: markdown }),
+            },
+          );
+          const data = await res.json();
+          if (!data.success) {
+            throw new Error(data.error?.message || "保存失败");
+          }
+          return true;
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "保存失败";
+        toast({ title: message, variant: "destructive" });
+        return false;
+      }
+    },
+    [workingDir, projectId, sessionId, toast, onItemsChange],
+  );
+
+  const openOrCreateConvention = useCallback(
+    async (target: Extract<ActiveTarget, { kind: "convention" | "pageConvention" }>) => {
+      const filePath = resolveWorkspaceFilePath(target);
+      if (!filePath) return;
+      if (existingConventionPaths.has(filePath)) {
+        setActiveTarget(target);
+        setConventionExpanded(true);
+        return;
+      }
+      const initialContent = buildInitialConventionContent(target);
+      const created = await saveTarget(target, initialContent);
+      if (!created) return;
+      setExistingConventionPaths((current) => new Set(current).add(filePath));
+      setContent(initialContent);
+      setActiveTarget(target);
+      setConventionExpanded(true);
+    },
+    [existingConventionPaths, saveTarget],
+  );
+
+  // ── 自动保存：在内容变化路径上防抖，切换目标/卸载时冲刷 ──────────────
+  // 在 markdownUpdated 触发 onChange 时捕获目标与内容，调度一次 800ms 防抖写回，
+  // 避免绕回 React state 用 effect 监听 content 造成的额外渲染与丢失。
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSaveRef = useRef<{ target: ActiveTarget; markdown: string } | null>(
+    null,
+  );
+  const saveTargetRef = useRef(saveTarget);
+  saveTargetRef.current = saveTarget;
+
+  const flushSave = useCallback(() => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    const pending = pendingSaveRef.current;
+    pendingSaveRef.current = null;
+    if (pending) {
+      saveTargetRef.current(pending.target, pending.markdown);
+    }
+  }, []);
+
+  const scheduleSave = useCallback((target: ActiveTarget, markdown: string) => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+    pendingSaveRef.current = { target, markdown };
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null;
+      const pending = pendingSaveRef.current;
+      pendingSaveRef.current = null;
+      if (pending) {
+        saveTargetRef.current(pending.target, pending.markdown);
+      }
+    }, 800);
+  }, []);
+
+  // 卸载时冲刷未落盘的编辑
+  useEffect(
+    () => () => {
+      flushSave();
+    },
+    [flushSave],
+  );
+
   // 加载当前目标内容
   useEffect(() => {
     if (!activeTarget) {
@@ -198,9 +402,11 @@ export function DocumentView({
       return;
     }
 
+    // 切换文档前先冲刷上一目标的未落盘编辑
+    flushSave();
+
     let cancelled = false;
     setContentLoading(true);
-    setDirty(false);
 
     const load = async () => {
       try {
@@ -236,65 +442,169 @@ export function DocumentView({
     return () => {
       cancelled = true;
     };
-  }, [activeTarget, workingDir, sessionId]);
+  }, [activeTarget, workingDir, sessionId, flushSave]);
 
-  const handleSave = useCallback(async () => {
-    if (!activeTarget) return;
-    setSaving(true);
-    try {
-      if (activeTarget.kind === "knowledge") {
-        if (!workingDir) return;
+  const createKnowledgeDocument = useCallback(
+    async (title: string, markdown: string): Promise<KnowledgeItem | null> => {
+      if (!workingDir) {
+        toast({ title: "工作空间未初始化", variant: "destructive" });
+        return null;
+      }
+      try {
         const params = new URLSearchParams({ workingDir });
         if (projectId) params.set("projectId", projectId);
         if (sessionId) params.set("sessionId", sessionId);
-        const res = await fetch(
-          `/api/knowledge/${activeTarget.item.id}?${params.toString()}`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ content: contentRef.current }),
-          },
-        );
+        const res = await fetch(`/api/knowledge?${params.toString()}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, description: title, content: markdown }),
+        });
         const data = await res.json();
-        if (data.success) {
-          setDirty(false);
-          toast({ title: "保存成功" });
-          onItemsChange?.(data.data ? [data.data] : []);
-          window.dispatchEvent(new Event("knowledge-updated"));
-          return;
+        if (!res.ok || !data.success) {
+          throw new Error(data.error?.message || "创建失败");
         }
-        throw new Error(data.error?.message || "保存失败");
-      } else {
-        if (!sessionId) return;
-        const filePath = resolveWorkspaceFilePath(activeTarget);
-        if (!filePath) return;
-        const res = await fetch(
-          `/api/sessions/${sessionId}/workspace/files/${encodeURIComponent(filePath)}`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ content: contentRef.current }),
-          },
-        );
-        const data = await res.json();
-        if (data.success) {
-          setDirty(false);
-          toast({ title: "保存成功" });
-          return;
-        }
-        throw new Error(data.error?.message || "保存失败");
+        const item = data.data as KnowledgeItem;
+        setItems((current) => [...current.filter((entry) => entry.id !== item.id), item]);
+        setUserExpanded(true);
+        setActiveTarget({ kind: "knowledge", item });
+        setContent(markdown);
+        onItemsChangeRef.current?.([...items.filter((entry) => entry.id !== item.id), item]);
+        return item;
+      } catch (error) {
+        toast({
+          title: "创建知识文档失败",
+          description: error instanceof Error ? error.message : undefined,
+          variant: "destructive",
+        });
+        return null;
       }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "保存失败";
-      toast({ title: message, variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
-  }, [activeTarget, workingDir, projectId, sessionId, toast, onItemsChange]);
+    },
+    [items, projectId, sessionId, toast, workingDir],
+  );
 
-  const handleCreate = useCallback(() => {
-    onAddRequest?.();
-  }, [onAddRequest]);
+  const handleCreate = useCallback(async () => {
+    setKnowledgeMenuOpen(false);
+    const item = await createKnowledgeDocument("未命名文档", "");
+    if (!item) return;
+    setRenamingKnowledgeId(item.id);
+    setRenamingKnowledgeTitle(item.title);
+  }, [createKnowledgeDocument]);
+
+  const handleKnowledgeUpload = useCallback(
+    async (file: File | undefined) => {
+      if (!file) return;
+      if (!isSupportedKnowledgeUpload(file)) {
+        toast({ title: "仅支持 Markdown / TXT 文件", variant: "destructive" });
+        return;
+      }
+      try {
+        const markdown = await file.text();
+        await createKnowledgeDocument(getKnowledgeUploadTitle(file.name), markdown);
+      } catch (error) {
+        toast({
+          title: "读取文件失败",
+          description: error instanceof Error ? error.message : undefined,
+          variant: "destructive",
+        });
+      }
+    },
+    [createKnowledgeDocument, toast],
+  );
+
+  const commitKnowledgeRename = useCallback(
+    async (item: KnowledgeItem) => {
+      const title = renamingKnowledgeTitle.trim();
+      setRenamingKnowledgeId(null);
+      if (!title || title === item.title || !workingDir) return;
+      try {
+        const params = new URLSearchParams({ workingDir });
+        if (projectId) params.set("projectId", projectId);
+        if (sessionId) params.set("sessionId", sessionId);
+        const res = await fetch(`/api/knowledge/${item.id}?${params.toString()}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error?.message || "重命名失败");
+        }
+        const updated = data.data as KnowledgeItem;
+        setItems((current) =>
+          current.map((entry) => (entry.id === updated.id ? updated : entry)),
+        );
+        setActiveTarget((current) =>
+          current?.kind === "knowledge" && current.item.id === updated.id
+            ? { kind: "knowledge", item: updated }
+            : current,
+        );
+      } catch (error) {
+        toast({
+          title: "重命名失败",
+          description: error instanceof Error ? error.message : undefined,
+          variant: "destructive",
+        });
+      }
+    },
+    [projectId, renamingKnowledgeTitle, sessionId, toast, workingDir],
+  );
+
+  const handleCreateDesignSpec = useCallback(async () => {
+    if (!workingDir) return;
+    const title = window.prompt("设计规范文档名称", `设计规范 ${designSpecs.length + 1}`);
+    if (!title) return;
+    try {
+      const params = new URLSearchParams({ workingDir });
+      if (sessionId) params.set("sessionId", sessionId);
+      if (projectId) params.set("projectId", projectId);
+      const res = await fetch(`/api/design-specs?${params.toString()}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast({ title: "已创建设计规范" });
+        setDesignSpecExpanded(true);
+        setActiveTarget({ kind: "designSpec", doc: data.data });
+        fetchDesignSpecs();
+        window.dispatchEvent(new Event("design-spec-updated"));
+      } else {
+        toast({ title: "创建失败", description: data.error?.message, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "创建失败", variant: "destructive" });
+    }
+  }, [workingDir, sessionId, projectId, designSpecs.length, toast, fetchDesignSpecs]);
+
+  const handleDeleteDesignSpec = useCallback(
+    async (doc: DesignSpecMeta) => {
+      if (!workingDir) return;
+      if (!window.confirm(`确定要删除「${doc.title}」吗？`)) return;
+      try {
+        const params = new URLSearchParams({ workingDir });
+        if (sessionId) params.set("sessionId", sessionId);
+        if (projectId) params.set("projectId", projectId);
+        const res = await fetch(`/api/design-specs/${doc.id}?${params.toString()}`, {
+          method: "DELETE",
+        });
+        const data = await res.json();
+        if (data.success) {
+          toast({ title: "删除成功" });
+          if (activeTarget?.kind === "designSpec" && activeTarget.doc.id === doc.id) {
+            setActiveTarget(null);
+          }
+          fetchDesignSpecs();
+          window.dispatchEvent(new Event("design-spec-updated"));
+        } else {
+          toast({ title: "删除失败", description: data.error?.message, variant: "destructive" });
+        }
+      } catch {
+        toast({ title: "删除失败", variant: "destructive" });
+      }
+    },
+    [workingDir, sessionId, projectId, activeTarget, toast, fetchDesignSpecs],
+  );
 
   const handleDelete = useCallback(
     async (item: KnowledgeItem) => {
@@ -338,27 +648,13 @@ export function DocumentView({
     activeTarget?.kind === target.kind &&
     (target.kind !== "knowledge" ||
       (activeTarget.kind === "knowledge" &&
-        activeTarget.item.id === target.item.id));
-
-  const headerTitle = activeTarget
-    ? activeTarget.kind === "memory"
-      ? "AI 记忆"
-      : activeTarget.kind === "convention"
-        ? "项目公约"
-        : activeTarget.kind === "pageConvention"
-          ? `${activeTarget.page.name} 公约`
-          : activeTarget.item.title
-    : "未选择文档";
-
-  const headerSub = activeTarget
-    ? activeTarget.kind === "knowledge"
-      ? activeTarget.item.updatedAt
-        ? `更新于 ${new Date(activeTarget.item.updatedAt).toLocaleString()}`
-        : "Markdown 文档"
-      : activeTarget.kind === "pageConvention"
-        ? `页面公约 · ${activeTarget.page.name}`
-        : "Markdown 文档"
-    : "从左侧目录选择文档";
+        activeTarget.item.id === target.item.id)) &&
+    (target.kind !== "pageConvention" ||
+      (activeTarget.kind === "pageConvention" &&
+        activeTarget.page.id === target.page.id)) &&
+    (target.kind !== "designSpec" ||
+      (activeTarget.kind === "designSpec" &&
+        activeTarget.doc.id === target.doc.id));
 
   return (
     <div className="flex h-full min-h-0">
@@ -369,15 +665,7 @@ export function DocumentView({
             <FolderOpen className="h-3.5 w-3.5" />
             目录
           </h2>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6"
-            title="新建文档"
-            onClick={handleCreate}
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </Button>
+          <span className="text-[10px] text-muted-foreground">文档</span>
         </div>
         <div className="flex-1 overflow-y-auto scrollbar-thin">
           <div className="p-1.5">
@@ -426,7 +714,7 @@ export function DocumentView({
                     <div
                       className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors"
                       onClick={() => {
-                        setActiveTarget({ kind: "convention" });
+                        void openOrCreateConvention({ kind: "convention" });
                       }}
                     >
                       <ScrollText className="h-3.5 w-3.5" />
@@ -446,8 +734,8 @@ export function DocumentView({
               </div>
               {conventionExpanded && (
                 <div className="space-y-0">
-                  {/* 项目公约（根） */}
-                  <div
+                  {/* 已创建的项目公约（根） */}
+                  {existingConventionPaths.has("convention.md") && <div
                     className={cn(
                       "group flex cursor-pointer items-center gap-1.5 rounded-sm py-1 pr-2 text-sm transition-colors hover:bg-accent/50",
                       isActive({ kind: "convention" })
@@ -459,9 +747,9 @@ export function DocumentView({
                   >
                     <ScrollText className="h-4 w-4 shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate">项目公约</span>
-                  </div>
-                  {/* 各页面公约 */}
-                  {pages.map((page) => (
+                  </div>}
+                  {/* 已创建的页面公约 */}
+                  {pages.filter((page) => existingConventionPaths.has(`demos/${page.id}/convention.md`)).map((page) => (
                     <div
                       key={page.id}
                       className={cn(
@@ -482,12 +770,12 @@ export function DocumentView({
                       </span>
                     </div>
                   ))}
-                  {pages.length === 0 && (
+                  {existingConventionPaths.size === 0 && (
                     <div
                       className="px-3 py-2 text-xs text-muted-foreground"
                       style={{ paddingLeft: 24 + 12 }}
                     >
-                      暂无页面
+                      暂无公约，可通过右上角 + 新建
                     </div>
                   )}
                 </div>
@@ -509,18 +797,40 @@ export function DocumentView({
                 <span className="flex-1 font-medium text-foreground">
                   项目知识库
                 </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-5 w-5 p-0 opacity-0 transition-opacity group-hover:opacity-100"
-                  title="新建文档"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCreate();
-                  }}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
+                <Popover open={knowledgeMenuOpen} onOpenChange={setKnowledgeMenuOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-5 w-5 p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                      title="新建或上传文档"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" side="bottom" className="w-32 p-1">
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors hover:bg-accent"
+                      onClick={handleCreate}
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      新建
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors hover:bg-accent"
+                      onClick={() => {
+                        setKnowledgeMenuOpen(false);
+                        knowledgeUploadInputRef.current?.click();
+                      }}
+                    >
+                      <Upload className="h-3.5 w-3.5" />
+                      上传
+                    </button>
+                  </PopoverContent>
+                </Popover>
               </div>
               {userExpanded && (
                 <div className="space-y-0">
@@ -548,9 +858,18 @@ export function DocumentView({
                           setActiveTarget({ kind: "knowledge", item })
                         }
                         onEdit={() =>
-                          setActiveTarget({ kind: "knowledge", item })
+                          {
+                            setActiveTarget({ kind: "knowledge", item });
+                            setRenamingKnowledgeId(item.id);
+                            setRenamingKnowledgeTitle(item.title);
+                          }
                         }
                         onDelete={() => handleDelete(item)}
+                        renaming={renamingKnowledgeId === item.id}
+                        renameValue={renamingKnowledgeTitle}
+                        onRenameValueChange={setRenamingKnowledgeTitle}
+                        onRenameCommit={() => commitKnowledgeRename(item)}
+                        onRenameCancel={() => setRenamingKnowledgeId(null)}
                         onHistory={
                           onDocHistory
                             ? () => onDocHistory(item)
@@ -623,55 +942,133 @@ export function DocumentView({
                 </div>
               )}
             </div>
+
+            {/* 设计规范 */}
+            <div className="mt-1">
+              <div
+                className="group flex cursor-pointer items-center gap-1.5 rounded-sm px-3 py-1.5 text-sm transition-colors hover:bg-accent/50"
+                onClick={() => setDesignSpecExpanded(!designSpecExpanded)}
+              >
+                {designSpecExpanded ? (
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                )}
+                <FolderOpen className="h-4 w-4 shrink-0 text-cyan-500" />
+                <span className="flex-1 font-medium text-foreground">
+                  设计规范
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-5 w-5 p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                  title="新建设计规范文档"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCreateDesignSpec();
+                  }}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              {designSpecExpanded && (
+                <div className="space-y-0">
+                  {designSpecsLoading ? (
+                    <div
+                      className="px-3 py-2 text-xs text-muted-foreground"
+                      style={{ paddingLeft: 24 + 12 }}
+                    >
+                      加载中...
+                    </div>
+                  ) : designSpecs.length === 0 ? (
+                    <div
+                      className="px-3 py-2 text-xs text-muted-foreground"
+                      style={{ paddingLeft: 24 + 12 }}
+                    >
+                      暂无文档，点击 + 添加
+                    </div>
+                  ) : (
+                    designSpecs.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className={cn(
+                          "group flex cursor-pointer items-center gap-1.5 rounded-sm py-1 pr-2 text-sm transition-colors hover:bg-accent/50",
+                          activeTarget?.kind === "designSpec" &&
+                            activeTarget.doc.id === doc.id
+                            ? "bg-accent text-accent-foreground"
+                            : "text-foreground",
+                        )}
+                        style={{ paddingLeft: 24 + 8 }}
+                        onClick={() => setActiveTarget({ kind: "designSpec", doc })}
+                      >
+                        <FileText className="h-4 w-4 shrink-0 text-cyan-500" />
+                        <span className="min-w-0 flex-1 truncate">{doc.title}</span>
+                        <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            title="删除"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteDesignSpec(doc);
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                          </Button>
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
+      <input
+        ref={knowledgeUploadInputRef}
+        data-testid="knowledge-upload-input"
+        type="file"
+        accept=".md,.markdown,.txt,text/markdown,text/plain"
+        className="hidden"
+        onChange={(event) => {
+          void handleKnowledgeUpload(event.target.files?.[0]);
+          event.target.value = "";
+        }}
+      />
+
       {/* 文档编辑区 */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <div className="flex items-center justify-between border-b px-4 py-2.5">
-          <div className="min-w-0">
-            <div className="truncate text-sm font-medium">{headerTitle}</div>
-            <div className="text-[11px] text-muted-foreground">{headerSub}</div>
-          </div>
-          {activeTarget && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={handleSave}
-              disabled={saving || !dirty || contentLoading}
-            >
-              {saving ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        {activeTarget?.kind === "designSpec" ? (
+          <DesignSpecEditor
+            docId={activeTarget.doc.id}
+          />
+        ) : (
+          <>
+            <div className="min-h-0 flex-1 p-4">
+              {contentLoading ? (
+                <div className="flex h-full items-center justify-center">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : activeTarget ? (
+                <DocumentEditor
+                  value={content}
+                  onChange={(next) => {
+                    setContent(next);
+                    scheduleSave(activeTarget, next);
+                  }}
+                  className="h-full"
+                />
               ) : (
-                <Save className="h-3.5 w-3.5" />
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                  请从左侧目录选择文档开始编辑
+                </div>
               )}
-              保存
-            </Button>
-          )}
-        </div>
-        <div className="min-h-0 flex-1 p-4">
-          {contentLoading ? (
-            <div className="flex h-full items-center justify-center">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
-          ) : activeTarget ? (
-            <DocumentEditor
-              value={content}
-              onChange={(next) => {
-                setContent(next);
-                setDirty(true);
-              }}
-              format="markdown"
-              className="h-full"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-              请从左侧目录选择文档开始编辑
-            </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
 
       {/* 选择页面（用于新建页面公约） */}
@@ -691,7 +1088,7 @@ export function DocumentView({
                   key={page.id}
                   className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-2 text-sm hover:bg-accent transition-colors"
                   onClick={() => {
-                    setActiveTarget({ kind: "pageConvention", page });
+                    void openOrCreateConvention({ kind: "pageConvention", page });
                     setPagePickerOpen(false);
                   }}
                 >
@@ -715,6 +1112,11 @@ function KnowledgeFileItem({
   onEdit,
   onHistory,
   onDelete,
+  renaming,
+  renameValue,
+  onRenameValueChange,
+  onRenameCommit,
+  onRenameCancel,
 }: {
   item: KnowledgeItem;
   active: boolean;
@@ -722,6 +1124,11 @@ function KnowledgeFileItem({
   onEdit?: () => void;
   onHistory?: () => void;
   onDelete?: () => void;
+  renaming?: boolean;
+  renameValue?: string;
+  onRenameValueChange?: (value: string) => void;
+  onRenameCommit?: () => void;
+  onRenameCancel?: () => void;
 }) {
   return (
     <div
@@ -733,7 +1140,27 @@ function KnowledgeFileItem({
       onClick={onSelect}
     >
       <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-      <span className="min-w-0 flex-1 truncate">{item.title}</span>
+      {renaming ? (
+        <input
+          autoFocus
+          className="h-6 min-w-0 flex-1 rounded border bg-background px-1 text-sm outline-none focus:ring-1 focus:ring-ring"
+          value={renameValue}
+          onClick={(event) => event.stopPropagation()}
+          onChange={(event) => onRenameValueChange?.(event.target.value)}
+          onBlur={onRenameCommit}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              onRenameCommit?.();
+            } else if (event.key === "Escape") {
+              event.preventDefault();
+              onRenameCancel?.();
+            }
+          }}
+        />
+      ) : (
+        <span className="min-w-0 flex-1 truncate">{item.title}</span>
+      )}
       <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
         <Eye className="h-3 w-3 text-muted-foreground" />
         {onEdit && <Pencil className="h-3 w-3 text-blue-400" />}

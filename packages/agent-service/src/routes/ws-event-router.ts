@@ -15,6 +15,7 @@ const AGENT_EVENT_TYPES = [
   "plan",
   "error",
   "status",
+  "context_compacted",
   "permission_request",
   "user_choice_request",
 ] as const;
@@ -29,6 +30,7 @@ export interface ServerMessage {
     | "error"
     | "finish"
     | "status"
+    | "context_compacted"
     | "pong"
     | "permission_request"
     | "user_choice_request"
@@ -65,6 +67,12 @@ export interface ServerMessage {
   details?: unknown;
   durationMs?: number;
   timestamp?: number;
+  contextCompaction?: {
+    reason: "preflight" | "overflow_recovery";
+    tokensBefore: number;
+    contextWindow: number;
+    durationMs: number;
+  };
   permissionRequest?: {
     sessionId: string;
     options: Array<{
@@ -282,6 +290,20 @@ export class WebSocketEventRouter {
           id: messageId,
           sessionId: this.sessionId,
           status: event.status,
+        });
+        break;
+
+      case "context_compacted":
+        this.sendMessage({
+          type: "context_compacted",
+          id: messageId,
+          sessionId: this.sessionId,
+          contextCompaction: {
+            reason: event.reason,
+            tokensBefore: event.tokensBefore,
+            contextWindow: event.contextWindow,
+            durationMs: event.durationMs,
+          },
         });
         break;
 

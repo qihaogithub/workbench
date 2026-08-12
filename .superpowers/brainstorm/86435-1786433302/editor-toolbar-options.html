@@ -1,0 +1,42 @@
+<h2>文档编辑器顶部工具栏：更适合哪一种？</h2>
+<p class="subtitle">三种方案都会同步修复：浮动格式图标对比度、块拖拽手柄尺寸，以及恢复“+”插入入口。</p>
+
+<div class="cards">
+  <div class="card" data-choice="compact-sticky" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0b0d10;padding:18px;color:#f4f4f5;min-height:230px">
+      <div style="border:1px solid #30343b;border-radius:9px;background:#17191d;padding:7px 10px;display:flex;align-items:center;gap:5px;box-shadow:0 8px 22px #0008">
+        <button class="mock-button" style="padding:6px 8px">↶</button><button class="mock-button" style="padding:6px 8px">↷</button>
+        <span style="width:1px;height:22px;background:#3b4048;margin:0 4px"></span>
+        <button class="mock-button" style="padding:6px 10px">正文⌄</button>
+        <button class="mock-button" style="font-weight:800;padding:6px 9px">B</button><button class="mock-button" style="font-style:italic;padding:6px 9px">I</button><button class="mock-button" style="text-decoration:underline;padding:6px 9px">U</button>
+        <span style="width:1px;height:22px;background:#3b4048;margin:0 4px"></span>
+        <button class="mock-button" style="padding:6px 9px">☷</button><button class="mock-button" style="padding:6px 9px">1.</button><button class="mock-button" style="padding:6px 9px">🔗</button>
+      </div>
+      <div style="padding:25px 30px;display:flex;gap:10px;align-items:flex-start"><span style="color:#aeb4bd;font-size:14px">＋ ⋮⋮</span><strong style="font-size:25px">一级标题</strong></div>
+    </div>
+    <div class="card-body"><h3>A · 紧凑吸顶工具栏（推荐）</h3><p>常用格式始终可见；选中文本时浮动条只保留上下文操作，层级最清楚。</p></div>
+  </div>
+
+  <div class="card" data-choice="full-sticky" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0b0d10;padding:18px;color:#f4f4f5;min-height:230px">
+      <div style="border-bottom:1px solid #30343b;background:#15171a;padding:8px 10px;display:flex;align-items:center;gap:5px">
+        <button class="mock-button" style="padding:6px 8px">↶</button><button class="mock-button" style="padding:6px 8px">↷</button><button class="mock-button" style="padding:6px 10px">标题⌄</button><button class="mock-button" style="font-weight:800;padding:6px 9px">B</button><button class="mock-button" style="font-style:italic;padding:6px 9px">I</button><button class="mock-button" style="padding:6px 9px">☷</button><button class="mock-button" style="padding:6px 9px">1.</button><button class="mock-button" style="padding:6px 9px">☑</button><button class="mock-button" style="padding:6px 9px">❝</button><button class="mock-button" style="padding:6px 9px">⌗</button><button class="mock-button" style="padding:6px 9px">▦</button>
+      </div>
+      <div style="padding:25px 30px;display:flex;gap:10px;align-items:flex-start"><span style="color:#aeb4bd;font-size:14px">＋ ⋮⋮</span><strong style="font-size:25px">一级标题</strong></div>
+    </div>
+    <div class="card-body"><h3>B · 完整吸顶工具栏</h3><p>覆盖更多插入功能，操作一步到位；但窄栏里更拥挤，需要折叠溢出项。</p></div>
+  </div>
+
+  <div class="card" data-choice="hybrid" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0b0d10;padding:18px;color:#f4f4f5;min-height:230px">
+      <div style="border:1px solid #30343b;border-radius:9px;background:#17191d;padding:7px 10px;display:flex;align-items:center;gap:5px;width:max-content">
+        <button class="mock-button" style="padding:6px 8px">＋ 插入</button><button class="mock-button" style="padding:6px 8px">↶</button><button class="mock-button" style="padding:6px 8px">↷</button><button class="mock-button" style="padding:6px 8px">更多 ···</button>
+      </div>
+      <div style="margin:16px 30px 0;border:1px solid #343943;border-radius:8px;background:#191c21;padding:6px;display:flex;gap:4px;width:max-content;box-shadow:0 8px 22px #0008"><button class="mock-button" style="font-weight:800;padding:6px 9px;color:#fff">B</button><button class="mock-button" style="font-style:italic;padding:6px 9px;color:#fff">I</button><button class="mock-button" style="padding:6px 9px;color:#fff">🔗</button></div>
+      <div style="padding:14px 30px;display:flex;gap:10px;align-items:flex-start"><span style="color:#aeb4bd;font-size:14px">＋ ⋮⋮</span><strong style="font-size:25px">一级标题</strong></div>
+    </div>
+    <div class="card-body"><h3>C · 顶部轻量 + 浮动格式</h3><p>顶部只放文档级动作，文字格式仍跟随选区；视觉最轻，但常用格式不始终可见。</p></div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:20px">点击一个方案，然后回到对话里回复“选好了”或补充你的偏好。</p>

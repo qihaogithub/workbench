@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import {
   ConfigForm,
+  extractCodeConfigBindingKeys,
   extractPrototypeConfigBindingKeys,
   PageConfigPanel,
 } from "@workbench/demo-ui";
@@ -653,5 +654,97 @@ describe("PageConfigPanel 配置项与资源规范折叠区", () => {
     expect(screen.getByText("受影响页面")).toBeInTheDocument();
     fireEvent.click(screen.getByText("页面 B"));
     expect(onPageSelect).toHaveBeenCalledWith("page_b");
+  });
+
+  it("extractCodeConfigBindingKeys 提取 props 解构的共享配置字段", () => {
+    const code = `
+export default function Page(props: DemoProps) {
+  const {
+    bigBannerForeground = 'a.png',
+    bigBannerBackground = 'b.png',
+    miniBanners = [],
+  } = props as Record<string, unknown>;
+  return <div />;
+}`;
+    expect(extractCodeConfigBindingKeys(code)).toEqual(
+      expect.arrayContaining([
+        "bigBannerForeground",
+        "bigBannerBackground",
+        "miniBanners",
+      ]),
+    );
+  });
+
+  it("extractCodeConfigBindingKeys 忽略无关对象字面量字段", () => {
+    const code = `
+const subjects = [{ key: 'a', label: '阅读' }];
+export default function Page(props: DemoProps) {
+  const { theme = 'light' } = props;
+  return <div>{subjects[0].key}</div>;
+}`;
+    expect(extractCodeConfigBindingKeys(code)).toEqual(["theme"]);
+  });
+
+  it("extractCodeConfigBindingKeys 无 props 解构时返回空", () => {
+    expect(extractCodeConfigBindingKeys("export default () => <div />")).toEqual(
+      [],
+    );
+    expect(extractCodeConfigBindingKeys(undefined)).toEqual([]);
+  });
+
+  it("extractCodeConfigBindingKeys 识别 props 别名、静态访问和动态共享字段族", () => {
+    const code = `
+export default function Page(props: DemoProps) {
+  const p = props as Record<string, unknown>;
+  const subject = (p.activeSubject as string) || 'reading';
+  const mobile = p[\`headerBg\${cap(subject)}\`];
+  const progress = p[\`progressBg\${cap(subject)}\`];
+  return <div>{String(mobile)}{String(progress)}</div>;
+}`;
+
+    expect(
+      extractCodeConfigBindingKeys(code, [
+        "activeSubject",
+        "headerBgReading",
+        "headerBgThinking",
+        "progressBgReading",
+        "progressBgThinking",
+        "padHeaderBgReading",
+      ]),
+    ).toEqual([
+      "activeSubject",
+      "headerBgReading",
+      "headerBgThinking",
+      "progressBgReading",
+      "progressBgThinking",
+    ]);
+  });
+
+  it("extractCodeConfigBindingKeys 不把动态字段前缀扩散到未引用字段族", () => {
+    const code = `
+export default function Page(props: DemoProps) {
+  const p = props as Record<string, unknown>;
+  return <img src={String(p[\`headerBg\${subject}\`])} />;
+}`;
+
+    expect(
+      extractCodeConfigBindingKeys(code, [
+        "headerBgReading",
+        "headerBgThinking",
+        "progressBgReading",
+      ]),
+    ).toEqual(["headerBgReading", "headerBgThinking"]);
+  });
+
+  it("extractCodeConfigBindingKeys 无稳定前后缀的动态键不推断为全部共享字段", () => {
+    const code = `
+export default function Page(props: DemoProps) {
+  const p = props as Record<string, unknown>;
+  return <div>{String(p[\`\${fieldName}\`])}</div>;
+}`;
+
+    expect(
+      extractCodeConfigBindingKeys(code, ["logo", "theme", "activeSubject"]),
+    ).toEqual([]);
   });
 });

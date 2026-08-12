@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "build:docker": "esbuild src/server.ts --bundle --platform=node --target=node20 --outdir=dist --format=cjs --external:fastify --external:@fastify/cors --external:@fastify/multipart --external:@fastify/rate-limit --external:@fastify/websocket --external:mammoth --external:pdf-parse --external:pino --external:pino-pretty --external:undici --external:ws --external:sharp --external:@xenova/transformers",
+    "build:docker": "esbuild src/server.ts --bundle --platform=node --target=node24 --outdir=dist --format=cjs --external:fastify --external:@fastify/cors --external:@fastify/multipart --external:@fastify/rate-limit --external:@fastify/websocket --external:mammoth --external:pdf-parse --external:pino --external:pino-pretty --external:undici --external:ws --external:sharp --external:@xenova/transformers",
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -26,6 +26,7 @@
     "@workbench/knowledge-core": "workspace:*",
     "@workbench/knowledge-service": "workspace:*",
     "@workbench/preview-contract": "workspace:*",
+    "@workbench/project-core": "workspace:*",
     "@workbench/shared": "workspace:*",
     "@workbench/sketch-core": "workspace:*",
     "@xenova/transformers": "^2.17.2",

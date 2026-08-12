@@ -1,0 +1,55 @@
+<h2>Crepe 统一主题怎么落地？</h2>
+<p class="subtitle">所有入口会共用同一套交互能力，但编辑器既出现在暗色工作台，也出现在浅色弹窗和使用端页面。请选择视觉策略。</p>
+
+<div class="cards">
+  <div class="card" data-choice="adaptive" onclick="toggleSelect(this)">
+    <div class="card-image" style="display:grid;grid-template-columns:1fr 1fr;gap:0;min-height:260px">
+      <div style="background:#111827;padding:24px 18px">
+        <div style="height:100%;border:1px solid #334155;border-radius:12px;background:#0f172a;padding:20px;color:#e5e7eb;box-shadow:0 12px 28px rgba(0,0,0,.25)">
+          <div style="font-size:24px;font-weight:720;margin-bottom:12px">项目说明</div>
+          <p style="color:#cbd5e1;line-height:1.7">编辑器自然融入暗色工作台。</p>
+          <div style="display:inline-flex;gap:8px;border:1px solid #475569;border-radius:8px;padding:7px;background:#1e293b"><b>B</b><i>I</i><span>↗</span></div>
+        </div>
+      </div>
+      <div style="background:#f8fafc;padding:24px 18px">
+        <div style="height:100%;border:1px solid #e2e8f0;border-radius:12px;background:#fff;padding:20px;color:#172033;box-shadow:0 12px 28px rgba(15,23,42,.08)">
+          <div style="font-size:24px;font-weight:720;margin-bottom:12px">项目说明</div>
+          <p style="color:#475569;line-height:1.7">同一组件自动适配浅色弹窗。</p>
+          <div style="display:inline-flex;gap:8px;border:1px solid #cbd5e1;border-radius:8px;padding:7px;background:#fff"><b>B</b><i>I</i><span>↗</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A · 自适应宿主主题（推荐）</h3>
+      <p>保留 Crepe 的交互与布局，用项目 CSS tokens 重写颜色、圆角、阴影和焦点态。暗色与浅色入口自动适配，品牌一致性最好。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="frame" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#eef2f7;padding:28px 24px;min-height:260px">
+      <div style="margin:auto;max-width:390px;border:1px solid #d8dee8;border-radius:8px;background:white;padding:24px 32px;box-shadow:0 4px 14px rgba(15,23,42,.07)">
+        <div style="font-size:27px;font-weight:740;color:#202939;margin-bottom:12px">项目说明</div>
+        <p style="color:#4b5565;line-height:1.7">所有场景都使用官方 Frame 的浅色编辑纸张。</p>
+        <div style="border-left:3px solid #94a3b8;padding-left:12px;color:#64748b">稳定、统一、接近演示</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B · 官方 Frame 原样主题</h3>
+      <p>最接近 Playground，接入速度最快；但在暗色工作台里会形成明显的白色“纸张”，与现有产品外观割裂。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="reading" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#18181b;padding:28px 24px;min-height:260px">
+      <div style="margin:auto;max-width:390px;padding:22px 34px;color:#f4f4f5">
+        <div style="font-family:Georgia,serif;font-size:29px;margin-bottom:14px">项目说明</div>
+        <p style="font-family:Georgia,serif;color:#d4d4d8;line-height:1.9">弱化边框和控件，让内容像文章一样成为视觉中心。</p>
+        <div style="font-size:13px;color:#a1a1aa;margin-top:30px">输入 / 打开块菜单</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C · 沉浸式无框阅读主题</h3>
+      <p>正文体验更安静，适合长文档；但表格、配置备注和紧凑弹窗中的操作可发现性较弱。</p>
+    </div>
+  </div>
+</div>

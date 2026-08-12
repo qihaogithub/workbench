@@ -13,7 +13,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "build:docker": "esbuild src/server.ts --bundle --platform=node --target=node20 --outdir=dist --format=cjs --packages=external",
+    "build:docker": "esbuild src/server.ts --bundle --platform=node --target=node24 --outdir=dist --format=cjs --packages=external",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

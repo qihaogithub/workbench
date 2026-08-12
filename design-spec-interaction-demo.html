@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>设计规范 · 录入交互</title>
+<style>
+  :root {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 90%;
+    --primary-foreground: 0 0% 4%;
+    --secondary: 0 0% 16%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 16%;
+    --muted-foreground: 0 0% 63%;
+    --accent: 0 0% 16%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 16%;
+    --input: 0 0% 16%;
+    --ring: 0 0% 63%;
+    --radius: 0.75rem;
+  }
+  * { box-sizing: border-box; border-color: hsl(var(--border)); }
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* 细滚动条（OneFlow） */
+  * { scrollbar-width: thin; scrollbar-color: hsl(var(--muted-foreground) / 0.25) transparent; }
+  *::-webkit-scrollbar { width: 6px; height: 6px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb { background-color: hsl(var(--muted-foreground) / 0.25); border-radius: 999px; border: 1px solid transparent; background-clip: padding-box; }
+  *::-webkit-scrollbar-thumb:hover { background-color: hsl(var(--muted-foreground) / 0.45); }
+
+  .topbar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 24px; height: 56px;
+    background: hsl(var(--card));
+    border-bottom: 1px solid hsl(var(--border));
+    flex-shrink: 0;
+  }
+  .tb-back { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 6px; cursor: pointer; color: hsl(var(--muted-foreground)); }
+  .tb-back:hover { background: hsl(var(--accent)); color: hsl(var(--foreground)); }
+  .tb-name { font-size: 16px; font-weight: 600; }
+  .tb-center { flex: 1; display: flex; align-items: center; justify-content: center; }
+  .tb-right { flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+  .seg {
+    display: inline-flex; align-items: center; gap: 2px; padding: 3px;
+    background: hsl(var(--secondary)); border-radius: 8px;
+  }
+  .seg button {
+    border: none; background: transparent; color: hsl(var(--muted-foreground));
+    font-size: 12px; padding: 4px 12px; border-radius: 6px; cursor: pointer;
+  }
+  .seg button.active { background: hsl(var(--popover)); color: hsl(var(--foreground)); }
+  .tb-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid hsl(var(--input)); background: transparent; color: hsl(var(--foreground));
+    height: 32px; padding: 0 12px; border-radius: 6px; font-size: 13px; cursor: pointer;
+  }
+  .tb-btn:hover { background: hsl(var(--accent)); }
+  .tb-users { display: flex; align-items: center; gap: 6px; font-size: 12px; color: hsl(var(--muted-foreground)); }
+
+  .layout { display: flex; gap: 0; height: calc(100vh - 56px); align-items: stretch; }
+  .col { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+  .col-left { width: 25%; border-right: 1px solid hsl(var(--border)); background: hsl(var(--card)); }
+  .col-center { position: relative; flex: 1; padding: 16px; background: hsl(var(--background)); display: flex; flex-direction: column; min-height: 0; }
+  .col-right { width: 25%; border-left: 1px solid hsl(var(--border)); background: hsl(var(--card)); }
+
+  .tabs {
+    display: flex; align-items: center; gap: 2px;
+    padding: 0 8px; height: 44px; border-bottom: 1px solid hsl(var(--border)); flex-shrink: 0;
+  }
+  .tab {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: none; background: transparent; color: hsl(var(--muted-foreground));
+    font-size: 13px; padding: 6px 10px; border-radius: 6px; cursor: pointer; height: 30px;
+  }
+  .tab.active { color: hsl(var(--foreground)); }
+
+  .chat { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .chat-msgs { flex: 1; overflow-y: auto; padding: 16px 14px; display: flex; flex-direction: column; gap: 14px; }
+  .msg { display: flex; gap: 10px; max-width: 100%; }
+  .msg .avatar { width: 26px; height: 26px; border-radius: 6px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }
+  .msg .bubble { font-size: 13px; line-height: 1.6; padding: 8px 12px; border-radius: 8px; }
+  .msg.user { flex-direction: row-reverse; }
+  .msg.user .bubble { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+  .msg.assistant .bubble { background: hsl(var(--secondary) / 0.5); border: 1px solid hsl(var(--border)); }
+  .chat-input { border-top: 1px solid hsl(var(--border)); padding: 12px; flex-shrink: 0; }
+  .chat-input textarea {
+    width: 100%; height: 64px; resize: none; border: 1px solid hsl(var(--input));
+    border-radius: 8px; background: hsl(var(--background)); color: hsl(var(--foreground));
+    padding: 8px 10px; font-size: 13px; outline: none; font-family: inherit;
+  }
+  .chat-send { margin-top: 8px; display: flex; justify-content: flex-end; }
+
+  .section-head { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .section-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+  .section-head .sub { font-size: 12px; color: hsl(var(--muted-foreground)); }
+  .section-head .spacer { flex: 1; }
+
+  .center-inner {
+    position: relative;
+    background: hsl(var(--card)); border: 1px solid hsl(var(--border));
+    border-radius: calc(var(--radius)); box-shadow: 0 1px 3px rgba(0,0,0,.3);
+    padding: 16px; height: 100%; display: flex; flex-direction: column; min-height: 0;
+  }
+  .floating-add {
+    position: absolute; right: 20px; bottom: 20px; z-index: 5;
+    width: 44px; height: 44px; border-radius: 50%;
+    background: hsl(var(--primary)); color: hsl(var(--primary-foreground));
+    border: none; font-size: 22px; line-height: 1; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,.45);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .floating-add:hover { opacity: .9; }
+  .entries { display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px; }
+
+  .panel {
+    background: transparent;
+    display: flex; flex-direction: column; height: 100%; min-height: 0;
+  }
+  .panel-head {
+    padding: 14px 16px; border-bottom: 1px solid hsl(var(--border));
+    display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+  }
+  .panel-head h3 { margin: 0; font-size: 13px; font-weight: 600; }
+  .panel-head .count { font-size: 12px; color: hsl(var(--muted-foreground)); }
+  .panel-head .spacer { flex: 1; }
+
+  .muted { color: hsl(var(--muted-foreground)); }
+  .search {
+    margin: 12px 12px 8px; width: calc(100% - 24px);
+    height: 36px; padding: 0 12px;
+    border: 1px solid hsl(var(--input)); border-radius: calc(var(--radius) - 2px);
+    background: hsl(var(--background)); color: hsl(var(--foreground));
+    font-size: 13px; outline: none;
+  }
+  .search::placeholder { color: hsl(var(--muted-foreground)); }
+  .search:focus { outline: none; box-shadow: 0 0 0 2px hsl(var(--ring)); }
+  .filters { display: flex; gap: 6px; padding: 0 12px 10px; flex-wrap: wrap; }
+  .chip {
+    font-size: 12px; padding: 4px 10px; border-radius: 999px;
+    border: 1px solid hsl(var(--border)); background: transparent; cursor: pointer; color: hsl(var(--muted-foreground));
+  }
+  .chip.active { background: hsl(var(--secondary)); color: hsl(var(--foreground)); border-color: transparent; }
+  .pool { flex: 1; overflow-y: auto; padding: 0 8px 10px; min-height: 0; }
+  .pool-group { margin-bottom: 4px; }
+  .pool-group-head {
+    display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;
+    padding: 8px 10px 4px; font-weight: 600; font-size: 12px; color: hsl(var(--foreground));
+  }
+  .pool-group-head .chevron { transition: transform .15s; color: hsl(var(--muted-foreground)); font-size: 10px; }
+  .pool-group.collapsed .pool-group-head .chevron { transform: rotate(-90deg); }
+  .pool-group-head .count { color: hsl(var(--muted-foreground)); font-weight: 400; font-size: 11px; margin-left: auto; }
+  .pool-group .pool-items { overflow: hidden; }
+  .pool-group.collapsed .pool-items { display: none; }
+  .pool-group-title {
+    font-size: 11px; color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: .05em;
+    padding: 10px 10px 4px; font-weight: 600;
+  }
+  .pool-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 8px; cursor: grab;
+  }
+  .pool-item:hover { background: hsl(var(--accent)); }
+  .pool-item.dragging { opacity: .5; }
+  .pool-item .info { flex: 1; min-width: 0; }
+  .pool-item .name { font-weight: 500; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pool-item .meta { font-size: 11px; color: hsl(var(--muted-foreground)); display: flex; gap: 6px; margin-top: 2px; }
+  .pool-item .bound-tag {
+    font-size: 10px; padding: 0 6px; border-radius: 999px; line-height: 16px;
+    background: hsl(var(--secondary)); color: hsl(var(--muted-foreground)); border: 1px solid hsl(var(--border));
+  }
+  .pool-item.bound .name { color: hsl(var(--muted-foreground)); }
+
+  .entries { display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 200px; }
+  .entry {
+    border: 1px solid hsl(var(--border)); border-radius: var(--radius);
+    background: hsl(var(--card)); overflow: hidden;
+  }
+  .entry-head {
+    display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+    cursor: pointer; user-select: none;
+  }
+  .entry-head:hover { background: hsl(var(--accent) / 0.5); }
+  .entry-head .chevron { transition: transform .15s; color: hsl(var(--muted-foreground)); font-size: 11px; }
+  .entry.open .entry-head .chevron { transform: rotate(90deg); }
+  .entry-title { font-weight: 600; font-size: 14px; }
+  .entry-title {
+    border: 1px solid transparent; font-size: 14px; font-weight: 600; padding: 2px 6px;
+    border-radius: 6px; outline: none; background: transparent; color: hsl(var(--foreground));
+    color-scheme: dark; caret-color: hsl(var(--foreground));
+  }
+  .entry-title:hover, .entry-title:focus { background: hsl(var(--background)); border-color: hsl(var(--border)); }
+  .entry-head .tag { font-size: 12px; color: hsl(var(--muted-foreground)); }
+  .entry-head .spacer { flex: 1; }
+  .entry-head .del {
+    border: none; background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; font-size: 15px; visibility: hidden;
+  }
+  .entry:hover .entry-head .del { visibility: visible; }
+  .entry-head .del:hover { color: hsl(var(--destructive-foreground)); }
+  .entry-body { border-top: 1px solid hsl(var(--border)); padding: 14px 16px; display: none; }
+  .entry.open .entry-body { display: block; }
+  .spec-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .spec-table th, .spec-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid hsl(var(--border)); vertical-align: middle; }
+  .spec-table th { color: hsl(var(--muted-foreground)); font-weight: 500; }
+  .spec-table tr:last-child td { border-bottom: none; }
+  .spec-table .col-name { font-weight: 500; }
+  .spec-table .col-fmt, .spec-table .col-size { color: hsl(var(--muted-foreground)); }
+  .spec-table .col-size { min-width: 90px; }
+  .spec-table .col-thumb { width: 34px; }
+  .spec-table .col-act { width: 0; }
+  .spec-table tbody tr { position: relative; }
+  .spec-table .unbind {
+    border: none; background: transparent; cursor: pointer; color: hsl(var(--muted-foreground));
+    padding: 2px; display: none; align-items: center; justify-content: center;
+    position: absolute; top: 50%; right: 6px; transform: translateY(-50%); border-radius: 4px;
+  }
+  .spec-table tr:hover .unbind { display: inline-flex; }
+  .spec-table tr:hover .col-act { display: none; }
+  .spec-table .unbind:hover { color: hsl(var(--destructive-foreground)); background: hsl(var(--destructive) / 0.15); }
+  .thumb {
+    width: 52px; height: 52px; border-radius: 6px; border: 1px solid hsl(var(--border));
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    background-size: cover; background-position: center; cursor: zoom-in; overflow: hidden;
+  }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb .ti { font-size: 22px; line-height: 1; }
+  .thumb.color { background: var(--thumb-color, hsl(var(--secondary))); }
+  .hover-pop .big.color-big { width: 240px; height: 240px; border-radius: 6px; }
+  .hover-pop {
+    position: fixed; z-index: 80; pointer-events: none; display: none;
+    background: hsl(var(--popover)); border: 1px solid hsl(var(--border)); border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.5); padding: 6px;
+  }
+  .hover-pop .big { border-radius: 6px; }
+  .hover-pop .big.swatch { width: 240px; height: 240px; }
+  .hover-pop .big.img { width: 400px; height: 300px; display: flex; align-items: center; justify-content: center; }
+  .hover-pop .big.page { width: 400px; height: 300px; display: flex; align-items: center; justify-content: center; }
+  .hover-pop .cap { font-size: 13px; color: hsl(var(--muted-foreground)); margin-top: 5px; text-align: center; }
+  .hover-pop .big.img img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+  .hover-pop .big.combined { display: flex; gap: 10px; align-items: stretch; }
+  .hover-pop .combined-left { width: 240px; height: 240px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .hover-pop .combined-left .img, .hover-pop .combined-left .color-big,
+  .hover-pop .combined-left .thumb-big { width: 100%; height: 100%; border-radius: 6px; }
+  .hover-pop .combined-left .img img { width: 100%; height: 100%; object-fit: contain; }
+  .hover-pop .combined-left .thumb-big { background: hsl(var(--secondary)); display: flex; align-items: center; justify-content: center; font-size: 40px; color: hsl(var(--muted-foreground)); }
+  .hover-pop .combined-right { width: 200px; display: flex; flex-direction: column; align-items: center; gap: 6px; justify-content: center; }
+  .hover-pop .combined-right .page { width: 100%; height: 180px; }
+  .hover-pop .combined-lbl { font-size: 12px; color: hsl(var(--muted-foreground)); }
+  .zoom-overlay {
+    position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,.85);
+    display: flex; align-items: center; justify-content: center; cursor: zoom-out; overflow: hidden;
+  }
+  .zoom-overlay .zoom-body { display: flex; gap: 24px; align-items: center; transition: transform .1s; }
+  .zoom-overlay .zoom-pane { display: flex; align-items: center; }
+  .zoom-overlay img.zoom-img {
+    width: 40vw; max-width: 620px; max-height: 70vh; object-fit: contain; border-radius: 8px;
+    background: rgba(0,0,0,.4); user-select: none; pointer-events: none;
+  }
+  .zoom-overlay .zoom-hint {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    color: hsl(var(--muted-foreground)); font-size: 12px; background: rgba(0,0,0,.5);
+    padding: 6px 14px; border-radius: 999px; pointer-events: none;
+  }
+  .zoom-overlay .zoom-close {
+    position: fixed; top: 16px; right: 20px; width: 40px; height: 40px; border-radius: 50%;
+    border: none; background: rgba(255,255,255,.12); color: #fff; font-size: 20px; cursor: pointer;
+  }
+  .zoom-overlay .zoom-close:hover { background: rgba(255,255,255,.25); }
+  .md-block { margin-top: 14px; }
+  .md-toolbar { display: flex; gap: 4px; margin-bottom: 6px; align-items: center; }
+  .md-toolbar button {
+    font-size: 12px; padding: 4px 9px; border: 1px solid hsl(var(--border)); background: transparent;
+    border-radius: 6px; cursor: pointer; color: hsl(var(--muted-foreground));
+  }
+  .md-toolbar button:hover { background: hsl(var(--accent)); color: hsl(var(--foreground)); }
+  .md-input {
+    width: 100%; min-height: 60px; border: 1px solid hsl(var(--input)); border-radius: 8px;
+    padding: 8px 10px; font-size: 13px; font-family: inherit; resize: vertical; outline: none; line-height: 1.5;
+    background: hsl(var(--background)); color: hsl(var(--foreground));
+  }
+  .md-input:focus { box-shadow: 0 0 0 2px hsl(var(--ring)); }
+  .md-preview {
+    border: 1px solid hsl(var(--border)); border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.6;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .md-preview h3 { margin: .4em 0; }
+  .md-preview ul, .md-preview ol { margin: .3em 0; padding-left: 1.4em; }
+  .md-preview code { background: hsl(var(--muted) / 0.5); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  .mode-toggle { display: flex; gap: 4px; }
+  .mode-toggle button.active { background: hsl(var(--secondary)); color: hsl(var(--foreground)); border-color: transparent; }
+
+  .swatch {
+    width: 26px; height: 26px; border-radius: 6px; border: 1px solid hsl(var(--border));
+    display: inline-flex; align-items: center; justify-content: center; font-size: 10px;
+    background-size: cover; background-position: center; flex-shrink: 0;
+  }
+  .swatch.text { background: hsl(var(--secondary)); color: hsl(var(--foreground)); font-weight: 600; font-size: 13px; }
+  .swatch.image { background: hsl(var(--accent)); }
+
+  .empty { text-align: center; color: hsl(var(--muted-foreground)); padding: 40px 20px; font-size: 13px; line-height: 1.7; }
+  .btn {
+    border: 1px solid transparent; background: hsl(var(--primary)); color: hsl(var(--primary-foreground));
+    border-radius: calc(var(--radius) - 2px); padding: 0 14px; height: 36px;
+    font-size: 13px; font-weight: 500; cursor: pointer;
+  }
+  .btn:hover { opacity: .9; }
+  .btn.outline { background: transparent; border-color: hsl(var(--input)); color: hsl(var(--foreground)); }
+  .btn.outline:hover { background: hsl(var(--accent)); }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: hsl(var(--secondary)); color: hsl(var(--foreground)); padding: 9px 16px; border-radius: 8px; font-size: 13px;
+    border: 1px solid hsl(var(--border));
+    opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 50;
+  }
+  .toast.show { opacity: 1; }
+  .stale { color: hsl(var(--destructive-foreground)); font-size: 11px; }
+  .entry.dragover { border-color: hsl(var(--ring)); background: hsl(var(--accent) / 0.4); }
+  .entry.dragging { opacity: .5; }
+  #entries.dragover { background: hsl(var(--accent) / 0.25); border: 2px dashed hsl(var(--ring)); border-radius: var(--radius); }
+  #entries.dragover .entries-empty { border-color: hsl(var(--ring)); background: hsl(var(--accent) / 0.4); color: hsl(var(--foreground)); }
+  .entries-empty { border: 2px dashed hsl(var(--border)); border-radius: var(--radius); padding: 32px; text-align: center; color: hsl(var(--muted-foreground)); font-size: 13px; align-self: stretch; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="tb-back">←</span>
+  <span class="tb-name">活动页项目</span>
+  <span class="tb-center">
+    <span class="seg">
+      <button class="active">设计规范</button>
+      <button>预览</button>
+    </span>
+  </span>
+  <span class="tb-right">
+    <span class="tb-users"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> 2 人在线</span>
+    <button class="tb-btn">分享</button>
+  </span>
+</div>
+
+<div class="layout">
+  <!-- 左侧：AI 对话区（示意） -->
+  <div class="col col-left">
+    <div class="tabs">
+      <button class="tab active"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4m0 0H8m4 0h4"/></svg> AI 对话</button>
+      <button class="tab"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 2 9 5-9 5-9-5 9-5z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg> 页面</button>
+      <button class="tab"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7 12 3 4 7v10l8 4 8-4V7z"/><path d="m4 7 8 4 8-4"/><path d="M12 11v10"/></svg> 代码</button>
+    </div>
+    <div class="chat">
+      <div class="chat-msgs">
+        <div class="msg assistant">
+          <span class="avatar" style="background:hsl(217 91% 60%)">AI</span>
+          <div class="bubble">你好，我是 AI 助手。可以帮你生成或修改页面设计。</div>
+        </div>
+        <div class="msg user">
+          <span class="avatar" style="background:hsl(0 0% 40%)">我</span>
+          <div class="bubble">帮我把首页的按钮改成统一的品牌色。</div>
+        </div>
+        <div class="msg assistant">
+          <span class="avatar" style="background:hsl(217 91% 60%)">AI</span>
+          <div class="bubble">好的，已根据项目设计规范更新首页按钮颜色。<br/>如果需要调整其他配置项，也可以直接告诉我。</div>
+        </div>
+      </div>
+      <div class="chat-input">
+        <textarea placeholder="输入消息，描述你的修改需求…"></textarea>
+        <div class="chat-send"><button class="btn">发送</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 中间：设计规范编辑区 -->
+  <div class="col col-center">
+    <div class="entries" id="entries"></div>
+    <button class="floating-add" id="add-entry-btn" title="新建规范">＋</button>
+  </div>
+
+  <!-- 右侧：配置项素材列表 -->
+  <div class="col col-right">
+    <div class="panel">
+      <div class="panel-head">
+        <h3>配置项</h3>
+        <span class="count" id="pool-count"></span>
+        <span class="spacer"></span>
+        <span class="seg filter-seg" id="bind-filter" data-bind="unbound">
+          <button data-bind-filter="all">全部</button>
+          <button data-bind-filter="bound">已绑定</button>
+          <button class="active" data-bind-filter="unbound">未绑定</button>
+        </span>
+      </div>
+      <input class="search" id="pool-search" placeholder="搜索配置项" />
+      <div class="filters" id="pool-filters"></div>
+      <div class="pool" id="pool"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="hover-pop" id="hover-pop"></div>
+
+<script>
+// ============ 模拟数据 ============
+// 配置项：来自 project.config.schema.json + 各页面 config.schema.json
+const CONFIG_ITEMS = [
+  // 项目级（会拆分到受影响页面展示）
+  { id: "p.brand.primary", key: "brandPrimary", scope: "project", pages: ["首页", "活动页"], title: "品牌主色", kind: "color", value: "#4F46E5", category: "色值", src: "项目级" },
+  { id: "p.brand.text", key: "brandTextColor", scope: "project", pages: ["首页", "活动页"], title: "正文文字色", kind: "color", value: "#111827", category: "色值", src: "项目级" },
+  { id: "p.font.heading", key: "headingFont", scope: "project", pages: ["首页", "活动页"], title: "标题字体", kind: "text", value: "苹方 / PingFang SC", category: "文字", src: "项目级" },
+  { id: "p.font.body", key: "bodyFont", scope: "project", pages: ["首页", "活动页"], title: "正文字体", kind: "text", value: "PingFang SC", category: "文字", src: "项目级" },
+  { id: "p.space.radius", key: "radius", scope: "project", pages: ["首页", "活动页"], title: "通用圆角", kind: "number", value: "12", unit: "px", category: "数值", src: "项目级" },
+  { id: "p.space.gap", key: "gap", scope: "project", pages: ["首页", "活动页"], title: "模块间距", kind: "number", value: "24", unit: "px", category: "数值", src: "项目级" },
+  { id: "p.img.logo", key: "logo", scope: "project", pages: ["首页", "活动页"], title: "品牌 Logo", kind: "image", value: "logo.svg", category: "图片", src: "项目级", format: "SVG" },
+  // 页面级
+  { id: "pg.home.btn.bg", key: "btnBg", scope: "page", pageId: "home", pageName: "首页", title: "按钮背景色", kind: "color", value: "#4F46E5", category: "色值", src: "首页" },
+  { id: "pg.home.btn.txt", key: "btnText", scope: "page", pageId: "home", pageName: "首页", title: "按钮文字色", kind: "color", value: "#FFFFFF", category: "色值", src: "首页" },
+  { id: "pg.home.btn.radius", key: "btnRadius", scope: "page", pageId: "home", pageName: "首页", title: "按钮圆角", kind: "number", value: "8", unit: "px", category: "数值", src: "首页" },
+  { id: "pg.home.banner.title", key: "bannerTitle", scope: "page", pageId: "home", pageName: "首页", title: "首屏标题", kind: "text", value: "限时特惠", category: "文字", src: "首页" },
+  { id: "pg.home.banner.src", key: "bannerImg", scope: "page", pageId: "home", pageName: "首页", title: "首屏横幅图", kind: "image", value: "banner-hero.png", category: "图片", src: "首页", format: "PNG", size: { w: "1200", h: "600" } },
+  { id: "pg.home.carousel", key: "carouselImg", scope: "page", pageId: "home", pageName: "首页", title: "轮播图", kind: "image", value: "carousel-1.png", category: "图片", src: "首页", format: "JPG", size: { w: "750", h: "600", wMin: true } },
+  { id: "pg.activity.topbanner", key: "topBanner", scope: "page", pageId: "activity", pageName: "活动页", title: "活动顶部横幅", kind: "image", value: "activity-top.png", category: "图片", src: "活动页", format: "PNG", size: { w: "不限", wAny: true, h: "300" } },
+  { id: "pg.home.banner.motion", key: "bannerMotion", scope: "page", pageId: "home", pageName: "首页", title: "横幅入场动效", kind: "motion", value: "fade-up", category: "动效", src: "首页" },
+  { id: "pg.activity.bg", key: "activityBg", scope: "page", pageId: "activity", pageName: "活动页", title: "活动页背景色", kind: "color", value: "#EEF2FF", category: "色值", src: "活动页" },
+  { id: "pg.activity.card.bg", key: "cardBg", scope: "page", pageId: "activity", pageName: "活动页", title: "卡片背景色", kind: "color", value: "#FFFFFF", category: "色值", src: "活动页" },
+  { id: "pg.activity.card.radius", key: "cardRadius", scope: "page", pageId: "activity", pageName: "活动页", title: "卡片圆角", kind: "number", value: "16", unit: "px", category: "数值", src: "活动页" },
+];
+
+// 规范条目（初始示例）
+let entries = [
+  {
+    id: "e1",
+    title: "品牌主按钮",
+    markdown: "**主按钮**用于核心转化动作，背景使用品牌主色，文字为白色。\n\n- 悬停色加深 10%\n- 圆角 8px\n\n> 按钮文字保持简洁，不超过 6 个字。",
+    refs: ["p.brand.primary", "pg.home.btn.bg", "pg.home.btn.txt", "pg.home.btn.radius"],
+    open: true,
+  },
+  {
+    id: "e2",
+    title: "活动卡片",
+    markdown: "",
+    refs: ["pg.activity.card.bg", "pg.activity.card.radius"],
+    open: false,
+  },
+];
+
+// ============ 渲染 ============
+const $ = (s, el) => (el || document).querySelector(s);
+const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
+
+const KIND_META = {
+  color: { label: "色值" },
+  text: { label: "文字" },
+  image: { label: "图片" },
+  number: { label: "数值" },
+  motion: { label: "动效" },
+};
+
+const CATEGORY_ORDER = ["图片", "动效", "色值", "文字", "数值"];
+
+function swatchSvg(item) {
+  if (item.kind === "color") return { style: `background:${item.value}` };
+  if (item.kind === "text") return { text: item.value.slice(0, 1) };
+  if (item.kind === "number") return { text: item.value };
+  if (item.kind === "motion") return { text: "▶" };
+  return { text: "🖼" };
+}
+
+function renderSwatch(item) {
+  const s = swatchSvg(item);
+  const el = document.createElement("span");
+  el.className = `swatch ${item.kind}`;
+  if (s.style) el.style.background = s.style.background;
+  if (s.text) el.textContent = s.text;
+  return el;
+}
+
+// 第一列缩略图：图片显示默认值(小图)，其余类型显示固定图标
+function kindThumbIcon(kind) {
+  if (kind === "color") return "●";
+  if (kind === "image") return "";
+  if (kind === "motion") return "▶";
+  if (kind === "number") return "#";
+  return "Aa"; // text
+}
+
+function renderKindThumb(item) {
+  const el = document.createElement("div");
+  el.className = `thumb ${item.kind}`;
+  if (item.kind === "color") {
+    el.style.background = item.value;
+  } else if (item.kind === "image") {
+    // 图片显示默认值：小缩略
+    el.classList.add("has-img");
+    const img = document.createElement("img");
+    img.src = item.thumb || `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="52" height="52"><rect width="100%" height="100%" fill="#2b3a55"/><text x="50%" y="50%" fill="#8ab4f8" font-size="9" text-anchor="middle" dominant-baseline="central" font-family="sans-serif">' + (item.key || item.title).slice(0,4) + '</text></svg>')}`;
+    img.alt = item.title;
+    el.appendChild(img);
+  } else {
+    const ti = document.createElement("span");
+    ti.className = "ti";
+    ti.textContent = kindThumbIcon(item.kind);
+    el.appendChild(ti);
+  }
+  return el;
+}
+
+// 悬停放大气泡
+const hoverPop = () => document.getElementById("hover-pop");
+function showPopFor(el, bigContentFns, caption) {
+  el.addEventListener("mouseenter", (ev) => showPop(bigContentFns(), caption, ev));
+  el.addEventListener("mousemove", (ev) => movePop(ev));
+  el.addEventListener("mouseleave", () => hidePop());
+}
+function showPop(bigEl, caption, ev) {
+  const pop = hoverPop();
+  pop.innerHTML = "";
+  const big = bigEl.cloneNode(true);
+  big.style.cssText = "";
+  big.classList.add("big");
+  if (!big.classList.contains("img") && !big.classList.contains("page") && !big.classList.contains("combined")) big.classList.add("swatch");
+  pop.appendChild(big);
+  if (caption) { const c = document.createElement("div"); c.className = "cap"; c.textContent = caption; pop.appendChild(c); }
+  pop.style.display = "block";
+  movePop(ev);
+}
+function movePop(ev) {
+  const pop = hoverPop();
+  const w = pop.offsetWidth, h = pop.offsetHeight;
+  let x = ev.clientX + 14, y = ev.clientY + 14;
+  if (x + w > innerWidth) x = ev.clientX - w - 14;
+  if (y + h > innerHeight) y = ev.clientY - h - 14;
+  pop.style.left = x + "px"; pop.style.top = y + "px";
+}
+function hidePop() { hoverPop().style.display = "none"; }
+
+// 页面缩略图放大内容
+const PAGE_LABELS = { home: "首页", activity: "活动页" };
+function pageBig(item) {
+  const b = document.createElement("div");
+  b.className = "page";
+  const label = item.scope === "project" ? "项目级" : PAGE_LABELS[item.pageId] || item.pageName || "页面";
+  b.style.background = "hsl(var(--card))";
+  b.textContent = label;
+  b.style.color = "hsl(var(--muted-foreground))";
+  b.style.fontSize = "13px";
+  b.style.border = "1px solid hsl(var(--border))";
+  b.style.borderRadius = "6px";
+  return b;
+}
+// 图片放大内容（复用原图，放大尺寸）
+function imageSrc(item, w, h) {
+  return item.thumb || `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '"><rect width="100%" height="100%" fill="#2b3a55"/><text x="50%" y="50%" fill="#8ab4f8" font-size="' + Math.round(w/13) + '" text-anchor="middle" dominant-baseline="central" font-family="sans-serif">' + item.value + '</text></svg>')}`;
+}
+// 所在页面示意图（生成一张示意缩略图）
+function pageImgSrc(item) {
+  const label = item.scope === "project" ? "项目级" : (item.pageName || "页面");
+  const w = 800, h = 500;
+  return `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '"><rect width="100%" height="100%" fill="#1a2233"/><rect x="24" y="24" width="' + (w-48) + '" height="60" rx="6" fill="#2b3a55"/><rect x="24" y="100" width="' + (w-48) + '" height="' + (h-124) + '" rx="6" fill="#242f47"/><text x="50%" y="50%" fill="#8ab4f8" font-size="34" text-anchor="middle" dominant-baseline="central" font-family="sans-serif">' + label + ' 页面示意</text></svg>')}`;
+}
+function imageBig(item) {
+  const b = document.createElement("div");
+  b.className = "img";
+  const img = document.createElement("img");
+  img.src = imageSrc(item, 160, 100);
+  img.alt = item.title;
+  b.appendChild(img);
+  return b;
+}
+// 全屏蒙层查看大图（整体缩放 + 拖拽平移）
+function openZoom(item) {
+  const overlay = document.createElement("div");
+  overlay.className = "zoom-overlay";
+  const zoomBody = document.createElement("div");
+  zoomBody.className = "zoom-body";
+  // 左侧：配置项默认图
+  const left = document.createElement("div");
+  left.className = "zoom-pane";
+  const limg = document.createElement("img");
+  limg.className = "zoom-img";
+  limg.src = imageSrc(item, 800, 500);
+  limg.alt = item.title;
+  left.appendChild(limg);
+  // 右侧：所在页面示意图
+  const right = document.createElement("div");
+  right.className = "zoom-pane";
+  const rimg = document.createElement("img");
+  rimg.className = "zoom-img";
+  rimg.src = pageImgSrc(item);
+  rimg.alt = "页面示意";
+  right.appendChild(rimg);
+  zoomBody.append(left, right);
+  const hint = document.createElement("div");
+  hint.className = "zoom-hint";
+  hint.textContent = "滚轮整体缩放 · 拖拽平移 · 点击或 Esc 关闭";
+  const close = document.createElement("button");
+  close.className = "zoom-close";
+  close.textContent = "✕";
+  overlay.append(zoomBody, hint, close);
+  // 整体缩放：作用在 zoom-body 上，两张图一起缩放平移
+  let scale = 1, tx = 0, ty = 0, dragging = false, sx = 0, sy = 0, stx = 0, sty = 0;
+  const apply = () => { zoomBody.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`; };
+  overlay.addEventListener("wheel", ev => {
+    ev.preventDefault();
+    scale += ev.deltaY < 0 ? 0.15 : -0.15;
+    scale = Math.min(6, Math.max(0.5, scale));
+    apply();
+  }, { passive: false });
+  overlay.addEventListener("mousedown", ev => {
+    if (ev.target === overlay || ev.target === close) return;
+    dragging = true; sx = ev.clientX; sy = ev.clientY; stx = tx; sty = ty;
+  });
+  window.addEventListener("mousemove", ev => {
+    if (!dragging) return;
+    tx = stx + (ev.clientX - sx); ty = sty + (ev.clientY - sy);
+    apply();
+  });
+  window.addEventListener("mouseup", () => { dragging = false; });
+  overlay.addEventListener("click", ev => { if (ev.target === overlay || ev.target === close) closeZoom(); });
+  window.addEventListener("keydown", onKey);
+  function onKey(ev) { if (ev.key === "Escape") closeZoom(); }
+  function closeZoom() {
+    overlay.remove();
+    window.removeEventListener("keydown", onKey);
+  }
+  document.body.appendChild(overlay);
+}
+// 色值放大内容
+function colorBig(item) {
+  const b = document.createElement("div");
+  b.className = "color-big";
+  b.style.background = item.value;
+  return b;
+}
+
+// 组合放大气泡：左侧第一列图片，右侧所在页面示意图
+function combinedBig(item) {
+  const wrap = document.createElement("div");
+  wrap.className = "combined";
+  const left = document.createElement("div");
+  left.className = "combined-left";
+  let leftEl;
+  if (item.kind === "image") leftEl = imageBig(item);
+  else if (item.kind === "color") leftEl = colorBig(item);
+  else {
+    leftEl = document.createElement("div");
+    leftEl.className = "thumb-big";
+    leftEl.textContent = kindThumbIcon(item.kind);
+  }
+  left.appendChild(leftEl);
+  const right = document.createElement("div");
+  right.className = "combined-right";
+  const lbl = document.createElement("div");
+  lbl.className = "combined-lbl";
+  lbl.textContent = item.scope === "project" ? "项目级" : (item.pageName || "页面");
+  right.appendChild(pageBig(item));
+  right.appendChild(lbl);
+  wrap.append(left, right);
+  return wrap;
+}
+
+// 尺寸格式化：W=xxx H=xxx / W≥xxx H=xxx / W=不限 H=xxx
+// size: { w: "1200", h: "600", wMin?: boolean, wAny?: boolean, hMin?: boolean, hAny?: boolean }
+function formatSize(item) {
+  if (!item || !item.size) return "—";
+  const { w, h, wMin, wAny, hMin, hAny } = item.size;
+  const wStr = wAny ? "不限" : (wMin ? "≥" + w : "=" + w);
+  const hStr = hAny ? "不限" : (hMin ? "≥" + h : "=" + h);
+  return `W${wStr}  H${hStr}`;
+}
+
+function refCount() { return entries.reduce((n, e) => n + e.refs.length, 0); }
+
+function renderPool() {
+  const q = ($("#pool-search").value || "").trim().toLowerCase();
+  const activeFilter = $(".chip.active")?.dataset.filter || "all";
+  const bindFilter = $("#bind-filter")?.dataset.bind || "all";
+  const boundIds = new Set(entries.flatMap(e => e.refs));
+  const items = CONFIG_ITEMS.filter(it => {
+    if (activeFilter !== "all" && it.category !== activeFilter) return false;
+    if (bindFilter === "bound" && !boundIds.has(it.id)) return false;
+    if (bindFilter === "unbound" && boundIds.has(it.id)) return false;
+    if (q && !(it.title + it.key + it.src + it.category).toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  const groups = {};
+  for (const it of items) {
+    // 项目级配置拆分到受影响页面；页面级归入其所在页面
+    const pages = it.scope === "project" ? (it.pages || ["项目级"]) : [it.pageName || "页面"];
+    for (const p of pages) {
+      (groups[p] = groups[p] || []).push(it);
+    }
+  }
+  // 页面顺序：按受影响页面顺序
+  const cats = Object.keys(groups);
+
+  const pool = $("#pool");
+  pool.innerHTML = "";
+  if (cats.length === 0) {
+    pool.innerHTML = `<div class="empty">无匹配配置项</div>`;
+  }
+  for (const cat of cats) {
+    const g = document.createElement("div");
+    g.className = "pool-group";
+    const head = document.createElement("div");
+    head.className = "pool-group-head";
+    const chev = document.createElement("span");
+    chev.className = "chevron";
+    chev.textContent = "▼";
+    const hname = document.createElement("span");
+    hname.textContent = cat;
+    const hcount = document.createElement("span");
+    hcount.className = "count";
+    hcount.textContent = `${groups[cat].length} 项`;
+    head.append(chev, hname, hcount);
+    const itemsWrap = document.createElement("div");
+    itemsWrap.className = "pool-items";
+    head.addEventListener("click", () => g.classList.toggle("collapsed"));
+    g.appendChild(head);
+    g.appendChild(itemsWrap);
+    for (const it of groups[cat]) {
+      const row = document.createElement("div");
+      row.className = "pool-item";
+      row.draggable = true;
+      row.dataset.id = it.id;
+      const sw = renderSwatch(it);
+      if (it.kind === "image") {
+        sw.classList.add("swatch-img");
+        sw.style.backgroundImage = `url('${imageSrc(it, 52, 52)}')`;
+        sw.style.backgroundSize = "cover";
+        sw.textContent = "";
+        // 悬浮放大（不含名称）
+        sw.addEventListener("mouseenter", (ev) => showPop(imageBig(it), "", ev));
+        sw.addEventListener("mousemove", (ev) => movePop(ev));
+        sw.addEventListener("mouseleave", () => hidePop());
+        // 点击全屏查看
+        sw.addEventListener("click", (ev) => { ev.stopPropagation(); openZoom(it); });
+        // 阻止图片上的拖拽，避免小位移误触发行拖拽而吞掉 click
+        sw.addEventListener("dragstart", (ev) => ev.preventDefault());
+      }
+      row.appendChild(sw);
+      const info = document.createElement("div");
+      info.className = "info";
+      const name = document.createElement("div");
+      name.className = "name";
+      name.textContent = it.title;
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      const kind = document.createElement("span");
+      kind.textContent = KIND_META[it.kind].label;
+      const src = document.createElement("span");
+      src.textContent = it.scope === "project" ? "项目级" : it.pageName;
+      meta.appendChild(kind); meta.appendChild(src);
+      if (boundIds.has(it.id)) {
+        const boundTag = document.createElement("span");
+        boundTag.className = "bound-tag";
+        boundTag.textContent = "已绑定";
+        meta.appendChild(boundTag);
+        row.classList.add("bound");
+      }
+      info.appendChild(name); info.appendChild(meta);
+      row.appendChild(info);
+
+      row.addEventListener("dragstart", e => {
+        e.dataTransfer.setData("text/plain", it.id);
+        row.classList.add("dragging");
+      });
+      row.addEventListener("dragend", () => row.classList.remove("dragging"));
+      // 点击图片查看时不触发整行拖拽
+      row.addEventListener("mousedown", ev => {
+        if (ev.target.classList && ev.target.classList.contains("swatch-img")) {
+          row.draggable = false;
+        }
+      });
+      row.addEventListener("mouseup", () => { row.draggable = true; });
+
+      itemsWrap.appendChild(row);
+    }
+    pool.appendChild(g);
+  }
+  $("#pool-count").textContent = `${items.length} 项`;
+}
+
+function renderFilters() {
+  const cats = CATEGORY_ORDER.filter(c => CONFIG_ITEMS.some(i => i.category === c));
+  const wrap = $("#pool-filters");
+  wrap.innerHTML = "";
+  const mk = (label, val, active) => {
+    const c = document.createElement("button");
+    c.className = "chip" + (active ? " active" : "");
+    c.dataset.filter = val;
+    c.textContent = label;
+    c.addEventListener("click", () => {
+      $$(".chip", wrap).forEach(x => x.classList.remove("active"));
+      c.classList.add("active");
+      renderPool();
+    });
+    return c;
+  };
+  wrap.appendChild(mk("全部", "all", true));
+  cats.forEach(c => wrap.appendChild(mk(c, c, false)));
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// 极简 Markdown 渲染
+function mdToHtml(md) {
+  if (!md) return "";
+  const esc = escapeHtml(md);
+  let html = esc;
+  html = html.replace(/^### (.*)$/gm, "<h3>$1</h3>");
+  html = html.replace(/^## (.*)$/gm, "<h2>$1</h2>");
+  html = html.replace(/^# (.*)$/gm, "<h1>$1</h1>");
+  html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(/`(.+?)`/g, "<code>$1</code>");
+  html = html.replace(/^> (.*)$/gm, "<blockquote>$1</blockquote>");
+  html = html.replace(/^- (.*)$/gm, "<li>$1</li>");
+  const hasUl = /<li>/.test(html);
+  if (hasUl) html = html.replace(/(<li>.*<\/li>)/gms, "<ul>$1</ul>");
+  html = html.replace(/\n{2,}/g, "<br/><br/>").replace(/\n/g, "<br/>");
+  return html;
+}
+
+function renderEntries() {
+  const wrap = $("#entries");
+  wrap.innerHTML = "";
+  if (entries.length === 0) {
+    const emptyEl = document.createElement("div");
+    emptyEl.className = "entries-empty";
+    emptyEl.textContent = "拖入配置项以创建规范";
+    wrap.appendChild(emptyEl);
+    return;
+  }
+  for (const e of entries) {
+    wrap.appendChild(renderEntry(e));
+  }
+  renderRightDrop();
+}
+
+function renderEntry(e) {
+  const card = document.createElement("div");
+  card.className = "entry" + (e.open ? " open" : "");
+  card.dataset.entry = e.id;
+
+  const head = document.createElement("div");
+  head.className = "entry-head";
+  const chev = document.createElement("span");
+  chev.className = "chevron";
+  chev.textContent = "▶";
+  const titleInput = document.createElement("input");
+  titleInput.className = "entry-title";
+  titleInput.value = e.title;
+  titleInput.addEventListener("click", ev => ev.stopPropagation());
+  titleInput.addEventListener("input", () => { e.title = titleInput.value; renderPool(); });
+  const spacer = document.createElement("span");
+  spacer.className = "spacer";
+  const del = document.createElement("button");
+  del.className = "del";
+  del.title = "删除条目";
+  del.textContent = "✕";
+  del.addEventListener("click", ev => {
+    ev.stopPropagation();
+    entries = entries.filter(x => x.id !== e.id);
+    renderEntries(); renderPool();
+    toast(`已删除「${e.title}」`);
+  });
+  head.append(chev, titleInput, spacer, del);
+  head.addEventListener("click", () => { e.open = !e.open; renderEntries(); });
+
+  const body = document.createElement("div");
+  body.className = "entry-body";
+
+  const effRefs = e.refs.filter(id => CONFIG_ITEMS.some(c => c.id === id));
+  const table = document.createElement("table");
+  table.className = "spec-table";
+  const thead = document.createElement("thead");
+  const thr = document.createElement("tr");
+  ["", "配置项", "格式", "尺寸"].forEach((h, i) => {
+    const th = document.createElement("th");
+    th.textContent = h;
+    if (i === 0) th.className = "col-thumb";
+    thr.appendChild(th);
+  });
+  thead.appendChild(thr);
+  table.appendChild(thead);
+  const tbody = document.createElement("tbody");
+  for (const storeKey of e.refs) {
+    const item = CONFIG_ITEMS.find(c => c.id === storeKey);
+    const tr = document.createElement("tr");
+    // 第一列缩略图（图片显示默认值，其余固定图标）
+    const thumbTd = document.createElement("td");
+    thumbTd.className = "col-thumb";
+    if (item) {
+      const thumb = renderKindThumb(item);
+      thumbTd.appendChild(thumb);
+      // 悬停气泡：同时展示第一列图片 + 所在页面示意图
+      showPopFor(thumb, () => combinedBig(item), item ? item.title : "");
+      // 图片点击全屏查看
+      if (item.kind === "image") {
+        thumb.classList.add("thumb-clickable");
+        thumb.addEventListener("click", (ev) => { ev.stopPropagation(); openZoom(item); });
+      }
+    }
+    const nameTd = document.createElement("td");
+    nameTd.className = "col-name";
+    nameTd.textContent = item ? item.title : "已失效引用";
+    const fmtTd = document.createElement("td");
+    fmtTd.className = "col-fmt";
+    fmtTd.textContent = item && item.format ? item.format : "—";
+    const sizeTd = document.createElement("td");
+    sizeTd.className = "col-size";
+    sizeTd.textContent = formatSize(item);
+    // 删除按钮：绝对定位叠加在行末，不占列宽
+    const unbind = document.createElement("button");
+    unbind.className = "unbind";
+    unbind.title = "解绑";
+    unbind.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+    unbind.addEventListener("click", () => unbindItem(storeKey, e.id));
+    tr.append(thumbTd, nameTd, fmtTd, sizeTd, unbind);
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  if (effRefs.length === 0) { table.style.display = "none"; }
+
+  card.addEventListener("dragover", ev => {
+    ev.preventDefault(); ev.stopPropagation();
+    card.classList.add("dragover");
+  });
+  card.addEventListener("dragleave", () => card.classList.remove("dragover"));
+  card.addEventListener("drop", ev => {
+    ev.preventDefault(); ev.stopPropagation();
+    card.classList.remove("dragover");
+    const entryId = ev.dataTransfer.getData("text/entry-id");
+    if (entryId) {
+      // 拖动的是另一张规范卡片 → 排序
+      reorderEntry(entryId, e.id);
+      return;
+    }
+    const id = ev.dataTransfer.getData("text/plain");
+    if (id) bindItem(id, e.id);
+  });
+  // 拖动整张卡片用于排序
+  card.draggable = true;
+  card.addEventListener("dragstart", ev => {
+    ev.dataTransfer.setData("text/entry-id", e.id);
+    card.classList.add("dragging");
+    ev.stopPropagation();
+  });
+  card.addEventListener("dragend", () => card.classList.remove("dragging"));
+
+  const mdBlock = document.createElement("div");
+  mdBlock.className = "md-block";
+  const toolbar = document.createElement("div");
+  toolbar.className = "md-toolbar";
+  const modeToggle = document.createElement("div");
+  modeToggle.className = "mode-toggle";
+  const btnEdit = document.createElement("button");
+  btnEdit.textContent = "编辑";
+  const btnPrev = document.createElement("button");
+  btnPrev.textContent = "预览";
+  btnEdit.classList.add("active");
+  modeToggle.append(btnEdit, btnPrev);
+  toolbar.appendChild(modeToggle);
+  const parseBtn = document.createElement("button");
+  parseBtn.textContent = "B";
+  parseBtn.title = "加粗";
+  const hBtn = document.createElement("button");
+  hBtn.textContent = "H";
+  hBtn.title = "标题";
+  toolbar.append(parseBtn, hBtn);
+  const input = document.createElement("textarea");
+  input.className = "md-input";
+  input.placeholder = "写点什么…";
+  input.value = e.markdown;
+  input.addEventListener("input", () => { e.markdown = input.value; });
+  const preview = document.createElement("div");
+  preview.className = "md-preview";
+  preview.style.display = "none";
+  preview.innerHTML = mdToHtml(e.markdown);
+  btnEdit.addEventListener("click", () => {
+    btnEdit.classList.add("active"); btnPrev.classList.remove("active");
+    input.style.display = ""; preview.style.display = "none";
+  });
+  btnPrev.addEventListener("click", () => {
+    btnPrev.classList.add("active"); btnEdit.classList.remove("active");
+    preview.innerHTML = mdToHtml(e.markdown);
+    preview.style.display = ""; input.style.display = "none";
+  });
+  const wrapSel = (tpl) => () => {
+    const s = input.selectionStart, en = input.selectionEnd, v = input.value;
+    input.value = v.slice(0, s) + tpl + v.slice(en);
+    input.focus(); input.selectionStart = s + 1; input.selectionEnd = s + tpl.length - 1;
+    e.markdown = input.value;
+  };
+  parseBtn.addEventListener("click", wrapSel("**加粗文字**"));
+  hBtn.addEventListener("click", wrapSel("### 标题"));
+  mdBlock.append(toolbar, input, preview);
+
+  body.append(table, mdBlock);
+  card.append(head, body);
+  return card;
+}
+
+// ============ 操作 ============
+function bindItem(itemId, entryId) {
+  const item = CONFIG_ITEMS.find(c => c.id === itemId);
+  const e = entries.find(x => x.id === entryId);
+  if (!item || !e) return;
+  if (!e.refs.includes(itemId)) e.refs.push(itemId);
+  renderEntries(); renderPool();
+  toast(`已绑定「${item.title}」`);
+}
+
+function unbindItem(itemId, entryId) {
+  const e = entries.find(x => x.id === entryId);
+  if (!e) return;
+  e.refs = e.refs.filter(id => id !== itemId);
+  renderEntries(); renderPool();
+}
+
+// 拖动规范卡片排序：把 sourceId 移到 targetId 之后
+function reorderEntry(sourceId, targetId) {
+  if (sourceId === targetId) return;
+  const from = entries.findIndex(x => x.id === sourceId);
+  const to = entries.findIndex(x => x.id === targetId);
+  if (from === -1 || to === -1) return;
+  const [moved] = entries.splice(from, 1);
+  const insertAt = to > from ? to : to; // 移到目标之后
+  entries.splice(insertAt + 1, 0, moved);
+  renderEntries(); renderPool();
+}
+
+// ============ 新建 ============
+function addEntry() {
+  const id = "e" + Date.now();
+  const title = prompt("规范条目名称", `新规范 ${entries.length + 1}`);
+  if (!title) return;
+  entries.push({ id, title, markdown: "", refs: [], open: true });
+  renderEntries(); renderPool();
+  toast(`已创建「${title}」`);
+}
+
+// 右侧空白区域拖入 → 新建规范并绑定该配置项
+function renderRightDrop() {
+  const entriesContainer = $("#entries");
+  const keep = entriesContainer.dataset.dropReady;
+  entriesContainer.dataset.dropReady = "1";
+  if (keep) return;
+  entriesContainer.addEventListener("dragover", ev => {
+    ev.preventDefault();
+    entriesContainer.classList.add("dragover");
+  });
+  entriesContainer.addEventListener("dragleave", ev => { entriesContainer.classList.remove("dragover"); });
+  entriesContainer.addEventListener("drop", ev => {
+    ev.preventDefault();
+    entriesContainer.classList.remove("dragover");
+    const id = ev.dataTransfer.getData("text/plain");
+    if (!id) return;
+    const item = CONFIG_ITEMS.find(c => c.id === id);
+    const title = item ? item.title : "新规范";
+    const newId = "e" + Date.now();
+    entries.push({ id: newId, title, markdown: "", refs: [id], open: true });
+    renderEntries(); renderPool();
+    toast(`已创建「${title}」`);
+  });
+}
+
+document.getElementById("add-entry-btn").addEventListener("click", addEntry);
+
+let toastTimer;
+function toast(msg) {
+  const t = $("#toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 1800);
+}
+
+// ============ 初始化 ============
+$("#pool-search").addEventListener("input", renderPool);
+const bindFilterSeg = $("#bind-filter");
+bindFilterSeg.addEventListener("click", ev => {
+  const btn = ev.target.closest("button");
+  if (!btn) return;
+  bindFilterSeg.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  bindFilterSeg.dataset.bind = btn.dataset.bindFilter;
+  renderPool();
+});
+renderFilters();
+renderPool();
+renderRightDrop();
+renderEntries();
+</script>
+</body>
+</html>

@@ -1,0 +1,332 @@
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { DocumentView } from "./DocumentView";
+
+const toast = jest.fn();
+
+jest.mock("@/components/ui/toast-provider", () => ({
+  useToast: () => ({ toast }),
+}));
+
+jest.mock("@workbench/demo-ui", () => ({
+  DocumentEditor: ({ value }: { value: string }) => (
+    <div data-testid="document-editor">{value}</div>
+  ),
+}));
+
+jest.mock("./DesignSpecEditor", () => ({
+  DesignSpecEditor: () => <div>design spec</div>,
+}));
+
+function jsonResponse(data: unknown, ok = true) {
+  return Promise.resolve({ ok, json: async () => data });
+}
+
+describe("DocumentView knowledge creation", () => {
+  beforeEach(() => {
+    toast.mockClear();
+    global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith("/api/knowledge?") && init?.method === "POST") {
+        return jsonResponse({
+          success: true,
+          data: {
+            id: "kb-new",
+            title: "未命名文档",
+            source: "user",
+            description: "未命名文档",
+            fileName: "未命名文档.md",
+            addedAt: "2026-08-11T00:00:00.000Z",
+            updatedAt: "2026-08-11T00:00:00.000Z",
+            sizeBytes: 0,
+          },
+        });
+      }
+      if (url.includes("/api/knowledge/kb-new") && init?.method === "PUT") {
+        const body = JSON.parse(String(init.body));
+        return jsonResponse({
+          success: true,
+          data: {
+            id: "kb-new",
+            title: body.title,
+            source: "user",
+            description: "未命名文档",
+            fileName: "未命名文档.md",
+            addedAt: "2026-08-11T00:00:00.000Z",
+            updatedAt: "2026-08-11T00:00:00.000Z",
+            sizeBytes: 0,
+          },
+        });
+      }
+      if (url.startsWith("/api/knowledge/content")) {
+        return jsonResponse({ success: true, data: { content: "" } });
+      }
+      if (url.startsWith("/api/knowledge?")) {
+        return jsonResponse({ success: true, data: [] });
+      }
+      if (url.includes("/attachments")) {
+        return jsonResponse({ success: true, data: [] });
+      }
+      if (url.startsWith("/api/design-specs")) {
+        return jsonResponse({ success: true, data: [] });
+      }
+      return jsonResponse({ success: false }, false);
+    }) as jest.Mock;
+  });
+
+  it("creates an unnamed document, opens it, and commits an inline rename", async () => {
+    const user = userEvent.setup();
+    render(
+      <DocumentView
+        workingDir="/workspace"
+        projectId="project-1"
+        sessionId="session-1"
+      />,
+    );
+
+    await user.click(await screen.findByTitle("新建或上传文档"));
+    await user.click(screen.getByText("新建"));
+
+    const input = await screen.findByDisplayValue("未命名文档");
+    expect(screen.getByTestId("document-editor")).toBeInTheDocument();
+    await user.clear(input);
+    await user.type(input, "项目说明{Enter}");
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/api/knowledge/kb-new?"),
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify({ title: "项目说明" }),
+        }),
+      );
+    });
+    expect(await screen.findByText("项目说明")).toBeInTheDocument();
+  });
+
+  it("rejects unsupported uploads without changing the current document", async () => {
+    render(
+      <DocumentView
+        workingDir="/workspace"
+        projectId="project-1"
+        sessionId="session-1"
+      />,
+    );
+
+    const input = await screen.findByTestId("knowledge-upload-input");
+    fireEvent.change(input, {
+      target: { files: [new File(["pdf"], "guide.pdf", { type: "application/pdf" })] },
+    });
+
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "仅支持 Markdown / TXT 文件",
+        variant: "destructive",
+      }),
+    );
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      expect.stringContaining("/api/knowledge?"),
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("cancels an inline rename with Escape and commits it on blur", async () => {
+    const user = userEvent.setup();
+    render(
+      <DocumentView
+        workingDir="/workspace"
+        projectId="project-1"
+        sessionId="session-1"
+      />,
+    );
+    await user.click(await screen.findByTitle("新建或上传文档"));
+    await user.click(screen.getByText("新建"));
+    const input = await screen.findByDisplayValue("未命名文档");
+    await user.clear(input);
+    await user.type(input, "不要保存{Escape}");
+    expect(screen.queryByDisplayValue("不要保存")).not.toBeInTheDocument();
+    expect(screen.getByText("未命名文档")).toBeInTheDocument();
+
+    await user.click(screen.getByTitle("新建或上传文档"));
+    await user.click(screen.getByText("新建"));
+    const secondInput = await screen.findByDisplayValue("未命名文档");
+    await user.clear(secondInput);
+    await user.type(secondInput, "失焦保存");
+    fireEvent.blur(secondInput);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/api/knowledge/kb-new?"),
+        expect.objectContaining({ body: JSON.stringify({ title: "失焦保存" }) }),
+      );
+    });
+  });
+
+  it("uploads an accepted text file and opens the created document", async () => {
+    (global.fetch as jest.Mock).mockImplementation(
+      (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.startsWith("/api/knowledge?") && init?.method === "POST") {
+          const body = JSON.parse(String(init.body));
+          return jsonResponse({
+            success: true,
+            data: {
+              id: "kb-upload",
+              title: body.title,
+              source: "user",
+              description: body.description,
+              fileName: "notes.md",
+              addedAt: "2026-08-11T00:00:00.000Z",
+              updatedAt: "2026-08-11T00:00:00.000Z",
+              sizeBytes: body.content.length,
+            },
+          });
+        }
+        if (url.startsWith("/api/knowledge/content")) {
+          return jsonResponse({ success: true, data: { content: "# Notes" } });
+        }
+        if (url.startsWith("/api/knowledge?")) return jsonResponse({ success: true, data: [] });
+        if (url.includes("/attachments") || url.startsWith("/api/design-specs")) {
+          return jsonResponse({ success: true, data: [] });
+        }
+        return jsonResponse({ success: false }, false);
+      },
+    );
+    render(
+      <DocumentView
+        workingDir="/workspace"
+        projectId="project-1"
+        sessionId="session-1"
+      />,
+    );
+    const file = new File(["# Notes"], "notes.txt", { type: "text/plain" });
+    Object.defineProperty(file, "text", {
+      value: jest.fn().mockResolvedValue("# Notes"),
+    });
+
+    fireEvent.change(await screen.findByTestId("knowledge-upload-input"), {
+      target: { files: [file] },
+    });
+
+    expect(await screen.findByText("notes")).toBeInTheDocument();
+    expect(await screen.findByTestId("document-editor")).toHaveTextContent("# Notes");
+  });
+
+  it("shows an error when reading an accepted upload fails", async () => {
+    render(
+      <DocumentView
+        workingDir="/workspace"
+        projectId="project-1"
+        sessionId="session-1"
+      />,
+    );
+    const file = new File(["notes"], "notes.md", { type: "text/markdown" });
+    Object.defineProperty(file, "text", {
+      value: jest.fn().mockRejectedValue(new Error("read failed")),
+    });
+
+    fireEvent.change(await screen.findByTestId("knowledge-upload-input"), {
+      target: { files: [file] },
+    });
+
+    await waitFor(() => {
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "读取文件失败",
+          description: "read failed",
+          variant: "destructive",
+        }),
+      );
+    });
+    expect(screen.queryByTestId("document-editor")).not.toBeInTheDocument();
+  });
+
+  it("preserves the current selection when document creation fails", async () => {
+    (global.fetch as jest.Mock).mockImplementation(
+      (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.startsWith("/api/knowledge?") && init?.method === "POST") {
+          return jsonResponse(
+            { success: false, error: { message: "authority unavailable" } },
+            false,
+          );
+        }
+        if (url.startsWith("/api/knowledge?")) {
+          return jsonResponse({ success: true, data: [] });
+        }
+        if (url.includes("/attachments") || url.startsWith("/api/design-specs")) {
+          return jsonResponse({ success: true, data: [] });
+        }
+        return jsonResponse({ success: false }, false);
+      },
+    );
+    const user = userEvent.setup();
+    render(
+      <DocumentView
+        workingDir="/workspace"
+        projectId="project-1"
+        sessionId="session-1"
+      />,
+    );
+
+    await user.click(await screen.findByTitle("新建或上传文档"));
+    await user.click(screen.getByText("新建"));
+
+    await waitFor(() => {
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "创建知识文档失败",
+          description: "authority unavailable",
+          variant: "destructive",
+        }),
+      );
+    });
+    expect(screen.queryByDisplayValue("未命名文档")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("document-editor")).not.toBeInTheDocument();
+  });
+
+  it("only lists existing conventions and creates a project convention from the add menu", async () => {
+    (global.fetch as jest.Mock).mockImplementation(
+      (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes("/workspace/files/") && init?.method === "PUT") {
+          return jsonResponse({ success: true, data: { path: "convention.md" } });
+        }
+        if (url.includes("/workspace/files/")) {
+          return jsonResponse({ success: false }, false);
+        }
+        if (url.startsWith("/api/knowledge?")) return jsonResponse({ success: true, data: [] });
+        if (url.includes("/attachments") || url.startsWith("/api/design-specs")) {
+          return jsonResponse({ success: true, data: [] });
+        }
+        return jsonResponse({ success: false }, false);
+      },
+    );
+    const user = userEvent.setup();
+    render(
+      <DocumentView
+        workingDir="/workspace"
+        projectId="project-1"
+        sessionId="session-1"
+        pages={[{ id: "page-1", name: "未创建页面公约" }]}
+      />,
+    );
+
+    expect(await screen.findByText("暂无公约，可通过右上角 + 新建")).toBeInTheDocument();
+    expect(screen.queryByText("未创建页面公约")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTitle("新建/添加公约"));
+    await user.click(screen.getByText("项目公约", { selector: "div" }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/workspace/files/convention.md"),
+        expect.objectContaining({
+          method: "PUT",
+          body: expect.stringContaining("# 项目公约"),
+        }),
+      );
+    });
+
+  });
+});

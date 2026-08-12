@@ -1068,6 +1068,7 @@ export const visualEditScript = `
       propertyChanges: Array.isArray(next.propertyChanges) ? next.propertyChanges : [],
       annotations: Array.isArray(next.annotations) ? next.annotations : []
     };
+    syncSelectionCursor(state.enabled && !state.annotationMode);
     ensureLayer();
     if (!state.enabled) {
       clearHover();
@@ -1079,6 +1080,25 @@ export const visualEditScript = `
     redrawSelection();
     redrawHoverFromState();
     renderAnnotations();
+  }
+
+  function syncSelectionCursor(enabled) {
+    var styleId = 'visual-selection-cursor';
+    var cursorStyle = document.getElementById(styleId);
+    document.documentElement.toggleAttribute('data-visual-selection-mode', enabled);
+    if (!enabled) {
+      if (cursorStyle) cursorStyle.remove();
+      return;
+    }
+    if (!cursorStyle) {
+      cursorStyle = document.createElement('style');
+      cursorStyle.id = styleId;
+      cursorStyle.textContent =
+        'html[data-visual-selection-mode] body *:not([data-visual-overlay]):not([data-visual-overlay] *){' +
+        'cursor:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2724%27 height=%2724%27 viewBox=%270 0 24 24%27%3E%3Cpath d=%27M4 2.5 4.1 18l4.45-4.2 3.1 6.2 3.15-1.58-3.1-6.2 6.2-.18L4 2.5Z%27 fill=%27%23111827%27 stroke=%27white%27 stroke-width=%271.6%27 stroke-linejoin=%27round%27/%3E%3Ccircle cx=%2718.2%27 cy=%2718.2%27 r=%273%27 fill=%27%233b82f6%27 stroke=%27white%27 stroke-width=%271.2%27/%3E%3C/svg%3E") 4 3,default!important;' +
+        '}';
+      document.head.appendChild(cursorStyle);
+    }
   }
 
   function closestEditable(target) {

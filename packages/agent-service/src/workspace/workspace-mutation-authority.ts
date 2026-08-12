@@ -2,6 +2,8 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
+import { buildPageDesignSpecSyncWrites } from "@workbench/project-core/page-design-spec-sync";
+
 import type {
   WorkspaceMutationCommittedEvent,
   WorkspaceMutationReceipt,
@@ -528,6 +530,7 @@ export class WorkspaceMutationAuthority {
         }
 
         const workspacePath = this.workspacePath(request.workspaceId);
+        request = this.withPageDesignSpecSync(request, workspacePath);
         const actual = this.readResourceHashes(workspacePath);
         if (this.rootHash(actual) !== state.rootHash) {
           // Yjs-First: auto-adopt filesystem reality instead of rejecting with
@@ -671,6 +674,63 @@ export class WorkspaceMutationAuthority {
     return [...new Set(request.operations.flatMap((operation) => (
       operation.type === "move_path" ? [operation.from, operation.to] : [operation.path]
     )))].sort();
+  }
+
+  /**
+   * 将页面 config.schema.json 的设计规范副作用并入原 mutation。
+   * 这样 AI、协同和创作端的任意受管写入入口都会在同一事务内完成同步。
+   */
+  private withPageDesignSpecSync(
+    request: WorkspaceMutationRequest,
+    workspacePath: string,
+  ): WorkspaceMutationRequest {
+    const schemaOperation = request.operations.find((operation) => (
+      operation.type === "put_text"
+      && /^demos\/[^/]+\/config\.schema\.json$/.test(operation.path)
+    ));
+    if (!schemaOperation || schemaOperation.type !== "put_text") return request;
+    const match = /^demos\/([^/]+)\/config\.schema\.json$/.exec(schemaOperation.path);
+    if (!match) return request;
+
+    const pageId = match[1];
+    const pageName = this.pageName(workspacePath, pageId);
+    const writes = buildPageDesignSpecSyncWrites({
+      workspacePath,
+      pageId,
+      pageName,
+      schema: schemaOperation.content,
+    });
+    if (writes.length === 0) return request;
+
+    const operations = [...request.operations];
+    for (const write of writes) {
+      if (operations.some((operation) => operation.type === "put_text" && operation.path === write.path)) {
+        continue;
+      }
+      const target = path.join(workspacePath, write.path);
+      const previousContent = fs.existsSync(target) ? fs.readFileSync(target, "utf-8") : null;
+      operations.push({
+        type: "put_text",
+        path: write.path,
+        content: write.content,
+        ...(previousContent === null
+          ? { expectedAbsent: true }
+          : { expectedHash: hashWorkspaceContent(previousContent) }),
+      });
+    }
+    return { ...request, operations };
+  }
+
+  private pageName(workspacePath: string, pageId: string): string {
+    try {
+      const tree = JSON.parse(fs.readFileSync(path.join(workspacePath, "workspace-tree.json"), "utf-8")) as {
+        pages?: Array<{ id?: string; name?: string }>;
+      };
+      const page = tree.pages?.find((candidate) => candidate.id === pageId);
+      return page?.name?.trim() || pageId;
+    } catch {
+      return pageId;
+    }
   }
 
   private recordMutationDiagnostic(

@@ -117,10 +117,11 @@ export {
   resolvePreviewRelativePath,
 } from "./preview-resource-cache";
 export { ConfigScopeWrapper } from "./ConfigScopeWrapper";
+export { PageConfigPanel } from "./PageConfigPanel";
 export {
+  extractCodeConfigBindingKeys,
   extractPrototypeConfigBindingKeys,
-  PageConfigPanel,
-} from "./PageConfigPanel";
+} from "./config-binding-utils";
 export type { PageConfigPanelPage } from "./PageConfigPanel";
 export { ConfigForm } from "./ConfigForm";
 export { parseSchemaToFields } from "./schema-parser";
@@ -176,7 +177,6 @@ export {
 export { PageRequirements } from "./PageRequirements";
 export { DocumentEditor } from "./DocumentEditor";
 export type {
-  DocumentEditorFormat,
   DocumentEditorProps,
   DocumentUploadHandler,
 } from "./DocumentEditor";
@@ -209,6 +209,7 @@ export type {
   CommentLayerProps,
   CreateCommentInput,
   AddReplyInput,
+  UpdateCommentContentInput,
   IframeViewState,
   MentionCandidate,
   CommentPanelProps,

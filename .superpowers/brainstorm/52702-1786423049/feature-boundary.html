@@ -1,0 +1,57 @@
+<h2>项目特有能力如何接入 Crepe？</h2>
+<p class="subtitle">Crepe 覆盖标准 Markdown 交互；项目还需要“配置引用、视频、附件”等扩展。请选择扩展入口。</p>
+
+<div class="cards">
+  <div class="card" data-choice="slash" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#111827;padding:22px;min-height:270px">
+      <div style="max-width:470px;margin:auto;color:#e5e7eb">
+        <div style="font-size:26px;font-weight:720;margin-bottom:18px">项目说明</div>
+        <div style="border:1px solid #374151;border-radius:12px;background:#1f2937;padding:8px;box-shadow:0 18px 38px rgba(0,0,0,.3)">
+          <div style="padding:7px 10px;color:#9ca3af;font-size:12px">基础块</div>
+          <div style="padding:8px 10px;border-radius:7px;background:#374151">H1　一级标题</div>
+          <div style="padding:8px 10px">☷　表格</div>
+          <div style="margin:5px 0;border-top:1px solid #4b5563"></div>
+          <div style="padding:7px 10px;color:#9ca3af;font-size:12px">项目能力</div>
+          <div style="padding:8px 10px">↗　引用配置项</div>
+          <div style="padding:8px 10px">▣　上传视频或附件</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A · 扩展 Crepe 块菜单（推荐）</h3>
+      <p>所有插入操作集中在 `/` 菜单，配置引用可搜索，上传项按入口能力出现。最连贯，但需要维护一层 Crepe feature 配置适配。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="toolbar" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f8fafc;padding:22px;min-height:270px">
+      <div style="max-width:470px;margin:auto;border:1px solid #e2e8f0;border-radius:12px;background:white;color:#1e293b;overflow:hidden">
+        <div style="display:flex;gap:8px;border-bottom:1px solid #e2e8f0;padding:9px 12px;background:#f8fafc">
+          <span style="padding:6px 8px;border-radius:6px;background:white;border:1px solid #cbd5e1">引用配置</span>
+          <span style="padding:6px 8px;border-radius:6px;background:white;border:1px solid #cbd5e1">视频</span>
+          <span style="padding:6px 8px;border-radius:6px;background:white;border:1px solid #cbd5e1">附件</span>
+        </div>
+        <div style="padding:24px 30px"><div style="font-size:26px;font-weight:720">项目说明</div><p style="color:#64748b;line-height:1.7">标准编辑走 Crepe，业务动作留在外层。</p></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B · 独立业务工具条</h3>
+      <p>Crepe 保持原生，项目能力放编辑器顶栏。实现边界清晰，但重新引入常驻工具栏，占空间且与 `/` 菜单形成两套入口。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="plus" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#fafaf9;padding:22px;min-height:270px">
+      <div style="max-width:470px;margin:auto;color:#292524;position:relative;padding:24px 35px;background:#fff;border-radius:10px">
+        <div style="position:absolute;left:5px;top:25px;width:24px;height:24px;border:1px solid #d6d3d1;border-radius:6px;display:grid;place-items:center">＋</div>
+        <div style="font-family:Georgia,serif;font-size:28px">项目说明</div>
+        <p style="font-family:Georgia,serif;color:#57534e;line-height:1.8">在每个块旁边通过加号打开完整插入面板。</p>
+        <div style="position:absolute;left:10px;top:60px;border:1px solid #d6d3d1;border-radius:9px;background:white;padding:10px;box-shadow:0 10px 24px rgba(0,0,0,.12);font-size:13px">引用配置　·　视频　·　附件</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C · 块旁加号入口</h3>
+      <p>发现性最好，接近 Notion；但会改造 Crepe 的块手柄与定位逻辑，交互和维护成本最高。</p>
+    </div>
+  </div>
+</div>

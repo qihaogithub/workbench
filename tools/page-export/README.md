@@ -20,6 +20,7 @@
 | `bin/export.mjs` | 编排：路由发现 → 登录 → single-file 渲染 → normalize → import |
 | `bin/normalize.mjs` | 转换：样式分离 / 红线净化 / CSS 局部化 / 锚点 / 图片 / manifest |
 | `bin/discover-routes.mjs` | 路由自动发现（Next.js app/pages、Vite 待扩展） |
+| `bin/export-opinions.mjs` | 评审意见回流：读创作端评论 → 按 routeKey 导出意见 JSON |
 | `package.json` | 声明 `single-file-cli` 依赖与脚本入口 |
 
 ## 快速开始
@@ -84,9 +85,17 @@ out/
 - 导入前校验：`ow project import-prototype --source <normalized> --manifest @./manifest.json --assets images:assets/images --dry-run --json`，检查 `prototypeGate.decision === "accept_prototype"`。
 - 导入后：创作端原型页预览 + `ow project visual-check <projectId> --json` 截图确认。
 
-## 评审闭环（P1，未实现）
+## 评审闭环（P1，已实现）
 
-创作端「批注→AI 修改」评审闭环对原型页仍有半成品缺口（批注交互、AI prompt 分流、回流意见消费），见设计文档 `docs/plans/远期规划/创作端开发项目模式方案/页面导出工具方案.md`。本工具 P0 只打通导出通道，`routeKey` 锚点已为回流契约预留。
+创作端「批注→AI 修改」评审闭环已接通（原型页 `PrototypePagePreview` 批注交互、批注模式/发送入口、AI prompt 按运行时分流到 `prototype.html`/`prototype.css`）。`routeKey` 锚点（normalize 注入的 `data-route`）作为意见回流主键。
+
+意见回流：
+
+```bash
+node tools/page-export/bin/export-opinions.mjs --project <projectId> --data-dir <repo>/data --output opinions.json
+```
+
+消费：agent 按 `routeKey` 定位开发项目路由源码 → 逐条处理 `text` → 回写状态，与下次导出形成循环。详见设计文档 `docs/plans/远期规划/创作端开发项目模式方案/页面导出工具方案.md`。
 
 ## 许可注意
 

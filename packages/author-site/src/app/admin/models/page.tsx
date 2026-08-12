@@ -64,6 +64,8 @@ interface ProviderFormState {
   apiKey: string;
   modelsText: string;
   defaultModel: string;
+  contextWindow: string;
+  maxTokens: string;
   enabled: boolean;
 }
 
@@ -125,6 +127,13 @@ function extractGroup(id: string): string {
   return idx >= 0 ? id.slice(0, idx) : "";
 }
 
+function parseOptionalPositiveInteger(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const parsed = Number(trimmed);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
 function matchesAutoRule(modelId: string, rule: AutoEnableRule): boolean {
   if (rule.type === "prefix") {
     return modelId.startsWith(rule.value);
@@ -147,6 +156,8 @@ function providerToForm(p: BackendProvider): ProviderFormState {
     apiKey: p.apiKey,
     modelsText: p.models.join("\n"),
     defaultModel: p.defaultModel || "",
+    contextWindow: p.contextWindow ? String(p.contextWindow) : "",
+    maxTokens: p.maxTokens ? String(p.maxTokens) : "",
     enabled: p.enabled !== false,
   };
 }
@@ -159,6 +170,8 @@ function formToProvider(f: ProviderFormState): BackendProvider {
     apiKey: f.apiKey.trim(),
     models: f.modelsText.split("\n").map((s) => s.trim()).filter(Boolean),
     defaultModel: f.defaultModel.trim() || undefined,
+    contextWindow: parseOptionalPositiveInteger(f.contextWindow),
+    maxTokens: parseOptionalPositiveInteger(f.maxTokens),
     enabled: f.enabled,
   };
 }
@@ -170,6 +183,8 @@ const EMPTY_FORM: ProviderFormState = {
   apiKey: "",
   modelsText: "",
   defaultModel: "",
+  contextWindow: "",
+  maxTokens: "",
   enabled: true,
 };
 
@@ -530,6 +545,14 @@ function SuppliersTab() {
       setError("默认模型必须在模型列表中");
       return;
     }
+    if (form.contextWindow.trim() && !parseOptionalPositiveInteger(form.contextWindow)) {
+      setError("上下文窗口必须是正整数");
+      return;
+    }
+    if (form.maxTokens.trim() && !parseOptionalPositiveInteger(form.maxTokens)) {
+      setError("最大输出 token 必须是正整数");
+      return;
+    }
 
     setError(null);
     const newProvider = formToProvider(form);
@@ -831,6 +854,30 @@ function SuppliersTab() {
                   value={form.defaultModel}
                   onChange={(e) => setForm({ ...form, defaultModel: e.target.value })}
                   placeholder="留空则取列表第一个"
+                  className="bg-neutral-800 border-neutral-700 text-neutral-200 placeholder:text-neutral-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-neutral-400 mb-1">
+                  上下文窗口 (选填)
+                </label>
+                <Input
+                  inputMode="numeric"
+                  value={form.contextWindow}
+                  onChange={(e) => setForm({ ...form, contextWindow: e.target.value })}
+                  placeholder="128000"
+                  className="bg-neutral-800 border-neutral-700 text-neutral-200 placeholder:text-neutral-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-neutral-400 mb-1">
+                  最大输出 token (选填)
+                </label>
+                <Input
+                  inputMode="numeric"
+                  value={form.maxTokens}
+                  onChange={(e) => setForm({ ...form, maxTokens: e.target.value })}
+                  placeholder="4096"
                   className="bg-neutral-800 border-neutral-700 text-neutral-200 placeholder:text-neutral-500"
                 />
               </div>

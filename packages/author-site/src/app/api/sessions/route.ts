@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import path from "path";
-import fs from "fs";
 import { getAgentClient } from "@/lib/agent-client";
 import {
   createApiSuccess,
   createApiError,
-  getSessionPath,
   getSessionMeta,
   findWorkspacePath,
   getWorkspaceMeta,
-  getWorkspaceMultiDemoFiles,
-  getWorkspaceFiles,
+  getProjectConfigSchema,
+  getProjectConfigValues,
+  listWorkspaceDemoPages,
+  readFoldersMeta,
+  readProjectMeta,
 } from "@/lib/fs-utils";
 import {
   archiveActiveSession,
@@ -27,6 +27,53 @@ import {
 import { readExternalAuthSessionConfigWithRefresh } from "@/lib/external-auth";
 import { getModelConfig } from "@/lib/model-config";
 import { readUserBackendProvidersConfig } from "@/lib/user-model-config";
+
+function createSessionBootstrap(input: {
+  sessionId: string;
+  projectId: string;
+  workspaceId: string | null;
+  workspaceScope: "live" | "branch" | "snapshot-source" | "legacy";
+  workspacePath: string;
+  activePageId?: string;
+}) {
+  const project = readProjectMeta(input.projectId);
+  const demoPages = input.workspaceId
+    ? listWorkspaceDemoPages(input.workspaceId)
+    : [];
+  const demoFolders = input.workspacePath
+    ? readFoldersMeta(input.workspacePath)
+    : [];
+  const requestedPageExists = input.activePageId
+    ? demoPages.some((page) => page.id === input.activePageId)
+    : false;
+  const activePageId = requestedPageExists
+    ? input.activePageId!
+    : demoPages[0]?.id ?? null;
+
+  return {
+    sessionId: input.sessionId,
+    workspaceId: input.workspaceId,
+    workspaceScope: input.workspaceScope,
+    isSharedWorkspace: input.workspaceScope === "live",
+    workspacePath: input.workspacePath,
+    tempWorkspace: input.workspacePath,
+    project: {
+      id: input.projectId,
+      name: project?.name ?? input.projectId,
+      thumbnail: project?.thumbnail,
+      authoringPreferences: project?.authoringPreferences,
+    },
+    demoPages,
+    demoFolders,
+    projectConfigSchema: input.workspacePath
+      ? getProjectConfigSchema(input.workspacePath)
+      : undefined,
+    projectConfigValues: input.workspacePath
+      ? getProjectConfigValues(input.workspacePath)
+      : {},
+    activePageId,
+  };
+}
 
 async function pushUserModelConfig(userId: string, sessionId: string): Promise<void> {
   try {
@@ -86,6 +133,8 @@ export async function POST(request: NextRequest) {
     const userId = payload.userId;
     const body = await request.json();
     const { demoId: projectId, forceNew, workspaceId } = body;
+    const activePageId =
+      typeof body.activePageId === "string" ? body.activePageId : undefined;
 
     if (!projectId || typeof projectId !== "string") {
       return NextResponse.json(
@@ -105,51 +154,23 @@ export async function POST(request: NextRequest) {
       await pushUserExternalAuth(userId, activeSessionId);
 
       const meta = getSessionMeta(activeSessionId);
-      let code = "";
-      let schema = "";
-      let workspacePath = "";
-
-      if (meta?.workspaceId) {
-        const wsPath = findWorkspacePath(meta.workspaceId);
-        // 多页面模式：读取所有页面，返回第一个页面的 code/schema 作为兼容
-        const multiFiles = getWorkspaceMultiDemoFiles(meta.workspaceId);
-        if (multiFiles && Object.keys(multiFiles.demos).length > 0) {
-          const firstDemoId = Object.keys(multiFiles.demos)[0];
-          const firstDemo = multiFiles.demos[firstDemoId];
-          code = firstDemo.code;
-          schema = firstDemo.schema;
-        } else {
-          // fallback 到旧格式（workspace 根目录）
-          const files = getWorkspaceFiles(meta.workspaceId);
-          code = files?.code || "";
-          schema = files?.schema || "";
-        }
-        workspacePath = wsPath || getSessionPath(activeSessionId) || "";
-      } else {
-        // 无 workspaceId 的 legacy session，尝试从 session 路径读取
-        const sessionPath = getSessionPath(activeSessionId);
-        const codePath = path.join(sessionPath, "index.tsx");
-        const schemaPath = path.join(sessionPath, "config.schema.json");
-        if (fs.existsSync(codePath)) code = fs.readFileSync(codePath, "utf-8");
-        if (fs.existsSync(schemaPath)) schema = fs.readFileSync(schemaPath, "utf-8");
-        workspacePath = sessionPath || "";
-      }
+      const workspaceId = meta?.workspaceId || null;
+      const workspacePath = workspaceId
+        ? findWorkspacePath(workspaceId) || ""
+        : "";
+      const workspaceScope = workspaceId
+        ? getWorkspaceMeta(workspaceId)?.scope || "legacy"
+        : "legacy";
 
       return NextResponse.json(
-        createApiSuccess({
+        createApiSuccess(createSessionBootstrap({
           sessionId: activeSessionId,
-          workspaceId: meta?.workspaceId || null,
-          workspaceScope: meta?.workspaceId
-            ? getWorkspaceMeta(meta.workspaceId)?.scope || "legacy"
-            : "legacy",
-          isSharedWorkspace: meta?.workspaceId
-            ? getWorkspaceMeta(meta.workspaceId)?.scope === "live"
-            : false,
-          code,
-          schema,
+          projectId,
+          workspaceId,
+          workspaceScope,
           workspacePath,
-          tempWorkspace: workspacePath,
-        }),
+          activePageId,
+        })),
       );
     }
 
@@ -161,7 +182,17 @@ export async function POST(request: NextRequest) {
     await pushUserModelConfig(userId, result.sessionId);
     await pushUserExternalAuth(userId, result.sessionId);
     enforceSessionLimit(userId, projectId, 5);
-    return NextResponse.json(createApiSuccess(result), { status: 201 });
+    return NextResponse.json(
+      createApiSuccess(createSessionBootstrap({
+        sessionId: result.sessionId,
+        projectId,
+        workspaceId: result.workspaceId,
+        workspaceScope: result.workspaceScope,
+        workspacePath: result.workspacePath,
+        activePageId,
+      })),
+      { status: 201 },
+    );
   } catch (error) {
     console.error("Error creating session:", error);
 

@@ -26,6 +26,10 @@ export interface BackendProvider {
   defaultModel?: string;
   /** 选填：是否启用，默认 true */
   enabled?: boolean;
+  /** 选填：供应商模型的实际上下文窗口；未配置时兼容默认 128k。 */
+  contextWindow?: number;
+  /** 选填：供应商模型的最大输出 token；未配置时使用服务默认值。 */
+  maxTokens?: number;
 }
 
 /**

@@ -1,5 +1,6 @@
 "use client";
 
+import { createContext, useContext, type ReactNode } from "react";
 import {
   SketchEditorCanvas,
   SketchEditorToolbar,
@@ -18,6 +19,10 @@ export type SketchEditorEngineHost = {
   nativeController: SketchEditorController;
 };
 
+const SketchEditorEngineContext = createContext<SketchEditorEngineHost | null>(
+  null,
+);
+
 export function useSketchEditorEngineHost(input: {
   engine: SketchEditorEngine | null;
   scene: SketchSceneDocument;
@@ -34,17 +39,43 @@ export function useSketchEditorEngineHost(input: {
   };
 }
 
+export function SketchEditorEngineProvider({
+  engine,
+  scene,
+  onSceneChange,
+  children,
+}: {
+  engine: SketchEditorEngine;
+  scene: SketchSceneDocument;
+  onSceneChange: (scene: SketchSceneDocument) => void;
+  children: ReactNode;
+}) {
+  const host = useSketchEditorEngineHost({ engine, scene, onSceneChange });
+  return (
+    <SketchEditorEngineContext.Provider value={host}>
+      {children}
+    </SketchEditorEngineContext.Provider>
+  );
+}
+
+function useSketchEditorEngineContext(): SketchEditorEngineHost {
+  const host = useContext(SketchEditorEngineContext);
+  if (!host) {
+    throw new Error("Sketch editor controls must be rendered inside its provider");
+  }
+  return host;
+}
+
 export function SketchEditorEngineStage({
-  host,
   scene,
   configData,
   previewSize,
 }: {
-  host: SketchEditorEngineHost;
   scene: SketchSceneDocument;
   configData: Record<string, unknown>;
   previewSize?: PreviewSize;
 }) {
+  const host = useSketchEditorEngineContext();
   return (
     <SketchEditorCanvas
       scene={scene}
@@ -57,12 +88,11 @@ export function SketchEditorEngineStage({
 }
 
 export function SketchEditorEngineToolbar({
-  host,
   scene,
 }: {
-  host: SketchEditorEngineHost;
   scene: SketchSceneDocument;
 }) {
+  const host = useSketchEditorEngineContext();
   if (host.engine !== "native") return null;
   return (
     <SketchEditorToolbar
@@ -73,12 +103,11 @@ export function SketchEditorEngineToolbar({
 }
 
 export function SketchEditorEngineLayerPanel({
-  host,
   scene,
 }: {
-  host: SketchEditorEngineHost;
   scene: SketchSceneDocument;
 }) {
+  const host = useSketchEditorEngineContext();
   return (
     <SketchLayerPanel
       scene={scene}
@@ -89,12 +118,11 @@ export function SketchEditorEngineLayerPanel({
 }
 
 export function SketchEditorEngineInspectorPanel({
-  host,
   scene,
 }: {
-  host: SketchEditorEngineHost;
   scene: SketchSceneDocument;
 }) {
+  const host = useSketchEditorEngineContext();
   return (
     <SketchPropertyPanel
       scene={scene}

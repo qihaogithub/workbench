@@ -14,6 +14,7 @@ import type {
   CommentApiAdapter,
   CreateCommentInput,
   MentionCandidate,
+  UpdateCommentContentInput,
 } from "@workbench/demo-ui";
 import type { CommentReply, CommentThread, ProjectVisitor } from "@workbench/shared";
 import { DATA_BASE, getAuthToken } from "./api";
@@ -127,6 +128,20 @@ export function createCommentApi(projectId: string): CommentApiAdapter {
           body: JSON.stringify({ ...input, ...anonymousFields() }),
         },
       );
+      return data.reply;
+    },
+
+    async updateComment(threadId: string, input: UpdateCommentContentInput): Promise<CommentThread> {
+      const data = await commentRequest<{ thread: CommentThread }>(`${base}/${encodeURIComponent(threadId)}`, {
+        method: "PATCH", body: JSON.stringify({ ...input, ...anonymousFields() }),
+      });
+      return data.thread;
+    },
+
+    async updateReply(threadId: string, replyId: string, input: UpdateCommentContentInput): Promise<CommentReply> {
+      const data = await commentRequest<{ reply: CommentReply }>(`${base}/${encodeURIComponent(threadId)}/replies/${encodeURIComponent(replyId)}`, {
+        method: "PATCH", body: JSON.stringify({ ...input, ...anonymousFields() }),
+      });
       return data.reply;
     },
 

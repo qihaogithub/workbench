@@ -17,7 +17,7 @@ import type {
   CommentThread,
   CommentWsEvent,
 } from "@workbench/shared";
-import type { AddReplyInput, CommentApiAdapter, CreateCommentInput } from "./types";
+import type { AddReplyInput, CommentApiAdapter, CreateCommentInput, UpdateCommentContentInput } from "./types";
 
 export interface UseCommentsOptions {
   projectId: string;
@@ -36,9 +36,13 @@ export interface UseCommentsResult {
   refresh: () => Promise<void>;
   createComment: (input: CreateCommentInput) => Promise<CommentThread>;
   addReply: (threadId: string, input: AddReplyInput) => Promise<CommentReply>;
+  updateComment: (threadId: string, input: UpdateCommentContentInput) => Promise<CommentThread>;
+  updateReply: (threadId: string, replyId: string, input: UpdateCommentContentInput) => Promise<CommentReply>;
   setResolved: (threadId: string, resolved: boolean) => Promise<void>;
   deleteThread: (threadId: string) => Promise<void>;
   deleteReply: (threadId: string, replyId: string) => Promise<void>;
+  /** @AI 任务失败后重试（重新入队） */
+  retryAiTask?: (threadId: string) => Promise<void>;
 }
 
 /** 将 WS 事件幂等地应用到线程列表 */
@@ -50,6 +54,9 @@ function applyWsEvent(
     case "comment:created": {
       if (threads.some((t) => t.id === event.thread.id)) return threads;
       return [...threads, event.thread];
+    }
+    case "comment:updated": {
+      return threads.map((thread) => thread.id === event.thread.id ? event.thread : thread);
     }
     case "comment:replied": {
       return threads.map((t) => {
@@ -189,6 +196,28 @@ export function useComments({
     [],
   );
 
+  const updateComment = useCallback(
+    async (threadId: string, input: UpdateCommentContentInput): Promise<CommentThread> => {
+      const updated = await apiRef.current.updateComment(threadId, input);
+      setThreads((current) => current.map((thread) => thread.id === threadId ? updated : thread));
+      return updated;
+    },
+    [],
+  );
+
+  const updateReply = useCallback(
+    async (threadId: string, replyId: string, input: UpdateCommentContentInput): Promise<CommentReply> => {
+      const updated = await apiRef.current.updateReply(threadId, replyId, input);
+      setThreads((current) => current.map((thread) => thread.id !== threadId ? thread : {
+        ...thread,
+        replies: thread.replies.map((reply) => reply.id === replyId ? updated : reply),
+        updatedAt: Date.now(),
+      }));
+      return updated;
+    },
+    [],
+  );
+
   const setResolved = useCallback(
     async (threadId: string, resolved: boolean): Promise<void> => {
       // 乐观更新
@@ -240,6 +269,23 @@ export function useComments({
     [threads],
   );
 
+  const retryAiTask = useCallback(
+    async (threadId: string): Promise<void> => {
+      if (!apiRef.current.retryAiTask) return;
+      const previous = threads;
+      setThreads((current) =>
+        current.map((t) => (t.id === threadId ? { ...t, aiTaskStatus: "pending" } : t)),
+      );
+      try {
+        await apiRef.current.retryAiTask(threadId);
+      } catch (err) {
+        setThreads(previous);
+        throw err;
+      }
+    },
+    [threads],
+  );
+
   return {
     threads,
     isLoading,
@@ -247,9 +293,12 @@ export function useComments({
     refresh,
     createComment,
     addReply,
+    updateComment,
+    updateReply,
     setResolved,
     deleteThread,
     deleteReply,
+    retryAiTask,
   };
 }
 

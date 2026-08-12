@@ -15,6 +15,7 @@ export type {
   CommentLayerProps,
   CreateCommentInput,
   AddReplyInput,
+  UpdateCommentContentInput,
   IframeViewState,
   MentionCandidate,
 } from "./types";
