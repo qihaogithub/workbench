@@ -76,9 +76,12 @@ export interface PreviewStageProps {
   selectorSlot?: ReactNode;
   toolbarCenter?: ReactNode;
   toolbarTrailing?: ReactNode;
+  /** 单页模式按 ← 时调用；未提供时按页面排序切换到上一页。 */
+  onSinglePagePrevious?: () => void;
+  /** 单页模式按 → 时调用；未提供时按页面排序切换到下一页。 */
+  onSinglePageNext?: () => void;
   renderSingleContent?: (
     context: PreviewStageRenderContext,
   ) => ReactNode | undefined;
   className?: string;
 }
-

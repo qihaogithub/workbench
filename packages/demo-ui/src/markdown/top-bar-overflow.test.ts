@@ -6,6 +6,10 @@ function setWidth(element: HTMLElement, width: number) {
     configurable: true,
     value: () => ({ width }),
   });
+  Object.defineProperty(element, "clientWidth", {
+    configurable: true,
+    value: width,
+  });
 }
 
 function pointerDown(element: HTMLElement) {
@@ -20,6 +24,7 @@ function createTopBar(width: number, attach = true) {
   const root = document.createElement("div");
   const topBar = document.createElement("div");
   topBar.className = "milkdown-top-bar";
+  setWidth(topBar, width);
   const inner = document.createElement("div");
   inner.className = "top-bar-inner";
   setWidth(inner, width);
@@ -31,13 +36,19 @@ function createTopBar(width: number, attach = true) {
   const bold = document.createElement("button");
   bold.className = "top-bar-item";
   bold.textContent = "B";
+  bold.style.marginLeft = "3px";
+  bold.style.marginRight = "3px";
   setWidth(bold, 32);
   const divider = document.createElement("div");
   divider.className = "top-bar-divider";
+  divider.style.marginLeft = "5px";
+  divider.style.marginRight = "5px";
   setWidth(divider, 10);
   const italic = document.createElement("button");
   italic.className = "top-bar-item";
   italic.textContent = "I";
+  italic.style.marginLeft = "3px";
+  italic.style.marginRight = "3px";
   setWidth(italic, 32);
   const onItalic = vi.fn();
   italic.addEventListener("pointerdown", onItalic);
@@ -46,7 +57,7 @@ function createTopBar(width: number, attach = true) {
   topBar.append(inner);
   root.append(topBar);
   if (attach) document.body.append(root);
-  return { root, inner, heading, bold, divider, italic, onItalic };
+  return { root, topBar, inner, heading, bold, divider, italic, onItalic };
 }
 
 describe("Crepe TopBar 溢出菜单", () => {
@@ -67,7 +78,7 @@ describe("Crepe TopBar 溢出菜单", () => {
     const fixture = createTopBar(110);
     const controller = mountTopBarOverflow({ root: fixture.root });
 
-    expect(fixture.heading.hidden).toBe(false);
+    expect(fixture.heading.hidden).toBe(true);
     expect(fixture.bold.hidden).toBe(true);
     expect(fixture.divider.hidden).toBe(true);
     expect(fixture.italic.hidden).toBe(true);
@@ -93,6 +104,7 @@ describe("Crepe TopBar 溢出菜单", () => {
   it("宽度恢复后还原原生工具并隐藏更多入口", () => {
     const fixture = createTopBar(110);
     const controller = mountTopBarOverflow({ root: fixture.root });
+    setWidth(fixture.topBar, 240);
     setWidth(fixture.inner, 240);
     controller.refresh();
 
@@ -102,6 +114,65 @@ describe("Crepe TopBar 溢出菜单", () => {
     expect(fixture.italic.hidden).toBe(false);
     expect(fixture.root.querySelector<HTMLElement>("[data-top-bar-overflow]")?.hidden).toBe(
       true,
+    );
+
+    controller.destroy();
+    fixture.root.remove();
+  });
+
+  it("测量工具项外边距，为更多入口预留可见空间", () => {
+    const fixture = createTopBar(155);
+    const controller = mountTopBarOverflow({ root: fixture.root });
+
+    expect(fixture.heading.hidden).toBe(false);
+    expect(fixture.bold.hidden).toBe(false);
+    expect(fixture.italic.hidden).toBe(true);
+    expect(fixture.root.querySelector<HTMLElement>("[data-top-bar-overflow]")?.hidden).toBe(
+      false,
+    );
+
+    controller.destroy();
+    fixture.root.remove();
+  });
+
+  it("即使所有工具刚好放得下，也为更多入口保留安全宽度", () => {
+    const fixture = createTopBar(200);
+    const controller = mountTopBarOverflow({ root: fixture.root });
+
+    expect(fixture.italic.hidden).toBe(true);
+    expect(fixture.root.querySelector<HTMLElement>("[data-top-bar-overflow]")?.hidden).toBe(
+      false,
+    );
+
+    controller.destroy();
+    fixture.root.remove();
+  });
+
+  it("以工具栏父容器的宽度判断溢出，不受已撑宽的内部行误导", () => {
+    const fixture = createTopBar(155);
+    setWidth(fixture.inner, 480);
+    const controller = mountTopBarOverflow({ root: fixture.root });
+
+    expect(fixture.italic.hidden).toBe(true);
+    expect(fixture.root.querySelector<HTMLElement>("[data-top-bar-overflow]")?.hidden).toBe(
+      false,
+    );
+
+    controller.destroy();
+    fixture.root.remove();
+  });
+
+  it("检测到原生滚动溢出时强制收纳，即使边界测量恰好相等", () => {
+    const fixture = createTopBar(240);
+    Object.defineProperty(fixture.topBar, "scrollWidth", {
+      configurable: true,
+      value: 320,
+    });
+    const controller = mountTopBarOverflow({ root: fixture.root });
+
+    expect(fixture.italic.hidden).toBe(true);
+    expect(fixture.root.querySelector<HTMLElement>("[data-top-bar-overflow]")?.hidden).toBe(
+      false,
     );
 
     controller.destroy();
@@ -133,7 +204,7 @@ describe("Crepe TopBar 溢出菜单", () => {
     trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
     expect(fixture.root.querySelector("[role='menu']")).toBeTruthy();
-    expect(fixture.root.querySelectorAll("[role='menuitem']")).toHaveLength(2);
+    expect(fixture.root.querySelectorAll("[role='menuitem']")).toHaveLength(3);
 
     controller.destroy();
     fixture.root.remove();

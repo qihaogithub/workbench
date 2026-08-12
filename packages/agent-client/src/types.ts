@@ -95,12 +95,8 @@ export interface SendMessageOptions {
   referencedProjects?: Array<{ projectId: string; label?: string }>;
   images?: ImageAttachment[];
   files?: FileAttachment[];
-  /**
-   * v3.2: 静态 system prompt 注入（L2 + L4）
-   * author-site 端通过 buildStaticSystemPrompt() 生成
-   * 注：L3 动态上下文已拼到 content 字段头部
-   */
-  systemPrompt?: string;
+  /** 调用方提供的项目规则；服务端会置于不可覆盖的安全骨架之后。 */
+  projectRules?: string;
   /** 行为模式；通常由 AgentClient/AgentStream 按配置自动注入，无需手动传 */
   mode?: AgentMode;
   /** viewer-readonly 模式下的浏览端上下文（服务端用于拼接只读问答上下文） */

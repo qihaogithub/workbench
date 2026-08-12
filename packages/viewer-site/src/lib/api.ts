@@ -36,6 +36,23 @@ export interface PublishedDemoPage {
   sketchMeta?: Record<string, unknown>;
   sketchScenePath?: string;
   sketchMetaPath?: string;
+  requirements?: string;
+}
+
+export interface PublishedDesignSpecMeta {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PublishedDesignSpecDoc extends PublishedDesignSpecMeta {
+  entries: Array<{
+    id: string;
+    title: string;
+    markdown: string;
+    refs: Array<{ scope: "project" | "page"; pageId?: string; fieldKey: string }>;
+  }>;
 }
 
 export interface PublishedProject {
@@ -51,6 +68,7 @@ export interface PublishedProject {
   projectConfigValues?: Record<string, unknown>;
   canvasState?: CanvasState;
   knowledge?: KnowledgeIndexItem[];
+  designSpecs?: PublishedDesignSpecMeta[];
 }
 
 export interface ProjectsIndex {
@@ -66,9 +84,27 @@ export interface ProjectsIndex {
   generatedAt: number;
 }
 
-export const DATA_BASE =
-  process.env.NEXT_PUBLIC_DATA_BASE ||
-  (process.env.NODE_ENV === "development" ? "http://localhost:3200" : "");
+type PublicRuntimeEnv = {
+  NEXT_PUBLIC_DATA_BASE?: string;
+  NEXT_PUBLIC_VIEWER_DOCKER_MODE?: string;
+};
+
+export function resolveDataBase(env: PublicRuntimeEnv): string {
+  // A Docker viewer serves published data through its own nginx origin. Do not
+  // let a developer's root .env endpoint become part of that static bundle.
+  if (env.NEXT_PUBLIC_VIEWER_DOCKER_MODE === "true") return "";
+
+  return (
+    env.NEXT_PUBLIC_DATA_BASE ||
+    (process.env.NODE_ENV === "development" ? "http://localhost:3200" : "")
+  );
+}
+
+export const DATA_BASE = resolveDataBase({
+  NEXT_PUBLIC_DATA_BASE: process.env.NEXT_PUBLIC_DATA_BASE,
+  NEXT_PUBLIC_VIEWER_DOCKER_MODE:
+    process.env.NEXT_PUBLIC_VIEWER_DOCKER_MODE,
+});
 
 async function fetchJson<T>(path: string): Promise<T> {
   const res = await fetch(`${DATA_BASE}${path}`, { cache: "no-store" });
@@ -122,6 +158,15 @@ export async function getKnowledgeDocContent(
     `/data/${projectId}/knowledge/${encodeURIComponent(fileName)}`,
   );
   return content;
+}
+
+export async function getDesignSpecDoc(
+  projectId: string,
+  docId: string,
+): Promise<PublishedDesignSpecDoc> {
+  return fetchJson<PublishedDesignSpecDoc>(
+    `/data/${projectId}/design-spec/spec-${encodeURIComponent(docId)}.json`,
+  );
 }
 
 export function getDataUrl(path: string): string {
@@ -285,4 +330,3 @@ export async function deleteDemoPage(
     },
   );
 }
-

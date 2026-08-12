@@ -22,6 +22,18 @@ interface UseCanvasWorkspaceOptions {
   projectId?: string;
 }
 
+/** Viewport pan/zoom is local viewing state, not a canvas content mutation. */
+function getCanvasContentSignature(state: CanvasState): string {
+  return JSON.stringify({
+    pages: state.pages ?? {},
+    pageGroups: state.pageGroups ?? {},
+    hiddenPageIds: state.hiddenPageIds ?? [],
+    nodes: state.nodes ?? {},
+    layers: state.layers ?? {},
+    hiddenKnowledgeDocumentIds: state.hiddenKnowledgeDocumentIds ?? [],
+  });
+}
+
 export function useCanvasWorkspace({
   sessionId,
   projectId,
@@ -118,9 +130,14 @@ export function useCanvasWorkspace({
   }, [setCanvasPersistenceDirty]);
 
   const updateCanvasState = useCallback((nextState: CanvasState) => {
+    const contentChanged =
+      getCanvasContentSignature(canvasStateRef.current) !==
+      getCanvasContentSignature(nextState);
     canvasStateRef.current = nextState;
-    setCanvasPersistenceDirty(true);
-    setHasUnsavedCanvasChanges(true);
+    if (contentChanged) {
+      setCanvasPersistenceDirty(true);
+      setHasUnsavedCanvasChanges(true);
+    }
     setCanvasState(nextState);
   }, [setCanvasPersistenceDirty]);
 

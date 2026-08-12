@@ -25,6 +25,16 @@ export type PublishStatus =
   | "unpublished_changes"
   | null;
 
+/**
+ * 工作区中的文档类资源（知识库、设计规范）保存后不经过页面草稿状态，
+ * 但仍需要让下一次发布重新生成公开产物。
+ */
+export function markWorkspaceDocumentChanged(
+  status: PublishStatus,
+): PublishStatus {
+  return status === "published" ? "unpublished_changes" : status;
+}
+
 export interface PreviewVersionState {
   scope: "page";
   version: PageVersionInfo;

@@ -37,6 +37,7 @@ interface ViewerDemoPage {
   prototypeMeta?: Record<string, unknown>;
   sketchScene?: Record<string, unknown>;
   sketchMeta?: Record<string, unknown>;
+  requirements?: string;
 }
 
 interface ViewerData {
@@ -488,8 +489,10 @@ export default function ViewerProjectPage() {
               projectConfigSchema={data.projectConfigSchema}
               onProjectConfigChange={handleProjectConfigChange}
               onPageConfigChange={handlePageConfigChange}
+              requirements={data.demoPages.find((page) => page.id === (previewMode === "single" ? activeDemoId : configPanelDetailPageId))?.requirements}
               readonly
               hideDetailHeader={previewMode === "single"}
+              requirementsPosition="beforeConfig"
             />
           </div>
         )}

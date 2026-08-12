@@ -52,6 +52,8 @@ interface CanvasPageItemProps {
   brokenReference?: boolean;
   onLayoutChange?: (pageId: string, layout: CanvasPageLayout) => void;
   onConfigEdit?: (pageId: string, event?: React.PointerEvent) => void;
+  /** 画布评论模式下选择本页；优先于页面拖拽和预览内容交互。 */
+  onCommentSelect?: (pageId: string) => void;
   onRequestDelete?: (pageId: string) => void;
   onViewSource?: (pageId: string) => void;
   className?: string;
@@ -523,6 +525,7 @@ export function CanvasPageItem({
   brokenReference = false,
   onLayoutChange,
   onConfigEdit,
+  onCommentSelect,
   onRequestDelete,
   onViewSource,
   onConsoleEntry,
@@ -837,6 +840,19 @@ export function CanvasPageItem({
         )}
       </div>
 
+      {onCommentSelect && (
+        <button
+          type="button"
+          aria-label={`为${page.name}添加评论`}
+          className="absolute inset-0 z-40 cursor-crosshair rounded-lg bg-transparent"
+          onPointerDown={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onCommentSelect(page.id);
+          }}
+        />
+      )}
+
       {/* 引用页标记 */}
       {page.isReference && !brokenReference && (
         <div
@@ -934,17 +950,31 @@ export function CanvasPageItem({
           <>
             {/* 遮罩层 */}
             <div
+              data-canvas-context-menu-layer="backdrop"
               className="fixed inset-0 z-40"
-              onClick={() => setContextMenu(null)}
+              onPointerDown={(event) => {
+                event.stopPropagation();
+                if (event.button === 2) return;
+                event.preventDefault();
+                setContextMenu(null);
+              }}
               onContextMenu={(e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 setContextMenu(null);
               }}
             />
             {/* 菜单 */}
             <div
+              data-canvas-context-menu-layer="menu"
               className="fixed z-50 bg-popover border rounded-lg shadow-lg py-1 min-w-[8rem]"
               style={{ left: contextMenu.x, top: contextMenu.y }}
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => event.stopPropagation()}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
             >
               {page.isReference ? (
                 <>

@@ -2,7 +2,9 @@ import {
   acknowledgeWorkspaceProjectionFromBrowser,
   readWorkspaceAuthorityEventsFromBrowser,
   readWorkspaceAuthorityResourceFromBrowser,
+  readWorkspaceAuthorityStateFromBrowser,
 } from "../workspace-authority-browser-client";
+import { WorkspaceAuthorityClientError } from "../workspace-authority-shared";
 
 describe("workspace authority browser client", () => {
   const originalFetch = global.fetch;
@@ -53,5 +55,22 @@ describe("workspace authority browser client", () => {
       "/api/workspace-authority/project-1/live-1/projection-ack",
       expect.objectContaining({ method: "POST" }),
     );
+  });
+
+  it("标识未就绪时在客户端拒绝请求，避免空路径触发 not-found 编译", async () => {
+    global.fetch = jest.fn() as unknown as typeof fetch;
+
+    await expect(
+      readWorkspaceAuthorityStateFromBrowser({
+        projectId: "project-1",
+        workspaceId: "",
+        sessionId: "",
+      }),
+    ).rejects.toMatchObject<Partial<WorkspaceAuthorityClientError>>({
+      code: "WORKSPACE_AUTHORITY_NOT_READY",
+      status: 503,
+    });
+
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 });

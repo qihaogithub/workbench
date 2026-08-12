@@ -135,6 +135,31 @@ describe("配置项素材池聚合", () => {
     expect(byKey.bannerMotion.kind).toBe("motion");
   });
 
+  it("为平台图床图片附加已登记的原始像素尺寸", () => {
+    const pool = buildConfigPool(undefined, [
+      {
+        id: "p1",
+        name: "首页",
+        schema: JSON.stringify({
+          properties: {
+            hero: {
+              type: "string",
+              format: "image",
+              title: "主视觉图片",
+              default: "/api/images/img_hero",
+            },
+          },
+        }),
+      },
+    ], {
+      resolveImageSize: (value) => value === "/api/images/img_hero"
+        ? { width: 750, height: 148 }
+        : null,
+    });
+
+    expect(pool[0].size).toEqual({ w: "750", h: "148" });
+  });
+
   it("无项目 schema 时只聚合页面级", () => {
     const pool = buildConfigPool(undefined, [
       { id: "p1", name: "首页", schema: pageSchema },

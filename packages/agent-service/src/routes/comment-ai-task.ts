@@ -237,11 +237,11 @@ async function runCommentTaskLoop(session: CommentTaskSession): Promise<void> {
         }
         if (agent instanceof BackendAgent) {
           try {
-            await agent.updateSystemPrompt(buildCommentSystemPrompt());
+            await agent.updateProjectRules(buildCommentSystemPrompt());
           } catch (error) {
             logger.warn(
               { sessionId, error: error instanceof Error ? error.message : String(error) },
-              "评论任务：注入系统提示词失败（继续执行）",
+              "评论任务：注入项目规则失败（继续执行）",
             );
           }
         }

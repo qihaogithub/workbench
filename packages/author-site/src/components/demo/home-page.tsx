@@ -24,7 +24,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { CoverImageDialog } from "@/components/cover-image-dialog";
-import { DemoCard } from "@/components/demo/demo-card";
+import {
+  DemoCard,
+  MAX_SCREENSHOT_COVER_ITEMS,
+} from "@/components/demo/demo-card";
 import { DeleteConfirmDialog } from "@/components/demo/delete-confirm-dialog";
 import {
   ProjectNameCategoryDialog,
@@ -56,6 +59,7 @@ const SCREENSHOT_ENSURE_DELAY_MS =
   process.env.NODE_ENV === "development" ? 15_000 : 1500;
 const LOAD_SCREENSHOT_METADATA_IMMEDIATELY =
   process.env.NODE_ENV !== "development";
+const SCREENSHOT_METADATA_BATCH_LIMIT = 500;
 type SelectedNav =
   | { type: "all" }
   | { type: "project-category"; category: string; exact?: boolean };
@@ -241,6 +245,8 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
   const [loadScreenshotMetadata, setLoadScreenshotMetadata] = useState(
     LOAD_SCREENSHOT_METADATA_IMMEDIATELY,
   );
+  const [screenshotMetadataByProject, setScreenshotMetadataByProject] =
+    useState<Record<string, Record<string, string | null>>>({});
   const navigationStartedRef = useRef(false);
 
   useEffect(() => {
@@ -259,6 +265,66 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
     navigationStartedRef.current = true;
     setLoadScreenshotMetadata(false);
   }, []);
+
+  const screenshotMetadataItems = useMemo(
+    () =>
+      demos
+        .flatMap((demo) =>
+          demo.thumbnail
+            ? []
+            : (demo.demoPages ?? [])
+                .slice(0, MAX_SCREENSHOT_COVER_ITEMS)
+                .map((page) => ({
+                  projectId: demo.id,
+                  pageId: page.id,
+                })),
+        )
+        .slice(0, SCREENSHOT_METADATA_BATCH_LIMIT),
+    [demos],
+  );
+
+  useEffect(() => {
+    if (!loadScreenshotMetadata || screenshotMetadataItems.length === 0) {
+      return;
+    }
+
+    const controller = new AbortController();
+    void fetch("/api/screenshots/metadata", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: screenshotMetadataItems }),
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((result) => {
+        if (controller.signal.aborted) return;
+        const items = result?.success === true ? result.data?.items : null;
+        if (!Array.isArray(items)) return;
+
+        const next: Record<string, Record<string, string | null>> = {};
+        for (const item of items) {
+          if (
+            !item ||
+            typeof item.projectId !== "string" ||
+            typeof item.pageId !== "string"
+          ) {
+            continue;
+          }
+          next[item.projectId] ??= {};
+          next[item.projectId][item.pageId] =
+            item.available === true && typeof item.url === "string"
+              ? item.url
+              : null;
+        }
+        setScreenshotMetadataByProject(next);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+      });
+
+    return () => controller.abort();
+  }, [loadScreenshotMetadata, screenshotMetadataItems, screenshotRevision]);
 
   const projectCategories = useMemo(
     () => uniqueCategories(demos.map((demo) => normalizeCategory(demo.category))),
@@ -757,8 +823,7 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
                   <DemoCard
                     key={demo.id}
                     demo={demo}
-                    screenshotRevision={screenshotRevision}
-                    loadScreenshotMetadata={loadScreenshotMetadata}
+                    screenshotMetadata={screenshotMetadataByProject[demo.id]}
                     onOpen={handleOpenProject}
                     onDelete={() => setDeleteTarget(demo)}
                     onSaveAsTemplate={() => setTemplateTarget(demo)}

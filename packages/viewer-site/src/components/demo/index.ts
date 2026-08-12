@@ -59,6 +59,7 @@ export { SketchPagePreview } from "@workbench/sketch-react/preview";
 export type {
   PreviewPanelProps,
   ConfigFormProps,
+  DesignSpecEntryLink,
   PageConfigPanelPage,
   DocumentEditorProps,
   ImageItem,

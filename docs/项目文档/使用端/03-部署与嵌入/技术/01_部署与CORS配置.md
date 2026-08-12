@@ -2,13 +2,14 @@
 
 > 版本：v2.0
 > 创建日期：2026-05-04
-> 更新日期：2026-07-07
+> 更新日期：2026-08-12
 
 ---
 
 ```yaml
 covers:
   - docker-compose.yml
+  - scripts/docker-viewer-env-isolation.test.mjs
   - docker/viewer-site/nginx.conf
   - scripts/deploy.sh
   - packages/viewer-site/next.config.js
@@ -75,6 +76,8 @@ agent-service 使用 Fastify 的 `@fastify/cors` 插件，通过 `CORS_ORIGINS` 
 - 使用端新增：`http://localhost:3300`、`http://127.0.0.1:3300`
 - 生产环境通过 `CORS_ORIGINS` 环境变量统一配置
 
+浏览器直连的 Agent 请求会在配置 API Key 时携带 `X-API-Key`。该头必须包含在 agent-service 的 CORS 预检允许头中；否则浏览器会在上传图片或其他 multipart 附件前拦截请求，并表现为无法连接 AI 服务。
+
 使用端 AI 问答由浏览器直接请求 agent-service 的只读接口，因此生产环境的 `CORS_ORIGINS` 也必须包含 viewer-site 实际访问域名。
 
 Docker Compose 会把 `.env.docker` 中的 `CORS_ORIGINS` 注入到 agent-service；如果新增正式访问域名，需要先更新 `.env.docker`，再通过部署脚本上线。
@@ -119,7 +122,7 @@ screenshot-service 也通过 Docker Compose 接收 `CORS_ORIGINS`。author-site 
 - **preview runtime env**：将 `PREVIEW_RUNTIME_SOURCE`、`PREVIEW_SHELL_MODE` 和 `CDN_BASE_URL` 注入到共享 PreviewPanel，默认使用同源 runtime
 - **静态导出 shell 策略**：开发环境可使用 `/api/preview-runtime/shell` 固定 shell；生产静态导出没有动态 route，因此默认使用 inline shell，并把 runtime base 绑定到当前 viewer origin
 
-正式环境的 viewer-site 采用静态导出镜像，`NEXT_PUBLIC_AGENT_SERVICE_URL` 和 `NEXT_PUBLIC_DATA_BASE` 需要在 Docker build 阶段通过 build args 注入。构建脚本会先执行 `build:preview-runtime`，把 `preview-runtime/manifest.json` 和 vendor chunks 写入 viewer-site public 目录，使发布 iframe 可以从 viewer 同源加载 React、lucide、framer 和 `@preview/sdk`。
+正式环境的 viewer-site 采用静态导出镜像，浏览器可见变量会在 Docker build 阶段固化。Docker 的数据基址只读取 `DOCKER_NEXT_PUBLIC_DATA_BASE`，默认留空并使用 viewer 同源的 nginx 数据映射；构建同时标记为 Docker 模式，使根目录 `.env` 中供 `pnpm dev` 使用的 `NEXT_PUBLIC_DATA_BASE=http://localhost:4200` 即使意外进入构建环境也会被忽略。只有需要让浏览器跨域读取另一数据源时，才设置前者。构建脚本会先执行 `build:preview-runtime`，把 `preview-runtime/manifest.json` 和 vendor chunks 写入 viewer-site public 目录，使发布 iframe 可以从 viewer 同源加载 React、lucide、framer 和 `@preview/sdk`。
 
 ### 5.1 published 数据静态映射
 

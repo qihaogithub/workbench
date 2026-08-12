@@ -25,6 +25,7 @@ COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY packages/knowledge-core/package.json ./packages/knowledge-core/
 COPY packages/knowledge-service/package.json ./packages/knowledge-service/
 COPY packages/preview-contract/package.json ./packages/preview-contract/
+COPY packages/project-core/package.json ./packages/project-core/
 COPY packages/sketch-core/package.json ./packages/sketch-core/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/agent-service/package.json ./packages/agent-service/
@@ -35,6 +36,7 @@ RUN --mount=type=cache,id=workbench-pnpm-store,target=/pnpm/store \
 COPY packages/knowledge-core/ ./packages/knowledge-core/
 COPY packages/knowledge-service/ ./packages/knowledge-service/
 COPY packages/preview-contract/ ./packages/preview-contract/
+COPY packages/project-core/ ./packages/project-core/
 COPY packages/sketch-core/ ./packages/sketch-core/
 COPY packages/shared/ ./packages/shared/
 COPY packages/agent-service/ ./packages/agent-service/
@@ -45,6 +47,7 @@ FROM node:24-bookworm-slim
 
 ARG NPM_REGISTRY=https://registry.npmmirror.com
 ENV npm_config_registry=${NPM_REGISTRY}
+ENV npm_config_sharp_libvips_binary_host=https://npmmirror.com/mirrors/sharp-libvips
 
 WORKDIR /app
 

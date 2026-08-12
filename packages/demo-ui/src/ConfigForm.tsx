@@ -10,11 +10,11 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import type { ConfigFormProps } from "./types";
+import type { DesignSpecEntryLink } from "./types";
 import type { FieldConfig, FieldGroup, VisibleWhenCondition } from "./schema-parser";
 import { parseSchemaToFields } from "./schema-parser";
 import { getPageTypeLimits } from "./type-limits-store";
 import { FieldRenderer, PositionConfigContext, type PositionConfigContextValue, type PositionFieldEntry } from "./FieldRenderer";
-import { NoteDialog } from "./NoteDialog";
 import { configFieldMatchesCategoryFilter } from "./config-categories";
 
 function isFieldVisible(
@@ -125,7 +125,8 @@ function FieldGroupSection({
   isFirst,
   sessionId,
   readonly,
-  onNoteClick,
+  designSpecEntries,
+  onEditDesignSpec,
 }: {
   group: FieldGroup;
   formData: Record<string, unknown>;
@@ -133,7 +134,8 @@ function FieldGroupSection({
   isFirst?: boolean;
   sessionId?: string;
   readonly?: boolean;
-  onNoteClick: (fieldKey: string) => void;
+  designSpecEntries?: DesignSpecEntryLink[];
+  onEditDesignSpec?: (docId: string, entryId: string) => void;
 }) {
   const [open, setOpen] = useState(true);
 
@@ -149,7 +151,8 @@ function FieldGroupSection({
               onChange={(value) => onChange(field.key, value)}
               sessionId={sessionId}
               readonly={readonly}
-              onNoteClick={onNoteClick}
+              designSpecEntries={designSpecEntries}
+              onEditDesignSpec={onEditDesignSpec}
               fieldPath={field.key}
             />
           ))}
@@ -183,7 +186,8 @@ function FieldGroupSection({
                 onChange={(value) => onChange(field.key, value)}
                 sessionId={sessionId}
                 readonly={readonly}
-                onNoteClick={onNoteClick}
+                designSpecEntries={designSpecEntries}
+                onEditDesignSpec={onEditDesignSpec}
                 fieldPath={field.key}
               />
             ))}
@@ -209,6 +213,8 @@ export function ConfigForm({
   positionEditActive,
   positionEditDimming,
   onTogglePositionDimming,
+  designSpecEntries,
+  onEditDesignSpec,
 }: ConfigFormProps) {
   const [formData, setFormData] = useState<Record<string, unknown>>(
     () => {
@@ -218,7 +224,6 @@ export function ConfigForm({
     },
   );
 
-  const [noteDialogField, setNoteDialogField] = useState<string | null>(null);
 
   const flattenPathMap = useMemo(() => computeFlattenPathMap(schema), [schema]);
   const flattenedInitialData = useMemo(
@@ -362,56 +367,6 @@ export function ConfigForm({
     [onChange]
   );
 
-  const updateSchemaNote = useCallback(
-    (fieldKey: string, noteHtml: string) => {
-      if (!onSchemaChange || !schema) return;
-      try {
-        const parsed = JSON.parse(schema);
-        if (parsed.properties?.[fieldKey]) {
-          if (!parsed.properties[fieldKey].$demo) {
-            parsed.properties[fieldKey].$demo = {};
-          }
-          parsed.properties[fieldKey].$demo.note = noteHtml;
-          onSchemaChange(JSON.stringify(parsed, null, 2));
-        }
-      } catch (e) {
-        console.warn("[ConfigForm] Failed to update schema note:", e);
-      }
-    },
-    [schema, onSchemaChange],
-  );
-
-  const deleteSchemaNote = useCallback(
-    (fieldKey: string) => {
-      if (!onSchemaChange || !schema) return;
-      try {
-        const parsed = JSON.parse(schema);
-        if (parsed.properties?.[fieldKey]?.$demo) {
-          delete parsed.properties[fieldKey].$demo.note;
-          if (Object.keys(parsed.properties[fieldKey].$demo).length === 0) {
-            delete parsed.properties[fieldKey].$demo;
-          }
-          onSchemaChange(JSON.stringify(parsed, null, 2));
-        }
-      } catch (e) {
-        console.warn("[ConfigForm] Failed to delete schema note:", e);
-      }
-    },
-    [schema, onSchemaChange],
-  );
-
-  const handleNoteClick = useCallback((fieldKey: string) => {
-    setNoteDialogField(fieldKey);
-  }, []);
-
-  const currentNoteField = useMemo(() => {
-    if (!noteDialogField) return null;
-    for (const group of visibleFieldGroups) {
-      const found = group.fields.find((f) => f.key === noteDialogField);
-      if (found) return found;
-    }
-    return null;
-  }, [noteDialogField, visibleFieldGroups]);
 
   if (visibleFieldGroups.length === 0) {
     return (
@@ -449,26 +404,13 @@ export function ConfigForm({
                   isFirst={index === 0}
                   sessionId={sessionId}
                   readonly={readonly}
-                  onNoteClick={handleNoteClick}
+                  designSpecEntries={designSpecEntries}
+                  onEditDesignSpec={onEditDesignSpec}
                 />
               </div>
             ))}
           </div>
         </div>
-
-        {currentNoteField ? (
-          <NoteDialog
-            open={!!noteDialogField}
-            onOpenChange={(open) => {
-              if (!open) setNoteDialogField(null);
-            }}
-            fieldTitle={currentNoteField.title}
-            note={currentNoteField.note || ""}
-            readonly={readonly}
-            onSave={(markdown) => updateSchemaNote(currentNoteField.key, markdown)}
-            onDelete={() => deleteSchemaNote(currentNoteField.key)}
-          />
-        ) : null}
       </div>
     </PositionConfigContext.Provider>
   );

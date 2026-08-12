@@ -10,11 +10,12 @@ const NEXT_CACHE_DIRS = [
   resolve("packages/viewer-site/.next"),
 ];
 const clearCache = process.argv.slice(2).includes("--clear-cache");
+const visualFull = process.argv.slice(2).includes("--visual-full");
 const isWin = platform() === "win32";
 
 const unknownArgs = process.argv
   .slice(2)
-  .filter((arg) => arg !== "--clear-cache");
+  .filter((arg) => arg !== "--clear-cache" && arg !== "--visual-full");
 
 if (unknownArgs.length > 0) {
   console.error(`[dev-restart] Unknown option(s): ${unknownArgs.join(", ")}`);
@@ -172,6 +173,11 @@ function startDevServices() {
   const child = spawn("corepack", ["pnpm", "run", "dev:services"], {
     stdio: "inherit",
     shell: isWin,
+    env: {
+      ...process.env,
+      // 五个服务始终本机常驻；仅选择编辑页是否自动驱动 Puppeteer 截图。
+      NEXT_PUBLIC_AUTOMATIC_SCREENSHOT_GENERATION: visualFull ? "true" : "false",
+    },
   });
 
   const forwardSignal = (signal) => {
@@ -200,6 +206,11 @@ try {
   } else {
     console.log("[dev-restart] Preserving Next.js caches. Use pnpm dev:repair to clear them.");
   }
+  console.log(
+    `[dev-restart] Full local service topology; automatic editor screenshots are ${
+      visualFull ? "enabled" : "paused"
+    }.`,
+  );
   startDevServices();
 } catch (error) {
   console.error(`[dev-restart] ${error instanceof Error ? error.message : String(error)}`);

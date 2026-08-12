@@ -26,6 +26,7 @@ import {
 } from "./DesignSpecVisuals";
 
 interface DesignSpecWorkspaceValue {
+  projectId?: string;
   activeDocId: string | null;
   setActiveDocId: (id: string | null) => void;
   doc: DesignSpecDoc | null;
@@ -38,6 +39,7 @@ interface DesignSpecWorkspaceValue {
   addEntryWithItem: (itemId: string) => void;
   deleteEntry: (entryId: string) => void;
   toggleEntry: (entryId: string) => void;
+  openEntry: (entryId: string) => void;
   renameEntry: (entryId: string, title: string) => void;
   setMarkdown: (entryId: string, md: string) => void;
   bindRef: (itemId: string, entryId: string) => void;
@@ -263,6 +265,10 @@ export function DesignSpecWorkspaceProvider({
     });
   }, []);
 
+  const openEntry = useCallback((entryId: string) => {
+    setOpenIds((prev) => (prev.has(entryId) ? prev : new Set([...prev, entryId])));
+  }, []);
+
   const renameEntry = useCallback(
     (entryId: string, title: string) => {
       updateDoc((d) => ({
@@ -395,6 +401,7 @@ export function DesignSpecWorkspaceProvider({
 
   const value = useMemo<DesignSpecWorkspaceValue>(
     () => ({
+      projectId,
       activeDocId,
       setActiveDocId,
       doc,
@@ -407,6 +414,7 @@ export function DesignSpecWorkspaceProvider({
       addEntryWithItem,
       deleteEntry,
       toggleEntry,
+      openEntry,
       renameEntry,
       setMarkdown,
       bindRef,
@@ -431,6 +439,7 @@ export function DesignSpecWorkspaceProvider({
     }),
     [
       activeDocId,
+      projectId,
       setActiveDocId,
       doc,
       pool,
@@ -442,6 +451,7 @@ export function DesignSpecWorkspaceProvider({
       addEntryWithItem,
       deleteEntry,
       toggleEntry,
+      openEntry,
       renameEntry,
       setMarkdown,
       bindRef,
@@ -464,8 +474,8 @@ export function DesignSpecWorkspaceProvider({
   return (
     <DesignSpecWorkspaceContext.Provider value={value}>
       {children}
-      <HoverPop pop={hoverPop} />
-      {zoomed && <ZoomOverlay item={zoomed} onClose={() => setZoomed(null)} />}
+      <HoverPop pop={hoverPop} projectId={projectId} />
+      {zoomed && <ZoomOverlay item={zoomed} projectId={projectId} onClose={() => setZoomed(null)} />}
     </DesignSpecWorkspaceContext.Provider>
   );
 }

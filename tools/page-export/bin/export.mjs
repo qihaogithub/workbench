@@ -93,7 +93,7 @@ async function login(baseUrl, username, password) {
   return body.data.token;
 }
 
-function runSingleFile(url, outputFile, cookie) {
+function runSingleFile(url, outputFile, cookie, waitUntilDelay) {
   const args = [
     url,
     "--dump-content",
@@ -102,7 +102,7 @@ function runSingleFile(url, outputFile, cookie) {
     "--browser-width=1280",
     "--browser-height=900",
     "--browser-wait-until=networkIdle",
-    "--browser-wait-until-delay=1500",
+    `--browser-wait-until-delay=${waitUntilDelay}`,
     "--compress-html=false",
     "--remove-hidden-elements=true",
     "--remove-unused-styles=true",
@@ -167,6 +167,7 @@ function runImport(dir, opts) {
     "--json",
   ];
   if (opts.name) args.push("--name", opts.name);
+  if (opts.projectId) args.push("--project-id", opts.projectId);
   if (opts.dryRun) args.push("--dry-run");
   if (opts.commit) args.push("--commit");
   const run = spawnSync("node", args, {
@@ -189,6 +190,10 @@ async function main() {
   const outputDir = path.resolve(args.output || "out");
   const htmlDir = path.join(outputDir, "raw");
   const normDir = path.join(outputDir, "normalized");
+  const waitUntilDelay = Number(args["browser-wait-until-delay"] || 1500);
+  if (!Number.isFinite(waitUntilDelay) || waitUntilDelay < 0) {
+    throw new Error("--browser-wait-until-delay 必须是非负毫秒数");
+  }
 
   fs.mkdirSync(htmlDir, { recursive: true });
 
@@ -245,7 +250,7 @@ async function main() {
       continue;
     }
     try {
-      const bytes = runSingleFile(route.url, outFile, cookieFile);
+      const bytes = runSingleFile(route.url, outFile, cookieFile, waitUntilDelay);
       console.error(`[render] ${route.routeKey} -> ${bytes} bytes`);
     } catch (error) {
       console.error(`[render] 失败 ${route.routeKey}: ${error.message}`);
@@ -265,10 +270,20 @@ async function main() {
   // 6. import
   const importName = args["import-name"] || "页面导出";
   const dryOnly = args["dry-run"] === "true";
-  let result = runImport(normDir, { name: importName, dryRun: true, commit: false });
+  let result = runImport(normDir, {
+    name: importName,
+    projectId: args["project-id"],
+    dryRun: true,
+    commit: false,
+  });
   console.error(`[import] dry-run: ${result.parsed.ok === true ? "OK" : "失败"}`);
   if (!dryOnly && result.parsed.ok === true) {
-    result = runImport(normDir, { name: importName, dryRun: false, commit: args["no-commit"] !== "true" });
+    result = runImport(normDir, {
+      name: importName,
+      projectId: args["project-id"],
+      dryRun: false,
+      commit: args["no-commit"] !== "true",
+    });
     console.error(`[import] 提交: ${result.parsed.ok === true ? "OK" : "失败"}`);
   }
   process.stdout.write(JSON.stringify({ ...result.parsed, normalized }, null, 2) + "\n");

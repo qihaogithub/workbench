@@ -1,7 +1,10 @@
 import { act, renderHook } from "@testing-library/react";
 import { flushWorkspaceCollab } from "@/lib/client-workspace-flush";
 import { projectApiClient } from "@/lib/project-api";
-import { useVersionControl } from "../hooks/useVersionControl";
+import {
+  markWorkspaceDocumentChanged,
+  useVersionControl,
+} from "../hooks/useVersionControl";
 import type { SketchPatchVersionSummary } from "@workbench/project-core";
 
 jest.mock("@/components/ui/toast-provider", () => ({
@@ -67,6 +70,15 @@ describe("useVersionControl", () => {
       json: async () => ({ success: true, data: {} }),
     } as Response)) as jest.MockedFunction<typeof fetch>;
     global.fetch = fetchMock;
+  });
+
+  it("设计规范等工作区文档更新后，将已发布项目标记为有未发布变更", () => {
+    expect(markWorkspaceDocumentChanged("published")).toBe(
+      "unpublished_changes",
+    );
+    expect(markWorkspaceDocumentChanged("never_published")).toBe(
+      "never_published",
+    );
   });
 
   it("命名页面版本时带上当前草图 patch 摘要", async () => {

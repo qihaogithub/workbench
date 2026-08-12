@@ -17,12 +17,16 @@ import {
 } from "./markdown/crepe-config";
 import { mountHeadingStyleToolbar } from "./markdown/heading-style-toolbar";
 import { mountTopBarOverflow } from "./markdown/top-bar-overflow";
+import { getExternalImageUrlFromClipboard } from "./markdown/remote-image-paste";
 import "@milkdown/crepe/theme/common/style.css";
 import "./markdown/crepe-theme.css";
 
 export type DocumentUploadHandler = (
   file: File,
 ) => Promise<{ url: string; kind: "image" | "video" | "file" }>;
+
+/** Converts an external image URL to a stable URL hosted by the current system. */
+export type DocumentRemoteImageHandler = (url: string) => Promise<string>;
 
 export interface ConfigReferenceCandidate {
   key: string;
@@ -36,6 +40,8 @@ export interface DocumentEditorProps {
   placeholder?: string;
   /** 提供时，Crepe 块菜单显示图片/视频/附件上传项。 */
   uploadHandler?: DocumentUploadHandler;
+  /** 提供时，快捷键粘贴的外网图片会先保存到当前系统图床。 */
+  localizeRemoteImage?: DocumentRemoteImageHandler;
   /** 提供时，Crepe 块菜单显示「引用配置项」。 */
   referenceCandidates?: ConfigReferenceCandidate[];
   className?: string;
@@ -56,6 +62,7 @@ export function DocumentEditor({
   readOnly = false,
   placeholder = "输入 Markdown 内容...",
   uploadHandler,
+  localizeRemoteImage,
   referenceCandidates,
   className,
 }: DocumentEditorProps) {
@@ -65,12 +72,16 @@ export function DocumentEditor({
   const crepeRef = useRef<Crepe | null>(null);
   const onChangeRef = useRef(onChange);
   const uploadHandlerRef = useRef(uploadHandler);
+  const localizeRemoteImageRef = useRef(localizeRemoteImage);
   const referenceCandidatesRef = useRef(referenceCandidates);
   const lastEmittedRef = useRef(value);
   const mountedRef = useRef(true);
+  const readOnlyRef = useRef(readOnly);
 
   onChangeRef.current = onChange;
   uploadHandlerRef.current = uploadHandler;
+  localizeRemoteImageRef.current = localizeRemoteImage;
+  readOnlyRef.current = readOnly;
   referenceCandidatesRef.current = referenceCandidates;
   const uploadsEnabled = Boolean(uploadHandler);
   const referenceCandidateSignature = (referenceCandidates ?? [])
@@ -142,6 +153,23 @@ export function DocumentEditor({
       });
     });
 
+    const handlePaste = (event: ClipboardEvent) => {
+      const localize = localizeRemoteImageRef.current;
+      if (!localize || readOnlyRef.current) return;
+      const externalUrl = getExternalImageUrlFromClipboard(event.clipboardData);
+      if (!externalUrl) return;
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      void localize(externalUrl)
+        .then((url) => {
+          if (!mountedRef.current || crepeRef.current !== crepe) return;
+          insertMarkdown(crepe, `![](${url})`);
+        })
+        .catch(reportUploadError);
+    };
+    root.addEventListener("paste", handlePaste, true);
+
     let headingStyleToolbar: ReturnType<typeof mountHeadingStyleToolbar> | null =
       null;
     let topBarOverflow: ReturnType<typeof mountTopBarOverflow> | null = null;
@@ -171,6 +199,7 @@ export function DocumentEditor({
 
     return () => {
       mountedRef.current = false;
+      root.removeEventListener("paste", handlePaste, true);
       headingStyleToolbar?.destroy();
       topBarOverflow?.destroy();
       if (crepeRef.current === crepe) crepeRef.current = null;

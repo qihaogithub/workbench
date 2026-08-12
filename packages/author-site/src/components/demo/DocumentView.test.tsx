@@ -104,6 +104,53 @@ describe("DocumentView knowledge creation", () => {
     expect(await screen.findByText("项目说明")).toBeInTheDocument();
   });
 
+  it("shows knowledge history and deletion in the more menu without view or edit shortcuts", async () => {
+    (global.fetch as jest.Mock).mockImplementation(
+      (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.startsWith("/api/knowledge?")) {
+          return jsonResponse({
+            success: true,
+            data: [{
+              id: "kb-existing",
+              title: "项目说明",
+              source: "user",
+              description: "项目说明",
+              fileName: "项目说明.md",
+              addedAt: "2026-08-12T00:00:00.000Z",
+              updatedAt: "2026-08-12T00:00:00.000Z",
+              sizeBytes: 0,
+            }],
+          });
+        }
+        if (url.includes("/attachments") || url.startsWith("/api/design-specs")) {
+          return jsonResponse({ success: true, data: [] });
+        }
+        return jsonResponse({ success: false }, false);
+      },
+    );
+    const onDocHistory = jest.fn();
+    const user = userEvent.setup();
+    render(
+      <DocumentView
+        workingDir="/workspace"
+        projectId="project-1"
+        sessionId="session-1"
+        onDocHistory={onDocHistory}
+      />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "打开项目说明的更多操作" }));
+
+    expect(screen.getByRole("menuitem", { name: "历史" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "删除" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "查看" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "编辑" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("menuitem", { name: "历史" }));
+    expect(onDocHistory).toHaveBeenCalledWith(expect.objectContaining({ id: "kb-existing" }));
+  });
+
   it("rejects unsupported uploads without changing the current document", async () => {
     render(
       <DocumentView

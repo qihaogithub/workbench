@@ -1,109 +1,31 @@
-import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import type { NextRequest } from "next/server";
 
-import { findProjectRoot } from "@/lib/fs-utils";
+import {
+  getLocalScreenshotMetadata,
+  isSafeScreenshotIdentifier,
+  normalizeScreenshotHash,
+  readLocalScreenshotFile,
+} from "@/lib/screenshot-file-store";
 import { fetchScreenshotService } from "@/lib/screenshot-service";
 
-const DATA_DIR =
-  process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), "data");
-const SCREENSHOTS_DIR = path.join(DATA_DIR, "screenshots");
-const MIN_MEANINGFUL_SCREENSHOT_BYTES = 8 * 1024;
-const LARGE_RENDER_AREA = 160_000;
-
-interface ScreenshotMeta {
-  currentHash?: string;
-  renderBoxes?: Record<string, unknown>;
-  variants?: Record<string, {
-    variant?: "strict" | "fast";
-    generatedAt?: string;
-    renderBox?: unknown;
-  }>;
-}
-
-function normalizeHash(hash?: string | null): string | null {
-  if (!hash) return null;
-  return /^[a-f0-9]{16}$/i.test(hash) ? hash.toLowerCase() : null;
-}
-
-function isLikelyBlankScreenshot(byteLength: number, renderBox?: unknown): boolean {
-  if (!renderBox || typeof renderBox !== "object") return false;
-  const box = renderBox as Record<string, unknown>;
-  const width = typeof box.width === "number" ? box.width : 0;
-  const height = typeof box.height === "number" ? box.height : 0;
-  return (
-    width * height >= LARGE_RENDER_AREA &&
-    byteLength < MIN_MEANINGFUL_SCREENSHOT_BYTES
-  );
-}
-
-function readScreenshotMeta(
-  projectId: string,
-  pageId: string,
-): ScreenshotMeta | null {
-  const metaPath = path.join(SCREENSHOTS_DIR, projectId, `${pageId}.meta.json`);
-  try {
-    const content = fs.readFileSync(metaPath, "utf-8");
-    return JSON.parse(content) as ScreenshotMeta;
-  } catch {
-    return null;
-  }
-}
-
-function resolveCurrentScreenshotMeta(meta: ScreenshotMeta | null): {
-  hash: string;
-  variant: "strict" | "fast";
-  renderBox?: unknown;
-} | null {
-  if (!meta) return null;
-  const currentHash = normalizeHash(meta.currentHash);
-  if (currentHash) {
-    return {
-      hash: currentHash,
-      variant: "strict",
-      renderBox: meta.renderBoxes?.[currentHash],
-    };
-  }
-
-  const latestVariant = Object.entries(meta.variants ?? {})
-    .map(([key, value]) => {
-      const [hash, variant = "strict"] = key.split(":");
-      return {
-        hash,
-        variant: variant === "fast" ? "fast" as const : "strict" as const,
-        generatedAt: value.generatedAt ?? "",
-        renderBox: value.renderBox,
-      };
-    })
-    .filter((entry) => normalizeHash(entry.hash))
-    .sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))[0];
-
-  return latestVariant ?? null;
-}
-
-async function proxyScreenshotFile(
+async function proxyScreenshot(
   projectId: string,
   pageId: string,
   search: string,
 ): Promise<Response | null> {
   try {
     const response = await fetchScreenshotService(
-      `/api/screenshots/file/${encodeURIComponent(
-        projectId,
-      )}/${encodeURIComponent(pageId)}${search}`,
+      `/api/screenshots/file/${encodeURIComponent(projectId)}/${encodeURIComponent(pageId)}${search}`,
     );
-
-    if (response.status === 404) {
-      return null;
-    }
-
+    if (response.status === 404) return null;
     return new Response(await response.arrayBuffer(), {
       status: response.status,
       headers: {
         "Content-Type":
           response.headers.get("Content-Type") || "application/json",
         "Cache-Control":
-          response.headers.get("Cache-Control") || "public, max-age=3600",
+          response.headers.get("Cache-Control") ||
+          (search.includes("meta=1") ? "no-store" : "public, max-age=3600"),
       },
     });
   } catch {
@@ -111,76 +33,17 @@ async function proxyScreenshotFile(
   }
 }
 
-async function proxyScreenshotMeta(
-  projectId: string,
-  pageId: string,
-): Promise<Response | null> {
-  try {
-    const response = await fetchScreenshotService(
-      `/api/screenshots/file/${encodeURIComponent(
-        projectId,
-      )}/${encodeURIComponent(pageId)}?meta=1`,
-    );
-
-    if (response.status === 404) {
-      return null;
-    }
-
-    return new Response(await response.arrayBuffer(), {
-      status: response.status,
-      headers: {
-        "Content-Type":
-          response.headers.get("Content-Type") || "application/json",
-        "Cache-Control": "no-store",
-      },
-    });
-  } catch {
-    return null;
-  }
-}
-
-function getLocalScreenshotPath(
-  projectId: string,
-  pageId: string,
-  hash: string,
-  variant: "strict" | "fast" = "strict",
-): string {
-  const projectDir = path.join(SCREENSHOTS_DIR, projectId);
-  return path.join(
-    projectDir,
-    variant === "strict"
-      ? `${pageId}.${hash}.png`
-      : `${pageId}.${hash}.${variant}.png`,
+function notFound(message: string) {
+  return new Response(
+    JSON.stringify({
+      success: false,
+      error: { code: "NOT_FOUND", message },
+    }),
+    {
+      status: 404,
+      headers: { "Content-Type": "application/json" },
+    },
   );
-}
-
-function readLocalScreenshot(
-  projectId: string,
-  pageId: string,
-  hash?: string | null,
-  variant: "strict" | "fast" = "strict",
-): Buffer | null {
-  const projectDir = path.join(SCREENSHOTS_DIR, projectId);
-  if (!fs.existsSync(projectDir)) return null;
-
-  const normalizedHash = normalizeHash(hash);
-  if (hash && !normalizedHash) return null;
-
-  const filePath = normalizedHash
-    ? getLocalScreenshotPath(projectId, pageId, normalizedHash, variant)
-    : (() => {
-        const meta = readScreenshotMeta(projectId, pageId);
-        const current = resolveCurrentScreenshotMeta(meta);
-        return current
-          ? getLocalScreenshotPath(projectId, pageId, current.hash, current.variant)
-          : path.join(projectDir, `${pageId}.png`);
-      })();
-
-  try {
-    return fs.readFileSync(filePath);
-  } catch {
-    return null;
-  }
 }
 
 export async function GET(
@@ -188,94 +51,67 @@ export async function GET(
   { params }: { params: { projectId: string; pageId: string } },
 ) {
   const { projectId, pageId } = params;
-  if (request.nextUrl.searchParams.get("meta") === "1") {
-    const proxiedMeta = await proxyScreenshotMeta(projectId, pageId);
-    if (proxiedMeta) return proxiedMeta;
-
-    const meta = readScreenshotMeta(projectId, pageId);
-    const current = resolveCurrentScreenshotMeta(meta);
-    const currentBuffer = current
-      ? readLocalScreenshot(projectId, pageId, current.hash, current.variant)
-      : null;
-    if (
-      !current ||
-      !currentBuffer ||
-      isLikelyBlankScreenshot(currentBuffer.length, current.renderBox)
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: { code: "NOT_FOUND", message: "Screenshot meta not found" },
-        },
-        { status: 404 },
-      );
-    }
-
+  if (
+    !isSafeScreenshotIdentifier(projectId) ||
+    !isSafeScreenshotIdentifier(pageId)
+  ) {
     return new Response(
       JSON.stringify({
-        success: true,
-        data: {
-          currentHash: current.hash,
-          variant: current.variant,
-          url: `/api/screenshots/file/${encodeURIComponent(
-            projectId,
-          )}/${encodeURIComponent(pageId)}?${new URLSearchParams({
-            hash: current.hash,
-            ...(current.variant === "fast" ? { variant: "fast" } : {}),
-          }).toString()}`,
-          renderBox: current.renderBox,
-        },
+        success: false,
+        error: { code: "INVALID_SCREENSHOT_ID", message: "截图标识非法" },
       }),
       {
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "no-store",
-        },
+        status: 400,
+        headers: { "Content-Type": "application/json" },
       },
     );
   }
 
-  const proxied = await proxyScreenshotFile(
-    projectId,
-    pageId,
-    request.nextUrl.search,
-  );
-  if (proxied) return proxied;
+  if (request.nextUrl.searchParams.get("meta") === "1") {
+    const metadata = getLocalScreenshotMetadata(projectId, pageId);
+    if (metadata) {
+      return new Response(
+        JSON.stringify({ success: true, data: metadata }),
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+          },
+        },
+      );
+    }
+    return (
+      (await proxyScreenshot(projectId, pageId, "?meta=1")) ??
+      notFound("Screenshot meta not found")
+    );
+  }
 
   const rawHash = request.nextUrl.searchParams.get("hash");
+  const normalizedHash = normalizeScreenshotHash(rawHash);
+  if (rawHash && !normalizedHash) {
+    return notFound("Screenshot file not found");
+  }
   const variant =
     request.nextUrl.searchParams.get("variant") === "fast" ? "fast" : "strict";
-  const hash = normalizeHash(rawHash);
-  const buffer = readLocalScreenshot(projectId, pageId, rawHash, variant);
-  if (!buffer) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: { code: "NOT_FOUND", message: "Screenshot file not found" },
+  const local = readLocalScreenshotFile({
+    projectId,
+    pageId,
+    hash: rawHash,
+    variant,
+  });
+  if (local) {
+    return new Response(new Uint8Array(local.buffer), {
+      headers: {
+        "Content-Type": "image/png",
+        "Cache-Control": local.immutable
+          ? "public, max-age=31536000, immutable"
+          : "no-store",
       },
-      { status: 404 },
-    );
-  }
-  const meta = readScreenshotMeta(projectId, pageId);
-  const current = rawHash ? null : resolveCurrentScreenshotMeta(meta);
-  const renderBox =
-    hash && meta?.renderBoxes ? meta.renderBoxes[hash] : current?.renderBox;
-  if (isLikelyBlankScreenshot(buffer.length, renderBox)) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: { code: "NOT_FOUND", message: "Screenshot file unavailable" },
-      },
-      { status: 404 },
-    );
+    });
   }
 
-  return new NextResponse(new Uint8Array(buffer), {
-    headers: {
-      "Content-Type": "image/png",
-      "Cache-Control": hash
-        ? "public, max-age=31536000, immutable"
-        : "no-store",
-    },
-  });
+  return (
+    (await proxyScreenshot(projectId, pageId, request.nextUrl.search)) ??
+    notFound("Screenshot file not found")
+  );
 }

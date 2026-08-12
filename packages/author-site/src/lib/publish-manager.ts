@@ -40,6 +40,7 @@ import {
 } from "@/lib/publish/image-processor";
 import { replacePathsInContent } from "@/lib/publish/path-replacer";
 import type { PublishContext } from "@/lib/publish/types";
+import type { DesignSpecMeta } from "@/lib/design-specs";
 
 const PUBLISHED_DIR = path.join(getDataDir(), "published");
 const SCREENSHOTS_DIR = path.join(getDataDir(), "screenshots");
@@ -74,6 +75,28 @@ function copyKnowledgeForPublish(
     { recursive: true },
   );
   return items;
+}
+
+/** 将可公开浏览的设计规范连同目录索引复制到发布目录。 */
+function copyDesignSpecsForPublish(
+  workspacePath: string,
+  publishedProjectDir: string,
+): DesignSpecMeta[] | undefined {
+  const designSpecDir = path.join(workspacePath, "design-spec");
+  const manifestPath = path.join(designSpecDir, "manifest.json");
+  if (!fs.existsSync(manifestPath)) return undefined;
+  try {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8")) as {
+      items?: DesignSpecMeta[];
+    };
+    if (!Array.isArray(manifest.items)) return undefined;
+    fs.cpSync(designSpecDir, path.join(publishedProjectDir, "design-spec"), {
+      recursive: true,
+    });
+    return manifest.items;
+  } catch {
+    return undefined;
+  }
 }
 
 function resolvePublishThumbnailSource(thumbnail: string): string | undefined {
@@ -119,6 +142,7 @@ export interface PublishedDemoPage {
   sketchMeta?: Record<string, unknown>;
   sketchScenePath?: string;
   sketchMetaPath?: string;
+  requirements?: string;
 }
 
 interface ScreenshotMeta {
@@ -147,6 +171,7 @@ export interface PublishedProject {
   projectConfigValues?: Record<string, unknown>;
   canvasState?: CanvasState;
   knowledge?: KnowledgeIndexItem[];
+  designSpecs?: DesignSpecMeta[];
   previewRuntime?: {
     version: string;
     source: "local" | "cdn";
@@ -489,6 +514,7 @@ export async function publishProject(
   const canvasState = readCanvasStateFromWorkspace(workspacePath);
   const appGraph = readAppGraph(workspacePath);
   const knowledge = copyKnowledgeForPublish(workspacePath, publishedProjectDir);
+  const designSpecs = copyDesignSpecsForPublish(workspacePath, publishedProjectDir);
 
   const viewerBaseUrl = getViewerBaseUrl();
   const totalPages = demoPages.length;
@@ -511,6 +537,7 @@ export async function publishProject(
     const prototypeMetaPath = path.join(demoDir, "prototype.meta.json");
     const sketchScenePath = path.join(demoDir, "sketch.scene.json");
     const sketchMetaPath = path.join(demoDir, "sketch.meta.json");
+    const requirementsPath = path.join(demoDir, "requirements.md");
     const runtimeType = page.runtimeType;
 
     const demoPublishDir = path.join(publishedProjectDir, "demos", page.id);
@@ -522,6 +549,9 @@ export async function publishProject(
     );
 
     let previewSize: PreviewSize | undefined;
+    const requirements = fs.existsSync(requirementsPath)
+      ? fs.readFileSync(requirementsPath, "utf-8")
+      : undefined;
     let pageConfigData: Record<string, unknown> = {};
     let schemaPublishPath: string | undefined;
     if (fs.existsSync(schemaPath)) {
@@ -588,6 +618,7 @@ export async function publishProject(
         parentId: page.parentId,
         runtimeType,
         schemaPath: schemaPublishPath,
+        requirements,
         previewSize,
         screenshotPath,
         prototypeHtml,
@@ -649,6 +680,7 @@ export async function publishProject(
         parentId: page.parentId,
         runtimeType,
         schemaPath: schemaPublishPath,
+        requirements,
         previewSize,
         screenshotPath,
         sketchScene,
@@ -743,6 +775,7 @@ export async function publishProject(
       runtimeType,
       compiledJsPath,
       schemaPath: schemaPublishPath,
+      requirements,
       previewSize,
       screenshotPath,
       iframeHtmlPath,
@@ -893,6 +926,7 @@ export async function publishProject(
         : undefined,
     canvasState,
     knowledge,
+    designSpecs,
     previewRuntime: {
       version: PREVIEW_RUNTIME_MANIFEST_VERSION,
       source: useCdnRuntime ? "cdn" : "local",

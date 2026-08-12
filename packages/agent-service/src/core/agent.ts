@@ -13,6 +13,8 @@ import {
   ErrorEvent,
   FinishEvent,
   StatusEvent,
+  ContextCompactedEvent,
+  RunSummaryEvent,
   PermissionRequestEvent,
   UserChoiceRequestEvent,
   ConfigUpdatedEvent,
@@ -121,6 +123,8 @@ interface EventMap {
   error: ErrorEvent;
   finish: FinishEvent;
   status: StatusEvent;
+  context_compacted: ContextCompactedEvent;
+  run_summary: RunSummaryEvent;
   permission_request: PermissionRequestEvent;
   user_choice_request: UserChoiceRequestEvent;
   config_updated: ConfigUpdatedEvent;

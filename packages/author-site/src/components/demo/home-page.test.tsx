@@ -194,7 +194,7 @@ describe("HomePage", () => {
     ).toBeInTheDocument();
   });
 
-  it("首页稳定后才串行补生缺失截图，并使用 hash meta 缩略图", async () => {
+  it("首页用一个批量请求读取截图元数据，再串行补生缺失截图", async () => {
     jest.useFakeTimers();
     let resolveFirstEnsure: ((response: Response) => void) | undefined;
     const revalidate = jest.fn();
@@ -234,25 +234,49 @@ describe("HomePage", () => {
           JSON.stringify({ success: true, data: { generated: 1 } }),
         );
       }
-      if (url.includes("/api/screenshots/file/proj-cover/page-1?meta=1")) {
-        return new Response(
-          JSON.stringify({
+      if (url === "/api/screenshots/metadata") {
+        return {
+          ok: true,
+          json: async () => ({
             success: true,
             data: {
-              url: "/api/screenshots/file/proj-cover/page-1?hash=1111111111111111",
+              items: [
+                {
+                  projectId: "proj-cover",
+                  pageId: "page-1",
+                  available: true,
+                  url: "/api/screenshots/file/proj-cover/page-1?hash=1111111111111111",
+                },
+                {
+                  projectId: "proj-cover-2",
+                  pageId: "page-2",
+                  available: false,
+                },
+              ],
             },
           }),
-        );
+        } as Response;
       }
       return new Response(JSON.stringify({ success: false }), { status: 404 });
     }) as typeof fetch;
 
     render(<HomePage initialDemos={[]} />);
 
-    expect(global.fetch).not.toHaveBeenCalledWith(
-      "/api/screenshots/file/proj-cover/page-1?meta=1",
-      expect.anything(),
-    );
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/screenshots/metadata",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            items: [
+              { projectId: "proj-cover", pageId: "page-1" },
+              { projectId: "proj-cover-2", pageId: "page-2" },
+            ],
+          }),
+          signal: expect.any(AbortSignal),
+        }),
+      );
+    });
 
     act(() => {
       const firstObserver = intersectionObservers[0];
@@ -305,15 +329,15 @@ describe("HomePage", () => {
         }),
       );
     });
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        "/api/screenshots/file/proj-cover/page-1?meta=1",
-        { cache: "no-store" },
-      );
-    });
-    expect(global.fetch).not.toHaveBeenCalledWith(
-      "/api/screenshots/file/proj-cover/page-1",
+    const metadataCalls = (global.fetch as jest.Mock).mock.calls.filter(
+      ([input]) => String(input) === "/api/screenshots/metadata",
     );
+    expect(metadataCalls).toHaveLength(1);
+    expect(
+      (global.fetch as jest.Mock).mock.calls.some(([input]) =>
+        String(input).includes("?meta=1"),
+      ),
+    ).toBe(false);
   });
 
   it("开始打开项目后取消尚未启动的截图补生", async () => {
@@ -333,7 +357,10 @@ describe("HomePage", () => {
       error: null,
       revalidate: jest.fn(),
     });
-    global.fetch = jest.fn() as typeof fetch;
+    global.fetch = jest.fn(async () => ({
+      ok: false,
+      json: async () => ({ success: false }),
+    }) as Response) as typeof fetch;
 
     render(<HomePage initialDemos={[]} />);
 

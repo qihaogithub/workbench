@@ -124,6 +124,35 @@ describe("PreviewStage", () => {
     expect(screen.queryByTestId("single-preview")).not.toBeInTheDocument();
   });
 
+  it.each([
+    ["ArrowLeft", "page-b", "page-a"],
+    ["ArrowRight", "page-a", "page-b"],
+  ] as const)(
+    "在单页模式按 %s 时按页面顺序切换",
+    (key, activePageId, expectedPageId) => {
+      const { onActivePageChange } = renderStage({ activePageId });
+
+      fireEvent.keyDown(window, { key });
+
+      expect(onActivePageChange).toHaveBeenCalledWith(expectedPageId);
+    },
+  );
+
+  it("使用宿主的单页切换处理器，并忽略编辑中的方向键", () => {
+    const onSinglePagePrevious = vi.fn();
+    const onSinglePageNext = vi.fn();
+    renderStage({ onSinglePagePrevious, onSinglePageNext });
+
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    fireEvent.keyDown(document.body.appendChild(document.createElement("input")), {
+      key: "ArrowLeft",
+    });
+
+    expect(onSinglePagePrevious).toHaveBeenCalledTimes(1);
+    expect(onSinglePageNext).toHaveBeenCalledTimes(1);
+  });
+
   it("支持宿主 selector、toolbar 和单页内容覆盖", () => {
     renderStage({
       selectorSlot: <span>文档选择器</span>,

@@ -1,9 +1,16 @@
 import type { DemoPageMeta } from "@workbench/shared";
 
+export type ReferencedDesignSpec = {
+  id: string;
+  title: string;
+  entries: Array<{ id: string; title: string; markdown: string }>;
+};
+
 export type CanvasPageContent = {
   pageId: string;
   code?: string;
   schema?: string;
+  projectConfigSchema?: string;
   configData?: Record<string, unknown>;
   runtimeType?: DemoPageMeta["runtimeType"];
   prototypeHtml?: string;
@@ -11,6 +18,8 @@ export type CanvasPageContent = {
   prototypeMeta?: Record<string, unknown>;
   sketchScene?: string;
   sketchMeta?: Record<string, unknown>;
+  requirements?: string;
+  designSpecs?: ReferencedDesignSpec[];
 };
 
 type ApiResponse = {

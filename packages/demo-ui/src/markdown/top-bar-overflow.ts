@@ -14,6 +14,22 @@ function measureWidth(element: HTMLElement, fallback = 0): number {
   return element.getBoundingClientRect().width || element.offsetWidth || fallback;
 }
 
+function measureOuterWidth(element: HTMLElement, fallback = 0): number {
+  const styles = window.getComputedStyle(element);
+  const marginStart = Number.parseFloat(styles.marginLeft) || 0;
+  const marginEnd = Number.parseFloat(styles.marginRight) || 0;
+  return measureWidth(element, fallback) + marginStart + marginEnd;
+}
+
+function measureContentWidth(element: HTMLElement, fallback = 0): number {
+  const styles = window.getComputedStyle(element);
+  const paddingStart = Number.parseFloat(styles.paddingLeft) || 0;
+  const paddingEnd = Number.parseFloat(styles.paddingRight) || 0;
+  const clientWidth = element.clientWidth;
+  const boxWidth = clientWidth || measureWidth(element, fallback);
+  return Math.max(0, boxWidth - paddingStart - paddingEnd);
+}
+
 function isDivider(element: HTMLElement): boolean {
   return element.classList.contains("top-bar-divider");
 }
@@ -176,26 +192,53 @@ function mountTopBarOverflowWhenReady({ root }: TopBarOverflowOptions) {
     });
     more.hidden = false;
 
-    const availableWidth = measureWidth(inner);
-    const allItemsWidth = items.reduce((total, item) => total + measureWidth(item), 0);
-    if (availableWidth === 0 || allItemsWidth <= availableWidth) {
+    // The inner flex row may already have been widened by the unhidden controls.
+    // Measure its stable parent instead, otherwise an overflowing row reports its
+    // own expanded width and can never decide to move items into the menu.
+    const availableWidth = measureContentWidth(topBar);
+    // Flex layout includes margins in each item's consumed inline space. Measuring
+    // only border boxes can incorrectly conclude that every control fits, leaving
+    // the appended overflow trigger just outside the clipped TopBar.
+    const allItemsWidth = items.reduce(
+      (total, item) => total + measureOuterWidth(item),
+      0,
+    );
+    // Keep a conservative slot for the trigger even while it is hidden. The
+    // control's rendered width varies by host CSS and a tight measurement is
+    // enough to clip it at the right edge before a user can open the menu.
+    const overflowTriggerWidth = Math.max(measureOuterWidth(more, 36), 48);
+    const hasVisualOverflow = topBar.scrollWidth > topBar.clientWidth;
+    if (
+      availableWidth === 0 ||
+      (!hasVisualOverflow && allItemsWidth + overflowTriggerWidth <= availableWidth)
+    ) {
       more.hidden = true;
       close();
       syncing = false;
       return;
     }
 
-    const spaceForItems = Math.max(0, availableWidth - measureWidth(more, 36));
+    const spaceForItems = Math.max(0, availableWidth - overflowTriggerWidth);
     let usedWidth = 0;
     let overflowed = false;
     items.forEach((item) => {
-      if (overflowed || usedWidth + measureWidth(item) > spaceForItems) {
+      if (overflowed || usedWidth + measureOuterWidth(item) > spaceForItems) {
         overflowed = true;
         item.hidden = true;
         return;
       }
-      usedWidth += measureWidth(item);
+      usedWidth += measureOuterWidth(item);
     });
+
+    // A rendered scroll overflow is authoritative. It can include intrinsic
+    // widths not reflected by individual control measurements, so ensure at
+    // least one actionable item moves into the menu in that case.
+    if (hasVisualOverflow && !items.some((item) => item.hidden)) {
+      const lastActionableItem = [...items]
+        .reverse()
+        .find((item) => !isDivider(item));
+      if (lastActionableItem) lastActionableItem.hidden = true;
+    }
 
     const lastVisible = [...items].reverse().find((item) => !item.hidden);
     if (lastVisible && isDivider(lastVisible)) lastVisible.hidden = true;

@@ -85,7 +85,7 @@ export class AgentClient {
         model: options?.model || options?.options?.model,
         images: options?.images,
         files: options?.files,
-        systemPrompt: options?.options?.systemPrompt,
+        projectRules: options?.options?.projectRules,
         options: options?.options,
       }),
     });
@@ -408,7 +408,7 @@ export class AgentStream {
         model: options?.model,
         images: options?.images,
         files: options?.files,
-        systemPrompt: options?.systemPrompt,
+        projectRules: options?.projectRules,
         options,
       }),
     );

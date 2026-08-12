@@ -44,6 +44,7 @@ export async function GET(
       const prototypeMetaPath = path.join(demoDir, "prototype.meta.json");
       const sketchScenePath = path.join(demoDir, "sketch.scene.json");
       const sketchMetaPath = path.join(demoDir, "sketch.meta.json");
+      const requirementsPath = path.join(demoDir, "requirements.md");
 
       let code = "";
       let schema: string | undefined;
@@ -53,6 +54,9 @@ export async function GET(
       let prototypeMeta: Record<string, unknown> | undefined;
       let sketchScene: Record<string, unknown> | undefined;
       let sketchMeta: Record<string, unknown> | undefined;
+      const requirements = fs.existsSync(requirementsPath)
+        ? fs.readFileSync(requirementsPath, "utf-8")
+        : undefined;
 
       if (fs.existsSync(codePath)) {
         code = fs.readFileSync(codePath, "utf-8");
@@ -111,6 +115,7 @@ export async function GET(
         prototypeMeta,
         sketchScene,
         sketchMeta,
+        requirements,
       };
     });
 

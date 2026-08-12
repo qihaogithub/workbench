@@ -6,6 +6,7 @@ export type {
   DemoSchema,
   PreviewPanelProps,
   ConfigFormProps,
+  DesignSpecEntryLink,
   PreviewMode,
   PreviewState,
   CanvasToolMode,

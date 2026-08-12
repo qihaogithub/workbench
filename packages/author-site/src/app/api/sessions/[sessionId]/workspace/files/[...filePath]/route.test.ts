@@ -256,4 +256,42 @@ describe("workspace file content route", () => {
     expect(commitWorkspaceMutation).not.toHaveBeenCalled();
     expect(fs.readFileSync(path.join(workspacePath, "index.tsx"), "utf-8")).toBe("old code");
   });
+
+  it("DELETE 仅通过 Authority 删除项目公约", async () => {
+    const content = "# 项目公约\n\n- 不自动创建\n";
+    fs.writeFileSync(path.join(workspacePath, "convention.md"), content, "utf-8");
+    const { DELETE } = await import("./route");
+
+    const response = await DELETE(
+      {} as NextRequest,
+      { params: { sessionId: "session-1", filePath: ["convention.md"] } },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({ success: true, data: { path: "convention.md" } });
+    expect(commitWorkspaceMutation).toHaveBeenCalledWith(expect.objectContaining({
+      reason: "author_convention_delete",
+      operations: [expect.objectContaining({
+        type: "delete_path",
+        path: "convention.md",
+        expectedHash: expect.any(String),
+      })],
+    }));
+    expect(fs.existsSync(path.join(workspacePath, "convention.md"))).toBe(true);
+  });
+
+  it("DELETE 拒绝删除非公约工作空间文件", async () => {
+    const { DELETE } = await import("./route");
+
+    const response = await DELETE(
+      {} as NextRequest,
+      { params: { sessionId: "session-1", filePath: ["index.tsx"] } },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toMatchObject({ success: false, error: { code: "FORBIDDEN" } });
+    expect(commitWorkspaceMutation).not.toHaveBeenCalled();
+  });
 });

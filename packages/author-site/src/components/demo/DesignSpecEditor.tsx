@@ -16,9 +16,10 @@ import {
 
 interface DesignSpecEditorProps {
   docId: string;
+  focusEntryId?: string;
 }
 
-export function DesignSpecEditor({ docId }: DesignSpecEditorProps) {
+export function DesignSpecEditor({ docId, focusEntryId }: DesignSpecEditorProps) {
   const ws = useDesignSpecWorkspace();
 
   // 选中当前设计规范文档；离开时清空
@@ -30,6 +31,9 @@ export function DesignSpecEditor({ docId }: DesignSpecEditorProps) {
   useEffect(() => {
     return () => setActiveDocIdRef.current(null);
   }, []);
+  useEffect(() => {
+    if (focusEntryId) ws.openEntry(focusEntryId);
+  }, [focusEntryId, ws.openEntry]);
 
   if (ws.loading) {
     return (
@@ -186,30 +190,32 @@ function EntryCard({
                   return (
                     <tr
                       key={refToPoolId(ref)}
-                      tabIndex={0}
                       className="group/trow relative hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                      onMouseMove={(e) =>
-                        ws.setHoverPop({
-                          item,
-                          x: e.clientX,
-                          y: e.clientY,
-                        })
-                      }
-                      onMouseLeave={() => ws.setHoverPop(null)}
-                      onFocus={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        ws.setHoverPop({ item, x: rect.right, y: rect.top });
-                      }}
-                      onBlur={() => ws.setHoverPop(null)}
                     >
                       <td className="py-1 pr-2">
                         <div
+                          tabIndex={0}
+                          role="button"
+                          aria-label={`预览${item.title}`}
+                          onMouseMove={(e) =>
+                            ws.setHoverPop({
+                              item,
+                              x: e.clientX,
+                              y: e.clientY,
+                            })
+                          }
+                          onMouseLeave={() => ws.setHoverPop(null)}
+                          onFocus={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            ws.setHoverPop({ item, x: rect.right, y: rect.top });
+                          }}
+                          onBlur={() => ws.setHoverPop(null)}
                           onClick={() => {
                             if (item.kind === "image") ws.setZoomed(item);
                           }}
                           className={cn(
-                            "inline-block",
-                            item.kind === "image" && "cursor-zoom-in",
+                            "inline-block rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                            item.kind === "image" ? "cursor-zoom-in" : "cursor-pointer",
                           )}
                         >
                           <KindThumb item={item} />

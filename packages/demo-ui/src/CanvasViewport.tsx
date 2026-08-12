@@ -285,6 +285,8 @@ export function CanvasViewport({
     (e: React.PointerEvent) => {
       if (!canInteractWithViewport) return;
       if (activeCreationMode) return;
+      const target = e.target as HTMLElement;
+      if (target.closest("[data-canvas-context-menu-layer]")) return;
 
       const isPrimaryButton = e.button === 0 || e.button === undefined;
       const isMiddleButton = e.button === 1;
@@ -297,7 +299,6 @@ export function CanvasViewport({
         e.stopPropagation();
 
         // 记录点击的页面 ID（用于 pointerUp 时判断是否触发配置面板）
-        const target = e.target as HTMLElement;
         const pageEl = target.closest("[data-page-id]");
         const nodeEl = target.closest("[data-canvas-node-id]");
         clickedPageIdRef.current = pageEl ? pageEl.getAttribute("data-page-id") : null;

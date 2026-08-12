@@ -23,8 +23,17 @@ describe("loadCanvasPageContent", () => {
           prototypeHtml: "<main>源页面</main>",
           prototypeCss: "main { color: red; }",
           schema: "{\"type\":\"object\"}",
+          projectConfigSchema: "{\"type\":\"object\",\"properties\":{\"brand\":{\"type\":\"string\"}}}",
           configData: { title: "最新内容" },
           runtimeType: "prototype-html-css",
+          requirements: "# 页面规范",
+          designSpecs: [
+            {
+              id: "brand",
+              title: "品牌规范",
+              entries: [{ id: "color", title: "主色", markdown: "使用蓝色。" }],
+            },
+          ],
         },
       }),
     });
@@ -40,6 +49,9 @@ describe("loadCanvasPageContent", () => {
       pageId: "reference-page",
       prototypeHtml: "<main>源页面</main>",
       configData: { title: "最新内容" },
+      projectConfigSchema: expect.stringContaining("brand"),
+      requirements: "# 页面规范",
+      designSpecs: [{ title: "品牌规范" }],
     });
 
     expect(request).toHaveBeenCalledWith(

@@ -34,15 +34,14 @@ import {
 import type { DemoMeta } from "@workbench/shared";
 
 const DEFAULT_CATEGORY = "未分类";
-const MAX_SCREENSHOT_COVER_ITEMS = 10;
+export const MAX_SCREENSHOT_COVER_ITEMS = 10;
 const DEFAULT_SCREENSHOT_ASPECT_RATIO = 9 / 16;
 const MIN_SCREENSHOT_ASPECT_RATIO = 0.45;
 const MAX_SCREENSHOT_ASPECT_RATIO = 1.8;
 
 interface DemoCardProps {
   demo: DemoMeta;
-  screenshotRevision?: number;
-  loadScreenshotMetadata?: boolean;
+  screenshotMetadata?: Record<string, string | null>;
   onDelete: (id: string) => void;
   onSaveAsTemplate: (demo: DemoMeta) => void;
   onDuplicate: (demo: DemoMeta) => void;
@@ -87,20 +86,16 @@ function clampScreenshotAspectRatio(ratio: number): number {
 }
 
 function PageScreenshotCell({
-  projectId,
   page,
-  screenshotRevision = 0,
-  loadScreenshotMetadata = true,
+  imageUrl,
   showOverlay,
   overlayText,
   className,
   style,
   onAspectRatio,
 }: {
-  projectId: string;
   page: { id: string; name: string };
-  screenshotRevision?: number;
-  loadScreenshotMetadata?: boolean;
+  imageUrl?: string | null;
   showOverlay: boolean;
   overlayText?: string;
   className?: string;
@@ -109,7 +104,6 @@ function PageScreenshotCell({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(false);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -135,44 +129,8 @@ function PageScreenshotCell({
   }, []);
 
   useEffect(() => {
-    if (!isVisible || !loadScreenshotMetadata) return;
-
-    let cancelled = false;
-    const metaUrl = `/api/screenshots/file/${encodeURIComponent(
-      projectId,
-    )}/${encodeURIComponent(page.id)}?meta=1`;
-
-    setImageUrl(null);
     setFailed(false);
-
-    fetch(metaUrl, { cache: "no-store" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((result) => {
-        if (cancelled) return;
-        const payload = result as
-          | { success?: boolean; data?: { url?: unknown } }
-          | null;
-        const url =
-          payload?.success === true && typeof payload.data?.url === "string"
-            ? payload.data.url
-            : null;
-
-        if (url) {
-          setImageUrl(url);
-        } else {
-          setFailed(true);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setFailed(true);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isVisible, loadScreenshotMetadata, projectId, page.id, screenshotRevision]);
+  }, [imageUrl]);
 
   const handleError = useCallback(() => {
     setFailed(true);
@@ -194,7 +152,7 @@ function PageScreenshotCell({
       className={`relative flex min-h-0 items-center justify-center overflow-hidden rounded-sm bg-muted/35 ${className ?? ""}`}
       style={style}
     >
-      {!failed && imageUrl ? (
+      {isVisible && !failed && imageUrl ? (
         <img
           src={imageUrl}
           alt={page.name}
@@ -252,12 +210,10 @@ function PagePreviewPlaceholder({ label }: { label: string }) {
 
 function ScreenshotCover({
   demo,
-  screenshotRevision,
-  loadScreenshotMetadata,
+  screenshotMetadata,
 }: {
   demo: DemoMeta;
-  screenshotRevision?: number;
-  loadScreenshotMetadata?: boolean;
+  screenshotMetadata?: Record<string, string | null>;
 }) {
   const [aspectRatios, setAspectRatios] = useState<Record<string, number>>({});
   const pages = demo.demoPages ?? [];
@@ -341,10 +297,8 @@ function ScreenshotCover({
               return (
                 <PageScreenshotCell
                   key={page.id}
-                  projectId={demo.id}
                   page={page}
-                  screenshotRevision={screenshotRevision}
-                  loadScreenshotMetadata={loadScreenshotMetadata}
+                  imageUrl={screenshotMetadata?.[page.id]}
                   className={
                     isDenseLayout
                       ? "min-w-0"
@@ -411,8 +365,7 @@ function PlaceholderIcon() {
 
 export function DemoCard({
   demo,
-  screenshotRevision,
-  loadScreenshotMetadata,
+  screenshotMetadata,
   onDelete,
   onSaveAsTemplate,
   onDuplicate,
@@ -446,8 +399,7 @@ export function DemoCard({
               <div className="h-full w-full">
                 <ScreenshotCover
                   demo={demo}
-                  screenshotRevision={screenshotRevision}
-                  loadScreenshotMetadata={loadScreenshotMetadata}
+                  screenshotMetadata={screenshotMetadata}
                 />
               </div>
             ) : (

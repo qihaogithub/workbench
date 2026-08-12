@@ -161,4 +161,45 @@ describe("BackendAgent 超时防护", () => {
     expect(result.success).toBe(false);
     expect(result.error?.code).toBe("MESSAGE_TIMEOUT");
   });
+
+  it("工具已开始后遇到可重试错误，不会重放整轮", async () => {
+    let streamHandler: ((event: any) => void) | undefined;
+    const backend: IBackendAdapter = {
+      name: "test-backend",
+      initialize: vi.fn().mockResolvedValue(undefined),
+      sendMessage: vi
+        .fn()
+        .mockImplementationOnce(async () => {
+          streamHandler?.({
+            type: "tool_call",
+            sessionId: "test-session",
+            toolCallId: "write-1",
+            status: "in_progress",
+            title: "writeFile",
+            kind: "edit",
+            parameters: { path: "config.json" },
+          });
+          throw Object.assign(new Error("503 Service Unavailable"), { status: 503 });
+        })
+        .mockResolvedValue("不应执行到第二次"),
+      onStream: vi.fn((handler) => {
+        streamHandler = handler;
+      }),
+      getStatus: vi.fn().mockResolvedValue("idle" as const),
+      destroy: vi.fn().mockResolvedValue(undefined),
+      checkHealth: vi.fn().mockResolvedValue(true),
+    };
+    const agent = createAgent(backend);
+    await startAgent(agent);
+
+    const resultPromise = agent.sendMessage("更新配置");
+    await vi.runAllTimersAsync();
+    const result = await resultPromise;
+
+    expect(backend.sendMessage).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      success: false,
+      error: { code: "MESSAGE_SEND_ERROR", retryable: false },
+    });
+  });
 });

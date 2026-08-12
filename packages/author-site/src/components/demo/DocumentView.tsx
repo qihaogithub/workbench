@@ -11,9 +11,9 @@ import {
   Eye,
   FileText,
   FolderOpen,
+  History,
   Loader2,
   MoreVertical,
-  Pencil,
   Plus,
   ScrollText,
   Trash2,
@@ -60,6 +60,8 @@ export interface PageItem {
   id: string;
   name: string;
 }
+
+const EMPTY_PAGE_ITEMS: PageItem[] = [];
 
 /** 右侧编辑区当前打开的目标：知识库文档 / AI 记忆 / 项目公约 / 页面公约 / 设计规范 */
 type ActiveTarget =
@@ -111,13 +113,14 @@ export interface DocumentViewProps {
   onChatFileConvert?: (file: ChatAttachment) => void;
   onChatFileDelete?: (file: ChatAttachment) => void;
   onDocDeleted?: (item: KnowledgeItem) => void;
+  designSpecFocus?: { docId: string; entryId: string } | null;
 }
 
 export function DocumentView({
   workingDir,
   projectId,
   sessionId,
-  pages = [],
+  pages = EMPTY_PAGE_ITEMS,
   onItemsChange,
   onItemsLoaded,
   onDocHistory,
@@ -125,6 +128,7 @@ export function DocumentView({
   onChatFileConvert,
   onChatFileDelete,
   onDocDeleted,
+  designSpecFocus,
 }: DocumentViewProps) {
   const { toast } = useToast();
   const [items, setItems] = useState<KnowledgeItem[]>([]);
@@ -144,15 +148,37 @@ export function DocumentView({
   const [designSpecs, setDesignSpecs] = useState<DesignSpecMeta[]>([]);
   const [designSpecsLoading, setDesignSpecsLoading] = useState(false);
   const [designSpecExpanded, setDesignSpecExpanded] = useState(true);
+  const [focusedEntryId, setFocusedEntryId] = useState<string | null>(null);
   const [knowledgeMenuOpen, setKnowledgeMenuOpen] = useState(false);
   const [renamingKnowledgeId, setRenamingKnowledgeId] = useState<string | null>(null);
   const [renamingKnowledgeTitle, setRenamingKnowledgeTitle] = useState("");
+  const knowledgeMutationVersionRef = useRef(0);
   const knowledgeUploadInputRef = useRef<HTMLInputElement>(null);
 
   const onItemsChangeRef = useRef(onItemsChange);
   onItemsChangeRef.current = onItemsChange;
   const onItemsLoadedRef = useRef(onItemsLoaded);
   onItemsLoadedRef.current = onItemsLoaded;
+
+  const localizeRemoteImage = useCallback(
+    async (url: string): Promise<string> => {
+      if (!sessionId) throw new Error("当前会话不可用，无法保存外网图片");
+
+      const response = await fetch(`/api/sessions/${sessionId}/assets/localize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: { kind: "selected-image", src: url, currentSrc: url },
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload?.success || !payload?.data?.editPreviewUrl) {
+        throw new Error(payload?.error?.message || "外网图片保存失败");
+      }
+      return payload.data.editPreviewUrl;
+    },
+    [sessionId],
+  );
 
   const userItems = useMemo(
     () => items.filter((item) => item.source !== "system"),
@@ -161,6 +187,7 @@ export function DocumentView({
 
   const fetchItems = useCallback(async () => {
     if (!workingDir) return;
+    const requestMutationVersion = knowledgeMutationVersionRef.current;
     setLoading(true);
     try {
       const params = new URLSearchParams({ workingDir });
@@ -169,6 +196,7 @@ export function DocumentView({
       const res = await fetch(`/api/knowledge?${params.toString()}`);
       const data = await res.json();
       if (data.success) {
+        if (knowledgeMutationVersionRef.current !== requestMutationVersion) return;
         setItems(data.data);
         onItemsChangeRef.current?.(data.data);
         onItemsLoadedRef.current?.(data.data);
@@ -224,6 +252,15 @@ export function DocumentView({
   useEffect(() => {
     fetchDesignSpecs();
   }, [fetchDesignSpecs]);
+
+  useEffect(() => {
+    if (!designSpecFocus) return;
+    const doc = designSpecs.find((item) => item.id === designSpecFocus.docId);
+    if (!doc) return;
+    setDesignSpecExpanded(true);
+    setActiveTarget({ kind: "designSpec", doc });
+    setFocusedEntryId(designSpecFocus.entryId);
+  }, [designSpecFocus, designSpecs]);
 
   const fetchExistingConventions = useCallback(async () => {
     if (!sessionId) {
@@ -350,6 +387,39 @@ export function DocumentView({
     [existingConventionPaths, saveTarget],
   );
 
+  const deleteConvention = useCallback(
+    async (target: Extract<ActiveTarget, { kind: "convention" | "pageConvention" }>) => {
+      const filePath = resolveWorkspaceFilePath(target);
+      if (!filePath || !sessionId) return;
+      const label = target.kind === "convention" ? "项目公约" : `${target.page.name}的页面公约`;
+      if (!window.confirm(`确定删除「${label}」吗？删除后无法恢复。`)) return;
+      try {
+        const res = await fetch(
+          `/api/sessions/${sessionId}/workspace/files/${encodeURIComponent(filePath)}`,
+          { method: "DELETE" },
+        );
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error?.message || "删除失败");
+        setExistingConventionPaths((current) => {
+          const next = new Set(current);
+          next.delete(filePath);
+          return next;
+        });
+        setActiveTarget((current) =>
+          current && resolveWorkspaceFilePath(current) === filePath ? null : current,
+        );
+        toast({ title: "公约已删除" });
+      } catch (error) {
+        toast({
+          title: "删除公约失败",
+          description: error instanceof Error ? error.message : undefined,
+          variant: "destructive",
+        });
+      }
+    },
+    [sessionId, toast],
+  );
+
   // ── 自动保存：在内容变化路径上防抖，切换目标/卸载时冲刷 ──────────────
   // 在 markdownUpdated 触发 onChange 时捕获目标与内容，调度一次 800ms 防抖写回，
   // 避免绕回 React state 用 effect 监听 content 造成的额外渲染与丢失。
@@ -464,6 +534,7 @@ export function DocumentView({
           throw new Error(data.error?.message || "创建失败");
         }
         const item = data.data as KnowledgeItem;
+        knowledgeMutationVersionRef.current += 1;
         setItems((current) => [...current.filter((entry) => entry.id !== item.id), item]);
         setUserExpanded(true);
         setActiveTarget({ kind: "knowledge", item });
@@ -530,6 +601,7 @@ export function DocumentView({
           throw new Error(data.error?.message || "重命名失败");
         }
         const updated = data.data as KnowledgeItem;
+        knowledgeMutationVersionRef.current += 1;
         setItems((current) =>
           current.map((entry) => (entry.id === updated.id ? updated : entry)),
         );
@@ -590,6 +662,7 @@ export function DocumentView({
         });
         const data = await res.json();
         if (data.success) {
+          knowledgeMutationVersionRef.current += 1;
           toast({ title: "删除成功" });
           if (activeTarget?.kind === "designSpec" && activeTarget.doc.id === doc.id) {
             setActiveTarget(null);
@@ -747,6 +820,10 @@ export function DocumentView({
                   >
                     <ScrollText className="h-4 w-4 shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate">项目公约</span>
+                    <DocumentMoreMenu
+                      label="项目公约"
+                      onDelete={() => void deleteConvention({ kind: "convention" })}
+                    />
                   </div>}
                   {/* 已创建的页面公约 */}
                   {pages.filter((page) => existingConventionPaths.has(`demos/${page.id}/convention.md`)).map((page) => (
@@ -768,6 +845,12 @@ export function DocumentView({
                       <span className="min-w-0 flex-1 truncate">
                         {page.name}
                       </span>
+                      <DocumentMoreMenu
+                        label={`${page.name}页面公约`}
+                        onDelete={() =>
+                          void deleteConvention({ kind: "pageConvention", page })
+                        }
+                      />
                     </div>
                   ))}
                   {existingConventionPaths.size === 0 && (
@@ -856,13 +939,6 @@ export function DocumentView({
                         }
                         onSelect={() =>
                           setActiveTarget({ kind: "knowledge", item })
-                        }
-                        onEdit={() =>
-                          {
-                            setActiveTarget({ kind: "knowledge", item });
-                            setRenamingKnowledgeId(item.id);
-                            setRenamingKnowledgeTitle(item.title);
-                          }
                         }
                         onDelete={() => handleDelete(item)}
                         renaming={renamingKnowledgeId === item.id}
@@ -1003,20 +1079,10 @@ export function DocumentView({
                       >
                         <FileText className="h-4 w-4 shrink-0 text-cyan-500" />
                         <span className="min-w-0 flex-1 truncate">{doc.title}</span>
-                        <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0"
-                            title="删除"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteDesignSpec(doc);
-                            }}
-                          >
-                            <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                          </Button>
-                        </span>
+                        <DocumentMoreMenu
+                          label={doc.title}
+                          onDelete={() => handleDeleteDesignSpec(doc)}
+                        />
                       </div>
                     ))
                   )}
@@ -1044,10 +1110,11 @@ export function DocumentView({
         {activeTarget?.kind === "designSpec" ? (
           <DesignSpecEditor
             docId={activeTarget.doc.id}
+            focusEntryId={focusedEntryId ?? undefined}
           />
         ) : (
           <>
-            <div className="min-h-0 flex-1 p-4">
+            <div className="min-h-0 flex-1">
               {contentLoading ? (
                 <div className="flex h-full items-center justify-center">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -1059,6 +1126,7 @@ export function DocumentView({
                     setContent(next);
                     scheduleSave(activeTarget, next);
                   }}
+                  localizeRemoteImage={localizeRemoteImage}
                   className="h-full"
                 />
               ) : (
@@ -1109,7 +1177,6 @@ function KnowledgeFileItem({
   item,
   active,
   onSelect,
-  onEdit,
   onHistory,
   onDelete,
   renaming,
@@ -1121,7 +1188,6 @@ function KnowledgeFileItem({
   item: KnowledgeItem;
   active: boolean;
   onSelect: () => void;
-  onEdit?: () => void;
   onHistory?: () => void;
   onDelete?: () => void;
   renaming?: boolean;
@@ -1161,60 +1227,65 @@ function KnowledgeFileItem({
       ) : (
         <span className="min-w-0 flex-1 truncate">{item.title}</span>
       )}
-      <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-        <Eye className="h-3 w-3 text-muted-foreground" />
-        {onEdit && <Pencil className="h-3 w-3 text-blue-400" />}
-      </span>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 p-0 opacity-0 transition-opacity group-hover:opacity-100"
-            title="更多"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <MoreVertical className="h-3.5 w-3.5" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {onEdit && (
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit();
-              }}
-            >
-              <Pencil className="h-3.5 w-3.5 mr-2" />
-              编辑
-            </DropdownMenuItem>
-          )}
-          {onHistory && (
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation();
-                onHistory();
-              }}
-            >
-              <MoreVertical className="h-3.5 w-3.5 mr-2" />
-              历史
-            </DropdownMenuItem>
-          )}
-          {onDelete && (
-            <DropdownMenuItem
-              className="text-destructive"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-            >
-              <Trash2 className="h-3.5 w-3.5 mr-2" />
-              删除
-            </DropdownMenuItem>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <DocumentMoreMenu
+        label={item.title}
+        onHistory={onHistory}
+        onDelete={onDelete}
+      />
     </div>
+  );
+}
+
+/** 文档目录的统一更多菜单。仅具备资源历史的知识库文档展示“历史”。 */
+function DocumentMoreMenu({
+  label,
+  onHistory,
+  onDelete,
+}: {
+  label: string;
+  onHistory?: () => void;
+  onDelete?: () => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 w-6 shrink-0 p-0 opacity-0 transition-opacity group-hover:opacity-100"
+          title={`打开${label}的更多操作`}
+          aria-label={`打开${label}的更多操作`}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <MoreVertical className="h-3.5 w-3.5" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {onHistory && (
+          <DropdownMenuItem
+            onClick={(event) => {
+              event.stopPropagation();
+              onHistory();
+            }}
+          >
+            <History className="mr-2 h-3.5 w-3.5" />
+            历史
+          </DropdownMenuItem>
+        )}
+        {onDelete && (
+          <DropdownMenuItem
+            className="text-destructive"
+            onClick={(event) => {
+              event.stopPropagation();
+              onDelete();
+            }}
+          >
+            <Trash2 className="mr-2 h-3.5 w-3.5" />
+            删除
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

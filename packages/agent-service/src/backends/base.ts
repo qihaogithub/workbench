@@ -21,11 +21,8 @@ export interface IBackendAdapter {
   getWorkingDir?(): string | null;
   resolvePermission?(toolCallId: string, approved: boolean, responseContent?: string): void;
   resolveUserChoice?(requestId: string, choice: UserChoiceResponse): void;
-  /**
-   * v3.2: 运行时更新 system prompt（仅静态部分 L2 + L4）
-   * 不重建 Agent，保留 messages 历史
-   */
-  updateSystemPrompt?(newPrompt: string): Promise<void>;
+  /** Update project-specific rules without replacing the server safety prompt. */
+  updateProjectRules?(rules: string): Promise<void>;
   /**
    * 向服务端会话中追加一条历史消息（用于编辑重发时重建 session 历史）。
    * 不触发 LLM 调用，仅写入 session 存储。

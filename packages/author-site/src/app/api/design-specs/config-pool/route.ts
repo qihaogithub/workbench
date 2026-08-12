@@ -5,6 +5,7 @@ import * as path from "path";
 import { createApiError, createApiSuccess, listDemoPages } from "@/lib/fs-utils";
 import { buildConfigPool } from "@/lib/design-specs";
 import { resolveDesignSpecContext } from "@/lib/design-specs/route-helpers";
+import { getImageInfo } from "@/lib/image-store";
 
 /** GET /api/design-specs/config-pool?workingDir=&sessionId= → 配置项素材池 */
 export async function GET(request: NextRequest) {
@@ -26,7 +27,14 @@ export async function GET(request: NextRequest) {
       return { id: page.id, name: page.name, schema };
     });
 
-    const pool = buildConfigPool(projectSchema, pages);
+    const pool = buildConfigPool(projectSchema, pages, {
+      resolveImageSize: (value) => {
+        const imageId = getImageStoreId(value);
+        if (!imageId) return null;
+        const image = getImageInfo(imageId);
+        return image ? { width: image.width, height: image.height } : null;
+      },
+    });
     return NextResponse.json(createApiSuccess(pool));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -34,5 +42,16 @@ export async function GET(request: NextRequest) {
       createApiError("FILE_READ_ERROR", `读取配置项失败: ${message}`),
       { status: 500 },
     );
+  }
+}
+
+/** 仅解析本应用图床的图片，不能在打开规范页时请求任意外链。 */
+function getImageStoreId(value: string): string | null {
+  try {
+    const pathname = new URL(value, "http://design-spec.local").pathname;
+    const match = /^\/api\/images\/(img_[A-Za-z0-9_-]+)\/?$/.exec(pathname);
+    return match?.[1] ?? null;
+  } catch {
+    return null;
   }
 }

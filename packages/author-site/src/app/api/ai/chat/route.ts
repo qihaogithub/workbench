@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     const agentSessionId = localSessionId || `session-${Date.now()}`;
 
     // v3.2: 扫描工作空间 → 渲染 L3 上下文 → 拼到 user content 前面
-    // L3 走 user message 前缀（不进 system prompt），L2 + L5 走 systemPrompt 字段
+    // L3 走 user message 前缀；L2 + L5 作为项目规则交给服务端安全骨架封装。
     // 收益：system prompt 100% 静态 → LLM API 缓存持续命中
     const workingDir = localSessionId
       ? (getSessionWorkspacePath(localSessionId) || getSessionPath(localSessionId))
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       options: {
         timeout: 120000,
         stream: false,
-        systemPrompt: STATIC_SYSTEM_PROMPT,
+        projectRules: STATIC_SYSTEM_PROMPT,
       },
     });
 
