@@ -58,6 +58,8 @@ node tools/page-export/bin/export.mjs \
 | `--no-login` | 跳过登录（公开页面） | - |
 | `--output` | 输出目录 | `out` |
 | `--import-name` | 导入项目名 | `页面导出` |
+| `--project-id` | 将原型页导入已有项目；省略时新建项目 | - |
+| `--browser-wait-until-delay` | 网络空闲后额外等待的毫秒数；加载较慢的编辑页可设为 `3000` | `1500` |
 | `--dry-run` | 只 dry-run 校验不导入不提交 | - |
 | `--no-commit` | 导入但不提交（保留 edit 事务） | - |
 | `--manifest-only` | 只做 normalize 生成 manifest，不调 import | - |

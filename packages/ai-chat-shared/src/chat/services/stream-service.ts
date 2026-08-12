@@ -264,12 +264,12 @@ export class StreamService {
       throw new MissingTransactionalDeleteToolsError();
     }
     const authorContext = getAuthorContextIntegration();
-    let systemPrompt = authorContext?.buildStaticSystemPrompt({
+    let projectRules = authorContext?.buildStaticSystemPrompt({
       toolNames: toolCapabilities?.toolNames || [],
     });
 
     // v3.2: 异步获取 L3 上下文 + L4 记忆（通过宿主注入的 API）→ 拼到 user content 前面
-    // L3 走 user message 前缀（不进 system prompt），L2 + L5 走 systemPrompt 字段
+    // L3 走 user message 前缀；L2 + L5 作为项目规则交给服务端安全骨架封装。
     // L4 记忆仅在首条消息注入
     // 公约注入 L2 system prompt 末尾
     const activeViewPrefix = buildActiveViewContextPrefix(activeViewContext);
@@ -312,8 +312,8 @@ export class StreamService {
       ]
         .filter(Boolean)
         .join("");
-      if (conventionSuffix && systemPrompt) {
-        systemPrompt = `${systemPrompt}${conventionSuffix}`;
+      if (conventionSuffix && projectRules) {
+        projectRules = `${projectRules}${conventionSuffix}`;
       }
     }
 
@@ -327,7 +327,7 @@ export class StreamService {
       model: modelId,
       images,
       files,
-      systemPrompt,
+      projectRules,
     });
   }
 

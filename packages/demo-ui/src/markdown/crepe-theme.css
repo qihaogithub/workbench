@@ -54,7 +54,7 @@
   width: 100%;
   max-width: 100%;
   margin: 0;
-  padding: 16px 20px 40px 64px;
+  padding: 16px 64px 40px;
   color: var(--crepe-color-on-background);
   caret-color: var(--crepe-color-primary);
   font-family: var(--crepe-font-default);
@@ -65,9 +65,14 @@
 }
 
 .document-editor-crepe .milkdown .milkdown-top-bar {
+  box-sizing: border-box;
   top: 0;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
   min-height: 44px;
   padding: 0 8px;
+  overflow: hidden;
   flex-wrap: nowrap;
   border-bottom: 1px solid var(--crepe-color-surface-low);
   background: var(--crepe-color-surface);
@@ -78,8 +83,10 @@
 }
 
 .document-editor-crepe .milkdown .milkdown-top-bar .top-bar-inner {
-  width: 100%;
+  flex: 1 1 0;
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   flex-wrap: nowrap;
 }
 
@@ -374,7 +381,7 @@
 @media (max-width: 640px) {
   .document-editor-crepe .milkdown .ProseMirror {
     max-width: none;
-    padding: 12px 14px 32px 56px;
+    padding: 12px 56px 32px;
     font-size: 14px;
   }
 }

@@ -225,6 +225,13 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h
 
 viewer-site dev 端口注意：Next.js 14 的 `next dev` 在加载 `.env` 之前解析端口，`.env` 里的 `PORT=4300` 不生效，必须显式 `-p 4300`（已写在 dev 脚本中）；`.env` 的 PORT 仅作约定记录。
 
+Next 开发编译性能约束：
+
+- author-site 当前默认使用 Next.js 14.1 Webpack；不要直接追加 `--turbo`。现有 instrumentation、`better-sqlite3`、Markdown 文本导入和 workspace 源码解析需要在受支持 Next LTS 的独立升级任务中一起迁移验证。
+- 编辑页和根布局不得从 `@workbench/demo-ui`、`@workbench/ai-chat-shared` 或 `date-fns/locale` 桶入口获取单个轻量能力；优先使用 package exports 公开的精确子路径，并维护高频路由静态导入测试。
+- 采集冷编译基线前必须关闭仍指向 author-site 的旧浏览器标签，再清理 `.next` 和重启服务；旧页面会自动重连并发起 Authority/会话请求，污染模块数和编译时间。
+- 被 `useEffect` / `useCallback` 依赖的可选数组或对象 props 不得在函数参数中使用 `=[]` / `={}` 这类每次渲染创建新引用的默认值；使用模块级稳定常量，避免请求 effect 循环。
+
 `.next/`、`node_modules/`、`coverage/`、`dist/`、`out/`、`test/**/test-outputs/` 都是生成物或依赖目录，不作为源码入口。
 
 `packages/shared/src/index.ts` 是共享类型入口。`@workbench/shared` 由 author-site、agent-service、screenshot-service 等包通过 `workspace:*` 引用。

@@ -139,13 +139,6 @@ function PoolItem({ item, bound }: { item: ConfigPoolItem; bound: boolean }) {
       onDragStart={(e) => {
         e.dataTransfer.setData("text/plain", "pool:" + item.id);
       }}
-      onMouseMove={(e) => openHoverPreview(e.clientX, e.clientY)}
-      onMouseLeave={() => ws.setHoverPop(null)}
-      onFocus={(e) => {
-        const rect = e.currentTarget.getBoundingClientRect();
-        openHoverPreview(rect.right, rect.top);
-      }}
-      onBlur={() => ws.setHoverPop(null)}
       className={cn(
         "flex cursor-grab items-center gap-2 rounded-md px-1.5 py-1.5 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         bound && "opacity-80",
@@ -153,7 +146,18 @@ function PoolItem({ item, bound }: { item: ConfigPoolItem; bound: boolean }) {
     >
       <span
         draggable={false}
-        className="shrink-0"
+        tabIndex={0}
+        className={cn(
+          "shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "cursor-pointer",
+        )}
+        onMouseMove={(e) => openHoverPreview(e.clientX, e.clientY)}
+        onMouseLeave={() => ws.setHoverPop(null)}
+        onFocus={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          openHoverPreview(rect.right, rect.top);
+        }}
+        onBlur={() => ws.setHoverPop(null)}
         onClick={
           isImage
             ? () => {

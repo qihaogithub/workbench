@@ -567,6 +567,78 @@ describe("PageConfigPanel 配置项与资源规范折叠区", () => {
     expect(screen.getByText("暂无资源规范")).toBeInTheDocument();
   });
 
+  it("可隐藏资源规范，仅保留配置项", () => {
+    render(
+      <PageConfigPanel
+        pages={[{ id: "page_a", name: "页面 A", order: 0, schema: pageSchema, configData: {} }]}
+        activePageId="page_a"
+        detailPageId="page_a"
+        hideDetailHeader
+        readonly
+        requirementsPosition="hidden"
+      />,
+    );
+
+    expect(screen.getByText("配置项")).toBeInTheDocument();
+    expect(screen.queryByText("资源规范")).not.toBeInTheDocument();
+  });
+
+  it("浏览端仅在页面没有资源规范和关联设计规范时隐藏规范折叠区", () => {
+    const { rerender } = render(
+      <PageConfigPanel
+        pages={[{ id: "page_a", name: "页面 A", order: 0, schema: pageSchema, configData: {} }]}
+        activePageId="page_a"
+        detailPageId="page_a"
+        hideDetailHeader
+        readonly
+        requirementsPosition="beforeConfig"
+        hideEmptyRequirements
+      />,
+    );
+
+    expect(screen.queryByText("资源规范")).not.toBeInTheDocument();
+
+    rerender(
+      <PageConfigPanel
+        pages={[{ id: "page_a", name: "页面 A", order: 0, schema: pageSchema, configData: {} }]}
+        activePageId="page_a"
+        detailPageId="page_a"
+        hideDetailHeader
+        readonly
+        requirementsPosition="beforeConfig"
+        hideEmptyRequirements
+        designSpecEntries={[{
+          docId: "spec-1",
+          docTitle: "弹窗规范",
+          entryId: "entry-1",
+          entryTitle: "配图",
+          markdown: "图片底部不留白。",
+          scope: "project",
+          fieldKey: "popupImage",
+        }]}
+      />,
+    );
+
+    expect(screen.getByText("资源规范")).toBeInTheDocument();
+    expect(screen.getByText("弹窗规范 · 配图")).toBeInTheDocument();
+    expect(screen.getByText("图片底部不留白。", { exact: false })).toBeInTheDocument();
+  });
+
+  it("可将资源规范视觉排列在配置项之前", () => {
+    render(
+      <PageConfigPanel
+        pages={[{ id: "page_a", name: "页面 A", order: 0, schema: pageSchema, configData: {} }]}
+        activePageId="page_a"
+        detailPageId="page_a"
+        hideDetailHeader
+        readonly
+        requirementsPosition="beforeConfig"
+      />,
+    );
+
+    expect(screen.getByText("资源规范").closest(".order-first")).not.toBeNull();
+  });
+
   it("readonly 时资源规范不显示编辑按钮", () => {
     render(
       <PageConfigPanel

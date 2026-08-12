@@ -218,4 +218,35 @@ describe("screenshot file route", () => {
 
     expect(response.status).toBe(404);
   });
+
+  it("未指定 hash 时按 metadata 读取最新 fast 变体", async () => {
+    const projectDir = path.join(tempDir, "screenshots", "proj_1");
+    fs.mkdirSync(projectDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(projectDir, "page_1.1111111111111111.fast.png"),
+      Buffer.from("fast-current"),
+    );
+    fs.writeFileSync(
+      path.join(projectDir, "page_1.meta.json"),
+      JSON.stringify({
+        variants: {
+          "1111111111111111:fast": {
+            variant: "fast",
+            generatedAt: "2026-08-12T00:00:00.000Z",
+          },
+        },
+      }),
+    );
+
+    const { GET } = await import("./route");
+    const response = await GET(
+      createRequest("http://localhost/api/screenshots/file/proj_1/page_1"),
+      { params: { projectId: "proj_1", pageId: "page_1" } },
+    );
+
+    expect(Buffer.from(await response.arrayBuffer()).toString()).toBe(
+      "fast-current",
+    );
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+  });
 });

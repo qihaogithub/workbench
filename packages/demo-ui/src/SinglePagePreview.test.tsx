@@ -116,7 +116,7 @@ describe("SinglePagePreview", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("按 runtime 分发原型页和草图页", () => {
+  it("按 runtime 分发原型页和草图页", async () => {
     const { rerender } = render(
       <SinglePagePreview
         page={createPage({
@@ -140,7 +140,7 @@ describe("SinglePagePreview", () => {
         })}
       />,
     );
-    const sketch = screen.getByTestId("sketch-renderer");
+    const sketch = await screen.findByTestId("sketch-renderer");
     expect(sketch).toHaveAttribute("data-scene", '{"nodes":[]}');
     expect(sketch).toHaveAttribute("data-fill-container", "true");
   });

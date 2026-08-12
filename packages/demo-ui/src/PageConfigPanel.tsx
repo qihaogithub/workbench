@@ -20,7 +20,7 @@ import {
   getSchemaFieldCountByCategory,
 } from "./config-categories";
 import { cn } from "./utils";
-import type { PositionableSizeItem } from "./types";
+import type { DesignSpecEntryLink, PositionableSizeItem } from "./types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -35,6 +35,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+
+const EMPTY_DESIGN_SPEC_ENTRIES: DesignSpecEntryLink[] = [];
 export {
   extractCodeConfigBindingKeys,
   extractPrototypeConfigBindingKeys,
@@ -46,7 +48,15 @@ export interface PageConfigPanelPage {
   order?: number;
   schema?: string;
   configData?: Record<string, unknown>;
+  /** 引用页使用源项目共享配置 Schema；普通页省略并继承面板项目 Schema。 */
+  projectConfigSchema?: string;
   projectConfigBindings?: string[];
+  /** 跨项目引用页携带的源项目设计规范，只读展示。 */
+  referenceDesignSpecs?: Array<{
+    id: string;
+    title: string;
+    entries: Array<{ id: string; title: string; markdown: string }>;
+  }>;
 }
 
 interface PageConfigPanelProps {
@@ -81,6 +91,16 @@ interface PageConfigPanelProps {
   onRequirementsChange?: (markdown: string) => void;
   /** 配置要求加载中。 */
   requirementsLoading?: boolean;
+  /** 资源规范折叠区的展示位置；创作端由文档视图承载时可隐藏。 */
+  requirementsPosition?: "beforeConfig" | "afterConfig" | "hidden";
+  /** 只读入口在没有页面资源规范和关联设计规范时隐藏整个折叠区。 */
+  hideEmptyRequirements?: boolean;
+  /** 已加载的设计规范绑定，用于配置字段旁的只读入口。 */
+  designSpecEntries?: DesignSpecEntryLink[];
+  /** 仅创作端提供：跳转到文档视图中的指定规范条目。 */
+  onEditDesignSpec?: (docId: string, entryId: string) => void;
+  /** 创作端设计规范 API 上下文；提供后面板会按需读取绑定。 */
+  designSpecApiContext?: { workingDir?: string; sessionId?: string; projectId?: string };
 }
 
 function getSortedPages(pages: PageConfigPanelPage[]) {
@@ -254,6 +274,11 @@ export function PageConfigPanel({
   requirements,
   onRequirementsChange,
   requirementsLoading,
+  requirementsPosition = "afterConfig",
+  hideEmptyRequirements = false,
+  designSpecEntries = EMPTY_DESIGN_SPEC_ENTRIES,
+  onEditDesignSpec,
+  designSpecApiContext,
 }: PageConfigPanelProps) {
   const [internalDetailPageId, setInternalDetailPageId] = useState<
     string | null
@@ -263,9 +288,46 @@ export function PageConfigPanel({
   const [requirementsSectionOpen, setRequirementsSectionOpen] = useState(true);
   const [editingRequirements, setEditingRequirements] = useState(false);
   const [requirementsDraft, setRequirementsDraft] = useState("");
+  const [loadedDesignSpecEntries, setLoadedDesignSpecEntries] = useState<DesignSpecEntryLink[]>([]);
   const [saveDefaultsScope, setSaveDefaultsScope] = useState<
     "page" | "project" | null
   >(null);
+
+  useEffect(() => {
+    if (!designSpecApiContext?.workingDir) return;
+    let cancelled = false;
+    const params = new URLSearchParams({ workingDir: designSpecApiContext.workingDir });
+    if (designSpecApiContext.sessionId) params.set("sessionId", designSpecApiContext.sessionId);
+    if (designSpecApiContext.projectId) params.set("projectId", designSpecApiContext.projectId);
+    void fetch(`/api/design-specs?${params.toString()}`)
+      .then((res) => res.json())
+      .then(async (result) => {
+        if (!result?.success || !Array.isArray(result.data)) return [];
+        return Promise.all(result.data.map(async (meta: { id: string; title: string }) => {
+          const res = await fetch(`/api/design-specs/${encodeURIComponent(meta.id)}?${params.toString()}`);
+          const docResult = await res.json();
+          const doc = docResult?.data;
+          if (!docResult?.success || !doc || !Array.isArray(doc.entries)) return [];
+          return doc.entries.flatMap((entry: { id: string; title: string; markdown?: string; refs?: Array<{ scope: "project" | "page"; pageId?: string; fieldKey: string }> }) =>
+            (entry.refs ?? []).map((ref) => ({
+              docId: doc.id,
+              docTitle: doc.title || meta.title,
+              entryId: entry.id,
+              entryTitle: entry.title,
+              markdown: entry.markdown ?? "",
+              ...ref,
+            } satisfies DesignSpecEntryLink)),
+          );
+        }));
+      })
+      .then((entryGroups) => {
+        if (!cancelled && Array.isArray(entryGroups)) setLoadedDesignSpecEntries(entryGroups.flat());
+      })
+      .catch(() => { if (!cancelled) setLoadedDesignSpecEntries([]); });
+    return () => { cancelled = true; };
+  }, [designSpecApiContext?.workingDir, designSpecApiContext?.sessionId, designSpecApiContext?.projectId]);
+
+  const effectiveDesignSpecEntries = designSpecEntries.length > 0 ? designSpecEntries : loadedDesignSpecEntries;
   const [restoreDefaultsScope, setRestoreDefaultsScope] = useState<
     "page" | "project" | null
   >(null);
@@ -277,7 +339,7 @@ export function PageConfigPanel({
       sortedPages.map((page) => ({
         page,
         projectConfigSchema: getScopedProjectConfigSchema(
-          projectConfigSchema,
+          page.projectConfigSchema ?? projectConfigSchema,
           page.projectConfigBindings,
         ),
       })),
@@ -441,6 +503,20 @@ export function PageConfigPanel({
   const showSharedConfig =
     selectedProjectCount > 0 && !!selectedProjectConfigSchema;
   const showPageConfig = pageCount > 0 && !!selectedPage.schema;
+  const referenceDesignSpecs = selectedPage.referenceDesignSpecs ?? [];
+  const scopedDesignSpecEntries = effectiveDesignSpecEntries.filter(
+    (entry) =>
+      entry.scope === "project" ||
+      (entry.scope === "page" && entry.pageId === selectedPage.id),
+  );
+  const hasRequirements = Boolean(requirements?.trim());
+  const shouldShowRequirements =
+    requirementsPosition !== "hidden" &&
+    (!hideEmptyRequirements ||
+      requirementsLoading ||
+      editingRequirements ||
+      hasRequirements ||
+      scopedDesignSpecEntries.length > 0);
   const configData = selectedPage.configData ?? {};
   const saveDefaultsEnabled =
     !readonly &&
@@ -556,6 +632,8 @@ export function PageConfigPanel({
                     readonly={readonly}
                     configCategoryFilter={configCategoryFilter}
                     typeLimits={typeLimits}
+                    designSpecEntries={effectiveDesignSpecEntries.filter((entry) => entry.scope === "project")}
+                    onEditDesignSpec={onEditDesignSpec}
                   />
                 </ConfigScopeWrapper>
               </section>
@@ -584,6 +662,8 @@ export function PageConfigPanel({
                   positionEditActive={positionEditActive}
                   positionEditDimming={positionEditDimming}
                   onTogglePositionDimming={onTogglePositionDimming}
+                  designSpecEntries={effectiveDesignSpecEntries.filter((entry) => entry.scope === "page" && entry.pageId === selectedPage.id)}
+                  onEditDesignSpec={onEditDesignSpec}
                 />
               </ConfigScopeWrapper>
             </section>
@@ -600,6 +680,34 @@ export function PageConfigPanel({
           )}
           </PanelSection>
 
+          {referenceDesignSpecs.length > 0 && (
+            <PanelSection
+              title="设计规范"
+              open={requirementsSectionOpen}
+              onToggle={() => setRequirementsSectionOpen((current) => !current)}
+            >
+              <div className="space-y-4 pt-3">
+                {referenceDesignSpecs.map((spec) => (
+                  <section key={spec.id} className="rounded-md border p-3">
+                    <h3 className="text-sm font-medium">{spec.title}</h3>
+                    {spec.entries.map((entry) => (
+                      <div key={entry.id} className="mt-3">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          {entry.title}
+                        </p>
+                        {entry.markdown.trim() && (
+                          <PageRequirements markdown={entry.markdown} />
+                        )}
+                      </div>
+                    ))}
+                  </section>
+                ))}
+              </div>
+            </PanelSection>
+          )}
+
+          {shouldShowRequirements && (
+            <div className={requirementsPosition === "beforeConfig" ? "order-first" : undefined}>
           <PanelSection
             title="资源规范"
             open={requirementsSectionOpen}
@@ -665,9 +773,23 @@ export function PageConfigPanel({
                   输入 @ 或使用工具栏「插入引用」选择当前页配置项，以 @[名称](key) 形式引用。
                 </p>
               </div>
-            ) : requirements && requirements.trim() ? (
-              <div className="pt-2">
-                <PageRequirements markdown={requirements} />
+            ) : hasRequirements || scopedDesignSpecEntries.length > 0 ? (
+              <div className="space-y-4 pt-2">
+                {hasRequirements && <PageRequirements markdown={requirements!} />}
+                {scopedDesignSpecEntries.map((entry) => (
+                  <section key={`${entry.docId}:${entry.entryId}`} className="rounded-md border p-3">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      {entry.docTitle} · {entry.entryTitle}
+                    </p>
+                    {entry.markdown.trim() ? (
+                      <div className="mt-2">
+                        <PageRequirements markdown={entry.markdown} />
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-sm text-muted-foreground">暂无说明</p>
+                    )}
+                  </section>
+                ))}
               </div>
             ) : (
               <div className="flex min-h-[120px] flex-col items-center justify-center px-4 text-center">
@@ -681,6 +803,8 @@ export function PageConfigPanel({
               </div>
             )}
           </PanelSection>
+            </div>
+          )}
         </div>
       </div>
 

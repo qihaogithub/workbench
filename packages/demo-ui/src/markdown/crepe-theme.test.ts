@@ -61,6 +61,9 @@ describe("Crepe 宿主主题契约", () => {
     expect(theme).toMatch(
       /\.document-editor-crepe\s+\.milkdown\s+\.ProseMirror\s*\{[^}]*min-width:\s*0;[^}]*width:\s*100%;[^}]*max-width:\s*100%;/s,
     );
+    expect(theme).toMatch(
+      /\.milkdown-top-bar\s*\{[^}]*min-width:\s*0;[^}]*width:\s*100%;[^}]*max-width:\s*100%;[^}]*overflow:\s*hidden;/s,
+    );
   });
 
   it("为原生工具按钮提供明确的默认、悬停和选中状态", () => {
@@ -94,10 +97,10 @@ describe("Crepe 宿主主题契约", () => {
 
   it("为两个块操作按钮保留不会被宿主裁切的左侧沟槽", () => {
     expect(theme).toMatch(
-      /\.ProseMirror\s*\{[^}]*padding:\s*16px\s+20px\s+40px\s+64px;/s,
+      /\.ProseMirror\s*\{[^}]*padding:\s*16px\s+64px\s+40px;/s,
     );
     expect(theme).toMatch(
-      /@media\s*\(max-width:\s*640px\)[^{]*\{[\s\S]*?\.ProseMirror\s*\{[^}]*padding:\s*12px\s+14px\s+32px\s+56px;/s,
+      /@media\s*\(max-width:\s*640px\)[^{]*\{[\s\S]*?\.ProseMirror\s*\{[^}]*padding:\s*12px\s+56px\s+32px;/s,
     );
   });
 });

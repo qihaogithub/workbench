@@ -23,8 +23,8 @@ describe("上传附件 prompt 格式化", () => {
   });
 
   it("本轮上传与历史附件分组展示", () => {
-    const current = makeFile({ id: "cur-1", name: "本轮.md" });
-    const history = makeFile({ id: "hist-1", name: "历史.md" });
+    const current = makeFile({ id: "cur-1", name: "本轮.md", textPreview: "本轮预览" });
+    const history = makeFile({ id: "hist-1", name: "历史.md", textPreview: "历史预览" });
     const prompt = formatUploadedFilesForPrompt(
       [current, history],
       new Set(["cur-1"]),
@@ -34,6 +34,8 @@ describe("上传附件 prompt 格式化", () => {
     expect(prompt).toContain("本轮.md");
     expect(prompt).toContain("【历史附件】");
     expect(prompt).toContain("历史.md");
+    expect(prompt).toContain("本轮预览");
+    expect(prompt).not.toContain("历史预览");
   });
 
   it("历史附件按内容去重，不重复列副本", () => {

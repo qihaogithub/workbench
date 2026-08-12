@@ -40,13 +40,8 @@ interface SendMessageBody {
   viewerContext?: ViewerContextPayload;
   images?: ImageAttachment[];
   files?: FileAttachment[];
-  /**
-   * v3.2: 静态 system prompt 注入（L2 + L4）
-   * author-site 端通过 buildStaticSystemPrompt() 生成
-   * 注：L3 动态上下文已拼到 content 字段头部
-   * viewer-readonly 模式下忽略
-   */
-  systemPrompt?: string;
+  /** 项目规则；服务端将其放在不可覆盖的安全骨架之后。 */
+  projectRules?: string;
   options?: {
     timeout?: number;
     stream?: boolean;
@@ -125,7 +120,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
     '/api/agent/:sessionId/message',
     async (request: FastifyRequest<{ Params: SessionParams; Body: SendMessageBody }>, reply: FastifyReply) => {
       const { sessionId } = request.params;
-      const { content, projectId, demoId, workingDir, customWorkspace, systemPrompt, options, images, files } = request.body;
+      const { content, projectId, demoId, workingDir, customWorkspace, projectRules, options, images, files } = request.body;
 
       if (!content) {
         return reply.code(400).send({
@@ -242,12 +237,11 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
           await agent.setModel(requestedModelId);
         }
 
-        // v3.2: 注入静态 system prompt（必须在 agent.start() 之后，因为 Pi Agent 实例在 start() 时才创建）
-        // viewer-readonly：忽略客户端 systemPrompt，服务端强制只读系统提示词
+        // viewer-readonly 使用服务端规则；普通模式只接受项目规则，不能覆盖安全骨架。
         if (viewerSession && agent instanceof BackendAgent) {
-          await agent.updateSystemPrompt(buildViewerAiSystemPrompt());
-        } else if (systemPrompt && agent instanceof BackendAgent) {
-          await agent.updateSystemPrompt(systemPrompt);
+          await agent.updateProjectRules(buildViewerAiSystemPrompt());
+        } else if (projectRules && agent instanceof BackendAgent) {
+          await agent.updateProjectRules(projectRules);
         }
 
         sessionStore.update(sessionId, {

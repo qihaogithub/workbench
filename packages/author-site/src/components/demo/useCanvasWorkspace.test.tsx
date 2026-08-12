@@ -154,6 +154,33 @@ describe("useCanvasWorkspace", () => {
     expect(saveCall).toBeUndefined();
   });
 
+  it("仅因查看画布发生的视口适配不会标记为未保存", async () => {
+    const fetchMock = jest.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        jsonFetchResponse({ success: true, data: { state: null } }),
+    ) as jest.MockedFunction<typeof fetch>;
+    global.fetch = fetchMock;
+    window.fetch = fetchMock;
+    globalThis.fetch = fetchMock;
+
+    const { result } = renderHook(() =>
+      useCanvasWorkspace({ sessionId: "session_1", projectId: "project_1" }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.saveStatus).toBe("idle");
+    });
+
+    act(() => {
+      result.current.setCanvasState({
+        ...result.current.canvasState,
+        viewport: { x: 0, y: 0, zoom: 0.8 },
+      });
+    });
+
+    expect(result.current.hasUnsavedCanvasChanges).toBe(false);
+  });
+
   it("Yjs-First: flushCanvasState 清除 dirty 但不发送 HTTP POST", async () => {
     const fetchMock = jest.fn(
       async (input: RequestInfo | URL, init?: RequestInit) => {

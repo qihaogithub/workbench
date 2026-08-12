@@ -12,6 +12,7 @@ import {
   findWorkspacePath,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
+import { listDesignSpecDocs, readDesignSpecDoc } from "@/lib/design-specs";
 import {
   type DemoFolderMeta,
   type DemoPageMeta,
@@ -186,11 +187,17 @@ export async function GET(
 
     // 读取源页面文件内容
     const demoDir = path.join(sourceWorkspacePath, "demos", sourcePageId);
+    const designSpecs = listDesignSpecDocs(sourceWorkspacePath)
+      .map((meta) => readDesignSpecDoc(sourceWorkspacePath, meta.id))
+      .filter((doc): doc is NonNullable<typeof doc> => doc !== null);
 
     return NextResponse.json(
       createApiSuccess({
         code: readFileIfExists(path.join(demoDir, "index.tsx")),
         schema: readFileIfExists(path.join(demoDir, "config.schema.json")),
+        projectConfigSchema: readFileIfExists(
+          path.join(sourceWorkspacePath, "project.config.schema.json"),
+        ),
         configData: readJsonIfExists(
           path.join(sourceWorkspacePath, "project.config.values.json"),
         ),
@@ -204,6 +211,8 @@ export async function GET(
           path.join(demoDir, "sketch.scene.json"),
         ),
         sketchMeta: readJsonIfExists(path.join(demoDir, "sketch.meta.json")),
+        requirements: readFileIfExists(path.join(demoDir, "requirements.md")),
+        designSpecs,
       }),
     );
   } catch (error) {

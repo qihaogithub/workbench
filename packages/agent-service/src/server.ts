@@ -58,7 +58,13 @@ async function start() {
   await fastify.register(cors, {
     origin: allowedOrigins,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Upgrade", "Connection"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-API-Key",
+      "Upgrade",
+      "Connection",
+    ],
     credentials: true,
   });
   await fastify.register(websocket);

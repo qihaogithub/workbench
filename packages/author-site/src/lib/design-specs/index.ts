@@ -27,4 +27,4 @@ export {
 } from "./storage";
 export type { DesignSpecManifest } from "./storage";
 export { buildConfigPool } from "./config-pool";
-export type { ConfigPoolPageInput } from "./config-pool";
+export type { ConfigPoolBuildOptions, ConfigPoolPageInput } from "./config-pool";

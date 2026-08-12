@@ -192,6 +192,22 @@ export interface ConfigFormProps {
   positionEditActive?: boolean;
   positionEditDimming?: boolean;
   onTogglePositionDimming?: () => void;
+  /** 与当前配置范围匹配的设计规范条目（宿主加载，只读展示）。 */
+  designSpecEntries?: DesignSpecEntryLink[];
+  /** 创作端从规范详情跳转至文档视图；浏览端不传。 */
+  onEditDesignSpec?: (docId: string, entryId: string) => void;
+}
+
+/** 配置面板消费的设计规范绑定；设计规范内容不写入 Schema。 */
+export interface DesignSpecEntryLink {
+  docId: string;
+  docTitle: string;
+  entryId: string;
+  entryTitle: string;
+  markdown: string;
+  scope: "project" | "page";
+  pageId?: string;
+  fieldKey: string;
 }
 
 export type PreviewMode = "single" | "canvas" | "document";
@@ -446,6 +462,8 @@ export interface PreviewCanvasProps {
   /** 画布选中的页面添加到 AI 对话 */
   onAddPagesToChat?: (pageIds: string[]) => void;
   onPageConfigEdit?: (pageId: string) => void;
+  /** 评论模式下选择画布页面，以进入该页的评论定位流程 */
+  onPageComment?: (pageId: string) => void;
   onCanvasClick?: () => void;
   className?: string;
   editingPageId?: string;

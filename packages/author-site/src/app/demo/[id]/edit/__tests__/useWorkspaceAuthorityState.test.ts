@@ -293,4 +293,25 @@ describe("useWorkspaceAuthorityState", () => {
     expect(mockReadState).not.toHaveBeenCalled();
     expect(result.current.isConnected).toBe(false);
   });
+
+  it("标识未就绪时默认保持禁用，refresh 与 ack 也不应发请求", async () => {
+    const { result } = renderHook(() =>
+      useWorkspaceAuthorityState({
+        ...BASE_OPTIONS,
+        workspaceId: "",
+        sessionId: "",
+      }),
+    );
+
+    await act(async () => {
+      jest.advanceTimersByTime(2_000);
+      await result.current.refresh();
+      result.current.ackPreview(1 as never, "applied");
+    });
+
+    expect(mockReadState).not.toHaveBeenCalled();
+    expect(mockReadEvents).not.toHaveBeenCalled();
+    expect(mockReadAcks).not.toHaveBeenCalled();
+    expect(mockAckPreview).not.toHaveBeenCalled();
+  });
 });

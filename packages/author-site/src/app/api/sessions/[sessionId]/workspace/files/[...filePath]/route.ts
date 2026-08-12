@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import path from "path";
 import fs from "fs";
 import {
@@ -312,5 +313,111 @@ export async function PUT(
       createApiError("FILE_WRITE_ERROR", "更新文件内容失败"),
       { status: 500 },
     );
+  }
+}
+
+/**
+ * DELETE /api/sessions/{sessionId}/workspace/files/{...filePath}
+ * 仅删除用户按需创建的项目/页面公约。
+ */
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: { sessionId: string; filePath: string[] } },
+) {
+  try {
+    const token = getAuthCookie();
+    if (!token) {
+      return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
+        status: 401,
+      });
+    }
+
+    const payload = await verifyToken(token);
+    if (!payload) {
+      return NextResponse.json(createApiError("UNAUTHORIZED", "登录已过期"), {
+        status: 401,
+      });
+    }
+
+    const { sessionId, filePath: filePathParts } = params;
+    if (!sessionExists(sessionId)) {
+      return NextResponse.json(createApiError("SESSION_NOT_FOUND"), { status: 404 });
+    }
+    const meta = getSessionMeta(sessionId);
+    if (!meta) {
+      return NextResponse.json(createApiError("SESSION_NOT_FOUND"), { status: 404 });
+    }
+    if (meta.userId && meta.userId !== payload.userId) {
+      return NextResponse.json(createApiError("FORBIDDEN", "无权操作其他用户的 Session"), {
+        status: 403,
+      });
+    }
+    if (isSessionExpired(meta)) {
+      return NextResponse.json(createApiError("SESSION_EXPIRED"), { status: 410 });
+    }
+    if (!meta.workspaceId) {
+      return NextResponse.json(
+        createApiError("INVALID_REQUEST", "Session 未绑定 workspaceId"),
+        { status: 400 },
+      );
+    }
+
+    const wsPath = findWorkspacePath(meta.workspaceId);
+    if (!wsPath) {
+      return NextResponse.json(createApiError("FILE_READ_ERROR", "工作空间路径不存在"), {
+        status: 500,
+      });
+    }
+    const resolved = resolveWorkspaceFilePath(wsPath, filePathParts);
+    if (!resolved) {
+      return NextResponse.json(createApiError("FORBIDDEN", "禁止访问工作空间外的文件"), {
+        status: 403,
+      });
+    }
+
+    const { relativePath, absolutePath } = resolved;
+    const isConvention =
+      relativePath === "convention.md" ||
+      /^demos\/[^/]+\/convention\.md$/.test(relativePath);
+    if (!isConvention) {
+      return NextResponse.json(createApiError("FORBIDDEN", "仅支持删除公约文档"), {
+        status: 403,
+      });
+    }
+    if (!fs.existsSync(absolutePath) || !fs.statSync(absolutePath).isFile()) {
+      return NextResponse.json(createApiError("FILE_READ_ERROR", "文件不存在"), {
+        status: 404,
+      });
+    }
+
+    const content = fs.readFileSync(absolutePath, "utf-8");
+    const receipt = await commitWorkspaceMutation({
+      mutationId: crypto.randomUUID(),
+      projectId: meta.demoId,
+      workspaceId: meta.workspaceId,
+      sessionId,
+      baseRevision: 0,
+      actor: "author-site",
+      reason: "author_convention_delete",
+      operations: [{
+        type: "delete_path",
+        path: relativePath,
+        expectedHash: crypto.createHash("sha256").update(content).digest("hex"),
+      }],
+    });
+
+    return NextResponse.json(
+      createApiSuccess({ path: relativePath, message: "公约已删除", receipt }),
+    );
+  } catch (error) {
+    console.error("Error deleting convention file:", error);
+    if (error instanceof WorkspaceAuthorityClientError) {
+      return NextResponse.json(createApiError(error.code as never, error.message), {
+        status: error.status,
+      });
+    }
+    return NextResponse.json(createApiError("FILE_WRITE_ERROR", "删除公约失败"), {
+      status: 500,
+    });
   }
 }

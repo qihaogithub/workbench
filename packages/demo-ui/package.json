@@ -15,6 +15,7 @@
     "./config-binding-utils": "./src/config-binding-utils.ts",
     "./compile-cache": "./src/compile-cache.ts",
     "./validator": "./src/validator.ts",
+    "./DocumentEditor": "./src/DocumentEditor.tsx",
     "./PageConfigPanel": "./src/PageConfigPanel.tsx",
     "./PreviewModeSwitcher": "./src/PreviewModeSwitcher.tsx",
     "./PreviewStage": "./src/PreviewStage.tsx",

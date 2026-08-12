@@ -151,6 +151,9 @@ import {
   SlidersHorizontal,
   SquarePen,
 } from "lucide-react";
+
+const automaticScreenshotGenerationEnabled =
+  process.env.NEXT_PUBLIC_AUTOMATIC_SCREENSHOT_GENERATION !== "false";
 import {
   Select,
   SelectContent,
@@ -177,9 +180,13 @@ import type {
 import { useCollabDocument } from "@/hooks/useCollabDocument";
 import { VisualEditSidebar } from "./components/VisualEditSidebar";
 import { useVisualEditState, getNodeLabel, buildVisualSelectionPrompt } from "./hooks/useVisualEditState";
-import { useVersionControl } from "./hooks/useVersionControl";
+import {
+  markWorkspaceDocumentChanged,
+  useVersionControl,
+} from "./hooks/useVersionControl";
 import { useWorkspaceAuthorityState } from "./hooks/useWorkspaceAuthorityState";
 import { useCommandHistory } from "./hooks/useCommandHistory";
+import { getExitSaveState } from "./exit-save-state";
 import {
   resolveSinglePreviewResourceHistoryTarget,
   type SinglePreviewTarget,
@@ -217,7 +224,10 @@ import type {
   UserAuthoringPreferences,
 } from "@workbench/shared";
 import { projectApiClient } from "@/lib/project-api";
-import { loadCanvasPageContent } from "@/lib/canvas-page-content-loader";
+import {
+  loadCanvasPageContent,
+  type ReferencedDesignSpec,
+} from "@/lib/canvas-page-content-loader";
 import { parseFigmaImportContent } from "../../../../../lib/markdown-parser";
 import { useDemos } from "@/lib/api";
 import {
@@ -227,7 +237,7 @@ import {
 import type { ActiveViewContext } from "@workbench/ai-chat-shared/active-view-context";
 import { sanitizeHydratedMessages } from "@/lib/sanitize-hydrated-messages";
 import { format } from "date-fns";
-import { zhCN } from "date-fns/locale";
+import { zhCN } from "date-fns/locale/zh-CN";
 
 const PreviewStage = dynamic(
   () => import("@workbench/demo-ui/PreviewStage").then((m) => m.PreviewStage),
@@ -929,12 +939,21 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [pageSchemaMap, setPageSchemaMap] = useState<Record<string, string>>(
     {},
   );
+  const [referencePageRequirements, setReferencePageRequirements] = useState<
+    Record<string, string>
+  >({});
+  const [referencePageDesignSpecs, setReferencePageDesignSpecs] = useState<
+    Record<string, ReferencedDesignSpec[]>
+  >({});
+  const [referencePageProjectSchemas, setReferencePageProjectSchemas] =
+    useState<Record<string, string>>({});
   const pageSchemaMapRef = useRef(pageSchemaMap);
   pageSchemaMapRef.current = pageSchemaMap;
   const [requirementsMap, setRequirementsMap] = useState<
     Record<string, string>
   >({});
   const [requirementsLoading, setRequirementsLoading] = useState(false);
+  const [designSpecFocus, setDesignSpecFocus] = useState<{ docId: string; entryId: string } | null>(null);
   const [pageCodes, setPageCodes] = useState<Record<string, string>>({});
   const [pagePrototypeMap, setPagePrototypeMap] = useState<
     Record<
@@ -1101,6 +1120,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     projectId: demoId,
     workspaceId,
     sessionId,
+    enabled: Boolean(demoId && workspaceId && sessionId),
   });
 
   const markWorkspaceChanged = useCallback(() => {
@@ -1309,7 +1329,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   } = useScreenshotGeneration({
     projectId: demoId,
     sessionId,
-    enabled: true, // 截图常驻生成，不再仅限画布模式
+    enabled: automaticScreenshotGenerationEnabled,
     pageIds: screenshotPageIds,
   });
   // ── 截图再生：集中标记 + 持久化管线后统一触发 ──
@@ -1600,6 +1620,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       pageCode?: string,
       configOverride?: Record<string, unknown>,
     ) => {
+      if (!automaticScreenshotGenerationEnabled) return;
       const timers = screenshotRegenerateTimerRef.current;
       if (timers[pageId]) clearTimeout(timers[pageId]);
       timers[pageId] = setTimeout(() => {
@@ -1659,6 +1680,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   scheduleScreenshotRegenerateRef.current = scheduleScreenshotRegenerate;
 
   const regenerateCanvasScreenshots = useCallback(async () => {
+    if (!automaticScreenshotGenerationEnabled) return;
     const available = await checkServiceHealth();
     if (!available || demoPages.length === 0) return;
 
@@ -1709,6 +1731,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   // 首屏优先加载单页 iframe；批量截图延后到预览 ready 或用户进入画布后。
   useEffect(() => {
+    if (!automaticScreenshotGenerationEnabled) return;
     if (initialScreenshotBatchStartedRef.current) return;
     if (previewMode === "canvas" && visibleCanvasPageIds.length === 0) return;
     const canStartBatch =
@@ -2151,6 +2174,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [activeCommentThreadId, setActiveCommentThreadId] = useState<
     string | null
   >(null);
+  const [canvasCommentTarget, setCanvasCommentTarget] = useState<{
+    pageId: string;
+    pageName: string;
+  } | null>(null);
   const commentsData = useComments({
     projectId: demoId,
     pageId: activeDemoId,
@@ -2160,13 +2187,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const unresolvedCommentCount = commentsData.threads.filter(
     (t) => !t.resolved,
   ).length;
-  // 画布模式不支持评论，切换时退出评论模式
-  useEffect(() => {
-    if (previewMode === "canvas") {
-      setCommentModeActive(false);
-      setActiveCommentThreadId(null);
-    }
-  }, [previewMode]);
   const activeDemoRuntimeTypeForCollab = demoPages.find(
     (page) => page.id === activeDemoId,
   )?.runtimeType;
@@ -3265,6 +3285,21 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     publishingButtonText,
     handleCreateVersion,
   } = versionControl;
+
+  useEffect(() => {
+    const markPublishedSnapshotStale = () => {
+      setPublishStatus(markWorkspaceDocumentChanged);
+    };
+    window.addEventListener("design-spec-updated", markPublishedSnapshotStale);
+    window.addEventListener("knowledge-updated", markPublishedSnapshotStale);
+    return () => {
+      window.removeEventListener(
+        "design-spec-updated",
+        markPublishedSnapshotStale,
+      );
+      window.removeEventListener("knowledge-updated", markPublishedSnapshotStale);
+    };
+  }, [setPublishStatus]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -4502,40 +4537,68 @@ ${context.details}
       }
       if (!sessionId) return;
       try {
-        const res = await fetch(`/api/sessions/${sessionId}/files/${pageId}`);
-        const data = await res.json();
-        if (data.success) {
-          const prototypeMeta = data.data.prototypeMeta as
+        const selectedPage = demoPages.find((page) => page.id === pageId);
+        if (!selectedPage) return;
+        const data = await loadCanvasPageContent({
+          page: selectedPage,
+          projectId: demoId,
+          sessionId,
+        });
+        {
+          const prototypeMeta = data.prototypeMeta as
             | PrototypePageMeta
             | undefined;
           setPageCodes((prev) => ({
             ...prev,
-            [pageId]: data.data.code,
+            [pageId]: data.code ?? "",
           }));
           if (
-            data.data.prototypeHtml !== undefined ||
-            data.data.prototypeCss !== undefined
+            data.prototypeHtml !== undefined ||
+            data.prototypeCss !== undefined
           ) {
             setPagePrototypeMap((prev) => ({
               ...prev,
               [pageId]: {
-                html: data.data.prototypeHtml,
-                css: data.data.prototypeCss,
+                html: data.prototypeHtml,
+                css: data.prototypeCss,
                 meta: prototypeMeta,
               },
             }));
           }
-          setCode(data.data.code);
-          setSchema(data.data.schema);
-          updatePageSchemaMapFromLoad(pageId, data.data.schema);
-          setEditorContent(buildFigmaText(data.data.code, data.data.schema));
+          setCode(data.code ?? "");
+          setSchema(data.schema ?? "");
+          updatePageSchemaMapFromLoad(pageId, data.schema ?? "");
+          setEditorContent(buildFigmaText(data.code ?? "", data.schema ?? ""));
           setConfigDataMap((prev) => {
-            if (prev[pageId]) return prev;
-            const defaults = getSafeMergedDefaults(data.data.schema);
-            return { ...prev, [pageId]: defaults };
+            const defaults = getSafeMergedDefaults(data.schema ?? "");
+            return {
+              ...prev,
+              [pageId]: {
+                ...defaults,
+                ...(data.configData ?? {}),
+              },
+            };
           });
+          if (data.requirements !== undefined) {
+            setReferencePageRequirements((prev) => ({
+              ...prev,
+              [pageId]: data.requirements ?? "",
+            }));
+          }
+          if (data.designSpecs !== undefined) {
+            setReferencePageDesignSpecs((prev) => ({
+              ...prev,
+              [pageId]: data.designSpecs ?? [],
+            }));
+          }
+          if (data.projectConfigSchema !== undefined) {
+            setReferencePageProjectSchemas((prev) => ({
+              ...prev,
+              [pageId]: data.projectConfigSchema ?? "",
+            }));
+          }
           const size =
-            getPreviewSize(data.data.schema) ??
+            getPreviewSize(data.schema ?? "") ??
             getPrototypePreviewSize(prototypeMeta);
           if (size) {
             setPagePreviewSizeMap((prev) => ({
@@ -4551,6 +4614,8 @@ ${context.details}
     },
     [
       focusCanvasPage,
+      demoId,
+      demoPages,
       getSafeMergedDefaults,
       pagePreviewSizeMap,
       previewMode,
@@ -5886,20 +5951,17 @@ ${context.details}
     workspaceTreeCollab.status,
     canvasLayoutCollab.status,
   ];
-  const hasGenuineExitBlock =
-    (hasPendingWorkspaceFlush && !authoritySynced) ||
-    workspaceFlushError !== null ||
-    (hasUnsavedChanges &&
-      exitSyncStatuses.some(
-        (status) => status === "error" || status === "offline",
-      ));
-
-  const hasPendingExitWork =
-    hasUnsavedCanvasChanges ||
-    hasPendingWorkspaceFlush ||
-    hasUnsavedChanges ||
-    syncInFlightRef.current ||
-    syncDebounceRef.current !== null;
+  const { hasGenuineExitBlock, hasPendingExitWork } = getExitSaveState({
+    hasUnsavedCanvasChanges,
+    hasPendingWorkspaceFlush,
+    hasUnsavedChanges,
+    workspaceFlushError,
+    hasOfflineOrErrorCollab: exitSyncStatuses.some(
+      (status) => status === "error" || status === "offline",
+    ),
+    syncInFlight: syncInFlightRef.current,
+    syncDebounceScheduled: syncDebounceRef.current !== null,
+  });
 
   const flushBeforeExit = useCallback(async () => {
     const shouldPersistWorkspace =
@@ -6809,7 +6871,7 @@ ${context.details}
   const hasAnyConfig = showProjectConfig || showPageConfig;
   const isConfigPanelVisible =
     (previewMode === "single" && !singlePreviewViewingDocument) ||
-    (previewMode === "canvas" && hasAnyConfig) ||
+    previewMode === "canvas" ||
     previewMode === "document";
   const handlePreviewModeChange = useCallback(
     (nextMode: PreviewMode) => {
@@ -7139,6 +7201,15 @@ ${context.details}
             <ImageIcon className="h-4 w-4" />
             <span className="text-xs">设置封面</span>
           </Button>
+          {!automaticScreenshotGenerationEnabled && (
+            <Badge
+              variant="outline"
+              className="hidden border-amber-300 bg-amber-50 text-amber-800 md:inline-flex"
+              title="本地完整服务仍在运行；仅暂停编辑页自动截图。使用 pnpm dev:visual-full 验证画布截图和缩略图。"
+            >
+              开发：自动截图已暂停
+            </Badge>
+          )}
         </div>
         <div className="flex flex-1 items-center justify-center">
           <PreviewModeSwitcher
@@ -7972,7 +8043,11 @@ await handlePublishWithScreenshot();
               </div>
             )}
           </ResizablePanel>
-          <ResizablePanel className="relative border rounded-lg overflow-hidden bg-background shadow-sm flex flex-col">
+          <ResizablePanel
+            className={`relative flex flex-col overflow-hidden bg-background ${
+              previewMode === "document" ? "" : "border rounded-lg shadow-sm"
+            }`}
+          >
             <div className="flex-1 overflow-hidden">
               {previewMode === "document" ? (
                 <DocumentView
@@ -8022,6 +8097,7 @@ await handlePublishWithScreenshot();
                   onDocDeleted={() => {
                     window.dispatchEvent(new Event("knowledge-updated"));
                   }}
+                  designSpecFocus={designSpecFocus}
                 />
               ) : (
               <>
@@ -8168,6 +8244,8 @@ await handlePublishWithScreenshot();
                   ) : undefined
                 }
                 toolbarCenter={toolbarCenter}
+                onSinglePagePrevious={handleSinglePreviewPrev}
+                onSinglePageNext={handleSinglePreviewNext}
                 toolbarTrailing={
                   previewMode === "single" &&
                   activeRuntimeConversion &&
@@ -8508,6 +8586,17 @@ await handlePublishWithScreenshot();
                         );
                     }
                   },
+                  onPageComment: commentModeActive
+                    ? (pageId) => {
+                        setRightPanelTab("comments");
+                        setCanvasCommentTarget({
+                          pageId,
+                          pageName:
+                            demoPages.find((page) => page.id === pageId)
+                              ?.name ?? "未命名页面",
+                        });
+                      }
+                    : undefined,
                   onCanvasClick: () => {
                     clearCanvasSelection();
                     setCanvasEditingPageId(null);
@@ -8704,6 +8793,8 @@ await handlePublishWithScreenshot();
                             pageSchemaMap[page.id] ||
                             (page.id === activeDemoId ? schema : undefined),
                           configData: configDataMap[page.id],
+                          projectConfigSchema: referencePageProjectSchemas[page.id],
+                          referenceDesignSpecs: referencePageDesignSpecs[page.id],
                           projectConfigBindings:
                             page.runtimeType === "prototype-html-css"
                               ? extractPrototypeConfigBindingKeys(
@@ -8728,8 +8819,16 @@ await handlePublishWithScreenshot();
                         onProjectSchemaChange={handleProjectSchemaChange}
                         onPageConfigChange={handlePageConfigPanelChange}
                         onPageSchemaChange={handlePageSchemaChange}
-                        onSaveAsDefaults={handleSaveAsDefaults}
-                        onRestoreDefaults={handleRestoreDefaults}
+                        onSaveAsDefaults={
+                          activeDemoPage?.reference
+                            ? undefined
+                            : handleSaveAsDefaults
+                        }
+                        onRestoreDefaults={
+                          activeDemoPage?.reference
+                            ? undefined
+                            : handleRestoreDefaults
+                        }
                         onProjectSaveAsDefaults={handleProjectSaveAsDefaults}
                         onProjectRestoreDefaults={handleProjectRestoreDefaults}
                         sessionId={sessionId}
@@ -8739,11 +8838,22 @@ await handlePublishWithScreenshot();
                         positionEditActive={positionEditMode.enabled}
                         positionEditDimming={positionEditDimming}
                         onTogglePositionDimming={handleTogglePositionDimming}
-                        requirements={requirementsMap[activeDemoId] ?? ""}
+                        requirements={
+                          activeDemoPage?.reference
+                            ? (referencePageRequirements[activeDemoId] ?? "")
+                            : (requirementsMap[activeDemoId] ?? "")
+                        }
                         onRequirementsChange={(markdown) =>
                           handlePageRequirementsChange(activeDemoId, markdown)
                         }
                         requirementsLoading={requirementsLoading}
+                        requirementsPosition="hidden"
+                        readonly={!!activeDemoPage?.reference}
+                        designSpecApiContext={{ workingDir: workspacePath || undefined, sessionId, projectId: demoId }}
+                        onEditDesignSpec={(docId, entryId) => {
+                          setDesignSpecFocus({ docId, entryId });
+                          setPreviewMode("document");
+                        }}
                       />
                     </TabsContent>
                     <TabsContent
@@ -8772,7 +8882,44 @@ await handlePublishWithScreenshot();
                   )}
                 </>
               ) : (
-                <PageConfigPanel
+                <Tabs
+                  value={hasAnyConfig ? rightPanelTab : "comments"}
+                  onValueChange={(v) =>
+                    setRightPanelTab(v as "config" | "comments")
+                  }
+                  className="flex h-full flex-col"
+                >
+                  <TabsList className="w-full justify-start gap-2 rounded-none border-b px-2 h-12 bg-transparent">
+                    {hasAnyConfig && (
+                      <TabsTrigger
+                        value="config"
+                        title="配置"
+                        className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                      >
+                        <SlidersHorizontal className="h-4 w-4" />
+                        {rightPanelTab === "config" && <span>配置</span>}
+                      </TabsTrigger>
+                    )}
+                    <TabsTrigger
+                      value="comments"
+                      title="评论"
+                      className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                      {rightPanelTab === "comments" && <span>评论</span>}
+                      {unresolvedCommentCount > 0 && (
+                        <span className="ml-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[9px] font-semibold text-white">
+                          {unresolvedCommentCount}
+                        </span>
+                      )}
+                    </TabsTrigger>
+                  </TabsList>
+                  {hasAnyConfig && (
+                    <TabsContent
+                      value="config"
+                      className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
+                    >
+                      <PageConfigPanel
                   pages={demoPages.map((page) => ({
                     id: page.id,
                     name: page.name,
@@ -8781,6 +8928,8 @@ await handlePublishWithScreenshot();
                       pageSchemaMap[page.id] ||
                       (page.id === activeDemoId ? schema : undefined),
                     configData: configDataMap[page.id],
+                    projectConfigSchema: referencePageProjectSchemas[page.id],
+                    referenceDesignSpecs: referencePageDesignSpecs[page.id],
                     projectConfigBindings:
                       page.runtimeType === "prototype-html-css"
                         ? extractPrototypeConfigBindingKeys(
@@ -8812,9 +8961,18 @@ await handlePublishWithScreenshot();
                   onProjectConfigChange={handleProjectConfigPanelChange}
                   onProjectSchemaChange={handleProjectSchemaChange}
                   onPageConfigChange={handlePageConfigPanelChange}
+                  requirementsPosition="hidden"
                   onPageSchemaChange={handlePageSchemaChange}
-                  onSaveAsDefaults={handleSaveAsDefaults}
-                  onRestoreDefaults={handleRestoreDefaults}
+                  onSaveAsDefaults={
+                    activeDemoPage?.reference
+                      ? undefined
+                      : handleSaveAsDefaults
+                  }
+                  onRestoreDefaults={
+                    activeDemoPage?.reference
+                      ? undefined
+                      : handleRestoreDefaults
+                  }
                   onProjectSaveAsDefaults={handleProjectSaveAsDefaults}
                   onProjectRestoreDefaults={handleProjectRestoreDefaults}
                   sessionId={sessionId}
@@ -8834,7 +8992,38 @@ await handlePublishWithScreenshot();
                     )
                   }
                   requirementsLoading={requirementsLoading}
-                />
+                        readonly={!!activeDemoPage?.reference}
+                        designSpecApiContext={{ workingDir: workspacePath || undefined, sessionId, projectId: demoId }}
+                        onEditDesignSpec={(docId, entryId) => {
+                          setDesignSpecFocus({ docId, entryId });
+                          setPreviewMode("document");
+                        }}
+                      />
+                    </TabsContent>
+                  )}
+                  <TabsContent
+                    value="comments"
+                    className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
+                  >
+                    <CommentPanel
+                      threads={commentsData.threads}
+                      currentUserId={currentUserId || undefined}
+                      activeThreadId={activeCommentThreadId}
+                      onSelectThread={(id) => {
+                        setActiveCommentThreadId(id);
+                        setCommentModeActive(false);
+                      }}
+                      commentMode={commentModeActive}
+                      onCommentModeChange={setCommentModeActive}
+                      createHint="点击画布页面后，直接添加页面级评论"
+                      canvasCommentTarget={canvasCommentTarget}
+                      onCanvasCommentTargetChange={setCanvasCommentTarget}
+                      api={commentApi}
+                      onCreateComment={commentsData.createComment}
+                      canMentionAgent
+                    />
+                  </TabsContent>
+                </Tabs>
               )}
             </ResizablePanel>
           )}

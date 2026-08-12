@@ -85,6 +85,21 @@ describe("viewer project data route", () => {
     const pageId = page.data?.meta.id ?? "";
     expect(service.commitEdit(editId, "viewer 兼容性测试").ok).toBe(true);
 
+    const workspacePath = path.join(tempDir, "projects", projectId, "workspace");
+    fs.mkdirSync(path.join(workspacePath, "design-spec"), { recursive: true });
+    fs.writeFileSync(
+      path.join(workspacePath, "design-spec", "manifest.json"),
+      JSON.stringify({ version: 1, items: [{ id: "ds_demo", title: "首页规范", createdAt: "2026-08-12T00:00:00.000Z", updatedAt: "2026-08-12T00:00:00.000Z" }] }),
+    );
+    fs.writeFileSync(
+      path.join(workspacePath, "design-spec", "spec-ds_demo.json"),
+      JSON.stringify({ id: "ds_demo", title: "首页规范", createdAt: "2026-08-12T00:00:00.000Z", updatedAt: "2026-08-12T00:00:00.000Z", entries: [] }),
+    );
+    fs.writeFileSync(
+      path.join(workspacePath, "demos", pageId, "requirements.md"),
+      "# 资源规范",
+    );
+
     const projectDir = path.join(tempDir, "local-project");
     const pulled = pullProjectScaffold(service, service.defaultActor(), { projectId, targetDir: projectDir });
     expect(pulled.ok).toBe(true);
@@ -121,7 +136,7 @@ describe("viewer project data route", () => {
       success: boolean;
       data?: {
         project: { id: string; name: string } | null;
-        demoPages: Array<{ id: string; code: string; schema?: string }>;
+        demoPages: Array<{ id: string; code: string; schema?: string; requirements?: string }>;
         canvasState?: CanvasState;
       };
     };
@@ -131,6 +146,7 @@ describe("viewer project data route", () => {
     expect(body.data?.project?.name).toBe("CLI 写入项目");
     expect(body.data?.demoPages).toHaveLength(1);
     expect(body.data?.demoPages[0]?.code).toContain("CLI submitted page");
+    expect(body.data?.demoPages[0]?.requirements).toBe("# 资源规范");
     expect(body.data?.canvasState?.pages[pageId]).toEqual(canvasState.pages[pageId]);
 
     const published = await publishProject(projectId);
@@ -147,7 +163,8 @@ describe("viewer project data route", () => {
       fs.readFileSync(path.join(tempDir, "published", projectId, "project.json"), "utf-8"),
     ) as {
       id: string;
-      demoPages: Array<{ compiledJsPath: string; iframeHtmlPath?: string }>;
+      demoPages: Array<{ compiledJsPath: string; iframeHtmlPath?: string; requirements?: string }>;
+      designSpecs?: Array<{ id: string; title: string }>;
       canvasState?: CanvasState;
     };
     expect(publishedProject.id).toBe(projectId);
@@ -158,6 +175,11 @@ describe("viewer project data route", () => {
     expect(publishedProject.demoPages[0]?.iframeHtmlPath).toMatch(
       new RegExp(`^demos/${body.data?.demoPages[0]?.id}/iframe[.]html[?]v=[0-9]+$`),
     );
+    expect(publishedProject.demoPages[0]?.requirements).toBe("# 资源规范");
+    expect(publishedProject.designSpecs).toEqual([
+      expect.objectContaining({ id: "ds_demo", title: "首页规范" }),
+    ]);
+    expect(fs.existsSync(path.join(tempDir, "published", projectId, "design-spec", "spec-ds_demo.json"))).toBe(true);
   });
 
   it("发布 HTML/CSS 原型页静态内容供 viewer 渲染", async () => {

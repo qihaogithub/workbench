@@ -1,4 +1,4 @@
-import { configureAiChatShared } from "@workbench/ai-chat-shared";
+import { configureAiChatShared } from "@workbench/ai-chat-shared/config";
 import { getAgentClient } from "@/lib/agent-client";
 import {
   buildStaticSystemPrompt,

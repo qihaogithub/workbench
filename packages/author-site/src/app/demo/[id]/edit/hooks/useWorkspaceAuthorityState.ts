@@ -79,6 +79,8 @@ export function useWorkspaceAuthorityState(
 ): UseWorkspaceAuthorityStateReturn {
   const { projectId, workspaceId, sessionId, enabled = true } = options;
   const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+  const authorityReady =
+    enabled && Boolean(projectId && workspaceId && sessionId);
 
   const [state, setState] = useState<WorkspaceAuthorityState>({
     draftVersion: 0,
@@ -102,6 +104,7 @@ export function useWorkspaceAuthorityState(
   const CONSECUTIVE_FAILURE_THRESHOLD = 2;
 
   const fetchState = useCallback(async () => {
+    if (!authorityReady) return;
     try {
       const snapshot = await readWorkspaceAuthorityStateFromBrowser({
         projectId,
@@ -127,9 +130,10 @@ export function useWorkspaceAuthorityState(
         isConnected: false,
       }));
     }
-  }, [projectId, workspaceId, sessionId]);
+  }, [authorityReady, projectId, workspaceId, sessionId]);
 
   const pollProjectionAcks = useCallback(async () => {
+    if (!authorityReady) return;
     try {
       const afterRevision = lastPolledRevisionRef.current as WorkspaceRevision;
       const acks = await readWorkspaceProjectionAcksFromBrowser({
@@ -156,9 +160,10 @@ export function useWorkspaceAuthorityState(
     } catch {
       // projection-acks 获取失败不影响连接状态，下次轮询重试
     }
-  }, [projectId, workspaceId, sessionId]);
+  }, [authorityReady, projectId, workspaceId, sessionId]);
 
   const pollEvents = useCallback(async () => {
+    if (!authorityReady) return;
     try {
       const afterRevision = lastPolledRevisionRef.current as WorkspaceRevision;
       const events = await readWorkspaceAuthorityEventsFromBrowser({
@@ -216,27 +221,28 @@ export function useWorkspaceAuthorityState(
         }));
       }
     }
-  }, [projectId, workspaceId, sessionId]);
+  }, [authorityReady, projectId, workspaceId, sessionId]);
 
   const refresh = useCallback(async () => {
+    if (!authorityReady) return;
     await fetchState();
     await pollEvents();
     void pollProjectionAcks();
-  }, [fetchState, pollEvents, pollProjectionAcks]);
+  }, [authorityReady, fetchState, pollEvents, pollProjectionAcks]);
 
   // 初始拉取
   useEffect(() => {
-    if (!enabled) return;
+    if (!authorityReady) return;
     mountedRef.current = true;
     void fetchState();
     return () => {
       mountedRef.current = false;
     };
-  }, [enabled, fetchState]);
+  }, [authorityReady, fetchState]);
 
   // 轮询事件
   useEffect(() => {
-    if (!enabled) return;
+    if (!authorityReady) return;
 
     const interval = setInterval(() => {
       if (document.hidden) return;
@@ -245,7 +251,7 @@ export function useWorkspaceAuthorityState(
     }, pollIntervalMs);
 
     return () => clearInterval(interval);
-  }, [enabled, pollIntervalMs, pollEvents, pollProjectionAcks]);
+  }, [authorityReady, pollIntervalMs, pollEvents, pollProjectionAcks]);
 
   const markDraftChanged = useCallback(() => {
     setState((prev) => ({
@@ -256,6 +262,7 @@ export function useWorkspaceAuthorityState(
 
   const ackPreview = useCallback(
     (revision: WorkspaceRevision, status: "applied" | "failed") => {
+      if (!authorityReady) return;
       setState((prev) => ({
         ...prev,
         previewStatus: status === "applied" ? "applied" : "failed",
@@ -275,7 +282,7 @@ export function useWorkspaceAuthorityState(
         // ack 失败静默处理，下次轮询会重新获取
       });
     },
-    [projectId, workspaceId, sessionId],
+    [authorityReady, projectId, workspaceId, sessionId],
   );
 
   const setCanonicalStatus = useCallback(

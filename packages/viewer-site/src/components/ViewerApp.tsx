@@ -36,6 +36,7 @@ import {
   getProjects,
   getProjectData,
   getDemoSchema,
+  getDesignSpecDoc,
   getDataUrl,
   DATA_BASE,
   getThumbnailUrl,
@@ -122,6 +123,17 @@ const DEFAULT_SCREENSHOT_ASPECT_RATIO = 9 / 16;
 const MIN_SCREENSHOT_ASPECT_RATIO = 0.45;
 const MAX_SCREENSHOT_ASPECT_RATIO = 1.8;
 const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico)(\?[^'")\s]*)?$/i;
+
+type DesignSpecEntryLink = {
+  docId: string;
+  docTitle: string;
+  entryId: string;
+  entryTitle: string;
+  markdown: string;
+  scope: "project" | "page";
+  pageId?: string;
+  fieldKey: string;
+};
 
 const sortOptions: { value: SortOption; label: string }[] = [
   { value: "newest", label: "最新更新" },
@@ -865,6 +877,7 @@ function buildTree(
 function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const router = useRouter();
   const [project, setProject] = useState<PublishedProject | null>(null);
+  const [designSpecEntries, setDesignSpecEntries] = useState<DesignSpecEntryLink[]>([]);
   const [error, setError] = useState<Error | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activePageId, setActivePageId] = useState<string>("");
@@ -885,6 +898,10 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const [rightPanelTab, setRightPanelTab] = useState<"config" | "comments">("config");
   const [commentModeActive, setCommentModeActive] = useState(false);
   const [activeCommentThreadId, setActiveCommentThreadId] = useState<string | null>(null);
+  const [canvasCommentTarget, setCanvasCommentTarget] = useState<{
+    pageId: string;
+    pageName: string;
+  } | null>(null);
   const [canvasState, setCanvasState] = useState<CanvasState>({
     viewport: { x: 40, y: 40, zoom: 0.5 },
     pages: {},
@@ -933,13 +950,28 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
     }
   }, [isLoggedIn, project, projectId]);
 
-  // 画布模式不支持评论，切换时退出评论模式
   useEffect(() => {
-    if (previewMode === "canvas") {
-      setCommentModeActive(false);
-      setActiveCommentThreadId(null);
+    if (!project?.designSpecs?.length) {
+      setDesignSpecEntries([]);
+      return;
     }
-  }, [previewMode]);
+    let cancelled = false;
+    void Promise.all(project.designSpecs.map((meta) => getDesignSpecDoc(projectId, meta.id)))
+      .then((docs) => docs.flatMap((doc) =>
+        doc.entries.flatMap((entry) => entry.refs.map((ref) => ({
+          docId: doc.id,
+          docTitle: doc.title,
+          entryId: entry.id,
+          entryTitle: entry.title,
+          markdown: entry.markdown,
+          ...ref,
+        } satisfies DesignSpecEntryLink))),
+      ))
+      .then((entries) => { if (!cancelled) setDesignSpecEntries(entries); })
+      .catch(() => { if (!cancelled) setDesignSpecEntries([]); });
+    return () => { cancelled = true; };
+  }, [project, projectId]);
+
 
   useEffect(() => {
     getProjectData(projectId)
@@ -1271,6 +1303,11 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const hasPageConfig = !isSchemaEmpty(activePageSchema);
   const hasSchema = hasProjectConfig || hasPageConfig;
   const hasBothScopes = hasProjectConfig && hasPageConfig;
+  const configPanelRequirements = project.demoPages.find(
+    (page) =>
+      page.id ===
+      (previewMode === "single" ? activePageId : configPanelDetailPageId),
+  )?.requirements;
 
   const configPanel = (
     <PageConfigPanel
@@ -1295,7 +1332,11 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
       onProjectConfigChange={handleProjectConfigChange}
       onPageConfigChange={handlePageConfigChange}
       onRestoreDefaults={handleRestoreDefaults}
+      requirements={configPanelRequirements}
       hideDetailHeader={previewMode === "single"}
+      requirementsPosition="beforeConfig"
+      hideEmptyRequirements
+      designSpecEntries={designSpecEntries}
     />
   );
 
@@ -1310,6 +1351,15 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
       }}
       commentMode={commentModeActive}
       onCommentModeChange={setCommentModeActive}
+      createHint={
+        previewMode === "canvas"
+          ? "点击画布页面后，直接添加页面级评论"
+          : undefined
+      }
+      canvasCommentTarget={canvasCommentTarget}
+      onCanvasCommentTargetChange={setCanvasCommentTarget}
+      api={commentApi}
+      onCreateComment={commentsData.createComment}
     />
   );
 
@@ -1396,6 +1446,13 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
             <ViewerDocumentView
               projectId={projectId}
               items={project.knowledge ?? []}
+              designSpecs={project.designSpecs ?? []}
+              projectConfigSchema={project.projectConfigSchema}
+              pages={project.demoPages.map((page) => ({
+                id: page.id,
+                name: page.name,
+                schema: pageSchemaMap[page.id],
+              }))}
             />
           ) : (
           <CommentLayer
@@ -1438,13 +1495,24 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                   handlePageChange(pageId);
                   setConfigPanelDetailPageId(pageId);
                 },
+                onPageComment: commentModeActive
+                  ? (pageId) => {
+                      setRightPanelTab("comments");
+                      setCanvasCommentTarget({
+                        pageId,
+                        pageName:
+                          project.demoPages.find((page) => page.id === pageId)
+                            ?.name ?? "未命名页面",
+                      });
+                    }
+                  : undefined,
               }}
             />
           </CommentLayer>
           )}
         </div>
 
-        {previewMode === "document" ? null : previewMode === "single" ? (
+        {previewMode === "document" ? null : (
           <div className="w-80 border-l border-border shrink-0 flex flex-col">
             {hasSchema ? (
               <Tabs
@@ -1492,12 +1560,6 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
               commentsPanel
             )}
           </div>
-        ) : (
-          hasSchema && (
-            <div className="w-80 border-l border-border shrink-0 flex flex-col">
-              {configPanel}
-            </div>
-          )
         )}
       </div>
       </ErrorBoundary>

@@ -1,4 +1,4 @@
-import type { PreviewSize } from "@workbench/demo-ui";
+import type { PreviewSize } from "@workbench/demo-ui/types";
 
 export type {
   ValidationErrorType,
@@ -20,6 +20,6 @@ export {
 export {
   getDefaultValues,
   getPreviewSize,
-} from "@workbench/demo-ui";
+} from "@workbench/demo-ui/validator";
 
 export type { PreviewSize };

@@ -88,4 +88,37 @@ describe("DocumentEditor（Milkdown 集成）", () => {
       ),
     ).toBe("true");
   });
+
+  it("粘贴外网图片时先调用图床本地化处理器", async () => {
+    const localizeRemoteImage = vi.fn().mockResolvedValue("/api/images/img_local");
+    render(
+      <DocumentEditor
+        value=""
+        onChange={() => {}}
+        localizeRemoteImage={localizeRemoteImage}
+      />,
+    );
+
+    const editor = await waitFor(() => {
+      const element = document.querySelector(".ProseMirror");
+      expect(element).toBeTruthy();
+      return element!;
+    });
+    const event = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "clipboardData", {
+      value: {
+        getData: (type: string) =>
+          type === "text/html"
+            ? '<img src="https://cdn.example.com/hero.png">'
+            : "",
+      },
+    });
+    editor.dispatchEvent(event);
+
+    await waitFor(() => {
+      expect(localizeRemoteImage).toHaveBeenCalledWith(
+        "https://cdn.example.com/hero.png",
+      );
+    });
+  });
 });

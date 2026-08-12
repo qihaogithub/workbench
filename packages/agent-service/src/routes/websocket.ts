@@ -81,8 +81,8 @@ interface ClientMessage {
   viewerContext?: ViewerContextPayload;
   images?: ImageAttachment[];
   files?: FileAttachment[];
-  /** v3.2: 静态 system prompt 注入（L2 + L4）；viewer-readonly 模式下忽略 */
-  systemPrompt?: string;
+  /** 项目规则；服务端将其放入不可覆盖的安全边界之后。 */
+  projectRules?: string;
   entries?: Array<{
     level: "log" | "warn" | "error" | "info" | "debug";
     args: string;
@@ -422,25 +422,25 @@ export async function registerWebSocketRoutes(
                 await agent.setModel(requestedModelId);
               }
 
-              // v3.2: 注入静态 system prompt（必须在 agent.start() 之后，因为 Pi Agent 实例在 start() 时才创建）
-              // viewer-readonly：忽略客户端 systemPrompt，服务端强制只读系统提示词
+              // 必须在 agent.start() 后更新规则，因为 Pi Agent 实例在 start() 时创建。
+              // viewer-readonly 使用服务端规则；普通模式只能传入项目规则，不能覆盖安全骨架。
               if (mode === "viewer-readonly" && agent instanceof BackendAgent) {
-                await agent.updateSystemPrompt(buildViewerAiSystemPrompt());
-              } else if (message.systemPrompt && agent instanceof BackendAgent) {
+                await agent.updateProjectRules(buildViewerAiSystemPrompt());
+              } else if (message.projectRules && agent instanceof BackendAgent) {
                 logger.info(
-                  { sessionId, promptLength: message.systemPrompt.length },
-                  "WebSocket: calling updateSystemPrompt",
+                  { sessionId, rulesLength: message.projectRules.length },
+                  "WebSocket: updating project rules",
                 );
-                await agent.updateSystemPrompt(message.systemPrompt);
-              } else if (!message.systemPrompt) {
+                await agent.updateProjectRules(message.projectRules);
+              } else if (!message.projectRules) {
                 logger.info(
                   { sessionId },
-                  "WebSocket: no systemPrompt in message, skipping update",
+                  "WebSocket: no project rules in message, skipping update",
                 );
               } else {
                 logger.warn(
                   { sessionId, agentType: agent.constructor.name },
-                  "WebSocket: agent is not BackendAgent, cannot updateSystemPrompt",
+                  "WebSocket: agent is not BackendAgent, cannot update project rules",
                 );
               }
 

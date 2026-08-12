@@ -19,6 +19,23 @@ interface Envelope<T> {
   error?: { code?: string; message?: string };
 }
 
+interface WorkspaceAuthorityIdentifiers {
+  projectId: string;
+  workspaceId: string;
+  sessionId: string;
+}
+
+function getIdentifiersNotReadyError(
+  input: WorkspaceAuthorityIdentifiers,
+): WorkspaceAuthorityClientError | null {
+  if (input.projectId && input.workspaceId && input.sessionId) return null;
+  return new WorkspaceAuthorityClientError(
+    "WORKSPACE_AUTHORITY_NOT_READY",
+    "Workspace Authority 标识尚未就绪",
+    503,
+  );
+}
+
 function sameOriginPath(
   projectId: string,
   workspaceId: string,
@@ -61,6 +78,8 @@ export function readWorkspaceAuthorityStateFromBrowser(input: {
   workspaceId: string;
   sessionId: string;
 }): Promise<WorkspaceAuthoritySnapshot["state"]> {
+  const notReady = getIdentifiersNotReadyError(input);
+  if (notReady) return Promise.reject(notReady);
   return request(
     sameOriginPath(
       input.projectId,
@@ -78,6 +97,8 @@ export function readWorkspaceAuthorityEventsFromBrowser(input: {
   sessionId: string;
   afterRevision: WorkspaceRevision;
 }): Promise<WorkspaceMutationCommittedEvent[]> {
+  const notReady = getIdentifiersNotReadyError(input);
+  if (notReady) return Promise.reject(notReady);
   return request(
     sameOriginPath(
       input.projectId,
@@ -95,6 +116,8 @@ export function readWorkspaceProjectionAcksFromBrowser(input: {
   sessionId: string;
   afterRevision?: WorkspaceRevision;
 }): Promise<WorkspaceProjectionAck[]> {
+  const notReady = getIdentifiersNotReadyError(input);
+  if (notReady) return Promise.reject(notReady);
   return request(
     sameOriginPath(
       input.projectId,
@@ -109,6 +132,8 @@ export function readWorkspaceProjectionAcksFromBrowser(input: {
 export function acknowledgeWorkspaceProjectionFromBrowser(
   ack: WorkspaceProjectionAck & { sessionId: string },
 ): Promise<{ acknowledged: true }> {
+  const notReady = getIdentifiersNotReadyError(ack);
+  if (notReady) return Promise.reject(notReady);
   return request(
     sameOriginPath(ack.projectId, ack.workspaceId, "/projection-ack"),
     {
@@ -126,6 +151,8 @@ export function readWorkspaceAuthorityResourceFromBrowser(input: {
   sessionId: string;
   path: string;
 }): Promise<WorkspaceAuthorityResource> {
+  const notReady = getIdentifiersNotReadyError(input);
+  if (notReady) return Promise.reject(notReady);
   const resourcePath = input.path.split("/").map(encodeURIComponent).join("/");
   return request(
     sameOriginPath(
@@ -143,6 +170,8 @@ export function readWorkspaceAuthorityHealthFromBrowser(input: {
   workspaceId: string;
   sessionId: string;
 }): Promise<WorkspaceAuthorityHealthView> {
+  const notReady = getIdentifiersNotReadyError(input);
+  if (notReady) return Promise.reject(notReady);
   return request(
     sameOriginPath(
       input.projectId,

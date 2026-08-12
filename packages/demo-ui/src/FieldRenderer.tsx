@@ -16,15 +16,12 @@ import {
 import { cn } from "./utils";
 import { FileUploadWidget } from "./widgets";
 import { ImageListWidget, type ImageItem } from "./ImageListWidget";
-import { NoteButton } from "./NoteButton";
-import { NotePreview } from "./NotePreview";
-import { stripMarkdown } from "./note-html";
 import { ArrayFieldGroup } from "./ArrayFieldGroup";
 import { MultiSelect } from "./MultiSelect";
 import { CascadeSelect } from "./CascadeSelect";
 import type { FieldConfig } from "./schema-parser";
 import { createContext, useContext, useMemo } from "react";
-import { Check, Edit3, Pencil } from "lucide-react";
+import { BookOpen, Check, Edit3, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -33,6 +30,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DocumentEditor } from "./DocumentEditor";
+import type { DesignSpecEntryLink } from "./types";
 
 export interface PositionFieldEntry {
   posKey: string;
@@ -75,7 +73,8 @@ export function FieldRenderer({
   onChange,
   sessionId,
   readonly,
-  onNoteClick,
+  designSpecEntries = [],
+  onEditDesignSpec,
   embedded,
   fieldPath,
 }: {
@@ -84,7 +83,8 @@ export function FieldRenderer({
   onChange: (value: unknown) => void;
   sessionId?: string;
   readonly?: boolean;
-  onNoteClick?: (fieldKey: string) => void;
+  designSpecEntries?: DesignSpecEntryLink[];
+  onEditDesignSpec?: (docId: string, entryId: string) => void;
   embedded?: boolean;
   fieldPath?: string;
 }) {
@@ -492,8 +492,7 @@ function RichTextInput({
     field.type === "text" ||
     (field.maxLength !== undefined && field.maxLength > 100);
 
-  const hasNote = !embedded && !!field.note && !!stripMarkdown(field.note);
-  const showNoteButton = !embedded && !!onNoteClick && (hasNote || !readonly);
+  const linkedSpecs = designSpecEntries.filter((entry) => entry.fieldKey === field.key);
 
   return (
     <div
@@ -510,23 +509,58 @@ function RichTextInput({
             {field.title}
             {field.required && <span className="text-red-500 ml-0.5">*</span>}
           </Label>
-          {showNoteButton && (
-            <NoteButton
-              hasNote={hasNote}
-              readonly={readonly}
-              onClick={() => onNoteClick!(field.key)}
-            />
+          {linkedSpecs.length > 0 && (
+            <DesignSpecIndicator specs={linkedSpecs} onEditDesignSpec={onEditDesignSpec} />
           )}
         </div>
-      )}
-      {hasNote && isComplexField && (
-        <NotePreview markdown={field.note!} />
       )}
       <div className={isComplexField ? "w-full" : "flex-1 min-w-0"}>
         {renderInput()}
       </div>
     </div>
   );
+}
+
+function DesignSpecIndicator({ specs, onEditDesignSpec }: {
+  specs: DesignSpecEntryLink[];
+  onEditDesignSpec?: (docId: string, entryId: string) => void;
+}) {
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  return <>
+    <span className="relative inline-flex" onMouseEnter={() => setPreviewOpen(true)} onMouseLeave={() => setPreviewOpen(false)}>
+      <button
+        type="button"
+        aria-label={`查看关联设计规范，共 ${specs.length} 条`}
+        onFocus={() => setPreviewOpen(true)}
+        onBlur={() => setPreviewOpen(false)}
+        onClick={(event) => { event.stopPropagation(); setDialogOpen(true); }}
+        className="inline-flex shrink-0 items-center justify-center rounded-sm text-primary transition-colors hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <BookOpen className="h-3.5 w-3.5" />
+      </button>
+      {previewOpen && (
+        <span role="tooltip" className="absolute left-0 top-full z-30 mt-1.5 w-60 rounded-md border bg-popover px-2.5 py-2 text-left text-xs text-popover-foreground shadow-md">
+          <span className="mb-1 block font-medium">关联设计规范</span>
+          {specs.map((spec) => <span key={`${spec.docId}:${spec.entryId}`} className="block truncate text-muted-foreground">{spec.docTitle} · {spec.entryTitle}</span>)}
+        </span>
+      )}
+    </span>
+    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <DialogContent className="flex max-h-[80vh] max-w-2xl flex-col">
+        <DialogHeader><DialogTitle>关联设计规范</DialogTitle></DialogHeader>
+        <div className="min-h-0 space-y-3 overflow-y-auto pr-1">
+          {specs.map((spec) => <section key={`${spec.docId}:${spec.entryId}`} className="rounded-lg border p-3">
+            <p className="text-xs text-muted-foreground">{spec.docTitle}</p>
+            <h3 className="mt-1 text-sm font-semibold">{spec.entryTitle || "未命名条目"}</h3>
+            {spec.markdown.trim() ? <DocumentEditor value={spec.markdown} onChange={() => {}} readOnly className="mt-2" /> : <p className="mt-2 text-sm text-muted-foreground">暂无说明</p>}
+            {onEditDesignSpec && <Button className="mt-3" size="sm" onClick={() => { setDialogOpen(false); onEditDesignSpec(spec.docId, spec.entryId); }}>去编辑</Button>}
+          </section>)}
+        </div>
+      </DialogContent>
+    </Dialog>
+  </>;
 }
 
 function PositionFieldInput({

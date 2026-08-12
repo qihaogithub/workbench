@@ -485,6 +485,7 @@ export function PreviewCanvas({
   onRequestDeletePages,
   onAddPagesToChat,
   onPageConfigEdit,
+  onPageComment,
   onCanvasClick,
   className,
   editingPageId,
@@ -922,6 +923,10 @@ export function PreviewCanvas({
 
   const handlePageSelect = useCallback(
     (pageId: string, event?: React.PointerEvent | React.MouseEvent) => {
+      if (onPageComment) {
+        onPageComment(pageId);
+        return;
+      }
       if (isEditorMode && effectiveToolMode === "select") {
         const isAdditive =
           Boolean(event?.shiftKey) ||
@@ -947,7 +952,7 @@ export function PreviewCanvas({
         onPageConfigEdit?.(pageId);
       }
     },
-    [effectiveToolMode, isEditorMode, onPageConfigEdit],
+    [effectiveToolMode, isEditorMode, onPageComment, onPageConfigEdit],
   );
 
   // 粘贴选择器回调
@@ -3179,6 +3184,9 @@ export function PreviewCanvas({
                 renderMode={renderMode}
                 onLayoutChange={handleLayoutChange}
                 onConfigEdit={handlePageSelect}
+                onCommentSelect={
+                  onPageComment ? (pageId) => onPageComment(pageId) : undefined
+                }
                 onRequestDelete={
                   onRequestDeletePages
                     ? (pageId) => void onRequestDeletePages([pageId])

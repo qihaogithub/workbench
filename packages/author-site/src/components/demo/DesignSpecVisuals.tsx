@@ -57,14 +57,6 @@ export function imageSrc(item: ConfigPoolItem, w: number, h: number): string {
     : imagePlaceholder(item, w, h);
 }
 
-/** 所在页面示意图（SVG data-uri） */
-export function pageDiagramSrc(label: string): string {
-  const safe = label.replace(/[<>&"]/g, "");
-  return `data:image/svg+xml;utf8,${encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500"><rect width="100%" height="100%" fill="#1a2233"/><rect x="24" y="24" width="752" height="60" rx="6" fill="#2b3a55"/><rect x="24" y="100" width="752" height="376" rx="6" fill="#242f47"/><text x="50%" y="50%" fill="#8ab4f8" font-size="34" text-anchor="middle" dominant-baseline="central" font-family="sans-serif">${safe} 页面示意</text></svg>`,
-  )}`;
-}
-
 export function pageLabel(item: ConfigPoolItem): string {
   return item.scope === "project" ? "项目级" : item.pageName || "页面";
 }
@@ -151,8 +143,57 @@ export interface HoverPopState {
   y: number;
 }
 
+/** 读取当前项目页面的最新截图；缺失时明确显示不可用，不以占位图冒充页面效果。 */
+function PageScreenshot({
+  item,
+  projectId,
+  className,
+}: {
+  item: ConfigPoolItem;
+  projectId?: string;
+  className: string;
+}) {
+  const [src, setSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!projectId || !item.pageId) {
+      setSrc(null);
+      return;
+    }
+    let cancelled = false;
+    const url = `/api/screenshots/file/${encodeURIComponent(projectId)}/${encodeURIComponent(item.pageId)}?meta=1`;
+    void fetch(url, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((result: unknown) => {
+        const candidate = (result as { data?: { url?: unknown } } | null)?.data?.url;
+        if (!cancelled) setSrc(typeof candidate === "string" ? candidate : null);
+      })
+      .catch(() => {
+        if (!cancelled) setSrc(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [item.pageId, projectId]);
+
+  if (!src) {
+    return (
+      <div className={`${className} flex items-center justify-center bg-muted px-3 text-center text-xs text-muted-foreground`}>
+        暂无最新页面效果图
+      </div>
+    );
+  }
+  return <img src={src} alt={`${pageLabel(item)} 页面效果图`} className={className} />;
+}
+
 /** 配置项悬浮预览：所有类型显示所在页面，图片额外显示默认图。 */
-export function HoverPop({ pop }: { pop: HoverPopState | null }) {
+export function HoverPop({
+  pop,
+  projectId,
+}: {
+  pop: HoverPopState | null;
+  projectId?: string;
+}) {
   if (!pop) return null;
   const hasImageDefault = pop.item.kind === "image";
   return (
@@ -170,9 +211,9 @@ export function HoverPop({ pop }: { pop: HoverPopState | null }) {
             />
           </div>
         )}
-        <img
-          src={pageDiagramSrc(pageLabel(pop.item))}
-          alt="所在页面示意"
+        <PageScreenshot
+          item={pop.item}
+          projectId={projectId}
           className={
             hasImageDefault
               ? "h-[180px] w-[200px] self-center rounded-md border object-cover"
@@ -187,9 +228,11 @@ export function HoverPop({ pop }: { pop: HoverPopState | null }) {
 /** 全屏图片查看：配置项默认图 + 所在页面示意图，滚轮整体缩放、拖拽平移、点击或 Esc 关闭 */
 export function ZoomOverlay({
   item,
+  projectId,
   onClose,
 }: {
   item: ConfigPoolItem;
+  projectId?: string;
   onClose: () => void;
 }) {
   const [transform, setTransform] = useState({ scale: 1, x: 0, y: 0 });
@@ -265,11 +308,10 @@ export function ZoomOverlay({
           )}
         </div>
         <div className="flex items-center">
-          <img
-            src={pageDiagramSrc(pageLabel(item))}
-            alt="所在页面示意"
+          <PageScreenshot
+            item={item}
+            projectId={projectId}
             className="max-h-[70vh] max-w-[40vw] rounded-lg bg-black/40 object-contain"
-            draggable={false}
           />
         </div>
       </div>

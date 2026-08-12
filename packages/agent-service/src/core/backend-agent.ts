@@ -70,12 +70,17 @@ export class BackendAgent extends BaseAgent {
   private backend: BackendWithModelSupport;
   private busy = false;
   private initialized = false;
+  /** A run that has invoked a tool may already have external side effects. */
+  private toolStartedInCurrentRun = false;
 
   constructor(config: AgentConfig, backend: IBackendAdapter) {
     super(config);
     this.backend = backend as BackendWithModelSupport;
 
     this.backend.onStream((event) => {
+      if (event.type === "tool_call") {
+        this.toolStartedInCurrentRun = true;
+      }
       this.emit(event.type, event);
     });
   }
@@ -98,6 +103,7 @@ export class BackendAgent extends BaseAgent {
   ): Promise<AgentResult> {
     const startTime = Date.now();
     this.busy = true;
+    this.toolStartedInCurrentRun = false;
     this.messageCount++;
     this.setStatus("processing");
 
@@ -172,6 +178,10 @@ export class BackendAgent extends BaseAgent {
         (error, meta) => {
           // 超时或 cancel 后不再重试，立即向上抛出
           if (timedOut || !this.busy) throw error;
+          // A full AgentHarness prompt may execute writes, external requests, or
+          // delegated work before surfacing a transient model error. Retrying it
+          // would replay that work, so only the pre-tool portion is retry-safe.
+          if (this.toolStartedInCurrentRun) throw error;
           logger.warn(
             {
               sessionId: this.sessionId,
@@ -273,7 +283,7 @@ export class BackendAgent extends BaseAgent {
         error: {
           code: errorCode,
           message: errorMessage,
-          retryable: !contextOverflow,
+          retryable: !contextOverflow && !this.toolStartedInCurrentRun,
         },
         metadata: responseDebug
           ? { emptyResponseDebug: responseDebug }
@@ -345,11 +355,11 @@ export class BackendAgent extends BaseAgent {
     return this.backend.getFiles?.() || [];
   }
 
-  async updateSystemPrompt(newPrompt: string): Promise<void> {
-    if (this.backend.updateSystemPrompt) {
-      await this.backend.updateSystemPrompt(newPrompt);
+  async updateProjectRules(rules: string): Promise<void> {
+    if (this.backend.updateProjectRules) {
+      await this.backend.updateProjectRules(rules);
     } else {
-      throw new Error("updateSystemPrompt not supported by backend");
+      throw new Error("updateProjectRules not supported by backend");
     }
   }
 

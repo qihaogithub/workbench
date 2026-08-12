@@ -1,6 +1,6 @@
 # Docker 部署方案
 
-> 更新日期：2026-07-23
+> 更新日期：2026-08-12
 > 状态：已验证可用（Pi Agent 单后端架构）
 
 ```yaml
@@ -15,6 +15,8 @@ covers:
   - package.json
   - packages/author-site/next.config.js
   - packages/viewer-site/next.config.js
+  - packages/project-core/package.json
+  - scripts/docker-viewer-env-isolation.test.mjs
   - scripts/docker-orbstack-up.sh
   - scripts/docker-orbstack-verify.sh
   - scripts/docker-screenshot-deep-health.sh

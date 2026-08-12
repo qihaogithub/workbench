@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 
 import { PreviewCanvas } from "./PreviewCanvas";
 import { PreviewStageToolbar } from "./PreviewStageToolbar";
@@ -28,6 +28,8 @@ export function PreviewStage({
   selectorSlot,
   toolbarCenter,
   toolbarTrailing,
+  onSinglePagePrevious,
+  onSinglePageNext,
   renderSingleContent,
   className,
 }: PreviewStageProps) {
@@ -36,7 +38,58 @@ export function PreviewStage({
     () => normalizePreviewStagePages(pages),
     [pages],
   );
+  const orderedPages = useMemo(
+    () => [...normalizedPages].sort((left, right) => left.order - right.order),
+    [normalizedPages],
+  );
   const activePage = normalizedPages.find((page) => page.id === activePageId);
+
+  useEffect(() => {
+    if (previewMode !== "single") return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        isEditableElement(event.target)
+      ) {
+        return;
+      }
+
+      const activePageIndex = orderedPages.findIndex(
+        (page) => page.id === activePageId,
+      );
+      if (event.key === "ArrowLeft") {
+        if (onSinglePagePrevious) {
+          event.preventDefault();
+          onSinglePagePrevious();
+        } else if (activePageIndex > 0) {
+          event.preventDefault();
+          onActivePageChange(orderedPages[activePageIndex - 1].id);
+        }
+      } else if (event.key === "ArrowRight") {
+        if (onSinglePageNext) {
+          event.preventDefault();
+          onSinglePageNext();
+        } else if (activePageIndex >= 0 && activePageIndex < orderedPages.length - 1) {
+          event.preventDefault();
+          onActivePageChange(orderedPages[activePageIndex + 1].id);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    activePageId,
+    orderedPages,
+    onActivePageChange,
+    onSinglePageNext,
+    onSinglePagePrevious,
+    previewMode,
+  ]);
   const defaultSingleContent = (
     <SinglePagePreview {...singlePageProps} page={activePage} />
   );
@@ -88,3 +141,10 @@ export function PreviewStage({
   );
 }
 
+function isEditableElement(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.isContentEditable ||
+    target.closest("input, textarea, select, [contenteditable='true']") !== null
+  );
+}

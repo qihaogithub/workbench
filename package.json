@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "node scripts/dev-restart.mjs",
     "dev:repair": "node scripts/dev-restart.mjs --clear-cache",
+    "dev:visual-full": "node scripts/dev-restart.mjs --visual-full",
+    "dev:visual-full:repair": "node scripts/dev-restart.mjs --visual-full --clear-cache",
     "dev:services": "concurrently -n author,agent,knowledge,viewer,sshot -c blue,green,magenta,cyan,yellow \"corepack pnpm --filter @workbench/author-site dev\" \"corepack pnpm --filter @workbench/agent-service dev\" \"corepack pnpm --filter @workbench/knowledge-service dev\" \"corepack pnpm --filter @workbench/viewer-site dev\" \"corepack pnpm --filter @workbench/screenshot-service dev\"",
     "dev:author": "corepack pnpm --filter @workbench/author-site dev",
     "dev:preview": "concurrently -n author,sshot -c blue,yellow \"corepack pnpm --filter @workbench/author-site dev\" \"corepack pnpm --filter @workbench/screenshot-service dev\"",
@@ -47,6 +49,7 @@
     "check:workspace-deploy-preflight": "node scripts/check-workspace-deploy-preflight.mjs --data-dir data --compose docker-compose.yml",
     "check:workspace-deploy-compose": "node scripts/check-workspace-deploy-preflight.mjs --compose docker-compose.yml --skip-authority",
     "test:workspace-deploy-preflight": "node --test scripts/check-workspace-deploy-preflight.test.mjs",
+    "test:docker-viewer-env-isolation": "node --test scripts/docker-viewer-env-isolation.test.mjs",
     "check:docker-build": "scripts/docker-build-check.sh",
     "check:repo": "node scripts/check-repo.mjs",
     "check:automation": "node OPS/automations/bin/automation.mjs check-tools",
