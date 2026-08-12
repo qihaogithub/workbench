@@ -108,7 +108,6 @@ export function PermissionDialog({
                 <DocumentEditor
                   value={editablePlan}
                   onChange={setEditablePlan}
-                  format="markdown"
                   placeholder="编辑执行计划..."
                 />
               </div>

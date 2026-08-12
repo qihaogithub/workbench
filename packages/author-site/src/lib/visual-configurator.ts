@@ -1,4 +1,4 @@
-import type { VisualNodeInfo } from "@workbench/demo-ui";
+import type { VisualNodeInfo } from "@workbench/demo-ui/iframe-types";
 
 export type VisualConfigKind = "text" | "image" | "color";
 

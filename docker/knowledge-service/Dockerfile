@@ -1,4 +1,8 @@
-FROM node:20-bookworm-slim AS builder
+FROM node:24-bookworm-slim AS builder
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
 
@@ -16,7 +20,7 @@ COPY packages/knowledge-service/ ./packages/knowledge-service/
 
 RUN pnpm --filter @workbench/knowledge-service build:docker
 
-FROM node:20-bookworm-slim AS runtime-deps
+FROM node:24-bookworm-slim AS runtime-deps
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends python3 make g++ \
@@ -28,7 +32,7 @@ RUN npm init -y \
     && npm install --omit=dev fastify@4.29.1 better-sqlite3@12.11.1 dotenv@17.4.2 \
     && npm cache clean --force
 
-FROM node:20-bookworm-slim
+FROM node:24-bookworm-slim
 
 WORKDIR /app
 

@@ -34,6 +34,10 @@ import { CommentCreatePopover } from "./CommentCreatePopover";
 import { CommentPin } from "./CommentPin";
 import { CommentSidebar } from "./CommentSidebar";
 import { CommentThreadPopover } from "./CommentThreadPopover";
+import {
+  computePrototypePinPosition,
+  computePrototypePinRatio,
+} from "./pin-layout";
 import { useComments } from "./useComments";
 import type {
   CommentLayerProps,
@@ -71,10 +75,6 @@ interface CreateDraft {
   pin: { xRatio: number; yRatio: number };
   left: number;
   top: number;
-}
-
-function clamp01(value: number): number {
-  return Math.min(1, Math.max(0, value));
 }
 
 /** 查找容器内原型预览的根元素（Shadow DOM 内）；iframe 页面返回 null */
@@ -184,9 +184,13 @@ export function CommentLayer({
   threads: threadsProp,
   onCreateComment,
   onAddReply,
+  onUpdateComment,
+  onUpdateReply,
   onSetResolved,
   onDeleteThread,
   onDeleteReply,
+  onRetryAiTask,
+  showPins = true,
 }: CommentLayerProps) {
   const areaRef = useRef<HTMLDivElement>(null);
   const [iframeEl, setIframeEl] = useState<HTMLIFrameElement | null>(null);
@@ -240,6 +244,12 @@ export function CommentLayer({
   const addReply = useExternalData
     ? onAddReply ?? internalComments.addReply
     : internalComments.addReply;
+  const updateComment = useExternalData
+    ? onUpdateComment ?? internalComments.updateComment
+    : internalComments.updateComment;
+  const updateReply = useExternalData
+    ? onUpdateReply ?? internalComments.updateReply
+    : internalComments.updateReply;
   const setResolved = useExternalData
     ? onSetResolved ?? internalComments.setResolved
     : internalComments.setResolved;
@@ -249,6 +259,9 @@ export function CommentLayer({
   const deleteReply = useExternalData
     ? onDeleteReply ?? internalComments.deleteReply
     : internalComments.deleteReply;
+  const retryAiTask = useExternalData
+    ? onRetryAiTask ?? internalComments.retryAiTask
+    : internalComments.retryAiTask;
 
   /* ---------------- @候选人 ---------------- */
   const [fetchedCandidates, setFetchedCandidates] = useState<MentionCandidate[]>([]);
@@ -356,14 +369,18 @@ export function CommentLayer({
 
       const containerRect = container.getBoundingClientRect();
       const rootRect = root.getBoundingClientRect();
-      const xRatio =
-        rootRect.width > 0
-          ? clamp01((event.clientX - rootRect.left) / rootRect.width)
-          : 0;
-      const yRatio =
-        rootRect.height > 0
-          ? clamp01((event.clientY - rootRect.top) / rootRect.height)
-          : 0;
+      // 内容归一化坐标：把点击位置换算成相对完整内容（scrollWidth/scrollHeight）的比例，
+      // 与 iframe 路径一致，才能在滚动时让 pin 跟随元素。
+      const { xRatio, yRatio } = computePrototypePinRatio({
+        offsetWidth: root.offsetWidth,
+        scrollWidth: root.scrollWidth,
+        scrollHeight: root.scrollHeight,
+        scrollLeft: root.scrollLeft,
+        scrollTop: root.scrollTop,
+        rect: rootRect,
+        clientX: event.clientX,
+        clientY: event.clientY,
+      });
 
       const node = buildVisualNodeInfoFromElement(target, root);
       setCreateDraft({
@@ -433,9 +450,50 @@ export function CommentLayer({
   useEffect(() => {
     const host = protoHostEl;
     if (!host || disabled) return;
-    const onScroll = () => setLayoutVersion((v) => v + 1);
-    host.addEventListener("scroll", onScroll, true);
-    return () => host.removeEventListener("scroll", onScroll, true);
+    const increment = () => setLayoutVersion((v) => v + 1);
+    // scroll 事件不穿越 shadow 边界，必须监听 shadow 内实际滚动的 .prototype-root，
+    // 只监听宿主元素（[data-prototype-preview]）收不到内部滚动。
+    let current: HTMLElement | null = null;
+    let shadowObserver: MutationObserver | null = null;
+    const detachRoot = () => {
+      current?.removeEventListener("scroll", increment);
+      current = null;
+    };
+    const attachRoot = () => {
+      const root =
+        host.shadowRoot?.querySelector<HTMLElement>(".prototype-root") ?? null;
+      if (root === current) return;
+      detachRoot();
+      if (root) {
+        current = root;
+        root.addEventListener("scroll", increment, { passive: true });
+      }
+    };
+    const watchShadow = () => {
+      const shadow = host.shadowRoot;
+      if (!shadow) return;
+      shadowObserver?.disconnect();
+      shadowObserver = new MutationObserver(attachRoot);
+      shadowObserver.observe(shadow, { childList: true, subtree: true });
+      attachRoot();
+    };
+    // shadow 由 PrototypePagePreview 异步 attach（attachShadow + innerHTML），
+    // 宿主子树观察器看不到 shadow 内容；这里轮询等待 shadowRoot 出现后挂监听。
+    let attempts = 0;
+    let poll = window.setInterval(() => {
+      if (host.shadowRoot || ++attempts > 50) {
+        window.clearInterval(poll);
+        if (host.shadowRoot) watchShadow();
+      }
+    }, 200);
+    watchShadow();
+    host.addEventListener("scroll", increment, true);
+    return () => {
+      window.clearInterval(poll);
+      host.removeEventListener("scroll", increment, true);
+      shadowObserver?.disconnect();
+      detachRoot();
+    };
   }, [protoHostEl, disabled]);
 
   /* ---------------- 原型页评论模式：十字光标 + 悬停高亮 + 点击捕获 ---------------- */
@@ -521,17 +579,26 @@ export function CommentLayer({
     const container = areaRef.current;
     if (!container) return new Map<string, { left: number; top: number }>();
 
-    // 原型页（无 iframe）：直接用根的视口矩形定位，自动跟随滚动/缩放
+    // 原型页（无 iframe）：用 root 的滚动内容定位，自动跟随滚动/缩放
     const protoRoot = findPrototypeRoot(container);
     if (protoRoot) {
       const rootRect = protoRoot.getBoundingClientRect();
       const containerRect = container.getBoundingClientRect();
       const map = new Map<string, { left: number; top: number }>();
       for (const thread of threads) {
-        map.set(thread.id, {
-          left: rootRect.left - containerRect.left + thread.pin.xRatio * rootRect.width,
-          top: rootRect.top - containerRect.top + thread.pin.yRatio * rootRect.height,
-        });
+        map.set(
+          thread.id,
+          computePrototypePinPosition({
+            offsetWidth: protoRoot.offsetWidth,
+            scrollWidth: protoRoot.scrollWidth,
+            scrollHeight: protoRoot.scrollHeight,
+            scrollLeft: protoRoot.scrollLeft,
+            scrollTop: protoRoot.scrollTop,
+            rect: rootRect,
+            containerRect,
+            pin: thread.pin,
+          }),
+        );
       }
       return map;
     }
@@ -588,7 +655,7 @@ export function CommentLayer({
       <div ref={areaRef} className="relative min-w-0 flex-1 overflow-hidden">
         {children}
 
-        <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
+        {showPins && <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
           {threads.map((thread, index) => {
             const pos = pinPositions.get(thread.id);
             if (!pos) return null;
@@ -611,7 +678,7 @@ export function CommentLayer({
               </div>
             );
           })}
-        </div>
+        </div>}
 
         {createDraft && (
           <CommentCreatePopover
@@ -635,9 +702,12 @@ export function CommentLayer({
             top={activeThreadPos.top + 20}
             onClose={() => updateActiveThreadId(null)}
             onAddReply={addReply}
+            onUpdateComment={updateComment}
+            onUpdateReply={updateReply}
             onSetResolved={setResolved}
             onDeleteThread={deleteThread}
             onDeleteReply={deleteReply}
+            onRetryAiTask={retryAiTask}
           />
         )}
 

@@ -1,25 +1,35 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  useMemo,
+  type ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import { BUILT_IN_CONFIG_CATEGORIES } from "@workbench/demo-ui/config-categories";
 import {
-  BUILT_IN_CONFIG_CATEGORIES,
+  extractCodeConfigBindingKeys,
   extractPrototypeConfigBindingKeys,
-  invalidateCompileCache,
-  isSchemaEmpty,
-  PreviewModeSwitcher,
-} from "../../../../../components/demo";
+} from "@workbench/demo-ui/config-binding-utils";
+import { invalidateCompileCache } from "@workbench/demo-ui/compile-cache";
+import { isSchemaEmpty } from "@workbench/demo-ui/validator";
+import { PreviewModeSwitcher } from "@workbench/demo-ui/PreviewModeSwitcher";
 import type {
-  PositionableSizeItem,
   PreviewMode,
-  PreviewStagePage,
   PreviewSize,
   ScreenshotRenderBox,
+} from "@workbench/demo-ui/types";
+import type {
+  PositionableSizeItem,
   VisualNodeInfo,
   VisualNodeTreeItem,
   VisualPropertyChangeKind,
-} from "../../../../../components/demo";
+} from "@workbench/demo-ui/iframe-types";
+import type { PreviewStagePage } from "@workbench/demo-ui/preview-stage-types";
 import type {
   CommentAuthor,
   DemoPageRuntimeType,
@@ -83,6 +93,7 @@ import {
 import { PreviewProjectionTracker } from "@/lib/preview-projection-tracker";
 import { WorkspacePerformanceSampler } from "@/lib/workspace-performance-sampling";
 import { Button } from "@/components/ui/button";
+import { DesignSpecWorkspaceProvider } from "@/components/demo/DesignSpecWorkspace";
 import {
   Popover,
   PopoverContent,
@@ -96,11 +107,13 @@ import { Badge } from "@/components/ui/badge";
 import type {
   AutoRepairTrigger,
   VisualPropertyAutoSend,
-  ChatMessage,
-  StreamService,
+} from "@workbench/ai-chat-shared/ai-chat";
+import type { ChatMessage } from "@workbench/ai-chat-shared/message";
+import type { StreamService } from "@workbench/ai-chat-shared/stream-service";
+import type {
   ChatElementRef,
   ChatPageRef,
-} from "@/components/ai-elements";
+} from "@workbench/ai-chat-shared/element-selection";
 import { getAgentClient } from "@/lib/agent-client";
 import { useConsoleBuffer } from "@/components/demo/useConsoleBuffer";
 import { useEditorDiagnostics } from "@/components/demo/useEditorDiagnostics";
@@ -133,6 +146,8 @@ import {
 } from "lucide-react";
 import {
   MessageSquare,
+  MessageSquarePlus,
+  Send,
   SlidersHorizontal,
   SquarePen,
 } from "lucide-react";
@@ -160,7 +175,6 @@ import type {
   KnowledgeDocDialogMode,
 } from "@/components/demo/KnowledgeDocDialog";
 import { useCollabDocument } from "@/hooks/useCollabDocument";
-import { useSketchEditorEngineHost } from "./components/SketchEditorEngineHost";
 import { VisualEditSidebar } from "./components/VisualEditSidebar";
 import { useVisualEditState, getNodeLabel, buildVisualSelectionPrompt } from "./hooks/useVisualEditState";
 import { useVersionControl } from "./hooks/useVersionControl";
@@ -171,13 +185,13 @@ import {
   type SinglePreviewTarget,
 } from "./single-preview-history";
 import {
-  CanvasDocumentContent,
   getAnnotationsFromCanvasState,
   getCanvasDocumentEntries,
-  normalizeCanvasPageLayouts,
-  useCanvasDocumentMarkdown,
   withCanvasAnnotationNodes,
-} from "@workbench/demo-ui";
+} from "@workbench/demo-ui/canvas-kernel";
+import { CanvasDocumentContent } from "@workbench/demo-ui/CanvasDocumentContent";
+import { normalizeCanvasPageLayouts } from "@workbench/demo-ui/canvas-layout";
+import { useCanvasDocumentMarkdown } from "@workbench/demo-ui/useCanvasDocumentMarkdown";
 import type {
   CanvasDocumentNode,
   CanvasState,
@@ -190,7 +204,7 @@ import type {
   PreviewDiagnosticError,
   SnapshotQuality,
   SnapshotRejectionReason,
-} from "@workbench/demo-ui";
+} from "@workbench/demo-ui/types";
 import type {
   DemoFiles,
   DemoPageMeta,
@@ -203,36 +217,37 @@ import type {
   UserAuthoringPreferences,
 } from "@workbench/shared";
 import { projectApiClient } from "@/lib/project-api";
+import { loadCanvasPageContent } from "@/lib/canvas-page-content-loader";
 import { parseFigmaImportContent } from "../../../../../lib/markdown-parser";
 import { useDemos } from "@/lib/api";
-import { resolveSketchEditorEngine } from "@/lib/sketch-editor-engine";
-import type { ActiveViewContext } from "@/components/ai-elements";
+import {
+  resolveSketchEditorEngine,
+  type SketchEditorEngine,
+} from "@/lib/sketch-editor-engine";
+import type { ActiveViewContext } from "@workbench/ai-chat-shared/active-view-context";
 import { sanitizeHydratedMessages } from "@/lib/sanitize-hydrated-messages";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
 
 const PreviewStage = dynamic(
-  () =>
-    import("../../../../../components/demo").then((m) => m.PreviewStage),
+  () => import("@workbench/demo-ui/PreviewStage").then((m) => m.PreviewStage),
   { ssr: false, loading: () => null },
 );
 const CommentLayer = dynamic(
-  () =>
-    import("../../../../../components/demo").then((m) => m.CommentLayer),
+  () => import("@workbench/demo-ui/comment").then((m) => m.CommentLayer),
   { ssr: false, loading: () => null },
 );
 const CommentPanel = dynamic(
-  () =>
-    import("../../../../../components/demo").then((m) => m.CommentPanel),
+  () => import("@workbench/demo-ui/comment").then((m) => m.CommentPanel),
   { ssr: false, loading: () => null },
 );
 const PageConfigPanel = dynamic(
-  () =>
-    import("../../../../../components/demo").then((m) => m.PageConfigPanel),
+  () => import("@workbench/demo-ui/PageConfigPanel").then((m) => m.PageConfigPanel),
   { ssr: false, loading: () => null },
 );
 const AIChat = dynamic(
-  () => import("@/components/ai-elements").then((m) => m.AIChat),
+  () =>
+    import("@/components/ai-elements/author-ai-chat").then((m) => m.AIChat),
   { ssr: false, loading: () => null },
 );
 const VisualPropertyPanel = dynamic(
@@ -243,6 +258,13 @@ const SketchEditorEngineStage = dynamic(
   () =>
     import("./components/SketchEditorEngineHost").then(
       (m) => m.SketchEditorEngineStage,
+    ),
+  { ssr: false, loading: () => null },
+);
+const SketchEditorEngineProvider = dynamic(
+  () =>
+    import("./components/SketchEditorEngineHost").then(
+      (m) => m.SketchEditorEngineProvider,
     ),
   { ssr: false, loading: () => null },
 );
@@ -267,6 +289,29 @@ const SketchEditorEngineInspectorPanel = dynamic(
     ),
   { ssr: false, loading: () => null },
 );
+
+function SketchEditorEngineBoundary({
+  engine,
+  scene,
+  onSceneChange,
+  children,
+}: {
+  engine: SketchEditorEngine | null;
+  scene: SketchSceneDocument;
+  onSceneChange: (scene: SketchSceneDocument) => void;
+  children: ReactNode;
+}) {
+  if (!engine) return <>{children}</>;
+  return (
+    <SketchEditorEngineProvider
+      engine={engine}
+      scene={scene}
+      onSceneChange={onSceneChange}
+    >
+      {children}
+    </SketchEditorEngineProvider>
+  );
+}
 const CoverImageDialog = dynamic(
   () => import("@/components/cover-image-dialog").then((m) => m.CoverImageDialog),
   { ssr: false, loading: () => null },
@@ -289,6 +334,13 @@ const WorkspaceCodeDialog = dynamic(
 );
 const DocumentView = dynamic(
   () => import("@/components/demo/DocumentView").then((m) => m.DocumentView),
+  { ssr: false, loading: () => null },
+);
+const DocumentModeRightPanel = dynamic(
+  () =>
+    import("@/components/demo/DocumentModeRightPanel").then(
+      (m) => m.DocumentModeRightPanel,
+    ),
   { ssr: false, loading: () => null },
 );
 const KnowledgeDocDialog = dynamic(
@@ -498,7 +550,7 @@ type HistoryEvent =
       version: VersionInfo;
     };
 
-type DemoPage = DemoPageMeta & { previewSize?: import("@workbench/demo-ui").PreviewSize };
+type DemoPage = DemoPageMeta & { previewSize?: PreviewSize };
 
 const runtimeTypeLabels: Record<DemoPageRuntimeType, string> = {
   "high-fidelity-react": "高保真 React",
@@ -909,7 +961,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   pageSketchMapRef.current = pageSketchMap;
   const [sketchEditing, setSketchEditing] = useState(false);
   const [pagePreviewSizeMap, setPagePreviewSizeMap] = useState<
-    Record<string, import("@workbench/demo-ui").PreviewSize>
+    Record<string, PreviewSize>
   >({});
   const [positionableItemSizes, setPositionableItemSizes] = useState<
     Record<string, PositionableSizeItem>
@@ -967,6 +1019,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   const [agentSessionId, setAgentSessionId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitialPageLoading, setIsInitialPageLoading] = useState(false);
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  const [initialPageError, setInitialPageError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
 
@@ -975,7 +1031,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   const [workspacePath, setWorkspacePath] = useState("");
   const [previewSize, setPreviewSize] =
-    useState<import("@workbench/demo-ui").PreviewSize>();
+    useState<PreviewSize>();
 
   useEffect(() => bindKeyboardShortcuts(), [bindKeyboardShortcuts]);
 
@@ -2946,6 +3002,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     canRetryVisualPropertySubmission,
     visualDraftAction,
     visualPropertySending,
+    visualAnnotationMode,
+    setVisualAnnotationMode,
     visualAnnotations,
     setVisualAnnotations,
     visualPatches,
@@ -3634,41 +3692,26 @@ ${context.details}
 
   useEffect(() => {
     const loadDemo = async () => {
+      let bootstrapReady = false;
       try {
         setIsLoading(true);
+        setBootstrapError(null);
+        setInitialPageError(null);
 
-        // 并行获取项目列表和用户偏好
-        const [demosRes, userAuthoringPreferencesRes] = await Promise.all([
-          fetch("/api/demos"),
-          fetch("/api/user/authoring-preferences"),
-        ]);
-
-        const demosData = await demosRes.json();
-        if (demosData.success) {
-          const demo = demosData.data.find(
-            (d: {
-              id: string;
-              name: string;
-              thumbnail?: string;
-              authoringPreferences?: ProjectAuthoringPreferences;
-            }) => d.id === demoId,
-          );
-          if (demo) {
-            setDemoName(demo.name);
-            setCurrentThumbnail(demo.thumbnail);
-            setProjectAuthoringPreferences(demo.authoringPreferences);
-          }
-        }
-
-        if (userAuthoringPreferencesRes.ok) {
-          const userAuthoringPreferencesData =
-            await userAuthoringPreferencesRes.json();
-          if (userAuthoringPreferencesData.success) {
-            setUserAuthoringPreferences(
-              userAuthoringPreferencesData.data?.preferences,
-            );
-          }
-        }
+        const userAuthoringPreferencesPromise = fetch(
+          "/api/user/authoring-preferences",
+        );
+        void userAuthoringPreferencesPromise
+          .then(async (response) => {
+            if (!response.ok) return;
+            const data = await response.json();
+            if (data.success) {
+              setUserAuthoringPreferences(data.data?.preferences);
+            }
+          })
+          .catch(() => {
+            // 用户偏好不是编辑器启动门禁，失败时使用默认值。
+          });
 
         const sessionRes = await fetch("/api/sessions", {
           method: "POST",
@@ -3687,28 +3730,54 @@ ${context.details}
         }
 
         setSessionId(sessionData.data.sessionId);
-
         setWorkspaceId(sessionData.data.workspaceId || "");
         setWorkspacePath(
           sessionData.data.workspacePath ||
             sessionData.data.tempWorkspace ||
             "",
         );
-
-        const filesRes = await fetch(
-          `/api/sessions/${sessionData.data.sessionId}/files`,
+        setDemoName(sessionData.data.project?.name || demoId);
+        setCurrentThumbnail(sessionData.data.project?.thumbnail);
+        setProjectAuthoringPreferences(
+          sessionData.data.project?.authoringPreferences,
         );
-        if (!filesRes.ok) {
-          throw new Error("加载文件失败");
+        setDemoPages(sessionData.data.demoPages || []);
+        setDemoFolders(sessionData.data.demoFolders || []);
+        setProjectConfigSchema(sessionData.data.projectConfigSchema);
+        projectConfigSchemaRef.current = sessionData.data.projectConfigSchema;
+        setProjectConfigValues(sessionData.data.projectConfigValues ?? {});
+        const initialPageId = sessionData.data.activePageId || "";
+        setActiveDemoId(initialPageId);
+        activeDemoIdRef.current = initialPageId;
+
+        bootstrapReady = true;
+        setIsLoading(false);
+
+        let initialPageFiles: Record<string, unknown> | null = null;
+        if (initialPageId) {
+          setIsInitialPageLoading(true);
+          const pageFilesRes = await fetch(
+            `/api/sessions/${sessionData.data.sessionId}/files/${initialPageId}`,
+          );
+          if (!pageFilesRes.ok) {
+            throw new Error("加载当前页失败");
+          }
+          const pageFilesData = await pageFilesRes.json();
+          if (!pageFilesData.success) {
+            throw new Error(
+              pageFilesData.error?.message || "加载当前页失败",
+            );
+          }
+          initialPageFiles = pageFilesData.data;
         }
 
-        const filesData = await filesRes.json();
-        if (!filesData.success) {
-          throw new Error(filesData.error?.message || "加载文件失败");
-        }
-
-        // 多页面格式适配
-        const multi = filesData.data;
+        const multi = {
+          ...sessionData.data,
+          demos:
+            initialPageId && initialPageFiles
+              ? { [initialPageId]: initialPageFiles }
+              : {},
+        };
         const rawPages = multi.demoPages || [];
         const pagesWithSize = rawPages.map(
           (page: {
@@ -3730,10 +3799,7 @@ ${context.details}
         projectConfigSchemaRef.current = multi.projectConfigSchema;
 
         // 记录每个页面的 previewSize
-        const previewSizeMap: Record<
-          string,
-          import("@workbench/demo-ui").PreviewSize
-        > = {};
+        const previewSizeMap: Record<string, PreviewSize> = {};
         for (const page of pagesWithSize) {
           if (page.previewSize) {
             previewSizeMap[page.id] = page.previewSize;
@@ -3746,16 +3812,11 @@ ${context.details}
         let initialDemoId = "";
 
         if (multi.demos && Object.keys(multi.demos).length > 0) {
-          const sortedPageIds = rawPages.map((p: { id: string }) => p.id);
           const demoIds = Object.keys(multi.demos);
           const targetDemoId =
-            sortedPageIds.length > 0
-              ? sortedPageIds.includes(demoId as string)
-                ? (demoId as string)
-                : sortedPageIds[0]
-              : demoIds.includes(demoId as string)
-                ? (demoId as string)
-                : demoIds[0];
+            initialPageId && demoIds.includes(initialPageId)
+              ? initialPageId
+              : demoIds[0];
           const currentDemo = multi.demos[targetDemoId];
           loadedCode = currentDemo.code;
           loadedSchema = currentDemo.schema;
@@ -3861,22 +3922,28 @@ ${context.details}
 
         const size = getPreviewSize(loadedSchema);
         setPreviewSize(size);
-
-        // 初始化 Agent 会话
         setAgentSessionId(sessionData.data.sessionId);
+
       } catch (error) {
-        toastRef.current({
-          title: "加载失败",
-          description: error instanceof Error ? error.message : "未知错误",
-          variant: "destructive",
-        });
+        const message = error instanceof Error ? error.message : "未知错误";
+        if (bootstrapReady) {
+          setInitialPageError(message);
+        } else {
+          setBootstrapError(message);
+          toastRef.current({
+            title: "加载失败",
+            description: message,
+            variant: "destructive",
+          });
+        }
       } finally {
         setIsLoading(false);
+        setIsInitialPageLoading(false);
       }
     };
 
     loadDemo();
-  }, [demoId]);
+  }, [demoId, loadAttempt]);
 
   useEffect(() => {
     const pageId = activeDemoIdRef.current;
@@ -4314,25 +4381,29 @@ ${context.details}
       try {
         const loadedPages = await Promise.all(
           missingPageIds.map(async (pageId) => {
-            const res = await fetch(
-              `/api/sessions/${sessionId}/files/${pageId}`,
-            );
-            const data = await res.json();
-            if (!data.success) return null;
-            return {
-              pageId,
-              code: data.data.code ?? "",
-              schema: data.data.schema ?? "",
-              prototypeHtml: data.data.prototypeHtml as string | undefined,
-              prototypeCss: data.data.prototypeCss as string | undefined,
-              prototypeMeta: data.data.prototypeMeta as
-                | PrototypePageMeta
-                | undefined,
-              sketchScene: data.data.sketchScene as string | undefined,
-              sketchMeta: data.data.sketchMeta as
-                | Record<string, unknown>
-                | undefined,
-            };
+            const page = demoPages.find((item) => item.id === pageId);
+            if (!page) return null;
+            try {
+              const data = await loadCanvasPageContent({
+                page,
+                projectId: demoId,
+                sessionId,
+              });
+              return {
+                pageId,
+                code: data.code ?? "",
+                schema: data.schema ?? "",
+                configData: data.configData,
+                prototypeHtml: data.prototypeHtml,
+                prototypeCss: data.prototypeCss,
+                prototypeMeta: data.prototypeMeta as PrototypePageMeta | undefined,
+                sketchScene: data.sketchScene,
+                sketchMeta: data.sketchMeta,
+              };
+            } catch (error) {
+              console.error("加载画布页面内容失败:", pageId, error);
+              return null;
+            }
           }),
         );
         if (cancelled) return;
@@ -4355,10 +4426,7 @@ ${context.details}
         > = {};
         const nextSchemas: Record<string, string> = {};
         const nextDefaults: Record<string, Record<string, unknown>> = {};
-        const nextPreviewSizes: Record<
-          string,
-          import("@workbench/demo-ui").PreviewSize
-        > = {};
+        const nextPreviewSizes: Record<string, PreviewSize> = {};
 
         for (const page of loadedPages) {
           if (!page) continue;
@@ -4380,7 +4448,10 @@ ${context.details}
               meta: page.sketchMeta,
             };
           }
-          nextDefaults[page.pageId] = getSafeMergedDefaults(page.schema);
+          nextDefaults[page.pageId] = {
+            ...getSafeMergedDefaults(page.schema),
+            ...(page.configData ?? {}),
+          };
           const size = getPreviewSize(page.schema);
           if (size) {
             nextPreviewSizes[page.pageId] = size;
@@ -4413,7 +4484,7 @@ ${context.details}
     return () => {
       cancelled = true;
     };
-  }, [canvasMissingPageIdsKey, getSafeMergedDefaults, sessionId]);
+  }, [canvasMissingPageIdsKey, demoId, demoPages, getSafeMergedDefaults, sessionId]);
 
   const handleConfigPanelPageSelect = useCallback(
     async (pageId: string) => {
@@ -5223,10 +5294,7 @@ ${context.details}
             meta?: Record<string, unknown>;
           }
         > = {};
-        const previewSizeMap: Record<
-          string,
-          import("@workbench/demo-ui").PreviewSize
-        > = {};
+        const previewSizeMap: Record<string, PreviewSize> = {};
         const loadedProjectConfigValues = multi.projectConfigValues ?? {};
         setProjectConfigValues(loadedProjectConfigValues);
         if (multi.demos) {
@@ -6117,6 +6185,8 @@ ${context.details}
         name: page.name,
         runtimeType: page.runtimeType,
         order: page.order,
+        isReference: !!page.reference,
+        sourceProjectId: page.reference?.sourceProjectId,
         ...runtimeData,
         configData: configDataMap[page.id],
         schema: pageSchemaMap[page.id],
@@ -6174,11 +6244,6 @@ ${context.details}
     viewingDocument: singlePreviewViewingDocument,
   });
   const nativeSketchEditingActive = activeSketchEditorEngine === "native";
-  const sketchEditorHost = useSketchEditorEngineHost({
-    engine: activeSketchEditorEngine,
-    scene: activeSketchScene,
-    onSceneChange: handleSketchSceneChange,
-  });
   const sketchLayerDrawerActive = nativeSketchEditingActive;
 
   const handleSubmitVisualDraftAction = useCallback(() => {
@@ -6823,6 +6888,21 @@ ${context.details}
     );
   }
 
+  if (bootstrapError) {
+    return (
+      <div className="flex h-screen items-center justify-center px-6">
+        <div className="max-w-md space-y-4 text-center">
+          <p className="text-base font-medium">编辑器加载失败</p>
+          <p className="text-sm text-muted-foreground">{bootstrapError}</p>
+          <Button onClick={() => setLoadAttempt((current) => current + 1)}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            重新加载
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   const activeRuntimeConversion = activeDemoId
     ? runtimeConversions[activeDemoId]
     : undefined;
@@ -7189,6 +7269,16 @@ await handlePublishWithScreenshot();
       </div>
 
       <div className="flex-1 overflow-hidden">
+        <DesignSpecWorkspaceProvider
+          workingDir={workspacePath || undefined}
+          sessionId={sessionId}
+          projectId={demoId}
+        >
+        <SketchEditorEngineBoundary
+          engine={activeSketchEditorEngine}
+          scene={activeSketchScene}
+          onSceneChange={handleSketchSceneChange}
+        >
         <ResizablePanelGroup
           sizesKey={isConfigPanelVisible ? "3panel" : "2panel"}
           direction="horizontal"
@@ -7877,10 +7967,7 @@ await handlePublishWithScreenshot();
                   </div>
                 </div>
                 <div className="min-h-0 flex-1 overflow-hidden p-2">
-                  <SketchEditorEngineLayerPanel
-                    host={sketchEditorHost}
-                    scene={activeSketchScene}
-                  />
+                  <SketchEditorEngineLayerPanel scene={activeSketchScene} />
                 </div>
               </div>
             )}
@@ -7896,11 +7983,6 @@ await handlePublishWithScreenshot();
                   onItemsChange={setKnowledgeItems}
                   onItemsLoaded={(items) => setKnowledgeItems(items)}
                   onDocHistory={(item) => setKbHistoryItem(item)}
-                  onAddRequest={() => {
-                    setKbDocDialogItem(null);
-                    setKbDocDialogMode("add");
-                    setKbDocDialogOpen(true);
-                  }}
                   onChatFileSelect={async (attachment) => {
                     try {
                       if (attachment.mimeType?.startsWith("image/")) {
@@ -7978,9 +8060,13 @@ await handlePublishWithScreenshot();
                 threads={commentsData.threads}
                 onCreateComment={commentsData.createComment}
                 onAddReply={commentsData.addReply}
+                onUpdateComment={commentsData.updateComment}
+                onUpdateReply={commentsData.updateReply}
                 onSetResolved={commentsData.setResolved}
                 onDeleteThread={commentsData.deleteThread}
                 onDeleteReply={commentsData.deleteReply}
+                onRetryAiTask={commentsData.retryAiTask}
+                showPins={rightPanelTab === "comments"}
               >
               <PreviewStage
                 pages={previewStagePages}
@@ -8041,6 +8127,43 @@ await handlePublishWithScreenshot();
                           <History className="h-3.5 w-3.5" />
                         )}
                       </Button>
+                      {visualEditActive && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className={`h-7 w-7 ${
+                            visualAnnotationMode
+                              ? "border-amber-500/80 bg-amber-500/15 text-amber-300 hover:bg-amber-500/20 hover:text-amber-200"
+                              : ""
+                          }`}
+                          aria-pressed={visualAnnotationMode}
+                          onClick={handleStartVisualAnnotation}
+                          title={
+                            visualAnnotationMode
+                              ? "退出批注模式"
+                              : "批注模式"
+                          }
+                        >
+                          <MessageSquarePlus className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      {visualEditActive &&
+                        visualAnnotations.filter(
+                          (annotation) => !annotation.resolved,
+                        ).length > 0 &&
+                        !visualAnnotationMode && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7 border-blue-500/50 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 hover:text-blue-200"
+                            onClick={handleSendVisualAnnotationsToAI}
+                            title="发送批注给 AI"
+                          >
+                            <Send className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                     </>
                   ) : undefined
                 }
@@ -8117,6 +8240,55 @@ await handlePublishWithScreenshot();
                       demoId: activeDemoId,
                       allowScroll: true,
                       visualEditMode: visualEditActive,
+                      visualAnnotationMode,
+                      visualAnnotations,
+                      onVisualAnnotationCreate: (
+                        node,
+                        text,
+                        annotationId,
+                        styleChanges,
+                      ) => {
+                        setSelectedVisualNode(node);
+                        const trimmedText = text?.trim() ?? "";
+                        const hasStyleChanges =
+                          !!styleChanges && styleChanges.length > 0;
+                        if (
+                          annotationId &&
+                          !trimmedText &&
+                          !hasStyleChanges
+                        ) {
+                          setVisualAnnotations((prev) =>
+                            prev.filter(
+                              (annotation) =>
+                                annotation.id !== annotationId,
+                            ),
+                          );
+                          return;
+                        }
+                        if (trimmedText || hasStyleChanges) {
+                          if (annotationId) {
+                            setVisualAnnotations((prev) =>
+                              prev.map((annotation) =>
+                                annotation.id === annotationId
+                                  ? {
+                                      ...annotation,
+                                      nodeId: node.nodeId,
+                                      domPath: node.domPath,
+                                      text: trimmedText || "样式修改",
+                                      styleChanges,
+                                    }
+                                  : annotation,
+                              ),
+                            );
+                          } else {
+                            handleCreateVisualAnnotation(
+                              trimmedText,
+                              node,
+                              styleChanges,
+                            );
+                          }
+                        }
+                      },
                       visualHoverNodeId: visualEditActive
                         ? visualPanelHoverNodeId
                         : null,
@@ -8187,7 +8359,7 @@ await handlePublishWithScreenshot();
                       onStaticPrototypeSnapshot:
                         handleStaticPrototypeSnapshot,
                       onVisualInlineEdit: handleVisualInlineEdit,
-                      visualAnnotationMode: false,
+                      visualAnnotationMode,
                       onVisualAnnotationCreate: (
                         node,
                         text,
@@ -8375,14 +8547,12 @@ await handlePublishWithScreenshot();
                         <div className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-md border bg-background shadow-sm">
                           <div className="min-h-0 flex-1 overflow-hidden">
                             <SketchEditorEngineStage
-                              host={sketchEditorHost}
                               scene={activeSketchScene}
                               configData={configData}
                               previewSize={resolvedPreviewSize}
                             />
                           </div>
                           <SketchEditorEngineToolbar
-                            host={sketchEditorHost}
                             scene={activeSketchScene}
                           />
                         </div>
@@ -8396,12 +8566,38 @@ await handlePublishWithScreenshot();
               </>
               )}
             </div>
+            {(isInitialPageLoading || initialPageError) && (
+              <div className="absolute inset-0 z-30 flex items-center justify-center bg-background/85 backdrop-blur-sm">
+                {isInitialPageLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    正在加载当前页…
+                  </div>
+                ) : (
+                  <div className="max-w-sm space-y-3 px-6 text-center">
+                    <p className="text-sm font-medium">当前页加载失败</p>
+                    <p className="text-xs text-muted-foreground">
+                      {initialPageError}
+                    </p>
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        setLoadAttempt((current) => current + 1)
+                      }
+                    >
+                      <RefreshCw className="mr-2 h-3.5 w-3.5" />
+                      重试
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </ResizablePanel>
 
           {isConfigPanelVisible && (
             <ResizablePanel className="relative flex flex-col overflow-hidden border-l bg-card">
               {previewMode === "document" ? (
-                <CommentPanel
+                <DocumentModeRightPanel
                   threads={commentsData.threads}
                   currentUserId={currentUserId || undefined}
                   activeThreadId={activeCommentThreadId}
@@ -8411,6 +8607,7 @@ await handlePublishWithScreenshot();
                   }}
                   commentMode={commentModeActive}
                   onCommentModeChange={setCommentModeActive}
+                  unresolvedCount={unresolvedCommentCount}
                 />
               ) : previewMode === "single" ? (
                 <>
@@ -8512,7 +8709,13 @@ await handlePublishWithScreenshot();
                               ? extractPrototypeConfigBindingKeys(
                                   pagePrototypeMap[page.id]?.html,
                                 )
-                              : [],
+                              : page.runtimeType === "high-fidelity-react" ||
+                                  page.runtimeType === "sketch-scene"
+                                ? extractCodeConfigBindingKeys(
+                                    pageCodes[page.id],
+                                    getSchemaPropertyKeys(projectConfigSchema),
+                                  )
+                                : [],
                         }))}
                         activePageId={activeDemoId}
                         detailPageId={activeDemoId}
@@ -8563,7 +8766,6 @@ await handlePublishWithScreenshot();
                   {sketchLayerDrawerActive && (
                     <div className="absolute inset-0 z-20 flex flex-col border-l bg-card shadow-2xl">
                       <SketchEditorEngineInspectorPanel
-                        host={sketchEditorHost}
                         scene={activeSketchScene}
                       />
                     </div>
@@ -8584,7 +8786,13 @@ await handlePublishWithScreenshot();
                         ? extractPrototypeConfigBindingKeys(
                             pagePrototypeMap[page.id]?.html,
                           )
-                        : [],
+                        : page.runtimeType === "high-fidelity-react" ||
+                            page.runtimeType === "sketch-scene"
+                          ? extractCodeConfigBindingKeys(
+                              pageCodes[page.id],
+                              getSchemaPropertyKeys(projectConfigSchema),
+                            )
+                          : [],
                   }))}
                   activePageId={activeDemoId}
                   detailPageId={
@@ -8631,6 +8839,8 @@ await handlePublishWithScreenshot();
             </ResizablePanel>
           )}
         </ResizablePanelGroup>
+        </SketchEditorEngineBoundary>
+        </DesignSpecWorkspaceProvider>
       </div>
 
       <Dialog

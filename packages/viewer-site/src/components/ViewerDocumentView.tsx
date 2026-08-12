@@ -126,7 +126,6 @@ export function ViewerDocumentView({
               value={content}
               onChange={() => {}}
               readOnly
-              format="markdown"
               className="h-full"
             />
           ) : (

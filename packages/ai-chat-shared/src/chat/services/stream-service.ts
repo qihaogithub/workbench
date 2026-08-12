@@ -127,6 +127,7 @@ export interface StreamEventHandlers {
   onStream?: (content: string) => void;
   onThought?: (content: string) => void;
   onPlan?: (content: string) => void;
+  onContextCompacted?: () => void;
   onModels?: (event: StreamEvent) => void;
   onToolCall?: (toolCall: ReturnType<typeof parseToolCallFromEvent>) => void;
   onToolUpdate?: (update: ToolUpdateEvent) => void;
@@ -586,6 +587,12 @@ export class StreamService {
       if (event.content) {
         this.handlers.onPlan?.(event.content);
       }
+    });
+
+    this.stream.on("context_compacted", (event: StreamEvent) => {
+      if (this.currentSessionId !== streamId) return;
+      this.connectionEstablished = true;
+      this.handlers.onContextCompacted?.();
     });
 
     this.stream.on("models", (event: StreamEvent) => {

@@ -1,13 +1,22 @@
 "use client";
 
 import React, { useRef } from "react";
+import dynamic from "next/dynamic";
 import type { ImageAttachment } from "@workbench/agent-client";
 import type { UserChoiceResponse } from "./services/stream-service";
-import { Message, type ChatMessage } from "../message";
-import { AssistantMessage } from "../assistant-message";
-import { Bot, RefreshCw, MessageSquare } from "lucide-react";
+import type { ChatMessage } from "../message";
+import { Bot, Check, RefreshCw, MessageSquare } from "lucide-react";
 import { cn } from "../lib/utils";
 import { ChatCard } from "../chat-card";
+
+const Message = dynamic(() => import("../message").then((m) => m.Message), {
+  ssr: false,
+  loading: () => null,
+});
+const AssistantMessage = dynamic(
+  () => import("../assistant-message").then((m) => m.AssistantMessage),
+  { ssr: false, loading: () => null },
+);
 
 function classifyRenderError(error: Error): "data" | "render" {
   const msg = error.message || "";
@@ -166,6 +175,7 @@ interface ChatMessagesProps {
   messages: ChatMessage[];
   currentMessage: ChatMessage;
   isStreaming: boolean;
+  contextCompactionNotice?: boolean;
   onRegenerate: (targetAssistantId: string) => void;
   onExternalAuthConnected: (targetAssistantId: string) => void;
   onRollback: (targetAssistantId: string) => void;
@@ -203,6 +213,7 @@ export function ChatMessages({
   messages,
   currentMessage,
   isStreaming,
+  contextCompactionNotice = false,
   onRegenerate,
   onExternalAuthConnected,
   onRollback,
@@ -299,6 +310,17 @@ export function ChatMessages({
           {renderMessage(msg, index)}
         </MessageErrorBoundary>
       ))}
+
+      {contextCompactionNotice && (
+        <div
+          className="flex items-center justify-center gap-1.5 py-3 text-xs text-muted-foreground"
+          role="status"
+          aria-live="polite"
+        >
+          <Check className="h-3.5 w-3.5" aria-hidden="true" />
+          <span>已整理较早的对话内容，保留近期上下文</span>
+        </div>
+      )}
 
       {shouldRenderCurrentMessage && (
         <MessageErrorBoundary

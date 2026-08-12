@@ -1,4 +1,4 @@
-FROM node:20-bookworm-slim AS builder
+FROM node:24-bookworm-slim AS builder
 
 ARG DEBIAN_MIRROR=
 
@@ -74,7 +74,7 @@ COPY scripts/ ./scripts/
 
 RUN pnpm --filter @workbench/author-site build
 
-FROM node:20-bookworm-slim
+FROM node:24-bookworm-slim
 
 WORKDIR /app
 

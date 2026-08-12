@@ -297,7 +297,7 @@ docker compose --env-file .env.docker up -d screenshot-service
 corepack pnpm docker:screenshot:deep-health
 ```
 
-截图服务镜像运行时使用 `node:20-bookworm-slim`，安装 Debian `chromium` 和 `chromium-sandbox`，并以非 root `node` 用户启动 Node 进程。
+截图服务镜像运行时使用 `node:24-bookworm-slim`，安装 Debian `chromium` 和 `chromium-sandbox`，并以非 root `node` 用户启动 Node 进程。
 
 ### 3.10 preview runtime 构建约束
 

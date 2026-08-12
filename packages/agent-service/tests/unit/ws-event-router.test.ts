@@ -140,6 +140,37 @@ describe('WebSocketEventRouter', () => {
     ]);
   });
 
+  it('转发上下文压缩事件而不暴露压缩摘要', () => {
+    const messages: ServerMessage[] = [];
+    const router = new WebSocketEventRouter('session-1', (message) => {
+      messages.push(message);
+    });
+    const agent = new TestAgent({ sessionId: 'session-1' });
+
+    router.bindAgent(agent);
+    router.startMessage('message-1');
+    agent.fire({
+      type: 'context_compacted',
+      sessionId: 'session-1',
+      reason: 'preflight',
+      tokensBefore: 104_000,
+      contextWindow: 128_000,
+      durationMs: 321,
+    });
+
+    expect(messages).toContainEqual({
+      type: 'context_compacted',
+      id: 'message-1',
+      sessionId: 'session-1',
+      contextCompaction: {
+        reason: 'preflight',
+        tokensBefore: 104_000,
+        contextWindow: 128_000,
+        durationMs: 321,
+      },
+    });
+  });
+
   it('应在转发 Agent 事件时通知活动回调', () => {
     const activities: AgentEvent[] = [];
     const router = new WebSocketEventRouter(

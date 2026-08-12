@@ -254,6 +254,7 @@ export function AIChat({
 
   const {
     plan,
+    contextCompactionNotice,
     pendingPermissionRequest,
     silenceSeconds,
     memoryFilePathsRef,
@@ -435,6 +436,7 @@ export function AIChat({
             messages={messages}
             currentMessage={currentMessage}
             isStreaming={isStreaming}
+            contextCompactionNotice={contextCompactionNotice}
             onRegenerate={handleRegenerate}
             onExternalAuthConnected={handleRegenerate}
             onRollback={handleRollback}

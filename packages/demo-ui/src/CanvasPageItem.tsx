@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useCallback, useRef } from "react";
+import React, {
+  lazy,
+  Suspense,
+  useState,
+  useCallback,
+  useRef,
+} from "react";
 import { createPortal } from "react-dom";
 import { Trash2, Lock, ExternalLink, Unlink } from "lucide-react";
 import { CanvasSelectionBox } from "./CanvasSelectionBox";
@@ -11,7 +17,6 @@ import {
 import { cn } from "./utils";
 import { PreviewPanel } from "./PreviewPanel";
 import { PrototypePagePreview } from "./PrototypePagePreview";
-import { SketchPagePreview } from "./SketchPagePreview";
 import { IframePreviewFrame } from "./IframePreviewFrame";
 import { resolvePagePreviewRenderer } from "./preview-stage-resolver";
 import type {
@@ -23,6 +28,12 @@ import type {
   PositionableSizeItem,
   ScreenshotRenderBox,
 } from "./types";
+
+const SketchPagePreview = lazy(() =>
+  import("./SketchPagePreview").then((module) => ({
+    default: module.SketchPagePreview,
+  })),
+);
 
 type ResizeEdge = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
@@ -363,12 +374,20 @@ export function CanvasPagePreviewContent({
 
       {shouldRenderSketch && (
         <div className="absolute inset-0 h-full w-full overflow-hidden bg-white shadow-md pointer-events-none">
-          <SketchPagePreview
-            scene={page.sketchScene}
-            configData={page.configData}
-            previewSize={resolvedPreviewSize}
-            fillContainer
-          />
+          <Suspense
+            fallback={
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                正在加载手绘预览…
+              </div>
+            }
+          >
+            <SketchPagePreview
+              scene={page.sketchScene}
+              configData={page.configData}
+              previewSize={resolvedPreviewSize}
+              fillContainer
+            />
+          </Suspense>
         </div>
       )}
 

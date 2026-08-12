@@ -35,10 +35,10 @@ while [ "$#" -gt 0 ]; do
     shift
 done
 
-docker pull node:20-bookworm-slim
+docker pull node:24-bookworm-slim
 docker pull nginx:alpine
 
 if [ "${screenshot}" = true ]; then
     platform="${SCREENSHOT_SERVICE_PLATFORM:-linux/amd64}"
-    docker pull --platform "${platform}" node:20-bookworm-slim
+    docker pull --platform "${platform}" node:24-bookworm-slim
 fi

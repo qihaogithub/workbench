@@ -23,6 +23,7 @@ import {
   commitWorkspaceMutation,
   WorkspaceAuthorityClientError,
 } from "@/lib/workspace-authority-client";
+import { applyPageDesignSpecSync } from "@workbench/project-core/page-design-spec-sync";
 
 function hashText(content: string): string {
   return crypto.createHash("sha256").update(content).digest("hex");
@@ -261,6 +262,15 @@ export async function PUT(
           createApiError("FILE_WRITE_ERROR", "更新页面文件失败"),
           { status: 500 },
         );
+      }
+      if (typeof schema === "string") {
+        const page = demoPages.find((candidate) => candidate.id === targetDemoId);
+        applyPageDesignSpecSync({
+          workspacePath,
+          pageId: targetDemoId,
+          pageName: page?.name ?? targetDemoId,
+          schema,
+        });
       }
     }
 

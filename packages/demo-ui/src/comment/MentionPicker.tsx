@@ -1,11 +1,6 @@
 "use client";
 
-/**
- * @提及相关组件：
- * - MentionPicker：候选人弹出列表
- * - MentionTextarea：带 @ 触发逻辑的输入框（检测 "@xxx" → 弹出选择器 → 插入提及）
- * - MentionContent：渲染评论内容，将 "@名称" 高亮
- */
+/** 评论输入中的 @ 提及选择与结构化标签输入器。 */
 import {
   Fragment,
   useCallback,
@@ -19,91 +14,60 @@ import type { CommentMention } from "@workbench/shared";
 import { cn } from "../utils";
 import type { MentionCandidate } from "./types";
 
-/* ------------------------------------------------------------------ */
-/* MentionPicker                                                       */
-/* ------------------------------------------------------------------ */
+export function filterMentionCandidates(
+  candidates: MentionCandidate[],
+  query: string,
+): MentionCandidate[] {
+  const normalized = query.trim().toLowerCase();
+  return normalized
+    ? candidates.filter((candidate) => candidate.name.toLowerCase().includes(normalized))
+    : candidates;
+}
 
 export interface MentionPickerProps {
   candidates: MentionCandidate[];
-  /** "@" 之后已输入的过滤文本 */
-  query: string;
+  activeIndex: number;
+  onActiveIndexChange: (index: number) => void;
   onSelect: (candidate: MentionCandidate) => void;
-  onDismiss?: () => void;
   className?: string;
 }
 
 export function MentionPicker({
   candidates,
-  query,
+  activeIndex,
+  onActiveIndexChange,
   onSelect,
   className,
 }: MentionPickerProps) {
-  const [activeIndex, setActiveIndex] = useState(0);
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return candidates;
-    return candidates.filter((c) => c.name.toLowerCase().includes(q));
-  }, [candidates, query]);
-
-  useEffect(() => {
-    setActiveIndex(0);
-  }, [query]);
-
-  if (filtered.length === 0) {
+  if (candidates.length === 0) {
     return (
-      <div
-        className={cn(
-          "rounded-md border border-border bg-popover px-3 py-2 text-xs text-muted-foreground shadow-md",
-          className,
-        )}
-      >
+      <div className={cn("rounded-md border border-border bg-popover px-3 py-2 text-xs text-muted-foreground shadow-md", className)}>
         无匹配的提及对象
       </div>
     );
   }
 
   return (
-    <div
-      className={cn(
-        "max-h-44 overflow-y-auto rounded-md border border-border bg-popover py-1 shadow-md",
-        className,
-      )}
-      onMouseDown={(e) => e.preventDefault()}
-    >
-      {filtered.map((candidate, index) => (
+    <div className={cn("max-h-44 overflow-y-auto rounded-md border border-border bg-popover py-1 shadow-md", className)} onMouseDown={(event) => event.preventDefault()}>
+      {candidates.map((candidate, index) => (
         <button
           key={`${candidate.type}:${candidate.id}`}
           type="button"
           className={cn(
             "flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs",
-            index === activeIndex
-              ? "bg-accent text-accent-foreground"
-              : "text-foreground",
+            index === activeIndex ? "bg-accent text-accent-foreground" : "text-foreground",
           )}
-          onMouseEnter={() => setActiveIndex(index)}
+          onMouseEnter={() => onActiveIndexChange(index)}
           onClick={() => onSelect(candidate)}
         >
-          {candidate.type === "agent" ? (
-            <Bot className="h-3.5 w-3.5 shrink-0 text-violet-500" />
-          ) : (
-            <User className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          )}
+          {candidate.type === "agent" ? <Bot className="h-3.5 w-3.5 shrink-0 text-violet-500" /> : <User className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
           <span className="truncate">{candidate.name}</span>
-          {candidate.type === "agent" && (
-            <span className="ml-auto shrink-0 rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] text-violet-500">
-              AI
-            </span>
-          )}
+          {candidate.type === "agent" && <span className="ml-auto shrink-0 rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] text-violet-500">AI</span>}
         </button>
       ))}
     </div>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/* MentionTextarea                                                     */
-/* ------------------------------------------------------------------ */
 
 export interface MentionTextareaProps {
   value: string;
@@ -113,185 +77,235 @@ export interface MentionTextareaProps {
   candidates: MentionCandidate[];
   placeholder?: string;
   autoFocus?: boolean;
-  /** Cmd/Ctrl + Enter 触发 */
   onSubmit?: () => void;
   rows?: number;
   className?: string;
 }
 
-interface ActiveMention {
-  start: number;
-  query: string;
-}
+interface ActiveMention { start: number; query: string }
 
-function detectActiveMention(text: string, cursor: number): ActiveMention | null {
-  let i = cursor - 1;
-  while (i >= 0) {
-    const ch = text[i];
-    if (ch === "@") {
-      if (i === 0 || /\s/.test(text[i - 1])) {
-        return { start: i, query: text.slice(i + 1, cursor) };
-      }
-      return null;
-    }
-    if (/\s/.test(ch)) return null;
-    i -= 1;
+export function detectActiveMention(text: string, cursor: number): ActiveMention | null {
+  let index = cursor - 1;
+  while (index >= 0) {
+    const character = text[index];
+    if (character === "@") return { start: index, query: text.slice(index + 1, cursor) };
+    if (/\s/.test(character)) return null;
+    index -= 1;
   }
   return null;
 }
 
-export function MentionTextarea({
-  value,
-  onChange,
-  mentions,
-  onMentionsChange,
-  candidates,
-  placeholder,
-  autoFocus,
-  onSubmit,
-  rows = 3,
-  className,
-}: MentionTextareaProps) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [active, setActive] = useState<ActiveMention | null>(null);
+function getCaretOffset(root: HTMLElement): number {
+  const selection = window.getSelection();
+  if (!selection?.rangeCount) return root.innerText.length;
+  const range = selection.getRangeAt(0);
+  if (!root.contains(range.startContainer)) return root.innerText.length;
+  const before = range.cloneRange();
+  before.selectNodeContents(root);
+  before.setEnd(range.startContainer, range.startOffset);
+  return before.toString().length;
+}
 
-  const updateActive = useCallback(() => {
-    const el = textareaRef.current;
-    if (!el) {
-      setActive(null);
+function setCaretOffset(root: HTMLElement, offset: number): void {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let remaining = offset;
+  let node = walker.nextNode();
+  while (node) {
+    const length = node.textContent?.length ?? 0;
+    if (remaining <= length) {
+      const range = document.createRange();
+      range.setStart(node, remaining);
+      range.collapse(true);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
       return;
     }
-    setActive(detectActiveMention(el.value, el.selectionStart ?? el.value.length));
+    remaining -= length;
+    node = walker.nextNode();
+  }
+  root.focus();
+}
+
+function mentionKey(mention: Pick<CommentMention, "type" | "id">): string {
+  return `${mention.type}:${mention.id}`;
+}
+
+function collectMentions(root: HTMLElement): CommentMention[] {
+  return Array.from(root.querySelectorAll<HTMLElement>("[data-mention-id]")).map((node) => ({
+    id: node.dataset.mentionId!,
+    type: node.dataset.mentionType as CommentMention["type"],
+    name: node.dataset.mentionName!,
+  }));
+}
+
+function renderEditor(root: HTMLElement, value: string, mentions: CommentMention[]): void {
+  root.replaceChildren();
+  const ordered = [...mentions].sort((a, b) => b.name.length - a.name.length);
+  const pattern = ordered.length
+    ? new RegExp(`@(${ordered.map((mention) => mention.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`, "g")
+    : null;
+  const byName = new Map(ordered.map((mention) => [mention.name, mention]));
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while (pattern && (match = pattern.exec(value)) !== null) {
+    if (match.index > lastIndex) root.append(document.createTextNode(value.slice(lastIndex, match.index)));
+    const mention = byName.get(match[1]);
+    if (mention) {
+      const tag = document.createElement("span");
+      tag.contentEditable = "false";
+      tag.dataset.mentionId = mention.id;
+      tag.dataset.mentionType = mention.type;
+      tag.dataset.mentionName = mention.name;
+      tag.className = cn(
+        "mx-0.5 inline-flex select-none items-center gap-1 rounded px-1.5 py-0.5 align-baseline font-medium",
+        mention.type === "agent" ? "bg-violet-500/15 text-violet-700 dark:text-violet-300" : "bg-blue-500/15 text-blue-700 dark:text-blue-300",
+      );
+      const icon = document.createElement("span");
+      icon.textContent = "@";
+      icon.setAttribute("aria-hidden", "true");
+      tag.append(icon, document.createTextNode(mention.name));
+      root.append(tag);
+    }
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < value.length || root.childNodes.length === 0) root.append(document.createTextNode(value.slice(lastIndex)));
+}
+
+export function MentionTextarea({ value, onChange, mentions, onMentionsChange, candidates, placeholder, autoFocus, onSubmit, rows = 3, className }: MentionTextareaProps) {
+  const editorRef = useRef<HTMLDivElement>(null);
+  const [active, setActive] = useState<ActiveMention | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const filtered = useMemo(() => active ? filterMentionCandidates(candidates, active.query) : [], [active, candidates]);
+
+  const updateActive = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    setActive(detectActiveMention(editor.innerText, getCaretOffset(editor)));
   }, []);
 
-  const handleChange = (next: string) => {
-    onChange(next);
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || editor.innerText === value) return;
+    renderEditor(editor, value, mentions);
+  }, [value, mentions]);
+
+  useEffect(() => { setActiveIndex(0); }, [active?.start, active?.query]);
+
+  const emitInput = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    onChange(editor.innerText.replace(/\n$/, ""));
+    onMentionsChange(collectMentions(editor));
     requestAnimationFrame(updateActive);
-  };
+  }, [onChange, onMentionsChange, updateActive]);
 
-  const handleSelect = (candidate: MentionCandidate) => {
-    if (!active) return;
-    const el = textareaRef.current;
-    const cursor = el?.selectionStart ?? value.length;
-    const before = value.slice(0, active.start);
-    const after = value.slice(cursor);
+  const selectCandidate = useCallback((candidate: MentionCandidate) => {
+    const editor = editorRef.current;
+    if (!editor || !active) return;
+    const cursor = getCaretOffset(editor);
+    const text = editor.innerText;
+    const nextMention: CommentMention = { id: candidate.id, name: candidate.name, type: candidate.type };
+    const nextMentions = mentions.some((mention) => mentionKey(mention) === mentionKey(nextMention)) ? mentions : [...mentions, nextMention];
     const insert = `@${candidate.name} `;
-    const next = before + insert + after;
+    const next = text.slice(0, active.start) + insert + text.slice(cursor);
+    renderEditor(editor, next, nextMentions);
     onChange(next);
-    if (!mentions.some((m) => m.id === candidate.id && m.type === candidate.type)) {
-      onMentionsChange([
-        ...mentions,
-        { type: candidate.type, id: candidate.id, name: candidate.name },
-      ]);
-    }
+    onMentionsChange(nextMentions);
     setActive(null);
-    requestAnimationFrame(() => {
-      if (el) {
-        const pos = before.length + insert.length;
-        el.focus();
-        el.setSelectionRange(pos, pos);
-      }
-    });
-  };
+    requestAnimationFrame(() => setCaretOffset(editor, active.start + insert.length));
+  }, [active, mentions, onChange, onMentionsChange]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-      e.preventDefault();
+  const removeAdjacentMention = useCallback((backward: boolean): boolean => {
+    const editor = editorRef.current;
+    if (!editor) return false;
+    const selection = window.getSelection();
+    if (!selection?.rangeCount || !selection.getRangeAt(0).collapsed) return false;
+    const range = selection.getRangeAt(0);
+    let node: Node | null = range.startContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = backward ? node.previousSibling : node.nextSibling;
+    else node = backward ? node.childNodes[range.startOffset - 1] : node.childNodes[range.startOffset];
+    if (!(node instanceof HTMLElement) || !node.dataset.mentionId) return false;
+    const offset = getCaretOffset(editor) - (backward ? node.innerText.length : 0);
+    const key = `${node.dataset.mentionType}:${node.dataset.mentionId}`;
+    node.remove();
+    onChange(editor.innerText);
+    onMentionsChange(collectMentions(editor).filter((mention) => mentionKey(mention) !== key));
+    requestAnimationFrame(() => setCaretOffset(editor, Math.max(0, offset)));
+    return true;
+  }, [onChange, onMentionsChange]);
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      event.preventDefault();
       onSubmit?.();
       return;
     }
-    if (active && e.key === "Escape") {
-      e.preventDefault();
-      setActive(null);
+    if (active && filtered.length > 0) {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        setActiveIndex((index) => (event.key === "ArrowDown" ? (index + 1) % filtered.length : (index - 1 + filtered.length) % filtered.length));
+        return;
+      }
+      if (event.key === "Enter" || event.key === "Tab") {
+        event.preventDefault();
+        selectCandidate(filtered[activeIndex]);
+        return;
+      }
     }
+    if (active && event.key === "Escape") {
+      event.preventDefault();
+      setActive(null);
+      return;
+    }
+    if (event.key === "Backspace" && removeAdjacentMention(true)) event.preventDefault();
+    if (event.key === "Delete" && removeAdjacentMention(false)) event.preventDefault();
   };
 
   return (
     <div className="relative">
-      <textarea
-        ref={textareaRef}
-        value={value}
-        rows={rows}
-        placeholder={placeholder}
+      <div
+        ref={editorRef}
+        contentEditable
+        role="textbox"
+        aria-multiline="true"
+        data-placeholder={placeholder}
+        suppressContentEditableWarning
         autoFocus={autoFocus}
-        onChange={(e) => handleChange(e.target.value)}
-        onSelect={updateActive}
+        onInput={emitInput}
+        onKeyUp={updateActive}
         onClick={updateActive}
+        onBlur={() => setTimeout(() => setActive(null), 120)}
         onKeyDown={handleKeyDown}
-        onBlur={() => {
-          setTimeout(() => setActive(null), 120);
-        }}
-        className={cn(
-          "w-full resize-none rounded-md border border-input bg-background px-2.5 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring",
-          className,
-        )}
+        className={cn("min-h-[2.5rem] w-full whitespace-pre-wrap break-words rounded-md border border-input bg-background px-2.5 py-2 text-xs text-foreground empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)] focus:outline-none focus:ring-1 focus:ring-ring", rows === 2 ? "min-h-[4rem]" : "min-h-[5.5rem]", className)}
       />
       {active && candidates.length > 0 && (
         <div className="absolute bottom-full left-0 z-50 mb-1 w-56">
-          <MentionPicker
-            candidates={candidates}
-            query={active.query}
-            onSelect={handleSelect}
-            onDismiss={() => setActive(null)}
-          />
+          <MentionPicker candidates={filtered} activeIndex={activeIndex} onActiveIndexChange={setActiveIndex} onSelect={selectCandidate} />
         </div>
       )}
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* MentionContent                                                      */
-/* ------------------------------------------------------------------ */
-
-export interface MentionContentProps {
-  content: string;
-  mentions?: CommentMention[];
-  className?: string;
-}
+export interface MentionContentProps { content: string; mentions?: CommentMention[]; className?: string }
 
 export function MentionContent({ content, mentions, className }: MentionContentProps) {
   const nodes = useMemo(() => {
-    if (!mentions || mentions.length === 0) return null;
-    const names = [...new Set(mentions.map((m) => m.name))].sort(
-      (a, b) => b.length - a.length,
-    );
-    const pattern = new RegExp(
-      `@(${names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`,
-      "g",
-    );
+    if (!mentions?.length) return null;
+    const names = [...new Set(mentions.map((mention) => mention.name))].sort((a, b) => b.length - a.length);
+    const pattern = new RegExp(`@(${names.map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`, "g");
     const parts: Array<string | { name: string }> = [];
     let lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = pattern.exec(content)) !== null) {
-      if (match.index > lastIndex) {
-        parts.push(content.slice(lastIndex, match.index));
-      }
+      if (match.index > lastIndex) parts.push(content.slice(lastIndex, match.index));
       parts.push({ name: match[1] });
       lastIndex = match.index + match[0].length;
     }
     if (lastIndex < content.length) parts.push(content.slice(lastIndex));
     return parts;
   }, [content, mentions]);
-
-  if (!nodes) {
-    return <span className={cn("whitespace-pre-wrap break-words", className)}>{content}</span>;
-  }
-
-  return (
-    <span className={cn("whitespace-pre-wrap break-words", className)}>
-      {nodes.map((part, index) =>
-        typeof part === "string" ? (
-          <Fragment key={index}>{part}</Fragment>
-        ) : (
-          <span
-            key={index}
-            className="rounded bg-blue-500/15 px-0.5 font-medium text-blue-600 dark:text-blue-400"
-          >
-            @{part.name}
-          </span>
-        ),
-      )}
-    </span>
-  );
+  if (!nodes) return <span className={cn("whitespace-pre-wrap break-words", className)}>{content}</span>;
+  return <span className={cn("whitespace-pre-wrap break-words", className)}>{nodes.map((part, index) => typeof part === "string" ? <Fragment key={index}>{part}</Fragment> : <span key={index} className="rounded bg-blue-500/15 px-0.5 font-medium text-blue-600 dark:text-blue-400">@{part.name}</span>)}</span>;
 }

@@ -35,6 +35,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+export {
+  extractCodeConfigBindingKeys,
+  extractPrototypeConfigBindingKeys,
+} from "./config-binding-utils";
 
 export interface PageConfigPanelPage {
   id: string;
@@ -81,24 +85,6 @@ interface PageConfigPanelProps {
 
 function getSortedPages(pages: PageConfigPanelPage[]) {
   return [...pages].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-}
-
-const PROTOTYPE_TEXT_BINDING_RE = /\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
-const PROTOTYPE_ATTRIBUTE_BINDING_RE =
-  /\bdata-bind-(?:text|src|href|style-color|style-background-color|style-border-color)\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/g;
-
-export function extractPrototypeConfigBindingKeys(html?: string | null): string[] {
-  if (!html) return [];
-
-  const keys = new Set<string>();
-  for (const match of html.matchAll(PROTOTYPE_TEXT_BINDING_RE)) {
-    if (match[1]) keys.add(match[1]);
-  }
-  for (const match of html.matchAll(PROTOTYPE_ATTRIBUTE_BINDING_RE)) {
-    const key = match[1] ?? match[2] ?? match[3];
-    if (key) keys.add(key);
-  }
-  return [...keys];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

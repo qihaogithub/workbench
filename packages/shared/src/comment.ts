@@ -94,6 +94,7 @@ export interface CommentStoreData {
 /** WebSocket 广播事件 */
 export type CommentWsEvent =
   | { type: "comment:created"; thread: CommentThread }
+  | { type: "comment:updated"; thread: CommentThread }
   | { type: "comment:replied"; threadId: string; reply: CommentReply }
   | { type: "comment:resolved"; threadId: string; resolved: boolean }
   | { type: "comment:deleted"; threadId: string }

@@ -270,6 +270,22 @@ export class AgentRunLog {
           payload: { status: event.status },
         });
         break;
+
+      case 'context_compacted':
+        this.append({
+          level: 'info',
+          source: 'system',
+          eventType: 'context_compacted',
+          title: 'Conversation context compacted',
+          summary: `reason=${event.reason}, tokensBefore=${event.tokensBefore}`,
+          payload: {
+            reason: event.reason,
+            tokensBefore: event.tokensBefore,
+            contextWindow: event.contextWindow,
+            durationMs: event.durationMs,
+          },
+        });
+        break;
     }
   }
 

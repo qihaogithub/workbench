@@ -244,4 +244,26 @@ describe("backend providers sync", () => {
     _stopRecoveryMonitoring();
     mocks.restoreFetch();
   });
+
+  it("re-pushes agent global config when DB has providers but agent config is empty (agent restart)", async () => {
+    const mocks = mockBackendProvidersModules({});
+    mocks.fetchBackendProvidersFromAgent.mockResolvedValue({
+      ok: true,
+      config: { providers: [] },
+    });
+    const { _verifyTick } = await import("@/lib/backend-providers-sync");
+
+    await _verifyTick();
+
+    expect(mocks.pushBackendProvidersToAgent).toHaveBeenCalledWith(savedConfig);
+  });
+
+  it("does not re-push when agent global config already matches DB", async () => {
+    const mocks = mockBackendProvidersModules({});
+    const { _verifyTick } = await import("@/lib/backend-providers-sync");
+
+    await _verifyTick();
+
+    expect(mocks.pushBackendProvidersToAgent).not.toHaveBeenCalled();
+  });
 });

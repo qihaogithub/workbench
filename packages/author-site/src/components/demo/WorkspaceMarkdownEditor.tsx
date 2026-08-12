@@ -17,7 +17,6 @@ export function WorkspaceMarkdownEditor({
     <DocumentEditor
       value={value}
       onChange={onChange}
-      format="markdown"
       readOnly={readOnly}
     />
   );

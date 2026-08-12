@@ -60,7 +60,6 @@ export type {
   PreviewPanelProps,
   ConfigFormProps,
   PageConfigPanelPage,
-  DocumentEditorFormat,
   DocumentEditorProps,
   ImageItem,
   ImageListWidgetProps,

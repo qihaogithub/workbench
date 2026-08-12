@@ -2,8 +2,11 @@
 
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
-import { LayerTreeMenu } from "@workbench/demo-ui";
-import type { VisualNodeInfo, VisualNodeTreeItem } from "@workbench/demo-ui";
+import { LayerTreeMenu } from "@workbench/demo-ui/LayerTreeMenu";
+import type {
+  VisualNodeInfo,
+  VisualNodeTreeItem,
+} from "@workbench/demo-ui/iframe-types";
 import { cn } from "@/lib/utils";
 
 const HEADER_HEIGHT = 37;

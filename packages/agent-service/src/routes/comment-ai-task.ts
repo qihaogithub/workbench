@@ -34,6 +34,7 @@ import {
 } from "../backends/pi-tools/comment-tools";
 import { broadcastCommentEvent } from "./comments-ws";
 import { projectWorkspaceManager } from "../workspace/project-workspace-manager";
+import { discoverLiveWorkspaces } from "../workspace/workspace-authority-migration";
 import { logger } from "../utils/logger";
 
 const TOKEN_HEADER = "x-internal-token";
@@ -165,12 +166,29 @@ function buildCommentTaskPrompt(
 // 任务循环
 // ============================================================
 
-async function resolveProjectWorkingDir(
+export async function resolveProjectWorkingDir(
   projectId: string,
 ): Promise<string | null> {
   try {
     await projectWorkspaceManager.init();
     const { project } = await projectWorkspaceManager.getProject(projectId);
+
+    // 优先解析到项目当前 active 的 live workspace（预览/编辑会话读取的数据源）。
+    // 否则回退到项目基准工作区，避免评论 @AI 的改动落在预览不读的目录。
+    if (project.activeWorkspaceId) {
+      const dataDir = path.dirname(getProjectsDir());
+      const live = discoverLiveWorkspaces(dataDir).find(
+        (ws) =>
+          ws.projectId === projectId &&
+          ws.workspaceId === project.activeWorkspaceId,
+      );
+      if (live) return live.workspacePath;
+      logger.warn(
+        { projectId, activeWorkspaceId: project.activeWorkspaceId },
+        "评论任务：active live workspace 未命中，回退到项目基准工作区",
+      );
+    }
+
     return project.workspacePath || null;
   } catch (error) {
     logger.warn(

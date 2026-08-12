@@ -96,12 +96,19 @@ describe("sessions route external auth reuse", () => {
         createdAt: 1,
         updatedAt: 2,
       })),
-      getWorkspaceMultiDemoFiles: jest.fn(() => ({
-        demos: {
-          page_1: { code: "code", schema: "schema" },
-        },
+      readProjectMeta: jest.fn(() => ({
+        id: "project-1",
+        name: "测试项目",
+        thumbnail: "/cover.png",
+        authoringPreferences: { sketchEditorEngine: "native" },
       })),
-      getWorkspaceFiles: jest.fn(() => ({ code: "code", schema: "schema" })),
+      listWorkspaceDemoPages: jest.fn(() => [
+        { id: "page_1", name: "页面 1", order: 0, parentId: null },
+        { id: "page_2", name: "页面 2", order: 1, parentId: null },
+      ]),
+      readFoldersMeta: jest.fn(() => []),
+      getProjectConfigSchema: jest.fn(() => '{"type":"object"}'),
+      getProjectConfigValues: jest.fn(() => ({ theme: "dark" })),
     }));
     jest.doMock("@/lib/session-manager", () => ({
       archiveActiveSession: jest.fn(),
@@ -111,10 +118,7 @@ describe("sessions route external auth reuse", () => {
         workspaceScope: "live",
         isSharedWorkspace: true,
         workspacePath: "/tmp/workspace",
-        code: "",
-        schema: "",
         tempWorkspace: "/tmp/workspace",
-        demos: { demos: {}, projectConfigSchema: undefined },
       })),
       enforceSessionLimit: jest.fn(),
       ensureSessionUsesProjectActiveWorkspace: jest.fn(),
@@ -278,6 +282,39 @@ describe("sessions route external auth reuse", () => {
       "project-1",
       undefined,
     );
+  });
+
+  it("新 Session 只返回轻量 Bootstrap，并按请求选择当前页", async () => {
+    const { POST } = await import("./route");
+
+    const response = await POST(
+      createJsonRequest({ demoId: "project-1", activePageId: "page_2" }) as never,
+    );
+    const body = (await response.json()) as {
+      data: Record<string, unknown> & { project: Record<string, unknown> };
+    };
+
+    expect(response.status).toBe(201);
+    expect(body.data.activePageId).toBe("page_2");
+    expect(body.data.demoPages).toHaveLength(2);
+    expect(body.data.project).toMatchObject({
+      id: "project-1",
+      name: "测试项目",
+      thumbnail: "/cover.png",
+    });
+    expect(body.data).not.toHaveProperty("demos");
+    expect(body.data).not.toHaveProperty("code");
+    expect(body.data).not.toHaveProperty("schema");
+  });
+
+  it("当 activePageId 无效时稳定回退到目录第一页", async () => {
+    const { POST } = await import("./route");
+    const response = await POST(
+      createJsonRequest({ demoId: "project-1", activePageId: "missing" }) as never,
+    );
+    const body = (await response.json()) as { data: { activePageId: string } };
+
+    expect(body.data.activePageId).toBe("page_1");
   });
 
   it("显式 forceNew 只归档当前对话，不创建用户私有 workspace", async () => {

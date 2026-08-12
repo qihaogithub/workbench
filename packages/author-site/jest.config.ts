@@ -12,6 +12,8 @@ const config: Config = {
   modulePathIgnorePatterns: ['<rootDir>/.next/'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^@milkdown(/.*)?$': '<rootDir>/jest-milkdown-mock.js',
+    '^@prosemirror-adapter/(react|core)$': '<rootDir>/jest-milkdown-mock.js',
     '^streamdown$': '<rootDir>/jest-streamdown-mock.js',
     '^@streamdown/(.*)$': '<rootDir>/jest-streamdown-mock.js',
     '^@workbench/project-core$': '<rootDir>/../project-core/src/index.ts',

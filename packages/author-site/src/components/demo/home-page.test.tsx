@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -55,6 +56,11 @@ const mockUpdateProjectTemplate = updateProjectTemplate as jest.MockedFunction<
   typeof updateProjectTemplate
 >;
 const originalFetch = global.fetch;
+const originalIntersectionObserver = global.IntersectionObserver;
+let intersectionObservers: Array<{
+  callback: IntersectionObserverCallback;
+  elements: Element[];
+}> = [];
 
 const demos = [
   {
@@ -78,6 +84,22 @@ const demos = [
 
 describe("HomePage", () => {
   beforeEach(() => {
+    intersectionObservers = [];
+    global.IntersectionObserver = jest.fn((callback: IntersectionObserverCallback) => {
+      const observerState = { callback, elements: [] as Element[] };
+      intersectionObservers.push(observerState);
+      return {
+        disconnect: jest.fn(),
+        observe: jest.fn((element: Element) => {
+          observerState.elements.push(element);
+        }),
+        takeRecords: jest.fn(() => []),
+        unobserve: jest.fn(),
+        root: null,
+        rootMargin: "0px",
+        thresholds: [0],
+      };
+    }) as unknown as typeof IntersectionObserver;
     mockUseDemos.mockReturnValue({
       demos,
       isLoading: false,
@@ -117,7 +139,9 @@ describe("HomePage", () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    jest.useRealTimers();
     global.fetch = originalFetch;
+    global.IntersectionObserver = originalIntersectionObserver;
   });
 
   it("普通项目卡片主体链接到项目编辑页", () => {
@@ -170,7 +194,9 @@ describe("HomePage", () => {
     ).toBeInTheDocument();
   });
 
-  it("无手动封面的项目会触发截图 ensure 并使用 hash meta 缩略图", async () => {
+  it("首页稳定后才串行补生缺失截图，并使用 hash meta 缩略图", async () => {
+    jest.useFakeTimers();
+    let resolveFirstEnsure: ((response: Response) => void) | undefined;
     const revalidate = jest.fn();
     mockUseDemos.mockReturnValue({
       demos: [
@@ -182,14 +208,28 @@ describe("HomePage", () => {
           updatedAt: 2,
           demoPages: [{ id: "page-1", name: "首页", order: 0, parentId: null }],
         },
+        {
+          id: "proj-cover-2",
+          name: "自动封面项目 2",
+          category: "活动",
+          createdAt: 1,
+          updatedAt: 2,
+          demoPages: [{ id: "page-2", name: "次页", order: 0, parentId: null }],
+        },
       ],
       isLoading: false,
       error: null,
       revalidate,
     });
-    global.fetch = jest.fn(async (input: RequestInfo | URL) => {
+    global.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url === "/api/screenshots/ensure") {
+        const body = JSON.parse(String(init?.body ?? "{}"));
+        if (body.projectId === "proj-cover") {
+          return new Promise((resolve) => {
+            resolveFirstEnsure = resolve;
+          }) as Promise<Response>;
+        }
         return new Response(
           JSON.stringify({ success: true, data: { generated: 1 } }),
         );
@@ -209,12 +249,59 @@ describe("HomePage", () => {
 
     render(<HomePage initialDemos={[]} />);
 
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      "/api/screenshots/file/proj-cover/page-1?meta=1",
+      expect.anything(),
+    );
+
+    act(() => {
+      const firstObserver = intersectionObservers[0];
+      firstObserver?.callback(
+        [
+          {
+            isIntersecting: true,
+            target: firstObserver.elements[0],
+          } as IntersectionObserverEntry,
+        ],
+        {} as IntersectionObserver,
+      );
+    });
+
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      "/api/screenshots/ensure",
+      expect.anything(),
+    );
+
+    await jest.advanceTimersByTimeAsync(1500);
+
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         "/api/screenshots/ensure",
         expect.objectContaining({
           method: "POST",
           body: JSON.stringify({ projectId: "proj-cover" }),
+        }),
+      );
+    });
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      "/api/screenshots/ensure",
+      expect.objectContaining({
+        body: JSON.stringify({ projectId: "proj-cover-2" }),
+      }),
+    );
+
+    resolveFirstEnsure?.(
+      {
+        json: async () => ({ success: true, data: { generated: 1 } }),
+      } as Response,
+    );
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/screenshots/ensure",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ projectId: "proj-cover-2" }),
         }),
       );
     });
@@ -226,6 +313,38 @@ describe("HomePage", () => {
     });
     expect(global.fetch).not.toHaveBeenCalledWith(
       "/api/screenshots/file/proj-cover/page-1",
+    );
+  });
+
+  it("开始打开项目后取消尚未启动的截图补生", async () => {
+    jest.useFakeTimers();
+    mockUseDemos.mockReturnValue({
+      demos: [
+        {
+          id: "proj-cover",
+          name: "自动封面项目",
+          category: "活动",
+          createdAt: 1,
+          updatedAt: 2,
+          demoPages: [{ id: "page-1", name: "首页", order: 0, parentId: null }],
+        },
+      ],
+      isLoading: false,
+      error: null,
+      revalidate: jest.fn(),
+    });
+    global.fetch = jest.fn() as typeof fetch;
+
+    render(<HomePage initialDemos={[]} />);
+
+    fireEvent.click(
+      screen.getByRole("link", { name: "打开项目 自动封面项目" }),
+    );
+    await jest.advanceTimersByTimeAsync(1500);
+
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      "/api/screenshots/ensure",
+      expect.anything(),
     );
   });
 

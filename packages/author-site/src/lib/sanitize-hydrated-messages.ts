@@ -1,4 +1,4 @@
-import type { ChatMessage } from "@/components/ai-elements";
+import type { ChatMessage } from "@workbench/ai-chat-shared/message";
 
 const VALID_AUTO_REPAIR_STATUSES = new Set(["running", "completed", "failed"]);
 

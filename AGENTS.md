@@ -44,7 +44,7 @@ AI agent 在启动任务前应优先读取 `memory.md`（如果存在），以�
 
 - **项目阶段：未上线，不需要向后兼容。** 可以直接做破坏性变更（重命名接口、删除字段、修改数据格式等），无需迁移脚本或兼容层。不要为了兼容旧数据格式（如旧版 config.schema.json 的字段写法、废弃的类型键、历史 AI 生成的非标准 schema 等）添加额外代码分支或映射逻辑——修复数据本身比在代码层兜底更干净。
 - 包管理器：`pnpm@8.15.0`
-- Node 要求：`node >=20.0.0`
+- Node 要求：`node >=24.0.0 <25`（统一使用 Node 24 LTS）
 - `.npmrc`：`shamefully-hoist=true`
 - Workspace：`packages/*` 和 `OPS/CLI`
 - 前端：Next.js 14 App Router、Tailwind CSS、shadcn/ui、lucide-react
@@ -183,6 +183,8 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h
 - 大 SPA 页面必须开 single-file 的 `--remove-unused-styles` / `--remove-unused-fonts` / `--remove-hidden-elements`，否则 CSS 超 `MAX_PROTOTYPE_CSS_LENGTH`（120KB）。
 - 导入 `ow project import-prototype` 需显式 `--data-dir <repo>/data`，否则在 `--source` 目录运行时 dataDir 解析错误。
 - normalize 进度日志走 stderr，stdout 只输出 JSON。
+- 评审意见回流用 `bin/export-opinions.mjs`：读 `data/projects/<projectId>/comments.json`，按 routeKey（来自 demoPages / `data-route` 锚点）导出意见 JSON，agent 在开发项目按 routeKey 定位源码消费。
+- 纯静态 HTML/CSS 项目走 B 路径：`export.mjs --static <html-dir>`（跳过 single-file 渲染，直接净化源码，复用 normalize 净化规则）；`import-prototype` 已支持按 pageId 覆盖更新既有原型页。
 
 `OPS/automations/` 用于维护 Codex 定时任务和维护型自动任务的运行上下文，包括 context、runbook 和当前状态账本。它的目标读者是自动任务中的 AI，优先保证可执行、可复查和低噪声更新。
 
@@ -343,6 +345,17 @@ pnpm --filter @workbench/project-cli test
 
 ## 关键架构
 
+Markdown 编辑器（DocumentEditor）：
+
+- `packages/demo-ui/src/DocumentEditor.tsx` 是项目唯一的 Markdown 富文本编辑器，基于 **Milkdown Crepe v7**；Markdown 即主线模型，实现实时渲染输入。**已不再使用 TipTap、自研 Milkdown native-ui 或 prosemirror-markdown**，勿再引用旧实现。
+- Crepe 统一提供 `/` 块菜单、选中文本浮动格式条、块拖拽、链接、图片、表格、代码块、列表、光标与占位体验；项目能力通过 `packages/demo-ui/src/markdown/crepe-config.ts` 的 `BlockEdit.buildMenu` 追加配置引用、视频和附件，图片上传复用 `ImageBlock` 配置。Latex、TopBar 和 Crepe AI 明确关闭。
+- `DocumentEditor` 直接管理单一 Crepe 实例；受控 `value`/`onChange` 用 `lastEmittedRef` 防回环，外部同步用底层 Milkdown `replaceAll`，只读切换用 `crepe.setReadonly`，卸载必须销毁实例。
+- 主题只导入 Crepe common 结构样式，项目色彩、排版、浮层与响应式规则集中在 `packages/demo-ui/src/markdown/crepe-theme.css`，通过宿主 CSS tokens 自动适配明暗主题。
+- 消费方（author-site/viewer-site/ai-chat-shared）统一以 Markdown 传 `value`，已无 `format`/`htmlSanitizer` 参数。
+- **prosemirror 双实例**：milkdown 与 prosemirror-adapter 各带不同 `prosemirror-view`/`prosemirror-model`，根 `package.json` `overrides` 已强制统一单一版本，勿手动改回。
+- **测试 ESM 坑**：`@milkdown/*`、`@prosemirror-adapter/*` 均为 ESM-only，author-site 的 Jest（CJS）无法解析，靠 `packages/author-site/jest-milkdown-mock.js` + jest.config `moduleNameMapper` 全局映射兜底；demo-ui 用 Vitest 直接跑真实 Milkdown（roundtrip 幂等 + 集成渲染测试）。`codemirror`/`@codemirror/*` 自带 CJS 构建，Jest 可直接解析、无需 mock。
+- **Node 24 + vitest 1.6.1 不兼容**：会报 `Cannot set property testPath`，demo-ui 已升级 vitest 2.1.9；其它包若在 Node 24 下跑 vitest 报此错，同样需升级 vitest。
+
 Auth：
 
 - author-site 使用 JWT（`jose`）。
@@ -397,6 +410,19 @@ Docker：
 - 部署脚本：`scripts/deploy.sh`。
 - Docker 环境：OrbStack（macOS）。国内 Docker Hub 直连不通，需通过 Clash 代理拉取镜像。
 
+数据目录双向同步（本地 ↔ 正式），统一入口 `scripts/data-sync.sh`：
+
+```bash
+scripts/data-sync.sh prod2local            # 正式 → 覆盖本地（自动备份本地，交互确认）
+scripts/data-sync.sh prod2local --dry-run  # 只读预检
+scripts/data-sync.sh local2prod            # 本地 → 覆盖正式（高风险，自动备份正式）
+scripts/data-sync.sh local2prod --yes      # 跳过交互确认
+```
+
+- 底层复用 `scripts/sync-production-data-to-local.sh`（prod2local）与 `scripts/deploy-author-with-data.sh`（local2prod），环境变量（`SERVER_IP`/`SERVER_USER`/`SSH_PASSWORD` 等）可覆盖透传。
+- 覆盖前自动备份；正式备份 `/Users/jojo/workbench-data-backups`，本地备份 `../workbench-data-backups`。
+- 注意：覆盖只改磁盘 data，已运行的 Docker 容器需重新构建/重启才生效。
+
 OrbStack 代理配置（开发必备）：
 
 OrbStack `network_proxy` 如果在 VM 启动前就指向宿主机桥接 IP（`192.168.139.3`），会导致 VM 启不动（桥接由 OrbStack 自己创建，启动时尚未就绪，死锁）。使用 launchd 自动代理守护进程根治：
@@ -431,6 +457,7 @@ orb config set network_proxy "http://192.168.139.3:7890"
 
 Docker 栈启动注意事项：
 
+- 3200-3300 端口服务来自 Docker 构建产物，不会像 4200-4300 端口的本地 dev 服务一样反映当前源码。做 UI 验收时若 DOM 或 CSS 与工作区不一致，先确认端口并重建对应容器，不要把旧构建现象当成当前源码行为。
 - `docker compose up` 默认读取根目录 `.env`，该文件是 dev 端口（4200-4300）的 CORS 白名单。**Docker 栈必须使用 `--env-file .env.docker` 启动**，否则 agent-service 的 CORS 白名单会错配为 dev 端口，导致浏览器端附件上传等跨域请求被拦截（"Failed to fetch"）。聊天正常是因为走 WebSocket（不受 CORS 限制）。
 - 正确启动命令：`docker compose --env-file .env.docker up -d`（或经过 deploy.sh 生成的 `.deploy.env`）。
 - 验证 CORS 是否生效：`docker inspect workbench-agent-service-1 | grep CORS_ORIGINS` 应含 3200/3300；curl 带 `Origin: http://localhost:3200` POST 附件应返回 `access-control-allow-origin`。

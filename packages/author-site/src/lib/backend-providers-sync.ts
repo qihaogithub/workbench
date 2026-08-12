@@ -272,6 +272,43 @@ export function scheduleStartupBackendProvidersSync(): void {
     });
   }, STARTUP_SYNC_DELAY_MS);
   unrefTimer(timer);
+
+  // agent-service 的全局 backendProviders 是内存态，agent-service 重启后会丢失。
+  // 启动后周期性核验：若 DB 有配置而 agent-service 全局配置缺失（如 agent 重启），自动重新推送。
+  startPeriodicVerify();
+}
+
+// ── 周期性配置核验 ──
+
+let verifyTimer: NodeJS.Timeout | null = null;
+const VERIFY_INTERVAL_MS = 15_000;
+
+function startPeriodicVerify(): void {
+  if (verifyTimer) return;
+  verifyTimer = setInterval(() => {
+    void verifyTick();
+  }, VERIFY_INTERVAL_MS);
+  unrefTimer(verifyTimer);
+}
+
+async function verifyTick(): Promise<void> {
+  if (syncState.inProgress || hasPendingRetry()) return;
+
+  const stored = readStoredBackendProvidersConfig();
+  const dbHasProviders = (stored.config?.providers?.length ?? 0) > 0;
+  if (!dbHasProviders) return;
+
+  const agentResult = await fetchBackendProvidersFromAgent();
+  const agentHasProviders =
+    agentResult.ok && (agentResult.config?.providers?.length ?? 0) > 0;
+  if (agentHasProviders) return;
+
+  console.log(
+    "[BackendProviders Sync] agent-service global config missing, re-pushing",
+  );
+  await syncStoredBackendProvidersToAgent("recovery", {
+    scheduleRetryOnFailure: true,
+  });
 }
 
 // ── Agent-service 健康恢复监控 ──
@@ -346,6 +383,7 @@ function stopRecoveryMonitoring(): void {
 /** @internal exported for unit testing only */
 export {
   recoveryTick as _recoveryTick,
+  verifyTick as _verifyTick,
   stopRecoveryMonitoring as _stopRecoveryMonitoring,
 };
 

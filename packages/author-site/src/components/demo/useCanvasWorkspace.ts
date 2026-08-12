@@ -5,8 +5,8 @@ import type {
   CanvasSaveStatus,
   CanvasState,
   PreviewMode,
-} from "@workbench/demo-ui";
-import { loadCanvasLayout } from "@workbench/demo-ui";
+} from "@workbench/demo-ui/types";
+import { loadCanvasLayout } from "@workbench/demo-ui/canvas-utils";
 
 const DEFAULT_CANVAS_STATE: CanvasState = {
   viewport: { x: 40, y: 40, zoom: 0.5 },

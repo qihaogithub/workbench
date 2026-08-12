@@ -44,6 +44,7 @@ const ALLOWED_TAGS = [
 ];
 
 const ALLOWED_ATTR = [
+  "class",
   "href",
   "target",
   "rel",

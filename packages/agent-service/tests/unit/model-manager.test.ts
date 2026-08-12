@@ -6,6 +6,7 @@ import type { AgentConfig } from '../../src/core/types';
 vi.mock('@earendil-works/pi-agent-core', () => ({
   AgentHarness: vi.fn(),
   InMemorySessionRepo: vi.fn(),
+  estimateContextTokens: () => ({ tokens: 0 }),
 }));
 vi.mock('@earendil-works/pi-agent-core/node', () => ({
   NodeExecutionEnv: vi.fn(),
@@ -132,6 +133,31 @@ describe('ModelManager', () => {
       expect(model.baseUrl).toBe('https://api.example.com/v1');
       expect(model.api).toBe('openai-completions');
       expect(model.apiKey).toBe('sk-test');
+    });
+
+    it('使用供应商声明的上下文窗口和最大输出', () => {
+      const customManager = new ModelManager({
+        sessionId: 'test-session',
+        backendProviders: {
+          providers: [
+            {
+              id: 'custom',
+              name: 'custom',
+              models: ['model-a'],
+              apiKey: 'sk-test',
+              baseURL: 'https://api.example.com/v1',
+              contextWindow: 64_000,
+              maxTokens: 8_192,
+            },
+          ],
+          activeModelId: 'custom/model-a',
+        },
+      });
+
+      expect(customManager.getModel()).toMatchObject({
+        contextWindow: 64_000,
+        maxTokens: 8_192,
+      });
     });
 
     it('AgentConfig.model 命中 multimodalModels 时自定义模型应支持图片输入', () => {

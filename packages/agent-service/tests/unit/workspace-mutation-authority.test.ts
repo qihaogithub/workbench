@@ -29,6 +29,45 @@ afterEach(() => {
 });
 
 describe("WorkspaceMutationAuthority", () => {
+  it("写入页面图片或动效 Schema 时在同一 mutation 创建并同步设计规范", async () => {
+    const { authority, workspacePath } = createAuthority();
+    fs.writeFileSync(
+      path.join(workspacePath, "workspace-tree.json"),
+      JSON.stringify({ folders: [], pages: [{ id: "home", name: "首页", order: 0 }] }),
+      "utf-8",
+    );
+    const schema = JSON.stringify({
+      properties: {
+        hero: { type: "string", format: "image", title: "头图" },
+        introMotion: { type: "motion", title: "入场动效" },
+      },
+    });
+
+    const receipt = await authority.mutate({
+      mutationId: "design-spec-sync", projectId: "project-1", workspaceId: "workspace-1", baseRevision: 1,
+      actor: "ai", reason: "update_schema", operations: [
+        { type: "put_text", path: "demos/home/config.schema.json", content: schema, expectedAbsent: true },
+      ],
+    });
+
+    expect(receipt.resources.map((resource) => resource.path)).toEqual(expect.arrayContaining([
+      "demos/home/config.schema.json",
+      "design-spec/manifest.json",
+    ]));
+    const manifest = JSON.parse(fs.readFileSync(path.join(workspacePath, "design-spec", "manifest.json"), "utf-8")) as {
+      items: Array<{ id: string; title: string }>;
+    };
+    const doc = JSON.parse(fs.readFileSync(
+      path.join(workspacePath, "design-spec", `spec-${manifest.items[0].id}.json`),
+      "utf-8",
+    )) as { entries: Array<{ autoManagedFieldKey: string; markdown: string }> };
+    expect(manifest.items[0].title).toBe("首页设计规范");
+    expect(doc.entries).toEqual(expect.arrayContaining([
+      expect.objectContaining({ autoManagedFieldKey: "hero", markdown: "" }),
+      expect.objectContaining({ autoManagedFieldKey: "introMotion", markdown: "" }),
+    ]));
+  });
+
   it("提交 receipt 后才发布事件，Yjs-First 不再拒绝旧 hash 覆盖", async () => {
     const { authority, workspacePath } = createAuthority();
     const events: string[] = [];

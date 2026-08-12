@@ -1,16 +1,21 @@
 "use client";
-import React, { useMemo } from "react";
+import React, { lazy, Suspense, useMemo } from "react";
 
 import { IframePreviewFrame } from "./IframePreviewFrame";
 import { PreviewPanel } from "./PreviewPanel";
 import { PrototypePagePreview } from "./PrototypePagePreview";
-import { SketchPagePreview } from "./SketchPagePreview";
 import {
   resolvePagePreviewRenderer,
   resolvePreviewStageSize,
 } from "./preview-stage-resolver";
 import type { SinglePagePreviewProps } from "./preview-stage-types";
 import { cn } from "./utils";
+
+const SketchPagePreview = lazy(() =>
+  import("./SketchPagePreview").then((module) => ({
+    default: module.SketchPagePreview,
+  })),
+);
 
 function DefaultEmptyState() {
   return (
@@ -64,13 +69,21 @@ function SinglePagePreviewInternal({
   } else if (page && renderer === "sketch") {
     content = (
       <div className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-md border bg-background shadow-sm">
-        <SketchPagePreview
-          {...rendererProps?.sketch}
-          scene={page.sketchScene}
-          previewSize={previewSize}
-          configData={page.configData}
-          fillContainer={rendererProps?.sketch?.fillContainer ?? true}
-        />
+        <Suspense
+          fallback={
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              正在加载手绘预览…
+            </div>
+          }
+        >
+          <SketchPagePreview
+            {...rendererProps?.sketch}
+            scene={page.sketchScene}
+            previewSize={previewSize}
+            configData={page.configData}
+            fillContainer={rendererProps?.sketch?.fillContainer ?? true}
+          />
+        </Suspense>
       </div>
     );
   } else if (
@@ -137,4 +150,3 @@ export const SinglePagePreview = React.memo(
   SinglePagePreviewInternal,
   areSinglePagePreviewPropsEqual,
 );
-

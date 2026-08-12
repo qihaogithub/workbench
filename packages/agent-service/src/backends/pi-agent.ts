@@ -43,10 +43,16 @@ import { logger } from "../utils/logger";
 import { withLlmRetry } from "../utils/retry-utils";
 import {
   getAgentHarness,
+  getEstimateContextTokens,
   getNodeExecutionEnv,
   getInMemorySessionRepo,
   loadPiAgentDeps,
 } from "./managers/pi-agent-deps";
+import {
+  decideContextCompaction,
+  estimatePendingPromptTokens,
+  type ContextCompactionDecision,
+} from "./managers/context-compaction-manager";
 import { ModelManager, getServiceConfig } from "./managers/model-manager";
 import { PermissionManager } from "./managers/permission-manager";
 import { UserInteractionManager } from "./managers/user-interaction-manager";
@@ -530,6 +536,86 @@ export class PiAgentBackend implements IBackendAdapter {
       messages: stripExpiredImageParts(event.messages),
     }));
     this.unsubFns.push(unsubContext);
+  }
+
+  private async compactContextIfNeeded(
+    model: any,
+    pendingPrompt: string,
+    imageCount: number,
+    reason: "preflight" | "overflow_recovery",
+  ): Promise<boolean> {
+    if (!this.harness || !this.session?.buildContext) return false;
+
+    let decision: ContextCompactionDecision | null = null;
+    try {
+      const context = await this.session.buildContext();
+      if (!context?.messages?.length) return false;
+
+      const estimate = getEstimateContextTokens();
+      const historicalTokens = typeof estimate === "function"
+        ? estimate(context.messages).tokens
+        : 0;
+      const estimatedTokens = historicalTokens + estimatePendingPromptTokens(
+        pendingPrompt,
+        imageCount,
+      );
+      decision = decideContextCompaction(estimatedTokens, model);
+      if (reason === "preflight" && !decision.shouldCompact) return false;
+
+      const startedAt = Date.now();
+      const result = await this.harness.compact();
+      const durationMs = Date.now() - startedAt;
+      const tokensBefore = Number.isFinite(result?.tokensBefore)
+        ? result.tokensBefore
+        : decision.estimatedTokens;
+
+      logger.info(
+        {
+          sessionId: this.sessionId ?? this.config.sessionId,
+          modelId: model?.id,
+          reason,
+          estimatedTokens: decision.estimatedTokens,
+          thresholdTokens: decision.thresholdTokens,
+          contextWindow: decision.contextWindow,
+          maxTokens: decision.maxTokens,
+          tokensBefore,
+          durationMs,
+        },
+        "Pi Agent context compacted",
+      );
+      this.eventCallback?.({
+        type: "context_compacted",
+        sessionId: this.sessionId ?? this.config.sessionId,
+        reason,
+        tokensBefore,
+        contextWindow: decision.contextWindow,
+        durationMs,
+      });
+      return true;
+    } catch (error) {
+      logger.warn(
+        {
+          sessionId: this.sessionId ?? this.config.sessionId,
+          modelId: model?.id,
+          reason,
+          estimatedTokens: decision?.estimatedTokens,
+          contextWindow: decision?.contextWindow,
+          error: serializeErrorForLog(error),
+        },
+        "Pi Agent context compaction failed",
+      );
+      return false;
+    }
+  }
+
+  private isContextOverflowError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    const normalized = message.toLowerCase();
+    return (
+      normalized.includes("maximum context length") ||
+      normalized.includes("context length exceeded") ||
+      normalized.includes("context window exceeded")
+    );
   }
 
   /**
@@ -1021,9 +1107,34 @@ Keep the final response concise: summarize what you changed, what you verified, 
     );
 
     try {
-      const result = await this.harness.prompt(promptContent, {
-        images: imageContent,
-      });
+      await this.compactContextIfNeeded(
+        model,
+        promptContent,
+        imageContent?.length ?? 0,
+        "preflight",
+      );
+
+      let result: any;
+      try {
+        result = await this.harness.prompt(promptContent, {
+          images: imageContent,
+        });
+      } catch (error) {
+        if (!this.isContextOverflowError(error)) throw error;
+
+        const compacted = await this.compactContextIfNeeded(
+          model,
+          promptContent,
+          imageContent?.length ?? 0,
+          "overflow_recovery",
+        );
+        if (!compacted) throw error;
+
+        // Exactly one retry: a second overflow reaches the normal error mapper.
+        result = await this.harness.prompt(promptContent, {
+          images: imageContent,
+        });
+      }
       this.status = "ready";
       this.lastResponseDebug = summarizeAssistantMessageShape(result);
 

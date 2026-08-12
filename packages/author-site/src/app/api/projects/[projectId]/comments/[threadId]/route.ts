@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { CommentAiTaskStatus } from "@workbench/shared";
+import type { CommentAiTaskStatus, CommentMention } from "@workbench/shared";
 import { createApiSuccess, createApiError } from "@/lib/fs-utils";
 import {
   getCommentThread,
@@ -13,6 +13,7 @@ type RouteParams = { params: { projectId: string; threadId: string } };
 interface PatchBody {
   resolved?: boolean;
   content?: string;
+  mentions?: CommentMention[];
   aiTaskStatus?: CommentAiTaskStatus;
   anonymousId?: string;
   displayName?: string;
@@ -47,12 +48,17 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       });
     }
 
-    const updates: { resolved?: boolean; content?: string; aiTaskStatus?: CommentAiTaskStatus } = {};
+    const updates: { resolved?: boolean; content?: string; mentions?: CommentMention[]; aiTaskStatus?: CommentAiTaskStatus } = {};
     if (typeof body.resolved === "boolean") {
       updates.resolved = body.resolved;
     }
     if (typeof body.content === "string" && body.content.trim()) {
+      const mentions = Array.isArray(body.mentions) ? body.mentions : [];
+      if (authorResult.author.isAnonymous && mentions.some((mention) => mention.type === "user")) {
+        return NextResponse.json(createApiError("VALIDATION_ERROR", "匿名用户不能 @其他用户"), { status: 400 });
+      }
       updates.content = body.content.trim();
+      updates.mentions = mentions;
     }
     if (body.aiTaskStatus !== undefined) {
       updates.aiTaskStatus = body.aiTaskStatus;

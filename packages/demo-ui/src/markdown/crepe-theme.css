@@ -1,0 +1,391 @@
+.document-editor-crepe {
+  /* Keep Crepe's Frame palette relationships while deriving both modes from the host. */
+  --crepe-color-background: color-mix(in srgb, hsl(var(--background)) 94%, hsl(var(--foreground)));
+  --crepe-color-on-background: hsl(var(--foreground));
+  --crepe-color-surface: hsl(var(--background));
+  --crepe-color-surface-low: color-mix(in srgb, hsl(var(--background)) 90%, hsl(var(--foreground)));
+  --crepe-color-on-surface: color-mix(in srgb, hsl(var(--background)) 20%, hsl(var(--foreground)));
+  --crepe-color-on-surface-variant: color-mix(in srgb, hsl(var(--background)) 36%, hsl(var(--foreground)));
+  --crepe-color-outline: color-mix(in srgb, hsl(var(--background)) 56%, hsl(var(--foreground)));
+  --crepe-color-primary: color-mix(in srgb, hsl(var(--background)) 30%, hsl(var(--foreground)));
+  --crepe-color-secondary: color-mix(in srgb, hsl(var(--background)) 72%, hsl(var(--foreground)));
+  --crepe-color-on-secondary: color-mix(in srgb, hsl(var(--background)) 14%, hsl(var(--foreground)));
+  --crepe-color-hover: color-mix(in srgb, hsl(var(--background)) 88%, hsl(var(--foreground)));
+  --crepe-color-selected: color-mix(in srgb, hsl(var(--background)) 82%, hsl(var(--foreground)));
+  --crepe-color-inverse: hsl(var(--foreground));
+  --crepe-color-on-inverse: hsl(var(--background));
+  --crepe-color-inline-code: hsl(var(--destructive));
+  --crepe-color-error: hsl(var(--destructive));
+  --crepe-color-inline-area: color-mix(in srgb, hsl(var(--background)) 84%, hsl(var(--foreground)));
+
+  --crepe-base-font-size: 16px;
+  --crepe-font-default: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif;
+  --crepe-font-title: var(--crepe-font-default);
+  --crepe-font-code: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+
+  --crepe-shadow-1: 0 1px 2px color-mix(in srgb, hsl(var(--foreground)) 15%, transparent),
+    0 1px 3px color-mix(in srgb, hsl(var(--foreground)) 8%, transparent);
+  --crepe-shadow-2: 0 2px 6px color-mix(in srgb, hsl(var(--foreground)) 15%, transparent),
+    0 1px 2px color-mix(in srgb, hsl(var(--foreground)) 10%, transparent);
+
+  color: var(--crepe-color-on-background);
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.document-editor-crepe > .crepe,
+.document-editor-crepe .milkdown {
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--crepe-color-background);
+}
+
+.document-editor-crepe .milkdown .ProseMirror {
+  box-sizing: border-box;
+  min-height: 200px;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 16px 20px 40px 64px;
+  color: var(--crepe-color-on-background);
+  caret-color: var(--crepe-color-primary);
+  font-family: var(--crepe-font-default);
+  font-size: 15px;
+  line-height: 1.75;
+  word-break: break-word;
+  outline: none;
+}
+
+.document-editor-crepe .milkdown .milkdown-top-bar {
+  top: 0;
+  min-height: 44px;
+  padding: 0 8px;
+  flex-wrap: nowrap;
+  border-bottom: 1px solid var(--crepe-color-surface-low);
+  background: var(--crepe-color-surface);
+}
+
+.document-editor-crepe[data-readonly="true"] .milkdown .milkdown-top-bar {
+  display: none;
+}
+
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-inner {
+  width: 100%;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-inner > * {
+  flex-shrink: 0;
+}
+
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-item {
+  margin-inline: 3px;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-divider {
+  margin-inline: 5px;
+}
+
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-heading-dropdown {
+  border: 1px solid var(--crepe-color-surface-low);
+  background: var(--crepe-color-surface);
+  box-shadow: var(--crepe-shadow-2);
+}
+
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow {
+  position: relative;
+  margin-left: auto;
+}
+
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-trigger,
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-item {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--crepe-color-on-surface);
+}
+
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-trigger {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-trigger:hover,
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-item:hover,
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-heading:hover,
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-heading-option:hover,
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-back:hover {
+  background: var(--crepe-color-hover);
+}
+
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  right: 0;
+  display: flex;
+  min-width: 144px;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid var(--crepe-color-surface-low);
+  border-radius: 8px;
+  background: var(--crepe-color-surface);
+  box-shadow: var(--crepe-shadow-2);
+}
+
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-heading,
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-heading-option,
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-back {
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--crepe-color-on-surface);
+  font: inherit;
+  text-align: left;
+}
+
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-item svg,
+.document-editor-crepe .milkdown .milkdown-toolbar .toolbar-item svg {
+  color: var(--crepe-color-on-surface);
+  fill: var(--crepe-color-on-surface);
+  opacity: 1;
+}
+
+.document-editor-crepe .milkdown .milkdown-toolbar .toolbar-item {
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-item:hover,
+.document-editor-crepe .milkdown .milkdown-toolbar .toolbar-item:hover {
+  background: var(--crepe-color-hover);
+}
+
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-item.active,
+.document-editor-crepe .milkdown .milkdown-toolbar .toolbar-item.active {
+  background: var(--crepe-color-selected);
+}
+
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-item:hover svg,
+.document-editor-crepe .milkdown .milkdown-toolbar .toolbar-item:hover svg,
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-item.active svg,
+.document-editor-crepe .milkdown .milkdown-toolbar .toolbar-item.active svg {
+  color: var(--crepe-color-primary);
+  fill: var(--crepe-color-primary);
+  opacity: 1;
+}
+
+.document-editor-crepe .milkdown .milkdown-block-handle {
+  gap: 2px;
+}
+
+.document-editor-crepe .milkdown .milkdown-block-handle .operation-item {
+  width: 22px;
+  height: 22px;
+  padding: 4px;
+  transition: background-color 160ms ease;
+}
+
+.document-editor-crepe .milkdown .milkdown-block-handle .operation-item svg {
+  width: 14px;
+  height: 14px;
+  color: var(--crepe-color-on-surface);
+  fill: var(--crepe-color-on-surface);
+  opacity: 1;
+}
+
+.document-editor-crepe .milkdown .milkdown-slash-menu {
+  border-radius: 8px;
+}
+
+.document-editor-crepe .milkdown .milkdown-slash-menu .tab-group {
+  padding: 4px 6px 0;
+}
+
+.document-editor-crepe .milkdown .milkdown-slash-menu .tab-group ul {
+  gap: 2px;
+  padding: 2px;
+}
+
+.document-editor-crepe .milkdown .milkdown-slash-menu .tab-group ul li {
+  padding: 4px 8px;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.document-editor-crepe .milkdown .milkdown-slash-menu .menu-groups {
+  max-height: min(320px, 55vh);
+  padding: 2px 6px 6px;
+}
+
+.document-editor-crepe .milkdown .milkdown-slash-menu .menu-groups .menu-group h6 {
+  padding: 7px 8px 4px;
+  font-size: 12px;
+  line-height: 16px;
+  text-transform: none;
+}
+
+.document-editor-crepe .milkdown .milkdown-slash-menu .menu-groups .menu-group li {
+  min-width: 176px;
+  gap: 10px;
+  padding: 7px 8px;
+}
+
+.document-editor-crepe .milkdown .milkdown-slash-menu .menu-groups .menu-group li svg {
+  width: 18px;
+  height: 18px;
+}
+
+.document-editor-crepe .milkdown .milkdown-slash-menu .menu-groups .menu-group li > span {
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.document-editor-crepe .milkdown .ProseMirror > * + * {
+  margin-top: 0.8em;
+}
+
+.document-editor-crepe .milkdown .ProseMirror h1,
+.document-editor-crepe .milkdown .ProseMirror h2,
+.document-editor-crepe .milkdown .ProseMirror h3,
+.document-editor-crepe .milkdown .ProseMirror h4 {
+  color: var(--crepe-color-on-background);
+  font-family: var(--crepe-font-default);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.document-editor-crepe .milkdown .ProseMirror h1 { font-size: 2em; margin-top: 1.35em; }
+.document-editor-crepe .milkdown .ProseMirror h2 { font-size: 1.55em; margin-top: 1.25em; }
+.document-editor-crepe .milkdown .ProseMirror h3 { font-size: 1.25em; margin-top: 1.1em; }
+.document-editor-crepe .milkdown .ProseMirror p { margin-block: 0.6em; }
+.document-editor-crepe .milkdown .ProseMirror a { color: var(--crepe-color-primary); text-decoration: underline; text-underline-offset: 3px; }
+.document-editor-crepe .milkdown .ProseMirror blockquote { border-left: 3px solid var(--crepe-color-outline); padding-left: 1em; color: var(--crepe-color-on-surface-variant); }
+.document-editor-crepe .milkdown .ProseMirror hr { margin: 2em 0; border-color: var(--crepe-color-outline); }
+
+.document-editor-crepe .milkdown .heading-style-selector {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.document-editor-crepe .milkdown .heading-style-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 78px;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--crepe-color-on-surface);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.document-editor-crepe .milkdown .heading-style-trigger:hover,
+.document-editor-crepe .milkdown .heading-style-trigger[aria-expanded="true"] {
+  background: var(--crepe-color-hover);
+}
+
+.document-editor-crepe .milkdown .heading-style-menu {
+  position: absolute;
+  z-index: 2;
+  top: calc(100% + 6px);
+  left: 0;
+  display: grid;
+  min-width: 128px;
+  padding: 4px;
+  border: 1px solid var(--crepe-color-surface-low);
+  border-radius: 8px;
+  background: var(--crepe-color-surface);
+  box-shadow: var(--crepe-shadow-2);
+}
+
+.document-editor-crepe .milkdown .heading-style-option {
+  min-height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--crepe-color-on-surface);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+}
+
+.document-editor-crepe .milkdown .heading-style-option:hover,
+.document-editor-crepe .milkdown .heading-style-option[aria-checked="true"] {
+  background: var(--crepe-color-hover);
+}
+
+.document-editor-crepe .milkdown .ProseMirror:focus-visible {
+  outline: none;
+}
+
+.document-editor-crepe .milkdown .crepe-placeholder::before {
+  color: var(--crepe-color-on-surface-variant);
+  opacity: 0.75;
+}
+
+.document-editor-crepe .milkdown-menu,
+.document-editor-crepe [data-milkdown-menu],
+.document-editor-crepe .milkdown-toolbar,
+.document-editor-crepe .milkdown-link-preview,
+.document-editor-crepe .milkdown-link-edit {
+  border: 1px solid var(--crepe-color-surface-low);
+  border-radius: 10px;
+  background: var(--crepe-color-surface);
+  color: var(--crepe-color-on-surface);
+  box-shadow: var(--crepe-shadow-2);
+}
+
+.document-editor-crepe button,
+.document-editor-crepe [role="button"] {
+  cursor: pointer;
+}
+
+.document-editor-crepe button:focus-visible,
+.document-editor-crepe [role="button"]:focus-visible,
+.document-editor-crepe input:focus-visible {
+  outline: 2px solid var(--crepe-color-primary);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .document-editor-crepe .milkdown .ProseMirror {
+    max-width: none;
+    padding: 12px 14px 32px 56px;
+    font-size: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .document-editor-crepe *,
+  .document-editor-crepe *::before,
+  .document-editor-crepe *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

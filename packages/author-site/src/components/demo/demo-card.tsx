@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type SyntheticEvent,
@@ -41,6 +42,7 @@ const MAX_SCREENSHOT_ASPECT_RATIO = 1.8;
 interface DemoCardProps {
   demo: DemoMeta;
   screenshotRevision?: number;
+  loadScreenshotMetadata?: boolean;
   onDelete: (id: string) => void;
   onSaveAsTemplate: (demo: DemoMeta) => void;
   onDuplicate: (demo: DemoMeta) => void;
@@ -49,6 +51,7 @@ interface DemoCardProps {
   onChangeCover: (demo: DemoMeta) => void;
   onShare: (demo: DemoMeta) => void;
   onConvertToProject: (demo: DemoMeta) => void;
+  onOpen?: () => void;
 }
 
 function formatShortDate(timestamp: number): string {
@@ -87,6 +90,7 @@ function PageScreenshotCell({
   projectId,
   page,
   screenshotRevision = 0,
+  loadScreenshotMetadata = true,
   showOverlay,
   overlayText,
   className,
@@ -96,16 +100,43 @@ function PageScreenshotCell({
   projectId: string;
   page: { id: string; name: string };
   screenshotRevision?: number;
+  loadScreenshotMetadata?: boolean;
   showOverlay: boolean;
   overlayText?: string;
   className?: string;
   style?: CSSProperties;
   onAspectRatio?: (pageId: string, aspectRatio: number) => void;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return;
+
+    if (typeof IntersectionObserver === "undefined") {
+      setIsVisible(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "240px 0px" },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!isVisible || !loadScreenshotMetadata) return;
+
     let cancelled = false;
     const metaUrl = `/api/screenshots/file/${encodeURIComponent(
       projectId,
@@ -141,7 +172,7 @@ function PageScreenshotCell({
     return () => {
       cancelled = true;
     };
-  }, [projectId, page.id, screenshotRevision]);
+  }, [isVisible, loadScreenshotMetadata, projectId, page.id, screenshotRevision]);
 
   const handleError = useCallback(() => {
     setFailed(true);
@@ -159,6 +190,7 @@ function PageScreenshotCell({
 
   return (
     <div
+      ref={containerRef}
       className={`relative flex min-h-0 items-center justify-center overflow-hidden rounded-sm bg-muted/35 ${className ?? ""}`}
       style={style}
     >
@@ -221,9 +253,11 @@ function PagePreviewPlaceholder({ label }: { label: string }) {
 function ScreenshotCover({
   demo,
   screenshotRevision,
+  loadScreenshotMetadata,
 }: {
   demo: DemoMeta;
   screenshotRevision?: number;
+  loadScreenshotMetadata?: boolean;
 }) {
   const [aspectRatios, setAspectRatios] = useState<Record<string, number>>({});
   const pages = demo.demoPages ?? [];
@@ -310,6 +344,7 @@ function ScreenshotCover({
                   projectId={demo.id}
                   page={page}
                   screenshotRevision={screenshotRevision}
+                  loadScreenshotMetadata={loadScreenshotMetadata}
                   className={
                     isDenseLayout
                       ? "min-w-0"
@@ -377,6 +412,7 @@ function PlaceholderIcon() {
 export function DemoCard({
   demo,
   screenshotRevision,
+  loadScreenshotMetadata,
   onDelete,
   onSaveAsTemplate,
   onDuplicate,
@@ -385,6 +421,7 @@ export function DemoCard({
   onChangeCover,
   onShare,
   onConvertToProject,
+  onOpen,
 }: DemoCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const editHref = `/demo/${demo.id}/edit`;
@@ -393,6 +430,7 @@ export function DemoCard({
     <div className="group relative">
       <Link
         href={editHref}
+        onClick={onOpen}
         aria-label={`打开项目 ${demo.name}`}
         className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
@@ -409,6 +447,7 @@ export function DemoCard({
                 <ScreenshotCover
                   demo={demo}
                   screenshotRevision={screenshotRevision}
+                  loadScreenshotMetadata={loadScreenshotMetadata}
                 />
               </div>
             ) : (

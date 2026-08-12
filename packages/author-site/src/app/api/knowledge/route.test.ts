@@ -186,6 +186,29 @@ describe("knowledge routes live Workspace writes", () => {
     expect(fs.existsSync(path.join(workspacePath, "knowledge", "New_Doc.md"))).toBe(false);
   });
 
+  it("live Workspace 允许创建内容为空的知识文档", async () => {
+    const { POST } = await import("./route");
+    const request = createRequest(
+      `http://localhost/api/knowledge?workingDir=${encodeURIComponent(workspacePath)}&projectId=project-1&sessionId=session-1`,
+      { title: "未命名文档", content: "" },
+    );
+
+    const response = await POST(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(body).toMatchObject({
+      success: true,
+      data: { title: "未命名文档", sizeBytes: 0 },
+    });
+    expect(commitWorkspaceMutation.mock.calls[0][0]).toMatchObject({
+      operations: [
+        { type: "put_text", path: "knowledge/未命名文档.md", content: "" },
+        { type: "put_text", path: "knowledge/manifest.json" },
+      ],
+    });
+  });
+
   it("live Workspace 更新知识文档不直接写文件", async () => {
     const { PUT } = await import("./[docId]/route");
     const request = createRequest(

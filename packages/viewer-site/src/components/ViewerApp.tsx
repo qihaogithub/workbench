@@ -1414,9 +1414,12 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
             threads={commentsData.threads}
             onCreateComment={commentsData.createComment}
             onAddReply={commentsData.addReply}
+            onUpdateComment={commentsData.updateComment}
+            onUpdateReply={commentsData.updateReply}
             onSetResolved={commentsData.setResolved}
             onDeleteThread={commentsData.deleteThread}
             onDeleteReply={commentsData.deleteReply}
+            showPins={rightPanelTab === "comments"}
           >
             <PreviewStage
               className="h-full bg-background"

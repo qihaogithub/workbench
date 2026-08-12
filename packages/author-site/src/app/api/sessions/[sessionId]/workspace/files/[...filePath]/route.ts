@@ -9,7 +9,6 @@ import {
   createApiError,
   findWorkspacePath,
   ensureMemoryFile,
-  ensureConventionFile,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { isFileEditable } from "@/lib/workspace-file-utils";
@@ -133,10 +132,6 @@ export async function GET(
 
     if (relativePath === "memory.md" && !isLiveWorkspace(meta.workspaceId)) {
       ensureMemoryFile(wsPath);
-    }
-
-    if (relativePath === "convention.md") {
-      ensureConventionFile(wsPath);
     }
 
     if (!fs.existsSync(absolutePath)) {

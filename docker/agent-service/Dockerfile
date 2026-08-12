@@ -1,4 +1,4 @@
-FROM node:20-bookworm-slim AS builder
+FROM node:24-bookworm-slim AS builder
 
 ARG DEBIAN_MIRROR=
 
@@ -41,7 +41,7 @@ COPY packages/agent-service/ ./packages/agent-service/
 
 RUN pnpm --filter @workbench/agent-service build:docker
 
-FROM node:20-bookworm-slim
+FROM node:24-bookworm-slim
 
 ARG NPM_REGISTRY=https://registry.npmmirror.com
 ENV npm_config_registry=${NPM_REGISTRY}

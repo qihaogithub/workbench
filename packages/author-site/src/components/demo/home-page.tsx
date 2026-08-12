@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -45,6 +52,10 @@ import {
 import type { DemoMeta } from "@workbench/shared";
 
 const DEFAULT_CATEGORY = "未分类";
+const SCREENSHOT_ENSURE_DELAY_MS =
+  process.env.NODE_ENV === "development" ? 15_000 : 1500;
+const LOAD_SCREENSHOT_METADATA_IMMEDIATELY =
+  process.env.NODE_ENV !== "development";
 type SelectedNav =
   | { type: "all" }
   | { type: "project-category"; category: string; exact?: boolean };
@@ -227,6 +238,27 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
   const [coverTarget, setCoverTarget] = useState<DemoMeta | null>(null);
   const [shareTarget, setShareTarget] = useState<DemoMeta | null>(null);
   const [screenshotRevision, setScreenshotRevision] = useState(0);
+  const [loadScreenshotMetadata, setLoadScreenshotMetadata] = useState(
+    LOAD_SCREENSHOT_METADATA_IMMEDIATELY,
+  );
+  const navigationStartedRef = useRef(false);
+
+  useEffect(() => {
+    if (LOAD_SCREENSHOT_METADATA_IMMEDIATELY) return;
+
+    const timer = window.setTimeout(() => {
+      if (!navigationStartedRef.current) {
+        setLoadScreenshotMetadata(true);
+      }
+    }, SCREENSHOT_ENSURE_DELAY_MS);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const handleOpenProject = useCallback(() => {
+    navigationStartedRef.current = true;
+    setLoadScreenshotMetadata(false);
+  }, []);
 
   const projectCategories = useMemo(
     () => uniqueCategories(demos.map((demo) => normalizeCategory(demo.category))),
@@ -261,7 +293,7 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
     });
   }, [demos, normalizedQuery, selectedNav, projectFilter]);
 
-  // 为无封面的项目自动补生缺失截图
+  // 等首屏稳定后再串行补生截图，避免与路由编译、缩略图读取抢占资源。
   const ensureTriggeredRef = useRef(false);
   useEffect(() => {
     if (ensureTriggeredRef.current || demos.length === 0) return;
@@ -273,33 +305,41 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
 
     if (projectsNeedingScreenshots.length === 0) return;
 
-    let hasGenerated = false;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      let hasGenerated = false;
 
-    Promise.all(
-      projectsNeedingScreenshots.map((d) =>
-        fetch("/api/screenshots/ensure", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ projectId: d.id }),
-        })
-          .then((res) => res.json())
-          .then((result) => {
-            if (result.success && result.data?.generated > 0) {
-              hasGenerated = true;
-            }
-          })
-          .catch(() => {
-            // 静默失败
-          }),
-      ),
-    ).then(() => {
-      if (hasGenerated) {
-        setTimeout(() => {
+      for (const d of projectsNeedingScreenshots) {
+        if (cancelled || navigationStartedRef.current) return;
+
+        try {
+          const res = await fetch("/api/screenshots/ensure", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ projectId: d.id }),
+          });
+          const result = await res.json();
+          if (result.success && result.data?.generated > 0) {
+            hasGenerated = true;
+          }
+        } catch {
+          // 静默失败，不阻断其他项目的延后补生。
+        }
+      }
+
+      if (!cancelled && !navigationStartedRef.current && hasGenerated) {
+        window.setTimeout(() => {
+          if (cancelled || navigationStartedRef.current) return;
           setScreenshotRevision(Date.now());
           revalidate();
         }, 5000);
       }
-    });
+    }, SCREENSHOT_ENSURE_DELAY_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [demos]);
 
@@ -718,6 +758,8 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
                     key={demo.id}
                     demo={demo}
                     screenshotRevision={screenshotRevision}
+                    loadScreenshotMetadata={loadScreenshotMetadata}
+                    onOpen={handleOpenProject}
                     onDelete={() => setDeleteTarget(demo)}
                     onSaveAsTemplate={() => setTemplateTarget(demo)}
                     onDuplicate={() =>

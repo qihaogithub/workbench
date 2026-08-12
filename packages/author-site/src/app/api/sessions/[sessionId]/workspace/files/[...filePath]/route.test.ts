@@ -171,6 +171,23 @@ describe("workspace file content route", () => {
     });
   });
 
+  it("读取缺失项目公约不创建文件", async () => {
+    const { GET } = await import("./route");
+
+    const response = await GET(
+      {} as NextRequest,
+      { params: { sessionId: "session-1", filePath: ["convention.md"] } },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body).toMatchObject({
+      success: false,
+      error: { code: "FILE_READ_ERROR" },
+    });
+    expect(fs.existsSync(path.join(workspacePath, "convention.md"))).toBe(false);
+  });
+
   it("GET 拒绝包含路径回退片段的工作区文件路径", async () => {
     isLiveWorkspace.mockReturnValue(true);
     const { GET } = await import("./route");

@@ -157,6 +157,8 @@ export class ModelManager {
     );
 
     if (baseUrl) {
+      const contextWindow = providerConfig?.contextWindow ?? 128000;
+      const maxTokens = providerConfig?.maxTokens ?? 4096;
       return {
         id: modelId,
         name: modelId,
@@ -167,8 +169,8 @@ export class ModelManager {
         reasoning: false,
         input: supportsImages ? (['text', 'image'] as const) : (['text'] as const),
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 128000,
-        maxTokens: 4096,
+        contextWindow,
+        maxTokens,
       };
     }
 
@@ -199,6 +201,8 @@ export class ModelManager {
     const modelId = this.resolveListedModelId(providerConfig, parsed.model || fullModelId, fullModelId);
 
     if (baseUrl) {
+      const contextWindow = providerConfig?.contextWindow ?? 128000;
+      const maxTokens = providerConfig?.maxTokens ?? 1024;
       return {
         id: modelId,
         name: modelId,
@@ -209,8 +213,8 @@ export class ModelManager {
         reasoning: false,
         input: ['text', 'image'] as const,
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 128000,
-        maxTokens: 1024,
+        contextWindow,
+        maxTokens,
       };
     }
 

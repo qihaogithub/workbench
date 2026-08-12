@@ -189,7 +189,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!content || typeof content !== 'string') {
+    if (typeof content !== 'string') {
       return NextResponse.json(
         { success: false, error: { code: 'INVALID_REQUEST', message: '内容必填' } },
         { status: 400 }

@@ -262,7 +262,7 @@ function createLocalId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function buildAttachmentParts(
+export function buildAttachmentParts(
   images?: ImageAttachment[],
   files?: FileAttachment[],
 ): NonNullable<ChatMessage["parts"]> {
@@ -271,15 +271,17 @@ function buildAttachmentParts(
       type: "image" as const,
       url: `data:${img.mimeType};base64,${img.data}`,
     })) || []),
-    ...(files?.map((file) => ({
-      type: "file" as const,
-      name: file.name,
-      url: "",
-      size: file.size,
-      attachmentId: file.id,
-      mimeType: file.mimeType,
-      textExtracted: file.textExtracted,
-    })) || []),
+    ...(files
+      ?.filter((file) => !file.mimeType.startsWith("image/"))
+      .map((file) => ({
+        type: "file" as const,
+        name: file.name,
+        url: "",
+        size: file.size,
+        attachmentId: file.id,
+        mimeType: file.mimeType,
+        textExtracted: file.textExtracted,
+      })) || []),
   ];
 }
 
@@ -484,6 +486,7 @@ export function useChatStream(options: UseChatStreamOptions) {
   }, [sessionId, messagesRef]);
 
   const [plan, setPlan] = useState<PlanState>(EMPTY_PLAN);
+  const [contextCompactionNotice, setContextCompactionNotice] = useState(false);
   const [pendingPermissionRequest, setPendingPermissionRequest] =
     useState<PermissionRequest | null>(null);
   const [silenceSeconds, setSilenceSeconds] = useState<number | null>(null);
@@ -649,6 +652,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       busyRetryAttemptedRef.current = false;
 
       const source = runOptions?.source ?? "user";
+      setContextCompactionNotice(false);
       const trimmedMessage = userMessage.trim();
       const traceId = `ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const isSystemAutoRepair = source === "system_auto_repair";
@@ -841,6 +845,11 @@ export function useChatStream(options: UseChatStreamOptions) {
                 fallbackText: `${prev.fallbackText}${content}`,
               }));
             }
+          },
+
+          onContextCompacted: () => {
+            markActivity();
+            setContextCompactionNotice(true);
           },
 
           onModels: (event) => {
@@ -1820,6 +1829,7 @@ export function useChatStream(options: UseChatStreamOptions) {
   return {
     plan,
     setPlan,
+    contextCompactionNotice,
     pendingPermissionRequest,
     silenceSeconds,
     memoryFilePathsRef,

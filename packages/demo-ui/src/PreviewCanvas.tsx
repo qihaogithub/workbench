@@ -1,6 +1,8 @@
 "use client";
 
 import React, {
+  lazy,
+  Suspense,
   useState,
   useCallback,
   useMemo,
@@ -27,7 +29,6 @@ import type { CanvasClipboardData } from "./canvas-clipboard";
 import { CanvasFreeNodeItem } from "./CanvasFreeNodeItem";
 import { CanvasSelectionBox } from "./CanvasSelectionBox";
 import { CanvasToolbar } from "./CanvasToolbar";
-import { DocumentEditor } from "./DocumentEditor";
 import { useCanvasDocumentMarkdown } from "./useCanvasDocumentMarkdown";
 import {
   DEFAULT_MAX_ACTIVE_CANVAS_IFRAMES,
@@ -56,6 +57,12 @@ import {
   screenPointToCanvasPoint,
   withCanvasAnnotationNodes,
 } from "./canvas-kernel";
+
+const DocumentEditor = lazy(() =>
+  import("./DocumentEditor").then((module) => ({
+    default: module.DocumentEditor,
+  })),
+);
 import {
   writeCanvasClipboard,
   readCanvasClipboard,
@@ -3300,16 +3307,23 @@ export function PreviewCanvas({
               <div className="text-sm font-semibold">编辑文档</div>
             </div>
             <div className="min-h-0 flex-1 p-4">
-              <DocumentEditor
-                value={documentDraft.markdown}
-                onChange={(markdown) =>
-                  setDocumentDraft((prev) =>
-                    prev ? { ...prev, markdown } : prev,
-                  )
+              <Suspense
+                fallback={
+                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                    正在加载文档编辑器…
+                  </div>
                 }
-                format="markdown"
-                placeholder="文档标题"
-              />
+              >
+                <DocumentEditor
+                  value={documentDraft.markdown}
+                  onChange={(markdown) =>
+                    setDocumentDraft((prev) =>
+                      prev ? { ...prev, markdown } : prev,
+                    )
+                  }
+                  placeholder="文档标题"
+                />
+              </Suspense>
             </div>
             <div className="flex justify-end gap-2 border-t px-4 py-3">
               <button

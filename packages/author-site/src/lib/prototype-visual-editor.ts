@@ -2,7 +2,7 @@ import type {
   VisualNodeInfo,
   VisualPropertyChange,
   VisualPropertyChangeKind,
-} from "@workbench/demo-ui";
+} from "@workbench/demo-ui/iframe-types";
 
 export type PrototypeVisualConfigKind = "text" | "image" | "color";
 

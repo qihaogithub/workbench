@@ -2,7 +2,10 @@
 
 import { useState, useCallback, useMemo, type MutableRefObject, type RefObject } from "react";
 import { useToast } from "@/components/ui/toast-provider";
-import type { AutoRepairTrigger, VisualPropertyAutoSend } from "@/components/ai-elements";
+import type {
+  AutoRepairTrigger,
+  VisualPropertyAutoSend,
+} from "@workbench/ai-chat-shared/ai-chat";
 import type {
   VisualAnnotation,
   VisualEditPatch,
@@ -11,7 +14,7 @@ import type {
   VisualPropertyChange,
   VisualPropertyChangeKind,
   VisualStyleChange,
-} from "../../../../../../components/demo";
+} from "@workbench/demo-ui/iframe-types";
 import {
   buildVisualConfigCandidates,
   suggestVisualConfigFieldKey,
@@ -22,7 +25,7 @@ import type {
   PrototypeVisualConfigTarget,
   PrototypeVisualConfigResult,
 } from "@/lib/prototype-visual-editor";
-import { invalidateCompileCache } from "../../../../../../components/demo";
+import { invalidateCompileCache } from "@workbench/demo-ui/compile-cache";
 import {
   getSelectedImageSource,
   isProjectLocalImageReference,
@@ -1418,9 +1421,13 @@ ${message}
       })
       .join("\n\n");
 
+    const targetHint = isPrototypeVisualPage?.()
+      ? `请优先读取并修改 demos/${activeDemoIdRef.current}/prototype.html 与 prototype.css（以及需要时同步的 config.schema.json）。只处理这些批注指向的问题；如果必须修改其他文件，请先说明原因。`
+      : `请优先读取并修改 demos/${activeDemoIdRef.current}/index.tsx。只处理这些批注指向的问题；如果必须修改其他文件，请先说明原因。`;
+
     const prompt = `${summary}
 
-请优先读取并修改 demos/${activeDemoIdRef.current}/index.tsx。只处理这些批注指向的问题；如果必须修改其他文件，请先说明原因。
+${targetHint}
 
 <!-- VISUAL_ANNOTATION_CONTEXT
 ${context}
@@ -1435,7 +1442,7 @@ ${context}
         item.resolved ? item : { ...item, resolved: true },
       ),
     );
-  }, [visualAnnotations, activeDemoIdRef, setTabValue, setTriggerAutoSend]);
+  }, [visualAnnotations, activeDemoIdRef, isPrototypeVisualPage, setTabValue, setTriggerAutoSend]);
 
   const handleVisualInlineEdit = useCallback(
     (payload: VisualInlineEditPayload) => {

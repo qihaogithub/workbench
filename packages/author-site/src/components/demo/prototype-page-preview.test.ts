@@ -434,6 +434,76 @@ describe("PrototypePagePreview", () => {
     }
   });
 
+  it("批注模式下点击元素打开批注输入浮层并提交", () => {
+    const onVisualAnnotationCreate = jest.fn();
+    const onVisualSelect = jest.fn();
+    const { container } = render(
+      React.createElement(PrototypePagePreview, {
+        html: `<button data-ow-id="cta"><span data-ow-id="cta-label">立即开始</span></button>`,
+        css: "",
+        visualEditMode: true,
+        visualAnnotationMode: true,
+        onVisualAnnotationCreate,
+        onVisualSelect,
+      }),
+    );
+
+    const host = container.querySelector("[data-prototype-preview]");
+    const span = host?.shadowRoot?.querySelector("span");
+    expect(span).not.toBeNull();
+
+    fireEvent.click(span!);
+    expect(onVisualSelect).toHaveBeenCalled();
+
+    const input = container.querySelector("input");
+    expect(input).not.toBeNull();
+    fireEvent.change(input!, { target: { value: "按钮文案再加粗" } });
+    fireEvent.click(container.querySelector("input + button")!);
+
+    expect(onVisualAnnotationCreate).toHaveBeenCalledTimes(1);
+    expect(onVisualAnnotationCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ nodeId: "cta-label", tagName: "span" }),
+      "按钮文案再加粗",
+      undefined,
+    );
+  });
+
+  it("已存在批注时渲染批注图钉，点击打开浮层可继续编辑", async () => {
+    const onVisualAnnotationCreate = jest.fn();
+    const { container } = render(
+      React.createElement(PrototypePagePreview, {
+        html: `<button data-ow-id="cta">立即开始</button>`,
+        css: "",
+        visualEditMode: true,
+        visualAnnotationMode: true,
+        visualAnnotations: [
+          {
+            id: "note-1",
+            nodeId: "cta",
+            domPath: "prototype-root > button:nth-of-type(1)",
+            text: "颜色太浅",
+            createdAt: Date.now(),
+          },
+        ],
+        onVisualAnnotationCreate,
+      }),
+    );
+
+    const host = container.querySelector("[data-prototype-preview]");
+    const rootEl = host?.shadowRoot?.querySelector(".prototype-root");
+    expect(rootEl).not.toBeNull();
+
+    let pin: Element | null = null;
+    await waitFor(() => {
+      pin = rootEl?.querySelector("button[title='颜色太浅']") ?? null;
+      expect(pin).not.toBeNull();
+    });
+    fireEvent.click(pin!);
+
+    const input = container.querySelector("input");
+    expect(input?.value).toBe("颜色太浅");
+  });
+
   it("画布原型页缺少显式 previewSize 时仍使用 layout 尺寸计算内容缩放", async () => {
     const { container } = render(
       React.createElement(CanvasPageItem, {

@@ -188,7 +188,6 @@ export function WorkspaceCodeDialog({
               key={filePath}
               value={editContent}
               onChange={handleChange}
-              format="markdown"
               readOnly={!editable}
             />
           ) : (
