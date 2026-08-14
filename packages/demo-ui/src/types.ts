@@ -462,8 +462,14 @@ export interface PreviewCanvasProps {
   /** 画布选中的页面添加到 AI 对话 */
   onAddPagesToChat?: (pageIds: string[]) => void;
   onPageConfigEdit?: (pageId: string) => void;
-  /** 评论模式下选择画布页面，以进入该页的评论定位流程 */
-  onPageComment?: (pageId: string) => void;
+  /** 评论模式下点击画布页面，以其点击位置创建页面级评论。 */
+  onPageComment?: (input: {
+    pageId: string;
+    pageName: string;
+    pin: { xRatio: number; yRatio: number };
+    clientX: number;
+    clientY: number;
+  }) => void;
   onCanvasClick?: () => void;
   className?: string;
   editingPageId?: string;

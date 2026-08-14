@@ -201,6 +201,7 @@ export {
   MentionContent,
   CommentSidebar,
   CommentPanel,
+  DocumentCommentPanel,
   useComments,
   threadMentionsUser,
 } from "./comment";
@@ -214,6 +215,7 @@ export type {
   IframeViewState,
   MentionCandidate,
   CommentPanelProps,
+  DocumentCommentPanelProps,
 } from "./comment";
 export { PreviewCanvas } from "./PreviewCanvas";
 export { CanvasViewport } from "./CanvasViewport";

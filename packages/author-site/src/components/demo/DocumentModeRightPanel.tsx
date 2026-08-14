@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Layers, MessageSquare } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CommentPanel, type CommentPanelProps } from "@workbench/demo-ui";
+import { DocumentCommentPanel, type DocumentCommentPanelProps } from "@workbench/demo-ui";
 import { cn } from "@/lib/utils";
 import { useDesignSpecWorkspace } from "./DesignSpecWorkspace";
 import { DesignSpecConfigPanel } from "./DesignSpecConfigPanel";
@@ -15,7 +15,7 @@ import { DesignSpecConfigPanel } from "./DesignSpecConfigPanel";
 export function DocumentModeRightPanel({
   unresolvedCount = 0,
   ...commentProps
-}: CommentPanelProps & { unresolvedCount?: number }) {
+}: DocumentCommentPanelProps & { unresolvedCount?: number }) {
   const { activeDocId } = useDesignSpecWorkspace();
   const [tab, setTab] = useState<"assets" | "comments">("comments");
 
@@ -25,7 +25,7 @@ export function DocumentModeRightPanel({
   }, [activeDocId]);
 
   if (!activeDocId) {
-    return <CommentPanel {...commentProps} />;
+    return <DocumentCommentPanel {...commentProps} />;
   }
 
   return (
@@ -71,7 +71,7 @@ export function DocumentModeRightPanel({
           "flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden",
         )}
       >
-        <CommentPanel {...commentProps} />
+        <DocumentCommentPanel {...commentProps} />
       </TabsContent>
     </Tabs>
   );

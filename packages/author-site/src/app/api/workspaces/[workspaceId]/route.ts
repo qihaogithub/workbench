@@ -11,10 +11,10 @@ import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 
 export async function GET(
   _request: Request,
-  { params }: { params: { workspaceId: string } },
+  { params }: { params: Promise<{ workspaceId: string }> },
 ) {
   try {
-    const token = getAuthCookie();
+    const token = await getAuthCookie();
     if (!token) {
       return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
         status: 401,
@@ -28,7 +28,7 @@ export async function GET(
       });
     }
 
-    const { workspaceId } = params;
+    const { workspaceId } = await params;
 
     const workspace = getWorkspace(workspaceId);
     if (!workspace) {
@@ -56,10 +56,10 @@ export async function GET(
 
 export async function DELETE(
   _request: Request,
-  { params }: { params: { workspaceId: string } },
+  { params }: { params: Promise<{ workspaceId: string }> },
 ) {
   try {
-    const token = getAuthCookie();
+    const token = await getAuthCookie();
     if (!token) {
       return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
         status: 401,
@@ -73,7 +73,7 @@ export async function DELETE(
       });
     }
 
-    const { workspaceId } = params;
+    const { workspaceId } = await params;
     const workspace = getWorkspace(workspaceId);
 
     if (!workspace) {

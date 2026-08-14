@@ -4,7 +4,6 @@ import { createAgentBusyResult, getAgentManager } from "../core/agent-manager";
 import { BackendAgent } from "../core/backend-agent";
 import {
   AgentConfig,
-  AgentResult,
   FileAttachment,
   ImageAttachment,
   UserChoiceResponse,
@@ -21,6 +20,11 @@ import { getSessionExternalAuthConfigs } from "../config/session-external-auth";
 import { workspaceManager } from "../workspace/workspace-manager";
 import { snapshotService } from "../session/snapshot-service";
 import { consoleBuffer } from "../session/console-buffer";
+import {
+  getConversationCheckpointStore,
+  isCanonicalCheckpointEnabled,
+  stripInjectedConversationHistory,
+} from "../session/conversation-checkpoint-store";
 import { getWorkbenchToolCapabilities } from "../backends/pi-tools";
 import {
   buildViewerAiSystemPrompt,
@@ -92,6 +96,7 @@ interface ClientMessage {
     timeout?: number;
     stream?: boolean;
     resumeSessionId?: string;
+    conversation?: { assistantMessageId?: string };
   };
   timestamp?: number;
   /** permission_response: 权限确认响应 */
@@ -102,7 +107,11 @@ interface ClientMessage {
   requestId?: string;
   choice?: UserChoiceResponse;
   /** resync_history: 重同步历史消息列表 */
-  messages?: Array<{ role: string; content: string }>;
+  messages?: Array<{ id?: string; role: string; content: string }>;
+  /** resync_history: 客户端基于的 canonical checkpoint 版本。 */
+  checkpointVersion?: number;
+  /** resync_history: 截断后的最后一条消息，避免静默覆盖更新的服务端历史。 */
+  truncateAfterMessageId?: string;
 }
 
 interface ActiveConnection {
@@ -167,7 +176,7 @@ function heartbeat(): void {
   for (const [sessionId, conn] of connections) {
     if (now - conn.lastPing > HEARTBEAT_TIMEOUT) {
       logger.info({ sessionId }, "WebSocket connection timed out, closing");
-      conn.eventRouter.destroy();
+      void conn.eventRouter.destroy();
       conn.socket.terminate();
       connections.delete(sessionId);
     }
@@ -211,13 +220,10 @@ export async function registerWebSocketRoutes(
         }
       };
 
-      let lastAgentActivityAt = Date.now();
       const eventRouter = new WebSocketEventRouter(
         sessionId,
         sendMessage,
-        () => {
-          lastAgentActivityAt = Date.now();
-        },
+        () => {},
       );
 
       const connection: ActiveConnection = {
@@ -395,7 +401,7 @@ export async function registerWebSocketRoutes(
                       config.model,
                   });
                   eventRouter.recordFinish(result);
-                  eventRouter.finishMessage();
+                  await eventRouter.finishMessage();
                 }
                 sendMessage({
                   type: "error",
@@ -471,13 +477,11 @@ export async function registerWebSocketRoutes(
                   config.model,
               });
 
-              let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
               let progressHeartbeatHandle:
                 | ReturnType<typeof setInterval>
                 | undefined;
 
               try {
-                lastAgentActivityAt = Date.now();
                 progressHeartbeatHandle = setInterval(() => {
                   if (eventRouter.isCancelled()) return;
                   sendMessage({
@@ -491,61 +495,23 @@ export async function registerWebSocketRoutes(
                 progressHeartbeatHandle.unref?.();
 
                 // viewer-readonly：服务端拼接只读问答上下文（页面/配置/记忆/知识库索引）
+                const rawUserContent = isCanonicalCheckpointEnabled()
+                  ? stripInjectedConversationHistory(message.content)
+                  : message.content;
                 const outgoingContent = viewerSession
                   ? buildViewerReadonlyContent(
                       viewerSession.project,
                       message.viewerContext,
-                      message.content,
+                      rawUserContent,
                     )
-                  : message.content;
+                  : rawUserContent;
 
-                const sendPromise = agent.sendMessage(outgoingContent, {
+                const result = await agent.sendMessage(outgoingContent, {
                   ...message.options,
+                  timeout: explicitMessageTimeoutMs ?? undefined,
                   images: message.images,
                   files: message.files,
                 });
-
-                const result: AgentResult = explicitMessageTimeoutMs
-                  ? await Promise.race([
-                      sendPromise,
-                      new Promise<AgentResult>((resolve) => {
-                        timeoutHandle = setTimeout(() => {
-                          const elapsedMs = Date.now() - lastAgentActivityAt;
-                          const partialFiles =
-                            agent instanceof BackendAgent
-                              ? agent.getFiles()
-                              : [];
-                          eventRouter.cancelMessage();
-                          agent.cancel();
-
-                          logger.warn(
-                            {
-                              sessionId,
-                              timeoutMs: explicitMessageTimeoutMs,
-                              elapsedMs,
-                            },
-                            "Agent sendMessage reached explicit timeout, cancelling",
-                          );
-
-                          resolve({
-                            success: false,
-                            files:
-                              partialFiles.length > 0
-                                ? partialFiles
-                                : undefined,
-                            error: {
-                              code: "MESSAGE_TIMEOUT",
-                              message: `消息处理超时（已达到显式上限 ${Math.round(
-                                explicitMessageTimeoutMs / 1000,
-                              )}s），已自动取消`,
-                              retryable: true,
-                            },
-                          });
-                        }, explicitMessageTimeoutMs);
-                        timeoutHandle.unref?.();
-                      }),
-                    ])
-                  : await sendPromise;
 
                 if (
                   !result.success &&
@@ -556,6 +522,22 @@ export async function registerWebSocketRoutes(
 
                 eventRouter.recordFinish(result);
 
+                const checkpoint =
+                  isCanonicalCheckpointEnabled() &&
+                  result.success &&
+                  result.content?.trim() &&
+                  message.options?.conversation?.assistantMessageId
+                    ? getConversationCheckpointStore().recordTurn(
+                        sessionId,
+                        { id: messageId, role: "user", content: rawUserContent },
+                        {
+                          id: message.options.conversation.assistantMessageId,
+                          role: "assistant",
+                          content: result.content,
+                        },
+                      )
+                    : undefined;
+
                 if (result.success) {
                   sendMessage({
                     type: "finish",
@@ -564,6 +546,7 @@ export async function registerWebSocketRoutes(
                     content: result.content,
                     files: result.files,
                     metadata: result.metadata,
+                    checkpointVersion: checkpoint?.version,
                   });
                 } else {
                   sendMessage({
@@ -615,10 +598,9 @@ export async function registerWebSocketRoutes(
                 });
                 throw error;
               } finally {
-                if (timeoutHandle) clearTimeout(timeoutHandle);
                 if (progressHeartbeatHandle)
                   clearInterval(progressHeartbeatHandle);
-                eventRouter.finishMessage();
+                await eventRouter.finishMessage();
               }
             } catch (error) {
               eventRouter.recordError({
@@ -717,11 +699,11 @@ export async function registerWebSocketRoutes(
             const agent = manager.get(targetSessionId);
             if (agent) {
               eventRouter.cancelMessage();
-              agent.cancel();
+              void agent.cancel();
               sendMessage({
                 type: "status",
                 sessionId: targetSessionId,
-                status: "ready",
+                status: "cancelling",
               });
             }
             break;
@@ -1024,8 +1006,32 @@ export async function registerWebSocketRoutes(
               return;
             }
 
+            const checkpointStore = getConversationCheckpointStore();
+            const checkpointEnabled = isCanonicalCheckpointEnabled();
+            const resolvedCheckpoint = checkpointEnabled
+              ? checkpointStore.resolveResync(sessionId, {
+                  expectedVersion: message.checkpointVersion,
+                  truncateAfterMessageId: message.truncateAfterMessageId,
+                  fallbackMessages: messages,
+                })
+              : null;
+            if (resolvedCheckpoint && !resolvedCheckpoint.ok) {
+              sendMessage({
+                type: "error",
+                id: resyncId || "unknown",
+                error: {
+                  code: resolvedCheckpoint.code,
+                  message: "会话历史已变化，请刷新后重试。",
+                },
+              });
+              return;
+            }
+            const replayMessages = resolvedCheckpoint
+              ? resolvedCheckpoint.checkpoint.messages
+              : messages;
+
             logger.info(
-              { sessionId, messageCount: messages.length },
+              { sessionId, messageCount: replayMessages.length, checkpointEnabled },
               "WebSocket resync_history received",
             );
 
@@ -1052,14 +1058,18 @@ export async function registerWebSocketRoutes(
                 await agent.start();
               }
 
-              for (const msg of messages) {
+              for (const msg of replayMessages) {
                 if (msg.role && msg.content) {
                   await agent.appendHistoryMessage(msg.role, msg.content);
                 }
               }
 
+              const checkpoint = resolvedCheckpoint
+                ? checkpointStore.commit(sessionId, resolvedCheckpoint.checkpoint)
+                : undefined;
+
               logger.info(
-                { sessionId, replayedCount: messages.length },
+                { sessionId, replayedCount: replayMessages.length, checkpointVersion: checkpoint?.version },
                 "resync_history completed",
               );
             } catch (error) {
@@ -1083,6 +1093,9 @@ export async function registerWebSocketRoutes(
               id: resyncId,
               sessionId,
               status: "ready",
+              checkpointVersion: checkpointEnabled
+                ? checkpointStore.get(sessionId)?.version
+                : undefined,
             });
             return;
           }
@@ -1106,7 +1119,7 @@ export async function registerWebSocketRoutes(
           "WebSocket connection closed",
         );
 
-        eventRouter.destroy();
+        await eventRouter.destroy();
         connections.delete(connectionId);
 
         const hasOtherConnections = Array.from(connections.values()).some(
@@ -1148,7 +1161,7 @@ export async function registerWebSocketRoutes(
 
       socket.on("error", (error) => {
         logger.error({ sessionId, connectionId, error }, "WebSocket error");
-        eventRouter.destroy();
+        void eventRouter.destroy();
         connections.delete(connectionId);
       });
 
@@ -1177,7 +1190,7 @@ export function broadcastToSession(
 
 export function closeAllConnections(): void {
   for (const [, conn] of connections) {
-    conn.eventRouter.destroy();
+    void conn.eventRouter.destroy();
     conn.socket.close(1000, "Server shutting down");
   }
   connections.clear();

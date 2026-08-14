@@ -13,6 +13,7 @@ export type AgentStatus =
   | 'initializing'
   | 'ready'
   | 'processing'
+  | 'cancelling'
   | 'error'
   | 'destroyed';
 
@@ -22,6 +23,7 @@ export type ErrorCode =
   | 'AGENT_NOT_INITIALIZED'
   | 'BACKEND_UNAVAILABLE'
   | 'MESSAGE_SEND_ERROR'
+  | 'CANCELLED'
   | 'FILE_ACCESS_DENIED'
   | 'RATE_LIMIT_EXCEEDED'
   | 'INTERNAL_ERROR';
@@ -74,6 +76,25 @@ export interface ResultMetadata {
     completion: number;
   };
   duration?: number;
+  runSummary?: RunSummary;
+}
+
+export interface RunSummary {
+  mutations: Array<{
+    mutationId: string;
+    revision: number;
+    status: 'committed' | 'conflicted' | 'rolled_back';
+    resources: Array<{
+      path: string;
+      action: 'created' | 'modified' | 'deleted' | 'moved';
+    }>;
+    actor: string;
+  }>;
+  projections: Array<{
+    revision: number;
+    surface: string;
+    status: 'pending' | 'applied' | 'failed';
+  }>;
 }
 
 export interface AgentResult {
@@ -105,6 +126,8 @@ export interface SendMessageOptions {
     files?: string[];
     presetRules?: string;
   };
+  /** 用于服务端 canonical checkpoint 记录的助手消息 ID。 */
+  conversation?: { assistantMessageId?: string };
 }
 
 /** 图片附件，Base64 编码 */

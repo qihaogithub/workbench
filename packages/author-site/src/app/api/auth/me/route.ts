@@ -4,7 +4,7 @@ import { findUserById } from "@/lib/user";
 import { createApiError, createApiSuccess } from "@/lib/fs-utils";
 
 export async function GET() {
-  const token = getAuthCookie();
+  const token = await getAuthCookie();
   if (!token) {
     return NextResponse.json(createApiError("VALIDATION_ERROR", "未登录"), {
       status: 401,

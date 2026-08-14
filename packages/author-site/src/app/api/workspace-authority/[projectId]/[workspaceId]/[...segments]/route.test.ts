@@ -80,7 +80,8 @@ describe("workspace authority same-origin proxy", () => {
       status: 200,
       headers: { "Content-Type": "application/json" },
     })) as unknown as typeof fetch;
-    const context = { params: { projectId: "project-1", workspaceId: "live-1", segments: ["state"] } };
+    const routeParams = { projectId: "project-1", workspaceId: "live-1", segments: ["state"] };
+    const context = { params: Promise.resolve(routeParams) };
     const response = await GET(createRequest("http://author.test/api/workspace-authority/project-1/live-1/state?sessionId=session-1"), context);
     expect(response.status).toBe(200);
     expect(global.fetch).toHaveBeenCalledWith(
@@ -90,7 +91,7 @@ describe("workspace authority same-origin proxy", () => {
 
     const rejected = await GET(
       createRequest("http://author.test/api/workspace-authority/project-1/live-1/private?sessionId=session-1"),
-      { params: { ...context.params, segments: ["private"] } },
+      { params: Promise.resolve({ ...routeParams, segments: ["private"] }) },
     );
     expect(rejected.status).toBe(400);
   });
@@ -107,7 +108,7 @@ describe("workspace authority same-origin proxy", () => {
     };
     const response = await POST(createRequest("http://author.test/api/workspace-authority/project-1/live-1/mutate", {
       method: "POST", contentType: "application/json", body: JSON.stringify(body),
-    }), { params: { projectId: "project-1", workspaceId: "live-1", segments: ["mutate"] } });
+    }), { params: Promise.resolve({ projectId: "project-1", workspaceId: "live-1", segments: ["mutate"] }) });
     expect(response.status).toBe(200);
     expect(global.fetch).toHaveBeenCalledWith(
       new URL("http://agent.internal/api/workspace-authority/projects/project-1/workspaces/live-1/mutate?sessionId=session-1"),

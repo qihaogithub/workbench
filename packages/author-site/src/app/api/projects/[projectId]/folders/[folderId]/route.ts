@@ -131,7 +131,7 @@ async function resolveSessionWorkspace(
   | { ok: true; sessionId: string; workspaceId: string; workspacePath: string }
   | { ok: false; response: NextResponse }
 > {
-  const token = getAuthCookie();
+  const token = await getAuthCookie();
   if (!token) {
     return {
       ok: false,
@@ -255,10 +255,10 @@ async function resolveSessionWorkspace(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { projectId: string; folderId: string } },
+  { params }: { params: Promise<{ projectId: string; folderId: string }> },
 ) {
   try {
-    const { projectId, folderId } = params;
+    const { projectId, folderId } = await params;
     if (!projectExists(projectId)) {
       return NextResponse.json(createApiError("PROJECT_NOT_FOUND"), {
         status: 404,
@@ -395,10 +395,10 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { projectId: string; folderId: string } },
+  { params }: { params: Promise<{ projectId: string; folderId: string }> },
 ) {
   try {
-    const { projectId, folderId } = params;
+    const { projectId, folderId } = await params;
     if (!projectExists(projectId)) {
       return NextResponse.json(createApiError("PROJECT_NOT_FOUND"), {
         status: 404,

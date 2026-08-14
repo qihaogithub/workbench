@@ -6,7 +6,7 @@ import { createApiError, createApiSuccess } from "@/lib/fs-utils";
 import { findDingtalkIdentityByUserId } from "@/lib/user";
 
 export async function GET() {
-  const token = getAuthCookie();
+  const token = await getAuthCookie();
   const payload = token ? await verifyToken(token) : null;
   if (!payload) {
     return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {

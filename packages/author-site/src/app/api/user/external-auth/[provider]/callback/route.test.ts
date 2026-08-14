@@ -69,7 +69,7 @@ describe("Figma OAuth callback route", () => {
         url: requestUrl,
         nextUrl: new URL(requestUrl),
       } as NextRequest,
-      { params: { provider: "figma" } },
+      { params: Promise.resolve({ provider: "figma" }) },
     );
 
     expect(response.status).toBe(307);
@@ -90,7 +90,7 @@ describe("Figma OAuth callback route", () => {
         url: requestUrl,
         nextUrl: new URL(requestUrl),
       } as NextRequest,
-      { params: { provider: "figma" } },
+      { params: Promise.resolve({ provider: "figma" }) },
     );
 
     expect(response.status).toBe(307);

@@ -43,7 +43,7 @@ Pi Agent 已具备上下文预压缩、一次上下文溢出恢复、超时控�
 | 工具后整轮重试 | `BackendAgent.sendMessage()` 将完整 `backend.sendMessage()` 包在 `withLlmRetry` 内；Pi 的 context-overflow 恢复也会重发 prompt。 | 问题成立。两层重发都必须在收到首个 `tool_call` 后关闭。第 1 项已完成并有回归测试。 |
 | 历史附件按需注入 | 已按 attachmentId 读取、历史附件去重和 20 项上限，但历史条目仍注入 `textPreview`（最多 240 字）。 | 问题部分成立；实施目标改为“历史附件只注入索引，不带 preview”。 |
 | `run_summary` 与验证闭环 | 后端已生成 mutation receipt/projection ack 的 `run_summary` 事件；但 WS event router 未订阅或转发它。 | 不重建数据模型；补齐 WS/client/UI 通路及适用验证证据即可。 |
-| 能力渐进披露 | 工具集和预装 Skill 在 Harness 初始化时整体注册/注入，尚无 profile 或扩展入口。 | 问题成立；首期只做边界明确的 profile 并使用 feature flag，避免同时改动工具注册与 Harness 重建。 |
+| 能力渐进披露 | 工具集和预装 Skill 在 Harness 初始化时整体注册/注入，初始上下文成本随工具数线性增长。 | 问题成立；改为完整注册、最小初始发现集与 Agent 自主按需激活，不以 profile 收窄权限。 |
 | 取消与断连 | `cancel()` 发出 abort 后立即把状态设为 `ready`；最后连接断开会在 abort 未 settle 时继续清理。 | 问题成立。状态机必须等 Harness 与子 Agent 清理完成。 |
 | 外部内容边界 | WS 当前允许调用方直接更新完整 system prompt。 | 此项提升为 P0：调用方内容只能进入受限槽位，不能替换安全骨架。 |
 
@@ -55,18 +55,18 @@ Pi Agent 已具备上下文预压缩、一次上下文溢出恢复、超时控�
 
 #### 方案
 
-定义能力档案：`read_only`、`authoring`、`debug`、`image`、`integration`。每轮只注册与档案匹配的工具，并只向模型注入该档案的详细工具说明和匹配的 Skill 索引。
+服务端保留完整工具注册，但每轮只把最小发现集的 schema 交给模型：安全读取、Skill 读取、计划/选择控制和按需加载入口。其余工具按任务能力分组为 `workspace`、`pages`、`comments`、`image`、`web`、`external`，避免一开始注入全部 schema。
 
-所有档案都保留一个简短能力目录：只描述能力名称、使用场景和申请入口，不携带完整工具 schema。模型需要当前档案外能力时，通过始终可用的能力扩展入口申请；服务端校验请求、权限和会话状态后，在安全的下一轮或受控 Harness 重建后激活相应档案。
+模型始终看到简短能力目录和 `activateCapabilities` 入口，不携带未激活工具的完整 schema。模型自行判断任务需要后调用该入口，Pi Harness 在当前会话内激活对应已注册工具，并在同一轮的下一次模型循环继续执行；不弹用户确认，不通过客户端参数扩大权限。
 
-低置信度意图回退至较宽的 `authoring` 档案；复杂多文件修改默认使用 `authoring`，不执行激进裁剪。权限、计划、用户选择和取消等控制能力不得因档案切换消失。
+复杂任务可由模型请求多个分组或 `all`，因此渐进披露不会限制 Agent 使用能力。文件/命令/外部操作的既有服务端权限检查保持不变；计划、用户选择和取消等控制工具始终可用。
 
 #### 风险控制
 
 - 能力目录确保模型知道可申请的能力，不会因工具暂未注册而误以为系统不支持；
-- 扩展失败应给出结构化原因并可回退到完整编辑档案；
-- 记录能力申请、扩展成功率和“工具不存在”错误，作为回归指标；
-- 首期只为边界清晰的 read-only、图片和集成场景收窄工具，编辑档案先保持较宽。
+- 加载失败应返回结构化原因，模型可继续使用已激活工具或请求 `all`；
+- 记录能力加载次数、成功率和“工具不存在”错误，作为回归指标；
+- 不以能力分组限制 Agent 权限；分组只影响初始上下文大小。
 
 ### 2. 工具开始后禁止整轮重试
 
@@ -123,14 +123,14 @@ Pi Agent 已具备上下文预压缩、一次上下文溢出恢复、超时控�
 
 #### 方案
 
-服务端维护 canonical session checkpoint，包括：Pi 压缩后的会话摘要/消息、最近保留轮次、附件索引、模型与能力档案版本、必要的工具结果摘要和会话版本。检查点只记录恢复所需的安全摘要，不保存图片 base64、密钥或冗余工具输出。
+首期服务端维护内存级 canonical session checkpoint：真实用户/助手轮次、消息 ID 与单调版本号。每条消息及总量均受预算限制，并会剥离旧版客户端注入的“最近历史”前缀，避免回放时上下文重复。它不保存图片 base64、密钥或冗余工具输出，也不在进程重启后恢复；Pi 压缩摘要、附件索引、当前已激活能力和持久化恢复属于后续扩展。
 
-`resync_history` 改为版本化增量协议：客户端提交其已知 checkpoint/version 与增量消息；服务端优先恢复 canonical checkpoint，只校验并追加最近差异。客户端传入全量历史仅作为受限兜底，必须有消息数、token 与来源校验上限，不能覆盖服务端权威状态。
+`resync_history` 已改为版本化截断协议：客户端提交其已知 checkpoint version 和截断锚点；服务端优先从 canonical checkpoint 截取后重建 Harness。首次灰度会话才接受受限全量历史作为种子，之后版本或锚点冲突返回明确错误，不能静默覆盖服务端权威状态。
 
 #### 验收
 
 - 长会话重连后恢复输入大小近似“检查点 + 最近轮次”，而非完整历史线性增长；
-- 编辑重发不丢失附件索引、模型档案与已压缩上下文；
+- 编辑重发不丢失附件索引、模型配置与已压缩上下文；
 - 版本冲突返回明确重同步动作，不静默覆盖；
 - 客户端超出回放预算时不会压垮 Agent 或绕过服务端状态。
 
@@ -195,18 +195,18 @@ Pi Agent 已具备上下文预压缩、一次上下文溢出恢复、超时控�
 1. [x] 工具启动后的整轮重试闸门；
 2. [x] 受控 project rules 槽位与服务端提示词安全骨架（P0）；
 3. [x] 历史附件按需注入；
-4. [ ] 异步日志队列；
-5. [ ] 渐进披露能力档案；
-6. [ ] canonical checkpoint 与增量重同步；
-7. [ ] 取消/超时状态机；
-8. [ ] 前端流式与终态错误统一；
-9. [ ] run_summary 的 WS/client/UI 通路与验证闭环。
+4. [x] 异步日志队列；
+5. [ ] Agent 自主按需工具/Skill 加载（最小发现集、同轮自动激活、完整权限保持和加载指标已完成；跨 checkpoint 恢复已激活能力仍待实现）；
+6. [ ] canonical checkpoint 与增量重同步（首期内存级版本化截断、冲突拒绝和受限 seed 已完成；Pi 摘要/附件索引、持久化和真正增量追加仍待实现）；
+7. [x] 取消/超时状态机；
+8. [x] 前端流式与终态错误统一；
+9. [x] run_summary 的 WS/client/UI 通路与验证闭环。
 
 第 1 项是后续恢复/回退安全边界。第 5、6 项应连续实现，因为检查点恢复不能与尚未完成清理的旧运行并发。第 9 项依赖现有 mutation authority，但不依赖模型路由。
 
 ## 主要改动边界
 
-- `packages/agent-service/src/backends/pi-agent.ts`：执行阶段、能力档案、检查点、恢复与 Harness 生命周期；
+- `packages/agent-service/src/backends/pi-agent.ts`：执行阶段、按需能力加载、检查点、恢复与 Harness 生命周期；
 - `packages/agent-service/src/core/backend-agent.ts`：重试边界与状态机；
 - `packages/agent-service/src/backends/pi-tools/`：能力注册、扩展入口与附件读取；
 - `packages/agent-service/src/routes/websocket.ts`、`ws-event-router.ts`：增量重同步、终态协议与 run_summary；
@@ -224,15 +224,22 @@ Pi Agent 已具备上下文预压缩、一次上下文溢出恢复、超时控�
 
 ## 风险与发布策略
 
-- 所有新策略通过显式 feature flag 灰度：能力档案、附件懒加载、异步日志、checkpoint resync 和验证闭环分别可独立关闭；
+- 所有新策略通过显式 feature flag 灰度：附件懒加载、异步日志、checkpoint resync 和验证闭环分别可独立关闭；按需能力加载不改变权限，仅改变初始工具上下文；
 - 第一阶段每项先启用诊断指标，再逐步默认开启；
 - checkpoint 协议变更必须支持服务端拒绝旧客户端并返回一次受限的兼容重同步动作；
-- 如果能力收窄导致申请失败率或完成率下降，立即回退到宽 `authoring` 档案；
+- 如果按需加载导致任务完成率下降，允许模型请求 `all`，并根据指标调整最小发现集；
 - 任何检测到副作用不确定的错误均禁止自动整轮回放，交给用户或明确的恢复流程处理。
 
 ## 进度记录
 
-- 2026-08-12：确认采用两期方案；渐进披露采用“短能力目录 + 按需扩展 + 低置信度宽档案回退”，不采用静态隐藏工具；数据驱动模型路由单列远期规划，不纳入本方案。
+- 2026-08-12：确认采用两期方案；渐进披露采用“短能力目录 + 按需扩展”，不采用静态隐藏工具；数据驱动模型路由单列远期规划，不纳入本方案。
 - 2026-08-12：完成源码复查并校正文档。确认完整 prompt 的可重试边界确有副作用重放风险；已在外层 LLM 重试和 Pi 的 context-overflow 重发两处以首个 `tool_call` 为闸门关闭重试。补齐 `BaseAgent` 的 `context_compacted` / `run_summary` 事件类型声明，使现有 WS 订阅可通过完整类型检查。定向测试：`pnpm --filter @workbench/agent-service test -- tests/unit/backend-agent-inactivity-timeout.test.ts`；类型检查：`pnpm check:agent`。
 - 2026-08-12：完成 P0 提示词信任边界。对外协议将 `systemPrompt` 改为 `projectRules`；创作端静态规则、评论任务与使用端规则均只能写入该槽位。Pi 后端固定在前拼接服务端安全骨架，明确外部内容不得改变安全规则、权限、工具或工作区边界，并限制项目规则长度。`pi-agent`、规则委托、agent-client 与 ai-chat-shared 的定向测试/类型检查通过；完整 agent-service 测试有一个既有环境限制：Authority 路由用例监听 `127.0.0.1` 时被 sandbox 以 EPERM 拒绝。
 - 2026-08-12：完成历史附件按需注入。历史附件清单不再注入 `textPreview`，只提供稳定 attachmentId 与元数据；本轮上传保留必要预览。模型需要历史内容时必须调用 `readUploadedFile`。定向测试：`pnpm --filter @workbench/agent-service test -- tests/unit/uploaded-file-prompt.test.ts`；类型检查：`pnpm --filter @workbench/agent-service typecheck`。
+- 2026-08-12：完成异步日志队列。Agent run log 与结构化诊断日志改为 run 内有序、短窗口批量的异步写入；关键事件触发立即 flush，增量事件在队列满载时优先丢弃，run 完成/取消/销毁前 `drain()`，不让落盘阻塞 WS 推送。定向测试：`pnpm --filter @workbench/agent-service test -- tests/unit/ws-event-router.test.ts`；类型检查：`pnpm --filter @workbench/agent-service typecheck`。
+- 2026-08-13：完成 `run_summary` 的 WS/client/UI 通路与验证闭环。事件路由器透传 Authority mutation/projection 摘要；agent-client、共享 stream service 提供强类型字段和 `onRunSummary` 回调，`finish.metadata.runSummary` 保留相同摘要作为终态兜底。聊天消息仅在收到 receipt 时显示已提交 mutation 数，projection 失败则显示失败数，不以模型文本冒充验证。事件路由与聊天渲染回归测试通过。
+- 2026-08-13：完成取消/超时状态机。Agent 请求取消后先进入 `cancelling`，直到 Harness abort 与本轮 `sendMessage` 实际收束才释放 busy 并回到 `ready`；显式取消的 WS 状态不再提前伪报 `ready`。取消期间的新请求得到 `AGENT_BUSY`，防止复用仍在收尾的 Harness。定向测试覆盖延迟 abort、超时、busy 响应；Agent Service、Client 和共享聊天包类型检查通过。
+- 2026-08-13：完成前端流式与终态错误统一。部分正文/工具过程存在时把错误合并入当前 assistant 消息；连接建立前的服务端错误只交付一次携带错误码的终态回调，消除“连接错误 + 具体服务端错误”双气泡。聊天渲染与 StreamService 回归测试通过。
+- 2026-08-13：完成 canonical checkpoint 首期。`PI_AGENT_CANONICAL_CHECKPOINTS_ENABLED=true` 时，服务端对成功轮次记录受 24 条/48KB 预算限制的真实 user/assistant 文本与消息 ID；编辑重发以 checkpoint version 和末条消息 ID 请求截断重建，版本或锚点冲突明确拒绝。首次会话可由受校验的前端历史 seed，之后不能覆盖服务端状态。该能力为进程内会话恢复，不宣称跨重启持久化；Agent Service、Client、共享聊天包和创作端类型检查及 checkpoint 单测通过。
+- 2026-08-13：按用户意图撤回“以 profile 收窄工具集”的设计，改为 Agent 自主按需加载。所有工具仍在服务端注册，初始只向模型暴露最小发现集与短目录；模型调用 `activateCapabilities` 后，Pi Harness 用 `setActiveTools()` 在同一轮后续循环激活对应真实工具，或可请求 `all`。Skill 继续由 `readPreinstalledSkill` 按名称读取全文；全程没有用户授权步骤，也没有客户端提权入口。定向工具、Pi Agent 与 AgentManager 测试通过。
+- 2026-08-13：补齐按需加载验证与指标。真实 Pi Agent loop 集成测试模拟“先加载、后写入”的连续工具循环，证明下一次模型请求携带新 active tool；每次加载同时写入 `ai.capability_activated`，只记录能力分组、成功/失败、加载前后工具数、耗时和短错误摘要。run log/diagnostic 测试覆盖落盘与不向用户侧 WS 透传；Agent Service 类型检查通过。

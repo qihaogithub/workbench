@@ -1,7 +1,7 @@
 import { generatePreviewAuthoringRules } from '@workbench/preview-contract/rules';
 
-import SYSTEM_PROMPT from './prompts/system-prompt.md';
 import { WORKSPACE_STATUS_TEMPLATE } from '../agent-prompts/workspace-status.template';
+import SYSTEM_PROMPT from './prompts/system-prompt.md';
 
 export interface SystemPromptContext {
   projectName: string;

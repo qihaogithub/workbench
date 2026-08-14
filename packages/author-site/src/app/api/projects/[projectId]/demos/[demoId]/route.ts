@@ -194,10 +194,10 @@ function createMutationErrorResponse(error: WorkspaceAuthorityClientError) {
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { projectId: string; demoId: string } },
+  { params }: { params: Promise<{ projectId: string; demoId: string }> },
 ) {
   try {
-    const { projectId, demoId } = params;
+    const { projectId, demoId } = await params;
 
     if (!projectExists(projectId)) {
       return NextResponse.json(createApiError("PROJECT_NOT_FOUND"), {
@@ -235,7 +235,7 @@ async function resolveSessionWorkspace(
 ): Promise<
   { ok: true; ctx: SessionContext } | { ok: false; response: NextResponse }
 > {
-  const token = getAuthCookie();
+  const token = await getAuthCookie();
   if (!token) {
     return {
       ok: false,
@@ -356,10 +356,10 @@ async function resolveSessionWorkspace(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { projectId: string; demoId: string } },
+  { params }: { params: Promise<{ projectId: string; demoId: string }> },
 ) {
   try {
-    const { projectId, demoId } = params;
+    const { projectId, demoId } = await params;
     if (!projectExists(projectId)) {
       return NextResponse.json(createApiError("PROJECT_NOT_FOUND"), {
         status: 404,
@@ -489,10 +489,10 @@ export async function PATCH(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string; demoId: string } },
+  { params }: { params: Promise<{ projectId: string; demoId: string }> },
 ) {
   try {
-    const { projectId, demoId } = params;
+    const { projectId, demoId } = await params;
     if (!projectExists(projectId)) {
       return NextResponse.json(createApiError("PROJECT_NOT_FOUND"), {
         status: 404,
@@ -640,10 +640,10 @@ export async function POST(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { projectId: string; demoId: string } },
+  { params }: { params: Promise<{ projectId: string; demoId: string }> },
 ) {
   try {
-    const { projectId, demoId } = params;
+    const { projectId, demoId } = await params;
     if (!projectExists(projectId)) {
       return NextResponse.json(createApiError("PROJECT_NOT_FOUND"), {
         status: 404,

@@ -17,7 +17,8 @@ export interface IBackendAdapter {
   getFiles?(): Array<{ path: string; action: 'created' | 'modified' | 'deleted'; content?: string }>;
   getLastResponseDebug?(): unknown;
   setPromptTimeout?(seconds: number): void;
-  cancelPrompt?(): void;
+  /** Requests cancellation and resolves after the backend has accepted the abort. */
+  cancelPrompt?(): void | Promise<void>;
   getWorkingDir?(): string | null;
   resolvePermission?(toolCallId: string, approved: boolean, responseContent?: string): void;
   resolveUserChoice?(requestId: string, choice: UserChoiceResponse): void;

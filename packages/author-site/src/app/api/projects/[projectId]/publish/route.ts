@@ -70,10 +70,11 @@ function hasCanonicalRevisionMetadata(project: {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string } },
+  { params }: { params: Promise<{ projectId: string }> },
 ) {
   try {
-    const token = getAuthCookie();
+    const { projectId } = await params;
+    const token = await getAuthCookie();
     if (!token) {
       return NextResponse.json(createApiError('UNAUTHORIZED', '未登录'), { status: 401 });
     }
@@ -91,18 +92,18 @@ export async function POST(
       let session = sessionId ? getEditSession(sessionId) : null;
       if (!session) {
         const workspaceMeta = getWorkspaceMeta(workspaceId);
-        if (!workspaceMeta || workspaceMeta.demoId !== params.projectId) {
+        if (!workspaceMeta || workspaceMeta.demoId !== projectId) {
           return NextResponse.json(createApiError('SESSION_NOT_FOUND'), { status: 404 });
         }
         if (workspaceMeta.userId && workspaceMeta.userId !== payload.userId) {
           return NextResponse.json(createApiError('FORBIDDEN', '无权操作其他用户的 Workspace'), { status: 403 });
         }
 
-        const resumed = await createEditSession(payload.userId, params.projectId, workspaceId);
+        const resumed = await createEditSession(payload.userId, projectId, workspaceId);
         sessionId = resumed.sessionId;
         session = getEditSession(sessionId);
       }
-      if (!session || !sessionId || session.demoId !== params.projectId) {
+      if (!session || !sessionId || session.demoId !== projectId) {
         return NextResponse.json(createApiError('SESSION_NOT_FOUND'), { status: 404 });
       }
       if (session.userId && session.userId !== payload.userId) {
@@ -110,7 +111,7 @@ export async function POST(
       }
       try {
         const synced = await flushAndSyncProjectWorkspace({
-          projectId: params.projectId,
+          projectId,
           workspaceId: session.workspaceId,
           sessionId,
         });
@@ -136,7 +137,7 @@ export async function POST(
         );
       }
     } else {
-      const project = readProjectMeta(params.projectId);
+      const project = readProjectMeta(projectId);
       // 治本修复：activeWorkspaceId 指向已删除的 workspace 时，旧逻辑会让同步前置检查
       // 恒不满足、发布永远 400。此处视为无活跃工作区，清理悬空引用后放行。
       if (
@@ -148,7 +149,7 @@ export async function POST(
         );
         delete project.activeWorkspaceId;
         delete project.activeWorkspaceUpdatedAt;
-        writeProjectMeta(params.projectId, project);
+        writeProjectMeta(projectId, project);
       }
       const activeUpdatedAt = project?.activeWorkspaceId
         ? getWorkspaceMeta(project.activeWorkspaceId)?.updatedAt ??
@@ -177,8 +178,8 @@ export async function POST(
     };
     const result =
       Object.keys(publishOptions).length > 0
-        ? await publishProject(params.projectId, publishOptions)
-        : await publishProject(params.projectId);
+        ? await publishProject(projectId, publishOptions)
+        : await publishProject(projectId);
     return NextResponse.json(createApiSuccess(result));
   } catch (error) {
     if (error instanceof PublishError) {
@@ -208,10 +209,11 @@ export async function POST(
 
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: { projectId: string } },
+  { params }: { params: Promise<{ projectId: string }> },
 ) {
   try {
-    const token = getAuthCookie();
+    const { projectId } = await params;
+    const token = await getAuthCookie();
     if (!token) {
       return NextResponse.json(createApiError('UNAUTHORIZED', '未登录'), { status: 401 });
     }
@@ -221,8 +223,8 @@ export async function DELETE(
       return NextResponse.json(createApiError('UNAUTHORIZED', '登录已过期'), { status: 401 });
     }
 
-    unpublishProject(params.projectId);
-    return NextResponse.json(createApiSuccess({ projectId: params.projectId }));
+    unpublishProject(projectId);
+    return NextResponse.json(createApiSuccess({ projectId }));
   } catch (error) {
     console.error('撤销发布失败:', error);
     return NextResponse.json(

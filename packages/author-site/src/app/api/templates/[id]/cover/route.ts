@@ -26,11 +26,12 @@ function deleteExistingCover(templateId: string): void {
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await params;
     const service = getProjectAdminService();
-    const template = service.getTemplate(params.id);
+    const template = service.getTemplate(id);
     if (!template.ok) return projectAdminResponse(template);
 
     const formData = await request.formData();
@@ -60,16 +61,16 @@ export async function POST(
       file.type === "image/jpeg" ? "jpg" : file.type === "image/png" ? "png" : "webp";
 
     ensureThumbnailsDir();
-    deleteExistingCover(params.id);
+    deleteExistingCover(id);
 
-    const filename = `${params.id}_cover.${ext}`;
+    const filename = `${id}_cover.${ext}`;
     fs.writeFileSync(
       path.join(THUMBNAILS_DIR, filename),
       Buffer.from(await file.arrayBuffer()),
     );
 
     const thumbnail = `/thumbnails/${filename}`;
-    const result = service.updateTemplateMeta(params.id, { thumbnail });
+    const result = service.updateTemplateMeta(id, { thumbnail });
     if (!result.ok) return projectAdminResponse(result);
 
     return NextResponse.json(createApiSuccess({ thumbnail }));
@@ -84,15 +85,16 @@ export async function POST(
 
 export async function DELETE(
   _request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await params;
     const service = getProjectAdminService();
-    const template = service.getTemplate(params.id);
+    const template = service.getTemplate(id);
     if (!template.ok) return projectAdminResponse(template);
 
-    deleteExistingCover(params.id);
-    const result = service.updateTemplateMeta(params.id, { thumbnail: undefined });
+    deleteExistingCover(id);
+    const result = service.updateTemplateMeta(id, { thumbnail: undefined });
     if (!result.ok) return projectAdminResponse(result);
 
     return NextResponse.json(createApiSuccess({ thumbnail: null }));

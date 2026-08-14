@@ -357,7 +357,7 @@ function parseCanvasState(value: unknown): CanvasState | null {
 }
 
 async function validateSessionAccess(sessionId: string) {
-  const token = getAuthCookie();
+  const token = await getAuthCookie();
   if (!token) {
     return {
       response: NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
@@ -529,10 +529,11 @@ function writeJsonFileAtomic(filePath: string, value: unknown): void {
 
 export async function GET(
   _request: Request,
-  { params }: { params: { sessionId: string } },
+  { params }: { params: Promise<{ sessionId: string }> },
 ) {
   try {
-    const access = await validateSessionAccess(params.sessionId);
+    const { sessionId } = await params;
+    const access = await validateSessionAccess(sessionId);
     if (access.response) return access.response;
 
     let stored: { state: CanvasState; updatedAt?: number } | null = null;
@@ -566,10 +567,11 @@ export async function GET(
 
 export async function POST(
   request: Request,
-  { params }: { params: { sessionId: string } },
+  { params }: { params: Promise<{ sessionId: string }> },
 ) {
   try {
-    const access = await validateSessionAccess(params.sessionId);
+    const { sessionId } = await params;
+    const access = await validateSessionAccess(sessionId);
     if (access.response) return access.response;
 
     const body = (await request.json().catch(() => null)) as unknown;
@@ -612,7 +614,7 @@ export async function POST(
       const writeResponse = await fetch(
         `${agentServiceUrl}/api/collab/projects/${encodeURIComponent(access.projectId!)}` +
         `/workspaces/${encodeURIComponent(access.workspaceId!)}/write` +
-        `?sessionId=${encodeURIComponent(params.sessionId)}` +
+        `?sessionId=${encodeURIComponent(sessionId)}` +
         `&resourcePath=${encodeURIComponent(".canvas-layout.json")}` +
         `&kind=canvas-layout`,
         {

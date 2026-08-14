@@ -15,14 +15,14 @@
 | `src/components/demo/` | 项目编辑、页面树、预览、配置、截图等核心 UI |
 | `src/components/ai-elements/` | AI 对话消息、工具调用、权限确认与流式展示 |
 | `src/lib/` | 文件系统、session、项目、发布、模型、编译和 API client 逻辑 |
-| `src/middleware.ts` | 登录鉴权、页面/API 保护和 CORS |
+| `src/proxy.ts` | 登录鉴权、页面/API 保护和 CORS |
 | `scripts/` | 包内辅助脚本，例如数据库初始化 |
 
 ## 改动边界
 
 - API route 返回值使用 `{ success: true, data }` 或 `{ success: false, error }`，优先复用 `src/lib/fs-utils.ts` 中的 `createApiSuccess`、`createApiError`。
 - 项目读写能力正在向 `@workbench/project-core` 收敛；新增项目管理能力时，优先确认是否应该进入 `project-core`，避免 Web API 与 CLI 行为分叉。
-- 改登录、鉴权或 session 时，同步检查 `src/middleware.ts`、`src/lib/auth/`、`src/app/api/auth/` 和前端调用。
+- 改登录、鉴权或 session 时，同步检查 `src/proxy.ts`、`src/lib/auth/`、`src/app/api/auth/` 和前端调用。
 - 改 AI 对话时，同步检查 `src/lib/agent-client.ts`、`src/components/ai-elements/`、session API 与 agent-service 事件结构。
 - 改截图或预览时，同步检查 `src/lib/screenshot-service.ts`、`src/components/demo/useScreenshotGeneration.ts`、`packages/screenshot-service/` 和相关测试。
 - 不要修改 `components/`、`lib/` 根层历史兼容目录，除非确认该路径仍被当前代码引用。

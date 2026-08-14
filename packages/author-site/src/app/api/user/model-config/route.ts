@@ -14,7 +14,7 @@ import {
 } from "@/lib/user-model-config";
 
 async function requireUserId(): Promise<string | null> {
-  const token = getAuthCookie();
+  const token = await getAuthCookie();
   if (!token) return null;
 
   const payload = await verifyToken(token);

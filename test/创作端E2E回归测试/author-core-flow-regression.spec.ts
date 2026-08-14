@@ -207,7 +207,7 @@ test.describe('创作端核心流程回归', () => {
     await expect(page.getByRole('heading', { name: project.name })).toBeVisible({
       timeout: 30000,
     });
-    await expect(page.getByRole('button', { name: /同步并发布|创建版本并发布/ })).toBeVisible({
+    await expect(page.getByRole('button', { name: '发布' })).toBeVisible({
       timeout: 30000,
     });
   });

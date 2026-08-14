@@ -22,7 +22,7 @@ import {
 import { isLiveWorkspacePath } from "@/lib/live-workspace-route-context";
 
 async function getAuthenticatedUser() {
-  const token = getAuthCookie();
+  const token = await getAuthCookie();
   if (!token) return null;
   return verifyToken(token);
 }
@@ -76,21 +76,22 @@ function parseSketchPatchSummary(value: unknown): SketchPatchVersionSummary | un
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string; kind: string; resourceId: string } },
+  { params }: { params: Promise<{ projectId: string; kind: string; resourceId: string }> },
 ) {
+  const { projectId, kind: kindParam, resourceId } = await params;
   const payload = await getAuthenticatedUser();
   if (!payload) {
     return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), { status: 401 });
   }
-  const kind = normalizeKind(params.kind);
+  const kind = normalizeKind(kindParam);
   if (!kind) {
     return NextResponse.json(createApiError("INVALID_REQUEST", "资源类型不合法"), { status: 400 });
   }
   const result = projectService().resourceVersionList(
     {
-      projectId: params.projectId,
+      projectId,
       kind,
-      resourceId: params.resourceId,
+      resourceId,
       includeDraft: request.nextUrl.searchParams.get("includeDraft") === "true",
     },
     {
@@ -111,13 +112,14 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string; kind: string; resourceId: string } },
+  { params }: { params: Promise<{ projectId: string; kind: string; resourceId: string }> },
 ) {
+  const { projectId, kind: kindParam, resourceId } = await params;
   const payload = await getAuthenticatedUser();
   if (!payload) {
     return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), { status: 401 });
   }
-  const kind = normalizeKind(params.kind);
+  const kind = normalizeKind(kindParam);
   if (!kind) {
     return NextResponse.json(createApiError("INVALID_REQUEST", "资源类型不合法"), { status: 400 });
   }
@@ -143,7 +145,7 @@ export async function POST(
       return NextResponse.json(createApiError("SESSION_NOT_FOUND"), { status: 404 });
     }
     const meta = getSessionMeta(body.sessionId);
-    if (!meta || meta.demoId !== params.projectId) {
+    if (!meta || meta.demoId !== projectId) {
       return NextResponse.json(createApiError("SESSION_NOT_FOUND"), { status: 404 });
     }
     if (meta.userId && meta.userId !== payload.userId) {
@@ -158,7 +160,7 @@ export async function POST(
     if (meta.workspaceId && sourceWorkspacePath && isLiveWorkspacePath(sourceWorkspacePath)) {
       try {
         const synced = await flushAndSyncProjectWorkspace({
-          projectId: params.projectId,
+          projectId,
           workspaceId: meta.workspaceId,
           sessionId: body.sessionId,
         });
@@ -178,9 +180,9 @@ export async function POST(
   }
   const result = projectService().resourceVersionCreate(
     {
-      projectId: params.projectId,
+      projectId,
       kind,
-      resourceId: params.resourceId,
+      resourceId,
       editId: body.editId,
       sourceWorkspacePath,
       workspaceId: workspaceProof?.workspaceId,

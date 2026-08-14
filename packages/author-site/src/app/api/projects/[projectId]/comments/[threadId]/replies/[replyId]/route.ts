@@ -5,7 +5,7 @@ import type { CommentMention } from "@workbench/shared";
 import { resolveCommentAuthor, canModify } from "@/lib/comment-auth";
 
 type RouteParams = {
-  params: { projectId: string; threadId: string; replyId: string };
+  params: Promise<{ projectId: string; threadId: string; replyId: string }>;
 };
 
 interface PatchBody {
@@ -17,13 +17,14 @@ interface PatchBody {
 
 /** PATCH /api/projects/[projectId]/comments/[threadId]/replies/[replyId] */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
+  const { projectId, threadId, replyId } = await params;
   try {
     const body = (await request.json()) as PatchBody;
     if (!body.content || typeof body.content !== "string" || !body.content.trim()) {
       return NextResponse.json(createApiError("VALIDATION_ERROR", "回复内容不能为空"), { status: 400 });
     }
-    const thread = getCommentThread(params.projectId, params.threadId);
-    const reply = thread?.replies.find((candidate) => candidate.id === params.replyId);
+    const thread = getCommentThread(projectId, threadId);
+    const reply = thread?.replies.find((candidate) => candidate.id === replyId);
     if (!reply) return NextResponse.json(createApiError("COMMENT_NOT_FOUND", "回复不存在"), { status: 404 });
     const authorResult = await resolveCommentAuthor(request, body);
     if (!authorResult) return NextResponse.json(createApiError("VALIDATION_ERROR", "未登录用户需提供 anonymousId"), { status: 400 });
@@ -32,7 +33,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (authorResult.author.isAnonymous && mentions.some((mention) => mention.type === "user")) {
       return NextResponse.json(createApiError("VALIDATION_ERROR", "匿名用户不能 @其他用户"), { status: 400 });
     }
-    const updated = await updateReply(params.projectId, params.threadId, params.replyId, { content: body.content.trim(), mentions });
+    const updated = await updateReply(projectId, threadId, replyId, { content: body.content.trim(), mentions });
     return NextResponse.json(createApiSuccess({ reply: updated!.reply }));
   } catch (error) {
     console.error("更新回复失败:", error);
@@ -50,15 +51,16 @@ interface DeleteBody {
  * 删除回复（作者本人或管理员）
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  const { projectId, threadId, replyId } = await params;
   try {
-    const thread = getCommentThread(params.projectId, params.threadId);
+    const thread = getCommentThread(projectId, threadId);
     if (!thread) {
       return NextResponse.json(createApiError("COMMENT_NOT_FOUND", "评论不存在"), {
         status: 404,
       });
     }
 
-    const reply = thread.replies.find((r) => r.id === params.replyId);
+    const reply = thread.replies.find((r) => r.id === replyId);
     if (!reply) {
       return NextResponse.json(createApiError("COMMENT_NOT_FOUND", "回复不存在"), {
         status: 404,
@@ -87,7 +89,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       });
     }
 
-    await deleteReply(params.projectId, params.threadId, params.replyId);
+    await deleteReply(projectId, threadId, replyId);
     return NextResponse.json(createApiSuccess({ deleted: true }));
   } catch (error) {
     console.error("删除回复失败:", error);

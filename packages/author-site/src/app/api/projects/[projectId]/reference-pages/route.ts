@@ -54,10 +54,11 @@ function readWorkspaceTreeSnapshot(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string } },
+  { params }: { params: Promise<{ projectId: string }> },
 ) {
+  const { projectId } = await params;
   try {
-    const token = getAuthCookie();
+    const token = await getAuthCookie();
     if (!token) {
       return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
         status: 401,
@@ -71,7 +72,6 @@ export async function POST(
       });
     }
 
-    const { projectId } = params;
     if (!projectExists(projectId)) {
       return NextResponse.json(createApiError("PROJECT_NOT_FOUND"), {
         status: 404,

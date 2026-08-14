@@ -156,9 +156,9 @@ function serveFromGlobalImageStore(
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { sessionId: string; path: string[] } },
+  { params }: { params: Promise<{ sessionId: string; path: string[] }> },
 ) {
-  const { sessionId, path: pathSegments } = params;
+  const { sessionId, path: pathSegments } = await params;
 
   if (!sessionId || !pathSegments || pathSegments.length === 0) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });

@@ -8,7 +8,7 @@ import {
 } from "@/lib/comment-store";
 import { resolveCommentAuthor, canModify } from "@/lib/comment-auth";
 
-type RouteParams = { params: { projectId: string; threadId: string } };
+type RouteParams = { params: Promise<{ projectId: string; threadId: string }> };
 
 interface PatchBody {
   resolved?: boolean;
@@ -24,10 +24,11 @@ interface PatchBody {
  * resolve/reopen/编辑评论内容
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
+  const { projectId, threadId } = await params;
   try {
     const body = (await request.json()) as PatchBody;
 
-    const thread = getCommentThread(params.projectId, params.threadId);
+    const thread = getCommentThread(projectId, threadId);
     if (!thread) {
       return NextResponse.json(createApiError("COMMENT_NOT_FOUND", "评论不存在"), {
         status: 404,
@@ -71,8 +72,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     const updated = await updateCommentThread(
-      params.projectId,
-      params.threadId,
+      projectId,
+      threadId,
       updates,
     );
 
@@ -95,8 +96,9 @@ interface DeleteBody {
  * 删除评论线程（作者本人或管理员）
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  const { projectId, threadId } = await params;
   try {
-    const thread = getCommentThread(params.projectId, params.threadId);
+    const thread = getCommentThread(projectId, threadId);
     if (!thread) {
       return NextResponse.json(createApiError("COMMENT_NOT_FOUND", "评论不存在"), {
         status: 404,
@@ -125,7 +127,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       });
     }
 
-    await deleteCommentThread(params.projectId, params.threadId);
+    await deleteCommentThread(projectId, threadId);
     return NextResponse.json(createApiSuccess({ deleted: true }));
   } catch (error) {
     console.error("删除评论失败:", error);

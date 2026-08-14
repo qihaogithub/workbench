@@ -4,7 +4,7 @@
  * 测量创作端编辑页加载速度 —— ego-browser 自动化脚本
  *
  * 用法:
- *   pnpm measure:edit-page-load [projectId]
+ *   pnpm measure:edit-page-load [projectId] [--json]
  *   或
  *   node scripts/development/measure-edit-page-load.mjs [projectId]
  *
@@ -15,9 +15,9 @@
  *   NO_LOGIN — 设为 1 跳过自动登录
  *
  * 输出:
- *   - 冷/热加载导航耗时
- *   - 加载中状态持续时间
- *   - 返回首页耗时
+ *   - 冷/热加载导航耗时与 Navigation Timing
+ *   - 编辑器 ready marker 到达时间
+ *   - 返回首页耗时与 Navigation Timing
  */
 
 import { execSync } from "child_process";
@@ -27,6 +27,7 @@ const BASE_URL = process.env.BASE_URL || "http://localhost:4200";
 const USERNAME = process.env.USERNAME || "qihao";
 const PASSWORD = process.env.PASSWORD || "130015";
 const SKIP_LOGIN = process.env.NO_LOGIN === "1";
+const JSON_OUTPUT = process.argv.includes("--json");
 
 function getDefaultProject() {
   try {
@@ -37,7 +38,10 @@ function getDefaultProject() {
   }
 }
 
-const projectId = process.argv[2] || process.env.PROJECT_ID || getDefaultProject();
+const projectId =
+  process.argv.slice(2).find((argument) => !argument.startsWith("-")) ||
+  process.env.PROJECT_ID ||
+  getDefaultProject();
 
 if (!projectId) {
   console.error("❌ 未找到项目，请指定 projectId");
@@ -56,11 +60,33 @@ function esc(v) {
 const egoScript = `const task = await useOrCreateTaskSpace('measure-edit-' + Date.now());
 const result = { project: '${esc(projectId)}', baseUrl: '${esc(BASE_URL)}' };
 
+async function navigationTiming() {
+  return await js(String.raw\`(() => {
+    const entry = performance.getEntriesByType('navigation').at(-1);
+    if (!entry) return null;
+    return {
+      responseStart: Math.round(entry.responseStart),
+      domContentLoaded: Math.round(entry.domContentLoadedEventEnd),
+      load: Math.round(entry.loadEventEnd),
+      duration: Math.round(entry.duration),
+      transferSize: entry.transferSize,
+    };
+  })()\`);
+}
+
+async function waitForEditorReady(timeoutSeconds) {
+  await waitForElement('[data-testid="editor-ready"]', { timeout: timeoutSeconds });
+  return await js(String.raw\`(() => ({
+    marker: Boolean(document.querySelector('[data-testid="editor-ready"]')),
+    loadingVisible: document.body.innerText.includes('加载中...'),
+    url: location.href,
+  }))()\`);
+}
+
 // ── 登录 ──
 ${SKIP_LOGIN ? "" : `
 {
-  await gotoAndWait('${esc(BASE_URL)}/login', { timeout: 20, settle: 2 });
-  await wait(3);
+  await gotoAndWait('${esc(BASE_URL)}/login', { timeout: 20, settle: 0 });
   const onLoginPage = await (async () => {
     try { const b = await js('document.body.innerText'); return b.includes('密码') || b.includes('Password'); } catch (_) { return false; }
   })();
@@ -69,27 +95,21 @@ ${SKIP_LOGIN ? "" : `
     await fillInput('input[type="text"], input[type="email"]', '${esc(USERNAME)}');
     await fillInput('input[type="password"]', '${esc(PASSWORD)}');
     await click('button[type="submit"]', { label: 'login' });
-    await wait(5);
+    await waitForLoad({ timeout: 20 });
   }
 }
 `}
 // ── 冷加载 ──
 const coldStart = Date.now();
 try {
-  await gotoAndWait('${esc(EDIT_URL)}', { timeout: 60, settle: 3 });
+  await gotoAndWait('${esc(EDIT_URL)}', { timeout: 120, settle: 0 });
+  result.coldEditorReady = await waitForEditorReady(120);
 } catch (e) {
   result.coldNavError = e.message || String(e);
 }
 result.coldNavigationMs = Date.now() - coldStart;
-
-for (let i = 0; i < 30; i++) {
-  try {
-    const stillLoading = await js('document.body.innerText.includes("加载中")');
-    if (!stillLoading) { result.loadingDurationS = (i + 1) * 2; break; }
-  } catch (e) { result.jsError = e.message || String(e); break; }
-  await wait(2);
-}
-if (result.loadingDurationS == null) result.loadingTimedOut = true;
+result.coldEditorReadyMs = result.coldNavigationMs;
+result.coldNavigationTiming = await navigationTiming();
 
 try {
   result.pageContent = await js('document.body.innerText.substring(0, 300)');
@@ -97,23 +117,21 @@ try {
 
 // ── 返回首页 ──
 const backStart = Date.now();
-await gotoAndWait('${esc(HOME_URL)}', { timeout: 20, settle: 2 });
+await gotoAndWait('${esc(HOME_URL)}', { timeout: 60, settle: 0 });
 result.backToHomeMs = Date.now() - backStart;
+result.backToHomeNavigationTiming = await navigationTiming();
 
 // ── 热加载 ──
 const warmStart = Date.now();
-await gotoAndWait('${esc(EDIT_URL)}', { timeout: 60, settle: 3 });
-result.warmNavigationMs = Date.now() - warmStart;
-
-for (let i = 0; i < 15; i++) {
-  try {
-    if (!(await js('document.body.innerText.includes("加载中")'))) {
-      result.warmLoadingDurationS = (i + 1) * 2; break;
-    }
-  } catch (_) { break; }
-  await wait(2);
+try {
+  await gotoAndWait('${esc(EDIT_URL)}', { timeout: 120, settle: 0 });
+  result.warmEditorReady = await waitForEditorReady(120);
+} catch (e) {
+  result.warmNavError = e.message || String(e);
 }
-if (result.warmLoadingDurationS == null) result.warmLoadingTimedOut = true;
+result.warmNavigationMs = Date.now() - warmStart;
+result.warmEditorReadyMs = result.warmNavigationMs;
+result.warmNavigationTiming = await navigationTiming();
 
 cliLog(JSON.stringify(result));`;
 
@@ -132,7 +150,7 @@ try {
     try {
       const r = JSON.parse(line);
       if (r.project) {
-        printResult(r);
+        printResult(r, JSON_OUTPUT);
         found = true;
       }
     } catch (_) {
@@ -155,7 +173,7 @@ try {
     try {
       const r = JSON.parse(line);
       if (r.project) {
-        printResult(r);
+        printResult(r, JSON_OUTPUT);
         found = true;
       }
     } catch (_) {}
@@ -167,20 +185,21 @@ try {
   }
 }
 
-function printResult(r) {
+function printResult(r, jsonOutput) {
+  if (jsonOutput) {
+    console.log(JSON.stringify(r));
+    return;
+  }
   console.log("═══════════════════════════════════");
   console.log("  编辑页加载速度测量");
   console.log("═══════════════════════════════════");
   console.log(`  项目:     ${r.project}`);
   console.log(`  服务:     ${r.baseUrl}`);
   console.log("───────────────────────────────────");
-  console.log(`  冷加载:   ${r.coldNavigationMs ?? "?"}ms (导航)`);
+  console.log(`  冷加载:   ${r.coldNavigationMs ?? "?"}ms (到编辑器 ready)`);
   if (r.coldNavError) console.log(`            ⚠️ 导航失败: ${r.coldNavError}`);
-  if (r.loadingDurationS != null) {
-    console.log(`            加载中持续 ${r.loadingDurationS}s`);
-  } else if (r.loadingTimedOut) {
-    console.log(`            ⚠️ 加载中状态超时 (>60s)`);
-  }
+  if (r.coldEditorReady) console.log(`            ready marker: ${r.coldEditorReady.marker ? "已到达" : "未到达"}`);
+  if (r.coldNavigationTiming) console.log(`            responseStart/load: ${r.coldNavigationTiming.responseStart}/${r.coldNavigationTiming.load}ms`);
   if (r.jsError) console.log(`            ❌ JS 错误: ${r.jsError}`);
   if (r.pageContent) {
     const preview = r.pageContent.replace(/\n/g, " ").slice(0, 60);
@@ -188,16 +207,13 @@ function printResult(r) {
   }
   console.log("───────────────────────────────────");
   console.log(`  返回首页: ${r.backToHomeMs ?? "?"}ms`);
-  console.log(`  热加载:   ${r.warmNavigationMs ?? "?"}ms (导航)`);
-  if (r.warmLoadingDurationS != null) {
-    console.log(`            加载中持续 ${r.warmLoadingDurationS}s`);
-  } else if (r.warmLoadingTimedOut) {
-    console.log(`            ⚠️ 加载中状态超时`);
-  }
+  console.log(`  热加载:   ${r.warmNavigationMs ?? "?"}ms (到编辑器 ready)`);
+  if (r.warmEditorReady) console.log(`            ready marker: ${r.warmEditorReady.marker ? "已到达" : "未到达"}`);
+  if (r.warmNavigationTiming) console.log(`            responseStart/load: ${r.warmNavigationTiming.responseStart}/${r.warmNavigationTiming.load}ms`);
   console.log("═══════════════════════════════════");
 
-  const coldOk = r.loadingDurationS != null && !r.jsError && !r.coldNavError;
-  const warmOk = r.warmLoadingDurationS != null;
+  const coldOk = r.coldEditorReady?.marker && !r.coldEditorReady.loadingVisible && !r.jsError && !r.coldNavError;
+  const warmOk = r.warmEditorReady?.marker && !r.warmEditorReady.loadingVisible && !r.warmNavError;
   const coldMs = r.coldNavigationMs || 99999;
   const warmMs = r.warmNavigationMs || 99999;
 

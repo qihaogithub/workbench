@@ -31,6 +31,15 @@ interface RunLogEntry {
   payload?: unknown;
 }
 
+interface PendingLogEntry {
+  line: RunLogEntry;
+  diagnostic?: EditorDiagnosticEvent;
+  droppable: boolean;
+}
+
+const LOG_FLUSH_INTERVAL_MS = 25;
+const MAX_PENDING_LOG_ENTRIES = 256;
+
 function findProjectRoot(cwd: string): string {
   let current = path.resolve(cwd);
   while (current !== path.dirname(current)) {
@@ -120,6 +129,10 @@ export class AgentRunLog {
   private readonly demoId?: string;
   private readonly workingDir?: string;
   private readonly model?: string;
+  private pendingEntries: PendingLogEntry[] = [];
+  private flushTimer: ReturnType<typeof setTimeout> | undefined;
+  private writeChain: Promise<void> = Promise.resolve();
+  private droppedIncrementalEntries = 0;
 
   constructor(options: AgentRunLogStartOptions) {
     this.sessionId = options.sessionId;
@@ -129,7 +142,6 @@ export class AgentRunLog {
     this.model = options.model;
 
     const dir = path.join(getRunLogRoot(), safePathPart(options.sessionId));
-    fs.mkdirSync(dir, { recursive: true });
     this.filePath = path.join(dir, `${safePathPart(options.messageId)}.jsonl`);
 
     this.append({
@@ -286,6 +298,26 @@ export class AgentRunLog {
           },
         });
         break;
+
+      case 'capability_activation':
+        this.append({
+          level: event.status === 'failed' ? 'warn' : 'info',
+          source: 'system',
+          eventType: 'capability_activation',
+          title: event.status === 'completed'
+            ? 'Task capabilities activated'
+            : 'Task capability activation failed',
+          summary: `capabilities=${event.capabilities.join(',')}, tools=${event.previousActiveToolCount}->${event.activeToolCount}, durationMs=${event.durationMs}`,
+          payload: {
+            status: event.status,
+            capabilityGroups: event.capabilities,
+            previousActiveToolCount: event.previousActiveToolCount,
+            activeToolCount: event.activeToolCount,
+            durationMs: event.durationMs,
+            errorMessage: event.error?.message,
+          },
+        });
+        break;
     }
   }
 
@@ -329,7 +361,17 @@ export class AgentRunLog {
     });
   }
 
-  private appendDiagnosticEvent(line: RunLogEntry): void {
+  /** Flush queued diagnostics before a run is discarded. */
+  async drain(): Promise<void> {
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer);
+      this.flushTimer = undefined;
+    }
+    await this.flush();
+    await this.writeChain;
+  }
+
+  private createDiagnosticEvent(line: RunLogEntry): EditorDiagnosticEvent | undefined {
     const eventTypeByRunLog: Record<string, string> = {
       run_start: 'ai.run_started',
       tool_call: 'ai.tool_call_started',
@@ -338,9 +380,10 @@ export class AgentRunLog {
       error: 'ai.run_failed',
       agent_error: 'ai.run_failed',
       cancel: 'ai.run_failed',
+      capability_activation: 'ai.capability_activated',
     };
     const eventType = eventTypeByRunLog[line.eventType];
-    if (!eventType) return;
+    if (!eventType) return undefined;
 
     const diagnostic: EditorDiagnosticEvent = createEditorDiagnosticEvent({
       id: `ai-${this.sessionId}-${this.messageId}-${this.diagnosticSequence}`,
@@ -368,13 +411,7 @@ export class AgentRunLog {
     });
     this.diagnosticSequence += 1;
 
-    const filePath = getDiagnosticsJsonlPath();
-    try {
-      fs.mkdirSync(path.dirname(filePath), { recursive: true });
-      fs.appendFileSync(filePath, `${JSON.stringify(diagnostic)}\n`, 'utf-8');
-    } catch (error) {
-      logger.warn({ error, filePath }, 'Failed to append agent diagnostic event');
-    }
+    return diagnostic;
   }
 
   private append(entry: Omit<RunLogEntry, 'timestamp' | 'sessionId' | 'messageId'>): void {
@@ -386,12 +423,81 @@ export class AgentRunLog {
       payload: sanitizePayload(entry.payload),
     };
 
-    try {
-      fs.appendFileSync(this.filePath, `${JSON.stringify(line)}\n`, 'utf-8');
-    } catch (error) {
-      logger.warn({ error, logPath: this.filePath }, 'Failed to append agent run log');
+    const droppable = line.eventType === 'thought' || line.eventType === 'status';
+    if (this.pendingEntries.length >= MAX_PENDING_LOG_ENTRIES) {
+      const firstDroppable = this.pendingEntries.findIndex((item) => item.droppable);
+      if (firstDroppable >= 0) {
+        this.pendingEntries.splice(firstDroppable, 1);
+        this.droppedIncrementalEntries += 1;
+      } else if (droppable) {
+        this.droppedIncrementalEntries += 1;
+        return;
+      }
     }
-    this.appendDiagnosticEvent(line);
+    this.pendingEntries.push({
+      line,
+      diagnostic: this.createDiagnosticEvent(line),
+      droppable,
+    });
+
+    // Terminal and mutation-related events should begin flushing immediately,
+    // without making the WebSocket event path wait on filesystem I/O.
+    if (!droppable) {
+      void this.flush();
+      return;
+    }
+    this.scheduleFlush();
+  }
+
+  private scheduleFlush(): void {
+    if (this.flushTimer) return;
+    this.flushTimer = setTimeout(() => {
+      this.flushTimer = undefined;
+      void this.flush();
+    }, LOG_FLUSH_INTERVAL_MS);
+    this.flushTimer.unref?.();
+  }
+
+  private async flush(): Promise<void> {
+    if (this.pendingEntries.length === 0) return;
+    const batch = this.pendingEntries.splice(0);
+    const droppedIncrementalEntries = this.droppedIncrementalEntries;
+    this.droppedIncrementalEntries = 0;
+
+    this.writeChain = this.writeChain
+      .catch(() => undefined)
+      .then(async () => {
+        try {
+          await fs.promises.mkdir(path.dirname(this.filePath), { recursive: true });
+          const lines = batch.map((item) => JSON.stringify(item.line)).join('\n');
+          await fs.promises.appendFile(this.filePath, `${lines}\n`, 'utf-8');
+
+          const diagnostics = batch
+            .map((item) => item.diagnostic)
+            .filter((item): item is EditorDiagnosticEvent => Boolean(item));
+          if (diagnostics.length > 0) {
+            const diagnosticPath = getDiagnosticsJsonlPath();
+            await fs.promises.mkdir(path.dirname(diagnosticPath), { recursive: true });
+            await fs.promises.appendFile(
+              diagnosticPath,
+              `${diagnostics.map((item) => JSON.stringify(item)).join('\n')}\n`,
+              'utf-8',
+            );
+          }
+          if (droppedIncrementalEntries > 0) {
+            logger.warn(
+              { sessionId: this.sessionId, messageId: this.messageId, droppedIncrementalEntries },
+              'Agent run log queue dropped incremental events',
+            );
+          }
+        } catch (error) {
+          logger.warn(
+            { error, logPath: this.filePath },
+            'Failed to flush agent run log queue',
+          );
+        }
+      });
+    await this.writeChain;
   }
 }
 

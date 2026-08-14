@@ -8,9 +8,10 @@ import { reconcileTemplateKnowledge } from "@/lib/knowledge-service";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await params;
     const body = await request.json();
     const { category, name, description } = body as {
       category?: unknown;
@@ -32,7 +33,7 @@ export async function POST(
       );
     }
 
-    const result = getProjectAdminService().createTemplateFromProject(params.id, {
+    const result = getProjectAdminService().createTemplateFromProject(id, {
       category,
       name,
       description,

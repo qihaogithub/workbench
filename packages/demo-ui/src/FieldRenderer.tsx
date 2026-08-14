@@ -21,7 +21,7 @@ import { MultiSelect } from "./MultiSelect";
 import { CascadeSelect } from "./CascadeSelect";
 import type { FieldConfig } from "./schema-parser";
 import { createContext, useContext, useMemo } from "react";
-import { BookOpen, Check, Edit3, Pencil } from "lucide-react";
+import { BookOpen, Check, Edit3, ImageIcon, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -321,48 +321,6 @@ export function FieldRenderer({
   );
 }
 
-function RichTextInput({
-  value,
-  onChange,
-  field,
-  readonly,
-}: {
-  value: unknown;
-  onChange: (value: unknown) => void;
-  field: FieldConfig;
-  readonly?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setOpen(true)}
-        disabled={readonly}
-      >
-        <Edit3 className="h-3 w-3 mr-1" />
-        编辑
-      </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>{field.title}</DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 min-h-0">
-            <DocumentEditor
-              value={(value as string) || ""}
-              onChange={(v) => onChange(v)}
-              readOnly={readonly}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
       return (
         <Input
           type="number"
@@ -510,7 +468,12 @@ function RichTextInput({
             {field.required && <span className="text-red-500 ml-0.5">*</span>}
           </Label>
           {linkedSpecs.length > 0 && (
-            <DesignSpecIndicator specs={linkedSpecs} onEditDesignSpec={onEditDesignSpec} />
+            <DesignSpecIndicator
+              specs={linkedSpecs}
+              field={field}
+              value={value}
+              onEditDesignSpec={onEditDesignSpec}
+            />
           )}
         </div>
       )}
@@ -521,8 +484,10 @@ function RichTextInput({
   );
 }
 
-function DesignSpecIndicator({ specs, onEditDesignSpec }: {
+function DesignSpecIndicator({ specs, field, value, onEditDesignSpec }: {
   specs: DesignSpecEntryLink[];
+  field: FieldConfig;
+  value: unknown;
   onEditDesignSpec?: (docId: string, entryId: string) => void;
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -549,18 +514,38 @@ function DesignSpecIndicator({ specs, onEditDesignSpec }: {
     </span>
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
       <DialogContent className="flex max-h-[80vh] max-w-2xl flex-col">
-        <DialogHeader><DialogTitle>关联设计规范</DialogTitle></DialogHeader>
+        <DialogHeader className="sr-only"><DialogTitle>关联设计规范</DialogTitle></DialogHeader>
         <div className="min-h-0 space-y-3 overflow-y-auto pr-1">
           {specs.map((spec) => <section key={`${spec.docId}:${spec.entryId}`} className="rounded-lg border p-3">
             <p className="text-xs text-muted-foreground">{spec.docTitle}</p>
             <h3 className="mt-1 text-sm font-semibold">{spec.entryTitle || "未命名条目"}</h3>
-            {spec.markdown.trim() ? <DocumentEditor value={spec.markdown} onChange={() => {}} readOnly className="mt-2" /> : <p className="mt-2 text-sm text-muted-foreground">暂无说明</p>}
+            <DesignSpecConfigTable field={field} value={value} />
+            {spec.markdown.trim() ? <DocumentEditor value={spec.markdown} onChange={() => {}} readOnly scrollable={false} className="mt-3" /> : <p className="mt-3 text-sm text-muted-foreground">暂无说明</p>}
             {onEditDesignSpec && <Button className="mt-3" size="sm" onClick={() => { setDialogOpen(false); onEditDesignSpec(spec.docId, spec.entryId); }}>去编辑</Button>}
           </section>)}
         </div>
       </DialogContent>
     </Dialog>
   </>;
+}
+
+function DesignSpecConfigTable({ field, value }: { field: FieldConfig; value: unknown }) {
+  const isImage = field.uiWidget === "image" || field.uiWidget === "file" || field.format === "image" || /(?:image|img|logo|banner|pic|thumb|background)/i.test(field.key);
+  const isColor = field.format === "color" || field.type === "color";
+  const format = isImage && typeof value === "string"
+    ? value.split(".").pop()?.toUpperCase() || "—"
+    : field.format?.toUpperCase() || "—";
+
+  return <table className="mt-3 w-full border-collapse text-xs">
+    <thead><tr className="text-left text-muted-foreground"><th className="w-[52px] py-1 pr-2 font-medium" /><th className="py-1 pr-2 font-medium">配置项</th><th className="py-1 pr-2 font-medium">格式</th><th className="py-1 font-medium">尺寸</th></tr></thead>
+    <tbody><tr className="hover:bg-accent/40"><td className="py-1 pr-2"><ConfigSpecThumbnail title={field.title} value={value} isImage={isImage} isColor={isColor} /></td><td className="font-medium">{field.title}</td><td className="text-muted-foreground">{format}</td><td className="text-muted-foreground">—</td></tr></tbody>
+  </table>;
+}
+
+function ConfigSpecThumbnail({ title, value, isImage, isColor }: { title: string; value: unknown; isImage: boolean; isColor: boolean }) {
+  if (isColor) return <span className="block h-[52px] w-[52px] rounded-md border" style={{ background: typeof value === "string" ? value : "hsl(var(--secondary))" }} />;
+  if (isImage && typeof value === "string" && value) return <img src={value} alt={title} className="h-[52px] w-[52px] rounded-md border object-cover" />;
+  return <span className="flex h-[52px] w-[52px] items-center justify-center rounded-md border text-lg text-muted-foreground">{isImage ? <ImageIcon className="h-5 w-5" /> : "Aa"}</span>;
 }
 
 function PositionFieldInput({

@@ -8,9 +8,10 @@ import { reconcileTemplateKnowledge } from "@/lib/knowledge-service";
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await params;
     const body = await request.json();
     const { name, category } = body as {
       name?: unknown;
@@ -41,7 +42,7 @@ export async function PATCH(
       );
     }
 
-    const result = getProjectAdminService().updateTemplateMeta(params.id, {
+    const result = getProjectAdminService().updateTemplateMeta(id, {
       name: typeof name === "string" ? name.trim() : undefined,
       category: typeof category === "string" ? category.trim() : undefined,
     });
@@ -60,11 +61,12 @@ export async function PATCH(
 
 export async function DELETE(
   _request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await params;
     const service = getProjectAdminService();
-    const preview = service.deleteTemplatePreview(params.id);
+    const preview = service.deleteTemplatePreview(id);
     if (!preview.ok || !preview.data) return projectAdminResponse(preview);
 
     const result = service.deleteTemplateExecute(

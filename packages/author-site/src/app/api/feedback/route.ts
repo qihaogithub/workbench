@@ -15,7 +15,7 @@ const VALID_CATEGORIES: FeedbackCategory[] = ["bug", "suggestion", "question", "
 const VALID_SEVERITIES: FeedbackSeverity[] = ["high", "medium", "low"];
 
 async function resolveUser(request: NextRequest) {
-  const cookieToken = getAuthCookie();
+  const cookieToken = await getAuthCookie();
   if (cookieToken) {
     const payload = await verifyToken(cookieToken);
     if (payload) return payload;

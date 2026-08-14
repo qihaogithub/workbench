@@ -6,7 +6,7 @@ import { createApiSuccess, createApiError } from "@/lib/fs-utils";
 
 export async function POST(
   request: Request,
-  { params }: { params: { userId: string } },
+  { params }: { params: Promise<{ userId: string }> },
 ) {
   if (!(await verifyAdminRequest(request))) {
     return NextResponse.json(createApiError("UNAUTHORIZED", "未授权访问"), {
@@ -14,7 +14,7 @@ export async function POST(
     });
   }
 
-  const { userId } = params;
+  const { userId } = await params;
   const user = findUserById(userId);
   if (!user) {
     return NextResponse.json(createApiError("VALIDATION_ERROR", "用户不存在"), {

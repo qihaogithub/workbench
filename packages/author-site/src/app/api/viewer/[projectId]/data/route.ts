@@ -20,10 +20,10 @@ import { readCanvasStateFromWorkspace } from "@/lib/canvas-layout-file";
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { projectId: string } },
+  { params }: { params: Promise<{ projectId: string }> },
 ) {
   try {
-    const { projectId } = params;
+    const { projectId } = await params;
 
     if (!projectExists(projectId)) {
       return NextResponse.json(createApiError("PROJECT_NOT_FOUND"), {

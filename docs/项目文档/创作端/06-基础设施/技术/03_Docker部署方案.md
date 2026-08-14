@@ -1,9 +1,4 @@
-# Docker 部署方案
-
-> 更新日期：2026-08-12
-> 状态：已验证可用（Pi Agent 单后端架构）
-
-```yaml
+---
 covers:
   - docker-compose.yml
   - docker/agent-service/Dockerfile
@@ -32,11 +27,16 @@ covers:
   - packages/preview-contract/package.json
   - packages/sketch-core/package.json
   - packages/sketch-react/package.json
-  - packages/author-site/src/middleware.ts
+  - packages/author-site/src/proxy.ts
   - scripts/build-preview-runtime.mjs
   - packages/author-site/public/preview-runtime/manifest.json
   - packages/viewer-site/public/preview-runtime/manifest.json
-```
+---
+
+# Docker 部署方案
+
+> 更新日期：2026-08-13
+> 状态：已验证可用（Pi Agent 单后端架构）
 
 ## 一、系统架构
 
@@ -75,13 +75,15 @@ covers:
 
 | 容器                 | CPU 上限 | 内存上限 | 进程数上限 | 说明                                         |
 | -------------------- | -------- | -------- | ---------- | -------------------------------------------- |
-| `author-site`        | 1.0 CPU  | 1GB      | 512        | Next.js SSR 与 API                           |
+| `author-site`        | 2.0 CPU  | 2GB      | 512        | Next.js SSR、项目文件 API 与首屏预览调度       |
 | `agent-service`      | 1.0 CPU  | 1GB      | 512        | Agent 会话与工具调用                         |
 | `knowledge-service`  | 1.0 CPU  | 1GB      | 256        | SQLite FTS5、周期协调和在线备份              |
-| `screenshot-service` | 1.0 CPU  | 1536MB   | 768        | Chromium 截图任务；额外配置 256MB `/dev/shm` |
+| `screenshot-service` | 2.5 CPU  | 2GB      | 768        | Chromium 截图任务；额外配置 256MB `/dev/shm` |
 | `viewer-site`        | 0.5 CPU  | 512MB    | 256        | Nginx 静态预览端                             |
 
 这些限制只约束运行中的容器。Docker build 阶段仍可能消耗宿主机资源，因此部署脚本还会控制构建并发和默认部署范围。
+
+`author-site` 是交互延迟敏感服务，项目编辑首屏、Session 文件读取和 Next.js 服务端渲染共用同一个 CPU 预算。运维验收需同时检查 `docker stats` 和容器 `cpu.stat`；若 `nr_throttled / nr_periods` 持续偏高，不能只依据某一时刻的 CPU 百分比判定服务健康。新镜像部署后还应核对容器启动日志中的 Next.js 版本与当前仓库一致，并检查 `RestartCount`、`OOMKilled` 与 V8 heap OOM 日志，避免“容器当前 healthy”掩盖周期性崩溃。
 
 M1 Mac mini 部署默认使用 `linux/arm64` 构建，避免 Rosetta/QEMU 模拟开销。`knowledge-service` 保持单实例；一百人以内的局域网编辑规模下，SQLite 的本地低延迟、低运维成本和可重建全文索引更合适。
 
@@ -142,7 +144,7 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 | `PI_AGENT_BASE_URL`                  | （空）                           | 自定义 API 地址                                                            |
 | `PORT`                               | 服务端口                         | Fastify/Next.js 监听端口                                                   |
 | `HOSTNAME`                           | `0.0.0.0`                        | Next.js 绑定地址                                                           |
-| `CORS_ORIGINS`                       | 逗号分隔的 URL                   | 允许的跨域来源                                                             |
+| `DOCKER_CORS_ORIGINS`                | 逗号分隔的 URL                   | Docker 容器允许的跨域来源；Compose 注入为容器内 `CORS_ORIGINS`，与本地开发配置隔离 |
 | `SCREENSHOT_SERVICE_URL`             | `http://screenshot-service:3202` | author-site 调用截图服务的 Docker 内网地址                                 |
 | `KNOWLEDGE_SERVICE_URL`              | `http://knowledge-service:3203`  | author-site/agent-service 调用独立知识服务的 Docker 内网地址                |
 | `KNOWLEDGE_RECONCILE_INTERVAL_MS`    | `60000`                          | 模板项目周期协调间隔                                                       |
@@ -174,7 +176,7 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 | `NEXT_PUBLIC_VIEWER_URL`             | `http://10.130.33.131:3300`                                       | **局域网 IP**，浏览器端访问浏览端                     |
 | `NEXT_PUBLIC_DATA_BASE`              | `/data`                                                           | viewer-site 静态导出的数据基址                      |
 | `NEXT_PUBLIC_WEB_URL`                | `http://10.130.33.131:3200`                                       | **局域网 IP**，浏览器端使用                         |
-| `CORS_ORIGINS`                       | `http://10.130.33.131:3200,...`                                   | 包含局域网 IP                                       |
+| `DOCKER_CORS_ORIGINS`                | `http://10.130.33.131:3200,...`                                   | 包含局域网 IP                                       |
 | `PREVIEW_RUNTIME_SOURCE`             | `local`                                                           | preview runtime 来源；仅诊断时改为 `cdn`            |
 | `JWT_SECRET`                         | `change-this-to-a-random-string`                                  | JWT 签名密钥                                        |
 | `USE_SECURE_COOKIE`                  | `false`                                                           | HTTP 内网部署时设为 false                           |
@@ -191,7 +193,7 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 - `SCREENSHOT_SERVICE_URL` 在容器内使用 `http://screenshot-service:3202`
 - `INTERNAL_API_TOKEN` 必须在 author-site 和 agent-service 中保持同一个非空值，否则管理后台保存的后端供应商配置只能写入数据库，无法同步到 agent-service 运行时。
 - Figma MCP 用户授权必须先配置 Figma OAuth app；OAuth scopes 页至少选择 `file_content:read`，Embed API 的 allowed origins 不影响 OAuth 授权。
-- `CORS_ORIGINS` 必须同时包含创作端、使用端的真实访问来源和必要的 localhost 来源
+- `DOCKER_CORS_ORIGINS` 必须同时包含创作端、使用端的真实访问来源和必要的 localhost 来源；容器内服务读取的仍是由 Compose 注入的 `CORS_ORIGINS`
 - `author-site` 的 CORS 中间件会读取 `CORS_ORIGINS`，并在认证逻辑之前响应 API/viewer 路由的 OPTIONS 预检
 - `docker-compose.yml` 默认 `USE_SECURE_COOKIE=false`，匹配 `http://<IP>:3200` 的内网访问方式；若改为 HTTPS 域名访问，应显式设置为 `true`。
 

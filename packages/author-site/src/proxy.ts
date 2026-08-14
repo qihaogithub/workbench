@@ -43,7 +43,7 @@ function applyPublicModuleCorsHeaders(headers: Headers) {
   headers.set("Access-Control-Allow-Private-Network", "true");
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const token = request.cookies.get(getAuthCookieName())?.value;
   const user = token ? await verifyToken(token) : null;
   const pathname = request.nextUrl.pathname;

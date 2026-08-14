@@ -10,18 +10,10 @@
  *
  * 布局：筛选栏 → 评论列表 → 底部吸底操作栏（添加评论按钮居中）。
  */
-import { useEffect, useState } from "react";
 import { MessageSquarePlus } from "lucide-react";
 import type { CommentThread } from "@workbench/shared";
 import { cn } from "../utils";
-import { CommentCreatePopover } from "./CommentCreatePopover";
 import { CommentSidebar } from "./CommentSidebar";
-import type { CommentApiAdapter, CreateCommentInput, MentionCandidate } from "./types";
-
-export interface CanvasCommentTarget {
-  pageId: string;
-  pageName: string;
-}
 
 export interface CommentPanelProps {
   threads: CommentThread[];
@@ -35,12 +27,6 @@ export interface CommentPanelProps {
   canCreateComment?: boolean;
   /** 进入评论模式后的定位提示 */
   createHint?: string;
-  /** 画布点击选中的页面；传入时在侧栏直接完成页面级评论。 */
-  canvasCommentTarget?: CanvasCommentTarget | null;
-  onCanvasCommentTargetChange?: (target: CanvasCommentTarget | null) => void;
-  api?: CommentApiAdapter;
-  onCreateComment?: (input: CreateCommentInput) => Promise<CommentThread>;
-  canMentionAgent?: boolean;
   className?: string;
 }
 
@@ -53,41 +39,8 @@ export function CommentPanel({
   onCommentModeChange,
   canCreateComment = true,
   createHint = "点击页面内容定位评论",
-  canvasCommentTarget,
-  onCanvasCommentTargetChange,
-  api,
-  onCreateComment,
-  canMentionAgent = false,
   className,
 }: CommentPanelProps) {
-  const [mentionCandidates, setMentionCandidates] = useState<MentionCandidate[]>([]);
-
-  useEffect(() => {
-    if (!canvasCommentTarget || !api) return;
-    let cancelled = false;
-    void api.listMentionCandidates().then((candidates) => {
-      if (!cancelled) setMentionCandidates(candidates);
-    }).catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [api, canvasCommentTarget]);
-
-  const canvasDraft = canvasCommentTarget
-    ? {
-        pageId: canvasCommentTarget.pageId,
-        anchor: {
-          domPath: "canvas-page",
-          tagName: "canvas-page",
-          componentName: canvasCommentTarget.pageName,
-          textSnippet: canvasCommentTarget.pageName,
-          snapshot: { attrs: { "data-page-id": canvasCommentTarget.pageId } },
-        },
-        pin: { xRatio: 0.5, yRatio: 0.5 },
-      }
-    : null;
-  const canvasPageName = canvasCommentTarget?.pageName;
-
   return (
     <div className={cn("flex h-full min-h-0 flex-col", className)}>
       <CommentSidebar
@@ -98,29 +51,6 @@ export function CommentPanel({
         showHeader={false}
         className="min-h-0 flex-1"
       />
-      {canvasDraft && canvasPageName && onCreateComment && (
-        <div className="shrink-0 border-t border-border p-3">
-          <p className="mb-2 text-xs text-muted-foreground">
-            页面级评论：{canvasPageName}
-          </p>
-          <CommentCreatePopover
-            embedded
-            draft={canvasDraft}
-            mentionCandidates={mentionCandidates}
-            canMentionAgent={canMentionAgent}
-            left={0}
-            top={0}
-            onCancel={() => onCanvasCommentTargetChange?.(null)}
-            onSubmit={async (input) => {
-              const thread = await onCreateComment(input);
-              onCanvasCommentTargetChange?.(null);
-              onSelectThread(thread.id);
-              onCommentModeChange(false);
-              return thread;
-            }}
-          />
-        </div>
-      )}
       {canCreateComment && (
         <div className="shrink-0 border-t border-border p-3">
           <div className="flex items-center justify-center">

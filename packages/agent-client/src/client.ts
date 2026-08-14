@@ -9,6 +9,7 @@ import type {
   UpdateWorkspaceOptions,
   SendMessageOptions,
   ApiResponse,
+  RunSummary,
 } from "./types";
 
 export interface AgentClientConfig {
@@ -254,6 +255,7 @@ export interface StreamEvent {
     | "pong"
     | "status"
     | "context_compacted"
+    | "run_summary"
     | "permission_request"
     | "user_choice_request"
     | "models";
@@ -315,11 +317,15 @@ export interface StreamEvent {
     contextWindow: number;
     durationMs: number;
   };
+  runSummary?: RunSummary;
+  checkpointVersion?: number;
 }
+
 
 export interface ToolCapabilities {
   toolVersion: number;
   toolNames: string[];
+  checkpointEnabled?: boolean;
 }
 
 export class AgentStream {
@@ -464,8 +470,9 @@ export class AgentStream {
    */
   async resyncHistory(
     sessionId: string,
-    messages: Array<{ role: string; content: string }>,
-  ): Promise<void> {
+    messages: Array<{ id?: string; role: string; content: string }>,
+    options?: { checkpointVersion?: number; truncateAfterMessageId?: string },
+  ): Promise<number | undefined> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new Error("WebSocket is not connected");
     }
@@ -483,7 +490,7 @@ export class AgentStream {
           clearTimeout(timeout);
           this.off("status", onStatus);
           this.off("error", onError);
-          resolve();
+          resolve(event.checkpointVersion);
         }
       };
 
@@ -507,6 +514,8 @@ export class AgentStream {
           id,
           sessionId,
           messages,
+          checkpointVersion: options?.checkpointVersion,
+          truncateAfterMessageId: options?.truncateAfterMessageId,
         }),
       );
     });

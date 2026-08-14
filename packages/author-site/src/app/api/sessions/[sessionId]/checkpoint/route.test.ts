@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
 jest.mock("@/lib/auth/jwt", () => ({
-  getAuthCookie: jest.fn(() => "token"),
+  getAuthCookie: jest.fn(async () => "token"),
   verifyToken: jest.fn(async () => ({
     userId: "user-1",
     username: "测试用户",
@@ -104,7 +104,7 @@ describe("session checkpoint route", () => {
     const workspaceFlush = await import("@/lib/workspace-flush");
 
     const response = await POST(jsonRequest({ note: "停止编辑后自动保存记录" }), {
-      params: { sessionId: "session-1" },
+      params: Promise.resolve({ sessionId: "session-1" }),
     });
     const body = await response.json();
 
@@ -151,7 +151,7 @@ describe("session checkpoint route", () => {
       });
 
     const response = await POST(jsonRequest({}), {
-      params: { sessionId: "session-1" },
+      params: Promise.resolve({ sessionId: "session-1" }),
     });
     const body = await response.json();
 
@@ -175,7 +175,7 @@ describe("session checkpoint route", () => {
       .mockRejectedValueOnce(new Error("Workspace source not found"));
 
     const response = await POST(jsonRequest({}), {
-      params: { sessionId: "session-1" },
+      params: Promise.resolve({ sessionId: "session-1" }),
     });
     const body = await response.json();
 

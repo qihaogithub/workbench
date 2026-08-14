@@ -66,10 +66,11 @@ function readJsonIfExists(filePath: string): Record<string, unknown> | undefined
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string; pageId: string } },
+  { params }: { params: Promise<{ projectId: string; pageId: string }> },
 ) {
   try {
-    const token = getAuthCookie();
+    const { projectId, pageId } = await params;
+    const token = await getAuthCookie();
     if (!token) {
       return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
         status: 401,
@@ -83,7 +84,6 @@ export async function GET(
       });
     }
 
-    const { projectId, pageId } = params;
     const sessionId = request.nextUrl.searchParams.get("sessionId");
 
     if (!projectExists(projectId)) {

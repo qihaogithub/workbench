@@ -1,5 +1,11 @@
 import { BaseAgent } from "../core/agent";
-import { AgentError, AgentEvent, AgentResult, AgentStatus } from "../core/types";
+import {
+  AgentError,
+  AgentEvent,
+  AgentResult,
+  AgentStatus,
+  RunSummary,
+} from "../core/types";
 import {
   AgentRunLog,
   AgentRunLogStartOptions,
@@ -16,6 +22,8 @@ const AGENT_EVENT_TYPES = [
   "error",
   "status",
   "context_compacted",
+  "capability_activation",
+  "run_summary",
   "permission_request",
   "user_choice_request",
 ] as const;
@@ -31,6 +39,7 @@ export interface ServerMessage {
     | "finish"
     | "status"
     | "context_compacted"
+    | "run_summary"
     | "pong"
     | "permission_request"
     | "user_choice_request"
@@ -40,6 +49,8 @@ export interface ServerMessage {
   content?: string;
   done?: boolean;
   status?: AgentStatus;
+  /** 会话 checkpoint 的单调版本号；仅灰度开启时返回。 */
+  checkpointVersion?: number;
   error?: {
     code?: string;
     message?: string;
@@ -73,6 +84,7 @@ export interface ServerMessage {
     contextWindow: number;
     durationMs: number;
   };
+  runSummary?: RunSummary;
   permissionRequest?: {
     sessionId: string;
     options: Array<{
@@ -175,7 +187,8 @@ export class WebSocketEventRouter {
     }
   }
 
-  finishMessage(): void {
+  async finishMessage(): Promise<void> {
+    await this.runLog?.drain();
     this.activeMessage = null;
     this.runLog = null;
   }
@@ -196,7 +209,8 @@ export class WebSocketEventRouter {
     return this.activeMessage?.isCancelled ?? false;
   }
 
-  destroy(): void {
+  async destroy(): Promise<void> {
+    await this.runLog?.drain();
     this.unbindAgent();
     this.activeMessage = null;
     this.runLog = null;
@@ -304,6 +318,15 @@ export class WebSocketEventRouter {
             contextWindow: event.contextWindow,
             durationMs: event.durationMs,
           },
+        });
+        break;
+
+      case "run_summary":
+        this.sendMessage({
+          type: "run_summary",
+          id: messageId,
+          sessionId: this.sessionId,
+          runSummary: event.runSummary,
         });
         break;
 

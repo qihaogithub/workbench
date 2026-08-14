@@ -116,7 +116,7 @@ async function pushUserExternalAuth(userId: string, sessionId: string): Promise<
 
 export async function POST(request: NextRequest) {
   try {
-    const token = getAuthCookie();
+    const token = await getAuthCookie();
     if (!token) {
       return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
         status: 401,

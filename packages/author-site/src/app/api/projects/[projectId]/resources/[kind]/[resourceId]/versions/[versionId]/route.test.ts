@@ -118,7 +118,7 @@ describe("resource version detail route", () => {
       })),
     }));
     jest.doMock("@/lib/auth/jwt", () => ({
-      getAuthCookie: jest.fn(() => "token"),
+  getAuthCookie: jest.fn(async () => "token"),
       verifyToken: jest.fn(async () => ({
         userId: "user-1",
         username: "测试用户",
@@ -217,12 +217,12 @@ describe("resource version detail route", () => {
     const response = await POST(
       jsonRequest({ sessionId: "session-1", workspaceId: "live-workspace" }),
       {
-        params: {
+        params: Promise.resolve({
           projectId: "project-1",
           kind: "page",
           resourceId: "page-1",
           versionId: "prv_1",
-        },
+        }),
       },
     );
     const body = await response.json();
@@ -295,12 +295,12 @@ describe("resource version detail route", () => {
     const response = await POST(
       jsonRequest({ sessionId: "session-1", workspaceId: "branch-workspace" }),
       {
-        params: {
+        params: Promise.resolve({
           projectId: "project-1",
           kind: "page",
           resourceId: "page-1",
           versionId: "prv_1",
-        },
+        }),
       },
     );
     const body = await response.json();

@@ -72,6 +72,7 @@ import type {
   CanvasState,
   PreviewStagePage,
 } from "@/components/demo";
+import type { CanvasCommentDraft } from "@workbench/demo-ui/comment";
 import {
   createCommentApi,
   recordProjectVisit,
@@ -898,10 +899,8 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const [rightPanelTab, setRightPanelTab] = useState<"config" | "comments">("config");
   const [commentModeActive, setCommentModeActive] = useState(false);
   const [activeCommentThreadId, setActiveCommentThreadId] = useState<string | null>(null);
-  const [canvasCommentTarget, setCanvasCommentTarget] = useState<{
-    pageId: string;
-    pageName: string;
-  } | null>(null);
+  const [canvasCommentDraft, setCanvasCommentDraft] =
+    useState<CanvasCommentDraft | null>(null);
   const [canvasState, setCanvasState] = useState<CanvasState>({
     viewport: { x: 40, y: 40, zoom: 0.5 },
     pages: {},
@@ -921,7 +920,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const commentWsUrl = useMemo(() => getCommentWsUrl(), []);
   const commentsData = useComments({
     projectId,
-    pageId: activePageId,
+    target: { kind: "page", pageId: activePageId },
     api: commentApi,
     wsUrl: commentWsUrl,
   });
@@ -1336,6 +1335,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
       hideDetailHeader={previewMode === "single"}
       requirementsPosition="beforeConfig"
       hideEmptyRequirements
+      sectionNavigation="anchorTabs"
       designSpecEntries={designSpecEntries}
     />
   );
@@ -1356,10 +1356,6 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
           ? "点击画布页面后，直接添加页面级评论"
           : undefined
       }
-      canvasCommentTarget={canvasCommentTarget}
-      onCanvasCommentTargetChange={setCanvasCommentTarget}
-      api={commentApi}
-      onCreateComment={commentsData.createComment}
     />
   );
 
@@ -1462,7 +1458,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
             wsUrl={commentWsUrl}
             currentUser={commentUser}
             canMentionAgent={false}
-            disabled={previewMode === "canvas"}
+            disabled={false}
             showToggle={false}
             commentMode={commentModeActive}
             onCommentModeChange={setCommentModeActive}
@@ -1477,6 +1473,8 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
             onDeleteThread={commentsData.deleteThread}
             onDeleteReply={commentsData.deleteReply}
             showPins={rightPanelTab === "comments"}
+            canvasCreateDraft={canvasCommentDraft}
+            onCanvasCreateDraftChange={setCanvasCommentDraft}
           >
             <PreviewStage
               className="h-full bg-background"
@@ -1496,13 +1494,22 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                   setConfigPanelDetailPageId(pageId);
                 },
                 onPageComment: commentModeActive
-                  ? (pageId) => {
+                  ? ({ pageId, pageName, pin, clientX, clientY }) => {
                       setRightPanelTab("comments");
-                      setCanvasCommentTarget({
-                        pageId,
-                        pageName:
-                          project.demoPages.find((page) => page.id === pageId)
-                            ?.name ?? "未命名页面",
+                      setCanvasCommentDraft({
+                        input: {
+                          target: { kind: "page", pageId },
+                          anchor: {
+                            domPath: "canvas-page",
+                            tagName: "canvas-page",
+                            componentName: pageName,
+                            textSnippet: pageName,
+                            snapshot: { attrs: { "data-page-id": pageId } },
+                          },
+                          pin,
+                        },
+                        clientX,
+                        clientY,
                       });
                     }
                   : undefined,

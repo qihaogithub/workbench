@@ -8,10 +8,11 @@ import { reconcileTemplateKnowledge } from "@/lib/knowledge-service";
 
 export async function POST(
   _request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const result = getProjectAdminService().convertTemplateToProject(params.id);
+    const { id } = await params;
+    const result = getProjectAdminService().convertTemplateToProject(id);
     if (!result.ok) return projectAdminResponse(result);
     await reconcileTemplateKnowledge();
 

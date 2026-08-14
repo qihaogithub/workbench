@@ -33,10 +33,10 @@ function deleteExistingCover(projectId: string): void {
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: projectId } = params;
+    const { id: projectId } = await params;
 
     if (!projectExists(projectId)) {
       return NextResponse.json(
@@ -102,10 +102,10 @@ export async function POST(
 
 export async function DELETE(
   _request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: projectId } = params;
+    const { id: projectId } = await params;
 
     if (!projectExists(projectId)) {
       return NextResponse.json(

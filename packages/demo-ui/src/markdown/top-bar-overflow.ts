@@ -56,6 +56,8 @@ function mountTopBarOverflowWhenReady({ root }: TopBarOverflowOptions) {
   const topBar = root.querySelector<HTMLElement>(".milkdown-top-bar");
   const inner = topBar?.querySelector<HTMLElement>(".top-bar-inner");
   if (!topBar || !inner) return { refresh() {}, destroy() {} };
+  const editorHost =
+    root.closest<HTMLElement>('[data-document-editor="crepe"]') ?? root;
 
   let open = false;
   let destroyed = false;
@@ -73,7 +75,11 @@ function mountTopBarOverflowWhenReady({ root }: TopBarOverflowOptions) {
   trigger.setAttribute("aria-expanded", "false");
   trigger.textContent = "…";
   more.append(trigger);
-  inner.append(more);
+  // The native TopBar, its inner row, and `root` itself all live in Crepe's
+  // scrolling/clipping subtree. Mount the recovery control in the React-owned
+  // editor host so it cannot be removed by Vue or clipped with the controls it
+  // is responsible for exposing.
+  editorHost.append(more);
 
   const menu = () => more.querySelector<HTMLElement>("[data-top-bar-overflow-menu]");
   const focusEditor = () =>
@@ -127,8 +133,11 @@ function mountTopBarOverflowWhenReady({ root }: TopBarOverflowOptions) {
     const overflowMenu = menu();
     if (!overflowMenu) return;
     overflowMenu.replaceChildren();
-    sources()
-      .filter((source) => source.hidden && !isDivider(source))
+    const allSources = sources();
+    const hiddenSources = allSources.filter(
+      (source) => source.hidden && !isDivider(source),
+    );
+    (hiddenSources.length > 0 ? hiddenSources : allSources.filter((source) => !isDivider(source)))
       .forEach((source, index) => {
         if (isHeadingSelector(source)) {
           const item = document.createElement("button");
@@ -209,10 +218,13 @@ function mountTopBarOverflowWhenReady({ root }: TopBarOverflowOptions) {
     const overflowTriggerWidth = Math.max(measureOuterWidth(more, 36), 48);
     const hasVisualOverflow = topBar.scrollWidth > topBar.clientWidth;
     if (
-      availableWidth === 0 ||
-      (!hasVisualOverflow && allItemsWidth + overflowTriggerWidth <= availableWidth)
+      availableWidth > 0 &&
+      !hasVisualOverflow &&
+      allItemsWidth + overflowTriggerWidth <= availableWidth
     ) {
-      more.hidden = true;
+      // Keep the entry visible as a stable affordance. When nothing is hidden,
+      // opening it shows the complete tool set instead of an empty menu.
+      more.hidden = false;
       close();
       syncing = false;
       return;
@@ -242,9 +254,8 @@ function mountTopBarOverflowWhenReady({ root }: TopBarOverflowOptions) {
 
     const lastVisible = [...items].reverse().find((item) => !item.hidden);
     if (lastVisible && isDivider(lastVisible)) lastVisible.hidden = true;
-    more.hidden = !items.some((item) => item.hidden && !isDivider(item));
-    if (more.hidden) close();
-    else if (open) refreshMenu();
+    more.hidden = false;
+    if (open) refreshMenu();
     syncing = false;
   };
 

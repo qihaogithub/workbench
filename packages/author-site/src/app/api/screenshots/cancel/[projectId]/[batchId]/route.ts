@@ -9,9 +9,9 @@ import {
 
 export async function POST(
   _request: NextRequest,
-  { params }: { params: { projectId: string; batchId: string } },
+  { params }: { params: Promise<{ projectId: string; batchId: string }> },
 ) {
-  const { projectId, batchId } = params;
+  const { projectId, batchId } = await params;
 
   try {
     const response = await fetchScreenshotService(

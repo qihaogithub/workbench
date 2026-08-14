@@ -1,5 +1,4 @@
 import { getErrorMessage } from "./error-utils";
-import { logger } from "./logger";
 
 export interface RetryOptions {
   maxRetries?: number;

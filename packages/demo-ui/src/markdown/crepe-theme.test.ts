@@ -33,6 +33,30 @@ describe("Crepe 宿主主题契约", () => {
     );
   });
 
+  it("使用紧凑的 H1-H6 标题选择器宽度", () => {
+    expect(theme).toMatch(
+      /\.top-bar-heading-label\s*\{[^}]*min-width:\s*42px;/s,
+    );
+    expect(theme).toMatch(
+      /\.heading-style-trigger\s*\{[^}]*min-width:\s*48px;/s,
+    );
+  });
+
+  it("让原生标题下拉菜单在正文与溢出工具之上，并保留完整点击热区", () => {
+    expect(theme).toMatch(
+      /\.top-bar-heading-selector\s*\{[^}]*position:\s*relative;[^}]*z-index:\s*30;/s,
+    );
+    expect(theme).toMatch(
+      /\.top-bar-heading-button\s*\{[^}]*display:\s*flex;[^}]*cursor:\s*pointer;/s,
+    );
+    expect(theme).toMatch(
+      /\.top-bar-heading-dropdown\s*\{[^}]*position:\s*absolute;[^}]*z-index:\s*31;/s,
+    );
+    expect(theme).toMatch(
+      /\.top-bar-heading-option\s*\{[^}]*width:\s*100%;[^}]*cursor:\s*pointer;/s,
+    );
+  });
+
   it("让正文、浮动工具栏和 TopBar 使用同一套 Crepe 表面层级", () => {
     expect(theme).toMatch(
       /\.document-editor-crepe\s+\.milkdown\s*\{[^}]*background:\s*var\(--crepe-color-background\)/s,
@@ -51,7 +75,7 @@ describe("Crepe 宿主主题契约", () => {
     );
   });
 
-  it("让编辑器宽度受宿主容器约束，并阻止整体横向滚动", () => {
+  it("让编辑器宽度受宿主容器约束，并让工具栏浮层保持可交互", () => {
     expect(theme).toMatch(
       /\.document-editor-crepe\s*\{[^}]*min-width:\s*0;[^}]*width:\s*100%;[^}]*max-width:\s*100%;[^}]*overflow-x:\s*hidden;/s,
     );
@@ -62,7 +86,13 @@ describe("Crepe 宿主主题契约", () => {
       /\.document-editor-crepe\s+\.milkdown\s+\.ProseMirror\s*\{[^}]*min-width:\s*0;[^}]*width:\s*100%;[^}]*max-width:\s*100%;/s,
     );
     expect(theme).toMatch(
-      /\.milkdown-top-bar\s*\{[^}]*min-width:\s*0;[^}]*width:\s*100%;[^}]*max-width:\s*100%;[^}]*overflow:\s*hidden;/s,
+      /\.milkdown-top-bar\s*\{[^}]*min-width:\s*0;[^}]*width:\s*100%;[^}]*max-width:\s*100%;[^}]*overflow:\s*visible;/s,
+    );
+    expect(theme).toMatch(
+      /\.top-bar-inner\s*\{[^}]*position:\s*relative;[^}]*padding-right:\s*48px;[^}]*overflow:\s*visible;/s,
+    );
+    expect(theme).toMatch(
+      /\.document-editor-crepe\s*>\s*\.top-bar-overflow\s*\{[^}]*position:\s*absolute;[^}]*top:\s*6px;[^}]*right:\s*8px;/s,
     );
   });
 

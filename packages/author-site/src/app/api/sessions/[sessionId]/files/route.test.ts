@@ -7,7 +7,7 @@ const updateWorkspaceDemoFiles = jest.fn();
 const commitWorkspaceMutation = jest.fn();
 
 jest.mock("@/lib/auth/jwt", () => ({
-  getAuthCookie: jest.fn(() => "token"),
+  getAuthCookie: jest.fn(async () => "token"),
   verifyToken: jest.fn(async () => ({
     userId: "user-1",
     username: "测试用户",
@@ -128,7 +128,7 @@ describe("legacy session files route", () => {
 
     const response = await PUT(
       jsonRequest({ code, schema }),
-      { params: { sessionId: "session-1" } },
+      { params: Promise.resolve({ sessionId: "session-1" }) },
     );
     const body = await response.json();
 

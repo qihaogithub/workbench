@@ -72,4 +72,5 @@ describe('AgentManager tool version handling', () => {
     expect(agents[0].kill).not.toHaveBeenCalled();
     expect(second.getConfig().toolVersion).toBe(1);
   });
+
 });

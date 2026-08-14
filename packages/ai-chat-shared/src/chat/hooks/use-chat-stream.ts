@@ -40,6 +40,7 @@ import {
   buildActiveViewContextPrefix,
   type ActiveViewContext,
 } from "../../lib/active-view-context";
+import type { RunSummary } from "@workbench/agent-client";
 
 const DEFAULT_CURRENT_MESSAGE: ChatMessage = {
   role: "assistant",
@@ -504,6 +505,8 @@ export function useChatStream(options: UseChatStreamOptions) {
   const previousSessionIdRef = useRef(sessionId);
   const lastPersistAtRef = useRef<number>(0);
   const throttlePersistTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const currentRunSummaryRef = useRef<RunSummary | null>(null);
+  const checkpointVersionRef = useRef<number | undefined>(undefined);
 
   const throttledPersistRef = useRef<() => void>(() => {});
   throttledPersistRef.current = () => {
@@ -650,6 +653,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       if (!userMessage.trim() || !agentSessionId) return;
       activeRunRef.current = true;
       busyRetryAttemptedRef.current = false;
+      currentRunSummaryRef.current = null;
 
       const source = runOptions?.source ?? "user";
       setContextCompactionNotice(false);
@@ -906,7 +910,12 @@ export function useChatStream(options: UseChatStreamOptions) {
             }));
           },
 
+          onRunSummary: (runSummary) => {
+            currentRunSummaryRef.current = runSummary;
+          },
+
           onFinish: async (result) => {
+            checkpointVersionRef.current = result.metadata?.checkpointVersion;
             streamService.stopKeepalive();
             onDiagnosticEvent?.({
               name: "ai.stream_finish_event",
@@ -930,6 +939,7 @@ export function useChatStream(options: UseChatStreamOptions) {
                   result.content ||
                   (hasStructuredParts ? "" : "抱歉，我没有收到有效的回复。"),
                 parts: finalParts,
+                runSummary: currentRunSummaryRef.current ?? result.metadata?.runSummary,
               };
 
               const messagesWithAutoRepairStatus = updateAutoRepairStatus(
@@ -948,6 +958,7 @@ export function useChatStream(options: UseChatStreamOptions) {
                 parts: [],
               });
               setStreamContent("");
+              currentRunSummaryRef.current = null;
 
               // 后备检查：如果 onToolUpdate 未正确触发 knowledge-updated 事件，
               // 在 onFinish 时遍历所有 tool parts 再检查一次
@@ -1180,6 +1191,7 @@ export function useChatStream(options: UseChatStreamOptions) {
           files?.length ? files : undefined,
           viewerContext,
           referencedProjects,
+          { assistantMessageId },
         );
         onDiagnosticEvent?.({
           name: "ai.message_sent",
@@ -1696,11 +1708,15 @@ export function useChatStream(options: UseChatStreamOptions) {
         try {
           const syncService = new StreamService({ mode });
           await syncService.connect(agentSessionId, sessionId);
-          await syncService.resyncHistory(
+          checkpointVersionRef.current = await syncService.resyncHistory(
             agentSessionId,
             truncated
               .filter((m) => m.role === "user" || m.role === "assistant")
-              .map((m) => ({ role: m.role, content: m.content })),
+              .map((m) => ({ id: m.id, role: m.role, content: m.content })),
+            {
+              checkpointVersion: checkpointVersionRef.current,
+              truncateAfterMessageId: truncated.at(-1)?.id,
+            },
           );
           syncService.close();
         } catch (error) {
@@ -1732,11 +1748,15 @@ export function useChatStream(options: UseChatStreamOptions) {
       try {
         const syncService = new StreamService({ mode });
         await syncService.connect(agentSessionId, sessionId);
-        await syncService.resyncHistory(
+        checkpointVersionRef.current = await syncService.resyncHistory(
           agentSessionId,
           truncated
             .filter((m) => m.role === "user" || m.role === "assistant")
-            .map((m) => ({ role: m.role, content: m.content })),
+            .map((m) => ({ id: m.id, role: m.role, content: m.content })),
+          {
+            checkpointVersion: checkpointVersionRef.current,
+            truncateAfterMessageId: truncated.at(-1)?.id,
+          },
         );
         syncService.close();
       } catch (error) {
@@ -1808,11 +1828,15 @@ export function useChatStream(options: UseChatStreamOptions) {
       try {
         const syncService = new StreamService({ mode });
         await syncService.connect(agentSessionId, sessionId);
-        await syncService.resyncHistory(
+        checkpointVersionRef.current = await syncService.resyncHistory(
           agentSessionId,
           truncated
             .filter((m) => m.role === "user" || m.role === "assistant")
-            .map((m) => ({ role: m.role, content: m.content })),
+            .map((m) => ({ id: m.id, role: m.role, content: m.content })),
+          {
+            checkpointVersion: checkpointVersionRef.current,
+            truncateAfterMessageId: truncated.at(-1)?.id,
+          },
         );
         syncService.close();
       } catch (error) {

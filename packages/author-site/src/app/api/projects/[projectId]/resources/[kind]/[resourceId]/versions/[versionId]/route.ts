@@ -45,7 +45,7 @@ const DEFAULT_SKETCH_META = {
 };
 
 async function getAuthenticatedUser() {
-  const token = getAuthCookie();
+  const token = await getAuthCookie();
   if (!token) return null;
   return verifyToken(token);
 }
@@ -173,22 +173,23 @@ function createMutationErrorResponse(error: WorkspaceAuthorityClientError) {
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { projectId: string; kind: string; resourceId: string; versionId: string } },
+  { params }: { params: Promise<{ projectId: string; kind: string; resourceId: string; versionId: string }> },
 ) {
+  const { projectId, kind: kindParam, resourceId, versionId } = await params;
   const payload = await getAuthenticatedUser();
   if (!payload) {
     return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), { status: 401 });
   }
-  const kind = normalizeKind(params.kind);
+  const kind = normalizeKind(kindParam);
   if (!kind) {
     return NextResponse.json(createApiError("INVALID_REQUEST", "资源类型不合法"), { status: 400 });
   }
   const result = projectService().resourceVersionGet(
     {
-      projectId: params.projectId,
+      projectId,
       kind,
-      resourceId: params.resourceId,
-      versionId: params.versionId,
+      resourceId,
+      versionId,
     },
     {
       id: payload.userId,
@@ -208,13 +209,14 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string; kind: string; resourceId: string; versionId: string } },
+  { params }: { params: Promise<{ projectId: string; kind: string; resourceId: string; versionId: string }> },
 ) {
+  const { projectId, kind: kindParam, resourceId, versionId } = await params;
   const payload = await getAuthenticatedUser();
   if (!payload) {
     return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), { status: 401 });
   }
-  const kind = normalizeKind(params.kind);
+  const kind = normalizeKind(kindParam);
   if (!kind) {
     return NextResponse.json(createApiError("INVALID_REQUEST", "资源类型不合法"), { status: 400 });
   }
@@ -234,7 +236,7 @@ export async function POST(
       | { workspaceId: string; workspaceRevision?: number; workspaceRootHash?: string }
       | undefined;
     if (body.sessionId) {
-      if (!sessionExists(body.sessionId) || !meta || meta.demoId !== params.projectId) {
+      if (!sessionExists(body.sessionId) || !meta || meta.demoId !== projectId) {
         return NextResponse.json(createApiError("SESSION_NOT_FOUND"), { status: 404 });
       }
       if (meta.userId && meta.userId !== payload.userId) {
@@ -246,7 +248,7 @@ export async function POST(
     }
     if (restoreWorkspaceId) {
       const workspaceMeta = getWorkspaceMeta(restoreWorkspaceId);
-      if (!workspaceMeta || workspaceMeta.projectId !== params.projectId || workspaceMeta.status === "archived") {
+      if (!workspaceMeta || workspaceMeta.projectId !== projectId || workspaceMeta.status === "archived") {
         return NextResponse.json(
           createApiError("WORKSPACE_STALE", "当前工作区已过期，请刷新项目后重试"),
           { status: 409 },
@@ -267,7 +269,7 @@ export async function POST(
       }
       try {
         await flushWorkspaceBeforeCriticalAction({
-          projectId: params.projectId,
+          projectId,
           workspaceId: restoreWorkspaceId,
           sessionId: body.sessionId,
         });
@@ -281,10 +283,10 @@ export async function POST(
 
       const versionResult = service.resourceVersionGet(
         {
-          projectId: params.projectId,
+          projectId,
           kind: "page",
-          resourceId: params.resourceId,
-          versionId: params.versionId,
+          resourceId,
+          versionId,
         },
         actor,
       );
@@ -297,7 +299,7 @@ export async function POST(
       const files = versionResult.data.content as DemoFiles;
       const conflictResult = validateRestoredPageSchema({
         workspacePath: restoreWorkspacePath,
-        pageId: params.resourceId,
+        pageId: resourceId,
         schema: files.schema,
       });
       if (!conflictResult.ok) {
@@ -314,11 +316,11 @@ export async function POST(
       try {
         const runtimeType = getLiveWorkspacePageRuntime({
           workspacePath: restoreWorkspacePath,
-          pageId: params.resourceId,
+          pageId: resourceId,
         });
         await commitWorkspaceMutation({
           mutationId: crypto.randomUUID(),
-          projectId: params.projectId,
+          projectId,
           workspaceId: restoreWorkspaceId,
           sessionId: body.sessionId,
           baseRevision: 0,
@@ -326,7 +328,7 @@ export async function POST(
           reason: "restore_page_version",
           operations: createRestorePageVersionOperations({
             workspacePath: restoreWorkspacePath,
-            pageId: params.resourceId,
+            pageId: resourceId,
             runtimeType,
             files,
           }),
@@ -335,18 +337,18 @@ export async function POST(
         if (error instanceof WorkspaceAuthorityClientError) return createMutationErrorResponse(error);
         throw error;
       }
-      updateWorkspaceDemoFiles(restoreWorkspaceId, params.resourceId, files);
+      updateWorkspaceDemoFiles(restoreWorkspaceId, resourceId, files);
       const snapshotResult = createProjectVersionSnapshot(
-        params.projectId,
+        projectId,
         actor.name,
         {
           sessionId: body.sessionId,
-          note: `从页面版本 ${params.versionId} 恢复`,
+          note: `从页面版本 ${versionId} 恢复`,
           type: "restore_snapshot",
           sourceWorkspacePath: restoreWorkspacePath,
         },
       );
-      const newVersionId = snapshotResult.version?.versionId ?? params.versionId;
+      const newVersionId = snapshotResult.version?.versionId ?? versionId;
       markWorkspaceBasedOnVersion(restoreWorkspaceId, newVersionId);
       return NextResponse.json(createApiSuccess({
         success: true,
@@ -359,7 +361,7 @@ export async function POST(
     if (body.sessionId) {
       try {
         const synced = await flushAndSyncProjectWorkspace({
-          projectId: params.projectId,
+          projectId,
           workspaceId: restoreWorkspaceId,
           sessionId: body.sessionId,
         });
@@ -379,7 +381,7 @@ export async function POST(
       }
     }
 
-    const pageResult = service.restorePageVersion(params.projectId, params.resourceId, params.versionId, actor, {
+    const pageResult = service.restorePageVersion(projectId, resourceId, versionId, actor, {
       sessionId: body.sessionId,
       workspaceId: restoreWorkspaceProof?.workspaceId,
       workspaceRevision: restoreWorkspaceProof?.workspaceRevision,
@@ -394,7 +396,7 @@ export async function POST(
     if (restoreWorkspaceId) {
       const workspaceUpdated = updateWorkspaceDemoFiles(
         restoreWorkspaceId,
-        params.resourceId,
+        resourceId,
         pageResult.data.files,
       );
       if (!workspaceUpdated) {
@@ -412,7 +414,7 @@ export async function POST(
   if (body.sessionId && body.workspaceId) {
     try {
       const synced = await flushAndSyncProjectWorkspace({
-        projectId: params.projectId,
+        projectId,
         workspaceId: body.workspaceId,
         sessionId: body.sessionId,
       });
@@ -431,10 +433,10 @@ export async function POST(
   }
   const result = service.resourceRestore(
     {
-      projectId: params.projectId,
+      projectId,
       kind,
-      resourceId: params.resourceId,
-      versionId: params.versionId,
+      resourceId,
+      versionId,
       sessionId: body.sessionId,
       workspaceId: restoreWorkspaceProof?.workspaceId ?? body.workspaceId,
       workspaceRevision: restoreWorkspaceProof?.workspaceRevision,

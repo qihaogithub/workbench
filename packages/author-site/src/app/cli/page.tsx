@@ -9,8 +9,8 @@ import { getProjectCliAuthorSiteUrl } from "@/lib/project-cli-url";
 
 export const dynamic = "force-dynamic";
 
-export default function Page() {
-  const authorSiteUrl = getProjectCliAuthorSiteUrl(headers());
+export default async function Page() {
+  const authorSiteUrl = getProjectCliAuthorSiteUrl(await headers());
   const version = "0.1.0";
 
   return (

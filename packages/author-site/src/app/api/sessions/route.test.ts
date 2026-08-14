@@ -69,7 +69,7 @@ describe("sessions route external auth reuse", () => {
     global.Response = TestResponse as unknown as typeof Response;
 
     jest.doMock("@/lib/auth/jwt", () => ({
-      getAuthCookie: jest.fn(() => "token"),
+      getAuthCookie: jest.fn(async () => "token"),
       verifyToken: jest.fn(async () => ({
         userId: "user-1",
         username: "测试用户",

@@ -17,7 +17,11 @@ import {
 } from "./markdown/crepe-config";
 import { mountHeadingStyleToolbar } from "./markdown/heading-style-toolbar";
 import { mountTopBarOverflow } from "./markdown/top-bar-overflow";
-import { getExternalImageUrlFromClipboard } from "./markdown/remote-image-paste";
+import {
+  getExternalImageUrlFromClipboard,
+  getMarkdownImagePaste,
+  replaceMarkdownImageUrls,
+} from "./markdown/remote-image-paste";
 import "@milkdown/crepe/theme/common/style.css";
 import "./markdown/crepe-theme.css";
 
@@ -44,6 +48,16 @@ export interface DocumentEditorProps {
   localizeRemoteImage?: DocumentRemoteImageHandler;
   /** 提供时，Crepe 块菜单显示「引用配置项」。 */
   referenceCandidates?: ConfigReferenceCandidate[];
+  /** 只读内容交由父级滚动时关闭编辑器自身滚动，完整展开正文。 */
+  scrollable?: boolean;
+  /** 有非空文本选区时，显示评论入口并返回可重新定位的选区锚点。 */
+  onCommentSelection?: (selection: {
+    quote: string;
+    prefix: string;
+    suffix: string;
+    from: number;
+    to: number;
+  }) => void;
   className?: string;
 }
 
@@ -64,6 +78,8 @@ export function DocumentEditor({
   uploadHandler,
   localizeRemoteImage,
   referenceCandidates,
+  scrollable = true,
+  onCommentSelection,
   className,
 }: DocumentEditorProps) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -77,11 +93,13 @@ export function DocumentEditor({
   const lastEmittedRef = useRef(value);
   const mountedRef = useRef(true);
   const readOnlyRef = useRef(readOnly);
+  const onCommentSelectionRef = useRef(onCommentSelection);
 
   onChangeRef.current = onChange;
   uploadHandlerRef.current = uploadHandler;
   localizeRemoteImageRef.current = localizeRemoteImage;
   readOnlyRef.current = readOnly;
+  onCommentSelectionRef.current = onCommentSelection;
   referenceCandidatesRef.current = referenceCandidates;
   const uploadsEnabled = Boolean(uploadHandler);
   const referenceCandidateSignature = (referenceCandidates ?? [])
@@ -156,15 +174,25 @@ export function DocumentEditor({
     const handlePaste = (event: ClipboardEvent) => {
       const localize = localizeRemoteImageRef.current;
       if (!localize || readOnlyRef.current) return;
-      const externalUrl = getExternalImageUrlFromClipboard(event.clipboardData);
-      if (!externalUrl) return;
+
+      const markdownPaste = getMarkdownImagePaste(event.clipboardData);
+      const plainText = event.clipboardData?.getData("text/plain")?.trim() ?? "";
+      const externalUrl = plainText
+        ? null
+        : getExternalImageUrlFromClipboard(event.clipboardData);
+      if (!markdownPaste && !externalUrl) return;
 
       event.preventDefault();
       event.stopImmediatePropagation();
-      void localize(externalUrl)
-        .then((url) => {
+      const urls = markdownPaste?.externalUrls ?? [externalUrl!];
+      void Promise.all(urls.map(async (url) => [url, await localize(url)] as const))
+        .then((localized) => {
           if (!mountedRef.current || crepeRef.current !== crepe) return;
-          insertMarkdown(crepe, `![](${url})`);
+          const replacements = new Map(localized);
+          const markdown = markdownPaste
+            ? replaceMarkdownImageUrls(markdownPaste.markdown, replacements)
+            : `![](${replacements.get(externalUrl!)})`;
+          insertMarkdown(crepe, markdown);
         })
         .catch(reportUploadError);
     };
@@ -173,6 +201,8 @@ export function DocumentEditor({
     let headingStyleToolbar: ReturnType<typeof mountHeadingStyleToolbar> | null =
       null;
     let topBarOverflow: ReturnType<typeof mountTopBarOverflow> | null = null;
+    let selectionCommentButton: HTMLButtonElement | null = null;
+    let selectionToolbarObserver: MutationObserver | null = null;
     void crepe.create().then(() => {
       if (!mountedRef.current || crepeRef.current !== crepe) return;
       topBarOverflow = mountTopBarOverflow({ root });
@@ -195,6 +225,38 @@ export function DocumentEditor({
           });
         },
       });
+      if (onCommentSelectionRef.current) {
+        selectionCommentButton = document.createElement("button");
+        selectionCommentButton.type = "button";
+        selectionCommentButton.className = "document-comment-selection-button";
+        selectionCommentButton.title = "添加选区评论";
+        selectionCommentButton.setAttribute("aria-label", "添加选区评论");
+        selectionCommentButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4zM12 8v6m-3-3h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+        selectionCommentButton.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          const selection = crepe.editor.action((ctx) => ctx.get(editorViewCtx).state.selection);
+          if (selection.empty) return;
+          const doc = crepe.editor.action((ctx) => ctx.get(editorViewCtx).state.doc);
+          const quote = doc.textBetween(selection.from, selection.to, "\n").trim();
+          if (!quote) return;
+          const fullText = doc.textBetween(0, doc.content.size, "\n");
+          const start = fullText.indexOf(quote);
+          onCommentSelectionRef.current?.({
+            quote,
+            prefix: fullText.slice(Math.max(0, start - 80), start),
+            suffix: fullText.slice(start + quote.length, start + quote.length + 80),
+            from: selection.from,
+            to: selection.to,
+          });
+        });
+        const attach = () => {
+          const toolbar = root.querySelector<HTMLElement>(".milkdown-toolbar");
+          if (toolbar && selectionCommentButton && !toolbar.contains(selectionCommentButton)) toolbar.append(selectionCommentButton);
+        };
+        attach();
+        selectionToolbarObserver = new MutationObserver(attach);
+        selectionToolbarObserver.observe(root, { childList: true, subtree: true });
+      }
     });
 
     return () => {
@@ -202,12 +264,13 @@ export function DocumentEditor({
       root.removeEventListener("paste", handlePaste, true);
       headingStyleToolbar?.destroy();
       topBarOverflow?.destroy();
+      selectionToolbarObserver?.disconnect();
+      selectionCommentButton?.remove();
       if (crepeRef.current === crepe) crepeRef.current = null;
       void crepe.destroy();
     };
     // Crepe's feature graph is immutable after creation. Callback props use refs;
     // only changes that reshape the menu recreate the instance.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placeholder, uploadsEnabled, referenceCandidateSignature]);
 
   useEffect(() => {
@@ -226,9 +289,14 @@ export function DocumentEditor({
 
   return (
     <div
-      className={cn("document-editor-crepe relative h-full min-h-[200px]", className)}
+      className={cn(
+        "document-editor-crepe relative",
+        scrollable ? "h-full min-h-[200px]" : "h-auto min-h-0",
+        className,
+      )}
       data-document-editor="crepe"
       data-readonly={readOnly}
+      data-scrollable={scrollable}
     >
       <div ref={rootRef} className="crepe h-full" />
       <input

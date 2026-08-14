@@ -1,4 +1,4 @@
-export const PREVIEW_CONTRACT_VERSION = "2026-07-preview-contract-v1";
+export const PREVIEW_CONTRACT_VERSION = "2026-08-preview-contract-v2";
 
 export type PreviewDependencyKind = "core" | "internal" | "sdk";
 
@@ -8,9 +8,9 @@ export interface PreviewDependencyDefinition {
 }
 
 export const PREVIEW_DEPENDENCY_POLICY: Record<string, PreviewDependencyDefinition> = {
-  react: { version: "18.3.1", kind: "core" },
-  "react-dom": { version: "18.3.1", kind: "core" },
-  "lucide-react": { version: "0.323.0", kind: "internal" },
+  react: { version: "19.2.3", kind: "core" },
+  "react-dom": { version: "19.2.3", kind: "core" },
+  "lucide-react": { version: "0.575.0", kind: "internal" },
   "framer-motion": { version: "12.38.0", kind: "internal" },
   "svgaplayerweb": { version: "2.3.1", kind: "internal" },
   "lottie-web": { version: "5.13.0", kind: "internal" },

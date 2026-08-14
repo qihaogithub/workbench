@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
+const path = require("path");
+
 const nextConfig = {
   output: process.env.NODE_ENV === "production" ? "export" : undefined,
+  outputFileTracingRoot: path.resolve(__dirname, "../.."),
   trailingSlash: true,
   env: {
     NEXT_PUBLIC_PREVIEW_CDN_BASE_URL:

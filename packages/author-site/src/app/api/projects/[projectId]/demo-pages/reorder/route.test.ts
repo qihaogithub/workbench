@@ -31,7 +31,7 @@ class MockWorkspaceAuthorityClientError extends Error {
 }
 
 jest.mock("@/lib/auth/jwt", () => ({
-  getAuthCookie: jest.fn(() => "token"),
+  getAuthCookie: jest.fn(async () => "token"),
   verifyToken: jest.fn(async () => ({
     userId: "user-1",
     username: "测试用户",
@@ -173,7 +173,7 @@ describe("project demo-pages reorder route live Workspace writes", () => {
           { id: "folder-1", order: 2, parentId: null },
         ],
       }),
-      { params: { projectId: "project-1" } },
+      { params: Promise.resolve({ projectId: "project-1" }) },
     );
     const body = await response.json();
 

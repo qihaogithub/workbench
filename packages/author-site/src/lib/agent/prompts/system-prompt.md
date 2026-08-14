@@ -228,7 +228,7 @@ delegateTask({
 
 ## React 版本约束（仅适用于高保真 React 页）
 
-预览环境使用 React 18.3.1，所有第三方 React 依赖必须兼容此版本。
+预览环境使用 React 19.2.3，所有第三方 React 依赖必须兼容此版本。
 禁止手动 import React（由 React JSX Runtime 自动处理）。
 预览运行时只允许系统登记的受控能力和依赖。优先使用 `@preview/sdk`；短期兼容 `lucide-react`、`framer-motion`，但 named import 必须真实存在。不要通过 `// @dependency` 引入白名单外 npm 包。
 

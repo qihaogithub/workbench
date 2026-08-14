@@ -6,7 +6,7 @@ import { getServerAgentServiceUrl } from "@/lib/runtime-config";
 import { getEditSession } from "@/lib/session-manager";
 
 interface RouteContext {
-  params: { projectId: string; workspaceId: string; segments: string[] };
+  params: Promise<{ projectId: string; workspaceId: string; segments: string[] }>;
 }
 
 const GET_ENDPOINTS = new Set(["state", "snapshot", "health", "events", "projection-acks"]);
@@ -21,11 +21,13 @@ function endpointPath(segments: string[]): string | null {
 }
 
 async function proxy(request: Request, context: RouteContext, method: "GET" | "POST") {
-  const token = getAuthCookie();
+  const token = await getAuthCookie();
   const user = token ? await verifyToken(token) : null;
   if (!user) return NextResponse.json(createApiError("UNAUTHORIZED", "未登录或登录已过期"), { status: 401 });
 
-  const endpoint = endpointPath(context.params.segments);
+  const { projectId, workspaceId, segments } = await context.params;
+
+  const endpoint = endpointPath(segments);
   const allowed = endpoint && (method === "GET"
     ? GET_ENDPOINTS.has(endpoint) || endpoint.startsWith("resources/")
     : POST_ENDPOINTS.has(endpoint));
@@ -51,14 +53,14 @@ async function proxy(request: Request, context: RouteContext, method: "GET" | "P
   if (session.userId && session.userId !== user.userId) {
     return NextResponse.json(createApiError("FORBIDDEN", "无权访问其他用户的 Session"), { status: 403 });
   }
-  if (session.demoId !== context.params.projectId || session.workspaceId !== context.params.workspaceId) {
+  if (session.demoId !== projectId || session.workspaceId !== workspaceId) {
     return NextResponse.json(createApiError("INVALID_REQUEST", "Session 与项目或 Workspace 不匹配"), { status: 400 });
   }
 
-  const upstreamPath = context.params.segments.map(encodeURIComponent).join("/");
+  const upstreamPath = segments.map(encodeURIComponent).join("/");
   const upstreamUrl = new URL(
-    `${getServerAgentServiceUrl()}/api/workspace-authority/projects/${encodeURIComponent(context.params.projectId)}`
-      + `/workspaces/${encodeURIComponent(context.params.workspaceId)}/${upstreamPath}`,
+    `${getServerAgentServiceUrl()}/api/workspace-authority/projects/${encodeURIComponent(projectId)}`
+      + `/workspaces/${encodeURIComponent(workspaceId)}/${upstreamPath}`,
   );
   incomingUrl.searchParams.forEach((value, key) => upstreamUrl.searchParams.append(key, value));
   if (!upstreamUrl.searchParams.has("sessionId") && sessionId) upstreamUrl.searchParams.set("sessionId", sessionId);

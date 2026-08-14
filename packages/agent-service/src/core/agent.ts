@@ -14,6 +14,7 @@ import {
   FinishEvent,
   StatusEvent,
   ContextCompactedEvent,
+  CapabilityActivationEvent,
   RunSummaryEvent,
   PermissionRequestEvent,
   UserChoiceRequestEvent,
@@ -62,7 +63,7 @@ export abstract class BaseAgent extends EventEmitter {
     content: string,
     options?: SendMessageOptions,
   ): Promise<AgentResult>;
-  abstract cancel(): void;
+  abstract cancel(): void | Promise<void>;
   abstract kill(): Promise<void>;
   abstract updateConfig(config: Partial<AgentConfig>): void;
   abstract appendHistoryMessage(role: string, content: string): Promise<void>;
@@ -124,6 +125,7 @@ interface EventMap {
   finish: FinishEvent;
   status: StatusEvent;
   context_compacted: ContextCompactedEvent;
+  capability_activation: CapabilityActivationEvent;
   run_summary: RunSummaryEvent;
   permission_request: PermissionRequestEvent;
   user_choice_request: UserChoiceRequestEvent;

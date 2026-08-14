@@ -923,10 +923,6 @@ export function PreviewCanvas({
 
   const handlePageSelect = useCallback(
     (pageId: string, event?: React.PointerEvent | React.MouseEvent) => {
-      if (onPageComment) {
-        onPageComment(pageId);
-        return;
-      }
       if (isEditorMode && effectiveToolMode === "select") {
         const isAdditive =
           Boolean(event?.shiftKey) ||
@@ -952,7 +948,7 @@ export function PreviewCanvas({
         onPageConfigEdit?.(pageId);
       }
     },
-    [effectiveToolMode, isEditorMode, onPageComment, onPageConfigEdit],
+    [effectiveToolMode, isEditorMode, onPageConfigEdit],
   );
 
   // 粘贴选择器回调
@@ -3184,9 +3180,21 @@ export function PreviewCanvas({
                 renderMode={renderMode}
                 onLayoutChange={handleLayoutChange}
                 onConfigEdit={handlePageSelect}
-                onCommentSelect={
-                  onPageComment ? (pageId) => onPageComment(pageId) : undefined
-                }
+                onCommentSelect={onPageComment ? (pageId, event) => {
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  const page = pagesById.get(pageId);
+                  if (!page || rect.width === 0 || rect.height === 0) return;
+                  onPageComment({
+                    pageId,
+                    pageName: page.name,
+                    pin: {
+                      xRatio: Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)),
+                      yRatio: Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)),
+                    },
+                    clientX: event.clientX,
+                    clientY: event.clientY,
+                  });
+                } : undefined}
                 onRequestDelete={
                   onRequestDeletePages
                     ? (pageId) => void onRequestDeletePages([pageId])

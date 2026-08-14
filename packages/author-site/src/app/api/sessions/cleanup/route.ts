@@ -6,7 +6,7 @@ import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 export async function POST() {
   try {
     // 从 Cookie 读取 userId
-    const token = getAuthCookie();
+    const token = await getAuthCookie();
     if (!token) {
       return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
         status: 401,

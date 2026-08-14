@@ -103,12 +103,18 @@ export function formatThread(thread: CommentThread): string {
       : `用户(${thread.author.name})`;
 
   const lines: string[] = [];
-  lines.push(`[评论 #${shortId}] id=${thread.id} | 页面: ${thread.pageId} | 状态: ${status}`);
+  const target = thread.target.kind === "page"
+    ? `页面: ${thread.target.pageId}`
+    : `文档: ${thread.target.resourceLabel} (${thread.target.resourceId})`;
+  lines.push(`[评论 #${shortId}] id=${thread.id} | ${target} | 状态: ${status}`);
   if (thread.aiTaskStatus) {
     lines.push(`  AI任务状态: ${thread.aiTaskStatus}`);
   }
   lines.push(`  ${authorLabel}: ${thread.content}`);
-  if (thread.anchor) {
+  if (thread.target.kind === "document") {
+    const anchor = thread.documentAnchor;
+    lines.push(`  文档范围: ${anchor?.kind === "selection" ? `选区「${anchor.quote ?? ""}」` : "整篇文档"}${anchor?.status === "orphaned" ? "（引用已变更）" : ""}`);
+  } else if (thread.anchor) {
     const snapshot = thread.anchor.snapshot;
     const snippet = snapshot?.outerHtml || thread.anchor.textSnippet;
     const className = snapshot?.className;
@@ -175,7 +181,7 @@ export function createReadCommentsTool(
 
       let threads = readCommentStore(projectId).threads;
       if (args.pageId) {
-        threads = threads.filter((t) => t.pageId === args.pageId);
+        threads = threads.filter((t) => t.target.kind === "page" && t.target.pageId === args.pageId);
       }
       if (args.resolved !== undefined) {
         threads = threads.filter((t) => t.resolved === args.resolved);

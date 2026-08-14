@@ -462,11 +462,12 @@ async function updateMemoryFile(
 async function createKnowledgeDocument(
   page: Page,
   workingDir: string,
+  sessionId: string,
   marker: string,
 ): Promise<KnowledgeItem> {
   const title = `自动保存知识库-${marker}`;
   const response = await page.request.post(
-    `/api/knowledge?workingDir=${encodeURIComponent(workingDir)}`,
+    `/api/knowledge?workingDir=${encodeURIComponent(workingDir)}&sessionId=${encodeURIComponent(sessionId)}`,
     {
       data: {
         title,
@@ -610,20 +611,6 @@ async function getCanvasLayout(
   return body.data.state;
 }
 
-function waitForCanvasLayoutSave(
-  page: Page,
-  timeout = 15000,
-): Promise<PlaywrightResponse | null> {
-  return page
-    .waitForResponse(
-      (response) =>
-        /\/api\/sessions\/[^/]+\/canvas-layout(?:\?|$)/.test(response.url()) &&
-        response.request().method() === 'POST',
-      { timeout },
-    )
-    .catch(() => null);
-}
-
 async function waitForCanvasLayoutState(
   page: Page,
   sessionId: string,
@@ -645,10 +632,6 @@ async function waitForCanvasLayoutState(
   }
 
   return latestState;
-}
-
-function getSessionIdFromCanvasLayoutUrl(url: string): string | null {
-  return /\/api\/sessions\/([^/]+)\/canvas-layout(?:\?|$)/.exec(url)?.[1] ?? null;
 }
 
 function summarizeCanvasState(state: CanvasState | null): string {
@@ -781,46 +764,27 @@ async function addTextNode(page: Page, text: string): Promise<void> {
 
 async function exitEditorToHomeAfterAutosaveFlush(
   page: Page,
-  pendingCanvasSaveResponse: Promise<PlaywrightResponse | null>,
+  sessionId: string,
   expected: {
     movedPageId: string;
     markerText: string;
   },
 ): Promise<string> {
-  const canvasSaveResponsePromise = waitForCanvasLayoutSave(page, 10000);
-
   await page.getByTitle('返回首页').click();
+  await expect(page).toHaveURL(
+    (url) => url.origin === E2E_BASE_URL && url.pathname === '/',
+    { timeout: 30000 },
+  );
 
-  const canvasSaveResponse = await Promise.race([
-    pendingCanvasSaveResponse,
-    canvasSaveResponsePromise,
-  ]);
-  if (canvasSaveResponse) {
-    const saveBody = await parseApiResponse<CanvasLayoutResult>(canvasSaveResponse);
-    const savedSessionId = getSessionIdFromCanvasLayoutUrl(canvasSaveResponse.url());
-    expect(savedSessionId, '画布布局保存 URL 应包含 sessionId').toBeTruthy();
-
-    const persistedState =
-      canvasStateContainsExpectedChange(saveBody.data.state, expected)
-        ? saveBody.data.state
-        : await waitForCanvasLayoutState(page, savedSessionId!, expected);
-    expect(
-      canvasStateContainsExpectedChange(persistedState, expected),
-      [
-        '画布布局保存后应可从后端读回本次页面移动和文本节点',
-        `保存响应状态: ${summarizeCanvasState(saveBody.data.state)}`,
-        `后端状态: ${summarizeCanvasState(persistedState)}`,
-      ].join('\n'),
-    ).toBe(true);
-
-    await expect(page).toHaveURL(
-      (url) => url.origin === E2E_BASE_URL && url.pathname === '/',
-      { timeout: 30000 },
-    );
-    return savedSessionId!;
-  } else {
-    throw new Error('画布改动后没有捕获到自动保存或退出 flush 的 canvas-layout 请求');
-  }
+  const persistedState = await waitForCanvasLayoutState(page, sessionId, expected);
+  expect(
+    canvasStateContainsExpectedChange(persistedState, expected),
+    [
+      '画布布局保存后应可从后端读回本次页面移动和文本节点',
+      `后端状态: ${summarizeCanvasState(persistedState)}`,
+    ].join('\n'),
+  ).toBe(true);
+  return sessionId;
 }
 
 function getCanvasNodes(state: CanvasState): CanvasFreeNode[] {
@@ -926,6 +890,7 @@ test.describe('画布自动保存与重新打开回归', () => {
     const knowledgeItem = await createKnowledgeDocument(
       page,
       filesBeforeEdits.workspacePath,
+      editSessionId,
       knowledgeMarker,
     );
     await persistWorkspace(page, editSessionId);
@@ -937,14 +902,15 @@ test.describe('画布自动保存与重新打开回归', () => {
     await expect(page.getByRole('heading', { name: project.name })).toBeVisible({
       timeout: 30000,
     });
-    await parseApiResponse<SessionCreateResult>(await canvasSessionPromise);
+    const canvasSessionBody = await parseApiResponse<SessionCreateResult>(
+      await canvasSessionPromise,
+    );
 
     await switchToCanvas(page);
-    const canvasSaveResponsePromise = waitForCanvasLayoutSave(page);
     const movedPageId = await dragFirstCanvasPage(page);
     await addTextNode(page, markerText);
 
-    await exitEditorToHomeAfterAutosaveFlush(page, canvasSaveResponsePromise, {
+    await exitEditorToHomeAfterAutosaveFlush(page, canvasSessionBody.data.sessionId, {
       movedPageId,
       markerText,
     });

@@ -14,10 +14,10 @@ const MESSAGES_FILE = ".messages.json";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } },
+  { params }: { params: Promise<{ projectId: string }> },
 ) {
   try {
-    const token = getAuthCookie();
+    const token = await getAuthCookie();
     if (!token) {
       return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
         status: 401,
@@ -32,7 +32,7 @@ export async function GET(
     }
 
     const userId = payload.userId;
-    const { projectId } = params;
+    const { projectId } = await params;
 
     const projectSessionsDir = path.join(
       getSessionsDir(),

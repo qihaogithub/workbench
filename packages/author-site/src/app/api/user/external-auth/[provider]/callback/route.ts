@@ -106,9 +106,10 @@ async function syncExternalAuthToActiveSessions(
 
 export async function GET(
   request: NextRequest,
-  context: { params: { provider: string } },
+  context: { params: Promise<{ provider: string }> },
 ) {
-  if (context.params.provider !== "figma") {
+  const { provider } = await context.params;
+  if (provider !== "figma") {
     return buildRedirect(request, "unsupported");
   }
 

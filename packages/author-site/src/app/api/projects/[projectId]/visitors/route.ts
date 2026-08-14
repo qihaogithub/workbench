@@ -8,10 +8,11 @@ import { listVisitors } from "@/lib/visitors-store";
  */
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { projectId: string } },
+  { params }: { params: Promise<{ projectId: string }> },
 ) {
+  const { projectId } = await params;
   try {
-    const visitors = listVisitors(params.projectId);
+    const visitors = listVisitors(projectId);
     return NextResponse.json(createApiSuccess({ visitors }));
   } catch (error) {
     console.error("获取访问者列表失败:", error);

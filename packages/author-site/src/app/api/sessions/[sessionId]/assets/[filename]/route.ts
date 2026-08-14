@@ -12,10 +12,10 @@ import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 
 export async function GET(
   _request: Request,
-  { params }: { params: { sessionId: string; filename: string } },
+  { params }: { params: Promise<{ sessionId: string; filename: string }> },
 ) {
   try {
-    const { sessionId, filename } = params;
+    const { sessionId, filename } = await params;
 
     if (!sessionExists(sessionId)) {
       return NextResponse.json(
@@ -69,10 +69,10 @@ export async function GET(
 
 export async function DELETE(
   _request: Request,
-  { params }: { params: { sessionId: string; filename: string } },
+  { params }: { params: Promise<{ sessionId: string; filename: string }> },
 ) {
   try {
-    const token = getAuthCookie();
+    const token = await getAuthCookie();
     if (!token) {
       return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
         status: 401,
@@ -86,7 +86,7 @@ export async function DELETE(
       });
     }
 
-    const { sessionId, filename } = params;
+    const { sessionId, filename } = await params;
 
     if (!sessionExists(sessionId)) {
       return NextResponse.json(

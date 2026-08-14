@@ -20,7 +20,7 @@ import {
   WorkspaceAuthorityClientError,
 } from "@/lib/workspace-authority-client";
 
-type RouteParams = { params: { docId: string } };
+type RouteParams = { params: Promise<{ docId: string }> };
 
 function mutationErrorResponse(error: WorkspaceAuthorityClientError) {
   return NextResponse.json(
@@ -38,7 +38,7 @@ function notFound() {
 
 /** GET /api/design-specs/[docId] → 单文档 */
 export async function GET(request: NextRequest, { params }: RouteParams) {
-  const { docId } = params;
+  const { docId } = await params;
   if (!isSafeDocId(docId)) return notFound();
   const resolved = await resolveDesignSpecContext(request);
   if ("response" in resolved) return resolved.response;
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
 /** PUT /api/design-specs/[docId] body { doc } → 保存整份文档 */
 export async function PUT(request: NextRequest, { params }: RouteParams) {
-  const { docId } = params;
+  const { docId } = await params;
   if (!isSafeDocId(docId)) return notFound();
   const resolved = await resolveDesignSpecContext(request);
   if ("response" in resolved) return resolved.response;
@@ -134,7 +134,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
 /** DELETE /api/design-specs/[docId] → 删除文档 */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
-  const { docId } = params;
+  const { docId } = await params;
   if (!isSafeDocId(docId)) return notFound();
   const resolved = await resolveDesignSpecContext(request);
   if ("response" in resolved) return resolved.response;

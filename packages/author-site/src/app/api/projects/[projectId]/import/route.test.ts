@@ -18,7 +18,7 @@ jest.mock("@workbench/project-core", () => {
 });
 
 jest.mock("@/lib/auth/jwt", () => ({
-  getAuthCookie: jest.fn(() => "token"),
+  getAuthCookie: jest.fn(async () => "token"),
   verifyToken: jest.fn(async () => ({ userId: "user-1" })),
 }));
 
@@ -89,7 +89,7 @@ describe("project import route", () => {
     const { POST } = await import("./route");
     const projectCore = await import("@workbench/project-core");
     const response = await POST(archiveRequest(Uint8Array.from(Buffer.from("archive"))), {
-      params: { projectId: "project-1" },
+      params: Promise.resolve({ projectId: "project-1" }),
     });
     const body = await response.json();
 
@@ -109,7 +109,7 @@ describe("project import route", () => {
     const { POST } = await import("./route");
     const response = await POST(
       archiveRequest(Uint8Array.from(Buffer.from("archive")), "application/json"),
-      { params: { projectId: "project-1" } },
+      { params: Promise.resolve({ projectId: "project-1" }) },
     );
     const body = await response.json();
 

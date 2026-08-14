@@ -18,6 +18,7 @@ export type AgentStatus =
   | "initializing"
   | "ready"
   | "processing"
+  | "cancelling"
   | "error"
   | "destroyed";
 
@@ -29,6 +30,7 @@ export type ErrorCode =
   | "BACKEND_UNAVAILABLE"
   | "MESSAGE_SEND_ERROR"
   | "MESSAGE_TIMEOUT"
+  | "CANCELLED"
   | "FILE_ACCESS_DENIED"
   | "RATE_LIMIT_EXCEEDED"
   | "CONTEXT_OVERFLOW"
@@ -182,6 +184,7 @@ export type EventType =
   | "finish"
   | "status"
   | "context_compacted"
+  | "capability_activation"
   | "permission_request"
   | "user_choice_request";
 
@@ -248,6 +251,17 @@ export interface ContextCompactedEvent {
   tokensBefore: number;
   contextWindow: number;
   durationMs: number;
+}
+
+export interface CapabilityActivationEvent {
+  type: "capability_activation";
+  sessionId: string;
+  status: "completed" | "failed";
+  capabilities: string[];
+  previousActiveToolCount: number;
+  activeToolCount: number;
+  durationMs: number;
+  error?: { message?: string };
 }
 
 export interface RunSummaryEvent {
@@ -333,6 +347,7 @@ export type AgentEvent =
   | FinishEvent
   | StatusEvent
   | ContextCompactedEvent
+  | CapabilityActivationEvent
   | RunSummaryEvent
   | PermissionRequestEvent
   | UserChoiceRequestEvent

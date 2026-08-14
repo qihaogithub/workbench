@@ -5,12 +5,12 @@ export interface HeadingStyleOption {
 
 export const HEADING_STYLE_OPTIONS: HeadingStyleOption[] = [
   { label: "正文", level: null },
-  { label: "一级标题", level: 1 },
-  { label: "二级标题", level: 2 },
-  { label: "三级标题", level: 3 },
-  { label: "四级标题", level: 4 },
-  { label: "五级标题", level: 5 },
-  { label: "六级标题", level: 6 },
+  { label: "H1", level: 1 },
+  { label: "H2", level: 2 },
+  { label: "H3", level: 3 },
+  { label: "H4", level: 4 },
+  { label: "H5", level: 5 },
+  { label: "H6", level: 6 },
 ];
 
 interface HeadingStyleToolbarOptions {

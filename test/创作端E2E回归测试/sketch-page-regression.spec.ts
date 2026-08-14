@@ -86,6 +86,10 @@ async function getSessionFiles(page: Page, sessionId: string): Promise<SessionFi
 
 test.describe('手绘页面回归', () => {
   test('创建手绘页面、进入编辑并添加文本', async ({ page }) => {
+    test.skip(
+      process.env.NEXT_PUBLIC_SKETCH_SCENE_AUTHORING_ENABLED !== 'true',
+      '手绘页面创作功能默认未开放；开启 feature flag 后执行此回归。',
+    );
     test.setTimeout(120000);
 
     await openHome(page);

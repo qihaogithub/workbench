@@ -1303,7 +1303,7 @@ describe('PiAgent 工具', () => {
         }),
       });
       
-      expect(tools).toHaveLength(34);
+      expect(tools).toHaveLength(35);
 
       const toolNames = tools.map(tool => tool.name);
       expect(toolNames).toContain('readFile');
@@ -1321,6 +1321,7 @@ describe('PiAgent 工具', () => {
       expect(toolNames).toContain('knowledgeReport');
       expect(toolNames).toContain('readKnowledgeSource');
       expect(toolNames).toContain('readPreinstalledSkill');
+      expect(toolNames).toContain('activateCapabilities');
       expect(toolNames).toContain('arrangeCanvasPages');
       expect(toolNames).not.toContain('readSketchScene');
       expect(toolNames).not.toContain('patchSketchScene');
@@ -1349,8 +1350,9 @@ describe('PiAgent 工具', () => {
       const { createWorkbenchTools } = await import('../../src/backends/pi-tools');
       const tools = createWorkbenchTools(mockConfig, undefined, { includeDelegateTask: false });
 
-      expect(tools).toHaveLength(33);
+      expect(tools).toHaveLength(34);
       expect(tools.map(tool => tool.name)).not.toContain('delegateTask');
+      expect(tools.map(tool => tool.name)).toContain('activateCapabilities');
       expect(tools.map(tool => tool.name)).toContain('readUploadedFile');
       expect(tools.map(tool => tool.name)).toContain('requestUserChoice');
     });

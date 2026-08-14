@@ -153,37 +153,28 @@ function PageScreenshot({
   projectId?: string;
   className: string;
 }) {
-  const [src, setSrc] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const pageId = item.pageId;
 
   useEffect(() => {
-    if (!projectId || !item.pageId) {
-      setSrc(null);
-      return;
-    }
-    let cancelled = false;
-    const url = `/api/screenshots/file/${encodeURIComponent(projectId)}/${encodeURIComponent(item.pageId)}?meta=1`;
-    void fetch(url, { cache: "no-store" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((result: unknown) => {
-        const candidate = (result as { data?: { url?: unknown } } | null)?.data?.url;
-        if (!cancelled) setSrc(typeof candidate === "string" ? candidate : null);
-      })
-      .catch(() => {
-        if (!cancelled) setSrc(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [item.pageId, projectId]);
+    setFailed(false);
+  }, [pageId, projectId]);
 
-  if (!src) {
+  if (!projectId || !pageId || failed) {
     return (
       <div className={`${className} flex items-center justify-center bg-muted px-3 text-center text-xs text-muted-foreground`}>
         暂无最新页面效果图
       </div>
     );
   }
-  return <img src={src} alt={`${pageLabel(item)} 页面效果图`} className={className} />;
+  return (
+    <img
+      src={`/api/screenshots/file/${encodeURIComponent(projectId)}/${encodeURIComponent(pageId)}`}
+      alt={`${pageLabel(item)} 页面效果图`}
+      className={className}
+      onError={() => setFailed(true)}
+    />
+  );
 }
 
 /** 配置项悬浮预览：所有类型显示所在页面，图片额外显示默认图。 */
@@ -216,8 +207,8 @@ export function HoverPop({
           projectId={projectId}
           className={
             hasImageDefault
-              ? "h-[180px] w-[200px] self-center rounded-md border object-cover"
-              : "h-[180px] w-[240px] rounded-md border object-cover"
+              ? "h-[240px] w-[240px] self-center rounded-md border bg-muted object-contain"
+              : "h-[320px] w-[280px] rounded-md border bg-muted object-contain"
           }
         />
       </div>

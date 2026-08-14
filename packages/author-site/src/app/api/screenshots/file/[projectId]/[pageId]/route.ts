@@ -48,9 +48,9 @@ function notFound(message: string) {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string; pageId: string } },
+  { params }: { params: Promise<{ projectId: string; pageId: string }> },
 ) {
-  const { projectId, pageId } = params;
+  const { projectId, pageId } = await params;
   if (
     !isSafeScreenshotIdentifier(projectId) ||
     !isSafeScreenshotIdentifier(pageId)

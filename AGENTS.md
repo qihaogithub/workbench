@@ -47,7 +47,7 @@ AI agent 在启动任务前应优先读取 `memory.md`（如果存在），以�
 - Node 要求：`node >=24.0.0 <25`（统一使用 Node 24 LTS）
 - `.npmrc`：`shamefully-hoist=true`
 - Workspace：`packages/*` 和 `OPS/CLI`
-- 前端：Next.js 14 App Router、Tailwind CSS、shadcn/ui、lucide-react
+- 前端：Next.js 16 App Router、React 19、Tailwind CSS、shadcn/ui、lucide-react
 - 后端：Fastify
 - 共享包：`@workbench/shared`
 - 数据目录：默认 `data/`，可由 `DATA_DIR` 覆盖
@@ -204,8 +204,8 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h
 
 | 包名                            | 路径                           | 类型                                                   | 端口 | 测试                     |
 | ------------------------------- | ------------------------------ | ------------------------------------------------------ | ---- | ------------------------ |
-| `@workbench/author-site`        | `packages/author-site/`        | Next.js 14 App Router                                  | 4200 | Jest + Testing Library   |
-| `@workbench/viewer-site`        | `packages/viewer-site/`        | Next.js 14 App Router                                  | 4300 | 无包内测试脚本           |
+| `@workbench/author-site`        | `packages/author-site/`        | Next.js 16 App Router                                  | 4200 | Jest + Testing Library   |
+| `@workbench/viewer-site`        | `packages/viewer-site/`        | Next.js 16 App Router                                  | 4300 | 无包内测试脚本           |
 | `@workbench/demo-ui`            | `packages/demo-ui/`            | 创作端与使用端共享预览组件                             | -    | Vitest + Testing Library |
 | `@workbench/shared`             | `packages/shared/`             | 共享类型和常量                                         | -    | 无测试脚本               |
 | `@workbench/sketch-core`        | `packages/sketch-core/`        | 草图页协议、校验、patch、几何、只读渲染                | -    | Vitest                   |
@@ -223,14 +223,20 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h
 
 端口说明：本地 dev 端口是 4200-4300 段（author 4200 / agent 4201 / screenshot 4202 / knowledge 4203 / viewer 4300），全部默认绑定 `0.0.0.0` 支持局域网访问；Docker 部署使用 3200-3300 段，见 `docker-compose.yml`，不要混用。
 
-viewer-site dev 端口注意：Next.js 14 的 `next dev` 在加载 `.env` 之前解析端口，`.env` 里的 `PORT=4300` 不生效，必须显式 `-p 4300`（已写在 dev 脚本中）；`.env` 的 PORT 仅作约定记录。
+viewer-site dev 端口注意：`next dev` 在加载 `.env` 之前解析端口，`.env` 里的 `PORT=4300` 不生效，必须显式 `-p 4300`（已写在 dev 脚本中）；`.env` 的 PORT 仅作约定记录。
 
 Next 开发编译性能约束：
 
-- author-site 当前默认使用 Next.js 14.1 Webpack；不要直接追加 `--turbo`。现有 instrumentation、`better-sqlite3`、Markdown 文本导入和 workspace 源码解析需要在受支持 Next LTS 的独立升级任务中一起迁移验证。
+- author-site、viewer-site 与 sketch-playground 均使用 Next.js 16.2.12 / React 19.2.3。默认 `dev` / `build` 显式使用 Webpack，`dev:turbo` / `build:turbo` 用于 Turbopack 验证；在完成同机性能 A/B 前，不得改写默认 bundler。
+- author-site Turbopack 已通过 Markdown raw-text rule 与 NodeNext workspace 源码 `.js`→`.ts/.tsx` 精确重写支持；规则只可覆盖 `knowledge-*`、`preview-contract` 与 `project-*` 的源码目录，不能扩展到所有 workspace 文件，否则会破坏共享包的导出分析。
+- `tailwind.config.ts` 在 Next 16 的 ESM 加载环境中不得调用 CommonJS `require()`；插件使用标准 ESM import。Markdown 资源必须同时保留 Webpack 的 `asset/source` 和 Turbopack raw-text rule，二者缺一会让编辑页的系统 prompt 首编译失败。
+- Next 16 的 Playwright 开发服务若以 `127.0.0.1` 访问，应用 `next.config.js` 必须将其加入 `allowedDevOrigins`；否则 HMR 资源会被安全策略阻断，表现为画布交互用例无法完成。
 - 编辑页和根布局不得从 `@workbench/demo-ui`、`@workbench/ai-chat-shared` 或 `date-fns/locale` 桶入口获取单个轻量能力；优先使用 package exports 公开的精确子路径，并维护高频路由静态导入测试。
+- 编辑页不得直接动态引用 `author-ai-chat`；保留 `deferred-author-ai-chat` 二级延迟边界，只在初始页面文件就绪后挂载 AI 对话，避免 Mermaid、Shiki 等富文本依赖与预览区争抢首屏资源。
+- Docker 编辑页延迟诊断不能只看某一时刻的 `docker stats`；同时核对 author-site 容器 `cpu.stat` 的 `nr_throttled / nr_periods`、`RestartCount`、V8 heap OOM 日志和启动日志中的 Next.js 版本，避免周期性限流或重启被当前 `healthy` 状态掩盖。
 - 采集冷编译基线前必须关闭仍指向 author-site 的旧浏览器标签，再清理 `.next` 和重启服务；旧页面会自动重连并发起 Authority/会话请求，污染模块数和编译时间。
 - 被 `useEffect` / `useCallback` 依赖的可选数组或对象 props 不得在函数参数中使用 `=[]` / `={}` 这类每次渲染创建新引用的默认值；使用模块级稳定常量，避免请求 effect 循环。
+- 草图画布测试在 hover、选择或拖拽等状态提交后，必须重新查询 `dangerouslySetInnerHTML` 生成的 SVG 节点；React 19 重渲染会替换这些 DOM 节点，不能向已脱离文档的旧引用派发后续 PointerEvent。
 
 `.next/`、`node_modules/`、`coverage/`、`dist/`、`out/`、`test/**/test-outputs/` 都是生成物或依赖目录，不作为源码入口。
 
@@ -355,9 +361,11 @@ pnpm --filter @workbench/project-cli test
 Markdown 编辑器（DocumentEditor）：
 
 - `packages/demo-ui/src/DocumentEditor.tsx` 是项目唯一的 Markdown 富文本编辑器，基于 **Milkdown Crepe v7**；Markdown 即主线模型，实现实时渲染输入。**已不再使用 TipTap、自研 Milkdown native-ui 或 prosemirror-markdown**，勿再引用旧实现。
-- Crepe 统一提供 `/` 块菜单、选中文本浮动格式条、块拖拽、链接、图片、表格、代码块、列表、光标与占位体验；项目能力通过 `packages/demo-ui/src/markdown/crepe-config.ts` 的 `BlockEdit.buildMenu` 追加配置引用、视频和附件，图片上传复用 `ImageBlock` 配置。Latex、TopBar 和 Crepe AI 明确关闭。
+- Crepe 统一提供 `/` 块菜单、选中文本浮动格式条、块拖拽、链接、图片、表格、代码块、列表、光标与占位体验；项目能力通过 `packages/demo-ui/src/markdown/crepe-config.ts` 的 `BlockEdit.buildMenu` 追加配置引用、视频和附件，图片上传复用 `ImageBlock` 配置。TopBar 已启用，Latex 和 Crepe AI 明确关闭。
 - `DocumentEditor` 直接管理单一 Crepe 实例；受控 `value`/`onChange` 用 `lastEmittedRef` 防回环，外部同步用底层 Milkdown `replaceAll`，只读切换用 `crepe.setReadonly`，卸载必须销毁实例。
+- 若可编辑的 `DocumentEditor` 消费方拥有 Session 上下文，必须传入 `localizeRemoteImage`；快捷键粘贴网页外网图片时，该处理器调用当前 Session 的资源本地化接口，成功后才写入图床地址，不能让外链直接落入 Markdown。
 - 主题只导入 Crepe common 结构样式，项目色彩、排版、浮层与响应式规则集中在 `packages/demo-ui/src/markdown/crepe-theme.css`，通过宿主 CSS tokens 自动适配明暗主题。
+- TopBar 的“更多”恢复入口必须挂在 `[data-document-editor="crepe"]` React 外层宿主，与 `.crepe` 滚动/裁切容器平级；不得挂回 `.crepe`、`.milkdown-top-bar` 或 `.top-bar-inner`，否则入口会与被收纳工具共享裁切链。
 - 消费方（author-site/viewer-site/ai-chat-shared）统一以 Markdown 传 `value`，已无 `format`/`htmlSanitizer` 参数。
 - **prosemirror 双实例**：milkdown 与 prosemirror-adapter 各带不同 `prosemirror-view`/`prosemirror-model`，根 `package.json` `overrides` 已强制统一单一版本，勿手动改回。
 - **测试 ESM 坑**：`@milkdown/*`、`@prosemirror-adapter/*` 均为 ESM-only，author-site 的 Jest（CJS）无法解析，靠 `packages/author-site/jest-milkdown-mock.js` + jest.config `moduleNameMapper` 全局映射兜底；demo-ui 用 Vitest 直接跑真实 Milkdown（roundtrip 幂等 + 集成渲染测试）。`codemirror`/`@codemirror/*` 自带 CJS 构建，Jest 可直接解析、无需 mock。
@@ -366,7 +374,7 @@ Markdown 编辑器（DocumentEditor）：
 Auth：
 
 - author-site 使用 JWT（`jose`）。
-- `middleware.ts` 保护 `/demo`、`/projects` 和 `/api/sessions`。
+- `proxy.ts` 保护 `/demo`、`/projects` 和 `/api/sessions`。
 - 页面路由未登录时重定向到 `/login`；API 路由返回 401 JSON。
 - 需要 `JWT_SECRET` 环境变量。
 
@@ -383,7 +391,7 @@ Session：
 
 CORS：
 
-- author-site 的跨域逻辑在 `middleware.ts`。
+- author-site 的跨域逻辑在 `proxy.ts`。
 - agent-service 的 CORS 在 `packages/agent-service/src/server.ts`。
 - agent-service 使用 `.env` 中的 `CORS_ORIGINS`。
 

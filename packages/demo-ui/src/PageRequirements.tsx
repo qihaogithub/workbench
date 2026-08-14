@@ -2,6 +2,7 @@
 
 import { useCallback, useRef } from "react";
 import { renderPageRequirementsMarkdown, stripMarkdown } from "./note-html";
+import "./page-requirements.css";
 
 interface PageRequirementsProps {
   /** 页面配置要求 Markdown 内容（含行内软引用 @[名称](key)） */
@@ -11,6 +12,8 @@ interface PageRequirementsProps {
   /** 空文档时是否渲染占位。默认渲染。 */
   showEmptyPlaceholder?: boolean;
   placeholderText?: string;
+  /** 设计规范由项目作者维护，浏览端可以展示其中的 HTTPS 图片。 */
+  allowExternalMedia?: boolean;
 }
 
 /**
@@ -23,10 +26,13 @@ export function PageRequirements({
   onRefClick,
   showEmptyPlaceholder = true,
   placeholderText = "暂无配置要求",
+  allowExternalMedia = false,
 }: PageRequirementsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const sanitized = renderPageRequirementsMarkdown(markdown);
+  const sanitized = renderPageRequirementsMarkdown(markdown, {
+    allowExternalMedia,
+  });
   const plainText = stripMarkdown(markdown);
 
   const handleClick = useCallback(
@@ -54,7 +60,7 @@ export function PageRequirements({
   return (
     <div
       ref={containerRef}
-      className="markdown-editor-content text-xs text-muted-foreground leading-tight"
+      className="page-requirements-content text-xs text-muted-foreground leading-tight"
       onClick={handleClick}
       dangerouslySetInnerHTML={{ __html: sanitized }}
     />

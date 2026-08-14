@@ -18,7 +18,7 @@ function getImportMaxBytes(): number {
 }
 
 async function isAuthenticated(): Promise<boolean> {
-  const token = getAuthCookie();
+  const token = await getAuthCookie();
   return Boolean(token && (await verifyToken(token)));
 }
 
@@ -58,8 +58,9 @@ async function readArchive(request: NextRequest, maxBytes: number): Promise<Buff
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string } },
+  { params }: { params: Promise<{ projectId: string }> },
 ) {
+  const { projectId } = await params;
   if (!(await isAuthenticated())) {
     return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
       status: 401,
@@ -78,7 +79,7 @@ export async function POST(
     const archive = await readArchive(request, getImportMaxBytes());
     const result = await importProjectArchive(
       getDataDir(),
-      params.projectId,
+      projectId,
       archive,
     );
     return NextResponse.json(createApiSuccess(result));

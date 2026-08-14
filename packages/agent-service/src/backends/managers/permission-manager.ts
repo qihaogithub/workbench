@@ -1,5 +1,4 @@
 import * as path from 'path';
-import * as fs from 'fs';
 
 import type { AgentConfig, AgentEvent } from '../../core/types';
 import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from '../pi-tools/permissions';

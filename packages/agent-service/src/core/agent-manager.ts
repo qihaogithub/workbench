@@ -35,7 +35,7 @@ export function createAgentBusyResult(): AgentResult {
     success: false,
     error: {
       code: 'AGENT_BUSY',
-      message: '上一轮 AI 请求仍在运行，请等待完成或先取消后再发送。',
+      message: '上一轮 AI 请求仍在运行或正在取消，请等待其完全结束后再发送。',
       retryable: true,
     },
   };
@@ -45,6 +45,10 @@ export class AgentManager implements IAgentManager {
   private agents: Map<string, BaseAgent> = new Map();
   private factory: AgentFactory;
   private idleCheckTimer: ReturnType<typeof setInterval> | null = null;
+
+  private isRunActive(agent: BaseAgent): boolean {
+    return agent.status === 'processing' || agent.status === 'cancelling';
+  }
 
   constructor(factory?: AgentFactory, private idleTimeoutMs: number = DEFAULT_IDLE_TIMEOUT_MS) {
     this.factory = factory || getAgentFactory();
@@ -68,7 +72,7 @@ export class AgentManager implements IAgentManager {
         config.toolVersion !== undefined &&
         currentVersion !== config.toolVersion
       ) {
-        if (existingAgent.status === 'processing') {
+        if (this.isRunActive(existingAgent)) {
           logger.warn(
             { sessionId, currentVersion, newVersion: config.toolVersion },
             'Agent tool version changed while processing; keeping current agent until next turn',
@@ -88,7 +92,7 @@ export class AgentManager implements IAgentManager {
         config.toolMode !== undefined &&
         existingAgent.getConfig().toolMode !== config.toolMode
       ) {
-        if (existingAgent.status === 'processing') {
+        if (this.isRunActive(existingAgent)) {
           logger.warn(
             { sessionId, currentMode: existingAgent.getConfig().toolMode, newMode: config.toolMode },
             'Agent tool mode changed while processing; keeping current agent until next turn',

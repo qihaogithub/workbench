@@ -158,8 +158,26 @@ describe("AI 页面预览运行时策略", () => {
       { preferCdn: true },
     );
 
-    expect(result.compiledCode).toContain("lucide-react@0.323.0");
-    expect(result.compiledCode).toContain("react@18.3.1");
+    expect(result.compiledCode).toContain("lucide-react@0.575.0");
+    expect(result.compiledCode).toContain("react@19.2.3");
+  });
+
+  it("CDN 回退模式为 framer-motion 注入 React 19 依赖", () => {
+    const result = compileCode(
+      `
+        import { motion } from "framer-motion";
+
+        export default function Demo() {
+          return <motion.div />;
+        }
+      `,
+      undefined,
+      { preferCdn: true },
+    );
+
+    expect(result.compiledCode).toContain(
+      "framer-motion@12.38.0?deps=react@19.2.3,react-dom@19.2.3",
+    );
   });
 
   it("支持 SVGA 依赖紧急 CDN 回退", () => {

@@ -244,6 +244,7 @@ test.describe('创作端配置功能回归', () => {
     expect(reopenedFiles.demos[firstPage.id].schema).toContain('Page One Title E2E');
     expect(reopenedFiles.demos[secondPage.id].schema).toContain('Page Two CTA E2E');
 
+    await page.getByRole('tab', { name: '配置', exact: true }).click();
     await expect(page.getByText('Shared Title E2E')).toBeVisible({ timeout: 30000 });
     await selectPreviewPage(page, secondPage.name);
     await expect(page.getByText('Page Two CTA E2E')).toBeVisible({ timeout: 30000 });

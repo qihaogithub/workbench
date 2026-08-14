@@ -45,7 +45,7 @@ describe('Agent busy response', () => {
       success: false,
       error: {
         code: 'AGENT_BUSY',
-        message: '上一轮 AI 请求仍在运行，请等待完成或先取消后再发送。',
+        message: '上一轮 AI 请求仍在运行或正在取消，请等待其完全结束后再发送。',
         retryable: true,
       },
     });

@@ -67,42 +67,41 @@ const ALLOWED_ATTR = [
   "preload",
 ];
 
-/** 仅允许同源受控路径（/api/、/data/ 等），禁止协议相对 // 与外部绝对地址 */
-function isSafeMediaSrc(src: string): boolean {
+/** 仅允许同源受控路径（/api/、/data/ 等），禁止协议相对 // 与外部绝对地址。 */
+function isSafeMediaSrc(src: string, allowExternalMedia = false): boolean {
   const trimmed = src.trim();
   if (!trimmed) return false;
+  if (allowExternalMedia && /^https:\/\//i.test(trimmed)) return true;
   if (!trimmed.startsWith("/")) return false;
   if (trimmed.startsWith("//")) return false;
   if (trimmed === "/") return false;
   return true;
 }
 
-let srcHookInstalled = false;
-
-function installMediaSrcHook(): void {
-  if (typeof window === "undefined" || srcHookInstalled) return;
-  const DOMPurify = require("dompurify");
-  DOMPurify.addHook("afterSanitizeAttributes", (node: Element) => {
-    const tag = node.tagName.toLowerCase();
-    if (tag === "img" || tag === "video" || tag === "audio" || tag === "source") {
-      const src = node.getAttribute("src");
-      if (!src || !isSafeMediaSrc(src)) {
-        node.removeAttribute("src");
-      }
-    }
-  });
-  srcHookInstalled = true;
-}
-
-export function sanitizeNoteHtml(html: string): string {
+export function sanitizeNoteHtml(
+  html: string,
+  { allowExternalMedia = false }: { allowExternalMedia?: boolean } = {},
+): string {
   if (typeof window === "undefined") return html;
-  installMediaSrcHook();
   const DOMPurify = require("dompurify");
-  return DOMPurify.sanitize(html, {
+  const sanitized = DOMPurify.sanitize(html, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
     ALLOW_DATA_ATTR: true,
   });
+  const template = document.createElement("template");
+  template.innerHTML = sanitized;
+  template.content
+    .querySelectorAll<HTMLImageElement | HTMLMediaElement | HTMLSourceElement>(
+      "img, video, audio, source",
+    )
+    .forEach((node) => {
+      const src = node.getAttribute("src");
+      if (!src || !isSafeMediaSrc(src, allowExternalMedia)) {
+        node.removeAttribute("src");
+      }
+    });
+  return template.innerHTML;
 }
 
 function escapeHtml(text: string): string {
@@ -132,7 +131,10 @@ const REQUIREMENT_REF_REGEX = /@\[([^\]]+)\]\(([^)]+)\)/g;
  * 行内软引用 `@[名称](key)` 会被渲染为 chip（`span.pr-ref`，携带 `data-ref-key`），
  * 供前端通过事件委托绑定点击跳转到对应配置项。
  */
-export function renderPageRequirementsMarkdown(markdown: string): string {
+export function renderPageRequirementsMarkdown(
+  markdown: string,
+  options?: { allowExternalMedia?: boolean },
+): string {
   if (!markdown) return "";
   const withChips = markdown.replace(
     REQUIREMENT_REF_REGEX,
@@ -145,7 +147,7 @@ export function renderPageRequirementsMarkdown(markdown: string): string {
   } catch {
     html = escapeHtml(markdown).replace(/\n/g, "<br>");
   }
-  return sanitizeNoteHtml(html);
+  return sanitizeNoteHtml(html, options);
 }
 
 /** 从 Markdown 备注中提取纯文本，用于空值判断与摘要截断 */
@@ -155,7 +157,7 @@ export function stripMarkdown(markdown: string): string {
     .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/<[^>]*>/g, " ")
-    .replace(/[#>*_`~|\-]/g, " ")
+    .replace(/[#>*_`~|-]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }

@@ -50,12 +50,13 @@ export async function verifyToken(token: string): Promise<UserPayload | null> {
  * - 可通过 USE_SECURE_COOKIE=false 禁用（适用于 HTTP 内网部署）
  * - 示例：USE_SECURE_COOKIE=false docker-compose up -d
  */
-export function setAuthCookie(token: string): void {
+export async function setAuthCookie(token: string): Promise<void> {
   const isProduction = process.env.NODE_ENV === "production";
   const useSecureCookie =
     isProduction && process.env.USE_SECURE_COOKIE !== "false";
 
-  cookies().set(getAuthCookieName(), token, {
+  const cookieStore = await cookies();
+  cookieStore.set(getAuthCookieName(), token, {
     httpOnly: true,
     secure: useSecureCookie,
     sameSite: "lax",
@@ -67,13 +68,15 @@ export function setAuthCookie(token: string): void {
 /**
  * 获取认证 Cookie
  */
-export function getAuthCookie(): string | undefined {
-  return cookies().get(getAuthCookieName())?.value;
+export async function getAuthCookie(): Promise<string | undefined> {
+  const cookieStore = await cookies();
+  return cookieStore.get(getAuthCookieName())?.value;
 }
 
 /**
  * 清除认证 Cookie（登出）
  */
-export function clearAuthCookie(): void {
-  cookies().delete(getAuthCookieName());
+export async function clearAuthCookie(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete(getAuthCookieName());
 }

@@ -16,7 +16,7 @@ import type {
   MentionCandidate,
   UpdateCommentContentInput,
 } from "@workbench/demo-ui";
-import type { CommentReply, CommentThread, ProjectVisitor } from "@workbench/shared";
+import type { CommentReply, CommentThread, CommentTarget, ProjectVisitor } from "@workbench/shared";
 import { DATA_BASE, getAuthToken } from "./api";
 import { getBrowserAgentServiceUrl } from "./runtime-config";
 
@@ -106,8 +106,12 @@ export function createCommentApi(projectId: string): CommentApiAdapter {
   const base = `/api/projects/${enc}/comments`;
 
   return {
-    async listComments(pageId?: string): Promise<CommentThread[]> {
-      const qs = pageId ? `?pageId=${encodeURIComponent(pageId)}` : "";
+    async listComments(target?: CommentTarget): Promise<CommentThread[]> {
+      const qs = target?.kind === "page"
+        ? `?pageId=${encodeURIComponent(target.pageId)}`
+        : target?.kind === "document"
+          ? `?resourceId=${encodeURIComponent(target.resourceId)}`
+          : "";
       const data = await commentRequest<{ threads: CommentThread[] }>(`${base}${qs}`);
       return data.threads;
     },

@@ -11,7 +11,6 @@ import { logger } from "../utils/logger";
 import { getErrorMessage } from "../utils/error-utils";
 import {
   isRateLimitError,
-  isRetryableLlmError,
   withLlmRetry,
 } from "../utils/retry-utils";
 import { INACTIVITY_TIMEOUT_MS, ABSOLUTE_TIMEOUT_MS } from "./timeouts";
@@ -56,7 +55,7 @@ interface BackendWithModelSupport extends IBackendAdapter {
     content?: string;
   }>;
   getLastResponseDebug?: () => unknown;
-  cancelPrompt?: () => void;
+  cancelPrompt?: () => void | Promise<void>;
   resolvePermission?: (
     toolCallId: string,
     approved: boolean,
@@ -70,6 +69,8 @@ export class BackendAgent extends BaseAgent {
   private backend: BackendWithModelSupport;
   private busy = false;
   private initialized = false;
+  /** The run still owns the harness until sendMessage settles after this becomes true. */
+  private cancellationRequested = false;
   /** A run that has invoked a tool may already have external side effects. */
   private toolStartedInCurrentRun = false;
 
@@ -103,6 +104,7 @@ export class BackendAgent extends BaseAgent {
   ): Promise<AgentResult> {
     const startTime = Date.now();
     this.busy = true;
+    this.cancellationRequested = false;
     this.toolStartedInCurrentRun = false;
     this.messageCount++;
     this.setStatus("processing");
@@ -128,7 +130,7 @@ export class BackendAgent extends BaseAgent {
           "Inactivity timeout fired, calling cancel()",
         );
         timedOut = true;
-        this.cancel();
+        void this.cancel();
       }, INACTIVITY_TIMEOUT_MS);
       inactivityTimer.unref?.();
     };
@@ -145,15 +147,16 @@ export class BackendAgent extends BaseAgent {
     // 启动无进展定时器
     resetInactivityTimer();
 
-    // 启动绝对超时定时器（永不重置）
+    // 启动绝对超时定时器（永不重置）；调用方显式 timeout 已在路由层完成边界校验。
+    const absoluteTimeoutMs = options?.timeout ?? ABSOLUTE_TIMEOUT_MS;
     const absoluteTimer = setTimeout(() => {
       logger.warn(
-        { sessionId: this.sessionId, absoluteMs: ABSOLUTE_TIMEOUT_MS },
+        { sessionId: this.sessionId, absoluteMs: absoluteTimeoutMs },
         "Absolute timeout fired, calling cancel()",
       );
       timedOut = true;
-      this.cancel();
-    }, ABSOLUTE_TIMEOUT_MS);
+      void this.cancel();
+    }, absoluteTimeoutMs);
     absoluteTimer.unref?.();
 
     try {
@@ -177,7 +180,7 @@ export class BackendAgent extends BaseAgent {
         {},
         (error, meta) => {
           // 超时或 cancel 后不再重试，立即向上抛出
-          if (timedOut || !this.busy) throw error;
+          if (timedOut || this.cancellationRequested) throw error;
           // A full AgentHarness prompt may execute writes, external requests, or
           // delegated work before surfacing a transient model error. Retrying it
           // would replay that work, so only the pre-tool portion is retry-safe.
@@ -202,6 +205,8 @@ export class BackendAgent extends BaseAgent {
           { sessionId: this.sessionId, durationMs: Date.now() - startTime },
           "sendMessage resolved after timeout, returning MESSAGE_TIMEOUT",
         );
+        this.busy = false;
+        this.setStatus("ready");
         return {
           success: false,
           error: {
@@ -212,10 +217,23 @@ export class BackendAgent extends BaseAgent {
         };
       }
 
-      this.busy = false;
-      this.setStatus("ready");
+      if (this.cancellationRequested) {
+        this.busy = false;
+        this.setStatus("ready");
+        return {
+          success: false,
+          error: {
+            code: "CANCELLED",
+            message: "AI 请求已取消。",
+            retryable: true,
+          },
+        };
+      }
 
       const files = this.backend.getFiles?.() || [];
+
+      this.busy = false;
+      this.setStatus("ready");
 
       logger.info(
         {
@@ -237,17 +255,33 @@ export class BackendAgent extends BaseAgent {
       };
     } catch (error) {
       if (timedOut) {
-        // cancel() 已将 busy 设为 false、status 设为 ready
-        // 不在此处调用 setStatus('error') 以免覆盖
         logger.info(
           { sessionId: this.sessionId, durationMs: Date.now() - startTime },
           "sendMessage end timeout (caught error after cancel)",
         );
+        this.busy = false;
+        this.setStatus("ready");
         return {
           success: false,
           error: {
             code: "MESSAGE_TIMEOUT",
             message: "AI 处理超时，已自动取消。请重试或换用其他模型。",
+            retryable: true,
+          },
+        };
+      }
+      if (this.cancellationRequested) {
+        logger.info(
+          { sessionId: this.sessionId, durationMs: Date.now() - startTime },
+          "sendMessage ended after cancellation",
+        );
+        this.busy = false;
+        this.setStatus("ready");
+        return {
+          success: false,
+          error: {
+            code: "CANCELLED",
+            message: "AI 请求已取消。",
             retryable: true,
           },
         };
@@ -299,15 +333,15 @@ export class BackendAgent extends BaseAgent {
     }
   }
 
-  cancel(): void {
+  async cancel(): Promise<void> {
     logger.info(
       { sessionId: this.sessionId, busy: this.busy, status: this._status },
       "cancel() called",
     );
-    if (!this.busy) return; // 幂等守卫：防止多路竞态重复 cancel
-    this.backend.cancelPrompt?.();
-    this.busy = false;
-    this.setStatus("ready");
+    if (!this.busy || this.cancellationRequested) return;
+    this.cancellationRequested = true;
+    this.setStatus("cancelling");
+    await this.backend.cancelPrompt?.();
   }
 
   async kill(): Promise<void> {

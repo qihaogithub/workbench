@@ -46,7 +46,7 @@ async function resolveSessionWorkspace(
 ): Promise<
   { ok: true; ctx: SessionContext } | { ok: false; response: NextResponse }
 > {
-  const token = getAuthCookie();
+  const token = await getAuthCookie();
   if (!token) {
     return {
       ok: false,
@@ -151,10 +151,10 @@ async function resolveSessionWorkspace(
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { projectId: string } },
+  { params }: { params: Promise<{ projectId: string }> },
 ) {
   try {
-    const { projectId } = params;
+    const { projectId } = await params;
     if (!projectExists(projectId)) {
       return NextResponse.json(createApiError("PROJECT_NOT_FOUND"), {
         status: 404,
@@ -180,10 +180,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { projectId: string } },
+  { params }: { params: Promise<{ projectId: string }> },
 ) {
   try {
-    const { projectId } = params;
+    const { projectId } = await params;
     if (!projectExists(projectId)) {
       return NextResponse.json(createApiError("PROJECT_NOT_FOUND"), {
         status: 404,

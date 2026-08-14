@@ -7,14 +7,8 @@ import type { AgentConfig } from '../../core/types';
 import { logger } from '../../utils/logger';
 import { resolveLiveWorkspaceMutationContext } from '../../workspace/workspace-mutation-authority';
 import {
-  WORKSPACE_TREE_FILENAME,
-  type WorkspacePage,
-  type WorkspaceTree,
   isSafePageId,
   getPageDir,
-  getWorkspaceTreePath,
-  isCompletePageDir,
-  readWorkspaceTree,
   listPages,
 } from './workspace-page-utils';
 

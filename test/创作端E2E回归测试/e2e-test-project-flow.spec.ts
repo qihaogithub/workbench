@@ -277,6 +277,8 @@ test.describe('项目创建和代码编辑完整流程', () => {
 
       const categoryInput = createDialog.locator('#project-category');
       if (await categoryInput.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await categoryInput.click();
+        await page.getByRole('button', { name: '自定义分类', exact: true }).click();
         await categoryInput.fill(E2E_PROJECT_CATEGORY);
         logger.log('已填写 E2E 项目分类');
       }

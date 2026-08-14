@@ -27,9 +27,10 @@ import {
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { sessionId: string } },
+  { params }: { params: Promise<{ sessionId: string }> },
 ) {
-  const auth = await authorize(params.sessionId);
+  const { sessionId } = await params;
+  const auth = await authorize(sessionId);
   if (!auth.ok) return auth.res;
 
   const { searchParams } = new URL(request.url);
@@ -70,9 +71,10 @@ export async function GET(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { sessionId: string } },
+  { params }: { params: Promise<{ sessionId: string }> },
 ) {
-  const auth = await authorize(params.sessionId);
+  const { sessionId } = await params;
+  const auth = await authorize(sessionId);
   if (!auth.ok) return auth.res;
 
   const { searchParams } = new URL(request.url);
@@ -113,7 +115,7 @@ export async function DELETE(
 async function authorize(sessionId: string): Promise<
   { ok: true; projectId: string } | { ok: false; res: NextResponse }
 > {
-  const token = getAuthCookie();
+  const token = await getAuthCookie();
   if (!token) {
     return { ok: false, res: NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), { status: 401 }) };
   }

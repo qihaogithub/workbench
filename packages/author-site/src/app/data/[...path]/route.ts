@@ -25,9 +25,10 @@ const MIME_TYPES: Record<string, string> = {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { path: string[] } },
+  { params }: { params: Promise<{ path: string[] }> },
 ) {
-  const filePath = params.path.join("/");
+  const { path: pathSegments } = await params;
+  const filePath = pathSegments.join("/");
 
   let resolvedPath: string;
 

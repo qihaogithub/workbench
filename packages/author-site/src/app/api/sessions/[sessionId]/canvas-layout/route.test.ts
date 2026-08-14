@@ -83,7 +83,7 @@ describe("canvas layout route", () => {
     process.env.WORKSPACES_DIR = path.join(tempDir, "workspaces");
     process.env.SNAPSHOTS_DIR = path.join(tempDir, "snapshots");
     jest.doMock("@/lib/auth/jwt", () => ({
-      getAuthCookie: jest.fn(() => "token"),
+      getAuthCookie: jest.fn(async () => "token"),
       verifyToken: jest.fn(async () => ({
         userId: "user-1",
         username: "测试用户",
@@ -211,7 +211,7 @@ describe("canvas layout route", () => {
 
     const response = await POST(
       createJsonRequest({ projectId: project.id, version: 1, state }),
-      { params: { sessionId: session.sessionId } },
+      { params: Promise.resolve({ sessionId: session.sessionId }) },
     );
 
     expect(response.status).toBe(200);
@@ -235,7 +235,7 @@ describe("canvas layout route", () => {
 
     const getResponse = await GET(
       createRequest(),
-      { params: { sessionId: session.sessionId } },
+      { params: Promise.resolve({ sessionId: session.sessionId }) },
     );
     const body = (await getResponse.json()) as {
       success: boolean;
@@ -277,7 +277,7 @@ describe("canvas layout route", () => {
 
     const response = await POST(
       createJsonRequest({ projectId: project.id, version: 1, state }),
-      { params: { sessionId: session.sessionId } },
+      { params: Promise.resolve({ sessionId: session.sessionId }) },
     );
 
     expect(response.status).toBe(200);
@@ -349,7 +349,7 @@ describe("canvas layout route", () => {
 
     const response = await GET(
       createRequest(),
-      { params: { sessionId: session.sessionId } },
+      { params: Promise.resolve({ sessionId: session.sessionId }) },
     );
     const body = (await response.json()) as {
       success: boolean;
@@ -392,7 +392,7 @@ describe("canvas layout route", () => {
 
     const response = await POST(
       createJsonRequest({ projectId: project.id, version: 1, state }),
-      { params: { sessionId: session.sessionId } },
+      { params: Promise.resolve({ sessionId: session.sessionId }) },
     );
 
     expect(response.status).toBe(400);

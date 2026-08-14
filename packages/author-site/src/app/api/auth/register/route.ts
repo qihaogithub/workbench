@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       username: user.username,
     });
-    setAuthCookie(token);
+    await setAuthCookie(token);
 
     return NextResponse.json(
       createApiSuccess({

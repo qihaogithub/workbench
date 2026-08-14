@@ -131,7 +131,7 @@ describe("viewer project data route", () => {
     );
 
     const { GET } = await import("./route");
-    const response = await GET({} as NextRequest, { params: { projectId } });
+    const response = await GET({} as NextRequest, { params: Promise.resolve({ projectId }) });
     const body = await response.json() as {
       success: boolean;
       data?: {
@@ -155,7 +155,7 @@ describe("viewer project data route", () => {
     const { GET: getPublishedData } = await import("../../../../data/[...path]/route");
     const publishedResponse = await getPublishedData(
       { headers: new Headers() } as NextRequest,
-      { params: { path: [projectId, "project.json"] } },
+      { params: Promise.resolve({ path: [projectId, "project.json"] }) },
     );
     expect(publishedResponse.status).toBe(200);
     expect(publishedResponse.headers.get("Cache-Control")).toBe("no-store");
@@ -202,7 +202,7 @@ describe("viewer project data route", () => {
     expect(service.commitEdit(editId, "发布原型页").ok).toBe(true);
 
     const { GET } = await import("./route");
-    const response = await GET({} as NextRequest, { params: { projectId } });
+    const response = await GET({} as NextRequest, { params: Promise.resolve({ projectId }) });
     const body = await response.json() as {
       success: boolean;
       data?: {

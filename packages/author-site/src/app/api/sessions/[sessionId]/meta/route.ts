@@ -12,10 +12,10 @@ import path from "path";
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { sessionId: string } },
+  { params }: { params: Promise<{ sessionId: string }> },
 ) {
   try {
-    const token = getAuthCookie();
+    const token = await getAuthCookie();
     if (!token) {
       return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
         status: 401,
@@ -29,7 +29,7 @@ export async function PATCH(
       });
     }
 
-    const { sessionId } = params;
+    const { sessionId } = await params;
 
     if (!sessionExists(sessionId)) {
       return NextResponse.json(createApiError("SESSION_NOT_FOUND"), {

@@ -53,7 +53,7 @@ interface CanvasPageItemProps {
   onLayoutChange?: (pageId: string, layout: CanvasPageLayout) => void;
   onConfigEdit?: (pageId: string, event?: React.PointerEvent) => void;
   /** 画布评论模式下选择本页；优先于页面拖拽和预览内容交互。 */
-  onCommentSelect?: (pageId: string) => void;
+  onCommentSelect?: (pageId: string, event: React.PointerEvent) => void;
   onRequestDelete?: (pageId: string) => void;
   onViewSource?: (pageId: string) => void;
   className?: string;
@@ -848,7 +848,7 @@ export function CanvasPageItem({
           onPointerDown={(event) => {
             event.preventDefault();
             event.stopPropagation();
-            onCommentSelect(page.id);
+            onCommentSelect(page.id, event);
           }}
         />
       )}

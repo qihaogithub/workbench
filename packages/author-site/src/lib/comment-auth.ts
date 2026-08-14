@@ -18,7 +18,7 @@ import type { UserPayload } from "@/lib/auth/jwt";
 export async function resolveUser(
   request: NextRequest,
 ): Promise<UserPayload | null> {
-  const cookieToken = getAuthCookie();
+  const cookieToken = await getAuthCookie();
   if (cookieToken) {
     const payload = await verifyToken(cookieToken);
     if (payload) return payload;
