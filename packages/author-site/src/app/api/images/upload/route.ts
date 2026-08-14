@@ -4,7 +4,7 @@ import { createApiError } from "@/lib/fs-utils";
 import { uploadImage } from "@/lib/image-store";
 
 export async function POST(request: NextRequest) {
-  const token = getAuthCookie();
+  const token = await getAuthCookie();
   if (!token) {
     return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), { status: 401 });
   }

@@ -3,9 +3,9 @@ import { getImageInfo } from "@/lib/image-store";
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { imageId: string } },
+  { params }: { params: Promise<{ imageId: string }> },
 ) {
-  const { imageId } = params;
+  const { imageId } = await params;
 
   if (!imageId) {
     return NextResponse.json(

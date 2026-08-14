@@ -4,7 +4,7 @@
  * 提供管理后台的访问控制,通过独立的 Admin Secret 进行验证
  * 支持 URL 参数和 Cookie 两种验证方式
  *
- * 注意: 此模块在 Edge Runtime (middleware) 中运行,不能使用 Node.js 的 crypto 模块
+ * 注意: 此模块也被 Next.js Proxy 调用，继续使用 Web Crypto 以保持运行时可移植性。
  */
 
 import { cookies } from "next/headers";
@@ -21,7 +21,7 @@ export function getAdminSecret(): string {
 }
 
 /**
- * 简单的哈希函数 (Edge Runtime 兼容)
+ * 简单的哈希函数（运行时可移植）
  * 使用 Web Crypto API 替代 Node.js crypto
  */
 export async function hashSecret(secret: string): Promise<string> {
@@ -87,7 +87,7 @@ export async function verifyAdminRequest(request: Request): Promise<boolean> {
  * 设置 Admin Cookie (验证通过后)
  */
 export async function setAdminCookie(): Promise<void> {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const hash = await hashSecret(getAdminSecret());
   cookieStore.set(ADMIN_COOKIE_NAME, hash, {
     httpOnly: true,
@@ -101,12 +101,13 @@ export async function setAdminCookie(): Promise<void> {
 /**
  * 清除 Admin Cookie (登出)
  */
-export function clearAdminCookie(): void {
-  cookies().delete(ADMIN_COOKIE_NAME);
+export async function clearAdminCookie(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete(ADMIN_COOKIE_NAME);
 }
 
 /**
- * Middleware 辅助: 验证并设置 Cookie 或返回 401
+ * Proxy/API 辅助：验证并设置 Cookie 或返回 401
  */
 export async function withAdminAuth(
   request: NextRequest,

@@ -78,7 +78,7 @@ async function authorize(
   | { ok: true; workspaceId: string; sessionId: string }
   | { ok: false; response: NextResponse }
 > {
-  const token = getAuthCookie();
+  const token = await getAuthCookie();
   if (!token)
     return {
       ok: false,
@@ -164,13 +164,13 @@ async function authorize(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string; demoId: string } },
+  { params }: { params: Promise<{ projectId: string; demoId: string }> },
 ) {
   try {
+    const { projectId, demoId } = await params;
     const sessionId = request.nextUrl.searchParams.get("sessionId") ?? undefined;
-    const auth = await authorize(params, sessionId);
+    const auth = await authorize({ projectId, demoId }, sessionId);
     if (!auth.ok) return auth.response;
-    const { projectId, demoId } = params;
 
     const wsPath = findWorkspacePath(auth.workspaceId);
     if (!wsPath)
@@ -204,17 +204,17 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { projectId: string; demoId: string } },
+  { params }: { params: Promise<{ projectId: string; demoId: string }> },
 ) {
   try {
+    const { projectId, demoId } = await params;
     const body = await request.json().catch(() => ({}));
     const { sessionId, requirements } = body as {
       sessionId?: string;
       requirements?: string;
     };
-    const auth = await authorize(params, sessionId);
+    const auth = await authorize({ projectId, demoId }, sessionId);
     if (!auth.ok) return auth.response;
-    const { projectId, demoId } = params;
 
     if (typeof requirements !== "string")
       return NextResponse.json(

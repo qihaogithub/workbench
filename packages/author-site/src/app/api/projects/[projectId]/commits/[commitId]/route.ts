@@ -5,21 +5,22 @@ import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { createApiError, createApiSuccess, getDataDir } from "@/lib/fs-utils";
 
 async function getAuthenticatedUser() {
-  const token = getAuthCookie();
+  const token = await getAuthCookie();
   if (!token) return null;
   return verifyToken(token);
 }
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { projectId: string; commitId: string } },
+  { params }: { params: Promise<{ projectId: string; commitId: string }> },
 ) {
+  const { projectId, commitId } = await params;
   const payload = await getAuthenticatedUser();
   if (!payload) {
     return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), { status: 401 });
   }
   const result = new ProjectAdminService({ dataDir: getDataDir() }).projectCommitList(
-    params.projectId,
+    projectId,
     true,
     {
       id: payload.userId,
@@ -34,7 +35,7 @@ export async function GET(
       { status: result.error?.code === "FORBIDDEN" ? 403 : 500 },
     );
   }
-  const commit = result.data.commits.find((item) => item.id === params.commitId);
+  const commit = result.data.commits.find((item) => item.id === commitId);
   if (!commit) {
     return NextResponse.json(createApiError("VERSION_NOT_FOUND", "项目提交不存在"), { status: 404 });
   }

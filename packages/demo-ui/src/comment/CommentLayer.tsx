@@ -191,6 +191,8 @@ export function CommentLayer({
   onDeleteReply,
   onRetryAiTask,
   showPins = true,
+  canvasCreateDraft,
+  onCanvasCreateDraftChange,
 }: CommentLayerProps) {
   const areaRef = useRef<HTMLDivElement>(null);
   const [iframeEl, setIframeEl] = useState<HTMLIFrameElement | null>(null);
@@ -232,7 +234,7 @@ export function CommentLayer({
   const useExternalData = threadsProp !== undefined;
   const internalComments = useComments({
     projectId,
-    pageId,
+    target: { kind: "page", pageId },
     api,
     wsUrl,
     enabled: !useExternalData,
@@ -480,7 +482,7 @@ export function CommentLayer({
     // shadow 由 PrototypePagePreview 异步 attach（attachShadow + innerHTML），
     // 宿主子树观察器看不到 shadow 内容；这里轮询等待 shadowRoot 出现后挂监听。
     let attempts = 0;
-    let poll = window.setInterval(() => {
+    const poll = window.setInterval(() => {
       if (host.shadowRoot || ++attempts > 50) {
         window.clearInterval(poll);
         if (host.shadowRoot) watchShadow();
@@ -586,6 +588,7 @@ export function CommentLayer({
       const containerRect = container.getBoundingClientRect();
       const map = new Map<string, { left: number; top: number }>();
       for (const thread of threads) {
+        if (!thread.pin) continue;
         map.set(
           thread.id,
           computePrototypePinPosition({
@@ -596,7 +599,7 @@ export function CommentLayer({
             scrollTop: protoRoot.scrollTop,
             rect: rootRect,
             containerRect,
-            pin: thread.pin,
+            pin: thread.pin!,
           }),
         );
       }
@@ -617,6 +620,7 @@ export function CommentLayer({
 
     const map = new Map<string, { left: number; top: number }>();
     for (const thread of threads) {
+      if (!thread.pin) continue;
       const docX = thread.pin.xRatio * viewState.docWidth;
       const docY = thread.pin.yRatio * viewState.docHeight;
       const vpX = docX - viewState.scrollX;
@@ -643,6 +647,12 @@ export function CommentLayer({
     [threads, activeThreadId],
   );
   const activeThreadPos = activeThread ? pinPositions.get(activeThread.id) : undefined;
+  const canvasPopoverPosition = canvasCreateDraft && areaRef.current
+    ? {
+        left: canvasCreateDraft.clientX - areaRef.current.getBoundingClientRect().left,
+        top: canvasCreateDraft.clientY - areaRef.current.getBoundingClientRect().top + 14,
+      }
+    : null;
 
   const unresolvedCount = threads.filter((t) => !t.resolved).length;
 
@@ -654,6 +664,22 @@ export function CommentLayer({
     <div className={cn("flex h-full w-full", className)}>
       <div ref={areaRef} className="relative min-w-0 flex-1 overflow-hidden">
         {children}
+
+        {canvasCreateDraft && canvasPopoverPosition && (
+          <CommentCreatePopover
+            draft={canvasCreateDraft.input}
+            mentionCandidates={candidates}
+            canMentionAgent={canMentionAgent}
+            left={canvasPopoverPosition.left}
+            top={canvasPopoverPosition.top}
+            onCancel={() => onCanvasCreateDraftChange?.(null)}
+            onSubmit={async (input) => {
+              await handleSubmitCreate(input);
+              onCanvasCreateDraftChange?.(null);
+              updateCommentMode(false);
+            }}
+          />
+        )}
 
         {showPins && <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
           {threads.map((thread, index) => {
@@ -682,7 +708,7 @@ export function CommentLayer({
 
         {createDraft && (
           <CommentCreatePopover
-            draft={{ pageId, anchor: createDraft.anchor, pin: createDraft.pin }}
+            draft={{ target: { kind: "page", pageId }, anchor: createDraft.anchor, pin: createDraft.pin }}
             mentionCandidates={candidates}
             canMentionAgent={canMentionAgent}
             left={createDraft.left}

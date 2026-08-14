@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -11,7 +15,7 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "incremental": true,
     "plugins": [
       {
@@ -20,21 +24,56 @@
     ],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@workbench/ai-chat-shared": ["../ai-chat-shared/src/index.ts"],
-      "@workbench/ai-chat-shared/*": ["../ai-chat-shared/src/*"],
-      "@workbench/project-core": ["../project-core/src"],
-      "@workbench/preview-contract": ["../preview-contract/src"],
-      "@workbench/preview-contract/*": ["../preview-contract/src/*"],
-      "@workbench/shared": ["../shared/src"],
-      "@workbench/sketch-core": ["../sketch-core/src"],
-      "@workbench/sketch-react": ["../sketch-react/src/index.tsx"],
-      "@workbench/demo-ui": ["../demo-ui/src/index.ts"],
-      "@workbench/demo-ui/*": ["../demo-ui/src/*"],
-      "@workbench/shared/agent-prompts": ["../shared/src/agent-prompts/index.ts"],
-      "@workbench/agent-client": ["../agent-client/src"]
+      "@/*": [
+        "./src/*"
+      ],
+      "@workbench/ai-chat-shared": [
+        "../ai-chat-shared/src/index.ts"
+      ],
+      "@workbench/ai-chat-shared/*": [
+        "../ai-chat-shared/src/*"
+      ],
+      "@workbench/project-core": [
+        "../project-core/src"
+      ],
+      "@workbench/preview-contract": [
+        "../preview-contract/src"
+      ],
+      "@workbench/preview-contract/*": [
+        "../preview-contract/src/*"
+      ],
+      "@workbench/shared": [
+        "../shared/src"
+      ],
+      "@workbench/sketch-core": [
+        "../sketch-core/src"
+      ],
+      "@workbench/sketch-react": [
+        "../sketch-react/src/index.tsx"
+      ],
+      "@workbench/demo-ui": [
+        "../demo-ui/src/index.ts"
+      ],
+      "@workbench/demo-ui/*": [
+        "../demo-ui/src/*"
+      ],
+      "@workbench/shared/agent-prompts": [
+        "../shared/src/agent-prompts/index.ts"
+      ],
+      "@workbench/agent-client": [
+        "../agent-client/src"
+      ]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "data"]
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "data"
+  ]
 }

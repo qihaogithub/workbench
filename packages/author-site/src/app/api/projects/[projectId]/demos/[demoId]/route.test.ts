@@ -34,7 +34,7 @@ class MockWorkspaceAuthorityClientError extends Error {
 }
 
 jest.mock("@/lib/auth/jwt", () => ({
-  getAuthCookie: jest.fn(() => "token"),
+  getAuthCookie: jest.fn(async () => "token"),
   verifyToken: jest.fn(async () => ({
     userId: "user-1",
     username: "测试用户",
@@ -205,7 +205,7 @@ describe("project demo route live Workspace page metadata writes", () => {
         order: 3,
         parentId: "folder-1",
       }),
-      { params: { projectId: "project-1", demoId: "page-1" } },
+      { params: Promise.resolve({ projectId: "project-1", demoId: "page-1" }) },
     );
     const body = await response.json();
 
@@ -259,7 +259,7 @@ describe("project demo route live Workspace page metadata writes", () => {
 
     const response = await DELETE(
       createRequest({ sessionId: "session-1" }),
-      { params: { projectId: "project-1", demoId: "page-1" } },
+      { params: Promise.resolve({ projectId: "project-1", demoId: "page-1" }) },
     );
     const body = await response.json();
 
@@ -357,7 +357,7 @@ describe("project demo route live Workspace page metadata writes", () => {
         action: "restoreDeletedSnapshot",
         snapshotId: "snapshot-1",
       }),
-      { params: { projectId: "project-1", demoId: "page-1" } },
+      { params: Promise.resolve({ projectId: "project-1", demoId: "page-1" }) },
     );
     const body = await response.json();
 

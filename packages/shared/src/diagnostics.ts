@@ -93,6 +93,7 @@ const FORBIDDEN_PAYLOAD_KEYS = new Set([
 
 const DEFAULT_ALLOWED_PAYLOAD_KEYS = new Set([
   "activeWorkspaceId",
+  "activeToolCount",
   "acknowledgedAt",
   "actor",
   "baseRevision",
@@ -100,6 +101,7 @@ const DEFAULT_ALLOWED_PAYLOAD_KEYS = new Set([
   "baseVersionAfter",
   "baseVersionBefore",
   "candidateResourcePaths",
+  "capabilityGroups",
   "changedFiles",
   "compileHash",
   "clientId",
@@ -143,6 +145,7 @@ const DEFAULT_ALLOWED_PAYLOAD_KEYS = new Set([
   "phase",
   "previewMode",
   "projectionLatencyMs",
+  "previousActiveToolCount",
   "publishTarget",
   "queueWaitMs",
   "reason",
@@ -199,6 +202,16 @@ const EVENT_PAYLOAD_ALLOWLIST: Record<string, readonly string[]> = {
     "fileCount",
   ],
   "ai.run_failed": ["messageId", "runId", "errorCode", "errorMessage"],
+  "ai.capability_activated": [
+    "messageId",
+    "runId",
+    "status",
+    "capabilityGroups",
+    "previousActiveToolCount",
+    "activeToolCount",
+    "durationMs",
+    "errorMessage",
+  ],
   "autosave.flush_before_ai_send_started": ["revision", "workspaceId"],
   "autosave.flush_before_ai_send_succeeded": ["revision", "elapsedMs"],
   "autosave.flush_before_ai_send_failed": [

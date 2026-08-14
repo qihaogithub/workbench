@@ -27,6 +27,7 @@ import {
 
 interface DesignSpecWorkspaceValue {
   projectId?: string;
+  sessionId?: string;
   activeDocId: string | null;
   setActiveDocId: (id: string | null) => void;
   doc: DesignSpecDoc | null;
@@ -402,6 +403,7 @@ export function DesignSpecWorkspaceProvider({
   const value = useMemo<DesignSpecWorkspaceValue>(
     () => ({
       projectId,
+      sessionId,
       activeDocId,
       setActiveDocId,
       doc,

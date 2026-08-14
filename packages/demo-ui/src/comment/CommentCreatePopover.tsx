@@ -19,8 +19,6 @@ export interface CommentCreatePopoverProps {
   canMentionAgent?: boolean;
   left: number;
   top: number;
-  /** 嵌入侧栏时使用正常文档流布局。 */
-  embedded?: boolean;
   onCancel: () => void;
   onSubmit: (input: CreateCommentInput) => Promise<unknown>;
 }
@@ -31,7 +29,6 @@ export function CommentCreatePopover({
   canMentionAgent,
   left,
   top,
-  embedded = false,
   onCancel,
   onSubmit,
 }: CommentCreatePopoverProps) {
@@ -59,12 +56,8 @@ export function CommentCreatePopover({
 
   return (
     <div
-      className={
-        embedded
-          ? "w-full rounded-lg border border-border bg-popover p-2.5 shadow-sm"
-          : "absolute z-50 w-72 -translate-x-1/2 rounded-lg border border-border bg-popover p-2.5 shadow-lg"
-      }
-      style={embedded ? undefined : { left, top }}
+      className="absolute z-50 w-72 -translate-x-1/2 rounded-lg border border-border bg-popover p-2.5 shadow-lg"
+      style={{ left, top }}
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >

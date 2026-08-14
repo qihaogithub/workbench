@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
 jest.mock("@/lib/auth/jwt", () => ({
-  getAuthCookie: jest.fn(() => "token"),
+  getAuthCookie: jest.fn(async () => "token"),
   verifyToken: jest.fn(async () => ({
     userId: "user-1",
     username: "测试用户",
@@ -153,7 +153,7 @@ describe("project publish route", () => {
 
     const response = await POST(
       jsonRequest({ sessionId: "session-missing", workspaceId: "workspace-1" }),
-      { params: { projectId: "project-1" } },
+      { params: Promise.resolve({ projectId: "project-1" }) },
     );
     const body = await response.json();
 
@@ -200,7 +200,7 @@ describe("project publish route", () => {
 
     const response = await POST(
       jsonRequest({ sessionId: "session-missing", workspaceId: "workspace-1" }),
-      { params: { projectId: "project-1" } },
+      { params: Promise.resolve({ projectId: "project-1" }) },
     );
     const body = await response.json();
 
@@ -224,7 +224,7 @@ describe("project publish route", () => {
 
     const response = await POST(
       jsonRequest({ sessionId: "session-missing" }),
-      { params: { projectId: "project-1" } },
+      { params: Promise.resolve({ projectId: "project-1" }) },
     );
     const body = await response.json();
 
@@ -266,7 +266,7 @@ describe("project publish route", () => {
       );
 
     const response = await POST(jsonRequest({}), {
-      params: { projectId: "project-1" },
+      params: Promise.resolve({ projectId: "project-1" }),
     });
     const body = (await response.json()) as { success: boolean };
 
@@ -300,7 +300,7 @@ describe("project publish route", () => {
     );
 
     const response = await POST(jsonRequest({}), {
-      params: { projectId: "project-1" },
+      params: Promise.resolve({ projectId: "project-1" }),
     });
     const body = (await response.json()) as {
       success: boolean;
@@ -329,7 +329,7 @@ describe("project publish route", () => {
 
     const response = await POST(
       jsonRequest({ sessionId: "session-missing", workspaceId: "workspace-1" }),
-      { params: { projectId: "project-1" } },
+      { params: Promise.resolve({ projectId: "project-1" }) },
     );
 
     expect(response.status).toBe(200);
@@ -353,7 +353,7 @@ describe("project publish route", () => {
 
     const response = await POST(
       jsonRequest({}),
-      { params: { projectId: "project-1" } },
+      { params: Promise.resolve({ projectId: "project-1" }) },
     );
     const body = await response.json();
 

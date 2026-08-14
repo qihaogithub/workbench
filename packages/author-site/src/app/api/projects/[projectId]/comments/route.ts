@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { CommentAnchor, CommentMention } from "@workbench/shared";
+import type { CommentAnchor, CommentMention, CommentTarget, DocumentCommentAnchor } from "@workbench/shared";
 import { createApiSuccess, createApiError } from "@/lib/fs-utils";
 import { listComments, createCommentThread } from "@/lib/comment-store";
 import { resolveCommentAuthor } from "@/lib/comment-auth";
@@ -10,16 +10,18 @@ import { resolveCommentAuthor } from "@/lib/comment-auth";
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } },
+  { params }: { params: Promise<{ projectId: string }> },
 ) {
+  const { projectId } = await params;
   try {
     const { searchParams } = request.nextUrl;
     const pageId = searchParams.get("pageId") || undefined;
+    const resourceId = searchParams.get("resourceId") || undefined;
     const resolvedParam = searchParams.get("resolved");
     const resolved =
       resolvedParam === "true" ? true : resolvedParam === "false" ? false : undefined;
 
-    const threads = listComments(params.projectId, { pageId, resolved });
+    const threads = listComments(projectId, { pageId, resourceId, resolved });
     return NextResponse.json(createApiSuccess({ threads }));
   } catch (error) {
     console.error("获取评论列表失败:", error);
@@ -30,9 +32,10 @@ export async function GET(
 }
 
 interface CreateCommentBody {
-  pageId?: string;
+  target?: CommentTarget;
   anchor?: CommentAnchor;
   pin?: { xRatio: number; yRatio: number };
+  documentAnchor?: DocumentCommentAnchor;
   content?: string;
   mentions?: CommentMention[];
   anonymousId?: string;
@@ -45,41 +48,27 @@ interface CreateCommentBody {
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string } },
+  { params }: { params: Promise<{ projectId: string }> },
 ) {
+  const { projectId } = await params;
   try {
     const body = (await request.json()) as CreateCommentBody;
 
     // 参数校验
-    if (!body.pageId || typeof body.pageId !== "string") {
-      return NextResponse.json(createApiError("VALIDATION_ERROR", "pageId 必填"), {
-        status: 400,
-      });
-    }
     if (!body.content || typeof body.content !== "string" || !body.content.trim()) {
       return NextResponse.json(createApiError("VALIDATION_ERROR", "评论内容不能为空"), {
         status: 400,
       });
     }
-    if (
-      !body.anchor ||
-      typeof body.anchor.domPath !== "string" ||
-      typeof body.anchor.tagName !== "string"
-    ) {
-      return NextResponse.json(
-        createApiError("VALIDATION_ERROR", "anchor（domPath + tagName）必填"),
-        { status: 400 },
-      );
+    if (!body.target || (body.target.kind !== "page" && body.target.kind !== "document")) {
+      return NextResponse.json(createApiError("VALIDATION_ERROR", "target 必填"), { status: 400 });
     }
-    if (
-      !body.pin ||
-      typeof body.pin.xRatio !== "number" ||
-      typeof body.pin.yRatio !== "number"
-    ) {
-      return NextResponse.json(
-        createApiError("VALIDATION_ERROR", "pin（xRatio + yRatio）必填"),
-        { status: 400 },
-      );
+    if (body.target.kind === "page") {
+      if (!body.target.pageId || !body.anchor?.domPath || !body.anchor.tagName || !body.pin || typeof body.pin.xRatio !== "number" || typeof body.pin.yRatio !== "number") {
+        return NextResponse.json(createApiError("VALIDATION_ERROR", "页面评论需要 pageId、anchor 与 pin"), { status: 400 });
+      }
+    } else if (!body.target.resourceId || !body.target.resourceLabel || !body.documentAnchor || !["document", "selection"].includes(body.documentAnchor.kind)) {
+      return NextResponse.json(createApiError("VALIDATION_ERROR", "文档评论需要资源与文档锚点"), { status: 400 });
     }
 
     // 身份解析
@@ -101,10 +90,11 @@ export async function POST(
     }
 
     const thread = await createCommentThread({
-      projectId: params.projectId,
-      pageId: body.pageId,
+      projectId,
+      target: body.target,
       anchor: body.anchor,
       pin: body.pin,
+      documentAnchor: body.documentAnchor,
       content: body.content.trim(),
       author: authorResult.author,
       mentions,

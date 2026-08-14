@@ -8,7 +8,7 @@ const saveProjectConfigSchema = jest.fn();
 const deleteProjectConfigSchema = jest.fn();
 
 jest.mock("@/lib/auth/jwt", () => ({
-  getAuthCookie: jest.fn(() => "token"),
+  getAuthCookie: jest.fn(async () => "token"),
   verifyToken: jest.fn(async () => ({
     userId: "user-1",
     username: "测试用户",
@@ -154,7 +154,7 @@ describe("project config route", () => {
 
     const response = await PUT(
       jsonRequest({ sessionId: "session-1", schema }),
-      { params: { projectId: "project-1" } },
+      { params: Promise.resolve({ projectId: "project-1" }) },
     );
     const body = await response.json();
 
@@ -183,7 +183,7 @@ describe("project config route", () => {
 
     const response = await DELETE(
       jsonRequest({ sessionId: "session-1" }),
-      { params: { projectId: "project-1" } },
+      { params: Promise.resolve({ projectId: "project-1" }) },
     );
     const body = await response.json();
 

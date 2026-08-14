@@ -177,4 +177,36 @@ describe("StreamService plan event", () => {
     });
     expect(close).toHaveBeenCalledTimes(1);
   });
+
+  it("连接尚未建立时只交付一次具体错误，避免聊天区重复错误气泡", () => {
+    const service = new StreamService() as any;
+    const handlers = new Map<string, (event: any) => void>();
+    const onConnectionError = jest.fn();
+    const onError = jest.fn();
+    const close = jest.fn();
+
+    service.currentSessionId = "session-1";
+    service.stream = {
+      on: (event: string, handler: (event: any) => void) => {
+        handlers.set(event, handler);
+      },
+      close,
+    };
+    service.handlers = { onConnectionError, onError };
+
+    service.setupEventHandlers();
+    handlers.get("error")?.({
+      type: "error",
+      error: { code: "BACKEND_UNAVAILABLE", message: "服务暂不可用" },
+    });
+
+    expect(onConnectionError).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith({
+      code: "BACKEND_UNAVAILABLE",
+      message: "服务暂不可用",
+      files: undefined,
+    });
+    expect(close).toHaveBeenCalledTimes(1);
+  });
 });

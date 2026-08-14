@@ -7,11 +7,12 @@ import {
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { hash: string } },
+  { params }: { params: Promise<{ hash: string }> },
 ) {
-  const hash = params.hash.endsWith(".js")
-    ? params.hash.slice(0, -".js".length)
-    : params.hash;
+  const { hash: requestedHash } = await params;
+  const hash = requestedHash.endsWith(".js")
+    ? requestedHash.slice(0, -".js".length)
+    : requestedHash;
 
   if (!isValidPreviewModuleHash(hash)) {
     return new NextResponse("Invalid preview module hash", { status: 400 });

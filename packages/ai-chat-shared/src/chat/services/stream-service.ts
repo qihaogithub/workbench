@@ -4,6 +4,7 @@ import {
   type FileAttachment,
   type StreamEvent,
   type ImageAttachment,
+  type RunSummary,
   type ViewerContext,
 } from "@workbench/agent-client";
 import { parseToolCallFromEvent } from "../utils/chat-stream-utils";
@@ -20,6 +21,7 @@ import {
 export interface ToolCapabilities {
   toolVersion: number;
   toolNames: string[];
+  checkpointEnabled?: boolean;
 }
 
 export class MissingTransactionalDeleteToolsError extends Error {
@@ -121,6 +123,7 @@ export interface StreamResult {
     action: "created" | "modified" | "deleted";
     content?: string;
   }>;
+  metadata?: { runSummary?: RunSummary; checkpointVersion?: number };
 }
 
 export interface StreamEventHandlers {
@@ -128,6 +131,7 @@ export interface StreamEventHandlers {
   onThought?: (content: string) => void;
   onPlan?: (content: string) => void;
   onContextCompacted?: () => void;
+  onRunSummary?: (runSummary: RunSummary) => void;
   onModels?: (event: StreamEvent) => void;
   onToolCall?: (toolCall: ReturnType<typeof parseToolCallFromEvent>) => void;
   onToolUpdate?: (update: ToolUpdateEvent) => void;
@@ -234,6 +238,7 @@ export class StreamService {
     files?: FileAttachment[],
     viewerContext?: ViewerContext,
     referencedProjects?: Array<{ projectId: string; label?: string }>,
+    conversation?: { assistantMessageId?: string },
   ): Promise<void> {
     if (!this.stream) {
       throw new Error("Stream not connected");
@@ -251,6 +256,7 @@ export class StreamService {
         model: modelId,
         images,
         viewerContext,
+        conversation,
       });
       return;
     }
@@ -328,6 +334,7 @@ export class StreamService {
       images,
       files,
       projectRules,
+      conversation,
     });
   }
 
@@ -392,8 +399,9 @@ export class StreamService {
    */
   async resyncHistory(
     agentSessionId: string,
-    messages: Array<{ role: string; content: string }>,
-  ): Promise<void> {
+    messages: Array<{ id?: string; role: string; content: string }>,
+    options?: { checkpointVersion?: number; truncateAfterMessageId?: string },
+  ): Promise<number | undefined> {
     const agentClient = getConfiguredAgentClient();
     const stream = agentClient.stream(agentSessionId);
     try {
@@ -424,7 +432,7 @@ export class StreamService {
         stream.on("error", onError);
       });
 
-      await stream.resyncHistory(agentSessionId, messages);
+      return await stream.resyncHistory(agentSessionId, messages, options);
     } finally {
       stream.close();
     }
@@ -595,6 +603,11 @@ export class StreamService {
       this.handlers.onContextCompacted?.();
     });
 
+    this.stream.on("run_summary", (event: StreamEvent) => {
+      if (this.currentSessionId !== streamId || !event.runSummary) return;
+      this.handlers.onRunSummary?.(event.runSummary);
+    });
+
     this.stream.on("models", (event: StreamEvent) => {
       if (this.currentSessionId !== streamId) return;
       this.handlers.onModels?.(event);
@@ -644,9 +657,16 @@ export class StreamService {
         this.stream?.close();
         return;
       }
+      const metadata = {
+        ...(event.metadata as { runSummary?: RunSummary } | undefined),
+        ...(event.checkpointVersion === undefined
+          ? {}
+          : { checkpointVersion: event.checkpointVersion }),
+      };
       const result: StreamResult = {
         content: event.content,
         files: event.files,
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
       };
       this.deliverFinish(result);
       this.close();
@@ -675,8 +695,7 @@ export class StreamService {
         "WebSocket 连接失败，请检查 Agent Service 是否运行";
 
       if (!this.connectionEstablished) {
-        // 连接未建立时，同时触发 onConnectionError 和 onError
-        this.handlers.onConnectionError?.();
+        // 只交付带服务端错误码的终态回调；同时触发连接回调会让上层追加两条错误消息。
         this.handlers.onError?.({
           message: errorMessage,
           code: event.error?.code,

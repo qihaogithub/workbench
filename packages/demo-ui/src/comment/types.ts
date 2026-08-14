@@ -12,6 +12,8 @@ import type {
   CommentMention,
   CommentReply,
   CommentThread,
+  CommentTarget,
+  DocumentCommentAnchor,
 } from "@workbench/shared";
 
 /** @提及候选人 */
@@ -23,11 +25,19 @@ export interface MentionCandidate {
 
 /** 创建评论线程的输入 */
 export interface CreateCommentInput {
-  pageId: string;
+  target: CommentTarget;
   content: string;
-  anchor: CommentAnchor;
-  pin: { xRatio: number; yRatio: number };
+  anchor?: CommentAnchor;
+  pin?: { xRatio: number; yRatio: number };
+  documentAnchor?: DocumentCommentAnchor;
   mentions?: CommentMention[];
+}
+
+/** 画布页面上的评论创建草稿：保存页面级锚点和点击位置。 */
+export interface CanvasCommentDraft {
+  input: Omit<CreateCommentInput, "content" | "mentions">;
+  clientX: number;
+  clientY: number;
 }
 
 /** 添加回复的输入 */
@@ -47,8 +57,8 @@ export interface UpdateCommentContentInput {
  * 由宿主（viewer-site / author-site）实现，屏蔽鉴权与跨域细节。
  */
 export interface CommentApiAdapter {
-  /** 列出评论线程（可按页面过滤） */
-  listComments(pageId?: string): Promise<CommentThread[]>;
+  /** 列出评论线程（可按页面或文档目标过滤） */
+  listComments(target?: CommentTarget): Promise<CommentThread[]>;
   /** 创建评论线程 */
   createComment(input: CreateCommentInput): Promise<CommentThread>;
   /** 添加回复 */
@@ -129,6 +139,9 @@ export interface CommentLayerProps {
   onRetryAiTask?: (threadId: string) => Promise<void>;
   /** 是否显示预览区评论标记，默认 true。 */
   showPins?: boolean;
+  /** 由画布页面点击发起的创建草稿；输入框仍由本层在点击位置显示。 */
+  canvasCreateDraft?: CanvasCommentDraft | null;
+  onCanvasCreateDraftChange?: (draft: CanvasCommentDraft | null) => void;
 }
 
 /** 评论创建/定位所需的 iframe 视图状态 */

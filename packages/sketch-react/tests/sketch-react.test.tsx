@@ -294,6 +294,18 @@ function getCanvasStage(): HTMLElement {
   return stage as HTMLElement;
 }
 
+function getSketchNodeElement(nodeId: string): Element {
+  const node = document.querySelector(`[data-sketch-node-id="${nodeId}"]`);
+  expect(node).not.toBeNull();
+  return node as Element;
+}
+
+function getSketchNodeLabelElement(nodeId: string): Element {
+  const node = document.querySelector(`[data-sketch-node-label="${nodeId}"]`);
+  expect(node).not.toBeNull();
+  return node as Element;
+}
+
 function setCanvasStageRect(stage: HTMLElement, width = 400, height = 300) {
   stage.getBoundingClientRect = () =>
     ({
@@ -682,7 +694,8 @@ describe("sketch-react", () => {
   });
 
   it("shows hover highlight and selected center point without changing scene data", async () => {
-    render(<ControlledEditor />);
+    const selectionEvents: SketchEditorSelection[] = [];
+    render(<ControlledEditor onSelectionChange={(selection) => selectionEvents.push(selection)} />);
 
     const originalSceneJson = screen.getByTestId("scene-json").textContent;
     const cardLabel = document.querySelector('[data-sketch-node-label="card"]');
@@ -697,10 +710,10 @@ describe("sketch-react", () => {
       expect(screen.queryByTestId("sketch-selection-box")).toBeNull();
     });
     expect(screen.getByTestId("scene-json").textContent).toBe(originalSceneJson);
-
-    fireEvent.pointerDown(cardLabel as Element, { clientX: 80, clientY: 120 });
+    fireEvent.pointerDown(getSketchNodeLabelElement("card"), { clientX: 80, clientY: 120 });
 
     await waitFor(() => {
+      expect(selectionEvents.at(-1)?.nodeIds).toEqual(["card"]);
       expect(screen.getByTestId("sketch-selection-box")).not.toBeNull();
       expect(screen.getByTestId("sketch-selection-center-point")).not.toBeNull();
       expect(screen.getByTestId("sketch-rotate-handle")).not.toBeNull();
@@ -708,7 +721,7 @@ describe("sketch-react", () => {
       expect(screen.queryByTestId("sketch-hover-highlight")).toBeNull();
     });
 
-    fireEvent.pointerMove(titleNode as Element, { clientX: 40, clientY: 44 });
+    fireEvent.pointerMove(getSketchNodeElement("title"), { clientX: 40, clientY: 44 });
 
     await waitFor(() => {
       expect(screen.getByTestId("sketch-hover-highlight")).not.toBeNull();
@@ -4841,7 +4854,7 @@ describe("sketch-react", () => {
     expect(rightBottom).not.toBeNull();
     dispatchPointerEvent(nearOrigin as Element, "pointerdown", 20, 20);
     dispatchPointerEvent(stage, "pointerup", 20, 20);
-    dispatchPointerEvent(rightBottom as Element, "pointerdown", 110, 70, { shiftKey: true });
+    dispatchPointerEvent(getSketchNodeElement("right-bottom"), "pointerdown", 110, 70, { shiftKey: true });
     dispatchPointerEvent(stage, "pointerup", 110, 70, { shiftKey: true });
 
     const northWestHandle = await screen.findByTestId("sketch-resize-handle-nw");
@@ -5017,7 +5030,7 @@ describe("sketch-react", () => {
 
     dispatchPointerEvent(titleNode as Element, "pointerdown", 30, 40);
     dispatchPointerEvent(stage, "pointerup", 30, 40);
-    dispatchPointerEvent(cardLabel as Element, "pointerdown", 80, 120, { shiftKey: true });
+    dispatchPointerEvent(getSketchNodeLabelElement("card"), "pointerdown", 80, 120, { shiftKey: true });
     dispatchPointerEvent(stage, "pointerup", 80, 120, { shiftKey: true });
 
     const resizeHandle = await screen.findByTestId("sketch-resize-handle");
@@ -5065,7 +5078,7 @@ describe("sketch-react", () => {
 
     dispatchPointerEvent(lineA as Element, "pointerdown", 45, 50);
     dispatchPointerEvent(stage, "pointerup", 45, 50);
-    dispatchPointerEvent(lineB as Element, "pointerdown", 105, 50, { shiftKey: true });
+    dispatchPointerEvent(getSketchNodeElement("line-b"), "pointerdown", 105, 50, { shiftKey: true });
     dispatchPointerEvent(stage, "pointerup", 105, 50, { shiftKey: true });
 
     const resizeHandle = await screen.findByTestId("sketch-resize-handle");
@@ -5113,7 +5126,7 @@ describe("sketch-react", () => {
 
     dispatchPointerEvent(lineA as Element, "pointerdown", 60, 50);
     dispatchPointerEvent(stage, "pointerup", 60, 50);
-    dispatchPointerEvent(lineB as Element, "pointerdown", 140, 50, { shiftKey: true });
+    dispatchPointerEvent(getSketchNodeElement("line-b"), "pointerdown", 140, 50, { shiftKey: true });
     dispatchPointerEvent(stage, "pointerup", 140, 50, { shiftKey: true });
 
     const resizeHandle = await screen.findByTestId("sketch-resize-handle");
@@ -5161,7 +5174,7 @@ describe("sketch-react", () => {
 
     dispatchPointerEvent(lineA as Element, "pointerdown", 1, 50);
     dispatchPointerEvent(stage, "pointerup", 1, 50);
-    dispatchPointerEvent(lineB as Element, "pointerdown", 21, 50, { shiftKey: true });
+    dispatchPointerEvent(getSketchNodeElement("line-b"), "pointerdown", 21, 50, { shiftKey: true });
     dispatchPointerEvent(stage, "pointerup", 21, 50, { shiftKey: true });
 
     const resizeHandle = await screen.findByTestId("sketch-resize-handle");
@@ -5210,7 +5223,7 @@ describe("sketch-react", () => {
 
     dispatchPointerEvent(lineA as Element, "pointerdown", 50, 45);
     dispatchPointerEvent(stage, "pointerup", 50, 45);
-    dispatchPointerEvent(lineB as Element, "pointerdown", 50, 105, { shiftKey: true });
+    dispatchPointerEvent(getSketchNodeElement("line-b"), "pointerdown", 50, 105, { shiftKey: true });
     dispatchPointerEvent(stage, "pointerup", 50, 105, { shiftKey: true });
 
     const resizeHandle = await screen.findByTestId("sketch-resize-handle");
@@ -5258,7 +5271,7 @@ describe("sketch-react", () => {
 
     dispatchPointerEvent(lockedNode as Element, "pointerdown", 30, 40);
     dispatchPointerEvent(stage, "pointerup", 30, 40);
-    dispatchPointerEvent(cardLabel as Element, "pointerdown", 80, 120, { shiftKey: true });
+    dispatchPointerEvent(getSketchNodeLabelElement("card"), "pointerdown", 80, 120, { shiftKey: true });
     dispatchPointerEvent(stage, "pointerup", 80, 120, { shiftKey: true });
 
     const resizeHandle = await screen.findByTestId("sketch-resize-handle");

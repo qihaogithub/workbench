@@ -20,10 +20,10 @@ import {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } },
+  { params }: { params: Promise<{ projectId: string }> },
 ) {
   try {
-    const { projectId } = params;
+    const { projectId } = await params;
 
     const url = new URL(request.url);
     const page = url.searchParams.get("page");

@@ -51,7 +51,8 @@ services:
       - BRAVE_SEARCH_API_KEY=${BRAVE_SEARCH_API_KEY:-}
       - PI_AGENT_WEB_SEARCH_TIMEOUT_MS=${PI_AGENT_WEB_SEARCH_TIMEOUT_MS:-10000}
       - PI_AGENT_WEB_SEARCH_CACHE_TTL_MS=${PI_AGENT_WEB_SEARCH_CACHE_TTL_MS:-600000}
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3200,http://localhost:3300}
+      # Keep Docker origins separate from root .env (pnpm dev uses :4200/:4300).
+      - CORS_ORIGINS=${DOCKER_CORS_ORIGINS:-http://localhost:3200,http://localhost:3300,http://127.0.0.1:3200,http://127.0.0.1:3300}
       - DATA_DIR=/app/data
       - WORKSPACE_AUTHORITY_INSTANCE_MODE=single
       - WORKSPACE_AUTHORITY_REPLICA_COUNT=1
@@ -107,7 +108,8 @@ services:
       - JWT_SECRET=${JWT_SECRET:-change-this-in-production}
       - AUTH_COOKIE_NAME=${AUTH_COOKIE_NAME:-auth_token_docker}
       - USE_SECURE_COOKIE=${USE_SECURE_COOKIE:-false}
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3200,http://localhost:3300}
+      # Keep Docker origins separate from root .env (pnpm dev uses :4200/:4300).
+      - CORS_ORIGINS=${DOCKER_CORS_ORIGINS:-http://localhost:3200,http://localhost:3300,http://127.0.0.1:3200,http://127.0.0.1:3300}
       - DATA_DIR=/app/data
       - FIGMA_OAUTH_CLIENT_ID=${FIGMA_OAUTH_CLIENT_ID:-}
       - FIGMA_OAUTH_CLIENT_SECRET=${FIGMA_OAUTH_CLIENT_SECRET:-}
@@ -121,7 +123,7 @@ services:
     depends_on:
       - agent-service
       - knowledge-service
-    cpus: "1.0"
+    cpus: "2.0"
     mem_limit: 2g
     pids_limit: 512
     restart: unless-stopped
@@ -142,7 +144,8 @@ services:
       - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
       - PUPPETEER_DISABLE_SANDBOX=${PUPPETEER_DISABLE_SANDBOX:-true}
       - DATA_DIR=/app/data
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3200,http://localhost:3300}
+      # Keep Docker origins separate from root .env (pnpm dev uses :4200/:4300).
+      - CORS_ORIGINS=${DOCKER_CORS_ORIGINS:-http://localhost:3200,http://localhost:3300,http://127.0.0.1:3200,http://127.0.0.1:3300}
       - SCREENSHOT_MAX_CONCURRENT_PAGES=${SCREENSHOT_MAX_CONCURRENT_PAGES:-4}
     volumes:
       - ${APP_DATA_DIR:-/opt/workbench/data}:/app/data

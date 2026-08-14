@@ -80,6 +80,45 @@ describe("BackendAgent 超时防护", () => {
     expect(result.error?.retryable).toBe(true);
   });
 
+  it("取消期间保持忙碌，直到底层 prompt 确认收尾", async () => {
+    let rejectPrompt: ((error: Error) => void) | undefined;
+    let finishAbort: (() => void) | undefined;
+    const backend: IBackendAdapter = {
+      name: "test-backend",
+      initialize: vi.fn().mockResolvedValue(undefined),
+      sendMessage: vi.fn(
+        () => new Promise<string>((_resolve, reject) => { rejectPrompt = reject; }),
+      ),
+      onStream: vi.fn(),
+      getStatus: vi.fn().mockResolvedValue("busy" as const),
+      destroy: vi.fn().mockResolvedValue(undefined),
+      checkHealth: vi.fn().mockResolvedValue(true),
+      cancelPrompt: vi.fn(
+        () => new Promise<void>((resolve) => { finishAbort = resolve; }),
+      ),
+    };
+    const agent = createAgent(backend);
+    await startAgent(agent);
+
+    const sendPromise = agent.sendMessage("hello");
+    const cancelPromise = agent.cancel();
+
+    expect(agent.isBusy()).toBe(true);
+    expect(agent.status).toBe("cancelling");
+
+    finishAbort?.();
+    rejectPrompt?.(new Error("CANCELLED"));
+    await cancelPromise;
+    const result = await sendPromise;
+
+    expect(result).toMatchObject({
+      success: false,
+      error: { code: "CANCELLED", retryable: true },
+    });
+    expect(agent.isBusy()).toBe(false);
+    expect(agent.status).toBe("ready");
+  });
+
   it("事件持续到来时 inactivity timer 被重置", async () => {
     const backend = createMockBackend();
     const agent = createAgent(backend);

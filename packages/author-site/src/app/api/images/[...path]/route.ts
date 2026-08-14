@@ -30,9 +30,9 @@ const MIME_TYPES: Record<string, string> = {
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { path: string[] } },
+  { params }: { params: Promise<{ path: string[] }> },
 ) {
-  const { path: pathSegments } = params;
+  const { path: pathSegments } = await params;
 
   if (!pathSegments || pathSegments.length === 0) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });

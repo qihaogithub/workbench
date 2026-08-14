@@ -118,7 +118,7 @@ describe("screenshot file route", () => {
       createRequest(
         "http://localhost/api/screenshots/file/proj_1/page_1?hash=1111111111111111",
       ),
-      { params: { projectId: "proj_1", pageId: "page_1" } },
+      { params: Promise.resolve({ projectId: "proj_1", pageId: "page_1" }) },
     );
 
     expect(Buffer.from(await response.arrayBuffer()).toString()).toBe(
@@ -146,7 +146,7 @@ describe("screenshot file route", () => {
       createRequest(
         "http://localhost/api/screenshots/file/proj_1/page_1?hash=1111111111111111",
       ),
-      { params: { projectId: "proj_1", pageId: "page_1" } },
+      { params: Promise.resolve({ projectId: "proj_1", pageId: "page_1" }) },
     );
 
     expect(response.status).toBe(404);
@@ -175,7 +175,7 @@ describe("screenshot file route", () => {
       createRequest(
         "http://localhost/api/screenshots/file/proj_1/page_1?meta=1",
       ),
-      { params: { projectId: "proj_1", pageId: "page_1" } },
+      { params: Promise.resolve({ projectId: "proj_1", pageId: "page_1" }) },
     );
 
     expect(response.status).toBe(200);
@@ -213,7 +213,7 @@ describe("screenshot file route", () => {
       createRequest(
         "http://localhost/api/screenshots/file/proj_1/page_1?meta=1",
       ),
-      { params: { projectId: "proj_1", pageId: "page_1" } },
+      { params: Promise.resolve({ projectId: "proj_1", pageId: "page_1" }) },
     );
 
     expect(response.status).toBe(404);
@@ -241,7 +241,7 @@ describe("screenshot file route", () => {
     const { GET } = await import("./route");
     const response = await GET(
       createRequest("http://localhost/api/screenshots/file/proj_1/page_1"),
-      { params: { projectId: "proj_1", pageId: "page_1" } },
+      { params: Promise.resolve({ projectId: "proj_1", pageId: "page_1" }) },
     );
 
     expect(Buffer.from(await response.arrayBuffer()).toString()).toBe(

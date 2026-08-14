@@ -6,7 +6,7 @@ import { createApiError, createApiSuccess } from "@/lib/fs-utils";
 
 export async function GET(request: NextRequest) {
   try {
-    const token = getAuthCookie();
+    const token = await getAuthCookie();
     if (!token) {
       return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
         status: 401,

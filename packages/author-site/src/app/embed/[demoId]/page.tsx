@@ -12,9 +12,9 @@ import { mergeConfigToProps } from '@/lib/runtime-props'
 import { EmbedPageContent } from './EmbedConfigPanel'
 
 interface EmbedPageProps {
-  params: {
+  params: Promise<{
     demoId: string
-  }
+  }>
 }
 
 function extractSchemaDefaults(schemaContent: string): Record<string, unknown> {
@@ -35,8 +35,8 @@ function extractSchemaDefaults(schemaContent: string): Record<string, unknown> {
   }
 }
 
-export default function EmbedPage({ params }: EmbedPageProps) {
-  const { demoId } = params
+export default async function EmbedPage({ params }: EmbedPageProps) {
+  const { demoId } = await params
 
   if (!projectExists(demoId)) {
     notFound()

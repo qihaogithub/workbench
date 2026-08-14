@@ -6,6 +6,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import type { ComponentProps } from "react";
 
 import { HomePage } from "./home-page";
 import {
@@ -21,6 +22,15 @@ const mockRouterPush = jest.fn();
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockRouterPush }),
+}));
+
+jest.mock("next/link", () => ({
+  __esModule: true,
+  default: ({ href, children, ...props }: ComponentProps<"a">) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
 }));
 
 jest.mock("@/components/ui/toast-provider", () => ({
@@ -139,6 +149,7 @@ describe("HomePage", () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    jest.restoreAllMocks();
     jest.useRealTimers();
     global.fetch = originalFetch;
     global.IntersectionObserver = originalIntersectionObserver;
@@ -195,7 +206,17 @@ describe("HomePage", () => {
   });
 
   it("首页用一个批量请求读取截图元数据，再串行补生缺失截图", async () => {
-    jest.useFakeTimers();
+    const scheduledTimers: Array<() => void> = [];
+    const setTimeoutSpy = jest
+      .spyOn(window, "setTimeout")
+      .mockImplementation(
+        ((callback: TimerHandler) => {
+          if (typeof callback === "function") {
+            scheduledTimers.push(callback as () => void);
+          }
+          return 0 as unknown as number;
+        }) as typeof window.setTimeout,
+      );
     let resolveFirstEnsure: ((response: Response) => void) | undefined;
     const revalidate = jest.fn();
     mockUseDemos.mockReturnValue({
@@ -260,23 +281,24 @@ describe("HomePage", () => {
       return new Response(JSON.stringify({ success: false }), { status: 404 });
     }) as typeof fetch;
 
-    render(<HomePage initialDemos={[]} />);
-
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        "/api/screenshots/metadata",
-        expect.objectContaining({
-          method: "POST",
-          body: JSON.stringify({
-            items: [
-              { projectId: "proj-cover", pageId: "page-1" },
-              { projectId: "proj-cover-2", pageId: "page-2" },
-            ],
-          }),
-          signal: expect.any(AbortSignal),
-        }),
-      );
+    await act(async () => {
+      render(<HomePage initialDemos={[]} />);
+      await Promise.resolve();
     });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/screenshots/metadata",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          items: [
+            { projectId: "proj-cover", pageId: "page-1" },
+            { projectId: "proj-cover-2", pageId: "page-2" },
+          ],
+        }),
+        signal: expect.any(AbortSignal),
+      }),
+    );
 
     act(() => {
       const firstObserver = intersectionObservers[0];
@@ -296,17 +318,22 @@ describe("HomePage", () => {
       expect.anything(),
     );
 
-    await jest.advanceTimersByTimeAsync(1500);
-
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        "/api/screenshots/ensure",
-        expect.objectContaining({
-          method: "POST",
-          body: JSON.stringify({ projectId: "proj-cover" }),
-        }),
-      );
+    act(() => {
+      const ensureTimer = scheduledTimers.shift();
+      expect(ensureTimer).toEqual(expect.any(Function));
+      ensureTimer?.();
     });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/screenshots/ensure",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ projectId: "proj-cover" }),
+      }),
+    );
     expect(global.fetch).not.toHaveBeenCalledWith(
       "/api/screenshots/ensure",
       expect.objectContaining({
@@ -314,21 +341,23 @@ describe("HomePage", () => {
       }),
     );
 
-    resolveFirstEnsure?.(
-      {
-        json: async () => ({ success: true, data: { generated: 1 } }),
-      } as Response,
-    );
-
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        "/api/screenshots/ensure",
-        expect.objectContaining({
-          method: "POST",
-          body: JSON.stringify({ projectId: "proj-cover-2" }),
-        }),
+    await act(async () => {
+      resolveFirstEnsure?.(
+        {
+          json: async () => ({ success: true, data: { generated: 1 } }),
+        } as Response,
       );
+      await Promise.resolve();
+      await Promise.resolve();
     });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/screenshots/ensure",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ projectId: "proj-cover-2" }),
+      }),
+    );
     const metadataCalls = (global.fetch as jest.Mock).mock.calls.filter(
       ([input]) => String(input) === "/api/screenshots/metadata",
     );
@@ -338,6 +367,7 @@ describe("HomePage", () => {
         String(input).includes("?meta=1"),
       ),
     ).toBe(false);
+    setTimeoutSpy.mockRestore();
   });
 
   it("开始打开项目后取消尚未启动的截图补生", async () => {
@@ -569,6 +599,9 @@ describe("HomePage", () => {
       expect(mockUpdateDemo).toHaveBeenCalledWith("proj-1", {
         name: "改名后的活动页",
       });
+      expect(
+        screen.queryByRole("dialog", { name: "修改名称" }),
+      ).not.toBeInTheDocument();
     });
 
     fireEvent.click(

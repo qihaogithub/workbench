@@ -3,6 +3,14 @@ const path = require("path");
 
 // 加载 monorepo 根目录 .env，使 INTERNAL_API_TOKEN 等变量对 Next.js 可用
 const rootEnvPath = path.resolve(__dirname, "../../.env");
+const turbopackRelativeTsImportLoader = path.resolve(
+  __dirname,
+  "../../scripts/turbopack-rewrite-relative-ts-imports.cjs",
+);
+const turbopackRawTextLoader = path.resolve(
+  __dirname,
+  "../../scripts/turbopack-raw-text-loader.cjs",
+);
 if (fs.existsSync(rootEnvPath)) {
   const envContent = fs.readFileSync(rootEnvPath, "utf-8");
   for (const line of envContent.split("\n")) {
@@ -27,6 +35,7 @@ if (fs.existsSync(rootEnvPath)) {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  outputFileTracingRoot: path.resolve(__dirname, "../.."),
   // 仅影响 next dev：在首页、截图接口与编辑页间切换时保留已编译路由，
   // 避免默认的短暂缓冲窗口导致重复编译。
   onDemandEntries: {
@@ -53,29 +62,44 @@ const nextConfig = {
     "@workbench/knowledge-service",
     "@workbench/project-core",
     "@workbench/project-scaffold",
+    "@workbench/preview-contract",
     "@workbench/sketch-core",
     "@workbench/sketch-react",
     "@workbench/shared",
     "shiki",
   ],
-  experimental: {
-    serverActions: {
-      bodySizeLimit: "10mb",
+  serverExternalPackages: [
+    "langium",
+    "@mermaid-js/parser",
+    "better-sqlite3",
+    "typescript",
+  ],
+  turbopack: {
+    root: path.resolve(__dirname, "../.."),
+    rules: {
+      "*.md": {
+        loaders: [turbopackRawTextLoader],
+        as: "*.js",
+      },
+      "*.ts": {
+        condition: {
+          path: /^packages\/(?:knowledge-core|knowledge-service|preview-contract|project-cli|project-core|project-scaffold)\/src\//,
+        },
+        loaders: [turbopackRelativeTsImportLoader],
+      },
+      "*.tsx": {
+        condition: {
+          path: /^packages\/(?:knowledge-core|knowledge-service|preview-contract|project-cli|project-core|project-scaffold)\/src\//,
+        },
+        loaders: [turbopackRelativeTsImportLoader],
+      },
     },
-    instrumentationHook: true,
-    serverComponentsExternalPackages: [
-      "langium",
-      "@mermaid-js/parser",
-      "better-sqlite3",
-      "typescript",
-    ],
   },
   webpack: (config, { isServer }) => {
     config.resolve.extensionAlias = {
       ...config.resolve.extensionAlias,
       ".js": [".ts", ".tsx", ".js"],
     };
-    // 让 .md 文件可以 import 为纯文本字符串
     config.module.rules.push({
       test: /\.md$/,
       type: "asset/source",

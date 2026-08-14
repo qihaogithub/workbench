@@ -84,7 +84,13 @@ tests/
 
 ## Pi Agent 工具集
 
-`src/backends/pi-tools/` 默认暴露 27 个工具；`PI_AGENT_WEB_SEARCH_ENABLED=true` 时额外注册 `webSearch`：
+### 按需工具加载
+
+- 渐进披露只缩减首轮发送给模型的工具 schema，不是权限收窄。服务端仍完整注册工具，L1 权限检查保持不变。
+- 初始激活读取、`readPreinstalledSkill`、计划/选择控制和 `activateCapabilities`；Agent 根据任务在同一轮自行加载 `workspace`、`pages`、`comments`、`image`、`web`、`external` 或 `all`。
+- `activateCapabilities` 不触发用户确认，也不接受客户端提权；它调用 Pi Harness `setActiveTools()`，在下一次模型循环生效。Skill 正文仍按需由 `readPreinstalledSkill` 读取。
+
+`src/backends/pi-tools/` 默认暴露 28 个工具；`PI_AGENT_WEB_SEARCH_ENABLED=true` 时额外注册 `webSearch`：
 
 | 工具 | 用途 |
 |:-----|:-----|
@@ -224,6 +230,11 @@ export interface IBackendAdapter {
   appendHistoryMessage?(role: string, content: string): Promise<void>;
 }
 ```
+
+## 运行取消状态
+
+- `BackendAgent` 在取消、无进展超时或绝对超时后先进入 `cancelling`，此时仍保持 busy，禁止把 Agent 复用于下一条消息。
+- `cancelPrompt()` 可以异步；只有底层 prompt 实际收束后，`sendMessage()` 才释放 busy 并转为 `ready`。WebSocket 的 `cancel` 指令只能推送 `cancelling`，不得提前伪报 `ready`。
 
 ## 构建 / 测试 / 开发命令
 

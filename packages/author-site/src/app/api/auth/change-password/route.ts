@@ -5,7 +5,7 @@ import { validatePassword } from "@/lib/auth/password";
 import { createApiSuccess, createApiError } from "@/lib/fs-utils";
 
 export async function POST(request: Request) {
-  const token = getAuthCookie();
+  const token = await getAuthCookie();
   const user = token ? await verifyToken(token) : null;
 
   if (!user) {
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   logPasswordReset(user.userId, user.username, "self_change");
 
   // 清除当前 session，要求重新登录
-  clearAuthCookie();
+  await clearAuthCookie();
 
   return NextResponse.json(
     createApiSuccess({ message: "密码修改成功，请重新登录" }),

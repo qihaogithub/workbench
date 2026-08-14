@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "./lib/utils";
-import type { ImageAttachment } from "@workbench/agent-client";
+import type { ImageAttachment, RunSummary } from "@workbench/agent-client";
 import {
   CheckCircle2,
   AlertTriangle,
@@ -163,6 +163,8 @@ export interface ChatMessage {
   queueStatus?: "queued" | "sending";
   /** @deprecated 使用 parts 数组替代 */
   content: string;
+  /** 服务端 Authority mutation/projection 的本轮终态摘要。 */
+  runSummary?: RunSummary;
   autoRepair?: {
     status: "running" | "completed" | "failed";
     title: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, Loader2, Plus, Trash2 } from "lucide-react";
 import { DocumentEditor } from "@workbench/demo-ui";
 import { cn } from "@/lib/utils";
@@ -106,6 +106,24 @@ function EntryCard({
 }) {
   const ws = useDesignSpecWorkspace();
   const [dragover, setDragover] = useState(false);
+  const localizeRemoteImage = useCallback(
+    async (url: string): Promise<string> => {
+      if (!ws.sessionId) throw new Error("当前会话不可用，无法保存外网图片");
+      const response = await fetch(`/api/sessions/${ws.sessionId}/assets/localize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: { kind: "selected-image", src: url, currentSrc: url },
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload?.success || !payload?.data?.editPreviewUrl) {
+        throw new Error(payload?.error?.message || "外网图片保存失败");
+      }
+      return payload.data.editPreviewUrl;
+    },
+    [ws.sessionId],
+  );
 
   const poolByRef = (ref: DesignSpecRef) => {
     const id = refToPoolId(ref);
@@ -274,6 +292,7 @@ function EntryCard({
             <DocumentEditor
               value={entry.markdown}
               onChange={(markdown) => ws.setMarkdown(entry.id, markdown)}
+              localizeRemoteImage={localizeRemoteImage}
               placeholder="写点说明…"
               className="h-[260px] min-h-[220px] overflow-hidden rounded-md border"
             />

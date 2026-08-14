@@ -16,12 +16,13 @@ import type {
   CommentReply,
   CommentThread,
   CommentWsEvent,
+  CommentTarget,
 } from "@workbench/shared";
 import type { AddReplyInput, CommentApiAdapter, CreateCommentInput, UpdateCommentContentInput } from "./types";
 
 export interface UseCommentsOptions {
   projectId: string;
-  pageId: string;
+  target: CommentTarget;
   api: CommentApiAdapter;
   /** agent-service WS 地址，如 ws://localhost:4201/ws/comments */
   wsUrl?: string;
@@ -89,7 +90,7 @@ function applyWsEvent(
 
 export function useComments({
   projectId,
-  pageId,
+  target,
   api,
   wsUrl,
   enabled = true,
@@ -103,14 +104,14 @@ export function useComments({
   const refresh = useCallback(async () => {
     try {
       setError(null);
-      const list = await apiRef.current.listComments(pageId);
+      const list = await apiRef.current.listComments(target);
       setThreads(list);
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));
     } finally {
       setIsLoading(false);
     }
-  }, [pageId]);
+  }, [target]);
 
   // 首次加载 + pageId 变化时重新拉取
   useEffect(() => {
@@ -143,7 +144,15 @@ export function useComments({
           if (typeof data.type !== "string" || !data.type.startsWith("comment:")) {
             return;
           }
-          setThreads((current) => applyWsEvent(current, data));
+          setThreads((current) => {
+            const next = applyWsEvent(current, data);
+            return next.filter((thread) =>
+              thread.target.kind === target.kind &&
+              (target.kind === "page"
+                ? thread.target.kind === "page" && thread.target.pageId === target.pageId
+                : thread.target.kind === "document" && thread.target.resourceId === target.resourceId),
+            );
+          });
         } catch {
           // 忽略无法解析的消息
         }
@@ -168,7 +177,7 @@ export function useComments({
         ws.close();
       }
     };
-  }, [wsUrl, projectId, enabled]);
+  }, [wsUrl, projectId, target, enabled]);
 
   const createComment = useCallback(
     async (input: CreateCommentInput): Promise<CommentThread> => {

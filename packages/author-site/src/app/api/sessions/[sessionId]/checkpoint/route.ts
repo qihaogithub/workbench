@@ -15,10 +15,10 @@ import { validateWorkspacePreviewRuntime } from "@/lib/preview-validation";
 
 export async function POST(
   request: Request,
-  { params }: { params: { sessionId: string } },
+  { params }: { params: Promise<{ sessionId: string }> },
 ) {
   try {
-    const token = getAuthCookie();
+    const token = await getAuthCookie();
     if (!token) {
       return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
         status: 401,
@@ -38,7 +38,8 @@ export async function POST(
         ? body.note.trim()
         : "自动保存记录";
 
-    const session = getEditSession(params.sessionId);
+    const { sessionId } = await params;
+    const session = getEditSession(sessionId);
     if (!session) {
       return NextResponse.json(createApiError("SESSION_NOT_FOUND"), {
         status: 404,
@@ -62,7 +63,7 @@ export async function POST(
       synced = await flushAndSyncProjectWorkspace({
         projectId: session.demoId,
         workspaceId: session.workspaceId,
-        sessionId: params.sessionId,
+        sessionId,
       });
       if (
         synced.canonicalRevision === undefined ||
@@ -94,7 +95,7 @@ export async function POST(
     }
 
     const result = createProjectVersionSnapshot(session.demoId, payload.username, {
-      sessionId: params.sessionId,
+      sessionId,
       note,
       type: "auto_checkpoint",
       advanceWorkspaceId: session.workspaceId,
@@ -112,7 +113,7 @@ export async function POST(
 
     return NextResponse.json(
       createApiSuccess({
-        sessionId: params.sessionId,
+        sessionId,
         version: result.version.versionId,
         savedAt: result.version.savedAt,
       }),

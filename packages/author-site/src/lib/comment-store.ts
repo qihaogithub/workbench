@@ -77,6 +77,7 @@ async function notifyWsEvent(
 
 export interface ListCommentsOptions {
   pageId?: string;
+  resourceId?: string;
   resolved?: boolean;
 }
 
@@ -87,7 +88,10 @@ export function listComments(
   const { threads } = readCommentStore(projectId);
   let result = threads;
   if (options.pageId) {
-    result = result.filter((t) => t.pageId === options.pageId);
+    result = result.filter((t) => t.target.kind === "page" && t.target.pageId === options.pageId);
+  }
+  if (options.resourceId) {
+    result = result.filter((t) => t.target.kind === "document" && t.target.resourceId === options.resourceId);
   }
   if (options.resolved !== undefined) {
     result = result.filter((t) => t.resolved === options.resolved);
@@ -105,9 +109,10 @@ export function getCommentThread(
 
 export interface CreateCommentInput {
   projectId: string;
-  pageId: string;
-  anchor: CommentThread["anchor"];
-  pin: CommentThread["pin"];
+  target: CommentThread["target"];
+  anchor?: CommentThread["anchor"];
+  pin?: CommentThread["pin"];
+  documentAnchor?: CommentThread["documentAnchor"];
   content: string;
   author: CommentThread["author"];
   mentions?: CommentThread["mentions"];
@@ -123,9 +128,10 @@ export async function createCommentThread(
   const thread: CommentThread = {
     id: generateId("cmt"),
     projectId: input.projectId,
-    pageId: input.pageId,
+    target: input.target,
     anchor: input.anchor,
     pin: input.pin,
+    documentAnchor: input.documentAnchor,
     content: input.content,
     author: input.author,
     mentions: input.mentions,

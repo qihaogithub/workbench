@@ -61,10 +61,10 @@ function resolveWorkspaceFilePath(
  */
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { sessionId: string; filePath: string[] } },
+  { params }: { params: Promise<{ sessionId: string; filePath: string[] }> },
 ) {
   try {
-    const token = getAuthCookie();
+    const token = await getAuthCookie();
     if (!token) {
       return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
         status: 401,
@@ -78,7 +78,7 @@ export async function GET(
       });
     }
 
-    const { sessionId, filePath: filePathParts } = params;
+    const { sessionId, filePath: filePathParts } = await params;
 
     if (!sessionExists(sessionId)) {
       return NextResponse.json(createApiError("SESSION_NOT_FOUND"), {
@@ -183,10 +183,10 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { sessionId: string; filePath: string[] } },
+  { params }: { params: Promise<{ sessionId: string; filePath: string[] }> },
 ) {
   try {
-    const token = getAuthCookie();
+    const token = await getAuthCookie();
     if (!token) {
       return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
         status: 401,
@@ -200,7 +200,7 @@ export async function PUT(
       });
     }
 
-    const { sessionId, filePath: filePathParts } = params;
+    const { sessionId, filePath: filePathParts } = await params;
 
     if (!sessionExists(sessionId)) {
       return NextResponse.json(createApiError("SESSION_NOT_FOUND"), {
@@ -322,10 +322,10 @@ export async function PUT(
  */
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: { sessionId: string; filePath: string[] } },
+  { params }: { params: Promise<{ sessionId: string; filePath: string[] }> },
 ) {
   try {
-    const token = getAuthCookie();
+    const token = await getAuthCookie();
     if (!token) {
       return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
         status: 401,
@@ -339,7 +339,7 @@ export async function DELETE(
       });
     }
 
-    const { sessionId, filePath: filePathParts } = params;
+    const { sessionId, filePath: filePathParts } = await params;
     if (!sessionExists(sessionId)) {
       return NextResponse.json(createApiError("SESSION_NOT_FOUND"), { status: 404 });
     }

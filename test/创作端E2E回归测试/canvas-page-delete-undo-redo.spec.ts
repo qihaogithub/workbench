@@ -178,7 +178,18 @@ test.describe('画布页面删除与撤回重做', () => {
     await expect(targetCanvasPage).toBeVisible({ timeout: 30000 });
     await expect(keepCanvasPage).toBeVisible({ timeout: 30000 });
 
-    await targetCanvasPage.click();
+    const targetBox = await targetCanvasPage.boundingBox();
+    expect(targetBox).toBeTruthy();
+    if (!targetBox) throw new Error('未找到待删除画布页面的位置');
+    const targetX = targetBox.x + targetBox.width / 2;
+    const targetY = targetBox.y + targetBox.height / 2;
+    await page.mouse.move(targetX, targetY);
+    await page.mouse.down();
+    await page.mouse.up();
+    await expect(page.getByRole('button', { name: '删除页面' })).toBeVisible({
+      timeout: 10000,
+    });
+
     page.once('dialog', (dialog) => dialog.accept());
     const deleteResponsePromise = page.waitForResponse(
       (response) =>
@@ -199,7 +210,7 @@ test.describe('画布页面删除与撤回重做', () => {
         response.url().includes(`/api/projects/${project.id}/demos/${targetPage.id}`) &&
         response.request().method() === 'POST',
     );
-    await page.getByTitle('撤回 (Cmd/Ctrl+Z)').click();
+    await page.keyboard.press('Meta+z');
     await parseApiResponse<DemoPageMeta>(await restoreResponsePromise);
     await expect(canvasRoot.locator(`[data-page-id="${targetPage.id}"]`)).toBeVisible({
       timeout: 10000,
@@ -216,7 +227,7 @@ test.describe('画布页面删除与撤回重做', () => {
         response.url().includes(`/api/projects/${project.id}/demos/${targetPage.id}`) &&
         response.request().method() === 'DELETE',
     );
-    await page.getByTitle('重做 (Cmd/Ctrl+Shift+Z / Cmd/Ctrl+Y)').click();
+    await page.keyboard.press('Meta+Shift+z');
     await parseApiResponse<unknown>(await redoDeleteResponsePromise);
     await expect(canvasRoot.locator(`[data-page-id="${targetPage.id}"]`)).toHaveCount(0);
     await expect(keepCanvasPage).toBeVisible();

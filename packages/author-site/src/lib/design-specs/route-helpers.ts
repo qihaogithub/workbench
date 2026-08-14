@@ -22,7 +22,7 @@ export interface DesignSpecRouteContext {
 export async function resolveDesignSpecContext(
   request: NextRequest,
 ): Promise<{ ctx: DesignSpecRouteContext } | { response: NextResponse }> {
-  const token = getAuthCookie();
+  const token = await getAuthCookie();
   if (!token) {
     return { response: NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), { status: 401 }) };
   }

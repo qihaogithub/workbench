@@ -19,3 +19,15 @@ test("viewer Docker build does not inherit the development data endpoint", async
     "viewer Docker builds must opt into same-origin published-data loading",
   );
 });
+
+test("author-site Docker CPU budget protects interactive editor latency", async () => {
+  const compose = await readFile(composePath, "utf8");
+  const authorSection =
+    compose.match(/  author-site:\n([\s\S]*?)(?=\n  [a-z][a-z-]+:\n)/)?.[1] ?? "";
+
+  assert.match(
+    authorSection,
+    /cpus: "2\.0"/,
+    "author-site needs two CPUs because editor traffic is latency-sensitive",
+  );
+});

@@ -237,6 +237,51 @@ describe("编辑 Session 续期", () => {
   });
 });
 
+describe("过期 Session 清理", () => {
+  const originalEnv = { ...process.env };
+  let dataDir: string;
+
+  beforeEach(() => {
+    dataDir = makeTempDataDir();
+  });
+
+  afterEach(() => {
+    cleanup(dataDir);
+    process.env = { ...originalEnv };
+    jest.resetModules();
+  });
+
+  it("只返回本轮实际转为 expired 的 Session", async () => {
+    const sessionId = "session-expired-editing";
+    const sessionDir = path.join(
+      dataDir,
+      "sessions",
+      "user-1",
+      "project-1",
+      sessionId,
+    );
+    fs.mkdirSync(sessionDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(sessionDir, ".session.json"),
+      JSON.stringify({
+        sessionId,
+        userId: "user-1",
+        demoId: "project-1",
+        workspaceId: null,
+        status: "editing",
+        createdAt: Date.now() - 10_000,
+        expiresAt: Date.now() - 1_000,
+      }),
+      "utf-8",
+    );
+
+    const { cleanupAllExpiredSessions } = await importSessionManager(dataDir);
+
+    expect(cleanupAllExpiredSessions()).toEqual([sessionId]);
+    expect(cleanupAllExpiredSessions()).toEqual([]);
+  });
+});
+
 describe("活跃 Session 复用", () => {
   const originalEnv = { ...process.env };
   let dataDir: string;

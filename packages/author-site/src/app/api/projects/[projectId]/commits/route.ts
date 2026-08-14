@@ -5,21 +5,22 @@ import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { createApiError, createApiSuccess, getDataDir } from "@/lib/fs-utils";
 
 async function getAuthenticatedUser() {
-  const token = getAuthCookie();
+  const token = await getAuthCookie();
   if (!token) return null;
   return verifyToken(token);
 }
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } },
+  { params }: { params: Promise<{ projectId: string }> },
 ) {
+  const { projectId } = await params;
   const payload = await getAuthenticatedUser();
   if (!payload) {
     return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), { status: 401 });
   }
   const result = new ProjectAdminService({ dataDir: getDataDir() }).projectCommitList(
-    params.projectId,
+    projectId,
     request.nextUrl.searchParams.get("includeDraft") === "true",
     {
       id: payload.userId,

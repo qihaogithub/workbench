@@ -7,7 +7,7 @@ jest.mock("fs", () => ({
 }));
 
 jest.mock("@/lib/auth/jwt", () => ({
-  getAuthCookie: jest.fn(() => "token"),
+  getAuthCookie: jest.fn(async () => "token"),
   verifyToken: jest.fn(async () => ({
     userId: "user-1",
     username: "测试用户",
@@ -153,7 +153,7 @@ describe("selected image localize route", () => {
           dataBase64,
         },
       }),
-      { params: { sessionId: "session-1" } },
+      { params: Promise.resolve({ sessionId: "session-1" }) },
     );
 
     const body = await response.json();
@@ -214,7 +214,7 @@ describe("selected image localize route", () => {
         },
         browserReadError: "Failed to fetch",
       }),
-      { params: { sessionId: "session-1" } },
+      { params: Promise.resolve({ sessionId: "session-1" }) },
     );
 
     const body = await response.json();

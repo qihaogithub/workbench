@@ -2071,13 +2071,13 @@ function buildRuntimeImports(
 ): Record<string, string> {
   if (useCdnRuntime) {
     return {
-      react: `${cdnBase}/react@18.3.1`,
-      "react-dom": `${cdnBase}/react-dom@18.3.1`,
-      "react-dom/client": `${cdnBase}/react-dom@18.3.1/client`,
-      "react/jsx-runtime": `${cdnBase}/react@18.3.1/jsx-runtime`,
-      "react/jsx-dev-runtime": `${cdnBase}/react@18.3.1/jsx-dev-runtime`,
-      "lucide-react": `${cdnBase}/lucide-react@0.323.0?deps=react@18.3.1,react-dom@18.3.1`,
-      "framer-motion": `${cdnBase}/framer-motion@12.38.0?deps=react@18.3.1,react-dom@18.3.1`,
+      react: `${cdnBase}/react@19.2.3`,
+      "react-dom": `${cdnBase}/react-dom@19.2.3`,
+      "react-dom/client": `${cdnBase}/react-dom@19.2.3/client`,
+      "react/jsx-runtime": `${cdnBase}/react@19.2.3/jsx-runtime`,
+      "react/jsx-dev-runtime": `${cdnBase}/react@19.2.3/jsx-dev-runtime`,
+      "lucide-react": `${cdnBase}/lucide-react@0.575.0?deps=react@19.2.3,react-dom@19.2.3`,
+      "framer-motion": `${cdnBase}/framer-motion@12.38.0?deps=react@19.2.3,react-dom@19.2.3`,
       "svgaplayerweb": `${cdnBase}/svgaplayerweb@2.3.1`,
       "lottie-web": `${cdnBase}/lottie-web@5.13.0`,
       "@rive-app/canvas": `${cdnBase}/@rive-app/canvas@2.38.1`,

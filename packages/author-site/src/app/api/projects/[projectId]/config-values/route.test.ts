@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 const commitWorkspaceMutation = jest.fn();
 
 jest.mock("@/lib/auth/jwt", () => ({
-  getAuthCookie: jest.fn(() => "token"),
+  getAuthCookie: jest.fn(async () => "token"),
   verifyToken: jest.fn(async () => ({
     userId: "user-1",
     username: "测试用户",
@@ -131,7 +131,7 @@ describe("project config values route", () => {
     };
     const response = await PUT(
       jsonRequest({ sessionId: "session-1", values }),
-      { params: { projectId: "project-1" } },
+      { params: Promise.resolve({ projectId: "project-1" }) },
     );
     const body = await response.json();
 

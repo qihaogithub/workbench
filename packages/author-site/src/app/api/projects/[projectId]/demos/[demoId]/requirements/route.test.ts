@@ -6,7 +6,7 @@ import path from "path";
 const commitWorkspaceMutation = jest.fn();
 
 jest.mock("@/lib/auth/jwt", () => ({
-  getAuthCookie: jest.fn(() => "token"),
+  getAuthCookie: jest.fn(async () => "token"),
   verifyToken: jest.fn(async () => ({
     userId: "user-1",
     username: "测试用户",
@@ -130,7 +130,7 @@ describe("project demo requirements route", () => {
     const requirements = "@[页面标题](title) 需突出显示。";
     const response = await PUT(
       jsonRequest({ sessionId: "session-1", requirements }),
-      { params: { projectId: "project-1", demoId: "page-1" } },
+      { params: Promise.resolve({ projectId: "project-1", demoId: "page-1" }) },
     );
     const body = await response.json();
     expect(response.status).toBe(200);
@@ -166,7 +166,7 @@ describe("project demo requirements route", () => {
       {
         nextUrl: { searchParams: new URLSearchParams({ sessionId: "session-1" }) },
       } as unknown as NextRequest,
-      { params: { projectId: "project-1", demoId: "page-1" } },
+      { params: Promise.resolve({ projectId: "project-1", demoId: "page-1" }) },
     );
     const body = await response.json();
     expect(response.status).toBe(200);
@@ -181,7 +181,7 @@ describe("project demo requirements route", () => {
     const { PUT } = await import("./route");
     const response = await PUT(
       jsonRequest({ sessionId: "session-1", requirements: 123 }),
-      { params: { projectId: "project-1", demoId: "page-1" } },
+      { params: Promise.resolve({ projectId: "project-1", demoId: "page-1" }) },
     );
     expect(response.status).toBe(400);
   });

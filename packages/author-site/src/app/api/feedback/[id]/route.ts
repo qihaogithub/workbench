@@ -11,7 +11,7 @@ import type { FeedbackStatus } from "@workbench/shared";
 const VALID_STATUSES: FeedbackStatus[] = ["open", "in_progress", "done"];
 
 async function resolveUser(request: NextRequest) {
-  const cookieToken = getAuthCookie();
+  const cookieToken = await getAuthCookie();
   if (cookieToken) {
     const payload = await verifyToken(cookieToken);
     if (payload) return payload;

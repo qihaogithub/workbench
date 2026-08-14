@@ -171,6 +171,33 @@ function hasVisibleCurrentMessage(msg: ChatMessage): boolean {
   );
 }
 
+function RunSummaryStatus({ summary }: { summary: NonNullable<ChatMessage["runSummary"]> }) {
+  const failedProjections = summary.projections.filter(
+    (projection) => projection.status === "failed",
+  ).length;
+  const committedMutations = summary.mutations.filter(
+    (mutation) => mutation.status === "committed",
+  ).length;
+
+  if (committedMutations === 0 && failedProjections === 0) return null;
+
+  return (
+    <div
+      className={cn(
+        "mt-2 flex items-center gap-1.5 text-xs",
+        failedProjections > 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground",
+      )}
+      role="status"
+    >
+      <Check className="h-3.5 w-3.5" aria-hidden="true" />
+      <span>
+        {committedMutations > 0 ? `已提交 ${committedMutations} 项修改` : "修改状态已更新"}
+        {failedProjections > 0 ? `；${failedProjections} 项预览同步失败` : ""}
+      </span>
+    </div>
+  );
+}
+
 interface ChatMessagesProps {
   messages: ChatMessage[];
   currentMessage: ChatMessage;
@@ -250,21 +277,23 @@ export function ChatMessages({
       );
     }
     return (
-      <AssistantMessage
-        key={msg.id ?? `msg-${msg.role}-${index}`}
-        content={msg.content}
-        reasonings={msg.reasonings}
-        tools={msg.tools}
-        parts={msg.parts}
-        messageId={msg.id}
-        hasFileChanges={hasFileChanges(msg)}
-        isStreaming={false}
-        onRegenerate={onRegenerate}
-        onExternalAuthConnected={onExternalAuthConnected}
-        onRollback={onRollback}
-        externalAuthSessionId={externalAuthSessionId}
-        onUserChoiceResponse={onUserChoiceResponse}
-      />
+      <div key={msg.id ?? `msg-${msg.role}-${index}`}>
+        <AssistantMessage
+          content={msg.content}
+          reasonings={msg.reasonings}
+          tools={msg.tools}
+          parts={msg.parts}
+          messageId={msg.id}
+          hasFileChanges={hasFileChanges(msg)}
+          isStreaming={false}
+          onRegenerate={onRegenerate}
+          onExternalAuthConnected={onExternalAuthConnected}
+          onRollback={onRollback}
+          externalAuthSessionId={externalAuthSessionId}
+          onUserChoiceResponse={onUserChoiceResponse}
+        />
+        {msg.runSummary && <RunSummaryStatus summary={msg.runSummary} />}
+      </div>
     );
   };
 

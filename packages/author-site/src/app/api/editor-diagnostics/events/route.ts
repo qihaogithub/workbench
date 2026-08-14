@@ -26,7 +26,7 @@ function isEventLike(value: unknown): value is EditorDiagnosticEvent {
 
 export async function POST(request: Request) {
   try {
-    const token = getAuthCookie();
+    const token = await getAuthCookie();
     if (!token) {
       return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
         status: 401,

@@ -171,6 +171,40 @@ describe('WebSocketEventRouter', () => {
     });
   });
 
+  it('转发 mutation 与 projection 的运行摘要', () => {
+    const messages: ServerMessage[] = [];
+    const router = new WebSocketEventRouter('session-1', (message) => {
+      messages.push(message);
+    });
+    const agent = new TestAgent({ sessionId: 'session-1' });
+
+    router.bindAgent(agent);
+    router.startMessage('message-1');
+    agent.fire({
+      type: 'run_summary',
+      sessionId: 'session-1',
+      runSummary: {
+        mutations: [{
+          mutationId: 'mutation-1',
+          revision: 7,
+          status: 'committed',
+          resources: [{ path: 'demos/home/prototype.html', action: 'modified' }],
+          actor: 'agent',
+        }],
+        projections: [{ revision: 7, surface: 'preview', status: 'applied' }],
+      },
+    });
+
+    expect(messages).toContainEqual({
+      type: 'run_summary',
+      id: 'message-1',
+      sessionId: 'session-1',
+      runSummary: expect.objectContaining({
+        mutations: [expect.objectContaining({ mutationId: 'mutation-1' })],
+      }),
+    });
+  });
+
   it('应在转发 Agent 事件时通知活动回调', () => {
     const activities: AgentEvent[] = [];
     const router = new WebSocketEventRouter(
@@ -232,7 +266,7 @@ describe('WebSocketEventRouter', () => {
     ]);
   });
 
-  it('应将本轮执行事件保存到 JSONL 日志文件', () => {
+  it('应在 run 结束 drain 后将执行事件保存到 JSONL 日志文件', async () => {
     const router = new WebSocketEventRouter('session-1', () => undefined);
     const agent = new TestAgent({ sessionId: 'session-1' });
 
@@ -277,6 +311,7 @@ describe('WebSocketEventRouter', () => {
       content: '',
       files: [{ path: 'workspace-tree.json', action: 'modified' }],
     });
+    await router.finishMessage();
 
     const logPath = path.join(tempLogDir, 'session-1', 'message-1.jsonl');
     const entries = fs
@@ -333,5 +368,44 @@ describe('WebSocketEventRouter', () => {
       }),
     );
     expect(diagnostics[1].payload.parameters).toBeUndefined();
+  });
+
+  it('将能力加载指标写入 run log 与结构化诊断，但不发送用户侧事件', async () => {
+    const messages: ServerMessage[] = [];
+    const router = new WebSocketEventRouter('session-activation', (message) => {
+      messages.push(message);
+    });
+    const agent = new TestAgent({ sessionId: 'session-activation' });
+    router.bindAgent(agent);
+    router.startMessage('message-activation', { contentLength: 0 });
+
+    agent.fire({
+      type: 'capability_activation',
+      sessionId: 'session-activation',
+      status: 'completed',
+      capabilities: ['workspace', 'pages'],
+      previousActiveToolCount: 8,
+      activeToolCount: 20,
+      durationMs: 4,
+    });
+    await router.finishMessage();
+
+    expect(messages).toEqual([]);
+    const logPath = path.join(tempLogDir, 'session-activation', 'message-activation.jsonl');
+    expect(fs.readFileSync(logPath, 'utf-8')).toContain('"eventType":"capability_activation"');
+
+    const diagnosticPath = path.join(tempDataDir, 'editor-diagnostics', 'agent-service.jsonl');
+    const diagnostic = fs.readFileSync(diagnosticPath, 'utf-8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line))
+      .find((entry) => entry.eventType === 'ai.capability_activated');
+    expect(diagnostic.eventType).toBe('ai.capability_activated');
+    expect(diagnostic.payload).toMatchObject({
+      capabilityGroups: ['workspace', 'pages'],
+      previousActiveToolCount: 8,
+      activeToolCount: 20,
+      durationMs: 4,
+    });
   });
 });

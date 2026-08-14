@@ -33,7 +33,7 @@ function signState(payload: object): string {
 }
 
 async function requireUserId(): Promise<string | null> {
-  const token = getAuthCookie();
+  const token = await getAuthCookie();
   if (!token) return null;
   const payload = await verifyToken(token);
   return payload?.userId || null;
@@ -80,9 +80,10 @@ async function syncExternalAuthToActiveSessions(
 
 export async function GET(
   request: NextRequest,
-  context: { params: { provider: string } },
+  context: { params: Promise<{ provider: string }> },
 ) {
   try {
+    const { provider } = await context.params;
     const userId = await requireUserId();
     if (!userId) {
       return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
@@ -90,7 +91,6 @@ export async function GET(
       });
     }
 
-    const provider = context.params.provider;
     const requestedSessionId = getRequestedAgentSessionId(request);
     if (!isProvider(provider)) {
       return NextResponse.json(

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   ChevronDown,
@@ -95,6 +95,8 @@ interface PageConfigPanelProps {
   requirementsPosition?: "beforeConfig" | "afterConfig" | "hidden";
   /** 只读入口在没有页面资源规范和关联设计规范时隐藏整个折叠区。 */
   hideEmptyRequirements?: boolean;
+  /** 使用端可将资源规范与配置项显示为不切换内容的快速定位 Tab。 */
+  sectionNavigation?: "none" | "anchorTabs";
   /** 已加载的设计规范绑定，用于配置字段旁的只读入口。 */
   designSpecEntries?: DesignSpecEntryLink[];
   /** 仅创作端提供：跳转到文档视图中的指定规范条目。 */
@@ -121,29 +123,35 @@ function PanelSection({
   onToggle,
   actions,
   children,
+  collapsible = true,
 }: {
   title: string;
   open: boolean;
   onToggle: () => void;
   actions?: React.ReactNode;
   children: React.ReactNode;
+  collapsible?: boolean;
 }) {
   return (
     <section className="flex flex-col">
       <div className="flex items-center justify-between gap-2 border-b pb-2">
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={open}
-          className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 rounded-md px-1 py-1 text-left transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {open ? (
-            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-          )}
-          <span className="text-sm font-semibold">{title}</span>
-        </button>
+        {collapsible ? (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={open}
+            className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 rounded-md px-1 py-1 text-left transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {open ? (
+              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+            )}
+            <span className="text-sm font-semibold">{title}</span>
+          </button>
+        ) : (
+          <h2 className="min-w-0 flex-1 px-1 py-1 text-sm font-semibold">{title}</h2>
+        )}
         {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
       </div>
       {open && <div className="flex flex-col">{children}</div>}
@@ -276,6 +284,7 @@ export function PageConfigPanel({
   requirementsLoading,
   requirementsPosition = "afterConfig",
   hideEmptyRequirements = false,
+  sectionNavigation = "none",
   designSpecEntries = EMPTY_DESIGN_SPEC_ENTRIES,
   onEditDesignSpec,
   designSpecApiContext,
@@ -292,6 +301,12 @@ export function PageConfigPanel({
   const [saveDefaultsScope, setSaveDefaultsScope] = useState<
     "page" | "project" | null
   >(null);
+  const contentContainerRef = useRef<HTMLDivElement>(null);
+  const requirementsSectionRef = useRef<HTMLDivElement>(null);
+  const configSectionRef = useRef<HTMLDivElement>(null);
+  const [activeSectionAnchor, setActiveSectionAnchor] = useState<
+    "requirements" | "config"
+  >("requirements");
 
   useEffect(() => {
     if (!designSpecApiContext?.workingDir) return;
@@ -522,6 +537,27 @@ export function PageConfigPanel({
     !readonly &&
     !!selectedPage?.schema &&
     Object.keys(configData).length > 0;
+  const showSectionNavigation =
+    sectionNavigation === "anchorTabs" &&
+    shouldShowRequirements &&
+    (showSharedConfig || showPageConfig);
+
+  const scrollToSection = (section: "requirements" | "config") => {
+    const container = contentContainerRef.current;
+    const target =
+      section === "requirements"
+        ? requirementsSectionRef.current
+        : configSectionRef.current;
+    if (!container || !target) return;
+
+    setActiveSectionAnchor(section);
+    const top = target.offsetTop - container.offsetTop;
+    if (typeof container.scrollTo === "function") {
+      container.scrollTo({ top, behavior: "smooth" });
+    } else {
+      container.scrollTop = top;
+    }
+  };
 
   return (
     <div className={cn("flex h-full flex-col bg-card", className)}>
@@ -549,12 +585,40 @@ export function PageConfigPanel({
           </div>
         </div>
       )}
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+      {showSectionNavigation && (
+        <nav
+          aria-label="配置内容快速定位"
+          className="flex shrink-0 gap-1 border-b bg-card px-4 pt-2"
+        >
+          {([
+            ["requirements", "资源规范"],
+            ["config", "配置项"],
+          ] as const).map(([section, label]) => (
+            <button
+              key={section}
+              type="button"
+              aria-pressed={activeSectionAnchor === section}
+              onClick={() => scrollToSection(section)}
+              className={cn(
+                "cursor-pointer border-b-2 px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                activeSectionAnchor === section
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      )}
+      <div ref={contentContainerRef} className="min-h-0 flex-1 overflow-y-auto p-4">
         <div className="flex flex-col gap-4">
+          <div ref={configSectionRef}>
           <PanelSection
             title="配置项"
             open={configSectionOpen}
             onToggle={() => setConfigSectionOpen((current) => !current)}
+            collapsible={!showSectionNavigation}
             actions={
               <>
                 {onRestoreDefaults && (
@@ -679,6 +743,7 @@ export function PageConfigPanel({
             </div>
           )}
           </PanelSection>
+          </div>
 
           {referenceDesignSpecs.length > 0 && (
             <PanelSection
@@ -707,11 +772,15 @@ export function PageConfigPanel({
           )}
 
           {shouldShowRequirements && (
-            <div className={requirementsPosition === "beforeConfig" ? "order-first" : undefined}>
+            <div
+              ref={requirementsSectionRef}
+              className={requirementsPosition === "beforeConfig" ? "order-first" : undefined}
+            >
           <PanelSection
             title="资源规范"
             open={requirementsSectionOpen}
             onToggle={() => setRequirementsSectionOpen((current) => !current)}
+            collapsible={!showSectionNavigation}
             actions={
               requirementsLoading ? null : editingRequirements ? (
                 <>
@@ -775,7 +844,9 @@ export function PageConfigPanel({
               </div>
             ) : hasRequirements || scopedDesignSpecEntries.length > 0 ? (
               <div className="space-y-4 pt-2">
-                {hasRequirements && <PageRequirements markdown={requirements!} />}
+                {hasRequirements && (
+                  <PageRequirements markdown={requirements!} allowExternalMedia />
+                )}
                 {scopedDesignSpecEntries.map((entry) => (
                   <section key={`${entry.docId}:${entry.entryId}`} className="rounded-md border p-3">
                     <p className="text-xs font-medium text-muted-foreground">
@@ -783,7 +854,7 @@ export function PageConfigPanel({
                     </p>
                     {entry.markdown.trim() ? (
                       <div className="mt-2">
-                        <PageRequirements markdown={entry.markdown} />
+                        <PageRequirements markdown={entry.markdown} allowExternalMedia />
                       </div>
                     ) : (
                       <p className="mt-2 text-sm text-muted-foreground">暂无说明</p>

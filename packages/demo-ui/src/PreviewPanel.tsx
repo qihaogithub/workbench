@@ -325,7 +325,6 @@ function PreviewPanelInternal({
   onPositionDrag,
   onPositionEditExit,
 }: PreviewPanelProps) {
-  console.count("[perf] PreviewPanel render");
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);

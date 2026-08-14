@@ -6,10 +6,10 @@ import { getEditSession, renewEditSession } from "@/lib/session-manager";
 
 export async function POST(
   _request: Request,
-  { params }: { params: { sessionId: string } },
+  { params }: { params: Promise<{ sessionId: string }> },
 ) {
   try {
-    const token = getAuthCookie();
+    const token = await getAuthCookie();
     if (!token) {
       return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
         status: 401,
@@ -23,7 +23,8 @@ export async function POST(
       });
     }
 
-    const session = getEditSession(params.sessionId);
+    const { sessionId } = await params;
+    const session = getEditSession(sessionId);
     if (!session) {
       return NextResponse.json(createApiError("SESSION_NOT_FOUND"), {
         status: 404,
@@ -36,7 +37,7 @@ export async function POST(
       );
     }
 
-    const renewed = renewEditSession(params.sessionId);
+    const renewed = renewEditSession(sessionId);
     if (!renewed) {
       return NextResponse.json(
         createApiError("SESSION_EXPIRED", "Session 已过期，无法续期"),
@@ -44,10 +45,10 @@ export async function POST(
       );
     }
 
-    const updatedSession = getEditSession(params.sessionId);
+    const updatedSession = getEditSession(sessionId);
     return NextResponse.json(
       createApiSuccess({
-        sessionId: params.sessionId,
+        sessionId,
         expiresAt: updatedSession?.expiresAt ?? Date.now() + 2 * 60 * 60 * 1000,
       }),
     );

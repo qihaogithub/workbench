@@ -273,6 +273,9 @@ node scripts/development/test-ai-workspace-refresh.mjs
 
 ```bash
 pnpm measure:edit-page-load [projectId]
+
+# 只输出单行 JSON，便于采样汇总
+pnpm measure:edit-page-load [projectId] --json
 ```
 
 ### 常用环境变量

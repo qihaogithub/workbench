@@ -2,9 +2,9 @@
 
 ## 文档状态
 
-- 状态：待实施
+- 状态：进行中（Wave 5：Docker 构建门禁已通过；Turbopack A/B 与完整 E2E 最终门禁待完成）
 - 编制日期：2026-08-12
-- 当前分支 / 基线提交：`main` / `1f4c5686`
+- 当前分支 / 基线提交：`codex/next16-turbopack-migration` / `bd2c21bc`
 - 目标：将工作区从 Next.js 14.1 / React 18.3 迁移到受支持的 Next.js 16 Active LTS / React 19，并独立决定是否把 Turbopack 设为默认开发与构建 bundler。
 - 前置方案：[创作端-开发模式路由加载性能治理方案](./创作端-开发模式路由加载性能治理方案.md)
 - 长期事实文档：[开发环境路由编译性能](../../项目文档/创作端/06-基础设施/技术/07_开发环境路由编译性能.md)
@@ -102,6 +102,8 @@ Next 升级会同时改变 React 主版本、App Router 动态 API、客户端�
 | 官方支持 | 16.x Active LTS；15.x Maintenance LTS；14.x unsupported | Next.js Support Policy |
 
 执行时不得直接使用浮动 `latest` 写入 manifest。协调者先重新查询官方安全公告与 registry，冻结准确版本并记录在本文进度表。本文编制时的候选值为：Checkpoint A `next@15.5.22`，最终 `next@16.2.12`；React 使用目标 Next 版本支持的最新 19.2.x 安全补丁。
+
+2026-08-12 执行冻结：Checkpoint A 使用 `next@15.5.22` / `eslint-config-next@15.5.22`，React 使用 `react@19.2.3`、`react-dom@19.2.3`、`@types/react@19.2.7`、`@types/react-dom@19.2.3`。`lucide-react@0.575.0` 与 `@radix-ui/react-compose-refs@1.1.2` 的 peer range 已确认覆盖 React 19。最终 Checkpoint B 继续锁定为 `next@16.2.12` / `eslint-config-next@16.2.12`；两代 Next 均接受该 React 主版本。版本依据为 Next 官方支持政策及 npm registry 的稳定包元数据。
 
 ### 4.2 author Next 配置合同
 
@@ -324,8 +326,8 @@ flowchart TD
 
 #### NEXT-00 工作树与恢复点
 
-- [ ] 记录 `git status --short`、当前分支、提交和所有高冲突文件。
-- [ ] 将现有业务改动先合并到明确提交，或经用户确认在独立干净 worktree 开始迁移。
+- [x] 记录 `git status --short`、当前分支、提交和所有高冲突文件。
+- [x] 当前工作树干净，创建 `codex/next16-turbopack-migration` 作为可恢复迁移起点；本轮不提交，由用户决定何时提交。
 - [ ] 不使用 reset/checkout/stash 覆盖未知来源改动。
 - [ ] 创建迁移分支时使用 `codex/` 前缀；是否 commit 由用户决定。
 
@@ -333,19 +335,19 @@ flowchart TD
 
 #### NEXT-01 版本冻结与 peer 预检
 
-- [ ] 核验执行日 Next Active/Maintenance LTS、安全补丁和目标 React peer。
-- [ ] 冻结 Checkpoint A、Checkpoint B、React、React DOM、类型、eslint-config-next 精确版本。
-- [ ] 盘点 React 19 peer 冲突，重点确认 Radix compose refs override 与 lucide-react。
-- [ ] 把精确版本和选择理由回填本文。
+- [x] 核验执行日 Next Active/Maintenance LTS、安全补丁和目标 React peer。
+- [x] 冻结 Checkpoint A、Checkpoint B、React、React DOM、类型、eslint-config-next 精确版本。
+- [x] 盘点 React 19 peer 冲突，重点确认 Radix compose refs override 与 lucide-react。
+- [x] 把精确版本和选择理由回填本文。
 
 验收：目标版本均为 stable、受支持、安全补丁已覆盖，无 canary/preview。
 
 #### NEXT-02 验收基础设施加固
 
-- [ ] 为 `measure-edit-page-load.mjs` 增加根脚本入口，输出可机器读取的 Navigation Timing 与编辑器 ready marker；硬指标不得包含固定 `settle` 等待。
-- [ ] 修正 sketch playground dev/E2E 端口不一致，统一到项目约定端口并验证自动启动。
-- [ ] 为 Proxy 补现状合同测试：auth redirect、页面/API 保护、Admin、普通 CORS、preview module CORS、matcher。
-- [ ] 为 instrumentation 增加最小幂等/启动合同或可观察性，确保能判断注册次数与 native 依赖错误。
+- [x] 为 `measure-edit-page-load.mjs` 增加根脚本入口，输出可机器读取的 Navigation Timing 与编辑器 ready marker；硬指标不得包含固定 `settle` 等待。
+- [x] 修正 sketch playground dev/E2E 端口不一致，统一到项目约定端口 3400 并完成 typecheck。
+- [x] 为 Proxy 补现状合同测试：auth redirect、页面/API 保护、Admin、普通 CORS、preview module CORS、matcher。
+- [x] 为 instrumentation 增加 Node runtime 的启动任务和 interval 注册合同测试。
 
 所有权：测试/开发脚本，不修改 Next/React 依赖。
 
@@ -369,11 +371,11 @@ flowchart TD
 
 任务：
 
-- [ ] 统一 Next 15 checkpoint、React/React DOM 19、React 19 类型与 eslint-config-next。
-- [ ] 更新共享包 peer/dev range，使本地测试使用真实 host 版本。
-- [ ] 选择 React 19 兼容的 lucide/Radix 方案；不能用 `--force` 或忽略 peer 冲突作为完成条件。
-- [ ] 统一 lockfile，确认只有预期的 Next/React 主版本。
-- [ ] 保存安装日志，区分既有 warning 与新增 warning。
+- [x] 统一 Next 15 checkpoint、React/React DOM 19、React 19 类型与 eslint-config-next。
+- [x] 更新共享包 peer/dev range，使本地测试使用真实 host 版本。
+- [x] 选择 React 19 兼容的 lucide/Radix 方案；不能用 `--force` 或忽略 peer 冲突作为完成条件。
+- [x] 统一 lockfile，确认只有预期的 Next/React 主版本。
+- [x] 保存安装日志；安装仅出现既有 `eslint@8` 和 `@types/dompurify` 过期提示，以及 Node `url.parse` deprecation，未出现 Next/React peer 冲突。
 
 验收：`pnpm install --frozen-lockfile` 可复现；无新增 Next/React peer warning。
 
@@ -385,10 +387,10 @@ flowchart TD
 
 #### NEXT-12 公共 Async Request 合同
 
-- [ ] 将 auth/admin cookie helper 改为真实异步 API。
-- [ ] 冻结 Route Handler 的 `params: Promise<T>` 写法和测试 context 写法。
-- [ ] 冻结编辑页 Client Component 与 embed Server Component 的解包方式。
-- [ ] 提供静态检查，阻止 `UnsafeUnwrapped`、`@next-codemod-error` 与同步 `cookies()` / `headers()` 回流。
+- [x] 将 auth/admin cookie helper 改为真实异步 API。
+- [x] 冻结 Route Handler 的 `params: Promise<T>` 写法和测试 context 写法。
+- [x] 核验编辑页 Client Component 与 embed 页面是否需 Promise 解包；不因文件名动态而假定必改。
+- [x] 提供静态检查，阻止 `UnsafeUnwrapped`、`@next-codemod-error` 与同步 `cookies()` / `headers()` 回流。
 
 这是 Wave 2 的硬前置。公共 helper 完成后，目录子智能体只消费合同，不再各自设计签名。
 
@@ -398,9 +400,9 @@ flowchart TD
 
 所有权：`packages/author-site/src/app/api/projects/**`
 
-- [ ] 迁移约 30 个同步动态 Route Handler。
-- [ ] 同时处理本目录对异步 cookie/auth helper 的调用。
-- [ ] 更新本目录直接调用 handler 的测试。
+- [x] 迁移约 30 个同步动态 Route Handler。
+- [x] 同时处理本目录对异步 cookie/auth helper 的调用。
+- [x] 更新本目录直接调用 handler 的测试。
 - [ ] 保持项目、配置、页面、资源、发布与版本接口的状态码和响应合同不变。
 
 验证：本目录定向 Jest + author typecheck。
@@ -409,9 +411,9 @@ flowchart TD
 
 所有权：`packages/author-site/src/app/api/sessions/**`
 
-- [ ] 迁移约 22 个同步动态 Route Handler。
-- [ ] 同时处理本目录的 cookie/auth await。
-- [ ] 更新本目录 route 测试。
+- [x] 迁移约 22 个同步动态 Route Handler。
+- [x] 同时处理本目录的 cookie/auth await。
+- [x] 更新本目录 route 测试。
 - [ ] 保持 Session、保存、Workspace Authority、文件与协同语义不变。
 
 验证：本目录定向 Jest + author typecheck + workspace authority 检查。
@@ -427,17 +429,17 @@ flowchart TD
 - `packages/author-site/src/app/demo/[id]/edit/page.tsx`
 - 经协调者明确列出的 auth consumer helper
 
-- [ ] 迁移其余约 25 个同步动态 route。
-- [ ] await `headers()`、cookie helper 与页面 params。
-- [ ] 更新相关测试 context。
+- [x] 迁移其余约 25 个同步动态 route。
+- [x] await `headers()`、cookie helper 与页面 params。
+- [x] 更新相关测试 context。
 - [ ] 编辑页只做 params 必要修改，保留既有性能治理和用户改动。
 
 验证：相关定向 Jest、编辑页导入边界测试、author typecheck。
 
 Wave 2 汇总门禁：
 
-- [ ] `rg`/静态检查中不再存在同步动态 params、同步 request API 或 codemod marker。
-- [ ] `corepack pnpm check:author`
+- [x] 静态检查中不再存在同步动态 params、同步 request API 或 codemod marker。
+- [x] `corepack pnpm check:author`
 - [ ] Next 15 Webpack dev/build 启动，检查动态 API warning 为 0。
 
 ### Wave 3：框架边界、React 19 与工具链（最多 3 个子智能体并行）
@@ -446,8 +448,8 @@ Wave 2 汇总门禁：
 
 所有权：`middleware.ts` → `proxy.ts`、proxy 合同测试；公共 auth helper 只在协调者授权时修改。
 
-- [ ] 完成文件与导出重命名。
-- [ ] 保持 matcher、重定向、401 JSON、Admin cookie、普通 CORS 和 preview CORS 等价。
+- [x] 完成文件与导出重命名。
+- [x] 保持 matcher、重定向、401 JSON、Admin cookie、普通 CORS 和 preview CORS 等价。
 - [ ] 验证 Node Proxy runtime 下 jose/Web Crypto 行为。
 - [ ] 不扩大或缩小保护路径。
 
@@ -455,8 +457,8 @@ Wave 2 汇总门禁：
 
 单一所有权：`packages/author-site/next.config.js`、`src/instrumentation.ts` 及专项测试。
 
-- [ ] 删除 `experimental.instrumentationHook`。
-- [ ] 迁移顶层 `serverExternalPackages`。
+- [x] 删除 `experimental.instrumentationHook`。
+- [x] 迁移顶层 `serverExternalPackages`。
 - [ ] 静态确认无 Server Action 后删除无效的 10MB Server Action 配置；若发现真实消费者则保留并补合同。
 - [ ] 保留根 `.env`、standalone、onDemandEntries、公开环境变量和必要 transpilePackages。
 - [ ] 分别验证 users DB、diagnostics DB、启动任务与 interval 注册。
@@ -474,37 +476,38 @@ Wave 2 汇总门禁：
 
 所有权：ESLint/Jest 配置，不编辑 manifests。
 
-- [ ] author/viewer 从 `next lint` 迁为 ESLint CLI。
-- [ ] 选择与仓库其余包一致、可复现的 flat config；保留 Next core-web-vitals/TypeScript 规则。
+- [x] author/viewer 从 `next lint` 迁为 ESLint CLI。
+- [x] 选择与仓库其余包一致、可复现的 flat config；保留 Next core-web-vitals/TypeScript 规则。
 - [ ] 保持 `.next`、`out`、生成 runtime、test outputs 的 ignore。
-- [ ] 验证 `next/jest`、Markdown transform、Milkdown/Streamdown mock 和 workspace alias。
+- [x] 验证 `next/jest`、Markdown transform、Milkdown/Streamdown mock 和 workspace alias。
 
 Checkpoint A 门禁：
 
-- [ ] `check:author`、`check:viewer`、`check:demo-ui`、`check:ai-chat-shared`
-- [ ] `check:sketch-core`、`check:sketch-react`、`check:sketch-playground`
-- [ ] author、viewer、sketch 三套 production build
-- [ ] `lint:all`
-- [ ] 核心 E2E 冒烟
+- [x] `check:author`、`check:viewer`、`check:demo-ui`、`check:ai-chat-shared`
+- [x] `check:sketch-core`、`check:sketch-react`、`check:sketch-playground`
+- [x] author、viewer、sketch 三套 Webpack production build
+- [x] `lint:all`（0 error；保留既有告警）
+- [x] 核心 E2E 冒烟（author core flow 通过）
+- [x] 画布自动保存与重新打开 E2E（Yjs-first 持久化链路通过）
 
 ### Wave 4：Next 16 与 Turbopack 等价能力（先串行升版，再并行）
 
 #### NEXT-40 Next 16 最终升版（依赖所有者，串行）
 
-- [ ] 从已通过的 Checkpoint A 升到冻结的 Next 16.x / React 19.2.x。
-- [ ] 运行 typegen 与 typecheck，确保不再依赖同步兼容层。
-- [ ] 更新 lock；其他子智能体停止期间完成安装。
-- [ ] 先使用显式 Webpack dev/build 建立 Next 16 功能基线。
+- [x] 从已通过的 Checkpoint A 升到冻结的 Next 16.x / React 19.2.x。
+- [x] 运行 typegen 与 typecheck，确保不再依赖同步兼容层。
+- [x] 更新 lock；其他子智能体停止期间完成安装。
+- [x] 先使用显式 Webpack dev/build 建立 Next 16 功能基线。
 
 #### NEXT-41 Turbopack 资源与 workspace ESM 专项
 
 所有权：author Next config、Markdown prompt 资源，以及经协调者授权的 project-core/project-scaffold/knowledge-service 文件。
 
-- [ ] 优先将单个 system prompt raw Markdown import 改为 bundler 无关资源。
-- [ ] 实测 Next 16 是否能解析现有 `.js` → TS workspace specifier。
+- [x] 保持单个 system prompt raw Markdown import，并为 Webpack `asset/source` 与 Turbopack raw-text rule 建立等价加载路径。
+- [x] 实测 Next 16 是否能解析现有 `.js` → TS workspace specifier。
 - [ ] 若失败，优先修正 package/source 边界；不得生成大规模逐文件 alias 表。
 - [ ] 检查 AI Chat/Mermaid client 图是否仍触达 `langium` / `vscode-jsonrpc`。
-- [ ] 配置 Turbopack workspace root、必要 rules/aliases，并保留 Webpack 等价路径用于对照。
+- [x] 配置 Turbopack workspace root、必要 rules/aliases，并保留 Webpack 等价路径用于对照。
 - [ ] 用 `NEXT_TURBOPACK_TRACING=1` 采集阻塞证据，禁止用压制 warning 代替修复。
 
 #### NEXT-42 预览 runtime 与合同同步
@@ -518,9 +521,9 @@ Checkpoint A 门禁：
 - author/viewer `public/preview-runtime/**`
 - 对应 policy/contract 测试
 
-- [ ] 将 React/React DOM/lucide 版本同步到统一预览合同。
-- [ ] 更新 import map、dependency policy 与合同版本。
-- [ ] 重建受追踪 runtime 产物；其他智能体不得同时运行该生成命令。
+- [x] 将 React/React DOM/lucide 版本同步到统一预览合同。
+- [x] 更新 import map、dependency policy 与合同版本。
+- [x] 重建受追踪 runtime 产物；其他智能体不得同时运行该生成命令。
 - [ ] 验证 local/CDN/fixed/inline 路径使用相同版本语义。
 - [ ] 验证高保真 React 页面、SDK、动画运行时和 viewer 静态输出。
 
@@ -528,18 +531,18 @@ Checkpoint A 门禁：
 
 所有权：`packages/viewer-site/**`、`packages/sketch-playground/**` 中未被 runtime 生成任务占用的文件。
 
-- [ ] viewer static export、catch-all、唯一 Route Handler、`next/image` unoptimized 和 AI Chat 边界。
-- [ ] sketch dev 端口、typecheck、production build、Playwright E2E。
+- [x] viewer static export、catch-all、唯一 Route Handler、`next/image` unoptimized 和 AI Chat 边界。
+- [x] sketch dev 端口、typecheck、production build、Playwright E2E（20/20）。
 - [ ] 检查 viewer 不经根 barrel 重新拉入不必要的 Mermaid/Node 依赖。
 
 #### NEXT-44 部署产物
 
 所有权：author/viewer Dockerfile、local production preview、构建检查脚本。
 
-- [ ] 验证 author `.next/standalone` 路径与 server 启动命令。
-- [ ] 验证 native module 在 builder/runtime 中可加载。
-- [ ] 验证 viewer `out/` 和 nginx 路径。
-- [ ] 验证 Docker build check 不依赖 Next 14 日志或目录细节。
+- [x] 验证 author `.next/standalone` 路径与 server 启动命令。
+- [x] 验证 native module 在 builder/runtime 中可加载。
+- [x] 验证 viewer `out/` 和 nginx 路径。
+- [x] 验证 Docker build check 不依赖 Next 14 日志或目录细节。
 
 ### Wave 5：统一验收与默认 bundler 决策
 
@@ -582,6 +585,8 @@ corepack pnpm test:e2e:sketch-playground
 corepack pnpm check:docker-build
 ```
 
+当前执行记录：核心流程与 sketch-playground E2E 均已通过；配置、项目分类、画布自动保存和画布删除/撤回/重做的定向 E2E 也已通过。`sketch-page-regression` 会在默认关闭 `NEXT_PUBLIC_SKETCH_SCENE_AUTHORING_ENABLED` 时条件跳过，开启该 feature flag 的环境必须重新执行该用例。完整创作端 E2E 上次在后台仍运行时被停止，未产生可采信的最终结果；`check:all` 与 Docker build 仍分别受既有 Workspace Authority 守卫缺口和本机 Docker daemon 未启动阻断。
+
 此外必须人工/浏览器验证：
 
 - 登录、注册、登出、Admin、页面/API 未登录行为。
@@ -611,14 +616,14 @@ corepack pnpm check:docker-build
 #### NEXT-52 默认 bundler 决策
 
 - [ ] 功能与性能均达标：默认 Turbopack，保留 Webpack 诊断命令。
-- [ ] Next 16 达标但 Turbopack 不达标：默认显式 Webpack，记录阻塞证据与后续重试条件。
+- [x] Next 16 基础功能已通过而 Turbopack 未满足默认准入：默认显式 Webpack；待稳定生产构建、同机 A/B 和全量浏览器验收后再重试。
 - [ ] Next 16 Webpack 也不达标：停止准入，回到 Checkpoint A 或迁移起点定位，不用配置压制错误。
 
 #### NEXT-53 文档与规则收尾
 
-- [ ] 更新本文任务状态、精确版本、验证结果、性能数据和未决风险。
-- [ ] 使用 `doc-maintainer` 更新长期技术文档：开发编译器、预览 runtime/依赖合同、部署构建事实与对应模块 INDEX。
-- [ ] 更新根 AGENTS.md：Next/React 版本、默认 bundler、基线命令、Turbopack 已知约束；删除已失效的 Next 14.1 说明。
+- [x] 更新本文任务状态、精确版本、验证结果和未决风险；性能 A/B 数据待 Wave 5 完成后追加。
+- [x] 使用 `doc-maintainer` 更新长期技术文档：开发编译器、预览 runtime/依赖合同与对应模块 INDEX；部署镜像门禁仍待完成。
+- [x] 更新根 AGENTS.md：Next/React 版本、默认 bundler、基线命令、Turbopack 已知约束；删除已失效的 Next 14.1 说明。
 - [ ] 若任务完成，按 `docs/plans/已完成/README.md` 压缩并归档本文；旧性能方案只保留最终索引与历史数据。
 
 ## 八、文件所有权矩阵
@@ -697,3 +702,11 @@ corepack pnpm check:docker-build
 ## 十二、进度记录
 
 - 2026-08-12：完成方案编制。确认 Next 14 unsupported、Next 16 Active LTS；盘点三套 Next app、77 个同步动态 Route Handler、异步 cookie helper 传播、Proxy/Instrumentation/native、Webpack 专属配置、React 19 peer 风险与预览 runtime 隐藏耦合；形成 6 个 Wave、任务 ID、文件所有权、验证矩阵和分层回退策略。
+- 2026-08-13：完成 Next 16.2.12 / React 19.2.3 依赖收口、Async Request APIs 分片迁移、`middleware.ts` → `proxy.ts`、ESLint flat config、预览合同 v2 与 author/viewer/sketch 的 Webpack/Turbopack 双轨脚本。author 编辑页在 Turbopack 开发态完成浏览器冒烟，已验证 Markdown 文本与受限 NodeNext workspace `.js`→TS 解析规则；一次 `build:turbo` 已完整通过。随后在清理 `.next` 的重复构建中，Turbopack 停在优化阶段两分钟无输出且无 CPU 进展，已主动中止，故不能视为稳定生产构建。Next 16 的 Webpack 生产构建已通过；为修正 Next 16 ESM 配置加载及 bundler 等价性，author/viewer Tailwind 插件改用 ESM import，author 恢复 Markdown 的 Webpack `asset/source` rule。viewer 静态导出还发现 `/api/preview-runtime/shell` 未声明静态策略；添加 `dynamic = "force-static"` 和 workspace tracing root 后，Webpack build 通过并将该路由预渲染为静态内容。`check:author` 已在清除并行 TypeScript 争用后通过（156 suites / 1124 tests）；此前并行运行出现的 8 个跨模块 Jest 超时，串行全量同样全部通过，确认不是业务断言回归。`check:viewer`、`check:demo-ui`（97 tests）、`check:ai-chat-shared`、`check:sketch-core`（69 tests）、`check:sketch-react`（152 tests）、`check:sketch-playground`、preview-contract typecheck/test 和 Async Request API 静态检查均通过。草图 React 的 8 个多选/缩放失败已归因并修复为测试适配：hover/选择提交会替换 `dangerouslySetInnerHTML` 生成的 SVG 节点，测试改为在每次状态提交后重新查询目标节点，不再向脱离文档的旧引用派发事件。随后 author、viewer、sketch 三套 Webpack production build 及全仓 `lint:all` 均通过（lint 仅遗留历史告警）；agent-service 在允许本地端口绑定的环境通过 63 个测试文件、505 个测试，先前唯一 `EPERM` 属沙箱限制。默认 bundler 仍是 Webpack：同机三轮冷/热性能 A/B 被 ego-browser 无响应输出阻塞；Docker 预检还存在既有 data workspace drift，Docker BuildKit/OrbStack 在 agent-service 阶段报 RPC EOF；全量 E2E 与其余生产产物门禁待执行。
+- 2026-08-13（补充）：`check:all` 已通过 preview-contract 后被 `check:workspace-authority` 的 5 项既有业务守卫缺口阻断：live Workspace 恢复版本测试仍期待旧本地写入，且三个数据脚本未登记 local-write 白名单。这些项不涉及 Next/React 迁移，保留给 Workspace Authority 任务处理；不能把聚合门禁标记为全绿。
+- 2026-08-13（补充）：sketch-playground Playwright 先暴露 Next 16 对 `127.0.0.1` HMR 的开发来源限制；在其 Next config 增加 `allowedDevOrigins` 后，画布创建与性能基线用例恢复。随后右键菜单用例的人工 `dispatchEvent("contextmenu")` 在浏览器中将菜单落到不可点击位置，改为与用户一致的真实右键点击；完整 `test:e2e:sketch-playground` 通过 20/20。此次修复不改变生产画布行为。
+- 2026-08-13（补充）：在本地 author-site（4200）与 agent-service（4201）完整拓扑下，`test:e2e:core-flow` 通过：登录、项目创建、Workspace Authority 写入、保存与重读、编辑页加载均正常。用例末尾的发布入口断言由历史的“同步并发布/创建版本并发布”改为当前可访问名称“发布”。首次仅启动 author-site 时的 Authority 未就绪，以及冷编译下的加载延迟，均为测试前置条件而非迁移功能回归。
+- 2026-08-13（补充）：Docker 构建门禁曾因 `~/.orbstack/run/docker.sock` 不存在而无法启动；启动 OrbStack 后已重跑并完成 knowledge-service、agent-service、author-site、viewer-site 四个镜像。author 阶段完成 Next 16 standalone 产物与 `better-sqlite3` Linux 原生编译，viewer 阶段完成静态导出镜像；Docker build check 不再是本次迁移阻塞项。构建调用输出通道会提前释放，故以 Buildx 四个目标均为 `Completed`、且 author/viewer 镜像创建时间已刷新为验收证据。
+- 2026-08-13（补充）：以 `NEXT_TURBOPACK_TRACING=1` 复现 author `build:turbo`，在“Creating optimized production build”后 73 秒无新增输出、进程 CPU 为 0%，仅产生约 332 MB 的二进制 `packages/author-site/.next/trace-turbopack`；已安全中止（exit 130）。这证明 Turbopack 生产构建尚不具稳定性，默认继续固定 Webpack；不可仅凭此前一次成功构建切换默认。Docker Desktop context 同样缺少 `~/.docker/run/docker.sock`，需先启动任一 Docker daemon 后再验证镜像。
+- 2026-08-13（补充）：完整 `test:e2e` 首轮恰遇 agent-service `tsx` 热重启与按需路由首次编译，两个重型用例超时，不能作为有效集成结论。稳定拓扑下，core flow 通过；画布自动保存用例还暴露两处旧测试夹具与当前 Workspace Authority/Yjs-first 契约不符：知识库 live workspace 写入缺少 `sessionId`，且画布保存仍监听已移除的 REST `POST /canvas-layout`。测试已改为传入编辑 Session，并以“退出完成后从 GET 读到持久化布局”断言，定向 E2E 通过（2.3 分钟）。`test:e2e:sketch-playground` 已通过 20/20；完整 `test:e2e` 仍待在稳定、预热的全服务环境重新运行。
+- 2026-08-13（补充）：其余三个过期测试契约已收敛并通过各自定向回归：配置面板不再默认展开，测试在读取 schema 后显式切换“配置”标签；项目分类从文本框改为选择器，测试进入“自定义分类”后填写；画布页删除/撤回/重做改为真实选择操作和全局快捷键。手绘页面创作由 `NEXT_PUBLIC_SKETCH_SCENE_AUTHORING_ENABLED` feature flag 显式关闭，API 设计性返回 403，故手绘 E2E 在 flag 未开启时条件跳过，开启后自动恢复执行。完整 `test:e2e` 重新执行时其 runner 输出通道提前释放，而本地全服务拓扑仍在继续跑；停止服务时尚未写出最终结果，不能将该轮视为通过，需在可持续收集退出码的环境重跑。此次仅更新测试以匹配已验证的产品合同，不改变业务代码。

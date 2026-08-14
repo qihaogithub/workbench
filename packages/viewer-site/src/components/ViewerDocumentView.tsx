@@ -101,7 +101,7 @@ function ReadonlyDesignSpec({ doc, pool }: { doc: PublishedDesignSpecDoc; pool: 
                 {refs.map((item) => <tr key={item.id} className="hover:bg-accent/40"><td className="py-1 pr-2"><ConfigThumbnail item={item} /></td><td className="font-medium">{item.title}</td><td className="text-muted-foreground">{item.format || "—"}</td><td className="text-muted-foreground">—</td></tr>)}
                 {Array.from({ length: staleCount }).map((_, index) => <tr key={`stale-${index}`} className="text-muted-foreground"><td className="py-1 pr-2"><span className="inline-flex h-[52px] w-[52px] items-center justify-center rounded-md border bg-secondary">?</span></td><td className="italic">已失效引用</td><td>—</td><td>—</td></tr>)}
               </tbody></table>}
-              <div className={cn(entry.refs.length > 0 && "mt-3")}><div className="mb-1 text-[11px] font-medium text-muted-foreground">说明</div><DocumentEditor value={entry.markdown} onChange={() => {}} readOnly className="h-[260px] min-h-[220px] overflow-hidden rounded-md border" /></div>
+              <div className={cn(entry.refs.length > 0 && "mt-3")}><div className="mb-1 text-[11px] font-medium text-muted-foreground">说明</div><DocumentEditor value={entry.markdown} onChange={() => {}} readOnly scrollable={false} className="rounded-md border" /></div>
             </div>}
           </section>;
         })}

@@ -20,7 +20,7 @@ jest.mock("@workbench/project-core", () => {
 });
 
 jest.mock("@/lib/auth/jwt", () => ({
-  getAuthCookie: jest.fn(() => "token"),
+  getAuthCookie: jest.fn(async () => "token"),
   verifyToken: jest.fn(async () => ({ userId: "user-1" })),
 }));
 
@@ -80,7 +80,7 @@ describe("project export route", () => {
       {
         nextUrl: new URL("http://localhost/api/projects/project-1/export?manifest=1"),
       } as NextRequest,
-      { params: { projectId: "project-1" } },
+      { params: Promise.resolve({ projectId: "project-1" }) },
     );
     const body = await response.json();
 
@@ -95,7 +95,7 @@ describe("project export route", () => {
     const { GET } = await import("./route");
     const response = await GET(
       { nextUrl: new URL("http://localhost/api/projects/project-1/export") } as NextRequest,
-      { params: { projectId: "project-1" } },
+      { params: Promise.resolve({ projectId: "project-1" }) },
     );
 
     expect(response.status).toBe(200);

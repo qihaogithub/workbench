@@ -423,7 +423,6 @@ function enrichCompileError(
 ): { message: string; suggestion: string } {
   const lineMatch = rawMessage.match(/\((\d+):(\d+)\)$/);
   const line = lineMatch ? parseInt(lineMatch[1], 10) : undefined;
-  const col = lineMatch ? parseInt(lineMatch[2], 10) : undefined;
 
   let suggestion = '';
   let category = '';

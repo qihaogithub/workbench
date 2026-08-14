@@ -9,8 +9,9 @@ import { resolveUser } from "@/lib/comment-auth";
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string } },
+  { params }: { params: Promise<{ projectId: string }> },
 ) {
+  const { projectId } = await params;
   try {
     const user = await resolveUser(request);
     if (!user) {
@@ -19,7 +20,7 @@ export async function POST(
       });
     }
 
-    const visitor = recordVisit(params.projectId, user.userId, user.username);
+    const visitor = recordVisit(projectId, user.userId, user.username);
     return NextResponse.json(createApiSuccess({ visitor }));
   } catch (error) {
     console.error("记录访问失败:", error);

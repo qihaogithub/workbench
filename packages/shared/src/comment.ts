@@ -1,9 +1,7 @@
 /**
  * 评论功能共享类型定义
  *
- * 评论 = 用户在页面内容上点击添加的带位置上下文的留言线程。
- * 每条评论必然落在某个元素之上（anchor），元素信息仅作位置参考，
- * 不代表评论语义上"针对"该元素。
+ * 评论可绑定页面画布位置，或绑定工作区中的文档资源。
  */
 
 /** 评论作者身份 */
@@ -64,6 +62,33 @@ export interface CommentAnchor {
   snapshot?: CommentElementSnapshot;
 }
 
+/** 页面评论目标。 */
+export interface PageCommentTarget {
+  kind: "page";
+  pageId: string;
+}
+
+/** 文档评论的稳定资源标识。 */
+export interface DocumentCommentTarget {
+  kind: "document";
+  /** 工作区内路径；设计规范以 design-spec/<docId>#<entryId> 表示一个条目说明。 */
+  resourceId: string;
+  resourceLabel: string;
+}
+
+export type CommentTarget = PageCommentTarget | DocumentCommentTarget;
+
+/** 文档选区锚点。prefix/suffix 用于正文改动后的重新定位。 */
+export interface DocumentCommentAnchor {
+  kind: "document" | "selection";
+  quote?: string;
+  prefix?: string;
+  suffix?: string;
+  from?: number;
+  to?: number;
+  status?: "active" | "orphaned";
+}
+
 /** @AI 任务状态 */
 export type CommentAiTaskStatus = "pending" | "processing" | "done" | "failed";
 
@@ -71,11 +96,13 @@ export type CommentAiTaskStatus = "pending" | "processing" | "done" | "failed";
 export interface CommentThread {
   id: string;
   projectId: string;
-  pageId: string;
-  /** 必有：评论位置下方元素（位置上下文） */
-  anchor: CommentAnchor;
-  /** 必有：pin 视觉定位（0~1 归一化坐标） */
-  pin: { xRatio: number; yRatio: number };
+  target: CommentTarget;
+  /** 页面评论的位置上下文。 */
+  anchor?: CommentAnchor;
+  /** 页面评论 pin（0~1 归一化坐标）。 */
+  pin?: { xRatio: number; yRatio: number };
+  /** 文档评论的整篇/选区定位信息。 */
+  documentAnchor?: DocumentCommentAnchor;
   content: string;
   author: CommentAuthor;
   mentions?: CommentMention[];

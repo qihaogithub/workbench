@@ -15,7 +15,7 @@ const createTextWorkspaceMutation = jest.fn((input: unknown) => ({
 }));
 
 jest.mock("@/lib/auth/jwt", () => ({
-  getAuthCookie: jest.fn(() => "token"),
+  getAuthCookie: jest.fn(async () => "token"),
   verifyToken: jest.fn(async () => ({
     userId: "user-1",
     username: "测试用户",
@@ -137,7 +137,7 @@ describe("workspace file content route", () => {
 
     const response = await GET(
       {} as NextRequest,
-      { params: { sessionId: "session-1", filePath: ["memory.md"] } },
+      { params: Promise.resolve({ sessionId: "session-1", filePath: ["memory.md"] }) },
     );
     const body = await response.json();
 
@@ -156,7 +156,7 @@ describe("workspace file content route", () => {
 
     const response = await GET(
       {} as NextRequest,
-      { params: { sessionId: "session-1", filePath: ["memory.md"] } },
+      { params: Promise.resolve({ sessionId: "session-1", filePath: ["memory.md"] }) },
     );
     const body = await response.json();
 
@@ -176,7 +176,7 @@ describe("workspace file content route", () => {
 
     const response = await GET(
       {} as NextRequest,
-      { params: { sessionId: "session-1", filePath: ["convention.md"] } },
+      { params: Promise.resolve({ sessionId: "session-1", filePath: ["convention.md"] }) },
     );
     const body = await response.json();
 
@@ -194,7 +194,7 @@ describe("workspace file content route", () => {
 
     const response = await GET(
       {} as NextRequest,
-      { params: { sessionId: "session-1", filePath: ["demos", "..", "index.tsx"] } },
+      { params: Promise.resolve({ sessionId: "session-1", filePath: ["demos", "..", "index.tsx"] }) },
     );
     const body = await response.json();
 
@@ -211,7 +211,7 @@ describe("workspace file content route", () => {
 
     const response = await PUT(
       jsonRequest({ content: "new code" }),
-      { params: { sessionId: "session-1", filePath: ["index.tsx"] } },
+      { params: Promise.resolve({ sessionId: "session-1", filePath: ["index.tsx"] }) },
     );
     const body = await response.json();
 
@@ -244,7 +244,7 @@ describe("workspace file content route", () => {
 
     const response = await PUT(
       jsonRequest({ content: "new code" }),
-      { params: { sessionId: "session-1", filePath: ["demos", "..", "index.tsx"] } },
+      { params: Promise.resolve({ sessionId: "session-1", filePath: ["demos", "..", "index.tsx"] }) },
     );
     const body = await response.json();
 
@@ -264,7 +264,7 @@ describe("workspace file content route", () => {
 
     const response = await DELETE(
       {} as NextRequest,
-      { params: { sessionId: "session-1", filePath: ["convention.md"] } },
+      { params: Promise.resolve({ sessionId: "session-1", filePath: ["convention.md"] }) },
     );
     const body = await response.json();
 
@@ -286,7 +286,7 @@ describe("workspace file content route", () => {
 
     const response = await DELETE(
       {} as NextRequest,
-      { params: { sessionId: "session-1", filePath: ["index.tsx"] } },
+      { params: Promise.resolve({ sessionId: "session-1", filePath: ["index.tsx"] }) },
     );
     const body = await response.json();
 

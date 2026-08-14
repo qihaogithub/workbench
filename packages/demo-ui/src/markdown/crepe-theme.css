@@ -47,6 +47,21 @@
   background: var(--crepe-color-background);
 }
 
+.document-editor-crepe > .crepe {
+  position: relative;
+}
+
+/* 规范说明等嵌入式只读内容由父级统一滚动，避免产生嵌套滚动条。 */
+.document-editor-crepe[data-scrollable="false"] > .crepe,
+.document-editor-crepe[data-scrollable="false"] .milkdown {
+  height: auto;
+  overflow: visible;
+}
+
+.document-editor-crepe[data-scrollable="false"] .milkdown .ProseMirror {
+  min-height: 0;
+}
+
 .document-editor-crepe .milkdown .ProseMirror {
   box-sizing: border-box;
   min-height: 200px;
@@ -66,13 +81,14 @@
 
 .document-editor-crepe .milkdown .milkdown-top-bar {
   box-sizing: border-box;
+  position: relative;
   top: 0;
   min-width: 0;
   width: 100%;
   max-width: 100%;
   min-height: 44px;
   padding: 0 8px;
-  overflow: hidden;
+  overflow: visible;
   flex-wrap: nowrap;
   border-bottom: 1px solid var(--crepe-color-surface-low);
   background: var(--crepe-color-surface);
@@ -83,10 +99,13 @@
 }
 
 .document-editor-crepe .milkdown .milkdown-top-bar .top-bar-inner {
+  position: relative;
+  box-sizing: border-box;
   flex: 1 1 0;
   min-width: 0;
   max-width: 100%;
-  overflow: hidden;
+  padding-right: 48px;
+  overflow: visible;
   flex-wrap: nowrap;
 }
 
@@ -104,18 +123,59 @@
 }
 
 .document-editor-crepe .milkdown .milkdown-top-bar .top-bar-heading-dropdown {
+  position: absolute;
+  z-index: 31;
+  top: 100%;
+  left: 0;
+  min-width: 160px;
+  padding: 8px 4px 4px;
+  border-radius: 8px;
   border: 1px solid var(--crepe-color-surface-low);
   background: var(--crepe-color-surface);
   box-shadow: var(--crepe-shadow-2);
 }
 
-.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow {
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-heading-selector {
   position: relative;
-  margin-left: auto;
+  z-index: 30;
+  flex-shrink: 0;
+  padding: 6px;
 }
 
-.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-trigger,
-.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-item {
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-heading-button {
+  display: flex;
+  height: 32px;
+  box-sizing: border-box;
+  align-items: center;
+  padding: 4px 4px 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-heading-label {
+  min-width: 42px;
+}
+
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-heading-option {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.document-editor-crepe > .top-bar-overflow {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 2;
+}
+
+.document-editor-crepe .top-bar-overflow-trigger,
+.document-editor-crepe .top-bar-overflow-item {
   display: inline-flex;
   width: 32px;
   height: 32px;
@@ -127,20 +187,20 @@
   color: var(--crepe-color-on-surface);
 }
 
-.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-trigger {
+.document-editor-crepe .top-bar-overflow-trigger {
   font-size: 20px;
   line-height: 1;
 }
 
-.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-trigger:hover,
-.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-item:hover,
-.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-heading:hover,
-.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-heading-option:hover,
-.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-back:hover {
+.document-editor-crepe .top-bar-overflow-trigger:hover,
+.document-editor-crepe .top-bar-overflow-item:hover,
+.document-editor-crepe .top-bar-overflow-heading:hover,
+.document-editor-crepe .top-bar-overflow-heading-option:hover,
+.document-editor-crepe .top-bar-overflow-back:hover {
   background: var(--crepe-color-hover);
 }
 
-.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-menu {
+.document-editor-crepe .top-bar-overflow-menu {
   position: absolute;
   z-index: 30;
   top: calc(100% + 4px);
@@ -156,9 +216,9 @@
   box-shadow: var(--crepe-shadow-2);
 }
 
-.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-heading,
-.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-heading-option,
-.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-back {
+.document-editor-crepe .top-bar-overflow-heading,
+.document-editor-crepe .top-bar-overflow-heading-option,
+.document-editor-crepe .top-bar-overflow-back {
   width: 100%;
   padding: 6px 8px;
   border: 0;
@@ -297,7 +357,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  min-width: 78px;
+  min-width: 48px;
   height: 30px;
   padding: 0 8px;
   border: 0;

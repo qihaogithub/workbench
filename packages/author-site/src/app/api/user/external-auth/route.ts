@@ -15,7 +15,7 @@ import { createApiError, createApiSuccess } from "@/lib/fs-utils";
 import { listActiveSessionsForUser } from "@/lib/session-manager";
 
 async function requireUserId(): Promise<string | null> {
-  const token = getAuthCookie();
+  const token = await getAuthCookie();
   if (!token) return null;
   const payload = await verifyToken(token);
   return payload?.userId || null;

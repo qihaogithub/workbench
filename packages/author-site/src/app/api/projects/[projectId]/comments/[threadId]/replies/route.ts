@@ -4,7 +4,7 @@ import { createApiSuccess, createApiError } from "@/lib/fs-utils";
 import { createReply } from "@/lib/comment-store";
 import { resolveCommentAuthor } from "@/lib/comment-auth";
 
-type RouteParams = { params: { projectId: string; threadId: string } };
+type RouteParams = { params: Promise<{ projectId: string; threadId: string }> };
 
 interface CreateReplyBody {
   content?: string;
@@ -18,6 +18,7 @@ interface CreateReplyBody {
  * 添加回复（支持匿名）
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
+  const { projectId, threadId } = await params;
   try {
     const body = (await request.json()) as CreateReplyBody;
 
@@ -45,8 +46,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     const result = await createReply({
-      projectId: params.projectId,
-      threadId: params.threadId,
+      projectId,
+      threadId,
       content: body.content.trim(),
       author: authorResult.author,
       mentions,

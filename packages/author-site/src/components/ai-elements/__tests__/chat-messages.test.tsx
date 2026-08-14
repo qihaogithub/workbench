@@ -67,4 +67,35 @@ describe("ChatMessages 流式占位", () => {
     expect(await screen.findByText("页面已创建")).toBeInTheDocument();
     expect(screen.queryByTestId("ai-working-indicator")).not.toBeInTheDocument();
   });
+
+  it("仅展示服务端回执确认的 mutation 与 projection 状态", async () => {
+    renderChatMessages({
+      isStreaming: false,
+      messages: [
+        {
+          id: "assistant-1",
+          role: "assistant",
+          content: "页面已更新",
+          runSummary: {
+            mutations: [
+              {
+                mutationId: "mutation-1",
+                revision: 7,
+                status: "committed",
+                resources: [
+                  { path: "demos/home/prototype.html", action: "modified" },
+                ],
+                actor: "agent",
+              },
+            ],
+            projections: [
+              { revision: 7, surface: "preview", status: "failed" },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(await screen.findByText("已提交 1 项修改；1 项预览同步失败")).toBeInTheDocument();
+  });
 });

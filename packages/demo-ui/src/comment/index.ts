@@ -8,11 +8,13 @@ export { CommentCreatePopover } from "./CommentCreatePopover";
 export { MentionPicker, MentionTextarea, MentionContent } from "./MentionPicker";
 export { CommentSidebar } from "./CommentSidebar";
 export { CommentPanel } from "./CommentPanel";
+export { DocumentCommentPanel } from "./DocumentCommentPanel";
 export { useComments, threadMentionsUser } from "./useComments";
 export type {
   CommentApiAdapter,
   CommentFilter,
   CommentLayerProps,
+  CanvasCommentDraft,
   CreateCommentInput,
   AddReplyInput,
   UpdateCommentContentInput,
@@ -29,4 +31,5 @@ export type {
 } from "./MentionPicker";
 export type { CommentSidebarProps } from "./CommentSidebar";
 export type { CommentPanelProps } from "./CommentPanel";
+export type { DocumentCommentPanelProps } from "./DocumentCommentPanel";
 export type { UseCommentsOptions, UseCommentsResult } from "./useComments";

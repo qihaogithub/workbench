@@ -3,6 +3,6 @@ import { clearAuthCookie } from "@/lib/auth/jwt";
 import { createApiSuccess } from "@/lib/fs-utils";
 
 export async function POST() {
-  clearAuthCookie();
+  await clearAuthCookie();
   return NextResponse.json(createApiSuccess({ message: "已登出" }));
 }

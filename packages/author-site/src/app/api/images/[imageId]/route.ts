@@ -19,9 +19,9 @@ const MIME_TYPES: Record<string, string> = {
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { imageId: string } },
+  { params }: { params: Promise<{ imageId: string }> },
 ) {
-  const { imageId } = params;
+  const { imageId } = await params;
 
   if (!imageId) {
     return NextResponse.json({ error: "Missing image ID" }, { status: 400 });

@@ -892,19 +892,24 @@ export function cleanupExpiredSessions(userId: string): string[] {
       try {
         const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
         if (Date.now() > meta.expiresAt) {
+          let changed = false;
           // 仅清理 workspace，保留 session 元数据和消息
           if (meta.workspaceId && !isLiveWorkspace(meta.workspaceId)) {
             const wsPath = findWorkspacePath(meta.workspaceId);
             if (wsPath && fs.existsSync(wsPath)) {
               fs.rmSync(wsPath, { recursive: true, force: true });
+              changed = true;
             }
           }
           // 更新状态为 expired
           if (meta.status === 'editing') {
             meta.status = 'expired';
             fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
+            changed = true;
           }
-          cleaned.push(sessionDir.name);
+          if (changed) {
+            cleaned.push(sessionDir.name);
+          }
         }
       } catch {
         continue;
@@ -958,19 +963,24 @@ export function cleanupAllExpiredSessions(): string[] {
         try {
           const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
           if (Date.now() > meta.expiresAt) {
+            let changed = false;
             // 仅清理 workspace，保留 session 元数据和消息
             if (meta.workspaceId && !isLiveWorkspace(meta.workspaceId)) {
               const wsPath = findWorkspacePath(meta.workspaceId);
               if (wsPath && fs.existsSync(wsPath)) {
                 fs.rmSync(wsPath, { recursive: true, force: true });
+                changed = true;
               }
             }
             // 更新状态为 expired
             if (meta.status === 'editing') {
               meta.status = 'expired';
               fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
+              changed = true;
             }
-            cleaned.push(sessionDir.name);
+            if (changed) {
+              cleaned.push(sessionDir.name);
+            }
           }
         } catch {
           continue;

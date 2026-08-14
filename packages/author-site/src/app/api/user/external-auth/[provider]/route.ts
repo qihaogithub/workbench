@@ -15,7 +15,7 @@ import { createApiError, createApiSuccess } from "@/lib/fs-utils";
 import { listActiveSessionsForUser } from "@/lib/session-manager";
 
 async function requireUserId(): Promise<string | null> {
-  const token = getAuthCookie();
+  const token = await getAuthCookie();
   if (!token) return null;
   const payload = await verifyToken(token);
   return payload?.userId || null;
@@ -36,7 +36,7 @@ async function syncExternalAuthToActiveSessions(userId: string): Promise<void> {
 
 export async function DELETE(
   _request: Request,
-  context: { params: { provider: string } },
+  context: { params: Promise<{ provider: string }> },
 ) {
   try {
     const userId = await requireUserId();
@@ -46,7 +46,7 @@ export async function DELETE(
       });
     }
 
-    const provider = context.params.provider;
+    const { provider } = await context.params;
     if (!isProvider(provider)) {
       return NextResponse.json(
         createApiError("INVALID_REQUEST", "不支持的外部授权类型"),

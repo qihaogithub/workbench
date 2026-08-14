@@ -6,6 +6,7 @@ import {
   useEffect,
   useRef,
   useMemo,
+  use,
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -32,13 +33,18 @@ import type {
 import type { PreviewStagePage } from "@workbench/demo-ui/preview-stage-types";
 import type {
   CommentAuthor,
+  CommentTarget,
+  DocumentCommentAnchor,
   DemoPageRuntimeType,
   ProjectAuthoringPreferences,
   PrototypePageMeta,
   SketchSceneDocument,
 } from "@workbench/shared";
 import { createAuthorCommentApi } from "@/lib/comment-api-client";
-import { useComments } from "@workbench/demo-ui/comment";
+import {
+  useComments,
+  type CanvasCommentDraft,
+} from "@workbench/demo-ui/comment";
 import { getBrowserAgentServiceUrl } from "@/lib/runtime-config";
 import {
   createDefaultSketchScene,
@@ -255,9 +261,11 @@ const PageConfigPanel = dynamic(
   () => import("@workbench/demo-ui/PageConfigPanel").then((m) => m.PageConfigPanel),
   { ssr: false, loading: () => null },
 );
-const AIChat = dynamic(
+const DeferredAuthorAIChat = dynamic(
   () =>
-    import("@/components/ai-elements/author-ai-chat").then((m) => m.AIChat),
+    import("@/components/ai-elements/deferred-author-ai-chat").then(
+      (module) => module.DeferredAuthorAIChat,
+    ),
   { ssr: false, loading: () => null },
 );
 const VisualPropertyPanel = dynamic(
@@ -366,9 +374,9 @@ const ResourceHistoryDialog = dynamic(
 );
 
 interface DemoEditPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 type AiFileChange = {
@@ -887,7 +895,7 @@ function getCanvasContentHistorySignature(state: CanvasState): string {
 
 export default function DemoEditPage({ params }: DemoEditPageProps) {
   const router = useRouter();
-  const { id: demoId } = params;
+  const { id: demoId } = use(params);
   const { toast } = useToast();
   const toastRef = useRef(toast);
   toastRef.current = toast;
@@ -2174,15 +2182,22 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [activeCommentThreadId, setActiveCommentThreadId] = useState<
     string | null
   >(null);
-  const [canvasCommentTarget, setCanvasCommentTarget] = useState<{
-    pageId: string;
-    pageName: string;
-  } | null>(null);
+  const [activeDocumentCommentTarget, setActiveDocumentCommentTarget] = useState<CommentTarget | null>(null);
+  const [documentCommentSelection, setDocumentCommentSelection] = useState<DocumentCommentAnchor | null>(null);
+  const [canvasCommentDraft, setCanvasCommentDraft] =
+    useState<CanvasCommentDraft | null>(null);
   const commentsData = useComments({
     projectId: demoId,
-    pageId: activeDemoId,
+    target: { kind: "page", pageId: activeDemoId },
     api: commentApi,
     wsUrl: commentWsUrl,
+  });
+  const documentCommentsData = useComments({
+    projectId: demoId,
+    target: activeDocumentCommentTarget ?? { kind: "document", resourceId: "", resourceLabel: "" },
+    api: commentApi,
+    wsUrl: commentWsUrl,
+    enabled: Boolean(activeDocumentCommentTarget),
   });
   const unresolvedCommentCount = commentsData.threads.filter(
     (t) => !t.resolved,
@@ -7162,7 +7177,10 @@ ${context.details}
     ) : undefined;
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div
+      className="flex flex-col h-screen bg-background"
+      data-testid="editor-ready"
+    >
       <div className="flex items-center px-6 py-4 border-b bg-card">
         <div className="flex flex-1 items-center gap-4">
           <Button
@@ -7413,7 +7431,8 @@ await handlePublishWithScreenshot();
                 forceMount
                 className="flex-1 flex flex-col mt-0 min-h-0 min-w-0 data-[state=inactive]:hidden"
               >
-                <AIChat
+                <DeferredAuthorAIChat
+                  ready={!isInitialPageLoading}
                   key={agentSessionId}
                   sessionId={sessionId}
                   agentSessionId={agentSessionId}
@@ -8055,6 +8074,11 @@ await handlePublishWithScreenshot();
                   projectId={demoId}
                   sessionId={sessionId}
                   pages={demoPages.map((p) => ({ id: p.id, name: p.name }))}
+                  onCommentTargetChange={setActiveDocumentCommentTarget}
+                  onDocumentCommentSelection={(documentAnchor) => {
+                    setActiveCommentThreadId(null);
+                    setDocumentCommentSelection(documentAnchor);
+                  }}
                   onItemsChange={setKnowledgeItems}
                   onItemsLoaded={(items) => setKnowledgeItems(items)}
                   onDocHistory={(item) => setKbHistoryItem(item)}
@@ -8127,7 +8151,7 @@ await handlePublishWithScreenshot();
                 wsUrl={commentWsUrl}
                 currentUser={commentUser}
                 canMentionAgent
-                disabled={previewMode === "canvas"}
+                disabled={false}
                 showToggle={false}
                 commentMode={commentModeActive}
                 onCommentModeChange={setCommentModeActive}
@@ -8143,6 +8167,8 @@ await handlePublishWithScreenshot();
                 onDeleteReply={commentsData.deleteReply}
                 onRetryAiTask={commentsData.retryAiTask}
                 showPins={rightPanelTab === "comments"}
+                canvasCreateDraft={canvasCommentDraft}
+                onCanvasCreateDraftChange={setCanvasCommentDraft}
               >
               <PreviewStage
                 pages={previewStagePages}
@@ -8587,13 +8613,22 @@ await handlePublishWithScreenshot();
                     }
                   },
                   onPageComment: commentModeActive
-                    ? (pageId) => {
+                    ? ({ pageId, pageName, pin, clientX, clientY }) => {
                         setRightPanelTab("comments");
-                        setCanvasCommentTarget({
-                          pageId,
-                          pageName:
-                            demoPages.find((page) => page.id === pageId)
-                              ?.name ?? "未命名页面",
+                        setCanvasCommentDraft({
+                          input: {
+                            target: { kind: "page", pageId },
+                            anchor: {
+                              domPath: "canvas-page",
+                              tagName: "canvas-page",
+                              componentName: pageName,
+                              textSnippet: pageName,
+                              snapshot: { attrs: { "data-page-id": pageId } },
+                            },
+                            pin,
+                          },
+                          clientX,
+                          clientY,
                         });
                       }
                     : undefined,
@@ -8687,16 +8722,21 @@ await handlePublishWithScreenshot();
             <ResizablePanel className="relative flex flex-col overflow-hidden border-l bg-card">
               {previewMode === "document" ? (
                 <DocumentModeRightPanel
-                  threads={commentsData.threads}
+                  target={activeDocumentCommentTarget}
+                  threads={documentCommentsData.threads}
                   currentUserId={currentUserId || undefined}
+                  currentUser={commentUser}
+                  mentionCandidates={[]}
+                  canMentionAgent={true}
                   activeThreadId={activeCommentThreadId}
                   onSelectThread={(id) => {
                     setActiveCommentThreadId(id);
                     setCommentModeActive(false);
                   }}
-                  commentMode={commentModeActive}
-                  onCommentModeChange={setCommentModeActive}
-                  unresolvedCount={unresolvedCommentCount}
+                  onCreateComment={documentCommentsData.createComment}
+                  selectionDraft={documentCommentSelection}
+                  onSelectionDraftHandled={() => setDocumentCommentSelection(null)}
+                  unresolvedCount={documentCommentsData.threads.filter((thread) => !thread.resolved).length}
                 />
               ) : previewMode === "single" ? (
                 <>
@@ -9016,11 +9056,6 @@ await handlePublishWithScreenshot();
                       commentMode={commentModeActive}
                       onCommentModeChange={setCommentModeActive}
                       createHint="点击画布页面后，直接添加页面级评论"
-                      canvasCommentTarget={canvasCommentTarget}
-                      onCanvasCommentTargetChange={setCanvasCommentTarget}
-                      api={commentApi}
-                      onCreateComment={commentsData.createComment}
-                      canMentionAgent
                     />
                   </TabsContent>
                 </Tabs>

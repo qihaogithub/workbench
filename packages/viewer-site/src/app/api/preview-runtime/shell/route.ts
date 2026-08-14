@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { generateIframeHtml } from "@workbench/demo-ui/iframe-template";
 
+// 该 shell 只读取构建时环境变量；viewer 的静态导出必须把这一点显式告知 Next。
+export const dynamic = "force-static";
+
 function shouldUsePreviewRuntimeCdn(): boolean {
   return (
     process.env.PREVIEW_RUNTIME_SOURCE === "cdn" ||

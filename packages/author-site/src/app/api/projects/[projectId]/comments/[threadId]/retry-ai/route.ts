@@ -3,13 +3,14 @@ import { createApiSuccess, createApiError } from "@/lib/fs-utils";
 import { getCommentThread, retryAiTask } from "@/lib/comment-store";
 import { resolveCommentAuthor, canModify } from "@/lib/comment-auth";
 
-type RouteParams = { params: { projectId: string; threadId: string } };
+type RouteParams = { params: Promise<{ projectId: string; threadId: string }> };
 
 /**
  * POST /api/projects/[projectId]/comments/[threadId]/retry-ai
  * @AI 任务失败后重试：将线程状态置回 pending 并重新入队。
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
+  const { projectId, threadId } = await params;
   try {
     let body: { anonymousId?: string; displayName?: string } = {};
     try {
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const existing = getCommentThread(params.projectId, params.threadId);
+    const existing = getCommentThread(projectId, threadId);
     if (!existing) {
       return NextResponse.json(createApiError("COMMENT_NOT_FOUND", "评论不存在"), {
         status: 404,
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       });
     }
 
-    const thread = await retryAiTask(params.projectId, params.threadId);
+    const thread = await retryAiTask(projectId, threadId);
     return NextResponse.json(createApiSuccess({ thread }));
   } catch (error) {
     console.error("重试评论 AI 任务失败:", error);

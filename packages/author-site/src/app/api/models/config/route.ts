@@ -20,7 +20,7 @@ export async function GET() {
     const config = JSON.parse(JSON.stringify(await getModelConfig())) as Awaited<
       ReturnType<typeof getModelConfig>
     >;
-    const token = getAuthCookie();
+    const token = await getAuthCookie();
     const payload = token ? await verifyToken(token) : null;
     const userProviders = payload
       ? readUserBackendProvidersConfig(payload.userId)

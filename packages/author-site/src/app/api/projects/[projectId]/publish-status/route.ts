@@ -4,10 +4,11 @@ import { getPublishStatus } from '@/lib/publish-manager';
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { projectId: string } },
+  { params }: { params: Promise<{ projectId: string }> },
 ) {
+  const { projectId } = await params;
   try {
-    const result = getPublishStatus(params.projectId);
+    const result = getPublishStatus(projectId);
     return NextResponse.json(createApiSuccess(result));
   } catch (error) {
     if (error instanceof Error && error.message === 'PROJECT_NOT_FOUND') {

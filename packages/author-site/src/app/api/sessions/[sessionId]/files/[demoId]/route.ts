@@ -242,10 +242,10 @@ function isSketchPatchOperationCandidate(value: unknown): boolean {
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { sessionId: string; demoId: string } },
+  { params }: { params: Promise<{ sessionId: string; demoId: string }> },
 ) {
   try {
-    const token = getAuthCookie();
+    const token = await getAuthCookie();
     if (!token) {
       return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
         status: 401,
@@ -259,7 +259,7 @@ export async function GET(
       });
     }
 
-    const { sessionId, demoId } = params;
+    const { sessionId, demoId } = await params;
 
     if (!sessionExists(sessionId)) {
       return NextResponse.json(createApiError("SESSION_NOT_FOUND"), {
@@ -313,10 +313,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { sessionId: string; demoId: string } },
+  { params }: { params: Promise<{ sessionId: string; demoId: string }> },
 ) {
   try {
-    const token = getAuthCookie();
+    const token = await getAuthCookie();
     if (!token) {
       return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
         status: 401,
@@ -330,7 +330,7 @@ export async function PUT(
       });
     }
 
-    const { sessionId, demoId } = params;
+    const { sessionId, demoId } = await params;
 
     if (!sessionExists(sessionId)) {
       return NextResponse.json(createApiError("SESSION_NOT_FOUND"), {

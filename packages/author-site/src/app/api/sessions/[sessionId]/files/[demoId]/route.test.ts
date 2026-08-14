@@ -13,7 +13,7 @@ jest.mock("fs", () => ({
 }));
 
 jest.mock("@/lib/auth/jwt", () => ({
-  getAuthCookie: jest.fn(() => "token"),
+  getAuthCookie: jest.fn(async () => "token"),
   verifyToken: jest.fn(async () => ({
     userId: "user-1",
     username: "测试用户",
@@ -201,7 +201,7 @@ describe("session demo page files route sketch patch", () => {
     });
 
     const response = await GET({} as NextRequest, {
-      params: { sessionId: "session-1", demoId: "page-sketch" },
+      params: Promise.resolve({ sessionId: "session-1", demoId: "page-sketch" }),
     });
     const body = await response.json();
 
@@ -252,7 +252,7 @@ describe("session demo page files route sketch patch", () => {
           traceId: "trace-stale-patch",
         },
       }),
-      { params: { sessionId: "session-1", demoId: "page-sketch" } },
+      { params: Promise.resolve({ sessionId: "session-1", demoId: "page-sketch" }) },
     );
     const body = await response.json();
 
@@ -320,7 +320,7 @@ describe("session demo page files route sketch patch", () => {
           traceId: "trace-valid-patch",
         },
       }),
-      { params: { sessionId: "session-1", demoId: "page-sketch" } },
+      { params: Promise.resolve({ sessionId: "session-1", demoId: "page-sketch" }) },
     );
     const body = await response.json();
 
@@ -384,7 +384,7 @@ describe("session demo page files route sketch patch", () => {
           traceId: "trace-server-patch",
         },
       }),
-      { params: { sessionId: "session-1", demoId: "page-sketch" } },
+      { params: Promise.resolve({ sessionId: "session-1", demoId: "page-sketch" }) },
     );
     const body = await response.json();
 
@@ -461,7 +461,7 @@ describe("session demo page files route sketch patch", () => {
         sketchScene: nextSceneJson,
         sketchMeta: { source: "test" },
       }),
-      { params: { sessionId: "session-1", demoId: "page-sketch" } },
+      { params: Promise.resolve({ sessionId: "session-1", demoId: "page-sketch" }) },
     );
     const body = await response.json();
 
@@ -548,7 +548,7 @@ describe("session demo page files route sketch patch", () => {
             traceId: rejectedTraceId,
           },
         }),
-        { params: { sessionId: "session-1", demoId: "page-sketch" } },
+        { params: Promise.resolve({ sessionId: "session-1", demoId: "page-sketch" }) },
       );
 
       expect(rejectedResponse.status).toBe(409);
@@ -600,7 +600,7 @@ describe("session demo page files route sketch patch", () => {
             traceId: validatedTraceId,
           },
         }),
-        { params: { sessionId: "session-1", demoId: "page-sketch" } },
+        { params: Promise.resolve({ sessionId: "session-1", demoId: "page-sketch" }) },
       );
 
       expect(validatedResponse.status).toBe(200);

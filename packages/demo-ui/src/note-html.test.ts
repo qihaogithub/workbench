@@ -70,6 +70,16 @@ describe("renderPageRequirementsMarkdown", () => {
     expect(html).not.toContain("pr-ref");
   });
 
+  it("资源规范展示可保留 HTTPS 图片，默认仍移除外部媒体", () => {
+    const markdown = "![规范图](https://example.com/spec.png)";
+    expect(renderPageRequirementsMarkdown(markdown)).not.toContain(
+      'src="https://example.com/spec.png"',
+    );
+    expect(
+      renderPageRequirementsMarkdown(markdown, { allowExternalMedia: true }),
+    ).toContain('src="https://example.com/spec.png"');
+  });
+
   it("空内容返回空字符串", () => {
     expect(renderPageRequirementsMarkdown("")).toBe("");
   });

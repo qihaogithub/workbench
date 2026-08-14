@@ -10,10 +10,10 @@ import {
 
 export async function POST(
   _request: Request,
-  { params }: { params: { sessionId: string } },
+  { params }: { params: Promise<{ sessionId: string }> },
 ) {
   try {
-    const token = getAuthCookie();
+    const token = await getAuthCookie();
     if (!token) {
       return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
         status: 401,
@@ -27,7 +27,8 @@ export async function POST(
       });
     }
 
-    const session = getEditSession(params.sessionId);
+    const { sessionId } = await params;
+    const session = getEditSession(sessionId);
     if (!session) {
       return NextResponse.json(createApiError("SESSION_NOT_FOUND"), {
         status: 404,
@@ -50,11 +51,11 @@ export async function POST(
       const synced = await flushAndSyncProjectWorkspace({
         projectId: session.demoId,
         workspaceId: session.workspaceId,
-        sessionId: params.sessionId,
+        sessionId,
       });
       return NextResponse.json(
         createApiSuccess({
-          sessionId: params.sessionId,
+          sessionId,
           projectId: session.demoId,
           workspacePath: synced.workspacePath,
           canonicalRevision: synced.canonicalRevision,

@@ -17,10 +17,10 @@ function parseProjectAuthoringPreferences(value: unknown): ProjectAuthoringPrefe
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     const { name, category, authoringPreferences } = body as {
       name?: unknown;
@@ -83,10 +83,10 @@ export async function PATCH(
 
 export async function DELETE(
   _request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     const service = getProjectAdminService();
     const preview = service.deleteProjectPreview(id);

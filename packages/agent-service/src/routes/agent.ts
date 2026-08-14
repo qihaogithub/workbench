@@ -14,6 +14,7 @@ import { AgentConfig, FileAttachment, ImageAttachment } from '../core/types';
 import { logger } from '../utils/logger';
 import type { WorkspaceInfo } from '@workbench/shared/contracts';
 import { getWorkbenchToolCapabilities } from '../backends/pi-tools';
+import { isCanonicalCheckpointEnabled } from '../session/conversation-checkpoint-store';
 import {
   buildViewerAiSystemPrompt,
   buildViewerReadonlyContent,
@@ -112,7 +113,10 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
   scoped.get('/api/tools/capabilities', async (_request, reply: FastifyReply) => {
     return reply.send({
       success: true,
-      data: getWorkbenchToolCapabilities(),
+      data: {
+        ...getWorkbenchToolCapabilities(),
+        checkpointEnabled: isCanonicalCheckpointEnabled(),
+      },
     });
   });
 

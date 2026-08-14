@@ -87,12 +87,12 @@ describe("buildCrepeConfig", () => {
     expect(blockEdit?.textGroup).toMatchObject({
       label: "文本",
       text: { label: "正文" },
-      h1: { label: "一级标题" },
-      h2: { label: "二级标题" },
-      h3: { label: "三级标题" },
-      h4: { label: "四级标题" },
-      h5: { label: "五级标题" },
-      h6: { label: "六级标题" },
+      h1: { label: "H1" },
+      h2: { label: "H2" },
+      h3: { label: "H3" },
+      h4: { label: "H4" },
+      h5: { label: "H5" },
+      h6: { label: "H6" },
       quote: { label: "引用" },
       divider: { label: "分隔线" },
     });
@@ -120,12 +120,12 @@ describe("buildCrepeConfig", () => {
     expect(config.featureConfigs?.[Crepe.Feature.TopBar]).toMatchObject({
       headingOptions: [
         { label: "正文", level: null },
-        { label: "一级标题", level: 1 },
-        { label: "二级标题", level: 2 },
-        { label: "三级标题", level: 3 },
-        { label: "四级标题", level: 4 },
-        { label: "五级标题", level: 5 },
-        { label: "六级标题", level: 6 },
+        { label: "H1", level: 1 },
+        { label: "H2", level: 2 },
+        { label: "H3", level: 3 },
+        { label: "H4", level: 4 },
+        { label: "H5", level: 5 },
+        { label: "H6", level: 6 },
       ],
     });
   });

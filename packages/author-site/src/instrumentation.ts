@@ -2,8 +2,7 @@
  * Next.js Instrumentation Hook
  * 用于服务器端定时任务（如 Session 清理）
  *
- * 注意：需要在 next.config.js 中启用：
- * experimental: { instrumentationHook: true }
+ * Next.js 会自动加载此约定文件；无需配置 experimental flag。
  */
 
 let cleanupInterval: NodeJS.Timeout | null = null;

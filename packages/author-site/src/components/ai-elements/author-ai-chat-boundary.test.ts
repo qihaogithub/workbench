@@ -5,17 +5,30 @@ const authorSiteRoot = path.resolve(__dirname, "../../..");
 const workspaceRoot = path.resolve(authorSiteRoot, "../..");
 
 describe("author AI chat bundle boundary", () => {
-  it("编辑页通过宿主专用入口加载 AIChat，不经过全量聚合导出", () => {
+  it("编辑页通过二级延迟边界加载 AIChat，不把富文本依赖放进首屏路由", () => {
     const editorPage = fs.readFileSync(
       path.join(authorSiteRoot, "src/app/demo/[id]/edit/page.tsx"),
       "utf8",
     );
+    const deferredBoundary = fs.readFileSync(
+      path.join(
+        authorSiteRoot,
+        "src/components/ai-elements/deferred-author-ai-chat.tsx",
+      ),
+      "utf8",
+    );
 
     expect(editorPage).toContain(
-      'import("@/components/ai-elements/author-ai-chat")',
+      'import("@/components/ai-elements/deferred-author-ai-chat")',
     );
     expect(editorPage).not.toContain(
-      'import("@/components/ai-elements").then((m) => m.AIChat)',
+      'import("@/components/ai-elements/author-ai-chat")',
+    );
+    expect(deferredBoundary).toContain(
+      'import("@/components/ai-elements/author-ai-chat")',
+    );
+    expect(deferredBoundary).not.toContain(
+      'from "@workbench/ai-chat-shared"',
     );
   });
 

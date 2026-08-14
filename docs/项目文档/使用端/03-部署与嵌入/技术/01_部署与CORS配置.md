@@ -70,17 +70,17 @@ covers:
 
 ### 3.1 agent-service CORS 配置
 
-agent-service 使用 Fastify 的 `@fastify/cors` 插件，通过 `CORS_ORIGINS` 环境变量配置允许的来源：
+agent-service 使用 Fastify 的 `@fastify/cors` 插件，通过容器内的 `CORS_ORIGINS` 配置允许的来源。Docker Compose 从 `DOCKER_CORS_ORIGINS` 注入该值，与根目录 `.env` 中供 `pnpm dev` 使用的 `CORS_ORIGINS` 隔离：
 
 - 默认允许：`http://localhost:3200`、`http://127.0.0.1:3200`（创作端）
 - 使用端新增：`http://localhost:3300`、`http://127.0.0.1:3300`
-- 生产环境通过 `CORS_ORIGINS` 环境变量统一配置
+- Docker/生产环境通过 `DOCKER_CORS_ORIGINS` 统一配置；容器启动后会映射为 `CORS_ORIGINS`
 
 浏览器直连的 Agent 请求会在配置 API Key 时携带 `X-API-Key`。该头必须包含在 agent-service 的 CORS 预检允许头中；否则浏览器会在上传图片或其他 multipart 附件前拦截请求，并表现为无法连接 AI 服务。
 
 使用端 AI 问答由浏览器直接请求 agent-service 的只读接口，因此生产环境的 `CORS_ORIGINS` 也必须包含 viewer-site 实际访问域名。
 
-Docker Compose 会把 `.env.docker` 中的 `CORS_ORIGINS` 注入到 agent-service；如果新增正式访问域名，需要先更新 `.env.docker`，再通过部署脚本上线。
+Docker Compose 会把 `.env.docker` 中的 `DOCKER_CORS_ORIGINS` 注入到 agent-service；如果新增正式访问域名，需要先更新 `.env.docker`，再通过部署脚本上线。不能复用根目录开发环境的 `CORS_ORIGINS`，否则 Docker 的 `3200/3300` 来源可能被错误替换为开发服务的 `4200/4300`，使浏览器预检缺少 `Access-Control-Allow-Origin`。
 
 ### 3.2 author-site 创作端 CORS 配置
 

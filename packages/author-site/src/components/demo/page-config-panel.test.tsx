@@ -624,6 +624,27 @@ describe("PageConfigPanel 配置项与资源规范折叠区", () => {
     expect(screen.getByText("图片底部不留白。", { exact: false })).toBeInTheDocument();
   });
 
+  it("资源规范中的 Markdown 标题、列表和 HTTPS 图片按展示格式渲染", () => {
+    render(
+      <PageConfigPanel
+        pages={[{ id: "page_a", name: "页面 A", order: 0, schema: pageSchema, configData: {} }]}
+        activePageId="page_a"
+        detailPageId="page_a"
+        hideDetailHeader
+        readonly
+        requirementsPosition="beforeConfig"
+        requirements={"## 图片要求\n\n- 底部不留白\n\n![示例](https://example.com/spec.png)"}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "图片要求" })).toBeInTheDocument();
+    expect(screen.getByText("底部不留白")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "示例" })).toHaveAttribute(
+      "src",
+      "https://example.com/spec.png",
+    );
+  });
+
   it("可将资源规范视觉排列在配置项之前", () => {
     render(
       <PageConfigPanel
@@ -637,6 +658,36 @@ describe("PageConfigPanel 配置项与资源规范折叠区", () => {
     );
 
     expect(screen.getByText("资源规范").closest(".order-first")).not.toBeNull();
+  });
+
+  it("浏览端定位 Tab 只滚动到资源规范或配置项，不切换或隐藏内容", () => {
+    render(
+      <PageConfigPanel
+        pages={[{ id: "page_a", name: "页面 A", order: 0, schema: pageSchema, configData: {} }]}
+        activePageId="page_a"
+        detailPageId="page_a"
+        hideDetailHeader
+        readonly
+        requirementsPosition="beforeConfig"
+        requirements="# 图片要求\n\n底部不留白"
+        sectionNavigation="anchorTabs"
+      />,
+    );
+
+    const requirementsTab = screen.getByRole("button", { name: "资源规范" });
+    const configTab = screen.getByRole("button", { name: "配置项" });
+
+    expect(requirementsTab).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("图片要求", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("本页配置")).toBeInTheDocument();
+
+    fireEvent.click(configTab);
+
+    expect(configTab).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("图片要求", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("本页配置")).toBeInTheDocument();
+    expect(requirementsTab).not.toHaveAttribute("aria-expanded");
+    expect(configTab).not.toHaveAttribute("aria-expanded");
   });
 
   it("readonly 时资源规范不显示编辑按钮", () => {

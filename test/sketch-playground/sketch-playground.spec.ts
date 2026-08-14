@@ -444,12 +444,7 @@ test("sketch playground pans with the hand tool without changing scene JSON", as
 test("sketch playground runs commands from the canvas context menu", async ({ page }) => {
   await page.goto("/");
 
-  await page.locator('[data-sketch-node-id="card"]').dispatchEvent("contextmenu", {
-    bubbles: true,
-    cancelable: true,
-    clientX: 220,
-    clientY: 220,
-  });
+  await page.locator('[data-sketch-node-label="card"]').click({ button: "right" });
 
   const menu = page.getByRole("menu", { name: "草图右键菜单" });
   await expect(menu).toBeVisible();

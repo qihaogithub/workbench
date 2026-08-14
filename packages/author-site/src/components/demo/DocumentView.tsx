@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/dialog";
 import { DocumentEditor } from "@workbench/demo-ui";
 import type { KnowledgeItem } from "./KnowledgeDocDialog";
+import type { CommentTarget, DocumentCommentAnchor } from "@workbench/shared";
 import { DesignSpecEditor } from "./DesignSpecEditor";
 import type { DesignSpecMeta } from "@/lib/design-specs";
 import { cn } from "@/lib/utils";
@@ -114,6 +115,8 @@ export interface DocumentViewProps {
   onChatFileDelete?: (file: ChatAttachment) => void;
   onDocDeleted?: (item: KnowledgeItem) => void;
   designSpecFocus?: { docId: string; entryId: string } | null;
+  onCommentTargetChange?: (target: CommentTarget | null) => void;
+  onDocumentCommentSelection?: (anchor: DocumentCommentAnchor) => void;
 }
 
 export function DocumentView({
@@ -129,6 +132,8 @@ export function DocumentView({
   onChatFileDelete,
   onDocDeleted,
   designSpecFocus,
+  onCommentTargetChange,
+  onDocumentCommentSelection,
 }: DocumentViewProps) {
   const { toast } = useToast();
   const [items, setItems] = useState<KnowledgeItem[]>([]);
@@ -729,6 +734,21 @@ export function DocumentView({
       (activeTarget.kind === "designSpec" &&
         activeTarget.doc.id === target.doc.id));
 
+  useEffect(() => {
+    if (!activeTarget || activeTarget.kind === "designSpec") {
+      onCommentTargetChange?.(null);
+      return;
+    }
+    const resourceId = activeTarget.kind === "knowledge"
+      ? `knowledge/${activeTarget.item.fileName}`
+      : resolveWorkspaceFilePath(activeTarget);
+    if (!resourceId) return onCommentTargetChange?.(null);
+    const resourceLabel = activeTarget.kind === "knowledge"
+      ? activeTarget.item.title
+      : activeTarget.kind === "memory" ? "AI 记忆" : activeTarget.kind === "convention" ? "项目公约" : `${activeTarget.page.name} 页面公约`;
+    onCommentTargetChange?.({ kind: "document", resourceId, resourceLabel });
+  }, [activeTarget, onCommentTargetChange]);
+
   return (
     <div className="flex h-full min-h-0">
       {/* 目录区 */}
@@ -1127,6 +1147,7 @@ export function DocumentView({
                     scheduleSave(activeTarget, next);
                   }}
                   localizeRemoteImage={localizeRemoteImage}
+                  onCommentSelection={(selection) => onDocumentCommentSelection?.({ kind: "selection", ...selection, status: "active" })}
                   className="h-full"
                 />
               ) : (

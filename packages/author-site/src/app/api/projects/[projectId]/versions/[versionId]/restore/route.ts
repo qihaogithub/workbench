@@ -20,15 +20,16 @@ function projectService() {
 }
 
 async function getAuthenticatedUser() {
-  const token = getAuthCookie();
+  const token = await getAuthCookie();
   if (!token) return null;
   return verifyToken(token);
 }
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string; versionId: string } },
+  { params }: { params: Promise<{ projectId: string; versionId: string }> },
 ) {
+  const { projectId, versionId } = await params;
   const payload = await getAuthenticatedUser();
   if (!payload) {
     return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
@@ -58,7 +59,7 @@ export async function POST(
       });
     }
     const meta = getSessionMeta(body.sessionId);
-    if (!meta || meta.demoId !== params.projectId) {
+    if (!meta || meta.demoId !== projectId) {
       return NextResponse.json(createApiError("SESSION_NOT_FOUND"), {
         status: 404,
       });
@@ -76,7 +77,7 @@ export async function POST(
     }
     try {
       const synced = await flushAndSyncProjectWorkspace({
-        projectId: params.projectId,
+        projectId,
         workspaceId: body.workspaceId,
         sessionId: body.sessionId,
       });
@@ -95,8 +96,8 @@ export async function POST(
   }
 
   const result = projectService().restoreProjectVersion(
-    params.projectId,
-    params.versionId,
+    projectId,
+    versionId,
     actor,
     restoreWorkspaceProof,
   );

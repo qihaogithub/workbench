@@ -282,9 +282,16 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
         .slice(0, SCREENSHOT_METADATA_BATCH_LIMIT),
     [demos],
   );
+  const screenshotMetadataRequestBody = useMemo(
+    () =>
+      screenshotMetadataItems.length > 0
+        ? JSON.stringify({ items: screenshotMetadataItems })
+        : null,
+    [screenshotMetadataItems],
+  );
 
   useEffect(() => {
-    if (!loadScreenshotMetadata || screenshotMetadataItems.length === 0) {
+    if (!loadScreenshotMetadata || !screenshotMetadataRequestBody) {
       return;
     }
 
@@ -292,7 +299,7 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
     void fetch("/api/screenshots/metadata", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items: screenshotMetadataItems }),
+      body: screenshotMetadataRequestBody,
       cache: "no-store",
       signal: controller.signal,
     })
@@ -324,7 +331,11 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
       });
 
     return () => controller.abort();
-  }, [loadScreenshotMetadata, screenshotMetadataItems, screenshotRevision]);
+  }, [
+    loadScreenshotMetadata,
+    screenshotMetadataRequestBody,
+    screenshotRevision,
+  ]);
 
   const projectCategories = useMemo(
     () => uniqueCategories(demos.map((demo) => normalizeCategory(demo.category))),

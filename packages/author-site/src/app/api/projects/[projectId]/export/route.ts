@@ -10,14 +10,15 @@ import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { createApiError, createApiSuccess, getDataDir } from "@/lib/fs-utils";
 
 async function isAuthenticated(): Promise<boolean> {
-  const token = getAuthCookie();
+  const token = await getAuthCookie();
   return Boolean(token && (await verifyToken(token)));
 }
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } },
+  { params }: { params: Promise<{ projectId: string }> },
 ) {
+  const { projectId } = await params;
   if (!(await isAuthenticated())) {
     return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), {
       status: 401,
@@ -27,17 +28,17 @@ export async function GET(
   try {
     if (request.nextUrl.searchParams.get("manifest") === "1") {
       return NextResponse.json(
-        createApiSuccess(buildProjectManifest(getDataDir(), params.projectId)),
+        createApiSuccess(buildProjectManifest(getDataDir(), projectId)),
       );
     }
 
-    const archive = await createProjectArchive(getDataDir(), params.projectId);
+    const archive = await createProjectArchive(getDataDir(), projectId);
     const body = Uint8Array.from(archive).buffer;
     return new NextResponse(body, {
       status: 200,
       headers: {
         "Content-Type": "application/gzip",
-        "Content-Disposition": `attachment; filename="${params.projectId}.tar.gz"`,
+        "Content-Disposition": `attachment; filename="${projectId}.tar.gz"`,
         "Content-Length": String(archive.byteLength),
         "Cache-Control": "no-store",
       },

@@ -60,7 +60,7 @@ describe("createReply @AI 触发任务", () => {
   async function createThread(mentions?: CommentMention[]) {
     return createCommentThread({
       projectId: "p1",
-      pageId: "page-1",
+      target: { kind: "page", pageId: "page-1" },
       anchor: { domPath: "body > div", tagName: "div" },
       pin: { xRatio: 0.5, yRatio: 0.5 },
       content: "请修改按钮颜色",
@@ -164,7 +164,7 @@ describe("编辑评论与回复", () => {
   async function createThreadForEdit() {
     return createCommentThread({
       projectId: "p1",
-      pageId: "page-1",
+      target: { kind: "page", pageId: "page-1" },
       anchor: { domPath: "body > div", tagName: "div" },
       pin: { xRatio: 0.5, yRatio: 0.5 },
       content: "请修改按钮颜色",

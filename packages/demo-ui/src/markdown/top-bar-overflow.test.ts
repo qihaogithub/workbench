@@ -101,7 +101,7 @@ describe("Crepe TopBar 溢出菜单", () => {
     fixture.root.remove();
   });
 
-  it("宽度恢复后还原原生工具并隐藏更多入口", () => {
+  it("宽度恢复后还原原生工具并保留更多入口", () => {
     const fixture = createTopBar(110);
     const controller = mountTopBarOverflow({ root: fixture.root });
     setWidth(fixture.topBar, 240);
@@ -113,7 +113,7 @@ describe("Crepe TopBar 溢出菜单", () => {
     expect(fixture.divider.hidden).toBe(false);
     expect(fixture.italic.hidden).toBe(false);
     expect(fixture.root.querySelector<HTMLElement>("[data-top-bar-overflow]")?.hidden).toBe(
-      true,
+      false,
     );
 
     controller.destroy();
@@ -179,13 +179,37 @@ describe("Crepe TopBar 溢出菜单", () => {
     fixture.root.remove();
   });
 
-  it("没有溢出时不会显示更多入口，销毁后恢复受控节点", () => {
+  it("更多入口挂在 React 编辑器宿主，逃离 .crepe 的滚动与裁切链", () => {
+    const fixture = createTopBar(110, false);
+    const editorHost = document.createElement("div");
+    editorHost.dataset.documentEditor = "crepe";
+    editorHost.append(fixture.root);
+    document.body.append(editorHost);
+    const controller = mountTopBarOverflow({ root: fixture.root });
+    const overflow = editorHost.querySelector<HTMLElement>(
+      "[data-top-bar-overflow]",
+    )!;
+
+    expect(overflow.parentElement).toBe(editorHost);
+    expect(overflow.hidden).toBe(false);
+    expect(fixture.root.querySelector("[data-top-bar-overflow]")).toBeNull();
+    expect(editorHost.lastElementChild).toBe(overflow);
+
+    controller.destroy();
+    editorHost.remove();
+  });
+
+  it("没有溢出时仍显示更多入口，销毁后恢复受控节点", () => {
     const fixture = createTopBar(240);
     const controller = mountTopBarOverflow({ root: fixture.root });
 
     expect(fixture.root.querySelector<HTMLElement>("[data-top-bar-overflow]")?.hidden).toBe(
-      true,
+      false,
     );
+    pointerDown(
+      fixture.root.querySelector<HTMLButtonElement>(".top-bar-overflow-trigger")!,
+    );
+    expect(fixture.root.querySelectorAll("[role='menuitem']")).toHaveLength(3);
     controller.destroy();
     expect(fixture.heading.hidden).toBe(false);
     expect(fixture.bold.hidden).toBe(false);
