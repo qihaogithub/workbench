@@ -112,6 +112,57 @@ describe("workspace manager diagnostics", () => {
     jest.resetModules();
   });
 
+  it("active workspace 页面索引为空时从项目 canonical workspace 恢复页面", async () => {
+    const projectId = "project-empty-active-pages";
+    const projectWorkspace = path.join(dataDir, "projects", projectId, "workspace");
+    writeProject(dataDir, projectId, {
+      activeWorkspaceId: "live-empty-pages",
+      demoPages: [{
+        id: "home",
+        name: "首页",
+        order: 0,
+        parentId: null,
+        runtimeType: "prototype-html-css",
+      }],
+    });
+    fs.mkdirSync(path.join(projectWorkspace, "demos", "home"), { recursive: true });
+    fs.writeFileSync(path.join(projectWorkspace, "workspace-tree.json"), JSON.stringify({
+      folders: [],
+      pages: [{
+        id: "home",
+        name: "首页",
+        order: 0,
+        parentId: null,
+        runtimeType: "prototype-html-css",
+      }],
+    }));
+    fs.writeFileSync(path.join(projectWorkspace, "demos", "home", "config.schema.json"), "{}");
+    fs.writeFileSync(path.join(projectWorkspace, "demos", "home", "prototype.html"), "<main>home</main>");
+    fs.mkdirSync(path.join(dataDir, "workspaces", "projects", projectId, "live-empty-pages"), { recursive: true });
+    fs.writeFileSync(path.join(dataDir, "workspaces", "projects", projectId, "live-empty-pages", ".workspace.json"), JSON.stringify({
+      workspaceId: "live-empty-pages",
+      projectId,
+      demoId: projectId,
+      scope: "live",
+      status: "active",
+      baseVersion: "v2",
+      createdAt: 1,
+      updatedAt: 1,
+    }));
+    fs.writeFileSync(path.join(dataDir, "projects", projectId, "project.json"), JSON.stringify({
+      ...JSON.parse(fs.readFileSync(path.join(dataDir, "projects", projectId, "project.json"), "utf8")),
+      activeWorkspaceId: "live-empty-pages",
+    }));
+
+    const { workspaceManager } = await importModules(dataDir);
+    const result = workspaceManager.getOrCreateProjectActiveWorkspace(projectId, {
+      includeFiles: true,
+    });
+
+    expect(JSON.parse(fs.readFileSync(path.join(result.workspacePath, "workspace-tree.json"), "utf8")).pages).toHaveLength(1);
+    expect(fs.readFileSync(path.join(result.workspacePath, "demos", "home", "prototype.html"), "utf8")).toContain("home");
+  });
+
   it("缺少 active workspace 时记录 missing_active_workspace", async () => {
     const projectId = "project-missing-active";
     writeProject(dataDir, projectId);

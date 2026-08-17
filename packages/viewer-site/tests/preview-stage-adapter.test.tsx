@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { PublishedDemoPage } from "@/lib/api";
-import { createPublishedPreviewStagePage } from "@/lib/preview-stage-adapter";
+import {
+  createPublishedPreviewStagePage,
+  resolvePrototypeDataUrls,
+} from "@/lib/preview-stage-adapter";
 
 function createPage(
   overrides: Partial<PublishedDemoPage> = {},
@@ -54,6 +57,33 @@ describe("published preview stage adapter", () => {
     expect(page.prototypeCss).toBe("main { color: red; }");
     expect(page.iframeUrl).toBeUndefined();
     expect(page.compiledJsUrl).toBeUndefined();
+  });
+
+  it("开发浏览端将原型资源指向数据源，而不是 viewer 自身端口", () => {
+    const html = resolvePrototypeDataUrls(
+      '<img src="/data/project-1/assets/images/icon.png" />',
+      "http://localhost:4200",
+    );
+    const css = resolvePrototypeDataUrls(
+      '.hero { background-image: url("/data/project-1/assets/images/bg.png"); }',
+      "http://localhost:4200",
+    );
+
+    expect(html).toContain(
+      'src="http://localhost:4200/data/project-1/assets/images/icon.png"',
+    );
+    expect(css).toContain(
+      'url("http://localhost:4200/data/project-1/assets/images/bg.png")',
+    );
+  });
+
+  it("生产同源浏览端保留 /data 资源路径", () => {
+    expect(
+      resolvePrototypeDataUrls(
+        '<img src="/data/project-1/assets/images/icon.png" />',
+        "",
+      ),
+    ).toBe('<img src="/data/project-1/assets/images/icon.png" />');
   });
 
   it("草图页只序列化草图运行时数据", () => {

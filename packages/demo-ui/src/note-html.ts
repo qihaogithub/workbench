@@ -68,7 +68,10 @@ const ALLOWED_ATTR = [
 ];
 
 /** 仅允许同源受控路径（/api/、/data/ 等），禁止协议相对 // 与外部绝对地址。 */
-function isSafeMediaSrc(src: string, allowExternalMedia = false): boolean {
+function isSafeMediaSrc(
+  src: string,
+  allowExternalMedia = false,
+): boolean {
   const trimmed = src.trim();
   if (!trimmed) return false;
   if (allowExternalMedia && /^https:\/\//i.test(trimmed)) return true;
@@ -80,11 +83,20 @@ function isSafeMediaSrc(src: string, allowExternalMedia = false): boolean {
 
 export function sanitizeNoteHtml(
   html: string,
-  { allowExternalMedia = false }: { allowExternalMedia?: boolean } = {},
+  {
+    allowExternalMedia = false,
+    mediaBaseUrl,
+  }: { allowExternalMedia?: boolean; mediaBaseUrl?: string } = {},
 ): string {
   if (typeof window === "undefined") return html;
   const DOMPurify = require("dompurify");
-  const sanitized = DOMPurify.sanitize(html, {
+  const normalizedHtml = mediaBaseUrl
+    ? html.replace(
+        /(\bsrc\s*=\s*["'])\/api\/images\//gi,
+        `$1${mediaBaseUrl.replace(/\/$/, "")}/api/images/`,
+      )
+    : html;
+  const sanitized = DOMPurify.sanitize(normalizedHtml, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
     ALLOW_DATA_ATTR: true,
@@ -97,7 +109,17 @@ export function sanitizeNoteHtml(
     )
     .forEach((node) => {
       const src = node.getAttribute("src");
-      if (!src || !isSafeMediaSrc(src, allowExternalMedia)) {
+      const resolvedSrc = node.getAttribute("src");
+      const trustedMediaSrc = mediaBaseUrl
+        ? `${mediaBaseUrl.replace(/\/$/, "")}/api/images/`
+        : undefined;
+      const isTrustedMediaSrc = Boolean(
+        trustedMediaSrc && resolvedSrc?.startsWith(trustedMediaSrc),
+      );
+      if (
+        !resolvedSrc ||
+        (!isTrustedMediaSrc && !isSafeMediaSrc(resolvedSrc, allowExternalMedia))
+      ) {
         node.removeAttribute("src");
       }
     });
@@ -125,6 +147,27 @@ export function renderNoteMarkdown(markdown: string): string {
 }
 
 const REQUIREMENT_REF_REGEX = /@\[([^\]]+)\]\(([^)]+)\)/g;
+const IMAGE_WIDTH_MARKER = "width:";
+const DEFAULT_READONLY_IMAGE_WIDTH = "default";
+
+/**
+ * Crepe 将图片显示宽度保存在 image alt 的内部元数据中。只读 Markdown
+ * 渲染不会创建 Crepe 图片块，需在安全清洗后把该元数据转为受限的展示属性。
+ */
+function applyReadonlyImageSizing(html: string): string {
+  return html.replace(/<img\b([^>]*)>/gi, (tag, attributes: string) => {
+    const alt = attributes.match(/\balt=(['"])(.*?)\1/i)?.[2] ?? "";
+    const width = alt.startsWith(IMAGE_WIDTH_MARKER)
+      ? Number(alt.slice(IMAGE_WIDTH_MARKER.length))
+      : 0;
+    if (!Number.isFinite(width) || width <= 0) {
+      return `${tag.slice(0, -1)} data-image-width="${DEFAULT_READONLY_IMAGE_WIDTH}">`;
+    }
+
+    const targetWidth = Math.round(width);
+    return `${tag.slice(0, -1)} data-image-width="${targetWidth}" style="width: min(${targetWidth}px, 100%)">`;
+  });
+}
 
 /**
  * 将页面配置要求 Markdown 渲染为已清洗的安全 HTML。
@@ -133,7 +176,7 @@ const REQUIREMENT_REF_REGEX = /@\[([^\]]+)\]\(([^)]+)\)/g;
  */
 export function renderPageRequirementsMarkdown(
   markdown: string,
-  options?: { allowExternalMedia?: boolean },
+  options?: { allowExternalMedia?: boolean; mediaBaseUrl?: string },
 ): string {
   if (!markdown) return "";
   const withChips = markdown.replace(
@@ -147,7 +190,7 @@ export function renderPageRequirementsMarkdown(
   } catch {
     html = escapeHtml(markdown).replace(/\n/g, "<br>");
   }
-  return sanitizeNoteHtml(html, options);
+  return applyReadonlyImageSizing(sanitizeNoteHtml(html, options));
 }
 
 /** 从 Markdown 备注中提取纯文本，用于空值判断与摘要截断 */

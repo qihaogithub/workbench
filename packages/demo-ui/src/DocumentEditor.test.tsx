@@ -89,6 +89,28 @@ describe("DocumentEditor（Milkdown 集成）", () => {
     ).toBe("true");
   });
 
+  it("按持久化目标宽度渲染图片，并把窄容器适配交给 CSS 上限", async () => {
+    render(
+      <DocumentEditor
+        value={'![width:360](/api/images/example.png "示例图片")'}
+        onChange={() => {}}
+      />,
+    );
+
+    const wrapper = await waitFor(() => {
+      const element = document.querySelector<HTMLElement>(
+        ".milkdown-image-block .image-wrapper",
+      );
+      expect(element).toBeTruthy();
+      return element!;
+    });
+
+    expect(wrapper.style.width).toBe("min(360px, 100%)");
+    expect(
+      wrapper.querySelector("img")?.style.width,
+    ).toBe("100%");
+  });
+
   it("粘贴外网图片时先调用图床本地化处理器", async () => {
     const localizeRemoteImage = vi.fn().mockResolvedValue("/api/images/img_local");
     render(

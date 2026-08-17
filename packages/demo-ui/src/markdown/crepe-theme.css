@@ -54,8 +54,10 @@
 /* 规范说明等嵌入式只读内容由父级统一滚动，避免产生嵌套滚动条。 */
 .document-editor-crepe[data-scrollable="false"] > .crepe,
 .document-editor-crepe[data-scrollable="false"] .milkdown {
-  height: auto;
-  overflow: visible;
+  height: auto !important;
+  min-height: 0;
+  overflow-x: visible !important;
+  overflow-y: visible !important;
 }
 
 .document-editor-crepe[data-scrollable="false"] .milkdown .ProseMirror {
@@ -67,8 +69,8 @@
   min-height: 200px;
   min-width: 0;
   width: 100%;
-  max-width: 100%;
-  margin: 0;
+  max-width: 880px;
+  margin: 0 auto;
   padding: 16px 64px 40px;
   color: var(--crepe-color-on-background);
   caret-color: var(--crepe-color-primary);
@@ -81,8 +83,9 @@
 
 .document-editor-crepe .milkdown .milkdown-top-bar {
   box-sizing: border-box;
-  position: relative;
+  position: sticky;
   top: 0;
+  z-index: 20;
   min-width: 0;
   width: 100%;
   max-width: 100%;
@@ -111,6 +114,10 @@
 
 .document-editor-crepe .milkdown .milkdown-top-bar .top-bar-inner > * {
   flex-shrink: 0;
+}
+
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-inner > [hidden] {
+  display: none !important;
 }
 
 .document-editor-crepe .milkdown .milkdown-top-bar .top-bar-item {
@@ -171,7 +178,7 @@
   position: absolute;
   top: 6px;
   right: 8px;
-  z-index: 2;
+  z-index: 20;
 }
 
 .document-editor-crepe .top-bar-overflow-trigger,
@@ -230,7 +237,8 @@
 }
 
 .document-editor-crepe .milkdown .milkdown-top-bar .top-bar-item svg,
-.document-editor-crepe .milkdown .milkdown-toolbar .toolbar-item svg {
+.document-editor-crepe .milkdown .milkdown-toolbar .toolbar-item svg,
+.document-editor-crepe .top-bar-overflow-item svg {
   color: var(--crepe-color-on-surface);
   fill: var(--crepe-color-on-surface);
   opacity: 1;
@@ -253,7 +261,8 @@
 .document-editor-crepe .milkdown .milkdown-top-bar .top-bar-item:hover svg,
 .document-editor-crepe .milkdown .milkdown-toolbar .toolbar-item:hover svg,
 .document-editor-crepe .milkdown .milkdown-top-bar .top-bar-item.active svg,
-.document-editor-crepe .milkdown .milkdown-toolbar .toolbar-item.active svg {
+.document-editor-crepe .milkdown .milkdown-toolbar .toolbar-item.active svg,
+.document-editor-crepe .top-bar-overflow-item:hover svg {
   color: var(--crepe-color-primary);
   fill: var(--crepe-color-primary);
   opacity: 1;
@@ -350,7 +359,10 @@
 
 .document-editor-crepe .milkdown .heading-style-selector {
   position: relative;
+  display: flex;
   flex: 0 0 auto;
+  align-items: center;
+  margin: 6px;
 }
 
 .document-editor-crepe .milkdown .heading-style-trigger {
@@ -367,6 +379,15 @@
   font: inherit;
   font-size: 13px;
   white-space: nowrap;
+}
+
+.document-editor-crepe .milkdown .heading-style-chevron {
+  display: inline-flex;
+  width: 12px;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  pointer-events: none;
 }
 
 .document-editor-crepe .milkdown .heading-style-trigger:hover,
@@ -386,6 +407,10 @@
   border-radius: 8px;
   background: var(--crepe-color-surface);
   box-shadow: var(--crepe-shadow-2);
+}
+
+.document-editor-crepe .milkdown .milkdown-toolbar {
+  overflow: visible;
 }
 
 .document-editor-crepe .milkdown .heading-style-option {

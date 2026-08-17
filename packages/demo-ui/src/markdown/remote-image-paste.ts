@@ -16,12 +16,23 @@ function isExternalHttpUrl(value: string): boolean {
 export function getExternalImageUrlFromClipboard(
   clipboardData: Pick<DataTransfer, "getData"> | null,
 ): string | null {
+  return getExternalImageUrlsFromClipboard(clipboardData)[0] ?? null;
+}
+
+/** Returns every external image URL present in an HTML clipboard payload. */
+export function getExternalImageUrlsFromClipboard(
+  clipboardData: Pick<DataTransfer, "getData"> | null,
+): string[] {
   const html = clipboardData?.getData("text/html");
-  if (!html) return null;
+  if (!html) return [];
 
   const document = new DOMParser().parseFromString(html, "text/html");
-  const src = document.querySelector("img[src]")?.getAttribute("src")?.trim();
-  return src && isExternalHttpUrl(src) ? src : null;
+  const urls: string[] = [];
+  for (const image of document.querySelectorAll("img[src]")) {
+    const src = image.getAttribute("src")?.trim();
+    if (src && isExternalHttpUrl(src) && !urls.includes(src)) urls.push(src);
+  }
+  return urls;
 }
 
 const MARKDOWN_IMAGE_RE = /(!\[[^\]]*\]\(\s*)(https?:\/\/[^\s)]+)(\s*[^)]*\))/g;

@@ -353,6 +353,8 @@ export function createTextWorkspaceMutation(input: {
   path: string;
   content: string;
   previousContent: string | null;
+  /** Authority 状态中的基线 hash；优先于本地投影文件内容。 */
+  previousHash?: string;
   reason: string;
 }): WorkspaceMutationRequest {
   return {
@@ -368,7 +370,9 @@ export function createTextWorkspaceMutation(input: {
         type: "put_text",
         path: input.path,
         content: input.content,
-        ...(input.previousContent === null
+        ...(input.previousHash
+          ? { expectedHash: input.previousHash }
+          : input.previousContent === null
           ? { expectedAbsent: true }
           : {
               expectedHash: crypto

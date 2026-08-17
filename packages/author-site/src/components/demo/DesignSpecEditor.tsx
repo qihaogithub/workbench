@@ -1,7 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, Loader2, Plus, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  GripVertical,
+  Loader2,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { DocumentEditor } from "@workbench/demo-ui";
 import { cn } from "@/lib/utils";
 import type { DesignSpecEntry, DesignSpecRef } from "@/lib/design-specs";
@@ -54,11 +61,12 @@ export function DesignSpecEditor({ docId, focusEntryId }: DesignSpecEditorProps)
   const doc = ws.doc;
 
   return (
-    <div className="flex h-full min-w-0 flex-col overflow-hidden">
+    <div className="relative flex h-full min-w-0 flex-col overflow-hidden">
       {/* 中栏：卡片列表 */}
       <div
+        data-testid="design-spec-scroll-area"
         className={cn(
-          "relative flex min-w-0 flex-1 flex-col overflow-y-auto p-4",
+          "flex min-w-0 flex-1 flex-col overflow-y-auto p-4",
         )}
         onDragOver={(e) => {
           e.preventDefault();
@@ -85,14 +93,14 @@ export function DesignSpecEditor({ docId, focusEntryId }: DesignSpecEditorProps)
             ))}
           </div>
         )}
-        <button
-          className="absolute bottom-5 right-5 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-opacity hover:opacity-90"
-          title="新建条目"
-          onClick={() => ws.addEntry()}
-        >
-          <Plus className="h-5 w-5" />
-        </button>
       </div>
+      <button
+        className="absolute bottom-5 right-5 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-opacity hover:opacity-90"
+        title="新建条目"
+        onClick={() => ws.addEntry()}
+      >
+        <Plus className="h-5 w-5" />
+      </button>
     </div>
   );
 }
@@ -136,10 +144,6 @@ function EntryCard({
 
   return (
     <div
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData("text/plain", "entry:" + entry.id);
-      }}
       onDragOver={(e) => {
         e.preventDefault();
         setDragover(true);
@@ -162,6 +166,19 @@ function EntryCard({
         className="flex cursor-pointer items-center gap-2 px-3 py-2.5 hover:bg-accent/50"
         onClick={() => ws.toggleEntry(entry.id)}
       >
+        <button
+          type="button"
+          draggable
+          aria-label={`拖动排序${entry.title}`}
+          title="拖动排序"
+          className="shrink-0 cursor-grab touch-none rounded p-0.5 text-muted-foreground hover:bg-accent active:cursor-grabbing"
+          onClick={(e) => e.stopPropagation()}
+          onDragStart={(e) => {
+            e.dataTransfer.setData("text/plain", "entry:" + entry.id);
+          }}
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
         {open ? (
           <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
         ) : (
@@ -200,6 +217,9 @@ function EntryCard({
                   <th className="py-1 pr-2 font-medium">配置项</th>
                   <th className="py-1 pr-2 font-medium">格式</th>
                   <th className="py-1 font-medium">尺寸</th>
+                  <th className="w-0 p-0">
+                    <span className="sr-only">操作</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -246,13 +266,15 @@ function EntryCard({
                       <td className="pr-7 text-muted-foreground">
                         {formatSize(item)}
                       </td>
-                      <button
-                        className="absolute right-1 top-1/2 hidden -translate-y-1/2 rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive group-hover/trow:inline-flex"
-                        title="解绑"
-                        onClick={() => ws.unbindRef(refToPoolId(ref), entry.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      <td className="w-0 p-0 text-right">
+                        <button
+                          className="hidden rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive group-hover/trow:inline-flex"
+                          title="解绑"
+                          onClick={() => ws.unbindRef(refToPoolId(ref), entry.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -269,13 +291,15 @@ function EntryCard({
                     <td className="italic">已失效引用</td>
                     <td>-</td>
                     <td className="pr-7">-</td>
-                    <button
-                      className="absolute right-1 top-1/2 hidden -translate-y-1/2 rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive group-hover/trow:inline-flex"
-                      title="解绑"
-                      onClick={() => ws.unbindRef(refToPoolId(ref), entry.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    <td className="w-0 p-0 text-right">
+                      <button
+                        className="hidden rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive group-hover/trow:inline-flex"
+                        title="解绑"
+                        onClick={() => ws.unbindRef(refToPoolId(ref), entry.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -294,7 +318,8 @@ function EntryCard({
               onChange={(markdown) => ws.setMarkdown(entry.id, markdown)}
               localizeRemoteImage={localizeRemoteImage}
               placeholder="写点说明…"
-              className="h-[260px] min-h-[220px] overflow-hidden rounded-md border"
+              scrollable={false}
+              className="rounded-md border"
             />
           </div>
         </div>

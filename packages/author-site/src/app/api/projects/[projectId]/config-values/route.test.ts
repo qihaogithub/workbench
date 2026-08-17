@@ -55,6 +55,16 @@ jest.mock("@/lib/workspace-authority-client", () => {
   }
   return {
     commitWorkspaceMutation,
+    getWorkspaceAuthorityState: jest.fn(async () => ({
+      workspaceId: "workspace-1",
+      projectId: "project-1",
+      revision: 1,
+      rootHash: "root-hash",
+      resourceHashes: {
+        "project.config.values.json": "authority-values-hash",
+      },
+      updatedAt: 1,
+    })),
     createTextWorkspaceMutation: jest.fn((input) => ({
       mutationId: "mutation-1",
       projectId: input.projectId,
@@ -67,7 +77,9 @@ jest.mock("@/lib/workspace-authority-client", () => {
         type: "put_text",
         path: input.path,
         content: input.content,
-        expectedAbsent: input.previousContent === null,
+        ...(input.previousHash
+          ? { expectedHash: input.previousHash }
+          : { expectedAbsent: input.previousContent === null }),
       }],
     })),
     WorkspaceAuthorityClientError,
@@ -125,6 +137,7 @@ describe("project config values route", () => {
     const { PUT } = await import("./route");
     const fsUtils = await import("@/lib/fs-utils");
     const workspaceManager = await import("@/lib/workspace-manager");
+    const authorityClient = await import("@/lib/workspace-authority-client");
 
     const values = {
       modalImage: "/api/sessions/session-1/assets/popup.png",
@@ -149,8 +162,14 @@ describe("project config values route", () => {
         type: "put_text",
         path: "project.config.values.json",
         content: JSON.stringify(values, null, 2),
+        expectedHash: "authority-values-hash",
       })],
     }));
+    expect(authorityClient.getWorkspaceAuthorityState).toHaveBeenCalledWith({
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      sessionId: "session-1",
+    });
     expect(fsUtils.saveProjectConfigValues).not.toHaveBeenCalled();
     expect(workspaceManager.updateWorkspaceTimestamp).not.toHaveBeenCalled();
   });

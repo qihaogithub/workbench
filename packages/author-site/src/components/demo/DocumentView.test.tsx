@@ -8,7 +8,7 @@ jest.mock("@/components/ui/toast-provider", () => ({
   useToast: () => ({ toast }),
 }));
 
-jest.mock("@workbench/demo-ui", () => ({
+jest.mock("@workbench/demo-ui/DocumentEditor", () => ({
   DocumentEditor: ({ value }: { value: string }) => (
     <div data-testid="document-editor">{value}</div>
   ),
@@ -361,6 +361,9 @@ describe("DocumentView knowledge creation", () => {
 
     expect(await screen.findByText("暂无公约，可通过右上角 + 新建")).toBeInTheDocument();
     expect(screen.queryByText("未创建页面公约")).not.toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/sessions/session-1/workspace/files?include=conventions",
+    );
 
     await user.click(screen.getByTitle("新建/添加公约"));
     await user.click(screen.getByText("项目公约", { selector: "div" }));
@@ -375,5 +378,112 @@ describe("DocumentView knowledge creation", () => {
       );
     });
 
+  });
+
+  it("reuses a document already opened in this view instead of reading it again", async () => {
+    (global.fetch as jest.Mock).mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/knowledge/content")) {
+        return jsonResponse({
+          success: true,
+          data: { content: url.includes("first.md") ? "第一篇正文" : "第二篇正文" },
+        });
+      }
+      if (url.startsWith("/api/knowledge?")) {
+        return jsonResponse({
+          success: true,
+          data: [
+            {
+              id: "first",
+              title: "第一篇",
+              source: "user",
+              description: "",
+              fileName: "first.md",
+              addedAt: "2026-08-12T00:00:00.000Z",
+              updatedAt: "2026-08-12T00:00:00.000Z",
+              sizeBytes: 10,
+            },
+            {
+              id: "second",
+              title: "第二篇",
+              source: "user",
+              description: "",
+              fileName: "second.md",
+              addedAt: "2026-08-12T00:00:00.000Z",
+              updatedAt: "2026-08-12T00:00:00.000Z",
+              sizeBytes: 10,
+            },
+          ],
+        });
+      }
+      if (url.includes("/attachments") || url.startsWith("/api/design-specs")) {
+        return jsonResponse({ success: true, data: [] });
+      }
+      return jsonResponse({ success: false }, false);
+    });
+    const user = userEvent.setup();
+    render(
+      <DocumentView
+        workingDir="/workspace"
+        projectId="project-1"
+        sessionId="session-1"
+      />,
+    );
+
+    expect(await screen.findByText("第一篇正文")).toBeInTheDocument();
+    await user.click(screen.getByText("第二篇"));
+    expect(await screen.findByText("第二篇正文")).toBeInTheDocument();
+    await user.click(screen.getByText("第一篇"));
+    expect(await screen.findByText("第一篇正文")).toBeInTheDocument();
+
+    const contentRequests = (global.fetch as jest.Mock).mock.calls.filter(([input]) =>
+      String(input).startsWith("/api/knowledge/content"),
+    );
+    expect(contentRequests).toHaveLength(2);
+  });
+
+  it("reloads the active document after its workspace changes", async () => {
+    (global.fetch as jest.Mock).mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/knowledge/content")) {
+        return jsonResponse({
+          success: true,
+          data: { content: url.includes("workspace-two") ? "新工作空间正文" : "原工作空间正文" },
+        });
+      }
+      if (url.startsWith("/api/knowledge?")) {
+        return jsonResponse({
+          success: true,
+          data: [{
+            id: "shared-id",
+            title: "共享名称",
+            source: "user",
+            description: "",
+            fileName: "shared.md",
+            addedAt: "2026-08-12T00:00:00.000Z",
+            updatedAt: "2026-08-12T00:00:00.000Z",
+            sizeBytes: 10,
+          }],
+        });
+      }
+      if (url.includes("/attachments") || url.startsWith("/api/design-specs")) {
+        return jsonResponse({ success: true, data: [] });
+      }
+      return jsonResponse({ success: false }, false);
+    });
+    const { rerender } = render(
+      <DocumentView workingDir="/workspace-one" projectId="project-1" sessionId="session-1" />,
+    );
+
+    expect(await screen.findByText("原工作空间正文")).toBeInTheDocument();
+    rerender(
+      <DocumentView workingDir="/workspace-two" projectId="project-2" sessionId="session-2" />,
+    );
+    expect(await screen.findByText("新工作空间正文")).toBeInTheDocument();
+
+    const contentRequests = (global.fetch as jest.Mock).mock.calls.filter(([input]) =>
+      String(input).startsWith("/api/knowledge/content"),
+    );
+    expect(contentRequests).toHaveLength(2);
   });
 });

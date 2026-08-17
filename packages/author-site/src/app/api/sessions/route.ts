@@ -150,8 +150,10 @@ export async function POST(request: NextRequest) {
     const activeSessionId = findActiveSession(userId, projectId);
     if (activeSessionId && !workspaceId) {
       ensureSessionUsesProjectActiveWorkspace(userId, projectId, activeSessionId);
-      await pushUserModelConfig(userId, activeSessionId);
-      await pushUserExternalAuth(userId, activeSessionId);
+      await Promise.all([
+        pushUserModelConfig(userId, activeSessionId),
+        pushUserExternalAuth(userId, activeSessionId),
+      ]);
 
       const meta = getSessionMeta(activeSessionId);
       const workspaceId = meta?.workspaceId || null;
@@ -179,8 +181,10 @@ export async function POST(request: NextRequest) {
         ? workspaceId
         : undefined;
     const result = await createEditSession(userId, projectId, resumeWorkspaceId);
-    await pushUserModelConfig(userId, result.sessionId);
-    await pushUserExternalAuth(userId, result.sessionId);
+    await Promise.all([
+      pushUserModelConfig(userId, result.sessionId),
+      pushUserExternalAuth(userId, result.sessionId),
+    ]);
     enforceSessionLimit(userId, projectId, 5);
     return NextResponse.json(
       createApiSuccess(createSessionBootstrap({

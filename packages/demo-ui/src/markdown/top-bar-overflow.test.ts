@@ -61,6 +61,73 @@ function createTopBar(width: number, attach = true) {
 }
 
 describe("Crepe TopBar 溢出菜单", () => {
+  it("在宿主从隐藏模式变为可见时重新测量", async () => {
+    const visibility: { notify?: () => void } = {};
+    class IntersectionObserverStub {
+      constructor(callback: IntersectionObserverCallback) {
+        visibility.notify = () =>
+          callback(
+            [{ isIntersecting: true } as IntersectionObserverEntry],
+            this as unknown as IntersectionObserver,
+          );
+      }
+      observe() {}
+      disconnect() {}
+    }
+    vi.stubGlobal("IntersectionObserver", IntersectionObserverStub);
+    const fixture = createTopBar(240);
+    const controller = mountTopBarOverflow({ root: fixture.root });
+
+    setWidth(fixture.topBar, 110);
+    setWidth(fixture.inner, 110);
+    expect(visibility.notify).toBeTypeOf("function");
+    visibility.notify?.();
+    await Promise.resolve();
+
+    expect(fixture.bold.hidden).toBe(true);
+    controller.destroy();
+    fixture.root.remove();
+    vi.unstubAllGlobals();
+  });
+
+  it("持续等待隐藏宿主获得可用布局尺寸", () => {
+    const callbacks: FrameRequestCallback[] = [];
+    const retries: Array<() => void> = [];
+    const requestFrame = vi
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((callback) => {
+        callbacks.push(callback);
+        return callbacks.length;
+      });
+    const cancelFrame = vi
+      .spyOn(window, "cancelAnimationFrame")
+      .mockImplementation(() => {});
+    const setTimer = vi
+      .spyOn(window, "setTimeout")
+      .mockImplementation(((handler: TimerHandler) => {
+        if (typeof handler === "function") retries.push(() => handler());
+        return retries.length;
+      }) as typeof window.setTimeout);
+    const clearTimer = vi
+      .spyOn(window, "clearTimeout")
+      .mockImplementation(() => {});
+    const fixture = createTopBar(0);
+    const controller = mountTopBarOverflow({ root: fixture.root });
+
+    callbacks.shift()?.(0);
+    setWidth(fixture.topBar, 110);
+    setWidth(fixture.inner, 110);
+    retries.shift()?.();
+
+    expect(fixture.bold.hidden).toBe(true);
+    controller.destroy();
+    fixture.root.remove();
+    requestFrame.mockRestore();
+    cancelFrame.mockRestore();
+    setTimer.mockRestore();
+    clearTimer.mockRestore();
+  });
+
   it("等待 Crepe 异步插入 TopBar 后再开始测量", async () => {
     const fixture = createTopBar(110, false);
     const controller = mountTopBarOverflow({ root: fixture.root });
@@ -70,6 +137,22 @@ describe("Crepe TopBar 溢出菜单", () => {
 
     expect(fixture.root.querySelector("[data-top-bar-overflow]")).toBeTruthy();
     expect(fixture.bold.hidden).toBe(true);
+    controller.destroy();
+    fixture.root.remove();
+  });
+
+  it("Crepe 替换 TopBar DOM 后改为绑定当前工具栏", async () => {
+    const fixture = createTopBar(0);
+    const replacement = createTopBar(110, false);
+    const controller = mountTopBarOverflow({ root: fixture.root });
+
+    fixture.root.replaceChildren(replacement.topBar);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(replacement.bold.hidden).toBe(true);
+    expect(fixture.root.querySelectorAll("[data-top-bar-overflow]")).toHaveLength(1);
+
     controller.destroy();
     fixture.root.remove();
   });

@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BookOpen, ChevronDown, ChevronRight, FileText, FolderOpen, Loader2 } from "lucide-react";
 import type { KnowledgeIndexItem } from "@workbench/shared";
-import { DocumentEditor, parseSchemaToFields } from "@workbench/demo-ui";
+import { DocumentEditor, PageRequirements, parseSchemaToFields } from "@workbench/demo-ui";
 import { cn } from "@/lib/utils";
 import {
+  DATA_BASE,
   getDesignSpecDoc,
   getDataUrl,
   getKnowledgeDocContent,
@@ -97,11 +98,13 @@ function ReadonlyDesignSpec({ doc, pool }: { doc: PublishedDesignSpecDoc; pool: 
               <span className="shrink-0 text-[11px] text-muted-foreground">{entry.refs.length} 项配置</span>
             </button>
             {open && <div className="border-t px-3 py-3">
-              {entry.refs.length > 0 && <table className="w-full border-collapse text-xs"><thead><tr className="text-left text-muted-foreground"><th className="w-[52px] py-1 pr-2 font-medium" /><th className="py-1 pr-2 font-medium">配置项</th><th className="py-1 pr-2 font-medium">格式</th><th className="py-1 font-medium">尺寸</th></tr></thead><tbody>
-                {refs.map((item) => <tr key={item.id} className="hover:bg-accent/40"><td className="py-1 pr-2"><ConfigThumbnail item={item} /></td><td className="font-medium">{item.title}</td><td className="text-muted-foreground">{item.format || "—"}</td><td className="text-muted-foreground">—</td></tr>)}
-                {Array.from({ length: staleCount }).map((_, index) => <tr key={`stale-${index}`} className="text-muted-foreground"><td className="py-1 pr-2"><span className="inline-flex h-[52px] w-[52px] items-center justify-center rounded-md border bg-secondary">?</span></td><td className="italic">已失效引用</td><td>—</td><td>—</td></tr>)}
-              </tbody></table>}
-              <div className={cn(entry.refs.length > 0 && "mt-3")}><div className="mb-1 text-[11px] font-medium text-muted-foreground">说明</div><DocumentEditor value={entry.markdown} onChange={() => {}} readOnly scrollable={false} className="rounded-md border" /></div>
+              <div className="mx-auto w-full max-w-[760px]">
+                {entry.refs.length > 0 && <table className="w-full border-collapse text-xs"><thead><tr className="text-left text-muted-foreground"><th className="w-[52px] py-1 pr-2 font-medium" /><th className="py-1 pr-2 font-medium">配置项</th><th className="py-1 pr-2 font-medium">格式</th><th className="py-1 font-medium">尺寸</th></tr></thead><tbody>
+                  {refs.map((item) => <tr key={item.id} className="hover:bg-accent/40"><td className="py-1 pr-2"><ConfigThumbnail item={item} /></td><td className="font-medium">{item.title}</td><td className="text-muted-foreground">{item.format || "—"}</td><td className="text-muted-foreground">—</td></tr>)}
+                  {Array.from({ length: staleCount }).map((_, index) => <tr key={`stale-${index}`} className="text-muted-foreground"><td className="py-1 pr-2"><span className="inline-flex h-[52px] w-[52px] items-center justify-center rounded-md border bg-secondary">?</span></td><td className="italic">已失效引用</td><td>—</td><td>—</td></tr>)}
+                </tbody></table>}
+                <div className={cn(entry.refs.length > 0 && "mt-3")}><div className="mb-1 text-[11px] font-medium text-muted-foreground">说明</div><PageRequirements markdown={entry.markdown} allowExternalMedia mediaBaseUrl={DATA_BASE} /></div>
+              </div>
             </div>}
           </section>;
         })}

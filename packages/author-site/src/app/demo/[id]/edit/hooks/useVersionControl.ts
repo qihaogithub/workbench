@@ -666,8 +666,7 @@ export function useVersionControl(params: UseVersionControlParams) {
   const publishButtonDisabled =
     externalIsSaving ||
     publishing ||
-    publishStatus === null ||
-    (!hasPendingChanges && !hasPublishableChanges);
+    publishStatus === null;
   const publishButtonText = "发布";
   const publishingButtonText = "发布中...";
 

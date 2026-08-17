@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./contracts": "./src/contracts.ts",
+    "./validator": "./src/validator.ts",
     "./demo/iframe-template": "./src/demo/iframe-template.ts",
     "./demo/prototype-preview": "./src/demo/prototype-preview.ts",
     "./demo/sketch-scene": "./src/demo/sketch-scene.ts",

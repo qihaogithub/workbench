@@ -1332,6 +1332,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
       onPageConfigChange={handlePageConfigChange}
       onRestoreDefaults={handleRestoreDefaults}
       requirements={configPanelRequirements}
+      mediaBaseUrl={DATA_BASE}
       hideDetailHeader={previewMode === "single"}
       requirementsPosition="beforeConfig"
       hideEmptyRequirements

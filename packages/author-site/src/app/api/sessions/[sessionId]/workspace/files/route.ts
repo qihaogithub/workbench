@@ -21,6 +21,25 @@ import type { WorkspaceFileNode } from "@/lib/workspace-file-utils";
 
 const ATTACHMENTS_DIR_NAME = ".ai-attachments";
 
+function listWorkspaceConventionPaths(workspacePath: string): string[] {
+  const paths: string[] = [];
+  if (fs.existsSync(path.join(workspacePath, "convention.md"))) {
+    paths.push("convention.md");
+  }
+
+  const demosPath = path.join(workspacePath, "demos");
+  if (!fs.existsSync(demosPath)) return paths;
+
+  for (const entry of fs.readdirSync(demosPath, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const relativePath = `demos/${entry.name}/convention.md`;
+    if (fs.existsSync(path.join(workspacePath, relativePath))) {
+      paths.push(relativePath);
+    }
+  }
+  return paths;
+}
+
 function listProjectAttachments(projectId: string): WorkspaceFileNode[] {
   const attachmentsDir = path.join(DATA_DIR, "projects", projectId, ATTACHMENTS_DIR_NAME);
   if (!fs.existsSync(attachmentsDir)) return [];
@@ -122,6 +141,12 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const relativePath = searchParams.get("path") || "";
     const showKnowledge = searchParams.get("showKnowledge") === "true";
+
+    if (searchParams.get("include") === "conventions") {
+      return NextResponse.json(
+        createApiSuccess({ paths: listWorkspaceConventionPaths(wsPath) }),
+      );
+    }
 
     const wsMeta = getWorkspaceMeta(meta.workspaceId);
     const projectId = wsMeta?.projectId;

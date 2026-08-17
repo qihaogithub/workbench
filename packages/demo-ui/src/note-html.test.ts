@@ -19,6 +19,13 @@ describe("sanitizeNoteHtml", () => {
     expect(out).toContain('<img src="/api/images/img_1"');
   });
 
+  it("可将全局图床地址指向浏览端数据源", () => {
+    const out = sanitizeNoteHtml('<img src="/api/images/img_1" alt="x">', {
+      mediaBaseUrl: "http://localhost:3200/",
+    });
+    expect(out).toContain('src="http://localhost:3200/api/images/img_1"');
+  });
+
   it("允许视频标签与控制器属性", () => {
     const out = sanitizeNoteHtml('<video controls src="/api/attachments/v1"></video>');
     expect(out).toContain("<video");
@@ -78,6 +85,21 @@ describe("renderPageRequirementsMarkdown", () => {
     expect(
       renderPageRequirementsMarkdown(markdown, { allowExternalMedia: true }),
     ).toContain('src="https://example.com/spec.png"');
+  });
+
+  it("将图片的持久化目标宽度带到只读渲染，并为历史图片标记默认尺寸策略", () => {
+    const sized = renderPageRequirementsMarkdown(
+      "![width:360](https://example.com/spec.png)",
+      { allowExternalMedia: true },
+    );
+    const legacy = renderPageRequirementsMarkdown(
+      "![1.00](https://example.com/spec.png)",
+      { allowExternalMedia: true },
+    );
+
+    expect(sized).toContain('data-image-width="360"');
+    expect(sized).toContain('width: min(360px, 100%)');
+    expect(legacy).toContain('data-image-width="default"');
   });
 
   it("空内容返回空字符串", () => {

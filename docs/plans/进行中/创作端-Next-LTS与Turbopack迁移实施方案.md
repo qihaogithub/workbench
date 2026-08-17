@@ -2,7 +2,7 @@
 
 ## 文档状态
 
-- 状态：进行中（Wave 5：Docker 构建门禁已通过；Turbopack A/B 与完整 E2E 最终门禁待完成）
+- 状态：进行中（Wave 5：author 开发态 Turbopack A/B 与浏览器门禁已通过，开发默认值已切换；生产构建仍使用 Webpack，完整 E2E 最终门禁待完成）
 - 编制日期：2026-08-12
 - 当前分支 / 基线提交：`codex/next16-turbopack-migration` / `bd2c21bc`
 - 目标：将工作区从 Next.js 14.1 / React 18.3 迁移到受支持的 Next.js 16 Active LTS / React 19，并独立决定是否把 Turbopack 设为默认开发与构建 bundler。
@@ -585,7 +585,7 @@ corepack pnpm test:e2e:sketch-playground
 corepack pnpm check:docker-build
 ```
 
-当前执行记录：核心流程与 sketch-playground E2E 均已通过；配置、项目分类、画布自动保存和画布删除/撤回/重做的定向 E2E 也已通过。`sketch-page-regression` 会在默认关闭 `NEXT_PUBLIC_SKETCH_SCENE_AUTHORING_ENABLED` 时条件跳过，开启该 feature flag 的环境必须重新执行该用例。完整创作端 E2E 上次在后台仍运行时被停止，未产生可采信的最终结果；`check:all` 与 Docker build 仍分别受既有 Workspace Authority 守卫缺口和本机 Docker daemon 未启动阻断。
+当前执行记录：核心流程与 sketch-playground E2E 均已通过；配置、项目分类、画布自动保存和画布删除/撤回/重做的定向 E2E 也已通过。`sketch-page-regression` 会在默认关闭 `NEXT_PUBLIC_SKETCH_SCENE_AUTHORING_ENABLED` 时条件跳过，开启该 feature flag 的环境必须重新执行该用例。完整创作端 E2E 上次在后台仍运行时被停止，未产生可采信的最终结果；`check:all` 仍受既有 Workspace Authority 守卫缺口阻断。启动 OrbStack 后，knowledge-service、agent-service、author-site 与 viewer-site 的 Docker Buildx 构建均已完成，Docker build 不再是本次迁移阻塞项。
 
 此外必须人工/浏览器验证：
 
@@ -615,14 +615,14 @@ corepack pnpm check:docker-build
 
 #### NEXT-52 默认 bundler 决策
 
-- [ ] 功能与性能均达标：默认 Turbopack，保留 Webpack 诊断命令。
-- [x] Next 16 基础功能已通过而 Turbopack 未满足默认准入：默认显式 Webpack；待稳定生产构建、同机 A/B 和全量浏览器验收后再重试。
+- [x] author 开发态功能与性能均达标：`dev` 默认 Turbopack，保留 `dev:webpack` 诊断命令；生产 `build` 继续使用 Webpack。
+- [ ] Turbopack 生产构建通过独立稳定性门禁后，再单独决定是否切换 `build`。
 - [ ] Next 16 Webpack 也不达标：停止准入，回到 Checkpoint A 或迁移起点定位，不用配置压制错误。
 
 #### NEXT-53 文档与规则收尾
 
-- [x] 更新本文任务状态、精确版本、验证结果和未决风险；性能 A/B 数据待 Wave 5 完成后追加。
-- [x] 使用 `doc-maintainer` 更新长期技术文档：开发编译器、预览 runtime/依赖合同与对应模块 INDEX；部署镜像门禁仍待完成。
+- [x] 更新本文任务状态、精确版本、验证结果和未决风险；性能 A/B 数据已追加。
+- [x] 使用 `doc-maintainer` 更新长期技术文档：开发编译器、预览 runtime/依赖合同与对应模块 INDEX；Docker 镜像门禁已完成。
 - [x] 更新根 AGENTS.md：Next/React 版本、默认 bundler、基线命令、Turbopack 已知约束；删除已失效的 Next 14.1 说明。
 - [ ] 若任务完成，按 `docs/plans/已完成/README.md` 压缩并归档本文；旧性能方案只保留最终索引与历史数据。
 
@@ -701,6 +701,10 @@ corepack pnpm check:docker-build
 
 ## 十二、进度记录
 
+- 2026-08-14（编辑器启动链第二轮收窄）：并行审计确认四个独立根因：Session Bootstrap 在返回前串行推送模型与授权配置；页面评论 target 每次渲染新建对象导致 REST/WS effects 重复运行；author 校验适配器仍穿透 `@workbench/shared` 根桶；初始单页模式仍同步导入 3,374 行 `PreviewCanvas` 及其自由节点、Markdown 与几何子树。四项均先补红灯契约再做最小修复：两项 Session 配置改为 `Promise.all` 且仍在响应前共同完成；评论 target 改为稳定引用并在空活动页时禁用；shared 新增 `./validator` 精确导出；`PreviewStage` 只在 canvas 分支异步加载画布。定向 author 测试 44 项、demo-ui 13 项、shared/demo-ui/author 类型检查均通过。已存在的完整五服务热环境下，三次编辑页导航到可用状态为 1.118s、1.923s、2.040s，中位数相对上轮 3.976s 改善约 51.6%；手动切换画布后异步子树正常挂载，无运行时异常。由于 4200–4300 完整拓扑是用户已有进程，本轮未停服清理 `.next`，因此该数据只验证热启动改善，冷编译增益待下次可独占服务时按原准入门禁复测。
+
+- 2026-08-14：Docker 部署后编辑页出现“框架加载但内容为空”。证据显示 `/api/sessions` 的 bootstrap 以 active Workspace 的 `workspace-tree.json` 为页面真值；历史 active Workspace 可能保留页面目录但页面索引为空，导致 `demoPages=[]`、`activePageId=null`，前端将空 bootstrap 当作成功状态渲染。已在 `workspace-manager` 增加窄范围自愈：仅当 active Workspace 页面集合为空且项目基准工作区存在页面时，恢复页面目录和 `workspace-tree.json`，不覆盖其它工作区数据；补充回归测试并通过 author-site typecheck、Workspace Manager 测试和 Sessions API 测试。完整 Docker 编辑页 E2E 仍需在已登录浏览器中复验。
+
 - 2026-08-12：完成方案编制。确认 Next 14 unsupported、Next 16 Active LTS；盘点三套 Next app、77 个同步动态 Route Handler、异步 cookie helper 传播、Proxy/Instrumentation/native、Webpack 专属配置、React 19 peer 风险与预览 runtime 隐藏耦合；形成 6 个 Wave、任务 ID、文件所有权、验证矩阵和分层回退策略。
 - 2026-08-13：完成 Next 16.2.12 / React 19.2.3 依赖收口、Async Request APIs 分片迁移、`middleware.ts` → `proxy.ts`、ESLint flat config、预览合同 v2 与 author/viewer/sketch 的 Webpack/Turbopack 双轨脚本。author 编辑页在 Turbopack 开发态完成浏览器冒烟，已验证 Markdown 文本与受限 NodeNext workspace `.js`→TS 解析规则；一次 `build:turbo` 已完整通过。随后在清理 `.next` 的重复构建中，Turbopack 停在优化阶段两分钟无输出且无 CPU 进展，已主动中止，故不能视为稳定生产构建。Next 16 的 Webpack 生产构建已通过；为修正 Next 16 ESM 配置加载及 bundler 等价性，author/viewer Tailwind 插件改用 ESM import，author 恢复 Markdown 的 Webpack `asset/source` rule。viewer 静态导出还发现 `/api/preview-runtime/shell` 未声明静态策略；添加 `dynamic = "force-static"` 和 workspace tracing root 后，Webpack build 通过并将该路由预渲染为静态内容。`check:author` 已在清除并行 TypeScript 争用后通过（156 suites / 1124 tests）；此前并行运行出现的 8 个跨模块 Jest 超时，串行全量同样全部通过，确认不是业务断言回归。`check:viewer`、`check:demo-ui`（97 tests）、`check:ai-chat-shared`、`check:sketch-core`（69 tests）、`check:sketch-react`（152 tests）、`check:sketch-playground`、preview-contract typecheck/test 和 Async Request API 静态检查均通过。草图 React 的 8 个多选/缩放失败已归因并修复为测试适配：hover/选择提交会替换 `dangerouslySetInnerHTML` 生成的 SVG 节点，测试改为在每次状态提交后重新查询目标节点，不再向脱离文档的旧引用派发事件。随后 author、viewer、sketch 三套 Webpack production build 及全仓 `lint:all` 均通过（lint 仅遗留历史告警）；agent-service 在允许本地端口绑定的环境通过 63 个测试文件、505 个测试，先前唯一 `EPERM` 属沙箱限制。默认 bundler 仍是 Webpack：同机三轮冷/热性能 A/B 被 ego-browser 无响应输出阻塞；Docker 预检还存在既有 data workspace drift，Docker BuildKit/OrbStack 在 agent-service 阶段报 RPC EOF；全量 E2E 与其余生产产物门禁待执行。
 - 2026-08-13（补充）：`check:all` 已通过 preview-contract 后被 `check:workspace-authority` 的 5 项既有业务守卫缺口阻断：live Workspace 恢复版本测试仍期待旧本地写入，且三个数据脚本未登记 local-write 白名单。这些项不涉及 Next/React 迁移，保留给 Workspace Authority 任务处理；不能把聚合门禁标记为全绿。
@@ -710,3 +714,6 @@ corepack pnpm check:docker-build
 - 2026-08-13（补充）：以 `NEXT_TURBOPACK_TRACING=1` 复现 author `build:turbo`，在“Creating optimized production build”后 73 秒无新增输出、进程 CPU 为 0%，仅产生约 332 MB 的二进制 `packages/author-site/.next/trace-turbopack`；已安全中止（exit 130）。这证明 Turbopack 生产构建尚不具稳定性，默认继续固定 Webpack；不可仅凭此前一次成功构建切换默认。Docker Desktop context 同样缺少 `~/.docker/run/docker.sock`，需先启动任一 Docker daemon 后再验证镜像。
 - 2026-08-13（补充）：完整 `test:e2e` 首轮恰遇 agent-service `tsx` 热重启与按需路由首次编译，两个重型用例超时，不能作为有效集成结论。稳定拓扑下，core flow 通过；画布自动保存用例还暴露两处旧测试夹具与当前 Workspace Authority/Yjs-first 契约不符：知识库 live workspace 写入缺少 `sessionId`，且画布保存仍监听已移除的 REST `POST /canvas-layout`。测试已改为传入编辑 Session，并以“退出完成后从 GET 读到持久化布局”断言，定向 E2E 通过（2.3 分钟）。`test:e2e:sketch-playground` 已通过 20/20；完整 `test:e2e` 仍待在稳定、预热的全服务环境重新运行。
 - 2026-08-13（补充）：其余三个过期测试契约已收敛并通过各自定向回归：配置面板不再默认展开，测试在读取 schema 后显式切换“配置”标签；项目分类从文本框改为选择器，测试进入“自定义分类”后填写；画布页删除/撤回/重做改为真实选择操作和全局快捷键。手绘页面创作由 `NEXT_PUBLIC_SKETCH_SCENE_AUTHORING_ENABLED` feature flag 显式关闭，API 设计性返回 403，故手绘 E2E 在 flag 未开启时条件跳过，开启后自动恢复执行。完整 `test:e2e` 重新执行时其 runner 输出通道提前释放，而本地全服务拓扑仍在继续跑；停止服务时尚未写出最终结果，不能将该轮视为通过，需在可持续收集退出码的环境重跑。此次仅更新测试以匹配已验证的产品合同，不改变业务代码。
+- 2026-08-14：统一 author-site、knowledge-service 与 OPS CLI 的 `better-sqlite3` 到 `12.11.1`，消除开发、CLI 与知识服务 Docker 镜像之间的原生依赖版本漂移。冻结锁文件安装后，三处均在 Node 24 / macOS arm64 成功加载 binding 并完成内存 SQLite 冒烟；author-site 与 knowledge-service typecheck 通过。author 全量 Jest 的 4 个失败来自 AI 流式服务新增 `assistantMessageId` 参数后，既有 mock 仍断言旧 10 参数签名，属于独立的 Agent 测试适配，不以此次 native 依赖变更掩盖。Docker 构建门禁正在重跑以验收 Linux 产物。
+- 2026-08-14（开发编译性能复核）：首轮 author-site Webpack 探针确认慢请求主要等待 Next 按需编译，热 `/login` 仍为 350ms 量级；但冷请求在不同时点从 19.5s 波动到 56s，同期 10 核机器的 load average 升至 89–102，可用内存降至数十 MB 并伴随大量 swap。高占用主要来自项目外的 Chrome renderer、WindowServer、OrbStack 和 DrCleaner；这一轮样本已判定为资源争用污染，不用于 Webpack/Turbopack 默认值决策。路由、根布局、Proxy 与 Instrumentation 相对升级前基线没有可解释该量级回退的业务依赖图变化；三类 agent-service 配置同步为 3s 后异步退避任务，属于日志和健壮性次要问题，不是路由冷编译主因。NEXT-51 仍保持未完成；下一轮必须在停止其他构建/测试、旧浏览器热重连和高占用应用后，通过负载/内存准入检查，再串行执行各 3 轮 Webpack/Turbopack 冷热 A/B。
+- 2026-08-14（NEXT-51/52 收口）：恢复可用内存并将正式样本限制在一分钟 load 不超过 15 后，以 Webpack/Turbopack 交错顺序采集。`/login` 三轮冷响应中位数为 6.868s/4.058s（Turbopack 改善 40.9%）；首页各两轮为 12.283s/8.557s（改善 30.3%）；编辑页三轮为 29.815s/12.507s（改善 58.1%），Next 日志中位数为 28.4s/12.5s（改善 56.0%），热响应为 208ms/65ms。所有有效样本均返回 HTTP 200，无 bundler 编译错误；一轮被 4200 旧浏览器标签自动请求污染的样本已作废，后续统一使用空闲端口。完整 author/agent/knowledge/viewer/screenshot 拓扑下，Turbopack 编辑页连续三次到达 `editor-ready`，用时 4.089s、3.976s、3.280s；临时源文件标记触发 Fast Refresh 后页面仍保持 ready，撤销标记后再次验证，两次均无 `Runtime.exceptionThrown`。因此 author-site `dev` 切换为 Turbopack，`dev:webpack` 保留诊断回退；生产 `build` 仍固定 Webpack，不将开发准入外推为生产准入。

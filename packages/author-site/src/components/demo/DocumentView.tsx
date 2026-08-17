@@ -36,7 +36,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { DocumentEditor } from "@workbench/demo-ui";
+import { DocumentEditor } from "@workbench/demo-ui/DocumentEditor";
 import type { KnowledgeItem } from "./KnowledgeDocDialog";
 import type { CommentTarget, DocumentCommentAnchor } from "@workbench/shared";
 import { DesignSpecEditor } from "./DesignSpecEditor";
@@ -102,6 +102,16 @@ function buildInitialConventionContent(target: ActiveTarget): string {
 `;
 }
 
+function getContentCacheKey(target: ActiveTarget): string {
+  if (target.kind === "knowledge") return `knowledge:${target.item.id}`;
+  if (target.kind === "memory") return "workspace:memory.md";
+  if (target.kind === "convention") return "workspace:convention.md";
+  if (target.kind === "pageConvention") {
+    return `workspace:demos/${target.page.id}/convention.md`;
+  }
+  return `design-spec:${target.doc.id}`;
+}
+
 export interface DocumentViewProps {
   workingDir?: string;
   projectId?: string;
@@ -159,11 +169,17 @@ export function DocumentView({
   const [renamingKnowledgeTitle, setRenamingKnowledgeTitle] = useState("");
   const knowledgeMutationVersionRef = useRef(0);
   const knowledgeUploadInputRef = useRef<HTMLInputElement>(null);
+  // 同一视图内切换文档时复用已读取的正文；资源列表刷新时会清空该缓存。
+  const contentCacheRef = useRef(new Map<string, string>());
 
   const onItemsChangeRef = useRef(onItemsChange);
   onItemsChangeRef.current = onItemsChange;
   const onItemsLoadedRef = useRef(onItemsLoaded);
   onItemsLoadedRef.current = onItemsLoaded;
+
+  useEffect(() => {
+    contentCacheRef.current.clear();
+  }, [workingDir, sessionId]);
 
   const localizeRemoteImage = useCallback(
     async (url: string): Promise<string> => {
@@ -272,27 +288,16 @@ export function DocumentView({
       setExistingConventionPaths(new Set());
       return;
     }
-    const paths = [
-      "convention.md",
-      ...pages.map((page) => `demos/${page.id}/convention.md`),
-    ];
-    const existing = await Promise.all(
-      paths.map(async (filePath) => {
-        try {
-          const res = await fetch(
-            `/api/sessions/${sessionId}/workspace/files/${encodeURIComponent(filePath)}`,
-          );
-          const data = await res.json();
-          return data.success ? filePath : null;
-        } catch {
-          return null;
-        }
-      }),
-    );
-    setExistingConventionPaths(
-      new Set(existing.filter((filePath): filePath is string => filePath !== null)),
-    );
-  }, [pages, sessionId]);
+    try {
+      const res = await fetch(
+        `/api/sessions/${sessionId}/workspace/files?include=conventions`,
+      );
+      const data = await res.json();
+      setExistingConventionPaths(new Set(data.success ? data.data.paths || [] : []));
+    } catch {
+      setExistingConventionPaths(new Set());
+    }
+  }, [sessionId]);
 
   useEffect(() => {
     fetchExistingConventions();
@@ -300,6 +305,7 @@ export function DocumentView({
 
   useEffect(() => {
     const handler = () => {
+      contentCacheRef.current.clear();
       fetchItems();
       fetchChatFiles();
       fetchDesignSpecs();
@@ -385,6 +391,7 @@ export function DocumentView({
       const created = await saveTarget(target, initialContent);
       if (!created) return;
       setExistingConventionPaths((current) => new Set(current).add(filePath));
+      contentCacheRef.current.set(getContentCacheKey(target), initialContent);
       setContent(initialContent);
       setActiveTarget(target);
       setConventionExpanded(true);
@@ -480,12 +487,21 @@ export function DocumentView({
     // 切换文档前先冲刷上一目标的未落盘编辑
     flushSave();
 
+    const cacheKey = getContentCacheKey(activeTarget);
+    const cached = contentCacheRef.current.get(cacheKey);
+    if (cached !== undefined) {
+      setContent(cached);
+      setContentLoading(false);
+      return;
+    }
+
     let cancelled = false;
     setContentLoading(true);
 
     const load = async () => {
       try {
         let text = "";
+        let loaded = false;
         if (activeTarget.kind === "knowledge") {
           if (!workingDir) return;
           const res = await fetch(
@@ -494,7 +510,10 @@ export function DocumentView({
             )}&fileName=${encodeURIComponent(activeTarget.item.fileName)}`,
           );
           const data = await res.json();
-          if (data.success) text = data.data.content || "";
+          if (data.success) {
+            text = data.data.content || "";
+            loaded = true;
+          }
         } else {
           if (!sessionId) return;
           const filePath = resolveWorkspaceFilePath(activeTarget);
@@ -503,9 +522,15 @@ export function DocumentView({
             `/api/sessions/${sessionId}/workspace/files/${encodeURIComponent(filePath)}`,
           );
           const data = await res.json();
-          if (data.success) text = data.data.content || "";
+          if (data.success) {
+            text = data.data.content || "";
+            loaded = true;
+          }
         }
-        if (!cancelled) setContent(text);
+        if (!cancelled) {
+          if (loaded) contentCacheRef.current.set(cacheKey, text);
+          setContent(text);
+        }
       } catch {
         if (!cancelled) setContent("");
       } finally {
@@ -542,6 +567,7 @@ export function DocumentView({
         knowledgeMutationVersionRef.current += 1;
         setItems((current) => [...current.filter((entry) => entry.id !== item.id), item]);
         setUserExpanded(true);
+        contentCacheRef.current.set(`knowledge:${item.id}`, markdown);
         setActiveTarget({ kind: "knowledge", item });
         setContent(markdown);
         onItemsChangeRef.current?.([...items.filter((entry) => entry.id !== item.id), item]);
@@ -1143,6 +1169,7 @@ export function DocumentView({
                 <DocumentEditor
                   value={content}
                   onChange={(next) => {
+                    contentCacheRef.current.set(getContentCacheKey(activeTarget), next);
                     setContent(next);
                     scheduleSave(activeTarget, next);
                   }}

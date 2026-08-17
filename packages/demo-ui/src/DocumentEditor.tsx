@@ -19,6 +19,7 @@ import { mountHeadingStyleToolbar } from "./markdown/heading-style-toolbar";
 import { mountTopBarOverflow } from "./markdown/top-bar-overflow";
 import {
   getExternalImageUrlFromClipboard,
+  getExternalImageUrlsFromClipboard,
   getMarkdownImagePaste,
   replaceMarkdownImageUrls,
 } from "./markdown/remote-image-paste";
@@ -177,24 +178,58 @@ export function DocumentEditor({
 
       const markdownPaste = getMarkdownImagePaste(event.clipboardData);
       const plainText = event.clipboardData?.getData("text/plain")?.trim() ?? "";
+      const externalUrls = getExternalImageUrlsFromClipboard(event.clipboardData);
       const externalUrl = plainText
         ? null
         : getExternalImageUrlFromClipboard(event.clipboardData);
-      if (!markdownPaste && !externalUrl) return;
 
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      const urls = markdownPaste?.externalUrls ?? [externalUrl!];
-      void Promise.all(urls.map(async (url) => [url, await localize(url)] as const))
+      if (markdownPaste) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        void Promise.all(
+          markdownPaste.externalUrls.map(async (url) => [url, await localize(url)] as const),
+        )
+          .then((localized) => {
+            if (!mountedRef.current || crepeRef.current !== crepe) return;
+            insertMarkdown(
+              crepe,
+              replaceMarkdownImageUrls(markdownPaste.markdown, new Map(localized)),
+            );
+          })
+          .catch(reportUploadError);
+        return;
+      }
+
+      if (externalUrl) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        void localize(externalUrl)
+          .then((url) => {
+            if (!mountedRef.current || crepeRef.current !== crepe) return;
+            insertMarkdown(crepe, `![](${url})`);
+          })
+          .catch(reportUploadError);
+        return;
+      }
+
+      // Rich article paste: let Milkdown preserve the full HTML structure, then
+      // localize the image URLs from the resulting Markdown document.
+      if (!externalUrls.length) return;
+
+      window.setTimeout(() => {
+        void Promise.all(
+          externalUrls.map(async (url) => [url, await localize(url)] as const),
+        )
         .then((localized) => {
           if (!mountedRef.current || crepeRef.current !== crepe) return;
           const replacements = new Map(localized);
-          const markdown = markdownPaste
-            ? replaceMarkdownImageUrls(markdownPaste.markdown, replacements)
-            : `![](${replacements.get(externalUrl!)})`;
-          insertMarkdown(crepe, markdown);
+          const markdown = replaceMarkdownImageUrls(lastEmittedRef.current, replacements);
+          if (markdown !== lastEmittedRef.current) {
+            crepe.editor.action(replaceAll(markdown));
+          }
         })
         .catch(reportUploadError);
+      }, 0);
     };
     root.addEventListener("paste", handlePaste, true);
 

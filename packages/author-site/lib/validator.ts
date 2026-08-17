@@ -7,7 +7,7 @@ export type {
   ValidationCheck,
   ValidationCheckIssue,
   ValidateDemoResult,
-} from "@workbench/shared";
+} from "@workbench/shared/validator";
 
 export {
   validateAll,
@@ -15,7 +15,7 @@ export {
   validatePropsSchema,
   isValidJson,
   formatValidateDemoResult,
-} from "@workbench/shared";
+} from "@workbench/shared/validator";
 
 export {
   getDefaultValues,

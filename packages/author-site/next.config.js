@@ -48,11 +48,11 @@ const nextConfig = {
     NEXT_PUBLIC_PREVIEW_RUNTIME_SOURCE:
       process.env.PREVIEW_RUNTIME_SOURCE || "local",
     NEXT_PUBLIC_PREVIEW_SHELL_MODE: process.env.PREVIEW_SHELL_MODE || "fixed",
-    // 本地完整服务联调默认不发起编辑页的 Puppeteer 截图任务；
-    // `pnpm dev:visual-full` 显式开启，生产模式保持开启。
+    // 本地开发和生产均默认启用编辑页的 Puppeteer 自动截图；
+    // 可由显式环境变量覆盖，供专项诊断使用。
     NEXT_PUBLIC_AUTOMATIC_SCREENSHOT_GENERATION:
       process.env.NEXT_PUBLIC_AUTOMATIC_SCREENSHOT_GENERATION ||
-      (process.env.NODE_ENV === "development" ? "false" : "true"),
+      "true",
   },
   transpilePackages: [
     "@workbench/agent-client",
