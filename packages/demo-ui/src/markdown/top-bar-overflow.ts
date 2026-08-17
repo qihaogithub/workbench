@@ -63,6 +63,8 @@ function mountTopBarOverflowWhenReady({ root }: TopBarOverflowOptions) {
   let destroyed = false;
   let syncing = false;
   let refreshQueued = false;
+  let layoutFrame: number | null = null;
+  let layoutRetry: number | null = null;
 
   const more = document.createElement("div");
   more.className = "top-bar-overflow";
@@ -193,7 +195,7 @@ function mountTopBarOverflowWhenReady({ root }: TopBarOverflowOptions) {
     );
 
   const refresh = () => {
-    if (destroyed) return;
+    if (destroyed) return false;
     syncing = true;
     const items = sources();
     items.forEach((item) => {
@@ -217,6 +219,12 @@ function mountTopBarOverflowWhenReady({ root }: TopBarOverflowOptions) {
     // enough to clip it at the right edge before a user can open the menu.
     const overflowTriggerWidth = Math.max(measureOuterWidth(more, 36), 48);
     const hasVisualOverflow = topBar.scrollWidth > topBar.clientWidth;
+    const hasMeasurableLayout =
+      availableWidth > 0 && (items.length === 0 || allItemsWidth > 0);
+    if (!hasMeasurableLayout) {
+      syncing = false;
+      return false;
+    }
     if (
       availableWidth > 0 &&
       !hasVisualOverflow &&
@@ -227,7 +235,7 @@ function mountTopBarOverflowWhenReady({ root }: TopBarOverflowOptions) {
       more.hidden = false;
       close();
       syncing = false;
-      return;
+      return true;
     }
 
     const spaceForItems = Math.max(0, availableWidth - overflowTriggerWidth);
@@ -257,6 +265,7 @@ function mountTopBarOverflowWhenReady({ root }: TopBarOverflowOptions) {
     more.hidden = false;
     if (open) refreshMenu();
     syncing = false;
+    return true;
   };
 
   const scheduleRefresh = () => {
@@ -280,6 +289,13 @@ function mountTopBarOverflowWhenReady({ root }: TopBarOverflowOptions) {
       ? null
       : new ResizeObserver(() => scheduleRefresh());
   resizeObserver?.observe(inner);
+  const intersectionObserver =
+    typeof IntersectionObserver === "undefined"
+      ? null
+      : new IntersectionObserver((entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) scheduleRefresh();
+        });
+  intersectionObserver?.observe(editorHost);
   window.addEventListener("resize", scheduleRefresh);
 
   trigger.addEventListener("pointerdown", (event) => {
@@ -300,6 +316,20 @@ function mountTopBarOverflowWhenReady({ root }: TopBarOverflowOptions) {
   document.addEventListener("pointerdown", closeWhenOutside);
 
   refresh();
+  // Crepe can resolve `create()` while the document-mode pane still has zero
+  // layout width. Retry only while dimensions are unusable so a hidden pane can
+  // become visible later without leaving the full row permanently overflowing.
+  const refreshAfterLayout = () => {
+    layoutFrame = null;
+    const measured = refresh();
+    if (!measured && !destroyed && editorHost.dataset.readonly !== "true") {
+      layoutRetry = window.setTimeout(() => {
+        layoutRetry = null;
+        refreshAfterLayout();
+      }, 100);
+    }
+  };
+  layoutFrame = window.requestAnimationFrame(refreshAfterLayout);
 
   return {
     refresh,
@@ -307,6 +337,9 @@ function mountTopBarOverflowWhenReady({ root }: TopBarOverflowOptions) {
       destroyed = true;
       observer.disconnect();
       resizeObserver?.disconnect();
+      intersectionObserver?.disconnect();
+      if (layoutFrame !== null) window.cancelAnimationFrame(layoutFrame);
+      if (layoutRetry !== null) window.clearTimeout(layoutRetry);
       window.removeEventListener("resize", scheduleRefresh);
       document.removeEventListener("pointerdown", closeWhenOutside);
       sources().forEach((item) => {
@@ -324,23 +357,30 @@ function mountTopBarOverflowWhenReady({ root }: TopBarOverflowOptions) {
  */
 export function mountTopBarOverflow(options: TopBarOverflowOptions) {
   let controller: ReturnType<typeof mountTopBarOverflowWhenReady> | null = null;
+  let boundInner: HTMLElement | null = null;
   let destroyed = false;
 
   const attach = () => {
-    if (destroyed || controller) return;
-    if (!options.root.querySelector(".milkdown-top-bar .top-bar-inner")) return;
+    if (destroyed) return;
+    const currentInner = options.root.querySelector<HTMLElement>(
+      ".milkdown-top-bar .top-bar-inner",
+    );
+    if (currentInner === boundInner) return;
+    controller?.destroy();
+    controller = null;
+    boundInner = null;
+    if (!currentInner) return;
     controller = mountTopBarOverflowWhenReady(options);
-    rootObserver.disconnect();
+    boundInner = currentInner;
   };
   const rootObserver = new MutationObserver(attach);
 
+  rootObserver.observe(options.root, { childList: true, subtree: true });
   attach();
-  if (!controller) {
-    rootObserver.observe(options.root, { childList: true, subtree: true });
-  }
 
   return {
     refresh() {
+      attach();
       controller?.refresh();
     },
     destroy() {

@@ -24,6 +24,9 @@ describe("mountHeadingStyleToolbar", () => {
     expect(root.querySelector("[data-heading-style-trigger]")?.textContent).toBe(
       "正文⌄",
     );
+    expect(root.querySelector(".heading-style-chevron")?.getAttribute("aria-hidden")).toBe(
+      "true",
+    );
 
     toolbar.destroy();
     root.remove();

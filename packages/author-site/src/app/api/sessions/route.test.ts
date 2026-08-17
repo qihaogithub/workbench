@@ -35,6 +35,20 @@ function createJsonRequest(body: unknown): Request {
   } as unknown as Request;
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
+async function flushMicrotasks(): Promise<void> {
+  for (let index = 0; index < 20; index += 1) {
+    await Promise.resolve();
+  }
+}
+
 describe("sessions route external auth reuse", () => {
   const originalResponse = global.Response;
   const externalAuthConfig = {
@@ -248,6 +262,58 @@ describe("sessions route external auth reuse", () => {
       },
     );
   });
+
+  it.each([
+    { label: "新建会话", reuseSession: false, expectedStatus: 201 },
+    { label: "复用会话", reuseSession: true, expectedStatus: 200 },
+  ])(
+    "$label 时并发启动模型与授权配置推送，并在两者完成前保持 POST pending",
+    async ({ reuseSession, expectedStatus }) => {
+      const modelPush = createDeferred<{ ok: true; message: string }>();
+      const externalAuthPush = createDeferred<{ ok: true; message: string }>();
+      const pushSessionModelConfigToAgent = jest.fn(() => modelPush.promise);
+      const pushSessionExternalAuthToAgent = jest.fn(
+        () => externalAuthPush.promise,
+      );
+
+      jest.doMock("@/lib/agent-providers", () => ({
+        pushSessionModelConfigToAgent,
+        pushSessionExternalAuthToAgent,
+      }));
+      if (reuseSession) {
+        jest.doMock("@/lib/session-manager", () => ({
+          archiveActiveSession: jest.fn(),
+          createEditSession: jest.fn(),
+          enforceSessionLimit: jest.fn(),
+          ensureSessionUsesProjectActiveWorkspace: jest.fn(),
+          findActiveSession: jest.fn(() => "session-existing"),
+        }));
+      }
+
+      const { POST } = await import("./route");
+      let responseSettled = false;
+      const responsePromise = POST(
+        createJsonRequest({ demoId: "project-1" }) as never,
+      ).then((response) => {
+        responseSettled = true;
+        return response;
+      });
+
+      await flushMicrotasks();
+
+      expect(pushSessionModelConfigToAgent).toHaveBeenCalledTimes(1);
+      expect(pushSessionExternalAuthToAgent).toHaveBeenCalledTimes(1);
+      expect(responseSettled).toBe(false);
+
+      modelPush.resolve({ ok: true, message: "ok" });
+      await flushMicrotasks();
+      expect(responseSettled).toBe(false);
+
+      externalAuthPush.resolve({ ok: true, message: "ok" });
+      const response = await responsePromise;
+      expect(response.status).toBe(expectedStatus);
+    },
+  );
 
   it("复用活跃会话前会确保绑定项目级共享 workspace", async () => {
     jest.doMock("@/lib/session-manager", () => ({

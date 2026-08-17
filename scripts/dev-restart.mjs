@@ -3,19 +3,20 @@ import { rmSync } from "node:fs";
 import { resolve } from "node:path";
 import { platform } from "node:os";
 
-const PORTS = [4200, 4201, 4202, 4203, 4300];
+const PORTS = [3400, 4200, 4201, 4202, 4203, 4300];
 const SHUTDOWN_WAIT_MS = 1500;
 const NEXT_CACHE_DIRS = [
   resolve("packages/author-site/.next"),
   resolve("packages/viewer-site/.next"),
+  resolve("packages/sketch-playground/.next"),
 ];
 const clearCache = process.argv.slice(2).includes("--clear-cache");
-const visualFull = process.argv.slice(2).includes("--visual-full");
+const lite = process.argv.slice(2).includes("--lite");
 const isWin = platform() === "win32";
 
 const unknownArgs = process.argv
   .slice(2)
-  .filter((arg) => arg !== "--clear-cache" && arg !== "--visual-full");
+  .filter((arg) => arg !== "--clear-cache" && arg !== "--lite");
 
 if (unknownArgs.length > 0) {
   console.error(`[dev-restart] Unknown option(s): ${unknownArgs.join(", ")}`);
@@ -175,8 +176,8 @@ function startDevServices() {
     shell: isWin,
     env: {
       ...process.env,
-      // 五个服务始终本机常驻；仅选择编辑页是否自动驱动 Puppeteer 截图。
-      NEXT_PUBLIC_AUTOMATIC_SCREENSHOT_GENERATION: visualFull ? "true" : "false",
+      // 六个服务始终本机常驻；轻量档仅暂停编辑页自动驱动 Puppeteer 截图。
+      NEXT_PUBLIC_AUTOMATIC_SCREENSHOT_GENERATION: lite ? "false" : "true",
     },
   });
 
@@ -208,7 +209,7 @@ try {
   }
   console.log(
     `[dev-restart] Full local service topology; automatic editor screenshots are ${
-      visualFull ? "enabled" : "paused"
+      lite ? "paused" : "enabled"
     }.`,
   );
   startDevServices();

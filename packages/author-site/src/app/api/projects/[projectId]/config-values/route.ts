@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
 import path from "path";
 import {
   createApiError,
@@ -19,6 +18,7 @@ import { isLiveWorkspacePath } from "@/lib/live-workspace-route-context";
 import {
   commitWorkspaceMutation,
   createTextWorkspaceMutation,
+  getWorkspaceAuthorityState,
   WorkspaceAuthorityClientError,
 } from "@/lib/workspace-authority-client";
 
@@ -214,14 +214,12 @@ export async function PUT(
     }
 
     if (isLiveWorkspacePath(ctx.ctx.workspacePath)) {
-      const configValuesPath = path.join(
-        ctx.ctx.workspacePath,
-        "project.config.values.json",
-      );
-      const previousContent = fs.existsSync(configValuesPath)
-        ? fs.readFileSync(configValuesPath, "utf-8")
-        : null;
       try {
+        const authorityState = await getWorkspaceAuthorityState({
+          projectId,
+          workspaceId: ctx.ctx.workspaceId,
+          sessionId: resolvedSessionId,
+        });
         await commitWorkspaceMutation(
           createTextWorkspaceMutation({
             projectId,
@@ -229,7 +227,9 @@ export async function PUT(
             sessionId: resolvedSessionId,
             path: "project.config.values.json",
             content: JSON.stringify(values, null, 2),
-            previousContent,
+            previousContent: null,
+            previousHash:
+              authorityState.resourceHashes["project.config.values.json"],
             reason: "update_project_config_values",
           }),
         );

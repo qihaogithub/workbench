@@ -73,6 +73,15 @@ describe("Crepe 宿主主题契约", () => {
     expect(theme).toMatch(
       /\.document-editor-crepe\s*>\s*\.crepe,[\s\S]*?\.document-editor-crepe\s+\.milkdown\s*\{[^}]*min-height:\s*0;[^}]*height:\s*100%;[^}]*overflow-y:\s*auto;/s,
     );
+    expect(theme).toMatch(
+      /\.milkdown-top-bar\s*\{[^}]*position:\s*sticky;[^}]*top:\s*0;[^}]*z-index:\s*20;/s,
+    );
+  });
+
+  it("让嵌入式只读正文退出自身滚动，由外层文档区承载滚动", () => {
+    expect(theme).toMatch(
+      /\[data-scrollable=["']false["']\][^{]*>\s*\.crepe,[\s\S]*?\[data-scrollable=["']false["']\][^{]*\.milkdown\s*\{[^}]*height:\s*auto\s*!important;[^}]*overflow-x:\s*visible\s*!important;[^}]*overflow-y:\s*visible\s*!important;/s,
+    );
   });
 
   it("让编辑器宽度受宿主容器约束，并让工具栏浮层保持可交互", () => {
@@ -83,7 +92,7 @@ describe("Crepe 宿主主题契约", () => {
       /\.document-editor-crepe\s+>\s*\.crepe,[\s\S]*?\.document-editor-crepe\s+\.milkdown\s*\{[^}]*min-width:\s*0;[^}]*width:\s*100%;[^}]*max-width:\s*100%;/s,
     );
     expect(theme).toMatch(
-      /\.document-editor-crepe\s+\.milkdown\s+\.ProseMirror\s*\{[^}]*min-width:\s*0;[^}]*width:\s*100%;[^}]*max-width:\s*100%;/s,
+      /\.document-editor-crepe\s+\.milkdown\s+\.ProseMirror\s*\{[^}]*min-width:\s*0;[^}]*width:\s*100%;[^}]*max-width:\s*880px;[^}]*margin:\s*0\s+auto;/s,
     );
     expect(theme).toMatch(
       /\.milkdown-top-bar\s*\{[^}]*min-width:\s*0;[^}]*width:\s*100%;[^}]*max-width:\s*100%;[^}]*overflow:\s*visible;/s,
@@ -92,7 +101,22 @@ describe("Crepe 宿主主题契约", () => {
       /\.top-bar-inner\s*\{[^}]*position:\s*relative;[^}]*padding-right:\s*48px;[^}]*overflow:\s*visible;/s,
     );
     expect(theme).toMatch(
-      /\.document-editor-crepe\s*>\s*\.top-bar-overflow\s*\{[^}]*position:\s*absolute;[^}]*top:\s*6px;[^}]*right:\s*8px;/s,
+      /\.document-editor-crepe\s*>\s*\.top-bar-overflow\s*\{[^}]*position:\s*absolute;[^}]*top:\s*6px;[^}]*right:\s*8px;[^}]*z-index:\s*(?:[2-9]\d|\d{3,});/s,
+    );
+  });
+
+  it("让收纳项真正退出布局，避免主题 display 覆盖 hidden 语义", () => {
+    expect(theme).toMatch(
+      /\.top-bar-inner\s*>\s*\[hidden\]\s*\{[^}]*display:\s*none\s*!important;/s,
+    );
+  });
+
+  it("对齐浮动标题触发器，并允许其菜单逃离工具栏裁切", () => {
+    expect(theme).toMatch(
+      /\.milkdown-toolbar\s*\{[^}]*overflow:\s*visible;/s,
+    );
+    expect(theme).toMatch(
+      /\.heading-style-selector\s*\{[^}]*display:\s*flex;[^}]*align-items:\s*center;[^}]*margin:\s*6px;/s,
     );
   });
 
@@ -105,6 +129,15 @@ describe("Crepe 宿主主题契约", () => {
     );
     expect(theme).toMatch(
       /\.top-bar-item\.active[^}]*\.toolbar-item\.active[^}]*\{[^}]*background:\s*var\(--crepe-color-selected\)/s,
+    );
+  });
+
+  it("让脱离 Milkdown 作用域的溢出工具图标仍使用主题色", () => {
+    expect(theme).toMatch(
+      /\.top-bar-overflow-item\s+svg[^{]*\{[^}]*color:\s*var\(--crepe-color-on-surface\);[^}]*fill:\s*var\(--crepe-color-on-surface\);/s,
+    );
+    expect(theme).toMatch(
+      /\.top-bar-overflow-item:hover\s+svg[^{]*\{[^}]*color:\s*var\(--crepe-color-primary\);[^}]*fill:\s*var\(--crepe-color-primary\);/s,
     );
   });
 

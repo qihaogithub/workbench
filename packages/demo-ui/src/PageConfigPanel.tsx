@@ -101,6 +101,8 @@ interface PageConfigPanelProps {
   designSpecEntries?: DesignSpecEntryLink[];
   /** 仅创作端提供：跳转到文档视图中的指定规范条目。 */
   onEditDesignSpec?: (docId: string, entryId: string) => void;
+  /** 浏览端数据源地址；用于跨站访问创作端全局图床。 */
+  mediaBaseUrl?: string;
   /** 创作端设计规范 API 上下文；提供后面板会按需读取绑定。 */
   designSpecApiContext?: { workingDir?: string; sessionId?: string; projectId?: string };
 }
@@ -288,6 +290,7 @@ export function PageConfigPanel({
   designSpecEntries = EMPTY_DESIGN_SPEC_ENTRIES,
   onEditDesignSpec,
   designSpecApiContext,
+  mediaBaseUrl,
 }: PageConfigPanelProps) {
   const [internalDetailPageId, setInternalDetailPageId] = useState<
     string | null
@@ -845,7 +848,7 @@ export function PageConfigPanel({
             ) : hasRequirements || scopedDesignSpecEntries.length > 0 ? (
               <div className="space-y-4 pt-2">
                 {hasRequirements && (
-                  <PageRequirements markdown={requirements!} allowExternalMedia />
+                  <PageRequirements markdown={requirements!} allowExternalMedia mediaBaseUrl={mediaBaseUrl} />
                 )}
                 {scopedDesignSpecEntries.map((entry) => (
                   <section key={`${entry.docId}:${entry.entryId}`} className="rounded-md border p-3">
@@ -854,7 +857,7 @@ export function PageConfigPanel({
                     </p>
                     {entry.markdown.trim() ? (
                       <div className="mt-2">
-                        <PageRequirements markdown={entry.markdown} allowExternalMedia />
+                        <PageRequirements markdown={entry.markdown} allowExternalMedia mediaBaseUrl={mediaBaseUrl} />
                       </div>
                     ) : (
                       <p className="mt-2 text-sm text-muted-foreground">暂无说明</p>

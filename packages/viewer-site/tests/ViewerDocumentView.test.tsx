@@ -7,6 +7,15 @@ vi.mock("@workbench/demo-ui", () => ({
   DocumentEditor: ({ value, readOnly }: { value: string; readOnly?: boolean }) => (
     <div data-read-only={String(readOnly)}>{value}</div>
   ),
+  PageRequirements: ({
+    markdown,
+    allowExternalMedia,
+  }: {
+    markdown: string;
+    allowExternalMedia?: boolean;
+  }) => (
+    <div data-external-media={String(allowExternalMedia)}>{markdown}</div>
+  ),
   parseSchemaToFields: (schema: string) => [{
     fields: Object.entries(JSON.parse(schema).properties || {}).map(([key, field]) => ({ key, ...(field as object) })),
   }],
@@ -51,6 +60,10 @@ describe("ViewerDocumentView", () => {
     expect(await screen.findByText("品牌图片")).toBeTruthy();
     expect(screen.getByText("1 项配置")).toBeTruthy();
     expect(screen.getByText("头图")).toBeTruthy();
-    expect(screen.getByText("图片应使用 16:9。").getAttribute("data-read-only")).toBe("true");
+    expect(screen.getByRole("table").parentElement?.className).toContain(
+      "max-w-[760px]",
+    );
+    expect(screen.getByText("图片应使用 16:9。").getAttribute("data-external-media")).toBe("true");
+    expect(screen.queryByText("图片应使用 16:9。").getAttribute("data-read-only")).toBeNull();
   });
 });

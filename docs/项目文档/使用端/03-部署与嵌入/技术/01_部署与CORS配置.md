@@ -2,7 +2,7 @@
 
 > 版本：v2.0
 > 创建日期：2026-05-04
-> 更新日期：2026-08-12
+> 更新日期：2026-08-14
 
 ---
 
@@ -33,7 +33,7 @@ covers:
 │                                                                 │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
 │  │  viewer-site    │  │  author-site     │  │  agent-service  │ │
-│  │  :3300          │──│  :3200          │  │  :3201          │ │
+│  │  :4300          │──│  :4200          │  │  :4201          │ │
 │  │                 │  │                 │  │                 │ │
 │  │  项目列表页     │  │  viewer 端点     │  │  项目列表 API   │ │
 │  │  预览页(iframe) │  │  配置接口       │  │  项目详情 API   │ │
@@ -56,9 +56,9 @@ covers:
 
 | 变量                            | 示例值                  | 说明                                           |
 | :------------------------------ | :---------------------- | :--------------------------------------------- |
-| `NEXT_PUBLIC_WEB_URL`           | `http://localhost:3200` | author-site 创作端地址，用于生成 viewer iframe URL |
-| `NEXT_PUBLIC_AGENT_SERVICE_URL` | `http://localhost:3201` | agent-service 地址，用于使用端只读 AI 问答 API |
-| `NEXT_PUBLIC_DATA_BASE`         | 空字符串 / `http://localhost:3200` | viewer-site 读取项目数据的基址；同源静态部署保持为空，本地开发跨 author-site 读取时设为 author-site 地址 |
+| `NEXT_PUBLIC_WEB_URL`           | `http://localhost:4200` | author-site 创作端地址，用于生成 viewer iframe URL |
+| `NEXT_PUBLIC_AGENT_SERVICE_URL` | `http://localhost:4201` | agent-service 地址，用于使用端只读 AI 问答 API |
+| `NEXT_PUBLIC_DATA_BASE`         | 空字符串 / `http://localhost:4200` | viewer-site 读取项目数据的基址；同源静态部署保持为空，本地开发跨 author-site 读取时设为 author-site 地址。未设置时开发模式默认使用 `http://localhost:4200`。 |
 | `PREVIEW_RUNTIME_SOURCE`        | `local`                 | viewer 预览 iframe 的 runtime 来源；仅诊断时设为 `cdn` |
 | `PREVIEW_SHELL_MODE`            | `inline`                | viewer 生产静态导出默认 inline shell，开发环境默认 fixed shell |
 

@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useEffect, useMemo } from "react";
+import React, { lazy, Suspense, useEffect, useMemo } from "react";
 
-import { PreviewCanvas } from "./PreviewCanvas";
 import { PreviewStageToolbar } from "./PreviewStageToolbar";
 import { SinglePagePreview } from "./SinglePagePreview";
 import {
@@ -11,6 +10,12 @@ import {
 } from "./preview-stage-resolver";
 import type { PreviewStageProps } from "./preview-stage-types";
 import { cn } from "./utils";
+
+const PreviewCanvas = lazy(() =>
+  import("./PreviewCanvas").then(({ PreviewCanvas }) => ({
+    default: PreviewCanvas,
+  })),
+);
 
 export function PreviewStage({
   pages,
@@ -126,13 +131,17 @@ export function PreviewStage({
         {previewMode === "document" ? (
           singleContent
         ) : previewMode === "canvas" ? (
-          <PreviewCanvas
-            {...canvasProps}
-            pages={normalizedPages}
-            canvasState={canvasState}
-            onCanvasStateChange={onCanvasStateChange}
-            interactionMode={interactionMode}
-          />
+          <Suspense
+            fallback={<div className="h-full w-full" aria-hidden="true" />}
+          >
+            <PreviewCanvas
+              {...canvasProps}
+              pages={normalizedPages}
+              canvasState={canvasState}
+              onCanvasStateChange={onCanvasStateChange}
+              interactionMode={interactionMode}
+            />
+          </Suspense>
         ) : (
           singleContent
         )}

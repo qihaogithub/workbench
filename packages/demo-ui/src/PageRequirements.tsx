@@ -14,6 +14,8 @@ interface PageRequirementsProps {
   placeholderText?: string;
   /** 设计规范由项目作者维护，浏览端可以展示其中的 HTTPS 图片。 */
   allowExternalMedia?: boolean;
+  /** 浏览端数据源地址；用于跨站访问创作端全局图床。 */
+  mediaBaseUrl?: string;
 }
 
 /**
@@ -27,11 +29,13 @@ export function PageRequirements({
   showEmptyPlaceholder = true,
   placeholderText = "暂无配置要求",
   allowExternalMedia = false,
+  mediaBaseUrl,
 }: PageRequirementsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const sanitized = renderPageRequirementsMarkdown(markdown, {
     allowExternalMedia,
+    mediaBaseUrl,
   });
   const plainText = stripMarkdown(markdown);
 
@@ -60,7 +64,7 @@ export function PageRequirements({
   return (
     <div
       ref={containerRef}
-      className="page-requirements-content text-xs text-muted-foreground leading-tight"
+      className="page-requirements-content text-muted-foreground"
       onClick={handleClick}
       dangerouslySetInnerHTML={{ __html: sanitized }}
     />

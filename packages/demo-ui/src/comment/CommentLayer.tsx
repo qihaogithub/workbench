@@ -331,7 +331,9 @@ export function CommentLayer({
 
       const iframeRect = frame.getBoundingClientRect();
       const containerRect = container.getBoundingClientRect();
-      const designWidth = frame.contentWindow?.innerWidth || payload.viewportWidth;
+      // 发布 iframe 可能与 viewer-site 跨源；只能使用 iframe 通过消息上报的尺寸，
+      // 读取跨源窗口属性会直接抛出 SecurityError。
+      const designWidth = payload.viewportWidth;
       const scale = designWidth > 0 ? iframeRect.width / designWidth : 1;
       const left = iframeRect.left - containerRect.left + payload.x * scale;
       const top = iframeRect.top - containerRect.top + payload.y * scale;
@@ -612,7 +614,8 @@ export function CommentLayer({
     }
     const iframeRect = frame.getBoundingClientRect();
     const containerRect = container.getBoundingClientRect();
-    const designWidth = frame.contentWindow?.innerWidth || viewState.viewportWidth;
+    // 跨源 iframe 的窗口属性不可读，viewportWidth 来自 iframe 的消息协议。
+    const designWidth = viewState.viewportWidth;
     if (!designWidth || iframeRect.width === 0) return new Map();
     const scale = iframeRect.width / designWidth;
     const offsetX = iframeRect.left - containerRect.left;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getExternalImageUrlFromClipboard,
+  getExternalImageUrlsFromClipboard,
   getMarkdownImagePaste,
   replaceMarkdownImageUrls,
 } from "./remote-image-paste";
@@ -16,6 +17,19 @@ describe("getExternalImageUrlFromClipboard", () => {
         clipboardHtml('<p><img src="https://cdn.example.com/hero.png"></p>'),
       ),
     ).toBe("https://cdn.example.com/hero.png");
+  });
+
+  it("collects every external image from rich HTML clipboard content", () => {
+    expect(
+      getExternalImageUrlsFromClipboard(
+        clipboardHtml(
+          '<article><p>正文</p><img src="https://cdn.example.com/one.png"><img src="https://cdn.example.com/two.png"></article>',
+        ),
+      ),
+    ).toEqual([
+      "https://cdn.example.com/one.png",
+      "https://cdn.example.com/two.png",
+    ]);
   });
 
   it("ignores same-origin, non-HTTP, and non-image clipboard content", () => {

@@ -1,6 +1,7 @@
 import type { PreviewStagePage } from "@workbench/demo-ui";
 
 import {
+  DATA_BASE,
   getCompiledJsUrl,
   getPublishedFileUrl,
   type PublishedDemoPage,
@@ -13,6 +14,23 @@ interface CreatePublishedPreviewStagePageInput {
   schema?: string;
 }
 
+/**
+ * Published prototype HTML is rendered inside the viewer origin. In local
+ * development the published data is served by author-site (4200), while the
+ * viewer itself runs on 4300, so absolute /data URLs in the HTML must use the
+ * configured data origin too. Docker keeps DATA_BASE empty and remains same-origin.
+ */
+export function resolvePrototypeDataUrls(
+  value?: string,
+  dataBase: string = DATA_BASE,
+): string | undefined {
+  if (!value || !dataBase) return value;
+  const dataOrigin = dataBase.replace(/\/$/, "");
+  return value
+    .replace(/(\b(?:src|href|poster)\s*=\s*["'])\/data\//gi, `$1${dataOrigin}/data/`)
+    .replace(/(url\(\s*["']?)\/data\//gi, `$1${dataOrigin}/data/`);
+}
+
 export function createPublishedPreviewStagePage({
   projectId,
   page,
@@ -23,8 +41,8 @@ export function createPublishedPreviewStagePage({
   const runtimeData =
     runtimeType === "prototype-html-css"
       ? {
-          prototypeHtml: page.prototypeHtml,
-          prototypeCss: page.prototypeCss,
+          prototypeHtml: resolvePrototypeDataUrls(page.prototypeHtml),
+          prototypeCss: resolvePrototypeDataUrls(page.prototypeCss),
           prototypeMeta: page.prototypeMeta,
         }
       : runtimeType === "sketch-scene"

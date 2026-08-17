@@ -2,6 +2,7 @@ import * as path from "path";
 import * as fs from "fs";
 import * as crypto from "crypto";
 import { DATA_DIR } from "./paths";
+import { OPTIMIZATION_MIN_BYTES, optimizeRasterImage } from "./image-optimizer";
 
 const IMAGE_STORE_DIR = path.join(DATA_DIR, "image-store");
 const BLOBS_DIR = path.join(IMAGE_STORE_DIR, "blobs");
@@ -46,6 +47,16 @@ interface ImageStoreManifest {
   images: ImageStoreEntry[];
 }
 
+export interface ImageStoreOptimizationReport {
+  dryRun: boolean;
+  scanned: number;
+  eligible: number;
+  optimized: number;
+  skipped: number;
+  failed: number;
+  bytesSaved: number;
+}
+
 export interface UploadResult {
   success: true;
   imageId: string;
@@ -84,7 +95,9 @@ function readManifest(): ImageStoreManifest {
 
 function writeManifest(manifest: ImageStoreManifest): void {
   ensureImageStoreDir();
-  fs.writeFileSync(MANIFEST_PATH, JSON.stringify(manifest, null, 2), "utf-8");
+  const tempPath = `${MANIFEST_PATH}.${process.pid}.${crypto.randomBytes(6).toString("hex")}.tmp`;
+  fs.writeFileSync(tempPath, JSON.stringify(manifest, null, 2), "utf-8");
+  fs.renameSync(tempPath, MANIFEST_PATH);
 }
 
 function computeSha256(buffer: Buffer): string {
@@ -102,6 +115,10 @@ function getExt(filename: string): string {
 function getMimeType(filename: string): string {
   const ext = path.extname(filename).toLowerCase();
   return MIME_TYPES[ext] || "application/octet-stream";
+}
+
+function getBlobPath(entry: Pick<ImageStoreEntry, "sha256" | "filename">): string {
+  return path.join(BLOBS_DIR, `${entry.sha256.slice(0, 16)}.${getExt(entry.filename)}`);
 }
 
 function readImageDimensions(
@@ -152,10 +169,10 @@ export async function uploadImage(params: {
   projectId?: string;
   createdBy?: string;
 }): Promise<UploadResult | UploadError> {
-  const { buffer, filename, sourceType, sourceUrl, projectId, createdBy = "unknown" } = params;
+  const { buffer: uploadBuffer, filename, sourceType, sourceUrl, projectId, createdBy = "unknown" } = params;
 
-  if (buffer.length > MAX_FILE_SIZE) {
-    const sizeMB = (buffer.length / 1024 / 1024).toFixed(1);
+  if (uploadBuffer.length > MAX_FILE_SIZE) {
+    const sizeMB = (uploadBuffer.length / 1024 / 1024).toFixed(1);
     return {
       success: false,
       error: {
@@ -175,6 +192,11 @@ export async function uploadImage(params: {
       },
     };
   }
+
+  const { buffer } = await optimizeRasterImage({
+    buffer: uploadBuffer,
+    extension: ext,
+  });
 
   const sha256 = computeSha256(buffer);
   const mimeType = getMimeType(filename);
@@ -254,8 +276,7 @@ export function getImage(imageId: string): {
     return { error: "Image not found" };
   }
 
-  const blobFilename = `${entry.sha256.slice(0, 16)}.${path.extname(entry.filename).slice(1)}`;
-  const blobPath = path.join(BLOBS_DIR, blobFilename);
+  const blobPath = getBlobPath(entry);
 
   if (!fs.existsSync(blobPath)) {
     return { error: "Image blob file missing" };
@@ -275,4 +296,88 @@ export function getImageInfo(imageId: string): ImageStoreEntry | null {
 
 export function getImageStoreDir(): string {
   return IMAGE_STORE_DIR;
+}
+
+/**
+ * Re-processes current image-store entries using the same non-resizing upload
+ * optimisation rules. Run this only while the author service is stopped, as
+ * the manifest remains a file-backed single-writer store.
+ */
+export async function optimizeStoredImages(options: { dryRun?: boolean } = {}): Promise<ImageStoreOptimizationReport> {
+  const dryRun = options.dryRun ?? false;
+  const manifest = readManifest();
+  const report: ImageStoreOptimizationReport = {
+    dryRun,
+    scanned: manifest.images.length,
+    eligible: 0,
+    optimized: 0,
+    skipped: 0,
+    failed: 0,
+    bytesSaved: 0,
+  };
+  const previousBlobPaths = new Set<string>();
+
+  for (const entry of manifest.images) {
+    const extension = getExt(entry.filename);
+    if (extension !== "jpg" && extension !== "jpeg" && extension !== "png") {
+      report.skipped += 1;
+      continue;
+    }
+
+    const blobPath = getBlobPath(entry);
+    if (!fs.existsSync(blobPath)) {
+      report.failed += 1;
+      continue;
+    }
+
+    try {
+      const source = fs.readFileSync(blobPath);
+      if (source.length <= OPTIMIZATION_MIN_BYTES) {
+        report.skipped += 1;
+        continue;
+      }
+
+      report.eligible += 1;
+      const result = await optimizeRasterImage({ buffer: source, extension });
+      if (!result.optimized) {
+        report.skipped += 1;
+        continue;
+      }
+
+      const sha256 = computeSha256(result.buffer);
+      if (sha256 === entry.sha256) {
+        report.skipped += 1;
+        continue;
+      }
+
+      if (!dryRun) {
+        const optimizedPath = getBlobPath({ sha256, filename: entry.filename });
+        if (!fs.existsSync(optimizedPath)) {
+          fs.writeFileSync(optimizedPath, result.buffer);
+        }
+
+        previousBlobPaths.add(blobPath);
+        entry.sha256 = sha256;
+        entry.sizeBytes = result.buffer.length;
+      }
+      report.optimized += 1;
+      report.bytesSaved += source.length - result.buffer.length;
+    } catch {
+      report.failed += 1;
+    }
+  }
+
+  if (report.optimized === 0 || dryRun) return report;
+
+  writeManifest(manifest);
+  for (const previousBlobPath of previousBlobPaths) {
+    const stillReferenced = manifest.images.some(
+      (entry) => getBlobPath(entry) === previousBlobPath,
+    );
+    if (!stillReferenced && fs.existsSync(previousBlobPath)) {
+      fs.unlinkSync(previousBlobPath);
+    }
+  }
+
+  return report;
 }

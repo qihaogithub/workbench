@@ -70,6 +70,13 @@ AI agent 在启动任务前应优先读取 `memory.md`（如果存在），以�
 10. **独立思考，不要刻意迎合用户。** 当用户提出的方案存在技术缺陷、违背最佳实践或不适合当前架构时，应明确指出问题并给出更优替代方案，而不是盲目执行。对于用户提出的需求要独立思考其合理性和可行性，给出客观专业的判断。
 11. **主动维护 AGENTS.md。** 在完成每次任务后，如果发现新的约定、工具、流程、架构信息或常见陷阱值得沉淀，应主动更新 `AGENTS.md`、`packages/agent-service/AGENTS.md` 或 `OPS/AGENTS.md` 中对应的内容，使后续代理能从中受益。不要让好经验只留在这一次对话中。
 
+### 子智能体模型路由
+
+- 主智能体继续使用用户在 Codex 界面中选择的模型，不修改全局默认模型配置。
+- 纯文本代码检索、代码研究、架构分析和审查类子任务优先使用 DeepSeek 子智能体。
+- 实现、修改、测试、浏览器自动化和多模态类子任务使用 `gpt-5.6-luna` 子智能体；该模型适合高并发、成本敏感的工作负载。
+- 只有在任务确实需要更高推理能力，或 Luna 无法完成时，才升级子任务模型，并在进度或最终说明中注明原因。
+
 ## 创作端问题诊断优先入口
 
 遇到创作端编辑页、协同、自动保存、AI 对话、预览、发布或重新打开复原类问题时，先使用结构化诊断入口建立时间线，再读源码或手工 `rg data/editor-diagnostics`：
@@ -227,12 +234,14 @@ viewer-site dev 端口注意：`next dev` 在加载 `.env` 之前解析端口，
 
 Next 开发编译性能约束：
 
-- author-site、viewer-site 与 sketch-playground 均使用 Next.js 16.2.12 / React 19.2.3。默认 `dev` / `build` 显式使用 Webpack，`dev:turbo` / `build:turbo` 用于 Turbopack 验证；在完成同机性能 A/B 前，不得改写默认 bundler。
+- author-site、viewer-site 与 sketch-playground 均使用 Next.js 16.2.12 / React 19.2.3。author-site 的日常 `dev` 默认使用 Turbopack，`dev:webpack` 保留为诊断回退；生产 `build` 仍显式使用 Webpack。viewer-site 与 sketch-playground 的 `dev` / `build` 继续使用 Webpack，两者的 Turbopack 脚本仅用于专项验证。
 - author-site Turbopack 已通过 Markdown raw-text rule 与 NodeNext workspace 源码 `.js`→`.ts/.tsx` 精确重写支持；规则只可覆盖 `knowledge-*`、`preview-contract` 与 `project-*` 的源码目录，不能扩展到所有 workspace 文件，否则会破坏共享包的导出分析。
 - `tailwind.config.ts` 在 Next 16 的 ESM 加载环境中不得调用 CommonJS `require()`；插件使用标准 ESM import。Markdown 资源必须同时保留 Webpack 的 `asset/source` 和 Turbopack raw-text rule，二者缺一会让编辑页的系统 prompt 首编译失败。
 - Next 16 的 Playwright 开发服务若以 `127.0.0.1` 访问，应用 `next.config.js` 必须将其加入 `allowedDevOrigins`；否则 HMR 资源会被安全策略阻断，表现为画布交互用例无法完成。
 - 编辑页和根布局不得从 `@workbench/demo-ui`、`@workbench/ai-chat-shared` 或 `date-fns/locale` 桶入口获取单个轻量能力；优先使用 package exports 公开的精确子路径，并维护高频路由静态导入测试。
 - 编辑页不得直接动态引用 `author-ai-chat`；保留 `deferred-author-ai-chat` 二级延迟边界，只在初始页面文件就绪后挂载 AI 对话，避免 Mermaid、Shiki 等富文本依赖与预览区争抢首屏资源。
+- author 校验适配器必须从 `@workbench/shared/validator` 精确子路径导入；`PreviewStage` 必须保留 `PreviewCanvas` 按 canvas 模式懒加载边界，不得让初始单页模式解析完整画布、Markdown 与几何子树。
+- Session Bootstrap 向 agent-service 推送模型配置与外部授权时应并发执行、共同完成后再返回；评论等 effect 的 target 对象必须使用稳定引用，并在资源 ID 就绪前禁用网络链路，避免启动期重复 REST/WS。
 - Docker 编辑页延迟诊断不能只看某一时刻的 `docker stats`；同时核对 author-site 容器 `cpu.stat` 的 `nr_throttled / nr_periods`、`RestartCount`、V8 heap OOM 日志和启动日志中的 Next.js 版本，避免周期性限流或重启被当前 `healthy` 状态掩盖。
 - 采集冷编译基线前必须关闭仍指向 author-site 的旧浏览器标签，再清理 `.next` 和重启服务；旧页面会自动重连并发起 Authority/会话请求，污染模块数和编译时间。
 - 被 `useEffect` / `useCallback` 依赖的可选数组或对象 props 不得在函数参数中使用 `=[]` / `={}` 这类每次渲染创建新引用的默认值；使用模块级稳定常量，避免请求 effect 循环。
@@ -281,7 +290,7 @@ pnpm test:e2e:ui
 pnpm test:e2e:headed
 ```
 
-注意：`pnpm dev` 会并行启动 author、agent、viewer、screenshot。当前正式截图服务是 `packages/screenshot-service/`。
+注意：`pnpm dev` 会并行启动 author、agent、knowledge、viewer、screenshot 和 sketch Playground，并启用编辑页自动截图；`pnpm dev:lite` 保持相同六服务拓扑，但暂停自动截图以降低日常资源占用。两者启动前都会释放 3400、4200–4203、4300 端口。当前正式截图服务是 `packages/screenshot-service/`。
 
 包级验证：
 
@@ -364,8 +373,11 @@ Markdown 编辑器（DocumentEditor）：
 - Crepe 统一提供 `/` 块菜单、选中文本浮动格式条、块拖拽、链接、图片、表格、代码块、列表、光标与占位体验；项目能力通过 `packages/demo-ui/src/markdown/crepe-config.ts` 的 `BlockEdit.buildMenu` 追加配置引用、视频和附件，图片上传复用 `ImageBlock` 配置。TopBar 已启用，Latex 和 Crepe AI 明确关闭。
 - `DocumentEditor` 直接管理单一 Crepe 实例；受控 `value`/`onChange` 用 `lastEmittedRef` 防回环，外部同步用底层 Milkdown `replaceAll`，只读切换用 `crepe.setReadonly`，卸载必须销毁实例。
 - 若可编辑的 `DocumentEditor` 消费方拥有 Session 上下文，必须传入 `localizeRemoteImage`；快捷键粘贴网页外网图片时，该处理器调用当前 Session 的资源本地化接口，成功后才写入图床地址，不能让外链直接落入 Markdown。
+- 图片缩放以持久化目标像素宽度为准，渲染时仅用正文容器作为上限；`@milkdown/components@7.22.0` 的 `patches/@milkdown__components@7.22.0.patch` 负责 Markdown 编解码和拖拽写回。升级该依赖时必须复核此补丁，历史比例型图片会在再次调整尺寸后迁移为目标宽度。
+- 设计规范说明的 `PageRequirements` 是 MarkdownIt 轻量只读渲染器，不经过 Crepe；它必须同步识别图片宽度元数据，并为未迁移的历史图片保留 560px 阅读上限，避免浏览端绕过编辑器策略而铺满宽屏。
 - 主题只导入 Crepe common 结构样式，项目色彩、排版、浮层与响应式规则集中在 `packages/demo-ui/src/markdown/crepe-theme.css`，通过宿主 CSS tokens 自动适配明暗主题。
-- TopBar 的“更多”恢复入口必须挂在 `[data-document-editor="crepe"]` React 外层宿主，与 `.crepe` 滚动/裁切容器平级；不得挂回 `.crepe`、`.milkdown-top-bar` 或 `.top-bar-inner`，否则入口会与被收纳工具共享裁切链。
+- 桌面端 Markdown 阅读排版统一为 15px 正文、1.75 行高与约 760px 文本列：`DocumentEditor` 的 880px 正文盒包含左右编辑沟槽，`PageRequirements`（设计规范的轻量只读渲染器）直接使用 760px 居中阅读列；浏览端设计规范的已绑定配置表也必须放入同一列，避免表格与说明左右边缘不齐；不要让浏览端回退到 `text-xs` 等紧凑 UI 字号。
+- TopBar 的“更多”恢复入口必须挂在 `[data-document-editor="crepe"]` React 外层宿主，与 `.crepe` 滚动/裁切容器平级，且层级高于原生 TopBar；不得挂回 `.crepe`、`.milkdown-top-bar` 或 `.top-bar-inner`。Crepe/Vue 会在初次创建后替换 TopBar DOM，溢出适配器必须持续核对并重绑定当前 `.top-bar-inner`；被收纳节点的 `[hidden]` 语义不得被主题 `display` 规则覆盖。恢复菜单的克隆 SVG 位于 `.milkdown` 选择器作用域外，必须显式承接原 TopBar 的默认与悬停 `color` / `fill`，否则深色菜单中会回退为黑色图标。
 - 消费方（author-site/viewer-site/ai-chat-shared）统一以 Markdown 传 `value`，已无 `format`/`htmlSanitizer` 参数。
 - **prosemirror 双实例**：milkdown 与 prosemirror-adapter 各带不同 `prosemirror-view`/`prosemirror-model`，根 `package.json` `overrides` 已强制统一单一版本，勿手动改回。
 - **测试 ESM 坑**：`@milkdown/*`、`@prosemirror-adapter/*` 均为 ESM-only，author-site 的 Jest（CJS）无法解析，靠 `packages/author-site/jest-milkdown-mock.js` + jest.config `moduleNameMapper` 全局映射兜底；demo-ui 用 Vitest 直接跑真实 Milkdown（roundtrip 幂等 + 集成渲染测试）。`codemirror`/`@codemirror/*` 自带 CJS 构建，Jest 可直接解析、无需 mock。

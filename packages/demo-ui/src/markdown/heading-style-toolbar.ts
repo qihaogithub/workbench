@@ -52,10 +52,18 @@ export function mountHeadingStyleToolbar({
   };
 
   const refresh = () => {
-    root.querySelector<HTMLButtonElement>("[data-heading-style-trigger]")?.replaceChildren(
-      labelFor(getActiveLevel()),
-      document.createTextNode("⌄"),
+    const trigger = root.querySelector<HTMLButtonElement>(
+      "[data-heading-style-trigger]",
     );
+    if (!trigger) return;
+    const label = document.createElement("span");
+    label.className = "heading-style-label";
+    label.textContent = labelFor(getActiveLevel());
+    const chevron = document.createElement("span");
+    chevron.className = "heading-style-chevron";
+    chevron.setAttribute("aria-hidden", "true");
+    chevron.textContent = "⌄";
+    trigger.replaceChildren(label, chevron);
   };
 
   const show = (selector: HTMLElement) => {

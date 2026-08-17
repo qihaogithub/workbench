@@ -1,8 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { resolveDataBase } from "../src/lib/api";
 
 describe("resolveDataBase", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("uses the local author-site data endpoint during development", () => {
+    vi.stubEnv("NODE_ENV", "development");
+
+    expect(resolveDataBase({})).toBe("http://localhost:4200");
+  });
+
   it("ignores development data endpoint when building the Docker viewer", () => {
     expect(
       resolveDataBase({

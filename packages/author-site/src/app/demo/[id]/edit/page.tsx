@@ -19,6 +19,7 @@ import {
 import { invalidateCompileCache } from "@workbench/demo-ui/compile-cache";
 import { isSchemaEmpty } from "@workbench/demo-ui/validator";
 import { PreviewModeSwitcher } from "@workbench/demo-ui/PreviewModeSwitcher";
+import { PreviewStage } from "@workbench/demo-ui/PreviewStage";
 import type {
   PreviewMode,
   PreviewSize,
@@ -245,10 +246,6 @@ import { sanitizeHydratedMessages } from "@/lib/sanitize-hydrated-messages";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale/zh-CN";
 
-const PreviewStage = dynamic(
-  () => import("@workbench/demo-ui/PreviewStage").then((m) => m.PreviewStage),
-  { ssr: false, loading: () => null },
-);
 const CommentLayer = dynamic(
   () => import("@workbench/demo-ui/comment").then((m) => m.CommentLayer),
   { ssr: false, loading: () => null },
@@ -2186,11 +2183,16 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [documentCommentSelection, setDocumentCommentSelection] = useState<DocumentCommentAnchor | null>(null);
   const [canvasCommentDraft, setCanvasCommentDraft] =
     useState<CanvasCommentDraft | null>(null);
+  const activePageCommentTarget = useMemo<CommentTarget>(
+    () => ({ kind: "page", pageId: activeDemoId }),
+    [activeDemoId],
+  );
   const commentsData = useComments({
     projectId: demoId,
-    target: { kind: "page", pageId: activeDemoId },
+    target: activePageCommentTarget,
     api: commentApi,
     wsUrl: commentWsUrl,
+    enabled: Boolean(activeDemoId),
   });
   const documentCommentsData = useComments({
     projectId: demoId,
@@ -3263,9 +3265,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     setHasUnsavedChanges,
     setIsSaving,
     beforePublish: async () => {
-      if (Object.keys(projectConfigValuesRef.current).length === 0) {
-        return;
-      }
+      // 队列曾失败时不能永久阻止发布；以最新值在 Authority 基线下重试。
       const saved = await persistProjectConfigValues(
         projectConfigValuesRef.current,
       );
@@ -4163,7 +4163,10 @@ ${context.details}
         ...projectConfigValuesRef.current,
         ...data,
       };
+      // 立即更新 ref，保证紧跟在本次输入后的发布会等待这次保存。
+      projectConfigValuesRef.current = nextProjectConfigValues;
       setProjectConfigValues(nextProjectConfigValues);
+      void persistProjectConfigValues(nextProjectConfigValues);
       setConfigDataMap((prev) => {
         const next = { ...prev };
         for (const pageId of Object.keys(next)) {
@@ -4177,7 +4180,7 @@ ${context.details}
         return next;
       });
     },
-    [demoPages],
+    [demoPages, persistProjectConfigValues],
   );
 
   const handleSchemaChange = useCallback(

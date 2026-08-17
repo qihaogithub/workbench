@@ -92,9 +92,9 @@ describe("PreviewStage", () => {
 
   it.each(["readonly", "viewer", "editor"] as const)(
     "画布接收同一份规范化尺寸和 %s 交互模式",
-    (interactionMode) => {
+    async (interactionMode) => {
       renderStage({ previewMode: "canvas", interactionMode });
-      const canvas = screen.getByTestId("preview-canvas");
+      const canvas = await screen.findByTestId("preview-canvas");
       expect(canvas).toHaveAttribute("data-width", "1024");
       expect(canvas).toHaveAttribute("data-mode", interactionMode);
     },
@@ -117,11 +117,18 @@ describe("PreviewStage", () => {
     );
   });
 
-  it("画布模式不渲染默认单页内容", () => {
+  it("画布模式不渲染默认单页内容", async () => {
     renderStage({ previewMode: "canvas" });
-    const canvas = screen.getByTestId("preview-canvas");
+    const canvas = await screen.findByTestId("preview-canvas");
     expect(canvas).toHaveAttribute("data-width", "1024");
     expect(screen.queryByTestId("single-preview")).not.toBeInTheDocument();
+  });
+
+  it("文档模式不挂载画布", () => {
+    renderStage({ previewMode: "document" });
+
+    expect(screen.getByTestId("single-preview")).toBeInTheDocument();
+    expect(screen.queryByTestId("preview-canvas")).not.toBeInTheDocument();
   });
 
   it.each([

@@ -96,7 +96,7 @@ export function resolveDataBase(env: PublicRuntimeEnv): string {
 
   return (
     env.NEXT_PUBLIC_DATA_BASE ||
-    (process.env.NODE_ENV === "development" ? "http://localhost:3200" : "")
+    (process.env.NODE_ENV === "development" ? "http://localhost:4200" : "")
   );
 }
 

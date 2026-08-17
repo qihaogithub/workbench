@@ -16,6 +16,7 @@ import {
   writeProjectMeta,
   getLatestVersion,
   syncProjectDemoPagesFromWorkspace,
+  listDemoPages,
   type WorkspaceMeta,
 } from "./fs-utils";
 import type { MultiDemoFiles } from "@workbench/shared";
@@ -109,6 +110,41 @@ function copyWorkspaceClean(source: string, target: string): void {
     recursive: true,
     filter: (src: string) => !src.includes("node_modules"),
   });
+}
+
+/**
+ * Older live workspaces can retain their non-page files while losing the page
+ * index during a migration/materialization. An empty page set is unambiguous:
+ * restore only the canonical page tree and page directories, preserving any
+ * other live-workspace state.
+ */
+function repairEmptyActiveWorkspacePages(
+  projectId: string,
+  workspacePath: string,
+): void {
+  if (listDemoPages(workspacePath).length > 0) return;
+
+  const canonicalPath = path.join(getProjectPath(projectId), "workspace");
+  const canonicalPages = listDemoPages(canonicalPath);
+  if (canonicalPages.length === 0) return;
+
+  const sourceDemosPath = path.join(canonicalPath, "demos");
+  const targetDemosPath = path.join(workspacePath, "demos");
+  if (fs.existsSync(sourceDemosPath)) {
+    fs.mkdirSync(targetDemosPath, { recursive: true });
+    for (const page of canonicalPages) {
+      const sourcePagePath = path.join(sourceDemosPath, page.id);
+      const targetPagePath = path.join(targetDemosPath, page.id);
+      if (fs.existsSync(sourcePagePath) && !fs.existsSync(targetPagePath)) {
+        fs.cpSync(sourcePagePath, targetPagePath, { recursive: true });
+      }
+    }
+  }
+
+  const sourceTreePath = path.join(canonicalPath, "workspace-tree.json");
+  if (fs.existsSync(sourceTreePath)) {
+    fs.copyFileSync(sourceTreePath, path.join(workspacePath, "workspace-tree.json"));
+  }
 }
 
 function writeLiveWorkspaceMeta(
@@ -292,6 +328,7 @@ export function getOrCreateProjectActiveWorkspace(
         });
       }
       if (isWorkspaceBasedOnLatest(projectId, meta)) {
+        repairEmptyActiveWorkspacePages(projectId, activePath);
         const demos = options.includeFiles === false
           ? { demos: {}, projectConfigSchema: undefined }
           : getWorkspaceMultiDemoFiles(project.activeWorkspaceId) ?? {

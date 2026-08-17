@@ -3178,7 +3178,10 @@ export function PreviewCanvas({
                     : undefined
                 }
                 renderMode={renderMode}
-                onLayoutChange={handleLayoutChange}
+                // Viewer 只读：运行时内容测量不能反向改写已发布布局。
+                // 否则页面加载期间的高度微调会改变布局签名，触发 viewer
+                // 的适应屏幕逻辑并覆盖用户当前的缩放/平移。
+                onLayoutChange={isEditorMode ? handleLayoutChange : undefined}
                 onConfigEdit={handlePageSelect}
                 onCommentSelect={onPageComment ? (pageId, event) => {
                   const rect = event.currentTarget.getBoundingClientRect();
@@ -3230,7 +3233,9 @@ export function PreviewCanvas({
               shouldUseScreenshotLayer ? screenshotRenderBoxes : undefined
             }
             onSelect={handlePageGroupSelect}
-            onLayoutChange={handlePageGroupLayoutChange}
+            onLayoutChange={
+              isEditorMode ? handlePageGroupLayoutChange : undefined
+            }
             onActivePageChange={handlePageGroupActivePageChange}
             onDirectoryCollapsedChange={handlePageGroupDirectoryCollapsedChange}
             onDragStart={handleDragStart}
@@ -3294,7 +3299,7 @@ export function PreviewCanvas({
                 selectedDocumentNodeIds.includes(node.id)
               }
               editing={editingTextNodeId === node.id}
-              onLayoutChange={handleNodeLayoutChange}
+              onLayoutChange={isEditorMode ? handleNodeLayoutChange : undefined}
               onEdit={handleEditNode}
               onTextChange={handleTextNodeChange}
               onNodeStyleChange={handleNodeStyleChange}

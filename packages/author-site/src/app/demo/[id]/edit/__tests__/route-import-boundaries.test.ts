@@ -16,6 +16,10 @@ describe("编辑路由导入边界", () => {
 
     expect(page).toContain('from "date-fns/locale/zh-CN"');
     expect(page).not.toContain('from "date-fns/locale"');
+    expect(page).toContain(
+      'import { PreviewStage } from "@workbench/demo-ui/PreviewStage";',
+    );
+    expect(page).not.toContain('import("@workbench/demo-ui/PreviewStage")');
 
     expect(validator).toContain('from "@workbench/demo-ui/types"');
     expect(validator).toContain('from "@workbench/demo-ui/validator"');
@@ -30,5 +34,19 @@ describe("编辑路由导入边界", () => {
       'from "@workbench/demo-ui/DocumentEditor"',
     );
     expect(knowledgeDialog).not.toContain('from "@workbench/demo-ui"');
+  });
+
+  it("评论启动链复用稳定的页面 target 并等待活动页就绪", () => {
+    const page = readAuthorFile("src/app/demo/[id]/edit/page.tsx");
+
+    expect(page).toMatch(
+      /const activePageCommentTarget = useMemo<CommentTarget>\([\s\S]*?pageId: activeDemoId[\s\S]*?\[activeDemoId\][\s\S]*?\);/,
+    );
+    expect(page).toMatch(
+      /const commentsData = useComments\(\{[\s\S]*?target: activePageCommentTarget,[\s\S]*?enabled: Boolean\(activeDemoId\),[\s\S]*?\}\);/,
+    );
+    expect(page).not.toContain(
+      'target: { kind: "page", pageId: activeDemoId },',
+    );
   });
 });

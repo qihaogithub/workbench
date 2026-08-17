@@ -81,6 +81,48 @@ describe("useVersionControl", () => {
     );
   });
 
+  it("发布状态就绪后，即使没有本地脏状态也允许重新发布", async () => {
+    mockedProjectApiClient.getPublishStatus.mockResolvedValue({
+      projectId: "project-1",
+      status: "published",
+      publishedVersion: "v1",
+      publishedAt: Date.now(),
+      currentVersion: "v1",
+      hasUnpublishedChanges: false,
+    });
+
+    const { result } = renderHook(() =>
+      useVersionControl({
+        demoId: "project-1",
+        sessionId: "session-1",
+        workspaceId: "workspace-1",
+        activeDemoId: "page-1",
+        activeDemoIdRef: { current: "page-1" },
+        currentUsername: "测试用户",
+        code: "export default function Demo() {}",
+        schema: "{}",
+        validationResult: { isValid: true, errors: [] },
+        demoPages: [{ id: "page-1", name: "首页", order: 0, parentId: null, runtimeType: "high-fidelity-react" as const }],
+        hasUnsavedChanges: false,
+        hasUnsavedCanvasChanges: false,
+        isSaving: false,
+        applyDemoSnapshot: jest.fn(),
+        flushCanvasState: jest.fn().mockResolvedValue(undefined),
+        markCanvasChangesSaved: jest.fn(),
+        setActiveDemoId: jest.fn(),
+        setDemoPages: jest.fn(),
+        setDemoFolders: jest.fn(),
+        setProjectConfigSchema: jest.fn(),
+        setPageCodes: jest.fn(),
+        setHasUnsavedChanges: jest.fn(),
+        setIsSaving: jest.fn(),
+      }),
+    );
+
+    await act(async () => {});
+    expect(result.current.publishButtonDisabled).toBe(false);
+  });
+
   it("命名页面版本时带上当前草图 patch 摘要", async () => {
     const sketchPatchSummary: SketchPatchVersionSummary = {
       operationCount: 3,

@@ -1,0 +1,421 @@
+diff --git a/lib/image-block/index.js b/lib/image-block/index.js
+index ba6e478ff5d685224be694969d139901109f68c2..53ba45537b60d70482606c3346d7dba40da64d27 100644
+--- a/lib/image-block/index.js
++++ b/lib/image-block/index.js
+@@ -99,6 +99,12 @@ var __spreadValues$1 = (a, b) => {
+   return a;
+ };
+ const IMAGE_DATA_TYPE = "image-block";
++const WIDTH_MARKER = "width:";
++const getImageWidth = (alt) => {
++  if (typeof alt !== "string" || !alt.startsWith(WIDTH_MARKER)) return 0;
++  const width = Number(alt.slice(WIDTH_MARKER.length));
++  return Number.isFinite(width) && width > 0 ? width : 0;
++};
+ const imageBlockSchema = $nodeSchema("image-block", () => {
+   return {
+     inline: false,
+@@ -112,7 +118,8 @@ const imageBlockSchema = $nodeSchema("image-block", () => {
+     attrs: {
+       src: { default: "", validate: "string" },
+       caption: { default: "", validate: "string" },
+-      ratio: { default: 1, validate: "number" }
++      ratio: { default: 1, validate: "number" },
++      width: { default: 0, validate: "number" }
+     },
+     parseDOM: [
+       {
+@@ -123,7 +130,8 @@ const imageBlockSchema = $nodeSchema("image-block", () => {
+           return {
+             src: dom.getAttribute("src") || "",
+             caption: dom.getAttribute("caption") || "",
+-            ratio: Number((_a = dom.getAttribute("ratio")) != null ? _a : 1)
++            ratio: Number((_a = dom.getAttribute("ratio")) != null ? _a : 1),
++            width: Number(dom.getAttribute("width") || 0)
+           };
+         }
+       }
+@@ -134,12 +142,14 @@ const imageBlockSchema = $nodeSchema("image-block", () => {
+       runner: (state, node, type) => {
+         const src = node.url;
+         const caption = node.title;
++        const width = getImageWidth(node.alt);
+         let ratio = Number(node.alt || 1);
+         if (Number.isNaN(ratio) || ratio === 0) ratio = 1;
+         state.addNode(type, {
+           src,
+           caption,
+-          ratio
++          ratio,
++          width
+         });
+       }
+     },
+@@ -150,7 +160,7 @@ const imageBlockSchema = $nodeSchema("image-block", () => {
+         state.addNode("image", void 0, void 0, {
+           title: node.attrs.caption,
+           url: node.attrs.src,
+-          alt: `${Number.parseFloat(node.attrs.ratio).toFixed(2)}`
++          alt: node.attrs.width > 0 ? `${WIDTH_MARKER}${Math.round(node.attrs.width)}` : `${Number.parseFloat(node.attrs.ratio).toFixed(2)}`
+         });
+         state.closeNode();
+       }
+@@ -348,6 +358,10 @@ const ImageViewer = defineComponent({
+       type: Object,
+       required: true
+     },
++    width: {
++      type: Object,
++      required: true
++    },
+     selected: {
+       type: Object,
+       required: true
+@@ -365,7 +379,7 @@ const ImageViewer = defineComponent({
+       required: true
+     }
+   },
+-  setup({ src, caption, ratio, readonly, setAttr, config }) {
++  setup({ src, caption, ratio, width, readonly, setAttr, config }) {
+     var _a;
+     const imageRef = ref();
+     const resizeHandle = ref();
+@@ -378,13 +392,17 @@ const ImageViewer = defineComponent({
+       if (!image) return;
+       const host = image.closest(".milkdown-image-block");
+       if (!host) return;
++      if (width.value && width.value > 0) {
++        image.style.height = "auto";
++        return;
++      }
+       let maxWidth = host.getBoundingClientRect().width;
+       if (!maxWidth) return;
+       if (config.maxWidth && config.maxWidth < maxWidth)
+         maxWidth = config.maxWidth;
+       const height = image.naturalHeight;
+-      const width = image.naturalWidth;
+-      let transformedHeight = width < maxWidth ? height : maxWidth * (height / width);
++      const naturalWidth = image.naturalWidth;
++      let transformedHeight = naturalWidth < maxWidth ? height : maxWidth * (height / naturalWidth);
+       if (config.maxHeight && transformedHeight > config.maxHeight)
+         transformedHeight = config.maxHeight;
+       const h2 = (transformedHeight * ((_a2 = ratio.value) != null ? _a2 : 1)).toFixed(2);
+@@ -423,6 +441,12 @@ const ImageViewer = defineComponent({
+       const top = image.getBoundingClientRect().top;
+       let height = e.clientY - top;
+       if (height < 100) height = 100;
++      const host = image.closest(".milkdown-image-block");
++      const hostWidth = (host == null ? void 0 : host.getBoundingClientRect().width) ?? 0;
++      const maxWidth = config.maxWidth ? Math.min(hostWidth, config.maxWidth) : hostWidth;
++      if (maxWidth && image.naturalWidth) {
++        height = Math.min(height, maxWidth * (image.naturalHeight / image.naturalWidth));
++      }
+       if (config.maxHeight && height > config.maxHeight)
+         height = config.maxHeight;
+       const h2 = Number(height).toFixed(2);
+@@ -434,13 +458,10 @@ const ImageViewer = defineComponent({
+       window.removeEventListener("pointerup", onResizeHandlePointerUp);
+       const image = imageRef.value;
+       if (!image) return;
+-      const originHeight = Number(image.dataset.origin);
+-      const currentHeight = Number(image.dataset.height);
+-      const ratio2 = Number.parseFloat(
+-        Number(currentHeight / originHeight).toFixed(2)
+-      );
+-      if (Number.isNaN(ratio2)) return;
+-      setAttr("ratio", ratio2);
++      const currentWidth = image.getBoundingClientRect().width;
++      if (!Number.isFinite(currentWidth) || currentWidth <= 0) return;
++      setAttr("width", Math.round(currentWidth));
++      image.style.height = "auto";
+     };
+     const onResizeHandlePointerDown = (e) => {
+       if (readonly.value) return;
+@@ -450,7 +471,7 @@ const ImageViewer = defineComponent({
+       window.addEventListener("pointerup", onResizeHandlePointerUp);
+     };
+     return () => {
+-      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h("div", { class: "image-wrapper" }, /* @__PURE__ */ h("div", { class: "operation" }, /* @__PURE__ */ h("div", { class: "operation-item", onPointerdown: onToggleCaption }, /* @__PURE__ */ h(Icon, { icon: config.captionIcon }))), /* @__PURE__ */ h(
++      return /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h("div", { class: "image-wrapper", style: width.value && width.value > 0 ? { width: `min(${Math.round(width.value)}px, 100%)` } : void 0 }, /* @__PURE__ */ h("div", { class: "operation" }, /* @__PURE__ */ h("div", { class: "operation-item", onPointerdown: onToggleCaption }, /* @__PURE__ */ h(Icon, { icon: config.captionIcon }))), /* @__PURE__ */ h(
+         "img",
+         {
+           ref: imageRef,
+@@ -458,6 +479,7 @@ const ImageViewer = defineComponent({
+           onLoad: onImageLoad,
+           src: src.value,
+           alt: caption.value,
++          style: width.value && width.value > 0 ? { width: "100%", height: "auto" } : void 0,
+           onError: (e) => {
+             var _a2;
+             return Promise.resolve((_a2 = config.onImageLoadError) == null ? void 0 : _a2.call(config, e)).catch(() => {
+@@ -522,6 +544,10 @@ const MilkdownImageBlock = defineComponent({
+       type: Object,
+       required: true
+     },
++    width: {
++      type: Object,
++      required: true
++    },
+     selected: {
+       type: Object,
+       required: true
+@@ -572,6 +598,7 @@ const imageBlockView = $view(
+       const src = ref(initialNode.attrs.src);
+       const caption = ref(initialNode.attrs.caption);
+       const ratio = ref(initialNode.attrs.ratio);
++      const width = ref(initialNode.attrs.width);
+       const selected = ref(false);
+       const readonly = ref(!view.editable);
+       const setAttr = (attr, value) => {
+@@ -591,6 +618,7 @@ const imageBlockView = $view(
+         src,
+         caption,
+         ratio,
++        width,
+         selected,
+         readonly,
+         setAttr,
+@@ -621,6 +649,7 @@ const imageBlockView = $view(
+           }
+         }
+         ratio.value = node.attrs.ratio;
++        width.value = node.attrs.width;
+         caption.value = node.attrs.caption;
+         readonly.value = !view.editable;
+       };
+diff --git a/lib/image-block/view/components/image-block.d.ts b/lib/image-block/view/components/image-block.d.ts
+index 5fb35ca2af719b5b1399d9e9455de952ef0580fa..fa366e061225eec69f6de421e6414c5c1c4bc36b 100644
+--- a/lib/image-block/view/components/image-block.d.ts
++++ b/lib/image-block/view/components/image-block.d.ts
+@@ -4,6 +4,7 @@ type Attrs = {
+     src: string;
+     caption: string;
+     ratio: number;
++    width: number;
+ };
+ export type MilkdownImageBlockProps = {
+     selected: Ref<boolean>;
+diff --git a/src/image-block/schema.ts b/src/image-block/schema.ts
+index 6790c76b0a1a2765a18767b5520921b21a8a0e9e..0174a0e22e615a2cb0b7f311c12d9aa3eb19244b 100644
+--- a/src/image-block/schema.ts
++++ b/src/image-block/schema.ts
+@@ -4,6 +4,14 @@ import { $nodeSchema } from '@milkdown/utils'
+ import { withMeta } from '../__internal__/meta'
+ 
+ export const IMAGE_DATA_TYPE = 'image-block'
++const WIDTH_MARKER = 'width:'
++
++const getImageWidth = (alt: unknown) => {
++  if (typeof alt !== 'string' || !alt.startsWith(WIDTH_MARKER)) return 0
++
++  const width = Number(alt.slice(WIDTH_MARKER.length))
++  return Number.isFinite(width) && width > 0 ? width : 0
++}
+ 
+ export const imageBlockSchema = $nodeSchema('image-block', () => {
+   return {
+@@ -19,6 +27,7 @@ export const imageBlockSchema = $nodeSchema('image-block', () => {
+       src: { default: '', validate: 'string' },
+       caption: { default: '', validate: 'string' },
+       ratio: { default: 1, validate: 'number' },
++      width: { default: 0, validate: 'number' },
+     },
+     parseDOM: [
+       {
+@@ -30,6 +39,7 @@ export const imageBlockSchema = $nodeSchema('image-block', () => {
+             src: dom.getAttribute('src') || '',
+             caption: dom.getAttribute('caption') || '',
+             ratio: Number(dom.getAttribute('ratio') ?? 1),
++            width: Number(dom.getAttribute('width') ?? 0),
+           }
+         },
+       },
+@@ -40,6 +50,7 @@ export const imageBlockSchema = $nodeSchema('image-block', () => {
+       runner: (state, node, type) => {
+         const src = node.url as string
+         const caption = node.title as string
++        const width = getImageWidth(node.alt)
+         let ratio = Number((node.alt as string) || 1)
+         if (Number.isNaN(ratio) || ratio === 0) ratio = 1
+ 
+@@ -47,6 +58,7 @@ export const imageBlockSchema = $nodeSchema('image-block', () => {
+           src,
+           caption,
+           ratio,
++          width,
+         })
+       },
+     },
+@@ -57,7 +69,12 @@ export const imageBlockSchema = $nodeSchema('image-block', () => {
+         state.addNode('image', undefined, undefined, {
+           title: node.attrs.caption,
+           url: node.attrs.src,
+-          alt: `${Number.parseFloat(node.attrs.ratio).toFixed(2)}`,
++          // Width is editor metadata. Legacy ratio-only images remain readable and
++          // are upgraded when a user resizes them again.
++          alt:
++            node.attrs.width > 0
++              ? `${WIDTH_MARKER}${Math.round(node.attrs.width)}`
++              : `${Number.parseFloat(node.attrs.ratio).toFixed(2)}`,
+         })
+         state.closeNode()
+       },
+diff --git a/src/image-block/view/components/image-block.tsx b/src/image-block/view/components/image-block.tsx
+index 0f6d67ca9eb6ab5a030481162b5110db47f999ba..0cad5ec5b2147f478bae059aa2d349a50f61ad17 100644
+--- a/src/image-block/view/components/image-block.tsx
++++ b/src/image-block/view/components/image-block.tsx
+@@ -12,6 +12,7 @@ type Attrs = {
+   src: string
+   caption: string
+   ratio: number
++  width: number
+ }
+ 
+ export type MilkdownImageBlockProps = {
+@@ -37,6 +38,10 @@ export const MilkdownImageBlock = defineComponent<MilkdownImageBlockProps>({
+       type: Object,
+       required: true,
+     },
++    width: {
++      type: Object,
++      required: true,
++    },
+     selected: {
+       type: Object,
+       required: true,
+diff --git a/src/image-block/view/components/image-viewer.tsx b/src/image-block/view/components/image-viewer.tsx
+index b982b11339a2d0f7c7a27a78c414417d36af6980..9f4c2b92e43d1383f9d083fe9bbca06f76b42ebe 100644
+--- a/src/image-block/view/components/image-viewer.tsx
++++ b/src/image-block/view/components/image-viewer.tsx
+@@ -23,6 +23,10 @@ export const ImageViewer = defineComponent<MilkdownImageBlockProps>({
+       type: Object,
+       required: true,
+     },
++    width: {
++      type: Object,
++      required: true,
++    },
+     selected: {
+       type: Object,
+       required: true,
+@@ -40,7 +44,7 @@ export const ImageViewer = defineComponent<MilkdownImageBlockProps>({
+       required: true,
+     },
+   },
+-  setup({ src, caption, ratio, readonly, setAttr, config }) {
++  setup({ src, caption, ratio, width, readonly, setAttr, config }) {
+     const imageRef = ref<HTMLImageElement>()
+     const resizeHandle = ref<HTMLDivElement>()
+     const showCaption = ref(Boolean(caption.value?.length))
+@@ -53,6 +57,11 @@ export const ImageViewer = defineComponent<MilkdownImageBlockProps>({
+       const host = image.closest('.milkdown-image-block')
+       if (!host) return
+ 
++      if (width.value && width.value > 0) {
++        image.style.height = 'auto'
++        return
++      }
++
+       let maxWidth = host.getBoundingClientRect().width
+       if (!maxWidth) return
+ 
+@@ -60,9 +69,9 @@ export const ImageViewer = defineComponent<MilkdownImageBlockProps>({
+         maxWidth = config.maxWidth
+ 
+       const height = image.naturalHeight
+-      const width = image.naturalWidth
++      const naturalWidth = image.naturalWidth
+       let transformedHeight =
+-        width < maxWidth ? height : maxWidth * (height / width)
++        naturalWidth < maxWidth ? height : maxWidth * (height / naturalWidth)
+ 
+       if (config.maxHeight && transformedHeight > config.maxHeight)
+         transformedHeight = config.maxHeight
+@@ -110,6 +119,14 @@ export const ImageViewer = defineComponent<MilkdownImageBlockProps>({
+       const top = image.getBoundingClientRect().top
+       let height = e.clientY - top
+       if (height < 100) height = 100
++      const host = image.closest('.milkdown-image-block')
++      const hostWidth = host?.getBoundingClientRect().width ?? 0
++      const maxWidth = config.maxWidth
++        ? Math.min(hostWidth, config.maxWidth)
++        : hostWidth
++      if (maxWidth && image.naturalWidth) {
++        height = Math.min(height, maxWidth * (image.naturalHeight / image.naturalWidth))
++      }
+       if (config.maxHeight && height > config.maxHeight)
+         height = config.maxHeight
+       const h = Number(height).toFixed(2)
+@@ -124,14 +141,13 @@ export const ImageViewer = defineComponent<MilkdownImageBlockProps>({
+       const image = imageRef.value
+       if (!image) return
+ 
+-      const originHeight = Number(image.dataset.origin)
+-      const currentHeight = Number(image.dataset.height)
+-      const ratio = Number.parseFloat(
+-        Number(currentHeight / originHeight).toFixed(2)
+-      )
+-      if (Number.isNaN(ratio)) return
++      const currentWidth = image.getBoundingClientRect().width
++      if (!Number.isFinite(currentWidth) || currentWidth <= 0) return
+ 
+-      setAttr('ratio', ratio)
++      // A physical width is stable across wide and narrow document layouts.
++      // The wrapper caps it at the current container width without overwriting it.
++      setAttr('width', Math.round(currentWidth))
++      image.style.height = 'auto'
+     }
+ 
+     const onResizeHandlePointerDown = (e: PointerEvent) => {
+@@ -145,7 +161,14 @@ export const ImageViewer = defineComponent<MilkdownImageBlockProps>({
+     return () => {
+       return (
+         <>
+-          <div class="image-wrapper">
++          <div
++            class="image-wrapper"
++            style={
++              width.value && width.value > 0
++                ? { width: `min(${Math.round(width.value)}px, 100%)` }
++                : undefined
++            }
++          >
+             <div class="operation">
+               <div class="operation-item" onPointerdown={onToggleCaption}>
+                 <Icon icon={config.captionIcon} />
+@@ -157,6 +180,7 @@ export const ImageViewer = defineComponent<MilkdownImageBlockProps>({
+               onLoad={onImageLoad}
+               src={src.value}
+               alt={caption.value}
++              style={width.value && width.value > 0 ? { width: '100%', height: 'auto' } : undefined}
+               onError={(e) =>
+                 Promise.resolve(config.onImageLoadError?.(e)).catch(() => {})
+               }
+diff --git a/src/image-block/view/index.ts b/src/image-block/view/index.ts
+index b8a1b1ad08790fbffa692eb6733340b341f9fe0c..6b0bc643ff6addb3982b0a53c02da2619f674e44 100644
+--- a/src/image-block/view/index.ts
++++ b/src/image-block/view/index.ts
+@@ -17,6 +17,7 @@ export const imageBlockView = $view(
+       const src = ref(initialNode.attrs.src)
+       const caption = ref(initialNode.attrs.caption)
+       const ratio = ref(initialNode.attrs.ratio)
++      const width = ref(initialNode.attrs.width)
+       const selected = ref(false)
+       const readonly = ref(!view.editable)
+       const setAttr = (attr: string, value: unknown) => {
+@@ -36,6 +37,7 @@ export const imageBlockView = $view(
+         src,
+         caption,
+         ratio,
++        width,
+         selected,
+         readonly,
+         setAttr,
+@@ -68,6 +70,7 @@ export const imageBlockView = $view(
+           }
+         }
+         ratio.value = node.attrs.ratio
++        width.value = node.attrs.width
+         caption.value = node.attrs.caption
+ 
+         readonly.value = !view.editable
