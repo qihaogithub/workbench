@@ -28,6 +28,7 @@ import type {
   AppGraphValidationResult,
 } from "@workbench/shared";
 import { MAX_VERSIONS_KEEP } from "@workbench/shared";
+import { normalizeHtmlImport } from "@workbench/project-core";
 import { syncBuiltinKnowledge } from "./knowledge/builtin-documents";
 import {
   DATA_DIR,
@@ -557,7 +558,14 @@ export function listDemoPages(workspacePath: string): DemoPageMeta[] {
     const hasSketch = fs.existsSync(path.join(dir, "sketch.scene.json"));
     const hasPrototype = fs.existsSync(path.join(dir, "prototype.html"));
     const hasReact = fs.existsSync(path.join(dir, "index.tsx"));
-    if (hasSchema && (hasSketch || hasPrototype || hasReact)) {
+    const hasSandbox = fs.existsSync(path.join(dir, "sandbox.html"));
+    const runtimeFiles = [hasSketch, hasPrototype, hasReact, hasSandbox].filter(Boolean).length;
+    const runtimeMatches =
+      (page.runtimeType === "sketch-scene" && hasSketch) ||
+      (page.runtimeType === "prototype-html-css" && hasPrototype) ||
+      (page.runtimeType === "high-fidelity-react" && hasReact) ||
+      (page.runtimeType === "sandboxed-html" && hasSandbox);
+    if (hasSchema && runtimeFiles === 1 && runtimeMatches) {
       result.push(page);
     }
   }
@@ -574,12 +582,16 @@ export function listDemoPages(workspacePath: string): DemoPageMeta[] {
     const hasReactCode = fs.existsSync(path.join(dir, "index.tsx"));
     const hasPrototype = fs.existsSync(path.join(dir, "prototype.html"));
     const hasSketchScene = fs.existsSync(path.join(dir, "sketch.scene.json"));
-    if (hasSchema && (hasReactCode || hasPrototype || hasSketchScene)) {
+    const hasSandbox = fs.existsSync(path.join(dir, "sandbox.html"));
+    const runtimeFiles = [hasReactCode, hasPrototype, hasSketchScene, hasSandbox].filter(Boolean).length;
+    if (hasSchema && runtimeFiles === 1) {
       const inferredRuntimeType: DemoPageRuntimeType = hasSketchScene
         ? "sketch-scene"
         : hasPrototype
           ? "prototype-html-css"
-          : "high-fidelity-react";
+          : hasSandbox
+            ? "sandboxed-html"
+            : "high-fidelity-react";
       result.push({
         id: entry.name,
         name: entry.name.split("_")[0].replace(/-/g, " "),
@@ -601,9 +613,13 @@ export function listDemoPages(workspacePath: string): DemoPageMeta[] {
  * 根据页面目录中的文件推断运行时类型（唯一真相来源是文件系统）。
  */
 export function resolvePageRuntimeType(pageDir: string): DemoPageRuntimeType {
-  if (fs.existsSync(path.join(pageDir, "sketch.scene.json"))) return "sketch-scene";
-  if (fs.existsSync(path.join(pageDir, "prototype.html"))) return "prototype-html-css";
-  return "high-fidelity-react";
+  const candidates: DemoPageRuntimeType[] = [];
+  if (fs.existsSync(path.join(pageDir, "sketch.scene.json"))) candidates.push("sketch-scene");
+  if (fs.existsSync(path.join(pageDir, "prototype.html"))) candidates.push("prototype-html-css");
+  if (fs.existsSync(path.join(pageDir, "sandbox.html"))) candidates.push("sandboxed-html");
+  if (fs.existsSync(path.join(pageDir, "index.tsx"))) candidates.push("high-fidelity-react");
+  if (candidates.length !== 1) throw new Error("PAGE_RUNTIME_FILES_INVALID");
+  return candidates[0];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -1550,12 +1566,15 @@ export function getWorkspaceMultiDemoFiles(
       const prototypeMetaPath = path.join(dir, "prototype.meta.json");
       const sketchScenePath = path.join(dir, "sketch.scene.json");
       const sketchMetaPath = path.join(dir, "sketch.meta.json");
+      const sandboxHtmlPath = path.join(dir, "sandbox.html");
+      const htmlImportMetaPath = path.join(dir, "html-import.meta.json");
       const configValuesPath = path.join(dir, "config.values.json");
       if (
         fs.existsSync(schemaPath) &&
         (fs.existsSync(codePath) ||
           fs.existsSync(prototypeHtmlPath) ||
-          fs.existsSync(sketchScenePath))
+          fs.existsSync(sketchScenePath) ||
+          fs.existsSync(sandboxHtmlPath))
       ) {
         demos[entry.name] = {
           code: fs.existsSync(codePath)
@@ -1581,6 +1600,12 @@ export function getWorkspaceMultiDemoFiles(
                 string,
                 unknown
               >)
+            : undefined,
+          sandboxHtml: fs.existsSync(sandboxHtmlPath)
+            ? fs.readFileSync(sandboxHtmlPath, "utf-8")
+            : undefined,
+          htmlImportMeta: fs.existsSync(htmlImportMetaPath)
+            ? (JSON.parse(fs.readFileSync(htmlImportMetaPath, "utf-8")) as DemoFiles["htmlImportMeta"])
             : undefined,
           configValues: fs.existsSync(configValuesPath)
             ? (JSON.parse(
@@ -1615,13 +1640,16 @@ export function getWorkspaceDemoPageFiles(
   const prototypeMetaPath = path.join(demoDir, "prototype.meta.json");
   const sketchScenePath = path.join(demoDir, "sketch.scene.json");
   const sketchMetaPath = path.join(demoDir, "sketch.meta.json");
+  const sandboxHtmlPath = path.join(demoDir, "sandbox.html");
+  const htmlImportMetaPath = path.join(demoDir, "html-import.meta.json");
   const configValuesPath = path.join(demoDir, "config.values.json");
 
   if (
     !fs.existsSync(schemaPath) ||
     (!fs.existsSync(codePath) &&
       !fs.existsSync(prototypeHtmlPath) &&
-      !fs.existsSync(sketchScenePath))
+      !fs.existsSync(sketchScenePath) &&
+      !fs.existsSync(sandboxHtmlPath))
   )
     return null;
   return {
@@ -1647,6 +1675,12 @@ export function getWorkspaceDemoPageFiles(
           unknown
         >)
       : undefined,
+    sandboxHtml: fs.existsSync(sandboxHtmlPath)
+      ? fs.readFileSync(sandboxHtmlPath, "utf-8")
+      : undefined,
+    htmlImportMeta: fs.existsSync(htmlImportMetaPath)
+      ? (JSON.parse(fs.readFileSync(htmlImportMetaPath, "utf-8")) as DemoFiles["htmlImportMeta"])
+      : undefined,
     configValues: fs.existsSync(configValuesPath)
       ? (JSON.parse(
           fs.readFileSync(configValuesPath, "utf-8"),
@@ -1666,6 +1700,16 @@ export function updateWorkspaceDemoFiles(
 ): boolean {
   const wsPath = findWorkspacePath(workspaceId);
   if (!wsPath) return false;
+
+  let normalizedSandboxHtml: string | undefined;
+  if (typeof files.sandboxHtml === "string") {
+    const normalized = normalizeHtmlImport(files.sandboxHtml);
+    if (
+      normalized.analysis.outcome.status !== "accepted" ||
+      normalized.analysis.outcome.runtimeType !== "sandboxed-html"
+    ) return false;
+    normalizedSandboxHtml = normalized.normalizedHtml ?? files.sandboxHtml;
+  }
 
   const demoDir = getDemoDirPath(wsPath, demoId);
   if (!fs.existsSync(demoDir)) {
@@ -1714,6 +1758,16 @@ export function updateWorkspaceDemoFiles(
     fs.writeFileSync(
       path.join(demoDir, "sketch.meta.json"),
       JSON.stringify(files.sketchMeta, null, 2),
+      "utf-8",
+    );
+  }
+  if (normalizedSandboxHtml !== undefined) {
+    fs.writeFileSync(path.join(demoDir, "sandbox.html"), normalizedSandboxHtml, "utf-8");
+  }
+  if (files.htmlImportMeta) {
+    fs.writeFileSync(
+      path.join(demoDir, "html-import.meta.json"),
+      JSON.stringify(files.htmlImportMeta, null, 2),
       "utf-8",
     );
   }

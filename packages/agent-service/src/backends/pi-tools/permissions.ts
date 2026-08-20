@@ -74,12 +74,17 @@ export function isPathAllowed(
 
 export interface CommandPermissionResult {
   allowed: boolean;
-  reason?: 'denied_command' | 'node_eval_blocked' | 'npm_npx_blocked' | 'not_in_allowed';
+  reason?:
+    | 'denied_command'
+    | 'node_eval_blocked'
+    | 'npm_npx_blocked'
+    | 'shell_syntax_blocked'
+    | 'not_in_allowed';
   baseCommand?: string;
 }
 
 export function getCommandPermissionDescription(config: PermissionConfig): string {
-  return `Allowed commands: ${config.allowedCommands.join(', ')}. Blocked: ${config.deniedCommands.join(', ')}, npm, npx, node -e.`;
+  return `Allowed commands: ${config.allowedCommands.join(', ')}. Blocked: ${config.deniedCommands.join(', ')}, npm, npx, node eval/print flags, shell composition syntax.`;
 }
 
 export function getCommandPermissionResult(
@@ -88,6 +93,11 @@ export function getCommandPermissionResult(
 ): CommandPermissionResult {
   const trimmed = command.trim();
   if (!trimmed) return { allowed: false, reason: 'not_in_allowed' };
+  // The command is later passed to spawn({ shell: true }). Never let the
+  // first-token allowlist turn into a shell-script allowlist.
+  if (hasShellCompositionSyntax(trimmed)) {
+    return { allowed: false, reason: 'shell_syntax_blocked' };
+  }
   const baseCmd = trimmed.split(/\s+/)[0];
   if (config.deniedCommands.includes(baseCmd)) {
     return { allowed: false, reason: 'denied_command', baseCommand: baseCmd };
@@ -95,7 +105,12 @@ export function getCommandPermissionResult(
   if (baseCmd === "npm" || baseCmd === "npx") {
     return { allowed: false, reason: 'npm_npx_blocked', baseCommand: baseCmd };
   }
-  if (baseCmd === "node" && /\s(?:-e|--eval)(?:\s|=|$)/.test(` ${trimmed}`)) {
+  if (
+    baseCmd === "node" &&
+    /(?:^|\s)(?:--(?:eval|print)(?:\s|=|$)|-[^-\s]*[ep][^-\s]*(?:\s|$))/.test(
+      trimmed,
+    )
+  ) {
     return { allowed: false, reason: 'node_eval_blocked', baseCommand: baseCmd };
   }
   if (!config.allowedCommands.includes(baseCmd)) {
@@ -128,7 +143,14 @@ export function isLiveWorkspaceReadOnlyCommandAllowed(
 }
 
 function hasShellWriteOrCompositionSyntax(command: string): boolean {
-  return /(?:^|[^\\])(?:>>?|<<|[|;&]|\$\(|`|\n)/.test(command) || /\b(?:tee|xargs)\b/.test(command);
+  return hasShellCompositionSyntax(command) || /\b(?:tee|xargs)\b/.test(command);
+}
+
+function hasShellCompositionSyntax(command: string): boolean {
+  // Deliberately reject these characters even inside quotes. This is a small,
+  // predictable deny-list for the shell=true execution boundary; callers can
+  // use the file tools for content containing such characters.
+  return /[<>|;&`\r\n]|\$\(/.test(command);
 }
 
 function matchGlob(filePath: string, pattern: string): boolean {

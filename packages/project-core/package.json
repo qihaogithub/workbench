@@ -7,6 +7,7 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./html-import": "./src/html-import.ts",
     "./page-design-spec-sync": "./src/page-design-spec-sync.ts"
   },
   "scripts": {
@@ -19,6 +20,7 @@
     "@workbench/preview-contract": "workspace:*",
     "@workbench/shared": "workspace:*",
     "@workbench/sketch-core": "workspace:*",
+    "parse5": "7.3.0",
     "tar": "^7.4.3"
   },
   "devDependencies": {

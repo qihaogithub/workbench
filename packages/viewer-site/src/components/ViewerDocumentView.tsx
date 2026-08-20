@@ -36,6 +36,16 @@ type ConfigPoolItem = {
   format?: string;
 };
 
+/**
+ * 文档视图只显示使用者可阅读的项目知识库或设计规范；系统知识不构成入口内容。
+ */
+export function hasViewerDocumentContent(
+  items: KnowledgeIndexItem[],
+  designSpecs: PublishedDesignSpecMeta[],
+) {
+  return items.some((item) => item.source !== "system") || designSpecs.length > 0;
+}
+
 function buildConfigPool(projectSchema: string | undefined, pages: ViewerDocumentViewProps["pages"]): ConfigPoolItem[] {
   const readFields = (schema?: string) => schema ? parseSchemaToFields(schema).flatMap((group) => group.fields) : [];
   const kindOf = (field: { type: string; format?: string; uiWidget?: string; key: string; default?: unknown }): ConfigPoolItemKind => {

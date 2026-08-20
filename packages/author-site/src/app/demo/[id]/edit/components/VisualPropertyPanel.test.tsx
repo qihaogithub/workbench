@@ -81,6 +81,30 @@ function renderPanel(
 }
 
 describe("VisualPropertyPanel 清空入口", () => {
+  it("从未选中状态切换到选中元素时保持 Hook 调用顺序", () => {
+    const { rerender } = renderPanel({ selectedNode: null });
+
+    rerender(
+      <VisualPropertyPanel
+        selectedNode={selectedNode}
+        propertyChanges={[]}
+        configMarks={[]}
+        aiInstruction=""
+        usedConfigKeys={[]}
+        sessionId="session-1"
+        onPropertyChange={jest.fn()}
+        onRestoreProperty={jest.fn()}
+        onClearChanges={jest.fn()}
+        onMarkConfig={jest.fn()}
+        onUpdateConfigMark={jest.fn()}
+        onRemoveConfigMark={jest.fn()}
+        onAiInstructionChange={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText("位置")).toBeInTheDocument();
+  });
+
   it("当前图层没有修改时禁用清空按钮", () => {
     renderPanel();
 
@@ -229,7 +253,7 @@ describe("VisualPropertyPanel 配置项入口", () => {
       "100",
       "style",
     );
-    expect(screen.getByRole("dialog")).toHaveTextContent("配置项设置");
+    expect(screen.getByRole("dialog")).toHaveTextContent("添加配置项");
   });
 
   it("已有配置项以顶部信息条展示并可继续编辑", () => {
@@ -238,7 +262,7 @@ describe("VisualPropertyPanel 配置项入口", () => {
     const configBar = screen.getByRole("button", { name: /文字颜色 textColor/ });
     expect(configBar).toBeInTheDocument();
     fireEvent.click(configBar);
-    expect(screen.getByRole("dialog")).toHaveTextContent("配置项设置");
+    expect(screen.getByRole("dialog")).toHaveTextContent("编辑配置项");
     expect(screen.getByDisplayValue("文字颜色")).toBeInTheDocument();
   });
 
@@ -262,9 +286,53 @@ describe("VisualPropertyPanel 配置项入口", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "不透明度编辑配置项" }));
 
-    expect(screen.getByRole("dialog")).toHaveTextContent("配置项设置");
+    expect(screen.getByRole("dialog")).toHaveTextContent("编辑配置项");
     expect(onUpdateConfigMark).toHaveBeenCalledWith("config-mark-2", { defaultValue: "100" });
     expect(screen.getByDisplayValue("不透明度")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("80")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("100")).toBeInTheDocument();
+  });
+
+  it("图片配置复用图片格式下拉、W/H 规则与上传式默认值控件", () => {
+    const imageNode: VisualNodeInfo = {
+      ...selectedNode,
+      attrs: { src: "/cover.png" },
+      editCapabilities: ["image"],
+    };
+    const imageMark: VisualConfigMark = {
+      id: "config-mark-image",
+      changeId: "body > div:nth-child(1):attribute:src",
+      nodeId: "node-1",
+      domPath: "body > div:nth-child(1)",
+      kind: "attribute",
+      property: "src",
+      label: "替换图片",
+      fieldTitle: "封面",
+      fieldKey: "coverImage",
+      defaultValue: "/cover.png",
+      scope: "page",
+      widthRule: { operator: "≥", value: 320 },
+      heightRule: { operator: "≤", value: 900 },
+    };
+
+    const onUpdateConfigMark = jest.fn();
+    renderPanel({ selectedNode: imageNode, configMarks: [imageMark], onUpdateConfigMark });
+    fireEvent.click(screen.getByRole("button", { name: "替换图片编辑配置项" }));
+
+    expect(screen.getByRole("dialog")).toHaveTextContent("格式限制");
+    expect(screen.getByText("全部图片")).toBeInTheDocument();
+    expect(screen.getByLabelText("W≥具体数值")).toHaveValue(320);
+    expect(screen.getByLabelText("H≤具体数值")).toHaveValue(900);
+    expect(screen.getByLabelText("上传默认图片")).toHaveAttribute("type", "file");
+
+    fireEvent.click(screen.getByLabelText("W 比较符"));
+    for (const operator of ["=", ">", "≥", "<", "≤"]) {
+      expect(screen.getByRole("option", { name: operator })).toBeInTheDocument();
+    }
+    fireEvent.click(screen.getByRole("option", { name: ">" }));
+    expect(onUpdateConfigMark).toHaveBeenLastCalledWith("config-mark-image", expect.objectContaining({ widthRule: { operator: ">", value: 320 } }));
+
+    fireEvent.click(screen.getByText("全部图片"));
+    fireEvent.click(screen.getByRole("option", { name: "PNG" }));
+    expect(onUpdateConfigMark).toHaveBeenLastCalledWith("config-mark-image", expect.objectContaining({ accept: "image/png" }));
   });
 });

@@ -59,6 +59,15 @@ describe("preview stage resolver", () => {
     expect(
       resolvePagePreviewRenderer(
         createPage({
+          runtimeType: "sandboxed-html" as PreviewStagePage["runtimeType"],
+          iframeUrl: "/should-not-be-used.html",
+          sandboxExecutionUrl: "/controlled/execution/opaque-id",
+        }),
+      ),
+    ).toBe("sandbox-html");
+    expect(
+      resolvePagePreviewRenderer(
+        createPage({
           iframeUrl: "/published.html",
           compiledJsUrl: "/compiled.js",
           code: "export default function Page() {}",
@@ -86,6 +95,19 @@ describe("preview stage resolver", () => {
       ),
     ).toBe("authoring-code");
     expect(resolvePagePreviewRenderer(createPage())).toBe("empty");
+  });
+
+  it("未知 runtime 不会落入可信 renderer", () => {
+    expect(
+      resolvePagePreviewRenderer(
+        createPage({
+          runtimeType: "future-runtime" as PreviewStagePage["runtimeType"],
+          iframeUrl: "/published.html",
+          compiledJsUrl: "/compiled.js",
+          code: "export default 1",
+        }),
+      ),
+    ).toBe("empty");
   });
 
   it("规范化页面列表并复用未变化的引用", () => {

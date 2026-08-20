@@ -150,12 +150,32 @@ describe('isCommandAllowed', () => {
     expect(isCommandAllowed('node --eval "console.log(1)"', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
   });
 
+  it('拒绝等价的 node print 执行入口', () => {
+    expect(isCommandAllowed('node -p "process.env"', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
+    expect(isCommandAllowed('node --print="process.env"', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
+  });
+
   it('拒绝空命令', () => {
     expect(isCommandAllowed('', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
   });
 
   it('拒绝前后带空格的命令', () => {
     expect(isCommandAllowed('   rm -rf /', DEFAULT_WORKSPACE_PERMISSIONS)).toBe(false);
+  });
+
+  it('在所有 workspace 模式拒绝 shell 组合、重定向和命令替换', () => {
+    for (const command of [
+      'ls; echo bypass',
+      'ls && echo bypass',
+      'ls | cat',
+      'echo data > output.txt',
+      'echo data >> output.txt',
+      'echo $(cat secret.txt)',
+      'echo `cat secret.txt`',
+      'cat README.md\necho bypass',
+    ]) {
+      expect(isCommandAllowed(command, DEFAULT_WORKSPACE_PERMISSIONS), command).toBe(false);
+    }
   });
 });
 

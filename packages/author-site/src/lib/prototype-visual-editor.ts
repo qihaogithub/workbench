@@ -3,6 +3,11 @@ import type {
   VisualPropertyChange,
   VisualPropertyChangeKind,
 } from "@workbench/demo-ui/iframe-types";
+import type { ImageDimensionRule } from "@workbench/shared/demo/config-schema-definition";
+import {
+  applyPrototypeCommand,
+  type TextPatch,
+} from "@workbench/prototype-core";
 
 export type PrototypeVisualConfigKind = "text" | "image" | "color";
 
@@ -13,14 +18,19 @@ export interface PrototypeVisualConfigTarget {
   defaultValue: string;
   category?: string;
   colorProperty?: "color" | "backgroundColor" | "borderColor";
-  imageWidthOperator?: ">" | "=" | "<" | "≥" | "≤";
-  imageWidthValue?: number;
-  imageHeightOperator?: ">" | "=" | "<" | "≥" | "≤";
-  imageHeightValue?: number;
+  accept?: string;
+  widthRule?: ImageDimensionRule;
+  heightRule?: ImageDimensionRule;
 }
 
 export type PrototypeVisualEditResult =
-  | { ok: true; html: string }
+  | {
+      ok: true;
+      html: string;
+      resolvedNodeId?: string;
+      forwardPatches?: TextPatch[];
+      inversePatches?: TextPatch[];
+    }
   | { ok: false; error: string };
 
 export type PrototypeVisualConfigResult =
@@ -141,6 +151,20 @@ function normalizeStyleValue(property: string, value: string): string {
   return trimmed;
 }
 
+function describePrototypeEditError(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  if (message.includes("Prototype target not found")) {
+    return "无法定位选中的原型节点，页面可能已被其他编辑更新";
+  }
+  if (message.includes("single direct text node")) {
+    return "该元素包含嵌套内容，不能整块替换文本，请选择具体文字节点";
+  }
+  if (message.includes("location unavailable")) {
+    return "无法安全定位该元素的源码范围，请改用 AI 修改";
+  }
+  return message || "原型页属性写回失败";
+}
+
 function validateTarget(target: PrototypeVisualConfigTarget): string | null {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(target.fieldKey)) {
     return "字段 key 必须以英文字母或下划线开头，并且只能包含英文字母、数字和下划线";
@@ -193,14 +217,11 @@ function createSchemaProperty(target: PrototypeVisualConfigTarget): Record<strin
     uiOptions.category = category;
   }
   if (target.kind === "image") {
-    if (target.imageWidthOperator && typeof target.imageWidthValue === "number") {
-      uiOptions.widthOperator = target.imageWidthOperator;
-      uiOptions.widthValue = target.imageWidthValue;
+    if (typeof target.accept === "string" && target.accept.trim()) {
+      uiOptions.accept = target.accept.trim();
     }
-    if (target.imageHeightOperator && typeof target.imageHeightValue === "number") {
-      uiOptions.heightOperator = target.imageHeightOperator;
-      uiOptions.heightValue = target.imageHeightValue;
-    }
+    if (target.widthRule) uiOptions.widthRule = target.widthRule;
+    if (target.heightRule) uiOptions.heightRule = target.heightRule;
   }
   if (Object.keys(uiOptions).length > 0) {
     property["ui:options"] = uiOptions;
@@ -216,28 +237,46 @@ export function applyPrototypePropertyChange(
   kind: VisualPropertyChangeKind,
 ): PrototypeVisualEditResult {
   try {
+    if (kind === "text" || kind === "attribute") {
+      const result = applyPrototypeCommand(
+        html,
+        kind === "text"
+          ? {
+              type: "set-text",
+              target: { nodeId: node.nodeId, domPath: node.domPath },
+              text: value || "",
+            }
+          : {
+              type: "set-attribute",
+              target: { nodeId: node.nodeId, domPath: node.domPath },
+              name: property,
+              value: value || null,
+            },
+      );
+      return {
+        ok: true,
+        html: result.nextSource,
+        resolvedNodeId: result.resolvedNodeId,
+        forwardPatches: result.forwardPatches,
+        inversePatches: result.inversePatches,
+      };
+    }
+
     const { root } = parsePrototypeHtml(html);
     const element = getElementByNode(root, node);
     if (!element) return { ok: false, error: "无法定位选中的原型节点" };
     ensureStableNodeId(element, node);
 
-    if (kind === "text") {
-      element.textContent = value || "";
-    } else if (kind === "attribute") {
-      if (value) element.setAttribute(property, value);
-      else element.removeAttribute(property);
-    } else {
-      element.style.setProperty(
-        property.replace(/[A-Z]/g, (part) => `-${part.toLowerCase()}`),
-        normalizeStyleValue(property, value),
-      );
-    }
+    element.style.setProperty(
+      property.replace(/[A-Z]/g, (part) => `-${part.toLowerCase()}`),
+      normalizeStyleValue(property, value),
+    );
 
     return { ok: true, html: serializePrototypeHtml(root) };
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : "原型页属性写回失败",
+      error: describePrototypeEditError(error),
     };
   }
 }

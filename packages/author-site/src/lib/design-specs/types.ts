@@ -60,6 +60,8 @@ export interface ConfigPoolItem {
   size?: {
     w: string;
     h: string;
+    wOperator?: string;
+    hOperator?: string;
     wMin?: boolean;
     wAny?: boolean;
     hMin?: boolean;

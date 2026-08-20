@@ -1,16 +1,15 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, type ReactNode } from "react";
 import {
   GripVertical,
   ChevronDown,
-  X,
   Plus,
   Info,
+  Trash2,
 } from "lucide-react";
 import { cn } from "./utils";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Collapsible,
   CollapsibleContent,
@@ -90,20 +89,22 @@ function ArrayItemHeader({
   field,
   item,
   index,
+  sortableId,
   isOpen,
   onToggle,
-  onTypeChange,
   onRemove,
   readonly,
+  children,
 }: {
   field: FieldConfig;
   item: Record<string, unknown>;
   index: number;
+  sortableId: string;
   isOpen: boolean;
   onToggle: () => void;
-  onTypeChange: (newType: string) => void;
   onRemove: () => void;
   readonly?: boolean;
+  children?: ReactNode;
 }) {
   const {
     attributes,
@@ -112,10 +113,10 @@ function ArrayItemHeader({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: String(index) });
+  } = useSortable({ id: sortableId });
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Translate.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
@@ -127,71 +128,60 @@ function ArrayItemHeader({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex items-center gap-1 py-1.5 px-2 rounded-md border transition-all",
+        "flex min-h-9 flex-col gap-2.5 rounded-lg bg-foreground/[0.07] p-2 transition-[background-color,box-shadow,opacity,transform] duration-200",
         isDragging
-          ? "bg-accent/50 shadow-sm border-accent"
-          : "bg-muted/30 border-border/50",
+          ? "bg-foreground/[0.11] shadow-md"
+          : "hover:bg-foreground/[0.09]",
       )}
     >
-      {!readonly && (
-        <button
-          type="button"
-          className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground shrink-0 touch-none p-0.5"
-          {...attributes}
-          {...listeners}
-        >
-          <GripVertical className="h-3.5 w-3.5" />
-        </button>
-      )}
-
-      <button
-        type="button"
-        className="flex items-center gap-1 flex-1 min-w-0 text-left"
-        onClick={onToggle}
-      >
-        <ChevronDown
-          className={cn(
-            "h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform",
-            isOpen && "rotate-180",
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2.5">
+          {!readonly && (
+            <button
+              type="button"
+              className="shrink-0 cursor-grab touch-none text-foreground/40 transition-colors hover:text-foreground/70 active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={`拖动${title}`}
+              {...attributes}
+              {...listeners}
+            >
+              <GripVertical className="h-3.5 w-3.5" />
+            </button>
           )}
-        />
-        <span className="text-xs font-medium truncate">{title}</span>
-      </button>
 
-      {field.oneOf && (
-        <Select
-          value={String(item[field.oneOf.discriminator] ?? "") || undefined}
-          onValueChange={onTypeChange}
-          disabled={readonly}
-        >
-          <SelectTrigger className="h-6 w-28 text-[10px] px-1.5 shrink-0">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {field.oneOf.variants
-              .filter((v) => String(v.value) !== "")
-              .map((v) => (
-                <SelectItem key={String(v.value)} value={String(v.value)}>
-                  {v.title}
-                </SelectItem>
-              ))}
-          </SelectContent>
-        </Select>
-      )}
+          <button
+            type="button"
+            className="flex min-w-0 items-center gap-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={onToggle}
+            aria-expanded={isOpen}
+          >
+            <ChevronDown
+              className={cn(
+                "h-4 w-4 shrink-0 text-foreground/40 transition-transform duration-200",
+                !isOpen && "-rotate-90",
+              )}
+            />
+            <span className="truncate text-sm font-normal leading-5 text-foreground">{title}</span>
+          </button>
+        </div>
 
-      {!readonly && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-5 w-5 shrink-0 text-muted-foreground hover:text-destructive"
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemove();
-          }}
-        >
-          <X className="h-3 w-3" />
-        </Button>
-      )}
+        {!readonly && (
+          <div className="flex shrink-0 items-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-4 w-4 shrink-0 rounded-none p-0 text-foreground/40 hover:bg-transparent hover:text-foreground/70 focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={`删除${title}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove();
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+      {children}
     </div>
   );
 }
@@ -228,22 +218,25 @@ function AddMenu({
 
   if (field.oneOf && field.oneOf.variants.length > 1) {
     return (
-      <div className="relative inline-block">
+      <div className="relative w-full">
         <Button
-          variant="outline"
+          variant="ghost"
           size="sm"
-          className="h-7 text-xs"
+          className="h-9 w-full justify-center gap-2 rounded-lg bg-foreground/[0.07] px-2 text-[13px] font-semibold text-foreground/40 hover:bg-foreground/[0.09] hover:text-foreground/70"
           onClick={() => setOpen((v) => !v)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           disabled={hasAllLimited}
+          aria-expanded={open}
+          aria-haspopup="menu"
         >
-          <Plus className="h-3 w-3 mr-1" />
-          添加{field.title || "项目"}
+          <Plus className="h-3.5 w-3.5" />
+          添加
         </Button>
         {open && (
           <div
             ref={menuRef}
-            className="absolute bottom-full left-0 mb-1 min-w-[160px] bg-popover border border-border rounded-md shadow-md z-50 py-1"
+            role="menu"
+            className="absolute bottom-full left-0 right-0 z-50 mb-2 overflow-hidden rounded-xl border border-foreground/10 bg-popover p-1 shadow-[0_12px_28px_rgba(0,0,0,0.35)]"
           >
             {field.oneOf.variants.map((variant) => {
               const atLimit = variant.maxItems != null && variant.maxItems > 0
@@ -252,11 +245,12 @@ function AddMenu({
                 <button
                   key={String(variant.value)}
                   type="button"
+                  role="menuitem"
                   className={cn(
-                    "w-full text-left px-3 py-1.5 text-xs transition-colors",
+                    "flex min-h-10 w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     atLimit
-                      ? "text-muted-foreground/50 cursor-not-allowed"
-                      : "hover:bg-accent cursor-pointer"
+                      ? "cursor-not-allowed text-muted-foreground/45"
+                      : "cursor-pointer text-foreground hover:bg-foreground/[0.07] focus-visible:bg-foreground/[0.07]"
                   )}
                   disabled={atLimit}
                   onClick={() => {
@@ -266,9 +260,9 @@ function AddMenu({
                     }
                   }}
                 >
-                  {variant.title}
+                  <span className="min-w-0 truncate">{variant.title}</span>
                   {variant.maxItems != null && variant.maxItems > 0 && (
-                    <span className="ml-1 text-muted-foreground/60">
+                    <span className="shrink-0 text-xs text-muted-foreground/60">
                       ({countByType(value, field.oneOf!.discriminator, variant.value)}/{variant.maxItems})
                     </span>
                   )}
@@ -285,13 +279,13 @@ function AddMenu({
 
   return (
     <Button
-      variant="outline"
+      variant="ghost"
       size="sm"
-      className="h-7 text-xs"
+      className="h-9 w-full justify-center gap-2 rounded-lg bg-foreground/[0.07] px-2 text-[13px] font-semibold text-foreground/40 hover:bg-foreground/[0.09] hover:text-foreground/70"
       onClick={() => onSelect()}
     >
-      <Plus className="h-3 w-3 mr-1" />
-      添加{field.title || "项目"}
+      <Plus className="h-3.5 w-3.5" />
+      添加
     </Button>
   );
 }
@@ -303,6 +297,12 @@ export function ArrayFieldGroup({
   sessionId,
   readonly,
 }: ArrayFieldGroupProps) {
+  const sortableIdSequenceRef = useRef(0);
+  const createSortableId = useCallback(
+    () => `${field.key}-sortable-${sortableIdSequenceRef.current++}`,
+    [field.key],
+  );
+  const [itemIds, setItemIds] = useState(() => value.map(createSortableId));
   const [openItems, setOpenItems] = useState<Set<number>>(() => {
     const collapsed =
       field.uiOptions?.collapsed !== undefined
@@ -313,6 +313,22 @@ export function ArrayFieldGroup({
     }
     return new Set();
   });
+
+  // 保持拖拽标识与项本身绑定，而不是绑定数组位置。外部仅增删数据时，
+  // 补齐或截断标识；组件内部的增删与排序会在对应 handler 中同步移动标识。
+  useEffect(() => {
+    setItemIds((previousIds) => {
+      if (previousIds.length === value.length) return previousIds;
+      if (previousIds.length > value.length) return previousIds.slice(0, value.length);
+      return [
+        ...previousIds,
+        ...Array.from(
+          { length: value.length - previousIds.length },
+          createSortableId,
+        ),
+      ];
+    });
+  }, [value.length, createSortableId]);
 
   const maxItems =
     typeof field.uiOptions?.maxItems === "number"
@@ -338,9 +354,10 @@ export function ArrayFieldGroup({
         next.add(newIndex);
         return next;
       });
+      setItemIds((previousIds) => [...previousIds, createSortableId()]);
       onChange(newValue);
     },
-    [field, value, onChange],
+    [field, value, onChange, createSortableId],
   );
 
   const handleRemove = useCallback(
@@ -355,6 +372,7 @@ export function ArrayFieldGroup({
         }
         return adjusted;
       });
+      setItemIds((previousIds) => previousIds.filter((_, itemIndex) => itemIndex !== index));
       onChange(newValue);
     },
     [value, onChange],
@@ -364,9 +382,11 @@ export function ArrayFieldGroup({
     (event: DragEndEvent) => {
       const { active, over } = event;
       if (!over || active.id === over.id) return;
-      const oldIndex = Number(active.id);
-      const newIndex = Number(over.id);
+      const oldIndex = itemIds.indexOf(String(active.id));
+      const newIndex = itemIds.indexOf(String(over.id));
+      if (oldIndex < 0 || newIndex < 0) return;
       const newValue = arrayMove(value, oldIndex, newIndex);
+      setItemIds((previousIds) => arrayMove(previousIds, oldIndex, newIndex));
       setOpenItems((prev) => {
         const next = new Set<number>();
         for (const i of prev) {
@@ -378,27 +398,7 @@ export function ArrayFieldGroup({
       });
       onChange(newValue);
     },
-    [value, onChange],
-  );
-
-  const handleTypeChange = useCallback(
-    (index: number, newType: string) => {
-      const item = { ...value[index] };
-      const discriminator = field.oneOf!.discriminator;
-      item[discriminator] = newType;
-      const variant = field.oneOf!.variants.find((v) => String(v.value) === newType);
-      if (variant) {
-        for (const f of variant.fields) {
-          if (item[f.key] === undefined) {
-            item[f.key] = f.default ?? "";
-          }
-        }
-      }
-      const newValue = [...value];
-      newValue[index] = item;
-      onChange(newValue);
-    },
-    [field, value, onChange],
+    [itemIds, value, onChange],
   );
 
   const handleItemFieldChange = useCallback(
@@ -438,7 +438,7 @@ export function ArrayFieldGroup({
   };
 
   return (
-    <div className="space-y-1.5">
+    <div className="flex flex-col gap-2.5 pt-2.5">
       {!isEmpty && (
         <DndContext
           sensors={sensors}
@@ -446,34 +446,33 @@ export function ArrayFieldGroup({
           onDragEnd={handleDragEnd}
         >
           <SortableContext
-            items={value.map((_, i) => String(i))}
+            items={itemIds}
             strategy={verticalListSortingStrategy}
           >
-            <div className="space-y-1">
+            <div className="flex flex-col gap-2.5">
               {value.map((item, index) => {
                 const isOpen = openItems.has(index);
+                const sortableId = itemIds[index] ?? `${field.key}-pending-${index}`;
                 const visibleFields = getVisibleFields(item);
                 const discriminator = field.oneOf?.discriminator;
                 const itemType = discriminator ? String(item[discriminator] ?? "") : "";
                 const variantTypePrefix = itemType ? `[${itemType}]` : "";
 
                 return (
-                  <div key={index} className="space-y-1">
-                    <ArrayItemHeader
-                      field={field}
-                      item={item}
-                      index={index}
-                      isOpen={isOpen}
-                      onToggle={() => toggleItem(index)}
-                      onTypeChange={(newType) =>
-                        handleTypeChange(index, newType)
-                      }
-                      onRemove={() => handleRemove(index)}
-                      readonly={readonly}
-                    />
+                  <ArrayItemHeader
+                    key={sortableId}
+                    field={field}
+                    item={item}
+                    index={index}
+                    sortableId={sortableId}
+                    isOpen={isOpen}
+                    onToggle={() => toggleItem(index)}
+                    onRemove={() => handleRemove(index)}
+                    readonly={readonly}
+                  >
                     <Collapsible open={isOpen}>
                       <CollapsibleContent>
-                        <div className="pl-6 pr-2 pt-1 pb-2 space-y-1 bg-muted/10 rounded-b-md">
+                        <div className="flex flex-col gap-2.5 pl-[22px] pt-2.5">
                           {visibleFields.length === 0 ? (
                             <div className="py-2 text-center">
                               <p className="text-[10px] text-muted-foreground">无配置项</p>
@@ -501,7 +500,7 @@ export function ArrayFieldGroup({
                         </div>
                       </CollapsibleContent>
                     </Collapsible>
-                  </div>
+                  </ArrayItemHeader>
                 );
               })}
             </div>
@@ -510,7 +509,7 @@ export function ArrayFieldGroup({
       )}
 
       {isEmpty && (
-        <div className="flex flex-col items-center justify-center py-6 text-center bg-muted/20 rounded-md border border-dashed border-border">
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-foreground/20 bg-black/40 py-6 text-center">
           <Info className="h-5 w-5 text-muted-foreground/50 mb-1" />
           <p className="text-xs text-muted-foreground">
             暂无{field.title || "项目"}
@@ -522,7 +521,7 @@ export function ArrayFieldGroup({
       )}
 
       {canAdd && !readonly && (
-        <div className="flex justify-center pt-1">
+        <div className="flex pt-0">
           <AddMenu field={field} value={value} onSelect={handleAdd} />
         </div>
       )}

@@ -6,6 +6,7 @@ import { resolvePageRuntimeType } from "../utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { ProjectAdminService } from "../service.js";
+import { normalizeHtmlImport } from "../html-import.js";
 import type { EditTransaction, PageDetail, PreviewPlan } from "../types.js";
 
 let tempDir: string;
@@ -30,6 +31,44 @@ function overwriteEditTransaction(transaction: EditTransaction): void {
 }
 
 describe("ProjectAdminService", () => {
+  it("支持 sandboxed-html 的 dry-run、创建、读取、版本快照与恢复，并拒绝混合文件", () => {
+    const created = service.createProject({ name: "Sandbox 项目" });
+    const projectId = created.data?.id ?? "";
+    const edit = service.beginEdit(projectId);
+    const editId = (edit.data as EditTransaction).editId;
+    const source = "<button onclick=\"this.textContent='ok'\">Go</button><script>document.body.dataset.ready='1'</script>";
+    const analyzed = normalizeHtmlImport(source);
+    const htmlImportMeta = {
+      source: "html-import",
+      analysisVersion: analyzed.analysis.analysisVersion,
+      sourceHash: analyzed.analysis.sourceHash,
+      normalizedHash: analyzed.normalizedHash ?? "",
+      sandboxPolicyVersion: 1,
+    };
+    const dryRun = service.createPage({ editId, name: "交互页", pageId: "sandbox", runtimeType: "sandboxed-html", sandboxHtml: source, htmlImportMeta, dryRun: true });
+    expect(dryRun.ok).toBe(true);
+    const page = service.createPage({ editId, name: "交互页", pageId: "sandbox", runtimeType: "sandboxed-html", sandboxHtml: source, htmlImportMeta });
+    expect(page.ok).toBe(true);
+    expect(page.data?.meta.runtimeType).toBe("sandboxed-html");
+    expect(page.data?.files.sandboxHtml).toContain("<script>");
+    expect(service.getPage(editId, "sandbox").data?.files.htmlImportMeta).toMatchObject({ source: "html-import" });
+
+    expect(service.commitEdit(editId, "新增 sandbox 页").ok).toBe(true);
+    const activeEdit = service.beginEdit(projectId);
+    const activeEditId = (activeEdit.data as EditTransaction).editId;
+
+    const version = service.createPageVersion({ projectId, pageId: "sandbox", sourceWorkspacePath: (activeEdit.data as EditTransaction).workspacePath, note: "sandbox snapshot" });
+    expect(version.ok, JSON.stringify({ error: version.error, runtime: version.runtimeValidation })).toBe(true);
+    const versionId = version.data?.resourceVersion?.id ?? "";
+    expect(service.resourceVersionGet({ projectId, kind: "page", resourceId: "sandbox", versionId }).data?.content).toMatchObject({ sandboxHtml: expect.stringContaining("<script>") });
+
+    const switched = service.switchPageRuntime({ editId: activeEditId, pageId: "sandbox", targetRuntimeType: "high-fidelity-react", code: "export default function Demo(){return <main/>}" });
+    expect(switched.ok).toBe(true);
+    const pageDir = path.join((activeEdit.data as EditTransaction).workspacePath, "demos", "sandbox");
+    expect(fs.existsSync(path.join(pageDir, "sandbox.html"))).toBe(false);
+    expect(service.restorePageVersion(projectId, "sandbox", versionId).ok).toBe(true);
+  });
+
   it("创建项目并读取详情", () => {
     const created = service.createProject({
       name: "测试项目",
@@ -823,7 +862,7 @@ describe("ProjectAdminService", () => {
     });
   });
 
-  it("支持在保留旧文件的前提下切换页面运行时类型", () => {
+  it("切换页面运行时类型时清理互斥文件", () => {
     const created = service.createProject({ name: "运行时切换项目" });
     const edit = service.beginEdit(created.data?.id ?? "");
     const editId = (edit.data as EditTransaction).editId;
@@ -854,12 +893,7 @@ describe("ProjectAdminService", () => {
         "utf-8",
       ),
     ).toContain("高保真页");
-    expect(
-      fs.readFileSync(
-        path.join(workspacePath, "demos", pageId, "prototype.html"),
-        "utf-8",
-      ),
-    ).toContain("原型切换页");
+    expect(fs.existsSync(path.join(workspacePath, "demos", pageId, "prototype.html"))).toBe(false);
 
     const reverted = service.switchPageRuntime({
       editId,

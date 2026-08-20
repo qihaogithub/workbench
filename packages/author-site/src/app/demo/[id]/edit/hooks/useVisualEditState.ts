@@ -15,6 +15,7 @@ import type {
   VisualPropertyChangeKind,
   VisualStyleChange,
 } from "@workbench/demo-ui/iframe-types";
+import type { ImageDimensionRule } from "@workbench/shared/demo/config-schema-definition";
 import {
   buildVisualConfigCandidates,
   suggestVisualConfigFieldKey,
@@ -87,10 +88,10 @@ export interface VisualConfigMark {
   defaultValue: string;
   category?: string;
   scope: "page" | "project";
-  imageWidthOperator?: ">" | "=" | "<" | "≥" | "≤";
-  imageWidthValue?: number;
-  imageHeightOperator?: ">" | "=" | "<" | "≥" | "≤";
-  imageHeightValue?: number;
+  /** Image MIME allow-list, persisted with the mark and forwarded to direct/AI application. */
+  accept?: string;
+  widthRule?: ImageDimensionRule;
+  heightRule?: ImageDimensionRule;
 }
 
 export type VisualPropertySubmissionStatus =
@@ -224,7 +225,10 @@ function formatVisualConfigMarkForPrompt(
   fallbackReason?: string,
 ): string {
   const reason = fallbackReason ? `，直接写回结果：${fallbackReason}` : "";
-  return `${index + 1}. ${mark.label} -> ${mark.scope === "project" ? "项目级" : "页面级"}配置项，名称：${mark.fieldTitle}，key：${mark.fieldKey}，默认值：${mark.defaultValue}，分类：${mark.category?.trim() || "未设置"}${reason}`;
+  const imageRules = mark.property === "src" && mark.accept?.trim()
+    ? `，接受文件类型：${mark.accept.trim()}`
+    : "";
+  return `${index + 1}. ${mark.label} -> ${mark.scope === "project" ? "项目级" : "页面级"}配置项，名称：${mark.fieldTitle}，key：${mark.fieldKey}，默认值：${mark.defaultValue}，分类：${mark.category?.trim() || "未设置"}${imageRules}${reason}`;
 }
 
 function canDirectApplyPrototypeConfigMark(
@@ -348,6 +352,9 @@ function getConfigMarkSignature(mark: VisualConfigMark): string {
     defaultValue: mark.defaultValue,
     category: mark.category ?? "",
     scope: mark.scope,
+    accept: mark.accept ?? "",
+    widthRule: mark.widthRule ?? null,
+    heightRule: mark.heightRule ?? null,
   });
 }
 
@@ -422,10 +429,9 @@ function createPrototypeConfigTargetFromMark(
       title: mark.fieldTitle.trim(),
       defaultValue: mark.defaultValue,
       category: mark.category?.trim(),
-      imageWidthOperator: mark.imageWidthOperator,
-      imageWidthValue: mark.imageWidthValue,
-      imageHeightOperator: mark.imageHeightOperator,
-      imageHeightValue: mark.imageHeightValue,
+      accept: mark.accept?.trim(),
+      widthRule: mark.widthRule,
+      heightRule: mark.heightRule,
     };
   }
   if (
@@ -769,6 +775,7 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
         defaultValue: value,
         category: "",
         scope: "page",
+        accept: property === "src" ? "image/*" : undefined,
       };
       setVisualConfigMarks((prev) => {
         const index = prev.findIndex((item) => item.changeId === changeId);
@@ -782,7 +789,7 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
   );
 
   const handleUpdateVisualConfigMark = useCallback(
-    (markId: string, patch: Partial<Pick<VisualConfigMark, "fieldTitle" | "fieldKey" | "defaultValue" | "category" | "scope" | "imageWidthOperator" | "imageWidthValue" | "imageHeightOperator" | "imageHeightValue">>) => {
+    (markId: string, patch: Partial<Pick<VisualConfigMark, "fieldTitle" | "fieldKey" | "defaultValue" | "category" | "scope" | "accept" | "widthRule" | "heightRule">>) => {
       setVisualConfigMarks((prev) =>
         prev.map((item) => (item.id === markId ? { ...item, ...patch } : item)),
       );

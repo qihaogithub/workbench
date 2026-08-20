@@ -1,0 +1,22 @@
+:root { color-scheme: light dark; font: 14px/1.45 system-ui, sans-serif; }
+body { margin: 0; min-width: 300px; background: #f7f8fa; color: #17202a; }
+main { padding: 16px; }
+h1 { margin: 0 0 6px; font-size: 18px; }
+.hint, .status { color: #5d6875; font-size: 12px; }
+button, input { box-sizing: border-box; border: 1px solid #c9d0d8; border-radius: 6px; padding: 8px 10px; background: white; color: inherit; }
+button { cursor: pointer; font-weight: 600; } button:disabled { opacity: .5; cursor: default; }
+#load, #filter, #start, #continue { width: 100%; margin-top: 10px; }
+#tabs { margin-top: 10px; max-height: 55vh; overflow: auto; }
+.settings { margin-top: 16px; padding-top: 12px; border-top: 1px solid #e0e4e8; }
+.settings label, .settings select, .settings input { display: block; width: 100%; margin-top: 8px; }
+.settings h2 { margin: 0; font-size: 14px; }
+.rule-actions { display: flex; gap: 8px; margin-top: 8px; } .rule-actions button { flex: 1; }
+.history-list { margin-top: 8px; max-height: 180px; overflow: auto; }
+.history-item { display: flex; gap: 6px; align-items: center; padding: 6px 0; border-bottom: 1px solid #e0e4e8; font-size: 11px; }
+.history-item span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-item button { padding: 3px 6px; font-size: 11px; } .danger { color: #a52727; }
+.tab { display: flex; gap: 8px; padding: 8px 4px; border-bottom: 1px solid #e0e4e8; }
+.tab label { min-width: 0; } .tab strong, .tab small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tab small { color: #687582; font-size: 11px; }
+.actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; } .actions span { flex: 1; color: #5d6875; font-size: 12px; }
+@media (prefers-color-scheme: dark) { body { background: #202124; color: #e8eaed; } button, input { background: #303134; border-color: #5f6368; } .tab { border-color: #3c4043; } }

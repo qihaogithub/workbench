@@ -140,7 +140,7 @@ interface CanvasPageGroupItemProps {
     activePageId: string,
     event?: React.PointerEvent | React.MouseEvent,
   ) => void;
-  onLayoutChange: (groupId: string, layout: CanvasPageLayout) => void;
+  onLayoutChange?: (groupId: string, layout: CanvasPageLayout) => void;
   onActivePageChange: (groupId: string, pageId: string) => void;
   onDirectoryCollapsedChange: (groupId: string, collapsed: boolean) => void;
   onDragStart?: (groupId: string) => void;
@@ -264,7 +264,7 @@ function CanvasPageGroupItem({
             x: startLayoutRef.current.x + dx,
             y: startLayoutRef.current.y + dy,
           };
-      onLayoutChange(group.id, nextLayout);
+      onLayoutChange?.(group.id, nextLayout);
       onDragMove?.(group.id, nextLayout, resizeEdge ?? undefined);
     },
     [
@@ -430,13 +430,17 @@ function CanvasPageGroupItem({
             onConsoleEntry={onConsoleEntry}
             onError={onError}
             onPositionableSizes={onPositionableSizes}
-            onLayoutChange={(pageId, nextLayout) => {
-              onLayoutChange(group.id, {
-                ...group.layout,
-                width: nextLayout.width,
-                height: nextLayout.height,
-              })
-            }}
+            onLayoutChange={
+              editable && onLayoutChange
+                ? (_pageId, nextLayout) => {
+                    onLayoutChange(group.id, {
+                      ...group.layout,
+                      width: nextLayout.width,
+                      height: nextLayout.height,
+                    });
+                  }
+                : undefined
+            }
           />
         ) : (
           <div className="flex h-full items-center justify-center bg-muted/35 text-sm text-muted-foreground">

@@ -65,9 +65,9 @@ export function pageLabel(item: ConfigPoolItem): string {
 export function formatSize(item: ConfigPoolItem): string {
   const s = item.size;
   if (!s) return "—";
-  const wStr = s.wAny ? "不限" : s.wMin ? "≥" + s.w : "=" + s.w;
-  const hStr = s.hAny ? "不限" : s.hMin ? "≥" + s.h : "=" + s.h;
-  return `W${wStr}  H${hStr}`;
+  const wStr = s.wAny ? "不限" : `${s.wOperator || (s.wMin ? "≥" : "=")} ${s.w}px`;
+  const hStr = s.hAny ? "不限" : `${s.hOperator || (s.hMin ? "≥" : "=")} ${s.h}px`;
+  return `W ${wStr} · H ${hStr}`;
 }
 
 export function Swatch({

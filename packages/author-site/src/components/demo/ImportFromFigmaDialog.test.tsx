@@ -13,6 +13,7 @@ jest.mock("@/lib/project-api", () => ({
   projectApiClient: {
     createDemoPage: jest.fn(),
     updateDemoPageFiles: jest.fn(),
+    importHtmlPage: jest.fn(),
   },
 }));
 
@@ -31,6 +32,14 @@ describe("ImportFromFigmaDialog", () => {
     mockToast.mockClear();
     (projectApiClient.createDemoPage as jest.Mock).mockReset();
     (projectApiClient.updateDemoPageFiles as jest.Mock).mockReset();
+    (projectApiClient.importHtmlPage as jest.Mock).mockReset();
+    (projectApiClient.importHtmlPage as jest.Mock).mockImplementation(
+      async (_projectId: string, _sessionId: string, filename: string) => ({
+        page: { id: filename.replace(/\.html?$/i, ""), name: filename.replace(/\.html?$/i, ""), order: 1 },
+        analysis: { outcome: { status: "accepted", runtimeType: "prototype-html-css" }, warnings: [] },
+        warnings: [],
+      }),
+    );
   });
 
   it("通过文件选择器添加多个文件并显示在列表中", async () => {
@@ -103,17 +112,16 @@ describe("ImportFromFigmaDialog", () => {
       2,
       expect.objectContaining({ id: "page-b" }),
     );
-    expect(projectApiClient.createDemoPage).toHaveBeenCalledTimes(2);
+    expect(projectApiClient.importHtmlPage).toHaveBeenCalledTimes(2);
   });
 
   it("上传 HTML 导入时使用文件名作为页面名称", async () => {
     const html = "<!DOCTYPE html><html><body>Figma Export</body></html>";
-    (projectApiClient.createDemoPage as jest.Mock).mockResolvedValue({
-      id: "page-1",
-      name: "成长豆商城",
-      order: 1,
+    (projectApiClient.importHtmlPage as jest.Mock).mockResolvedValue({
+      page: { id: "page-1", name: "成长豆商城", order: 1 },
+      analysis: { outcome: { status: "accepted", runtimeType: "prototype-html-css" }, warnings: [] },
+      warnings: [],
     });
-    (projectApiClient.updateDemoPageFiles as jest.Mock).mockResolvedValue({});
 
     render(
       <ImportFromFigmaDialog
@@ -134,20 +142,22 @@ describe("ImportFromFigmaDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: /导入并创建页面/ }));
 
     await waitFor(() => {
-      expect(projectApiClient.createDemoPage).toHaveBeenCalledWith(
+      expect(projectApiClient.importHtmlPage).toHaveBeenCalledWith(
         "proj-1",
-        "成长豆商城",
         "session-1",
-        undefined,
-        "prototype-html-css",
+        "成长豆商城.html",
+        html,
+        "成长豆商城",
       );
     });
   });
 
   it("导入 Figma HTML 时持久化设计稿尺寸", async () => {
-    const page = { id: "page-1", name: "从Figma导入的页面", order: 1 };
-    (projectApiClient.createDemoPage as jest.Mock).mockResolvedValue(page);
-    (projectApiClient.updateDemoPageFiles as jest.Mock).mockResolvedValue({});
+    (projectApiClient.importHtmlPage as jest.Mock).mockResolvedValue({
+      page: { id: "page-1", name: "从Figma导入的页面", order: 1 },
+      analysis: { outcome: { status: "accepted", runtimeType: "prototype-html-css" }, warnings: [] },
+      warnings: [],
+    });
 
     render(
       <ImportFromFigmaDialog
@@ -175,14 +185,12 @@ describe("ImportFromFigmaDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: /导入并创建页面/ }));
 
     await waitFor(() => {
-      expect(projectApiClient.updateDemoPageFiles).toHaveBeenCalledWith(
+      expect(projectApiClient.importHtmlPage).toHaveBeenCalledWith(
         "proj-1",
-        "page-1",
         "session-1",
-        expect.objectContaining({
-          prototypeMeta: { width: 375, height: 812, generatedBy: "figma-import" },
-          schema: '{"type":"object","properties":{}}',
-        }),
+        "page.html",
+        expect.stringContaining("figma-export"),
+        "page",
       );
     });
   });
@@ -275,10 +283,9 @@ describe("ImportFromFigmaDialog", () => {
 
   it("批量导入时每个文件使用去扩展名后的文件名作为页面名称", async () => {
     const html = "<!DOCTYPE html><html></html>";
-    (projectApiClient.createDemoPage as jest.Mock)
-      .mockResolvedValueOnce({ id: "p1", name: "a", order: 1 })
-      .mockResolvedValueOnce({ id: "p2", name: "b", order: 2 });
-    (projectApiClient.updateDemoPageFiles as jest.Mock).mockResolvedValue({});
+    (projectApiClient.importHtmlPage as jest.Mock)
+      .mockResolvedValueOnce({ page: { id: "p1", name: "a", order: 1 }, analysis: { warnings: [] }, warnings: [] })
+      .mockResolvedValueOnce({ page: { id: "p2", name: "b", order: 2 }, analysis: { warnings: [] }, warnings: [] });
 
     render(
       <ImportFromFigmaDialog
@@ -304,15 +311,15 @@ describe("ImportFromFigmaDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: /导入并创建页面/ }));
 
     await waitFor(() => {
-      expect(projectApiClient.createDemoPage).toHaveBeenCalledTimes(2);
+      expect(projectApiClient.importHtmlPage).toHaveBeenCalledTimes(2);
     });
-    expect(projectApiClient.createDemoPage).toHaveBeenNthCalledWith(
+    expect(projectApiClient.importHtmlPage).toHaveBeenNthCalledWith(
       1,
-      "proj-1", "a", "session-1", undefined, "prototype-html-css",
+      "proj-1", "session-1", "a.html", html, "a",
     );
-    expect(projectApiClient.createDemoPage).toHaveBeenNthCalledWith(
+    expect(projectApiClient.importHtmlPage).toHaveBeenNthCalledWith(
       2,
-      "proj-1", "b", "session-1", undefined, "prototype-html-css",
+      "proj-1", "session-1", "b.html", html, "b",
     );
   });
 });

@@ -18,6 +18,7 @@ import {
   isCompletePageDir,
   isCompletePageDirFromSnapshot,
   formatPageEntry,
+  resolvePageRuntimeTypeFromSnapshot,
   readWorkspaceTree,
   listPages,
 } from "./workspace-page-utils";
@@ -224,6 +225,14 @@ function listPagesFromSnapshot(
         page.runtimeType,
       );
     })
+    .map((page) => ({
+      ...page,
+      runtimeType: resolvePageRuntimeTypeFromSnapshot(
+        snapshot.resources,
+        page.id,
+        page.runtimeType,
+      ),
+    }))
     .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
 }
 

@@ -5,6 +5,7 @@ import {
   getCompiledJsUrl,
   getPublishedFileUrl,
   type PublishedDemoPage,
+  type PublishedHtmlExecution,
 } from "./api";
 
 interface CreatePublishedPreviewStagePageInput {
@@ -12,6 +13,7 @@ interface CreatePublishedPreviewStagePageInput {
   page: PublishedDemoPage;
   configData?: Record<string, unknown>;
   schema?: string;
+  sandboxExecution?: PublishedHtmlExecution;
 }
 
 /**
@@ -36,6 +38,7 @@ export function createPublishedPreviewStagePage({
   page,
   configData,
   schema,
+  sandboxExecution,
 }: CreatePublishedPreviewStagePageInput): PreviewStagePage {
   const runtimeType = page.runtimeType ?? "high-fidelity-react";
   const runtimeData =
@@ -45,6 +48,11 @@ export function createPublishedPreviewStagePage({
           prototypeCss: resolvePrototypeDataUrls(page.prototypeCss),
           prototypeMeta: page.prototypeMeta,
         }
+      : runtimeType === "sandboxed-html"
+        ? {
+            sandboxExecutionUrl: sandboxExecution?.executionUrl,
+            sandboxChannelId: sandboxExecution?.channelId,
+          }
       : runtimeType === "sketch-scene"
         ? {
             sketchScene: page.sketchScene

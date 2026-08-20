@@ -171,6 +171,7 @@ export interface ResourceReference {
  */
 export type DemoPageRuntimeType =
   | "prototype-html-css"
+  | "sandboxed-html"
   | "high-fidelity-react"
   | "sketch-scene";
 

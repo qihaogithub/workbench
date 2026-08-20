@@ -11,7 +11,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { BUILT_IN_CONFIG_CATEGORIES } from "@workbench/demo-ui/config-categories";
+import { ConfigItemEditorDialog } from "@workbench/demo-ui/ConfigItemEditorDialog";
 import {
   extractCodeConfigBindingKeys,
   extractPrototypeConfigBindingKeys,
@@ -37,10 +37,15 @@ import type {
   CommentTarget,
   DocumentCommentAnchor,
   DemoPageRuntimeType,
+  HtmlImportMeta,
+  PageSnapshotInput,
   ProjectAuthoringPreferences,
   PrototypePageMeta,
   SketchSceneDocument,
+  SchemaDefinitionMutation,
 } from "@workbench/shared";
+import type { ConfigDefinitionDraft } from "@workbench/shared/demo/config-schema-definition";
+import { applyTextPatches, type TextPatch } from "@workbench/prototype-core";
 import { createAuthorCommentApi } from "@/lib/comment-api-client";
 import {
   useComments,
@@ -79,6 +84,8 @@ import {
   resolvePreviewPageCode,
 } from "@/lib/preview-page-code";
 import { getPrototypePreviewSize } from "@/lib/prototype-preview-size";
+import { analyzeConfigDefinitionImpact } from "@/lib/config-definition-impact";
+import { applyCollabTextPatches } from "@/lib/prototype-collab-patches";
 import {
   applyPrototypePropertyChange,
   applyPrototypeVisualConfiguration,
@@ -186,6 +193,10 @@ import type {
 } from "@/components/demo/KnowledgeDocDialog";
 import { useCollabDocument } from "@/hooks/useCollabDocument";
 import { VisualEditSidebar } from "./components/VisualEditSidebar";
+import {
+  resolveCanvasRightPanelTab,
+  type RightPanelTab,
+} from "./right-panel-tab";
 import { useVisualEditState, getNodeLabel, buildVisualSelectionPrompt } from "./hooks/useVisualEditState";
 import {
   markWorkspaceDocumentChanged,
@@ -570,6 +581,7 @@ type DemoPage = DemoPageMeta & { previewSize?: PreviewSize };
 const runtimeTypeLabels: Record<DemoPageRuntimeType, string> = {
   "high-fidelity-react": "高保真 React",
   "prototype-html-css": "HTML/CSS 原型",
+  "sandboxed-html": "隔离交互 HTML",
   "sketch-scene": "手绘页面",
 };
 
@@ -577,6 +589,7 @@ function getEffectiveRuntimeType(
   page?: Pick<DemoPage, "runtimeType"> | null,
 ): DemoPageRuntimeType {
   if (page?.runtimeType === "prototype-html-css") return "prototype-html-css";
+  if (page?.runtimeType === "sandboxed-html") return "sandboxed-html";
   if (page?.runtimeType === "sketch-scene") return "sketch-scene";
   return "high-fidelity-react";
 }
@@ -639,6 +652,15 @@ interface RuntimeConversionFileSnapshot {
   prototypeMeta?: PrototypePageMeta;
   sketchScene?: string;
   sketchMeta?: Record<string, unknown>;
+}
+
+interface PrototypeVisualHistoryEntry {
+  pageId: string;
+  changeId: string;
+  before: string;
+  after: string;
+  forwardPatches: TextPatch[];
+  inversePatches: TextPatch[];
 }
 
 function toCanvasKnowledgeDocument(
@@ -972,6 +994,11 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   >({});
   const pagePrototypeMapRef = useRef(pagePrototypeMap);
   pagePrototypeMapRef.current = pagePrototypeMap;
+  const [pageSandboxMap, setPageSandboxMap] = useState<
+    Record<string, { html?: string; meta?: HtmlImportMeta }>
+  >({});
+  const pageSandboxMapRef = useRef(pageSandboxMap);
+  pageSandboxMapRef.current = pageSandboxMap;
   const [pageSketchMap, setPageSketchMap] = useState<
     Record<
       string,
@@ -983,6 +1010,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   >({});
   const pageSketchMapRef = useRef(pageSketchMap);
   pageSketchMapRef.current = pageSketchMap;
+  const [sandboxExecutionMap, setSandboxExecutionMap] = useState<
+    Record<string, { url?: string; channelId?: string }>
+  >({});
   const [sketchEditing, setSketchEditing] = useState(false);
   const [pagePreviewSizeMap, setPagePreviewSizeMap] = useState<
     Record<string, PreviewSize>
@@ -1452,6 +1482,17 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         };
       }
 
+      if (page.runtimeType === "sandboxed-html") {
+        const sandbox = pageSandboxMapRef.current[page.id] ?? {};
+        if (!sandbox.html || !sandbox.meta) return null;
+        return {
+          ...common,
+          runtimeType: "sandboxed-html",
+          sandboxHtml: sandbox.html,
+          htmlImportMeta: sandbox.meta,
+        };
+      }
+
       if (page.runtimeType === "sketch-scene") {
         const sketch = pageSketchMapRef.current[page.id] ?? {};
         if (!sketch.scene) return null;
@@ -1647,17 +1688,12 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           delete timers[pageId];
           return;
         }
+        const regenerateInput: PageSnapshotInput = snapshotInput.runtimeType
+          ? (snapshotInput as PageSnapshotInput)
+          : { ...snapshotInput, runtimeType: "high-fidelity-react" };
         const { width, height } = getScreenshotRequestSize(
           pagePreviewSizeMap[pageId],
         );
-        const regenerateInput =
-          snapshotInput.runtimeType === "prototype-html-css" ||
-          snapshotInput.runtimeType === "sketch-scene"
-            ? snapshotInput
-            : {
-                ...snapshotInput,
-                runtimeType: "high-fidelity-react" as const,
-              };
         regeneratePageSnapshot(
           pageId,
           regenerateInput,
@@ -2111,9 +2147,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   const [errorBannerVisible, setErrorBannerVisible] = useState(false);
   const [tabValue, setTabValue] = useState("ai");
-  const [rightPanelTab, setRightPanelTab] = useState<
-    "edit" | "config" | "comments"
-  >("edit");
+  const [rightPanelTab, setRightPanelTab] =
+    useState<RightPanelTab>("edit");
   const [chatElement, setChatElement] =
     useState<ChatElementRef | null>(null);
   const [chatPageRefs, setChatPageRefs] = useState<ChatPageRef[]>([]);
@@ -2913,9 +2948,25 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   );
 
   const applyPrototypeHtmlToActivePage = useCallback(
-    (html: string) => {
+    (
+      html: string,
+      sourcePatch?: { before: string; patches: TextPatch[] },
+    ): boolean => {
       const pageId = activeDemoIdRef.current;
-      if (!pageId) return;
+      if (!pageId) return false;
+      if (
+        sourcePatch &&
+        !applyCollabTextPatches(
+          activePrototypeHtmlCollab.status === "synced"
+            ? activePrototypeHtmlCollab.ytext
+            : null,
+          sourcePatch.before,
+          html,
+          sourcePatch.patches,
+        )
+      ) {
+        return false;
+      }
       setPagePrototypeMap((prev) => ({
         ...prev,
         [pageId]: {
@@ -2926,13 +2977,34 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       markScreenshotDirty(pageId);
       persistPrototypePageDraft(pageId, { html });
       markWorkspaceChanged();
+      return true;
     },
     [
+      activePrototypeHtmlCollab.status,
+      activePrototypeHtmlCollab.ytext,
       markScreenshotDirty,
       markWorkspaceChanged,
       persistPrototypePageDraft,
     ],
   );
+
+  const prototypeVisualHistoryRef = useRef<
+    Record<
+      string,
+      {
+        undo: PrototypeVisualHistoryEntry[];
+        redo: PrototypeVisualHistoryEntry[];
+      }
+    >
+  >({});
+
+  const getPrototypeVisualHistory = useCallback((pageId: string) => {
+    const existing = prototypeVisualHistoryRef.current[pageId];
+    if (existing) return existing;
+    const created = { undo: [], redo: [] };
+    prototypeVisualHistoryRef.current[pageId] = created;
+    return created;
+  }, []);
 
   const applyActivePrototypeVisualPropertyChange = useCallback(
     (
@@ -2943,7 +3015,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     ) => {
       const pageId = activeDemoIdRef.current;
       const currentHtml = pageId
-        ? pagePrototypeMapRef.current[pageId]?.html
+        ? activePrototypeHtmlCollab.status === "synced" && activePrototypeHtmlCollab.ytext
+          ? activePrototypeHtmlCollab.ytext.toString()
+          : pagePrototypeMapRef.current[pageId]?.html
         : undefined;
       if (!pageId || currentHtml === undefined) return false;
       const result = applyPrototypePropertyChange(
@@ -2956,10 +3030,37 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       if (!result.ok) {
         return false;
       }
-      applyPrototypeHtmlToActivePage(result.html);
-      return true;
+      const applied = applyPrototypeHtmlToActivePage(
+        result.html,
+        result.forwardPatches
+          ? { before: currentHtml, patches: result.forwardPatches }
+          : undefined,
+      );
+      if (
+        applied &&
+        result.forwardPatches &&
+        result.inversePatches
+      ) {
+        const history = getPrototypeVisualHistory(pageId);
+        history.undo.push({
+          pageId,
+          changeId: `${node.domPath || node.nodeId}:${kind}:${property}`,
+          before: currentHtml,
+          after: result.html,
+          forwardPatches: result.forwardPatches,
+          inversePatches: result.inversePatches,
+        });
+        if (history.undo.length > 100) history.undo.shift();
+        history.redo = [];
+      }
+      return applied;
     },
-    [applyPrototypeHtmlToActivePage],
+    [
+      activePrototypeHtmlCollab.status,
+      activePrototypeHtmlCollab.ytext,
+      applyPrototypeHtmlToActivePage,
+      getPrototypeVisualHistory,
+    ],
   );
 
   const applyActivePrototypeVisualConfig = useCallback(
@@ -3029,6 +3130,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     visualPanelHoverNodeId,
     setVisualPanelHoverNodeId,
     visualPropertyChanges,
+    setVisualPropertyChanges,
     visualConfigMarks,
     visualAiInstruction,
     setVisualAiInstruction,
@@ -3052,9 +3154,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     visualConfigCandidateId,
     setVisualConfigCandidateId,
     visualConfigTitle,
-    setVisualConfigTitle,
     visualConfigFieldKey,
-    setVisualConfigFieldKey,
     visualConfigDefaultValue,
     setVisualConfigDefaultValue,
     visualConfigCategory,
@@ -3088,6 +3188,98 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     handleVisualInlineEdit,
     handleCreateVisualAnnotation,
   } = visualEditState;
+
+  const handlePrototypeVisualTextChange = useCallback(
+    (node: VisualNodeInfo, nextText: string, previousText: string) => {
+      const pageId = activeDemoIdRef.current;
+      const bindingKey = node.binding?.kind === "text" ? node.binding.key.trim() : "";
+      if (bindingKey) {
+        const nextPageConfig = {
+          ...(configDataMapRef.current[pageId] ?? {}),
+          [bindingKey]: nextText,
+        };
+        configDataMapRef.current = {
+          ...configDataMapRef.current,
+          [pageId]: nextPageConfig,
+        };
+        setConfigDataMap((previous) => ({
+          ...previous,
+          [pageId]: nextPageConfig,
+        }));
+        persistPageConfigValues(pageId, nextPageConfig);
+        markScreenshotDirty(pageId);
+        markWorkspaceChanged();
+        return;
+      }
+
+      handleVisualPropertyChange(
+        node,
+        "text",
+        "文本",
+        nextText,
+        "text",
+        previousText,
+      );
+    },
+    [
+      handleVisualPropertyChange,
+      markScreenshotDirty,
+      markWorkspaceChanged,
+      persistPageConfigValues,
+    ],
+  );
+
+  const applyPrototypeVisualHistory = useCallback(
+    (direction: "undo" | "redo"): "applied" | "empty" | "conflict" => {
+      const pageId = activeDemoIdRef.current;
+      const history = getPrototypeVisualHistory(pageId);
+      const source = direction === "undo" ? history.undo : history.redo;
+      const destination = direction === "undo" ? history.redo : history.undo;
+      const entry = source.pop();
+      if (!entry) return "empty";
+
+      const currentHtml =
+        activePrototypeHtmlCollab.status === "synced" &&
+        activePrototypeHtmlCollab.ytext
+          ? activePrototypeHtmlCollab.ytext.toString()
+          : pagePrototypeMapRef.current[pageId]?.html ?? "";
+      const expectedCurrent = direction === "undo" ? entry.after : entry.before;
+      if (currentHtml !== expectedCurrent) {
+        source.push(entry);
+        return "conflict";
+      }
+
+      const patches =
+        direction === "undo" ? entry.inversePatches : entry.forwardPatches;
+      const nextHtml = applyTextPatches(currentHtml, patches);
+      const expectedNext = direction === "undo" ? entry.before : entry.after;
+      if (
+        nextHtml !== expectedNext ||
+        !applyPrototypeHtmlToActivePage(nextHtml, {
+          before: currentHtml,
+          patches,
+        })
+      ) {
+        source.push(entry);
+        return "conflict";
+      }
+
+      destination.push(entry);
+      if (direction === "undo") {
+        setVisualPropertyChanges((previous) =>
+          previous.filter((change) => change.id !== entry.changeId),
+        );
+      }
+      return "applied";
+    },
+    [
+      activePrototypeHtmlCollab.status,
+      activePrototypeHtmlCollab.ytext,
+      applyPrototypeHtmlToActivePage,
+      getPrototypeVisualHistory,
+      setVisualPropertyChanges,
+    ],
+  );
 
   const [visualLayerTreeRequestKey, setVisualLayerTreeRequestKey] = useState(0);
   const [visualLayerTreeNodes, setVisualLayerTreeNodes] = useState<
@@ -4209,10 +4401,26 @@ ${context.details}
     [handleSchemaChange],
   );
 
+  const handlePageDefinitionChange = useCallback(
+    (pageId: string, mutation: SchemaDefinitionMutation) => {
+      handlePageSchemaChange(pageId, mutation.schema);
+      setConfigDataMap((previous) => {
+        const current = previous[pageId] ?? {};
+        const next = { ...current, ...mutation.valuePlan.setDefaults };
+        for (const key of mutation.valuePlan.removeKeys) delete next[key];
+        persistPageConfigValues(pageId, next);
+        return { ...previous, [pageId]: next };
+      });
+      markScreenshotDirty(pageId);
+      markWorkspaceChanged();
+    },
+    [handlePageSchemaChange, markScreenshotDirty, markWorkspaceChanged, persistPageConfigValues],
+  );
+
   const handleSaveAsDefaults = useCallback(
-    (pageId: string) => {
+    (pageId: string, defaultValues?: Record<string, unknown>) => {
       const currentSchema = pageSchemaMapRef.current[pageId];
-      const currentConfig = configDataMapRef.current[pageId];
+      const currentConfig = defaultValues ?? configDataMapRef.current[pageId];
       if (!currentSchema || !currentConfig) {
         toast({ title: "保存失败", description: "未找到配置数据", variant: "destructive" });
         return;
@@ -4331,9 +4539,77 @@ ${context.details}
     ],
   );
 
-  const handleProjectSaveAsDefaults = useCallback(() => {
+  const handleProjectDefinitionChange = useCallback(
+    (mutation: SchemaDefinitionMutation) => {
+      handleProjectSchemaChange(mutation.schema);
+      const nextProjectValues = { ...projectConfigValuesRef.current, ...mutation.valuePlan.setDefaults };
+      for (const key of mutation.valuePlan.removeKeys) delete nextProjectValues[key];
+      projectConfigValuesRef.current = nextProjectValues;
+      setProjectConfigValues(nextProjectValues);
+      void persistProjectConfigValues(nextProjectValues);
+      setConfigDataMap((previous) => {
+        const next: Record<string, Record<string, unknown>> = {};
+        for (const [pageId, values] of Object.entries(previous)) {
+          next[pageId] = { ...values, ...mutation.valuePlan.setDefaults };
+          for (const key of mutation.valuePlan.removeKeys) delete next[pageId][key];
+        }
+        return next;
+      });
+    },
+    [handleProjectSchemaChange, persistProjectConfigValues],
+  );
+
+  const handleConfigDefinitionSendToAI = useCallback(
+    (scope: "project" | "page", mutation: SchemaDefinitionMutation) => {
+      const changedKeys = [...mutation.diff.added, ...mutation.diff.updated, ...mutation.diff.deleted];
+      const targetPageIds = scope === "project"
+        ? demoPages.map((page) => page.id)
+        : activeDemoIdRef.current ? [activeDemoIdRef.current] : [];
+      const bindings = targetPageIds.flatMap((pageId) => {
+        const page = demoPages.find((item) => item.id === pageId);
+        if (!page) return [];
+        const keys = page.runtimeType === "prototype-html-css"
+          ? extractPrototypeConfigBindingKeys(pagePrototypeMap[pageId]?.html)
+          : extractCodeConfigBindingKeys(pageCodes[pageId], changedKeys);
+        return keys.filter((key) => changedKeys.includes(key)).map((key) => `- ${page.name} (${pageId})：${key}`);
+      });
+      const operation = mutation.diff.deleted.length ? "清理已删除字段的页面消费" : mutation.diff.typeChanged.length ? "适配已变更字段类型的页面消费" : "让页面接入新增或更新的字段";
+      const aiPrompt = `【目标】${operation}\n\n【作用域】${scope === "project" ? "项目级共享配置" : "当前页面配置"}\n【页面】${targetPageIds.map((id) => demoPages.find((page) => page.id === id)?.name ?? id).join("、")}\n\n【Schema 变更】\n- 新增：${mutation.diff.added.join("、") || "无"}\n- 更新：${mutation.diff.updated.join("、") || "无"}\n- 删除：${mutation.diff.deleted.join("、") || "无"}\n- 类型变化：${mutation.diff.typeChanged.join("、") || "无"}\n- 已保存的 Schema 定义已在工作区生效；请读取对应 config.schema.json 确认完整规则。\n\n【已发现页面绑定】\n${bindings.join("\n") || "- 暂未发现绑定；如需页面展示新字段，请按现有页面模式接入。"}\n\n【必须完成】\n1. 修改受影响页面的 React props 或原型 data-bind-* / {{fieldKey}} 绑定；保持现有视觉效果。\n2. 清理已删除字段的引用，或适配类型变化；不要扩大配置范围。\n3. 检查页面配置要求和设计规范中的相关引用，必要时更新引用。\n\n【验收】\n完成 Schema 校验与配置预览联动，并在回复中报告 workspace mutation receipt 与验证结果。`;
+      setTabValue("ai");
+      setTriggerAutoSend(aiPrompt);
+      toast({ title: "定义已保存，正在交给 AI 同步页面" });
+    },
+    [demoPages, pageCodes, pagePrototypeMap, toast],
+  );
+
+  const handleConfigDefinitionAnalyze = useCallback(
+    (scope: "project" | "page", mutation: SchemaDefinitionMutation) => {
+      const report = analyzeConfigDefinitionImpact({
+        scope,
+        pageId: activeDemoIdRef.current ?? undefined,
+        mutation,
+        pages: demoPages.map((page) => ({
+          pageId: page.id,
+          pageName: page.name,
+          runtimeType: page.runtimeType,
+          code: pageCodes[page.id],
+          prototypeHtml: pagePrototypeMap[page.id]?.html,
+          requirements: requirementsMap[page.id] ?? referencePageRequirements[page.id],
+        })),
+      });
+      return {
+        risk: report.risk,
+        boundPages: report.boundPages.map(({ pageName, keys }) => ({ pageName, keys })),
+        requirementRefCount: report.requirementRefs.length,
+        designSpecRefCount: 0,
+      };
+    },
+    [demoPages, pageCodes, pagePrototypeMap, referencePageRequirements, requirementsMap],
+  );
+
+  const handleProjectSaveAsDefaults = useCallback((defaultValues?: Record<string, unknown>) => {
     const currentSchema = projectConfigSchemaRef.current;
-    const currentConfig = projectConfigValuesRef.current;
+    const currentConfig = defaultValues ?? projectConfigValuesRef.current;
     if (!currentSchema || !currentConfig) {
       toast({
         title: "保存失败",
@@ -4450,8 +4726,12 @@ ${context.details}
                 prototypeHtml: data.prototypeHtml,
                 prototypeCss: data.prototypeCss,
                 prototypeMeta: data.prototypeMeta as PrototypePageMeta | undefined,
+                sandboxHtml: data.sandboxHtml,
+                htmlImportMeta: data.htmlImportMeta as HtmlImportMeta | undefined,
                 sketchScene: data.sketchScene,
                 sketchMeta: data.sketchMeta,
+                sandboxExecutionUrl: data.sandboxExecutionUrl,
+                sandboxChannelId: data.sandboxChannelId,
               };
             } catch (error) {
               console.error("加载画布页面内容失败:", pageId, error);
@@ -4477,9 +4757,17 @@ ${context.details}
             meta?: Record<string, unknown>;
           }
         > = {};
+        const nextSandboxes: Record<
+          string,
+          { html?: string; meta?: HtmlImportMeta }
+        > = {};
         const nextSchemas: Record<string, string> = {};
         const nextDefaults: Record<string, Record<string, unknown>> = {};
         const nextPreviewSizes: Record<string, PreviewSize> = {};
+        const nextSandboxExecutions: Record<
+          string,
+          { url?: string; channelId?: string }
+        > = {};
 
         for (const page of loadedPages) {
           if (!page) continue;
@@ -4501,21 +4789,37 @@ ${context.details}
               meta: page.sketchMeta,
             };
           }
+          if (page.sandboxHtml !== undefined || page.htmlImportMeta !== undefined) {
+            nextSandboxes[page.pageId] = {
+              html: page.sandboxHtml,
+              meta: page.htmlImportMeta,
+            };
+          }
           nextDefaults[page.pageId] = {
             ...getSafeMergedDefaults(page.schema),
             ...(page.configData ?? {}),
           };
+          if (
+            page.sandboxExecutionUrl !== undefined ||
+            page.sandboxChannelId !== undefined
+          ) {
+            nextSandboxExecutions[page.pageId] = {
+              url: page.sandboxExecutionUrl,
+              channelId: page.sandboxChannelId,
+            };
+          }
           const size = getPreviewSize(page.schema);
           if (size) {
             nextPreviewSizes[page.pageId] = size;
           }
         }
 
-        if (Object.keys(nextCodes).length === 0) return;
+        if (!loadedPages.some((page) => page !== null)) return;
 
         setPageCodes((prev) => ({ ...prev, ...nextCodes }));
         setPagePrototypeMap((prev) => ({ ...prev, ...nextPrototypes }));
         setPageSketchMap((prev) => ({ ...prev, ...nextSketches }));
+        setPageSandboxMap((prev) => ({ ...prev, ...nextSandboxes }));
         setPageSchemaMap((prev) => mergeLoadedPageSchemas(prev, nextSchemas));
         setConfigDataMap((prev) => {
           const next = { ...prev };
@@ -4527,6 +4831,7 @@ ${context.details}
           return next;
         });
         setPagePreviewSizeMap((prev) => ({ ...prev, ...nextPreviewSizes }));
+        setSandboxExecutionMap((prev) => ({ ...prev, ...nextSandboxExecutions }));
       } catch (err) {
         console.error("加载画布页面代码失败:", err);
       }
@@ -4571,7 +4876,7 @@ ${context.details}
             [pageId]: data.code ?? "",
           }));
           if (
-            data.prototypeHtml !== undefined ||
+          data.prototypeHtml !== undefined ||
             data.prototypeCss !== undefined
           ) {
             setPagePrototypeMap((prev) => ({
@@ -4580,6 +4885,27 @@ ${context.details}
                 html: data.prototypeHtml,
                 css: data.prototypeCss,
                 meta: prototypeMeta,
+              },
+            }));
+          }
+          if (data.sandboxHtml !== undefined || data.htmlImportMeta !== undefined) {
+            setPageSandboxMap((prev) => ({
+              ...prev,
+              [pageId]: {
+                html: data.sandboxHtml,
+                meta: data.htmlImportMeta as HtmlImportMeta | undefined,
+              },
+            }));
+          }
+          if (
+            data.sandboxExecutionUrl !== undefined ||
+            data.sandboxChannelId !== undefined
+          ) {
+            setSandboxExecutionMap((prev) => ({
+              ...prev,
+              [pageId]: {
+                url: data.sandboxExecutionUrl,
+                channelId: data.sandboxChannelId,
               },
             }));
           }
@@ -4664,6 +4990,16 @@ ${context.details}
         return next;
       });
       setPageSketchMap((prev) => {
+        const next = { ...prev };
+        pageIds.forEach((pageId) => delete next[pageId]);
+        return next;
+      });
+      setPageSandboxMap((prev) => {
+        const next = { ...prev };
+        pageIds.forEach((pageId) => delete next[pageId]);
+        return next;
+      });
+      setSandboxExecutionMap((prev) => {
         const next = { ...prev };
         pageIds.forEach((pageId) => delete next[pageId]);
         return next;
@@ -5909,13 +6245,21 @@ ${context.details}
   }, [syncWorkspaceToProject, createDiagnosticTraceId, recordDiagnosticEvent]);
   flushSyncWorkspaceRef.current = flushSyncWorkspace;
 
-  // Cleanup debounce timer on unmount
+  // Cleanup delayed work on unmount so old sessions cannot receive stale writes.
   useEffect(() => {
     return () => {
       if (syncDebounceRef.current) {
         clearTimeout(syncDebounceRef.current);
         syncDebounceRef.current = null;
       }
+      for (const timer of Object.values(pageConfigPersistTimersRef.current)) {
+        clearTimeout(timer);
+      }
+      pageConfigPersistTimersRef.current = {};
+      for (const timer of Object.values(screenshotRegenerateTimerRef.current)) {
+        clearTimeout(timer);
+      }
+      screenshotRegenerateTimerRef.current = {};
     };
   }, []);
 
@@ -6229,7 +6573,12 @@ ${context.details}
 
     return demoPages.map((page) => {
       const runtimeData =
-        page.runtimeType === "prototype-html-css"
+        page.runtimeType === "sandboxed-html"
+          ? {
+              sandboxExecutionUrl: sandboxExecutionMap[page.id]?.url,
+              sandboxChannelId: sandboxExecutionMap[page.id]?.channelId,
+            }
+          : page.runtimeType === "prototype-html-css"
           ? {
               prototypeHtml: pagePrototypeMap[page.id]?.html,
               prototypeCss: pagePrototypeMap[page.id]?.css,
@@ -6285,6 +6634,7 @@ ${context.details}
     pagePreviewSizeMap,
     pagePrototypeMap,
     pageSketchMap,
+    sandboxExecutionMap,
     pageSchemaMap,
     pageSnapshots,
     previewSize,
@@ -6309,6 +6659,49 @@ ${context.details}
     !singlePreviewViewingDocument &&
     rightPanelTab === "edit" &&
     !commentModeActive;
+
+  useEffect(() => {
+    if (!visualEditActive || activeDemoPage?.runtimeType !== "prototype-html-css") {
+      return;
+    }
+    const handlePrototypeHistoryShortcut = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        target.closest("input,textarea,select,[contenteditable]:not([contenteditable='false'])")
+      ) {
+        return;
+      }
+      const modifier = event.metaKey || event.ctrlKey;
+      const key = event.key.toLowerCase();
+      const direction =
+        modifier && key === "z"
+          ? event.shiftKey
+            ? "redo"
+            : "undo"
+          : modifier && event.ctrlKey && key === "y"
+            ? "redo"
+            : null;
+      if (!direction) return;
+      const result = applyPrototypeVisualHistory(direction);
+      if (result === "empty") return;
+      event.preventDefault();
+      if (result === "conflict") {
+        toast({
+          title: "无法撤销可视化修改",
+          description: "页面源码已被其他编辑更新，请重新选择元素后再修改。",
+          variant: "destructive",
+        });
+      }
+    };
+    window.addEventListener("keydown", handlePrototypeHistoryShortcut);
+    return () => window.removeEventListener("keydown", handlePrototypeHistoryShortcut);
+  }, [
+    activeDemoPage?.runtimeType,
+    applyPrototypeVisualHistory,
+    toast,
+    visualEditActive,
+  ]);
 
   useEffect(() => {
     if (previewMode !== "single" || singlePreviewViewingDocument) return;
@@ -6886,7 +7279,13 @@ ${context.details}
   const showProjectConfig = hasProjectConfig;
   const showPageConfig = hasPageConfig;
   const hasBothScopes = showProjectConfig && showPageConfig;
-  const hasAnyConfig = showProjectConfig || showPageConfig;
+  // 创作端即使尚未声明字段也保留配置页签，用户可从空态打开定义管理器创建首个字段。
+  const hasAnyConfig =
+    showProjectConfig || showPageConfig || (!!activeDemoPage && !activeDemoPage.reference);
+  const canvasRightPanelTab = resolveCanvasRightPanelTab(
+    rightPanelTab,
+    hasAnyConfig,
+  );
   const isConfigPanelVisible =
     (previewMode === "single" && !singlePreviewViewingDocument) ||
     previewMode === "canvas" ||
@@ -6928,6 +7327,36 @@ ${context.details}
   const visualConfigUsedKeys = getSchemaPropertyKeys(
     schema,
     projectConfigSchema,
+  );
+  const visualConfigDraft = useMemo<ConfigDefinitionDraft>(
+    () => ({
+      key: visualConfigFieldKey,
+      title: visualConfigTitle,
+      kind: selectedVisualConfigCandidate?.kind ?? "text",
+      default: visualConfigDefaultValue,
+      group: visualConfigCategory || undefined,
+    }),
+    [
+      selectedVisualConfigCandidate?.kind,
+      visualConfigCategory,
+      visualConfigDefaultValue,
+      visualConfigFieldKey,
+      visualConfigTitle,
+    ],
+  );
+  const handleVisualConfigDraftChange = useCallback(
+    (draft: ConfigDefinitionDraft) => {
+      handleVisualConfigTitleChange(draft.title);
+      setVisualConfigDefaultValue(
+        typeof draft.default === "string" ? draft.default : String(draft.default ?? ""),
+      );
+      setVisualConfigCategory(draft.group ?? "");
+    },
+    [
+      handleVisualConfigTitleChange,
+      setVisualConfigCategory,
+      setVisualConfigDefaultValue,
+    ],
   );
   const getVisualNodeChangeCount = useCallback(
     (node: VisualNodeInfo) => {
@@ -8408,6 +8837,7 @@ await handlePublishWithScreenshot();
                       visualPropertyChanges,
                       onVisualSelect: handleVisualSelect,
                       onVisualSelectStack: setVisualNodeStack,
+                      onVisualTextChange: handlePrototypeVisualTextChange,
                       onToggleNodeHidden: handleToggleVisualNodeHidden,
                       visualNodeTreeRequestKey: visualLayerTreeRequestKey,
                       onVisualNodeTreeChange: setVisualLayerTreeNodes,
@@ -8860,8 +9290,12 @@ await handlePublishWithScreenshot();
                         projectConfigSchema={projectConfigSchema}
                         onProjectConfigChange={handleProjectConfigPanelChange}
                         onProjectSchemaChange={handleProjectSchemaChange}
+                        onProjectDefinitionChange={handleProjectDefinitionChange}
+                        onDefinitionSendToAI={handleConfigDefinitionSendToAI}
+                        onDefinitionAnalyze={handleConfigDefinitionAnalyze}
                         onPageConfigChange={handlePageConfigPanelChange}
                         onPageSchemaChange={handlePageSchemaChange}
+                        onPageDefinitionChange={handlePageDefinitionChange}
                         onSaveAsDefaults={
                           activeDemoPage?.reference
                             ? undefined
@@ -8926,7 +9360,7 @@ await handlePublishWithScreenshot();
                 </>
               ) : (
                 <Tabs
-                  value={hasAnyConfig ? rightPanelTab : "comments"}
+                  value={canvasRightPanelTab}
                   onValueChange={(v) =>
                     setRightPanelTab(v as "config" | "comments")
                   }
@@ -8940,7 +9374,7 @@ await handlePublishWithScreenshot();
                         className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
                       >
                         <SlidersHorizontal className="h-4 w-4" />
-                        {rightPanelTab === "config" && <span>配置</span>}
+                        {canvasRightPanelTab === "config" && <span>配置</span>}
                       </TabsTrigger>
                     )}
                     <TabsTrigger
@@ -8949,7 +9383,7 @@ await handlePublishWithScreenshot();
                       className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
                     >
                       <MessageSquare className="h-4 w-4" />
-                      {rightPanelTab === "comments" && <span>评论</span>}
+                      {canvasRightPanelTab === "comments" && <span>评论</span>}
                       {unresolvedCommentCount > 0 && (
                         <span className="ml-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[9px] font-semibold text-white">
                           {unresolvedCommentCount}
@@ -9003,9 +9437,13 @@ await handlePublishWithScreenshot();
                   projectConfigSchema={projectConfigSchema}
                   onProjectConfigChange={handleProjectConfigPanelChange}
                   onProjectSchemaChange={handleProjectSchemaChange}
+                  onProjectDefinitionChange={handleProjectDefinitionChange}
+                  onDefinitionSendToAI={handleConfigDefinitionSendToAI}
+                  onDefinitionAnalyze={handleConfigDefinitionAnalyze}
                   onPageConfigChange={handlePageConfigPanelChange}
                   requirementsPosition="hidden"
                   onPageSchemaChange={handlePageSchemaChange}
+                  onPageDefinitionChange={handlePageDefinitionChange}
                   onSaveAsDefaults={
                     activeDemoPage?.reference
                       ? undefined
@@ -9070,28 +9508,33 @@ await handlePublishWithScreenshot();
         </DesignSpecWorkspaceProvider>
       </div>
 
-      <Dialog
+      <ConfigItemEditorDialog
         open={visualConfigDialogOpen}
         onOpenChange={(open) => {
           if (!open) handleCloseVisualConfigDialog();
         }}
-      >
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>添加配置项</DialogTitle>
-            <DialogDescription>
-              将当前选中的页面元素转换为配置面板中的可编辑字段。
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="visual-config-kind">配置内容</Label>
+        mode="create"
+        scope="page"
+        draft={visualConfigDraft}
+        onDraftChange={handleVisualConfigDraftChange}
+        allowedKinds={[visualConfigDraft.kind]}
+        showRequired={false}
+        groupLabel="分类"
+        busy={visualConfigApplying}
+        applyPlan={{
+          kind: "bind_and_apply",
+          title: "保存并应用",
+          description: "将所选属性设为配置项，并尝试直接应用到页面。无法安全直写时会交给 AI 处理。",
+        }}
+        formPrefix={
+          <div className="space-y-3">
+            <label className="block space-y-1.5 text-sm font-medium">
+              配置内容
               <Select
                 value={visualConfigCandidateId}
                 onValueChange={handleVisualConfigCandidateChange}
               >
-                <SelectTrigger id="visual-config-kind">
+                <SelectTrigger>
                   <SelectValue placeholder="选择配置内容" />
                 </SelectTrigger>
                 <SelectContent>
@@ -9102,70 +9545,7 @@ await handlePublishWithScreenshot();
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="visual-config-title">显示名称</Label>
-                <Input
-                  id="visual-config-title"
-                  value={visualConfigTitle}
-                  onChange={(event) =>
-                    handleVisualConfigTitleChange(event.target.value)
-                  }
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="visual-config-key">字段 key</Label>
-                <Input
-                  id="visual-config-key"
-                  value={visualConfigFieldKey}
-                  onChange={(event) =>
-                    setVisualConfigFieldKey(event.target.value)
-                  }
-                  spellCheck={false}
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="visual-config-default">默认值</Label>
-              <div className="flex items-center gap-2">
-                {selectedVisualConfigCandidate?.kind === "color" && (
-                  <span
-                    className="h-8 w-8 rounded-md border"
-                    style={{ backgroundColor: visualConfigDefaultValue }}
-                  />
-                )}
-                <Input
-                  id="visual-config-default"
-                  value={visualConfigDefaultValue}
-                  onChange={(event) =>
-                    setVisualConfigDefaultValue(event.target.value)
-                  }
-                  className="font-mono text-xs"
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="visual-config-category">分类</Label>
-              <Input
-                id="visual-config-category"
-                list="visual-config-category-options"
-                value={visualConfigCategory}
-                onChange={(event) =>
-                  setVisualConfigCategory(event.target.value)
-                }
-                placeholder="可选，例如 设计"
-              />
-              <datalist id="visual-config-category-options">
-                {BUILT_IN_CONFIG_CATEGORIES.map((category) => (
-                  <option key={category} value={category} />
-                ))}
-              </datalist>
-            </div>
-
+            </label>
             {visualConfigNode && (
               <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
                 <div className="truncate">
@@ -9175,48 +9555,38 @@ await handlePublishWithScreenshot();
                     : ""}
                 </div>
                 {visualConfigNode.textContent && (
-                  <div className="mt-1 truncate">
-                    文本：{visualConfigNode.textContent}
-                  </div>
+                  <div className="mt-1 truncate">文本：{visualConfigNode.textContent}</div>
                 )}
               </div>
             )}
-
             {visualConfigError && (
               <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 {visualConfigError}
               </div>
             )}
           </div>
-
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleCloseVisualConfigDialog}
-              disabled={visualConfigApplying}
-            >
-              取消
-            </Button>
-            <Button
-              type="button"
-              onClick={handleApplyVisualConfig}
-              disabled={
-                visualConfigApplying ||
-                !selectedVisualConfigCandidate ||
-                !visualConfigFieldKey.trim() ||
-                !visualConfigTitle.trim()
-              }
-              className="gap-2"
-            >
-              {visualConfigApplying && (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              )}
-              添加
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        }
+        defaultValueEditor={
+          <div className="flex items-center gap-2">
+            {visualConfigDraft.kind === "color" && (
+              <input
+                aria-label="选择默认颜色"
+                className="h-8 w-8 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
+                type="color"
+                value={visualConfigDefaultValue || "#000000"}
+                onChange={(event) => setVisualConfigDefaultValue(event.target.value)}
+              />
+            )}
+            <Input
+              aria-label="默认值"
+              value={visualConfigDefaultValue}
+              onChange={(event) => setVisualConfigDefaultValue(event.target.value)}
+              className="font-mono text-xs"
+            />
+          </div>
+        }
+        onApply={handleApplyVisualConfig}
+      />
 
       <CoverImageDialog
         open={coverDialogOpen}

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>批量捕获</title><link rel="stylesheet" href="sidepanel.css"></head>
+<body>
+  <main>
+    <h1>批量捕获</h1>
+    <p class="hint">仅列出 HTTP/HTTPS 标签页。捕获不会读取 history、Cookie 或 storage。</p>
+    <button id="load" type="button">加载标签页（需要可选权限）</button>
+    <input id="filter" type="search" placeholder="过滤标题或网址" hidden>
+    <div id="tabs" aria-live="polite"></div>
+    <section class="settings"><label for="profile">捕获配置</label><select id="profile"></select><p id="profile-description" class="hint"></p><label for="rule-origin">当前站点规则（exact origin）</label><input id="rule-origin" type="url" placeholder="https://example.com"><div class="rule-actions"><button id="save-rule" type="button">保存站点规则</button><button id="delete-rule" type="button" class="secondary">删除站点规则</button></div><div id="rules" class="history-list"></div></section>
+    <div class="actions"><span id="count">未选择标签页</span><button id="start" type="button" disabled>加入批量队列</button></div>
+    <p id="status" class="status"></p>
+    <button id="continue" type="button" hidden>切换到选中标签页后继续</button>
+    <section id="review" class="settings" hidden><h2>下载前安全审核</h2><pre id="review-summary"></pre><button id="approve-download" type="button">批准并下载</button><button id="cancel-review" type="button" class="secondary">取消捕获</button></section>
+    <section class="settings"><h2>导出历史</h2><div id="history" class="history-list"></div><button id="clear-history" type="button" class="danger">清空历史</button></section>
+  </main>
+  <script type="module" src="sidepanel.js"></script>
+</body>
+</html>

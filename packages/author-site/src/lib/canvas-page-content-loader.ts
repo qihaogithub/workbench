@@ -16,6 +16,10 @@ export type CanvasPageContent = {
   prototypeHtml?: string;
   prototypeCss?: string;
   prototypeMeta?: Record<string, unknown>;
+  sandboxHtml?: string;
+  htmlImportMeta?: Record<string, unknown>;
+  sandboxExecutionUrl?: string;
+  sandboxChannelId?: string;
   sketchScene?: string;
   sketchMeta?: Record<string, unknown>;
   requirements?: string;
@@ -25,6 +29,12 @@ export type CanvasPageContent = {
 type ApiResponse = {
   ok: boolean;
   json: () => Promise<unknown>;
+};
+
+type ApiRequestInit = {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
 };
 
 type SuccessfulPayload = {
@@ -46,7 +56,7 @@ export async function loadCanvasPageContent(input: {
   page: DemoPageMeta;
   projectId: string;
   sessionId: string;
-  request?: (url: string) => Promise<ApiResponse>;
+  request?: (url: string, init?: ApiRequestInit) => Promise<ApiResponse>;
 }): Promise<CanvasPageContent> {
   const request = input.request ?? ((url: string) => fetch(url));
   const encodedSessionId = encodeURIComponent(input.sessionId);
@@ -64,5 +74,46 @@ export async function loadCanvasPageContent(input: {
     throw new Error(message);
   }
 
-  return { pageId: input.page.id, ...payload.data };
+  const pageData = { pageId: input.page.id, ...payload.data };
+
+  // sandboxed-html 页面只能通过服务端签发的一次性执行票据运行。
+  // 原始 HTML 永远不作为 iframe src 或客户端执行输入传递。
+  if (input.page.runtimeType === "sandboxed-html" && !input.page.reference) {
+    const executionResponse = await request(
+      `/api/projects/${encodeURIComponent(input.projectId)}/demos/${encodeURIComponent(input.page.id)}/html-execution`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sessionId: input.sessionId }),
+      },
+    );
+    const executionPayload = await executionResponse.json();
+    if (
+      !executionResponse.ok ||
+      !isSuccessfulPayload(executionPayload) ||
+      !executionPayload.success ||
+      !executionPayload.data ||
+      typeof executionPayload.data !== "object"
+    ) {
+      const message =
+        isSuccessfulPayload(executionPayload) && executionPayload.error?.message
+          ? executionPayload.error.message
+          : "创建 HTML 预览执行票据失败";
+      throw new Error(message);
+    }
+    const executionData = executionPayload.data as Record<string, unknown>;
+    return {
+      ...pageData,
+      sandboxExecutionUrl:
+        typeof executionData.executionUrl === "string"
+          ? executionData.executionUrl
+          : undefined,
+      sandboxChannelId:
+        typeof executionData.channelId === "string"
+          ? executionData.channelId
+          : undefined,
+    };
+  }
+
+  return pageData;
 }

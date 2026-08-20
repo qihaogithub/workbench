@@ -13,6 +13,7 @@ import {
   formatDiagnosticFailureDetails,
   readSqliteEvents,
   summarizeDiagnosticPerformance,
+  summarizeSandboxDiagnostics,
 } from "./diagnostics.js";
 
 function makeDataDir(): string {
@@ -344,4 +345,78 @@ test("formatDiagnosticFailureDetails includes sync failure summary fields", () =
     summary,
     " workspace=workspace-1 page=page-1 phase=persist-workspace code=WORKSPACE_STALE status=409",
   );
+});
+
+test("sandbox summary exposes runtime safety outcomes without raw ticket or channel fields", () => {
+  const base = {
+    schemaVersion: 1,
+    source: "preview" as const,
+    eventGroup: "preview" as const,
+    projectId: "project-1",
+    pageId: "page-1",
+  };
+  const summary = summarizeSandboxDiagnostics([
+    {
+      ...base,
+      id: "issued",
+      ts: "2026-07-09T00:00:00.000Z",
+      level: "info" as const,
+      eventType: "preview.sandbox_execution_issued",
+      payload: {
+        runtimeType: "sandboxed-html",
+        sandboxPolicyVersion: 1,
+        renderer: "sandbox-html",
+        executionIdHash: "sha256:opaque",
+      },
+    },
+    {
+      ...base,
+      id: "failed",
+      ts: "2026-07-09T00:00:01.000Z",
+      level: "error" as const,
+      eventType: "preview.sandbox_runtime_failed",
+      payload: {
+        runtimeType: "sandboxed-html",
+        sandboxPolicyVersion: 1,
+        renderer: "sandbox-html",
+        errorCode: "SANDBOX_POLICY_MISMATCH",
+        timeoutMs: 8000,
+        blockedRequestCount: 2,
+        contextClosed: true,
+        browserRestarted: true,
+        executionId: "raw-ticket-id",
+        channelId: "raw-channel-id",
+      },
+    },
+    {
+      ...base,
+      id: "expired",
+      ts: "2026-07-09T00:00:02.000Z",
+      level: "error" as const,
+      eventType: "preview.sandbox_runtime_failed",
+      payload: {
+        runtimeType: "sandboxed-html",
+        sandboxPolicyVersion: 1,
+        renderer: "sandbox-html",
+        errorCode: "EXPIRED_EXECUTION_TICKET",
+        timeoutMs: 9000,
+        blockedRequestCount: 1,
+        contextClosed: false,
+        browserRestarted: false,
+      },
+    },
+  ]);
+
+  assert.equal(summary.executionIssued, 1);
+  assert.equal(summary.runtimeFailures, 2);
+  assert.deepEqual(summary.runtimeTypes, ["sandboxed-html"]);
+  assert.deepEqual(summary.policyVersions, [1]);
+  assert.deepEqual(summary.renderers, ["sandbox-html"]);
+  assert.equal(summary.policyMismatch, 1);
+  assert.equal(summary.expiredTicket, 1);
+  assert.equal(summary.blockedRequestCount, 3);
+  assert.equal(summary.timeoutMs.p95, 9000);
+  assert.deepEqual(summary.contextRecovery, { contextClosed: 1, browserRestarted: 1, recovered: 1 });
+  assert.equal("executionId" in summary, false);
+  assert.equal("channelId" in summary, false);
 });

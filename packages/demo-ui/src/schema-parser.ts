@@ -85,64 +85,6 @@ function formatFieldName(key: string): string {
     .trim();
 }
 
-function detectGroup(key: string, prop: { format?: string }): string {
-  if (
-    key.startsWith("color") ||
-    key.endsWith("Color") ||
-    prop.format === "color"
-  ) {
-    return "颜色配置";
-  }
-  if (
-    key.startsWith("size") ||
-    key.endsWith("Size") ||
-    key.endsWith("Width") ||
-    key.endsWith("Height")
-  ) {
-    return "尺寸设置";
-  }
-  if (
-    key.startsWith("text") ||
-    key.endsWith("Text") ||
-    key.endsWith("Title") ||
-    key.endsWith("Content")
-  ) {
-    return "文本内容";
-  }
-  if (
-    key.startsWith("image") ||
-    key.endsWith("Image") ||
-    key.endsWith("Url") ||
-    key.endsWith("Icon")
-  ) {
-    return "图片资源";
-  }
-  if (
-    key.startsWith("show") ||
-    key.startsWith("hide") ||
-    key.startsWith("enable") ||
-    key.startsWith("disable")
-  ) {
-    return "显示选项";
-  }
-  if (
-    key.startsWith("animation") ||
-    key.endsWith("Animation") ||
-    key.endsWith("Transition")
-  ) {
-    return "动画效果";
-  }
-  if (
-    key.startsWith("layout") ||
-    key.endsWith("Layout") ||
-    key.endsWith("Position")
-  ) {
-    return "布局设置";
-  }
-
-  return "基础配置";
-}
-
 function hasPositionable(prop: Record<string, unknown>): boolean {
   const demo = prop.$demo as Record<string, unknown> | undefined;
   return !!(demo?.positionable);
@@ -480,9 +422,8 @@ title: typeof prop.title === "string" ? prop.title : formatFieldName(key),
         const explicitGroup = uiOptions && typeof uiOptions.group === "string"
           ? uiOptions.group.trim()
           : undefined;
-        const groupName = explicitGroup !== undefined
-          ? explicitGroup
-          : detectGroup(key, prop);
+        // Grouping is authored metadata. Fields without an explicit group render flat.
+        const groupName = explicitGroup ?? "";
         if (!groups[groupName]) {
           groups[groupName] = [];
         }

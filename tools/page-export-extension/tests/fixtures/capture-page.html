@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <title>Editable Snapshot Capture Fixture</title>
+    <link rel="stylesheet" href="external.css">
+    <style>
+      body { font: 16px/1.5 system-ui; color: #172033; }
+      .state-panel[open] { border: 2px solid #4f6fae; padding: 12px; }
+    </style>
+  </head>
+  <body onload="document.body.dataset.loaded = 'true'">
+    <h1>捕获夹具</h1>
+    <details class="state-panel" open><summary>已展开状态</summary><p>这是用户准备后的页面状态。</p></details>
+    <form action="/should-not-submit" method="post">
+      <label>当前值 <input id="current-value" value="initial"></label>
+    </form>
+    <button id="inline-event" onclick="this.dataset.clicked = 'true'">内联事件</button>
+    <div id="shadow-host"></div>
+    <canvas id="chart" width="120" height="60"></canvas>
+    <iframe title="同源内嵌文档" src="frame.html"></iframe>
+    <img id="external-image" loading="lazy" alt="同源外部图片" src="external-image.svg">
+    <script src="external.js"></script>
+    <script>
+      document.querySelector("#current-value").value = "runtime-value";
+      const shadow = document.querySelector("#shadow-host").attachShadow({ mode: "open" });
+      shadow.innerHTML = "<span id='shadow-state'>shadow preserved</span>";
+      const context = document.querySelector("#chart").getContext("2d");
+      context.fillStyle = "#4f6fae";
+      context.fillRect(5, 5, 110, 50);
+    </script>
+  </body>
+</html>

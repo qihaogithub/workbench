@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { IframePreviewFrameProps } from "./IframePreviewFrame";
 import type { PrototypePagePreviewProps } from "./PrototypePagePreview";
 import type { SketchPagePreviewProps } from "./SketchPagePreview";
+import type { SandboxedHtmlFrameProps } from "./SandboxedHtmlFrame";
 import type {
   CanvasInteractionMode,
   CanvasPageData,
@@ -18,6 +19,10 @@ export interface PreviewStagePage extends CanvasPageData {
   runtimeType: CanvasPageRuntimeType;
   schema?: string;
   fallbackPreviewSize?: PreviewSize;
+  /** 交互 HTML 的受控执行入口；不得使用 sandboxHtml 作为 iframe src。 */
+  sandboxExecutionUrl?: string;
+  sandboxChannelId?: string;
+  sandboxHtml?: string;
 }
 
 export interface SinglePageRendererProps {
@@ -36,6 +41,10 @@ export interface SinglePageRendererProps {
   highFidelity?: Omit<
     PreviewPanelProps,
     "code" | "compiledJsUrl" | "previewSize" | "configData"
+  >;
+  sandbox?: Omit<
+    SandboxedHtmlFrameProps,
+    "executionUrl" | "channelId" | "title" | "previewSize"
   >;
 }
 

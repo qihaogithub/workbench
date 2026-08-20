@@ -17,6 +17,7 @@
   "dependencies": {
     "@fastify/cors": "^9.0.0",
     "@fastify/rate-limit": "^9.0.0",
+    "@workbench/project-core": "workspace:*",
     "@workbench/shared": "workspace:*",
     "@workbench/sketch-core": "workspace:*",
     "dotenv": "^17.4.2",

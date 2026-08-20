@@ -13,6 +13,7 @@ import {
 } from "@/lib/ensure-image-resolver";
 import type {
   DemoPageRuntimeType,
+  HtmlImportMeta,
   PageSnapshotInput,
   PrototypePageMeta,
   SketchSceneDocument,
@@ -171,11 +172,11 @@ async function readJsonFile<T>(filePath: string): Promise<T | null> {
 
 async function readWorkspaceRuntimeTypes(
   workspacePath: string,
-): Promise<Record<string, DemoPageRuntimeType | undefined>> {
+): Promise<Record<string, DemoPageRuntimeType | "invalid" | undefined>> {
   const tree = await readJsonFile<{
     pages?: Array<{ id?: unknown; runtimeType?: unknown }>;
   }>(path.join(workspacePath, "workspace-tree.json"));
-  const result: Record<string, DemoPageRuntimeType | undefined> = {};
+  const result: Record<string, DemoPageRuntimeType | "invalid" | undefined> = {};
   for (const page of tree?.pages ?? []) {
     if (typeof page.id !== "string") continue;
     result[page.id] =
@@ -185,7 +186,9 @@ async function readWorkspaceRuntimeTypes(
           ? "sketch-scene"
           : page.runtimeType === "high-fidelity-react"
             ? "high-fidelity-react"
-            : undefined;
+            : page.runtimeType === "sandboxed-html"
+              ? "sandboxed-html"
+              : "invalid";
   }
   return result;
 }
@@ -273,21 +276,36 @@ async function readProjectThumbnailPages(
     const prototypeHtml = await readTextFile(
       path.join(pageDir, "prototype.html"),
     );
+    const sandboxHtml = await readTextFile(
+      path.join(pageDir, "sandbox.html"),
+    );
+    const htmlImportMeta = await readJsonFile<HtmlImportMeta>(
+      path.join(pageDir, "html-import.meta.json"),
+    );
     const prototypeCss =
       (await readTextFile(path.join(pageDir, "prototype.css"))) ?? "";
     const sketchScene = await readJsonFile<SketchSceneDocument>(
       path.join(pageDir, "sketch.scene.json"),
     );
-    const runtimeType =
-      runtimeTypes[entry.name] ??
-      (!code && sketchScene
-        ? "sketch-scene"
-        : !code && prototypeHtml
-          ? "prototype-html-css"
-          : "high-fidelity-react");
+    const declaredRuntimeType = runtimeTypes[entry.name];
+    if (declaredRuntimeType === "invalid") continue;
+    const detectedRuntimeTypes = [
+      code !== null ? "high-fidelity-react" : null,
+      prototypeHtml !== null ? "prototype-html-css" : null,
+      sandboxHtml !== null ? "sandboxed-html" : null,
+      sketchScene ? "sketch-scene" : null,
+    ].filter((value): value is DemoPageRuntimeType => value !== null);
+    if (detectedRuntimeTypes.length !== 1) continue;
+    const runtimeType = declaredRuntimeType ?? detectedRuntimeTypes[0];
+    if (runtimeType !== detectedRuntimeTypes[0]) continue;
     if (runtimeType === "high-fidelity-react" && !code) continue;
     if (runtimeType === "prototype-html-css" && !prototypeHtml) continue;
     if (runtimeType === "sketch-scene" && !sketchScene) continue;
+    if (
+      runtimeType === "sandboxed-html" &&
+      (!sandboxHtml || !htmlImportMeta)
+    )
+      continue;
 
     const schemaPath = path.join(pageDir, "config.schema.json");
     const pageDefaults = await readSchemaDefaults(schemaPath);
@@ -355,11 +373,18 @@ async function readProjectThumbnailPages(
                   path.join(pageDir, "sketch.meta.json"),
                 )) ?? undefined,
             }
-          : {
-              ...common,
-              runtimeType: "high-fidelity-react",
-              code: code ? resolveCodeImagePaths(code, imageMap) : "",
-            },
+          : runtimeType === "sandboxed-html"
+            ? {
+                ...common,
+                runtimeType: "sandboxed-html",
+                sandboxHtml: sandboxHtml!,
+                htmlImportMeta: htmlImportMeta as HtmlImportMeta,
+              }
+            : {
+                ...common,
+                runtimeType: "high-fidelity-react",
+                code: code ? resolveCodeImagePaths(code, imageMap) : "",
+              },
     );
   }
 

@@ -5,6 +5,7 @@ import type { CanvasState } from "@workbench/demo-ui";
 export type PublishedPageRuntimeType =
   | "prototype-html-css"
   | "high-fidelity-react"
+  | "sandboxed-html"
   | "sketch-scene";
 
 export interface PreviewSize {
@@ -36,7 +37,24 @@ export interface PublishedDemoPage {
   sketchMeta?: Record<string, unknown>;
   sketchScenePath?: string;
   sketchMetaPath?: string;
+  sandboxExecutionPath?: string;
+  htmlImportMeta?: {
+    source: "html-import";
+    analysisVersion: number;
+    sourceHash: string;
+    normalizedHash: string;
+    sandboxPolicyVersion: number;
+    viewport?: { width: number; height: number };
+  };
+  sandboxRendererVersion?: number;
   requirements?: string;
+}
+
+export interface PublishedHtmlExecution {
+  executionUrl: string;
+  channelId: string;
+  expiresAt: number;
+  sandboxPolicyVersion: number;
 }
 
 export interface PublishedDesignSpecMeta {
@@ -211,6 +229,35 @@ export function getPublishedFileUrl(
   filePath: string,
 ): string {
   return `${DATA_BASE}/data/${projectId}/${filePath}`;
+}
+
+export async function issuePublishedHtmlExecution(
+  executionPath: string,
+): Promise<PublishedHtmlExecution> {
+  if (!executionPath.startsWith("/api/projects/")) {
+    throw new Error("发布 HTML execution 路径不合法");
+  }
+  const response = await fetch(`${DATA_BASE}${executionPath}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`HTML execution 签发失败: ${response.status}`);
+  const payload = await response.json() as {
+    success?: boolean;
+    data?: Partial<PublishedHtmlExecution>;
+    error?: { message?: string };
+  };
+  if (
+    !payload.success ||
+    typeof payload.data?.executionUrl !== "string" ||
+    typeof payload.data.channelId !== "string" ||
+    typeof payload.data.expiresAt !== "number" ||
+    typeof payload.data.sandboxPolicyVersion !== "number"
+  ) {
+    throw new Error(payload.error?.message ?? "HTML execution 响应不合法");
+  }
+  return payload.data as PublishedHtmlExecution;
 }
 
 let authToken: string | null = null;

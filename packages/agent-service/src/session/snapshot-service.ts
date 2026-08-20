@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import type { SnapshotInfo, CompareResult, FileChangeInfo } from '@workbench/shared/contracts';
 import { logger } from '../utils/logger';
 
@@ -11,6 +11,21 @@ interface SnapshotData {
 
 export class SnapshotService {
   private snapshots: Map<string, SnapshotData> = new Map();
+
+  private resolveWorkspaceFilePath(workingDir: string, filePath: string): string {
+    const workspaceRoot = path.resolve(workingDir);
+    const fullPath = path.resolve(workspaceRoot, filePath);
+    const relativePath = path.relative(workspaceRoot, fullPath);
+    if (
+      !relativePath ||
+      relativePath === '..' ||
+      relativePath.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(relativePath)
+    ) {
+      throw new Error(`File path must stay within the workspace: ${filePath}`);
+    }
+    return fullPath;
+  }
 
   async init(workingDir: string): Promise<SnapshotInfo> {
     const isGitRepo = this.isGitRepository(workingDir);
@@ -36,7 +51,7 @@ export class SnapshotService {
 
   private isGitRepository(workingDir: string): boolean {
     try {
-      execSync('git rev-parse --git-dir', { cwd: workingDir, stdio: 'pipe' });
+      execFileSync('git', ['rev-parse', '--git-dir'], { cwd: workingDir, stdio: 'pipe' });
       return true;
     } catch {
       return false;
@@ -45,7 +60,7 @@ export class SnapshotService {
 
   private getCurrentBranch(workingDir: string): string | null {
     try {
-      const branch = execSync('git rev-parse --abbrev-ref HEAD', {
+      const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
         cwd: workingDir,
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -124,17 +139,23 @@ export class SnapshotService {
     const unstaged: FileChangeInfo[] = [];
 
     try {
-      const statusOutput = execSync('git status --porcelain', {
+      const statusOutput = execFileSync('git', ['status', '--porcelain=v1', '-z'], {
         cwd: workingDir,
         encoding: 'utf-8',
       });
 
-      const lines = statusOutput.split('\n').filter(Boolean);
-
-      for (const line of lines) {
-        const indexStatus = line[0];
-        const workTreeStatus = line[1];
-        const filePath = line.substring(3);
+      const records = statusOutput.split('\0');
+      for (let index = 0; index < records.length - 1; index += 1) {
+        const record = records[index];
+        if (!record) continue;
+        const indexStatus = record[0];
+        const workTreeStatus = record[1];
+        const filePath = record.substring(3);
+        // With -z, rename/copy entries carry the old path in the following
+        // NUL-delimited record. The new path is the actionable path.
+        if (indexStatus === 'R' || indexStatus === 'C' || workTreeStatus === 'R' || workTreeStatus === 'C') {
+          index += 1;
+        }
 
         if (indexStatus !== ' ' && indexStatus !== '?') {
           staged.push({
@@ -231,7 +252,7 @@ export class SnapshotService {
 
     if (isGitRepo) {
       try {
-        const content = execSync(`git show HEAD:"${filePath}"`, {
+        const content = execFileSync('git', ['show', `HEAD:${filePath}`], {
           cwd: workingDir,
           encoding: 'utf-8',
           stdio: ['pipe', 'pipe', 'pipe'],
@@ -256,7 +277,7 @@ export class SnapshotService {
 
     if (isGitRepo) {
       try {
-        execSync(`git add "${filePath}"`, { cwd: workingDir });
+        execFileSync('git', ['add', '--', filePath], { cwd: workingDir });
         logger.debug({ workingDir, filePath }, 'File staged with git');
       } catch (error) {
         logger.error({ error, workingDir, filePath }, 'Failed to stage file with git');
@@ -270,7 +291,7 @@ export class SnapshotService {
 
     if (isGitRepo) {
       try {
-        execSync('git add -A', { cwd: workingDir });
+        execFileSync('git', ['add', '-A'], { cwd: workingDir });
         logger.debug({ workingDir }, 'All files staged with git');
       } catch (error) {
         logger.error({ error, workingDir }, 'Failed to stage all files with git');
@@ -284,7 +305,7 @@ export class SnapshotService {
 
     if (isGitRepo) {
       try {
-        execSync(`git reset HEAD "${filePath}"`, { cwd: workingDir });
+        execFileSync('git', ['reset', 'HEAD', '--', filePath], { cwd: workingDir });
         logger.debug({ workingDir, filePath }, 'File unstaged with git');
       } catch (error) {
         logger.error({ error, workingDir, filePath }, 'Failed to unstage file with git');
@@ -295,14 +316,14 @@ export class SnapshotService {
 
   async discardFile(workingDir: string, filePath: string, operation: 'create' | 'modify' | 'delete'): Promise<void> {
     const isGitRepo = this.isGitRepository(workingDir);
-    const fullPath = path.join(workingDir, filePath);
+    const fullPath = this.resolveWorkspaceFilePath(workingDir, filePath);
 
     if (isGitRepo) {
       try {
         if (operation === 'create') {
           await fs.promises.rm(fullPath, { force: true });
         } else {
-          execSync(`git checkout HEAD -- "${filePath}"`, { cwd: workingDir });
+          execFileSync('git', ['checkout', 'HEAD', '--', filePath], { cwd: workingDir });
         }
         logger.debug({ workingDir, filePath, operation }, 'File discarded with git');
       } catch (error) {

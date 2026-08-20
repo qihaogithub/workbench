@@ -6,6 +6,17 @@ import type {
 } from "./workspace";
 
 export type { DemoPageRuntimeType } from "./workspace";
+export {
+  PAGE_RUNTIME_CAPABILITIES,
+  PageRuntimeCapabilityError,
+  getPageRuntimeCapabilities,
+  isDemoPageRuntimeType,
+} from "./page-runtime-capabilities";
+export type {
+  PageRuntimeCapabilities,
+  PageRuntimeRendererId,
+  PageRuntimeSourceKind,
+} from "./page-runtime-capabilities";
 export type {
   CanonicalSyncedRevision,
   ProjectBaseVersion,
@@ -66,6 +77,17 @@ export type {
   PageRequirementRef,
   ResolvedPageRequirementRef,
 } from "./demo/page-requirements";
+export {
+  applySchemaDefinitionCommand,
+  readConfigDefinitionFields,
+} from "./demo/config-schema-definition";
+export type {
+  ConfigDefinitionDraft,
+  ConfigDefinitionKind,
+  SchemaDefinitionCommand,
+  SchemaDefinitionDiff,
+  SchemaDefinitionMutation,
+} from "./demo/config-schema-definition";
 
 export interface PrototypePageMeta {
   width?: number;
@@ -73,6 +95,15 @@ export interface PrototypePageMeta {
   generatedBy?: string;
   updatedAt?: number;
   [key: string]: unknown;
+}
+
+export interface HtmlImportMeta {
+  source: string;
+  analysisVersion: number;
+  sourceHash: string;
+  normalizedHash: string;
+  sandboxPolicyVersion: number;
+  viewport?: { width?: number; height?: number };
 }
 
 export interface DemoMeta {
@@ -128,6 +159,8 @@ export interface DemoFiles {
   prototypeHtml?: string;
   prototypeCss?: string;
   prototypeMeta?: PrototypePageMeta;
+  sandboxHtml?: string;
+  htmlImportMeta?: HtmlImportMeta;
   sketchScene?: string;
   sketchMeta?: Record<string, unknown>;
   configValues?: Record<string, unknown>;
@@ -155,6 +188,12 @@ export interface PrototypeHtmlCssPageSnapshotInput extends PageSnapshotBaseInput
   prototypeMeta?: PrototypePageMeta;
 }
 
+export interface SandboxedHtmlPageSnapshotInput extends PageSnapshotBaseInput {
+  runtimeType: "sandboxed-html";
+  sandboxHtml: string;
+  htmlImportMeta: HtmlImportMeta;
+}
+
 export interface SketchScenePageSnapshotInput extends PageSnapshotBaseInput {
   runtimeType: "sketch-scene";
   sketchScene: import("./demo/sketch-scene").SketchSceneDocument;
@@ -164,6 +203,7 @@ export interface SketchScenePageSnapshotInput extends PageSnapshotBaseInput {
 export type PageSnapshotInput =
   | HighFidelityReactPageSnapshotInput
   | PrototypeHtmlCssPageSnapshotInput
+  | SandboxedHtmlPageSnapshotInput
   | SketchScenePageSnapshotInput;
 
 /**
@@ -205,6 +245,8 @@ export type CollabResourceKind =
   | "page-code"
   | "page-prototype-html"
   | "page-prototype-css"
+  | "page-sandbox-html"
+  | "page-html-import-meta"
   | "page-schema"
   | "page-sketch-scene"
   | "project-schema"
@@ -292,12 +334,25 @@ export const ErrorCode = {
   UNPUBLISH_FAILED: "UNPUBLISH_FAILED",
   PUBLISH_FAILED: "PUBLISH_FAILED",
   PUBLISH_COMPILE_FAILED: "PUBLISH_COMPILE_FAILED",
+  PUBLISH_RUNTIME_UNSUPPORTED: "PUBLISH_RUNTIME_UNSUPPORTED",
+  SANDBOX_ORIGIN_NOT_CONFIGURED: "SANDBOX_ORIGIN_NOT_CONFIGURED",
+  SANDBOX_MANIFEST_INVALID: "SANDBOX_MANIFEST_INVALID",
   IMAGE_LOCALIZATION_FAILED: "IMAGE_LOCALIZATION_FAILED",
   ARCHIVE_INVALID: "ARCHIVE_INVALID",
   IMPORT_PROJECT_MISMATCH: "IMPORT_PROJECT_MISMATCH",
   IMPORT_WRITE_FAILED: "IMPORT_WRITE_FAILED",
   PROJECT_EXPORT_FAILED: "PROJECT_EXPORT_FAILED",
   PROJECT_IMPORT_FAILED: "PROJECT_IMPORT_FAILED",
+  HTML_IMPORT_INVALID: "HTML_IMPORT_INVALID",
+  HTML_IMPORT_TOO_LARGE: "HTML_IMPORT_TOO_LARGE",
+  HTML_IMPORT_EXTERNAL_RESOURCE_UNSUPPORTED:
+    "HTML_IMPORT_EXTERNAL_RESOURCE_UNSUPPORTED",
+  HTML_IMPORT_EMBED_UNSUPPORTED: "HTML_IMPORT_EMBED_UNSUPPORTED",
+  HTML_IMPORT_CAPABILITY_RESTRICTED: "HTML_IMPORT_CAPABILITY_RESTRICTED",
+  HTML_IMPORT_INTERACTIVE_NOT_YET_SUPPORTED:
+    "HTML_IMPORT_INTERACTIVE_NOT_YET_SUPPORTED",
+  HTML_IMPORT_RUNTIME_MISMATCH: "HTML_IMPORT_RUNTIME_MISMATCH",
+  HTML_RUNTIME_FAILED: "HTML_RUNTIME_FAILED",
 } as const;
 
 export type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -335,12 +390,24 @@ export const ERROR_MESSAGES: Record<ErrorCodeType, string> = {
   UNPUBLISH_FAILED: "撤销发布失败",
   PUBLISH_FAILED: "发布失败",
   PUBLISH_COMPILE_FAILED: "发布失败：页面编译错误",
+  PUBLISH_RUNTIME_UNSUPPORTED: "页面运行时不支持发布",
+  SANDBOX_ORIGIN_NOT_CONFIGURED: "HTML 隔离运行域未配置",
+  SANDBOX_MANIFEST_INVALID: "HTML 隔离运行清单无效",
   IMAGE_LOCALIZATION_FAILED: "发布图片资源本地化失败",
   ARCHIVE_INVALID: "项目归档无效",
   IMPORT_PROJECT_MISMATCH: "归档项目与目标项目不匹配",
   IMPORT_WRITE_FAILED: "导入项目写入失败",
   PROJECT_EXPORT_FAILED: "导出项目失败",
   PROJECT_IMPORT_FAILED: "导入项目失败",
+  HTML_IMPORT_INVALID: "无法读取有效 HTML",
+  HTML_IMPORT_TOO_LARGE: "HTML 文件过大，请压缩后重试",
+  HTML_IMPORT_EXTERNAL_RESOURCE_UNSUPPORTED: "当前仅支持自包含的单文件资源",
+  HTML_IMPORT_EMBED_UNSUPPORTED: "当前不支持页面内嵌第三方内容",
+  HTML_IMPORT_CAPABILITY_RESTRICTED: "页面依赖当前不支持的浏览器能力",
+  HTML_IMPORT_INTERACTIVE_NOT_YET_SUPPORTED:
+    "交互 HTML 将在隔离运行时启用后支持",
+  HTML_IMPORT_RUNTIME_MISMATCH: "HTML 产物与页面运行时不匹配",
+  HTML_RUNTIME_FAILED: "HTML 交互预览运行失败",
 };
 
 export * from "./workspace";

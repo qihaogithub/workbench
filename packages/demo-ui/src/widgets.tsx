@@ -32,56 +32,19 @@ function getImageDimensions(file: File): Promise<{ width: number; height: number
 }
 
 interface DimensionOptions {
-  minWidth?: number;
-  minHeight?: number;
-  maxWidth?: number;
-  maxHeight?: number;
-  widthOperator?: string;
-  widthValue?: number;
-  heightOperator?: string;
-  heightValue?: number;
+  widthRule?: { operator: "=" | ">" | "≥" | "<" | "≤"; value: number };
+  heightRule?: { operator: "=" | ">" | "≥" | "<" | "≤"; value: number };
 }
 
 function validateImageDimensions(
   actual: { width: number; height: number },
   options: DimensionOptions
 ): { valid: boolean; message: string } {
-  const { minWidth, minHeight, maxWidth, maxHeight } = options;
   const parts: string[] = [];
-
-  if (minWidth && maxWidth && minWidth === maxWidth) {
-    if (actual.width !== minWidth) parts.push(`宽度=${minWidth}px`);
-  } else {
-    if (minWidth && actual.width < minWidth) parts.push(`宽度≥${minWidth}px`);
-    if (maxWidth && actual.width > maxWidth) parts.push(`宽度≤${maxWidth}px`);
-  }
-
-  if (minHeight && maxHeight && minHeight === maxHeight) {
-    if (actual.height !== minHeight) parts.push(`高度=${minHeight}px`);
-  } else {
-    if (minHeight && actual.height < minHeight) parts.push(`高度≥${minHeight}px`);
-    if (maxHeight && actual.height > maxHeight) parts.push(`高度≤${maxHeight}px`);
-  }
-
-  if (options.widthOperator && typeof options.widthValue === 'number') {
-    const w = actual.width;
-    const v = options.widthValue;
-    if (options.widthOperator === '>' && !(w > v)) parts.push(`宽度>${v}px`);
-    else if (options.widthOperator === '<' && !(w < v)) parts.push(`宽度<${v}px`);
-    else if (options.widthOperator === '=' && w !== v) parts.push(`宽度=${v}px`);
-    else if (options.widthOperator === '≥' && !(w >= v)) parts.push(`宽度≥${v}px`);
-    else if (options.widthOperator === '≤' && !(w <= v)) parts.push(`宽度≤${v}px`);
-  }
-
-  if (options.heightOperator && typeof options.heightValue === 'number') {
-    const h = actual.height;
-    const v = options.heightValue;
-    if (options.heightOperator === '>' && !(h > v)) parts.push(`高度>${v}px`);
-    else if (options.heightOperator === '<' && !(h < v)) parts.push(`高度<${v}px`);
-    else if (options.heightOperator === '=' && h !== v) parts.push(`高度=${v}px`);
-    else if (options.heightOperator === '≥' && !(h >= v)) parts.push(`高度≥${v}px`);
-    else if (options.heightOperator === '≤' && !(h <= v)) parts.push(`高度≤${v}px`);
-  }
+  const matches = (actualValue: number, rule: DimensionOptions["widthRule"]) => !rule
+    || ({ "=": actualValue === rule.value, ">": actualValue > rule.value, "≥": actualValue >= rule.value, "<": actualValue < rule.value, "≤": actualValue <= rule.value }[rule.operator]);
+  if (!matches(actual.width, options.widthRule) && options.widthRule) parts.push(`宽度${options.widthRule.operator}${options.widthRule.value}px`);
+  if (!matches(actual.height, options.heightRule) && options.heightRule) parts.push(`高度${options.heightRule.operator}${options.heightRule.value}px`);
 
   if (parts.length === 0) return { valid: true, message: '' };
   return {
@@ -134,14 +97,8 @@ export interface FileUploadWidgetOptions {
   accept?: string;
   maxSize?: number;
   placeholder?: string;
-  minWidth?: number;
-  minHeight?: number;
-  maxWidth?: number;
-  maxHeight?: number;
-  widthOperator?: ">" | "=" | "<" | "≥" | "≤";
-  widthValue?: number;
-  heightOperator?: ">" | "=" | "<" | "≥" | "≤";
-  heightValue?: number;
+  widthRule?: DimensionOptions["widthRule"];
+  heightRule?: DimensionOptions["heightRule"];
 }
 
 export interface SpineBundle {
@@ -189,21 +146,11 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
   const maxSize = rawOptions.maxSize || 50 * 1024 * 1024;
 
   const dimensionOptions: DimensionOptions = {
-    minWidth: rawOptions.minWidth,
-    minHeight: rawOptions.minHeight,
-    maxWidth: rawOptions.maxWidth,
-    maxHeight: rawOptions.maxHeight,
-    widthOperator: rawOptions.widthOperator,
-    widthValue: rawOptions.widthValue,
-    heightOperator: rawOptions.heightOperator,
-    heightValue: rawOptions.heightValue,
+    widthRule: rawOptions.widthRule,
+    heightRule: rawOptions.heightRule,
   };
 
-  const hasDimensionCheck = Object.values(dimensionOptions).some((v) => typeof v === 'number') ||
-    Object.values({
-      wo: dimensionOptions.widthOperator,
-      ho: dimensionOptions.heightOperator,
-    }).some((v) => typeof v === 'string' && v.length > 0);
+  const hasDimensionCheck = Object.values(dimensionOptions).some((rule) => !!rule);
 
   const doUpload = useCallback(
     async (file: File, skipDimensionCheck = false) => {

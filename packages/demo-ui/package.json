@@ -13,6 +13,8 @@
     "./preview-stage-types": "./src/preview-stage-types.ts",
     "./config-categories": "./src/config-categories.ts",
     "./config-binding-utils": "./src/config-binding-utils.ts",
+    "./ConfigDefinitionManagerDialog": "./src/ConfigDefinitionManagerDialog.tsx",
+    "./ConfigItemEditorDialog": "./src/ConfigItemEditorDialog.tsx",
     "./compile-cache": "./src/compile-cache.ts",
     "./validator": "./src/validator.ts",
     "./DocumentEditor": "./src/DocumentEditor.tsx",

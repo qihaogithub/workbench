@@ -247,6 +247,9 @@ corepack pnpm diagnostics:autosave -- --project "project-1" --since 24h
 corepack pnpm diagnostics:collab -- --workspace "workspace-1"
 corepack pnpm diagnostics:preview -- --project "project-1"
 
+# 查看 sandbox HTML 的 runtime / policy / renderer / timeout / recovery 摘要
+corepack pnpm diagnostics:preview -- --project "project-1" --format text
+
 # 导出 JSON 复现包
 corepack pnpm diagnostics:export -- --project "project-1" --since 24h --output diagnostics-export.json
 
@@ -257,6 +260,8 @@ OPS_CLI_REMOTE_PASSWORD="***" corepack pnpm diagnostics:autosave -- \
   --project "project-1" \
   --since 24h
 ```
+
+`preview.sandbox_*` 事件在 JSON 结果的 `sandbox` 字段聚合展示执行次数、runtime 类型、策略版本、renderer、失败码、被阻断请求数、超时分位数及 context/browser recovery。text 输出只显示这些摘要；执行票据、channel 和 HTML/CSS/JS 源码不会进入诊断输出。
 
 根目录提供稳定别名：
 

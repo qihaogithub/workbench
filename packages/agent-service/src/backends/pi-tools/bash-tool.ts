@@ -55,27 +55,13 @@ export function createBashTool(config: AgentConfig): AgentTool<typeof BashParams
     ) => {
       const command = args.command.trim();
 
-      const permResult = getCommandPermissionResult(command, permissions);
-      if (!permResult.allowed) {
-        const baseCommand = permResult.baseCommand || command.split(/\s+/)[0] || '';
-        const detail = permResult.reason === 'node_eval_blocked'
-          ? `"node -e" and "node --eval" are blocked for security reasons. Use readFile/writeFile/editFile tools instead.`
-          : permResult.reason === 'npm_npx_blocked'
-            ? `"npm" and "npx" are not allowed in the workspace sandbox.`
-            : permResult.reason === 'denied_command'
-              ? `command "${baseCommand}" is in the denied list.`
-              : `command "${baseCommand}" is not in the allowed list.`;
-        logger.warn({ command: baseCommand, reason: permResult.reason }, 'Command not allowed by permissions');
-        return {
-          content: [{ type: 'text', text: `Error: ${detail} ${permDesc}` }],
-          details: { command, error: 'permission denied', reason: permResult.reason },
-          isError: true,
-        };
-      }
-
       const liveWorkspace = config.workingDir
         ? resolveLiveWorkspaceMutationContext(config.workingDir)
         : null;
+
+      // Keep the live-workspace error stable for all commands that are
+      // forbidden by the Authority guard, including shell syntax rejected by
+      // the general command parser below.
       if (liveWorkspace && !isLiveWorkspaceReadOnlyCommandAllowed(command, permissions)) {
         const baseCommand = command.split(/\s+/)[0] || '';
         logger.warn({ command: baseCommand, workspaceId: liveWorkspace.workspaceId }, 'Live Workspace bash command blocked by Authority guard');
@@ -87,6 +73,34 @@ export function createBashTool(config: AgentConfig): AgentTool<typeof BashParams
             workspaceId: liveWorkspace.workspaceId,
             projectId: liveWorkspace.projectId,
           },
+          isError: true,
+        };
+      }
+
+      const permResult = getCommandPermissionResult(command, permissions);
+      if (!permResult.allowed) {
+        const baseCommand = permResult.baseCommand || command.split(/\s+/)[0] || '';
+        let detail: string;
+        switch (permResult.reason) {
+          case 'node_eval_blocked':
+            detail = 'Node eval/print flags are blocked for security reasons. Use readFile/writeFile/editFile tools instead.';
+            break;
+          case 'npm_npx_blocked':
+            detail = '"npm" and "npx" are not allowed in the workspace sandbox.';
+            break;
+          case 'denied_command':
+            detail = `command "${baseCommand}" is in the denied list.`;
+            break;
+          case 'shell_syntax_blocked':
+            detail = 'shell composition, redirection, command substitution, and newline syntax are not allowed.';
+            break;
+          default:
+            detail = `command "${baseCommand}" is not in the allowed list.`;
+        }
+        logger.warn({ command: baseCommand, reason: permResult.reason }, 'Command not allowed by permissions');
+        return {
+          content: [{ type: 'text', text: `Error: ${detail} ${permDesc}` }],
+          details: { command, error: 'permission denied', reason: permResult.reason },
           isError: true,
         };
       }

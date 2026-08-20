@@ -26,6 +26,8 @@ const RESOURCE_KINDS: CollabResourceKind[] = [
   "page-code",
   "page-prototype-html",
   "page-prototype-css",
+  "page-sandbox-html",
+  "page-html-import-meta",
   "page-schema",
   "page-sketch-scene",
   "project-schema",

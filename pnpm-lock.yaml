@@ -458,6 +458,9 @@ importers:
       '@workbench/project-scaffold':
         specifier: workspace:*
         version: link:../project-scaffold
+      '@workbench/prototype-core':
+        specifier: workspace:*
+        version: link:../prototype-core
       '@workbench/shared':
         specifier: workspace:*
         version: link:../shared
@@ -704,6 +707,22 @@ importers:
         specifier: ^2.1.9
         version: 2.1.9(jsdom@26.1.0)
 
+  packages/editable-snapshot-core:
+    dependencies:
+      parse5:
+        specifier: 7.3.0
+        version: 7.3.0
+    devDependencies:
+      '@types/node':
+        specifier: 20.19.37
+        version: 20.19.37
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 2.1.9
+        version: 2.1.9(@types/node@20.19.37)
+
   packages/knowledge-core:
     devDependencies:
       typescript:
@@ -805,6 +824,9 @@ importers:
       '@workbench/sketch-core':
         specifier: workspace:*
         version: link:../sketch-core
+      parse5:
+        specifier: 7.3.0
+        version: 7.3.0
       tar:
         specifier: ^7.4.3
         version: 7.5.20
@@ -835,6 +857,22 @@ importers:
         specifier: ^5.3.3
         version: 5.9.3
 
+  packages/prototype-core:
+    dependencies:
+      parse5:
+        specifier: 7.3.0
+        version: 7.3.0
+    devDependencies:
+      '@types/node':
+        specifier: 20.19.37
+        version: 20.19.37
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 2.1.9
+        version: 2.1.9(@types/node@20.19.37)
+
   packages/screenshot-service:
     dependencies:
       '@fastify/cors':
@@ -843,6 +881,9 @@ importers:
       '@fastify/rate-limit':
         specifier: ^9.0.0
         version: 9.1.0
+      '@workbench/project-core':
+        specifier: workspace:*
+        version: link:../project-core
       '@workbench/shared':
         specifier: workspace:*
         version: link:../shared
@@ -1126,6 +1167,34 @@ importers:
       vitest:
         specifier: ^1.6.1
         version: 1.6.1(@types/node@20.19.37)
+
+  tools/page-export-extension:
+    dependencies:
+      '@workbench/editable-snapshot-core':
+        specifier: workspace:*
+        version: link:../../packages/editable-snapshot-core
+      html2canvas:
+        specifier: 1.4.1
+        version: 1.4.1
+      prettier:
+        specifier: 3.6.2
+        version: 3.6.2
+      single-file-cli:
+        specifier: 2.0.83
+        version: 2.0.83
+    devDependencies:
+      esbuild:
+        specifier: ^0.20.2
+        version: 0.20.2
+      playwright:
+        specifier: 1.59.1
+        version: 1.59.1
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 2.1.9
+        version: 2.1.9(jsdom@26.1.0)
 
 packages:
 
@@ -8263,6 +8332,11 @@ packages:
       bare-path: 3.0.1
     dev: false
 
+  /base64-arraybuffer@1.0.2:
+    resolution: {integrity: sha512-I3yl4r9QB5ZRY3XuJVEPfc2XhZO6YweFPI+UovAzn+8/hb3oJ6lnysaFcjVpkCPfVWFUDvoZ8kmVDP7WyRtYtQ==}
+    engines: {node: '>= 0.6.0'}
+    dev: false
+
   /base64-js@1.5.1:
     resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
     dev: false
@@ -8786,6 +8860,12 @@ packages:
     peerDependenciesMeta:
       srvx:
         optional: true
+    dev: false
+
+  /css-line-break@2.1.0:
+    resolution: {integrity: sha512-FHcKFCZcAha3LwfVBhCQbW2nCNbkZXn7KVUJcsT5/P8YmfsVja0FMPJr0B903j/E69HUphKiV9iQArX8SDYA4w==}
+    dependencies:
+      utrie: 1.0.2
     dev: false
 
   /css.escape@1.5.1:
@@ -11050,6 +11130,14 @@ packages:
 
   /html-void-elements@3.0.0:
     resolution: {integrity: sha512-bEqo66MRXsUGxWHV5IP0PUiAWwoEjba4VCzg0LjFJBpchPaTfyfCKTG6bc5F8ucKec3q5y6qOdGyYTSBEvhCrg==}
+    dev: false
+
+  /html2canvas@1.4.1:
+    resolution: {integrity: sha512-fPU6BHNpsyIhr8yyMpTLLxAbkaK8ArIBcmZIRiBLiDhjeqvXolaEmDGmELFuX9I4xDcaKKcJl+TKZLqruBbmWA==}
+    engines: {node: '>=8.0.0'}
+    dependencies:
+      css-line-break: 2.1.0
+      text-segmentation: 1.0.3
     dev: false
 
   /http-proxy-agent@7.0.2:
@@ -14029,7 +14117,6 @@ packages:
       nanoid: 3.3.18
       picocolors: 1.1.1
       source-map-js: 1.2.1
-    dev: false
 
   /postcss@8.5.8:
     resolution: {integrity: sha512-OW/rX8O/jXnm82Ey1k44pObPtdblfiuWnrd8X7GJ7emImCOstunGbXUpp7HdBrFQX6rJzn3sPT397Wp5aCwCHg==}
@@ -14064,6 +14151,12 @@ packages:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
     engines: {node: '>= 0.8.0'}
     dev: true
+
+  /prettier@3.6.2:
+    resolution: {integrity: sha512-I7AIg5boAr5R0FFtJ6rCfD+LFsWHp81dolrFD8S79U9tb8Az2nGrJncnMSnys+bpQJfRUzqs9hnA81OAA3hCuQ==}
+    engines: {node: '>=14'}
+    hasBin: true
+    dev: false
 
   /pretty-format@27.5.1:
     resolution: {integrity: sha512-Qb1gy5OrP5+zDf2Bvnzdl3jsTf1qXVMazbvCoKhtKqVs4/YK4ozX4gKQJJVyNe+cajNPn0KoC0MC3FUmaHWEmQ==}
@@ -15188,7 +15281,6 @@ packages:
   /simple-cdp@1.10.0:
     resolution: {integrity: sha512-UXDAaiges1GqNKtBy39po+CD4hXDJxQEDtR1GF9bK2J9MNN0epTo2GpoSmEc8o5ofW8dutpHafBjowEchSNgig==}
     engines: {bun: '>=1.0', deno: '>=1.4'}
-    dev: true
 
   /simple-concat@1.0.1:
     resolution: {integrity: sha512-cSFtAPtRhljv69IK0hTVZQ+OfE9nePi/rtJmw5UjHeVyVroEqJXP1sFztKUy1qU+xvz3u/sfYJLa947b7nAN2Q==}
@@ -15218,7 +15310,6 @@ packages:
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
-    dev: true
 
   /slash@3.0.0:
     resolution: {integrity: sha512-g9Q1haeby36OSStwb4ntCGGGaKsaVSjQ68fBxoQcutl5fS1vuY18H3wSt3jFyFtrkx+Kz0V1G85A4MyAdDMi2Q==}
@@ -15799,6 +15890,12 @@ packages:
       b4a: 1.8.1
     transitivePeerDependencies:
       - react-native-b4a
+    dev: false
+
+  /text-segmentation@1.0.3:
+    resolution: {integrity: sha512-iOiPUo/BGnZ6+54OsWxZidGCsdU8YbE4PSpdPinp7DeMtUJNJBoJ/ouUSTJjHkh1KntHaltHl/gDs2FC4i5+Nw==}
+    dependencies:
+      utrie: 1.0.2
     dev: false
 
   /text-table@0.2.0:
@@ -16400,6 +16497,12 @@ packages:
       unescape: 1.0.1
     dev: false
 
+  /utrie@1.0.2:
+    resolution: {integrity: sha512-1MLa5ouZiOmQzUbjbu9VmjLzn1QLXBhwpUa7kdLUQK+KQ5KA9I1vk5U4YHe/X2Ch7PYnJfWuWT+VbuxbGwljhw==}
+    dependencies:
+      base64-arraybuffer: 1.0.2
+    dev: false
+
   /uuid@11.1.0:
     resolution: {integrity: sha512-0/A9rDy9P7cJ+8w1c9WD9V//9Wj15Ce2MPz8Ri6032usz+NfePxx5AcN3bN+r6ZL6jEo066/yNYB3tn4pQEx+A==}
     hasBin: true
@@ -16516,7 +16619,7 @@ packages:
     dependencies:
       '@types/node': 20.19.37
       esbuild: 0.21.5
-      postcss: 8.5.8
+      postcss: 8.5.26
       rollup: 4.60.1
     optionalDependencies:
       fsevents: 2.3.3

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Editable Snapshot</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <header><span class="eyebrow">WORKBENCH</span><h1>高保真页面快照</h1><p>捕获当前标签及已准备好的可见状态，生成 Agent 可编辑工程。</p></header>
+      <form id="capture-form">
+        <section class="permission" aria-live="polite"><strong id="permission-status">正在检查当前站点权限…</strong><button id="grant-permission" type="button" class="secondary">授权当前站点（可选）</button><span id="permission-detail">拒绝后仍可使用 activeTab 降级捕获，但页面加载前状态和部分跨域 iframe 可能无法还原。</span></section>
+        <label>Route key<input id="route-key" required placeholder="/dashboard"></label>
+        <label>项目键（可选）<input id="project-key" placeholder="author-site"></label>
+        <label>页面状态备注（可选）<textarea id="page-note" rows="3" placeholder="已展开筛选器，滚动到第二屏"></textarea></label>
+        <aside><strong>安全提示</strong><span>产物保留脚本和 iframe，可能包含页面 DOM 中已有的敏感信息。仅在隔离预览中打开。</span></aside>
+        <div class="actions"><button id="capture" type="submit">捕获并下载</button><button id="cancel" type="button" class="secondary" hidden>取消</button></div>
+      </form>
+      <section aria-live="polite"><div class="status-row"><span id="status">准备捕获当前标签页</span><span id="detail"></span></div><progress id="progress" max="100" value="0"></progress><pre id="review" hidden></pre><button id="approve-download" type="button" hidden>确认风险并下载 ZIP</button></section>
+      <footer>内部技术原型 · SingleFile AGPL-3.0 · 禁止商店分发</footer>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

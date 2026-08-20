@@ -48,7 +48,7 @@ export function buildConfigPool(
         value: field.default,
         category: field.category,
         format: inferFormat(field),
-        size: resolveImageSize(field.default, kind, options),
+        size: resolveImageSize(field, kind, options),
         // 项目级配置项拆分到各受影响页面（真实 schema 无 usage 信息，默认归入全部页面）
         pages: pageNames.length ? pageNames : undefined,
       });
@@ -69,7 +69,7 @@ export function buildConfigPool(
         value: field.default,
         category: field.category,
         format: inferFormat(field),
-        size: resolveImageSize(field.default, kind, options),
+        size: resolveImageSize(field, kind, options),
       });
     }
   }
@@ -78,12 +78,27 @@ export function buildConfigPool(
 }
 
 function resolveImageSize(
-  value: unknown,
+  field: FlatField,
   kind: ConfigPoolItemKind,
   options: ConfigPoolBuildOptions,
 ): ConfigPoolItem["size"] | undefined {
-  if (kind !== "image" || typeof value !== "string") return undefined;
-  const size = options.resolveImageSize?.(value);
+  if (kind !== "image") return undefined;
+
+  const widthRule = readImageRule(field.uiOptions?.widthRule);
+  const heightRule = readImageRule(field.uiOptions?.heightRule);
+  if (widthRule || heightRule) {
+    return {
+      w: widthRule ? String(widthRule.value) : "",
+      h: heightRule ? String(heightRule.value) : "",
+      wOperator: widthRule?.operator,
+      hOperator: heightRule?.operator,
+      wAny: !widthRule,
+      hAny: !heightRule,
+    };
+  }
+
+  if (typeof field.default !== "string") return undefined;
+  const size = options.resolveImageSize?.(field.default);
   if (!size || !isPositivePixel(size.width) || !isPositivePixel(size.height)) {
     return undefined;
   }
@@ -102,6 +117,7 @@ type FlatField = {
   uiWidget?: string;
   default?: unknown;
   category?: string;
+  uiOptions?: Record<string, unknown>;
 };
 
 /** 展平 schema 顶层字段（parseSchemaToFields 已按分组返回） */
@@ -119,6 +135,7 @@ function flattenFields(schema: string): FlatField[] {
         uiWidget: field.uiWidget,
         default: field.default,
         category: field.category,
+        uiOptions: field.uiOptions,
       });
     }
   }
@@ -168,11 +185,24 @@ function inferKind(field: FlatField): ConfigPoolItemKind {
 function inferFormat(field: FlatField): string | undefined {
   const kind = inferKind(field);
   if (kind === "image") {
-    if (typeof field.default === "string") {
-      const ext = field.default.split(".").pop()?.toUpperCase();
-      if (ext && ext.length >= 2 && ext.length <= 5) return ext;
-    }
+    const accept = typeof field.uiOptions?.accept === "string"
+      ? field.uiOptions.accept.trim()
+      : "";
+    if (!accept || accept === "image/*" || accept === "*/*") return "不限";
+    const labels = accept.split(",").map((item) => item.trim()).filter(Boolean).map((item) => {
+      const raw = item.includes("/") ? item.split("/").pop() ?? item : item.replace(/^\./, "");
+      return raw.toLowerCase() === "jpeg" ? "jpg" : raw.toLowerCase();
+    });
+    return Array.from(new Set(labels)).join("/") || "不限";
   }
   if (field.format) return field.format.toUpperCase();
   return undefined;
+}
+
+function readImageRule(value: unknown): { operator: string; value: number } | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const rule = value as Record<string, unknown>;
+  return typeof rule.operator === "string" && typeof rule.value === "number" && Number.isFinite(rule.value)
+    ? { operator: rule.operator, value: rule.value }
+    : undefined;
 }

@@ -337,6 +337,10 @@ export function CanvasPagePreviewContent({
       renderMode === "sleeping-iframe") &&
     !!page.snapshotHtml &&
     page.snapshotQuality !== "failed";
+  const shouldRenderSandboxPlaceholder =
+    resolvedRenderer === "sandbox-html" &&
+    !screenshotUrl &&
+    !shouldRenderSnapshot;
   const shouldRenderScreenshot =
     !shouldRenderSnapshot &&
     !!screenshotUrl &&
@@ -390,6 +394,12 @@ export function CanvasPagePreviewContent({
               fillContainer
             />
           </Suspense>
+        </div>
+      )}
+
+      {shouldRenderSandboxPlaceholder && (
+        <div className="absolute inset-0 flex items-center justify-center bg-muted/35 px-4 text-center text-sm text-muted-foreground shadow-md">
+          交互 HTML 在单页预览中运行
         </div>
       )}
 

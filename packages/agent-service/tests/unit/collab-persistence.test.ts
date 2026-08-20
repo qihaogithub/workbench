@@ -21,6 +21,8 @@ beforeEach(() => {
   fs.writeFileSync(path.join(workspacePath, "demos", "page-1", "index.tsx"), "old", "utf-8");
   fs.writeFileSync(path.join(workspacePath, "demos", "page-1", "prototype.html"), "<main>old</main>", "utf-8");
   fs.writeFileSync(path.join(workspacePath, "demos", "page-1", "prototype.css"), "main { color: black; }", "utf-8");
+  fs.writeFileSync(path.join(workspacePath, "demos", "page-1", "sandbox.html"), "<button>old</button>", "utf-8");
+  fs.writeFileSync(path.join(workspacePath, "demos", "page-1", "html-import.meta.json"), "{}", "utf-8");
   fs.writeFileSync(path.join(workspacePath, "demos", "page-1", "config.schema.json"), "{}", "utf-8");
   fs.writeFileSync(path.join(workspacePath, "knowledge", "产品规则.md"), "# 产品规则", "utf-8");
   writeJson(path.join(workspacePath, ".workspace.json"), {
@@ -136,6 +138,29 @@ describe("WorkspaceFilePersistence", () => {
         sessionId: "session-1",
         resourcePath: "demos/page-1/prototype.css",
         kind: "page-prototype-css",
+      }).ok,
+    ).toBe(true);
+  });
+
+  it("允许 sandbox HTML 与导入审计元数据进入独立协同房间", () => {
+    const persistence = new WorkspaceFilePersistence(tempDir);
+
+    expect(
+      persistence.validateSession({
+        projectId: "proj-1",
+        workspaceId: "ws-1",
+        sessionId: "session-1",
+        resourcePath: "demos/page-1/sandbox.html",
+        kind: "page-sandbox-html",
+      }).ok,
+    ).toBe(true);
+    expect(
+      persistence.validateSession({
+        projectId: "proj-1",
+        workspaceId: "ws-1",
+        sessionId: "session-1",
+        resourcePath: "demos/page-1/html-import.meta.json",
+        kind: "page-html-import-meta",
       }).ok,
     ).toBe(true);
   });

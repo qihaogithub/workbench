@@ -43,6 +43,85 @@ try {
   assert.match(createdData.id, /^proj_/);
   assert.equal(createdData.category, "CLI 分类");
 
+  const htmlImportSource = path.join(tempDir, "landing.html");
+  fs.writeFileSync(
+    htmlImportSource,
+    "<!doctype html><html><head><title>Landing</title></head><body><h1>Hello</h1></body></html>",
+    "utf-8",
+  );
+  const htmlImportEdit = runCli(["edit", "begin", createdData.id], tempDir);
+  assert.equal(htmlImportEdit.result.status, 0);
+  const htmlImportEditData = htmlImportEdit.payload.data as { editId: string; workspaceId: string };
+  const htmlImportWorkspace = htmlImportEditData.workspaceId;
+  const htmlImport = runCli(
+    [
+      "project",
+      "import-html",
+      "--project",
+      createdData.id,
+      "--workspace",
+      htmlImportWorkspace,
+      "--name",
+      "Landing",
+      "--source",
+      htmlImportSource,
+    ],
+    tempDir,
+  );
+  assert.equal(htmlImport.result.status, 0);
+  assert.equal(htmlImport.payload.ok, true);
+  const htmlImportData = htmlImport.payload.data as {
+    analysis: { outcome: { status: string; runtimeType?: string } };
+    runtime: string;
+    page: { id: string; runtimeType: string };
+    workspace: string;
+  };
+  assert.equal(htmlImportData.analysis.outcome.status, "accepted");
+  assert.equal(htmlImportData.analysis.outcome.runtimeType, "prototype-html-css");
+  assert.equal(htmlImportData.runtime, "prototype-html-css");
+  assert.equal(htmlImportData.page.runtimeType, "prototype-html-css");
+  assert.equal(
+    fs.existsSync(path.join(htmlImportData.workspace, "demos", "landing", "prototype.html")),
+    true,
+  );
+
+  const interactiveSource = path.join(tempDir, "interactive.html");
+  fs.writeFileSync(interactiveSource, "<button onclick=\"alert('x')\">Run</button>", "utf-8");
+  const interactiveImport = runCli(
+    [
+      "project",
+      "import-html",
+      "--project",
+      createdData.id,
+      "--workspace",
+      htmlImportData.workspace,
+      "--name",
+      "Interactive",
+      "--source",
+      interactiveSource,
+    ],
+    tempDir,
+  );
+  assert.equal(interactiveImport.result.status, 0);
+  assert.equal(interactiveImport.payload.ok, true);
+  const interactiveImportData = interactiveImport.payload.data as {
+    runtime: string;
+    page: { id: string; runtimeType: string };
+    workspace: string;
+  };
+  assert.equal(interactiveImportData.runtime, "sandboxed-html");
+  assert.equal(interactiveImportData.page.runtimeType, "sandboxed-html");
+  assert.equal(
+    fs.existsSync(path.join(interactiveImportData.workspace, "demos", interactiveImportData.page.id, "sandbox.html")),
+    true,
+  );
+  assert.equal(
+    fs.existsSync(path.join(interactiveImportData.workspace, "demos", interactiveImportData.page.id, "html-import.meta.json")),
+    true,
+  );
+  const discardedHtmlImportEdit = runCli(["edit", "discard", htmlImportEditData.editId], tempDir);
+  assert.equal(discardedHtmlImportEdit.result.status, 0);
+
   const updatedProject = runCli(
     [
       "project",

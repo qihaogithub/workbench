@@ -102,6 +102,6 @@ describe('createCaptureScreenshotTool', () => {
     const result = await tool.execute('tool_call_1', {});
 
     expect(result.isError).toBe(true);
-    expect(result.details).toEqual(expect.objectContaining({ error: 'code_file_not_found' }));
+    expect(result.details).toEqual(expect.objectContaining({ error: 'page_runtime_not_found' }));
   });
 });

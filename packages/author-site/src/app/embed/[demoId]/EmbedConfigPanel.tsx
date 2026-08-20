@@ -13,6 +13,7 @@ interface EmbedPageInfo {
   schema: string;
   iframeUrl: string;
   initialConfigData: Record<string, unknown>;
+  runtimeType?: string;
 }
 
 interface EmbedPageContentProps {
@@ -23,6 +24,7 @@ interface EmbedPageContentProps {
   initialConfigData: Record<string, unknown>;
   projectConfigData?: Record<string, unknown>;
   pages?: EmbedPageInfo[];
+  runtimeType?: string;
 }
 
 export function EmbedPageContent({
@@ -33,6 +35,7 @@ export function EmbedPageContent({
   initialConfigData,
   projectConfigData,
   pages,
+  runtimeType,
 }: EmbedPageContentProps) {
   const isGridMode = pages && pages.length > 1;
 
@@ -75,6 +78,7 @@ export function EmbedPageContent({
               schema={schema}
               projectConfigSchema={projectConfigSchema}
               initialConfigData={initialConfigData}
+              runtimeType={runtimeType ?? pages?.[0]?.runtimeType}
             />
           )}
         </div>
@@ -88,11 +92,13 @@ function EmbedSingleMode({
   schema,
   projectConfigSchema,
   initialConfigData,
+  runtimeType,
 }: {
   iframeUrl: string;
   schema: string;
   projectConfigSchema?: string;
   initialConfigData: Record<string, unknown>;
+  runtimeType?: string;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [configData, setConfigData] = useState(initialConfigData);
@@ -101,12 +107,10 @@ function EmbedSingleMode({
     (data: Record<string, unknown>) => {
       const iframe = iframeRef.current;
       if (!iframe?.contentWindow) return;
-      iframe.contentWindow.postMessage(
-        { type: "UPDATE_CONFIG", configData: data },
-        "*"
-      );
+      if (runtimeType === "sandboxed-html") return;
+      iframe.contentWindow.postMessage({ type: "UPDATE_CONFIG", configData: data }, "*");
     },
-    []
+    [runtimeType]
   );
 
   const handleConfigChange = useCallback(
@@ -128,7 +132,7 @@ function EmbedSingleMode({
           <iframe
             ref={iframeRef}
             src={iframeUrl}
-            sandbox="allow-scripts allow-same-origin"
+            sandbox={runtimeType === "sandboxed-html" ? "allow-scripts" : "allow-scripts allow-same-origin"}
             className="w-full"
             style={{ minHeight: "400px" }}
           />
@@ -182,17 +186,19 @@ function EmbedGridMode({
     (pageId: string, data: Record<string, unknown>) => {
       const iframe = iframeRefsRef.current.get(pageId);
       if (!iframe?.contentWindow) return;
+      if (pages.find((page) => page.id === pageId)?.runtimeType === "sandboxed-html") return;
       iframe.contentWindow.postMessage(
         { type: "UPDATE_CONFIG", configData: data },
         "*"
       );
     },
-    []
+    [pages]
   );
 
   const broadcastProjectConfig = useCallback(
     (data: Record<string, unknown>) => {
-      iframeRefsRef.current.forEach((iframe) => {
+      iframeRefsRef.current.forEach((iframe, pageId) => {
+        if (pages.find((page) => page.id === pageId)?.runtimeType === "sandboxed-html") return;
         iframe.contentWindow?.postMessage(
           { type: "UPDATE_CONFIG", configData: data },
           "*"
@@ -260,7 +266,7 @@ function EmbedGridMode({
                   <iframe
                     ref={registerIframe(page.id)}
                     src={page.iframeUrl}
-                    sandbox="allow-scripts allow-same-origin"
+                    sandbox={page.runtimeType === "sandboxed-html" ? "allow-scripts" : "allow-scripts allow-same-origin"}
                     className="w-full h-full"
                     style={{ pointerEvents: "none" }}
                   />

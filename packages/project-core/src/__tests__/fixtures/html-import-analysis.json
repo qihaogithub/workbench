@@ -1,0 +1,21 @@
+[
+  { "id": "static-marketing", "source": "<!doctype html><html><head><title>Landing</title></head><body><h1>Hello</h1></body></html>", "status": "accepted", "runtimeType": "prototype-html-css", "signals": [], "unsupported": [] },
+  { "id": "details-css", "source": "<details><summary>More</summary><p>Text</p></details><style>p:hover{color:red}</style>", "status": "accepted", "runtimeType": "prototype-html-css", "signals": [], "unsupported": [] },
+  { "id": "classic-script", "source": "<button id='b'>Go</button><script>document.querySelector('#b').onclick=()=>{}</script>", "status": "accepted", "runtimeType": "sandboxed-html", "signals": ["classic-script"], "unsupported": [] },
+  { "id": "inline-module", "source": "<script type='MODULE'>document.body.dataset.ready='1'</script>", "status": "accepted", "runtimeType": "sandboxed-html", "signals": ["inline-module-script"], "unsupported": [] },
+  { "id": "external-module-import", "source": "<script type='module'>import x from './x.js'</script>", "status": "rejected", "signals": ["inline-module-script"], "unsupported": ["external-module-import"] },
+  { "id": "event-attribute", "source": "<button ONCLICK='this.textContent=\"ok\"'>Go</button>", "status": "accepted", "runtimeType": "sandboxed-html", "signals": ["event-handler-attribute"], "unsupported": [] },
+  { "id": "javascript-url", "source": "<a HrEf=' javascript:document.body.dataset.ok=1 '>Go</a>", "status": "accepted", "runtimeType": "sandboxed-html", "signals": ["javascript-url"], "unsupported": [] },
+  { "id": "inert-json", "source": "<script type='application/ld+json'>{\"name\":\"demo\"}</script><p>Visible</p>", "status": "accepted", "runtimeType": "prototype-html-css", "signals": ["inert-data-script"], "unsupported": [] },
+  { "id": "external-script", "source": "<script src='https://cdn.example/app.js'></script>", "status": "rejected", "signals": ["classic-script"], "unsupported": ["external-script", "remote-resource"] },
+  { "id": "embedded-frame", "source": "<iframe src='https://example.com'></iframe>", "status": "rejected", "signals": [], "unsupported": ["embedded-browsing-context", "remote-resource"] },
+  { "id": "meta-refresh", "source": "<meta http-equiv='Refresh' content='0;url=https://example.com'>", "status": "rejected", "signals": [], "unsupported": ["meta-refresh"] },
+  { "id": "default-form-submit", "source": "<form><input name='q'><button>Send</button></form>", "status": "rejected", "signals": [], "unsupported": ["form-submission"] },
+  { "id": "sandbox-blocked-form-submit", "source": "<form onsubmit='event.preventDefault()'><input name='q'><button>Send</button></form>", "status": "accepted", "runtimeType": "sandboxed-html", "signals": ["event-handler-attribute"], "unsupported": [] },
+  { "id": "relative-resource", "source": "<img src='./hero.png'>", "status": "rejected", "signals": [], "unsupported": ["relative-resource"] },
+  { "id": "remote-resource", "source": "<link rel='stylesheet' href='https://cdn.example/app.css'>", "status": "rejected", "signals": [], "unsupported": ["remote-resource"] },
+  { "id": "data-resource", "source": "<img src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='>", "status": "accepted", "runtimeType": "prototype-html-css", "signals": ["data-url-resource"], "unsupported": [] },
+  { "id": "worker", "source": "<script>new Worker('data:text/javascript,postMessage(1)')</script>", "status": "rejected", "signals": ["classic-script"], "unsupported": ["worker"] },
+  { "id": "runtime-error-compatible", "source": "<script>throw new Error('fixture')</script>", "status": "accepted", "runtimeType": "sandboxed-html", "signals": ["classic-script"], "unsupported": [] },
+  { "id": "empty-first-frame-compatible", "source": "<script>setTimeout(()=>document.body.textContent='later',100)</script>", "status": "accepted", "runtimeType": "sandboxed-html", "signals": ["classic-script"], "unsupported": [] }
+]

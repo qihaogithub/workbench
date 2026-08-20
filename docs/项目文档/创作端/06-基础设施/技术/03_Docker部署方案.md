@@ -11,6 +11,7 @@ covers:
   - packages/author-site/next.config.js
   - packages/viewer-site/next.config.js
   - packages/project-core/package.json
+  - packages/prototype-core/package.json
   - scripts/docker-viewer-env-isolation.test.mjs
   - scripts/docker-orbstack-up.sh
   - scripts/docker-orbstack-verify.sh
@@ -35,7 +36,7 @@ covers:
 
 # Docker 部署方案
 
-> 更新日期：2026-08-13
+> 更新日期：2026-08-20
 > 状态：已验证可用（Pi Agent 单后端架构）
 
 ## 一、系统架构
@@ -278,7 +279,7 @@ Chromium 是否能真实启动属于截图能力诊断，不作为默认容器�
 | 镜像                 | 需要复制的 workspace 包                                                                                                                                                          |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `agent-service`      | `agent-service`、`shared`、`knowledge-core`、`knowledge-service`、`preview-contract`、`sketch-core`                                                                              |
-| `author-site`        | `author-site`、`agent-client`、`demo-ui`、`knowledge-core`、`knowledge-service`、`preview-contract`、`project-core`、`project-scaffold`、`sketch-core`、`sketch-react`、`shared` |
+| `author-site`        | `author-site`、`agent-client`、`demo-ui`、`knowledge-core`、`knowledge-service`、`preview-contract`、`project-core`、`project-scaffold`、`prototype-core`、`sketch-core`、`sketch-react`、`shared` |
 | `knowledge-service`  | `knowledge-service`、`knowledge-core`                                                                                                                                             |
 | `screenshot-service` | `screenshot-service`、`sketch-core`、`shared`                                                                                                                                    |
 | `viewer-site`        | `viewer-site`、`demo-ui`、`sketch-core`、`sketch-react`、`shared`                                                                                                                |
@@ -288,6 +289,12 @@ Chromium 是否能真实启动属于截图能力诊断，不作为默认容器�
 `.dockerignore` 是 Docker 构建上下文的一部分，必须排除 `.workbench/`、`.codegraph/`、`data/`、`test/`、包内 `.next/`、`dist/` 和本地依赖目录，避免把本地工作区、缓存、诊断数据或测试输出复制进镜像构建上下文。
 
 各服务 Dockerfile 的 `pnpm install` 使用同一个 BuildKit cache mount：`id=workbench-pnpm-store,target=/pnpm/store`。首次冷构建仍需下载依赖；之后主应用镜像串行构建会复用同一份 pnpm store，避免每个服务重复从 registry 拉取同一批依赖。
+
+Builder 阶段的 workspace 安装统一使用 `pnpm install --frozen-lockfile`，这部分构建依赖必须与仓库 `pnpm-lock.yaml` 完全一致。新增或修改 workspace 依赖时，应先在仓库更新锁文件，再同步 Dockerfile 的 manifest 复制清单；禁止用 `--no-frozen-lockfile` 让 builder 临时解析新版本。
+
+根 `package.json` 的 `patchedDependencies` 也是依赖安装输入，因此所有 builder 都必须在 `pnpm install` 前复制 `patches/`。只复制 manifest 和锁文件会让 pnpm 在计算补丁摘要时失败；升级或移除补丁依赖时需同步维护该目录和根声明。
+
+`agent-service` 与 `screenshot-service` 的 runtime 阶段目前仍单独安装 bundle 外置依赖，不属于上述 frozen workspace 安装保证。完整镜像可复现性需要后续把这些依赖改为从 builder 的锁定部署产物复制；在此之前不能把 builder 锁文件一致性表述为整个运行镜像已完全可复现。
 
 ### 3.9 screenshot-service Chromium 运行约束
 

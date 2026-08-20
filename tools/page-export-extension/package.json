@@ -1,0 +1,28 @@
+{
+  "name": "@workbench/page-export-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-or-later",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:fidelity-harness": "node scripts/build-fidelity-harness.mjs",
+    "test:extension-e2e": "node scripts/run-loaded-extension-e2e.mjs",
+    "verify:distribution-materials": "node scripts/verify-distribution-materials.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm test && pnpm build && pnpm verify:distribution-materials"
+  },
+  "dependencies": {
+    "@workbench/editable-snapshot-core": "workspace:*",
+    "html2canvas": "1.4.1",
+    "prettier": "3.6.2",
+    "single-file-cli": "2.0.83"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.2",
+    "playwright": "1.59.1",
+    "typescript": "5.9.3",
+    "vitest": "2.1.9"
+  }
+}

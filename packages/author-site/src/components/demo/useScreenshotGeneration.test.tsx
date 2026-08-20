@@ -157,6 +157,65 @@ describe("useScreenshotGeneration", () => {
     unmount();
   });
 
+  it("切换项目后清空截图并忽略旧项目的延迟 meta 响应", async () => {
+    let resolveOldMeta: ((response: Response) => void) | undefined;
+    const fetchMock = jest.fn(async (input: RequestInfo | URL) => {
+      const url = getFetchUrl(input);
+      if (url.includes("/api/screenshots/health")) {
+        return jsonFetchResponse({ success: true });
+      }
+      if (url.includes("/api/screenshots/file/proj_1/page_1?meta=1")) {
+        return new Promise<Response>((resolve) => {
+          resolveOldMeta = resolve;
+        });
+      }
+      if (url.includes("/api/screenshots/file/proj_2/page_1?meta=1")) {
+        return jsonFetchResponse({
+          success: true,
+          data: { currentHash: "2222222222222222", renderBox },
+        });
+      }
+      return jsonFetchResponse({ success: false }, { status: 404 });
+    }) as jest.Mock;
+    global.fetch = fetchMock;
+    window.fetch = fetchMock;
+    globalThis.fetch = fetchMock;
+
+    const { result, rerender, unmount } = renderHook(
+      ({ projectId }) =>
+        useScreenshotGeneration({ projectId, pageIds: ["page_1"] }),
+      { initialProps: { projectId: "proj_1" } },
+    );
+
+    await waitFor(() => expect(resolveOldMeta).toBeDefined());
+    rerender({ projectId: "proj_2" });
+
+    await waitFor(() => {
+      expect(result.current.pageScreenshots.page_1).toMatchObject({
+        screenshotUrl:
+          "/api/screenshots/file/proj_2/page_1?hash=2222222222222222",
+        hash: "2222222222222222",
+      });
+    });
+
+    await act(async () => {
+      resolveOldMeta?.(
+        jsonFetchResponse({
+          success: true,
+          data: { currentHash: "1111111111111111", renderBox },
+        }),
+      );
+    });
+
+    expect(result.current.pageScreenshots.page_1).toMatchObject({
+      screenshotUrl:
+        "/api/screenshots/file/proj_2/page_1?hash=2222222222222222",
+      hash: "2222222222222222",
+    });
+
+    unmount();
+  });
+
   it("批量状态 hash 与 expectedHash 不一致时忽略旧结果", async () => {
     const fetchMock = jest.fn(async (input: RequestInfo | URL) => {
       const url = getFetchUrl(input);

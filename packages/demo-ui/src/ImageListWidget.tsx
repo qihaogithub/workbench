@@ -32,32 +32,19 @@ function getImageDimensions(file: File): Promise<{ width: number; height: number
 }
 
 interface DimensionOptions {
-  minWidth?: number;
-  minHeight?: number;
-  maxWidth?: number;
-  maxHeight?: number;
+  widthRule?: { operator: "=" | ">" | "≥" | "<" | "≤"; value: number };
+  heightRule?: { operator: "=" | ">" | "≥" | "<" | "≤"; value: number };
 }
 
 function validateImageDimensions(
   actual: { width: number; height: number },
   options: DimensionOptions
 ): { valid: boolean; message: string } {
-  const { minWidth, minHeight, maxWidth, maxHeight } = options;
   const parts: string[] = [];
-
-  if (minWidth && maxWidth && minWidth === maxWidth) {
-    if (actual.width !== minWidth) parts.push(`宽度=${minWidth}px`);
-  } else {
-    if (minWidth && actual.width < minWidth) parts.push(`宽度≥${minWidth}px`);
-    if (maxWidth && actual.width > maxWidth) parts.push(`宽度≤${maxWidth}px`);
-  }
-
-  if (minHeight && maxHeight && minHeight === maxHeight) {
-    if (actual.height !== minHeight) parts.push(`高度=${minHeight}px`);
-  } else {
-    if (minHeight && actual.height < minHeight) parts.push(`高度≥${minHeight}px`);
-    if (maxHeight && actual.height > maxHeight) parts.push(`高度≤${maxHeight}px`);
-  }
+  const matches = (actualValue: number, rule: DimensionOptions["widthRule"]) => !rule
+    || ({ "=": actualValue === rule.value, ">": actualValue > rule.value, "≥": actualValue >= rule.value, "<": actualValue < rule.value, "≤": actualValue <= rule.value }[rule.operator]);
+  if (!matches(actual.width, options.widthRule) && options.widthRule) parts.push(`宽度${options.widthRule.operator}${options.widthRule.value}px`);
+  if (!matches(actual.height, options.heightRule) && options.heightRule) parts.push(`高度${options.heightRule.operator}${options.heightRule.value}px`);
 
   if (parts.length === 0) return { valid: true, message: '' };
   return {
@@ -93,10 +80,8 @@ export interface ImageListWidgetProps {
     accept?: string;
     maxSize?: number;
     maxItems?: number;
-    minWidth?: number;
-    minHeight?: number;
-    maxWidth?: number;
-    maxHeight?: number;
+    widthRule?: DimensionOptions["widthRule"];
+    heightRule?: DimensionOptions["heightRule"];
   };
 }
 
@@ -114,12 +99,10 @@ export function ImageListWidget({
   const accept = options.accept ?? 'image/*';
 
   const dimensionOptions: DimensionOptions = {
-    minWidth: options.minWidth,
-    minHeight: options.minHeight,
-    maxWidth: options.maxWidth,
-    maxHeight: options.maxHeight,
+    widthRule: options.widthRule,
+    heightRule: options.heightRule,
   };
-  const hasDimensionCheck = Object.values(dimensionOptions).some((v) => typeof v === 'number');
+  const hasDimensionCheck = Object.values(dimensionOptions).some((rule) => !!rule);
 
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
@@ -257,8 +240,8 @@ export function ImageListWidget({
   }, [defaultValue, onChange]);
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-end gap-2">
+    <div className="relative">
+      <div className="absolute right-0 top-[-26px] flex h-5 items-center gap-2">
         {needsRestore && (
           <Button
             type="button"
@@ -277,41 +260,47 @@ export function ImageListWidget({
       </div>
 
       <div className="flex flex-wrap gap-3">
-        {value.map((item, index) => (
-          <div
-            key={`${item.url}-${index}`}
-            className="relative w-[80px] h-[80px] rounded-lg border border-border bg-muted overflow-hidden group shrink-0"
-          >
-            <img
-              src={resolveConfigImageSrc(item.url, sessionId)}
-              alt={item.alt || '图片'}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-                target.parentElement!.classList.add('flex', 'items-center', 'justify-center');
-              }}
-            />
-            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPreviewImage(item.url)}
-                className="p-2 rounded-full bg-background/90 text-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
-                aria-label="放大查看"
-              >
-                <ZoomIn className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDelete(index)}
-                className="p-2 rounded-full bg-background/90 text-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors"
-                aria-label="删除图片"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+        {value.map((item, index) => {
+          const imageSrc = resolveConfigImageSrc(item.url, sessionId);
+
+          return (
+            <div
+              key={`${item.url}-${index}`}
+              className="relative w-[80px] h-[80px] rounded-lg border border-border bg-muted overflow-hidden group shrink-0"
+            >
+              {imageSrc && (
+                <img
+                  src={imageSrc}
+                  alt={item.alt || '图片'}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    target.parentElement!.classList.add('flex', 'items-center', 'justify-center');
+                  }}
+                />
+              )}
+              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPreviewImage(item.url)}
+                  className="p-2 rounded-full bg-background/90 text-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
+                  aria-label="放大查看"
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(index)}
+                  className="p-2 rounded-full bg-background/90 text-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                  aria-label="删除图片"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {isUploading && (
           <div className="w-[80px] h-[80px] rounded-lg border border-dashed border-border bg-muted/30 flex flex-col items-center justify-center gap-2 shrink-0">
@@ -346,7 +335,7 @@ export function ImageListWidget({
         multiple
       />
 
-      {uploadError && <p className="text-xs text-destructive text-center">{uploadError}</p>}
+      {uploadError && <p className="mt-2 text-center text-xs text-destructive">{uploadError}</p>}
 
       <Dialog open={!!sizeWarning} onOpenChange={(open) => !open && setSizeWarning(null)}>
         <DialogContent className="sm:max-w-md">

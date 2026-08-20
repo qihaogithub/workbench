@@ -168,6 +168,7 @@ import {
   fixProjectWorkspaceReferences,
   listProjectWorkspaces,
 } from "./workspace-admin.js";
+import { analyzeHtmlImport, normalizeHtmlImport } from "./html-import.js";
 import {
   backupAndResetContentGraphStorage,
   readContentGraphAdminStatus,
@@ -2070,6 +2071,16 @@ export class ProjectAdminService {
             `demos/${version.resourceId}/prototype.css`,
             `demos/${version.resourceId}/prototype.meta.json`,
           );
+        } else if (runtimeType === ("sandboxed-html" as DemoPageRuntimeType)) {
+          fs.rmSync(path.join(demoDir, "index.tsx"), { force: true });
+          fs.rmSync(path.join(demoDir, "prototype.html"), { force: true });
+          fs.rmSync(path.join(demoDir, "prototype.css"), { force: true });
+          fs.rmSync(path.join(demoDir, "prototype.meta.json"), { force: true });
+          fs.rmSync(path.join(demoDir, "sketch.scene.json"), { force: true });
+          fs.rmSync(path.join(demoDir, "sketch.meta.json"), { force: true });
+          fs.writeFileSync(path.join(demoDir, "sandbox.html"), (files as DemoFiles & { sandboxHtml?: string }).sandboxHtml ?? "", "utf-8");
+          writeJsonFile(path.join(demoDir, "html-import.meta.json"), (files as DemoFiles & { htmlImportMeta?: Record<string, unknown> }).htmlImportMeta ?? {});
+          writtenFiles.push(`demos/${version.resourceId}/sandbox.html`, `demos/${version.resourceId}/html-import.meta.json`);
         } else if (runtimeType === "sketch-scene") {
           fs.rmSync(path.join(demoDir, "index.tsx"), { force: true });
           fs.rmSync(path.join(demoDir, "prototype.html"), { force: true });
@@ -2360,9 +2371,13 @@ export class ProjectAdminService {
             ? "sketch-scene"
             : input.prototypeHtml
               ? "prototype-html-css"
-              : input.code
+            : input.code
                 ? "high-fidelity-react"
                 : "prototype-html-css";
+    const requestedRuntime = (input as PageCreateInput & { runtimeType?: string }).runtimeType;
+    const resolvedRuntimeType = requestedRuntime === "sandboxed-html"
+      ? ("sandboxed-html" as DemoPageRuntimeType)
+      : runtimeType;
     const meta: DemoPageMeta = {
       id: pageId,
       name: input.name.trim() || "Untitled",
@@ -2374,11 +2389,37 @@ export class ProjectAdminService {
       ),
       order: input.order ?? tree.pages.length,
       parentId,
-      runtimeType,
+      runtimeType: resolvedRuntimeType,
     };
+    const sandboxNormalization = resolvedRuntimeType === "sandboxed-html"
+      ? normalizeHtmlImport(input.sandboxHtml ?? "")
+      : null;
+    if (
+      sandboxNormalization &&
+      (sandboxNormalization.analysis.outcome.status !== "accepted" ||
+        sandboxNormalization.analysis.outcome.runtimeType !== "sandboxed-html")
+    ) {
+      return fail("VALIDATION_BLOCKED", "sandbox HTML 导入校验失败");
+    }
+    const normalizedSandboxHtml = sandboxNormalization
+      ? sandboxNormalization.normalizedHtml ?? input.sandboxHtml ?? ""
+      : undefined;
+    const sandboxPersistedAnalysis = normalizedSandboxHtml === undefined
+      ? null
+      : analyzeHtmlImport(normalizedSandboxHtml);
+    const canonicalHtmlImportMeta = sandboxNormalization && sandboxPersistedAnalysis
+      ? {
+          ...input.htmlImportMeta,
+          source: "html-import" as const,
+          analysisVersion: sandboxPersistedAnalysis.analysisVersion,
+          sandboxPolicyVersion: 1,
+          sourceHash: sandboxNormalization.analysis.sourceHash,
+          normalizedHash: sandboxPersistedAnalysis.sourceHash,
+        }
+      : undefined;
     if (input.dryRun) {
       const files: DemoFiles =
-        runtimeType === "prototype-html-css"
+      resolvedRuntimeType === "prototype-html-css"
           ? {
               code: "",
               schema: input.schema ?? DEFAULT_DEMO_SCHEMA,
@@ -2386,7 +2427,7 @@ export class ProjectAdminService {
               prototypeCss: input.prototypeCss ?? DEFAULT_PROTOTYPE_CSS,
               prototypeMeta: input.prototypeMeta ?? DEFAULT_PROTOTYPE_META,
             }
-          : runtimeType === "sketch-scene"
+          : resolvedRuntimeType === "sketch-scene"
             ? {
                 code: "",
                 schema: input.schema ?? DEFAULT_DEMO_SCHEMA,
@@ -2394,13 +2435,20 @@ export class ProjectAdminService {
                   input.sketchScene ?? createDefaultSketchSceneText(),
                 sketchMeta: input.sketchMeta ?? DEFAULT_SKETCH_META,
               }
-            : {
+            : resolvedRuntimeType === ("sandboxed-html" as DemoPageRuntimeType)
+              ? ({
+                  code: "",
+                  schema: input.schema ?? DEFAULT_DEMO_SCHEMA,
+                  sandboxHtml: normalizedSandboxHtml ?? "",
+                  htmlImportMeta: canonicalHtmlImportMeta,
+                } as DemoFiles)
+              : {
                 code: input.code ?? DEFAULT_DEMO_CODE,
                 schema: input.schema ?? DEFAULT_DEMO_SCHEMA,
               };
       const runtimeValidation = this.validatePageFilesRuntime(
         pageId,
-        runtimeType,
+        resolvedRuntimeType,
         files,
       );
       return ok(
@@ -2422,7 +2470,7 @@ export class ProjectAdminService {
       );
     const demoDir = this.pageDir(workspacePath, pageId);
     ensureDir(demoDir);
-    if (runtimeType === "prototype-html-css") {
+    if (resolvedRuntimeType === "prototype-html-css") {
       fs.writeFileSync(
         path.join(demoDir, "prototype.html"),
         input.prototypeHtml ?? DEFAULT_PROTOTYPE_HTML,
@@ -2437,7 +2485,7 @@ export class ProjectAdminService {
         path.join(demoDir, "prototype.meta.json"),
         input.prototypeMeta ?? DEFAULT_PROTOTYPE_META,
       );
-    } else if (runtimeType === "sketch-scene") {
+    } else if (resolvedRuntimeType === "sketch-scene") {
       fs.writeFileSync(
         path.join(demoDir, "sketch.scene.json"),
         input.sketchScene ?? createDefaultSketchSceneText(),
@@ -2447,6 +2495,9 @@ export class ProjectAdminService {
         path.join(demoDir, "sketch.meta.json"),
         input.sketchMeta ?? DEFAULT_SKETCH_META,
       );
+    } else if (resolvedRuntimeType === ("sandboxed-html" as DemoPageRuntimeType)) {
+      fs.writeFileSync(path.join(demoDir, "sandbox.html"), normalizedSandboxHtml ?? "", "utf-8");
+      writeJsonFile(path.join(demoDir, "html-import.meta.json"), canonicalHtmlImportMeta ?? {});
     } else {
       fs.writeFileSync(
         path.join(demoDir, "index.tsx"),
@@ -2732,8 +2783,11 @@ export class ProjectAdminService {
     const tree = this.readWorkspaceTree(workspacePath);
     const pageIndex = tree.pages.findIndex((page) => page.id === input.pageId);
     if (pageIndex === -1) return fail("DEMO_PAGE_NOT_FOUND", "页面不存在");
-    const targetRuntimeType =
-      input.targetRuntimeType === "prototype-html-css"
+    const requestedTargetRuntime = (input as PageSwitchRuntimeInput & { targetRuntimeType?: string }).targetRuntimeType;
+    const targetRuntimeType: DemoPageRuntimeType | undefined =
+      requestedTargetRuntime === "sandboxed-html"
+        ? ("sandboxed-html" as DemoPageRuntimeType)
+        : input.targetRuntimeType === "prototype-html-css"
         ? "prototype-html-css"
         : input.targetRuntimeType === "high-fidelity-react"
           ? "high-fidelity-react"
@@ -2772,6 +2826,29 @@ export class ProjectAdminService {
       sketchMeta:
         input.sketchMeta ?? currentFiles.sketchMeta ?? DEFAULT_SKETCH_META,
     };
+    if (targetRuntimeType === ("sandboxed-html" as DemoPageRuntimeType)) {
+      const sandboxSource =
+        (input as PageSwitchRuntimeInput & { sandboxHtml?: string }).sandboxHtml ??
+        (currentFiles as DemoFiles & { sandboxHtml?: string }).sandboxHtml ?? "";
+      const sandboxNormalization = normalizeHtmlImport(sandboxSource);
+      if (
+        sandboxNormalization.analysis.outcome.status !== "accepted" ||
+        sandboxNormalization.analysis.outcome.runtimeType !== "sandboxed-html"
+      ) {
+        return fail("VALIDATION_BLOCKED", "sandbox HTML 校验失败");
+      }
+      const normalizedSandboxHtml = sandboxNormalization.normalizedHtml ?? sandboxSource;
+      const persistedAnalysis = analyzeHtmlImport(normalizedSandboxHtml);
+      nextFiles.sandboxHtml = normalizedSandboxHtml;
+      nextFiles.htmlImportMeta = {
+        ...(input.htmlImportMeta ?? currentFiles.htmlImportMeta),
+        source: "html-import",
+        analysisVersion: persistedAnalysis.analysisVersion,
+        sandboxPolicyVersion: 1,
+        sourceHash: sandboxNormalization.analysis.sourceHash,
+        normalizedHash: persistedAnalysis.sourceHash,
+      };
+    }
     const validation = this.validateSchemaPair(
       this.readProjectConfig(workspacePath),
       nextFiles.schema,
@@ -2850,10 +2927,16 @@ export class ProjectAdminService {
           nextFiles.prototypeMeta ?? DEFAULT_PROTOTYPE_META,
         );
         fs.rmSync(path.join(demoDir, "sketch.scene.json"), { force: true });
+        fs.rmSync(path.join(demoDir, "sketch.meta.json"), { force: true });
+        fs.rmSync(path.join(demoDir, "sandbox.html"), { force: true });
+        fs.rmSync(path.join(demoDir, "html-import.meta.json"), { force: true });
       } else if (targetRuntimeType === "sketch-scene") {
         fs.rmSync(path.join(demoDir, "index.tsx"), { force: true });
         fs.rmSync(path.join(demoDir, "prototype.html"), { force: true });
         fs.rmSync(path.join(demoDir, "prototype.css"), { force: true });
+        fs.rmSync(path.join(demoDir, "prototype.meta.json"), { force: true });
+        fs.rmSync(path.join(demoDir, "sandbox.html"), { force: true });
+        fs.rmSync(path.join(demoDir, "html-import.meta.json"), { force: true });
         fs.writeFileSync(
           path.join(demoDir, "sketch.scene.json"),
           nextFiles.sketchScene ?? createDefaultSketchSceneText(),
@@ -2863,8 +2946,23 @@ export class ProjectAdminService {
           path.join(demoDir, "sketch.meta.json"),
           nextFiles.sketchMeta ?? DEFAULT_SKETCH_META,
         );
+      } else if (targetRuntimeType === ("sandboxed-html" as DemoPageRuntimeType)) {
+        fs.rmSync(path.join(demoDir, "index.tsx"), { force: true });
+        fs.rmSync(path.join(demoDir, "prototype.html"), { force: true });
+        fs.rmSync(path.join(demoDir, "prototype.css"), { force: true });
+        fs.rmSync(path.join(demoDir, "prototype.meta.json"), { force: true });
+        fs.rmSync(path.join(demoDir, "sketch.scene.json"), { force: true });
+        fs.rmSync(path.join(demoDir, "sketch.meta.json"), { force: true });
+        fs.writeFileSync(path.join(demoDir, "sandbox.html"), nextFiles.sandboxHtml ?? "", "utf-8");
+        writeJsonFile(path.join(demoDir, "html-import.meta.json"), nextFiles.htmlImportMeta ?? {});
       } else {
         fs.rmSync(path.join(demoDir, "sketch.scene.json"), { force: true });
+        fs.rmSync(path.join(demoDir, "sketch.meta.json"), { force: true });
+        fs.rmSync(path.join(demoDir, "prototype.html"), { force: true });
+        fs.rmSync(path.join(demoDir, "prototype.css"), { force: true });
+        fs.rmSync(path.join(demoDir, "prototype.meta.json"), { force: true });
+        fs.rmSync(path.join(demoDir, "sandbox.html"), { force: true });
+        fs.rmSync(path.join(demoDir, "html-import.meta.json"), { force: true });
         fs.writeFileSync(
           path.join(demoDir, "index.tsx"),
           nextFiles.code || DEFAULT_DEMO_CODE,
@@ -3292,6 +3390,9 @@ listPageRequirements(
     const demoDir = this.pageDir(workspacePath, pageId);
     const runtimeType = resourceVersion.runtime?.runtimeType ?? resolvePageRuntimeType(demoDir);
     if (runtimeType === "prototype-html-css") {
+      fs.rmSync(path.join(demoDir, "index.tsx"), { force: true });
+      fs.rmSync(path.join(demoDir, "sandbox.html"), { force: true });
+      fs.rmSync(path.join(demoDir, "html-import.meta.json"), { force: true });
       fs.writeFileSync(
         path.join(demoDir, "prototype.html"),
         files.prototypeHtml ?? "",
@@ -3306,7 +3407,22 @@ listPageRequirements(
         path.join(demoDir, "prototype.meta.json"),
         files.prototypeMeta ?? DEFAULT_PROTOTYPE_META,
       );
+    } else if (runtimeType === ("sandboxed-html" as DemoPageRuntimeType)) {
+      fs.rmSync(path.join(demoDir, "index.tsx"), { force: true });
+      fs.rmSync(path.join(demoDir, "prototype.html"), { force: true });
+      fs.rmSync(path.join(demoDir, "prototype.css"), { force: true });
+      fs.rmSync(path.join(demoDir, "prototype.meta.json"), { force: true });
+      fs.rmSync(path.join(demoDir, "sketch.scene.json"), { force: true });
+      fs.rmSync(path.join(demoDir, "sketch.meta.json"), { force: true });
+      fs.writeFileSync(path.join(demoDir, "sandbox.html"), (files as DemoFiles & { sandboxHtml?: string }).sandboxHtml ?? "", "utf-8");
+      writeJsonFile(path.join(demoDir, "html-import.meta.json"), (files as DemoFiles & { htmlImportMeta?: Record<string, unknown> }).htmlImportMeta ?? {});
     } else if (runtimeType === "sketch-scene") {
+      fs.rmSync(path.join(demoDir, "index.tsx"), { force: true });
+      fs.rmSync(path.join(demoDir, "prototype.html"), { force: true });
+      fs.rmSync(path.join(demoDir, "prototype.css"), { force: true });
+      fs.rmSync(path.join(demoDir, "prototype.meta.json"), { force: true });
+      fs.rmSync(path.join(demoDir, "sandbox.html"), { force: true });
+      fs.rmSync(path.join(demoDir, "html-import.meta.json"), { force: true });
       fs.writeFileSync(
         path.join(demoDir, "sketch.scene.json"),
         files.sketchScene ?? createDefaultSketchSceneText(),
@@ -3317,6 +3433,13 @@ listPageRequirements(
         files.sketchMeta ?? DEFAULT_SKETCH_META,
       );
     } else {
+      fs.rmSync(path.join(demoDir, "sketch.scene.json"), { force: true });
+      fs.rmSync(path.join(demoDir, "sketch.meta.json"), { force: true });
+      fs.rmSync(path.join(demoDir, "prototype.html"), { force: true });
+      fs.rmSync(path.join(demoDir, "prototype.css"), { force: true });
+      fs.rmSync(path.join(demoDir, "prototype.meta.json"), { force: true });
+      fs.rmSync(path.join(demoDir, "sandbox.html"), { force: true });
+      fs.rmSync(path.join(demoDir, "html-import.meta.json"), { force: true });
       fs.writeFileSync(path.join(demoDir, "index.tsx"), files.code, "utf-8");
     }
     fs.writeFileSync(
@@ -5361,6 +5484,11 @@ listPageRequirements(
         projectId,
         JSON.stringify(files.sketchMeta ?? DEFAULT_SKETCH_META, null, 2),
       );
+    } else if (runtimeType === ("sandboxed-html" as DemoPageRuntimeType)) {
+      const extended = fileRefs as ResourceBlobMap & { sandboxHtml?: string; htmlImportMeta?: string };
+      extended.sandboxHtml = this.writeBlob(projectId, (files as DemoFiles & { sandboxHtml?: string }).sandboxHtml ?? "");
+      const meta = (files as DemoFiles & { htmlImportMeta?: Record<string, unknown> }).htmlImportMeta;
+      extended.htmlImportMeta = this.writeBlob(projectId, JSON.stringify(meta ?? {}, null, 2));
     } else {
       fileRefs.code = this.writeBlob(projectId, files.code);
     }
@@ -5456,6 +5584,8 @@ listPageRequirements(
     );
     const sketchScene = this.readBlob(version.projectId, files.sketchScene);
     const sketchMetaText = this.readBlob(version.projectId, files.sketchMeta);
+    const sandboxHtml = this.readBlob(version.projectId, (files as ResourceBlobMap & { sandboxHtml?: string }).sandboxHtml);
+    const htmlImportMetaText = this.readBlob(version.projectId, (files as ResourceBlobMap & { htmlImportMeta?: string }).htmlImportMeta);
     const requirements = this.readBlob(version.projectId, files.requirements);
     if (prototypeHtml !== undefined) result.prototypeHtml = prototypeHtml;
     if (prototypeCss !== undefined) result.prototypeCss = prototypeCss;
@@ -5466,6 +5596,8 @@ listPageRequirements(
     if (sketchMetaText !== undefined) {
       result.sketchMeta = JSON.parse(sketchMetaText) as Record<string, unknown>;
     }
+    if (sandboxHtml !== undefined) (result as DemoFiles & { sandboxHtml?: string }).sandboxHtml = sandboxHtml;
+    if (htmlImportMetaText !== undefined) result.htmlImportMeta = JSON.parse(htmlImportMetaText);
     if (requirements !== undefined) result.requirements = requirements;
     return result;
   }
@@ -5859,6 +5991,8 @@ listPageRequirements(
     const prototypeHtmlPath = path.join(demoDir, "prototype.html");
     const prototypeCssPath = path.join(demoDir, "prototype.css");
     const prototypeMetaPath = path.join(demoDir, "prototype.meta.json");
+    const sandboxHtmlPath = path.join(demoDir, "sandbox.html");
+    const htmlImportMetaPath = path.join(demoDir, "html-import.meta.json");
     const sketchScenePath = path.join(demoDir, "sketch.scene.json");
     const sketchMetaPath = path.join(demoDir, "sketch.meta.json");
     if (!fs.existsSync(schemaPath)) return null;
@@ -5875,6 +6009,12 @@ listPageRequirements(
     if (fs.existsSync(prototypeMetaPath)) {
       files.prototypeMeta =
         readJsonFile<PrototypePageMeta>(prototypeMetaPath) ?? undefined;
+    }
+    if (fs.existsSync(sandboxHtmlPath)) {
+      (files as DemoFiles & { sandboxHtml?: string }).sandboxHtml = fs.readFileSync(sandboxHtmlPath, "utf-8");
+    }
+    if (fs.existsSync(htmlImportMetaPath)) {
+      files.htmlImportMeta = readJsonFile<NonNullable<DemoFiles["htmlImportMeta"]>>(htmlImportMetaPath) ?? undefined;
     }
     if (fs.existsSync(sketchScenePath)) {
       files.sketchScene = fs.readFileSync(sketchScenePath, "utf-8");
@@ -6142,6 +6282,19 @@ listPageRequirements(
     runtimeType: DemoPageRuntimeType,
     files: DemoFiles,
   ): RuntimeValidationResult {
+    if (runtimeType === ("sandboxed-html" as DemoPageRuntimeType)) {
+      const sandboxHtml = (files as DemoFiles & { sandboxHtml?: string }).sandboxHtml ?? "";
+      const analysis = analyzeHtmlImport(sandboxHtml);
+      const issues: RuntimeValidationIssue[] = [];
+      if (analysis.outcome.status !== "accepted" || analysis.outcome.runtimeType !== "sandboxed-html") {
+        issues.push({ pageId, severity: "error", stage: "prototype_contract", code: analysis.outcome.status === "rejected" ? analysis.outcome.code : "HTML_IMPORT_RUNTIME_MISMATCH", message: "sandbox HTML 未通过导入分析", instruction: "请重新导入可执行 HTML，并确保所有资源符合 sandbox 策略。" });
+      }
+      const meta = (files as DemoFiles & { htmlImportMeta?: Record<string, unknown> }).htmlImportMeta;
+      if (!meta || meta.source !== "html-import" || typeof meta.sourceHash !== "string" || !/^[a-f0-9]{64}$/.test(meta.sourceHash) || meta.normalizedHash !== analysis.sourceHash || meta.analysisVersion !== analysis.analysisVersion || meta.sandboxPolicyVersion !== 1) {
+        issues.push({ pageId, severity: "error", stage: "prototype_contract", code: "HTML_IMPORT_META_MISMATCH", message: "sandbox 导入元数据与源码分析不一致", instruction: "请使用 project-core 导入流程生成 html-import.meta.json。" });
+      }
+      return { ok: issues.length === 0, issues, pageIds: [pageId] };
+    }
     if (runtimeType === "prototype-html-css") {
       return this.validatePrototypePageSource(
         pageId,

@@ -57,6 +57,10 @@ export type {
   AppActionPayload,
 } from "./types";
 export type { IframePreviewFrameProps } from "./IframePreviewFrame";
+export type {
+  SandboxedHtmlFrameProps,
+  SandboxedHtmlFrameStatus,
+} from "./SandboxedHtmlFrame";
 export type { PrototypePagePreviewProps } from "./PrototypePagePreview";
 export type { SketchPagePreviewProps } from "./SketchPagePreview";
 export type {
@@ -118,6 +122,10 @@ export {
   resolvePreviewRelativePath,
 } from "./preview-resource-cache";
 export { ConfigScopeWrapper } from "./ConfigScopeWrapper";
+export { ConfigDefinitionManagerDialog } from "./ConfigDefinitionManagerDialog";
+export type { ConfigDefinitionManagerDialogProps, ConfigDefinitionScope, ConfigDefinitionImpactSummary } from "./ConfigDefinitionManagerDialog";
+export { ConfigItemEditorDialog } from "./ConfigItemEditorDialog";
+export type { ConfigItemEditorDialogProps, ConfigItemApplyPlanSnapshot } from "./ConfigItemEditorDialog";
 export { PageConfigPanel } from "./PageConfigPanel";
 export {
   extractCodeConfigBindingKeys,
@@ -135,6 +143,13 @@ export type {
 } from "./schema-parser";
 export { PreviewPanel } from "./PreviewPanel";
 export { SinglePagePreview } from "./SinglePagePreview";
+export { SandboxedHtmlFrame } from "./SandboxedHtmlFrame";
+export {
+  SANDBOXED_HTML_CHANNEL,
+  isSandboxedHtmlMessage,
+  readSandboxedHtmlHeight,
+  createSandboxedHtmlRateLimiter,
+} from "./sandboxed-html-protocol";
 export {
   normalizePreviewStagePage,
   normalizePreviewStagePages,

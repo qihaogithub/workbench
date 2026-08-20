@@ -98,6 +98,12 @@ export interface UpdateDemoPageFilesResult {
   imageLocalization?: ImageLocalizationResult;
 }
 
+export interface HtmlImportPageResult {
+  page: DemoPageMeta;
+  analysis: import("@workbench/project-core").HtmlImportAnalysis;
+  warnings: import("@workbench/project-core").HtmlImportWarning[];
+}
+
 /**
  * API 响应类型
  */
@@ -281,6 +287,31 @@ export class ProjectApiClient {
     );
     if (!response.success || !response.data) {
       throw new Error(response.error?.message || '创建页面失败');
+    }
+    return response.data;
+  }
+
+  async importHtmlPage(
+    projectId: string,
+    sessionId: string,
+    filename: string,
+    html: string,
+    name?: string,
+    parentId?: string | null,
+  ): Promise<HtmlImportPageResult> {
+    const response = await this.localRequest<HtmlImportPageResult>(
+      `/api/projects/${projectId}/imports/html`,
+      {
+        method: "POST",
+        body: JSON.stringify({ sessionId, filename, html, name, parentId }),
+      },
+    );
+    if (!response.success || !response.data) {
+      throw new ProjectApiError(
+        response.error?.code || "HTML_IMPORT_INVALID",
+        response.error?.message || "导入 HTML 页面失败",
+        response.error?.details,
+      );
     }
     return response.data;
   }
