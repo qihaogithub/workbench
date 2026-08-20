@@ -9,6 +9,7 @@ import type {
   VisualStyleChange,
   AppActionPayload,
 } from "./iframe-types";
+import type { FieldConfig } from "./schema-parser";
 
 export type {
   IframeOutMessageType,
@@ -196,6 +197,8 @@ export interface ConfigFormProps {
   designSpecEntries?: DesignSpecEntryLink[];
   /** 创作端从规范详情跳转至文档视图；浏览端不传。 */
   onEditDesignSpec?: (docId: string, entryId: string) => void;
+  /** 创作端提供时，字段标题可打开对应的配置定义编辑器；浏览端不传。 */
+  onEditConfigDefinition?: (fieldKey: string, field: FieldConfig) => void;
 }
 
 /** 配置面板消费的设计规范绑定；设计规范内容不写入 Schema。 */
@@ -254,6 +257,7 @@ export type CanvasSaveStatus =
 
 export type CanvasPageRuntimeType =
   | "prototype-html-css"
+  | "sandboxed-html"
   | "high-fidelity-react"
   | "sketch-scene";
 
@@ -275,6 +279,8 @@ export interface CanvasPageData {
   prototypeHtml?: string;
   prototypeCss?: string;
   prototypeMeta?: Record<string, unknown>;
+  sandboxExecutionUrl?: string;
+  sandboxChannelId?: string;
   sketchScene?: string;
   sketchMeta?: Record<string, unknown>;
   configData?: Record<string, unknown>;

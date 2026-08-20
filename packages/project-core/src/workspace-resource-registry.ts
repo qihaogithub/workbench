@@ -7,6 +7,8 @@ export type WorkspaceResourceKind =
   | "page-prototype-html"
   | "page-prototype-css"
   | "page-prototype-meta"
+  | "page-sandbox-html"
+  | "page-html-import-meta"
   | "page-schema"
   | "page-sketch-scene"
   | "page-sketch-meta"
@@ -60,6 +62,8 @@ export class WorkspaceResourceRegistry {
     if (/^demos\/[^/]+\/prototype\.html$/.test(normalized)) return { kind: "page-prototype-html", text: true, maxBytes: TEXT_MAX_BYTES, validation: "text" };
     if (/^demos\/[^/]+\/prototype\.css$/.test(normalized)) return { kind: "page-prototype-css", text: true, maxBytes: TEXT_MAX_BYTES, validation: "text" };
     if (/^demos\/[^/]+\/prototype\.meta\.json$/.test(normalized)) return { kind: "page-prototype-meta", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
+    if (/^demos\/[^/]+\/sandbox\.html$/.test(normalized)) return { kind: "page-sandbox-html", text: true, maxBytes: TEXT_MAX_BYTES, validation: "text" };
+    if (/^demos\/[^/]+\/html-import\.meta\.json$/.test(normalized)) return { kind: "page-html-import-meta", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
     if (/^demos\/[^/]+\/config\.schema\.json$/.test(normalized)) return { kind: "page-schema", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
     if (/^demos\/[^/]+\/sketch\.scene\.json$/.test(normalized)) return { kind: "page-sketch-scene", text: true, maxBytes: TEXT_MAX_BYTES, validation: "sketch-scene" };
     if (/^demos\/[^/]+\/sketch\.meta\.json$/.test(normalized)) return { kind: "page-sketch-meta", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };

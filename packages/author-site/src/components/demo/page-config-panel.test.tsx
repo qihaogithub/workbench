@@ -317,8 +317,7 @@ describe("PageConfigPanel", () => {
     expect(screen.queryByText("标题")).not.toBeInTheDocument();
   });
 
-  it("配置项折叠区展示恢复与保存按钮并调用页面级回调", () => {
-    const onSaveAsDefaults = jest.fn();
+  it("配置内容无标题且不折叠，恢复入口收入右下角更多菜单", () => {
     const onRestoreDefaults = jest.fn();
     render(
       <TooltipProvider>
@@ -335,28 +334,50 @@ describe("PageConfigPanel", () => {
           activePageId="page_a"
           detailPageId="page_a"
           hideDetailHeader
-          onSaveAsDefaults={onSaveAsDefaults}
           onRestoreDefaults={onRestoreDefaults}
         />
       </TooltipProvider>,
     );
 
-    expect(screen.getByRole("button", { name: "恢复" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "保存" })).toBeInTheDocument();
+    expect(screen.queryByText("配置项")).not.toBeInTheDocument();
+    expect(screen.getByText("本页配置")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "恢复默认" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "恢复" }));
+    fireEvent.click(screen.getByRole("button", { name: "更多配置操作" }));
+    fireEvent.click(screen.getByRole("button", { name: "恢复默认" }));
     expect(screen.getByText("恢复默认配置")).toBeInTheDocument();
     expect(screen.getByText(/当前页面配置恢复为初始默认值/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
     expect(onRestoreDefaults).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("恢复默认配置")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "保存" }));
-    expect(screen.getByText("保存为默认配置")).toBeInTheDocument();
-    expect(screen.getByText(/当前本页配置覆盖默认配置/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "确认" }));
-    expect(onSaveAsDefaults).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText("保存为默认配置")).not.toBeInTheDocument();
+  });
+
+  it("字段名称打开单项编辑器，新增入口不再打开集合管理器", () => {
+    const onPageDefinitionChange = jest.fn();
+    render(
+      <TooltipProvider>
+        <PageConfigPanel
+          pages={[{ id: "page_a", name: "页面 A", order: 0, schema: pageSchema, configData: {} }]}
+          activePageId="page_a"
+          detailPageId="page_a"
+          hideDetailHeader
+          onPageDefinitionChange={onPageDefinitionChange}
+        />
+      </TooltipProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "编辑配置项：标题" }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("编辑配置项");
+    expect(screen.queryByText("管理配置项")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("名称"), { target: { value: "页面标题" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存字段" }));
+    expect(onPageDefinitionChange).toHaveBeenCalledWith("page_a", expect.objectContaining({ diff: expect.objectContaining({ updated: ["title"] }) }));
+
+    fireEvent.click(screen.getByRole("button", { name: "更多配置操作" }));
+    fireEvent.click(screen.getByRole("button", { name: "添加配置项" }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("添加配置项");
   });
 
   it("未传入配置项回调时不展示恢复与保存按钮", () => {
@@ -381,11 +402,11 @@ describe("PageConfigPanel", () => {
 
     expect(screen.getByText("共享配置")).toBeInTheDocument();
     expect(screen.getByText("本页配置")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "恢复" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "更多配置操作" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
   });
 
-  it("只读模式隐藏配置项折叠区的保存按钮，恢复按钮仍可操作", () => {
+  it("只读模式的更多菜单只保留恢复默认", () => {
     const onRestoreDefaults = jest.fn();
     render(
       <PageConfigPanel
@@ -407,10 +428,12 @@ describe("PageConfigPanel", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "恢复" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "更多配置操作" }));
+    expect(screen.getByRole("button", { name: "恢复默认" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "添加配置项" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "恢复" }));
+    fireEvent.click(screen.getByRole("button", { name: "恢复默认" }));
     fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
     expect(onRestoreDefaults).toHaveBeenCalledTimes(1);
   });
@@ -550,7 +573,7 @@ describe("PageConfigPanel 配置项与资源规范折叠区", () => {
     },
   });
 
-  it("配置项与资源规范折叠区默认展开，资源规范空态展示", () => {
+  it("配置内容无标题直接展示，资源规范折叠区默认展开", () => {
     render(
       <PageConfigPanel
         pages={[{ id: "page_a", name: "页面 A", order: 0, schema: pageSchema, configData: {} }]}
@@ -561,10 +584,45 @@ describe("PageConfigPanel 配置项与资源规范折叠区", () => {
       />,
     );
 
-    expect(screen.getByText("配置项")).toBeInTheDocument();
+    expect(screen.queryByText("配置项")).not.toBeInTheDocument();
     expect(screen.getByText("本页配置")).toBeInTheDocument();
     expect(screen.getByText("资源规范")).toBeInTheDocument();
     expect(screen.getByText("暂无资源规范")).toBeInTheDocument();
+  });
+
+  it("配置项关联的设计规范说明为空时不展示整个规范模块", () => {
+    render(
+      <ConfigForm
+        schema={typedPageSchema}
+        initialData={{ heroImage: "https://example.com/hero.png" }}
+        designSpecEntries={[
+          {
+            docId: "spec-1",
+            docTitle: "视觉规范",
+            entryId: "entry-1",
+            entryTitle: "主视觉图片",
+            markdown: "  \n ",
+            scope: "page",
+            fieldKey: "heroImage",
+          },
+          {
+            docId: "spec-1",
+            docTitle: "视觉规范",
+            entryId: "entry-2",
+            entryTitle: "有内容的规范",
+            markdown: "保留这条说明。",
+            scope: "page",
+            fieldKey: "heroImage",
+          },
+        ]}
+        onChange={() => {}}
+      />,
+    );
+
+    expect(screen.queryByRole("heading", { name: "主视觉图片" })).not.toBeInTheDocument();
+    expect(screen.queryByText("暂无说明")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "有内容的规范" })).toBeInTheDocument();
+    expect(screen.getByText("保留这条说明。")).toBeInTheDocument();
   });
 
   it("可隐藏资源规范，仅保留配置项", () => {
@@ -579,11 +637,11 @@ describe("PageConfigPanel 配置项与资源规范折叠区", () => {
       />,
     );
 
-    expect(screen.getByText("配置项")).toBeInTheDocument();
+    expect(screen.queryByText("配置项")).not.toBeInTheDocument();
     expect(screen.queryByText("资源规范")).not.toBeInTheDocument();
   });
 
-  it("浏览端仅在页面没有资源规范和关联设计规范时隐藏规范折叠区", () => {
+  it("浏览端将设计规范内联在配置项下，不再放入资源规范区", () => {
     const { rerender } = render(
       <PageConfigPanel
         pages={[{ id: "page_a", name: "页面 A", order: 0, schema: pageSchema, configData: {} }]}
@@ -613,15 +671,17 @@ describe("PageConfigPanel 配置项与资源规范折叠区", () => {
           entryId: "entry-1",
           entryTitle: "配图",
           markdown: "图片底部不留白。",
-          scope: "project",
-          fieldKey: "popupImage",
+          scope: "page",
+          pageId: "page_a",
+          fieldKey: "title",
         }]}
       />,
     );
 
-    expect(screen.getByText("资源规范")).toBeInTheDocument();
-    expect(screen.getByText("弹窗规范 · 配图")).toBeInTheDocument();
-    expect(screen.getByText("图片底部不留白。", { exact: false })).toBeInTheDocument();
+    expect(screen.queryByText("资源规范")).not.toBeInTheDocument();
+    expect(screen.queryByText("弹窗规范 · 配图")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "配图" })).toBeInTheDocument();
+    expect(screen.getByText("图片底部不留白。")).toBeInTheDocument();
   });
 
   it("资源规范中的 Markdown 标题、列表和 HTTPS 图片按展示格式渲染", () => {
@@ -658,36 +718,6 @@ describe("PageConfigPanel 配置项与资源规范折叠区", () => {
     );
 
     expect(screen.getByText("资源规范").closest(".order-first")).not.toBeNull();
-  });
-
-  it("浏览端定位 Tab 只滚动到资源规范或配置项，不切换或隐藏内容", () => {
-    render(
-      <PageConfigPanel
-        pages={[{ id: "page_a", name: "页面 A", order: 0, schema: pageSchema, configData: {} }]}
-        activePageId="page_a"
-        detailPageId="page_a"
-        hideDetailHeader
-        readonly
-        requirementsPosition="beforeConfig"
-        requirements="# 图片要求\n\n底部不留白"
-        sectionNavigation="anchorTabs"
-      />,
-    );
-
-    const requirementsTab = screen.getByRole("button", { name: "资源规范" });
-    const configTab = screen.getByRole("button", { name: "配置项" });
-
-    expect(requirementsTab).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("图片要求", { exact: false })).toBeInTheDocument();
-    expect(screen.getByText("本页配置")).toBeInTheDocument();
-
-    fireEvent.click(configTab);
-
-    expect(configTab).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("图片要求", { exact: false })).toBeInTheDocument();
-    expect(screen.getByText("本页配置")).toBeInTheDocument();
-    expect(requirementsTab).not.toHaveAttribute("aria-expanded");
-    expect(configTab).not.toHaveAttribute("aria-expanded");
   });
 
   it("readonly 时资源规范不显示编辑按钮", () => {

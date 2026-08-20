@@ -1,4 +1,5 @@
 import type { VisualNodeInfo } from "@workbench/demo-ui/iframe-types";
+import type { ImageDimensionRule } from "@workbench/shared/demo/config-schema-definition";
 
 export type VisualConfigKind = "text" | "image" | "color";
 
@@ -18,10 +19,8 @@ export interface VisualConfigTarget {
   defaultValue: string;
   category?: string;
   colorProperty?: "color" | "backgroundColor" | "borderColor";
-  imageWidthOperator?: ">" | "=" | "<" | "≥" | "≤";
-  imageWidthValue?: number;
-  imageHeightOperator?: ">" | "=" | "<" | "≥" | "≤";
-  imageHeightValue?: number;
+  widthRule?: ImageDimensionRule;
+  heightRule?: ImageDimensionRule;
 }
 
 export interface VisualConfigureParams {
@@ -273,14 +272,8 @@ function createSchemaProperty(target: VisualConfigTarget): Record<string, unknow
     uiOptions.category = category;
   }
   if (target.kind === "image") {
-    if (target.imageWidthOperator && typeof target.imageWidthValue === "number") {
-      uiOptions.widthOperator = target.imageWidthOperator;
-      uiOptions.widthValue = target.imageWidthValue;
-    }
-    if (target.imageHeightOperator && typeof target.imageHeightValue === "number") {
-      uiOptions.heightOperator = target.imageHeightOperator;
-      uiOptions.heightValue = target.imageHeightValue;
-    }
+    if (target.widthRule) uiOptions.widthRule = target.widthRule;
+    if (target.heightRule) uiOptions.heightRule = target.heightRule;
   }
   if (Object.keys(uiOptions).length > 0) {
     property["ui:options"] = uiOptions;

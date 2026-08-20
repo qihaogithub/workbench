@@ -81,6 +81,12 @@ vi.mock("./PreviewPanel", () => ({
   ),
 }));
 
+vi.mock("./SandboxedHtmlFrame", () => ({
+  SandboxedHtmlFrame: ({ executionUrl, title }: { executionUrl: string; title: string }) => (
+    <div data-testid="sandbox-renderer" data-url={executionUrl} data-title={title} />
+  ),
+}));
+
 function createPage(
   overrides: Partial<PreviewStagePage> = {},
 ): PreviewStagePage {
@@ -96,6 +102,24 @@ function createPage(
 }
 
 describe("SinglePagePreview", () => {
+  it("交互 HTML 显式使用 sandbox renderer，并优先于 iframe URL", () => {
+    render(
+      <SinglePagePreview
+        page={createPage({
+          runtimeType: "sandboxed-html" as PreviewStagePage["runtimeType"],
+          iframeUrl: "/wrong-trusted-frame.html",
+          sandboxExecutionUrl: "/sandbox/execution/opaque-id",
+          sandboxChannelId: "channel-1",
+          sandboxHtml: "<button>go</button>",
+        })}
+      />,
+    );
+    expect(screen.getByTestId("sandbox-renderer")).toHaveAttribute(
+      "data-url",
+      "/sandbox/execution/opaque-id",
+    );
+    expect(screen.queryByTestId("iframe-renderer")).not.toBeInTheDocument();
+  });
   it("优先分发发布 iframe 并透传页面公共属性", () => {
     render(
       <SinglePagePreview

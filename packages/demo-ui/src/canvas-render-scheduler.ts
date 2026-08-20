@@ -65,6 +65,11 @@ export function computeCanvasRenderModes({
       )
       .map((page) => page.id),
   );
+  const sandboxPageIds = new Set(
+    pages
+      .filter((page) => page.runtimeType === "sandboxed-html")
+      .map((page) => page.id),
+  );
   const snapshotPageIds = new Set(
     pages
       .filter(
@@ -73,7 +78,15 @@ export function computeCanvasRenderModes({
       )
       .map((page) => page.id),
   );
-  const runtimePages = pages.filter((page) => !prototypePageIds.has(page.id));
+  const runtimePages = pages.filter(
+    (page) =>
+      !prototypePageIds.has(page.id) && !sandboxPageIds.has(page.id),
+  );
+
+  // 画布只显示 sandboxed-html 的截图或安全占位；执行票据只在单页预览中消费。
+  for (const pageId of sandboxPageIds) {
+    modes[pageId] = screenshotUrls?.[pageId] ? "screenshot" : "loading";
+  }
 
   if (pages.length < MIN_CANVAS_SCREENSHOT_PAGE_COUNT) {
     for (const pageId of prototypePageIds) {

@@ -76,4 +76,52 @@ describe("loadCanvasPageContent", () => {
       "/api/sessions/session-1/files/local-page",
     );
   });
+
+  it("sandboxed-html 页面只通过鉴权接口申请执行票据", async () => {
+    const request = jest.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: { sandboxHtml: "<button>安全预览</button>", runtimeType: "sandboxed-html" },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: {
+            executionUrl: "/api/html-sandbox/executions/ticket",
+            channelId: "channel-1",
+            expiresAt: "2026-08-20T00:05:00.000Z",
+          },
+        }),
+      });
+
+    const result = await loadCanvasPageContent({
+      page: {
+        ...referencePage,
+        id: "interactive-page",
+        runtimeType: "sandboxed-html" as DemoPageMeta["runtimeType"],
+        reference: undefined,
+      },
+      projectId: "target-project",
+      sessionId: "session-1",
+      request,
+    });
+
+    expect(result).toMatchObject({
+      sandboxHtml: "<button>安全预览</button>",
+      sandboxExecutionUrl: "/api/html-sandbox/executions/ticket",
+      sandboxChannelId: "channel-1",
+    });
+    expect(request).toHaveBeenNthCalledWith(
+      2,
+      "/api/projects/target-project/demos/interactive-page/html-execution",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ sessionId: "session-1" }),
+      }),
+    );
+  });
 });

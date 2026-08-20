@@ -40,6 +40,12 @@ export interface PrototypePagePreviewProps {
   visualPropertyChanges?: VisualPropertyChange[];
   onVisualSelect?: (node: VisualNodeInfo | null) => void;
   onVisualSelectStack?: (nodes: VisualNodeInfo[]) => void;
+  /** 双击叶子文本后的直接提交；绑定文本由宿主写入配置，普通文本写回 prototype.html。 */
+  onVisualTextChange?: (
+    node: VisualNodeInfo,
+    nextText: string,
+    previousText: string,
+  ) => void;
   onToggleNodeHidden?: (node: VisualNodeInfo) => void;
   visualNodeTreeRequestKey?: number;
   onVisualNodeTreeChange?: (nodes: VisualNodeTreeItem[]) => void;
@@ -175,6 +181,7 @@ function getNodeInfo(element: VisualElement, root: Element): VisualNodeInfo {
   const style = window.getComputedStyle(element);
   const domPath = getDomPath(element, root);
   const className = element.getAttribute("class")?.trim() || undefined;
+  const textBindingKey = element.getAttribute("data-bind-text")?.trim();
   const caps: VisualNodeInfo["editCapabilities"] = ["annotate", "style", "structure"];
   if (text && element.children.length === 0) caps.push("text");
   if (element instanceof HTMLImageElement || element.getAttribute("src")) caps.push("image");
@@ -198,6 +205,9 @@ function getNodeInfo(element: VisualElement, root: Element): VisualNodeInfo {
       role: element.getAttribute("role") || undefined,
       ariaLabel: element.getAttribute("aria-label") || undefined,
     },
+    binding: textBindingKey
+      ? { kind: "text", key: textBindingKey }
+      : undefined,
     computedStyle: {
       color: style.color || undefined,
       backgroundColor: style.backgroundColor || undefined,
@@ -433,6 +443,7 @@ export function PrototypePagePreview({
   visualPropertyChanges = [],
   onVisualSelect,
   onVisualSelectStack,
+  onVisualTextChange,
   onToggleNodeHidden,
   visualNodeTreeRequestKey,
   onVisualNodeTreeChange,
@@ -730,6 +741,9 @@ export function PrototypePagePreview({
       [data-prototype-annotation-pin], [data-prototype-annotation-pin] * {
         cursor: pointer !important;
       }
+      [data-prototype-text-editor] {
+        cursor: text !important;
+      }
     `;
     shadow.appendChild(style);
     return () => style.remove();
@@ -758,10 +772,24 @@ export function PrototypePagePreview({
     };
 
     const handlePointerOver = (event: Event) => {
+      if (
+        event.composedPath().some(
+          (item) => item instanceof Element && item.hasAttribute("data-prototype-text-editor"),
+        )
+      ) {
+        return;
+      }
       const target = resolveVisualEventTarget(event.composedPath()[0] ?? null, root);
       setHoveredElement(target);
     };
     const handleClick = (event: Event) => {
+      if (
+        event.composedPath().some(
+          (item) => item instanceof Element && item.hasAttribute("data-prototype-text-editor"),
+        )
+      ) {
+        return;
+      }
       const pinnedElement = (event.composedPath()[0] as Element | null)?.closest(
         "[data-prototype-annotation-pin]",
       );
@@ -825,6 +853,127 @@ export function PrototypePagePreview({
           },
         });
       }
+    };
+    let activeTextEditor: {
+      editor: HTMLTextAreaElement;
+      target: HTMLElement;
+      node: VisualNodeInfo;
+      previousText: string;
+      inlineColor: string;
+      inlineTextShadow: string;
+      composing: boolean;
+    } | null = null;
+
+    const finishTextEdit = (commit: boolean) => {
+      const active = activeTextEditor;
+      if (!active) return;
+      activeTextEditor = null;
+      const nextText = active.editor.value;
+      active.target.style.color = active.inlineColor;
+      active.target.style.textShadow = active.inlineTextShadow;
+      active.editor.remove();
+      host.focus({ preventScroll: true });
+      if (commit && nextText !== active.previousText) {
+        onVisualTextChange?.(active.node, nextText, active.previousText);
+      }
+    };
+
+    const startTextEdit = (target: VisualElement) => {
+      if (!(target instanceof HTMLElement) || target.children.length > 0) return;
+      const node = getNodeInfo(target, root);
+      if (!node.editCapabilities.includes("text")) return;
+
+      finishTextEdit(false);
+      const previousText = target.textContent ?? "";
+      const targetRect = target.getBoundingClientRect();
+      const rootRect = root.getBoundingClientRect();
+      const scaleX = root.offsetWidth > 0 ? rootRect.width / root.offsetWidth : 1;
+      const scaleY = root.offsetHeight > 0 ? rootRect.height / root.offsetHeight : scaleX;
+      const computed = getComputedStyle(target);
+      const editor = document.createElement("textarea");
+      editor.setAttribute("data-prototype-text-editor", "true");
+      editor.setAttribute("aria-label", `编辑 ${node.tagName} 文本`);
+      editor.value = previousText;
+      Object.assign(editor.style, {
+        position: "absolute",
+        left: `${(targetRect.left - rootRect.left) / Math.max(scaleX, 0.0001) + root.scrollLeft}px`,
+        top: `${(targetRect.top - rootRect.top) / Math.max(scaleY, 0.0001) + root.scrollTop}px`,
+        width: `${Math.max(targetRect.width / Math.max(scaleX, 0.0001), 24)}px`,
+        height: `${Math.max(targetRect.height / Math.max(scaleY, 0.0001), parseFloat(computed.lineHeight) || 24)}px`,
+        minHeight: `${parseFloat(computed.lineHeight) || 24}px`,
+        margin: "0",
+        padding: computed.padding,
+        border: "2px solid #2563eb",
+        borderRadius: computed.borderRadius,
+        outline: "none",
+        resize: "none",
+        overflow: "hidden",
+        zIndex: "2147483646",
+        background: "transparent",
+        color: computed.color,
+        caretColor: computed.color,
+        font: computed.font,
+        fontFamily: computed.fontFamily,
+        fontSize: computed.fontSize,
+        fontWeight: computed.fontWeight,
+        lineHeight: computed.lineHeight,
+        letterSpacing: computed.letterSpacing,
+        textAlign: computed.textAlign,
+        whiteSpace: computed.whiteSpace,
+        boxSizing: "border-box",
+        cursor: "text",
+      });
+
+      activeTextEditor = {
+        editor,
+        target,
+        node,
+        previousText,
+        inlineColor: target.style.color,
+        inlineTextShadow: target.style.textShadow,
+        composing: false,
+      };
+      target.style.color = "transparent";
+      target.style.textShadow = "none";
+      root.appendChild(editor);
+
+      editor.addEventListener("pointerdown", (event) => event.stopPropagation());
+      editor.addEventListener("click", (event) => event.stopPropagation());
+      editor.addEventListener("dblclick", (event) => event.stopPropagation());
+      editor.addEventListener("compositionstart", () => {
+        if (activeTextEditor) activeTextEditor.composing = true;
+      });
+      editor.addEventListener("compositionend", () => {
+        if (activeTextEditor) activeTextEditor.composing = false;
+      });
+      editor.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          finishTextEdit(false);
+          return;
+        }
+        if (event.key === "Enter" && !event.shiftKey && !activeTextEditor?.composing) {
+          event.preventDefault();
+          finishTextEdit(true);
+        }
+      });
+      editor.addEventListener("blur", () => finishTextEdit(true));
+      editor.focus({ preventScroll: true });
+      editor.select();
+    };
+
+    const handleDoubleClick = (event: Event) => {
+      if (visualAnnotationMode) return;
+      const target = resolveVisualEventTarget(event.composedPath()[0] ?? null, root);
+      if (!target || target === root) return;
+      const node = getNodeInfo(target, root);
+      if (!node.editCapabilities.includes("text")) return;
+      event.preventDefault();
+      event.stopPropagation();
+      activeSelectedElement = target;
+      onVisualSelect?.(node);
+      onVisualSelectStack?.(collectAncestorNodeStack(target, root));
+      startTextEdit(target);
     };
     const handlePointerLeave = () => setHoveredElement(null);
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -910,14 +1059,17 @@ export function PrototypePagePreview({
 
     shadow.addEventListener("pointerover", handlePointerOver);
     shadow.addEventListener("click", handleClick, true);
+    shadow.addEventListener("dblclick", handleDoubleClick, true);
     shadow.addEventListener("pointerleave", handlePointerLeave);
     shadow.addEventListener("contextmenu", handleContextMenu, true);
     host.addEventListener("keydown", handleKeyDown);
     return () => {
       setHoveredElement(null);
       setContextMenu(null);
+      finishTextEdit(false);
       shadow.removeEventListener("pointerover", handlePointerOver);
       shadow.removeEventListener("click", handleClick, true);
+      shadow.removeEventListener("dblclick", handleDoubleClick, true);
       shadow.removeEventListener("pointerleave", handlePointerLeave);
       shadow.removeEventListener("contextmenu", handleContextMenu, true);
       host.removeEventListener("keydown", handleKeyDown);
@@ -925,6 +1077,7 @@ export function PrototypePagePreview({
   }, [
     onVisualSelect,
     onVisualSelectStack,
+    onVisualTextChange,
     onToggleNodeHidden,
     selectedVisualNodeId,
     visualAnnotationMode,

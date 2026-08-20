@@ -133,11 +133,13 @@ runtime issue 的 JSON 字段包括 `pageId`、`severity`、`stage`、`code`、`
 
 HTML/CSS 原型页通过同一套页面命令进入编辑事务。`page create` 支持 `runtimeType: "prototype-html-css"`，并接收 `prototypeHtml`、`prototypeCss` 和 `prototypeMeta`；`page update-prototype` 用于更新原型页内容，不复用 `page update-code`。当前共享层默认行为也已切到“未显式传 `runtimeType` 且未传 React `code` 时默认创建原型页”，因此需要稳定创建高保真 React 页时，应显式传 `--runtime-type high-fidelity-react` 或直接提供页面代码。原型页校验由 `project-core` 执行，只检查静态 HTML/CSS 安全边界，不进入 React 编译和 iframe runtime contract。CLI JSON 会保留 `prototypeGate`，让代理能区分继续修复原型页还是升级为高保真页。
 
+可执行 HTML 使用同一套事务和 JSON 合同，但运行时固定为 `sandboxed-html`。`page create` 与 `page switch-runtime` 接收 `sandboxHtml`、`htmlImportMeta`；project-core 负责判型、归一化、`sourceHash`（原始输入）与 `normalizedHash`（持久化源码）校验，并只写入 `sandbox.html` 与 `html-import.meta.json`。CLI 不启动浏览器、不生成执行 ticket，也不把源码映射为公开静态资源；正式发布和 viewer/embed 动态签发由 author-site 负责。
+
 原型页 HTML 当前允许最高 2MB 输入，主要用于承接大型 Figma HTML 导出。只要仍满足静态安全边界，`page create`、`page update-prototype`、`page update-prototypes` 与 `project import-prototype` 都应继续复用这条共享链路，而不是因为旧 120KB 假设被迫拆页或误判成 CLI 能力缺失。
 
 草图页也通过同一套页面命令进入编辑事务。`page create` 支持 `runtimeType: "sketch-scene"`，并接收 `sketchScene` 和 `sketchMeta`；`page update-sketch` 用于更新草图 scene，不复用代码或原型页更新命令。草图页校验由 `project-core` 调用 `@workbench/sketch-core` 的 `SketchSceneDocument` 校验入口执行，失败时返回结构化 runtime issue。
 
-`page switch-runtime` 用于在编辑事务内切换页面运行时类型。命令接收目标 `targetRuntimeType`，并可同时传入目标运行时需要的 `code`、`prototypeHtml`、`prototypeCss`、`prototypeMeta`、`sketchScene`、`sketchMeta` 和 `schema`。`project-core` 会先按目标运行时校验产物；通过后才更新页面元数据和目标运行时文件，失败时返回 `VALIDATION_BLOCKED` 并保留原页面内容。旧运行时文件不会在切换时删除，用于失败回退、对比或后续 AI 继续转换。
+`page switch-runtime` 用于在编辑事务内切换页面运行时类型。命令接收目标 `targetRuntimeType`，并可同时传入目标运行时需要的 `code`、`prototypeHtml`、`prototypeCss`、`prototypeMeta`、`sandboxHtml`、`htmlImportMeta`、`sketchScene`、`sketchMeta` 和 `schema`。`project-core` 会先按共享 capability registry 校验产物；通过后才更新页面元数据和目标运行时文件，失败时返回 `VALIDATION_BLOCKED` 并保留原页面内容，同时清理旧运行时文件以避免混合合同。
 
 ## JSON 输出契约
 
@@ -203,6 +205,8 @@ ow project content-gc <projectId> --dry-run --json
 ## 发布路径
 
 `publish project` 优先调用 author-site 正式发布 API。该路径需要配置 `AUTHOR_SITE_URL` 和 `AUTHOR_SITE_AUTH_TOKEN`，由 Web 发布链路完成编译、产物写入和可选外部同步。
+
+当项目含 `sandboxed-html` 页面时，CLI 仍只调用正式发布链路：发布清单不含 sandbox 源码，源码与 manifest 保存在服务端私有发布源，使用端和嵌入端再通过独立 origin 动态签发短时 opaque ticket。未配置独立 sandbox origin、manifest 校验失败或运行时不支持时，CLI 返回稳定错误码，不回退到公开静态文件。
 
 当远端发布配置缺失时，CLI 会退回到 `project-core` 的本地发布状态更新。这是降级路径，只能用于本地管理状态闭环；输出需要带上对应提示和产物摘要，避免代理误判为完整线上发布。两条发布路径都会返回或记录内容图 `commitId`，用于把发布结果绑定到当时的资源指针集合。
 

@@ -1,7 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { ViewerDocumentView } from "../src/components/ViewerDocumentView";
+import {
+  hasViewerDocumentContent,
+  ViewerDocumentView,
+} from "../src/components/ViewerDocumentView";
 
 vi.mock("@workbench/demo-ui", () => ({
   DocumentEditor: ({ value, readOnly }: { value: string; readOnly?: boolean }) => (
@@ -22,6 +25,7 @@ vi.mock("@workbench/demo-ui", () => ({
 }));
 
 vi.mock("../src/lib/api", () => ({
+  DATA_BASE: "/data",
   getKnowledgeDocContent: vi.fn(),
   getDataUrl: (value: string) => value,
   getDesignSpecDoc: vi.fn().mockResolvedValue({
@@ -37,6 +41,33 @@ vi.mock("../src/lib/api", () => ({
 }));
 
 describe("ViewerDocumentView", () => {
+  it("only exposes document content for user documents or design specifications", () => {
+    expect(hasViewerDocumentContent([], [])).toBe(false);
+    expect(hasViewerDocumentContent([
+      {
+        id: "system",
+        title: "项目公约",
+        fileName: "system.md",
+        source: "system",
+        description: "",
+        addedAt: "",
+        updatedAt: "",
+      },
+    ], [])).toBe(false);
+    expect(hasViewerDocumentContent([
+      {
+        id: "user",
+        title: "使用说明",
+        fileName: "guide.md",
+        source: "user",
+        description: "",
+        addedAt: "",
+        updatedAt: "",
+      },
+    ], [])).toBe(true);
+    expect(hasViewerDocumentContent([], [{ id: "spec-1", title: "首页规范", createdAt: "", updatedAt: "" }])).toBe(true);
+  });
+
   it("renders design-spec configuration entries with the author-side card structure", async () => {
     render(
       <ViewerDocumentView
@@ -64,6 +95,6 @@ describe("ViewerDocumentView", () => {
       "max-w-[760px]",
     );
     expect(screen.getByText("图片应使用 16:9。").getAttribute("data-external-media")).toBe("true");
-    expect(screen.queryByText("图片应使用 16:9。").getAttribute("data-read-only")).toBeNull();
+    expect(screen.getByText("图片应使用 16:9。").getAttribute("data-read-only")).toBeNull();
   });
 });

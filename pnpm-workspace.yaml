@@ -1,6 +1,7 @@
 packages:
   - "packages/*"
   - "OPS/CLI"
+  - "tools/page-export-extension"
 
 allowBuilds:
   '@google/genai': set this to true or false

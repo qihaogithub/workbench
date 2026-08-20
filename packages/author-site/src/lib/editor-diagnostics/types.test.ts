@@ -113,6 +113,44 @@ describe("editor diagnostic sanitizers", () => {
     });
   });
 
+  it("保留 sandbox 执行摘要但不记录源码与原始票据", () => {
+    const event = normalizeEditorDiagnosticEvent({
+      id: "evt-sandbox",
+      editorSessionId: "editor-session-1",
+      projectId: "project-1",
+      activePageId: "page-1",
+      timestamp: 1,
+      category: "preview",
+      name: "preview.sandbox_runtime_failed",
+      level: "error",
+      details: {
+        runtimeType: "sandboxed-html",
+        sandboxPolicyVersion: 1,
+        renderer: "sandbox-html",
+        timeoutMs: 8_000,
+        blockedRequestCount: 3,
+        contextClosed: true,
+        browserRestarted: false,
+        executionIdHash: "sha256:opaque",
+        executionId: "raw-ticket-id",
+        code: "<script>secret()</script>",
+      },
+    });
+
+    expect(event.payload).toEqual({
+      runtimeType: "sandboxed-html",
+      sandboxPolicyVersion: 1,
+      renderer: "sandbox-html",
+      timeoutMs: 8_000,
+      blockedRequestCount: 3,
+      contextClosed: true,
+      browserRestarted: false,
+      executionIdHash: "sha256:opaque",
+      code: { length: 25, redacted: true },
+    });
+    expect(event.payload).not.toHaveProperty("executionId");
+  });
+
   it("保留 AI 发送前同步失败的阶段化字段", () => {
     const event = normalizeEditorDiagnosticEvent({
       id: "evt-ai-before-send",

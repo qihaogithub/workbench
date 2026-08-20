@@ -52,6 +52,7 @@ export default async function EmbedPage({ params }: EmbedPageProps) {
       const publishedPages: Array<{
         id: string
         name: string
+        runtimeType?: string
         schemaPath?: string
         iframeHtmlPath?: string
         embedCode?: string
@@ -74,18 +75,25 @@ export default async function EmbedPage({ params }: EmbedPageProps) {
             : '{}'
 
           const iframeUrl = viewerBaseUrl
-            ? `${viewerBaseUrl}/data/${demoId}/${page.iframeHtmlPath || `demos/${page.id}/iframe.html`}`
-            : `/${page.iframeHtmlPath || `demos/${page.id}/iframe.html`}`
+            ? page.runtimeType === 'sandboxed-html'
+              ? `/api/embed/${demoId}/iframe?page=${encodeURIComponent(page.id)}`
+              : `${viewerBaseUrl}/data/${demoId}/${page.iframeHtmlPath || `demos/${page.id}/iframe.html`}`
+            : page.runtimeType === 'sandboxed-html'
+              ? `/api/embed/${demoId}/iframe?page=${encodeURIComponent(page.id)}`
+              : `/${page.iframeHtmlPath || `demos/${page.id}/iframe.html`}`
 
           const mergedConfigData = mergeConfigToProps(projectConfigSchema, schema)
 
           return (
             <EmbedPageContent
-              embedCode={page.embedCode || ''}
+              embedCode={page.runtimeType === 'sandboxed-html'
+                ? `<iframe src="/api/embed/${demoId}/iframe?page=${encodeURIComponent(page.id)}" sandbox="allow-scripts" style="width:100%;border:none"></iframe>`
+                : page.embedCode || ''}
               iframeUrl={iframeUrl}
               schema={schema}
               projectConfigSchema={projectConfigSchema}
               initialConfigData={mergedConfigData}
+              runtimeType={page.runtimeType}
             />
           )
         }
@@ -108,8 +116,12 @@ export default async function EmbedPage({ params }: EmbedPageProps) {
           } catch {}
 
           const iframeUrl = viewerBaseUrl
-            ? `${viewerBaseUrl}/data/${demoId}/${page.iframeHtmlPath || `demos/${page.id}/iframe.html`}`
-            : `/${page.iframeHtmlPath || `demos/${page.id}/iframe.html`}`
+            ? page.runtimeType === 'sandboxed-html'
+              ? `/api/embed/${demoId}/iframe?page=${encodeURIComponent(page.id)}`
+              : `${viewerBaseUrl}/data/${demoId}/${page.iframeHtmlPath || `demos/${page.id}/iframe.html`}`
+            : page.runtimeType === 'sandboxed-html'
+              ? `/api/embed/${demoId}/iframe?page=${encodeURIComponent(page.id)}`
+              : `/${page.iframeHtmlPath || `demos/${page.id}/iframe.html`}`
 
           return {
             id: page.id,
@@ -117,6 +129,7 @@ export default async function EmbedPage({ params }: EmbedPageProps) {
             schema: pageSchema,
             iframeUrl,
             initialConfigData: pageConfigData,
+            runtimeType: page.runtimeType,
           }
         })
 
@@ -140,7 +153,7 @@ export default async function EmbedPage({ params }: EmbedPageProps) {
   const iframeUrl = `/api/embed/${demoId}/iframe`
   const embedCode = `<iframe
   src="${iframeUrl}"
-  sandbox="allow-scripts allow-same-origin"
+  sandbox="allow-scripts"
   style="width: 100%; border: none;"
 />`
 

@@ -73,8 +73,9 @@ AI agent 在启动任务前应优先读取 `memory.md`（如果存在），以�
 ### 子智能体模型路由
 
 - 主智能体继续使用用户在 Codex 界面中选择的模型，不修改全局默认模型配置。
-- 纯文本代码检索、代码研究、架构分析和审查类子任务优先使用 DeepSeek 子智能体。
-- 实现、修改、测试、浏览器自动化和多模态类子任务使用 `gpt-5.6-luna` 子智能体；该模型适合高并发、成本敏感的工作负载。
+- 对于调查、代码检索、日志梳理，以及边界明确、方案完善且验收标准清晰的实施任务，优先派发已配置的 `LunaWorker` 子智能体（`gpt-5.6-luna`）。任务可以跨多个文件或篇幅较大；只要不需要在执行中重新作关键决策，就不以“简单”或“低风险”为限制。它尤其适合需要消耗较多上下文或 token 的高吞吐任务。
+- `LunaWorker` 不独立承担未决的架构、产品、安全或接口契约决策，也不处理破坏性操作、视觉验收或难以复现的疑难问题；主智能体先明确方案后，可将其余实现部分交给 `LunaWorker`。
+- DeepSeek 子智能体仅在已实际配置并通过验收后才可作为纯文本研究/审查的优先路由；当前未配置时不得假定可用。
 - 只有在任务确实需要更高推理能力，或 Luna 无法完成时，才升级子任务模型，并在进度或最终说明中注明原因。
 
 ## 创作端问题诊断优先入口
@@ -192,6 +193,31 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h
 - normalize 进度日志走 stderr，stdout 只输出 JSON。
 - 评审意见回流用 `bin/export-opinions.mjs`：读 `data/projects/<projectId>/comments.json`，按 routeKey（来自 demoPages / `data-route` 锚点）导出意见 JSON，agent 在开发项目按 routeKey 定位源码消费。
 - 纯静态 HTML/CSS 项目走 B 路径：`export.mjs --static <html-dir>`（跳过 single-file 渲染，直接净化源码，复用 normalize 净化规则）；`import-prototype` 已支持按 pageId 覆盖更新既有原型页。
+
+## 高保真页面快照插件（tools/page-export-extension/）
+
+`tools/page-export-extension/` 是 Chrome / Edge Manifest V3 内部技术原型，把用户当前标签导出为包含可执行内容的 Editable Snapshot Bundle v1；纯函数拆包核心位于 `packages/editable-snapshot-core/`。它与 `tools/page-export/` 的静态原型净化链路互斥：不得把高保真 bundle 直接导入创作端原型运行时，也不得用 prototypeGate 规则覆盖 faithful 原件。
+
+关键约束：
+
+- 构建入口：`corepack pnpm check:page-export-extension`；解压扩展产物在 `tools/page-export-extension/dist/`。
+- 插件构建期展开 `single-file-cli@2.0.83` 内置的 SingleFile Core 1.5.68 静态脚本，运行时禁止 `eval`；升级版本必须同时复核采集选项、浏览器夹具和 AGPL notice。
+- 当前许可状态仅允许内部原型，禁止商店发布或外部分发；完成 AGPL 兼容发布决策或商业许可后才能产品化。
+- `activeTab` hook 在用户点击后注入，无法回溯所有 document-start 状态；capture report 必须保留该降级，不能宣称通用交互完全还原。
+- 大 HTML 走 256KB Port 分块、sequence/checksum、后台串行转发与 offscreen 聚合；不要改回单条 runtime message。
+- Bundle 包含脚本、iframe 和事件，必须标记 `executableContent: true`，默认用隔离 runner 离线预览；不得读取或导出 Cookie、浏览器 storage 数据库或 history。
+- offscreen 生成 ZIP 后必须进入 `review_required`，由 Popup/Side Panel 展示安全与 fidelity 摘要；用户批准前不得调用 downloads，取消/失败/批准后需撤销 Blob URL。
+- Side Panel 的批量捕获先按需申请可选 `tabs`，再为用户逐项选择的标签申请按 scheme 与 host 限定的权限；Chrome host match pattern 不能区分端口，必须在 UI/报告中如实说明该边界。不得默认全选、自动激活标签或把当前可见截图冒充非活动标签。
+- fidelity 回放使用 script-disabled/offline iframe + html2canvas DOM/CSS 渲染。不要改回 SVG `foreignObject` 绘制：Chrome 会把包含 HTML 的 canvas 标为 origin-unclean，`toBlob` 必然失败。报告必须继续声明近似渲染不证明交互等价。
+- 执行文件保持原字节，Prettier 只写 `workspace/readable/`；外部 source map/source 只能经已授权 scheme-and-host、无凭证 GET 拉取，并拒绝跨 origin 重定向。Agent 修改后用 bundle 内 `runner/repack.mjs` 追加 workspace 内容哈希历史。
+
+## HTML sandbox 长期约定
+
+- HTML 自动判型由共享 runtime capability registry 统一维护；当前四类 runtime 为 `prototype-html-css`、`sandboxed-html`、`high-fidelity-react`、`sketch-scene`，未知 runtime 必须 fail-closed。
+- `sandboxed-html` 页面 canonical 文件是 `sandbox.html` 与 `html-import.meta.json`；`sourceHash` 表示原始输入，`normalizedHash` 表示持久化归一化源码，禁止交换语义或把源码作为公开静态资源。
+- 交互预览、viewer/embed 和发布都必须使用独立 sandbox origin、5 分钟 opaque execution ticket、`allow-scripts`、CSP/Permissions-Policy/referrer/no-store；不得把 ticket、源码或宿主会话注入页面。
+- screenshot-service 对 sandbox 使用每任务独立 Chromium context，并在超时/错误时有界清理与强杀兜底。sandbox 降低权限但不承诺绝对断网、CPU/内存硬隔离或任意脚本业务等价。
+- 发布只公开 manifest 摘要，源码保存在服务端私有源，由 viewer/embed 动态签发 ticket；诊断只记录脱敏摘要，禁止记录 execution ticket、HTML 原文或用户代码。
 
 `OPS/automations/` 用于维护 Codex 定时任务和维护型自动任务的运行上下文，包括 context、runbook 和当前状态账本。它的目标读者是自动任务中的 AI，优先保证可执行、可复查和低噪声更新。
 

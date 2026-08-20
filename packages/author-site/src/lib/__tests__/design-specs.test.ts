@@ -130,7 +130,7 @@ describe("配置项素材池聚合", () => {
     expect(byKey.brandPrimary.kind).toBe("color");
     expect(byKey.headingFont.kind).toBe("text");
     expect(byKey.logo.kind).toBe("image");
-    expect(byKey.logo.format).toBe("SVG");
+    expect(byKey.logo.format).toBe("不限");
     expect(byKey.btnRadius.kind).toBe("number");
     expect(byKey.bannerMotion.kind).toBe("motion");
   });
@@ -158,6 +158,37 @@ describe("配置项素材池聚合", () => {
     });
 
     expect(pool[0].size).toEqual({ w: "750", h: "148" });
+  });
+
+  it("将图片 ui:options 的格式与尺寸规则带到设计规范摘要", () => {
+    const pool = buildConfigPool(undefined, [{
+      id: "p1",
+      name: "首页",
+      schema: JSON.stringify({
+        properties: {
+          hero: {
+            type: "string",
+            format: "image",
+            title: "主视觉图片",
+            "ui:options": {
+              accept: "image/png,image/jpeg",
+              widthRule: { operator: "=", value: 100 },
+              heightRule: { operator: "=", value: 100 },
+            },
+          },
+        },
+      }),
+    }]);
+
+    expect(pool[0].format).toBe("png/jpg");
+    expect(pool[0].size).toEqual({
+      w: "100",
+      h: "100",
+      wOperator: "=",
+      hOperator: "=",
+      wAny: false,
+      hAny: false,
+    });
   });
 
   it("无项目 schema 时只聚合页面级", () => {

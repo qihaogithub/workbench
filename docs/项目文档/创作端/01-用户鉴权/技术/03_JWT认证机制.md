@@ -2,6 +2,7 @@
 covers:
   - packages/author-site/src/lib/auth/jwt.ts
   - packages/author-site/src/lib/auth/password.ts
+  - packages/author-site/package.json
   - docker-compose.yml
 ---
 
@@ -222,6 +223,8 @@ cookies().set("auth_token", token, {
 ```
 
 Docker Compose 默认面向局域网 HTTP 访问，因此 `USE_SECURE_COOKIE` 默认值为 `false`；如果服务放在 HTTPS 域名后，应在环境变量中显式改为 `true`。
+
+author-site 的 workspace 脚本会显式读取仓库根目录的 `.env`（文件不存在时不阻断启动）。这避免从包目录启动 Next.js 时遗漏 Cookie 配置，导致 HTTP 的 frpc 穿透虽然登录接口返回成功、浏览器却拒绝保存带 `Secure` 标志的 Cookie。对外协议是唯一判断依据：HTTP 设为 `false`，HTTPS 设为 `true`；修改后必须重启 author-site。
 
 ### 4.3 Cookie 读取
 

@@ -24,6 +24,7 @@ ENV NEXT_PUBLIC_MODEL_NAME_FILTERS=${NEXT_PUBLIC_MODEL_NAME_FILTERS}
 ENV CI=true
 
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY patches/ ./patches/
 COPY packages/agent-client/package.json ./packages/agent-client/
 COPY packages/ai-chat-shared/package.json ./packages/ai-chat-shared/
 COPY packages/demo-ui/package.json ./packages/demo-ui/
@@ -33,7 +34,7 @@ COPY packages/shared/package.json ./packages/shared/
 COPY packages/viewer-site/package.json ./packages/viewer-site/
 
 RUN --mount=type=cache,id=workbench-pnpm-store,target=/pnpm/store \
-    pnpm install --store-dir /pnpm/store --no-frozen-lockfile --ignore-scripts \
+    pnpm install --store-dir /pnpm/store --frozen-lockfile --ignore-scripts \
     && pnpm rebuild --store-dir /pnpm/store esbuild
 
 COPY packages/agent-client/ ./packages/agent-client/

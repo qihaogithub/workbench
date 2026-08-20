@@ -40,6 +40,7 @@ ENV JWT_SECRET=${JWT_SECRET}
 ENV CI=true
 
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY patches/ ./patches/
 COPY packages/agent-client/package.json ./packages/agent-client/
 COPY packages/ai-chat-shared/package.json ./packages/ai-chat-shared/
 COPY packages/demo-ui/package.json ./packages/demo-ui/
@@ -48,13 +49,14 @@ COPY packages/knowledge-service/package.json ./packages/knowledge-service/
 COPY packages/preview-contract/package.json ./packages/preview-contract/
 COPY packages/project-core/package.json ./packages/project-core/
 COPY packages/project-scaffold/package.json ./packages/project-scaffold/
+COPY packages/prototype-core/package.json ./packages/prototype-core/
 COPY packages/sketch-core/package.json ./packages/sketch-core/
 COPY packages/sketch-react/package.json ./packages/sketch-react/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/author-site/package.json ./packages/author-site/
 
 RUN --mount=type=cache,id=workbench-pnpm-store,target=/pnpm/store \
-    pnpm install --store-dir /pnpm/store --no-frozen-lockfile --ignore-scripts \
+    pnpm install --store-dir /pnpm/store --frozen-lockfile --ignore-scripts \
     && pnpm rebuild --store-dir /pnpm/store esbuild \
     && pnpm --filter @workbench/author-site rebuild --store-dir /pnpm/store better-sqlite3
 
@@ -66,6 +68,7 @@ COPY packages/knowledge-service/ ./packages/knowledge-service/
 COPY packages/preview-contract/ ./packages/preview-contract/
 COPY packages/project-core/ ./packages/project-core/
 COPY packages/project-scaffold/ ./packages/project-scaffold/
+COPY packages/prototype-core/ ./packages/prototype-core/
 COPY packages/sketch-core/ ./packages/sketch-core/
 COPY packages/sketch-react/ ./packages/sketch-react/
 COPY packages/shared/ ./packages/shared/

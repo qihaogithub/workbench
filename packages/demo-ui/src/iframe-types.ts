@@ -81,6 +81,11 @@ export interface VisualNodeInfo {
     role?: string;
     ariaLabel?: string;
   };
+  /** 原型页节点的运行时配置绑定；编辑器据此修改配置值而不是覆盖绑定源码。 */
+  binding?: {
+    kind: 'text';
+    key: string;
+  };
   computedStyle?: {
     color?: string;
     backgroundColor?: string;

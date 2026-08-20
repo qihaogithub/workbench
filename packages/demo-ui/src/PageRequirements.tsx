@@ -2,6 +2,7 @@
 
 import { useCallback, useRef } from "react";
 import { renderPageRequirementsMarkdown, stripMarkdown } from "./note-html";
+import { cn } from "./utils";
 import "./page-requirements.css";
 
 interface PageRequirementsProps {
@@ -16,6 +17,8 @@ interface PageRequirementsProps {
   allowExternalMedia?: boolean;
   /** 浏览端数据源地址；用于跨站访问创作端全局图床。 */
   mediaBaseUrl?: string;
+  /** 供嵌入式规范卡复用阅读器的排版约束。 */
+  className?: string;
 }
 
 /**
@@ -30,6 +33,7 @@ export function PageRequirements({
   placeholderText = "暂无配置要求",
   allowExternalMedia = false,
   mediaBaseUrl,
+  className,
 }: PageRequirementsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -64,7 +68,7 @@ export function PageRequirements({
   return (
     <div
       ref={containerRef}
-      className="page-requirements-content text-muted-foreground"
+      className={cn("page-requirements-content text-muted-foreground", className)}
       onClick={handleClick}
       dangerouslySetInnerHTML={{ __html: sanitized }}
     />

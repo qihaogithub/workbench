@@ -50,12 +50,14 @@ import {
   reorderDemoPages,
   switchPageRuntime,
   deleteDemoPage,
+  issuePublishedHtmlExecution,
 } from "@/lib/api";
 import { createPublishedPreviewStagePage } from "@/lib/preview-stage-adapter";
 import type {
   ProjectsIndex,
   PublishedProject,
   PublishedDemoPage,
+  PublishedHtmlExecution,
 } from "@/lib/api";
 import type { DemoPageRuntimeType } from "@workbench/shared";
 import {
@@ -114,7 +116,10 @@ import {
 } from "@/components/ui/tabs";
 import { FeedbackPage } from "@/components/FeedbackPage";
 import { ViewerAiPanel } from "@/components/ViewerAiPanel";
-import { ViewerDocumentView } from "@/components/ViewerDocumentView";
+import {
+  hasViewerDocumentContent,
+  ViewerDocumentView,
+} from "@/components/ViewerDocumentView";
 
 type SortOption = "newest" | "oldest" | "name";
 type ProjectListItem = ProjectsIndex["projects"][number];
@@ -892,6 +897,9 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const [pageSchemaMap, setPageSchemaMap] = useState<Record<string, string>>(
     {},
   );
+  const [sandboxExecutionMap, setSandboxExecutionMap] = useState<
+    Record<string, PublishedHtmlExecution | undefined>
+  >({});
   const [flashDirectoryId, setFlashDirectoryId] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("canvas");
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
@@ -912,6 +920,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
+  const projectLoadGenerationRef = useRef(0);
 
   const isLoggedIn = sessionId != null;
 
@@ -973,8 +982,23 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
 
 
   useEffect(() => {
-    getProjectData(projectId)
+    const generation = ++projectLoadGenerationRef.current;
+    let cancelled = false;
+    const isCurrent = () =>
+      !cancelled && projectLoadGenerationRef.current === generation;
+
+    setIsLoading(true);
+    setError(null);
+    setProject(null);
+    setConfigData({});
+    setConfigDataMap({});
+    setPageSchemaMap({});
+    setSandboxExecutionMap({});
+    setActivePageId("");
+
+    void getProjectData(projectId)
       .then(async (data) => {
+        if (!isCurrent()) return;
         setProject(data);
         setCanvasState(
           data.canvasState ?? {
@@ -993,35 +1017,53 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
         if (data.demoPages.length > 0) {
           setActivePageId(data.demoPages[0].id);
 
-          for (const page of data.demoPages) {
-            if (page.schemaPath) {
+          const pageResults = await Promise.all(
+            data.demoPages.map(async (page) => {
+              if (!page.schemaPath) {
+                return {
+                  pageId: page.id,
+                  schema: undefined,
+                  config: mergeConfigDefaults(
+                    data.projectConfigSchema,
+                    undefined,
+                    data.projectConfigValues,
+                    projectId,
+                  ),
+                };
+              }
+
               try {
                 const schema = await getDemoSchema(projectId, page.schemaPath);
                 const schemaStr = JSON.stringify(schema);
-                schemaMap[page.id] = schemaStr;
-                const defaults = mergeConfigDefaults(
-                  data.projectConfigSchema,
-                  schemaStr,
-                  data.projectConfigValues,
-                  projectId,
-                );
-                initialConfigMap[page.id] = defaults;
+                return {
+                  pageId: page.id,
+                  schema: schemaStr,
+                  config: mergeConfigDefaults(
+                    data.projectConfigSchema,
+                    schemaStr,
+                    data.projectConfigValues,
+                    projectId,
+                  ),
+                };
               } catch {
-                initialConfigMap[page.id] = mergeConfigDefaults(
-                  data.projectConfigSchema,
-                  undefined,
-                  data.projectConfigValues,
-                  projectId,
-                );
+                return {
+                  pageId: page.id,
+                  schema: undefined,
+                  config: mergeConfigDefaults(
+                    data.projectConfigSchema,
+                    undefined,
+                    data.projectConfigValues,
+                    projectId,
+                  ),
+                };
               }
-            } else {
-              initialConfigMap[page.id] = mergeConfigDefaults(
-                data.projectConfigSchema,
-                undefined,
-                data.projectConfigValues,
-                projectId,
-              );
-            }
+            }),
+          );
+
+          if (!isCurrent()) return;
+          for (const result of pageResults) {
+            initialConfigMap[result.pageId] = result.config;
+            if (result.schema) schemaMap[result.pageId] = result.schema;
           }
 
           const firstPage = data.demoPages[0];
@@ -1032,9 +1074,44 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
         setConfigDataMap(initialConfigMap);
         setPageSchemaMap(schemaMap);
       })
-      .catch(setError)
-      .finally(() => setIsLoading(false));
+      .catch((loadError: unknown) => {
+        if (isCurrent()) {
+          setError(
+            loadError instanceof Error
+              ? loadError
+              : new Error(String(loadError)),
+          );
+        }
+      })
+      .finally(() => {
+        if (isCurrent()) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [projectId]);
+
+  useEffect(() => {
+    if (previewMode !== "single" || !activePageId || !project) return;
+    const page = project.demoPages.find((candidate) => candidate.id === activePageId);
+    if (page?.runtimeType !== "sandboxed-html" || !page.sandboxExecutionPath) return;
+    const current = sandboxExecutionMap[page.id];
+    if (current && current.expiresAt > Date.now() + 10_000) return;
+    let cancelled = false;
+    void issuePublishedHtmlExecution(page.sandboxExecutionPath)
+      .then((execution) => {
+        if (!cancelled) {
+          setSandboxExecutionMap((previous) => ({ ...previous, [page.id]: execution }));
+        }
+      })
+      .catch((executionError: unknown) => {
+        if (!cancelled) {
+          setError(executionError instanceof Error ? executionError : new Error(String(executionError)));
+        }
+      });
+    return () => { cancelled = true; };
+  }, [activePageId, previewMode, project, sandboxExecutionMap]);
 
   const handlePageChange = useCallback(
     (pageId: string) => {
@@ -1266,9 +1343,10 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
           page,
           configData: configDataMap[page.id],
           schema: pageSchemaMap[page.id],
+          sandboxExecution: sandboxExecutionMap[page.id],
         }),
       ),
-    [configDataMap, pageSchemaMap, project, projectId],
+    [configDataMap, pageSchemaMap, project, projectId, sandboxExecutionMap],
   );
 
   if (isLoading) {
@@ -1302,6 +1380,10 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const hasPageConfig = !isSchemaEmpty(activePageSchema);
   const hasSchema = hasProjectConfig || hasPageConfig;
   const hasBothScopes = hasProjectConfig && hasPageConfig;
+  const hasDocumentContent = hasViewerDocumentContent(
+    project.knowledge ?? [],
+    project.designSpecs ?? [],
+  );
   const configPanelRequirements = project.demoPages.find(
     (page) =>
       page.id ===
@@ -1336,7 +1418,6 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
       hideDetailHeader={previewMode === "single"}
       requirementsPosition="beforeConfig"
       hideEmptyRequirements
-      sectionNavigation="anchorTabs"
       designSpecEntries={designSpecEntries}
     />
   );
@@ -1370,6 +1451,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
         onLogoutClick={handleLogout}
         previewMode={previewMode}
         onPreviewModeChange={setPreviewMode}
+        hasDocumentContent={hasDocumentContent}
       />
       <ErrorBoundary>
         <div className="flex-1 flex min-h-0 overflow-hidden">
@@ -1847,6 +1929,7 @@ function Header({
   onLogoutClick,
   previewMode,
   onPreviewModeChange,
+  hasDocumentContent = true,
 }: {
   name: string;
   onBack: () => void;
@@ -1855,6 +1938,7 @@ function Header({
   onLogoutClick?: () => void;
   previewMode?: PreviewMode;
   onPreviewModeChange?: (mode: PreviewMode) => void;
+  hasDocumentContent?: boolean;
 }) {
   return (
     <header className="grid grid-cols-[1fr_auto_1fr] items-center h-14 px-4 border-b border-border shrink-0 gap-3">
@@ -1873,7 +1957,11 @@ function Header({
           <PreviewModeSwitcher
             mode={previewMode}
             onModeChange={onPreviewModeChange}
-            modes={["single", "canvas", "document"]}
+            modes={
+              hasDocumentContent
+                ? ["single", "canvas", "document"]
+                : ["single", "canvas"]
+            }
           />
         </div>
       )}

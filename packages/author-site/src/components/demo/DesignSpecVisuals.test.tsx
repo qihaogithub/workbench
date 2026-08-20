@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import type { ConfigPoolItem } from "@/lib/design-specs";
-import { HoverPop } from "./DesignSpecVisuals";
+import { formatSize, HoverPop } from "./DesignSpecVisuals";
 
 const baseItem: ConfigPoolItem = {
   id: "page:home:headline",
@@ -44,5 +44,19 @@ describe("HoverPop", () => {
     expect(screen.getByAltText("首页 页面效果图")).toHaveClass("object-contain");
     expect(screen.queryByText("主视觉图片")).not.toBeInTheDocument();
     expect(screen.queryByText("首页")).not.toBeInTheDocument();
+  });
+});
+
+describe("formatSize", () => {
+  it("格式化图片尺寸规则", () => {
+    expect(formatSize({
+      ...baseItem,
+      kind: "image",
+      size: { w: "100", h: "100", wOperator: "=", hOperator: "=" },
+    })).toBe("W = 100px · H = 100px");
+  });
+
+  it("未设置尺寸规则时显示破折号", () => {
+    expect(formatSize(baseItem)).toBe("—");
   });
 });

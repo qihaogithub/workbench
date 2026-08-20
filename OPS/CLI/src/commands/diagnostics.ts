@@ -99,6 +99,27 @@ export interface WorkspaceDiagnosticFlow {
     | "canonical_failed";
 }
 
+export interface SandboxDiagnosticSummary {
+  eventCount: number;
+  executionIssued: number;
+  runtimeFailures: number;
+  screenshotsCompleted: number;
+  runtimeTypes: string[];
+  policyVersions: number[];
+  renderers: string[];
+  failureCodes: Record<string, number>;
+  policyMismatch: number;
+  expiredTicket: number;
+  blockedRequestCount: number;
+  timeoutCount: number;
+  timeoutMs: DiagnosticPercentileSummary;
+  contextRecovery: {
+    contextClosed: number;
+    browserRestarted: number;
+    recovered: number;
+  };
+}
+
 const WORKSPACE_FLOW_GROUPS = ["autosave", "collab", "preview", "workspace"] as const;
 const CORRELATED_QUERY_KINDS = new Set(["autosave", "collab", "preview", "project", "export"]);
 
@@ -636,6 +657,109 @@ export function summarizeDiagnosticPerformance(events: EditorDiagnosticEvent[]) 
   };
 }
 
+function incrementCount(target: Record<string, number>, key: string): void {
+  target[key] = (target[key] ?? 0) + 1;
+}
+
+function stringPayload(event: EditorDiagnosticEvent, key: string): string | undefined {
+  const value = event.payload[key];
+  return typeof value === "string" && value ? value : undefined;
+}
+
+function booleanPayload(event: EditorDiagnosticEvent, key: string): boolean {
+  return event.payload[key] === true;
+}
+
+/**
+ * Summarize sandbox execution failures without exposing source, execution IDs,
+ * channel IDs, or any other raw correlation token. The event sanitizer is the
+ * first boundary; this aggregate is the CLI's second, stable presentation
+ * boundary for text and machine consumers.
+ */
+export function summarizeSandboxDiagnostics(events: EditorDiagnosticEvent[]): SandboxDiagnosticSummary {
+  const sandboxEvents = events.filter((event) =>
+    event.eventType === "preview.sandbox_execution_issued" ||
+    event.eventType === "preview.sandbox_runtime_failed" ||
+    event.eventType === "preview.sandbox_screenshot_completed",
+  );
+  const runtimeTypes = new Set<string>();
+  const policyVersions = new Set<number>();
+  const renderers = new Set<string>();
+  const failureCodes: Record<string, number> = {};
+  const timeoutSamples: number[] = [];
+  let executionIssued = 0;
+  let runtimeFailures = 0;
+  let screenshotsCompleted = 0;
+  let policyMismatch = 0;
+  let expiredTicket = 0;
+  let blockedRequestCount = 0;
+  let timeoutCount = 0;
+  let contextClosed = 0;
+  let browserRestarted = 0;
+  let recovered = 0;
+
+  for (const event of sandboxEvents) {
+    const runtimeType = stringPayload(event, "runtimeType");
+    if (runtimeType) runtimeTypes.add(runtimeType);
+    const policy = event.payload.sandboxPolicyVersion;
+    if (typeof policy === "number" && Number.isFinite(policy)) policyVersions.add(policy);
+    const renderer = stringPayload(event, "renderer");
+    if (renderer) renderers.add(renderer);
+
+    if (event.eventType === "preview.sandbox_execution_issued") {
+      executionIssued += 1;
+      continue;
+    }
+    if (event.eventType === "preview.sandbox_screenshot_completed") {
+      screenshotsCompleted += 1;
+      if (booleanPayload(event, "contextClosed")) contextClosed += 1;
+      if (booleanPayload(event, "browserRestarted")) {
+        browserRestarted += 1;
+        recovered += 1;
+      }
+      const blocked = numericPayload(event, "blockedRequestCount");
+      if (blocked !== undefined) blockedRequestCount += blocked;
+      continue;
+    }
+
+    runtimeFailures += 1;
+    const errorCode = stringPayload(event, "errorCode");
+    if (errorCode) {
+      incrementCount(failureCodes, errorCode);
+      const normalized = errorCode.toLowerCase().replace(/[- ]/g, "_");
+      if (normalized.includes("policy") && normalized.includes("mismatch")) policyMismatch += 1;
+      if (normalized.includes("expired") && normalized.includes("ticket")) expiredTicket += 1;
+      if (normalized.includes("timeout") || normalized === "timed_out") timeoutCount += 1;
+    }
+    const timeoutMs = numericPayload(event, "timeoutMs");
+    if (timeoutMs !== undefined) timeoutSamples.push(timeoutMs);
+    const blocked = numericPayload(event, "blockedRequestCount");
+    if (blocked !== undefined) blockedRequestCount += blocked;
+    if (booleanPayload(event, "contextClosed")) contextClosed += 1;
+    if (booleanPayload(event, "browserRestarted")) {
+      browserRestarted += 1;
+      recovered += 1;
+    }
+  }
+
+  return {
+    eventCount: sandboxEvents.length,
+    executionIssued,
+    runtimeFailures,
+    screenshotsCompleted,
+    runtimeTypes: [...runtimeTypes].sort(),
+    policyVersions: [...policyVersions].sort((a, b) => a - b),
+    renderers: [...renderers].sort(),
+    failureCodes,
+    policyMismatch,
+    expiredTicket,
+    blockedRequestCount,
+    timeoutCount,
+    timeoutMs: summarizeSamples(timeoutSamples),
+    contextRecovery: { contextClosed, browserRestarted, recovered },
+  };
+}
+
 function mergeEvents(primary: EditorDiagnosticEvent[], fallback: EditorDiagnosticEvent[], limit: number): EditorDiagnosticEvent[] {
   const byId = new Map(primary.map((event) => [event.id, event]));
   for (const event of fallback) if (!byId.has(event.id)) byId.set(event.id, event);
@@ -701,6 +825,7 @@ export function buildDiagnosticsResult(kind: string, options: DiagnosticsOptions
     events,
     workspaceFlows: buildWorkspaceFlows(events),
     performance: summarizeDiagnosticPerformance(events),
+    sandbox: summarizeSandboxDiagnostics(events),
     fallbackEvents: jsonlEvents.length > 0 ? jsonlEvents : undefined,
     agentRunLogs: listAgentRunLogs(dataDir, eventsForRunLogs),
   };
@@ -747,6 +872,7 @@ function printTextTimeline(events: EditorDiagnosticEvent[], diagnostics: EditorD
 function printTextAnalysis(
   flows: WorkspaceDiagnosticFlow[],
   performance: ReturnType<typeof summarizeDiagnosticPerformance>,
+  sandbox: SandboxDiagnosticSummary,
 ): void {
   if (flows.length > 0) {
     showInfo(`Workspace revision flows: ${flows.length}`);
@@ -762,6 +888,15 @@ function printTextAnalysis(
     for (const [name, summary] of populated) {
       console.log(`  ${name}: count=${summary.count} p50=${summary.p50} p95=${summary.p95} p99=${summary.p99} max=${summary.max}`);
     }
+  }
+  if (sandbox.eventCount > 0) {
+    showInfo("Sandbox runtime summary");
+    console.log(`  events=${sandbox.eventCount} issued=${sandbox.executionIssued} failures=${sandbox.runtimeFailures} screenshots=${sandbox.screenshotsCompleted}`);
+    console.log(`  runtime=${sandbox.runtimeTypes.join(",") || "-"} policy=${sandbox.policyVersions.join(",") || "-"} renderer=${sandbox.renderers.join(",") || "-"}`);
+    console.log(`  policyMismatch=${sandbox.policyMismatch} expiredTicket=${sandbox.expiredTicket} blockedRequests=${sandbox.blockedRequestCount}`);
+    console.log(`  timeoutCount=${sandbox.timeoutCount} timeoutP95Ms=${sandbox.timeoutMs.p95 ?? "-"} contextClosed=${sandbox.contextRecovery.contextClosed} browserRestarted=${sandbox.contextRecovery.browserRestarted} recovered=${sandbox.contextRecovery.recovered}`);
+    const failureCodes = Object.entries(sandbox.failureCodes).map(([code, count]) => `${code}=${count}`).join(", ");
+    if (failureCodes) console.log(`  failureCodes=${failureCodes}`);
   }
 }
 
@@ -813,7 +948,7 @@ export async function queryDiagnostics(kind: string, options: DiagnosticsOptions
 
     if (options.format === "text") {
       printTextTimeline(result.events, result.diagnostics);
-      printTextAnalysis(result.workspaceFlows, result.performance);
+      printTextAnalysis(result.workspaceFlows, result.performance, result.sandbox);
       return;
     }
 

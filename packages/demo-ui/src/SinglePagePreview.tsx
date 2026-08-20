@@ -4,6 +4,7 @@ import React, { lazy, Suspense, useMemo } from "react";
 import { IframePreviewFrame } from "./IframePreviewFrame";
 import { PreviewPanel } from "./PreviewPanel";
 import { PrototypePagePreview } from "./PrototypePagePreview";
+import { SandboxedHtmlFrame } from "./SandboxedHtmlFrame";
 import {
   resolvePagePreviewRenderer,
   resolvePreviewStageSize,
@@ -41,7 +42,17 @@ function SinglePagePreviewInternal({
 
   let content: React.ReactNode = emptyState ?? <DefaultEmptyState />;
 
-  if (page && renderer === "published-iframe" && page.iframeUrl) {
+  if (page && renderer === "sandbox-html" && page.sandboxExecutionUrl && page.sandboxChannelId) {
+    content = (
+      <SandboxedHtmlFrame
+        {...rendererProps?.sandbox}
+        executionUrl={page.sandboxExecutionUrl}
+        channelId={page.sandboxChannelId}
+        title={page.name}
+        previewSize={previewSize}
+      />
+    );
+  } else if (page && renderer === "published-iframe" && page.iframeUrl) {
     const iframeProps = rendererProps?.iframe;
     content = (
       <IframePreviewFrame

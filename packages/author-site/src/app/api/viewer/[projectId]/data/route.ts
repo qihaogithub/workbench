@@ -44,6 +44,8 @@ export async function GET(
       const prototypeMetaPath = path.join(demoDir, "prototype.meta.json");
       const sketchScenePath = path.join(demoDir, "sketch.scene.json");
       const sketchMetaPath = path.join(demoDir, "sketch.meta.json");
+      const sandboxHtmlPath = path.join(demoDir, "sandbox.html");
+      const htmlImportMetaPath = path.join(demoDir, "html-import.meta.json");
       const requirementsPath = path.join(demoDir, "requirements.md");
 
       let code = "";
@@ -54,6 +56,7 @@ export async function GET(
       let prototypeMeta: Record<string, unknown> | undefined;
       let sketchScene: Record<string, unknown> | undefined;
       let sketchMeta: Record<string, unknown> | undefined;
+      let htmlImportMeta: Record<string, unknown> | undefined;
       const requirements = fs.existsSync(requirementsPath)
         ? fs.readFileSync(requirementsPath, "utf-8")
         : undefined;
@@ -104,6 +107,17 @@ export async function GET(
           sketchMeta = undefined;
         }
       }
+      // sandbox.html is executable source and must never be included in the
+      // general viewer data response. Only expose its audited metadata; the
+      // published execution endpoint signs a short-lived iframe ticket on
+      // demand after validating the private source manifest.
+      if (page.runtimeType === "sandboxed-html" && fs.existsSync(sandboxHtmlPath) && fs.existsSync(htmlImportMetaPath)) {
+        try {
+          htmlImportMeta = JSON.parse(fs.readFileSync(htmlImportMetaPath, "utf-8")) as Record<string, unknown>;
+        } catch {
+          htmlImportMeta = undefined;
+        }
+      }
 
       return {
         ...page,
@@ -115,6 +129,7 @@ export async function GET(
         prototypeMeta,
         sketchScene,
         sketchMeta,
+        htmlImportMeta,
         requirements,
       };
     });

@@ -1,6 +1,7 @@
 import path from "path";
 import fs from "fs";
 import os from "os";
+import crypto from "crypto";
 
 let tempDir: string;
 let getPublishStatus: typeof import("../publish-manager").getPublishStatus;
@@ -108,8 +109,49 @@ function setupPageScreenshot(projectId: string, pageId: string) {
   fs.writeFileSync(path.join(screenshotsDir, `${pageId}.png`), "png", "utf-8");
 }
 
+function setupSandboxPublishableProject(projectId: string) {
+  const projectDir = path.join(tempDir, "projects", projectId);
+  const workspacePath = path.join(projectDir, "workspace");
+  const demoDir = path.join(workspacePath, "demos", "interactive");
+  fs.mkdirSync(demoDir, { recursive: true });
+  const html = "<!doctype html><button id='go'>Run</button><script>document.querySelector('#go').onclick=()=>document.body.dataset.clicked='1'</script>";
+  const normalizedHash = crypto.createHash("sha256").update(html).digest("hex");
+  fs.writeFileSync(path.join(demoDir, "sandbox.html"), html, "utf-8");
+  fs.writeFileSync(
+    path.join(demoDir, "html-import.meta.json"),
+    JSON.stringify({
+      source: "html-import",
+      analysisVersion: 1,
+      sourceHash: "a".repeat(64),
+      normalizedHash,
+      sandboxPolicyVersion: 1,
+    }),
+  );
+  fs.writeFileSync(path.join(demoDir, "config.schema.json"), JSON.stringify({ type: "object", properties: {} }));
+  fs.writeFileSync(
+    path.join(workspacePath, "workspace-tree.json"),
+    JSON.stringify({ folders: [], pages: [{ id: "interactive", name: "交互页", order: 0, parentId: null, runtimeType: "sandboxed-html" }] }),
+  );
+  fs.writeFileSync(path.join(workspacePath, "app.graph.json"), JSON.stringify({ version: 1, entry: "interactive", pages: {}, actions: [], state: {} }));
+  const now = Date.now();
+  fs.writeFileSync(
+    path.join(projectDir, "project.json"),
+    JSON.stringify({
+      id: projectId,
+      name: "sandbox 项目",
+      workspacePath,
+      demoPages: [{ id: "interactive", name: "交互页", order: 0, parentId: null }],
+      demoFolders: [],
+      versions: [],
+      createdAt: now,
+      updatedAt: now,
+    }),
+  );
+}
+
 afterAll(() => {
   delete process.env.DATA_DIR;
+  delete process.env.HTML_SANDBOX_PUBLIC_ORIGIN;
   if (tempDir && fs.existsSync(tempDir)) {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
@@ -278,6 +320,47 @@ describe("getPublishStatus", () => {
     expect(publishedProject.demoPages[0].iframeHtmlPath).toMatch(
       /^demos\/home\/iframe\.html\?v=\d+$/,
     );
+  });
+
+  it("发布 sandbox 只生成受控 manifest，并把源码放入服务端私有目录", async () => {
+    setupSandboxPublishableProject("proj-publish-sandbox");
+    process.env.HTML_SANDBOX_PUBLIC_ORIGIN = "https://sandbox.example";
+
+    await publishProject("proj-publish-sandbox");
+
+    const projectDir = path.join(tempDir, "published", "proj-publish-sandbox");
+    const published = JSON.parse(fs.readFileSync(path.join(projectDir, "project.json"), "utf-8"));
+    const page = published.demoPages[0];
+    expect(page.runtimeType).toBe("sandboxed-html");
+    expect(page.sandboxExecutionPath).toContain("/published-html-execution/interactive");
+    expect(page.sandboxExecutionPath).toContain("version=v1");
+    expect(page.sandboxRendererVersion).toBe(1);
+    expect(page.htmlImportMeta).toMatchObject({
+      source: "html-import",
+      analysisVersion: 1,
+      sandboxPolicyVersion: 1,
+      sourceHash: "a".repeat(64),
+      normalizedHash: crypto
+        .createHash("sha256")
+        .update(fs.readFileSync(path.join(tempDir, "projects", "proj-publish-sandbox", "workspace", "demos", "interactive", "sandbox.html"), "utf-8"))
+        .digest("hex"),
+    });
+    expect(JSON.stringify(published)).not.toContain("document.querySelector");
+    expect(fs.existsSync(path.join(projectDir, "demos", "interactive", "sandbox.html"))).toBe(false);
+
+    const privateDir = path.join(tempDir, "html-sandbox-published", "proj-publish-sandbox", "v1");
+    const privateManifest = JSON.parse(fs.readFileSync(path.join(privateDir, "manifest.json"), "utf-8"));
+    expect(privateManifest.pages.interactive.sourceKey).toMatch(/^[a-f0-9]{32}$/);
+    const privateHtmlPath = path.join(privateDir, privateManifest.pages.interactive.fileName);
+    expect(fs.readFileSync(privateHtmlPath, "utf-8")).toContain("document.querySelector");
+  });
+
+  it("sandbox 发布未配置独立 origin 时 fail closed", async () => {
+    setupSandboxPublishableProject("proj-publish-sandbox-no-origin");
+    delete process.env.HTML_SANDBOX_PUBLIC_ORIGIN;
+    await expect(publishProject("proj-publish-sandbox-no-origin")).rejects.toMatchObject({
+      code: "SANDBOX_ORIGIN_NOT_CONFIGURED",
+    });
   });
 
   it("发布共享配置上传图时应写入本地化运行值并覆盖页面默认值", async () => {

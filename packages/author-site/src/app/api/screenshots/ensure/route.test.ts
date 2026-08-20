@@ -1,6 +1,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { normalizeHtmlImport } from "@workbench/project-core";
 import { ReadableStream as NodeReadableStream } from "stream/web";
 import type { NextRequest } from "next/server";
 
@@ -86,10 +87,15 @@ function writeProjectPage(
     projectId: string;
     pageId: string;
     code?: string;
-    runtimeType?: "prototype-html-css" | "high-fidelity-react";
+    runtimeType?:
+      | "prototype-html-css"
+      | "sandboxed-html"
+      | "high-fidelity-react";
     prototypeHtml?: string;
     prototypeCss?: string;
     prototypeMeta?: Record<string, unknown>;
+    sandboxHtml?: string;
+    htmlImportMeta?: Record<string, unknown>;
     pageSchema?: Record<string, unknown>;
     projectSchema?: Record<string, unknown>;
   },
@@ -102,7 +108,7 @@ function writeProjectPage(
   );
   const pagePath = path.join(workspacePath, "demos", options.pageId);
   fs.mkdirSync(pagePath, { recursive: true });
-  if (options.runtimeType !== "prototype-html-css") {
+  if (!options.runtimeType || options.runtimeType === "high-fidelity-react") {
     fs.writeFileSync(
       path.join(pagePath, "index.tsx"),
       options.code ?? "export default function Demo(){ return <div>ok</div>; }",
@@ -138,6 +144,44 @@ function writeProjectPage(
             order: 0,
             parentId: null,
             runtimeType: "prototype-html-css",
+          },
+        ],
+      }),
+      "utf-8",
+    );
+  }
+  if (options.runtimeType === "sandboxed-html") {
+    const normalized = normalizeHtmlImport(options.sandboxHtml ?? "<main>Sandbox</main>");
+    if (!normalized.normalizedHtml || !normalized.normalizedHash) throw new Error("invalid sandbox fixture");
+    fs.writeFileSync(
+      path.join(pagePath, "sandbox.html"),
+      normalized.normalizedHtml,
+      "utf-8",
+    );
+    fs.writeFileSync(
+      path.join(pagePath, "html-import.meta.json"),
+      JSON.stringify(
+        options.htmlImportMeta ?? {
+          source: "html-import",
+          analysisVersion: 1,
+          sourceHash: normalized.analysis.sourceHash,
+          normalizedHash: normalized.normalizedHash,
+          sandboxPolicyVersion: 1,
+        },
+      ),
+      "utf-8",
+    );
+    fs.writeFileSync(
+      path.join(workspacePath, "workspace-tree.json"),
+      JSON.stringify({
+        folders: [],
+        pages: [
+          {
+            id: options.pageId,
+            name: options.pageId,
+            order: 0,
+            parentId: null,
+            runtimeType: "sandboxed-html",
           },
         ],
       }),
@@ -273,6 +317,37 @@ describe("screenshots ensure route", () => {
         }),
       ],
     });
+  });
+
+  it("按 canonical sandbox 文件组装 sandbox PageSnapshotInput", async () => {
+    writeProjectPage(tempDir, {
+      projectId: "proj_1",
+      pageId: "sandbox_page",
+      runtimeType: "sandboxed-html",
+      sandboxHtml: "<button id=\"go\">Go</button>",
+    });
+
+    const { POST } = await import("./route");
+    const response = await POST(createRequest({ projectId: "proj_1" }));
+    expect(response.status).toBe(200);
+
+    const call = (global.fetch as jest.Mock).mock.calls.find(
+      ([url]) => url === "http://screenshot-service/api/screenshots/generate-batch",
+    );
+    expect(call).toBeDefined();
+    const body = JSON.parse(call[1].body);
+    expect(body.pages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          pageId: "sandbox_page",
+          runtimeType: "sandboxed-html",
+          sandboxHtml: expect.stringContaining("<button id=\"go\">Go</button>"),
+          htmlImportMeta: expect.objectContaining({
+            sandboxPolicyVersion: 1,
+          }),
+        }),
+      ]),
+    );
   });
 
   it("已有健康 hash 截图时不重新生成", async () => {

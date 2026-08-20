@@ -5,12 +5,13 @@ RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
 WORKDIR /app
 
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY patches/ ./patches/
 COPY packages/sketch-core/package.json ./packages/sketch-core/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/screenshot-service/package.json ./packages/screenshot-service/
 
 RUN --mount=type=cache,id=workbench-pnpm-store,target=/pnpm/store \
-    PUPPETEER_SKIP_DOWNLOAD=true pnpm install --store-dir /pnpm/store --no-frozen-lockfile
+    PUPPETEER_SKIP_DOWNLOAD=true pnpm install --store-dir /pnpm/store --frozen-lockfile
 
 COPY packages/sketch-core/ ./packages/sketch-core/
 COPY packages/shared/ ./packages/shared/

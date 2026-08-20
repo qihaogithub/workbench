@@ -1,0 +1,27 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "workbench-page-export-extension-0.1.0",
+  "documentNamespace": "https://workbench.local/spdx/page-export-extension/0.1.0",
+  "creationInfo": {
+    "created": "2026-08-20T00:00:00Z",
+    "creators": ["Tool: Workbench repository build"]
+  },
+  "packages": [
+    { "name": "@workbench/page-export-extension", "SPDXID": "SPDXRef-Package-Extension", "versionInfo": "0.1.0", "downloadLocation": "NOASSERTION", "filesAnalyzed": false, "licenseConcluded": "NOASSERTION", "licenseDeclared": "NOASSERTION", "copyrightText": "NOASSERTION" },
+    { "name": "single-file-cli", "SPDXID": "SPDXRef-Package-SingleFileCLI", "versionInfo": "2.0.83", "downloadLocation": "https://github.com/gildas-lormeau/single-file-cli/tree/v2.0.83", "filesAnalyzed": false, "licenseConcluded": "AGPL-3.0-or-later", "licenseDeclared": "AGPL-3.0-or-later", "copyrightText": "NOASSERTION" },
+    { "name": "single-file-core", "SPDXID": "SPDXRef-Package-SingleFileCore", "versionInfo": "1.5.68", "downloadLocation": "https://github.com/gildas-lormeau/single-file-core/tree/1.5.68", "filesAnalyzed": false, "licenseConcluded": "AGPL-3.0-or-later", "licenseDeclared": "AGPL-3.0-or-later", "copyrightText": "NOASSERTION" },
+    { "name": "html2canvas", "SPDXID": "SPDXRef-Package-Html2Canvas", "versionInfo": "1.4.1", "downloadLocation": "https://github.com/niklasvh/html2canvas/tree/v1.4.1", "filesAnalyzed": false, "licenseConcluded": "MIT", "licenseDeclared": "MIT", "copyrightText": "NOASSERTION" },
+    { "name": "prettier", "SPDXID": "SPDXRef-Package-Prettier", "versionInfo": "3.6.2", "downloadLocation": "https://github.com/prettier/prettier", "filesAnalyzed": false, "licenseConcluded": "MIT", "licenseDeclared": "MIT", "copyrightText": "NOASSERTION" },
+    { "name": "parse5", "SPDXID": "SPDXRef-Package-Parse5", "versionInfo": "7.3.0", "downloadLocation": "https://github.com/inikulin/parse5", "filesAnalyzed": false, "licenseConcluded": "MIT", "licenseDeclared": "MIT", "copyrightText": "NOASSERTION" }
+  ],
+  "relationships": [
+    { "spdxElementId": "SPDXRef-DOCUMENT", "relationshipType": "DESCRIBES", "relatedSpdxElement": "SPDXRef-Package-Extension" },
+    { "spdxElementId": "SPDXRef-Package-Extension", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-SingleFileCLI" },
+    { "spdxElementId": "SPDXRef-Package-SingleFileCLI", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-SingleFileCore" },
+    { "spdxElementId": "SPDXRef-Package-Extension", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-Html2Canvas" },
+    { "spdxElementId": "SPDXRef-Package-Extension", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-Prettier" },
+    { "spdxElementId": "SPDXRef-Package-Extension", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-Parse5" }
+  ]
+}

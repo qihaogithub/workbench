@@ -18,6 +18,7 @@ describe("PreviewCanvas viewer layout contract", () => {
     expect(previewCanvasSource).toMatch(
       /isEditorMode \? handlePageGroupLayoutChange : undefined/,
     );
+    expect(previewCanvasSource).toMatch(/editable && onLayoutChange/);
     expect(previewCanvasSource).toMatch(
       /onLayoutChange=\{isEditorMode \? handleNodeLayoutChange : undefined\}/,
     );

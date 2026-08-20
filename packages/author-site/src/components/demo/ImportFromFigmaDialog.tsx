@@ -16,11 +16,6 @@ import type { DemoPageMeta } from "@workbench/shared";
 import { projectApiClient } from "@/lib/project-api";
 import { Loader2, Upload, FileText, X, CheckCircle2, AlertCircle } from "lucide-react";
 
-const EMPTY_FIGMA_CONFIG_SCHEMA = JSON.stringify({
-  type: "object",
-  properties: {},
-});
-
 function getImportedPageName(filename: string): string {
   const name = filename.replace(/\.html?$/i, "").trim();
   return name || "从Figma导入的页面";
@@ -181,37 +176,33 @@ export function ImportFromFigmaDialog({
         }
 
         const pageName = getImportedPageName(entry.file.name);
-        const page = await projectApiClient.createDemoPage(
-          projectId,
-          pageName,
-          sessionId,
-          undefined,
-          parsed.kind === "prototype" ? "prototype-html-css" : undefined,
-        );
-
         if (parsed.kind === "prototype") {
-          const result = await projectApiClient.updateDemoPageFiles(projectId, page.id, sessionId, {
-            prototypeHtml: parsed.prototypeHtml,
-            prototypeCss: parsed.prototypeCss,
-            prototypeMeta: parsed.prototypeMeta,
-            schema: EMPTY_FIGMA_CONFIG_SCHEMA,
-            localizeImages: true,
-          });
-          if (result.imageLocalization && result.imageLocalization.failed > 0) {
-            updateFileStatus(entry.id, "success", `${result.imageLocalization.failed} 张图片未本地化`);
-          } else {
-            updateFileStatus(entry.id, "success");
-          }
+          const result = await projectApiClient.importHtmlPage(
+            projectId,
+            sessionId,
+            entry.file.name,
+            parsed.prototypeHtml,
+            pageName,
+          );
+          updateFileStatus(entry.id, "success", result.warnings.length > 0 ? "已导入（含兼容性提示）" : undefined);
+          onPageCreated(result.page);
+          successCount++;
+          continue;
         } else {
+          const page = await projectApiClient.createDemoPage(
+            projectId,
+            pageName,
+            sessionId,
+          );
           await projectApiClient.updateDemoPageFiles(projectId, page.id, sessionId, {
             code: parsed.code,
             schema: parsed.schema,
           });
           updateFileStatus(entry.id, "success");
+          onPageCreated(page);
+          successCount++;
+          continue;
         }
-
-        onPageCreated(page);
-        successCount++;
       } catch (err) {
         updateFileStatus(entry.id, "error", err instanceof Error ? err.message : "未知错误");
         failCount++;
@@ -286,10 +277,10 @@ export function ImportFromFigmaDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
-            从 Figma 导入
+            导入 HTML
           </DialogTitle>
           <DialogDescription>
-            拖拽或点击上传 Figma 插件导出的 HTML 文件，支持批量导入多个页面
+            拖拽或点击上传 HTML 文件，支持批量导入多个页面
           </DialogDescription>
         </DialogHeader>
 

@@ -20,6 +20,10 @@ import {
   upgradeProjectScaffold,
   validateProjectScaffold,
 } from "../../project-scaffold/src/index.js";
+import {
+  HtmlImportError,
+  stageHtmlImportBranch,
+} from "../../project-core/src/html-import.js";
 import type {
   AssetReplaceInput,
   AssetUploadInput,
@@ -632,6 +636,70 @@ function findWorkspaceMetadata(
     }
   }
   return null;
+}
+
+function findBranchWorkspacePath(
+  dataDir: string,
+  projectId: string,
+  workspace: string,
+  actorId: string,
+): string | undefined {
+  const requested = path.resolve(workspace);
+  if (fs.existsSync(requested)) {
+    try {
+      const metadata = JSON.parse(
+        fs.readFileSync(path.join(requested, ".workspace.json"), "utf8"),
+      ) as { projectId?: string; demoId?: string; scope?: string };
+      if (
+        (metadata.projectId ?? metadata.demoId) === projectId &&
+        metadata.scope === "branch"
+      ) return requested;
+    } catch {
+      // Continue with workspace-id lookup below.
+    }
+  }
+  const roots = [
+    path.join(dataDir, "workspaces", actorId, projectId),
+    path.join(dataDir, "workspaces"),
+  ];
+  for (const root of roots) {
+    if (!fs.existsSync(root)) continue;
+    const candidates = roots[0] === root
+      ? [path.join(root, workspace)]
+      : walkLocalFiles(root)
+          .filter((file) => path.basename(file) === ".workspace.json")
+          .map((file) => path.dirname(file));
+    for (const candidate of candidates) {
+      if (!fs.existsSync(candidate)) continue;
+      const metadataPath = path.join(candidate, ".workspace.json");
+      try {
+        const metadata = JSON.parse(fs.readFileSync(metadataPath, "utf8")) as {
+          projectId?: string;
+          demoId?: string;
+          scope?: string;
+          workspaceId?: string;
+        };
+        if (
+          (metadata.projectId ?? metadata.demoId) === projectId &&
+          metadata.workspaceId === workspace &&
+          metadata.scope === "branch"
+        ) return candidate;
+      } catch {
+        // Ignore unrelated or incomplete workspace metadata.
+      }
+    }
+  }
+  return undefined;
+}
+
+function importHtmlPageId(name: string, explicit?: string): string {
+  const value = (explicit ?? name)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+  return value || `html-import-${Date.now()}`;
 }
 
 async function tryCreateAuthorityService(
@@ -2157,6 +2225,124 @@ register(
 );
 
 register(
+  "project import-html",
+  "将单页 HTML 分析、规范化并原子导入本地 branch 工作区",
+  (args, pos, { service, actor }) => {
+    const projectId = stringArg(args, "projectId") || stringArg(args, "project", pos[0]);
+    const workspaceArg = optionalStringArg(args, "workspace", pos[1]);
+    const name = stringArg(args, "name", pos[2]);
+    const sourceArg = optionalStringArg(args, "source", pos[3]);
+    if (!projectId || !workspaceArg || !name || !sourceArg) {
+      return cliFail(
+        "INVALID_REQUEST",
+        "必须提供 project、workspace、name、source（workspace 可传 branch 工作区 ID 或路径）",
+        {
+          nextActions: [
+            "ow project import-html --project <projectId> --workspace <workspaceId-or-path> --name <pageName> --source <file.html> --json",
+          ],
+        },
+      );
+    }
+    const sourcePath = path.resolve(sourceArg);
+    if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
+      return cliFail("SOURCE_NOT_FOUND", `HTML 源文件不存在: ${sourcePath}`, {
+        nextActions: ["检查 --source 路径后重试"],
+      });
+    }
+    let source: string;
+    try {
+      source = fs.readFileSync(sourcePath, "utf8");
+    } catch (error) {
+      return cliFail(
+        "SOURCE_READ_FAILED",
+        `无法读取 HTML 源文件: ${error instanceof Error ? error.message : String(error)}`,
+        { nextActions: ["确认文件可读后重试"] },
+      );
+    }
+
+    const project = service.getProject(projectId, actor);
+    if (!project.ok) {
+      return cliFail(
+        project.error?.code ?? "PROJECT_NOT_FOUND",
+        project.error?.message ?? "项目不存在",
+        { nextActions: ["确认 --project 后重试"] },
+      );
+    }
+
+    const workspacePath = findBranchWorkspacePath(
+      service.dataDir,
+      projectId,
+      workspaceArg,
+      actor.id,
+    );
+    if (!workspacePath) {
+      return cliFail(
+        "WORKSPACE_NOT_FOUND",
+        `branch 工作区不存在或不属于项目: ${workspaceArg}`,
+        { nextActions: [`ow edit begin ${projectId} --json`] },
+      );
+    }
+
+    const pageId = importHtmlPageId(name, optionalStringArg(args, "page"));
+    const schema = optionalStringArg(args, "schema") ?? "{}";
+    const css = optionalStringArg(args, "css") ?? "";
+    try {
+      const stage = stageHtmlImportBranch({
+        workspacePath,
+        pageId,
+        page: {
+          name,
+          routeKey: optionalStringArg(args, "routeKey") ?? pageId,
+          order: numberArg(args, "order") ?? (project.data?.pages.length ?? 0),
+          parentId: hasArg(args, "parentId")
+            ? optionalStringArg(args, "parentId") ?? null
+            : null,
+        },
+        source,
+        schema,
+        css,
+      });
+      stage.commit();
+      const runtime = stage.analysis.outcome.status === "accepted"
+        ? stage.analysis.outcome.runtimeType
+        : undefined;
+      return cliOk(
+        {
+          analysis: stage.analysis,
+          runtime,
+          page: {
+            id: pageId,
+            name,
+            routeKey: optionalStringArg(args, "routeKey") ?? pageId,
+            runtimeType: runtime,
+          },
+          projectId,
+          workspace: workspacePath,
+        },
+        {
+          nextActions: [
+            `ow edit validate ${path.basename(workspacePath)} --json`,
+            `ow project import-html --project ${projectId} --workspace ${workspacePath} --name ${name} --source <file.html> --json`,
+          ],
+        },
+      );
+    } catch (error) {
+      if (error instanceof HtmlImportError) {
+        return cliFail(error.code, error.message, {
+          nextActions: ["根据 analysis.unsupportedCapabilities 修正 HTML 后重试"],
+        });
+      }
+      return cliFail(
+        "HTML_IMPORT_STAGE_FAILED",
+        error instanceof Error ? error.message : String(error),
+        { nextActions: ["检查 branch 工作区完整性后重试"] },
+      );
+    }
+  },
+  ["project_import_html", "import-html"],
+);
+
+register(
   "project commit-list",
   "列出项目内容图提交",
   (args, pos, { service, actor }) =>
@@ -2643,6 +2829,11 @@ register(
         args.prototypeMeta && typeof args.prototypeMeta === "object"
           ? (args.prototypeMeta as PageCreateInput["prototypeMeta"])
           : undefined,
+      sandboxHtml: optionalStringArg(args, "sandboxHtml"),
+      htmlImportMeta:
+        args.htmlImportMeta && typeof args.htmlImportMeta === "object"
+          ? (args.htmlImportMeta as PageCreateInput["htmlImportMeta"])
+          : undefined,
       sketchScene: optionalStringArg(args, "sketchScene"),
       sketchMeta:
         args.sketchMeta && typeof args.sketchMeta === "object"
@@ -2759,6 +2950,11 @@ register(
       prototypeMeta:
         args.prototypeMeta && typeof args.prototypeMeta === "object"
           ? (args.prototypeMeta as PageSwitchRuntimeInput["prototypeMeta"])
+          : undefined,
+      sandboxHtml: optionalStringArg(args, "sandboxHtml"),
+      htmlImportMeta:
+        args.htmlImportMeta && typeof args.htmlImportMeta === "object"
+          ? (args.htmlImportMeta as PageSwitchRuntimeInput["htmlImportMeta"])
           : undefined,
       sketchScene: optionalStringArg(args, "sketchScene"),
       sketchMeta:

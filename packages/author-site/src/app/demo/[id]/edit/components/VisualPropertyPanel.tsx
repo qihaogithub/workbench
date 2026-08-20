@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   AlignCenter,
   AlignJustify,
@@ -33,14 +33,6 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -60,6 +52,8 @@ import {
   type VisualPropertyChange,
   type VisualPropertyChangeKind,
 } from "@workbench/demo-ui";
+import { ConfigItemEditorDialog } from "@workbench/demo-ui/ConfigItemEditorDialog";
+import type { ConfigDefinitionDraft, ConfigDefinitionKind } from "@workbench/shared/demo/config-schema-definition";
 import { localizeSelectedImageAsset } from "../image-localization";
 import type { VisualConfigMark, VisualDraftActionState } from "../hooks/useVisualEditState";
 import { VisualDraftActionBar } from "./VisualDraftActionBar";
@@ -94,7 +88,7 @@ interface VisualPropertyPanelProps {
   ) => void;
   onUpdateConfigMark: (
     markId: string,
-    patch: Partial<Pick<VisualConfigMark, "fieldTitle" | "fieldKey" | "defaultValue" | "category" | "scope" | "imageWidthOperator" | "imageWidthValue" | "imageHeightOperator" | "imageHeightValue">>,
+    patch: Partial<Pick<VisualConfigMark, "fieldTitle" | "fieldKey" | "defaultValue" | "category" | "scope" | "accept" | "widthRule" | "heightRule">>,
   ) => void;
   onRemoveConfigMark: (markId: string) => void;
   onAiInstructionChange: (value: string) => void;
@@ -533,6 +527,42 @@ async function readFileAsDataUrl(file: File) {
   });
 }
 
+function getConfigDraftKind(mark: Pick<VisualConfigMark, "property" | "kind">): ConfigDefinitionKind {
+  if (mark.property === "src") return "image";
+  if (mark.property === "color" || mark.property === "backgroundColor" || mark.property === "borderColor") return "color";
+  if (mark.kind === "text") return "text";
+  return "text";
+}
+
+function configMarkToDraft(mark: VisualConfigMark): ConfigDefinitionDraft {
+  return {
+    key: mark.fieldKey,
+    title: mark.fieldTitle,
+    kind: getConfigDraftKind(mark),
+    default: mark.defaultValue,
+    group: mark.category || undefined,
+    accept: mark.accept,
+    widthRule: mark.widthRule,
+    heightRule: mark.heightRule,
+  };
+}
+
+function createPendingConfigDraft(
+  spec: Pick<PropertySpec, "property" | "label" | "kind">,
+  value: string,
+): ConfigDefinitionDraft {
+  return {
+    key: spec.property.replace(/[^A-Za-z0-9_]/g, "_") || "newConfig",
+    title: spec.label,
+    kind: getConfigDraftKind(spec),
+    default: value,
+  };
+}
+
+function defaultValueText(value: unknown) {
+  return typeof value === "string" ? value : value == null ? "" : String(value);
+}
+
 export function VisualPropertyPanel({
   selectedNode,
   sessionId,
@@ -561,6 +591,7 @@ export function VisualPropertyPanel({
   const [cornerRadiusExpanded, setCornerRadiusExpanded] = useState(false);
   const [paddingExpanded, setPaddingExpanded] = useState(false);
   const [editingConfigChangeId, setEditingConfigChangeId] = useState<string | null>(null);
+  const [configEditorDraft, setConfigEditorDraft] = useState<ConfigDefinitionDraft | null>(null);
   const specsBySection = useMemo(() => {
     if (!selectedNode) return [];
     const grouped = new Map<string, PropertySpec[]>();
@@ -571,6 +602,14 @@ export function VisualPropertyPanel({
       .map((section) => [section, grouped.get(section) ?? []] as const)
       .filter(([, specs]) => specs.length > 0);
   }, [selectedNode]);
+
+  const editingConfigMark = editingConfigChangeId
+    ? configMarks.find((mark) => mark.changeId === editingConfigChangeId) ?? null
+    : null;
+
+  useEffect(() => {
+    if (editingConfigMark) setConfigEditorDraft(configMarkToDraft(editingConfigMark));
+  }, [editingConfigMark]);
 
   const uploadImageReplacement = async (
     file: File,
@@ -811,10 +850,6 @@ export function VisualPropertyPanel({
       mark.domPath === selectedNode.domPath ||
       mark.nodeId === selectedNode.nodeId,
   );
-  const editingConfigMark = editingConfigChangeId
-    ? configMarks.find((mark) => mark.changeId === editingConfigChangeId) ?? null
-    : null;
-
   const getConfigMarkForSpec = (spec: Pick<PropertySpec, "property" | "kind">) =>
     configMarks.find(
       (mark) =>
@@ -829,8 +864,10 @@ export function VisualPropertyPanel({
     const existing = getConfigMarkForSpec(spec);
     if (existing) {
       onUpdateConfigMark(existing.id, { defaultValue: value });
+      setConfigEditorDraft({ ...configMarkToDraft(existing), default: value });
     } else {
       onMarkConfig(selectedNode, spec.property, spec.label, value, spec.kind);
+      setConfigEditorDraft(createPendingConfigDraft(spec, value));
     }
     setEditingConfigChangeId(changeId);
   };
@@ -985,192 +1022,55 @@ export function VisualPropertyPanel({
 
   const renderConfigMarkDialog = () => {
     const mark = editingConfigMark;
-    const isImage = mark?.property === "src";
-    return (
-      <Dialog
-        open={editingConfigChangeId !== null}
-        onOpenChange={(open) => {
-          if (!open) setEditingConfigChangeId(null);
-        }}
-      >
-        <DialogContent className="max-w-sm gap-4 p-4">
-          <DialogHeader>
-            <DialogTitle className="text-base">配置项设置</DialogTitle>
-            <DialogDescription className="text-xs">
-              将当前属性交给 AI 写入配置字段，后续可在配置栏中调整。
-            </DialogDescription>
-          </DialogHeader>
-          {mark ? (
-            <div className="space-y-3">
-              <div className="rounded-md border bg-muted/30 px-3 py-2">
-                <p className="text-xs font-medium">{mark.label}</p>
-                <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
-                  {mark.kind}:{mark.property}
-                </p>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">配置名称</Label>
-                <Input
-                  value={mark.fieldTitle}
-                  className="h-8 text-xs"
-                  placeholder="配置名称"
-                  onChange={(event) =>
-                    onUpdateConfigMark(mark.id, { fieldTitle: event.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">默认值</Label>
-                <Input
-                  value={mark.defaultValue}
-                  className="h-8 font-mono text-xs"
-                  placeholder="默认值"
-                  onChange={(event) =>
-                    onUpdateConfigMark(mark.id, { defaultValue: event.target.value })
-                  }
-                />
-              </div>
-              {isImage && (
-                <div className="space-y-1.5">
-                  <Label className="text-xs">尺寸限制</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="flex items-center gap-1">
-                      <span className="w-5 shrink-0 text-center text-xs font-medium text-muted-foreground">W</span>
-                      <Select
-                        value={mark.imageWidthOperator ?? " "}
-                        onValueChange={(value) =>
-                          onUpdateConfigMark(mark.id, {
-                            imageWidthOperator: (value === " " ? undefined : value) as VisualConfigMark["imageWidthOperator"],
-                          })
-                        }
-                      >
-                        <SelectTrigger className="h-8 w-16 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value=" ">-</SelectItem>
-                          <SelectItem value=">">{">"}</SelectItem>
-                          <SelectItem value="=">{"="}</SelectItem>
-                          <SelectItem value="<">{"<"}</SelectItem>
-                          <SelectItem value="≥">{"≥"}</SelectItem>
-                          <SelectItem value="≤">{"≤"}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        type="number"
-                        min={0}
-                        value={mark.imageWidthValue ?? ""}
-                        className="h-8 flex-1 font-mono text-xs"
-                        placeholder="px"
-                        onChange={(event) =>
-                          onUpdateConfigMark(mark.id, {
-                            imageWidthValue: event.target.value ? Number(event.target.value) : undefined,
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="w-5 shrink-0 text-center text-xs font-medium text-muted-foreground">H</span>
-                      <Select
-                        value={mark.imageHeightOperator ?? " "}
-                        onValueChange={(value) =>
-                          onUpdateConfigMark(mark.id, {
-                            imageHeightOperator: (value === " " ? undefined : value) as VisualConfigMark["imageHeightOperator"],
-                          })
-                        }
-                      >
-                        <SelectTrigger className="h-8 w-16 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value=" ">-</SelectItem>
-                          <SelectItem value=">">{">"}</SelectItem>
-                          <SelectItem value="=">{"="}</SelectItem>
-                          <SelectItem value="<">{"<"}</SelectItem>
-                          <SelectItem value="≥">{"≥"}</SelectItem>
-                          <SelectItem value="≤">{"≤"}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        type="number"
-                        min={0}
-                        value={mark.imageHeightValue ?? ""}
-                        className="h-8 flex-1 font-mono text-xs"
-                        placeholder="px"
-                        onChange={(event) =>
-                          onUpdateConfigMark(mark.id, {
-                            imageHeightValue: event.target.value ? Number(event.target.value) : undefined,
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-              <div className="space-y-1.5">
-                <Label className="text-xs">分类</Label>
-                <Input
-                  value={mark.category ?? ""}
-                  list="visual-config-mark-category-options"
-                  className="h-8 text-xs"
-                  placeholder="分类（可选，例如 设计）"
-                  onChange={(event) =>
-                    onUpdateConfigMark(mark.id, { category: event.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">配置范围</Label>
-                <Select
-                  value={mark.scope}
-                  onValueChange={(value) =>
-                    onUpdateConfigMark(mark.id, {
-                      scope: value === "project" ? "project" : "page",
-                    })
-                  }
-                >
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="page">页面级配置</SelectItem>
-                    <SelectItem value="project">项目级配置</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-md border bg-muted/30 px-3 py-6 text-center text-xs text-muted-foreground">
-              正在创建配置项...
-            </div>
-          )}
-          <DialogFooter className="gap-2 sm:justify-between sm:space-x-0">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8"
-              disabled={!mark}
-              onClick={() => {
-                if (!mark) return;
-                onRemoveConfigMark(mark.id);
-                setEditingConfigChangeId(null);
-              }}
-            >
-              移除
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              className="h-8"
-              onClick={() => setEditingConfigChangeId(null)}
-            >
-              完成
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+    const draft = configEditorDraft;
+    const updateDraft = (next: ConfigDefinitionDraft) => {
+      setConfigEditorDraft(next);
+      if (!mark) return;
+      onUpdateConfigMark(mark.id, {
+        fieldTitle: next.title,
+        defaultValue: defaultValueText(next.default),
+        category: next.group ?? "",
+        accept: next.accept,
+        widthRule: next.widthRule,
+        heightRule: next.heightRule,
+      });
+    };
+    const defaultValueEditor = draft && (
+      draft.kind === "color" ? (
+        <div className="flex items-center gap-2">
+          <Input aria-label="默认颜色" type="color" className="h-9 w-11 cursor-pointer p-1" value={colorToHex(defaultValueText(draft.default))} onChange={(event) => updateDraft({ ...draft, default: event.target.value })} />
+          <Input aria-label="默认颜色值" className="font-mono text-sm" value={defaultValueText(draft.default)} onChange={(event) => updateDraft({ ...draft, default: event.target.value })} />
+        </div>
+      ) : draft.kind === "image" || draft.kind === "images" ? (
+        <div className="space-y-2">
+          <Input aria-label="上传默认图片" type="file" accept={draft.accept || "image/*"} onChange={async (event) => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+            updateDraft({ ...draft, default: await readFileAsDataUrl(file) });
+          }} />
+          {defaultValueText(draft.default) && <p className="truncate text-xs text-muted-foreground">已选择默认图片</p>}
+        </div>
+      ) : (
+        <Input aria-label="默认值" value={defaultValueText(draft.default)} onChange={(event) => updateDraft({ ...draft, default: event.target.value })} />
+      )
     );
+
+    return draft ? <ConfigItemEditorDialog
+      open={editingConfigChangeId !== null}
+      onOpenChange={(open) => {
+        if (!open) {
+          setEditingConfigChangeId(null);
+          setConfigEditorDraft(null);
+        }
+      }}
+      mode={mark ? "edit" : "create"}
+      scope={mark?.scope ?? "page"}
+      draft={draft}
+      onDraftChange={updateDraft}
+      defaultValueEditor={defaultValueEditor}
+      applyPlan={{ kind: "ai_required", description: "保存字段后，此次可视化改动会随现有草稿交给 AI 应用。" }}
+      onSave={() => setEditingConfigChangeId(null)}
+    /> : null;
   };
 
   const applyArrangement = (nextArrangement: "free" | "row" | "column" | "grid") => {

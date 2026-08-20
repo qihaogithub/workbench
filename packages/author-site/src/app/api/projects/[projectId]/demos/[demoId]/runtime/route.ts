@@ -3,11 +3,13 @@ import crypto from "crypto";
 import path from "path";
 import type {
   DemoPageRuntimeType,
+  HtmlImportMeta,
   PrototypePageMeta,
   WorkspaceTree,
 } from "@workbench/shared";
 import type { WorkspaceMutationOperation } from "@workbench/shared/contracts";
 import type { RuntimeValidationResult } from "@workbench/project-core";
+import { normalizeHtmlImport } from "@workbench/project-core";
 
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import {
@@ -38,6 +40,37 @@ import {
 
 function hashText(content: string): string {
   return crypto.createHash("sha256").update(content).digest("hex");
+}
+
+const DEFAULT_SANDBOX_HTML =
+  '<button id="sandbox-root" onclick="this.textContent=\'已运行\'">运行交互</button>';
+
+function createDeletePathOperation(input: {
+  workspacePath: string;
+  resourcePath: string;
+}): WorkspaceMutationOperation | null {
+  const absolutePath = path.join(input.workspacePath, input.resourcePath);
+  if (!fs.existsSync(absolutePath)) return null;
+  return {
+    type: "delete_path",
+    path: input.resourcePath,
+    expectedHash: hashText(fs.readFileSync(absolutePath, "utf-8")),
+  };
+}
+
+function createTrustedHtmlImportMeta(
+  source: string,
+  normalizedHash: string,
+  analysis: ReturnType<typeof normalizeHtmlImport>["analysis"],
+): HtmlImportMeta {
+  return {
+    source: "html-import" as const,
+    analysisVersion: analysis.analysisVersion,
+    sandboxPolicyVersion: 1,
+    sourceHash: analysis.sourceHash,
+    normalizedHash,
+    viewport: analysis.detectedViewport,
+  };
 }
 
 function createPutTextOperation(input: {
@@ -136,6 +169,8 @@ export async function PUT(
       prototypeHtml,
       prototypeCss,
       prototypeMeta,
+      sandboxHtml,
+      htmlImportMeta: _clientHtmlImportMeta,
       sketchScene,
       sketchMeta,
     } = body as {
@@ -146,6 +181,8 @@ export async function PUT(
       prototypeHtml?: string;
       prototypeCss?: string;
       prototypeMeta?: unknown;
+      sandboxHtml?: string;
+      htmlImportMeta?: unknown;
       sketchScene?: string;
       sketchMeta?: unknown;
     };
@@ -160,6 +197,7 @@ export async function PUT(
       targetRuntimeType !== "prototype-html-css" &&
       targetRuntimeType !== "high-fidelity-react" &&
       targetRuntimeType !== "sketch-scene"
+      && targetRuntimeType !== "sandboxed-html"
     ) {
       return NextResponse.json(
         createApiError("INVALID_REQUEST", "targetRuntimeType 不合法"),
@@ -196,6 +234,12 @@ export async function PUT(
     if (prototypeCss !== undefined && typeof prototypeCss !== "string") {
       return NextResponse.json(
         createApiError("INVALID_REQUEST", "prototypeCss 必须为字符串"),
+        { status: 400 },
+      );
+    }
+    if (sandboxHtml !== undefined && typeof sandboxHtml !== "string") {
+      return NextResponse.json(
+        createApiError("INVALID_REQUEST", "sandboxHtml 必须为字符串"),
         { status: 400 },
       );
     }
@@ -298,6 +342,34 @@ export async function PUT(
         status: 404,
       });
     }
+    let sandboxHtmlForWrite: string | undefined;
+    let htmlImportMetaForWrite: HtmlImportMeta | undefined;
+    if (targetRuntimeType === "sandboxed-html") {
+      const source =
+        sandboxHtml ?? currentFiles.sandboxHtml ?? DEFAULT_SANDBOX_HTML;
+      const normalized = normalizeHtmlImport(source);
+      if (
+        normalized.analysis.outcome.status !== "accepted" ||
+        normalized.analysis.outcome.runtimeType !== "sandboxed-html"
+      ) {
+        return NextResponse.json(
+          createApiError(
+            normalized.analysis.outcome.status === "rejected"
+              ? normalized.analysis.outcome.code
+              : "HTML_IMPORT_RUNTIME_MISMATCH",
+            "sandbox HTML 未通过导入分析",
+            { analysis: normalized.analysis },
+          ),
+          { status: 422 },
+        );
+      }
+      sandboxHtmlForWrite = normalized.normalizedHtml ?? source;
+      htmlImportMetaForWrite = createTrustedHtmlImportMeta(
+        source,
+        normalized.normalizedHash ?? "",
+        normalized.analysis,
+      );
+    }
     const nextFiles = {
       ...currentFiles,
       code: code ?? currentFiles.code,
@@ -307,6 +379,9 @@ export async function PUT(
       prototypeMeta:
         (prototypeMeta as PrototypePageMeta | undefined) ??
         currentFiles.prototypeMeta,
+      sandboxHtml: sandboxHtmlForWrite ?? currentFiles.sandboxHtml,
+      htmlImportMeta:
+        htmlImportMetaForWrite ?? currentFiles.htmlImportMeta,
       sketchScene: sketchScene ?? currentFiles.sketchScene,
       sketchMeta:
         (sketchMeta as Record<string, unknown> | undefined) ??
@@ -344,6 +419,33 @@ export async function PUT(
         );
       };
 
+      const runtimeFiles = [
+        "index.tsx",
+        "prototype.html",
+        "prototype.css",
+        "prototype.meta.json",
+        "sandbox.html",
+        "html-import.meta.json",
+        "sketch.scene.json",
+        "sketch.meta.json",
+      ];
+      const retainedFiles =
+        targetRuntimeType === "high-fidelity-react"
+          ? ["index.tsx"]
+          : targetRuntimeType === "prototype-html-css"
+            ? ["prototype.html", "prototype.css", "prototype.meta.json"]
+            : targetRuntimeType === "sandboxed-html"
+              ? ["sandbox.html", "html-import.meta.json"]
+              : ["sketch.scene.json", "sketch.meta.json"];
+      for (const fileName of runtimeFiles) {
+        if (retainedFiles.includes(fileName)) continue;
+        const operation = createDeletePathOperation({
+          workspacePath: wsPath,
+          resourcePath: demoResourcePath(fileName),
+        });
+        if (operation) operations.push(operation);
+      }
+
       if (
         targetRuntimeType === "high-fidelity-react" &&
         typeof nextFiles.code === "string"
@@ -369,6 +471,16 @@ export async function PUT(
             JSON.stringify(nextFiles.prototypeMeta, null, 2),
           );
         }
+      }
+      if (targetRuntimeType === "sandboxed-html") {
+        addTextOperation(
+          demoResourcePath("sandbox.html"),
+          sandboxHtmlForWrite ?? DEFAULT_SANDBOX_HTML,
+        );
+        addTextOperation(
+          demoResourcePath("html-import.meta.json"),
+          JSON.stringify(htmlImportMetaForWrite, null, 2),
+        );
       }
       if (targetRuntimeType === "sketch-scene") {
         if (typeof nextFiles.sketchScene === "string") {
@@ -426,6 +538,14 @@ export async function PUT(
           targetRuntimeType === "prototype-html-css"
             ? nextFiles.prototypeMeta
             : undefined,
+        sandboxHtml:
+          targetRuntimeType === "sandboxed-html"
+            ? sandboxHtmlForWrite
+            : undefined,
+        htmlImportMeta:
+          targetRuntimeType === "sandboxed-html"
+            ? htmlImportMetaForWrite
+            : undefined,
         sketchScene:
           targetRuntimeType === "sketch-scene"
             ? nextFiles.sketchScene
@@ -440,6 +560,30 @@ export async function PUT(
           createApiError("FILE_WRITE_ERROR", "更新页面文件失败"),
           { status: 500 },
         );
+      }
+      const runtimeFiles = [
+        "index.tsx",
+        "prototype.html",
+        "prototype.css",
+        "prototype.meta.json",
+        "sandbox.html",
+        "html-import.meta.json",
+        "sketch.scene.json",
+        "sketch.meta.json",
+      ];
+      const retainedFiles =
+        targetRuntimeType === "high-fidelity-react"
+          ? ["index.tsx"]
+          : targetRuntimeType === "prototype-html-css"
+            ? ["prototype.html", "prototype.css", "prototype.meta.json"]
+            : targetRuntimeType === "sandboxed-html"
+              ? ["sandbox.html", "html-import.meta.json"]
+              : ["sketch.scene.json", "sketch.meta.json"];
+      for (const fileName of runtimeFiles) {
+        if (!retainedFiles.includes(fileName)) {
+          const filePath = path.join(demoDir, fileName);
+          if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        }
       }
       updatedMeta = writeDemoPageMeta(wsPath, demoId, {});
     }

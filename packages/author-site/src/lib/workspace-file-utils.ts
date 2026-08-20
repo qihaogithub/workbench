@@ -14,6 +14,7 @@ const EDITABLE_PATTERNS: RegExp[] = [
   /^demos\/[^/]+\/config\.schema\.json$/,
   /^demos\/[^/]+\/prototype\.html$/,
   /^demos\/[^/]+\/prototype\.css$/,
+  /^demos\/[^/]+\/sandbox\.html$/,
   /^demos\/[^/]+\/sketch\.scene\.json$/,
   /^demos\/[^/]+\/sketch\.meta\.json$/,
   /^project\.config\.schema\.json$/,
@@ -66,10 +67,12 @@ export function isHiddenEntry(name: string, showKnowledge = false): boolean {
 
 export function normalizePageRuntimeType(
   runtimeType?: DemoPageRuntimeType | null,
-): DemoPageRuntimeType {
+): DemoPageRuntimeType | null {
   if (runtimeType === "prototype-html-css") return "prototype-html-css";
+  if (runtimeType === "sandboxed-html") return "sandboxed-html";
   if (runtimeType === "sketch-scene") return "sketch-scene";
-  return "high-fidelity-react";
+  if (runtimeType === "high-fidelity-react") return "high-fidelity-react";
+  return null;
 }
 
 export function isEmptyConfigSchemaContent(content?: string | null): boolean {
@@ -95,7 +98,9 @@ export function isVisiblePageRuntimeFile(input: {
 }): boolean {
   const runtimeType = normalizePageRuntimeType(input.runtimeType);
 
+  if (!runtimeType) return false;
   if (input.fileName === "prototype.meta.json") return false;
+  if (input.fileName === "html-import.meta.json") return false;
   if (input.fileName === "sketch.meta.json") return false;
   if (input.fileName === "config.schema.json") {
     return !isEmptyConfigSchemaContent(input.schemaContent);
@@ -106,9 +111,13 @@ export function isVisiblePageRuntimeFile(input: {
       input.fileName === "prototype.css"
     );
   }
+  if (runtimeType === "sandboxed-html") {
+    return input.fileName === "sandbox.html";
+  }
   if (
     input.fileName === "prototype.html" ||
-    input.fileName === "prototype.css"
+    input.fileName === "prototype.css" ||
+    input.fileName === "sandbox.html"
   ) {
     return false;
   }

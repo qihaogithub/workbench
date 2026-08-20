@@ -58,6 +58,27 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h --output /
 | AI 是否改写 | `ai.run_started`、工具调用摘要、文件变更、`ai.run_finished` |
 | 预览错误来源 | `preview.error`、`post_generation_validation`、iframe runtime 或自动修复事件 |
 
+### sandbox HTML 运行时闭环
+
+对交互 HTML 先执行：
+
+```bash
+corepack pnpm diagnostics:preview -- --project <projectId> --since 24h --format text
+corepack pnpm diagnostics:preview -- --project <projectId> --since 24h
+```
+
+检查 JSON 的 `sandbox` 摘要和 `preview.sandbox_*` 事件：
+
+| 现象 | 首要字段/判断 | 处理路径 |
+|:-----|:--------------|:---------|
+| policy mismatch | `sandbox.policyMismatch`、`failureCodes`；通常为 `SANDBOX_POLICY_MISMATCH` | 对照页面 `html-import.meta.json` 的 policy/version 与当前 renderer；重新签发前先确认源码 hash 和分析版本一致，不能直接放宽 CSP |
+| expired ticket | `sandbox.expiredTicket` 或 `EXPIRED_EXECUTION_TICKET` | 票据仅短时、一次性使用；重新打开/刷新页面重新申请执行票据，检查客户端是否缓存旧 URL；不要把 execution ID 写入日志或复制到工单 |
+| blocked request | `sandbox.blockedRequestCount` 与 runtime failed/screenshot completed 的 `blockedRequestCount` | 确认是否为预期的跨源、表单、顶层导航或能力阻断；保留 blocked 次数和策略版本即可，不允许为恢复页面而增加 `connect-src` 或 `allow-same-origin` |
+| timeout | `sandbox.timeoutCount`、`sandbox.timeoutMs` 的 p50/p95/p99 与 `errorCode` | 区分页面脚本挂起、截图超时和服务响应超时；先看 `contextClosed`/`browserRestarted`，再按超时阶段定位，不把 timeout 改成无限等待 |
+| process/context recovery | `sandbox.contextRecovery.contextClosed`、`browserRestarted`、`recovered` | `browserRestarted=true` 只代表执行器完成恢复尝试，不代表业务成功；结合后续 `sandbox_execution_issued`、`sandbox_screenshot_completed` 或仍未收敛的失败事件判断。连续恢复失败时停机并人工确认 |
+
+诊断摘要只包含 runtime 类型、策略版本、renderer、错误码、超时数值、阻断计数和恢复布尔量。源码、原始 execution ID、channel ID 不应出现在事件 payload、CLI text、JSON 导出包或自动任务账本中；若发现，应立即按“诊断系统自身缺口”处理并停止传播该导出包。
+
 `diagnostics:autosave`、`diagnostics:collab` 和 `diagnostics:preview` 不再只返回单一事件组；它们同时带出 autosave/collab/preview/workspace 事件，便于在一次查询中从草稿 flush 追到 mutation receipt、projection ack 和 canonical materialization。
 
 ## 降级规则

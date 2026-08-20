@@ -5,6 +5,7 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { AgentConfig } from "../../core/types";
 import { loadConfig } from "../../utils/config";
 import { logger } from "../../utils/logger";
+import { readWorkspaceTree, resolvePageRuntimeType } from "./workspace-page-utils";
 
 const CaptureScreenshotParams = Type.Object({
   width: Type.Optional(
@@ -295,21 +296,28 @@ export function createCaptureScreenshotTool(
       const demoDir = getDemoDir(workingDir, demoId);
       const prototypeHtmlPath = path.join(demoDir, "prototype.html");
       const prototypeCssPath = path.join(demoDir, "prototype.css");
+      const sandboxHtmlPath = path.join(demoDir, "sandbox.html");
+      const htmlImportMetaPath = path.join(demoDir, "html-import.meta.json");
       const codePath = path.join(demoDir, "index.tsx");
       const schemaPath = path.join(demoDir, "config.schema.json");
 
-      const isPrototypePage = fs.existsSync(prototypeHtmlPath);
-      const isCodePage = !isPrototypePage && fs.existsSync(codePath);
+      const persistedRuntimeType = readWorkspaceTree(workingDir).pages.find(
+        (page) => page.id === demoId,
+      )?.runtimeType;
+      const runtimeType = resolvePageRuntimeType(demoDir, persistedRuntimeType);
+      const isPrototypePage = runtimeType === "prototype-html-css";
+      const isSandboxPage = runtimeType === "sandboxed-html";
+      const isCodePage = runtimeType === "high-fidelity-react";
 
-      if (!isPrototypePage && !isCodePage) {
+      if (!isPrototypePage && !isSandboxPage && !isCodePage) {
         return {
           content: [
             {
               type: "text" as const,
-              text: `Error: preview code file not found: demos/${demoId}/index.tsx`,
+              text: `Error: unsupported or missing page runtime for demos/${demoId}.`,
             },
           ],
-          details: { error: "code_file_not_found", path: codePath },
+          details: { error: "page_runtime_not_found", path: demoDir },
           isError: true,
         };
       }
@@ -323,7 +331,38 @@ export function createCaptureScreenshotTool(
 
         let requestBody: Record<string, unknown>;
 
-        if (isPrototypePage) {
+        if (isSandboxPage) {
+          if (!fs.existsSync(sandboxHtmlPath) || !fs.existsSync(htmlImportMetaPath)) {
+            return {
+              content: [{ type: "text" as const, text: `Error: sandbox files not found: demos/${demoId}/sandbox.html and html-import.meta.json` }],
+              details: { error: "sandbox_files_not_found", path: sandboxHtmlPath },
+              isError: true,
+            };
+          }
+          const sandboxHtml = await fs.promises.readFile(sandboxHtmlPath, "utf-8");
+          let htmlImportMeta: unknown;
+          try {
+            htmlImportMeta = JSON.parse(await fs.promises.readFile(htmlImportMetaPath, "utf-8"));
+          } catch {
+            return {
+              content: [{ type: "text" as const, text: `Error: invalid html-import.meta.json for demos/${demoId}.` }],
+              details: { error: "sandbox_meta_invalid", path: htmlImportMetaPath },
+              isError: true,
+            };
+          }
+          requestBody = {
+            projectId,
+            pageId: demoId,
+            runtimeType: "sandboxed-html",
+            sandboxHtml,
+            htmlImportMeta,
+            configData,
+            width,
+            height,
+            fullPage,
+            sessionId: config.sessionId,
+          };
+        } else if (isPrototypePage) {
           const rawHtml = await fs.promises.readFile(
             prototypeHtmlPath,
             "utf-8",
@@ -361,6 +400,13 @@ export function createCaptureScreenshotTool(
             sessionId: config.sessionId,
           };
         } else {
+          if (!fs.existsSync(codePath)) {
+            return {
+              content: [{ type: "text" as const, text: `Error: preview code file not found: demos/${demoId}/index.tsx` }],
+              details: { error: "code_file_not_found", path: codePath },
+              isError: true,
+            };
+          }
           const code = await fs.promises.readFile(codePath, "utf-8");
           requestBody = {
             projectId,

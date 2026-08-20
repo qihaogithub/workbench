@@ -9,6 +9,8 @@ import {
   getProjectConfigSchema,
   listDemoPages,
 } from "@/lib/fs-utils";
+import { getDataDir } from "@/lib/paths";
+import { issuePublishedHtmlExecution } from "@/lib/published-html-execution";
 import { compileCode } from "@/lib/compiler";
 import { generateIframeHtml } from '@workbench/demo-ui/iframe-template';
 import { getCdnBaseUrl } from '@/lib/cdn-config';
@@ -45,6 +47,29 @@ export async function GET(
       if (demoPages.length > 0) {
         effectivePage = demoPages[0].id;
       }
+    }
+
+    // Sign on the server and redirect. An allow-scripts-only iframe has an
+    // opaque origin and cannot safely call the author API from a launcher.
+    const publishedProjectPath = path.join(getDataDir(), "published", projectId, "project.json");
+    const publishedProject = fs.existsSync(publishedProjectPath)
+      ? (() => { try { return JSON.parse(fs.readFileSync(publishedProjectPath, "utf8")) as { publishedVersion?: string; demoPages?: Array<Record<string, unknown>> }; } catch { return undefined; } })()
+      : undefined;
+    const publishedPage = publishedProject?.demoPages?.find((candidate) => candidate.id === effectivePage);
+    if (publishedPage?.runtimeType === "sandboxed-html" && typeof publishedPage.sandboxExecutionPath === "string") {
+      const issued = issuePublishedHtmlExecution({
+        projectId,
+        pageId: String(publishedPage.id),
+        version: publishedProject?.publishedVersion ?? "",
+        requestOrigin: url.origin,
+      });
+      if (!issued.ok) {
+        return new NextResponse("HTML preview unavailable", {
+          status: issued.status,
+          headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+        });
+      }
+      return NextResponse.redirect(issued.data.executionUrl, 307);
     }
 
     if (!effectivePage) {

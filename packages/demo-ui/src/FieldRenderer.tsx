@@ -21,7 +21,7 @@ import { MultiSelect } from "./MultiSelect";
 import { CascadeSelect } from "./CascadeSelect";
 import type { FieldConfig } from "./schema-parser";
 import { createContext, useContext, useMemo } from "react";
-import { BookOpen, Check, Edit3, ImageIcon, Pencil } from "lucide-react";
+import { Check, ChevronDown, Edit3, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -30,6 +30,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DocumentEditor } from "./DocumentEditor";
+import { PageRequirements } from "./PageRequirements";
 import type { DesignSpecEntryLink } from "./types";
 
 export interface PositionFieldEntry {
@@ -75,6 +76,7 @@ export function FieldRenderer({
   readonly,
   designSpecEntries = [],
   onEditDesignSpec,
+  onEditConfigDefinition,
   embedded,
   fieldPath,
 }: {
@@ -85,9 +87,23 @@ export function FieldRenderer({
   readonly?: boolean;
   designSpecEntries?: DesignSpecEntryLink[];
   onEditDesignSpec?: (docId: string, entryId: string) => void;
+  onEditConfigDefinition?: (fieldKey: string, field: FieldConfig) => void;
   embedded?: boolean;
   fieldPath?: string;
 }) {
+  const isInlineControl =
+    field.type === "boolean" ||
+    field.type === "number" ||
+    field.type === "integer" ||
+    field.type === "color" ||
+    field.format === "color";
+  const isImageUploadControl =
+    field.uiWidget === "file" ||
+    field.uiWidget === "image" ||
+    field.uiWidget === "imageList" ||
+    field.format === "image" ||
+    field.format === "file";
+
   const renderInput = () => {
     if (field.uiWidget === "file" || field.uiWidget === "image") {
       return (
@@ -179,20 +195,24 @@ export function FieldRenderer({
       );
     }
 
-    if (field.format === "color") {
+    if (field.format === "color" || field.type === "color") {
       return (
-        <div className="flex gap-2 items-center">
-          <input
-            type="color"
-            value={(value as string) || "#000000"}
-            onChange={(e) => onChange(e.target.value)}
-            className="w-8 h-8 rounded cursor-pointer border-0"
-          />
+        <div className="ml-auto flex h-7 w-20 items-center gap-1 rounded-lg bg-black/40 px-1.5 py-1">
+          <span className="flex size-4 shrink-0 items-center justify-center overflow-hidden rounded-[4px]">
+            <input
+              type="color"
+              value={(value as string) || "#000000"}
+              onChange={(e) => onChange(e.target.value)}
+              aria-label={`${field.title}颜色选择器`}
+              className="size-full cursor-pointer appearance-none border-0 bg-transparent p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-[4px] [&::-webkit-color-swatch]:border-0"
+            />
+          </span>
           <Input
             value={(value as string) || ""}
             onChange={(e) => onChange(e.target.value)}
             placeholder="#000000"
-            className="flex-1 font-mono h-8"
+            aria-label={`${field.title}色值`}
+            className="h-full min-w-0 flex-1 border-0 bg-transparent p-0 font-mono text-sm text-foreground shadow-none focus-visible:ring-0"
           />
         </div>
       );
@@ -266,6 +286,7 @@ export function FieldRenderer({
           <Switch
             checked={(value as boolean) || false}
             onCheckedChange={(checked: boolean) => onChange(checked)}
+            className="ml-auto h-[21px] w-[39px] border-0 shadow-none data-[state=checked]:bg-[#575765] data-[state=unchecked]:bg-[#3a3a40] [&>span]:size-[17px] [&>span]:data-[state=checked]:translate-x-[18px]"
           />
         </div>
       );
@@ -273,53 +294,34 @@ export function FieldRenderer({
 
     if (field.type === "number" || field.type === "integer") {
       if (field.minimum !== undefined && field.maximum !== undefined) {
-        const currentValue =
-          (value as number) ?? field.default ?? field.minimum;
-
-        const getUnit = (): string => {
-          const name = (field.key + field.title).toLowerCase();
-          if (
-            name.includes("间隔") ||
-            name.includes("时间") ||
-            name.includes("duration")
-          ) {
-            return "ms";
-          }
-          if (
-            name.includes("高度") ||
-            name.includes("height") ||
-            name.includes("宽度") ||
-            name.includes("width") ||
-            name.includes("大小") ||
-            name.includes("size")
-          ) {
-            return "px";
-          }
-          return "";
-        };
-
-        const unit = getUnit();
+        const currentValue = (value as number) ?? field.default ?? field.minimum;
 
         return (
-          <div className="flex items-center gap-3 w-full">
-            <div className="min-w-[60px] text-left shrink-0">
-              <span className="font-mono text-sm font-medium text-foreground">
-                {currentValue}
-                {unit}
-              </span>
-            </div>
-            <div className="flex-1 min-w-[120px]">
-              <Slider
-                value={[currentValue]}
-                min={field.minimum}
-                max={field.maximum}
-                step={field.type === "integer" ? 1 : 0.1}
-                onValueChange={(vals: number[]) => onChange(vals[0])}
-              />
-            </div>
-</div>
-  );
-}
+          <div className="ml-auto flex min-w-0 items-center gap-2">
+            <Input
+              type="number"
+              value={currentValue.toString()}
+              onChange={(event) => {
+                const parsed = field.type === "integer"
+                  ? parseInt(event.target.value, 10)
+                  : parseFloat(event.target.value);
+                if (!Number.isNaN(parsed)) onChange(parsed);
+              }}
+              min={field.minimum}
+              max={field.maximum}
+              className="h-7 w-[60px] shrink-0 border-0 bg-black/40 px-1.5 text-center font-mono text-sm shadow-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0"
+            />
+            <Slider
+              value={[currentValue]}
+              min={field.minimum}
+              max={field.maximum}
+              step={field.type === "integer" ? 1 : 0.1}
+              onValueChange={(values: number[]) => onChange(values[0])}
+              className="min-w-[72px] flex-1"
+            />
+          </div>
+        );
+      }
 
       return (
         <Input
@@ -334,7 +336,7 @@ export function FieldRenderer({
           }
           min={field.minimum}
           max={field.maximum}
-          className="font-mono h-8"
+          className="ml-auto h-7 w-[60px] border-0 bg-black/40 px-1.5 text-center font-mono text-sm shadow-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0"
         />
       );
     }
@@ -353,7 +355,7 @@ export function FieldRenderer({
             onChange(index >= 0 ? field.enum![index] : val);
           }}
         >
-          <SelectTrigger className="h-8">
+          <SelectTrigger className="h-9 rounded-lg border-0 bg-black/40 px-3 text-sm shadow-none focus:ring-2 focus:ring-ring">
             <SelectValue placeholder="请选择">{displayValue}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -393,7 +395,7 @@ export function FieldRenderer({
           onChange={(e) => onChange(e.target.value)}
           placeholder={`请输入${field.title}`}
           rows={3}
-          className="resize-y min-h-[80px]"
+          className="h-24 min-h-24 resize-y rounded-lg border-0 bg-black/40 px-3 py-2.5 text-sm shadow-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0"
         />
       );
     }
@@ -406,7 +408,7 @@ export function FieldRenderer({
           placeholder={`请输入${field.title}`}
           maxLength={field.maxLength}
           rows={3}
-          className="resize-none"
+          className="h-24 min-h-24 resize-none rounded-lg border-0 bg-black/40 px-3 py-2.5 text-sm shadow-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0"
         />
       );
     }
@@ -429,123 +431,173 @@ export function FieldRenderer({
         onChange={(e) => onChange(e.target.value)}
         placeholder={`请输入${field.title}`}
         maxLength={field.maxLength}
-        className="h-8"
+        className="h-9 rounded-lg border-0 bg-black/40 px-3 text-sm shadow-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0"
       />
     );
   };
 
-  const isComplexField =
-    field.uiWidget === "file" ||
-    field.uiWidget === "image" ||
-    field.uiWidget === "imageList" ||
-    field.format === "image" ||
-    field.format === "file" ||
-    field.type === "array" ||
-    field.type === "richtext" ||
-    field.type === "text" ||
-    (field.maxLength !== undefined && field.maxLength > 100) ||
-    !!field.positionable;
-
-  const isTextareaField =
-    field.type === "text" ||
-    (field.maxLength !== undefined && field.maxLength > 100);
-
-  const linkedSpecs = designSpecEntries.filter((entry) => entry.fieldKey === field.key);
+  const linkedSpecs = designSpecEntries.filter(
+    (entry) => entry.fieldKey === field.key && entry.markdown.trim(),
+  );
+  const imageDimensions = formatImageDimensions(field.uiOptions);
+  const showImageHint =
+    imageDimensions !== "—" &&
+    (field.uiWidget === "file" ||
+      field.uiWidget === "image" ||
+      field.uiWidget === "imageList" ||
+      field.format === "image" ||
+      field.format === "file");
+  const fieldLabel = (
+    <>
+      {field.title}
+      {field.required && <span className="ml-0.5 text-red-500">*</span>}
+    </>
+  );
 
   return (
     <div
       className={cn(
-        "py-1.5",
-        isComplexField
-          ? "flex flex-col gap-2"
-          : "flex items-center gap-2",
+        "w-full rounded-lg",
+        isInlineControl
+          ? "flex min-h-7 items-center gap-3"
+          : cn("flex flex-col", isImageUploadControl ? "gap-1.5" : "gap-3"),
       )}
     >
-      {(field.title !== "" && (isComplexField || !isTextareaField)) && (
-        <div className="flex items-center gap-1 min-w-0">
-          <Label className="text-xs font-medium text-foreground truncate shrink-0 cursor-default">
-            {field.title}
-            {field.required && <span className="text-red-500 ml-0.5">*</span>}
-          </Label>
-          {linkedSpecs.length > 0 && (
-            <DesignSpecIndicator
-              specs={linkedSpecs}
-              field={field}
-              value={value}
-              onEditDesignSpec={onEditDesignSpec}
-            />
-          )}
+      {field.title !== "" && (
+        <div className={cn("flex min-w-0 items-center gap-1", isInlineControl ? "min-w-0 flex-1" : "w-full")}>
+          <div className="min-w-0 flex-1">
+            {onEditConfigDefinition && !readonly ? (
+              <button
+                type="button"
+                onClick={() => onEditConfigDefinition(field.key, field)}
+                className="min-w-0 max-w-full truncate rounded-sm text-left text-sm font-medium text-foreground/70 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label={`编辑配置项：${field.title}`}
+              >
+                {fieldLabel}
+              </button>
+            ) : (
+              <Label className="block min-w-0 truncate text-sm font-medium text-foreground/70">
+                {fieldLabel}
+              </Label>
+            )}
+            {showImageHint && <p className="mt-0.5 truncate text-[13px] font-medium text-foreground/30">{imageDimensions}</p>}
+          </div>
         </div>
       )}
-      <div className={isComplexField ? "w-full" : "flex-1 min-w-0"}>
+      <div className={cn("min-w-0", isInlineControl ? "flex-1" : "w-full")}>
         {renderInput()}
       </div>
+      {linkedSpecs.length > 0 && (
+        <DesignSpecCards specs={linkedSpecs} onEditDesignSpec={onEditDesignSpec} />
+      )}
     </div>
   );
 }
 
-function DesignSpecIndicator({ specs, field, value, onEditDesignSpec }: {
+const DESIGN_SPEC_COLLAPSED_CONTENT_HEIGHT = 116;
+
+function DesignSpecCards({ specs, onEditDesignSpec }: {
   specs: DesignSpecEntryLink[];
-  field: FieldConfig;
-  value: unknown;
   onEditDesignSpec?: (docId: string, entryId: string) => void;
 }) {
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  return <div className="flex flex-col gap-3">
+    {specs.map((spec) => (
+      <DesignSpecCard
+        key={`${spec.docId}:${spec.entryId}`}
+        spec={spec}
+        onEdit={onEditDesignSpec ? () => onEditDesignSpec(spec.docId, spec.entryId) : undefined}
+      />
+    ))}
+  </div>;
+}
 
-  return <>
-    <span className="relative inline-flex" onMouseEnter={() => setPreviewOpen(true)} onMouseLeave={() => setPreviewOpen(false)}>
-      <button
-        type="button"
-        aria-label={`查看关联设计规范，共 ${specs.length} 条`}
-        onFocus={() => setPreviewOpen(true)}
-        onBlur={() => setPreviewOpen(false)}
-        onClick={(event) => { event.stopPropagation(); setDialogOpen(true); }}
-        className="inline-flex shrink-0 items-center justify-center rounded-sm text-primary transition-colors hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <BookOpen className="h-3.5 w-3.5" />
-      </button>
-      {previewOpen && (
-        <span role="tooltip" className="absolute left-0 top-full z-30 mt-1.5 w-60 rounded-md border bg-popover px-2.5 py-2 text-left text-xs text-popover-foreground shadow-md">
-          <span className="mb-1 block font-medium">关联设计规范</span>
-          {specs.map((spec) => <span key={`${spec.docId}:${spec.entryId}`} className="block truncate text-muted-foreground">{spec.docTitle} · {spec.entryTitle}</span>)}
-        </span>
-      )}
-    </span>
-    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-      <DialogContent className="flex max-h-[80vh] max-w-2xl flex-col">
-        <DialogHeader className="sr-only"><DialogTitle>关联设计规范</DialogTitle></DialogHeader>
-        <div className="min-h-0 space-y-3 overflow-y-auto pr-1">
-          {specs.map((spec) => <section key={`${spec.docId}:${spec.entryId}`} className="rounded-lg border p-3">
-            <p className="text-xs text-muted-foreground">{spec.docTitle}</p>
-            <h3 className="mt-1 text-sm font-semibold">{spec.entryTitle || "未命名条目"}</h3>
-            <DesignSpecConfigTable field={field} value={value} />
-            {spec.markdown.trim() ? <DocumentEditor value={spec.markdown} onChange={() => {}} readOnly scrollable={false} className="mt-3" /> : <p className="mt-3 text-sm text-muted-foreground">暂无说明</p>}
-            {onEditDesignSpec && <Button className="mt-3" size="sm" onClick={() => { setDialogOpen(false); onEditDesignSpec(spec.docId, spec.entryId); }}>去编辑</Button>}
-          </section>)}
+function DesignSpecCard({ spec, onEdit }: { spec: DesignSpecEntryLink; onEdit?: () => void }) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+
+  useEffect(() => {
+    const measure = () => {
+      const content = contentRef.current;
+      setOverflows(Boolean(content && content.scrollHeight > DESIGN_SPEC_COLLAPSED_CONTENT_HEIGHT + 1));
+    };
+    measure();
+    const observer = typeof ResizeObserver === "undefined" || !contentRef.current
+      ? undefined
+      : new ResizeObserver(measure);
+    if (contentRef.current) observer?.observe(contentRef.current);
+    return () => observer?.disconnect();
+  }, [spec.markdown]);
+
+  return (
+    <section className="rounded-lg bg-foreground/[0.05] p-3">
+      <div className="flex min-h-[22px] items-center gap-2">
+        <h3 className="min-w-0 flex-1 truncate text-lg font-bold leading-[22px] text-foreground/60">
+          {spec.entryTitle || "未命名设计规范"}
+        </h3>
+        {onEdit && (
+          <button
+            type="button"
+            onClick={onEdit}
+            aria-label={`编辑设计规范：${spec.entryTitle || "未命名设计规范"}`}
+            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-foreground/40 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      {spec.markdown.trim() && (
+        <div
+          ref={contentRef}
+          className={cn("mt-3 overflow-hidden", expanded ? "" : "max-h-[116px]")}
+        >
+          <PageRequirements
+            markdown={spec.markdown}
+            className="!max-w-none !text-sm !leading-[1.5] !text-foreground/60 [&_h1]:!text-base [&_h2]:!text-base [&_h3]:!text-sm [&_h4]:!text-sm"
+          />
         </div>
-      </DialogContent>
-    </Dialog>
-  </>;
+      )}
+      {overflows && (
+        <button
+          type="button"
+          onClick={() => setExpanded((current) => !current)}
+          aria-expanded={expanded}
+          className="-mx-3 -mb-3 mt-3 flex h-8 w-[calc(100%+24px)] items-center justify-center gap-0.5 border-t border-foreground/10 text-xs text-foreground/40 transition-colors hover:text-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {expanded ? "收起" : "展开"}
+          <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", expanded && "rotate-180")} />
+        </button>
+      )}
+    </section>
+  );
 }
 
-function DesignSpecConfigTable({ field, value }: { field: FieldConfig; value: unknown }) {
-  const isImage = field.uiWidget === "image" || field.uiWidget === "file" || field.format === "image" || /(?:image|img|logo|banner|pic|thumb|background)/i.test(field.key);
-  const isColor = field.format === "color" || field.type === "color";
-  const format = isImage && typeof value === "string"
-    ? value.split(".").pop()?.toUpperCase() || "—"
-    : field.format?.toUpperCase() || "—";
+type ImageRule = { operator?: string; value?: number };
 
-  return <table className="mt-3 w-full border-collapse text-xs">
-    <thead><tr className="text-left text-muted-foreground"><th className="w-[52px] py-1 pr-2 font-medium" /><th className="py-1 pr-2 font-medium">配置项</th><th className="py-1 pr-2 font-medium">格式</th><th className="py-1 font-medium">尺寸</th></tr></thead>
-    <tbody><tr className="hover:bg-accent/40"><td className="py-1 pr-2"><ConfigSpecThumbnail title={field.title} value={value} isImage={isImage} isColor={isColor} /></td><td className="font-medium">{field.title}</td><td className="text-muted-foreground">{format}</td><td className="text-muted-foreground">—</td></tr></tbody>
-  </table>;
+function readImageRule(options: Record<string, unknown> | undefined, key: "widthRule" | "heightRule"): ImageRule | undefined {
+  const value = options?.[key];
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const rule = value as Record<string, unknown>;
+  return typeof rule.value === "number" && Number.isFinite(rule.value) && typeof rule.operator === "string"
+    ? { operator: rule.operator, value: rule.value }
+    : undefined;
 }
 
-function ConfigSpecThumbnail({ title, value, isImage, isColor }: { title: string; value: unknown; isImage: boolean; isColor: boolean }) {
-  if (isColor) return <span className="block h-[52px] w-[52px] rounded-md border" style={{ background: typeof value === "string" ? value : "hsl(var(--secondary))" }} />;
-  if (isImage && typeof value === "string" && value) return <img src={value} alt={title} className="h-[52px] w-[52px] rounded-md border object-cover" />;
-  return <span className="flex h-[52px] w-[52px] items-center justify-center rounded-md border text-lg text-muted-foreground">{isImage ? <ImageIcon className="h-5 w-5" /> : "Aa"}</span>;
+export function formatImageAccept(options?: Record<string, unknown>): string {
+  const accept = typeof options?.accept === "string" ? options.accept.trim() : "";
+  if (!accept || accept === "image/*" || accept === "*/*") return "不限";
+  const labels = accept.split(",").map((item) => item.trim()).filter(Boolean).map((item) => {
+    const raw = item.includes("/") ? item.split("/").pop() ?? item : item.replace(/^\./, "");
+    return raw.toLowerCase() === "jpeg" ? "jpg" : raw.toLowerCase();
+  });
+  return Array.from(new Set(labels)).join("/") || "不限";
+}
+
+export function formatImageDimensions(options?: Record<string, unknown>): string {
+  const width = readImageRule(options, "widthRule");
+  const height = readImageRule(options, "heightRule");
+  const rules = [width && `W ${width.operator} ${width.value}px`, height && `H ${height.operator} ${height.value}px`].filter(Boolean);
+  return rules.length ? rules.join(" · ") : "—";
 }
 
 function PositionFieldInput({

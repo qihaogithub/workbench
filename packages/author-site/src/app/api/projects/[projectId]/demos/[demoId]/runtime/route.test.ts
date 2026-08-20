@@ -244,7 +244,12 @@ describe("demo runtime route live Workspace writes", () => {
       }),
     );
     const mutation = commitWorkspaceMutation.mock.calls[0]?.[0];
-    expect(mutation?.operations).toEqual([
+    expect(mutation?.operations).toHaveLength(5);
+    expect(mutation?.operations).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: "delete_path",
+        path: "demos/page-1/index.tsx",
+      }),
       expect.objectContaining({
         type: "put_text",
         path: "demos/page-1/prototype.html",
@@ -264,8 +269,10 @@ describe("demo runtime route live Workspace writes", () => {
         type: "put_text",
         path: "workspace-tree.json",
       }),
-    ]);
-    const treeOperation = mutation?.operations?.[3];
+    ]));
+    const treeOperation = mutation?.operations?.find(
+      (operation) => "path" in operation && operation.path === "workspace-tree.json",
+    );
     expect(treeOperation?.type).toBe("put_text");
     if (treeOperation?.type !== "put_text") {
       throw new Error("Expected workspace-tree put_text operation");

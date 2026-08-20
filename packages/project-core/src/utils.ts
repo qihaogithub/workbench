@@ -45,15 +45,19 @@ export function ensureDir(dir: string): void {
 }
 
 /**
- * 根据页面目录下的文件推断运行时类型。
- * 优先级：sketch.scene.json > prototype.html > high-fidelity-react（默认）
+ * 根据页面目录下的唯一运行时文件推断类型；混合或无标记目录一律失败。
  */
 export function resolvePageRuntimeType(pageDir: string): DemoPageRuntimeType {
-  if (fs.existsSync(path.join(pageDir, "sketch.scene.json")))
-    return "sketch-scene";
-  if (fs.existsSync(path.join(pageDir, "prototype.html")))
-    return "prototype-html-css";
-  return "high-fidelity-react";
+  const markers = [
+    ["sketch-scene", "sketch.scene.json"],
+    ["sandboxed-html", "sandbox.html"],
+    ["prototype-html-css", "prototype.html"],
+    ["high-fidelity-react", "index.tsx"],
+  ] as const;
+  const present = markers.filter(([, filename]) => fs.existsSync(path.join(pageDir, filename)));
+  if (present.length > 1) throw new Error("RUNTIME_TYPE_CONFLICT");
+  if (present.length === 1) return present[0][0] as DemoPageRuntimeType;
+  throw new Error("RUNTIME_TYPE_UNKNOWN");
 }
 
 export function createDefaultSketchSceneText(): string {

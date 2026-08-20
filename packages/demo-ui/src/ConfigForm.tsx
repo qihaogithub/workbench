@@ -1,14 +1,8 @@
 "use client";
 
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
-import { ChevronDown, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { cn } from "./utils";
-import { Separator } from "@/components/ui/separator";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import type { ConfigFormProps } from "./types";
 import type { DesignSpecEntryLink } from "./types";
 import type { FieldConfig, FieldGroup, VisibleWhenCondition } from "./schema-parser";
@@ -127,6 +121,7 @@ function FieldGroupSection({
   readonly,
   designSpecEntries,
   onEditDesignSpec,
+  onEditConfigDefinition,
 }: {
   group: FieldGroup;
   formData: Record<string, unknown>;
@@ -136,13 +131,12 @@ function FieldGroupSection({
   readonly?: boolean;
   designSpecEntries?: DesignSpecEntryLink[];
   onEditDesignSpec?: (docId: string, entryId: string) => void;
+  onEditConfigDefinition?: (fieldKey: string, field: FieldConfig) => void;
 }) {
-  const [open, setOpen] = useState(true);
-
   if (group.title === "") {
     return (
-      <div className="py-2">
-        <div className="space-y-1 px-2 pt-1 pb-1">
+      <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-5">
           {group.fields.map((field) => (
             <FieldRenderer
               key={field.key}
@@ -153,6 +147,7 @@ function FieldGroupSection({
               readonly={readonly}
               designSpecEntries={designSpecEntries}
               onEditDesignSpec={onEditDesignSpec}
+              onEditConfigDefinition={onEditConfigDefinition}
               fieldPath={field.key}
             />
           ))}
@@ -162,39 +157,27 @@ function FieldGroupSection({
   }
 
   return (
-    <div className="py-2">
-      <Collapsible open={open} onOpenChange={setOpen}>
-        <CollapsibleTrigger asChild>
-          <div className="flex items-center gap-1 py-1.5 cursor-pointer hover:bg-accent/30 rounded-sm transition-colors">
-            <span>
-              {open ? (
-                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform rotate-180" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
-              )}
-            </span>
-            <h3 className="text-sm font-medium text-muted-foreground">{group.title}</h3>
-          </div>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="space-y-1 pl-5 pr-2 pt-1 pb-1">
-            {group.fields.map((field) => (
-              <FieldRenderer
-                key={field.key}
-                field={field}
-                value={formData[field.key]}
-                onChange={(value) => onChange(field.key, value)}
-                sessionId={sessionId}
-                readonly={readonly}
-                designSpecEntries={designSpecEntries}
-                onEditDesignSpec={onEditDesignSpec}
-                fieldPath={field.key}
-              />
-            ))}
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
-    </div>
+    <section className="flex flex-col gap-5" aria-label={group.title}>
+      <h3 className="border-b border-foreground/10 pb-2 text-sm font-medium text-foreground/40">
+        {group.title}
+      </h3>
+      <div className="flex flex-col gap-5">
+        {group.fields.map((field) => (
+          <FieldRenderer
+            key={field.key}
+            field={field}
+            value={formData[field.key]}
+            onChange={(value) => onChange(field.key, value)}
+            sessionId={sessionId}
+            readonly={readonly}
+            designSpecEntries={designSpecEntries}
+            onEditDesignSpec={onEditDesignSpec}
+            onEditConfigDefinition={onEditConfigDefinition}
+            fieldPath={field.key}
+          />
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -215,6 +198,7 @@ export function ConfigForm({
   onTogglePositionDimming,
   designSpecEntries,
   onEditDesignSpec,
+  onEditConfigDefinition,
 }: ConfigFormProps) {
   const [formData, setFormData] = useState<Record<string, unknown>>(
     () => {
@@ -391,25 +375,23 @@ export function ConfigForm({
 
   return (
     <PositionConfigContext.Provider value={positionConfigValue}>
-      <div className={cn("h-full", className)}>
-        <div className="h-full overflow-y-auto">
-          <div className="px-1 pb-4">
-            {visibleFieldGroups.map((group, index) => (
-              <div key={index}>
-                {index > 0 && <Separator className="my-2" />}
-                <FieldGroupSection
-                  group={group}
-                  formData={effectiveFormData}
-                  onChange={handleFieldChange}
-                  isFirst={index === 0}
-                  sessionId={sessionId}
-                  readonly={readonly}
-                  designSpecEntries={designSpecEntries}
-                  onEditDesignSpec={onEditDesignSpec}
-                />
-              </div>
-            ))}
-          </div>
+      <div className={cn("min-w-0", className)}>
+        <div className="flex flex-col gap-5 pb-2">
+          {visibleFieldGroups.map((group, index) => (
+            <div key={index}>
+              <FieldGroupSection
+                group={group}
+                formData={effectiveFormData}
+                onChange={handleFieldChange}
+                isFirst={index === 0}
+                sessionId={sessionId}
+                readonly={readonly}
+                designSpecEntries={designSpecEntries}
+                onEditDesignSpec={onEditDesignSpec}
+                onEditConfigDefinition={onEditConfigDefinition}
+              />
+            </div>
+          ))}
         </div>
       </div>
     </PositionConfigContext.Provider>

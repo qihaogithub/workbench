@@ -1,12 +1,14 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ChevronDown,
   ChevronRight,
   FileText,
   ListFilter,
+  MoreHorizontal,
+  Plus,
   RotateCcw,
   Save,
 } from "lucide-react";
@@ -14,6 +16,14 @@ import { ConfigForm } from "./ConfigForm";
 import { ConfigScopeWrapper } from "./ConfigScopeWrapper";
 import { PageRequirements } from "./PageRequirements";
 import { RichTextEditor } from "./RichTextEditor";
+import { ConfigItemEditorDialog, type ConfigItemApplyPlanSnapshot } from "./ConfigItemEditorDialog";
+import {
+  applySchemaDefinitionCommand,
+  readConfigDefinitionFields,
+  type ConfigDefinitionDraft,
+  type SchemaDefinitionMutation,
+} from "@workbench/shared/demo/config-schema-definition";
+import type { ConfigDefinitionImpactSummary } from "./ConfigDefinitionManagerDialog";
 import { parseSchemaToFields } from "./schema-parser";
 import {
   getAvailableConfigCategories,
@@ -37,6 +47,7 @@ import {
 } from "@/components/ui/popover";
 
 const EMPTY_DESIGN_SPEC_ENTRIES: DesignSpecEntryLink[] = [];
+const EMPTY_SCHEMA = '{\n  "type": "object",\n  "properties": {}\n}';
 export {
   extractCodeConfigBindingKeys,
   extractPrototypeConfigBindingKeys,
@@ -59,6 +70,33 @@ export interface PageConfigPanelPage {
   }>;
 }
 
+type DefinitionEditorState = {
+  mode: "create" | "edit";
+  scope: "page" | "project";
+  draft: ConfigDefinitionDraft;
+  originalKey?: string;
+};
+
+function newConfigDefinitionDraft(schema: string): ConfigDefinitionDraft {
+  const keys = new Set(readConfigDefinitionFields(schema).map((field) => field.key));
+  let index = 1;
+  while (keys.has(`field_${index}`)) index += 1;
+  return { key: `field_${index}`, title: "新配置项", kind: "text", default: "" };
+}
+
+function buildDefaultValueSchema(draft: ConfigDefinitionDraft) {
+  const property: Record<string, unknown> = { title: draft.title || "默认值", default: draft.default };
+  if (draft.kind === "number") property.type = "number";
+  else if (draft.kind === "integer") property.type = "integer";
+  else if (draft.kind === "boolean") property.type = "boolean";
+  else if (draft.kind === "enum") { property.type = "string"; property.enum = draft.enum ?? []; }
+  else if (draft.kind === "color") { property.type = "string"; property.format = "color"; }
+  else if (draft.kind === "image") { property.type = "string"; property.format = "image"; property["ui:options"] = { group: "", accept: draft.accept, maxSize: draft.maxSize, widthRule: draft.widthRule, heightRule: draft.heightRule }; }
+  else if (draft.kind === "images") { property.type = "array"; property.items = { type: "string", format: "image" }; property["ui:options"] = { group: "", accept: draft.accept, maxSize: draft.maxSize, widthRule: draft.widthRule, heightRule: draft.heightRule }; }
+  else { property.type = "string"; if (draft.kind === "textarea") property["ui:widget"] = "textarea"; if (draft.kind === "richtext") property.format = "richtext"; }
+  return JSON.stringify({ type: "object", properties: { [draft.key]: property } });
+}
+
 interface PageConfigPanelProps {
   pages: PageConfigPanelPage[];
   activePageId?: string;
@@ -68,11 +106,16 @@ interface PageConfigPanelProps {
   projectConfigSchema?: string;
   onProjectConfigChange?: (data: Record<string, unknown>) => void;
   onProjectSchemaChange?: (schema: string) => void;
+  /** 管理器的定义变更；宿主负责应用运行值清理计划并进入协同持久化链路。 */
+  onProjectDefinitionChange?: (mutation: SchemaDefinitionMutation) => void;
   onPageConfigChange?: (pageId: string, data: Record<string, unknown>) => void;
   onPageSchemaChange?: (pageId: string, schema: string) => void;
-  onSaveAsDefaults?: (pageId: string) => void;
+  onPageDefinitionChange?: (pageId: string, mutation: SchemaDefinitionMutation) => void;
+  onDefinitionSendToAI?: (scope: "project" | "page", mutation: SchemaDefinitionMutation) => void;
+  onDefinitionAnalyze?: (scope: "project" | "page", mutation: SchemaDefinitionMutation) => ConfigDefinitionImpactSummary;
+  onSaveAsDefaults?: (pageId: string, values?: Record<string, unknown>) => void;
   onRestoreDefaults?: (pageId: string) => void;
-  onProjectSaveAsDefaults?: () => void;
+  onProjectSaveAsDefaults?: (values?: Record<string, unknown>) => void;
   onProjectRestoreDefaults?: () => void;
   readonly?: boolean;
   sessionId?: string;
@@ -93,10 +136,8 @@ interface PageConfigPanelProps {
   requirementsLoading?: boolean;
   /** 资源规范折叠区的展示位置；创作端由文档视图承载时可隐藏。 */
   requirementsPosition?: "beforeConfig" | "afterConfig" | "hidden";
-  /** 只读入口在没有页面资源规范和关联设计规范时隐藏整个折叠区。 */
+  /** 只读入口在没有页面资源规范时隐藏整个折叠区。 */
   hideEmptyRequirements?: boolean;
-  /** 使用端可将资源规范与配置项显示为不切换内容的快速定位 Tab。 */
-  sectionNavigation?: "none" | "anchorTabs";
   /** 已加载的设计规范绑定，用于配置字段旁的只读入口。 */
   designSpecEntries?: DesignSpecEntryLink[];
   /** 仅创作端提供：跳转到文档视图中的指定规范条目。 */
@@ -136,25 +177,25 @@ function PanelSection({
 }) {
   return (
     <section className="flex flex-col">
-      <div className="flex items-center justify-between gap-2 border-b pb-2">
+      <div className="flex items-center justify-between gap-3 border-b border-border/80 pb-2">
         {collapsible ? (
           <button
             type="button"
             onClick={onToggle}
             aria-expanded={open}
-            className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 rounded-md px-1 py-1 text-left transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="inline-flex h-7 min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-md px-0 text-left transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {open ? (
               <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
             ) : (
               <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
             )}
-            <span className="text-sm font-semibold">{title}</span>
+            <span className="text-[15px] font-semibold leading-none text-foreground">{title}</span>
           </button>
         ) : (
-          <h2 className="min-w-0 flex-1 px-1 py-1 text-sm font-semibold">{title}</h2>
+          <h2 className="flex h-7 min-w-0 flex-1 items-center text-[15px] font-semibold leading-none text-foreground">{title}</h2>
         )}
-        {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
+        {actions && <div className="flex shrink-0 items-center gap-3">{actions}</div>}
       </div>
       {open && <div className="flex flex-col">{children}</div>}
     </section>
@@ -264,8 +305,12 @@ export function PageConfigPanel({
   projectConfigSchema,
   onProjectConfigChange,
   onProjectSchemaChange,
+  onProjectDefinitionChange,
   onPageConfigChange,
   onPageSchemaChange,
+  onPageDefinitionChange,
+  onDefinitionSendToAI,
+  onDefinitionAnalyze,
   onSaveAsDefaults,
   onRestoreDefaults,
   onProjectSaveAsDefaults,
@@ -286,7 +331,6 @@ export function PageConfigPanel({
   requirementsLoading,
   requirementsPosition = "afterConfig",
   hideEmptyRequirements = false,
-  sectionNavigation = "none",
   designSpecEntries = EMPTY_DESIGN_SPEC_ENTRIES,
   onEditDesignSpec,
   designSpecApiContext,
@@ -296,20 +340,12 @@ export function PageConfigPanel({
     string | null
   >(null);
   const [configCategoryFilter, setConfigCategoryFilter] = useState("");
-  const [configSectionOpen, setConfigSectionOpen] = useState(true);
+  const [configActionsOpen, setConfigActionsOpen] = useState(false);
   const [requirementsSectionOpen, setRequirementsSectionOpen] = useState(true);
   const [editingRequirements, setEditingRequirements] = useState(false);
   const [requirementsDraft, setRequirementsDraft] = useState("");
   const [loadedDesignSpecEntries, setLoadedDesignSpecEntries] = useState<DesignSpecEntryLink[]>([]);
-  const [saveDefaultsScope, setSaveDefaultsScope] = useState<
-    "page" | "project" | null
-  >(null);
-  const contentContainerRef = useRef<HTMLDivElement>(null);
-  const requirementsSectionRef = useRef<HTMLDivElement>(null);
-  const configSectionRef = useRef<HTMLDivElement>(null);
-  const [activeSectionAnchor, setActiveSectionAnchor] = useState<
-    "requirements" | "config"
-  >("requirements");
+  const [definitionEditor, setDefinitionEditor] = useState<DefinitionEditorState | null>(null);
 
   useEffect(() => {
     if (!designSpecApiContext?.workingDir) return;
@@ -346,6 +382,7 @@ export function PageConfigPanel({
   }, [designSpecApiContext?.workingDir, designSpecApiContext?.sessionId, designSpecApiContext?.projectId]);
 
   const effectiveDesignSpecEntries = designSpecEntries.length > 0 ? designSpecEntries : loadedDesignSpecEntries;
+
   const [restoreDefaultsScope, setRestoreDefaultsScope] = useState<
     "page" | "project" | null
   >(null);
@@ -395,6 +432,55 @@ export function PageConfigPanel({
   const selectedPageConfig =
     scopedPages.find((item) => item.page.id === effectiveDetailPageId) ?? null;
   const selectedPage = selectedPageConfig?.page ?? null;
+  const selectedProjectConfigSchema = selectedPageConfig?.projectConfigSchema;
+
+  const openDefinitionEditor = (scope: "page" | "project", key?: string) => {
+    if (!selectedPage) return;
+    const targetSchema = scope === "project"
+      ? selectedProjectConfigSchema || EMPTY_SCHEMA
+      : selectedPage.schema || EMPTY_SCHEMA;
+    const existing = key
+      ? readConfigDefinitionFields(targetSchema).find((field) => field.key === key)
+      : undefined;
+    setDefinitionEditor(existing
+      ? { mode: "edit", scope, draft: existing, originalKey: existing.key }
+      : { mode: "create", scope, draft: newConfigDefinitionDraft(targetSchema) });
+  };
+
+  const definitionImpact = useMemo<ConfigItemApplyPlanSnapshot | undefined>(() => {
+    if (!definitionEditor || !selectedPage) return undefined;
+    const isProject = definitionEditor.scope === "project";
+    const targetSchema = isProject ? selectedProjectConfigSchema || EMPTY_SCHEMA : selectedPage.schema || EMPTY_SCHEMA;
+    try {
+      const mutation = applySchemaDefinitionCommand(targetSchema, definitionEditor.mode === "create"
+        ? { type: "field.add", field: definitionEditor.draft }
+        : { type: "field.update", key: definitionEditor.originalKey!, patch: definitionEditor.draft });
+      const impact = onDefinitionAnalyze?.(definitionEditor.scope, mutation);
+      if (impact?.risk === "ai_required") {
+        return { kind: "ai_required", title: "需要 AI 应用", description: "该定义变更会影响已绑定页面。保存定义后，请确认页面同步任务。" };
+      }
+      return { kind: "schema_only", title: "仅保存字段", description: isProject ? "将更新共享字段定义；不会自动改写任何页面源码。" : "将更新字段定义；不会覆盖当前预览中已编辑的配置值。" };
+    } catch (error) {
+      return { kind: "unsupported", title: "暂不能保存", description: error instanceof Error ? error.message : "字段定义无效" };
+    }
+  }, [definitionEditor, onDefinitionAnalyze, selectedPage, selectedProjectConfigSchema]);
+
+  const saveDefinitionEditor = () => {
+    if (!definitionEditor || !selectedPage) return;
+    const targetSchema = definitionEditor.scope === "project"
+      ? selectedProjectConfigSchema || EMPTY_SCHEMA
+      : selectedPage.schema || EMPTY_SCHEMA;
+    try {
+      const mutation = applySchemaDefinitionCommand(targetSchema, definitionEditor.mode === "create"
+        ? { type: "field.add", field: definitionEditor.draft }
+        : { type: "field.update", key: definitionEditor.originalKey!, patch: definitionEditor.draft });
+      if (definitionEditor.scope === "project") onProjectDefinitionChange?.(mutation);
+      else onPageDefinitionChange?.(selectedPage.id, mutation);
+      setDefinitionEditor(null);
+    } catch {
+      // The same validation error is shown in the editor's apply-plan panel.
+    }
+  };
   const sharedAffectedPages = useMemo(
     () =>
       scopedPages
@@ -428,9 +514,9 @@ export function PageConfigPanel({
   if (!selectedPage) {
     return (
       <div className={cn("flex h-full flex-col bg-card", className)}>
-        <div className="border-b px-4 py-3">
+        <div className="border-b border-border/80 px-4 py-3">
           <div className="flex min-w-0 items-center justify-between gap-3">
-            <h2 className="min-w-0 truncate text-sm font-medium">{title}</h2>
+            <h2 className="min-w-0 truncate text-[15px] font-semibold">{title}</h2>
             <ConfigCategoryFilterSelect
               value={configCategoryFilter}
               onChange={setConfigCategoryFilter}
@@ -438,7 +524,7 @@ export function PageConfigPanel({
             />
           </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-2">
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">
           {sortedPages.length === 0 ? (
             <div className="flex h-full min-h-[160px] flex-col items-center justify-center px-4 text-center">
               <FileText className="mb-3 h-8 w-8 text-muted-foreground/50" />
@@ -466,10 +552,10 @@ export function PageConfigPanel({
                     type="button"
                     onClick={() => openPageDetail(page.id)}
                     className={cn(
-                      "flex w-full cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-left transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      "flex w-full cursor-pointer items-center gap-2 rounded-lg border border-transparent px-3 py-2.5 text-left transition-colors hover:bg-foreground/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       isActive
-                        ? "border-primary/30 bg-primary/10"
-                        : "border-transparent",
+                        ? "border-primary/35 bg-primary/10"
+                        : "",
                     )}
                   >
                     <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -513,7 +599,6 @@ export function PageConfigPanel({
     selectedPage.schema,
     configCategoryFilter,
   );
-  const selectedProjectConfigSchema = selectedPageConfig?.projectConfigSchema;
   const selectedProjectCount = getSchemaFieldCountByCategory(
     selectedProjectConfigSchema,
     configCategoryFilter,
@@ -521,51 +606,27 @@ export function PageConfigPanel({
   const showSharedConfig =
     selectedProjectCount > 0 && !!selectedProjectConfigSchema;
   const showPageConfig = pageCount > 0 && !!selectedPage.schema;
+  const canAddConfig = !readonly && Boolean(onProjectDefinitionChange || onPageDefinitionChange);
+  const restoreDefaultsTarget = onRestoreDefaults
+    ? "page"
+    : onProjectRestoreDefaults
+      ? "project"
+      : null;
+  const showConfigActions = canAddConfig || restoreDefaultsTarget !== null;
+  const configDefinitionCreateScope = onPageDefinitionChange ? "page" : "project";
   const referenceDesignSpecs = selectedPage.referenceDesignSpecs ?? [];
-  const scopedDesignSpecEntries = effectiveDesignSpecEntries.filter(
-    (entry) =>
-      entry.scope === "project" ||
-      (entry.scope === "page" && entry.pageId === selectedPage.id),
-  );
   const hasRequirements = Boolean(requirements?.trim());
   const shouldShowRequirements =
     requirementsPosition !== "hidden" &&
     (!hideEmptyRequirements ||
       requirementsLoading ||
       editingRequirements ||
-      hasRequirements ||
-      scopedDesignSpecEntries.length > 0);
+      hasRequirements);
   const configData = selectedPage.configData ?? {};
-  const saveDefaultsEnabled =
-    !readonly &&
-    !!selectedPage?.schema &&
-    Object.keys(configData).length > 0;
-  const showSectionNavigation =
-    sectionNavigation === "anchorTabs" &&
-    shouldShowRequirements &&
-    (showSharedConfig || showPageConfig);
-
-  const scrollToSection = (section: "requirements" | "config") => {
-    const container = contentContainerRef.current;
-    const target =
-      section === "requirements"
-        ? requirementsSectionRef.current
-        : configSectionRef.current;
-    if (!container || !target) return;
-
-    setActiveSectionAnchor(section);
-    const top = target.offsetTop - container.offsetTop;
-    if (typeof container.scrollTo === "function") {
-      container.scrollTo({ top, behavior: "smooth" });
-    } else {
-      container.scrollTop = top;
-    }
-  };
-
   return (
-    <div className={cn("flex h-full flex-col bg-card", className)}>
+    <div className={cn("relative flex h-full flex-col bg-card", className)}>
       {!hideDetailHeader && (
-        <div className="border-b px-4 py-3">
+        <div className="border-b border-border/80 px-4 py-3">
           <div className="flex min-w-0 items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
               <button
@@ -576,7 +637,7 @@ export function PageConfigPanel({
               >
                 <ArrowLeft className="h-4 w-4" />
               </button>
-              <h2 className="min-w-0 truncate text-sm font-medium">
+              <h2 className="min-w-0 truncate text-[15px] font-semibold">
                 {selectedPage.name}
               </h2>
             </div>
@@ -588,74 +649,13 @@ export function PageConfigPanel({
           </div>
         </div>
       )}
-      {showSectionNavigation && (
-        <nav
-          aria-label="配置内容快速定位"
-          className="flex shrink-0 gap-1 border-b bg-card px-4 pt-2"
-        >
-          {([
-            ["requirements", "资源规范"],
-            ["config", "配置项"],
-          ] as const).map(([section, label]) => (
-            <button
-              key={section}
-              type="button"
-              aria-pressed={activeSectionAnchor === section}
-              onClick={() => scrollToSection(section)}
-              className={cn(
-                "cursor-pointer border-b-2 px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                activeSectionAnchor === section
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
-      )}
-      <div ref={contentContainerRef} className="min-h-0 flex-1 overflow-y-auto p-4">
-        <div className="flex flex-col gap-4">
-          <div ref={configSectionRef}>
-          <PanelSection
-            title="配置项"
-            open={configSectionOpen}
-            onToggle={() => setConfigSectionOpen((current) => !current)}
-            collapsible={!showSectionNavigation}
-            actions={
-              <>
-                {onRestoreDefaults && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 gap-1 px-2 text-xs"
-                    onClick={() => setRestoreDefaultsScope("page")}
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                    恢复
-                  </Button>
-                )}
-                {!readonly && onSaveAsDefaults && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 gap-1 px-2 text-xs"
-                    disabled={!saveDefaultsEnabled}
-                    onClick={() => setSaveDefaultsScope("page")}
-                  >
-                    <Save className="h-3.5 w-3.5" />
-                    保存
-                  </Button>
-                )}
-              </>
-            }
-          >
+      <div className={cn("min-h-0 flex-1 overflow-y-auto p-4", showConfigActions && "pb-20")}>
+        <div className="flex flex-col gap-5">
+          <section className="flex flex-col">
             {showSharedConfig && (
-              <section className="flex flex-col">
-                <div className="mb-3 mt-2 flex items-center gap-2 pl-5">
-                  <span className="text-sm font-semibold">共享配置</span>
+              <section className="flex flex-col gap-5">
+                <div className="flex h-10 items-center gap-2 py-3">
+                  <span className="text-base font-semibold leading-none text-foreground">共享配置</span>
                   {sharedAffectedPages.length > 0 && (
                     <Popover>
                       <PopoverTrigger asChild>
@@ -701,15 +701,16 @@ export function PageConfigPanel({
                     typeLimits={typeLimits}
                     designSpecEntries={effectiveDesignSpecEntries.filter((entry) => entry.scope === "project")}
                     onEditDesignSpec={onEditDesignSpec}
+                    onEditConfigDefinition={(key) => openDefinitionEditor("project", key)}
                   />
                 </ConfigScopeWrapper>
               </section>
             )}
 
             {showPageConfig && (
-              <section className="flex flex-col">
-                <div className="mb-3 mt-2 flex items-center gap-2 pl-5">
-                  <span className="text-sm font-semibold">本页配置</span>
+              <section className="flex flex-col gap-5">
+                <div className="flex h-10 items-center gap-2 py-3">
+                  <span className="text-base font-semibold leading-none text-foreground">本页配置</span>
                 </div>
                 <ConfigScopeWrapper scope="page" hideHeader>
                 <ConfigForm
@@ -731,6 +732,7 @@ export function PageConfigPanel({
                   onTogglePositionDimming={onTogglePositionDimming}
                   designSpecEntries={effectiveDesignSpecEntries.filter((entry) => entry.scope === "page" && entry.pageId === selectedPage.id)}
                   onEditDesignSpec={onEditDesignSpec}
+                  onEditConfigDefinition={(key) => openDefinitionEditor("page", key)}
                 />
               </ConfigScopeWrapper>
             </section>
@@ -745,8 +747,7 @@ export function PageConfigPanel({
               </p>
             </div>
           )}
-          </PanelSection>
-          </div>
+          </section>
 
           {referenceDesignSpecs.length > 0 && (
             <PanelSection
@@ -776,14 +777,12 @@ export function PageConfigPanel({
 
           {shouldShowRequirements && (
             <div
-              ref={requirementsSectionRef}
               className={requirementsPosition === "beforeConfig" ? "order-first" : undefined}
             >
           <PanelSection
             title="资源规范"
             open={requirementsSectionOpen}
             onToggle={() => setRequirementsSectionOpen((current) => !current)}
-            collapsible={!showSectionNavigation}
             actions={
               requirementsLoading ? null : editingRequirements ? (
                 <>
@@ -845,25 +844,9 @@ export function PageConfigPanel({
                   输入 @ 或使用工具栏「插入引用」选择当前页配置项，以 @[名称](key) 形式引用。
                 </p>
               </div>
-            ) : hasRequirements || scopedDesignSpecEntries.length > 0 ? (
+            ) : hasRequirements ? (
               <div className="space-y-4 pt-2">
-                {hasRequirements && (
-                  <PageRequirements markdown={requirements!} allowExternalMedia mediaBaseUrl={mediaBaseUrl} />
-                )}
-                {scopedDesignSpecEntries.map((entry) => (
-                  <section key={`${entry.docId}:${entry.entryId}`} className="rounded-md border p-3">
-                    <p className="text-xs font-medium text-muted-foreground">
-                      {entry.docTitle} · {entry.entryTitle}
-                    </p>
-                    {entry.markdown.trim() ? (
-                      <div className="mt-2">
-                        <PageRequirements markdown={entry.markdown} allowExternalMedia mediaBaseUrl={mediaBaseUrl} />
-                      </div>
-                    ) : (
-                      <p className="mt-2 text-sm text-muted-foreground">暂无说明</p>
-                    )}
-                  </section>
-                ))}
+                <PageRequirements markdown={requirements!} allowExternalMedia mediaBaseUrl={mediaBaseUrl} />
               </div>
             ) : (
               <div className="flex min-h-[120px] flex-col items-center justify-center px-4 text-center">
@@ -882,45 +865,82 @@ export function PageConfigPanel({
         </div>
       </div>
 
-      <Dialog
-        open={saveDefaultsScope !== null}
-        onOpenChange={(open) => {
-          if (!open) setSaveDefaultsScope(null);
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>保存为默认配置</DialogTitle>
-            <DialogDescription>
-              {saveDefaultsScope === "project"
-                ? `将使用当前共享配置值覆盖项目级默认配置，影响 ${sharedAffectedPages.length} 个页面，所有页面将使用新默认值。确认保存？`
-                : "将使用当前本页配置覆盖默认配置，新项目或新增页面将使用新默认值。确认保存？"}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
+      {showConfigActions && (
+        <Popover open={configActionsOpen} onOpenChange={setConfigActionsOpen}>
+          <PopoverTrigger asChild>
             <Button
+              type="button"
               variant="outline"
-              size="sm"
-              onClick={() => setSaveDefaultsScope(null)}
+              size="icon"
+              aria-label="更多配置操作"
+              className="absolute bottom-4 right-4 z-20 h-11 w-11 cursor-pointer rounded-full border-border/90 bg-card/95 text-foreground shadow-lg backdrop-blur transition-colors duration-200 hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              取消
+              <MoreHorizontal className="h-5 w-5" />
             </Button>
-            <Button
-              size="sm"
-              onClick={() => {
-                if (saveDefaultsScope === "project") {
-                  onProjectSaveAsDefaults?.();
-                } else if (saveDefaultsScope === "page" && selectedPage) {
-                  onSaveAsDefaults?.(selectedPage.id);
-                }
-                setSaveDefaultsScope(null);
+          </PopoverTrigger>
+          <PopoverContent
+            side="top"
+            align="end"
+            sideOffset={8}
+            className="z-30 w-48 p-1"
+          >
+            <div className="flex flex-col gap-0.5">
+              {canAddConfig && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfigActionsOpen(false);
+                    openDefinitionEditor(configDefinitionCreateScope);
+                  }}
+                  className="flex h-10 w-full cursor-pointer items-center gap-2 rounded-md px-3 text-left text-sm text-foreground transition-colors duration-200 hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Plus className="h-4 w-4 shrink-0" />
+                  <span>添加配置项</span>
+                </button>
+              )}
+              {restoreDefaultsTarget && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfigActionsOpen(false);
+                    setRestoreDefaultsScope(restoreDefaultsTarget);
+                  }}
+                  className="flex h-10 w-full cursor-pointer items-center gap-2 rounded-md px-3 text-left text-sm text-foreground transition-colors duration-200 hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <RotateCcw className="h-4 w-4 shrink-0" />
+                  <span>恢复默认</span>
+                </button>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
+
+      {definitionEditor && (
+        <ConfigItemEditorDialog
+          open
+          onOpenChange={(open) => { if (!open) setDefinitionEditor(null); }}
+          mode={definitionEditor.mode}
+          scope={definitionEditor.scope}
+          draft={definitionEditor.draft}
+          onDraftChange={(draft) => setDefinitionEditor((current) => current ? { ...current, draft } : current)}
+          applyPlan={definitionImpact}
+          defaultValueEditor={
+            <ConfigForm
+              key={`${definitionEditor.scope}-${definitionEditor.draft.key}-${definitionEditor.draft.kind}`}
+              schema={buildDefaultValueSchema(definitionEditor.draft)}
+              initialData={{ [definitionEditor.draft.key]: definitionEditor.draft.default }}
+              onChange={(values) => {
+                const value = values[definitionEditor.draft.key];
+                if (value !== undefined) setDefinitionEditor((current) => current ? { ...current, draft: { ...current.draft, default: value } } : current);
               }}
-            >
-              确认
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              readonly={readonly}
+            />
+          }
+          readOnly={readonly}
+          onSave={definitionImpact?.kind === "ai_required" ? undefined : saveDefinitionEditor}
+        />
+      )}
 
       <Dialog
         open={restoreDefaultsScope !== null}

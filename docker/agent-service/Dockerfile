@@ -22,6 +22,7 @@ RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
 WORKDIR /app
 
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY patches/ ./patches/
 COPY packages/knowledge-core/package.json ./packages/knowledge-core/
 COPY packages/knowledge-service/package.json ./packages/knowledge-service/
 COPY packages/preview-contract/package.json ./packages/preview-contract/
@@ -31,7 +32,7 @@ COPY packages/shared/package.json ./packages/shared/
 COPY packages/agent-service/package.json ./packages/agent-service/
 
 RUN --mount=type=cache,id=workbench-pnpm-store,target=/pnpm/store \
-    pnpm install --store-dir /pnpm/store --no-frozen-lockfile
+    pnpm install --store-dir /pnpm/store --frozen-lockfile
 
 COPY packages/knowledge-core/ ./packages/knowledge-core/
 COPY packages/knowledge-service/ ./packages/knowledge-service/

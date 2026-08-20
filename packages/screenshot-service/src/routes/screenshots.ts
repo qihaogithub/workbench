@@ -34,6 +34,7 @@ import {
   getSketchSceneHashSource,
   parseSketchSceneDocument,
 } from "@workbench/sketch-core";
+import { getSandboxBrowserRunner } from "../utils/sandbox-browser-runner";
 import type {
   RenderStageTimings,
   ScreenshotPriority,
@@ -41,6 +42,14 @@ import type {
   ScreenshotRenderMode,
 } from "../utils/browser-pool";
 import { getScreenshotMetrics } from "../utils/screenshot-metrics";
+
+// Keep the analyzer as the single project-core implementation while avoiding
+// pulling project-core's broad source index into this package's NodeNext type
+// graph (the service is bundled/loaded through the workspace at runtime).
+type HtmlImportNormalizer = (source: string) => {
+  analysis: { outcome: { status: string; runtimeType?: string }; sourceHash: string };
+  normalizedHash?: string;
+};
 
 // --- Request schemas ---
 
@@ -481,6 +490,22 @@ function normalizeSnapshotInput(
   const previewSize = input.previewSize ?? { width, height };
   const configData = normalizeConfigData(input.configData);
 
+  if (input.runtimeType === "sandboxed-html") {
+    const normalizeHtmlImport = (require("@workbench/project-core") as { normalizeHtmlImport: HtmlImportNormalizer }).normalizeHtmlImport;
+    if (typeof input.sandboxHtml !== "string" || input.sandboxHtml.length === 0 || !input.htmlImportMeta || typeof input.htmlImportMeta !== "object") return null;
+    const normalized = normalizeHtmlImport(input.sandboxHtml);
+    const meta = input.htmlImportMeta;
+    if (
+      normalized.analysis.outcome.status !== "accepted" ||
+      normalized.analysis.outcome.runtimeType !== "sandboxed-html" ||
+      meta.analysisVersion !== 1 ||
+      meta.sandboxPolicyVersion !== 1 ||
+      !/^[a-f0-9]{64}$/i.test(meta.sourceHash) ||
+      meta.normalizedHash !== normalized.analysis.sourceHash
+    ) return null;
+    return { runtimeType: "sandboxed-html", sandboxHtml: input.sandboxHtml, htmlImportMeta: meta, configData, previewSize };
+  }
+
   if (input.runtimeType === "prototype-html-css") {
     if (typeof input.prototypeHtml !== "string" || input.prototypeHtml.length === 0) {
       return null;
@@ -527,6 +552,9 @@ function getSnapshotHashSource(input: PageSnapshotInput): string {
   }
   if (input.runtimeType === "sketch-scene") {
     return getSketchSceneHashSource(input.sketchScene, input.configData);
+  }
+  if (input.runtimeType === "sandboxed-html") {
+    return JSON.stringify({ sandboxRendererVersion: 1, runtimeType: input.runtimeType, sandboxHtml: input.sandboxHtml, htmlImportMeta: input.htmlImportMeta });
   }
   return JSON.stringify({
     runtimeType: input.runtimeType,
@@ -761,6 +789,16 @@ async function generateScreenshotUncached(
         },
         constrainHeight: false,
       });
+    } else if (snapshotInput.runtimeType === "sandboxed-html") {
+      return getSandboxBrowserRunner().renderPage(
+        snapshotInput.sandboxHtml,
+        width,
+        height,
+        fullPage,
+        priority,
+        renderMode,
+        measuredHeight,
+      );
     } else {
       html = buildSketchScenePreviewDocumentHtml({
         scene: snapshotInput.sketchScene,

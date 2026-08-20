@@ -33,8 +33,10 @@ import {
   type PrototypePageMeta,
   type SketchSceneDocument,
   type SketchScenePatchOperation,
+  type HtmlImportMeta,
 } from "@workbench/shared";
 import type { RuntimeValidationResult } from "@workbench/project-core";
+import { normalizeHtmlImport } from "@workbench/project-core/html-import";
 import { applyPageDesignSpecSync } from "@workbench/project-core/page-design-spec-sync";
 import { localizeHtmlImages, type ImageLocalizationResult } from "@/lib/image-localizer";
 
@@ -50,6 +52,26 @@ type SketchPatchDiagnosticContext = {
 
 function hashText(content: string): string {
   return crypto.createHash("sha256").update(content).digest("hex");
+}
+
+function createTrustedHtmlImportMeta(
+  source: string,
+): HtmlImportMeta | null {
+  const normalized = normalizeHtmlImport(source);
+  if (
+    normalized.analysis.outcome.status !== "accepted" ||
+    normalized.analysis.outcome.runtimeType !== "sandboxed-html"
+  ) {
+    return null;
+  }
+  return {
+    source: "html-import" as const,
+    analysisVersion: normalized.analysis.analysisVersion,
+    sandboxPolicyVersion: 1,
+    sourceHash: normalized.analysis.sourceHash,
+    normalizedHash: normalized.normalizedHash ?? "",
+    viewport: normalized.analysis.detectedViewport,
+  };
 }
 
 function createPutTextOperation(input: {
@@ -372,6 +394,8 @@ export async function PUT(
       prototypeHtml,
       prototypeCss,
       prototypeMeta,
+      sandboxHtml,
+      htmlImportMeta: _clientHtmlImportMeta,
       sketchScene,
       sketchMeta,
       sketchPatch,
@@ -384,6 +408,8 @@ export async function PUT(
       prototypeHtml?: string;
       prototypeCss?: string;
       prototypeMeta?: unknown;
+      sandboxHtml?: string;
+      htmlImportMeta?: unknown;
       sketchScene?: string;
       sketchMeta?: unknown;
       sketchPatch?: unknown;
@@ -401,6 +427,7 @@ export async function PUT(
       prototypeHtml === undefined &&
       prototypeCss === undefined &&
       prototypeMeta === undefined &&
+      sandboxHtml === undefined &&
       sketchScene === undefined &&
       sketchMeta === undefined &&
       sketchPatch === undefined &&
@@ -435,6 +462,12 @@ export async function PUT(
     if (prototypeCss !== undefined && typeof prototypeCss !== "string") {
       return NextResponse.json(
         createApiError("INVALID_REQUEST", "prototypeCss 必须为字符串"),
+        { status: 400 },
+      );
+    }
+    if (sandboxHtml !== undefined && typeof sandboxHtml !== "string") {
+      return NextResponse.json(
+        createApiError("INVALID_REQUEST", "sandboxHtml 必须为字符串"),
         { status: 400 },
       );
     }
@@ -505,6 +538,30 @@ export async function PUT(
     }
 
     let prototypeHtmlForWrite = prototypeHtml;
+    let sandboxHtmlForWrite = sandboxHtml;
+    let htmlImportMetaForWrite: HtmlImportMeta | undefined;
+    if (typeof sandboxHtml === "string") {
+      const normalized = normalizeHtmlImport(sandboxHtml);
+      if (
+        normalized.analysis.outcome.status !== "accepted" ||
+        normalized.analysis.outcome.runtimeType !== "sandboxed-html"
+      ) {
+        return NextResponse.json(
+          createApiError(
+            normalized.analysis.outcome.status === "rejected"
+              ? normalized.analysis.outcome.code
+              : "HTML_IMPORT_RUNTIME_MISMATCH",
+            "sandbox HTML 未通过导入分析",
+            { analysis: normalized.analysis },
+          ),
+          { status: 422 },
+        );
+      }
+      sandboxHtmlForWrite = normalized.normalizedHtml ?? sandboxHtml;
+      htmlImportMetaForWrite = createTrustedHtmlImportMeta(
+        sandboxHtml,
+      ) ?? undefined;
+    }
     let imageLocalizationResult: ImageLocalizationResult | undefined;
     if (
       typeof prototypeHtml === "string" &&
@@ -589,13 +646,23 @@ export async function PUT(
     const pageMeta = listDemoPages(wsPath).find((page) => page.id === demoId);
     const pageRuntimeType = pageMeta?.runtimeType;
     const isPrototypePage = pageRuntimeType === "prototype-html-css";
+    const isSandboxPage = pageRuntimeType === "sandboxed-html";
     const isSketchPage = pageRuntimeType === "sketch-scene";
+    if (sandboxHtml !== undefined && !isSandboxPage) {
+      return NextResponse.json(
+        createApiError(
+          "INVALID_REQUEST",
+          "sandboxHtml 只能写入 sandboxed-html 页面",
+        ),
+        { status: 400 },
+      );
+    }
     const currentFiles =
-      isPrototypePage || isSketchPage || parsedSketchPatch
+      isPrototypePage || isSandboxPage || isSketchPage || parsedSketchPatch
         ? getWorkspaceDemoPageFiles(meta.workspaceId, demoId)
         : null;
     if (
-      (isPrototypePage || isSketchPage || parsedSketchPatch) &&
+      (isPrototypePage || isSandboxPage || isSketchPage || parsedSketchPatch) &&
       !currentFiles
     ) {
       return NextResponse.json(createApiError("DEMO_PAGE_NOT_FOUND"), {
@@ -759,7 +826,7 @@ export async function PUT(
         : JSON.stringify(patchedScene, null, 2);
     }
 
-    if (isPrototypePage || isSketchPage) {
+    if (isPrototypePage || isSandboxPage || isSketchPage) {
       if (!currentFiles) {
         return NextResponse.json(createApiError("DEMO_PAGE_NOT_FOUND"), {
           status: 404,
@@ -767,7 +834,11 @@ export async function PUT(
       }
       runtimeValidation = getProjectAdminService().validateDemoPageFilesRuntime(
         demoId,
-        isSketchPage ? "sketch-scene" : "prototype-html-css",
+        isSketchPage
+          ? "sketch-scene"
+          : isSandboxPage
+            ? "sandboxed-html"
+            : "prototype-html-css",
         {
           ...currentFiles,
           code: code ?? currentFiles.code,
@@ -777,6 +848,9 @@ export async function PUT(
           prototypeMeta:
             (prototypeMeta as PrototypePageMeta | undefined) ??
             currentFiles.prototypeMeta,
+          sandboxHtml: sandboxHtmlForWrite ?? currentFiles.sandboxHtml,
+          htmlImportMeta:
+            htmlImportMetaForWrite ?? currentFiles.htmlImportMeta,
           sketchScene: sketchSceneForWrite ?? currentFiles.sketchScene,
           sketchMeta:
             (sketchMeta as Record<string, unknown> | undefined) ??
@@ -790,7 +864,9 @@ export async function PUT(
           .join("；");
         const baseMessage = isSketchPage
           ? "手绘页面校验未通过，暂不保存"
-          : "原型页校验未通过，暂不保存";
+          : isSandboxPage
+            ? "sandbox 页面校验未通过，暂不保存"
+            : "原型页校验未通过，暂不保存";
         return NextResponse.json(
           createApiError(
             "VALIDATION_ERROR",
@@ -828,6 +904,14 @@ export async function PUT(
         addTextOperation(
           demoResourcePath("prototype.meta.json"),
           JSON.stringify(prototypeMeta, null, 2),
+        );
+      }
+      if (typeof sandboxHtmlForWrite === "string")
+        addTextOperation(demoResourcePath("sandbox.html"), sandboxHtmlForWrite);
+      if (htmlImportMetaForWrite) {
+        addTextOperation(
+          demoResourcePath("html-import.meta.json"),
+          JSON.stringify(htmlImportMetaForWrite, null, 2),
         );
       }
       if (typeof sketchSceneForWrite === "string") {
@@ -874,6 +958,8 @@ export async function PUT(
         prototypeHtml: prototypeHtmlForWrite,
         prototypeCss,
         prototypeMeta: prototypeMeta as PrototypePageMeta | undefined,
+        sandboxHtml: sandboxHtmlForWrite,
+        htmlImportMeta: htmlImportMetaForWrite,
         sketchScene: sketchSceneForWrite,
         sketchMeta: sketchMeta as Record<string, unknown> | undefined,
         configValues,

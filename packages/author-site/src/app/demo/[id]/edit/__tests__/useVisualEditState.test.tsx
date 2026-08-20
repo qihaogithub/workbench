@@ -144,6 +144,34 @@ describe("useVisualEditState 智能属性写回", () => {
     expect(mockToast).not.toHaveBeenCalled();
   });
 
+  it("图片配置的接受文件类型会持久化到标记并传给 AI", () => {
+    const view = renderVisualEditState();
+    const node = createNode({
+      attrs: { src: "/cover.png" },
+      editCapabilities: ["image"],
+    });
+
+    act(() => {
+      view.result.current.handleVisualSelect(node);
+      view.result.current.handleMarkVisualConfig(node, "src", "替换图片", "/cover.png", "attribute");
+    });
+    const mark = view.result.current.visualConfigMarks[0];
+    expect(mark.accept).toBe("image/*");
+
+    act(() => {
+      view.result.current.handleUpdateVisualConfigMark(mark.id, { accept: "image/webp" });
+    });
+    expect(view.result.current.visualConfigMarks[0].accept).toBe("image/webp");
+
+    act(() => {
+      view.result.current.handleSendVisualPropertiesToAI();
+    });
+
+    expect(view.setTriggerAutoSend).toHaveBeenCalledTimes(1);
+    const triggerArg = view.setTriggerAutoSend.mock.calls[0][0] as { hiddenPrompt: string };
+    expect(triggerArg.hiddenPrompt).toContain("接受文件类型：image/webp");
+  });
+
   it("原型页项目级配置项不阻断，自动转交 AI", () => {
     const applyPrototypeVisualConfig = jest.fn();
     const view = renderVisualEditState({

@@ -59,6 +59,30 @@ describe("published preview stage adapter", () => {
     expect(page.compiledJsUrl).toBeUndefined();
   });
 
+  it("交互 HTML 只使用动态签发的受控执行入口", () => {
+    const page = createPublishedPreviewStagePage({
+      projectId: "project-1",
+      page: createPage({
+        runtimeType: "sandboxed-html",
+        iframeHtmlPath: "demos/page-1/iframe.html",
+        compiledJsPath: "demos/page-1/compiled.js",
+        sandboxExecutionPath: "/api/projects/project-1/published-html-execution/page-1",
+      }),
+      sandboxExecution: {
+        executionUrl: "https://sandbox.example/api/html-sandbox/executions/opaque",
+        channelId: "channel-1",
+        expiresAt: Date.now() + 60_000,
+        sandboxPolicyVersion: 1,
+      },
+    });
+
+    expect(page.runtimeType).toBe("sandboxed-html");
+    expect(page.sandboxExecutionUrl).toContain("/api/html-sandbox/executions/opaque");
+    expect(page.sandboxChannelId).toBe("channel-1");
+    expect(page.iframeUrl).toBeUndefined();
+    expect(page.compiledJsUrl).toBeUndefined();
+  });
+
   it("开发浏览端将原型资源指向数据源，而不是 viewer 自身端口", () => {
     const html = resolvePrototypeDataUrls(
       '<img src="/data/project-1/assets/images/icon.png" />',

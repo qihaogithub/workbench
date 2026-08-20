@@ -181,9 +181,25 @@ try {
   await runCommand("project delete-cover", ["project", "delete-cover", projectId]);
 
   const edit = await runCommand("edit begin", ["edit", "begin", projectId]);
-  const editId = dataOf<{ editId: string }>(edit).editId;
+  const editData = dataOf<{ editId: string; workspaceId: string }>(edit);
+  const editId = editData.editId;
   await runCommand("edit status", ["edit", "status", editId]);
   await runCommand("edit extend", ["edit", "extend", editId]);
+
+  const htmlImportSource = path.join(tempDir, "all-commands-import.html");
+  fs.writeFileSync(htmlImportSource, "<!doctype html><html><body><h1>HTML import</h1></body></html>", "utf-8");
+  await runCommand("project import-html", [
+    "project",
+    "import-html",
+    "--project",
+    projectId,
+    "--workspace",
+    editData.workspaceId,
+    "--name",
+    "HTML 导入页",
+    "--source",
+    htmlImportSource,
+  ]);
 
   const folder = await runCommand("folder create", ["folder", "create", editId, "首页分组"]);
   const folderId = dataOf<{ id: string }>(folder).id;

@@ -54,6 +54,7 @@ type LegacyReactScreenshotInput = Omit<
 export type ScreenshotBatchPageInput = (
   | LegacyReactScreenshotInput
   | Extract<PageSnapshotInput, { runtimeType: "prototype-html-css" }>
+  | Extract<PageSnapshotInput, { runtimeType: "sandboxed-html" }>
   | Extract<PageSnapshotInput, { runtimeType: "sketch-scene" }>
 ) & {
   pageId: string;
@@ -149,6 +150,8 @@ export function useScreenshotGeneration(
   const pollStartedAtRef = useRef<number | null>(null);
   const pollFailuresRef = useRef(0);
   const pageRequestVersionsRef = useRef<Record<string, number>>({});
+  const activeProjectIdRef = useRef(projectId);
+  activeProjectIdRef.current = projectId;
 
   const getScreenshotUrl = useCallback(
     (pageId: string, hash?: string, variant: ScreenshotRenderMode = "strict") => {
@@ -195,21 +198,25 @@ export function useScreenshotGeneration(
     });
   }, []);
 
-  const invalidatePageScreenshots = useCallback((pageIds: string[]) => {
-    if (pageIds.length === 0) return;
-    setPageScreenshots((prev) => {
-      const next = { ...prev };
-      for (const pageId of pageIds) {
-        pageRequestVersionsRef.current[pageId] =
-          (pageRequestVersionsRef.current[pageId] || 0) + 1;
-        next[pageId] = {
-          loading: false,
-          expectedHash: INVALIDATED_SCREENSHOT_HASH,
-        };
-      }
-      return next;
-    });
-  }, []);
+  const invalidatePageScreenshots = useCallback(
+    (pageIds: string[]) => {
+      if (pageIds.length === 0) return;
+      setPageScreenshots((prev) => {
+        const next = { ...prev };
+        for (const pageId of pageIds) {
+          const requestKey = `${projectId ?? ""}\0${pageId}`;
+          pageRequestVersionsRef.current[requestKey] =
+            (pageRequestVersionsRef.current[requestKey] || 0) + 1;
+          next[pageId] = {
+            loading: false,
+            expectedHash: INVALIDATED_SCREENSHOT_HASH,
+          };
+        }
+        return next;
+      });
+    },
+    [projectId],
+  );
 
   const invalidatePageScreenshot = useCallback(
     (pageId: string) => {
@@ -270,6 +277,7 @@ export function useScreenshotGeneration(
   const preloadScreenshotMeta = useCallback(
     async (targetPageIds: string[]) => {
       if (!projectId || !enabled || targetPageIds.length === 0) return;
+      const requestProjectId = projectId;
 
       const uniquePageIds = Array.from(new Set(targetPageIds)).filter(Boolean);
       await Promise.all(
@@ -281,10 +289,12 @@ export function useScreenshotGeneration(
             );
             if (!response.ok) return;
             const result = await response.json();
+            if (activeProjectIdRef.current !== requestProjectId) return;
             if (!result.success || !result.data?.currentHash) return;
             const data = result.data as ScreenshotMetaResponse;
 
             setPageScreenshots((prev) => {
+              if (activeProjectIdRef.current !== requestProjectId) return prev;
               const existing = prev[pageId];
               if (existing?.screenshotUrl) return prev;
 
@@ -316,9 +326,12 @@ export function useScreenshotGeneration(
   const pollBatchStatus = useCallback(
     async (currentBatchId: string) => {
       if (!projectId) return;
+      const requestProjectId = projectId;
+      if (activeProjectIdRef.current !== requestProjectId) return;
       if (batchIdRef.current !== currentBatchId) return;
 
       const scheduleNextPoll = (retryAfterMs?: number) => {
+        if (activeProjectIdRef.current !== requestProjectId) return;
         if (batchIdRef.current !== currentBatchId) return;
         if (pollTimerRef.current) {
           clearTimeout(pollTimerRef.current);
@@ -350,6 +363,7 @@ export function useScreenshotGeneration(
           )}/${encodeURIComponent(currentBatchId)}`,
         );
         if (!response.ok) {
+          if (activeProjectIdRef.current !== requestProjectId) return;
           markPollingFailure();
           if (pollFailuresRef.current < MAX_POLL_FAILURES) {
             scheduleNextPoll();
@@ -358,6 +372,7 @@ export function useScreenshotGeneration(
         }
 
         const result = await response.json();
+        if (activeProjectIdRef.current !== requestProjectId) return;
         if (batchIdRef.current !== currentBatchId) return;
 
         if (!result.success) {
@@ -437,6 +452,7 @@ export function useScreenshotGeneration(
           scheduleNextPoll(data.retryAfterMs);
         }
       } catch {
+        if (activeProjectIdRef.current !== requestProjectId) return;
         markPollingFailure();
         if (pollFailuresRef.current < MAX_POLL_FAILURES) {
           scheduleNextPoll();
@@ -449,10 +465,12 @@ export function useScreenshotGeneration(
   const startBatchGeneration = useCallback(
     async (pages: BatchPageInput[]) => {
       if (!projectId || !enabled || pages.length === 0) return;
+      const requestProjectId = projectId;
 
       if (batchIdRef.current) {
         await cancelBatch(batchIdRef.current);
       }
+      if (activeProjectIdRef.current !== requestProjectId) return;
       stopPolling();
       setPagesLoading(pages);
       setBooleanStateIfChanged(setIsGenerating, true);
@@ -472,6 +490,12 @@ export function useScreenshotGeneration(
                     prototypeCss: p.prototypeCss,
                     prototypeMeta: p.prototypeMeta,
                   }
+                : p.runtimeType === "sandboxed-html"
+                  ? {
+                      runtimeType: p.runtimeType,
+                      sandboxHtml: p.sandboxHtml,
+                      htmlImportMeta: p.htmlImportMeta,
+                    }
                 : p.runtimeType === "sketch-scene"
                   ? {
                       runtimeType: p.runtimeType,
@@ -493,6 +517,7 @@ export function useScreenshotGeneration(
         });
 
         const result = await response.json();
+        if (activeProjectIdRef.current !== requestProjectId) return;
 
         if (result.success && result.data?.batchId) {
           setNullableBooleanStateIfChanged(setServiceAvailable, true);
@@ -549,6 +574,7 @@ export function useScreenshotGeneration(
           });
         }
       } catch {
+        if (activeProjectIdRef.current !== requestProjectId) return;
         stopPolling();
         setPagesUnavailable(pages);
       }
@@ -577,10 +603,12 @@ export function useScreenshotGeneration(
       measuredHeight?: number,
     ) => {
       if (!projectId || !enabled) return;
+      const requestProjectId = projectId;
+      const requestKey = `${requestProjectId}\0${pageId}`;
 
       const requestVersion =
-        (pageRequestVersionsRef.current[pageId] || 0) + 1;
-      pageRequestVersionsRef.current[pageId] = requestVersion;
+        (pageRequestVersionsRef.current[requestKey] || 0) + 1;
+      pageRequestVersionsRef.current[requestKey] = requestVersion;
 
       setPageScreenshots((prev) => {
         return {
@@ -605,6 +633,11 @@ export function useScreenshotGeneration(
                   prototypeCss: snapshotInput.prototypeCss,
                   prototypeMeta: snapshotInput.prototypeMeta,
                 }
+              : snapshotInput.runtimeType === "sandboxed-html"
+                ? {
+                    sandboxHtml: snapshotInput.sandboxHtml,
+                    htmlImportMeta: snapshotInput.htmlImportMeta,
+                  }
               : snapshotInput.runtimeType === "sketch-scene"
                 ? {
                     sketchScene: snapshotInput.sketchScene,
@@ -624,7 +657,12 @@ export function useScreenshotGeneration(
         });
 
         const result = await response.json();
-        if (pageRequestVersionsRef.current[pageId] !== requestVersion) return;
+        if (
+          activeProjectIdRef.current !== requestProjectId ||
+          pageRequestVersionsRef.current[requestKey] !== requestVersion
+        ) {
+          return;
+        }
 
         if (result.success && result.data?.url && result.data?.hash) {
           setNullableBooleanStateIfChanged(setServiceAvailable, true);
@@ -661,7 +699,12 @@ export function useScreenshotGeneration(
           });
         }
       } catch {
-        if (pageRequestVersionsRef.current[pageId] !== requestVersion) return;
+        if (
+          activeProjectIdRef.current !== requestProjectId ||
+          pageRequestVersionsRef.current[requestKey] !== requestVersion
+        ) {
+          return;
+        }
         setNullableBooleanStateIfChanged(setServiceAvailable, false);
         setPageScreenshots((prev) => {
           return {
@@ -711,6 +754,14 @@ export function useScreenshotGeneration(
   useEffect(() => {
     checkServiceHealth();
   }, [checkServiceHealth]);
+
+  useEffect(() => {
+    pageRequestVersionsRef.current = {};
+    batchIdRef.current = null;
+    setNullableStringStateIfChanged(setBatchId, null);
+    setPageScreenshots({});
+    stopPolling();
+  }, [projectId, stopPolling]);
 
   useEffect(() => {
     const targetPageIds = pageIdsKey ? pageIdsKey.split("\0") : [];

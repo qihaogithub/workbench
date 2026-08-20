@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Workbench Editable Snapshot",
+  "description": "Capture the active tab into an Agent-editable high-fidelity snapshot bundle.",
+  "version": "0.1.0",
+  "minimum_chrome_version": "116",
+  "action": {
+    "default_title": "Capture editable snapshot",
+    "default_popup": "ui/popup.html"
+  },
+  "background": {
+    "service_worker": "background/background.js",
+    "type": "module"
+  },
+  "permissions": ["activeTab", "scripting", "downloads", "storage", "offscreen", "sidePanel"],
+  "optional_permissions": ["tabs"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "side_panel": {
+    "default_path": "sidepanel/sidepanel.html"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}

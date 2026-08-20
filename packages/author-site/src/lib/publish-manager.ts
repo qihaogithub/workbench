@@ -1,5 +1,6 @@
 import path from "path";
 import fs from "fs";
+import crypto from "node:crypto";
 import { execFile } from "child_process";
 import { compileCode } from "@/lib/compiler";
 import {
@@ -25,8 +26,10 @@ import type {
   DemoFolderMeta,
   AppGraph,
   KnowledgeIndexItem,
+  HtmlImportMeta,
 } from "@workbench/shared";
-import { ProjectAdminService } from "@workbench/project-core";
+import { getPageRuntimeCapabilities } from "@workbench/shared/page-runtime-capabilities";
+import { normalizeHtmlImport, ProjectAdminService } from "@workbench/project-core";
 import type { CanvasState } from "@workbench/demo-ui";
 import { generateIframeHtml } from "@workbench/demo-ui/iframe-template";
 import { getCdnBaseUrl } from "@/lib/cdn-config";
@@ -44,6 +47,9 @@ import type { DesignSpecMeta } from "@/lib/design-specs";
 
 const PUBLISHED_DIR = path.join(getDataDir(), "published");
 const SCREENSHOTS_DIR = path.join(getDataDir(), "screenshots");
+/** sandbox 源码发布到服务端私有目录；绝不位于 /data 静态公开目录。 */
+const PUBLISHED_SANDBOX_DIR = path.join(getDataDir(), "html-sandbox-published");
+const SANDBOX_RENDERER_VERSION = 1;
 
 /** 读取工作区知识库 manifest，返回可直接发布的元数据 */
 export function readKnowledgeManifestForPublish(
@@ -143,6 +149,10 @@ export interface PublishedDemoPage {
   sketchScenePath?: string;
   sketchMetaPath?: string;
   requirements?: string;
+  /** sandbox 仅发布受控 issuance 路径和策略摘要，不包含源码或短时 ticket。 */
+  sandboxExecutionPath?: string;
+  htmlImportMeta?: HtmlImportMeta;
+  sandboxRendererVersion?: number;
 }
 
 interface ScreenshotMeta {
@@ -215,7 +225,10 @@ export class PublishError extends Error {
       | "NO_CONTENT_TO_PUBLISH"
       | "SNAPSHOT_CREATE_ERROR"
       | "IMAGE_LOCALIZATION_FAILED"
-      | "PUBLISH_COMPILE_FAILED",
+      | "PUBLISH_COMPILE_FAILED"
+      | "PUBLISH_RUNTIME_UNSUPPORTED"
+      | "SANDBOX_ORIGIN_NOT_CONFIGURED"
+      | "SANDBOX_MANIFEST_INVALID",
     message: string,
     public readonly details?: unknown,
   ) {
@@ -273,6 +286,89 @@ export function getPublishedDir(): string {
 
 function getViewerBaseUrl(): string {
   return process.env.VIEWER_CLOUDFLARE_URL || process.env.VIEWER_LAN_URL || "";
+}
+
+function resolvePublishedSandboxOrigin(): string | null {
+  const configured = process.env.HTML_SANDBOX_PUBLIC_ORIGIN?.trim();
+  if (!configured) return null;
+  try {
+    return new URL(configured).origin;
+  } catch {
+    return null;
+  }
+}
+
+function readSandboxImportMeta(metaPath: string): HtmlImportMeta {
+  let value: unknown;
+  try {
+    value = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+  } catch {
+    throw new PublishError("SANDBOX_MANIFEST_INVALID", "sandbox HTML 的导入元数据不可读");
+  }
+  if (!value || typeof value !== "object") {
+    throw new PublishError("SANDBOX_MANIFEST_INVALID", "sandbox HTML 的导入元数据无效");
+  }
+  const meta = value as Partial<HtmlImportMeta>;
+  if (meta.source !== "html-import") {
+    throw new PublishError("SANDBOX_MANIFEST_INVALID", "sandbox HTML 的来源元数据无效");
+  }
+  if (
+    typeof meta.analysisVersion !== "number" ||
+    typeof meta.sandboxPolicyVersion !== "number" ||
+    typeof meta.sourceHash !== "string" ||
+    !/^[a-f0-9]{64}$/i.test(meta.sourceHash) ||
+    typeof meta.normalizedHash !== "string" ||
+    !/^[a-f0-9]{64}$/i.test(meta.normalizedHash)
+  ) {
+    throw new PublishError("SANDBOX_MANIFEST_INVALID", "sandbox HTML 的策略或哈希元数据无效");
+  }
+  return meta as HtmlImportMeta;
+}
+
+interface PendingPublishedSandbox {
+  pageId: string;
+  sourceKey: string;
+  html: string;
+  htmlImportMeta: HtmlImportMeta;
+}
+
+function writePrivateSandboxPublication(
+  projectId: string,
+  version: string,
+  pages: PendingPublishedSandbox[],
+): { finalDir: string; temporaryDir: string } | undefined {
+  if (pages.length === 0) return undefined;
+  const temporaryDir = path.join(
+    PUBLISHED_SANDBOX_DIR,
+    ".tmp",
+    `${projectId}-${version}-${Date.now()}-${crypto.randomBytes(6).toString("hex")}`,
+  );
+  const finalDir = path.join(PUBLISHED_SANDBOX_DIR, projectId, version);
+  fs.mkdirSync(temporaryDir, { recursive: true, mode: 0o700 });
+  const manifest: Record<string, unknown> = {
+    version: 1,
+    projectId,
+    publishedVersion: version,
+    pages: {},
+  };
+  for (const page of pages) {
+    const fileName = `${page.sourceKey}.html`;
+    fs.writeFileSync(path.join(temporaryDir, fileName), page.html, {
+      encoding: "utf-8",
+      mode: 0o600,
+    });
+    (manifest.pages as Record<string, unknown>)[page.pageId] = {
+      sourceKey: page.sourceKey,
+      fileName,
+      htmlImportMeta: page.htmlImportMeta,
+    };
+  }
+  fs.writeFileSync(
+    path.join(temporaryDir, "manifest.json"),
+    `${JSON.stringify(manifest, null, 2)}\n`,
+    { encoding: "utf-8", mode: 0o600 },
+  );
+  return { finalDir, temporaryDir };
 }
 
 function copyPreviewRuntimeForPublish(
@@ -494,6 +590,18 @@ export async function publishProject(
   const publishedDemoPages: PublishedDemoPage[] = [];
   const compileIssues: PublishPageCompileIssue[] = [];
   const dryRunPages: PublishDryRunReport["pages"] = [];
+  const pendingSandboxPages: PendingPublishedSandbox[] = [];
+
+  const hasSandboxPage = demoPages.some(
+    (page) => page.runtimeType === "sandboxed-html",
+  );
+  if (hasSandboxPage && !dryRun && !resolvePublishedSandboxOrigin()) {
+    cleanupTmpDir();
+    throw new PublishError(
+      "SANDBOX_ORIGIN_NOT_CONFIGURED",
+      "发布 sandbox HTML 前必须配置独立的 HTML_SANDBOX_PUBLIC_ORIGIN",
+    );
+  }
 
   const rawProjectConfigSchema = getProjectConfigSchema(workspacePath);
   const projectConfigSchema =
@@ -539,6 +647,16 @@ export async function publishProject(
     const sketchMetaPath = path.join(demoDir, "sketch.meta.json");
     const requirementsPath = path.join(demoDir, "requirements.md");
     const runtimeType = page.runtimeType;
+
+    try {
+      getPageRuntimeCapabilities(runtimeType);
+    } catch {
+      cleanupTmpDir();
+      throw new PublishError(
+        "PUBLISH_RUNTIME_UNSUPPORTED",
+        `页面 ${page.id} 使用了未知运行时，发布已拒绝`,
+      );
+    }
 
     const demoPublishDir = path.join(publishedProjectDir, "demos", page.id);
     fs.mkdirSync(demoPublishDir, { recursive: true });
@@ -700,6 +818,59 @@ export async function publishProject(
       const pagePercent =
         10 + Math.floor(((i + 1) / Math.max(totalPages, 1)) * 80);
       onProgress?.(pagePercent, `发布手绘页面 ${i + 1}/${totalPages}...`);
+      continue;
+    }
+
+    if (runtimeType === "sandboxed-html") {
+      const sandboxHtmlPath = path.join(demoDir, "sandbox.html");
+      const htmlImportMetaPath = path.join(demoDir, "html-import.meta.json");
+      if (!fs.existsSync(sandboxHtmlPath)) {
+        cleanupTmpDir();
+        throw new PublishError("SANDBOX_MANIFEST_INVALID", `页面 ${page.id} 缺少 sandbox.html`);
+      }
+      const html = fs.readFileSync(sandboxHtmlPath, "utf-8");
+      const htmlImportMeta = readSandboxImportMeta(htmlImportMetaPath);
+      const normalization = normalizeHtmlImport(html);
+      if (
+        normalization.analysis.outcome.status !== "accepted" ||
+        normalization.analysis.outcome.runtimeType !== "sandboxed-html" ||
+        htmlImportMeta.analysisVersion !== normalization.analysis.analysisVersion ||
+        htmlImportMeta.analysisVersion !== 1 ||
+        htmlImportMeta.sandboxPolicyVersion !== 1 ||
+        htmlImportMeta.normalizedHash !== normalization.analysis.sourceHash
+      ) {
+        cleanupTmpDir();
+        throw new PublishError(
+          "SANDBOX_MANIFEST_INVALID",
+          `页面 ${page.id} 的 sandbox 源码与导入安全元数据不一致`,
+        );
+      }
+      const sourceKey = crypto.randomBytes(16).toString("hex");
+      pendingSandboxPages.push({ pageId: page.id, sourceKey, html, htmlImportMeta });
+      const sandboxExecutionPath = `/api/projects/${encodeURIComponent(projectId)}/published-html-execution/${encodeURIComponent(page.id)}?version=${encodeURIComponent("__PUBLISHED_VERSION__")}`;
+      publishedDemoPages.push({
+        id: page.id,
+        name: page.name,
+        routeKey: page.routeKey,
+        order: page.order,
+        parentId: page.parentId,
+        runtimeType,
+        schemaPath: schemaPublishPath,
+        requirements,
+        previewSize,
+        screenshotPath,
+        sandboxExecutionPath,
+        htmlImportMeta,
+        sandboxRendererVersion: SANDBOX_RENDERER_VERSION,
+      });
+      dryRunPages.push({
+        pageId: page.id,
+        name: page.name,
+        runtimeType,
+        compile: { passed: true },
+      });
+      const pagePercent = 10 + Math.floor(((i + 1) / Math.max(totalPages, 1)) * 80);
+      onProgress?.(pagePercent, `发布 sandbox 页面 ${i + 1}/${totalPages}...`);
       continue;
     }
 
@@ -889,6 +1060,28 @@ export async function publishProject(
   }
 
   const currentVersion = snapshotResult.version.versionId;
+  let privateSandboxPublication: { finalDir: string; temporaryDir: string } | undefined;
+  if (pendingSandboxPages.length > 0) {
+    try {
+      privateSandboxPublication = writePrivateSandboxPublication(
+        projectId,
+        currentVersion,
+        pendingSandboxPages,
+      );
+      for (const publishedPage of publishedDemoPages) {
+        if (publishedPage.runtimeType !== "sandboxed-html") continue;
+        publishedPage.sandboxExecutionPath = publishedPage.sandboxExecutionPath?.replace(
+          "__PUBLISHED_VERSION__",
+          encodeURIComponent(currentVersion),
+        );
+      }
+    } catch (error) {
+      cleanupTmpDir();
+      throw error instanceof PublishError
+        ? error
+        : new PublishError("SANDBOX_MANIFEST_INVALID", "写入 sandbox 发布源失败");
+    }
+  }
   const publishCommit = new ProjectAdminService({
     dataDir: getDataDir(),
   }).projectCreatePublishCommit(
@@ -939,6 +1132,19 @@ export async function publishProject(
     JSON.stringify(publishedProject, null, 2),
   );
 
+  if (privateSandboxPublication) {
+    fs.mkdirSync(path.dirname(privateSandboxPublication.finalDir), {
+      recursive: true,
+      mode: 0o700,
+    });
+    fs.rmSync(privateSandboxPublication.finalDir, { recursive: true, force: true });
+    fs.renameSync(
+      privateSandboxPublication.temporaryDir,
+      privateSandboxPublication.finalDir,
+    );
+  }
+  // 私有 sandbox 源先就位，再替换公开 manifest；如公开发布失败，最多留下
+  // 不可公开访问的孤立私有版本，不会出现公开页指向缺失源的半成品。
   fs.rmSync(finalPublishedProjectDir, { recursive: true, force: true });
   fs.renameSync(publishedProjectDir, finalPublishedProjectDir);
 
@@ -1010,6 +1216,10 @@ export function unpublishProject(projectId: string): void {
   const projectDir = path.join(PUBLISHED_DIR, projectId);
   if (fs.existsSync(projectDir)) {
     fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+  const sandboxProjectDir = path.join(PUBLISHED_SANDBOX_DIR, projectId);
+  if (fs.existsSync(sandboxProjectDir)) {
+    fs.rmSync(sandboxProjectDir, { recursive: true, force: true });
   }
 
   regenerateProjectsIndex();

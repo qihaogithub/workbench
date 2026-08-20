@@ -20,6 +20,7 @@ import type {
   WorkspaceMutationRequest,
   WorkspaceMutationReceipt,
   WorkspaceMutationOperation,
+  HtmlImportMeta,
 } from "@workbench/shared/contracts";
 
 export type { ProjectResourceKind } from "@workbench/shared/contracts";
@@ -632,6 +633,8 @@ export interface PageCreateInput {
   prototypeHtml?: string;
   prototypeCss?: string;
   prototypeMeta?: PrototypePageMeta;
+  sandboxHtml?: string;
+  htmlImportMeta?: HtmlImportMeta;
   sketchScene?: string;
   sketchMeta?: Record<string, unknown>;
   dryRun?: boolean;
@@ -655,6 +658,8 @@ export interface PageUpdatePrototypeInput {
   prototypeHtml?: string;
   prototypeCss?: string;
   prototypeMeta?: PrototypePageMeta;
+  sandboxHtml?: string;
+  htmlImportMeta?: HtmlImportMeta;
   sketchScene?: string;
   sketchMeta?: Record<string, unknown>;
   dryRun?: boolean;
@@ -669,6 +674,8 @@ export interface PageSwitchRuntimeInput {
   prototypeHtml?: string;
   prototypeCss?: string;
   prototypeMeta?: PrototypePageMeta;
+  sandboxHtml?: string;
+  htmlImportMeta?: HtmlImportMeta;
   sketchScene?: string;
   sketchMeta?: Record<string, unknown>;
   reason?: string;

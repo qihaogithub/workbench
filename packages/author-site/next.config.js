@@ -32,10 +32,26 @@ if (fs.existsSync(rootEnvPath)) {
   }
 }
 
+function getAllowedDevOrigins() {
+  const configured = process.env.NEXT_ALLOWED_DEV_ORIGINS || "";
+  return Array.from(
+    new Set(
+      configured
+        .split(",")
+        .map((origin) => origin.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.resolve(__dirname, "../.."),
+  // Next 16 blocks HMR and other /_next requests from origins that are not
+  // explicitly trusted once this option is configured. Keep public dev
+  // tunnels opt-in through the local environment instead of hard-coding one.
+  allowedDevOrigins: getAllowedDevOrigins(),
   // 仅影响 next dev：在首页、截图接口与编辑页间切换时保留已编译路由，
   // 避免默认的短暂缓冲窗口导致重复编译。
   onDemandEntries: {
@@ -63,6 +79,7 @@ const nextConfig = {
     "@workbench/project-core",
     "@workbench/project-scaffold",
     "@workbench/preview-contract",
+    "@workbench/prototype-core",
     "@workbench/sketch-core",
     "@workbench/sketch-react",
     "@workbench/shared",

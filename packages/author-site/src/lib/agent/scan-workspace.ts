@@ -11,7 +11,7 @@ interface PageInfo {
   id: string;
   name: string;
   routeKey?: string;
-  runtimeType: "prototype-html-css" | "high-fidelity-react" | "sketch-scene";
+  runtimeType: "prototype-html-css" | "high-fidelity-react" | "sandboxed-html" | "sketch-scene";
   sourcePaths: string[];
   schemaPath: string;
 }
@@ -80,6 +80,8 @@ export function scanWorkspaceContext(workingDir: string): SystemPromptContext {
               path.join("demos", p.id, "prototype.html"),
               path.join("demos", p.id, "prototype.css"),
             ]
+          : runtimeType === "sandboxed-html"
+            ? [path.join("demos", p.id, "sandbox.html")]
           : runtimeType === "sketch-scene"
             ? [path.join("demos", p.id, "sketch.scene.json")]
             : [path.join("demos", p.id, "index.tsx")],

@@ -13,6 +13,8 @@ export function resolveCollabResourceKind(resourcePath: string): CollabResourceK
   if (/^demos\/[^/]+\/index\.tsx$/.test(normalized)) return "page-code";
   if (/^demos\/[^/]+\/prototype\.html$/.test(normalized)) return "page-prototype-html";
   if (/^demos\/[^/]+\/prototype\.css$/.test(normalized)) return "page-prototype-css";
+  if (/^demos\/[^/]+\/sandbox\.html$/.test(normalized)) return "page-sandbox-html";
+  if (/^demos\/[^/]+\/html-import\.meta\.json$/.test(normalized)) return "page-html-import-meta";
   if (/^demos\/[^/]+\/config\.schema\.json$/.test(normalized)) return "page-schema";
   if (/^demos\/[^/]+\/sketch\.scene\.json$/.test(normalized)) return "page-sketch-scene";
   if (normalized === "project.config.schema.json") return "project-schema";
@@ -319,6 +321,8 @@ export class WorkspaceFilePersistence {
     if (kind === "page-code") return /^demos\/[^/]+\/index\.tsx$/.test(resourcePath);
     if (kind === "page-prototype-html") return /^demos\/[^/]+\/prototype\.html$/.test(resourcePath);
     if (kind === "page-prototype-css") return /^demos\/[^/]+\/prototype\.css$/.test(resourcePath);
+    if (kind === "page-sandbox-html") return /^demos\/[^/]+\/sandbox\.html$/.test(resourcePath);
+    if (kind === "page-html-import-meta") return /^demos\/[^/]+\/html-import\.meta\.json$/.test(resourcePath);
     if (kind === "page-schema") return /^demos\/[^/]+\/config\.schema\.json$/.test(resourcePath);
     if (kind === "page-sketch-scene") return /^demos\/[^/]+\/sketch\.scene\.json$/.test(resourcePath);
     if (kind === "project-schema") return resourcePath === "project.config.schema.json";

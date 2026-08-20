@@ -100,13 +100,21 @@ export default function Demo({}: DemoProps) {
         fieldKey: "bannerImage",
         title: "Banner",
         defaultValue: "/banner.png",
+        widthRule: { operator: "≥", value: 320 },
+        heightRule: { operator: "≤", value: 900 },
       },
     });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.code).toContain("src={bannerImage}");
-    expect(JSON.parse(result.schema).properties.bannerImage.format).toBe("image");
+    expect(JSON.parse(result.schema).properties.bannerImage).toEqual({
+      type: "string",
+      title: "Banner",
+      default: "/banner.png",
+      format: "image",
+      "ui:options": { widthRule: { operator: "≥", value: 320 }, heightRule: { operator: "≤", value: 900 } },
+    });
   });
 
   it("应把唯一文本所在元素追加颜色 style", () => {
@@ -189,5 +197,16 @@ export default function Demo({}: DemoProps) {
       default: "Hello",
       "ui:options": { category: "设计" },
     });
+  });
+
+  it("原型页图片配置化只写标准图片尺寸区间", () => {
+    const result = applyPrototypeVisualConfiguration({
+      html: '<img data-ow-id="banner" src="/banner.png" />', schema,
+      node: node({ nodeId: "banner", tagName: "img", textContent: undefined, attrs: { src: "/banner.png" } }),
+      target: { kind: "image", fieldKey: "bannerImage", title: "Banner", defaultValue: "/banner.png", widthRule: { operator: "=", value: 400 }, heightRule: { operator: "<", value: 600 } },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(JSON.parse(result.schema).properties.bannerImage["ui:options"]).toEqual({ widthRule: { operator: "=", value: 400 }, heightRule: { operator: "<", value: 600 } });
   });
 });
