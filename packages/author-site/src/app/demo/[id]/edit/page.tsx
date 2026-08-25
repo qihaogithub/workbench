@@ -4689,14 +4689,46 @@ ${context.details}
   }, []);
 
   const canvasMissingPageIdsKey = useMemo(() => {
-    if (previewMode !== "canvas" || !sessionId || demoPages.length === 0) {
+    if (!sessionId || demoPages.length === 0) {
       return "";
     }
-    return demoPages
+    // 单页首次进入时，活动页内容可能尚未进入按页缓存（例如 bootstrap
+    // 只返回了页面树）。画布模式原本会补齐所有页面，导致“切到画布再切回
+    // 单页”看起来像修复了白屏。单页只补齐当前页，画布继续补齐全部页面。
+    const candidatePages =
+      previewMode === "canvas"
+        ? demoPages
+        : demoPages.filter((page) => page.id === activeDemoId);
+
+    return candidatePages
+      .filter((page) => {
+        if (page.runtimeType === "prototype-html-css") {
+          return pagePrototypeMap[page.id] === undefined;
+        }
+        if (page.runtimeType === "sketch-scene") {
+          return pageSketchMap[page.id] === undefined;
+        }
+        if (page.runtimeType === "sandboxed-html") {
+          return (
+            pageSandboxMap[page.id] === undefined ||
+            sandboxExecutionMap[page.id] === undefined
+          );
+        }
+        return pageCodes[page.id] === undefined;
+      })
       .map((page) => page.id)
-      .filter((pageId) => pageCodes[pageId] === undefined)
       .join("\0");
-  }, [demoPages, pageCodes, previewMode, sessionId]);
+  }, [
+    activeDemoId,
+    demoPages,
+    pageCodes,
+    pagePrototypeMap,
+    pageSandboxMap,
+    pageSketchMap,
+    previewMode,
+    sandboxExecutionMap,
+    sessionId,
+  ]);
 
   useEffect(() => {
     if (!sessionId || !canvasMissingPageIdsKey) return;
@@ -4706,7 +4738,7 @@ ${context.details}
 
     let cancelled = false;
 
-    const loadMissingPageCodes = async () => {
+    const loadMissingPageContent = async () => {
       try {
         const loadedPages = await Promise.all(
           missingPageIds.map(async (pageId) => {
@@ -4833,11 +4865,11 @@ ${context.details}
         setPagePreviewSizeMap((prev) => ({ ...prev, ...nextPreviewSizes }));
         setSandboxExecutionMap((prev) => ({ ...prev, ...nextSandboxExecutions }));
       } catch (err) {
-        console.error("加载画布页面代码失败:", err);
+        console.error("加载预览页面内容失败:", err);
       }
     };
 
-    void loadMissingPageCodes();
+    void loadMissingPageContent();
 
     return () => {
       cancelled = true;

@@ -6,6 +6,7 @@ import {
   generatePageSlug,
   getDemoDirPath,
   readDemoPageMeta,
+  resolvePageRuntimeType,
   writeDemoPageMeta,
   listDemoPages,
   ensureWorkspaceFiles,
@@ -90,6 +91,46 @@ describe("多 Demo 页面 — fs-utils", () => {
       expect(getDemoDirPath("/tmp/ws", "demo_1")).toBe(
         path.join("/tmp/ws", "demos", "demo_1"),
       );
+    });
+  });
+
+  describe("页面运行时文件判型", () => {
+    let ws: string;
+
+    beforeEach(() => {
+      ws = makeTempWorkspace("ws-runtime-files");
+    });
+    afterEach(() => cleanup(ws));
+
+    it("应忽略原型页旁的空 index.tsx 占位文件", () => {
+      const demoId = "prototype_page";
+      const demoDir = getDemoDirPath(ws, demoId);
+      fs.mkdirSync(demoDir, { recursive: true });
+      fs.writeFileSync(path.join(demoDir, "config.schema.json"), "{}", "utf-8");
+      fs.writeFileSync(path.join(demoDir, "prototype.html"), "<main>原型页</main>", "utf-8");
+      fs.writeFileSync(path.join(demoDir, "index.tsx"), "", "utf-8");
+      writeDemoPageMeta(ws, demoId, {
+        name: "原型页",
+        routeKey: "prototype-page",
+        runtimeType: "prototype-html-css",
+      });
+
+      expect(resolvePageRuntimeType(demoDir)).toBe("prototype-html-css");
+      expect(listDemoPages(ws)).toEqual([
+        expect.objectContaining({
+          id: demoId,
+          runtimeType: "prototype-html-css",
+        }),
+      ]);
+    });
+
+    it("应继续拒绝同时存在两个非空运行时入口的页面", () => {
+      const demoDir = getDemoDirPath(ws, "invalid_page");
+      fs.mkdirSync(demoDir, { recursive: true });
+      fs.writeFileSync(path.join(demoDir, "prototype.html"), "<main>原型页</main>", "utf-8");
+      fs.writeFileSync(path.join(demoDir, "index.tsx"), "export default function Page() { return null; }", "utf-8");
+
+      expect(() => resolvePageRuntimeType(demoDir)).toThrow("PAGE_RUNTIME_FILES_INVALID");
     });
   });
 
