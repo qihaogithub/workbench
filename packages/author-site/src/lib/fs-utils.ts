@@ -70,6 +70,16 @@ import {
 
 const SESSION_EXPIRY_MS = 2 * 60 * 60 * 1000;
 
+/** 空文件是写入流程留下的占位符，不是有效的页面运行时入口。 */
+function hasRuntimeFile(filePath: string): boolean {
+  try {
+    const stat = fs.statSync(filePath);
+    return stat.isFile() && stat.size > 0;
+  } catch {
+    return false;
+  }
+}
+
 export function listProjects(): DemoMeta[] {
   ensureDirsExist();
 
@@ -394,8 +404,10 @@ function migrateLegacyToTree(workspacePath: string): WorkspaceTree {
         // 目录存在但无 .demo.json：用目录名兜底
         const dir = path.join(demosDir, entry.name);
         if (
-          fs.existsSync(path.join(dir, "index.tsx")) &&
-          fs.existsSync(path.join(dir, "config.schema.json"))
+          fs.existsSync(path.join(dir, "config.schema.json")) &&
+          ["sketch.scene.json", "prototype.html", "sandbox.html", "index.tsx"].some(
+            (fileName) => hasRuntimeFile(path.join(dir, fileName)),
+          )
         ) {
           pages.push({
             id: entry.name,
@@ -555,10 +567,10 @@ export function listDemoPages(workspacePath: string): DemoPageMeta[] {
     const dir = path.join(demosDir, page.id);
     // 根据磁盘文件推断运行时类型，用于校验页面文件完整性
     const hasSchema = fs.existsSync(path.join(dir, "config.schema.json"));
-    const hasSketch = fs.existsSync(path.join(dir, "sketch.scene.json"));
-    const hasPrototype = fs.existsSync(path.join(dir, "prototype.html"));
-    const hasReact = fs.existsSync(path.join(dir, "index.tsx"));
-    const hasSandbox = fs.existsSync(path.join(dir, "sandbox.html"));
+    const hasSketch = hasRuntimeFile(path.join(dir, "sketch.scene.json"));
+    const hasPrototype = hasRuntimeFile(path.join(dir, "prototype.html"));
+    const hasReact = hasRuntimeFile(path.join(dir, "index.tsx"));
+    const hasSandbox = hasRuntimeFile(path.join(dir, "sandbox.html"));
     const runtimeFiles = [hasSketch, hasPrototype, hasReact, hasSandbox].filter(Boolean).length;
     const runtimeMatches =
       (page.runtimeType === "sketch-scene" && hasSketch) ||
@@ -579,10 +591,10 @@ export function listDemoPages(workspacePath: string): DemoPageMeta[] {
     if (result.some((p) => p.id === entry.name)) continue;
     const dir = path.join(demosDir, entry.name);
     const hasSchema = fs.existsSync(path.join(dir, "config.schema.json"));
-    const hasReactCode = fs.existsSync(path.join(dir, "index.tsx"));
-    const hasPrototype = fs.existsSync(path.join(dir, "prototype.html"));
-    const hasSketchScene = fs.existsSync(path.join(dir, "sketch.scene.json"));
-    const hasSandbox = fs.existsSync(path.join(dir, "sandbox.html"));
+    const hasReactCode = hasRuntimeFile(path.join(dir, "index.tsx"));
+    const hasPrototype = hasRuntimeFile(path.join(dir, "prototype.html"));
+    const hasSketchScene = hasRuntimeFile(path.join(dir, "sketch.scene.json"));
+    const hasSandbox = hasRuntimeFile(path.join(dir, "sandbox.html"));
     const runtimeFiles = [hasReactCode, hasPrototype, hasSketchScene, hasSandbox].filter(Boolean).length;
     if (hasSchema && runtimeFiles === 1) {
       const inferredRuntimeType: DemoPageRuntimeType = hasSketchScene
@@ -614,10 +626,10 @@ export function listDemoPages(workspacePath: string): DemoPageMeta[] {
  */
 export function resolvePageRuntimeType(pageDir: string): DemoPageRuntimeType {
   const candidates: DemoPageRuntimeType[] = [];
-  if (fs.existsSync(path.join(pageDir, "sketch.scene.json"))) candidates.push("sketch-scene");
-  if (fs.existsSync(path.join(pageDir, "prototype.html"))) candidates.push("prototype-html-css");
-  if (fs.existsSync(path.join(pageDir, "sandbox.html"))) candidates.push("sandboxed-html");
-  if (fs.existsSync(path.join(pageDir, "index.tsx"))) candidates.push("high-fidelity-react");
+  if (hasRuntimeFile(path.join(pageDir, "sketch.scene.json"))) candidates.push("sketch-scene");
+  if (hasRuntimeFile(path.join(pageDir, "prototype.html"))) candidates.push("prototype-html-css");
+  if (hasRuntimeFile(path.join(pageDir, "sandbox.html"))) candidates.push("sandboxed-html");
+  if (hasRuntimeFile(path.join(pageDir, "index.tsx"))) candidates.push("high-fidelity-react");
   if (candidates.length !== 1) throw new Error("PAGE_RUNTIME_FILES_INVALID");
   return candidates[0];
 }
