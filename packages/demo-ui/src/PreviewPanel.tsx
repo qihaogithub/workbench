@@ -1736,7 +1736,7 @@ function PreviewPanelInternal({
   );
 }
 
-function arePreviewPanelPropsEqual(
+export function arePreviewPanelPropsEqual(
   prev: PreviewPanelProps,
   next: PreviewPanelProps,
 ): boolean {
@@ -1752,6 +1752,19 @@ function arePreviewPanelPropsEqual(
     prev.activityState === next.activityState &&
     prev.visualEditMode === next.visualEditMode &&
     prev.visualAnnotationMode === next.visualAnnotationMode &&
+    prev.visualHoverNodeId === next.visualHoverNodeId &&
+    prev.selectedVisualNodeId === next.selectedVisualNodeId &&
+    prev.hiddenVisualNodeIds === next.hiddenVisualNodeIds &&
+    prev.visualLayerTreeNodes === next.visualLayerTreeNodes &&
+    prev.visualPropertyChanges === next.visualPropertyChanges &&
+    prev.visualAnnotations === next.visualAnnotations &&
+    prev.visualNodeTreeRequestKey === next.visualNodeTreeRequestKey &&
+    prev.staticPrototypeRequestKey === next.staticPrototypeRequestKey &&
+    prev.onVisualSelect === next.onVisualSelect &&
+    prev.onVisualSelectStack === next.onVisualSelectStack &&
+    prev.onVisualNodeTreeChange === next.onVisualNodeTreeChange &&
+    prev.onVisualInlineEdit === next.onVisualInlineEdit &&
+    prev.onVisualAnnotationCreate === next.onVisualAnnotationCreate &&
     prev.isAutoRepairing === next.isAutoRepairing &&
     prev.positionEditMode === next.positionEditMode &&
     prev.positionEditDimming === next.positionEditDimming &&
