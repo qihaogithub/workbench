@@ -12,6 +12,111 @@ function getPrototypeRoot(container: HTMLElement): HTMLElement {
 }
 
 describe("PrototypePagePreview 文本直接编辑", () => {
+  it("点击预览宿主空白处时清空选择和图层栈", () => {
+    const onVisualSelect = vi.fn();
+    const onVisualSelectStack = vi.fn();
+    const { container } = render(
+      <PrototypePagePreview
+        html="<button>保存</button>"
+        visualEditMode
+        onVisualSelect={onVisualSelect}
+        onVisualSelectStack={onVisualSelectStack}
+      />,
+    );
+
+    const host = container.querySelector<HTMLElement>("[data-prototype-preview]");
+    if (!host) throw new Error("原型页宿主未渲染");
+    fireEvent.click(host);
+
+    expect(onVisualSelect).toHaveBeenCalledWith(null);
+    expect(onVisualSelectStack).toHaveBeenCalledWith([]);
+  });
+
+  it("点击缩放页面外的预览容器空白处时清空选择和图层栈", () => {
+    const onVisualSelect = vi.fn();
+    const onVisualSelectStack = vi.fn();
+    const { container } = render(
+      <PrototypePagePreview
+        html="<button>保存</button>"
+        previewSize={{ width: 960, height: 640 }}
+        containerSizeOverride={{ width: 1280, height: 900 }}
+        visualEditMode
+        onVisualSelect={onVisualSelect}
+        onVisualSelectStack={onVisualSelectStack}
+      />,
+    );
+
+    const previewContainer = container.querySelector<HTMLElement>(
+      "[data-prototype-preview-container]",
+    );
+    if (!previewContainer) throw new Error("缩放预览容器未渲染");
+    fireEvent.click(previewContainer);
+
+    expect(onVisualSelect).toHaveBeenCalledWith(null);
+    expect(onVisualSelectStack).toHaveBeenCalledWith([]);
+  });
+
+  it("受控选中节点会保留原型页选中标记", () => {
+    const { container } = render(
+      <PrototypePagePreview
+        html="<button>保存</button>"
+        visualEditMode
+        selectedVisualNodeId="prototype-root > button:nth-of-type(1)"
+      />,
+    );
+
+    const root = getPrototypeRoot(container);
+    expect(root.querySelector("button")).toHaveAttribute(
+      "data-prototype-selected",
+      "true",
+    );
+  });
+
+  it("内容重建后仍注入可视化编辑专用鼠标", () => {
+    const { container, rerender } = render(
+      <PrototypePagePreview html="<button>保存</button>" visualEditMode />,
+    );
+
+    const host = container.querySelector<HTMLElement>("[data-prototype-preview]");
+    if (!host?.shadowRoot) throw new Error("原型页 Shadow DOM 未渲染");
+    expect(
+      host.shadowRoot.getElementById("prototype-visual-selection-cursor"),
+    ).not.toBeNull();
+
+    rerender(
+      <PrototypePagePreview
+        html="<button>保存</button>"
+        configData={{ title: "更新后的配置" }}
+        visualEditMode
+      />,
+    );
+
+    expect(
+      host.shadowRoot.getElementById("prototype-visual-selection-cursor"),
+    ).not.toBeNull();
+  });
+
+  it("点击实际元素不会触发宿主空白清空逻辑", () => {
+    const onVisualSelect = vi.fn();
+    const { container } = render(
+      <PrototypePagePreview
+        html="<button>保存</button>"
+        visualEditMode
+        onVisualSelect={onVisualSelect}
+      />,
+    );
+
+    const root = getPrototypeRoot(container);
+    const button = root.querySelector("button");
+    if (!button) throw new Error("测试按钮未渲染");
+    fireEvent.click(button);
+
+    expect(onVisualSelect).toHaveBeenCalledWith(
+      expect.objectContaining({ tagName: "button" }),
+    );
+    expect(onVisualSelect).not.toHaveBeenCalledWith(null);
+  });
+
   it("双击叶子文本后用覆盖层提交修改", () => {
     const onVisualTextChange = vi.fn();
     const { container } = render(

@@ -747,7 +747,21 @@ export function PrototypePagePreview({
     `;
     shadow.appendChild(style);
     return () => style.remove();
-  }, [visualAnnotationMode, visualEditMode]);
+  // 页面内容会在配置、样式或临时属性变化时重建 Shadow DOM；这些输入变化后必须
+  // 重新注入选择光标，不能只依赖编辑模式开关。
+  }, [
+    allowScroll,
+    configData,
+    css,
+    demoId,
+    fillContainer,
+    html,
+    sessionId,
+    shouldScaleToPreviewSize,
+    visualAnnotationMode,
+    visualEditMode,
+    visualPropertyChanges,
+  ]);
 
   useEffect(() => {
     const shadow = shadowRef.current;
@@ -976,6 +990,17 @@ export function PrototypePagePreview({
       startTextEdit(target);
     };
     const handlePointerLeave = () => setHoveredElement(null);
+    const handleHostClick = (event: MouseEvent) => {
+      // Shadow DOM 内命中元素和根节点空白的点击都已在 shadow 捕获处理器中消费。
+      // 这里专门处理 Shadow DOM 宿主自身（即页面外露空白）的原生事件，避免 React
+      // 合成事件在 Shadow 边界上的 retargeting 让取消选择失效。
+      if (event.target !== host) return;
+      setContextMenu(null);
+      activeSelectedElement = null;
+      setHoveredElement(null);
+      onVisualSelect?.(null);
+      onVisualSelectStack?.([]);
+    };
     const handleKeyDown = (event: KeyboardEvent) => {
       const eventTarget = event.target;
       if (
@@ -1062,6 +1087,7 @@ export function PrototypePagePreview({
     shadow.addEventListener("dblclick", handleDoubleClick, true);
     shadow.addEventListener("pointerleave", handlePointerLeave);
     shadow.addEventListener("contextmenu", handleContextMenu, true);
+    host.addEventListener("click", handleHostClick);
     host.addEventListener("keydown", handleKeyDown);
     return () => {
       setHoveredElement(null);
@@ -1072,6 +1098,7 @@ export function PrototypePagePreview({
       shadow.removeEventListener("dblclick", handleDoubleClick, true);
       shadow.removeEventListener("pointerleave", handlePointerLeave);
       shadow.removeEventListener("contextmenu", handleContextMenu, true);
+      host.removeEventListener("click", handleHostClick);
       host.removeEventListener("keydown", handleKeyDown);
     };
   }, [
@@ -1198,6 +1225,15 @@ export function PrototypePagePreview({
     <div
       ref={containerRef}
       className={cn("relative flex h-full w-full items-center justify-center", className)}
+      data-prototype-preview-container
+      onClick={(event) => {
+        // 缩放预览的页面外空白位于此容器，而非 Shadow DOM 宿主。仅当事件直接命中
+        // 容器自身时才取消选择，页面内容、批注和图层菜单的点击不会走入该分支。
+        if (!visualEditMode || event.target !== event.currentTarget) return;
+        setContextMenu(null);
+        onVisualSelect?.(null);
+        onVisualSelectStack?.([]);
+      }}
     >
       <style>{`
         [data-prototype-preview]::-webkit-scrollbar {
