@@ -45,6 +45,7 @@ export {
   HTML_IMPORT_UNSUPPORTED_CAPABILITY_CODES,
   HTML_IMPORT_WARNING_CODES,
   hashHtmlImportSource,
+  requiresHtmlImportConfirmation,
   sortHtmlImportAnalysisCollections,
 } from "./html-import-contract";
 export {
@@ -66,6 +67,8 @@ export type {
   HtmlImportRejectionCode,
   HtmlImportResourceClassification,
   HtmlImportRuntime,
+  HtmlImportSource,
+  HtmlImportSourceKind,
   HtmlImportSignal,
   HtmlImportSignalCode,
   HtmlImportWarning,

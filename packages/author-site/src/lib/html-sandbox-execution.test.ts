@@ -30,7 +30,10 @@ describe("html sandbox execution", () => {
     expect(ticketRef.channelId).toMatch(/^[a-f0-9]{32}$/);
     expect(ticketRef.expiresAt).toBe(1_000 + execution.HTML_SANDBOX_EXECUTION_TTL_MS);
     expect(ticketRef.executionId).not.toContain("button");
-    expect(execution.readHtmlSandboxExecution(ticketRef.executionId, 1_001)?.html).toContain("onclick");
+    const stored = execution.readHtmlSandboxExecution(ticketRef.executionId, 1_001)!;
+    expect(stored.artifactRef).toMatch(/^[a-f0-9]{64}$/);
+    const ticketPath = path.join(tempDir, "html-sandbox-executions", `${ticketRef.executionId}.json`);
+    expect(fs.readFileSync(ticketPath, "utf8")).not.toContain("onclick");
     expect(execution.readHtmlSandboxExecution(ticketRef.executionId, ticketRef.expiresAt)).toBeNull();
   });
 
@@ -53,6 +56,31 @@ describe("html sandbox execution", () => {
     fs.writeFileSync(secondPath, JSON.stringify(persisted), "utf8");
     expect(execution.readHtmlSandboxExecution(second.executionId, 2_001)).toBeNull();
     expect(fs.existsSync(secondPath)).toBe(false);
+  });
+
+  it("emits only hashed execution diagnostics when a contextual ticket expires or is revoked", async () => {
+    const appendServerEditorDiagnosticEvent = jest.fn();
+    jest.doMock("./editor-diagnostics/store", () => ({ appendServerEditorDiagnosticEvent }));
+    const execution = await import("./html-sandbox-execution");
+    const context = { projectId: "project-1", sessionId: "session-1", workspaceId: "workspace-1", pageId: "page-1" };
+    const revoked = execution.createHtmlSandboxExecution("<p>safe</p>", 1_000, context);
+    execution.deleteHtmlSandboxExecution(revoked.executionId);
+    const expired = execution.createHtmlSandboxExecution("<p>safe</p>", 2_000, context);
+    expect(execution.readHtmlSandboxExecution(expired.executionId, expired.expiresAt)).toBeNull();
+
+    expect(appendServerEditorDiagnosticEvent).toHaveBeenCalledWith(expect.objectContaining({
+      eventType: "sandbox.execution.revoked",
+      projectId: "project-1",
+      payload: expect.objectContaining({ executionIdHash: expect.any(String) }),
+    }));
+    expect(appendServerEditorDiagnosticEvent).toHaveBeenCalledWith(expect.objectContaining({
+      eventType: "sandbox.execution.expired",
+      projectId: "project-1",
+      payload: expect.objectContaining({ executionIdHash: expect.any(String) }),
+    }));
+    const payloads = appendServerEditorDiagnosticEvent.mock.calls.map(([event]) => JSON.stringify(event));
+    expect(payloads.join(" ")).not.toContain(revoked.executionId);
+    expect(payloads.join(" ")).not.toContain(expired.executionId);
   });
 
   it("injects only the telemetry bridge and removes input policy overrides", async () => {

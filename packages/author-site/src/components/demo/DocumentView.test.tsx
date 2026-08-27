@@ -74,6 +74,23 @@ describe("DocumentView knowledge creation", () => {
     }) as jest.Mock;
   });
 
+  it("does not show or load chat attachments in the document view", async () => {
+    render(
+      <DocumentView
+        workingDir="/workspace"
+        projectId="project-1"
+        sessionId="session-1"
+      />,
+    );
+
+    await screen.findByText("项目知识库");
+
+    expect(screen.queryByText("对话文件")).not.toBeInTheDocument();
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      expect.stringContaining("/attachments"),
+    );
+  });
+
   it("creates an unnamed document, opens it, and commits an inline rename", async () => {
     const user = userEvent.setup();
     render(

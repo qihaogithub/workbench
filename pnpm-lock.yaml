@@ -830,10 +830,16 @@ importers:
       tar:
         specifier: ^7.4.3
         version: 7.5.20
+      yauzl:
+        specifier: ^3.4.0
+        version: 3.4.0
     devDependencies:
       '@types/node':
         specifier: ^20.11.16
         version: 20.19.37
+      '@types/yauzl':
+        specifier: ^2.10.3
+        version: 2.10.3
       typescript:
         specifier: ^5.3.3
         version: 5.9.3

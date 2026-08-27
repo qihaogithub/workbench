@@ -50,6 +50,10 @@ type HtmlImportNormalizer = (source: string) => {
   analysis: { outcome: { status: string; runtimeType?: string }; sourceHash: string };
   normalizedHash?: string;
 };
+type HtmlImportContract = {
+  normalizeHtmlImport: HtmlImportNormalizer;
+  HTML_IMPORT_ANALYSIS_VERSION: number;
+};
 
 // --- Request schemas ---
 
@@ -60,6 +64,7 @@ type RequestSnapshotInput =
       code: string;
       configData?: Record<string, unknown>;
       previewSize?: PageSnapshotInput["previewSize"];
+      presentation?: PageSnapshotInput["presentation"];
     };
 
 type GenerateRequest = RequestSnapshotInput & {
@@ -205,6 +210,32 @@ const PRIORITY_WEIGHT: Record<ScreenshotPriority, number> = {
 
 function generateBatchId(): string {
   return `batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+async function reportBatchTerminal(
+  batch: BatchState,
+  pages: BatchPage[],
+): Promise<void> {
+  if (!config.screenshotDiagnosticsToken) return;
+  const response = await fetch(`${config.authorSiteUrl}/api/internal/screenshot-diagnostics`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-screenshot-diagnostics-token": config.screenshotDiagnosticsToken,
+    },
+    body: JSON.stringify({
+      projectId: batch.projectId,
+      batchId: batch.batchId,
+      status: batch.status,
+      total: batch.total,
+      completed: batch.completed,
+      failed: batch.failed,
+      cached: batch.cached,
+      sandboxPageCount: pages.filter((page) => page.runtimeType === "sandboxed-html").length,
+      errorsByCode: batch.errorsByCode,
+    }),
+  });
+  if (!response.ok) throw new Error(`screenshot diagnostics callback rejected: ${response.status}`);
 }
 
 function getRequestId(request: FastifyRequest): string {
@@ -491,19 +522,21 @@ function normalizeSnapshotInput(
   const configData = normalizeConfigData(input.configData);
 
   if (input.runtimeType === "sandboxed-html") {
-    const normalizeHtmlImport = (require("@workbench/project-core") as { normalizeHtmlImport: HtmlImportNormalizer }).normalizeHtmlImport;
+    const { normalizeHtmlImport, HTML_IMPORT_ANALYSIS_VERSION } = require(
+      "@workbench/project-core",
+    ) as HtmlImportContract;
     if (typeof input.sandboxHtml !== "string" || input.sandboxHtml.length === 0 || !input.htmlImportMeta || typeof input.htmlImportMeta !== "object") return null;
     const normalized = normalizeHtmlImport(input.sandboxHtml);
     const meta = input.htmlImportMeta;
     if (
       normalized.analysis.outcome.status !== "accepted" ||
       normalized.analysis.outcome.runtimeType !== "sandboxed-html" ||
-      meta.analysisVersion !== 1 ||
+      meta.analysisVersion !== HTML_IMPORT_ANALYSIS_VERSION ||
       meta.sandboxPolicyVersion !== 1 ||
       !/^[a-f0-9]{64}$/i.test(meta.sourceHash) ||
       meta.normalizedHash !== normalized.analysis.sourceHash
     ) return null;
-    return { runtimeType: "sandboxed-html", sandboxHtml: input.sandboxHtml, htmlImportMeta: meta, configData, previewSize };
+    return { runtimeType: "sandboxed-html", sandboxHtml: input.sandboxHtml, htmlImportMeta: meta, configData, previewSize, presentation: input.presentation };
   }
 
   if (input.runtimeType === "prototype-html-css") {
@@ -517,6 +550,7 @@ function normalizeSnapshotInput(
       prototypeMeta: normalizePrototypeMeta(input.prototypeMeta),
       configData,
       previewSize,
+      presentation: input.presentation,
     };
   }
 
@@ -532,6 +566,7 @@ function normalizeSnapshotInput(
           : undefined,
       configData,
       previewSize,
+      presentation: input.presentation,
     };
   }
 
@@ -543,24 +578,26 @@ function normalizeSnapshotInput(
     code: input.code,
     configData,
     previewSize,
+    presentation: input.presentation,
   };
 }
 
 function getSnapshotHashSource(input: PageSnapshotInput): string {
   if (input.runtimeType === "high-fidelity-react") {
-    return input.code;
+    return JSON.stringify({ code: input.code, presentation: input.presentation });
   }
   if (input.runtimeType === "sketch-scene") {
-    return getSketchSceneHashSource(input.sketchScene, input.configData);
+    return JSON.stringify({ scene: getSketchSceneHashSource(input.sketchScene, input.configData), presentation: input.presentation });
   }
   if (input.runtimeType === "sandboxed-html") {
-    return JSON.stringify({ sandboxRendererVersion: 1, runtimeType: input.runtimeType, sandboxHtml: input.sandboxHtml, htmlImportMeta: input.htmlImportMeta });
+    return JSON.stringify({ sandboxRendererVersion: 1, runtimeType: input.runtimeType, sandboxHtml: input.sandboxHtml, htmlImportMeta: input.htmlImportMeta, presentation: input.presentation });
   }
   return JSON.stringify({
     runtimeType: input.runtimeType,
     prototypeHtml: input.prototypeHtml,
     prototypeCss: input.prototypeCss || "",
     prototypeMeta: normalizePrototypeMeta(input.prototypeMeta),
+    presentation: input.presentation,
   });
 }
 
@@ -1200,6 +1237,10 @@ async function processBatch(
     },
     "screenshot batch completed",
   );
+
+  reportBatchTerminal(batch, pages).catch((error) => {
+    logger?.warn({ batchId: batch.batchId, projectId: batch.projectId, error: getErrorMessage(error) }, "screenshot diagnostics callback failed");
+  });
 
   // Clean up batch state after 5 minutes
   setTimeout(() => {

@@ -3,6 +3,8 @@ import type {
   CanvasPageData,
   CanvasPageGroup,
   CanvasPageLayout,
+  CanvasNavigationState,
+  CanvasSection,
 } from "./types";
 
 const CLIPBOARD_KEY = "workbench:canvas-clipboard";
@@ -25,6 +27,10 @@ export interface CanvasClipboardData {
   pageLayouts: Record<string, CanvasPageLayout>;
   /** 涉及的页面组 */
   pageGroups: CanvasPageGroup[];
+  /** Copied Section graph; children are remapped during paste. */
+  sections?: CanvasSection[];
+  /** 仅包含复制页面内部的跳转关系。 */
+  navigation?: CanvasNavigationState;
   /** 选中内容的整体边界框 */
   bounds: { x: number; y: number; width: number; height: number } | null;
 }
@@ -50,10 +56,46 @@ export function readCanvasClipboard(): CanvasClipboardData | null {
     if (typeof data.pageLayouts !== "object" || data.pageLayouts === null)
       return null;
     if (!Array.isArray(data.pageGroups)) return null;
+    if (!Array.isArray(data.sections)) data.sections = [];
     return data;
   } catch {
     return null;
   }
+}
+
+/** Rewrites every copied Section ID and its internal member references. */
+export function remapCanvasSectionsForPaste(input: {
+  sections: CanvasSection[];
+  pageIdMapping: Map<string, string>;
+  nodeIdMapping: Map<string, string>;
+  offset: { x: number; y: number };
+  now: number;
+  createId: () => string;
+}): Record<string, CanvasSection> {
+  const sectionIdMapping = new Map<string, string>();
+  for (const section of input.sections) sectionIdMapping.set(section.id, input.createId());
+  const result: Record<string, CanvasSection> = {};
+  for (const section of input.sections) {
+    const id = sectionIdMapping.get(section.id);
+    if (!id) continue;
+    const children = section.children.flatMap((child) => {
+      const mappedId = child.kind === "page"
+        ? input.pageIdMapping.get(child.id)
+        : child.kind === "node"
+          ? input.nodeIdMapping.get(child.id)
+          : sectionIdMapping.get(child.id);
+      return mappedId ? [{ kind: child.kind, id: mappedId }] : [];
+    });
+    result[id] = {
+      ...section,
+      id,
+      layout: { ...section.layout, x: section.layout.x + input.offset.x, y: section.layout.y + input.offset.y },
+      children,
+      createdAt: input.now,
+      updatedAt: input.now,
+    };
+  }
+  return result;
 }
 
 /**
@@ -63,6 +105,7 @@ export function readCanvasClipboard(): CanvasClipboardData | null {
 export function computeBounds(
   pageLayouts: Record<string, CanvasPageLayout>,
   nodes: CanvasFreeNode[],
+  sections: CanvasSection[] = [],
 ): { x: number; y: number; width: number; height: number } | null {
   let minX = Infinity;
   let minY = Infinity;
@@ -78,6 +121,14 @@ export function computeBounds(
 
   for (const node of nodes) {
     const { x, y, width, height } = node.layout;
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x + width);
+    maxY = Math.max(maxY, y + height);
+  }
+
+  for (const section of sections) {
+    const { x, y, width, height } = section.layout;
     minX = Math.min(minX, x);
     minY = Math.min(minY, y);
     maxX = Math.max(maxX, x + width);

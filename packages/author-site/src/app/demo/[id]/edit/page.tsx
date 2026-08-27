@@ -44,6 +44,11 @@ import type {
   SketchSceneDocument,
   SchemaDefinitionMutation,
 } from "@workbench/shared";
+import {
+  applyPagePresentationToSchema,
+  resolvePagePresentation,
+  type PagePresentationProfile,
+} from "@workbench/shared";
 import type { ConfigDefinitionDraft } from "@workbench/shared/demo/config-schema-definition";
 import { applyTextPatches, type TextPatch } from "@workbench/prototype-core";
 import { createAuthorCommentApi } from "@/lib/comment-api-client";
@@ -83,7 +88,6 @@ import {
   hasPreviewPageCode,
   resolvePreviewPageCode,
 } from "@/lib/preview-page-code";
-import { getPrototypePreviewSize } from "@/lib/prototype-preview-size";
 import { analyzeConfigDefinitionImpact } from "@/lib/config-definition-impact";
 import { applyCollabTextPatches } from "@/lib/prototype-collab-patches";
 import {
@@ -108,6 +112,8 @@ import { PreviewProjectionTracker } from "@/lib/preview-projection-tracker";
 import { WorkspacePerformanceSampler } from "@/lib/workspace-performance-sampling";
 import { Button } from "@/components/ui/button";
 import { DesignSpecWorkspaceProvider } from "@/components/demo/DesignSpecWorkspace";
+import { HtmlFileDropZone } from "@/components/demo/HtmlFileDropZone";
+import { PageViewportControl } from "@/components/demo/PageViewportControl";
 import {
   Popover,
   PopoverContent,
@@ -246,7 +252,6 @@ import {
   loadCanvasPageContent,
   type ReferencedDesignSpec,
 } from "@/lib/canvas-page-content-loader";
-import { parseFigmaImportContent } from "../../../../../lib/markdown-parser";
 import { useDemos } from "@/lib/api";
 import {
   resolveSketchEditorEngine,
@@ -434,7 +439,9 @@ function isCanvasScreenshotRenderBoxCompatible(
   return Math.abs(renderBox.width - expectedWidth) < 1;
 }
 
-const CANVAS_SCREENSHOT_FULL_PAGE = true;
+function shouldCaptureFullPage(presentation?: PagePresentationProfile): boolean {
+  return presentation?.heightBehavior !== "fixed";
+}
 
 function createVisualId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -906,6 +913,8 @@ function flattenNestedDelta(
 function getCanvasContentHistorySignature(state: CanvasState): string {
   return JSON.stringify({
     pages: state.pages ?? {},
+    sections: state.sections ?? {},
+    pageGroups: state.pageGroups ?? {},
     nodes: state.nodes ?? {},
     layers: state.layers ?? {},
     hiddenKnowledgeDocumentIds: state.hiddenKnowledgeDocumentIds ?? [],
@@ -943,6 +952,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     undo,
   } = commandHistory;
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [droppedHtmlFiles, setDroppedHtmlFiles] = useState<File[]>();
 
   const [code, setCode] = useState("");
   const [schema, setSchema] = useState("");
@@ -1086,6 +1096,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [workspacePath, setWorkspacePath] = useState("");
   const [previewSize, setPreviewSize] =
     useState<PreviewSize>();
+  const [temporaryPresentation, setTemporaryPresentation] =
+    useState<PagePresentationProfile>();
 
   useEffect(() => bindKeyboardShortcuts(), [bindKeyboardShortcuts]);
 
@@ -1177,6 +1189,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   demoPagesRef.current = demoPages;
   const [demoFolders, setDemoFolders] = useState<DemoFolderMeta[]>([]);
   const [activeDemoId, setActiveDemoId] = useState<string>("");
+  useEffect(() => setTemporaryPresentation(undefined), [activeDemoId]);
   const [runtimeConversions, setRuntimeConversions] = useState<
     Record<string, RuntimeConversionState>
   >({});
@@ -1193,7 +1206,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     // 切换页面时重新加载该页配置要求
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDemoId]);
-  const suppressNextCanvasCollabPushRef = useRef(false);
   const [projectConfigSchema, setProjectConfigSchema] = useState<
     string | undefined
   >(undefined);
@@ -1220,7 +1232,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     clearCanvasSelection,
     flushCanvasState,
     hasUnsavedCanvasChanges,
-    applyRemoteCanvasState,
+    rebaseRemoteCanvasState,
     markCanvasChangesSaved,
   } = useCanvasWorkspace({
     sessionId,
@@ -1465,6 +1477,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       const common = {
         pageId: page.id,
         configData,
+        presentation: resolvePagePresentation(pageSchemaMap[page.id] ?? ""),
         previewSize,
         width,
         height,
@@ -1526,7 +1539,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         code: pageCode,
       };
     },
-    [activeDemoId, code, configDataMap, pageCodes, pagePreviewSizeMap],
+    [activeDemoId, code, configDataMap, pageCodes, pagePreviewSizeMap, pageSchemaMap],
   );
 
   const buildScreenshotBatchPages = useCallback(
@@ -1561,7 +1574,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           return [
             {
               ...snapshotInput,
-              fullPage: CANVAS_SCREENSHOT_FULL_PAGE,
+              fullPage: shouldCaptureFullPage(snapshotInput.presentation),
               priority,
               renderMode,
               measuredHeight: pageScreenshots[p.id]?.renderBox?.height,
@@ -1699,7 +1712,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           regenerateInput,
           width,
           height,
-          CANVAS_SCREENSHOT_FULL_PAGE,
+          shouldCaptureFullPage(regenerateInput.presentation),
           getScreenshotPriority(pageId),
           "strict" as const,
           pageScreenshots[pageId]?.renderBox?.height,
@@ -1755,7 +1768,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         snapshotInput as Parameters<typeof regeneratePageSnapshot>[1],
         width,
         height,
-        CANVAS_SCREENSHOT_FULL_PAGE,
+        shouldCaptureFullPage(snapshotInput.presentation),
         priority,
         "strict" as const,
         pageScreenshots[pageId]?.renderBox?.height,
@@ -1834,104 +1847,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       return [...current, item];
     });
   }, []);
-
-  // 对话/聊天附件类型
-  interface ChatAttachment {
-    id: string;
-    name: string;
-    mimeType: string;
-    size: number;
-    textExtracted: boolean;
-    textPreview?: string;
-    createdAt?: string;
-  }
-
-  const handleConvertChatToKnowledge = useCallback(
-    async (file: ChatAttachment) => {
-      if (!workspacePath || !sessionId) return;
-      if (
-        !confirm(`将「${file.name}」转为知识库文件？转为知识库后将删除原聊天附件。`)
-      )
-        return;
-      try {
-        const contentRes = await fetch(
-          `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(file.id)}`,
-        );
-        const contentData = await contentRes.json();
-        if (!contentData.success) {
-          toast({
-            title: "转换失败",
-            description: contentData.error?.message,
-            variant: "destructive",
-          });
-          return;
-        }
-        const title = file.name.replace(/\.(md|markdown|txt|text|json|csv)$/i, "");
-        const params = new URLSearchParams({ workingDir: workspacePath });
-        if (demoId) params.set("projectId", demoId);
-        if (sessionId) params.set("sessionId", sessionId);
-        const createRes = await fetch(
-          `/api/knowledge?${params.toString()}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              title: title || file.name,
-              description: `从聊天附件转换: ${file.name}`,
-              content: contentData.data.text || "",
-            }),
-          },
-        );
-        const createData = await createRes.json();
-        if (!createData.success) {
-          toast({
-            title: "转换失败",
-            description: createData.error?.message,
-            variant: "destructive",
-          });
-          return;
-        }
-        await fetch(
-          `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(file.id)}`,
-          { method: "DELETE" },
-        );
-        toast({ title: "已转为知识库文件" });
-        upsertKnowledgeItem(createData.data);
-        window.dispatchEvent(new Event("knowledge-updated"));
-        window.dispatchEvent(new Event("chat-attachments-updated"));
-      } catch {
-        toast({ title: "转换失败", variant: "destructive" });
-      }
-    },
-    [workspacePath, sessionId, demoId, toast, upsertKnowledgeItem],
-  );
-
-  const handleDeleteChatFile = useCallback(
-    async (file: ChatAttachment) => {
-      if (!sessionId) return;
-      if (!confirm(`确定要删除聊天附件「${file.name}」吗？`)) return;
-      try {
-        const res = await fetch(
-          `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(file.id)}`,
-          { method: "DELETE" },
-        );
-        const data = await res.json();
-        if (data.success) {
-          toast({ title: "删除成功" });
-          window.dispatchEvent(new Event("chat-attachments-updated"));
-        } else {
-          toast({
-            title: "删除失败",
-            description: data.error?.message,
-            variant: "destructive",
-          });
-        }
-      } catch {
-        toast({ title: "删除失败", variant: "destructive" });
-      }
-    },
-    [sessionId, toast],
-  );
 
   const canvasKnowledgeDocuments = useMemo(
     () =>
@@ -3822,21 +3737,24 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     ) {
       return;
     }
-    suppressNextCanvasCollabPushRef.current = true;
-    applyRemoteCanvasState(remoteState);
+    const rebased = rebaseRemoteCanvasState(remoteState);
+    if (rebased.conflicts.length > 0) {
+      toast({
+        title: "画布协作冲突",
+        description: `以下对象被同时修改：${rebased.conflicts.join("、")}。已保留本地草稿，请刷新后手动确认。`,
+        variant: "destructive",
+      });
+    }
   }, [
-    applyRemoteCanvasState,
     canvasLayoutCollab.status,
     canvasLayoutCollab.value,
+    rebaseRemoteCanvasState,
+    toast,
   ]);
 
   useEffect(() => {
     if (canvasLayoutCollab.status !== "synced" || !hasUnsavedCanvasChanges)
       return;
-    if (suppressNextCanvasCollabPushRef.current) {
-      suppressNextCanvasCollabPushRef.current = false;
-      return;
-    }
     replaceCollabText(
       canvasLayoutCollab.ytext,
       serializeCanvasLayout(demoId, canvasState),
@@ -4401,6 +4319,36 @@ ${context.details}
     [handleSchemaChange],
   );
 
+  const handleSavePagePresentation = useCallback(
+    (presentation: PagePresentationProfile) => {
+      const pageId = activeDemoIdRef.current;
+      if (!pageId) return;
+      const currentSchema = pageSchemaMapRef.current[pageId];
+      if (!currentSchema) {
+        toast({ title: "无法保存展示尺寸", description: "页面配置尚未加载。", variant: "destructive" });
+        return;
+      }
+      try {
+        const nextSchema = applyPagePresentationToSchema(currentSchema, presentation);
+        handlePageSchemaChange(pageId, nextSchema);
+        const nextSize = { ...presentation.viewport };
+        setPagePreviewSizeMap((current) => ({ ...current, [pageId]: nextSize }));
+        setPreviewSize(nextSize);
+        setTemporaryPresentation(undefined);
+        markScreenshotDirty(pageId);
+        markWorkspaceChanged();
+        toast({ title: "已设为页面默认视口", description: `${presentation.viewport.width}×${presentation.viewport.height}` });
+      } catch (error) {
+        toast({
+          title: "无法保存展示尺寸",
+          description: error instanceof Error ? error.message : "页面配置无效",
+          variant: "destructive",
+        });
+      }
+    },
+    [handlePageSchemaChange, markScreenshotDirty, markWorkspaceChanged, toast],
+  );
+
   const handlePageDefinitionChange = useCallback(
     (pageId: string, mutation: SchemaDefinitionMutation) => {
       handlePageSchemaChange(pageId, mutation.schema);
@@ -4877,7 +4825,7 @@ ${context.details}
   }, [canvasMissingPageIdsKey, demoId, demoPages, getSafeMergedDefaults, sessionId]);
 
   const handleConfigPanelPageSelect = useCallback(
-    async (pageId: string) => {
+    async (pageId: string, suppliedPage?: DemoPageMeta) => {
       rememberActivePageSchema();
       setSinglePreviewTarget({ kind: "page", pageId });
       setActiveDemoId(pageId);
@@ -4892,7 +4840,7 @@ ${context.details}
       }
       if (!sessionId) return;
       try {
-        const selectedPage = demoPages.find((page) => page.id === pageId);
+        const selectedPage = suppliedPage ?? demoPages.find((page) => page.id === pageId);
         if (!selectedPage) return;
         const data = await loadCanvasPageContent({
           page: selectedPage,
@@ -4973,9 +4921,7 @@ ${context.details}
               [pageId]: data.projectConfigSchema ?? "",
             }));
           }
-          const size =
-            getPreviewSize(data.schema ?? "") ??
-            getPrototypePreviewSize(prototypeMeta);
+          const size = getPreviewSize(data.schema ?? "");
           if (size) {
             setPagePreviewSizeMap((prev) => ({
               ...prev,
@@ -5003,6 +4949,16 @@ ${context.details}
   );
   const handleConfigPanelPageSelectRef = useRef(handleConfigPanelPageSelect);
   handleConfigPanelPageSelectRef.current = handleConfigPanelPageSelect;
+  const handlePreviewHtmlFilesDrop = useCallback(
+    (files: File[]) => {
+      if (!sessionId) {
+        toast({ title: "未创建 Session", description: "请等待编辑器初始化后重试。", variant: "destructive" });
+        return;
+      }
+      setDroppedHtmlFiles(files);
+    },
+    [sessionId, toast],
+  );
   const fallbackPageId = useMemo(() => {
     if (demoPages.length === 0) return "";
     return [...demoPages].sort((a, b) => a.order - b.order)[0]?.id ?? "";
@@ -5096,8 +5052,18 @@ ${context.details}
         const layout = effectiveLayouts[page.id];
         if (layout) nextPages[page.id] = layout;
       }
-      if (nextPageLayoutsDiffer(currentState.pages, nextPages)) {
-        setCanvasState({ ...currentState, pages: nextPages });
+      const navigation = currentState.navigation;
+      const navigationReferencesDeletedPage = Object.values(navigation?.hotspots ?? {}).some((hotspot) => deleted.has(hotspot.pageId)) || Object.values(navigation?.connections ?? {}).some((connection) => deleted.has(connection.source.pageId) || deleted.has(connection.target.pageId));
+      if (nextPageLayoutsDiffer(currentState.pages, nextPages) || navigationReferencesDeletedPage) {
+        const nextHotspots = Object.fromEntries(
+          Object.entries(navigation?.hotspots ?? {}).filter(([, hotspot]) => !deleted.has(hotspot.pageId)),
+        );
+        const nextConnections = Object.fromEntries(
+          Object.entries(navigation?.connections ?? {}).filter(([, connection]) =>
+            !deleted.has(connection.source.pageId) && !deleted.has(connection.target.pageId) && Boolean(nextHotspots[connection.source.hotspotId]),
+          ),
+        );
+        setCanvasState({ ...currentState, pages: nextPages, ...(navigation ? { navigation: { hotspots: nextHotspots, connections: nextConnections } } : {}) });
       }
 
       if (deleted.has(activeDemoIdRef.current)) {
@@ -5308,7 +5274,7 @@ ${context.details}
     [demoId, sessionId, handleWorkspaceTreeChanged, toast],
   );
 
-  // 画布粘贴 HTML 代码创建页面
+  // 画布粘贴 HTML：交给页面树现有的可信 Figma 自动导入 / 工作台分流。
   const handlePasteHtmlContent = useCallback(
     async (html: string) => {
       if (!sessionId) {
@@ -5320,68 +5286,11 @@ ${context.details}
         return;
       }
 
-      const parsed = parseFigmaImportContent(html.trim());
-      if (!parsed.success) {
-        toast({
-          title: "粘贴的代码无法识别",
-          description:
-            parsed.error || "请复制 Figma 导出的 HTML 代码后重试",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      toast({ title: "正在从剪贴板创建页面…" });
-      try {
-        const pageName =
-          parsed.kind === "prototype"
-            ? parsed.title?.trim() || "从剪贴板导入的页面"
-            : "从剪贴板导入的页面";
-        const page = await projectApiClient.createDemoPage(
-          demoId,
-          pageName,
-          sessionId,
-          undefined,
-          parsed.kind === "prototype" ? "prototype-html-css" : undefined,
-        );
-
-        if (parsed.kind === "prototype") {
-          await projectApiClient.updateDemoPageFiles(
-            demoId,
-            page.id,
-            sessionId,
-            {
-              prototypeHtml: parsed.prototypeHtml,
-              prototypeCss: parsed.prototypeCss,
-              prototypeMeta: parsed.prototypeMeta,
-              schema: JSON.stringify({ type: "object", properties: {} }),
-              localizeImages: true,
-            },
-          );
-        } else {
-          await projectApiClient.updateDemoPageFiles(demoId, page.id, sessionId, {
-            code: parsed.code,
-            schema: parsed.schema,
-          });
-        }
-
-        setDemoPages((current) =>
-          [...current, page].sort((a, b) => a.order - b.order),
-        );
-        handleWorkspaceTreeChanged();
-        toast({ title: `已粘贴页面「${page.name}」` });
-      } catch (err) {
-        const reason =
-          err instanceof Error && err.message ? err.message : "未知错误";
-        console.error("粘贴 HTML 创建页面失败:", err);
-        toast({
-          title: "创建页面失败",
-          description: `${reason}，请确认 Figma 导入服务可用后重试`,
-          variant: "destructive",
-        });
-      }
+      setDroppedHtmlFiles([
+        new File([html], "clipboard-import.html", { type: "text/html" }),
+      ]);
     },
-    [demoId, sessionId, handleWorkspaceTreeChanged, toast],
+    [sessionId, toast],
   );
 
   // 创建引用页
@@ -6599,6 +6508,10 @@ ${context.details}
   );
 
   const activeDemoPage = demoPages.find((page) => page.id === activeDemoId);
+  const activePersistedPresentation = useMemo(
+    () => resolvePagePresentation(pageSchemaMap[activeDemoId] ?? schema),
+    [activeDemoId, pageSchemaMap, schema],
+  );
   const previewStagePages = useMemo<PreviewStagePage[]>(() => {
     const activeCodePageId =
       pageCodes[activeDemoId] === code ? activeDemoId : undefined;
@@ -6641,6 +6554,10 @@ ${context.details}
             }
           : undefined;
 
+      const persistedPresentation = resolvePagePresentation(pageSchemaMap[page.id] ?? "");
+      const presentation = page.id === activeDemoId && temporaryPresentation
+        ? temporaryPresentation
+        : persistedPresentation;
       return {
         id: page.id,
         name: page.name,
@@ -6651,7 +6568,8 @@ ${context.details}
         ...runtimeData,
         configData: configDataMap[page.id],
         schema: pageSchemaMap[page.id],
-        previewSize: pagePreviewSizeMap[page.id],
+        presentation,
+        previewSize: presentation?.viewport ?? pagePreviewSizeMap[page.id],
         fallbackPreviewSize:
           page.id === activeDemoId ? previewSize : undefined,
         ...(snapshot || prototypeSnapshot),
@@ -6670,6 +6588,7 @@ ${context.details}
     pageSchemaMap,
     pageSnapshots,
     previewSize,
+    temporaryPresentation,
   ]);
   const activeSinglePreviewDocumentNode = useMemo(() => {
     if (singlePreviewTarget?.kind !== "document") return undefined;
@@ -7640,6 +7559,15 @@ ${context.details}
       </div>
     ) : undefined;
 
+  const viewportControl = activePersistedPresentation ? (
+    <PageViewportControl
+      presentation={activePersistedPresentation}
+      temporaryPresentation={temporaryPresentation}
+      onTemporaryChange={setTemporaryPresentation}
+      onSaveDefault={handleSavePagePresentation}
+    />
+  ) : undefined;
+
   return (
     <div
       className="flex flex-col h-screen bg-background"
@@ -8186,6 +8114,7 @@ await handlePublishWithScreenshot();
 
               <TabsContent
                 value="pages"
+                forceMount
                 className="flex-1 flex flex-col mt-0 min-h-0 min-w-0 data-[state=inactive]:hidden overflow-hidden"
               >
                 <DemoPageTree
@@ -8196,6 +8125,16 @@ await handlePublishWithScreenshot();
                   onPagesChange={setDemoPages}
                   onFoldersChange={setDemoFolders}
                   onWorkspaceChange={handleWorkspaceTreeChanged}
+                  htmlImportInitialFiles={droppedHtmlFiles}
+                  onHtmlImportInitialFilesConsumed={() => setDroppedHtmlFiles(undefined)}
+                  onHtmlImportPreviewStatus={(status) => {
+                    recordDiagnosticEvent({
+                      category: "preview",
+                      name: `sandbox.preview.${status.replace(/-/g, "_")}`,
+                      level: ["runtime-error", "timeout", "left-document", "incomplete"].includes(status) ? "warn" : "info",
+                      details: { runtimeType: "sandboxed-html", status },
+                    });
+                  }}
                   activeDemoId={activeDemoId}
                   onPageSelect={async (pageId) => {
                     if (editingPageId === pageId) return;
@@ -8250,9 +8189,7 @@ await handlePublishWithScreenshot();
                             );
                             return { ...prev, [pageId]: defaults };
                           });
-                          const size =
-                            getPreviewSize(data.data.schema) ??
-                            getPrototypePreviewSize(prototypeMeta);
+                          const size = getPreviewSize(data.data.schema);
                           if (size) {
                             setPagePreviewSizeMap((prev) => ({
                               ...prev,
@@ -8546,42 +8483,6 @@ await handlePublishWithScreenshot();
                   onItemsChange={setKnowledgeItems}
                   onItemsLoaded={(items) => setKnowledgeItems(items)}
                   onDocHistory={(item) => setKbHistoryItem(item)}
-                  onChatFileSelect={async (attachment) => {
-                    try {
-                      if (attachment.mimeType?.startsWith("image/")) {
-                        window.open(
-                          `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(attachment.id)}&raw=1`,
-                          "_blank",
-                        );
-                        return;
-                      }
-                      const res = await fetch(
-                        `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(attachment.id)}`,
-                      );
-                      const data = await res.json();
-                      if (data.success) {
-                        setWsCodeDialogData({
-                          filePath: data.data.metadata.name,
-                          content: data.data.text,
-                          editable: false,
-                        });
-                        setWsCodeDialogOpen(true);
-                      } else {
-                        toast({
-                          title: "查看附件失败",
-                          description: data.error?.message,
-                          variant: "destructive",
-                        });
-                      }
-                    } catch {
-                      toast({
-                        title: "查看附件失败",
-                        variant: "destructive",
-                      });
-                    }
-                  }}
-                  onChatFileConvert={handleConvertChatToKnowledge}
-                  onChatFileDelete={handleDeleteChatFile}
                   onDocDeleted={() => {
                     window.dispatchEvent(new Event("knowledge-updated"));
                   }}
@@ -8634,6 +8535,7 @@ await handlePublishWithScreenshot();
                 canvasCreateDraft={canvasCommentDraft}
                 onCanvasCreateDraftChange={setCanvasCommentDraft}
               >
+              <HtmlFileDropZone onFilesDrop={handlePreviewHtmlFilesDrop}>
               <PreviewStage
                 pages={previewStagePages}
                 activePageId={activeDemoId}
@@ -8738,9 +8640,11 @@ await handlePublishWithScreenshot();
                 onSinglePageNext={handleSinglePreviewNext}
                 toolbarTrailing={
                   previewMode === "single" &&
-                  activeRuntimeConversion &&
                   !singlePreviewViewingDocument ? (
-                    <div className="flex min-w-0 items-center gap-1">
+                    <div className="flex min-w-0 items-center gap-2">
+                      {viewportControl}
+                      {activeRuntimeConversion ? (
+                      <div className="flex min-w-0 items-center gap-1">
                       <Badge
                         variant={
                           activeRuntimeConversion.status === "failed"
@@ -8781,6 +8685,8 @@ await handlePublishWithScreenshot();
                           重试
                         </Button>
                       )}
+                      </div>
+                      ) : null}
                     </div>
                   ) : undefined
                 }
@@ -9060,9 +8966,7 @@ await handlePublishWithScreenshot();
                               );
                               return { ...prev, [pageId]: defaults };
                             });
-                            const size =
-                              getPreviewSize(data.data.schema) ??
-                              getPrototypePreviewSize(prototypeMeta);
+                            const size = getPreviewSize(data.data.schema);
                             if (size) {
                               setPagePreviewSizeMap((prev) => ({
                                 ...prev,
@@ -9151,6 +9055,7 @@ await handlePublishWithScreenshot();
                   return undefined;
                 }}
               />
+              </HtmlFileDropZone>
               </CommentLayer>
               </>
               )}

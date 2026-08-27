@@ -15,7 +15,6 @@ import {
   validateAppGraph,
 } from "@/lib/fs-utils";
 import { type PreviewSize, extractPreviewSize } from "@/lib/preview-size";
-import { getPrototypePreviewSize } from "@/lib/prototype-preview-size";
 import { readCanvasStateFromWorkspace } from "@/lib/canvas-layout-file";
 
 export async function GET(
@@ -82,12 +81,6 @@ export async function GET(
         } catch {
           prototypeMeta = undefined;
         }
-      }
-      // 原型页面：若 schema 未提供 previewSize，从 prototypeMeta 回退获取
-      if (!previewSize && prototypeMeta) {
-        previewSize = getPrototypePreviewSize(
-          prototypeMeta as import("@workbench/shared").PrototypePageMeta,
-        );
       }
       if (fs.existsSync(sketchScenePath)) {
         try {

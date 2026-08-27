@@ -69,7 +69,6 @@ function createTrustedHtmlImportMeta(
     sandboxPolicyVersion: 1,
     sourceHash: analysis.sourceHash,
     normalizedHash,
-    viewport: analysis.detectedViewport,
   };
 }
 
@@ -196,8 +195,8 @@ export async function PUT(
     if (
       targetRuntimeType !== "prototype-html-css" &&
       targetRuntimeType !== "high-fidelity-react" &&
-      targetRuntimeType !== "sketch-scene"
-      && targetRuntimeType !== "sandboxed-html"
+      targetRuntimeType !== "sketch-scene" &&
+      targetRuntimeType !== "sandboxed-html"
     ) {
       return NextResponse.json(
         createApiError("INVALID_REQUEST", "targetRuntimeType 不合法"),
@@ -380,8 +379,7 @@ export async function PUT(
         (prototypeMeta as PrototypePageMeta | undefined) ??
         currentFiles.prototypeMeta,
       sandboxHtml: sandboxHtmlForWrite ?? currentFiles.sandboxHtml,
-      htmlImportMeta:
-        htmlImportMetaForWrite ?? currentFiles.htmlImportMeta,
+      htmlImportMeta: htmlImportMetaForWrite ?? currentFiles.htmlImportMeta,
       sketchScene: sketchScene ?? currentFiles.sketchScene,
       sketchMeta:
         (sketchMeta as Record<string, unknown> | undefined) ??

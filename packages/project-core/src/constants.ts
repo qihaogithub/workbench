@@ -22,6 +22,16 @@ export const DEFAULT_DEMO_SCHEMA = JSON.stringify(
     $schema: "https://json-schema.org/draft/2020-12/schema",
     title: "Demo 配置",
     type: "object",
+    $demo: {
+      presentation: {
+        version: 1,
+        mode: "responsive-page",
+        viewport: { width: 375, height: 812 },
+        heightBehavior: "content",
+        preset: "custom",
+        source: "user",
+      },
+    },
     properties: {
       title: { type: "string", title: "标题", default: "Hello World" },
       description: {

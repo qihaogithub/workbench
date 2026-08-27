@@ -77,6 +77,7 @@ export function createPublishedPreviewStagePage({
     ...runtimeData,
     configData,
     schema,
-    previewSize: page.previewSize,
+    presentation: page.presentation,
+    previewSize: page.presentation?.viewport ?? page.previewSize,
   };
 }

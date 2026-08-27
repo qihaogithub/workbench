@@ -1,12 +1,6 @@
 "use client";
 
-import React, {
-  lazy,
-  Suspense,
-  useState,
-  useCallback,
-  useRef,
-} from "react";
+import React, { lazy, Suspense, useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Trash2, Lock, ExternalLink, Unlink } from "lucide-react";
 import { CanvasSelectionBox } from "./CanvasSelectionBox";
@@ -18,7 +12,9 @@ import { cn } from "./utils";
 import { PreviewPanel } from "./PreviewPanel";
 import { PrototypePagePreview } from "./PrototypePagePreview";
 import { IframePreviewFrame } from "./IframePreviewFrame";
+import { SandboxedHtmlFrame } from "./SandboxedHtmlFrame";
 import { resolvePagePreviewRenderer } from "./preview-stage-resolver";
+import { PageNavigationOverlay } from "./PageNavigationOverlay";
 import type {
   CanvasPageLayout,
   CanvasPageData,
@@ -27,6 +23,8 @@ import type {
   CanvasPageRenderMode,
   PositionableSizeItem,
   ScreenshotRenderBox,
+  CanvasNavigationHotspot,
+  CanvasNavigationConnection,
 } from "./types";
 
 const SketchPagePreview = lazy(() =>
@@ -59,7 +57,7 @@ interface CanvasPageItemProps {
   className?: string;
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
   onError?: (error: Error) => void;
-  onDragStart?: (pageId: string) => void;
+  onDragStart?: (pageId: string, options?: { copy?: boolean }) => void;
   onDragMove?: (
     pageId: string,
     layout: CanvasPageLayout,
@@ -68,6 +66,25 @@ interface CanvasPageItemProps {
   onDragEnd?: () => void;
   toolMode?: CanvasToolMode;
   onPositionableSizes?: (sizes: Record<string, PositionableSizeItem>) => void;
+  navigationPages?: CanvasPageData[];
+  navigationHotspots?: CanvasNavigationHotspot[];
+  navigationConnections?: CanvasNavigationConnection[];
+  navigationActive?: boolean;
+  showNavigationHotspots?: boolean;
+  onCreateNavigation?: (
+    pageId: string,
+    rect: CanvasNavigationHotspot["rect"],
+    targetPageId: string,
+  ) => void;
+  onUpdateNavigationHotspot?: (
+    hotspotId: string,
+    rect: CanvasNavigationHotspot["rect"],
+  ) => void;
+  onUpdateNavigationTarget?: (hotspotId: string, targetPageId: string) => void;
+  onDeleteNavigationHotspot?: (hotspotId: string) => void;
+  onNavigationHover?: (pageId: string | null) => void;
+  hasNavigationRelations?: boolean;
+  onDeleteNavigationRelations?: (pageId: string) => void;
 }
 
 interface CanvasPagePreviewContentProps {
@@ -308,7 +325,13 @@ export function CanvasPagePreviewContent({
 
   React.useEffect(() => {
     setIframeContentLoaded(false);
-  }, [renderMode, page.code, page.compiledJsUrl, page.iframeUrl, page.configData]);
+  }, [
+    renderMode,
+    page.code,
+    page.compiledJsUrl,
+    page.iframeUrl,
+    page.configData,
+  ]);
 
   React.useEffect(() => {
     if (!screenshotRenderBox) return;
@@ -333,12 +356,12 @@ export function CanvasPagePreviewContent({
   const shouldRenderSketch =
     renderMode === "prototype" && resolvedRenderer === "sketch";
   const shouldRenderSnapshot =
-    (renderMode === "screenshot" ||
-      renderMode === "sleeping-iframe") &&
+    (renderMode === "screenshot" || renderMode === "sleeping-iframe") &&
     !!page.snapshotHtml &&
     page.snapshotQuality !== "failed";
   const shouldRenderSandboxPlaceholder =
     resolvedRenderer === "sandbox-html" &&
+    (!page.sandboxExecutionUrl || !page.sandboxChannelId) &&
     !screenshotUrl &&
     !shouldRenderSnapshot;
   const shouldRenderScreenshot =
@@ -349,7 +372,9 @@ export function CanvasPagePreviewContent({
       renderMode === "sleeping-iframe");
   const shouldRenderLoading =
     renderMode === "loading" ||
-    (renderMode === "sleeping-iframe" && !screenshotUrl && !shouldRenderSnapshot);
+    (renderMode === "sleeping-iframe" &&
+      !screenshotUrl &&
+      !shouldRenderSnapshot);
   const keepScreenshotVisible =
     shouldRenderScreenshot &&
     (renderMode === "screenshot" ||
@@ -431,42 +456,75 @@ export function CanvasPagePreviewContent({
         )}
 
       {shouldRenderIframe &&
+        resolvedRenderer === "sandbox-html" &&
+        page.sandboxExecutionUrl &&
+        page.sandboxChannelId && (
+          <div
+            className="absolute inset-0 h-full w-full overflow-hidden bg-white shadow-md transition-opacity duration-200 ease-out"
+            style={{
+              opacity: showIframeContent ? 1 : 0,
+              pointerEvents: "none",
+            }}
+          >
+            <SandboxedHtmlFrame
+              executionUrl={page.sandboxExecutionUrl}
+              channelId={page.sandboxChannelId}
+              title={page.name}
+              previewSize={resolvedPreviewSize}
+              heightBehavior={page.presentation?.heightBehavior}
+              fillContainer
+              onStatusChange={(status) => {
+                if (status === "ready" || status === "loaded") {
+                  handleIframeContentLoaded();
+                }
+                if (status === "error" || status === "timeout") {
+                  onError?.(new Error(`Sandbox HTML preview ${status}`));
+                }
+              }}
+              onContentHeightChange={handleContentHeightChange}
+            />
+          </div>
+        )}
+
+      {shouldRenderIframe &&
         resolvedRenderer !== "published-iframe" &&
+        resolvedRenderer !== "sandbox-html" &&
         resolvedRenderer !== "empty" && (
-        <div
-          className="absolute inset-0 h-full w-full transition-opacity duration-200 ease-out"
-          style={{
-            opacity: showIframeContent ? 1 : 0,
-            pointerEvents: "none",
-          }}
-        >
-          <PreviewPanel
-            code={page.code}
-            compiledJsUrl={page.compiledJsUrl}
-            sessionId={sessionId}
-            demoId={page.id}
-            configData={page.configData}
-            previewSize={resolvedPreviewSize}
-            fillContainer
-            containerSizeOverride={containerSizeOverride}
-            onConsoleEntry={onConsoleEntry}
-            onError={onError}
-            onContentHeightChange={handleContentHeightChange}
-            onContentLoaded={handleIframeContentLoaded}
-            activityState={
-              renderMode === "sleeping-iframe" ? "sleeping" : "active"
-            }
-            effectiveHeight={iframeEffectiveHeight}
-            onPositionableSizes={onPositionableSizes}
-          />
-        </div>
-      )}
+          <div
+            className="absolute inset-0 h-full w-full transition-opacity duration-200 ease-out"
+            style={{
+              opacity: showIframeContent ? 1 : 0,
+              pointerEvents: "none",
+            }}
+          >
+            <PreviewPanel
+              code={page.code}
+              compiledJsUrl={page.compiledJsUrl}
+              sessionId={sessionId}
+              demoId={page.id}
+              configData={page.configData}
+              previewSize={resolvedPreviewSize}
+              fillContainer
+              containerSizeOverride={containerSizeOverride}
+              onConsoleEntry={onConsoleEntry}
+              onError={onError}
+              onContentHeightChange={handleContentHeightChange}
+              onContentLoaded={handleIframeContentLoaded}
+              activityState={
+                renderMode === "sleeping-iframe" ? "sleeping" : "active"
+              }
+              effectiveHeight={iframeEffectiveHeight}
+              onPositionableSizes={onPositionableSizes}
+            />
+          </div>
+        )}
 
       {shouldRenderSnapshot && (
         <div
           className="absolute inset-0 h-full w-full overflow-hidden bg-white shadow-md pointer-events-none transition-opacity duration-200 ease-out"
           style={{
-            opacity: renderMode === "screenshot" || !iframeContentLoaded ? 1 : 0,
+            opacity:
+              renderMode === "screenshot" || !iframeContentLoaded ? 1 : 0,
           }}
         >
           <PrototypePagePreview
@@ -545,6 +603,18 @@ export function CanvasPageItem({
   onDragEnd,
   toolMode = "hand",
   onPositionableSizes,
+  navigationPages,
+  navigationHotspots,
+  navigationConnections,
+  navigationActive = false,
+  showNavigationHotspots = false,
+  onCreateNavigation,
+  onUpdateNavigationHotspot,
+  onUpdateNavigationTarget,
+  onDeleteNavigationHotspot,
+  onNavigationHover,
+  hasNavigationRelations = false,
+  onDeleteNavigationRelations,
 }: CanvasPageItemProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
@@ -646,7 +716,7 @@ export function CanvasPageItem({
       setIsDragging(true);
       startPosRef.current = { x: e.clientX, y: e.clientY };
       layoutStartRef.current = { ...layoutRef.current };
-      onDragStart?.(page.id);
+      onDragStart?.(page.id, { copy: e.altKey });
     },
     [canInteract, page.id, onConfigEdit, onDragStart],
   );
@@ -802,8 +872,12 @@ export function CanvasPageItem({
       onPointerMove={handleDragPointerMove}
       onPointerUp={handleDragPointerUp}
       onLostPointerCapture={handleLostPointerCapture}
-      onMouseEnter={() => setIsHovering(true)}
+      onMouseEnter={() => {
+        setIsHovering(true);
+        onNavigationHover?.(page.id);
+      }}
       onMouseLeave={() => {
+        onNavigationHover?.(null);
         if (!isDragging && !isResizing) {
           setIsHovering(false);
           setHoveredEdge(null);
@@ -849,6 +923,22 @@ export function CanvasPageItem({
           />
         )}
       </div>
+
+      <PageNavigationOverlay
+        pageId={page.id}
+        pages={navigationPages ?? []}
+        hotspots={navigationHotspots}
+        connections={navigationConnections}
+        enabled={navigationActive}
+        visible={showNavigationHotspots}
+        editable={editable}
+        onCreate={(rect, targetPageId) =>
+          onCreateNavigation?.(page.id, rect, targetPageId)
+        }
+        onUpdateHotspot={onUpdateNavigationHotspot}
+        onUpdateTarget={onUpdateNavigationTarget}
+        onDeleteHotspot={onDeleteNavigationHotspot}
+      />
 
       {onCommentSelect && (
         <button
@@ -1014,13 +1104,27 @@ export function CanvasPageItem({
                         width: defaultSize.width,
                         height: defaultSize.height,
                         sizeMode: "preview",
-                        previewSizeKey: getCanvasPreviewSizeKey(page.previewSize),
+                        previewSizeKey: getCanvasPreviewSizeKey(
+                          page.previewSize,
+                        ),
                       });
                       setContextMenu(null);
                     }}
                   >
                     重置大小
                   </button>
+                  {hasNavigationRelations && onDeleteNavigationRelations && (
+                    <button
+                      type="button"
+                      className="w-full px-3 py-1.5 text-left text-sm hover:bg-muted"
+                      onClick={() => {
+                        onDeleteNavigationRelations(page.id);
+                        setContextMenu(null);
+                      }}
+                    >
+                      删除页面跳转关系
+                    </button>
+                  )}
                   {onRequestDelete && (
                     <button
                       type="button"
@@ -1052,7 +1156,9 @@ export function CanvasPageItem({
                         width: defaultSize.width,
                         height: defaultSize.height,
                         sizeMode: "preview",
-                        previewSizeKey: getCanvasPreviewSizeKey(page.previewSize),
+                        previewSizeKey: getCanvasPreviewSizeKey(
+                          page.previewSize,
+                        ),
                       });
                       setContextMenu(null);
                     }}

@@ -10,14 +10,14 @@ import type {
   MultiDemoFiles,
   PrototypePageMeta,
   ResourceVersion,
-} from '@workbench/shared';
+} from "@workbench/shared";
 import type {
   RuntimeValidationResult,
   SketchPatchVersionSummary,
   ProjectRestoreResult,
-} from '@workbench/project-core';
+} from "@workbench/project-core";
 
-import { getBrowserAgentServiceUrl } from './runtime-config';
+import { getBrowserAgentServiceUrl } from "./runtime-config";
 
 /**
  * 项目级共享配置 Schema 响应
@@ -49,7 +49,9 @@ interface ResourceVersionDetailPayload {
   content?: unknown;
 }
 
-function pageVersionInfoFromResource(version: ResourceVersion): PageVersionInfo {
+function pageVersionInfoFromResource(
+  version: ResourceVersion,
+): PageVersionInfo {
   const metadata = version.metadata as { page?: DemoPageMeta };
   return {
     versionId: version.id,
@@ -98,10 +100,20 @@ export interface UpdateDemoPageFilesResult {
   imageLocalization?: ImageLocalizationResult;
 }
 
-export interface HtmlImportPageResult {
-  page: DemoPageMeta;
+export interface PreparedHtmlImport {
+  draftId: string;
+  filename: string;
+  name: string;
   analysis: import("@workbench/project-core").HtmlImportAnalysis;
-  warnings: import("@workbench/project-core").HtmlImportWarning[];
+  recommendation: import("@workbench/shared").PagePresentationProfile;
+  confirmationRequired: boolean;
+  execution?: { executionUrl: string; channelId: string; expiresAt: number };
+}
+
+export interface CommittedHtmlImport {
+  page: DemoPageMeta;
+  presentation: import("@workbench/shared").PagePresentationProfile;
+  idempotentReplay?: boolean;
 }
 
 /**
@@ -147,11 +159,11 @@ export class ProjectApiClient {
    */
   async getVersionHistory(projectId: string): Promise<VersionHistoryResponse> {
     const response = await this.request<VersionHistoryResponse>(
-      `/api/projects/${projectId}/versions`
+      `/api/projects/${projectId}/versions`,
     );
 
     if (!response.success || !response.data) {
-      throw new Error(response.error?.message || '获取版本历史失败');
+      throw new Error(response.error?.message || "获取版本历史失败");
     }
 
     return response.data;
@@ -165,7 +177,7 @@ export class ProjectApiClient {
       `/api/projects/${projectId}/resources/page/${demoId}/versions`,
     );
     if (!response.success || !response.data) {
-      throw new Error(response.error?.message || '获取页面版本历史失败');
+      throw new Error(response.error?.message || "获取页面版本历史失败");
     }
     return {
       projectId,
@@ -188,14 +200,14 @@ export class ProjectApiClient {
     const response = await this.localRequest<ResourceVersion>(
       `/api/projects/${projectId}/resources/page/${demoId}/versions`,
       {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify(request ?? {}),
       },
     );
     if (!response.success || !response.data) {
       throw new ProjectApiError(
-        response.error?.code || 'FILE_WRITE_ERROR',
-        response.error?.message || '创建页面版本失败',
+        response.error?.code || "FILE_WRITE_ERROR",
+        response.error?.message || "创建页面版本失败",
         response.error?.details,
       );
     }
@@ -211,7 +223,7 @@ export class ProjectApiClient {
       `/api/projects/${projectId}/resources/page/${demoId}/versions/${versionId}`,
     );
     if (!response.success || !response.data) {
-      throw new Error(response.error?.message || '读取页面版本失败');
+      throw new Error(response.error?.message || "读取页面版本失败");
     }
     return response.data.content as DemoFiles;
   }
@@ -225,12 +237,12 @@ export class ProjectApiClient {
     const response = await this.localRequest<RestorePageVersionResponse>(
       `/api/projects/${projectId}/resources/page/${demoId}/versions/${versionId}`,
       {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify(request ?? {}),
       },
     );
     if (!response.success || !response.data) {
-      throw new Error(response.error?.message || '恢复页面版本失败');
+      throw new Error(response.error?.message || "恢复页面版本失败");
     }
     return response.data;
   }
@@ -243,12 +255,12 @@ export class ProjectApiClient {
     const response = await this.localRequest<ProjectRestoreResult>(
       `/api/projects/${projectId}/versions/${versionId}/restore`,
       {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify(request ?? {}),
       },
     );
     if (!response.success || !response.data) {
-      throw new Error(response.error?.message || '恢复项目版本失败');
+      throw new Error(response.error?.message || "恢复项目版本失败");
     }
     return response.data;
   }
@@ -260,10 +272,10 @@ export class ProjectApiClient {
    */
   async listDemoPages(projectId: string): Promise<DemoPageMeta[]> {
     const response = await this.localRequest<{ demoPages: DemoPageMeta[] }>(
-      `/api/projects/${projectId}/demos`
+      `/api/projects/${projectId}/demos`,
     );
     if (!response.success || !response.data) {
-      throw new Error(response.error?.message || '获取页面列表失败');
+      throw new Error(response.error?.message || "获取页面列表失败");
     }
     return response.data.demoPages;
   }
@@ -281,26 +293,26 @@ export class ProjectApiClient {
     const response = await this.localRequest<DemoPageMeta>(
       `/api/projects/${projectId}/demos`,
       {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify({ sessionId, name, parentId, runtimeType }),
-      }
+      },
     );
     if (!response.success || !response.data) {
-      throw new Error(response.error?.message || '创建页面失败');
+      throw new Error(response.error?.message || "创建页面失败");
     }
     return response.data;
   }
 
-  async importHtmlPage(
+  async prepareHtmlImport(
     projectId: string,
     sessionId: string,
     filename: string,
     html: string,
     name?: string,
     parentId?: string | null,
-  ): Promise<HtmlImportPageResult> {
-    const response = await this.localRequest<HtmlImportPageResult>(
-      `/api/projects/${projectId}/imports/html`,
+  ): Promise<PreparedHtmlImport> {
+    const response = await this.localRequest<PreparedHtmlImport>(
+      `/api/projects/${projectId}/imports/html/prepare`,
       {
         method: "POST",
         body: JSON.stringify({ sessionId, filename, html, name, parentId }),
@@ -309,22 +321,68 @@ export class ProjectApiClient {
     if (!response.success || !response.data) {
       throw new ProjectApiError(
         response.error?.code || "HTML_IMPORT_INVALID",
-        response.error?.message || "导入 HTML 页面失败",
+        response.error?.message || "准备 HTML 导入失败",
         response.error?.details,
       );
     }
     return response.data;
   }
 
+  async commitHtmlImport(
+    projectId: string,
+    sessionId: string,
+    draftId: string,
+    presentation: import("@workbench/shared").PagePresentationProfile,
+    name?: string,
+    confirmationAccepted = false,
+  ): Promise<CommittedHtmlImport> {
+    const response = await this.localRequest<CommittedHtmlImport>(
+      `/api/projects/${projectId}/imports/html/commit`,
+      {
+        method: "POST",
+        body: JSON.stringify({ sessionId, draftId, presentation, name, confirmationAccepted }),
+      },
+    );
+    if (!response.success || !response.data) {
+      throw new ProjectApiError(
+        response.error?.code || "HTML_IMPORT_INVALID",
+        response.error?.message || "提交 HTML 导入失败",
+        response.error?.details,
+      );
+    }
+    return response.data;
+  }
+
+  async cancelHtmlImport(
+    projectId: string,
+    sessionId: string,
+    draftId: string,
+  ): Promise<void> {
+    const response = await this.localRequest<{ cancelled: true }>(
+      `/api/projects/${projectId}/imports/html/cancel`,
+      { method: "POST", body: JSON.stringify({ sessionId, draftId }) },
+    );
+    if (!response.success) {
+      throw new ProjectApiError(
+        response.error?.code || "HTML_IMPORT_INVALID",
+        response.error?.message || "取消 HTML 导入失败",
+        response.error?.details,
+      );
+    }
+  }
+
   /**
    * 获取单个 Demo 页面元信息
    */
-  async getDemoPageMeta(projectId: string, demoId: string): Promise<DemoPageMeta> {
+  async getDemoPageMeta(
+    projectId: string,
+    demoId: string,
+  ): Promise<DemoPageMeta> {
     const response = await this.localRequest<DemoPageMeta>(
-      `/api/projects/${projectId}/demos/${demoId}`
+      `/api/projects/${projectId}/demos/${demoId}`,
     );
     if (!response.success || !response.data) {
-      throw new Error(response.error?.message || '获取页面元信息失败');
+      throw new Error(response.error?.message || "获取页面元信息失败");
     }
     return response.data;
   }
@@ -350,12 +408,12 @@ export class ProjectApiClient {
     const response = await this.localRequest<UpdateDemoPageFilesResult>(
       `/api/sessions/${sessionId}/files/${demoId}`,
       {
-        method: 'PUT',
+        method: "PUT",
         body: JSON.stringify(files),
-      }
+      },
     );
     if (!response.success) {
-      throw new Error(response.error?.message || '更新页面文件失败');
+      throw new Error(response.error?.message || "更新页面文件失败");
     }
     return response.data ?? {};
   }
@@ -372,12 +430,12 @@ export class ProjectApiClient {
     const response = await this.localRequest<DemoPageMeta[]>(
       `/api/projects/${projectId}/reference-pages`,
       {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify({ sourceProjectId, sourcePageIds, sessionId }),
-      }
+      },
     );
     if (!response.success || !response.data) {
-      throw new Error(response.error?.message || '创建引用页失败');
+      throw new Error(response.error?.message || "创建引用页失败");
     }
     return response.data;
   }
@@ -412,10 +470,10 @@ export class ProjectApiClient {
       sketchMeta?: Record<string, unknown>;
     }>(
       `/api/projects/${projectId}/reference-page/${pageId}?sessionId=${sessionId}`,
-      { method: 'GET' },
+      { method: "GET" },
     );
     if (!response.success || !response.data) {
-      throw new Error(response.error?.message || '获取引用页内容失败');
+      throw new Error(response.error?.message || "获取引用页内容失败");
     }
     return response.data;
   }
@@ -432,12 +490,12 @@ export class ProjectApiClient {
     const response = await this.localRequest<DemoPageMeta>(
       `/api/projects/${projectId}/demos/${demoId}`,
       {
-        method: 'PATCH',
+        method: "PATCH",
         body: JSON.stringify({ sessionId, ...patch }),
-      }
+      },
     );
     if (!response.success || !response.data) {
-      throw new Error(response.error?.message || '更新页面元数据失败');
+      throw new Error(response.error?.message || "更新页面元数据失败");
     }
     return response.data;
   }
@@ -452,10 +510,10 @@ export class ProjectApiClient {
   ): Promise<void> {
     const response = await this.localRequest<null>(
       `/api/projects/${projectId}/demos/${demoId}?sessionId=${encodeURIComponent(sessionId)}`,
-      { method: 'DELETE' }
+      { method: "DELETE" },
     );
     if (!response.success) {
-      throw new Error(response.error?.message || '删除页面失败');
+      throw new Error(response.error?.message || "删除页面失败");
     }
   }
 
@@ -466,10 +524,10 @@ export class ProjectApiClient {
    */
   async getProjectConfig(projectId: string): Promise<ProjectConfigSchema> {
     const response = await this.localRequest<ProjectConfigSchema>(
-      `/api/projects/${projectId}/config`
+      `/api/projects/${projectId}/config`,
     );
     if (!response.success || !response.data) {
-      throw new Error(response.error?.message || '获取项目配置失败');
+      throw new Error(response.error?.message || "获取项目配置失败");
     }
     return response.data;
   }
@@ -482,15 +540,15 @@ export class ProjectApiClient {
     schema: string,
     sessionId: string,
   ): Promise<void> {
-    const response = await this.localRequest<{ schema: string; exists: boolean }>(
-      `/api/projects/${projectId}/config`,
-      {
-        method: 'PUT',
-        body: JSON.stringify({ sessionId, schema }),
-      }
-    );
+    const response = await this.localRequest<{
+      schema: string;
+      exists: boolean;
+    }>(`/api/projects/${projectId}/config`, {
+      method: "PUT",
+      body: JSON.stringify({ sessionId, schema }),
+    });
     if (!response.success) {
-      throw new Error(response.error?.message || '更新项目配置失败');
+      throw new Error(response.error?.message || "更新项目配置失败");
     }
   }
 
@@ -503,10 +561,10 @@ export class ProjectApiClient {
   ): Promise<void> {
     const response = await this.localRequest<{ removed: boolean }>(
       `/api/projects/${projectId}/config?sessionId=${encodeURIComponent(sessionId)}`,
-      { method: 'DELETE' }
+      { method: "DELETE" },
     );
     if (!response.success) {
-      throw new Error(response.error?.message || '删除项目配置失败');
+      throw new Error(response.error?.message || "删除项目配置失败");
     }
   }
 
@@ -517,10 +575,10 @@ export class ProjectApiClient {
    */
   async listFolders(projectId: string): Promise<DemoFolderMeta[]> {
     const response = await this.localRequest<{ folders: DemoFolderMeta[] }>(
-      `/api/projects/${projectId}/folders`
+      `/api/projects/${projectId}/folders`,
     );
     if (!response.success || !response.data) {
-      throw new Error(response.error?.message || '获取文件夹列表失败');
+      throw new Error(response.error?.message || "获取文件夹列表失败");
     }
     return response.data.folders;
   }
@@ -537,12 +595,12 @@ export class ProjectApiClient {
     const response = await this.localRequest<DemoFolderMeta>(
       `/api/projects/${projectId}/folders`,
       {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify({ sessionId, name, parentId }),
-      }
+      },
     );
     if (!response.success || !response.data) {
-      throw new Error(response.error?.message || '创建文件夹失败');
+      throw new Error(response.error?.message || "创建文件夹失败");
     }
     return response.data;
   }
@@ -559,12 +617,12 @@ export class ProjectApiClient {
     const response = await this.localRequest<DemoFolderMeta>(
       `/api/projects/${projectId}/folders/${folderId}`,
       {
-        method: 'PATCH',
+        method: "PATCH",
         body: JSON.stringify({ sessionId, ...patch }),
-      }
+      },
     );
     if (!response.success || !response.data) {
-      throw new Error(response.error?.message || '更新文件夹失败');
+      throw new Error(response.error?.message || "更新文件夹失败");
     }
     return response.data;
   }
@@ -580,10 +638,10 @@ export class ProjectApiClient {
   ): Promise<string[]> {
     const response = await this.localRequest<{ deletedPageIds: string[] }>(
       `/api/projects/${projectId}/folders/${folderId}?sessionId=${encodeURIComponent(sessionId)}&deleteContents=${deleteContents}`,
-      { method: 'DELETE' }
+      { method: "DELETE" },
     );
     if (!response.success) {
-      throw new Error(response.error?.message || '删除文件夹失败');
+      throw new Error(response.error?.message || "删除文件夹失败");
     }
     return response.data?.deletedPageIds ?? [];
   }
@@ -600,18 +658,21 @@ export class ProjectApiClient {
     const response = await this.localRequest<null>(
       `/api/projects/${projectId}/demo-pages/reorder`,
       {
-        method: 'PATCH',
+        method: "PATCH",
         body: JSON.stringify({ sessionId, pages, folders }),
-      }
+      },
     );
     if (!response.success) {
-      throw new Error(response.error?.message || '批量排序失败');
+      throw new Error(response.error?.message || "批量排序失败");
     }
   }
 
   // ============ 发布管理 ============
 
-  async publishProject(projectId: string, request?: { sessionId?: string; workspaceId?: string }): Promise<{
+  async publishProject(
+    projectId: string,
+    request?: { sessionId?: string; workspaceId?: string },
+  ): Promise<{
     projectId: string;
     publishedVersion: string;
     commitId?: string;
@@ -630,15 +691,12 @@ export class ProjectApiClient {
       publishedAt: number;
       demoCount: number;
       duration: number;
-    }>(
-      `/api/projects/${projectId}/publish`,
-      {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }
-    );
+    }>(`/api/projects/${projectId}/publish`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
     if (!response.success || !response.data) {
-      throw new Error(response.error?.message || '发布失败');
+      throw new Error(response.error?.message || "发布失败");
     }
     return response.data;
   }
@@ -649,7 +707,7 @@ export class ProjectApiClient {
     publishedAt: number | null;
     currentVersion: string | null;
     hasUnpublishedChanges: boolean;
-    status: 'never_published' | 'published' | 'unpublished_changes';
+    status: "never_published" | "published" | "unpublished_changes";
   }> {
     const response = await this.localRequest<{
       projectId: string;
@@ -657,12 +715,10 @@ export class ProjectApiClient {
       publishedAt: number | null;
       currentVersion: string | null;
       hasUnpublishedChanges: boolean;
-      status: 'never_published' | 'published' | 'unpublished_changes';
-    }>(
-      `/api/projects/${projectId}/publish-status`
-    );
+      status: "never_published" | "published" | "unpublished_changes";
+    }>(`/api/projects/${projectId}/publish-status`);
     if (!response.success || !response.data) {
-      throw new Error(response.error?.message || '获取发布状态失败');
+      throw new Error(response.error?.message || "获取发布状态失败");
     }
     return response.data;
   }
@@ -670,10 +726,10 @@ export class ProjectApiClient {
   async unpublishProject(projectId: string): Promise<{ projectId: string }> {
     const response = await this.localRequest<{ projectId: string }>(
       `/api/projects/${projectId}/publish`,
-      { method: 'DELETE' },
+      { method: "DELETE" },
     );
     if (!response.success || !response.data) {
-      throw new Error(response.error?.message || '撤销发布失败');
+      throw new Error(response.error?.message || "撤销发布失败");
     }
     return response.data;
   }
@@ -683,12 +739,14 @@ export class ProjectApiClient {
   /**
    * 获取 Session 关联 workspace 的全部页面文件
    */
-  async getSessionMultiDemoFiles(sessionId: string): Promise<SessionMultiDemoFiles> {
+  async getSessionMultiDemoFiles(
+    sessionId: string,
+  ): Promise<SessionMultiDemoFiles> {
     const response = await this.localRequest<SessionMultiDemoFiles>(
-      `/api/sessions/${sessionId}/files`
+      `/api/sessions/${sessionId}/files`,
     );
     if (!response.success || !response.data) {
-      throw new Error(response.error?.message || '读取 Session 文件失败');
+      throw new Error(response.error?.message || "读取 Session 文件失败");
     }
     return response.data;
   }
@@ -701,10 +759,10 @@ export class ProjectApiClient {
     demoId: string,
   ): Promise<DemoFiles> {
     const response = await this.localRequest<DemoFiles>(
-      `/api/sessions/${sessionId}/files/${demoId}`
+      `/api/sessions/${sessionId}/files/${demoId}`,
     );
     if (!response.success || !response.data) {
-      throw new Error(response.error?.message || '读取页面文件失败');
+      throw new Error(response.error?.message || "读取页面文件失败");
     }
     return response.data;
   }
@@ -720,12 +778,12 @@ export class ProjectApiClient {
     const response = await this.localRequest<null>(
       `/api/sessions/${sessionId}/files/${demoId}`,
       {
-        method: 'PUT',
+        method: "PUT",
         body: JSON.stringify(files),
-      }
+      },
     );
     if (!response.success) {
-      throw new Error(response.error?.message || '更新页面文件失败');
+      throw new Error(response.error?.message || "更新页面文件失败");
     }
   }
 
@@ -734,15 +792,16 @@ export class ProjectApiClient {
     demoId: string,
     request: SwitchSessionDemoPageRuntimeRequest,
   ): Promise<SwitchSessionDemoPageRuntimeResponse> {
-    const response = await this.localRequest<SwitchSessionDemoPageRuntimeResponse>(
-      `/api/projects/${projectId}/demos/${demoId}/runtime`,
-      {
-        method: 'PUT',
-        body: JSON.stringify(request),
-      },
-    );
+    const response =
+      await this.localRequest<SwitchSessionDemoPageRuntimeResponse>(
+        `/api/projects/${projectId}/demos/${demoId}/runtime`,
+        {
+          method: "PUT",
+          body: JSON.stringify(request),
+        },
+      );
     if (!response.success || !response.data) {
-      throw new Error(response.error?.message || '切换页面类型失败');
+      throw new Error(response.error?.message || "切换页面类型失败");
     }
     return response.data;
   }
@@ -750,11 +809,14 @@ export class ProjectApiClient {
   /**
    * 通用请求方法（Next.js 本地路由，使用相对路径）
    */
-  private async localRequest<T>(path: string, options?: RequestInit): Promise<ApiResponse<T>> {
+  private async localRequest<T>(
+    path: string,
+    options?: RequestInit,
+  ): Promise<ApiResponse<T>> {
     try {
       const response = await fetch(path, {
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           ...options?.headers,
         },
         ...options,
@@ -766,8 +828,8 @@ export class ProjectApiClient {
       return {
         success: false,
         error: {
-          code: 'NETWORK_ERROR',
-          message: error instanceof Error ? error.message : '网络请求失败',
+          code: "NETWORK_ERROR",
+          message: error instanceof Error ? error.message : "网络请求失败",
         },
       };
     }
@@ -776,11 +838,14 @@ export class ProjectApiClient {
   /**
    * 通用请求方法
    */
-  private async request<T>(path: string, options?: RequestInit): Promise<ApiResponse<T>> {
+  private async request<T>(
+    path: string,
+    options?: RequestInit,
+  ): Promise<ApiResponse<T>> {
     try {
       const response = await fetch(`${this.baseUrl}${path}`, {
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           ...options?.headers,
         },
         ...options,
@@ -792,8 +857,8 @@ export class ProjectApiClient {
       return {
         success: false,
         error: {
-          code: 'NETWORK_ERROR',
-          message: error instanceof Error ? error.message : '网络请求失败',
+          code: "NETWORK_ERROR",
+          message: error instanceof Error ? error.message : "网络请求失败",
         },
       };
     }

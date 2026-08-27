@@ -214,6 +214,9 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h
 ## HTML sandbox 长期约定
 
 - HTML 自动判型由共享 runtime capability registry 统一维护；当前四类 runtime 为 `prototype-html-css`、`sandboxed-html`、`high-fidelity-react`、`sketch-scene`，未知 runtime 必须 fail-closed。
+- 页面持久化展示只读取 `config.schema.json.$demo.presentation`；导入 meta 只保留来源/哈希审计，不得恢复 `$demo.previewSize`、`prototype.meta.json` 或 `html-import.meta.json` 尺寸回退。renderer 内部 `previewSize` 只是 presentation 或单页临时设备的投影。
+- HTML 导入使用 prepare/commit/cancel 私有 draft 协议：prepare 不创建页面，commit 在一次 Authority mutation 中写入 runtime 文件、presentation 和页面树；取消、移除或过期必须同时清理 draft 和 execution ticket。
+- 固定 Figma 画板使用 `fixed-canvas + fixed`；普通 HTML 使用 `responsive-page + content`。单页临时设备切换、画布卡片几何和页面持久化视口三者必须保持独立。
 - `sandboxed-html` 页面 canonical 文件是 `sandbox.html` 与 `html-import.meta.json`；`sourceHash` 表示原始输入，`normalizedHash` 表示持久化归一化源码，禁止交换语义或把源码作为公开静态资源。
 - 交互预览、viewer/embed 和发布都必须使用独立 sandbox origin、5 分钟 opaque execution ticket、`allow-scripts`、CSP/Permissions-Policy/referrer/no-store；不得把 ticket、源码或宿主会话注入页面。
 - screenshot-service 对 sandbox 使用每任务独立 Chromium context，并在超时/错误时有界清理与强杀兜底。sandbox 降低权限但不承诺绝对断网、CPU/内存硬隔离或任意脚本业务等价。

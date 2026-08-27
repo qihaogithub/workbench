@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "node:crypto";
 import fs from "fs";
 import fsp from "fs/promises";
 import path from "path";
@@ -18,6 +19,8 @@ import type {
   PrototypePageMeta,
   SketchSceneDocument,
 } from "@workbench/shared";
+import { resolvePagePresentation } from "@workbench/shared";
+import { appendServerEditorDiagnosticEvent } from "@/lib/editor-diagnostics/store";
 
 const DATA_DIR = getDataDir();
 const PROJECTS_DIR = path.join(DATA_DIR, "projects");
@@ -132,7 +135,7 @@ type ThumbnailPageInput = PageSnapshotInput & {
   pageId: string;
   width?: number;
   height?: number;
-  fullPage: true;
+  fullPage: boolean;
   priority: "thumbnail";
   renderMode: "strict";
   force: boolean;
@@ -310,6 +313,7 @@ async function readProjectThumbnailPages(
     const schemaPath = path.join(pageDir, "config.schema.json");
     const pageDefaults = await readSchemaDefaults(schemaPath);
     const previewSize = await readPreviewSize(schemaPath);
+    const presentation = resolvePagePresentation((await readTextFile(schemaPath)) ?? "");
     const prototypeMeta =
       (await readJsonFile<PrototypePageMeta>(
         path.join(pageDir, "prototype.meta.json"),
@@ -327,9 +331,10 @@ async function readProjectThumbnailPages(
         imageMap,
       ),
       previewSize,
+      presentation,
       width,
       height,
-      fullPage: true,
+      fullPage: presentation?.heightBehavior !== "fixed",
       priority: "thumbnail",
       renderMode: "strict",
       force: force || !(await hasHealthyScreenshotCache(projectId, entry.name)),
@@ -394,8 +399,8 @@ async function readProjectThumbnailPages(
 async function requestScreenshotGeneration(
   projectId: string,
   pages: ThumbnailPageInput[],
-): Promise<void> {
-  await fetch(`${getScreenshotServiceUrl()}/api/screenshots/generate-batch`, {
+): Promise<{ batchId: string }> {
+  const response = await fetch(`${getScreenshotServiceUrl()}/api/screenshots/generate-batch`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -403,6 +408,14 @@ async function requestScreenshotGeneration(
       pages,
     }),
   });
+  const body = await response.json().catch(() => null) as {
+    success?: unknown;
+    data?: { batchId?: unknown };
+  } | null;
+  if (!response.ok || body?.success !== true || typeof body.data?.batchId !== "string") {
+    throw new Error("SCREENSHOT_BATCH_REJECTED");
+  }
+  return { batchId: body.data.batchId };
 }
 
 function toResponsePage(page: ThumbnailPageInput): {
@@ -467,9 +480,26 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      await requestScreenshotGeneration(projectId, pagesToGenerate);
-    } catch {
-      // 截图服务不可达时静默失败，不阻塞响应
+      const batch = await requestScreenshotGeneration(projectId, pagesToGenerate);
+      appendServerEditorDiagnosticEvent({
+        level: "info",
+        eventGroup: "preview",
+        eventType: "sandbox.screenshot.queued",
+        projectId,
+        payload: {
+          pageCount: pagesToGenerate.length,
+          sandboxPageCount: pagesToGenerate.filter((page) => page.runtimeType === "sandboxed-html").length,
+          batchIdHash: crypto.createHash("sha256").update(batch.batchId).digest("hex"),
+        },
+      });
+    } catch (error) {
+      appendServerEditorDiagnosticEvent({
+        level: "error",
+        eventGroup: "preview",
+        eventType: "sandbox.screenshot.request_failed",
+        projectId,
+        payload: { errorCode: error instanceof Error ? error.name : "SCREENSHOT_REQUEST_FAILED" },
+      });
     }
 
     return NextResponse.json({

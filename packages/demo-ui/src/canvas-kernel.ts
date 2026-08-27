@@ -9,6 +9,7 @@ import type {
   CanvasToolMode,
   CanvasViewportState,
 } from "./types";
+import { normalizeCanvasSections } from "./canvas-section";
 
 export interface CanvasPoint {
   x: number;
@@ -130,6 +131,10 @@ export function withCanvasAnnotationNodes(
 
 export function normalizeCanvasStateLayers(state: CanvasState): CanvasState {
   const annotationNodes = getAnnotationsFromCanvasState(state);
+  const sections = normalizeCanvasSections(state.sections, {
+    pages: state.pages,
+    nodes: annotationNodes,
+  });
   const documents = Object.fromEntries(
     Object.entries(annotationNodes).filter(
       (entry): entry is [string, Extract<CanvasFreeNode, { kind: "document" }>] =>
@@ -151,6 +156,7 @@ export function normalizeCanvasStateLayers(state: CanvasState): CanvasState {
     ...state,
     nodes: annotationNodes,
     layers,
+    sections,
   };
 }
 

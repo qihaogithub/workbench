@@ -1,5 +1,5 @@
 import type { SketchSceneDocument } from "@workbench/sketch-core";
-import type { DemoFolderMeta, DemoPageMeta, DemoPageRuntimeType, KnowledgeIndexItem } from "@workbench/shared";
+import type { DemoFolderMeta, DemoPageMeta, DemoPageRuntimeType, KnowledgeIndexItem, PagePresentationProfile } from "@workbench/shared";
 import type { CanvasState } from "@workbench/demo-ui";
 
 export type PublishedPageRuntimeType =
@@ -26,6 +26,7 @@ export interface PublishedDemoPage {
   iframeHtmlPath?: string;
   schemaPath?: string;
   previewSize?: PreviewSize;
+  presentation?: PagePresentationProfile;
   screenshotPath?: string;
   prototypeHtml?: string;
   prototypeCss?: string;

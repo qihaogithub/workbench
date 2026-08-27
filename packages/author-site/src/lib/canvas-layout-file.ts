@@ -6,9 +6,12 @@ import type {
   CanvasLayersState,
   CanvasPageLayout,
   CanvasPageGroup,
+  CanvasSection,
+  CanvasSectionChild,
+  CanvasSectionStyle,
   CanvasState,
 } from "@workbench/demo-ui";
-import { normalizeCanvasStateLayers } from "@workbench/demo-ui";
+import { normalizeCanvasStateLayers, parseCanvasNavigation } from "@workbench/demo-ui";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -231,6 +234,79 @@ function parseCanvasPageGroups(
   return groups;
 }
 
+function parseCanvasSectionChildren(value: unknown): CanvasSectionChild[] | null {
+  if (!Array.isArray(value) || value.length > 1000) return null;
+  const children: CanvasSectionChild[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) return null;
+    const kind = readString(item, "kind");
+    const id = readString(item, "id");
+    if (!id || id.length > 160 || (kind !== "page" && kind !== "node" && kind !== "section")) {
+      return null;
+    }
+    children.push({ kind, id });
+  }
+  return children;
+}
+
+function parseCanvasSectionStyle(value: unknown): CanvasSectionStyle | undefined | null {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return null;
+  const stringField = (key: string): string | undefined | null => {
+    if (value[key] === undefined) return undefined;
+    const field = readString(value, key);
+    return field === null || field.length > 64 ? null : field;
+  };
+  const fill = stringField("fill");
+  const stroke = stringField("stroke");
+  const titleColor = stringField("titleColor");
+  if (fill === null || stroke === null || titleColor === null) return null;
+  const strokeWidth = readNumber(value, "strokeWidth");
+  const opacity = readNumber(value, "opacity");
+  const cornerRadius = readNumber(value, "cornerRadius");
+  if ((strokeWidth !== null && (strokeWidth < 0 || strokeWidth > 64)) ||
+      (opacity !== null && (opacity < 0 || opacity > 1)) ||
+      (cornerRadius !== null && (cornerRadius < 0 || cornerRadius > 10000))) return null;
+  return {
+    ...(fill ? { fill } : {}),
+    ...(stroke ? { stroke } : {}),
+    ...(strokeWidth !== null ? { strokeWidth } : {}),
+    ...(opacity !== null ? { opacity } : {}),
+    ...(cornerRadius !== null ? { cornerRadius } : {}),
+    ...(titleColor ? { titleColor } : {}),
+  };
+}
+
+/** Invalid individual Sections are ignored so a damaged container cannot hide pages. */
+function parseCanvasSections(value: unknown): Record<string, CanvasSection> | undefined {
+  if (!isRecord(value)) return undefined;
+  const sections: Record<string, CanvasSection> = {};
+  for (const [sectionId, sectionValue] of Object.entries(value)) {
+    if (!isRecord(sectionValue)) continue;
+    const id = readString(sectionValue, "id");
+    const title = readString(sectionValue, "title");
+    const layout = parseLayout(sectionValue.layout);
+    const children = parseCanvasSectionChildren(sectionValue.children);
+    const style = parseCanvasSectionStyle(sectionValue.style);
+    const createdAt = readNumber(sectionValue, "createdAt");
+    const updatedAt = readNumber(sectionValue, "updatedAt");
+    if (!id || id !== sectionId || !id.startsWith("section_") || !title || title.length > 120 ||
+        sectionValue.kind !== "section" || !layout || !children || style === null ||
+        createdAt === null || updatedAt === null) continue;
+    sections[id] = {
+      id,
+      kind: "section",
+      title,
+      layout,
+      children,
+      ...(style ? { style } : {}),
+      createdAt,
+      updatedAt,
+    };
+  }
+  return sections;
+}
+
 function parseKnowledgeDocument(value: unknown):
   | {
       id: string;
@@ -315,6 +391,9 @@ export function parseCanvasState(value: unknown): CanvasState | null {
   const hiddenPageIds = readStringArray(value, "hiddenPageIds") ?? undefined;
   const pageGroups = parseCanvasPageGroups(value.pageGroups);
   if (pageGroups === null) return null;
+  const sections = parseCanvasSections(value.sections);
+  const navigation = parseCanvasNavigation(value.navigation, new Set(Object.keys(pages)));
+  if (navigation === null) return null;
 
   return normalizeCanvasStateLayers({
     viewport: {
@@ -324,10 +403,12 @@ export function parseCanvasState(value: unknown): CanvasState | null {
     },
     pages,
     ...(pageGroups ? { pageGroups } : {}),
+    ...(sections ? { sections } : {}),
     ...(hiddenPageIds ? { hiddenPageIds } : {}),
     ...(nodes ? { nodes } : {}),
     ...(layers ? { layers } : {}),
     ...(hiddenKnowledgeDocumentIds ? { hiddenKnowledgeDocumentIds } : {}),
+    ...(navigation ? { navigation } : {}),
   });
 }
 

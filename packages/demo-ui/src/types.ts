@@ -1,3 +1,4 @@
+import type { PagePresentationProfile } from "@workbench/shared";
 import type {
   ConsoleLogPayload,
   PositionableSizeItem,
@@ -216,7 +217,7 @@ export interface DesignSpecEntryLink {
 export type PreviewMode = "single" | "canvas" | "document";
 
 /** 画布工具模式：hand=拖动工具（仅平移画布），select=选择工具（可移动/缩放页面） */
-export type CanvasToolMode = "hand" | "select" | "text" | "image";
+export type CanvasToolMode = "hand" | "select" | "text" | "image" | "navigation" | "section";
 
 export type CanvasInteractionMode = "readonly" | "viewer" | "editor";
 
@@ -241,11 +242,37 @@ export interface CanvasViewportState {
 export interface CanvasState {
   pages: Record<string, CanvasPageLayout>;
   viewport: CanvasViewportState;
+  /** Semantic canvas containers. They never change page resources or page groups. */
+  sections?: Record<string, CanvasSection>;
   pageGroups?: Record<string, CanvasPageGroup>;
   hiddenPageIds?: string[];
   nodes?: Record<string, CanvasFreeNode>;
   layers?: CanvasLayersState;
   hiddenKnowledgeDocumentIds?: string[];
+  /** 页面间跳转说明；仅画布关系层消费，不改写页面源码。 */
+  navigation?: CanvasNavigationState;
+}
+
+export interface CanvasNavigationHotspot {
+  id: string;
+  pageId: string;
+  /** 相对于页面内容区域的归一化矩形。 */
+  rect: { x: number; y: number; width: number; height: number };
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CanvasNavigationConnection {
+  id: string;
+  source: { pageId: string; hotspotId: string };
+  target: { pageId: string };
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CanvasNavigationState {
+  hotspots: Record<string, CanvasNavigationHotspot>;
+  connections: Record<string, CanvasNavigationConnection>;
 }
 
 export type CanvasSaveStatus =
@@ -288,6 +315,8 @@ export interface CanvasPageData {
   isReference?: boolean;              // 是否为引用页
   sourceProjectId?: string;           // 引用页的源项目 ID
   previewSize?: PreviewSize;
+  /** Persisted page viewport semantics. Canvas card geometry remains separate. */
+  presentation?: PagePresentationProfile;
   order: number;
   snapshotHtml?: string;
   snapshotCss?: string;
@@ -310,6 +339,37 @@ export interface CanvasPageGroup {
   activePageId: string;
   layout: CanvasPageLayout;
   directoryCollapsed?: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type CanvasSectionChildKind = "page" | "node" | "section";
+
+export interface CanvasSectionChild {
+  kind: CanvasSectionChildKind;
+  id: string;
+}
+
+export interface CanvasSectionStyle {
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  opacity?: number;
+  cornerRadius?: number;
+  titleColor?: string;
+}
+
+/**
+ * A canvas-only organizational container. Its children retain absolute canvas
+ * coordinates, so moving or resizing a Section never mutates child layouts.
+ */
+export interface CanvasSection {
+  id: string;
+  kind: "section";
+  title: string;
+  layout: CanvasPageLayout;
+  style?: CanvasSectionStyle;
+  children: CanvasSectionChild[];
   createdAt: number;
   updatedAt: number;
 }

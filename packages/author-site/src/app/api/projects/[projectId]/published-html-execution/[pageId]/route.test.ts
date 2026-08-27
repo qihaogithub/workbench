@@ -25,7 +25,7 @@ describe("published HTML execution issuance", () => {
   });
 
   async function fixture() {
-    const { normalizeHtmlImport } = await import("@workbench/project-core");
+    const { HTML_IMPORT_ANALYSIS_VERSION, normalizeHtmlImport } = await import("@workbench/project-core");
     const html = "<!doctype html><html><body><button onclick=\"this.textContent='ok'\">go</button></body></html>";
     const normalized = normalizeHtmlImport(html);
     if (normalized.analysis.outcome.status !== "accepted" || !normalized.normalizedHash || !normalized.normalizedHtml) throw new Error("fixture rejected");
@@ -34,7 +34,7 @@ describe("published HTML execution issuance", () => {
     const version = "v-1";
     const meta = {
       source: "html-import" as const,
-      analysisVersion: 1,
+      analysisVersion: HTML_IMPORT_ANALYSIS_VERSION,
       sourceHash: normalized.analysis.sourceHash,
       normalizedHash: normalized.normalizedHash,
       sandboxPolicyVersion: 1,

@@ -22,8 +22,17 @@ vi.mock("./PreviewCanvas", () => ({
 }));
 
 vi.mock("./SinglePagePreview", () => ({
-  SinglePagePreview: ({ page }: { page?: PreviewStagePage }) => (
-    <div data-testid="single-preview">
+  SinglePagePreview: ({
+    page,
+    onRequestPasteHtmlContent,
+  }: {
+    page?: PreviewStagePage;
+    onRequestPasteHtmlContent?: (html: string) => void;
+  }) => (
+    <div
+      data-testid="single-preview"
+      data-has-html-paste-handler={String(Boolean(onRequestPasteHtmlContent))}
+    >
       {page?.id}:{page?.previewSize?.width}
     </div>
   ),
@@ -37,7 +46,7 @@ const pages: PreviewStagePage[] = [
     runtimeType: "high-fidelity-react",
     code: "export default function B() {}",
     schema: JSON.stringify({
-      $demo: { previewSize: { width: 1024, height: 768 } },
+      $demo: { presentation: { version: 1, mode: "responsive-page", viewport: { width: 1024, height: 768 }, heightBehavior: "content", preset: "custom", source: "user" } },
     }),
   },
   {
@@ -107,6 +116,17 @@ describe("PreviewStage", () => {
     expect(
       screen.getByLabelText("选择预览页面"),
     ).toHaveValue("");
+  });
+
+  it("把画布 HTML 导入回调复用到单页预览", () => {
+    renderStage({
+      canvasProps: { onRequestPasteHtmlContent: vi.fn() },
+    });
+
+    expect(screen.getByTestId("single-preview")).toHaveAttribute(
+      "data-has-html-paste-handler",
+      "true",
+    );
   });
 
   it("renderSingleContent 返回 undefined 时回退默认单页", () => {

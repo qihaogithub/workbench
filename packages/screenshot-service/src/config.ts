@@ -7,6 +7,7 @@ export const config = {
 
   authorSiteUrl:
     process.env.AUTHOR_SITE_URL || "http://localhost:4200",
+  screenshotDiagnosticsToken: process.env.SCREENSHOT_DIAGNOSTICS_TOKEN || "",
   cdnBaseUrl: process.env.CDN_BASE_URL || "https://esm.sh",
   previewRuntimeSource: process.env.PREVIEW_RUNTIME_SOURCE || "local",
 

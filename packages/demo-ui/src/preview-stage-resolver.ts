@@ -1,7 +1,6 @@
-import { getPrototypePreviewSize } from "./prototype-preview-size";
+import { getPageRuntimeCapabilities, resolvePagePresentation } from "@workbench/shared";
 import type { PreviewStagePage } from "./preview-stage-types";
 import type { PreviewSize } from "./types";
-import { getPreviewSize } from "./validator";
 
 export type PagePreviewRendererKind =
   | "sandbox-html"
@@ -19,12 +18,9 @@ function hasText(value: string | undefined): value is string {
 export function resolvePreviewStageSize(
   page: PreviewStagePage,
 ): PreviewSize | undefined {
-  return (
-    (page.schema ? getPreviewSize(page.schema) : undefined) ??
-    page.previewSize ??
-    getPrototypePreviewSize(page.prototypeMeta) ??
-    page.fallbackPreviewSize
-  );
+  const presentation = page.presentation ??
+    (page.schema ? resolvePagePresentation(page.schema) : undefined);
+  return presentation?.viewport ?? page.previewSize ?? page.fallbackPreviewSize;
 }
 
 export function normalizePreviewStagePage(
@@ -51,15 +47,17 @@ export function resolvePagePreviewRenderer(
   page: PreviewStagePage,
 ): PagePreviewRendererKind {
   const runtimeType = page.runtimeType as string | undefined;
-  if (
-    runtimeType !== undefined &&
-    !["prototype-html-css", "sandboxed-html", "sketch-scene", "high-fidelity-react"].includes(runtimeType)
-  ) {
-    return "empty";
+  let runtimeRenderer: "prototype" | "sandbox-html" | "react-module" | "sketch" | undefined;
+  if (runtimeType !== undefined) {
+    try {
+      runtimeRenderer = getPageRuntimeCapabilities(runtimeType).previewRenderer;
+    } catch {
+      return "empty";
+    }
   }
   // Runtime is the persisted authority. Never let an accidental iframe URL
   // upgrade an interactive page to the trusted/published renderer.
-  if (runtimeType === "sandboxed-html") return "sandbox-html";
+  if (runtimeRenderer === "sandbox-html") return "sandbox-html";
   if (hasText(page.iframeUrl)) return "published-iframe";
   if (page.runtimeType === "prototype-html-css") return "prototype";
   if (page.runtimeType === "sketch-scene") return "sketch";

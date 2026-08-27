@@ -38,7 +38,10 @@ import {
 import type { RuntimeValidationResult } from "@workbench/project-core";
 import { normalizeHtmlImport } from "@workbench/project-core/html-import";
 import { applyPageDesignSpecSync } from "@workbench/project-core/page-design-spec-sync";
-import { localizeHtmlImages, type ImageLocalizationResult } from "@/lib/image-localizer";
+import {
+  localizeHtmlImages,
+  type ImageLocalizationResult,
+} from "@/lib/image-localizer";
 
 type SketchPatchPayload = {
   baseSceneKey?: string;
@@ -54,9 +57,7 @@ function hashText(content: string): string {
   return crypto.createHash("sha256").update(content).digest("hex");
 }
 
-function createTrustedHtmlImportMeta(
-  source: string,
-): HtmlImportMeta | null {
+function createTrustedHtmlImportMeta(source: string): HtmlImportMeta | null {
   const normalized = normalizeHtmlImport(source);
   if (
     normalized.analysis.outcome.status !== "accepted" ||
@@ -70,7 +71,6 @@ function createTrustedHtmlImportMeta(
     sandboxPolicyVersion: 1,
     sourceHash: normalized.analysis.sourceHash,
     normalizedHash: normalized.normalizedHash ?? "",
-    viewport: normalized.analysis.detectedViewport,
   };
 }
 
@@ -495,7 +495,7 @@ export async function PUT(
           operationCount: countPatchOperations(sketchPatch),
           hasBaseSceneKey: Boolean(
             isRecord(sketchPatch) &&
-            typeof sketchPatch.baseSceneKey === "string",
+              typeof sketchPatch.baseSceneKey === "string",
           ),
         },
       });
@@ -558,15 +558,11 @@ export async function PUT(
         );
       }
       sandboxHtmlForWrite = normalized.normalizedHtml ?? sandboxHtml;
-      htmlImportMetaForWrite = createTrustedHtmlImportMeta(
-        sandboxHtml,
-      ) ?? undefined;
+      htmlImportMetaForWrite =
+        createTrustedHtmlImportMeta(sandboxHtml) ?? undefined;
     }
     let imageLocalizationResult: ImageLocalizationResult | undefined;
-    if (
-      typeof prototypeHtml === "string" &&
-      localizeImages === true
-    ) {
+    if (typeof prototypeHtml === "string" && localizeImages === true) {
       try {
         const localized = await localizeHtmlImages(prototypeHtml, meta.demoId);
         prototypeHtmlForWrite = localized.html;
@@ -849,8 +845,7 @@ export async function PUT(
             (prototypeMeta as PrototypePageMeta | undefined) ??
             currentFiles.prototypeMeta,
           sandboxHtml: sandboxHtmlForWrite ?? currentFiles.sandboxHtml,
-          htmlImportMeta:
-            htmlImportMetaForWrite ?? currentFiles.htmlImportMeta,
+          htmlImportMeta: htmlImportMetaForWrite ?? currentFiles.htmlImportMeta,
           sketchScene: sketchSceneForWrite ?? currentFiles.sketchScene,
           sketchMeta:
             (sketchMeta as Record<string, unknown> | undefined) ??
@@ -897,7 +892,10 @@ export async function PUT(
       if (typeof schema === "string")
         addTextOperation(demoResourcePath("config.schema.json"), schema);
       if (typeof prototypeHtmlForWrite === "string")
-        addTextOperation(demoResourcePath("prototype.html"), prototypeHtmlForWrite);
+        addTextOperation(
+          demoResourcePath("prototype.html"),
+          prototypeHtmlForWrite,
+        );
       if (typeof prototypeCss === "string")
         addTextOperation(demoResourcePath("prototype.css"), prototypeCss);
       if (prototypeMeta) {
@@ -971,7 +969,9 @@ export async function PUT(
         );
       }
       if (typeof schema === "string") {
-        const page = listDemoPages(wsPath).find((candidate) => candidate.id === demoId);
+        const page = listDemoPages(wsPath).find(
+          (candidate) => candidate.id === demoId,
+        );
         applyPageDesignSpecSync({
           workspacePath: wsPath,
           pageId: demoId,
@@ -983,10 +983,13 @@ export async function PUT(
 
     const responseData: Record<string, unknown> = {};
     if (runtimeValidation) responseData.runtimeValidation = runtimeValidation;
-    if (imageLocalizationResult) responseData.imageLocalization = imageLocalizationResult;
+    if (imageLocalizationResult)
+      responseData.imageLocalization = imageLocalizationResult;
 
     return NextResponse.json(
-      createApiSuccess(Object.keys(responseData).length > 0 ? responseData : null),
+      createApiSuccess(
+        Object.keys(responseData).length > 0 ? responseData : null,
+      ),
     );
   } catch (error) {
     if (error instanceof WorkspaceAuthorityClientError)

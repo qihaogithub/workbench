@@ -1,6 +1,7 @@
 import { PreviewRuntimeContractError, type RuntimeContractIssue } from '@workbench/preview-contract/runtime';
 import { compilePreviewPageSource } from '@workbench/preview-contract/compiler';
 import { checkConfigSchemaAgainstPrototype } from '@workbench/shared/demo/config-runtime-compatibility';
+import { resolvePagePresentation } from '@workbench/shared';
 
 type ToolRuntimeValidationStage = RuntimeContractIssue['stage'] | 'prototype_contract';
 type PrototypeGateDecision =
@@ -290,19 +291,9 @@ export function validatePreviewFileWrite(
     try {
       const parsed = JSON.parse(content) as Record<string, unknown>;
 
-      const demo = parsed.$demo;
-      const previewSize =
-        demo != null && typeof demo === 'object' && !Array.isArray(demo)
-          ? (demo as Record<string, unknown>).previewSize
-          : undefined;
-      const hasValidPreviewSize =
-        previewSize != null &&
-        typeof previewSize === 'object' &&
-        !Array.isArray(previewSize) &&
-        ('width' in (previewSize as Record<string, unknown>)) &&
-        ('height' in (previewSize as Record<string, unknown>));
+      const presentation = resolvePagePresentation(parsed);
 
-      if (!hasValidPreviewSize) {
+      if (!presentation) {
         return {
           ok: false,
           file: normalizedPath,
@@ -312,10 +303,10 @@ export function validatePreviewFileWrite(
               file: normalizedPath,
               pageId,
               stage: 'schema_contract',
-              code: 'MISSING_PREVIEW_SIZE',
+              code: 'MISSING_PAGE_PRESENTATION',
               severity: 'error',
-              message: 'config.schema.json 缺少 $demo.previewSize 字段（需包含 width 和 height）',
-              instruction: '请在 config.schema.json 中添加 "$demo": { "previewSize": { "width": <数字>, "height": <数字> } }，宽高根据页面目标设备自行判断。',
+              message: 'config.schema.json 缺少有效的 $demo.presentation 展示配置',
+              instruction: '请在 config.schema.json 的 $demo.presentation 中设置 version、mode、viewport、heightBehavior、preset 和 source；页面视口写入 presentation.viewport。',
             },
           ],
         };

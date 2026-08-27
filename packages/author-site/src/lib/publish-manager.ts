@@ -27,9 +27,15 @@ import type {
   AppGraph,
   KnowledgeIndexItem,
   HtmlImportMeta,
+  PagePresentationProfile,
 } from "@workbench/shared";
+import { resolvePagePresentation } from "@workbench/shared";
 import { getPageRuntimeCapabilities } from "@workbench/shared/page-runtime-capabilities";
-import { normalizeHtmlImport, ProjectAdminService } from "@workbench/project-core";
+import {
+  HTML_IMPORT_ANALYSIS_VERSION,
+  normalizeHtmlImport,
+  ProjectAdminService,
+} from "@workbench/project-core";
 import type { CanvasState } from "@workbench/demo-ui";
 import { generateIframeHtml } from "@workbench/demo-ui/iframe-template";
 import { getCdnBaseUrl } from "@/lib/cdn-config";
@@ -135,6 +141,7 @@ export interface PublishedDemoPage {
   compiledJsPath?: string;
   schemaPath?: string;
   previewSize?: PreviewSize;
+  presentation?: PagePresentationProfile;
   screenshotPath?: string;
   iframeHtmlPath?: string;
   embedCode?: string;
@@ -667,6 +674,7 @@ export async function publishProject(
     );
 
     let previewSize: PreviewSize | undefined;
+    let presentation: PagePresentationProfile | undefined;
     const requirements = fs.existsSync(requirementsPath)
       ? fs.readFileSync(requirementsPath, "utf-8")
       : undefined;
@@ -680,6 +688,7 @@ export async function publishProject(
           : rawSchemaContent;
       fs.writeFileSync(path.join(demoPublishDir, "schema.json"), schemaContent);
       previewSize = extractPreviewSize(schemaContent);
+      presentation = resolvePagePresentation(schemaContent);
       pageConfigData = extractSchemaDefaults(schemaContent);
       schemaPublishPath = `demos/${page.id}/schema.json`;
     }
@@ -738,6 +747,7 @@ export async function publishProject(
         schemaPath: schemaPublishPath,
         requirements,
         previewSize,
+        presentation,
         screenshotPath,
         prototypeHtml,
         prototypeCss,
@@ -800,6 +810,7 @@ export async function publishProject(
         schemaPath: schemaPublishPath,
         requirements,
         previewSize,
+        presentation,
         screenshotPath,
         sketchScene,
         sketchMeta,
@@ -835,7 +846,7 @@ export async function publishProject(
         normalization.analysis.outcome.status !== "accepted" ||
         normalization.analysis.outcome.runtimeType !== "sandboxed-html" ||
         htmlImportMeta.analysisVersion !== normalization.analysis.analysisVersion ||
-        htmlImportMeta.analysisVersion !== 1 ||
+        htmlImportMeta.analysisVersion !== HTML_IMPORT_ANALYSIS_VERSION ||
         htmlImportMeta.sandboxPolicyVersion !== 1 ||
         htmlImportMeta.normalizedHash !== normalization.analysis.sourceHash
       ) {
@@ -858,6 +869,7 @@ export async function publishProject(
         schemaPath: schemaPublishPath,
         requirements,
         previewSize,
+        presentation,
         screenshotPath,
         sandboxExecutionPath,
         htmlImportMeta,
@@ -935,7 +947,9 @@ export async function publishProject(
     const iframeSrc = viewerBaseUrl
       ? `${viewerBaseUrl}/data/${projectId}/${iframeHtmlPath}`
       : `/data/${projectId}/${iframeHtmlPath}`;
-    const embedCode = `<iframe\n  src="${iframeSrc}"\n  sandbox="allow-scripts"\n  style="width: 100%; border: none;"\n/>`;
+    const embedWidth = presentation?.viewport.width ?? 1440;
+    const embedHeight = presentation?.viewport.height ?? 900;
+    const embedCode = `<iframe\n  src="${iframeSrc}"\n  sandbox="allow-scripts"\n  width="${embedWidth}"\n  height="${embedHeight}"\n  style="width: min(100%, ${embedWidth}px); height: ${embedHeight}px; border: none;"\n/>`;
 
     publishedDemoPages.push({
       id: page.id,
@@ -948,6 +962,7 @@ export async function publishProject(
       schemaPath: schemaPublishPath,
       requirements,
       previewSize,
+      presentation,
       screenshotPath,
       iframeHtmlPath,
       embedCode,

@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { SinglePagePreview } from "./SinglePagePreview";
@@ -82,8 +82,8 @@ vi.mock("./PreviewPanel", () => ({
 }));
 
 vi.mock("./SandboxedHtmlFrame", () => ({
-  SandboxedHtmlFrame: ({ executionUrl, title }: { executionUrl: string; title: string }) => (
-    <div data-testid="sandbox-renderer" data-url={executionUrl} data-title={title} />
+  SandboxedHtmlFrame: ({ executionUrl, title, heightBehavior }: { executionUrl: string; title: string; heightBehavior?: string }) => (
+    <div data-testid="sandbox-renderer" data-url={executionUrl} data-title={title} data-height-behavior={heightBehavior} />
   ),
 }));
 
@@ -102,6 +102,26 @@ function createPage(
 }
 
 describe("SinglePagePreview", () => {
+  it("编辑态单页预览粘贴 HTML 时请求导入", () => {
+    const onRequestPasteHtmlContent = vi.fn();
+    const html = "<!doctype html><html><body><main>Figma</main></body></html>";
+    render(
+      <SinglePagePreview
+        page={createPage()}
+        onRequestPasteHtmlContent={onRequestPasteHtmlContent}
+      />,
+    );
+
+    fireEvent.paste(screen.getByTestId("single-page-preview-import-target"), {
+      clipboardData: {
+        getData: (type: string) => (type === "text/plain" ? html : ""),
+        files: [],
+      },
+    });
+
+    expect(onRequestPasteHtmlContent).toHaveBeenCalledWith(html);
+  });
+
   it("交互 HTML 显式使用 sandbox renderer，并优先于 iframe URL", () => {
     render(
       <SinglePagePreview
@@ -111,6 +131,14 @@ describe("SinglePagePreview", () => {
           sandboxExecutionUrl: "/sandbox/execution/opaque-id",
           sandboxChannelId: "channel-1",
           sandboxHtml: "<button>go</button>",
+          presentation: {
+            version: 1,
+            mode: "fixed-canvas",
+            viewport: { width: 960, height: 640 },
+            heightBehavior: "fixed",
+            preset: "custom",
+            source: "figma",
+          },
         })}
       />,
     );
@@ -119,6 +147,7 @@ describe("SinglePagePreview", () => {
       "/sandbox/execution/opaque-id",
     );
     expect(screen.queryByTestId("iframe-renderer")).not.toBeInTheDocument();
+    expect(screen.getByTestId("sandbox-renderer")).toHaveAttribute("data-height-behavior", "fixed");
   });
   it("优先分发发布 iframe 并透传页面公共属性", () => {
     render(

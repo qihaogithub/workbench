@@ -7,6 +7,7 @@ import type {
   PreviewMode,
 } from "@workbench/demo-ui/types";
 import { loadCanvasLayout } from "@workbench/demo-ui/canvas-utils";
+import { rebaseCanvasState } from "@/lib/canvas-state-rebase";
 
 const DEFAULT_CANVAS_STATE: CanvasState = {
   viewport: { x: 40, y: 40, zoom: 0.5 },
@@ -26,6 +27,7 @@ interface UseCanvasWorkspaceOptions {
 function getCanvasContentSignature(state: CanvasState): string {
   return JSON.stringify({
     pages: state.pages ?? {},
+    sections: state.sections ?? {},
     pageGroups: state.pageGroups ?? {},
     hiddenPageIds: state.hiddenPageIds ?? [],
     nodes: state.nodes ?? {},
@@ -52,6 +54,7 @@ export function useCanvasWorkspace({
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirtyRef = useRef(false);
   const lastPersistedRef = useRef("");
+  const lastCommittedStateRef = useRef<CanvasState>(DEFAULT_CANVAS_STATE);
   const canvasStateRef = useRef<CanvasState>(DEFAULT_CANVAS_STATE);
 
   const setCanvasPersistenceDirty = useCallback((dirty: boolean) => {
@@ -86,10 +89,12 @@ export function useCanvasWorkspace({
 
         if (state) {
           canvasStateRef.current = state;
+          lastCommittedStateRef.current = state;
           setCanvasState(state);
           lastPersistedRef.current = JSON.stringify(state);
         } else {
           canvasStateRef.current = DEFAULT_CANVAS_STATE;
+          lastCommittedStateRef.current = DEFAULT_CANVAS_STATE;
           setCanvasState(DEFAULT_CANVAS_STATE);
           lastPersistedRef.current = "";
         }
@@ -143,12 +148,36 @@ export function useCanvasWorkspace({
 
   const applyRemoteCanvasState = useCallback((nextState: CanvasState) => {
     canvasStateRef.current = nextState;
+    lastCommittedStateRef.current = nextState;
     lastPersistedRef.current = JSON.stringify(nextState);
     setCanvasPersistenceDirty(false);
     setHasUnsavedCanvasChanges(false);
     setCanvasState(nextState);
     setSaveStatus("saved");
     setSaveError(undefined);
+  }, [setCanvasPersistenceDirty]);
+
+  const rebaseRemoteCanvasState = useCallback((remoteState: CanvasState) => {
+    const result = rebaseCanvasState(
+      lastCommittedStateRef.current,
+      canvasStateRef.current,
+      remoteState,
+    );
+    lastCommittedStateRef.current = remoteState;
+    if (result.conflicts.length > 0) {
+      return { conflicts: result.conflicts, state: canvasStateRef.current };
+    }
+
+    const contentChanged =
+      getCanvasContentSignature(result.state) !==
+      getCanvasContentSignature(remoteState);
+    canvasStateRef.current = result.state;
+    setCanvasPersistenceDirty(contentChanged);
+    setHasUnsavedCanvasChanges(contentChanged);
+    setCanvasState(result.state);
+    setSaveStatus(contentChanged ? "idle" : "saved");
+    setSaveError(undefined);
+    return { conflicts: [], state: result.state };
   }, [setCanvasPersistenceDirty]);
 
   const markCanvasChangesSaved = useCallback(() => {
@@ -180,6 +209,7 @@ export function useCanvasWorkspace({
     saveError,
     hasUnsavedCanvasChanges,
     applyRemoteCanvasState,
+    rebaseRemoteCanvasState,
     markCanvasChangesSaved,
   };
 }

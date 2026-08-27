@@ -129,7 +129,11 @@ describe("HTML sandbox execution issuance route", () => {
       },
     });
     expect(body.data.executionUrl).not.toContain(validHtml);
-    expect(mockCreateHtmlSandboxExecution).toHaveBeenCalledWith(validHtml);
+    expect(mockCreateHtmlSandboxExecution).toHaveBeenCalledWith(
+      validHtml,
+      expect.any(Number),
+      expect.objectContaining({ projectId: "project-1", sessionId: "session-1", workspaceId: "workspace-1", pageId: "page-1" }),
+    );
   });
 
   it.each([
@@ -159,7 +163,11 @@ describe("HTML sandbox execution issuance route", () => {
       params: Promise.resolve({ projectId: "project-1", demoId: "page-1" }),
     });
     expect(response.status).toBe(200);
-    expect(mockCreateHtmlSandboxExecution).toHaveBeenCalledWith(validHtml);
+    expect(mockCreateHtmlSandboxExecution).toHaveBeenCalledWith(
+      validHtml,
+      expect.any(Number),
+      expect.objectContaining({ projectId: "project-1", sessionId: "session-1", workspaceId: "workspace-1", pageId: "page-1" }),
+    );
   });
 
   it("fails closed when the independent public origin is unavailable", async () => {

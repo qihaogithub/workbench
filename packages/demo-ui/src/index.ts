@@ -16,8 +16,15 @@ export type {
   CanvasPageLayout,
   CanvasViewportState,
   CanvasState,
+  CanvasNavigationState,
+  CanvasNavigationHotspot,
+  CanvasNavigationConnection,
   CanvasPageGroup,
   CanvasPageGroupEntry,
+  CanvasSection,
+  CanvasSectionChild,
+  CanvasSectionChildKind,
+  CanvasSectionStyle,
   CanvasLayersState,
   CanvasSaveStatus,
   CanvasPageData,
@@ -79,12 +86,7 @@ export type {
   CommentViewStatePayload,
   ElementLocationResultPayload,
 } from "./iframe-types";
-export {
-  getDefaultValues,
-  getPreviewSize,
-  isSchemaEmpty,
-} from "./validator";
-export { getPrototypePreviewSize } from "./prototype-preview-size";
+export { getDefaultValues, getPreviewSize, isSchemaEmpty } from "./validator";
 export {
   BUILT_IN_CONFIG_CATEGORIES,
   configFieldMatchesCategoryFilter,
@@ -106,6 +108,22 @@ export {
   MIN_CANVAS_SCREENSHOT_PAGE_COUNT,
 } from "./canvas-render-scheduler";
 export { computePreviewRuntimePoolPlan } from "./preview-runtime-pool";
+export { parseCanvasNavigation } from "./canvas-navigation";
+export {
+  createCanvasSection,
+  assignCanvasObjectToSection,
+  assignCanvasSectionToSection,
+  computeCanvasSectionAutoLayout,
+  fitCanvasSectionToChildren,
+  findInnermostSectionContainingLayout,
+  getCanvasSectionParents,
+  moveCanvasSectionWithChildren,
+  normalizeCanvasSections,
+  reconcileCanvasSectionMembership,
+  removeCanvasSection,
+  sectionContainsLayout,
+  sectionContainsPoint,
+} from "./canvas-section";
 export type {
   PreviewRuntimePoolInput,
   PreviewRuntimePoolMode,
@@ -123,9 +141,16 @@ export {
 } from "./preview-resource-cache";
 export { ConfigScopeWrapper } from "./ConfigScopeWrapper";
 export { ConfigDefinitionManagerDialog } from "./ConfigDefinitionManagerDialog";
-export type { ConfigDefinitionManagerDialogProps, ConfigDefinitionScope, ConfigDefinitionImpactSummary } from "./ConfigDefinitionManagerDialog";
+export type {
+  ConfigDefinitionManagerDialogProps,
+  ConfigDefinitionScope,
+  ConfigDefinitionImpactSummary,
+} from "./ConfigDefinitionManagerDialog";
 export { ConfigItemEditorDialog } from "./ConfigItemEditorDialog";
-export type { ConfigItemEditorDialogProps, ConfigItemApplyPlanSnapshot } from "./ConfigItemEditorDialog";
+export type {
+  ConfigItemEditorDialogProps,
+  ConfigItemApplyPlanSnapshot,
+} from "./ConfigItemEditorDialog";
 export { PageConfigPanel } from "./PageConfigPanel";
 export {
   extractCodeConfigBindingKeys,
@@ -197,11 +222,7 @@ export type {
   DocumentUploadHandler,
 } from "./DocumentEditor";
 export { RichTextEditor } from "./RichTextEditor";
-export {
-  customWidgets,
-  ColorPickerWidget,
-  FileUploadWidget,
-} from "./widgets";
+export { customWidgets, ColorPickerWidget, FileUploadWidget } from "./widgets";
 export type { FileUploadWidgetOptions, FileUploadWidgetProps } from "./widgets";
 export { ImageListWidget } from "./ImageListWidget";
 export type { ImageItem, ImageListWidgetProps } from "./ImageListWidget";
@@ -236,6 +257,7 @@ export { PreviewCanvas } from "./PreviewCanvas";
 export { CanvasViewport } from "./CanvasViewport";
 export { CanvasPageItem, CanvasPagePreviewContent } from "./CanvasPageItem";
 export { CanvasFreeNodeItem } from "./CanvasFreeNodeItem";
+export { CanvasSectionItem } from "./CanvasSectionItem";
 export { CanvasDocumentContent } from "./CanvasDocumentContent";
 export { CanvasToolbar } from "./CanvasToolbar";
 export { PageSkeleton } from "./PageSkeleton";
@@ -264,6 +286,7 @@ export {
   readCanvasClipboard,
   computeBounds,
   isEditableTarget,
+  remapCanvasSectionsForPaste,
 } from "./canvas-clipboard";
 export type { CanvasClipboardData } from "./canvas-clipboard";
 export { PasteOptionsModal } from "./PasteOptionsModal";

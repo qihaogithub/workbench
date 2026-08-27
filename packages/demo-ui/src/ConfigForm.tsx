@@ -10,6 +10,7 @@ import { parseSchemaToFields } from "./schema-parser";
 import { getPageTypeLimits } from "./type-limits-store";
 import { FieldRenderer, PositionConfigContext, type PositionConfigContextValue, type PositionFieldEntry } from "./FieldRenderer";
 import { configFieldMatchesCategoryFilter } from "./config-categories";
+import { getPreviewSize } from "./validator";
 
 function isFieldVisible(
   field: FieldConfig,
@@ -242,12 +243,7 @@ export function ConfigForm({
   );
 
   const previewSize = useMemo(() => {
-    try {
-      const parsed = JSON.parse(schema);
-      return parsed.$demo?.previewSize as { width?: number | string; height?: number | string } | undefined;
-    } catch {
-      return undefined;
-    }
+    return getPreviewSize(schema);
   }, [schema]);
 
   const positionRegistryRef = useRef(new Map<string, PositionFieldEntry>());

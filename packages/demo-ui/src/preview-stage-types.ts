@@ -5,6 +5,8 @@ import type { PrototypePagePreviewProps } from "./PrototypePagePreview";
 import type { SketchPagePreviewProps } from "./SketchPagePreview";
 import type { SandboxedHtmlFrameProps } from "./SandboxedHtmlFrame";
 import type {
+  CanvasNavigationHotspot,
+  CanvasNavigationConnection,
   CanvasInteractionMode,
   CanvasPageData,
   CanvasPageRuntimeType,
@@ -54,6 +56,23 @@ export interface SinglePagePreviewProps {
   emptyState?: ReactNode;
   className?: string;
   onBackgroundClick?: () => void;
+  navigationPages?: CanvasPageData[];
+  navigationHotspots?: CanvasNavigationHotspot[];
+  navigationConnections?: CanvasNavigationConnection[];
+  navigationEditable?: boolean;
+  onCreateNavigation?: (
+    pageId: string,
+    rect: CanvasNavigationHotspot["rect"],
+    targetPageId: string,
+  ) => void;
+  onUpdateNavigationHotspot?: (
+    hotspotId: string,
+    rect: CanvasNavigationHotspot["rect"],
+  ) => void;
+  onUpdateNavigationTarget?: (hotspotId: string, targetPageId: string) => void;
+  onDeleteNavigationHotspot?: (hotspotId: string) => void;
+  /** 单页面预览区粘贴 HTML 代码时触发，由宿主复用 HTML 导入链路。 */
+  onRequestPasteHtmlContent?: (html: string) => void | Promise<void>;
 }
 
 export interface PreviewStageRenderContext {

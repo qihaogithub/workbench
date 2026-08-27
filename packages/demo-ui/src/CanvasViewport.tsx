@@ -36,8 +36,9 @@ interface CanvasViewportProps {
   alignmentGuides?: AlignmentGuide[];
   toolMode?: CanvasToolMode;
   onSelectionRectChange?: (rect: CanvasSelectionRect) => void;
-  creationMode?: Extract<CanvasToolMode, "text" | "image"> | null;
+  creationMode?: Extract<CanvasToolMode, "text" | "image" | "section"> | null;
   onCanvasPointClick?: (point: CanvasPointerPoint) => void;
+  onCanvasRectCreate?: (rect: CanvasSelectionRect) => void;
 }
 
 const MIN_ZOOM = 0.05;
@@ -68,6 +69,7 @@ export function CanvasViewport({
   onSelectionRectChange,
   creationMode,
   onCanvasPointClick,
+  onCanvasRectCreate,
 }: CanvasViewportProps) {
   const resolvedInteractionMode = interactionMode ?? (editable ? "editor" : "readonly");
   const canInteractWithViewport = resolvedInteractionMode !== "readonly";
@@ -75,6 +77,8 @@ export function CanvasViewport({
   const [isPanning, setIsPanning] = useState(false);
   const isPanningRef = useRef(false);
   const [selectionBox, setSelectionBox] =
+    useState<CanvasSelectionRect | null>(null);
+  const [creationBox, setCreationBox] =
     useState<CanvasSelectionRect | null>(null);
   const isSelectingRef = useRef(false);
   const isPointCreatingRef = useRef(false);
@@ -191,6 +195,12 @@ export function CanvasViewport({
       // V 键：切换到选择工具
       if (e.key === "v" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.repeat) {
         onToolModeChange?.("select");
+      }
+
+      // Shift + S：绘制 Section。
+      if (e.key.toLowerCase() === "s" && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && !e.repeat) {
+        e.preventDefault();
+        onToolModeChange?.("section");
       }
 
       // Ctrl/Cmd + 0：适应屏幕
@@ -335,6 +345,9 @@ export function CanvasViewport({
         creationStartPointRef.current = point;
         containerRef.current?.setPointerCapture(e.pointerId);
         isPointCreatingRef.current = true;
+        if (activeCreationMode === "section") {
+          setCreationBox({ x: point.x, y: point.y, width: 0, height: 0 });
+        }
         return;
       }
       if (toolMode === "hand" || e.button === 1 || (isPrimaryButton && spaceHeld)) return;
@@ -367,6 +380,18 @@ export function CanvasViewport({
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
+      if (isPointCreatingRef.current && activeCreationMode === "section") {
+        const point = getCanvasPointFromPointer(e.clientX, e.clientY);
+        const start = creationStartPointRef.current;
+        if (!point || !start) return;
+        setCreationBox({
+          x: Math.min(start.x, point.x),
+          y: Math.min(start.y, point.y),
+          width: Math.abs(point.x - start.x),
+          height: Math.abs(point.y - start.y),
+        });
+        return;
+      }
       if (isSelectingRef.current) {
         const selection = getSelectionFromPointer(e.clientX, e.clientY);
         if (!selection) return;
@@ -385,6 +410,8 @@ export function CanvasViewport({
       });
     },
     [
+      activeCreationMode,
+      getCanvasPointFromPointer,
       getSelectionFromPointer,
       onSelectionRectChange,
       scheduleUpdate,
@@ -395,12 +422,20 @@ export function CanvasViewport({
     (e: React.PointerEvent) => {
       if (isPointCreatingRef.current) {
         isPointCreatingRef.current = false;
-        const point =
-          creationStartPointRef.current ??
-          getCanvasPointFromPointer(e.clientX, e.clientY);
+        const start = creationStartPointRef.current;
+        const point = start ?? getCanvasPointFromPointer(e.clientX, e.clientY);
+        const end = getCanvasPointFromPointer(e.clientX, e.clientY);
         containerRef.current?.releasePointerCapture(e.pointerId);
         creationStartPointRef.current = null;
-        if (point) onCanvasPointClick?.(point);
+        if (activeCreationMode === "section" && start && end) {
+          onCanvasRectCreate?.({
+            x: Math.min(start.x, end.x),
+            y: Math.min(start.y, end.y),
+            width: Math.abs(end.x - start.x),
+            height: Math.abs(end.y - start.y),
+          });
+        } else if (point) onCanvasPointClick?.(point);
+        setCreationBox(null);
         return;
       }
 
@@ -449,6 +484,8 @@ export function CanvasViewport({
       getSelectionFromPointer,
       onCanvasClick,
       onCanvasPointClick,
+      onCanvasRectCreate,
+      activeCreationMode,
       onNodeClick,
       onPageClick,
       onSelectionRectChange,
@@ -598,6 +635,18 @@ export function CanvasViewport({
             top: selectionBox.y,
             width: selectionBox.width,
             height: selectionBox.height,
+          }}
+        />
+      )}
+      {creationBox && activeCreationMode === "section" && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute z-40 border-2 border-primary/80 bg-primary/10"
+          style={{
+            left: viewport.x + creationBox.x * viewport.zoom,
+            top: viewport.y + creationBox.y * viewport.zoom,
+            width: creationBox.width * viewport.zoom,
+            height: creationBox.height * viewport.zoom,
           }}
         />
       )}

@@ -25,7 +25,6 @@ export interface UserModelConfigInput {
   keepExistingApiKey?: boolean;
   clearApiKey?: boolean;
   models?: string[];
-  defaultModel?: string;
   enabled?: boolean;
 }
 
@@ -121,6 +120,57 @@ function validateBaseURL(baseURL: string): void {
   }
 }
 
+function buildModelsUrl(baseURL: string): string {
+  const normalized = baseURL.trim().replace(/\/+$/, "");
+  validateBaseURL(normalized);
+  return `${normalized}/models`;
+}
+
+export async function fetchUserModelCatalog(
+  userId: string,
+  input: Pick<UserModelConfigInput, "baseURL" | "apiKey">,
+): Promise<string[]> {
+  const existing = readStoredUserModelConfig(userId);
+  const baseURL = input.baseURL?.trim() || existing?.provider.baseURL || "";
+  if (!baseURL) throw new Error("baseURL 必填");
+
+  const apiKey = input.apiKey?.trim() ||
+    (existing?.provider.encryptedApiKey
+      ? decryptApiKey(existing.provider.encryptedApiKey)
+      : "");
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10_000);
+
+  try {
+    const response = await fetch(buildModelsUrl(baseURL), {
+      headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`供应商返回 ${response.status}`);
+
+    const body = (await response.json()) as { data?: unknown };
+    const items = Array.isArray(body.data) ? body.data : [];
+    return Array.from(
+      new Set(
+        items
+          .flatMap((item) =>
+            typeof item === "object" && item !== null && typeof (item as { id?: unknown }).id === "string"
+              ? [(item as { id: string }).id.trim()]
+              : [],
+          )
+          .filter(Boolean),
+      ),
+    );
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("获取模型列表超时，请稍后重试");
+    }
+    throw error instanceof Error ? error : new Error("获取模型列表失败");
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 function parseStoredConfig(row: UserModelConfigRow): StoredUserModelConfig {
   return JSON.parse(row.config_json) as StoredUserModelConfig;
 }
@@ -132,6 +182,7 @@ function toSafeConfig(
   const {
     encryptedApiKey: encrypted,
     hasApiKey: storedHasApiKey,
+    defaultModel: _legacyDefaultModel,
     ...provider
   } = stored.provider;
 
@@ -179,7 +230,6 @@ export function readUserBackendProvidersConfig(
     baseURL: stored.provider.baseURL,
     apiKey,
     models: stored.provider.models,
-    defaultModel: stored.provider.defaultModel,
     enabled: stored.provider.enabled !== false,
   };
 
@@ -192,11 +242,6 @@ export function readUserBackendProvidersConfig(
   return {
     providers,
     activeProviderId: provider.id,
-    activeModelId: provider.defaultModel
-      ? `${provider.id}/${provider.defaultModel}`
-      : provider.models[0]
-        ? `${provider.id}/${provider.models[0]}`
-        : undefined,
   };
 }
 
@@ -210,11 +255,6 @@ export function upsertUserModelConfig(
 
   const models = normalizeModels(input.models);
   if (models.length === 0) throw new Error("至少填写一个模型");
-
-  const defaultModel = input.defaultModel?.trim() || undefined;
-  if (defaultModel && !models.includes(defaultModel)) {
-    throw new Error("默认模型必须在模型列表中");
-  }
 
   const existing = readStoredUserModelConfig(userId);
   let encryptedApiKey: string | undefined;
@@ -233,7 +273,6 @@ export function upsertUserModelConfig(
     encryptedApiKey,
     hasApiKey: Boolean(encryptedApiKey),
     models,
-    defaultModel,
     enabled: input.enabled !== false,
   };
 

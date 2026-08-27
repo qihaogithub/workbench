@@ -1,12 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ALargeSmall,
-  Edit3,
-  Maximize2,
-  Minimize2,
-} from "lucide-react";
+import { ALargeSmall, Edit3, Maximize2, Minimize2 } from "lucide-react";
 import { CanvasDocumentContent } from "./CanvasDocumentContent";
 import { CanvasSelectionBox } from "./CanvasSelectionBox";
 import { cn } from "./utils";
@@ -37,8 +32,12 @@ interface CanvasFreeNodeItemProps {
     nodeId: string,
     event?: React.PointerEvent | React.MouseEvent,
   ) => void;
-  onDragStart?: (nodeId: string) => void;
-  onDragMove?: (nodeId: string, layout: CanvasPageLayout, edge?: string) => void;
+  onDragStart?: (nodeId: string, options?: { copy?: boolean }) => void;
+  onDragMove?: (
+    nodeId: string,
+    layout: CanvasPageLayout,
+    edge?: string,
+  ) => void;
   onDragEnd?: () => void;
 }
 
@@ -203,7 +202,8 @@ function isCornerResize(edge: ResizeEdge): boolean {
 }
 
 function clampTextScaleFontSize(fontSize: number, scale: number): number {
-  const safeFontSize = Number.isFinite(fontSize) && fontSize > 0 ? fontSize : 18;
+  const safeFontSize =
+    Number.isFinite(fontSize) && fontSize > 0 ? fontSize : 18;
   return Math.min(
     Math.max(Math.round(safeFontSize * scale), TEXT_NODE_MIN_FONT_SIZE),
     TEXT_NODE_MAX_FONT_SIZE,
@@ -219,8 +219,12 @@ function computeTextScaleResize(
 ): { layout: CanvasPageLayout; fontSize: number } {
   const safeFontSize =
     Number.isFinite(fontSize) && fontSize > 0 ? fontSize : 18;
-  const proposedWidth = edge.includes("e") ? layout.width + dx : layout.width - dx;
-  const proposedHeight = edge.includes("s") ? layout.height + dy : layout.height - dy;
+  const proposedWidth = edge.includes("e")
+    ? layout.width + dx
+    : layout.width - dx;
+  const proposedHeight = edge.includes("s")
+    ? layout.height + dy
+    : layout.height - dy;
   const widthScale = proposedWidth / layout.width;
   const heightScale = proposedHeight / layout.height;
   const rawScale =
@@ -229,8 +233,14 @@ function computeTextScaleResize(
       : heightScale;
   const nextFontSize = clampTextScaleFontSize(safeFontSize, rawScale);
   const scale = nextFontSize / safeFontSize;
-  const width = Math.min(Math.max(layout.width * scale, safeFontSize * scale), MAX_SIZE);
-  const height = Math.min(Math.max(layout.height * scale, TEXT_NODE_MIN_HEIGHT * scale), MAX_SIZE);
+  const width = Math.min(
+    Math.max(layout.width * scale, safeFontSize * scale),
+    MAX_SIZE,
+  );
+  const height = Math.min(
+    Math.max(layout.height * scale, TEXT_NODE_MIN_HEIGHT * scale),
+    MAX_SIZE,
+  );
 
   let x = layout.x;
   let y = layout.y;
@@ -325,21 +335,28 @@ function estimateTextLineWidthUnits(line: string): number {
   }, 0);
 }
 
-function estimateTextNodeContentHeight(node: CanvasTextNode, width?: number): number {
+function estimateTextNodeContentHeight(
+  node: CanvasTextNode,
+  width?: number,
+): number {
   const safeFontSize =
     Number.isFinite(node.fontSize) && node.fontSize > 0 ? node.fontSize : 18;
   const lineHeight = safeFontSize * TEXT_LINE_HEIGHT;
   const safeWidth =
     Number.isFinite(width) && width && width > 0 ? width : node.layout.width;
   const lineCapacity = Math.max(1, safeWidth / safeFontSize);
-  const visualLines = (node.text || "")
-    .split(/\r?\n/)
-    .reduce((total, line) => {
-      return total + Math.max(1, Math.ceil(estimateTextLineWidthUnits(line) / lineCapacity));
-    }, 0);
+  const visualLines = (node.text || "").split(/\r?\n/).reduce((total, line) => {
+    return (
+      total +
+      Math.max(1, Math.ceil(estimateTextLineWidthUnits(line) / lineCapacity))
+    );
+  }, 0);
 
   return Math.ceil(
-    Math.max(TEXT_NODE_MIN_HEIGHT, visualLines * lineHeight + TEXT_NODE_VERTICAL_PADDING),
+    Math.max(
+      TEXT_NODE_MIN_HEIGHT,
+      visualLines * lineHeight + TEXT_NODE_VERTICAL_PADDING,
+    ),
   );
 }
 
@@ -419,7 +436,14 @@ export function CanvasFreeNodeItem({
     const caretPosition = textArea.value.length;
     textArea.focus();
     textArea.setSelectionRange(caretPosition, caretPosition);
-  }, [canInteract, editing, node.kind, node.id, node.kind === "text" ? node.text : "", selected]);
+  }, [
+    canInteract,
+    editing,
+    node.kind,
+    node.id,
+    node.kind === "text" ? node.text : "",
+    selected,
+  ]);
 
   const updateEdgeFromPointer = useCallback(
     (e: React.PointerEvent | React.MouseEvent) => {
@@ -430,7 +454,8 @@ export function CanvasFreeNodeItem({
       const el = containerRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      const edgeHitSize = node.kind === "text" ? TEXT_EDGE_HIT_SIZE : EDGE_HIT_SIZE;
+      const edgeHitSize =
+        node.kind === "text" ? TEXT_EDGE_HIT_SIZE : EDGE_HIT_SIZE;
       const cornerHitSize =
         node.kind === "text" ? TEXT_CORNER_HIT_SIZE : CORNER_HIT_SIZE;
       const edge = detectResizeEdge(
@@ -487,7 +512,7 @@ export function CanvasFreeNodeItem({
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       setIsDragging(true);
       layoutStartRef.current = { ...layoutRef.current };
-      onDragStart?.(node.id);
+      onDragStart?.(node.id, { copy: e.altKey });
     },
     [canInteract, node.id, onDragStart, onSelect],
   );
@@ -544,17 +569,24 @@ export function CanvasFreeNodeItem({
                   (node.intrinsicHeight ?? layoutStartRef.current.height)
                 : undefined,
             minWidth:
-              node.kind === "text" ? estimateTextNodeContentWidth(node) : undefined,
+              node.kind === "text"
+                ? estimateTextNodeContentWidth(node)
+                : undefined,
             minHeight: node.kind === "text" ? TEXT_NODE_MIN_HEIGHT : undefined,
           },
         );
         if (node.kind === "text") {
-          const minHeight = estimateTextNodeContentHeight(node, newLayout.width);
+          const minHeight = estimateTextNodeContentHeight(
+            node,
+            newLayout.width,
+          );
           if (newLayout.height < minHeight) {
             const heightDelta = minHeight - newLayout.height;
             newLayout = {
               ...newLayout,
-              y: isResizing.includes("n") ? newLayout.y - heightDelta : newLayout.y,
+              y: isResizing.includes("n")
+                ? newLayout.y - heightDelta
+                : newLayout.y,
               height: minHeight,
             };
           }
@@ -612,7 +644,10 @@ export function CanvasFreeNodeItem({
           }
         : {
             ...node.layout,
-            height: estimateTextNodeContentHeight({ ...node, text }, node.layout.width),
+            height: estimateTextNodeContentHeight(
+              { ...node, text },
+              node.layout.width,
+            ),
           };
       if (
         nextLayout.width !== node.layout.width ||
@@ -683,7 +718,11 @@ export function CanvasFreeNodeItem({
         <div
           className="pointer-events-none absolute left-0 z-30 max-w-full truncate font-medium text-foreground/75 drop-shadow-sm"
           title={node.title}
-          style={{ top: -labelTopOffset, fontSize: labelFontSize, lineHeight: 1.2 }}
+          style={{
+            top: -labelTopOffset,
+            fontSize: labelFontSize,
+            lineHeight: 1.2,
+          }}
         >
           {node.title}
         </div>
@@ -761,8 +800,8 @@ export function CanvasFreeNodeItem({
           </div>
         )}
 
-        {node.kind === "text" && (
-          selected && editing && canInteract ? (
+        {node.kind === "text" &&
+          (selected && editing && canInteract ? (
             <textarea
               ref={textAreaRef}
               aria-label="编辑文字"
@@ -798,9 +837,7 @@ export function CanvasFreeNodeItem({
             >
               {node.text}
             </div>
-          )
-        )}
-
+          ))}
       </div>
 
       <CanvasSelectionBox
@@ -810,10 +847,22 @@ export function CanvasFreeNodeItem({
 
       {showEdgeHandles && (
         <>
-          <div className="absolute top-0 left-0 right-0 z-20" style={{ height: EDGE_HIT_SIZE, cursor: "ns-resize" }} />
-          <div className="absolute bottom-0 left-0 right-0 z-20" style={{ height: EDGE_HIT_SIZE, cursor: "ns-resize" }} />
-          <div className="absolute top-0 left-0 bottom-0 z-20" style={{ width: EDGE_HIT_SIZE, cursor: "ew-resize" }} />
-          <div className="absolute top-0 right-0 bottom-0 z-20" style={{ width: EDGE_HIT_SIZE, cursor: "ew-resize" }} />
+          <div
+            className="absolute top-0 left-0 right-0 z-20"
+            style={{ height: EDGE_HIT_SIZE, cursor: "ns-resize" }}
+          />
+          <div
+            className="absolute bottom-0 left-0 right-0 z-20"
+            style={{ height: EDGE_HIT_SIZE, cursor: "ns-resize" }}
+          />
+          <div
+            className="absolute top-0 left-0 bottom-0 z-20"
+            style={{ width: EDGE_HIT_SIZE, cursor: "ew-resize" }}
+          />
+          <div
+            className="absolute top-0 right-0 bottom-0 z-20"
+            style={{ width: EDGE_HIT_SIZE, cursor: "ew-resize" }}
+          />
         </>
       )}
     </div>
@@ -846,9 +895,7 @@ function CanvasNodePropertiesBubble({
       onNodeStyleChange?.({ ...node, color });
     };
     const applyBackgroundColor = (color: string | undefined) => {
-      onNodeStyleChange?.(
-        { ...node, backgroundColor: color },
-      );
+      onNodeStyleChange?.({ ...node, backgroundColor: color });
     };
 
     return (
@@ -984,7 +1031,9 @@ function CanvasNodePropertiesBubble({
             <span className="relative h-full w-full overflow-hidden rounded-sm border border-border/60 bg-background">
               <span
                 className="absolute inset-0"
-                style={{ backgroundColor: node.backgroundColor ?? "transparent" }}
+                style={{
+                  backgroundColor: node.backgroundColor ?? "transparent",
+                }}
               />
               <span
                 className="absolute bottom-0.5 left-1 text-sm font-semibold leading-none"
