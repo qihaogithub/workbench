@@ -58,7 +58,7 @@ export async function loadCanvasPageContent(input: {
   sessionId: string;
   request?: (url: string, init?: ApiRequestInit) => Promise<ApiResponse>;
 }): Promise<CanvasPageContent> {
-  const request = input.request ?? ((url: string) => fetch(url));
+  const request = input.request ?? ((url: string, init?: ApiRequestInit) => fetch(url, init));
   const encodedSessionId = encodeURIComponent(input.sessionId);
   const url = input.page.reference
     ? `/api/projects/${input.projectId}/reference-page/${input.page.id}?sessionId=${encodedSessionId}`

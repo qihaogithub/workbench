@@ -16,6 +16,7 @@ export type SandboxedHtmlFrameStatus =
   | "ready"
   | "loaded"
   | "runtime-error"
+  | "left-document"
   | "empty-first-frame"
   | "error"
   | "timeout";
@@ -29,6 +30,7 @@ export interface SandboxedHtmlFrameProps {
   fillContainer?: boolean;
   reloadKey?: string | number;
   timeoutMs?: number;
+  heightBehavior?: "fixed" | "content";
   onStatusChange?: (status: SandboxedHtmlFrameStatus) => void;
   onContentHeightChange?: (height: number) => void;
 }
@@ -42,6 +44,7 @@ export function SandboxedHtmlFrame({
   fillContainer = false,
   reloadKey,
   timeoutMs = 8_000,
+  heightBehavior = "content",
   onStatusChange,
   onContentHeightChange,
 }: SandboxedHtmlFrameProps) {
@@ -74,44 +77,54 @@ export function SandboxedHtmlFrame({
     const limiter = createSandboxedHtmlRateLimiter();
     let hasReady = false;
     let hasUsefulFrame = false;
-    const timeout = window.setTimeout(() => announce("timeout"), timeoutMs);
-    const emptyFrame = window.setTimeout(() => {
+    let timeout: number | undefined;
+    let emptyFrame: number | undefined;
+    const settle = (next: SandboxedHtmlFrameStatus) => {
+      if (timeout !== undefined) window.clearTimeout(timeout);
+      if (emptyFrame !== undefined) window.clearTimeout(emptyFrame);
+      announce(next);
+    };
+    timeout = window.setTimeout(() => settle("timeout"), timeoutMs);
+    emptyFrame = window.setTimeout(() => {
       if (hasReady && !hasUsefulFrame) announce("empty-first-frame");
     }, Math.min(timeoutMs, 1200));
     const onLoad = () => {
-      if (!hasReady) announce("loaded");
+      if (hasReady) settle("left-document");
+      else announce("loaded");
     };
-    const onError = () => announce("error");
+    const onError = () => settle("error");
     const onMessage = (event: MessageEvent) => {
       if (event.source !== frame.contentWindow) return;
       if (!limiter.accept()) return;
       if (!isSandboxedHtmlMessage(event.data, channelId, currentGeneration)) return;
       if (event.data.type === "READY") {
         hasReady = true;
-        announce("ready");
+        settle("ready");
         return;
       }
       if (event.data.type === "RESIZE") {
         const height = readSandboxedHtmlHeight(event.data);
         if (height === undefined) return;
         hasUsefulFrame = true;
-        setContentHeight(height);
-        onContentHeightChange?.(height);
+        if (heightBehavior === "content") {
+          setContentHeight(height);
+          onContentHeightChange?.(height);
+        }
         return;
       }
-      if (event.data.type === "RUNTIME_ERROR") announce("runtime-error");
+      if (event.data.type === "RUNTIME_ERROR") settle("runtime-error");
     };
     frame.addEventListener("load", onLoad);
     frame.addEventListener("error", onError);
     window.addEventListener("message", onMessage);
     return () => {
-      window.clearTimeout(timeout);
-      window.clearTimeout(emptyFrame);
+      if (timeout !== undefined) window.clearTimeout(timeout);
+      if (emptyFrame !== undefined) window.clearTimeout(emptyFrame);
       frame.removeEventListener("load", onLoad);
       frame.removeEventListener("error", onError);
       window.removeEventListener("message", onMessage);
     };
-  }, [frameUrl, channelId, generation, reloadKey, timeoutMs, onContentHeightChange]);
+  }, [frameUrl, channelId, generation, reloadKey, timeoutMs, heightBehavior, onContentHeightChange]);
 
   useEffect(() => {
     const node = iframeRef.current?.parentElement;
@@ -129,10 +142,10 @@ export function SandboxedHtmlFrame({
     containerSize.width,
     containerSize.height,
     fillContainer,
-    contentHeight,
+    heightBehavior === "content" ? contentHeight : undefined,
   );
   return (
-    <div className={cn("relative h-full min-h-[240px]", className)} data-sandbox-status={status}>
+    <div className={cn("relative h-full w-full min-h-[240px]", className)} data-sandbox-status={status}>
       <div style={scale.wrapperStyle}>
         <iframe
           key={frameKey}

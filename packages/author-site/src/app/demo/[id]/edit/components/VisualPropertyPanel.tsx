@@ -165,11 +165,11 @@ const TEXT_SPECS: PropertySpec[] = [
 ];
 
 const IMAGE_SPECS: PropertySpec[] = [
-  { section: "图片", property: "src", label: "替换图片", kind: "attribute", input: "file" },
+  { section: "填充", property: "src", label: "图片", kind: "attribute", input: "file" },
 ];
 
 const BACKGROUND_SPECS: PropertySpec[] = [
-  { section: "背景", property: "backgroundColor", label: "颜色", kind: "style", input: "color" },
+  { section: "填充", property: "backgroundColor", label: "颜色", kind: "style", input: "color" },
 ];
 
 const BORDER_SPECS: PropertySpec[] = [
@@ -186,7 +186,7 @@ const LINK_SPECS: PropertySpec[] = [
   { section: "链接", property: "href", label: "链接地址", kind: "attribute", input: "text" },
 ];
 
-const SECTION_ORDER = ["位置", "布局", "外观", "图片", "文本", "背景", "边框", "链接", "阴影与模糊"];
+const SECTION_ORDER = ["位置", "布局", "外观", "填充", "文本", "边框", "链接", "阴影与模糊"];
 
 function getChangeId(
   node: VisualNodeInfo,
@@ -484,6 +484,7 @@ function getGroupIcon(group: string) {
   if (group === "外观") return <Brush className="h-3.5 w-3.5" />;
   if (group === "布局") return <AlignCenter className="h-3.5 w-3.5" />;
   if (group === "位置") return <Box className="h-3.5 w-3.5" />;
+  if (group === "填充") return <PanelTop className="h-3.5 w-3.5" />;
   if (group === "背景") return <PanelTop className="h-3.5 w-3.5" />;
   if (group === "边框") return <Square className="h-3.5 w-3.5" />;
   if (group === "阴影与模糊") return <Brush className="h-3.5 w-3.5" />;
@@ -1548,16 +1549,26 @@ export function VisualPropertyPanel({
       applyStyleValue("backgroundColor", "背景颜色", "#FFFFFF");
     };
     const spec = BACKGROUND_SPECS[0];
+    const imageSpec = IMAGE_SPECS[0];
+    const hasImage = Boolean(selectedNode && (
+      selectedNode.editCapabilities.includes("image") ||
+      selectedNode.attrs?.src ||
+      selectedNode.attrs?.currentSrc
+    ));
+    const imageChangeId = hasImage ? getChangeId(selectedNode, imageSpec.property, imageSpec.kind) : "";
+    const imageCurrentValue = hasImage ? getCurrentValue(selectedNode, imageSpec) : "";
+    const imageChange = hasImage ? propertyChanges.find((item) => item.id === imageChangeId) : undefined;
+    const imageValue = imageChange?.value ?? imageCurrentValue;
     const changeId = getChangeId(selectedNode, spec.property, spec.kind);
     const currentValue = getCurrentValue(selectedNode, spec);
     const change = propertyChanges.find((item) => item.id === changeId);
     const value = change?.value ?? currentValue;
 
     return (
-      <section key="背景" className="border-b border-border/80 bg-card">
+      <section key="填充" className="border-b border-border/80 bg-card">
         <div className="flex items-center justify-between px-3 py-2">
           <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-            {getGroupIcon("背景")}
+            {getGroupIcon("填充")}
             填充
           </div>
           {!hasBackgroundColor && (
@@ -1573,6 +1584,44 @@ export function VisualPropertyPanel({
             </Button>
           )}
         </div>
+
+        {hasImage && (
+          <div className="space-y-1 px-3 pb-3">
+            <div className="grid grid-cols-[68px_minmax(0,1fr)_32px] items-center gap-2">
+              <div className="flex items-center">
+                {renderConfigMarkLabel(imageSpec, imageValue, imageCurrentValue || undefined)}
+              </div>
+              <Input
+                type="file"
+                accept="image/*"
+                className="h-8 text-xs"
+                disabled={uploadingChangeId === imageChangeId || localizingChangeId === imageChangeId}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  void uploadImageReplacement(file, imageChangeId, (nextValue, resource) => {
+                    onPropertyChange(selectedNode, imageSpec.property, "图片", nextValue, imageSpec.kind, imageCurrentValue || undefined, resource);
+                  });
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                title="本地化当前图片"
+                disabled={uploadingChangeId === imageChangeId || localizingChangeId === imageChangeId}
+                onClick={() => {
+                  void localizeSelectedImage(imageChangeId, imageCurrentValue, (nextValue, resource) => {
+                    onPropertyChange(selectedNode, imageSpec.property, "图片", nextValue, imageSpec.kind, imageCurrentValue || undefined, resource);
+                  });
+                }}
+              >
+                {localizingChangeId === imageChangeId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+              </Button>
+            </div>
+          </div>
+        )}
 
         {hasBackgroundColor && (
           <div className="px-3 pb-3">
@@ -1778,7 +1827,7 @@ export function VisualPropertyPanel({
             if (section === "位置") return renderPositionSection();
             if (section === "布局") return renderLayoutSection();
             if (section === "外观") return renderAppearanceSection();
-            if (section === "背景") return renderBackgroundSection();
+            if (section === "填充") return renderBackgroundSection();
             if (section === "边框") return renderBorderSection();
             if (section === "阴影与模糊") return renderEffectSection();
             return (

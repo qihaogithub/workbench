@@ -8,12 +8,12 @@ import {
   hashHtmlImportSource,
   sortHtmlImportAnalysisCollections,
   type HtmlImportAnalysis,
-  type HtmlImportRejectionCode,
   type HtmlImportResourceClassification,
   type HtmlImportSignal,
   type HtmlResourceReference,
   type HtmlUnsupportedCapability,
 } from "./html-import-contract";
+import { recommendHtmlImportPresentation } from "@workbench/shared";
 
 interface ParsedNode {
   nodeName: string;
@@ -59,6 +59,23 @@ function classifyUrl(value: string): HtmlImportResourceClassification {
   return "relative";
 }
 
+function resourcePolicy(classification: HtmlImportResourceClassification): Pick<HtmlResourceReference, "impact" | "remediation"> {
+  switch (classification) {
+    case "data":
+    case "fragment":
+      return { impact: "preserved", remediation: "none" };
+    case "blob":
+      return { impact: "blocked", remediation: "embed-as-data-url" };
+    case "relative":
+      return { impact: "blocked", remediation: "include-in-bundle" };
+    case "javascript":
+      return { impact: "blocked", remediation: "replace-with-safe-link" };
+    case "remote":
+    case "other":
+      return { impact: "blocked", remediation: "replace-or-localize" };
+  }
+}
+
 function dataUrlPayloadBytes(value: string): number {
   const comma = value.indexOf(",");
   if (comma === -1) return Buffer.byteLength(value, "utf8");
@@ -88,32 +105,25 @@ function nodePath(parentPath: string, node: ParsedNode, index: number): string {
   return `${parentPath}/${label}[${index}]`;
 }
 
-function rejectionCode(capabilities: HtmlUnsupportedCapability[]): HtmlImportRejectionCode {
-  if (capabilities.some((item) => item.code === "embedded-browsing-context")) {
-    return "HTML_IMPORT_EMBED_UNSUPPORTED";
-  }
-  if (capabilities.some((item) => [
-    "external-script",
-    "external-module-import",
-    "relative-resource",
-    "remote-resource",
-    "base-url",
-    "data-url-too-large",
-  ].includes(item.code))) {
-    return "HTML_IMPORT_EXTERNAL_RESOURCE_UNSUPPORTED";
-  }
-  return "HTML_IMPORT_CAPABILITY_RESTRICTED";
-}
-
 /** Phase 0 structural prototype. It is intentionally not exported from package index or wired to writes. */
-export function analyzeHtmlImportSpike(source: string): HtmlImportAnalysisSpikeResult {
+export function analyzeHtmlImportSpike(
+  source: string,
+): HtmlImportAnalysisSpikeResult {
   const sourceHash = hashHtmlImportSource(source);
   if (!source.trim()) {
     return {
       analysis: {
         analysisVersion: HTML_IMPORT_ANALYSIS_VERSION,
+        compatibility: "blocked",
         outcome: { status: "rejected", code: "HTML_IMPORT_INVALID" },
-        signals: [], unsupportedCapabilities: [], resourceReferences: [], warnings: [], sourceHash,
+        signals: [],
+        unsupportedCapabilities: [],
+        resourceReferences: [],
+        warnings: [],
+        source: { kind: "unknown", confirmationBypassEligible: false },
+        presentation: recommendHtmlImportPresentation({}),
+        sourceHash,
+        normalizedHash: hashHtmlImportSource(""),
       },
     };
   }
@@ -121,8 +131,16 @@ export function analyzeHtmlImportSpike(source: string): HtmlImportAnalysisSpikeR
     return {
       analysis: {
         analysisVersion: HTML_IMPORT_ANALYSIS_VERSION,
+        compatibility: "blocked",
         outcome: { status: "rejected", code: "HTML_IMPORT_TOO_LARGE" },
-        signals: [], unsupportedCapabilities: [], resourceReferences: [], warnings: [], sourceHash,
+        signals: [],
+        unsupportedCapabilities: [],
+        resourceReferences: [],
+        warnings: [],
+        source: { kind: "unknown", confirmationBypassEligible: false },
+        presentation: recommendHtmlImportPresentation({}),
+        sourceHash,
+        normalizedHash: hashHtmlImportSource(""),
       },
     };
   }
@@ -139,19 +157,31 @@ export function analyzeHtmlImportSpike(source: string): HtmlImportAnalysisSpikeR
   const visit = (node: ParsedNode, parentPath: string, index: number): void => {
     const path = nodePath(parentPath, node, index);
     const tagName = node.tagName?.toLowerCase();
-    const attrs = new Map((node.attrs ?? []).map((attr) => [attr.name.toLowerCase(), attr.value]));
-    if (tagName === "title") detectedTitle = textContent(node).trim() || undefined;
+    const attrs = new Map(
+      (node.attrs ?? []).map((attr) => [attr.name.toLowerCase(), attr.value]),
+    );
+    if (tagName === "title")
+      detectedTitle = textContent(node).trim() || undefined;
     if (tagName === "meta" && attrs.get("name")?.toLowerCase() === "viewport") {
       const content = attrs.get("content") ?? "";
       const width = /(?:^|,)\s*width\s*=\s*(\d+)/i.exec(content)?.[1];
       const height = /(?:^|,)\s*height\s*=\s*(\d+)/i.exec(content)?.[1];
-      if (width && height) detectedViewport = { width: Number(width), height: Number(height) };
+      if (width && height)
+        detectedViewport = { width: Number(width), height: Number(height) };
     }
     if (tagName && EMBED_TAGS.has(tagName)) {
-      unsupportedCapabilities.push({ code: "embedded-browsing-context", path, detail: tagName });
+      unsupportedCapabilities.push({
+        code: "embedded-browsing-context",
+        path,
+        detail: tagName,
+      });
     }
-    if (tagName === "base") unsupportedCapabilities.push({ code: "base-url", path });
-    if (tagName === "meta" && attrs.get("http-equiv")?.toLowerCase() === "refresh") {
+    if (tagName === "base")
+      unsupportedCapabilities.push({ code: "base-url", path });
+    if (
+      tagName === "meta" &&
+      attrs.get("http-equiv")?.toLowerCase() === "refresh"
+    ) {
       unsupportedCapabilities.push({ code: "meta-refresh", path });
     }
     if (tagName === "form") hasForm = true;
@@ -159,76 +189,166 @@ export function analyzeHtmlImportSpike(source: string): HtmlImportAnalysisSpikeR
       const type = (attrs.get("type") ?? "").trim().toLowerCase();
       const src = attrs.get("src")?.trim();
       const executable = EXECUTABLE_SCRIPT_TYPES.has(type);
-      if (src) unsupportedCapabilities.push({ code: "external-script", path, detail: src });
+      if (src)
+        unsupportedCapabilities.push({
+          code: "external-script",
+          path,
+          detail: src,
+        });
       if (executable) {
-        signals.push({ code: type === "module" ? "inline-module-script" : "classic-script", path });
+        signals.push({
+          code: type === "module" ? "inline-module-script" : "classic-script",
+          path,
+        });
         const body = textContent(node);
-        if (type === "module" && /(?:^|[;\n])\s*(?:import\s*(?:\(|[\s{*])|export\s+[^;]*?\sfrom\s*)/m.test(body)) {
-          unsupportedCapabilities.push({ code: "external-module-import", path });
+        if (
+          type === "module" &&
+          /(?:^|[;\n])\s*(?:import\s*(?:\(|[\s{*])|export\s+[^;]*?\sfrom\s*)/m.test(
+            body,
+          )
+        ) {
+          unsupportedCapabilities.push({
+            code: "external-module-import",
+            path,
+          });
         }
-        if (/\bnew\s+(?:Shared)?Worker\s*\(|\bnavigator\.serviceWorker\.register\s*\(/.test(body)) {
-          unsupportedCapabilities.push({ code: body.includes("serviceWorker") ? "service-worker" : "worker", path });
+        if (
+          /\bnew\s+(?:Shared)?Worker\s*\(|\bnavigator\.serviceWorker\.register\s*\(/.test(
+            body,
+          )
+        ) {
+          unsupportedCapabilities.push({
+            code: body.includes("serviceWorker") ? "service-worker" : "worker",
+            path,
+          });
         }
-        if (/\bwindow\.open\s*\(/.test(body)) unsupportedCapabilities.push({ code: "popup", path });
+        if (/\bwindow\.open\s*\(/.test(body))
+          unsupportedCapabilities.push({ code: "popup", path });
       } else {
-        signals.push({ code: "inert-data-script", path, detail: type || "unspecified" });
+        signals.push({
+          code: "inert-data-script",
+          path,
+          detail: type || "unspecified",
+        });
       }
     }
     if (tagName) {
       for (const [name, value] of attrs) {
-        if (name.startsWith("on")) signals.push({ code: "event-handler-attribute", path, detail: name });
-        if (name === "download") unsupportedCapabilities.push({ code: "download", path });
+        if (name.startsWith("on"))
+          signals.push({ code: "event-handler-attribute", path, detail: name });
+        if (name === "download")
+          unsupportedCapabilities.push({ code: "download", path });
         if (!URL_ATTRIBUTES.has(name) || !value.trim()) continue;
         const classification = classifyUrl(value);
-        resourceReferences.push({ tagName, attributeName: name, value, classification, path });
-        if (classification === "javascript") signals.push({ code: "javascript-url", path, detail: name });
-        if (classification === "relative") unsupportedCapabilities.push({ code: "relative-resource", path, detail: value });
-        if (classification === "remote") unsupportedCapabilities.push({ code: "remote-resource", path, detail: value });
-        if (classification === "blob" && tagName === "script") unsupportedCapabilities.push({ code: "blob-script", path });
+        resourceReferences.push({
+          tagName,
+          attributeName: name,
+          value,
+          classification,
+          ...resourcePolicy(classification),
+          path,
+        });
+        if (classification === "javascript")
+          signals.push({ code: "javascript-url", path, detail: name });
+        if (classification === "relative")
+          unsupportedCapabilities.push({
+            code: "relative-resource",
+            path,
+            detail: value,
+          });
+        if (classification === "remote")
+          unsupportedCapabilities.push({
+            code: "remote-resource",
+            path,
+            detail: value,
+          });
+        if (classification === "blob" && tagName === "script")
+          unsupportedCapabilities.push({ code: "blob-script", path });
         if (classification === "data") {
           signals.push({ code: "data-url-resource", path, detail: name });
           const bytes = dataUrlPayloadBytes(value);
           totalDataUrlBytes += bytes;
-          if (bytes > HTML_IMPORT_MAX_DATA_URL_BYTES) unsupportedCapabilities.push({ code: "data-url-too-large", path, detail: `${bytes}` });
+          if (bytes > HTML_IMPORT_MAX_DATA_URL_BYTES)
+            unsupportedCapabilities.push({
+              code: "data-url-too-large",
+              path,
+              detail: `${bytes}`,
+            });
         }
       }
     }
-    (node.childNodes ?? []).forEach((child, childIndex) => visit(child, path, childIndex));
+    (node.childNodes ?? []).forEach((child, childIndex) =>
+      visit(child, path, childIndex),
+    );
   };
   visit(document, "", 0);
-  const hasInteractiveSignal = signals.some((signal) => [
-    "classic-script",
-    "inline-module-script",
-    "event-handler-attribute",
-    "javascript-url",
-  ].includes(signal.code));
+  const hasInteractiveSignal = signals.some((signal) =>
+    [
+      "classic-script",
+      "inline-module-script",
+      "event-handler-attribute",
+      "javascript-url",
+    ].includes(signal.code),
+  );
   if (hasForm && !hasInteractiveSignal) {
-    unsupportedCapabilities.push({ code: "form-submission", path: "/html/body/form" });
+    unsupportedCapabilities.push({
+      code: "form-submission",
+      path: "/html/body/form",
+    });
   }
   if (totalDataUrlBytes > HTML_IMPORT_MAX_TOTAL_DATA_URL_BYTES) {
-    unsupportedCapabilities.push({ code: "data-url-too-large", path: "/", detail: `${totalDataUrlBytes}` });
+    unsupportedCapabilities.push({
+      code: "data-url-too-large",
+      path: "/",
+      detail: `${totalDataUrlBytes}`,
+    });
   }
 
-  const sorted = sortHtmlImportAnalysisCollections({ signals, unsupportedCapabilities, resourceReferences, warnings: [] });
-  const outcome = sorted.unsupportedCapabilities.length > 0
-    ? { status: "rejected" as const, code: rejectionCode(sorted.unsupportedCapabilities) }
+  const sorted = sortHtmlImportAnalysisCollections({
+    signals,
+    unsupportedCapabilities,
+    resourceReferences,
+    warnings: unsupportedCapabilities.map((capability) => ({
+      code: "restricted-api-possible" as const,
+      path: capability.path,
+      detail: capability.code,
+    })),
+  });
+  const hasOversizedData = sorted.unsupportedCapabilities.some(
+    (capability) => capability.code === "data-url-too-large",
+  );
+  const outcome = hasOversizedData
+    ? { status: "rejected" as const, code: "HTML_IMPORT_TOO_LARGE" as const }
     : {
         status: "accepted" as const,
         runtimeType: hasInteractiveSignal
-          ? "sandboxed-html" as const
-          : "prototype-html-css" as const,
+          ? ("sandboxed-html" as const)
+          : ("prototype-html-css" as const),
       };
   const normalizedHtml = serialize(document as never);
+  const normalizedHash = hashHtmlImportSource(normalizedHtml);
   return {
     analysis: {
       analysisVersion: HTML_IMPORT_ANALYSIS_VERSION,
+      runtimeType: outcome.status === "accepted" ? outcome.runtimeType : undefined,
+      compatibility: hasOversizedData
+        ? "blocked"
+        : sorted.unsupportedCapabilities.length > 0
+          ? "degraded"
+          : "complete",
       outcome,
       ...sorted,
+      source: { kind: "unknown", confirmationBypassEligible: false },
       ...(detectedTitle ? { detectedTitle } : {}),
       ...(detectedViewport ? { detectedViewport } : {}),
+      presentation: recommendHtmlImportPresentation({
+        numericViewport: detectedViewport,
+        hasViewportSignal: detectedViewport !== undefined,
+      }),
       sourceHash,
+      normalizedHash,
     },
     normalizedHtml,
-    normalizedHash: hashHtmlImportSource(normalizedHtml),
+    normalizedHash,
   };
 }

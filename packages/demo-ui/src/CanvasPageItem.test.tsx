@@ -109,3 +109,31 @@ describe("CanvasPageItem context menu", () => {
     },
   );
 });
+
+describe("CanvasPageItem sandbox HTML preview", () => {
+  it("画布中使用受控 sandbox execution iframe，而不是空的 React 代码预览", () => {
+    const { container } = render(
+      <CanvasPageItem
+        page={{
+          id: "sandbox-page",
+          name: "交互页面",
+          order: 0,
+          runtimeType: "sandboxed-html",
+          sandboxExecutionUrl: "https://sandbox.example/executions/ticket-1",
+          sandboxChannelId: "channel-1",
+          previewSize: { width: 375, height: 812 },
+        }}
+        layout={{ x: 0, y: 0, width: 375, height: 812 }}
+        editable={false}
+        renderMode="iframe"
+      />,
+    );
+
+    const frame = container.querySelector(
+      'iframe[data-sandbox-channel="channel-1"]',
+    ) as HTMLIFrameElement | null;
+    expect(frame).not.toBeNull();
+    expect(frame?.src).toContain("https://sandbox.example/executions/ticket-1");
+    expect(frame?.getAttribute("sandbox")).toContain("allow-scripts");
+  });
+});

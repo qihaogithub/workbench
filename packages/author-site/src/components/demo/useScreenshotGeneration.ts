@@ -504,6 +504,7 @@ export function useScreenshotGeneration(
                     }
                   : { runtimeType: "high-fidelity-react", code: p.code }),
               configData: p.configData || {},
+              presentation: p.presentation,
               previewSize: p.previewSize,
               width: p.width,
               height: p.height,
@@ -645,6 +646,7 @@ export function useScreenshotGeneration(
                   }
                 : { code: snapshotInput.code }),
             configData: snapshotInput.configData || {},
+            presentation: snapshotInput.presentation,
             previewSize: snapshotInput.previewSize,
             width,
             height,

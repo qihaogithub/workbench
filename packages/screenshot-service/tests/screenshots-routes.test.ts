@@ -102,7 +102,9 @@ describe("screenshot routes", () => {
     resolveRender?.();
     const responses = await Promise.all([first, second]);
 
-    expect(responses.map((response) => response.statusCode)).toEqual([200, 200]);
+    expect(responses.map((response) => response.statusCode)).toEqual([
+      200, 200,
+    ]);
     expect(renderCount).toBe(1);
     await app.close();
   });
@@ -135,8 +137,13 @@ describe("screenshot routes", () => {
       }),
     }));
     vi.doMock("../src/utils/screenshot-store", () => ({
-      computeScreenshotHash: (_code: string, _config: unknown, _w: number, _h: number, fullPage: boolean) =>
-        `hash-${String(fullPage)}`,
+      computeScreenshotHash: (
+        _code: string,
+        _config: unknown,
+        _w: number,
+        _h: number,
+        fullPage: boolean,
+      ) => `hash-${String(fullPage)}`,
       screenshotExists: vi.fn(async () => false),
       readScreenshotRenderBox: vi.fn(),
       readScreenshot: vi.fn(),
@@ -235,7 +242,7 @@ describe("screenshot routes", () => {
         priority: "background",
         variant: "strict",
         quality: "strict",
-        hash: "hash-a-320-640-false",
+        hash: 'hash-{"code":"a"}-320-640-false',
         status: "pending",
       },
     ]);
@@ -315,22 +322,24 @@ describe("screenshot routes", () => {
       expect(renderOrder).toEqual(["active", "background"]);
     });
 
-    let data: {
-      priorityStats: {
-        active: { completed: number };
-        background: { completed: number };
-      };
-      metrics: {
-        rendered: number;
-        totalQueueWaitMs: number;
-        renderStages: { pageCreateMs: number; setContentMs: number };
-      };
-      retryAfterMs: number;
-      prioritySlices: {
-        active: { status: string; completedElapsedMs: number };
-      };
-      results: Array<{ pageId: string }>;
-    } | undefined;
+    let data:
+      | {
+          priorityStats: {
+            active: { completed: number };
+            background: { completed: number };
+          };
+          metrics: {
+            rendered: number;
+            totalQueueWaitMs: number;
+            renderStages: { pageCreateMs: number; setContentMs: number };
+          };
+          retryAfterMs: number;
+          prioritySlices: {
+            active: { status: string; completedElapsedMs: number };
+          };
+          results: Array<{ pageId: string }>;
+        }
+      | undefined;
     await vi.waitFor(async () => {
       const statusResponse = await app.inject({
         method: "GET",
@@ -350,10 +359,9 @@ describe("screenshot routes", () => {
       status: "completed",
       completedElapsedMs: expect.any(Number),
     });
-    expect(data?.results.map((item: { pageId: string }) => item.pageId)).toEqual([
-      "page_active",
-      "page_background",
-    ]);
+    expect(
+      data?.results.map((item: { pageId: string }) => item.pageId),
+    ).toEqual(["page_active", "page_background"]);
     await app.close();
   });
 
@@ -507,7 +515,10 @@ describe("screenshot routes", () => {
       getBrowserPool: () => ({
         renderPage,
       }),
-      isLikelyBlankScreenshot: (byteLength: number, box?: { width: number; height: number }) =>
+      isLikelyBlankScreenshot: (
+        byteLength: number,
+        box?: { width: number; height: number },
+      ) =>
         Boolean(box && box.width * box.height >= 160_000 && byteLength < 8192),
     }));
     vi.doMock("../src/utils/screenshot-store", () => ({
@@ -581,7 +592,8 @@ describe("screenshot routes", () => {
         projectId: "proj_1",
         pageId: "prototype_1",
         runtimeType: "prototype-html-css",
-        prototypeHtml: "<main>{{title}}<script>window.bad = true</script></main>",
+        prototypeHtml:
+          "<main>{{title}}<script>window.bad = true</script></main>",
         prototypeCss: "main { width: 100vw; }",
         configData: { title: "原型页" },
         width: 320,
@@ -754,7 +766,10 @@ describe("screenshot routes", () => {
     }));
     vi.doMock("../src/utils/browser-pool", () => ({
       getBrowserPool: vi.fn(),
-      isLikelyBlankScreenshot: (byteLength: number, box?: { width: number; height: number }) =>
+      isLikelyBlankScreenshot: (
+        byteLength: number,
+        box?: { width: number; height: number },
+      ) =>
         Boolean(box && box.width * box.height >= 160_000 && byteLength < 8192),
     }));
     vi.doMock("../src/utils/screenshot-store", () => ({

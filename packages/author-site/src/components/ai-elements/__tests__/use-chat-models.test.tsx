@@ -308,6 +308,26 @@ describe("useChatModels", () => {
     jest.useRealTimers();
   });
 
+  it("个人模型配置保存后立即重新请求当前会话的模型列表", async () => {
+    const { unmount } = renderHook(() =>
+      useChatModels({ agentSessionId: "session-config-refresh", workingDir: "/tmp/workspace" }),
+    );
+
+    await waitFor(() => expect(mockStreams.get("session-config-refresh")).toBeDefined());
+    const stream = mockStreams.get("session-config-refresh")!;
+    await waitFor(() => expect(stream.ws.send).toHaveBeenCalledTimes(1));
+
+    act(() => {
+      window.dispatchEvent(new Event("workbench:ai-model-config-updated"));
+    });
+
+    expect(stream.ws.send).toHaveBeenCalledTimes(2);
+    expect(stream.ws.send).toHaveBeenLastCalledWith(
+      JSON.stringify({ type: "get_models", mode: "workbench", workingDir: "/tmp/workspace" }),
+    );
+    unmount();
+  });
+
   it("浏览端直接展示 Agent 服务返回的可用模型", async () => {
     const { result, unmount } = renderHook(() =>
       useChatModels({

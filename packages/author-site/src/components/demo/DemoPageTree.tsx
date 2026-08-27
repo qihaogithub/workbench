@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import type {
   DemoPageMeta,
   DemoFolderMeta,
@@ -32,6 +32,7 @@ import { useToast } from "@/components/ui/toast-provider";
 import { DemoPageTreeItem, StaticTreeItem } from "./DemoPageTreeItem";
 import { NewFolderDialog } from "./NewFolderDialog";
 import { ImportFromFigmaDialog } from "./ImportFromFigmaDialog";
+import { importTrustedFigmaHtmlFiles } from "./html-import-intake";
 import { Plus, FileText, FolderPlus, Upload } from "lucide-react";
 import {
   flattenTree,
@@ -64,6 +65,9 @@ interface DemoPageTreeProps {
     options?: RuntimeConversionRequestOptions,
   ) => void;
   onWorkspaceChange?: () => void;
+  htmlImportInitialFiles?: File[];
+  onHtmlImportInitialFilesConsumed?: () => void;
+  onHtmlImportPreviewStatus?: (status: "unavailable" | "loading" | "ready" | "incomplete" | "runtime-error" | "timeout" | "left-document") => void;
 }
 
 function getDropAfter(event: DragEndEvent): boolean {
@@ -112,6 +116,9 @@ export function DemoPageTree({
   onPageDelete,
   onRequestRuntimeConversion,
   onWorkspaceChange,
+  htmlImportInitialFiles,
+  onHtmlImportInitialFilesConsumed,
+  onHtmlImportPreviewStatus,
 }: DemoPageTreeProps) {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
     new Set(),
@@ -120,9 +127,12 @@ export function DemoPageTree({
   const [newFolderParentId, setNewFolderParentId] = useState<string | null>(
     null,
   );
-  const [importFigmaDialogOpen, setImportFigmaDialogOpen] = useState(false);
+  const [importHtmlDialogOpen, setImportHtmlDialogOpen] = useState(false);
+  const [workbenchInitialFiles, setWorkbenchInitialFiles] = useState<File[]>();
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const htmlInputRef = useRef<HTMLInputElement>(null);
+  const processedInitialFiles = useRef<File[] | undefined>(undefined);
   const { toast } = useToast();
 
   const flatItems = useMemo(
@@ -409,6 +419,61 @@ export function DemoPageTree({
     [pages, onPagesChange, onPageSelect, onWorkspaceChange],
   );
 
+  const handleDirectFigmaCreated = useCallback(
+    (createdPages: DemoPageMeta[]) => {
+      if (!createdPages.length) return;
+      onPagesChange([...pages, ...createdPages].sort((a, b) => a.order - b.order));
+      onPageSelect(createdPages[createdPages.length - 1]!.id);
+      onWorkspaceChange?.();
+    },
+    [onPageSelect, onPagesChange, onWorkspaceChange, pages],
+  );
+
+  const handleHtmlFiles = useCallback(
+    async (incoming: File[]) => {
+      if (!sessionId) {
+        toast({ title: "未创建 Session", variant: "destructive" });
+        return;
+      }
+      const result = await importTrustedFigmaHtmlFiles({
+        api: projectApiClient,
+        projectId,
+        sessionId,
+        files: incoming,
+      });
+      handleDirectFigmaCreated(result.imported.map((item) => item.page));
+      result.imported.forEach((item) => {
+        toast({
+          title: "已直接导入 Figma HTML",
+          description: item.blockedResourceCount
+            ? `${item.filename} 已创建；${item.blockedResourceCount} 项受限资源仍被阻断。`
+            : `${item.filename} 已创建页面。`,
+        });
+      });
+      result.failures.forEach((item) =>
+        toast({
+          title: "Figma HTML 导入失败",
+          description: `${item.filename}：${item.error.message}`,
+          variant: "destructive",
+        }),
+      );
+      if (result.remainingFiles.length) {
+        setWorkbenchInitialFiles(result.remainingFiles);
+        setImportHtmlDialogOpen(true);
+      }
+    },
+    [handleDirectFigmaCreated, projectId, sessionId, toast],
+  );
+
+  useEffect(() => {
+    if (!htmlImportInitialFiles?.length) return;
+    if (processedInitialFiles.current === htmlImportInitialFiles) return;
+    processedInitialFiles.current = htmlImportInitialFiles;
+    void handleHtmlFiles(htmlImportInitialFiles).finally(() => {
+      onHtmlImportInitialFilesConsumed?.();
+    });
+  }, [handleHtmlFiles, htmlImportInitialFiles, onHtmlImportInitialFilesConsumed]);
+
   const handleMovePageToFolder = useCallback(
     async (pageId: string, targetParentId: string | null) => {
       if (!sessionId) return;
@@ -491,10 +556,10 @@ export function DemoPageTree({
                 className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
                 onClick={() => {
                   setPopoverOpen(false);
-                  setImportFigmaDialogOpen(true);
+                  htmlInputRef.current?.click();
                 }}
               >
-                <Upload className="h-4 w-4" />从 Figma 导入
+                <Upload className="h-4 w-4" />上传 HTML 文件
               </button>
             </PopoverContent>
           </Popover>
@@ -577,12 +642,28 @@ export function DemoPageTree({
         onCreate={handleCreateFolder}
       />
 
+      <input
+        ref={htmlInputRef}
+        type="file"
+        accept=".html,.htm,text/html"
+        multiple
+        className="hidden"
+        onChange={(event) => {
+          const files = event.target.files ? Array.from(event.target.files) : [];
+          event.target.value = "";
+          if (files.length) void handleHtmlFiles(files);
+        }}
+      />
+
       <ImportFromFigmaDialog
-        open={importFigmaDialogOpen}
-        onOpenChange={setImportFigmaDialogOpen}
+        open={importHtmlDialogOpen}
+        onOpenChange={setImportHtmlDialogOpen}
         projectId={projectId}
         sessionId={sessionId}
         onPageCreated={handleImportFigmaCreated}
+        initialFiles={workbenchInitialFiles}
+        onInitialFilesConsumed={() => setWorkbenchInitialFiles(undefined)}
+        onPreviewStatus={onHtmlImportPreviewStatus}
       />
     </div>
   );

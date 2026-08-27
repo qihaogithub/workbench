@@ -61,18 +61,31 @@ export {
   sanitizePrototypeCss,
   sanitizePrototypeHtml,
 } from "./demo/prototype-preview";
-export {
-  checkConfigSchemaAgainstPrototype,
-} from "./demo/config-runtime-compatibility";
-export type {
-  ConfigRuntimeCompatibilityResult,
-} from "./demo/config-runtime-compatibility";
+export { checkConfigSchemaAgainstPrototype } from "./demo/config-runtime-compatibility";
+export type { ConfigRuntimeCompatibilityResult } from "./demo/config-runtime-compatibility";
 export {
   parsePageRequirementsRefs,
   findPageRequirementRefMatches,
   resolvePageRequirementRefs,
   inferPageRequirementTitle,
 } from "./demo/page-requirements";
+export {
+  PAGE_PRESENTATION_LIMITS,
+  PAGE_PRESENTATION_PRESETS,
+  applyPagePresentationToSchema,
+  createPagePresentationProfile,
+  isValidPagePresentationViewport,
+  recommendHtmlImportPresentation,
+  resolvePagePresentation,
+} from "./demo/page-presentation";
+export type {
+  HtmlImportPresentationConfidence,
+  HtmlImportPresentationRecommendation,
+  PagePresentationMode,
+  PagePresentationPreset,
+  PagePresentationProfile,
+  PagePresentationSource,
+} from "./demo/page-presentation";
 export type {
   PageRequirementRef,
   ResolvedPageRequirementRef,
@@ -90,8 +103,7 @@ export type {
 } from "./demo/config-schema-definition";
 
 export interface PrototypePageMeta {
-  width?: number;
-  height?: number;
+  source?: string;
   generatedBy?: string;
   updatedAt?: number;
   [key: string]: unknown;
@@ -103,7 +115,6 @@ export interface HtmlImportMeta {
   sourceHash: string;
   normalizedHash: string;
   sandboxPolicyVersion: number;
-  viewport?: { width?: number; height?: number };
 }
 
 export interface DemoMeta {
@@ -170,18 +181,21 @@ export interface DemoFiles {
 
 interface PageSnapshotBaseInput {
   configData: Record<string, unknown>;
+  presentation?: import("./demo/page-presentation").PagePresentationProfile;
   previewSize?: {
     width?: string | number;
     height?: string | number;
   };
 }
 
-export interface HighFidelityReactPageSnapshotInput extends PageSnapshotBaseInput {
+export interface HighFidelityReactPageSnapshotInput
+  extends PageSnapshotBaseInput {
   runtimeType: "high-fidelity-react";
   code: string;
 }
 
-export interface PrototypeHtmlCssPageSnapshotInput extends PageSnapshotBaseInput {
+export interface PrototypeHtmlCssPageSnapshotInput
+  extends PageSnapshotBaseInput {
   runtimeType: "prototype-html-css";
   prototypeHtml: string;
   prototypeCss?: string;
@@ -345,6 +359,7 @@ export const ErrorCode = {
   PROJECT_IMPORT_FAILED: "PROJECT_IMPORT_FAILED",
   HTML_IMPORT_INVALID: "HTML_IMPORT_INVALID",
   HTML_IMPORT_TOO_LARGE: "HTML_IMPORT_TOO_LARGE",
+  HTML_IMPORT_NOT_RENDERABLE: "HTML_IMPORT_NOT_RENDERABLE",
   HTML_IMPORT_EXTERNAL_RESOURCE_UNSUPPORTED:
     "HTML_IMPORT_EXTERNAL_RESOURCE_UNSUPPORTED",
   HTML_IMPORT_EMBED_UNSUPPORTED: "HTML_IMPORT_EMBED_UNSUPPORTED",
@@ -401,6 +416,7 @@ export const ERROR_MESSAGES: Record<ErrorCodeType, string> = {
   PROJECT_IMPORT_FAILED: "导入项目失败",
   HTML_IMPORT_INVALID: "无法读取有效 HTML",
   HTML_IMPORT_TOO_LARGE: "HTML 文件过大，请压缩后重试",
+  HTML_IMPORT_NOT_RENDERABLE: "HTML 未包含可渲染内容",
   HTML_IMPORT_EXTERNAL_RESOURCE_UNSUPPORTED: "当前仅支持自包含的单文件资源",
   HTML_IMPORT_EMBED_UNSUPPORTED: "当前不支持页面内嵌第三方内容",
   HTML_IMPORT_CAPABILITY_RESTRICTED: "页面依赖当前不支持的浏览器能力",
@@ -419,7 +435,6 @@ export * from "./diagnostics";
 export * from "./ai-error-normalizer";
 export * from "./comment";
 export * from "./feedback";
-
 
 /** 图片附件，Base64 编码 */
 export interface ImageAttachment {

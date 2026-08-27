@@ -21,6 +21,7 @@ import {
   KeyRound,
   Link2,
   LogOut,
+  Plus,
   RefreshCw,
   Settings,
   User,
@@ -80,14 +81,15 @@ export function SettingsButton() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [checking, setChecking] = useState(false);
-  const [providerId, setProviderId] = useState("jojo");
-  const [providerName, setProviderName] = useState("叫叫");
-  const [baseURL, setBaseURL] = useState("https://token.xjjj.co/v1");
+  const [providerId, setProviderId] = useState("");
+  const [providerName, setProviderName] = useState("");
+  const [baseURL, setBaseURL] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [hasApiKey, setHasApiKey] = useState(false);
-  const [modelsText, setModelsText] = useState("deepseek-v4-flash-0731");
-  const [defaultModel, setDefaultModel] = useState("");
+  const [modelsText, setModelsText] = useState("");
   const [loadingModelConfig, setLoadingModelConfig] = useState(false);
+  const [fetchingModels, setFetchingModels] = useState(false);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [externalProviders, setExternalProviders] = useState<ExternalProviderStatus[]>([]);
   const [externalMessage, setExternalMessage] = useState("");
   const [loadingExternalAuth, setLoadingExternalAuth] = useState(false);
@@ -139,12 +141,11 @@ export function SettingsButton() {
       const data = await res.json();
       if (data.success && data.data?.provider) {
         const provider = data.data.provider;
-        setProviderId(provider.id || "custom");
-        setProviderName(provider.name || "自定义模型");
+        setProviderId(provider.id || "");
+        setProviderName(provider.name || "");
         setBaseURL(provider.baseURL || "");
         setHasApiKey(Boolean(provider.hasApiKey));
         setModelsText(Array.isArray(provider.models) ? provider.models.join("\n") : "");
-        setDefaultModel(provider.defaultModel || "");
       }
     } catch {
       toast({
@@ -158,8 +159,51 @@ export function SettingsButton() {
   };
 
   const handleOpenModelConfig = async () => {
+    setAvailableModels([]);
     setView("model-config");
     await loadModelConfig();
+  };
+
+  const handleFetchModels = async () => {
+    if (!baseURL.trim()) {
+      toast({
+        title: "请先填写 baseURL",
+        description: "需要通过 OpenAI 兼容接口获取模型列表",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setFetchingModels(true);
+    try {
+      const res = await fetch("/api/user/model-config/models", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ baseURL, apiKey }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error?.message || "获取模型列表失败");
+      }
+      setAvailableModels(Array.isArray(data.data?.models) ? data.data.models : []);
+    } catch (error) {
+      toast({
+        title: "获取模型列表失败",
+        description: error instanceof Error ? error.message : "请检查 baseURL 和 API Key",
+        variant: "destructive",
+      });
+    } finally {
+      setFetchingModels(false);
+    }
+  };
+
+  const handleAddFetchedModel = (model: string) => {
+    const currentModels = modelsText
+      .split("\n")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    if (currentModels.includes(model)) return;
+    setModelsText([...currentModels, model].join("\n"));
   };
 
   const loadExternalAuth = async () => {
@@ -294,7 +338,6 @@ export function SettingsButton() {
           apiKey,
           keepExistingApiKey: !apiKey,
           models,
-          defaultModel: defaultModel || undefined,
           enabled: true,
         }),
       });
@@ -302,9 +345,10 @@ export function SettingsButton() {
       if (data.success) {
         setApiKey("");
         setHasApiKey(Boolean(data.data?.provider?.hasApiKey));
+        window.dispatchEvent(new Event("workbench:ai-model-config-updated"));
         toast({
           title: "AI 模型配置已保存",
-          description: "刷新或新打开编辑页后生效",
+          description: "当前编辑页的模型列表正在刷新",
         });
         setView("main");
       } else {
@@ -335,13 +379,13 @@ export function SettingsButton() {
       });
       const data = await res.json();
       if (data.success) {
-        setProviderId("jojo");
-        setProviderName("叫叫");
-        setBaseURL("https://token.xjjj.co/v1");
+        setProviderId("");
+        setProviderName("");
+        setBaseURL("");
         setApiKey("");
         setHasApiKey(false);
-        setModelsText("deepseek-v4-flash-0731");
-        setDefaultModel("");
+        setModelsText("");
+        setAvailableModels([]);
         toast({ title: "AI 模型配置已清空" });
         setView("main");
       } else {
@@ -556,7 +600,10 @@ export function SettingsButton() {
                   <Label>baseURL</Label>
                   <Input
                     value={baseURL}
-                    onChange={(e) => setBaseURL(e.target.value)}
+                    onChange={(e) => {
+                      setBaseURL(e.target.value);
+                      setAvailableModels([]);
+                    }}
                     placeholder="https://token.xjjj.co/v1"
                     disabled={submitting || loadingModelConfig}
                   />
@@ -566,28 +613,59 @@ export function SettingsButton() {
                   <Input
                     type="password"
                     value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
+                    onChange={(e) => {
+                      setApiKey(e.target.value);
+                      setAvailableModels([]);
+                    }}
                     placeholder={hasApiKey ? "已保存，留空则保持不变" : "sk-..."}
                     disabled={submitting || loadingModelConfig}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>模型列表（每行一个）</Label>
+                  <div className="flex items-center justify-between gap-3">
+                    <Label>从供应商获取模型</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleFetchModels}
+                      disabled={submitting || loadingModelConfig || fetchingModels}
+                    >
+                      <RefreshCw className={`mr-2 h-4 w-4 ${fetchingModels ? "animate-spin" : ""}`} />
+                      {fetchingModels ? "获取中..." : "获取模型列表"}
+                    </Button>
+                  </div>
+                  {availableModels.length > 0 ? (
+                    <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-input p-2">
+                      {availableModels.map((model) => {
+                        const added = modelsText.split("\n").some((item) => item.trim() === model);
+                        return (
+                          <div key={model} className="flex items-center justify-between gap-3 rounded px-2 py-1.5 text-sm hover:bg-accent">
+                            <span className="min-w-0 truncate">{model}</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleAddFetchedModel(model)}
+                              disabled={added || submitting || loadingModelConfig}
+                            >
+                              <Plus className="mr-1 h-4 w-4" />
+                              {added ? "已添加" : "添加"}
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+                <div className="space-y-2">
+                  <Label>手动模型列表（每行一个）</Label>
                   <textarea
                     value={modelsText}
                     onChange={(e) => setModelsText(e.target.value)}
                     placeholder={"deepseek-v4-flash-0731\ngpt-4o-mini"}
                     disabled={submitting || loadingModelConfig}
                     className="min-h-[112px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>默认模型</Label>
-                  <Input
-                    value={defaultModel}
-                    onChange={(e) => setDefaultModel(e.target.value)}
-                    placeholder="留空则使用列表第一项"
-                    disabled={submitting || loadingModelConfig}
                   />
                 </div>
               </div>

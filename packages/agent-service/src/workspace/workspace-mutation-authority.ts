@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { buildPageDesignSpecSyncWrites } from "@workbench/project-core/page-design-spec-sync";
+import { normalizeHtmlImport } from "@workbench/project-core/html-import";
 
 import type {
   WorkspaceMutationCommittedEvent,
@@ -470,8 +471,8 @@ export class WorkspaceMutationAuthority {
     }));
   }
 
-  /** Store untrusted binary bytes outside the editable Workspace until a
-   * subsequent put_binary mutation validates and commits their exact hash. */
+  /** Store untrusted bytes outside the editable Workspace until a subsequent
+   * staged mutation validates and commits their exact hash. */
   async stageBinary(projectId: string, workspaceId: string, content: Buffer): Promise<{ stagingId: string; hash: string; size: number }> {
     if (content.length === 0 || content.length > 20 * 1024 * 1024) {
       throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
@@ -530,6 +531,7 @@ export class WorkspaceMutationAuthority {
         }
 
         const workspacePath = this.workspacePath(request.workspaceId);
+        request = this.expandHtmlImportCommand(request, workspacePath);
         request = this.withPageDesignSpecSync(request, workspacePath);
         const actual = this.readResourceHashes(workspacePath);
         if (this.rootHash(actual) !== state.rootHash) {
@@ -672,7 +674,11 @@ export class WorkspaceMutationAuthority {
 
   private mutationResourcePaths(request: WorkspaceMutationRequest): string[] {
     return [...new Set(request.operations.flatMap((operation) => (
-      operation.type === "move_path" ? [operation.from, operation.to] : [operation.path]
+      operation.type === "move_path"
+        ? [operation.from, operation.to]
+        : operation.type === "commit_html_import"
+          ? []
+          : [operation.path]
     )))].sort();
   }
 
@@ -798,6 +804,90 @@ export class WorkspaceMutationAuthority {
     }
   }
 
+  private expandHtmlImportCommand(
+    request: WorkspaceMutationRequest,
+    workspacePath: string,
+  ): WorkspaceMutationRequest {
+    const commands = request.operations.filter(
+      (operation): operation is Extract<typeof operation, { type: "commit_html_import" }> =>
+        operation.type === "commit_html_import",
+    );
+    if (!commands.length) return request;
+    if (commands.length !== 1 || request.operations.length !== 1)
+      throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+    const command = commands[0];
+    if (
+      !/^[0-9a-f-]{36}$/i.test(command.stagingId) ||
+      command.size <= 0 ||
+      command.size > 2 * 1024 * 1024 ||
+      !command.name.trim() ||
+      !/^[a-f0-9]{64}$/.test(command.sourceHash)
+    )
+      throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+    const stagedPath = this.stagingPath(request.workspaceId, command.stagingId);
+    if (!fs.existsSync(stagedPath))
+      throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+    const source = fs.readFileSync(stagedPath);
+    if (source.length !== command.size || hashWorkspaceContent(source) !== command.hash)
+      throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+    const text = source.toString("utf8");
+    if (!Buffer.from(text, "utf8").equals(source))
+      throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+    const analysis = normalizeHtmlImport(text);
+    if (
+      analysis.analysis.outcome.status !== "accepted" ||
+      analysis.analysis.analysisVersion !== command.analysisVersion ||
+      analysis.analysis.sourceHash !== command.sourceHash ||
+      analysis.normalizedHash !== command.normalizedHash ||
+      analysis.analysis.runtimeType !== command.runtimeType ||
+      !analysis.normalizedHtml
+    )
+      throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+    const presentation = command.presentation;
+    if (
+      !presentation ||
+      (presentation.mode === "fixed-canvas" && presentation.heightBehavior !== "fixed") ||
+      (presentation.mode === "responsive-page" && presentation.heightBehavior !== "content")
+    )
+      throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+    const treeFile = path.join(workspacePath, "workspace-tree.json");
+    if (!fs.existsSync(treeFile))
+      throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+    const tree = this.readJson<{ folders?: Array<{ id: string }>; pages?: Array<{ id: string; name: string; routeKey?: string; order: number; parentId?: string | null }> }>(treeFile);
+    const folders = tree.folders ?? [];
+    const pages = tree.pages ?? [];
+    if (command.parentId && !folders.some((folder) => folder.id === command.parentId))
+      throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+    const slug = command.name.trim().toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, "-").replace(/^-+|-+$/g, "") || "html-page";
+    const pageId = `${slug.slice(0, 48)}_${crypto.randomBytes(3).toString("hex")}`;
+    const usedRoutes = new Set(pages.map((page) => page.routeKey).filter((value): value is string => Boolean(value)));
+    let routeKey = slug;
+    let suffix = 2;
+    while (usedRoutes.has(routeKey)) routeKey = `${slug}-${suffix++}`;
+    const siblings = pages.filter((page) => (page.parentId ?? null) === command.parentId);
+    const order = siblings.length ? Math.max(...siblings.map((page) => page.order)) + 1 : 0;
+    const page = { id: pageId, name: command.name.trim(), routeKey, order, parentId: command.parentId, runtimeType: command.runtimeType };
+    const prefix = `demos/${pageId}`;
+    const meta = JSON.stringify({ source: "html-import", analysisVersion: command.analysisVersion, sourceHash: command.sourceHash, normalizedHash: command.normalizedHash, sandboxPolicyVersion: 1 }, null, 2) + "\n";
+    const schema = JSON.stringify({ type: "object", properties: {}, $demo: { presentation } }, null, 2) + "\n";
+    const treeText = JSON.stringify({ folders, pages: [...pages, page] }, null, 2) + "\n";
+    const operations: WorkspaceMutationRequest["operations"] = command.runtimeType === "sandboxed-html"
+      ? [
+          { type: "put_text", path: `${prefix}/sandbox.html`, content: analysis.normalizedHtml, expectedAbsent: true },
+          { type: "put_text", path: `${prefix}/html-import.meta.json`, content: meta, expectedAbsent: true },
+          { type: "put_text", path: `${prefix}/config.schema.json`, content: schema, expectedAbsent: true },
+          { type: "put_text", path: "workspace-tree.json", content: treeText },
+        ]
+      : [
+          { type: "put_text", path: `${prefix}/prototype.html`, content: analysis.normalizedHtml, expectedAbsent: true },
+          { type: "put_text", path: `${prefix}/prototype.css`, content: "", expectedAbsent: true },
+          { type: "put_text", path: `${prefix}/prototype.meta.json`, content: JSON.stringify({ source: "html-import", generatedBy: "html-import" }, null, 2) + "\n", expectedAbsent: true },
+          { type: "put_text", path: `${prefix}/config.schema.json`, content: schema, expectedAbsent: true },
+          { type: "put_text", path: "workspace-tree.json", content: treeText },
+        ];
+    return { ...request, operations };
+  }
+
   private prepare(request: WorkspaceMutationRequest, payloadHash: string, state: WorkspaceAuthorityState, workspacePath: string): PreparedMutation {
     if (!request.mutationId || request.operations.length === 0) throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
     const before: PreparedMutation["before"] = {};
@@ -820,6 +910,21 @@ export class WorkspaceMutationAuthority {
         if (content.length !== operation.size || hashWorkspaceContent(content) !== operation.hash) {
           throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
         }
+      } else if (operation.type === "put_staged_text") {
+        if (operation.path.startsWith("assets/") || !/^[0-9a-f-]{36}$/i.test(operation.stagingId) || operation.size <= 0 || operation.size > 2 * 1024 * 1024) {
+          throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+        }
+        const staged = this.stagingPath(request.workspaceId, operation.stagingId);
+        if (!fs.existsSync(staged)) throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+        const content = fs.readFileSync(staged);
+        if (content.length !== operation.size || hashWorkspaceContent(content) !== operation.hash) {
+          throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+        }
+        const text = content.toString("utf8");
+        if (!Buffer.from(text, "utf8").equals(content)) {
+          throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+        }
+        assertManagedWorkspaceTextWrite(operation.path, text);
       }
       // Yjs-First: assertExpected() removed for all operation types — Authority no
       // longer does per-resource hash conflict detection. All writes are routed
@@ -867,6 +972,11 @@ export class WorkspaceMutationAuthority {
       } else if (operation.type === "put_binary") {
         const before = prepared.before[operation.path];
         this.writeBufferAtomic(this.resolve(workspacePath, operation.path), fs.readFileSync(this.stagingPath(prepared.request.workspaceId, operation.stagingId)));
+        changes.push({ path: operation.path, action: before.exists ? "modified" : "created", beforeHash: before.hash, afterHash: operation.hash });
+      } else if (operation.type === "put_staged_text") {
+        const before = prepared.before[operation.path];
+        const content = fs.readFileSync(this.stagingPath(prepared.request.workspaceId, operation.stagingId));
+        this.writeTextAtomic(this.resolve(workspacePath, operation.path), content.toString("utf8"));
         changes.push({ path: operation.path, action: before.exists ? "modified" : "created", beforeHash: before.hash, afterHash: operation.hash });
       } else if (operation.type === "delete_path") {
         const before = prepared.before[operation.path];
@@ -1068,7 +1178,9 @@ export class WorkspaceMutationAuthority {
   }
   private removeStagedBinaries(request: WorkspaceMutationRequest): void {
     for (const operation of request.operations) {
-      if (operation.type === "put_binary") fs.rmSync(this.stagingPath(request.workspaceId, operation.stagingId), { force: true });
+      if (operation.type === "put_binary" || operation.type === "put_staged_text") {
+        fs.rmSync(this.stagingPath(request.workspaceId, operation.stagingId), { force: true });
+      }
     }
   }
 

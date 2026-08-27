@@ -71,9 +71,10 @@ describe('preview-validation', () => {
   });
 
   describe('config.schema.json 复合类型检查', () => {
+    const presentation = { version: 1, mode: 'responsive-page', viewport: { width: 390, height: 844 }, heightBehavior: 'content', preset: 'mobile', source: 'user' };
     const validSchema = JSON.stringify({
       type: 'object',
-      $demo: { previewSize: { width: 375, height: 812 } },
+      $demo: { presentation },
       properties: {
         title: { type: 'string', title: '标题' },
         count: { type: 'number', title: '数量' },
@@ -94,7 +95,7 @@ describe('preview-validation', () => {
         'demos/home/config.schema.json',
         JSON.stringify({
           type: 'object',
-          $demo: { previewSize: { width: 375, height: 812 } },
+          $demo: { presentation },
           properties: {
             modules: { type: 'array', title: '模块列表', items: { type: 'object', properties: {} } },
           },
@@ -110,7 +111,7 @@ describe('preview-validation', () => {
         'demos/home/config.schema.json',
         JSON.stringify({
           type: 'object',
-          $demo: { previewSize: { width: 375, height: 812 } },
+          $demo: { presentation },
           properties: {
             modules: { type: 'array', title: '模块列表', items: { type: 'object', properties: {} } },
           },
@@ -126,7 +127,7 @@ describe('preview-validation', () => {
         'demos/home/config.schema.json',
         JSON.stringify({
           type: 'object',
-          $demo: { previewSize: { width: 375, height: 812 } },
+          $demo: { presentation },
           properties: {
             modules: { type: 'array', title: '模块列表', items: { type: 'object', properties: {} } },
           },
@@ -141,7 +142,7 @@ describe('preview-validation', () => {
         'demos/home/config.schema.json',
         JSON.stringify({
           type: 'object',
-          $demo: { previewSize: { width: 375, height: 812 } },
+          $demo: { presentation },
           properties: {
             images: { type: 'imageList', title: '图片列表' },
           },
@@ -157,7 +158,7 @@ describe('preview-validation', () => {
         'demos/home/config.schema.json',
         JSON.stringify({
           type: 'object',
-          $demo: { previewSize: { width: 375, height: 812 } },
+          $demo: { presentation },
           properties: {
             logo: { type: 'position', title: 'Logo 位置', key: 'logo', size: { width: 100, height: 50 } },
           },

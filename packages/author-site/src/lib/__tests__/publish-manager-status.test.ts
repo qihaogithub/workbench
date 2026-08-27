@@ -2,6 +2,7 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import crypto from "crypto";
+import { HTML_IMPORT_ANALYSIS_VERSION } from "@workbench/project-core";
 
 let tempDir: string;
 let getPublishStatus: typeof import("../publish-manager").getPublishStatus;
@@ -121,7 +122,7 @@ function setupSandboxPublishableProject(projectId: string) {
     path.join(demoDir, "html-import.meta.json"),
     JSON.stringify({
       source: "html-import",
-      analysisVersion: 1,
+      analysisVersion: HTML_IMPORT_ANALYSIS_VERSION,
       sourceHash: "a".repeat(64),
       normalizedHash,
       sandboxPolicyVersion: 1,
@@ -337,7 +338,7 @@ describe("getPublishStatus", () => {
     expect(page.sandboxRendererVersion).toBe(1);
     expect(page.htmlImportMeta).toMatchObject({
       source: "html-import",
-      analysisVersion: 1,
+      analysisVersion: HTML_IMPORT_ANALYSIS_VERSION,
       sandboxPolicyVersion: 1,
       sourceHash: "a".repeat(64),
       normalizedHash: crypto

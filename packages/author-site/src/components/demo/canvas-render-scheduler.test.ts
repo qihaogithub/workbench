@@ -53,6 +53,28 @@ describe("computeCanvasRenderModes", () => {
     expect(result.sleepingPageIds).toEqual([]);
   });
 
+  it("少页面 sandbox HTML 在截图尚未生成时也会进入受控 iframe", () => {
+    const pages = [
+      {
+        ...makePage("sandbox_1"),
+        runtimeType: "sandboxed-html" as const,
+      },
+    ];
+
+    const result = computeCanvasRenderModes({
+      pages,
+      layouts: { sandbox_1: makeLayout(0) },
+      visiblePageIds: new Set(["sandbox_1"]),
+      viewport: { x: 0, y: 0, zoom: 1 },
+      containerWidth: 220,
+      containerHeight: 200,
+      recentIframeAccess: new Map(),
+    });
+
+    expect(result.modes.sandbox_1).toBe("iframe");
+    expect(result.activePageIds).toEqual(["sandbox_1"]);
+  });
+
   it("6 页及以上时选中页始终 active，最近页进入 iframe", () => {
     const pages = Array.from({ length: 6 }, (_, index) =>
       makePage(`page_${index + 1}`),

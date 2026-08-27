@@ -88,7 +88,12 @@ export async function POST(
       { status: 503 },
     );
   }
-  const execution = createHtmlSandboxExecution(sandboxHtml);
+  const execution = createHtmlSandboxExecution(sandboxHtml, Date.now(), {
+    projectId,
+    sessionId,
+    workspaceId: session.workspaceId,
+    pageId: demoId,
+  });
   appendServerEditorDiagnosticEvent({
     level: "info",
     eventGroup: "preview",

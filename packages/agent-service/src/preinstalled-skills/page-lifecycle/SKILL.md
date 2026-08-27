@@ -29,7 +29,14 @@ description: 创建/重命名/排序页面和文件夹的完整规则：目录�
 ```json
 {
   "$demo": {
-    "previewSize": { "width": 375, "height": 812 }
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": { "width": 390, "height": 844 },
+      "heightBehavior": "content",
+      "preset": "mobile",
+      "source": "user"
+    }
   },
   "type": "object",
   "properties": {},
@@ -37,14 +44,21 @@ description: 创建/重命名/排序页面和文件夹的完整规则：目录�
 }
 ```
 
-`previewSize` 的宽高由你根据页面目标设备和内容自行判断填写。
+`presentation.viewport` 的宽高由你根据页面目标设备和内容自行判断填写；页面响应式布局使用 `responsive-page + content`，固定设计画板才使用 `fixed-canvas + fixed`。
 
 如果用户明确要求配置项，使用以下格式定义字段（按分组组织）：
 
 ```json
 {
   "$demo": {
-    "previewSize": { "width": 375, "height": 812 }
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": { "width": 390, "height": 844 },
+      "heightBehavior": "content",
+      "preset": "mobile",
+      "source": "user"
+    }
   },
   "type": "object",
   "properties": {

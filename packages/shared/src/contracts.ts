@@ -1,6 +1,7 @@
 export * from "./index";
 
 import type { WorkspaceRevision } from "./workspace";
+import type { DemoPageRuntimeType, PagePresentationProfile } from "./index";
 
 /**
  * Durable, single-writer contract for an active (live) Workspace.
@@ -81,6 +82,19 @@ export interface WorkspaceMutationPutBinaryOperation {
   expectedAbsent?: boolean;
 }
 
+/** Text payloads may also be staged when their JSON representation would exceed
+ * the Authority mutation endpoint limit. The Authority validates UTF-8 and the
+ * normal managed-text path policy before the atomic commit. */
+export interface WorkspaceMutationPutStagedTextOperation {
+  type: "put_staged_text";
+  path: string;
+  stagingId: string;
+  hash: string;
+  size: number;
+  expectedHash?: string;
+  expectedAbsent?: boolean;
+}
+
 export interface WorkspaceMutationDeletePathOperation {
   type: "delete_path";
   path: string;
@@ -95,11 +109,35 @@ export interface WorkspaceMutationMovePathOperation {
   expectedTargetAbsent?: boolean;
 }
 
+/** A declarative import command. Authority expands it only after entering its
+ * workspace serial section, so page id/route/order are allocated from the
+ * current tree rather than a caller's stale snapshot. */
+export interface WorkspaceMutationCommitHtmlImportOperation {
+  type: "commit_html_import";
+  /** Compatibility placeholders; Authority consumes this command before the
+   * generic resource-operation pipeline observes these fields. */
+  path: "";
+  from: "";
+  to: "";
+  stagingId: string;
+  hash: string;
+  size: number;
+  name: string;
+  parentId: string | null;
+  runtimeType: Extract<DemoPageRuntimeType, "prototype-html-css" | "sandboxed-html">;
+  analysisVersion: number;
+  sourceHash: string;
+  normalizedHash: string;
+  presentation: PagePresentationProfile;
+}
+
 export type WorkspaceMutationOperation =
   | WorkspaceMutationPutTextOperation
   | WorkspaceMutationPutBinaryOperation
+  | WorkspaceMutationPutStagedTextOperation
   | WorkspaceMutationDeletePathOperation
-  | WorkspaceMutationMovePathOperation;
+  | WorkspaceMutationMovePathOperation
+  | WorkspaceMutationCommitHtmlImportOperation;
 
 export interface WorkspaceMutationRequest {
   mutationId: string;

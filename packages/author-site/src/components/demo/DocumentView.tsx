@@ -4,11 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast-provider";
 import {
-  BookOpen,
   Brain,
   ChevronDown,
   ChevronRight,
-  Eye,
   FileText,
   FolderOpen,
   History,
@@ -46,16 +44,6 @@ import {
   getKnowledgeUploadTitle,
   isSupportedKnowledgeUpload,
 } from "./document-view-knowledge";
-
-interface ChatAttachment {
-  id: string;
-  name: string;
-  mimeType: string;
-  size: number;
-  textExtracted: boolean;
-  textPreview?: string;
-  createdAt?: string;
-}
 
 export interface PageItem {
   id: string;
@@ -120,9 +108,6 @@ export interface DocumentViewProps {
   onItemsChange?: (items: KnowledgeItem[]) => void;
   onItemsLoaded?: (items: KnowledgeItem[]) => void;
   onDocHistory?: (item: KnowledgeItem) => void;
-  onChatFileSelect?: (file: ChatAttachment) => void;
-  onChatFileConvert?: (file: ChatAttachment) => void;
-  onChatFileDelete?: (file: ChatAttachment) => void;
   onDocDeleted?: (item: KnowledgeItem) => void;
   designSpecFocus?: { docId: string; entryId: string } | null;
   onCommentTargetChange?: (target: CommentTarget | null) => void;
@@ -137,9 +122,6 @@ export function DocumentView({
   onItemsChange,
   onItemsLoaded,
   onDocHistory,
-  onChatFileSelect,
-  onChatFileConvert,
-  onChatFileDelete,
   onDocDeleted,
   designSpecFocus,
   onCommentTargetChange,
@@ -157,9 +139,6 @@ export function DocumentView({
     new Set(),
   );
   const [pagePickerOpen, setPagePickerOpen] = useState(false);
-  const [chatFiles, setChatFiles] = useState<ChatAttachment[]>([]);
-  const [chatFilesLoading, setChatFilesLoading] = useState(false);
-  const [chatExpanded, setChatExpanded] = useState(true);
   const [designSpecs, setDesignSpecs] = useState<DesignSpecMeta[]>([]);
   const [designSpecsLoading, setDesignSpecsLoading] = useState(false);
   const [designSpecExpanded, setDesignSpecExpanded] = useState(true);
@@ -229,22 +208,6 @@ export function DocumentView({
     }
   }, [workingDir, projectId, sessionId]);
 
-  const fetchChatFiles = useCallback(async () => {
-    if (!sessionId) return;
-    setChatFilesLoading(true);
-    try {
-      const res = await fetch(`/api/sessions/${sessionId}/attachments`);
-      const data = await res.json();
-      if (data.success) {
-        setChatFiles(data.data || []);
-      }
-    } catch {
-      // 静默失败
-    } finally {
-      setChatFilesLoading(false);
-    }
-  }, [sessionId]);
-
   const fetchDesignSpecs = useCallback(async () => {
     if (!workingDir) return;
     setDesignSpecsLoading(true);
@@ -265,10 +228,6 @@ export function DocumentView({
   useEffect(() => {
     fetchItems();
   }, [fetchItems]);
-
-  useEffect(() => {
-    fetchChatFiles();
-  }, [fetchChatFiles]);
 
   useEffect(() => {
     fetchDesignSpecs();
@@ -307,18 +266,15 @@ export function DocumentView({
     const handler = () => {
       contentCacheRef.current.clear();
       fetchItems();
-      fetchChatFiles();
       fetchDesignSpecs();
     };
     window.addEventListener("knowledge-updated", handler);
-    window.addEventListener("chat-attachments-updated", handler);
     window.addEventListener("design-spec-updated", handler);
     return () => {
       window.removeEventListener("knowledge-updated", handler);
-      window.removeEventListener("chat-attachments-updated", handler);
       window.removeEventListener("design-spec-updated", handler);
     };
-  }, [fetchItems, fetchChatFiles, fetchDesignSpecs]);
+  }, [fetchItems, fetchDesignSpecs]);
 
   // 默认选中第一个用户文档
   useEffect(() => {
@@ -1004,67 +960,6 @@ export function DocumentView({
               )}
             </div>
 
-            {/* 对话文件 */}
-            <div className="mt-1">
-              <div
-                className="group flex cursor-pointer items-center gap-1.5 rounded-sm px-3 py-1.5 text-sm transition-colors hover:bg-accent/50"
-                onClick={() => setChatExpanded(!chatExpanded)}
-              >
-                {chatExpanded ? (
-                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                )}
-                <FolderOpen className="h-4 w-4 shrink-0 text-purple-500" />
-                <span className="flex-1 font-medium text-foreground">
-                  对话文件
-                </span>
-                {!chatFilesLoading && chatFiles.length > 0 && (
-                  <span className="text-[10px] text-muted-foreground">
-                    {chatFiles.length}
-                  </span>
-                )}
-              </div>
-              {chatExpanded && (
-                <div className="space-y-0">
-                  {chatFilesLoading ? (
-                    <div
-                      className="px-3 py-2 text-xs text-muted-foreground"
-                      style={{ paddingLeft: 24 + 12 }}
-                    >
-                      加载中...
-                    </div>
-                  ) : chatFiles.length === 0 ? (
-                    <div
-                      className="px-3 py-2 text-xs text-muted-foreground"
-                      style={{ paddingLeft: 24 + 12 }}
-                    >
-                      暂无对话文件
-                    </div>
-                  ) : (
-                    chatFiles.map((file) => (
-                      <ChatFileItem
-                        key={file.id}
-                        file={file}
-                        sessionId={sessionId}
-                        onView={() => onChatFileSelect?.(file)}
-                        onConvert={
-                          onChatFileConvert
-                            ? () => onChatFileConvert(file)
-                            : undefined
-                        }
-                        onDelete={
-                          onChatFileDelete
-                            ? () => onChatFileDelete(file)
-                            : undefined
-                        }
-                      />
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-
             {/* 设计规范 */}
             <div className="mt-1">
               <div
@@ -1334,99 +1229,5 @@ function DocumentMoreMenu({
         )}
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-}
-
-/** 对话文件单个聊天附件项 */
-function ChatFileItem({
-  file,
-  sessionId,
-  onView,
-  onConvert,
-  onDelete,
-}: {
-  file: ChatAttachment;
-  sessionId?: string;
-  onView: () => void;
-  onConvert?: () => void;
-  onDelete?: () => void;
-}) {
-  const isImage = file.mimeType?.startsWith("image/");
-  const imgUrl = sessionId
-    ? `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(
-        file.id,
-      )}&raw=1`
-    : "";
-  return (
-    <div
-      className="group flex cursor-pointer items-center gap-1.5 rounded-sm py-1 pr-2 text-sm transition-colors hover:bg-accent/50"
-      style={{ paddingLeft: 24 + 8 }}
-      onClick={onView}
-    >
-      {isImage ? (
-        <img
-          src={imgUrl}
-          alt={file.name}
-          className="h-6 w-6 shrink-0 rounded object-cover"
-        />
-      ) : (
-        <FileText className="h-4 w-4 shrink-0 text-purple-500" />
-      )}
-      <span className="min-w-0 flex-1 truncate text-foreground">
-        {file.name}
-      </span>
-      {file.size ? (
-        <span className="shrink-0 text-[10px] text-muted-foreground">
-          {(file.size / 1024).toFixed(1)}KB
-        </span>
-      ) : null}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 p-0 opacity-0 transition-opacity group-hover:opacity-100"
-            title="更多"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <MoreVertical className="h-3.5 w-3.5" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            onClick={(e) => {
-              e.stopPropagation();
-              onView();
-            }}
-          >
-            <Eye className="h-3.5 w-3.5 mr-2" />
-            查看
-          </DropdownMenuItem>
-          {onConvert && (
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation();
-                onConvert();
-              }}
-            >
-              <BookOpen className="h-3.5 w-3.5 mr-2" />
-              转为知识库
-            </DropdownMenuItem>
-          )}
-          {onDelete && (
-            <DropdownMenuItem
-              className="text-destructive"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-            >
-              <Trash2 className="h-3.5 w-3.5 mr-2" />
-              删除
-            </DropdownMenuItem>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
   );
 }

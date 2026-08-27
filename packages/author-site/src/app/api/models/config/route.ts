@@ -27,9 +27,18 @@ export async function GET() {
       : null;
 
     if (userProviders?.providers.length) {
-      const providerPrefixes = userProviders.providers
-        .filter((provider) => provider.enabled !== false)
-        .map((provider) => `${provider.id}/`);
+      const enabledProviders = userProviders.providers.filter(
+        (provider) => provider.enabled !== false,
+      );
+      const providerPrefixes = enabledProviders.map(
+        (provider) => `${provider.id}/`,
+      );
+      // `enabledModels` 是管理员的精确白名单。将当前用户已保存的
+      // 个人模型也并入这份响应，避免模型已由 agent-service 返回后仍被
+      // 客户端白名单过滤掉。此响应按登录用户生成，不会泄露给其他用户。
+      const userEnabledModels = enabledProviders.flatMap((provider) =>
+        provider.models.map((modelId) => `${provider.id}/${modelId}`),
+      );
       const existingRules = config.frontend.autoEnableRules || [];
       const existingPrefixValues = new Set(
         existingRules
@@ -46,6 +55,14 @@ export async function GET() {
         allowedPrefixes: Array.from(
           new Set([...(config.frontend.allowedPrefixes || []), ...providerPrefixes]),
         ),
+        enabledModels: Array.isArray(config.frontend.enabledModels)
+          ? Array.from(
+              new Set([
+                ...config.frontend.enabledModels,
+                ...userEnabledModels,
+              ]),
+            )
+          : config.frontend.enabledModels,
       };
     }
 

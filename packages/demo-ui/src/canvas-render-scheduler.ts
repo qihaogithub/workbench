@@ -65,11 +65,6 @@ export function computeCanvasRenderModes({
       )
       .map((page) => page.id),
   );
-  const sandboxPageIds = new Set(
-    pages
-      .filter((page) => page.runtimeType === "sandboxed-html")
-      .map((page) => page.id),
-  );
   const snapshotPageIds = new Set(
     pages
       .filter(
@@ -80,13 +75,11 @@ export function computeCanvasRenderModes({
   );
   const runtimePages = pages.filter(
     (page) =>
-      !prototypePageIds.has(page.id) && !sandboxPageIds.has(page.id),
+      !prototypePageIds.has(page.id),
   );
 
-  // 画布只显示 sandboxed-html 的截图或安全占位；执行票据只在单页预览中消费。
-  for (const pageId of sandboxPageIds) {
-    modes[pageId] = screenshotUrls?.[pageId] ? "screenshot" : "loading";
-  }
+  // sandboxed-html 和 React 页面共用 iframe 运行池；前者仍由 CanvasPageItem
+  // 使用受控 sandbox execution iframe 渲染，绝不将原始 HTML 直接用作 iframe src。
 
   if (pages.length < MIN_CANVAS_SCREENSHOT_PAGE_COUNT) {
     for (const pageId of prototypePageIds) {

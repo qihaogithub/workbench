@@ -124,4 +124,53 @@ describe("loadCanvasPageContent", () => {
       }),
     );
   });
+
+  it("默认 fetch 适配器会把 POST 方法和请求体透传给执行票据接口", async () => {
+    const fetchSpy = jest
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: {
+            sandboxHtml: "<button>安全预览</button>",
+            runtimeType: "sandboxed-html",
+          },
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: {
+            executionUrl: "/api/html-sandbox/executions/ticket",
+            channelId: "channel-1",
+          },
+        }),
+      } as Response);
+
+    try {
+      await loadCanvasPageContent({
+        page: {
+          ...referencePage,
+          id: "interactive-page",
+          runtimeType: "sandboxed-html" as DemoPageMeta["runtimeType"],
+          reference: undefined,
+        },
+        projectId: "target-project",
+        sessionId: "session-1",
+      });
+
+      expect(fetchSpy).toHaveBeenNthCalledWith(
+        2,
+        "/api/projects/target-project/demos/interactive-page/html-execution",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ sessionId: "session-1" }),
+        }),
+      );
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
 });

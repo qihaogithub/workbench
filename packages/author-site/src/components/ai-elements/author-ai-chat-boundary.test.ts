@@ -27,9 +27,7 @@ describe("author AI chat bundle boundary", () => {
     expect(deferredBoundary).toContain(
       'import("@/components/ai-elements/author-ai-chat")',
     );
-    expect(deferredBoundary).not.toContain(
-      'from "@workbench/ai-chat-shared"',
-    );
+    expect(deferredBoundary).not.toContain('from "@workbench/ai-chat-shared"');
   });
 
   it("宿主入口只注入创作端配置并从共享包 AIChat 子路径导出", () => {
@@ -94,7 +92,6 @@ describe("author AI chat bundle boundary", () => {
       "src/lib/prototype-visual-editor.ts",
       "src/lib/visual-configurator.ts",
       "src/lib/comment-api-client.ts",
-      "src/lib/prototype-preview-size.ts",
     ];
 
     for (const relativePath of sourceFiles) {

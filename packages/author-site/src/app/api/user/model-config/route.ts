@@ -102,8 +102,7 @@ export async function PUT(request: NextRequest) {
     const status =
       message.includes("必填") ||
       message.includes("无效") ||
-      message.includes("至少") ||
-      message.includes("默认模型")
+      message.includes("至少")
         ? 400
         : 500;
 

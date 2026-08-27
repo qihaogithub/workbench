@@ -163,7 +163,7 @@ function writeProjectPage(
       JSON.stringify(
         options.htmlImportMeta ?? {
           source: "html-import",
-          analysisVersion: 1,
+          analysisVersion: 2,
           sourceHash: normalized.analysis.sourceHash,
           normalizedHash: normalized.normalizedHash,
           sandboxPolicyVersion: 1,
@@ -192,7 +192,16 @@ function writeProjectPage(
     path.join(pagePath, "config.schema.json"),
     JSON.stringify(
       options.pageSchema ?? {
-        $demo: { previewSize: { width: 1024, height: 768 } },
+        $demo: {
+          presentation: {
+            version: 1,
+            mode: "responsive-page",
+            viewport: { width: 1024, height: 768 },
+            heightBehavior: "content",
+            preset: "custom",
+            source: "user",
+          },
+        },
         type: "object",
         properties: {
           image: { type: "string", default: "https://example.com/a.png" },
@@ -253,7 +262,7 @@ describe("screenshots ensure route", () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "screenshots-ensure-"));
     process.env.DATA_DIR = tempDir;
     global.fetch = jest.fn(
-      async () => new TestResponse(JSON.stringify({ success: true })),
+      async () => new TestResponse(JSON.stringify({ success: true, data: { batchId: "batch-1" } })),
     ) as unknown as typeof fetch;
     jest.doMock("@/lib/runtime-config", () => ({
       getScreenshotServiceUrl: () => "http://screenshot-service",
@@ -272,7 +281,7 @@ describe("screenshots ensure route", () => {
     }
   });
 
-  it("按 schema 默认值和 previewSize 组装缩略图截图请求", async () => {
+  it("按 schema 默认值和 presentation viewport 组装缩略图截图请求", async () => {
     writeProjectPage(tempDir, {
       projectId: "proj_1",
       pageId: "page_1",

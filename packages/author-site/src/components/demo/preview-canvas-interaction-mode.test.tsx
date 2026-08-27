@@ -2289,6 +2289,44 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
       expect(onRequestPasteHtmlContent).toHaveBeenCalledWith(html);
     });
 
+    it("内部画布剪贴板存在时不抢占系统 HTML 粘贴", () => {
+      const onRequestPasteHtmlContent = jest.fn();
+      window.localStorage.setItem(
+        "workbench:canvas-clipboard",
+        JSON.stringify({
+          version: 1,
+          copiedAt: Date.now(),
+          nodes: [],
+          pages: [
+            {
+              id: "copied-page",
+              name: "已复制页面",
+              order: 0,
+              code: "export default function Demo(){return null}",
+            },
+          ],
+          pageLayouts: {
+            "copied-page": { x: 0, y: 0, width: 375, height: 812 },
+          },
+          pageGroups: [],
+          bounds: { x: 0, y: 0, width: 375, height: 812 },
+        }),
+      );
+      render(
+        <HtmlPasteCanvas
+          onRequestPasteHtmlContent={onRequestPasteHtmlContent}
+        />,
+      );
+      const canvas = screen.getByLabelText("画布工作区");
+      const html = "<!doctype html><html><body><main>Figma</main></body></html>";
+
+      expect(fireEvent.keyDown(canvas, { key: "v", ctrlKey: true })).toBe(true);
+      fireEvent.paste(canvas, { clipboardData: makeClipboardData(html) });
+
+      expect(onRequestPasteHtmlContent).toHaveBeenCalledWith(html);
+      window.localStorage.removeItem("workbench:canvas-clipboard");
+    });
+
     it("粘贴非 HTML 文本不触发 onRequestPasteHtmlContent", () => {
       const onRequestPasteHtmlContent = jest.fn();
       render(

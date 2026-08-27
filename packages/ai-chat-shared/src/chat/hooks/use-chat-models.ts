@@ -54,6 +54,7 @@ const MODEL_PREFERENCE_STORAGE_PREFIX = "workbench:ai-model:";
 const MODEL_STREAM_KEEPALIVE_INTERVAL_MS = 25_000;
 const MODEL_STREAM_READY_REQUEST_DELAY_MS = 50;
 const MODEL_LOADING_TIMEOUT_MS = 30_000;
+const MODEL_CONFIG_UPDATED_EVENT = "workbench:ai-model-config-updated";
 
 interface TimerWithUnref {
   unref: () => void;
@@ -220,6 +221,9 @@ export function useChatModels(options: UseChatModelsOptions) {
         if (initialRequestSent) return;
         initialRequestSent = requestModels();
       };
+      const refreshModelsAfterConfigUpdate = () => {
+        requestModels();
+      };
 
       let connected = false;
       stream.on("status", (event: StreamEvent) => {
@@ -306,12 +310,31 @@ export function useChatModels(options: UseChatModelsOptions) {
           setModelState((prev) => ({ ...prev, isLoading: false }));
         }
       });
+      window.addEventListener(
+        MODEL_CONFIG_UPDATED_EVENT,
+        refreshModelsAfterConfigUpdate,
+      );
+
+      return () => {
+        window.removeEventListener(
+          MODEL_CONFIG_UPDATED_EVENT,
+          refreshModelsAfterConfigUpdate,
+        );
+      };
     };
 
-    setupModelStream();
+    let disposeStreamListeners: (() => void) | undefined;
+    void setupModelStream().then((dispose) => {
+      if (disposed) {
+        dispose?.();
+      } else {
+        disposeStreamListeners = dispose;
+      }
+    });
 
     return () => {
       disposed = true;
+      disposeStreamListeners?.();
       if (modelReadyRequestTimerRef.current) {
         clearTimeout(modelReadyRequestTimerRef.current);
         modelReadyRequestTimerRef.current = null;

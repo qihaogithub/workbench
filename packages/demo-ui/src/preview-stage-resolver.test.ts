@@ -20,10 +20,10 @@ function createPage(
 }
 
 describe("preview stage resolver", () => {
-  it("按 schema、页面尺寸、原型元数据、fallback 的顺序解析尺寸", () => {
+  it("按 presentation、schema 投影、页面尺寸、fallback 的顺序解析尺寸", () => {
     const page = createPage({
       schema: JSON.stringify({
-        $demo: { previewSize: { width: 1200, height: 800 } },
+        $demo: { presentation: { version: 1, mode: "responsive-page", viewport: { width: 1200, height: 800 }, heightBehavior: "content", preset: "custom", source: "user" } },
       }),
       previewSize: { width: 900, height: 600 },
       prototypeMeta: { previewSize: { width: 375, height: 812 } },
@@ -43,14 +43,6 @@ describe("preview stage resolver", () => {
         ...page,
         schema: undefined,
         previewSize: undefined,
-      }),
-    ).toEqual({ width: 375, height: 812 });
-    expect(
-      resolvePreviewStageSize({
-        ...page,
-        schema: undefined,
-        previewSize: undefined,
-        prototypeMeta: undefined,
       }),
     ).toEqual({ width: 320, height: 568 });
   });
@@ -117,7 +109,7 @@ describe("preview stage resolver", () => {
 
     const unresolvedPage = createPage({
       schema: JSON.stringify({
-        $demo: { previewSize: { width: 1024, height: 768 } },
+        $demo: { presentation: { version: 1, mode: "responsive-page", viewport: { width: 1024, height: 768 }, heightBehavior: "content", preset: "custom", source: "user" } },
       }),
     });
     const unresolvedPages = [unresolvedPage];

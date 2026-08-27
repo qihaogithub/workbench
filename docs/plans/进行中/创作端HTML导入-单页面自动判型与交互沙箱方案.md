@@ -1,7 +1,7 @@
 # 创作端 HTML 导入：单页面自动判型与交互沙箱方案
 
 > 日期：2026-08-20  
-> 状态：Phase 0–2b 实施与自动化验证已完成，等待用户验收  
+> 状态：隔离运行时与 presentation 导入工作台已实施，等待用户验收
 > 范围：创作端导入单个 `.html` / `.htm` 文件  
 > 核心决策：系统自动选择静态原型或隔离交互运行时；用户不选择模式；脚本不得被静默删除后降级
 
@@ -77,15 +77,16 @@
 
 ```yaml
 overall_status: ready_for_review
-current_phase: phase_2b
+current_phase: presentation_workbench
 phase_status: ready_for_review
-current_goal: "等待用户验收 sandboxed-html 端到端闭环"
+current_goal: "等待用户验收 HTML 尺寸识别、确认工作台与统一 presentation 闭环"
 scope_in:
   - "HTML 自动判型、原子导入与四 runtime 公共合同"
   - "创作端、截图、viewer、发布、embed、CLI、Agent 和 diagnostics"
   - "安全回归、包级检查、项目文档与长期约定"
+  - "prepare/commit/cancel 私有 draft、尺寸置信度分析、集中工作台与导入后视口设置"
 scope_out:
-  - "外部资源、配置绑定、持久状态与元素级视觉编辑"
+  - "外部资源本地化、配置绑定、持久状态与元素级视觉编辑"
 locked_decisions:
   - "runtime=sandboxed-html"
   - "source=sandbox.html"
@@ -93,19 +94,29 @@ locked_decisions:
   - "inline module 仅允许无外部 import"
   - "blob script 首期禁用"
   - "空首帧和一般 runtime error 为兼容性状态，不回滚导入"
-  - "相对/远程资源首期拒绝；data URL 超限则拒绝整个导入"
+  - "相对/远程资源与其他受限能力可导入，但强制进入无网络权限的 sandbox；data URL 超限则拒绝整个导入"
   - "保留现有 Workbench Export Markdown 兼容入口，不在本功能中删除"
   - "analysisVersion=1；sandboxPolicyVersion=1"
   - "输入上限 2 MiB；单 data URL 1 MiB；data URL 累计 2 MiB"
   - "capability registry 位于 shared，未知 runtime fail-closed"
   - "sandbox 执行要求独立 origin、受控 wrapper，顶层直达拒绝"
   - "sandbox 截图使用专用 Browser 实例和每任务 BrowserContext"
+  - "config.schema.json.$demo.presentation 是展示唯一真值，不保留旧 previewSize/meta 尺寸读取分支"
+  - "Figma 高置信度固定画板可自动提交；其他 HTML 默认推荐 1440x900 并要求确认"
+  - "画布卡片几何、单页临时设备与页面持久化视口是三个独立概念"
 completed:
   - "Phase 0/1：判型合同、19 类 fixture、静态导入、live/branch 原子提交与旧入口兼容已完成"
   - "Phase 2a：sandboxed-html 文件协议、capability registry、受控 ticket/wrapper、专用 renderer 与安全 E2E 已完成"
   - "Phase 2b：snapshot/hash、专用 Chromium 截图、私有发布源、viewer/embed 动态签发与 diagnostics 已完成"
   - "Embed 签发改为服务端完成后 307 跳转，保持 allow-scripts-only opaque origin"
   - "项目需求、技术、预览、截图、发布、CLI、viewer 文档与 AGENTS.md 已同步"
+  - "2026-08-25：用户要求尽力导入所有单页面 HTML；受限能力改为 sandbox 兼容性提示，不再拒绝整份文档"
+  - "2026-08-25：live Workspace 的 HTML 正文经 Authority staging 后以受管 staged-text mutation 原子提交，避免默认 JSON body limit 返回 413，同时保留 demos 文本资源约束"
+  - "2026-08-25：画布调度将 sandboxed-html 纳入有界 execution iframe 运行池；截图未就绪时不再停留在灰色加载态，仍不暴露原始 HTML"
+  - "2026-08-26：修复画布内容加载器默认 fetch 适配器丢弃 RequestInit，确保 execution ticket 请求真实发送 POST，避免 Next 405 空响应触发 Response.json 解析失败"
+  - "2026-08-26：完成 PagePresentationProfile、尺寸置信度分析、prepare/commit/cancel draft 协议与宽版导入工作台"
+  - "2026-08-26：单页临时设备切换与显式设为默认、fixed/content 高度行为、截图指纹、发布 manifest、viewer/embed 统一 resolver 已接通"
+  - "2026-08-26：数据目录 1573 份 Schema 已执行直接迁移，1571 份写入 presentation，2 份原始 JSON 无效未改写"
 changed_files:
   - "packages/shared、project-core、project-cli、demo-ui"
   - "packages/author-site、screenshot-service、viewer-site、agent-service"
@@ -127,10 +138,13 @@ checks:
   - "check:project-scaffold：既有 shared CommonJS/ESM named export 运行时基线失败，与 HTML 导入改动无关"
   - "corepack pnpm check:workspace-authority：当前工作树与纯净 HEAD 均以相同 5 项既有问题失败；失败文件均未被本任务修改"
   - "corepack pnpm check:all：在同一 workspace-authority 基线失败处停止，之前 preview-contract 通过"
+  - "presentation 本次回归：author 聚焦 11 suites / 72 tests 通过，author/viewer/screenshot/agent/project-core/demo-ui typecheck 通过"
+  - "project-core：11 files / 149 tests 通过；demo-ui：28 files / 143 tests 通过；screenshot：4 files / 23 tests 通过"
+  - "agent 相关：3 files / 39 tests 通过；数据迁移脚本：2 tests 通过"
 blockers: []
 decisions_needed: []
-next_action: "用户验收后将 overall_status 改为 complete，压缩并归档本计划"
-updated_at: "2026-08-20"
+next_action: "用户在创作端验收 Figma 直接拖入、普通 dashboard 选电脑视口导入与设为页面默认；验收后压缩归档"
+updated_at: "2026-08-26"
 ```
 
 更新规则：
@@ -150,7 +164,7 @@ updated_at: "2026-08-20"
 
 - 无可执行脚本：进入现有 `prototype-html-css`，保留视觉编辑、配置绑定和轻量预览。
 - 含可执行脚本、事件属性或 `javascript:` URL：进入新增 `sandboxed-html`，只在受控 iframe 中运行。
-- 命中明确不支持的结构或外部依赖：拒绝导入并返回结构化原因，不静默损失交互。
+- 命中受限结构或外部依赖：保留源码并进入隔离运行时，返回结构化兼容性提示，不静默损失交互。
 
 这不是导入对话框的局部改动。新增 `sandboxed-html` 会影响共享类型、页面文件协议、编辑预览、Workspace 写入、截图、发布、viewer、CLI、Agent 扫描和诊断。完成静态导入约需 1.5–2 周；交互运行时全链路 MVP 约需再投入 3–4 周，总体建议按 **4–6 周**规划。
 
@@ -586,7 +600,7 @@ POST /api/projects/:projectId/imports/html
 - 标签、属性、script MIME 大小写与畸形 HTML 归一化。
 - JSON/LD+JSON/text/plain 不误判，并从静态产物删除或安全转存。
 - classic/inline module、事件属性、`javascript:` 正确进入 sandbox。
-- 外部 import、iframe、meta refresh、form、相对资源正确拒绝或警告。
+- 外部 import、iframe、meta refresh、form、相对资源正确进入 sandbox 并产生兼容性提示。
 - 属性顺序不影响分析；hash、reason code 和 analysis version 稳定。
 - runtime switch 清除旧运行时专属文件。
 - runtime union、snapshot、publish payload、resource registry 均有穷尽分支测试。
@@ -840,6 +854,17 @@ Phase 0–2b 合计约 **4–6 周**，取决于独立 origin 和截图进程隔
 - [x] 若实施发现新的长期约定或陷阱，更新根 `AGENTS.md`。
 - [x] 第十八章全部通过，账本为 `overall_status=ready_for_review`。
 - [ ] 用户验收后标记整体完成并压缩归档本计划。
+
+### Presentation 导入工作台验收项
+
+- [x] 实现 Figma 固定画板、数字 viewport、`device-width`、无尺寸与冲突信号的置信度分析。
+- [x] 实现绑定用户/项目/Session/Workspace、有限时的 prepare/commit/cancel 私有 draft。
+- [x] 实现响应式导入工作台、安全 iframe、设备预设、自定义边界、批量套用与失败重试。
+- [x] 实现拖入高置信度 Figma 自动提交，普通/混合 HTML 进入工作台。
+- [x] 实现单页临时设备切换与“设为页面默认”，并使截图、发布、viewer/embed 共用 presentation。
+- [x] 删除旧单阶段导入接口、`$demo.previewSize` 持久化读取与原型 meta 尺寸回退，并完成现有 Schema 迁移。
+- [x] 包级类型检查、相关单元/集成测试和项目文档同步通过。
+- [ ] 用户完成真实 HTML 文件的界面验收。
 
 ## 十五、实施风险与关闭规则
 

@@ -43,17 +43,17 @@ describe("user model config", () => {
       baseURL: "https://api.example.com/v1",
       apiKey: "sk-test",
       models: ["gpt-4o", "gpt-4o-mini"],
-      defaultModel: "gpt-4o",
     });
 
     const safe = readUserModelConfig("u1");
     expect(safe?.provider.apiKey).toBe("");
     expect(safe?.provider.hasApiKey).toBe(true);
+    expect(safe?.provider.defaultModel).toBeUndefined();
     expect("encryptedApiKey" in (safe?.provider || {})).toBe(false);
 
     const backend = readUserBackendProvidersConfig("u1");
     expect(backend?.providers[0].apiKey).toBe("sk-test");
-    expect(backend?.activeModelId).toBe("custom/gpt-4o");
+    expect(backend?.activeModelId).toBeUndefined();
   });
 
   it("keeps existing API key when saving an empty key", async () => {
@@ -77,7 +77,7 @@ describe("user model config", () => {
     expect(backend?.providers[0].models).toEqual(["model-b"]);
   });
 
-  it("merges user provider before admin providers and keeps user default active", async () => {
+  it("merges user provider before admin providers without persisting an active model", async () => {
     const { upsertUserModelConfig, readUserBackendProvidersConfig } =
       await import("@/lib/user-model-config");
     await createUser("u1");
@@ -88,7 +88,6 @@ describe("user model config", () => {
       baseURL: "https://api.example.com/v1",
       apiKey: "sk-user",
       models: ["user-model"],
-      defaultModel: "user-model",
     });
 
     const backend = readUserBackendProvidersConfig("u1", {
@@ -112,7 +111,30 @@ describe("user model config", () => {
       "admin",
     ]);
     expect(backend?.activeProviderId).toBe("custom");
-    expect(backend?.activeModelId).toBe("custom/user-model");
+    expect(backend?.activeModelId).toBeUndefined();
+  });
+
+  it("gets OpenAI-compatible catalog entries without saving the supplied API key", async () => {
+    const { fetchUserModelCatalog } = await import("@/lib/user-model-config");
+    await createUser("u1");
+    const fetchMock = jest.fn(async () =>
+      new Response(JSON.stringify({ data: [{ id: "model-a" }, { id: "model-a" }, { id: "model-b" }] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    global.fetch = fetchMock as typeof fetch;
+
+    await expect(
+      fetchUserModelCatalog("u1", {
+        baseURL: "https://api.example.com/v1/",
+        apiKey: "sk-unsaved",
+      }),
+    ).resolves.toEqual(["model-a", "model-b"]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/v1/models",
+      expect.objectContaining({ headers: { Authorization: "Bearer sk-unsaved" } }),
+    );
   });
 
   it("returns admin providers when user has no personal config", async () => {

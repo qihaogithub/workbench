@@ -166,10 +166,10 @@ describe('checkConfigSchemaAgainstPrototype', () => {
     expect(result.supported).toBe(true);
   });
 
-  it('$demo.previewSize / note 不触发升级', () => {
+  it('$demo.presentation / note 不触发升级', () => {
     const result = checkConfigSchemaAgainstPrototype({
       type: 'object',
-      $demo: { previewSize: { width: 375, height: 812 }, note: '测试页面' },
+      $demo: { presentation: { version: 1, mode: 'responsive-page', viewport: { width: 390, height: 844 }, heightBehavior: 'content', preset: 'mobile', source: 'user' }, note: '测试页面' },
       properties: {
         title: { type: 'string', title: '标题' },
       },

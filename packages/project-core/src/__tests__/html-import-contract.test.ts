@@ -22,7 +22,7 @@ const fixtures = JSON.parse(readFileSync(new URL("./fixtures/html-import-analysi
 
 describe("Phase 0 HTML import contract spike", () => {
   it("freezes analysis and sandbox policy versions", () => {
-    expect(HTML_IMPORT_ANALYSIS_VERSION).toBe(1);
+    expect(HTML_IMPORT_ANALYSIS_VERSION).toBe(2);
     expect(HTML_IMPORT_SANDBOX_POLICY_VERSION).toBe(1);
   });
 

@@ -11,6 +11,8 @@ import {
   Hand,
   MousePointer2,
   LayoutGrid,
+  Route,
+  Square,
 } from "lucide-react";
 import {
   Tooltip,
@@ -147,6 +149,38 @@ export function CanvasToolbar({
                     aria-pressed={toolMode === "select"}
                   >
                     <MousePointer2 className="h-4 w-4" />
+                  </button>
+                </ToolbarTooltip>
+              )}
+              {isEditorMode && (
+                <ToolbarTooltip label="绘制 Section（Shift + S）">
+                  <button
+                    type="button"
+                    onClick={() => onToolModeChange("section")}
+                    className={cn(
+                      toolbarToggleButtonClass,
+                      toolMode === "section" && activeToggleButtonClass,
+                    )}
+                    aria-label="Section 工具"
+                    aria-pressed={toolMode === "section"}
+                  >
+                    <Square className="h-4 w-4" />
+                  </button>
+                </ToolbarTooltip>
+              )}
+              {isEditorMode && (
+                <ToolbarTooltip label="绘制页面跳转热区">
+                  <button
+                    type="button"
+                    onClick={() => onToolModeChange("navigation")}
+                    className={cn(
+                      toolbarToggleButtonClass,
+                      toolMode === "navigation" && activeToggleButtonClass,
+                    )}
+                    aria-label="连线工具"
+                    aria-pressed={toolMode === "navigation"}
+                  >
+                    <Route className="h-4 w-4" />
                   </button>
                 </ToolbarTooltip>
               )}

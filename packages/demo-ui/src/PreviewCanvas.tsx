@@ -19,14 +19,28 @@ import {
   BetweenHorizontalStart,
   BetweenVerticalStart,
   Combine,
+  Maximize2,
   MessageSquarePlus,
+  SlidersHorizontal,
   Trash2,
 } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { CanvasViewport } from "./CanvasViewport";
 import { CanvasPageItem, CanvasPagePreviewContent } from "./CanvasPageItem";
 import { PasteOptionsModal } from "./PasteOptionsModal";
 import type { CanvasClipboardData } from "./canvas-clipboard";
 import { CanvasFreeNodeItem } from "./CanvasFreeNodeItem";
+import { CanvasSectionItem } from "./CanvasSectionItem";
 import { CanvasSelectionBox } from "./CanvasSelectionBox";
 import { CanvasToolbar } from "./CanvasToolbar";
 import { useCanvasDocumentMarkdown } from "./useCanvasDocumentMarkdown";
@@ -37,7 +51,6 @@ import {
 } from "./canvas-render-scheduler";
 import { computePreviewRuntimePoolPlan } from "./preview-runtime-pool";
 import {
-  computeAutoCanvasLayout,
   computeFitCanvasViewport,
   computeInitialCanvasLayout,
   normalizeCanvasPageLayouts,
@@ -48,6 +61,12 @@ import {
   prewarmPreviewImageUrls,
 } from "./preview-resource-cache";
 import { cn } from "./utils";
+import { extractHtmlImportFromClipboard } from "./html-import-clipboard";
+import {
+  findNavigationRoute,
+  toRoundedNavigationPath,
+  type NavigationRouteRect,
+} from "./canvas-navigation-routing";
 import {
   getAnnotationsFromCanvasState,
   getActiveCanvasDocumentEntry,
@@ -57,6 +76,17 @@ import {
   screenPointToCanvasPoint,
   withCanvasAnnotationNodes,
 } from "./canvas-kernel";
+import {
+  assignCanvasObjectToSection,
+  assignCanvasSectionToSection,
+  computeCanvasSectionAutoLayout,
+  createCanvasSection,
+  findInnermostSectionContainingLayout,
+  fitCanvasSectionToChildren,
+  moveCanvasSectionWithChildren,
+  reconcileCanvasSectionMembership,
+  removeCanvasSection,
+} from "./canvas-section";
 
 const DocumentEditor = lazy(() =>
   import("./DocumentEditor").then((module) => ({
@@ -68,6 +98,7 @@ import {
   readCanvasClipboard,
   computeBounds,
   isEditableTarget,
+  remapCanvasSectionsForPaste,
 } from "./canvas-clipboard";
 import {
   PAGE_GROUP_DIRECTORY_WIDTH,
@@ -98,11 +129,14 @@ import type {
   CanvasPageLayout,
   AlignmentGuide,
   CanvasToolMode,
+  CanvasNavigationHotspot,
+  CanvasNavigationConnection,
   CanvasFreeNode,
   CanvasDocumentNode,
   CanvasPageData,
   CanvasPageGroup,
   CanvasPageRenderMode,
+  CanvasSection,
   ConsoleLogPayload,
   PositionableSizeItem,
   ScreenshotRenderBox,
@@ -124,6 +158,153 @@ type MultiPageAlignAction =
   | "bottom"
   | "distribute-x"
   | "distribute-y";
+
+function remapNavigation(
+  navigation: NonNullable<CanvasState["navigation"]> | undefined,
+  pageIdMapping: Map<string, string>,
+): NonNullable<CanvasState["navigation"]> | undefined {
+  if (!navigation) return undefined;
+  const timestamp = Date.now();
+  const hotspots: NonNullable<CanvasState["navigation"]>["hotspots"] = {};
+  const hotspotIds = new Map<string, string>();
+  for (const hotspot of Object.values(navigation.hotspots)) {
+    const pageId = pageIdMapping.get(hotspot.pageId);
+    if (!pageId) continue;
+    const id = `navigation_hotspot_${crypto.randomUUID()}`;
+    hotspotIds.set(hotspot.id, id);
+    hotspots[id] = {
+      ...hotspot,
+      id,
+      pageId,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+  }
+  const connections: NonNullable<CanvasState["navigation"]>["connections"] = {};
+  for (const connection of Object.values(navigation.connections)) {
+    const sourcePageId = pageIdMapping.get(connection.source.pageId);
+    const targetPageId = pageIdMapping.get(connection.target.pageId);
+    const hotspotId = hotspotIds.get(connection.source.hotspotId);
+    if (!sourcePageId || !targetPageId || !hotspotId) continue;
+    const id = `navigation_connection_${crypto.randomUUID()}`;
+    connections[id] = {
+      ...connection,
+      id,
+      source: { pageId: sourcePageId, hotspotId },
+      target: { pageId: targetPageId },
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+  }
+  return { hotspots, connections };
+}
+
+function NavigationConnectionsLayer({
+  connections,
+  hotspots,
+  layouts,
+  obstacles,
+  hoveredPageId,
+}: {
+  connections: CanvasNavigationConnection[];
+  hotspots: CanvasNavigationHotspot[];
+  layouts: Record<string, CanvasPageLayout>;
+  obstacles: NavigationRouteRect[];
+  hoveredPageId: string | null;
+}) {
+  const hotspotsById = new Map(
+    hotspots.map((hotspot) => [hotspot.id, hotspot]),
+  );
+  const lines = connections.flatMap((connection) => {
+    const hotspot = hotspotsById.get(connection.source.hotspotId);
+    const source = hotspot ? layouts[connection.source.pageId] : undefined;
+    const target = layouts[connection.target.pageId];
+    if (!hotspot || !source || !target) return [];
+    const sourceCenter = {
+      x: source.x + (hotspot.rect.x + hotspot.rect.width / 2) * source.width,
+      y: source.y + (hotspot.rect.y + hotspot.rect.height / 2) * source.height,
+    };
+    const targetCenter = {
+      x: target.x + target.width / 2,
+      y: target.y + target.height / 2,
+    };
+    const dx = targetCenter.x - sourceCenter.x;
+    const dy = targetCenter.y - sourceCenter.y;
+    const sourcePoint =
+      Math.abs(dx) > Math.abs(dy)
+        ? { x: dx >= 0 ? source.x + source.width : source.x, y: sourceCenter.y }
+        : {
+            x: sourceCenter.x,
+            y: dy >= 0 ? source.y + source.height : source.y,
+          };
+    const targetPoint =
+      Math.abs(dx) > Math.abs(dy)
+        ? { x: dx >= 0 ? target.x : target.x + target.width, y: targetCenter.y }
+        : {
+            x: targetCenter.x,
+            y: dy >= 0 ? target.y : target.y + target.height,
+          };
+    const active =
+      hoveredPageId === connection.source.pageId ||
+      hoveredPageId === connection.target.pageId;
+    const routeObstacles = obstacles.filter(
+      (rect) =>
+        !(
+          rect.x === source.x - 16 &&
+          rect.y === source.y - 16 &&
+          rect.width === source.width + 32 &&
+          rect.height === source.height + 32
+        ) &&
+        !(
+          rect.x === target.x - 16 &&
+          rect.y === target.y - 16 &&
+          rect.width === target.width + 32 &&
+          rect.height === target.height + 32
+        ),
+    );
+    const route = findNavigationRoute({
+      source: sourcePoint,
+      target: targetPoint,
+      obstacles: routeObstacles,
+      forceOrthogonalBends: true,
+    });
+    return [{ connection, route, active }];
+  });
+  if (lines.length === 0) return null;
+  return (
+    <svg
+      className="pointer-events-none absolute overflow-visible"
+      style={{ zIndex: -1, width: 1, height: 1 }}
+      aria-label="页面跳转关系"
+    >
+      <defs>
+        <marker
+          id="canvas-navigation-arrow"
+          markerWidth="8"
+          markerHeight="8"
+          refX="7"
+          refY="4"
+          orient="auto"
+        >
+          <path d="M0,0 L8,4 L0,8 z" className="fill-primary" />
+        </marker>
+      </defs>
+      {lines.map(({ connection, route, active }) => {
+        const path = toRoundedNavigationPath(route);
+        return (
+          <path
+            key={connection.id}
+            d={path}
+            fill="none"
+            markerEnd="url(#canvas-navigation-arrow)"
+            className={active ? "stroke-primary" : "stroke-primary/40"}
+            strokeWidth={active ? 3 : 2}
+          />
+        );
+      })}
+    </svg>
+  );
+}
 
 interface CanvasPageGroupItemProps {
   group: CanvasPageGroup;
@@ -457,27 +638,6 @@ function CanvasPageGroupItem({
   );
 }
 
-/** 判断剪贴板文本是否为 Figma 导出的 HTML 页面代码 */
-function looksLikeHtmlImport(text: string): boolean {
-  const trimmed = text.trim();
-  if (!trimmed) return false;
-  if (/^<!doctype\s+html\b/i.test(trimmed)) return true;
-  if (/<html[\s>]/i.test(trimmed)) return true;
-  return /<(body|main|section|div|style|svg|img)[\s>]/i.test(trimmed);
-}
-
-/** 从系统剪贴板提取 HTML 代码，非 HTML 内容返回 null */
-function extractHtmlImportFromClipboard(
-  clipboardData: DataTransfer | null,
-): string | null {
-  if (!clipboardData) return null;
-  const plain = clipboardData.getData("text/plain");
-  if (plain && looksLikeHtmlImport(plain)) return plain;
-  const html = clipboardData.getData("text/html");
-  if (html && looksLikeHtmlImport(html)) return html;
-  return null;
-}
-
 export function PreviewCanvas({
   editable = false,
   interactionMode,
@@ -529,6 +689,9 @@ export function PreviewCanvas({
   // 对齐辅助线状态
   const [alignmentGuides, setAlignmentGuides] = useState<AlignmentGuide[]>([]);
   const [activeDragItemId, setActiveDragItemId] = useState<string | null>(null);
+  const [dropTargetSectionId, setDropTargetSectionId] = useState<string | null>(
+    null,
+  );
   const [documentDraft, setDocumentDraft] = useState<{
     nodeId?: string;
     knowledgeDocumentId?: string;
@@ -544,10 +707,19 @@ export function PreviewCanvas({
   const [selectedPageGroupIds, setSelectedPageGroupIds] = useState<string[]>(
     [],
   );
+  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(
+    null,
+  );
+  const [titleEditingSectionId, setTitleEditingSectionId] = useState<
+    string | null
+  >(null);
   const [editingTextNodeId, setEditingTextNodeId] = useState<string | null>(
     null,
   );
   const [selectedPageIds, setSelectedPageIds] = useState<string[]>([]);
+  const [hoveredNavigationPageId, setHoveredNavigationPageId] = useState<
+    string | null
+  >(null);
   const pendingImageFilesRef = useRef<File[]>([]);
 
   // 跨项目粘贴选择器状态
@@ -555,6 +727,9 @@ export function PreviewCanvas({
     pages: CanvasPageData[];
     pageLayouts: Record<string, CanvasPageLayout>;
     pageGroups: CanvasPageGroup[];
+    sections: CanvasSection[];
+    nodeIdMapping: Map<string, string>;
+    offset: { x: number; y: number };
     sourceProjectId: string;
   } | null>(null);
 
@@ -576,6 +751,11 @@ export function PreviewCanvas({
     string,
     CanvasPageLayout
   > | null>(null);
+  const copyDragRef = useRef<{
+    kind: "page" | "node";
+    sourceId: string;
+    startLayout: CanvasPageLayout;
+  } | null>(null);
 
   const canvasState = useMemo(
     () => normalizeCanvasStateLayers(externalState || internalState),
@@ -584,6 +764,7 @@ export function PreviewCanvas({
   const isControlledState = externalState !== undefined;
   const canvasStateRef = useRef(canvasState);
   canvasStateRef.current = canvasState;
+  const effectiveSections = canvasState.sections ?? {};
 
   const effectivePages = useMemo(() => {
     return normalizeCanvasPageLayouts(pages, canvasState.pages);
@@ -597,6 +778,25 @@ export function PreviewCanvas({
   const hiddenPageIdSet = useMemo(
     () => new Set(canvasState.hiddenPageIds ?? []),
     [canvasState.hiddenPageIds],
+  );
+  const navigation = canvasState.navigation;
+  const navigationHotspots = useMemo(
+    () =>
+      Object.values(navigation?.hotspots ?? {}).filter((hotspot) =>
+        pageIds.has(hotspot.pageId),
+      ),
+    [navigation?.hotspots, pageIds],
+  );
+  const navigationConnections = useMemo(
+    () =>
+      Object.values(navigation?.connections ?? {}).filter(
+        (connection) =>
+          pageIds.has(connection.source.pageId) &&
+          pageIds.has(connection.target.pageId) &&
+          navigation?.hotspots?.[connection.source.hotspotId]?.pageId ===
+            connection.source.pageId,
+      ),
+    [navigation?.connections, navigation?.hotspots, pageIds],
   );
   const effectivePageGroups = useMemo(() => {
     return Object.fromEntries(
@@ -630,7 +830,6 @@ export function PreviewCanvas({
     () => new Set(Object.keys(effectivePageGroups)),
     [effectivePageGroups],
   );
-
   const standalonePageLayouts = useMemo(
     () =>
       Object.fromEntries(
@@ -656,6 +855,27 @@ export function PreviewCanvas({
   );
 
   const effectiveNodes = getAnnotationsFromCanvasState(canvasState);
+  const navigationObstacles = useMemo<NavigationRouteRect[]>(
+    () => {
+      const layouts = [
+        ...Object.values(renderablePageLayouts),
+        ...Object.values(effectivePageGroups).map((group) => group.layout),
+        ...Object.values(effectiveNodes).map((node) => node.layout),
+      ];
+      const unique = new Map<string, NavigationRouteRect>();
+      for (const layout of layouts) {
+        const rect = {
+          x: layout.x - 16,
+          y: layout.y - 16,
+          width: layout.width + 32,
+          height: layout.height + 32,
+        };
+        unique.set(`${rect.x}:${rect.y}:${rect.width}:${rect.height}`, rect);
+      }
+      return [...unique.values()];
+    },
+    [effectiveNodes, effectivePageGroups, renderablePageLayouts],
+  );
   const documentNodes = useMemo(
     () =>
       Object.values(effectiveNodes).filter(
@@ -798,27 +1018,78 @@ export function PreviewCanvas({
         group.layout,
       ]),
     );
-    return { ...standalonePageLayouts, ...pageGroupLayouts, ...nodeLayouts };
-  }, [effectiveNodes, effectivePageGroups, standalonePageLayouts]);
+    const sectionLayouts = Object.fromEntries(
+      Object.entries(effectiveSections).map(([id, section]) => [
+        id,
+        section.layout,
+      ]),
+    );
+    return {
+      ...standalonePageLayouts,
+      ...pageGroupLayouts,
+      ...nodeLayouts,
+      ...sectionLayouts,
+    };
+  }, [
+    effectiveNodes,
+    effectivePageGroups,
+    effectiveSections,
+    standalonePageLayouts,
+  ]);
+
+  const visibleItemLayouts = useMemo(
+    () => ({
+      ...standalonePageLayouts,
+      ...Object.fromEntries(
+        Object.entries(effectivePageGroups).map(([id, group]) => [
+          id,
+          group.layout,
+        ]),
+      ),
+      ...Object.fromEntries(
+        Object.entries(effectiveNodes)
+          .map(([id, node]) => [id, node.layout]),
+      ),
+      ...Object.fromEntries(
+        Object.entries(effectiveSections)
+          .map(([id, section]) => [id, section.layout]),
+      ),
+    }),
+    [
+      effectiveNodes,
+      effectivePageGroups,
+      effectiveSections,
+      standalonePageLayouts,
+    ],
+  );
 
   const allItemLayoutSignature = useMemo(
-    () => getCanvasLayoutSignature(allItemLayouts),
-    [allItemLayouts],
+    () => getCanvasLayoutSignature(visibleItemLayouts),
+    [visibleItemLayouts],
   );
 
   const updateState = useCallback(
-    (updater: (prev: CanvasState) => CanvasState) => {
+    (
+      updater: (prev: CanvasState) => CanvasState,
+      options: { normalize?: boolean } = {},
+    ) => {
       const previousState = canvasStateRef.current;
       const newState = updater(previousState);
       if (newState === previousState) {
         return;
       }
-      const normalizedState = normalizeCanvasStateLayers(newState);
-      canvasStateRef.current = normalizedState;
+      // A Section move translates its complete subtree, so its membership is
+      // unchanged until the drag settles. Avoid rebuilding the entire canvas
+      // graph on each pointer event; handleDragEnd performs the one required
+      // reconciliation when the gesture completes.
+      const nextState = options.normalize === false
+        ? newState
+        : normalizeCanvasStateLayers(newState);
+      canvasStateRef.current = nextState;
       if (isControlledState) {
-        onCanvasStateChange(normalizedState);
+        onCanvasStateChange(nextState);
       } else {
-        setInternalState(normalizedState);
+        setInternalState(nextState);
       }
     },
     [isControlledState, onCanvasStateChange],
@@ -828,10 +1099,134 @@ export function PreviewCanvas({
     setSelectedNodeId(null);
     setSelectedDocumentNodeIds([]);
     setSelectedPageGroupIds([]);
+    setSelectedSectionId(null);
     setEditingTextNodeId(null);
     setSelectedPageIds([]);
     onCanvasClick?.();
   }, [onCanvasClick]);
+
+  const handleCreateSection = useCallback(
+    (rect: CanvasRect) => {
+      if (rect.width < 80 || rect.height < 60) return;
+      const id = `section_${crypto.randomUUID()}`;
+      const maxZ = Math.max(
+        0,
+        ...Object.values(allItemLayouts).map((layout) => layout.zIndex ?? 0),
+      );
+      const section = createCanvasSection({
+        id,
+        layout: { ...rect, zIndex: maxZ + 1 },
+      });
+      const candidatePageEntries = Object.entries(effectivePages).filter(
+        ([, layout]) =>
+          layout.x >= rect.x &&
+          layout.y >= rect.y &&
+          layout.x + layout.width <= rect.x + rect.width &&
+          layout.y + layout.height <= rect.y + rect.height,
+      );
+      const children = [
+        ...candidatePageEntries.map(([pageId]) => ({
+          kind: "page" as const,
+          id: pageId,
+        })),
+        ...Object.entries(effectiveNodes)
+          .filter(
+            ([, node]) =>
+              node.layout.x >= rect.x &&
+              node.layout.y >= rect.y &&
+              node.layout.x + node.layout.width <= rect.x + rect.width &&
+              node.layout.y + node.layout.height <= rect.y + rect.height,
+          )
+          .map(([nodeId]) => ({ kind: "node" as const, id: nodeId })),
+      ];
+      updateState((prev) => {
+        // A newly created page can have an effective fallback layout before it
+        // has ever been moved. Persist candidate layouts before automatic
+        // membership so normalization sees every fully-contained item.
+        let next: CanvasState = {
+          ...prev,
+          pages: {
+            ...prev.pages,
+            ...Object.fromEntries(candidatePageEntries),
+          },
+          sections: { ...(prev.sections ?? {}), [id]: section },
+        };
+        for (const child of children) {
+          const layout = child.kind === "page"
+            ? next.pages[child.id]
+            : next.nodes?.[child.id]?.layout;
+          if (layout) next = assignCanvasObjectToSection(next, child, layout);
+        }
+        return next;
+      });
+      setSelectedNodeId(null);
+      setSelectedDocumentNodeIds([]);
+      setSelectedPageGroupIds([]);
+      setSelectedPageIds([]);
+      setSelectedSectionId(id);
+      setTitleEditingSectionId(id);
+      setToolMode("select");
+    },
+    [allItemLayouts, effectiveNodes, effectivePages, updateState],
+  );
+
+  const handleRenameSection = useCallback(
+    (sectionId: string, title: string) => {
+      updateState((prev) => {
+        const section = prev.sections?.[sectionId];
+        if (!section) return prev;
+        return {
+          ...prev,
+          sections: {
+            ...prev.sections,
+            [sectionId]: { ...section, title, updatedAt: Date.now() },
+          },
+        };
+      });
+    },
+    [updateState],
+  );
+
+  const handleSectionLayoutChange = useCallback(
+    (
+      sectionId: string,
+      layout: CanvasPageLayout,
+      operation: "move" | "resize",
+    ) => {
+      updateState((prev) => {
+        const section = prev.sections?.[sectionId];
+        if (!section) return prev;
+        if (operation === "move") {
+          return moveCanvasSectionWithChildren(prev, sectionId, layout);
+        }
+        return {
+          ...prev,
+          sections: {
+            ...prev.sections,
+            [sectionId]: { ...section, layout, updatedAt: Date.now() },
+          },
+        };
+      }, { normalize: operation !== "move" });
+    },
+    [updateState],
+  );
+
+  const handleSectionStyleChange = useCallback(
+    (sectionId: string, style: CanvasSection["style"]) => {
+      updateState((prev) => {
+        const section = prev.sections?.[sectionId];
+        if (!section) return prev;
+        return {
+          ...prev,
+          sections: {
+            ...prev.sections,
+            [sectionId]: { ...section, style, updatedAt: Date.now() },
+          },
+        };
+      });
+    },
+    [updateState],
+  );
 
   useEffect(() => {
     setSelectedPageIds((current) =>
@@ -855,10 +1250,143 @@ export function PreviewCanvas({
 
   const handleLayoutChange = useCallback(
     (pageId: string, layout: CanvasPageLayout) => {
+      updateState((prev) =>
+        reconcileCanvasSectionMembership({
+          ...prev,
+          pages: { ...prev.pages, [pageId]: layout },
+        }),
+      );
+    },
+    [updateState],
+  );
+
+  const handleCreateNavigation = useCallback(
+    (
+      pageId: string,
+      rect: CanvasNavigationHotspot["rect"],
+      targetPageId: string,
+    ) => {
+      const timestamp = Date.now();
+      const hotspotId = `navigation_hotspot_${timestamp}_${Math.random().toString(36).slice(2, 8)}`;
+      const connectionId = `navigation_connection_${timestamp}_${Math.random().toString(36).slice(2, 8)}`;
       updateState((prev) => ({
         ...prev,
-        pages: { ...prev.pages, [pageId]: layout },
+        navigation: {
+          hotspots: {
+            ...(prev.navigation?.hotspots ?? {}),
+            [hotspotId]: {
+              id: hotspotId,
+              pageId,
+              rect,
+              createdAt: timestamp,
+              updatedAt: timestamp,
+            },
+          },
+          connections: {
+            ...(prev.navigation?.connections ?? {}),
+            [connectionId]: {
+              id: connectionId,
+              source: { pageId, hotspotId },
+              target: { pageId: targetPageId },
+              createdAt: timestamp,
+              updatedAt: timestamp,
+            },
+          },
+        },
       }));
+      setToolMode("select");
+    },
+    [updateState],
+  );
+
+  const handleUpdateNavigationHotspot = useCallback(
+    (hotspotId: string, rect: CanvasNavigationHotspot["rect"]) => {
+      updateState((prev) => {
+        const hotspot = prev.navigation?.hotspots[hotspotId];
+        if (!hotspot) return prev;
+        return {
+          ...prev,
+          navigation: {
+            hotspots: {
+              ...(prev.navigation?.hotspots ?? {}),
+              [hotspotId]: { ...hotspot, rect, updatedAt: Date.now() },
+            },
+            connections: { ...(prev.navigation?.connections ?? {}) },
+          },
+        };
+      });
+    },
+    [updateState],
+  );
+
+  const handleUpdateNavigationTarget = useCallback(
+    (hotspotId: string, targetPageId: string) => {
+      updateState((prev) => {
+        const connection = Object.values(prev.navigation?.connections ?? {}).find(
+          (item) => item.source.hotspotId === hotspotId,
+        );
+        if (!connection || connection.source.pageId === targetPageId) return prev;
+        return {
+          ...prev,
+          navigation: {
+            hotspots: { ...(prev.navigation?.hotspots ?? {}) },
+            connections: {
+              ...(prev.navigation?.connections ?? {}),
+              [connection.id]: {
+                ...connection,
+                target: { pageId: targetPageId },
+                updatedAt: Date.now(),
+              },
+            },
+          },
+        };
+      });
+    },
+    [updateState],
+  );
+
+  const handleDeleteNavigationHotspot = useCallback(
+    (hotspotId: string) => {
+      updateState((prev) => {
+        if (!prev.navigation?.hotspots[hotspotId]) return prev;
+        const { [hotspotId]: _removed, ...hotspots } = prev.navigation.hotspots;
+        const connections = Object.fromEntries(
+          Object.entries(prev.navigation.connections).filter(
+            ([, connection]) => connection.source.hotspotId !== hotspotId,
+          ),
+        );
+        return { ...prev, navigation: { hotspots, connections } };
+      });
+    },
+    [updateState],
+  );
+
+  const handleDeleteNavigationRelations = useCallback(
+    (pageId: string) => {
+      updateState((prev) => {
+        const connections = Object.fromEntries(
+          Object.entries(prev.navigation?.connections ?? {}).filter(
+            ([, connection]) =>
+              connection.source.pageId !== pageId &&
+              connection.target.pageId !== pageId,
+          ),
+        );
+        const activeHotspotIds = new Set(
+          Object.values(connections).map(
+            (connection) => connection.source.hotspotId,
+          ),
+        );
+        const hotspots = Object.fromEntries(
+          Object.entries(prev.navigation?.hotspots ?? {}).filter(
+            ([id, hotspot]) =>
+              hotspot.pageId !== pageId && activeHotspotIds.has(id),
+          ),
+        );
+        return {
+          ...prev,
+          ...(prev.navigation ? { navigation: { hotspots, connections } } : {}),
+        };
+      });
     },
     [updateState],
   );
@@ -870,6 +1398,7 @@ export function PreviewCanvas({
         setSelectedPageIds([]);
         setSelectedNodeId(null);
         setSelectedDocumentNodeIds([]);
+        setSelectedSectionId(null);
         setSelectedPageGroupIds([]);
         setEditingTextNodeId(null);
         return;
@@ -902,6 +1431,7 @@ export function PreviewCanvas({
         : [];
 
       setSelectedDocumentNodeIds(nextSelectedDocumentNodeIds);
+      setSelectedSectionId(null);
       setSelectedPageGroupIds(nextSelectedPageGroupIds);
       setSelectedNodeId(
         !hasSelectedPageLikeItems
@@ -972,14 +1502,21 @@ export function PreviewCanvas({
           if (layout) nextPages[newId] = layout;
         });
         const nextGroups = { ...(prev.pageGroups ?? {}) };
+        const pastedSections = remapCanvasSectionsForPaste({
+          sections: data.sections,
+          pageIdMapping,
+          nodeIdMapping: data.nodeIdMapping,
+          offset: data.offset,
+          now: Date.now(),
+          createId: () => `section_${crypto.randomUUID()}`,
+        });
         for (const oldGroup of data.pageGroups) {
           const newGroupPages = oldGroup.pages.map((entry) => ({
             ...entry,
             pageId: pageIdMapping.get(entry.pageId) ?? entry.pageId,
           }));
           const newActivePageId =
-            pageIdMapping.get(oldGroup.activePageId) ??
-            oldGroup.activePageId;
+            pageIdMapping.get(oldGroup.activePageId) ?? oldGroup.activePageId;
           const groupId = `page-group-${crypto.randomUUID()}`;
           nextGroups[groupId] = {
             ...oldGroup,
@@ -994,9 +1531,8 @@ export function PreviewCanvas({
           ...prev,
           pages: nextPages,
           pageGroups:
-            Object.keys(nextGroups).length > 0
-              ? nextGroups
-              : prev.pageGroups,
+            Object.keys(nextGroups).length > 0 ? nextGroups : prev.pageGroups,
+          sections: { ...(prev.sections ?? {}), ...pastedSections },
         };
       });
       const newPageIds = Array.from(pageIdMapping.values());
@@ -1024,14 +1560,21 @@ export function PreviewCanvas({
           if (layout) nextPages[newId] = { ...layout, zIndex: layout.zIndex };
         });
         const nextGroups = { ...(prev.pageGroups ?? {}) };
+        const pastedSections = remapCanvasSectionsForPaste({
+          sections: data.sections,
+          pageIdMapping,
+          nodeIdMapping: data.nodeIdMapping,
+          offset: data.offset,
+          now: Date.now(),
+          createId: () => `section_${crypto.randomUUID()}`,
+        });
         for (const oldGroup of data.pageGroups) {
           const newGroupPages = oldGroup.pages.map((entry) => ({
             ...entry,
             pageId: pageIdMapping.get(entry.pageId) ?? entry.pageId,
           }));
           const newActivePageId =
-            pageIdMapping.get(oldGroup.activePageId) ??
-            oldGroup.activePageId;
+            pageIdMapping.get(oldGroup.activePageId) ?? oldGroup.activePageId;
           const groupId = `page-group-${crypto.randomUUID()}`;
           nextGroups[groupId] = {
             ...oldGroup,
@@ -1046,9 +1589,8 @@ export function PreviewCanvas({
           ...prev,
           pages: nextPages,
           pageGroups:
-            Object.keys(nextGroups).length > 0
-              ? nextGroups
-              : prev.pageGroups,
+            Object.keys(nextGroups).length > 0 ? nextGroups : prev.pageGroups,
+          sections: { ...(prev.sections ?? {}), ...pastedSections },
         };
       });
       const newPageIds = Array.from(pageIdMapping.values());
@@ -1206,10 +1748,12 @@ export function PreviewCanvas({
       updateState((prev) => {
         const node = prev.nodes?.[nodeId];
         if (!node) return prev;
-        return withCanvasAnnotationNodes(prev, {
-          ...(prev.nodes ?? {}),
-          [nodeId]: { ...node, layout, updatedAt: Date.now() },
-        });
+        return reconcileCanvasSectionMembership(
+          withCanvasAnnotationNodes(prev, {
+            ...(prev.nodes ?? {}),
+            [nodeId]: { ...node, layout, updatedAt: Date.now() },
+          }),
+        );
       });
     },
     [updateState],
@@ -1244,6 +1788,7 @@ export function PreviewCanvas({
         Boolean(event?.ctrlKey);
       setSelectedDocumentNodeIds([]);
       setSelectedNodeId(null);
+      setSelectedSectionId(null);
       setEditingTextNodeId(null);
       if (isAdditive) {
         setSelectedPageGroupIds((current) =>
@@ -1255,6 +1800,7 @@ export function PreviewCanvas({
       }
       setSelectedPageIds([]);
       setSelectedPageGroupIds([groupId]);
+      setSelectedSectionId(null);
       onPageConfigEdit?.(activePageId);
     },
     [onPageConfigEdit],
@@ -1536,7 +2082,8 @@ export function PreviewCanvas({
       !isEditorMode ||
       (!selectedNodeId &&
         selectedDocumentNodeIds.length === 0 &&
-        selectedPageIds.length === 0) ||
+        selectedPageIds.length === 0 &&
+        !selectedSectionId) ||
       documentDraft
     ) {
       return;
@@ -1554,6 +2101,13 @@ export function PreviewCanvas({
       }
 
       event.preventDefault();
+      if (selectedSectionId) {
+        updateState((prev) =>
+          removeCanvasSection(prev, selectedSectionId),
+        );
+        setSelectedSectionId(null);
+        return;
+      }
       if (selectedPageIds.length > 0) {
         void onRequestDeletePages?.(selectedPageIds);
         return;
@@ -1577,6 +2131,8 @@ export function PreviewCanvas({
     selectedDocumentNodeIds,
     selectedNodeId,
     selectedPageIds,
+    selectedSectionId,
+    updateState,
   ]);
 
   // ── 复制快捷键（Ctrl/Cmd+C）──
@@ -1586,7 +2142,8 @@ export function PreviewCanvas({
       selectedNodeId ||
       selectedDocumentNodeIds.length > 0 ||
       selectedPageIds.length > 0 ||
-      selectedPageGroupIds.length > 0;
+      selectedPageGroupIds.length > 0 ||
+      Boolean(selectedSectionId);
     if (!hasSelection) return;
 
     const handleCopy = (event: KeyboardEvent) => {
@@ -1597,6 +2154,20 @@ export function PreviewCanvas({
 
       // 收集选中的自由节点
       const copiedNodeIds = new Set<string>();
+      const copiedSectionIds = new Set<string>();
+      const copiedSectionPageIds = new Set<string>();
+      const collectSection = (sectionId: string) => {
+        if (copiedSectionIds.has(sectionId)) return;
+        const section = effectiveSections[sectionId];
+        if (!section) return;
+        copiedSectionIds.add(sectionId);
+        for (const child of section.children) {
+          if (child.kind === "section") collectSection(child.id);
+          if (child.kind === "page") copiedSectionPageIds.add(child.id);
+          if (child.kind === "node") copiedNodeIds.add(child.id);
+        }
+      };
+      if (selectedSectionId) collectSection(selectedSectionId);
       if (selectedDocumentNodeIds.length > 0) {
         selectedDocumentNodeIds.forEach((id) => copiedNodeIds.add(id));
       } else if (selectedNodeId) {
@@ -1611,12 +2182,14 @@ export function PreviewCanvas({
       // 收集选中的页面及布局
       const copiedPages: CanvasPageData[] = [];
       const copiedPageLayouts: Record<string, CanvasPageLayout> = {};
-      selectedPageIds.forEach((pageId) => {
-        const page = pagesById.get(pageId);
-        const layout = effectivePages[pageId];
-        if (page) copiedPages.push(page);
-        if (layout) copiedPageLayouts[pageId] = layout;
-      });
+      new Set([...selectedPageIds, ...copiedSectionPageIds]).forEach(
+        (pageId) => {
+          const page = pagesById.get(pageId);
+          const layout = effectivePages[pageId];
+          if (page) copiedPages.push(page);
+          if (layout) copiedPageLayouts[pageId] = layout;
+        },
+      );
 
       // 收集选中的页面组
       const copiedPageGroups: CanvasPageGroup[] = [];
@@ -1624,8 +2197,32 @@ export function PreviewCanvas({
         const group = canvasState.pageGroups?.[groupId];
         if (group) copiedPageGroups.push(group);
       });
+      const copiedSections = Array.from(copiedSectionIds)
+        .map((sectionId) => effectiveSections[sectionId])
+        .filter((section): section is CanvasSection => Boolean(section));
+      const copiedPageIds = new Set(copiedPages.map((page) => page.id));
+      const copiedHotspots = Object.fromEntries(
+        Object.entries(canvasState.navigation?.hotspots ?? {}).filter(
+          ([, hotspot]) => copiedPageIds.has(hotspot.pageId),
+        ),
+      );
+      const copiedNavigation = {
+        hotspots: copiedHotspots,
+        connections: Object.fromEntries(
+          Object.entries(canvasState.navigation?.connections ?? {}).filter(
+            ([, connection]) =>
+              copiedPageIds.has(connection.source.pageId) &&
+              copiedPageIds.has(connection.target.pageId) &&
+              Boolean(copiedHotspots[connection.source.hotspotId]),
+          ),
+        ),
+      };
 
-      const bounds = computeBounds(copiedPageLayouts, copiedNodes);
+      const bounds = computeBounds(
+        copiedPageLayouts,
+        copiedNodes,
+        copiedSections,
+      );
 
       writeCanvasClipboard({
         version: 1,
@@ -1636,6 +2233,10 @@ export function PreviewCanvas({
         pages: copiedPages,
         pageLayouts: copiedPageLayouts,
         pageGroups: copiedPageGroups,
+        sections: copiedSections,
+        ...(Object.keys(copiedHotspots).length > 0
+          ? { navigation: copiedNavigation }
+          : {}),
         bounds,
       });
     };
@@ -1649,203 +2250,264 @@ export function PreviewCanvas({
     selectedDocumentNodeIds,
     selectedPageIds,
     selectedPageGroupIds,
+    selectedSectionId,
     effectiveNodes,
+    effectiveSections,
     effectivePages,
     pagesById,
     canvasState.pageGroups,
+    canvasState.navigation,
     projectId,
     sessionId,
   ]);
 
-  // ── 粘贴快捷键（Ctrl/Cmd+V）──
-  useEffect(() => {
-    if (!isEditorMode || documentDraft) return;
+  // 内部画布剪贴板只能在原生 paste 事件中处理。这样系统 HTML/文件
+  // 可先依据实际 ClipboardData 分流，不会被残留的 localStorage 内容拦截。
+  const handleInternalCanvasPaste = useCallback(() => {
+    const clipboardData = readCanvasClipboard();
+    if (!clipboardData) return false;
+    const clipboardSections = clipboardData.sections ?? [];
+    const hasContent =
+      clipboardData.nodes.length > 0 ||
+      clipboardData.pages.length > 0 ||
+      clipboardData.pageGroups.length > 0 ||
+      clipboardSections.length > 0;
+    if (!hasContent) return false;
 
-    const handlePaste = (event: KeyboardEvent) => {
-      const key = event.key.toLowerCase();
-      if (key !== "v" || !(event.metaKey || event.ctrlKey)) return;
-      if (isEditableTarget(event.target)) return;
-      // 如果系统剪贴板有文件，让现有 onPaste 处理
-      // （keyboard event 无法直接读取 clipboardData.files，此处不阻止）
+    const PASTE_OFFSET = 24;
+    const zoom = canvasState.viewport.zoom || 1;
+    const centerX = (-canvasState.viewport.x + containerSize.width / 2) / zoom;
+    const centerY = (-canvasState.viewport.y + containerSize.height / 2) / zoom;
+    const offsetX = clipboardData.bounds
+      ? centerX - clipboardData.bounds.x + PASTE_OFFSET
+      : PASTE_OFFSET;
+    const offsetY = clipboardData.bounds
+      ? centerY - clipboardData.bounds.y + PASTE_OFFSET
+      : PASTE_OFFSET;
+    const now = Date.now();
+    const maxZ = Math.max(
+      0,
+      ...Object.values(allItemLayouts).map((l) => l.zIndex ?? 0),
+    );
 
-      const clipboardData = readCanvasClipboard();
-      if (!clipboardData) return;
-      const hasContent =
-        clipboardData.nodes.length > 0 ||
-        clipboardData.pages.length > 0 ||
-        clipboardData.pageGroups.length > 0;
-      if (!hasContent) return;
-      event.preventDefault();
-
-      const PASTE_OFFSET = 24;
-      const zoom = canvasState.viewport.zoom || 1;
-      const centerX =
-        (-canvasState.viewport.x + containerSize.width / 2) / zoom;
-      const centerY =
-        (-canvasState.viewport.y + containerSize.height / 2) / zoom;
-      const offsetX = clipboardData.bounds
-        ? centerX - clipboardData.bounds.x + PASTE_OFFSET
-        : PASTE_OFFSET;
-      const offsetY = clipboardData.bounds
-        ? centerY - clipboardData.bounds.y + PASTE_OFFSET
-        : PASTE_OFFSET;
-      const now = Date.now();
-      const maxZ = Math.max(
-        0,
-        ...Object.values(allItemLayouts).map((l) => l.zIndex ?? 0),
+    // A. 粘贴自由节点
+    const newNodeIds: string[] = [];
+    const nodeIdMapping = new Map<string, string>();
+    if (clipboardData.nodes.length > 0) {
+      const newNodes: CanvasFreeNode[] = clipboardData.nodes.map(
+        (node, index) => {
+          const prefix =
+            node.kind === "text"
+              ? "text"
+              : node.kind === "image"
+                ? "img"
+                : "doc";
+          const newId = `${prefix}-${crypto.randomUUID()}`;
+          newNodeIds.push(newId);
+          nodeIdMapping.set(node.id, newId);
+          return {
+            ...node,
+            id: newId,
+            layout: {
+              ...node.layout,
+              x: node.layout.x + offsetX,
+              y: node.layout.y + offsetY,
+              zIndex: maxZ + 1 + index,
+            },
+            createdAt: now,
+            updatedAt: now,
+          } as CanvasFreeNode;
+        },
       );
 
-      // A. 粘贴自由节点
-      const newNodeIds: string[] = [];
-      if (clipboardData.nodes.length > 0) {
-        const newNodes: CanvasFreeNode[] = clipboardData.nodes.map(
-          (node, index) => {
-            const prefix =
-              node.kind === "text"
-                ? "text"
-                : node.kind === "image"
-                  ? "img"
-                  : "doc";
-            const newId = `${prefix}-${crypto.randomUUID()}`;
-            newNodeIds.push(newId);
-            return {
-              ...node,
-              id: newId,
-              layout: {
-                ...node.layout,
-                x: node.layout.x + offsetX,
-                y: node.layout.y + offsetY,
-                zIndex: maxZ + 1 + index,
-              },
-              createdAt: now,
-              updatedAt: now,
-            } as CanvasFreeNode;
-          },
-        );
-
-        updateState((prev) => {
-          const nextNodes = { ...(prev.nodes ?? {}) };
-          for (const node of newNodes) {
-            nextNodes[node.id] = node;
-          }
-          return withCanvasAnnotationNodes(prev, nextNodes);
-        });
-      }
-
-      // B. 粘贴页面（通过回调通知父组件）
-      if (clipboardData.pages.length > 0 && onRequestPastePages) {
-        // 对页面布局应用偏移
-        const shiftedPageLayouts: Record<string, CanvasPageLayout> = {};
-        for (const [pageId, layout] of Object.entries(
-          clipboardData.pageLayouts,
-        )) {
-          shiftedPageLayouts[pageId] = {
-            ...layout,
-            x: layout.x + offsetX,
-            y: layout.y + offsetY,
-            zIndex: maxZ + 1,
-          };
+      updateState((prev) => {
+        const nextNodes = { ...(prev.nodes ?? {}) };
+        for (const node of newNodes) {
+          nextNodes[node.id] = node;
         }
+        return withCanvasAnnotationNodes(prev, nextNodes);
+      });
+    }
 
-        // 判断是否为跨项目粘贴
-        const isCrossProject =
-          clipboardData.sourceProjectId &&
-          clipboardData.sourceProjectId !== projectId;
-
-        if (isCrossProject && onRequestCreateReferences) {
-          // 跨项目：弹出选择器，暂存粘贴数据
-          setPendingPasteModal({
-            pages: clipboardData.pages,
-            pageLayouts: shiftedPageLayouts,
-            pageGroups: clipboardData.pageGroups,
-            sourceProjectId: clipboardData.sourceProjectId ?? "",
-          });
-        } else {
-          // 同项目：直接粘贴为副本
-          void onRequestPastePages({
-            pages: clipboardData.pages,
-            pageLayouts: shiftedPageLayouts,
-            pageGroups: clipboardData.pageGroups,
-          }).then(({ pageIdMapping }) => {
-            // 将新页面布局写入画布状态
-            updateState((prev) => {
-              const nextPages = { ...prev.pages };
-              pageIdMapping.forEach((newId, oldId) => {
-                const layout = shiftedPageLayouts[oldId];
-                if (layout) nextPages[newId] = layout;
-              });
-              const nextGroups = { ...(prev.pageGroups ?? {}) };
-              for (const oldGroup of clipboardData.pageGroups) {
-                const newGroupPages = oldGroup.pages.map((entry) => ({
-                  ...entry,
-                  pageId: pageIdMapping.get(entry.pageId) ?? entry.pageId,
-                }));
-                const newActivePageId =
-                  pageIdMapping.get(oldGroup.activePageId) ??
-                  oldGroup.activePageId;
-                const groupId = `page-group-${crypto.randomUUID()}`;
-                nextGroups[groupId] = {
-                  ...oldGroup,
-                  id: groupId,
-                  pages: newGroupPages,
-                  activePageId: newActivePageId,
-                  createdAt: now,
-                  updatedAt: now,
-                };
-              }
-              return {
-                ...prev,
-                pages: nextPages,
-                pageGroups:
-                  Object.keys(nextGroups).length > 0
-                    ? nextGroups
-                    : prev.pageGroups,
-              };
-            });
-            const newPageIds = Array.from(pageIdMapping.values());
-            setSelectedPageIds(newPageIds);
-            setSelectedNodeId(null);
-            setSelectedDocumentNodeIds([]);
-            setSelectedPageGroupIds([]);
-          });
-        }
-      }
-
-      // 选中粘贴的节点（如果有节点且无页面）
-      if (newNodeIds.length > 0 && clipboardData.pages.length === 0) {
-        if (newNodeIds.length === 1) {
-          setSelectedNodeId(newNodeIds[0]);
-          setSelectedDocumentNodeIds([]);
-        } else {
-          setSelectedNodeId(null);
-          setSelectedDocumentNodeIds(newNodeIds);
-        }
-        setSelectedPageIds([]);
-        setSelectedPageGroupIds([]);
-      }
+    const applyPastedSections = (pageIdMapping: Map<string, string>) => {
+      if (clipboardSections.length === 0) return;
+      updateState((prev) => ({
+        ...prev,
+        sections: {
+          ...(prev.sections ?? {}),
+          ...remapCanvasSectionsForPaste({
+            sections: clipboardSections,
+            pageIdMapping,
+            nodeIdMapping,
+            offset: { x: offsetX, y: offsetY },
+            now,
+            createId: () => `section_${crypto.randomUUID()}`,
+          }),
+        },
+      }));
     };
 
-    window.addEventListener("keydown", handlePaste);
-    return () => window.removeEventListener("keydown", handlePaste);
+    // B. 粘贴页面（通过回调通知父组件）
+    if (clipboardData.pages.length > 0 && onRequestPastePages) {
+      // 对页面布局应用偏移
+      const shiftedPageLayouts: Record<string, CanvasPageLayout> = {};
+      for (const [pageId, layout] of Object.entries(
+        clipboardData.pageLayouts,
+      )) {
+        shiftedPageLayouts[pageId] = {
+          ...layout,
+          x: layout.x + offsetX,
+          y: layout.y + offsetY,
+          zIndex: maxZ + 1,
+        };
+      }
+
+      // 判断是否为跨项目粘贴
+      const isCrossProject =
+        clipboardData.sourceProjectId &&
+        clipboardData.sourceProjectId !== projectId;
+
+      if (isCrossProject && onRequestCreateReferences) {
+        // 跨项目：弹出选择器，暂存粘贴数据
+        setPendingPasteModal({
+          pages: clipboardData.pages,
+          pageLayouts: shiftedPageLayouts,
+          pageGroups: clipboardData.pageGroups,
+          sections: clipboardSections,
+          nodeIdMapping,
+          offset: { x: offsetX, y: offsetY },
+          sourceProjectId: clipboardData.sourceProjectId ?? "",
+        });
+      } else {
+        // 同项目：直接粘贴为副本
+        void onRequestPastePages({
+          pages: clipboardData.pages,
+          pageLayouts: shiftedPageLayouts,
+          pageGroups: clipboardData.pageGroups,
+        }).then(({ pageIdMapping }) => {
+          // 将新页面布局写入画布状态
+          updateState((prev) => {
+            const nextPages = { ...prev.pages };
+            pageIdMapping.forEach((newId, oldId) => {
+              const layout = shiftedPageLayouts[oldId];
+              if (layout) nextPages[newId] = layout;
+            });
+            const nextGroups = { ...(prev.pageGroups ?? {}) };
+            const pastedSections = remapCanvasSectionsForPaste({
+              sections: clipboardSections,
+              pageIdMapping,
+              nodeIdMapping,
+              offset: { x: offsetX, y: offsetY },
+              now,
+              createId: () => `section_${crypto.randomUUID()}`,
+            });
+            const remappedNavigation = remapNavigation(
+              clipboardData.navigation,
+              pageIdMapping,
+            );
+            for (const oldGroup of clipboardData.pageGroups) {
+              const newGroupPages = oldGroup.pages.map((entry) => ({
+                ...entry,
+                pageId: pageIdMapping.get(entry.pageId) ?? entry.pageId,
+              }));
+              const newActivePageId =
+                pageIdMapping.get(oldGroup.activePageId) ??
+                oldGroup.activePageId;
+              const groupId = `page-group-${crypto.randomUUID()}`;
+              nextGroups[groupId] = {
+                ...oldGroup,
+                id: groupId,
+                pages: newGroupPages,
+                activePageId: newActivePageId,
+                createdAt: now,
+                updatedAt: now,
+              };
+            }
+            return {
+              ...prev,
+              pages: nextPages,
+              pageGroups:
+                Object.keys(nextGroups).length > 0
+                  ? nextGroups
+                  : prev.pageGroups,
+              sections: { ...(prev.sections ?? {}), ...pastedSections },
+              ...(remappedNavigation
+                ? {
+                    navigation: {
+                      hotspots: {
+                        ...(prev.navigation?.hotspots ?? {}),
+                        ...remappedNavigation.hotspots,
+                      },
+                      connections: {
+                        ...(prev.navigation?.connections ?? {}),
+                        ...remappedNavigation.connections,
+                      },
+                    },
+                  }
+                : {}),
+            };
+          });
+          const newPageIds = Array.from(pageIdMapping.values());
+          setSelectedPageIds(newPageIds);
+          setSelectedNodeId(null);
+          setSelectedDocumentNodeIds([]);
+          setSelectedPageGroupIds([]);
+        });
+      }
+    } else {
+      applyPastedSections(new Map());
+    }
+
+    // 选中粘贴的节点（如果有节点且无页面）
+    if (newNodeIds.length > 0 && clipboardData.pages.length === 0) {
+      if (newNodeIds.length === 1) {
+        setSelectedNodeId(newNodeIds[0]);
+        setSelectedDocumentNodeIds([]);
+      } else {
+        setSelectedNodeId(null);
+        setSelectedDocumentNodeIds(newNodeIds);
+      }
+      setSelectedPageIds([]);
+      setSelectedPageGroupIds([]);
+      setSelectedSectionId(null);
+    }
+    return true;
   }, [
-    isEditorMode,
-    documentDraft,
     canvasState.viewport,
     containerSize.width,
     containerSize.height,
     allItemLayouts,
     updateState,
     onRequestPastePages,
+    onRequestCreateReferences,
+    projectId,
   ]);
 
   // 开始拖拽/缩放时，清空辅助线
   const handleDragStart = useCallback(
-    (itemId: string) => {
+    (itemId: string, options?: { copy?: boolean }) => {
       activeDragItemIdRef.current = itemId;
       setActiveDragItemId(itemId);
       setAlignmentGuides([]);
+      const sourceLayout = pageIds.has(itemId)
+        ? effectivePages[itemId]
+        : effectiveNodes[itemId]?.layout;
+      const canCopy =
+        Boolean(options?.copy) &&
+        Boolean(sourceLayout) &&
+        (Boolean(effectiveNodes[itemId]) ||
+          (pageIds.has(itemId) && Boolean(onRequestPastePages)));
+      copyDragRef.current =
+        canCopy && sourceLayout
+          ? {
+              kind: pageIds.has(itemId) ? "page" : "node",
+              sourceId: itemId,
+              startLayout: { ...sourceLayout },
+            }
+          : null;
       if (
         pageIds.has(itemId) &&
+        !options?.copy &&
         selectedPageIds.length > 1 &&
         selectedPageIds.includes(itemId)
       ) {
@@ -1863,7 +2525,13 @@ export function PreviewCanvas({
         multiDragStartLayoutsRef.current = null;
       }
     },
-    [effectivePages, pageIds, selectedPageIds],
+    [
+      effectiveNodes,
+      effectivePages,
+      onRequestPastePages,
+      pageIds,
+      selectedPageIds,
+    ],
   );
 
   // 拖拽/缩放过程中计算对齐
@@ -1912,7 +2580,15 @@ export function PreviewCanvas({
       );
 
       setAlignmentGuides(guides);
-      updateState((prev) => ({
+      if (isPageItem || Boolean(effectiveNodes[itemId])) {
+        setDropTargetSectionId(
+          findInnermostSectionContainingLayout(
+            effectiveSections,
+            alignedLayout,
+          )?.id ?? null,
+        );
+      }
+      updateState((prev) => reconcileCanvasSectionMembership({
         ...prev,
         pages: isPageItem
           ? { ...prev.pages, [itemId]: alignedLayout }
@@ -1940,16 +2616,133 @@ export function PreviewCanvas({
           : prev.nodes,
       }));
     },
-    [activeDragItemId, allItemLayouts, pageGroupIds, pageIds, updateState],
+    [
+      activeDragItemId,
+      allItemLayouts,
+      effectiveNodes,
+      effectiveSections,
+      pageGroupIds,
+      pageIds,
+      updateState,
+    ],
   );
 
   // 结束拖拽/缩放时，清空辅助线
   const handleDragEnd = useCallback(() => {
+    const itemId = activeDragItemIdRef.current;
+    const copyDrag = copyDragRef.current;
+    copyDragRef.current = null;
+    if (copyDrag && itemId === copyDrag.sourceId) {
+      const targetLayout =
+        copyDrag.kind === "page"
+          ? canvasStateRef.current.pages[copyDrag.sourceId]
+          : canvasStateRef.current.nodes?.[copyDrag.sourceId]?.layout;
+      if (targetLayout) {
+        if (copyDrag.kind === "node") {
+          const sourceNode = canvasStateRef.current.nodes?.[copyDrag.sourceId];
+          if (sourceNode) {
+            const newId = `${sourceNode.kind === "text" ? "text" : sourceNode.kind === "image" ? "img" : "doc"}-${crypto.randomUUID()}`;
+            const now = Date.now();
+            updateState((prev) => {
+              const nextNodes = {
+                ...(prev.nodes ?? {}),
+                [copyDrag.sourceId]: {
+                  ...sourceNode,
+                  layout: copyDrag.startLayout,
+                },
+                [newId]: {
+                  ...sourceNode,
+                  id: newId,
+                  layout: targetLayout,
+                  createdAt: now,
+                  updatedAt: now,
+                },
+              };
+              return assignCanvasObjectToSection(
+                withCanvasAnnotationNodes(prev, nextNodes),
+                { kind: "node", id: newId },
+                targetLayout,
+              );
+            });
+            setSelectedNodeId(newId);
+          }
+        } else {
+          const sourcePage = pagesById.get(copyDrag.sourceId);
+          if (sourcePage && onRequestPastePages) {
+            updateState((prev) => ({
+              ...prev,
+              pages: {
+                ...prev.pages,
+                [copyDrag.sourceId]: copyDrag.startLayout,
+              },
+            }));
+            void onRequestPastePages({
+              pages: [sourcePage],
+              pageLayouts: { [copyDrag.sourceId]: targetLayout },
+              pageGroups: [],
+            }).then(({ pageIdMapping }) => {
+              const newId = pageIdMapping.get(copyDrag.sourceId);
+              if (!newId) return;
+              updateState((prev) =>
+                assignCanvasObjectToSection(
+                  {
+                    ...prev,
+                    pages: { ...prev.pages, [newId]: targetLayout },
+                  },
+                  { kind: "page", id: newId },
+                  targetLayout,
+                ),
+              );
+              setSelectedPageIds([newId]);
+            });
+          }
+        }
+      }
+      activeDragItemIdRef.current = null;
+      setActiveDragItemId(null);
+      multiDragStartLayoutsRef.current = null;
+      setAlignmentGuides([]);
+      setDropTargetSectionId(null);
+      return;
+    }
+    if (itemId && effectiveSections[itemId]) {
+      const layout = canvasStateRef.current.sections?.[itemId]?.layout;
+      if (layout)
+        updateState((prev) =>
+          reconcileCanvasSectionMembership(
+            assignCanvasSectionToSection(prev, itemId, layout),
+          ),
+        );
+    } else if (
+      itemId &&
+      (pageIds.has(itemId) || Boolean(effectiveNodes[itemId]))
+    ) {
+      const kind = pageIds.has(itemId) ? "page" : "node";
+      const layout =
+        kind === "page"
+          ? canvasStateRef.current.pages[itemId]
+          : canvasStateRef.current.nodes?.[itemId]?.layout;
+      if (layout) {
+        updateState((prev) =>
+          reconcileCanvasSectionMembership(
+            assignCanvasObjectToSection(prev, { kind, id: itemId }, layout),
+          ),
+        );
+      }
+    }
     activeDragItemIdRef.current = null;
     setActiveDragItemId(null);
     multiDragStartLayoutsRef.current = null;
     setAlignmentGuides([]);
-  }, []);
+    setDropTargetSectionId(null);
+  }, [
+    effectiveNodes,
+    effectiveSections,
+    onRequestPastePages,
+    pageIds,
+    pagesById,
+    updateState,
+  ]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -2096,7 +2889,7 @@ export function PreviewCanvas({
   }, [focusPageId]);
 
   const fitCanvasToScreen = useCallback(() => {
-    const viewport = computeFitCanvasViewport(allItemLayouts, {
+    const viewport = computeFitCanvasViewport(visibleItemLayouts, {
       containerWidth: containerSize.width,
       containerHeight: containerSize.height,
     });
@@ -2107,7 +2900,7 @@ export function PreviewCanvas({
       viewport,
     }));
     return true;
-  }, [allItemLayouts, containerSize, updateState]);
+  }, [containerSize, updateState, visibleItemLayouts]);
 
   const handleFitToScreen = useCallback(() => {
     fitCanvasToScreen();
@@ -2147,7 +2940,7 @@ export function PreviewCanvas({
       return;
     }
 
-    const viewport = computeFitCanvasViewport(allItemLayouts, {
+    const viewport = computeFitCanvasViewport(visibleItemLayouts, {
       containerWidth: containerSize.width,
       containerHeight: containerSize.height,
     });
@@ -2162,7 +2955,7 @@ export function PreviewCanvas({
     }));
   }, [
     allItemLayoutSignature,
-    allItemLayouts,
+    visibleItemLayouts,
     containerSize.height,
     containerSize.width,
     resolvedInteractionMode,
@@ -2170,21 +2963,43 @@ export function PreviewCanvas({
   ]);
 
   const handleAutoLayout = useCallback(() => {
-    const arrangedPages = computeAutoCanvasLayout(pages, {
-      currentLayout: effectivePages,
+    updateState((prev) => {
+      const arranged = computeCanvasSectionAutoLayout({
+        ...prev,
+        pages: effectivePages,
+        nodes: effectiveNodes,
+      });
+      const layouts = {
+        ...arranged.pages,
+        ...Object.fromEntries(
+          Object.entries(arranged.nodes ?? {}).map(([id, node]) => [
+            id,
+            node.layout,
+          ]),
+        ),
+        ...Object.fromEntries(
+          Object.entries(arranged.sections ?? {}).map(([id, section]) => [
+            id,
+            section.layout,
+          ]),
+        ),
+      };
+      const viewport =
+        computeFitCanvasViewport(layouts, {
+          containerWidth: containerSize.width,
+          containerHeight: containerSize.height,
+        }) ?? prev.viewport;
+      return withCanvasAnnotationNodes(
+        {
+          ...prev,
+          pages: arranged.pages,
+          sections: arranged.sections,
+          viewport,
+        },
+        arranged.nodes ?? {},
+      );
     });
-    const nextViewport =
-      computeFitCanvasViewport(arrangedPages, {
-        containerWidth: containerSize.width,
-        containerHeight: containerSize.height,
-      }) ?? canvasState.viewport;
-
-    updateState((prev) => ({
-      ...prev,
-      pages: arrangedPages,
-      viewport: nextViewport,
-    }));
-  }, [canvasState.viewport, containerSize, effectivePages, pages, updateState]);
+  }, [containerSize, effectiveNodes, effectivePages, updateState]);
 
   const createNodeId = useCallback((prefix: string) => {
     if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -2853,6 +3668,26 @@ export function PreviewCanvas({
     selectedPageLikeCount,
   ]);
 
+  const selectedSection = selectedSectionId
+    ? effectiveSections[selectedSectionId]
+    : undefined;
+  const selectedSectionToolbarStyle = useMemo<
+    React.CSSProperties | undefined
+  >(() => {
+    if (!selectedSection) return undefined;
+    const zoom = canvasState.viewport.zoom || 1;
+    return {
+      left:
+        canvasState.viewport.x +
+        (selectedSection.layout.x + selectedSection.layout.width / 2) * zoom,
+      top: Math.max(
+        12,
+        canvasState.viewport.y + selectedSection.layout.y * zoom - 62,
+      ),
+      transform: "translateX(-50%)",
+    };
+  }, [canvasState.viewport, selectedSection]);
+
   const renderAlignmentButton = (
     action: MultiPageAlignAction,
     label: string,
@@ -2942,7 +3777,10 @@ export function PreviewCanvas({
       onPaste={(event) => {
         if (!isEditorMode) return;
         const target = event.target as HTMLElement;
-        if (target.closest("input,textarea") || target.isContentEditable) {
+        if (
+          target.closest("button,input,textarea,select,a") ||
+          target.isContentEditable
+        ) {
           return;
         }
         if (documentDraft) return;
@@ -2960,8 +3798,10 @@ export function PreviewCanvas({
           if (html) {
             event.preventDefault();
             void onRequestPasteHtmlContent(html);
+            return;
           }
         }
+        if (handleInternalCanvasPaste()) event.preventDefault();
       }}
     >
       {canInteractWithViewport && (
@@ -3117,6 +3957,115 @@ export function PreviewCanvas({
         </div>
       )}
 
+      {isEditorMode && selectedSection && selectedSectionToolbarStyle && (
+        <TooltipProvider delayDuration={250}>
+          <div
+            role="toolbar"
+            aria-label="Section 操作"
+            className="absolute z-30 flex w-max max-w-[calc(100vw-1rem)] items-center gap-1 overflow-x-auto whitespace-nowrap rounded-lg border bg-background/95 p-1 shadow-lg backdrop-blur"
+            style={selectedSectionToolbarStyle}
+          >
+            <input
+              type="color"
+              aria-label="Section 填充色"
+              value={selectedSection.style?.fill ?? "#eff6ff"}
+              className="h-8 w-8 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
+              onChange={(event) =>
+                handleSectionStyleChange(selectedSection.id, {
+                  ...selectedSection.style,
+                  fill: event.target.value,
+                })
+              }
+            />
+            <input
+              type="color"
+              aria-label="Section 边框色"
+              value={selectedSection.style?.stroke ?? "#94a3b8"}
+              className="h-8 w-8 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
+              onChange={(event) =>
+                handleSectionStyleChange(selectedSection.id, {
+                  ...selectedSection.style,
+                  stroke: event.target.value,
+                })
+              }
+            />
+            <input
+              type="color"
+              aria-label="Section 标题颜色"
+              value={selectedSection.style?.titleColor ?? "#334155"}
+              className="h-8 w-8 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
+              onChange={(event) =>
+                handleSectionStyleChange(selectedSection.id, {
+                  ...selectedSection.style,
+                  titleColor: event.target.value,
+                })
+              }
+            />
+            <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
+            <Popover>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Section 样式设置"
+                      className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <SlidersHorizontal className="h-4 w-4" />
+                    </button>
+                  </PopoverTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="top">样式设置</TooltipContent>
+              </Tooltip>
+              <PopoverContent align="center" side="top" className="w-56 space-y-3 p-3">
+                <label className="grid grid-cols-[4.5rem_1fr] items-center gap-3 text-xs">
+                  边框宽度
+                  <input type="range" min="0" max="8" step="1" aria-label="Section 边框宽度" value={selectedSection.style?.strokeWidth ?? 1} onChange={(event) => handleSectionStyleChange(selectedSection.id, { ...selectedSection.style, strokeWidth: Number(event.target.value) })} />
+                </label>
+                <label className="grid grid-cols-[4.5rem_1fr] items-center gap-3 text-xs">
+                  不透明度
+                  <input type="range" min="0.1" max="1" step="0.1" aria-label="Section 不透明度" value={selectedSection.style?.opacity ?? 1} onChange={(event) => handleSectionStyleChange(selectedSection.id, { ...selectedSection.style, opacity: Number(event.target.value) })} />
+                </label>
+                <label className="grid grid-cols-[4.5rem_1fr] items-center gap-3 text-xs">
+                  圆角
+                  <input type="range" min="0" max="32" step="1" aria-label="Section 圆角" value={selectedSection.style?.cornerRadius ?? 10} onChange={(event) => handleSectionStyleChange(selectedSection.id, { ...selectedSection.style, cornerRadius: Number(event.target.value) })} />
+                </label>
+              </PopoverContent>
+            </Popover>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="适应成员"
+                  className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={() => updateState((prev) => fitCanvasSectionToChildren(prev, selectedSection.id))}
+                >
+                  <Maximize2 className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">适应成员</TooltipContent>
+            </Tooltip>
+            <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="删除分区"
+                  className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-destructive transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={() => {
+                    updateState((prev) => removeCanvasSection(prev, selectedSection.id));
+                    setSelectedSectionId(null);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">删除分区并释放成员</TooltipContent>
+            </Tooltip>
+          </div>
+        </TooltipProvider>
+      )}
+
       <CanvasViewport
         viewport={canvasState.viewport}
         onViewportChange={(viewport) =>
@@ -3136,14 +4085,50 @@ export function PreviewCanvas({
         onSelectionRectChange={handleSelectionRectChange}
         creationMode={
           isEditorMode &&
-          (effectiveToolMode === "text" || effectiveToolMode === "image")
+          (effectiveToolMode === "text" ||
+            effectiveToolMode === "image" ||
+            effectiveToolMode === "section")
             ? effectiveToolMode
             : null
         }
         onCanvasPointClick={handleCanvasPointCreate}
+        onCanvasRectCreate={handleCreateSection}
       >
+        {Object.values(effectiveSections)
+          .map((section: CanvasSection) => (
+            <CanvasSectionItem
+              key={section.id}
+              section={section}
+              editable={isEditorMode}
+              zoom={canvasState.viewport.zoom}
+              selected={selectedSectionId === section.id}
+              dropTarget={dropTargetSectionId === section.id}
+              startEditing={titleEditingSectionId === section.id}
+              onSelect={(id) => {
+                setSelectedSectionId(id);
+                setSelectedPageIds([]);
+                setSelectedPageGroupIds([]);
+                setSelectedNodeId(null);
+                setSelectedDocumentNodeIds([]);
+              }}
+              onRename={handleRenameSection}
+              onLayoutChange={handleSectionLayoutChange}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            />
+          ))}
+        <NavigationConnectionsLayer
+          connections={navigationConnections}
+          hotspots={navigationHotspots}
+          layouts={renderablePageLayouts}
+          obstacles={navigationObstacles}
+          hoveredPageId={hoveredNavigationPageId}
+        />
         {pages
-          .filter((page) => !hiddenPageIdSet.has(page.id))
+          .filter(
+            (page) =>
+              !hiddenPageIdSet.has(page.id),
+          )
           .map((page) => {
             const renderMode = pageRenderModes[page.id] ?? "loading";
             return (
@@ -3187,28 +4172,51 @@ export function PreviewCanvas({
                 // 的适应屏幕逻辑并覆盖用户当前的缩放/平移。
                 onLayoutChange={isEditorMode ? handleLayoutChange : undefined}
                 onConfigEdit={handlePageSelect}
-                onCommentSelect={onPageComment ? (pageId, event) => {
-                  const rect = event.currentTarget.getBoundingClientRect();
-                  const page = pagesById.get(pageId);
-                  if (!page || rect.width === 0 || rect.height === 0) return;
-                  onPageComment({
-                    pageId,
-                    pageName: page.name,
-                    pin: {
-                      xRatio: Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)),
-                      yRatio: Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)),
-                    },
-                    clientX: event.clientX,
-                    clientY: event.clientY,
-                  });
-                } : undefined}
+                onCommentSelect={
+                  onPageComment
+                    ? (pageId, event) => {
+                        const rect =
+                          event.currentTarget.getBoundingClientRect();
+                        const page = pagesById.get(pageId);
+                        if (!page || rect.width === 0 || rect.height === 0)
+                          return;
+                        onPageComment({
+                          pageId,
+                          pageName: page.name,
+                          pin: {
+                            xRatio: Math.min(
+                              1,
+                              Math.max(
+                                0,
+                                (event.clientX - rect.left) / rect.width,
+                              ),
+                            ),
+                            yRatio: Math.min(
+                              1,
+                              Math.max(
+                                0,
+                                (event.clientY - rect.top) / rect.height,
+                              ),
+                            ),
+                          },
+                          clientX: event.clientX,
+                          clientY: event.clientY,
+                        });
+                      }
+                    : undefined
+                }
                 onRequestDelete={
                   onRequestDeletePages
                     ? (pageId) => void onRequestDeletePages([pageId])
                     : undefined
                 }
                 onViewSource={onViewSource}
-                brokenReference={page.isReference && !page.code && !page.prototypeHtml && !page.sketchScene}
+                brokenReference={
+                  page.isReference &&
+                  !page.code &&
+                  !page.prototypeHtml &&
+                  !page.sketchScene
+                }
                 onConsoleEntry={onConsoleEntry}
                 onError={onError}
                 onDragStart={handleDragStart}
@@ -3217,6 +4225,29 @@ export function PreviewCanvas({
                 toolMode={effectiveToolMode}
                 selected={selectedPageIds.includes(page.id)}
                 onPositionableSizes={onPositionableSizes}
+                navigationPages={pages}
+                navigationHotspots={navigationHotspots.filter(
+                  (hotspot) => hotspot.pageId === page.id,
+                )}
+                navigationConnections={navigationConnections}
+                navigationActive={
+                  isEditorMode && effectiveToolMode === "navigation"
+                }
+                showNavigationHotspots={
+                  hoveredNavigationPageId === page.id ||
+                  selectedPageIds.includes(page.id)
+                }
+                onCreateNavigation={handleCreateNavigation}
+                onUpdateNavigationHotspot={handleUpdateNavigationHotspot}
+                onUpdateNavigationTarget={handleUpdateNavigationTarget}
+                onDeleteNavigationHotspot={handleDeleteNavigationHotspot}
+                onNavigationHover={setHoveredNavigationPageId}
+                hasNavigationRelations={navigationConnections.some(
+                  (connection) =>
+                    connection.source.pageId === page.id ||
+                    connection.target.pageId === page.id,
+                )}
+                onDeleteNavigationRelations={handleDeleteNavigationRelations}
               />
             );
           })}
@@ -3250,79 +4281,83 @@ export function PreviewCanvas({
             onPositionableSizes={onPositionableSizes}
           />
         ))}
-        {Object.values(effectiveNodes).map((node) => {
-          const renderedNode = (() => {
-            if (node.kind !== "document") return node;
-            const documents = getCanvasDocumentEntries(node).map((entry) => {
-              const knowledgeDocument =
-                knowledgeDocumentsById.get(entry.knowledgeDocument.id) ??
-                entry.knowledgeDocument;
-              return {
-                ...entry,
-                title: knowledgeDocument.title,
-                knowledgeDocument,
-              };
-            });
-            const activeEntry =
-              documents.find((entry) => entry.id === node.activeDocumentId) ??
-              documents[0];
-            if (documents.length > 1) {
-              return {
-                ...node,
-                documents,
-                activeDocumentId: activeEntry?.id ?? node.activeDocumentId,
-                markdown: activeEntry
-                  ? (knowledgeDocumentMarkdown[
-                      activeEntry.knowledgeDocument.id
-                    ] ?? node.markdown)
-                  : node.markdown,
-              };
-            }
-            if (activeEntry) {
-              return {
-                ...node,
-                title: activeEntry.knowledgeDocument.title,
-                knowledgeDocument: activeEntry.knowledgeDocument,
-                markdown:
-                  knowledgeDocumentMarkdown[activeEntry.knowledgeDocument.id] ??
-                  node.markdown,
-              };
-            }
-            return node;
-          })();
-
-          return (
-            <CanvasFreeNodeItem
-              key={node.id}
-              node={renderedNode}
-              editable={isEditorMode}
-              zoom={canvasState.viewport.zoom}
-              toolMode={effectiveToolMode}
-              selected={
-                selectedNodeId === node.id ||
-                selectedDocumentNodeIds.includes(node.id)
+        {Object.values(effectiveNodes)
+          .map((node) => {
+            const renderedNode = (() => {
+              if (node.kind !== "document") return node;
+              const documents = getCanvasDocumentEntries(node).map((entry) => {
+                const knowledgeDocument =
+                  knowledgeDocumentsById.get(entry.knowledgeDocument.id) ??
+                  entry.knowledgeDocument;
+                return {
+                  ...entry,
+                  title: knowledgeDocument.title,
+                  knowledgeDocument,
+                };
+              });
+              const activeEntry =
+                documents.find((entry) => entry.id === node.activeDocumentId) ??
+                documents[0];
+              if (documents.length > 1) {
+                return {
+                  ...node,
+                  documents,
+                  activeDocumentId: activeEntry?.id ?? node.activeDocumentId,
+                  markdown: activeEntry
+                    ? (knowledgeDocumentMarkdown[
+                        activeEntry.knowledgeDocument.id
+                      ] ?? node.markdown)
+                    : node.markdown,
+                };
               }
-              editing={editingTextNodeId === node.id}
-              onLayoutChange={isEditorMode ? handleNodeLayoutChange : undefined}
-              onEdit={handleEditNode}
-              onTextChange={handleTextNodeChange}
-              onNodeStyleChange={handleNodeStyleChange}
-              onTextEditStart={(nodeId) => {
-                setSelectedPageIds([]);
-                setSelectedDocumentNodeIds([]);
-                setSelectedPageGroupIds([]);
-                setSelectedNodeId(nodeId);
-                setEditingTextNodeId(nodeId);
-              }}
-              onToggleCollapse={handleNodeToggleCollapse}
-              onActiveDocumentChange={handleActiveDocumentChange}
-              onSelect={handleNodeSelect}
-              onDragStart={handleDragStart}
-              onDragMove={handleDragMove}
-              onDragEnd={handleDragEnd}
-            />
-          );
-        })}
+              if (activeEntry) {
+                return {
+                  ...node,
+                  title: activeEntry.knowledgeDocument.title,
+                  knowledgeDocument: activeEntry.knowledgeDocument,
+                  markdown:
+                    knowledgeDocumentMarkdown[
+                      activeEntry.knowledgeDocument.id
+                    ] ?? node.markdown,
+                };
+              }
+              return node;
+            })();
+
+            return (
+              <CanvasFreeNodeItem
+                key={node.id}
+                node={renderedNode}
+                editable={isEditorMode}
+                zoom={canvasState.viewport.zoom}
+                toolMode={effectiveToolMode}
+                selected={
+                  selectedNodeId === node.id ||
+                  selectedDocumentNodeIds.includes(node.id)
+                }
+                editing={editingTextNodeId === node.id}
+                onLayoutChange={
+                  isEditorMode ? handleNodeLayoutChange : undefined
+                }
+                onEdit={handleEditNode}
+                onTextChange={handleTextNodeChange}
+                onNodeStyleChange={handleNodeStyleChange}
+                onTextEditStart={(nodeId) => {
+                  setSelectedPageIds([]);
+                  setSelectedDocumentNodeIds([]);
+                  setSelectedPageGroupIds([]);
+                  setSelectedNodeId(nodeId);
+                  setEditingTextNodeId(nodeId);
+                }}
+                onToggleCollapse={handleNodeToggleCollapse}
+                onActiveDocumentChange={handleActiveDocumentChange}
+                onSelect={handleNodeSelect}
+                onDragStart={handleDragStart}
+                onDragMove={handleDragMove}
+                onDragEnd={handleDragEnd}
+              />
+            );
+          })}
       </CanvasViewport>
 
       {documentDraft && (

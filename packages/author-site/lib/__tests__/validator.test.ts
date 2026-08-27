@@ -406,13 +406,17 @@ describe("getDefaultValues", () => {
 });
 
 describe("getPreviewSize", () => {
-  it("应从 $demo.previewSize 中提取预览尺寸", () => {
+  it("应从 $demo.presentation.viewport 中提取预览尺寸", () => {
     const schema = JSON.stringify({
       $schema: "https://json-schema.org/draft/2020-12/schema",
       $demo: {
-        previewSize: {
-          width: 390,
-          height: 844,
+        presentation: {
+          version: 1,
+          mode: "responsive-page",
+          viewport: { width: 390, height: 844 },
+          heightBehavior: "content",
+          preset: "mobile",
+          source: "user",
         },
       },
       title: "Demo",
@@ -428,13 +432,16 @@ describe("getPreviewSize", () => {
     });
   });
 
-  it("应支持 scale 属性", () => {
+  it("展示配置只解析持久化视口，不混入临时缩放", () => {
     const schema = JSON.stringify({
       $demo: {
-        previewSize: {
-          width: 1440,
-          height: 900,
-          scale: 0.5,
+        presentation: {
+          version: 1,
+          mode: "responsive-page",
+          viewport: { width: 1440, height: 900 },
+          heightBehavior: "content",
+          preset: "desktop",
+          source: "user",
         },
       },
       title: "Demo",
@@ -447,7 +454,6 @@ describe("getPreviewSize", () => {
     expect(size).toEqual({
       width: 1440,
       height: 900,
-      scale: 0.5,
     });
   });
 

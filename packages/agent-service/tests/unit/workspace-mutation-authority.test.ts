@@ -5,6 +5,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceMutationAuthority, WorkspaceMutationAuthorityError } from "../../src/workspace/workspace-mutation-authority";
+import { normalizeHtmlImport } from "@workbench/project-core/html-import";
 
 const temporaryRoots: string[] = [];
 const hash = (content: string) => crypto.createHash("sha256").update(content).digest("hex");
@@ -29,6 +30,64 @@ afterEach(() => {
 });
 
 describe("WorkspaceMutationAuthority", () => {
+  it("在 Authority 串行区内分配 HTML 导入页面并支持同一 commitKey 重放", async () => {
+    const { authority, workspacePath } = createAuthority();
+    fs.writeFileSync(path.join(workspacePath, "workspace-tree.json"), JSON.stringify({ folders: [{ id: "folder-1" }], pages: [{ id: "home", name: "首页", routeKey: "home", order: 0 }] }), "utf8");
+    const html = "<main>Imported</main>";
+    const normalized = normalizeHtmlImport(html);
+    const staged = await authority.stageBinary("project-1", "workspace-1", Buffer.from(html, "utf8"));
+    const request = {
+      mutationId: "html-import-commit-key", projectId: "project-1", workspaceId: "workspace-1", baseRevision: 1, actor: "author-site" as const, reason: "commit_html_import_draft",
+      operations: [{ type: "commit_html_import" as const, path: "" as const, from: "" as const, to: "" as const, stagingId: staged.stagingId, hash: staged.hash, size: staged.size, name: "Landing", parentId: null, runtimeType: "prototype-html-css" as const, analysisVersion: normalized.analysis.analysisVersion, sourceHash: normalized.analysis.sourceHash, normalizedHash: normalized.normalizedHash, presentation: { version: 1 as const, mode: "responsive-page" as const, heightBehavior: "content" as const, preset: "desktop" as const, source: "recommended" as const, viewport: { width: 1440, height: 900 } } }],
+    };
+    await expect(authority.mutate({
+      ...request,
+      mutationId: "html-import-tampered-source",
+      operations: [{ ...request.operations[0], sourceHash: "0".repeat(64) }],
+    })).rejects.toMatchObject({ code: "WORKSPACE_INVALID_OPERATION" });
+    await expect(authority.mutate({
+      ...request,
+      mutationId: "html-import-missing-folder",
+      operations: [{ ...request.operations[0], parentId: "missing-folder" }],
+    })).rejects.toMatchObject({ code: "WORKSPACE_INVALID_OPERATION" });
+    const [first, replay] = await Promise.all([authority.mutate(request), authority.mutate(request)]);
+    expect(replay).toEqual(first);
+    const tree = JSON.parse(fs.readFileSync(path.join(workspacePath, "workspace-tree.json"), "utf8")) as { pages: Array<{ id: string; routeKey: string }> };
+    expect(tree.pages).toHaveLength(2);
+    expect(tree.pages[1].routeKey).toBe("landing");
+    expect(fs.existsSync(path.join(workspacePath, "demos", tree.pages[1].id, "prototype.html"))).toBe(true);
+    const folderReceipt = await authority.mutate({
+      ...request,
+      mutationId: "html-import-same-name-in-folder",
+      operations: [{ ...request.operations[0], parentId: "folder-1" }],
+    });
+    const folderPageId = folderReceipt.resources
+      .map((resource) => /^demos\/([^/]+)\/prototype\.html$/.exec(resource.path)?.[1])
+      .find(Boolean);
+    const updatedTree = JSON.parse(fs.readFileSync(path.join(workspacePath, "workspace-tree.json"), "utf8")) as { pages: Array<{ id: string; parentId: string | null; routeKey: string; order: number }> };
+    expect(updatedTree.pages).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: folderPageId, parentId: "folder-1", routeKey: "landing-2", order: 0 }),
+    ]));
+  });
+
+  it("并发的不同 HTML draft 不冲突且各自进入页面树", async () => {
+    const { authority, workspacePath } = createAuthority();
+    fs.writeFileSync(path.join(workspacePath, "workspace-tree.json"), JSON.stringify({ folders: [], pages: [] }), "utf8");
+    const presentation = { version: 1 as const, mode: "responsive-page" as const, heightBehavior: "content" as const, preset: "desktop" as const, source: "recommended" as const, viewport: { width: 1440, height: 900 } };
+    const requestFor = async (mutationId: string, html: string) => {
+      const normalized = normalizeHtmlImport(html);
+      const staged = await authority.stageBinary("project-1", "workspace-1", Buffer.from(html, "utf8"));
+      return { mutationId, projectId: "project-1", workspaceId: "workspace-1", baseRevision: 1, actor: "author-site" as const, reason: "commit_html_import_draft", operations: [{ type: "commit_html_import" as const, path: "" as const, from: "" as const, to: "" as const, stagingId: staged.stagingId, hash: staged.hash, size: staged.size, name: "Landing", parentId: null, runtimeType: "prototype-html-css" as const, analysisVersion: normalized.analysis.analysisVersion, sourceHash: normalized.analysis.sourceHash, normalizedHash: normalized.normalizedHash, presentation }] };
+    };
+    const [one, two] = await Promise.all([requestFor("html-1", "<main>One</main>"), requestFor("html-2", "<main>Two</main>")]);
+    await Promise.all([authority.mutate(one), authority.mutate(two)]);
+    const tree = JSON.parse(fs.readFileSync(path.join(workspacePath, "workspace-tree.json"), "utf8")) as { pages: Array<{ id: string; routeKey: string; order: number }> };
+    expect(tree.pages).toHaveLength(2);
+    expect(new Set(tree.pages.map((page) => page.id)).size).toBe(2);
+    expect(new Set(tree.pages.map((page) => page.routeKey)).size).toBe(2);
+    expect(tree.pages.map((page) => page.order).sort()).toEqual([0, 1]);
+  });
+
   it("写入页面图片或动效 Schema 时在同一 mutation 创建并同步设计规范", async () => {
     const { authority, workspacePath } = createAuthority();
     fs.writeFileSync(
@@ -274,6 +333,27 @@ describe("WorkspaceMutationAuthority", () => {
     expect(fs.readFileSync(path.join(workspacePath, "assets", "images", "image.bin"))).toEqual(bytes);
     expect(receipt.resources).toEqual([expect.objectContaining({ path: "assets/images/image.bin", afterHash: staged.hash })]);
     expect(fs.existsSync(path.join(path.dirname(workspacePath), "data", "workspace-authority", "workspace-1", "staging", `${staged.stagingId}.bin`))).toBe(false);
+  });
+
+  it("大文本可经 staging 原子写入受管页面资源，且仍拒绝 assets 路径", async () => {
+    const { authority, workspacePath } = createAuthority();
+    const html = "<main>staged HTML</main>";
+    const staged = await authority.stageBinary("project-1", "workspace-1", Buffer.from(html, "utf8"));
+    const receipt = await authority.mutate({
+      mutationId: "staged-text-1", projectId: "project-1", workspaceId: "workspace-1", baseRevision: 1,
+      actor: "author-site", reason: "html_import",
+      operations: [{ type: "put_staged_text", path: "demos/imported/sandbox.html", stagingId: staged.stagingId, hash: staged.hash, size: staged.size, expectedAbsent: true }],
+    });
+    expect(fs.readFileSync(path.join(workspacePath, "demos", "imported", "sandbox.html"), "utf-8")).toBe(html);
+    expect(receipt.resources).toEqual([expect.objectContaining({ path: "demos/imported/sandbox.html", afterHash: staged.hash })]);
+    expect(fs.existsSync(path.join(path.dirname(workspacePath), "data", "workspace-authority", "workspace-1", "staging", `${staged.stagingId}.bin`))).toBe(false);
+
+    const stagedAsset = await authority.stageBinary("project-1", "workspace-1", Buffer.from("not an asset", "utf8"));
+    await expect(authority.mutate({
+      mutationId: "staged-text-assets-rejected", projectId: "project-1", workspaceId: "workspace-1", baseRevision: receipt.revision,
+      actor: "author-site", reason: "html_import",
+      operations: [{ type: "put_staged_text", path: "assets/not-allowed.html", stagingId: stagedAsset.stagingId, hash: stagedAsset.hash, size: stagedAsset.size, expectedAbsent: true }],
+    })).rejects.toMatchObject({ code: "WORKSPACE_INVALID_OPERATION" });
   });
 
   it("启动时回滚没有 receipt 的 prepared mutation，避免半写入成为新版本", async () => {

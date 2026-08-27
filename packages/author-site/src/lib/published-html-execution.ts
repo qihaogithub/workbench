@@ -1,6 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import { normalizeHtmlImport } from "@workbench/project-core";
+import {
+  HTML_IMPORT_ANALYSIS_VERSION,
+  normalizeHtmlImport,
+} from "@workbench/project-core";
 import { getDataDir } from "@/lib/fs-utils";
 import { createHtmlSandboxExecution, HTML_SANDBOX_POLICY_VERSION, resolveHtmlSandboxPublicOrigin } from "@/lib/html-sandbox-execution";
 
@@ -15,7 +18,7 @@ function isSafeSegment(value: string): boolean { return Boolean(value) && value 
 function isMeta(value: unknown): value is PublishedMeta {
   if (!value || typeof value !== "object") return false;
   const meta = value as Partial<PublishedMeta>;
-  return meta.source === "html-import" && meta.analysisVersion === 1 &&
+  return meta.source === "html-import" && meta.analysisVersion === HTML_IMPORT_ANALYSIS_VERSION &&
     meta.sandboxPolicyVersion === HTML_SANDBOX_POLICY_VERSION &&
     typeof meta.sourceHash === "string" && /^[a-f0-9]{64}$/i.test(meta.sourceHash) &&
     typeof meta.normalizedHash === "string" && /^[a-f0-9]{64}$/i.test(meta.normalizedHash);
@@ -56,6 +59,6 @@ export function issuePublishedHtmlExecution(input: { projectId: string; pageId: 
   if (normalized.analysis.outcome.status !== "accepted" || normalized.analysis.outcome.runtimeType !== "sandboxed-html" || normalized.analysis.sourceHash !== pageMeta.normalizedHash) return failure(422, "发布 HTML 源哈希或安全合同不一致");
   const publicOrigin = resolveHtmlSandboxPublicOrigin(requestOrigin);
   if (!publicOrigin) return failure(503, "HTML sandbox 独立 origin 未配置");
-  const ticket = createHtmlSandboxExecution(html);
+  const ticket = createHtmlSandboxExecution(html, Date.now(), { projectId, pageId });
   return { ok: true, data: { executionUrl: `${publicOrigin}/api/html-sandbox/executions/${ticket.executionId}`, channelId: ticket.channelId, expiresAt: ticket.expiresAt, sandboxPolicyVersion: HTML_SANDBOX_POLICY_VERSION } };
 }
