@@ -223,7 +223,7 @@ export type {
 } from "./DocumentEditor";
 export { RichTextEditor } from "./RichTextEditor";
 export { customWidgets, ColorPickerWidget, FileUploadWidget } from "./widgets";
-export type { FileUploadWidgetOptions, FileUploadWidgetProps } from "./widgets";
+export type { FileUploadWidgetOptions, FileUploadWidgetProps, VideoValue } from "./widgets";
 export { ImageListWidget } from "./ImageListWidget";
 export type { ImageItem, ImageListWidgetProps } from "./ImageListWidget";
 export { generateIframeHtml, buildIframeHtml } from "./iframe-template";

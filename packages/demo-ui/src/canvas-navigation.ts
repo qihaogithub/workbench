@@ -13,10 +13,10 @@ export function parseCanvasNavigation(
   if (!isRecord(value) || !isRecord(value.hotspots) || !isRecord(value.connections)) return null;
   const hotspots: CanvasNavigationState["hotspots"] = {};
   for (const [id, raw] of Object.entries(value.hotspots)) {
-    if (!isRecord(raw) || raw.id !== id || typeof raw.pageId !== "string" || !pageIds.has(raw.pageId) || !isRecord(raw.rect)) return null;
+    if (!isRecord(raw) || raw.id !== id || typeof raw.pageId !== "string" || !pageIds.has(raw.pageId) || (raw.kind !== "area" && raw.kind !== "point") || !isRecord(raw.rect)) return null;
     const { x, y, width, height } = raw.rect;
     if (typeof x !== "number" || typeof y !== "number" || typeof width !== "number" || typeof height !== "number" || ![x, y, width, height].every(Number.isFinite) || x < 0 || y < 0 || width <= 0 || height <= 0 || x + width > 1 || y + height > 1 || typeof raw.createdAt !== "number" || typeof raw.updatedAt !== "number") return null;
-    hotspots[id] = { id, pageId: raw.pageId, rect: { x, y, width, height }, createdAt: raw.createdAt, updatedAt: raw.updatedAt };
+    hotspots[id] = { id, pageId: raw.pageId, kind: raw.kind, rect: { x, y, width, height }, createdAt: raw.createdAt, updatedAt: raw.updatedAt };
   }
   const connections: CanvasNavigationState["connections"] = {};
   const seenHotspots = new Set<string>();

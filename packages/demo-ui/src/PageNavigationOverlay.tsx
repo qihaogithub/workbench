@@ -19,6 +19,7 @@ interface NormalizedRect {
   width: number;
   height: number;
 }
+type NavigationDraft = Pick<CanvasNavigationHotspot, "kind" | "rect">;
 type ResizeHandle = "nw" | "ne" | "se" | "sw";
 type EditGesture =
   | { kind: "move"; hotspot: CanvasNavigationHotspot; point: Point }
@@ -38,13 +39,16 @@ interface PageNavigationOverlayProps {
   enabled?: boolean;
   visible?: boolean;
   editable?: boolean;
-  onCreate?: (rect: NormalizedRect, targetPageId: string) => void;
+  onCreate?: (rect: NormalizedRect, targetPageId: string, kind: CanvasNavigationHotspot["kind"]) => void;
+  /** 告知画布有一个尚未选择目标的新连线，可直接点选其他页面卡片。 */
+  onPendingTargetChange?: (draft: NavigationDraft | null) => void;
   onUpdateHotspot?: (hotspotId: string, rect: NormalizedRect) => void;
   onUpdateTarget?: (hotspotId: string, targetPageId: string) => void;
   onDeleteHotspot?: (hotspotId: string) => void;
 }
 
 const MIN_HOTSPOT_SIZE = 12;
+const POINT_HOTSPOT_SIZE = 0.002;
 const HANDLE_CLASS =
   "absolute h-2.5 w-2.5 rounded-sm border border-primary bg-background shadow-sm";
 
@@ -69,6 +73,7 @@ export function PageNavigationOverlay({
   visible = false,
   editable = false,
   onCreate,
+  onPendingTargetChange,
   onUpdateHotspot,
   onUpdateTarget,
   onDeleteHotspot,
@@ -76,7 +81,7 @@ export function PageNavigationOverlay({
   const rootRef = useRef<HTMLDivElement>(null);
   const startRef = useRef<Point | null>(null);
   const editGestureRef = useRef<EditGesture | null>(null);
-  const [draft, setDraft] = useState<NormalizedRect | null>(null);
+  const [draft, setDraft] = useState<NavigationDraft | null>(null);
   const [selectedHotspotId, setSelectedHotspotId] = useState<string | null>(
     null,
   );
@@ -129,12 +134,17 @@ export function PageNavigationOverlay({
   const selectedRect = editingRect ?? selectedHotspot?.rect ?? null;
 
   const cancel = useCallback(() => {
+    const hadDraft = Boolean(draft);
     startRef.current = null;
     editGestureRef.current = null;
     setDraft(null);
     setEditingRect(null);
     setSelectedHotspotId(null);
-  }, []);
+    if (hadDraft) onPendingTargetChange?.(null);
+  }, [draft, onPendingTargetChange]);
+  useEffect(() => {
+    if (!enabled && draft) cancel();
+  }, [cancel, draft, enabled]);
   useEffect(() => {
     if (
       selectedHotspotId &&
@@ -211,7 +221,7 @@ export function PageNavigationOverlay({
     setSelectedHotspotId(null);
     setEditingRect(null);
     startRef.current = point;
-    setDraft({ x: point.x, y: point.y, width: 0, height: 0 });
+    setDraft({ kind: "area", rect: { x: point.x, y: point.y, width: 0, height: 0 } });
     event.currentTarget.setPointerCapture(event.pointerId);
   };
   const move = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -223,7 +233,7 @@ export function PageNavigationOverlay({
     }
     if (!startRef.current) return;
     const next = rectFromPointer(event.clientX, event.clientY);
-    if (next) setDraft(next);
+    if (next) setDraft({ kind: "area", rect: next });
   };
   const finish = (event: React.PointerEvent<HTMLDivElement>) => {
     event.currentTarget.releasePointerCapture?.(event.pointerId);
@@ -240,18 +250,26 @@ export function PageNavigationOverlay({
     if (!startRef.current) return;
     const next = rectFromPointer(event.clientX, event.clientY);
     startRef.current = null;
-    if (
-      !next ||
-      next.width * event.currentTarget.clientWidth < MIN_HOTSPOT_SIZE ||
-      next.height * event.currentTarget.clientHeight < MIN_HOTSPOT_SIZE
-    ) {
-      setDraft(null);
-      return;
-    }
-    setDraft(next);
+    if (!next) return cancel();
+    const isArea =
+      next.width * event.currentTarget.clientWidth >= MIN_HOTSPOT_SIZE &&
+      next.height * event.currentTarget.clientHeight >= MIN_HOTSPOT_SIZE;
+    const draft = isArea
+      ? { kind: "area" as const, rect: next }
+      : {
+          kind: "point" as const,
+          rect: clampRect({
+            x: Math.min(1 - POINT_HOTSPOT_SIZE, Math.max(0, next.x - POINT_HOTSPOT_SIZE / 2)),
+            y: Math.min(1 - POINT_HOTSPOT_SIZE, Math.max(0, next.y - POINT_HOTSPOT_SIZE / 2)),
+            width: POINT_HOTSPOT_SIZE,
+            height: POINT_HOTSPOT_SIZE,
+          }),
+        };
+    setDraft(draft);
+    onPendingTargetChange?.(draft);
   };
 
-  const menuRect = draft ?? selectedRect;
+  const menuRect = draft?.rect ?? selectedRect;
   if (!(enabled || visible || hotspots.length > 0)) return null;
   return (
     <div
@@ -270,6 +288,7 @@ export function PageNavigationOverlay({
       {visible &&
         hotspots.map((hotspot) => {
           const isSelected = hotspot.id === selectedHotspotId;
+          if (hotspot.kind === "point") return null;
           const rect = isSelected && selectedRect ? selectedRect : hotspot.rect;
           const targetName =
             targets.find(
@@ -313,14 +332,14 @@ export function PageNavigationOverlay({
             </div>
           );
         })}
-      {draft && (
+      {draft?.kind === "area" && (
         <div
           className="pointer-events-none absolute rounded border-2 border-primary bg-primary/10"
           style={{
-            left: `${draft.x * 100}%`,
-            top: `${draft.y * 100}%`,
-            width: `${draft.width * 100}%`,
-            height: `${draft.height * 100}%`,
+            left: `${draft.rect.x * 100}%`,
+            top: `${draft.rect.y * 100}%`,
+            width: `${draft.rect.width * 100}%`,
+            height: `${draft.rect.height * 100}%`,
           }}
         />
       )}
@@ -350,10 +369,10 @@ export function PageNavigationOverlay({
                     : "flex w-full cursor-pointer rounded px-2 py-1.5 text-left text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 }
                 onClick={() => {
-                  if (draft) onCreate?.(draft, page.id);
+                  if (draft) onCreate?.(draft.rect, page.id, draft.kind);
                   else if (selectedHotspot)
                     onUpdateTarget?.(selectedHotspot.id, page.id);
-                  setDraft(null);
+                  cancel();
                 }}
               >
                 {page.name}

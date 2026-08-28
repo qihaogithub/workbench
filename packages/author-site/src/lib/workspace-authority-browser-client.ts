@@ -91,6 +91,29 @@ export function readWorkspaceAuthorityStateFromBrowser(input: {
   );
 }
 
+/**
+ * Reads one immutable Authority materialization. Callers that project several
+ * resources (for example a page tree plus its runtime files) must use this
+ * instead of issuing independent resource reads, which could span revisions.
+ */
+export function readWorkspaceAuthoritySnapshotFromBrowser(input: {
+  projectId: string;
+  workspaceId: string;
+  sessionId: string;
+}): Promise<WorkspaceAuthoritySnapshot> {
+  const notReady = getIdentifiersNotReadyError(input);
+  if (notReady) return Promise.reject(notReady);
+  return request(
+    sameOriginPath(
+      input.projectId,
+      input.workspaceId,
+      `/snapshot?sessionId=${encodeURIComponent(input.sessionId)}`,
+    ),
+    { method: "GET" },
+    "WORKSPACE_MUTATION_FAILED",
+  );
+}
+
 export function readWorkspaceAuthorityEventsFromBrowser(input: {
   projectId: string;
   workspaceId: string;

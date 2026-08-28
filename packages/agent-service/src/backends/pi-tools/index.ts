@@ -53,6 +53,7 @@ import {
   createPreviewDeletePagesTool,
   type PermissionHandler,
 } from "./delete-page-tool";
+import { createCreatePageTool } from "./create-page-tool";
 import { createDelegateTaskTool, type SubagentRunner } from "./subagent-tool";
 import { createGenerateImageTool } from "./generate-image-tool";
 import { createExtractImageElementTool } from "./extract-image-element-tool";
@@ -65,7 +66,7 @@ import {
 } from "./comment-tools";
 import { createSubmitFeedbackTool } from "./feedback-tool";
 
-export const WORKBENCH_TOOL_VERSION = 28;
+export const WORKBENCH_TOOL_VERSION = 29;
 
 const SKETCH_SCENE_TOOLS_ENABLED =
   process.env.PI_AGENT_SKETCH_TOOLS_ENABLED === "true";
@@ -96,7 +97,7 @@ const CONTROL_TOOL_NAMES = new Set([
 
 const CAPABILITY_TOOL_NAMES: Record<Exclude<CapabilityName, "all">, ReadonlySet<string>> = {
   workspace: new Set(["readFile", "readUploadedFile", "listFiles", "editFile", "writeFile", "deleteFile", "bash", "schemaValidate", "knowledgeReport", "readKnowledgeSource", "getConsoleLogs", "captureScreenshot"]),
-  pages: new Set(["listPages", "arrangeCanvasPages", "previewDeletePages", "executeDeletePagePlan", "deletePage", "deletePages"]),
+  pages: new Set(["createPage", "listPages", "arrangeCanvasPages", "previewDeletePages", "executeDeletePagePlan", "deletePage", "deletePages"]),
   comments: new Set(["readComments", "inspectElement", "replyComment", "resolveComment", "submitFeedback"]),
   image: new Set(["saveImage", "listImages", "readUserImage", "captureScreenshot", "delegateTask"]),
   web: new Set(["webRead", "webSearch"]),
@@ -111,7 +112,7 @@ const INITIAL_TOOL_NAMES = new Set([
 export function formatCapabilityDirectory(): string {
   const entries = [
     "- `workspace`：文件编辑、命令、校验、知识与诊断。",
-    "- `pages`：页面列表、画布整理和受确认的页面删除。",
+    "- `pages`：原子创建页面、页面列表、画布整理和受确认的页面删除。",
     "- `comments`：评论读取、定位、回复和解决。",
     "- `image`：图片素材、截图与图像子 Agent。",
     "- `web`：公开网页阅读与联网搜索（取决于服务端配置）。",
@@ -213,6 +214,7 @@ export function createWorkbenchTools(
       ? []
       : [createRequestUserChoiceTool(options.userChoiceHandler)]),
     createUpdatePlanTool(),
+    createCreatePageTool(config),
     createListPagesTool(config),
     createPreviewDeletePagesTool(config, deletionPlanStore),
     createExecuteDeletePagePlanTool(

@@ -2,6 +2,7 @@
 covers:
   - packages/demo-ui/src/types.ts
   - packages/demo-ui/src/PreviewCanvas.tsx
+  - packages/demo-ui/src/CanvasToolbar.tsx
   - packages/demo-ui/src/CanvasPageItem.tsx
   - packages/demo-ui/src/CanvasSectionItem.tsx
   - packages/demo-ui/src/canvas-layout.ts
@@ -57,7 +58,7 @@ Section 的目标是让用户像整理白板一样按“登录流程”“方案
 
 ### 3.1 创建
 
-工具栏增加 Section 按钮，快捷键为 Shift + S。激活后鼠标显示十字/区域光标；按下记录画布坐标，移动显示半透明边界，释放后以最小尺寸门槛（建议 80×60 画布像素）创建 Section。点击空白不创建零尺寸对象。创建成功后立即选中并聚焦标题输入；取消标题时保留“Section”，不产生空标题。
+底部工具栏将抓手与选择工具保留在左侧导航组；Section 与页面跳转热区移入右侧创建组，并分别使用区域面板和路径图标。Section 快捷键为 Shift + S。激活后鼠标显示十字/区域光标；按下记录画布坐标，移动显示半透明边界，释放后以最小尺寸门槛（建议 80×60 画布像素）创建 Section。点击空白不创建零尺寸对象。创建成功后立即选中并聚焦标题输入；取消标题时保留“Section”，不产生空标题。
 
 从空白处拖出一个完整包裹对象外框的矩形时，释放即把这些页面和自由节点写入 `children`，不显示确认弹窗。直接把页面、自由节点或子 Section 拖入已有 Section 时，只有对象完整落入最内层 Section 才归属；任何一边越界即从原父 Section 自动释放。按 Alt/Option 拖动页面或自由节点会在落点创建副本，原对象及原成员关系保持不变，副本按同一规则加入候选 Section。
 

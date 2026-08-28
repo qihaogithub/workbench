@@ -1,0 +1,307 @@
+{"kind":"deck","id":"pr/3sgbrq","name":"Deck"}
+{"kind":"layout","layoutId":"1622aa32-c6c6-476d-b3d7-e1ff19e3adf8","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"8783ea8b-fb15-4d07-a3c4-c53181d2be46","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/4srlx0","slide":1,"title":"ONEFLOW / LAUNCH","textShapes":15}
+{"kind":"textbox","id":"sh/rud8redg","slide":1,"text":"ONEFLOW / LAUNCH","textPreview":"ONEFLOW / LAUNCH","textChars":16,"textLines":1,"bbox":[64,24,260,18]}
+{"kind":"textbox","id":"sh/svmpkje1","slide":1,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[1180,24,36,18]}
+{"kind":"textbox","id":"sh/twfqtovm","slide":1,"text":"每个活动，都不该从零开始","textPreview":"每个活动，都不该从零开始","textChars":12,"textLines":1,"bbox":[64,126,720,116]}
+{"kind":"textbox","id":"sh/i547e9wz","slide":1,"text":"OneFlow 是面向运营活动的 AI 协作平台。","textPreview":"OneFlow 是面向运营活动的 AI 协作平台。","textChars":25,"textLines":1,"bbox":[68,260,520,34]}
+{"kind":"shape","id":"sh/jqdonudk","slide":1,"bbox":[68,330,430,30]}
+{"kind":"textbox","id":"sh/4rmpgzep","slide":1,"text":"目标 → 原型 → 配置 → 预览 → 上线 → 复用","textPreview":"目标 → 原型 → 配置 → 预览 → 上线 → 复用","textChars":27,"textLines":1,"bbox":[68,337,430,16]}
+{"kind":"shape","id":"sh/5sv6p4va","slide":1,"bbox":[790,142,50,50]}
+{"kind":"textbox","id":"sh/a1k7apwn","slide":1,"text":"1","textPreview":"1","textChars":1,"textLines":1,"bbox":[790,154,50,22.5]}
+{"kind":"textbox","id":"sh/v2tojud8","slide":1,"text":"重复","textPreview":"重复","textChars":2,"textLines":1,"bbox":[858,140,160,28]}
+{"kind":"textbox","id":"sh/j2hgbmxs","slide":1,"text":"每次重新整理方案与原型","textPreview":"每次重新整理方案与原型","textChars":11,"textLines":1,"bbox":[858,174,300,42]}
+{"kind":"shape","id":"sh/i18z21g7","slide":1,"bbox":[790,260,50,50]}
+{"kind":"textbox","id":"sh/54zydwfi","slide":1,"text":"2","textPreview":"2","textChars":1,"textLines":1,"bbox":[790,272,50,22.5]}
+{"kind":"textbox","id":"sh/k3qh4ryx","slide":1,"text":"分散","textPreview":"分散","textChars":2,"textLines":1,"bbox":[858,258,160,28]}
+{"kind":"textbox","id":"sh/7q10f6xo","slide":1,"text":"规范和经验散落各处","textPreview":"规范和经验散落各处","textChars":9,"textLines":1,"bbox":[858,292,300,42]}
+{"kind":"shape","id":"sh/658z61g3","slide":1,"bbox":[790,378,50,50]}
+{"kind":"textbox","id":"sh/tsjihgfu","slide":1,"text":"3","textPreview":"3","textChars":1,"textLines":1,"bbox":[790,390,50,22.5]}
+{"kind":"textbox","id":"sh/srah8by9","slide":1,"text":"等待","textPreview":"等待","textChars":2,"textLines":1,"bbox":[858,376,160,28]}
+{"kind":"textbox","id":"sh/nuxg32hk","slide":1,"text":"跨角色不断补上下文","textPreview":"跨角色不断补上下文","textChars":9,"textLines":1,"bbox":[858,410,300,42]}
+{"kind":"shape","id":"sh/m9ozuhgz","slide":1,"bbox":[730,520,430,2]}
+{"kind":"textbox","id":"sh/qpwj2p0n","slide":1,"text":"把活动从“临时拼接”变成“连续交付”","textPreview":"把活动从“临时拼接”变成“连续交付”","textChars":18,"textLines":1,"bbox":[730,548,430,32]}
+{"kind":"notes","id":"nt/4srlx0","slide":1,"text":""}
+{"kind":"slide","id":"sl/ng8t7t","slide":2,"title":"ALL HANDS / ONEFLOW","textShapes":18}
+{"kind":"textbox","id":"sh/ytob2t83","slide":2,"text":"ALL HANDS / ONEFLOW","textPreview":"ALL HANDS / ONEFLOW","textChars":19,"textLines":1,"bbox":[64,24,260,18]}
+{"kind":"textbox","id":"sh/lgfadoru","slide":2,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1180,24,36,18]}
+{"kind":"textbox","id":"sh/0v6t4jq9","slide":2,"text":"不用安装编程工具，也能参与 AI 创作和协作","textPreview":"不用安装编程工具，也能参与 AI 创作和协作","textChars":22,"textLines":1,"bbox":[64,72,860,78]}
+{"kind":"textbox","id":"sh/nixsfy90","slide":2,"text":"OneFlow 不只是新增工具，而是一种新的协作方式。","textPreview":"OneFlow 不只是新增工具，而是一种新的协作方式。","textChars":27,"textLines":1,"bbox":[66,151,820,36]}
+{"kind":"shape","id":"sh/mhob6t8f","slide":2,"bbox":[64,230,500,330]}
+{"kind":"shape","id":"sh/9kfuh8rq","slide":2,"bbox":[716,230,500,330]}
+{"kind":"textbox","id":"sh/8j6t83q5","slide":2,"text":"过去：上下文分散","textPreview":"过去：上下文分散","textChars":8,"textLines":1,"bbox":[96,264,320,34]}
+{"kind":"shape","id":"sh/vmhcji9w","slide":2,"bbox":[104,348,110,30]}
+{"kind":"textbox","id":"sh/al8bad8b","slide":2,"text":"文档","textPreview":"文档","textChars":2,"textLines":1,"bbox":[104,355,110,16]}
+{"kind":"shape","id":"sh/8vm5wz69","slide":2,"bbox":[232,410,110,30]}
+{"kind":"textbox","id":"sh/9gvmp4nu","slide":2,"text":"对话","textPreview":"对话","textChars":2,"textLines":1,"bbox":[232,417,110,16]}
+{"kind":"shape","id":"sh/mtknupoj","slide":2,"bbox":[360,350,110,30]}
+{"kind":"textbox","id":"sh/nud4nu54","slide":2,"text":"文件","textPreview":"文件","textChars":2,"textLines":1,"bbox":[360,357,110,16]}
+{"kind":"shape","id":"sh/wjm50jml","slide":2,"bbox":[180,485,110,30]}
+{"kind":"textbox","id":"sh/xkvmton6","slide":2,"text":"个人工具","textPreview":"个人工具","textChars":4,"textLines":1,"bbox":[180,492,110,16]}
+{"kind":"textbox","id":"sh/ah4ny9of","slide":2,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[586,356,100,60]}
+{"kind":"textbox","id":"sh/vid4re50","slide":2,"text":"现在：一个 OneFlow 项目","textPreview":"现在：一个 OneFlow 项目","textChars":16,"textLines":1,"bbox":[748,264,390,34]}
+{"kind":"shape","id":"sh/kn654jmh","slide":2,"bbox":[760,350,104,30]}
+{"kind":"textbox","id":"sh/5of6xon2","slide":2,"text":"目标","textPreview":"目标","textChars":2,"textLines":1,"bbox":[760,357,104,16]}
+{"kind":"shape","id":"sh/d4bmhof6","slide":2,"bbox":[892,350,104,30]}
+{"kind":"textbox","id":"sh/s325ojel","slide":2,"text":"对话","textPreview":"对话","textChars":2,"textLines":1,"bbox":[892,357,104,16]}
+{"kind":"shape","id":"sh/r2t4fexg","slide":2,"bbox":[1024,350,104,30]}
+{"kind":"textbox","id":"sh/61knm9wv","slide":2,"text":"页面","textPreview":"页面","textChars":2,"textLines":1,"bbox":[1024,357,104,16]}
+{"kind":"shape","id":"sh/18vmlofi","slide":2,"bbox":[760,422,104,30]}
+{"kind":"textbox","id":"sh/0725sjex","slide":2,"text":"配置","textPreview":"配置","textChars":2,"textLines":1,"bbox":[760,429,104,16]}
+{"kind":"shape","id":"sh/f6t4jyxc","slide":2,"bbox":[892,422,104,30]}
+{"kind":"textbox","id":"sh/e5knqtwr","slide":2,"text":"资源","textPreview":"资源","textChars":2,"textLines":1,"bbox":[892,429,104,16]}
+{"kind":"shape","id":"sh/hcrm94fy","slide":2,"bbox":[1024,422,104,30]}
+{"kind":"textbox","id":"sh/wbilgzet","slide":2,"text":"预览","textPreview":"预览","textChars":2,"textLines":1,"bbox":[1024,429,104,16]}
+{"kind":"textbox","id":"sh/mhgjq5cb","slide":2,"text":"同一份项目上下文，让不同角色在线协作。","textPreview":"同一份项目上下文，让不同角色在线协作。","textChars":19,"textLines":1,"bbox":[748,514,410,38]}
+{"kind":"notes","id":"nt/ng8t7t","slide":2,"text":""}
+{"kind":"slide","id":"sl/tikt0j","slide":3,"title":"ALL HANDS / ONEFLOW","textShapes":36}
+{"kind":"textbox","id":"sh/0jylwrah","slide":3,"text":"ALL HANDS / ONEFLOW","textPreview":"ALL HANDS / ONEFLOW","textChars":19,"textLines":1,"bbox":[64,24,260,18]}
+{"kind":"textbox","id":"sh/zypknm9w","slide":3,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1180,24,36,18]}
+{"kind":"textbox","id":"sh/yxg3uhsb","slide":3,"text":"从临时拼接，变成连续交付","textPreview":"从临时拼接，变成连续交付","textChars":12,"textLines":1,"bbox":[64,72,860,78]}
+{"kind":"textbox","id":"sh/9ormtwry","slide":3,"text":"AI 承接可规则化的执行，人保留判断、标准和例外。","textPreview":"AI 承接可规则化的执行，人保留判断、标准和例外。","textChars":25,"textLines":1,"bbox":[66,151,820,36]}
+{"kind":"textbox","id":"sh/8nyl0rad","slide":3,"text":"过去","textPreview":"过去","textChars":2,"textLines":1,"bbox":[74,230,120,30]}
+{"kind":"textbox","id":"sh/nmpkrm9s","slide":3,"text":"提出目标","textPreview":"提出目标","textChars":4,"textLines":1,"bbox":[168,288,120,24]}
+{"kind":"textbox","id":"sh/mlg3y1s7","slide":3,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[286,283,55,30]}
+{"kind":"textbox","id":"sh/psn2hcre","slide":3,"text":"人工整理","textPreview":"人工整理","textChars":4,"textLines":1,"bbox":[350,288,120,24]}
+{"kind":"textbox","id":"sh/4relo7a9","slide":3,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[468,283,55,30]}
+{"kind":"textbox","id":"sh/ypk72xc3","slide":3,"text":"反复确认","textPreview":"反复确认","textChars":4,"textLines":1,"bbox":[532,288,120,24]}
+{"kind":"textbox","id":"sh/zqt8v2to","slide":3,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[650,283,55,30]}
+{"kind":"textbox","id":"sh/0r2p47a9","slide":3,"text":"开发重解","textPreview":"开发重解","textChars":4,"textLines":1,"bbox":[714,288,120,24]}
+{"kind":"textbox","id":"sh/lcbqxcbu","slide":3,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[832,283,55,30]}
+{"kind":"textbox","id":"sh/mdk76xsf","slide":3,"text":"上线","textPreview":"上线","textChars":2,"textLines":1,"bbox":[896,288,90,24]}
+{"kind":"textbox","id":"sh/net8z2tk","slide":3,"text":"沟通 / 等待 / 返工","textPreview":"沟通 / 等待 / 返工","textChars":12,"textLines":1,"bbox":[168,350,320,26]}
+{"kind":"shape","id":"sh/8fm987a5","slide":3,"bbox":[64,398,1152,2]}
+{"kind":"textbox","id":"sh/9gvq1cbq","slide":3,"text":"现在","textPreview":"现在","textChars":2,"textLines":1,"bbox":[74,430,120,30]}
+{"kind":"shape","id":"sh/ah4rahsb","slide":3,"bbox":[160,486,42,42]}
+{"kind":"textbox","id":"sh/vid83mtw","slide":3,"text":"1","textPreview":"1","textChars":1,"textLines":1,"bbox":[160,496.08,42,18.9]}
+{"kind":"textbox","id":"sh/7mxorm94","slide":3,"text":"输入目标","textPreview":"输入目标","textChars":4,"textLines":1,"bbox":[130,544,104,36]}
+{"kind":"textbox","id":"sh/6l47yh8j","slide":3,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[205,495,65,24]}
+{"kind":"shape","id":"sh/tofqtwru","slide":3,"bbox":[305,486,42,42]}
+{"kind":"textbox","id":"sh/sn6p0rqp","slide":3,"text":"2","textPreview":"2","textChars":1,"textLines":1,"bbox":[305,496.08,42,18.9]}
+{"kind":"textbox","id":"sh/jidonm9s","slide":3,"text":"AI 整合知识","textPreview":"AI 整合知识","textChars":7,"textLines":1,"bbox":[275,544,104,36]}
+{"kind":"textbox","id":"sh/ih47uh87","slide":3,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[350,495,65,24]}
+{"kind":"shape","id":"sh/5kv6pcry","slide":3,"bbox":[450,486,42,42]}
+{"kind":"textbox","id":"sh/kjmpw7qd","slide":3,"text":"3","textPreview":"3","textChars":1,"textLines":1,"bbox":[450,496.08,42,18.9]}
+{"kind":"textbox","id":"sh/vetoj29w","slide":3,"text":"可交互原型","textPreview":"可交互原型","textChars":5,"textLines":1,"bbox":[420,544,104,36]}
+{"kind":"textbox","id":"sh/adk7qx8b","slide":3,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[495,495,65,24]}
+{"kind":"shape","id":"sh/0jil0369","slide":3,"bbox":[595,486,42,42]}
+{"kind":"textbox","id":"sh/lkrmt87u","slide":3,"text":"4","textPreview":"4","textChars":1,"textLines":1,"bbox":[595,496.08,42,18.9]}
+{"kind":"textbox","id":"sh/yx03yto3","slide":3,"text":"配置与资源","textPreview":"配置与资源","textChars":5,"textLines":1,"bbox":[565,544,104,36]}
+{"kind":"textbox","id":"sh/zy94rypo","slide":3,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[640,495,65,24]}
+{"kind":"shape","id":"sh/8n25o365","slide":3,"bbox":[740,486,42,42]}
+{"kind":"textbox","id":"sh/9obmx87q","slide":3,"text":"5","textPreview":"5","textChars":1,"textLines":1,"bbox":[740,496.08,42,18.9]}
+{"kind":"textbox","id":"sh/ml0n2doz","slide":3,"text":"在线预览","textPreview":"在线预览","textChars":4,"textLines":1,"bbox":[710,544,104,36]}
+{"kind":"textbox","id":"sh/nm94vipk","slide":3,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[785,495,65,24]}
+{"kind":"shape","id":"sh/orylsj61","slide":3,"bbox":[885,486,42,42]}
+{"kind":"textbox","id":"sh/ps7mlo7m","slide":3,"text":"6","textPreview":"6","textChars":1,"textLines":1,"bbox":[885,496.08,42,18.9]}
+{"kind":"textbox","id":"sh/h03mh8b2","slide":3,"text":"精准接入","textPreview":"精准接入","textChars":4,"textLines":1,"bbox":[855,544,104,36]}
+{"kind":"textbox","id":"sh/gzu583ah","slide":3,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[930,495,65,24]}
+{"kind":"shape","id":"sh/vyl4fitw","slide":3,"bbox":[1030,486,42,42]}
+{"kind":"textbox","id":"sh/uxcn6dsb","slide":3,"text":"7","textPreview":"7","textChars":1,"textLines":1,"bbox":[1030,496.08,42,18.9]}
+{"kind":"textbox","id":"sh/twjmd8bq","slide":3,"text":"复盘沉淀","textPreview":"复盘沉淀","textChars":4,"textLines":1,"bbox":[1000,544,104,36]}
+{"kind":"notes","id":"nt/tikt0j","slide":3,"text":""}
+{"kind":"slide","id":"sl/z0t78k","slide":4,"title":"ALL HANDS / ONEFLOW","textShapes":20}
+{"kind":"textbox","id":"sh/s7id4v2p","slide":4,"text":"ALL HANDS / ONEFLOW","textPreview":"ALL HANDS / ONEFLOW","textChars":19,"textLines":1,"bbox":[64,24,260,18]}
+{"kind":"textbox","id":"sh/r69wbqlk","slide":4,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[1180,24,36,18]}
+{"kind":"textbox","id":"sh/650v2lkz","slide":4,"text":"不是替代谁，而是减少重复工作","textPreview":"不是替代谁，而是减少重复工作","textChars":14,"textLines":1,"bbox":[64,72,860,78]}
+{"kind":"textbox","id":"sh/54re9g3e","slide":4,"text":"每个角色都继续做判断，只是少一点搬运、对齐和返工。","textPreview":"每个角色都继续做判断，只是少一点搬运、对齐和返工。","textChars":25,"textLines":1,"bbox":[66,151,820,36]}
+{"kind":"shape","id":"sh/43id0bmt","slide":4,"bbox":[72,266,60,60]}
+{"kind":"textbox","id":"sh/j2pw76l8","slide":4,"text":"策划","textPreview":"策划","textChars":2,"textLines":1,"bbox":[72,280.4,60,27]}
+{"kind":"textbox","id":"sh/i1gvy14n","slide":4,"text":"方案更快可讨论","textPreview":"方案更快可讨论","textChars":7,"textLines":1,"bbox":[72,352,210,50]}
+{"kind":"textbox","id":"sh/h07e5g32","slide":4,"text":"输入目标与限制","textPreview":"输入目标与限制","textChars":7,"textLines":1,"bbox":[72,420,210,36]}
+{"kind":"textbox","id":"sh/wfydwbmh","slide":4,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[292,286,56,30]}
+{"kind":"shape","id":"sh/apsbahcr","slide":4,"bbox":[358,266,60,60]}
+{"kind":"textbox","id":"sh/bq1s3mtc","slide":4,"text":"产品","textPreview":"产品","textChars":2,"textLines":1,"bbox":[358,280.4,60,27]}
+{"kind":"textbox","id":"sh/cratcrux","slide":4,"text":"规则沉淀可复用","textPreview":"规则沉淀可复用","textChars":7,"textLines":1,"bbox":[358,352,210,50]}
+{"kind":"textbox","id":"sh/xcja5wb2","slide":4,"text":"定义能力与验收","textPreview":"定义能力与验收","textChars":7,"textLines":1,"bbox":[358,420,210,36]}
+{"kind":"textbox","id":"sh/2l8b6hcf","slide":4,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[578,286,56,30]}
+{"kind":"shape","id":"sh/nmhszmt0","slide":4,"bbox":[644,266,60,60]}
+{"kind":"textbox","id":"sh/onqt8rul","slide":4,"text":"设计","textPreview":"设计","textChars":2,"textLines":1,"bbox":[644,280.4,60,27]}
+{"kind":"textbox","id":"sh/poja1wb6","slide":4,"text":"资源在真实页面验证","textPreview":"资源在真实页面验证","textChars":9,"textLines":1,"bbox":[644,352,210,50]}
+{"kind":"textbox","id":"sh/eh8r2xcj","slide":4,"text":"制作并校验资源","textPreview":"制作并校验资源","textChars":7,"textLines":1,"bbox":[644,420,210,36]}
+{"kind":"textbox","id":"sh/fihsv2t4","slide":4,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[864,286,56,30]}
+{"kind":"shape","id":"sh/32d83y9w","slide":4,"bbox":[930,266,60,60]}
+{"kind":"textbox","id":"sh/i147adsb","slide":4,"text":"开发","textPreview":"开发","textChars":2,"textLines":1,"bbox":[930,280.4,60,27]}
+{"kind":"textbox","id":"sh/5ovq58rm","slide":4,"text":"直接读取完整上下文","textPreview":"直接读取完整上下文","textChars":9,"textLines":1,"bbox":[930,352,210,50]}
+{"kind":"textbox","id":"sh/4nmpc3ah","slide":4,"text":"评估与接入","textPreview":"评估与接入","textChars":5,"textLines":1,"bbox":[930,420,210,36]}
+{"kind":"shape","id":"sh/rqx87i9s","slide":4,"bbox":[72,540,1120,2]}
+{"kind":"textbox","id":"sh/qpo7eds7","slide":4,"text":"共同变化：人负责判断和标准，AI 负责执行、整合和自助答疑。","textPreview":"共同变化：人负责判断和标准，AI 负责执行、整合和自助答疑。","textChars":30,"textLines":1,"bbox":[72,566,1120,36]}
+{"kind":"notes","id":"nt/z0t78k","slide":4,"text":""}
+{"kind":"slide","id":"sl/uajevp","slide":5,"title":"ALL HANDS / ONEFLOW","textShapes":18}
+{"kind":"textbox","id":"sh/hcv6hw7m","slide":5,"text":"ALL HANDS / ONEFLOW","textPreview":"ALL HANDS / ONEFLOW","textChars":19,"textLines":1,"bbox":[64,24,260,18]}
+{"kind":"textbox","id":"sh/up47m18v","slide":5,"text":"05","textPreview":"05","textChars":2,"textLines":1,"bbox":[1180,24,36,18]}
+{"kind":"textbox","id":"sh/vqdof69g","slide":5,"text":"一个可交互原型，成为团队共同语言","textPreview":"一个可交互原型，成为团队共同语言","textChars":16,"textLines":1,"bbox":[64,72,860,78]}
+{"kind":"textbox","id":"sh/8n2pkrq5","slide":5,"text":"聊天记录会结束，原型会继续承载目标、规则、资源和开发上下文。","textPreview":"聊天记录会结束，原型会继续承载目标、规则、资源和开发上下文。","textChars":30,"textLines":1,"bbox":[66,151,820,36]}
+{"kind":"shape","id":"sh/9ob6dwra","slide":5,"bbox":[380,232,520,310]}
+{"kind":"textbox","id":"sh/mlknih8z","slide":5,"text":"ONEFLOW","textPreview":"ONEFLOW","textChars":7,"textLines":1,"bbox":[416,262,180,24]}
+{"kind":"textbox","id":"sh/7mtobm9k","slide":5,"text":"活动原型","textPreview":"活动原型","textChars":4,"textLines":1,"bbox":[416,306,300,44]}
+{"kind":"textbox","id":"sh/kj25g7qt","slide":5,"text":"页面 · 文案 · 状态 · 配置 · 资源 · 预览","textPreview":"页面 · 文案 · 状态 · 配置 · 资源 · 预览","textChars":27,"textLines":1,"bbox":[416,364,380,30]}
+{"kind":"shape","id":"sh/lkb69cre","slide":5,"bbox":[416,432,430,50]}
+{"kind":"textbox","id":"sh/l4re54vu","slide":5,"text":"一次生成页面与上下文，减少跨文档同步","textPreview":"一次生成页面与上下文，减少跨文档同步","textChars":18,"textLines":1,"bbox":[438,448,388,20]}
+{"kind":"shape","id":"sh/0jyxczu9","slide":5,"bbox":[120,278,100,30]}
+{"kind":"textbox","id":"sh/zipw3udo","slide":5,"text":"策划","textPreview":"策划","textChars":2,"textLines":1,"bbox":[120,285,100,16]}
+{"kind":"textbox","id":"sh/yhgfapc3","slide":5,"text":"↗","textPreview":"↗","textChars":1,"textLines":1,"bbox":[222,281,46,24]}
+{"kind":"shape","id":"sh/dg7e1kvi","slide":5,"bbox":[170,472,100,30]}
+{"kind":"textbox","id":"sh/cfyx8fex","slide":5,"text":"产品","textPreview":"产品","textChars":2,"textLines":1,"bbox":[170,479,100,16]}
+{"kind":"textbox","id":"sh/bepwzads","slide":5,"text":"↗","textPreview":"↗","textChars":1,"textLines":1,"bbox":[272,475,46,24]}
+{"kind":"shape","id":"sh/qdgv6pw7","slide":5,"bbox":[934,276,100,30]}
+{"kind":"textbox","id":"sh/pc7exkvm","slide":5,"text":"设计","textPreview":"设计","textChars":2,"textLines":1,"bbox":[934,283,100,16]}
+{"kind":"textbox","id":"sh/obed4fe1","slide":5,"text":"↙","textPreview":"↙","textChars":1,"textLines":1,"bbox":[880,279,46,24]}
+{"kind":"shape","id":"sh/gvixkfmx","slide":5,"bbox":[996,440,100,30]}
+{"kind":"textbox","id":"sh/hwredk3i","slide":5,"text":"运营","textPreview":"运营","textChars":2,"textLines":1,"bbox":[996,447,100,16]}
+{"kind":"textbox","id":"sh/ut0fi54r","slide":5,"text":"↙","textPreview":"↙","textChars":1,"textLines":1,"bbox":[942,443,46,24]}
+{"kind":"shape","id":"sh/vu9wbalc","slide":5,"bbox":[892,560,100,30]}
+{"kind":"textbox","id":"sh/8rixgvml","slide":5,"text":"开发","textPreview":"开发","textChars":2,"textLines":1,"bbox":[892,567,100,16]}
+{"kind":"textbox","id":"sh/tsre9036","slide":5,"text":"↙","textPreview":"↙","textChars":1,"textLines":1,"bbox":[838,563,46,24]}
+{"kind":"notes","id":"nt/uajevp","slide":5,"text":""}
+{"kind":"slide","id":"sl/1jz6hc","slide":6,"title":"ALL HANDS / ONEFLOW","textShapes":24}
+{"kind":"textbox","id":"sh/wz61sry1","slide":6,"text":"ALL HANDS / ONEFLOW","textPreview":"ALL HANDS / ONEFLOW","textChars":19,"textLines":1,"bbox":[64,24,260,18]}
+{"kind":"textbox","id":"sh/ved0jmhg","slide":6,"text":"06","textPreview":"06","textChars":2,"textLines":1,"bbox":[1180,24,36,18]}
+{"kind":"textbox","id":"sh/ud4jq1gv","slide":6,"text":"上传资源，就能看到它在真实页面中的效果","textPreview":"上传资源，就能看到它在真实页面中的效果","textChars":19,"textLines":1,"bbox":[64,72,860,78]}
+{"kind":"textbox","id":"sh/9cvihwza","slide":6,"text":"设计交付不止于素材文件，而是直接验证素材在页面中的可用性。","textPreview":"设计交付不止于素材文件，而是直接验证素材在页面中的可用性。","textChars":29,"textLines":1,"bbox":[66,151,820,36]}
+{"kind":"shape","id":"sh/8bm1oryp","slide":6,"bbox":[64,258,198,220]}
+{"kind":"shape","id":"sh/7ad0fmh4","slide":6,"bbox":[88,286,38,38]}
+{"kind":"textbox","id":"sh/m94jmhgz","slide":6,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[88,295.12,38,17.1]}
+{"kind":"textbox","id":"sh/t8z2tgfu","slide":6,"text":"看配置","textPreview":"看配置","textChars":3,"textLines":1,"bbox":[88,348,140,32]}
+{"kind":"textbox","id":"sh/s7q10by9","slide":6,"text":"确认尺寸、格式与状态","textPreview":"确认尺寸、格式与状态","textChars":10,"textLines":1,"bbox":[88,394,150,52]}
+{"kind":"textbox","id":"sh/a94nehsn","slide":6,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[260,348,36,30]}
+{"kind":"shape","id":"sh/bad4nmts","slide":6,"bbox":[296,258,198,220]}
+{"kind":"shape","id":"sh/wbm5grad","slide":6,"bbox":[320,286,38,38]}
+{"kind":"textbox","id":"sh/xcvmpwby","slide":6,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[320,295.12,38,17.1]}
+{"kind":"textbox","id":"sh/mlknahsb","slide":6,"text":"读规范","textPreview":"读规范","textChars":3,"textLines":1,"bbox":[320,348,140,32]}
+{"kind":"textbox","id":"sh/nmt4j2tw","slide":6,"text":"读取项目内的资源规则","textPreview":"读取项目内的资源规则","textChars":10,"textLines":1,"bbox":[320,394,150,52]}
+{"kind":"textbox","id":"sh/o7m5c7ah","slide":6,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[492,348,36,30]}
+{"kind":"shape","id":"sh/98vmlcb2","slide":6,"bbox":[528,258,198,220]}
+{"kind":"shape","id":"sh/6honm1sf","slide":6,"bbox":[552,286,38,38]}
+{"kind":"textbox","id":"sh/7ixov690","slide":6,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[552,295.12,38,17.1]}
+{"kind":"textbox","id":"sh/3mpk7y9s","slide":6,"text":"传资源","textPreview":"传资源","textChars":3,"textLines":1,"bbox":[552,348,140,32]}
+{"kind":"textbox","id":"sh/ilgjet87","slide":6,"text":"图片 / 动效 / 音效","textPreview":"图片 / 动效 / 音效","textChars":12,"textLines":1,"bbox":[552,394,150,52]}
+{"kind":"textbox","id":"sh/por298ri","slide":6,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[724,348,36,30]}
+{"kind":"shape","id":"sh/4ni1g3qx","slide":6,"bbox":[760,258,198,220]}
+{"kind":"shape","id":"sh/rq9kbi9o","slide":6,"bbox":[784,286,38,38]}
+{"kind":"textbox","id":"sh/qp0jid83","slide":6,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[784,295.12,38,17.1]}
+{"kind":"textbox","id":"sh/dsr2d8ru","slide":6,"text":"看预览","textPreview":"看预览","textChars":3,"textLines":1,"bbox":[784,348,140,32]}
+{"kind":"textbox","id":"sh/cri1k3q9","slide":6,"text":"实时看到页面效果","textPreview":"实时看到页面效果","textChars":8,"textLines":1,"bbox":[784,394,150,52]}
+{"kind":"textbox","id":"sh/ze9kfi9k","slide":6,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[956,348,36,30]}
+{"kind":"shape","id":"sh/ed0jmd8f","slide":6,"bbox":[992,258,198,220]}
+{"kind":"shape","id":"sh/wj21cn6d","slide":6,"bbox":[1016,286,38,38]}
+{"kind":"textbox","id":"sh/xkbi5sny","slide":6,"text":"05","textPreview":"05","textChars":2,"textLines":1,"bbox":[1016,295.12,38,17.1]}
+{"kind":"textbox","id":"sh/ahkjado7","slide":6,"text":"再验收","textPreview":"再验收","textChars":3,"textLines":1,"bbox":[1016,348,140,32]}
+{"kind":"textbox","id":"sh/bit03i5s","slide":6,"text":"调整并确认可用","textPreview":"调整并确认可用","textChars":7,"textLines":1,"bbox":[1016,394,150,52]}
+{"kind":"shape","id":"sh/of218n6h","slide":6,"bbox":[420,548,440,30]}
+{"kind":"textbox","id":"sh/9gbi18nm","slide":6,"text":"资源 + 页面 + 规范 = 一次验证","textPreview":"资源 + 页面 + 规范 = 一次验证","textChars":19,"textLines":1,"bbox":[420,555,440,16]}
+{"kind":"notes","id":"nt/1jz6hc","slide":6,"text":""}
+{"kind":"slide","id":"sl/7yu0n5","slide":7,"title":"ALL HANDS / ONEFLOW","textShapes":15}
+{"kind":"textbox","id":"sh/yhgfytcn","slide":7,"text":"ALL HANDS / ONEFLOW","textPreview":"ALL HANDS / ONEFLOW","textChars":19,"textLines":1,"bbox":[64,24,260,18]}
+{"kind":"textbox","id":"sh/lkry98by","slide":7,"text":"07","textPreview":"07","textChars":2,"textLines":1,"bbox":[1180,24,36,18]}
+{"kind":"textbox","id":"sh/kjix03ud","slide":7,"text":"AI 不只回答问题，还参与完成活动","textPreview":"AI 不只回答问题，还参与完成活动","textChars":17,"textLines":1,"bbox":[64,72,860,78]}
+{"kind":"textbox","id":"sh/7m9gbit4","slide":7,"text":"它有依据地执行、整合和答疑，人负责最终判断。","textPreview":"它有依据地执行、整合和答疑，人负责最终判断。","textChars":22,"textLines":1,"bbox":[66,151,820,36]}
+{"kind":"shape","id":"sh/6l0f2dcj","slide":7,"bbox":[104,238,920,80]}
+{"kind":"shape","id":"sh/t8rydsba","slide":7,"bbox":[126,256,42,42]}
+{"kind":"textbox","id":"sh/87ix4nup","slide":7,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[126,266.08,42,18.9]}
+{"kind":"textbox","id":"sh/nq5wzet0","slide":7,"text":"执行","textPreview":"执行","textChars":2,"textLines":1,"bbox":[194,257,160,30]}
+{"kind":"textbox","id":"sh/mpwfq9cf","slide":7,"text":"生成方案、原型、配置清单和资源清单","textPreview":"生成方案、原型、配置清单和资源清单","textChars":17,"textLines":1,"bbox":[370,260,612,32]}
+{"kind":"shape","id":"sh/ojqt8rut","slide":7,"bbox":[104,350,920,80]}
+{"kind":"shape","id":"sh/pkza1wve","slide":7,"bbox":[126,368,42,42]}
+{"kind":"textbox","id":"sh/2h8b6hc3","slide":7,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[126,378.08,42,18.9]}
+{"kind":"textbox","id":"sh/nihszmd8","slide":7,"text":"整合","textPreview":"整合","textChars":2,"textLines":1,"bbox":[194,369,160,30]}
+{"kind":"textbox","id":"sh/c7qtcbu5","slide":7,"text":"结合产品能力、视觉规范、历史经验和开发边界","textPreview":"结合产品能力、视觉规范、历史经验和开发边界","textChars":21,"textLines":1,"bbox":[370,372,612,32]}
+{"kind":"shape","id":"sh/x8ju5wvq","slide":7,"bbox":[104,462,920,80]}
+{"kind":"shape","id":"sh/al8ba1cz","slide":7,"bbox":[126,480,42,42]}
+{"kind":"textbox","id":"sh/bmhc36dk","slide":7,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[126,490.08,42,18.9]}
+{"kind":"textbox","id":"sh/sb6t07ul","slide":7,"text":"自助答疑","textPreview":"自助答疑","textChars":4,"textLines":1,"bbox":[194,481,160,30]}
+{"kind":"textbox","id":"sh/dcfatcv6","slide":7,"text":"回答能不能做、怎么配置、资源怎么准备、如何接入","textPreview":"回答能不能做、怎么配置、资源怎么准备、如何接入","textChars":23,"textLines":1,"bbox":[370,484,612,32]}
+{"kind":"textbox","id":"sh/9wnih4jy","slide":7,"text":"人：判断 / 标准 / 例外","textPreview":"人：判断 / 标准 / 例外","textChars":14,"textLines":1,"bbox":[104,610,300,28]}
+{"kind":"textbox","id":"sh/8veh8zid","slide":7,"text":"AI：执行 / 整合 / 自助答疑","textPreview":"AI：执行 / 整合 / 自助答疑","textChars":17,"textLines":1,"bbox":[800,610,320,28]}
+{"kind":"notes","id":"nt/7yu0n5","slide":7,"text":""}
+{"kind":"slide","id":"sl/ubnups","slide":8,"title":"ALL HANDS / ONEFLOW","textShapes":22}
+{"kind":"textbox","id":"sh/fmpkzy90","slide":8,"text":"ALL HANDS / ONEFLOW","textPreview":"ALL HANDS / ONEFLOW","textChars":19,"textLines":1,"bbox":[64,24,260,18]}
+{"kind":"textbox","id":"sh/gnyl83ql","slide":8,"text":"08","textPreview":"08","textChars":2,"textLines":1,"bbox":[1180,24,36,18]}
+{"kind":"textbox","id":"sh/1o7m1or6","slide":8,"text":"从活动目标，到上线复盘，一条链路完成","textPreview":"从活动目标，到上线复盘，一条链路完成","textChars":18,"textLines":1,"bbox":[64,72,860,78]}
+{"kind":"textbox","id":"sh/2pg3at8r","slide":8,"text":"一次活动不仅完成交付，还会为下一次活动留下可复用资产。","textPreview":"一次活动不仅完成交付，还会为下一次活动留下可复用资产。","textChars":27,"textLines":1,"bbox":[66,151,820,36]}
+{"kind":"shape","id":"sh/3qp43y9c","slide":8,"bbox":[74,250,188,62]}
+{"kind":"textbox","id":"sh/obilc3qh","slide":8,"text":"模板与知识","textPreview":"模板与知识","textChars":5,"textLines":1,"bbox":[74,270,188,24]}
+{"kind":"textbox","id":"sh/pcrm58r2","slide":8,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[264,267,42,24]}
+{"kind":"shape","id":"sh/qd03yd8n","slide":8,"bbox":[310,250,188,62]}
+{"kind":"textbox","id":"sh/be947i98","slide":8,"text":"活动目标","textPreview":"活动目标","textChars":4,"textLines":1,"bbox":[310,270,188,24]}
+{"kind":"textbox","id":"sh/n2tgzmx8","slide":8,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[500,267,42,24]}
+{"kind":"shape","id":"sh/m1kfqhwn","slide":8,"bbox":[546,250,188,62]}
+{"kind":"textbox","id":"sh/94bylwfe","slide":8,"text":"AI 方案","textPreview":"AI 方案","textChars":5,"textLines":1,"bbox":[546,270,188,24]}
+{"kind":"textbox","id":"sh/o32xsret","slide":8,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[736,267,42,24]}
+{"kind":"shape","id":"sh/zytgvmxw","slide":8,"bbox":[782,250,188,62]}
+{"kind":"textbox","id":"sh/ed0fmhwr","slide":8,"text":"交互原型","textPreview":"交互原型","textChars":4,"textLines":1,"bbox":[782,270,188,24]}
+{"kind":"textbox","id":"sh/10byxcf2","slide":8,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[972,267,42,24]}
+{"kind":"shape","id":"sh/0z2xoreh","slide":8,"bbox":[1018,250,188,62]}
+{"kind":"textbox","id":"sh/judgr6dg","slide":8,"text":"配置与资源","textPreview":"配置与资源","textChars":5,"textLines":1,"bbox":[1018,270,188,24]}
+{"kind":"textbox","id":"sh/yt4fy1wv","slide":8,"text":"↓","textPreview":"↓","textChars":1,"textLines":1,"bbox":[1100,318,30,48]}
+{"kind":"shape","id":"sh/up8jq5g3","slide":8,"bbox":[74,402,188,62]}
+{"kind":"textbox","id":"sh/vqh0zaho","slide":8,"text":"在线预览","textPreview":"在线预览","textChars":4,"textLines":1,"bbox":[74,422,188,24]}
+{"kind":"textbox","id":"sh/grq1sfy9","slide":8,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[264,419,42,24]}
+{"kind":"shape","id":"sh/hszi1kze","slide":8,"bbox":[310,402,188,62]}
+{"kind":"textbox","id":"sh/it8jupgz","slide":8,"text":"开发接入","textPreview":"开发接入","textChars":4,"textLines":1,"bbox":[310,422,188,24]}
+{"kind":"textbox","id":"sh/3uh03uxk","slide":8,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[500,419,42,24]}
+{"kind":"shape","id":"sh/4vq1wfy5","slide":8,"bbox":[546,402,188,62]}
+{"kind":"textbox","id":"sh/5wji5kfq","slide":8,"text":"验收上线","textPreview":"验收上线","textChars":4,"textLines":1,"bbox":[546,422,188,24]}
+{"kind":"textbox","id":"sh/yxozilgv","slide":8,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[736,419,42,24]}
+{"kind":"shape","id":"sh/jyx0rqhg","slide":8,"bbox":[782,402,188,62]}
+{"kind":"textbox","id":"sh/1s3mxozy","slide":8,"text":"经验回流","textPreview":"经验回流","textChars":4,"textLines":1,"bbox":[782,422,188,24]}
+{"kind":"textbox","id":"sh/0rulojid","slide":8,"text":"下一次活动，从“模板与知识”继续开始。","textPreview":"下一次活动，从“模板与知识”继续开始。","textChars":19,"textLines":1,"bbox":[330,612,620,30]}
+{"kind":"notes","id":"nt/ubnups","slide":8,"text":""}
+{"kind":"slide","id":"sl/gsg0i2","slide":9,"title":"ALL HANDS / ONEFLOW","textShapes":17}
+{"kind":"textbox","id":"sh/0bep0vux","slide":9,"text":"ALL HANDS / ONEFLOW","textPreview":"ALL HANDS / ONEFLOW","textChars":19,"textLines":1,"bbox":[64,24,260,18]}
+{"kind":"textbox","id":"sh/za5o7qdc","slide":9,"text":"09","textPreview":"09","textChars":2,"textLines":1,"bbox":[1180,24,36,18]}
+{"kind":"textbox","id":"sh/y9w7ylcr","slide":9,"text":"先用一个真实活动，验证完整闭环","textPreview":"先用一个真实活动，验证完整闭环","textChars":15,"textLines":1,"bbox":[64,72,860,78]}
+{"kind":"textbox","id":"sh/d8n65gv6","slide":9,"text":"本次全员宣讲只讲清边界；逐项操作教程放到后续培训。","textPreview":"本次全员宣讲只讲清边界；逐项操作教程放到后续培训。","textChars":25,"textLines":1,"bbox":[66,151,820,36]}
+{"kind":"shape","id":"sh/c7epwbul","slide":9,"bbox":[64,238,500,292]}
+{"kind":"textbox","id":"sh/r65o3qdg","slide":9,"text":"当前可用能力","textPreview":"当前可用能力","textChars":6,"textLines":1,"bbox":[96,270,260,30]}
+{"kind":"shape","id":"sh/q5cnulcv","slide":9,"bbox":[100,334,16,16]}
+{"kind":"textbox","id":"sh/x476hkvq","slide":9,"text":"活动模板与项目规范","textPreview":"活动模板与项目规范","textChars":9,"textLines":1,"bbox":[132,330,360,24]}
+{"kind":"shape","id":"sh/w3yp8fu5","slide":9,"bbox":[100,376,16,16]}
+{"kind":"textbox","id":"sh/i94r6lg3","slide":9,"text":"AI 原型与配置清单","textPreview":"AI 原型与配置清单","textChars":10,"textLines":1,"bbox":[132,372,360,24]}
+{"kind":"shape","id":"sh/jad8zqho","slide":9,"bbox":[100,418,16,16]}
+{"kind":"textbox","id":"sh/4bm98vyt","slide":9,"text":"资源上传与实时预览","textPreview":"资源上传与实时预览","textChars":9,"textLines":1,"bbox":[132,414,360,24]}
+{"kind":"shape","id":"sh/5cvq10ze","slide":9,"bbox":[100,460,16,16]}
+{"kind":"textbox","id":"sh/a5kr210r","slide":9,"text":"在线协作与开发接入","textPreview":"在线协作与开发接入","textChars":9,"textLines":1,"bbox":[132,456,360,24]}
+{"kind":"shape","id":"sh/v6d8v6hc","slide":9,"bbox":[716,238,500,292]}
+{"kind":"textbox","id":"sh/w7m94bix","slide":9,"text":"试点选择标准","textPreview":"试点选择标准","textChars":6,"textLines":1,"bbox":[748,270,260,30]}
+{"kind":"shape","id":"sh/h8vqxgzi","slide":9,"bbox":[752,334,16,16]}
+{"kind":"textbox","id":"sh/e1ore5gb","slide":9,"text":"1","textPreview":"1","textChars":1,"textLines":1,"bbox":[752,337.84,16,7.2]}
+{"kind":"textbox","id":"sh/f2x87ahg","slide":9,"text":"真实业务，范围可控","textPreview":"真实业务，范围可控","textChars":9,"textLines":1,"bbox":[784,330,370,24]}
+{"kind":"shape","id":"sh/bmpoz2x8","slide":9,"bbox":[752,382,16,16]}
+{"kind":"textbox","id":"sh/qlgnqxgn","slide":9,"text":"2","textPreview":"2","textChars":1,"textLines":1,"bbox":[752,385.84,16,7.2]}
+{"kind":"textbox","id":"sh/dor61cfy","slide":9,"text":"多角色参与，有明确上线时间","textPreview":"多角色参与，有明确上线时间","textChars":13,"textLines":1,"bbox":[784,378,370,24]}
+{"kind":"shape","id":"sh/cni5s7yt","slide":9,"bbox":[752,430,16,16]}
+{"kind":"textbox","id":"sh/zq9o32x4","slide":9,"text":"3","textPreview":"3","textChars":1,"textLines":1,"bbox":[752,433.84,16,7.2]}
+{"kind":"textbox","id":"sh/yp0nuxgj","slide":9,"text":"有复用价值，能沉淀经验","textPreview":"有复用价值，能沉淀经验","textChars":11,"textLines":1,"bbox":[784,426,370,24]}
+{"kind":"shape","id":"sh/lcr65cfa","slide":9,"bbox":[290,582,700,30]}
+{"kind":"textbox","id":"sh/0bi5w7ep","slide":9,"text":"验收：原型可用 · 沟通减少 · 能完成上线","textPreview":"验收：原型可用 · 沟通减少 · 能完成上线","textChars":22,"textLines":1,"bbox":[290,589,700,16]}
+{"kind":"notes","id":"nt/gsg0i2","slide":9,"text":""}
+{"kind":"slide","id":"sl/cajjg3","slide":10,"title":"ONEFLOW / NEXT","textShapes":21}
+{"kind":"textbox","id":"sh/sbqtoryh","slide":10,"text":"ONEFLOW / NEXT","textPreview":"ONEFLOW / NEXT","textChars":14,"textLines":1,"bbox":[64,24,260,18]}
+{"kind":"textbox","id":"sh/7ahcfmhw","slide":10,"text":"10","textPreview":"10","textChars":2,"textLines":1,"bbox":[1180,24,36,18]}
+{"kind":"textbox","id":"sh/698bmhgb","slide":10,"text":"选择一个真实活动，跑完第一条 OneFlow 工作流","textPreview":"选择一个真实活动，跑完第一条 OneFlow 工作流","textChars":26,"textLines":1,"bbox":[64,108,920,110]}
+{"kind":"textbox","id":"sh/hgjulwze","slide":10,"text":"先跑通一个闭环，再把有效方法扩展到更多活动。","textPreview":"先跑通一个闭环，再把有效方法扩展到更多活动。","textChars":22,"textLines":1,"bbox":[68,236,700,34]}
+{"kind":"shape","id":"sh/gfatsryt","slide":10,"bbox":[72,384,50,50]}
+{"kind":"textbox","id":"sh/fe1cj6h8","slide":10,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[72,396,50,22.5]}
+{"kind":"textbox","id":"sh/udsbq1gn","slide":10,"text":"确定试点","textPreview":"确定试点","textChars":4,"textLines":1,"bbox":[72,462,220,30]}
+{"kind":"textbox","id":"sh/xkfa9czu","slide":10,"text":"活动 + 负责人","textPreview":"活动 + 负责人","textChars":8,"textLines":1,"bbox":[72,502,220,40]}
+{"kind":"textbox","id":"sh/wj6tg7y9","slide":10,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[292,397,52,26]}
+{"kind":"shape","id":"sh/yt8bexs7","slide":10,"bbox":[352,384,50,50]}
+{"kind":"textbox","id":"sh/zuhs729s","slide":10,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[352,396,50,22.5]}
+{"kind":"textbox","id":"sh/kvqtg7ax","slide":10,"text":"补齐上下文","textPreview":"补齐上下文","textChars":5,"textLines":1,"bbox":[352,462,220,30]}
+{"kind":"textbox","id":"sh/lwza9cri","slide":10,"text":"策划 / 产品 / 设计 / 开发","textPreview":"策划 / 产品 / 设计 / 开发","textChars":17,"textLines":1,"bbox":[352,502,220,40]}
+{"kind":"textbox","id":"sh/mx8bihs3","slide":10,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[572,397,52,26]}
+{"kind":"shape","id":"sh/7yhsbm9o","slide":10,"bbox":[632,384,50,50]}
+{"kind":"textbox","id":"sh/8zqtk7a9","slide":10,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[632,396,50,22.5]}
+{"kind":"textbox","id":"sh/90jadcru","slide":10,"text":"完成闭环","textPreview":"完成闭环","textChars":4,"textLines":1,"bbox":[632,462,220,30]}
+{"kind":"textbox","id":"sh/ulsbmhsf","slide":10,"text":"原型 · 预览 · 评审 · 复盘","textPreview":"原型 · 预览 · 评审 · 复盘","textChars":17,"textLines":1,"bbox":[632,502,220,40]}
+{"kind":"textbox","id":"sh/vm1cfm9k","slide":10,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[852,397,52,26]}
+{"kind":"shape","id":"sh/rq1s3mps","slide":10,"bbox":[912,384,50,50]}
+{"kind":"textbox","id":"sh/6psrah87","slide":10,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[912,396,50,22.5]}
+{"kind":"textbox","id":"sh/ts3a5w7y","slide":10,"text":"沉淀复用","textPreview":"沉淀复用","textChars":4,"textLines":1,"bbox":[912,462,220,30]}
+{"kind":"textbox","id":"sh/sru9cr6d","slide":10,"text":"模板 · 规范 · 经验","textPreview":"模板 · 规范 · 经验","textChars":12,"textLines":1,"bbox":[912,502,220,40]}
+{"kind":"shape","id":"sh/jm1szmpw","slide":10,"bbox":[72,612,1120,2]}
+{"kind":"textbox","id":"sh/i1sr6h8b","slide":10,"text":"今天就开始：把下一场活动放进 OneFlow。","textPreview":"今天就开始：把下一场活动放进 OneFlow。","textChars":23,"textLines":1,"bbox":[72,636,720,28]}
+{"kind":"textbox","id":"sh/5oja1c72","slide":10,"text":"入口 / 联系人 / 时间：待补充","textPreview":"入口 / 联系人 / 时间：待补充","textChars":17,"textLines":1,"bbox":[920,638,272,24]}
+{"kind":"notes","id":"nt/cajjg3","slide":10,"text":""}

@@ -31,6 +31,7 @@ import {
   extractCodeAndSchemaUpdates,
   type FileChangeEntry,
 } from "../utils/chat-file-utils";
+import type { WorkspaceMutationReceipt } from "@workbench/shared/contracts";
 import {
   persistMessages,
   updateSessionTitle,
@@ -416,6 +417,7 @@ interface UseChatStreamOptions {
       action: "created" | "modified" | "deleted";
     }>,
   ) => void;
+  onWorkspaceMutationCommitted?: (receipt: WorkspaceMutationReceipt) => void;
   messagesRef: React.MutableRefObject<ChatMessage[]>;
   setMessages: (
     updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
@@ -452,6 +454,7 @@ export function useChatStream(options: UseChatStreamOptions) {
     onCodeUpdate,
     onSchemaUpdate,
     onFilesChange,
+    onWorkspaceMutationCommitted,
     messagesRef,
     setMessages,
     setIsStreaming,
@@ -878,6 +881,16 @@ export function useChatStream(options: UseChatStreamOptions) {
             const details = update.details as { knowledgeDocumentCreated?: boolean } | undefined;
             if (details?.knowledgeDocumentCreated) {
               window.dispatchEvent(new Event("knowledge-updated"));
+            }
+            const receipt = (update.details as { receipt?: unknown } | undefined)
+              ?.receipt;
+            if (
+              receipt &&
+              typeof receipt === "object" &&
+              (receipt as { committed?: unknown }).committed === true &&
+              Array.isArray((receipt as { resources?: unknown }).resources)
+            ) {
+              onWorkspaceMutationCommitted?.(receipt as WorkspaceMutationReceipt);
             }
           },
 
@@ -1406,6 +1419,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       onCodeUpdate,
       onSchemaUpdate,
       onFilesChange,
+      onWorkspaceMutationCommitted,
       setMessages,
       setIsStreaming,
       setStreamContent,

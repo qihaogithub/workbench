@@ -22,6 +22,8 @@ const MIME_TYPES: Record<string, string> = {
   '.atlas.txt': 'text/plain',
   '.txt': 'text/plain',
   '.zip': 'application/octet-stream',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
   '.ico': 'image/x-icon',
   '.bmp': 'image/bmp',
   '.css': 'text/css',

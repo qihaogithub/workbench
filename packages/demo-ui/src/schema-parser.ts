@@ -105,6 +105,7 @@ export function flattenSchema(parsed: Record<string, unknown>): Record<string, u
 
     if (
       propObj.type === "object" &&
+      propObj.format !== "video" &&
       isPlainRecord(propObj.properties) &&
       !hasPositionable(propObj)
     ) {

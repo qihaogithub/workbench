@@ -731,6 +731,9 @@ export function AssistantMessage({
                 aria-describedby={undefined}
                 className="grid max-h-[88vh] w-auto max-w-[92vw] place-items-center gap-0 overflow-hidden border-0 bg-background/95 p-4"
               >
+                <DialogTitle className="sr-only">
+                  图片预览：{block.alt ?? "图片"}
+                </DialogTitle>
                 <img
                   src={block.url}
                   alt={block.alt}

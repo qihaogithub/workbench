@@ -256,6 +256,8 @@ export interface CanvasState {
 export interface CanvasNavigationHotspot {
   id: string;
   pageId: string;
+  /** area 会显示并可编辑；point 仅作为画布连线的不可见起点。 */
+  kind: "area" | "point";
   /** 相对于页面内容区域的归一化矩形。 */
   rect: { x: number; y: number; width: number; height: number };
   createdAt: number;
@@ -421,6 +423,10 @@ export interface CanvasTextNode extends CanvasFreeNodeBase {
   fontSize: number;
   color: string;
   backgroundColor?: string;
+  textAlign?: "left" | "center" | "right";
+  fontWeight?: 400 | 500 | 600 | 700;
+  lineHeight?: number;
+  stylePreset?: "body" | "note" | "heading" | "emphasis";
   autoWidth?: boolean;
 }
 

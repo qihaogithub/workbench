@@ -48,6 +48,16 @@ function isSuccessfulPayload(value: unknown): value is SuccessfulPayload {
 }
 
 /**
+ * 原型页只有在 HTML 具有实际内容时才能作为可渲染的已加载状态。
+ *
+ * 协同文档初始化会短暂提供空文本；仅依据缓存对象是否存在会把该中间状态
+ * 误判成已加载，导致单页预览不再请求工作区中的真实原型文件。
+ */
+export function hasLoadedPrototypeHtml(html: string | undefined): boolean {
+  return typeof html === "string" && html.trim().length > 0;
+}
+
+/**
  * Resolves a page's preview content from its owning workspace. Reference pages
  * do not have a local demos/<pageId> directory, so they must always go through
  * the reference endpoint which reads the current source-page content.

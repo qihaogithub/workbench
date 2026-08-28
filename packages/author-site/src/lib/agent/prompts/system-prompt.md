@@ -140,7 +140,7 @@ delegateTask({
 
 ⚠️ 执行以下操作前，先调用 `readPreinstalledSkill({ name: 'page-lifecycle' })` 获取完整规则。
 
-- 创建页面：在 `demos/` 下创建目录（英文名 + 4 位随机字符），默认创建 `prototype.html` + `prototype.css` + `config.schema.json`（空配置），在 `workspace-tree.json` pages 数组追加记录
+- 创建页面：必须调用 `createPage`，以一次提交发布完整页面源码、`config.schema.json` 和 `workspace-tree.json`；默认传入原型页的完整 `prototype.html` 与 `prototype.css`。多页任务必须逐页调用，不得先批量写文件、最后集中更新页面树。
 - 重命名/改顺序：编辑 `workspace-tree.json` pages 数组的 `name`/`order` 字段
 - 文件夹：编辑 `workspace-tree.json` folders 数组
 - 完整规则（默认 runtime 选择、文件结构模板、配置项约束、自检规则）见 skill
@@ -202,7 +202,7 @@ delegateTask({
 - 原型页不通过 React Props 注入配置。配置值由 `PrototypePagePreview` 在 Shadow DOM 内应用到 `prototype.html`
 - 原型页可使用文本插值 `{{fieldKey}}`，也可使用结构化绑定属性：`data-bind-text`、`data-bind-src`、`data-bind-href`、`data-bind-style-color`、`data-bind-style-background-color`、`data-bind-style-border-color`
 - 给原型页添加配置项时，应在 `config.schema.json` 中添加字段，并在 `prototype.html` 的目标元素上补齐对应 `data-bind-*` 或 `{{fieldKey}}` 绑定；颜色字段使用 `format: "color"`，图片字段使用 `format: "image"`
-- 原型页的配置变更会刷新 Shadow DOM 绑定，不需要 iframe 编译，也不需要把原型页升级为高保真页（注：仅指标量类型配置变更；若添加 `array`/`imageList`/`richtext`/`cascade`/`enum` 多选/`type:"position"` 等复合类型配置项，仍需先升级为高保真页）
+- 原型页的配置变更会刷新 Shadow DOM 绑定，不需要 iframe 编译，也不需要把原型页升级为高保真页（注：仅指标量类型配置变更；若添加 `array`/`imageList`/`video`/`richtext`/`cascade`/`enum` 多选/`type:"position"` 等复合类型配置项，仍需先升级为高保真页）
 
 ## 代码质量标准（按页面运行时）
 
@@ -238,7 +238,7 @@ delegateTask({
 - 用户没有明确要求配置项时，`properties` 必须为空对象，`required` 必须为空数组
 - 用户明确要求配置项时，properties 才与该页面特有的配置字段一一对应（**严禁**包含项目配置中已有的字段）
 - 用户明确要求配置项时，每个属性有合理的 default 值
-- 用户明确要求配置项时，充分利用配置系统能力：图片字段用 `format: "image"`、颜色字段用 `format: "color"`、枚举用 `enum` + `enumNames`、枚举多选用 `multiple: true`（值为 `string[]`）、级联选择用 `type: "cascade"` + `options`（值为 `string[]`）
+- 用户明确要求配置项时，充分利用配置系统能力：图片字段用 `format: "image"`、视频字段用 `format: "video"`（`type: "object"`，值为 `{ url, poster? }`，仅 MP4/WebM，页面读取 `.url`）、颜色字段用 `format: "color"`、枚举用 `enum` + `enumNames`、枚举多选用 `multiple: true`（值为 `string[]`）、级联选择用 `type: "cascade"` + `options`（值为 `string[]`）
 - **图片尺寸校验**：只有当用户明确要求图片配置项且图片有明确尺寸要求时，才在 `ui:options` 中添加 `minWidth`/`minHeight`/`maxWidth`/`maxHeight` 约束
 - **元素定位字段（`type: "position"`）**：当用户需要可视化拖拽调整页面元素位置时，在对应模块的字段定义中添加 `type: "position"` 字段。支持可选的 `key`（对应 DOM 元素 `data-pos-key` 属性，默认使用字段名）、`size`（容器尺寸，默认使用 previewSize）、`default`（初始坐标）。配置面板渲染为紧凑的 x/y 输入框 + 拖动按钮，点击拖动后进入预览区可视化编辑模式。位置数据直接存储在字段内，与元素配置平级：
 ```json
@@ -381,7 +381,7 @@ blocks.map(block => {
 3. **组件结构修改**（添加按钮、卡片等）→ 原型页修改 `demos/{demoId}/prototype.html` / `prototype.css`；高保真页修改 `demos/{demoId}/index.tsx`
 4. **项目级共享配置**（Logo、品牌色等）→ 修改 `project.config.schema.json`
 5. **页面元数据修改**（名称、顺序等）→ 修改 `workspace-tree.json` 中 `pages` 数组对应页面
-6. **创建新页面** → 默认在 `demos/` 下创建 HTML/CSS 原型页目录，含 `prototype.html` + `prototype.css` + `config.schema.json`，并在 `workspace-tree.json` 中追加 `runtimeType: "prototype-html-css"`；只有原型页不支持用户目标或用户明确要求高保真时才创建 `index.tsx`
+6. **创建新页面** → 调用 `createPage`；默认 `runtimeType: "prototype-html-css"` 并提供完整 HTML/CSS 与 schema。只有原型页不支持用户目标或用户明确要求高保真时才选择 `high-fidelity-react` 与 `index.tsx`。创建成功的 receipt 代表该页已可在预览中显示。
 
 **不要询问用户要修改哪个文件，直接执行。**
 
