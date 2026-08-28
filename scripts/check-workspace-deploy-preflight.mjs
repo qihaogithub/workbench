@@ -13,13 +13,17 @@ function hashContent(content) {
 
 function isManagedWorkspaceResource(resourcePath) {
   return (
-    /^demos\/[^/]+\/(index\.tsx|prototype\.(html|css|meta\.json)|config\.schema\.json|sketch\.(scene|meta)\.json)$/.test(resourcePath) ||
+    /^demos\/[^/]+\/(index\.tsx|prototype\.(html|css|meta\.json)|sandbox\.html|html-import\.meta\.json|config\.schema\.json|sketch\.(scene|meta)\.json|convention\.md)$/.test(resourcePath) ||
     resourcePath === "project.config.schema.json" ||
     resourcePath === "project.config.values.json" ||
     resourcePath === "workspace-tree.json" ||
     resourcePath === ".canvas-layout.json" ||
+    resourcePath === "convention.md" ||
+    resourcePath === "memory.md" ||
     resourcePath === "knowledge/manifest.json" ||
     /^knowledge\/[^/]+\.(md|markdown|mdown)$/i.test(resourcePath) ||
+    resourcePath === "design-spec/manifest.json" ||
+    /^design-spec\/spec-[^/]+\.json$/.test(resourcePath) ||
     /^assets\/.+/.test(resourcePath)
   );
 }
