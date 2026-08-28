@@ -8,6 +8,8 @@ export interface WorkspaceAuthorityMigrationOptions {
   projectId?: string;
   workspaceId?: string;
   all?: boolean;
+  /** Explicit opt-in: accept on-disk drift as the next Authority revision. */
+  adoptExternalDrift?: boolean;
   apply: boolean;
 }
 
@@ -20,6 +22,8 @@ export interface WorkspaceAuthorityMigrationItem {
     | "bootstrapped"
     | "would_repair_backups"
     | "backups_repaired"
+    | "would_adopt"
+    | "adopted"
     | "already_bootstrapped"
     | "blocked";
   applied: boolean;
@@ -89,9 +93,22 @@ export async function migrateWorkspaceAuthorities(options: WorkspaceAuthorityMig
     const issues: string[] = [];
     if (health.activeLease) issues.push("active or stale write lease exists");
     if (health.preparedCount > 0) issues.push("prepared transactions need recovery");
-    if (health.stateExists && health.externalDrift) issues.push("external drift requires explicit adopt or restore");
+    const shouldAdoptExternalDrift = health.stateExists && health.externalDrift && options.adoptExternalDrift === true;
+    if (health.stateExists && health.externalDrift && !shouldAdoptExternalDrift) {
+      issues.push("external drift requires explicit adopt or restore");
+    }
     if (issues.length > 0) {
       items.push({ ...workspace, action: "blocked", applied: false, issues, revision: health.revision, rootHash: health.rootHash });
+      continue;
+    }
+
+    if (shouldAdoptExternalDrift) {
+      if (!options.apply) {
+        items.push({ ...workspace, action: "would_adopt", applied: false, issues: [], revision: health.revision, rootHash: health.rootHash });
+        continue;
+      }
+      const state = await authority.reconcileAdopt(workspace.projectId, workspace.workspaceId);
+      items.push({ ...workspace, action: "adopted", applied: true, issues: [], revision: state.revision, rootHash: state.rootHash });
       continue;
     }
 
