@@ -628,6 +628,7 @@ export function PreviewCanvas({
   onRequestDeletePages,
   onAddPagesToChat,
   onPageConfigEdit,
+  onPageRename,
   onPageComment,
   onCanvasClick,
   className,
@@ -4144,6 +4145,7 @@ export function PreviewCanvas({
                 // 的适应屏幕逻辑并覆盖用户当前的缩放/平移。
                 onLayoutChange={isEditorMode ? handleLayoutChange : undefined}
                 onConfigEdit={handlePageSelect}
+                onRename={isEditorMode ? onPageRename : undefined}
                 onCommentSelect={
                   onPageComment
                     ? (pageId, event) => {

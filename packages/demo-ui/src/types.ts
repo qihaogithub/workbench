@@ -526,6 +526,8 @@ export interface PreviewCanvasProps {
   /** 画布选中的页面添加到 AI 对话 */
   onAddPagesToChat?: (pageIds: string[]) => void;
   onPageConfigEdit?: (pageId: string) => void;
+  /** 在画布中重命名项目页面；成功后同步全部页面名称引用。 */
+  onPageRename?: (pageId: string, name: string) => Promise<boolean>;
   /** 评论模式下点击画布页面，以其点击位置创建页面级评论。 */
   onPageComment?: (input: {
     pageId: string;

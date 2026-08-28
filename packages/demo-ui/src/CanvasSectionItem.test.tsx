@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { CanvasSectionItem } from "./CanvasSectionItem";
+import { resolveCanvasTitleMetrics } from "./canvas-utils";
 
 const section = {
   id: "section_a",
@@ -67,7 +68,21 @@ describe("CanvasSectionItem", () => {
   it("以更大的字号展示标题", () => {
     render(<CanvasSectionItem section={section} editable />);
     expect(screen.getByRole("button", { name: /选择 Section: 登录流程/ }).parentElement).toHaveClass(
-      "text-base",
+      "font-semibold",
+    );
+  });
+
+  it("在 0.5x 前保持 12px 屏幕字号，之后随画布缩小", () => {
+    expect(resolveCanvasTitleMetrics(1)).toMatchObject({
+      fontSize: 12,
+      sectionHeight: 28,
+    });
+    expect(resolveCanvasTitleMetrics(0.5)).toMatchObject({
+      fontSize: 24,
+      sectionHeight: 56,
+    });
+    expect(resolveCanvasTitleMetrics(0.25)).toEqual(
+      resolveCanvasTitleMetrics(0.5),
     );
   });
 });
