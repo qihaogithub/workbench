@@ -321,7 +321,7 @@ echo -e "${BLUE}🔄 [3/4] 同步代码到服务器 (${SERVER_IP})...${NC}"
 cd "${PROJECT_DIR}"
 
 rsync_excludes=(
-    --exclude '/.git/'
+    --exclude '/.git'
     --exclude '/.gitignore'
     --exclude '/.agents/'
     --exclude '/.codegraph/'
