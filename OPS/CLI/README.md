@@ -364,9 +364,14 @@ corepack pnpm workspace-authority:migrate -- --all --json
 
 # 显式写入 Authority state 与 committed backup，不修改 Workspace 业务内容
 corepack pnpm workspace-authority:migrate -- --all --apply --json
+
+# 明确采纳已登记 Workspace 的当前磁盘漂移；先 dry-run，再加 --apply。
+# 该操作更新 Authority revision 与 committed backup，不回滚或改写 Workspace 业务文件。
+corepack pnpm workspace-authority:migrate -- --all --adopt-external-drift --json
+corepack pnpm workspace-authority:migrate -- --all --adopt-external-drift --apply --json
 ```
 
-已注册且完整的 Workspace 返回 `already_bootstrapped`；旧 state 缺少 committed backup 时返回 `would_repair_backups` / `backups_repaired`。若存在 external drift、lease 或 prepared 事务，迁移保持 `blocked`，不会静默 adopt。
+已注册且完整的 Workspace 返回 `already_bootstrapped`；旧 state 缺少 committed backup 时返回 `would_repair_backups` / `backups_repaired`。external drift 默认保持 `blocked`；只有显式传入 `--adopt-external-drift` 才会返回 `would_adopt` 或在 `--apply` 下写入 `adopted`。lease 或 prepared 事务始终阻断。
 
 ### `workspace-authority-bootstrap` / `workspace-authority-reconcile-adopt` / `workspace-authority-reconcile-restore`
 

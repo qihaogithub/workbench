@@ -10,6 +10,7 @@ function parseArgs(argv: string[]) {
     projectId?: string;
     workspaceId?: string;
     all?: boolean;
+    adoptExternalDrift?: boolean;
     apply: boolean;
     json: boolean;
   } = {
@@ -24,6 +25,7 @@ function parseArgs(argv: string[]) {
     else if (value === "--project") options.projectId = argv[++index];
     else if (value === "--workspace") options.workspaceId = argv[++index];
     else if (value === "--all") options.all = true;
+    else if (value === "--adopt-external-drift") options.adoptExternalDrift = true;
     else if (value === "--apply") options.apply = true;
     else if (value === "--json") options.json = true;
     else throw new Error(`Unknown argument: ${value}`);

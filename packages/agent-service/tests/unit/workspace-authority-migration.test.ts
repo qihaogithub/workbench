@@ -48,4 +48,19 @@ describe("workspace authority migration", () => {
     expect(repeated.items.every((item) => item.action === "already_bootstrapped")).toBe(true);
     expect(fs.readdirSync(path.join(first.dataDir, "workspace-authority", "live-1", "backups")).length).toBe(1);
   });
+
+  it("仅在显式 opt-in 时采纳 external drift", async () => {
+    const first = createLiveWorkspace("project-1", "live-1");
+    await migrateWorkspaceAuthorities({ dataDir: first.dataDir, all: true, apply: true });
+    fs.writeFileSync(path.join(first.workspacePath, "demos", "home", "index.tsx"), "changed-on-disk");
+
+    const blocked = await migrateWorkspaceAuthorities({ dataDir: first.dataDir, all: true, apply: false });
+    const preview = await migrateWorkspaceAuthorities({ dataDir: first.dataDir, all: true, adoptExternalDrift: true, apply: false });
+    const applied = await migrateWorkspaceAuthorities({ dataDir: first.dataDir, all: true, adoptExternalDrift: true, apply: true });
+
+    expect(blocked.items[0]?.action).toBe("blocked");
+    expect(preview.items[0]?.action).toBe("would_adopt");
+    expect(applied.items[0]?.action).toBe("adopted");
+    expect(applied.items[0]?.revision).toBe(2);
+  });
 });
