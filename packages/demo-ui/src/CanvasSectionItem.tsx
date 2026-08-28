@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { resolveCanvasTitleMetrics } from "./canvas-utils";
 import type { CanvasPageLayout, CanvasSection } from "./types";
 
 interface CanvasSectionItemProps {
@@ -67,6 +68,7 @@ export function CanvasSectionItem({
   const style = section.style ?? {};
   const sectionColor = style.color ?? "#94a3b8";
   const fillOpacity = style.fillOpacity ?? 12;
+  const titleMetrics = resolveCanvasTitleMetrics(zoom);
   const startDrag = (event: React.PointerEvent, kind: "move" | "resize") => {
     if (!editable || editing) return;
     const isTitleButton =
@@ -171,7 +173,13 @@ export function CanvasSectionItem({
         </>
       )}
       <div
-        className="pointer-events-auto absolute -top-8 left-0 flex h-7 max-w-full items-center gap-1 rounded-t-md border border-b-0 bg-background px-2 text-base font-semibold shadow-sm"
+        className="pointer-events-auto absolute left-0 flex max-w-full items-center gap-1 rounded-t-md border border-b-0 bg-background font-semibold shadow-sm"
+        style={{
+          top: -titleMetrics.sectionHeight,
+          height: titleMetrics.sectionHeight,
+          paddingInline: titleMetrics.sectionHorizontalPadding,
+          fontSize: titleMetrics.fontSize,
+        }}
         onPointerDown={(event) => startDrag(event, "move")}
         onPointerMove={moveDrag}
         onPointerUp={finishDrag}
@@ -187,7 +195,8 @@ export function CanvasSectionItem({
               value={title}
               maxLength={120}
               aria-label="Section 标题"
-              className="w-48 bg-transparent text-base outline-none"
+              className="w-48 bg-transparent outline-none"
+              style={{ fontSize: "inherit" }}
               onChange={(event) => setTitle(event.target.value)}
               onBlur={commit}
               onKeyDown={(event) => {

@@ -9795,3 +9795,37 @@ void handleCreateVersionWithScreenshot(versionNameInput || undefined);
     </div>
   );
 }
+  const handlePageRename = useCallback(
+    async (pageId: string, name: string): Promise<boolean> => {
+      if (!sessionId) return false;
+      try {
+        const res = await fetch(`/api/projects/${demoId}/demos/${pageId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId, name }),
+        });
+        const data = await res.json();
+        if (!data.success) {
+          toast({
+            title: "更新失败",
+            description: data.error?.message,
+            variant: "destructive",
+          });
+          return false;
+        }
+
+        setDemoPages((prev) =>
+          prev.map((page) => (page.id === pageId ? { ...page, name } : page)),
+        );
+        handleWorkspaceTreeChanged();
+        toast({ title: "名称已更新" });
+        return true;
+      } catch {
+        toast({ title: "更新失败", variant: "destructive" });
+        return false;
+      }
+    },
+    [demoId, handleWorkspaceTreeChanged, sessionId, toast],
+  );
+
+                  onPageRename: handlePageRename,

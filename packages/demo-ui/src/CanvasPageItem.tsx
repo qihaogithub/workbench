@@ -1,9 +1,17 @@
 "use client";
 
-import React, { lazy, Suspense, useState, useCallback, useRef } from "react";
+import React, {
+  lazy,
+  Suspense,
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 import { createPortal } from "react-dom";
 import { Trash2, Lock, ExternalLink, Unlink } from "lucide-react";
 import { CanvasSelectionBox } from "./CanvasSelectionBox";
+import { resolveCanvasTitleMetrics } from "./canvas-utils";
 import {
   getCanvasPreviewSizeKey,
   resolveCanvasContentHeightLayout,
@@ -50,6 +58,7 @@ interface CanvasPageItemProps {
   brokenReference?: boolean;
   onLayoutChange?: (pageId: string, layout: CanvasPageLayout) => void;
   onConfigEdit?: (pageId: string, event?: React.PointerEvent) => void;
+  onRename?: (pageId: string, name: string) => Promise<boolean>;
   /** 画布评论模式下选择本页；优先于页面拖拽和预览内容交互。 */
   onCommentSelect?: (pageId: string, event: React.PointerEvent) => void;
   onRequestDelete?: (pageId: string) => void;
@@ -106,11 +115,6 @@ const MAX_SIZE = 2000;
 const MIN_MEASURED_CONTENT_HEIGHT = 50;
 const EDGE_HIT_SIZE = 8; // 边框热区宽度（px）
 const CORNER_HIT_SIZE = 16; // 角点判定范围（px）
-const PAGE_LABEL_SCREEN_FONT_SIZE = 12;
-const PAGE_LABEL_MAX_FONT_SIZE = 24;
-const PAGE_LABEL_SCREEN_GAP = 8;
-const PAGE_LABEL_MAX_TOP_OFFSET = 40;
-
 function parsePreviewSizeValue(
   value: string | number | undefined,
   fallback: number,
@@ -593,6 +597,7 @@ export function CanvasPageItem({
   brokenReference = false,
   onLayoutChange,
   onConfigEdit,
+  onRename,
   onCommentSelect,
   onRequestDelete,
   onViewSource,
@@ -620,6 +625,8 @@ export function CanvasPageItem({
   const [isHovering, setIsHovering] = useState(false);
   const [isResizing, setIsResizing] = useState<ResizeEdge | null>(null);
   const [hoveredEdge, setHoveredEdge] = useState<ResizeEdge | null>(null);
+  const [isTitleEditing, setIsTitleEditing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(page.name);
   // 右键菜单状态
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -638,6 +645,15 @@ export function CanvasPageItem({
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
   const containerRef = useRef<HTMLDivElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const titleCommitPendingRef = useRef(false);
+
+  useEffect(() => setTitleDraft(page.name), [page.name]);
+  useEffect(() => {
+    if (!isTitleEditing) return;
+    titleInputRef.current?.focus();
+    titleInputRef.current?.select();
+  }, [isTitleEditing]);
 
   const canInteract = editable && toolMode === "select";
   const showEdgeHandles =
@@ -841,15 +857,28 @@ export function CanvasPageItem({
           : toolMode === "hand" && editable && !isEditing
             ? "default"
             : undefined;
-  const safeZoom = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
-  const pageLabelFontSize = Math.min(
-    PAGE_LABEL_SCREEN_FONT_SIZE / safeZoom,
-    PAGE_LABEL_MAX_FONT_SIZE,
-  );
-  const pageLabelTopOffset = Math.min(
-    (PAGE_LABEL_SCREEN_FONT_SIZE + PAGE_LABEL_SCREEN_GAP) / safeZoom,
-    PAGE_LABEL_MAX_TOP_OFFSET,
-  );
+  const titleMetrics = resolveCanvasTitleMetrics(zoom);
+  const cancelTitleEdit = useCallback(() => {
+    setTitleDraft(page.name);
+    setIsTitleEditing(false);
+  }, [page.name]);
+  const commitTitleEdit = useCallback(async () => {
+    if (titleCommitPendingRef.current) return;
+    const next = titleDraft.trim();
+    if (!next || next === page.name) {
+      cancelTitleEdit();
+      return;
+    }
+
+    titleCommitPendingRef.current = true;
+    setIsTitleEditing(false);
+    try {
+      const renamed = await onRename?.(page.id, next);
+      if (!renamed) setTitleDraft(page.name);
+    } finally {
+      titleCommitPendingRef.current = false;
+    }
+  }, [cancelTitleEdit, onRename, page.id, page.name, titleDraft]);
 
   return (
     <div
@@ -891,15 +920,50 @@ export function CanvasPageItem({
       }}
     >
       <div
-        className="absolute left-0 max-w-full truncate font-medium text-muted-foreground pointer-events-none"
-        title={page.name}
+        className="absolute left-0 z-50 max-w-full"
         style={{
-          top: -pageLabelTopOffset,
-          fontSize: pageLabelFontSize,
+          top: -titleMetrics.topOffset,
+          fontSize: titleMetrics.fontSize,
           lineHeight: 1.2,
         }}
+        onPointerDown={(event) => event.stopPropagation()}
       >
-        {page.name}
+        {isTitleEditing ? (
+          <input
+            ref={titleInputRef}
+            value={titleDraft}
+            maxLength={120}
+            aria-label="页面标题"
+            className="w-48 bg-background px-1 text-muted-foreground outline-none ring-1 ring-primary"
+            style={{ fontSize: "inherit", lineHeight: "inherit" }}
+            onChange={(event) => setTitleDraft(event.target.value)}
+            onBlur={() => void commitTitleEdit()}
+            onKeyDown={(event) => {
+              event.stopPropagation();
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void commitTitleEdit();
+              } else if (event.key === "Escape") {
+                event.preventDefault();
+                cancelTitleEdit();
+              }
+            }}
+          />
+        ) : (
+          <button
+            type="button"
+            className="block max-w-full truncate text-left font-medium text-muted-foreground"
+            title="双击改名称"
+            aria-label={`页面标题：${page.name}，双击改名称`}
+            onClick={(event) => event.stopPropagation()}
+            onDoubleClick={(event) => {
+              event.stopPropagation();
+              if (canInteract && onRename) setIsTitleEditing(true);
+            }}
+          >
+            {page.name}
+          </button>
+        )}
       </div>
 
       <div className="absolute inset-0 rounded-lg overflow-hidden">

@@ -25,7 +25,7 @@ covers:
 # 画布 Section（分区）实现设计
 
 > 状态：已实施（协议、归一化、布局解析、创建/重命名、完整包裹自动收纳与越界自动释放、嵌套、样式、释放式删除、复制粘贴、Option/Alt 拖拽复制、自动排版、协作重放、无障碍标识、性能基线与浏览器 E2E 均已落地）  
-> 更新日期：2026-08-27
+> 更新日期：2026-08-28
 
 本文定义项目级画布的 Section 功能。用户需求见[预览系统需求中的画布工作台](../预览系统_需求文档.md#242-画布工作台)；现有画布协同和页面组边界见[协同草稿驱动预览](./08_协同草稿驱动预览.md)。Section 只组织画布对象，不改变页面资源或页面内部草图协议。
 
@@ -71,11 +71,11 @@ Section 的目标是让用户像整理白板一样按“登录流程”“方案
 
 收纳候选按对象外框是否完整位于 Section 内计算；多选对象逐个按同一规则重新判定。拖入子 Section 时优先收纳到最内层 Section，并在拖动提示中展示完整路径。
 
-移出通过拖到 Section 外或边界变化后的自动释放完成。删除父 Section 会递归删除其子 Section 容器并释放所有页面和自由节点；Section 删除从不删除项目页面资源或自由节点。页面组不在本期收纳范围内。标题以较大的字号始终可见；双击标题栏任意位置即可进入重命名。
+移出通过拖到 Section 外或边界变化后的自动释放完成。删除父 Section 会递归删除其子 Section 容器并释放所有页面和自由节点；Section 删除从不删除项目页面资源或自由节点。页面组不在本期收纳范围内。页面与 Section 标题均可双击重命名：页面名称写回项目页面元数据，Section 名称写回画布布局；两类标题使用同一屏幕可读字号策略。
 
 ## 4. 渲染与层级
 
-`PreviewCanvas` 将画布渲染拆为背景层、Section 层、页面/自由节点层、选择反馈层。Section 背景和边框使用 CSS/SVG 轻量绘制，不进入页面截图、iframe 或页面截图 hash。标题固定在 Section 左上角，随视口缩放保持最小可读字号；过小分区自动隐藏填充，仅保留边框和标题。
+`PreviewCanvas` 将画布渲染拆为背景层、Section 层、页面/自由节点层、选择反馈层。Section 背景和边框使用 CSS/SVG 轻量绘制，不进入页面截图、iframe 或页面截图 hash。页面与 Section 标题在缩放不低于 0.5x 时保持约 12px 屏幕字号；低于该阈值时停止反向补偿并随画布继续缩小。Section 标题栏的高度和内边距同步补偿，使文字不会被标题栏裁切；过小分区自动隐藏填充，仅保留边框和标题。
 
 所有 Section 均使用画布绝对坐标和全局 `zIndex`；嵌套只表达成员关系，不创建局部坐标或局部层级。渲染时祖先 Section 的背景固定在后代 Section 背景与普通对象之后，且任何 Section 都不能遮挡成员点击。适应屏幕和画布边界计算以所有可见对象的并集计算，Section 外框只在其没有可见成员、或其边界超出成员并集时补充边界，避免重复扩大面积。
 
@@ -97,8 +97,9 @@ Section 与 pages、nodes 一起写入 `.canvas-layout.json`，仍沿用画布�
 
 | 模块 | 责任 |
 |---|---|
-| `demo-ui/types.ts` | 暴露 Section、成员引用和样式的共享类型 |
-| `PreviewCanvas.tsx` | 工具态、完整边界命中、选择反馈、Section 整体拖动、自动收纳/释放、颜色色块入口及颜色/透明度气泡框和渲染层级 |
+| `demo-ui/types.ts` | 暴露 Section、成员引用和样式，以及画布页面重命名回调 |
+| `PreviewCanvas.tsx` | 工具态、完整边界命中、选择反馈、Section 整体拖动、自动收纳/释放、页面重命名接线、颜色色块入口及颜色/透明度气泡框和渲染层级 |
+| `CanvasPageItem.tsx` / `CanvasSectionItem.tsx` / `canvas-utils.ts` | 页面与 Section 标题的双击编辑，以及统一的 12px/0.5x 阈值标题尺度 |
 | `canvas-section.ts` | 完整边界、嵌套循环、成员树整体平移、自动收纳/释放、单色样式归一化和 Section 单元自动排版纯函数 |
 | `canvas-clipboard.ts` | 复制/粘贴 Section，重写 Section 与成员 ID 映射 |
 | `canvas-layout-file.ts` / API route / viewer 数据读取 | 读取、字段级容错、校验、Authority 提交和版本化写入；所有消费端使用同一解析器 |
@@ -111,7 +112,7 @@ Section 与 pages、nodes 一起写入 `.canvas-layout.json`，仍沿用画布�
 
 P0 验收已覆盖：Shift + S 创建并自动聚焦标题、标题重命名、绘制完整包裹自动收纳且无确认弹窗、拖入/越界自动释放、嵌套循环拒绝与多父归一化、删除分区释放页面和自由节点、Section 整体移动时页面/自由节点/嵌套 Section 同步平移、刷新和协同回流恢复、并发 mutation 的记录级重放与同记录冲突提示。浏览器回归覆盖 Alt/Option 页面复制、自动收纳、整体拖动、缩放越界释放、重命名、默认删除与自动保存落盘。
 
-P1 验收已覆盖：批量选择与对齐、复制粘贴 ID 重写、Section 单元自动排版、撤销重做、单个损坏 Section 降级、键盘 Tab 导航、深度缩放下标题可读性，以及 500 个对象对齐热路径的性能基线。
+P1 验收已覆盖：批量选择与对齐、复制粘贴 ID 重写、Section 单元自动排版、撤销重做、单个损坏 Section 降级、键盘 Tab 导航、页面与 Section 在 0.5x 前的统一标题可读性、页面双击重命名，以及 500 个对象对齐热路径的性能基线。
 
 建议新增 `canvas-section.test.ts`（纯函数）和 `preview-canvas-interaction-mode.test.tsx` 场景，并在 `test/创作端E2E回归测试/` 增加 Section 回归用例。完成实现后至少运行 `corepack pnpm check:demo-ui`、`corepack pnpm check:author` 与对应 Playwright 回归。
 
