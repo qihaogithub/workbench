@@ -385,6 +385,7 @@ if [ "${DEPLOY_SYNC_MODE}" = "targeted" ]; then
                 add_required_package "shared"
                 ;;
             author-site)
+                add_required_package "ai-chat-shared"
                 add_required_package "agent-client"
                 add_required_package "author-site"
                 add_required_package "demo-ui"
@@ -424,6 +425,7 @@ if [ "${DEPLOY_SYNC_MODE}" = "targeted" ]; then
     }
 
     all_workspace_packages=(
+        "ai-chat-shared"
         "agent-client"
         "agent-service"
         "author-site"
