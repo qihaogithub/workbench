@@ -62,18 +62,16 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 export APP_DATA_DIR="${APP_DATA_DIR:-${PROJECT_DIR}/data}"
-# Read SERVER_IP from .env.docker to derive correct browser-facing URLs.
-# NEXT_PUBLIC_* vars are baked into the JS bundle at build time; if they point
-# to localhost but the user accesses via SERVER_IP, WebSocket/fetch will fail.
+# Read SERVER_IP from .env.docker to derive browser-facing URLs for services
+# that require one. Agent-service is always derived from window.location by
+# the browser bundle and must never be injected as a NEXT_PUBLIC build value.
 SERVER_IP_FROM_ENV="$(grep -E '^SERVER_IP=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- || true)"
 if [ -n "${SERVER_IP_FROM_ENV}" ]; then
-  export NEXT_PUBLIC_AGENT_SERVICE_URL="${NEXT_PUBLIC_AGENT_SERVICE_URL:-http://${SERVER_IP_FROM_ENV}:3201}"
   export NEXT_PUBLIC_SCREENSHOT_SERVICE_URL="${NEXT_PUBLIC_SCREENSHOT_SERVICE_URL:-http://${SERVER_IP_FROM_ENV}:3202}"
   export NEXT_PUBLIC_WEB_URL="${NEXT_PUBLIC_WEB_URL:-http://${SERVER_IP_FROM_ENV}:3200}"
   export CORS_ORIGINS="${CORS_ORIGINS:-http://${SERVER_IP_FROM_ENV}:3200,http://${SERVER_IP_FROM_ENV}:3300,http://localhost:3200,http://localhost:3300,http://127.0.0.1:3200,http://127.0.0.1:3300}"
   export FIGMA_OAUTH_REDIRECT_URI="${FIGMA_OAUTH_REDIRECT_URI:-http://${SERVER_IP_FROM_ENV}:3200/api/user/external-auth/figma/callback}"
 else
-  export NEXT_PUBLIC_AGENT_SERVICE_URL="${NEXT_PUBLIC_AGENT_SERVICE_URL:-http://localhost:3201}"
   export NEXT_PUBLIC_SCREENSHOT_SERVICE_URL="${NEXT_PUBLIC_SCREENSHOT_SERVICE_URL:-http://localhost:3202}"
   export NEXT_PUBLIC_WEB_URL="${NEXT_PUBLIC_WEB_URL:-http://localhost:3200}"
   export CORS_ORIGINS="${CORS_ORIGINS:-http://localhost:3200,http://localhost:3300,http://127.0.0.1:3200,http://127.0.0.1:3300}"

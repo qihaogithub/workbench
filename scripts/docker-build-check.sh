@@ -60,7 +60,6 @@ if [ ! -f "${ENV_FILE}" ]; then
 fi
 
 export APP_DATA_DIR="${APP_DATA_DIR:-${PROJECT_DIR}/data}"
-export NEXT_PUBLIC_AGENT_SERVICE_URL="${NEXT_PUBLIC_AGENT_SERVICE_URL:-http://localhost:3201}"
 export NEXT_PUBLIC_SCREENSHOT_SERVICE_URL="${NEXT_PUBLIC_SCREENSHOT_SERVICE_URL:-http://localhost:3202}"
 export NEXT_PUBLIC_DATA_BASE="${NEXT_PUBLIC_DATA_BASE:-}"
 export CORS_ORIGINS="${CORS_ORIGINS:-http://localhost:3200,http://localhost:3300,http://127.0.0.1:3200,http://127.0.0.1:3300}"

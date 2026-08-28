@@ -337,7 +337,6 @@ export async function POST(
         if (error instanceof WorkspaceAuthorityClientError) return createMutationErrorResponse(error);
         throw error;
       }
-      updateWorkspaceDemoFiles(restoreWorkspaceId, resourceId, files);
       const snapshotResult = createProjectVersionSnapshot(
         projectId,
         actor.name,
@@ -349,7 +348,6 @@ export async function POST(
         },
       );
       const newVersionId = snapshotResult.version?.versionId ?? versionId;
-      markWorkspaceBasedOnVersion(restoreWorkspaceId, newVersionId);
       return NextResponse.json(createApiSuccess({
         success: true,
         newVersionId,

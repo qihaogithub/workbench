@@ -78,7 +78,8 @@ COPY packages/shared/ ./packages/shared/
 COPY packages/author-site/ ./packages/author-site/
 COPY scripts/ ./scripts/
 
-RUN pnpm --filter @workbench/author-site build
+RUN pnpm --filter @workbench/author-site build \
+    && node scripts/check-browser-agent-url-bundle.mjs packages/author-site/.next/static
 
 FROM node:24-bookworm-slim
 

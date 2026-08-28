@@ -11,7 +11,11 @@ function trimTrailingSlashes(value: string): string {
  * 使同一 Docker 镜像在任意 IP/域名下均可正常工作。
  */
 export function getBrowserAgentServiceUrl(): string {
-  const configured = process.env.NEXT_PUBLIC_AGENT_SERVICE_URL;
+  // 生产构建不得接受浏览器端地址覆盖，避免将 localhost 内联进远程部署包。
+  const configured =
+    process.env.NODE_ENV === "development"
+      ? process.env.NEXT_PUBLIC_AGENT_SERVICE_URL
+      : undefined;
   if (configured) return trimTrailingSlashes(configured);
   if (typeof window !== "undefined") {
     return `${window.location.protocol}//${window.location.hostname}:${AGENT_SERVICE_PORT}`;

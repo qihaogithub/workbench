@@ -2063,6 +2063,22 @@ const workspaceWriteAllowlist = new Map([
     "scripts/migrate-legacy-template-projects.test.mjs",
     "isolated temporary migration test fixtures only",
   ],
+  [
+    "scripts/backfill-image-dimensions.mjs",
+    "one-off image-store manifest metadata migration",
+  ],
+  [
+    "scripts/batch-generate-image-alt.mjs",
+    "operator-triggered project image alt-text backfill migration",
+  ],
+  [
+    "scripts/migrate-config-notes-to-page-requirements.mjs",
+    "operator-triggered project page requirements migration",
+  ],
+  [
+    "scripts/migrate-page-presentation.mjs",
+    "operator-triggered project page presentation migration",
+  ],
 ]);
 
 const scannedWriteFiles = [
