@@ -1,6 +1,18 @@
 FROM node:24-bookworm-slim AS builder
 
-RUN apt-get update \
+ARG DEBIAN_MIRROR=
+ARG HTTP_PROXY=
+ARG HTTPS_PROXY=
+ENV http_proxy=$HTTP_PROXY https_proxy=$HTTPS_PROXY
+
+RUN if [ -n "$DEBIAN_MIRROR" ]; then \
+      find /etc/apt -type f \( -name 'sources.list' -o -name '*.sources' \) -print0 \
+        | xargs -0 sed -i \
+          -e "s|http://deb.debian.org/debian|${DEBIAN_MIRROR}|g" \
+          -e "s|http://deb.debian.org/debian-security|${DEBIAN_MIRROR}-security|g" \
+          -e "s|http://security.debian.org/debian-security|${DEBIAN_MIRROR}-security|g"; \
+    fi \
+    && apt-get update \
     && apt-get install -y --no-install-recommends python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
 
@@ -23,7 +35,19 @@ RUN pnpm --filter @workbench/knowledge-service build:docker
 
 FROM node:24-bookworm-slim AS runtime-deps
 
-RUN apt-get update \
+ARG DEBIAN_MIRROR=
+ARG HTTP_PROXY=
+ARG HTTPS_PROXY=
+ENV http_proxy=$HTTP_PROXY https_proxy=$HTTPS_PROXY
+
+RUN if [ -n "$DEBIAN_MIRROR" ]; then \
+      find /etc/apt -type f \( -name 'sources.list' -o -name '*.sources' \) -print0 \
+        | xargs -0 sed -i \
+          -e "s|http://deb.debian.org/debian|${DEBIAN_MIRROR}|g" \
+          -e "s|http://deb.debian.org/debian-security|${DEBIAN_MIRROR}-security|g" \
+          -e "s|http://security.debian.org/debian-security|${DEBIAN_MIRROR}-security|g"; \
+    fi \
+    && apt-get update \
     && apt-get install -y --no-install-recommends python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
 

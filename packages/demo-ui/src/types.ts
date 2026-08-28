@@ -351,17 +351,15 @@ export interface CanvasSectionChild {
 }
 
 export interface CanvasSectionStyle {
-  fill?: string;
-  stroke?: string;
-  strokeWidth?: number;
-  opacity?: number;
-  cornerRadius?: number;
-  titleColor?: string;
+  /** One Section color drives the opaque border and translucent fill. */
+  color?: string;
+  /** Fill alpha as a percentage; the border is always fully opaque. */
+  fillOpacity?: number;
 }
 
 /**
- * A canvas-only organizational container. Its children retain absolute canvas
- * coordinates, so moving or resizing a Section never mutates child layouts.
+ * A canvas-only organizational container. Children retain absolute canvas
+ * coordinates and move together with their containing Section.
  */
 export interface CanvasSection {
   id: string;

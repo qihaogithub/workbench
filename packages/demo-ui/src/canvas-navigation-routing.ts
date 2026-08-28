@@ -10,6 +10,8 @@ export interface NavigationRouteRect {
   height: number;
 }
 
+type NavigationSide = "left" | "right" | "top" | "bottom";
+
 const EPSILON = 0.001;
 
 function isPointInsideRect(
@@ -71,6 +73,135 @@ function simplifyRoute(points: NavigationRoutePoint[]) {
   });
 }
 
+function isRouteClear(
+  points: NavigationRoutePoint[],
+  obstacles: NavigationRouteRect[],
+) {
+  return points.every(
+    (point, index) =>
+      index === 0 || isSegmentClear(points[index - 1], point, obstacles),
+  );
+}
+
+function fallbackOrthogonalRoute(
+  source: NavigationRoutePoint,
+  target: NavigationRoutePoint,
+) {
+  const dx = target.x - source.x;
+  const dy = target.y - source.y;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    const middleX = (source.x + target.x) / 2;
+    if (Math.abs(dy) > EPSILON) {
+      return [
+        source,
+        { x: middleX, y: source.y },
+        { x: middleX, y: target.y },
+        target,
+      ];
+    }
+    const railY = source.y - 48;
+    return [
+      source,
+      { x: middleX, y: source.y },
+      { x: middleX, y: railY },
+      { x: target.x, y: railY },
+      target,
+    ];
+  }
+  const middleY = (source.y + target.y) / 2;
+  if (Math.abs(dx) > EPSILON) {
+    return [
+      source,
+      { x: source.x, y: middleY },
+      { x: target.x, y: middleY },
+      target,
+    ];
+  }
+  const railX = source.x - 48;
+  return [
+    source,
+    { x: source.x, y: middleY },
+    { x: railX, y: middleY },
+    { x: railX, y: target.y },
+    target,
+  ];
+}
+
+function pointOnSide(rect: NavigationRouteRect, side: NavigationSide) {
+  switch (side) {
+    case "left":
+      return { x: rect.x, y: rect.y + rect.height / 2 };
+    case "right":
+      return { x: rect.x + rect.width, y: rect.y + rect.height / 2 };
+    case "top":
+      return { x: rect.x + rect.width / 2, y: rect.y };
+    case "bottom":
+      return { x: rect.x + rect.width / 2, y: rect.y + rect.height };
+  }
+}
+
+function moveOutside(
+  point: NavigationRoutePoint,
+  side: NavigationSide,
+  gap: number,
+) {
+  switch (side) {
+    case "left":
+      return { ...point, x: point.x - gap };
+    case "right":
+      return { ...point, x: point.x + gap };
+    case "top":
+      return { ...point, y: point.y - gap };
+    case "bottom":
+      return { ...point, y: point.y + gap };
+  }
+}
+
+/**
+ * Creates a connector with locked entry and exit normals. The first and final
+ * segments therefore always leave/enter the selected page side perpendicularly.
+ */
+export function buildNavigationConnectorRoute(input: {
+  sourceRect: NavigationRouteRect;
+  targetRect: NavigationRouteRect;
+  sourceAnchor: NavigationRoutePoint;
+  obstacles: NavigationRouteRect[];
+  lead?: number;
+}): NavigationRoutePoint[] {
+  const targetCenter = {
+    x: input.targetRect.x + input.targetRect.width / 2,
+    y: input.targetRect.y + input.targetRect.height / 2,
+  };
+  const dx = targetCenter.x - input.sourceAnchor.x;
+  const dy = targetCenter.y - input.sourceAnchor.y;
+  const horizontal = Math.abs(dx) >= Math.abs(dy);
+  const sourceSide: NavigationSide = horizontal
+    ? dx >= 0
+      ? "right"
+      : "left"
+    : dy >= 0
+      ? "bottom"
+      : "top";
+  const targetSide: NavigationSide = horizontal
+    ? dx >= 0
+      ? "left"
+      : "right"
+    : dy >= 0
+      ? "top"
+      : "bottom";
+  const sourcePoint = pointOnSide(input.sourceRect, sourceSide);
+  const targetPoint = pointOnSide(input.targetRect, targetSide);
+  const lead = input.lead ?? 28;
+  const sourceLead = moveOutside(sourcePoint, sourceSide, lead);
+  const targetLead = moveOutside(targetPoint, targetSide, lead);
+  const middle = findNavigationRoute({
+    source: sourceLead,
+    target: targetLead,
+    obstacles: input.obstacles,
+  });
+  return [sourcePoint, ...middle, targetPoint];
+}
+
 /**
  * Finds a stable Manhattan route through a sparse visibility grid. Obstacle
  * edges are valid route lanes; their interior is not. The route is derived at
@@ -85,7 +216,11 @@ export function findNavigationRoute(input: {
 }): NavigationRoutePoint[] {
   const { source, target } = input;
   let obstacles = input.obstacles.filter(
-    (rect) => rect.width > 0 && rect.height > 0,
+    (rect) =>
+      rect.width > 0 &&
+      rect.height > 0 &&
+      !isPointInsideRect(source, rect) &&
+      !isPointInsideRect(target, rect),
   );
   const direct = isSegmentClear(source, target, obstacles);
   if (direct && !input.forceOrthogonalBends) return [source, target];
@@ -110,6 +245,22 @@ export function findNavigationRoute(input: {
             height: 2,
           },
     ];
+  }
+
+  // For a relationship whose pages are laid out side by side, keep both end
+  // segments horizontal. This produces the familiar connector shape instead
+  // of allowing the shortest-path tie breaker to run down a page edge first.
+  const dx = target.x - source.x;
+  const dy = target.y - source.y;
+  if (Math.abs(dx) >= Math.abs(dy) && Math.abs(dy) > EPSILON) {
+    const middleX = (source.x + target.x) / 2;
+    const preferred = [
+      source,
+      { x: middleX, y: source.y },
+      { x: middleX, y: target.y },
+      target,
+    ];
+    if (isRouteClear(preferred, obstacles)) return preferred;
   }
 
   const xs = dedupe([
@@ -138,7 +289,7 @@ export function findNavigationRoute(input: {
   const sourceIndex = pointIndex.get(`${source.x}:${source.y}`);
   const targetIndex = pointIndex.get(`${target.x}:${target.y}`);
   if (sourceIndex === undefined || targetIndex === undefined)
-    return [source, target];
+    return fallbackOrthogonalRoute(source, target);
 
   const neighbors: Array<Array<{ index: number; distance: number }>> =
     points.map(() => []);
@@ -197,7 +348,8 @@ export function findNavigationRoute(input: {
       queue.push({ index: neighbor.index, distance });
     }
   }
-  if (!Number.isFinite(distances[targetIndex])) return [source, target];
+  if (!Number.isFinite(distances[targetIndex]))
+    return fallbackOrthogonalRoute(source, target);
   const route: NavigationRoutePoint[] = [];
   for (let cursor = targetIndex; cursor >= 0; cursor = previous[cursor]) {
     route.push(points[cursor]);

@@ -151,7 +151,7 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 | `KNOWLEDGE_RECONCILE_INTERVAL_MS`    | `60000`                          | 模板项目周期协调间隔                                                       |
 | `KNOWLEDGE_BACKUP_INTERVAL_MS`       | `86400000`                       | SQLite 在线备份间隔                                                        |
 | `KNOWLEDGE_BACKUP_RETENTION_DAYS`    | `7`                              | 知识索引备份保留天数                                                       |
-| `NEXT_PUBLIC_AGENT_SERVICE_URL`      | 局域网或公网 URL                 | author-site/viewer-site 浏览器端访问 agent-service                         |
+| `NEXT_PUBLIC_AGENT_SERVICE_URL`      | 可选；未设置时按当前页面主机名推导 `:3201` | author-site/viewer-site 浏览器端访问 agent-service；只有跨主机/反向代理时才需显式设置 |
 | `NEXT_PUBLIC_SCREENSHOT_SERVICE_URL` | 局域网或公网 URL                 | author-site 浏览器端访问 screenshot-service                                |
 | `NEXT_PUBLIC_VIEWER_URL`             | 局域网或公网 URL                 | author-site 首页「浏览端」入口与分享弹窗使用的浏览端基址；未配置时按端口推导（3200→3300） |
 | `NEXT_PUBLIC_DATA_BASE`              | `/data` 或外部数据基址           | viewer-site 静态导出时的数据基址                                           |
@@ -172,7 +172,7 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 | ------------------------------------ | ----------------------------------------------------------------- | --------------------------------------------------- |
 | `NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES` | `xjjj/,jojo/`                                                     | 前端模型白名单                                      |
 | `APP_DATA_DIR`                       | `/opt/workbench/data`                                             | 宿主机持久数据目录，绑定到容器 `/app/data`          |
-| `NEXT_PUBLIC_AGENT_SERVICE_URL`      | `http://10.130.33.131:3201`                                       | **局域网 IP**，浏览器端使用                         |
+| `NEXT_PUBLIC_AGENT_SERVICE_URL`      | （留空）                                                        | Docker Compose 默认不注入；浏览器按当前页面的主机名自动推导 `:3201`。跨主机/反向代理部署时再显式填写可访问 URL |
 | `NEXT_PUBLIC_SCREENSHOT_SERVICE_URL` | `http://10.130.33.131:3202`                                       | **局域网 IP**，浏览器端使用                         |
 | `NEXT_PUBLIC_VIEWER_URL`             | `http://10.130.33.131:3300`                                       | **局域网 IP**，浏览器端访问浏览端                     |
 | `NEXT_PUBLIC_DATA_BASE`              | `/data`                                                           | viewer-site 静态导出的数据基址                      |
@@ -189,7 +189,7 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 
 ### 3.3 局域网访问关键点
 
-- `NEXT_PUBLIC_*` 变量必须使用**服务器局域网 IP**，因为是浏览器直接访问的地址
+- `NEXT_PUBLIC_*` 中的跨服务浏览器地址在同主机部署时可留空，由前端按当前页面主机名自动推导；跨主机或反向代理部署时必须使用浏览器可访问的服务器 URL
 - `AGENT_SERVICE_URL` 使用**容器内部 DNS 名称**（Docker 网络内可解析）
 - `SCREENSHOT_SERVICE_URL` 在容器内使用 `http://screenshot-service:3202`
 - `INTERNAL_API_TOKEN` 必须在 author-site 和 agent-service 中保持同一个非空值，否则管理后台保存的后端供应商配置只能写入数据库，无法同步到 agent-service 运行时。

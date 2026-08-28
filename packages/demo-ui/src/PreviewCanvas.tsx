@@ -21,7 +21,6 @@ import {
   Combine,
   Maximize2,
   MessageSquarePlus,
-  SlidersHorizontal,
   Trash2,
 } from "lucide-react";
 import {
@@ -63,7 +62,7 @@ import {
 import { cn } from "./utils";
 import { extractHtmlImportFromClipboard } from "./html-import-clipboard";
 import {
-  findNavigationRoute,
+  buildNavigationConnectorRoute,
   toRoundedNavigationPath,
   type NavigationRouteRect,
 } from "./canvas-navigation-routing";
@@ -224,26 +223,6 @@ function NavigationConnectionsLayer({
       x: source.x + (hotspot.rect.x + hotspot.rect.width / 2) * source.width,
       y: source.y + (hotspot.rect.y + hotspot.rect.height / 2) * source.height,
     };
-    const targetCenter = {
-      x: target.x + target.width / 2,
-      y: target.y + target.height / 2,
-    };
-    const dx = targetCenter.x - sourceCenter.x;
-    const dy = targetCenter.y - sourceCenter.y;
-    const sourcePoint =
-      Math.abs(dx) > Math.abs(dy)
-        ? { x: dx >= 0 ? source.x + source.width : source.x, y: sourceCenter.y }
-        : {
-            x: sourceCenter.x,
-            y: dy >= 0 ? source.y + source.height : source.y,
-          };
-    const targetPoint =
-      Math.abs(dx) > Math.abs(dy)
-        ? { x: dx >= 0 ? target.x : target.x + target.width, y: targetCenter.y }
-        : {
-            x: targetCenter.x,
-            y: dy >= 0 ? target.y : target.y + target.height,
-          };
     const active =
       hoveredPageId === connection.source.pageId ||
       hoveredPageId === connection.target.pageId;
@@ -262,11 +241,11 @@ function NavigationConnectionsLayer({
           rect.height === target.height + 32
         ),
     );
-    const route = findNavigationRoute({
-      source: sourcePoint,
-      target: targetPoint,
+    const route = buildNavigationConnectorRoute({
+      sourceRect: source,
+      targetRect: target,
+      sourceAnchor: sourceCenter,
       obstacles: routeObstacles,
-      forceOrthogonalBends: true,
     });
     return [{ connection, route, active }];
   });
@@ -3965,70 +3944,63 @@ export function PreviewCanvas({
             className="absolute z-30 flex w-max max-w-[calc(100vw-1rem)] items-center gap-1 overflow-x-auto whitespace-nowrap rounded-lg border bg-background/95 p-1 shadow-lg backdrop-blur"
             style={selectedSectionToolbarStyle}
           >
-            <input
-              type="color"
-              aria-label="Section 填充色"
-              value={selectedSection.style?.fill ?? "#eff6ff"}
-              className="h-8 w-8 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
-              onChange={(event) =>
-                handleSectionStyleChange(selectedSection.id, {
-                  ...selectedSection.style,
-                  fill: event.target.value,
-                })
-              }
-            />
-            <input
-              type="color"
-              aria-label="Section 边框色"
-              value={selectedSection.style?.stroke ?? "#94a3b8"}
-              className="h-8 w-8 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
-              onChange={(event) =>
-                handleSectionStyleChange(selectedSection.id, {
-                  ...selectedSection.style,
-                  stroke: event.target.value,
-                })
-              }
-            />
-            <input
-              type="color"
-              aria-label="Section 标题颜色"
-              value={selectedSection.style?.titleColor ?? "#334155"}
-              className="h-8 w-8 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
-              onChange={(event) =>
-                handleSectionStyleChange(selectedSection.id, {
-                  ...selectedSection.style,
-                  titleColor: event.target.value,
-                })
-              }
-            />
-            <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
             <Popover>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <PopoverTrigger asChild>
                     <button
                       type="button"
-                      aria-label="Section 样式设置"
-                      className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <SlidersHorizontal className="h-4 w-4" />
-                    </button>
+                      aria-label="Section 颜色与透明度"
+                      className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md p-1 transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      style={{
+                        backgroundColor:
+                          selectedSection.style?.color ?? "#94a3b8",
+                      }}
+                    />
                   </PopoverTrigger>
                 </TooltipTrigger>
-                <TooltipContent side="top">样式设置</TooltipContent>
+                <TooltipContent side="top">颜色与透明度</TooltipContent>
               </Tooltip>
-              <PopoverContent align="center" side="top" className="w-56 space-y-3 p-3">
-                <label className="grid grid-cols-[4.5rem_1fr] items-center gap-3 text-xs">
-                  边框宽度
-                  <input type="range" min="0" max="8" step="1" aria-label="Section 边框宽度" value={selectedSection.style?.strokeWidth ?? 1} onChange={(event) => handleSectionStyleChange(selectedSection.id, { ...selectedSection.style, strokeWidth: Number(event.target.value) })} />
+              <PopoverContent
+                align="center"
+                side="top"
+                sideOffset={8}
+                className="w-64 space-y-4 p-3"
+              >
+                <label className="flex items-center justify-between gap-4 text-sm font-medium">
+                  颜色
+                  <input
+                    type="color"
+                    aria-label="Section 颜色"
+                    value={selectedSection.style?.color ?? "#94a3b8"}
+                    className="h-9 w-12 cursor-pointer rounded border border-input bg-transparent p-0.5"
+                    onChange={(event) =>
+                      handleSectionStyleChange(selectedSection.id, {
+                        ...selectedSection.style,
+                        color: event.target.value,
+                      })
+                    }
+                  />
                 </label>
-                <label className="grid grid-cols-[4.5rem_1fr] items-center gap-3 text-xs">
-                  不透明度
-                  <input type="range" min="0.1" max="1" step="0.1" aria-label="Section 不透明度" value={selectedSection.style?.opacity ?? 1} onChange={(event) => handleSectionStyleChange(selectedSection.id, { ...selectedSection.style, opacity: Number(event.target.value) })} />
-                </label>
-                <label className="grid grid-cols-[4.5rem_1fr] items-center gap-3 text-xs">
-                  圆角
-                  <input type="range" min="0" max="32" step="1" aria-label="Section 圆角" value={selectedSection.style?.cornerRadius ?? 10} onChange={(event) => handleSectionStyleChange(selectedSection.id, { ...selectedSection.style, cornerRadius: Number(event.target.value) })} />
+                <label className="grid gap-2 text-sm font-medium">
+                  <span className="flex items-center justify-between">
+                    填充透明度
+                    <output className="text-muted-foreground">{selectedSection.style?.fillOpacity ?? 12}%</output>
+                  </span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="5"
+                    aria-label="Section 填充透明度"
+                    value={selectedSection.style?.fillOpacity ?? 12}
+                    onChange={(event) =>
+                      handleSectionStyleChange(selectedSection.id, {
+                        ...selectedSection.style,
+                        fillOpacity: Number(event.target.value),
+                      })
+                    }
+                  />
                 </label>
               </PopoverContent>
             </Popover>

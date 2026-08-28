@@ -1,6 +1,9 @@
 FROM node:24-bookworm-slim AS builder
 
 ARG DEBIAN_MIRROR=
+ARG HTTP_PROXY=
+ARG HTTPS_PROXY=
+ENV http_proxy=$HTTP_PROXY https_proxy=$HTTPS_PROXY
 
 RUN if [ -n "$DEBIAN_MIRROR" ]; then \
       find /etc/apt -type f \( -name 'sources.list' -o -name '*.sources' \) -print0 \
