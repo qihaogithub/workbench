@@ -102,18 +102,19 @@ export function FieldRenderer({
     field.uiWidget === "image" ||
     field.uiWidget === "imageList" ||
     field.format === "image" ||
-    field.format === "file";
+    field.format === "file" ||
+    field.format === "video";
 
   const renderInput = () => {
-    if (field.uiWidget === "file" || field.uiWidget === "image") {
+    if (field.uiWidget === "file" || field.uiWidget === "image" || field.format === "video") {
       return (
         <FileUploadWidget
-          value={value as string}
+          value={value as any}
           onChange={onChange}
           label={field.title}
           required={field.required}
           sessionId={sessionId}
-          options={field.uiOptions as any}
+          options={{ ...(field.uiOptions as any), ...(field.format === "video" ? { mediaType: "video", accept: field.uiOptions?.accept || "video/mp4,video/webm" } : {}) }}
           defaultValue={
             typeof field.default === "string" ? field.default : undefined
           }

@@ -9,10 +9,10 @@ import {
   ZoomOut,
   Maximize,
   Hand,
+  LayoutPanelTop,
   MousePointer2,
   LayoutGrid,
   Route,
-  Square,
 } from "lucide-react";
 import {
   Tooltip,
@@ -152,38 +152,6 @@ export function CanvasToolbar({
                   </button>
                 </ToolbarTooltip>
               )}
-              {isEditorMode && (
-                <ToolbarTooltip label="绘制 Section（Shift + S）">
-                  <button
-                    type="button"
-                    onClick={() => onToolModeChange("section")}
-                    className={cn(
-                      toolbarToggleButtonClass,
-                      toolMode === "section" && activeToggleButtonClass,
-                    )}
-                    aria-label="Section 工具"
-                    aria-pressed={toolMode === "section"}
-                  >
-                    <Square className="h-4 w-4" />
-                  </button>
-                </ToolbarTooltip>
-              )}
-              {isEditorMode && (
-                <ToolbarTooltip label="绘制页面跳转热区">
-                  <button
-                    type="button"
-                    onClick={() => onToolModeChange("navigation")}
-                    className={cn(
-                      toolbarToggleButtonClass,
-                      toolMode === "navigation" && activeToggleButtonClass,
-                    )}
-                    aria-label="连线工具"
-                    aria-pressed={toolMode === "navigation"}
-                  >
-                    <Route className="h-4 w-4" />
-                  </button>
-                </ToolbarTooltip>
-              )}
             </div>
           </ToolbarGroup>
         )}
@@ -251,6 +219,34 @@ export function CanvasToolbar({
                 />
               </>
             )}
+            <ToolbarTooltip label="绘制 Section（Shift + S）">
+              <button
+                type="button"
+                onClick={() => onToolModeChange?.("section")}
+                className={cn(
+                  toolbarButtonClass,
+                  toolMode === "section" && activeToolbarButtonClass,
+                )}
+                aria-label="Section 工具"
+                aria-pressed={toolMode === "section"}
+              >
+                <LayoutPanelTop className="h-4 w-4" />
+              </button>
+            </ToolbarTooltip>
+            <ToolbarTooltip label="绘制页面跳转热区">
+              <button
+                type="button"
+                onClick={() => onToolModeChange?.("navigation")}
+                className={cn(
+                  toolbarButtonClass,
+                  toolMode === "navigation" && activeToolbarButtonClass,
+                )}
+                aria-label="连线工具"
+                aria-pressed={toolMode === "navigation"}
+              >
+                <Route className="h-4 w-4" />
+              </button>
+            </ToolbarTooltip>
           </ToolbarGroup>
         )}
 

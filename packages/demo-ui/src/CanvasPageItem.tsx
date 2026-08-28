@@ -11,6 +11,12 @@ import React, {
 import { createPortal } from "react-dom";
 import { Trash2, Lock, ExternalLink, Unlink } from "lucide-react";
 import { CanvasSelectionBox } from "./CanvasSelectionBox";
+import {
+  CanvasResizeHandles,
+  detectCanvasResizeEdge,
+  getCanvasResizeHandleFromTarget,
+  RESIZE_CURSOR_BY_EDGE,
+} from "./CanvasResizeHandles";
 import { resolveCanvasTitleMetrics } from "./canvas-utils";
 import {
   getCanvasPreviewSizeKey,
@@ -33,6 +39,7 @@ import type {
   ScreenshotRenderBox,
   CanvasNavigationHotspot,
   CanvasNavigationConnection,
+  ResizeEdge,
 } from "./types";
 
 const SketchPagePreview = lazy(() =>
@@ -40,8 +47,6 @@ const SketchPagePreview = lazy(() =>
     default: module.SketchPagePreview,
   })),
 );
-
-type ResizeEdge = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
 interface CanvasPageItemProps {
   page: CanvasPageData;
@@ -84,6 +89,14 @@ interface CanvasPageItemProps {
     pageId: string,
     rect: CanvasNavigationHotspot["rect"],
     targetPageId: string,
+    kind: CanvasNavigationHotspot["kind"],
+  ) => void;
+  /** 当前有来自其他页面、等待直接点选目标的新连线。 */
+  navigationTargetPending?: boolean;
+  onNavigationTargetSelect?: (pageId: string) => void;
+  onNavigationDraftChange?: (
+    pageId: string,
+    draft: Pick<CanvasNavigationHotspot, "kind" | "rect"> | null,
   ) => void;
   onUpdateNavigationHotspot?: (
     hotspotId: string,
@@ -129,65 +142,6 @@ function parsePreviewSizeValue(
     }
   }
   return fallback;
-}
-
-const EDGE_CURSORS: Record<ResizeEdge, string> = {
-  n: "ns-resize",
-  s: "ns-resize",
-  e: "ew-resize",
-  w: "ew-resize",
-  ne: "nesw-resize",
-  nw: "nwse-resize",
-  se: "nwse-resize",
-  sw: "nesw-resize",
-};
-
-function isResizeEdge(value: string | null | undefined): value is ResizeEdge {
-  return (
-    value === "n" ||
-    value === "s" ||
-    value === "e" ||
-    value === "w" ||
-    value === "ne" ||
-    value === "nw" ||
-    value === "se" ||
-    value === "sw"
-  );
-}
-
-// 根据鼠标在页面元素上的位置判断缩放方向
-function detectResizeEdge(
-  localX: number,
-  localY: number,
-  width: number,
-  height: number,
-): ResizeEdge | null {
-  const nearLeft = localX < EDGE_HIT_SIZE;
-  const nearRight = localX > width - EDGE_HIT_SIZE;
-  const nearTop = localY < EDGE_HIT_SIZE;
-  const nearBottom = localY > height - EDGE_HIT_SIZE;
-
-  if (!nearLeft && !nearRight && !nearTop && !nearBottom) return null;
-
-  // 角点判定
-  const inCornerZone =
-    (localX < CORNER_HIT_SIZE || localX > width - CORNER_HIT_SIZE) &&
-    (localY < CORNER_HIT_SIZE || localY > height - CORNER_HIT_SIZE);
-
-  if (inCornerZone) {
-    if (nearTop && nearLeft) return "nw";
-    if (nearTop && nearRight) return "ne";
-    if (nearBottom && nearLeft) return "sw";
-    if (nearBottom && nearRight) return "se";
-  }
-
-  // 边条判定
-  if (nearTop) return "n";
-  if (nearBottom) return "s";
-  if (nearLeft) return "w";
-  if (nearRight) return "e";
-
-  return null;
 }
 
 function computeResizeLayout(
@@ -614,6 +568,9 @@ export function CanvasPageItem({
   navigationActive = false,
   showNavigationHotspots = false,
   onCreateNavigation,
+  navigationTargetPending = false,
+  onNavigationTargetSelect,
+  onNavigationDraftChange,
   onUpdateNavigationHotspot,
   onUpdateNavigationTarget,
   onDeleteNavigationHotspot,
@@ -671,7 +628,11 @@ export function CanvasPageItem({
       const rect = el.getBoundingClientRect();
       const localX = e.clientX - rect.left;
       const localY = e.clientY - rect.top;
-      const edge = detectResizeEdge(localX, localY, rect.width, rect.height);
+      const edge = detectCanvasResizeEdge(localX, localY, rect.width, rect.height, {
+        handles: "all",
+        edgeHitSize: EDGE_HIT_SIZE,
+        cornerHitSize: CORNER_HIT_SIZE,
+      });
       setHoveredEdge(edge);
     },
     [canInteract, isDragging, isResizing],
@@ -682,6 +643,12 @@ export function CanvasPageItem({
       // 始终记录起始位置，用于点击检测
       startPosRef.current = { x: e.clientX, y: e.clientY };
 
+      if (navigationTargetPending && e.button === 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        onNavigationTargetSelect?.(page.id);
+        return;
+      }
       if (!canInteract) {
         // hand 模式下事件被 viewport capture phase 拦截，不会到达这里
         // 但保留安全检查
@@ -694,16 +661,14 @@ export function CanvasPageItem({
       // 如果点在边框/角点热区，启动缩放而非拖拽
       const el = containerRef.current;
       if (el) {
-        const handleEl = target.closest("[data-resize-handle]");
-        const handleEdge = el.contains(handleEl)
-          ? handleEl?.getAttribute("data-resize-handle")
-          : null;
         const rect = el.getBoundingClientRect();
         const localX = e.clientX - rect.left;
         const localY = e.clientY - rect.top;
-        const edge = isResizeEdge(handleEdge)
-          ? handleEdge
-          : detectResizeEdge(localX, localY, rect.width, rect.height);
+        const edge = getCanvasResizeHandleFromTarget(target, el) ?? detectCanvasResizeEdge(localX, localY, rect.width, rect.height, {
+          handles: "all",
+          edgeHitSize: EDGE_HIT_SIZE,
+          cornerHitSize: CORNER_HIT_SIZE,
+        });
         if (edge) {
           e.stopPropagation();
           e.preventDefault();
@@ -734,7 +699,7 @@ export function CanvasPageItem({
       layoutStartRef.current = { ...layoutRef.current };
       onDragStart?.(page.id, { copy: e.altKey });
     },
-    [canInteract, page.id, onConfigEdit, onDragStart],
+    [canInteract, navigationTargetPending, onConfigEdit, onDragStart, onNavigationTargetSelect, page.id],
   );
 
   const handleDragPointerMove = useCallback(
@@ -830,28 +795,14 @@ export function CanvasPageItem({
     onDragEnd?.();
   }, [onDragEnd]);
 
-  if (!visible) {
-    return (
-      <div
-        style={{
-          position: "absolute",
-          left: layout.x,
-          top: layout.y,
-          width: layout.width,
-          height: layout.height,
-          backgroundColor: "transparent",
-          pointerEvents: "none",
-        }}
-      />
-    );
-  }
-
   // 当前 cursor
   const activeCursor =
-    isResizing && EDGE_CURSORS[isResizing]
-      ? EDGE_CURSORS[isResizing]
-      : hoveredEdge && EDGE_CURSORS[hoveredEdge]
-        ? EDGE_CURSORS[hoveredEdge]
+    navigationTargetPending
+      ? "crosshair"
+      : isResizing && RESIZE_CURSOR_BY_EDGE[isResizing]
+      ? RESIZE_CURSOR_BY_EDGE[isResizing]
+      : hoveredEdge && RESIZE_CURSOR_BY_EDGE[hoveredEdge]
+        ? RESIZE_CURSOR_BY_EDGE[hoveredEdge]
         : canInteract && !isDragging
           ? "move"
           : toolMode === "hand" && editable && !isEditing
@@ -880,12 +831,29 @@ export function CanvasPageItem({
     }
   }, [cancelTitleEdit, onRename, page.id, page.name, titleDraft]);
 
+  if (!visible) {
+    return (
+      <div
+        style={{
+          position: "absolute",
+          left: layout.x,
+          top: layout.y,
+          width: layout.width,
+          height: layout.height,
+          backgroundColor: "transparent",
+          pointerEvents: "none",
+        }}
+      />
+    );
+  }
+
   return (
     <div
       ref={containerRef}
       data-page-id={page.id}
       className={cn(
         "absolute rounded-lg transition-shadow duration-200 select-none",
+        navigationTargetPending && "ring-2 ring-primary shadow-[0_0_0_4px_rgba(59,130,246,0.2)]",
         isEditing &&
           "ring-2 ring-white shadow-[0_0_0_1px_rgba(15,23,42,0.35),0_14px_34px_rgba(15,23,42,0.28)]",
       )}
@@ -996,9 +964,10 @@ export function CanvasPageItem({
         enabled={navigationActive}
         visible={showNavigationHotspots}
         editable={editable}
-        onCreate={(rect, targetPageId) =>
-          onCreateNavigation?.(page.id, rect, targetPageId)
+        onCreate={(rect, targetPageId, kind) =>
+          onCreateNavigation?.(page.id, rect, targetPageId, kind)
         }
+        onPendingTargetChange={(draft) => onNavigationDraftChange?.(page.id, draft)}
         onUpdateHotspot={onUpdateNavigationHotspot}
         onUpdateTarget={onUpdateNavigationTarget}
         onDeleteHotspot={onDeleteNavigationHotspot}
@@ -1033,80 +1002,10 @@ export function CanvasPageItem({
         handles={canInteract}
       />
 
-      {/* 边框热区 — 四条边 */}
-      {showEdgeHandles && (
-        <>
-          {/* 四角热区覆盖选中框外侧的可视化角点 */}
-          <div
-            data-resize-handle="nw"
-            className="absolute z-50"
-            style={{
-              left: -CORNER_HIT_SIZE / 2,
-              top: -CORNER_HIT_SIZE / 2,
-              width: CORNER_HIT_SIZE,
-              height: CORNER_HIT_SIZE,
-              cursor: "nwse-resize",
-            }}
-          />
-          <div
-            data-resize-handle="ne"
-            className="absolute z-50"
-            style={{
-              right: -CORNER_HIT_SIZE / 2,
-              top: -CORNER_HIT_SIZE / 2,
-              width: CORNER_HIT_SIZE,
-              height: CORNER_HIT_SIZE,
-              cursor: "nesw-resize",
-            }}
-          />
-          <div
-            data-resize-handle="sw"
-            className="absolute z-50"
-            style={{
-              left: -CORNER_HIT_SIZE / 2,
-              bottom: -CORNER_HIT_SIZE / 2,
-              width: CORNER_HIT_SIZE,
-              height: CORNER_HIT_SIZE,
-              cursor: "nesw-resize",
-            }}
-          />
-          <div
-            data-resize-handle="se"
-            className="absolute z-50"
-            style={{
-              right: -CORNER_HIT_SIZE / 2,
-              bottom: -CORNER_HIT_SIZE / 2,
-              width: CORNER_HIT_SIZE,
-              height: CORNER_HIT_SIZE,
-              cursor: "nwse-resize",
-            }}
-          />
-          {/* 上边 */}
-          <div
-            data-resize-handle="n"
-            className="absolute top-0 left-0 right-0 z-20"
-            style={{ height: EDGE_HIT_SIZE, cursor: "ns-resize" }}
-          />
-          {/* 下边 */}
-          <div
-            data-resize-handle="s"
-            className="absolute bottom-0 left-0 right-0 z-20"
-            style={{ height: EDGE_HIT_SIZE, cursor: "ns-resize" }}
-          />
-          {/* 左边 */}
-          <div
-            data-resize-handle="w"
-            className="absolute top-0 left-0 bottom-0 z-20"
-            style={{ width: EDGE_HIT_SIZE, cursor: "ew-resize" }}
-          />
-          {/* 右边 */}
-          <div
-            data-resize-handle="e"
-            className="absolute top-0 right-0 bottom-0 z-20"
-            style={{ width: EDGE_HIT_SIZE, cursor: "ew-resize" }}
-          />
-        </>
-      )}
+      <CanvasResizeHandles
+        visible={showEdgeHandles}
+        options={{ handles: "all", edgeHitSize: EDGE_HIT_SIZE, cornerHitSize: CORNER_HIT_SIZE }}
+      />
 
       {/* 右键菜单 */}
       {contextMenu &&

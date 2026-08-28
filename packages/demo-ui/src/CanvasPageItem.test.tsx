@@ -110,6 +110,31 @@ describe("CanvasPageItem context menu", () => {
   );
 });
 
+describe("CanvasPageItem navigation targets", () => {
+  it("directly selects this page as a pending navigation target instead of dragging it", () => {
+    const onNavigationTargetSelect = vi.fn();
+    const onDragStart = vi.fn();
+    const { container } = render(
+      <CanvasPageItem
+        page={{ id: "target", name: "目标页", order: 1 }}
+        layout={{ x: 0, y: 0, width: 375, height: 812 }}
+        editable
+        renderMode="loading"
+        toolMode="navigation"
+        navigationTargetPending
+        onNavigationTargetSelect={onNavigationTargetSelect}
+        onDragStart={onDragStart}
+      />,
+    );
+    fireEvent(
+      container.querySelector("[data-page-id='target']")!,
+      new MouseEvent("pointerdown", { bubbles: true, button: 0 }),
+    );
+    expect(onNavigationTargetSelect).toHaveBeenCalledWith("target");
+    expect(onDragStart).not.toHaveBeenCalled();
+  });
+});
+
 describe("CanvasPageItem title editing", () => {
   it("双击标题重命名且不启动页面拖拽", async () => {
     const onRename = vi.fn().mockResolvedValue(true);
@@ -175,6 +200,75 @@ describe("CanvasPageItem title editing", () => {
     await waitFor(() =>
       expect(onRename).toHaveBeenCalledWith("page-1", "失焦名称"),
     );
+  });
+});
+
+describe("CanvasPageItem proportional resize", () => {
+  it("exposes all resize handles while preserving the page aspect ratio", () => {
+    const onLayoutChange = vi.fn();
+    const { container } = render(
+      <CanvasPageItem
+        page={{ id: "page-1", name: "页面一", order: 0, previewSize: { width: 375, height: 812 } }}
+        layout={{ x: 100, y: 120, width: 375, height: 812 }}
+        editable
+        selected
+        renderMode="loading"
+        toolMode="select"
+        onLayoutChange={onLayoutChange}
+      />,
+    );
+
+    expect(container.querySelectorAll("[data-canvas-resize-handle]")).toHaveLength(8);
+    expect(container.querySelector('[data-canvas-resize-handle="nw"]')).toHaveStyle({ cursor: "nwse-resize" });
+    expect(container.querySelector('[data-canvas-resize-handle="n"]')).toHaveStyle({ cursor: "ns-resize" });
+    expect(container.querySelector('[data-canvas-resize-handle="e"]')).toHaveStyle({ cursor: "ew-resize" });
+
+    const southEast = container.querySelector('[data-canvas-resize-handle="se"]') as HTMLElement;
+    const page = container.querySelector('[data-page-id="page-1"]') as HTMLElement;
+    fireEvent(southEast, new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 0, clientY: 0 }));
+    fireEvent(page, new MouseEvent("pointermove", { bubbles: true, clientX: 40, clientY: 10 }));
+
+    const resized = onLayoutChange.mock.calls.at(-1)?.[1];
+    expect(resized.width / resized.height).toBeCloseTo(375 / 812);
+
+    fireEvent(page, new MouseEvent("pointerup", { bubbles: true, clientX: 40, clientY: 10 }));
+
+    const east = container.querySelector('[data-canvas-resize-handle="e"]') as HTMLElement;
+    fireEvent(east, new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 0, clientY: 0 }));
+    fireEvent(page, new MouseEvent("pointermove", { bubbles: true, clientX: 40, clientY: 10 }));
+
+    const edgeResized = onLayoutChange.mock.calls.at(-1)?.[1];
+    expect(edgeResized.width / edgeResized.height).toBeCloseTo(375 / 812);
+  });
+});
+
+describe("CanvasPageItem visibility", () => {
+  it("can change from hidden to visible without changing its Hook order", () => {
+    const page = { id: "page-visibility", name: "可见性页面", order: 0 };
+    const layout = { x: 0, y: 0, width: 375, height: 812 };
+    const { rerender } = render(
+      <CanvasPageItem
+        page={page}
+        layout={layout}
+        editable
+        visible={false}
+        renderMode="loading"
+        toolMode="select"
+      />,
+    );
+
+    expect(() =>
+      rerender(
+        <CanvasPageItem
+          page={page}
+          layout={layout}
+          editable
+          visible
+          renderMode="loading"
+          toolMode="select"
+        />,
+      ),
+    ).not.toThrow();
   });
 });
 

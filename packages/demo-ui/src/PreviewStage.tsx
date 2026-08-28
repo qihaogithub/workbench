@@ -95,14 +95,14 @@ export function PreviewStage({
     onSinglePagePrevious,
     previewMode,
   ]);
-  const createSingleNavigation = (pageId: string, rect: { x: number; y: number; width: number; height: number }, targetPageId: string) => {
+  const createSingleNavigation = (pageId: string, rect: { x: number; y: number; width: number; height: number }, targetPageId: string, kind: "area" | "point") => {
     const timestamp = Date.now();
     const hotspotId = `navigation_hotspot_${timestamp}_${Math.random().toString(36).slice(2, 8)}`;
     const connectionId = `navigation_connection_${timestamp}_${Math.random().toString(36).slice(2, 8)}`;
     onCanvasStateChange({
       ...canvasState,
       navigation: {
-        hotspots: { ...(canvasState.navigation?.hotspots ?? {}), [hotspotId]: { id: hotspotId, pageId, rect, createdAt: timestamp, updatedAt: timestamp } },
+        hotspots: { ...(canvasState.navigation?.hotspots ?? {}), [hotspotId]: { id: hotspotId, pageId, kind, rect, createdAt: timestamp, updatedAt: timestamp } },
         connections: { ...(canvasState.navigation?.connections ?? {}), [connectionId]: { id: connectionId, source: { pageId, hotspotId }, target: { pageId: targetPageId }, createdAt: timestamp, updatedAt: timestamp } },
       },
     });

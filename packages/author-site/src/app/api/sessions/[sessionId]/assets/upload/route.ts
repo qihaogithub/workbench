@@ -21,6 +21,7 @@ const ALLOWED_MIME_TYPES = [
   "image/webp",
   "image/svg+xml",
 ];
+const ALLOWED_VIDEO_MIME_TYPES = ["video/mp4", "video/webm"];
 
 const ALLOWED_EXTENSIONS = new Set([
   ".jpg",
@@ -36,9 +37,12 @@ const ALLOWED_EXTENSIONS = new Set([
   ".skel",
   ".atlas",
   ".zip",
+  ".mp4",
+  ".webm",
 ]);
 
 const DEFAULT_MAX_SIZE = 50 * 1024 * 1024; // 50MB
+export const MAX_VIDEO_SIZE = 200 * 1024 * 1024; // 200MB
 
 const OCTET_STREAM_EXTENSIONS = new Set([".svga", ".lottie", ".riv", ".skel", ".atlas"]);
 
@@ -56,14 +60,35 @@ function getFileExtension(filename: string): string {
   return filename.slice(dotIndex).toLowerCase();
 }
 
-function isAllowedAssetFile(file: File): boolean {
+function hasAllowedAssetExtension(filename: string): boolean {
+  return ALLOWED_EXTENSIONS.has(getFileExtension(filename));
+}
+
+function hasExpectedVideoContainer(buffer: Buffer, extension: string): boolean {
+  if (extension === ".mp4") {
+    return buffer.length >= 8 && buffer.subarray(4, 8).toString("ascii") === "ftyp";
+  }
+  if (extension === ".webm") {
+    return buffer.length >= 4 && buffer.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]));
+  }
+  return false;
+}
+
+export function isAllowedAssetFile(file: File, buffer?: Buffer): boolean {
   const ext = getFileExtension(file.name);
-  if (!ALLOWED_EXTENSIONS.has(ext)) return false;
+  if (!hasAllowedAssetExtension(file.name)) return false;
   if (ext === ".json") {
     return file.type === "" || file.type === "application/json";
   }
   if (ext === ".zip") {
     return ZIP_MIME_TYPES.has(file.type);
+  }
+  if (ext === ".mp4" || ext === ".webm") {
+    // Some browsers provide an empty or generic MIME for valid local videos.
+    // The container signature, when available, is authoritative for video uploads.
+    return buffer
+      ? hasExpectedVideoContainer(buffer, ext)
+      : ALLOWED_VIDEO_MIME_TYPES.includes(file.type);
   }
   if (OCTET_STREAM_EXTENSIONS.has(ext)) {
     return file.type === "" || file.type === "application/octet-stream";
@@ -171,16 +196,18 @@ export async function POST(
       );
     }
 
-    if (!isAllowedAssetFile(file)) {
+    if (!hasAllowedAssetExtension(file.name)) {
       return NextResponse.json(
         createApiError("INVALID_FILE_TYPE", `不支持的文件类型: ${file.type}`),
         { status: 400 },
       );
     }
 
-    if (file.size > DEFAULT_MAX_SIZE) {
+    const ext = getFileExtension(file.name);
+    const maxSize = ext === ".mp4" || ext === ".webm" ? MAX_VIDEO_SIZE : DEFAULT_MAX_SIZE;
+    if (file.size > maxSize) {
       return NextResponse.json(
-        createApiError("FILE_TOO_LARGE", `文件大小超过 ${DEFAULT_MAX_SIZE / 1024 / 1024}MB 限制`),
+        createApiError("FILE_TOO_LARGE", `文件大小超过 ${maxSize / 1024 / 1024}MB 限制`),
         { status: 413 },
       );
     }
@@ -188,7 +215,26 @@ export async function POST(
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    const ext = getFileExtension(file.name);
+    if (!isAllowedAssetFile(file, buffer)) {
+      return NextResponse.json(
+        createApiError("INVALID_FILE_TYPE", `不支持的文件类型或文件内容: ${file.type || "未提供 MIME"}`),
+        { status: 400 },
+      );
+    }
+
+    if (ext === ".mp4" || ext === ".webm") {
+      const workspacePath = getSessionWorkspacePath(sessionId);
+      if (!workspacePath) {
+        return NextResponse.json(createApiError("SESSION_NOT_FOUND", "会话工作区不存在"), { status: 404 });
+      }
+      const stamp = Date.now().toString(36);
+      const destDir = path.join(workspacePath, "assets", "videos", stamp);
+      fs.mkdirSync(destDir, { recursive: true });
+      const filename = path.basename(file.name);
+      fs.writeFileSync(path.join(destDir, filename), buffer);
+      const url = `/api/sessions/${sessionId}/workspace/assets/videos/${stamp}/${filename}`;
+      return NextResponse.json(createApiSuccess({ url, filename, size: file.size, mimeType: file.type }));
+    }
 
     if (ext === ".zip") {
       const workspacePath = getSessionWorkspacePath(sessionId);

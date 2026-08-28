@@ -1191,7 +1191,7 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
     const { container } = render(<TestEditorCanvas />);
     const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
 
-    fireEvent.click(screen.getByLabelText("添加文字"));
+    fireEvent.keyDown(window, { key: "t" });
     expect(Object.values(getCanvasState().nodes ?? {})).toHaveLength(0);
     fireEvent.pointerDown(root, {
       button: 0,
@@ -1205,25 +1205,7 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
       pointerId: 4,
     });
 
-    await waitFor(() => {
-      const nodes = Object.values(getCanvasState().nodes ?? {});
-      expect(nodes).toHaveLength(1);
-      expect(nodes[0]).toMatchObject({
-        kind: "text",
-        title: "文字",
-        text: "",
-        fontSize: 18,
-        color: "#ffffff",
-        autoWidth: true,
-        layout: {
-          x: 520,
-          y: 400,
-          width: 18,
-          height: 25,
-        },
-      });
-      expect(nodes[0]).not.toHaveProperty("backgroundColor");
-    });
+    expect(Object.values(getCanvasState().nodes ?? {})).toHaveLength(0);
     expect(screen.getByLabelText("编辑文字")).toHaveFocus();
     expect(screen.getByLabelText("文字属性")).toBeInTheDocument();
     expect(screen.getByLabelText("编辑文字")).not.toHaveAttribute("placeholder");
@@ -1239,9 +1221,86 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
         kind: "text",
         title: "hello world",
         text: "hello world",
+        color: "#ffffff",
+        autoWidth: true,
+        textAlign: "left",
+        fontWeight: 400,
+        lineHeight: 1.5,
+        stylePreset: "body",
+        layout: { x: 520, y: 400 },
       });
       expect(nodes[0].layout.width).toBeGreaterThan(18);
-      expect(nodes[0].layout.height).toBe(25);
+      expect(nodes[0].layout.height).toBe(27);
+      expect(nodes[0]).not.toHaveProperty("backgroundColor");
+    });
+  });
+
+  it("空白文字草稿可通过 Escape 取消且不会持久化", async () => {
+    const { container } = render(<TestEditorCanvas />);
+    const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
+
+    fireEvent.click(screen.getByLabelText("添加文字"));
+    fireEvent.pointerDown(root, { button: 0, clientX: 300, clientY: 240, pointerId: 94 });
+    fireEvent.pointerUp(root, { clientX: 300, clientY: 240, pointerId: 94 });
+    expect(screen.getByLabelText("编辑文字")).toBeInTheDocument();
+
+    fireEvent.keyDown(screen.getByLabelText("编辑文字"), { key: "Escape" });
+    await waitFor(() => {
+      expect(screen.queryByLabelText("编辑文字")).not.toBeInTheDocument();
+      expect(Object.values(getCanvasState().nodes ?? {})).toHaveLength(0);
+    });
+  });
+
+  it("拖拽文字工具创建固定宽度文本框", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<TestEditorCanvas />);
+    const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
+
+    fireEvent.keyDown(window, { key: "t" });
+    fireEvent.pointerDown(root, { button: 0, clientX: 300, clientY: 240, pointerId: 96 });
+    fireEvent.pointerMove(root, { clientX: 380, clientY: 290, pointerId: 96 });
+    fireEvent.pointerUp(root, { clientX: 380, clientY: 290, pointerId: 96 });
+    await user.keyboard("固定宽度");
+
+    await waitFor(() => {
+      const node = Object.values(getCanvasState().nodes ?? {})[0];
+      expect(node).toMatchObject({
+        kind: "text",
+        autoWidth: false,
+        layout: { x: 520, y: 400, width: 160, height: 27 },
+      });
+    });
+  });
+
+  it("文本编辑支持提交快捷键与节点级排版预设", async () => {
+    const { container } = render(<TestTextNodeEditorCanvas />);
+    const textNode = container.querySelector("[data-canvas-node-id='text_2']") as HTMLElement;
+
+    fireEvent.click(screen.getByLabelText("选择工具"));
+    fireEvent.pointerDown(textNode, { button: 0, clientX: 430, clientY: 110, pointerId: 95 });
+    fireEvent.pointerUp(textNode, { clientX: 430, clientY: 110, pointerId: 95 });
+    fireEvent.keyDown(window, { key: "Enter" });
+    expect(screen.getByLabelText("编辑文字")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("文字样式预设"));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "标题" }));
+    expect(screen.getByLabelText("文字样式预设")).toHaveTextContent("标题");
+    fireEvent.click(screen.getByLabelText("文字排版"));
+    fireEvent.click(screen.getByLabelText("居中对齐"));
+    fireEvent.click(screen.getByLabelText("颜色设置"));
+    expect(screen.getByLabelText("无背景")).toBeInTheDocument();
+    expect(screen.queryByLabelText("更多字体颜色")).not.toBeInTheDocument();
+    fireEvent.keyDown(screen.getByLabelText("编辑文字"), { key: "Enter", ctrlKey: true });
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText("编辑文字")).not.toBeInTheDocument();
+      expect(getCanvasState().nodes?.text_2).toMatchObject({
+        fontSize: 28,
+        fontWeight: 700,
+        lineHeight: 1.25,
+        textAlign: "center",
+        stylePreset: "heading",
+      });
     });
   });
   it("图片工具支持从本地选择图片并在目标位置创建图片节点", async () => {

@@ -64,6 +64,7 @@ export interface SinglePagePreviewProps {
     pageId: string,
     rect: CanvasNavigationHotspot["rect"],
     targetPageId: string,
+    kind: CanvasNavigationHotspot["kind"],
   ) => void;
   onUpdateNavigationHotspot?: (
     hotspotId: string,

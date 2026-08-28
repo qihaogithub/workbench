@@ -18,6 +18,7 @@ import type { ProjectReference } from "./chat/inline-tag-input";
 import type { StreamService } from "./chat/services/stream-service";
 import type { ActiveViewContext } from "./lib/active-view-context";
 import type { AgentMode, ViewerContext } from "@workbench/agent-client";
+import type { WorkspaceMutationReceipt } from "@workbench/shared/contracts";
 import { X, FileText, ArrowDown } from "lucide-react";
 
 export interface AutoRepairTrigger {
@@ -119,6 +120,8 @@ interface AIChatProps {
   onFilesChange?: (
     files: Array<{ path: string; action: "created" | "modified" | "deleted" }>,
   ) => void;
+  /** A durable live-Workspace commit observed while the agent is still running. */
+  onWorkspaceMutationCommitted?: (receipt: WorkspaceMutationReceipt) => void;
   externalMessages?: ChatMessage[];
   externalIsStreaming?: boolean;
   externalStreamContent?: string;
@@ -169,6 +172,7 @@ export function AIChat({
   onCodeUpdate,
   onSchemaUpdate,
   onFilesChange,
+  onWorkspaceMutationCommitted,
   externalMessages,
   externalIsStreaming,
   externalStreamContent,
@@ -279,6 +283,7 @@ export function AIChat({
     onCodeUpdate,
     onSchemaUpdate,
     onFilesChange,
+    onWorkspaceMutationCommitted,
     messagesRef,
     setMessages,
     setIsStreaming,

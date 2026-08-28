@@ -95,6 +95,8 @@ export function ColorPickerWidget(props: WidgetProps) {
 
 export interface FileUploadWidgetOptions {
   accept?: string;
+  mediaType?: "image" | "video";
+  videoPreviewStyle?: "controls" | "compact" | "cover";
   maxSize?: number;
   placeholder?: string;
   widthRule?: DimensionOptions["widthRule"];
@@ -107,10 +109,18 @@ export interface SpineBundle {
   texture: string;
 }
 
+export interface VideoValue {
+  url: string;
+  poster?: string;
+}
+
+const DEFAULT_IMAGE_FILE_MAX_SIZE = 50 * 1024 * 1024;
+const DEFAULT_VIDEO_FILE_MAX_SIZE = 200 * 1024 * 1024;
+
 export interface FileUploadWidgetProps {
   id?: string;
-  value?: string | SpineBundle;
-  onChange: (value: string | SpineBundle | undefined) => void;
+  value?: string | SpineBundle | VideoValue;
+  onChange: (value: string | SpineBundle | VideoValue | undefined) => void;
   label?: string;
   required?: boolean;
   disabled?: boolean;
@@ -136,6 +146,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const posterInputRef = useRef<HTMLInputElement>(null);
 
   const [sizeWarning, setSizeWarning] = useState<{
     file: File;
@@ -143,7 +154,9 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
   } | null>(null);
 
   const accept = rawOptions.accept || 'image/*';
-  const maxSize = rawOptions.maxSize || 50 * 1024 * 1024;
+  const isVideo = rawOptions.mediaType === 'video';
+  const videoPreviewStyle = rawOptions.videoPreviewStyle || 'controls';
+  const maxSize = rawOptions.maxSize ?? (isVideo ? DEFAULT_VIDEO_FILE_MAX_SIZE : DEFAULT_IMAGE_FILE_MAX_SIZE);
 
   const dimensionOptions: DimensionOptions = {
     widthRule: rawOptions.widthRule,
@@ -159,7 +172,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
         return;
       }
 
-      if (hasDimensionCheck && !skipDimensionCheck) {
+      if (hasDimensionCheck && !skipDimensionCheck && !isVideo) {
         try {
           const dims = await getImageDimensions(file);
           const result = validateImageDimensions(dims, dimensionOptions);
@@ -186,10 +199,12 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
             body: formData,
           });
 
-          const data = await res.json();
+          const data = res.headers.get('content-type')?.includes('application/json')
+            ? await res.json()
+            : null;
 
-          if (!data.success) {
-            setError(data.error?.message || '上传失败');
+          if (!res.ok || !data?.success) {
+            setError(data?.error?.message || `上传失败（HTTP ${res.status}）`);
             return;
           }
 
@@ -202,7 +217,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
             await deleteServerFile(sessionId, value);
           }
 
-          onChange(isBundle ? (data.data as SpineBundle) : data.data.url);
+          onChange(isVideo ? { url: data.data.url } : (isBundle ? (data.data as SpineBundle) : data.data.url));
         } else {
           const dataUrl = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
@@ -210,7 +225,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
             reader.onerror = () => reject(new Error('读取文件失败'));
             reader.readAsDataURL(file);
           });
-          onChange(dataUrl);
+          onChange(isVideo ? { url: dataUrl } : dataUrl);
         }
       } catch {
         setError('上传失败，请重试');
@@ -218,8 +233,25 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
         setIsUploading(false);
       }
     },
-    [sessionId, maxSize, hasDimensionCheck, dimensionOptions, value, onChange]
+    [sessionId, maxSize, hasDimensionCheck, dimensionOptions, value, onChange, isVideo]
   );
+
+  const handlePosterChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !sessionId || !isVideo) return;
+    if (!file.type.startsWith('image/')) { setError('封面必须是图片'); return; }
+    if (file.size > maxSize) { setError(`封面大小超过 ${maxSize / 1024 / 1024}MB 限制`); return; }
+    setIsUploading(true); setError('');
+    try {
+      const formData = new FormData(); formData.append('file', file);
+      const res = await fetch(`/api/sessions/${sessionId}/assets/upload`, { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!data.success) { setError(data.error?.message || '封面上传失败'); return; }
+      const current = typeof value === 'object' && value !== null && 'url' in value ? value as VideoValue : { url: '' };
+      onChange({ ...current, poster: data.data.url });
+    } catch { setError('封面上传失败，请重试'); } finally { setIsUploading(false); }
+  }, [sessionId, isVideo, maxSize, value, onChange]);
 
   const handleFileSelect = useCallback(
     (file: File) => {
@@ -251,7 +283,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
   );
 
 const handleClear = useCallback(async () => {
-    if (sessionId && typeof value === 'object' && value !== null) {
+    if (sessionId && typeof value === 'object' && value !== null && !('url' in value)) {
       // Spine bundle：清空字段即可，zip 解压文件留在 workspace（由项目资产收集统一管理）
       onChange(defaultValue ?? undefined);
       return;
@@ -263,7 +295,7 @@ const handleClear = useCallback(async () => {
   }, [sessionId, value, onChange, defaultValue]);
 
   const isValueFromUpload = useMemo(() => {
-    if (typeof value === 'object' && value !== null) return true;
+    if (typeof value === 'object' && value !== null && !('url' in value)) return true;
     return typeof value === 'string' && value.startsWith('/api/sessions/');
   }, [value]);
 
@@ -277,9 +309,10 @@ const handleClear = useCallback(async () => {
         disabled={disabled || isUploading}
         className="hidden"
       />
+      {isVideo && <input ref={posterInputRef} type="file" accept="image/*" onChange={handlePosterChange} className="hidden" />}
       <div className="flex items-start gap-3">
         {value ? (
-          typeof value === 'object' ? (
+          typeof value === 'object' && !('url' in value) ? (
             <div className="relative w-[80px] h-[80px] rounded-lg border border-border overflow-hidden bg-muted shrink-0 flex flex-col items-center justify-center gap-1 group">
               <FileArchive className="w-5 h-5 text-muted-foreground" />
               <span className="text-[9px] text-muted-foreground px-1 text-center leading-tight">Spine 素材包</span>
@@ -304,6 +337,15 @@ const handleClear = useCallback(async () => {
                     <Trash2 className="w-4 h-4" />
                   </button>
                 )}
+              </div>
+            </div>
+          ) : isVideo && typeof value === 'object' && 'url' in value ? (
+            <div className="relative w-[180px] rounded-lg border border-border overflow-hidden bg-muted group">
+              <video src={value.url} poster={value.poster} controls={videoPreviewStyle !== 'cover'} className={videoPreviewStyle === 'compact' ? 'block w-full max-h-20 object-contain' : 'block w-full max-h-32 object-contain'} />
+              <div className="flex gap-2 p-2">
+                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={disabled || isUploading} className="text-xs text-primary">替换视频</button>
+                <button type="button" onClick={() => posterInputRef.current?.click()} disabled={disabled || isUploading} className="text-xs text-primary">{value.poster ? '替换封面' : '添加封面'}</button>
+                {!(defaultValue && value.url === defaultValue) && <button type="button" onClick={handleClear} disabled={disabled || isUploading} className="text-xs text-destructive">删除</button>}
               </div>
             </div>
           ) : (

@@ -131,6 +131,7 @@ import type {
   CanvasNavigationHotspot,
   CanvasNavigationConnection,
   CanvasFreeNode,
+  CanvasTextNode,
   CanvasDocumentNode,
   CanvasPageData,
   CanvasPageGroup,
@@ -198,18 +199,44 @@ function remapNavigation(
   return { hotspots, connections };
 }
 
-function NavigationConnectionsLayer({
+/** A navigation source belongs to exactly one connector, so delete them together. */
+export function removeNavigationConnectionFromState(
+  state: CanvasState,
+  connectionId: string,
+): CanvasState {
+  const connection = state.navigation?.connections[connectionId];
+  if (!connection || !state.navigation) return state;
+  const { [connectionId]: _removedConnection, ...connections } =
+    state.navigation.connections;
+  const { [connection.source.hotspotId]: _removedHotspot, ...hotspots } =
+    state.navigation.hotspots;
+  return { ...state, navigation: { hotspots, connections } };
+}
+
+export function NavigationConnectionsLayer({
   connections,
   hotspots,
   layouts,
   obstacles,
   hoveredPageId,
+  selectedConnectionId,
+  interactive,
+  onConnectionSelect,
+  draft,
 }: {
   connections: CanvasNavigationConnection[];
   hotspots: CanvasNavigationHotspot[];
   layouts: Record<string, CanvasPageLayout>;
   obstacles: NavigationRouteRect[];
   hoveredPageId: string | null;
+  selectedConnectionId: string | null;
+  interactive: boolean;
+  onConnectionSelect: (connectionId: string) => void;
+  draft: {
+    sourcePageId: string;
+    rect: CanvasNavigationHotspot["rect"];
+    pointer: { x: number; y: number } | null;
+  } | null;
 }) {
   const hotspotsById = new Map(
     hotspots.map((hotspot) => [hotspot.id, hotspot]),
@@ -249,11 +276,39 @@ function NavigationConnectionsLayer({
     });
     return [{ connection, route, active }];
   });
-  if (lines.length === 0) return null;
+  const draftRoute = (() => {
+    if (!draft?.pointer) return null;
+    const source = layouts[draft.sourcePageId];
+    if (!source) return null;
+    const sourceAnchor = {
+      x: source.x + (draft.rect.x + draft.rect.width / 2) * source.width,
+      y: source.y + (draft.rect.y + draft.rect.height / 2) * source.height,
+    };
+    return buildNavigationConnectorRoute({
+      sourceRect: source,
+      targetRect: {
+        x: draft.pointer.x - 0.5,
+        y: draft.pointer.y - 0.5,
+        width: 1,
+        height: 1,
+      },
+      sourceAnchor,
+      obstacles: obstacles.filter(
+        (rect) =>
+          !(
+            rect.x === source.x - 16 &&
+            rect.y === source.y - 16 &&
+            rect.width === source.width + 32 &&
+            rect.height === source.height + 32
+          ),
+      ),
+    });
+  })();
+  if (lines.length === 0 && !draftRoute) return null;
   return (
     <svg
-      className="pointer-events-none absolute overflow-visible"
-      style={{ zIndex: -1, width: 1, height: 1 }}
+      className="absolute overflow-visible"
+      style={{ zIndex: 1, width: 1, height: 1, pointerEvents: "none" }}
       aria-label="页面跳转关系"
     >
       <defs>
@@ -270,17 +325,40 @@ function NavigationConnectionsLayer({
       </defs>
       {lines.map(({ connection, route, active }) => {
         const path = toRoundedNavigationPath(route);
+        const selected = connection.id === selectedConnectionId;
         return (
           <path
             key={connection.id}
             d={path}
             fill="none"
             markerEnd="url(#canvas-navigation-arrow)"
-            className={active ? "stroke-primary" : "stroke-primary/40"}
-            strokeWidth={active ? 3 : 2}
+            className={active || selected ? "stroke-primary" : "stroke-primary/40"}
+            strokeWidth={active || selected ? 3 : 2}
+            pointerEvents={interactive ? "stroke" : "none"}
+            role={interactive ? "button" : undefined}
+            aria-label={interactive ? "选择页面跳转连线" : undefined}
+            tabIndex={interactive ? 0 : undefined}
+            onPointerDown={(event) => {
+              if (!interactive) return;
+              event.preventDefault();
+              event.stopPropagation();
+              onConnectionSelect(connection.id);
+            }}
           />
         );
       })}
+      {draftRoute && (
+        <path
+          d={toRoundedNavigationPath(draftRoute)}
+          fill="none"
+          markerEnd="url(#canvas-navigation-arrow)"
+          className="stroke-primary/70"
+          strokeWidth={2}
+          strokeDasharray="6 4"
+          pointerEvents="none"
+          aria-label="待完成页面跳转连线"
+        />
+      )}
     </svg>
   );
 }
@@ -696,10 +774,21 @@ export function PreviewCanvas({
   const [editingTextNodeId, setEditingTextNodeId] = useState<string | null>(
     null,
   );
+  const [pendingTextDraft, setPendingTextDraft] = useState<CanvasTextNode | null>(
+    null,
+  );
   const [selectedPageIds, setSelectedPageIds] = useState<string[]>([]);
   const [hoveredNavigationPageId, setHoveredNavigationPageId] = useState<
     string | null
   >(null);
+  const [pendingNavigation, setPendingNavigation] = useState<{
+    sourcePageId: string;
+    kind: CanvasNavigationHotspot["kind"];
+    rect: CanvasNavigationHotspot["rect"];
+    pointer: { x: number; y: number } | null;
+  } | null>(null);
+  const [selectedNavigationConnectionId, setSelectedNavigationConnectionId] =
+    useState<string | null>(null);
   const pendingImageFilesRef = useRef<File[]>([]);
 
   // 跨项目粘贴选择器状态
@@ -719,6 +808,14 @@ export function PreviewCanvas({
     toolMode,
     isEditorMode,
   );
+
+  const handleToolModeChange = useCallback((mode: CanvasToolMode) => {
+    setToolMode(mode);
+    if (mode !== "select") {
+      setEditingTextNodeId(null);
+      setPendingTextDraft(null);
+    }
+  }, []);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
@@ -835,6 +932,27 @@ export function PreviewCanvas({
   );
 
   const effectiveNodes = getAnnotationsFromCanvasState(canvasState);
+
+  useEffect(() => {
+    if (!isEditorMode) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Enter" || event.repeat || editingTextNodeId) return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target instanceof HTMLElement &&
+        target.closest("textarea,input,select,button,[contenteditable='true']")
+      ) {
+        return;
+      }
+      const node = selectedNodeId ? effectiveNodes[selectedNodeId] : undefined;
+      if (node?.kind !== "text") return;
+      event.preventDefault();
+      setEditingTextNodeId(node.id);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [editingTextNodeId, effectiveNodes, isEditorMode, selectedNodeId]);
+
   const navigationObstacles = useMemo<NavigationRouteRect[]>(
     () => {
       const layouts = [
@@ -1076,14 +1194,20 @@ export function PreviewCanvas({
   );
 
   const handleCanvasClick = useCallback(() => {
+    if (pendingNavigation) {
+      setPendingNavigation(null);
+      return;
+    }
+    setSelectedNavigationConnectionId(null);
     setSelectedNodeId(null);
     setSelectedDocumentNodeIds([]);
     setSelectedPageGroupIds([]);
     setSelectedSectionId(null);
     setEditingTextNodeId(null);
+    setPendingTextDraft(null);
     setSelectedPageIds([]);
     onCanvasClick?.();
-  }, [onCanvasClick]);
+  }, [onCanvasClick, pendingNavigation]);
 
   const handleCreateSection = useCallback(
     (rect: CanvasRect) => {
@@ -1245,6 +1369,7 @@ export function PreviewCanvas({
       pageId: string,
       rect: CanvasNavigationHotspot["rect"],
       targetPageId: string,
+      kind: CanvasNavigationHotspot["kind"],
     ) => {
       const timestamp = Date.now();
       const hotspotId = `navigation_hotspot_${timestamp}_${Math.random().toString(36).slice(2, 8)}`;
@@ -1257,6 +1382,7 @@ export function PreviewCanvas({
             [hotspotId]: {
               id: hotspotId,
               pageId,
+              kind,
               rect,
               createdAt: timestamp,
               updatedAt: timestamp,
@@ -1274,9 +1400,50 @@ export function PreviewCanvas({
           },
         },
       }));
+      setSelectedNavigationConnectionId(connectionId);
+      setSelectedNodeId(null);
+      setSelectedDocumentNodeIds([]);
+      setSelectedPageGroupIds([]);
+      setSelectedSectionId(null);
+      setSelectedPageIds([]);
       setToolMode("select");
+      setPendingNavigation(null);
     },
     [updateState],
+  );
+
+  const handleNavigationDraftChange = useCallback(
+    (
+      sourcePageId: string,
+      draft: Pick<CanvasNavigationHotspot, "kind" | "rect"> | null,
+    ) => {
+      setPendingNavigation(
+        draft ? { sourcePageId, ...draft, pointer: null } : null,
+      );
+    },
+    [],
+  );
+
+  const handleNavigationPointerMove = useCallback(
+    (pointer: { x: number; y: number }) => {
+      setPendingNavigation((current) =>
+        current ? { ...current, pointer } : current,
+      );
+    },
+    [],
+  );
+
+  const handleNavigationTargetSelect = useCallback(
+    (targetPageId: string) => {
+      if (!pendingNavigation || pendingNavigation.sourcePageId === targetPageId) return;
+      handleCreateNavigation(
+        pendingNavigation.sourcePageId,
+        pendingNavigation.rect,
+        targetPageId,
+        pendingNavigation.kind,
+      );
+    },
+    [handleCreateNavigation, pendingNavigation],
   );
 
   const handleUpdateNavigationHotspot = useCallback(
@@ -1341,6 +1508,18 @@ export function PreviewCanvas({
     [updateState],
   );
 
+  const handleDeleteNavigationConnection = useCallback(
+    (connectionId: string) => {
+      updateState((prev) =>
+        removeNavigationConnectionFromState(prev, connectionId),
+      );
+      setSelectedNavigationConnectionId((current) =>
+        current === connectionId ? null : current,
+      );
+    },
+    [updateState],
+  );
+
   const handleDeleteNavigationRelations = useCallback(
     (pageId: string) => {
       updateState((prev) => {
@@ -1375,6 +1554,7 @@ export function PreviewCanvas({
     (rect: CanvasRect) => {
       if (!isEditorMode || effectiveToolMode !== "select") return;
       if (rect.width < 2 && rect.height < 2) {
+        setSelectedNavigationConnectionId(null);
         setSelectedPageIds([]);
         setSelectedNodeId(null);
         setSelectedDocumentNodeIds([]);
@@ -1383,6 +1563,8 @@ export function PreviewCanvas({
         setEditingTextNodeId(null);
         return;
       }
+
+      setSelectedNavigationConnectionId(null);
 
       const nextSelectedPageIds = pages
         .filter((page) => {
@@ -1438,6 +1620,7 @@ export function PreviewCanvas({
   const handlePageSelect = useCallback(
     (pageId: string, event?: React.PointerEvent | React.MouseEvent) => {
       if (isEditorMode && effectiveToolMode === "select") {
+        setSelectedNavigationConnectionId(null);
         const isAdditive =
           Boolean(event?.shiftKey) ||
           Boolean(event?.metaKey) ||
@@ -1588,6 +1771,7 @@ export function PreviewCanvas({
   const handleNodeSelect = useCallback(
     (nodeId: string, event?: React.PointerEvent | React.MouseEvent) => {
       const node = effectiveNodes[nodeId];
+      setSelectedNavigationConnectionId(null);
       const isAdditive =
         Boolean(event?.shiftKey) ||
         Boolean(event?.metaKey) ||
@@ -2063,7 +2247,8 @@ export function PreviewCanvas({
       (!selectedNodeId &&
         selectedDocumentNodeIds.length === 0 &&
         selectedPageIds.length === 0 &&
-        !selectedSectionId) ||
+        !selectedSectionId &&
+        !selectedNavigationConnectionId) ||
       documentDraft
     ) {
       return;
@@ -2081,6 +2266,10 @@ export function PreviewCanvas({
       }
 
       event.preventDefault();
+      if (selectedNavigationConnectionId) {
+        handleDeleteNavigationConnection(selectedNavigationConnectionId);
+        return;
+      }
       if (selectedSectionId) {
         updateState((prev) =>
           removeCanvasSection(prev, selectedSectionId),
@@ -2106,10 +2295,12 @@ export function PreviewCanvas({
   }, [
     deleteNode,
     documentDraft,
+    handleDeleteNavigationConnection,
     isEditorMode,
     onRequestDeletePages,
     selectedDocumentNodeIds,
     selectedNodeId,
+    selectedNavigationConnectionId,
     selectedPageIds,
     selectedSectionId,
     updateState,
@@ -3508,7 +3699,10 @@ export function PreviewCanvas({
   );
 
   const handleAddTextNode = useCallback(
-    (canvasPoint?: CanvasPoint) => {
+    (
+      canvasPoint?: CanvasPoint,
+      fixedLayout?: Pick<CanvasPageLayout, "width" | "height">,
+    ) => {
       if (!canvasPoint) {
         pendingImageFilesRef.current = [];
         setSelectedPageIds([]);
@@ -3520,20 +3714,25 @@ export function PreviewCanvas({
         return;
       }
       const now = Date.now();
-      const id = createNodeId("text");
-      addOrUpdateNode({
-        id,
+      const width = fixedLayout?.width ?? 18;
+      const height = fixedLayout?.height ?? Math.ceil(18 * 1.35);
+      setPendingTextDraft({
+        id: `draft_text_${crypto.randomUUID()}`,
         kind: "text",
         title: "文字",
         text: "",
         fontSize: 18,
         color: "#ffffff",
-        autoWidth: true,
+        textAlign: "left",
+        fontWeight: 400,
+        lineHeight: 1.5,
+        stylePreset: "body",
+        autoWidth: !fixedLayout,
         layout: {
           x: canvasPoint.x,
           y: canvasPoint.y,
-          width: 18,
-          height: Math.ceil(18 * 1.35),
+          width,
+          height,
         },
         createdAt: now,
         updatedAt: now,
@@ -3541,20 +3740,57 @@ export function PreviewCanvas({
       setSelectedPageIds([]);
       setSelectedDocumentNodeIds([]);
       setSelectedPageGroupIds([]);
-      setSelectedNodeId(id);
-      setEditingTextNodeId(id);
+      setSelectedNodeId(null);
+      setEditingTextNodeId(null);
       setToolMode("select");
     },
-    [addOrUpdateNode, createNodeId, getNodeLayout],
+    [],
+  );
+
+  const handlePendingTextDraftChange = useCallback(
+    (text: string) => {
+      if (!pendingTextDraft) return;
+      const nextDraft = { ...pendingTextDraft, text };
+      if (!text.trim()) {
+        setPendingTextDraft(nextDraft);
+        return;
+      }
+
+      const now = Date.now();
+      const node: CanvasTextNode = {
+        ...nextDraft,
+        id: createNodeId("text"),
+        title: text.trim().split(/\r?\n/)[0]?.slice(0, 24) || "文字",
+        createdAt: now,
+        updatedAt: now,
+      };
+      addOrUpdateNode(node);
+      setSelectedNodeId(node.id);
+      setEditingTextNodeId(node.id);
+      setPendingTextDraft(null);
+    },
+    [addOrUpdateNode, createNodeId, pendingTextDraft],
+  );
+
+  const handleCanvasRectCreate = useCallback(
+    (rect: CanvasRect) => {
+      if (effectiveToolMode === "text") {
+        const isDrag = rect.width >= 3 || rect.height >= 3;
+        handleAddTextNode(
+          { x: rect.x, y: rect.y },
+          isDrag
+            ? { width: Math.max(18, rect.width), height: Math.max(25, rect.height) }
+            : undefined,
+        );
+        return;
+      }
+      handleCreateSection(rect);
+    },
+    [effectiveToolMode, handleAddTextNode, handleCreateSection],
   );
 
   const handleCanvasPointCreate = useCallback(
     (point: CanvasPoint) => {
-      if (effectiveToolMode === "text") {
-        handleAddTextNode(point);
-        return;
-      }
-
       if (effectiveToolMode === "image") {
         const files = pendingImageFilesRef.current;
         pendingImageFilesRef.current = [];
@@ -3568,7 +3804,7 @@ export function PreviewCanvas({
         setToolMode("select");
       }
     },
-    [addImageFile, effectiveToolMode, handleAddTextNode],
+    [addImageFile, effectiveToolMode],
   );
 
   const handleTextNodeChange = useCallback(
@@ -4052,10 +4288,11 @@ export function PreviewCanvas({
           isEditorMode ? (nodeId) => handleNodeSelect(nodeId) : undefined
         }
         onFitToScreen={handleFitToScreen}
-        onToolModeChange={isEditorMode ? setToolMode : undefined}
+        onToolModeChange={isEditorMode ? handleToolModeChange : undefined}
         alignmentGuides={alignmentGuides}
         toolMode={effectiveToolMode}
         onSelectionRectChange={handleSelectionRectChange}
+        onCanvasPointerMove={handleNavigationPointerMove}
         creationMode={
           isEditorMode &&
           (effectiveToolMode === "text" ||
@@ -4065,7 +4302,7 @@ export function PreviewCanvas({
             : null
         }
         onCanvasPointClick={handleCanvasPointCreate}
-        onCanvasRectCreate={handleCreateSection}
+        onCanvasRectCreate={handleCanvasRectCreate}
       >
         {Object.values(effectiveSections)
           .map((section: CanvasSection) => (
@@ -4078,6 +4315,7 @@ export function PreviewCanvas({
               dropTarget={dropTargetSectionId === section.id}
               startEditing={titleEditingSectionId === section.id}
               onSelect={(id) => {
+                setSelectedNavigationConnectionId(null);
                 setSelectedSectionId(id);
                 setSelectedPageIds([]);
                 setSelectedPageGroupIds([]);
@@ -4096,6 +4334,22 @@ export function PreviewCanvas({
           layouts={renderablePageLayouts}
           obstacles={navigationObstacles}
           hoveredPageId={hoveredNavigationPageId}
+          selectedConnectionId={selectedNavigationConnectionId}
+          interactive={
+            isEditorMode &&
+            (effectiveToolMode === "select" || effectiveToolMode === "navigation") &&
+            !pendingNavigation
+          }
+          onConnectionSelect={(connectionId) => {
+            setSelectedNavigationConnectionId(connectionId);
+            setSelectedPageIds([]);
+            setSelectedNodeId(null);
+            setSelectedDocumentNodeIds([]);
+            setSelectedPageGroupIds([]);
+            setSelectedSectionId(null);
+            setEditingTextNodeId(null);
+          }}
+          draft={pendingNavigation}
         />
         {pages
           .filter(
@@ -4205,8 +4459,15 @@ export function PreviewCanvas({
                 )}
                 navigationConnections={navigationConnections}
                 navigationActive={
-                  isEditorMode && effectiveToolMode === "navigation"
+                  isEditorMode &&
+                  effectiveToolMode === "navigation" &&
+                  (!pendingNavigation || pendingNavigation.sourcePageId === page.id)
                 }
+                navigationTargetPending={
+                  Boolean(pendingNavigation) && pendingNavigation?.sourcePageId !== page.id
+                }
+                onNavigationTargetSelect={handleNavigationTargetSelect}
+                onNavigationDraftChange={handleNavigationDraftChange}
                 showNavigationHotspots={
                   hoveredNavigationPageId === page.id ||
                   selectedPageIds.includes(page.id)
@@ -4323,6 +4584,12 @@ export function PreviewCanvas({
                   setSelectedNodeId(nodeId);
                   setEditingTextNodeId(nodeId);
                 }}
+                onTextEditFinish={(nodeId) => {
+                  if (editingTextNodeId === nodeId) setEditingTextNodeId(null);
+                }}
+                onTextEditCancel={(nodeId) => {
+                  if (editingTextNodeId === nodeId) setEditingTextNodeId(null);
+                }}
                 onToggleCollapse={handleNodeToggleCollapse}
                 onActiveDocumentChange={handleActiveDocumentChange}
                 onSelect={handleNodeSelect}
@@ -4332,6 +4599,28 @@ export function PreviewCanvas({
               />
             );
           })}
+        {pendingTextDraft && (
+          <CanvasFreeNodeItem
+            key={pendingTextDraft.id}
+            node={pendingTextDraft}
+            editable={isEditorMode}
+            zoom={canvasState.viewport.zoom}
+            toolMode="select"
+            selected
+            editing
+            onLayoutChange={(nodeId, layout) => {
+              setPendingTextDraft((draft) =>
+                draft?.id === nodeId ? { ...draft, layout } : draft,
+              );
+            }}
+            onTextChange={(_, text) => handlePendingTextDraftChange(text)}
+            onNodeStyleChange={(node) => {
+              if (node.kind === "text") setPendingTextDraft(node);
+            }}
+            onTextEditFinish={() => setPendingTextDraft(null)}
+            onTextEditCancel={() => setPendingTextDraft(null)}
+          />
+        )}
       </CanvasViewport>
 
       {documentDraft && (

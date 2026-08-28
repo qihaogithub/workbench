@@ -39,6 +39,8 @@ interface CanvasViewportProps {
   creationMode?: Extract<CanvasToolMode, "text" | "image" | "section"> | null;
   onCanvasPointClick?: (point: CanvasPointerPoint) => void;
   onCanvasRectCreate?: (rect: CanvasSelectionRect) => void;
+  /** Reports the pointer in canvas coordinates even while it is over a child item. */
+  onCanvasPointerMove?: (point: CanvasPointerPoint) => void;
 }
 
 const MIN_ZOOM = 0.05;
@@ -70,6 +72,7 @@ export function CanvasViewport({
   creationMode,
   onCanvasPointClick,
   onCanvasRectCreate,
+  onCanvasPointerMove,
 }: CanvasViewportProps) {
   const resolvedInteractionMode = interactionMode ?? (editable ? "editor" : "readonly");
   const canInteractWithViewport = resolvedInteractionMode !== "readonly";
@@ -197,6 +200,10 @@ export function CanvasViewport({
         onToolModeChange?.("select");
       }
 
+      if (e.key === "t" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.repeat) {
+        onToolModeChange?.("text");
+      }
+
       // Shift + S：绘制 Section。
       if (e.key.toLowerCase() === "s" && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && !e.repeat) {
         e.preventDefault();
@@ -264,6 +271,7 @@ export function CanvasViewport({
 
       // Escape：取消选中页面（触发 onCanvasClick）
       if (e.key === "Escape") {
+        if (activeCreationMode) onToolModeChange?.("select");
         onCanvasClick?.();
       }
     };
@@ -427,7 +435,7 @@ export function CanvasViewport({
         const end = getCanvasPointFromPointer(e.clientX, e.clientY);
         containerRef.current?.releasePointerCapture(e.pointerId);
         creationStartPointRef.current = null;
-        if (activeCreationMode === "section" && start && end) {
+        if ((activeCreationMode === "section" || activeCreationMode === "text") && start && end) {
           onCanvasRectCreate?.({
             x: Math.min(start.x, end.x),
             y: Math.min(start.y, end.y),
@@ -573,6 +581,10 @@ export function CanvasViewport({
       data-canvas-root="true"
       tabIndex={0}
       onPointerDownCapture={handlePointerDownCapture}
+      onPointerMoveCapture={(event) => {
+        const point = getCanvasPointFromPointer(event.clientX, event.clientY);
+        if (point) onCanvasPointerMove?.(point);
+      }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}

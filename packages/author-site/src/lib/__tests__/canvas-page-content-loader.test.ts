@@ -1,5 +1,8 @@
 import type { DemoPageMeta } from "@workbench/shared";
-import { loadCanvasPageContent } from "../canvas-page-content-loader";
+import {
+  hasLoadedPrototypeHtml,
+  loadCanvasPageContent,
+} from "../canvas-page-content-loader";
 
 describe("loadCanvasPageContent", () => {
   const referencePage: DemoPageMeta = {
@@ -172,5 +175,14 @@ describe("loadCanvasPageContent", () => {
     } finally {
       fetchSpy.mockRestore();
     }
+  });
+});
+
+describe("hasLoadedPrototypeHtml", () => {
+  it("does not treat an empty collaboration placeholder as loaded page content", () => {
+    expect(hasLoadedPrototypeHtml(undefined)).toBe(false);
+    expect(hasLoadedPrototypeHtml("")).toBe(false);
+    expect(hasLoadedPrototypeHtml(" \n ")).toBe(false);
+    expect(hasLoadedPrototypeHtml("<main>课程首页</main>")).toBe(true);
   });
 });

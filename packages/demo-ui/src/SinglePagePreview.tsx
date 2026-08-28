@@ -201,8 +201,8 @@ function SinglePagePreviewInternal({
             enabled={navigationActive}
             visible={navigationActive}
             editable={navigationEditable}
-            onCreate={(rect, targetPageId) => {
-              onCreateNavigation?.(page.id, rect, targetPageId);
+            onCreate={(rect, targetPageId, kind) => {
+              onCreateNavigation?.(page.id, rect, targetPageId, kind);
               setNavigationActive(false);
             }}
             onUpdateHotspot={onUpdateNavigationHotspot}

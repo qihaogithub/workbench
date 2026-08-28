@@ -21,6 +21,19 @@ describe("configuration definition mutations", () => {
     expect(result.diff.updated).toEqual(["heroImage"]);
   });
 
+  it("creates a video field with an object value and hidden preview options", () => {
+    const result = applySchemaDefinitionCommand(SCHEMA, {
+      type: "field.add",
+      field: { key: "heroVideo", title: "主视频", kind: "video", default: { url: "", poster: "" } },
+    });
+    const video = JSON.parse(result.schema).properties.heroVideo;
+    expect(video.format).toBe("video");
+    expect(video.type).toBe("object");
+    expect(video.required).toEqual(["url"]);
+    expect(video["ui:options"]).toEqual({ accept: "video/mp4,video/webm", videoPreviewStyle: "controls" });
+    expect(readConfigDefinitionFields(result.schema).find((field) => field.key === "heroVideo")?.kind).toBe("video");
+  });
+
   it("updates required fields and produces a value cleanup plan for deletion", () => {
     const added = applySchemaDefinitionCommand(SCHEMA, {
       type: "field.add",

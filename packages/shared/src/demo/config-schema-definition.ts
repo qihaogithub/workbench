@@ -9,7 +9,8 @@ export type ConfigDefinitionKind =
   | "enum"
   | "color"
   | "image"
-  | "images";
+  | "images"
+  | "video";
 
 export type ImageDimensionOperator = "=" | ">" | "≥" | "<" | "≤";
 
@@ -131,6 +132,15 @@ function propertyFromDraft(draft: ConfigDefinitionDraft): SchemaRecord {
     case "richtext": property.type = "string"; property.format = "richtext"; break;
     case "image": property.type = "string"; property.format = "image"; break;
     case "images": property.type = "array"; property.items = { type: "string", format: "image" }; break;
+    case "video":
+      property.type = "object";
+      property.format = "video";
+      property.properties = {
+        url: { type: "string", title: "视频地址" },
+        poster: { type: "string", title: "封面地址", format: "image" },
+      };
+      property.required = ["url"];
+      break;
     default: property.type = "string";
   }
   if (draft.kind === "image" || draft.kind === "images") {
@@ -144,6 +154,10 @@ function propertyFromDraft(draft: ConfigDefinitionDraft): SchemaRecord {
     if (heightRule) uiOptions.heightRule = heightRule;
     if (draft.accept?.trim()) uiOptions.accept = draft.accept.trim();
   }
+  if (draft.kind === "video") {
+    uiOptions.accept = draft.accept?.trim() || "video/mp4,video/webm";
+    uiOptions.videoPreviewStyle = "controls";
+  }
   if (Object.keys(uiOptions).length) property["ui:options"] = uiOptions;
   return property;
 }
@@ -155,6 +169,7 @@ function draftFromProperty(key: string, property: SchemaRecord, required: boolea
     : property.format === "richtext" ? "richtext"
     : property["ui:widget"] === "textarea" ? "textarea"
     : property.format === "image" ? "image"
+    : property.format === "video" ? "video"
     : type === "array" ? "images"
     : type === "number" ? "number"
     : type === "integer" ? "integer"
@@ -244,6 +259,9 @@ function applyMetadataPatch(
       if (heightRule) options.heightRule = heightRule;
       else delete options.heightRule;
     }
+  }
+  if (next.kind === "video" && changed("accept")) {
+    options.accept = next.accept?.trim() || "video/mp4,video/webm";
   }
   if (Object.keys(options).length) property["ui:options"] = options;
   else delete property["ui:options"];

@@ -65,7 +65,7 @@ export interface ConfigItemEditorDialogProps {
 const KINDS: Array<[ConfigDefinitionKind, string]> = [
   ["text", "短文本"], ["textarea", "长文本"], ["richtext", "富文本"],
   ["number", "数字"], ["integer", "整数"], ["boolean", "布尔"],
-  ["enum", "枚举"], ["color", "颜色"], ["image", "单图"], ["images", "多图"],
+  ["enum", "枚举"], ["color", "颜色"], ["image", "单图"], ["images", "多图"], ["video", "视频"],
 ];
 
 const ACCEPT_OPTIONS = [

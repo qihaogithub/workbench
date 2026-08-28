@@ -1,18 +1,24 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ALargeSmall, Edit3, Maximize2, Minimize2 } from "lucide-react";
+import { ALargeSmall, AlignCenter, AlignLeft, AlignRight, ChevronDown, Edit3, Maximize2, Minimize2 } from "lucide-react";
 import { CanvasDocumentContent } from "./CanvasDocumentContent";
 import { CanvasSelectionBox } from "./CanvasSelectionBox";
+import {
+  CanvasResizeHandles,
+  detectCanvasResizeEdge,
+  getCanvasResizeHandleFromTarget,
+  RESIZE_CURSOR_BY_EDGE,
+  type CanvasResizeHandleSet,
+} from "./CanvasResizeHandles";
 import { cn } from "./utils";
 import type {
   CanvasFreeNode,
   CanvasPageLayout,
   CanvasTextNode,
   CanvasToolMode,
+  ResizeEdge,
 } from "./types";
-
-type ResizeEdge = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
 interface CanvasFreeNodeItemProps {
   node: CanvasFreeNode;
@@ -26,6 +32,8 @@ interface CanvasFreeNodeItemProps {
   onTextChange?: (nodeId: string, text: string) => void;
   onNodeStyleChange?: (node: CanvasFreeNode) => void;
   onTextEditStart?: (nodeId: string) => void;
+  onTextEditFinish?: (nodeId: string) => void;
+  onTextEditCancel?: (nodeId: string) => void;
   onToggleCollapse?: (nodeId: string) => void;
   onActiveDocumentChange?: (nodeId: string, documentId: string) => void;
   onSelect?: (
@@ -108,50 +116,12 @@ const BACKGROUND_COLOR_SWATCHES = [
   "#e879f9",
 ] as const;
 
-const EDGE_CURSORS: Record<ResizeEdge, string> = {
-  n: "ns-resize",
-  s: "ns-resize",
-  e: "ew-resize",
-  w: "ew-resize",
-  ne: "nesw-resize",
-  nw: "nwse-resize",
-  se: "nwse-resize",
-  sw: "nesw-resize",
-};
-
-function detectResizeEdge(
-  localX: number,
-  localY: number,
-  width: number,
-  height: number,
-  edgeHitSize = EDGE_HIT_SIZE,
-  cornerHitSize = CORNER_HIT_SIZE,
-): ResizeEdge | null {
-  const nearLeft = localX < edgeHitSize;
-  const nearRight = localX > width - edgeHitSize;
-  const nearTop = localY < edgeHitSize;
-  const nearBottom = localY > height - edgeHitSize;
-
-  if (!nearLeft && !nearRight && !nearTop && !nearBottom) return null;
-
-  const inCornerZone =
-    (localX < cornerHitSize || localX > width - cornerHitSize) &&
-    (localY < cornerHitSize || localY > height - cornerHitSize);
-
-  if (inCornerZone) {
-    if (nearTop && nearLeft) return "nw";
-    if (nearTop && nearRight) return "ne";
-    if (nearBottom && nearLeft) return "sw";
-    if (nearBottom && nearRight) return "se";
-  }
-
-  if (nearTop) return "n";
-  if (nearBottom) return "s";
-  if (nearLeft) return "w";
-  if (nearRight) return "e";
-
-  return null;
-}
+const TEXT_STYLE_PRESETS = {
+  body: { label: "正文", fontSize: 18, fontWeight: 400, lineHeight: 1.5 },
+  note: { label: "注释", fontSize: 14, fontWeight: 400, lineHeight: 1.45 },
+  heading: { label: "标题", fontSize: 28, fontWeight: 700, lineHeight: 1.25 },
+  emphasis: { label: "强调", fontSize: 18, fontWeight: 600, lineHeight: 1.35 },
+} as const;
 
 function computeResizeLayout(
   layout: CanvasPageLayout,
@@ -341,7 +311,7 @@ function estimateTextNodeContentHeight(
 ): number {
   const safeFontSize =
     Number.isFinite(node.fontSize) && node.fontSize > 0 ? node.fontSize : 18;
-  const lineHeight = safeFontSize * TEXT_LINE_HEIGHT;
+  const lineHeight = safeFontSize * (node.lineHeight ?? TEXT_LINE_HEIGHT);
   const safeWidth =
     Number.isFinite(width) && width && width > 0 ? width : node.layout.width;
   const lineCapacity = Math.max(1, safeWidth / safeFontSize);
@@ -398,6 +368,8 @@ export function CanvasFreeNodeItem({
   onTextChange,
   onNodeStyleChange,
   onTextEditStart,
+  onTextEditFinish,
+  onTextEditCancel,
   onToggleCollapse,
   onActiveDocumentChange,
   onSelect,
@@ -411,6 +383,7 @@ export function CanvasFreeNodeItem({
   const [hoveredEdge, setHoveredEdge] = useState<ResizeEdge | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
+  const isComposingRef = useRef(false);
   const startPosRef = useRef({ x: 0, y: 0 });
   const layoutStartRef = useRef(node.layout);
   const fontSizeStartRef = useRef(node.kind === "text" ? node.fontSize : 18);
@@ -422,6 +395,12 @@ export function CanvasFreeNodeItem({
   const canInteract = editable && toolMode === "select";
   const showEdgeHandles =
     (isHovering || selected) && canInteract && !isDragging && !isResizing;
+  const resizeHandles: CanvasResizeHandleSet = node.kind === "image" ? "corners" : "all";
+  const resizeHitArea = {
+    handles: resizeHandles,
+    edgeHitSize: node.kind === "text" ? TEXT_EDGE_HIT_SIZE : EDGE_HIT_SIZE,
+    cornerHitSize: node.kind === "text" ? TEXT_CORNER_HIT_SIZE : CORNER_HIT_SIZE,
+  } as const;
   const showPropertiesBubble =
     selected &&
     canInteract &&
@@ -454,21 +433,16 @@ export function CanvasFreeNodeItem({
       const el = containerRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      const edgeHitSize =
-        node.kind === "text" ? TEXT_EDGE_HIT_SIZE : EDGE_HIT_SIZE;
-      const cornerHitSize =
-        node.kind === "text" ? TEXT_CORNER_HIT_SIZE : CORNER_HIT_SIZE;
-      const edge = detectResizeEdge(
+      const edge = detectCanvasResizeEdge(
         e.clientX - rect.left,
         e.clientY - rect.top,
         rect.width,
         rect.height,
-        edgeHitSize,
-        cornerHitSize,
+        resizeHitArea,
       );
       setHoveredEdge(edge);
     },
-    [canInteract, isDragging, isResizing, node.kind],
+    [canInteract, isDragging, isResizing, resizeHitArea],
   );
 
   const handlePointerDown = useCallback(
@@ -483,17 +457,12 @@ export function CanvasFreeNodeItem({
       const el = containerRef.current;
       if (el) {
         const rect = el.getBoundingClientRect();
-        const edgeHitSize =
-          node.kind === "text" ? TEXT_EDGE_HIT_SIZE : EDGE_HIT_SIZE;
-        const cornerHitSize =
-          node.kind === "text" ? TEXT_CORNER_HIT_SIZE : CORNER_HIT_SIZE;
-        const edge = detectResizeEdge(
+        const edge = getCanvasResizeHandleFromTarget(target, el) ?? detectCanvasResizeEdge(
           e.clientX - rect.left,
           e.clientY - rect.top,
           rect.width,
           rect.height,
-          edgeHitSize,
-          cornerHitSize,
+          resizeHitArea,
         );
         if (edge) {
           e.stopPropagation();
@@ -514,7 +483,7 @@ export function CanvasFreeNodeItem({
       layoutStartRef.current = { ...layoutRef.current };
       onDragStart?.(node.id, { copy: e.altKey });
     },
-    [canInteract, node.id, onDragStart, onSelect],
+    [canInteract, node.id, onDragStart, onSelect, resizeHitArea],
   );
 
   const handlePointerMove = useCallback(
@@ -640,7 +609,7 @@ export function CanvasFreeNodeItem({
         ? {
             ...node.layout,
             width: estimateTextNodeAutoWidth(node, text),
-            height: Math.ceil(node.fontSize * TEXT_LINE_HEIGHT),
+            height: Math.ceil(node.fontSize * (node.lineHeight ?? TEXT_LINE_HEIGHT)),
           }
         : {
             ...node.layout,
@@ -662,10 +631,10 @@ export function CanvasFreeNodeItem({
   );
 
   const activeCursor =
-    isResizing && EDGE_CURSORS[isResizing]
-      ? EDGE_CURSORS[isResizing]
-      : hoveredEdge && EDGE_CURSORS[hoveredEdge]
-        ? EDGE_CURSORS[hoveredEdge]
+    isResizing && RESIZE_CURSOR_BY_EDGE[isResizing]
+      ? RESIZE_CURSOR_BY_EDGE[isResizing]
+      : hoveredEdge && RESIZE_CURSOR_BY_EDGE[hoveredEdge]
+        ? RESIZE_CURSOR_BY_EDGE[hoveredEdge]
         : canInteract && !isDragging
           ? "move"
           : undefined;
@@ -810,14 +779,34 @@ export function CanvasFreeNodeItem({
               autoFocus
               onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => event.stopPropagation()}
+              onCompositionStart={() => {
+                isComposingRef.current = true;
+              }}
+              onCompositionEnd={() => {
+                isComposingRef.current = false;
+              }}
+              onBlur={() => onTextEditFinish?.(node.id)}
+              onKeyDown={(event) => {
+                if (isComposingRef.current || event.nativeEvent.isComposing) return;
+                if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                  event.preventDefault();
+                  onTextEditFinish?.(node.id);
+                }
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  onTextEditCancel?.(node.id);
+                }
+              }}
               onChange={handleTextAreaChange}
               style={{
                 color: node.color,
                 backgroundColor: node.backgroundColor,
                 fontSize: node.fontSize,
-                lineHeight: TEXT_LINE_HEIGHT,
+                fontWeight: node.fontWeight ?? 400,
+                lineHeight: node.lineHeight ?? TEXT_LINE_HEIGHT,
+                textAlign: node.textAlign ?? "left",
                 minHeight: node.autoWidth
-                  ? Math.ceil(node.fontSize * TEXT_LINE_HEIGHT)
+                  ? Math.ceil(node.fontSize * (node.lineHeight ?? TEXT_LINE_HEIGHT))
                   : estimateTextNodeContentHeight(node, node.layout.width),
                 overflow: "hidden",
                 whiteSpace: node.autoWidth ? "pre" : "pre-wrap",
@@ -830,7 +819,9 @@ export function CanvasFreeNodeItem({
                 color: node.color,
                 backgroundColor: node.backgroundColor,
                 fontSize: node.fontSize,
-                lineHeight: TEXT_LINE_HEIGHT,
+                fontWeight: node.fontWeight ?? 400,
+                lineHeight: node.lineHeight ?? TEXT_LINE_HEIGHT,
+                textAlign: node.textAlign ?? "left",
                 whiteSpace: node.autoWidth ? "pre" : "pre-wrap",
                 wordBreak: "break-word",
               }}
@@ -845,26 +836,7 @@ export function CanvasFreeNodeItem({
         handles={canInteract}
       />
 
-      {showEdgeHandles && (
-        <>
-          <div
-            className="absolute top-0 left-0 right-0 z-20"
-            style={{ height: EDGE_HIT_SIZE, cursor: "ns-resize" }}
-          />
-          <div
-            className="absolute bottom-0 left-0 right-0 z-20"
-            style={{ height: EDGE_HIT_SIZE, cursor: "ns-resize" }}
-          />
-          <div
-            className="absolute top-0 left-0 bottom-0 z-20"
-            style={{ width: EDGE_HIT_SIZE, cursor: "ew-resize" }}
-          />
-          <div
-            className="absolute top-0 right-0 bottom-0 z-20"
-            style={{ width: EDGE_HIT_SIZE, cursor: "ew-resize" }}
-          />
-        </>
-      )}
+      <CanvasResizeHandles visible={showEdgeHandles} options={resizeHitArea} />
     </div>
   );
 }
@@ -879,14 +851,36 @@ function CanvasNodePropertiesBubble({
   onNodeStyleChange?: (node: CanvasFreeNode) => void;
 }) {
   const [colorPanelOpen, setColorPanelOpen] = useState(false);
+  const [presetPanelOpen, setPresetPanelOpen] = useState(false);
+  const [layoutPanelOpen, setLayoutPanelOpen] = useState(false);
+  const [opensBelow, setOpensBelow] = useState(false);
+  const bubbleRef = useRef<HTMLDivElement>(null);
   const top = -Math.min((48 + TEXT_PROPERTIES_BUBBLE_SCREEN_GAP) / zoom, 120);
+  const belowTop = Math.min(
+    (48 + TEXT_PROPERTIES_BUBBLE_SCREEN_GAP) / zoom,
+    120,
+  );
   const inputClass =
-    "h-8 rounded-md border border-border/70 bg-background px-2 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/25";
-  const iconClass = "h-4 w-4 text-muted-foreground";
-  const colorButtonClass =
-    "flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-border/70 bg-background p-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30";
+    "h-9 rounded-lg border border-white/10 bg-black/20 px-2 text-base font-medium tabular-nums text-white outline-none transition-colors placeholder:text-white/40 focus-visible:border-blue-400 focus-visible:ring-2 focus-visible:ring-blue-400/40";
+  const iconClass = "h-4 w-4 text-white/75";
+  const toolbarButtonClass =
+    "flex h-9 cursor-pointer items-center justify-center rounded-lg px-2 text-sm text-white/85 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70";
+  const iconButtonClass = cn(toolbarButtonClass, "w-9 p-1");
   const swatchClass =
     "h-6 w-6 cursor-pointer rounded-md border border-border/70 transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500";
+  const activeTextStylePreset = node.stylePreset ?? "body";
+  const activeTextStyle = TEXT_STYLE_PRESETS[activeTextStylePreset];
+
+  useEffect(() => {
+    const updatePlacement = () => {
+      const rect = bubbleRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setOpensBelow(rect.top < 72 && window.innerHeight - rect.bottom > 96);
+    };
+    updatePlacement();
+    window.addEventListener("resize", updatePlacement);
+    return () => window.removeEventListener("resize", updatePlacement);
+  }, [zoom]);
 
   const renderColorPanel = () => {
     if (!colorPanelOpen) return null;
@@ -900,13 +894,16 @@ function CanvasNodePropertiesBubble({
 
     return (
       <div
-        className="absolute bottom-full left-1/2 mb-2 w-72 -translate-x-1/2 rounded-lg border border-border/80 bg-background/98 p-3 shadow-xl backdrop-blur"
+        className={cn(
+          "absolute left-0 w-72 rounded-xl border border-white/10 bg-[#202124]/98 p-3 text-white shadow-2xl backdrop-blur",
+          opensBelow ? "top-full mt-2" : "bottom-full mb-2",
+        )}
         role="dialog"
         aria-label="颜色设置"
       >
         <div className="mb-2 flex items-center gap-2">
-          <div className="text-sm font-medium text-foreground">字体颜色</div>
-          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+          <div className="text-sm font-medium">字体颜色</div>
+          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-white/60">
             经典
           </span>
         </div>
@@ -929,8 +926,8 @@ function CanvasNodePropertiesBubble({
         </div>
 
         <div className="mb-2 mt-4 flex items-center gap-2">
-          <div className="text-sm font-medium text-foreground">背景颜色</div>
-          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+          <div className="text-sm font-medium">背景颜色</div>
+          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-white/60">
             经典
           </span>
         </div>
@@ -939,14 +936,14 @@ function CanvasNodePropertiesBubble({
             type="button"
             className={cn(
               swatchClass,
-              "relative overflow-hidden bg-background",
+              "relative overflow-hidden bg-[linear-gradient(45deg,#303136_25%,transparent_25%,transparent_75%,#303136_75%),linear-gradient(45deg,#303136_25%,transparent_25%,transparent_75%,#303136_75%)] bg-[length:8px_8px] bg-[position:0_0,4px_4px]",
               node.backgroundColor === undefined && "ring-2 ring-blue-500",
             )}
             title="无背景"
             aria-label="无背景"
             onClick={() => applyBackgroundColor(undefined)}
           >
-            <span className="absolute left-1/2 top-0 h-full w-px -rotate-45 bg-border" />
+            <span className="absolute inset-0 flex items-center justify-center bg-black/25 text-[10px] font-medium text-white">空</span>
           </button>
           {BACKGROUND_COLOR_SWATCHES.map((color) => (
             <button
@@ -964,54 +961,89 @@ function CanvasNodePropertiesBubble({
             />
           ))}
         </div>
-        <div className="mt-4 border-t border-border/70 pt-3">
-          <label className="flex h-8 cursor-pointer items-center gap-2 rounded-md px-1 text-sm text-foreground transition-colors hover:bg-muted">
-            <span
-              className="h-5 w-5 rounded-full"
-              style={{
-                background:
-                  "conic-gradient(from 90deg, #ef4444, #f59e0b, #22c55e, #06b6d4, #6366f1, #ec4899, #ef4444)",
-              }}
-            />
-            <span>更多颜色</span>
-            <input
-              aria-label="更多字体颜色"
-              type="color"
-              className="sr-only"
-              value={node.color}
-              onChange={(event) => applyTextColor(event.target.value)}
-            />
-          </label>
-        </div>
       </div>
     );
   };
 
   return (
     <div
+      ref={bubbleRef}
       role="toolbar"
       aria-label="文字属性"
-      className="absolute left-1/2 z-[80] flex -translate-x-1/2 items-center gap-1 rounded-lg border border-border/80 bg-background/95 p-1.5 shadow-lg backdrop-blur"
-      style={{ top }}
+      className="absolute left-1/2 z-[80] flex -translate-x-1/2 items-center gap-1 rounded-xl border border-white/10 bg-[#1d1e20]/[.98] p-1.5 text-white shadow-[0_12px_30px_rgba(0,0,0,.32)] backdrop-blur"
+      style={opensBelow ? { top: belowTop } : { top }}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => {
-        if (event.key === "Escape") setColorPanelOpen(false);
+        if (event.key === "Escape") {
+          setColorPanelOpen(false);
+          setPresetPanelOpen(false);
+          setLayoutPanelOpen(false);
+        }
       }}
     >
       {node.kind === "text" && (
         <>
-          <label
-            className="flex h-8 items-center gap-1 rounded-md px-1"
-            title="字号"
-          >
-            <ALargeSmall className={iconClass} />
+          <div className="relative">
+            <button
+              aria-label="文字样式预设"
+              aria-expanded={presetPanelOpen}
+              type="button"
+              className={cn(toolbarButtonClass, "gap-1.5")}
+              onClick={() => {
+                setPresetPanelOpen((current) => !current);
+                setColorPanelOpen(false);
+                setLayoutPanelOpen(false);
+              }}
+            >
+              <ALargeSmall className={iconClass} />
+              <span className="max-w-12 truncate">{activeTextStyle.label}</span>
+              <ChevronDown className="h-3.5 w-3.5 text-white/55" />
+            </button>
+            {presetPanelOpen && (
+              <div
+                className={cn(
+                  "absolute left-0 z-10 w-60 rounded-xl border border-white/10 bg-[#202124]/98 p-1 shadow-2xl",
+                  opensBelow ? "top-full mt-2" : "bottom-full mb-2",
+                )}
+                role="menu"
+                aria-label="文字样式预设"
+              >
+                {Object.entries(TEXT_STYLE_PRESETS).map(([preset, value]) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={activeTextStylePreset === preset}
+                    className={cn(
+                      "flex h-14 w-full cursor-pointer items-center rounded-lg px-3 text-left text-xl text-white/80 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70",
+                      activeTextStylePreset === preset && "bg-white/10 text-white",
+                    )}
+                    onClick={() => {
+                      onNodeStyleChange?.({
+                        ...node,
+                        stylePreset: preset as CanvasTextNode["stylePreset"],
+                        fontSize: value.fontSize,
+                        fontWeight: value.fontWeight,
+                        lineHeight: value.lineHeight,
+                      });
+                      setPresetPanelOpen(false);
+                    }}
+                  >
+                    {value.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <span className="h-5 w-px bg-white/15" aria-hidden="true" />
+          <label className="flex h-9 items-center gap-1" title="字号">
             <input
               aria-label="文字字号"
               type="number"
               min={10}
               max={96}
-              className={cn(inputClass, "w-16")}
+              className={cn(inputClass, "w-[72px]")}
               value={node.fontSize}
               onChange={(event) =>
                 onNodeStyleChange?.({
@@ -1021,26 +1053,92 @@ function CanvasNodePropertiesBubble({
               }
             />
           </label>
+          <span className="h-5 w-px bg-white/15" aria-hidden="true" />
+          <div className="relative">
+            <button
+              aria-label="文字排版"
+              aria-expanded={layoutPanelOpen}
+              type="button"
+              title="对齐与行高"
+              className={cn(toolbarButtonClass, "gap-1")}
+              onClick={() => {
+                setLayoutPanelOpen((current) => !current);
+                setColorPanelOpen(false);
+                setPresetPanelOpen(false);
+              }}
+            >
+              {(node.textAlign ?? "left") === "center" ? <AlignCenter className={iconClass} /> : (node.textAlign ?? "left") === "right" ? <AlignRight className={iconClass} /> : <AlignLeft className={iconClass} />}
+              <ChevronDown className="h-3.5 w-3.5 text-white/55" />
+            </button>
+            {layoutPanelOpen && (
+              <div
+                className={cn(
+                  "absolute right-0 z-10 w-44 rounded-xl border border-white/10 bg-[#202124]/98 p-2 shadow-2xl",
+                  opensBelow ? "top-full mt-2" : "bottom-full mb-2",
+                )}
+                role="dialog"
+                aria-label="文字排版"
+              >
+                <div className="px-1 pb-1.5 text-xs font-medium text-white/55">对齐方式</div>
+                <div className="grid grid-cols-3 gap-1">
+                  {([
+                    ["left", AlignLeft, "左对齐"],
+                    ["center", AlignCenter, "居中对齐"],
+                    ["right", AlignRight, "右对齐"],
+                  ] as const).map(([textAlign, Icon, label]) => (
+                    <button
+                      key={textAlign}
+                      type="button"
+                      aria-label={label}
+                      aria-pressed={(node.textAlign ?? "left") === textAlign}
+                      className={cn(
+                        iconButtonClass,
+                        "w-full",
+                        (node.textAlign ?? "left") === textAlign && "bg-white/15 text-white",
+                      )}
+                      onClick={() => onNodeStyleChange?.({ ...node, textAlign })}
+                    >
+                      <Icon className={iconClass} />
+                    </button>
+                  ))}
+                </div>
+                <div className="my-2 h-px bg-white/10" />
+                <label className="flex items-center justify-between gap-2 px-1 text-sm text-white/80">
+                  <span>行高</span>
+                  <input
+                    aria-label="文字行高"
+                    type="number"
+                    min={1}
+                    max={2.4}
+                    step={0.05}
+                    className={cn(inputClass, "h-8 w-[68px] text-sm")}
+                    value={node.lineHeight ?? TEXT_LINE_HEIGHT}
+                    onChange={(event) =>
+                      onNodeStyleChange?.({
+                        ...node,
+                        lineHeight: Number(event.target.value) || TEXT_LINE_HEIGHT,
+                      })
+                    }
+                  />
+                </label>
+              </div>
+            )}
+          </div>
           <button
             aria-label="颜色设置"
+            aria-expanded={colorPanelOpen}
             type="button"
-            title="颜色设置"
-            className={colorButtonClass}
-            onClick={() => setColorPanelOpen((current) => !current)}
+            title="文字与背景颜色"
+            className={iconButtonClass}
+            onClick={() => {
+              setColorPanelOpen((current) => !current);
+              setPresetPanelOpen(false);
+              setLayoutPanelOpen(false);
+            }}
           >
-            <span className="relative h-full w-full overflow-hidden rounded-sm border border-border/60 bg-background">
-              <span
-                className="absolute inset-0"
-                style={{
-                  backgroundColor: node.backgroundColor ?? "transparent",
-                }}
-              />
-              <span
-                className="absolute bottom-0.5 left-1 text-sm font-semibold leading-none"
-                style={{ color: node.color }}
-              >
-                A
-              </span>
+            <span className="relative flex h-6 w-6 items-center justify-center overflow-hidden rounded-md border border-white/20 bg-[#18191b] text-sm font-semibold leading-none" style={{ color: node.color }}>
+              A
+              <span className="absolute bottom-0 left-1 right-1 h-0.5 rounded-full" style={{ backgroundColor: node.color }} />
             </span>
           </button>
         </>

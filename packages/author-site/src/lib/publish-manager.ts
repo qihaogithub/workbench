@@ -47,6 +47,7 @@ import {
   processImagesForPublish,
   type ImageLocalizationOptions,
 } from "@/lib/publish/image-processor";
+import { processVideosForPublish } from "@/lib/publish/video-processor";
 import { replacePathsInContent } from "@/lib/publish/path-replacer";
 import type { PublishContext } from "@/lib/publish/types";
 import type { DesignSpecMeta } from "@/lib/design-specs";
@@ -232,6 +233,7 @@ export class PublishError extends Error {
       | "NO_CONTENT_TO_PUBLISH"
       | "SNAPSHOT_CREATE_ERROR"
       | "IMAGE_LOCALIZATION_FAILED"
+      | "VIDEO_LOCALIZATION_FAILED"
       | "PUBLISH_COMPILE_FAILED"
       | "PUBLISH_RUNTIME_UNSUPPORTED"
       | "SANDBOX_ORIGIN_NOT_CONFIGURED"
@@ -589,6 +591,16 @@ export async function publishProject(
           reason: item.error || "UNKNOWN",
         })),
       },
+    );
+  }
+  const videoResult = processVideosForPublish(publishContext);
+  for (const [source, target] of videoResult.urlMap) urlMap.set(source, target);
+  if (videoResult.errors.length > 0 && !dryRun) {
+    cleanupTmpDir();
+    throw new PublishError(
+      "VIDEO_LOCALIZATION_FAILED",
+      `发布失败：${videoResult.errors.length} 个视频资源不可用`,
+      { videos: videoResult.errors },
     );
   }
 

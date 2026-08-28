@@ -116,7 +116,23 @@ description: 创建/重命名/排序页面和文件夹的完整规则：目录�
 }
 ```
 
-支持的类型：`string`、`number`、`integer`、`boolean`、`text`（长文本）、`color`、`image`、`imageList`、`richtext`、`enum`、`cascade`、`array`。
+支持的类型：`string`、`number`、`integer`、`boolean`、`text`（长文本）、`color`、`image`、`imageList`、`video`、`richtext`、`enum`、`cascade`、`array`。
+
+**视频（video）**：仅用于用户明确要求上传 MP4/WebM 视频的场景。Schema 必须声明为对象值，页面 Props 读取 `heroVideo.url`，`poster` 为可选封面；不要把视频字段写成字符串 URL，也不要让页面依赖会话 URL：发布时平台会本地化资源。
+
+```json
+"heroVideo": {
+  "type": "object",
+  "title": "主视频",
+  "format": "video",
+  "properties": {
+    "url": { "type": "string", "title": "视频地址" },
+    "poster": { "type": "string", "title": "封面地址", "format": "image" }
+  },
+  "required": ["url"],
+  "ui:options": { "accept": "video/mp4,video/webm", "videoPreviewStyle": "controls" }
+}
+```
 
 **枚举多选**：`type: "enum"` 添加 `multiple: true` 即可切换为多选模式（checkbox 组），`default` 值为 `string[]`，页面 props 中该字段值为 `string[]`。
 
@@ -142,6 +158,7 @@ description: 创建/重命名/排序页面和文件夹的完整规则：目录�
 **必须升级高保真页才能使用的配置类型（需结构化消费）：**
 - `array`（含 `variants` 模块数组，以及 `$demo.sortable`、`$demo.maxItems` 等扩展）
 - `imageList`、`richtext`、`cascade`
+- `format: "video"`（值为 `{ url, poster? }`）
 - `enum` 多选（`multiple: true`）
 - `type: "position"`（坐标定位字段）
 - `$demo.orderable`、`$demo.orderableHorizontal`、`$demo.positionable`（根级排序/定位声明）
@@ -172,7 +189,17 @@ description: 创建/重命名/排序页面和文件夹的完整规则：目录�
 - 适用于 enum 联动、boolean 开关联动等场景
 - 被隐藏字段的当前值不会丢失，重新显示后恢复
 
-### workspace-tree.json 追加规则
+### 原子创建页面（必须使用 createPage）
+
+新建页面必须调用 `createPage`，一次提交页面运行时源码、`config.schema.json` 和 `workspace-tree.json`。不要再用 `writeFile` / `editFile` 分别创建目录、写文件、最后批量改页面树。
+
+- 多页任务按页面逐个完成后立即调用一次 `createPage`；不要等全部页面都生成完再发布页面树。
+- `createPage` 的 `pageId` 是目录名；传入完整 `source`、完整 `configSchema`、`name`、`parentId`、`order` 和 `runtimeType`。原型页还必须传完整 `prototypeCss`，它会与 `prototype.html`、schema 和页面树一起发布；高保真 React 页不得传 `prototypeCss`。
+- `runtimeType` 默认 `prototype-html-css`，只有需要 React 执行能力时选 `high-fidelity-react`。
+- 成功结果的 `details.createdPage` 和 `details.receipt` 是该页已完整持久化的证明；之后的视觉细化可继续用现有文件编辑工具。
+- 已存在页面的源码、schema、名称或排序修改继续使用相应现有工具，不调用 `createPage`。
+
+### workspace-tree.json 追加规则（createPage 内部行为）
 
 在 `workspace-tree.json` 的 `pages` 数组中追加新页面记录：
 

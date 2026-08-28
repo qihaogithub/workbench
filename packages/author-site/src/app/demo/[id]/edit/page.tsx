@@ -44,6 +44,7 @@ import type {
   SketchSceneDocument,
   SchemaDefinitionMutation,
 } from "@workbench/shared";
+import type { WorkspaceMutationReceipt } from "@workbench/shared/contracts";
 import {
   applyPagePresentationToSchema,
   resolvePagePresentation,
@@ -110,6 +111,10 @@ import {
 } from "@/lib/workspace-save-state-machine";
 import { PreviewProjectionTracker } from "@/lib/preview-projection-tracker";
 import { WorkspacePerformanceSampler } from "@/lib/workspace-performance-sampling";
+import { getPersistablePageContent } from "@/lib/page-content-state";
+import {
+  readWorkspaceAuthoritySnapshotFromBrowser,
+} from "@/lib/workspace-authority-browser-client";
 import { Button } from "@/components/ui/button";
 import { DesignSpecWorkspaceProvider } from "@/components/demo/DesignSpecWorkspace";
 import { HtmlFileDropZone } from "@/components/demo/HtmlFileDropZone";
@@ -249,6 +254,7 @@ import type {
 } from "@workbench/shared";
 import { projectApiClient } from "@/lib/project-api";
 import {
+  hasLoadedPrototypeHtml,
   loadCanvasPageContent,
   type ReferencedDesignSpec,
 } from "@/lib/canvas-page-content-loader";
@@ -724,6 +730,44 @@ function isAiFileChangeRefreshTarget(normalizedPath: string): boolean {
   );
 }
 
+function projectAuthoritySnapshotResources(resources: Record<string, string>) {
+  const parseJson = <T,>(value: string | undefined): T | undefined => {
+    if (!value) return undefined;
+    try { return JSON.parse(value) as T; } catch { return undefined; }
+  };
+  const tree = parseJson<{ pages?: DemoPageMeta[]; folders?: DemoFolderMeta[] }>(resources["workspace-tree.json"]);
+  const demoPages = Array.isArray(tree?.pages) ? tree.pages : [];
+  const demoFolders = Array.isArray(tree?.folders) ? tree.folders : [];
+  const demos: Record<string, RuntimeConversionFileSnapshot> = {};
+  for (const page of demoPages) {
+    const prefix = `demos/${page.id}/`;
+    const schema = resources[`${prefix}config.schema.json`];
+    const code = resources[`${prefix}index.tsx`];
+    const prototypeHtml = resources[`${prefix}prototype.html`];
+    const sketchScene = resources[`${prefix}sketch.scene.json`];
+    const sandboxHtml = resources[`${prefix}sandbox.html`];
+    if (!schema || (!code && !prototypeHtml && !sketchScene && !sandboxHtml)) continue;
+    demos[page.id] = {
+      code: code ?? "",
+      schema,
+      prototypeHtml,
+      prototypeCss: resources[`${prefix}prototype.css`],
+      prototypeMeta: parseJson<PrototypePageMeta>(resources[`${prefix}prototype.meta.json`]),
+      sketchScene,
+      sketchMeta: parseJson<Record<string, unknown>>(resources[`${prefix}sketch.meta.json`]),
+    };
+  }
+  return {
+    demoPages,
+    demoFolders,
+    multi: {
+      demos,
+      projectConfigSchema: resources["project.config.schema.json"],
+      projectConfigValues: parseJson<Record<string, unknown>>(resources["project.config.values.json"]),
+    },
+  };
+}
+
 const WORKSPACE_FLUSH_DELAY_MS = 1200;
 
 type WorkspaceSyncPhase =
@@ -992,6 +1036,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [requirementsLoading, setRequirementsLoading] = useState(false);
   const [designSpecFocus, setDesignSpecFocus] = useState<{ docId: string; entryId: string } | null>(null);
   const [pageCodes, setPageCodes] = useState<Record<string, string>>({});
+  const pageCodesRef = useRef(pageCodes);
+  pageCodesRef.current = pageCodes;
   const [pagePrototypeMap, setPagePrototypeMap] = useState<
     Record<
       string,
@@ -1169,6 +1215,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     sessionId,
     enabled: Boolean(demoId && workspaceId && sessionId),
   });
+  const appliedAuthorityProjectionRevisionRef = useRef(0);
+  const pendingAuthorityProjectionRevisionRef = useRef(0);
+  const authorityProjectionChainRef = useRef<Promise<void>>(Promise.resolve());
 
   const markWorkspaceChanged = useCallback(() => {
     setHasUnsavedChanges(true);
@@ -1199,6 +1248,12 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     useState<SinglePreviewTarget | null>(null);
   const activeDemoIdRef = useRef(activeDemoId);
   activeDemoIdRef.current = activeDemoId;
+  // A page switch owns both the page id and its page-scoped content. Autosave
+  // must not observe the interval between requesting a page and committing its
+  // complete snapshot.
+  const pageSwitchInFlightRef = useRef(false);
+  const pageSwitchRequestRef = useRef(0);
+  const pageSwitchDeferredSyncRef = useRef(false);
   useEffect(() => {
     if (activeDemoId) {
       loadPageRequirements(activeDemoId);
@@ -2753,6 +2808,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         setCode((prev) => (prev === newCode ? prev : newCode));
         codeRef.current = newCode;
         if (targetPageId) {
+          pageCodesRef.current = {
+            ...pageCodesRef.current,
+            [targetPageId]: newCode,
+          };
           setPageCodes((prev) =>
             prev[targetPageId] === newCode
               ? prev
@@ -2772,6 +2831,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         setSchema(newSchema);
         schemaRef.current = newSchema;
         if (targetPageId) {
+          pageSchemaMapRef.current = {
+            ...pageSchemaMapRef.current,
+            [targetPageId]: newSchema,
+          };
           setPageSchemaMap((prev) => ({ ...prev, [targetPageId]: newSchema }));
         }
         const size = getPreviewSize(newSchema);
@@ -3850,6 +3913,39 @@ ${context.details}
     }
   };
 
+  const handlePageRename = useCallback(
+    async (pageId: string, name: string): Promise<boolean> => {
+      if (!sessionId) return false;
+      try {
+        const res = await fetch(`/api/projects/${demoId}/demos/${pageId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId, name }),
+        });
+        const data = await res.json();
+        if (!data.success) {
+          toast({
+            title: "更新失败",
+            description: data.error?.message,
+            variant: "destructive",
+          });
+          return false;
+        }
+
+        setDemoPages((prev) =>
+          prev.map((page) => (page.id === pageId ? { ...page, name } : page)),
+        );
+        handleWorkspaceTreeChanged();
+        toast({ title: "名称已更新" });
+        return true;
+      } catch {
+        toast({ title: "更新失败", variant: "destructive" });
+        return false;
+      }
+    },
+    [demoId, handleWorkspaceTreeChanged, sessionId, toast],
+  );
+
   useEffect(() => {
     const loadDemo = async () => {
       let bootstrapReady = false;
@@ -3989,7 +4085,9 @@ ${context.details}
         }
 
         setCode(loadedCode);
+        codeRef.current = loadedCode;
         setSchema(loadedSchema);
+        schemaRef.current = loadedSchema;
         setEditorContent(buildFigmaText(loadedCode, loadedSchema));
 
         const allDefaults: Record<string, Record<string, unknown>> = {};
@@ -4075,6 +4173,11 @@ ${context.details}
           schemas[initialDemoId] = loadedSchema;
         }
         setConfigDataMap(allDefaults);
+        pageCodesRef.current = codes;
+        pageSchemaMapRef.current = {
+          ...pageSchemaMapRef.current,
+          ...schemas,
+        };
         setPageCodes(codes);
         setPagePrototypeMap(prototypes);
         setPageSketchMap(sketches);
@@ -4619,6 +4722,10 @@ ${context.details}
 
   const updatePageSchemaMapFromLoad = useCallback(
     (pageId: string, loadedSchema: string) => {
+      pageSchemaMapRef.current = {
+        ...pageSchemaMapRef.current,
+        [pageId]: loadedSchema,
+      };
       setPageSchemaMap((prev) =>
         mergeLoadedPageSchemas(prev, { [pageId]: loadedSchema }),
       );
@@ -4651,7 +4758,7 @@ ${context.details}
     return candidatePages
       .filter((page) => {
         if (page.runtimeType === "prototype-html-css") {
-          return pagePrototypeMap[page.id] === undefined;
+          return !hasLoadedPrototypeHtml(pagePrototypeMap[page.id]?.html);
         }
         if (page.runtimeType === "sketch-scene") {
           return pageSketchMap[page.id] === undefined;
@@ -4714,6 +4821,13 @@ ${context.details}
                 sandboxChannelId: data.sandboxChannelId,
               };
             } catch (error) {
+              // 删除页面会让已经发出的画布补齐请求收到 404。此时 effect
+              // 通常已经因页面树更新而清理；若响应恰好先到，也应按陈旧
+              // 请求处理，避免把正常删除竞态打印成控制台错误。
+              const pageStillExists = demoPagesRef.current.some(
+                (item) => item.id === pageId,
+              );
+              if (cancelled || !pageStillExists) return null;
               console.error("加载画布页面内容失败:", pageId, error);
               return null;
             }
@@ -4825,20 +4939,20 @@ ${context.details}
   }, [canvasMissingPageIdsKey, demoId, demoPages, getSafeMergedDefaults, sessionId]);
 
   const handleConfigPanelPageSelect = useCallback(
-    async (pageId: string, suppliedPage?: DemoPageMeta) => {
+    async (
+      pageId: string,
+      suppliedPage?: DemoPageMeta,
+      { focusCanvas = true }: { focusCanvas?: boolean } = {},
+    ) => {
       rememberActivePageSchema();
-      setSinglePreviewTarget({ kind: "page", pageId });
-      setActiveDemoId(pageId);
-      activeDemoIdRef.current = pageId;
-      if (pagePreviewSizeMap[pageId]) {
-        setPreviewSize(pagePreviewSizeMap[pageId]);
-      }
-      if (previewMode === "canvas") {
-        setConfigPanelOverviewRequested(false);
-        focusCanvasPage(pageId);
-        setCanvasEditingPageId(pageId);
-      }
       if (!sessionId) return;
+      const requestId = ++pageSwitchRequestRef.current;
+      pageSwitchInFlightRef.current = true;
+      if (syncDebounceRef.current) {
+        clearTimeout(syncDebounceRef.current);
+        syncDebounceRef.current = null;
+        pageSwitchDeferredSyncRef.current = true;
+      }
       try {
         const selectedPage = suppliedPage ?? demoPages.find((page) => page.id === pageId);
         if (!selectedPage) return;
@@ -4847,14 +4961,22 @@ ${context.details}
           projectId: demoId,
           sessionId,
         });
+        if (requestId !== pageSwitchRequestRef.current) return;
         {
           const prototypeMeta = data.prototypeMeta as
             | PrototypePageMeta
             | undefined;
-          setPageCodes((prev) => ({
-            ...prev,
-            [pageId]: data.code ?? "",
-          }));
+          const nextCode = data.code ?? "";
+          const nextSchema = data.schema ?? "";
+          pageCodesRef.current = {
+            ...pageCodesRef.current,
+            [pageId]: nextCode,
+          };
+          pageSchemaMapRef.current = {
+            ...pageSchemaMapRef.current,
+            [pageId]: nextSchema,
+          };
+          setPageCodes((prev) => ({ ...prev, [pageId]: nextCode }));
           if (
           data.prototypeHtml !== undefined ||
             data.prototypeCss !== undefined
@@ -4889,12 +5011,9 @@ ${context.details}
               },
             }));
           }
-          setCode(data.code ?? "");
-          setSchema(data.schema ?? "");
-          updatePageSchemaMapFromLoad(pageId, data.schema ?? "");
-          setEditorContent(buildFigmaText(data.code ?? "", data.schema ?? ""));
+          updatePageSchemaMapFromLoad(pageId, nextSchema);
           setConfigDataMap((prev) => {
-            const defaults = getSafeMergedDefaults(data.schema ?? "");
+            const defaults = getSafeMergedDefaults(nextSchema);
             return {
               ...prev,
               [pageId]: {
@@ -4921,17 +5040,46 @@ ${context.details}
               [pageId]: data.projectConfigSchema ?? "",
             }));
           }
-          const size = getPreviewSize(data.schema ?? "");
+          const size = getPreviewSize(nextSchema);
           if (size) {
             setPagePreviewSizeMap((prev) => ({
               ...prev,
               [pageId]: size,
             }));
           }
+          // Commit the requested page's identity and all editor projections in
+          // one React update. The refs above make the same snapshot available
+          // to any synchronous persistence path immediately.
+          setCode(nextCode);
+          codeRef.current = nextCode;
+          setSchema(nextSchema);
+          schemaRef.current = nextSchema;
+          setEditorContent(buildFigmaText(nextCode, nextSchema));
           setPreviewSize(size);
+          setSinglePreviewTarget({ kind: "page", pageId });
+          setActiveDemoId(pageId);
+          activeDemoIdRef.current = pageId;
+          if (previewMode === "canvas") {
+            setConfigPanelOverviewRequested(false);
+            if (focusCanvas) {
+              focusCanvasPage(pageId);
+            } else {
+              setCanvasEditingPageId(pageId);
+            }
+          }
         }
       } catch (err) {
-        console.error("加载页面失败:", err);
+        if (requestId === pageSwitchRequestRef.current) {
+          console.error("加载页面失败:", err);
+        }
+      } finally {
+        if (requestId === pageSwitchRequestRef.current) {
+          pageSwitchInFlightRef.current = false;
+          if (pageSwitchDeferredSyncRef.current) {
+            pageSwitchDeferredSyncRef.current = false;
+            scheduleWorkspaceSyncRef.current();
+          }
+        }
       }
     },
     [
@@ -4939,7 +5087,6 @@ ${context.details}
       demoId,
       demoPages,
       getSafeMergedDefaults,
-      pagePreviewSizeMap,
       previewMode,
       rememberActivePageSchema,
       sessionId,
@@ -5560,7 +5707,10 @@ ${context.details}
   );
 
   const handleAiFilesChange = useCallback(
-    async (files: AiFileChange[]) => {
+    async (
+      files: AiFileChange[],
+      authoritySnapshot?: { state: { revision: number }; resources: Record<string, string> },
+    ) => {
       const traceId = createDiagnosticTraceId("ai-files");
       const activePageId = activeDemoIdRef.current;
       const normalizeAiFilePath = (filePath: string) => {
@@ -5596,31 +5746,51 @@ ${context.details}
       });
       if (!hasWorkspaceStructureChange || !sessionId) return;
 
-      handleWorkspaceTreeChanged();
+      if (authoritySnapshot) {
+        // Keep the live Yjs tree aligned with the exact Authority revision we
+        // are about to project. Otherwise an already-open room can flush its
+        // pre-creation tree and erase the newly published page from disk.
+        replaceCollabText(
+          workspaceTreeCollab.ytext,
+          authoritySnapshot.resources["workspace-tree.json"] ?? "",
+        );
+      } else {
+        handleWorkspaceTreeChanged();
+      }
 
       const previousPageIds = new Set(demoPages.map((page) => page.id));
       const previousActiveId = activeDemoIdRef.current;
 
       try {
-        const filesRes = await fetch(`/api/sessions/${sessionId}/files`);
-        if (!filesRes.ok) {
-          throw new Error("刷新页面列表失败");
+        let multi: ReturnType<typeof projectAuthoritySnapshotResources>["multi"] & {
+          demoPages?: DemoPageMeta[];
+          demoFolders?: DemoFolderMeta[];
+        };
+        let rawPages: DemoPageMeta[];
+        let snapshotFolders: DemoFolderMeta[];
+        if (authoritySnapshot) {
+          const projected = projectAuthoritySnapshotResources(authoritySnapshot.resources);
+          multi = projected.multi;
+          rawPages = projected.demoPages;
+          snapshotFolders = projected.demoFolders;
+        } else {
+          const filesRes = await fetch(`/api/sessions/${sessionId}/files`);
+          if (!filesRes.ok) throw new Error("刷新页面列表失败");
+          const filesData = await filesRes.json();
+          if (!filesData.success) throw new Error(filesData.error?.message || "刷新页面列表失败");
+          multi = filesData.data;
+          rawPages = multi.demoPages || [];
+          snapshotFolders = multi.demoFolders || [];
         }
-        const filesData = await filesRes.json();
-        if (!filesData.success) {
-          throw new Error(filesData.error?.message || "刷新页面列表失败");
-        }
-
-        const multi = filesData.data;
-        const rawPages = multi.demoPages || [];
-        const pagesWithSize = rawPages.map((page: DemoPageMeta) => ({
-          ...page,
-          previewSize: multi.demos?.[page.id]?.schema
-            ? getPreviewSize(multi.demos[page.id].schema)
-            : undefined,
-        }));
+        const pagesWithSize = rawPages.map((page: DemoPageMeta) => {
+          const pageSchema = multi.demos?.[page.id]?.schema;
+          return {
+            ...page,
+            previewSize: pageSchema ? getPreviewSize(pageSchema) : undefined,
+          };
+        });
         setDemoPages(pagesWithSize);
-        setDemoFolders(multi.demoFolders || []);
+        setDemoFolders(snapshotFolders);
         setProjectConfigSchema(multi.projectConfigSchema);
         projectConfigSchemaRef.current = multi.projectConfigSchema;
         replaceCollabText(
@@ -5716,6 +5886,11 @@ ${context.details}
         };
         pageSketchMapRef.current = { ...pageSketchMapRef.current, ...sketches };
 
+        pageCodesRef.current = codes;
+        pageSchemaMapRef.current = {
+          ...pageSchemaMapRef.current,
+          ...schemas,
+        };
         setPageCodes(codes);
         setPagePrototypeMap(prototypes);
         setPageSketchMap(sketches);
@@ -5732,7 +5907,7 @@ ${context.details}
         setPageSchemaMap((prev) => mergeLoadedPageSchemas(prev, schemas));
         setPagePreviewSizeMap(previewSizeMap);
 
-        markWorkspaceChanged();
+        if (!authoritySnapshot) markWorkspaceChanged();
         for (const pageId of pageIds) {
           markScreenshotDirty(pageId);
         }
@@ -5741,7 +5916,9 @@ ${context.details}
           name: "ai.files_change_marked_workspace_dirty",
           traceId,
           details: {
-            reason: "agent_file_change",
+            reason: authoritySnapshot
+              ? "authority_snapshot_projection"
+              : "agent_file_change",
           },
         });
 
@@ -5836,12 +6013,78 @@ ${context.details}
       markWorkspaceChanged,
       previewMode,
       projectSchemaCollab.ytext,
+      workspaceTreeCollab.ytext,
       reconcileRuntimeConversionsAfterAiFiles,
       recordDiagnosticEvent,
       sessionId,
       setFocusCanvasPageId,
       toast,
     ],
+  );
+
+  const handleWorkspaceMutationCommitted = useCallback(
+    (receipt: WorkspaceMutationReceipt) => {
+      const affectsPageProjection = receipt.resources.some((resource) =>
+        isAiFileChangeRefreshTarget(resource.path),
+      );
+      if (!affectsPageProjection || !sessionId || !workspaceId) return;
+
+      pendingAuthorityProjectionRevisionRef.current = Math.max(
+        pendingAuthorityProjectionRevisionRef.current,
+        receipt.revision,
+      );
+      const queuedAt = performance.now();
+      authorityProjectionChainRef.current = authorityProjectionChainRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          const minimumRevision = pendingAuthorityProjectionRevisionRef.current;
+          const snapshot = await readWorkspaceAuthoritySnapshotFromBrowser({
+            projectId: demoId,
+            workspaceId,
+            sessionId,
+          });
+          if (
+            snapshot.state.revision < minimumRevision ||
+            snapshot.state.revision <= appliedAuthorityProjectionRevisionRef.current
+          ) return;
+
+          await handleAiFilesChange(
+            receipt.resources.map((resource) => ({
+              path: resource.path,
+              action:
+                resource.action === "deleted"
+                  ? "deleted"
+                  : resource.beforeHash === null
+                    ? "created"
+                    : "modified",
+            })),
+            snapshot,
+          );
+          appliedAuthorityProjectionRevisionRef.current = snapshot.state.revision;
+          recordDiagnosticEvent({
+            category: "ai",
+            name: "ai.authority_snapshot_projected",
+            details: {
+              receiptRevision: receipt.revision,
+              snapshotRevision: snapshot.state.revision,
+              queueMs: Math.round(performance.now() - queuedAt),
+              resources: receipt.resources.map((resource) => resource.path),
+            },
+          });
+        })
+        .catch((error) => {
+          recordDiagnosticEvent({
+            category: "ai",
+            name: "ai.authority_snapshot_projection_failed",
+            level: "warn",
+            details: {
+              receiptRevision: receipt.revision,
+              message: error instanceof Error ? error.message : "未知错误",
+            },
+          });
+        });
+    },
+    [demoId, handleAiFilesChange, recordDiagnosticEvent, sessionId, workspaceId],
   );
 
   useEffect(() => {
@@ -5866,23 +6109,35 @@ ${context.details}
   // and handlePublish moved to useVersionControl hook
 
   const persistActivePageToSession = useCallback(async () => {
-    if (!sessionId || !activeDemoId) {
+    const pageId = activeDemoIdRef.current;
+    if (!sessionId || !pageId) {
       throw new Error("未选中页面或 Session 未创建");
+    }
+    if (pageSwitchInFlightRef.current) {
+      throw new Error("页面切换尚未完成，已阻止保存");
+    }
+    const pageContent = getPersistablePageContent({
+      pageId,
+      pageCodes: pageCodesRef.current,
+      pageSchemaMap: pageSchemaMapRef.current,
+    });
+    if (!pageContent) {
+      throw new Error("当前页面内容尚未完整加载，已阻止保存");
     }
 
     const saveRes = await fetch(
-      `/api/sessions/${sessionId}/files/${activeDemoId}`,
+      `/api/sessions/${sessionId}/files/${pageId}`,
       {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          code,
-          schema,
-          prototypeHtml: pagePrototypeMapRef.current[activeDemoId]?.html,
-          prototypeCss: pagePrototypeMapRef.current[activeDemoId]?.css,
-          prototypeMeta: pagePrototypeMapRef.current[activeDemoId]?.meta,
-          sketchScene: pageSketchMapRef.current[activeDemoId]?.scene,
-          sketchMeta: pageSketchMapRef.current[activeDemoId]?.meta,
+          code: pageContent.code,
+          schema: pageContent.schema,
+          prototypeHtml: pagePrototypeMapRef.current[pageId]?.html,
+          prototypeCss: pagePrototypeMapRef.current[pageId]?.css,
+          prototypeMeta: pagePrototypeMapRef.current[pageId]?.meta,
+          sketchScene: pageSketchMapRef.current[pageId]?.scene,
+          sketchMeta: pageSketchMapRef.current[pageId]?.meta,
           localizeImages: false,
         }),
       },
@@ -5902,7 +6157,7 @@ ${context.details}
       error.status = saveRes.status || 0;
       throw error;
     }
-  }, [activeDemoId, code, schema, sessionId]);
+  }, [sessionId]);
 
   const handleSketchSceneChange = useCallback(
     (scene: SketchSceneDocument) => {
@@ -6058,6 +6313,10 @@ ${context.details}
     if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
     syncDebounceRef.current = setTimeout(() => {
       syncDebounceRef.current = null;
+      if (pageSwitchInFlightRef.current) {
+        pageSwitchDeferredSyncRef.current = true;
+        return;
+      }
       if (syncInFlightRef.current) return;
       syncInFlightRef.current = true;
       void (async () => {
@@ -6132,6 +6391,10 @@ ${context.details}
     if (syncDebounceRef.current) {
       clearTimeout(syncDebounceRef.current);
       syncDebounceRef.current = null;
+    }
+    if (pageSwitchInFlightRef.current) {
+      pageSwitchDeferredSyncRef.current = true;
+      return;
     }
     if (syncInFlightRef.current) return;
     syncInFlightRef.current = true;
@@ -7836,6 +8099,7 @@ await handlePublishWithScreenshot();
                   onCodeUpdate={handleCodeUpdate}
                   onSchemaUpdate={handleSchemaUpdate}
                   onFilesChange={handleAiFilesChange}
+                  onWorkspaceMutationCommitted={handleWorkspaceMutationCommitted}
                   onDiagnosticEvent={(event) => {
                     recordDiagnosticEvent({
                       category: "ai",
@@ -8138,102 +8402,9 @@ await handlePublishWithScreenshot();
                   activeDemoId={activeDemoId}
                   onPageSelect={async (pageId) => {
                     if (editingPageId === pageId) return;
-                    setActiveDemoId(pageId);
-                    // 同步设置 previewSize，避免 fetch 期间用旧尺寸渲染
-                    if (pagePreviewSizeMap[pageId]) {
-                      setPreviewSize(pagePreviewSizeMap[pageId]);
-                    }
-                    if (previewMode === "canvas") {
-                      focusCanvasPage(pageId);
-                    }
-                    if (sessionId) {
-                      try {
-                        const res = await fetch(
-                          `/api/sessions/${sessionId}/files/${pageId}`,
-                        );
-                        const data = await res.json();
-                        if (data.success) {
-                          const prototypeMeta = data.data.prototypeMeta as
-                            | PrototypePageMeta
-                            | undefined;
-                          setPageCodes((prev) => ({
-                            ...prev,
-                            [pageId]: data.data.code,
-                          }));
-                          if (
-                            data.data.prototypeHtml !== undefined ||
-                            data.data.prototypeCss !== undefined
-                          ) {
-                            setPagePrototypeMap((prev) => ({
-                              ...prev,
-                              [pageId]: {
-                                html: data.data.prototypeHtml,
-                                css: data.data.prototypeCss,
-                                meta: prototypeMeta,
-                              },
-                            }));
-                          }
-                          setCode(data.data.code);
-                          setSchema(data.data.schema);
-                          setPageSchemaMap((prev) => ({
-                            ...prev,
-                            [pageId]: data.data.schema,
-                          }));
-                          setEditorContent(
-                            buildFigmaText(data.data.code, data.data.schema),
-                          );
-                          setConfigDataMap((prev) => {
-                            if (prev[pageId]) return prev;
-                            const defaults = getSafeMergedDefaults(
-                              data.data.schema,
-                            );
-                            return { ...prev, [pageId]: defaults };
-                          });
-                          const size = getPreviewSize(data.data.schema);
-                          if (size) {
-                            setPagePreviewSizeMap((prev) => ({
-                              ...prev,
-                              [pageId]: size,
-                            }));
-                          }
-                          setPreviewSize(size);
-                        }
-                      } catch (err) {
-                        console.error("加载页面失败:", err);
-                      }
-                    }
+                    await handleConfigPanelPageSelect(pageId);
                   }}
-                  onPageRename={async (pageId, name) => {
-                    if (!sessionId) return;
-                    try {
-                      const res = await fetch(
-                        `/api/projects/${demoId}/demos/${pageId}`,
-                        {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ sessionId, name }),
-                        },
-                      );
-                      const data = await res.json();
-                      if (data.success) {
-                        setDemoPages((prev) =>
-                          prev.map((p) =>
-                            p.id === pageId ? { ...p, name } : p,
-                          ),
-                        );
-                        handleWorkspaceTreeChanged();
-                        toast({ title: "名称已更新" });
-                      } else {
-                        toast({
-                          title: "更新失败",
-                          description: data.error?.message,
-                          variant: "destructive",
-                        });
-                      }
-                    } catch {
-                      toast({ title: "更新失败", variant: "destructive" });
-                    }
-                  }}
+                  onPageRename={handlePageRename}
                   onPageCopy={async (pageId) => {
                     if (!sessionId) {
                       toast({
@@ -8916,71 +9087,12 @@ await handlePublishWithScreenshot();
                   onUpdateKnowledgeDocument: updateCanvasKnowledgeDocument,
                   onReadKnowledgeDocument: readCanvasKnowledgeDocument,
                   onPageConfigEdit: (pageId) => {
-                    rememberActivePageSchema();
-                    setCanvasEditingPageId(pageId);
                     setConfigPanelDetailPageId(pageId);
-                    setConfigPanelOverviewRequested(false);
-                    setActiveDemoId(pageId);
-                    activeDemoIdRef.current = pageId;
-                    if (sessionId) {
-                      fetch(`/api/sessions/${sessionId}/files/${pageId}`)
-                        .then((res) => res.json())
-                        .then((data) => {
-                          if (data.success) {
-                            const prototypeMeta = data.data.prototypeMeta as
-                              | PrototypePageMeta
-                              | undefined;
-                            setPageCodes((prev) => ({
-                              ...prev,
-                              [pageId]: data.data.code,
-                            }));
-                            if (
-                              data.data.prototypeHtml !== undefined ||
-                              data.data.prototypeCss !== undefined
-                            ) {
-                              setPagePrototypeMap((prev) => ({
-                                ...prev,
-                                [pageId]: {
-                                  html: data.data.prototypeHtml,
-                                  css: data.data.prototypeCss,
-                                  meta: prototypeMeta,
-                                },
-                              }));
-                            }
-                            setCode(data.data.code);
-                            setSchema(data.data.schema);
-                            updatePageSchemaMapFromLoad(
-                              pageId,
-                              data.data.schema,
-                            );
-                            setEditorContent(
-                              buildFigmaText(
-                                data.data.code,
-                                data.data.schema,
-                              ),
-                            );
-                            setConfigDataMap((prev) => {
-                              if (prev[pageId]) return prev;
-                              const defaults = getSafeMergedDefaults(
-                                data.data.schema,
-                              );
-                              return { ...prev, [pageId]: defaults };
-                            });
-                            const size = getPreviewSize(data.data.schema);
-                            if (size) {
-                              setPagePreviewSizeMap((prev) => ({
-                                ...prev,
-                                [pageId]: size,
-                              }));
-                            }
-                            setPreviewSize(size);
-                          }
-                        })
-                        .catch((err) =>
-                          console.error("加载页面失败:", err),
-                        );
-                    }
+                    void handleConfigPanelPageSelect(pageId, undefined, {
+                      focusCanvas: false,
+                    });
                   },
+                  onPageRename: handlePageRename,
                   onPageComment: commentModeActive
                     ? ({ pageId, pageName, pin, clientX, clientY }) => {
                         setRightPanelTab("comments");

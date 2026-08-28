@@ -8,7 +8,7 @@ SERVER_PORT="${SERVER_PORT:-22}"
 SERVER_USER="${SERVER_USER:-jojo}"
 REMOTE_DIR="${REMOTE_DIR:-/Users/jojo/Documents/workbench}"
 # 认证方式：默认使用密码登录（SSH_PASSWORD），置空则回退到 SSH 私钥（SSH_KEY）
-SSH_PASSWORD="${SSH_PASSWORD:-123456}"
+SSH_PASSWORD="${SSH_PASSWORD-123456}"
 SSH_KEY="${SSH_KEY:-${HOME}/.ssh/figma-mirror-deploy-key}"
 LOCAL_DATA_DIR="${LOCAL_DATA_DIR:-${PROJECT_DIR}/data}"
 REMOTE_BACKUP_DIR="${REMOTE_BACKUP_DIR:-/Users/jojo/workbench-data-backups}"
