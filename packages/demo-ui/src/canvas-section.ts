@@ -92,16 +92,10 @@ export function normalizeCanvasSections(
       seen.add(key);
     }
     const style = section.style && {
-      ...(section.style.fill ? { fill: section.style.fill } : {}),
-      ...(section.style.stroke ? { stroke: section.style.stroke } : {}),
-      ...(section.style.strokeWidth !== undefined
-        ? { strokeWidth: section.style.strokeWidth }
+      ...(section.style.color ? { color: section.style.color } : {}),
+      ...(section.style.fillOpacity !== undefined
+        ? { fillOpacity: Math.max(0, Math.min(100, section.style.fillOpacity)) }
         : {}),
-      ...(section.style.opacity !== undefined ? { opacity: section.style.opacity } : {}),
-      ...(section.style.cornerRadius !== undefined
-        ? { cornerRadius: section.style.cornerRadius }
-        : {}),
-      ...(section.style.titleColor ? { titleColor: section.style.titleColor } : {}),
     };
     normalized[id] = {
       id,

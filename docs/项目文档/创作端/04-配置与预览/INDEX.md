@@ -30,7 +30,7 @@
 | [10\_评论批注机制.md](./技术/10_评论批注机制.md) | 评论提及标签、键盘选择、评论与回复编辑、双端同步和预览标记可见性边界 |
 | [11_HTML导入与隔离运行时.md](./技术/11_HTML导入与隔离运行时.md) | capability registry、presentation 统一真值、私有 draft 和 prepare/commit/cancel、Authority 原子提交、独立 origin 与短时 ticket、受控 iframe、截图指纹、发布/嵌入与脱敏诊断 |
 | [12_HTML资源Bundle与本地化.md](./技术/12_HTML资源Bundle与本地化.md) | ZIP/文件夹 bundle 安全门禁、相对资源重写、远程静态资源的显式授权本地化、内容寻址生命周期与外部 JavaScript 边界 |
-| [13_画布Section分区实现设计.md](./技术/13_画布Section分区实现设计.md) | 已实施的画布 Section：完整包裹自动收纳与越界释放、容器携带成员树整体移动、图标化样式工具栏、页面与自由节点及 Alt/Option 复制、嵌套交互、全局渲染层级、记录级协作重放与验收覆盖 |
+| [13_画布Section分区实现设计.md](./技术/13_画布Section分区实现设计.md) | 已实施的画布 Section：完整包裹自动收纳与越界释放、容器携带成员树整体移动、单色与填充透明度样式气泡框、页面与自由节点及 Alt/Option 复制、嵌套交互、全局渲染层级、记录级协作重放与验收覆盖 |
 
 ### 2026-06-21 补充
 

@@ -20,12 +20,18 @@ describe("CanvasSectionItem", () => {
     expect(screen.getByRole("textbox", { name: "Section 标题" })).toHaveFocus();
   });
 
-  it("标题双击进入重命名，同时不影响标题栏拖拽入口", () => {
-    render(<CanvasSectionItem section={section} editable />);
+  it("标题栏双击进入重命名，同时不影响标题栏拖拽入口", () => {
+    const onRename = vi.fn();
+    render(<CanvasSectionItem section={section} editable onRename={onRename} />);
     fireEvent.doubleClick(
-      screen.getByRole("button", { name: /选择 Section: 登录流程/ }),
+      screen.getByRole("button", { name: /选择 Section: 登录流程/ })
+        .parentElement as HTMLElement,
     );
-    expect(screen.getByRole("textbox", { name: "Section 标题" })).toBeVisible();
+    const input = screen.getByRole("textbox", { name: "Section 标题" });
+    expect(input).toBeVisible();
+    fireEvent.change(input, { target: { value: "新流程" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onRename).toHaveBeenCalledWith("section_a", "新流程");
   });
 
   it("始终显示标题栏，不再提供折叠入口", () => {
@@ -56,5 +62,12 @@ describe("CanvasSectionItem", () => {
     );
     expect(onSelect).toHaveBeenCalledWith("section_a");
     expect(screen.getByRole("button", { name: /选择 Section: 登录流程/ })).toBeVisible();
+  });
+
+  it("以更大的字号展示标题", () => {
+    render(<CanvasSectionItem section={section} editable />);
+    expect(screen.getByRole("button", { name: /选择 Section: 登录流程/ }).parentElement).toHaveClass(
+      "text-base",
+    );
   });
 });

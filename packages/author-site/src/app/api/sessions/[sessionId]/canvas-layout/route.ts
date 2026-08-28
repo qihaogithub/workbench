@@ -280,22 +280,15 @@ function parseCanvasSectionStyle(value: unknown): CanvasSectionStyle | undefined
     const field = readString(value, key);
     return field === null || field.length > 64 ? null : field;
   };
-  const fill = stringField("fill");
-  const stroke = stringField("stroke");
-  const titleColor = stringField("titleColor");
-  if (fill === null || stroke === null || titleColor === null) return null;
-  const strokeWidth = readNumber(value, "strokeWidth");
-  const opacity = readNumber(value, "opacity");
-  const cornerRadius = readNumber(value, "cornerRadius");
-  if ((strokeWidth !== null && (strokeWidth < 0 || strokeWidth > 64)) ||
-      (opacity !== null && (opacity < 0 || opacity > 1)) ||
-      (cornerRadius !== null && (cornerRadius < 0 || cornerRadius > 10000))) return null;
+  const color = stringField("color");
+  const fillOpacity = value.fillOpacity === undefined
+    ? undefined
+    : readNumber(value, "fillOpacity");
+  if (color === null || fillOpacity === null ||
+      (fillOpacity !== undefined && (fillOpacity < 0 || fillOpacity > 100))) return null;
   return {
-    ...(fill ? { fill } : {}), ...(stroke ? { stroke } : {}),
-    ...(strokeWidth !== null ? { strokeWidth } : {}),
-    ...(opacity !== null ? { opacity } : {}),
-    ...(cornerRadius !== null ? { cornerRadius } : {}),
-    ...(titleColor ? { titleColor } : {}),
+    ...(color ? { color } : {}),
+    ...(fillOpacity !== undefined ? { fillOpacity } : {}),
   };
 }
 

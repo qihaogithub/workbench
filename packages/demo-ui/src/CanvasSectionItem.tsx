@@ -65,6 +65,8 @@ export function CanvasSectionItem({
   };
 
   const style = section.style ?? {};
+  const sectionColor = style.color ?? "#94a3b8";
+  const fillOpacity = style.fillOpacity ?? 12;
   const startDrag = (event: React.PointerEvent, kind: "move" | "resize") => {
     if (!editable || editing) return;
     const isTitleButton =
@@ -130,13 +132,13 @@ export function CanvasSectionItem({
         width: section.layout.width,
         height: section.layout.height,
         zIndex: section.layout.zIndex ?? -1,
-        border: `${style.strokeWidth ?? (selected ? 2 : 1)}px solid ${style.stroke ?? (selected ? "hsl(var(--primary))" : "hsl(var(--border))")}`,
-        borderRadius: style.cornerRadius ?? 10,
-        background: style.fill ??
-          "color-mix(in srgb, hsl(var(--primary)) 5%, transparent)",
-        opacity: style.opacity ?? 1,
+        border: `1px solid ${sectionColor}`,
+        borderRadius: 10,
+        background: `color-mix(in srgb, ${sectionColor} ${fillOpacity}%, transparent)`,
         boxShadow: dropTarget
           ? "0 0 0 3px hsl(var(--primary) / 0.55)"
+          : selected
+            ? "0 0 0 1px hsl(var(--primary) / 0.6)"
           : undefined,
       }}
       data-canvas-section-id={section.id}
@@ -169,19 +171,23 @@ export function CanvasSectionItem({
         </>
       )}
       <div
-          className="pointer-events-auto absolute -top-7 left-0 flex h-6 max-w-full items-center gap-1 rounded-t-md border border-b-0 bg-background px-2 text-xs font-medium shadow-sm"
-          onPointerDown={(event) => startDrag(event, "move")}
-          onPointerMove={moveDrag}
-          onPointerUp={finishDrag}
-          onPointerCancel={finishDrag}
-        >
+        className="pointer-events-auto absolute -top-8 left-0 flex h-7 max-w-full items-center gap-1 rounded-t-md border border-b-0 bg-background px-2 text-base font-semibold shadow-sm"
+        onPointerDown={(event) => startDrag(event, "move")}
+        onPointerMove={moveDrag}
+        onPointerUp={finishDrag}
+        onPointerCancel={finishDrag}
+        onDoubleClick={(event) => {
+          event.stopPropagation();
+          if (editable) setEditing(true);
+        }}
+      >
           {editing ? (
             <input
               ref={inputRef}
               value={title}
               maxLength={120}
               aria-label="Section 标题"
-              className="w-40 bg-transparent outline-none"
+              className="w-48 bg-transparent text-base outline-none"
               onChange={(event) => setTitle(event.target.value)}
               onBlur={commit}
               onKeyDown={(event) => {
@@ -196,11 +202,10 @@ export function CanvasSectionItem({
             <button
               type="button"
               className="max-w-48 truncate text-left"
-              style={{ color: style.titleColor }}
-              aria-label={`选择 Section: ${section.title}，${section.children.length} 个成员`}
+              aria-label={`选择 Section: ${section.title}，${section.children.length} 个成员，双击改名称`}
+              title="双击改名称"
               data-section-title-button
               onClick={() => onSelect?.(section.id)}
-              onDoubleClick={() => editable && setEditing(true)}
             >
               {section.title} · {section.children.length}
             </button>

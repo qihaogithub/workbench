@@ -7,6 +7,8 @@ WORKDIR /app
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY patches/ ./patches/
 COPY packages/sketch-core/package.json ./packages/sketch-core/
+COPY packages/project-core/package.json ./packages/project-core/
+COPY packages/preview-contract/package.json ./packages/preview-contract/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/screenshot-service/package.json ./packages/screenshot-service/
 
@@ -14,6 +16,8 @@ RUN --mount=type=cache,id=workbench-pnpm-store,target=/pnpm/store \
     PUPPETEER_SKIP_DOWNLOAD=true pnpm install --store-dir /pnpm/store --frozen-lockfile
 
 COPY packages/sketch-core/ ./packages/sketch-core/
+COPY packages/project-core/ ./packages/project-core/
+COPY packages/preview-contract/ ./packages/preview-contract/
 COPY packages/shared/ ./packages/shared/
 COPY packages/screenshot-service/ ./packages/screenshot-service/
 
@@ -24,6 +28,9 @@ FROM --platform=$TARGETPLATFORM node:24-bookworm-slim
 WORKDIR /app
 
 ARG DEBIAN_MIRROR=
+ARG HTTP_PROXY=
+ARG HTTPS_PROXY=
+ENV http_proxy=$HTTP_PROXY https_proxy=$HTTPS_PROXY
 
 # 安装 Chromium
 RUN if [ -n "$DEBIAN_MIRROR" ]; then \

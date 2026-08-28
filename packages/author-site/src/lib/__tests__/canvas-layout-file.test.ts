@@ -44,14 +44,14 @@ describe("parseCanvasState Section recovery", () => {
         section_1: {
           ...validSection,
           collapsed: true,
-          style: { titleVisible: false, fill: "#eff6ff" },
+          style: { titleVisible: false, color: "#94a3b8", fillOpacity: 35, strokeWidth: 8 },
         },
       },
     });
 
     expect(state?.sections?.section_1).toEqual({
       ...validSection,
-      style: { fill: "#eff6ff" },
+      style: { color: "#94a3b8", fillOpacity: 35 },
     });
   });
 });
