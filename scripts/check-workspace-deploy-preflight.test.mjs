@@ -9,14 +9,13 @@ import { checkComposeDataDir, scanWorkspaceAuthorityData } from "./check-workspa
 
 const hash = (content) => crypto.createHash("sha256").update(content).digest("hex");
 
-function createFixture() {
+function createFixture(resourcePath = "demos/home/index.tsx") {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "workspace-deploy-preflight-"));
   const projectId = "project-1";
   const workspaceId = "live-1";
   const workspacePath = path.join(dataDir, "workspaces", "projects", projectId, workspaceId);
-  const resourcePath = "demos/home/index.tsx";
   const content = "committed";
-  fs.mkdirSync(path.join(workspacePath, "demos", "home"), { recursive: true });
+  fs.mkdirSync(path.dirname(path.join(workspacePath, resourcePath)), { recursive: true });
   fs.writeFileSync(path.join(workspacePath, ".workspace.json"), JSON.stringify({ scope: "live", projectId, workspaceId }));
   fs.writeFileSync(path.join(workspacePath, resourcePath), content);
   return { dataDir, projectId, workspaceId, workspacePath, resourcePath, content };
@@ -61,6 +60,26 @@ test("deploy preflight passes registered clean Workspace and detects drift", () 
     assert.equal(drifted.issues.some((entry) => entry.code === "WORKSPACE_EXTERNAL_DRIFT"), true);
   } finally {
     fs.rmSync(fixture.dataDir, { recursive: true, force: true });
+  }
+});
+
+test("deploy preflight uses the Authority managed-resource contract for sandbox and design-spec files", () => {
+  for (const resourcePath of [
+    "demos/home/sandbox.html",
+    "demos/home/html-import.meta.json",
+    "demos/home/convention.md",
+    "convention.md",
+    "memory.md",
+    "design-spec/manifest.json",
+    "design-spec/spec-home.json",
+  ]) {
+    const fixture = createFixture(resourcePath);
+    try {
+      registerFixture(fixture);
+      assert.equal(scanWorkspaceAuthorityData(fixture.dataDir).passed, true, resourcePath);
+    } finally {
+      fs.rmSync(fixture.dataDir, { recursive: true, force: true });
+    }
   }
 });
 
