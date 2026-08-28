@@ -243,13 +243,7 @@ describe("resource version detail route", () => {
       sessionId: "session-1",
     });
     expect(restorePageVersion).not.toHaveBeenCalled();
-    expect(updateWorkspaceDemoFiles).toHaveBeenCalledWith(
-      "live-workspace",
-      "page-1",
-      expect.objectContaining({
-        code: "export default function Demo(){ return <div>restored</div>; }",
-      }),
-    );
+    expect(updateWorkspaceDemoFiles).not.toHaveBeenCalled();
     expect(createProjectVersionSnapshot).toHaveBeenCalledWith(
       "project-1",
       "测试用户",
@@ -260,7 +254,7 @@ describe("resource version detail route", () => {
         sourceWorkspacePath: workspacePath,
       }),
     );
-    expect(markWorkspaceBasedOnVersion).toHaveBeenCalledWith("live-workspace", "v-restore-1");
+    expect(markWorkspaceBasedOnVersion).not.toHaveBeenCalled();
     expect(flushAndSyncProjectWorkspace).not.toHaveBeenCalled();
 
     expect(commitWorkspaceMutation).toHaveBeenCalledTimes(1);

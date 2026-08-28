@@ -46,7 +46,8 @@ COPY packages/shared/ ./packages/shared/
 COPY packages/viewer-site/ ./packages/viewer-site/
 COPY scripts/ ./scripts/
 
-RUN pnpm --filter @workbench/viewer-site build
+RUN pnpm --filter @workbench/viewer-site build \
+    && node scripts/check-browser-agent-url-bundle.mjs packages/viewer-site/out
 
 FROM nginx:alpine
 

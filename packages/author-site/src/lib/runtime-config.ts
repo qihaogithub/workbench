@@ -28,8 +28,12 @@ function parseIntegerEnv(value: string | undefined, fallback: number): number {
 }
 
 export function getBrowserAgentServiceUrl(): string {
-  // 显式配置优先（开发环境 .env 或反向代理等特殊拓扑）
-  const configured = process.env.NEXT_PUBLIC_AGENT_SERVICE_URL;
+  // 仅开发环境允许显式覆盖。NEXT_PUBLIC_* 会在生产构建时内联，若带有
+  // localhost 会让远程浏览器错误地连接访问者自己的机器。
+  const configured =
+    process.env.NODE_ENV === "development"
+      ? process.env.NEXT_PUBLIC_AGENT_SERVICE_URL
+      : undefined;
   if (configured) return trimTrailingSlashes(configured);
   // 浏览器环境：从当前页面 hostname 自动推导，同主机 + 固定端口
   // 使同一 Docker 镜像在任意 IP/域名下均可正常工作

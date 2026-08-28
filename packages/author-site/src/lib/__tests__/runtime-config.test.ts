@@ -39,11 +39,16 @@ describe("runtime-config", () => {
     );
   });
 
-  it("读取并规整 agent-service URL", () => {
+  it("仅在开发环境读取浏览器端 agent-service URL 覆盖", () => {
     process.env.AGENT_SERVICE_URL = "http://agent.local///";
     process.env.NEXT_PUBLIC_AGENT_SERVICE_URL = "http://agent.public///";
 
     expect(getServerAgentServiceUrl()).toBe("http://agent.local");
+    expect(getBrowserAgentServiceUrl()).toBe(
+      `http://localhost:${AGENT_SERVICE_PORT}`,
+    );
+
+    process.env = { ...process.env, NODE_ENV: "development" };
     expect(getBrowserAgentServiceUrl()).toBe("http://agent.public");
   });
 
@@ -53,8 +58,13 @@ describe("runtime-config", () => {
       `http://localhost:${AGENT_SERVICE_PORT}`,
     );
 
-    // 显式配置优先于自动推导
+    // 仅开发环境允许显式配置覆盖自动推导，防止 Docker 构建时写死 localhost。
     process.env.NEXT_PUBLIC_AGENT_SERVICE_URL = "http://custom:9999";
+    expect(getBrowserAgentServiceUrl()).toBe(
+      `http://localhost:${AGENT_SERVICE_PORT}`,
+    );
+
+    process.env = { ...process.env, NODE_ENV: "development" };
     expect(getBrowserAgentServiceUrl()).toBe("http://custom:9999");
   });
 

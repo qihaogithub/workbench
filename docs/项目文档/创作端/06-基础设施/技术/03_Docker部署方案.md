@@ -17,6 +17,7 @@ covers:
   - scripts/docker-orbstack-verify.sh
   - scripts/docker-screenshot-deep-health.sh
   - scripts/docker-build-check.sh
+  - scripts/check-browser-agent-url-bundle.mjs
   - scripts/docker-prepull.sh
   - scripts/dev-restart.mjs
   - scripts/local-production-preview.mjs
@@ -36,7 +37,7 @@ covers:
 
 # Docker 部署方案
 
-> 更新日期：2026-08-20
+> 更新日期：2026-08-28
 > 状态：已验证可用（Pi Agent 单后端架构）
 
 ## 一、系统架构
@@ -151,7 +152,7 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 | `KNOWLEDGE_RECONCILE_INTERVAL_MS`    | `60000`                          | 模板项目周期协调间隔                                                       |
 | `KNOWLEDGE_BACKUP_INTERVAL_MS`       | `86400000`                       | SQLite 在线备份间隔                                                        |
 | `KNOWLEDGE_BACKUP_RETENTION_DAYS`    | `7`                              | 知识索引备份保留天数                                                       |
-| `NEXT_PUBLIC_AGENT_SERVICE_URL`      | 可选；未设置时按当前页面主机名推导 `:3201` | author-site/viewer-site 浏览器端访问 agent-service；只有跨主机/反向代理时才需显式设置 |
+| （无浏览器端 Agent URL 配置）        | —                                | author-site/viewer-site 的 Docker 生产包始终按当前页面协议与主机名推导 `:3201`；不得注入 `NEXT_PUBLIC_AGENT_SERVICE_URL` |
 | `NEXT_PUBLIC_SCREENSHOT_SERVICE_URL` | 局域网或公网 URL                 | author-site 浏览器端访问 screenshot-service                                |
 | `NEXT_PUBLIC_VIEWER_URL`             | 局域网或公网 URL                 | author-site 首页「浏览端」入口与分享弹窗使用的浏览端基址；未配置时按端口推导（3200→3300） |
 | `NEXT_PUBLIC_DATA_BASE`              | `/data` 或外部数据基址           | viewer-site 静态导出时的数据基址                                           |
@@ -172,7 +173,6 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 | ------------------------------------ | ----------------------------------------------------------------- | --------------------------------------------------- |
 | `NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES` | `xjjj/,jojo/`                                                     | 前端模型白名单                                      |
 | `APP_DATA_DIR`                       | `/opt/workbench/data`                                             | 宿主机持久数据目录，绑定到容器 `/app/data`          |
-| `NEXT_PUBLIC_AGENT_SERVICE_URL`      | （留空）                                                        | Docker Compose 默认不注入；浏览器按当前页面的主机名自动推导 `:3201`。跨主机/反向代理部署时再显式填写可访问 URL |
 | `NEXT_PUBLIC_SCREENSHOT_SERVICE_URL` | `http://10.130.33.131:3202`                                       | **局域网 IP**，浏览器端使用                         |
 | `NEXT_PUBLIC_VIEWER_URL`             | `http://10.130.33.131:3300`                                       | **局域网 IP**，浏览器端访问浏览端                     |
 | `NEXT_PUBLIC_DATA_BASE`              | `/data`                                                           | viewer-site 静态导出的数据基址                      |
@@ -189,7 +189,8 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 
 ### 3.3 局域网访问关键点
 
-- `NEXT_PUBLIC_*` 中的跨服务浏览器地址在同主机部署时可留空，由前端按当前页面主机名自动推导；跨主机或反向代理部署时必须使用浏览器可访问的服务器 URL
+- Agent-service 的浏览器端地址不是 Docker 环境变量：生产包始终按当前页面协议与主机名推导 `:3201`。这避免将 `localhost` 编译进远程浏览器 bundle；跨主机或反向代理拓扑应由反向代理保持该同源主机约定。
+- 其他 `NEXT_PUBLIC_*` 跨服务浏览器地址仍须使用浏览器可访问的服务器 URL。
 - `AGENT_SERVICE_URL` 使用**容器内部 DNS 名称**（Docker 网络内可解析）
 - `SCREENSHOT_SERVICE_URL` 在容器内使用 `http://screenshot-service:3202`
 - `INTERNAL_API_TOKEN` 必须在 author-site 和 agent-service 中保持同一个非空值，否则管理后台保存的后端供应商配置只能写入数据库，无法同步到 agent-service 运行时。
@@ -200,7 +201,7 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 
 ### 3.4 本地 OrbStack 命令入口
 
-本地 OrbStack 不直接使用 `.env.docker` 中的远程 IP 作为浏览器访问地址，而是由脚本注入 `localhost` 覆盖值。固定入口如下：
+本地 OrbStack 不直接使用 `.env.docker` 中的远程 IP 作为浏览器访问地址。Agent-service 仍由页面地址自动推导为 `localhost:3201`；脚本只注入截图、站点与 CORS 等其余本地覆盖。固定入口如下：
 
 | 命令                                          | 作用                                                                |
 | --------------------------------------------- | ------------------------------------------------------------------- |
@@ -214,12 +215,13 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 `scripts/docker-orbstack-up.sh` 默认设置：
 
 - `APP_DATA_DIR=$PWD/data`
-- `NEXT_PUBLIC_AGENT_SERVICE_URL=http://localhost:3201`
 - `NEXT_PUBLIC_SCREENSHOT_SERVICE_URL=http://localhost:3202`
 - `NEXT_PUBLIC_WEB_URL=http://localhost:3200`
 - `CORS_ORIGINS` 同时包含 `localhost` 和 `127.0.0.1` 的创作端、使用端来源。
 
 `scripts/docker-build-check.sh` 默认串行构建 `agent-service`、`author-site` 和 `viewer-site`，降低本地 OrbStack 首次冷构建时多个 `pnpm install` 同时争抢 registry 带宽的概率。需要压测并行构建时显式添加 `--parallel`。
+
+author-site 与 viewer-site 的 Dockerfile 会在前端构建后扫描浏览器静态资源；若发现 `http://localhost:3201` 或 `NEXT_PUBLIC_AGENT_SERVICE_URL`，镜像构建立即失败，防止错误连接地址进入部署产物。
 
 ### 3.5 本地准生产预览
 
