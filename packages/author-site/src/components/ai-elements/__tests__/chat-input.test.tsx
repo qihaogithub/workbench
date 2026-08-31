@@ -21,7 +21,6 @@ describe("AI 输入区附件入口", () => {
           models={[]}
           canSwitch={false}
           isModelLoading={false}
-          supportsImages
           supportsFiles
           supportsHistory
         />

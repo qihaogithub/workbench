@@ -1,9 +1,11 @@
 ---
 name: page-runtime-conversion
-description: 页面运行时类型转换（prototype ↔ high-fidelity-react）的完整规范：以源页面视觉为 ground truth、逐元素还原、禁用 @preview/sdk 通用组件替换、分运行时细则、自检清单。触发词：转换页面运行时、切换为 React 页、切换为原型页、prototype-html-css、high-fidelity-react。仅在用户显式触发运行时切换操作（UI 按钮或命令）时使用，不适用于新建或重写页面。
+description: 页面运行时类型转换（prototype ↔ high-fidelity-react）的完整规范：以源页面视觉为 ground truth、逐元素还原、禁用 @preview/sdk 通用组件替换、分运行时细则、自检清单。触发词：转换页面运行时、切换为 React 页、切换为原型页、prototype-html-css、high-fidelity-react，或原型页新增必须由 React 消费的复合配置。仅在既有页面需要转换时使用，不适用于新建或重写页面。
 ---
 
 # 页面运行时类型转换
+
+除用户显式要求切换运行时外，当 `page-lifecycle` 规则要求原型页为复合配置（如 `format: "video"`）升级为 React 页时，也必须使用本规范。这是完成用户已明确配置诉求的必要实现步骤，不构成额外的审批理由。
 
 ## 核心约束
 

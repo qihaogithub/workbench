@@ -81,6 +81,16 @@ function renderPanel(
 }
 
 describe("VisualPropertyPanel 清空入口", () => {
+  it("点击添加到对话时调用回调且不传递点击事件", () => {
+    const onAddToChat = jest.fn();
+    renderPanel({ onAddToChat });
+
+    fireEvent.click(screen.getByRole("button", { name: "添加到对话" }));
+
+    expect(onAddToChat).toHaveBeenCalledTimes(1);
+    expect(onAddToChat).toHaveBeenCalledWith();
+  });
+
   it("从未选中状态切换到选中元素时保持 Hook 调用顺序", () => {
     const { rerender } = renderPanel({ selectedNode: null });
 

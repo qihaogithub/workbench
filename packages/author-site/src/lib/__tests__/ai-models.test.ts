@@ -154,13 +154,13 @@ describe("applyModelConfigs", () => {
     }
   });
 
-  it("白名单模型默认 supportsImages 为 false", () => {
+  it("白名单模型不再暴露单模型图片能力字段", () => {
     const result = applyModelConfigs([
       { id: "workbench/model-a", label: "workbench/Model A" },
       { id: "jojo/model-b", label: "jojo/Model B" },
     ]);
-    for (const m of result) {
-      expect(m.supportsImages).toBe(false);
+    for (const model of result) {
+      expect(model).not.toHaveProperty("supportsImages");
     }
   });
 

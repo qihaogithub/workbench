@@ -126,6 +126,48 @@ describe("ProjectAdminService", () => {
     expect(list.data?.map((project) => project.id)).toEqual([created.data?.id]);
   });
 
+  it("项目列表、详情和 project.json 投影统一读取 workspace tree", () => {
+    const created = service.createProject({ name: "投影一致性项目" });
+    const projectId = created.data?.id ?? "";
+    const workspacePath = path.join(tempDir, "projects", projectId, "workspace");
+    const pageIds = ["page-a", "page-b", "page-c"];
+    for (const pageId of pageIds) {
+      const pageDir = path.join(workspacePath, "demos", pageId);
+      fs.mkdirSync(pageDir, { recursive: true });
+      fs.writeFileSync(path.join(pageDir, "index.tsx"), "// page", "utf-8");
+      fs.writeFileSync(path.join(pageDir, "config.schema.json"), "{}", "utf-8");
+    }
+    fs.writeFileSync(
+      path.join(workspacePath, "workspace-tree.json"),
+      JSON.stringify({
+        folders: [],
+        pages: pageIds.map((id, order) => ({
+          id,
+          name: id,
+          order,
+          parentId: null,
+          runtimeType: "high-fidelity-react",
+        })),
+      }),
+      "utf-8",
+    );
+
+    const projectJsonPath = path.join(tempDir, "projects", projectId, "project.json");
+    const staleMeta = JSON.parse(fs.readFileSync(projectJsonPath, "utf-8"));
+    staleMeta.demoPages = [{ id: "stale", name: "旧页面", order: 0, parentId: null }];
+    fs.writeFileSync(projectJsonPath, JSON.stringify(staleMeta), "utf-8");
+
+    const listed = service.listProjects().data?.find((item) => item.id === projectId);
+    expect(listed?.demoPages?.map((page) => page.id)).toEqual(pageIds);
+    expect(service.getProject(projectId).data?.pages.map((page) => page.id)).toEqual(pageIds);
+
+    service.updateProject({ projectId, name: "投影一致性项目（已写回）" });
+    const persisted = JSON.parse(fs.readFileSync(projectJsonPath, "utf-8")) as {
+      demoPages?: Array<{ id: string }>;
+    };
+    expect(persisted.demoPages?.map((page) => page.id)).toEqual(pageIds);
+  });
+
   it("保存并返回项目级手绘编辑引擎偏好", () => {
     const created = service.createProject({ name: "手绘偏好项目" });
     const projectId = created.data?.id ?? "";

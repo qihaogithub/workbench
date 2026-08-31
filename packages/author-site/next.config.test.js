@@ -22,4 +22,10 @@ describe("author-site Next development origins", () => {
       "tunnel.example.test",
     ]);
   });
+
+  it("allows a 200MiB session asset plus its multipart envelope to reach route handlers", () => {
+    const config = require("./next.config");
+
+    expect(config.experimental?.proxyClientMaxBodySize).toBe(201 * 1024 * 1024);
+  });
 });

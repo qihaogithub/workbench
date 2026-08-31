@@ -20,6 +20,23 @@ const DEFAULT_MAX_SIZE = 50 * 1024 * 1024; // 50MB
 
 const NON_IMAGE_ANIMATION_EXTS = new Set([".json", ".svga", ".lottie", ".riv", ".skel", ".atlas"]);
 
+function invalidAssetMessage(extension: string, mimeType: string): string {
+  if (extension === ".mp4" || extension === ".webm") {
+    const format = extension === ".mp4" ? "MP4" : "WebM";
+    return `视频内容不是有效的 ${format} 容器，请选择有效的 ${format} 文件`;
+  }
+  return `不支持的文件类型或文件内容: ${mimeType || "未提供 MIME"}`;
+}
+
+function isUploadFile(value: FormDataEntryValue | null): value is File {
+  return typeof value === "object"
+    && value !== null
+    && typeof value.name === "string"
+    && typeof value.type === "string"
+    && typeof value.size === "number"
+    && typeof value.arrayBuffer === "function";
+}
+
 async function extractZipToWorkspace(
   buffer: Buffer,
   workspacePath: string,
@@ -109,9 +126,9 @@ export async function POST(
     const projectId = meta?.demoId;
 
     const formData = await request.formData();
-    const file = formData.get("file") as File | null;
+    const file = formData.get("file");
 
-    if (!file) {
+    if (!isUploadFile(file)) {
       return NextResponse.json(
         createApiError("INVALID_REQUEST", "请提供文件"),
         { status: 400 },
@@ -139,7 +156,7 @@ export async function POST(
 
     if (!isAllowedAssetFile(file, buffer)) {
       return NextResponse.json(
-        createApiError("INVALID_FILE_TYPE", `不支持的文件类型或文件内容: ${file.type || "未提供 MIME"}`),
+        createApiError("INVALID_FILE_TYPE", invalidAssetMessage(ext, file.type)),
         { status: 400 },
       );
     }

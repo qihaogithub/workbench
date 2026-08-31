@@ -59,7 +59,11 @@ import type {
   PublishedDemoPage,
   PublishedHtmlExecution,
 } from "@/lib/api";
-import type { DemoPageRuntimeType } from "@workbench/shared";
+import type {
+  CommentAuthor,
+  CommentTarget,
+  DemoPageRuntimeType,
+} from "@workbench/shared";
 import {
   extractPrototypeConfigBindingKeys,
   PageConfigPanel,
@@ -74,7 +78,12 @@ import type {
   CanvasState,
   PreviewStagePage,
 } from "@/components/demo";
-import type { CanvasCommentDraft } from "@workbench/demo-ui/comment";
+import {
+  CommentUnreadDot,
+  countUnresolvedCommentThreads,
+  filterPageCommentThreads,
+  type CanvasCommentDraft,
+} from "@workbench/demo-ui/comment";
 import {
   createCommentApi,
   recordProjectVisit,
@@ -82,10 +91,7 @@ import {
   getAnonymousId,
   getAnonymousDisplayName,
 } from "@/lib/comment-api";
-import type { CommentAuthor } from "@workbench/shared";
-import {
-  isSchemaEmpty,
-} from "@/components/demo";
+import { isSchemaEmpty } from "@/components/demo";
 import { getDefaultValues } from "@/lib/validator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -108,12 +114,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FeedbackPage } from "@/components/FeedbackPage";
 import { ViewerAiPanel } from "@/components/ViewerAiPanel";
 import {
@@ -214,7 +215,11 @@ function resolvePublishedConfigAssetUrls(
   options?: { projectId?: string },
 ): Record<string, unknown> {
   function resolveImageUrl(value: string): string {
-    if (options?.projectId && /^\.\.?\/[^'")\s]*$/.test(value) && IMAGE_EXT_RE.test(value)) {
+    if (
+      options?.projectId &&
+      /^\.\.?\/[^'")\s]*$/.test(value) &&
+      IMAGE_EXT_RE.test(value)
+    ) {
       const parts = "demos/_".split("/");
       for (const part of value.split("/")) {
         if (part === "." || part === "") continue;
@@ -333,7 +338,8 @@ function PageScreenshotCell({
     const staticImageUrl = page.screenshotPath
       ? `${getPublishedFileUrl(projectId, page.screenshotPath)}${cacheBust}`
       : null;
-    const directImageUrl = staticImageUrl ?? getScreenshotFileUrl(projectId, page.id);
+    const directImageUrl =
+      staticImageUrl ?? getScreenshotFileUrl(projectId, page.id);
     const metaUrl = getScreenshotFileMetaUrl(projectId, page.id);
     setImageUrl(null);
     setFailed(false);
@@ -345,7 +351,9 @@ function PageScreenshotCell({
       };
     }
 
-    if (new URL(metaUrl, window.location.href).origin !== window.location.origin) {
+    if (
+      new URL(metaUrl, window.location.href).origin !== window.location.origin
+    ) {
       return () => {
         cancelled = true;
       };
@@ -355,9 +363,10 @@ function PageScreenshotCell({
       .then((res) => (res.ok ? res.json() : null))
       .then((result) => {
         if (cancelled) return;
-        const payload = result as
-          | { success?: boolean; data?: { url?: unknown } }
-          | null;
+        const payload = result as {
+          success?: boolean;
+          data?: { url?: unknown };
+        } | null;
         const url =
           payload?.success === true && typeof payload.data?.url === "string"
             ? payload.data.url
@@ -543,9 +552,7 @@ function ScreenshotCover({
                   projectId={projectId}
                   page={page}
                   className={
-                    isDenseLayout
-                      ? "min-w-0"
-                      : "h-full max-w-[48%] shrink-0"
+                    isDenseLayout ? "min-w-0" : "h-full max-w-[48%] shrink-0"
                   }
                   style={
                     isDenseLayout
@@ -883,7 +890,9 @@ function buildTree(
 function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const router = useRouter();
   const [project, setProject] = useState<PublishedProject | null>(null);
-  const [designSpecEntries, setDesignSpecEntries] = useState<DesignSpecEntryLink[]>([]);
+  const [designSpecEntries, setDesignSpecEntries] = useState<
+    DesignSpecEntryLink[]
+  >([]);
   const [error, setError] = useState<Error | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activePageId, setActivePageId] = useState<string>("");
@@ -903,12 +912,21 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const [flashDirectoryId, setFlashDirectoryId] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("canvas");
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
-  const [configPanelDetailPageId, setConfigPanelDetailPageId] = useState<string | null>(null);
-  const [rightPanelTab, setRightPanelTab] = useState<"config" | "comments">("config");
+  const [configPanelDetailPageId, setConfigPanelDetailPageId] = useState<
+    string | null
+  >(null);
+  const [rightPanelTab, setRightPanelTab] = useState<"config" | "comments">(
+    "config",
+  );
   const [commentModeActive, setCommentModeActive] = useState(false);
-  const [activeCommentThreadId, setActiveCommentThreadId] = useState<string | null>(null);
+  const [activeCommentThreadId, setActiveCommentThreadId] = useState<
+    string | null
+  >(null);
   const [canvasCommentDraft, setCanvasCommentDraft] =
     useState<CanvasCommentDraft | null>(null);
+  const [canvasSelectedPageId, setCanvasSelectedPageId] = useState<
+    string | null
+  >(null);
   const [canvasState, setCanvasState] = useState<CanvasState>({
     viewport: { x: 40, y: 40, zoom: 0.5 },
     pages: {},
@@ -927,15 +945,35 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   // 评论功能：API 适配器 + WS 地址 + 当前作者身份
   const commentApi = useMemo(() => createCommentApi(projectId), [projectId]);
   const commentWsUrl = useMemo(() => getCommentWsUrl(), []);
+  const commentQueryTarget = useMemo<CommentTarget | undefined>(() => {
+    if (previewMode === "canvas") {
+      return canvasSelectedPageId
+        ? { kind: "page", pageId: canvasSelectedPageId }
+        : undefined;
+    }
+    return { kind: "page", pageId: activePageId };
+  }, [activePageId, canvasSelectedPageId, previewMode]);
   const commentsData = useComments({
     projectId,
-    target: { kind: "page", pageId: activePageId },
+    target: commentQueryTarget,
     api: commentApi,
     wsUrl: commentWsUrl,
   });
-  const unresolvedCommentCount = commentsData.threads.filter(
-    (t) => !t.resolved,
-  ).length;
+  const activePageCommentThreads = useMemo(
+    () => filterPageCommentThreads(commentsData.threads, activePageId),
+    [activePageId, commentsData.threads],
+  );
+  const isProjectCommentScope =
+    previewMode === "canvas" && !canvasSelectedPageId;
+  const unresolvedCommentCount = countUnresolvedCommentThreads(
+    isProjectCommentScope
+      ? filterPageCommentThreads(commentsData.threads)
+      : activePageCommentThreads,
+  );
+  const commentTabLabel =
+    unresolvedCommentCount > 0
+      ? `评论：有 ${unresolvedCommentCount} 条未解决评论`
+      : "评论";
   const commentUser = useMemo<CommentAuthor | null>(() => {
     if (isLoggedIn && sessionId) {
       return {
@@ -959,27 +997,47 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   }, [isLoggedIn, project, projectId]);
 
   useEffect(() => {
+    if (previewMode !== "canvas") {
+      setCanvasSelectedPageId(null);
+    }
+  }, [previewMode]);
+
+  useEffect(() => {
     if (!project?.designSpecs?.length) {
       setDesignSpecEntries([]);
       return;
     }
     let cancelled = false;
-    void Promise.all(project.designSpecs.map((meta) => getDesignSpecDoc(projectId, meta.id)))
-      .then((docs) => docs.flatMap((doc) =>
-        doc.entries.flatMap((entry) => entry.refs.map((ref) => ({
-          docId: doc.id,
-          docTitle: doc.title,
-          entryId: entry.id,
-          entryTitle: entry.title,
-          markdown: entry.markdown,
-          ...ref,
-        } satisfies DesignSpecEntryLink))),
-      ))
-      .then((entries) => { if (!cancelled) setDesignSpecEntries(entries); })
-      .catch(() => { if (!cancelled) setDesignSpecEntries([]); });
-    return () => { cancelled = true; };
+    void Promise.all(
+      project.designSpecs.map((meta) => getDesignSpecDoc(projectId, meta.id)),
+    )
+      .then((docs) =>
+        docs.flatMap((doc) =>
+          doc.entries.flatMap((entry) =>
+            entry.refs.map(
+              (ref) =>
+                ({
+                  docId: doc.id,
+                  docTitle: doc.title,
+                  entryId: entry.id,
+                  entryTitle: entry.title,
+                  markdown: entry.markdown,
+                  ...ref,
+                }) satisfies DesignSpecEntryLink,
+            ),
+          ),
+        ),
+      )
+      .then((entries) => {
+        if (!cancelled) setDesignSpecEntries(entries);
+      })
+      .catch(() => {
+        if (!cancelled) setDesignSpecEntries([]);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [project, projectId]);
-
 
   useEffect(() => {
     const generation = ++projectLoadGenerationRef.current;
@@ -1094,23 +1152,35 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     if (previewMode !== "single" || !activePageId || !project) return;
-    const page = project.demoPages.find((candidate) => candidate.id === activePageId);
-    if (page?.runtimeType !== "sandboxed-html" || !page.sandboxExecutionPath) return;
+    const page = project.demoPages.find(
+      (candidate) => candidate.id === activePageId,
+    );
+    if (page?.runtimeType !== "sandboxed-html" || !page.sandboxExecutionPath)
+      return;
     const current = sandboxExecutionMap[page.id];
     if (current && current.expiresAt > Date.now() + 10_000) return;
     let cancelled = false;
     void issuePublishedHtmlExecution(page.sandboxExecutionPath)
       .then((execution) => {
         if (!cancelled) {
-          setSandboxExecutionMap((previous) => ({ ...previous, [page.id]: execution }));
+          setSandboxExecutionMap((previous) => ({
+            ...previous,
+            [page.id]: execution,
+          }));
         }
       })
       .catch((executionError: unknown) => {
         if (!cancelled) {
-          setError(executionError instanceof Error ? executionError : new Error(String(executionError)));
+          setError(
+            executionError instanceof Error
+              ? executionError
+              : new Error(String(executionError)),
+          );
         }
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [activePageId, previewMode, project, sandboxExecutionMap]);
 
   const handlePageChange = useCallback(
@@ -1122,7 +1192,6 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
       if (pageConfig) {
         setConfigData(pageConfig);
       }
-
     },
     [project, configDataMap],
   );
@@ -1248,7 +1317,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
       const updatedProject = await getProjectData(projectId);
       setProject(updatedProject);
       const newPage = updatedProject.demoPages.find(
-        (p) => !project.demoPages.find((op) => op.id === p.id)
+        (p) => !project.demoPages.find((op) => op.id === p.id),
       );
       if (newPage) {
         setActivePageId(newPage.id);
@@ -1279,61 +1348,74 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
     }
   }, [sessionId, project, projectId]);
 
-  const handleDeletePage = useCallback(async (pageId: string) => {
-    if (!sessionId || !project) return;
-    try {
-      await deleteDemoPage(projectId, pageId, sessionId);
-      const updatedProject = await getProjectData(projectId);
-      setProject(updatedProject);
-      if (activePageId === pageId && updatedProject.demoPages.length > 0) {
-        setActivePageId(updatedProject.demoPages[0].id);
+  const handleDeletePage = useCallback(
+    async (pageId: string) => {
+      if (!sessionId || !project) return;
+      try {
+        await deleteDemoPage(projectId, pageId, sessionId);
+        const updatedProject = await getProjectData(projectId);
+        setProject(updatedProject);
+        if (activePageId === pageId && updatedProject.demoPages.length > 0) {
+          setActivePageId(updatedProject.demoPages[0].id);
+        }
+        setConfigDataMap((prev) => {
+          const next = { ...prev };
+          delete next[pageId];
+          return next;
+        });
+      } catch (err: any) {
+        console.error("删除页面失败:", err);
       }
-      setConfigDataMap((prev) => {
-        const next = { ...prev };
-        delete next[pageId];
-        return next;
-      });
-    } catch (err: any) {
-      console.error("删除页面失败:", err);
-    }
-  }, [sessionId, project, projectId, activePageId]);
+    },
+    [sessionId, project, projectId, activePageId],
+  );
 
-  const handleMovePage = useCallback(async (pageId: string, direction: "up" | "down") => {
-    if (!sessionId || !project) return;
-    const pages = [...project.demoPages].sort((a, b) => a.order - b.order);
-    const idx = pages.findIndex((p) => p.id === pageId);
-    if (idx === -1) return;
-    const targetIdx = direction === "up" ? idx - 1 : idx + 1;
-    if (targetIdx < 0 || targetIdx >= pages.length) return;
+  const handleMovePage = useCallback(
+    async (pageId: string, direction: "up" | "down") => {
+      if (!sessionId || !project) return;
+      const pages = [...project.demoPages].sort((a, b) => a.order - b.order);
+      const idx = pages.findIndex((p) => p.id === pageId);
+      if (idx === -1) return;
+      const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+      if (targetIdx < 0 || targetIdx >= pages.length) return;
 
-    const reordered = [...pages];
-    const temp = reordered[idx]!.order;
-    reordered[idx]!.order = reordered[targetIdx]!.order;
-    reordered[targetIdx]!.order = temp;
+      const reordered = [...pages];
+      const temp = reordered[idx]!.order;
+      reordered[idx]!.order = reordered[targetIdx]!.order;
+      reordered[targetIdx]!.order = temp;
 
-    try {
-      await reorderDemoPages(
-        projectId,
-        sessionId,
-        reordered.map((p) => ({ id: p.id, order: p.order, parentId: p.parentId })),
-      );
-      const updatedProject = await getProjectData(projectId);
-      setProject(updatedProject);
-    } catch (err: any) {
-      console.error("移动页面失败:", err);
-    }
-  }, [sessionId, project, projectId]);
+      try {
+        await reorderDemoPages(
+          projectId,
+          sessionId,
+          reordered.map((p) => ({
+            id: p.id,
+            order: p.order,
+            parentId: p.parentId,
+          })),
+        );
+        const updatedProject = await getProjectData(projectId);
+        setProject(updatedProject);
+      } catch (err: any) {
+        console.error("移动页面失败:", err);
+      }
+    },
+    [sessionId, project, projectId],
+  );
 
-  const handleRuntimeSwitch = useCallback(async (pageId: string, targetType: DemoPageRuntimeType) => {
-    if (!sessionId || !project) return;
-    try {
-      await switchPageRuntime(projectId, pageId, sessionId, targetType);
-      const updatedProject = await getProjectData(projectId);
-      setProject(updatedProject);
-    } catch (err: any) {
-      console.error("切换模块类型失败:", err);
-    }
-  }, [sessionId, project, projectId]);
+  const handleRuntimeSwitch = useCallback(
+    async (pageId: string, targetType: DemoPageRuntimeType) => {
+      if (!sessionId || !project) return;
+      try {
+        await switchPageRuntime(projectId, pageId, sessionId, targetType);
+        const updatedProject = await getProjectData(projectId);
+        setProject(updatedProject);
+      } catch (err: any) {
+        console.error("切换模块类型失败:", err);
+      }
+    },
+    [sessionId, project, projectId],
+  );
 
   const previewStagePages = useMemo<PreviewStagePage[]>(
     () =>
@@ -1424,7 +1506,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
 
   const commentsPanel = (
     <CommentPanel
-      threads={commentsData.threads}
+      threads={activePageCommentThreads}
       currentUserId={commentUser?.id}
       activeThreadId={activeCommentThreadId}
       onSelectThread={(id) => {
@@ -1455,21 +1537,22 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
       />
       <ErrorBoundary>
         <div className="flex-1 flex min-h-0 overflow-hidden">
-        {project && activePage && (
-          <ViewerAiPanel
-            key={projectId}
-            open={aiDrawerOpen}
-            projectId={projectId}
-            projectName={project.name}
-            activePageId={activePage.id}
-            activePageName={activePage.name}
-            activeConfig={configData}
-            onOpenChange={setAiDrawerOpen}
-          />
-        )}
-        {previewMode === "single" && (project.demoPages.length > 1 || isLoggedIn) && (
-          <div className="w-56 border-r border-border shrink-0 flex flex-col">
-            <style>{`
+          {project && activePage && (
+            <ViewerAiPanel
+              key={projectId}
+              open={aiDrawerOpen}
+              projectId={projectId}
+              projectName={project.name}
+              activePageId={activePage.id}
+              activePageName={activePage.name}
+              activeConfig={configData}
+              onOpenChange={setAiDrawerOpen}
+            />
+          )}
+          {previewMode === "single" &&
+            (project.demoPages.length > 1 || isLoggedIn) && (
+              <div className="w-56 border-r border-border shrink-0 flex flex-col">
+                <style>{`
               @keyframes dir-flash {
                 0%, 100% { background-color: transparent; }
                 50% { background-color: rgba(59, 130, 246, 0.15); }
@@ -1478,180 +1561,203 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                 animation: dir-flash 0.3s ease-in-out 3;
               }
             `}</style>
-            <div className="px-3 py-2.5 border-b border-border flex items-center justify-between">
-              <h2 className="text-xs font-medium text-muted-foreground">
-                页面目录
-              </h2>
-              {isLoggedIn && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      onClick={handleAddPage}
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <p className="text-xs">添加页面</p>
-                  </TooltipContent>
-                </Tooltip>
-              )}
-            </div>
-            <ScrollArea className="flex-1">
-              <div className="p-2 space-y-0.5">
-                <PageManagerList
-                  items={tree}
-                  activePageId={activePageId}
-                  expandedFolders={expandedFolders}
-                  onPageClick={handlePageChange}
-                  onToggleFolder={toggleFolder}
-                  flashPageId={flashDirectoryId}
-                  isLoggedIn={isLoggedIn}
-                  onDeletePage={handleDeletePage}
-                  onMovePage={handleMovePage}
-                  onRuntimeSwitch={handleRuntimeSwitch}
-                  demoPages={project.demoPages}
-                />
+                <div className="px-3 py-2.5 border-b border-border flex items-center justify-between">
+                  <h2 className="text-xs font-medium text-muted-foreground">
+                    页面目录
+                  </h2>
+                  {isLoggedIn && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={handleAddPage}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        <p className="text-xs">添加页面</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </div>
+                <ScrollArea className="flex-1">
+                  <div className="p-2 space-y-0.5">
+                    <PageManagerList
+                      items={tree}
+                      activePageId={activePageId}
+                      expandedFolders={expandedFolders}
+                      onPageClick={handlePageChange}
+                      onToggleFolder={toggleFolder}
+                      flashPageId={flashDirectoryId}
+                      isLoggedIn={isLoggedIn}
+                      onDeletePage={handleDeletePage}
+                      onMovePage={handleMovePage}
+                      onRuntimeSwitch={handleRuntimeSwitch}
+                      demoPages={project.demoPages}
+                    />
+                  </div>
+                </ScrollArea>
               </div>
-            </ScrollArea>
-          </div>
-        )}
+            )}
 
-        <div className="flex-1 min-w-0 overflow-hidden">
-          {previewMode === "document" ? (
-            <ViewerDocumentView
-              projectId={projectId}
-              items={project.knowledge ?? []}
-              designSpecs={project.designSpecs ?? []}
-              projectConfigSchema={project.projectConfigSchema}
-              pages={project.demoPages.map((page) => ({
-                id: page.id,
-                name: page.name,
-                schema: pageSchemaMap[page.id],
-              }))}
-            />
-          ) : (
-          <CommentLayer
-            projectId={projectId}
-            pageId={activePageId}
-            api={commentApi}
-            wsUrl={commentWsUrl}
-            currentUser={commentUser}
-            canMentionAgent={false}
-            disabled={false}
-            showToggle={false}
-            commentMode={commentModeActive}
-            onCommentModeChange={setCommentModeActive}
-            activeThreadId={activeCommentThreadId}
-            onActiveThreadChange={setActiveCommentThreadId}
-            threads={commentsData.threads}
-            onCreateComment={commentsData.createComment}
-            onAddReply={commentsData.addReply}
-            onUpdateComment={commentsData.updateComment}
-            onUpdateReply={commentsData.updateReply}
-            onSetResolved={commentsData.setResolved}
-            onDeleteThread={commentsData.deleteThread}
-            onDeleteReply={commentsData.deleteReply}
-            showPins={rightPanelTab === "comments"}
-            canvasCreateDraft={canvasCommentDraft}
-            onCanvasCreateDraftChange={setCanvasCommentDraft}
-          >
-            <PreviewStage
-              className="h-full bg-background"
-              pages={previewStagePages}
-              activePageId={activePageId}
-              onActivePageChange={handlePageChange}
-              previewMode={previewMode}
-              onPreviewModeChange={setPreviewMode}
-              canvasState={canvasState}
-              onCanvasStateChange={setCanvasState}
-              interactionMode="viewer"
-              showToolbar={project.demoPages.length >= 1}
-              canvasProps={{
-                projectId,
-                onPageConfigEdit: (pageId) => {
-                  handlePageChange(pageId);
-                  setConfigPanelDetailPageId(pageId);
-                },
-                onPageComment: commentModeActive
-                  ? ({ pageId, pageName, pin, clientX, clientY }) => {
-                      setRightPanelTab("comments");
-                      setCanvasCommentDraft({
-                        input: {
-                          target: { kind: "page", pageId },
-                          anchor: {
-                            domPath: "canvas-page",
-                            tagName: "canvas-page",
-                            componentName: pageName,
-                            textSnippet: pageName,
-                            snapshot: { attrs: { "data-page-id": pageId } },
-                          },
-                          pin,
-                        },
-                        clientX,
-                        clientY,
-                      });
-                    }
-                  : undefined,
-              }}
-            />
-          </CommentLayer>
-          )}
-        </div>
-
-        {previewMode === "document" ? null : (
-          <div className="w-80 border-l border-border shrink-0 flex flex-col">
-            {hasSchema ? (
-              <Tabs
-                value={rightPanelTab}
-                onValueChange={(v) =>
-                  setRightPanelTab(v as "config" | "comments")
-                }
-                className="flex h-full flex-col"
-              >
-                <TabsList className="w-full justify-start gap-2 rounded-none border-b px-2 h-12 bg-transparent">
-                  <TabsTrigger
-                    value="config"
-                    title="配置"
-                    className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
-                  >
-                    <SlidersHorizontal className="h-4 w-4" />
-                    {rightPanelTab === "config" && <span>配置</span>}
-                  </TabsTrigger>
-                  <TabsTrigger value="comments" title="评论"
-                    className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
-                  >
-                    <MessageCircle className="h-4 w-4" />
-                    {rightPanelTab === "comments" && <span>评论</span>}
-                    {unresolvedCommentCount > 0 && (
-                      <span className="ml-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[9px] font-semibold text-white">
-                        {unresolvedCommentCount}
-                      </span>
-                    )}
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent
-                  value="config"
-                  className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
-                >
-                  {configPanel}
-                </TabsContent>
-                <TabsContent
-                  value="comments"
-                  className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
-                >
-                  {commentsPanel}
-                </TabsContent>
-              </Tabs>
+          <div className="flex-1 min-w-0 overflow-hidden">
+            {previewMode === "document" ? (
+              <ViewerDocumentView
+                projectId={projectId}
+                items={project.knowledge ?? []}
+                designSpecs={project.designSpecs ?? []}
+                projectConfigSchema={project.projectConfigSchema}
+                pages={project.demoPages.map((page) => ({
+                  id: page.id,
+                  name: page.name,
+                  schema: pageSchemaMap[page.id],
+                }))}
+              />
             ) : (
-              commentsPanel
+              <CommentLayer
+                projectId={projectId}
+                pageId={activePageId}
+                api={commentApi}
+                wsUrl={commentWsUrl}
+                currentUser={commentUser}
+                canMentionAgent={false}
+                disabled={false}
+                showToggle={false}
+                commentMode={commentModeActive}
+                onCommentModeChange={setCommentModeActive}
+                activeThreadId={activeCommentThreadId}
+                onActiveThreadChange={setActiveCommentThreadId}
+                threads={activePageCommentThreads}
+                onCreateComment={commentsData.createComment}
+                onAddReply={commentsData.addReply}
+                onUpdateComment={commentsData.updateComment}
+                onUpdateReply={commentsData.updateReply}
+                onSetResolved={commentsData.setResolved}
+                onDeleteThread={commentsData.deleteThread}
+                onDeleteReply={commentsData.deleteReply}
+                showPins={!hasSchema || rightPanelTab === "comments"}
+                canvasCreateDraft={canvasCommentDraft}
+                onCanvasCreateDraftChange={setCanvasCommentDraft}
+              >
+                <PreviewStage
+                  className="h-full bg-background"
+                  pages={previewStagePages}
+                  activePageId={activePageId}
+                  onActivePageChange={handlePageChange}
+                  previewMode={previewMode}
+                  onPreviewModeChange={setPreviewMode}
+                  canvasState={canvasState}
+                  onCanvasStateChange={setCanvasState}
+                  interactionMode="viewer"
+                  showToolbar={project.demoPages.length >= 1}
+                  canvasProps={{
+                    projectId,
+                    onPageConfigEdit: (pageId) => {
+                      setCanvasSelectedPageId(pageId);
+                      handlePageChange(pageId);
+                      setConfigPanelDetailPageId(pageId);
+                    },
+                    onPageComment: commentModeActive
+                      ? ({ pageId, pageName, pin, clientX, clientY }) => {
+                          setCanvasSelectedPageId(pageId);
+                          setRightPanelTab("comments");
+                          setCanvasCommentDraft({
+                            input: {
+                              target: { kind: "page", pageId },
+                              anchor: {
+                                domPath: "canvas-page",
+                                tagName: "canvas-page",
+                                componentName: pageName,
+                                textSnippet: pageName,
+                                snapshot: { attrs: { "data-page-id": pageId } },
+                              },
+                              pin,
+                            },
+                            clientX,
+                            clientY,
+                          });
+                        }
+                      : undefined,
+                    onCanvasClick: () => {
+                      setCanvasSelectedPageId(null);
+                    },
+                  }}
+                />
+              </CommentLayer>
             )}
           </div>
-        )}
-      </div>
+
+          {previewMode === "document" ? null : (
+            <div className="w-80 border-l border-border shrink-0 flex flex-col">
+              {hasSchema ? (
+                <Tabs
+                  value={rightPanelTab}
+                  onValueChange={(v) =>
+                    setRightPanelTab(v as "config" | "comments")
+                  }
+                  className="flex h-full flex-col"
+                >
+                  <TabsList className="w-full justify-start gap-2 rounded-none border-b px-2 h-12 bg-transparent">
+                    <TabsTrigger
+                      value="config"
+                      title="配置"
+                      className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                    >
+                      <SlidersHorizontal className="h-4 w-4" />
+                      {rightPanelTab === "config" && <span>配置</span>}
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="comments"
+                      title={commentTabLabel}
+                      aria-label={commentTabLabel}
+                      className="relative gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      {rightPanelTab === "comments" && <span>评论</span>}
+                      <CommentUnreadDot count={unresolvedCommentCount} />
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent
+                    value="config"
+                    className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
+                  >
+                    {configPanel}
+                  </TabsContent>
+                  <TabsContent
+                    value="comments"
+                    className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
+                  >
+                    {commentsPanel}
+                  </TabsContent>
+                </Tabs>
+              ) : (
+                <Tabs value="comments" className="flex h-full flex-col">
+                  <TabsList className="w-full justify-start gap-2 rounded-none border-b px-2 h-12 bg-transparent">
+                    <TabsTrigger
+                      value="comments"
+                      title={commentTabLabel}
+                      aria-label={commentTabLabel}
+                      className="relative gap-2 px-2"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      <span>评论</span>
+                      <CommentUnreadDot count={unresolvedCommentCount} />
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent
+                    value="comments"
+                    className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
+                  >
+                    {commentsPanel}
+                  </TabsContent>
+                </Tabs>
+              )}
+            </div>
+          )}
+        </div>
       </ErrorBoundary>
       {!aiDrawerOpen && (
         <Button
@@ -1694,14 +1800,13 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
             )}
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setLoginDialogOpen(false)}
-            >
+            <Button variant="outline" onClick={() => setLoginDialogOpen(false)}>
               取消
             </Button>
             <Button onClick={handleLogin} disabled={loginLoading}>
-              {loginLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {loginLoading && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
               登录
             </Button>
           </DialogFooter>
@@ -1818,11 +1923,7 @@ function PageManagerList({
               <div className="flex items-center shrink-0 pr-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5"
-                    >
+                    <Button variant="ghost" size="icon" className="h-5 w-5">
                       <ArrowLeftRight className="h-3 w-3" />
                     </Button>
                   </PopoverTrigger>
@@ -1830,9 +1931,13 @@ function PageManagerList({
                     <div className="space-y-0.5">
                       <button
                         className={`w-full flex items-center gap-1.5 rounded-sm px-2 py-1.5 text-xs hover:bg-accent ${
-                          pageRuntime === "high-fidelity-react" ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+                          pageRuntime === "high-fidelity-react"
+                            ? "bg-accent text-accent-foreground"
+                            : "text-muted-foreground"
                         }`}
-                        onClick={() => onRuntimeSwitch(item.id, "high-fidelity-react")}
+                        onClick={() =>
+                          onRuntimeSwitch(item.id, "high-fidelity-react")
+                        }
                         disabled={pageRuntime === "high-fidelity-react"}
                       >
                         <FileCode className="h-3.5 w-3.5" />
@@ -1840,9 +1945,13 @@ function PageManagerList({
                       </button>
                       <button
                         className={`w-full flex items-center gap-1.5 rounded-sm px-2 py-1.5 text-xs hover:bg-accent ${
-                          pageRuntime === "prototype-html-css" ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+                          pageRuntime === "prototype-html-css"
+                            ? "bg-accent text-accent-foreground"
+                            : "text-muted-foreground"
                         }`}
-                        onClick={() => onRuntimeSwitch(item.id, "prototype-html-css")}
+                        onClick={() =>
+                          onRuntimeSwitch(item.id, "prototype-html-css")
+                        }
                         disabled={pageRuntime === "prototype-html-css"}
                       >
                         <FileText className="h-3.5 w-3.5" />
@@ -1850,7 +1959,9 @@ function PageManagerList({
                       </button>
                       <button
                         className={`w-full flex items-center gap-1.5 rounded-sm px-2 py-1.5 text-xs hover:bg-accent ${
-                          pageRuntime === "sketch-scene" ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+                          pageRuntime === "sketch-scene"
+                            ? "bg-accent text-accent-foreground"
+                            : "text-muted-foreground"
                         }`}
                         onClick={() => onRuntimeSwitch(item.id, "sketch-scene")}
                         disabled={pageRuntime === "sketch-scene"}
@@ -1966,41 +2077,40 @@ function Header({
         </div>
       )}
       <div className="flex items-center justify-end">
-      {onLoginClick !== undefined && (
-        isLoggedIn ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={onLogoutClick}
-              >
-                <LogOut className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <p className="text-xs">退出登录</p>
-            </TooltipContent>
-          </Tooltip>
-        ) : (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={onLoginClick}
-              >
-                <LogIn className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <p className="text-xs">登录以管理页面</p>
-            </TooltipContent>
-          </Tooltip>
-        )
-      )}
+        {onLoginClick !== undefined &&
+          (isLoggedIn ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={onLogoutClick}
+                >
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p className="text-xs">退出登录</p>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={onLoginClick}
+                >
+                  <LogIn className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p className="text-xs">登录以管理页面</p>
+              </TooltipContent>
+            </Tooltip>
+          ))}
       </div>
     </header>
   );

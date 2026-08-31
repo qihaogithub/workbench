@@ -219,7 +219,7 @@ export function CanvasToolbar({
                 />
               </>
             )}
-            <ToolbarTooltip label="绘制 Section（Shift + S）">
+            <ToolbarTooltip label="绘制分组（Shift + S）">
               <button
                 type="button"
                 onClick={() => onToolModeChange?.("section")}
@@ -227,7 +227,7 @@ export function CanvasToolbar({
                   toolbarButtonClass,
                   toolMode === "section" && activeToolbarButtonClass,
                 )}
-                aria-label="Section 工具"
+                aria-label="分组工具"
                 aria-pressed={toolMode === "section"}
               >
                 <LayoutPanelTop className="h-4 w-4" />

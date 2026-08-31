@@ -19,12 +19,12 @@ try {
   assert.equal(localOnly.ok, true);
   assert.deepEqual(localOnly.data, { configured: false });
 
-  const requests: Array<{ url: string; cookie: string }> = [];
+  const requests: Array<{ url: string; authorization: string }> = [];
   globalThis.fetch = (async (input, init) => {
     const headers = new Headers(init?.headers);
     requests.push({
       url: input.toString(),
-      cookie: headers.get("cookie") ?? "",
+      authorization: headers.get("authorization") ?? "",
     });
     return new Response(null, { status: 200 });
   }) as typeof fetch;
@@ -42,10 +42,10 @@ try {
   assert.equal(data.connectivity.ok, true);
   assert.equal(data.credentials.valid, true);
   assert.deepEqual(requests, [
-    { url: "https://author.test/", cookie: "" },
+    { url: "https://author.test/", authorization: "" },
     {
       url: "https://author.test/api/sessions",
-      cookie: "auth_token=doctor-token",
+      authorization: "Bearer doctor-token",
     },
   ]);
 

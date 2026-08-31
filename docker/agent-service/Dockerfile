@@ -32,6 +32,7 @@ COPY packages/preview-contract/package.json ./packages/preview-contract/
 COPY packages/project-core/package.json ./packages/project-core/
 COPY packages/sketch-core/package.json ./packages/sketch-core/
 COPY packages/shared/package.json ./packages/shared/
+COPY packages/whiteboard-core/package.json ./packages/whiteboard-core/
 COPY packages/agent-service/package.json ./packages/agent-service/
 
 RUN --mount=type=cache,id=workbench-pnpm-store,target=/pnpm/store \
@@ -43,6 +44,7 @@ COPY packages/preview-contract/ ./packages/preview-contract/
 COPY packages/project-core/ ./packages/project-core/
 COPY packages/sketch-core/ ./packages/sketch-core/
 COPY packages/shared/ ./packages/shared/
+COPY packages/whiteboard-core/ ./packages/whiteboard-core/
 COPY packages/agent-service/ ./packages/agent-service/
 
 RUN pnpm --filter @workbench/agent-service build:docker

@@ -83,6 +83,22 @@ describe("AgentManager processing 状态兜底", () => {
     expect(cleaned).toBe(0);
   });
 
+  it("等待计划审批的 agent 不应被 processing 兜底清理", () => {
+    vi.setSystemTime(new Date("2024-01-01T00:01:00Z"));
+    const factory = createMockFactory();
+    const manager = new AgentManager(factory as any, 3600000);
+    const agent = new MockAgent(
+      { sessionId: "approval" },
+      "awaiting_approval",
+      new Date(Date.now() - 60_000),
+    );
+    (manager as any).agents.set("approval", agent);
+
+    manager.cleanupIdleAgents(3600000);
+
+    expect(agent.kill).not.toHaveBeenCalled();
+  });
+
   it("非 processing 状态 agent 的现有行为不受影响", () => {
     vi.setSystemTime(new Date("2024-01-01T01:01:00Z"));
     const factory = createMockFactory();

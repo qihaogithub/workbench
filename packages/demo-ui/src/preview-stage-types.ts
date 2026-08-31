@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { PagePresentationProfile } from "@workbench/shared";
 
 import type { IframePreviewFrameProps } from "./IframePreviewFrame";
 import type { PrototypePagePreviewProps } from "./PrototypePagePreview";
@@ -19,6 +20,11 @@ import type {
 
 export interface PreviewStagePage extends CanvasPageData {
   runtimeType: CanvasPageRuntimeType;
+  /**
+   * 宿主在页面 schema 尚未加载时提供的持久化展示尺寸。
+   * 仅供画布解析卡片几何；单页预览仍只使用 presentation/schema。
+   */
+  canvasPreviewSize?: PreviewSize;
   schema?: string;
   /** 交互 HTML 的受控执行入口；不得使用 sandboxHtml 作为 iframe src。 */
   sandboxExecutionUrl?: string;
@@ -95,6 +101,11 @@ export interface PreviewStageProps {
   canvasState: CanvasState;
   onCanvasStateChange: (state: CanvasState) => void;
   interactionMode: CanvasInteractionMode;
+  /**
+   * 当前单页预览的非持久化视口投影。它不会传给画布，避免临时设备切换
+   * 改变画布页面的尺寸基准或自定义缩放语义。
+   */
+  singlePagePresentationOverride?: PagePresentationProfile;
   singlePageProps?: Omit<SinglePagePreviewProps, "page">;
   canvasProps?: Omit<
     PreviewCanvasProps,

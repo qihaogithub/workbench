@@ -1,5 +1,6 @@
 import type {
   CanvasFreeNode,
+  CanvasPageGroup,
   CanvasPageLayout,
   CanvasSection,
   CanvasSectionChild,
@@ -46,7 +47,11 @@ function canAddSectionChild(
  */
 export function normalizeCanvasSections(
   sections: Record<string, CanvasSection> | undefined,
-  available: { pages: Record<string, CanvasPageLayout>; nodes: Record<string, CanvasFreeNode> },
+  available: {
+    pages: Record<string, CanvasPageLayout>;
+    nodes: Record<string, CanvasFreeNode>;
+    pageGroups?: Record<string, CanvasPageGroup>;
+  },
 ): Record<string, CanvasSection> {
   if (!sections) return {};
 
@@ -72,14 +77,17 @@ export function normalizeCanvasSections(
       if (seen.has(key)) continue;
       const valid =
         (child.kind === "page" && Boolean(available.pages[child.id])) ||
+        (child.kind === "page-group" && Boolean(available.pageGroups?.[child.id])) ||
         (child.kind === "node" && Boolean(available.nodes[child.id])) ||
         (child.kind === "section" && knownSectionIds.has(child.id));
       if (!valid) continue;
       const childLayout = child.kind === "page"
         ? available.pages[child.id]
-        : child.kind === "node"
-          ? available.nodes[child.id]?.layout
-          : candidateSections[child.id]?.layout;
+        : child.kind === "page-group"
+          ? available.pageGroups?.[child.id]?.layout
+          : child.kind === "node"
+            ? available.nodes[child.id]?.layout
+            : candidateSections[child.id]?.layout;
       if (!childLayout || !sectionContainsLayout(section.layout, childLayout)) {
         continue;
       }
@@ -100,7 +108,7 @@ export function normalizeCanvasSections(
     normalized[id] = {
       id,
       kind: "section",
-      title: section.title.trim().slice(0, 120),
+      title: (section.title.trim() === "Section" ? "分组" : section.title.trim()).slice(0, 120),
       layout: { ...section.layout },
       ...(style && Object.keys(style).length > 0 ? { style } : {}),
       children: accepted,
@@ -127,6 +135,7 @@ interface CanvasLayoutUnit {
   id: string;
   bounds: CanvasSectionBounds;
   pageIds: string[];
+  pageGroupIds: string[];
   nodeIds: string[];
   sectionIds: string[];
 }
@@ -140,12 +149,12 @@ function expandBounds(bounds: CanvasSectionBounds | undefined, layout: CanvasPag
 
 /**
  * Rearranges root Section units and ungrouped objects without changing any
- * member's local relationship to its Section. Page groups are excluded.
+ * member's local relationship to its Section.
  */
 export function computeCanvasSectionAutoLayout(
   state: CanvasState,
   options: { columns?: number; gap?: number } = {},
-): Pick<CanvasState, "pages" | "nodes" | "sections"> {
+): Pick<CanvasState, "pages" | "pageGroups" | "nodes" | "sections"> {
   const columns = Math.max(1, options.columns ?? 3);
   const gap = Math.max(0, options.gap ?? 48);
   const sections = state.sections ?? {};
@@ -156,6 +165,7 @@ export function computeCanvasSectionAutoLayout(
   const appendSectionUnit = (rootId: string) => {
     let bounds: CanvasSectionBounds | undefined;
     const pageIds: string[] = [];
+    const pageGroupIds: string[] = [];
     const nodeIds: string[] = [];
     const sectionIds: string[] = [];
     const visit = (sectionId: string) => {
@@ -169,6 +179,14 @@ export function computeCanvasSectionAutoLayout(
           pageIds.push(child.id);
           bounds = expandBounds(bounds, state.pages[child.id]);
         }
+        if (child.kind === "page-group" && state.pageGroups?.[child.id]) {
+          const group = state.pageGroups[child.id];
+          pageGroupIds.push(child.id);
+          bounds = expandBounds(bounds, group.layout);
+          for (const page of group.pages) {
+            if (state.pages[page.pageId]) pageIds.push(page.pageId);
+          }
+        }
         if (child.kind === "node" && nodes[child.id]) {
           nodeIds.push(child.id);
           bounds = expandBounds(bounds, nodes[child.id].layout);
@@ -176,22 +194,23 @@ export function computeCanvasSectionAutoLayout(
       }
     };
     visit(rootId);
-    if (bounds) units.push({ id: `section:${rootId}`, bounds, pageIds, nodeIds, sectionIds });
+    if (bounds) units.push({ id: `section:${rootId}`, bounds, pageIds, pageGroupIds, nodeIds, sectionIds });
   };
 
   for (const sectionId of Object.keys(sections).sort()) {
     if (!parents.has(`section:${sectionId}`)) appendSectionUnit(sectionId);
   }
   for (const [pageId, layout] of Object.entries(state.pages)) {
-    if (!parents.has(`page:${pageId}`)) units.push({ id: `page:${pageId}`, bounds: { ...layout }, pageIds: [pageId], nodeIds: [], sectionIds: [] });
+    if (!parents.has(`page:${pageId}`)) units.push({ id: `page:${pageId}`, bounds: { ...layout }, pageIds: [pageId], pageGroupIds: [], nodeIds: [], sectionIds: [] });
   }
   for (const [nodeId, node] of Object.entries(nodes)) {
-    if (!parents.has(`node:${nodeId}`)) units.push({ id: `node:${nodeId}`, bounds: { ...node.layout }, pageIds: [], nodeIds: [nodeId], sectionIds: [] });
+    if (!parents.has(`node:${nodeId}`)) units.push({ id: `node:${nodeId}`, bounds: { ...node.layout }, pageIds: [], pageGroupIds: [], nodeIds: [nodeId], sectionIds: [] });
   }
 
   const ordered = [...units].sort((a, b) => a.bounds.y - b.bounds.y || a.bounds.x - b.bounds.x || a.id.localeCompare(b.id));
   const maxWidth = Math.max(0, ...ordered.map((unit) => unit.bounds.width));
   const nextPages = { ...state.pages };
+  const nextPageGroups = { ...(state.pageGroups ?? {}) };
   const nextNodes = { ...nodes };
   const nextSections = { ...sections };
   let rowY = 0;
@@ -207,6 +226,10 @@ export function computeCanvasSectionAutoLayout(
         const layout = nextPages[pageId];
         if (layout) nextPages[pageId] = { ...layout, x: layout.x + dx, y: layout.y + dy };
       }
+      for (const pageGroupId of unit.pageGroupIds) {
+        const group = nextPageGroups[pageGroupId];
+        if (group) nextPageGroups[pageGroupId] = { ...group, layout: { ...group.layout, x: group.layout.x + dx, y: group.layout.y + dy }, updatedAt: Date.now() };
+      }
       for (const nodeId of unit.nodeIds) {
         const node = nextNodes[nodeId];
         if (node) nextNodes[nodeId] = { ...node, layout: { ...node.layout, x: node.layout.x + dx, y: node.layout.y + dy } };
@@ -218,7 +241,7 @@ export function computeCanvasSectionAutoLayout(
     });
     rowY += rowHeight + gap;
   }
-  return { pages: nextPages, nodes: nextNodes, sections: nextSections };
+  return { pages: nextPages, pageGroups: nextPageGroups, nodes: nextNodes, sections: nextSections };
 }
 
 export function sectionContainsPoint(section: CanvasSection, point: { x: number; y: number }): boolean {
@@ -255,10 +278,10 @@ export function findInnermostSectionContainingLayout(
     .sort((a, b) => a.layout.width * a.layout.height - b.layout.width * b.layout.height || a.id.localeCompare(b.id))[0];
 }
 
-/** Reparents a page or free node after a completed drag; page groups are intentionally unsupported. */
+/** Reparents a page, page group or free node after a completed drag. */
 export function assignCanvasObjectToSection(
   state: CanvasState,
-  child: { kind: "page" | "node"; id: string },
+  child: { kind: "page" | "page-group" | "node"; id: string },
   layout: CanvasPageLayout,
 ): CanvasState {
   const target = findInnermostSectionContainingLayout(state.sections, layout)?.id;
@@ -325,6 +348,7 @@ export function moveCanvasSectionWithChildren(
   if (dx === 0 && dy === 0) return state;
 
   const pageIds = new Set<string>();
+  const pageGroupIds = new Set<string>();
   const nodeIds = new Set<string>();
   const sectionIds = new Set<string>();
   const visit = (id: string) => {
@@ -332,6 +356,7 @@ export function moveCanvasSectionWithChildren(
     sectionIds.add(id);
     for (const child of state.sections?.[id]?.children ?? []) {
       if (child.kind === "page") pageIds.add(child.id);
+      else if (child.kind === "page-group") pageGroupIds.add(child.id);
       else if (child.kind === "node") nodeIds.add(child.id);
       else visit(child.id);
     }
@@ -353,6 +378,17 @@ export function moveCanvasSectionWithChildren(
     const pageLayout = pages[id];
     if (pageLayout) pages[id] = { ...pageLayout, x: pageLayout.x + dx, y: pageLayout.y + dy };
   }
+  const pageGroups = { ...(state.pageGroups ?? {}) };
+  for (const id of pageGroupIds) {
+    const group = pageGroups[id];
+    if (group) {
+      pageGroups[id] = {
+        ...group,
+        layout: { ...group.layout, x: group.layout.x + dx, y: group.layout.y + dy },
+        updatedAt: now,
+      };
+    }
+  }
   const nodes = state.nodes && { ...state.nodes };
   for (const id of nodeIds) {
     const node = nodes?.[id];
@@ -364,11 +400,12 @@ export function moveCanvasSectionWithChildren(
       };
     }
   }
-  return { ...state, pages, ...(nodes ? { nodes } : {}), sections };
+  return { ...state, pages, pageGroups, ...(nodes ? { nodes } : {}), sections };
 }
 
 function getChildLayout(state: CanvasState, child: CanvasSectionChild): CanvasPageLayout | undefined {
   if (child.kind === "page") return state.pages[child.id];
+  if (child.kind === "page-group") return state.pageGroups?.[child.id]?.layout;
   if (child.kind === "node") return state.nodes?.[child.id]?.layout;
   return state.sections?.[child.id]?.layout;
 }
@@ -422,7 +459,7 @@ export function createCanvasSection(input: {
   return {
     id: input.id,
     kind: "section",
-    title: input.title?.trim().slice(0, 120) || "Section",
+    title: input.title?.trim().slice(0, 120) || "分组",
     layout: input.layout,
     children: [],
     createdAt: now,

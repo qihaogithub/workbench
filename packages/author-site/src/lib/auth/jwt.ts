@@ -1,5 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 function getSecret(): Uint8Array {
   return new TextEncoder().encode(
@@ -9,6 +9,19 @@ function getSecret(): Uint8Array {
 
 export function getAuthCookieName(): string {
   return process.env.AUTH_COOKIE_NAME || "auth_token";
+}
+
+/**
+ * Extract a JWT from a standard Bearer authorization header.
+ *
+ * Remote clients use this form so that authentication does not depend on the
+ * browser cookie name configured by the target author-site deployment.
+ */
+export function extractBearerToken(
+  authorization: string | null | undefined,
+): string | undefined {
+  const match = authorization?.match(/^Bearer\s+(\S+)$/i);
+  return match?.[1];
 }
 
 /** token 有效期，createToken、cookie maxAge 与 CLI 返回的 expiresAt 共用同一来源 */
@@ -67,11 +80,19 @@ export async function setAuthCookie(token: string): Promise<void> {
 }
 
 /**
- * 获取认证 Cookie
+ * 获取请求认证 Token。
+ *
+ * Browser requests continue to use the configured httpOnly cookie.  Remote
+ * CLI requests can use Authorization: Bearer when no cookie is present.  The
+ * cookie remains authoritative to preserve existing browser semantics.
  */
 export async function getAuthCookie(): Promise<string | undefined> {
   const cookieStore = await cookies();
-  return cookieStore.get(getAuthCookieName())?.value;
+  const cookieToken = cookieStore.get(getAuthCookieName())?.value;
+  if (cookieToken) return cookieToken;
+
+  const requestHeaders = await headers();
+  return extractBearerToken(requestHeaders.get("authorization"));
 }
 
 /**

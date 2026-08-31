@@ -115,7 +115,7 @@ export function createDingtalkTool(
     description:
       "Use the current user's DingTalk authorization through dws. Only doc, sheet, and wiki are allowed. Write operations require user confirmation.",
     parameters: DingtalkParams,
-    execute: async (toolCallId: string, args: DingtalkParams) => {
+    execute: async (toolCallId: string, args: DingtalkParams, signal?: AbortSignal) => {
       if (!ALLOWED_PRODUCTS.has(args.product)) {
         return {
           content: [{ type: "text", text: "Error: only dws doc, sheet, and wiki are allowed." }],
@@ -145,10 +145,15 @@ export function createDingtalkTool(
 
       const writeCommand = isWriteCommand(command);
       if (writeCommand) {
-        const approved = await permissionHandler?.(toolCallId, {
+        const permissionRequest = {
           title: "确认执行钉钉写操作",
           summary: `dws ${args.product} ${command.join(" ")}`,
-        });
+        };
+        const approved = permissionHandler
+          ? signal
+            ? await permissionHandler(toolCallId, permissionRequest, signal)
+            : await permissionHandler(toolCallId, permissionRequest)
+          : undefined;
         if (!approved) {
           return {
             content: [{ type: "text", text: "用户已取消钉钉写操作。" }],

@@ -6124,6 +6124,8 @@ export class ProjectAdminService {
       path.join(this.getProjectPath(projectId), "project.json"),
     );
     if (!parsed) return null;
+    const projection = this.readProjectProjection(projectId);
+    const workspacePath = this.projectWorkspacePath(projectId);
     return {
       id: parsed.id ?? projectId,
       name: parsed.name ?? projectId,
@@ -6150,9 +6152,13 @@ export class ProjectAdminService {
       category: normalizeProjectCategory(parsed.category),
       description: parsed.description,
       workspacePath:
-        parsed.workspacePath ?? this.projectWorkspacePath(projectId),
-      demoPages: Array.isArray(parsed.demoPages) ? parsed.demoPages : [],
-      demoFolders: Array.isArray(parsed.demoFolders) ? parsed.demoFolders : [],
+        parsed.workspacePath ?? workspacePath,
+      demoPages:
+        projection?.demoPages ??
+        (Array.isArray(parsed.demoPages) ? parsed.demoPages : []),
+      demoFolders:
+        projection?.demoFolders ??
+        (Array.isArray(parsed.demoFolders) ? parsed.demoFolders : []),
       versions: Array.isArray(parsed.versions) ? parsed.versions : [],
       createdAt: parsed.createdAt ?? Date.now(),
       updatedAt: parsed.updatedAt ?? Date.now(),
@@ -6190,10 +6196,32 @@ export class ProjectAdminService {
     };
   }
 
+  /**
+   * Live page/folder metadata is owned by workspace-tree.json.  project.json
+   * keeps the same fields as a derived cache for older consumers and exports.
+   * A missing tree is treated as a legacy workspace and falls back to the
+   * cached projection; a present but malformed tree still raises the existing
+   * workspace validation error.
+   */
+  private readProjectProjection(
+    projectId: string,
+  ): Pick<Project, "demoPages" | "demoFolders"> | undefined {
+    const workspacePath = this.projectWorkspacePath(projectId);
+    const treePath = path.join(workspacePath, WORKSPACE_TREE_FILENAME);
+    if (!fs.existsSync(treePath)) return undefined;
+    const tree = this.readWorkspaceTree(workspacePath);
+    return {
+      demoPages: sortPages(tree.pages),
+      demoFolders: tree.folders,
+    };
+  }
+
   private writeProject(projectId: string, project: Project): void {
+    const projection = this.readProjectProjection(projectId);
+    const next = projection ? { ...project, ...projection } : project;
     writeJsonFile(
       path.join(this.getProjectPath(projectId), "project.json"),
-      project,
+      next,
     );
   }
 

@@ -99,6 +99,10 @@ docker compose --env-file .env.docker up -d --force-recreate --no-build author-s
 
 `scripts/deploy-fast.sh` 适合已有可用远端目录的增量部署；首次部署前若远端没有 Node.js 且 agent 容器尚未运行，脚本的 Workspace Authority 预检会提前中止，此时按本文的首次部署流程启动一次即可。
 
+`agent-service` 与 `author-site` 的 Docker 构建上下文都需包含 `packages/whiteboard-core`（其源码被 Agent 工具链和创作端白板入口引用）；使用 targeted sync 时，部署脚本会将该 workspace 包列入两个服务的必需同步清单。若任一 Dockerfile 或同步清单缺少它，esbuild/Webpack 会在构建阶段报 `Could not resolve "@workbench/whiteboard-core"`。
+
+通过 `scripts/deploy.sh --remote-build` 构建时，测试机应设置 `DOCKER_BUILD_HTTP_PROXY=http://10.130.33.131:48179` 与 `DOCKER_BUILD_HTTPS_PROXY=http://10.130.33.131:48179`，脚本会把代理作为 BuildKit 参数传给各服务；不需要代理的环境保持为空即可。
+
 ## 四、验收与故障定位
 
 ```bash

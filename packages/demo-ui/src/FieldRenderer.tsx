@@ -34,17 +34,19 @@ import type { DesignSpecEntryLink, ImageConfigScope, WhiteboardLauncher } from "
 import { ImageInputActions } from "./ImageInputActions";
 
 export interface PositionFieldEntry {
+  instanceId: string;
   posKey: string;
   fieldPath: string;
   currentValue: { x: number; y: number };
+  domOccurrence?: number;
   containerSize?: { width: number; height: number };
 }
 
 export interface PositionConfigContextValue {
   registerPositionField(entry: PositionFieldEntry): () => void;
-  requestPositionEdit(): void;
+  requestPositionEdit(instanceId: string): void;
   exitPositionEdit(): void;
-  positionEditActive: boolean;
+  activePositionId: string | null;
   dimming: boolean;
   onToggleDimming?: () => void;
 }
@@ -80,6 +82,9 @@ export function FieldRenderer({
   onEditConfigDefinition,
   embedded,
   fieldPath,
+  defaultValueOverride,
+  positionInstanceId,
+  positionDomOccurrence,
   imageConfigScope,
   pageId,
   onLaunchWhiteboard,
@@ -95,10 +100,21 @@ export function FieldRenderer({
   onEditConfigDefinition?: (fieldKey: string, field: FieldConfig) => void;
   embedded?: boolean;
   fieldPath?: string;
+  /** Parent object-array defaults are resolved at the current array index. */
+  defaultValueOverride?: unknown;
+  positionInstanceId?: string;
+  positionDomOccurrence?: number;
   imageConfigScope?: ImageConfigScope;
   pageId?: string;
   onLaunchWhiteboard?: WhiteboardLauncher;
 }) {
+  const effectiveDefault = defaultValueOverride !== undefined
+    ? defaultValueOverride
+    : field.default;
+  const isSingleImageField = field.format === "image" || field.uiWidget === "image";
+  const isImageListField = field.uiWidget === "imageList"
+    || field.type === "imageList"
+    || (field.type === "array" && field.itemsFormat === "image");
   const isInlineControl =
     field.type === "boolean" ||
     field.type === "number" ||
@@ -124,15 +140,15 @@ export function FieldRenderer({
           sessionId={sessionId}
           options={{ ...(field.uiOptions as any), ...(field.format === "video" ? { mediaType: "video", accept: field.uiOptions?.accept || "video/mp4,video/webm" } : {}) }}
           defaultValue={
-            typeof field.default === "string" ? field.default : undefined
+            field.format === "video"
+              ? (effectiveDefault as any)
+              : typeof effectiveDefault === "string"
+                ? effectiveDefault
+                : undefined
           }
-          onWhiteboard={!readonly && field.format === "image" && onLaunchWhiteboard && fieldPath ? () => onLaunchWhiteboard({ scope: imageConfigScope, pageId, fieldPath, ...(typeof value === "string" ? { currentValue: value } : {}) }) : undefined}
+          onWhiteboard={!readonly && isSingleImageField && onLaunchWhiteboard && fieldPath ? () => onLaunchWhiteboard({ scope: imageConfigScope, pageId, fieldPath, ...(typeof value === "string" ? { currentValue: value } : {}) }) : undefined}
         />
       );
-
-      if (field.format !== "image" || readonly || !onLaunchWhiteboard || !fieldPath) {
-        return upload;
-      }
 
       return upload;
     }
@@ -165,7 +181,7 @@ export function FieldRenderer({
           title={field.title}
           sessionId={sessionId}
           options={field.uiOptions as any}
-          defaultValue={normalizeImageDefaults(field.default)}
+          defaultValue={normalizeImageDefaults(effectiveDefault)}
           renderItemActions={
             !readonly && onLaunchWhiteboard && fieldPath
               ? (item, index, onUpload) => (
@@ -215,15 +231,11 @@ export function FieldRenderer({
           sessionId={sessionId}
           options={field.uiOptions as any}
           defaultValue={
-            typeof field.default === "string" ? field.default : undefined
+            typeof effectiveDefault === "string" ? effectiveDefault : undefined
           }
-          onWhiteboard={!readonly && onLaunchWhiteboard && fieldPath ? () => onLaunchWhiteboard({ scope: imageConfigScope, pageId, fieldPath, ...(typeof value === "string" ? { currentValue: value } : {}) }) : undefined}
+          onWhiteboard={!readonly && isSingleImageField && onLaunchWhiteboard && fieldPath ? () => onLaunchWhiteboard({ scope: imageConfigScope, pageId, fieldPath, ...(typeof value === "string" ? { currentValue: value } : {}) }) : undefined}
         />
       );
-
-      if (field.format !== "image" || readonly || !onLaunchWhiteboard || !fieldPath) {
-        return upload;
-      }
 
       return upload;
     }
@@ -260,6 +272,11 @@ export function FieldRenderer({
             onChange={(newValue) => onChange(newValue)}
             sessionId={sessionId}
             readonly={readonly}
+            fieldPath={fieldPath}
+            defaultValueOverride={effectiveDefault}
+            imageConfigScope={imageConfigScope}
+            pageId={pageId}
+            onLaunchWhiteboard={onLaunchWhiteboard}
           />
         );
       }
@@ -308,7 +325,22 @@ export function FieldRenderer({
           title={field.title}
           sessionId={sessionId}
           options={field.uiOptions as any}
-          defaultValue={normalizeImageDefaults(field.default)}
+          defaultValue={normalizeImageDefaults(effectiveDefault)}
+          renderItemActions={
+            isImageListField && !readonly && onLaunchWhiteboard && fieldPath
+              ? (item, index, onUpload) => (
+                  <ImageInputActions
+                    onUpload={onUpload}
+                    onWhiteboard={() => onLaunchWhiteboard({
+                      scope: imageConfigScope,
+                      pageId,
+                      fieldPath,
+                      listItem: { index, url: item.url },
+                    })}
+                  />
+                )
+              : undefined
+          }
         />
       );
     }
@@ -453,6 +485,8 @@ export function FieldRenderer({
           value={value as { x: number; y: number } | undefined}
           onChange={onChange}
           fieldPath={fieldPath}
+          instanceId={positionInstanceId}
+          domOccurrence={positionDomOccurrence}
         />
       );
     }
@@ -586,27 +620,34 @@ function PositionFieldInput({
   value,
   onChange,
   fieldPath,
+  instanceId: providedInstanceId,
+  domOccurrence,
 }: {
   field: FieldConfig;
   value: { x: number; y: number } | undefined;
   onChange: (value: unknown) => void;
   fieldPath?: string;
+  instanceId?: string;
+  domOccurrence?: number;
 }) {
   const posConfig = usePositionConfig();
   const pos = value || { x: 0, y: 0 };
   const posKey = field.positionable?.key || field.key;
+  const instanceId = providedInstanceId ?? fieldPath ?? posKey;
   const containerWidth = field.positionable?.size?.width ?? 0;
   const containerHeight = field.positionable?.size?.height ?? 0;
 
   useEffect(() => {
     if (!posConfig || !fieldPath) return;
     return posConfig.registerPositionField({
+      instanceId,
       posKey,
       fieldPath,
       currentValue: pos,
+      domOccurrence,
       containerSize: field.positionable?.size,
     });
-  }, [posConfig, posKey, fieldPath, pos.x, pos.y, field.positionable?.size]);
+  }, [posConfig, instanceId, posKey, fieldPath, domOccurrence, pos.x, pos.y, field.positionable?.size]);
 
   const handleCoordChange = (axis: "x" | "y", val: string) => {
     const num = parseInt(val, 10);
@@ -643,14 +684,14 @@ function PositionFieldInput({
         />
       </div>
       {posConfig && (() => {
-        const isEditing = posConfig.positionEditActive;
+        const isEditing = posConfig.activePositionId === instanceId;
         return (
           <>
             <Button
               variant={isEditing ? "default" : "outline"}
               size="sm"
               className="h-6 text-xs px-2 shrink-0"
-              onClick={() => isEditing ? posConfig.exitPositionEdit() : posConfig.requestPositionEdit()}
+              onClick={() => isEditing ? posConfig.exitPositionEdit() : posConfig.requestPositionEdit(instanceId)}
             >
               {isEditing ? <Check className="h-3 w-3 mr-1" /> : <Pencil className="h-3 w-3 mr-1" />}
               {isEditing ? "完成" : "拖动"}

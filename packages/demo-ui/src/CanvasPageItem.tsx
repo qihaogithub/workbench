@@ -9,7 +9,7 @@ import React, {
   useRef,
 } from "react";
 import { createPortal } from "react-dom";
-import { Trash2, Lock, ExternalLink, Unlink } from "lucide-react";
+import { Copy, Trash2, Lock, ExternalLink, Unlink } from "lucide-react";
 import { CanvasSelectionBox } from "./CanvasSelectionBox";
 import {
   CanvasResizeHandles,
@@ -67,6 +67,10 @@ interface CanvasPageItemProps {
   /** 画布评论模式下选择本页；优先于页面拖拽和预览内容交互。 */
   onCommentSelect?: (pageId: string, event: React.PointerEvent) => void;
   onRequestDelete?: (pageId: string) => void;
+  /** 页面右键打开时同步画布选择范围。 */
+  onContextMenuOpen?: (pageId: string) => void;
+  /** 复制右键命中的页面；父组件负责确定多选复制范围。 */
+  onCopy?: (pageId: string) => void;
   onViewSource?: (pageId: string) => void;
   className?: string;
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
@@ -554,6 +558,8 @@ export function CanvasPageItem({
   onRename,
   onCommentSelect,
   onRequestDelete,
+  onContextMenuOpen,
+  onCopy,
   onViewSource,
   onConsoleEntry,
   onError,
@@ -804,7 +810,7 @@ export function CanvasPageItem({
       : hoveredEdge && RESIZE_CURSOR_BY_EDGE[hoveredEdge]
         ? RESIZE_CURSOR_BY_EDGE[hoveredEdge]
         : canInteract && !isDragging
-          ? "move"
+          ? "default"
           : toolMode === "hand" && editable && !isEditing
             ? "default"
             : undefined;
@@ -884,6 +890,7 @@ export function CanvasPageItem({
       onContextMenu={(e) => {
         if (!editable) return;
         e.preventDefault();
+        onContextMenuOpen?.(page.id);
         setContextMenu({ x: e.clientX, y: e.clientY });
       }}
     >
@@ -1039,6 +1046,19 @@ export function CanvasPageItem({
                 event.stopPropagation();
               }}
             >
+              {onCopy && (
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-muted"
+                  onClick={() => {
+                    onCopy(page.id);
+                    setContextMenu(null);
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                  复制
+                </button>
+              )}
               {page.isReference ? (
                 <>
                   <button

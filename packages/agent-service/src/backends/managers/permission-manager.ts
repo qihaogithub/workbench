@@ -3,7 +3,7 @@ import * as path from 'path';
 import type { AgentConfig, AgentEvent } from '../../core/types';
 import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from '../pi-tools/permissions';
 import { PERMISSION_TIMEOUT, type PermissionHandler, type PermissionRequestInfo } from '../pi-tools/delete-page-tool';
-import type { PlanApprovalRequest, PlanApprovalResult } from '../pi-tools/plan-approval-tool';
+import type { PlanApprovalHandler, PlanApprovalRequest, PlanApprovalResult } from '../pi-tools/plan-approval-tool';
 import { logger } from '../../utils/logger';
 
 const PLAN_APPROVAL_TIMEOUT_MS = 10 * 60_000;
@@ -22,8 +22,13 @@ export function isKnowledgeBasePath(filePath: string, workingDir: string): boole
 }
 
 interface PendingPermission {
-  resolve: (result: { approved: boolean; responseContent?: string }) => void;
-  reject: (error: Error) => void;
+  settle: (result: PermissionResolution) => boolean;
+}
+
+interface PermissionResolution {
+  approved: boolean;
+  responseContent?: string;
+  reason: 'user_response' | 'timeout' | 'cancelled';
 }
 
 /**
@@ -74,8 +79,12 @@ export class PermissionManager {
    * deletePage 权限确认：发出 permission_request 事件，等待用户确认或超时
    * 此方法由 deletePage 工具的 execute 函数调用（异步等待）
    */
-  requestPermission: PermissionHandler = (toolCallId: string, request: PermissionRequestInfo): Promise<boolean> => {
+  requestPermission: PermissionHandler = (toolCallId, request, signal): Promise<boolean> => {
     const sessionId = this.config.sessionId;
+
+    if (signal?.aborted) {
+      return Promise.resolve(false);
+    }
 
     logger.info({ toolCallId, request }, 'deletePage: requesting permission');
 
@@ -100,28 +109,19 @@ export class PermissionManager {
       });
     }
 
-    return new Promise<boolean>((resolve) => {
-      this.pendingPermissions.set(toolCallId, {
-        resolve: (result) => resolve(result.approved),
-        reject: (_err: Error) => resolve(false),
-      });
-
-      const timeoutId = setTimeout(() => {
-        if (this.pendingPermissions.has(toolCallId)) {
-          this.pendingPermissions.delete(toolCallId);
-          logger.warn({ toolCallId }, 'deletePage: permission request timed out');
-          resolve(false);
-        }
-      }, PERMISSION_TIMEOUT);
-      timeoutId.unref?.();
-    });
+    return this.waitForPermission(toolCallId, PERMISSION_TIMEOUT, signal, 'deletePage')
+      .then((result) => result.approved);
   };
 
   /**
    * 计划审批：发出 permission_request 事件，等待用户批准或取消
    */
-  requestPlanApproval = (toolCallId: string, request: PlanApprovalRequest): Promise<PlanApprovalResult> => {
+  requestPlanApproval: PlanApprovalHandler = (toolCallId, request, signal): Promise<PlanApprovalResult> => {
     const sessionId = this.config.sessionId;
+
+    if (signal?.aborted) {
+      return Promise.resolve({ approved: false, reason: 'cancelled' });
+    }
 
     logger.info({ toolCallId, title: request.title }, 'planApproval: requesting user approval');
 
@@ -148,24 +148,14 @@ export class PermissionManager {
       });
     }
 
-    return new Promise<PlanApprovalResult>((resolve) => {
-      this.pendingPermissions.set(toolCallId, {
-        resolve: (result) => resolve({
-          approved: result.approved,
-          planMarkdown: result.responseContent,
-        }),
-        reject: (_err: Error) => resolve({ approved: false }),
-      });
-
-      const timeoutId = setTimeout(() => {
-        if (this.pendingPermissions.has(toolCallId)) {
-          this.pendingPermissions.delete(toolCallId);
-          logger.warn({ toolCallId }, 'planApproval: permission request timed out');
-          resolve({ approved: false });
-        }
-      }, PLAN_APPROVAL_TIMEOUT_MS);
-      timeoutId.unref?.();
-    });
+    return this.waitForPermission(toolCallId, PLAN_APPROVAL_TIMEOUT_MS, signal, 'planApproval')
+      .then((result) => ({
+        approved: result.approved,
+        planMarkdown: result.responseContent,
+        ...(result.reason === 'user_response'
+          ? (result.approved ? {} : { reason: 'rejected' as const })
+          : { reason: result.reason }),
+      }));
   };
 
   /**
@@ -174,8 +164,7 @@ export class PermissionManager {
   resolvePermission(toolCallId: string, approved: boolean, responseContent?: string): void {
     const pending = this.pendingPermissions.get(toolCallId);
     if (pending) {
-      this.pendingPermissions.delete(toolCallId);
-      pending.resolve({ approved, responseContent });
+      pending.settle({ approved, responseContent, reason: 'user_response' });
       logger.info({ toolCallId, approved }, 'deletePage: permission resolved');
     } else {
       logger.warn({ toolCallId }, 'deletePage: no pending permission found for toolCallId');
@@ -187,6 +176,55 @@ export class PermissionManager {
   }
 
   clearPendingPermissions(): void {
-    this.pendingPermissions.clear();
+    this.cancelPendingPermissions();
+  }
+
+  cancelPendingPermissions(): void {
+    for (const pending of [...this.pendingPermissions.values()]) {
+      pending.settle({ approved: false, reason: 'cancelled' });
+    }
+  }
+
+  private waitForPermission(
+    toolCallId: string,
+    timeoutMs: number,
+    signal: AbortSignal | undefined,
+    logPrefix: 'deletePage' | 'planApproval',
+  ): Promise<PermissionResolution> {
+    if (signal?.aborted) {
+      return Promise.resolve({ approved: false, reason: 'cancelled' });
+    }
+
+    return new Promise<PermissionResolution>((resolve) => {
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      let abortListener: (() => void) | undefined;
+      const pending: PendingPermission = {
+        settle: (result) => {
+          if (this.pendingPermissions.get(toolCallId) !== pending) return false;
+          this.pendingPermissions.delete(toolCallId);
+          if (timeoutId) clearTimeout(timeoutId);
+          if (signal && abortListener) signal.removeEventListener('abort', abortListener);
+          resolve(result);
+          return true;
+        },
+      };
+
+      this.pendingPermissions.set(toolCallId, pending);
+      timeoutId = setTimeout(() => {
+        if (pending.settle({ approved: false, reason: 'timeout' })) {
+          logger.warn({ toolCallId }, `${logPrefix}: permission request timed out`);
+        }
+      }, timeoutMs);
+      timeoutId.unref?.();
+
+      if (signal) {
+        abortListener = () => {
+          if (pending.settle({ approved: false, reason: 'cancelled' })) {
+            logger.info({ toolCallId }, `${logPrefix}: permission request cancelled`);
+          }
+        };
+        signal.addEventListener('abort', abortListener, { once: true });
+      }
+    });
   }
 }

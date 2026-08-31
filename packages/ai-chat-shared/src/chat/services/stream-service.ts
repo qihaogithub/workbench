@@ -546,7 +546,7 @@ export class StreamService {
 
     this.stream.on("status", (event: StreamEvent) => {
       if (this.currentSessionId !== streamId) return;
-      if (event.status === "processing") {
+      if (event.status === "processing" || event.status === "awaiting_approval") {
         this.connectionEstablished = true;
         this.messageInFlight = true;
         this.clearReadyFallbackTimer();

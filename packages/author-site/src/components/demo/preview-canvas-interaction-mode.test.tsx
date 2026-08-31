@@ -7,6 +7,7 @@ import {
   type CanvasKnowledgeDocument,
   type CanvasState,
 } from "@workbench/demo-ui";
+import type { CanvasPageGroup } from "@workbench/demo-ui/types";
 
 const initialState: CanvasState = {
   viewport: { x: 40, y: 40, zoom: 0.5 },
@@ -318,9 +319,14 @@ function TestCanvasWithParentVisibleState({
 function TestEditorCanvasWithConfigCallback({
   onPageConfigEdit,
   onRequestDeletePages,
+  configCount,
 }: {
-  onPageConfigEdit: (pageId: string) => void;
+  onPageConfigEdit: (
+    pageId: string,
+    options?: { openConfigDetail?: boolean },
+  ) => void;
   onRequestDeletePages?: (pageIds: string[]) => void;
+  configCount?: number;
 }) {
   const [state, setState] = useState<CanvasState>({
     viewport: { x: 40, y: 40, zoom: 0.5 },
@@ -340,12 +346,102 @@ function TestEditorCanvasWithConfigCallback({
           order: 0,
           code: "export default function Demo(){return null}",
           previewSize: { width: 375, height: 812 },
+          configCount,
         },
       ]}
       canvasState={state}
       onCanvasStateChange={setState}
       onPageConfigEdit={onPageConfigEdit}
       onRequestDeletePages={onRequestDeletePages}
+    />
+  );
+}
+
+function TestPageGroupWithConfigCallback({
+  onPageConfigEdit,
+}: {
+  onPageConfigEdit: (
+    pageId: string,
+    options?: { openConfigDetail?: boolean },
+  ) => void;
+}) {
+  const [state, setState] = useState<CanvasState>({
+    viewport: { x: 0, y: 0, zoom: 1 },
+    pages: {
+      page_1: { x: 100, y: 100, width: 100, height: 100 },
+      page_2: { x: 220, y: 100, width: 100, height: 100 },
+    },
+    pageGroups: {
+      group_1: {
+        id: "group_1",
+        kind: "page-group",
+        title: "页面组",
+        pages: [
+          { id: "entry_1", pageId: "page_1", title: "页面一" },
+          { id: "entry_2", pageId: "page_2", title: "页面二" },
+        ],
+        activePageId: "page_1",
+        layout: { x: 100, y: 100, width: 220, height: 100 },
+        createdAt: 0,
+        updatedAt: 0,
+      } satisfies CanvasPageGroup,
+    },
+    hiddenPageIds: ["page_1", "page_2"],
+    nodes: {},
+  });
+
+  return (
+    <PreviewCanvas
+      interactionMode="editor"
+      pages={[
+        {
+          id: "page_1",
+          name: "页面一",
+          order: 0,
+          code: "export default function Demo(){return null}",
+          previewSize: { width: 100, height: 100 },
+          configCount: 0,
+        },
+        {
+          id: "page_2",
+          name: "页面二",
+          order: 1,
+          code: "export default function Demo(){return null}",
+          previewSize: { width: 100, height: 100 },
+          configCount: 2,
+        },
+      ]}
+      canvasState={state}
+      onCanvasStateChange={setState}
+      onPageConfigEdit={onPageConfigEdit}
+    />
+  );
+}
+
+function TestCrossProjectClipboardCanvas({
+  projectId,
+  onRequestPastePages,
+  onRequestCreateReferences,
+}: {
+  projectId: string;
+  onRequestPastePages: (input: unknown) => Promise<{ pageIdMapping: Map<string, string> }>;
+  onRequestCreateReferences: (input: unknown) => Promise<{ pageIdMapping: Map<string, string> }>;
+}) {
+  const [state, setState] = useState<CanvasState>({
+    viewport: { x: 40, y: 40, zoom: 0.5 },
+    pages: { target_page: { x: 100, y: 120, width: 375, height: 812 } },
+    nodes: {},
+  });
+
+  return (
+    <PreviewCanvas
+      interactionMode="editor"
+      projectId={projectId}
+      pages={[{ id: "target_page", name: "目标页面", order: 0 }]}
+      canvasState={state}
+      onCanvasStateChange={setState}
+      onRequestPastePages={onRequestPastePages as never}
+      onRequestCreateReferences={onRequestCreateReferences as never}
     />
   );
 }
@@ -733,6 +829,108 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
     expect(onPageConfigEdit).toHaveBeenCalledWith("page_1");
   });
 
+  it("画布直接点击零配置页面时请求保持一级列表", async () => {
+    const onPageConfigEdit = jest.fn();
+    const { container } = render(
+      <TestEditorCanvasWithConfigCallback
+        onPageConfigEdit={onPageConfigEdit}
+        configCount={0}
+      />,
+    );
+    const page = container.querySelector("[data-page-id='page_1']") as HTMLElement;
+    Object.defineProperty(page, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 100,
+        top: 120,
+        right: 475,
+        bottom: 932,
+        width: 375,
+        height: 812,
+        x: 100,
+        y: 120,
+        toJSON: () => ({}),
+      }),
+    });
+
+    fireEvent.pointerDown(page, {
+      button: 0,
+      clientX: 220,
+      clientY: 260,
+      pointerId: 22,
+    });
+    fireEvent.pointerUp(page, { clientX: 220, clientY: 260, pointerId: 22 });
+
+    await waitFor(() =>
+      expect(onPageConfigEdit).toHaveBeenCalledWith("page_1", {
+        openConfigDetail: false,
+      }),
+    );
+  });
+
+  it("画布直接点击有配置页面时请求进入详情", async () => {
+    const onPageConfigEdit = jest.fn();
+    const { container } = render(
+      <TestEditorCanvasWithConfigCallback
+        onPageConfigEdit={onPageConfigEdit}
+        configCount={2}
+      />,
+    );
+    const page = container.querySelector("[data-page-id='page_1']") as HTMLElement;
+    Object.defineProperty(page, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 100,
+        top: 120,
+        right: 475,
+        bottom: 932,
+        width: 375,
+        height: 812,
+        x: 100,
+        y: 120,
+        toJSON: () => ({}),
+      }),
+    });
+
+    fireEvent.pointerDown(page, {
+      button: 0,
+      clientX: 220,
+      clientY: 260,
+      pointerId: 23,
+    });
+    fireEvent.pointerUp(page, { clientX: 220, clientY: 260, pointerId: 23 });
+
+    await waitFor(() =>
+      expect(onPageConfigEdit).toHaveBeenCalledWith("page_1", {
+        openConfigDetail: true,
+      }),
+    );
+  });
+
+  it("页面组点击当前页面时复用配置详情判断", async () => {
+    const onPageConfigEdit = jest.fn();
+    const { container } = render(
+      <TestPageGroupWithConfigCallback onPageConfigEdit={onPageConfigEdit} />,
+    );
+    const group = container.querySelector(
+      "[data-page-group-id='group_1']",
+    ) as HTMLElement;
+
+    fireEvent.pointerDown(group, {
+      button: 0,
+      clientX: 150,
+      clientY: 130,
+      pointerId: 24,
+    });
+    fireEvent.pointerUp(group, { clientX: 150, clientY: 130, pointerId: 24 });
+
+    await waitFor(() =>
+      expect(onPageConfigEdit).toHaveBeenCalledWith("page_1", {
+        openConfigDetail: false,
+      }),
+    );
+  });
+
   it("editor 模式选中页面后按 Delete 请求删除页面", async () => {
     const onRequestDeletePages = jest.fn();
     const { container } = render(
@@ -797,6 +995,43 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
     expect(onRequestDeletePages).toHaveBeenCalledWith(["page_1"]);
   });
 
+  it("选中页面后 Ctrl/Cmd+C 写入画布剪贴板", async () => {
+    const { container } = render(
+      <TestEditorCanvasWithConfigCallback onPageConfigEdit={jest.fn()} />,
+    );
+    const page = container.querySelector("[data-page-id='page_1']") as HTMLElement;
+    Object.defineProperty(page, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 100,
+        top: 120,
+        right: 475,
+        bottom: 932,
+        width: 375,
+        height: 812,
+        x: 100,
+        y: 120,
+        toJSON: () => ({}),
+      }),
+    });
+
+    fireEvent.pointerDown(page, { button: 0, clientX: 220, clientY: 260, pointerId: 51 });
+    fireEvent.pointerUp(page, { clientX: 220, clientY: 260, pointerId: 51 });
+    await waitFor(() =>
+      expect(
+        container.querySelector("[data-page-id='page_1'] [data-canvas-selection-box='true']"),
+      ).toBeInTheDocument(),
+    );
+
+    fireEvent.keyDown(window, { key: "c", ctrlKey: true });
+
+    const clipboard = JSON.parse(
+      window.localStorage.getItem("workbench:canvas-clipboard") ?? "{}",
+    );
+    expect(clipboard.pages.map((item: { id: string }) => item.id)).toEqual(["page_1"]);
+    window.localStorage.removeItem("workbench:canvas-clipboard");
+  });
+
   it("editor 模式单选页面后显示删除按钮", async () => {
     const onRequestDeletePages = jest.fn();
     const { container } = render(
@@ -834,7 +1069,8 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
       pointerId: 23,
     });
 
-    const deleteButton = await screen.findByTitle("删除页面");
+    fireEvent.click(screen.getByRole("button", { name: "更多" }));
+    const deleteButton = await screen.findByRole("button", { name: "删除" });
     fireEvent.click(deleteButton);
 
     expect(onRequestDeletePages).toHaveBeenCalledWith(["page_1"]);
@@ -905,6 +1141,8 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
       shiftKey: true,
     });
 
+    fireEvent.click(screen.getByRole("button", { name: "更多" }));
+    fireEvent.click(screen.getByRole("button", { name: "更多" }));
     fireEvent.click(await screen.findByRole("button", { name: "合并页面" }));
 
     await waitFor(() => {
@@ -936,6 +1174,7 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
       top: "100px",
       width: "100px",
       height: "100px",
+      cursor: "default",
     });
 
     fireEvent.click(screen.getByRole("button", { name: "折叠页面目录" }));
@@ -1013,6 +1252,7 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
       pointerId: 44,
       shiftKey: true,
     });
+    fireEvent.click(screen.getByRole("button", { name: "更多" }));
     fireEvent.click(await screen.findByRole("button", { name: "合并页面" }));
 
     fireEvent.click(await screen.findByRole("button", { name: "页面二" }));
@@ -1166,6 +1406,7 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
       pointerId: 48,
       shiftKey: true,
     });
+    fireEvent.click(screen.getByRole("button", { name: "更多" }));
     fireEvent.click(await screen.findByRole("button", { name: "合并页面" }));
 
     dragMarquee(root, { clientX: 80, clientY: 80 }, { clientX: 650, clientY: 320 });
@@ -1174,6 +1415,7 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
       expect(screen.getByLabelText("多选对齐工具栏")).toBeInTheDocument();
     });
 
+    fireEvent.click(screen.getByRole("button", { name: "对齐" }));
     fireEvent.click(screen.getByLabelText("左对齐"));
 
     await waitFor(() => {
@@ -1700,6 +1942,7 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
       expect(screen.getByLabelText("多选对齐工具栏")).toBeInTheDocument();
     });
 
+    fireEvent.click(screen.getByRole("button", { name: "对齐" }));
     fireEvent.click(screen.getByLabelText("左对齐"));
 
     await waitFor(() => {
@@ -1720,6 +1963,7 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
       expect(screen.getByLabelText("多选对齐工具栏")).toBeInTheDocument();
     });
 
+    fireEvent.click(screen.getByRole("button", { name: "对齐" }));
     fireEvent.click(screen.getByLabelText("水平均分"));
 
     await waitFor(() => {
@@ -2332,6 +2576,46 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
         items: [],
       } as unknown as DataTransfer;
     }
+
+    it("进入目标项目画布后自动聚焦，跨项目粘贴显示复制或引用选项", async () => {
+      const onRequestPastePages = jest.fn().mockResolvedValue({
+        pageIdMapping: new Map(),
+      });
+      const onRequestCreateReferences = jest.fn().mockResolvedValue({
+        pageIdMapping: new Map(),
+      });
+      window.localStorage.setItem(
+        "workbench:canvas-clipboard",
+        JSON.stringify({
+          version: 1,
+          copiedAt: Date.now(),
+          sourceProjectId: "source-project",
+          nodes: [],
+          pages: [{ id: "source-page", name: "来源页面", order: 0 }],
+          pageLayouts: {
+            "source-page": { x: 0, y: 0, width: 375, height: 812 },
+          },
+          pageGroups: [],
+          bounds: { x: 0, y: 0, width: 375, height: 812 },
+        }),
+      );
+      render(
+        <TestCrossProjectClipboardCanvas
+          projectId="target-project"
+          onRequestPastePages={onRequestPastePages}
+          onRequestCreateReferences={onRequestCreateReferences}
+        />,
+      );
+      const canvas = screen.getByLabelText("画布工作区");
+
+      expect(canvas).toHaveFocus();
+      fireEvent.paste(canvas, { clipboardData: makeClipboardData("") });
+
+      expect(await screen.findByRole("heading", { name: "粘贴选项" })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /复制/ }));
+      await waitFor(() => expect(onRequestPastePages).toHaveBeenCalled());
+      window.localStorage.removeItem("workbench:canvas-clipboard");
+    });
 
     it("编辑器模式粘贴 HTML 代码时触发 onRequestPasteHtmlContent", () => {
       const onRequestPasteHtmlContent = jest.fn();

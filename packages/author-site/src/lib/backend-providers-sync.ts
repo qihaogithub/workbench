@@ -118,12 +118,7 @@ export function readStoredBackendProvidersConfig(): StoredBackendProviders {
   const entry = readDbConfigWithMeta(CONFIG_ID);
   const rawConfig = entry?.config?.backendProviders;
   const config = isBackendProvidersConfig(rawConfig)
-    ? {
-        ...rawConfig,
-        multimodalModels: Array.isArray(entry?.config?.multimodalModels)
-          ? entry.config.multimodalModels
-          : rawConfig.multimodalModels,
-      }
+    ? rawConfig
     : null;
 
   return {

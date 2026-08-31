@@ -16,6 +16,10 @@ import {
   extractCodeConfigBindingKeys,
   extractPrototypeConfigBindingKeys,
 } from "@workbench/demo-ui/config-binding-utils";
+import {
+  getSchemaFieldCountByBindings,
+  getSchemaFieldCountByCategory,
+} from "@workbench/demo-ui/config-categories";
 import { invalidateCompileCache } from "@workbench/demo-ui/compile-cache";
 import { isSchemaEmpty } from "@workbench/demo-ui/validator";
 import { PreviewModeSwitcher } from "@workbench/demo-ui/PreviewModeSwitcher";
@@ -23,6 +27,7 @@ import { PreviewStage } from "@workbench/demo-ui/PreviewStage";
 import type {
   PreviewMode,
   PreviewSize,
+  PositionEditTarget,
   ScreenshotRenderBox,
 } from "@workbench/demo-ui/types";
 import type {
@@ -55,6 +60,9 @@ import type { ConfigDefinitionDraft } from "@workbench/shared/demo/config-schema
 import { applyTextPatches, type TextPatch } from "@workbench/prototype-core";
 import { createAuthorCommentApi } from "@/lib/comment-api-client";
 import {
+  CommentUnreadDot,
+  countUnresolvedCommentThreads,
+  filterPageCommentThreads,
   useComments,
   type CanvasCommentDraft,
 } from "@workbench/demo-ui/comment";
@@ -113,9 +121,7 @@ import {
 import { PreviewProjectionTracker } from "@/lib/preview-projection-tracker";
 import { WorkspacePerformanceSampler } from "@/lib/workspace-performance-sampling";
 import { getPersistablePageContent } from "@/lib/page-content-state";
-import {
-  readWorkspaceAuthoritySnapshotFromBrowser,
-} from "@/lib/workspace-authority-browser-client";
+import { readWorkspaceAuthoritySnapshotFromBrowser } from "@/lib/workspace-authority-browser-client";
 import { Button } from "@/components/ui/button";
 import { DesignSpecWorkspaceProvider } from "@/components/demo/DesignSpecWorkspace";
 import { HtmlFileDropZone } from "@/components/demo/HtmlFileDropZone";
@@ -209,7 +215,11 @@ import {
   resolveCanvasRightPanelTab,
   type RightPanelTab,
 } from "./right-panel-tab";
-import { useVisualEditState, getNodeLabel, buildVisualSelectionPrompt } from "./hooks/useVisualEditState";
+import {
+  useVisualEditState,
+  getNodeLabel,
+  buildVisualSelectionPrompt,
+} from "./hooks/useVisualEditState";
 import {
   markWorkspaceDocumentChanged,
   useVersionControl,
@@ -260,7 +270,7 @@ import { projectApiClient } from "@/lib/project-api";
 import {
   hasLoadedPrototypeHtml,
   loadCanvasPageContent,
-  type ReferencedDesignSpec,
+  type ReferencedDesignSpecEntry,
 } from "@/lib/canvas-page-content-loader";
 import { useDemos } from "@/lib/api";
 import {
@@ -281,11 +291,15 @@ const CommentPanel = dynamic(
   { ssr: false, loading: () => null },
 );
 const PageConfigPanel = dynamic(
-  () => import("@workbench/demo-ui/PageConfigPanel").then((m) => m.PageConfigPanel),
+  () =>
+    import("@workbench/demo-ui/PageConfigPanel").then((m) => m.PageConfigPanel),
   { ssr: false, loading: () => null },
 );
 const WhiteboardDialog = dynamic(
-  () => import("@/components/demo/WhiteboardDialog").then((m) => m.WhiteboardDialog),
+  () =>
+    import("@/components/demo/WhiteboardDialog").then(
+      (m) => m.WhiteboardDialog,
+    ),
   { ssr: false, loading: () => null },
 );
 const DeferredAuthorAIChat = dynamic(
@@ -296,7 +310,10 @@ const DeferredAuthorAIChat = dynamic(
   { ssr: false, loading: () => null },
 );
 const VisualPropertyPanel = dynamic(
-  () => import("./components/VisualPropertyPanel").then((m) => m.VisualPropertyPanel),
+  () =>
+    import("./components/VisualPropertyPanel").then(
+      (m) => m.VisualPropertyPanel,
+    ),
   { ssr: false, loading: () => null },
 );
 const SketchEditorEngineStage = dynamic(
@@ -337,7 +354,10 @@ function SketchEditorEngineBoundary({
   );
 }
 const ProjectSettingsDialog = dynamic(
-  () => import("@/components/project-settings-dialog").then((m) => m.ProjectSettingsDialog),
+  () =>
+    import("@/components/project-settings-dialog").then(
+      (m) => m.ProjectSettingsDialog,
+    ),
   { ssr: false, loading: () => null },
 );
 const ShareDialog = dynamic(
@@ -349,11 +369,17 @@ const DemoPageTree = dynamic(
   { ssr: false, loading: () => null },
 );
 const WorkspaceFileTree = dynamic(
-  () => import("@/components/demo/WorkspaceFileTree").then((m) => m.WorkspaceFileTree),
+  () =>
+    import("@/components/demo/WorkspaceFileTree").then(
+      (m) => m.WorkspaceFileTree,
+    ),
   { ssr: false, loading: () => null },
 );
 const WorkspaceCodeDialog = dynamic(
-  () => import("@/components/demo/WorkspaceCodeDialog").then((m) => m.WorkspaceCodeDialog),
+  () =>
+    import("@/components/demo/WorkspaceCodeDialog").then(
+      (m) => m.WorkspaceCodeDialog,
+    ),
   { ssr: false, loading: () => null },
 );
 const DocumentView = dynamic(
@@ -368,7 +394,10 @@ const DocumentModeRightPanel = dynamic(
   { ssr: false, loading: () => null },
 );
 const KnowledgeDocDialog = dynamic(
-  () => import("@/components/demo/KnowledgeDocDialog").then((m) => m.KnowledgeDocDialog),
+  () =>
+    import("@/components/demo/KnowledgeDocDialog").then(
+      (m) => m.KnowledgeDocDialog,
+    ),
   { ssr: false, loading: () => null },
 );
 const ResourceHistoryDialog = dynamic(
@@ -432,7 +461,9 @@ function isCanvasScreenshotRenderBoxCompatible(
   return Math.abs(renderBox.width - expectedWidth) < 1;
 }
 
-function shouldCaptureFullPage(presentation?: PagePresentationProfile): boolean {
+function shouldCaptureFullPage(
+  presentation?: PagePresentationProfile,
+): boolean {
   return presentation?.heightBehavior !== "fixed";
 }
 
@@ -720,9 +751,16 @@ function isAiFileChangeRefreshTarget(normalizedPath: string): boolean {
 function projectAuthoritySnapshotResources(resources: Record<string, string>) {
   const parseJson = <T,>(value: string | undefined): T | undefined => {
     if (!value) return undefined;
-    try { return JSON.parse(value) as T; } catch { return undefined; }
+    try {
+      return JSON.parse(value) as T;
+    } catch {
+      return undefined;
+    }
   };
-  const tree = parseJson<{ pages?: DemoPageMeta[]; folders?: DemoFolderMeta[] }>(resources["workspace-tree.json"]);
+  const tree = parseJson<{
+    pages?: DemoPageMeta[];
+    folders?: DemoFolderMeta[];
+  }>(resources["workspace-tree.json"]);
   const demoPages = Array.isArray(tree?.pages) ? tree.pages : [];
   const demoFolders = Array.isArray(tree?.folders) ? tree.folders : [];
   const demos: Record<string, RuntimeConversionFileSnapshot> = {};
@@ -733,15 +771,20 @@ function projectAuthoritySnapshotResources(resources: Record<string, string>) {
     const prototypeHtml = resources[`${prefix}prototype.html`];
     const sketchScene = resources[`${prefix}sketch.scene.json`];
     const sandboxHtml = resources[`${prefix}sandbox.html`];
-    if (!schema || (!code && !prototypeHtml && !sketchScene && !sandboxHtml)) continue;
+    if (!schema || (!code && !prototypeHtml && !sketchScene && !sandboxHtml))
+      continue;
     demos[page.id] = {
       code: code ?? "",
       schema,
       prototypeHtml,
       prototypeCss: resources[`${prefix}prototype.css`],
-      prototypeMeta: parseJson<PrototypePageMeta>(resources[`${prefix}prototype.meta.json`]),
+      prototypeMeta: parseJson<PrototypePageMeta>(
+        resources[`${prefix}prototype.meta.json`],
+      ),
       sketchScene,
-      sketchMeta: parseJson<Record<string, unknown>>(resources[`${prefix}sketch.meta.json`]),
+      sketchMeta: parseJson<Record<string, unknown>>(
+        resources[`${prefix}sketch.meta.json`],
+      ),
     };
   }
   return {
@@ -750,7 +793,9 @@ function projectAuthoritySnapshotResources(resources: Record<string, string>) {
     multi: {
       demos,
       projectConfigSchema: resources["project.config.schema.json"],
-      projectConfigValues: parseJson<Record<string, unknown>>(resources["project.config.values.json"]),
+      projectConfigValues: parseJson<Record<string, unknown>>(
+        resources["project.config.values.json"],
+      ),
     },
   };
 }
@@ -908,11 +953,16 @@ function getSchemaGroupKeys(schema: string): Set<string> {
   try {
     const parsed = JSON.parse(schema);
     const props = parsed.properties;
-    if (!props || typeof props !== "object" || Array.isArray(props)) return new Set();
+    if (!props || typeof props !== "object" || Array.isArray(props))
+      return new Set();
     const groups = new Set<string>();
     for (const [key, prop] of Object.entries(props)) {
       const p = prop as Record<string, unknown>;
-      if (p?.type === "object" && p?.properties && !(p.$demo as Record<string, unknown>)?.positionable) {
+      if (
+        p?.type === "object" &&
+        p?.properties &&
+        !(p.$demo as Record<string, unknown>)?.positionable
+      ) {
         groups.add(key);
       }
     }
@@ -1012,9 +1062,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [referencePageRequirements, setReferencePageRequirements] = useState<
     Record<string, string>
   >({});
-  const [referencePageDesignSpecs, setReferencePageDesignSpecs] = useState<
-    Record<string, ReferencedDesignSpec[]>
-  >({});
+  const [referencePageDesignSpecEntries, setReferencePageDesignSpecEntries] =
+    useState<Record<string, ReferencedDesignSpecEntry[]>>({});
   const [referencePageProjectSchemas, setReferencePageProjectSchemas] =
     useState<Record<string, string>>({});
   const pageSchemaMapRef = useRef(pageSchemaMap);
@@ -1023,7 +1072,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     Record<string, string>
   >({});
   const [requirementsLoading, setRequirementsLoading] = useState(false);
-  const [designSpecFocus, setDesignSpecFocus] = useState<{ docId: string; entryId: string } | null>(null);
+  const [designSpecFocus, setDesignSpecFocus] = useState<{
+    docId: string;
+    entryId: string;
+  } | null>(null);
   const [pageCodes, setPageCodes] = useState<Record<string, string>>({});
   const pageCodesRef = useRef(pageCodes);
   pageCodesRef.current = pageCodes;
@@ -1076,31 +1128,54 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   const [positionEditMode, setPositionEditMode] = useState<{
     enabled: boolean;
-    items: string[];
-    positions: Record<string, { x: number; y: number }>;
-    boundary?: Record<string, { mode: "absolute" | "padding"; left: number; top: number; right: number; bottom: number }>;
-  }>({ enabled: false, items: [], positions: {} });
+    target: PositionEditTarget | null;
+  }>({ enabled: false, target: null });
+  const positionEditTargetRef = useRef<PositionEditTarget | null>(null);
+  const positionEditEnabledRef = useRef(false);
+  positionEditTargetRef.current = positionEditMode.target;
+  positionEditEnabledRef.current = positionEditMode.enabled;
 
   const [positionEditDimming, setPositionEditDimming] = useState(true);
 
-  const posKeyMapRef = useRef<Record<string, string>>({});
+  const positionFieldPathRef = useRef<Record<string, string>>({});
 
-  const handleEnterPositionEdit = useCallback(
-    (
-      items: string[],
-      positions: Record<string, { x: number; y: number }>,
-      posKeyMap: Record<string, string>,
-      boundary?: Record<string, { mode: "absolute" | "padding"; left: number; top: number; right: number; bottom: number }>,
-    ) => {
-      posKeyMapRef.current = posKeyMap;
-      setPositionEditMode({ enabled: true, items, positions, boundary });
-      setPositionEditDimming(true);
+  const handleEnterPositionEdit = useCallback((target: PositionEditTarget) => {
+    positionFieldPathRef.current[target.id] = target.fieldPath;
+    positionEditTargetRef.current = target;
+    setPositionEditMode({ enabled: true, target });
+    setPositionEditDimming((previous) =>
+      positionEditEnabledRef.current ? previous : true,
+    );
+  }, []);
+
+  const handlePositionFieldPathChange = useCallback(
+    (instanceId: string, fieldPath: string) => {
+      positionFieldPathRef.current[instanceId] = fieldPath;
+      const activeTarget = positionEditTargetRef.current;
+      if (
+        !activeTarget ||
+        activeTarget.id !== instanceId ||
+        activeTarget.fieldPath === fieldPath
+      ) {
+        return;
+      }
+      const nextTarget = { ...activeTarget, fieldPath };
+      positionEditTargetRef.current = nextTarget;
+      setPositionEditMode((previous) =>
+        previous.target?.id === instanceId &&
+        previous.target.fieldPath !== fieldPath
+          ? { ...previous, target: nextTarget }
+          : previous,
+      );
     },
     [],
   );
 
   const handleExitPositionEdit = useCallback(() => {
-    setPositionEditMode({ enabled: false, items: [], positions: {} });
+    positionFieldPathRef.current = {};
+    positionEditTargetRef.current = null;
+    positionEditEnabledRef.current = false;
+    setPositionEditMode({ enabled: false, target: null });
   }, []);
 
   const handleTogglePositionDimming = useCallback(() => {
@@ -1129,8 +1204,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [workspaceId, setWorkspaceId] = useState("");
 
   const [workspacePath, setWorkspacePath] = useState("");
-  const [previewSize, setPreviewSize] =
-    useState<PreviewSize>();
+  const [previewSize, setPreviewSize] = useState<PreviewSize>();
   const [temporaryPresentation, setTemporaryPresentation] =
     useState<PagePresentationProfile>();
 
@@ -1141,17 +1215,23 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   }, [resetCommandHistory, sessionId]);
 
   // ── Session 续期：每 30 分钟续一次，避免 2h 到期后保存/协同失效 ─────
-  const sessionRenewIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sessionRenewIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
   useEffect(() => {
     if (!sessionId) return;
-    if (sessionRenewIntervalRef.current) clearInterval(sessionRenewIntervalRef.current);
+    if (sessionRenewIntervalRef.current)
+      clearInterval(sessionRenewIntervalRef.current);
     const renew = () => {
-      fetch(`/api/sessions/${sessionId}/renew`, { method: "POST" }).catch(() => {});
+      fetch(`/api/sessions/${sessionId}/renew`, { method: "POST" }).catch(
+        () => {},
+      );
     };
     renew();
     sessionRenewIntervalRef.current = setInterval(renew, 30 * 60 * 1000);
     return () => {
-      if (sessionRenewIntervalRef.current) clearInterval(sessionRenewIntervalRef.current);
+      if (sessionRenewIntervalRef.current)
+        clearInterval(sessionRenewIntervalRef.current);
     };
   }, [sessionId]);
 
@@ -1189,8 +1269,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const syncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const syncInFlightRef = useRef(false);
   const scheduleWorkspaceSyncRef = useRef<() => void>(() => {});
-  const flushSyncWorkspaceRef = useRef<() => Promise<void>>(
-    () => Promise.resolve(),
+  const flushSyncWorkspaceRef = useRef<() => Promise<void>>(() =>
+    Promise.resolve(),
   );
   const previewTrackerRef = useRef<PreviewProjectionTracker>(
     new PreviewProjectionTracker(),
@@ -1584,7 +1664,14 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         code: pageCode,
       };
     },
-    [activeDemoId, code, configDataMap, pageCodes, pagePreviewSizeMap, pageSchemaMap],
+    [
+      activeDemoId,
+      code,
+      configDataMap,
+      pageCodes,
+      pagePreviewSizeMap,
+      pageSchemaMap,
+    ],
   );
 
   const buildScreenshotBatchPages = useCallback(
@@ -1698,14 +1785,11 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       if (timers[pageId]) clearTimeout(timers[pageId]);
       timers[pageId] = setTimeout(async () => {
         try {
-          await fetch(
-            `/api/sessions/${sessionId}/files/${pageId}`,
-            {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ configValues: values }),
-            },
-          );
+          await fetch(`/api/sessions/${sessionId}/files/${pageId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ configValues: values }),
+          });
         } catch {
           // 静默失败，不影响用户操作
         }
@@ -1774,8 +1858,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       pagePreviewSizeMap,
     ],
   );
-  const scheduleScreenshotRegenerateRef =
-    useRef<typeof scheduleScreenshotRegenerate>(scheduleScreenshotRegenerate);
+  const scheduleScreenshotRegenerateRef = useRef<
+    typeof scheduleScreenshotRegenerate
+  >(scheduleScreenshotRegenerate);
   scheduleScreenshotRegenerateRef.current = scheduleScreenshotRegenerate;
 
   const regenerateCanvasScreenshots = useCallback(async () => {
@@ -2107,10 +2192,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   const [errorBannerVisible, setErrorBannerVisible] = useState(false);
   const [tabValue, setTabValue] = useState("ai");
-  const [rightPanelTab, setRightPanelTab] =
-    useState<RightPanelTab>("config");
-  const [chatElement, setChatElement] =
-    useState<ChatElementRef | null>(null);
+  const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>("config");
+  const [chatElement, setChatElement] = useState<ChatElementRef | null>(null);
   const [chatPageRefs, setChatPageRefs] = useState<ChatPageRef[]>([]);
   const { demos } = useDemos();
   const projectReferences = useMemo(
@@ -2147,7 +2230,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   // publishStatus, versionHistory, and related state moved to useVersionControl hook
   const [currentUsername, setCurrentUsername] = useState<string>("");
   const [currentUserId, setCurrentUserId] = useState<string>("");
-  const [currentUserRole, setCurrentUserRole] = useState<"admin" | "editor" | "creator" | "readonly" | "">("");
+  const [currentUserRole, setCurrentUserRole] = useState<
+    "admin" | "editor" | "creator" | "readonly" | ""
+  >("");
   const collabUser = useMemo(
     () => ({
       userId: sessionId || "anonymous",
@@ -2175,31 +2260,57 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [activeCommentThreadId, setActiveCommentThreadId] = useState<
     string | null
   >(null);
-  const [activeDocumentCommentTarget, setActiveDocumentCommentTarget] = useState<CommentTarget | null>(null);
-  const [documentCommentSelection, setDocumentCommentSelection] = useState<DocumentCommentAnchor | null>(null);
+  const [activeDocumentCommentTarget, setActiveDocumentCommentTarget] =
+    useState<CommentTarget | null>(null);
+  const [documentCommentSelection, setDocumentCommentSelection] =
+    useState<DocumentCommentAnchor | null>(null);
   const [canvasCommentDraft, setCanvasCommentDraft] =
     useState<CanvasCommentDraft | null>(null);
   const activePageCommentTarget = useMemo<CommentTarget>(
     () => ({ kind: "page", pageId: activeDemoId }),
     [activeDemoId],
   );
+  const commentQueryTarget = useMemo<CommentTarget | undefined>(() => {
+    if (previewMode === "canvas") {
+      return canvasEditingPageId
+        ? { kind: "page", pageId: canvasEditingPageId }
+        : undefined;
+    }
+    return activePageCommentTarget;
+  }, [activePageCommentTarget, canvasEditingPageId, previewMode]);
   const commentsData = useComments({
     projectId: demoId,
-    target: activePageCommentTarget,
+    target: commentQueryTarget,
     api: commentApi,
     wsUrl: commentWsUrl,
     enabled: Boolean(activeDemoId),
   });
   const documentCommentsData = useComments({
     projectId: demoId,
-    target: activeDocumentCommentTarget ?? { kind: "document", resourceId: "", resourceLabel: "" },
+    target: activeDocumentCommentTarget ?? {
+      kind: "document",
+      resourceId: "",
+      resourceLabel: "",
+    },
     api: commentApi,
     wsUrl: commentWsUrl,
     enabled: Boolean(activeDocumentCommentTarget),
   });
-  const unresolvedCommentCount = commentsData.threads.filter(
-    (t) => !t.resolved,
-  ).length;
+  const activePageCommentThreads = useMemo(
+    () => filterPageCommentThreads(commentsData.threads, activeDemoId),
+    [activeDemoId, commentsData.threads],
+  );
+  const isProjectCommentScope =
+    previewMode === "canvas" && !canvasEditingPageId;
+  const unresolvedCommentCount = countUnresolvedCommentThreads(
+    isProjectCommentScope
+      ? filterPageCommentThreads(commentsData.threads)
+      : activePageCommentThreads,
+  );
+  const commentTabLabel =
+    unresolvedCommentCount > 0
+      ? `评论：有 ${unresolvedCommentCount} 条未解决评论`
+      : "评论";
   const activeDemoRuntimeTypeForCollab = demoPages.find(
     (page) => page.id === activeDemoId,
   )?.runtimeType;
@@ -2793,7 +2904,11 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       });
 
       if (newCode !== undefined) {
-        if (source !== "collab" && syncCollab) {
+        if (
+          source !== "collab" &&
+          syncCollab &&
+          activeCodeCollab.isSyncedForCurrentDescriptor
+        ) {
           replaceCollabText(activeCodeCollab.ytext, newCode);
         }
         setCode((prev) => (prev === newCode ? prev : newCode));
@@ -2815,7 +2930,11 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       }
 
       if (newSchema !== undefined) {
-        if (source !== "collab" && syncCollab) {
+        if (
+          source !== "collab" &&
+          syncCollab &&
+          activeSchemaCollab.isSyncedForCurrentDescriptor
+        ) {
           replaceCollabText(activeSchemaCollab.ytext, newSchema);
         }
         const oldSchema = schemaRef.current;
@@ -2871,7 +2990,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       }
     },
     [
+      activeCodeCollab.isSyncedForCurrentDescriptor,
       activeCodeCollab.ytext,
+      activeSchemaCollab.isSyncedForCurrentDescriptor,
       activeSchemaCollab.ytext,
       createDiagnosticTraceId,
       markWorkspaceChanged,
@@ -2926,7 +3047,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       if (
         sourcePatch &&
         !applyCollabTextPatches(
-          activePrototypeHtmlCollab.status === "synced"
+          activePrototypeHtmlCollab.isSyncedForCurrentDescriptor
             ? activePrototypeHtmlCollab.ytext
             : null,
           sourcePatch.before,
@@ -2949,7 +3070,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       return true;
     },
     [
-      activePrototypeHtmlCollab.status,
+      activePrototypeHtmlCollab.isSyncedForCurrentDescriptor,
       activePrototypeHtmlCollab.ytext,
       markScreenshotDirty,
       markWorkspaceChanged,
@@ -2984,7 +3105,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     ) => {
       const pageId = activeDemoIdRef.current;
       const currentHtml = pageId
-        ? activePrototypeHtmlCollab.status === "synced" && activePrototypeHtmlCollab.ytext
+        ? activePrototypeHtmlCollab.isSyncedForCurrentDescriptor &&
+          activePrototypeHtmlCollab.ytext
           ? activePrototypeHtmlCollab.ytext.toString()
           : pagePrototypeMapRef.current[pageId]?.html
         : undefined;
@@ -3005,11 +3127,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           ? { before: currentHtml, patches: result.forwardPatches }
           : undefined,
       );
-      if (
-        applied &&
-        result.forwardPatches &&
-        result.inversePatches
-      ) {
+      if (applied && result.forwardPatches && result.inversePatches) {
         const history = getPrototypeVisualHistory(pageId);
         history.undo.push({
           pageId,
@@ -3025,7 +3143,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       return applied;
     },
     [
-      activePrototypeHtmlCollab.status,
+      activePrototypeHtmlCollab.isSyncedForCurrentDescriptor,
       activePrototypeHtmlCollab.ytext,
       applyPrototypeHtmlToActivePage,
       getPrototypeVisualHistory,
@@ -3073,9 +3191,12 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   );
 
   // Visual edit state hook
-  const activePageForVisualAccess = demoPages.find((page) => page.id === activeDemoId);
+  const activePageForVisualAccess = demoPages.find(
+    (page) => page.id === activeDemoId,
+  );
   const activePageIsTemplate = Boolean(
-    (activePageForVisualAccess as { isTemplatePage?: boolean } | undefined)?.isTemplatePage,
+    (activePageForVisualAccess as { isTemplatePage?: boolean } | undefined)
+      ?.isTemplatePage,
   );
   const canUseVisualEditor =
     currentUserRole === "admin" ||
@@ -3170,7 +3291,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const handlePrototypeVisualTextChange = useCallback(
     (node: VisualNodeInfo, nextText: string, previousText: string) => {
       const pageId = activeDemoIdRef.current;
-      const bindingKey = node.binding?.kind === "text" ? node.binding.key.trim() : "";
+      const bindingKey =
+        node.binding?.kind === "text" ? node.binding.key.trim() : "";
       if (bindingKey) {
         const nextPageConfig = {
           ...(configDataMapRef.current[pageId] ?? {}),
@@ -3217,10 +3339,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       if (!entry) return "empty";
 
       const currentHtml =
-        activePrototypeHtmlCollab.status === "synced" &&
+        activePrototypeHtmlCollab.isSyncedForCurrentDescriptor &&
         activePrototypeHtmlCollab.ytext
           ? activePrototypeHtmlCollab.ytext.toString()
-          : pagePrototypeMapRef.current[pageId]?.html ?? "";
+          : (pagePrototypeMapRef.current[pageId]?.html ?? "");
       const expectedCurrent = direction === "undo" ? entry.after : entry.before;
       if (currentHtml !== expectedCurrent) {
         source.push(entry);
@@ -3251,7 +3373,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       return "applied";
     },
     [
-      activePrototypeHtmlCollab.status,
+      activePrototypeHtmlCollab.isSyncedForCurrentDescriptor,
       activePrototypeHtmlCollab.ytext,
       applyPrototypeHtmlToActivePage,
       getPrototypeVisualHistory,
@@ -3482,7 +3604,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         "design-spec-updated",
         markPublishedSnapshotStale,
       );
-      window.removeEventListener("knowledge-updated", markPublishedSnapshotStale);
+      window.removeEventListener(
+        "knowledge-updated",
+        markPublishedSnapshotStale,
+      );
     };
   }, [setPublishStatus]);
 
@@ -3507,7 +3632,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   }, [handlePublish, flushPendingPrototypeScreenshots]);
 
   useEffect(() => {
-    if (activeCodeCollab.status !== "synced") return;
+    if (!activeCodeCollab.isSyncedForCurrentDescriptor) return;
     if (activeCodeCollab.value === codeRef.current) return;
     if (activeCodeCollab.value === "" && codeRef.current.trim()) {
       replaceCollabText(activeCodeCollab.ytext, codeRef.current);
@@ -3518,14 +3643,14 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       source: "collab",
     });
   }, [
-    activeCodeCollab.status,
+    activeCodeCollab.isSyncedForCurrentDescriptor,
     activeCodeCollab.value,
     activeCodeCollab.ytext,
     applyDemoSnapshot,
   ]);
 
   useEffect(() => {
-    if (activeSchemaCollab.status !== "synced") return;
+    if (!activeSchemaCollab.isSyncedForCurrentDescriptor) return;
     if (activeSchemaCollab.value === schemaRef.current) return;
     const currentPageId = activeDemoIdRef.current;
     const knownPageSchema = currentPageId
@@ -3544,14 +3669,14 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       source: "collab",
     });
   }, [
-    activeSchemaCollab.status,
+    activeSchemaCollab.isSyncedForCurrentDescriptor,
     activeSchemaCollab.value,
     activeSchemaCollab.ytext,
     applyDemoSnapshot,
   ]);
 
   useEffect(() => {
-    if (activePrototypeHtmlCollab.status !== "synced") return;
+    if (!activePrototypeHtmlCollab.isSyncedForCurrentDescriptor) return;
     const currentPageId = activeDemoIdRef.current;
     if (!currentPageId) return;
     const currentHtml = pagePrototypeMapRef.current[currentPageId]?.html ?? "";
@@ -3576,14 +3701,14 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     }));
     markScreenshotDirty(currentPageId);
   }, [
-    activePrototypeHtmlCollab.status,
+    activePrototypeHtmlCollab.isSyncedForCurrentDescriptor,
     activePrototypeHtmlCollab.value,
     activePrototypeHtmlCollab.ytext,
     markScreenshotDirty,
   ]);
 
   useEffect(() => {
-    if (activePrototypeCssCollab.status !== "synced") return;
+    if (!activePrototypeCssCollab.isSyncedForCurrentDescriptor) return;
     const currentPageId = activeDemoIdRef.current;
     if (!currentPageId) return;
     const currentCss = pagePrototypeMapRef.current[currentPageId]?.css ?? "";
@@ -3608,14 +3733,14 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     }));
     markScreenshotDirty(currentPageId);
   }, [
-    activePrototypeCssCollab.status,
+    activePrototypeCssCollab.isSyncedForCurrentDescriptor,
     activePrototypeCssCollab.value,
     activePrototypeCssCollab.ytext,
     markScreenshotDirty,
   ]);
 
   useEffect(() => {
-    if (activeSketchSceneCollab.status !== "synced") return;
+    if (!activeSketchSceneCollab.isSyncedForCurrentDescriptor) return;
     const currentPageId = activeDemoIdRef.current;
     if (!currentPageId) return;
 
@@ -3646,7 +3771,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     }));
     markScreenshotDirty(currentPageId);
   }, [
-    activeSketchSceneCollab.status,
+    activeSketchSceneCollab.isSyncedForCurrentDescriptor,
     activeSketchSceneCollab.value,
     activeSketchSceneCollab.ytext,
     markScreenshotDirty,
@@ -3994,7 +4119,11 @@ ${context.details}
         );
         setDemoName(sessionData.data.project?.name || demoId);
         setCurrentThumbnail(sessionData.data.project?.thumbnail);
-        setProjectType(sessionData.data.project?.projectType === "template" ? "template" : "standard");
+        setProjectType(
+          sessionData.data.project?.projectType === "template"
+            ? "template"
+            : "standard",
+        );
         setProjectAuthoringPreferences(
           sessionData.data.project?.authoringPreferences,
         );
@@ -4021,9 +4150,7 @@ ${context.details}
           }
           const pageFilesData = await pageFilesRes.json();
           if (!pageFilesData.success) {
-            throw new Error(
-              pageFilesData.error?.message || "加载当前页失败",
-            );
+            throw new Error(pageFilesData.error?.message || "加载当前页失败");
           }
           initialPageFiles = pageFilesData.data;
         }
@@ -4138,7 +4265,10 @@ ${context.details}
               ...(demo.configValues ?? {}),
             };
             if (demo.schema) {
-              allDefaults[pageId] = flattenNestedDelta(allDefaults[pageId], demo.schema);
+              allDefaults[pageId] = flattenNestedDelta(
+                allDefaults[pageId],
+                demo.schema,
+              );
             }
             schemas[pageId] = demo.schema;
             codes[pageId] = demo.code;
@@ -4187,7 +4317,6 @@ ${context.details}
         const size = getPreviewSize(loadedSchema);
         setPreviewSize(size);
         setAgentSessionId(sessionData.data.sessionId);
-
       } catch (error) {
         const message = error instanceof Error ? error.message : "未知错误";
         if (bootstrapReady) {
@@ -4311,7 +4440,11 @@ ${context.details}
   );
 
   const launchWhiteboard = useCallback((target: ImageConfigTarget) => {
-    if ((target.scope !== "page" && target.scope !== "project") || !target.fieldPath) return;
+    if (
+      (target.scope !== "page" && target.scope !== "project") ||
+      !target.fieldPath
+    )
+      return;
     setWhiteboardTarget({
       scope: target.scope,
       ...(target.pageId ? { pageId: target.pageId } : {}),
@@ -4321,7 +4454,6 @@ ${context.details}
       ...(target.onCommit ? { onCommit: target.onCommit } : {}),
     });
   }, []);
-
 
   handlePageConfigPanelChangeRef.current = handlePageConfigPanelChange;
 
@@ -4354,14 +4486,11 @@ ${context.details}
       if (!sessionId) return;
       setRequirementsMap((prev) => ({ ...prev, [pageId]: markdown }));
       try {
-        await fetch(
-          `/api/projects/${demoId}/demos/${pageId}/requirements`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sessionId, requirements: markdown }),
-          },
-        );
+        await fetch(`/api/projects/${demoId}/demos/${pageId}/requirements`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId, requirements: markdown }),
+        });
       } catch {
         // 静默失败，下次进入编辑态仍可重新保存
       }
@@ -4373,7 +4502,8 @@ ${context.details}
     (key: string, x: number, y: number) => {
       const pageId = activeDemoIdRef.current;
       if (!pageId) return;
-      const fieldPath = posKeyMapRef.current[key];
+      if (positionEditTargetRef.current?.id !== key) return;
+      const fieldPath = positionFieldPathRef.current[key];
       if (!fieldPath) return;
       const currentConfig = configDataMapRef.current[pageId] || {};
       const newConfig = setNestedValue(currentConfig, fieldPath, { x, y });
@@ -4382,19 +4512,12 @@ ${context.details}
     [],
   );
 
-  const handlePositionDrag = useCallback(
-    (key: string, x: number, y: number) => {
-      const pageId = activeDemoIdRef.current;
-      if (!pageId) return;
-      const fieldPath = posKeyMapRef.current[key];
-      if (!fieldPath) return;
-      setConfigDataMap((prev) => {
-        const currentConfig = prev[pageId] || {};
-        return { ...prev, [pageId]: setNestedValue(currentConfig, fieldPath, { x, y }) };
-      });
-    },
-    [],
-  );
+  const handlePositionDrag = useCallback((key: string) => {
+    // 拖动过程是 iframe 内的临时交互事务，只由 transform 呈现。
+    // 此处不写入 React 配置状态，避免每帧重渲染表单与预览；
+    // pointerup 的 POSITION_CHANGE 会一次性提交最终坐标。
+    if (positionEditTargetRef.current?.id !== key) return;
+  }, []);
 
   const handleProjectConfigPanelChange = useCallback(
     (data: Record<string, unknown>) => {
@@ -4424,7 +4547,12 @@ ${context.details}
 
   const handleSchemaChange = useCallback(
     (newSchema: string) => {
-      replaceCollabText(activeSchemaCollab.ytext, newSchema);
+      replaceCollabText(
+        activeSchemaCollab.isSyncedForCurrentDescriptor
+          ? activeSchemaCollab.ytext
+          : null,
+        newSchema,
+      );
       setSchema(newSchema);
       const currentPageId = activeDemoIdRef.current;
       if (currentPageId) {
@@ -4435,7 +4563,11 @@ ${context.details}
         return buildFigmaText(currentCode, newSchema);
       });
     },
-    [activeSchemaCollab.ytext, code],
+    [
+      activeSchemaCollab.isSyncedForCurrentDescriptor,
+      activeSchemaCollab.ytext,
+      code,
+    ],
   );
 
   const handlePageSchemaChange = useCallback(
@@ -4454,19 +4586,32 @@ ${context.details}
       if (!pageId) return;
       const currentSchema = pageSchemaMapRef.current[pageId];
       if (!currentSchema) {
-        toast({ title: "无法保存展示尺寸", description: "页面配置尚未加载。", variant: "destructive" });
+        toast({
+          title: "无法保存展示尺寸",
+          description: "页面配置尚未加载。",
+          variant: "destructive",
+        });
         return;
       }
       try {
-        const nextSchema = applyPagePresentationToSchema(currentSchema, presentation);
+        const nextSchema = applyPagePresentationToSchema(
+          currentSchema,
+          presentation,
+        );
         handlePageSchemaChange(pageId, nextSchema);
         const nextSize = { ...presentation.viewport };
-        setPagePreviewSizeMap((current) => ({ ...current, [pageId]: nextSize }));
+        setPagePreviewSizeMap((current) => ({
+          ...current,
+          [pageId]: nextSize,
+        }));
         setPreviewSize(nextSize);
         setTemporaryPresentation(undefined);
         markScreenshotDirty(pageId);
         markWorkspaceChanged();
-        toast({ title: "已设为页面默认视口", description: `${presentation.viewport.width}×${presentation.viewport.height}` });
+        toast({
+          title: "已设为页面默认视口",
+          description: `${presentation.viewport.width}×${presentation.viewport.height}`,
+        });
       } catch (error) {
         toast({
           title: "无法保存展示尺寸",
@@ -4491,7 +4636,12 @@ ${context.details}
       markScreenshotDirty(pageId);
       markWorkspaceChanged();
     },
-    [handlePageSchemaChange, markScreenshotDirty, markWorkspaceChanged, persistPageConfigValues],
+    [
+      handlePageSchemaChange,
+      markScreenshotDirty,
+      markWorkspaceChanged,
+      persistPageConfigValues,
+    ],
   );
 
   const handleSaveAsDefaults = useCallback(
@@ -4499,14 +4649,22 @@ ${context.details}
       const currentSchema = pageSchemaMapRef.current[pageId];
       const currentConfig = defaultValues ?? configDataMapRef.current[pageId];
       if (!currentSchema || !currentConfig) {
-        toast({ title: "保存失败", description: "未找到配置数据", variant: "destructive" });
+        toast({
+          title: "保存失败",
+          description: "未找到配置数据",
+          variant: "destructive",
+        });
         return;
       }
 
       try {
         const schemaObj = JSON.parse(currentSchema);
         if (!schemaObj.properties || typeof schemaObj.properties !== "object") {
-          toast({ title: "保存失败", description: "Schema 中无 properties 定义", variant: "destructive" });
+          toast({
+            title: "保存失败",
+            description: "Schema 中无 properties 定义",
+            variant: "destructive",
+          });
           return;
         }
 
@@ -4527,9 +4685,16 @@ ${context.details}
         const newSchema = JSON.stringify(schemaObj, null, 2);
         handlePageSchemaChange(pageId, newSchema);
         persistPageConfigValues(pageId, currentConfig);
-        toast({ title: "配置已保存", description: `已更新 ${updatedCount} 个字段的默认值` });
+        toast({
+          title: "配置已保存",
+          description: `已更新 ${updatedCount} 个字段的默认值`,
+        });
       } catch {
-        toast({ title: "保存失败", description: "无法解析当前 Schema", variant: "destructive" });
+        toast({
+          title: "保存失败",
+          description: "无法解析当前 Schema",
+          variant: "destructive",
+        });
       }
     },
     [handlePageSchemaChange, persistPageConfigValues, toast],
@@ -4619,8 +4784,12 @@ ${context.details}
   const handleProjectDefinitionChange = useCallback(
     (mutation: SchemaDefinitionMutation) => {
       handleProjectSchemaChange(mutation.schema);
-      const nextProjectValues = { ...projectConfigValuesRef.current, ...mutation.valuePlan.setDefaults };
-      for (const key of mutation.valuePlan.removeKeys) delete nextProjectValues[key];
+      const nextProjectValues = {
+        ...projectConfigValuesRef.current,
+        ...mutation.valuePlan.setDefaults,
+      };
+      for (const key of mutation.valuePlan.removeKeys)
+        delete nextProjectValues[key];
       projectConfigValuesRef.current = nextProjectValues;
       setProjectConfigValues(nextProjectValues);
       void persistProjectConfigValues(nextProjectValues);
@@ -4628,7 +4797,8 @@ ${context.details}
         const next: Record<string, Record<string, unknown>> = {};
         for (const [pageId, values] of Object.entries(previous)) {
           next[pageId] = { ...values, ...mutation.valuePlan.setDefaults };
-          for (const key of mutation.valuePlan.removeKeys) delete next[pageId][key];
+          for (const key of mutation.valuePlan.removeKeys)
+            delete next[pageId][key];
         }
         return next;
       });
@@ -4638,19 +4808,33 @@ ${context.details}
 
   const handleConfigDefinitionSendToAI = useCallback(
     (scope: "project" | "page", mutation: SchemaDefinitionMutation) => {
-      const changedKeys = [...mutation.diff.added, ...mutation.diff.updated, ...mutation.diff.deleted];
-      const targetPageIds = scope === "project"
-        ? demoPages.map((page) => page.id)
-        : activeDemoIdRef.current ? [activeDemoIdRef.current] : [];
+      const changedKeys = [
+        ...mutation.diff.added,
+        ...mutation.diff.updated,
+        ...mutation.diff.deleted,
+      ];
+      const targetPageIds =
+        scope === "project"
+          ? demoPages.map((page) => page.id)
+          : activeDemoIdRef.current
+            ? [activeDemoIdRef.current]
+            : [];
       const bindings = targetPageIds.flatMap((pageId) => {
         const page = demoPages.find((item) => item.id === pageId);
         if (!page) return [];
-        const keys = page.runtimeType === "prototype-html-css"
-          ? extractPrototypeConfigBindingKeys(pagePrototypeMap[pageId]?.html)
-          : extractCodeConfigBindingKeys(pageCodes[pageId], changedKeys);
-        return keys.filter((key) => changedKeys.includes(key)).map((key) => `- ${page.name} (${pageId})：${key}`);
+        const keys =
+          page.runtimeType === "prototype-html-css"
+            ? extractPrototypeConfigBindingKeys(pagePrototypeMap[pageId]?.html)
+            : extractCodeConfigBindingKeys(pageCodes[pageId], changedKeys);
+        return keys
+          .filter((key) => changedKeys.includes(key))
+          .map((key) => `- ${page.name} (${pageId})：${key}`);
       });
-      const operation = mutation.diff.deleted.length ? "清理已删除字段的页面消费" : mutation.diff.typeChanged.length ? "适配已变更字段类型的页面消费" : "让页面接入新增或更新的字段";
+      const operation = mutation.diff.deleted.length
+        ? "清理已删除字段的页面消费"
+        : mutation.diff.typeChanged.length
+          ? "适配已变更字段类型的页面消费"
+          : "让页面接入新增或更新的字段";
       const aiPrompt = `【目标】${operation}\n\n【作用域】${scope === "project" ? "项目级共享配置" : "当前页面配置"}\n【页面】${targetPageIds.map((id) => demoPages.find((page) => page.id === id)?.name ?? id).join("、")}\n\n【Schema 变更】\n- 新增：${mutation.diff.added.join("、") || "无"}\n- 更新：${mutation.diff.updated.join("、") || "无"}\n- 删除：${mutation.diff.deleted.join("、") || "无"}\n- 类型变化：${mutation.diff.typeChanged.join("、") || "无"}\n- 已保存的 Schema 定义已在工作区生效；请读取对应 config.schema.json 确认完整规则。\n\n【已发现页面绑定】\n${bindings.join("\n") || "- 暂未发现绑定；如需页面展示新字段，请按现有页面模式接入。"}\n\n【必须完成】\n1. 修改受影响页面的 React props 或原型 data-bind-* / {{fieldKey}} 绑定；保持现有视觉效果。\n2. 清理已删除字段的引用，或适配类型变化；不要扩大配置范围。\n3. 检查页面配置要求和设计规范中的相关引用，必要时更新引用。\n\n【验收】\n完成 Schema 校验与配置预览联动，并在回复中报告 workspace mutation receipt 与验证结果。`;
       setTabValue("ai");
       setTriggerAutoSend(aiPrompt);
@@ -4671,69 +4855,82 @@ ${context.details}
           runtimeType: page.runtimeType,
           code: pageCodes[page.id],
           prototypeHtml: pagePrototypeMap[page.id]?.html,
-          requirements: requirementsMap[page.id] ?? referencePageRequirements[page.id],
+          requirements:
+            requirementsMap[page.id] ?? referencePageRequirements[page.id],
         })),
       });
       return {
         risk: report.risk,
-        boundPages: report.boundPages.map(({ pageName, keys }) => ({ pageName, keys })),
+        boundPages: report.boundPages.map(({ pageName, keys }) => ({
+          pageName,
+          keys,
+        })),
         requirementRefCount: report.requirementRefs.length,
         designSpecRefCount: 0,
       };
     },
-    [demoPages, pageCodes, pagePrototypeMap, referencePageRequirements, requirementsMap],
+    [
+      demoPages,
+      pageCodes,
+      pagePrototypeMap,
+      referencePageRequirements,
+      requirementsMap,
+    ],
   );
 
-  const handleProjectSaveAsDefaults = useCallback((defaultValues?: Record<string, unknown>) => {
-    const currentSchema = projectConfigSchemaRef.current;
-    const currentConfig = defaultValues ?? projectConfigValuesRef.current;
-    if (!currentSchema || !currentConfig) {
-      toast({
-        title: "保存失败",
-        description: "未找到配置数据",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const schemaObj = JSON.parse(currentSchema);
-      if (!schemaObj.properties || typeof schemaObj.properties !== "object") {
+  const handleProjectSaveAsDefaults = useCallback(
+    (defaultValues?: Record<string, unknown>) => {
+      const currentSchema = projectConfigSchemaRef.current;
+      const currentConfig = defaultValues ?? projectConfigValuesRef.current;
+      if (!currentSchema || !currentConfig) {
         toast({
           title: "保存失败",
-          description: "Schema 中无 properties 定义",
+          description: "未找到配置数据",
           variant: "destructive",
         });
         return;
       }
 
-      let updatedCount = 0;
-      for (const [key, value] of Object.entries(currentConfig)) {
-        if (!(key in schemaObj.properties)) continue;
-        if (
-          schemaObj.properties[key] &&
-          typeof schemaObj.properties[key] === "object"
-        ) {
-          schemaObj.properties[key].default = value;
-          updatedCount++;
+      try {
+        const schemaObj = JSON.parse(currentSchema);
+        if (!schemaObj.properties || typeof schemaObj.properties !== "object") {
+          toast({
+            title: "保存失败",
+            description: "Schema 中无 properties 定义",
+            variant: "destructive",
+          });
+          return;
         }
-      }
 
-      const newSchema = JSON.stringify(schemaObj, null, 2);
-      handleProjectSchemaChange(newSchema);
-      void persistProjectConfigValues(currentConfig);
-      toast({
-        title: "共享配置已保存",
-        description: `已更新 ${updatedCount} 个字段的默认值`,
-      });
-    } catch {
-      toast({
-        title: "保存失败",
-        description: "无法解析当前 Schema",
-        variant: "destructive",
-      });
-    }
-  }, [handleProjectSchemaChange, persistProjectConfigValues, toast]);
+        let updatedCount = 0;
+        for (const [key, value] of Object.entries(currentConfig)) {
+          if (!(key in schemaObj.properties)) continue;
+          if (
+            schemaObj.properties[key] &&
+            typeof schemaObj.properties[key] === "object"
+          ) {
+            schemaObj.properties[key].default = value;
+            updatedCount++;
+          }
+        }
+
+        const newSchema = JSON.stringify(schemaObj, null, 2);
+        handleProjectSchemaChange(newSchema);
+        void persistProjectConfigValues(currentConfig);
+        toast({
+          title: "共享配置已保存",
+          description: `已更新 ${updatedCount} 个字段的默认值`,
+        });
+      } catch {
+        toast({
+          title: "保存失败",
+          description: "无法解析当前 Schema",
+          variant: "destructive",
+        });
+      }
+    },
+    [handleProjectSchemaChange, persistProjectConfigValues, toast],
+  );
 
   const handleProjectRestoreDefaults = useCallback(() => {
     const projectSchema = projectConfigSchemaRef.current;
@@ -4838,9 +5035,13 @@ ${context.details}
                 configData: data.configData,
                 prototypeHtml: data.prototypeHtml,
                 prototypeCss: data.prototypeCss,
-                prototypeMeta: data.prototypeMeta as PrototypePageMeta | undefined,
+                prototypeMeta: data.prototypeMeta as
+                  | PrototypePageMeta
+                  | undefined,
                 sandboxHtml: data.sandboxHtml,
-                htmlImportMeta: data.htmlImportMeta as HtmlImportMeta | undefined,
+                htmlImportMeta: data.htmlImportMeta as
+                  | HtmlImportMeta
+                  | undefined,
                 sketchScene: data.sketchScene,
                 sketchMeta: data.sketchMeta,
                 sandboxExecutionUrl: data.sandboxExecutionUrl,
@@ -4909,7 +5110,10 @@ ${context.details}
               meta: page.sketchMeta,
             };
           }
-          if (page.sandboxHtml !== undefined || page.htmlImportMeta !== undefined) {
+          if (
+            page.sandboxHtml !== undefined ||
+            page.htmlImportMeta !== undefined
+          ) {
             nextSandboxes[page.pageId] = {
               html: page.sandboxHtml,
               meta: page.htmlImportMeta,
@@ -4951,7 +5155,10 @@ ${context.details}
           return next;
         });
         setPagePreviewSizeMap((prev) => ({ ...prev, ...nextPreviewSizes }));
-        setSandboxExecutionMap((prev) => ({ ...prev, ...nextSandboxExecutions }));
+        setSandboxExecutionMap((prev) => ({
+          ...prev,
+          ...nextSandboxExecutions,
+        }));
       } catch (err) {
         console.error("加载预览页面内容失败:", err);
       }
@@ -4962,13 +5169,22 @@ ${context.details}
     return () => {
       cancelled = true;
     };
-  }, [canvasMissingPageIdsKey, demoId, demoPages, getSafeMergedDefaults, sessionId]);
+  }, [
+    canvasMissingPageIdsKey,
+    demoId,
+    demoPages,
+    getSafeMergedDefaults,
+    sessionId,
+  ]);
 
   const handleConfigPanelPageSelect = useCallback(
     async (
       pageId: string,
       suppliedPage?: DemoPageMeta,
-      { focusCanvas = true }: { focusCanvas?: boolean } = {},
+      {
+        focusCanvas = true,
+        openConfigDetail = true,
+      }: { focusCanvas?: boolean; openConfigDetail?: boolean } = {},
     ) => {
       rememberActivePageSchema();
       if (!sessionId) return;
@@ -4980,7 +5196,8 @@ ${context.details}
         pageSwitchDeferredSyncRef.current = true;
       }
       try {
-        const selectedPage = suppliedPage ?? demoPages.find((page) => page.id === pageId);
+        const selectedPage =
+          suppliedPage ?? demoPages.find((page) => page.id === pageId);
         if (!selectedPage) return;
         const data = await loadCanvasPageContent({
           page: selectedPage,
@@ -5004,7 +5221,7 @@ ${context.details}
           };
           setPageCodes((prev) => ({ ...prev, [pageId]: nextCode }));
           if (
-          data.prototypeHtml !== undefined ||
+            data.prototypeHtml !== undefined ||
             data.prototypeCss !== undefined
           ) {
             setPagePrototypeMap((prev) => ({
@@ -5016,7 +5233,10 @@ ${context.details}
               },
             }));
           }
-          if (data.sandboxHtml !== undefined || data.htmlImportMeta !== undefined) {
+          if (
+            data.sandboxHtml !== undefined ||
+            data.htmlImportMeta !== undefined
+          ) {
             setPageSandboxMap((prev) => ({
               ...prev,
               [pageId]: {
@@ -5054,10 +5274,10 @@ ${context.details}
               [pageId]: data.requirements ?? "",
             }));
           }
-          if (data.designSpecs !== undefined) {
-            setReferencePageDesignSpecs((prev) => ({
+          if (data.designSpecEntries !== undefined) {
+            setReferencePageDesignSpecEntries((prev) => ({
               ...prev,
-              [pageId]: data.designSpecs ?? [],
+              [pageId]: data.designSpecEntries ?? [],
             }));
           }
           if (data.projectConfigSchema !== undefined) {
@@ -5086,7 +5306,12 @@ ${context.details}
           setActiveDemoId(pageId);
           activeDemoIdRef.current = pageId;
           if (previewMode === "canvas") {
-            setConfigPanelOverviewRequested(false);
+            if (openConfigDetail) {
+              setConfigPanelOverviewRequested(false);
+            } else {
+              setConfigPanelDetailPageId(null);
+              setConfigPanelOverviewRequested(true);
+            }
             if (focusCanvas) {
               focusCanvasPage(pageId);
             } else {
@@ -5125,7 +5350,11 @@ ${context.details}
   const handlePreviewHtmlFilesDrop = useCallback(
     (files: File[]) => {
       if (!sessionId) {
-        toast({ title: "未创建 Session", description: "请等待编辑器初始化后重试。", variant: "destructive" });
+        toast({
+          title: "未创建 Session",
+          description: "请等待编辑器初始化后重试。",
+          variant: "destructive",
+        });
         return;
       }
       setDroppedHtmlFiles(files);
@@ -5226,17 +5455,44 @@ ${context.details}
         if (layout) nextPages[page.id] = layout;
       }
       const navigation = currentState.navigation;
-      const navigationReferencesDeletedPage = Object.values(navigation?.hotspots ?? {}).some((hotspot) => deleted.has(hotspot.pageId)) || Object.values(navigation?.connections ?? {}).some((connection) => deleted.has(connection.source.pageId) || deleted.has(connection.target.pageId));
-      if (nextPageLayoutsDiffer(currentState.pages, nextPages) || navigationReferencesDeletedPage) {
-        const nextHotspots = Object.fromEntries(
-          Object.entries(navigation?.hotspots ?? {}).filter(([, hotspot]) => !deleted.has(hotspot.pageId)),
+      const navigationReferencesDeletedPage =
+        Object.values(navigation?.hotspots ?? {}).some((hotspot) =>
+          deleted.has(hotspot.pageId),
+        ) ||
+        Object.values(navigation?.connections ?? {}).some(
+          (connection) =>
+            deleted.has(connection.source.pageId) ||
+            deleted.has(connection.target.pageId),
         );
-        const nextConnections = Object.fromEntries(
-          Object.entries(navigation?.connections ?? {}).filter(([, connection]) =>
-            !deleted.has(connection.source.pageId) && !deleted.has(connection.target.pageId) && Boolean(nextHotspots[connection.source.hotspotId]),
+      if (
+        nextPageLayoutsDiffer(currentState.pages, nextPages) ||
+        navigationReferencesDeletedPage
+      ) {
+        const nextHotspots = Object.fromEntries(
+          Object.entries(navigation?.hotspots ?? {}).filter(
+            ([, hotspot]) => !deleted.has(hotspot.pageId),
           ),
         );
-        setCanvasState({ ...currentState, pages: nextPages, ...(navigation ? { navigation: { hotspots: nextHotspots, connections: nextConnections } } : {}) });
+        const nextConnections = Object.fromEntries(
+          Object.entries(navigation?.connections ?? {}).filter(
+            ([, connection]) =>
+              !deleted.has(connection.source.pageId) &&
+              !deleted.has(connection.target.pageId) &&
+              Boolean(nextHotspots[connection.source.hotspotId]),
+          ),
+        );
+        setCanvasState({
+          ...currentState,
+          pages: nextPages,
+          ...(navigation
+            ? {
+                navigation: {
+                  hotspots: nextHotspots,
+                  connections: nextConnections,
+                },
+              }
+            : {}),
+        });
       }
 
       if (deleted.has(activeDemoIdRef.current)) {
@@ -5735,7 +5991,10 @@ ${context.details}
   const handleAiFilesChange = useCallback(
     async (
       files: AiFileChange[],
-      authoritySnapshot?: { state: { revision: number }; resources: Record<string, string> },
+      authoritySnapshot?: {
+        state: { revision: number };
+        resources: Record<string, string>;
+      },
     ) => {
       const traceId = createDiagnosticTraceId("ai-files");
       const activePageId = activeDemoIdRef.current;
@@ -5788,14 +6047,18 @@ ${context.details}
       const previousActiveId = activeDemoIdRef.current;
 
       try {
-        let multi: ReturnType<typeof projectAuthoritySnapshotResources>["multi"] & {
+        let multi: ReturnType<
+          typeof projectAuthoritySnapshotResources
+        >["multi"] & {
           demoPages?: DemoPageMeta[];
           demoFolders?: DemoFolderMeta[];
         };
         let rawPages: DemoPageMeta[];
         let snapshotFolders: DemoFolderMeta[];
         if (authoritySnapshot) {
-          const projected = projectAuthoritySnapshotResources(authoritySnapshot.resources);
+          const projected = projectAuthoritySnapshotResources(
+            authoritySnapshot.resources,
+          );
           multi = projected.multi;
           rawPages = projected.demoPages;
           snapshotFolders = projected.demoFolders;
@@ -5803,7 +6066,8 @@ ${context.details}
           const filesRes = await fetch(`/api/sessions/${sessionId}/files`);
           if (!filesRes.ok) throw new Error("刷新页面列表失败");
           const filesData = await filesRes.json();
-          if (!filesData.success) throw new Error(filesData.error?.message || "刷新页面列表失败");
+          if (!filesData.success)
+            throw new Error(filesData.error?.message || "刷新页面列表失败");
           multi = filesData.data;
           rawPages = multi.demoPages || [];
           snapshotFolders = multi.demoFolders || [];
@@ -6071,8 +6335,10 @@ ${context.details}
           });
           if (
             snapshot.state.revision < minimumRevision ||
-            snapshot.state.revision <= appliedAuthorityProjectionRevisionRef.current
-          ) return;
+            snapshot.state.revision <=
+              appliedAuthorityProjectionRevisionRef.current
+          )
+            return;
 
           await handleAiFilesChange(
             receipt.resources.map((resource) => ({
@@ -6086,7 +6352,8 @@ ${context.details}
             })),
             snapshot,
           );
-          appliedAuthorityProjectionRevisionRef.current = snapshot.state.revision;
+          appliedAuthorityProjectionRevisionRef.current =
+            snapshot.state.revision;
           recordDiagnosticEvent({
             category: "ai",
             name: "ai.authority_snapshot_projected",
@@ -6110,7 +6377,13 @@ ${context.details}
           });
         });
     },
-    [demoId, handleAiFilesChange, recordDiagnosticEvent, sessionId, workspaceId],
+    [
+      demoId,
+      handleAiFilesChange,
+      recordDiagnosticEvent,
+      sessionId,
+      workspaceId,
+    ],
   );
 
   useEffect(() => {
@@ -6154,23 +6427,20 @@ ${context.details}
       throw new Error("当前页面内容尚未完整加载，已阻止保存");
     }
 
-    const saveRes = await fetch(
-      `/api/sessions/${sessionId}/files/${pageId}`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code: pageContent.code,
-          schema: pageContent.schema,
-          prototypeHtml: pagePrototypeMapRef.current[pageId]?.html,
-          prototypeCss: pagePrototypeMapRef.current[pageId]?.css,
-          prototypeMeta: pagePrototypeMapRef.current[pageId]?.meta,
-          sketchScene: pageSketchMapRef.current[pageId]?.scene,
-          sketchMeta: pageSketchMapRef.current[pageId]?.meta,
-          localizeImages: false,
-        }),
-      },
-    );
+    const saveRes = await fetch(`/api/sessions/${sessionId}/files/${pageId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code: pageContent.code,
+        schema: pageContent.schema,
+        prototypeHtml: pagePrototypeMapRef.current[pageId]?.html,
+        prototypeCss: pagePrototypeMapRef.current[pageId]?.css,
+        prototypeMeta: pagePrototypeMapRef.current[pageId]?.meta,
+        sketchScene: pageSketchMapRef.current[pageId]?.scene,
+        sketchMeta: pageSketchMapRef.current[pageId]?.meta,
+        localizeImages: false,
+      }),
+    });
 
     if (!saveRes.ok) {
       const result = await saveRes.json().catch(() => null);
@@ -6192,7 +6462,12 @@ ${context.details}
     (scene: SketchSceneDocument) => {
       if (!activeDemoId) return;
       const sceneText = JSON.stringify(scene, null, 2);
-      replaceCollabText(activeSketchSceneCollab.ytext, sceneText);
+      replaceCollabText(
+        activeSketchSceneCollab.isSyncedForCurrentDescriptor
+          ? activeSketchSceneCollab.ytext
+          : null,
+        sceneText,
+      );
       pageSketchMapRef.current = {
         ...pageSketchMapRef.current,
         [activeDemoId]: {
@@ -6212,6 +6487,7 @@ ${context.details}
     },
     [
       activeDemoId,
+      activeSketchSceneCollab.isSyncedForCurrentDescriptor,
       activeSketchSceneCollab.ytext,
       markScreenshotDirty,
       markWorkspaceChanged,
@@ -6639,9 +6915,7 @@ ${context.details}
 
     try {
       if (hasGenuineExitBlock) {
-        setExitErrorLabel(
-          workspaceFlushError ?? "最新修改尚未确认同步完成",
-        );
+        setExitErrorLabel(workspaceFlushError ?? "最新修改尚未确认同步完成");
         setExitState("confirm");
         setShowExitDialog(true);
         return;
@@ -6816,24 +7090,24 @@ ${context.details}
               sandboxChannelId: sandboxExecutionMap[page.id]?.channelId,
             }
           : page.runtimeType === "prototype-html-css"
-          ? {
-              prototypeHtml: pagePrototypeMap[page.id]?.html,
-              prototypeCss: pagePrototypeMap[page.id]?.css,
-              prototypeMeta: pagePrototypeMap[page.id]?.meta,
-            }
-          : page.runtimeType === "sketch-scene"
             ? {
-                sketchScene: pageSketchMap[page.id]?.scene,
-                sketchMeta: pageSketchMap[page.id]?.meta,
+                prototypeHtml: pagePrototypeMap[page.id]?.html,
+                prototypeCss: pagePrototypeMap[page.id]?.css,
+                prototypeMeta: pagePrototypeMap[page.id]?.meta,
               }
-            : {
-                code: resolvePreviewPageCode({
-                  pageId: page.id,
-                  pageCodes,
-                  activeCodePageId,
-                  activeCode: code,
-                }),
-              };
+            : page.runtimeType === "sketch-scene"
+              ? {
+                  sketchScene: pageSketchMap[page.id]?.scene,
+                  sketchMeta: pageSketchMap[page.id]?.meta,
+                }
+              : {
+                  code: resolvePreviewPageCode({
+                    pageId: page.id,
+                    pageCodes,
+                    activeCodePageId,
+                    activeCode: code,
+                  }),
+                };
 
       const snapshot = pageSnapshots[page.id];
       const prototypeSnapshot =
@@ -6846,10 +7120,45 @@ ${context.details}
             }
           : undefined;
 
-      const persistedPresentation = resolvePagePresentation(pageSchemaMap[page.id] ?? "");
-      const presentation = page.id === activeDemoId && temporaryPresentation
-        ? temporaryPresentation
-        : persistedPresentation;
+      const presentation = resolvePagePresentation(
+        pageSchemaMap[page.id] ?? "",
+      );
+      const pageSchemaKnown = Object.prototype.hasOwnProperty.call(
+        pageSchemaMap,
+        page.id,
+      );
+      const projectSchema =
+        referencePageProjectSchemas[page.id] ?? projectConfigSchema;
+      const consumesProjectConfig =
+        page.runtimeType === "prototype-html-css" ||
+        page.runtimeType === "high-fidelity-react" ||
+        page.runtimeType === "sketch-scene";
+      const runtimeSourceKnown =
+        !consumesProjectConfig ||
+        (page.runtimeType === "prototype-html-css"
+          ? Object.prototype.hasOwnProperty.call(pagePrototypeMap, page.id)
+          : page.runtimeType === "high-fidelity-react"
+            ? Object.prototype.hasOwnProperty.call(pageCodes, page.id)
+            : page.runtimeType === "sketch-scene"
+              ? Object.prototype.hasOwnProperty.call(pageSketchMap, page.id)
+              : true);
+      const projectConfigBindings =
+        page.runtimeType === "prototype-html-css"
+          ? extractPrototypeConfigBindingKeys(pagePrototypeMap[page.id]?.html)
+          : page.runtimeType === "high-fidelity-react" ||
+              page.runtimeType === "sketch-scene"
+            ? extractCodeConfigBindingKeys(
+                pageCodes[page.id],
+                getSchemaPropertyKeys(projectSchema),
+              )
+            : [];
+      const configCount =
+        pageSchemaKnown &&
+        (!consumesProjectConfig ||
+          (projectSchema !== undefined && runtimeSourceKnown))
+          ? getSchemaFieldCountByCategory(pageSchemaMap[page.id]) +
+            getSchemaFieldCountByBindings(projectSchema, projectConfigBindings)
+          : undefined;
       return {
         id: page.id,
         name: page.name,
@@ -6860,8 +7169,11 @@ ${context.details}
         ...runtimeData,
         configData: configDataMap[page.id],
         schema: pageSchemaMap[page.id],
+        configCount,
         presentation,
         previewSize: presentation?.viewport,
+        canvasPreviewSize:
+          pagePreviewSizeMap[page.id] ?? presentation?.viewport,
         ...(snapshot || prototypeSnapshot),
       };
     });
@@ -6874,6 +7186,8 @@ ${context.details}
     pagePreviewSizeMap,
     pagePrototypeMap,
     pageSketchMap,
+    projectConfigSchema,
+    referencePageProjectSchemas,
     sandboxExecutionMap,
     pageSchemaMap,
     pageSnapshots,
@@ -6903,14 +7217,19 @@ ${context.details}
     !commentModeActive;
 
   useEffect(() => {
-    if (!visualEditActive || activeDemoPage?.runtimeType !== "prototype-html-css") {
+    if (
+      !visualEditActive ||
+      activeDemoPage?.runtimeType !== "prototype-html-css"
+    ) {
       return;
     }
     const handlePrototypeHistoryShortcut = (event: KeyboardEvent) => {
       const target = event.target;
       if (
         target instanceof Element &&
-        target.closest("input,textarea,select,[contenteditable]:not([contenteditable='false'])")
+        target.closest(
+          "input,textarea,select,[contenteditable]:not([contenteditable='false'])",
+        )
       ) {
         return;
       }
@@ -6937,7 +7256,8 @@ ${context.details}
       }
     };
     window.addEventListener("keydown", handlePrototypeHistoryShortcut);
-    return () => window.removeEventListener("keydown", handlePrototypeHistoryShortcut);
+    return () =>
+      window.removeEventListener("keydown", handlePrototypeHistoryShortcut);
   }, [
     activeDemoPage?.runtimeType,
     applyPrototypeVisualHistory,
@@ -6964,16 +7284,24 @@ ${context.details}
     handleSendVisualPropertiesToAI();
   }, [handleSendVisualPropertiesToAI]);
 
+  const handleAddNodeToChat = useCallback(
+    (node: VisualNodeInfo) => {
+      if (!activeDemoId) return;
+      const label = getNodeLabel(node);
+      const context = buildVisualSelectionPrompt(node, activeDemoId);
+      setChatElement({
+        id: `elem-${Date.now()}`,
+        label,
+        context,
+      });
+    },
+    [activeDemoId],
+  );
+
   const handleAddToChat = useCallback(() => {
-    if (!selectedVisualNode || !activeDemoId) return;
-    const label = getNodeLabel(selectedVisualNode);
-    const context = buildVisualSelectionPrompt(selectedVisualNode, activeDemoId);
-    setChatElement({
-      id: `elem-${Date.now()}`,
-      label,
-      context,
-    });
-  }, [selectedVisualNode, activeDemoId]);
+    if (!selectedVisualNode) return;
+    handleAddNodeToChat(selectedVisualNode);
+  }, [selectedVisualNode, handleAddNodeToChat]);
 
   const handleAddPagesToChat = useCallback((pageIds: string[]) => {
     if (pageIds.length === 0) return;
@@ -7013,11 +7341,7 @@ ${context.details}
 
     if (!targetChanged) return;
     setVisualPanelHoverNodeId(null);
-  }, [
-    activeDemoId,
-    previewMode,
-    singlePreviewViewingDocument,
-  ]);
+  }, [activeDemoId, previewMode, singlePreviewViewingDocument]);
   const singlePreviewHistoryTarget = useMemo(
     () =>
       resolveSinglePreviewResourceHistoryTarget({
@@ -7107,14 +7431,22 @@ ${context.details}
     handleSinglePreviewSelectChange(
       singlePreviewNavigableItems[index - 1].value,
     );
-  }, [handleSinglePreviewSelectChange, singlePreviewCurrentIndex, singlePreviewNavigableItems]);
+  }, [
+    handleSinglePreviewSelectChange,
+    singlePreviewCurrentIndex,
+    singlePreviewNavigableItems,
+  ]);
   const handleSinglePreviewNext = useCallback(() => {
     const index = singlePreviewCurrentIndex;
     if (index < 0 || index >= singlePreviewNavigableItems.length - 1) return;
     handleSinglePreviewSelectChange(
       singlePreviewNavigableItems[index + 1].value,
     );
-  }, [handleSinglePreviewSelectChange, singlePreviewCurrentIndex, singlePreviewNavigableItems]);
+  }, [
+    handleSinglePreviewSelectChange,
+    singlePreviewCurrentIndex,
+    singlePreviewNavigableItems,
+  ]);
 
   const handleSinglePreviewResourceRestored = useCallback(async () => {
     if (!singlePreviewHistoryTarget) return;
@@ -7521,8 +7853,7 @@ ${context.details}
   const showPageConfig = hasPageConfig;
   const hasBothScopes = showProjectConfig && showPageConfig;
   // 创作端即使尚未声明字段也保留配置页签，用户可从空态打开定义管理器创建首个字段。
-  const hasAnyConfig =
-    showProjectConfig || showPageConfig || (!!activeDemoPage && !activeDemoPage.reference);
+  const hasAnyConfig = showProjectConfig || showPageConfig || !!activeDemoPage;
   const canvasRightPanelTab = resolveCanvasRightPanelTab(
     rightPanelTab,
     hasAnyConfig,
@@ -7546,9 +7877,7 @@ ${context.details}
       if (nextMode === previewMode) return;
       if (nextMode === "single") {
         setSinglePreviewTarget(
-          activeDemoId
-            ? { kind: "page", pageId: activeDemoId }
-            : null,
+          activeDemoId ? { kind: "page", pageId: activeDemoId } : null,
         );
         setPreviewMode("single");
         return;
@@ -7599,7 +7928,9 @@ ${context.details}
     (draft: ConfigDefinitionDraft) => {
       handleVisualConfigTitleChange(draft.title);
       setVisualConfigDefaultValue(
-        typeof draft.default === "string" ? draft.default : String(draft.default ?? ""),
+        typeof draft.default === "string"
+          ? draft.default
+          : String(draft.default ?? ""),
       );
       setVisualConfigCategory(draft.group ?? "");
     },
@@ -7809,9 +8140,8 @@ ${context.details}
             <SelectValue placeholder="选择页面" />
           </SelectTrigger>
           <SelectContent>
-            {singlePreviewNavigableItems.filter(
-              (item) => item.group === "页面",
-            ).length > 0 && (
+            {singlePreviewNavigableItems.filter((item) => item.group === "页面")
+              .length > 0 && (
               <SelectGroup>
                 <SelectLabel>页面</SelectLabel>
                 {singlePreviewNavigableItems
@@ -7823,9 +8153,8 @@ ${context.details}
                   ))}
               </SelectGroup>
             )}
-            {singlePreviewNavigableItems.filter(
-              (item) => item.group === "文档",
-            ).length > 0 && (
+            {singlePreviewNavigableItems.filter((item) => item.group === "文档")
+              .length > 0 && (
               <SelectGroup>
                 <SelectLabel>文档</SelectLabel>
                 {singlePreviewNavigableItems
@@ -7847,8 +8176,7 @@ ${context.details}
           disabled={
             singlePreviewNavigableItems.length === 0 ||
             singlePreviewCurrentIndex < 0 ||
-            singlePreviewCurrentIndex >=
-              singlePreviewNavigableItems.length - 1
+            singlePreviewCurrentIndex >= singlePreviewNavigableItems.length - 1
           }
           onClick={handleSinglePreviewNext}
           title="下一页"
@@ -7990,7 +8318,7 @@ ${context.details}
           <div className="flex items-center">
             <Button
               onClick={async () => {
-await handlePublishWithScreenshot();
+                await handlePublishWithScreenshot();
               }}
               disabled={publishButtonDisabled}
               variant={!publishButtonDisabled ? "default" : "outline"}
@@ -8055,637 +8383,676 @@ await handlePublishWithScreenshot();
           sessionId={sessionId}
           projectId={demoId}
         >
-        <SketchEditorEngineBoundary
-          engine={activeSketchEditorEngine}
-          scene={activeSketchScene}
-          onSceneChange={handleSketchSceneChange}
-        >
-        <ResizablePanelGroup
-          sizesKey={isConfigPanelVisible ? "3panel" : "2panel"}
-          direction="horizontal"
-          defaultSizes={isConfigPanelVisible ? [25, 50, 25] : [25, 75]}
-          minSizes={isConfigPanelVisible ? [20, 20, 20] : [20, 30]}
-          className="h-full"
-        >
-          <ResizablePanel className="relative flex flex-col overflow-hidden border-r bg-card">
-            <Tabs
-              value={tabValue}
-              onValueChange={setTabValue}
-              className="flex-1 flex flex-col min-h-0 [&>[data-state=active]]:flex-1 [&>[data-state=active]]:flex [&>[data-state=active]]:flex-col [&>[data-state=active]]:min-h-0"
+          <SketchEditorEngineBoundary
+            engine={activeSketchEditorEngine}
+            scene={activeSketchScene}
+            onSceneChange={handleSketchSceneChange}
+          >
+            <ResizablePanelGroup
+              sizesKey={isConfigPanelVisible ? "3panel" : "2panel"}
+              direction="horizontal"
+              defaultSizes={isConfigPanelVisible ? [25, 50, 25] : [25, 75]}
+              minSizes={isConfigPanelVisible ? [20, 20, 20] : [20, 30]}
+              className="h-full"
             >
-              <TabsList className="w-full justify-start gap-2 rounded-none border-b px-2 h-12 bg-transparent">
-                <TabsTrigger
-                  value="ai"
-                  title="AI 对话"
-                  className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+              <ResizablePanel className="relative flex flex-col overflow-hidden border-r bg-card">
+                <Tabs
+                  value={tabValue}
+                  onValueChange={setTabValue}
+                  className="flex-1 flex flex-col min-h-0 [&>[data-state=active]]:flex-1 [&>[data-state=active]]:flex [&>[data-state=active]]:flex-col [&>[data-state=active]]:min-h-0"
                 >
-                  <Bot className="h-4 w-4" />
-                  {tabValue === "ai" && <span>AI 对话</span>}
-                </TabsTrigger>
-                {previewMode !== "document" && (
-                  <TabsTrigger
-                    value="pages"
-                    title="页面"
-                    className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
-                  >
-                    <Layers className="h-4 w-4" />
-                    {tabValue === "pages" && <span>页面</span>}
-                    {tabValue === "pages" && demoPages.length > 0 && (
-                      <Badge
-                        variant="secondary"
-                        className="ml-1 text-[10px] h-4 px-1"
+                  <TabsList className="w-full justify-start gap-2 rounded-none border-b px-2 h-12 bg-transparent">
+                    <TabsTrigger
+                      value="ai"
+                      title="AI 对话"
+                      className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                    >
+                      <Bot className="h-4 w-4" />
+                      {tabValue === "ai" && <span>AI 对话</span>}
+                    </TabsTrigger>
+                    {previewMode !== "document" && (
+                      <TabsTrigger
+                        value="pages"
+                        title="页面"
+                        className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
                       >
-                        {demoPages.length}
-                      </Badge>
+                        <Layers className="h-4 w-4" />
+                        {tabValue === "pages" && <span>页面</span>}
+                        {tabValue === "pages" && demoPages.length > 0 && (
+                          <Badge
+                            variant="secondary"
+                            className="ml-1 text-[10px] h-4 px-1"
+                          >
+                            {demoPages.length}
+                          </Badge>
+                        )}
+                      </TabsTrigger>
                     )}
-                  </TabsTrigger>
-                )}
-                <TabsTrigger
-                  value="code"
-                  title="代码"
-                  className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
-                >
-                  <FolderOpen className="h-4 w-4" />
-                  {tabValue === "code" && <span>代码</span>}
-                </TabsTrigger>
-                <TabsTrigger
-                  value="history"
-                  title="版本"
-                  className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
-                >
-                  <History className="h-4 w-4" />
-                  {tabValue === "history" && <span>版本</span>}
-                </TabsTrigger>
-              </TabsList>
+                    <TabsTrigger
+                      value="code"
+                      title="代码"
+                      className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                    >
+                      <FolderOpen className="h-4 w-4" />
+                      {tabValue === "code" && <span>代码</span>}
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="history"
+                      title="版本"
+                      className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                    >
+                      <History className="h-4 w-4" />
+                      {tabValue === "history" && <span>版本</span>}
+                    </TabsTrigger>
+                  </TabsList>
 
-              <TabsContent
-                value="ai"
-                forceMount
-                className="flex-1 flex flex-col mt-0 min-h-0 min-w-0 data-[state=inactive]:hidden"
-              >
-                <DeferredAuthorAIChat
-                  ready={!isInitialPageLoading}
-                  key={agentSessionId}
-                  sessionId={sessionId}
-                  agentSessionId={agentSessionId}
-                  workingDir={workspacePath || undefined}
-                  projectId={demoId}
-                  demoId={activeDemoId}
-                  activeViewContext={activeViewContext}
-                  workspaceId={workspaceId || undefined}
-                  onCodeUpdate={handleCodeUpdate}
-                  onSchemaUpdate={handleSchemaUpdate}
-                  onFilesChange={handleAiFilesChange}
-                  onWorkspaceMutationCommitted={handleWorkspaceMutationCommitted}
-                  onDiagnosticEvent={(event) => {
-                    recordDiagnosticEvent({
-                      category: "ai",
-                      name: event.name,
-                      traceId: event.traceId,
-                      level: event.level,
-                      details: event.details,
-                    });
-                  }}
-                  beforeSend={flushPendingWorkspaceBeforeAiSend}
-                  onMemoryUpdate={async (filePath) => {
-                    try {
-                      const res = await fetch(
-                        `/api/sessions/${sessionId}/workspace/files/${encodeURIComponent(filePath)}`,
-                      );
-                      const data = await res.json();
-                      if (data.success) {
-                        setWsCodeDialogData({
-                          filePath: data.data.path,
-                          content: data.data.content,
-                          editable: data.data.editable,
+                  <TabsContent
+                    value="ai"
+                    forceMount
+                    className="flex-1 flex flex-col mt-0 min-h-0 min-w-0 data-[state=inactive]:hidden"
+                  >
+                    <DeferredAuthorAIChat
+                      ready={!isInitialPageLoading}
+                      key={agentSessionId}
+                      sessionId={sessionId}
+                      agentSessionId={agentSessionId}
+                      workingDir={workspacePath || undefined}
+                      projectId={demoId}
+                      demoId={activeDemoId}
+                      activeViewContext={activeViewContext}
+                      workspaceId={workspaceId || undefined}
+                      onCodeUpdate={handleCodeUpdate}
+                      onSchemaUpdate={handleSchemaUpdate}
+                      onFilesChange={handleAiFilesChange}
+                      onWorkspaceMutationCommitted={
+                        handleWorkspaceMutationCommitted
+                      }
+                      onDiagnosticEvent={(event) => {
+                        recordDiagnosticEvent({
+                          category: "ai",
+                          name: event.name,
+                          traceId: event.traceId,
+                          level: event.level,
+                          details: event.details,
                         });
-                        setWsCodeDialogOpen(true);
-                      } else {
-                        toast({
-                          title: "加载文件失败",
-                          description: data.error?.message,
-                          variant: "destructive",
-                        });
-                      }
-                    } catch {
-                      toast({
-                        title: "加载文件失败",
-                        variant: "destructive",
-                      });
-                    }
-                  }}
-                  externalMessages={aiMessages}
-                  externalIsStreaming={aiIsStreaming}
-                  externalStreamContent={aiStreamContent}
-                  externalCurrentMessage={aiCurrentMessage}
-                  onMessagesChange={setAiMessages}
-                  onIsStreamingChange={handleAiStreamingChange}
-                  onStreamContentChange={setAiStreamContent}
-                  onCurrentMessageChange={setAiCurrentMessage}
-                  currentSessionId={sessionId}
-                  onNewSession={async (existingWorkspaceId) => {
-                    try {
-                      const body: Record<string, unknown> = {
-                        demoId,
-                        forceNew: true,
-                      };
-                      if (existingWorkspaceId) {
-                        body.workspaceId = existingWorkspaceId;
-                      }
-                      const res = await fetch("/api/sessions", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(body),
-                      });
-                      const data = await res.json();
-                      if (!data.success) {
-                        toast({
-                          title: "新建对话失败",
-                          variant: "destructive",
-                        });
-                        return;
-                      }
-                      setSessionId(data.data.sessionId);
-                      setWorkspaceId(data.data.workspaceId || "");
-                      setWorkspacePath(
-                        data.data.workspacePath ||
-                          data.data.tempWorkspace ||
-                          "",
-                      );
-                      setAgentSessionId(data.data.sessionId);
-                      setAiMessages([]);
-                      setAiCurrentMessage({
-                        role: "assistant",
-                        content: "",
-                        parts: [],
-                      });
-                      setAiIsStreaming(false);
-                      setAiStreamContent("");
-                      if (!existingWorkspaceId) {
-                        setCode(data.data.code || "");
-                        setSchema(data.data.schema || "");
-                        if (activeDemoIdRef.current) {
-                          setPageSchemaMap((prev) => ({
-                            ...prev,
-                            [activeDemoIdRef.current]: data.data.schema || "",
-                          }));
-                        }
-                        setEditorContent(
-                          buildFigmaText(
-                            data.data.code || "",
-                            data.data.schema || "",
-                          ),
-                        );
-                        const defaults = getSafeMergedDefaults(
-                          data.data.schema || "",
-                        );
-                        setConfigDataMap((prev) => ({
-                          ...prev,
-                          [activeDemoIdRef.current]: defaults,
-                        }));
-                        const size = getPreviewSize(data.data.schema || "");
-                        setPreviewSize(size);
-                      }
-                      toast({ title: "已创建新对话" });
-                    } catch (error) {
-                      toast({
-                        title: "新建对话失败",
-                        description:
-                          error instanceof Error ? error.message : "未知错误",
-                        variant: "destructive",
-                      });
-                    }
-                  }}
-                  onSelectSession={async (newSessionId) => {
-                    try {
-                      if (sessionId && sessionId !== newSessionId) {
-                        await fetch(`/api/sessions/${sessionId}/meta`, {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ status: "discarded" }),
-                        });
-                      }
-
-                      await fetch(`/api/sessions/${newSessionId}/meta`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ status: "editing" }),
-                      });
-
-                      const sessionRes = await fetch(
-                        `/api/sessions/${newSessionId}`,
-                      );
-                      if (!sessionRes.ok) {
-                        toast({ title: "会话不存在", variant: "destructive" });
-                        return;
-                      }
-                      const sessionData = await sessionRes.json();
-                      if (!sessionData.success || sessionData.data?.isExpired) {
-                        toast({ title: "会话已过期", variant: "destructive" });
-                        return;
-                      }
-
-                      const messagesRes = await fetch(
-                        `/api/sessions/${newSessionId}/messages`,
-                      );
-                      const messagesData = await messagesRes.json();
-                      setAiMessages(
-                        messagesData.success && Array.isArray(messagesData.data)
-                          ? sanitizeHydratedMessages(messagesData.data)
-                          : [],
-                      );
-                      setAiCurrentMessage({
-                        role: "assistant",
-                        content: "",
-                        parts: [],
-                      });
-                      setAiIsStreaming(false);
-                      setAiStreamContent("");
-                      setAgentSessionId(newSessionId);
-                      setSessionId(newSessionId);
-                      toast({ title: "已切换会话" });
-                    } catch (error) {
-                      toast({
-                        title: "切换失败",
-                        description:
-                          error instanceof Error ? error.message : "未知错误",
-                        variant: "destructive",
-                      });
-                    }
-                  }}
-                  triggerAutoSend={triggerAutoSend}
-                  onTriggerAutoSendHandled={() => {
-                    setTriggerAutoSend(null);
-                    handleVisualPropertyAutoSendHandled();
-                  }}
-                  selectedElement={chatElement}
-                  onRemoveElement={() => setChatElement(null)}
-                  selectedPages={chatPageRefs}
-                  onRemovePages={() => setChatPageRefs([])}
-                  projects={projectReferences}
-                  externalStreamServiceRef={streamServiceRef}
-                  errorBanner={
-                    errorBannerVisible && validationResult.errors.length > 0 ? (
-                      <ErrorBanner
-                        errors={validationResult.errors}
-                        disabled={aiIsStreaming}
-                        onSendToAI={handleSendErrorToAI}
-                        onCheckCode={handleManualCheck}
-                        isChecking={isChecking}
-                      />
-                    ) : null
-                  }
-                />
-              </TabsContent>
-
-              <TabsContent
-                value="code"
-                className="flex-1 flex flex-col mt-0 min-h-0 min-w-0 data-[state=inactive]:hidden overflow-hidden"
-              >
-                <div className="flex-1 min-h-0 overflow-hidden">
-                  <WorkspaceFileTree
-                    sessionId={sessionId}
-                    showKnowledge={true}
-                    onFileSelect={async (filePath, editable) => {
-                      try {
-                        if (filePath.startsWith(".ai-attachments/")) {
-                          const attachmentId = filePath.split("/")[1];
-                          const metaRes = await fetch(
-                            `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(attachmentId)}`,
-                          );
-                          const metaData = await metaRes.json();
-                          if (
-                            metaData.success &&
-                            metaData.data.metadata?.mimeType?.startsWith("image/")
-                          ) {
-                            window.open(
-                              `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(attachmentId)}&raw=1`,
-                              "_blank",
-                            );
-                            return;
-                          }
+                      }}
+                      beforeSend={flushPendingWorkspaceBeforeAiSend}
+                      onMemoryUpdate={async (filePath) => {
+                        try {
                           const res = await fetch(
-                            `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(attachmentId)}`,
+                            `/api/sessions/${sessionId}/workspace/files/${encodeURIComponent(filePath)}`,
                           );
                           const data = await res.json();
                           if (data.success) {
                             setWsCodeDialogData({
-                              filePath: data.data.metadata.name,
-                              content: data.data.text,
-                              editable: false,
+                              filePath: data.data.path,
+                              content: data.data.content,
+                              editable: data.data.editable,
                             });
                             setWsCodeDialogOpen(true);
                           } else {
                             toast({
-                              title: "加载聊天文件失败",
+                              title: "加载文件失败",
                               description: data.error?.message,
                               variant: "destructive",
                             });
                           }
-                          return;
-                        }
-                        const res = await fetch(
-                          `/api/sessions/${sessionId}/workspace/files/${encodeURIComponent(filePath)}`,
-                        );
-                        const data = await res.json();
-                        if (data.success) {
-                          setWsCodeDialogData({
-                            filePath: data.data.path,
-                            content: data.data.content,
-                            editable: data.data.editable,
-                          });
-                          setWsCodeDialogOpen(true);
-                        } else {
+                        } catch {
                           toast({
                             title: "加载文件失败",
-                            description: data.error?.message,
                             variant: "destructive",
                           });
                         }
-                      } catch {
-                        toast({
-                          title: "加载文件失败",
-                          variant: "destructive",
-                        });
-                      }
-                    }}
-                  />
-                </div>
-              </TabsContent>
-
-              <TabsContent
-                value="pages"
-                forceMount
-                className="flex-1 flex flex-col mt-0 min-h-0 min-w-0 data-[state=inactive]:hidden overflow-hidden"
-              >
-                <DemoPageTree
-                  projectId={demoId}
-                  sessionId={sessionId}
-                  pages={demoPages}
-                  folders={demoFolders}
-                  onPagesChange={setDemoPages}
-                  onFoldersChange={setDemoFolders}
-                  onWorkspaceChange={handleWorkspaceTreeChanged}
-                  htmlImportInitialFiles={droppedHtmlFiles}
-                  onHtmlImportInitialFilesConsumed={() => setDroppedHtmlFiles(undefined)}
-                  onHtmlImportPreviewStatus={(status) => {
-                    recordDiagnosticEvent({
-                      category: "preview",
-                      name: `sandbox.preview.${status.replace(/-/g, "_")}`,
-                      level: ["runtime-error", "timeout", "left-document", "incomplete"].includes(status) ? "warn" : "info",
-                      details: { runtimeType: "sandboxed-html", status },
-                    });
-                  }}
-                  activeDemoId={activeDemoId}
-                  onPageSelect={async (pageId) => {
-                    if (editingPageId === pageId) return;
-                    await handleConfigPanelPageSelect(pageId);
-                  }}
-                  onPageRename={handlePageRename}
-                  onPageCopy={async (pageId) => {
-                    if (!sessionId) {
-                      toast({
-                        title: "未创建 Session",
-                        variant: "destructive",
-                      });
-                      return;
-                    }
-                    const page = demoPages.find((p) => p.id === pageId);
-                    if (!page) return;
-                    try {
-                      const res = await fetch(`/api/projects/${demoId}/demos`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          sessionId,
-                          name: `${page.name} - 副本`,
-                          sourcePageId: pageId,
-                        }),
-                      });
-                      const data = await res.json();
-                      if (data.success) {
-                        setDemoPages((prev) =>
-                          [...prev, data.data].sort(
-                            (a, b) => a.order - b.order,
-                          ),
-                        );
-                        handleWorkspaceTreeChanged();
-                        toast({ title: "页面复制成功" });
-                      } else {
-                        toast({
-                          title: "复制失败",
-                          description: data.error?.message,
-                          variant: "destructive",
-                        });
-                      }
-                    } catch {
-                      toast({ title: "复制失败", variant: "destructive" });
-                    }
-                  }}
-                  onRequestRuntimeConversion={handleRequestRuntimeConversion}
-                  onPageDelete={(pageId) => {
-                    void requestDeletePages([pageId]);
-                  }}
-                />
-              </TabsContent>
-
-              <TabsContent
-                value="history"
-                className="flex-1 flex flex-col mt-0 min-h-0 min-w-0 data-[state=inactive]:hidden overflow-auto"
-              >
-                <div className="p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">历史</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => setSaveVersionDialogOpen(true)}
-                        disabled={isSaving || !hasPendingChanges}
-                        className="h-8 gap-1.5"
-                      >
-                        {isSaving ? (
-                          <>
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            创建中...
-                          </>
-                        ) : (
-                          <>
-                            <History className="h-3.5 w-3.5" />
-                            保存为版本
-                          </>
-                        )}
-                      </Button>
-                      {publishStatus && (
-                        <Badge
-                          variant={
-                            publishStatus === "published"
-                              ? "secondary"
-                              : publishStatus === "unpublished_changes"
-                                ? "default"
-                                : "outline"
+                      }}
+                      externalMessages={aiMessages}
+                      externalIsStreaming={aiIsStreaming}
+                      externalStreamContent={aiStreamContent}
+                      externalCurrentMessage={aiCurrentMessage}
+                      onMessagesChange={setAiMessages}
+                      onIsStreamingChange={handleAiStreamingChange}
+                      onStreamContentChange={setAiStreamContent}
+                      onCurrentMessageChange={setAiCurrentMessage}
+                      currentSessionId={sessionId}
+                      onNewSession={async (existingWorkspaceId) => {
+                        try {
+                          const body: Record<string, unknown> = {
+                            demoId,
+                            forceNew: true,
+                          };
+                          if (existingWorkspaceId) {
+                            body.workspaceId = existingWorkspaceId;
                           }
-                        >
-                          {publishStatus === "published" && "已发布"}
-                          {publishStatus === "unpublished_changes" &&
-                            "有未发布变更"}
-                          {publishStatus === "never_published" && "未发布"}
-                        </Badge>
-                      )}
-                      {publishedVersion && publishStatus === "published" && (
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          <RefreshCw className="h-3 w-3" />
-                          {publishedVersion}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                          const res = await fetch("/api/sessions", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(body),
+                          });
+                          const data = await res.json();
+                          if (!data.success) {
+                            toast({
+                              title: "新建对话失败",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          setSessionId(data.data.sessionId);
+                          setWorkspaceId(data.data.workspaceId || "");
+                          setWorkspacePath(
+                            data.data.workspacePath ||
+                              data.data.tempWorkspace ||
+                              "",
+                          );
+                          setAgentSessionId(data.data.sessionId);
+                          setAiMessages([]);
+                          setAiCurrentMessage({
+                            role: "assistant",
+                            content: "",
+                            parts: [],
+                          });
+                          setAiIsStreaming(false);
+                          setAiStreamContent("");
+                          if (!existingWorkspaceId) {
+                            setCode(data.data.code || "");
+                            setSchema(data.data.schema || "");
+                            if (activeDemoIdRef.current) {
+                              setPageSchemaMap((prev) => ({
+                                ...prev,
+                                [activeDemoIdRef.current]:
+                                  data.data.schema || "",
+                              }));
+                            }
+                            setEditorContent(
+                              buildFigmaText(
+                                data.data.code || "",
+                                data.data.schema || "",
+                              ),
+                            );
+                            const defaults = getSafeMergedDefaults(
+                              data.data.schema || "",
+                            );
+                            setConfigDataMap((prev) => ({
+                              ...prev,
+                              [activeDemoIdRef.current]: defaults,
+                            }));
+                            const size = getPreviewSize(data.data.schema || "");
+                            setPreviewSize(size);
+                          }
+                          toast({ title: "已创建新对话" });
+                        } catch (error) {
+                          toast({
+                            title: "新建对话失败",
+                            description:
+                              error instanceof Error
+                                ? error.message
+                                : "未知错误",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      onSelectSession={async (newSessionId) => {
+                        try {
+                          if (sessionId && sessionId !== newSessionId) {
+                            await fetch(`/api/sessions/${sessionId}/meta`, {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ status: "discarded" }),
+                            });
+                          }
 
-                  {historyEvents.length === 0 ? (
-                    <div className="py-8 text-center text-sm text-muted-foreground">
-                      <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p>暂无历史记录</p>
-                      <p className="text-xs mt-1">
-                        内容会自动保存，需要时可命名重要版本
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {historyGroups.map((group) => (
-                        <div key={group.key} className="space-y-1">
-                          <div className="pl-2 text-xs font-medium text-muted-foreground">
-                            {group.label}
-                          </div>
-                          <div className="space-y-1">
-                            {group.events.map((event) => {
-                              return (
-                                <div
-                                  key={event.id}
-                                  className="group flex min-h-10 items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/40 focus-within:bg-muted/40"
-                                >
-                                  <span className="w-10 shrink-0 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
-                                    {format(event.savedAt, "HH:mm", {
-                                      locale: zhCN,
-                                    })}
-                                  </span>
-                                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                                    {event.title}
-                                    {event.kind === "project" && (
-                                      <span className="ml-3 inline-flex max-w-[110px] align-middle items-center gap-1 truncate text-xs font-normal text-muted-foreground">
-                                        <User className="h-3 w-3 shrink-0" />
-                                        <span className="truncate">
-                                          {event.savedBy}
-                                        </span>
-                                      </span>
-                                    )}
-                                  </span>
-                                  <div className="flex w-[96px] shrink-0 items-center justify-end gap-1">
-                                    {event.kind === "page" && (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() =>
-                                          handlePreviewPageVersion(
-                                            event.version,
-                                          )
-                                        }
-                                        className="h-7 gap-1 px-2 text-xs opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-                                      >
-                                        <Eye className="h-3 w-3" />
-                                        查看
-                                      </Button>
-                                    )}
-                                    {event.kind === "page" && (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() =>
-                                          handleRestorePageVersion(
-                                            event.version,
-                                          )
-                                        }
-                                        disabled={
-                                          restoring === event.version.versionId
-                                        }
-                                        className="h-7 gap-1 px-2 text-xs opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-                                      >
-                                        {restoring ===
-                                        event.version.versionId ? (
-                                          <Loader2 className="h-3 w-3 animate-spin" />
-                                        ) : (
-                                          <RotateCcw className="h-3 w-3" />
-                                        )}
-                                         恢复
-                                      </Button>
-                                    )}
-                                    {event.kind !== "page" && (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() =>
-                                          handleRestoreProjectVersion(
-                                            event.version,
-                                          )
-                                        }
-                                        disabled={
-                                          restoring === event.version.versionId
-                                        }
-                                        className="h-7 gap-1 px-2 text-xs opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-                                      >
-                                        {restoring ===
-                                        event.version.versionId ? (
-                                          <Loader2 className="h-3 w-3 animate-spin" />
-                                        ) : (
-                                          <RotateCcw className="h-3 w-3" />
-                                        )}
-                                        恢复
-                                      </Button>
-                                    )}
-                                  </div>
-                                </div>
+                          await fetch(`/api/sessions/${newSessionId}/meta`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ status: "editing" }),
+                          });
+
+                          const sessionRes = await fetch(
+                            `/api/sessions/${newSessionId}`,
+                          );
+                          if (!sessionRes.ok) {
+                            toast({
+                              title: "会话不存在",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          const sessionData = await sessionRes.json();
+                          if (
+                            !sessionData.success ||
+                            sessionData.data?.isExpired
+                          ) {
+                            toast({
+                              title: "会话已过期",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+
+                          const messagesRes = await fetch(
+                            `/api/sessions/${newSessionId}/messages`,
+                          );
+                          const messagesData = await messagesRes.json();
+                          setAiMessages(
+                            messagesData.success &&
+                              Array.isArray(messagesData.data)
+                              ? sanitizeHydratedMessages(messagesData.data)
+                              : [],
+                          );
+                          setAiCurrentMessage({
+                            role: "assistant",
+                            content: "",
+                            parts: [],
+                          });
+                          setAiIsStreaming(false);
+                          setAiStreamContent("");
+                          setAgentSessionId(newSessionId);
+                          setSessionId(newSessionId);
+                          toast({ title: "已切换会话" });
+                        } catch (error) {
+                          toast({
+                            title: "切换失败",
+                            description:
+                              error instanceof Error
+                                ? error.message
+                                : "未知错误",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      triggerAutoSend={triggerAutoSend}
+                      onTriggerAutoSendHandled={() => {
+                        setTriggerAutoSend(null);
+                        handleVisualPropertyAutoSendHandled();
+                      }}
+                      selectedElement={chatElement}
+                      onRemoveElement={() => setChatElement(null)}
+                      selectedPages={chatPageRefs}
+                      onRemovePages={() => setChatPageRefs([])}
+                      projects={projectReferences}
+                      externalStreamServiceRef={streamServiceRef}
+                      errorBanner={
+                        errorBannerVisible &&
+                        validationResult.errors.length > 0 ? (
+                          <ErrorBanner
+                            errors={validationResult.errors}
+                            disabled={aiIsStreaming}
+                            onSendToAI={handleSendErrorToAI}
+                            onCheckCode={handleManualCheck}
+                            isChecking={isChecking}
+                          />
+                        ) : null
+                      }
+                    />
+                  </TabsContent>
+
+                  <TabsContent
+                    value="code"
+                    className="flex-1 flex flex-col mt-0 min-h-0 min-w-0 data-[state=inactive]:hidden overflow-hidden"
+                  >
+                    <div className="flex-1 min-h-0 overflow-hidden">
+                      <WorkspaceFileTree
+                        sessionId={sessionId}
+                        showKnowledge={true}
+                        onFileSelect={async (filePath, editable) => {
+                          try {
+                            if (filePath.startsWith(".ai-attachments/")) {
+                              const attachmentId = filePath.split("/")[1];
+                              const metaRes = await fetch(
+                                `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(attachmentId)}`,
                               );
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                      <p className="pt-2 pl-4 text-xs text-muted-foreground">
-                        共 {historyEventTotal} 条历史
-                      </p>
+                              const metaData = await metaRes.json();
+                              if (
+                                metaData.success &&
+                                metaData.data.metadata?.mimeType?.startsWith(
+                                  "image/",
+                                )
+                              ) {
+                                window.open(
+                                  `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(attachmentId)}&raw=1`,
+                                  "_blank",
+                                );
+                                return;
+                              }
+                              const res = await fetch(
+                                `/api/sessions/${sessionId}/attachments?id=${encodeURIComponent(attachmentId)}`,
+                              );
+                              const data = await res.json();
+                              if (data.success) {
+                                setWsCodeDialogData({
+                                  filePath: data.data.metadata.name,
+                                  content: data.data.text,
+                                  editable: false,
+                                });
+                                setWsCodeDialogOpen(true);
+                              } else {
+                                toast({
+                                  title: "加载聊天文件失败",
+                                  description: data.error?.message,
+                                  variant: "destructive",
+                                });
+                              }
+                              return;
+                            }
+                            const res = await fetch(
+                              `/api/sessions/${sessionId}/workspace/files/${encodeURIComponent(filePath)}`,
+                            );
+                            const data = await res.json();
+                            if (data.success) {
+                              setWsCodeDialogData({
+                                filePath: data.data.path,
+                                content: data.data.content,
+                                editable: data.data.editable,
+                              });
+                              setWsCodeDialogOpen(true);
+                            } else {
+                              toast({
+                                title: "加载文件失败",
+                                description: data.error?.message,
+                                variant: "destructive",
+                              });
+                            }
+                          } catch {
+                            toast({
+                              title: "加载文件失败",
+                              variant: "destructive",
+                            });
+                          }
+                        }}
+                      />
                     </div>
-                  )}
-                </div>
-              </TabsContent>
-            </Tabs>
-          </ResizablePanel>
-          <ResizablePanel
-            className={`relative flex flex-col overflow-hidden bg-background ${
-              previewMode === "document" ? "" : "border rounded-lg shadow-sm"
-            }`}
-          >
-            <div className="flex-1 overflow-hidden">
-              {previewMode === "document" ? (
-                <DocumentView
-                  workingDir={workspacePath || undefined}
-                  projectId={demoId}
-                  sessionId={sessionId}
-                  pages={demoPages.map((p) => ({ id: p.id, name: p.name }))}
-                  onCommentTargetChange={setActiveDocumentCommentTarget}
-                  onDocumentCommentSelection={(documentAnchor) => {
-                    setActiveCommentThreadId(null);
-                    setDocumentCommentSelection(documentAnchor);
-                  }}
-                  onItemsChange={setKnowledgeItems}
-                  onItemsLoaded={(items) => setKnowledgeItems(items)}
-                  onDocHistory={(item) => setKbHistoryItem(item)}
-                  onDocDeleted={() => {
-                    window.dispatchEvent(new Event("knowledge-updated"));
-                  }}
-                  designSpecFocus={designSpecFocus}
-                />
-              ) : (
-              <>
-              <style>{`
+                  </TabsContent>
+
+                  <TabsContent
+                    value="pages"
+                    forceMount
+                    className="flex-1 flex flex-col mt-0 min-h-0 min-w-0 data-[state=inactive]:hidden overflow-hidden"
+                  >
+                    <DemoPageTree
+                      projectId={demoId}
+                      sessionId={sessionId}
+                      pages={demoPages}
+                      folders={demoFolders}
+                      onPagesChange={setDemoPages}
+                      onFoldersChange={setDemoFolders}
+                      onWorkspaceChange={handleWorkspaceTreeChanged}
+                      htmlImportInitialFiles={droppedHtmlFiles}
+                      onHtmlImportInitialFilesConsumed={() =>
+                        setDroppedHtmlFiles(undefined)
+                      }
+                      onHtmlImportPreviewStatus={(status) => {
+                        recordDiagnosticEvent({
+                          category: "preview",
+                          name: `sandbox.preview.${status.replace(/-/g, "_")}`,
+                          level: [
+                            "runtime-error",
+                            "timeout",
+                            "left-document",
+                            "incomplete",
+                          ].includes(status)
+                            ? "warn"
+                            : "info",
+                          details: { runtimeType: "sandboxed-html", status },
+                        });
+                      }}
+                      activeDemoId={activeDemoId}
+                      onPageSelect={async (pageId) => {
+                        if (editingPageId === pageId) return;
+                        await handleConfigPanelPageSelect(pageId);
+                      }}
+                      onPageRename={handlePageRename}
+                      onPageCopy={async (pageId) => {
+                        if (!sessionId) {
+                          toast({
+                            title: "未创建 Session",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        const page = demoPages.find((p) => p.id === pageId);
+                        if (!page) return;
+                        try {
+                          const res = await fetch(
+                            `/api/projects/${demoId}/demos`,
+                            {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                sessionId,
+                                name: `${page.name} - 副本`,
+                                sourcePageId: pageId,
+                              }),
+                            },
+                          );
+                          const data = await res.json();
+                          if (data.success) {
+                            setDemoPages((prev) =>
+                              [...prev, data.data].sort(
+                                (a, b) => a.order - b.order,
+                              ),
+                            );
+                            handleWorkspaceTreeChanged();
+                            toast({ title: "页面复制成功" });
+                          } else {
+                            toast({
+                              title: "复制失败",
+                              description: data.error?.message,
+                              variant: "destructive",
+                            });
+                          }
+                        } catch {
+                          toast({ title: "复制失败", variant: "destructive" });
+                        }
+                      }}
+                      onRequestRuntimeConversion={
+                        handleRequestRuntimeConversion
+                      }
+                      onPageDelete={(pageId) => {
+                        void requestDeletePages([pageId]);
+                      }}
+                    />
+                  </TabsContent>
+
+                  <TabsContent
+                    value="history"
+                    className="flex-1 flex flex-col mt-0 min-h-0 min-w-0 data-[state=inactive]:hidden overflow-auto"
+                  >
+                    <div className="p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">历史</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => setSaveVersionDialogOpen(true)}
+                            disabled={isSaving || !hasPendingChanges}
+                            className="h-8 gap-1.5"
+                          >
+                            {isSaving ? (
+                              <>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                创建中...
+                              </>
+                            ) : (
+                              <>
+                                <History className="h-3.5 w-3.5" />
+                                保存为版本
+                              </>
+                            )}
+                          </Button>
+                          {publishStatus && (
+                            <Badge
+                              variant={
+                                publishStatus === "published"
+                                  ? "secondary"
+                                  : publishStatus === "unpublished_changes"
+                                    ? "default"
+                                    : "outline"
+                              }
+                            >
+                              {publishStatus === "published" && "已发布"}
+                              {publishStatus === "unpublished_changes" &&
+                                "有未发布变更"}
+                              {publishStatus === "never_published" && "未发布"}
+                            </Badge>
+                          )}
+                          {publishedVersion &&
+                            publishStatus === "published" && (
+                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <RefreshCw className="h-3 w-3" />
+                                {publishedVersion}
+                              </span>
+                            )}
+                        </div>
+                      </div>
+
+                      {historyEvents.length === 0 ? (
+                        <div className="py-8 text-center text-sm text-muted-foreground">
+                          <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                          <p>暂无历史记录</p>
+                          <p className="text-xs mt-1">
+                            内容会自动保存，需要时可命名重要版本
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {historyGroups.map((group) => (
+                            <div key={group.key} className="space-y-1">
+                              <div className="pl-2 text-xs font-medium text-muted-foreground">
+                                {group.label}
+                              </div>
+                              <div className="space-y-1">
+                                {group.events.map((event) => {
+                                  return (
+                                    <div
+                                      key={event.id}
+                                      className="group flex min-h-10 items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/40 focus-within:bg-muted/40"
+                                    >
+                                      <span className="w-10 shrink-0 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+                                        {format(event.savedAt, "HH:mm", {
+                                          locale: zhCN,
+                                        })}
+                                      </span>
+                                      <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                                        {event.title}
+                                        {event.kind === "project" && (
+                                          <span className="ml-3 inline-flex max-w-[110px] align-middle items-center gap-1 truncate text-xs font-normal text-muted-foreground">
+                                            <User className="h-3 w-3 shrink-0" />
+                                            <span className="truncate">
+                                              {event.savedBy}
+                                            </span>
+                                          </span>
+                                        )}
+                                      </span>
+                                      <div className="flex w-[96px] shrink-0 items-center justify-end gap-1">
+                                        {event.kind === "page" && (
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() =>
+                                              handlePreviewPageVersion(
+                                                event.version,
+                                              )
+                                            }
+                                            className="h-7 gap-1 px-2 text-xs opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                                          >
+                                            <Eye className="h-3 w-3" />
+                                            查看
+                                          </Button>
+                                        )}
+                                        {event.kind === "page" && (
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() =>
+                                              handleRestorePageVersion(
+                                                event.version,
+                                              )
+                                            }
+                                            disabled={
+                                              restoring ===
+                                              event.version.versionId
+                                            }
+                                            className="h-7 gap-1 px-2 text-xs opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                                          >
+                                            {restoring ===
+                                            event.version.versionId ? (
+                                              <Loader2 className="h-3 w-3 animate-spin" />
+                                            ) : (
+                                              <RotateCcw className="h-3 w-3" />
+                                            )}
+                                            恢复
+                                          </Button>
+                                        )}
+                                        {event.kind !== "page" && (
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() =>
+                                              handleRestoreProjectVersion(
+                                                event.version,
+                                              )
+                                            }
+                                            disabled={
+                                              restoring ===
+                                              event.version.versionId
+                                            }
+                                            className="h-7 gap-1 px-2 text-xs opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                                          >
+                                            {restoring ===
+                                            event.version.versionId ? (
+                                              <Loader2 className="h-3 w-3 animate-spin" />
+                                            ) : (
+                                              <RotateCcw className="h-3 w-3" />
+                                            )}
+                                            恢复
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                          <p className="pt-2 pl-4 text-xs text-muted-foreground">
+                            共 {historyEventTotal} 条历史
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </ResizablePanel>
+              <ResizablePanel
+                className={`relative flex flex-col overflow-hidden bg-background ${
+                  previewMode === "document"
+                    ? ""
+                    : "border rounded-lg shadow-sm"
+                }`}
+              >
+                <div className="flex-1 overflow-hidden">
+                  {previewMode === "document" ? (
+                    <DocumentView
+                      workingDir={workspacePath || undefined}
+                      projectId={demoId}
+                      sessionId={sessionId}
+                      pages={demoPages.map((p) => ({ id: p.id, name: p.name }))}
+                      onCommentTargetChange={setActiveDocumentCommentTarget}
+                      onDocumentCommentSelection={(documentAnchor) => {
+                        setActiveCommentThreadId(null);
+                        setDocumentCommentSelection(documentAnchor);
+                      }}
+                      onItemsChange={setKnowledgeItems}
+                      onItemsLoaded={(items) => setKnowledgeItems(items)}
+                      onDocHistory={(item) => setKbHistoryItem(item)}
+                      onDocDeleted={() => {
+                        window.dispatchEvent(new Event("knowledge-updated"));
+                      }}
+                      designSpecFocus={designSpecFocus}
+                    />
+                  ) : (
+                    <>
+                      <style>{`
                 .layer-tree-menu-scrollbar {
                   scrollbar-width: thin;
                   scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent;
@@ -8704,876 +9071,1039 @@ await handlePublishWithScreenshot();
                   background: hsl(var(--muted-foreground) / 0.55);
                 }
               `}</style>
-              <CommentLayer
-                projectId={demoId}
-                pageId={activeDemoId}
-                api={commentApi}
-                wsUrl={commentWsUrl}
-                currentUser={commentUser}
-                canMentionAgent
-                disabled={false}
-                showToggle={false}
-                commentMode={commentModeActive}
-                onCommentModeChange={setCommentModeActive}
-                activeThreadId={activeCommentThreadId}
-                onActiveThreadChange={setActiveCommentThreadId}
-                threads={commentsData.threads}
-                onCreateComment={commentsData.createComment}
-                onAddReply={commentsData.addReply}
-                onUpdateComment={commentsData.updateComment}
-                onUpdateReply={commentsData.updateReply}
-                onSetResolved={commentsData.setResolved}
-                onDeleteThread={commentsData.deleteThread}
-                onDeleteReply={commentsData.deleteReply}
-                onRetryAiTask={commentsData.retryAiTask}
-                showPins={rightPanelTab === "comments"}
-                canvasCreateDraft={canvasCommentDraft}
-                onCanvasCreateDraftChange={setCanvasCommentDraft}
-              >
-              <HtmlFileDropZone onFilesDrop={handlePreviewHtmlFilesDrop}>
-              <PreviewStage
-                pages={previewStagePages}
-                activePageId={activeDemoId}
-                onActivePageChange={(pageId) =>
-                  handleSinglePreviewSelectChange(`page:${pageId}`)
-                }
-                previewMode={previewMode}
-                onPreviewModeChange={handlePreviewModeChange}
-                canvasState={canvasState}
-                onCanvasStateChange={setCanvasState}
-                interactionMode="editor"
-                selectorSlot={
-                  previewMode === "single" &&
-                  (demoPages.length > 0 ||
-                    singlePreviewDocumentNodes.length > 0) ? (
-                    <>
-                      {activeDemoPage?.runtimeType === "sketch-scene" && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className={`h-7 w-7 ${
-                            sketchEditing
-                              ? "border-emerald-500/80 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-200"
-                              : ""
-                          }`}
-                          title={sketchEditing ? "退出手绘编辑" : "手绘编辑"}
-                          aria-label="手绘编辑"
-                          aria-pressed={sketchEditing}
-                          onClick={() =>
-                            setSketchEditing((current) => !current)
-                          }
-                        >
-                          <MousePointer2 className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-7 w-7"
-                        disabled={
-                          !singlePreviewHistoryTarget ||
-                          singlePreviewHistoryPreparing
-                        }
-                        onClick={() => void handleOpenSinglePreviewHistory()}
-                        title={
-                          singlePreviewHistoryTarget
-                            ? `${singlePreviewHistoryTarget.title} 历史`
-                            : "当前对象没有可用历史"
-                        }
-                        aria-label="查看当前对象历史"
-                      >
-                        {singlePreviewHistoryPreparing ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <History className="h-3.5 w-3.5" />
-                        )}
-                      </Button>
-                      {visualEditActive && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className={`h-7 w-7 ${
-                            visualAnnotationMode
-                              ? "border-amber-500/80 bg-amber-500/15 text-amber-300 hover:bg-amber-500/20 hover:text-amber-200"
-                              : ""
-                          }`}
-                          aria-pressed={visualAnnotationMode}
-                          onClick={handleStartVisualAnnotation}
-                          title={
-                            visualAnnotationMode
-                              ? "退出批注模式"
-                              : "批注模式"
-                          }
-                        >
-                          <MessageSquarePlus className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                      {visualEditActive &&
-                        visualAnnotations.filter(
-                          (annotation) => !annotation.resolved,
-                        ).length > 0 &&
-                        !visualAnnotationMode && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="h-7 w-7 border-blue-500/50 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 hover:text-blue-200"
-                            onClick={handleSendVisualAnnotationsToAI}
-                            title="发送批注给 AI"
-                          >
-                            <Send className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                    </>
-                  ) : undefined
-                }
-                toolbarCenter={toolbarCenter}
-                onSinglePagePrevious={handleSinglePreviewPrev}
-                onSinglePageNext={handleSinglePreviewNext}
-                toolbarTrailing={
-                  previewMode === "single" &&
-                  !singlePreviewViewingDocument ? (
-                    <div className="flex min-w-0 items-center gap-2">
-                      {viewportControl}
-                      {activeRuntimeConversion ? (
-                      <div className="flex min-w-0 items-center gap-1">
-                      <Badge
-                        variant={
-                          activeRuntimeConversion.status === "failed"
-                            ? "destructive"
-                            : activeRuntimeConversion.status === "completed"
-                              ? "secondary"
-                              : "outline"
-                        }
-                        className="h-6 max-w-[180px] rounded-md px-2 text-[11px] font-normal"
-                        title={activeRuntimeConversion.message}
-                      >
-                        {(activeRuntimeConversion.status === "running" ||
-                          activeRuntimeConversion.status === "applying") && (
-                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                        )}
-                        {activeRuntimeConversion.status === "completed"
-                          ? "转换完成"
-                          : activeRuntimeConversion.status === "failed"
-                            ? "转换失败"
-                            : "转换中"}
-                      </Badge>
-                      {activeRuntimeConversion.status === "failed" && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          onClick={() =>
-                            handleRequestRuntimeConversion(
-                              activeRuntimeConversion.pageId,
-                              activeRuntimeConversion.targetRuntimeType,
-                            )
-                          }
-                          title={
-                            activeRuntimeConversion.message || "重试转换"
-                          }
-                        >
-                          <RefreshCw className="mr-1 h-3 w-3" />
-                          重试
-                        </Button>
-                      )}
-                      </div>
-                      ) : null}
-                    </div>
-                  ) : undefined
-                }
-                singlePageProps={{
-                  emptyState: (
-                    <div className="flex h-full min-h-[320px] items-center justify-center rounded-md border border-dashed bg-muted/20 px-6 text-center">
-                      <div className="max-w-sm">
-                        <FileText className="mx-auto mb-3 h-9 w-9 text-muted-foreground/60" />
-                        <p className="text-sm font-medium text-foreground">
-                          暂无页面
-                        </p>
-                        <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                          请在左侧页面列表点击“添加页面”，或让 AI 创建新页面。
-                        </p>
-                      </div>
-                    </div>
-                  ),
-                  onBackgroundClick: () => {
-                    handleVisualSelect(null, []);
-                    setVisualPanelHoverNodeId(null);
-                  },
-                  rendererProps: {
-                    prototype: {
-                      sessionId,
-                      demoId: activeDemoId,
-                      allowScroll: true,
-                      visualEditMode: visualEditActive,
-                      visualAnnotationMode,
-                      visualAnnotations,
-                      onVisualAnnotationCreate: (
-                        node,
-                        text,
-                        annotationId,
-                        styleChanges,
-                      ) => {
-                        setSelectedVisualNode(node);
-                        const trimmedText = text?.trim() ?? "";
-                        const hasStyleChanges =
-                          !!styleChanges && styleChanges.length > 0;
-                        if (
-                          annotationId &&
-                          !trimmedText &&
-                          !hasStyleChanges
-                        ) {
-                          setVisualAnnotations((prev) =>
-                            prev.filter(
-                              (annotation) =>
-                                annotation.id !== annotationId,
-                            ),
-                          );
-                          return;
-                        }
-                        if (trimmedText || hasStyleChanges) {
-                          if (annotationId) {
-                            setVisualAnnotations((prev) =>
-                              prev.map((annotation) =>
-                                annotation.id === annotationId
-                                  ? {
-                                      ...annotation,
-                                      nodeId: node.nodeId,
-                                      domPath: node.domPath,
-                                      text: trimmedText || "样式修改",
-                                      styleChanges,
-                                    }
-                                  : annotation,
-                              ),
-                            );
-                          } else {
-                            handleCreateVisualAnnotation(
-                              trimmedText,
-                              node,
-                              styleChanges,
-                            );
-                          }
-                        }
-                      },
-                      visualHoverNodeId: visualEditActive
-                        ? visualPanelHoverNodeId
-                        : null,
-                      selectedVisualNodeId:
-                        selectedVisualNode?.domPath ||
-                        selectedVisualNode?.nodeId ||
-                        null,
-                      hiddenVisualNodeIds,
-                      visualLayerTreeNodes,
-                      visualPropertyChanges,
-                      onVisualSelect: handleVisualSelect,
-                      onVisualSelectStack: setVisualNodeStack,
-                      onVisualTextChange: handlePrototypeVisualTextChange,
-                      onToggleNodeHidden: handleToggleVisualNodeHidden,
-                      visualNodeTreeRequestKey: visualLayerTreeRequestKey,
-                      onVisualNodeTreeChange: setVisualLayerTreeNodes,
-                    },
-                    sketch: {
-                      fillContainer: true,
-                    },
-                    highFidelity: {
-                      sessionId,
-                      demoId: activeDemoId,
-                      placeholderScreenshotUrl: activePreviewScreenshotUrl,
-                      onConsoleEntry: handleDiagnosticConsoleEntry,
-                      onError: handlePreviewError,
-                      isAutoRepairing,
-                      onContentLoaded: (details) => {
-                        recordDiagnosticEvent({
-                          category: "preview",
-                          name: "preview.content_loaded",
-                          details: {
-                            pageId: activeDemoId,
-                            mode: "single",
-                            requestId: details?.requestId,
-                          },
-                        });
-                        setSinglePreviewLoaded((current) =>
-                          current ? current : true,
-                        );
-                        const ackRevision =
-                          workspaceFlushRevisionRef.current;
-                        previewTrackerRef.current.ackPreview(
-                          ackRevision,
-                          "active-preview",
-                        );
-                        pendingSnapshotPageIdRef.current =
-                          activeDemoIdRef.current;
-                        setStaticPrototypeRequestKey((key) => key + 1);
-                      },
-                      onPositionableSizes: handlePositionableSizes,
-                      visualEditMode: visualEditActive,
-                      visualHoverNodeId: visualEditActive
-                        ? visualPanelHoverNodeId
-                        : null,
-                      selectedVisualNodeId:
-                        selectedVisualNode?.domPath ||
-                        selectedVisualNode?.nodeId ||
-                        null,
-                      hiddenVisualNodeIds,
-                      visualLayerTreeNodes,
-                      visualPropertyChanges,
-                      visualAnnotations,
-                      onVisualSelect: handleVisualSelect,
-                      onVisualSelectStack: setVisualNodeStack,
-                      visualNodeTreeRequestKey: visualLayerTreeRequestKey,
-                      onVisualNodeTreeChange: setVisualLayerTreeNodes,
-                      staticPrototypeRequestKey,
-                      onStaticPrototypeSnapshot:
-                        handleStaticPrototypeSnapshot,
-                      onVisualInlineEdit: handleVisualInlineEdit,
-                      visualAnnotationMode,
-                      onVisualAnnotationCreate: (
-                        node,
-                        text,
-                        annotationId,
-                        styleChanges,
-                      ) => {
-                        setSelectedVisualNode(node);
-                        const trimmedText = text?.trim() ?? "";
-                        const hasStyleChanges =
-                          !!styleChanges && styleChanges.length > 0;
-                        if (
-                          annotationId &&
-                          !trimmedText &&
-                          !hasStyleChanges
-                        ) {
-                          setVisualAnnotations((prev) =>
-                            prev.filter(
-                              (annotation) =>
-                                annotation.id !== annotationId,
-                            ),
-                          );
-                          return;
-                        }
-                        if (trimmedText || hasStyleChanges) {
-                          if (annotationId) {
-                            setVisualAnnotations((prev) =>
-                              prev.map((annotation) =>
-                                annotation.id === annotationId
-                                  ? {
-                                      ...annotation,
-                                      nodeId: node.nodeId,
-                                      domPath: node.domPath,
-                                      text: trimmedText || "样式修改",
-                                      styleChanges,
-                                    }
-                                  : annotation,
-                              ),
-                            );
-                          } else {
-                            handleCreateVisualAnnotation(
-                              trimmedText,
-                              node,
-                              styleChanges,
-                            );
-                          }
-                        }
-                      },
-                      positionEditMode,
-                      positionEditDimming,
-                      onPositionChange: handlePositionChange,
-                      onPositionDrag: handlePositionDrag,
-                      onPositionEditExit: handleExitPositionEdit,
-                    },
-                  },
-                }}
-                canvasProps={{
-                  editable: true,
-                  sessionId,
-                  projectId: demoId,
-                  onRequestDeletePages: requestDeletePages,
-                  onAddPagesToChat: handleAddPagesToChat,
-                  onRequestPastePages: handlePastePages,
-                  onRequestCreateReferences: handleCreateReferences,
-                  onRequestPasteHtmlContent: handlePasteHtmlContent,
-                  onViewSource: handleViewSourcePage,
-                  focusPageId: focusCanvasPageId,
-                  onVisiblePageIdsChange: setVisibleCanvasPageIds,
-                  editingPageId: canvasEditingPageId ?? undefined,
-                  screenshotUrls: canvasScreenshotUrls,
-                  screenshotRenderBoxes: canvasScreenshotRenderBoxes,
-                  onConsoleEntry: handleDiagnosticConsoleEntry,
-                  onError: handlePreviewError,
-                  onPositionableSizes: handlePositionableSizes,
-                  knowledgeDocuments: canvasKnowledgeDocuments,
-                  fitToScreenOnMount: fitCanvasToScreenOnMount,
-                  onFitToScreenOnMountComplete:
-                    handleInitialCanvasFitComplete,
-                  onCreateKnowledgeDocument: createCanvasKnowledgeDocument,
-                  onUpdateKnowledgeDocument: updateCanvasKnowledgeDocument,
-                  onReadKnowledgeDocument: readCanvasKnowledgeDocument,
-                  onPageConfigEdit: (pageId) => {
-                    setConfigPanelDetailPageId(pageId);
-                    void handleConfigPanelPageSelect(pageId, undefined, {
-                      focusCanvas: false,
-                    });
-                  },
-                  onPageRename: handlePageRename,
-                  onPageComment: commentModeActive
-                    ? ({ pageId, pageName, pin, clientX, clientY }) => {
-                        setRightPanelTab("comments");
-                        setCanvasCommentDraft({
-                          input: {
-                            target: { kind: "page", pageId },
-                            anchor: {
-                              domPath: "canvas-page",
-                              tagName: "canvas-page",
-                              componentName: pageName,
-                              textSnippet: pageName,
-                              snapshot: { attrs: { "data-page-id": pageId } },
-                            },
-                            pin,
-                          },
-                          clientX,
-                          clientY,
-                        });
-                      }
-                    : undefined,
-                  onCanvasClick: () => {
-                    clearCanvasSelection();
-                    setCanvasEditingPageId(null);
-                    setConfigPanelDetailPageId(null);
-                    setConfigPanelOverviewRequested(true);
-                  },
-                }}
-                renderSingleContent={({
-                  activePage,
-                  resolvedPreviewSize,
-                }) => {
-                  if (
-                    singlePreviewViewingDocument &&
-                    activeSinglePreviewDocumentNode
-                  ) {
-                    return (
-                      <div className="h-full overflow-y-auto p-4">
-                        <div className="mx-auto flex h-full max-w-4xl flex-col overflow-hidden rounded-md border bg-background shadow-sm">
-                          <CanvasDocumentContent
-                            node={activeSinglePreviewDocumentNode}
-                            className="min-h-0 flex-1"
-                            contentClassName="px-6 py-5 text-sm"
-                            onActiveDocumentChange={
-                              handleSinglePreviewDocumentActiveChange
-                            }
-                          />
-                        </div>
-                      </div>
-                    );
-                  }
-                  if (
-                    activePage?.runtimeType === "sketch-scene" &&
-                    sketchEditing
-                  ) {
-                    return (
-                      <div className="h-full overflow-y-auto p-4">
-                        <div className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-md border bg-background shadow-sm">
-                          <div className="min-h-0 flex-1 overflow-hidden">
-                            <SketchEditorEngineStage
-                              scene={activeSketchScene}
-                              configData={configData}
-                              previewSize={resolvedPreviewSize}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-                  return undefined;
-                }}
-              />
-              </HtmlFileDropZone>
-              </CommentLayer>
-              </>
-              )}
-            </div>
-            {(isInitialPageLoading || initialPageError) && (
-              <div className="absolute inset-0 z-30 flex items-center justify-center bg-background/85 backdrop-blur-sm">
-                {isInitialPageLoading ? (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    正在加载当前页…
-                  </div>
-                ) : (
-                  <div className="max-w-sm space-y-3 px-6 text-center">
-                    <p className="text-sm font-medium">当前页加载失败</p>
-                    <p className="text-xs text-muted-foreground">
-                      {initialPageError}
-                    </p>
-                    <Button
-                      size="sm"
-                      onClick={() =>
-                        setLoadAttempt((current) => current + 1)
-                      }
-                    >
-                      <RefreshCw className="mr-2 h-3.5 w-3.5" />
-                      重试
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-          </ResizablePanel>
-
-          {isConfigPanelVisible && (
-            <ResizablePanel className="relative flex flex-col overflow-hidden border-l bg-card">
-              {previewMode === "document" ? (
-                <DocumentModeRightPanel
-                  target={activeDocumentCommentTarget}
-                  threads={documentCommentsData.threads}
-                  currentUserId={currentUserId || undefined}
-                  currentUser={commentUser}
-                  mentionCandidates={[]}
-                  canMentionAgent={true}
-                  activeThreadId={activeCommentThreadId}
-                  onSelectThread={(id) => {
-                    setActiveCommentThreadId(id);
-                    setCommentModeActive(false);
-                  }}
-                  onCreateComment={documentCommentsData.createComment}
-                  selectionDraft={documentCommentSelection}
-                  onSelectionDraftHandled={() => setDocumentCommentSelection(null)}
-                  unresolvedCount={documentCommentsData.threads.filter((thread) => !thread.resolved).length}
-                />
-              ) : previewMode === "single" ? (
-                <>
-                  <Tabs
-                    value={effectiveRightPanelTab}
-                    onValueChange={(v) =>
-                      setRightPanelTab(v as "edit" | "config" | "comments")
-                    }
-                    className="flex h-full flex-col"
-                  >
-                    <TabsList className="w-full justify-start gap-2 rounded-none border-b px-2 h-12 bg-transparent">
-                      {canUseVisualEditor && (
-                        <TabsTrigger
-                          value="edit"
-                          title="编辑"
-                          className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
-                        >
-                          <SquarePen className="h-4 w-4" />
-                          {rightPanelTab === "edit" && <span>编辑</span>}
-                        </TabsTrigger>
-                      )}
-                      <TabsTrigger
-                        value="config"
-                        title="配置"
-                        className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
-                      >
-                        <SlidersHorizontal className="h-4 w-4" />
-                        {rightPanelTab === "config" && <span>配置</span>}
-                      </TabsTrigger>
-                      <TabsTrigger value="comments" title="评论"
-                        className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
-                      >
-                        <MessageSquare className="h-4 w-4" />
-                        {rightPanelTab === "comments" && <span>评论</span>}
-                        {unresolvedCommentCount > 0 && (
-                          <span className="ml-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[9px] font-semibold text-white">
-                            {unresolvedCommentCount}
-                          </span>
-                        )}
-                      </TabsTrigger>
-                    </TabsList>
-                    {canUseVisualEditor && (
-                      <TabsContent
-                        value="edit"
-                        className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
-                      >
-                        <VisualEditSidebar
-                        layerNodes={visualLayerTreeNodes}
-                        selectedNodeId={
-                          selectedVisualNode?.domPath ||
-                          selectedVisualNode?.nodeId ||
-                          null
-                        }
-                        hiddenNodeIds={hiddenVisualNodeIds}
-                        getNodeBadgeCount={getVisualNodeChangeCount}
-                        onSelectLayer={(node, path) => {
-                          handleVisualSelect(node, path);
-                        }}
-                        onToggleNodeHidden={handleToggleVisualNodeHidden}
-                        onHoverLayerNodeId={setVisualPanelHoverNodeId}
-                      >
-                        <VisualPropertyPanel
-                          selectedNode={selectedVisualNode}
-                          sessionId={sessionId}
-                          projectId={demoId}
-                          pageId={activeDemoId}
-                          runtimeType={activeDemoPage?.runtimeType}
-                          propertyChanges={visualPropertyChanges}
-                          configMarks={visualConfigMarks}
-                          aiInstruction={visualAiInstruction}
-                          usedConfigKeys={visualConfigUsedKeys}
-                          onPropertyChange={handleVisualPropertyChange}
-                          onRestoreProperty={handleRestoreVisualProperty}
-                          onClearChanges={handleClearSelectedVisualProperties}
-                          onMarkConfig={handleMarkVisualConfig}
-                          onUpdateConfigMark={handleUpdateVisualConfigMark}
-                          onRemoveConfigMark={handleRemoveVisualConfigMark}
-                          onAiInstructionChange={setVisualAiInstruction}
-                          draftAction={visualDraftAction}
-                          draftActionDisabled={visualSendDisabled}
-                          onDraftActionPrimary={handleSubmitVisualDraftAction}
-                          onDraftActionCancel={handleClearVisualProperties}
-                          onAddToChat={handleAddToChat}
-                        />
-                        </VisualEditSidebar>
-                      </TabsContent>
-                    )}
-                    <TabsContent
-                      value="config"
-                      className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
-                    >
-                      <PageConfigPanel
-                        pages={demoPages.map((page) => ({
-                          id: page.id,
-                          name: page.name,
-                          order: page.order,
-                          schema:
-                            pageSchemaMap[page.id] ||
-                            (page.id === activeDemoId ? schema : undefined),
-                          configData: configDataMap[page.id],
-                          projectConfigSchema: referencePageProjectSchemas[page.id],
-                          referenceDesignSpecs: referencePageDesignSpecs[page.id],
-                          projectConfigBindings:
-                            page.runtimeType === "prototype-html-css"
-                              ? extractPrototypeConfigBindingKeys(
-                                  pagePrototypeMap[page.id]?.html,
-                                )
-                              : page.runtimeType === "high-fidelity-react" ||
-                                  page.runtimeType === "sketch-scene"
-                                ? extractCodeConfigBindingKeys(
-                                    pageCodes[page.id],
-                                    getSchemaPropertyKeys(projectConfigSchema),
-                                  )
-                                : [],
-                        }))}
-                        activePageId={activeDemoId}
-                        detailPageId={activeDemoId}
-                        onDetailPageIdChange={(pageId) => {
-                          setConfigPanelDetailPageId(pageId);
-                        }}
-                        onPageSelect={handleConfigPanelPageSelect}
-                        projectConfigSchema={projectConfigSchema}
-                        onProjectConfigChange={handleProjectConfigPanelChange}
-                        onProjectSchemaChange={handleProjectSchemaChange}
-                        onProjectDefinitionChange={handleProjectDefinitionChange}
-                        onDefinitionSendToAI={handleConfigDefinitionSendToAI}
-                        onDefinitionAnalyze={handleConfigDefinitionAnalyze}
-                        onPageConfigChange={handlePageConfigPanelChange}
-                        onPageSchemaChange={handlePageSchemaChange}
-                        onPageDefinitionChange={handlePageDefinitionChange}
-                        onSaveAsDefaults={
-                          activeDemoPage?.reference
-                            ? undefined
-                            : handleSaveAsDefaults
-                        }
-                        onRestoreDefaults={
-                          activeDemoPage?.reference
-                            ? undefined
-                            : handleRestoreDefaults
-                        }
-                        onProjectSaveAsDefaults={handleProjectSaveAsDefaults}
-                        onProjectRestoreDefaults={handleProjectRestoreDefaults}
-                        sessionId={sessionId}
-                        onLaunchWhiteboard={WHITEBOARD_AUTHORING_ENABLED ? launchWhiteboard : undefined}
-                        hideDetailHeader
-                        onEnterPositionEdit={handleEnterPositionEdit}
-                        onExitPositionEdit={handleExitPositionEdit}
-                        positionEditActive={positionEditMode.enabled}
-                        positionEditDimming={positionEditDimming}
-                        onTogglePositionDimming={handleTogglePositionDimming}
-                        requirements={
-                          activeDemoPage?.reference
-                            ? (referencePageRequirements[activeDemoId] ?? "")
-                            : (requirementsMap[activeDemoId] ?? "")
-                        }
-                        onRequirementsChange={(markdown) =>
-                          handlePageRequirementsChange(activeDemoId, markdown)
-                        }
-                        requirementsLoading={requirementsLoading}
-                        requirementsPosition="hidden"
-                        readonly={!!activeDemoPage?.reference}
-                        designSpecApiContext={{ workingDir: workspacePath || undefined, sessionId, projectId: demoId }}
-                        onEditDesignSpec={(docId, entryId) => {
-                          setDesignSpecFocus({ docId, entryId });
-                          setPreviewMode("document");
-                        }}
-                      />
-                    </TabsContent>
-                    <TabsContent
-                      value="comments"
-                      className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
-                    >
-                      <CommentPanel
-                        threads={commentsData.threads}
-                        currentUserId={currentUserId || undefined}
-                        activeThreadId={activeCommentThreadId}
-                        onSelectThread={(id) => {
-                          setActiveCommentThreadId(id);
-                          setCommentModeActive(false);
-                        }}
+                      <CommentLayer
+                        projectId={demoId}
+                        pageId={activeDemoId}
+                        api={commentApi}
+                        wsUrl={commentWsUrl}
+                        currentUser={commentUser}
+                        canMentionAgent
+                        disabled={false}
+                        showToggle={false}
                         commentMode={commentModeActive}
                         onCommentModeChange={setCommentModeActive}
-                      />
-                    </TabsContent>
-                  </Tabs>
-                </>
-              ) : (
-                <Tabs
-                  value={canvasRightPanelTab}
-                  onValueChange={(v) =>
-                    setRightPanelTab(v as "config" | "comments")
-                  }
-                  className="flex h-full flex-col"
-                >
-                  <TabsList className="w-full justify-start gap-2 rounded-none border-b px-2 h-12 bg-transparent">
-                    {hasAnyConfig && (
-                      <TabsTrigger
-                        value="config"
-                        title="配置"
-                        className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                        activeThreadId={activeCommentThreadId}
+                        onActiveThreadChange={setActiveCommentThreadId}
+                        threads={activePageCommentThreads}
+                        onCreateComment={commentsData.createComment}
+                        onAddReply={commentsData.addReply}
+                        onUpdateComment={commentsData.updateComment}
+                        onUpdateReply={commentsData.updateReply}
+                        onSetResolved={commentsData.setResolved}
+                        onDeleteThread={commentsData.deleteThread}
+                        onDeleteReply={commentsData.deleteReply}
+                        onRetryAiTask={commentsData.retryAiTask}
+                        showPins={
+                          previewMode === "canvas"
+                            ? canvasRightPanelTab === "comments"
+                            : rightPanelTab === "comments"
+                        }
+                        canvasCreateDraft={canvasCommentDraft}
+                        onCanvasCreateDraftChange={setCanvasCommentDraft}
                       >
-                        <SlidersHorizontal className="h-4 w-4" />
-                        {canvasRightPanelTab === "config" && <span>配置</span>}
-                      </TabsTrigger>
-                    )}
-                    <TabsTrigger
-                      value="comments"
-                      title="评论"
-                      className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
-                    >
-                      <MessageSquare className="h-4 w-4" />
-                      {canvasRightPanelTab === "comments" && <span>评论</span>}
-                      {unresolvedCommentCount > 0 && (
-                        <span className="ml-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[9px] font-semibold text-white">
-                          {unresolvedCommentCount}
-                        </span>
-                      )}
-                    </TabsTrigger>
-                  </TabsList>
-                  {hasAnyConfig && (
-                    <TabsContent
-                      value="config"
-                      className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
-                    >
-                      <PageConfigPanel
-                  pages={demoPages.map((page) => ({
-                    id: page.id,
-                    name: page.name,
-                    order: page.order,
-                    schema:
-                      pageSchemaMap[page.id] ||
-                      (page.id === activeDemoId ? schema : undefined),
-                    configData: configDataMap[page.id],
-                    projectConfigSchema: referencePageProjectSchemas[page.id],
-                    referenceDesignSpecs: referencePageDesignSpecs[page.id],
-                    projectConfigBindings:
-                      page.runtimeType === "prototype-html-css"
-                        ? extractPrototypeConfigBindingKeys(
-                            pagePrototypeMap[page.id]?.html,
-                          )
-                        : page.runtimeType === "high-fidelity-react" ||
-                            page.runtimeType === "sketch-scene"
-                          ? extractCodeConfigBindingKeys(
-                              pageCodes[page.id],
-                              getSchemaPropertyKeys(projectConfigSchema),
-                            )
-                          : [],
-                  }))}
-                  activePageId={activeDemoId}
-                  detailPageId={
-                    configPanelOverviewRequested
-                      ? configPanelDetailPageId
-                      : (configPanelDetailPageId ?? activeDemoId)
-                  }
-                  onDetailPageIdChange={(pageId) => {
-                    setConfigPanelDetailPageId(pageId);
-                    setConfigPanelOverviewRequested(pageId === null);
-                    if (pageId === null && previewMode === "canvas") {
-                      clearCanvasSelection();
-                    }
-                  }}
-                  onPageSelect={handleConfigPanelPageSelect}
-                  projectConfigSchema={projectConfigSchema}
-                  onProjectConfigChange={handleProjectConfigPanelChange}
-                  onProjectSchemaChange={handleProjectSchemaChange}
-                  onProjectDefinitionChange={handleProjectDefinitionChange}
-                  onDefinitionSendToAI={handleConfigDefinitionSendToAI}
-                  onDefinitionAnalyze={handleConfigDefinitionAnalyze}
-                  onPageConfigChange={handlePageConfigPanelChange}
-                  requirementsPosition="hidden"
-                  onPageSchemaChange={handlePageSchemaChange}
-                  onPageDefinitionChange={handlePageDefinitionChange}
-                  onSaveAsDefaults={
-                    activeDemoPage?.reference
-                      ? undefined
-                      : handleSaveAsDefaults
-                  }
-                  onRestoreDefaults={
-                    activeDemoPage?.reference
-                      ? undefined
-                      : handleRestoreDefaults
-                  }
-                  onProjectSaveAsDefaults={handleProjectSaveAsDefaults}
-                  onProjectRestoreDefaults={handleProjectRestoreDefaults}
-                  sessionId={sessionId}
-                  onLaunchWhiteboard={WHITEBOARD_AUTHORING_ENABLED ? launchWhiteboard : undefined}
-                  onEnterPositionEdit={handleEnterPositionEdit}
-                  onExitPositionEdit={handleExitPositionEdit}
-                  positionEditActive={positionEditMode.enabled}
-                  positionEditDimming={positionEditDimming}
-                  onTogglePositionDimming={handleTogglePositionDimming}
-                  requirements={
-                    requirementsMap[configPanelDetailPageId ?? activeDemoId] ??
-                    ""
-                  }
-                  onRequirementsChange={(markdown) =>
-                    handlePageRequirementsChange(
-                      configPanelDetailPageId ?? activeDemoId,
-                      markdown,
-                    )
-                  }
-                  requirementsLoading={requirementsLoading}
-                        readonly={!!activeDemoPage?.reference}
-                        designSpecApiContext={{ workingDir: workspacePath || undefined, sessionId, projectId: demoId }}
-                        onEditDesignSpec={(docId, entryId) => {
-                          setDesignSpecFocus({ docId, entryId });
-                          setPreviewMode("document");
-                        }}
-                      />
-                    </TabsContent>
+                        <HtmlFileDropZone
+                          onFilesDrop={handlePreviewHtmlFilesDrop}
+                        >
+                          <PreviewStage
+                            pages={previewStagePages}
+                            activePageId={activeDemoId}
+                            onActivePageChange={(pageId) =>
+                              handleSinglePreviewSelectChange(`page:${pageId}`)
+                            }
+                            previewMode={previewMode}
+                            onPreviewModeChange={handlePreviewModeChange}
+                            canvasState={canvasState}
+                            onCanvasStateChange={setCanvasState}
+                            interactionMode="editor"
+                            singlePagePresentationOverride={
+                              temporaryPresentation
+                            }
+                            selectorSlot={
+                              previewMode === "single" &&
+                              (demoPages.length > 0 ||
+                                singlePreviewDocumentNodes.length > 0) ? (
+                                <>
+                                  {activeDemoPage?.runtimeType ===
+                                    "sketch-scene" && (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="icon"
+                                      className={`h-7 w-7 ${
+                                        sketchEditing
+                                          ? "border-emerald-500/80 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-200"
+                                          : ""
+                                      }`}
+                                      title={
+                                        sketchEditing
+                                          ? "退出手绘编辑"
+                                          : "手绘编辑"
+                                      }
+                                      aria-label="手绘编辑"
+                                      aria-pressed={sketchEditing}
+                                      onClick={() =>
+                                        setSketchEditing((current) => !current)
+                                      }
+                                    >
+                                      <MousePointer2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    disabled={
+                                      !singlePreviewHistoryTarget ||
+                                      singlePreviewHistoryPreparing
+                                    }
+                                    onClick={() =>
+                                      void handleOpenSinglePreviewHistory()
+                                    }
+                                    title={
+                                      singlePreviewHistoryTarget
+                                        ? `${singlePreviewHistoryTarget.title} 历史`
+                                        : "当前对象没有可用历史"
+                                    }
+                                    aria-label="查看当前对象历史"
+                                  >
+                                    {singlePreviewHistoryPreparing ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <History className="h-3.5 w-3.5" />
+                                    )}
+                                  </Button>
+                                  {visualEditActive && (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="icon"
+                                      className={`h-7 w-7 ${
+                                        visualAnnotationMode
+                                          ? "border-amber-500/80 bg-amber-500/15 text-amber-300 hover:bg-amber-500/20 hover:text-amber-200"
+                                          : ""
+                                      }`}
+                                      aria-pressed={visualAnnotationMode}
+                                      onClick={handleStartVisualAnnotation}
+                                      title={
+                                        visualAnnotationMode
+                                          ? "退出批注模式"
+                                          : "批注模式"
+                                      }
+                                    >
+                                      <MessageSquarePlus className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                  {visualEditActive &&
+                                    visualAnnotations.filter(
+                                      (annotation) => !annotation.resolved,
+                                    ).length > 0 &&
+                                    !visualAnnotationMode && (
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-7 w-7 border-blue-500/50 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 hover:text-blue-200"
+                                        onClick={
+                                          handleSendVisualAnnotationsToAI
+                                        }
+                                        title="发送批注给 AI"
+                                      >
+                                        <Send className="h-3.5 w-3.5" />
+                                      </Button>
+                                    )}
+                                </>
+                              ) : undefined
+                            }
+                            toolbarCenter={toolbarCenter}
+                            onSinglePagePrevious={handleSinglePreviewPrev}
+                            onSinglePageNext={handleSinglePreviewNext}
+                            toolbarTrailing={
+                              previewMode === "single" &&
+                              !singlePreviewViewingDocument ? (
+                                <div className="flex min-w-0 items-center gap-2">
+                                  {viewportControl}
+                                  {activeRuntimeConversion ? (
+                                    <div className="flex min-w-0 items-center gap-1">
+                                      <Badge
+                                        variant={
+                                          activeRuntimeConversion.status ===
+                                          "failed"
+                                            ? "destructive"
+                                            : activeRuntimeConversion.status ===
+                                                "completed"
+                                              ? "secondary"
+                                              : "outline"
+                                        }
+                                        className="h-6 max-w-[180px] rounded-md px-2 text-[11px] font-normal"
+                                        title={activeRuntimeConversion.message}
+                                      >
+                                        {(activeRuntimeConversion.status ===
+                                          "running" ||
+                                          activeRuntimeConversion.status ===
+                                            "applying") && (
+                                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                        )}
+                                        {activeRuntimeConversion.status ===
+                                        "completed"
+                                          ? "转换完成"
+                                          : activeRuntimeConversion.status ===
+                                              "failed"
+                                            ? "转换失败"
+                                            : "转换中"}
+                                      </Badge>
+                                      {activeRuntimeConversion.status ===
+                                        "failed" && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-7 px-2 text-xs"
+                                          onClick={() =>
+                                            handleRequestRuntimeConversion(
+                                              activeRuntimeConversion.pageId,
+                                              activeRuntimeConversion.targetRuntimeType,
+                                            )
+                                          }
+                                          title={
+                                            activeRuntimeConversion.message ||
+                                            "重试转换"
+                                          }
+                                        >
+                                          <RefreshCw className="mr-1 h-3 w-3" />
+                                          重试
+                                        </Button>
+                                      )}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              ) : undefined
+                            }
+                            singlePageProps={{
+                              emptyState: (
+                                <div className="flex h-full min-h-[320px] items-center justify-center rounded-md border border-dashed bg-muted/20 px-6 text-center">
+                                  <div className="max-w-sm">
+                                    <FileText className="mx-auto mb-3 h-9 w-9 text-muted-foreground/60" />
+                                    <p className="text-sm font-medium text-foreground">
+                                      暂无页面
+                                    </p>
+                                    <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                                      请在左侧页面列表点击“添加页面”，或让 AI
+                                      创建新页面。
+                                    </p>
+                                  </div>
+                                </div>
+                              ),
+                              onBackgroundClick: () => {
+                                handleVisualSelect(null, []);
+                                setVisualPanelHoverNodeId(null);
+                              },
+                              rendererProps: {
+                                prototype: {
+                                  sessionId,
+                                  demoId: activeDemoId,
+                                  allowScroll: true,
+                                  visualEditMode: visualEditActive,
+                                  visualAnnotationMode,
+                                  visualAnnotations,
+                                  onVisualAnnotationCreate: (
+                                    node,
+                                    text,
+                                    annotationId,
+                                    styleChanges,
+                                  ) => {
+                                    setSelectedVisualNode(node);
+                                    const trimmedText = text?.trim() ?? "";
+                                    const hasStyleChanges =
+                                      !!styleChanges && styleChanges.length > 0;
+                                    if (
+                                      annotationId &&
+                                      !trimmedText &&
+                                      !hasStyleChanges
+                                    ) {
+                                      setVisualAnnotations((prev) =>
+                                        prev.filter(
+                                          (annotation) =>
+                                            annotation.id !== annotationId,
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    if (trimmedText || hasStyleChanges) {
+                                      if (annotationId) {
+                                        setVisualAnnotations((prev) =>
+                                          prev.map((annotation) =>
+                                            annotation.id === annotationId
+                                              ? {
+                                                  ...annotation,
+                                                  nodeId: node.nodeId,
+                                                  domPath: node.domPath,
+                                                  text:
+                                                    trimmedText || "样式修改",
+                                                  styleChanges,
+                                                }
+                                              : annotation,
+                                          ),
+                                        );
+                                      } else {
+                                        handleCreateVisualAnnotation(
+                                          trimmedText,
+                                          node,
+                                          styleChanges,
+                                        );
+                                      }
+                                    }
+                                  },
+                                  visualHoverNodeId: visualEditActive
+                                    ? visualPanelHoverNodeId
+                                    : null,
+                                  selectedVisualNodeId:
+                                    selectedVisualNode?.domPath ||
+                                    selectedVisualNode?.nodeId ||
+                                    null,
+                                  hiddenVisualNodeIds,
+                                  visualLayerTreeNodes,
+                                  visualPropertyChanges,
+                                  onVisualSelect: handleVisualSelect,
+                                  onVisualSelectStack: setVisualNodeStack,
+                                  onVisualTextChange:
+                                    handlePrototypeVisualTextChange,
+                                  onToggleNodeHidden:
+                                    handleToggleVisualNodeHidden,
+                                  visualNodeTreeRequestKey:
+                                    visualLayerTreeRequestKey,
+                                  onVisualNodeTreeChange:
+                                    setVisualLayerTreeNodes,
+                                },
+                                sketch: {
+                                  fillContainer: true,
+                                },
+                                highFidelity: {
+                                  sessionId,
+                                  demoId: activeDemoId,
+                                  placeholderScreenshotUrl:
+                                    activePreviewScreenshotUrl,
+                                  onConsoleEntry: handleDiagnosticConsoleEntry,
+                                  onError: handlePreviewError,
+                                  isAutoRepairing,
+                                  onContentLoaded: (details) => {
+                                    recordDiagnosticEvent({
+                                      category: "preview",
+                                      name: "preview.content_loaded",
+                                      details: {
+                                        pageId: activeDemoId,
+                                        mode: "single",
+                                        requestId: details?.requestId,
+                                      },
+                                    });
+                                    setSinglePreviewLoaded((current) =>
+                                      current ? current : true,
+                                    );
+                                    const ackRevision =
+                                      workspaceFlushRevisionRef.current;
+                                    previewTrackerRef.current.ackPreview(
+                                      ackRevision,
+                                      "active-preview",
+                                    );
+                                    pendingSnapshotPageIdRef.current =
+                                      activeDemoIdRef.current;
+                                    setStaticPrototypeRequestKey(
+                                      (key) => key + 1,
+                                    );
+                                  },
+                                  onPositionableSizes: handlePositionableSizes,
+                                  visualEditMode: visualEditActive,
+                                  visualHoverNodeId: visualEditActive
+                                    ? visualPanelHoverNodeId
+                                    : null,
+                                  selectedVisualNodeId:
+                                    selectedVisualNode?.domPath ||
+                                    selectedVisualNode?.nodeId ||
+                                    null,
+                                  hiddenVisualNodeIds,
+                                  visualLayerTreeNodes,
+                                  visualPropertyChanges,
+                                  visualAnnotations,
+                                  onVisualSelect: handleVisualSelect,
+                                  onVisualSelectStack: setVisualNodeStack,
+                                  visualNodeTreeRequestKey:
+                                    visualLayerTreeRequestKey,
+                                  onVisualNodeTreeChange:
+                                    setVisualLayerTreeNodes,
+                                  staticPrototypeRequestKey,
+                                  onStaticPrototypeSnapshot:
+                                    handleStaticPrototypeSnapshot,
+                                  onVisualInlineEdit: handleVisualInlineEdit,
+                                  visualAnnotationMode,
+                                  onVisualAnnotationCreate: (
+                                    node,
+                                    text,
+                                    annotationId,
+                                    styleChanges,
+                                  ) => {
+                                    setSelectedVisualNode(node);
+                                    const trimmedText = text?.trim() ?? "";
+                                    const hasStyleChanges =
+                                      !!styleChanges && styleChanges.length > 0;
+                                    if (
+                                      annotationId &&
+                                      !trimmedText &&
+                                      !hasStyleChanges
+                                    ) {
+                                      setVisualAnnotations((prev) =>
+                                        prev.filter(
+                                          (annotation) =>
+                                            annotation.id !== annotationId,
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    if (trimmedText || hasStyleChanges) {
+                                      if (annotationId) {
+                                        setVisualAnnotations((prev) =>
+                                          prev.map((annotation) =>
+                                            annotation.id === annotationId
+                                              ? {
+                                                  ...annotation,
+                                                  nodeId: node.nodeId,
+                                                  domPath: node.domPath,
+                                                  text:
+                                                    trimmedText || "样式修改",
+                                                  styleChanges,
+                                                }
+                                              : annotation,
+                                          ),
+                                        );
+                                      } else {
+                                        handleCreateVisualAnnotation(
+                                          trimmedText,
+                                          node,
+                                          styleChanges,
+                                        );
+                                      }
+                                    }
+                                  },
+                                  positionEditMode,
+                                  positionEditDimming,
+                                  onPositionChange: handlePositionChange,
+                                  onPositionDrag: handlePositionDrag,
+                                  onPositionEditExit: handleExitPositionEdit,
+                                },
+                              },
+                            }}
+                            canvasProps={{
+                              editable: true,
+                              sessionId,
+                              projectId: demoId,
+                              onRequestDeletePages: requestDeletePages,
+                              onAddPagesToChat: handleAddPagesToChat,
+                              onRequestPastePages: handlePastePages,
+                              onRequestCreateReferences: handleCreateReferences,
+                              onRequestPasteHtmlContent: handlePasteHtmlContent,
+                              onViewSource: handleViewSourcePage,
+                              focusPageId: focusCanvasPageId,
+                              onVisiblePageIdsChange: setVisibleCanvasPageIds,
+                              editingPageId: canvasEditingPageId ?? undefined,
+                              screenshotUrls: canvasScreenshotUrls,
+                              screenshotRenderBoxes:
+                                canvasScreenshotRenderBoxes,
+                              onConsoleEntry: handleDiagnosticConsoleEntry,
+                              onError: handlePreviewError,
+                              onPositionableSizes: handlePositionableSizes,
+                              knowledgeDocuments: canvasKnowledgeDocuments,
+                              fitToScreenOnMount: fitCanvasToScreenOnMount,
+                              onFitToScreenOnMountComplete:
+                                handleInitialCanvasFitComplete,
+                              onCreateKnowledgeDocument:
+                                createCanvasKnowledgeDocument,
+                              onUpdateKnowledgeDocument:
+                                updateCanvasKnowledgeDocument,
+                              onReadKnowledgeDocument:
+                                readCanvasKnowledgeDocument,
+                              onPageConfigEdit: (pageId, options) => {
+                                if (options?.openConfigDetail === false) {
+                                  setConfigPanelDetailPageId(null);
+                                  setConfigPanelOverviewRequested(true);
+                                } else {
+                                  setConfigPanelDetailPageId(pageId);
+                                }
+                                void handleConfigPanelPageSelect(
+                                  pageId,
+                                  undefined,
+                                  {
+                                    focusCanvas: false,
+                                    openConfigDetail: options?.openConfigDetail,
+                                  },
+                                );
+                              },
+                              onPageRename: handlePageRename,
+                              onPageComment: commentModeActive
+                                ? ({
+                                    pageId,
+                                    pageName,
+                                    pin,
+                                    clientX,
+                                    clientY,
+                                  }) => {
+                                    setRightPanelTab("comments");
+                                    setCanvasCommentDraft({
+                                      input: {
+                                        target: { kind: "page", pageId },
+                                        anchor: {
+                                          domPath: "canvas-page",
+                                          tagName: "canvas-page",
+                                          componentName: pageName,
+                                          textSnippet: pageName,
+                                          snapshot: {
+                                            attrs: { "data-page-id": pageId },
+                                          },
+                                        },
+                                        pin,
+                                      },
+                                      clientX,
+                                      clientY,
+                                    });
+                                  }
+                                : undefined,
+                              onCanvasClick: () => {
+                                clearCanvasSelection();
+                                setCanvasEditingPageId(null);
+                                setConfigPanelDetailPageId(null);
+                                setConfigPanelOverviewRequested(true);
+                              },
+                            }}
+                            renderSingleContent={({
+                              activePage,
+                              resolvedPreviewSize,
+                            }) => {
+                              if (
+                                singlePreviewViewingDocument &&
+                                activeSinglePreviewDocumentNode
+                              ) {
+                                return (
+                                  <div className="h-full overflow-y-auto p-4">
+                                    <div className="mx-auto flex h-full max-w-4xl flex-col overflow-hidden rounded-md border bg-background shadow-sm">
+                                      <CanvasDocumentContent
+                                        node={activeSinglePreviewDocumentNode}
+                                        className="min-h-0 flex-1"
+                                        contentClassName="px-6 py-5 text-sm"
+                                        onActiveDocumentChange={
+                                          handleSinglePreviewDocumentActiveChange
+                                        }
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              if (
+                                activePage?.runtimeType === "sketch-scene" &&
+                                sketchEditing
+                              ) {
+                                return (
+                                  <div className="h-full overflow-y-auto p-4">
+                                    <div className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-md border bg-background shadow-sm">
+                                      <div className="min-h-0 flex-1 overflow-hidden">
+                                        <SketchEditorEngineStage
+                                          scene={activeSketchScene}
+                                          configData={configData}
+                                          previewSize={resolvedPreviewSize}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return undefined;
+                            }}
+                          />
+                        </HtmlFileDropZone>
+                      </CommentLayer>
+                    </>
                   )}
-                  <TabsContent
-                    value="comments"
-                    className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
-                  >
-                    <CommentPanel
-                      threads={commentsData.threads}
+                </div>
+                {(isInitialPageLoading || initialPageError) && (
+                  <div className="absolute inset-0 z-30 flex items-center justify-center bg-background/85 backdrop-blur-sm">
+                    {isInitialPageLoading ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        正在加载当前页…
+                      </div>
+                    ) : (
+                      <div className="max-w-sm space-y-3 px-6 text-center">
+                        <p className="text-sm font-medium">当前页加载失败</p>
+                        <p className="text-xs text-muted-foreground">
+                          {initialPageError}
+                        </p>
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            setLoadAttempt((current) => current + 1)
+                          }
+                        >
+                          <RefreshCw className="mr-2 h-3.5 w-3.5" />
+                          重试
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </ResizablePanel>
+
+              {isConfigPanelVisible && (
+                <ResizablePanel className="relative flex flex-col overflow-hidden border-l bg-card">
+                  {previewMode === "document" ? (
+                    <DocumentModeRightPanel
+                      target={activeDocumentCommentTarget}
+                      threads={documentCommentsData.threads}
                       currentUserId={currentUserId || undefined}
+                      currentUser={commentUser}
+                      mentionCandidates={[]}
+                      canMentionAgent={true}
                       activeThreadId={activeCommentThreadId}
                       onSelectThread={(id) => {
                         setActiveCommentThreadId(id);
                         setCommentModeActive(false);
                       }}
-                      commentMode={commentModeActive}
-                      onCommentModeChange={setCommentModeActive}
-                      createHint="点击画布页面后，直接添加页面级评论"
+                      onCreateComment={documentCommentsData.createComment}
+                      selectionDraft={documentCommentSelection}
+                      onSelectionDraftHandled={() =>
+                        setDocumentCommentSelection(null)
+                      }
+                      unresolvedCount={
+                        documentCommentsData.threads.filter(
+                          (thread) => !thread.resolved,
+                        ).length
+                      }
                     />
-                  </TabsContent>
-                </Tabs>
+                  ) : previewMode === "single" ? (
+                    <>
+                      <Tabs
+                        value={effectiveRightPanelTab}
+                        onValueChange={(v) =>
+                          setRightPanelTab(v as "edit" | "config" | "comments")
+                        }
+                        className="flex h-full flex-col"
+                      >
+                        <TabsList className="w-full justify-start gap-2 rounded-none border-b px-2 h-12 bg-transparent">
+                          {canUseVisualEditor && (
+                            <TabsTrigger
+                              value="edit"
+                              title="编辑"
+                              className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                            >
+                              <SquarePen className="h-4 w-4" />
+                              {rightPanelTab === "edit" && <span>编辑</span>}
+                            </TabsTrigger>
+                          )}
+                          <TabsTrigger
+                            value="config"
+                            title="配置"
+                            className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                          >
+                            <SlidersHorizontal className="h-4 w-4" />
+                            {rightPanelTab === "config" && <span>配置</span>}
+                          </TabsTrigger>
+                          <TabsTrigger
+                            value="comments"
+                            title={commentTabLabel}
+                            aria-label={commentTabLabel}
+                            className="relative gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                          >
+                            <MessageSquare className="h-4 w-4" />
+                            {rightPanelTab === "comments" && <span>评论</span>}
+                            <CommentUnreadDot count={unresolvedCommentCount} />
+                          </TabsTrigger>
+                        </TabsList>
+                        {canUseVisualEditor && (
+                          <TabsContent
+                            value="edit"
+                            className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
+                          >
+                            <VisualEditSidebar
+                              layerNodes={visualLayerTreeNodes}
+                              selectedNodeId={
+                                selectedVisualNode?.domPath ||
+                                selectedVisualNode?.nodeId ||
+                                null
+                              }
+                              hiddenNodeIds={hiddenVisualNodeIds}
+                              getNodeBadgeCount={getVisualNodeChangeCount}
+                              onSelectLayer={(node, path) => {
+                                handleVisualSelect(node, path);
+                              }}
+                              onToggleNodeHidden={handleToggleVisualNodeHidden}
+                              onHoverLayerNodeId={setVisualPanelHoverNodeId}
+                              onAddNodeToChat={handleAddNodeToChat}
+                            >
+                              <VisualPropertyPanel
+                                selectedNode={selectedVisualNode}
+                                sessionId={sessionId}
+                                projectId={demoId}
+                                pageId={activeDemoId}
+                                runtimeType={activeDemoPage?.runtimeType}
+                                propertyChanges={visualPropertyChanges}
+                                configMarks={visualConfigMarks}
+                                aiInstruction={visualAiInstruction}
+                                usedConfigKeys={visualConfigUsedKeys}
+                                onPropertyChange={handleVisualPropertyChange}
+                                onRestoreProperty={handleRestoreVisualProperty}
+                                onClearChanges={
+                                  handleClearSelectedVisualProperties
+                                }
+                                onMarkConfig={handleMarkVisualConfig}
+                                onUpdateConfigMark={
+                                  handleUpdateVisualConfigMark
+                                }
+                                onRemoveConfigMark={
+                                  handleRemoveVisualConfigMark
+                                }
+                                onAiInstructionChange={setVisualAiInstruction}
+                                draftAction={visualDraftAction}
+                                draftActionDisabled={visualSendDisabled}
+                                onDraftActionPrimary={
+                                  handleSubmitVisualDraftAction
+                                }
+                                onDraftActionCancel={
+                                  handleClearVisualProperties
+                                }
+                                onAddToChat={handleAddToChat}
+                              />
+                            </VisualEditSidebar>
+                          </TabsContent>
+                        )}
+                        <TabsContent
+                          value="config"
+                          className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
+                        >
+                          <PageConfigPanel
+                            pages={demoPages.map((page) => ({
+                              id: page.id,
+                              name: page.name,
+                              order: page.order,
+                              schema:
+                                pageSchemaMap[page.id] ||
+                                (page.id === activeDemoId ? schema : undefined),
+                              configData: configDataMap[page.id],
+                              projectConfigSchema:
+                                referencePageProjectSchemas[page.id],
+                              designSpecEntries:
+                                referencePageDesignSpecEntries[page.id],
+                              projectConfigBindings:
+                                page.runtimeType === "prototype-html-css"
+                                  ? extractPrototypeConfigBindingKeys(
+                                      pagePrototypeMap[page.id]?.html,
+                                    )
+                                  : page.runtimeType ===
+                                        "high-fidelity-react" ||
+                                      page.runtimeType === "sketch-scene"
+                                    ? extractCodeConfigBindingKeys(
+                                        pageCodes[page.id],
+                                        getSchemaPropertyKeys(
+                                          referencePageProjectSchemas[
+                                            page.id
+                                          ] ?? projectConfigSchema,
+                                        ),
+                                      )
+                                    : [],
+                            }))}
+                            activePageId={activeDemoId}
+                            detailPageId={activeDemoId}
+                            onDetailPageIdChange={(pageId) => {
+                              setConfigPanelDetailPageId(pageId);
+                            }}
+                            onPageSelect={(pageId, options) =>
+                              void handleConfigPanelPageSelect(
+                                pageId,
+                                undefined,
+                                {
+                                  openConfigDetail: options?.openConfigDetail,
+                                },
+                              )
+                            }
+                            projectConfigSchema={projectConfigSchema}
+                            onProjectConfigChange={
+                              handleProjectConfigPanelChange
+                            }
+                            onProjectSchemaChange={handleProjectSchemaChange}
+                            onProjectDefinitionChange={
+                              handleProjectDefinitionChange
+                            }
+                            onDefinitionSendToAI={
+                              handleConfigDefinitionSendToAI
+                            }
+                            onDefinitionAnalyze={handleConfigDefinitionAnalyze}
+                            onPageConfigChange={handlePageConfigPanelChange}
+                            onPageSchemaChange={handlePageSchemaChange}
+                            onPageDefinitionChange={handlePageDefinitionChange}
+                            onSaveAsDefaults={
+                              activeDemoPage?.reference
+                                ? undefined
+                                : handleSaveAsDefaults
+                            }
+                            onRestoreDefaults={
+                              activeDemoPage?.reference
+                                ? undefined
+                                : handleRestoreDefaults
+                            }
+                            onProjectSaveAsDefaults={
+                              handleProjectSaveAsDefaults
+                            }
+                            onProjectRestoreDefaults={
+                              handleProjectRestoreDefaults
+                            }
+                            sessionId={sessionId}
+                            onLaunchWhiteboard={
+                              WHITEBOARD_AUTHORING_ENABLED
+                                ? launchWhiteboard
+                                : undefined
+                            }
+                            hideDetailHeader
+                            onEnterPositionEdit={handleEnterPositionEdit}
+                            onPositionFieldPathChange={
+                              handlePositionFieldPathChange
+                            }
+                            onExitPositionEdit={handleExitPositionEdit}
+                            positionEditActiveId={
+                              positionEditMode.target?.id ?? null
+                            }
+                            positionEditDimming={positionEditDimming}
+                            onTogglePositionDimming={
+                              handleTogglePositionDimming
+                            }
+                            requirements={
+                              activeDemoPage?.reference
+                                ? (referencePageRequirements[activeDemoId] ??
+                                  "")
+                                : (requirementsMap[activeDemoId] ?? "")
+                            }
+                            onRequirementsChange={(markdown) =>
+                              handlePageRequirementsChange(
+                                activeDemoId,
+                                markdown,
+                              )
+                            }
+                            requirementsLoading={requirementsLoading}
+                            requirementsPosition="hidden"
+                            readonly={!!activeDemoPage?.reference}
+                            designSpecApiContext={{
+                              workingDir: workspacePath || undefined,
+                              sessionId,
+                              projectId: demoId,
+                            }}
+                            onEditDesignSpec={(docId, entryId) => {
+                              setDesignSpecFocus({ docId, entryId });
+                              setPreviewMode("document");
+                            }}
+                          />
+                        </TabsContent>
+                        <TabsContent
+                          value="comments"
+                          className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
+                        >
+                          <CommentPanel
+                            threads={activePageCommentThreads}
+                            currentUserId={currentUserId || undefined}
+                            activeThreadId={activeCommentThreadId}
+                            onSelectThread={(id) => {
+                              setActiveCommentThreadId(id);
+                              setCommentModeActive(false);
+                            }}
+                            commentMode={commentModeActive}
+                            onCommentModeChange={setCommentModeActive}
+                          />
+                        </TabsContent>
+                      </Tabs>
+                    </>
+                  ) : (
+                    <Tabs
+                      value={canvasRightPanelTab}
+                      onValueChange={(v) =>
+                        setRightPanelTab(v as "config" | "comments")
+                      }
+                      className="flex h-full flex-col"
+                    >
+                      <TabsList className="w-full justify-start gap-2 rounded-none border-b px-2 h-12 bg-transparent">
+                        {hasAnyConfig && (
+                          <TabsTrigger
+                            value="config"
+                            title="配置"
+                            className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                          >
+                            <SlidersHorizontal className="h-4 w-4" />
+                            {canvasRightPanelTab === "config" && (
+                              <span>配置</span>
+                            )}
+                          </TabsTrigger>
+                        )}
+                        <TabsTrigger
+                          value="comments"
+                          title={commentTabLabel}
+                          aria-label={commentTabLabel}
+                          className="relative gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                          {canvasRightPanelTab === "comments" && (
+                            <span>评论</span>
+                          )}
+                          <CommentUnreadDot count={unresolvedCommentCount} />
+                        </TabsTrigger>
+                      </TabsList>
+                      {hasAnyConfig && (
+                        <TabsContent
+                          value="config"
+                          className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
+                        >
+                          <PageConfigPanel
+                            pages={demoPages.map((page) => ({
+                              id: page.id,
+                              name: page.name,
+                              order: page.order,
+                              schema:
+                                pageSchemaMap[page.id] ||
+                                (page.id === activeDemoId ? schema : undefined),
+                              configData: configDataMap[page.id],
+                              projectConfigSchema:
+                                referencePageProjectSchemas[page.id],
+                              designSpecEntries:
+                                referencePageDesignSpecEntries[page.id],
+                              projectConfigBindings:
+                                page.runtimeType === "prototype-html-css"
+                                  ? extractPrototypeConfigBindingKeys(
+                                      pagePrototypeMap[page.id]?.html,
+                                    )
+                                  : page.runtimeType ===
+                                        "high-fidelity-react" ||
+                                      page.runtimeType === "sketch-scene"
+                                    ? extractCodeConfigBindingKeys(
+                                        pageCodes[page.id],
+                                        getSchemaPropertyKeys(
+                                          referencePageProjectSchemas[
+                                            page.id
+                                          ] ?? projectConfigSchema,
+                                        ),
+                                      )
+                                    : [],
+                            }))}
+                            activePageId={activeDemoId}
+                            detailPageId={
+                              configPanelOverviewRequested
+                                ? configPanelDetailPageId
+                                : (configPanelDetailPageId ?? activeDemoId)
+                            }
+                            onDetailPageIdChange={(pageId) => {
+                              setConfigPanelDetailPageId(pageId);
+                              setConfigPanelOverviewRequested(pageId === null);
+                              if (pageId === null && previewMode === "canvas") {
+                                clearCanvasSelection();
+                              }
+                            }}
+                            onPageSelect={(pageId, options) =>
+                              void handleConfigPanelPageSelect(
+                                pageId,
+                                undefined,
+                                {
+                                  openConfigDetail: options?.openConfigDetail,
+                                },
+                              )
+                            }
+                            hideOverviewHeader
+                            projectConfigSchema={projectConfigSchema}
+                            onProjectConfigChange={
+                              handleProjectConfigPanelChange
+                            }
+                            onProjectSchemaChange={handleProjectSchemaChange}
+                            onProjectDefinitionChange={
+                              handleProjectDefinitionChange
+                            }
+                            onDefinitionSendToAI={
+                              handleConfigDefinitionSendToAI
+                            }
+                            onDefinitionAnalyze={handleConfigDefinitionAnalyze}
+                            onPageConfigChange={handlePageConfigPanelChange}
+                            requirementsPosition="hidden"
+                            onPageSchemaChange={handlePageSchemaChange}
+                            onPageDefinitionChange={handlePageDefinitionChange}
+                            onSaveAsDefaults={
+                              activeDemoPage?.reference
+                                ? undefined
+                                : handleSaveAsDefaults
+                            }
+                            onRestoreDefaults={
+                              activeDemoPage?.reference
+                                ? undefined
+                                : handleRestoreDefaults
+                            }
+                            onProjectSaveAsDefaults={
+                              handleProjectSaveAsDefaults
+                            }
+                            onProjectRestoreDefaults={
+                              handleProjectRestoreDefaults
+                            }
+                            sessionId={sessionId}
+                            onLaunchWhiteboard={
+                              WHITEBOARD_AUTHORING_ENABLED
+                                ? launchWhiteboard
+                                : undefined
+                            }
+                            onEnterPositionEdit={handleEnterPositionEdit}
+                            onPositionFieldPathChange={
+                              handlePositionFieldPathChange
+                            }
+                            onExitPositionEdit={handleExitPositionEdit}
+                            positionEditActiveId={
+                              positionEditMode.target?.id ?? null
+                            }
+                            positionEditDimming={positionEditDimming}
+                            onTogglePositionDimming={
+                              handleTogglePositionDimming
+                            }
+                            requirements={
+                              requirementsMap[
+                                configPanelDetailPageId ?? activeDemoId
+                              ] ?? ""
+                            }
+                            onRequirementsChange={(markdown) =>
+                              handlePageRequirementsChange(
+                                configPanelDetailPageId ?? activeDemoId,
+                                markdown,
+                              )
+                            }
+                            requirementsLoading={requirementsLoading}
+                            readonly={!!activeDemoPage?.reference}
+                            designSpecApiContext={{
+                              workingDir: workspacePath || undefined,
+                              sessionId,
+                              projectId: demoId,
+                            }}
+                            onEditDesignSpec={(docId, entryId) => {
+                              setDesignSpecFocus({ docId, entryId });
+                              setPreviewMode("document");
+                            }}
+                          />
+                        </TabsContent>
+                      )}
+                      <TabsContent
+                        value="comments"
+                        className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
+                      >
+                        <CommentPanel
+                          threads={activePageCommentThreads}
+                          currentUserId={currentUserId || undefined}
+                          activeThreadId={activeCommentThreadId}
+                          onSelectThread={(id) => {
+                            setActiveCommentThreadId(id);
+                            setCommentModeActive(false);
+                          }}
+                          commentMode={commentModeActive}
+                          onCommentModeChange={setCommentModeActive}
+                          createHint="点击画布页面后，直接添加页面级评论"
+                        />
+                      </TabsContent>
+                    </Tabs>
+                  )}
+                </ResizablePanel>
               )}
-            </ResizablePanel>
-          )}
-        </ResizablePanelGroup>
-        </SketchEditorEngineBoundary>
+            </ResizablePanelGroup>
+          </SketchEditorEngineBoundary>
         </DesignSpecWorkspaceProvider>
       </div>
 
@@ -9583,7 +10113,9 @@ await handlePublishWithScreenshot();
           projectId={demoId}
           sessionId={sessionId}
           target={whiteboardTarget}
-          onOpenChange={(open) => { if (!open) setWhiteboardTarget(null); }}
+          onOpenChange={(open) => {
+            if (!open) setWhiteboardTarget(null);
+          }}
           onCommitted={handleWhiteboardCommitted}
           onDiagnosticEvent={recordDiagnosticEvent}
         />
@@ -9605,7 +10137,8 @@ await handlePublishWithScreenshot();
         applyPlan={{
           kind: "bind_and_apply",
           title: "保存并应用",
-          description: "将所选属性设为配置项，并尝试直接应用到页面。无法安全直写时会交给 AI 处理。",
+          description:
+            "将所选属性设为配置项，并尝试直接应用到页面。无法安全直写时会交给 AI 处理。",
         }}
         formPrefix={
           <div className="space-y-3">
@@ -9636,7 +10169,9 @@ await handlePublishWithScreenshot();
                     : ""}
                 </div>
                 {visualConfigNode.textContent && (
-                  <div className="mt-1 truncate">文本：{visualConfigNode.textContent}</div>
+                  <div className="mt-1 truncate">
+                    文本：{visualConfigNode.textContent}
+                  </div>
                 )}
               </div>
             )}
@@ -9655,13 +10190,17 @@ await handlePublishWithScreenshot();
                 className="h-8 w-8 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
                 type="color"
                 value={visualConfigDefaultValue || "#000000"}
-                onChange={(event) => setVisualConfigDefaultValue(event.target.value)}
+                onChange={(event) =>
+                  setVisualConfigDefaultValue(event.target.value)
+                }
               />
             )}
             <Input
               aria-label="默认值"
               value={visualConfigDefaultValue}
-              onChange={(event) => setVisualConfigDefaultValue(event.target.value)}
+              onChange={(event) =>
+                setVisualConfigDefaultValue(event.target.value)
+              }
               className="font-mono text-xs"
             />
           </div>
@@ -9823,7 +10362,10 @@ await handlePublishWithScreenshot();
         </DialogContent>
       </Dialog>
 
-      <Dialog open={saveVersionDialogOpen} onOpenChange={setSaveVersionDialogOpen}>
+      <Dialog
+        open={saveVersionDialogOpen}
+        onOpenChange={setSaveVersionDialogOpen}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>保存为版本</DialogTitle>
@@ -9843,7 +10385,9 @@ await handlePublishWithScreenshot();
                 if (e.key === "Enter") {
                   e.preventDefault();
                   setSaveVersionDialogOpen(false);
-void handleCreateVersionWithScreenshot(versionNameInput || undefined);
+                  void handleCreateVersionWithScreenshot(
+                    versionNameInput || undefined,
+                  );
                   setVersionNameInput("");
                 }
               }}
@@ -9863,7 +10407,9 @@ void handleCreateVersionWithScreenshot(versionNameInput || undefined);
             <Button
               onClick={() => {
                 setSaveVersionDialogOpen(false);
-                void handleCreateVersionWithScreenshot(versionNameInput || undefined);
+                void handleCreateVersionWithScreenshot(
+                  versionNameInput || undefined,
+                );
                 setVersionNameInput("");
               }}
             >
@@ -9886,7 +10432,7 @@ void handleCreateVersionWithScreenshot(versionNameInput || undefined);
                   正在保存最新修改，完成后将自动返回首页。
                 </>
               ) : (
-                exitErrorLabel ?? "最新修改尚未确认同步完成。"
+                (exitErrorLabel ?? "最新修改尚未确认同步完成。")
               )}
             </DialogDescription>
           </DialogHeader>
@@ -9916,7 +10462,10 @@ void handleCreateVersionWithScreenshot(versionNameInput || undefined);
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setShowUnpublishDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowUnpublishDialog(false)}
+            >
               取消
             </Button>
             <Button
@@ -9939,7 +10488,6 @@ void handleCreateVersionWithScreenshot(versionNameInput || undefined);
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
     </div>
   );
 }

@@ -36,6 +36,23 @@ function renderOverlay() {
 }
 
 describe("PageNavigationOverlay", () => {
+  it("keeps the standard cursor when editable hotspots are visible outside navigation mode", () => {
+    const { container } = render(
+      <div className="relative h-[100px] w-[100px]">
+        <PageNavigationOverlay
+          pageId="source"
+          pages={[{ id: "source", name: "来源页", order: 0 }]}
+          visible
+          editable
+        />
+      </div>,
+    );
+
+    const overlay = container.querySelector(".absolute.inset-0.z-30");
+    expect(overlay).toHaveClass("cursor-default");
+    expect(overlay).not.toHaveClass("cursor-crosshair");
+  });
+
   it("turns a click into an invisible point anchor and opens the page menu", () => {
     const { onCreate, onPendingTargetChange, overlay } = renderOverlay();
     fireEvent(overlay, new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 50, clientY: 50 }));

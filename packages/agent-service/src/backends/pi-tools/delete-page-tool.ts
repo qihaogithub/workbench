@@ -142,6 +142,7 @@ export interface PermissionRequestInfo {
 export type PermissionHandler = (
   toolCallId: string,
   request: PermissionRequestInfo,
+  signal?: AbortSignal,
 ) => Promise<boolean>;
 
 export function createDeletionPlanStore(
@@ -800,7 +801,7 @@ export function createExecuteDeletePagePlanTool(
     description:
       "Execute a page deletion plan returned by previewDeletePages. Never pass page IDs directly to this tool.",
     parameters: ExecuteDeletePagePlanParams,
-    execute: async (toolCallId: string, args: ExecuteDeletePagePlanParams) => {
+    execute: async (toolCallId: string, args: ExecuteDeletePagePlanParams, signal?: AbortSignal) => {
       const workingDir = getWorkingDir(config);
       if (!workingDir) {
         return {
@@ -874,11 +875,14 @@ export function createExecuteDeletePagePlanTool(
         }
 
         if (permissionHandler) {
-          const approved = await permissionHandler(toolCallId, {
+          const permissionRequest = {
             title: `删除 ${plan.pages.length} 个页面`,
             summary: plan.confirmationSummary,
             planId: plan.planId,
-          });
+          };
+          const approved = signal
+            ? await permissionHandler(toolCallId, permissionRequest, signal)
+            : await permissionHandler(toolCallId, permissionRequest);
           if (!approved) {
             return {
               content: [
@@ -942,7 +946,7 @@ export function createDeletePageTool(
     description:
       "Delete exactly one existing page by exact ID from listPages. Do not use this for batch/all/multiple page deletion; use deletePages instead.",
     parameters: DeletePageParams,
-    execute: async (toolCallId: string, args: DeletePageParams) => {
+    execute: async (toolCallId: string, args: DeletePageParams, signal?: AbortSignal) => {
       const workingDir = getWorkingDir(config);
       if (!workingDir) {
         return {
@@ -965,9 +969,12 @@ export function createDeletePageTool(
         }
 
         if (permissionHandler) {
-          const approved = await permissionHandler(toolCallId, {
+          const permissionRequest = {
             title: `删除页面: ${page.name} (${page.id})`,
-          });
+          };
+          const approved = signal
+            ? await permissionHandler(toolCallId, permissionRequest, signal)
+            : await permissionHandler(toolCallId, permissionRequest);
           if (!approved) {
             return {
               content: [
@@ -1025,7 +1032,7 @@ export function createDeletePagesTool(
     description:
       'Delete multiple existing pages by exact pageIds from listPages. Use this for any batch/all/multiple deletion request, including "delete all copy pages". This asks for confirmation once.',
     parameters: DeletePagesParams,
-    execute: async (toolCallId: string, args: DeletePagesParams) => {
+    execute: async (toolCallId: string, args: DeletePagesParams, signal?: AbortSignal) => {
       const workingDir = getWorkingDir(config);
       if (!workingDir) {
         return {
@@ -1065,10 +1072,13 @@ export function createDeletePagesTool(
           })
           .join(", ");
         if (permissionHandler) {
-          const approved = await permissionHandler(toolCallId, {
+          const permissionRequest = {
             title: `删除 ${requestedIds.length} 个页面`,
             summary: confirmLabel,
-          });
+          };
+          const approved = signal
+            ? await permissionHandler(toolCallId, permissionRequest, signal)
+            : await permissionHandler(toolCallId, permissionRequest);
           if (!approved) {
             return {
               content: [
