@@ -276,17 +276,16 @@ function updateSelectedLabel(
   }
   const rect = element.getBoundingClientRect();
   const hostRect = host.getBoundingClientRect();
-  // 标签位于被 transform: scale() 包裹的 Shadow DOM 中，position:fixed 退化为相对
-  // transform 祖先定位。getBoundingClientRect 差值已含缩放，需除回 scale，避免偏移被
-  // 二次叠加导致标签偏离元素边界（与高保真 iframe 视觉对齐）。
+  // 标签在宿主内使用 absolute 定位。getBoundingClientRect 的差值包含缩放，
+  // 因此要除回设计坐标；再叠加宿主滚动量，保证缩放和未缩放两种布局都落在元素上方。
   const scaledParent = host.parentElement;
   const scale =
     scaledParent && scaledParent.offsetWidth > 0
       ? scaledParent.getBoundingClientRect().width / scaledParent.offsetWidth
       : 1;
   label.style.display = "block";
-  label.style.left = `${Math.max(4, (rect.left - hostRect.left) / scale)}px`;
-  label.style.top = `${Math.max(4, (rect.top - hostRect.top) / scale - 24)}px`;
+  label.style.left = `${Math.max(4, (rect.left - hostRect.left) / scale + host.scrollLeft)}px`;
+  label.style.top = `${Math.max(4, (rect.top - hostRect.top) / scale + host.scrollTop - 24)}px`;
   label.textContent = formatSelectedLabel(element);
 }
 
@@ -1202,7 +1201,7 @@ export function PrototypePagePreview({
     <div
       ref={hostRef}
       className={cn(
-        "h-full w-full overflow-auto bg-white",
+        "relative h-full w-full overflow-auto bg-white",
         !shouldScaleToPreviewSize && className,
       )}
       style={shouldScaleToPreviewSize ? { scrollbarWidth: "none", msOverflowStyle: "none" } as React.CSSProperties : undefined}

@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { rmSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 import { platform } from "node:os";
 
@@ -13,6 +13,7 @@ const NEXT_CACHE_DIRS = [
 const clearCache = process.argv.slice(2).includes("--clear-cache");
 const lite = process.argv.slice(2).includes("--lite");
 const isWin = platform() === "win32";
+const dataDir = resolve(process.env.DATA_DIR || "data");
 
 const unknownArgs = process.argv
   .slice(2)
@@ -163,6 +164,35 @@ async function cleanPorts() {
   await terminatePids(pids);
 }
 
+/**
+ * Remove leases left by a crashed/killed local dev service.
+ * Active leases are retained so Workspace Authority remains fail-closed.
+ */
+function cleanStaleWorkspaceLeases() {
+  const leasesDir = resolve(dataDir, "workspace-authority", "leases");
+  if (!existsSync(leasesDir)) return;
+
+  let cleaned = 0;
+  for (const entry of readdirSync(leasesDir)) {
+    if (!entry.endsWith(".lock")) continue;
+    const lockPath = resolve(leasesDir, entry);
+    try {
+      const token = readFileSync(lockPath, "utf8").trim();
+      const separator = token.indexOf(":");
+      const pid = separator > 0 ? Number.parseInt(token.slice(0, separator), 10) : NaN;
+      if (!Number.isInteger(pid) || pid <= 0 || !isRunning(pid)) {
+        rmSync(lockPath, { force: true });
+        cleaned++;
+      }
+    } catch {
+      // A concurrently removed or unreadable lock is not actionable here.
+    }
+  }
+  if (cleaned > 0) {
+    console.log(`[dev-restart] Removed ${cleaned} stale Workspace Authority lease(s).`);
+  }
+}
+
 function cleanNextCaches() {
   for (const dir of NEXT_CACHE_DIRS) {
     rmSync(dir, { recursive: true, force: true });
@@ -202,6 +232,7 @@ function startDevServices() {
 
 try {
   await cleanPorts();
+  cleanStaleWorkspaceLeases();
   if (clearCache) {
     cleanNextCaches();
   } else {

@@ -199,8 +199,7 @@ describe("project demos route live Workspace writes", () => {
     expect(createWorkspaceDemoPage).not.toHaveBeenCalled();
     expect(copyWorkspaceDemoPage).not.toHaveBeenCalled();
     expect(fs.existsSync(path.join(workspacePath, "demos", "new-page_abcd"))).toBe(false);
-    expect(commitWorkspaceMutation).toHaveBeenCalledWith(
-      expect.objectContaining({
+    expect(commitWorkspaceMutation).toHaveBeenCalledWith(expect.objectContaining({
         projectId: "project-1",
         workspaceId: "workspace-1",
         sessionId: "session-1",
@@ -251,6 +250,13 @@ describe("project demos route live Workspace writes", () => {
       '{"type":"object","title":"source"}',
       "utf-8",
     );
+    fs.mkdirSync(path.join(workspacePath, "whiteboards"), { recursive: true });
+    fs.writeFileSync(path.join(workspacePath, "whiteboards", "wb_source.json"), JSON.stringify({
+      id: "wb_source", version: 1, scene: { version: 1, pageSize: { width: 100, height: 100 }, nodes: [] }, editorView: { zoom: 1, offsetX: 0, offsetY: 0 }, updatedAt: 1,
+    }), "utf-8");
+    fs.writeFileSync(path.join(workspacePath, "whiteboards", "bindings.json"), JSON.stringify({ bindings: [{
+      id: "binding-source", target: { scope: "page", pageId: "page-1", fieldPath: ["hero"] }, whiteboardId: "wb_source", sceneRevision: 1, outputAssetHash: "hash", updatedAt: 1,
+    }] }), "utf-8");
     const { POST } = await import("./route");
 
     const response = await POST(
@@ -284,31 +290,17 @@ describe("project demos route live Workspace writes", () => {
         sessionId: "session-1",
         actor: "author-site",
         reason: "copy_demo_page",
-        operations: [
-          expect.objectContaining({
-            type: "put_text",
-            path: "demos/new-page_abcd/config.schema.json",
-            content: '{"type":"object","title":"source"}',
-            expectedAbsent: true,
-          }),
-          expect.objectContaining({
-            type: "put_text",
-            path: "demos/new-page_abcd/prototype.html",
-            content: "<main>source</main>",
-            expectedAbsent: true,
-          }),
-          expect.objectContaining({
-            type: "put_text",
-            path: "demos/new-page_abcd/prototype.css",
-            content: ".source { color: red; }",
-            expectedAbsent: true,
-          }),
-          expect.objectContaining({
-            type: "put_text",
-            path: "workspace-tree.json",
-          }),
-        ],
       }),
     );
+    const mutation = (commitWorkspaceMutation.mock.calls as unknown as Array<[{ operations: unknown[] }]>)[0]?.[0];
+    expect(mutation).toBeDefined();
+    if (!mutation) throw new Error("Expected a Workspace mutation");
+    expect(mutation.operations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "put_text", path: "demos/new-page_abcd/config.schema.json", content: '{"type":"object","title":"source"}', expectedAbsent: true }),
+      expect.objectContaining({ type: "put_text", path: "demos/new-page_abcd/prototype.html", content: "<main>source</main>", expectedAbsent: true }),
+      expect.objectContaining({ type: "put_text", path: "demos/new-page_abcd/prototype.css", content: ".source { color: red; }", expectedAbsent: true }),
+      expect.objectContaining({ type: "put_text", path: "whiteboards/bindings.json" }),
+      expect.objectContaining({ type: "put_text", path: "workspace-tree.json" }),
+    ]));
   });
 });

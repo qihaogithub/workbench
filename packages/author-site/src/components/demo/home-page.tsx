@@ -19,6 +19,8 @@ import {
   Search,
   Terminal,
   MessageSquareText,
+  RotateCcw,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -49,8 +51,11 @@ import {
   saveDemoAsTemplate,
   updateProjectTemplate,
   updateDemo,
+  purgeTrashedProject,
+  restoreTrashedProject,
   uploadTemplateCover,
   useDemos,
+  useTrashedProjects,
 } from "@/lib/api";
 import type { DemoMeta } from "@workbench/shared";
 
@@ -62,6 +67,7 @@ const LOAD_SCREENSHOT_METADATA_IMMEDIATELY =
 const SCREENSHOT_METADATA_BATCH_LIMIT = 500;
 type SelectedNav =
   | { type: "all" }
+  | { type: "trash" }
   | { type: "project-category"; category: string; exact?: boolean };
 
 type ProjectFilter = "all" | "templates";
@@ -98,6 +104,15 @@ function formatCategoryPath(value: string): string {
     .map((part) => part.trim())
     .filter(Boolean)
     .join(" / ");
+}
+
+function formatShortDate(timestamp: number): string {
+  const date = new Date(timestamp);
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  const h = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  return `${m}/${d} ${h}:${min}`;
 }
 
 interface CategoryTreeNode {
@@ -230,6 +245,7 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
   const { demos, error, revalidate } = useDemos({
     fallbackData: initialDemos,
   });
+  const { projects: trashedProjects, revalidate: revalidateTrash } = useTrashedProjects();
   const { toast } = useToast();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -369,6 +385,16 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
       return matchesNav && matchesFilter && matchesSearch;
     });
   }, [demos, normalizedQuery, selectedNav, projectFilter]);
+  const filteredTrashedProjects = useMemo(
+    () => trashedProjects.filter((project) => {
+      if (!normalizedQuery) return true;
+      return [project.name, project.category ?? ""]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedQuery);
+    }),
+    [normalizedQuery, trashedProjects],
+  );
 
   // 等首屏稳定后再串行补生截图，避免与路由编译、缩略图读取抢占资源。
   const ensureTriggeredRef = useRef(false);
@@ -562,10 +588,11 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
       : await deleteDemo(deleteTarget.id);
     if (response.success) {
       toast({
-        title: "删除成功",
-        description: `「${deleteTarget.name}」已删除`,
+        title: "已移入回收站",
+        description: `「${deleteTarget.name}」将在 30 天后彻底删除`,
       });
       revalidate();
+      revalidateTrash();
     } else {
       toast({
         variant: "destructive",
@@ -574,6 +601,28 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
       });
     }
     setDeleteTarget(null);
+  };
+
+  const handleRestoreTrash = async (projectId: string, name: string) => {
+    const response = await restoreTrashedProject(projectId);
+    if (response.success) {
+      toast({ title: "恢复成功", description: `「${name}」已恢复为未发布项目` });
+      revalidate();
+      revalidateTrash();
+      return;
+    }
+    toast({ variant: "destructive", title: "恢复失败", description: response.error.message });
+  };
+
+  const handlePurgeTrash = async (projectId: string, name: string) => {
+    if (!window.confirm(`彻底删除「${name}」吗？此操作无法撤销。`)) return;
+    const response = await purgeTrashedProject(projectId);
+    if (response.success) {
+      toast({ title: "已彻底删除", description: `「${name}」无法恢复` });
+      revalidateTrash();
+      return;
+    }
+    toast({ variant: "destructive", title: "彻底删除失败", description: response.error.message });
   };
 
   const handleOpenViewer = () => {
@@ -798,10 +847,53 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
                   ))}
                 </div>
               ))}
+              <NavButton
+                active={selectedNav.type === "trash"}
+                icon={<Trash2 className="h-4 w-4 shrink-0" />}
+                label="回收站"
+                count={trashedProjects.length}
+                onClick={() => setSelectedNav({ type: "trash" })}
+              />
             </nav>
           </aside>
 
           <section className="min-w-0 space-y-4">
+            {selectedNav.type === "trash" ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b pb-3">
+                  <div>
+                    <h1 className="text-lg font-semibold">回收站</h1>
+                    <p className="text-sm text-muted-foreground">项目保留 30 天，到期后自动彻底删除。</p>
+                  </div>
+                </div>
+                {filteredTrashedProjects.length === 0 ? (
+                  <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">回收站为空</div>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredTrashedProjects.map((project) => {
+                      const remainingDays = Math.max(0, Math.ceil((project.purgeAt - Date.now()) / (24 * 60 * 60 * 1000)));
+                      return (
+                        <div key={project.id} className="flex flex-wrap items-center gap-3 rounded-lg border bg-card p-4">
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate font-medium">{project.name}</div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {project.projectType === "template" ? "模板项目" : "普通项目"} · 删除于 {formatShortDate(project.deletedAt)} · 剩余 {remainingDays} 天
+                            </div>
+                          </div>
+                          <Button size="sm" variant="outline" className="gap-1" onClick={() => handleRestoreTrash(project.id, project.name)}>
+                            <RotateCcw className="h-3.5 w-3.5" />恢复
+                          </Button>
+                          <Button size="sm" variant="destructive" className="gap-1" onClick={() => handlePurgeTrash(project.id, project.name)}>
+                            <Trash2 className="h-3.5 w-3.5" />彻底删除
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : (
+            <>
             <div className="sticky top-20 z-10 flex items-center gap-2 border-b bg-background pb-3">
               <button
                 type="button"
@@ -855,6 +947,8 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
                   />
                 ))}
             </div>
+            </>
+            )}
           </section>
         </div>
 

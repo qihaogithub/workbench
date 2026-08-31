@@ -1,4 +1,10 @@
 import type { PreviewStagePage } from "@workbench/demo-ui";
+import {
+  createPagePresentationProfile,
+  isValidPagePresentationViewport,
+  resolvePagePresentation,
+} from "@workbench/shared";
+import type { PagePresentationProfile } from "@workbench/shared";
 
 import {
   DATA_BASE,
@@ -14,6 +20,43 @@ interface CreatePublishedPreviewStagePageInput {
   configData?: Record<string, unknown>;
   schema?: string;
   sandboxExecution?: PublishedHtmlExecution;
+}
+
+function parseLegacyPreviewDimension(value: unknown): number | undefined {
+  if (typeof value === "number") {
+    return Number.isInteger(value) && value > 0 ? value : undefined;
+  }
+  if (typeof value !== "string") return undefined;
+  const parsed = Number.parseFloat(value.replace(/px$/, ""));
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+/**
+ * Published packages created before the presentation protocol only carry
+ * previewSize. Migrate that value at the viewer boundary so those packages do
+ * not silently render with the 375x812 mobile default. New presentation data
+ * always wins and remains the canonical value.
+ */
+function resolvePublishedPresentation(
+  page: PublishedDemoPage,
+  schema?: string,
+): PagePresentationProfile | undefined {
+  const canonical =
+    page.presentation ?? (schema ? resolvePagePresentation(schema) : undefined);
+  if (canonical) return canonical;
+
+  const width = parseLegacyPreviewDimension(page.previewSize?.width);
+  const height = parseLegacyPreviewDimension(page.previewSize?.height);
+  if (width === undefined || height === undefined) return undefined;
+  const viewport = { width, height };
+  if (!isValidPagePresentationViewport(viewport)) return undefined;
+
+  return createPagePresentationProfile({
+    mode: "responsive-page",
+    viewport,
+    heightBehavior: "content",
+    source: "user",
+  });
 }
 
 /**
@@ -41,6 +84,7 @@ export function createPublishedPreviewStagePage({
   sandboxExecution,
 }: CreatePublishedPreviewStagePageInput): PreviewStagePage {
   const runtimeType = page.runtimeType ?? "high-fidelity-react";
+  const presentation = resolvePublishedPresentation(page, schema);
   const runtimeData =
     runtimeType === "prototype-html-css"
       ? {
@@ -77,7 +121,7 @@ export function createPublishedPreviewStagePage({
     ...runtimeData,
     configData,
     schema,
-    presentation: page.presentation,
-    previewSize: page.presentation?.viewport ?? page.previewSize,
+    presentation,
+    previewSize: presentation?.viewport,
   };
 }

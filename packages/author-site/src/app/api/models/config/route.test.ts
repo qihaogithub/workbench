@@ -55,4 +55,24 @@ describe("GET /api/models/config", () => {
     });
     expect(readUserBackendProvidersConfig).toHaveBeenCalledWith("user-1");
   });
+
+  it("keeps global model configuration available when a personal API key can no longer be decrypted", async () => {
+    readUserBackendProvidersConfig.mockImplementation(() => {
+      throw new Error("Unsupported state or unable to authenticate data");
+    });
+    const { GET } = await import("./route");
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      success: true,
+      data: {
+        frontend: {
+          enabledModels: ["admin/default"],
+        },
+      },
+    });
+  });
 });

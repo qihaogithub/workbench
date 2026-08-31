@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   ArrowLeft,
   ChevronDown,
@@ -8,9 +9,11 @@ import {
   FileText,
   ListFilter,
   MoreHorizontal,
+  Pencil,
   Plus,
   RotateCcw,
   Save,
+  X,
 } from "lucide-react";
 import { ConfigForm } from "./ConfigForm";
 import { ConfigScopeWrapper } from "./ConfigScopeWrapper";
@@ -30,7 +33,7 @@ import {
   getSchemaFieldCountByCategory,
 } from "./config-categories";
 import { cn } from "./utils";
-import type { DesignSpecEntryLink, PositionableSizeItem } from "./types";
+import type { DesignSpecEntryLink, PositionableSizeItem, WhiteboardLauncher } from "./types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -77,6 +80,22 @@ type DefinitionEditorState = {
   originalKey?: string;
 };
 
+type ActiveDesignSpec = {
+  spec: DesignSpecEntryLink;
+  fieldTitle: string;
+  anchor?: { top: number; bottom: number };
+};
+
+type DesignSpecPanelBounds = {
+  top: number;
+  left: number;
+  height: number;
+  /** 配置栏左侧可供气泡使用的宽度。 */
+  availableLeftWidth: number;
+  anchorTop?: number;
+  anchorBottom?: number;
+};
+
 function newConfigDefinitionDraft(schema: string): ConfigDefinitionDraft {
   const keys = new Set(readConfigDefinitionFields(schema).map((field) => field.key));
   let index = 1;
@@ -97,7 +116,7 @@ function buildDefaultValueSchema(draft: ConfigDefinitionDraft) {
   return JSON.stringify({ type: "object", properties: { [draft.key]: property } });
 }
 
-interface PageConfigPanelProps {
+export interface PageConfigPanelProps {
   pages: PageConfigPanelPage[];
   activePageId?: string;
   detailPageId?: string | null;
@@ -146,6 +165,8 @@ interface PageConfigPanelProps {
   mediaBaseUrl?: string;
   /** 创作端设计规范 API 上下文；提供后面板会按需读取绑定。 */
   designSpecApiContext?: { workingDir?: string; sessionId?: string; projectId?: string };
+  /** 无 IO 白板启动 capability；仅创作端宿主提供。 */
+  onLaunchWhiteboard?: WhiteboardLauncher;
 }
 
 function getSortedPages(pages: PageConfigPanelPage[]) {
@@ -335,6 +356,7 @@ export function PageConfigPanel({
   onEditDesignSpec,
   designSpecApiContext,
   mediaBaseUrl,
+  onLaunchWhiteboard,
 }: PageConfigPanelProps) {
   const [internalDetailPageId, setInternalDetailPageId] = useState<
     string | null
@@ -346,6 +368,11 @@ export function PageConfigPanel({
   const [requirementsDraft, setRequirementsDraft] = useState("");
   const [loadedDesignSpecEntries, setLoadedDesignSpecEntries] = useState<DesignSpecEntryLink[]>([]);
   const [definitionEditor, setDefinitionEditor] = useState<DefinitionEditorState | null>(null);
+  const [activeDesignSpec, setActiveDesignSpec] = useState<ActiveDesignSpec | null>(null);
+  const [designSpecPanelBounds, setDesignSpecPanelBounds] =
+    useState<DesignSpecPanelBounds | null>(null);
+  const configPanelRef = useRef<HTMLDivElement | null>(null);
+  const designSpecPanelRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!designSpecApiContext?.workingDir) return;
@@ -388,6 +415,47 @@ export function PageConfigPanel({
   >(null);
   const effectiveDetailPageId =
     detailPageId === undefined ? internalDetailPageId : detailPageId;
+  useEffect(() => {
+    setActiveDesignSpec(null);
+  }, [effectiveDetailPageId, configCategoryFilter]);
+  useEffect(() => {
+    if (!activeDesignSpec) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!designSpecPanelRef.current?.contains(event.target as Node)) setActiveDesignSpec(null);
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [activeDesignSpec]);
+  useLayoutEffect(() => {
+    if (!activeDesignSpec || !configPanelRef.current) {
+      setDesignSpecPanelBounds(null);
+      return;
+    }
+
+    const updateBounds = () => {
+      const rect = configPanelRef.current?.getBoundingClientRect();
+      if (!rect) return;
+    setDesignSpecPanelBounds({
+      top: rect.top,
+      left: rect.left,
+      height: rect.height,
+      availableLeftWidth: rect.left,
+      anchorTop: activeDesignSpec.anchor?.top,
+      anchorBottom: activeDesignSpec.anchor?.bottom,
+    });
+    };
+
+    updateBounds();
+    const observer = typeof ResizeObserver === "undefined"
+      ? undefined
+      : new ResizeObserver(updateBounds);
+    observer?.observe(configPanelRef.current);
+    window.addEventListener("resize", updateBounds);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", updateBounds);
+    };
+  }, [activeDesignSpec]);
   const sortedPages = useMemo(() => getSortedPages(pages), [pages]);
   const scopedPages = useMemo<ScopedPageConfig[]>(
     () =>
@@ -623,8 +691,100 @@ export function PageConfigPanel({
       editingRequirements ||
       hasRequirements);
   const configData = selectedPage.configData ?? {};
+  const activeDesignSpecOptions = activeDesignSpec
+    ? effectiveDesignSpecEntries.filter((entry) =>
+        entry.fieldKey === activeDesignSpec.spec.fieldKey &&
+        entry.scope === activeDesignSpec.spec.scope &&
+        (entry.scope !== "page" || entry.pageId === activeDesignSpec.spec.pageId) &&
+        entry.markdown.trim(),
+      )
+    : [];
+  const hasRoomForSideBubble =
+    designSpecPanelBounds !== null &&
+    designSpecPanelBounds.availableLeftWidth >= 320 &&
+    typeof window !== "undefined" &&
+    window.innerWidth >= 768;
+  const bubbleMaxHeight = !designSpecPanelBounds
+    ? undefined
+    : Math.max(240, designSpecPanelBounds.height);
+  const bubbleTop = hasRoomForSideBubble ? designSpecPanelBounds?.top ?? 0 : 16;
+  const sideBubbleTop = hasRoomForSideBubble ? Math.max(8, bubbleTop - 48) : bubbleTop;
+  const bubbleArrowTop = activeDesignSpec?.anchor && designSpecPanelBounds
+    ? Math.max(18, Math.min(Math.max(18, designSpecPanelBounds.height - 18), ((activeDesignSpec.anchor.top + activeDesignSpec.anchor.bottom) / 2) - sideBubbleTop))
+    : 36;
+  const designSpecBubble = activeDesignSpec && designSpecPanelBounds && (
+    <aside
+      ref={designSpecPanelRef}
+      aria-label="设计规范"
+      className="fixed z-[70] flex max-w-[calc(100vw-16px)] flex-col overflow-visible rounded-xl border border-border/70 bg-card shadow-[0_20px_55px_-20px_rgb(0_0_0_/_0.65)] ring-1 ring-black/5"
+      style={hasRoomForSideBubble
+        ? {
+            top: sideBubbleTop,
+            left: Math.max(8, designSpecPanelBounds.left - Math.min(380, designSpecPanelBounds.availableLeftWidth - 20) - 12),
+            width: Math.min(380, designSpecPanelBounds.availableLeftWidth - 20),
+            maxHeight: bubbleMaxHeight ? bubbleMaxHeight + (bubbleTop - sideBubbleTop) : undefined,
+          }
+        : { top: 16, right: 8, left: 8, maxHeight: "calc(100dvh - 32px)" }}
+    >
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-2 z-0 h-0 w-0 border-y-[8px] border-y-transparent border-l-[8px] border-l-card"
+        style={{ top: bubbleArrowTop - 8 }}
+      />
+      <div className="relative z-10 flex min-h-14 shrink-0 items-center gap-3 rounded-t-xl border-b border-border/70 bg-muted/30 px-4 py-2.5">
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-sm font-semibold tracking-tight">{activeDesignSpec.fieldTitle}</h3>
+        </div>
+        {onEditDesignSpec && (
+          <button
+            type="button"
+            onClick={() => onEditDesignSpec(activeDesignSpec.spec.docId, activeDesignSpec.spec.entryId)}
+            aria-label="编辑规范"
+            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => setActiveDesignSpec(null)}
+          aria-label="关闭设计规范"
+          className="inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      {activeDesignSpecOptions.length > 1 && (
+        <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-border/80 px-3 py-2">
+          {activeDesignSpecOptions.map((spec) => (
+            <button
+              key={`${spec.docId}:${spec.entryId}`}
+              type="button"
+              onClick={() => setActiveDesignSpec({ spec, fieldTitle: activeDesignSpec.fieldTitle, anchor: activeDesignSpec.anchor })}
+              className={cn(
+                "max-w-[180px] shrink-0 truncate rounded-md px-2 py-1 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                spec.entryId === activeDesignSpec.spec.entryId
+                  ? "bg-foreground/10 text-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
+            >
+              {spec.entryTitle || "未命名规范"}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-card p-4">
+        <PageRequirements
+          markdown={activeDesignSpec.spec.markdown}
+          allowExternalMedia
+          mediaBaseUrl={mediaBaseUrl}
+          className="!max-w-none !text-sm !leading-[1.65]"
+        />
+      </div>
+    </aside>
+  );
   return (
-    <div className={cn("relative flex h-full flex-col bg-card", className)}>
+    <div ref={configPanelRef} className={cn("relative flex h-full flex-col bg-card", className)}>
       {!hideDetailHeader && (
         <div className="border-b border-border/80 px-4 py-3">
           <div className="flex min-w-0 items-center justify-between gap-3">
@@ -649,6 +809,7 @@ export function PageConfigPanel({
           </div>
         </div>
       )}
+      {typeof document !== "undefined" && designSpecBubble && createPortal(designSpecBubble, document.body)}
       <div className={cn("min-h-0 flex-1 overflow-y-auto p-4", showConfigActions && "pb-20")}>
         <div className="flex flex-col gap-5">
           <section className="flex flex-col">
@@ -701,7 +862,10 @@ export function PageConfigPanel({
                     typeLimits={typeLimits}
                     designSpecEntries={effectiveDesignSpecEntries.filter((entry) => entry.scope === "project")}
                     onEditDesignSpec={onEditDesignSpec}
+                    onOpenDesignSpec={(spec, fieldTitle, anchor) => setActiveDesignSpec((current) => current?.spec.entryId === spec.entryId ? null : { spec, fieldTitle, anchor })}
                     onEditConfigDefinition={(key) => openDefinitionEditor("project", key)}
+                    imageConfigScope="project"
+                    onLaunchWhiteboard={onLaunchWhiteboard}
                   />
                 </ConfigScopeWrapper>
               </section>
@@ -732,7 +896,11 @@ export function PageConfigPanel({
                   onTogglePositionDimming={onTogglePositionDimming}
                   designSpecEntries={effectiveDesignSpecEntries.filter((entry) => entry.scope === "page" && entry.pageId === selectedPage.id)}
                   onEditDesignSpec={onEditDesignSpec}
+                  onOpenDesignSpec={(spec, fieldTitle, anchor) => setActiveDesignSpec((current) => current?.spec.entryId === spec.entryId ? null : { spec, fieldTitle, anchor })}
                   onEditConfigDefinition={(key) => openDefinitionEditor("page", key)}
+                  imageConfigScope="page"
+                  pageId={selectedPage.id}
+                  onLaunchWhiteboard={onLaunchWhiteboard}
                 />
               </ConfigScopeWrapper>
             </section>
@@ -765,7 +933,11 @@ export function PageConfigPanel({
                           {entry.title}
                         </p>
                         {entry.markdown.trim() && (
-                          <PageRequirements markdown={entry.markdown} />
+                          <PageRequirements
+                            markdown={entry.markdown}
+                            allowExternalMedia
+                            mediaBaseUrl={mediaBaseUrl}
+                          />
                         )}
                       </div>
                     ))}

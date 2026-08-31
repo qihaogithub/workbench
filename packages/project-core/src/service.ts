@@ -69,6 +69,8 @@ import type {
   ProjectPackageExport,
   ProjectPublishCommitInput,
   PageUpdateInput,
+  PageTemplateUpdateInput,
+  PageTemplateBatchUpdateInput,
   PreviewPlan,
   ProjectAdminActor,
   ProjectAdminConfig,
@@ -80,6 +82,7 @@ import type {
   ResourceVersionDetail,
   ResourceVersionHistory,
   ProjectSummary,
+  TrashedProjectSummary,
   PublishStatus,
   PrototypeGateDecision,
   RuntimeValidationIssue,
@@ -175,6 +178,15 @@ import {
   restoreContentGraphStorage,
 } from "./content-graph-admin.js";
 
+const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
+
+interface TrashRecord {
+  project: Project;
+  deletedAt: number;
+  purgeAt: number;
+  deletedBy: Pick<ProjectAdminActor, "id" | "name" | "role">;
+}
+
 interface CanonicalWorkspaceProof {
   workspaceId?: string;
   workspaceRevision?: number;
@@ -238,6 +250,7 @@ export class ProjectAdminService {
   readonly internalDir: string;
   readonly editsDir: string;
   readonly plansDir: string;
+  readonly trashDir: string;
   readonly maxBatchSize: number;
 
   constructor(private readonly config: ProjectAdminConfig = {}) {
@@ -252,6 +265,7 @@ export class ProjectAdminService {
     this.internalDir = path.join(this.dataDir, ".project-admin");
     this.editsDir = path.join(this.internalDir, "edits");
     this.plansDir = path.join(this.internalDir, "plans");
+    this.trashDir = path.join(this.internalDir, "trash");
     this.maxBatchSize = config.maxBatchSize ?? getProjectAdminMaxBatchSize();
   }
 
@@ -266,6 +280,7 @@ export class ProjectAdminService {
       this.auditDir,
       this.editsDir,
       this.plansDir,
+      this.trashDir,
     ].forEach(ensureDir);
   }
 
@@ -674,6 +689,12 @@ export class ProjectAdminService {
   ): ProjectAdminResult<Project> {
     if (actor.role === "readonly")
       return fail("FORBIDDEN", "当前操作者没有写权限");
+    if (
+      (input.projectType !== undefined || input.templateSettings !== undefined) &&
+      actor.role !== "admin"
+    ) {
+      return fail("FORBIDDEN", "只有管理员可以管理模板项目");
+    }
     const access = this.requireProjectAccess(input.projectId, actor);
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     const project = this.readProject(input.projectId);
@@ -709,8 +730,23 @@ export class ProjectAdminService {
       next.authoringPreferences = input.authoringPreferences;
       diff.updated?.push("project.authoringPreferences");
     }
+    // Changing a standard project into a template promotes all current pages
+    // in the same metadata transaction. Page flags remain independent when
+    // converting a template back to a standard project.
+    const promotingToTemplate =
+      input.projectType === "template" && project.projectType !== "template";
+    const workspacePath = this.projectWorkspacePath(project.id);
+    const tree = promotingToTemplate ? this.readWorkspaceTree(workspacePath) : null;
+    if (promotingToTemplate && tree) {
+      tree.pages = tree.pages.map((page) => ({ ...page, isTemplatePage: true }));
+      next.demoPages = sortPages(tree.pages);
+      diff.updated?.push("pages.isTemplatePage");
+    }
     next.updatedAt = Date.now();
-    if (!input.dryRun) this.writeProject(project.id, next);
+    if (!input.dryRun) {
+      if (tree) this.writeWorkspaceTree(workspacePath, tree);
+      this.writeProject(project.id, next);
+    }
     const auditId = input.dryRun
       ? undefined
       : this.audit("project_rename", actor, "L1", true, {
@@ -749,10 +785,16 @@ export class ProjectAdminService {
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     const project = this.readProject(projectId);
     if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
+    if (project.projectType === "template" && actor.role !== "admin") {
+      return fail("FORBIDDEN", "只有管理员可以删除模板项目");
+    }
+    if (actor.role === "readonly") {
+      return fail("FORBIDDEN", "当前操作者没有写权限");
+    }
     const plan = this.createPlan("project_delete", projectId, [
-      `删除项目 ${project.name}`,
-      `删除 ${project.demoPages.length} 个页面`,
-      "删除项目工作空间和元数据",
+      `将项目 ${project.name} 移入回收站`,
+      `保留 ${project.demoPages.length} 个页面和项目工作空间 30 天`,
+      "立即下线已发布产物；恢复后需要重新发布",
     ]);
     return ok(plan, {
       diffSummary: { deleted: [`project:${projectId}`] },
@@ -764,9 +806,7 @@ export class ProjectAdminService {
     planId: string,
     confirmToken: string,
     actor = this.defaultActor(),
-  ): ProjectAdminResult<{ deleted: boolean; projectId: string }> {
-    if (actor.role !== "admin")
-      return fail("FORBIDDEN", "只有管理员可以删除项目");
+  ): ProjectAdminResult<{ trashed: boolean; projectId: string; purgeAt: number }> {
     const plan = this.readPlan(planId);
     if (!plan || plan.operation !== "project_delete") {
       return fail("PLAN_NOT_FOUND", "删除预览计划不存在");
@@ -776,10 +816,16 @@ export class ProjectAdminService {
     }
     const access = this.requireProjectAccess(plan.resourceId, actor);
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
-    fs.rmSync(this.getProjectPath(plan.resourceId), {
-      recursive: true,
-      force: true,
-    });
+    const project = this.readProject(plan.resourceId);
+    if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
+    if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    if (project.projectType === "template" && actor.role !== "admin") {
+      return fail("FORBIDDEN", "只有管理员可以删除模板项目");
+    }
+    if (fs.existsSync(this.trashEntryPath(project.id))) {
+      return fail("VALIDATION_BLOCKED", "回收站中已存在同 ID 项目");
+    }
+    const trash = this.moveProjectToTrash(project, actor);
     const deletedPublishedArtifact = this.deletePublishedProjectArtifact(
       plan.resourceId,
     );
@@ -787,15 +833,89 @@ export class ProjectAdminService {
       `project:${plan.resourceId}`,
       ...(deletedPublishedArtifact ? [`published:${plan.resourceId}`] : []),
     ];
-    const auditId = this.audit("project_delete_execute", actor, "L3", true, {
+    const auditId = this.audit("project_trash", actor, "L3", true, {
       projectId: plan.resourceId,
       resourceId: plan.resourceId,
       diffSummary: { deleted },
     });
     return ok(
-      { deleted: true, projectId: plan.resourceId },
+      { trashed: true, projectId: plan.resourceId, purgeAt: trash.purgeAt },
       { auditId, diffSummary: { deleted } },
     );
+  }
+
+  listTrashedProjects(
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<TrashedProjectSummary[]> {
+    this.ensureDirs();
+    const items: TrashedProjectSummary[] = [];
+    for (const entry of fs.readdirSync(this.trashDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const record = this.readTrashRecord(entry.name);
+      if (!record || !this.canManageTrashedProject(record.project, actor)) continue;
+      items.push(this.toTrashedProjectSummary(record));
+    }
+    return ok(items.sort((a, b) => b.deletedAt - a.deletedAt));
+  }
+
+  restoreTrashedProject(
+    projectId: string,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<{ restored: true; projectId: string }> {
+    const record = this.readTrashRecord(projectId);
+    if (!record) return fail("PROJECT_NOT_FOUND", "回收站中不存在该项目");
+    if (!this.canManageTrashedProject(record.project, actor)) {
+      return fail("FORBIDDEN", "当前操作者无权恢复该项目");
+    }
+    if (fs.existsSync(this.getProjectPath(projectId))) {
+      return fail("VALIDATION_BLOCKED", "同 ID 的活跃项目已存在，无法恢复");
+    }
+    const source = this.trashProjectPath(projectId);
+    const restoredProject = readJsonFile<Project>(path.join(source, "project.json"));
+    if (!restoredProject || restoredProject.id !== projectId) {
+      return fail("VALIDATION_BLOCKED", "回收站项目数据不完整，无法恢复");
+    }
+    fs.renameSync(source, this.getProjectPath(projectId));
+    const recordPath = this.trashRecordPath(projectId);
+    fs.rmSync(recordPath, { force: true });
+    fs.rmSync(this.trashEntryPath(projectId), { recursive: true, force: true });
+    const auditId = this.audit("project_restore", actor, "L3", true, {
+      projectId,
+      resourceId: projectId,
+      diffSummary: { created: [`project:${projectId}`] },
+    });
+    return ok({ restored: true, projectId }, { auditId });
+  }
+
+  purgeTrashedProject(
+    projectId: string,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<{ purged: true; projectId: string }> {
+    const record = this.readTrashRecord(projectId);
+    if (!record) return fail("PROJECT_NOT_FOUND", "回收站中不存在该项目");
+    if (!this.canManageTrashedProject(record.project, actor)) {
+      return fail("FORBIDDEN", "当前操作者无权彻底删除该项目");
+    }
+    this.removeTrashEntry(projectId);
+    const auditId = this.audit("project_trash_purge", actor, "L3", true, {
+      projectId,
+      resourceId: projectId,
+      diffSummary: { deleted: [`trash:${projectId}`] },
+    });
+    return ok({ purged: true, projectId }, { auditId });
+  }
+
+  purgeExpiredTrashedProjects(now = Date.now()): number {
+    this.ensureDirs();
+    let purged = 0;
+    for (const entry of fs.readdirSync(this.trashDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const record = this.readTrashRecord(entry.name);
+      if (!record || record.purgeAt > now) continue;
+      this.removeTrashEntry(entry.name);
+      purged += 1;
+    }
+    return purged;
   }
 
   setProjectCover(
@@ -803,9 +923,12 @@ export class ProjectAdminService {
     thumbnail: string | undefined,
     actor = this.defaultActor(),
   ): ProjectAdminResult<Project> {
-    return this.updateProject({ projectId, description: undefined }, actor).ok
-      ? this.patchProjectCover(projectId, thumbnail, actor)
-      : fail("PROJECT_NOT_FOUND", "项目不存在");
+    if (actor.role === "readonly") {
+      return fail("FORBIDDEN", "当前操作者没有写权限");
+    }
+    const access = this.requireProjectAccess(projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    return this.patchProjectCover(projectId, thumbnail, actor);
   }
 
   listTemplates(
@@ -853,8 +976,8 @@ export class ProjectAdminService {
     input: TemplateMetaInput,
     actor = this.defaultActor(),
   ): ProjectAdminResult<ProjectTemplateMeta> {
-    if (actor.role === "readonly")
-      return fail("FORBIDDEN", "当前操作者没有写权限");
+    if (actor.role !== "admin")
+      return fail("FORBIDDEN", "只有管理员可以管理模板项目");
     const access = this.requireProjectAccess(projectId, actor);
     if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
     if (this.isProjectLocked(projectId) && actor.role !== "admin") {
@@ -896,6 +1019,13 @@ export class ProjectAdminService {
       thumbnail: input.thumbnail ?? project.thumbnail,
       updatedAt: now,
     };
+    const workspacePath = this.projectWorkspacePath(projectId);
+    const tree = this.readWorkspaceTree(workspacePath);
+    tree.pages = tree.pages.map((page) => ({ ...page, isTemplatePage: true }));
+    updated.demoPages = sortPages(tree.pages);
+    // Validate/read all metadata before either write so validation failures
+    // cannot leave a partially promoted project behind.
+    this.writeWorkspaceTree(workspacePath, tree);
     this.writeProject(projectId, updated);
     const template = this.projectToTemplateMeta(updated);
     const auditId = this.audit(
@@ -920,8 +1050,8 @@ export class ProjectAdminService {
     input: Partial<TemplateMetaInput>,
     actor = this.defaultActor(),
   ): ProjectAdminResult<ProjectTemplateMeta> {
-    if (actor.role === "readonly")
-      return fail("FORBIDDEN", "当前操作者没有写权限");
+    if (actor.role !== "admin")
+      return fail("FORBIDDEN", "只有管理员可以管理模板项目");
     const project = this.readProject(templateId);
     if (!project || project.projectType !== "template") {
       return fail("TEMPLATE_NOT_FOUND", "模板不存在");
@@ -1036,15 +1166,19 @@ export class ProjectAdminService {
     });
   }
 
-  deleteTemplatePreview(templateId: string): ProjectAdminResult<PreviewPlan> {
+  deleteTemplatePreview(
+    templateId: string,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<PreviewPlan> {
+    if (actor.role !== "admin") return fail("FORBIDDEN", "只有管理员可以删除模板");
     const project = this.readProject(templateId);
     if (!project || project.projectType !== "template") {
       return fail("TEMPLATE_NOT_FOUND", "模板不存在");
     }
     return ok(
       this.createPlan("template_delete", templateId, [
-        `删除模板项目 ${project.name}`,
-        "删除项目工作区、发布产物和模板知识索引",
+        `将模板项目 ${project.name} 移入回收站`,
+        "保留项目工作区 30 天，并立即下线发布产物和模板知识索引",
         "不会删除已从该模板创建的其他项目",
       ]),
       { diffSummary: { deleted: [`project:${templateId}`] } },
@@ -1055,7 +1189,7 @@ export class ProjectAdminService {
     planId: string,
     confirmToken: string,
     actor = this.defaultActor(),
-  ): ProjectAdminResult<{ deleted: boolean; templateId: string }> {
+  ): ProjectAdminResult<{ trashed: boolean; templateId: string; purgeAt: number }> {
     if (actor.role !== "admin")
       return fail("FORBIDDEN", "只有管理员可以删除模板");
     const plan = this.readPlan(planId);
@@ -1069,18 +1203,18 @@ export class ProjectAdminService {
     if (!project || project.projectType !== "template") {
       return fail("TEMPLATE_NOT_FOUND", "模板不存在");
     }
-    fs.rmSync(this.getProjectPath(plan.resourceId), {
-      recursive: true,
-      force: true,
-    });
+    if (fs.existsSync(this.trashEntryPath(project.id))) {
+      return fail("VALIDATION_BLOCKED", "回收站中已存在同 ID 项目");
+    }
+    const trash = this.moveProjectToTrash(project, actor);
     this.deletePublishedProjectArtifact(plan.resourceId);
-    const auditId = this.audit("template_delete_execute", actor, "L3", true, {
+    const auditId = this.audit("template_trash", actor, "L3", true, {
       projectId: plan.resourceId,
       resourceId: plan.resourceId,
       diffSummary: { deleted: [`project:${plan.resourceId}`] },
     });
     return ok(
-      { deleted: true, templateId: plan.resourceId },
+      { trashed: true, templateId: plan.resourceId, purgeAt: trash.purgeAt },
       { auditId, diffSummary: { deleted: [`project:${plan.resourceId}`] } },
     );
   }
@@ -1089,8 +1223,8 @@ export class ProjectAdminService {
     templateId: string,
     actor = this.defaultActor(),
   ): ProjectAdminResult<DemoMeta> {
-    if (actor.role === "readonly")
-      return fail("FORBIDDEN", "当前操作者没有写权限");
+    if (actor.role !== "admin")
+      return fail("FORBIDDEN", "只有管理员可以管理模板项目");
     const project = this.readProject(templateId);
     if (!project || project.projectType !== "template") {
       return fail("TEMPLATE_NOT_FOUND", "模板不存在");
@@ -2430,6 +2564,8 @@ export class ProjectAdminService {
       order: input.order ?? tree.pages.length,
       parentId,
       runtimeType: resolvedRuntimeType,
+      isTemplatePage:
+        this.readProject(transaction.data.projectId)?.projectType === "template",
     };
     const sandboxNormalization =
       resolvedRuntimeType === "sandboxed-html"
@@ -2723,6 +2859,54 @@ export class ProjectAdminService {
     );
   }
 
+  /** Update one page's independent template-page marker (admin only). */
+  updatePageTemplate(
+    input: PageTemplateUpdateInput,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<DemoPageMeta> {
+    const result = this.updatePageTemplates(
+      { ...input, pageIds: [input.pageId] },
+      actor,
+    );
+    return result.ok && result.data
+      ? ok(result.data.pages[0], {
+          auditId: result.auditId,
+          diffSummary: result.diffSummary,
+        })
+      : (result as unknown as ProjectAdminResult<DemoPageMeta>);
+  }
+
+  /** Update multiple page markers atomically; all ids must belong to project. */
+  updatePageTemplates(
+    input: PageTemplateBatchUpdateInput,
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<{ pages: DemoPageMeta[] }> {
+    if (actor.role !== "admin")
+      return fail("FORBIDDEN", "只有管理员可以管理模板页面");
+    if (input.pageIds.length > this.maxBatchSize)
+      return fail("BATCH_LIMIT_EXCEEDED", `批量修改页面不能超过 ${this.maxBatchSize} 个`);
+    const project = this.readProject(input.projectId);
+    if (!project) return fail("PROJECT_NOT_FOUND", "项目不存在");
+    if (!this.canAccessProject(input.projectId, actor))
+      return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    const tree = this.readWorkspaceTree(this.projectWorkspacePath(input.projectId));
+    const requested = new Set(input.pageIds);
+    const missing = input.pageIds.filter((id) => !tree.pages.some((p) => p.id === id));
+    if (missing.length) return fail("DEMO_PAGE_NOT_FOUND", `页面不存在: ${missing.join(", ")}`);
+    const pages = tree.pages.map((page) =>
+      requested.has(page.id) ? { ...page, isTemplatePage: input.isTemplatePage } : page,
+    );
+    const diffSummary = { updated: input.pageIds.map((id) => `page:${id}:isTemplatePage`) };
+    if (!input.dryRun) {
+      this.writeWorkspaceTree(this.projectWorkspacePath(input.projectId), { ...tree, pages });
+      this.writeProject(input.projectId, { ...project, demoPages: sortPages(pages), updatedAt: Date.now() });
+    }
+    const auditId = input.dryRun ? undefined : this.audit("page_template_update", actor, "L1", true, {
+      projectId: input.projectId, diffSummary,
+    });
+    return ok({ pages: sortPages(pages).filter((page) => requested.has(page.id)) }, { auditId, diffSummary });
+  }
+
   updatePrototypePage(
     input: PageUpdatePrototypeInput,
     actor = this.defaultActor(),
@@ -2734,6 +2918,9 @@ export class ProjectAdminService {
     const tree = this.readWorkspaceTree(workspacePath);
     const page = tree.pages.find((item) => item.id === input.pageId);
     if (!page) return fail("DEMO_PAGE_NOT_FOUND", "页面不存在");
+    const visualAccess = this.assertVisualPageWriteAllowed(page, actor);
+    if (!visualAccess.ok)
+      return fail(visualAccess.error?.code ?? "FORBIDDEN", visualAccess.error?.message ?? "禁止可视化编辑");
     if (page.runtimeType !== "prototype-html-css") {
       return fail("INVALID_REQUEST", "当前页面不是 HTML/CSS 原型页");
     }
@@ -2834,6 +3021,12 @@ export class ProjectAdminService {
     const tree = this.readWorkspaceTree(workspacePath);
     const pageIndex = tree.pages.findIndex((page) => page.id === input.pageId);
     if (pageIndex === -1) return fail("DEMO_PAGE_NOT_FOUND", "页面不存在");
+    const visualAccess = this.assertVisualPageWriteAllowed(
+      tree.pages[pageIndex],
+      actor,
+    );
+    if (!visualAccess.ok)
+      return fail(visualAccess.error?.code ?? "FORBIDDEN", visualAccess.error?.message ?? "禁止可视化编辑");
     const requestedTargetRuntime = (
       input as PageSwitchRuntimeInput & { targetRuntimeType?: string }
     ).targetRuntimeType;
@@ -5285,6 +5478,94 @@ export class ProjectAdminService {
     return path.join(this.projectsDir, safeId(projectId, "project"));
   }
 
+  private trashEntryPath(projectId: string): string {
+    return path.join(this.trashDir, safeId(projectId, "project"));
+  }
+
+  private trashProjectPath(projectId: string): string {
+    return path.join(this.trashEntryPath(projectId), "project");
+  }
+
+  private trashRecordPath(projectId: string): string {
+    return path.join(this.trashEntryPath(projectId), "trash.json");
+  }
+
+  private moveProjectToTrash(project: Project, actor: ProjectAdminActor): TrashRecord {
+    const deletedAt = Date.now();
+    // Public artifacts are removed on deletion, so restored projects must not retain
+    // stale published metadata that could imply they are still publicly available.
+    const trashedProject: Project = {
+      ...project,
+      publishedVersion: undefined,
+      publishedAt: undefined,
+    };
+    const record: TrashRecord = {
+      project: trashedProject,
+      deletedAt,
+      purgeAt: deletedAt + TRASH_RETENTION_MS,
+      deletedBy: { id: actor.id, name: actor.name, role: actor.role },
+    };
+    const entryPath = this.trashEntryPath(project.id);
+    ensureDir(entryPath);
+    fs.renameSync(this.getProjectPath(project.id), this.trashProjectPath(project.id));
+    writeJsonFile(path.join(this.trashProjectPath(project.id), "project.json"), trashedProject);
+    writeJsonFile(this.trashRecordPath(project.id), record);
+    return record;
+  }
+
+  private readTrashRecord(projectId: string): TrashRecord | null {
+    const parsed = readJsonFile<Partial<TrashRecord>>(this.trashRecordPath(projectId));
+    if (
+      !parsed ||
+      !parsed.project ||
+      typeof parsed.project.id !== "string" ||
+      typeof parsed.project.name !== "string" ||
+      typeof parsed.deletedAt !== "number" ||
+      typeof parsed.purgeAt !== "number" ||
+      !parsed.deletedBy ||
+      typeof parsed.deletedBy.id !== "string" ||
+      typeof parsed.deletedBy.name !== "string" ||
+      (parsed.deletedBy.role !== "admin" && parsed.deletedBy.role !== "creator" && parsed.deletedBy.role !== "readonly")
+    ) {
+      return null;
+    }
+    return parsed as TrashRecord;
+  }
+
+  private canManageTrashedProject(project: Project, actor: ProjectAdminActor): boolean {
+    if (actor.role === "readonly") return false;
+    if (project.projectType === "template" && actor.role !== "admin") return false;
+    return this.canAccessProject(project.id, actor);
+  }
+
+  private toTrashedProjectSummary(record: TrashRecord): TrashedProjectSummary {
+    const { project } = record;
+    return {
+      id: project.id,
+      name: project.name,
+      projectType: project.projectType,
+      templateSettings: project.templateSettings,
+      sourceTemplateProjectId: project.sourceTemplateProjectId,
+      category: normalizeProjectCategory(project.category),
+      description: project.description,
+      authoringPreferences: project.authoringPreferences,
+      createdAt: project.createdAt,
+      updatedAt: project.updatedAt,
+      thumbnail: project.thumbnail,
+      demoCount: project.demoPages.length,
+      demoPages: project.demoPages,
+      publishedVersion: undefined,
+      publishedAt: undefined,
+      deletedAt: record.deletedAt,
+      purgeAt: record.purgeAt,
+      deletedBy: record.deletedBy,
+    };
+  }
+
+  private removeTrashEntry(projectId: string): void {
+    fs.rmSync(this.trashEntryPath(projectId), { recursive: true, force: true });
+  }
+
   private projectWorkspacePath(projectId: string): string {
     return path.join(this.getProjectPath(projectId), "workspace");
   }
@@ -5969,9 +6250,10 @@ export class ProjectAdminService {
       const rawPages = Array.isArray(parsed.pages) ? parsed.pages : [];
       const pages = rawPages.map((page) =>
         page.runtimeType
-          ? (page as DemoPageMeta)
+          ? ({ ...page, isTemplatePage: page.isTemplatePage === true } as DemoPageMeta)
           : {
               ...page,
+              isTemplatePage: page.isTemplatePage === true,
               runtimeType: resolvePageRuntimeType(path.join(demosDir, page.id)),
             },
       );
@@ -6006,6 +6288,7 @@ export class ProjectAdminService {
             order: pages.length,
             parentId: null,
             runtimeType: resolvePageRuntimeType(dir),
+            isTemplatePage: false,
           });
         }
       }
@@ -6061,6 +6344,16 @@ export class ProjectAdminService {
       transaction.workspacePath,
       operation,
     );
+  }
+
+  private assertVisualPageWriteAllowed(
+    page: DemoPageMeta,
+    actor: ProjectAdminActor,
+  ): ProjectAdminResult<void> {
+    if (actor.role === "creator" && page.isTemplatePage === true) {
+      return fail("FORBIDDEN", "编辑者不能可视化编辑模板页");
+    }
+    return ok(undefined);
   }
 
   private assertWorkspaceWriteAllowed(

@@ -182,6 +182,8 @@ export interface DemoPageMeta {
   order: number; // 在页面列表中的展示顺序（小者在前）
   parentId: string | null; // 所属文件夹 ID，null 表示根级
   runtimeType: DemoPageRuntimeType; // 页面运行时类型，创建时写入，读取时缺失则从文件系统推断补全
+  /** 是否属于模板页；独立于项目类型持久化。历史数据缺失时按 false 处理。 */
+  isTemplatePage?: boolean;
   reference?: {
     sourceProjectId: string;   // 源项目 ID
     sourcePageId: string;      // 源页面 ID

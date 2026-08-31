@@ -27,6 +27,10 @@ import { isSketchSceneAuthoringEnabled } from "@/lib/authoring-feature-flags";
 import { type PreviewSize, extractPreviewSize } from "@/lib/preview-size";
 import {
   createDefaultSketchScene,
+  asWhiteboardDocumentV2,
+  getWhiteboardDocumentRevision,
+  isWhiteboardBinding,
+  isWhiteboardDocument,
   type DemoFolderMeta,
   type DemoPageMeta,
   type DemoPageRuntimeType,
@@ -180,6 +184,35 @@ function buildCopyPageOperations(input: {
     );
   }
   return operations.length > 0 ? operations : null;
+}
+
+/** Whiteboards are target-owned, unlike content-addressed PNGs: a copied page gets a new editable document and binding. */
+function appendWhiteboardCopyOperations(input: {
+  workspacePath: string;
+  sourcePageId: string;
+  demoId: string;
+  operations: WorkspaceMutationOperation[];
+}) {
+  const bindingsPath = path.join(input.workspacePath, "whiteboards", "bindings.json");
+  if (!fs.existsSync(bindingsPath)) return;
+  let bindings: unknown[];
+  try { bindings = JSON.parse(fs.readFileSync(bindingsPath, "utf8")).bindings; } catch { return; }
+  if (!Array.isArray(bindings)) return;
+  const existing = bindings.filter(isWhiteboardBinding);
+  const derived = existing.flatMap((binding) => {
+    if (binding.target.scope !== "page" || binding.target.pageId !== input.sourcePageId) return [];
+    try {
+      const source = JSON.parse(fs.readFileSync(path.join(input.workspacePath, "whiteboards", `${binding.whiteboardId}.json`), "utf8"));
+      if (!isWhiteboardDocument(source)) return [];
+      const id = `wb_${crypto.randomUUID().replaceAll("-", "")}`;
+      const document = { ...asWhiteboardDocumentV2(source), id, documentRevision: getWhiteboardDocumentRevision(source), updatedAt: Date.now() };
+      const { sceneRevision: _legacySceneRevision, ...bindingWithoutLegacyRevision } = binding;
+      const next = { ...bindingWithoutLegacyRevision, id: `wb_${id}`, whiteboardId: id, documentRevisionAtOutput: document.documentRevision, target: { ...binding.target, pageId: input.demoId }, updatedAt: Date.now() };
+      input.operations.push(createPutTextOperation({ workspacePath: input.workspacePath, resourcePath: `whiteboards/${id}.json`, content: JSON.stringify(document, null, 2), expectedAbsent: true }));
+      return [next];
+    } catch { return []; }
+  });
+  if (derived.length) input.operations.push(createPutTextOperation({ workspacePath: input.workspacePath, resourcePath: "whiteboards/bindings.json", content: JSON.stringify({ bindings: [...existing, ...derived] }, null, 2) }));
 }
 
 export async function GET(
@@ -415,6 +448,14 @@ export async function POST(
             demoId,
             runtimeType: resolvedRuntimeType,
           });
+      if (sourcePageId && operations) {
+        appendWhiteboardCopyOperations({
+          workspacePath: wsPath,
+          sourcePageId,
+          demoId,
+          operations,
+        });
+      }
       if (!operations) {
         return NextResponse.json(
           createApiError("FILE_WRITE_ERROR", "创建页面失败"),
@@ -459,6 +500,16 @@ export async function POST(
             parentId,
             runtimeType,
           );
+      if (sourcePageId && demoMeta) {
+        const whiteboardWrites: WorkspaceMutationOperation[] = [];
+        appendWhiteboardCopyOperations({ workspacePath: wsPath, sourcePageId, demoId: demoMeta.id, operations: whiteboardWrites });
+        for (const write of whiteboardWrites) {
+          if (write.type !== "put_text") continue;
+          const target = path.join(wsPath, write.path);
+          fs.mkdirSync(path.dirname(target), { recursive: true });
+          fs.writeFileSync(target, write.content, "utf8");
+        }
+      }
     }
     if (!demoMeta) {
       return NextResponse.json(

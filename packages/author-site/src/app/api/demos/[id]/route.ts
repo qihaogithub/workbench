@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { ProjectAuthoringPreferences } from '@workbench/shared';
 import { createApiSuccess, createApiError } from '@/lib/fs-utils';
 import { getProjectAdminService, projectAdminResponse } from '@/lib/project-admin-service';
+import { getCurrentProjectActor } from '@/lib/auth/current-user';
 
 function parseProjectAuthoringPreferences(value: unknown): ProjectAuthoringPreferences | null | undefined {
   if (value === undefined) return undefined;
@@ -20,6 +21,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const actor = await getCurrentProjectActor();
+    if (!actor) return NextResponse.json(createApiError('UNAUTHORIZED', '未登录'), { status: 401 });
     const { id } = await params;
     const body = await request.json();
     const { name, category, authoringPreferences } = body as {
@@ -63,7 +66,7 @@ export async function PATCH(
       name: typeof name === 'string' ? name.trim() : undefined,
       category: typeof category === 'string' ? category.trim() : undefined,
       authoringPreferences: parsedAuthoringPreferences ?? undefined,
-    });
+    }, actor);
     if (!result.ok) return projectAdminResponse(result);
 
     return NextResponse.json(createApiSuccess({
@@ -86,15 +89,18 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const actor = await getCurrentProjectActor();
+    if (!actor) return NextResponse.json(createApiError('UNAUTHORIZED', '未登录'), { status: 401 });
     const { id } = await params;
 
     const service = getProjectAdminService();
-    const preview = service.deleteProjectPreview(id);
+    const preview = service.deleteProjectPreview(id, actor);
     if (!preview.ok || !preview.data) return projectAdminResponse(preview);
 
     const result = service.deleteProjectExecute(
       preview.data.planId,
       preview.data.confirmToken,
+      actor,
     );
     if (!result.ok) return projectAdminResponse(result);
 

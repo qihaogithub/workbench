@@ -20,7 +20,6 @@ import type {
 export interface PreviewStagePage extends CanvasPageData {
   runtimeType: CanvasPageRuntimeType;
   schema?: string;
-  fallbackPreviewSize?: PreviewSize;
   /** 交互 HTML 的受控执行入口；不得使用 sandboxHtml 作为 iframe src。 */
   sandboxExecutionUrl?: string;
   sandboxChannelId?: string;
@@ -60,6 +59,11 @@ export interface SinglePagePreviewProps {
   navigationHotspots?: CanvasNavigationHotspot[];
   navigationConnections?: CanvasNavigationConnection[];
   navigationEditable?: boolean;
+  /** 由宿主工具栏控制页面跳转热区绘制状态。 */
+  navigationActive?: boolean;
+  onNavigationActiveChange?: (active: boolean) => void;
+  /** 关闭时由宿主负责提供连线入口，避免内容区重复显示工具。 */
+  showNavigationTool?: boolean;
   onCreateNavigation?: (
     pageId: string,
     rect: CanvasNavigationHotspot["rect"],

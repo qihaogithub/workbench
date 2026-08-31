@@ -14,6 +14,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { ImageInputActions } from './ImageInputActions';
 
 function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
@@ -127,6 +128,7 @@ export interface FileUploadWidgetProps {
   sessionId?: string;
   options?: FileUploadWidgetOptions;
   defaultValue?: string;
+  onWhiteboard?: () => void;
 }
 
 export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
@@ -142,6 +144,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
   const sessionId = (props as any).sessionId ?? (props as any).formContext?.sessionId;
   const rawOptions = ((props as any).options || {}) as FileUploadWidgetOptions;
   const defaultValue = (props as any).defaultValue as string | undefined;
+  const onWhiteboard = (props as any).onWhiteboard as (() => void) | undefined;
 
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState('');
@@ -317,15 +320,7 @@ const handleClear = useCallback(async () => {
               <FileArchive className="w-5 h-5 text-muted-foreground" />
               <span className="text-[9px] text-muted-foreground px-1 text-center leading-tight">Spine 素材包</span>
               <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={disabled || isUploading}
-                  className="p-2 rounded-full bg-background/90 text-foreground hover:bg-primary hover:text-primary-foreground transition-colors disabled:opacity-50"
-                  aria-label="替换压缩包"
-                >
-                  <Repeat className="w-4 h-4" />
-                </button>
+                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={disabled || isUploading} className="p-2 rounded-full bg-background/90 text-foreground hover:bg-primary hover:text-primary-foreground transition-colors disabled:opacity-50" aria-label="替换压缩包"><Repeat className="w-4 h-4" /></button>
                 {!(defaultValue && value === defaultValue) && (
                   <button
                     type="button"
@@ -359,28 +354,12 @@ const handleClear = useCallback(async () => {
                   (e.target as HTMLImageElement).parentElement!.classList.add('flex', 'items-center', 'justify-center');
                 }}
               />
-              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={disabled || isUploading}
-                  className="p-2 rounded-full bg-background/90 text-foreground hover:bg-primary hover:text-primary-foreground transition-colors disabled:opacity-50"
-                  aria-label="替换图片"
-                >
-                  <Repeat className="w-4 h-4" />
+              <ImageInputActions onUpload={() => fileInputRef.current?.click()} onWhiteboard={onWhiteboard} disabled={disabled || isUploading} />
+              {!(defaultValue && value === defaultValue) && (
+                <button type="button" onClick={handleClear} disabled={disabled || isUploading} className="absolute right-1 top-1 rounded-full bg-background/90 p-1.5 text-foreground hover:bg-destructive hover:text-destructive-foreground" aria-label="删除图片" title="删除图片">
+                  <Trash2 className="h-3.5 w-3.5" />
                 </button>
-                {!(defaultValue && value === defaultValue) && (
-                  <button
-                    type="button"
-                    onClick={handleClear}
-                    disabled={disabled || isUploading}
-                    className="p-2 rounded-full bg-background/90 text-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-50"
-                    aria-label="删除图片"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
+              )}
             </div>
           )
         ) : (
@@ -389,6 +368,7 @@ const handleClear = useCallback(async () => {
             onDragOver={(e) => e.preventDefault()}
             onClick={() => fileInputRef.current?.click()}
             className={cn(
+              'group relative',
               'w-[80px] h-[80px] flex flex-col items-center justify-center gap-1.5 border-2 border-dashed rounded-lg cursor-pointer transition-colors shrink-0',
               isUploading
                 ? 'border-primary bg-primary/5'
@@ -405,6 +385,7 @@ const handleClear = useCallback(async () => {
                 <span className="text-xs text-muted-foreground">Upload</span>
               </div>
             )}
+            <ImageInputActions onUpload={() => fileInputRef.current?.click()} onWhiteboard={onWhiteboard} disabled={disabled || isUploading} />
           </div>
         )}
       </div>

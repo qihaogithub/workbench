@@ -90,7 +90,9 @@ tests/
 - 初始激活读取、`readPreinstalledSkill`、计划/选择控制和 `activateCapabilities`；Agent 根据任务在同一轮自行加载 `workspace`、`pages`、`comments`、`image`、`web`、`external` 或 `all`。
 - `activateCapabilities` 不触发用户确认，也不接受客户端提权；它调用 Pi Harness `setActiveTools()`，在下一次模型循环生效。Skill 正文仍按需由 `readPreinstalledSkill` 读取。
 
-`src/backends/pi-tools/` 默认暴露 28 个工具；`PI_AGENT_WEB_SEARCH_ENABLED=true` 时额外注册 `webSearch`：
+`src/backends/pi-tools/` 按 capability 和环境开关暴露工具；`PI_AGENT_WEB_SEARCH_ENABLED=true` 时额外注册 `webSearch`：
+
+白板代码/语义工具（`readWhiteboardContext`、`applyWhiteboardActions`、`serializeWhiteboardCode`、`importWhiteboardCode`、`planWhiteboardComposition`、`undoWhiteboardEdit`）默认不加入主工具集；设置 `PI_AGENT_WHITEBOARD_TOOLS_ENABLED=true` 后按 workspace capability 注册。写入型动作和代码导入要求 `permissionHandler` 确认，并携带 document revision；`undoWhiteboardEdit` 只恢复最近一次已确认修改。它们只写 `whiteboards/<id>.json`，不允许修改 binding target 或配置值。
 
 | 工具 | 用途 |
 |:-----|:-----|
@@ -136,6 +138,7 @@ PI_AGENT_BASE_URL=https://token.xjjj.co/v1  # 自定义 API 基础地址（OpenA
 PI_AGENT_TIMEOUT=120000               # 超时时间（毫秒）
 SCREENSHOT_SERVICE_URL=http://localhost:3202  # 截图服务地址（captureScreenshot 工具使用）
 PI_AGENT_SUBAGENTS_ENABLED=true       # 是否启用 delegateTask 子 Agent 工具
+PI_AGENT_WHITEBOARD_TOOLS_ENABLED=false # 是否注册白板 document/代码/语义 action、计划与撤销工具
 PI_AGENT_SUBAGENT_TIMEOUT=120000      # 子 Agent 单次任务超时时间（毫秒）
 PI_AGENT_WEB_READ_ENABLED=true        # 是否启用 webRead 网页读取工具
 PI_AGENT_WEB_READ_TIMEOUT_MS=10000    # webRead 单次请求超时

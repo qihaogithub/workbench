@@ -2,12 +2,11 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import {
-  projectExists,
-  readProjectMeta,
-  writeProjectMeta,
   createApiSuccess,
   createApiError,
 } from '@/lib/fs-utils';
+import { getCurrentProjectActor } from '@/lib/auth/current-user';
+import { getProjectAdminService, projectAdminResponse } from '@/lib/project-admin-service';
 
 const THUMBNAILS_DIR = path.join(process.cwd(), 'public', 'thumbnails');
 
@@ -36,14 +35,14 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: projectId } = await params;
-
-    if (!projectExists(projectId)) {
-      return NextResponse.json(
-        createApiError('PROJECT_NOT_FOUND', '项目不存在'),
-        { status: 404 }
-      );
+    const actor = await getCurrentProjectActor();
+    if (!actor) {
+      return NextResponse.json(createApiError('UNAUTHORIZED', '未登录'), { status: 401 });
     }
+    const { id: projectId } = await params;
+    const service = getProjectAdminService();
+    const project = service.getProject(projectId, actor);
+    if (!project.ok) return projectAdminResponse(project);
 
     const formData = await request.formData();
     const file = formData.get('file');
@@ -83,14 +82,10 @@ export async function POST(
 
     const thumbnailPath = `/thumbnails/${filename}`;
 
-    const project = readProjectMeta(projectId);
-    if (project) {
-      project.thumbnail = thumbnailPath;
-      project.updatedAt = Date.now();
-      writeProjectMeta(projectId, project);
-    }
+    const updated = service.setProjectCover(projectId, thumbnailPath, actor);
+    if (!updated.ok) return projectAdminResponse(updated);
 
-    return NextResponse.json(createApiSuccess({ thumbnail: thumbnailPath }));
+    return NextResponse.json(createApiSuccess({ thumbnail: updated.data?.thumbnail ?? thumbnailPath }));
   } catch (error) {
     console.error('Error uploading cover:', error);
     return NextResponse.json(
@@ -105,29 +100,29 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: projectId } = await params;
-
-    if (!projectExists(projectId)) {
-      return NextResponse.json(
-        createApiError('PROJECT_NOT_FOUND', '项目不存在'),
-        { status: 404 }
-      );
+    const actor = await getCurrentProjectActor();
+    if (!actor) {
+      return NextResponse.json(createApiError('UNAUTHORIZED', '未登录'), { status: 401 });
     }
+    const { id: projectId } = await params;
+    const service = getProjectAdminService();
+    const project = service.getProject(projectId, actor);
+    if (!project.ok) return projectAdminResponse(project);
 
     deleteExistingCover(projectId);
 
     const autoThumbnailPath = path.join(THUMBNAILS_DIR, `${projectId}.png`);
     const hasAutoThumbnail = fs.existsSync(autoThumbnailPath);
 
-    const project = readProjectMeta(projectId);
-    if (project) {
-      project.thumbnail = hasAutoThumbnail ? `/thumbnails/${projectId}.png` : undefined;
-      project.updatedAt = Date.now();
-      writeProjectMeta(projectId, project);
-    }
+    const updated = service.setProjectCover(
+      projectId,
+      hasAutoThumbnail ? `/thumbnails/${projectId}.png` : undefined,
+      actor,
+    );
+    if (!updated.ok) return projectAdminResponse(updated);
 
     return NextResponse.json(
-      createApiSuccess({ thumbnail: project?.thumbnail || null })
+      createApiSuccess({ thumbnail: updated.data?.thumbnail || null })
     );
   } catch (error) {
     console.error('Error deleting cover:', error);

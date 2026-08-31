@@ -467,6 +467,8 @@ export interface UseVisualEditStateParams {
   activeDemoIdRef: MutableRefObject<string>;
   sessionId: string;
   activeDemoId: string;
+  projectId?: string;
+  canUseVisualEditor?: boolean;
   runtimeType?: string;
   applyDemoSnapshot: ApplyDemoSnapshotFn;
   markWorkspaceChanged: () => void;
@@ -496,6 +498,8 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
     activeDemoIdRef,
     sessionId,
     activeDemoId,
+    projectId,
+    canUseVisualEditor = true,
     runtimeType,
     applyDemoSnapshot,
     markWorkspaceChanged,
@@ -1210,6 +1214,7 @@ ${effectiveInstructionForPrompt || "无"}
   }, []);
 
   const handleStartVisualConfig = useCallback(() => {
+    if (!canUseVisualEditor) return;
     if (visualConfigMode) {
       setVisualConfigMode(false);
       setVisualConfigNode(null);
@@ -1221,10 +1226,10 @@ ${effectiveInstructionForPrompt || "无"}
     setVisualAnnotationMode(false);
     setSelectedVisualNode(null);
     setVisualConfigError(null);
-  }, [visualConfigMode]);
+  }, [canUseVisualEditor, visualConfigMode]);
 
   const handleApplyVisualConfig = useCallback(async () => {
-    if (!visualConfigNode || !selectedVisualConfigCandidate) return;
+    if (!canUseVisualEditor || !visualConfigNode || !selectedVisualConfigCandidate) return;
 
     setVisualConfigApplying(true);
     setVisualConfigError(null);
@@ -1269,6 +1274,7 @@ ${effectiveInstructionForPrompt || "无"}
           code: codeRef.current,
           schema: schemaRef.current,
           projectConfigSchema,
+          projectId,
           demoId: activeDemoIdRef.current,
           node: visualConfigNode,
           target,
@@ -1358,6 +1364,8 @@ ${message}
     visualConfigNode,
     visualConfigTitle,
     activeDemoIdRef,
+    canUseVisualEditor,
+    projectId,
     setConfigDataMap,
   ]);
 

@@ -552,6 +552,7 @@ export function writeDemoPageMeta(
         ? patch.parentId
         : (existing?.parentId ?? null),
     runtimeType: patch.runtimeType ?? existing?.runtimeType ?? "high-fidelity-react",
+    isTemplatePage: patch.isTemplatePage ?? existing?.isTemplatePage ?? false,
   };
   if (existingIdx !== -1) {
     tree.pages[existingIdx] = merged;
@@ -621,6 +622,7 @@ export function listDemoPages(workspacePath: string): DemoPageMeta[] {
         order: result.length,
         parentId: null,
         runtimeType: inferredRuntimeType,
+        isTemplatePage: false,
       });
     }
   }

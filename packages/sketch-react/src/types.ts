@@ -48,6 +48,21 @@ export interface SketchPageEditorProps extends SketchPagePreviewProps {
   onSceneChange?: (scene: SketchSceneDocument) => void;
 }
 
+/**
+ * The shared editable workspace used by hosts that need the standard whiteboard
+ * interaction model without the page editor's persistent inspector layout.
+ */
+export interface SketchEditorSurfaceProps {
+  scene: SketchSceneDocument;
+  configData?: Record<string, unknown>;
+  /** Optional capability gate used by whiteboard bridge profiles. */
+  allowedTools?: readonly SketchTool[];
+  fillContainer?: boolean;
+  className?: string;
+  onSceneChange?: (scene: SketchSceneDocument) => void;
+  onSelectionChange?: (selection: SketchEditorSelection) => void;
+}
+
 export interface InlineTextSelectionState {
   nodeId: string;
   start: number;
@@ -58,6 +73,7 @@ export interface SketchEditorController {
   keyboardScopeId: string;
   tool: SketchTool;
   setTool: (tool: SketchTool) => void;
+  allowedTools?: readonly SketchTool[];
   selection: SketchEditorSelection;
   inlineTextSelection: InlineTextSelectionState | null;
   setInlineTextSelection: (selection: InlineTextSelectionState | null) => void;
@@ -91,6 +107,7 @@ export interface SketchPropertyPanelProps extends SketchEditorPartProps {
 
 export interface SketchEditorToolbarProps extends SketchEditorPartProps {
   configData?: Record<string, unknown>;
+  allowedTools?: readonly SketchTool[];
 }
 
 export interface SketchLayerPanelProps extends SketchEditorPartProps {

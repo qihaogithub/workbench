@@ -4,12 +4,15 @@ import {
   getProjectAdminService,
   projectAdminResponse,
 } from "@/lib/project-admin-service";
+import { getCurrentProjectActor } from "@/lib/auth/current-user";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const actor = await getCurrentProjectActor();
+    if (!actor) return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), { status: 401 });
     const { id } = await params;
     const body = await request.json();
     const { name, category } = body as {
@@ -35,6 +38,7 @@ export async function POST(
       id,
       name,
       category,
+      actor,
     );
 
     return projectAdminResponse(result, 201);

@@ -16,7 +16,7 @@ jest.mock("./extract-spine-package", () => ({
   ANIMATION_ASSET_EXTS: new Set(),
 }));
 
-import { isAllowedAssetFile, MAX_VIDEO_SIZE } from "./route";
+import { isAllowedAssetFile, MAX_VIDEO_SIZE } from "./asset-validation";
 
 describe("session asset upload validation", () => {
   it("accepts an MP4 whose browser MIME type is generic when its bytes identify it as MP4", () => {

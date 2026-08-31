@@ -3,9 +3,13 @@ const cleanupOrphanWorkspaces = jest.fn(() => []);
 const scheduleStartupBackendProvidersSync = jest.fn();
 const scheduleStartupImageDescriptionSync = jest.fn();
 const scheduleStartupImageGenSync = jest.fn();
+const purgeExpiredTrashedProjects = jest.fn(() => 0);
 
 jest.mock("@/lib/session-manager", () => ({ cleanupAllExpiredSessions }));
 jest.mock("@/lib/workspace-manager", () => ({ cleanupOrphanWorkspaces }));
+jest.mock("@/lib/project-admin-service", () => ({
+  getProjectAdminService: () => ({ purgeExpiredTrashedProjects }),
+}));
 jest.mock("@/lib/backend-providers-sync", () => ({
   scheduleStartupBackendProvidersSync,
 }));
@@ -34,6 +38,7 @@ describe("instrumentation register", () => {
 
     expect(cleanupAllExpiredSessions).toHaveBeenCalledTimes(1);
     expect(cleanupOrphanWorkspaces).toHaveBeenCalledTimes(1);
+    expect(purgeExpiredTrashedProjects).toHaveBeenCalledTimes(1);
     expect(scheduleStartupBackendProvidersSync).toHaveBeenCalledTimes(1);
     expect(scheduleStartupImageDescriptionSync).toHaveBeenCalledTimes(1);
     expect(scheduleStartupImageGenSync).toHaveBeenCalledTimes(1);

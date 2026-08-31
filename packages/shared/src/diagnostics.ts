@@ -182,6 +182,12 @@ const DEFAULT_ALLOWED_PAYLOAD_KEYS = new Set([
 ]);
 
 const EVENT_PAYLOAD_ALLOWLIST: Record<string, readonly string[]> = {
+  "whiteboard.code_import.completed": ["durationMs", "nodeCount", "success"],
+  "whiteboard.code_import.failed": ["diagnosticCodes", "durationMs"],
+  "whiteboard.asset_localization.completed": ["durationMs", "firstUsableImageLatencyMs", "assetCount", "success"],
+  "whiteboard.asset_localization.failed": ["durationMs", "assetCount", "errorCode"],
+  "whiteboard.commit.completed": ["commitLatencyMs", "documentRevision", "success"],
+  "whiteboard.commit.failed": ["commitLatencyMs", "success", "errorCode"],
   "ai.message_submitted": ["messageId", "contentLength", "model"],
   "ai.before_send_failed": ["message", "phase", "errorCode", "httpStatus"],
   "ai.run_started": ["messageId", "runId", "contentLength", "model", "workingDir", "demoId", "logPath"],

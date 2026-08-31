@@ -1,0 +1,4 @@
+{
+  "compilerOptions": { "target": "ES2020", "module": "esnext", "moduleResolution": "bundler", "lib": ["ES2020"], "strict": true, "skipLibCheck": true, "noEmit": true, "forceConsistentCasingInFileNames": true, "baseUrl": ".", "paths": { "@workbench/sketch-core": ["../sketch-core/src/index.ts"] } },
+  "include": ["src/**/*", "tests/**/*"]
+}

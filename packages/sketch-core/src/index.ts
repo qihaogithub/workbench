@@ -1394,7 +1394,7 @@ export function renderSketchSceneToSvgMarkup(
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="Sketch scene">`,
     "<defs>",
-    '<marker id="sketch-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto-start-reverse" markerUnits="strokeWidth">',
+    '<marker id="sketch-arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto-start-reverse" markerUnits="strokeWidth">',
     '<path d="M0,0 L0,6 L9,3 z" fill="context-stroke" />',
     "</marker>",
     "</defs>",

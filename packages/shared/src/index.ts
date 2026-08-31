@@ -266,7 +266,8 @@ export type CollabResourceKind =
   | "project-schema"
   | "workspace-tree"
   | "canvas-layout"
-  | "knowledge-document";
+  | "knowledge-document"
+  | "whiteboard-document";
 
 export type CollabSyncStatus =
   | "connecting"
@@ -437,6 +438,7 @@ export * from "./diagnostics";
 export * from "./ai-error-normalizer";
 export * from "./comment";
 export * from "./feedback";
+export * from "./whiteboard";
 
 /** 图片附件，Base64 编码 */
 export interface ImageAttachment {

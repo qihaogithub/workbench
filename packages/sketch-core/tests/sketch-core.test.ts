@@ -93,6 +93,7 @@ describe("sketch-core", () => {
 
     const svg = renderSketchSceneToSvgMarkup(scene);
     expect(svg).toContain('orient="auto-start-reverse"');
+    expect(svg).toContain('markerWidth="10" markerHeight="10" refX="9" refY="3"');
     expect(svg).toContain('data-sketch-node-id="default-arrow" opacity="1" x1="20" y1="20" x2="100" y2="20"');
     expect(svg).toContain('data-sketch-node-id="default-arrow" opacity="1" x1="20" y1="20" x2="100" y2="20" stroke="#1F2937" stroke-width="1" stroke-linecap="round" marker-end="url(#sketch-arrow)"');
     expect(svg).toContain('data-sketch-node-id="double-arrow" opacity="1" x1="20" y1="50" x2="100" y2="50" stroke="#1F2937" stroke-width="1" stroke-linecap="round" marker-start="url(#sketch-arrow)" marker-end="url(#sketch-arrow)"');

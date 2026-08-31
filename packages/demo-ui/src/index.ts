@@ -6,6 +6,9 @@ export type {
   DemoSchema,
   PreviewPanelProps,
   ConfigFormProps,
+  ImageConfigScope,
+  ImageConfigTarget,
+  WhiteboardLauncher,
   DesignSpecEntryLink,
   PreviewMode,
   PreviewState,
@@ -224,6 +227,8 @@ export type {
 export { RichTextEditor } from "./RichTextEditor";
 export { customWidgets, ColorPickerWidget, FileUploadWidget } from "./widgets";
 export type { FileUploadWidgetOptions, FileUploadWidgetProps, VideoValue } from "./widgets";
+export { ImageInputActions } from "./ImageInputActions";
+export type { ImageInputActionsProps } from "./ImageInputActions";
 export { ImageListWidget } from "./ImageListWidget";
 export type { ImageItem, ImageListWidgetProps } from "./ImageListWidget";
 export { generateIframeHtml, buildIframeHtml } from "./iframe-template";

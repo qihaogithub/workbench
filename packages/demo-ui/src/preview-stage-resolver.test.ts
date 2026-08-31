@@ -20,31 +20,20 @@ function createPage(
 }
 
 describe("preview stage resolver", () => {
-  it("按 presentation、schema 投影、页面尺寸、fallback 的顺序解析尺寸", () => {
+  it("只按 presentation 或 schema 投影解析尺寸，忽略历史 previewSize", () => {
     const page = createPage({
       schema: JSON.stringify({
         $demo: { presentation: { version: 1, mode: "responsive-page", viewport: { width: 1200, height: 800 }, heightBehavior: "content", preset: "custom", source: "user" } },
       }),
       previewSize: { width: 900, height: 600 },
       prototypeMeta: { previewSize: { width: 375, height: 812 } },
-      fallbackPreviewSize: { width: 320, height: 568 },
     });
     expect(resolvePreviewStageSize(page)).toEqual({
       width: 1200,
       height: 800,
     });
 
-    expect(resolvePreviewStageSize({ ...page, schema: undefined })).toEqual({
-      width: 900,
-      height: 600,
-    });
-    expect(
-      resolvePreviewStageSize({
-        ...page,
-        schema: undefined,
-        previewSize: undefined,
-      }),
-    ).toEqual({ width: 320, height: 568 });
+    expect(resolvePreviewStageSize({ ...page, schema: undefined })).toBeUndefined();
   });
 
   it("统一 renderer 选择优先级", () => {
@@ -103,7 +92,17 @@ describe("preview stage resolver", () => {
   });
 
   it("规范化页面列表并复用未变化的引用", () => {
-    const stablePage = createPage({ previewSize: { width: 800, height: 600 } });
+    const stablePage = createPage({
+      presentation: {
+        version: 1,
+        mode: "responsive-page",
+        viewport: { width: 800, height: 600 },
+        heightBehavior: "content",
+        preset: "custom",
+        source: "user",
+      },
+      previewSize: { width: 800, height: 600 },
+    });
     const stablePages = [stablePage];
     expect(normalizePreviewStagePages(stablePages)).toBe(stablePages);
 

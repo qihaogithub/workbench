@@ -180,6 +180,25 @@ describe("PreviewStage", () => {
     expect(onSinglePageNext).toHaveBeenCalledTimes(1);
   });
 
+  it("在单页编辑工具栏中将连线工具置于宿主尾部控件之前", () => {
+    renderStage({
+      interactionMode: "editor",
+      toolbarTrailing: <button type="button">自定义</button>,
+    });
+
+    const connectorTool = screen.getByRole("button", {
+      name: "绘制页面跳转热区",
+    });
+    const customControl = screen.getByRole("button", { name: "自定义" });
+
+    expect(
+      connectorTool.compareDocumentPosition(customControl) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    fireEvent.click(connectorTool);
+    expect(connectorTool).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("支持宿主 selector、toolbar 和单页内容覆盖", () => {
     renderStage({
       selectorSlot: <span>文档选择器</span>,

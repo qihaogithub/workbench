@@ -1,4 +1,8 @@
 ---
+
+## 模板页管理
+
+CLI 提供单页与批量模板页标记命令，统一调用项目领域服务。命令默认以编辑者身份执行，只有显式管理员身份可以变更模板项目或模板页；这样本地自动化和 CLI 不会因缺失角色而获得管理员权限。
 covers:
   - packages/author-site/src/app/cli/page.tsx
   - packages/author-site/src/lib/project-cli-url.ts

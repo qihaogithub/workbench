@@ -46,7 +46,7 @@ export function DeleteConfirmDialog({
             确认删除
           </DialogTitle>
           <DialogDescription>
-            确定要删除 Demo「{demoName}」吗？此操作无法撤销。
+            确定要将项目「{demoName}」移入回收站吗？项目会保留 30 天，期间可恢复。
           </DialogDescription>
         </DialogHeader>
 

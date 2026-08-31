@@ -51,6 +51,9 @@
       "@workbench/sketch-react": [
         "../sketch-react/src/index.tsx"
       ],
+      "@workbench/whiteboard-core": [
+        "../whiteboard-core/src/index.ts"
+      ],
       "@workbench/demo-ui": [
         "../demo-ui/src/index.ts"
       ],

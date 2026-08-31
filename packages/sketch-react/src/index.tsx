@@ -22,6 +22,7 @@ import {
   Link2,
   Lock,
   LocateFixed,
+  Layers,
   MoreHorizontal,
   MousePointer2,
   PaintBucket,
@@ -31,6 +32,7 @@ import {
   Rows3,
   Square,
   StickyNote,
+  SlidersHorizontal,
   Trash2,
   Type,
   Undo2,
@@ -69,6 +71,7 @@ import type {
   SketchEditorSelection,
   SketchPagePreviewProps,
   SketchPageEditorProps,
+  SketchEditorSurfaceProps,
   SketchEditorController,
   SketchEditorCanvasProps,
   SketchPropertyPanelProps,
@@ -1099,17 +1102,26 @@ export function useSketchEditorState(
   onSceneChange?: (scene: SketchSceneDocument) => void,
   onSelectionChange?: (selection: SketchEditorSelection) => void,
   configData?: Record<string, unknown>,
+  allowedTools?: readonly SketchTool[],
 ) {
   const keyboardScopeId = React.useId();
-  const [tool, setTool] = React.useState<SketchTool>("select");
+  const [tool, setToolState] = React.useState<SketchTool>("select");
   const [inlineTextSelection, setInlineTextSelection] = React.useState<InlineTextSelectionState | null>(null);
   const selectionState = useSketchSelection(scene, onSelectionChange, configData);
   const history = useSketchHistory(scene, onSceneChange);
+  const setTool = React.useCallback((nextTool: SketchTool) => {
+    if (allowedTools && !allowedTools.includes(nextTool)) return;
+    setToolState(nextTool);
+  }, [allowedTools]);
+  React.useEffect(() => {
+    if (allowedTools && !allowedTools.includes(tool)) setToolState("select");
+  }, [allowedTools, tool]);
 
   return {
     keyboardScopeId,
     tool,
     setTool,
+    allowedTools,
     inlineTextSelection,
     setInlineTextSelection,
     ...selectionState,
@@ -2504,6 +2516,16 @@ function downloadBlobFile(filename: string, blob: Blob) {
   URL.revokeObjectURL(url);
 }
 
+export async function renderSketchSceneToPngBlob(
+  scene: SketchSceneDocument,
+  options: SketchExportOptions = { scale: 1, withBackground: true },
+): Promise<Blob> {
+  const svgMarkup = renderExportSvgMarkup(scene, { withBackground: options.withBackground });
+  const blob = await renderSvgToPngBlob(svgMarkup, scene.pageSize, options.scale, options.withBackground);
+  if (!blob) throw new Error("SKETCH_PNG_EXPORT_FAILED");
+  return blob;
+}
+
 async function renderSvgToPngBlob(
   svgMarkup: string,
   size: { width: number; height: number },
@@ -2544,7 +2566,8 @@ async function copyPngToClipboardOrDownload(
   options: SketchExportOptions = { scale: 1, withBackground: false },
 ): Promise<SketchExportResult> {
   const svgMarkup = renderExportSvgMarkup(scene, { withBackground: options.withBackground });
-  const pngBlob = await renderSvgToPngBlob(svgMarkup, scene.pageSize, options.scale, options.withBackground);
+  let pngBlob: Blob | null = null;
+  try { pngBlob = await renderSketchSceneToPngBlob(scene, options); } catch { /* retain legacy SVG download fallback */ }
   if (!pngBlob) {
     downloadTextFile(filename.replace(/\.png$/i, ".svg"), svgMarkup, "image/svg+xml;charset=utf-8");
     return "downloaded";
@@ -2954,7 +2977,7 @@ function buildSketchActionEntries({
   const noSelection = selectedNodes.length ? undefined : "需要先选择对象";
   const noEditableSelection = editableSelectedNodes.length ? undefined : "当前选择不可编辑";
   const noLayerEditableSelection = layerEditableSelectedNodes.length ? undefined : "当前选择不可排序";
-  const tools = TOOL_OPTIONS.map<SketchActionEntry>((item) => ({
+  const tools = TOOL_OPTIONS.filter((item) => !controller.allowedTools || controller.allowedTools.includes(item.tool)).map<SketchActionEntry>((item) => ({
     id: `tool.${item.tool}`,
     section: "tool",
     label: item.label,
@@ -3294,31 +3317,34 @@ function SketchShortcutHelp({
   );
 }
 
-export function SketchEditorToolbar({ scene: _scene, controller, configData: _configData = {}, className }: SketchEditorToolbarProps) {
+export function SketchEditorToolbar({ scene: _scene, controller, configData: _configData = {}, className, allowedTools }: SketchEditorToolbarProps) {
   const toolButtonClass =
-    "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-35";
+    "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-violet-50 hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:opacity-35";
   const actionButtonClass =
-    "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-35";
+    "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-violet-50 hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:opacity-35";
 
   return (
     <div
       className={cn(
-        "flex min-h-12 w-fit max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 text-foreground shadow-2xl",
+        "flex min-h-12 w-fit max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white/95 p-1.5 text-slate-900 shadow-lg backdrop-blur",
         className,
       )}
       onPointerDownCapture={() => activateSketchKeyboardScope(controller)}
     >
-      {TOOL_OPTIONS.map((item) => {
+      {TOOL_OPTIONS.filter((item) => {
+        const tools = allowedTools ?? controller.allowedTools;
+        return !tools || tools.includes(item.tool);
+      }).map((item) => {
         const Icon = item.icon;
         return (
           <button
             key={item.tool}
             type="button"
             title={item.label}
-            aria-label={item.tool === "text" ? "text" : item.label}
+            aria-label={item.label}
             className={cn(
               toolButtonClass,
-              controller.tool === item.tool && "bg-[#7cc7ff] text-[#111111] hover:bg-[#7cc7ff] hover:text-[#111111]",
+              controller.tool === item.tool && "bg-violet-600 text-white shadow-sm hover:bg-violet-600 hover:text-white",
             )}
             onClick={() => controller.setTool(item.tool)}
           >
@@ -3326,16 +3352,16 @@ export function SketchEditorToolbar({ scene: _scene, controller, configData: _co
           </button>
         );
       })}
-      <div className="mx-2 h-8 w-px shrink-0 bg-border" />
+      <div className="mx-2 h-8 w-px shrink-0 bg-slate-200" />
       <button type="button" title="撤销" aria-label="撤销" className={actionButtonClass} disabled={!controller.canUndo} onClick={controller.undo}>
         <Undo2 className="h-4 w-4" />
       </button>
       <button type="button" title="重做" aria-label="重做" className={actionButtonClass} disabled={!controller.canRedo} onClick={controller.redo}>
         <Redo2 className="h-4 w-4" />
       </button>
-      <div className="ml-2 shrink-0 whitespace-nowrap px-2 text-xs text-muted-foreground">
+      <span className="sr-only" aria-live="polite">
         {controller.selection.nodeIds.length ? `${controller.selection.nodeIds.length} selected` : "No selection"}
-      </div>
+      </span>
     </div>
   );
 }
@@ -5411,6 +5437,9 @@ export function SketchEditorCanvas({
   }, [contextMenu]);
   const [commandPaletteOpen, setCommandPaletteOpen] = React.useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = React.useState(false);
+  const [detailsPanelOpen, setDetailsPanelOpen] = React.useState(false);
+  const [detailsPanelTab, setDetailsPanelTab] = React.useState<"properties" | "layers" | "fill" | "stroke" | "more">("properties");
+  const detailsPanelRef = React.useRef<HTMLDivElement>(null);
   const [clipboardVersion, setClipboardVersion] = React.useState(0);
   const [styleClipboardVersion, setStyleClipboardVersion] = React.useState(0);
   const dragStartRef = React.useRef<DragState | null>(null);
@@ -5497,6 +5526,10 @@ export function SketchEditorCanvas({
   }, [controller]);
 
   React.useEffect(() => {
+    if (!controller.selection.nodeIds.length) setDetailsPanelOpen(false);
+  }, [controller.selection.nodeIds.length]);
+
+  React.useEffect(() => {
     if (!contextMenu) return;
     const handlePointerDown = (event: PointerEvent) => {
       if (contextMenuRef.current && !contextMenuRef.current.contains(event.target as Node)) {
@@ -5506,6 +5539,17 @@ export function SketchEditorCanvas({
     document.addEventListener("pointerdown", handlePointerDown);
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [contextMenu]);
+
+  React.useEffect(() => {
+    if (!detailsPanelOpen) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (detailsPanelRef.current && !detailsPanelRef.current.contains(event.target as Node)) {
+        setDetailsPanelOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [detailsPanelOpen]);
 
   const updateInlineTextSelection = React.useCallback((element: HTMLTextAreaElement, nodeId: string) => {
     controller.setInlineTextSelection({
@@ -5731,41 +5775,38 @@ export function SketchEditorCanvas({
     action();
   }, [controller]);
 
-  const cycleSelectedColor = React.useCallback((property: "fill" | "stroke") => {
-    if (!selectedNode) return;
-    const fallback = property === "fill" ? "#ffffff" : "#111827";
-    const nextColor = getNextSketchSwatchColor(selectedNode.style?.[property], fallback);
-    updateSelectedStyle(scene, controller, property === "fill" ? { fill: nextColor } : { stroke: nextColor });
-  }, [controller, scene, selectedNode]);
+  const openDetailsBubble = React.useCallback((tab: "properties" | "layers" | "fill" | "stroke" | "more") => {
+    setShortcutHelpOpen(false);
+    setCommandPaletteOpen(false);
+    setDetailsPanelTab(tab);
+    setDetailsPanelOpen(true);
+  }, []);
 
   const floatingToolbarActions = React.useMemo<SketchFloatingToolbarAction[]>(() => {
     if (!quickToolbarPosition) return [];
-    const openMore = () => {
-      setShortcutHelpOpen(false);
-      setCommandPaletteOpen(true);
-    };
+    const openMore = () => openDetailsBubble("more");
     if (selectedNodes.length === 1 && selectedNode) {
       const actions: SketchFloatingToolbarAction[] = [];
       if (supportsFillStyle(selectedNode)) {
         actions.push({
           id: "fill",
           label: "填充",
-          title: "切换填充常用色",
+          title: "编辑填充",
           icon: <PaintBucket className="h-3.5 w-3.5" />,
           swatchColor: toColorInputValue(selectedNode.style?.fill, "#ffffff"),
           disabled: !canEditNodeProperties(selectedNode),
-          onClick: () => runQuickToolbarAction(() => cycleSelectedColor("fill")),
+          onClick: () => runQuickToolbarAction(() => openDetailsBubble("fill")),
         });
       }
       if (supportsStrokeStyle(selectedNode)) {
         actions.push({
           id: "stroke",
           label: "描边",
-          title: "切换描边常用色",
+          title: "编辑描边",
           icon: <PenLine className="h-3.5 w-3.5" />,
           swatchColor: toColorInputValue(selectedNode.style?.stroke, "#111827"),
           disabled: !canEditNodeProperties(selectedNode),
-          onClick: () => runQuickToolbarAction(() => cycleSelectedColor("stroke")),
+          onClick: () => runQuickToolbarAction(() => openDetailsBubble("stroke")),
         });
       }
       if (canInlineEditTextNode(selectedNode, configData)) {
@@ -5783,6 +5824,18 @@ export function SketchEditorCanvas({
           icon: <Copy className="h-3.5 w-3.5" />,
           disabled: !canEditNodeProperties(selectedNode),
           onClick: () => runQuickToolbarAction(copyStyle),
+        },
+        {
+          id: "properties",
+          label: "属性",
+          icon: <SlidersHorizontal className="h-3.5 w-3.5" />,
+          onClick: () => runQuickToolbarAction(() => openDetailsBubble("properties")),
+        },
+        {
+          id: "layers",
+          label: "图层",
+          icon: <Layers className="h-3.5 w-3.5" />,
+          onClick: () => runQuickToolbarAction(() => openDetailsBubble("layers")),
         },
         {
           id: "more",
@@ -5848,9 +5901,9 @@ export function SketchEditorCanvas({
     configData,
     controller,
     copyStyle,
-    cycleSelectedColor,
     editableSelectedNodes.length,
     layerEditableSelectedNodes.length,
+    openDetailsBubble,
     quickToolbarPosition,
     runQuickToolbarAction,
     scene,
@@ -5858,6 +5911,19 @@ export function SketchEditorCanvas({
     selectedNodes.length,
     startInlineTextEdit,
   ]);
+
+  const detailsBubblePosition = React.useMemo(() => {
+    const bubbleWidth = 320;
+    const bubbleHeight = detailsPanelTab === "more" || detailsPanelTab === "fill" || detailsPanelTab === "stroke" ? 210 : 460;
+    const containerWidth = containerRef.current?.clientWidth ?? width;
+    const containerHeight = containerRef.current?.clientHeight ?? height;
+    const toolbarTop = quickToolbarPosition?.top ?? 20;
+    const below = toolbarTop + 44;
+    return {
+      left: Math.max(12, Math.min(containerWidth - bubbleWidth - 12, (quickToolbarPosition?.left ?? bubbleWidth / 2) - bubbleWidth / 2)),
+      top: below + bubbleHeight <= containerHeight - 12 ? below : Math.max(12, toolbarTop - bubbleHeight - 8),
+    };
+  }, [detailsPanelTab, height, quickToolbarPosition, width]);
 
   const getInlineTextEditNodeIdFromPoint = React.useCallback(
     (target: Element, clientX: number, clientY: number): string | null => {
@@ -6091,6 +6157,8 @@ export function SketchEditorCanvas({
           setCommandPaletteOpen(false);
         } else if (shortcutHelpOpen) {
           setShortcutHelpOpen(false);
+        } else if (detailsPanelOpen) {
+          setDetailsPanelOpen(false);
         } else if (inlineTextEdit) {
           cancelInlineTextEdit();
         } else if (drawingDraftRef.current) {
@@ -6226,13 +6294,13 @@ export function SketchEditorCanvas({
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
     };
-  }, [actionEntries, cancelInlineTextEdit, commandPaletteOpen, configData, controller, inlineTextEdit, mode, scene, selectedNodes, setActiveDrawingDraft, shortcutHelpOpen]);
+  }, [actionEntries, cancelInlineTextEdit, commandPaletteOpen, configData, controller, detailsPanelOpen, inlineTextEdit, mode, scene, selectedNodes, setActiveDrawingDraft, shortcutHelpOpen]);
 
   return (
     <div
       ref={containerRef}
       className={cn(
-        "relative min-h-0 flex-1 overflow-hidden bg-[#1f1f1f]",
+        "relative min-h-0 flex-1 overflow-hidden bg-[#f8fafc] [background-image:radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:20px_20px]",
         panStartRef.current ? "cursor-grabbing" : isSpacePanning || controller.tool === "hand" ? "cursor-grab" : "cursor-default",
         className,
       )}
@@ -6577,7 +6645,7 @@ export function SketchEditorCanvas({
           void importImageFile(file, intent);
         }}
       />
-      <div className="absolute left-3 top-3 z-20 flex items-center gap-1 rounded-lg border border-border bg-card/95 p-1 text-foreground shadow-xl">
+      <div className="absolute bottom-4 right-4 z-20 flex items-center gap-1 rounded-xl border border-slate-200 bg-white/95 p-1 text-slate-900 shadow-lg backdrop-blur">
         <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="缩小" title="缩小" onClick={() => zoomViewportBy(0.85)}>
           <ZoomOut className="h-4 w-4" />
         </button>
@@ -6622,6 +6690,60 @@ export function SketchEditorCanvas({
       {shortcutHelpOpen ? (
         <SketchShortcutHelp actions={actionEntries} onClose={() => setShortcutHelpOpen(false)} />
       ) : null}
+      {detailsPanelOpen ? (
+        <div
+          ref={detailsPanelRef}
+          role="dialog"
+          aria-label="草图工具菜单"
+          className="absolute z-40 flex max-h-[min(460px,calc(100%-24px))] w-[min(320px,calc(100%-24px))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-xl"
+          style={detailsBubblePosition}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <div className="flex h-10 shrink-0 items-center gap-1 border-b border-slate-100 px-2">
+            {detailsPanelTab !== "more" ? (
+              <button type="button" className="rounded-lg px-2 py-1 text-xs text-slate-500 hover:bg-slate-100" onClick={() => setDetailsPanelTab("more")}>返回</button>
+            ) : null}
+            <span className="min-w-0 flex-1 truncate px-1 text-xs font-semibold">
+              {detailsPanelTab === "properties" ? "属性" : detailsPanelTab === "layers" ? "图层" : detailsPanelTab === "fill" ? "图形填充" : detailsPanelTab === "stroke" ? "描边" : "更多操作"}
+            </span>
+            <button type="button" className="rounded-lg px-2 py-1 text-xs text-slate-500 hover:bg-slate-100" aria-label="关闭工具菜单" onClick={() => setDetailsPanelOpen(false)}>关闭</button>
+          </div>
+          {detailsPanelTab === "more" ? (
+            <div className="grid gap-1 p-2">
+              <button type="button" className="rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50" onClick={() => setDetailsPanelTab("properties")}>属性与导出</button>
+              <button type="button" className="rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50" onClick={() => setDetailsPanelTab("layers")}>图层管理</button>
+            </div>
+          ) : detailsPanelTab === "fill" || detailsPanelTab === "stroke" ? (
+            <div className="p-3">
+              <p className="mb-3 text-xs text-slate-500">选择常用颜色</p>
+              <div className="grid grid-cols-6 gap-2">
+                {SKETCH_COLOR_SWATCHES.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    aria-label={`${detailsPanelTab === "fill" ? "填充" : "描边"} ${color}`}
+                    className="h-8 rounded-lg border border-slate-200 ring-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+                    style={{ backgroundColor: color }}
+                    onClick={() => updateSelectedStyle(scene, controller, detailsPanelTab === "fill" ? { fill: color } : { stroke: color })}
+                  />
+                ))}
+              </div>
+              <label className="mt-3 flex items-center justify-between text-xs text-slate-600">
+                自定义颜色
+                <input
+                  type="color"
+                  value={toColorInputValue(selectedNode?.style?.[detailsPanelTab === "fill" ? "fill" : "stroke"], detailsPanelTab === "fill" ? "#ffffff" : "#111827")}
+                  onChange={(event) => updateSelectedStyle(scene, controller, detailsPanelTab === "fill" ? { fill: event.target.value } : { stroke: event.target.value })}
+                />
+              </label>
+            </div>
+          ) : (
+            <div className="min-h-0 flex-1 overflow-hidden">
+              {detailsPanelTab === "properties" ? <SketchPropertyPanel scene={scene} controller={controller} configData={configData} className="h-full border-0 bg-white" /> : <SketchLayerPanel scene={scene} controller={controller} configData={configData} className="h-full border-0 bg-white" />}
+            </div>
+          )}
+        </div>
+      ) : null}
       {quickToolbarPosition && floatingToolbarActions.length ? (
         <SketchFloatingToolbar
           left={quickToolbarPosition.left}
@@ -6633,7 +6755,7 @@ export function SketchEditorCanvas({
       <div
         ref={stageRef}
         data-sketch-stage
-        className="absolute left-0 top-0 bg-white shadow-[0_18px_60px_rgba(0,0,0,0.35)] ring-1 ring-black/30"
+        className="absolute left-0 top-0 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.16)] ring-1 ring-slate-200"
         style={{
           width: fillContainer ? "100%" : width,
           height: fillContainer ? "100%" : height,
@@ -7250,6 +7372,38 @@ export function SketchPageEditor({
   );
 }
 
+/**
+ * Standard editable whiteboard workspace. Hosts own the surrounding chrome and
+ * persistence, while the canvas, keyboard scope, and floating primary toolbar
+ * remain one shared composition.
+ */
+export function SketchEditorSurface({
+  scene,
+  configData = {},
+  allowedTools,
+  fillContainer = false,
+  className,
+  onSceneChange,
+  onSelectionChange,
+}: SketchEditorSurfaceProps) {
+  const controller = useSketchEditorState(scene, onSceneChange, onSelectionChange, configData, allowedTools);
+
+  return (
+    <div data-sketch-editor-surface className={cn("relative flex h-full min-h-0 flex-col overflow-hidden bg-slate-100", className)}>
+      <SketchEditorCanvas
+        scene={scene}
+        controller={controller}
+        configData={configData}
+        fillContainer={fillContainer}
+        className="h-full"
+      />
+      <div className="pointer-events-none absolute inset-x-0 bottom-5 z-20 flex justify-center px-4">
+        <SketchEditorToolbar scene={scene} controller={controller} configData={configData} allowedTools={allowedTools} className="pointer-events-auto" />
+      </div>
+    </div>
+  );
+}
+
 export type {
   PreviewSize,
   SketchTool,
@@ -7257,6 +7411,7 @@ export type {
   SketchEditorSelection,
   SketchPagePreviewProps,
   SketchPageEditorProps,
+  SketchEditorSurfaceProps,
   SketchEditorController,
   SketchEditorPartProps,
   SketchEditorCanvasProps,

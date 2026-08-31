@@ -34,6 +34,7 @@ const RESOURCE_KINDS: CollabResourceKind[] = [
   "workspace-tree",
   "canvas-layout",
   "knowledge-document",
+  "whiteboard-document",
 ];
 
 function isResourceKind(value: unknown): value is CollabResourceKind {

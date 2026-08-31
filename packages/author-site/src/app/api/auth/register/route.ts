@@ -35,12 +35,13 @@ export async function POST(request: NextRequest) {
     const token = await createToken({
       userId: user.id,
       username: user.username,
+      role: user.role,
     });
     await setAuthCookie(token);
 
     return NextResponse.json(
       createApiSuccess({
-        user: { id: user.id, username: user.username },
+        user: { id: user.id, username: user.username, role: user.role },
       }),
     );
   } catch (error) {

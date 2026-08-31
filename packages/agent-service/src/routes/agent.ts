@@ -49,6 +49,7 @@ interface SendMessageBody {
   };
 }
 
+
 async function resolveCurrentModelId(agent: unknown): Promise<string | undefined> {
   if (!agent || typeof agent !== 'object' || !('getModelInfo' in agent)) {
     return undefined;
@@ -119,6 +120,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
       },
     });
   });
+
 
   scoped.post<{ Params: SessionParams; Body: SendMessageBody }>(
     '/api/agent/:sessionId/message',

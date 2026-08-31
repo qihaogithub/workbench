@@ -8,9 +8,26 @@ export function initializeDatabase(): void {
       id TEXT PRIMARY KEY,
       username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
-      created_at INTEGER NOT NULL
+      created_at INTEGER NOT NULL,
+      role TEXT NOT NULL DEFAULT 'editor'
     )
   `);
+
+  // 幂等兼容已有数据库：旧表没有 role 列时补列，并按注册时间初始化角色。
+  const userColumns = db.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>;
+  let addedRoleColumn = false;
+  if (!userColumns.some((column) => column.name === "role")) {
+    db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'editor'");
+    addedRoleColumn = true;
+  }
+  db.prepare(`
+    UPDATE users SET role = CASE
+      WHEN id = (SELECT id FROM users ORDER BY created_at ASC, rowid ASC LIMIT 1)
+        THEN 'admin'
+      ELSE 'editor'
+    END
+    WHERE ? OR role IS NULL OR role NOT IN ('admin', 'editor')
+  `).run(addedRoleColumn ? 1 : 0);
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS system_configs (

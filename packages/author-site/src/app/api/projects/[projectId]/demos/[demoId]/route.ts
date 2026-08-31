@@ -10,6 +10,7 @@ import type {
   DemoPageMeta,
   WorkspaceTree,
 } from "@workbench/shared";
+import { isWhiteboardBinding } from "@workbench/shared";
 import {
   createApiSuccess,
   createApiError,
@@ -108,6 +109,21 @@ function createManagedPageDeleteOperations(
     const bPath = "path" in b ? b.path : b.from;
     return aPath.localeCompare(bPath);
   });
+}
+
+/** Removing a page detaches its bindings in the same revision; documents remain for delayed, reachability-based GC. */
+function createWhiteboardDetachOperation(workspacePath: string, demoId: string): WorkspaceMutationOperation | null {
+  const bindingsPath = path.join(workspacePath, "whiteboards", "bindings.json");
+  if (!fs.existsSync(bindingsPath)) return null;
+  try {
+    const content = fs.readFileSync(bindingsPath, "utf8");
+    const raw = JSON.parse(content) as { bindings?: unknown };
+    if (!Array.isArray(raw.bindings)) return null;
+    const bindings = raw.bindings.filter(isWhiteboardBinding);
+    const retained = bindings.filter((binding) => binding.target.scope !== "page" || binding.target.pageId !== demoId);
+    if (retained.length === bindings.length) return null;
+    return { type: "put_text", path: "whiteboards/bindings.json", content: JSON.stringify({ bindings: retained }, null, 2), expectedHash: hashText(content) };
+  } catch { return null; }
 }
 
 function getDeletedPageSnapshotPath(
@@ -696,6 +712,10 @@ export async function DELETE(
     }
 
     if (liveWorkspace && treeSnapshot) {
+      const detachWhiteboard = createWhiteboardDetachOperation(
+        ctx.ctx.workspacePath,
+        demoId,
+      );
       await commitWorkspaceMutation({
         mutationId: crypto.randomUUID(),
         projectId,
@@ -706,6 +726,7 @@ export async function DELETE(
         reason: "delete_demo_page",
         operations: [
           ...createManagedPageDeleteOperations(ctx.ctx.workspacePath, demoId),
+          ...(detachWhiteboard ? [detachWhiteboard] : []),
           createWorkspaceTreePutOperation({
             previousContent: treeSnapshot.content,
             tree: {
@@ -724,11 +745,21 @@ export async function DELETE(
     }
 
     // Branch/non-live workspace: direct file write is expected behavior. Live workspace writes go through Authority above.
+    const detachWhiteboard = createWhiteboardDetachOperation(
+      ctx.ctx.workspacePath,
+      demoId,
+    );
     const success = deleteWorkspaceDemoPage(ctx.ctx.workspaceId, demoId);
     if (!success) {
       return NextResponse.json(
         createApiError("FILE_WRITE_ERROR", "删除页面失败"),
         { status: 500 },
+      );
+    }
+    if (detachWhiteboard?.type === "put_text") {
+      fs.writeFileSync(
+        path.join(ctx.ctx.workspacePath, detachWhiteboard.path),
+        detachWhiteboard.content,
       );
     }
 

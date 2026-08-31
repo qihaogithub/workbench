@@ -359,7 +359,6 @@ export default function ViewerProjectPage() {
           ...runtimeData,
           configData: configDataMap[page.id],
           schema: page.schema,
-          previewSize: page.previewSize,
         };
       }),
     [configDataMap, data],

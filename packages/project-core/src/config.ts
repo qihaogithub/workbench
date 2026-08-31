@@ -59,12 +59,12 @@ export function getProjectAdminMode(
 
 export function getProjectAdminActorEnv(): ProjectAdminActor {
   const role = (process.env.PROJECT_ADMIN_ROLE ??
-    "admin") as ProjectAdminActor["role"];
+    "creator") as ProjectAdminActor["role"];
   const user = process.env.USER ?? "local-codex";
   return {
     id: user,
     name: user,
-    role: ["admin", "creator", "readonly"].includes(role) ? role : "admin",
+    role: ["admin", "creator", "readonly"].includes(role) ? role : "creator",
     source: "project-admin-core",
     allowedProjectIds: parseCsvEnv(process.env.PROJECT_ADMIN_ALLOWED_PROJECTS),
   };

@@ -65,11 +65,22 @@ import {
   createResolveCommentTool,
 } from "./comment-tools";
 import { createSubmitFeedbackTool } from "./feedback-tool";
+import {
+  createApplyWhiteboardActionsTool,
+  createGenerateWhiteboardAssetTool,
+  createImportWhiteboardCodeTool,
+  createPlanWhiteboardCompositionTool,
+  createReadWhiteboardContextTool,
+  createSerializeWhiteboardCodeTool,
+  createUndoWhiteboardEditTool,
+} from "./whiteboard-tool";
 
-export const WORKBENCH_TOOL_VERSION = 29;
+export const WORKBENCH_TOOL_VERSION = 31;
 
 const SKETCH_SCENE_TOOLS_ENABLED =
   process.env.PI_AGENT_SKETCH_TOOLS_ENABLED === "true";
+const WHITEBOARD_TOOLS_ENABLED =
+  process.env.PI_AGENT_WHITEBOARD_TOOLS_ENABLED === "true";
 
 export type { PermissionHandler };
 export type { SubagentRunner, SubagentRunResult } from "./subagent-tool";
@@ -96,10 +107,10 @@ const CONTROL_TOOL_NAMES = new Set([
 ]);
 
 const CAPABILITY_TOOL_NAMES: Record<Exclude<CapabilityName, "all">, ReadonlySet<string>> = {
-  workspace: new Set(["readFile", "readUploadedFile", "listFiles", "editFile", "writeFile", "deleteFile", "bash", "schemaValidate", "knowledgeReport", "readKnowledgeSource", "getConsoleLogs", "captureScreenshot"]),
+  workspace: new Set(["readFile", "readUploadedFile", "listFiles", "editFile", "writeFile", "deleteFile", "bash", "schemaValidate", "knowledgeReport", "readKnowledgeSource", "getConsoleLogs", "captureScreenshot", "readWhiteboardContext", "applyWhiteboardActions", "serializeWhiteboardCode", "importWhiteboardCode", "planWhiteboardComposition", "undoWhiteboardEdit"]),
   pages: new Set(["createPage", "listPages", "arrangeCanvasPages", "previewDeletePages", "executeDeletePagePlan", "deletePage", "deletePages"]),
   comments: new Set(["readComments", "inspectElement", "replyComment", "resolveComment", "submitFeedback"]),
-  image: new Set(["saveImage", "listImages", "readUserImage", "captureScreenshot", "delegateTask"]),
+  image: new Set(["saveImage", "listImages", "readUserImage", "captureScreenshot", "delegateTask", "generateWhiteboardAsset"]),
   web: new Set(["webRead", "webSearch"]),
   external: new Set(["figmaMcp", "dingtalk"]),
 };
@@ -111,10 +122,10 @@ const INITIAL_TOOL_NAMES = new Set([
 
 export function formatCapabilityDirectory(): string {
   const entries = [
-    "- `workspace`：文件编辑、命令、校验、知识与诊断。",
+    "- `workspace`：文件编辑、命令、校验、知识、诊断，以及（启用时）白板 document/代码/语义 action、只读 composition plan 与可确认撤销。",
     "- `pages`：原子创建页面、页面列表、画布整理和受确认的页面删除。",
     "- `comments`：评论读取、定位、回复和解决。",
-    "- `image`：图片素材、截图与图像子 Agent。",
+    "- `image`：图片素材、截图、白板候选资产与图像子 Agent。",
     "- `web`：公开网页阅读与联网搜索（取决于服务端配置）。",
     "- `external`：已配置的 Figma、钉钉等外部集成。",
   ];
@@ -194,6 +205,17 @@ export function createWorkbenchTools(
     createReadPreinstalledSkillTool(),
     createActivateCapabilitiesTool(options.capabilityActivationHandler),
     createArrangeCanvasPagesTool(config),
+    ...(WHITEBOARD_TOOLS_ENABLED
+      ? [
+          createReadWhiteboardContextTool(config),
+          createApplyWhiteboardActionsTool(config, permissionHandler),
+          createSerializeWhiteboardCodeTool(config),
+          createImportWhiteboardCodeTool(config, permissionHandler),
+          createPlanWhiteboardCompositionTool(config),
+          createGenerateWhiteboardAssetTool(config),
+          createUndoWhiteboardEditTool(config, permissionHandler),
+        ]
+      : []),
     ...(SKETCH_SCENE_TOOLS_ENABLED
       ? [
           createReadSketchSceneTool(config),
