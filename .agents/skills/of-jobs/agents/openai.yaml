@@ -1,0 +1,6 @@
+interface:
+  display_name: "乔布斯｜OF 产品组长"
+  short_description: "OneFlow 产品目标、范围、优先级、需求与验收标准负责人"
+  default_prompt: "使用 $of-jobs 把这个想法整理成可实施、可验收的 OneFlow 需求。"
+policy:
+  allow_implicit_invocation: false
