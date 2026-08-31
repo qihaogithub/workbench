@@ -342,6 +342,38 @@ describe("sketch-core", () => {
     expect(validateSketchSceneDocument(next).valid).toBe(true);
   });
 
+  it("validates and renders explicit italic and text decoration values", () => {
+    const scene = testScene([
+      {
+        id: "styled-text",
+        type: "text",
+        x: 20,
+        y: 20,
+        width: 120,
+        height: 40,
+        text: "Styled",
+        style: { italic: false, textDecoration: "none" },
+        textStyleRuns: [{ start: 0, length: 6, style: { italic: true, textDecoration: "underline" } }],
+      },
+    ]);
+    const invalidItalic = {
+      ...scene.nodes[0],
+      style: { italic: "yes" },
+    } as unknown as SketchSceneNode;
+    const invalidDecoration = {
+      ...scene.nodes[0],
+      textStyleRuns: [{ start: 0, length: 6, style: { textDecoration: "wavy" } }],
+    } as unknown as SketchSceneNode;
+
+    expect(validateSketchSceneDocument(scene).valid).toBe(true);
+    expect(validateSketchSceneDocument(testScene([invalidItalic])).valid).toBe(false);
+    expect(validateSketchSceneDocument(testScene([invalidDecoration])).valid).toBe(false);
+
+    const svg = renderSketchSceneToSvgMarkup(scene);
+    expect(svg).toContain('font-style="normal" text-decoration="none"');
+    expect(svg).toContain('font-style="italic" text-decoration="underline"');
+  });
+
   it("rejects invalid optional node fields that can corrupt rendering state", () => {
     const invalidStateNode = {
       id: "bad-state",
