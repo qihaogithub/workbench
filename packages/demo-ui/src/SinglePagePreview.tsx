@@ -40,6 +40,9 @@ function SinglePagePreviewInternal({
   navigationHotspots,
   navigationConnections,
   navigationEditable = false,
+  navigationActive: controlledNavigationActive,
+  onNavigationActiveChange,
+  showNavigationTool = true,
   onCreateNavigation,
   onUpdateNavigationHotspot,
   onUpdateNavigationTarget,
@@ -49,7 +52,7 @@ function SinglePagePreviewInternal({
   console.count("[perf] SinglePagePreview render");
   const previewSize = useMemo(
     () => (page ? resolvePreviewStageSize(page) : undefined),
-    [page?.schema, page?.previewSize, page?.fallbackPreviewSize],
+    [page?.presentation, page?.schema],
   );
   const renderer = page ? resolvePagePreviewRenderer(page) : "empty";
   const presentation = useMemo(
@@ -58,7 +61,16 @@ function SinglePagePreviewInternal({
       (page?.schema ? resolvePagePresentation(page.schema) : undefined),
     [page?.schema, page?.presentation],
   );
-  const [navigationActive, setNavigationActive] = useState(false);
+  const [uncontrolledNavigationActive, setUncontrolledNavigationActive] =
+    useState(false);
+  const navigationActive =
+    controlledNavigationActive ?? uncontrolledNavigationActive;
+  const setNavigationActive = (active: boolean) => {
+    if (controlledNavigationActive === undefined) {
+      setUncontrolledNavigationActive(active);
+    }
+    onNavigationActiveChange?.(active);
+  };
 
   let content: React.ReactNode = emptyState ?? <DefaultEmptyState />;
 
@@ -147,9 +159,9 @@ function SinglePagePreviewInternal({
           display: none;
         }
       `}</style>
-      {page && navigationEditable && (
+      {page && navigationEditable && showNavigationTool && (
         <button type="button" className={cn("absolute right-5 top-5 z-40 flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border bg-background/90 text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", navigationActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground")}
-          aria-label="绘制页面跳转热区" aria-pressed={navigationActive} title="绘制页面跳转热区" onClick={() => setNavigationActive((value) => !value)}>
+          aria-label="绘制页面跳转热区" aria-pressed={navigationActive} title="绘制页面跳转热区" onClick={() => setNavigationActive(!navigationActive)}>
           <Route className="h-4 w-4" />
         </button>
       )}
@@ -221,6 +233,21 @@ function areSinglePagePreviewPropsEqual(
 ): boolean {
   if (prev.rendererProps !== next.rendererProps) return false;
   if (prev.onRequestPasteHtmlContent !== next.onRequestPasteHtmlContent) {
+    return false;
+  }
+  if (
+    prev.navigationPages !== next.navigationPages ||
+    prev.navigationHotspots !== next.navigationHotspots ||
+    prev.navigationConnections !== next.navigationConnections ||
+    prev.navigationEditable !== next.navigationEditable ||
+    prev.navigationActive !== next.navigationActive ||
+    prev.showNavigationTool !== next.showNavigationTool ||
+    prev.onNavigationActiveChange !== next.onNavigationActiveChange ||
+    prev.onCreateNavigation !== next.onCreateNavigation ||
+    prev.onUpdateNavigationHotspot !== next.onUpdateNavigationHotspot ||
+    prev.onUpdateNavigationTarget !== next.onUpdateNavigationTarget ||
+    prev.onDeleteNavigationHotspot !== next.onDeleteNavigationHotspot
+  ) {
     return false;
   }
   if (prev.page === next.page) return true;

@@ -160,6 +160,13 @@ export interface ProjectSummary extends DemoMeta {
   publishedAt?: number;
 }
 
+/** A project stored outside the active projects directory until it is restored or purged. */
+export interface TrashedProjectSummary extends ProjectSummary {
+  deletedAt: number;
+  purgeAt: number;
+  deletedBy: Pick<ProjectAdminActor, "id" | "name" | "role">;
+}
+
 export interface ProjectDetail {
   project: Project;
   pages: DemoPageMeta[];
@@ -637,6 +644,20 @@ export interface PageCreateInput {
   htmlImportMeta?: HtmlImportMeta;
   sketchScene?: string;
   sketchMeta?: Record<string, unknown>;
+  dryRun?: boolean;
+}
+
+export interface PageTemplateUpdateInput {
+  projectId: string;
+  pageId: string;
+  isTemplatePage: boolean;
+  dryRun?: boolean;
+}
+
+export interface PageTemplateBatchUpdateInput {
+  projectId: string;
+  pageIds: string[];
+  isTemplatePage: boolean;
   dryRun?: boolean;
 }
 

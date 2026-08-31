@@ -280,6 +280,18 @@ describe("多 Demo 页面 — fs-utils", () => {
       expect(renamed.order).toBe(5);
     });
 
+    it("更新其他页面元数据时保留模板页标记", () => {
+      const demoId = "template_page";
+      writeDemoPageMeta(ws, demoId, {
+        name: "模板页",
+        isTemplatePage: true,
+      });
+
+      const renamed = writeDemoPageMeta(ws, demoId, { name: "重命名后的模板页" });
+      expect(renamed.isTemplatePage).toBe(true);
+      expect(readDemoPageMeta(ws, demoId)?.isTemplatePage).toBe(true);
+    });
+
     it("重复 routeKey 写入时应自动生成唯一值", () => {
       const first = writeDemoPageMeta(ws, "demo_a", {
         name: "Home",

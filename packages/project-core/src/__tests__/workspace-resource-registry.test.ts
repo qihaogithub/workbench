@@ -55,6 +55,8 @@ describe("WorkspaceResourceRegistry", () => {
       [".canvas-layout.json", "canvas-layout", "json-object"],
       ["knowledge/guide.md", "knowledge-document", "text"],
       ["knowledge/manifest.json", "knowledge-manifest", "json-object"],
+      ["whiteboards/wb_1.json", "whiteboard-document", "whiteboard-document"],
+      ["whiteboards/bindings.json", "whiteboard-bindings", "whiteboard-bindings"],
       ["assets/image.png", "asset", "binary"],
     ] as const;
 
@@ -82,6 +84,18 @@ describe("WorkspaceResourceRegistry", () => {
       JSON.stringify(createDefaultSketchScene()),
     )).not.toThrow();
     expect(() => registry.assertTextWrite("demos/page-1/sketch.scene.json", "{}")).toThrow("WORKSPACE_INVALID_OPERATION");
+    const whiteboard = {
+      id: "wb_1",
+      version: 1,
+      scene: createDefaultSketchScene(),
+      editorView: { zoom: 1, offsetX: 0, offsetY: 0 },
+      updatedAt: 1,
+    };
+    expect(() => registry.assertTextWrite("whiteboards/wb_1.json", JSON.stringify(whiteboard))).not.toThrow();
+    expect(() => registry.assertTextWrite("whiteboards/wb_1.json", "{}")).toThrow("WORKSPACE_INVALID_OPERATION");
+    expect(() => registry.assertTextWrite("whiteboards/bindings.json", JSON.stringify({ bindings: [{
+      id: "binding-1", target: { scope: "page", pageId: "page-1", fieldPath: ["image"] }, whiteboardId: "wb_1", sceneRevision: 1, outputAssetHash: "a", updatedAt: 1,
+    }] }))).not.toThrow();
     expect(() => registry.assertBinaryWrite("assets/image.png", Buffer.from([1, 2, 3]))).not.toThrow();
     expect(() => registry.assertBinaryWrite("assets/image.png", Buffer.alloc(0))).toThrow("WORKSPACE_INVALID_OPERATION");
     expect(() => registry.assertBinaryWrite("demos/page-1/index.tsx", Buffer.from("x"))).toThrow("WORKSPACE_INVALID_OPERATION");

@@ -4,7 +4,10 @@
  * 提供侧边栏导航和主内容区布局
  */
 
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Settings, Database, Users, Bot } from "lucide-react";
 
 export default function AdminLayout({
@@ -12,6 +15,12 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+  const navItems = [
+    { href: "/admin", label: "概览", icon: Settings },
+    { href: "/admin/models", label: "AI 模型管理", icon: Bot },
+    { href: "/admin/users", label: "用户管理", icon: Users },
+  ];
   return (
     <div className="min-h-screen bg-neutral-950">
       {/* 顶部导航栏 */}
@@ -31,28 +40,16 @@ export default function AdminLayout({
         <div className="flex gap-8">
           {/* 侧边栏导航 */}
           <aside className="w-64 shrink-0">
-            <nav className="space-y-2">
-              <Link
-                href="/admin"
-                className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors hover:bg-neutral-800 text-neutral-400 hover:text-neutral-100"
-              >
-                <Settings className="h-5 w-5" />
-                概览
-              </Link>
-              <Link
-                href="/admin/models"
-                className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors hover:bg-neutral-800 text-neutral-400 hover:text-neutral-100"
-              >
-                <Bot className="h-5 w-5" />
-                AI 模型管理
-              </Link>
-              <Link
-                href="/admin/users"
-                className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors hover:bg-neutral-800 text-neutral-400 hover:text-neutral-100"
-              >
-                <Users className="h-5 w-5" />
-                用户管理
-              </Link>
+            <nav className="space-y-2" aria-label="管理后台导航">
+              {navItems.map(({ href, label, icon: Icon }) => {
+                const active = href === "/admin" ? pathname === href : pathname.startsWith(href);
+                return (
+                  <Link key={href} href={href} aria-current={active ? "page" : undefined} className={`flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors ${active ? "bg-indigo-500/15 text-indigo-300 ring-1 ring-inset ring-indigo-400/25" : "text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"}`}>
+                    <Icon className="h-5 w-5" />
+                    {label}
+                  </Link>
+                );
+              })}
             </nav>
           </aside>
 

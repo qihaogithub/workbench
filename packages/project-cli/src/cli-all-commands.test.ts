@@ -464,6 +464,27 @@ try {
   const committedVersionId = dataOf<{ version: { versionId: string } }>(committedEdit).version.versionId;
   const committedAuditId = String(committedEdit.auditId ?? "");
 
+  await runCommand("page update-template", [
+    "page",
+    "update-template",
+    "--project",
+    projectId,
+    "--page",
+    pageId,
+    "--is-template-page",
+    "true",
+  ]);
+  await runCommand("page update-templates", [
+    "page",
+    "update-templates",
+    "--project",
+    projectId,
+    "--page-ids",
+    JSON.stringify([pageId, prototypePageId]),
+    "--is-template-page",
+    "false",
+  ]);
+
   const createdResourceVersion = await runCommand("resource version-create", [
     "resource",
     "version-create",

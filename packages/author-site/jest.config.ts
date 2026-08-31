@@ -30,6 +30,7 @@ const config: Config = {
     '^@workbench/ai-chat-shared/(.*)$': '<rootDir>/../ai-chat-shared/src/$1',
     '^@workbench/demo-ui$': '<rootDir>/../demo-ui/src/index.ts',
     '^@workbench/demo-ui/(.*)$': '<rootDir>/../demo-ui/src/$1',
+    '^@workbench/whiteboard-core$': '<rootDir>/../whiteboard-core/src/index.ts',
     '^\\./config\\.js$': '<rootDir>/../project-core/src/config.ts',
     '^\\./constants\\.js$': '<rootDir>/../project-core/src/constants.ts',
     '^\\./internal-types\\.js$': '<rootDir>/../project-core/src/internal-types.ts',

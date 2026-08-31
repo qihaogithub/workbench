@@ -13,88 +13,10 @@ import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { uploadImage } from "@/lib/image-store";
 import { addProjectImage, type ProjectImage } from "@/lib/project-images";
 import { selectSpinePackage, ANIMATION_ASSET_EXTS } from "./extract-spine-package";
-
-const ALLOWED_MIME_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/gif",
-  "image/webp",
-  "image/svg+xml",
-];
-const ALLOWED_VIDEO_MIME_TYPES = ["video/mp4", "video/webm"];
-
-const ALLOWED_EXTENSIONS = new Set([
-  ".jpg",
-  ".jpeg",
-  ".png",
-  ".gif",
-  ".webp",
-  ".svg",
-  ".svga",
-  ".lottie",
-  ".riv",
-  ".json",
-  ".skel",
-  ".atlas",
-  ".zip",
-  ".mp4",
-  ".webm",
-]);
+import { getFileExtension, hasAllowedAssetExtension, isAllowedAssetFile, MAX_VIDEO_SIZE } from "./asset-validation";
 
 const DEFAULT_MAX_SIZE = 50 * 1024 * 1024; // 50MB
-export const MAX_VIDEO_SIZE = 200 * 1024 * 1024; // 200MB
 
-const OCTET_STREAM_EXTENSIONS = new Set([".svga", ".lottie", ".riv", ".skel", ".atlas"]);
-
-const ZIP_MIME_TYPES = new Set([
-  "",
-  "application/octet-stream",
-  "application/zip",
-  "application/x-zip-compressed",
-  "application/x-compressed",
-]);
-
-function getFileExtension(filename: string): string {
-  const dotIndex = filename.lastIndexOf(".");
-  if (dotIndex < 0) return "";
-  return filename.slice(dotIndex).toLowerCase();
-}
-
-function hasAllowedAssetExtension(filename: string): boolean {
-  return ALLOWED_EXTENSIONS.has(getFileExtension(filename));
-}
-
-function hasExpectedVideoContainer(buffer: Buffer, extension: string): boolean {
-  if (extension === ".mp4") {
-    return buffer.length >= 8 && buffer.subarray(4, 8).toString("ascii") === "ftyp";
-  }
-  if (extension === ".webm") {
-    return buffer.length >= 4 && buffer.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]));
-  }
-  return false;
-}
-
-export function isAllowedAssetFile(file: File, buffer?: Buffer): boolean {
-  const ext = getFileExtension(file.name);
-  if (!hasAllowedAssetExtension(file.name)) return false;
-  if (ext === ".json") {
-    return file.type === "" || file.type === "application/json";
-  }
-  if (ext === ".zip") {
-    return ZIP_MIME_TYPES.has(file.type);
-  }
-  if (ext === ".mp4" || ext === ".webm") {
-    // Some browsers provide an empty or generic MIME for valid local videos.
-    // The container signature, when available, is authoritative for video uploads.
-    return buffer
-      ? hasExpectedVideoContainer(buffer, ext)
-      : ALLOWED_VIDEO_MIME_TYPES.includes(file.type);
-  }
-  if (OCTET_STREAM_EXTENSIONS.has(ext)) {
-    return file.type === "" || file.type === "application/octet-stream";
-  }
-  return ALLOWED_MIME_TYPES.includes(file.type);
-}
 
 const NON_IMAGE_ANIMATION_EXTS = new Set([".json", ".svga", ".lottie", ".riv", ".skel", ".atlas"]);
 

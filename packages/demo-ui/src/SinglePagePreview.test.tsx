@@ -96,6 +96,14 @@ function createPage(
     order: 0,
     runtimeType: "high-fidelity-react",
     configData: { theme: "dark" },
+    presentation: {
+      version: 1,
+      mode: "responsive-page",
+      viewport: { width: 960, height: 640 },
+      heightBehavior: "content",
+      preset: "custom",
+      source: "user",
+    },
     previewSize: { width: 960, height: 640 },
     ...overrides,
   };
@@ -239,5 +247,32 @@ describe("SinglePagePreview", () => {
     );
 
     expect(screen.getByText("请先创建页面")).toBeInTheDocument();
+  });
+
+  it("响应宿主控制的页面跳转热区激活状态", () => {
+    const page = createPage();
+    const { rerender } = render(
+      <SinglePagePreview
+        page={page}
+        navigationEditable
+        navigationActive={false}
+        showNavigationTool={false}
+      />,
+    );
+
+    expect(
+      screen.queryByLabelText("绘制页面跳转热区"),
+    ).not.toBeInTheDocument();
+
+    rerender(
+      <SinglePagePreview
+        page={page}
+        navigationEditable
+        navigationActive
+        showNavigationTool={false}
+      />,
+    );
+
+    expect(screen.getByLabelText("绘制页面跳转热区")).toBeInTheDocument();
   });
 });

@@ -25,6 +25,18 @@ export type {
   WorkspaceResourceKind,
   WorkspaceRootManifest,
 } from "./workspace-resource-registry";
+export {
+  WHITEBOARD_GC_GRACE_MS,
+  planWhiteboardGarbageCollection,
+  whiteboardGcPathsToDelete,
+} from "./whiteboard-gc";
+export type { WhiteboardGarbageCollectionPlan } from "./whiteboard-gc";
+export {
+  WhiteboardTransactionConflictError,
+  recoverWhiteboardTransaction,
+  writeWhiteboardTransaction,
+} from "./whiteboard-transaction";
+export type { WhiteboardTransactionDelete, WhiteboardTransactionWrite } from "./whiteboard-transaction";
 export type * from "./types";
 export {
   applyPageDesignSpecSync,

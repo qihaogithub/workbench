@@ -2,8 +2,8 @@ import "./globals.css";
 import type { ReactNode } from "react";
 
 export const metadata = {
-  title: "Sketch SDK Playground",
-  description: "Independent sketch SDK development playground",
+  title: "Whiteboard Studio",
+  description: "Independent whiteboard development studio",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

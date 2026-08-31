@@ -11,7 +11,7 @@ const effectivePackageRoot = process.env.PROJECT_CLI_PACKAGE_ROOT
   : packageRoot;
 const cliPath = path.join(effectivePackageRoot, "bin", "ow.mjs");
 
-function runCli(args: string[], dataDir: string) {
+function runCli(args: string[], dataDir: string, role = "admin") {
   const result = spawnSync(
     process.execPath,
     [cliPath, ...args, "--json", "--data-dir", dataDir],
@@ -20,7 +20,7 @@ function runCli(args: string[], dataDir: string) {
       encoding: "utf-8",
       env: {
         ...process.env,
-        PROJECT_ADMIN_ROLE: "admin",
+        PROJECT_ADMIN_ROLE: role,
       },
     },
   );
@@ -196,6 +196,62 @@ try {
   const committed = runCli(["edit", "commit", editData.editId, "--note", "CLI 提交"], tempDir);
   assert.equal(committed.result.status, 0);
   assert.equal(committed.payload.ok, true);
+
+  const markedTemplatePage = runCli(
+    [
+      "page",
+      "update-template",
+      "--project",
+      createdData.id,
+      "--page",
+      pageData.meta.id,
+      "--is-template-page",
+      "true",
+    ],
+    tempDir,
+  );
+  assert.equal(markedTemplatePage.result.status, 0);
+  assert.equal(markedTemplatePage.payload.ok, true);
+  assert.equal(
+    (markedTemplatePage.payload.data as { isTemplatePage?: boolean }).isTemplatePage,
+    true,
+  );
+
+  const unmarkedByEditor = runCli(
+    [
+      "page",
+      "update-template",
+      "--project",
+      createdData.id,
+      "--page",
+      pageData.meta.id,
+      "--is-template-page",
+      "false",
+    ],
+    tempDir,
+    "creator",
+  );
+  assert.equal(unmarkedByEditor.result.status, 1);
+  assert.equal(
+    (unmarkedByEditor.payload.error as { code?: string }).code,
+    "FORBIDDEN",
+  );
+
+  const batchMarked = runCli(
+    [
+      "page",
+      "update-templates",
+      "--project",
+      createdData.id,
+      "--page-ids",
+      JSON.stringify([pageData.meta.id]),
+      "--is-template-page",
+      "false",
+    ],
+    tempDir,
+  );
+  assert.equal(batchMarked.result.status, 0);
+  assert.equal(batchMarked.payload.ok, true);
 
   const listed = runCli(["project_list"], tempDir);
   assert.equal(listed.result.status, 0);

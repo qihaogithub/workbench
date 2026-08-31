@@ -11,6 +11,7 @@ import {
 import {
   SketchEditorCanvas,
   SketchEditorToolbar,
+  SketchEditorSurface,
   SketchLayerPanel,
   SketchPropertyPanel,
   SketchPageEditor,
@@ -68,6 +69,16 @@ function ControlledEditor({
         onSelectionChange={onSelectionChange}
       />
       <output data-testid="scene-json">{JSON.stringify(value)}</output>
+    </>
+  );
+}
+
+function ControlledSurfaceEditor({ initialScene = scene }: { initialScene?: SketchSceneDocument }) {
+  const [value, setValue] = React.useState(initialScene);
+  return (
+    <>
+      <SketchEditorSurface scene={value} fillContainer onSceneChange={setValue} />
+      <output data-testid="surface-scene-json">{JSON.stringify(value)}</output>
     </>
   );
 }
@@ -1147,6 +1158,33 @@ describe("sketch-react", () => {
       const diamond = readRenderedScene().nodes.find((node) => node.type === "diamond");
       expect(diamond).toMatchObject({ name: "菱形", x: 40, y: 50, width: 110, height: 80 });
       expect(document.querySelector(`[data-sketch-node-id="${diamond?.id}"]`)).not.toBeNull();
+    });
+  });
+
+  it("uses one floating primary toolbar and canvas keyboard scope in the shared editor surface", async () => {
+    const emptyScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [],
+    };
+    render(<ControlledSurfaceEditor initialScene={emptyScene} />);
+    const stage = getCanvasStage();
+    setCanvasStageRect(stage);
+
+    expect(document.querySelectorAll("[data-sketch-editor-surface]")).toHaveLength(1);
+    expect(screen.getAllByLabelText("菱形")).toHaveLength(1);
+    expect(screen.queryByText("属性面板")).toBeNull();
+
+    fireEvent.click(screen.getByLabelText("菱形"));
+    dispatchPointerEvent(stage, "pointerdown", 40, 50);
+    dispatchPointerEvent(stage, "pointermove", 150, 130);
+    dispatchPointerEvent(stage, "pointerup", 150, 130);
+
+    await waitFor(() => {
+      const rendered = screen.getByTestId("surface-scene-json").textContent ?? "{}";
+      expect((JSON.parse(rendered) as SketchSceneDocument).nodes).toEqual(
+        expect.arrayContaining([expect.objectContaining({ type: "diamond", x: 40, y: 50 })]),
+      );
     });
   });
 
@@ -2246,7 +2284,7 @@ describe("sketch-react", () => {
         toJSON: () => ({}),
       }) as DOMRect;
 
-    fireEvent.click(screen.getByLabelText("text"));
+    fireEvent.click(screen.getByLabelText("文本"));
     dispatchPointerEvent(stage, "pointerdown", 260, 160);
     dispatchPointerEvent(stage, "pointerup", 260, 160);
 
@@ -4004,6 +4042,8 @@ describe("sketch-react", () => {
     expect(within(toolbar).getByLabelText("悬浮更多")).toBeTruthy();
 
     fireEvent.click(within(toolbar).getByLabelText("悬浮填充"));
+    expect(await screen.findByRole("dialog", { name: "草图工具菜单" })).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("填充 #f8fafc"));
 
     await waitFor(() => {
       const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;

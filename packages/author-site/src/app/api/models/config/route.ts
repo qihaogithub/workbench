@@ -22,9 +22,19 @@ export async function GET() {
     >;
     const token = await getAuthCookie();
     const payload = token ? await verifyToken(token) : null;
-    const userProviders = payload
-      ? readUserBackendProvidersConfig(payload.userId)
-      : null;
+    let userProviders = null;
+    if (payload) {
+      try {
+        userProviders = readUserBackendProvidersConfig(payload.userId);
+      } catch (error) {
+        // 个人 API Key 使用独立密钥加密；密钥轮换或历史脏数据不应让
+        // 全局模型配置接口失败，否则前端会把 agent-service 的模型全部过滤掉。
+        console.warn(
+          "[API] Ignoring unreadable user model config:",
+          error instanceof Error ? error.message : error,
+        );
+      }
+    }
 
     if (userProviders?.providers.length) {
       const enabledProviders = userProviders.providers.filter(

@@ -14,9 +14,7 @@ import { uploadCover, deleteCover, refreshScreenshots } from '@/lib/api'
 import { ImagePlus, Trash2, RefreshCcw, Loader2 } from 'lucide-react'
 import type { ApiResponse } from '@workbench/shared'
 
-interface CoverImageDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+export interface CoverImageSettingsPanelProps {
   projectId: string
   currentThumbnail?: string
   onThumbnailChange: (thumbnail: string | null) => void
@@ -24,15 +22,13 @@ interface CoverImageDialogProps {
   onDelete?: () => Promise<ApiResponse<{ thumbnail: string | null }>>
 }
 
-export function CoverImageDialog({
-  open,
-  onOpenChange,
+export function CoverImageSettingsPanel({
   projectId,
   currentThumbnail,
   onThumbnailChange,
   onUpload,
   onDelete,
-}: CoverImageDialogProps) {
+}: CoverImageSettingsPanelProps) {
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isUploading, setIsUploading] = useState(false)
@@ -130,32 +126,29 @@ export function CoverImageDialog({
   const isProcessing = isUploading || isDeleting || isRefreshing
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <div className="flex items-center gap-2">
-            <DialogTitle>设置封面图</DialogTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1 text-xs text-muted-foreground hover:text-foreground"
-              onClick={handleRefresh}
-              disabled={isProcessing}
-            >
-              {isRefreshing ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <RefreshCcw className="h-3.5 w-3.5" />
-              )}
-              刷新默认缩略图
-            </Button>
-          </div>
-          <DialogDescription>
-            上传自定义封面图，用于首页项目卡片展示
-          </DialogDescription>
-        </DialogHeader>
+    <section className="space-y-4" aria-labelledby="project-cover-settings-title">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 id="project-cover-settings-title" className="text-sm font-medium">项目封面</h3>
+          <p className="mt-1 text-sm text-muted-foreground">上传自定义封面图，用于首页项目卡片展示</p>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 shrink-0 gap-1 text-xs text-muted-foreground hover:text-foreground"
+          onClick={handleRefresh}
+          disabled={isProcessing}
+        >
+          {isRefreshing ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <RefreshCcw className="h-3.5 w-3.5" />
+          )}
+          刷新默认缩略图
+        </Button>
+      </div>
 
-        <div className="space-y-4">
+      <div className="space-y-4">
           {currentThumbnail ? (
             <div
               className={`relative aspect-video rounded-md overflow-hidden border-2 border-dashed transition-colors ${
@@ -243,7 +236,26 @@ export function CoverImageDialog({
               e.target.value = ''
             }}
           />
-        </div>
+      </div>
+    </section>
+  )
+}
+
+interface CoverImageDialogProps extends CoverImageSettingsPanelProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}
+
+/** @deprecated Prefer composing CoverImageSettingsPanel in ProjectSettingsDialog. */
+export function CoverImageDialog({ open, onOpenChange, ...props }: CoverImageDialogProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>设置封面图</DialogTitle>
+          <DialogDescription>上传或替换项目首页展示封面。</DialogDescription>
+        </DialogHeader>
+        <CoverImageSettingsPanel {...props} />
       </DialogContent>
     </Dialog>
   )

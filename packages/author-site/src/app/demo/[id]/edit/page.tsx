@@ -38,6 +38,7 @@ import type {
   DocumentCommentAnchor,
   DemoPageRuntimeType,
   HtmlImportMeta,
+  ProjectType,
   PageSnapshotInput,
   ProjectAuthoringPreferences,
   PrototypePageMeta,
@@ -147,7 +148,7 @@ import {
   Bot,
   Layers,
   Loader2,
-  ImageIcon,
+  Settings,
   Trash2,
   MoreVertical,
   Eye,
@@ -240,7 +241,10 @@ import type {
   PreviewDiagnosticError,
   SnapshotQuality,
   SnapshotRejectionReason,
+  ImageConfigTarget,
 } from "@workbench/demo-ui/types";
+import type { WhiteboardCommitTarget } from "@/components/demo/WhiteboardDialog";
+import { WHITEBOARD_AUTHORING_ENABLED } from "@/lib/authoring-feature-flags";
 import type {
   DemoFiles,
   DemoPageMeta,
@@ -280,6 +284,10 @@ const PageConfigPanel = dynamic(
   () => import("@workbench/demo-ui/PageConfigPanel").then((m) => m.PageConfigPanel),
   { ssr: false, loading: () => null },
 );
+const WhiteboardDialog = dynamic(
+  () => import("@/components/demo/WhiteboardDialog").then((m) => m.WhiteboardDialog),
+  { ssr: false, loading: () => null },
+);
 const DeferredAuthorAIChat = dynamic(
   () =>
     import("@/components/ai-elements/deferred-author-ai-chat").then(
@@ -302,27 +310,6 @@ const SketchEditorEngineProvider = dynamic(
   () =>
     import("./components/SketchEditorEngineHost").then(
       (m) => m.SketchEditorEngineProvider,
-    ),
-  { ssr: false, loading: () => null },
-);
-const SketchEditorEngineToolbar = dynamic(
-  () =>
-    import("./components/SketchEditorEngineHost").then(
-      (m) => m.SketchEditorEngineToolbar,
-    ),
-  { ssr: false, loading: () => null },
-);
-const SketchEditorEngineLayerPanel = dynamic(
-  () =>
-    import("./components/SketchEditorEngineHost").then(
-      (m) => m.SketchEditorEngineLayerPanel,
-    ),
-  { ssr: false, loading: () => null },
-);
-const SketchEditorEngineInspectorPanel = dynamic(
-  () =>
-    import("./components/SketchEditorEngineHost").then(
-      (m) => m.SketchEditorEngineInspectorPanel,
     ),
   { ssr: false, loading: () => null },
 );
@@ -349,8 +336,8 @@ function SketchEditorEngineBoundary({
     </SketchEditorEngineProvider>
   );
 }
-const CoverImageDialog = dynamic(
-  () => import("@/components/cover-image-dialog").then((m) => m.CoverImageDialog),
+const ProjectSettingsDialog = dynamic(
+  () => import("@/components/project-settings-dialog").then((m) => m.ProjectSettingsDialog),
   { ssr: false, loading: () => null },
 );
 const ShareDialog = dynamic(
@@ -1012,6 +999,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [projectConfigValues, setProjectConfigValues] = useState<
     Record<string, unknown>
   >({});
+  const [whiteboardTarget, setWhiteboardTarget] =
+    useState<WhiteboardCommitTarget | null>(null);
   const projectConfigValuesRef = useRef(projectConfigValues);
   projectConfigValuesRef.current = projectConfigValues;
   const projectConfigPersistQueueRef = useRef<Promise<boolean>>(
@@ -1169,7 +1158,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [demoName, setDemoName] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
-  const [coverDialogOpen, setCoverDialogOpen] = useState(false);
+  const [projectSettingsOpen, setProjectSettingsOpen] = useState(false);
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [exitState, setExitState] = useState<"saving" | "confirm">("saving");
   const [exitErrorLabel, setExitErrorLabel] = useState<string | null>(null);
@@ -1190,6 +1179,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [currentThumbnail, setCurrentThumbnail] = useState<string | undefined>(
     undefined,
   );
+  const [projectType, setProjectType] = useState<ProjectType>("standard");
   const [projectAuthoringPreferences, setProjectAuthoringPreferences] =
     useState<ProjectAuthoringPreferences | undefined>(undefined);
   const [userAuthoringPreferences, setUserAuthoringPreferences] = useState<
@@ -2118,7 +2108,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [errorBannerVisible, setErrorBannerVisible] = useState(false);
   const [tabValue, setTabValue] = useState("ai");
   const [rightPanelTab, setRightPanelTab] =
-    useState<RightPanelTab>("edit");
+    useState<RightPanelTab>("config");
   const [chatElement, setChatElement] =
     useState<ChatElementRef | null>(null);
   const [chatPageRefs, setChatPageRefs] = useState<ChatPageRef[]>([]);
@@ -2157,6 +2147,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   // publishStatus, versionHistory, and related state moved to useVersionControl hook
   const [currentUsername, setCurrentUsername] = useState<string>("");
   const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [currentUserRole, setCurrentUserRole] = useState<"admin" | "editor" | "creator" | "readonly" | "">("");
   const collabUser = useMemo(
     () => ({
       userId: sessionId || "anonymous",
@@ -3082,6 +3073,13 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   );
 
   // Visual edit state hook
+  const activePageForVisualAccess = demoPages.find((page) => page.id === activeDemoId);
+  const activePageIsTemplate = Boolean(
+    (activePageForVisualAccess as { isTemplatePage?: boolean } | undefined)?.isTemplatePage,
+  );
+  const canUseVisualEditor =
+    currentUserRole === "admin" ||
+    (currentUserRole !== "" && !activePageIsTemplate);
   const visualEditState = useVisualEditState({
     codeRef,
     schemaRef,
@@ -3089,6 +3087,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     activeDemoIdRef,
     sessionId,
     activeDemoId,
+    projectId: demoId,
+    canUseVisualEditor,
     runtimeType: activeDemoRuntimeTypeForCollab,
     applyDemoSnapshot,
     markWorkspaceChanged,
@@ -3994,6 +3994,7 @@ ${context.details}
         );
         setDemoName(sessionData.data.project?.name || demoId);
         setCurrentThumbnail(sessionData.data.project?.thumbnail);
+        setProjectType(sessionData.data.project?.projectType === "template" ? "template" : "standard");
         setProjectAuthoringPreferences(
           sessionData.data.project?.authoringPreferences,
         );
@@ -4296,6 +4297,31 @@ ${context.details}
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
+
+  const handleWhiteboardCommitted = useCallback(
+    (target: WhiteboardCommitTarget, values: Record<string, unknown>) => {
+      if (target.scope === "project") {
+        setProjectConfigValues(values);
+        return;
+      }
+      if (!target.pageId) return;
+      setConfigDataMap((current) => ({ ...current, [target.pageId!]: values }));
+    },
+    [],
+  );
+
+  const launchWhiteboard = useCallback((target: ImageConfigTarget) => {
+    if ((target.scope !== "page" && target.scope !== "project") || !target.fieldPath) return;
+    setWhiteboardTarget({
+      scope: target.scope,
+      ...(target.pageId ? { pageId: target.pageId } : {}),
+      fieldPath: target.fieldPath,
+      ...(target.listItem ? { listItem: target.listItem } : {}),
+      ...(target.currentValue ? { currentValue: target.currentValue } : {}),
+      ...(target.onCommit ? { onCommit: target.onCommit } : {}),
+    });
+  }, []);
+
 
   handlePageConfigPanelChangeRef.current = handlePageConfigPanelChange;
 
@@ -6101,6 +6127,9 @@ ${context.details}
             current === data.data.id ? current : data.data.id,
           );
         }
+        if (data?.success && typeof data.data?.role === "string") {
+          setCurrentUserRole(data.data.role);
+        }
       })
       .catch(() => {});
   }, []);
@@ -6832,9 +6861,7 @@ ${context.details}
         configData: configDataMap[page.id],
         schema: pageSchemaMap[page.id],
         presentation,
-        previewSize: presentation?.viewport ?? pagePreviewSizeMap[page.id],
-        fallbackPreviewSize:
-          page.id === activeDemoId ? previewSize : undefined,
+        previewSize: presentation?.viewport,
         ...(snapshot || prototypeSnapshot),
       };
     });
@@ -6869,6 +6896,7 @@ ${context.details}
     previewMode === "single" &&
     effectiveSinglePreviewTarget?.kind === "document";
   const visualEditActive =
+    canUseVisualEditor &&
     previewMode === "single" &&
     !singlePreviewViewingDocument &&
     rightPanelTab === "edit" &&
@@ -6931,7 +6959,6 @@ ${context.details}
     viewingDocument: singlePreviewViewingDocument,
   });
   const nativeSketchEditingActive = activeSketchEditorEngine === "native";
-  const sketchLayerDrawerActive = nativeSketchEditingActive;
 
   const handleSubmitVisualDraftAction = useCallback(() => {
     handleSendVisualPropertiesToAI();
@@ -7500,6 +7527,16 @@ ${context.details}
     rightPanelTab,
     hasAnyConfig,
   );
+  const effectiveRightPanelTab = canUseVisualEditor
+    ? rightPanelTab
+    : rightPanelTab === "comments"
+      ? "comments"
+      : "config";
+  useEffect(() => {
+    if (!canUseVisualEditor && rightPanelTab === "edit") {
+      setRightPanelTab("config");
+    }
+  }, [canUseVisualEditor, rightPanelTab]);
   const isConfigPanelVisible =
     (previewMode === "single" && !singlePreviewViewingDocument) ||
     previewMode === "canvas" ||
@@ -7869,10 +7906,10 @@ ${context.details}
             variant="ghost"
             size="sm"
             className="h-7 gap-1.5 text-muted-foreground hover:text-foreground"
-            onClick={() => setCoverDialogOpen(true)}
+            onClick={() => setProjectSettingsOpen(true)}
           >
-            <ImageIcon className="h-4 w-4" />
-            <span className="text-xs">设置封面</span>
+            <Settings className="h-4 w-4" />
+            <span className="text-xs">项目设置</span>
           </Button>
           {!automaticScreenshotGenerationEnabled && (
             <Badge
@@ -8620,19 +8657,6 @@ await handlePublishWithScreenshot();
                 </div>
               </TabsContent>
             </Tabs>
-            {sketchLayerDrawerActive && (
-              <div className="absolute inset-0 z-20 flex flex-col border-r bg-card shadow-2xl">
-                <div className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <Layers className="h-4 w-4 text-muted-foreground" />
-                    <span className="truncate text-sm font-medium">图层</span>
-                  </div>
-                </div>
-                <div className="min-h-0 flex-1 overflow-hidden p-2">
-                  <SketchEditorEngineLayerPanel scene={activeSketchScene} />
-                </div>
-              </div>
-            )}
           </ResizablePanel>
           <ResizablePanel
             className={`relative flex flex-col overflow-hidden bg-background ${
@@ -9157,9 +9181,6 @@ await handlePublishWithScreenshot();
                               previewSize={resolvedPreviewSize}
                             />
                           </div>
-                          <SketchEditorEngineToolbar
-                            scene={activeSketchScene}
-                          />
                         </div>
                       </div>
                     );
@@ -9223,21 +9244,23 @@ await handlePublishWithScreenshot();
               ) : previewMode === "single" ? (
                 <>
                   <Tabs
-                    value={rightPanelTab}
+                    value={effectiveRightPanelTab}
                     onValueChange={(v) =>
                       setRightPanelTab(v as "edit" | "config" | "comments")
                     }
                     className="flex h-full flex-col"
                   >
                     <TabsList className="w-full justify-start gap-2 rounded-none border-b px-2 h-12 bg-transparent">
-                      <TabsTrigger
-                        value="edit"
-                        title="编辑"
-                        className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
-                      >
-                        <SquarePen className="h-4 w-4" />
-                        {rightPanelTab === "edit" && <span>编辑</span>}
-                      </TabsTrigger>
+                      {canUseVisualEditor && (
+                        <TabsTrigger
+                          value="edit"
+                          title="编辑"
+                          className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
+                        >
+                          <SquarePen className="h-4 w-4" />
+                          {rightPanelTab === "edit" && <span>编辑</span>}
+                        </TabsTrigger>
+                      )}
                       <TabsTrigger
                         value="config"
                         title="配置"
@@ -9258,11 +9281,12 @@ await handlePublishWithScreenshot();
                         )}
                       </TabsTrigger>
                     </TabsList>
-                    <TabsContent
-                      value="edit"
-                      className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
-                    >
-                      <VisualEditSidebar
+                    {canUseVisualEditor && (
+                      <TabsContent
+                        value="edit"
+                        className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
+                      >
+                        <VisualEditSidebar
                         layerNodes={visualLayerTreeNodes}
                         selectedNodeId={
                           selectedVisualNode?.domPath ||
@@ -9300,8 +9324,9 @@ await handlePublishWithScreenshot();
                           onDraftActionCancel={handleClearVisualProperties}
                           onAddToChat={handleAddToChat}
                         />
-                      </VisualEditSidebar>
-                    </TabsContent>
+                        </VisualEditSidebar>
+                      </TabsContent>
+                    )}
                     <TabsContent
                       value="config"
                       className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
@@ -9358,6 +9383,7 @@ await handlePublishWithScreenshot();
                         onProjectSaveAsDefaults={handleProjectSaveAsDefaults}
                         onProjectRestoreDefaults={handleProjectRestoreDefaults}
                         sessionId={sessionId}
+                        onLaunchWhiteboard={WHITEBOARD_AUTHORING_ENABLED ? launchWhiteboard : undefined}
                         hideDetailHeader
                         onEnterPositionEdit={handleEnterPositionEdit}
                         onExitPositionEdit={handleExitPositionEdit}
@@ -9399,13 +9425,6 @@ await handlePublishWithScreenshot();
                       />
                     </TabsContent>
                   </Tabs>
-                  {sketchLayerDrawerActive && (
-                    <div className="absolute inset-0 z-20 flex flex-col border-l bg-card shadow-2xl">
-                      <SketchEditorEngineInspectorPanel
-                        scene={activeSketchScene}
-                      />
-                    </div>
-                  )}
                 </>
               ) : (
                 <Tabs
@@ -9506,6 +9525,7 @@ await handlePublishWithScreenshot();
                   onProjectSaveAsDefaults={handleProjectSaveAsDefaults}
                   onProjectRestoreDefaults={handleProjectRestoreDefaults}
                   sessionId={sessionId}
+                  onLaunchWhiteboard={WHITEBOARD_AUTHORING_ENABLED ? launchWhiteboard : undefined}
                   onEnterPositionEdit={handleEnterPositionEdit}
                   onExitPositionEdit={handleExitPositionEdit}
                   positionEditActive={positionEditMode.enabled}
@@ -9556,6 +9576,18 @@ await handlePublishWithScreenshot();
         </SketchEditorEngineBoundary>
         </DesignSpecWorkspaceProvider>
       </div>
+
+      {whiteboardTarget ? (
+        <WhiteboardDialog
+          open
+          projectId={demoId}
+          sessionId={sessionId}
+          target={whiteboardTarget}
+          onOpenChange={(open) => { if (!open) setWhiteboardTarget(null); }}
+          onCommitted={handleWhiteboardCommitted}
+          onDiagnosticEvent={recordDiagnosticEvent}
+        />
+      ) : null}
 
       <ConfigItemEditorDialog
         open={visualConfigDialogOpen}
@@ -9637,14 +9669,18 @@ await handlePublishWithScreenshot();
         onApply={handleApplyVisualConfig}
       />
 
-      <CoverImageDialog
-        open={coverDialogOpen}
-        onOpenChange={setCoverDialogOpen}
+      <ProjectSettingsDialog
+        open={projectSettingsOpen}
+        onOpenChange={setProjectSettingsOpen}
         projectId={demoId}
         currentThumbnail={currentThumbnail}
         onThumbnailChange={(thumbnail) =>
           setCurrentThumbnail(thumbnail ?? undefined)
         }
+        currentUserRole={currentUserRole}
+        projectType={projectType}
+        pages={demoPages}
+        onSettingsSaved={() => window.location.reload()}
       />
 
       <WorkspaceCodeDialog

@@ -77,13 +77,18 @@ export function SketchEditorEngineStage({
 }) {
   const host = useSketchEditorEngineContext();
   return (
-    <SketchEditorCanvas
-      scene={scene}
-      controller={host.nativeController}
-      configData={configData}
-      previewSize={previewSize}
-      fillContainer
-    />
+    <div className="relative h-full min-h-0 overflow-hidden">
+      <SketchEditorCanvas
+        scene={scene}
+        controller={host.nativeController}
+        configData={configData}
+        previewSize={previewSize}
+        fillContainer
+      />
+      <div className="pointer-events-none absolute inset-x-0 bottom-5 z-20 flex justify-center px-4">
+        <SketchEditorToolbar scene={scene} controller={host.nativeController} className="pointer-events-auto" />
+      </div>
+    </div>
   );
 }
 

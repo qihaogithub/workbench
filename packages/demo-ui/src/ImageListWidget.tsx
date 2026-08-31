@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useMemo, type ReactNode } from 'react';
 import { Trash2, Plus, Loader2, AlertTriangle, ZoomIn, Undo2 } from 'lucide-react';
 
 import { resolveConfigImageSrc } from './preview-config-utils';
@@ -83,6 +83,8 @@ export interface ImageListWidgetProps {
     widthRule?: DimensionOptions["widthRule"];
     heightRule?: DimensionOptions["heightRule"];
   };
+  /** 由字段宿主在当前项上渲染的附加操作，不负责图片存储 IO。 */
+  renderItemActions?: (item: ImageItem, index: number, onUpload: () => void) => ReactNode;
 }
 
 export function ImageListWidget({
@@ -93,6 +95,7 @@ export function ImageListWidget({
   sessionId,
   defaultValue,
   options = {},
+  renderItemActions,
 }: ImageListWidgetProps) {
   const maxItems = propMaxItems ?? options.maxItems ?? 20;
   const maxSize = options.maxSize ?? 50 * 1024 * 1024;
@@ -281,6 +284,7 @@ export function ImageListWidget({
                 />
               )}
               <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                {renderItemActions?.(item, index, () => fileInputRef.current?.click())}
                 <button
                   type="button"
                   onClick={() => setPreviewImage(item.url)}

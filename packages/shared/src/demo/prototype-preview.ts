@@ -437,7 +437,7 @@ export function buildPrototypePreviewHtmlFragment({
       ${safeCss}
     </style>
     <div class="prototype-root">${safeHtml}</div>
-    <div data-prototype-selected-label style="position:fixed;display:none;pointer-events:none;background:#2563eb;color:white;font:12px/1.2 system-ui,sans-serif;padding:3px 6px;border-radius:4px;z-index:2147483002;max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+    <div data-prototype-selected-label style="position:absolute;display:none;pointer-events:none;background:#2563eb;color:white;font:12px/1.2 system-ui,sans-serif;padding:3px 6px;border-radius:4px;z-index:2147483002;max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
   `;
 }
 

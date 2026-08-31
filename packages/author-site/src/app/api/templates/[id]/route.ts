@@ -5,12 +5,15 @@ import {
   projectAdminResponse,
 } from "@/lib/project-admin-service";
 import { reconcileTemplateKnowledge } from "@/lib/knowledge-service";
+import { getCurrentProjectActor } from "@/lib/auth/current-user";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const actor = await getCurrentProjectActor();
+    if (!actor) return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), { status: 401 });
     const { id } = await params;
     const body = await request.json();
     const { name, category } = body as {
@@ -45,7 +48,7 @@ export async function PATCH(
     const result = getProjectAdminService().updateTemplateMeta(id, {
       name: typeof name === "string" ? name.trim() : undefined,
       category: typeof category === "string" ? category.trim() : undefined,
-    });
+    }, actor);
     if (!result.ok) return projectAdminResponse(result);
     await reconcileTemplateKnowledge();
 
@@ -64,14 +67,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const actor = await getCurrentProjectActor();
+    if (!actor) return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), { status: 401 });
     const { id } = await params;
     const service = getProjectAdminService();
-    const preview = service.deleteTemplatePreview(id);
+    const preview = service.deleteTemplatePreview(id, actor);
     if (!preview.ok || !preview.data) return projectAdminResponse(preview);
 
     const result = service.deleteTemplateExecute(
       preview.data.planId,
       preview.data.confirmToken,
+      actor,
     );
     if (!result.ok) return projectAdminResponse(result);
     await reconcileTemplateKnowledge();

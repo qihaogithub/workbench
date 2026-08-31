@@ -12,6 +12,7 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { cleanupAllExpiredSessions } = await import('@/lib/session-manager');
     const { cleanupOrphanWorkspaces } = await import('@/lib/workspace-manager');
+    const { getProjectAdminService } = await import('@/lib/project-admin-service');
     const { scheduleStartupBackendProvidersSync } = await import('@/lib/backend-providers-sync');
     const { scheduleStartupImageDescriptionSync } = await import('@/lib/image-description-sync');
     const { scheduleStartupImageGenSync } = await import('@/lib/image-gen-sync');
@@ -25,6 +26,10 @@ export async function register() {
       const orphaned = cleanupOrphanWorkspaces();
       if (orphaned.length > 0) {
         console.log(`[Workspace GC] Initial cleanup: ${orphaned.length} orphan workspaces removed`);
+      }
+      const trashed = getProjectAdminService().purgeExpiredTrashedProjects();
+      if (trashed > 0) {
+        console.log(`[Project Trash] Initial cleanup: ${trashed} expired projects purged`);
       }
     } catch (error) {
       console.error('[Cleanup] Initial cleanup failed:', error);
@@ -44,6 +49,10 @@ export async function register() {
         const orphaned = cleanupOrphanWorkspaces();
         if (orphaned.length > 0) {
           console.log(`[Workspace GC] Cleaned ${orphaned.length} orphan workspaces`);
+        }
+        const trashed = getProjectAdminService().purgeExpiredTrashedProjects();
+        if (trashed > 0) {
+          console.log(`[Project Trash] Purged ${trashed} expired projects`);
         }
       } catch (error) {
         console.error('[Cleanup] Scheduled cleanup failed:', error);

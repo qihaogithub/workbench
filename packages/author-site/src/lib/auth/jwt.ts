@@ -17,6 +17,7 @@ export const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export interface UserPayload {
   userId: string;
   username: string;
+  role?: "admin" | "editor";
 }
 
 /**

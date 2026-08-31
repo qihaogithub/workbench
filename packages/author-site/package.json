@@ -62,6 +62,7 @@
     "@workbench/project-core": "workspace:*",
     "@workbench/project-scaffold": "workspace:*",
     "@workbench/shared": "workspace:*",
+    "@workbench/whiteboard-core": "workspace:*",
     "@workbench/sketch-core": "workspace:*",
     "@workbench/sketch-react": "workspace:*",
     "ai": "^6.0.146",

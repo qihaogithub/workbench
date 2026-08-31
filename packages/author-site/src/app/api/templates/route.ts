@@ -4,9 +4,12 @@ import {
   getProjectAdminService,
   projectAdminResponse,
 } from "@/lib/project-admin-service";
+import { getCurrentProjectActor } from "@/lib/auth/current-user";
 
 export async function GET() {
   try {
+    const actor = await getCurrentProjectActor();
+    if (!actor) return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), { status: 401 });
     return projectAdminResponse(getProjectAdminService().listTemplates());
   } catch (error) {
     console.error("Error listing templates:", error);

@@ -110,6 +110,22 @@ describe("published preview stage adapter", () => {
     ).toBe('<img src="/data/project-1/assets/images/icon.png" />');
   });
 
+  it("旧发布包缺少 presentation 时迁移 previewSize，避免回落到手机默认尺寸", () => {
+    const page = createPublishedPreviewStagePage({
+      projectId: "project-1",
+      page: createPage({
+        runtimeType: "prototype-html-css",
+        previewSize: { width: 1024, height: 768 },
+      }),
+      schema: JSON.stringify({
+        $demo: { previewSize: { width: 1024, height: 768 } },
+      }),
+    });
+
+    expect(page.presentation?.viewport).toEqual({ width: 1024, height: 768 });
+    expect(page.previewSize).toEqual({ width: 1024, height: 768 });
+  });
+
   it("草图页只序列化草图运行时数据", () => {
     const page = createPublishedPreviewStagePage({
       projectId: "project-1",

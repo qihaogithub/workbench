@@ -6,7 +6,10 @@ export interface User {
   id: string;
   username: string;
   createdAt: number;
+  role: UserRole;
 }
+
+export type UserRole = "admin" | "editor";
 
 export interface DingtalkIdentity {
   id: string;
@@ -35,14 +38,16 @@ export async function createUser(input: CreateUserInput): Promise<User> {
   const passwordHash = await hashPassword(input.password);
   const now = Date.now();
 
+  const count = getDb().prepare("SELECT COUNT(*) as count FROM users").get() as { count: number };
+  const assignedRole: UserRole = count.count === 0 ? "admin" : "editor";
   db.prepare(
     `
-    INSERT INTO users (id, username, password_hash, created_at)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO users (id, username, password_hash, created_at, role)
+    VALUES (?, ?, ?, ?, ?)
   `,
-  ).run(id, input.username, passwordHash, now);
+  ).run(id, input.username, passwordHash, now, assignedRole);
 
-  return { id, username: input.username, createdAt: now };
+  return { id, username: input.username, createdAt: now, role: assignedRole };
 }
 
 async function createPasswordlessUser(username: string): Promise<User> {
@@ -50,15 +55,17 @@ async function createPasswordlessUser(username: string): Promise<User> {
   const id = crypto.randomUUID();
   const passwordHash = await hashPassword(crypto.randomUUID());
   const now = Date.now();
+  const count = getDb().prepare("SELECT COUNT(*) as count FROM users").get() as { count: number };
+  const assignedRole: UserRole = count.count === 0 ? "admin" : "editor";
 
   db.prepare(
     `
-    INSERT INTO users (id, username, password_hash, created_at)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO users (id, username, password_hash, created_at, role)
+    VALUES (?, ?, ?, ?, ?)
   `,
-  ).run(id, username, passwordHash, now);
+  ).run(id, username, passwordHash, now, assignedRole);
 
-  return { id, username, createdAt: now };
+  return { id, username, createdAt: now, role: assignedRole };
 }
 
 function normalizeUsernamePart(value: string): string {
@@ -82,7 +89,7 @@ export function findUserByUsername(username: string): User | null {
   return (
     (db
       .prepare(
-        "SELECT id, username, created_at as createdAt FROM users WHERE username = ?",
+        "SELECT id, username, created_at as createdAt, role FROM users WHERE username = ?",
       )
       .get(username) as User) || null
   );
@@ -96,7 +103,7 @@ export function findUserById(id: string): User | null {
   return (
     (db
       .prepare(
-        "SELECT id, username, created_at as createdAt FROM users WHERE id = ?",
+        "SELECT id, username, created_at as createdAt, role FROM users WHERE id = ?",
       )
       .get(id) as User) || null
   );
@@ -267,9 +274,9 @@ export async function verifyUserPassword(
 ): Promise<User | null> {
   const db = getDb();
   const row = db
-    .prepare("SELECT id, username, password_hash FROM users WHERE username = ?")
+    .prepare("SELECT id, username, password_hash, created_at, role FROM users WHERE username = ?")
     .get(username) as
-    | { id: string; username: string; password_hash: string }
+    | { id: string; username: string; password_hash: string; created_at: number; role: UserRole }
     | undefined;
 
   if (!row) return null;
@@ -277,7 +284,7 @@ export async function verifyUserPassword(
   const valid = await verifyPassword(password, row.password_hash);
   if (!valid) return null;
 
-  return { id: row.id, username: row.username, createdAt: 0 };
+  return { id: row.id, username: row.username, createdAt: row.created_at, role: row.role };
 }
 
 /**
@@ -287,9 +294,14 @@ export function listAllUsers(): User[] {
   const db = getDb();
   return db
     .prepare(
-      "SELECT id, username, created_at as createdAt FROM users ORDER BY created_at ASC",
+      "SELECT id, username, created_at as createdAt, role FROM users ORDER BY created_at ASC",
     )
     .all() as User[];
+}
+
+export function updateUserRole(userId: string, role: UserRole): boolean {
+  const result = getDb().prepare("UPDATE users SET role = ? WHERE id = ?").run(role, userId);
+  return result.changes > 0;
 }
 
 /**

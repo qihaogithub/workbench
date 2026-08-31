@@ -6,11 +6,16 @@ const config: Config = {
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    // API handlers do not contain UI class names. Keeping them out of the
+    // content scan also avoids Tailwind's statSync race when a route is
+    // removed while Turbopack is rebuilding.
+    './src/app/*.{js,ts,jsx,tsx,mdx}',
+    './src/app/!(api)/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './node_modules/@workbench/shared/src/**/*.{js,ts,jsx,tsx,mdx}',
     './node_modules/@workbench/ai-chat-shared/src/**/*.{js,ts,jsx,tsx,mdx}',
     './node_modules/@workbench/demo-ui/src/**/*.{js,ts,jsx,tsx,mdx}',
+    './node_modules/@workbench/sketch-react/src/**/*.{js,ts,jsx,tsx,mdx}',
     './node_modules/streamdown/dist/**/*.js',
     './node_modules/@streamdown/code/dist/**/*.js',
     './node_modules/@streamdown/mermaid/dist/**/*.js',

@@ -5,7 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Select,
   SelectContent,
@@ -21,7 +21,7 @@ import { MultiSelect } from "./MultiSelect";
 import { CascadeSelect } from "./CascadeSelect";
 import type { FieldConfig } from "./schema-parser";
 import { createContext, useContext, useMemo } from "react";
-import { Check, ChevronDown, Edit3, Pencil } from "lucide-react";
+import { Check, Edit3, FileText, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -30,8 +30,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DocumentEditor } from "./DocumentEditor";
-import { PageRequirements } from "./PageRequirements";
-import type { DesignSpecEntryLink } from "./types";
+import type { DesignSpecEntryLink, ImageConfigScope, WhiteboardLauncher } from "./types";
+import { ImageInputActions } from "./ImageInputActions";
 
 export interface PositionFieldEntry {
   posKey: string;
@@ -76,9 +76,13 @@ export function FieldRenderer({
   readonly,
   designSpecEntries = [],
   onEditDesignSpec,
+  onOpenDesignSpec,
   onEditConfigDefinition,
   embedded,
   fieldPath,
+  imageConfigScope,
+  pageId,
+  onLaunchWhiteboard,
 }: {
   field: FieldConfig;
   value: unknown;
@@ -87,9 +91,13 @@ export function FieldRenderer({
   readonly?: boolean;
   designSpecEntries?: DesignSpecEntryLink[];
   onEditDesignSpec?: (docId: string, entryId: string) => void;
+  onOpenDesignSpec?: (spec: DesignSpecEntryLink, fieldTitle: string, anchor?: { top: number; bottom: number }) => void;
   onEditConfigDefinition?: (fieldKey: string, field: FieldConfig) => void;
   embedded?: boolean;
   fieldPath?: string;
+  imageConfigScope?: ImageConfigScope;
+  pageId?: string;
+  onLaunchWhiteboard?: WhiteboardLauncher;
 }) {
   const isInlineControl =
     field.type === "boolean" ||
@@ -107,7 +115,7 @@ export function FieldRenderer({
 
   const renderInput = () => {
     if (field.uiWidget === "file" || field.uiWidget === "image" || field.format === "video") {
-      return (
+      const upload = (
         <FileUploadWidget
           value={value as any}
           onChange={onChange}
@@ -118,8 +126,15 @@ export function FieldRenderer({
           defaultValue={
             typeof field.default === "string" ? field.default : undefined
           }
+          onWhiteboard={!readonly && field.format === "image" && onLaunchWhiteboard && fieldPath ? () => onLaunchWhiteboard({ scope: imageConfigScope, pageId, fieldPath, ...(typeof value === "string" ? { currentValue: value } : {}) }) : undefined}
         />
       );
+
+      if (field.format !== "image" || readonly || !onLaunchWhiteboard || !fieldPath) {
+        return upload;
+      }
+
+      return upload;
     }
 
     if (field.uiWidget === "imageList") {
@@ -151,6 +166,16 @@ export function FieldRenderer({
           sessionId={sessionId}
           options={field.uiOptions as any}
           defaultValue={normalizeImageDefaults(field.default)}
+          renderItemActions={
+            !readonly && onLaunchWhiteboard && fieldPath
+              ? (item, index, onUpload) => (
+                  <ImageInputActions
+                    onUpload={onUpload}
+                    onWhiteboard={onLaunchWhiteboard ? () => onLaunchWhiteboard({ scope: imageConfigScope, pageId, fieldPath, listItem: { index, url: item.url } }) : undefined}
+                  />
+                )
+              : undefined
+          }
         />
       );
     }
@@ -181,7 +206,7 @@ export function FieldRenderer({
     }
 
     if (field.format === "image" || field.format === "file") {
-      return (
+      const upload = (
         <FileUploadWidget
           value={value as string}
           onChange={onChange}
@@ -192,8 +217,15 @@ export function FieldRenderer({
           defaultValue={
             typeof field.default === "string" ? field.default : undefined
           }
+          onWhiteboard={!readonly && onLaunchWhiteboard && fieldPath ? () => onLaunchWhiteboard({ scope: imageConfigScope, pageId, fieldPath, ...(typeof value === "string" ? { currentValue: value } : {}) }) : undefined}
         />
       );
+
+      if (field.format !== "image" || readonly || !onLaunchWhiteboard || !fieldPath) {
+        return upload;
+      }
+
+      return upload;
     }
 
     if (field.format === "color" || field.type === "color") {
@@ -465,9 +497,38 @@ export function FieldRenderer({
       )}
     >
       {field.title !== "" && (
-        <div className={cn("flex min-w-0 items-center gap-1", isInlineControl ? "min-w-0 flex-1" : "w-full")}>
+      <div className={cn("flex min-w-0 items-center gap-1", isInlineControl ? "min-w-0 flex-1" : "w-full")}>
           <div className="min-w-0 flex-1">
-            {onEditConfigDefinition && !readonly ? (
+            {linkedSpecs.length > 0 && onOpenDesignSpec ? (
+              <div className="flex min-w-0 items-center gap-2">
+                {onEditConfigDefinition && !readonly ? (
+                  <button
+                    type="button"
+                    onClick={() => onEditConfigDefinition(field.key, field)}
+                    className="min-w-0 max-w-full truncate rounded-sm text-left text-sm font-medium text-foreground/70 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label={`编辑配置项：${field.title}`}
+                  >
+                    {fieldLabel}
+                  </button>
+                ) : <Label className="min-w-0 truncate text-sm font-medium text-foreground/70">{fieldLabel}</Label>}
+                <button
+                  type="button"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    if (rect.width || rect.height) {
+                      onOpenDesignSpec(linkedSpecs[0], field.title, { top: rect.top, bottom: rect.bottom });
+                    } else {
+                      onOpenDesignSpec(linkedSpecs[0], field.title);
+                    }
+                  }}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full bg-foreground/[0.08] px-1.5 py-0.5 text-[11px] font-medium text-foreground/55 transition-colors hover:bg-foreground/[0.14] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={`查看设计规范：${field.title}`}
+                >
+                  <FileText className="h-3 w-3" />规范
+                </button>
+              </div>
+            ) : onEditConfigDefinition && !readonly ? (
               <button
                 type="button"
                 onClick={() => onEditConfigDefinition(field.key, field)}
@@ -488,88 +549,7 @@ export function FieldRenderer({
       <div className={cn("min-w-0", isInlineControl ? "flex-1" : "w-full")}>
         {renderInput()}
       </div>
-      {linkedSpecs.length > 0 && (
-        <DesignSpecCards specs={linkedSpecs} onEditDesignSpec={onEditDesignSpec} />
-      )}
     </div>
-  );
-}
-
-const DESIGN_SPEC_COLLAPSED_CONTENT_HEIGHT = 116;
-
-function DesignSpecCards({ specs, onEditDesignSpec }: {
-  specs: DesignSpecEntryLink[];
-  onEditDesignSpec?: (docId: string, entryId: string) => void;
-}) {
-  return <div className="flex flex-col gap-3">
-    {specs.map((spec) => (
-      <DesignSpecCard
-        key={`${spec.docId}:${spec.entryId}`}
-        spec={spec}
-        onEdit={onEditDesignSpec ? () => onEditDesignSpec(spec.docId, spec.entryId) : undefined}
-      />
-    ))}
-  </div>;
-}
-
-function DesignSpecCard({ spec, onEdit }: { spec: DesignSpecEntryLink; onEdit?: () => void }) {
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [expanded, setExpanded] = useState(false);
-  const [overflows, setOverflows] = useState(false);
-
-  useEffect(() => {
-    const measure = () => {
-      const content = contentRef.current;
-      setOverflows(Boolean(content && content.scrollHeight > DESIGN_SPEC_COLLAPSED_CONTENT_HEIGHT + 1));
-    };
-    measure();
-    const observer = typeof ResizeObserver === "undefined" || !contentRef.current
-      ? undefined
-      : new ResizeObserver(measure);
-    if (contentRef.current) observer?.observe(contentRef.current);
-    return () => observer?.disconnect();
-  }, [spec.markdown]);
-
-  return (
-    <section className="rounded-lg bg-foreground/[0.05] p-3">
-      <div className="flex min-h-[22px] items-center gap-2">
-        <h3 className="min-w-0 flex-1 truncate text-lg font-bold leading-[22px] text-foreground/60">
-          {spec.entryTitle || "未命名设计规范"}
-        </h3>
-        {onEdit && (
-          <button
-            type="button"
-            onClick={onEdit}
-            aria-label={`编辑设计规范：${spec.entryTitle || "未命名设计规范"}`}
-            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-foreground/40 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-        )}
-      </div>
-      {spec.markdown.trim() && (
-        <div
-          ref={contentRef}
-          className={cn("mt-3 overflow-hidden", expanded ? "" : "max-h-[116px]")}
-        >
-          <PageRequirements
-            markdown={spec.markdown}
-            className="!max-w-none !text-sm !leading-[1.5] !text-foreground/60 [&_h1]:!text-base [&_h2]:!text-base [&_h3]:!text-sm [&_h4]:!text-sm"
-          />
-        </div>
-      )}
-      {overflows && (
-        <button
-          type="button"
-          onClick={() => setExpanded((current) => !current)}
-          aria-expanded={expanded}
-          className="-mx-3 -mb-3 mt-3 flex h-8 w-[calc(100%+24px)] items-center justify-center gap-0.5 border-t border-foreground/10 text-xs text-foreground/40 transition-colors hover:text-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {expanded ? "收起" : "展开"}
-          <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", expanded && "rotate-180")} />
-        </button>
-      )}
-    </section>
   );
 }
 

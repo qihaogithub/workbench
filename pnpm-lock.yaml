@@ -156,6 +156,9 @@ importers:
       '@workbench/sketch-core':
         specifier: workspace:*
         version: link:../sketch-core
+      '@workbench/whiteboard-core':
+        specifier: workspace:*
+        version: link:../whiteboard-core
       '@xenova/transformers':
         specifier: ^2.17.2
         version: 2.17.2
@@ -464,6 +467,9 @@ importers:
       '@workbench/shared':
         specifier: workspace:*
         version: link:../shared
+      '@workbench/whiteboard-core':
+        specifier: workspace:*
+        version: link:../whiteboard-core
       '@workbench/sketch-core':
         specifier: workspace:*
         version: link:../sketch-core
@@ -1167,6 +1173,22 @@ importers:
       tailwindcss-animate:
         specifier: ^1.0.7
         version: 1.0.7(tailwindcss@3.4.19)
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+      vitest:
+        specifier: ^1.6.1
+        version: 1.6.1(@types/node@20.19.37)
+
+  packages/whiteboard-core:
+    dependencies:
+      '@workbench/sketch-core':
+        specifier: workspace:*
+        version: link:../sketch-core
+    devDependencies:
+      '@types/node':
+        specifier: ^20.11.16
+        version: 20.19.37
       typescript:
         specifier: ^5.3.3
         version: 5.9.3

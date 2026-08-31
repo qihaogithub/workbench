@@ -198,9 +198,37 @@ export interface ConfigFormProps {
   designSpecEntries?: DesignSpecEntryLink[];
   /** 创作端从规范详情跳转至文档视图；浏览端不传。 */
   onEditDesignSpec?: (docId: string, entryId: string) => void;
+  /** 打开配置项关联的设计规范侧边气泡。 */
+  onOpenDesignSpec?: (spec: DesignSpecEntryLink, fieldTitle: string, anchor?: { top: number; bottom: number }) => void;
   /** 创作端提供时，字段标题可打开对应的配置定义编辑器；浏览端不传。 */
   onEditConfigDefinition?: (fieldKey: string, field: FieldConfig) => void;
+  /** 配置所在范围。未提供时由宿主自行解析归属。 */
+  imageConfigScope?: ImageConfigScope;
+  /** page 范围配置所属的页面；项目范围和独立表单可不提供。 */
+  pageId?: string;
+  /** 无 IO capability：宿主打开白板并负责草稿、提交与持久化。 */
+  onLaunchWhiteboard?: WhiteboardLauncher;
 }
+
+export type ImageConfigScope = "project" | "page";
+
+/**
+ * 白板要编辑的配置图片位置。imageList 同时带下标和 URL，供宿主在提交前确认
+ * 该项没有被删除或替换；demo-ui 不保存目标，因此不会留下悬空列表入口。
+ */
+export interface ImageConfigTarget {
+  scope?: ImageConfigScope;
+  pageId?: string;
+  fieldPath: string;
+  listItem?: { index: number; url: string };
+  /** Current single-image value; the host may use a local value as a removable background. */
+  currentValue?: string;
+  onCommit?: (url: string) => void;
+}
+
+
+/** 宿主提供的白板启动能力；demo-ui 不进行项目或网络 IO。 */
+export type WhiteboardLauncher = (target: ImageConfigTarget) => void;
 
 /** 配置面板消费的设计规范绑定；设计规范内容不写入 Schema。 */
 export interface DesignSpecEntryLink {

@@ -245,8 +245,9 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h
 | `@workbench/demo-ui`            | `packages/demo-ui/`            | 创作端与使用端共享预览组件                             | -    | Vitest + Testing Library |
 | `@workbench/shared`             | `packages/shared/`             | 共享类型和常量                                         | -    | 无测试脚本               |
 | `@workbench/sketch-core`        | `packages/sketch-core/`        | 草图页协议、校验、patch、几何、只读渲染                | -    | Vitest                   |
+| `@workbench/whiteboard-core`    | `packages/whiteboard-core/`    | 白板 v2 envelope、受限 HTML/CSS bridge、语义 action reducer | -    | Vitest                   |
 | `@workbench/sketch-react`       | `packages/sketch-react/`       | 草图页 React SDK：画布、工具栏、图层、属性栏和编辑状态 | -    | Vitest + Testing Library |
-| `@workbench/sketch-playground`  | `packages/sketch-playground/`  | 草图 SDK 独立开发与测试 Playground                     | 3400 | TypeScript + Playwright  |
+| `@workbench/sketch-playground`  | `packages/sketch-playground/`  | Whiteboard Studio：白板 SDK 独立开发、性能与交互验证   | 3400 | TypeScript + Playwright  |
 | `@workbench/agent-service`      | `packages/agent-service/`      | Fastify + Pi Agent                                     | 4201 | Vitest                   |
 | `@workbench/agent-client`       | `packages/agent-client/`       | Client SDK                                             | -    | 无测试脚本               |
 | `@workbench/screenshot-service` | `packages/screenshot-service/` | Fastify + Puppeteer                                    | 4202 | Vitest                   |
@@ -276,6 +277,16 @@ Next 开发编译性能约束：
 - 被 `useEffect` / `useCallback` 依赖的可选数组或对象 props 不得在函数参数中使用 `=[]` / `={}` 这类每次渲染创建新引用的默认值；使用模块级稳定常量，避免请求 effect 循环。
 - 草图画布测试在 hover、选择或拖拽等状态提交后，必须重新查询 `dangerouslySetInnerHTML` 生成的 SVG 节点；React 19 重渲染会替换这些 DOM 节点，不能向已脱离文档的旧引用派发后续 PointerEvent。
 
+## 白板独立开发边界
+
+- `@workbench/sketch-core` 是白板协议、几何、操作与只读渲染内核；`@workbench/sketch-react` 是可嵌入编辑器 UI 和状态层；两者不得依赖 `author-site` 的路由、项目数据、登录会话、AI 或截图服务。
+- `@workbench/sketch-playground` 是 Whiteboard Studio，使用 `pnpm dev:whiteboard` 单独启动（端口 3400）；`pnpm dev:sketch` 是兼容同义命令。白板的交互、性能、工具栏和布局优化应先在 Studio 的 fixtures 与性能面板中完成。
+- `author-site` 只保留白板入口、document/binding 持久化、PNG 导出和配置回填适配。只有宿主尺寸、权限、写回冲突或集成契约问题才应在创作端编辑页修改。
+- `@workbench/whiteboard-core` 只处理白板 document、受限代码 bridge 和语义 action；agent-service 的白板上下文、代码、计划、候选资产与撤销工具默认关闭，需显式设置 `PI_AGENT_WHITEBOARD_TOOLS_ENABLED=true`。AI action/代码导入只能产生私有 draft，必须由宿主渲染 PNG 后通过 WhiteboardCommit 一次提交 document、binding 与配置值；不得单独持久化 document、修改 binding target 或配置值。
+- non-live 白板 Commit 必须复用 `@workbench/project-core` 的 `writeWhiteboardTransaction`，不能手写 read-check-rename；该事务以排他锁、哈希 CAS 和可恢复 journal 保证恢复语义。
+- 创作端配置图片统一通过 `demo-ui` 的 `ImageInputActions` 暴露上传和白板绘图两个悬浮入口；AI 绘图只在白板内部提供，不在图片上传控件或 author-site 暴露独立生成接口。该入口不复用于聊天附件、文档编辑器或白板内部素材上传。
+- 白板能力稳定后，先运行 Studio 的类型检查与相关 E2E，再补充创作端对话框的回填集成验证；不要把创作端业务 API 或 Workspace 写入逻辑复制到 Studio。
+
 `.next/`、`node_modules/`、`coverage/`、`dist/`、`out/`、`test/**/test-outputs/` 都是生成物或依赖目录，不作为源码入口。
 
 `packages/shared/src/index.ts` 是共享类型入口。`@workbench/shared` 由 author-site、agent-service、screenshot-service 等包通过 `workspace:*` 引用。
@@ -294,6 +305,7 @@ pnpm dev:viewer
 pnpm dev:screenshot
 pnpm dev:preview
 pnpm dev:sketch
+pnpm dev:whiteboard
 pnpm build
 pnpm build:viewer
 pnpm lint
@@ -304,6 +316,7 @@ pnpm check:demo-ui
 pnpm check:agent
 pnpm check:screenshot
 pnpm check:sketch-core
+pnpm check:whiteboard-core
 pnpm check:sketch-react
 pnpm check:sketch-playground
 pnpm check:knowledge-core
@@ -344,6 +357,8 @@ pnpm --filter @workbench/screenshot-service typecheck
 # sketch-core / sketch-react / sketch-playground
 pnpm --filter @workbench/sketch-core typecheck
 pnpm --filter @workbench/sketch-core test
+pnpm --filter @workbench/whiteboard-core typecheck
+pnpm --filter @workbench/whiteboard-core test
 pnpm --filter @workbench/sketch-react typecheck
 pnpm --filter @workbench/sketch-react test
 pnpm --filter @workbench/sketch-playground typecheck
@@ -578,6 +593,7 @@ Docker 栈启动注意事项：
 - demo-ui：`pnpm check:demo-ui`；若改动共享预览入口，还需按消费者运行 `pnpm check:author` 和 `pnpm check:viewer`。
 - viewer-site：`pnpm check:viewer`，必要时 `pnpm build:viewer`。
 - sketch-core：`pnpm check:sketch-core`。
+- whiteboard-core：`pnpm check:whiteboard-core`；HTML/CSS 仅可通过 bridge profile 转换，不能依赖浏览器 DOM/layout 或宿主 IO。
 - sketch-react：`pnpm check:sketch-react`；如果改动影响 author-site 草图编辑态，也运行 `pnpm check:author` 和 `pnpm test:e2e -- sketch-page-regression.spec.ts`。
 - sketch-playground：`pnpm check:sketch-playground`，涉及交互或 fixture 时运行 `pnpm test:e2e:sketch-playground`。
 - agent-service：`pnpm check:agent`。

@@ -22,6 +22,7 @@
 - 文件系统写入必须围绕显式 `dataDir` 或测试临时目录，测试不得直接修改仓库根 `data/`。
 - 对外返回结构应保持业务语义稳定，不泄漏内部文件布局作为调用契约。
 - 涉及删除、覆盖、发布前检查等高风险操作时，优先提供 dry-run 或明确的错误结构。
+- 白板 non-live 资源写入一律使用 `whiteboard-transaction.ts` 的 `writeWhiteboardTransaction`，以文件哈希 CAS、排他锁和 journal 恢复避免多文件半提交；不要在调用方复制 rename/rollback 逻辑。
 
 ## 文档维护
 

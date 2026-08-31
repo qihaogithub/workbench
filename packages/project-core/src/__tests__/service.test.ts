@@ -14,12 +14,15 @@ let service: ProjectAdminService;
 
 beforeEach(() => {
   tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "project-core-"));
+  // The fixture exercises administrative lifecycle operations explicitly.
+  process.env.PROJECT_ADMIN_ROLE = "admin";
   service = new ProjectAdminService({ dataDir: tempDir });
 });
 
 afterEach(() => {
   fs.rmSync(tempDir, { recursive: true, force: true });
   delete process.env.AGENT_SERVICE_URL;
+  delete process.env.PROJECT_ADMIN_ROLE;
 });
 
 function overwriteEditTransaction(transaction: EditTransaction): void {
@@ -1163,7 +1166,58 @@ describe("ProjectAdminService", () => {
       plan.confirmToken,
     );
     expect(executed.ok).toBe(true);
+    expect(executed.data?.trashed).toBe(true);
     expect(service.getProject(projectId).ok).toBe(false);
+    expect(service.listTrashedProjects().data?.map((project) => project.id)).toContain(projectId);
+  });
+
+  it("编辑者可删除并恢复普通项目，但不能管理模板项目", () => {
+    const editor = { id: "editor-1", name: "编辑者", role: "creator" as const };
+    const standard = service.createProject({ name: "普通项目" });
+    const standardId = standard.data?.id ?? "";
+    const preview = service.deleteProjectPreview(standardId, editor);
+    expect(preview.ok).toBe(true);
+    const trashed = service.deleteProjectExecute(
+      (preview.data as PreviewPlan).planId,
+      (preview.data as PreviewPlan).confirmToken,
+      editor,
+    );
+    expect(trashed.ok).toBe(true);
+    expect(service.listTrashedProjects(editor).data?.map((project) => project.id)).toContain(standardId);
+    expect(service.restoreTrashedProject(standardId, editor).ok).toBe(true);
+    expect(service.getProject(standardId).ok).toBe(true);
+
+    const template = service.createProject({ name: "模板项目" });
+    const templateId = template.data?.id ?? "";
+    expect(service.updateProject({
+      projectId: templateId,
+      projectType: "template",
+      templateSettings: { description: "模板", scope: "team", official: false },
+    }).ok).toBe(true);
+    expect(service.deleteProjectPreview(templateId, editor).error?.code).toBe("FORBIDDEN");
+    expect(service.deleteTemplatePreview(templateId, editor).error?.code).toBe("FORBIDDEN");
+  });
+
+  it("回收站项目可提前清除并会在到期后自动清理", () => {
+    const created = service.createProject({ name: "回收站清理" });
+    const projectId = created.data?.id ?? "";
+    const preview = service.deleteProjectPreview(projectId);
+    const trashed = service.deleteProjectExecute(
+      (preview.data as PreviewPlan).planId,
+      (preview.data as PreviewPlan).confirmToken,
+    );
+    expect(service.purgeTrashedProject(projectId).ok).toBe(true);
+    expect(service.listTrashedProjects().data).toEqual([]);
+
+    const second = service.createProject({ name: "到期清理" });
+    const secondPreview = service.deleteProjectPreview(second.data?.id ?? "");
+    const secondTrashed = service.deleteProjectExecute(
+      (secondPreview.data as PreviewPlan).planId,
+      (secondPreview.data as PreviewPlan).confirmToken,
+    );
+    expect(service.purgeExpiredTrashedProjects(secondTrashed.data?.purgeAt ?? 0)).toBe(1);
+    expect(service.listTrashedProjects().data).toEqual([]);
+    expect(trashed.ok).toBe(true);
   });
 
   it("删除项目时同步清理已发布产物和发布索引", () => {
@@ -1625,6 +1679,39 @@ describe("ProjectAdminService", () => {
 
     const detail = service.getProject(converted.data?.id ?? "");
     expect(detail.data?.pages.map((page) => page.name)).toEqual(["首页"]);
+  });
+
+  it("仅允许有项目访问权的可写操作者更新项目封面，并记录封面审计", () => {
+    const created = service.createProject({ name: "封面项目" });
+    const projectId = created.data?.id ?? "";
+    const creator = {
+      id: "creator",
+      name: "Creator",
+      role: "creator" as const,
+      allowedProjectIds: [projectId],
+    };
+
+    const updated = service.setProjectCover(projectId, "/thumbnails/cover.webp", creator);
+    expect(updated.ok).toBe(true);
+    expect(updated.data?.thumbnail).toBe("/thumbnails/cover.webp");
+    expect(updated.auditId).toBeTruthy();
+
+    const denied = service.setProjectCover(projectId, undefined, {
+      id: "readonly",
+      name: "Readonly",
+      role: "readonly",
+    });
+    expect(denied.ok).toBe(false);
+    expect(denied.error?.code).toBe("FORBIDDEN");
+
+    const outsideAccess = service.setProjectCover(projectId, undefined, {
+      id: "other",
+      name: "Other",
+      role: "creator",
+      allowedProjectIds: ["another-project"],
+    });
+    expect(outsideAccess.ok).toBe(false);
+    expect(outsideAccess.error?.code).toBe("FORBIDDEN");
   });
 
   it("live workspace 写入在没有 mutation port 时被拒绝", () => {

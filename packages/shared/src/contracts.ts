@@ -2,6 +2,7 @@ export * from "./index";
 
 import type { WorkspaceRevision } from "./workspace";
 import type { DemoPageRuntimeType, PagePresentationProfile } from "./index";
+import { isWhiteboardBinding, isWhiteboardDocument } from "./whiteboard";
 
 /**
  * Durable, single-writer contract for an active (live) Workspace.
@@ -232,6 +233,8 @@ export function isManagedWorkspaceResource(resourcePath: string): boolean {
     || /^knowledge\/[^/]+\.(md|markdown|mdown)$/i.test(normalized)
     || normalized === "design-spec/manifest.json"
     || /^design-spec\/spec-[^/]+\.json$/.test(normalized)
+    || /^whiteboards\/[a-zA-Z0-9_-]{1,80}\.json$/.test(normalized)
+    || normalized === "whiteboards/bindings.json"
     || /^assets\/.+/.test(normalized)
   ));
 }
@@ -239,5 +242,20 @@ export function isManagedWorkspaceResource(resourcePath: string): boolean {
 export function assertManagedWorkspaceTextWrite(resourcePath: string, content: string): void {
   if (!isManagedWorkspaceResource(resourcePath) || /^assets\//.test(resourcePath) || content.length > 2 * 1024 * 1024) {
     throw new Error("WORKSPACE_INVALID_OPERATION");
+  }
+  if (/^whiteboards\/[a-zA-Z0-9_-]{1,80}\.json$/.test(resourcePath)) {
+    try {
+      if (!isWhiteboardDocument(JSON.parse(content))) throw new Error("invalid");
+    } catch {
+      throw new Error("WORKSPACE_INVALID_OPERATION");
+    }
+  }
+  if (resourcePath === "whiteboards/bindings.json") {
+    try {
+      const value = JSON.parse(content) as { bindings?: unknown };
+      if (!Array.isArray(value.bindings) || !value.bindings.every(isWhiteboardBinding)) throw new Error("invalid");
+    } catch {
+      throw new Error("WORKSPACE_INVALID_OPERATION");
+    }
   }
 }

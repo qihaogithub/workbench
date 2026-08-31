@@ -10,6 +10,8 @@
 test/创作端E2E回归测试/
 ├── e2e-test-project-flow.spec.ts    # 主测试脚本
 ├── author-core-flow-regression.spec.ts # 创作端核心流程回归脚本
+├── whiteboard-dialog-flow.spec.ts      # 配置图片白板宿主导入/提交回归
+├── whiteboard-dialog-playwright.config.ts # 白板 feature flag 隔离配置
 ├── playwright.config.ts              # Playwright 配置文件
 ├── global-setup.ts                   # 生成 E2E runId 和项目登记文件
 ├── global-teardown.ts                # 清理本轮和过期 E2E 测试项目
@@ -73,6 +75,9 @@ pnpm test:e2e
 
 # 只运行创作端核心流程回归
 pnpm test:e2e:core-flow
+
+# 只运行配置图片白板宿主回归（独立启用白板 feature flag）
+pnpm test:e2e:whiteboard
 
 # 有头模式运行（可见浏览器）
 pnpm test:e2e:headed

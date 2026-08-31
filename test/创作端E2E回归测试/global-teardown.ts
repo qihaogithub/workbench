@@ -1,4 +1,4 @@
-import { request } from '@playwright/test';
+import { chromium } from "@playwright/test";
 
 import {
   deleteE2EProject,
@@ -7,11 +7,22 @@ import {
   isStaleE2EProject,
   listProjects,
   readE2EProjectRegistry,
-} from './support/e2e-projects';
+} from "./support/e2e-projects";
+import { loginE2EUser } from "./support/e2e-auth";
 
 export default async function globalTeardown(): Promise<void> {
   const state = getE2ERunState();
-  const api = await request.newContext({ baseURL: state.baseURL });
+  // Project APIs require the same authenticated actor as the test page.  A
+  // plain request context has no auth cookie, which used to leave every
+  // registered fixture behind and made the cleanup warnings misleading.
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage({ baseURL: state.baseURL });
+  await loginE2EUser(page, {
+    baseURL: state.baseURL,
+    username: process.env.E2E_USER ?? "qihao",
+    password: process.env.E2E_PASSWORD ?? "130015",
+  });
+  const api = page.request;
 
   try {
     const registry = readE2EProjectRegistry(state.registryPath);
@@ -31,11 +42,15 @@ export default async function globalTeardown(): Promise<void> {
     try {
       projects = await listProjects(api);
     } catch (error) {
-      console.warn(`[e2e] failed to list projects for stale cleanup: ${String(error)}`);
+      console.warn(
+        `[e2e] failed to list projects for stale cleanup: ${String(error)}`,
+      );
       return;
     }
 
-    for (const project of projects.filter((item) => !registeredIds.has(item.id))) {
+    for (const project of projects.filter(
+      (item) => !registeredIds.has(item.id),
+    )) {
       if (!isStaleE2EProject(project)) continue;
       const result = await deleteE2EProject(api, project.id);
       if (!result.ok) {
@@ -45,6 +60,6 @@ export default async function globalTeardown(): Promise<void> {
       }
     }
   } finally {
-    await api.dispose();
+    await browser.close();
   }
 }

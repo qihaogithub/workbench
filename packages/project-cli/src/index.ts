@@ -33,6 +33,8 @@ import type {
   FolderUpdateInput,
   PageCreateInput,
   PageSwitchRuntimeInput,
+  PageTemplateBatchUpdateInput,
+  PageTemplateUpdateInput,
   PageUpdatePrototypeInput,
   PageUpdateInput,
   ProjectAdminActor,
@@ -419,6 +421,24 @@ function stringArrayArg(args: JsonObject, key: string): string[] {
   return [];
 }
 
+function requireTemplatePageMarker(
+  args: JsonObject,
+  key = "isTemplatePage",
+): boolean | ProjectAdminResult<never> {
+  if (!hasArg(args, key) || typeof args[key] !== "boolean") {
+    return cliFail(
+      "INVALID_REQUEST",
+      `必须提供布尔参数 --${key.replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`)}`,
+      {
+        nextActions: [
+          `ow page update-template --project <projectId> --page <pageId> --${key.replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`)} true --json`,
+        ],
+      },
+    );
+  }
+  return args[key] as boolean;
+}
+
 function objectArg(args: JsonObject, key: string): JsonObject {
   const value = args[key];
   if (value && typeof value === "object" && !Array.isArray(value))
@@ -478,7 +498,7 @@ function actorFromEnv(): ProjectAdminActor {
   const normalizedRole =
     role === "creator" || role === "readonly" || role === "admin"
       ? role
-      : "admin";
+      : "creator";
   const allowedProjectIds = (process.env.PROJECT_ADMIN_ALLOWED_PROJECTS ?? "")
     .split(",")
     .map((item) => item.trim())
@@ -2565,8 +2585,8 @@ register(
 register(
   "template delete-preview",
   "预览模板删除影响",
-  (args, pos, { service }) =>
-    service.deleteTemplatePreview(stringArg(args, "templateId", pos[0])),
+  (args, pos, { service, actor }) =>
+    service.deleteTemplatePreview(stringArg(args, "templateId", pos[0]), actor),
   ["template_delete_preview"],
 );
 
@@ -2857,6 +2877,72 @@ register(
       actor,
     ),
   ["page_duplicate"],
+);
+
+register(
+  "page update-template",
+  "修改单个页面的模板页标记（仅管理员）",
+  (args, pos, { service, actor }) => {
+    const marker = requireTemplatePageMarker(args);
+    if (typeof marker !== "boolean") return marker;
+    const projectId = stringArg(args, "projectId") || stringArg(args, "project", pos[0]);
+    const pageId = stringArg(args, "pageId") || stringArg(args, "page", pos[1]);
+    if (!projectId || !pageId) {
+      return cliFail(
+        "INVALID_REQUEST",
+        "必须提供 projectId 和 pageId",
+        {
+          nextActions: [
+            "ow page update-template --project <projectId> --page <pageId> --is-template-page true --json",
+          ],
+        },
+      );
+    }
+    const input: PageTemplateUpdateInput = {
+      projectId,
+      pageId,
+      isTemplatePage: marker,
+      dryRun: booleanArg(args, "dryRun"),
+    };
+    return service.updatePageTemplate(input, actor);
+  },
+  ["page_update_template", "page set-template", "page_set_template"],
+);
+
+register(
+  "page update-templates",
+  "批量修改页面的模板页标记（仅管理员）",
+  (args, pos, { service, actor }) => {
+    const marker = requireTemplatePageMarker(args);
+    if (typeof marker !== "boolean") return marker;
+    const projectId = stringArg(args, "projectId") || stringArg(args, "project", pos[0]);
+    const pageIds = stringArrayArg(args, "pageIds").length > 0
+      ? stringArrayArg(args, "pageIds")
+      : pos.slice(1).filter(Boolean);
+    if (!projectId || pageIds.length === 0) {
+      return cliFail(
+        "INVALID_REQUEST",
+        "必须提供 projectId 和至少一个 pageId",
+        {
+          nextActions: [
+            "ow page update-templates --project <projectId> --page-ids '[\"<pageId>\"]' --is-template-page true --json",
+          ],
+        },
+      );
+    }
+    const input: PageTemplateBatchUpdateInput = {
+      projectId,
+      pageIds,
+      isTemplatePage: marker,
+      dryRun: booleanArg(args, "dryRun"),
+    };
+    return service.updatePageTemplates(input, actor);
+  },
+  [
+    "page_update_templates",
+    "page set-templates",
+    "page_set_templates",
+  ],
 );
 
 register(

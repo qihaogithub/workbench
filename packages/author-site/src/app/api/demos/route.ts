@@ -4,10 +4,13 @@ import {
   getProjectAdminService,
   projectAdminResponse,
 } from "@/lib/project-admin-service";
+import { getCurrentProjectActor } from "@/lib/auth/current-user";
 
 export async function GET() {
   try {
-    const result = getProjectAdminService().listProjects();
+    const actor = await getCurrentProjectActor();
+    if (!actor) return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), { status: 401 });
+    const result = getProjectAdminService().listProjects(actor);
     if (!result.ok) return projectAdminResponse(result);
     const projects = result.data ?? [];
     return NextResponse.json(createApiSuccess(projects));
@@ -22,6 +25,8 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const actor = await getCurrentProjectActor();
+    if (!actor) return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), { status: 401 });
     const body = await request.json();
     const { name, category, templateId } = body as {
       name?: unknown;
@@ -54,7 +59,7 @@ export async function POST(request: NextRequest) {
       name,
       category,
       templateId,
-    });
+    }, actor);
     return projectAdminResponse(result, 201);
   } catch (error) {
     console.error("Error creating project:", error);

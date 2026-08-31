@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { createApiError, createApiSuccess } from "@/lib/fs-utils";
+import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
+import { findUserById } from "@/lib/user";
+import { getProjectPath, listDemoPages, projectExists } from "@/lib/fs-utils";
+import path from "path";
 import {
   applyVisualConfiguration,
   type VisualConfigTarget,
@@ -17,7 +21,27 @@ export async function POST(request: NextRequest) {
       demoId?: unknown;
       node?: unknown;
       target?: unknown;
+      projectId?: unknown;
     };
+
+    const token = await getAuthCookie();
+    const auth = token ? await verifyToken(token) : null;
+    if (!auth) {
+      return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), { status: 401 });
+    }
+    const user = findUserById(auth.userId);
+    const projectId = typeof body.projectId === "string" ? body.projectId : "";
+    const demoId = typeof body.demoId === "string" ? body.demoId : "";
+    if (!projectId || !demoId || !projectExists(projectId)) {
+      return NextResponse.json(createApiError("INVALID_REQUEST", "projectId 和 demoId 必须有效"), { status: 400 });
+    }
+    const page = listDemoPages(path.join(getProjectPath(projectId), "workspace")).find((item) => item.id === demoId);
+    if (!page) {
+      return NextResponse.json(createApiError("DEMO_PAGE_NOT_FOUND", "页面不存在"), { status: 404 });
+    }
+    if ((user as { role?: string } | null)?.role !== "admin" && (page as { isTemplatePage?: boolean }).isTemplatePage) {
+      return NextResponse.json(createApiError("FORBIDDEN", "编辑者不能对模板页使用可视化配置"), { status: 403 });
+    }
 
     if (typeof body.code !== "string" || typeof body.schema !== "string") {
       return NextResponse.json(
@@ -56,7 +80,6 @@ export async function POST(request: NextRequest) {
       typeof body.projectConfigSchema === "string"
         ? body.projectConfigSchema
         : undefined;
-    const demoId = typeof body.demoId === "string" ? body.demoId : "current";
     const conflictResult = validateNoSchemaConflictFromStrings(
       projectConfigSchema,
       { [demoId]: result.schema },

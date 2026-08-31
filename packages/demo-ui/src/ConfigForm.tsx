@@ -122,7 +122,11 @@ function FieldGroupSection({
   readonly,
   designSpecEntries,
   onEditDesignSpec,
+  onOpenDesignSpec,
   onEditConfigDefinition,
+  imageConfigScope,
+  pageId,
+  onLaunchWhiteboard,
 }: {
   group: FieldGroup;
   formData: Record<string, unknown>;
@@ -132,7 +136,11 @@ function FieldGroupSection({
   readonly?: boolean;
   designSpecEntries?: DesignSpecEntryLink[];
   onEditDesignSpec?: (docId: string, entryId: string) => void;
+  onOpenDesignSpec?: (spec: DesignSpecEntryLink, fieldTitle: string, anchor?: { top: number; bottom: number }) => void;
   onEditConfigDefinition?: (fieldKey: string, field: FieldConfig) => void;
+  imageConfigScope?: ConfigFormProps["imageConfigScope"];
+  pageId?: string;
+  onLaunchWhiteboard?: ConfigFormProps["onLaunchWhiteboard"];
 }) {
   if (group.title === "") {
     return (
@@ -148,8 +156,12 @@ function FieldGroupSection({
               readonly={readonly}
               designSpecEntries={designSpecEntries}
               onEditDesignSpec={onEditDesignSpec}
+              onOpenDesignSpec={onOpenDesignSpec}
               onEditConfigDefinition={onEditConfigDefinition}
               fieldPath={field.key}
+              imageConfigScope={imageConfigScope}
+              pageId={pageId}
+              onLaunchWhiteboard={onLaunchWhiteboard}
             />
           ))}
         </div>
@@ -173,8 +185,12 @@ function FieldGroupSection({
             readonly={readonly}
             designSpecEntries={designSpecEntries}
             onEditDesignSpec={onEditDesignSpec}
+            onOpenDesignSpec={onOpenDesignSpec}
             onEditConfigDefinition={onEditConfigDefinition}
             fieldPath={field.key}
+            imageConfigScope={imageConfigScope}
+            pageId={pageId}
+            onLaunchWhiteboard={onLaunchWhiteboard}
           />
         ))}
       </div>
@@ -199,7 +215,11 @@ export function ConfigForm({
   onTogglePositionDimming,
   designSpecEntries,
   onEditDesignSpec,
+  onOpenDesignSpec,
   onEditConfigDefinition,
+  imageConfigScope,
+  pageId,
+  onLaunchWhiteboard,
 }: ConfigFormProps) {
   const [formData, setFormData] = useState<Record<string, unknown>>(
     () => {
@@ -384,7 +404,11 @@ export function ConfigForm({
                 readonly={readonly}
                 designSpecEntries={designSpecEntries}
                 onEditDesignSpec={onEditDesignSpec}
+                onOpenDesignSpec={onOpenDesignSpec}
                 onEditConfigDefinition={onEditConfigDefinition}
+                imageConfigScope={imageConfigScope}
+                pageId={pageId}
+                onLaunchWhiteboard={onLaunchWhiteboard}
               />
             </div>
           ))}

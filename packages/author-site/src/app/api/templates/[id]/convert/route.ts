@@ -5,14 +5,17 @@ import {
   projectAdminResponse,
 } from "@/lib/project-admin-service";
 import { reconcileTemplateKnowledge } from "@/lib/knowledge-service";
+import { getCurrentProjectActor } from "@/lib/auth/current-user";
 
 export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const actor = await getCurrentProjectActor();
+    if (!actor) return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), { status: 401 });
     const { id } = await params;
-    const result = getProjectAdminService().convertTemplateToProject(id);
+    const result = getProjectAdminService().convertTemplateToProject(id, actor);
     if (!result.ok) return projectAdminResponse(result);
     await reconcileTemplateKnowledge();
 

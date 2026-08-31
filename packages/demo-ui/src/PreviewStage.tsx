@@ -1,6 +1,7 @@
 "use client";
 
-import React, { lazy, Suspense, useEffect, useMemo } from "react";
+import React, { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { Route } from "lucide-react";
 
 import { PreviewStageToolbar } from "./PreviewStageToolbar";
 import { SinglePagePreview } from "./SinglePagePreview";
@@ -48,6 +49,7 @@ export function PreviewStage({
     [normalizedPages],
   );
   const activePage = normalizedPages.find((page) => page.id === activePageId);
+  const [navigationActive, setNavigationActive] = useState(false);
 
   useEffect(() => {
     if (previewMode !== "single") return;
@@ -144,6 +146,9 @@ export function PreviewStage({
       navigationHotspots={activePage ? Object.values(canvasState.navigation?.hotspots ?? {}).filter((hotspot) => hotspot.pageId === activePage.id) : []}
       navigationConnections={Object.values(canvasState.navigation?.connections ?? {})}
       navigationEditable={interactionMode === "editor"}
+      navigationActive={navigationActive}
+      onNavigationActiveChange={setNavigationActive}
+      showNavigationTool={false}
       onCreateNavigation={createSingleNavigation}
       onUpdateNavigationHotspot={updateSingleNavigationHotspot}
       onUpdateNavigationTarget={updateSingleNavigationTarget}
@@ -176,7 +181,31 @@ export function PreviewStage({
           showDefaultPageSelector={showDefaultPageSelector}
           selectorSlot={selectorSlot}
           center={toolbarCenter}
-          trailing={toolbarTrailing}
+          trailing={
+            previewMode === "single" &&
+            interactionMode === "editor" &&
+            activePage ? (
+              <div className="flex min-w-0 items-center gap-2">
+                <button
+                  type="button"
+                  className={cn(
+                    "flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md border bg-background/90 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    navigationActive &&
+                      "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground",
+                  )}
+                  aria-label="绘制页面跳转热区"
+                  aria-pressed={navigationActive}
+                  title="绘制页面跳转热区"
+                  onClick={() => setNavigationActive((active) => !active)}
+                >
+                  <Route className="h-4 w-4" />
+                </button>
+                {toolbarTrailing}
+              </div>
+            ) : (
+              toolbarTrailing
+            )
+          }
         />
       )}
       <div className="min-h-0 flex-1 overflow-hidden">

@@ -28,12 +28,13 @@ export async function POST(request: NextRequest) {
     const token = await createToken({
       userId: user.id,
       username: user.username,
+      ...(user.role ? { role: user.role } : {}),
     });
     await setAuthCookie(token);
 
     return NextResponse.json(
       createApiSuccess({
-        user: { id: user.id, username: user.username },
+        user: { id: user.id, username: user.username, role: user.role },
         // CLI 等非浏览器客户端无法读取 httpOnly cookie，显式请求时在 body 返回 token
         ...(includeToken === true
           ? { token, expiresAt: issuedAt + TOKEN_TTL_MS }

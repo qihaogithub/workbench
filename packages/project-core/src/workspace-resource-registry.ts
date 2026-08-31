@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 
 import { validateSketchSceneDocument } from "@workbench/sketch-core";
+import { isWhiteboardBinding, isWhiteboardDocument, WHITEBOARD_DOCUMENT_MAX_BYTES } from "@workbench/shared";
 
 export type WorkspaceResourceKind =
   | "page-code"
@@ -21,13 +22,15 @@ export type WorkspaceResourceKind =
   | "canvas-layout"
   | "knowledge-document"
   | "knowledge-manifest"
-  | "asset";
+  | "asset"
+  | "whiteboard-document"
+  | "whiteboard-bindings";
 
 export interface WorkspaceResourceDescriptor {
   kind: WorkspaceResourceKind;
   text: boolean;
   maxBytes: number;
-  validation: "text" | "json-object" | "workspace-tree" | "sketch-scene" | "binary";
+  validation: "text" | "json-object" | "workspace-tree" | "sketch-scene" | "whiteboard-document" | "whiteboard-bindings" | "binary";
 }
 
 export interface WorkspaceRootManifest {
@@ -77,6 +80,8 @@ export class WorkspaceResourceRegistry {
     if (/^knowledge\/[^/]+\.(md|markdown|mdown)$/i.test(normalized)) return { kind: "knowledge-document", text: true, maxBytes: TEXT_MAX_BYTES, validation: "text" };
     if (normalized === "knowledge/manifest.json") return { kind: "knowledge-manifest", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
     if (/^assets\/.+/.test(normalized)) return { kind: "asset", text: false, maxBytes: 20 * 1024 * 1024, validation: "binary" };
+    if (normalized === "whiteboards/bindings.json") return { kind: "whiteboard-bindings", text: true, maxBytes: TEXT_MAX_BYTES, validation: "whiteboard-bindings" };
+    if (/^whiteboards\/[a-zA-Z0-9_-]{1,80}\.json$/.test(normalized)) return { kind: "whiteboard-document", text: true, maxBytes: WHITEBOARD_DOCUMENT_MAX_BYTES, validation: "whiteboard-document" };
     return null;
   }
 
@@ -131,6 +136,17 @@ export class WorkspaceResourceRegistry {
     }
     if (descriptor.validation === "sketch-scene") {
       if (!validateSketchSceneDocument(parsed).valid) throw new Error("WORKSPACE_INVALID_OPERATION");
+      return;
+    }
+    if (descriptor.validation === "whiteboard-document") {
+      if (!isWhiteboardDocument(parsed)) throw new Error("WORKSPACE_INVALID_OPERATION");
+      return;
+    }
+    if (descriptor.validation === "whiteboard-bindings") {
+      if (!Array.isArray((parsed as { bindings?: unknown }).bindings)
+        || !(parsed as { bindings: unknown[] }).bindings.every(isWhiteboardBinding)) {
+        throw new Error("WORKSPACE_INVALID_OPERATION");
+      }
       return;
     }
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {

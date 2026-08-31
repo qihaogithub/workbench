@@ -16,6 +16,9 @@ import {
   updateDemo,
   updateProjectTemplate,
   useDemos,
+  useTrashedProjects,
+  restoreTrashedProject,
+  purgeTrashedProject,
 } from "@/lib/api";
 
 const mockRouterPush = jest.fn();
@@ -47,8 +50,11 @@ jest.mock("@/lib/api", () => ({
   saveDemoAsTemplate: jest.fn(),
   updateDemo: jest.fn(),
   updateProjectTemplate: jest.fn(),
+  restoreTrashedProject: jest.fn(),
+  purgeTrashedProject: jest.fn(),
   uploadTemplateCover: jest.fn(),
   useDemos: jest.fn(),
+  useTrashedProjects: jest.fn(),
 }));
 
 jest.mock("@/lib/viewer-url", () => ({
@@ -56,6 +62,9 @@ jest.mock("@/lib/viewer-url", () => ({
 }));
 
 const mockUseDemos = useDemos as jest.MockedFunction<typeof useDemos>;
+const mockUseTrashedProjects = useTrashedProjects as jest.MockedFunction<typeof useTrashedProjects>;
+const mockRestoreTrashedProject = restoreTrashedProject as jest.MockedFunction<typeof restoreTrashedProject>;
+const mockPurgeTrashedProject = purgeTrashedProject as jest.MockedFunction<typeof purgeTrashedProject>;
 const mockCreateDemo = createDemo as jest.MockedFunction<typeof createDemo>;
 const mockConvertProjectTemplate = convertProjectTemplate as jest.MockedFunction<
   typeof convertProjectTemplate
@@ -115,6 +124,20 @@ describe("HomePage", () => {
       isLoading: false,
       error: null,
       revalidate: jest.fn(),
+    });
+    mockUseTrashedProjects.mockReturnValue({
+      projects: [],
+      isLoading: false,
+      error: null,
+      revalidate: jest.fn(),
+    });
+    mockRestoreTrashedProject.mockResolvedValue({
+      success: true,
+      data: { restored: true, projectId: "trash-1" },
+    });
+    mockPurgeTrashedProject.mockResolvedValue({
+      success: true,
+      data: { purged: true, projectId: "trash-1" },
     });
     mockCreateDemo.mockResolvedValue({
       success: true,
@@ -668,5 +691,33 @@ describe("HomePage", () => {
     expect(
       screen.getByRole("link", { name: "打开项目 弹窗页" }),
     ).toBeInTheDocument();
+  });
+
+  it("回收站展示可恢复项目并允许恢复", async () => {
+    mockUseTrashedProjects.mockReturnValue({
+      projects: [{
+        id: "trash-1",
+        name: "已删除项目",
+        projectType: "standard",
+        createdAt: 1,
+        updatedAt: 2,
+        demoPages: [],
+        deletedAt: Date.now(),
+        purgeAt: Date.now() + 10 * 24 * 60 * 60 * 1000,
+        deletedBy: { id: "editor", name: "编辑者", role: "creator" },
+      }],
+      isLoading: false,
+      error: null,
+      revalidate: jest.fn(),
+    });
+    render(<HomePage initialDemos={demos} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /回收站/ }));
+    expect(screen.getByText("已删除项目")).toBeInTheDocument();
+    expect(screen.getByText(/剩余 10 天/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "恢复" }));
+    await waitFor(() => {
+      expect(mockRestoreTrashedProject).toHaveBeenCalledWith("trash-1");
+    });
   });
 });

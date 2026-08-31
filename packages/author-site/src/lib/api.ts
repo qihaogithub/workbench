@@ -6,6 +6,7 @@ import type {
   ProjectTemplateMeta,
   SessionMeta,
 } from '@workbench/shared'
+import type { TrashedProjectSummary } from '@workbench/project-core'
 
 // 真实 API 调用
 const fetcher = async <T>(url: string): Promise<ApiResponse<T>> => {
@@ -54,6 +55,40 @@ export function useProjectTemplates() {
     error: error || apiError,
     revalidate,
   }
+}
+
+export function useTrashedProjects() {
+  const { data, error, isLoading, mutate: revalidate } = useSWR(
+    '/api/trash/projects',
+    () => fetcher<TrashedProjectSummary[]>('/api/trash/projects'),
+    { revalidateOnFocus: false },
+  )
+  return {
+    projects: data?.success ? data.data : [],
+    isLoading,
+    error: error || (data?.success === false ? data.error : null),
+    revalidate,
+  }
+}
+
+export async function restoreTrashedProject(
+  id: string,
+): Promise<ApiResponse<{ restored: true; projectId: string }>> {
+  const response = await fetch(`/api/trash/projects/${id}`, { method: 'POST' }).then((res) => res.json())
+  if (response.success) {
+    mutate('/api/demos')
+    mutate('/api/templates')
+    mutate('/api/trash/projects')
+  }
+  return response
+}
+
+export async function purgeTrashedProject(
+  id: string,
+): Promise<ApiResponse<{ purged: true; projectId: string }>> {
+  const response = await fetch(`/api/trash/projects/${id}`, { method: 'DELETE' }).then((res) => res.json())
+  if (response.success) mutate('/api/trash/projects')
+  return response
 }
 
 export async function createDemo(
@@ -129,6 +164,8 @@ export async function saveDemoAsTemplate(
 
   if (response.success) {
     mutate('/api/templates')
+    mutate('/api/demos')
+    mutate('/api/trash/projects')
   }
 
   return response
@@ -158,6 +195,8 @@ export async function deleteProjectTemplate(id: string): Promise<ApiResponse<voi
 
   if (response.success) {
     mutate('/api/templates')
+    mutate('/api/demos')
+    mutate('/api/trash/projects')
   }
 
   return response
@@ -172,6 +211,7 @@ export async function convertProjectTemplate(
 
   if (response.success) {
     mutate('/api/demos')
+    mutate('/api/trash/projects')
     mutate('/api/templates')
   }
 
@@ -200,6 +240,7 @@ export async function deleteDemo(id: string): Promise<ApiResponse<void>> {
 
   if (response.success) {
     mutate('/api/demos')
+    mutate('/api/trash/projects')
   }
 
   return response
