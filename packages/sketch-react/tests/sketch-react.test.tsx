@@ -332,6 +332,26 @@ function setCanvasStageRect(stage: HTMLElement, width = 400, height = 300) {
     }) as DOMRect;
 }
 
+function mockFloatingToolbarRect(width: number, height = 44) {
+  const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
+  return vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    if (this.getAttribute("role") === "toolbar") {
+      return {
+        left: 0,
+        top: 0,
+        width,
+        height,
+        right: width,
+        bottom: height,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      } as DOMRect;
+    }
+    return originalGetBoundingClientRect.call(this);
+  });
+}
+
 function openCanvasContextMenu() {
   fireEvent.contextMenu(getCanvasStage(), { clientX: 120, clientY: 120 });
   return screen.getByRole("menu", { name: "草图右键菜单" });
@@ -392,7 +412,10 @@ function openLayerContextMenu(nodeId: string) {
 }
 
 describe("sketch-react", () => {
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
 
   it("renders bound config data in read-only preview", () => {
     render(
@@ -727,8 +750,19 @@ describe("sketch-react", () => {
       expect(selectionEvents.at(-1)?.nodeIds).toEqual(["card"]);
       expect(screen.getByTestId("sketch-selection-box")).not.toBeNull();
       expect(screen.getByTestId("sketch-selection-center-point")).not.toBeNull();
-      expect(screen.getByTestId("sketch-rotate-handle")).not.toBeNull();
-      expect(screen.getByTestId("sketch-resize-handle")).not.toBeNull();
+      const rotateHandle = screen.getByTestId("sketch-rotate-handle");
+      expect(rotateHandle.tagName).toBe("BUTTON");
+      expect(rotateHandle.getAttribute("aria-label")).toBe("旋转控制柄");
+      expect(rotateHandle.className).toContain("bg-white");
+      expect(rotateHandle.className).toContain("bottom-0");
+      expect(rotateHandle.className).toContain("left-0");
+      expect(rotateHandle.querySelector("svg")).not.toBeNull();
+      const resizeHandles = document.querySelectorAll("[data-sketch-resize-handle]");
+      expect(resizeHandles).toHaveLength(8);
+      resizeHandles.forEach((handle) => {
+        expect(handle.className).toContain("bg-white");
+        expect(handle.className).toContain("border-slate-300");
+      });
       expect(screen.queryByTestId("sketch-hover-highlight")).toBeNull();
     });
 
@@ -1186,6 +1220,20 @@ describe("sketch-react", () => {
         expect.arrayContaining([expect.objectContaining({ type: "diamond", x: 40, y: 50 })]),
       );
     });
+  });
+
+  it("keeps fill-container stages in scene coordinates for pointer mapping", () => {
+    const emptyScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [],
+    };
+    render(<ControlledSurfaceEditor initialScene={emptyScene} />);
+
+    const stage = getCanvasStage();
+
+    expect(stage.style.width).toBe("400px");
+    expect(stage.style.height).toBe("300px");
   });
 
   it("zooms and pans the canvas viewport without changing the scene", async () => {
@@ -4022,7 +4070,7 @@ describe("sketch-react", () => {
     });
   });
 
-  it("shows a single-selection floating toolbar for fill, text, style, and more actions", async () => {
+  it("shows a single-selection floating toolbar for fill, text, layer order, and more actions", async () => {
     const panelScene: SketchSceneDocument = {
       version: 1,
       pageSize: { width: 400, height: 300 },
@@ -4038,7 +4086,9 @@ describe("sketch-react", () => {
     expect(within(toolbar).getByLabelText("悬浮填充")).toBeTruthy();
     expect(within(toolbar).getByLabelText("悬浮描边")).toBeTruthy();
     expect(within(toolbar).getByLabelText("悬浮文本")).toBeTruthy();
-    expect(within(toolbar).getByLabelText("悬浮复制样式")).toBeTruthy();
+    expect(within(toolbar).getByLabelText("悬浮层级")).toBeTruthy();
+    expect(within(toolbar).queryByLabelText("悬浮复制样式")).toBeNull();
+    expect(within(toolbar).queryByLabelText("悬浮属性")).toBeNull();
     expect(within(toolbar).getByLabelText("悬浮更多")).toBeTruthy();
 
     fireEvent.click(within(toolbar).getByLabelText("悬浮填充"));
@@ -4052,6 +4102,56 @@ describe("sketch-react", () => {
 
     fireEvent.click(within(toolbar).getByLabelText("悬浮文本"));
     expect(await screen.findByLabelText("画布文本编辑")).toBeTruthy();
+  });
+
+  it("supports no-color, layer order, and the compact more menu", async () => {
+    const menuScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "back", type: "rect", x: 20, y: 30, width: 80, height: 40, style: { fill: "#ffffff", stroke: "#111827" } },
+        { id: "front", type: "ellipse", x: 140, y: 50, width: 80, height: 60, style: { fill: "#ef4444", stroke: "#111827" } },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={menuScene} />);
+    clickLayerNode("front");
+    const toolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
+
+    fireEvent.click(within(toolbar).getByLabelText("悬浮填充"));
+    const fillMenu = screen.getByRole("menu", { name: "填充" });
+    expect(within(fillMenu).getByLabelText("填充 无颜色")).toBeTruthy();
+    fireEvent.click(within(fillMenu).getByLabelText("填充 无颜色"));
+    await waitFor(() => expect(readRenderedScene().nodes.find((node) => node.id === "front")?.style?.fill).toBe("transparent"));
+
+    fireEvent.click(within(toolbar).getByLabelText("悬浮层级"));
+    const layerMenu = screen.getByRole("menu", { name: "层级" });
+    expect(within(layerMenu).getByRole("menuitem", { name: /置顶/ })).toBeTruthy();
+    expect(within(layerMenu).getByRole("menuitem", { name: /上移一层/ })).toBeTruthy();
+    expect(within(layerMenu).getByRole("menuitem", { name: /下移一层/ })).toBeTruthy();
+    expect(within(layerMenu).getByRole("menuitem", { name: /置底/ })).toBeTruthy();
+    fireEvent.click(within(layerMenu).getByRole("menuitem", { name: /置顶/ }));
+    await waitFor(() => expect(readRenderedScene().nodes.at(-1)?.id).toBe("front"));
+
+    fireEvent.click(within(toolbar).getByLabelText("悬浮更多"));
+    const moreMenu = screen.getByRole("menu", { name: "更多操作" });
+    for (const label of ["删除", "剪切", "复制", "复制样式", "粘贴样式", "位置与大小"]) {
+      const pattern = label === "复制" ? /^复制 ⌘ C$/ : new RegExp(label);
+      expect(within(moreMenu).getByRole("menuitem", { name: pattern })).toBeTruthy();
+    }
+    expect(within(moreMenu).queryByText("副本")).toBeNull();
+    expect(within(moreMenu).queryByText("图层管理")).toBeNull();
+    expect(within(moreMenu).queryByText("属性与导出")).toBeNull();
+    expect((within(moreMenu).getByRole("menuitem", { name: /粘贴样式/ }) as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(within(moreMenu).getByRole("menuitem", { name: /位置与大小/ }));
+    expect(screen.getByLabelText("水平位置")).toBeTruthy();
+    expect(screen.getByLabelText("垂直位置")).toBeTruthy();
+    expect(screen.getByLabelText("宽度")).toBeTruthy();
+    expect(screen.getByLabelText("高度")).toBeTruthy();
+    expect(screen.queryByText("关闭")).toBeNull();
+    fireEvent.change(screen.getByLabelText("水平位置"), { target: { value: "180" } });
+    fireEvent.change(screen.getByLabelText("高度"), { target: { value: "72" } });
+    await waitFor(() => expect(readRenderedScene().nodes.find((node) => node.id === "front")).toMatchObject({ x: 180, height: 72 }));
   });
 
   it("shows a multi-selection floating toolbar for arrange, grouping, copy, delete, and more actions", async () => {
@@ -4091,6 +4191,57 @@ describe("sketch-react", () => {
       const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
       expect(parsed.nodes.find((node) => node.type === "group")?.children).toEqual(["a", "b", "c"]);
     });
+  });
+
+  it("keeps the floating toolbar centered when it fits and shifts it away from horizontal edges", async () => {
+    const toolbarWidth = 220;
+    const toolbarRectSpy = mockFloatingToolbarRect(toolbarWidth);
+    const renderSelection = async (x: number, y = 40) => {
+      const panelScene: SketchSceneDocument = {
+        version: 1,
+        pageSize: { width: 400, height: 300 },
+        nodes: [{ id: "rect", type: "rect", x, y, width: 40, height: 40, style: { fill: "#ffffff" } }],
+      };
+      render(<ControlledPartsEditorWithToolbarAndProperties initialScene={panelScene} />);
+      clickLayerNode("rect");
+      const toolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
+      await waitFor(() => expect(toolbar.style.left).not.toBe(""));
+      return toolbar;
+    };
+
+    const leftToolbar = await renderSelection(0);
+    expect(leftToolbar.style.left).toBe("126px");
+
+    cleanup();
+    const centeredToolbar = await renderSelection(180);
+    expect(centeredToolbar.style.left).toBe("224px");
+
+    cleanup();
+    const rightToolbar = await renderSelection(360);
+    expect(rightToolbar.style.left).toBe("322px");
+
+    const container = rightToolbar.parentElement as HTMLElement;
+    Object.defineProperty(container, "clientWidth", { configurable: true, value: 320 });
+    fireEvent(window, new Event("resize"));
+    await waitFor(() => expect(rightToolbar.style.left).toBe("194px"));
+
+    toolbarRectSpy.mockRestore();
+  });
+
+  it("keeps the existing vertical toolbar placement while resolving horizontal bounds", async () => {
+    const toolbarRectSpy = mockFloatingToolbarRect(220);
+    const panelScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [{ id: "rect", type: "rect", x: 180, y: 100, width: 40, height: 40, style: { fill: "#ffffff" } }],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={panelScene} />);
+
+    clickLayerNode("rect");
+    const toolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
+    await waitFor(() => expect(toolbar.style.top).toBe("40px"));
+
+    toolbarRectSpy.mockRestore();
   });
 
   it("edits common state, shape style, and line endpoints from the property panel", async () => {

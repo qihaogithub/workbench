@@ -7,8 +7,13 @@ import { twMerge } from "tailwind-merge";
 import {
   AlignHorizontalJustifyStart,
   AlignVerticalJustifyStart,
+  ArrowDown,
+  ArrowDownToLine,
+  ArrowUp,
+  ArrowUpToLine,
   ArrowRight,
   Circle,
+  ClipboardPaste,
   Command,
   Copy,
   Diamond,
@@ -29,7 +34,9 @@ import {
   Pencil,
   PenLine,
   Redo2,
+  RotateCcw,
   Rows3,
+  Scissors,
   Square,
   StickyNote,
   SlidersHorizontal,
@@ -203,6 +210,21 @@ interface SketchFloatingToolbarAction {
   swatchColor?: string;
   disabled?: boolean;
   onClick: () => void;
+}
+
+const SKETCH_FLOATING_TOOLBAR_EDGE_PADDING = 16;
+
+function resolveSketchFloatingToolbarLeft(
+  desiredLeft: number,
+  containerWidth: number,
+  toolbarWidth: number | null,
+): number {
+  if (!toolbarWidth || toolbarWidth <= 0 || !Number.isFinite(toolbarWidth)) return containerWidth / 2;
+
+  const minLeft = SKETCH_FLOATING_TOOLBAR_EDGE_PADDING + toolbarWidth / 2;
+  const maxLeft = containerWidth - SKETCH_FLOATING_TOOLBAR_EDGE_PADDING - toolbarWidth / 2;
+  if (maxLeft < minLeft) return containerWidth / 2;
+  return Math.min(maxLeft, Math.max(minLeft, desiredLeft));
 }
 
 interface PendingImageImportState {
@@ -1145,7 +1167,7 @@ function SelectionOverlay({
   scaleX: number;
   scaleY: number;
   onResizePointerDown?: (event: React.PointerEvent<HTMLDivElement>, handle: SketchResizeInteractionHandle) => void;
-  onRotatePointerDown?: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onRotatePointerDown?: (event: React.PointerEvent<HTMLElement>) => void;
   minimumSize?: number;
   endpointHandles?: {
     start: { x: number; y: number };
@@ -1208,13 +1230,17 @@ function SelectionOverlay({
         />
       ) : null}
       {onRotatePointerDown ? (
-        <div
-          className="pointer-events-auto absolute left-1/2 top-0 h-4 w-4 -translate-x-1/2 -translate-y-8 cursor-grab rounded-full border border-[#62b7ff] bg-[#1f1f1f] active:cursor-grabbing"
+        <button
+          type="button"
+          aria-label="旋转控制柄"
+          className="pointer-events-auto absolute bottom-0 left-0 inline-flex h-6 w-6 -translate-x-[calc(100%+28px)] translate-y-[calc(100%+28px)] cursor-grab appearance-none items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 shadow-[0_1px_3px_rgba(15,23,42,0.18)] transition-colors hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 active:cursor-grabbing"
           data-testid="sketch-rotate-handle"
           data-sketch-rotate-handle="true"
           title="旋转"
           onPointerDown={onRotatePointerDown}
-        />
+        >
+          <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+        </button>
       ) : null}
       {onResizePointerDown && endpointHandles
         ? ([
@@ -1223,7 +1249,7 @@ function SelectionOverlay({
           ]).map((item) => (
             <div
               key={item.key}
-              className="pointer-events-auto absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 cursor-move rounded-full border border-[#62b7ff] bg-[#1f1f1f]"
+              className="pointer-events-auto absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 cursor-move rounded-full border border-slate-300 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.16)] transition-colors hover:border-slate-400 hover:bg-slate-50"
               data-testid={item.testId}
               data-sketch-resize-handle={item.handle}
               style={{
@@ -1239,7 +1265,7 @@ function SelectionOverlay({
             <div
               key={item.handle}
               className={cn(
-                "pointer-events-auto absolute h-3 w-3 border border-[#62b7ff] bg-[#1f1f1f]",
+                "pointer-events-auto absolute h-3 w-3 border border-slate-300 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.16)] transition-colors hover:border-slate-400 hover:bg-slate-50",
                 item.className,
                 item.cursor,
               )}
@@ -1558,6 +1584,10 @@ function getInlineTextEditMetrics(node: SketchSceneNode, value: string): { style
     },
     overflowing,
   };
+}
+
+function isSketchNoColor(value: unknown): boolean {
+  return value === "transparent" || value === null || typeof value === "undefined";
 }
 
 function toColorInputValue(value: unknown, fallback: string): string {
@@ -5438,7 +5468,8 @@ export function SketchEditorCanvas({
   const [commandPaletteOpen, setCommandPaletteOpen] = React.useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = React.useState(false);
   const [detailsPanelOpen, setDetailsPanelOpen] = React.useState(false);
-  const [detailsPanelTab, setDetailsPanelTab] = React.useState<"properties" | "layers" | "fill" | "stroke" | "more">("properties");
+  const [detailsPanelTab, setDetailsPanelTab] = React.useState<"properties" | "layers" | "fill" | "stroke" | "more" | "position">("properties");
+  const [floatingSizeRatioLocked, setFloatingSizeRatioLocked] = React.useState(false);
   const detailsPanelRef = React.useRef<HTMLDivElement>(null);
   const [clipboardVersion, setClipboardVersion] = React.useState(0);
   const [styleClipboardVersion, setStyleClipboardVersion] = React.useState(0);
@@ -5456,8 +5487,10 @@ export function SketchEditorCanvas({
   const stageRef = React.useRef<HTMLDivElement>(null);
   const inlineTextRef = React.useRef<HTMLTextAreaElement>(null);
   const imageFileInputRef = React.useRef<HTMLInputElement>(null);
-  const width = normalizeSize(previewSize, scene.pageSize.width, "width");
-  const height = normalizeSize(previewSize, scene.pageSize.height, "height");
+  const [canvasContainerWidth, setCanvasContainerWidth] = React.useState<number | null>(null);
+  const [floatingToolbarWidth, setFloatingToolbarWidth] = React.useState<number | null>(null);
+  const width = fillContainer ? scene.pageSize.width : normalizeSize(previewSize, scene.pageSize.width, "width");
+  const height = fillContainer ? scene.pageSize.height : normalizeSize(previewSize, scene.pageSize.height, "height");
   const selectedNodes = getSelectedNodes(scene, controller);
   const selectedNode = selectedNodes.length === 1 ? selectedNodes[0] : null;
   const visibleSelectedNodes = selectedNodes.filter((node) => isNodeVisibleForConfig(node, configData));
@@ -5511,6 +5544,27 @@ export function SketchEditorCanvas({
         "Cmd/Ctrl 临时隐藏吸附参考线",
       ].join(" · ")
     : null;
+
+  React.useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const updateContainerWidth = () => {
+      const nextWidth = container.clientWidth || container.getBoundingClientRect().width;
+      if (!Number.isFinite(nextWidth) || nextWidth <= 0) return;
+      setCanvasContainerWidth((current) => (current === nextWidth ? current : nextWidth));
+    };
+
+    updateContainerWidth();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateContainerWidth);
+      return () => window.removeEventListener("resize", updateContainerWidth);
+    }
+
+    const observer = new ResizeObserver(updateContainerWidth);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
 
   React.useEffect(() => {
     if (!inlineTextEdit) return;
@@ -5601,6 +5655,12 @@ export function SketchEditorCanvas({
     };
     setStyleClipboardVersion((version) => version + 1);
   }, [selectedNodes]);
+
+  const cutSelected = React.useCallback(() => {
+    copySelected();
+    deleteSelected(scene, controller, configData);
+    setDetailsPanelOpen(false);
+  }, [configData, controller, copySelected, scene]);
 
   const pasteStyle = React.useCallback(() => {
     const clipboard = styleClipboardRef.current;
@@ -5744,16 +5804,17 @@ export function SketchEditorCanvas({
     ) return null;
     const scaleX = width / scene.pageSize.width;
     const scaleY = height / scene.pageSize.height;
-    const containerWidth = containerRef.current?.clientWidth ?? width + viewport.offsetX * 2;
-    const left = viewport.offsetX + (canvasSelectionBounds.x + canvasSelectionBounds.width / 2) * scaleX * viewport.scale;
+    const containerWidth = canvasContainerWidth ?? (containerRef.current?.clientWidth || width + viewport.offsetX * 2);
+    const desiredLeft = viewport.offsetX + (canvasSelectionBounds.x + canvasSelectionBounds.width / 2) * scaleX * viewport.scale;
     const top = viewport.offsetY + canvasSelectionBounds.y * scaleY * viewport.scale;
     const bottom = viewport.offsetY + (canvasSelectionBounds.y + canvasSelectionBounds.height) * scaleY * viewport.scale;
     return {
-      left: Math.max(16, Math.min(containerWidth - 16, left)),
+      left: resolveSketchFloatingToolbarLeft(desiredLeft, containerWidth, floatingToolbarWidth),
       top: top > 96 ? top - 84 : bottom + 32,
     };
   }, [
     canvasSelectionBounds,
+    canvasContainerWidth,
     controller.tool,
     dragStart,
     drawingDraft,
@@ -5764,6 +5825,7 @@ export function SketchEditorCanvas({
     scene.pageSize.height,
     scene.pageSize.width,
     selectedNodes.length,
+    floatingToolbarWidth,
     viewport.offsetX,
     viewport.offsetY,
     viewport.scale,
@@ -5775,7 +5837,12 @@ export function SketchEditorCanvas({
     action();
   }, [controller]);
 
-  const openDetailsBubble = React.useCallback((tab: "properties" | "layers" | "fill" | "stroke" | "more") => {
+  const handleFloatingToolbarWidthChange = React.useCallback((nextWidth: number) => {
+    if (!Number.isFinite(nextWidth) || nextWidth <= 0) return;
+    setFloatingToolbarWidth((current) => (current === nextWidth ? current : nextWidth));
+  }, []);
+
+  const openDetailsBubble = React.useCallback((tab: "properties" | "layers" | "fill" | "stroke" | "more" | "position") => {
     setShortcutHelpOpen(false);
     setCommandPaletteOpen(false);
     setDetailsPanelTab(tab);
@@ -5793,7 +5860,7 @@ export function SketchEditorCanvas({
           label: "填充",
           title: "编辑填充",
           icon: <PaintBucket className="h-3.5 w-3.5" />,
-          swatchColor: toColorInputValue(selectedNode.style?.fill, "#ffffff"),
+          swatchColor: isSketchNoColor(selectedNode.style?.fill) ? "transparent" : toColorInputValue(selectedNode.style?.fill, "#ffffff"),
           disabled: !canEditNodeProperties(selectedNode),
           onClick: () => runQuickToolbarAction(() => openDetailsBubble("fill")),
         });
@@ -5804,7 +5871,7 @@ export function SketchEditorCanvas({
           label: "描边",
           title: "编辑描边",
           icon: <PenLine className="h-3.5 w-3.5" />,
-          swatchColor: toColorInputValue(selectedNode.style?.stroke, "#111827"),
+          swatchColor: isSketchNoColor(selectedNode.style?.stroke) ? "transparent" : toColorInputValue(selectedNode.style?.stroke, "#111827"),
           disabled: !canEditNodeProperties(selectedNode),
           onClick: () => runQuickToolbarAction(() => openDetailsBubble("stroke")),
         });
@@ -5819,22 +5886,10 @@ export function SketchEditorCanvas({
       }
       actions.push(
         {
-          id: "copyStyle",
-          label: "复制样式",
-          icon: <Copy className="h-3.5 w-3.5" />,
-          disabled: !canEditNodeProperties(selectedNode),
-          onClick: () => runQuickToolbarAction(copyStyle),
-        },
-        {
-          id: "properties",
-          label: "属性",
-          icon: <SlidersHorizontal className="h-3.5 w-3.5" />,
-          onClick: () => runQuickToolbarAction(() => openDetailsBubble("properties")),
-        },
-        {
-          id: "layers",
-          label: "图层",
+          id: "layerOrder",
+          label: "层级",
           icon: <Layers className="h-3.5 w-3.5" />,
+          disabled: !canEditNodeProperties(selectedNode),
           onClick: () => runQuickToolbarAction(() => openDetailsBubble("layers")),
         },
         {
@@ -5913,8 +5968,8 @@ export function SketchEditorCanvas({
   ]);
 
   const detailsBubblePosition = React.useMemo(() => {
-    const bubbleWidth = 320;
-    const bubbleHeight = detailsPanelTab === "more" || detailsPanelTab === "fill" || detailsPanelTab === "stroke" ? 210 : 460;
+    const bubbleWidth = detailsPanelTab === "position" ? 360 : 320;
+    const bubbleHeight = detailsPanelTab === "more" ? 268 : detailsPanelTab === "fill" || detailsPanelTab === "stroke" ? 210 : detailsPanelTab === "layers" ? 180 : 96;
     const containerWidth = containerRef.current?.clientWidth ?? width;
     const containerHeight = containerRef.current?.clientHeight ?? height;
     const toolbarTop = quickToolbarPosition?.top ?? 20;
@@ -6144,13 +6199,6 @@ export function SketchEditorCanvas({
     if (mode !== "edit") return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
       if (!canHandleSketchKeyboardShortcut(controller)) return;
-      const target = event.target as HTMLElement | null;
-      if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA") return;
-      if (event.key === " ") {
-        event.preventDefault();
-        setIsSpacePanning(true);
-        return;
-      }
       if (event.key === "Escape") {
         event.preventDefault();
         if (commandPaletteOpen) {
@@ -6176,6 +6224,13 @@ export function SketchEditorCanvas({
           controller.clearSelection();
           controller.setTool("select");
         }
+        return;
+      }
+      const target = event.target as HTMLElement | null;
+      if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA") return;
+      if (event.key === " ") {
+        event.preventDefault();
+        setIsSpacePanning(true);
         return;
       }
       const runAction = (id: string): boolean => {
@@ -6695,47 +6750,86 @@ export function SketchEditorCanvas({
           ref={detailsPanelRef}
           role="dialog"
           aria-label="草图工具菜单"
-          className="absolute z-40 flex max-h-[min(460px,calc(100%-24px))] w-[min(320px,calc(100%-24px))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-xl"
+          className={cn(
+            "absolute z-40 max-h-[min(460px,calc(100%-24px))] overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 text-slate-900 shadow-[0_12px_32px_rgba(15,23,42,0.14)]",
+            detailsPanelTab === "position" ? "w-[min(360px,calc(100%-24px))]" : "w-[min(320px,calc(100%-24px))]",
+          )}
           style={detailsBubblePosition}
           onPointerDown={(event) => event.stopPropagation()}
+          onKeyDown={(event) => {
+            if (event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "Home" && event.key !== "End") return;
+            const items = Array.from(detailsPanelRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])') ?? []);
+            if (!items.length) return;
+            const currentIndex = items.indexOf(document.activeElement as HTMLElement);
+            const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : (currentIndex + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+            event.preventDefault();
+            items[nextIndex]?.focus();
+          }}
         >
-          <div className="flex h-10 shrink-0 items-center gap-1 border-b border-slate-100 px-2">
-            {detailsPanelTab !== "more" ? (
-              <button type="button" className="rounded-lg px-2 py-1 text-xs text-slate-500 hover:bg-slate-100" onClick={() => setDetailsPanelTab("more")}>返回</button>
-            ) : null}
-            <span className="min-w-0 flex-1 truncate px-1 text-xs font-semibold">
-              {detailsPanelTab === "properties" ? "属性" : detailsPanelTab === "layers" ? "图层" : detailsPanelTab === "fill" ? "图形填充" : detailsPanelTab === "stroke" ? "描边" : "更多操作"}
-            </span>
-            <button type="button" className="rounded-lg px-2 py-1 text-xs text-slate-500 hover:bg-slate-100" aria-label="关闭工具菜单" onClick={() => setDetailsPanelOpen(false)}>关闭</button>
-          </div>
           {detailsPanelTab === "more" ? (
-            <div className="grid gap-1 p-2">
-              <button type="button" className="rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50" onClick={() => setDetailsPanelTab("properties")}>属性与导出</button>
-              <button type="button" className="rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50" onClick={() => setDetailsPanelTab("layers")}>图层管理</button>
+            <div role="menu" aria-label="更多操作">
+              <FloatingMenuItem icon={<Trash2 className="h-4 w-4" />} label="删除" shortcut="Delete" disabled={!editableSelectedNodes.length} autoFocus onClick={() => { deleteSelected(scene, controller, configData); setDetailsPanelOpen(false); }} />
+              <FloatingMenuSeparator />
+              <FloatingMenuItem icon={<Scissors className="h-4 w-4" />} label="剪切" shortcut="⌘ X" disabled={!editableSelectedNodes.length} onClick={cutSelected} />
+              <FloatingMenuItem icon={<Copy className="h-4 w-4" />} label="复制" shortcut="⌘ C" disabled={!editableSelectedNodes.length} onClick={() => { copySelected(); setDetailsPanelOpen(false); }} />
+              <FloatingMenuSeparator />
+              <FloatingMenuItem icon={<Copy className="h-4 w-4" />} label="复制样式" shortcut="⌘⌥ C" disabled={!selectedNode || !canEditNodeProperties(selectedNode)} onClick={() => { copyStyle(); setDetailsPanelOpen(false); }} />
+              <FloatingMenuItem icon={<ClipboardPaste className="h-4 w-4" />} label="粘贴样式" shortcut="⌘⌥ V" disabled={!styleClipboardRef.current || !editableSelectedNodes.length} onClick={() => { pasteStyle(); setDetailsPanelOpen(false); }} />
+              <FloatingMenuSeparator />
+              <FloatingMenuItem icon={<SlidersHorizontal className="h-4 w-4" />} label="位置与大小" trailing={<ArrowRight className="h-4 w-4" />} disabled={!selectedNode || !canEditNodeProperties(selectedNode)} onClick={() => setDetailsPanelTab("position")} />
+            </div>
+          ) : detailsPanelTab === "layers" ? (
+            <div role="menu" aria-label="层级">
+              <FloatingMenuItem icon={<ArrowUpToLine className="h-4 w-4" />} label="置顶" shortcut="⌘⇧ ]" disabled={!layerEditableSelectedNodes.length} autoFocus onClick={() => { bringToFront(scene, controller, configData); setDetailsPanelOpen(false); }} />
+              <FloatingMenuItem icon={<ArrowUp className="h-4 w-4" />} label="上移一层" shortcut="⌘ ]" disabled={!layerEditableSelectedNodes.length} onClick={() => { bringForward(scene, controller, configData); setDetailsPanelOpen(false); }} />
+              <FloatingMenuItem icon={<ArrowDown className="h-4 w-4" />} label="下移一层" shortcut="⌘ [" disabled={!layerEditableSelectedNodes.length} onClick={() => { sendBackward(scene, controller, configData); setDetailsPanelOpen(false); }} />
+              <FloatingMenuItem icon={<ArrowDownToLine className="h-4 w-4" />} label="置底" shortcut="⌘⇧ [" disabled={!layerEditableSelectedNodes.length} onClick={() => { sendToBack(scene, controller, configData); setDetailsPanelOpen(false); }} />
             </div>
           ) : detailsPanelTab === "fill" || detailsPanelTab === "stroke" ? (
-            <div className="p-3">
-              <p className="mb-3 text-xs text-slate-500">选择常用颜色</p>
-              <div className="grid grid-cols-6 gap-2">
+            <div role="menu" aria-label={detailsPanelTab === "fill" ? "填充" : "描边"} className="p-1">
+              <div className="grid grid-cols-6 gap-1.5">
+                <button
+                  type="button"
+                  role="menuitem"
+                  autoFocus
+                  disabled={!selectedNode || !canEditNodeProperties(selectedNode)}
+                  aria-label={`${detailsPanelTab === "fill" ? "填充" : "描边"} 无颜色`}
+                  className="h-8 rounded-md border border-slate-200 bg-[linear-gradient(135deg,transparent_43%,#94a3b8_44%,#94a3b8_56%,transparent_57%)] ring-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+                  onClick={() => { updateSelectedStyle(scene, controller, detailsPanelTab === "fill" ? { fill: "transparent" } : { stroke: "transparent" }); setDetailsPanelOpen(false); }}
+                />
                 {SKETCH_COLOR_SWATCHES.map((color) => (
                   <button
                     key={color}
                     type="button"
+                    role="menuitem"
+                    disabled={!selectedNode || !canEditNodeProperties(selectedNode)}
                     aria-label={`${detailsPanelTab === "fill" ? "填充" : "描边"} ${color}`}
-                    className="h-8 rounded-lg border border-slate-200 ring-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+                    className="h-8 rounded-md border border-slate-200 ring-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
                     style={{ backgroundColor: color }}
-                    onClick={() => updateSelectedStyle(scene, controller, detailsPanelTab === "fill" ? { fill: color } : { stroke: color })}
+                    onClick={() => { updateSelectedStyle(scene, controller, detailsPanelTab === "fill" ? { fill: color } : { stroke: color }); setDetailsPanelOpen(false); }}
                   />
                 ))}
               </div>
-              <label className="mt-3 flex items-center justify-between text-xs text-slate-600">
+              <label className="mt-2 flex items-center justify-between rounded-md px-2 py-1 text-xs text-slate-600 hover:bg-slate-50">
                 自定义颜色
                 <input
                   type="color"
                   value={toColorInputValue(selectedNode?.style?.[detailsPanelTab === "fill" ? "fill" : "stroke"], detailsPanelTab === "fill" ? "#ffffff" : "#111827")}
+                  disabled={!selectedNode || !canEditNodeProperties(selectedNode)}
                   onChange={(event) => updateSelectedStyle(scene, controller, detailsPanelTab === "fill" ? { fill: event.target.value } : { stroke: event.target.value })}
                 />
               </label>
+            </div>
+          ) : detailsPanelTab === "position" && selectedNode ? (
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 p-2">
+              <FloatingNumberField label="水平位置" value={selectedNode.x} disabled={!canEditNodeProperties(selectedNode)} autoFocus onChange={(value) => applySelectedPatch(scene, controller, { x: value })} />
+              <FloatingNumberField label="垂直位置" value={selectedNode.y} disabled={!canEditNodeProperties(selectedNode)} onChange={(value) => applySelectedPatch(scene, controller, { y: value })} />
+              <span aria-hidden="true" />
+              <FloatingNumberField label="宽度" value={selectedNode.width} disabled={!canEditNodeProperties(selectedNode)} onChange={(value) => applySelectedPatch(scene, controller, floatingSizeRatioLocked && selectedNode.width ? { width: value, height: value * (selectedNode.height / selectedNode.width) } : { width: value })} />
+              <FloatingNumberField label="高度" value={selectedNode.height} disabled={!canEditNodeProperties(selectedNode)} onChange={(value) => applySelectedPatch(scene, controller, floatingSizeRatioLocked && selectedNode.height ? { height: value, width: value * (selectedNode.width / selectedNode.height) } : { height: value })} />
+              <button type="button" aria-label={floatingSizeRatioLocked ? "关闭尺寸比例锁定" : "开启尺寸比例锁定"} title={floatingSizeRatioLocked ? "关闭尺寸比例锁定" : "开启尺寸比例锁定"} disabled={!canEditNodeProperties(selectedNode) || selectedNode.width <= 0 || selectedNode.height <= 0} onClick={() => setFloatingSizeRatioLocked((locked) => !locked)} className={cn("inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 disabled:opacity-40", floatingSizeRatioLocked && "bg-slate-100 text-slate-900")}>
+                <Link2 className="h-3.5 w-3.5" />
+              </button>
             </div>
           ) : (
             <div className="min-h-0 flex-1 overflow-hidden">
@@ -6749,6 +6843,7 @@ export function SketchEditorCanvas({
           left={quickToolbarPosition.left}
           top={quickToolbarPosition.top}
           actions={floatingToolbarActions}
+          onWidthChange={handleFloatingToolbarWidthChange}
           onPointerDown={() => activateSketchKeyboardScope(controller)}
         />
       ) : null}
@@ -6757,8 +6852,9 @@ export function SketchEditorCanvas({
         data-sketch-stage
         className="absolute left-0 top-0 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.16)] ring-1 ring-slate-200"
         style={{
-          width: fillContainer ? "100%" : width,
-          height: fillContainer ? "100%" : height,
+          // Keep the stage in scene coordinates; fillContainer only affects its preview wrapper.
+          width,
+          height,
           transform: `translate(${viewport.offsetX}px, ${viewport.offsetY}px) scale(${viewport.scale})`,
           transformOrigin: "0 0",
         }}
@@ -7270,18 +7366,44 @@ function SketchFloatingToolbar({
   left,
   top,
   actions,
+  onWidthChange,
   onPointerDown,
 }: {
   left: number;
   top: number;
   actions: SketchFloatingToolbarAction[];
+  onWidthChange: (width: number) => void;
   onPointerDown: () => void;
 }) {
+  const toolbarRef = React.useRef<HTMLDivElement>(null);
+
+  React.useLayoutEffect(() => {
+    const toolbar = toolbarRef.current;
+    if (!toolbar) return;
+
+    const reportWidth = () => {
+      const nextWidth = toolbar.getBoundingClientRect().width || toolbar.offsetWidth;
+      if (!Number.isFinite(nextWidth) || nextWidth <= 0) return;
+      onWidthChange(nextWidth);
+    };
+
+    reportWidth();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", reportWidth);
+      return () => window.removeEventListener("resize", reportWidth);
+    }
+
+    const observer = new ResizeObserver(reportWidth);
+    observer.observe(toolbar);
+    return () => observer.disconnect();
+  }, [onWidthChange]);
+
   return (
     <div
+      ref={toolbarRef}
       role="toolbar"
       aria-label="草图悬浮快捷工具条"
-      className="pointer-events-none absolute z-30 flex -translate-x-1/2 items-center gap-1 rounded-lg border border-border bg-card/95 p-1 text-foreground shadow-2xl"
+      className="pointer-events-none absolute z-30 flex -translate-x-1/2 items-center gap-1 rounded-lg border border-slate-200 bg-white/95 p-1 text-slate-900 shadow-[0_8px_24px_rgba(15,23,42,0.12)] backdrop-blur"
       style={{ left, top }}
       onPointerDown={(event) => {
         event.stopPropagation();
@@ -7293,14 +7415,14 @@ function SketchFloatingToolbar({
         <button
           key={action.id}
           type="button"
-          className="pointer-events-auto inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          className="pointer-events-auto inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-md px-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
           disabled={action.disabled}
           aria-label={`悬浮${action.label}`}
           title={action.title ?? action.label}
           onClick={action.onClick}
         >
           {action.swatchColor ? (
-            <span className="h-3.5 w-3.5 rounded-sm border border-border" style={{ backgroundColor: action.swatchColor }} aria-hidden="true" />
+            <span className={cn("h-3.5 w-3.5 rounded-sm border border-slate-300", action.swatchColor === "transparent" && "bg-[linear-gradient(135deg,transparent_40%,#94a3b8_41%,#94a3b8_59%,transparent_60%)]")} style={action.swatchColor === "transparent" ? undefined : { backgroundColor: action.swatchColor }} aria-hidden="true" />
           ) : (
             action.icon
           )}
@@ -7313,6 +7435,76 @@ function SketchFloatingToolbar({
 
 function ContextMenuSeparator() {
   return <div className="my-1 h-px bg-border" role="separator" />;
+}
+
+function FloatingMenuSeparator() {
+  return <div className="my-1 h-px bg-slate-100" role="separator" />;
+}
+
+function FloatingMenuItem({
+  icon,
+  label,
+  shortcut,
+  trailing,
+  disabled,
+  autoFocus,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  shortcut?: string;
+  trailing?: React.ReactNode;
+  disabled?: boolean;
+  autoFocus?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      autoFocus={autoFocus}
+      disabled={disabled}
+      className="flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+      onClick={onClick}
+    >
+      <span className="flex h-4 w-4 shrink-0 items-center justify-center text-slate-500" aria-hidden="true">{icon}</span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {shortcut ? <kbd className="rounded border border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-500">{shortcut}</kbd> : null}
+      {trailing ? <span className="shrink-0 text-slate-400" aria-hidden="true">{trailing}</span> : null}
+    </button>
+  );
+}
+
+function FloatingNumberField({
+  label,
+  value,
+  disabled,
+  autoFocus,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  disabled?: boolean;
+  autoFocus?: boolean;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="flex min-w-0 items-center gap-1.5 text-xs text-slate-600">
+      <span className="shrink-0">{label}</span>
+      <input
+        type="number"
+        value={formatNumberFieldValue(value, true)}
+        disabled={disabled}
+        autoFocus={autoFocus}
+        aria-label={label}
+        onChange={(event) => {
+          const next = Number(event.target.value);
+          if (Number.isFinite(next)) onChange(next);
+        }}
+        className="h-8 min-w-0 w-full rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 disabled:bg-slate-50 disabled:opacity-50"
+      />
+    </label>
+  );
 }
 
 function ContextMenuButton({

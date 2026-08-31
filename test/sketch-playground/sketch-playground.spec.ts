@@ -31,12 +31,28 @@ test("selection exposes contextual editing and on-demand details", async ({ page
   await rect.click();
   const contextToolbar = page.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
   await expect(contextToolbar).toBeVisible();
+  await expect(contextToolbar.getByLabel("悬浮填充")).toBeVisible();
+  await expect(contextToolbar.getByLabel("悬浮描边")).toBeVisible();
+  await expect(contextToolbar.getByLabel("悬浮文本")).toBeVisible();
+  await expect(contextToolbar.getByLabel("悬浮层级")).toBeVisible();
   await contextToolbar.getByLabel("悬浮更多").click();
-  await expect(page.getByRole("dialog", { name: "草图工具菜单" })).toBeVisible();
-  await page.getByRole("button", { name: "图层管理" }).click();
-  await expect(page.getByTestId("sketch-layer-panel")).toBeVisible();
-  await page.getByRole("button", { name: "关闭工具菜单" }).click();
-  await expect(page.getByRole("dialog", { name: "草图工具菜单" })).toHaveCount(0);
+  const moreMenu = page.getByRole("menu", { name: "更多操作" });
+  await expect(moreMenu).toBeVisible();
+  await expect(moreMenu.getByRole("menuitem", { name: /删除/ })).toBeVisible();
+  await expect(moreMenu.getByRole("menuitem", { name: /^剪切/ })).toBeVisible();
+  await expect(moreMenu.getByRole("menuitem", { name: /^复制 ⌘ C$/ })).toBeVisible();
+  await expect(moreMenu.getByRole("menuitem", { name: /^复制样式/ })).toBeVisible();
+  await expect(moreMenu.getByRole("menuitem", { name: /^粘贴样式/ })).toBeVisible();
+  await expect(moreMenu.getByRole("menuitem", { name: /^位置与大小/ })).toBeVisible();
+  await expect(moreMenu.getByText("副本")).toHaveCount(0);
+  await expect(moreMenu.getByText("关闭")).toHaveCount(0);
+  await moreMenu.getByRole("menuitem", { name: /^位置与大小/ }).click();
+  await expect(page.getByLabel("水平位置")).toBeVisible();
+  await expect(page.getByLabel("垂直位置")).toBeVisible();
+  await expect(page.getByLabel("宽度")).toBeVisible();
+  await expect(page.getByLabel("高度")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu", { name: "更多操作" })).toHaveCount(0);
 });
 
 test("whiteboard keeps zoom and inline text editing available without fixed side panels", async ({ page }) => {
