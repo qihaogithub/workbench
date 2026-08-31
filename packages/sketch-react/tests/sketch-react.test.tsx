@@ -1,5 +1,5 @@
 import React from "react";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getSketchNodeBounds,
@@ -763,7 +763,18 @@ describe("sketch-react", () => {
         expect(handle.className).toContain("bg-white");
         expect(handle.className).toContain("border-slate-300");
       });
+      expect(rotateHandle.getAttribute("title")).toBe("旋转");
+      expect(Number.parseFloat(rotateHandle.style.width)).toBeCloseTo(24);
+      expect(Number.parseFloat((resizeHandles[0] as HTMLElement).style.width)).toBeCloseTo(12);
       expect(screen.queryByTestId("sketch-hover-highlight")).toBeNull();
+    });
+
+    fireEvent.click(screen.getByLabelText("放大"));
+
+    await waitFor(() => {
+      expect(Number.parseFloat(screen.getByTestId("sketch-rotate-handle").getAttribute("style")?.match(/width:\s*([^;]+)/)?.[1] ?? "0")).toBeCloseTo(24 / 1.15);
+      const resized = document.querySelector("[data-sketch-resize-handle]") as HTMLElement;
+      expect(Number.parseFloat(resized.style.width)).toBeCloseTo(12 / 1.15);
     });
 
     fireEvent.pointerMove(getSketchNodeElement("title"), { clientX: 40, clientY: 44 });
@@ -1445,6 +1456,118 @@ describe("sketch-react", () => {
           style: { italic: true },
         },
       ]);
+    });
+  });
+
+  it("shows the pure text toolbar with layer access, color presets, and alignment controls", async () => {
+    const textScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [{ id: "title", type: "text", x: 20, y: 30, width: 120, height: 34, text: "Title" }],
+    };
+    render(<ControlledPartsEditorWithToolbar initialScene={textScene} />);
+
+    clickLayerNode("title");
+    const toolbar = await screen.findByRole("toolbar", { name: "纯文本工具栏" });
+    expect(within(toolbar).getByLabelText("悬浮字号")).not.toBeNull();
+    expect(within(toolbar).getByLabelText("悬浮加粗")).not.toBeNull();
+    expect(within(toolbar).getByLabelText("悬浮斜体")).not.toBeNull();
+    expect(within(toolbar).getByLabelText("悬浮下划线")).not.toBeNull();
+    expect(within(toolbar).getByLabelText("悬浮文字颜色")).not.toBeNull();
+    expect(within(toolbar).getByLabelText("对齐方式")).not.toBeNull();
+    expect(within(toolbar).getByLabelText("悬浮层级")).not.toBeNull();
+    expect(within(toolbar).getByLabelText("悬浮更多")).not.toBeNull();
+
+    fireEvent.click(within(toolbar).getByLabelText("悬浮层级"));
+    expect(screen.getByRole("menu", { name: "层级" })).not.toBeNull();
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("menu", { name: "层级" })).toBeNull());
+
+    fireEvent.click(within(toolbar).getByLabelText("悬浮文字颜色"));
+    const colorMenu = screen.getByRole("menu", { name: "文字颜色" });
+    expect(within(colorMenu).queryByLabelText(/无颜色/)).toBeNull();
+    fireEvent.click(within(colorMenu).getByLabelText("文字颜色 #ef4444"));
+
+    fireEvent.click(within(toolbar).getByLabelText("对齐方式"));
+    const alignMenu = screen.getByRole("menu", { name: "对齐方式" });
+    fireEvent.click(within(alignMenu).getByLabelText("对齐方式 居中对齐"));
+
+    await waitFor(() => {
+      const node = readRenderedScene().nodes.find((item) => item.id === "title");
+      expect(node?.style).toMatchObject({ color: "#ef4444", textAlign: "center" });
+    });
+  });
+
+  it("applies pure text defaults without a selection and keeps range styles in runs", async () => {
+    const textScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [{ id: "title", type: "text", x: 20, y: 30, width: 120, height: 34, text: "Hello world" }],
+    };
+    render(<ControlledPartsEditorWithToolbar initialScene={textScene} />);
+
+    clickLayerNode("title");
+    const toolbar = await screen.findByRole("toolbar", { name: "纯文本工具栏" });
+    fireEvent.click(within(toolbar).getByLabelText("悬浮斜体"));
+    fireEvent.click(within(toolbar).getByLabelText("悬浮下划线"));
+    const fontSize = within(toolbar).getByLabelText("悬浮字号");
+    fireEvent.change(fontSize, { target: { value: "32" } });
+    fireEvent.blur(fontSize);
+
+    await waitFor(() => {
+      const node = readRenderedScene().nodes.find((item) => item.id === "title");
+      expect(node?.style).toMatchObject({ italic: true, textDecoration: "underline", fontSize: 32 });
+      expect(node?.textStyleRuns).toBeUndefined();
+    });
+
+    fireEvent.doubleClick(getSketchNodeElement("title"));
+    const editor = await screen.findByLabelText("画布文本编辑") as HTMLTextAreaElement;
+    editor.setSelectionRange(0, 5);
+    fireEvent.select(editor);
+    const inlineToolbar = await screen.findByRole("toolbar", { name: "纯文本工具栏" });
+    fireEvent.click(within(inlineToolbar).getByLabelText("悬浮加粗"));
+    fireEvent.click(within(inlineToolbar).getByLabelText("悬浮文字颜色"));
+    const inlineColorMenu = screen.getByRole("menu", { name: "文字颜色" });
+    fireEvent.click(within(inlineColorMenu).getByLabelText("文字颜色 #2563eb"));
+    fireEvent.blur(editor);
+
+    await waitFor(() => {
+      const node = readRenderedScene().nodes.find((item) => item.id === "title");
+      expect(node?.style).toMatchObject({ italic: true, textDecoration: "underline", fontSize: 32 });
+      expect(node?.textStyleRuns).toEqual([
+        {
+          start: 0,
+          length: 5,
+          style: { fontWeight: 700, color: "#2563eb" },
+        },
+      ]);
+    });
+  });
+
+  it("resizes pure text drafts from the longest line and commits on blur", async () => {
+    const textScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [{ id: "title", type: "text", x: 20, y: 30, width: 40, height: 34, text: "A" }],
+    };
+    render(<ControlledPartsEditor initialScene={textScene} />);
+
+    fireEvent.doubleClick(getSketchNodeElement("title"));
+    const editor = await screen.findByLabelText("画布文本编辑") as HTMLTextAreaElement;
+    const initialWidth = Number.parseFloat(editor.style.width);
+    const initialHeight = Number.parseFloat(editor.style.height);
+    fireEvent.change(editor, { target: { value: "A much longer line\nB" } });
+
+    expect(Number.parseFloat(editor.style.width)).toBeGreaterThan(initialWidth);
+    expect(Number.parseFloat(editor.style.height)).toBeGreaterThan(initialHeight);
+    expect(readRenderedScene().nodes.find((node) => node.id === "title")).toMatchObject({ x: 20, y: 30, width: 40, height: 34 });
+
+    fireEvent.blur(editor);
+    await waitFor(() => {
+      const node = readRenderedScene().nodes.find((item) => item.id === "title");
+      expect(node).toMatchObject({ x: 20, y: 30, text: "A much longer line\nB" });
+      expect(node?.width).toBeGreaterThan(40);
+      expect(node?.height).toBeGreaterThan(34);
     });
   });
 
@@ -2221,14 +2344,17 @@ describe("sketch-react", () => {
     await waitFor(() => {
       const kinds = Array.from(screen.getAllByTestId("sketch-snap-guide")).map((guide) => guide.getAttribute("data-sketch-snap-guide-kind"));
       expect(kinds).toContain("edge");
-      expect(screen.getByTestId("sketch-drag-modifier-hint").textContent).toContain("Cmd/Ctrl 临时隐藏吸附参考线");
+      expect(screen.getByTestId("sketch-drag-modifier-hint").textContent).toContain("Cmd/Ctrl 暂停吸附与参考线");
+      expect(screen.queryByText("网格", { exact: true })).toBeNull();
+      expect(screen.queryByText("边缘", { exact: true })).toBeNull();
+      expect(screen.queryByText("中心线", { exact: true })).toBeNull();
     });
 
     dispatchPointerEvent(stage, "pointermove", 60, 50);
     await waitFor(() => {
       const kinds = Array.from(screen.getAllByTestId("sketch-snap-guide")).map((guide) => guide.getAttribute("data-sketch-snap-guide-kind"));
       expect(kinds).toContain("grid");
-      expect(kinds).toContain("spacing");
+      expect(kinds).not.toContain("spacing");
     });
 
     dispatchPointerEvent(stage, "pointermove", 180, 50);
@@ -2242,6 +2368,46 @@ describe("sketch-react", () => {
     dispatchPointerEvent(stage, "pointerup", 180, 50);
     expect(screen.queryByTestId("sketch-drag-modifier-hint")).toBeNull();
     expect(screen.getByTestId("scene-json").textContent).not.toContain("snap");
+  });
+
+  it("automatically snaps moved objects to nearby page and object alignments, but not to the grid", async () => {
+    const snapScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "moving", type: "rect", x: 20, y: 50, width: 40, height: 40 },
+        { id: "target", type: "rect", x: 120, y: 100, width: 40, height: 40 },
+      ],
+    };
+    render(<ControlledEditor initialScene={snapScene} />);
+
+    const stage = getCanvasStage();
+    setCanvasStageRect(stage);
+    dispatchPointerEvent(getSketchNodeElement("moving"), "pointerdown", 30, 60);
+    dispatchPointerEvent(stage, "pointermove", 128, 112);
+
+    await waitFor(() => {
+      const moved = readRenderedScene().nodes.find((node) => node.id === "moving");
+      expect(moved).toMatchObject({ x: 120, y: 100 });
+      expect(Array.from(screen.getAllByTestId("sketch-snap-guide")).map((guide) => guide.getAttribute("data-sketch-snap-guide-kind"))).toEqual(expect.arrayContaining(["edge", "center"]));
+    });
+
+    dispatchPointerEvent(stage, "pointermove", 52, 60);
+
+    await waitFor(() => {
+      const moved = readRenderedScene().nodes.find((node) => node.id === "moving");
+      expect(moved).toMatchObject({ x: 42, y: 50 });
+      const kinds = Array.from(screen.getAllByTestId("sketch-snap-guide")).map((guide) => guide.getAttribute("data-sketch-snap-guide-kind"));
+      expect(kinds).toContain("grid");
+      expect(kinds).not.toContain("spacing");
+    });
+
+    dispatchPointerEvent(stage, "pointermove", 128, 112, { metaKey: true });
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("sketch-snap-guide")).toBeNull();
+      expect(readRenderedScene().nodes.find((node) => node.id === "moving")).toMatchObject({ x: 118, y: 102 });
+    });
   });
 
   it("draws newly created sticky nodes from pointer drag bounds", async () => {
@@ -4123,6 +4289,12 @@ describe("sketch-react", () => {
     fireEvent.click(within(fillMenu).getByLabelText("填充 无颜色"));
     await waitFor(() => expect(readRenderedScene().nodes.find((node) => node.id === "front")?.style?.fill).toBe("transparent"));
 
+    fireEvent.click(within(toolbar).getByLabelText("悬浮描边"));
+    const strokeMenu = screen.getByRole("menu", { name: "描边" });
+    expect(within(strokeMenu).getByLabelText("描边 无颜色")).toBeTruthy();
+    fireEvent.click(within(strokeMenu).getByLabelText("描边 无颜色"));
+    await waitFor(() => expect(readRenderedScene().nodes.find((node) => node.id === "front")?.style?.stroke).toBe("transparent"));
+
     fireEvent.click(within(toolbar).getByLabelText("悬浮层级"));
     const layerMenu = screen.getByRole("menu", { name: "层级" });
     expect(within(layerMenu).getByRole("menuitem", { name: /置顶/ })).toBeTruthy();
@@ -4132,8 +4304,23 @@ describe("sketch-react", () => {
     fireEvent.click(within(layerMenu).getByRole("menuitem", { name: /置顶/ }));
     await waitFor(() => expect(readRenderedScene().nodes.at(-1)?.id).toBe("front"));
 
-    fireEvent.click(within(toolbar).getByLabelText("悬浮更多"));
+    const moreTrigger = within(toolbar).getByLabelText("悬浮更多") as HTMLButtonElement;
+    moreTrigger.getBoundingClientRect = () => ({
+      left: 180,
+      top: 40,
+      width: 60,
+      height: 36,
+      right: 240,
+      bottom: 76,
+      x: 180,
+      y: 40,
+      toJSON: () => ({}),
+    }) as DOMRect;
+    fireEvent.click(moreTrigger);
     const moreMenu = screen.getByRole("menu", { name: "更多操作" });
+    const moreDialog = screen.getByRole("dialog", { name: "草图工具菜单" });
+    await waitFor(() => expect(moreDialog.style.left).toBe("108px"));
+    expect(moreDialog.className).toContain("w-max");
     for (const label of ["删除", "剪切", "复制", "复制样式", "粘贴样式", "位置与大小"]) {
       const pattern = label === "复制" ? /^复制 ⌘ C$/ : new RegExp(label);
       expect(within(moreMenu).getByRole("menuitem", { name: pattern })).toBeTruthy();
@@ -4152,6 +4339,43 @@ describe("sketch-react", () => {
     fireEvent.change(screen.getByLabelText("水平位置"), { target: { value: "180" } });
     fireEvent.change(screen.getByLabelText("高度"), { target: { value: "72" } });
     await waitFor(() => expect(readRenderedScene().nodes.find((node) => node.id === "front")).toMatchObject({ x: 180, height: 72 }));
+  });
+
+  it("shows the main toolbar tooltip after 200ms hover or focus without a native title", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<ControlledPartsEditorWithToolbarAndProperties initialScene={scene} />);
+
+      const selectButton = screen.getByRole("button", { name: /^选择$/ });
+      expect(selectButton.getAttribute("title")).toBeNull();
+
+      fireEvent.mouseEnter(selectButton.parentElement as HTMLElement);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(199);
+      });
+      expect(screen.queryByRole("tooltip")).toBeNull();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+
+      const hoverTooltip = screen.getByRole("tooltip");
+      expect(hoverTooltip.textContent).toBe("选择");
+      expect(hoverTooltip.parentElement).toBe(document.body);
+      expect(hoverTooltip.className).not.toContain("after:");
+
+      fireEvent.mouseLeave(selectButton.parentElement as HTMLElement);
+      expect(screen.queryByRole("tooltip")).toBeNull();
+
+      fireEvent.focus(selectButton);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+      expect(screen.getByRole("tooltip").textContent).toBe("选择");
+      fireEvent.blur(selectButton);
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("shows a multi-selection floating toolbar for arrange, grouping, copy, delete, and more actions", async () => {
@@ -4242,6 +4466,42 @@ describe("sketch-react", () => {
     await waitFor(() => expect(toolbar.style.top).toBe("40px"));
 
     toolbarRectSpy.mockRestore();
+  });
+
+  it("flips contextual menus above the toolbar and clamps them to the canvas edges", async () => {
+    const toolbarRectSpy = mockFloatingToolbarRect(220);
+    try {
+      const panelScene: SketchSceneDocument = {
+        version: 1,
+        pageSize: { width: 400, height: 300 },
+        nodes: [{ id: "rect", type: "rect", x: 360, y: 240, width: 40, height: 40 }],
+      };
+      render(<ControlledPartsEditorWithToolbarAndProperties initialScene={panelScene} />);
+
+      clickLayerNode("rect");
+      const toolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
+      const trigger = within(toolbar).getByLabelText("悬浮更多") as HTMLButtonElement;
+      trigger.getBoundingClientRect = () => ({
+        left: 360,
+        top: 180,
+        width: 40,
+        height: 32,
+        right: 400,
+        bottom: 212,
+        x: 360,
+        y: 180,
+        toJSON: () => ({}),
+      }) as DOMRect;
+
+      fireEvent.click(trigger);
+      const dialog = screen.getByRole("dialog", { name: "草图工具菜单" });
+      await waitFor(() => {
+        expect(dialog.style.left).toBe("184px");
+        expect(dialog.style.top).toBe("12px");
+      });
+    } finally {
+      toolbarRectSpy.mockRestore();
+    }
   });
 
   it("edits common state, shape style, and line endpoints from the property panel", async () => {

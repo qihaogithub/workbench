@@ -5,6 +5,9 @@ import { createPortal } from "react-dom";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
   AlignHorizontalJustifyStart,
   AlignVerticalJustifyStart,
   ArrowDown,
@@ -12,6 +15,10 @@ import {
   ArrowUp,
   ArrowUpToLine,
   ArrowRight,
+  Bold,
+  Check,
+  ChevronDown,
+  ChevronRight,
   Circle,
   ClipboardPaste,
   Command,
@@ -23,6 +30,7 @@ import {
   Group,
   Hand,
   ImageIcon,
+  Italic,
   Keyboard,
   Link2,
   Lock,
@@ -43,6 +51,7 @@ import {
   Trash2,
   Type,
   Undo2,
+  Underline,
   Unlock,
   ZoomIn,
   ZoomOut,
@@ -86,9 +95,19 @@ import type {
   SketchLayerPanelProps,
   InlineTextSelectionState,
 } from "./types";
+import {
+  getSketchTextAutoSize,
+  getSketchTextComputedStyle,
+  SKETCH_TEXT_DEFAULT_COLOR,
+  SKETCH_TEXT_DEFAULT_FONT_SIZE,
+  SKETCH_TEXT_DEFAULT_FONT_WEIGHT,
+  SKETCH_TEXT_PLACEHOLDER,
+  SKETCH_TEXT_MIN_SIZE,
+  type SketchTextComputedStyle,
+} from "./text-utils";
 
 type SketchResizeInteractionHandle = SketchSceneResizeHandle | "line-start" | "line-end";
-type SketchSnapGuideKind = "grid" | "center" | "edge" | "spacing";
+type SketchSnapGuideKind = "grid" | "center" | "edge";
 
 interface SketchSnapGuide {
   id: string;
@@ -135,6 +154,7 @@ interface DragState {
   initialScene: SketchSceneDocument;
   hasHistoryCheckpoint: boolean;
   duplicateOnDrag?: boolean;
+  sourceNodeIds?: string[];
 }
 
 interface MarqueeState {
@@ -170,6 +190,8 @@ interface EraseState {
 interface InlineTextEditState {
   nodeId: string;
   value: string;
+  style: SketchSceneStyle;
+  textStyleRuns?: SketchSceneNode["textStyleRuns"];
   deleteWhenEmpty?: boolean;
 }
 
@@ -209,7 +231,7 @@ interface SketchFloatingToolbarAction {
   icon: React.ReactNode;
   swatchColor?: string;
   disabled?: boolean;
-  onClick: () => void;
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
 }
 
 const SKETCH_FLOATING_TOOLBAR_EDGE_PADDING = 16;
@@ -321,14 +343,26 @@ function createNode(type: InsertableSketchTool): SketchSceneNode {
   };
 
   if (type === "text") {
-    return {
+    const textNode: SketchSceneNode = {
       ...base,
       type: "text",
-      width: 260,
-      height: 48,
+      width: SKETCH_TEXT_MIN_SIZE,
+      height: SKETCH_TEXT_MIN_SIZE,
       text: "",
-      style: { ...base.style, fill: "transparent", stroke: "transparent", fontSize: 24 },
+      style: {
+        ...base.style,
+        fill: "transparent",
+        stroke: "transparent",
+        color: SKETCH_TEXT_DEFAULT_COLOR,
+        fontSize: SKETCH_TEXT_DEFAULT_FONT_SIZE,
+        fontWeight: SKETCH_TEXT_DEFAULT_FONT_WEIGHT,
+        italic: false,
+        textDecoration: "none",
+        textAlign: "left",
+      },
     };
+    const size = getSketchTextAutoSize(textNode, "");
+    return { ...textNode, width: size.width, height: size.height };
   }
   if (type === "sticky") {
     return {
@@ -1155,6 +1189,7 @@ function SelectionOverlay({
   bounds,
   scaleX,
   scaleY,
+  viewportScale = 1,
   onResizePointerDown,
   onRotatePointerDown,
   minimumSize = 0,
@@ -1166,6 +1201,7 @@ function SelectionOverlay({
   bounds: SketchSceneBounds | null;
   scaleX: number;
   scaleY: number;
+  viewportScale?: number;
   onResizePointerDown?: (event: React.PointerEvent<HTMLDivElement>, handle: SketchResizeInteractionHandle) => void;
   onRotatePointerDown?: (event: React.PointerEvent<HTMLElement>) => void;
   minimumSize?: number;
@@ -1184,6 +1220,11 @@ function SelectionOverlay({
   const height = Math.max(scaledHeight, minimumSize);
   const left = bounds.x * scaleX - (width - scaledWidth) / 2;
   const top = bounds.y * scaleY - (height - scaledHeight) / 2;
+  const controlScale = Number.isFinite(viewportScale) && viewportScale > 0 ? viewportScale : 1;
+  const resizeHandleSize = 12 / controlScale;
+  const rotateHandleSize = 24 / controlScale;
+  const rotateHandleGap = 28 / controlScale;
+  const rotateIconSize = 14 / controlScale;
   const handles: Array<{
     handle: SketchSceneResizeHandle;
     className: string;
@@ -1233,13 +1274,19 @@ function SelectionOverlay({
         <button
           type="button"
           aria-label="旋转控制柄"
-          className="pointer-events-auto absolute bottom-0 left-0 inline-flex h-6 w-6 -translate-x-[calc(100%+28px)] translate-y-[calc(100%+28px)] cursor-grab appearance-none items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 shadow-[0_1px_3px_rgba(15,23,42,0.18)] transition-colors hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 active:cursor-grabbing"
+          className="pointer-events-auto absolute bottom-0 left-0 inline-flex cursor-grab appearance-none items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 shadow-[0_1px_3px_rgba(15,23,42,0.18)] transition-colors hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 active:cursor-grabbing"
           data-testid="sketch-rotate-handle"
           data-sketch-rotate-handle="true"
           title="旋转"
+          style={{
+            width: rotateHandleSize,
+            height: rotateHandleSize,
+            left: -(rotateHandleSize + rotateHandleGap),
+            bottom: -(rotateHandleSize + rotateHandleGap),
+          }}
           onPointerDown={onRotatePointerDown}
         >
-          <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+          <RotateCcw style={{ width: rotateIconSize, height: rotateIconSize }} strokeWidth={2} aria-hidden="true" />
         </button>
       ) : null}
       {onResizePointerDown && endpointHandles
@@ -1249,12 +1296,14 @@ function SelectionOverlay({
           ]).map((item) => (
             <div
               key={item.key}
-              className="pointer-events-auto absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 cursor-move rounded-full border border-slate-300 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.16)] transition-colors hover:border-slate-400 hover:bg-slate-50"
+              className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 cursor-move rounded-full border border-slate-300 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.16)] transition-colors hover:border-slate-400 hover:bg-slate-50"
               data-testid={item.testId}
               data-sketch-resize-handle={item.handle}
               style={{
                 left: item.point.x * scaleX - left,
                 top: item.point.y * scaleY - top,
+                width: resizeHandleSize,
+                height: resizeHandleSize,
               }}
               onPointerDown={(event) => onResizePointerDown(event, item.handle)}
             />
@@ -1265,12 +1314,13 @@ function SelectionOverlay({
             <div
               key={item.handle}
               className={cn(
-                "pointer-events-auto absolute h-3 w-3 border border-slate-300 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.16)] transition-colors hover:border-slate-400 hover:bg-slate-50",
+                "pointer-events-auto absolute border border-slate-300 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.16)] transition-colors hover:border-slate-400 hover:bg-slate-50",
                 item.className,
                 item.cursor,
               )}
               data-testid={item.handle === "se" ? "sketch-resize-handle" : `sketch-resize-handle-${item.handle}`}
               data-sketch-resize-handle={item.handle}
+              style={{ width: resizeHandleSize, height: resizeHandleSize }}
               onPointerDown={(event) => onResizePointerDown(event, item.handle)}
             />
           ))
@@ -1438,6 +1488,17 @@ const SKETCH_COLOR_SWATCHES = [
   "#ec4899",
 ];
 
+const SKETCH_TEXT_COLOR_SWATCHES = [
+  "#ffffff", "#000000", "#f3f4f6", "#64748b", "#334155", "#14b8a6", "#0ea5e9", "#2563eb", "#7c3aed", "#ef4444",
+  "#f8fafc", "#111827", "#e5e7eb", "#475569", "#1e3a8a", "#0f766e", "#0369a1", "#1d4ed8", "#6d28d9", "#dc2626",
+  "#f1f5f9", "#1f2937", "#d1d5db", "#374151", "#1e40af", "#0d9488", "#0284c7", "#1e3a8a", "#7e22ce", "#b91c1c",
+  "#e2e8f0", "#374151", "#9ca3af", "#4b5563", "#1d4ed8", "#0f766e", "#0369a1", "#1e40af", "#9333ea", "#991b1b",
+  "#cbd5e1", "#4b5563", "#6b7280", "#374151", "#1e3a8a", "#115e59", "#075985", "#1e40af", "#6b21a8", "#7f1d1d",
+  "#94a3b8", "#111827", "#4b5563", "#1f2937", "#172554", "#134e4a", "#0c4a6e", "#1e3a8a", "#581c87", "#450a0a",
+];
+
+const SKETCH_TEXT_SIZE_PRESETS = [12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64];
+
 const SKETCH_RECENT_COLOR_LIMIT = 8;
 
 function normalizeSketchHexColor(value: string): string | null {
@@ -1550,20 +1611,45 @@ function getInlineTextEditMetrics(node: SketchSceneNode, value: string): { style
   const height = Math.max(28, Math.abs(node.height));
   const fontSize = typeof style.fontSize === "number" ? style.fontSize : node.type === "text" ? 18 : 16;
   const isFreestandingText = node.type === "text";
+  const computedTextStyle = getSketchTextComputedStyle(node);
+  if (isFreestandingText) {
+    const autoSize = getSketchTextAutoSize(node, value);
+    return {
+      style: {
+        left: node.x,
+        top: node.y,
+        width: autoSize.width,
+        height: autoSize.height,
+        boxSizing: "border-box",
+        padding: 0,
+        overflowY: "hidden",
+        fontFamily: computedTextStyle.fontFamily,
+        fontSize: computedTextStyle.fontSize,
+        fontWeight: computedTextStyle.fontWeight,
+        fontStyle: computedTextStyle.italic ? "italic" : "normal",
+        textDecoration: computedTextStyle.textDecoration,
+        color: computedTextStyle.color,
+        caretColor: computedTextStyle.color,
+        lineHeight: `${computedTextStyle.lineHeight}px`,
+        textAlign: style.textAlign ?? "left",
+        transform: node.rotation ? `rotate(${node.rotation}deg)` : undefined,
+        transformOrigin: "center",
+      },
+      overflowing: false,
+    };
+  }
   const fullTextRunStyle = supportsTextStyle(node) ? getFullTextStyleRunStyle(node) : {};
   const lineHeight = Math.round(fullTextRunStyle.lineHeight ?? fontSize * 1.35);
   const lineCount = Math.max(1, value.split("\n").length);
   const textHeight = Math.max(lineHeight, lineCount * lineHeight);
-  const paddingX = isFreestandingText ? 0 : Math.min(16, Math.max(8, width * 0.08));
-  const paddingY = isFreestandingText ? 0 : Math.min(12, Math.max(6, height * 0.12));
-  const editWidth = isFreestandingText ? width : Math.max(32, width - paddingX * 2);
-  const availableHeight = isFreestandingText ? height : Math.max(28, height - paddingY * 2);
-  const editHeight = isFreestandingText ? Math.max(height, textHeight) : Math.max(lineHeight, Math.min(availableHeight, textHeight));
-  const overflowing = !isFreestandingText && textHeight > availableHeight;
-  const left = node.x + (isFreestandingText ? 0 : (width - editWidth) / 2);
-  const top = isFreestandingText
-    ? node.y
-    : node.y + paddingY + Math.max(0, (availableHeight - editHeight) / 2);
+  const paddingX = Math.min(16, Math.max(8, width * 0.08));
+  const paddingY = Math.min(12, Math.max(6, height * 0.12));
+  const editWidth = Math.max(32, width - paddingX * 2);
+  const availableHeight = Math.max(28, height - paddingY * 2);
+  const editHeight = Math.max(lineHeight, Math.min(availableHeight, textHeight));
+  const overflowing = textHeight > availableHeight;
+  const left = node.x + (width - editWidth) / 2;
+  const top = node.y + paddingY + Math.max(0, (availableHeight - editHeight) / 2);
 
   return {
     style: {
@@ -1574,9 +1660,13 @@ function getInlineTextEditMetrics(node: SketchSceneNode, value: string): { style
       boxSizing: "border-box",
       padding: 0,
       overflowY: overflowing ? "auto" : "hidden",
+      fontFamily: computedTextStyle.fontFamily,
       fontSize,
       fontWeight: style.fontWeight ?? (node.type === "text" ? 400 : 500),
+      fontStyle: computedTextStyle.italic ? "italic" : "normal",
+      textDecoration: computedTextStyle.textDecoration,
       color: style.color ?? "#111827",
+      caretColor: style.color ?? "#111827",
       lineHeight: `${lineHeight}px`,
       textAlign: style.textAlign ?? (isFreestandingText ? "left" : "center"),
       transform: node.rotation ? `rotate(${node.rotation}deg)` : undefined,
@@ -1654,6 +1744,77 @@ function getFullTextStyleRunStyle(node: SketchSceneNode): SketchSceneTextStyleOv
   if (textLength <= 0) return {};
   const run = node.textStyleRuns?.find((item) => item.start === 0 && item.length >= textLength);
   return run?.style ?? {};
+}
+
+function getTextStyleStateValue<K extends keyof SketchTextComputedStyle>(
+  node: SketchSceneNode,
+  range: { start: number; end: number } | null,
+  property: K,
+): { value: SketchTextComputedStyle[K] | undefined; mixed: boolean } {
+  const textLength = node.text?.length ?? 0;
+  const start = range ? Math.max(0, Math.min(textLength, range.start)) : 0;
+  const end = range ? Math.max(start, Math.min(textLength, range.end)) : Math.min(1, textLength);
+  const values = range && end > start
+    ? Array.from({ length: end - start }, (_, index) => getSketchTextComputedStyle(node, start + index)[property])
+    : [getSketchTextComputedStyle(node)[property]];
+  const firstValue = values[0];
+  return {
+    value: firstValue,
+    mixed: values.some((value) => !valuesEqual(value, firstValue)),
+  };
+}
+
+function isSketchBoldFontWeight(value: SketchTextComputedStyle["fontWeight"] | undefined): boolean {
+  if (typeof value === "number") return value >= 600;
+  return value === "bold" || value === "bolder" || Number(value) >= 600;
+}
+
+function getTextStylePatchForRange(
+  node: SketchSceneNode,
+  range: { start: number; end: number } | null,
+  stylePatch: SketchSceneTextStyleOverride,
+  defaultStylePatch: SketchSceneStyle,
+): Partial<SketchSceneNode> {
+  if (!range) {
+    return { style: { ...node.style, ...defaultStylePatch } };
+  }
+  return {
+    textStyleRuns: updateTextStyleRunsForRange(node, range, (style) => ({
+      ...style,
+      ...stylePatch,
+    })),
+  };
+}
+
+function cloneSketchTextStyleRuns(runs: SketchSceneNode["textStyleRuns"]): SketchSceneNode["textStyleRuns"] {
+  return runs?.map((run) => ({ ...run, style: { ...run.style } }));
+}
+
+function normalizeSketchTextStyleRuns(
+  text: string,
+  runs: SketchSceneNode["textStyleRuns"],
+): SketchSceneNode["textStyleRuns"] {
+  if (!runs?.length || !text.length) return undefined;
+  const normalized = runs
+    .map((run) => {
+      const start = Math.max(0, Math.min(text.length, Math.floor(run.start)));
+      const end = Math.max(start, Math.min(text.length, Math.floor(run.start + run.length)));
+      return { ...run, start, length: end - start, style: { ...run.style } };
+    })
+    .filter((run) => run.length > 0)
+    .sort((left, right) => left.start - right.start);
+  if (!normalized.length) return undefined;
+  return normalized;
+}
+
+function createInlineTextEditState(node: SketchSceneNode, deleteWhenEmpty = false): InlineTextEditState {
+  return {
+    nodeId: node.id,
+    value: node.text ?? "",
+    style: { ...node.style },
+    textStyleRuns: cloneSketchTextStyleRuns(node.textStyleRuns),
+    deleteWhenEmpty,
+  };
 }
 
 function getActiveInlineTextRange(
@@ -2243,7 +2404,10 @@ function getSketchSnapGuides(
   if (!bounds) return [];
   const threshold = 4;
   const guides: SketchSnapGuide[] = [];
-  const draggedIds = new Set(dragState.nodes.map((node) => node.id));
+  const draggedIds = new Set([
+    ...dragState.nodes.map((node) => node.id),
+    ...(dragState.sourceNodeIds ?? []),
+  ]);
   const pageCenterX = scene.pageSize.width / 2;
   const pageCenterY = scene.pageSize.height / 2;
   const boundsCenterX = bounds.x + bounds.width / 2;
@@ -2291,21 +2455,64 @@ function getSketchSnapGuides(
       pushNearestSnapGuide(guides, { kind: "center", orientation: "horizontal", position: targetCenterY, from: targetHorizontalFrom, to: targetHorizontalTo, label: "中心线" });
     }
 
-    const horizontalGap = bounds.x >= targetBounds.x + targetBounds.width
-      ? bounds.x - (targetBounds.x + targetBounds.width)
-      : targetBounds.x >= bounds.x + bounds.width
-        ? targetBounds.x - (bounds.x + bounds.width)
-        : null;
-    const verticalOverlap = bounds.y < targetBounds.y + targetBounds.height && bounds.y + bounds.height > targetBounds.y;
-    if (horizontalGap !== null && verticalOverlap && horizontalGap >= 8 && horizontalGap <= 80) {
-      const position = bounds.x >= targetBounds.x + targetBounds.width
-        ? targetBounds.x + targetBounds.width + horizontalGap / 2
-        : bounds.x + bounds.width + horizontalGap / 2;
-      pushNearestSnapGuide(guides, { kind: "spacing", orientation: "vertical", position, from: Math.min(bounds.y, targetBounds.y), to: Math.max(bounds.y + bounds.height, targetBounds.y + targetBounds.height), label: "间距" });
-    }
   }
 
   return guides.slice(0, 6);
+}
+
+interface SketchSnapDeltaCandidate {
+  distance: number;
+  delta: number;
+}
+
+function pickSketchSnapDelta(candidates: SketchSnapDeltaCandidate[]): number {
+  return [...candidates].sort((a, b) => a.distance - b.distance)[0]?.delta ?? 0;
+}
+
+function getSketchSnapDelta(
+  scene: SketchSceneDocument,
+  dragState: DragState,
+  previewNodes: SketchSceneNode[],
+  configData?: Record<string, unknown>,
+): { x: number; y: number } {
+  if (dragState.kind !== "move" || isSnapGuideSuppressed(dragState)) return { x: 0, y: 0 };
+  const bounds = getSketchSelectionBounds(previewNodes);
+  if (!bounds) return { x: 0, y: 0 };
+
+  const threshold = 4;
+  const verticalCandidates: SketchSnapDeltaCandidate[] = [];
+  const horizontalCandidates: SketchSnapDeltaCandidate[] = [];
+  const draggedIds = new Set([
+    ...dragState.nodes.map((node) => node.id),
+    ...(dragState.sourceNodeIds ?? []),
+  ]);
+  const boundsCenterX = bounds.x + bounds.width / 2;
+  const boundsCenterY = bounds.y + bounds.height / 2;
+  const addCandidate = (candidates: SketchSnapDeltaCandidate[], delta: number) => {
+    const distance = Math.abs(delta);
+    if (distance <= threshold) candidates.push({ distance, delta });
+  };
+
+  addCandidate(verticalCandidates, scene.pageSize.width / 2 - boundsCenterX);
+  addCandidate(horizontalCandidates, scene.pageSize.height / 2 - boundsCenterY);
+
+  for (const node of scene.nodes) {
+    if (draggedIds.has(node.id) || !isNodeVisibleForConfig(node, configData) || node.type === "group") continue;
+    const targetBounds = getSketchNodeBounds(node);
+    const targetCenterX = targetBounds.x + targetBounds.width / 2;
+    const targetCenterY = targetBounds.y + targetBounds.height / 2;
+    addCandidate(verticalCandidates, targetBounds.x - bounds.x);
+    addCandidate(verticalCandidates, targetBounds.x + targetBounds.width - (bounds.x + bounds.width));
+    addCandidate(verticalCandidates, targetCenterX - boundsCenterX);
+    addCandidate(horizontalCandidates, targetBounds.y - bounds.y);
+    addCandidate(horizontalCandidates, targetBounds.y + targetBounds.height - (bounds.y + bounds.height));
+    addCandidate(horizontalCandidates, targetCenterY - boundsCenterY);
+  }
+
+  return {
+    x: pickSketchSnapDelta(verticalCandidates),
+    y: pickSketchSnapDelta(horizontalCandidates),
+  };
 }
 
 function normalizeFiniteNumber(value: unknown): number | null {
@@ -3347,6 +3554,87 @@ function SketchShortcutHelp({
   );
 }
 
+function SketchMainToolbarTooltip({ label, children }: { label: string; children: React.ReactNode }) {
+  const triggerRef = React.useRef<HTMLSpanElement>(null);
+  const timerRef = React.useRef<number | null>(null);
+  const [visible, setVisible] = React.useState(false);
+  const [position, setPosition] = React.useState<{ left: number; top: number } | null>(null);
+
+  const clearTimer = React.useCallback(() => {
+    if (timerRef.current === null) return;
+    window.clearTimeout(timerRef.current);
+    timerRef.current = null;
+  }, []);
+
+  const updatePosition = React.useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const center = rect.left + rect.width / 2;
+    setPosition({
+      left: Math.max(8, Math.min(window.innerWidth - 8, center)),
+      top: Math.max(8, rect.top - 8),
+    });
+  }, []);
+
+  const hide = React.useCallback(() => {
+    clearTimer();
+    setVisible(false);
+    setPosition(null);
+  }, [clearTimer]);
+
+  const show = React.useCallback(() => {
+    clearTimer();
+    timerRef.current = window.setTimeout(() => {
+      timerRef.current = null;
+      updatePosition();
+      setVisible(true);
+    }, 200);
+  }, [clearTimer, updatePosition]);
+
+  React.useEffect(() => () => clearTimer(), [clearTimer]);
+
+  React.useEffect(() => {
+    if (!visible) return undefined;
+    const handleViewportChange = () => updatePosition();
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
+    return () => {
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
+    };
+  }, [updatePosition, visible]);
+
+  return (
+    <>
+      <span
+        ref={triggerRef}
+        className="inline-flex shrink-0"
+        onPointerEnter={show}
+        onPointerLeave={hide}
+        onMouseEnter={show}
+        onMouseLeave={hide}
+        onFocusCapture={show}
+        onBlurCapture={hide}
+      >
+        {children}
+      </span>
+      {visible && position && typeof document !== "undefined"
+        ? createPortal(
+            <span
+              role="tooltip"
+              className="pointer-events-none fixed z-[10000] max-w-[calc(100vw-16px)] -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] font-medium leading-4 text-white shadow-lg"
+              style={{ left: position.left, top: position.top }}
+            >
+              {label}
+            </span>,
+            document.body,
+          )
+        : null}
+    </>
+  );
+}
+
 export function SketchEditorToolbar({ scene: _scene, controller, configData: _configData = {}, className, allowedTools }: SketchEditorToolbarProps) {
   const toolButtonClass =
     "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-violet-50 hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:opacity-35";
@@ -3367,28 +3655,32 @@ export function SketchEditorToolbar({ scene: _scene, controller, configData: _co
       }).map((item) => {
         const Icon = item.icon;
         return (
-          <button
-            key={item.tool}
-            type="button"
-            title={item.label}
-            aria-label={item.label}
-            className={cn(
-              toolButtonClass,
-              controller.tool === item.tool && "bg-violet-600 text-white shadow-sm hover:bg-violet-600 hover:text-white",
-            )}
-            onClick={() => controller.setTool(item.tool)}
-          >
-            <Icon className="h-5 w-5" />
-          </button>
+          <SketchMainToolbarTooltip key={item.tool} label={item.label}>
+            <button
+              type="button"
+              aria-label={item.label}
+              className={cn(
+                toolButtonClass,
+                controller.tool === item.tool && "bg-violet-600 text-white shadow-sm hover:bg-violet-600 hover:text-white",
+              )}
+              onClick={() => controller.setTool(item.tool)}
+            >
+              <Icon className="h-5 w-5" />
+            </button>
+          </SketchMainToolbarTooltip>
         );
       })}
       <div className="mx-2 h-8 w-px shrink-0 bg-slate-200" />
-      <button type="button" title="撤销" aria-label="撤销" className={actionButtonClass} disabled={!controller.canUndo} onClick={controller.undo}>
-        <Undo2 className="h-4 w-4" />
-      </button>
-      <button type="button" title="重做" aria-label="重做" className={actionButtonClass} disabled={!controller.canRedo} onClick={controller.redo}>
-        <Redo2 className="h-4 w-4" />
-      </button>
+      <SketchMainToolbarTooltip label="撤销">
+        <button type="button" aria-label="撤销" className={actionButtonClass} disabled={!controller.canUndo} onClick={controller.undo}>
+          <Undo2 className="h-4 w-4" />
+        </button>
+      </SketchMainToolbarTooltip>
+      <SketchMainToolbarTooltip label="重做">
+        <button type="button" aria-label="重做" className={actionButtonClass} disabled={!controller.canRedo} onClick={controller.redo}>
+          <Redo2 className="h-4 w-4" />
+        </button>
+      </SketchMainToolbarTooltip>
       <span className="sr-only" aria-live="polite">
         {controller.selection.nodeIds.length ? `${controller.selection.nodeIds.length} selected` : "No selection"}
       </span>
@@ -5469,6 +5761,8 @@ export function SketchEditorCanvas({
   const [shortcutHelpOpen, setShortcutHelpOpen] = React.useState(false);
   const [detailsPanelOpen, setDetailsPanelOpen] = React.useState(false);
   const [detailsPanelTab, setDetailsPanelTab] = React.useState<"properties" | "layers" | "fill" | "stroke" | "more" | "position">("properties");
+  const [detailsPanelAnchorX, setDetailsPanelAnchorX] = React.useState<number | null>(null);
+  const [detailsPanelSize, setDetailsPanelSize] = React.useState<{ width: number; height: number } | null>(null);
   const [floatingSizeRatioLocked, setFloatingSizeRatioLocked] = React.useState(false);
   const detailsPanelRef = React.useRef<HTMLDivElement>(null);
   const [clipboardVersion, setClipboardVersion] = React.useState(0);
@@ -5488,18 +5782,31 @@ export function SketchEditorCanvas({
   const inlineTextRef = React.useRef<HTMLTextAreaElement>(null);
   const imageFileInputRef = React.useRef<HTMLInputElement>(null);
   const [canvasContainerWidth, setCanvasContainerWidth] = React.useState<number | null>(null);
+  const [canvasContainerHeight, setCanvasContainerHeight] = React.useState<number | null>(null);
   const [floatingToolbarWidth, setFloatingToolbarWidth] = React.useState<number | null>(null);
   const width = fillContainer ? scene.pageSize.width : normalizeSize(previewSize, scene.pageSize.width, "width");
   const height = fillContainer ? scene.pageSize.height : normalizeSize(previewSize, scene.pageSize.height, "height");
   const selectedNodes = getSelectedNodes(scene, controller);
   const selectedNode = selectedNodes.length === 1 ? selectedNodes[0] : null;
-  const visibleSelectedNodes = selectedNodes.filter((node) => isNodeVisibleForConfig(node, configData));
+  const inlineTextSourceNode = inlineTextEdit
+    ? scene.nodes.find((node) => node.id === inlineTextEdit.nodeId) ?? null
+    : null;
+  const inlineTextNode = inlineTextSourceNode && inlineTextEdit && inlineTextSourceNode.type === "text"
+    ? {
+        ...inlineTextSourceNode,
+        text: inlineTextEdit.value,
+        style: { ...inlineTextEdit.style },
+        textStyleRuns: cloneSketchTextStyleRuns(inlineTextEdit.textStyleRuns),
+      }
+    : inlineTextSourceNode;
+  const selectionNodes = selectedNodes.map((node) => node.id === inlineTextNode?.id ? inlineTextNode : node);
+  const visibleSelectedNodes = selectionNodes.filter((node) => isNodeVisibleForConfig(node, configData));
   const canvasSelectionBounds = getSketchSelectionBounds(visibleSelectedNodes);
   const hoveredNode = hoveredNodeId && !controller.selection.nodeIds.includes(hoveredNodeId)
     ? scene.nodes.find((node) => node.id === hoveredNodeId && isNodeVisibleForConfig(node, configData)) ?? null
     : null;
   const hoverSelectionBounds = hoveredNode ? getSketchNodeBounds(hoveredNode) : null;
-  const resizableSelectedNodes = getSelectionResizeNodes(selectedNodes).filter((node) => isNodeVisibleForConfig(node, configData));
+  const resizableSelectedNodes = getSelectionResizeNodes(selectionNodes).filter((node) => isNodeVisibleForConfig(node, configData));
   const resizeSelectionBounds = getSketchSelectionBounds(resizableSelectedNodes);
   const canResizeSelection = Boolean(resizeSelectionBounds && resizableSelectedNodes.length);
   const lineEndpointHandles =
@@ -5511,10 +5818,8 @@ export function SketchEditorCanvas({
           end: { x: selectedNode.x + selectedNode.width, y: selectedNode.y + selectedNode.height },
         }
       : undefined;
-  const inlineTextNode = inlineTextEdit
-    ? scene.nodes.find((node) => node.id === inlineTextEdit.nodeId) ?? null
-    : null;
   const canEditInlineTextNode = inlineTextNode ? canInlineEditTextNode(inlineTextNode, configData) : false;
+  const isPureTextInlineEdit = Boolean(inlineTextEdit && inlineTextNode?.type === "text");
   const inlineTextEditMetrics = inlineTextEdit && inlineTextNode && canEditInlineTextNode
     ? getInlineTextEditMetrics(inlineTextNode, inlineTextEdit.value)
     : null;
@@ -5532,16 +5837,22 @@ export function SketchEditorCanvas({
     : null;
   const canGroupSelection = layerEditableSelectedNodes.length >= 2;
   const canUngroupSelection = selectedGroupNodes.length > 0;
-  const previewScene = drawingDraft?.node
-    ? { ...scene, nodes: [...scene.nodes, drawingDraft.node] }
+  const inlineTextPreviewScene = inlineTextNode?.type === "text" && inlineTextEdit
+    ? {
+        ...scene,
+        nodes: scene.nodes.map((node) => node.id === inlineTextNode.id ? inlineTextNode : node),
+      }
     : scene;
+  const previewScene = drawingDraft?.node
+    ? { ...inlineTextPreviewScene, nodes: [...inlineTextPreviewScene.nodes, drawingDraft.node] }
+    : inlineTextPreviewScene;
   const connectorCandidatePoints = getConnectorCandidatePoints(scene, dragStart, configData);
   const snapGuides = getSketchSnapGuides(scene, dragStart, configData);
   const dragModifierHint = dragStart && dragStart.kind !== "rotate"
     ? [
         "Alt/Option 拖动复制",
         dragStart.kind === "resize" ? "Shift 等比缩放" : "Shift 约束比例",
-        "Cmd/Ctrl 临时隐藏吸附参考线",
+        "Cmd/Ctrl 暂停吸附与参考线",
       ].join(" · ")
     : null;
 
@@ -5551,8 +5862,13 @@ export function SketchEditorCanvas({
 
     const updateContainerWidth = () => {
       const nextWidth = container.clientWidth || container.getBoundingClientRect().width;
-      if (!Number.isFinite(nextWidth) || nextWidth <= 0) return;
-      setCanvasContainerWidth((current) => (current === nextWidth ? current : nextWidth));
+      const nextHeight = container.clientHeight || container.getBoundingClientRect().height;
+      if (Number.isFinite(nextWidth) && nextWidth > 0) {
+        setCanvasContainerWidth((current) => (current === nextWidth ? current : nextWidth));
+      }
+      if (Number.isFinite(nextHeight) && nextHeight > 0) {
+        setCanvasContainerHeight((current) => (current === nextHeight ? current : nextHeight));
+      }
     };
 
     updateContainerWidth();
@@ -5565,6 +5881,37 @@ export function SketchEditorCanvas({
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
+
+  React.useLayoutEffect(() => {
+    if (!detailsPanelOpen) {
+      setDetailsPanelSize((current) => (current === null ? current : null));
+      return undefined;
+    }
+    const panel = detailsPanelRef.current;
+    if (!panel) return undefined;
+
+    const reportSize = () => {
+      const rect = panel.getBoundingClientRect();
+      const nextWidth = panel.offsetWidth || rect.width;
+      const nextHeight = panel.offsetHeight || rect.height;
+      if (!Number.isFinite(nextWidth) || !Number.isFinite(nextHeight) || nextWidth <= 0 || nextHeight <= 0) return;
+      setDetailsPanelSize((current) => (
+        current?.width === nextWidth && current.height === nextHeight
+          ? current
+          : { width: nextWidth, height: nextHeight }
+      ));
+    };
+
+    reportSize();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", reportSize);
+      return () => window.removeEventListener("resize", reportSize);
+    }
+
+    const observer = new ResizeObserver(reportSize);
+    observer.observe(panel);
+    return () => observer.disconnect();
+  }, [detailsPanelOpen, detailsPanelTab]);
 
   React.useEffect(() => {
     if (!inlineTextEdit) return;
@@ -5685,8 +6032,41 @@ export function SketchEditorCanvas({
       controller.clearSelection();
       return;
     }
-    if (node.text === edit.value) return;
-    controller.applyOperations([{ op: "update", nodeId: node.id, patch: { text: edit.value } }]);
+    if (node.type !== "text") {
+      if (node.text === edit.value) return;
+      controller.applyOperations([{ op: "update", nodeId: node.id, patch: { text: edit.value } }]);
+      return;
+    }
+    const draftNode: SketchSceneNode = {
+      ...node,
+      text: edit.value,
+      style: { ...edit.style },
+      textStyleRuns: normalizeSketchTextStyleRuns(edit.value, edit.textStyleRuns),
+    };
+    const size = getSketchTextAutoSize(draftNode, edit.value);
+    const nextNode = {
+      ...draftNode,
+      width: size.width,
+      height: size.height,
+    };
+    if (
+      node.text === nextNode.text &&
+      node.width === nextNode.width &&
+      node.height === nextNode.height &&
+      JSON.stringify(node.style ?? {}) === JSON.stringify(nextNode.style ?? {}) &&
+      JSON.stringify(node.textStyleRuns ?? []) === JSON.stringify(nextNode.textStyleRuns ?? [])
+    ) return;
+    controller.applyOperations([{
+      op: "update",
+      nodeId: node.id,
+      patch: {
+        text: nextNode.text,
+        width: nextNode.width,
+        height: nextNode.height,
+        style: nextNode.style,
+        textStyleRuns: nextNode.textStyleRuns,
+      },
+    }]);
   }, [configData, controller, inlineTextEdit, scene.nodes]);
 
   const cancelInlineTextEdit = React.useCallback(() => {
@@ -5763,7 +6143,8 @@ export function SketchEditorCanvas({
     if (!node || !canInlineEditTextNode(node, configData)) return false;
     activateSketchKeyboardScope(controller);
     controller.setNodeIds([node.id]);
-    setInlineTextEdit({ nodeId: node.id, value: node.text ?? "" });
+    setDetailsPanelOpen(false);
+    setInlineTextEdit(createInlineTextEditState(node));
     return true;
   }, [configData, controller, scene.nodes]);
 
@@ -5797,7 +6178,7 @@ export function SketchEditorCanvas({
       controller.tool !== "select" ||
       !canvasSelectionBounds ||
       !selectedNodes.length ||
-      inlineTextEdit ||
+      (inlineTextEdit && !isPureTextInlineEdit) ||
       dragStart ||
       marquee ||
       drawingDraft
@@ -5820,6 +6201,7 @@ export function SketchEditorCanvas({
     drawingDraft,
     height,
     inlineTextEdit,
+    isPureTextInlineEdit,
     marquee,
     mode,
     scene.pageSize.height,
@@ -5842,16 +6224,122 @@ export function SketchEditorCanvas({
     setFloatingToolbarWidth((current) => (current === nextWidth ? current : nextWidth));
   }, []);
 
-  const openDetailsBubble = React.useCallback((tab: "properties" | "layers" | "fill" | "stroke" | "more" | "position") => {
+  const getDetailsPanelAnchorX = React.useCallback((trigger: HTMLElement | null): number | null => {
+    const fallback = quickToolbarPosition?.left ?? null;
+    if (!trigger) return fallback;
+    const container = containerRef.current;
+    const triggerRect = trigger.getBoundingClientRect();
+    if (!container || triggerRect.width <= 0) return fallback;
+    const containerRect = container.getBoundingClientRect();
+    return triggerRect.left + triggerRect.width / 2 - containerRect.left;
+  }, [quickToolbarPosition?.left]);
+
+  const openDetailsBubble = React.useCallback((
+    tab: "properties" | "layers" | "fill" | "stroke" | "more" | "position",
+    trigger?: HTMLElement | null,
+  ) => {
     setShortcutHelpOpen(false);
     setCommandPaletteOpen(false);
     setDetailsPanelTab(tab);
+    setDetailsPanelAnchorX(getDetailsPanelAnchorX(trigger ?? null));
+    setDetailsPanelSize(null);
     setDetailsPanelOpen(true);
-  }, []);
+  }, [getDetailsPanelAnchorX]);
+
+  const pureTextToolbarNode = selectedNodes.length === 1 && selectedNode?.type === "text"
+    ? (isPureTextInlineEdit && inlineTextNode?.type === "text" ? inlineTextNode : selectedNode)
+    : null;
+  const pureTextToolbarRange = pureTextToolbarNode && isPureTextInlineEdit
+    ? getActiveInlineTextRange(controller, pureTextToolbarNode)
+    : null;
+
+  const applyPureTextToolbarStyle = React.useCallback(
+    (stylePatch: SketchSceneTextStyleOverride, defaultStylePatch: SketchSceneStyle) => {
+      const node = pureTextToolbarNode;
+      if (!node || !canEditNodeProperties(node)) return;
+      const patch = getTextStylePatchForRange(node, pureTextToolbarRange, stylePatch, defaultStylePatch);
+      if (isPureTextInlineEdit) {
+        setInlineTextEdit((current) => {
+          if (!current || current.nodeId !== node.id) return current;
+          const nextStyle = patch.style ? { ...patch.style } : { ...current.style };
+          const nextRuns = patch.textStyleRuns !== undefined
+            ? normalizeSketchTextStyleRuns(current.value, patch.textStyleRuns)
+            : cloneSketchTextStyleRuns(current.textStyleRuns);
+          return { ...current, style: nextStyle, textStyleRuns: nextRuns };
+        });
+        return;
+      }
+      const candidateNode: SketchSceneNode = {
+        ...node,
+        style: patch.style ? { ...patch.style } : { ...node.style },
+        textStyleRuns: patch.textStyleRuns !== undefined ? patch.textStyleRuns : cloneSketchTextStyleRuns(node.textStyleRuns),
+      };
+      const size = getSketchTextAutoSize(candidateNode, candidateNode.text ?? "");
+      applySelectedPatch(scene, controller, { ...patch, width: size.width, height: size.height });
+    },
+    [controller, isPureTextInlineEdit, pureTextToolbarNode, pureTextToolbarRange, scene],
+  );
+
+  const applyPureTextToolbarAlignment = React.useCallback(
+    (textAlign: NonNullable<NonNullable<SketchSceneNode["style"]>["textAlign"]>) => {
+      const node = pureTextToolbarNode;
+      if (!node || !canEditNodeProperties(node)) return;
+      const nextStyle = { ...node.style, textAlign };
+      if (isPureTextInlineEdit) {
+        setInlineTextEdit((current) => current && current.nodeId === node.id ? { ...current, style: nextStyle } : current);
+        return;
+      }
+      applySelectedPatch(scene, controller, { style: nextStyle });
+    },
+    [controller, isPureTextInlineEdit, pureTextToolbarNode, scene],
+  );
+
+  const openPureTextDetails = React.useCallback((tab: "layers" | "more", trigger?: HTMLElement | null) => {
+    if (isPureTextInlineEdit) commitInlineTextEdit();
+    openDetailsBubble(tab, trigger);
+  }, [commitInlineTextEdit, isPureTextInlineEdit, openDetailsBubble]);
+
+  const togglePureTextBold = React.useCallback(() => {
+    if (!pureTextToolbarNode) return;
+    const state = getTextStyleStateValue(pureTextToolbarNode, pureTextToolbarRange, "fontWeight");
+    const nextBold = state.mixed || !isSketchBoldFontWeight(state.value);
+    applyPureTextToolbarStyle(
+      { fontWeight: nextBold ? 700 : 400 },
+      { fontWeight: nextBold ? 700 : 400 },
+    );
+  }, [applyPureTextToolbarStyle, pureTextToolbarNode, pureTextToolbarRange]);
+
+  const togglePureTextItalic = React.useCallback(() => {
+    if (!pureTextToolbarNode) return;
+    const state = getTextStyleStateValue(pureTextToolbarNode, pureTextToolbarRange, "italic");
+    const nextItalic = state.mixed || !Boolean(state.value);
+    applyPureTextToolbarStyle({ italic: nextItalic }, { italic: nextItalic });
+  }, [applyPureTextToolbarStyle, pureTextToolbarNode, pureTextToolbarRange]);
+
+  const togglePureTextUnderline = React.useCallback(() => {
+    if (!pureTextToolbarNode) return;
+    const state = getTextStyleStateValue(pureTextToolbarNode, pureTextToolbarRange, "textDecoration");
+    const nextDecoration = state.mixed || state.value !== "underline" ? "underline" : "none";
+    applyPureTextToolbarStyle(
+      { textDecoration: nextDecoration },
+      { textDecoration: nextDecoration },
+    );
+  }, [applyPureTextToolbarStyle, pureTextToolbarNode, pureTextToolbarRange]);
+
+  const setPureTextFontSize = React.useCallback((fontSize: number) => {
+    if (!Number.isInteger(fontSize) || fontSize < 1 || fontSize > 512) return;
+    applyPureTextToolbarStyle({ fontSize }, { fontSize });
+  }, [applyPureTextToolbarStyle]);
+
+  const setPureTextColor = React.useCallback((color: string) => {
+    const normalized = normalizeSketchHexColor(color);
+    if (!normalized) return;
+    applyPureTextToolbarStyle({ color: normalized }, { color: normalized });
+  }, [applyPureTextToolbarStyle]);
 
   const floatingToolbarActions = React.useMemo<SketchFloatingToolbarAction[]>(() => {
-    if (!quickToolbarPosition) return [];
-    const openMore = () => openDetailsBubble("more");
+    if (!quickToolbarPosition || selectedNode?.type === "text") return [];
+    const openMore = (trigger?: HTMLElement | null) => openDetailsBubble("more", trigger);
     if (selectedNodes.length === 1 && selectedNode) {
       const actions: SketchFloatingToolbarAction[] = [];
       if (supportsFillStyle(selectedNode)) {
@@ -5862,7 +6350,7 @@ export function SketchEditorCanvas({
           icon: <PaintBucket className="h-3.5 w-3.5" />,
           swatchColor: isSketchNoColor(selectedNode.style?.fill) ? "transparent" : toColorInputValue(selectedNode.style?.fill, "#ffffff"),
           disabled: !canEditNodeProperties(selectedNode),
-          onClick: () => runQuickToolbarAction(() => openDetailsBubble("fill")),
+          onClick: (event) => runQuickToolbarAction(() => openDetailsBubble("fill", event.currentTarget)),
         });
       }
       if (supportsStrokeStyle(selectedNode)) {
@@ -5873,7 +6361,7 @@ export function SketchEditorCanvas({
           icon: <PenLine className="h-3.5 w-3.5" />,
           swatchColor: isSketchNoColor(selectedNode.style?.stroke) ? "transparent" : toColorInputValue(selectedNode.style?.stroke, "#111827"),
           disabled: !canEditNodeProperties(selectedNode),
-          onClick: () => runQuickToolbarAction(() => openDetailsBubble("stroke")),
+          onClick: (event) => runQuickToolbarAction(() => openDetailsBubble("stroke", event.currentTarget)),
         });
       }
       if (canInlineEditTextNode(selectedNode, configData)) {
@@ -5890,13 +6378,13 @@ export function SketchEditorCanvas({
           label: "层级",
           icon: <Layers className="h-3.5 w-3.5" />,
           disabled: !canEditNodeProperties(selectedNode),
-          onClick: () => runQuickToolbarAction(() => openDetailsBubble("layers")),
+          onClick: (event) => runQuickToolbarAction(() => openDetailsBubble("layers", event.currentTarget)),
         },
         {
           id: "more",
           label: "更多",
           icon: <MoreHorizontal className="h-3.5 w-3.5" />,
-          onClick: () => runQuickToolbarAction(openMore),
+          onClick: (event) => runQuickToolbarAction(() => openMore(event.currentTarget)),
         },
       );
       return actions;
@@ -5948,7 +6436,7 @@ export function SketchEditorCanvas({
         id: "more",
         label: "更多",
         icon: <MoreHorizontal className="h-3.5 w-3.5" />,
-        onClick: () => runQuickToolbarAction(openMore),
+        onClick: (event) => runQuickToolbarAction(() => openMore(event.currentTarget)),
       },
     ];
   }, [
@@ -5968,17 +6456,28 @@ export function SketchEditorCanvas({
   ]);
 
   const detailsBubblePosition = React.useMemo(() => {
-    const bubbleWidth = detailsPanelTab === "position" ? 360 : 320;
-    const bubbleHeight = detailsPanelTab === "more" ? 268 : detailsPanelTab === "fill" || detailsPanelTab === "stroke" ? 210 : detailsPanelTab === "layers" ? 180 : 96;
-    const containerWidth = containerRef.current?.clientWidth ?? width;
-    const containerHeight = containerRef.current?.clientHeight ?? height;
+    const fallbackWidth = detailsPanelTab === "position"
+      ? 360
+      : detailsPanelTab === "fill" || detailsPanelTab === "stroke"
+        ? 236
+        : detailsPanelTab === "more"
+          ? 204
+          : detailsPanelTab === "layers"
+            ? 184
+            : 320;
+    const fallbackHeight = detailsPanelTab === "more" ? 268 : detailsPanelTab === "fill" || detailsPanelTab === "stroke" ? 210 : detailsPanelTab === "layers" ? 180 : 96;
+    const bubbleWidth = detailsPanelSize?.width ?? fallbackWidth;
+    const bubbleHeight = detailsPanelSize?.height ?? fallbackHeight;
+    const containerWidth = canvasContainerWidth ?? (containerRef.current?.clientWidth || width);
+    const containerHeight = canvasContainerHeight ?? (containerRef.current?.clientHeight || height);
     const toolbarTop = quickToolbarPosition?.top ?? 20;
     const below = toolbarTop + 44;
+    const anchorX = detailsPanelAnchorX ?? quickToolbarPosition?.left ?? containerWidth / 2;
     return {
-      left: Math.max(12, Math.min(containerWidth - bubbleWidth - 12, (quickToolbarPosition?.left ?? bubbleWidth / 2) - bubbleWidth / 2)),
+      left: Math.max(12, Math.min(containerWidth - bubbleWidth - 12, anchorX - bubbleWidth / 2)),
       top: below + bubbleHeight <= containerHeight - 12 ? below : Math.max(12, toolbarTop - bubbleHeight - 8),
     };
-  }, [detailsPanelTab, height, quickToolbarPosition, width]);
+  }, [canvasContainerHeight, canvasContainerWidth, detailsPanelAnchorX, detailsPanelSize, detailsPanelTab, height, quickToolbarPosition, width]);
 
   const getInlineTextEditNodeIdFromPoint = React.useCallback(
     (target: Element, clientX: number, clientY: number): string | null => {
@@ -6532,9 +7031,17 @@ export function SketchEditorCanvas({
               )
             : null;
         const translatedNodes = activeDragStart.kind === "move" ? translateSketchNodes(activeDragStart.nodes, delta) : null;
+        const snapDelta = translatedNodes && activeDragStart.kind === "move"
+          ? getSketchSnapDelta(scene, nextDragStart, translatedNodes, configData)
+          : { x: 0, y: 0 };
+        const snappedNodes = translatedNodes?.map((node) => ({
+          ...node,
+          x: node.x + snapDelta.x,
+          y: node.y + snapDelta.y,
+        })) ?? null;
         const previewNodes =
           activeDragStart.kind === "move"
-            ? translatedNodes ?? activeDragStart.nodes
+            ? snappedNodes ?? activeDragStart.nodes
             : activeDragStart.kind === "resize"
               ? activeDragStart.nodes.map((node, index) => (
                   resizeLineLikeNodeEndpoint(node, activeDragStart.resizeHandle, delta) ??
@@ -6544,7 +7051,7 @@ export function SketchEditorCanvas({
               : activeDragStart.nodes;
         const operations: SketchScenePatchOperation[] =
           activeDragStart.duplicateOnDrag && activeDragStart.kind === "move" && !activeDragStart.hasHistoryCheckpoint
-            ? (translatedNodes ?? activeDragStart.nodes).map((node) => ({ op: "add" as const, node }))
+            ? (snappedNodes ?? activeDragStart.nodes).map((node) => ({ op: "add" as const, node }))
             : activeDragStart.nodes.flatMap((node, index) => {
           if (activeDragStart.kind === "resize") {
             const nextNode = previewNodes[index] ?? node;
@@ -6555,7 +7062,7 @@ export function SketchEditorCanvas({
               patch: { x: nextNode.x, y: nextNode.y, width: nextNode.width, height: nextNode.height },
             }];
           }
-          const nextNode = translatedNodes?.[index] ?? node;
+          const nextNode = snappedNodes?.[index] ?? node;
           return [{
             op: "update" as const,
             nodeId: node.id,
@@ -6628,7 +7135,7 @@ export function SketchEditorCanvas({
             controller.setNodeIds([node.id]);
             controller.setTool("select");
             if (node.type === "text") {
-              setInlineTextEdit({ nodeId: node.id, value: node.text ?? "", deleteWhenEmpty: true });
+              setInlineTextEdit(createInlineTextEditState(node, true));
             }
           } else if (activeDrawingDraft.tool === "image") {
             requestImageFileImport({ point: finalPoint });
@@ -6752,7 +7259,13 @@ export function SketchEditorCanvas({
           aria-label="草图工具菜单"
           className={cn(
             "absolute z-40 max-h-[min(460px,calc(100%-24px))] overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 text-slate-900 shadow-[0_12px_32px_rgba(15,23,42,0.14)]",
-            detailsPanelTab === "position" ? "w-[min(360px,calc(100%-24px))]" : "w-[min(320px,calc(100%-24px))]",
+            detailsPanelTab === "position"
+              ? "w-[min(360px,calc(100%-24px))]"
+              : detailsPanelTab === "fill" || detailsPanelTab === "stroke"
+                ? "w-[min(236px,calc(100%-24px))]"
+                : detailsPanelTab === "more" || detailsPanelTab === "layers"
+                  ? "w-max max-w-[calc(100%-24px)]"
+                  : "w-[min(320px,calc(100%-24px))]",
           )}
           style={detailsBubblePosition}
           onPointerDown={(event) => event.stopPropagation()}
@@ -6837,6 +7350,25 @@ export function SketchEditorCanvas({
             </div>
           )}
         </div>
+      ) : null}
+      {quickToolbarPosition && pureTextToolbarNode ? (
+        <SketchTextFloatingToolbar
+          left={quickToolbarPosition.left}
+          top={quickToolbarPosition.top}
+          node={pureTextToolbarNode}
+          range={pureTextToolbarRange}
+          canEdit={canEditNodeProperties(pureTextToolbarNode)}
+          onWidthChange={handleFloatingToolbarWidthChange}
+          onPointerDown={() => activateSketchKeyboardScope(controller)}
+          onToggleBold={togglePureTextBold}
+          onToggleItalic={togglePureTextItalic}
+          onToggleUnderline={togglePureTextUnderline}
+          onFontSize={setPureTextFontSize}
+          onColor={setPureTextColor}
+          onAlign={applyPureTextToolbarAlignment}
+          onOpenLayers={(trigger) => runQuickToolbarAction(() => openPureTextDetails("layers", trigger))}
+          onOpenMore={(trigger) => runQuickToolbarAction(() => openPureTextDetails("more", trigger))}
+        />
       ) : null}
       {quickToolbarPosition && floatingToolbarActions.length ? (
         <SketchFloatingToolbar
@@ -6954,6 +7486,7 @@ export function SketchEditorCanvas({
                 initialScene: scene,
                 hasHistoryCheckpoint: false,
                 duplicateOnDrag,
+                sourceNodeIds: duplicateOnDrag ? dragNodes.map((item) => item.id) : undefined,
               });
             }
           } else {
@@ -7018,6 +7551,7 @@ export function SketchEditorCanvas({
           bounds={canResizeSelection ? resizeSelectionBounds : canvasSelectionBounds}
           scaleX={width / scene.pageSize.width}
           scaleY={height / scene.pageSize.height}
+          viewportScale={viewport.scale}
           minimumSize={8}
           endpointHandles={lineEndpointHandles}
           showCenterPoint={Boolean(canvasSelectionBounds)}
@@ -7087,7 +7621,6 @@ export function SketchEditorCanvas({
               guide.kind === "grid" && "bg-slate-400/70",
               guide.kind === "center" && "bg-blue-500/80",
               guide.kind === "edge" && "bg-emerald-500/80",
-              guide.kind === "spacing" && "bg-amber-500/80",
             )}
             style={
               guide.orientation === "vertical"
@@ -7104,20 +7637,7 @@ export function SketchEditorCanvas({
                     height: 1,
                   }
             }
-          >
-            <span
-              className={cn(
-                "absolute rounded px-1.5 py-0.5 text-[10px] font-medium text-white shadow-sm",
-                guide.orientation === "vertical" ? "left-1 top-1" : "left-1 -top-5",
-                guide.kind === "grid" && "bg-slate-600",
-                guide.kind === "center" && "bg-blue-600",
-                guide.kind === "edge" && "bg-emerald-600",
-                guide.kind === "spacing" && "bg-amber-600",
-              )}
-            >
-              {guide.label}
-            </span>
-          </span>
+          />
         ))}
         {connectorCandidatePoints.map((point) => (
           <span
@@ -7191,9 +7711,11 @@ export function SketchEditorCanvas({
             <textarea
               ref={inlineTextRef}
               aria-label="画布文本编辑"
+              wrap="off"
+              spellCheck={false}
               className="absolute z-20 resize-none rounded-sm border border-[#3da0ff] bg-white/95 px-2 py-1 text-[#111827] outline-none ring-2 ring-[#3da0ff]/30"
               style={inlineTextEditMetrics.style}
-              placeholder={inlineTextNode.type === "text" ? "输入文本" : "输入形状文本"}
+              placeholder={inlineTextNode.type === "text" ? SKETCH_TEXT_PLACEHOLDER : "输入形状文本"}
               value={inlineTextEdit.value}
               onPointerDown={(event) => {
                 event.stopPropagation();
@@ -7203,16 +7725,36 @@ export function SketchEditorCanvas({
               onSelect={(event) => updateInlineTextSelection(event.currentTarget, inlineTextNode.id)}
               onChange={(event) => {
                 updateInlineTextSelection(event.currentTarget, inlineTextNode.id);
-                setInlineTextEdit({ ...inlineTextEdit, value: event.target.value });
+                const nextValue = event.target.value;
+                setInlineTextEdit((current) => current ? {
+                  ...current,
+                  value: nextValue,
+                  textStyleRuns: normalizeSketchTextStyleRuns(nextValue, current.textStyleRuns),
+                } : current);
               }}
-              onBlur={commitInlineTextEdit}
+              onBlur={(event) => {
+                const relatedTarget = event.relatedTarget;
+                if (relatedTarget instanceof Element && relatedTarget.closest("[data-sketch-text-toolbar]")) return;
+                commitInlineTextEdit();
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Escape") {
                   event.preventDefault();
                   event.stopPropagation();
                   cancelInlineTextEdit();
                 }
-                if (event.key === "Enter" && !event.shiftKey) {
+                if (
+                  event.key === "Enter" &&
+                  !event.shiftKey &&
+                  inlineTextNode.type === "text" &&
+                  inlineTextEdit.deleteWhenEmpty &&
+                  inlineTextEdit.value.trim() === ""
+                ) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  commitInlineTextEdit();
+                }
+                if (event.key === "Enter" && !event.shiftKey && inlineTextNode.type !== "text") {
                   event.preventDefault();
                   event.stopPropagation();
                   commitInlineTextEdit();
@@ -7359,6 +7901,387 @@ export function SketchEditorCanvas({
         )
       ) : null}
     </div>
+  );
+}
+
+type SketchTextToolbarMenu = "size" | "color" | "align" | null;
+
+function SketchTextFloatingToolbar({
+  left,
+  top,
+  node,
+  range,
+  canEdit,
+  onWidthChange,
+  onPointerDown,
+  onToggleBold,
+  onToggleItalic,
+  onToggleUnderline,
+  onFontSize,
+  onColor,
+  onAlign,
+  onOpenLayers,
+  onOpenMore,
+}: {
+  left: number;
+  top: number;
+  node: SketchSceneNode;
+  range: { start: number; end: number } | null;
+  canEdit: boolean;
+  onWidthChange: (width: number) => void;
+  onPointerDown: () => void;
+  onToggleBold: () => void;
+  onToggleItalic: () => void;
+  onToggleUnderline: () => void;
+  onFontSize: (value: number) => void;
+  onColor: (value: string) => void;
+  onAlign: (value: "left" | "center" | "right") => void;
+  onOpenLayers: (trigger: HTMLElement) => void;
+  onOpenMore: (trigger: HTMLElement) => void;
+}) {
+  const toolbarRef = React.useRef<HTMLDivElement>(null);
+  const customColorInputRef = React.useRef<HTMLInputElement>(null);
+  const [openMenu, setOpenMenu] = React.useState<SketchTextToolbarMenu>(null);
+  const fontSizeState = getTextStyleStateValue(node, range, "fontSize");
+  const fontSizeValue = typeof fontSizeState.value === "number" && Number.isFinite(fontSizeState.value)
+    ? String(Math.round(fontSizeState.value))
+    : "";
+  const [fontSizeDraft, setFontSizeDraft] = React.useState(fontSizeValue);
+  const boldState = getTextStyleStateValue(node, range, "fontWeight");
+  const italicState = getTextStyleStateValue(node, range, "italic");
+  const decorationState = getTextStyleStateValue(node, range, "textDecoration");
+  const colorState = getTextStyleStateValue(node, range, "color");
+  const currentColor = toColorInputValue(colorState.value, SKETCH_TEXT_DEFAULT_COLOR);
+  const currentAlign = node.style?.textAlign ?? "left";
+  const AlignIcon = currentAlign === "center" ? AlignCenter : currentAlign === "right" ? AlignRight : AlignLeft;
+
+  React.useEffect(() => {
+    setFontSizeDraft(fontSizeState.mixed ? "" : fontSizeValue);
+  }, [fontSizeState.mixed, fontSizeValue]);
+
+  React.useEffect(() => {
+    if (!openMenu) return undefined;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!toolbarRef.current?.contains(event.target as Node)) setOpenMenu(null);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setOpenMenu(null);
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [openMenu]);
+
+  React.useLayoutEffect(() => {
+    const toolbar = toolbarRef.current;
+    if (!toolbar) return;
+    const reportWidth = () => {
+      const nextWidth = toolbar.getBoundingClientRect().width || toolbar.offsetWidth;
+      if (!Number.isFinite(nextWidth) || nextWidth <= 0) return;
+      onWidthChange(nextWidth);
+    };
+    reportWidth();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", reportWidth);
+      return () => window.removeEventListener("resize", reportWidth);
+    }
+    const observer = new ResizeObserver(reportWidth);
+    observer.observe(toolbar);
+    return () => observer.disconnect();
+  }, [onWidthChange]);
+
+  const commitFontSize = React.useCallback(() => {
+    const value = Number(fontSizeDraft);
+    if (!Number.isInteger(value) || value < 1 || value > 512) {
+      setFontSizeDraft(fontSizeState.mixed ? "" : fontSizeValue);
+      return;
+    }
+    onFontSize(value);
+    setFontSizeDraft(String(value));
+  }, [fontSizeDraft, fontSizeState.mixed, fontSizeValue, onFontSize]);
+
+  const chooseColor = React.useCallback((color: string) => {
+    onColor(color);
+    setOpenMenu(null);
+  }, [onColor]);
+
+  const chooseAlign = React.useCallback((align: "left" | "center" | "right") => {
+    onAlign(align);
+    setOpenMenu(null);
+  }, [onAlign]);
+
+  return (
+    <div
+      ref={toolbarRef}
+      role="toolbar"
+      aria-label="纯文本工具栏"
+      data-testid="sketch-text-floating-toolbar"
+      data-sketch-text-toolbar="true"
+      className="pointer-events-none absolute z-30 flex max-w-[calc(100%-24px)] -translate-x-1/2 items-center gap-0.5 rounded-lg border border-slate-200 bg-white/95 p-1 text-slate-900 shadow-[0_8px_24px_rgba(15,23,42,0.12)] backdrop-blur"
+      style={{ left, top }}
+      onPointerDown={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onPointerDown();
+      }}
+      onClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && openMenu) {
+          event.preventDefault();
+          setOpenMenu(null);
+        }
+      }}
+    >
+      <div className="relative pointer-events-auto flex items-center rounded-md border border-transparent focus-within:border-slate-200">
+        <input
+          type="number"
+          min={1}
+          max={512}
+          step={1}
+          value={fontSizeDraft}
+          disabled={!canEdit}
+          placeholder={fontSizeState.mixed ? "混合" : undefined}
+          aria-label="悬浮字号"
+          className="h-8 w-12 rounded-l-md border-0 bg-transparent px-1.5 text-center text-xs font-medium text-slate-700 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-40"
+          onPointerDown={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onPointerDown();
+            event.currentTarget.focus();
+          }}
+          onChange={(event) => {
+            const nextDraft = event.target.value;
+            setFontSizeDraft(nextDraft);
+            const nextValue = Number(nextDraft);
+            if (Number.isInteger(nextValue) && nextValue >= 1 && nextValue <= 512) onFontSize(nextValue);
+          }}
+          onBlur={commitFontSize}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              commitFontSize();
+            }
+          }}
+        />
+        <button
+          type="button"
+          aria-label="打开字号选项"
+          title="字号选项"
+          disabled={!canEdit}
+          className={cn(
+            "inline-flex h-8 w-6 items-center justify-center rounded-r-md text-slate-500 hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40",
+            openMenu === "size" && "bg-slate-100 text-slate-900",
+          )}
+          onClick={() => setOpenMenu((current) => current === "size" ? null : "size")}
+        >
+          <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+        {openMenu === "size" ? (
+          <div role="menu" aria-label="字号选项" className="absolute left-0 top-[calc(100%+6px)] z-50 grid w-36 grid-cols-3 gap-1 rounded-lg border border-slate-200 bg-white p-1.5 text-slate-700 shadow-xl">
+            {SKETCH_TEXT_SIZE_PRESETS.map((size) => (
+              <button
+                key={size}
+                type="button"
+                role="menuitemradio"
+                aria-checked={!fontSizeState.mixed && Number(fontSizeValue) === size}
+                className={cn(
+                  "h-8 rounded-md text-xs hover:bg-slate-50",
+                  !fontSizeState.mixed && Number(fontSizeValue) === size && "bg-slate-100 font-semibold text-slate-900",
+                )}
+                onClick={() => {
+                  onFontSize(size);
+                  setFontSizeDraft(String(size));
+                  setOpenMenu(null);
+                }}
+              >
+                {size}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+      <div className="mx-1 h-5 w-px bg-slate-200" role="separator" />
+      <SketchTextToolbarIconButton
+        label="加粗"
+        icon={<Bold className="h-4 w-4" strokeWidth={2.5} />}
+        active={!boldState.mixed && isSketchBoldFontWeight(boldState.value)}
+        mixed={boldState.mixed}
+        disabled={!canEdit}
+        onClick={onToggleBold}
+      />
+      <SketchTextToolbarIconButton
+        label="斜体"
+        icon={<Italic className="h-4 w-4" />}
+        active={!italicState.mixed && italicState.value === true}
+        mixed={italicState.mixed}
+        disabled={!canEdit}
+        onClick={onToggleItalic}
+      />
+      <SketchTextToolbarIconButton
+        label="下划线"
+        icon={<Underline className="h-4 w-4" />}
+        active={!decorationState.mixed && decorationState.value === "underline"}
+        mixed={decorationState.mixed}
+        disabled={!canEdit}
+        onClick={onToggleUnderline}
+      />
+      <div className="mx-1 h-5 w-px bg-slate-200" role="separator" />
+      <div className="relative pointer-events-auto">
+        <button
+          type="button"
+          aria-label="悬浮文字颜色"
+          title="文字颜色"
+          disabled={!canEdit}
+          className={cn(
+            "inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40",
+            openMenu === "color" && "bg-slate-100 text-slate-900",
+          )}
+          onClick={() => setOpenMenu((current) => current === "color" ? null : "color")}
+        >
+          <span className="h-4 w-4 rounded-sm border border-slate-300" style={{ backgroundColor: currentColor }} aria-hidden="true" />
+        </button>
+        {openMenu === "color" ? (
+          <div role="menu" aria-label="文字颜色" className="absolute left-1/2 top-[calc(100%+6px)] z-50 w-60 -translate-x-1/2 rounded-lg border border-slate-200 bg-white p-2 text-slate-700 shadow-xl">
+            <div className="grid grid-cols-10 gap-1.5" aria-label="预设文字颜色">
+              {SKETCH_TEXT_COLOR_SWATCHES.map((color, index) => (
+                <button
+                  key={`${color}-${index}`}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={color.toLowerCase() === currentColor.toLowerCase()}
+                  aria-label={`文字颜色 ${color}`}
+                  className={cn(
+                    "relative h-4 w-4 rounded-sm border border-slate-200 ring-offset-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500",
+                    color.toLowerCase() === currentColor.toLowerCase() && "ring-2 ring-slate-900",
+                  )}
+                  style={{ backgroundColor: color }}
+                  onClick={() => chooseColor(color)}
+                >
+                  {color.toLowerCase() === currentColor.toLowerCase() ? <Check className="absolute inset-0 m-auto h-3 w-3 text-white drop-shadow-[0_1px_1px_rgba(15,23,42,0.75)]" aria-hidden="true" /> : null}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              role="menuitem"
+              aria-label="文字颜色 其他颜色"
+              className="mt-2 flex h-8 w-full items-center gap-2 rounded-md border-t border-slate-100 px-1.5 text-left text-xs text-slate-700 hover:bg-slate-50"
+              onClick={() => customColorInputRef.current?.click()}
+            >
+              <PaintBucket className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+              <span>其他颜色</span>
+            </button>
+            <input
+              ref={customColorInputRef}
+              type="color"
+              value={currentColor}
+              tabIndex={-1}
+              aria-label="文字颜色 其他颜色输入"
+              className="absolute h-px w-px opacity-0"
+              onChange={(event) => chooseColor(event.target.value)}
+            />
+          </div>
+        ) : null}
+      </div>
+      <div className="relative pointer-events-auto">
+        <button
+          type="button"
+          aria-label="对齐方式"
+          title="对齐方式"
+          disabled={!canEdit}
+          className={cn(
+            "inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40",
+            openMenu === "align" && "bg-slate-100 text-slate-900",
+          )}
+          onClick={() => setOpenMenu((current) => current === "align" ? null : "align")}
+        >
+          <AlignIcon className="h-4 w-4" aria-hidden="true" />
+        </button>
+        {openMenu === "align" ? (
+          <div role="menu" aria-label="对齐方式" className="absolute left-1/2 top-[calc(100%+6px)] z-50 flex -translate-x-1/2 gap-1 rounded-lg border border-slate-200 bg-white p-1.5 text-slate-700 shadow-xl">
+            {([
+              { value: "left" as const, label: "左对齐", icon: AlignLeft },
+              { value: "center" as const, label: "居中对齐", icon: AlignCenter },
+              { value: "right" as const, label: "右对齐", icon: AlignRight },
+            ]).map((option) => {
+              const Icon = option.icon;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={currentAlign === option.value}
+                  aria-label={`对齐方式 ${option.label}`}
+                  className={cn(
+                    "inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-600 hover:bg-slate-50 hover:text-slate-900",
+                    currentAlign === option.value && "bg-slate-100 text-slate-900",
+                  )}
+                  onClick={() => chooseAlign(option.value)}
+                >
+                  <Icon className="h-4 w-4" aria-hidden="true" />
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+      <SketchTextToolbarIconButton
+        label="层级"
+        icon={<Layers className="h-4 w-4" />}
+        disabled={!canEdit}
+        onClick={(event) => {
+          setOpenMenu(null);
+          onOpenLayers(event.currentTarget);
+        }}
+      />
+      <SketchTextToolbarIconButton
+        label="更多"
+        icon={<MoreHorizontal className="h-4 w-4" />}
+        onClick={(event) => {
+          setOpenMenu(null);
+          onOpenMore(event.currentTarget);
+        }}
+      />
+    </div>
+  );
+}
+
+function SketchTextToolbarIconButton({
+  label,
+  icon,
+  active = false,
+  mixed = false,
+  disabled = false,
+  onClick,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  active?: boolean;
+  mixed?: boolean;
+  disabled?: boolean;
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={`悬浮${label}`}
+      title={label}
+      aria-pressed={mixed ? "mixed" : active}
+      disabled={disabled}
+      className={cn(
+        "pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40",
+        active && "bg-slate-100 text-slate-900",
+        mixed && "bg-slate-50 text-slate-700",
+      )}
+      onClick={onClick}
+    >
+      {icon}
+    </button>
   );
 }
 
