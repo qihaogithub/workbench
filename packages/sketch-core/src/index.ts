@@ -44,6 +44,8 @@ export interface SketchSceneStyle {
   radius?: number;
   fontSize?: number;
   fontWeight?: string | number;
+  italic?: boolean;
+  textDecoration?: "none" | "underline" | "line-through";
   textAlign?: "left" | "center" | "right";
   color?: string;
   lineDash?: number[];
@@ -452,6 +454,13 @@ function isValidSketchSceneStyle(value: unknown): boolean {
     value.fontWeight !== undefined &&
     typeof value.fontWeight !== "string" &&
     !isFiniteNonNegative(value.fontWeight)
+  ) {
+    return false;
+  }
+  if (!isOptionalBoolean(value.italic)) return false;
+  if (
+    value.textDecoration !== undefined &&
+    (typeof value.textDecoration !== "string" || !SKETCH_SCENE_TEXT_DECORATION_VALUES.has(value.textDecoration))
   ) {
     return false;
   }
@@ -1200,13 +1209,22 @@ function renderTextStyleOverrideAttributes(style: SketchSceneTextStyleOverride):
   if (style.fontSize !== undefined) attributes.push(`font-size="${escapeAttr(style.fontSize)}"`);
   if (style.fontWeight !== undefined) attributes.push(`font-weight="${escapeAttr(style.fontWeight)}"`);
   if (style.fontFamily) attributes.push(`font-family="${escapeAttr(style.fontFamily)}"`);
-  if (style.italic === true) attributes.push('font-style="italic"');
-  if (style.textDecoration && style.textDecoration !== "none") {
+  if (style.italic !== undefined) attributes.push(`font-style="${style.italic ? "italic" : "normal"}"`);
+  if (style.textDecoration !== undefined) {
     attributes.push(`text-decoration="${escapeAttr(style.textDecoration)}"`);
   }
   if (style.letterSpacing !== undefined) attributes.push(`letter-spacing="${escapeAttr(style.letterSpacing)}"`);
   if (style.lineHeight !== undefined && style.lineHeight !== null) {
     attributes.push(`style="line-height:${escapeAttr(style.lineHeight)}px"`);
+  }
+  return attributes.length ? ` ${attributes.join(" ")}` : "";
+}
+
+function renderBaseTextStyleAttributes(style: SketchSceneStyle): string {
+  const attributes: string[] = [];
+  if (style.italic !== undefined) attributes.push(`font-style="${style.italic ? "italic" : "normal"}"`);
+  if (style.textDecoration !== undefined) {
+    attributes.push(`text-decoration="${escapeAttr(style.textDecoration)}"`);
   }
   return attributes.length ? ` ${attributes.join(" ")}` : "";
 }
@@ -1290,7 +1308,7 @@ function renderCenteredNodeLabel(
   const labelX = node.x + node.width / 2;
   const labelY = node.y + Math.min(node.height / 2 + fontSize / 3, node.height - 8);
   const labelCommon = `data-sketch-node-label="${escapeAttr(node.id)}" opacity="${opacity}"${transform}`;
-  return `<text ${labelCommon} x="${labelX}" y="${labelY}" fill="${escapeAttr(color)}" font-size="${fontSize}" font-weight="${escapeAttr(style.fontWeight ?? 500)}" text-anchor="middle">${renderTextLinesWithStyleRuns(label, labelX, node.textStyleRuns)}</text>`;
+  return `<text ${labelCommon} x="${labelX}" y="${labelY}" fill="${escapeAttr(color)}" font-size="${fontSize}" font-weight="${escapeAttr(style.fontWeight ?? 500)}"${renderBaseTextStyleAttributes(style)} text-anchor="middle">${renderTextLinesWithStyleRuns(label, labelX, node.textStyleRuns)}</text>`;
 }
 
 function renderSketchNode(
@@ -1364,7 +1382,7 @@ function renderSketchNode(
     const fontWeight = style.fontWeight ?? 400;
     const anchor = style.textAlign === "center" ? "middle" : style.textAlign === "right" ? "end" : "start";
     const x = style.textAlign === "center" ? node.x + node.width / 2 : style.textAlign === "right" ? node.x + node.width : node.x;
-    return `<text ${common} x="${x}" y="${node.y + fontSize}" fill="${escapeAttr(color)}" font-size="${fontSize}" font-weight="${escapeAttr(fontWeight)}" text-anchor="${anchor}">${renderTextLinesWithStyleRuns(String(text), x, node.textStyleRuns)}</text>`;
+    return `<text ${common} x="${x}" y="${node.y + fontSize}" fill="${escapeAttr(color)}" font-size="${fontSize}" font-weight="${escapeAttr(fontWeight)}"${renderBaseTextStyleAttributes(style)} text-anchor="${anchor}">${renderTextLinesWithStyleRuns(String(text), x, node.textStyleRuns)}</text>`;
   }
 
   const isControl = node.type === "button" || node.type === "input" || node.type === "card";
