@@ -20,11 +20,13 @@ export interface PlanApprovalRequest {
 export interface PlanApprovalResult {
   approved: boolean;
   planMarkdown?: string;
+  reason?: 'rejected' | 'timeout' | 'cancelled';
 }
 
 export type PlanApprovalHandler = (
   toolCallId: string,
   request: PlanApprovalRequest,
+  signal?: AbortSignal,
 ) => Promise<PlanApprovalResult>;
 
 export function createRequestPlanApprovalTool(
@@ -36,7 +38,7 @@ export function createRequestPlanApprovalTool(
     description:
       'Submit a Markdown execution plan for user review. This tool waits until the user approves, edits, or rejects the plan. Use before executing complex tasks.',
     parameters: RequestPlanApprovalParams,
-    execute: async (toolCallId: string, args: RequestPlanApprovalParams) => {
+    execute: async (toolCallId: string, args: RequestPlanApprovalParams, signal?: AbortSignal) => {
       const planMarkdown = args.planMarkdown.trim();
       if (!planMarkdown) {
         return {
@@ -54,15 +56,28 @@ export function createRequestPlanApprovalTool(
         };
       }
 
-      const result = await approvalHandler(toolCallId, {
+      const request = {
         title: args.title?.trim() || '执行计划',
         planMarkdown,
-      });
+      };
+      const result = signal
+        ? await approvalHandler(toolCallId, request, signal)
+        : await approvalHandler(toolCallId, request);
 
       if (!result.approved) {
+        const error = result.reason === 'timeout'
+          ? 'approval_timed_out'
+          : result.reason === 'cancelled'
+            ? 'approval_cancelled'
+            : 'user_rejected';
+        const text = result.reason === 'timeout'
+          ? 'Plan approval timed out.'
+          : result.reason === 'cancelled'
+            ? 'Plan approval was cancelled.'
+            : 'Plan approval was rejected by the user.';
         return {
-          content: [{ type: 'text' as const, text: 'Plan approval was rejected by the user.' }],
-          details: { success: false, error: 'user_rejected' },
+          content: [{ type: 'text' as const, text }],
+          details: { success: false, error },
           isError: true,
         };
       }

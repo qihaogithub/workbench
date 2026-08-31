@@ -3,7 +3,6 @@
  *
  * 维护规则:
  * - 添加新模型:在 catch-all 之前追加一条,matcher 用正则覆盖 id 变体
- * - 标记多模态:在条目中加 `supportsImages: true`
  * - 标记思考深度:在条目中加 `supportsThinkingDepth: true`,前端会自动检测 -low/-medium/-high 变体并分组
  * - 自定义展示名:在条目中加 `alias`(否则去掉前缀后使用后端 label)
  * - 末尾的 catch-all `{ matcher: /.*\//, enabled: false }` 禁用所有未列入白名单的模型
@@ -59,15 +58,12 @@ export type ModelConfig = {
   enabled?: boolean;
   /** 自定义展示名,缺省时去掉前缀后使用后端 label */
   alias?: string;
-  /** 是否支持图片输入,默认 false */
-  supportsImages?: boolean;
   /** 是否支持思考深度选择(后端需提供 -low/-medium/-high 变体),默认 false */
   supportsThinkingDepth?: boolean;
 };
 
 export const UNCONFIGURED_DEFAULT = {
   enabled: true,
-  supportsImages: false,
   supportsThinkingDepth: false,
 } as const;
 
@@ -78,7 +74,6 @@ export type ResolvedModel = {
   label: string;
   /** 分组名(从 id 前缀提取,如 "sensenova") */
   group: string;
-  supportsImages: boolean;
   supportsThinkingDepth: boolean;
   /** 可用的思考深度选项 */
   availableDepths: ThinkingDepth[];
@@ -261,7 +256,6 @@ export function resolveModelConfig(rawId: string): {
   config: ModelConfig | null;
   enabled: boolean;
   alias: string | undefined;
-  supportsImages: boolean;
   supportsThinkingDepth: boolean;
 } {
   const config = MODEL_CONFIGS.find((c) => matchesId(c.matcher, rawId)) ?? null;
@@ -269,8 +263,6 @@ export function resolveModelConfig(rawId: string): {
     config,
     enabled: config?.enabled ?? UNCONFIGURED_DEFAULT.enabled,
     alias: config?.alias,
-    supportsImages:
-      config?.supportsImages ?? UNCONFIGURED_DEFAULT.supportsImages,
     supportsThinkingDepth:
       config?.supportsThinkingDepth ??
       UNCONFIGURED_DEFAULT.supportsThinkingDepth,
@@ -335,16 +327,14 @@ export function applyViewerModelConfigs(
  */
 export async function applyModelConfigsAsync(
   raw: Array<{ id: string; label: string }>,
-): Promise<{ models: ResolvedModel[]; imageDescriptionEnabled: boolean }> {
+): Promise<ResolvedModel[]> {
   let configData: {
     enabledModels?: string[];
     autoEnableRules?: Array<{ type: "prefix" | "nameFilter"; value: string }>;
     allowedPrefixes: string[];
     blacklist: string[];
     nameFilters: string[];
-    multimodalModels: string[];
   };
-  let imageDescriptionEnabled = false;
 
   try {
     const res = await fetch("/api/models/config");
@@ -356,10 +346,7 @@ export async function applyModelConfigsAsync(
         allowedPrefixes: data.frontend?.allowedPrefixes ?? [],
         blacklist: data.frontend?.blacklist ?? [],
         nameFilters: data.frontend?.nameFilters ?? [],
-        multimodalModels: data.multimodalModels ?? [],
       };
-      imageDescriptionEnabled =
-        data.imageDescription?.enabled === true;
     } else {
       configData = getEnvFallbackConfig();
     }
@@ -370,18 +357,14 @@ export async function applyModelConfigsAsync(
   const configs = buildModelConfigsFromData(configData.allowedPrefixes);
   const blacklist = parseBlacklistFromConfig(configData.blacklist);
   const nameFilters = parseNameFiltersFromConfig(configData.nameFilters);
-  const multimodalSet = new Set(configData.multimodalModels);
-
-  const models = applyModelConfigsWithFullData(raw, {
+  return applyModelConfigsWithFullData(raw, {
     configs,
     blacklist,
     nameFilters,
-    multimodalSet,
     enabledModels: configData.enabledModels,
     autoEnableRules: configData.autoEnableRules,
   });
 
-  return { models, imageDescriptionEnabled };
 }
 
 /**
@@ -399,7 +382,6 @@ function getEnvFallbackConfig() {
     allowedPrefixes,
     blacklist,
     nameFilters,
-    multimodalModels: [] as string[],
   };
 }
 
@@ -437,7 +419,6 @@ export function applyModelConfigsWithFullData(
     configs: ModelConfig[];
     blacklist: Set<string>;
     nameFilters: Array<{ group: string; keyword: string }>;
-    multimodalSet?: Set<string>;
     enabledModels?: string[];
     autoEnableRules?: Array<{ type: "prefix" | "nameFilter"; value: string }>;
   },
@@ -446,7 +427,6 @@ export function applyModelConfigsWithFullData(
     configs,
     blacklist,
     nameFilters,
-    multimodalSet,
     enabledModels,
   } = data;
 
@@ -460,7 +440,6 @@ export function applyModelConfigsWithFullData(
     depth?: ThinkingDepth;
     group: string;
     alias: string | undefined;
-    supportsImages: boolean;
     supportsThinkingDepth: boolean;
   }> = [];
 
@@ -477,14 +456,12 @@ export function applyModelConfigsWithFullData(
       if (!enabled) continue;
     }
 
-    // 获取 config 用于解析多模态/思考深度 (即使在启用列表模式下也需要)
+    // 获取 config 用于解析展示名和思考深度 (即使在启用列表模式下也需要)
     const config = configs.find((c) => matchesId(c.matcher, m.id)) ?? null;
 
     const group = extractGroup(m.id);
     let baseId = m.id;
     let depth: ThinkingDepth | undefined;
-    const supportsImages =
-      config?.supportsImages ?? UNCONFIGURED_DEFAULT.supportsImages;
     const supportsThinkingDepth =
       config?.supportsThinkingDepth ??
       UNCONFIGURED_DEFAULT.supportsThinkingDepth;
@@ -502,7 +479,6 @@ export function applyModelConfigsWithFullData(
       depth,
       group,
       alias: config?.alias,
-      supportsImages,
       supportsThinkingDepth,
     });
   }
@@ -540,7 +516,6 @@ export function applyModelConfigsWithFullData(
         id: first.baseId,
         label,
         group: first.group,
-        supportsImages: first.supportsImages,
         supportsThinkingDepth: availableDepths.length >= 2,
         availableDepths,
         depthVariantIds,
@@ -550,20 +525,10 @@ export function applyModelConfigsWithFullData(
         id: first.rawId,
         label,
         group: first.group,
-        supportsImages: first.supportsImages,
         supportsThinkingDepth: false,
         availableDepths: [],
         depthVariantIds: {},
       });
-    }
-  }
-
-  // 标记多模态模型
-  if (multimodalSet && multimodalSet.size > 0) {
-    for (const model of unorderedResult) {
-      if (multimodalSet.has(model.id)) {
-        model.supportsImages = true;
-      }
     }
   }
 
@@ -630,7 +595,6 @@ export function applyModelConfigsWithData(
     depth?: ThinkingDepth;
     group: string;
     alias: string | undefined;
-    supportsImages: boolean;
     supportsThinkingDepth: boolean;
   }> = [];
 
@@ -656,7 +620,6 @@ export function applyModelConfigsWithData(
       depth,
       group,
       alias: r.alias,
-      supportsImages: r.supportsImages,
       supportsThinkingDepth: r.supportsThinkingDepth,
     });
   }
@@ -693,7 +656,6 @@ export function applyModelConfigsWithData(
         id: first.baseId,
         label,
         group: first.group,
-        supportsImages: first.supportsImages,
         supportsThinkingDepth: availableDepths.length >= 2,
         availableDepths,
         depthVariantIds,
@@ -703,7 +665,6 @@ export function applyModelConfigsWithData(
         id: first.rawId,
         label,
         group: first.group,
-        supportsImages: first.supportsImages,
         supportsThinkingDepth: false,
         availableDepths: [],
         depthVariantIds: {},

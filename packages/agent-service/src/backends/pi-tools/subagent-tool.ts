@@ -15,16 +15,10 @@ const BaseDelegateTaskParams = Type.Object({
         "Optional extra context, constraints, or files the subagent should consider",
     }),
   ),
-  model: Type.Optional(
-    Type.Union([Type.Literal("inherit"), Type.Literal("vision")], {
-      description:
-        'Model for the subagent. "inherit" (default) uses the same model as the main agent. "vision" uses the configured vision model for image analysis. Use "vision" when your main model cannot see images but you need visual understanding of screenshots or images.',
-    }),
-  ),
   images: Type.Optional(
     Type.Array(Type.String(), {
       description:
-        'Image URLs for the subagent to analyze. Only effective when model is "vision". Supports absolute URLs and relative paths (/api/images/..., /api/screenshots/file/...). Relative paths are automatically resolved by the server. Obtain URLs from captureScreenshot, saveImage, or listImages results.',
+        "Image URLs for the subagent to analyze with the current multimodal model. Supports absolute URLs and relative paths (/api/images/..., /api/screenshots/file/...). Relative paths are automatically resolved by the server. Obtain URLs from captureScreenshot, saveImage, or listImages results.",
     }),
   ),
 });
@@ -33,7 +27,7 @@ const BaseDelegateTaskParams = Type.Object({
 const ImageSubagentParam = Type.Optional(
   Type.Union([Type.Literal("general"), Type.Literal("image")], {
     description:
-      'Subagent type. "general" (default) is a general-purpose subagent with the full toolset. "image" is a dedicated image subagent with only image tools (generateImage, extractImageElement, saveImage, listImages, readUserImage, readFile, writeFile) — use it when you need to generate, extract, or curate images, and combine with model: "vision" so the subagent can visually self-review generated images.',
+      'Subagent type. "general" (default) is a general-purpose subagent with the full toolset. "image" is a dedicated image subagent with only image tools (generateImage, extractImageElement, saveImage, listImages, readUserImage, readFile, writeFile) — use it when you need to generate, extract, or curate images and visually self-review generated images.',
   }),
 );
 
@@ -44,7 +38,6 @@ type DelegateTaskParams = Static<typeof BaseDelegateTaskParams> & {
 export interface SubagentRunnerParams {
   task: string;
   context?: string;
-  model?: "inherit" | "vision";
   imageUrls?: string[];
   subagentType?: "general" | "image";
 }
@@ -76,8 +69,8 @@ export function createDelegateTaskTool(
     : BaseDelegateTaskParams;
 
   const description = imageSubagentEnabled
-    ? "Delegate a self-contained task to a short-lived subagent. The subagent works in the same workspace, may edit files, and returns a concise result. Use model: 'vision' + images to let a vision-model subagent analyze screenshots or images when your main model cannot see images. Use subagentType: 'image' to spawn a dedicated image subagent (image tools only) that can generate and extract images, and self-review them with a vision model."
-    : "Delegate a self-contained task to a short-lived subagent. The subagent works in the same workspace, may edit files, and returns a concise result. Use model: 'vision' + images to let a vision-model subagent analyze screenshots or images when your main model cannot see images.";
+    ? "Delegate a self-contained task to a short-lived subagent. The subagent works in the same workspace, may edit files, and returns a concise result. Pass images when the current multimodal model needs to inspect them. Use subagentType: 'image' to spawn a dedicated image subagent (image tools only) that can generate and extract images and self-review them."
+    : "Delegate a self-contained task to a short-lived subagent. The subagent works in the same workspace, may edit files, and returns a concise result. Pass images when the current multimodal model needs to inspect them.";
 
   return {
     name: "delegateTask",
@@ -113,26 +106,11 @@ export function createDelegateTaskTool(
         };
       }
 
-      // 绘图未启用时，即使模型强行传 subagentType: image 也拒绝
-      if (!imageSubagentEnabled && args.subagentType === "image") {
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Error: 图像生成子 Agent 未启用（绘图模型未配置），无法委派图片任务。",
-            },
-          ],
-          details: { success: false, error: "image_subagent_disabled" },
-          isError: true,
-        };
-      }
-
       try {
         const result = await runner(
           {
             task,
             context: args.context,
-            model: args.model,
             imageUrls: args.images,
             subagentType: args.subagentType,
           },

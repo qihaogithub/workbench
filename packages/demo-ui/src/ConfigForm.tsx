@@ -209,8 +209,9 @@ export function ConfigForm({
   typeLimits,
   className,
   onEnterPositionEdit,
+  onPositionFieldPathChange,
   onExitPositionEdit,
-  positionEditActive,
+  positionEditActiveId,
   positionEditDimming,
   onTogglePositionDimming,
   designSpecEntries,
@@ -267,30 +268,46 @@ export function ConfigForm({
   }, [schema]);
 
   const positionRegistryRef = useRef(new Map<string, PositionFieldEntry>());
-  const positionEditActiveRef = useRef(false);
+  const activePositionIdRef = useRef<string | null>(positionEditActiveId ?? null);
+  const onPositionFieldPathChangeRef = useRef(onPositionFieldPathChange);
+  const onExitPositionEditRef = useRef(onExitPositionEdit);
+  activePositionIdRef.current = positionEditActiveId ?? null;
+  onPositionFieldPathChangeRef.current = onPositionFieldPathChange;
+  onExitPositionEditRef.current = onExitPositionEdit;
 
   const registerPositionField = useCallback((entry: PositionFieldEntry) => {
-    positionRegistryRef.current.set(entry.posKey, entry);
+    positionRegistryRef.current.set(entry.instanceId, entry);
+    onPositionFieldPathChangeRef.current?.(entry.instanceId, entry.fieldPath);
     return () => {
-      positionRegistryRef.current.delete(entry.posKey);
+      if (positionRegistryRef.current.get(entry.instanceId) === entry) {
+        positionRegistryRef.current.delete(entry.instanceId);
+      }
+      if (activePositionIdRef.current === entry.instanceId) {
+        queueMicrotask(() => {
+          if (
+            activePositionIdRef.current === entry.instanceId &&
+            !positionRegistryRef.current.has(entry.instanceId)
+          ) {
+            onExitPositionEditRef.current?.();
+          }
+        });
+      }
     };
   }, []);
 
-  const requestPositionEdit = useCallback(() => {
-    const entries = Array.from(positionRegistryRef.current.values());
-    const posKeys: string[] = entries.map((e) => e.posKey);
-    const positions: Record<string, { x: number; y: number }> = {};
-    const posKeyMap: Record<string, string> = {};
-    for (const entry of entries) {
-      positions[entry.posKey] = entry.currentValue;
-      posKeyMap[entry.posKey] = entry.fieldPath;
-    }
-    positionEditActiveRef.current = true;
-    onEnterPositionEdit?.(posKeys, positions, posKeyMap);
+  const requestPositionEdit = useCallback((instanceId: string) => {
+    const entry = positionRegistryRef.current.get(instanceId);
+    if (!entry) return;
+    onEnterPositionEdit?.({
+      id: entry.instanceId,
+      fieldPath: entry.fieldPath,
+      domKey: entry.posKey,
+      domOccurrence: entry.domOccurrence,
+      position: entry.currentValue,
+    });
   }, [onEnterPositionEdit]);
 
   const exitPositionEdit = useCallback(() => {
-    positionEditActiveRef.current = false;
     onExitPositionEdit?.();
   }, [onExitPositionEdit]);
 
@@ -299,7 +316,7 @@ export function ConfigForm({
       registerPositionField,
       requestPositionEdit,
       exitPositionEdit,
-      positionEditActive: positionEditActive ?? false,
+      activePositionId: positionEditActiveId ?? null,
       dimming: positionEditDimming ?? false,
       onToggleDimming: onTogglePositionDimming,
     };
@@ -307,12 +324,10 @@ export function ConfigForm({
     registerPositionField,
     requestPositionEdit,
     exitPositionEdit,
-    positionEditActive,
+    positionEditActiveId,
     positionEditDimming,
     onTogglePositionDimming,
   ]);
-
-  const hasPositionEdit = !!onEnterPositionEdit; 
 
   console.log(
     "[ConfigForm] Parsed field groups:",

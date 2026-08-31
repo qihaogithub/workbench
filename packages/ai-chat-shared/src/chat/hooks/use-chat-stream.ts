@@ -395,6 +395,24 @@ function hasVisibleAssistantContent(message: ChatMessage): boolean {
   );
 }
 
+function hasToolCallId(message: ChatMessage, toolCallId: string): boolean {
+  return Boolean(
+    toolCallId &&
+      message.parts?.some(
+        (part) => part.type === "tool" && part.toolCallId === toolCallId,
+      ),
+  );
+}
+
+function isTerminalToolUpdateStatus(status?: string): boolean {
+  return (
+    status === "completed" ||
+    status === "success" ||
+    status === "failed" ||
+    status === "error"
+  );
+}
+
 interface UseChatStreamOptions {
   sessionId: string;
   agentSessionId: string;
@@ -422,6 +440,8 @@ interface UseChatStreamOptions {
   setMessages: (
     updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
   ) => void;
+  /** 当前宿主展示的流状态；用于宿主兜底重置时同步释放本 Hook 的运行锁。 */
+  isStreaming?: boolean;
   setIsStreaming: (value: boolean) => void;
   setStreamContent: (updater: string | ((prev: string) => string)) => void;
   currentMessageRef: React.MutableRefObject<ChatMessage>;
@@ -457,6 +477,7 @@ export function useChatStream(options: UseChatStreamOptions) {
     onWorkspaceMutationCommitted,
     messagesRef,
     setMessages,
+    isStreaming = false,
     setIsStreaming,
     setStreamContent,
     currentMessageRef,
@@ -502,6 +523,8 @@ export function useChatStream(options: UseChatStreamOptions) {
   const memoryFilePathsRef = useRef<Set<string>>(new Set());
   const queuedMessagesRef = useRef<QueuedChatMessage[]>([]);
   const activeRunRef = useRef(false);
+  const pendingPermissionRef = useRef<PermissionRequest | null>(null);
+  const previousIsStreamingRef = useRef(isStreaming);
   const activeRunDedupeKeyRef = useRef<string | null>(null);
   const busyRetryAttemptedRef = useRef(false);
   const drainQueueRef = useRef<() => void>(() => {});
@@ -636,14 +659,67 @@ export function useChatStream(options: UseChatStreamOptions) {
     stopSilenceTracking,
   ]);
 
-  const completeRunAndDrain = useCallback(() => {
+  const clearPendingPermission = useCallback(
+    (errorMessage?: string) => {
+      const pendingPermission = pendingPermissionRef.current;
+      pendingPermissionRef.current = null;
+      setPendingPermissionRequest(null);
+
+      if (!pendingPermission || !errorMessage) return;
+      const update = {
+        toolCallId: pendingPermission.toolCall.toolCallId,
+        toolCallStatus: "failed",
+        error: { message: errorMessage },
+      };
+      setMessages((prev) => {
+        if (
+          !prev.some((message) => hasToolCallId(message, update.toolCallId))
+        ) {
+          return prev;
+        }
+        const next = prev.map((message) =>
+          hasToolCallId(message, update.toolCallId)
+            ? { ...message, parts: updateToolPart(message.parts || [], update) }
+            : message,
+        );
+        // 计划审批卡可能已从当前流消息移入历史；取消、拒绝和超时
+        // 都必须立即把其终态写入持久化历史。
+        void persistMessages(
+          sessionId,
+          next.filter((message) => !message.queueStatus),
+        ).catch(() => {});
+        return next;
+      });
+    },
+    [sessionId, setMessages],
+  );
+
+  const completeRunAndDrain = useCallback((permissionError?: string) => {
+    clearPendingPermission(permissionError);
     activeRunRef.current = false;
     activeRunDedupeKeyRef.current = null;
     setIsStreaming(false);
     setTimeout(() => {
       drainQueueRef.current();
     }, 0);
-  }, [setIsStreaming]);
+  }, [clearPendingPermission, setIsStreaming]);
+
+  // 编辑页的状态探测会在 Agent 已不再处理时把受控 isStreaming 置为 false。
+  // 这必须同时结束 Hook 内部的运行锁，否则已展示的等待消息永远不会被 drain。
+  useEffect(() => {
+    const transitionedToStopped = previousIsStreamingRef.current && !isStreaming;
+    previousIsStreamingRef.current = isStreaming;
+    if (
+      !transitionedToStopped ||
+      !activeRunRef.current ||
+      pendingPermissionRef.current
+    ) {
+      return;
+    }
+
+    stopSilenceTracking();
+    completeRunAndDrain("AI 运行已结束，未收到完整的工具结果。");
+  }, [completeRunAndDrain, isStreaming, stopSilenceTracking]);
 
   const startMessageRun = useCallback(
     async (
@@ -877,6 +953,32 @@ export function useChatStream(options: UseChatStreamOptions) {
               ...prev,
               parts: updateToolPart(prev.parts || [], update),
             }));
+            // 权限请求会将当前消息归档并清空流消息。终态更新不能只
+            // 写入当前消息，必须按 toolCallId 找到已归档的那张工具卡。
+            setMessages((prev) => {
+              if (
+                !prev.some((message) =>
+                  hasToolCallId(message, update.toolCallId),
+                )
+              ) {
+                return prev;
+              }
+              const next = prev.map((message) =>
+                hasToolCallId(message, update.toolCallId)
+                  ? {
+                      ...message,
+                      parts: updateToolPart(message.parts || [], update),
+                    }
+                  : message,
+              );
+              if (isTerminalToolUpdateStatus(update.toolCallStatus)) {
+                void persistMessages(
+                  sessionId,
+                  next.filter((message) => !message.queueStatus),
+                ).catch(() => {});
+              }
+              return next;
+            });
             // 知识库文档创建后通知前端刷新
             const details = update.details as { knowledgeDocumentCreated?: boolean } | undefined;
             if (details?.knowledgeDocumentCreated) {
@@ -896,6 +998,9 @@ export function useChatStream(options: UseChatStreamOptions) {
 
           onPermission: (request) => {
             if (request.toolCall.approvalKind === "plan_approval") {
+              // 计划审批会有意隐藏流式状态；先写 ref，避免宿主状态同步 effect
+              // 把仍在等待用户选择的运行误判为终态。
+              pendingPermissionRef.current = request;
               stopSilenceTracking();
               const currentMsg = currentMessageRef.current;
               if (hasVisibleAssistantContent(currentMsg)) {
@@ -1097,7 +1202,7 @@ export function useChatStream(options: UseChatStreamOptions) {
                 errorMessage,
               ),
             ]);
-            completeRunAndDrain();
+            completeRunAndDrain(normalized.userMessage);
           },
 
           onError: (error) => {
@@ -1182,7 +1287,7 @@ export function useChatStream(options: UseChatStreamOptions) {
             setStreamContent("");
             setCurrentMessage(DEFAULT_CURRENT_MESSAGE);
             stopSilenceTracking();
-            completeRunAndDrain();
+            completeRunAndDrain(normalizedMessage);
             void persistMessages(
               sessionId,
               messagesRef.current.filter((m) => !m.queueStatus),
@@ -1501,7 +1606,7 @@ export function useChatStream(options: UseChatStreamOptions) {
         );
         streamServiceRef.current?.close();
         stopSilenceTracking();
-        setPendingPermissionRequest(null);
+        clearPendingPermission("用户已开始新的对话。");
         activeRunRef.current = false;
         activeRunDedupeKeyRef.current = null;
         setIsStreaming(false);
@@ -1580,6 +1685,7 @@ export function useChatStream(options: UseChatStreamOptions) {
     },
     [
       agentSessionId,
+      clearPendingPermission,
       pendingPermissionRequest,
       setIsStreaming,
       setMessages,
@@ -1616,6 +1722,7 @@ export function useChatStream(options: UseChatStreamOptions) {
           startSilenceTracking();
         }
       }
+      pendingPermissionRef.current = null;
       setPendingPermissionRequest(null);
     },
     [pendingPermissionRequest, setIsStreaming, startSilenceTracking],
@@ -1675,7 +1782,7 @@ export function useChatStream(options: UseChatStreamOptions) {
         content: "",
         parts: [],
       });
-      completeRunAndDrain();
+      completeRunAndDrain("用户已取消当前运行。");
       void persistMessages(
         sessionId,
         messagesRef.current.filter((m) => !m.queueStatus),

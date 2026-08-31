@@ -9,8 +9,8 @@
  *   PI_AGENT_PROVIDER       选填，默认 "anthropic"
  *   PI_AGENT_MODEL          选填，vision model ID（需要支持图片输入）
  *   PI_AGENT_BASE_URL       选填，自定义 API 基础地址（OpenAI 兼容格式）
- *   IMAGE_DESCRIPTION_MODEL 选填，优先使用的识图模型（格式 provider/modelId）
- *   IMAGE_DESCRIPTION_TIMEOUT 选填，单张超时毫秒，默认 15000
+ *   IMAGE_ALT_MODEL          选填，优先使用的图片替代文本模型（格式 provider/modelId）
+ *   IMAGE_ALT_TIMEOUT        选填，单张超时毫秒，默认 15000
  */
 
 import fs from "fs";
@@ -36,8 +36,8 @@ const PI_AGENT_API_KEY = process.env.PI_AGENT_API_KEY || "";
 const PI_AGENT_PROVIDER = process.env.PI_AGENT_PROVIDER || "anthropic";
 const PI_AGENT_MODEL = process.env.PI_AGENT_MODEL || "claude-sonnet-4-20250514";
 const PI_AGENT_BASE_URL = process.env.PI_AGENT_BASE_URL || "";
-const IMAGE_DESCRIPTION_MODEL = process.env.IMAGE_DESCRIPTION_MODEL || "";
-const TIMEOUT_MS = Number(process.env.IMAGE_DESCRIPTION_TIMEOUT) || 15000;
+const IMAGE_ALT_MODEL = process.env.IMAGE_ALT_MODEL || "";
+const TIMEOUT_MS = Number(process.env.IMAGE_ALT_TIMEOUT) || 15000;
 
 const MIME_TYPES = {
   ".png": "image/png",
@@ -55,8 +55,8 @@ const ALT_PROMPT = `简要描述这张图片的内容，用于网页无障碍 al
 - 如果图片包含文字，引用原文`;
 
 function resolveVisionModel() {
-  if (IMAGE_DESCRIPTION_MODEL) {
-    const parts = IMAGE_DESCRIPTION_MODEL.split("/");
+  if (IMAGE_ALT_MODEL) {
+    const parts = IMAGE_ALT_MODEL.split("/");
     if (parts.length === 2) {
       return { provider: parts[0], modelId: parts[1] };
     }
@@ -69,7 +69,7 @@ function resolveVisionModel() {
 }
 
 function resolveBaseUrl() {
-  if (IMAGE_DESCRIPTION_MODEL) {
+  if (IMAGE_ALT_MODEL) {
     return PI_AGENT_BASE_URL;
   }
   return PI_AGENT_BASE_URL;

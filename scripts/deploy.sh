@@ -29,6 +29,9 @@ REMOTE_IMAGE_DIR_BASE="${REMOTE_IMAGE_DIR_BASE:-/tmp/workbench-deploy-images}"
 REMOTE_BUILD_MIN_MEM_AVAILABLE_MB="${REMOTE_BUILD_MIN_MEM_AVAILABLE_MB:-3072}"
 REMOTE_BUILD_MAX_LOAD="${REMOTE_BUILD_MAX_LOAD:-4.0}"
 ALLOW_CREATE_APP_DATA_DIR="${ALLOW_CREATE_APP_DATA_DIR:-false}"
+# 测试机等无法直连外网的环境可为 BuildKit 显式传入代理；留空时不注入代理。
+DOCKER_BUILD_HTTP_PROXY="${DOCKER_BUILD_HTTP_PROXY:-}"
+DOCKER_BUILD_HTTPS_PROXY="${DOCKER_BUILD_HTTPS_PROXY:-}"
 
 # 颜色输出
 GREEN='\033[0;32m'
@@ -383,6 +386,7 @@ if [ "${DEPLOY_SYNC_MODE}" = "targeted" ]; then
                 add_required_package "preview-contract"
                 add_required_package "sketch-core"
                 add_required_package "shared"
+                add_required_package "whiteboard-core"
                 ;;
             author-site)
                 add_required_package "ai-chat-shared"
@@ -398,6 +402,7 @@ if [ "${DEPLOY_SYNC_MODE}" = "targeted" ]; then
                 add_required_package "sketch-core"
                 add_required_package "sketch-react"
                 add_required_package "shared"
+                add_required_package "whiteboard-core"
                 ;;
             screenshot-service)
                 add_required_package "screenshot-service"
@@ -628,25 +633,32 @@ fi
 
 if [ -f /proc/meminfo ]; then
     mem_available_mb=\$(awk '/MemAvailable/ { print int(\$2 / 1024); exit }' /proc/meminfo)
-    load1=\$(awk '{ print \$1 }' /proc/loadavg)
+    load_avg_1=\$(awk '{ print \$1 }' /proc/loadavg)
 else
     mem_available_mb=\$(sysctl -n hw.memsize 2>/dev/null | awk '{ print int(\$1 / 1024 / 1024); exit }' || echo 99999)
-    load1=\$(sysctl -n vm.loadavg 2>/dev/null | awk '{ print \$2 }' || echo 0)
+    load_avg_1=\$(sysctl -n vm.loadavg 2>/dev/null | awk '{ print \$2 }' || echo 0)
 fi
-echo "🧯 远程构建预检: MemAvailable=\${mem_available_mb}MB Load1=\${load1}"
+echo "🧯 远程构建预检: MemAvailable=\${mem_available_mb}MB Load1=\${load_avg_1}"
 if [ "\${mem_available_mb}" -lt '${REMOTE_BUILD_MIN_MEM_AVAILABLE_MB}' ]; then
     echo "❌ 远程可用内存不足，拒绝在正式机上构建。需要 >= ${REMOTE_BUILD_MIN_MEM_AVAILABLE_MB}MB。"
     echo "   推荐使用默认 DEPLOY_BUILD_MODE=local，或低峰期再显式 --remote-build。"
     exit 1
 fi
-if awk -v load="\${load1}" -v max='${REMOTE_BUILD_MAX_LOAD}' 'BEGIN { exit !(load > max) }'; then
-    echo "❌ 远程负载过高，拒绝在正式机上构建。当前 Load1=\${load1}，上限=${REMOTE_BUILD_MAX_LOAD}。"
+if awk -v load_avg="\${load_avg_1}" -v max='${REMOTE_BUILD_MAX_LOAD}' 'BEGIN { exit !(load_avg > max) }'; then
+    echo "❌ 远程负载过高，拒绝在正式机上构建。当前 Load1=\${load_avg_1}，上限=${REMOTE_BUILD_MAX_LOAD}。"
     echo "   推荐使用默认 DEPLOY_BUILD_MODE=local，或低峰期再显式 --remote-build。"
     exit 1
 fi
 
 export COMPOSE_PARALLEL_LIMIT='${COMPOSE_PARALLEL_LIMIT}'
 DEPLOY_SERVICES='${DEPLOY_SERVICES}'
+build_args=()
+if [ -n '${DOCKER_BUILD_HTTP_PROXY}' ]; then
+    build_args+=(--build-arg "HTTP_PROXY=${DOCKER_BUILD_HTTP_PROXY}")
+fi
+if [ -n '${DOCKER_BUILD_HTTPS_PROXY}' ]; then
+    build_args+=(--build-arg "HTTPS_PROXY=${DOCKER_BUILD_HTTPS_PROXY}")
+fi
 
 echo "📦 构建服务: \${DEPLOY_SERVICES}"
 echo "🧯 COMPOSE_PARALLEL_LIMIT=\${COMPOSE_PARALLEL_LIMIT}"
@@ -654,6 +666,7 @@ echo "🧯 COMPOSE_PARALLEL_LIMIT=\${COMPOSE_PARALLEL_LIMIT}"
 for service in \${DEPLOY_SERVICES}; do
     echo "📦 构建服务: \${service}"
     docker compose --env-file .env.docker build \\
+        "\${build_args[@]}" \\
         --build-arg GIT_COMMIT='${GIT_COMMIT}' \\
         --build-arg GIT_BRANCH='${GIT_BRANCH}' \\
         --build-arg BUILD_TIME='${BUILD_TIME}' \\

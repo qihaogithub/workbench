@@ -35,8 +35,8 @@ covers:
 
 # CLI 能力层实现设计
 
-> 更新日期：2026-07-21
-> 更新说明：v2.3 补齐远程鉴权、整项目同步、发布 dry-run 与安全维护命令。
+> 更新日期：2026-08-31
+> 更新说明：v2.4 统一 Bearer 远程鉴权，并收敛 workspace tree 页面真值与项目投影。
 
 ## 技术定位
 
@@ -88,11 +88,13 @@ CLI 命令按能力域分组：
 
 ## 远程鉴权与整项目同步
 
-CLI 把多远程配置和凭证保存在独立的用户级配置中，文件权限限制为当前用户可读写。环境变量仍可以临时覆盖远程和 token，便于 CI 使用；命令输出不返回 token 原文。登录由 author-site 会话接口返回可供 CLI 保存的 token 和到期时间，后续远程请求统一通过 Cookie 携带。
+CLI 把多远程配置和凭证保存在独立的用户级配置中，文件权限限制为当前用户可读写。环境变量仍可以临时覆盖远程和 token，便于 CI 使用；命令输出不返回 token 原文。登录由 author-site 会话接口返回可供 CLI 保存的 token 和到期时间，后续远程请求统一通过 `Authorization: Bearer <token>` 携带，不依赖目标环境的 Cookie 名称。author-site 仍兼容浏览器 Cookie；服务端在未找到配置 Cookie 时读取 Bearer Token，因此 `AUTH_COOKIE_NAME` 可以在不同部署间独立配置。
 
 `sync diff` 只比较本地与远程的文件清单、大小和内容哈希。`sync push` 先把本地项目目录打成 gzip 归档，再交给 author-site 导入；`sync pull` 从 author-site 下载同格式归档，再由 project-core 替换本地项目。归档层拒绝越界路径、项目 ID 不一致和超限请求；导入先备份旧项目，失败时恢复，成功后重置不可跨环境沿用的活跃工作区证明。
 
 author-site 的导出端点既能返回归档，也能返回用于 diff 的清单；导入端点仅接受已登录请求并对请求体设置大小上限。这两个端点只做 HTTP 适配，安全检查、备份和原子替换由 project-core 统一完成。
+
+项目页面与文件夹的 live 真值是 `workspace-tree.json`。`project.json` 中的 `demoPages` 和 `demoFolders` 只作为派生缓存：CLI 读取项目列表时由 project-core 优先从 workspace tree 重建，归档导入和后续项目写入也会刷新该投影。页面已经在 tree 中声明运行时类型时，只校验该运行时的入口文件；遗留的其他运行时文件不会再把有效页面从列表中隐藏。
 
 `doctor` 在本地检查之外执行短超时的远程可达性检查，并在存在凭证时验证会话。未配置远程仍是合法的纯本地模式；远程不可达、凭证失效或即将过期则通过结构化警告和下一步建议呈现。
 

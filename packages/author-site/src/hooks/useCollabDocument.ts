@@ -20,6 +20,10 @@ export interface CollabUser {
 export interface CollabDocumentState {
   value: string;
   status: CollabSyncStatus;
+  /** 当前 descriptor 最近一次完成 Yjs 同步的身份键。 */
+  syncedDescriptorKey: string;
+  /** 仅当 value 已由当前 descriptor 的 provider 同步后才为 true。 */
+  isSyncedForCurrentDescriptor: boolean;
   awareness: CollabPresence[];
   provider: HocuspocusProvider | null;
   ydoc: Y.Doc | null;
@@ -44,6 +48,21 @@ const USER_COLORS = [
   "#0891b2",
 ];
 const OFFLINE_STATUS_DELAY_MS = 5000;
+
+export function isCollabDocumentSyncedForDescriptor({
+  status,
+  descriptorKey,
+  syncedDescriptorKey,
+}: Pick<
+  CollabDocumentState,
+  "status" | "syncedDescriptorKey"
+> & { descriptorKey: string }): boolean {
+  return (
+    status === "synced" &&
+    descriptorKey.length > 0 &&
+    descriptorKey === syncedDescriptorKey
+  );
+}
 
 function pickColor(seed: string): string {
   let hash = 0;
@@ -122,6 +141,7 @@ export function useCollabDocument(
 ): CollabDocumentState {
   const [value, setValue] = useState("");
   const [status, setStatus] = useState<CollabSyncStatus>("offline");
+  const [syncedDescriptorKey, setSyncedDescriptorKey] = useState("");
   const [awareness, setAwareness] = useState<CollabPresence[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [provider, setProvider] = useState<HocuspocusProvider | null>(null);
@@ -185,6 +205,7 @@ export function useCollabDocument(
     if (!stableDescriptor) {
       clearOfflineStatusTimer();
       setStatus((current) => (current === "offline" ? current : "offline"));
+      setSyncedDescriptorKey((current) => (current === "" ? current : ""));
       setValue((current) => (current === "" ? current : ""));
       setAwareness((current) => (current.length === 0 ? current : []));
       setProvider((current) => (current === null ? current : null));
@@ -195,6 +216,7 @@ export function useCollabDocument(
 
     clearOfflineStatusTimer();
     setStatus((current) => (current === "connecting" ? current : "connecting"));
+    setSyncedDescriptorKey((current) => (current === "" ? current : ""));
     setError((current) => (current === null ? current : null));
 
     const doc = new Y.Doc();
@@ -295,12 +317,14 @@ export function useCollabDocument(
       },
     );
     nextProvider.on("synced", (event: { state: boolean }) => {
-      if (event.state) {
-        clearOfflineStatusTimer();
-        const nextValue = text.toString();
-        setValue((current) => (current === nextValue ? current : nextValue));
-        setStatus((current) => (current === "synced" ? current : "synced"));
-      }
+      if (!event.state || providerRef.current !== nextProvider) return;
+      clearOfflineStatusTimer();
+      const nextValue = text.toString();
+      setValue((current) => (current === nextValue ? current : nextValue));
+      setSyncedDescriptorKey((current) =>
+        current === descriptorKey ? current : descriptorKey,
+      );
+      setStatus((current) => (current === "synced" ? current : "synced"));
     });
     nextProvider.on("authenticationFailed", () => {
       clearOfflineStatusTimer();
@@ -322,6 +346,7 @@ export function useCollabDocument(
     collabUser.color,
     collabUser.userId,
     collabUser.username,
+    descriptorKey,
     stableDescriptor,
   ]);
 
@@ -361,6 +386,12 @@ export function useCollabDocument(
   return {
     value,
     status,
+    syncedDescriptorKey,
+    isSyncedForCurrentDescriptor: isCollabDocumentSyncedForDescriptor({
+      status,
+      descriptorKey,
+      syncedDescriptorKey,
+    }),
     awareness,
     provider,
     ydoc,

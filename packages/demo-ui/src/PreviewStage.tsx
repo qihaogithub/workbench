@@ -27,6 +27,7 @@ export function PreviewStage({
   canvasState,
   onCanvasStateChange,
   interactionMode,
+  singlePagePresentationOverride,
   singlePageProps,
   canvasProps,
   showToolbar = true,
@@ -44,11 +45,27 @@ export function PreviewStage({
     () => normalizePreviewStagePages(pages),
     [pages],
   );
+  const canvasPages = useMemo(
+    () =>
+      normalizedPages.map((page) =>
+        page.canvasPreviewSize
+          ? { ...page, previewSize: page.canvasPreviewSize }
+          : page,
+      ),
+    [normalizedPages],
+  );
   const orderedPages = useMemo(
     () => [...normalizedPages].sort((left, right) => left.order - right.order),
     [normalizedPages],
   );
   const activePage = normalizedPages.find((page) => page.id === activePageId);
+  const singlePage = useMemo(
+    () =>
+      activePage && singlePagePresentationOverride
+        ? { ...activePage, presentation: singlePagePresentationOverride }
+        : activePage,
+    [activePage, singlePagePresentationOverride],
+  );
   const [navigationActive, setNavigationActive] = useState(false);
 
   useEffect(() => {
@@ -137,13 +154,13 @@ export function PreviewStage({
     onCanvasStateChange({ ...canvasState, navigation: { hotspots, connections } });
   };
   const defaultSingleContent = (
-    <SinglePagePreview {...singlePageProps} page={activePage}
+    <SinglePagePreview {...singlePageProps} page={singlePage}
       onRequestPasteHtmlContent={
         canvasProps?.onRequestPasteHtmlContent ??
         singlePageProps?.onRequestPasteHtmlContent
       }
       navigationPages={normalizedPages}
-      navigationHotspots={activePage ? Object.values(canvasState.navigation?.hotspots ?? {}).filter((hotspot) => hotspot.pageId === activePage.id) : []}
+      navigationHotspots={singlePage ? Object.values(canvasState.navigation?.hotspots ?? {}).filter((hotspot) => hotspot.pageId === singlePage.id) : []}
       navigationConnections={Object.values(canvasState.navigation?.connections ?? {})}
       navigationEditable={interactionMode === "editor"}
       navigationActive={navigationActive}
@@ -156,9 +173,9 @@ export function PreviewStage({
     />
   );
   const customSingleContent = renderSingleContent?.({
-    activePage,
-    resolvedPreviewSize: activePage
-      ? resolvePreviewStageSize(activePage)
+    activePage: singlePage,
+    resolvedPreviewSize: singlePage
+      ? resolvePreviewStageSize(singlePage)
       : undefined,
     defaultContent: defaultSingleContent,
   });
@@ -217,7 +234,7 @@ export function PreviewStage({
           >
             <PreviewCanvas
               {...canvasProps}
-              pages={normalizedPages}
+              pages={canvasPages}
               canvasState={canvasState}
               onCanvasStateChange={onCanvasStateChange}
               interactionMode={interactionMode}

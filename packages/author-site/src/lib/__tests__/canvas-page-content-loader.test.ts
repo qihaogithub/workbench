@@ -37,6 +37,18 @@ describe("loadCanvasPageContent", () => {
               entries: [{ id: "color", title: "主色", markdown: "使用蓝色。" }],
             },
           ],
+          designSpecEntries: [
+            {
+              docId: "brand",
+              docTitle: "品牌规范",
+              entryId: "color",
+              entryTitle: "主色",
+              markdown: "使用蓝色。",
+              scope: "page",
+              pageId: "reference-page",
+              fieldKey: "cover",
+            },
+          ],
         },
       }),
     });
@@ -55,6 +67,7 @@ describe("loadCanvasPageContent", () => {
       projectConfigSchema: expect.stringContaining("brand"),
       requirements: "# 页面规范",
       designSpecs: [{ title: "品牌规范" }],
+      designSpecEntries: [{ fieldKey: "cover", pageId: "reference-page" }],
     });
 
     expect(request).toHaveBeenCalledWith(

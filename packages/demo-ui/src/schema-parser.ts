@@ -35,6 +35,8 @@ export interface FieldConfig {
   visibleWhen?: VisibleWhenCondition;
   note?: string;
   itemsType?: string;
+  itemsFormat?: string;
+  itemsUiWidget?: string;
   children?: FieldConfig[];
   oneOf?: OneOfConfig;
   multiple?: boolean;
@@ -194,6 +196,12 @@ function parseProperties(
       itemsType: (prop.items as Record<string, unknown>)?.type as
         | string
         | undefined,
+      itemsFormat: (prop.items as Record<string, unknown>)?.format as
+        | string
+        | undefined,
+      itemsUiWidget: (prop.items as Record<string, unknown>)?.["ui:widget"] as
+        | string
+        | undefined,
     };
 
     if (prop["ui:widget"] === "multiselect") {
@@ -349,6 +357,12 @@ title: typeof prop.title === "string" ? prop.title : formatFieldName(key),
                 | undefined
             : undefined,
           itemsType: (prop.items as Record<string, unknown>)?.type as
+            | string
+            | undefined,
+          itemsFormat: (prop.items as Record<string, unknown>)?.format as
+            | string
+            | undefined,
+          itemsUiWidget: (prop.items as Record<string, unknown>)?.["ui:widget"] as
             | string
             | undefined,
         };

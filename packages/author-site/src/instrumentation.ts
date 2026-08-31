@@ -14,7 +14,6 @@ export async function register() {
     const { cleanupOrphanWorkspaces } = await import('@/lib/workspace-manager');
     const { getProjectAdminService } = await import('@/lib/project-admin-service');
     const { scheduleStartupBackendProvidersSync } = await import('@/lib/backend-providers-sync');
-    const { scheduleStartupImageDescriptionSync } = await import('@/lib/image-description-sync');
     const { scheduleStartupImageGenSync } = await import('@/lib/image-gen-sync');
 
     // 启动时立即执行一次清理
@@ -36,7 +35,6 @@ export async function register() {
     }
 
     scheduleStartupBackendProvidersSync();
-    scheduleStartupImageDescriptionSync();
     scheduleStartupImageGenSync();
 
     // 每 30 分钟执行一次全局清理

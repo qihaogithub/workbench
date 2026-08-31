@@ -18,17 +18,17 @@ const section = {
 describe("CanvasSectionItem", () => {
   it("创建后可直接聚焦标题输入", () => {
     render(<CanvasSectionItem section={section} editable startEditing />);
-    expect(screen.getByRole("textbox", { name: "Section 标题" })).toHaveFocus();
+    expect(screen.getByRole("textbox", { name: "分组标题" })).toHaveFocus();
   });
 
   it("标题栏双击进入重命名，同时不影响标题栏拖拽入口", () => {
     const onRename = vi.fn();
     render(<CanvasSectionItem section={section} editable onRename={onRename} />);
     fireEvent.doubleClick(
-      screen.getByRole("button", { name: /选择 Section: 登录流程/ })
+      screen.getByRole("button", { name: /选择分组: 登录流程/ })
         .parentElement as HTMLElement,
     );
-    const input = screen.getByRole("textbox", { name: "Section 标题" });
+    const input = screen.getByRole("textbox", { name: "分组标题" });
     expect(input).toBeVisible();
     fireEvent.change(input, { target: { value: "新流程" } });
     fireEvent.keyDown(input, { key: "Enter" });
@@ -44,7 +44,7 @@ describe("CanvasSectionItem", () => {
       "[data-canvas-section-id]",
     ) as HTMLElement;
     expect(item).not.toHaveAttribute("data-canvas-section-collapsed");
-    expect(screen.getByRole("button", { name: /选择 Section: 登录流程/ })).toBeVisible();
+    expect(screen.getByRole("button", { name: /选择分组: 登录流程/ })).toBeVisible();
     expect(screen.queryByRole("button", { name: /折叠 Section|展开 Section/ })).toBeNull();
   });
 
@@ -59,15 +59,15 @@ describe("CanvasSectionItem", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "选择并移动 Section: 登录流程" }),
+      screen.getByRole("button", { name: "选择并移动分组: 登录流程" }),
     );
     expect(onSelect).toHaveBeenCalledWith("section_a");
-    expect(screen.getByRole("button", { name: /选择 Section: 登录流程/ })).toBeVisible();
+    expect(screen.getByRole("button", { name: /选择分组: 登录流程/ })).toBeVisible();
   });
 
   it("以更大的字号展示标题", () => {
     render(<CanvasSectionItem section={section} editable />);
-    expect(screen.getByRole("button", { name: /选择 Section: 登录流程/ }).parentElement).toHaveClass(
+    expect(screen.getByRole("button", { name: /选择分组: 登录流程/ }).parentElement).toHaveClass(
       "font-semibold",
     );
   });

@@ -1,5 +1,11 @@
 import type { ProjectAdminActor } from "@workbench/project-core";
-import { getAuthCookie, getAuthCookieName, verifyToken, type UserPayload } from "@/lib/auth/jwt";
+import {
+  extractBearerToken,
+  getAuthCookie,
+  getAuthCookieName,
+  verifyToken,
+  type UserPayload,
+} from "@/lib/auth/jwt";
 import { findUserById, type User } from "@/lib/user";
 
 export async function getCurrentUser(): Promise<User | null> {
@@ -10,13 +16,10 @@ export async function getCurrentUser(): Promise<User | null> {
 }
 
 export async function getCurrentUserFromRequest(request: Request): Promise<User | null> {
-  const authorization = request.headers.get("authorization");
-  let token = authorization?.startsWith("Bearer ") ? authorization.slice(7) : undefined;
-  if (!token) {
-    const cookie = request.headers.get("cookie") ?? "";
-    const cookieName = getAuthCookieName().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    token = cookie.match(new RegExp(`(?:^|;\\s*)${cookieName}=([^;]+)`))?.[1];
-  }
+  const cookie = request.headers.get("cookie") ?? "";
+  const cookieName = getAuthCookieName().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const cookieToken = cookie.match(new RegExp(`(?:^|;\\s*)${cookieName}=([^;]+)`))?.[1];
+  const token = cookieToken || extractBearerToken(request.headers.get("authorization"));
   if (!token) return null;
   const payload = await verifyToken(token);
   return payload ? findUserById(payload.userId) : null;

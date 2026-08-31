@@ -56,6 +56,7 @@ COPY packages/prototype-core/package.json ./packages/prototype-core/
 COPY packages/sketch-core/package.json ./packages/sketch-core/
 COPY packages/sketch-react/package.json ./packages/sketch-react/
 COPY packages/shared/package.json ./packages/shared/
+COPY packages/whiteboard-core/package.json ./packages/whiteboard-core/
 COPY packages/author-site/package.json ./packages/author-site/
 
 RUN --mount=type=cache,id=workbench-pnpm-store,target=/pnpm/store \
@@ -75,6 +76,7 @@ COPY packages/prototype-core/ ./packages/prototype-core/
 COPY packages/sketch-core/ ./packages/sketch-core/
 COPY packages/sketch-react/ ./packages/sketch-react/
 COPY packages/shared/ ./packages/shared/
+COPY packages/whiteboard-core/ ./packages/whiteboard-core/
 COPY packages/author-site/ ./packages/author-site/
 COPY scripts/ ./scripts/
 

@@ -18,6 +18,7 @@ export type AgentStatus =
   | "initializing"
   | "ready"
   | "processing"
+  | "awaiting_approval"
   | "cancelling"
   | "error"
   | "destroyed";

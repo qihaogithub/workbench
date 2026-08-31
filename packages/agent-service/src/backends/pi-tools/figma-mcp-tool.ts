@@ -68,7 +68,7 @@ export function createFigmaMcpTool(
     description:
       "Use the current user's Figma authorization with the official Figma MCP endpoint. If the deployment has no Figma MCP access, report the platform error.",
     parameters: FigmaMcpParams,
-    execute: async (toolCallId: string, args: FigmaMcpParams) => {
+    execute: async (toolCallId: string, args: FigmaMcpParams, signal?: AbortSignal) => {
       const figma = config.externalAuth?.figma;
       if (!figma?.enabled || !figma.accessToken) {
         const details = createAuthRequiredDetails("not_connected");
@@ -97,10 +97,15 @@ export function createFigmaMcpTool(
           };
         }
         if (WRITE_PATTERN.test(args.toolName)) {
-          const approved = await permissionHandler?.(toolCallId, {
+          const permissionRequest = {
             title: "确认执行 Figma 写操作",
             summary: `Figma MCP tool: ${args.toolName}`,
-          });
+          };
+          const approved = permissionHandler
+            ? signal
+              ? await permissionHandler(toolCallId, permissionRequest, signal)
+              : await permissionHandler(toolCallId, permissionRequest)
+            : undefined;
           if (!approved) {
             return {
               content: [{ type: "text", text: "用户已取消 Figma 写操作。" }],

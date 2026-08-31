@@ -573,6 +573,39 @@ describe("多 Demo 页面 — fs-utils", () => {
       expect(list.map((d) => d.id)).toEqual(["ok"]);
     });
 
+    it("按树中声明的运行时收录带遗留原型文件的高保真页面", () => {
+      const pageId = "clipboard-import_e05e9d";
+      fs.writeFileSync(
+        path.join(ws, "workspace-tree.json"),
+        JSON.stringify(
+          {
+            folders: [],
+            pages: [
+              {
+                id: pageId,
+                name: "剪贴板导入",
+                order: 0,
+                parentId: null,
+                runtimeType: "high-fidelity-react",
+              },
+            ],
+          },
+          null,
+          2,
+        ),
+        "utf-8",
+      );
+      const dir = path.join(ws, "demos", pageId);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, "index.tsx"), "// react", "utf-8");
+      fs.writeFileSync(path.join(dir, "prototype.html"), "<!-- legacy -->", "utf-8");
+      fs.writeFileSync(path.join(dir, "prototype.css"), "/* legacy */", "utf-8");
+      fs.writeFileSync(path.join(dir, "prototype.meta.json"), "{}", "utf-8");
+      fs.writeFileSync(path.join(dir, "config.schema.json"), "{}", "utf-8");
+
+      expect(listDemoPages(ws).map((page) => page.id)).toEqual([pageId]);
+    });
+
     it("workspace-tree.json 缺失但目录存在时从目录名提取可读名称", () => {
       createDemoNoMeta("product-detail_a3f2");
 
@@ -580,6 +613,14 @@ describe("多 Demo 页面 — fs-utils", () => {
       expect(list).toHaveLength(1);
       expect(list[0].id).toBe("product-detail_a3f2");
       expect(list[0].name).toBe("product detail");
+    });
+
+    it("workspace-tree.json 缺失时不会收录混合运行时目录", () => {
+      createDemoNoMeta("ambiguous-page");
+      const dir = path.join(ws, "demos", "ambiguous-page");
+      fs.writeFileSync(path.join(dir, "prototype.html"), "<!-- legacy -->", "utf-8");
+
+      expect(() => listDemoPages(ws)).toThrow("PAGE_RUNTIME_FILES_INVALID");
     });
   });
 });

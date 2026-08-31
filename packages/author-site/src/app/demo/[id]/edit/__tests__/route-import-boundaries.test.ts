@@ -25,9 +25,7 @@ describe("编辑路由导入边界", () => {
     expect(validator).toContain('from "@workbench/demo-ui/validator"');
     expect(validator).not.toContain('from "@workbench/demo-ui"');
 
-    expect(aiChatSetup).toContain(
-      'from "@workbench/ai-chat-shared/config"',
-    );
+    expect(aiChatSetup).toContain('from "@workbench/ai-chat-shared/config"');
     expect(aiChatSetup).not.toContain('from "@workbench/ai-chat-shared"');
 
     expect(knowledgeDialog).toContain(
@@ -36,14 +34,24 @@ describe("编辑路由导入边界", () => {
     expect(knowledgeDialog).not.toContain('from "@workbench/demo-ui"');
   });
 
-  it("评论启动链复用稳定的页面 target 并等待活动页就绪", () => {
+  it("评论启动链会在画布未选页时切换到项目级 target", () => {
     const page = readAuthorFile("src/app/demo/[id]/edit/page.tsx");
 
     expect(page).toMatch(
       /const activePageCommentTarget = useMemo<CommentTarget>\([\s\S]*?pageId: activeDemoId[\s\S]*?\[activeDemoId\][\s\S]*?\);/,
     );
     expect(page).toMatch(
-      /const commentsData = useComments\(\{[\s\S]*?target: activePageCommentTarget,[\s\S]*?enabled: Boolean\(activeDemoId\),[\s\S]*?\}\);/,
+      /const commentQueryTarget = useMemo<CommentTarget \| undefined>\(\(\) => \{[\s\S]*?previewMode === "canvas"[\s\S]*?canvasEditingPageId[\s\S]*?: undefined;[\s\S]*?return activePageCommentTarget;[\s\S]*?\}\);/,
+    );
+    expect(page).toMatch(
+      /const commentsData = useComments\(\{[\s\S]*?target: commentQueryTarget,[\s\S]*?enabled: Boolean\(activeDemoId\),[\s\S]*?\}\);/,
+    );
+    expect(page).toContain("filterPageCommentThreads(commentsData.threads)");
+    expect(page).toContain(
+      "<CommentUnreadDot count={unresolvedCommentCount} />",
+    );
+    expect(page).toMatch(
+      /onCanvasClick: \(\) => \{[\s\S]*?setCanvasEditingPageId\(null\);/,
     );
     expect(page).not.toContain(
       'target: { kind: "page", pageId: activeDemoId },',

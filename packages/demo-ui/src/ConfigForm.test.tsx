@@ -42,6 +42,45 @@ const imageSchema = JSON.stringify({
   },
 });
 
+const duplicatePositionArraySchema = JSON.stringify({
+  type: "object",
+  properties: {
+    blanks: {
+      type: "array",
+      title: "空",
+      items: {
+        type: "object",
+        properties: {
+          position: {
+            type: "position",
+            title: "位置",
+            key: "blank",
+            size: { width: 1920, height: 1080 },
+          },
+        },
+      },
+    },
+  },
+});
+
+const nestedImageArraySchema = JSON.stringify({
+  type: "object",
+  properties: {
+    blanks: {
+      type: "array",
+      title: "空",
+      default: [{ image: "/default-blank.png", gallery: ["/default-detail.png"] }],
+      items: {
+        type: "object",
+        properties: {
+          image: { type: "string", title: "图片", format: "image" },
+          gallery: { type: "array", title: "细节图", items: { type: "string", format: "image" } },
+        },
+      },
+    },
+  },
+});
+
 describe("ConfigForm configuration-definition entry", () => {
   it("有非空设计规范时标题仍编辑配置项，规范标签打开气泡", () => {
     const onOpenDesignSpec = vi.fn();
@@ -179,7 +218,7 @@ describe("ConfigForm configuration-definition entry", () => {
       fieldPath: "gallery",
       listItem: { index: 1, url: "/two.png" },
     });
-    expect(screen.getAllByRole("button", { name: "白板绘图" })).toHaveLength(4);
+    expect(screen.getAllByRole("button", { name: "白板绘图" })).toHaveLength(3);
     expect(screen.queryAllByRole("button", { name: "AI绘图" })).toHaveLength(0);
   });
 
@@ -195,5 +234,138 @@ describe("ConfigForm configuration-definition entry", () => {
     );
 
     expect(screen.queryAllByRole("button", { name: "白板绘图" })).toHaveLength(0);
+  });
+
+  it("将嵌套数组图片解析为当前索引的白板目标，并保留默认图删除保护", () => {
+    const onLaunchWhiteboard = vi.fn();
+    render(
+      <ConfigForm
+        schema={nestedImageArraySchema}
+        onChange={vi.fn()}
+        imageConfigScope="page"
+        pageId="page-1"
+        onLaunchWhiteboard={onLaunchWhiteboard}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "项目 1" }));
+    const whiteboardButtons = screen.getAllByRole("button", { name: "白板绘图" });
+    fireEvent.click(whiteboardButtons[0]);
+    expect(onLaunchWhiteboard).toHaveBeenLastCalledWith({
+      scope: "page",
+      pageId: "page-1",
+      fieldPath: "blanks[0].image",
+      currentValue: "/default-blank.png",
+    });
+    fireEvent.click(whiteboardButtons[1]);
+    expect(onLaunchWhiteboard).toHaveBeenLastCalledWith({
+      scope: "page",
+      pageId: "page-1",
+      fieldPath: "blanks[0].gallery",
+      listItem: { index: 0, url: "/default-detail.png" },
+    });
+    // The only delete affordance belongs to the multi-image item; the nested
+    // default single image remains protected.
+    expect(screen.getAllByRole("button", { name: "删除图片" })).toHaveLength(1);
+  });
+
+  it("重复 DOM key 的数组定位项只激活当前实例并回传稳定路径", () => {
+    const onEnterPositionEdit = vi.fn();
+    const onExitPositionEdit = vi.fn();
+    const { rerender } = render(
+      <ConfigForm
+        schema={duplicatePositionArraySchema}
+        initialData={{
+          blanks: [
+            { position: { x: 100, y: 200 } },
+            { position: { x: 300, y: 400 } },
+          ],
+        }}
+        onChange={vi.fn()}
+        onEnterPositionEdit={onEnterPositionEdit}
+        onExitPositionEdit={onExitPositionEdit}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "项目 1" }));
+    fireEvent.click(screen.getByRole("button", { name: "项目 2" }));
+    expect(screen.getAllByRole("button", { name: "拖动" })).toHaveLength(2);
+    const firstDragButton = screen.getAllByRole("button", { name: "拖动" })[0];
+    fireEvent.click(firstDragButton);
+
+    expect(onEnterPositionEdit).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        id: expect.stringContaining("blanks:blanks-sortable-"),
+        fieldPath: "blanks[0].position",
+        domKey: "blank",
+        position: { x: 100, y: 200 },
+      }),
+    );
+    const firstTarget = onEnterPositionEdit.mock.calls[0][0];
+    rerender(
+      <ConfigForm
+        schema={duplicatePositionArraySchema}
+        initialData={{
+          blanks: [
+            { position: { x: 100, y: 200 } },
+            { position: { x: 300, y: 400 } },
+          ],
+        }}
+        onChange={vi.fn()}
+        onEnterPositionEdit={onEnterPositionEdit}
+        onExitPositionEdit={onExitPositionEdit}
+        positionEditActiveId={firstTarget.id}
+      />,
+    );
+    expect(screen.getAllByRole("button", { name: "完成" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "拖动" })).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "拖动" }));
+    expect(onEnterPositionEdit).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        fieldPath: "blanks[1].position",
+        domKey: "blank",
+        position: { x: 300, y: 400 },
+      }),
+    );
+    const secondTarget = onEnterPositionEdit.mock.calls[1][0];
+    expect(firstTarget.id).not.toBe(secondTarget.id);
+    rerender(
+      <ConfigForm
+        schema={duplicatePositionArraySchema}
+        initialData={{
+          blanks: [
+            { position: { x: 100, y: 200 } },
+            { position: { x: 300, y: 400 } },
+          ],
+        }}
+        onChange={vi.fn()}
+        onEnterPositionEdit={onEnterPositionEdit}
+        onExitPositionEdit={onExitPositionEdit}
+        positionEditActiveId={secondTarget.id}
+      />,
+    );
+    expect(screen.getAllByRole("button", { name: "完成" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "拖动" })).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "完成" }));
+    expect(onExitPositionEdit).toHaveBeenCalledTimes(1);
+    rerender(
+      <ConfigForm
+        schema={duplicatePositionArraySchema}
+        initialData={{
+          blanks: [
+            { position: { x: 100, y: 200 } },
+            { position: { x: 300, y: 400 } },
+          ],
+        }}
+        onChange={vi.fn()}
+        onEnterPositionEdit={onEnterPositionEdit}
+        onExitPositionEdit={onExitPositionEdit}
+        positionEditActiveId={null}
+      />,
+    );
+    expect(screen.getAllByRole("button", { name: "拖动" })).toHaveLength(2);
+
   });
 });

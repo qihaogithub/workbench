@@ -33,6 +33,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { FieldRenderer } from "./FieldRenderer";
 import type { FieldConfig } from "./schema-parser";
+import type { ImageConfigScope, WhiteboardLauncher } from "./types";
 
 function createItemDefault(
   field: FieldConfig,
@@ -192,6 +193,11 @@ export interface ArrayFieldGroupProps {
   onChange: (value: Record<string, unknown>[]) => void;
   sessionId?: string;
   readonly?: boolean;
+  fieldPath?: string;
+  defaultValueOverride?: unknown;
+  imageConfigScope?: ImageConfigScope;
+  pageId?: string;
+  onLaunchWhiteboard?: WhiteboardLauncher;
 }
 
 function AddMenu({
@@ -296,6 +302,11 @@ export function ArrayFieldGroup({
   onChange,
   sessionId,
   readonly,
+  fieldPath,
+  defaultValueOverride,
+  imageConfigScope,
+  pageId,
+  onLaunchWhiteboard,
 }: ArrayFieldGroupProps) {
   const sortableIdSequenceRef = useRef(0);
   const createSortableId = useCallback(
@@ -454,9 +465,9 @@ export function ArrayFieldGroup({
                 const isOpen = openItems.has(index);
                 const sortableId = itemIds[index] ?? `${field.key}-pending-${index}`;
                 const visibleFields = getVisibleFields(item);
-                const discriminator = field.oneOf?.discriminator;
-                const itemType = discriminator ? String(item[discriminator] ?? "") : "";
-                const variantTypePrefix = itemType ? `[${itemType}]` : "";
+                const defaultItem = Array.isArray(defaultValueOverride)
+                  ? defaultValueOverride[index]
+                  : undefined;
 
                 return (
                   <ArrayItemHeader
@@ -493,7 +504,35 @@ export function ArrayFieldGroup({
                                 sessionId={sessionId}
                                 readonly={readonly}
                                 embedded
-                                fieldPath={`${field.key}[${index}]${variantTypePrefix}.${childField.key}`}
+                                fieldPath={`${fieldPath ?? field.key}[${index}].${childField.key}`}
+                                defaultValueOverride={
+                                  defaultItem && typeof defaultItem === "object" && !Array.isArray(defaultItem)
+                                    ? (defaultItem as Record<string, unknown>)[childField.key]
+                                    : undefined
+                                }
+                                imageConfigScope={imageConfigScope}
+                                pageId={pageId}
+                                onLaunchWhiteboard={onLaunchWhiteboard}
+                                positionInstanceId={
+                                  childField.positionable
+                                    ? `${field.key}:${sortableId}:${childField.key}`
+                                    : undefined
+                                }
+                                positionDomOccurrence={
+                                  childField.positionable
+                                    ? value
+                                        .slice(0, index)
+                                        .reduce((occurrence, previousItem) => {
+                                          const previousField = getVisibleFields(previousItem).find(
+                                            (candidate) =>
+                                              candidate.positionable &&
+                                              (candidate.positionable.key || candidate.key) ===
+                                                (childField.positionable?.key || childField.key),
+                                          );
+                                          return previousField ? occurrence + 1 : occurrence;
+                                        }, 0)
+                                    : undefined
+                                }
                               />
                             ))
                           )}

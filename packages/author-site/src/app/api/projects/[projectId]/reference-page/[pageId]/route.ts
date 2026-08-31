@@ -190,6 +190,22 @@ export async function GET(
     const designSpecs = listDesignSpecDocs(sourceWorkspacePath)
       .map((meta) => readDesignSpecDoc(sourceWorkspacePath, meta.id))
       .filter((doc): doc is NonNullable<typeof doc> => doc !== null);
+    const designSpecEntries = designSpecs.flatMap((doc) =>
+      doc.entries.flatMap((entry) =>
+        (entry.refs ?? [])
+          .filter((ref) => ref.scope === "project" || ref.pageId === sourcePageId)
+          .map((ref) => ({
+            docId: doc.id,
+            docTitle: doc.title,
+            entryId: entry.id,
+            entryTitle: entry.title,
+            markdown: entry.markdown ?? "",
+            scope: ref.scope,
+            ...(ref.scope === "page" ? { pageId } : {}),
+            fieldKey: ref.fieldKey,
+          })),
+      ),
+    );
 
     return NextResponse.json(
       createApiSuccess({
@@ -213,6 +229,7 @@ export async function GET(
         sketchMeta: readJsonIfExists(path.join(demoDir, "sketch.meta.json")),
         requirements: readFileIfExists(path.join(demoDir, "requirements.md")),
         designSpecs,
+        designSpecEntries,
       }),
     );
   } catch (error) {

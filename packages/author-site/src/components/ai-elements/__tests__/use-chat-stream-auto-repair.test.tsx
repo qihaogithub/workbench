@@ -8,6 +8,7 @@ import {
 } from "@workbench/ai-chat-shared/chat/services/message-service";
 
 const mockSendMessage = jest.fn();
+let mockHandlers: any;
 
 jest.mock("@workbench/ai-chat-shared/chat/services/message-service", () => ({
   persistMessages: jest.fn().mockResolvedValue(undefined),
@@ -32,6 +33,10 @@ jest.mock("@workbench/ai-chat-shared/chat/services/stream-service", () => {
           content?: string;
         }>;
       }) => Promise<void>;
+      onToolCall?: (toolCall: any) => void;
+      onToolUpdate?: (update: any) => void;
+      onPermission?: (request: any) => void;
+      onError?: (error: any) => void;
     } = {};
 
     connect = jest.fn().mockResolvedValue({});
@@ -39,11 +44,29 @@ jest.mock("@workbench/ai-chat-shared/chat/services/stream-service", () => {
     startKeepalive = jest.fn();
     stopKeepalive = jest.fn();
     close = jest.fn();
+    sendPermissionResponse = jest.fn();
     setHandlers = jest.fn((handlers) => {
       this.handlers = handlers;
+      mockHandlers = handlers;
     });
     sendMessage = mockSendMessage.mockImplementation(
       async (message: string) => {
+        if (message.includes("等待计划审批")) {
+          this.handlers.onToolCall?.({
+            toolCallId: "plan-call-1",
+            toolName: "requestPlanApproval",
+            status: "running",
+          });
+          this.handlers.onPermission?.({
+            sessionId: "session-1",
+            options: [],
+            toolCall: {
+              toolCallId: "plan-call-1",
+              approvalKind: "plan_approval",
+            },
+          });
+          return;
+        }
         const files = message.includes("触发文件回调异常")
           ? [
               {
@@ -70,6 +93,7 @@ jest.mock("@workbench/ai-chat-shared/chat/services/stream-service", () => {
 describe("useChatStream 自动修复发送", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockHandlers = undefined;
   });
 
   afterEach(() => {
@@ -149,6 +173,7 @@ describe("useChatStream 自动修复发送", () => {
         undefined,
         undefined,
         undefined,
+        { assistantMessageId: expect.any(String) },
       );
     });
   });
@@ -212,6 +237,7 @@ expect(mockSendMessage).toHaveBeenCalledWith(
         undefined,
         undefined,
         undefined,
+        { assistantMessageId: expect.any(String) },
       );
     });
 
@@ -303,6 +329,7 @@ expect(mockSendMessage).toHaveBeenCalledWith(
         undefined,
         undefined,
         undefined,
+        { assistantMessageId: expect.any(String) },
       );
       const secondCallContent = mockSendMessage.mock.calls[1]?.[0] as string;
       expect(secondCallContent).toContain("用户：第一条");
@@ -319,6 +346,159 @@ expect(mockSendMessage).toHaveBeenCalledWith(
     expect(messages.some((message) => message.queueStatus)).toBe(false);
 
     jest.useRealTimers();
+  });
+
+  it("计划审批超时会结束历史工具状态并释放后续发送", async () => {
+    let messages: ChatMessage[] = [];
+    const messagesRef = { current: messages };
+    const setMessages = (
+      updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
+    ) => {
+      messages = typeof updater === "function" ? updater(messages) : updater;
+      messagesRef.current = messages;
+    };
+    const currentMessageRef = {
+      current: { role: "assistant", content: "", parts: [] } as ChatMessage,
+    };
+    const setCurrentMessage = (
+      updater: ChatMessage | ((prev: ChatMessage) => ChatMessage),
+    ) => {
+      currentMessageRef.current =
+        typeof updater === "function"
+          ? updater(currentMessageRef.current)
+          : updater;
+    };
+
+    const { result } = renderHook(() =>
+      useChatStream({
+        sessionId: "session-1",
+        agentSessionId: "agent-session-1",
+        messagesRef,
+        setMessages,
+        setIsStreaming: jest.fn(),
+        setStreamContent: jest.fn(),
+        currentMessageRef,
+        setCurrentMessage,
+      }),
+    );
+
+    act(() => {
+      result.current.handleSend("等待计划审批");
+    });
+    await waitFor(() => expect(result.current.pendingPermissionRequest).not.toBeNull());
+
+    act(() => {
+      mockHandlers.onError({
+        code: "MESSAGE_TIMEOUT",
+        message: "AI 服务响应超时",
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.pendingPermissionRequest).toBeNull();
+      expect(messages[1]?.parts?.[0]).toMatchObject({
+        type: "tool",
+        toolCallId: "plan-call-1",
+        status: "error",
+      });
+    });
+    expect(persistMessages).toHaveBeenCalledWith(
+      "session-1",
+      expect.arrayContaining([
+        expect.objectContaining({
+          parts: [
+            expect.objectContaining({
+              toolCallId: "plan-call-1",
+              status: "error",
+            }),
+          ],
+        }),
+      ]),
+    );
+
+    act(() => {
+      result.current.handleSend("继续");
+    });
+    await waitFor(() => {
+      expect(
+        mockSendMessage.mock.calls.some((call) =>
+          String(call[0]).includes("继续"),
+        ),
+      ).toBe(true);
+    });
+  });
+
+  it("计划批准后将终态工具更新回写到历史卡片并持久化", async () => {
+    let messages: ChatMessage[] = [];
+    const messagesRef = { current: messages };
+    const setMessages = (
+      updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
+    ) => {
+      messages = typeof updater === "function" ? updater(messages) : updater;
+      messagesRef.current = messages;
+    };
+    const currentMessageRef = {
+      current: { role: "assistant", content: "", parts: [] } as ChatMessage,
+    };
+    const setCurrentMessage = (
+      updater: ChatMessage | ((prev: ChatMessage) => ChatMessage),
+    ) => {
+      currentMessageRef.current =
+        typeof updater === "function"
+          ? updater(currentMessageRef.current)
+          : updater;
+    };
+
+    const { result } = renderHook(() =>
+      useChatStream({
+        sessionId: "session-1",
+        agentSessionId: "agent-session-1",
+        messagesRef,
+        setMessages,
+        setIsStreaming: jest.fn(),
+        setStreamContent: jest.fn(),
+        currentMessageRef,
+        setCurrentMessage,
+      }),
+    );
+
+    act(() => {
+      result.current.handleSend("等待计划审批");
+    });
+    await waitFor(() => expect(result.current.pendingPermissionRequest).not.toBeNull());
+
+    act(() => {
+      result.current.handlePermissionResponse("approve_once");
+      mockHandlers.onToolUpdate({
+        toolCallId: "plan-call-1",
+        toolCallStatus: "completed",
+        result: { approved: true },
+      });
+    });
+
+    await waitFor(() => {
+      expect(messages[1]?.parts?.[0]).toMatchObject({
+        type: "tool",
+        toolCallId: "plan-call-1",
+        status: "completed",
+        result: { approved: true },
+      });
+    });
+    expect(currentMessageRef.current.parts).toEqual([]);
+    expect(persistMessages).toHaveBeenCalledWith(
+      "session-1",
+      expect.arrayContaining([
+        expect.objectContaining({
+          parts: [
+            expect.objectContaining({
+              toolCallId: "plan-call-1",
+              status: "completed",
+              result: { approved: true },
+            }),
+          ],
+        }),
+      ]),
+    );
   });
 
   it("AI 回复期间触发的系统自动任务会排队，避免并发发送到 Agent", async () => {
@@ -609,6 +789,7 @@ expect(mockSendMessage).toHaveBeenCalledWith(
         undefined,
         undefined,
         undefined,
+        { assistantMessageId: expect.any(String) },
       );
     });
   });

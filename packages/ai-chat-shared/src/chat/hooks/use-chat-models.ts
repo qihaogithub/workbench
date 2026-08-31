@@ -22,7 +22,6 @@ export interface ModelState {
   models: ResolvedModel[];
   canSwitch: boolean;
   isLoading: boolean;
-  imageDescriptionEnabled: boolean;
 }
 
 const INITIAL_MODEL_STATE: ModelState = {
@@ -31,7 +30,6 @@ const INITIAL_MODEL_STATE: ModelState = {
   models: [],
   canSwitch: false,
   isLoading: true,
-  imageDescriptionEnabled: false,
 };
 
 interface UseChatModelsOptions {
@@ -152,14 +150,11 @@ export function useChatModels(options: UseChatModelsOptions) {
   const resolveModels = useCallback(
     async (event: StreamEvent) => {
       if (mode === "viewer-readonly") {
-        return {
-          models: applyViewerModelConfigs(event.models || []),
-          imageDescriptionEnabled: true,
-        };
+        return applyViewerModelConfigs(event.models || []);
       }
       return event.models
         ? applyModelConfigsAsync(event.models)
-        : { models: [], imageDescriptionEnabled: false };
+        : [];
     },
     [mode],
   );
@@ -261,7 +256,7 @@ export function useChatModels(options: UseChatModelsOptions) {
 
       stream.on("models", async (event: StreamEvent) => {
         const result = await resolveModels(event);
-        const models = result.models;
+        const models = result;
         const resolved = resolveCurrentModel(
           event.currentModelId || "",
           models,
@@ -282,7 +277,6 @@ export function useChatModels(options: UseChatModelsOptions) {
           models: models.length > 0 ? models : prev.models,
           canSwitch: event.canSwitch ?? prev.canSwitch,
           isLoading: preferred?.isApplying ?? false,
-          imageDescriptionEnabled: result.imageDescriptionEnabled,
         }));
 
         if (models.length > 0) {
@@ -436,7 +430,7 @@ export function useChatModels(options: UseChatModelsOptions) {
 
   const handleModelsEvent = useCallback(async (event: StreamEvent) => {
     const result = await resolveModels(event);
-    const models = result.models;
+    const models = result;
     const resolved = resolveCurrentModel(event.currentModelId || "", models);
     const preferred = applyPreferredModelToSession(
       models,
@@ -453,7 +447,6 @@ export function useChatModels(options: UseChatModelsOptions) {
       models: models.length > 0 ? models : prev.models,
       canSwitch: event.canSwitch ?? prev.canSwitch,
       isLoading: preferred?.isApplying ?? false,
-      imageDescriptionEnabled: result.imageDescriptionEnabled,
     }));
   }, [applyPreferredModelToSession, resolveModels]);
 
@@ -468,9 +461,6 @@ export function useChatModels(options: UseChatModelsOptions) {
   const currentModel = modelState.models.find(
     (m) => m.id === modelState.currentModelId,
   );
-  const currentSupportsImages =
-    currentModel?.supportsImages === true ||
-    modelState.imageDescriptionEnabled;
   const currentAvailableDepths = currentModel?.supportsThinkingDepth
     ? currentModel.availableDepths
     : [];
@@ -478,7 +468,6 @@ export function useChatModels(options: UseChatModelsOptions) {
   return {
     modelState,
     setModelState,
-    currentSupportsImages,
     currentAvailableDepths,
     handleModelChange,
     handleDepthChange,

@@ -128,4 +128,49 @@ describe("project transfer", () => {
     expect(imported.publishedVersion).toBeUndefined();
     expect(typeof imported.updatedAt).toBe("number");
   });
+
+  it("导入时以 workspace-tree.json 重建 project.json 页面投影", async () => {
+    writeProject(sourceDir, "project-1");
+    const projectDir = path.join(sourceDir, "projects", "project-1");
+    const workspaceDir = path.join(projectDir, "workspace");
+    const pageIds = ["page-1", "page-2", "page-3"];
+    for (const pageId of pageIds.slice(1)) {
+      const pageDir = path.join(workspaceDir, "demos", pageId);
+      fs.mkdirSync(pageDir, { recursive: true });
+      fs.writeFileSync(path.join(pageDir, "index.tsx"), "// page", "utf-8");
+      fs.writeFileSync(path.join(pageDir, "config.schema.json"), "{}", "utf-8");
+    }
+    fs.writeFileSync(
+      path.join(workspaceDir, "workspace-tree.json"),
+      JSON.stringify({
+        folders: [],
+        pages: pageIds.map((id, order) => ({
+          id,
+          name: id,
+          order,
+          parentId: null,
+          runtimeType: "high-fidelity-react",
+        })),
+      }),
+      "utf-8",
+    );
+    const sourceMetaPath = path.join(projectDir, "project.json");
+    const sourceMeta = JSON.parse(fs.readFileSync(sourceMetaPath, "utf-8"));
+    sourceMeta.demoPages = [
+      { id: "page-1", name: "旧投影", order: 0, parentId: null },
+    ];
+    fs.writeFileSync(sourceMetaPath, JSON.stringify(sourceMeta), "utf-8");
+
+    const archive = await createProjectArchive(sourceDir, "project-1");
+    await importProjectArchive(targetDir, "project-1", archive);
+
+    const imported = JSON.parse(
+      fs.readFileSync(
+        path.join(targetDir, "projects", "project-1", "project.json"),
+        "utf-8",
+      ),
+    ) as { demoPages?: Array<{ id: string }>; demoFolders?: unknown[] };
+    expect(imported.demoPages?.map((page) => page.id)).toEqual(pageIds);
+    expect(imported.demoFolders).toEqual([]);
+  });
 });

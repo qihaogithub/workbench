@@ -10,6 +10,8 @@ import React, {
   useEffect,
 } from "react";
 import {
+  ArrowLeftRight,
+  ArrowUpDown,
   AlignCenterHorizontal,
   AlignCenterVertical,
   AlignEndHorizontal,
@@ -19,9 +21,13 @@ import {
   BetweenHorizontalStart,
   BetweenVerticalStart,
   Combine,
+  Copy,
   Maximize2,
   MessageSquarePlus,
+  MoreHorizontal,
+  RotateCcw,
   Trash2,
+  LayoutGrid,
 } from "lucide-react";
 import {
   Popover,
@@ -52,6 +58,7 @@ import { computePreviewRuntimePoolPlan } from "./preview-runtime-pool";
 import {
   computeFitCanvasViewport,
   computeInitialCanvasLayout,
+  getCanvasPreviewSizeKey,
   normalizeCanvasPageLayouts,
   resolveCanvasPageSize,
 } from "./canvas-layout";
@@ -158,6 +165,8 @@ type MultiPageAlignAction =
   | "bottom"
   | "distribute-x"
   | "distribute-y";
+
+type MultiPageArrangeAction = "horizontal" | "vertical";
 
 function remapNavigation(
   navigation: NonNullable<CanvasState["navigation"]> | undefined,
@@ -536,7 +545,7 @@ function CanvasPageGroupItem({
   );
 
   const cursor =
-    resizeEdge || hoveredEdge ? "nwse-resize" : editable ? "move" : undefined;
+    resizeEdge || hoveredEdge ? "nwse-resize" : editable ? "default" : undefined;
 
   return (
     <div
@@ -833,6 +842,13 @@ export function PreviewCanvas({
     sourceId: string;
     startLayout: CanvasPageLayout;
   } | null>(null);
+
+  // 项目切换后浏览器通常会把焦点留在 body，导致原生 paste 事件不会到达
+  // 画布根节点。编辑态进入画布时主动聚焦，输入控件和后续交互仍可自行接管焦点。
+  useEffect(() => {
+    if (!isEditorMode || documentDraft) return;
+    containerRef.current?.focus({ preventScroll: true });
+  }, [documentDraft, isEditorMode, projectId]);
 
   const canvasState = useMemo(
     () => normalizeCanvasStateLayers(externalState || internalState),
@@ -1617,6 +1633,18 @@ export function PreviewCanvas({
     ],
   );
 
+  const notifyPageConfigEdit = useCallback(
+    (pageId: string) => {
+      const configCount = pages.find((page) => page.id === pageId)?.configCount;
+      if (configCount === undefined) {
+        onPageConfigEdit?.(pageId);
+      } else {
+        onPageConfigEdit?.(pageId, { openConfigDetail: configCount > 0 });
+      }
+    },
+    [onPageConfigEdit, pages],
+  );
+
   const handlePageSelect = useCallback(
     (pageId: string, event?: React.PointerEvent | React.MouseEvent) => {
       if (isEditorMode && effectiveToolMode === "select") {
@@ -1638,14 +1666,120 @@ export function PreviewCanvas({
         }
         setSelectedPageGroupIds([]);
         setSelectedPageIds([pageId]);
-        onPageConfigEdit?.(pageId);
+        notifyPageConfigEdit(pageId);
         return;
       }
       if (!isEditorMode) {
-        onPageConfigEdit?.(pageId);
+        notifyPageConfigEdit(pageId);
       }
     },
-    [effectiveToolMode, isEditorMode, onPageConfigEdit],
+    [effectiveToolMode, isEditorMode, notifyPageConfigEdit],
+  );
+
+  const writeCanvasSelectionToClipboard = useCallback(
+    (options?: { pageIds?: string[] }) => {
+      const pageIdsToCopy = options?.pageIds ?? selectedPageIds;
+      const includeNonPageSelection = options?.pageIds === undefined;
+
+      const copiedNodeIds = new Set<string>();
+      const copiedSectionIds = new Set<string>();
+      const copiedSectionPageIds = new Set<string>();
+      const copiedSectionPageGroupIds = new Set<string>();
+      const collectSection = (sectionId: string) => {
+        if (copiedSectionIds.has(sectionId)) return;
+        const section = effectiveSections[sectionId];
+        if (!section) return;
+        copiedSectionIds.add(sectionId);
+        for (const child of section.children) {
+          if (child.kind === "section") collectSection(child.id);
+          if (child.kind === "page") copiedSectionPageIds.add(child.id);
+          if (child.kind === "page-group") copiedSectionPageGroupIds.add(child.id);
+          if (child.kind === "node") copiedNodeIds.add(child.id);
+        }
+      };
+
+      if (includeNonPageSelection) {
+        if (selectedSectionId) collectSection(selectedSectionId);
+        if (selectedDocumentNodeIds.length > 0) {
+          selectedDocumentNodeIds.forEach((id) => copiedNodeIds.add(id));
+        } else if (selectedNodeId) {
+          copiedNodeIds.add(selectedNodeId);
+        }
+      }
+
+      const copiedNodes: CanvasFreeNode[] = [];
+      copiedNodeIds.forEach((id) => {
+        const node = effectiveNodes[id];
+        if (node) copiedNodes.push(node);
+      });
+
+      const copiedPages: CanvasPageData[] = [];
+      const copiedPageLayouts: Record<string, CanvasPageLayout> = {};
+      new Set([...pageIdsToCopy, ...copiedSectionPageIds]).forEach((pageId) => {
+        const page = pagesById.get(pageId);
+        const layout = effectivePages[pageId];
+        if (page) copiedPages.push(page);
+        if (layout) copiedPageLayouts[pageId] = layout;
+      });
+
+      const copiedPageGroups: CanvasPageGroup[] = includeNonPageSelection
+        ? [...new Set([...selectedPageGroupIds, ...copiedSectionPageGroupIds])].flatMap((groupId) => {
+            const group = canvasState.pageGroups?.[groupId];
+            return group ? [group] : [];
+          })
+        : [];
+      const copiedSections = Array.from(copiedSectionIds)
+        .map((sectionId) => effectiveSections[sectionId])
+        .filter((section): section is CanvasSection => Boolean(section));
+      const copiedPageIds = new Set(copiedPages.map((page) => page.id));
+      const copiedHotspots = Object.fromEntries(
+        Object.entries(canvasState.navigation?.hotspots ?? {}).filter(
+          ([, hotspot]) => copiedPageIds.has(hotspot.pageId),
+        ),
+      );
+      const copiedNavigation = {
+        hotspots: copiedHotspots,
+        connections: Object.fromEntries(
+          Object.entries(canvasState.navigation?.connections ?? {}).filter(
+            ([, connection]) =>
+              copiedPageIds.has(connection.source.pageId) &&
+              copiedPageIds.has(connection.target.pageId) &&
+              Boolean(copiedHotspots[connection.source.hotspotId]),
+          ),
+        ),
+      };
+
+      writeCanvasClipboard({
+        version: 1,
+        copiedAt: Date.now(),
+        sourceProjectId: projectId,
+        sourceSessionId: sessionId,
+        nodes: copiedNodes,
+        pages: copiedPages,
+        pageLayouts: copiedPageLayouts,
+        pageGroups: copiedPageGroups,
+        sections: copiedSections,
+        ...(Object.keys(copiedHotspots).length > 0
+          ? { navigation: copiedNavigation }
+          : {}),
+        bounds: computeBounds(copiedPageLayouts, copiedNodes, copiedSections),
+      });
+    },
+    [
+      canvasState.navigation,
+      canvasState.pageGroups,
+      effectiveNodes,
+      effectivePages,
+      effectiveSections,
+      pagesById,
+      projectId,
+      selectedDocumentNodeIds,
+      selectedNodeId,
+      selectedPageGroupIds,
+      selectedPageIds,
+      selectedSectionId,
+      sessionId,
+    ],
   );
 
   // 粘贴选择器回调
@@ -1907,6 +2041,85 @@ export function PreviewCanvas({
     [selectedPageBounds, selectedPageLikeLayoutEntries, updateState],
   );
 
+  const handleGroupSelectedPages = useCallback(() => {
+    if (selectedPageLikeLayoutEntries.length < 2 || !selectedPageBounds) return;
+    const padding = 24;
+    const titleSpace = 28;
+    const id = `section_${crypto.randomUUID()}`;
+    const section = createCanvasSection({
+      id,
+      title: "分组",
+      layout: {
+        x: selectedPageBounds.x - padding,
+        y: selectedPageBounds.y - padding - titleSpace,
+        width: selectedPageBounds.width + padding * 2,
+        height: selectedPageBounds.height + padding * 2 + titleSpace,
+        zIndex: Math.max(
+          0,
+          ...Object.values(allItemLayouts).map((layout) => layout.zIndex ?? 0),
+        ) + 1,
+      },
+    });
+    updateState((prev) => {
+      let next: CanvasState = {
+        ...prev,
+        sections: { ...(prev.sections ?? {}), [id]: section },
+      };
+      for (const entry of selectedPageLikeLayoutEntries) {
+        next = assignCanvasObjectToSection(next, entry, entry.layout);
+      }
+      return next;
+    });
+    setSelectedPageIds([]);
+    setSelectedPageGroupIds([]);
+    setSelectedSectionId(id);
+    setTitleEditingSectionId(id);
+    setToolMode("select");
+  }, [allItemLayouts, selectedPageBounds, selectedPageLikeLayoutEntries, updateState]);
+
+  const updateArrangedPageLayouts = useCallback(
+    (action: MultiPageArrangeAction) => {
+      if (selectedPageLikeLayoutEntries.length < 2 || !selectedPageBounds) return;
+
+      updateState((prev) => {
+        const entries = [...selectedPageLikeLayoutEntries].sort((a, b) => {
+          const primary = action === "horizontal" ? a.layout.x - b.layout.x : a.layout.y - b.layout.y;
+          if (primary !== 0) return primary;
+          return a.id.localeCompare(b.id);
+        });
+        const totalSize = entries.reduce(
+          (sum, entry) => sum + (action === "horizontal" ? entry.layout.width : entry.layout.height),
+          0,
+        );
+        const availableSize = action === "horizontal" ? selectedPageBounds.width : selectedPageBounds.height;
+        const gap = (availableSize - totalSize) / (entries.length - 1);
+        const nextPages = { ...prev.pages };
+        const nextPageGroups = { ...(prev.pageGroups ?? {}) };
+        let cursor = action === "horizontal" ? selectedPageBounds.x : selectedPageBounds.y;
+
+        for (const entry of entries) {
+          const size = action === "horizontal" ? entry.layout.width : entry.layout.height;
+          const nextLayout = {
+            ...entry.layout,
+            ...(action === "horizontal" ? { x: cursor } : { y: cursor }),
+          };
+          if (entry.kind === "page") {
+            nextPages[entry.id] = nextLayout;
+          } else if (nextPageGroups[entry.id]) {
+            nextPageGroups[entry.id] = {
+              ...nextPageGroups[entry.id],
+              layout: nextLayout,
+              updatedAt: Date.now(),
+            };
+          }
+          cursor += size + gap;
+        }
+        return { ...prev, pages: nextPages, pageGroups: nextPageGroups };
+      });
+    },
+    [selectedPageBounds, selectedPageLikeLayoutEntries, updateState],
+  );
+
   const handleNodeLayoutChange = useCallback(
     (nodeId: string, layout: CanvasPageLayout) => {
       updateState((prev) => {
@@ -1965,9 +2178,9 @@ export function PreviewCanvas({
       setSelectedPageIds([]);
       setSelectedPageGroupIds([groupId]);
       setSelectedSectionId(null);
-      onPageConfigEdit?.(activePageId);
+      notifyPageConfigEdit(activePageId);
     },
-    [onPageConfigEdit],
+    [notifyPageConfigEdit],
   );
 
   const handlePageGroupActivePageChange = useCallback(
@@ -2323,93 +2536,7 @@ export function PreviewCanvas({
       if (isEditableTarget(event.target)) return;
       event.preventDefault();
 
-      // 收集选中的自由节点
-      const copiedNodeIds = new Set<string>();
-      const copiedSectionIds = new Set<string>();
-      const copiedSectionPageIds = new Set<string>();
-      const collectSection = (sectionId: string) => {
-        if (copiedSectionIds.has(sectionId)) return;
-        const section = effectiveSections[sectionId];
-        if (!section) return;
-        copiedSectionIds.add(sectionId);
-        for (const child of section.children) {
-          if (child.kind === "section") collectSection(child.id);
-          if (child.kind === "page") copiedSectionPageIds.add(child.id);
-          if (child.kind === "node") copiedNodeIds.add(child.id);
-        }
-      };
-      if (selectedSectionId) collectSection(selectedSectionId);
-      if (selectedDocumentNodeIds.length > 0) {
-        selectedDocumentNodeIds.forEach((id) => copiedNodeIds.add(id));
-      } else if (selectedNodeId) {
-        copiedNodeIds.add(selectedNodeId);
-      }
-      const copiedNodes: CanvasFreeNode[] = [];
-      copiedNodeIds.forEach((id) => {
-        const node = effectiveNodes[id];
-        if (node) copiedNodes.push(node);
-      });
-
-      // 收集选中的页面及布局
-      const copiedPages: CanvasPageData[] = [];
-      const copiedPageLayouts: Record<string, CanvasPageLayout> = {};
-      new Set([...selectedPageIds, ...copiedSectionPageIds]).forEach(
-        (pageId) => {
-          const page = pagesById.get(pageId);
-          const layout = effectivePages[pageId];
-          if (page) copiedPages.push(page);
-          if (layout) copiedPageLayouts[pageId] = layout;
-        },
-      );
-
-      // 收集选中的页面组
-      const copiedPageGroups: CanvasPageGroup[] = [];
-      selectedPageGroupIds.forEach((groupId) => {
-        const group = canvasState.pageGroups?.[groupId];
-        if (group) copiedPageGroups.push(group);
-      });
-      const copiedSections = Array.from(copiedSectionIds)
-        .map((sectionId) => effectiveSections[sectionId])
-        .filter((section): section is CanvasSection => Boolean(section));
-      const copiedPageIds = new Set(copiedPages.map((page) => page.id));
-      const copiedHotspots = Object.fromEntries(
-        Object.entries(canvasState.navigation?.hotspots ?? {}).filter(
-          ([, hotspot]) => copiedPageIds.has(hotspot.pageId),
-        ),
-      );
-      const copiedNavigation = {
-        hotspots: copiedHotspots,
-        connections: Object.fromEntries(
-          Object.entries(canvasState.navigation?.connections ?? {}).filter(
-            ([, connection]) =>
-              copiedPageIds.has(connection.source.pageId) &&
-              copiedPageIds.has(connection.target.pageId) &&
-              Boolean(copiedHotspots[connection.source.hotspotId]),
-          ),
-        ),
-      };
-
-      const bounds = computeBounds(
-        copiedPageLayouts,
-        copiedNodes,
-        copiedSections,
-      );
-
-      writeCanvasClipboard({
-        version: 1,
-        copiedAt: Date.now(),
-        sourceProjectId: projectId,
-        sourceSessionId: sessionId,
-        nodes: copiedNodes,
-        pages: copiedPages,
-        pageLayouts: copiedPageLayouts,
-        pageGroups: copiedPageGroups,
-        sections: copiedSections,
-        ...(Object.keys(copiedHotspots).length > 0
-          ? { navigation: copiedNavigation }
-          : {}),
-        bounds,
-      });
+      writeCanvasSelectionToClipboard();
     };
 
     window.addEventListener("keydown", handleCopy);
@@ -2417,19 +2544,7 @@ export function PreviewCanvas({
   }, [
     isEditorMode,
     documentDraft,
-    selectedNodeId,
-    selectedDocumentNodeIds,
-    selectedPageIds,
-    selectedPageGroupIds,
-    selectedSectionId,
-    effectiveNodes,
-    effectiveSections,
-    effectivePages,
-    pagesById,
-    canvasState.pageGroups,
-    canvasState.navigation,
-    projectId,
-    sessionId,
+    writeCanvasSelectionToClipboard,
   ]);
 
   // 内部画布剪贴板只能在原生 paste 事件中处理。这样系统 HTML/文件
@@ -3143,6 +3258,12 @@ export function PreviewCanvas({
       const layouts = {
         ...arranged.pages,
         ...Object.fromEntries(
+          Object.entries(arranged.pageGroups ?? {}).map(([id, group]) => [
+            id,
+            group.layout,
+          ]),
+        ),
+        ...Object.fromEntries(
           Object.entries(arranged.nodes ?? {}).map(([id, node]) => [
             id,
             node.layout,
@@ -3164,6 +3285,7 @@ export function PreviewCanvas({
         {
           ...prev,
           pages: arranged.pages,
+          pageGroups: arranged.pageGroups,
           sections: arranged.sections,
           viewport,
         },
@@ -3243,6 +3365,28 @@ export function PreviewCanvas({
     selectedPageIds,
     updateState,
   ]);
+
+  const handleResetSelectedPages = useCallback(() => {
+    if (selectedPageIds.length === 0) return;
+    updateState((prev) => {
+      const nextPages = { ...prev.pages };
+      for (const pageId of selectedPageIds) {
+        const page = pagesById.get(pageId);
+        const layout = prev.pages[pageId];
+        if (!page || !layout) continue;
+        const width = Number(page.previewSize?.width) || 375;
+        const height = Number(page.previewSize?.height) || 812;
+        nextPages[pageId] = {
+          ...layout,
+          width,
+          height,
+          sizeMode: "preview",
+          previewSizeKey: getCanvasPreviewSizeKey(page.previewSize),
+        };
+      }
+      return { ...prev, pages: nextPages };
+    });
+  }, [pagesById, selectedPageIds, updateState]);
 
   const getDocumentTitleFromMarkdown = useCallback(
     (markdown: string, fallback = "文档") => {
@@ -3914,7 +4058,7 @@ export function PreviewCanvas({
       key={action}
       type="button"
       className={cn(
-        "flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40",
+        "flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40",
       )}
       aria-label={label}
       title={label}
@@ -4057,7 +4201,7 @@ export function PreviewCanvas({
           aria-label={
             selectedPageLikeCount > 1 ? "多选对齐工具栏" : "单选页面工具栏"
           }
-          className="absolute z-30 flex items-center gap-1 rounded-lg border bg-background/90 p-1 shadow-lg backdrop-blur"
+          className="absolute z-30 flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap rounded-lg border bg-background/90 p-1 shadow-lg backdrop-blur"
           style={selectionToolbarStyle}
         >
           {selectedPageLikeCount === 1 && (
@@ -4066,91 +4210,145 @@ export function PreviewCanvas({
             </span>
           )}
           {selectedPageLikeCount >= 2 && (
-            <>
-              {renderAlignmentButton(
-                "left",
-                "左对齐",
-                <AlignStartVertical className="h-4 w-4" />,
-              )}
-              {renderAlignmentButton(
-                "center-x",
-                "水平居中对齐",
-                <AlignCenterVertical className="h-4 w-4" />,
-              )}
-              {renderAlignmentButton(
-                "right",
-                "右对齐",
-                <AlignEndVertical className="h-4 w-4" />,
-              )}
-              <div className="mx-1 h-5 w-px bg-border" />
-              {renderAlignmentButton(
-                "top",
-                "顶部对齐",
-                <AlignStartHorizontal className="h-4 w-4" />,
-              )}
-              {renderAlignmentButton(
-                "center-y",
-                "垂直居中对齐",
-                <AlignCenterHorizontal className="h-4 w-4" />,
-              )}
-              {renderAlignmentButton(
-                "bottom",
-                "底部对齐",
-                <AlignEndHorizontal className="h-4 w-4" />,
-              )}
-              <div className="mx-1 h-5 w-px bg-border" />
-              {renderAlignmentButton(
-                "distribute-x",
-                "水平均分",
-                <BetweenVerticalStart className="h-4 w-4" />,
-                selectedPageLikeCount < 3,
-              )}
-              {renderAlignmentButton(
-                "distribute-y",
-                "垂直均分",
-                <BetweenHorizontalStart className="h-4 w-4" />,
-                selectedPageLikeCount < 3,
-              )}
-            </>
-          )}
-          {selectedPageIds.length >= 2 && selectedPageGroupIds.length === 0 && (
-            <>
-              <div className="mx-1 h-5 w-px bg-border" />
-              <button
-                type="button"
-                className="flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                onClick={handleMergeSelectedPages}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="对齐"
+                  className="flex h-8 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <AlignCenterHorizontal className="h-4 w-4" />
+                  对齐
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                side="top"
+                align="start"
+                sideOffset={8}
+                className="w-52 p-2.5"
               >
-                <Combine className="h-4 w-4" />
-                合并页面
-              </button>
-            </>
+                <div className="space-y-2">
+                  <div>
+                    <div className="mb-1 px-1 text-[11px] font-medium text-muted-foreground">
+                      水平对齐
+                    </div>
+                    <div className="grid grid-cols-3 gap-1">
+                      {renderAlignmentButton("left", "左对齐", <AlignStartVertical className="h-4 w-4" />)}
+                      {renderAlignmentButton("center-x", "水平居中对齐", <AlignCenterVertical className="h-4 w-4" />)}
+                      {renderAlignmentButton("right", "右对齐", <AlignEndVertical className="h-4 w-4" />)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="mb-1 px-1 text-[11px] font-medium text-muted-foreground">
+                      垂直对齐
+                    </div>
+                    <div className="grid grid-cols-3 gap-1">
+                      {renderAlignmentButton("top", "顶部对齐", <AlignStartHorizontal className="h-4 w-4" />)}
+                      {renderAlignmentButton("center-y", "垂直居中对齐", <AlignCenterHorizontal className="h-4 w-4" />)}
+                      {renderAlignmentButton("bottom", "底部对齐", <AlignEndHorizontal className="h-4 w-4" />)}
+                    </div>
+                  </div>
+                  <div className="border-t pt-2">
+                    <div className="mb-1 px-1 text-[11px] font-medium text-muted-foreground">
+                      分布
+                    </div>
+                    <div className="grid grid-cols-2 gap-1">
+                      {renderAlignmentButton("distribute-x", "水平均分", <BetweenVerticalStart className="h-4 w-4" />, selectedPageLikeCount < 3)}
+                      {renderAlignmentButton("distribute-y", "垂直均分", <BetweenHorizontalStart className="h-4 w-4" />, selectedPageLikeCount < 3)}
+                    </div>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+          {selectedPageLikeCount >= 2 && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="排列"
+                  className="flex h-8 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <ArrowLeftRight className="h-4 w-4" />
+                  排列
+                </button>
+              </PopoverTrigger>
+              <PopoverContent side="top" align="start" sideOffset={8} className="w-44 p-1">
+                <button type="button" className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => updateArrangedPageLayouts("horizontal")}>
+                  <ArrowLeftRight className="h-4 w-4" />
+                  横向排列
+                </button>
+                <button type="button" className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => updateArrangedPageLayouts("vertical")}>
+                  <ArrowUpDown className="h-4 w-4" />
+                  竖向排列
+                </button>
+                <button type="button" className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-muted" onClick={handleAutoLayout}>
+                  <LayoutGrid className="h-4 w-4" />
+                  自动排列
+                </button>
+              </PopoverContent>
+            </Popover>
+          )}
+          {selectedPageLikeCount >= 2 && (
+            <button
+              type="button"
+              aria-label="编组"
+              title="编组"
+              className="flex h-8 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={handleGroupSelectedPages}
+            >
+              <Combine className="h-4 w-4" />
+              编组
+            </button>
           )}
           {onAddPagesToChat && selectedPageIds.length > 0 && (
             <>
-              <div className="mx-1 h-5 w-px bg-border" />
               <button
                 type="button"
-                className="flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex h-8 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 onClick={() => onAddPagesToChat(selectedPageIds)}
               >
                 <MessageSquarePlus className="h-4 w-4" />
                 添加到对话
               </button>
+              <div className="mx-1 h-5 w-px bg-border" />
             </>
           )}
-          {onRequestDeletePages && selectedPageIds.length > 0 && (
-            <>
-              <div className="mx-1 h-5 w-px bg-border" />
-              <button
-                type="button"
-                className="flex h-8 w-8 items-center justify-center rounded-md text-destructive transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                title="删除页面"
-                onClick={() => void onRequestDeletePages(selectedPageIds)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </>
+          {selectedPageIds.length > 0 && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="更多"
+                  title="更多"
+                  className="flex h-8 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent side="top" align="end" sideOffset={8} className="w-44 p-1">
+                {selectedPageIds.length >= 2 && selectedPageGroupIds.length === 0 && (
+                  <button type="button" className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-muted" onClick={handleMergeSelectedPages}>
+                    <Combine className="h-4 w-4" />
+                    合并页面
+                  </button>
+                )}
+                <button type="button" className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-muted" onClick={handleResetSelectedPages}>
+                  <RotateCcw className="h-4 w-4" />
+                  重置大小
+                </button>
+                <button type="button" className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => writeCanvasSelectionToClipboard()}>
+                  <Copy className="h-4 w-4" />
+                  复制
+                </button>
+                {onRequestDeletePages && (
+                  <button type="button" className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-destructive hover:bg-destructive/10" onClick={() => void onRequestDeletePages(selectedPageIds)}>
+                    <Trash2 className="h-4 w-4" />
+                    删除
+                  </button>
+                )}
+              </PopoverContent>
+            </Popover>
           )}
         </div>
       )}
@@ -4177,7 +4375,7 @@ export function PreviewCanvas({
         <TooltipProvider delayDuration={250}>
           <div
             role="toolbar"
-            aria-label="Section 操作"
+            aria-label="分组操作"
             className="absolute z-30 flex w-max max-w-[calc(100vw-1rem)] items-center gap-1 overflow-x-auto whitespace-nowrap rounded-lg border bg-background/95 p-1 shadow-lg backdrop-blur"
             style={selectedSectionToolbarStyle}
           >
@@ -4187,7 +4385,7 @@ export function PreviewCanvas({
                   <PopoverTrigger asChild>
                     <button
                       type="button"
-                      aria-label="Section 颜色与透明度"
+                      aria-label="分组颜色与透明度"
                       className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md p-1 transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       style={{
                         backgroundColor:
@@ -4208,7 +4406,7 @@ export function PreviewCanvas({
                   颜色
                   <input
                     type="color"
-                    aria-label="Section 颜色"
+                    aria-label="分组颜色"
                     value={selectedSection.style?.color ?? "#94a3b8"}
                     className="h-9 w-12 cursor-pointer rounded border border-input bg-transparent p-0.5"
                     onChange={(event) =>
@@ -4229,7 +4427,7 @@ export function PreviewCanvas({
                     min="0"
                     max="100"
                     step="5"
-                    aria-label="Section 填充透明度"
+                    aria-label="分组填充透明度"
                     value={selectedSection.style?.fillOpacity ?? 12}
                     onChange={(event) =>
                       handleSectionStyleChange(selectedSection.id, {
@@ -4438,6 +4636,17 @@ export function PreviewCanvas({
                     ? (pageId) => void onRequestDeletePages([pageId])
                     : undefined
                 }
+                onContextMenuOpen={(pageId) => {
+                  if (selectedPageIds.includes(pageId)) return;
+                  handlePageSelect(pageId);
+                }}
+                onCopy={(pageId) => {
+                  writeCanvasSelectionToClipboard({
+                    pageIds: selectedPageIds.includes(pageId)
+                      ? selectedPageIds
+                      : [pageId],
+                  });
+                }}
                 onViewSource={onViewSource}
                 brokenReference={
                   page.isReference &&

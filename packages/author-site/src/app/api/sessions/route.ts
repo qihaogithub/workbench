@@ -84,10 +84,7 @@ async function pushUserModelConfig(userId: string, sessionId: string): Promise<v
     );
     if (!config) return;
 
-    const result = await pushSessionModelConfigToAgent(sessionId, {
-      ...config,
-      multimodalModels: globalConfig.multimodalModels,
-    });
+    const result = await pushSessionModelConfigToAgent(sessionId, config);
     if (!result.ok) {
       console.warn("[sessions] Failed to push user model config:", result.message);
     }

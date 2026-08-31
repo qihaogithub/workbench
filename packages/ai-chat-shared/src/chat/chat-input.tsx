@@ -110,12 +110,10 @@ async function uploadFileAttachment(
 }
 
 function PromptInputAddMenu({
-  supportsImages,
   supportsFiles,
   hasProjects,
   onOpenProjectPicker,
 }: {
-  supportsImages: boolean;
   supportsFiles: boolean;
   hasProjects: boolean;
   onOpenProjectPicker: () => void;
@@ -134,7 +132,7 @@ function PromptInputAddMenu({
     setOpen(false);
   };
 
-  if (!supportsImages && !supportsFiles && !hasProjects) return null;
+  if (!supportsFiles && !hasProjects) return null;
 
   return (
     <>
@@ -152,16 +150,14 @@ function PromptInputAddMenu({
           </Button>
         </PopoverTrigger>
         <PopoverContent side="top" className="w-40">
-          {supportsImages && (
-            <button
+          <button
               type="button"
               className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               onClick={() => imageInputRef.current?.click()}
             >
               <Image className="h-4 w-4" />
               添加图片
-            </button>
-          )}
+          </button>
           {supportsFiles && (
             <button
               type="button"
@@ -309,10 +305,8 @@ interface ChatInputProps {
   models: ResolvedModel[];
   canSwitch: boolean;
   isModelLoading: boolean;
-  supportsImages?: boolean;
   supportsFiles?: boolean;
   supportsHistory?: boolean;
-  imageDescriptionEnabled?: boolean;
   selectedElement?: ChatElementRef | null;
   onRemoveElement?: () => void;
   /** 画布多选页面引用，插入为多个紫色 @页面名 标签 */
@@ -336,10 +330,8 @@ export function ChatInput({
   models,
   canSwitch,
   isModelLoading,
-  supportsImages,
   supportsFiles = true,
   supportsHistory = true,
-  imageDescriptionEnabled = false,
   selectedElement,
   onRemoveElement,
   selectedPages,
@@ -557,7 +549,6 @@ export function ChatInput({
       className="flex-shrink-0"
       globalDrop
       multiple
-      supportsImages={supportsImages}
     >
       <AddFilesCapturer addFilesRef={addFilesRef} />
       <PromptInputHeader>
@@ -581,7 +572,6 @@ export function ChatInput({
       <PromptInputFooter>
         <PromptInputTools>
           <PromptInputAddMenu
-            supportsImages={Boolean(supportsImages)}
             supportsFiles={supportsFiles}
             hasProjects={Boolean(projects && projects.length > 0)}
             onOpenProjectPicker={() => setProjectPickerOpen(true)}
@@ -609,7 +599,6 @@ export function ChatInput({
             onModelChange={onModelChange}
             onDepthChange={onDepthChange}
             isLoading={isModelLoading}
-            imageDescriptionEnabled={imageDescriptionEnabled}
           />
         </PromptInputTools>
         <PromptInputSubmit />

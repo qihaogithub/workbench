@@ -7,12 +7,17 @@ let config: typeof import("./proxy").config;
 
 const verifyToken = jest.fn();
 const getAuthCookieName = jest.fn(() => "auth_token");
+const extractBearerToken = jest.fn((authorization: string | null | undefined) => {
+  const match = authorization?.match(/^Bearer\s+(\S+)$/i);
+  return match?.[1];
+});
 const verifyAdminSecret = jest.fn();
 const hashSecret = jest.fn(async (secret: string) => `hash:${secret}`);
 const getAdminSecret = jest.fn(() => "admin-secret");
 
 jest.mock("@/lib/auth/jwt", () => ({
   getAuthCookieName,
+  extractBearerToken,
   verifyToken,
 }));
 
@@ -25,11 +30,17 @@ jest.mock("@/lib/admin-auth", () => ({
 
 function request(
   path: string,
-  options: { method?: string; origin?: string; cookie?: string } = {},
+  options: {
+    method?: string;
+    origin?: string;
+    cookie?: string;
+    authorization?: string;
+  } = {},
 ) {
   const headers = new Headers();
   if (options.origin) headers.set("origin", options.origin);
   if (options.cookie) headers.set("cookie", options.cookie);
+  if (options.authorization) headers.set("authorization", options.authorization);
   const url = new URL(path, "http://localhost");
   return {
     cookies: {
@@ -70,6 +81,10 @@ describe("proxy authentication and CORS contract", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     delete process.env.CORS_ORIGINS;
+    extractBearerToken.mockImplementation((authorization) => {
+      const match = authorization?.match(/^Bearer\s+(\S+)$/i);
+      return match?.[1];
+    });
     verifyToken.mockResolvedValue(null);
     verifyAdminSecret.mockResolvedValue(false);
   });
@@ -101,6 +116,19 @@ describe("proxy authentication and CORS contract", () => {
       success: false,
       error: { code: "UNAUTHORIZED", message: "未登录" },
     });
+  });
+
+  it("accepts a Bearer token when the configured cookie is absent", async () => {
+    extractBearerToken.mockReturnValue("bearer-token");
+    verifyToken.mockResolvedValue({ userId: "u1", username: "alice" });
+
+    const response = await proxy(
+      request("/api/sessions", { authorization: "Bearer bearer-token" }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(extractBearerToken).toHaveBeenCalledWith("Bearer bearer-token");
+    expect(verifyToken).toHaveBeenCalledWith("bearer-token");
   });
 
   it("sets the admin cookie when an admin page is authorized by secret", async () => {

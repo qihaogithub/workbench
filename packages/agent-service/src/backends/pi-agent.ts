@@ -24,28 +24,6 @@ import {
   formatPreinstalledSkillsForPrompt,
   getPreinstalledSkills,
 } from "./preinstalled-skills";
-import {
-  ImageDescriber,
-  type ImageDescriberConfig,
-  type VisionDescribeRequest,
-} from "../services/image-describer";
-import { setImageAltDescriber } from "../services/image-alt-generator";
-
-let _imageDescriberConfigUpdater: ((config: Partial<ImageDescriberConfig>) => void) | null = null;
-let _latestImageDescriberConfig: Partial<ImageDescriberConfig> = {};
-
-export function updateImageDescriberConfig(config: Partial<ImageDescriberConfig>): void {
-  _latestImageDescriberConfig = { ..._latestImageDescriberConfig, ...config };
-  _imageDescriberConfigUpdater?.(config);
-}
-
-export function getImageDescriberConfig(): ImageDescriberConfig | null {
-  return _imageDescriberConfigUpdater
-    ? _currentImageDescriberConfig
-    : null;
-}
-
-let _currentImageDescriberConfig: ImageDescriberConfig | null = null;
 import { logger } from "../utils/logger";
 import { withLlmRetry } from "../utils/retry-utils";
 import {
@@ -237,7 +215,6 @@ export class PiAgentBackend implements IBackendAdapter {
   private sessionId: string | null = null;
   private currentProjectRules = "";
   private unsubFns: Array<() => void> = [];
-  private imageDescriber: ImageDescriber;
   private activeSubagents: Set<any> = new Set();
   private lastResponseDebug: unknown;
   private lastRunSummary: RunSummary | null = null;
@@ -263,22 +240,6 @@ export class PiAgentBackend implements IBackendAdapter {
       undefined,
       this.toolHookManager,
     );
-    this.imageDescriber = new ImageDescriber({}, (request) =>
-      this.describeImageWithVisionModel(request),
-    );
-    if (Object.keys(_latestImageDescriberConfig).length > 0) {
-      this.imageDescriber.updateConfig(_latestImageDescriberConfig);
-    }
-    _imageDescriberConfigUpdater = (config) => {
-      this.imageDescriber.updateConfig(config);
-      _currentImageDescriberConfig = this.imageDescriber.getConfig();
-    };
-    _currentImageDescriberConfig = this.imageDescriber.getConfig();
-
-    setImageAltDescriber(async (image) => {
-      const desc = await this.imageDescriber.describe([image]);
-      return desc || null;
-    });
   }
 
   private areSubagentsEnabled(): boolean {
@@ -384,163 +345,6 @@ export class PiAgentBackend implements IBackendAdapter {
       this.status = "error";
       logger.error({ error }, "Failed to initialize Pi Agent backend");
       throw error;
-    }
-  }
-
-  private async describeImageWithVisionModel(
-    request: VisionDescribeRequest,
-  ): Promise<string> {
-    await loadPiAgentDeps();
-
-    const visionModelId = request.modelId.trim()
-      ? request.modelId
-      : this.modelManager.getModel().id;
-
-    const model = this.modelManager.getVisionModel(visionModelId);
-    if (model.baseUrl) {
-      const auth = await this.modelManager.getApiKeyAndHeaders(model);
-      if (!auth?.apiKey) {
-        throw new Error(
-          `Vision model provider "${model.provider}" missing API key`,
-        );
-      }
-
-      const response = await withLlmRetry(
-        async () => {
-          const res = await fetch(
-            `${model.baseUrl.replace(/\/$/, "")}/chat/completions`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${auth.apiKey}`,
-                ...(auth.headers || {}),
-              },
-              body: JSON.stringify({
-                model: model.id,
-                messages: [
-                  {
-                    role: "user",
-                    content: [
-                      { type: "text", text: request.prompt },
-                      {
-                        type: "image_url",
-                        image_url: {
-                          url: `data:${request.image.mimeType};base64,${request.image.data}`,
-                        },
-                      },
-                    ],
-                  },
-                ],
-                max_tokens: 300,
-              }),
-              signal: request.signal,
-            },
-          );
-
-          if (!res.ok) {
-            const body = await res.text().catch(() => "");
-            throw Object.assign(
-              new Error(`Vision model request failed: ${res.status} ${body}`),
-              { status: res.status },
-            );
-          }
-
-          return res;
-        },
-        {},
-        (error, meta) => {
-          if (request.signal.aborted) throw error;
-          logger.warn(
-            {
-              attempt: meta.attempt + 1,
-              maxRetries: meta.maxRetries,
-              waitMs: meta.waitMs,
-              error: error instanceof Error ? error.message : String(error),
-            },
-            "Vision model API error, retrying after backoff",
-          );
-        },
-      );
-
-      const payload = (await response.json()) as {
-        choices?: Array<{
-          message?: {
-            content?: string | Array<{ type?: string; text?: string }>;
-            reasoning?: string;
-          };
-        }>;
-      };
-      const msg = payload.choices?.[0]?.message;
-      const content = msg?.content;
-      if (typeof content === "string" && content) {
-        return content;
-      }
-      if (Array.isArray(content)) {
-        return content
-          .filter((item) => item.type === "text" && item.text)
-          .map((item) => item.text)
-          .join("");
-      }
-      if (msg?.reasoning) {
-        return msg.reasoning;
-      }
-      logger.warn(
-        { modelId: model.id, samplePayload: JSON.stringify(msg).slice(0, 500) },
-        "Vision model response content type unexpected",
-      );
-      return "";
-    }
-
-    const NodeExecutionEnvCtor = getNodeExecutionEnv();
-    const InMemorySessionRepoCtor = getInMemorySessionRepo();
-    const AgentHarnessCtor = getAgentHarness();
-
-    const env = new NodeExecutionEnvCtor({
-      cwd: this.config.workingDir ?? process.cwd(),
-    });
-    const sessionRepo = new InMemorySessionRepoCtor();
-    const session = await sessionRepo.create();
-    const harness = new AgentHarnessCtor({
-      env,
-      session,
-      tools: [],
-      model,
-      systemPrompt:
-        "你是图片内容描述助手。只输出图片内容描述，不要寒暄，不要添加 Markdown。",
-      getApiKeyAndHeaders: (model: any) =>
-        this.modelManager.getApiKeyAndHeaders(model),
-      thinkingLevel: "off",
-    });
-
-    const abort = () => {
-      void harness.abort();
-    };
-    request.signal.addEventListener("abort", abort, { once: true });
-
-    try {
-      const result = await harness.prompt(request.prompt, {
-        images: [
-          {
-            type: "image" as const,
-            data: request.image.data,
-            mimeType: request.image.mimeType,
-          },
-        ],
-      });
-
-      const text = extractAssistantText(result);
-      if (!text) {
-        logger.warn(
-          summarizeAssistantMessageShape(result),
-          "Vision model AgentHarness response did not contain extractable text",
-        );
-      }
-      return text;
-    } finally {
-      request.signal.removeEventListener("abort", abort);
-      await harness.abort().catch(() => undefined);
-      await env.cleanup();
     }
   }
 
@@ -675,7 +479,7 @@ export class PiAgentBackend implements IBackendAdapter {
         "You are a dedicated image expert working for the main agent. You generate and curate images for a web page.",
         "Workflow: read the delegated task and any page context with readFile, then for each required image:",
         "1. Use generateImage to create it (prompt, size, filename). The result gives you imageId and URL.",
-        "2. Use readUserImage to visually review the generated image with your vision model.",
+        "2. Use readUserImage to visually review the generated image with your current multimodal model.",
         "3. If unsatisfied, regenerate with an improved prompt (up to a few retries).",
         "4. If the task needs a cutout, use extractImageElement to extract a subject from an image.",
         "5. Use listImages to check existing images and avoid duplicates.",
@@ -710,7 +514,7 @@ Keep the final response concise: summarize what you changed, what you verified, 
   }
 
   private async runSubagent(
-    params: { task: string; context?: string; model?: "inherit" | "vision"; imageUrls?: string[]; subagentType?: "general" | "image" },
+    params: { task: string; context?: string; imageUrls?: string[]; subagentType?: "general" | "image" },
     signal?: AbortSignal,
   ): Promise<SubagentRunResult> {
     if (!this.areSubagentsEnabled()) {
@@ -767,24 +571,13 @@ Keep the final response concise: summarize what you changed, what you verified, 
           imageSubagent: params.subagentType === "image",
         },
       );
-      let model: any;
+      const model = this.modelManager.getModel();
       let imageParts: any[] | undefined;
 
-      if (params.model === "vision" || params.subagentType === "image") {
-        const visionModelId = this.imageDescriber.getConfig().visionModelId;
-        if (!visionModelId) {
-          return {
-            success: false,
-            content: "识图模型未配置，请在管理后台设置识图模型",
-            durationMs: Date.now() - startedAt,
-          };
-        }
-        model = this.modelManager.getVisionModel(visionModelId);
-
-        if (params.imageUrls && params.imageUrls.length > 0) {
-          imageParts = [];
-          const screenshotServiceUrl = loadConfig().screenshotServiceUrl.replace(/\/+$/, "");
-          for (const url of params.imageUrls) {
+      if (params.imageUrls && params.imageUrls.length > 0) {
+        imageParts = [];
+        const screenshotServiceUrl = loadConfig().screenshotServiceUrl.replace(/\/+$/, "");
+        for (const url of params.imageUrls) {
             try {
               let buffer: Buffer;
               let mimeType: string;
@@ -840,10 +633,7 @@ Keep the final response concise: summarize what you changed, what you verified, 
                 durationMs: Date.now() - startedAt,
               };
             }
-          }
         }
-      } else {
-        model = this.modelManager.getModel();
       }
 
       const resources = { skills: getPreinstalledSkills() };
@@ -1003,8 +793,6 @@ Keep the final response concise: summarize what you changed, what you verified, 
 
     const images = normalizeImageAttachments(options?.images);
     const model = this.modelManager.getModel();
-    const modelSupportsImages =
-      Array.isArray(model?.input) && model.input.includes("image");
 
     const currentFiles = options?.files || [];
     const currentFileIds = new Set(currentFiles.map((file) => file.id));
@@ -1092,9 +880,7 @@ Keep the final response concise: summarize what you changed, what you verified, 
 
         if (persisted.length > 0) {
           const lines = persisted.map((img) => `- imageId: ${img.imageId}, URL: ${img.url}`).join("\n");
-          const hint = modelSupportsImages
-            ? "需要重新查看图片内容时可调用 readUserImage 传入 imageId。\n"
-            : "";
+          const hint = "需要重新查看图片内容时可调用 readUserImage 传入 imageId。\n";
           autoPersistText = `[图片已自动入库] 用户上传的图片已自动保存到图床，无需调用 saveImage 再次保存。直接在代码中使用以下 URL 引用即可：\n${hint}\n${lines}\n\n`;
         }
         if (failedNames.length > 0) {
@@ -1105,39 +891,13 @@ Keep the final response concise: summarize what you changed, what you verified, 
         logger.warn({ error: persistError }, "auto-persist: overall process failed");
       }
 
-      if (modelSupportsImages) {
-        imageContent = images.map((img) => ({
-          type: "image" as const,
-          data: img.data,
-          mimeType: img.mimeType,
-        }));
-        if (autoPersistText) {
-          promptContent = promptContent + "\n" + autoPersistText;
-        }
-      } else {
-        if (!this.imageDescriber.isAvailable()) {
-          logger.warn(
-            { modelId: model.id, imageCount: images.length },
-            "Image sent to non-vision model but image description is not configured",
-          );
-          throw new Error(
-            "当前模型不支持图片处理。请联系管理员配置识图模型以启用图片理解功能。",
-          );
-        }
-
-    logger.info(
-          { imageCount: images.length, modelId: model.id },
-          "Triggering image pre-description for non-vision model",
-        );
-
-        const imageDescription = await this.imageDescriber.describe(images);
-        const prefix = uploadedFilesPrefix
-          ? `${uploadedFilesPrefix}${content}`
-          : `【用户问题】${content}`;
-        promptContent = `【图片内容】${imageDescription}\n\n${prefix}`;
-        if (autoPersistText) {
-          promptContent = promptContent + "\n\n" + autoPersistText;
-        }
+      imageContent = images.map((img) => ({
+        type: "image" as const,
+        data: img.data,
+        mimeType: img.mimeType,
+      }));
+      if (autoPersistText) {
+        promptContent = promptContent + "\n" + autoPersistText;
       }
     }
 
@@ -1147,7 +907,6 @@ Keep the final response concise: summarize what you changed, what you verified, 
         imageCount: images?.length || 0,
         fileCount: currentFiles.length,
         sessionFileCount: uploadedFiles.length,
-        modelSupportsImages,
       },
       "Pi Agent sending message",
     );
@@ -1253,6 +1012,7 @@ Keep the final response concise: summarize what you changed, what you verified, 
   }
 
   async destroy(): Promise<void> {
+    this.permissionManager.cancelPendingPermissions();
     for (const unsub of this.unsubFns) {
       unsub();
     }
@@ -1349,6 +1109,7 @@ Keep the final response concise: summarize what you changed, what you verified, 
   }
 
   async cancelPrompt(): Promise<void> {
+    this.permissionManager.cancelPendingPermissions();
     const aborts: Array<Promise<unknown>> = [];
     if (this.harness) aborts.push(this.harness.abort());
     for (const subagent of this.activeSubagents) {

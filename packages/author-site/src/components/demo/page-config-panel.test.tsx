@@ -92,6 +92,55 @@ const conditionalMediaSchema = JSON.stringify({
 });
 
 describe("PageConfigPanel", () => {
+  it("一级列表可隐藏配置面板标题栏", () => {
+    render(
+      <PageConfigPanel
+        pages={[{ id: "page_a", name: "页面 A", order: 0, schema: "", configData: {} }]}
+        hideOverviewHeader
+        readonly
+      />,
+    );
+
+    expect(screen.queryByText("配置面板")).not.toBeInTheDocument();
+    expect(screen.getByText("页面 A")).toBeInTheDocument();
+  });
+
+  it("零配置页面隐藏数量和箭头，点击只触发页面选择不进入详情", () => {
+    const onPageSelect = jest.fn();
+    const onDetailPageIdChange = jest.fn();
+    const { container } = render(
+      <PageConfigPanel
+        pages={[
+          {
+            id: "empty-page",
+            name: "空配置页",
+            order: 0,
+            schema: "",
+            configData: {},
+            projectConfigBindings: [],
+          },
+        ]}
+        activePageId="empty-page"
+        onPageSelect={onPageSelect}
+        onDetailPageIdChange={onDetailPageIdChange}
+        readonly
+      />,
+    );
+
+    const pageButton = screen.getByRole("button", { name: "空配置页" });
+    expect(pageButton).toBeInTheDocument();
+    expect(pageButton).not.toHaveTextContent("0");
+    expect(container.querySelector(".lucide-chevron-right")).toBeNull();
+
+    fireEvent.click(pageButton);
+
+    expect(onPageSelect).toHaveBeenCalledWith("empty-page", {
+      openConfigDetail: false,
+    });
+    expect(onDetailPageIdChange).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("返回所有页面")).not.toBeInTheDocument();
+  });
+
   it("没有页面时展示明确空状态", () => {
     render(
       <PageConfigPanel
@@ -214,7 +263,7 @@ describe("PageConfigPanel", () => {
     );
 
     expect(screen.getByText("2")).toBeInTheDocument();
-    expect(screen.getByText("0")).toBeInTheDocument();
+    expect(screen.queryByText("0")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByText("页面 A"));
 
@@ -227,9 +276,8 @@ describe("PageConfigPanel", () => {
     fireEvent.click(screen.getByLabelText("返回所有页面"));
     fireEvent.click(screen.getByText("页面 B"));
 
-    expect(screen.queryByText("共享配置")).not.toBeInTheDocument();
-    expect(screen.queryByText("本页配置")).not.toBeInTheDocument();
-    expect(screen.getByText("没有匹配的配置项")).toBeInTheDocument();
+    expect(screen.queryByLabelText("返回所有页面")).not.toBeInTheDocument();
+    expect(screen.getByText("页面 B")).toBeInTheDocument();
   });
 
   it("支持按显式配置分类筛选页面列表和详情字段", () => {
@@ -620,9 +668,8 @@ describe("PageConfigPanel 配置项与资源规范折叠区", () => {
     );
 
     expect(screen.queryByRole("heading", { name: "主视觉图片" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "有内容的规范" })).not.toBeInTheDocument();
     expect(screen.queryByText("暂无说明")).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "有内容的规范" })).toBeInTheDocument();
-    expect(screen.getByText("保留这条说明。")).toBeInTheDocument();
   });
 
   it("可隐藏资源规范，仅保留配置项", () => {
@@ -680,7 +727,10 @@ describe("PageConfigPanel 配置项与资源规范折叠区", () => {
 
     expect(screen.queryByText("资源规范")).not.toBeInTheDocument();
     expect(screen.queryByText("弹窗规范 · 配图")).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "配图" })).toBeInTheDocument();
+    const specButton = screen.getByRole("button", { name: "查看设计规范：标题" });
+    expect(specButton).toBeInTheDocument();
+    fireEvent.click(specButton);
+    expect(screen.getByRole("complementary", { name: "设计规范" })).toBeInTheDocument();
     expect(screen.getByText("图片底部不留白。")).toBeInTheDocument();
   });
 

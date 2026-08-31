@@ -43,10 +43,6 @@ export function splitFullModelId(fullModelId: string | undefined): { provider?: 
   return provider && model ? { provider, model } : {};
 }
 
-function fullModelId(provider: string, modelId: string): string {
-  return `${provider}/${modelId}`;
-}
-
 /**
  * 模型管理器
  *
@@ -76,40 +72,6 @@ export class ModelManager {
       findProvider(this.getSessionProvidersConfig(), providerId) ||
       getBackendProvidersManager().getProvider(providerId)
     );
-  }
-
-  /**
-   * 将请求的模型 ID 解析为 provider 模型列表中的完整 ID。
-   *
-   * 优先精确匹配；其次允许省略内部前缀（如 `provider/jojo/model` 写成 `provider/model`），
-   * 按后缀匹配回写完整 ID。providerConfig 未配置模型列表时原样返回。
-   */
-  private resolveListedModelId(
-    providerConfig: BackendProvider | undefined,
-    modelId: string,
-    fullModelId: string,
-  ): string {
-    const models = providerConfig?.models;
-    if (!Array.isArray(models) || models.length === 0) {
-      return modelId;
-    }
-    const exact = models.find((m) => m === modelId);
-    if (exact) return exact;
-    const bySuffix = models.find(
-      (m) => m === fullModelId || m.endsWith(`/${modelId}`),
-    );
-    return bySuffix || modelId;
-  }
-
-  private getMultimodalModels(): Set<string> {
-    return new Set([
-      ...(this.getSessionProvidersConfig()?.multimodalModels || []),
-      ...(getBackendProvidersManager().getConfig().multimodalModels || []),
-    ]);
-  }
-
-  private modelSupportsImages(provider: string, modelId: string): boolean {
-    return this.getMultimodalModels().has(fullModelId(provider, modelId));
   }
 
   resolveProviderAndModel(): { provider: string; modelId: string } {
@@ -149,10 +111,8 @@ export class ModelManager {
     const providerConfig = this.getProviderConfig(provider);
     const baseUrl = providerConfig?.baseURL || this.config.piAgent?.baseUrl || svc.piAgent.baseUrl;
     const apiKeyFromProvider = providerConfig?.apiKey;
-    const supportsImages = this.modelSupportsImages(provider, modelId);
-
     logger.info(
-      { modelId, provider, baseUrl, hasProviderConfig: !!providerConfig, supportsImages },
+      { modelId, provider, baseUrl, hasProviderConfig: !!providerConfig },
       "Pi Agent getModel",
     );
 
@@ -165,50 +125,6 @@ export class ModelManager {
         api: 'openai-completions' as const,
         provider: provider,
         baseUrl: baseUrl,
-        ...(apiKeyFromProvider ? { apiKey: apiKeyFromProvider } : {}),
-        reasoning: false,
-        input: supportsImages ? (['text', 'image'] as const) : (['text'] as const),
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow,
-        maxTokens,
-      };
-    }
-
-    const getModelFn = getGetModel();
-    const model = getModelFn(provider, modelId);
-    if (!supportsImages) return model;
-    return {
-      ...model,
-      input: Array.from(new Set([...(model.input || []), 'image'])),
-    };
-  }
-
-  getVisionModel(fullModelId: string): any {
-    const svc = getServiceConfig();
-    const parsed = splitFullModelId(fullModelId);
-    const provider = parsed.provider || this.resolveProviderAndModel().provider;
-
-    const providerConfig = this.getProviderConfig(provider);
-    const baseUrl = providerConfig?.baseURL || this.config.piAgent?.baseUrl || svc.piAgent.baseUrl;
-    const apiKeyFromProvider = providerConfig?.apiKey;
-
-    // 解析 provider 模型列表中的完整模型 ID。
-    // visionModelId 格式为 `providerId/modelId`，其中 modelId 可能是 provider 模型列表
-    // 中的完整 ID（如 `OmniRoute/jojo/Qwen3.6-35B-A3B-FP8`），也可能被省略内部前缀
-    // （如 `OmniRoute/Qwen3.6-35B-A3B-FP8`）。直接使用裸 modelId 会让网关无法识别，
-    // 回退到错误的上游 provider（如 "No active credentials for provider: gemini"），
-    // 因此按后缀匹配回写为列表中的完整模型 ID。
-    const modelId = this.resolveListedModelId(providerConfig, parsed.model || fullModelId, fullModelId);
-
-    if (baseUrl) {
-      const contextWindow = providerConfig?.contextWindow ?? 128000;
-      const maxTokens = providerConfig?.maxTokens ?? 1024;
-      return {
-        id: modelId,
-        name: modelId,
-        api: 'openai-completions' as const,
-        provider,
-        baseUrl,
         ...(apiKeyFromProvider ? { apiKey: apiKeyFromProvider } : {}),
         reasoning: false,
         input: ['text', 'image'] as const,

@@ -614,6 +614,26 @@ describe('PiAgentBackend', () => {
       });
     });
 
+    it('取消 prompt 时应解除等待中的计划审批', async () => {
+      const backend = new PiAgentBackend(mockConfig);
+      await backend.start();
+
+      const requestPlanApproval = piAgentMocks.harnesses[0].options.tools.find(
+        (tool: any) => tool.name === 'requestPlanApproval',
+      );
+      const resultPromise = requestPlanApproval.execute('approval-cancelled', {
+        title: '执行计划',
+        planMarkdown: '## 原计划',
+      });
+
+      await backend.cancelPrompt();
+
+      await expect(resultPromise).resolves.toMatchObject({
+        isError: true,
+        details: { success: false, error: 'approval_cancelled' },
+      });
+    });
+
     it('应从带完整参数的 tool_result 钩子捕获 writeFile 文件摘要', async () => {
       const backend = new PiAgentBackend(mockConfig);
 

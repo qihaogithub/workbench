@@ -6,6 +6,17 @@ export type ReferencedDesignSpec = {
   entries: Array<{ id: string; title: string; markdown: string }>;
 };
 
+export type ReferencedDesignSpecEntry = {
+  docId: string;
+  docTitle: string;
+  entryId: string;
+  entryTitle: string;
+  markdown: string;
+  scope: "project" | "page";
+  pageId?: string;
+  fieldKey: string;
+};
+
 export type CanvasPageContent = {
   pageId: string;
   code?: string;
@@ -24,6 +35,7 @@ export type CanvasPageContent = {
   sketchMeta?: Record<string, unknown>;
   requirements?: string;
   designSpecs?: ReferencedDesignSpec[];
+  designSpecEntries?: ReferencedDesignSpecEntry[];
 };
 
 type ApiResponse = {

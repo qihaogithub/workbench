@@ -147,8 +147,8 @@ interface RemoteJsonResponse<T> {
 }
 
 /**
- * 调用远程 author-site API。鉴权走 `Cookie: auth_token=<token>` 头，
- * 与服务端各 route 的 getAuthCookie() 读取方式一致。
+ * 调用远程 author-site API。鉴权走标准 Bearer Token，
+ * 与服务端兼容的请求认证 Token 读取方式一致，不依赖目标环境的 Cookie 名称。
  */
 export async function remoteFetch(
   target: RemoteTarget,
@@ -159,7 +159,7 @@ export async function remoteFetch(
   const headers = new Headers(requestInit.headers);
   if (auth) {
     const token = requireRemoteToken(target);
-    headers.set("Cookie", `auth_token=${encodeURIComponent(token)}`);
+    headers.set("Authorization", `Bearer ${token}`);
   }
   try {
     return await fetch(`${target.url}${apiPath}`, {
