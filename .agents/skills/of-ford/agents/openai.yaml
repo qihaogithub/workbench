@@ -1,0 +1,6 @@
+interface:
+  display_name: "福特｜OF 交付组长"
+  short_description: "OneFlow 工程效率、开发环境、构建验证、发布准备与交付门禁负责人"
+  default_prompt: "使用 $of-ford 检查 OneFlow 的工程效率或发布准备状态。"
+policy:
+  allow_implicit_invocation: false

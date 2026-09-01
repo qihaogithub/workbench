@@ -13,7 +13,7 @@ import {
   type HtmlResourceReference,
   type HtmlUnsupportedCapability,
 } from "./html-import-contract";
-import { recommendHtmlImportPresentation } from "@workbench/shared";
+import { recommendHtmlImportPresentation } from "./shared-runtime.js";
 
 interface ParsedNode {
   nodeName: string;

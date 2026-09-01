@@ -9,10 +9,13 @@ describe("author-site bundler contract", () => {
       fs.readFileSync(path.join(authorSiteRoot, "package.json"), "utf8"),
     ) as { scripts?: Record<string, string> };
 
-    expect(packageJson.scripts?.dev).toContain("next dev --turbopack");
+    expect(packageJson.scripts?.dev).toContain("run-next-with-root-env.mjs");
+    expect(packageJson.scripts?.dev).toContain("--turbopack");
     expect(packageJson.scripts?.["dev:turbo"]).toBe(packageJson.scripts?.dev);
-    expect(packageJson.scripts?.["dev:webpack"]).toContain("next dev --webpack");
-    expect(packageJson.scripts?.build).toContain("next build --webpack");
+    expect(packageJson.scripts?.["dev:webpack"]).toContain("run-next-with-root-env.mjs");
+    expect(packageJson.scripts?.["dev:webpack"]).toContain("--webpack");
+    expect(packageJson.scripts?.build).toContain("run-next-with-root-env.mjs");
+    expect(packageJson.scripts?.build).toContain("build --webpack");
     expect(packageJson.scripts?.["build:webpack"]).toBe(
       packageJson.scripts?.build,
     );
