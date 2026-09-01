@@ -149,6 +149,7 @@ describe("useChatStream 自动修复发送", () => {
         undefined,
         undefined,
         undefined,
+        expect.objectContaining({ assistantMessageId: expect.any(String) }),
       );
     });
   });
@@ -212,6 +213,7 @@ expect(mockSendMessage).toHaveBeenCalledWith(
         undefined,
         undefined,
         undefined,
+        expect.objectContaining({ assistantMessageId: expect.any(String) }),
       );
     });
 
@@ -303,6 +305,7 @@ expect(mockSendMessage).toHaveBeenCalledWith(
         undefined,
         undefined,
         undefined,
+        expect.objectContaining({ assistantMessageId: expect.any(String) }),
       );
       const secondCallContent = mockSendMessage.mock.calls[1]?.[0] as string;
       expect(secondCallContent).toContain("用户：第一条");
@@ -609,6 +612,7 @@ expect(mockSendMessage).toHaveBeenCalledWith(
         undefined,
         undefined,
         undefined,
+        expect.objectContaining({ assistantMessageId: expect.any(String) }),
       );
     });
   });
