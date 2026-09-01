@@ -1,7 +1,11 @@
 import crypto from "node:crypto";
 
 import { validateSketchSceneDocument } from "@workbench/sketch-core";
-import { isWhiteboardBinding, isWhiteboardDocument, WHITEBOARD_DOCUMENT_MAX_BYTES } from "@workbench/shared";
+import {
+  isWhiteboardBinding,
+  isWhiteboardDocument,
+  WHITEBOARD_DOCUMENT_MAX_BYTES,
+} from "./shared-runtime.js";
 
 export type WorkspaceResourceKind =
   | "page-code"

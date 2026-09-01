@@ -1,4 +1,4 @@
-import type { DemoPageRuntimeType } from "./workspace.js";
+import type { DemoPageRuntimeType } from "./workspace";
 
 export type PageRuntimeSourceKind = "prototype" | "sandbox-html" | "react" | "sketch";
 export type PageRuntimeRendererId = "prototype" | "sandbox-html" | "react-module" | "sketch";

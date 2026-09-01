@@ -3,20 +3,20 @@ import type {
   ProjectTemplateSettings,
   ProjectType,
   WorkspaceRevision,
-} from "./workspace.js";
+} from "./workspace";
 
-export type { DemoPageRuntimeType } from "./workspace.js";
+export type { DemoPageRuntimeType } from "./workspace";
 export {
   PAGE_RUNTIME_CAPABILITIES,
   PageRuntimeCapabilityError,
   getPageRuntimeCapabilities,
   isDemoPageRuntimeType,
-} from "./page-runtime-capabilities.js";
+} from "./page-runtime-capabilities";
 export type {
   PageRuntimeCapabilities,
   PageRuntimeRendererId,
   PageRuntimeSourceKind,
-} from "./page-runtime-capabilities.js";
+} from "./page-runtime-capabilities";
 export type {
   CanonicalSyncedRevision,
   ProjectBaseVersion,
@@ -24,7 +24,7 @@ export type {
   SketchEditorEnginePreference,
   UserAuthoringPreferences,
   WorkspaceRevision,
-} from "./workspace.js";
+} from "./workspace";
 export {
   SKETCH_SCENE_PROTOCOL_VERSION,
   DEFAULT_SKETCH_SCENE_PAGE_SIZE,
@@ -36,7 +36,7 @@ export {
   parseSketchSceneDocument,
   renderSketchSceneToSvgMarkup,
   validateSketchSceneDocument,
-} from "./demo/sketch-scene.js";
+} from "./demo/sketch-scene";
 export type {
   SketchSceneAsset,
   SketchSceneDocument,
@@ -50,7 +50,7 @@ export type {
   SketchSceneStyle,
   SketchSceneValidationIssue,
   SketchSceneValidationResult,
-} from "./demo/sketch-scene.js";
+} from "./demo/sketch-scene";
 export {
   applyPrototypeBindings,
   applyPrototypeTextBindings,
@@ -60,15 +60,15 @@ export {
   rewritePrototypeAssetUrls,
   sanitizePrototypeCss,
   sanitizePrototypeHtml,
-} from "./demo/prototype-preview.js";
-export { checkConfigSchemaAgainstPrototype } from "./demo/config-runtime-compatibility.js";
-export type { ConfigRuntimeCompatibilityResult } from "./demo/config-runtime-compatibility.js";
+} from "./demo/prototype-preview";
+export { checkConfigSchemaAgainstPrototype } from "./demo/config-runtime-compatibility";
+export type { ConfigRuntimeCompatibilityResult } from "./demo/config-runtime-compatibility";
 export {
   parsePageRequirementsRefs,
   findPageRequirementRefMatches,
   resolvePageRequirementRefs,
   inferPageRequirementTitle,
-} from "./demo/page-requirements.js";
+} from "./demo/page-requirements";
 export {
   PAGE_PRESENTATION_LIMITS,
   PAGE_PRESENTATION_PRESETS,
@@ -77,7 +77,7 @@ export {
   isValidPagePresentationViewport,
   recommendHtmlImportPresentation,
   resolvePagePresentation,
-} from "./demo/page-presentation.js";
+} from "./demo/page-presentation";
 export type {
   HtmlImportPresentationConfidence,
   HtmlImportPresentationRecommendation,
@@ -85,22 +85,22 @@ export type {
   PagePresentationPreset,
   PagePresentationProfile,
   PagePresentationSource,
-} from "./demo/page-presentation.js";
+} from "./demo/page-presentation";
 export type {
   PageRequirementRef,
   ResolvedPageRequirementRef,
-} from "./demo/page-requirements.js";
+} from "./demo/page-requirements";
 export {
   applySchemaDefinitionCommand,
   readConfigDefinitionFields,
-} from "./demo/config-schema-definition.js";
+} from "./demo/config-schema-definition";
 export type {
   ConfigDefinitionDraft,
   ConfigDefinitionKind,
   SchemaDefinitionCommand,
   SchemaDefinitionDiff,
   SchemaDefinitionMutation,
-} from "./demo/config-schema-definition.js";
+} from "./demo/config-schema-definition";
 
 export interface PrototypePageMeta {
   source?: string;
@@ -181,7 +181,7 @@ export interface DemoFiles {
 
 interface PageSnapshotBaseInput {
   configData: Record<string, unknown>;
-  presentation?: import("./demo/page-presentation.js").PagePresentationProfile;
+  presentation?: import("./demo/page-presentation").PagePresentationProfile;
   previewSize?: {
     width?: string | number;
     height?: string | number;
@@ -210,7 +210,7 @@ export interface SandboxedHtmlPageSnapshotInput extends PageSnapshotBaseInput {
 
 export interface SketchScenePageSnapshotInput extends PageSnapshotBaseInput {
   runtimeType: "sketch-scene";
-  sketchScene: import("./demo/sketch-scene.js").SketchSceneDocument;
+  sketchScene: import("./demo/sketch-scene").SketchSceneDocument;
   sketchMeta?: Record<string, unknown>;
 }
 
@@ -429,16 +429,16 @@ export const ERROR_MESSAGES: Record<ErrorCodeType, string> = {
   HTML_RUNTIME_FAILED: "HTML 交互预览运行失败",
 };
 
-export * from "./workspace.js";
-export * from "./validator.js";
-export * from "./agent-config.js";
-export * from "./knowledge.js";
-export * from "./external-auth.js";
-export * from "./diagnostics.js";
-export * from "./ai-error-normalizer.js";
-export * from "./comment.js";
-export * from "./feedback.js";
-export * from "./whiteboard.js";
+export * from "./workspace";
+export * from "./validator";
+export * from "./agent-config";
+export * from "./knowledge";
+export * from "./external-auth";
+export * from "./diagnostics";
+export * from "./ai-error-normalizer";
+export * from "./comment";
+export * from "./feedback";
+export * from "./whiteboard";
 
 /** 图片附件，Base64 编码 */
 export interface ImageAttachment {

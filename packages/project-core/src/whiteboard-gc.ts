@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { isWhiteboardBinding, isWhiteboardDocument } from "@workbench/shared";
+import { isWhiteboardBinding, isWhiteboardDocument } from "./shared-runtime.js";
 
 export const WHITEBOARD_GC_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 

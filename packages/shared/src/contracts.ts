@@ -1,8 +1,8 @@
-export * from "./index.js";
+export * from "./index";
 
-import type { WorkspaceRevision } from "./workspace.js";
-import type { DemoPageRuntimeType, PagePresentationProfile } from "./index.js";
-import { isWhiteboardBinding, isWhiteboardDocument } from "./whiteboard.js";
+import type { WorkspaceRevision } from "./workspace";
+import type { DemoPageRuntimeType, PagePresentationProfile } from "./index";
+import { isWhiteboardBinding, isWhiteboardDocument } from "./whiteboard";
 
 /**
  * Durable, single-writer contract for an active (live) Workspace.
