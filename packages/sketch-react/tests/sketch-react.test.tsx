@@ -1304,7 +1304,12 @@ describe("sketch-react", () => {
     expect(rectNode).not.toBeNull();
     fireEvent.doubleClick(rectNode as Element);
 
-    const editor = await screen.findByLabelText("画布文本编辑");
+    const editor = await screen.findByLabelText("画布文本编辑") as HTMLTextAreaElement;
+    expect(editor.className).toContain("bg-transparent");
+    expect(editor.className).toContain("[scrollbar-width:none]");
+    expect(editor.className).toContain("[&::-webkit-scrollbar]:hidden");
+    expect(editor.style.overflowX).toBe("auto");
+    expect(editor.style.overflowY).toBe("hidden");
     fireEvent.change(editor, { target: { value: "Shape label" } });
     fireEvent.keyDown(editor, { key: "Enter" });
 
@@ -1312,6 +1317,58 @@ describe("sketch-react", () => {
       const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
       expect(parsed.nodes.find((node) => node.id === "rect")?.text).toBe("Shape label");
     });
+  });
+
+  it("reopens pure and shape text editing after a blur commit", async () => {
+    const editableScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "text", type: "text", x: 40, y: 40, width: 80, height: 30, text: "Text" },
+        { id: "rect", type: "rect", x: 40, y: 110, width: 140, height: 70, text: "Shape" },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbar initialScene={editableScene} />);
+
+    fireEvent.doubleClick(getSketchNodeElement("text"));
+    let editor = await screen.findByLabelText("画布文本编辑") as HTMLTextAreaElement;
+    fireEvent.change(editor, { target: { value: "Text after blur" } });
+    fireEvent.blur(editor);
+    await waitFor(() => expect(readRenderedScene().nodes.find((node) => node.id === "text")?.text).toBe("Text after blur"));
+
+    fireEvent.doubleClick(getSketchNodeElement("text"));
+    editor = await screen.findByLabelText("画布文本编辑") as HTMLTextAreaElement;
+    expect(editor.value).toBe("Text after blur");
+    fireEvent.keyDown(editor, { key: "Escape" });
+
+    fireEvent.doubleClick(getSketchNodeElement("rect"));
+    editor = await screen.findByLabelText("画布文本编辑") as HTMLTextAreaElement;
+    fireEvent.change(editor, { target: { value: "Shape after blur" } });
+    fireEvent.blur(editor);
+    await waitFor(() => expect(readRenderedScene().nodes.find((node) => node.id === "rect")?.text).toBe("Shape after blur"));
+
+    fireEvent.doubleClick(getSketchNodeElement("rect"));
+    editor = await screen.findByLabelText("画布文本编辑") as HTMLTextAreaElement;
+    expect(editor.value).toBe("Shape after blur");
+  });
+
+  it("hides the blank pure text placeholder while retaining its measured editing width", async () => {
+    render(<ControlledEditor initialScene={{ version: 1, pageSize: { width: 400, height: 300 }, nodes: [] }} />);
+
+    const stage = getCanvasStage();
+    setCanvasStageRect(stage);
+    fireEvent.click(screen.getByLabelText("文本"));
+    dispatchPointerEvent(stage, "pointerdown", 260, 160);
+    dispatchPointerEvent(stage, "pointerup", 260, 160);
+
+    const editor = await screen.findByLabelText("画布文本编辑") as HTMLTextAreaElement;
+    expect(editor.getAttribute("placeholder")).toBeNull();
+    expect(editor.className).toContain("bg-transparent");
+    expect(editor.className).toContain("[&::-webkit-scrollbar]:hidden");
+    expect(editor.style.overflowX).toBe("hidden");
+    expect(editor.style.overflowY).toBe("hidden");
+    expect(Number.parseFloat(editor.style.width)).toBeGreaterThan(32);
+    fireEvent.keyDown(editor, { key: "Escape" });
   });
 
   it("starts shape text editing from empty shape body hit testing", async () => {
@@ -1474,13 +1531,16 @@ describe("sketch-react", () => {
     expect(within(toolbar).getByLabelText("悬浮斜体")).not.toBeNull();
     expect(within(toolbar).getByLabelText("悬浮下划线")).not.toBeNull();
     expect(within(toolbar).getByLabelText("悬浮文字颜色")).not.toBeNull();
+    expect(within(toolbar).getByTestId("sketch-text-color-indicator")).not.toBeNull();
+    expect(within(toolbar).getByTestId("sketch-text-color-underline")).not.toBeNull();
     expect(within(toolbar).getByLabelText("对齐方式")).not.toBeNull();
     expect(within(toolbar).getByLabelText("悬浮层级")).not.toBeNull();
     expect(within(toolbar).getByLabelText("悬浮更多")).not.toBeNull();
 
-    fireEvent.click(within(toolbar).getByLabelText("悬浮层级"));
+    const layerTrigger = within(toolbar).getByLabelText("悬浮层级");
+    fireEvent.click(layerTrigger);
     expect(screen.getByRole("menu", { name: "层级" })).not.toBeNull();
-    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.click(layerTrigger);
     await waitFor(() => expect(screen.queryByRole("menu", { name: "层级" })).toBeNull());
 
     fireEvent.click(within(toolbar).getByLabelText("悬浮文字颜色"));
@@ -1496,6 +1556,33 @@ describe("sketch-react", () => {
       const node = readRenderedScene().nodes.find((item) => item.id === "title");
       expect(node?.style).toMatchObject({ color: "#ef4444", textAlign: "center" });
     });
+  });
+
+  it("uses the shared delayed tooltip for contextual text actions without native titles", async () => {
+    vi.useFakeTimers();
+    try {
+      const textScene: SketchSceneDocument = {
+        version: 1,
+        pageSize: { width: 400, height: 300 },
+        nodes: [{ id: "title", type: "text", x: 20, y: 30, width: 120, height: 34, text: "Title" }],
+      };
+      render(<ControlledPartsEditorWithToolbar initialScene={textScene} />);
+      clickLayerNode("title");
+
+      const toolbar = screen.getByRole("toolbar", { name: "纯文本工具栏" });
+      const boldButton = within(toolbar).getByLabelText("悬浮加粗");
+      expect(boldButton.getAttribute("title")).toBeNull();
+      fireEvent.mouseEnter(boldButton.parentElement as HTMLElement);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      expect(screen.getByRole("tooltip").textContent).toBe("加粗");
+      fireEvent.mouseLeave(boldButton.parentElement as HTMLElement);
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("applies pure text defaults without a selection and keeps range styles in runs", async () => {
@@ -4236,7 +4323,7 @@ describe("sketch-react", () => {
     });
   });
 
-  it("shows a single-selection floating toolbar for fill, text, layer order, and more actions", async () => {
+  it("shows a single-selection shape toolbar without a separate text action", async () => {
     const panelScene: SketchSceneDocument = {
       version: 1,
       pageSize: { width: 400, height: 300 },
@@ -4251,14 +4338,25 @@ describe("sketch-react", () => {
     const toolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
     expect(within(toolbar).getByLabelText("悬浮填充")).toBeTruthy();
     expect(within(toolbar).getByLabelText("悬浮描边")).toBeTruthy();
-    expect(within(toolbar).getByLabelText("悬浮文本")).toBeTruthy();
+    expect(within(toolbar).queryByLabelText("悬浮文本")).toBeNull();
     expect(within(toolbar).getByLabelText("悬浮层级")).toBeTruthy();
     expect(within(toolbar).queryByLabelText("悬浮复制样式")).toBeNull();
     expect(within(toolbar).queryByLabelText("悬浮属性")).toBeNull();
     expect(within(toolbar).getByLabelText("悬浮更多")).toBeTruthy();
+    expect(within(toolbar).getByTestId("sketch-floating-fill-indicator")).toBeTruthy();
+    expect(within(toolbar).getByTestId("sketch-floating-stroke-indicator")).toBeTruthy();
+    for (const label of ["填充", "描边", "文本", "层级", "更多"]) {
+      expect(within(toolbar).queryByText(label, { exact: true })).toBeNull();
+    }
+    for (const button of Array.from(within(toolbar).getAllByRole("button"))) {
+      expect(button.getAttribute("title")).toBeNull();
+    }
 
     fireEvent.click(within(toolbar).getByLabelText("悬浮填充"));
     expect(await screen.findByRole("dialog", { name: "草图工具菜单" })).toBeTruthy();
+    fireEvent.click(within(toolbar).getByLabelText("悬浮填充"));
+    await waitFor(() => expect(screen.queryByRole("menu", { name: "填充" })).toBeNull());
+    fireEvent.click(within(toolbar).getByLabelText("悬浮填充"));
     fireEvent.click(screen.getByLabelText("填充 #f8fafc"));
 
     await waitFor(() => {
@@ -4266,8 +4364,120 @@ describe("sketch-react", () => {
       expect(parsed.nodes.find((node) => node.id === "rect")?.style?.fill).toBe("#f8fafc");
     });
 
-    fireEvent.click(within(toolbar).getByLabelText("悬浮文本"));
+    fireEvent.doubleClick(getSketchNodeElement("rect"));
     expect(await screen.findByLabelText("画布文本编辑")).toBeTruthy();
+    expect(await screen.findByRole("toolbar", { name: "图文工具栏" })).toBeTruthy();
+  });
+
+  it("shows combined shape and text controls for a shape with text", async () => {
+    const textShapeScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [{
+        id: "rect",
+        type: "rect",
+        x: 20,
+        y: 30,
+        width: 120,
+        height: 60,
+        text: "Shape label",
+        style: { fill: "#ffffff", stroke: "#111827", color: "#123456", fontSize: 20 },
+      }],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={textShapeScene} />);
+
+    clickLayerNode("rect");
+
+    const toolbar = await screen.findByRole("toolbar", { name: "图文工具栏" });
+    expect(within(toolbar).getByLabelText("悬浮填充")).toBeTruthy();
+    expect(within(toolbar).getByLabelText("悬浮描边")).toBeTruthy();
+    expect(within(toolbar).getByLabelText("悬浮文字颜色")).toBeTruthy();
+    expect(within(toolbar).getByLabelText("悬浮字号")).toHaveProperty("value", "20");
+    expect(within(toolbar).getByLabelText("悬浮加粗")).toBeTruthy();
+    expect(within(toolbar).getByLabelText("悬浮斜体")).toBeTruthy();
+    expect(within(toolbar).getByLabelText("悬浮下划线")).toBeTruthy();
+    expect(within(toolbar).getByLabelText("对齐方式")).toBeTruthy();
+    expect(within(toolbar).getByLabelText("悬浮层级")).toBeTruthy();
+    expect(within(toolbar).getByLabelText("悬浮更多")).toBeTruthy();
+    expect(within(toolbar).queryByLabelText("悬浮文本")).toBeNull();
+    expect(within(toolbar).getByTestId("sketch-text-color-indicator")).toBeTruthy();
+    expect(within(toolbar).getByTestId("sketch-text-color-underline")).toHaveProperty("style.backgroundColor", "rgb(18, 52, 86)");
+
+    const buttonLabels = Array.from(within(toolbar).getAllByRole("button"), (button) => button.getAttribute("aria-label"));
+    expect(buttonLabels).toEqual([
+      "悬浮填充",
+      "悬浮描边",
+      "悬浮文字颜色",
+      "打开字号选项",
+      "悬浮加粗",
+      "悬浮斜体",
+      "悬浮下划线",
+      "对齐方式",
+      "悬浮层级",
+      "悬浮更多",
+    ]);
+
+    fireEvent.click(within(toolbar).getByLabelText("悬浮文字颜色"));
+    fireEvent.click(within(screen.getByRole("menu", { name: "文字颜色" })).getByLabelText("文字颜色 #ef4444"));
+    fireEvent.click(within(toolbar).getByLabelText("悬浮加粗"));
+    fireEvent.click(within(toolbar).getByLabelText("悬浮斜体"));
+    fireEvent.click(within(toolbar).getByLabelText("悬浮下划线"));
+    fireEvent.click(within(toolbar).getByLabelText("对齐方式"));
+    fireEvent.click(within(screen.getByRole("menu", { name: "对齐方式" })).getByLabelText("对齐方式 居中对齐"));
+
+    await waitFor(() => {
+      expect(readRenderedScene().nodes.find((node) => node.id === "rect")).toMatchObject({
+        width: 120,
+        height: 60,
+        style: {
+          color: "#ef4444",
+          fontWeight: 700,
+          italic: true,
+          textDecoration: "underline",
+          textAlign: "center",
+        },
+      });
+    });
+  });
+
+  it("shows the full text toolbar while editing an empty shape and commits draft styles", async () => {
+    const emptyTextShapeScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [{
+        id: "rect",
+        type: "rect",
+        x: 20,
+        y: 30,
+        width: 120,
+        height: 60,
+        style: { fill: "#ffffff", stroke: "#111827" },
+      }],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={emptyTextShapeScene} />);
+
+    fireEvent.doubleClick(getSketchNodeElement("rect"));
+    const editor = await screen.findByLabelText("画布文本编辑") as HTMLTextAreaElement;
+    const toolbar = await screen.findByRole("toolbar", { name: "图文工具栏" });
+    expect(within(toolbar).getByLabelText("悬浮文字颜色")).toBeTruthy();
+    expect(within(toolbar).getByLabelText("悬浮字号")).toBeTruthy();
+    expect(within(toolbar).getByLabelText("悬浮加粗")).toBeTruthy();
+    expect(within(toolbar).getByLabelText("悬浮斜体")).toBeTruthy();
+    expect(within(toolbar).getByLabelText("悬浮下划线")).toBeTruthy();
+    expect(within(toolbar).getByLabelText("对齐方式")).toBeTruthy();
+
+    fireEvent.click(within(toolbar).getByLabelText("悬浮加粗"));
+    fireEvent.click(within(toolbar).getByLabelText("悬浮文字颜色"));
+    fireEvent.click(within(screen.getByRole("menu", { name: "文字颜色" })).getByLabelText("文字颜色 #2563eb"));
+    fireEvent.change(editor, { target: { value: "Styled shape" } });
+    fireEvent.keyDown(editor, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(readRenderedScene().nodes.find((node) => node.id === "rect")).toMatchObject({
+        text: "Styled shape",
+        style: { color: "#2563eb", fontWeight: 700 },
+      });
+    });
   });
 
   it("supports no-color, layer order, and the compact more menu", async () => {
@@ -4288,12 +4498,14 @@ describe("sketch-react", () => {
     expect(within(fillMenu).getByLabelText("填充 无颜色")).toBeTruthy();
     fireEvent.click(within(fillMenu).getByLabelText("填充 无颜色"));
     await waitFor(() => expect(readRenderedScene().nodes.find((node) => node.id === "front")?.style?.fill).toBe("transparent"));
+    expect(within(toolbar).getByTestId("sketch-floating-fill-indicator").className).toContain("bg-white");
 
     fireEvent.click(within(toolbar).getByLabelText("悬浮描边"));
     const strokeMenu = screen.getByRole("menu", { name: "描边" });
     expect(within(strokeMenu).getByLabelText("描边 无颜色")).toBeTruthy();
     fireEvent.click(within(strokeMenu).getByLabelText("描边 无颜色"));
     await waitFor(() => expect(readRenderedScene().nodes.find((node) => node.id === "front")?.style?.stroke).toBe("transparent"));
+    expect(within(toolbar).getByTestId("sketch-floating-stroke-indicator").querySelector("span")?.className).toContain("bg-slate-300");
 
     fireEvent.click(within(toolbar).getByLabelText("悬浮层级"));
     const layerMenu = screen.getByRole("menu", { name: "层级" });
@@ -4335,6 +4547,9 @@ describe("sketch-react", () => {
     expect(screen.getByLabelText("垂直位置")).toBeTruthy();
     expect(screen.getByLabelText("宽度")).toBeTruthy();
     expect(screen.getByLabelText("高度")).toBeTruthy();
+    for (const label of ["水平位置", "垂直位置", "宽度", "高度"]) {
+      expect(screen.getByLabelText(label).parentElement?.className).toContain("grid-cols-[3rem_minmax(0,1fr)]");
+    }
     expect(screen.queryByText("关闭")).toBeNull();
     fireEvent.change(screen.getByLabelText("水平位置"), { target: { value: "180" } });
     fireEvent.change(screen.getByLabelText("高度"), { target: { value: "72" } });
