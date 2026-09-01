@@ -14,6 +14,7 @@ export type WorkspaceResourceKind =
   | "page-sketch-scene"
   | "page-sketch-meta"
   | "page-convention"
+  | "page-requirements"
   | "project-schema"
   | "project-config-values"
   | "workspace-tree"
@@ -71,6 +72,7 @@ export class WorkspaceResourceRegistry {
     if (/^demos\/[^/]+\/sketch\.scene\.json$/.test(normalized)) return { kind: "page-sketch-scene", text: true, maxBytes: TEXT_MAX_BYTES, validation: "sketch-scene" };
     if (/^demos\/[^/]+\/sketch\.meta\.json$/.test(normalized)) return { kind: "page-sketch-meta", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
     if (/^demos\/[^/]+\/convention\.md$/.test(normalized)) return { kind: "page-convention", text: true, maxBytes: TEXT_MAX_BYTES, validation: "text" };
+    if (/^demos\/[^/]+\/requirements\.md$/.test(normalized)) return { kind: "page-requirements", text: true, maxBytes: TEXT_MAX_BYTES, validation: "text" };
     if (normalized === "project.config.schema.json") return { kind: "project-schema", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
     if (normalized === "project.config.values.json") return { kind: "project-config-values", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
     if (normalized === "workspace-tree.json") return { kind: "workspace-tree", text: true, maxBytes: TEXT_MAX_BYTES, validation: "workspace-tree" };

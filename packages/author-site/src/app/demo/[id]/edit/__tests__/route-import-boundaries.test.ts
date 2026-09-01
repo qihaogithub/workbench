@@ -34,19 +34,22 @@ describe("编辑路由导入边界", () => {
     expect(knowledgeDialog).not.toContain('from "@workbench/demo-ui"');
   });
 
-  it("评论启动链会在画布未选页时切换到项目级 target", () => {
+  it("评论启动链在画布中维护项目级线程，并派生页面分组", () => {
     const page = readAuthorFile("src/app/demo/[id]/edit/page.tsx");
 
     expect(page).toMatch(
       /const activePageCommentTarget = useMemo<CommentTarget>\([\s\S]*?pageId: activeDemoId[\s\S]*?\[activeDemoId\][\s\S]*?\);/,
     );
     expect(page).toMatch(
-      /const commentQueryTarget = useMemo<CommentTarget \| undefined>\(\(\) => \{[\s\S]*?previewMode === "canvas"[\s\S]*?canvasEditingPageId[\s\S]*?: undefined;[\s\S]*?return activePageCommentTarget;[\s\S]*?\}\);/,
+      /const commentQueryTarget = useMemo<CommentTarget \| undefined>\(\(\) => \{[\s\S]*?if \(previewMode === "canvas"\) return undefined;[\s\S]*?return activePageCommentTarget;[\s\S]*?\}\);/,
     );
     expect(page).toMatch(
       /const commentsData = useComments\(\{[\s\S]*?target: commentQueryTarget,[\s\S]*?enabled: Boolean\(activeDemoId\),[\s\S]*?\}\);/,
     );
     expect(page).toContain("filterPageCommentThreads(commentsData.threads)");
+    expect(page).toContain("countUnresolvedCommentThreadsByPage");
+    expect(page).toContain("groupByPage");
+    expect(page).toContain("focusedPageId={canvasEditingPageId}");
     expect(page).toContain(
       "<CommentUnreadDot count={unresolvedCommentCount} />",
     );

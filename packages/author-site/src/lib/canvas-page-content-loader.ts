@@ -49,6 +49,8 @@ type ApiRequestInit = {
   body?: string;
 };
 
+const TRANSIENT_JSON_RETRY_DELAYS_MS = [200, 600, 1200];
+
 type SuccessfulPayload = {
   success?: boolean;
   data?: Omit<CanvasPageContent, "pageId">;
@@ -57,6 +59,46 @@ type SuccessfulPayload = {
 
 function isSuccessfulPayload(value: unknown): value is SuccessfulPayload {
   return typeof value === "object" && value !== null;
+}
+
+function waitForRetry(delayMs: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, delayMs));
+}
+
+/**
+ * Turbopack may briefly return its HTML error document while it is compiling a
+ * lazily visited dynamic API route. Retry only malformed JSON responses so a
+ * normal JSON API error remains observable to the caller.
+ */
+async function requestJsonWithTransientRetry(
+  request: (url: string, init?: ApiRequestInit) => Promise<ApiResponse>,
+  url: string,
+  init: ApiRequestInit | undefined,
+  endpointLabel: string,
+): Promise<{ response: ApiResponse; payload: unknown }> {
+  for (
+    let attempt = 0;
+    attempt <= TRANSIENT_JSON_RETRY_DELAYS_MS.length;
+    attempt += 1
+  ) {
+    const response =
+      init === undefined ? await request(url) : await request(url, init);
+    try {
+      return { response, payload: await response.json() };
+    } catch (error) {
+      if (
+        !(error instanceof SyntaxError) ||
+        attempt === TRANSIENT_JSON_RETRY_DELAYS_MS.length
+      ) {
+        throw new Error(`${endpointLabel} 返回了非 JSON 响应`, {
+          cause: error,
+        });
+      }
+      await waitForRetry(TRANSIENT_JSON_RETRY_DELAYS_MS[attempt]);
+    }
+  }
+
+  throw new Error(`${endpointLabel} 返回了非 JSON 响应`);
 }
 
 /**
@@ -80,15 +122,25 @@ export async function loadCanvasPageContent(input: {
   sessionId: string;
   request?: (url: string, init?: ApiRequestInit) => Promise<ApiResponse>;
 }): Promise<CanvasPageContent> {
-  const request = input.request ?? ((url: string, init?: ApiRequestInit) => fetch(url, init));
+  const request =
+    input.request ?? ((url: string, init?: ApiRequestInit) => fetch(url, init));
   const encodedSessionId = encodeURIComponent(input.sessionId);
   const url = input.page.reference
     ? `/api/projects/${input.projectId}/reference-page/${input.page.id}?sessionId=${encodedSessionId}`
     : `/api/sessions/${input.sessionId}/files/${input.page.id}`;
-  const response = await request(url);
-  const payload = await response.json();
+  const { response, payload } = await requestJsonWithTransientRetry(
+    request,
+    url,
+    undefined,
+    "页面内容接口",
+  );
 
-  if (!response.ok || !isSuccessfulPayload(payload) || !payload.success || !payload.data) {
+  if (
+    !response.ok ||
+    !isSuccessfulPayload(payload) ||
+    !payload.success ||
+    !payload.data
+  ) {
     const message =
       isSuccessfulPayload(payload) && payload.error?.message
         ? payload.error.message
@@ -101,15 +153,17 @@ export async function loadCanvasPageContent(input: {
   // sandboxed-html 页面只能通过服务端签发的一次性执行票据运行。
   // 原始 HTML 永远不作为 iframe src 或客户端执行输入传递。
   if (input.page.runtimeType === "sandboxed-html" && !input.page.reference) {
-    const executionResponse = await request(
-      `/api/projects/${encodeURIComponent(input.projectId)}/demos/${encodeURIComponent(input.page.id)}/html-execution`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ sessionId: input.sessionId }),
-      },
-    );
-    const executionPayload = await executionResponse.json();
+    const { response: executionResponse, payload: executionPayload } =
+      await requestJsonWithTransientRetry(
+        request,
+        `/api/projects/${encodeURIComponent(input.projectId)}/demos/${encodeURIComponent(input.page.id)}/html-execution`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ sessionId: input.sessionId }),
+        },
+        "HTML 执行票据接口",
+      );
     if (
       !executionResponse.ok ||
       !isSuccessfulPayload(executionPayload) ||

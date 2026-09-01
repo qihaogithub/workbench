@@ -49,7 +49,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       });
     }
 
-    const updates: { resolved?: boolean; content?: string; mentions?: CommentMention[]; aiTaskStatus?: CommentAiTaskStatus } = {};
+    const updates: { resolved?: boolean; content?: string; mentions?: CommentMention[]; aiTaskStatus?: CommentAiTaskStatus; aiTaskAuthorization?: { userId: string; role: "admin" | "editor"; expiresAt: number } } = {};
     if (typeof body.resolved === "boolean") {
       updates.resolved = body.resolved;
     }
@@ -60,6 +60,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       }
       updates.content = body.content.trim();
       updates.mentions = mentions;
+      if (authorResult.userId && authorResult.role) {
+        updates.aiTaskAuthorization = {
+          userId: authorResult.userId,
+          role: authorResult.role,
+          expiresAt: Date.now() + 2 * 60 * 60 * 1000,
+        };
+      }
     }
     if (body.aiTaskStatus !== undefined) {
       updates.aiTaskStatus = body.aiTaskStatus;

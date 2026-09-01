@@ -29,7 +29,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { DocumentEditor } from "./DocumentEditor";
+import {
+  DocumentEditor,
+  type MarkdownReferenceClickHandler,
+  type MarkdownReferenceContext,
+  type MarkdownReferenceProvider,
+} from "./DocumentEditor";
 import type { DesignSpecEntryLink, ImageConfigScope, WhiteboardLauncher } from "./types";
 import { ImageInputActions } from "./ImageInputActions";
 
@@ -55,6 +60,15 @@ export const PositionConfigContext = createContext<PositionConfigContextValue | 
 
 export function usePositionConfig(): PositionConfigContextValue | null {
   return useContext(PositionConfigContext);
+}
+
+const SPINE_PACKAGE_ACCEPT = ".zip,.zip.flutter,application/zip,application/x-zip-compressed";
+
+function mergeSpinePackageAccept(value: unknown): string {
+  const configured = typeof value === "string" ? value.trim() : "";
+  return configured.includes(".zip.flutter")
+    ? configured
+    : [configured, SPINE_PACKAGE_ACCEPT].filter(Boolean).join(",");
 }
 
 function normalizeImageDefaults(raw: unknown): ImageItem[] | undefined {
@@ -88,6 +102,9 @@ export function FieldRenderer({
   imageConfigScope,
   pageId,
   onLaunchWhiteboard,
+  referenceContext,
+  referenceProvider,
+  onReferenceClick,
 }: {
   field: FieldConfig;
   value: unknown;
@@ -107,6 +124,9 @@ export function FieldRenderer({
   imageConfigScope?: ImageConfigScope;
   pageId?: string;
   onLaunchWhiteboard?: WhiteboardLauncher;
+  referenceContext?: MarkdownReferenceContext;
+  referenceProvider?: MarkdownReferenceProvider;
+  onReferenceClick?: MarkdownReferenceClickHandler;
 }) {
   const effectiveDefault = defaultValueOverride !== undefined
     ? defaultValueOverride
@@ -127,9 +147,23 @@ export function FieldRenderer({
     field.uiWidget === "imageList" ||
     field.format === "image" ||
     field.format === "file" ||
-    field.format === "video";
+    field.format === "video" ||
+    field.format === "spine";
 
   const renderInput = () => {
+    if (field.format === "spine") {
+      return (
+        <FileUploadWidget
+          value={value as any}
+          onChange={onChange}
+          label={field.title}
+          required={field.required}
+          sessionId={sessionId}
+          options={{ ...(field.uiOptions as any), assetKind: "spine", accept: mergeSpinePackageAccept(field.uiOptions?.accept), pageId, configKey: field.key }}
+        />
+      );
+    }
+
     if (field.uiWidget === "file" || field.uiWidget === "image" || field.format === "video") {
       const upload = (
         <FileUploadWidget
@@ -449,6 +483,11 @@ export function FieldRenderer({
           onChange={onChange}
           field={field}
           readonly={readonly}
+          referenceContext={referenceContext}
+          referenceProvider={referenceProvider}
+          onReferenceClick={onReferenceClick}
+          scope={imageConfigScope}
+          pageId={pageId}
         />
       );
     }
@@ -719,13 +758,37 @@ function RichTextInput({
   onChange,
   field,
   readonly,
+  referenceContext,
+  referenceProvider,
+  onReferenceClick,
+  scope,
+  pageId,
 }: {
   value: unknown;
   onChange: (value: unknown) => void;
   field: FieldConfig;
   readonly?: boolean;
+  referenceContext?: MarkdownReferenceContext;
+  referenceProvider?: MarkdownReferenceProvider;
+  onReferenceClick?: MarkdownReferenceClickHandler;
+  scope?: "project" | "page";
+  pageId?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const richTextReferenceContext = referenceContext && scope
+    ? {
+        ...referenceContext,
+        source: {
+          kind: "richtext-field" as const,
+          projectId: referenceContext.source.projectId,
+          workspaceId: referenceContext.source.workspaceId,
+          scope,
+          ...(scope === "page" && pageId ? { pageId } : {}),
+          fieldKey: field.key,
+          jsonPointer: `/${field.key.replace(/~/g, "~0").replace(/\//g, "~1")}`,
+        },
+      }
+    : undefined;
 
   return (
     <div>
@@ -748,6 +811,9 @@ function RichTextInput({
               value={(value as string) || ""}
               onChange={(v) => onChange(v)}
               readOnly={readonly}
+              referenceContext={richTextReferenceContext}
+              referenceProvider={referenceProvider}
+              onReferenceClick={onReferenceClick}
             />
           </div>
         </DialogContent>

@@ -5,6 +5,7 @@ import { Type, type Static } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { resolvePagePresentation } from "@workbench/shared";
 import type { AgentConfig } from "../../core/types";
+import { aiMutationDeniedResult, assertAiMutationAllowed } from "./ai-mutation-policy";
 import { logger } from "../../utils/logger";
 import { resolveLiveWorkspaceMutationContext } from "../../workspace/workspace-mutation-authority";
 import { isSafePageId, getPageDir, listPages } from "./workspace-page-utils";
@@ -1073,6 +1074,8 @@ export function createArrangeCanvasPagesTool(
         };
         const layoutPath = getCanvasLayoutPath(workingDir);
         const content = JSON.stringify(storedLayout, null, 2);
+        const mutationDecision = assertAiMutationAllowed(config, CANVAS_LAYOUT_FILENAME, { content });
+        if (!mutationDecision.allowed) return aiMutationDeniedResult(mutationDecision, CANVAS_LAYOUT_FILENAME);
         const liveWorkspace = resolveLiveWorkspaceMutationContext(workingDir);
         const receipt = liveWorkspace
           ? await (async () => {

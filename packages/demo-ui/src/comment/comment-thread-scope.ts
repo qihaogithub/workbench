@@ -39,3 +39,20 @@ export function countUnresolvedCommentThreads(
 ): number {
   return threads.filter((thread) => !thread.resolved).length;
 }
+
+/**
+ * 统计项目内各页面的未处理评论数量。
+ *
+ * 文档评论没有 pageId，因此会被自然排除；返回普通对象便于直接传给
+ * 画布页面组件，且不暴露可变 Map 给 React props。
+ */
+export function countUnresolvedCommentThreadsByPage(
+  threads: CommentThread[],
+): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const thread of threads) {
+    if (thread.resolved || thread.target.kind !== "page") continue;
+    counts[thread.target.pageId] = (counts[thread.target.pageId] ?? 0) + 1;
+  }
+  return counts;
+}

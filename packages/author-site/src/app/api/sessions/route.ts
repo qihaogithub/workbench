@@ -14,6 +14,7 @@ import {
 } from "@/lib/fs-utils";
 import {
   archiveActiveSession,
+  bindEditSessionRole,
   createEditSession,
   enforceSessionLimit,
   ensureSessionUsesProjectActiveWorkspace,
@@ -23,10 +24,12 @@ import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import {
   pushSessionExternalAuthToAgent,
   pushSessionModelConfigToAgent,
+  pushSessionAuthorizationToAgent,
 } from "@/lib/agent-providers";
 import { readExternalAuthSessionConfigWithRefresh } from "@/lib/external-auth";
 import { getModelConfig } from "@/lib/model-config";
 import { readUserBackendProvidersConfig } from "@/lib/user-model-config";
+import { findUserById, type UserRole } from "@/lib/user";
 
 function createSessionBootstrap(input: {
   sessionId: string;
@@ -35,6 +38,7 @@ function createSessionBootstrap(input: {
   workspaceScope: "live" | "branch" | "snapshot-source" | "legacy";
   workspacePath: string;
   activePageId?: string;
+  userRole: UserRole;
 }) {
   const project = readProjectMeta(input.projectId);
   const demoPages = input.workspaceId
@@ -72,7 +76,26 @@ function createSessionBootstrap(input: {
       ? getProjectConfigValues(input.workspacePath)
       : {},
     activePageId,
+    userRole: input.userRole,
   };
+}
+
+async function pushSessionAuthorization(input: {
+  userId: string;
+  userRole: UserRole;
+  sessionId: string;
+  projectId: string;
+  expiresAt: number;
+}): Promise<void> {
+  const result = await pushSessionAuthorizationToAgent(input.sessionId, {
+    userId: input.userId,
+    role: input.userRole,
+    projectId: input.projectId,
+    expiresAt: input.expiresAt,
+  });
+  if (!result.ok) {
+    console.warn("[sessions] Failed to push session authorization:", result.message);
+  }
 }
 
 async function pushUserModelConfig(userId: string, sessionId: string): Promise<void> {
@@ -127,7 +150,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const userId = payload.userId;
+    const user = findUserById(payload.userId);
+    if (!user) {
+      return NextResponse.json(createApiError("UNAUTHORIZED", "用户不存在"), { status: 401 });
+    }
+    const userId = user.id;
+    const userRole = user.role;
     const body = await request.json();
     const { demoId: projectId, forceNew, workspaceId } = body;
     const activePageId =
@@ -147,9 +175,20 @@ export async function POST(request: NextRequest) {
     const activeSessionId = findActiveSession(userId, projectId);
     if (activeSessionId && !workspaceId) {
       ensureSessionUsesProjectActiveWorkspace(userId, projectId, activeSessionId);
+      const authorization = bindEditSessionRole(activeSessionId, userId, userRole);
+      if (!authorization) {
+        return NextResponse.json(createApiError("SESSION_NOT_FOUND", "Session 授权信息无效"), { status: 404 });
+      }
       await Promise.all([
         pushUserModelConfig(userId, activeSessionId),
         pushUserExternalAuth(userId, activeSessionId),
+        pushSessionAuthorization({
+          userId,
+          userRole,
+          sessionId: activeSessionId,
+          projectId: authorization.projectId,
+          expiresAt: authorization.expiresAt,
+        }),
       ]);
 
       const meta = getSessionMeta(activeSessionId);
@@ -169,6 +208,7 @@ export async function POST(request: NextRequest) {
           workspaceScope,
           workspacePath,
           activePageId,
+          userRole,
         })),
       );
     }
@@ -177,10 +217,21 @@ export async function POST(request: NextRequest) {
       typeof workspaceId === "string"
         ? workspaceId
         : undefined;
-    const result = await createEditSession(userId, projectId, resumeWorkspaceId);
+    const result = await createEditSession(userId, projectId, resumeWorkspaceId, userRole);
+    const authorization = bindEditSessionRole(result.sessionId, userId, userRole);
+    if (!authorization) {
+      throw new Error("Session 授权信息写入失败");
+    }
     await Promise.all([
       pushUserModelConfig(userId, result.sessionId),
       pushUserExternalAuth(userId, result.sessionId),
+      pushSessionAuthorization({
+        userId,
+        userRole,
+        sessionId: result.sessionId,
+        projectId: authorization.projectId,
+        expiresAt: authorization.expiresAt,
+      }),
     ]);
     enforceSessionLimit(userId, projectId, 5);
     return NextResponse.json(
@@ -191,6 +242,7 @@ export async function POST(request: NextRequest) {
         workspaceScope: result.workspaceScope,
         workspacePath: result.workspacePath,
         activePageId,
+        userRole,
       })),
       { status: 201 },
     );

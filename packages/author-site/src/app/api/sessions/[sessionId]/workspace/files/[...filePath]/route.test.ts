@@ -6,6 +6,7 @@ import path from "path";
 const ensureMemoryFile = jest.fn();
 const isLiveWorkspace = jest.fn();
 const commitWorkspaceMutation = jest.fn();
+const findUserById = jest.fn();
 const createTextWorkspaceMutation = jest.fn((input: unknown) => ({
   mutationId: "mutation-1",
   actor: "author-site",
@@ -26,8 +27,11 @@ jest.mock("@/lib/workspace-manager", () => ({
   isLiveWorkspace,
 }));
 
+jest.mock("@/lib/user", () => ({ findUserById }));
+
 jest.mock("@/lib/workspace-file-utils", () => ({
-  isFileEditable: jest.fn((filePath: string) => filePath === "index.tsx"),
+  isFileEditable: jest.fn((filePath: string) =>
+    filePath === "index.tsx" || filePath === "convention.md"),
 }));
 
 jest.mock("@/lib/workspace-authority-client", () => {
@@ -82,6 +86,7 @@ describe("workspace file content route", () => {
   beforeEach(() => {
     jest.resetModules();
     jest.clearAllMocks();
+    findUserById.mockReturnValue({ id: "user-1", role: "admin" });
     global.Response = TestResponse as unknown as typeof Response;
     commitWorkspaceMutation.mockResolvedValue({
       mutationId: "mutation-1",
@@ -257,6 +262,30 @@ describe("workspace file content route", () => {
     expect(fs.readFileSync(path.join(workspacePath, "index.tsx"), "utf-8")).toBe("old code");
   });
 
+  it("普通编辑者不能修改项目公约，但仍可读取", async () => {
+    const content = "# 项目公约\n";
+    fs.writeFileSync(path.join(workspacePath, "convention.md"), content, "utf-8");
+    findUserById.mockReturnValue({ id: "user-1", role: "editor" });
+    const { GET, PUT } = await import("./route");
+
+    const readResponse = await GET(
+      {} as NextRequest,
+      { params: Promise.resolve({ sessionId: "session-1", filePath: ["convention.md"] }) },
+    );
+    expect(readResponse.status).toBe(200);
+    await expect(readResponse.json()).resolves.toMatchObject({
+      success: true,
+      data: { editable: false },
+    });
+
+    const writeResponse = await PUT(
+      jsonRequest({ content: "# changed" }),
+      { params: Promise.resolve({ sessionId: "session-1", filePath: ["convention.md"] }) },
+    );
+    expect(writeResponse.status).toBe(403);
+    expect(commitWorkspaceMutation).not.toHaveBeenCalled();
+  });
+
   it("DELETE 仅通过 Authority 删除项目公约", async () => {
     const content = "# 项目公约\n\n- 不自动创建\n";
     fs.writeFileSync(path.join(workspacePath, "convention.md"), content, "utf-8");
@@ -279,6 +308,20 @@ describe("workspace file content route", () => {
       })],
     }));
     expect(fs.existsSync(path.join(workspacePath, "convention.md"))).toBe(true);
+  });
+
+  it("普通编辑者不能删除项目公约", async () => {
+    fs.writeFileSync(path.join(workspacePath, "convention.md"), "# 项目公约", "utf-8");
+    findUserById.mockReturnValue({ id: "user-1", role: "editor" });
+    const { DELETE } = await import("./route");
+
+    const response = await DELETE(
+      {} as NextRequest,
+      { params: Promise.resolve({ sessionId: "session-1", filePath: ["convention.md"] }) },
+    );
+
+    expect(response.status).toBe(403);
+    expect(commitWorkspaceMutation).not.toHaveBeenCalled();
   });
 
   it("DELETE 拒绝删除非公约工作空间文件", async () => {

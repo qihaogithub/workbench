@@ -10,6 +10,8 @@ import {
   resolveLiveWorkspaceMutationContext,
   WorkspaceMutationAuthorityError,
 } from "../../workspace/workspace-mutation-authority";
+import { aiMutationDeniedResult, assertAiMutationAllowed } from "./ai-mutation-policy";
+import { createManagedDocumentProposalResult } from "./document-proposal-tool";
 
 const WORKSPACE_TREE_FILENAME = "workspace-tree.json";
 
@@ -59,6 +61,9 @@ export function createDeleteFileTool(
           isError: true,
         };
       }
+
+      const mutationDecision = assertAiMutationAllowed(config, relativePath);
+      if (!mutationDecision.allowed) return aiMutationDeniedResult(mutationDecision, relativePath);
 
       if (isProtectedPath(relativePath)) {
         logger.warn(
@@ -131,6 +136,15 @@ export function createDeleteFileTool(
             details: { path: relativePath, error: "FILE_NOT_FOUND" },
             isError: true,
           };
+        }
+
+        if (liveWorkspace && snapshot) {
+          const proposalResult = createManagedDocumentProposalResult({
+            config, dataDir: liveWorkspace.dataDir, projectId: liveWorkspace.projectId,
+            workspaceId: liveWorkspace.workspaceId, snapshot, resourcePath: relativePath,
+            operationIntent: "delete", baseContent: existingContent, proposedContent: null,
+          });
+          if (proposalResult) return proposalResult;
         }
 
         if (liveWorkspace) {

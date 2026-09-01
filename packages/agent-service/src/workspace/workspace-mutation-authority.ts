@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { buildPageDesignSpecSyncWrites } from "@workbench/project-core/page-design-spec-sync";
 import { normalizeHtmlImport } from "@workbench/project-core/html-import";
+import { classifyManagedDocumentPath } from "@workbench/project-core/document-proposal";
 
 import type {
   WorkspaceMutationCommittedEvent,
@@ -474,7 +475,7 @@ export class WorkspaceMutationAuthority {
   /** Store untrusted bytes outside the editable Workspace until a subsequent
    * staged mutation validates and commits their exact hash. */
   async stageBinary(projectId: string, workspaceId: string, content: Buffer): Promise<{ stagingId: string; hash: string; size: number }> {
-    if (content.length === 0 || content.length > 20 * 1024 * 1024) {
+    if (content.length === 0 || content.length > 64 * 1024 * 1024) {
       throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
     }
     return this.serial(workspaceId, async () => this.withLease(workspaceId, async () => {
@@ -498,11 +499,17 @@ export class WorkspaceMutationAuthority {
       operationCount: request.operations.length,
     });
     try {
-      if (request.actor !== "collab") {
+      // Approved document proposals must flush their affected collaborative
+      // drafts only after acquiring the Authority critical section; otherwise
+      // a draft can change between an outside-the-lock flush and CAS.
+      if (request.actor !== "collab" && request.reason !== "document_proposal_apply") {
         await this.flushDraftsForMutation(request);
       }
       const queuedAt = Date.now();
       return await this.serial(request.workspaceId, async () => this.withLease(request.workspaceId, async () => {
+        if (request.reason === "document_proposal_apply") {
+          await this.flushDraftsForMutation(request);
+        }
         const queueWaitMs = Date.now() - queuedAt;
         let state = this.ensureBootstrap(request.projectId, request.workspaceId);
         if (state.projectId !== request.projectId) throw new WorkspaceMutationAuthorityError("WORKSPACE_NOT_FOUND");
@@ -670,6 +677,33 @@ export class WorkspaceMutationAuthority {
       }
       throw error;
     }
+  }
+
+  /**
+   * The sole Workspace write entry point for an already-approved document
+   * proposal. Unlike ordinary Yjs-first mutations, this preserves per-file
+   * preconditions and validates them while the Authority owns its workspace
+   * lease. Callers must compile operations from a frozen server-side proposal;
+   * this API intentionally accepts no client supplied proposal payload.
+   */
+  async commitDocumentProposal(request: WorkspaceMutationRequest): Promise<WorkspaceMutationReceipt> {
+    const paths = this.mutationResourcePaths(request);
+    const documentPaths = paths.filter((resourcePath) => classifyManagedDocumentPath(resourcePath));
+    if (documentPaths.length === 0 || paths.some((resourcePath) => (
+      resourcePath !== "knowledge/manifest.json" && !classifyManagedDocumentPath(resourcePath)
+    ))) {
+      throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+    }
+    for (const operation of request.operations) {
+      if (operation.type === "move_path" || operation.type === "commit_html_import") {
+        throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+      }
+      if (operation.type === "delete_path") continue;
+      if (!operation.expectedAbsent && !operation.expectedHash) {
+        throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+      }
+    }
+    return this.mutate({ ...request, reason: "document_proposal_apply" });
   }
 
   private mutationResourcePaths(request: WorkspaceMutationRequest): string[] {
@@ -901,7 +935,7 @@ export class WorkspaceMutationAuthority {
       if (operation.type === "put_text") {
         assertManagedWorkspaceTextWrite(operation.path, operation.content);
       } else if (operation.type === "put_binary") {
-        if (!operation.path.startsWith("assets/") || !/^[0-9a-f-]{36}$/i.test(operation.stagingId) || operation.size <= 0 || operation.size > 20 * 1024 * 1024) {
+        if (!operation.path.startsWith("assets/") || !/^[0-9a-f-]{36}$/i.test(operation.stagingId) || operation.size <= 0 || operation.size > 64 * 1024 * 1024) {
           throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
         }
         const staged = this.stagingPath(request.workspaceId, operation.stagingId);
@@ -926,9 +960,20 @@ export class WorkspaceMutationAuthority {
         }
         assertManagedWorkspaceTextWrite(operation.path, text);
       }
-      // Yjs-First: assertExpected() removed for all operation types — Authority no
-      // longer does per-resource hash conflict detection. All writes are routed
-      // through the Yjs room, which handles CRDT merging.
+      // Normal Yjs-first writes merge in the collab room. An approved document
+      // proposal is deliberately different: users approved a frozen snapshot,
+      // so its preconditions are checked inside this serial + lease section.
+      if (request.reason === "document_proposal_apply") {
+        if (operation.type === "move_path" || operation.type === "commit_html_import") {
+          throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+        }
+        const current = before[operation.path];
+        if (operation.type === "delete_path") {
+          this.assertExpected(current, operation.expectedHash, false, operation.path);
+        } else {
+          this.assertExpected(current, operation.expectedHash, operation.expectedAbsent, operation.path);
+        }
+      }
     }
     // A stale base is harmless only when every targeted resource still matched.
     if (request.baseRevision > state.revision) throw new WorkspaceMutationAuthorityError("WORKSPACE_RESOURCE_CONFLICT");
@@ -1333,6 +1378,8 @@ export function registerCollabDraftProvider(dataDir: string, provider: CollabDra
 /** Returns a live-workspace Authority request context, or null for branch/non-workspace paths. */
 export function resolveLiveWorkspaceMutationContext(workspacePath: string): {
   authority: WorkspaceMutationAuthority;
+  /** Shared durable data root for proposal snapshots and outbox records. */
+  dataDir: string;
   projectId: string;
   workspaceId: string;
 } | null {
@@ -1350,6 +1397,7 @@ export function resolveLiveWorkspaceMutationContext(workspacePath: string): {
     if (path.basename(current) !== "workspaces") return null;
     const dataDir = path.dirname(current);
     return {
+      dataDir,
       projectId,
       workspaceId: meta.workspaceId,
       authority: new WorkspaceMutationAuthority({ dataDir, resolveWorkspacePath: (id) => id === meta.workspaceId ? workspacePath : null }),

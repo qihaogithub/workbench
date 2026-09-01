@@ -222,7 +222,7 @@ export function normalizeWorkspaceResourcePath(resourcePath: string): string | n
 export function isManagedWorkspaceResource(resourcePath: string): boolean {
   const normalized = normalizeWorkspaceResourcePath(resourcePath);
   return Boolean(normalized && (
-    /^demos\/[^/]+\/(index\.tsx|prototype\.(html|css|meta\.json)|sandbox\.html|html-import\.meta\.json|config\.schema\.json|sketch\.(scene|meta)\.json|convention\.md)$/.test(normalized)
+    /^demos\/[^/]+\/(index\.tsx|prototype\.(html|css|meta\.json)|sandbox\.html|html-import\.meta\.json|config\.schema\.json|sketch\.(scene|meta)\.json|(convention|requirements)\.md)$/.test(normalized)
     || normalized === "project.config.schema.json"
     || normalized === "project.config.values.json"
     || normalized === "workspace-tree.json"

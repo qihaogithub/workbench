@@ -1,6 +1,7 @@
 import type { SketchSceneDocument } from "@workbench/sketch-core";
 import type { DemoFolderMeta, DemoPageMeta, DemoPageRuntimeType, KnowledgeIndexItem, PagePresentationProfile } from "@workbench/shared";
 import type { CanvasState } from "@workbench/demo-ui";
+import type { MarkdownReferenceTarget } from "@workbench/shared/markdown-reference";
 
 export type PublishedPageRuntimeType =
   | "prototype-html-css"
@@ -88,6 +89,42 @@ export interface PublishedProject {
   canvasState?: CanvasState;
   knowledge?: KnowledgeIndexItem[];
   designSpecs?: PublishedDesignSpecMeta[];
+  markdownReferences?: PublishedMarkdownReferenceSnapshot;
+}
+
+export interface PublishedMarkdownReferenceTarget {
+  target: MarkdownReferenceTarget;
+  label: string;
+  publishedPath: string;
+  aliases?: string[];
+}
+
+export interface PublishedMarkdownReferenceEdge {
+  source:
+    | { kind: "knowledge-document"; docId: string }
+    | { kind: "page-requirements"; pageId: string }
+    | { kind: "design-spec-entry"; specId: string; entryId: string };
+  target?: MarkdownReferenceTarget;
+  labelSnapshot: string;
+  targetState: "resolved" | "publish-unavailable";
+  line: number;
+  column: number;
+}
+
+export interface PublishedMarkdownReferenceSnapshot {
+  version: 1;
+  projectId: string;
+  publishedVersion: string;
+  canonicalSnapshot: {
+    versionId: string;
+    workspaceId?: string;
+    workspaceRevision?: number;
+    workspaceRootHash?: string;
+  };
+  targets: PublishedMarkdownReferenceTarget[];
+  documentPaths: Record<string, string>;
+  edges: PublishedMarkdownReferenceEdge[];
+  unresolvedCount: number;
 }
 
 export interface ProjectsIndex {

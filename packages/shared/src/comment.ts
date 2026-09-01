@@ -71,7 +71,11 @@ export interface PageCommentTarget {
 /** 文档评论的稳定资源标识。 */
 export interface DocumentCommentTarget {
   kind: "document";
-  /** 工作区内路径；设计规范以 design-spec/<docId>#<entryId> 表示一个条目说明。 */
+  /**
+   * 稳定资源标识。知识文档使用 `knowledge-document/<documentId>`；
+   * 其他工作区文件仍可使用相对路径，设计规范以
+   * `design-spec/<docId>#<entryId>` 表示一个条目说明。
+   */
   resourceId: string;
   resourceLabel: string;
 }
@@ -90,7 +94,19 @@ export interface DocumentCommentAnchor {
 }
 
 /** @AI 任务状态 */
-export type CommentAiTaskStatus = "pending" | "processing" | "done" | "failed";
+export type CommentAiTaskStatus = "pending" | "processing" | "awaiting_approval" | "done" | "failed";
+
+/**
+ * 触发 @AI 写入任务的服务端身份快照。
+ *
+ * 只存于评论存储的内部元数据，公开评论 API 不返回该字段；Agent Service
+ * 使用它在异步重试与重启恢复后继续执行与原触发者一致的权限策略。
+ */
+export interface CommentAiTaskAuthorization {
+  userId: string;
+  role: "admin" | "editor";
+  expiresAt: number;
+}
 
 /** 评论线程 */
 export interface CommentThread {
@@ -107,6 +123,10 @@ export interface CommentThread {
   author: CommentAuthor;
   mentions?: CommentMention[];
   aiTaskStatus?: CommentAiTaskStatus;
+  /** Private proposal identifier projected as status metadata, never as a
+   * write authorization. Present only while an Agent document proposal waits
+   * for the original user to review it. */
+  documentProposalId?: string;
   createdAt: number;
   updatedAt: number;
   resolved: boolean;
@@ -116,6 +136,8 @@ export interface CommentThread {
 /** comments.json 文件格式 */
 export interface CommentStoreData {
   threads: CommentThread[];
+  /** threadId -> 服务端解析的 @AI 任务授权，不属于公开评论内容。 */
+  aiTaskAuthorizations?: Record<string, CommentAiTaskAuthorization>;
 }
 
 /** WebSocket 广播事件 */

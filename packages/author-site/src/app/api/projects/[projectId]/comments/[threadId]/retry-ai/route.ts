@@ -39,7 +39,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       });
     }
 
-    const thread = await retryAiTask(projectId, threadId);
+    const thread = await retryAiTask(
+      projectId,
+      threadId,
+      authorResult.userId && authorResult.role
+        ? { userId: authorResult.userId, role: authorResult.role, expiresAt: Date.now() + 2 * 60 * 60 * 1000 }
+        : undefined,
+    );
     return NextResponse.json(createApiSuccess({ thread }));
   } catch (error) {
     console.error("重试评论 AI 任务失败:", error);

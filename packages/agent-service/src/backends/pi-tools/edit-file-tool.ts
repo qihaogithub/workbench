@@ -17,6 +17,8 @@ import {
 } from "../../workspace/workspace-mutation-authority";
 import { getHocuspocusCollabServer } from "../../collab/hocuspocus-server";
 import { resolveCollabResourceKind } from "../../collab/workspace-file-persistence";
+import { aiMutationDeniedResult, assertAiMutationAllowed } from "./ai-mutation-policy";
+import { createManagedDocumentProposalResult } from "./document-proposal-tool";
 
 // ---------------------------------------------------------------------------
 // Line ending & BOM utilities (aligned with pi-agent edit-diff.ts)
@@ -508,6 +510,37 @@ export function createEditFileTool(
           : normalizedNewContent;
 
         const newContent = bom + restoreLineEndings(finalLFContent, originalEnding);
+
+        // Execution-time enforcement protects direct tool invocation and
+        // checks the final workspace-tree payload rather than trusting the
+        // model's requested edit description.
+        const mutationDecision = assertAiMutationAllowed(config, args.path, { content: newContent });
+        if (!mutationDecision.allowed) return aiMutationDeniedResult(mutationDecision, args.path);
+
+        // Preflight the final document before entering collab/Authority. This
+        // keeps schema contract violations from being written and diagnosed
+        // only after the mutation.
+        const preflightValidation = validatePreviewFileWrite(
+          args.path,
+          newContent,
+          resolvePageRuntimeType(args.path, snapshot?.resources),
+        );
+        if (preflightValidation && !preflightValidation.ok) {
+          return {
+            content: [{ type: "text", text: `Error: ${formatRuntimeValidationInstruction(preflightValidation).trim()}` }],
+            details: { path: args.path, runtimeValidation: preflightValidation },
+            isError: true,
+          };
+        }
+
+        if (liveWorkspace && snapshot) {
+          const proposalResult = createManagedDocumentProposalResult({
+            config, dataDir: liveWorkspace.dataDir, projectId: liveWorkspace.projectId,
+            workspaceId: liveWorkspace.workspaceId, snapshot, resourcePath: args.path,
+            operationIntent: "replace", baseContent: rawContent, proposedContent: newContent,
+          });
+          if (proposalResult) return proposalResult;
+        }
 
         // --- Write back ---
         let receipt;

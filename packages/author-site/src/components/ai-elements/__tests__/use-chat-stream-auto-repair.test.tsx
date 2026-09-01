@@ -499,6 +499,31 @@ expect(mockSendMessage).toHaveBeenCalledWith(
         }),
       ]),
     );
+
+    await act(async () => {
+      await mockHandlers.onFinish({
+        content: "计划已执行",
+        files: [],
+      });
+    });
+
+    const assistantMessages = messages.filter(
+      (message) => message.role === "assistant",
+    );
+    expect(assistantMessages).toHaveLength(1);
+    expect(new Set(messages.map((message) => message.id)).size).toBe(
+      messages.length,
+    );
+    expect(assistantMessages[0]).toMatchObject({
+      content: "计划已执行",
+      parts: [
+        expect.objectContaining({
+          toolCallId: "plan-call-1",
+          status: "completed",
+          result: { approved: true },
+        }),
+      ],
+    });
   });
 
   it("AI 回复期间触发的系统自动任务会排队，避免并发发送到 Agent", async () => {

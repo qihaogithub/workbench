@@ -14,7 +14,7 @@ import {
   readDesignSpecManifest,
   saveDesignSpecDoc,
 } from "@/lib/design-specs";
-import { resolveDesignSpecContext } from "@/lib/design-specs/route-helpers";
+import { requireDesignSpecAdmin, resolveDesignSpecContext } from "@/lib/design-specs/route-helpers";
 import {
   commitWorkspaceMutation,
   WorkspaceAuthorityClientError,
@@ -61,6 +61,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   if (!isSafeDocId(docId)) return notFound();
   const resolved = await resolveDesignSpecContext(request);
   if ("response" in resolved) return resolved.response;
+  const authorizationError = requireDesignSpecAdmin(resolved.ctx);
+  if (authorizationError) return authorizationError;
   const { workingDir, live, liveContext } = resolved.ctx;
 
   const body = await request.json().catch(() => null);
@@ -138,6 +140,8 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   if (!isSafeDocId(docId)) return notFound();
   const resolved = await resolveDesignSpecContext(request);
   if ("response" in resolved) return resolved.response;
+  const authorizationError = requireDesignSpecAdmin(resolved.ctx);
+  if (authorizationError) return authorizationError;
   const { workingDir, live, liveContext } = resolved.ctx;
 
   const existing = readDesignSpecDoc(workingDir, docId);

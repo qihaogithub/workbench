@@ -390,6 +390,11 @@ interface CanvasPageGroupItemProps {
   onLayoutChange?: (groupId: string, layout: CanvasPageLayout) => void;
   onActivePageChange: (groupId: string, pageId: string) => void;
   onDirectoryCollapsedChange: (groupId: string, collapsed: boolean) => void;
+  commentCounts?: Record<string, number>;
+  onCommentBadgeClick?: (
+    pageId: string,
+    event: React.MouseEvent<HTMLButtonElement>,
+  ) => void;
   onDragStart?: (groupId: string) => void;
   onDragMove?: (
     groupId: string,
@@ -416,6 +421,8 @@ function CanvasPageGroupItem({
   onLayoutChange,
   onActivePageChange,
   onDirectoryCollapsedChange,
+  commentCounts,
+  onCommentBadgeClick,
   onDragStart,
   onDragMove,
   onDragEnd,
@@ -579,7 +586,7 @@ function CanvasPageGroupItem({
       }}
     >
       <div
-        className="absolute left-0 max-w-full truncate font-medium text-muted-foreground pointer-events-none"
+        className="absolute left-0 flex max-w-full items-center gap-1 font-medium text-muted-foreground"
         title={group.title}
         style={{
           top: -labelTopOffset,
@@ -587,7 +594,9 @@ function CanvasPageGroupItem({
           lineHeight: 1.2,
         }}
       >
-        {group.title}
+        <span className="max-w-full truncate" title={group.title}>
+          {group.title}
+        </span>
       </div>
 
       {group.directoryCollapsed ? (
@@ -640,25 +649,47 @@ function CanvasPageGroupItem({
           <div className="scrollbar-thin max-h-[inherit] overflow-auto py-1">
             {group.pages.map((entry) => {
               const active = entry.pageId === activePageId;
+              const commentCount = commentCounts?.[entry.pageId] ?? 0;
               return (
-                <button
+                <div
                   key={entry.id}
-                  type="button"
                   className={cn(
-                    "block w-full truncate px-3 py-2 text-left text-xs transition-colors hover:bg-background/80",
+                    "flex w-full items-center gap-1 px-3 py-2 text-xs transition-colors hover:bg-background/80",
                     active
                       ? "bg-background font-medium text-foreground"
                       : "text-muted-foreground",
                   )}
-                  title={entry.title}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onActivePageChange(group.id, entry.pageId);
-                    onSelect(group.id, entry.pageId, event);
-                  }}
                 >
-                  {entry.title}
-                </button>
+                  <button
+                    type="button"
+                    className="min-w-0 flex-1 truncate text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    title={entry.title}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onActivePageChange(group.id, entry.pageId);
+                      onSelect(group.id, entry.pageId, event);
+                    }}
+                  >
+                    {entry.title}
+                  </button>
+                  {commentCount > 0 && (
+                    <button
+                      type="button"
+                      className="shrink-0 cursor-pointer rounded-full border border-blue-500 bg-blue-600 px-2 py-0.5 text-[11px] font-semibold leading-4 text-white shadow-sm transition-colors duration-200 hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+                      title={`打开${entry.title}的评论列表`}
+                      aria-label={`${entry.title}有 ${commentCount} 条未处理评论，打开评论列表`}
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onActivePageChange(group.id, entry.pageId);
+                        onCommentBadgeClick?.(entry.pageId, event);
+                      }}
+                    >
+                      评论 {commentCount}
+                    </button>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -717,6 +748,8 @@ export function PreviewCanvas({
   onPageConfigEdit,
   onPageRename,
   onPageComment,
+  onPageCommentBadgeClick,
+  commentCounts,
   onCanvasClick,
   className,
   editingPageId,
@@ -1674,6 +1707,36 @@ export function PreviewCanvas({
       }
     },
     [effectiveToolMode, isEditorMode, notifyPageConfigEdit],
+  );
+
+  const handlePageCommentBadgeClick = useCallback(
+    (pageId: string) => {
+      if (isEditorMode) {
+        setSelectedNavigationConnectionId(null);
+        setSelectedNodeId(null);
+        setSelectedDocumentNodeIds([]);
+        setSelectedSectionId(null);
+        setSelectedPageGroupIds([]);
+        setSelectedPageIds([pageId]);
+      }
+      onPageCommentBadgeClick?.(pageId);
+    },
+    [isEditorMode, onPageCommentBadgeClick],
+  );
+
+  const handlePageGroupCommentBadgeClick = useCallback(
+    (groupId: string, pageId: string) => {
+      if (isEditorMode) {
+        setSelectedNavigationConnectionId(null);
+        setSelectedNodeId(null);
+        setSelectedDocumentNodeIds([]);
+        setSelectedSectionId(null);
+        setSelectedPageIds([]);
+        setSelectedPageGroupIds([groupId]);
+      }
+      onPageCommentBadgeClick?.(pageId);
+    },
+    [isEditorMode, onPageCommentBadgeClick],
   );
 
   const writeCanvasSelectionToClipboard = useCallback(
@@ -4631,6 +4694,12 @@ export function PreviewCanvas({
                       }
                     : undefined
                 }
+                commentCount={commentCounts?.[page.id] ?? 0}
+                onCommentBadgeClick={
+                  onPageCommentBadgeClick
+                    ? handlePageCommentBadgeClick
+                    : undefined
+                }
                 onRequestDelete={
                   onRequestDeletePages
                     ? (pageId) => void onRequestDeletePages([pageId])
@@ -4717,6 +4786,13 @@ export function PreviewCanvas({
             }
             onActivePageChange={handlePageGroupActivePageChange}
             onDirectoryCollapsedChange={handlePageGroupDirectoryCollapsedChange}
+            commentCounts={commentCounts}
+            onCommentBadgeClick={
+              onPageCommentBadgeClick
+                ? (pageId) =>
+                    handlePageGroupCommentBadgeClick(group.id, pageId)
+                : undefined
+            }
             onDragStart={handleDragStart}
             onDragMove={handleDragMove}
             onDragEnd={handleDragEnd}

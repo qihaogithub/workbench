@@ -11,6 +11,7 @@ import { getPageTypeLimits } from "./type-limits-store";
 import { FieldRenderer, PositionConfigContext, type PositionConfigContextValue, type PositionFieldEntry } from "./FieldRenderer";
 import { configFieldMatchesCategoryFilter } from "./config-categories";
 import { getPreviewSize } from "./validator";
+import { isAtomicConfigField } from "@workbench/shared";
 
 function isFieldVisible(
   field: FieldConfig,
@@ -81,7 +82,7 @@ function computeFlattenPathMap(schema: string): Record<string, string> {
     const map: Record<string, string> = {};
     for (const [key, prop] of Object.entries(properties)) {
       const p = prop as any;
-      if (p?.type === "object" && p?.properties && typeof p.properties === "object" && !Array.isArray(p.properties)) {
+      if (p?.type === "object" && !isAtomicConfigField(p) && p?.properties && typeof p.properties === "object" && !Array.isArray(p.properties)) {
         if (p.$demo?.positionable) continue;
         for (const nestedKey of Object.keys(p.properties)) {
           map[nestedKey] = key;
@@ -127,6 +128,9 @@ function FieldGroupSection({
   imageConfigScope,
   pageId,
   onLaunchWhiteboard,
+  referenceContext,
+  referenceProvider,
+  onReferenceClick,
 }: {
   group: FieldGroup;
   formData: Record<string, unknown>;
@@ -141,6 +145,9 @@ function FieldGroupSection({
   imageConfigScope?: ConfigFormProps["imageConfigScope"];
   pageId?: string;
   onLaunchWhiteboard?: ConfigFormProps["onLaunchWhiteboard"];
+  referenceContext?: ConfigFormProps["referenceContext"];
+  referenceProvider?: ConfigFormProps["referenceProvider"];
+  onReferenceClick?: ConfigFormProps["onReferenceClick"];
 }) {
   if (group.title === "") {
     return (
@@ -162,6 +169,9 @@ function FieldGroupSection({
               imageConfigScope={imageConfigScope}
               pageId={pageId}
               onLaunchWhiteboard={onLaunchWhiteboard}
+              referenceContext={referenceContext}
+              referenceProvider={referenceProvider}
+              onReferenceClick={onReferenceClick}
             />
           ))}
         </div>
@@ -191,6 +201,9 @@ function FieldGroupSection({
             imageConfigScope={imageConfigScope}
             pageId={pageId}
             onLaunchWhiteboard={onLaunchWhiteboard}
+            referenceContext={referenceContext}
+            referenceProvider={referenceProvider}
+            onReferenceClick={onReferenceClick}
           />
         ))}
       </div>
@@ -221,6 +234,9 @@ export function ConfigForm({
   imageConfigScope,
   pageId,
   onLaunchWhiteboard,
+  referenceContext,
+  referenceProvider,
+  onReferenceClick,
 }: ConfigFormProps) {
   const [formData, setFormData] = useState<Record<string, unknown>>(
     () => {
@@ -424,6 +440,9 @@ export function ConfigForm({
                 imageConfigScope={imageConfigScope}
                 pageId={pageId}
                 onLaunchWhiteboard={onLaunchWhiteboard}
+                referenceContext={referenceContext}
+                referenceProvider={referenceProvider}
+                onReferenceClick={onReferenceClick}
               />
             </div>
           ))}

@@ -11,6 +11,11 @@ import type {
   AppActionPayload,
 } from "./iframe-types";
 import type { FieldConfig } from "./schema-parser";
+import type {
+  MarkdownReferenceClickHandler,
+  MarkdownReferenceContext,
+  MarkdownReferenceProvider,
+} from "./DocumentEditor";
 
 export type {
   IframeOutMessageType,
@@ -221,6 +226,10 @@ export interface ConfigFormProps {
   pageId?: string;
   /** 无 IO capability：宿主打开白板并负责草稿、提交与持久化。 */
   onLaunchWhiteboard?: WhiteboardLauncher;
+  /** Optional typed references for richtext fields and field notes. */
+  referenceContext?: MarkdownReferenceContext;
+  referenceProvider?: MarkdownReferenceProvider;
+  onReferenceClick?: MarkdownReferenceClickHandler;
 }
 
 export type ImageConfigScope = "project" | "page";
@@ -490,7 +499,8 @@ export interface CanvasLayersState {
 export interface CanvasKnowledgeDocument {
   id: string;
   title: string;
-  fileName: string;
+  /** @deprecated Display-only compatibility field; document identity is `id`. */
+  fileName?: string;
   description?: string;
 }
 
@@ -588,6 +598,10 @@ export interface PreviewCanvasProps {
     clientX: number;
     clientY: number;
   }) => void;
+  /** 页面标题旁评论标签点击；宿主负责打开评论面板并同步页面选择。 */
+  onPageCommentBadgeClick?: (pageId: string) => void;
+  /** 各页面未处理评论数量，供画布标题标签展示。 */
+  commentCounts?: Record<string, number>;
   onCanvasClick?: () => void;
   className?: string;
   editingPageId?: string;

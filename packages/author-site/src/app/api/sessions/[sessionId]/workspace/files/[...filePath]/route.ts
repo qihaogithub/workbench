@@ -12,6 +12,7 @@ import {
   ensureMemoryFile,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
+import { findUserById } from "@/lib/user";
 import { isFileEditable } from "@/lib/workspace-file-utils";
 import { isLiveWorkspace } from "@/lib/workspace-manager";
 import {
@@ -23,6 +24,17 @@ import {
 interface ResolvedWorkspaceFile {
   relativePath: string;
   absolutePath: string;
+}
+
+function isConventionPath(relativePath: string): boolean {
+  return (
+    relativePath === "convention.md" ||
+    /^demos\/[^/]+\/convention\.md$/.test(relativePath)
+  );
+}
+
+function isAdminUserId(userId: string): boolean {
+  return findUserById(userId)?.role === "admin";
 }
 
 function resolveWorkspaceFilePath(
@@ -164,7 +176,8 @@ export async function GET(
       createApiSuccess({
         path: relativePath,
         content,
-        editable: isFileEditable(relativePath),
+        editable: isFileEditable(relativePath) &&
+          (!isConventionPath(relativePath) || isAdminUserId(payload.userId)),
         size: stat.size,
       }),
     );
@@ -252,6 +265,12 @@ export async function PUT(
     }
 
     const { relativePath, absolutePath } = resolved;
+
+    if (isConventionPath(relativePath) && !isAdminUserId(payload.userId)) {
+      return NextResponse.json(createApiError("FORBIDDEN", "仅管理员可编辑项目公约"), {
+        status: 403,
+      });
+    }
 
     // 权限校验：只允许编辑白名单内的文件
     if (!isFileEditable(relativePath)) {
@@ -376,11 +395,14 @@ export async function DELETE(
     }
 
     const { relativePath, absolutePath } = resolved;
-    const isConvention =
-      relativePath === "convention.md" ||
-      /^demos\/[^/]+\/convention\.md$/.test(relativePath);
+    const isConvention = isConventionPath(relativePath);
     if (!isConvention) {
       return NextResponse.json(createApiError("FORBIDDEN", "仅支持删除公约文档"), {
+        status: 403,
+      });
+    }
+    if (!isAdminUserId(payload.userId)) {
+      return NextResponse.json(createApiError("FORBIDDEN", "仅管理员可删除项目公约"), {
         status: 403,
       });
     }

@@ -33,7 +33,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (authorResult.author.isAnonymous && mentions.some((mention) => mention.type === "user")) {
       return NextResponse.json(createApiError("VALIDATION_ERROR", "匿名用户不能 @其他用户"), { status: 400 });
     }
-    const updated = await updateReply(projectId, threadId, replyId, { content: body.content.trim(), mentions });
+    const updated = await updateReply(projectId, threadId, replyId, {
+      content: body.content.trim(),
+      mentions,
+      aiTaskAuthorization: authorResult.userId && authorResult.role
+        ? { userId: authorResult.userId, role: authorResult.role, expiresAt: Date.now() + 2 * 60 * 60 * 1000 }
+        : undefined,
+    });
     return NextResponse.json(createApiSuccess({ reply: updated!.reply }));
   } catch (error) {
     console.error("更新回复失败:", error);

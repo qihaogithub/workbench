@@ -44,6 +44,8 @@ export interface FieldConfig {
   positionable?: { key?: string; size?: { width: number; height: number } };
 }
 
+import { isAtomicConfigField } from "@workbench/shared";
+
 export interface FieldGroup {
   title: string;
   icon?: string;
@@ -107,7 +109,7 @@ export function flattenSchema(parsed: Record<string, unknown>): Record<string, u
 
     if (
       propObj.type === "object" &&
-      propObj.format !== "video" &&
+      !isAtomicConfigField(propObj) &&
       isPlainRecord(propObj.properties) &&
       !hasPositionable(propObj)
     ) {

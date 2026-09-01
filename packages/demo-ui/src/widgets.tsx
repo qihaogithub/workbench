@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ImageInputActions } from './ImageInputActions';
+import type { SpineAssetRefV1 } from '@workbench/shared';
 
 function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
@@ -97,6 +98,10 @@ export function ColorPickerWidget(props: WidgetProps) {
 export interface FileUploadWidgetOptions {
   accept?: string;
   mediaType?: "image" | "video";
+  assetKind?: "spine";
+  /** Page field identity lets the server atomically attach a committed Spine ref. */
+  pageId?: string;
+  configKey?: string;
   videoPreviewStyle?: "controls" | "compact" | "cover";
   maxSize?: number;
   placeholder?: string;
@@ -108,6 +113,14 @@ export interface SpineBundle {
   skeleton: string;
   atlas: string;
   texture: string;
+}
+
+function isSpineAssetRef(value: unknown): value is SpineAssetRefV1 {
+  return isRecord(value)
+    && value.kind === 'spine'
+    && value.version === 1
+    && typeof value.assetId === 'string'
+    && /^spine_[a-f0-9]{64}$/.test(value.assetId);
 }
 
 export interface VideoValue {
@@ -194,8 +207,8 @@ const DEFAULT_VIDEO_FILE_MAX_SIZE = 200 * 1024 * 1024;
 
 export interface FileUploadWidgetProps {
   id?: string;
-  value?: string | SpineBundle | VideoValue;
-  onChange: (value: string | SpineBundle | VideoValue | undefined) => void;
+  value?: string | SpineBundle | SpineAssetRefV1 | VideoValue;
+  onChange: (value: string | SpineBundle | SpineAssetRefV1 | VideoValue | undefined) => void;
   label?: string;
   required?: boolean;
   disabled?: boolean;
@@ -230,8 +243,11 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
     message: string;
   } | null>(null);
 
-  const accept = rawOptions.accept || 'image/*';
   const isVideo = rawOptions.mediaType === 'video';
+  const isSpine = rawOptions.assetKind === 'spine';
+  // Finder does not consistently honor compound extensions such as `.zip.flutter`.
+  // Spine validates after selection and on the server, so leave this picker unrestricted.
+  const accept = isSpine ? undefined : rawOptions.accept || 'image/*';
   const maxSize = rawOptions.maxSize ?? (isVideo ? DEFAULT_VIDEO_FILE_MAX_SIZE : DEFAULT_IMAGE_FILE_MAX_SIZE);
 
   const dimensionOptions: DimensionOptions = {
@@ -243,7 +259,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
 
   // Video schemas use an object value, so an empty default (`{}`) must not be
   // treated as an uploaded Spine bundle or as a playable video.
-  const hasValue = isVideo ? isVideoValue(value) : Boolean(value);
+  const hasValue = isVideo ? isVideoValue(value) : isSpine ? isSpineAssetRef(value) : Boolean(value);
   const videoValue = isVideo && isVideoValue(value) ? value : null;
   const posterValue = videoValue?.poster;
   const posterSrc = posterValue ? resolveConfigImageSrc(posterValue, sessionId) : undefined;
@@ -283,6 +299,11 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
         if (sessionId) {
           const formData = new FormData();
           formData.append('file', file);
+          if (isSpine) {
+            formData.append('assetKind', 'spine');
+            if (rawOptions.pageId) formData.append('pageId', rawOptions.pageId);
+            if (rawOptions.configKey) formData.append('configKey', rawOptions.configKey);
+          }
 
           const res = await fetch(`/api/sessions/${sessionId}/assets/upload`, {
             method: 'POST',
@@ -297,8 +318,10 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
           }
 
           const uploadedUrl = getUploadedUrl(data);
-          const isBundle = isSpineBundle(data.data);
-          if (!uploadedUrl && !isBundle) {
+          const responseData = isRecord(data.data) && 'ref' in data.data ? data.data.ref : data.data;
+          const isBundle = isSpineBundle(responseData);
+          const isAssetRef = isSpineAssetRef(responseData);
+          if (!uploadedUrl && !isBundle && !isAssetRef) {
             setError('服务器未返回有效的上传地址，请重试');
             return;
           }
@@ -307,7 +330,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
             await deleteServerFile(sessionId, value);
           }
 
-          onChange(isVideo ? { url: uploadedUrl! } : (isBundle ? data.data : uploadedUrl!));
+          onChange(isVideo ? { url: uploadedUrl! } : (isAssetRef ? responseData : isBundle ? responseData : uploadedUrl!));
         } else {
           const dataUrl = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
@@ -323,7 +346,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
         setIsUploading(false);
       }
     },
-    [sessionId, maxSize, hasDimensionCheck, dimensionOptions, value, onChange, isVideo]
+    [sessionId, maxSize, hasDimensionCheck, dimensionOptions, value, onChange, isVideo, isSpine, rawOptions.pageId, rawOptions.configKey]
   );
 
   const handlePosterChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -349,9 +372,13 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
 
   const handleFileSelect = useCallback(
     (file: File) => {
+      if (isSpine && !/\.zip(?:\.flutter)?$/i.test(file.name)) {
+        setError('请选择 Spine 素材包（.zip 或 .zip.flutter）');
+        return;
+      }
       doUpload(file);
     },
-    [doUpload]
+    [doUpload, isSpine]
   );
 
   const handleInputChange = useCallback(
@@ -389,6 +416,11 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
       : typeof defaultValue === 'string'
         ? defaultValue
         : undefined;
+
+    if (!isVideo && isSpine && isSpineAssetRef(value)) {
+      onChange(nextValue);
+      return;
+    }
 
     if (!isVideo && sessionId && isSpineBundle(value)) {
       // Spine bundle：清空字段即可，zip 解压文件留在 workspace（由项目资产收集统一管理）
@@ -486,7 +518,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
                 </button>
               </div>
             </div>
-          ) : !isVideo && isSpineBundle(value) ? (
+          ) : !isVideo && (isSpineBundle(value) || isSpineAssetRef(value)) ? (
             <div className="relative w-[80px] h-[80px] rounded-lg border border-border overflow-hidden bg-muted shrink-0 flex flex-col items-center justify-center gap-1 group">
               <FileArchive className="w-5 h-5 text-muted-foreground" />
               <span className="text-[9px] text-muted-foreground px-1 text-center leading-tight">Spine 素材包</span>

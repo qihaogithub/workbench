@@ -383,6 +383,32 @@ function appendMessageBeforeQueued(
   ];
 }
 
+function finalizeAssistantMessageBeforeQueued(
+  messages: ChatMessage[],
+  message: ChatMessage,
+): ChatMessage[] {
+  const existingIndex = message.id
+    ? messages.findIndex((item) => item.id === message.id)
+    : -1;
+  if (existingIndex < 0) {
+    return appendMessageBeforeQueued(messages, message);
+  }
+
+  const existingMessage = messages[existingIndex];
+  const mergedMessage: ChatMessage = {
+    ...existingMessage,
+    ...message,
+    parts: [
+      ...(existingMessage.parts || []),
+      ...(message.parts || []),
+    ],
+  };
+
+  return messages.map((item, index) =>
+    index === existingIndex ? mergedMessage : item,
+  );
+}
+
 function hasVisibleAssistantContent(message: ChatMessage): boolean {
   if (message.content?.trim()) return true;
   return Boolean(
@@ -844,9 +870,9 @@ export function useChatStream(options: UseChatStreamOptions) {
       ).catch(() => {});
 
       let beforeSendFailed = false;
+      const assistantMessageId = createLocalId("assistant");
 
       try {
-        const assistantMessageId = `assistant-${Date.now()}`;
         memoryFilePathsRef.current.clear();
         setIsStreaming(true);
         setStreamContent("");
@@ -984,6 +1010,10 @@ export function useChatStream(options: UseChatStreamOptions) {
             if (details?.knowledgeDocumentCreated) {
               window.dispatchEvent(new Event("knowledge-updated"));
             }
+            const proposalId = (update.details as { proposalId?: unknown } | undefined)?.proposalId;
+            if (typeof proposalId === "string") {
+              window.dispatchEvent(new CustomEvent("document-proposal-created", { detail: { proposalId } }));
+            }
             const receipt = (update.details as { receipt?: unknown } | undefined)
               ?.receipt;
             if (
@@ -1006,7 +1036,7 @@ export function useChatStream(options: UseChatStreamOptions) {
               if (hasVisibleAssistantContent(currentMsg)) {
                 setMessages((prev) =>
                   appendMessageBeforeQueued(prev, {
-                    id: currentMsg.id || `assistant-${Date.now()}`,
+                    id: currentMsg.id || assistantMessageId,
                     role: "assistant",
                     content: currentMsg.content || accumulatedContent,
                     parts: currentMsg.parts,
@@ -1065,7 +1095,7 @@ export function useChatStream(options: UseChatStreamOptions) {
                 autoRepairMessageId,
                 "completed",
               );
-              const updatedMessages = appendMessageBeforeQueued(
+              const updatedMessages = finalizeAssistantMessageBeforeQueued(
                 messagesWithAutoRepairStatus,
                 assistantMessage,
               );
@@ -1192,7 +1222,7 @@ export function useChatStream(options: UseChatStreamOptions) {
               fallbackCode: "AGENT_CONNECTION_ERROR",
             });
             const errorMessage: ChatMessage = {
-              id: `error-${Date.now()}`,
+              id: createLocalId("error"),
               role: "assistant",
               content: normalized.userMessage,
             };
@@ -1259,7 +1289,7 @@ export function useChatStream(options: UseChatStreamOptions) {
               currentMsg,
             )
               ? {
-                  id: currentMsg.id || `assistant-${Date.now()}`,
+                  id: currentMsg.id || createLocalId("assistant"),
                   role: "assistant",
                   content:
                     currentMsg.content ||
@@ -1274,7 +1304,7 @@ export function useChatStream(options: UseChatStreamOptions) {
                   ],
                 }
               : {
-                  id: `error-${Date.now()}`,
+                  id: createLocalId("error"),
                   role: "assistant",
                   content: normalizedMessage,
                 };
@@ -1337,7 +1367,7 @@ export function useChatStream(options: UseChatStreamOptions) {
             details: diagnosticDetails,
           });
           const errorMessage: ChatMessage = {
-            id: `error-${Date.now()}`,
+            id: createLocalId("error"),
             role: "assistant",
             content: normalized.userMessage,
           };
@@ -1364,7 +1394,7 @@ export function useChatStream(options: UseChatStreamOptions) {
         if (error instanceof MissingTransactionalDeleteToolsError) {
           streamServiceRef.current?.close();
           const errorMessage: ChatMessage = {
-            id: `error-${Date.now()}`,
+            id: createLocalId("error"),
             role: "assistant",
             content: error.message,
           };
@@ -1384,7 +1414,7 @@ export function useChatStream(options: UseChatStreamOptions) {
 
         if (isBulkPageDeletionRequest(userMessage)) {
           const errorMessage: ChatMessage = {
-            id: `error-${Date.now()}`,
+            id: createLocalId("error"),
             role: "assistant",
             content:
               "当前无法建立安全的事务化删除通道。请确认 Agent Service 已重启并刷新页面后再试。",
@@ -1443,7 +1473,7 @@ export function useChatStream(options: UseChatStreamOptions) {
             result.data?.content || "抱歉，我没有收到有效的回复。";
 
           const assistantMessage: ChatMessage = {
-            id: `assistant-${Date.now()}`,
+            id: assistantMessageId,
             role: "assistant",
             content: aiReply,
           };
@@ -1497,7 +1527,7 @@ export function useChatStream(options: UseChatStreamOptions) {
         } catch (httpError) {
           const normalized = normalizeAiError(httpError);
           const errorMessage: ChatMessage = {
-            id: `error-${Date.now()}`,
+            id: createLocalId("error"),
             role: "assistant",
             content: normalized.userMessage,
           };
@@ -1769,7 +1799,7 @@ export function useChatStream(options: UseChatStreamOptions) {
         setMessages((prev) => [
           ...prev,
           {
-            id: `assistant-${Date.now()}`,
+            id: currentMessage.id || createLocalId("assistant"),
             role: "assistant",
             content: streamContent || "已取消",
             parts: currentMessage.parts,

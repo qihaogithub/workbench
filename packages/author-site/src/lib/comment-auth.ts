@@ -11,6 +11,7 @@ import type { NextRequest } from "next/server";
 import type { CommentAuthor } from "@workbench/shared";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import type { UserPayload } from "@/lib/auth/jwt";
+import { findUserById, type UserRole } from "@/lib/user";
 
 /**
  * 从请求中解析已登录用户（Cookie 优先，其次 X-Auth-Token header）
@@ -37,6 +38,8 @@ export interface CommentAuthorResult {
   author: CommentAuthor;
   /** 已登录用户 ID（用于权限判断） */
   userId?: string;
+  /** 始终由数据库读取，不能信任 JWT 或请求体中的角色。 */
+  role?: UserRole;
 }
 
 /**
@@ -51,13 +54,16 @@ export async function resolveCommentAuthor(
 ): Promise<CommentAuthorResult | null> {
   const user = await resolveUser(request);
   if (user) {
+    const currentUser = findUserById(user.userId);
+    if (!currentUser) return null;
     return {
       author: {
-        id: user.userId,
-        name: user.username,
+        id: currentUser.id,
+        name: currentUser.username,
         isAnonymous: false,
       },
-      userId: user.userId,
+      userId: currentUser.id,
+      role: currentUser.role,
     };
   }
 

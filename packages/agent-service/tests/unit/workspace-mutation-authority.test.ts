@@ -153,6 +153,28 @@ describe("WorkspaceMutationAuthority", () => {
     expect(events).toEqual(["mutation-1", "mutation-2"]);
   });
 
+  it("批准的文档提案在 Authority 临界区严格校验冻结 hash", async () => {
+    const { authority, workspacePath } = createAuthority();
+    fs.mkdirSync(path.join(workspacePath, "knowledge"), { recursive: true });
+    fs.writeFileSync(path.join(workspacePath, "knowledge", "rules.md"), "first", "utf-8");
+
+    const receipt = await authority.commitDocumentProposal({
+      mutationId: "proposal-1", projectId: "project-1", workspaceId: "workspace-1", baseRevision: 1,
+      actor: "author-site", reason: "ignored-by-strict-api", operations: [
+        { type: "put_text", path: "knowledge/rules.md", content: "approved", expectedHash: hash("first") },
+      ],
+    });
+    expect(receipt.resources).toEqual([expect.objectContaining({ path: "knowledge/rules.md", action: "modified" })]);
+
+    await expect(authority.commitDocumentProposal({
+      mutationId: "proposal-stale", projectId: "project-1", workspaceId: "workspace-1", baseRevision: 1,
+      actor: "author-site", reason: "ignored-by-strict-api", operations: [
+        { type: "put_text", path: "knowledge/rules.md", content: "stale", expectedHash: hash("first") },
+      ],
+    })).rejects.toMatchObject({ code: "WORKSPACE_RESOURCE_CONFLICT" });
+    expect(fs.readFileSync(path.join(workspacePath, "knowledge", "rules.md"), "utf-8")).toBe("approved");
+  });
+
   it("允许旧 revision 在目标资源 hash 未变化时安全 rebase", async () => {
     const { authority, workspacePath } = createAuthority();
     fs.mkdirSync(path.join(workspacePath, "demos", "other"), { recursive: true });

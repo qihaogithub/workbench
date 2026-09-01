@@ -66,6 +66,13 @@ interface CanvasPageItemProps {
   onRename?: (pageId: string, name: string) => Promise<boolean>;
   /** 画布评论模式下选择本页；优先于页面拖拽和预览内容交互。 */
   onCommentSelect?: (pageId: string, event: React.PointerEvent) => void;
+  /** 页面标题旁的未处理评论数量。 */
+  commentCount?: number;
+  /** 点击页面标题旁评论标签。 */
+  onCommentBadgeClick?: (
+    pageId: string,
+    event: React.MouseEvent<HTMLButtonElement>,
+  ) => void;
   onRequestDelete?: (pageId: string) => void;
   /** 页面右键打开时同步画布选择范围。 */
   onContextMenuOpen?: (pageId: string) => void;
@@ -557,6 +564,8 @@ export function CanvasPageItem({
   onConfigEdit,
   onRename,
   onCommentSelect,
+  commentCount = 0,
+  onCommentBadgeClick,
   onRequestDelete,
   onContextMenuOpen,
   onCopy,
@@ -925,19 +934,37 @@ export function CanvasPageItem({
             }}
           />
         ) : (
-          <button
-            type="button"
-            className="block max-w-full truncate text-left font-medium text-muted-foreground"
-            title="双击改名称"
-            aria-label={`页面标题：${page.name}，双击改名称`}
-            onClick={(event) => event.stopPropagation()}
-            onDoubleClick={(event) => {
-              event.stopPropagation();
-              if (canInteract && onRename) setIsTitleEditing(true);
-            }}
-          >
-            {page.name}
-          </button>
+          <div className="flex max-w-full items-center gap-1">
+            <button
+              type="button"
+              className="block min-w-0 max-w-full truncate text-left font-medium text-muted-foreground"
+              title="双击改名称"
+              aria-label={`页面标题：${page.name}，双击改名称`}
+              onClick={(event) => event.stopPropagation()}
+              onDoubleClick={(event) => {
+                event.stopPropagation();
+                if (canInteract && onRename) setIsTitleEditing(true);
+              }}
+            >
+              {page.name}
+            </button>
+            {commentCount > 0 && (
+              <button
+                type="button"
+                className="shrink-0 cursor-pointer rounded-full border border-blue-500 bg-blue-600 px-2 py-0.5 text-[11px] font-semibold leading-4 text-white shadow-sm transition-colors duration-200 hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+                title={`打开${page.name}的评论列表`}
+                aria-label={`${page.name}有 ${commentCount} 条未处理评论，打开评论列表`}
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onCommentBadgeClick?.(page.id, event);
+                }}
+              >
+                评论 {commentCount}
+              </button>
+            )}
+          </div>
         )}
       </div>
 

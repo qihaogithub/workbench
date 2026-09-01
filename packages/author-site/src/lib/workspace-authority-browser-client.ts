@@ -11,7 +11,10 @@ import type {
   WorkspaceAuthorityResource,
   WorkspaceAuthoritySnapshot,
 } from "./workspace-authority-shared";
-import { WorkspaceAuthorityClientError } from "./workspace-authority-shared";
+import {
+  WORKSPACE_AUTHORITY_NOT_READY_MESSAGE,
+  WorkspaceAuthorityClientError,
+} from "./workspace-authority-shared";
 
 interface Envelope<T> {
   success?: boolean;
@@ -52,10 +55,10 @@ async function request<T>(
   let response: Response;
   try {
     response = await fetch(url, init);
-  } catch (error: unknown) {
+  } catch {
     throw new WorkspaceAuthorityClientError(
       "WORKSPACE_AUTHORITY_NOT_READY",
-      error instanceof Error ? error.message : "Workspace Authority 不可用",
+      WORKSPACE_AUTHORITY_NOT_READY_MESSAGE,
       503,
     );
   }

@@ -1710,6 +1710,45 @@ export class ProjectAdminService {
     });
   }
 
+  resourceVersionCreateKnowledgeTombstone(
+    input: {
+      projectId: string;
+      resourceId: string;
+      item: KnowledgeItemMeta;
+      content: string;
+      workspaceId?: string;
+      workspaceRevision?: number;
+      workspaceRootHash?: string;
+      note?: string;
+      source?: ResourceVersion["source"];
+    },
+    actor = this.defaultActor(),
+  ): ProjectAdminResult<ResourceVersion> {
+    if (actor.role === "readonly") return fail("FORBIDDEN", "当前操作者没有写权限");
+    const access = this.requireProjectAccess(input.projectId, actor);
+    if (!access.ok) return fail("FORBIDDEN", "当前操作者无权访问该项目");
+    if (!this.readProject(input.projectId)) return fail("PROJECT_NOT_FOUND", "项目不存在");
+    if (input.item.id !== input.resourceId) return fail("INVALID_REQUEST", "知识文档 tombstone 与资源不匹配");
+    const version = this.createKnowledgeResourceVersion({
+      projectId: input.projectId, item: input.item, content: input.content,
+      versionId: nowId("krv"), actor, source: input.source ?? "ai", note: input.note ?? `删除知识文档 ${input.item.title}`,
+      workspaceId: input.workspaceId, workspaceRevision: input.workspaceRevision,
+      workspaceRootHash: input.workspaceRootHash, tombstone: true,
+    });
+    const previous = this.readHeadCommit(input.projectId)?.resourcePointers.find(
+      (pointer) => pointer.kind === "knowledge_document" && pointer.resourceId === input.resourceId,
+    );
+    const commit = this.createContentCommit({
+      projectId: input.projectId, visibility: "semantic", intent: input.source === "user" ? "edit" : "ai",
+      title: input.note ?? `删除知识文档 ${input.item.title}`,
+      pointers: [{ kind: "knowledge_document", resourceId: input.resourceId, versionId: version.id }],
+      changedResources: [{ kind: "knowledge_document", resourceId: input.resourceId, fromVersionId: previous?.versionId, toVersionId: version.id }],
+      actor, workspaceId: input.workspaceId, workspaceRevision: input.workspaceRevision, workspaceRootHash: input.workspaceRootHash,
+    });
+    this.writeMaterializationManifest(input.projectId, commit.id, [version]);
+    return ok(version, { diffSummary: { deleted: [`knowledge:${input.resourceId}`] } });
+  }
+
   resourceRestore(
     input: ResourceRestoreInput,
     actor = this.defaultActor(),
@@ -2301,6 +2340,12 @@ export class ProjectAdminService {
       if (version.kind === "knowledge_document") {
         const payload = this.knowledgeContentFromResourceVersion(version);
         if (!payload) continue;
+        const metadata = version.metadata as Partial<KnowledgeResourceMetadata>;
+        if (metadata.tombstone) {
+          fs.rmSync(path.join(workspacePath, "knowledge", path.basename(payload.item.fileName)), { force: true });
+          knowledgeManifest = { ...knowledgeManifest, items: knowledgeManifest.items.filter((item) => item.id !== payload.item.id) };
+          continue;
+        }
         ensureDir(path.join(workspacePath, "knowledge"));
         fs.writeFileSync(
           path.join(
@@ -6063,12 +6108,14 @@ export class ProjectAdminService {
     workspaceRevision?: number;
     workspaceRootHash?: string;
     migrationStatus?: ResourceVersion["runtime"]["migrationStatus"];
+    tombstone?: boolean;
   }): ResourceVersion {
     const metadata: KnowledgeResourceMetadata = {
       item: input.item,
       files: {
         markdown: this.writeBlob(input.projectId, input.content),
       },
+      ...(input.tombstone ? { tombstone: true } : {}),
     };
     const blobRefs = Object.values(metadata.files).filter(
       (hash): hash is string => Boolean(hash),

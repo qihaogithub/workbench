@@ -225,12 +225,16 @@ export { DocumentEditor } from "./DocumentEditor";
 export type {
   DocumentEditorProps,
   DocumentUploadHandler,
+  MarkdownReferenceContext,
+  MarkdownReferenceProvider,
+  MarkdownReferenceClickHandler,
 } from "./DocumentEditor";
 export { RichTextEditor } from "./RichTextEditor";
 export { customWidgets, ColorPickerWidget, FileUploadWidget } from "./widgets";
 export type {
   FileUploadWidgetOptions,
   FileUploadWidgetProps,
+  SpineBundle,
   VideoValue,
 } from "./widgets";
 export { ImageInputActions } from "./ImageInputActions";
@@ -253,6 +257,7 @@ export {
   useComments,
   threadMentionsUser,
   countUnresolvedCommentThreads,
+  countUnresolvedCommentThreadsByPage,
   filterCommentThreadsByTarget,
   filterPageCommentThreads,
 } from "./comment";
@@ -260,12 +265,14 @@ export type {
   CommentApiAdapter,
   CommentFilter,
   CommentLayerProps,
+  CanvasCommentDraft,
   CreateCommentInput,
   AddReplyInput,
   UpdateCommentContentInput,
   IframeViewState,
   MentionCandidate,
   CommentPanelProps,
+  CommentPageMeta,
   DocumentCommentPanelProps,
   CommentUnreadDotProps,
 } from "./comment";

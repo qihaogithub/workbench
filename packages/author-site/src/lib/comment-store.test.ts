@@ -98,6 +98,32 @@ describe("createReply @AI 触发任务", () => {
     expect(enqueueCalls().length).toBeGreaterThan(0);
   });
 
+  it("持久化并透传服务端 @AI 触发者授权", async () => {
+    const authorization = {
+      userId: "u1",
+      role: "editor" as const,
+      expiresAt: Date.now() + 60_000,
+    };
+    const thread = await createCommentThread({
+      projectId: "p1",
+      target: { kind: "page", pageId: "page-1" },
+      anchor: { domPath: "body > div", tagName: "div" },
+      pin: { xRatio: 0.5, yRatio: 0.5 },
+      content: "请修改按钮颜色",
+      author,
+      mentions: [agentMention],
+      aiTaskAuthorization: authorization,
+    });
+
+    expect(loadStore("p1").aiTaskAuthorizations?.[thread.id]).toEqual(authorization);
+    const request = enqueueCalls()[0];
+    expect(JSON.parse((request[1] as RequestInit).body as string)).toMatchObject({
+      projectId: "p1",
+      threadId: thread.id,
+      ...authorization,
+    });
+  });
+
   it("回复不 @AI 时：不置 pending、不入队", async () => {
     const thread = await createThread([agentMention]);
     await createReply({

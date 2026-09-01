@@ -1,3 +1,4 @@
+/** @deprecated Use `/api/projects/:projectId/documents/:documentId`. */
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import type { WorkspaceMutationOperation } from '@workbench/shared/contracts';

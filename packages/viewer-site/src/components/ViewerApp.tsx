@@ -64,6 +64,7 @@ import type {
   CommentTarget,
   DemoPageRuntimeType,
 } from "@workbench/shared";
+import type { MarkdownReferenceTarget } from "@workbench/shared/markdown-reference";
 import {
   extractPrototypeConfigBindingKeys,
   PageConfigPanel,
@@ -81,6 +82,7 @@ import type {
 import {
   CommentUnreadDot,
   countUnresolvedCommentThreads,
+  countUnresolvedCommentThreadsByPage,
   filterPageCommentThreads,
   type CanvasCommentDraft,
 } from "@workbench/demo-ui/comment";
@@ -946,13 +948,9 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const commentApi = useMemo(() => createCommentApi(projectId), [projectId]);
   const commentWsUrl = useMemo(() => getCommentWsUrl(), []);
   const commentQueryTarget = useMemo<CommentTarget | undefined>(() => {
-    if (previewMode === "canvas") {
-      return canvasSelectedPageId
-        ? { kind: "page", pageId: canvasSelectedPageId }
-        : undefined;
-    }
+    if (previewMode === "canvas") return undefined;
     return { kind: "page", pageId: activePageId };
-  }, [activePageId, canvasSelectedPageId, previewMode]);
+  }, [activePageId, previewMode]);
   const commentsData = useComments({
     projectId,
     target: commentQueryTarget,
@@ -960,14 +958,27 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
     wsUrl: commentWsUrl,
   });
   const activePageCommentThreads = useMemo(
-    () => filterPageCommentThreads(commentsData.threads, activePageId),
-    [activePageId, commentsData.threads],
+    () =>
+      filterPageCommentThreads(
+        commentsData.threads,
+        previewMode === "canvas"
+          ? (canvasSelectedPageId ?? activePageId)
+          : activePageId,
+      ),
+    [activePageId, canvasSelectedPageId, commentsData.threads, previewMode],
   );
-  const isProjectCommentScope =
-    previewMode === "canvas" && !canvasSelectedPageId;
+  const canvasCommentThreads = useMemo(
+    () => filterPageCommentThreads(commentsData.threads),
+    [commentsData.threads],
+  );
+  const canvasCommentCounts = useMemo(
+    () => countUnresolvedCommentThreadsByPage(canvasCommentThreads),
+    [canvasCommentThreads],
+  );
+  const isProjectCommentScope = previewMode === "canvas";
   const unresolvedCommentCount = countUnresolvedCommentThreads(
     isProjectCommentScope
-      ? filterPageCommentThreads(commentsData.threads)
+      ? canvasCommentThreads
       : activePageCommentThreads,
   );
   const commentTabLabel =
@@ -1194,6 +1205,53 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
       }
     },
     [project, configDataMap],
+  );
+
+  const handleCommentThreadSelect = useCallback(
+    (threadId: string) => {
+      const thread = commentsData.threads.find((item) => item.id === threadId);
+      if (previewMode === "canvas" && thread?.target.kind === "page") {
+        setCanvasSelectedPageId(thread.target.pageId);
+        setRightPanelTab("comments");
+        handlePageChange(thread.target.pageId);
+        setConfigPanelDetailPageId(thread.target.pageId);
+      }
+      setActiveCommentThreadId(threadId);
+      setCommentModeActive(false);
+    },
+    [commentsData.threads, handlePageChange, previewMode],
+  );
+
+  const handleCanvasCommentBadgeClick = useCallback(
+    (pageId: string) => {
+      setCanvasSelectedPageId(pageId);
+      handlePageChange(pageId);
+      setConfigPanelDetailPageId(pageId);
+      setRightPanelTab("comments");
+      setCommentModeActive(false);
+      setCanvasCommentDraft(null);
+    },
+    [handlePageChange],
+  );
+
+  const handleReferenceNavigate = useCallback(
+    (target: MarkdownReferenceTarget) => {
+      if (!project || target.projectId !== projectId) return;
+      if (target.kind === "document") {
+        setPreviewMode("document");
+        return;
+      }
+      if (target.kind === "project") {
+        setPreviewMode("canvas");
+        return;
+      }
+      const page = project.demoPages.find((candidate) => candidate.id === target.pageId);
+      if (!page) return;
+      setConfigPanelDetailPageId(page.id);
+      handlePageChange(page.id);
+      setPreviewMode("single");
+    },
+    [handlePageChange, project, projectId],
   );
 
   const handleConfigChange = useCallback(
@@ -1494,6 +1552,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
       projectConfigSchema={project.projectConfigSchema}
       onProjectConfigChange={handleProjectConfigChange}
       onPageConfigChange={handlePageConfigChange}
+      onReferenceClick={({ target }) => handleReferenceNavigate(target)}
       onRestoreDefaults={handleRestoreDefaults}
       requirements={configPanelRequirements}
       mediaBaseUrl={DATA_BASE}
@@ -1506,15 +1565,19 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
 
   const commentsPanel = (
     <CommentPanel
-      threads={activePageCommentThreads}
+      threads={previewMode === "canvas" ? canvasCommentThreads : activePageCommentThreads}
       currentUserId={commentUser?.id}
       activeThreadId={activeCommentThreadId}
-      onSelectThread={(id) => {
-        setActiveCommentThreadId(id);
-        setCommentModeActive(false);
-      }}
+      onSelectThread={handleCommentThreadSelect}
       commentMode={commentModeActive}
       onCommentModeChange={setCommentModeActive}
+      groupByPage={previewMode === "canvas"}
+      commentPages={project?.demoPages.map((page) => ({
+        id: page.id,
+        name: page.name,
+        order: page.order,
+      }))}
+      focusedPageId={previewMode === "canvas" ? canvasSelectedPageId : null}
       createHint={
         previewMode === "canvas"
           ? "点击画布页面后，直接添加页面级评论"
@@ -1609,6 +1672,8 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                 projectId={projectId}
                 items={project.knowledge ?? []}
                 designSpecs={project.designSpecs ?? []}
+                references={project.markdownReferences}
+                onReferenceNavigate={handleReferenceNavigate}
                 projectConfigSchema={project.projectConfigSchema}
                 pages={project.demoPages.map((page) => ({
                   id: page.id,
@@ -1619,7 +1684,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
             ) : (
               <CommentLayer
                 projectId={projectId}
-                pageId={activePageId}
+                pageId={previewMode === "canvas" ? (canvasSelectedPageId ?? activePageId) : activePageId}
                 api={commentApi}
                 wsUrl={commentWsUrl}
                 currentUser={commentUser}
@@ -1660,6 +1725,8 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                       handlePageChange(pageId);
                       setConfigPanelDetailPageId(pageId);
                     },
+                    commentCounts: canvasCommentCounts,
+                    onPageCommentBadgeClick: handleCanvasCommentBadgeClick,
                     onPageComment: commentModeActive
                       ? ({ pageId, pageName, pin, clientX, clientY }) => {
                           setCanvasSelectedPageId(pageId);
