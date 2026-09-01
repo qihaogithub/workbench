@@ -36,6 +36,13 @@ import type {
   VisualNodeTreeItem,
   VisualPropertyChangeKind,
 } from "@workbench/demo-ui/iframe-types";
+import type {
+  MarkdownReferenceClickHandler,
+  MarkdownReferenceContext,
+  MarkdownReferenceProvider,
+} from "@workbench/demo-ui/DocumentEditor";
+import type { MarkdownReferenceCandidate } from "@workbench/shared/markdown-reference";
+import { classifyConfigField } from "@workbench/shared";
 import type { PreviewStagePage } from "@workbench/demo-ui/preview-stage-types";
 import type {
   CommentAuthor,
@@ -62,6 +69,7 @@ import { createAuthorCommentApi } from "@/lib/comment-api-client";
 import {
   CommentUnreadDot,
   countUnresolvedCommentThreads,
+  countUnresolvedCommentThreadsByPage,
   filterPageCommentThreads,
   useComments,
   type CanvasCommentDraft,
@@ -209,6 +217,7 @@ import type {
   KnowledgeItem,
   KnowledgeDocDialogMode,
 } from "@/components/demo/KnowledgeDocDialog";
+import { toKnowledgeItem } from "@/components/demo/document-api-adapter";
 import { useCollabDocument } from "@/hooks/useCollabDocument";
 import { VisualEditSidebar } from "./components/VisualEditSidebar";
 import {
@@ -700,7 +709,6 @@ function toCanvasKnowledgeDocument(
   return {
     id: item.id,
     title: item.title,
-    fileName: item.fileName,
     description: item.description,
   };
 }
@@ -959,8 +967,7 @@ function getSchemaGroupKeys(schema: string): Set<string> {
     for (const [key, prop] of Object.entries(props)) {
       const p = prop as Record<string, unknown>;
       if (
-        p?.type === "object" &&
-        p?.properties &&
+        classifyConfigField(p) === "group" &&
         !(p.$demo as Record<string, unknown>)?.positionable
       ) {
         groups.add(key);
@@ -1363,6 +1370,40 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     sessionId,
     projectId: demoId,
   });
+
+  const markdownReferenceProvider = useCallback<MarkdownReferenceProvider>(
+    async ({ query, signal }) => {
+      const params = new URLSearchParams({ q: query, kind: "project,page,document" });
+      if (sessionId) params.set("sessionId", sessionId);
+      const response = await fetch(
+        `/api/projects/${encodeURIComponent(demoId)}/markdown-references/candidates?${params.toString()}`,
+        { signal },
+      );
+      if (!response.ok) return [];
+      const payload = await response.json();
+      const candidates = payload?.data?.candidates ?? payload?.data;
+      return Array.isArray(candidates) ? (candidates as MarkdownReferenceCandidate[]) : [];
+    },
+    [demoId, sessionId],
+  );
+
+  const pageRequirementsReferenceContext = useMemo<MarkdownReferenceContext | undefined>(() => {
+    if (!workspaceId || !activeDemoId) return undefined;
+    return {
+      source: {
+        kind: "page-requirements",
+        projectId: demoId,
+        workspaceId,
+        pageId: activeDemoId,
+      },
+      policy: {
+        allowedTargetKinds: ["project", "page", "document"],
+        sameProjectOnly: true,
+        allowUnresolved: false,
+      },
+    };
+  }, [activeDemoId, demoId, workspaceId]);
+
   const canvasStateRef = useRef(canvasState);
   canvasStateRef.current = canvasState;
   const suppressCanvasHistoryRef = useRef(false);
@@ -1785,17 +1826,28 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       if (timers[pageId]) clearTimeout(timers[pageId]);
       timers[pageId] = setTimeout(async () => {
         try {
-          await fetch(`/api/sessions/${sessionId}/files/${pageId}`, {
+          const response = await fetch(`/api/sessions/${sessionId}/files/${pageId}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ configValues: values }),
           });
-        } catch {
-          // 静默失败，不影响用户操作
+          if (!response.ok) {
+            throw new Error(`保存配置失败（${response.status}）`);
+          }
+          delete timers[pageId];
+        } catch (error) {
+          // 保留内存中的最新值和工作区 dirty 状态，下一次改动会重试。
+          delete timers[pageId];
+          toast({
+            title: "配置尚未保存",
+            description:
+              error instanceof Error ? error.message : "请稍后重试。",
+            variant: "destructive",
+          });
         }
       }, 500);
     },
-    [sessionId],
+    [sessionId, toast],
   );
   const screenshotRegenerateTimerRef = useRef<
     Record<string, ReturnType<typeof setTimeout>>
@@ -1966,6 +2018,20 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     useState(false);
   const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>([]);
 
+  useEffect(() => {
+    const handleOpenKnowledgeDocument = (event: Event) => {
+      const docId = (event as CustomEvent<{ docId?: string }>).detail?.docId;
+      if (!docId) return;
+      const item = knowledgeItems.find((candidate) => candidate.id === docId);
+      if (!item) return;
+      setKbDocDialogItem(item);
+      setKbDocDialogMode("read");
+      setKbDocDialogOpen(true);
+    };
+    window.addEventListener("knowledge-open-document", handleOpenKnowledgeDocument);
+    return () => window.removeEventListener("knowledge-open-document", handleOpenKnowledgeDocument);
+  }, [knowledgeItems]);
+
   const upsertKnowledgeItem = useCallback((item: KnowledgeItem) => {
     setKnowledgeItems((current) => {
       const exists = current.some((existing) => existing.id === item.id);
@@ -1990,34 +2056,35 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     async (
       input: CanvasKnowledgeDocumentCreateInput,
     ): Promise<CanvasKnowledgeDocument> => {
-      if (!workspacePath) {
-        throw new Error("工作空间未初始化");
+      if (!demoId) {
+        throw new Error("项目未初始化");
       }
 
-      const query = new URLSearchParams({
-        workingDir: workspacePath,
-        projectId: demoId,
-      });
+      const query = new URLSearchParams();
       if (sessionId) query.set("sessionId", sessionId);
-      const res = await fetch(`/api/knowledge?${query.toString()}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: input.title,
-          description: input.description ?? input.title,
-          content: input.content,
-        }),
-      });
+      const res = await fetch(
+        `/api/projects/${encodeURIComponent(demoId)}/documents${query.toString() ? `?${query.toString()}` : ""}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: input.title,
+            description: input.description ?? input.title,
+            content: input.content,
+          }),
+        },
+      );
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.error?.message || "添加知识文档失败");
       }
 
-      upsertKnowledgeItem(data.data);
+      const item = toKnowledgeItem(data.data.snapshot);
+      upsertKnowledgeItem(item);
       window.dispatchEvent(new Event("knowledge-updated"));
-      return toCanvasKnowledgeDocument(data.data);
+      return toCanvasKnowledgeDocument(item);
     },
-    [demoId, sessionId, workspacePath, upsertKnowledgeItem],
+    [demoId, sessionId, upsertKnowledgeItem],
   );
 
   const updateCanvasKnowledgeDocument = useCallback(
@@ -2025,47 +2092,47 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       id: string,
       input: CanvasKnowledgeDocumentUpdateInput,
     ): Promise<CanvasKnowledgeDocument> => {
-      if (!workspacePath) {
-        throw new Error("工作空间未初始化");
+      if (!demoId) {
+        throw new Error("项目未初始化");
       }
 
-      const query = new URLSearchParams({
-        workingDir: workspacePath,
-        projectId: demoId,
-      });
+      const query = new URLSearchParams();
       if (sessionId) query.set("sessionId", sessionId);
-      const res = await fetch(`/api/knowledge/${id}?${query.toString()}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      });
+      const res = await fetch(
+        `/api/projects/${encodeURIComponent(demoId)}/documents/${encodeURIComponent(id)}${query.toString() ? `?${query.toString()}` : ""}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input),
+        },
+      );
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.error?.message || "保存知识文档失败");
       }
 
-      upsertKnowledgeItem(data.data);
+      const item = toKnowledgeItem(data.data.snapshot);
+      upsertKnowledgeItem(item);
       window.dispatchEvent(new Event("knowledge-updated"));
-      return toCanvasKnowledgeDocument(data.data);
+      return toCanvasKnowledgeDocument(item);
     },
-    [demoId, sessionId, workspacePath, upsertKnowledgeItem],
+    [demoId, sessionId, upsertKnowledgeItem],
   );
 
   const readCanvasKnowledgeDocument = useCallback(
     async (document: CanvasKnowledgeDocument): Promise<string> => {
-      if (!workspacePath) return "";
-      const query = new URLSearchParams({
-        workingDir: workspacePath,
-        fileName: document.fileName,
-      });
-      const res = await fetch(`/api/knowledge/content?${query.toString()}`);
+      if (!demoId) return "";
+      const query = sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : "";
+      const res = await fetch(
+        `/api/projects/${encodeURIComponent(demoId)}/documents/${encodeURIComponent(document.id)}${query}`,
+      );
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.error?.message || "读取知识文档失败");
       }
-      return data.data.content;
+      return data.data.content || "";
     },
-    [workspacePath],
+    [demoId, sessionId],
   );
   const canvasKnowledgeDocumentsById = useMemo(
     () =>
@@ -2271,13 +2338,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     [activeDemoId],
   );
   const commentQueryTarget = useMemo<CommentTarget | undefined>(() => {
-    if (previewMode === "canvas") {
-      return canvasEditingPageId
-        ? { kind: "page", pageId: canvasEditingPageId }
-        : undefined;
-    }
+    if (previewMode === "canvas") return undefined;
     return activePageCommentTarget;
-  }, [activePageCommentTarget, canvasEditingPageId, previewMode]);
+  }, [activePageCommentTarget, previewMode]);
   const commentsData = useComments({
     projectId: demoId,
     target: commentQueryTarget,
@@ -2297,14 +2360,27 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     enabled: Boolean(activeDocumentCommentTarget),
   });
   const activePageCommentThreads = useMemo(
-    () => filterPageCommentThreads(commentsData.threads, activeDemoId),
-    [activeDemoId, commentsData.threads],
+    () =>
+      filterPageCommentThreads(
+        commentsData.threads,
+        previewMode === "canvas"
+          ? (canvasEditingPageId ?? activeDemoId)
+          : activeDemoId,
+      ),
+    [activeDemoId, canvasEditingPageId, commentsData.threads, previewMode],
   );
-  const isProjectCommentScope =
-    previewMode === "canvas" && !canvasEditingPageId;
+  const canvasCommentThreads = useMemo(
+    () => filterPageCommentThreads(commentsData.threads),
+    [commentsData.threads],
+  );
+  const canvasCommentCounts = useMemo(
+    () => countUnresolvedCommentThreadsByPage(canvasCommentThreads),
+    [canvasCommentThreads],
+  );
+  const isProjectCommentScope = previewMode === "canvas";
   const unresolvedCommentCount = countUnresolvedCommentThreads(
     isProjectCommentScope
-      ? filterPageCommentThreads(commentsData.threads)
+      ? canvasCommentThreads
       : activePageCommentThreads,
   );
   const commentTabLabel =
@@ -4418,13 +4494,19 @@ ${context.details}
         ? flattenNestedDelta(configDataMapRef.current[pageId] ?? {}, schema)
         : (configDataMapRef.current[pageId] ?? {});
       const nextPageConfig = { ...prevClean, ...dataClean };
+      configDataMapRef.current = {
+        ...configDataMapRef.current,
+        [pageId]: nextPageConfig,
+      };
       setConfigDataMap((prev) => ({
         ...prev,
         [pageId]: nextPageConfig,
       }));
+      persistPageConfigValues(pageId, nextPageConfig);
+      markScreenshotDirty(pageId);
+      markWorkspaceChanged();
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    [markScreenshotDirty, markWorkspaceChanged, persistPageConfigValues],
   );
 
   const handleWhiteboardCommitted = useCallback(
@@ -5347,6 +5429,61 @@ ${context.details}
   );
   const handleConfigPanelPageSelectRef = useRef(handleConfigPanelPageSelect);
   handleConfigPanelPageSelectRef.current = handleConfigPanelPageSelect;
+  const handleCommentThreadSelect = useCallback(
+    (threadId: string) => {
+      const thread = commentsData.threads.find((item) => item.id === threadId);
+      if (previewMode === "canvas" && thread?.target.kind === "page") {
+        setCanvasEditingPageId(thread.target.pageId);
+        setRightPanelTab("comments");
+        void handleConfigPanelPageSelect(
+          thread.target.pageId,
+          undefined,
+          { focusCanvas: false, openConfigDetail: false },
+        );
+      }
+      setActiveCommentThreadId(threadId);
+      setCommentModeActive(false);
+    },
+    [
+      commentsData.threads,
+      handleConfigPanelPageSelect,
+      previewMode,
+      setCanvasEditingPageId,
+    ],
+  );
+  const handleCanvasCommentBadgeClick = useCallback(
+    (pageId: string) => {
+      setCanvasEditingPageId(pageId);
+      setRightPanelTab("comments");
+      setCommentModeActive(false);
+      setCanvasCommentDraft(null);
+      void handleConfigPanelPageSelect(pageId, undefined, {
+        focusCanvas: false,
+        openConfigDetail: false,
+      });
+    },
+    [handleConfigPanelPageSelect, setCanvasEditingPageId],
+  );
+  const handleMarkdownReferenceClick = useCallback<MarkdownReferenceClickHandler>(
+    ({ target }) => {
+      if (target.projectId !== demoId) return;
+      if (target.kind === "page") {
+        void handleConfigPanelPageSelectRef.current(target.pageId, undefined, {
+          openConfigDetail: true,
+        });
+        return;
+      }
+      if (target.kind === "document") {
+        setPreviewMode("document");
+        window.dispatchEvent(
+          new CustomEvent("knowledge-open-document", { detail: { docId: target.docId } }),
+        );
+        return;
+      }
+      setPreviewMode("document");
+    },
+    [demoId, setPreviewMode],
+  );
   const handlePreviewHtmlFilesDrop = useCallback(
     (files: File[]) => {
       if (!sessionId) {
@@ -8382,6 +8519,7 @@ ${context.details}
           workingDir={workspacePath || undefined}
           sessionId={sessionId}
           projectId={demoId}
+          readOnly={currentUserRole !== "admin"}
         >
           <SketchEditorEngineBoundary
             engine={activeSketchEditorEngine}
@@ -9035,7 +9173,15 @@ ${context.details}
                     <DocumentView
                       workingDir={workspacePath || undefined}
                       projectId={demoId}
+                      documentApiMode="project"
+                      workspaceId={workspaceId}
                       sessionId={sessionId}
+                      onReferenceClick={handleMarkdownReferenceClick}
+                      userRole={
+                        currentUserRole === "admin" || currentUserRole === "editor"
+                          ? currentUserRole
+                          : ""
+                      }
                       pages={demoPages.map((p) => ({ id: p.id, name: p.name }))}
                       onCommentTargetChange={setActiveDocumentCommentTarget}
                       onDocumentCommentSelection={(documentAnchor) => {
@@ -9073,7 +9219,7 @@ ${context.details}
               `}</style>
                       <CommentLayer
                         projectId={demoId}
-                        pageId={activeDemoId}
+                        pageId={previewMode === "canvas" ? (canvasEditingPageId ?? activeDemoId) : activeDemoId}
                         api={commentApi}
                         wsUrl={commentWsUrl}
                         currentUser={commentUser}
@@ -9520,6 +9666,7 @@ ${context.details}
                               onReadKnowledgeDocument:
                                 readCanvasKnowledgeDocument,
                               onPageConfigEdit: (pageId, options) => {
+                                setCanvasEditingPageId(pageId);
                                 if (options?.openConfigDetail === false) {
                                   setConfigPanelDetailPageId(null);
                                   setConfigPanelOverviewRequested(true);
@@ -9536,6 +9683,9 @@ ${context.details}
                                 );
                               },
                               onPageRename: handlePageRename,
+                              commentCounts: canvasCommentCounts,
+                              onPageCommentBadgeClick:
+                                handleCanvasCommentBadgeClick,
                               onPageComment: commentModeActive
                                 ? ({
                                     pageId,
@@ -9544,6 +9694,7 @@ ${context.details}
                                     clientX,
                                     clientY,
                                   }) => {
+                                    setCanvasEditingPageId(pageId);
                                     setRightPanelTab("comments");
                                     setCanvasCommentDraft({
                                       input: {
@@ -9851,6 +10002,9 @@ ${context.details}
                               handleProjectRestoreDefaults
                             }
                             sessionId={sessionId}
+                            referenceContext={pageRequirementsReferenceContext}
+                            referenceProvider={markdownReferenceProvider}
+                            onReferenceClick={handleMarkdownReferenceClick}
                             onLaunchWhiteboard={
                               WHITEBOARD_AUTHORING_ENABLED
                                 ? launchWhiteboard
@@ -9903,10 +10057,7 @@ ${context.details}
                             threads={activePageCommentThreads}
                             currentUserId={currentUserId || undefined}
                             activeThreadId={activeCommentThreadId}
-                            onSelectThread={(id) => {
-                              setActiveCommentThreadId(id);
-                              setCommentModeActive(false);
-                            }}
+                            onSelectThread={handleCommentThreadSelect}
                             commentMode={commentModeActive}
                             onCommentModeChange={setCommentModeActive}
                           />
@@ -10039,6 +10190,9 @@ ${context.details}
                               handleProjectRestoreDefaults
                             }
                             sessionId={sessionId}
+                            referenceContext={pageRequirementsReferenceContext}
+                            referenceProvider={markdownReferenceProvider}
+                            onReferenceClick={handleMarkdownReferenceClick}
                             onLaunchWhiteboard={
                               WHITEBOARD_AUTHORING_ENABLED
                                 ? launchWhiteboard
@@ -10085,16 +10239,20 @@ ${context.details}
                         value="comments"
                         className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
                       >
-                        <CommentPanel
-                          threads={activePageCommentThreads}
+                          <CommentPanel
+                          threads={canvasCommentThreads}
                           currentUserId={currentUserId || undefined}
                           activeThreadId={activeCommentThreadId}
-                          onSelectThread={(id) => {
-                            setActiveCommentThreadId(id);
-                            setCommentModeActive(false);
-                          }}
+                          onSelectThread={handleCommentThreadSelect}
                           commentMode={commentModeActive}
                           onCommentModeChange={setCommentModeActive}
+                          groupByPage
+                          commentPages={demoPages.map((page) => ({
+                            id: page.id,
+                            name: page.name,
+                            order: page.order,
+                          }))}
+                          focusedPageId={canvasEditingPageId}
                           createHint="点击画布页面后，直接添加页面级评论"
                         />
                       </TabsContent>
@@ -10256,10 +10414,11 @@ ${context.details}
         onOpenChange={setKbDocDialogOpen}
         mode={kbDocDialogMode}
         item={kbDocDialogItem}
-        workingDir={workspacePath || undefined}
         projectId={demoId}
+        documentApiMode="project"
         workspaceId={workspaceId}
         sessionId={sessionId}
+        onReferenceClick={handleMarkdownReferenceClick}
         collabUser={collabUser}
         onSaved={(item) => {
           if (item) {

@@ -5,6 +5,10 @@ import type {
   WorkspaceRevision,
 } from "./workspace";
 
+export * from "./markdown-reference";
+export * from "./document/contracts";
+export * from "./config-field-capabilities";
+
 export type { DemoPageRuntimeType } from "./workspace";
 export {
   PAGE_RUNTIME_CAPABILITIES,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Crepe } from "@milkdown/crepe";
 import { commandsCtx, editorViewCtx } from "@milkdown/kit/core";
 import {
@@ -17,6 +17,14 @@ import {
 } from "./markdown/crepe-config";
 import { mountHeadingStyleToolbar } from "./markdown/heading-style-toolbar";
 import { mountTopBarOverflow } from "./markdown/top-bar-overflow";
+import {
+  decodeMarkdownReferenceUri,
+  serializeMarkdownReference,
+  type MarkdownReferenceCandidate,
+  type MarkdownReferenceSource,
+  type MarkdownReferenceTarget,
+  type ReferencePolicy,
+} from "@workbench/shared/markdown-reference";
 import {
   getExternalImageUrlFromClipboard,
   getExternalImageUrlsFromClipboard,
@@ -38,6 +46,24 @@ export interface ConfigReferenceCandidate {
   label: string;
 }
 
+/** 编辑器宿主授予的项目引用上下文；不包含用户/session 对象。 */
+export interface MarkdownReferenceContext {
+  source: MarkdownReferenceSource;
+  policy: ReferencePolicy;
+}
+
+export type MarkdownReferenceProvider = (input: {
+  query: string;
+  trigger: "@";
+  context: MarkdownReferenceContext;
+  signal?: AbortSignal;
+}) => Promise<MarkdownReferenceCandidate[]> | MarkdownReferenceCandidate[];
+
+export type MarkdownReferenceClickHandler = (input: {
+  target: MarkdownReferenceTarget;
+  labelSnapshot: string;
+}) => void;
+
 export interface DocumentEditorProps {
   value: string;
   onChange: (value: string) => void;
@@ -49,6 +75,14 @@ export interface DocumentEditorProps {
   localizeRemoteImage?: DocumentRemoteImageHandler;
   /** 提供时，Crepe 块菜单显示「引用配置项」。 */
   referenceCandidates?: ConfigReferenceCandidate[];
+  /** 项目/页面/知识文档引用的 typed source 与权限策略。 */
+  referenceContext?: MarkdownReferenceContext;
+  /** 输入 @ 时按当前 scope 查询候选；未提供时不启用实体引用菜单。 */
+  referenceProvider?: MarkdownReferenceProvider;
+  /** 点击 wb:// 引用时交由宿主导航；浏览器不会直接请求自定义协议。 */
+  onReferenceClick?: MarkdownReferenceClickHandler;
+  /** 供诊断/最近使用记录插入的实体引用。 */
+  onReferenceInserted?: (candidate: MarkdownReferenceCandidate) => void;
   /** 只读内容交由父级滚动时关闭编辑器自身滚动，完整展开正文。 */
   scrollable?: boolean;
   /** 有非空文本选区时，显示评论入口并返回可重新定位的选区锚点。 */
@@ -79,6 +113,10 @@ export function DocumentEditor({
   uploadHandler,
   localizeRemoteImage,
   referenceCandidates,
+  referenceContext,
+  referenceProvider,
+  onReferenceClick,
+  onReferenceInserted,
   scrollable = true,
   onCommentSelection,
   className,
@@ -95,6 +133,10 @@ export function DocumentEditor({
   const mountedRef = useRef(true);
   const readOnlyRef = useRef(readOnly);
   const onCommentSelectionRef = useRef(onCommentSelection);
+  const referenceContextRef = useRef(referenceContext);
+  const referenceProviderRef = useRef(referenceProvider);
+  const onReferenceClickRef = useRef(onReferenceClick);
+  const onReferenceInsertedRef = useRef(onReferenceInserted);
 
   onChangeRef.current = onChange;
   uploadHandlerRef.current = uploadHandler;
@@ -102,10 +144,27 @@ export function DocumentEditor({
   readOnlyRef.current = readOnly;
   onCommentSelectionRef.current = onCommentSelection;
   referenceCandidatesRef.current = referenceCandidates;
+  referenceContextRef.current = referenceContext;
+  referenceProviderRef.current = referenceProvider;
+  onReferenceClickRef.current = onReferenceClick;
+  onReferenceInsertedRef.current = onReferenceInserted;
   const uploadsEnabled = Boolean(uploadHandler);
   const referenceCandidateSignature = (referenceCandidates ?? [])
     .map((candidate) => `${candidate.key}\u0000${candidate.label}`)
     .join("\u0001");
+  const [referenceMenu, setReferenceMenu] = useState<{
+    query: string;
+    candidates: MarkdownReferenceCandidate[];
+    selectedIndex: number;
+  } | null>(null);
+  const referenceMenuRef = useRef(referenceMenu);
+  referenceMenuRef.current = referenceMenu;
+  const referenceTriggerRef = useRef<number | null>(null);
+  const referenceRequestRef = useRef(0);
+  const referenceAbortRef = useRef<AbortController | null>(null);
+  const openReferenceMenuRef = useRef<(() => void) | null>(null);
+  const forceReferenceMenuRef = useRef(false);
+  const insertReferenceCandidateRef = useRef<((candidate: MarkdownReferenceCandidate) => void) | null>(null);
 
   const reportUploadError = useCallback((error: unknown) => {
     window.alert(error instanceof Error ? error.message : "上传失败，请重试");
@@ -150,12 +209,14 @@ export function DocumentEditor({
           `@[${escapeMarkdownLabel(candidate.label)}](${candidate.key})`,
         );
       },
+      openProjectReference: () => openReferenceMenuRef.current?.(),
     };
     const config = buildCrepeConfig({
       placeholder,
       actions,
       enableUploads: uploadsEnabled,
       referenceCandidates: referenceCandidatesRef.current,
+      enableProjectReferences: Boolean(referenceProviderRef.current && referenceContextRef.current),
     });
     const crepe = new Crepe({
       root,
@@ -233,6 +294,170 @@ export function DocumentEditor({
     };
     root.addEventListener("paste", handlePaste, true);
 
+    const closeReferenceMenu = () => {
+      referenceTriggerRef.current = null;
+      forceReferenceMenuRef.current = false;
+      referenceAbortRef.current?.abort();
+      referenceAbortRef.current = null;
+      setReferenceMenu(null);
+    };
+
+    const updateReferenceMenu = () => {
+      const provider = referenceProviderRef.current;
+      const context = referenceContextRef.current;
+      const view = crepe.editor.action((ctx) => ctx.get(editorViewCtx));
+      if (!provider || !context || readOnlyRef.current || !view.state.selection.empty) {
+        closeReferenceMenu();
+        return;
+      }
+      const trigger = referenceTriggerRef.current;
+      if (trigger === null || trigger > view.state.selection.from) {
+        closeReferenceMenu();
+        return;
+      }
+      const typed = view.state.doc.textBetween(trigger, view.state.selection.from, "");
+      if ((!forceReferenceMenuRef.current && !typed.startsWith("@")) || /[\n\r\t ]/.test(typed) || typed.length > 120) {
+        closeReferenceMenu();
+        return;
+      }
+      const query = forceReferenceMenuRef.current ? "" : typed.slice(1);
+      const requestId = ++referenceRequestRef.current;
+      referenceAbortRef.current?.abort();
+      const controller = new AbortController();
+      referenceAbortRef.current = controller;
+      Promise.resolve(provider({ query, trigger: "@", context, signal: controller.signal }))
+        .then((candidates) => {
+          if (requestId !== referenceRequestRef.current || !mountedRef.current) return;
+          const allowedKinds = context.policy.allowedTargetKinds;
+          const visibleCandidates = candidates.filter((candidate) => {
+            if (allowedKinds && !allowedKinds.includes(candidate.target.kind)) return false;
+            if (context.policy.sameProjectOnly && candidate.target.projectId !== context.source.projectId) return false;
+            return true;
+          });
+          setReferenceMenu({ query, candidates: visibleCandidates.slice(0, 30), selectedIndex: 0 });
+        })
+        .catch(() => {
+          if (requestId === referenceRequestRef.current) setReferenceMenu(null);
+        });
+    };
+    openReferenceMenuRef.current = () => {
+      const provider = referenceProviderRef.current;
+      const context = referenceContextRef.current;
+      if (!provider || !context || readOnlyRef.current) return;
+      const view = crepe.editor.action((ctx) => ctx.get(editorViewCtx));
+      if (!view.state.selection.empty) return;
+      referenceTriggerRef.current = view.state.selection.from;
+      forceReferenceMenuRef.current = true;
+      updateReferenceMenu();
+    };
+
+    const insertReferenceCandidate = (candidate: MarkdownReferenceCandidate) => {
+      const trigger = referenceTriggerRef.current;
+      if (trigger === null) return;
+      const view = crepe.editor.action((ctx) => ctx.get(editorViewCtx));
+      const markdown = serializeMarkdownReference(
+        candidate.target,
+        candidate.displayPath.split(" / ").pop() || candidate.displayPath,
+      );
+      // Delete the trigger/query, then let Milkdown parse canonical Markdown
+      // into a link mark instead of inserting the syntax as literal text.
+      view.dispatch(view.state.tr.delete(trigger, view.state.selection.from));
+      insertMarkdown(crepe, markdown);
+      closeReferenceMenu();
+      onReferenceInsertedRef.current?.(candidate);
+    };
+    insertReferenceCandidateRef.current = insertReferenceCandidate;
+
+    const handleReferenceKeyDown = (event: KeyboardEvent) => {
+      const provider = referenceProviderRef.current;
+      const context = referenceContextRef.current;
+      if (!provider || !context || readOnlyRef.current) return;
+      const view = crepe.editor.action((ctx) => ctx.get(editorViewCtx));
+      if (event.key === "@" && view.state.selection.empty) {
+        referenceTriggerRef.current = view.state.selection.from;
+        window.queueMicrotask(updateReferenceMenu);
+        return;
+      }
+      // Treat a canonical wb:// link mark as one atomic chip for deletion.
+      // Milkdown stores the label as ordinary text with a link mark; deleting
+      // the whole marked run keeps users from leaving a half-written URI.
+      if ((event.key === "Backspace" || event.key === "Delete") && view.state.selection.empty) {
+        const { from } = view.state.selection;
+        const direction = event.key === "Backspace" ? -1 : 1;
+        const probe = direction < 0 ? view.state.doc.resolve(from).nodeBefore : view.state.doc.resolve(from).nodeAfter;
+        const mark = probe?.marks.find((candidate) => typeof candidate.attrs?.href === "string" && candidate.attrs.href.startsWith("wb://"));
+        if (mark) {
+          let start = from;
+          let end = from;
+          if (direction < 0) {
+            while (start > 0) {
+              const node = view.state.doc.resolve(start).nodeBefore;
+              if (!node?.isText || !node.marks.some((candidate) => candidate.eq(mark))) break;
+              start -= node.nodeSize;
+            }
+            end = from;
+          } else {
+            while (end < view.state.doc.content.size) {
+              const node = view.state.doc.resolve(end).nodeAfter;
+              if (!node?.isText || !node.marks.some((candidate) => candidate.eq(mark))) break;
+              end += node.nodeSize;
+            }
+          }
+          if (start !== end) {
+            event.preventDefault();
+            view.dispatch(view.state.tr.delete(start, end));
+            return;
+          }
+        }
+      }
+      const currentMenu = referenceMenuRef.current;
+      if (!currentMenu) {
+        if (event.key === "Escape") closeReferenceMenu();
+        return;
+      }
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const delta = event.key === "ArrowDown" ? 1 : -1;
+        setReferenceMenu((current) => {
+          if (!current || current.candidates.length === 0) return current;
+          const selectedIndex =
+            (current.selectedIndex + delta + current.candidates.length) % current.candidates.length;
+          return { ...current, selectedIndex };
+        });
+        return;
+      }
+      if (event.key === "Enter") {
+        const candidate = currentMenu.candidates[currentMenu.selectedIndex];
+        if (!candidate) return;
+        event.preventDefault();
+        insertReferenceCandidate(candidate);
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeReferenceMenu();
+        return;
+      }
+      window.setTimeout(updateReferenceMenu, 0);
+    };
+
+    const handleReferenceInput = () => window.setTimeout(updateReferenceMenu, 0);
+    const handleReferenceClick = (event: MouseEvent) => {
+      const anchor = (event.target as HTMLElement).closest<HTMLAnchorElement>("a[href]");
+      const href = anchor?.getAttribute("href");
+      if (!href?.startsWith("wb://")) return;
+      const target = decodeMarkdownReferenceUri(href);
+      if (!target) return;
+      event.preventDefault();
+      onReferenceClickRef.current?.({
+        target,
+        labelSnapshot: anchor?.textContent?.trim() || "",
+      });
+    };
+    root.addEventListener("keydown", handleReferenceKeyDown, true);
+    root.addEventListener("input", handleReferenceInput, true);
+    root.addEventListener("click", handleReferenceClick, true);
+
     let headingStyleToolbar: ReturnType<typeof mountHeadingStyleToolbar> | null =
       null;
     let topBarOverflow: ReturnType<typeof mountTopBarOverflow> | null = null;
@@ -297,6 +522,13 @@ export function DocumentEditor({
     return () => {
       mountedRef.current = false;
       root.removeEventListener("paste", handlePaste, true);
+      root.removeEventListener("keydown", handleReferenceKeyDown, true);
+      root.removeEventListener("input", handleReferenceInput, true);
+      root.removeEventListener("click", handleReferenceClick, true);
+      referenceRequestRef.current += 1;
+      closeReferenceMenu();
+      openReferenceMenuRef.current = null;
+      insertReferenceCandidateRef.current = null;
       headingStyleToolbar?.destroy();
       topBarOverflow?.destroy();
       selectionToolbarObserver?.disconnect();
@@ -306,7 +538,7 @@ export function DocumentEditor({
     };
     // Crepe's feature graph is immutable after creation. Callback props use refs;
     // only changes that reshape the menu recreate the instance.
-  }, [placeholder, uploadsEnabled, referenceCandidateSignature]);
+  }, [placeholder, uploadsEnabled, referenceCandidateSignature, Boolean(referenceProvider), Boolean(referenceContext)]);
 
   useEffect(() => {
     crepeRef.current?.setReadonly(readOnly);
@@ -316,6 +548,9 @@ export function DocumentEditor({
     const crepe = crepeRef.current;
     if (!crepe || value === lastEmittedRef.current) return;
     lastEmittedRef.current = value;
+    referenceTriggerRef.current = null;
+    referenceRequestRef.current += 1;
+    setReferenceMenu(null);
     queueMicrotask(() => {
       if (crepeRef.current !== crepe) return;
       crepe.editor.action(replaceAll(value));
@@ -334,6 +569,34 @@ export function DocumentEditor({
       data-scrollable={scrollable}
     >
       <div ref={rootRef} className="crepe h-full" />
+      {referenceMenu && referenceMenu.candidates.length > 0 && (
+        <div
+          className="document-reference-menu absolute z-50 mt-1 max-h-72 min-w-64 max-w-[min(90vw,28rem)] overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+          role="listbox"
+          aria-label="项目引用候选"
+        >
+          {referenceMenu.candidates.map((candidate, index) => (
+            <button
+              key={`${candidate.target.kind}:${candidate.target.projectId}:${candidate.target.kind === "project" ? "" : candidate.target.kind === "page" ? candidate.target.pageId : candidate.target.docId}`}
+              type="button"
+              role="option"
+              aria-selected={index === referenceMenu.selectedIndex}
+              className={cn(
+                "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm",
+                index === referenceMenu.selectedIndex ? "bg-accent text-accent-foreground" : "hover:bg-accent/60",
+              )}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                insertReferenceCandidateRef.current?.(candidate);
+              }}
+            >
+              <span className="shrink-0 text-muted-foreground">@</span>
+              <span className="min-w-0 flex-1 truncate">{candidate.displayPath}</span>
+              <span className="shrink-0 text-[10px] uppercase text-muted-foreground">{candidate.target.kind}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <input
         ref={videoInputRef}
         type="file"

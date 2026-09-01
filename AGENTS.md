@@ -272,6 +272,7 @@ Next 开发编译性能约束：
 - 编辑页不得直接动态引用 `author-ai-chat`；保留 `deferred-author-ai-chat` 二级延迟边界，只在初始页面文件就绪后挂载 AI 对话，避免 Mermaid、Shiki 等富文本依赖与预览区争抢首屏资源。
 - author 校验适配器必须从 `@workbench/shared/validator` 精确子路径导入；`PreviewStage` 必须保留 `PreviewCanvas` 按 canvas 模式懒加载边界，不得让初始单页模式解析完整画布、Markdown 与几何子树。
 - Session Bootstrap 向 agent-service 推送模型配置与外部授权时应并发执行、共同完成后再返回；评论等 effect 的 target 对象必须使用稳定引用，并在资源 ID 就绪前禁用网络链路，避免启动期重复 REST/WS。
+- AI 对话本地消息 ID 不得只使用 `Date.now()`，统一通过带随机后缀的 `createLocalId` 生成；计划审批会将同一轮 assistant 消息分段归档，终态落库必须按该轮 ID 合并并保留已归档的工具卡，不得用 React key 加下标掩盖重复数据。
 - Docker 编辑页延迟诊断不能只看某一时刻的 `docker stats`；同时核对 author-site 容器 `cpu.stat` 的 `nr_throttled / nr_periods`、`RestartCount`、V8 heap OOM 日志和启动日志中的 Next.js 版本，避免周期性限流或重启被当前 `healthy` 状态掩盖。
 - 采集冷编译基线前必须关闭仍指向 author-site 的旧浏览器标签，再清理 `.next` 和重启服务；旧页面会自动重连并发起 Authority/会话请求，污染模块数和编译时间。
 - 被 `useEffect` / `useCallback` 依赖的可选数组或对象 props 不得在函数参数中使用 `=[]` / `={}` 这类每次渲染创建新引用的默认值；使用模块级稳定常量，避免请求 effect 循环。

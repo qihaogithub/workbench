@@ -830,6 +830,9 @@ importers:
       '@workbench/sketch-core':
         specifier: workspace:*
         version: link:../sketch-core
+      better-sqlite3:
+        specifier: 12.11.1
+        version: 12.11.1
       parse5:
         specifier: 7.3.0
         version: 7.3.0
@@ -840,6 +843,9 @@ importers:
         specifier: ^3.4.0
         version: 3.4.0
     devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
       '@types/node':
         specifier: ^20.11.16
         version: 20.19.37

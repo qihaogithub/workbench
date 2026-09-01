@@ -546,6 +546,9 @@ function PreviewPanelInternal({
         sessionId,
         demoId,
       });
+      const spineAssetBaseUrl = sessionId && typeof window !== "undefined"
+        ? `${window.location.origin}/api/sessions/${encodeURIComponent(sessionId)}/workspace/assets/animations`
+        : undefined;
       updateCodeSentAtRef.current =
         typeof performance !== "undefined" ? performance.now() : null;
       reportTiming("parent_update_code_url_sent", {
@@ -561,6 +564,7 @@ function PreviewPanelInternal({
           configData: resolvedConfig,
           appState: appStateRef.current || {},
           routeParams: routeParamsRef.current || {},
+          spineAssetBaseUrl,
           cssImports: cssList,
           requestId,
         },
@@ -601,6 +605,9 @@ function PreviewPanelInternal({
         sessionId,
         demoId,
       });
+      const spineAssetBaseUrl = sessionId && typeof window !== "undefined"
+        ? `${window.location.origin}/api/sessions/${encodeURIComponent(sessionId)}/workspace/assets/animations`
+        : undefined;
       updateCodeSentAtRef.current =
         typeof performance !== "undefined" ? performance.now() : null;
       reportTiming("parent_update_code_sent", {
@@ -615,6 +622,7 @@ function PreviewPanelInternal({
           configData: resolvedConfig,
           appState: appStateRef.current || {},
           routeParams: routeParamsRef.current || {},
+          spineAssetBaseUrl,
           cssImports: result.cssImports,
           requestId,
         },
@@ -639,6 +647,9 @@ function PreviewPanelInternal({
         sessionId,
         demoId,
       });
+      const spineAssetBaseUrl = sessionId && typeof window !== "undefined"
+        ? `${window.location.origin}/api/sessions/${encodeURIComponent(sessionId)}/workspace/assets/animations`
+        : undefined;
       const requestId = activePreviewRequestIdRef.current;
 
       iframe.contentWindow.postMessage(
@@ -647,6 +658,7 @@ function PreviewPanelInternal({
           configData: resolvedConfig,
           appState: appStateRef.current || {},
           routeParams: routeParamsRef.current || {},
+          spineAssetBaseUrl,
           requestId,
         },
         "*",

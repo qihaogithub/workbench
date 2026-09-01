@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -7,8 +7,11 @@ import {
 } from "../src/components/ViewerDocumentView";
 
 vi.mock("@workbench/demo-ui", () => ({
-  DocumentEditor: ({ value, readOnly }: { value: string; readOnly?: boolean }) => (
-    <div data-read-only={String(readOnly)}>{value}</div>
+  DocumentEditor: ({ value, readOnly, onReferenceClick }: { value: string; readOnly?: boolean; onReferenceClick?: (input: { target: { kind: "page"; projectId: string; pageId: string }; labelSnapshot: string }) => void }) => (
+    <div data-read-only={String(readOnly)}>
+      {value}
+      <button type="button" data-testid="published-page-reference" onClick={() => onReferenceClick?.({ target: { kind: "page", projectId: "project-1", pageId: "page-1" }, labelSnapshot: "首页" })}>打开页面引用</button>
+    </div>
   ),
   PageRequirements: ({
     markdown,
@@ -26,7 +29,7 @@ vi.mock("@workbench/demo-ui", () => ({
 
 vi.mock("../src/lib/api", () => ({
   DATA_BASE: "/data",
-  getKnowledgeDocContent: vi.fn(),
+  getKnowledgeDocContent: vi.fn().mockResolvedValue("正文"),
   getDataUrl: (value: string) => value,
   getDesignSpecDoc: vi.fn().mockResolvedValue({
     id: "spec-1",
@@ -96,5 +99,36 @@ describe("ViewerDocumentView", () => {
     );
     expect(screen.getByText("图片应使用 16:9。").getAttribute("data-external-media")).toBe("true");
     expect(screen.getByText("图片应使用 16:9。").getAttribute("data-read-only")).toBeNull();
+  });
+
+  it("uses the published reference directory for read-only navigation and status", async () => {
+    const onReferenceNavigate = vi.fn();
+    render(
+      <ViewerDocumentView
+        projectId="project-1"
+        items={[{ id: "doc-1", title: "指南", fileName: "guide.md", source: "user", description: "", addedAt: "", updatedAt: "" }]}
+        designSpecs={[]}
+        pages={[{ id: "page-1", name: "首页" }]}
+        references={{
+          version: 1,
+          projectId: "project-1",
+          publishedVersion: "v1",
+          canonicalSnapshot: { versionId: "v1" },
+          targets: [
+            { target: { kind: "project", projectId: "project-1" }, label: "项目", publishedPath: "project.json" },
+            { target: { kind: "page", projectId: "project-1", pageId: "page-1" }, label: "首页", publishedPath: "demos/page-1" },
+            { target: { kind: "document", projectId: "project-1", docId: "doc-1" }, label: "指南", publishedPath: "knowledge/guide.md" },
+          ],
+          documentPaths: { "doc-1": "knowledge/guide.md" },
+          edges: [],
+          unresolvedCount: 1,
+        }}
+        onReferenceNavigate={onReferenceNavigate}
+      />,
+    );
+
+    expect(await screen.findByText("当前发布版本中有 1 个引用不可用")).toBeTruthy();
+    fireEvent.click(await screen.findByTestId("published-page-reference"));
+    expect(onReferenceNavigate).toHaveBeenCalledWith({ kind: "page", projectId: "project-1", pageId: "page-1" });
   });
 });

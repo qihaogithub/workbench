@@ -5,6 +5,7 @@ import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from '../pi-tools/permis
 import { PERMISSION_TIMEOUT, type PermissionHandler, type PermissionRequestInfo } from '../pi-tools/delete-page-tool';
 import type { PlanApprovalHandler, PlanApprovalRequest, PlanApprovalResult } from '../pi-tools/plan-approval-tool';
 import { logger } from '../../utils/logger';
+import { assertAiMutationAllowed } from '../pi-tools/ai-mutation-policy';
 
 const PLAN_APPROVAL_TIMEOUT_MS = 10 * 60_000;
 
@@ -65,6 +66,19 @@ export class PermissionManager {
         !isPathAllowed(targetPath, this.config.workingDir ?? '', this.config.permissions ?? DEFAULT_WORKSPACE_PERMISSIONS)
       ) {
         return { block: true, reason: `Access denied: path "${targetPath}" is not allowed by workspace permissions` };
+      }
+    }
+
+    if (["writeFile", "editFile", "deleteFile"].includes(toolName)) {
+      const targetPath = input?.path || input?.filePath;
+      // editFile needs its calculated final content for workspace-tree.json;
+      // its execution boundary performs that check. Other paths can be
+      // rejected before the model spends a tool turn.
+      if (targetPath && !(toolName === "editFile" && String(targetPath).replace(/^\.?\//, "") === "workspace-tree.json")) {
+        const decision = assertAiMutationAllowed(this.config, targetPath, {
+          content: toolName === "writeFile" ? input?.content : undefined,
+        });
+        if (!decision.allowed) return { block: true, reason: decision.message ?? "FILE_ACCESS_DENIED" };
       }
     }
 

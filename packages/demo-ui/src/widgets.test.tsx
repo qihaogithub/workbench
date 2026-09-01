@@ -46,6 +46,20 @@ describe("FileUploadWidget", () => {
     expect(screen.getByText("Spine 素材包")).toBeInTheDocument();
   });
 
+  it("renders a managed Spine asset reference as one atomic upload", () => {
+    const assetId = `spine_${"a".repeat(64)}` as const;
+    const { container } = render(
+      <FileUploadWidget
+        value={{ kind: "spine", version: 1, assetId }}
+        onChange={vi.fn()}
+        options={{ assetKind: "spine", accept: ".zip" }}
+      />,
+    );
+
+    expect(screen.getByText("Spine 素材包")).toBeInTheDocument();
+    expect(container.querySelector('input[type="file"]')).not.toHaveAttribute("accept");
+  });
+
   it("stores the URL returned by the session upload endpoint", async () => {
     const onChange = vi.fn();
     vi.stubGlobal(

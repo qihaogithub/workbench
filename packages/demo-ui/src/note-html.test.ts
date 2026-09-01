@@ -77,6 +77,16 @@ describe("renderPageRequirementsMarkdown", () => {
     expect(html).not.toContain("pr-ref");
   });
 
+  it("将 canonical wb 引用渲染为带 URI 的安全 chip", () => {
+    const html = renderPageRequirementsMarkdown(
+      "参见 [首页](wb://page/project-1/home)。",
+    );
+    expect(html).toContain(
+      '<span class="pr-reference" data-reference-uri="wb://page/project-1/home">首页</span>',
+    );
+    expect(html).not.toContain('href="wb://');
+  });
+
   it("资源规范展示可保留 HTTPS 图片，默认仍移除外部媒体", () => {
     const markdown = "![规范图](https://example.com/spec.png)";
     expect(renderPageRequirementsMarkdown(markdown)).not.toContain(

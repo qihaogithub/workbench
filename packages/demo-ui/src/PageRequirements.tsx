@@ -3,6 +3,8 @@
 import { useCallback, useRef } from "react";
 import { renderPageRequirementsMarkdown, stripMarkdown } from "./note-html";
 import { cn } from "./utils";
+import type { MarkdownReferenceTarget } from "@workbench/shared/markdown-reference";
+import { decodeMarkdownReferenceUri } from "@workbench/shared/markdown-reference";
 import "./page-requirements.css";
 
 interface PageRequirementsProps {
@@ -10,6 +12,8 @@ interface PageRequirementsProps {
   markdown: string;
   /** 点击配置项引用 chip 时回调，参数为该配置项 key。 */
   onRefClick?: (configKey: string) => void;
+  /** 点击 wb:// 实体引用时交给宿主导航。 */
+  onReferenceClick?: (input: { target: MarkdownReferenceTarget; labelSnapshot: string }) => void;
   /** 空文档时是否渲染占位。默认渲染。 */
   showEmptyPlaceholder?: boolean;
   placeholderText?: string;
@@ -29,6 +33,7 @@ interface PageRequirementsProps {
 export function PageRequirements({
   markdown,
   onRefClick,
+  onReferenceClick,
   showEmptyPlaceholder = true,
   placeholderText = "暂无配置要求",
   allowExternalMedia = false,
@@ -45,6 +50,16 @@ export function PageRequirements({
 
   const handleClick = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
+      const reference = (event.target as HTMLElement).closest<HTMLElement>("[data-reference-uri]");
+      if (reference) {
+        const uri = reference.getAttribute("data-reference-uri");
+        const target = uri ? decodeMarkdownReferenceUri(uri) : undefined;
+        if (target) {
+          event.preventDefault();
+          onReferenceClick?.({ target, labelSnapshot: reference.textContent?.trim() || "" });
+        }
+        return;
+      }
       if (!onRefClick) return;
       const target = (event.target as HTMLElement).closest<HTMLElement>(
         "[data-ref-key]",
@@ -52,7 +67,7 @@ export function PageRequirements({
       const key = target?.getAttribute("data-ref-key");
       if (key) onRefClick(key);
     },
-    [onRefClick],
+    [onRefClick, onReferenceClick],
   );
 
   if (!plainText && !showEmptyPlaceholder) return null;

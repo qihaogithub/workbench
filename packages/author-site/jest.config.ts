@@ -17,6 +17,7 @@ const config: Config = {
     '^streamdown$': '<rootDir>/jest-streamdown-mock.js',
     '^@streamdown/(.*)$': '<rootDir>/jest-streamdown-mock.js',
     '^@workbench/project-core$': '<rootDir>/../project-core/src/index.ts',
+    '^@workbench/project-core/documents$': '<rootDir>/../project-core/src/documents/index.ts',
     '^@workbench/project-core/html-import$': '<rootDir>/../project-core/src/html-import.ts',
     '^@workbench/project-scaffold$': '<rootDir>/../project-scaffold/src/index.ts',
     '^@workbench/prototype-core$': '<rootDir>/../prototype-core/src/index.ts',

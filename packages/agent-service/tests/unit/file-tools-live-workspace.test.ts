@@ -197,7 +197,7 @@ describe("live Workspace file tools", () => {
     expect(result.content[0].text).not.toContain("id: broken");
   });
 
-  it("writeFile 创建新 knowledge/*.md 时透明同步 manifest.json", async () => {
+  it("writeFile 对新知识文档只创建待审核 proposal，不写 Workspace 或 manifest", async () => {
     const workspacePath = createLiveWorkspace();
     const config: AgentConfig = {
       sessionId: "session-1",
@@ -209,38 +209,27 @@ describe("live Workspace file tools", () => {
       content: "# 测试文档\n\n这是一份测试知识文档。",
     });
 
-    // writeFile 应成功
     expect(result.isError).toBeFalsy();
-    expect(result.details).toHaveProperty("knowledgeDocumentCreated", true);
+    expect(result.details).toHaveProperty("status", "awaiting_approval");
+    expect(result.details).toHaveProperty("proposalId");
+    expect(result.content[0].text).toContain("has not been changed");
 
-    // .md 文件应已写入工作区
     const docPath = path.join(workspacePath, "knowledge", "test-doc.md");
-    expect(fs.existsSync(docPath)).toBe(true);
-    expect(fs.readFileSync(docPath, "utf-8")).toContain("测试文档");
+    expect(fs.existsSync(docPath)).toBe(false);
 
-    // manifest.json 应已创建并包含新条目
     const manifestPath = path.join(workspacePath, "knowledge", "manifest.json");
-    expect(fs.existsSync(manifestPath)).toBe(true);
-    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
-    expect(manifest.items).toHaveLength(1);
-    expect(manifest.items[0].fileName).toBe("test-doc.md");
-    expect(manifest.items[0].title).toBe("test-doc");
-    expect(manifest.items[0].source).toBe("user");
-    expect(manifest.items[0].id).toMatch(/^kb_/);
+    expect(fs.existsSync(manifestPath)).toBe(false);
   });
 
-  it("writeFile 编辑已存在 knowledge/*.md 时不触发 manifest 同步", async () => {
+  it("writeFile 覆盖已有知识文档时保留原内容直到批准", async () => {
     const workspacePath = createLiveWorkspace();
     const config: AgentConfig = {
       sessionId: "session-1",
       workingDir: workspacePath,
     };
 
-    // 先创建文档
-    await createWriteFileTool(config).execute("write-1", {
-      path: "knowledge/existing.md",
-      content: "初始内容",
-    });
+    fs.mkdirSync(path.join(workspacePath, "knowledge"), { recursive: true });
+    fs.writeFileSync(path.join(workspacePath, "knowledge", "existing.md"), "初始内容", "utf-8");
 
     // 再次写入（覆盖）
     const result = await createWriteFileTool(config).execute("write-2", {
@@ -249,15 +238,12 @@ describe("live Workspace file tools", () => {
     });
 
     expect(result.isError).toBeFalsy();
-    expect(result.details).toHaveProperty("knowledgeDocumentCreated", false);
+    expect(result.details).toHaveProperty("status", "awaiting_approval");
 
-    // manifest 应仍只有 1 个条目
-    const manifestPath = path.join(workspacePath, "knowledge", "manifest.json");
-    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
-    expect(manifest.items).toHaveLength(1);
+    expect(fs.readFileSync(path.join(workspacePath, "knowledge", "existing.md"), "utf-8")).toBe("初始内容");
   });
 
-  it("writeFile 使用 ./ 前缀路径创建 knowledge 文档时归一化后触发 manifest 同步", async () => {
+  it("writeFile 使用 ./ 前缀路径创建 proposal 时规范化路径", async () => {
     const workspacePath = createLiveWorkspace();
     const config: AgentConfig = {
       sessionId: "session-1",
@@ -271,13 +257,7 @@ describe("live Workspace file tools", () => {
     });
 
     expect(result.isError).toBeFalsy();
-    expect(result.details).toHaveProperty("knowledgeDocumentCreated", true);
-
-    // manifest.json 应已创建并包含新条目
-    const manifestPath = path.join(workspacePath, "knowledge", "manifest.json");
-    expect(fs.existsSync(manifestPath)).toBe(true);
-    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
-    expect(manifest.items).toHaveLength(1);
-    expect(manifest.items[0].fileName).toBe("prefixed-doc.md");
+    expect(result.details).toMatchObject({ path: "knowledge/prefixed-doc.md", status: "awaiting_approval" });
+    expect(fs.existsSync(path.join(workspacePath, "knowledge", "prefixed-doc.md"))).toBe(false);
   });
 });

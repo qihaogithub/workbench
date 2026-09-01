@@ -49,3 +49,8 @@ description: 页面运行时类型转换（prototype ↔ high-fidelity-react）�
 - `config.schema.json` 未丢失字段
 - 项目内资源引用路径正确
 - 未引入脚本/iframe/远程资源违规
+
+### Spine 复合配置
+
+- Spine 只能使用单个 `format: "spine"` 的原子素材字段，上传 `.zip` 或 Flutter 导出的 `.zip.flutter`；不得生成 `skeleton`、`atlas`、`texture` 三个独立上传字段，也不得使用 `type: "string" + format: "file" + accept: ".zip"`。
+- 页面运行时使用 `<SpinePlayer src={spineAsset} animation={spineAnimation} loop={spineLoop} audioEnabled={spineAudioEnabled} />`。未上传时 `spineAsset` 保持缺失并使用页面 fallback；压缩包内的音频会由 Spine event 自动播放，三个文件 URL 是上传服务解析后的内部结果，不能写入作者 schema、值或源码。

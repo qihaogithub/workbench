@@ -25,8 +25,9 @@ describe("loadCanvasPageContent", () => {
         data: {
           prototypeHtml: "<main>源页面</main>",
           prototypeCss: "main { color: red; }",
-          schema: "{\"type\":\"object\"}",
-          projectConfigSchema: "{\"type\":\"object\",\"properties\":{\"brand\":{\"type\":\"string\"}}}",
+          schema: '{"type":"object"}',
+          projectConfigSchema:
+            '{"type":"object","properties":{"brand":{"type":"string"}}}',
           configData: { title: "最新内容" },
           runtimeType: "prototype-html-css",
           requirements: "# 页面规范",
@@ -78,7 +79,10 @@ describe("loadCanvasPageContent", () => {
   it("普通页面仍从当前 session 工作空间读取", async () => {
     const request = jest.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ success: true, data: { code: "export default () => null" } }),
+      json: async () => ({
+        success: true,
+        data: { code: "export default () => null" },
+      }),
     });
 
     await loadCanvasPageContent({
@@ -93,13 +97,82 @@ describe("loadCanvasPageContent", () => {
     );
   });
 
-  it("sandboxed-html 页面只通过鉴权接口申请执行票据", async () => {
-    const request = jest.fn()
+  it("动态 API 路由编译期短暂返回 HTML 时会重试页面内容请求", async () => {
+    const request = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        json: async () => {
+          throw new SyntaxError("Unexpected token '<'");
+        },
+      })
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           success: true,
-          data: { sandboxHtml: "<button>安全预览</button>", runtimeType: "sandboxed-html" },
+          data: { code: "export default () => null" },
+        }),
+      });
+    jest.useFakeTimers();
+
+    try {
+      const pending = loadCanvasPageContent({
+        page: { ...referencePage, id: "local-page", reference: undefined },
+        projectId: "target-project",
+        sessionId: "session-1",
+        request,
+      });
+      await jest.advanceTimersByTimeAsync(200);
+
+      await expect(pending).resolves.toMatchObject({
+        pageId: "local-page",
+        code: "export default () => null",
+      });
+      expect(request).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("持续收到 HTML 时给出接口上下文而不是 JSON 语法错误", async () => {
+    const request = jest.fn().mockResolvedValue({
+      ok: false,
+      json: async () => {
+        throw new SyntaxError("Unexpected token '<'");
+      },
+    });
+    jest.useFakeTimers();
+
+    try {
+      const pending = loadCanvasPageContent({
+        page: { ...referencePage, id: "local-page", reference: undefined },
+        projectId: "target-project",
+        sessionId: "session-1",
+        request,
+      });
+      const rejected = expect(pending).rejects.toThrow(
+        "页面内容接口 返回了非 JSON 响应",
+      );
+      await jest.runAllTimersAsync();
+
+      await rejected;
+      expect(request).toHaveBeenCalledTimes(4);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("sandboxed-html 页面只通过鉴权接口申请执行票据", async () => {
+    const request = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: {
+            sandboxHtml: "<button>安全预览</button>",
+            runtimeType: "sandboxed-html",
+          },
         }),
       })
       .mockResolvedValueOnce({

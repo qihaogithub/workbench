@@ -2,6 +2,7 @@ import type { CommentTarget, CommentThread } from "@workbench/shared";
 import { describe, expect, it } from "vitest";
 import {
   countUnresolvedCommentThreads,
+  countUnresolvedCommentThreadsByPage,
   filterCommentThreadsByTarget,
   filterPageCommentThreads,
 } from "./comment-thread-scope";
@@ -54,5 +55,11 @@ describe("comment thread scope", () => {
     expect(pageThreads).toEqual([pageA, pageBResolved]);
     expect(filterPageCommentThreads(threads, "page_a")).toEqual([pageA]);
     expect(countUnresolvedCommentThreads(pageThreads)).toBe(1);
+  });
+
+  it("按页面统计未处理评论，忽略已处理和文档评论", () => {
+    expect(countUnresolvedCommentThreadsByPage(threads)).toEqual({
+      page_a: 1,
+    });
   });
 });

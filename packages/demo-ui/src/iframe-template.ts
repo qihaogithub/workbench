@@ -8,6 +8,7 @@ export interface IframeTemplateOptions {
   useCdnRuntime?: boolean;
   supportUrlMode?: boolean;
   baseOrigin?: string;
+  spineAssetBaseUrl?: string;
 }
 
 const DEFAULT_CDN_BASE = "https://esm.sh";
@@ -2102,6 +2103,7 @@ export function generateIframeHtml(
     useCdnRuntime,
     supportUrlMode = true,
     baseOrigin,
+    spineAssetBaseUrl,
   } = options;
   const cdnBase = cdnBaseUrl || DEFAULT_CDN_BASE;
   const runtimeImports = buildRuntimeImports(cdnBase, runtimeBaseUrl, useCdnRuntime);
@@ -2116,6 +2118,7 @@ export function generateIframeHtml(
   const initialCode = compiledCode ? JSON.stringify(compiledCode) : "null";
   const initialCodeUrl = compiledCodeUrl ? JSON.stringify(compiledCodeUrl) : "null";
   const initialConfig = JSON.stringify(configData || {});
+  const initialSpineAssetBaseUrl = JSON.stringify(spineAssetBaseUrl || "");
 
   const loadModuleFn = `
     function reportRuntimeError(payload) {
@@ -2358,6 +2361,7 @@ ${cssLinks}
     window.__DEMO_PROPS__ = currentConfig;
     window.__APP_STATE__ = currentAppState;
     window.__ROUTE_PARAMS__ = currentRouteParams;
+    window.__WORKBENCH_SPINE_ASSET_BASE__ = ${initialSpineAssetBaseUrl};
 
     // 画布可按页面完整内容高度显示卡片，最多到 MAX_PAGE_HEIGHT（50000）。
     // 这里与画布上限保持一致，保证单次测量请求的高度不会超过画布能展示的上限，
@@ -2521,7 +2525,8 @@ ${cssLinks}
     window.addEventListener('message', (event) => {
       if (event.source !== window.parent) return;
 
-      const { type, code, moduleUrl, configData: newConfigData, cssImports: newCssImports, appState, routeParams, requestId${supportUrlMode ? ", isUrl" : ""} } = event.data;
+      const { type, code, moduleUrl, configData: newConfigData, cssImports: newCssImports, appState, routeParams, spineAssetBaseUrl, requestId${supportUrlMode ? ", isUrl" : ""} } = event.data;
+      if (typeof spineAssetBaseUrl === 'string') window.__WORKBENCH_SPINE_ASSET_BASE__ = spineAssetBaseUrl;
 
       if (type === 'SLEEP') {
         isSleeping = true;

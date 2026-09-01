@@ -616,6 +616,23 @@ describe("ProjectAdminService", () => {
     });
   });
 
+  it("为已删除知识文档创建不可物化的 tombstone 版本", () => {
+    const created = service.createProject({ name: "知识删除 tombstone 项目" });
+    const projectId = created.data?.id ?? "";
+    const item = {
+      id: "kb_deleted", title: "已删除文档", source: "user" as const, description: "删除前快照",
+      fileName: "deleted.md", addedAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    const tombstone = service.resourceVersionCreateKnowledgeTombstone({
+      projectId, resourceId: item.id, item, content: "# 删除前正文\n",
+      workspaceId: "live-delete", workspaceRevision: 52, workspaceRootHash: "delete-root",
+    });
+    expect(tombstone.ok).toBe(true);
+    const version = service.resourceVersionGet({ projectId, kind: "knowledge_document", resourceId: item.id, versionId: tombstone.data!.id });
+    expect(version.data?.version.metadata).toMatchObject({ tombstone: true, item: { id: item.id } });
+    expect(service.projectCommitList(projectId).data?.commits[0]?.audit).toMatchObject({ workspaceId: "live-delete", workspaceRevision: 52 });
+  });
+
   it("恢复页面资源版本时记录 restore snapshot 和 commit 的 workspace proof", () => {
     const created = service.createProject({ name: "资源恢复 proof 项目" });
     const projectId = created.data?.id ?? "";

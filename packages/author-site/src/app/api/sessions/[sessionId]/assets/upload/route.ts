@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
+import crypto from "node:crypto";
 import fs from "fs";
 import path from "path";
-import yauzl from "yauzl";
 import {
   sessionExists,
   createApiSuccess,
@@ -12,8 +12,11 @@ import {
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { uploadImage } from "@/lib/image-store";
 import { addProjectImage, type ProjectImage } from "@/lib/project-images";
-import { selectSpinePackage, ANIMATION_ASSET_EXTS } from "./extract-spine-package";
-import { getFileExtension, hasAllowedAssetExtension, isAllowedAssetFile, MAX_VIDEO_SIZE } from "./asset-validation";
+import { getFileExtension, hasAllowedAssetExtension, isAllowedAssetFile, isSpinePackageFilename, MAX_VIDEO_SIZE } from "./asset-validation";
+import { prepareSpineAsset } from "./spine-assets";
+import type { WorkspaceMutationOperation } from "@workbench/shared/contracts";
+import { isLiveWorkspacePath } from "@/lib/live-workspace-route-context";
+import { commitWorkspaceMutation, reconcileWorkspaceAuthority, stageWorkspaceBinary, WorkspaceAuthorityClientError } from "@/lib/workspace-authority-client";
 
 const DEFAULT_MAX_SIZE = 50 * 1024 * 1024; // 50MB
 
@@ -35,63 +38,6 @@ function isUploadFile(value: FormDataEntryValue | null): value is File {
     && typeof value.type === "string"
     && typeof value.size === "number"
     && typeof value.arrayBuffer === "function";
-}
-
-async function extractZipToWorkspace(
-  buffer: Buffer,
-  workspacePath: string,
-  sessionId: string,
-): Promise<{ skeleton: string; atlas: string; texture: string } | null> {
-  const stamp = Date.now().toString(36);
-  const destDir = path.join(workspacePath, "assets", "animations", stamp);
-  fs.mkdirSync(destDir, { recursive: true });
-
-  return new Promise((resolve, reject) => {
-    yauzl.fromBuffer(buffer, { lazyEntries: true }, (err, zipfile) => {
-      if (err) return reject(err);
-      const files: Record<string, string> = {};
-      zipfile.readEntry();
-      zipfile.on("entry", (entry) => {
-        const entryName = entry.fileName;
-        if (/\/$/.test(entryName)) { zipfile.readEntry(); return; }
-        const normalized = path.normalize(entryName);
-        if (normalized.startsWith("..") || path.isAbsolute(normalized)) {
-          zipfile.readEntry(); return;
-        }
-        const ext = path.extname(entryName).toLowerCase();
-        if (!ANIMATION_ASSET_EXTS.has(ext)) { zipfile.readEntry(); return; }
-        zipfile.openReadStream(entry, (openErr, readStream) => {
-          if (openErr) { zipfile.readEntry(); return; }
-          const chunks: Buffer[] = [];
-          readStream.on("data", (chunk: Buffer) => chunks.push(chunk));
-          readStream.on("end", () => {
-            const destPath = path.join(destDir, path.basename(entryName));
-            fs.writeFileSync(destPath, Buffer.concat(chunks));
-            files[path.basename(entryName)] = destPath;
-            zipfile.readEntry();
-          });
-        });
-      });
-      zipfile.on("end", () => {
-        let selected: { skeleton: string; atlas: string; texture: string } | null = null;
-        try {
-          selected = selectSpinePackage(files);
-        } catch {}
-
-        if (!selected) {
-          try { fs.rmSync(destDir, { recursive: true, force: true }); } catch {}
-          return resolve(null);
-        }
-        const basePath = `/api/sessions/${sessionId}/workspace/assets/animations/${stamp}`;
-        resolve({
-          skeleton: `${basePath}/${path.basename(selected.skeleton)}`,
-          atlas: `${basePath}/${path.basename(selected.atlas)}`,
-          texture: `${basePath}/${path.basename(selected.texture)}`,
-        });
-      });
-      zipfile.on("error", reject);
-    });
-  });
 }
 
 export async function POST(
@@ -175,22 +121,77 @@ export async function POST(
       return NextResponse.json(createApiSuccess({ url, filename, size: file.size, mimeType: file.type }));
     }
 
-    if (ext === ".zip") {
+    if (isSpinePackageFilename(file.name)) {
+      if (formData.get("assetKind") !== "spine") {
+        return NextResponse.json(createApiError("INVALID_REQUEST", "ZIP 上传必须声明 assetKind=spine"), { status: 400 });
+      }
       const workspacePath = getSessionWorkspacePath(sessionId);
-      if (!workspacePath) {
+      if (!workspacePath || !projectId || !meta?.workspaceId) {
         return NextResponse.json(
           createApiError("SESSION_NOT_FOUND", "会话工作区不存在"),
           { status: 404 },
         );
       }
-      const spineFiles = await extractZipToWorkspace(buffer, workspacePath, sessionId);
-      if (!spineFiles) {
-        return NextResponse.json(
-          createApiError("INVALID_FILE_TYPE", "ZIP 包内未找到 Spine 动画文件（需要 .skel/.json + .atlas + .png）"),
-          { status: 400 },
-        );
+      try {
+        if (!isLiveWorkspacePath(workspacePath)) throw new Error("WORKSPACE_AUTHORITY_REQUIRED");
+        const asset = await prepareSpineAsset(buffer, file.name);
+        let adoptedLegacyDrift = false;
+        const stage = async (content: Buffer) => {
+          try {
+            return await stageWorkspaceBinary({ projectId, workspaceId: meta.workspaceId!, sessionId, content });
+          } catch (error) {
+            if (!(error instanceof WorkspaceAuthorityClientError) || error.code !== "WORKSPACE_EXTERNAL_DRIFT" || adoptedLegacyDrift) throw error;
+            await reconcileWorkspaceAuthority({ projectId, workspaceId: meta.workspaceId!, sessionId, mode: "adopt" });
+            adoptedLegacyDrift = true;
+            return stageWorkspaceBinary({ projectId, workspaceId: meta.workspaceId!, sessionId, content });
+          }
+        };
+        const stagedFiles = await Promise.all(asset.files.map(async (fileEntry) => ({ fileEntry, staged: await stage(fileEntry.content) })));
+        const manifest = Buffer.from(JSON.stringify(asset.manifest, null, 2) + "\n", "utf8");
+        const stagedManifest = await stage(manifest);
+        const prefix = `assets/animations/${asset.ref.assetId}`;
+        const operations: WorkspaceMutationOperation[] = [
+          ...stagedFiles.map(({ fileEntry, staged }) => ({
+            type: "put_binary" as const,
+            path: `${prefix}/${fileEntry.path}`,
+            stagingId: staged.stagingId,
+            hash: staged.hash,
+            size: staged.size,
+          })),
+          { type: "put_binary", path: `${prefix}/manifest.json`, stagingId: stagedManifest.stagingId, hash: stagedManifest.hash, size: stagedManifest.size },
+        ];
+        const pageId = formData.get("pageId");
+        const configKey = formData.get("configKey");
+        if (typeof pageId === "string" && /^[A-Za-z0-9_-]+$/.test(pageId) && typeof configKey === "string" && /^[A-Za-z0-9_-]+$/.test(configKey)) {
+          const configPath = `demos/${pageId}/config.values.json`;
+          const absoluteConfigPath = path.join(workspacePath, configPath);
+          let previous: Record<string, unknown> = {};
+          let previousText: string | null = null;
+          try { previousText = fs.readFileSync(absoluteConfigPath, "utf8"); previous = JSON.parse(previousText) as Record<string, unknown>; } catch { /* an empty config is valid */ }
+          const content = JSON.stringify({ ...previous, [configKey]: asset.ref }, null, 2) + "\n";
+          operations.push({
+            type: "put_text",
+            path: configPath,
+            content,
+            ...(previousText === null ? { expectedAbsent: true } : { expectedHash: crypto.createHash("sha256").update(previousText).digest("hex") }),
+          });
+        }
+        await commitWorkspaceMutation({
+          mutationId: crypto.randomUUID(), projectId, workspaceId: meta.workspaceId, sessionId,
+          baseRevision: 0, actor: "author-site", reason: "commit_spine_asset", operations,
+        });
+        return NextResponse.json(createApiSuccess({ ref: asset.ref, summary: asset.summary }));
+      } catch (error) {
+        if (error instanceof WorkspaceAuthorityClientError) {
+          return NextResponse.json(
+            createApiError("FILE_WRITE_ERROR", error.message, { authorityCode: error.code }),
+            { status: error.status },
+          );
+        }
+        const reason = error instanceof WorkspaceAuthorityClientError ? error.code : error instanceof Error ? error.message : "INVALID_ZIP";
+        const status = reason === "ZIP_TOO_LARGE" || reason === "ZIP_UNCOMPRESSED_TOO_LARGE" || reason === "TOO_MANY_ZIP_ENTRIES" ? 413 : 400;
+        return NextResponse.json(createApiError("INVALID_FILE_TYPE", `Spine 素材包无效: ${reason}`), { status });
       }
-      return NextResponse.json(createApiSuccess(spineFiles));
     }
 
     if (NON_IMAGE_ANIMATION_EXTS.has(ext)) {

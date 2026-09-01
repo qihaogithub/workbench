@@ -70,4 +70,7 @@ export interface KnowledgeManifest {
 export interface KnowledgeResourceMetadata extends Record<string, unknown> {
   item: KnowledgeItemMeta;
   files: ResourceBlobMap;
+  /** A historical deletion marker. Its markdown snapshot remains private for
+   * restoration/audit, but materialization must not recreate the document. */
+  tombstone?: boolean;
 }

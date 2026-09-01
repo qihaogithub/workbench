@@ -1,6 +1,10 @@
 "use client";
 
 import MarkdownIt from "markdown-it";
+import {
+  decodeMarkdownReferenceUri,
+  parseMarkdownReferences,
+} from "@workbench/shared/markdown-reference";
 
 /**
  * 配置项备注的 Markdown 安全渲染工具。
@@ -53,6 +57,7 @@ const ALLOWED_ATTR = [
   "disabled",
   "data-type",
   "data-checked",
+  "data-reference-uri",
   // 媒体属性
   "src",
   "alt",
@@ -137,13 +142,31 @@ function escapeHtml(text: string): string {
 /** 将 Markdown 备注渲染为已清洗的安全 HTML（图片/视频/附件内联显示） */
 export function renderNoteMarkdown(markdown: string): string {
   if (!markdown) return "";
+  const withReferences = replaceCanonicalReferenceMarkup(markdown);
   let html: string;
   try {
-    html = md.render(markdown);
+    html = md.render(withReferences);
   } catch {
     html = escapeHtml(markdown).replace(/\n/g, "<br>");
   }
   return sanitizeNoteHtml(html);
+}
+
+/** Replace only parser-approved wb:// links (never code or HTML attributes)
+ * with inert chips before Markdown-it renders the rest of the document. */
+function replaceCanonicalReferenceMarkup(markdown: string): string {
+  const references = parseMarkdownReferences(markdown).references;
+  let result = markdown;
+  for (const reference of [...references].sort((a, b) => b.start - a.start)) {
+    const raw = markdown.slice(reference.start, reference.end);
+    const uriStart = raw.indexOf("(wb://");
+    const uriEnd = raw.lastIndexOf(")");
+    if (uriStart < 0 || uriEnd <= uriStart) continue;
+    const uri = raw.slice(uriStart + 1, uriEnd);
+    if (!decodeMarkdownReferenceUri(uri)) continue;
+    result = `${result.slice(0, reference.start)}<span class="pr-reference" data-reference-uri="${escapeHtml(uri)}">${escapeHtml(reference.labelSnapshot)}</span>${result.slice(reference.end)}`;
+  }
+  return result;
 }
 
 const REQUIREMENT_REF_REGEX = /@\[([^\]]+)\]\(([^)]+)\)/g;
@@ -179,7 +202,8 @@ export function renderPageRequirementsMarkdown(
   options?: { allowExternalMedia?: boolean; mediaBaseUrl?: string },
 ): string {
   if (!markdown) return "";
-  const withChips = markdown.replace(
+  const withReferences = replaceCanonicalReferenceMarkup(markdown);
+  const withChips = withReferences.replace(
     REQUIREMENT_REF_REGEX,
     (_match, name: string, key: string) =>
       `<span class="pr-ref" data-ref-key="${escapeHtml(key)}">${escapeHtml(name)}</span>`,

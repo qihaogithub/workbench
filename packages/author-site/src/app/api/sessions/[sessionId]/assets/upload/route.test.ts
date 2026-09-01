@@ -22,11 +22,6 @@ jest.mock("@/lib/fs-utils", () => ({
 }));
 jest.mock("@/lib/image-store", () => ({ uploadImage: jest.fn() }));
 jest.mock("@/lib/project-images", () => ({ addProjectImage: jest.fn() }));
-jest.mock("./extract-spine-package", () => ({
-  selectSpinePackage: jest.fn(),
-  ANIMATION_ASSET_EXTS: new Set(),
-}));
-
 import fs from "fs";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import {

@@ -14,7 +14,9 @@
     "./demo/sketch-scene": "./src/demo/sketch-scene.ts",
     "./demo/config-runtime-compatibility": "./src/demo/config-runtime-compatibility.ts",
     "./demo/page-requirements": "./src/demo/page-requirements.ts",
-    "./demo/config-schema-definition": "./src/demo/config-schema-definition.ts"
+    "./demo/config-schema-definition": "./src/demo/config-schema-definition.ts",
+    "./markdown-reference": "./src/markdown-reference/index.ts",
+    "./document": "./src/document/contracts.ts"
   },
   "dependencies": {
     "@workbench/sketch-core": "workspace:*"

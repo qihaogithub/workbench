@@ -4,6 +4,7 @@ import { createAgentBusyResult, getAgentManager } from '../core/agent-manager';
 import { BackendAgent } from '../core/backend-agent';
 import { getSessionModelConfigs } from '../config/session-model-configs';
 import { getSessionExternalAuthConfigs } from '../config/session-external-auth';
+import { getSessionAuthorizations } from '../config/session-authorizations';
 import { getSessionStore } from '../session/session-store';
 import { validatePath } from '../session/session-guard';
 import { snapshotService } from '../session/snapshot-service';
@@ -170,6 +171,25 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 
         let workspaceInfo: WorkspaceInfo | undefined;
 
+        // Role and project are server-bound by author-site.  A client may
+        // omit projectId, but it must never substitute a different project
+        // for an already-bound session.
+        const sessionAuthorization = mode === 'viewer-readonly'
+          ? undefined
+          : getSessionAuthorizations().get(sessionId);
+        if (sessionAuthorization && projectId && sessionAuthorization.projectId !== projectId) {
+          return reply.code(403).send({
+            success: false,
+            error: { code: 'FILE_ACCESS_DENIED', message: '会话与项目不匹配' },
+          });
+        }
+        const authorAuthorization = mode === 'viewer-readonly'
+          ? undefined
+          : (sessionAuthorization ?? {
+              userId: '', role: null, projectId: projectId || '', expiresAt: 0, source: 'author-session' as const,
+            });
+        const resolvedProjectId = authorAuthorization?.projectId || projectId;
+
         if (mode === 'viewer-readonly') {
           // viewer-readonly 的 workingDir 指向项目工作空间，不走临时工作空间机制
         } else if (workingDir) {
@@ -190,13 +210,16 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 
         const config: AgentConfig = {
           sessionId,
-          projectId,
+          projectId: resolvedProjectId,
           demoId,
           workingDir: workspaceInfo?.path || workingDir,
           model: requestedModelId || currentModelId,
           toolVersion: getWorkbenchToolCapabilities().toolVersion,
           backendProviders: getSessionModelConfigs().get(sessionId),
           externalAuth: getSessionExternalAuthConfigs().get(sessionId),
+          // Browser-provided role is intentionally ignored. An absent internal
+          // binding is represented explicitly so write tools fail closed.
+          authorAuthorization,
           // viewer-readonly：服务端强制 workingDir/toolMode/permissions，忽略客户端同名字段
           ...(viewerSession ? viewerSession.configPatch : {}),
         };

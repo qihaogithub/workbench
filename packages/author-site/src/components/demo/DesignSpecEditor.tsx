@@ -9,7 +9,12 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { DocumentEditor } from "@workbench/demo-ui";
+import {
+  DocumentEditor,
+  type MarkdownReferenceClickHandler,
+  type MarkdownReferenceContext,
+  type MarkdownReferenceProvider,
+} from "@workbench/demo-ui";
 import { cn } from "@/lib/utils";
 import type { DesignSpecEntry, DesignSpecRef } from "@/lib/design-specs";
 import { useDesignSpecWorkspace } from "./DesignSpecWorkspace";
@@ -24,9 +29,20 @@ import {
 interface DesignSpecEditorProps {
   docId: string;
   focusEntryId?: string;
+  readOnly?: boolean;
+  workspaceId?: string;
+  referenceProvider?: MarkdownReferenceProvider;
+  onReferenceClick?: MarkdownReferenceClickHandler;
 }
 
-export function DesignSpecEditor({ docId, focusEntryId }: DesignSpecEditorProps) {
+export function DesignSpecEditor({
+  docId,
+  focusEntryId,
+  readOnly = false,
+  workspaceId,
+  referenceProvider,
+  onReferenceClick,
+}: DesignSpecEditorProps) {
   const ws = useDesignSpecWorkspace();
 
   // 选中当前设计规范文档；离开时清空
@@ -69,10 +85,12 @@ export function DesignSpecEditor({ docId, focusEntryId }: DesignSpecEditorProps)
           "flex min-w-0 flex-1 flex-col overflow-y-auto p-4",
         )}
         onDragOver={(e) => {
+          if (readOnly) return;
           e.preventDefault();
           e.dataTransfer.dropEffect = "copy";
         }}
         onDrop={(e) => {
+          if (readOnly) return;
           e.preventDefault();
           const raw = e.dataTransfer.getData("text/plain");
           if (raw.startsWith("pool:")) ws.addEntryWithItem(raw.slice(5));
@@ -87,30 +105,45 @@ export function DesignSpecEditor({ docId, focusEntryId }: DesignSpecEditorProps)
             {doc.entries.map((entry) => (
               <EntryCard
                 key={entry.id}
+                docId={doc.id}
                 entry={entry}
                 open={ws.openIds.has(entry.id)}
+                readOnly={readOnly}
+                workspaceId={workspaceId}
+                referenceProvider={referenceProvider}
+                onReferenceClick={onReferenceClick}
               />
             ))}
           </div>
         )}
       </div>
-      <button
+      {!readOnly && <button
         className="absolute bottom-5 right-5 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-opacity hover:opacity-90"
         title="新建条目"
         onClick={() => ws.addEntry()}
       >
         <Plus className="h-5 w-5" />
-      </button>
+      </button>}
     </div>
   );
 }
 
 function EntryCard({
+  docId,
   entry,
   open,
+  readOnly,
+  workspaceId,
+  referenceProvider,
+  onReferenceClick,
 }: {
+  docId: string;
   entry: DesignSpecEntry;
   open: boolean;
+  readOnly: boolean;
+  workspaceId?: string;
+  referenceProvider?: MarkdownReferenceProvider;
+  onReferenceClick?: MarkdownReferenceClickHandler;
 }) {
   const ws = useDesignSpecWorkspace();
   const [dragover, setDragover] = useState(false);
@@ -145,11 +178,13 @@ function EntryCard({
   return (
     <div
       onDragOver={(e) => {
+        if (readOnly) return;
         e.preventDefault();
         setDragover(true);
       }}
       onDragLeave={() => setDragover(false)}
       onDrop={(e) => {
+        if (readOnly) return;
         e.preventDefault();
         setDragover(false);
         const raw = e.dataTransfer.getData("text/plain");
@@ -168,12 +203,13 @@ function EntryCard({
       >
         <button
           type="button"
-          draggable
+          draggable={!readOnly}
           aria-label={`拖动排序${entry.title}`}
           title="拖动排序"
           className="shrink-0 cursor-grab touch-none rounded p-0.5 text-muted-foreground hover:bg-accent active:cursor-grabbing"
           onClick={(e) => e.stopPropagation()}
           onDragStart={(e) => {
+            if (readOnly) return;
             e.dataTransfer.setData("text/plain", "entry:" + entry.id);
           }}
         >
@@ -187,13 +223,14 @@ function EntryCard({
         <input
           className="min-w-0 flex-1 rounded bg-transparent px-1 py-0.5 text-sm font-semibold outline-none hover:bg-background focus:border focus:border-border"
           value={entry.title}
+          readOnly={readOnly}
           onClick={(e) => e.stopPropagation()}
           onChange={(e) => ws.renameEntry(entry.id, e.target.value)}
         />
         <span className="shrink-0 text-[11px] text-muted-foreground">
           {entry.refs.length} 项配置
         </span>
-        <button
+        {!readOnly && <button
           className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-destructive"
           title="删除条目"
           onClick={(e) => {
@@ -202,7 +239,7 @@ function EntryCard({
           }}
         >
           <Trash2 className="h-3.5 w-3.5" />
-        </button>
+        </button>}
       </div>
 
       {/* 展开内容 */}
@@ -267,13 +304,13 @@ function EntryCard({
                         {formatSize(item)}
                       </td>
                       <td className="w-0 p-0 text-right">
-                        <button
+                        {!readOnly && <button
                           className="hidden rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive group-hover/trow:inline-flex"
                           title="解绑"
                           onClick={() => ws.unbindRef(refToPoolId(ref), entry.id)}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        </button>}
                       </td>
                     </tr>
                   );
@@ -292,13 +329,13 @@ function EntryCard({
                     <td>-</td>
                     <td className="pr-7">-</td>
                     <td className="w-0 p-0 text-right">
-                      <button
+                      {!readOnly && <button
                         className="hidden rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive group-hover/trow:inline-flex"
                         title="解绑"
                         onClick={() => ws.unbindRef(refToPoolId(ref), entry.id)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      </button>}
                     </td>
                   </tr>
                 ))}
@@ -317,6 +354,27 @@ function EntryCard({
               value={entry.markdown}
               onChange={(markdown) => ws.setMarkdown(entry.id, markdown)}
               localizeRemoteImage={localizeRemoteImage}
+              readOnly={readOnly}
+              referenceContext={
+                ws.projectId && workspaceId
+                  ? ({
+                      source: {
+                        kind: "design-spec-entry",
+                        projectId: ws.projectId,
+                        workspaceId,
+                        specId: docId,
+                        entryId: entry.id,
+                      },
+                      policy: {
+                        allowedTargetKinds: ["project", "page", "document"],
+                        sameProjectOnly: true,
+                        allowUnresolved: false,
+                      },
+                    } satisfies MarkdownReferenceContext)
+                  : undefined
+              }
+              referenceProvider={referenceProvider}
+              onReferenceClick={onReferenceClick}
               placeholder="写点说明…"
               scrollable={false}
               className="rounded-md border"

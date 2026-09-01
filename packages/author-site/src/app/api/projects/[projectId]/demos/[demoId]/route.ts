@@ -34,6 +34,7 @@ import {
   commitWorkspaceMutation,
   WorkspaceAuthorityClientError,
 } from "@/lib/workspace-authority-client";
+import { WORKSPACE_AUTHORITY_NOT_READY_MESSAGE } from "@/lib/workspace-authority-shared";
 import fs from "fs";
 
 function hashText(content: string): string {
@@ -200,8 +201,12 @@ function createManagedPageRestoreOperations(input: {
 }
 
 function createMutationErrorResponse(error: WorkspaceAuthorityClientError) {
+  const message =
+    error.code === "WORKSPACE_AUTHORITY_NOT_READY"
+      ? WORKSPACE_AUTHORITY_NOT_READY_MESSAGE
+      : error.message;
   return NextResponse.json(
-    createApiError("FILE_WRITE_ERROR", error.message, {
+    createApiError("FILE_WRITE_ERROR", message, {
       authorityCode: error.code,
     }),
     { status: error.status },

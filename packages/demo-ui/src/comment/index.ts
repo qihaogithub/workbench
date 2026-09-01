@@ -17,6 +17,7 @@ export { CommentUnreadDot } from "./CommentUnreadDot";
 export { useComments, threadMentionsUser } from "./useComments";
 export {
   countUnresolvedCommentThreads,
+  countUnresolvedCommentThreadsByPage,
   filterCommentThreadsByTarget,
   filterPageCommentThreads,
 } from "./comment-thread-scope";
@@ -39,7 +40,7 @@ export type {
   MentionTextareaProps,
   MentionContentProps,
 } from "./MentionPicker";
-export type { CommentSidebarProps } from "./CommentSidebar";
+export type { CommentPageMeta, CommentSidebarProps } from "./CommentSidebar";
 export type { CommentPanelProps } from "./CommentPanel";
 export type { DocumentCommentPanelProps } from "./DocumentCommentPanel";
 export type { CommentUnreadDotProps } from "./CommentUnreadDot";

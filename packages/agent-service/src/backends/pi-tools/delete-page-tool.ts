@@ -22,6 +22,7 @@ import {
   readWorkspaceTree,
   listPages,
 } from "./workspace-page-utils";
+import { aiMutationDeniedResult, assertAiMutationAllowed } from "./ai-mutation-policy";
 
 const PERMISSION_TIMEOUT_MS = 60_000;
 const DELETION_PLAN_TTL_MS = 5 * 60_000;
@@ -366,6 +367,14 @@ async function deleteOnePage(
   pageId: string,
   pageName?: string,
 ) {
+  const mutationDecision = assertAiMutationAllowed(
+    config,
+    `demos/${pageId}/index.tsx`,
+    { pageIds: [pageId] },
+  );
+  if (!mutationDecision.allowed) {
+    return { ok: false as const, result: aiMutationDeniedResult(mutationDecision, pageId) };
+  }
   if (!isSafePageId(pageId)) {
     return {
       ok: false as const,
@@ -482,6 +491,14 @@ async function deletePageBatch(
   workingDir: string,
   pageIds: string[],
 ) {
+  const mutationDecision = assertAiMutationAllowed(
+    config,
+    "demos",
+    { pageIds },
+  );
+  if (!mutationDecision.allowed) {
+    return { ok: false as const, result: aiMutationDeniedResult(mutationDecision, pageIds.join(",")) };
+  }
   const tree = readWorkspaceTree(workingDir);
   const pages = listPages(workingDir);
   const byId = new Map(pages.map((page) => [page.id, page]));

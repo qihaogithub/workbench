@@ -30,7 +30,10 @@ import type {
   WorkspaceAuthoritySnapshot,
   WorkspaceBinaryStagingReceipt,
 } from "./workspace-authority-shared";
-import { WorkspaceAuthorityClientError } from "./workspace-authority-shared";
+import {
+  WORKSPACE_AUTHORITY_NOT_READY_MESSAGE,
+  WorkspaceAuthorityClientError,
+} from "./workspace-authority-shared";
 
 function authorityUrl(
   projectId: string,
@@ -48,10 +51,10 @@ async function requestAuthorityJson<T>(
   init: RequestInit,
   fallbackCode: WorkspaceAuthorityApiErrorCode,
 ): Promise<T> {
-  const response = await fetch(url, init).catch((error: unknown) => {
+  const response = await fetch(url, init).catch(() => {
     throw new WorkspaceAuthorityClientError(
       "WORKSPACE_AUTHORITY_NOT_READY",
-      error instanceof Error ? error.message : "Workspace Authority 不可用",
+      WORKSPACE_AUTHORITY_NOT_READY_MESSAGE,
       503,
     );
   });
@@ -204,10 +207,10 @@ async function executeMutation(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(request),
       },
-    ).catch((error: unknown) => {
+    ).catch(() => {
       lastError = new WorkspaceAuthorityClientError(
         "WORKSPACE_AUTHORITY_NOT_READY",
-        error instanceof Error ? error.message : "Workspace Authority 不可用",
+        WORKSPACE_AUTHORITY_NOT_READY_MESSAGE,
         503,
       );
       return undefined;
@@ -278,6 +281,17 @@ export async function commitWorkspaceMutation(
   }
 }
 
+/** Commits only frozen, server-compiled document proposal operations. */
+export async function commitDocumentProposalMutation(
+  request: WorkspaceMutationRequest,
+): Promise<WorkspaceMutationReceipt> {
+  return requestAuthorityJson(
+    authorityUrl(request.projectId, request.workspaceId, "/document-proposal-commit"),
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request) },
+    "WORKSPACE_MUTATION_FAILED",
+  );
+}
+
 export async function getWorkspaceAuthoritySnapshot(input: {
   projectId: string;
   workspaceId: string;
@@ -286,10 +300,10 @@ export async function getWorkspaceAuthoritySnapshot(input: {
   const response = await fetch(
     `${getServerAgentServiceUrl()}/api/workspace-authority/projects/${encodeURIComponent(input.projectId)}/workspaces/${encodeURIComponent(input.workspaceId)}/snapshot?sessionId=${encodeURIComponent(input.sessionId)}`,
     { method: "GET" },
-  ).catch((error: unknown) => {
+  ).catch(() => {
     throw new WorkspaceAuthorityClientError(
       "WORKSPACE_AUTHORITY_NOT_READY",
-      error instanceof Error ? error.message : "Workspace Authority 不可用",
+      WORKSPACE_AUTHORITY_NOT_READY_MESSAGE,
       503,
     );
   });
@@ -324,10 +338,10 @@ export async function stageWorkspaceBinary(input: {
       headers: { "Content-Type": "application/octet-stream" },
       body: new Uint8Array(input.content),
     },
-  ).catch((error: unknown) => {
+  ).catch(() => {
     throw new WorkspaceAuthorityClientError(
       "WORKSPACE_AUTHORITY_NOT_READY",
-      error instanceof Error ? error.message : "Workspace Authority 不可用",
+      WORKSPACE_AUTHORITY_NOT_READY_MESSAGE,
       503,
     );
   });

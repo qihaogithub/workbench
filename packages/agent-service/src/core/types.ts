@@ -55,8 +55,26 @@ export interface AgentConfig {
   permissions?: import("../backends/pi-tools/permissions").PermissionConfig;
   backendProviders?: BackendProvidersConfig;
   externalAuth?: ExternalAuthSessionConfig;
+  /**
+   * Authorization bound by an internal author-site call. Never populate this
+   * from an HTTP/WebSocket client payload.
+   *
+   * `null` is deliberately meaningful: it denotes an unverified authoring
+   * session and all AI mutations must fail closed.
+   */
+  authorAuthorization?: AgentAuthorAuthorization | null;
 
   piAgent?: PiAgentConfig;
+}
+
+export type AuthorRole = "admin" | "editor";
+
+export interface AgentAuthorAuthorization {
+  userId: string;
+  role: AuthorRole | null;
+  projectId: string;
+  expiresAt: number;
+  source: "author-session" | "comment-task";
 }
 
 export interface ReferencedProject {

@@ -13,7 +13,9 @@
 import { MessageSquarePlus } from "lucide-react";
 import type { CommentThread } from "@workbench/shared";
 import { cn } from "../utils";
-import { CommentSidebar } from "./CommentSidebar";
+import { CommentSidebar, type CommentPageMeta } from "./CommentSidebar";
+
+const EMPTY_COMMENT_PAGES: CommentPageMeta[] = [];
 
 export interface CommentPanelProps {
   threads: CommentThread[];
@@ -27,6 +29,12 @@ export interface CommentPanelProps {
   canCreateComment?: boolean;
   /** 进入评论模式后的定位提示 */
   createHint?: string;
+  /** 画布模式下按页面分组评论。 */
+  groupByPage?: boolean;
+  /** 画布页面名称与顺序。 */
+  commentPages?: CommentPageMeta[];
+  /** 当前画布焦点页面，用于自动定位分组。 */
+  focusedPageId?: string | null;
   className?: string;
 }
 
@@ -39,6 +47,9 @@ export function CommentPanel({
   onCommentModeChange,
   canCreateComment = true,
   createHint = "点击页面内容定位评论",
+  groupByPage = false,
+  commentPages = EMPTY_COMMENT_PAGES,
+  focusedPageId = null,
   className,
 }: CommentPanelProps) {
   return (
@@ -49,6 +60,9 @@ export function CommentPanel({
         activeThreadId={activeThreadId}
         onSelectThread={onSelectThread}
         showHeader={false}
+        groupByPage={groupByPage}
+        commentPages={commentPages}
+        focusedPageId={focusedPageId}
         className="min-h-0 flex-1"
       />
       {canCreateComment && (

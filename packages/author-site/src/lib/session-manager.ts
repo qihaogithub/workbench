@@ -32,6 +32,7 @@ import type {
   MultiDemoFiles,
   VersionHistoryEntryType,
 } from "@workbench/shared";
+import type { UserRole } from "./user";
 const SESSION_EXPIRY_MS = 2 * 60 * 60 * 1000;
 const DIRECTORY_REPLACE_RETRY_DELAYS_MS = [80, 160, 320, 640];
 
@@ -416,6 +417,7 @@ export async function createEditSession(
   userId: string,
   projectId: string,
   existingWorkspaceId?: string,
+  userRole?: UserRole,
 ): Promise<CreateSessionResult> {
   if (!projectExists(projectId)) {
     throw new Error(`Project "${projectId}" 不存在`);
@@ -456,6 +458,9 @@ export async function createEditSession(
   const sessionMeta = {
     sessionId,
     userId,
+    // 角色由 author-site 的已认证调用方写入，供 agent-service 在服务端
+    // 解析会话授权；绝不从浏览器的 AI 请求体读取角色。
+    ...(userRole ? { role: userRole } : {}),
     demoId: projectId,
     workspaceId,
     status: 'editing' as const,
@@ -478,6 +483,39 @@ export async function createEditSession(
     workspacePath,
     tempWorkspace: workspacePath,
   };
+}
+
+/**
+ * 为存量编辑 Session 补齐由服务端解析出的用户角色。
+ * 旧 Session 没有 role 时必须由重新打开编辑器的已认证用户绑定，不能信任客户端。
+ */
+export function bindEditSessionRole(
+  sessionId: string,
+  userId: string,
+  userRole: UserRole,
+): { projectId: string; expiresAt: number } | null {
+  const sessionPath = getSessionPath(sessionId);
+  if (!sessionPath) return null;
+  const metaPath = path.join(sessionPath, ".session.json");
+  if (!fs.existsSync(metaPath)) return null;
+  try {
+    const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8")) as {
+      userId?: unknown;
+      demoId?: unknown;
+      expiresAt?: unknown;
+      role?: unknown;
+    };
+    if (meta.userId !== userId || typeof meta.demoId !== "string" || typeof meta.expiresAt !== "number") {
+      return null;
+    }
+    if (meta.role !== userRole) {
+      meta.role = userRole;
+      fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
+    }
+    return { projectId: meta.demoId, expiresAt: meta.expiresAt };
+  } catch {
+    return null;
+  }
 }
 
 export function getEditSession(sessionId: string) {

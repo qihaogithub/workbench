@@ -19,6 +19,11 @@ import { ConfigForm } from "./ConfigForm";
 import { ConfigScopeWrapper } from "./ConfigScopeWrapper";
 import { PageRequirements } from "./PageRequirements";
 import { RichTextEditor } from "./RichTextEditor";
+import type {
+  MarkdownReferenceClickHandler,
+  MarkdownReferenceContext,
+  MarkdownReferenceProvider,
+} from "./DocumentEditor";
 import { ConfigItemEditorDialog, type ConfigItemApplyPlanSnapshot } from "./ConfigItemEditorDialog";
 import {
   applySchemaDefinitionCommand,
@@ -157,6 +162,10 @@ export interface PageConfigPanelProps {
   onRequirementsChange?: (markdown: string) => void;
   /** 配置要求加载中。 */
   requirementsLoading?: boolean;
+  /** 页面需求 Markdown 的项目实体引用上下文。 */
+  referenceContext?: MarkdownReferenceContext;
+  referenceProvider?: MarkdownReferenceProvider;
+  onReferenceClick?: MarkdownReferenceClickHandler;
   /** 资源规范折叠区的展示位置；创作端由文档视图承载时可隐藏。 */
   requirementsPosition?: "beforeConfig" | "afterConfig" | "hidden";
   /** 只读入口在没有页面资源规范时隐藏整个折叠区。 */
@@ -356,6 +365,9 @@ export function PageConfigPanel({
   requirements,
   onRequirementsChange,
   requirementsLoading,
+  referenceContext,
+  referenceProvider,
+  onReferenceClick,
   requirementsPosition = "afterConfig",
   hideEmptyRequirements = false,
   designSpecEntries = EMPTY_DESIGN_SPEC_ENTRIES,
@@ -884,6 +896,9 @@ export function PageConfigPanel({
                     onOpenDesignSpec={(spec, fieldTitle, anchor) => setActiveDesignSpec((current) => current?.spec.entryId === spec.entryId ? null : { spec, fieldTitle, anchor })}
                     onEditConfigDefinition={(key) => openDefinitionEditor("project", key)}
                     imageConfigScope="project"
+                    referenceContext={referenceContext}
+                    referenceProvider={referenceProvider}
+                    onReferenceClick={onReferenceClick}
                     onLaunchWhiteboard={onLaunchWhiteboard}
                   />
                 </ConfigScopeWrapper>
@@ -920,6 +935,9 @@ export function PageConfigPanel({
                   onEditConfigDefinition={(key) => openDefinitionEditor("page", key)}
                   imageConfigScope="page"
                   pageId={selectedPage.id}
+                  referenceContext={referenceContext}
+                  referenceProvider={referenceProvider}
+                  onReferenceClick={onReferenceClick}
                   onLaunchWhiteboard={onLaunchWhiteboard}
                 />
               </ConfigScopeWrapper>
@@ -1001,6 +1019,9 @@ export function PageConfigPanel({
                   referenceCandidates={getReferenceCandidates(
                     selectedPage.schema,
                   )}
+                  referenceContext={referenceContext}
+                  referenceProvider={referenceProvider}
+                  onReferenceClick={onReferenceClick}
                 />
                 <p className="text-xs text-muted-foreground">
                   输入 @ 或使用工具栏「插入引用」选择当前页配置项，以 @[名称](key) 形式引用。
@@ -1008,7 +1029,12 @@ export function PageConfigPanel({
               </div>
             ) : hasRequirements ? (
               <div className="space-y-4 pt-2">
-                <PageRequirements markdown={requirements!} allowExternalMedia mediaBaseUrl={mediaBaseUrl} />
+                <PageRequirements
+                  markdown={requirements!}
+                  allowExternalMedia
+                  mediaBaseUrl={mediaBaseUrl}
+                  onReferenceClick={onReferenceClick}
+                />
               </div>
             ) : (
               <div className="flex min-h-[120px] flex-col items-center justify-center px-4 text-center">

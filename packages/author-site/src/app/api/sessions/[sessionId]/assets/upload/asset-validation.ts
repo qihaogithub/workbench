@@ -7,7 +7,14 @@ const OCTET_STREAM_EXTENSIONS = new Set([".svga", ".lottie", ".riv", ".skel", ".
 const ZIP_MIME_TYPES = new Set(["", "application/octet-stream", "application/zip", "application/x-zip-compressed", "application/x-compressed"]);
 
 export function getFileExtension(filename: string): string { const dot = filename.lastIndexOf("."); return dot < 0 ? "" : filename.slice(dot).toLowerCase(); }
-export function hasAllowedAssetExtension(filename: string): boolean { return ALLOWED_EXTENSIONS.has(getFileExtension(filename)); }
+/** Flutter exporters commonly name a normal ZIP bundle `*.zip.flutter`. */
+export function isSpinePackageFilename(filename: string): boolean {
+  const lower = filename.toLowerCase();
+  return lower.endsWith(".zip") || lower.endsWith(".zip.flutter");
+}
+export function hasAllowedAssetExtension(filename: string): boolean {
+  return isSpinePackageFilename(filename) || ALLOWED_EXTENSIONS.has(getFileExtension(filename));
+}
 
 function hasMp4FtypBox(buffer: Buffer): boolean {
   const scanLimit = Math.min(buffer.length, VIDEO_HEADER_SCAN_BYTES);
@@ -57,7 +64,7 @@ export function isAllowedAssetFile(file: File, buffer?: Buffer): boolean {
   const extension = getFileExtension(file.name);
   if (!hasAllowedAssetExtension(file.name)) return false;
   if (extension === ".json") return file.type === "" || file.type === "application/json";
-  if (extension === ".zip") return ZIP_MIME_TYPES.has(file.type);
+  if (isSpinePackageFilename(file.name)) return ZIP_MIME_TYPES.has(file.type);
   if (extension === ".mp4" || extension === ".webm") return buffer ? hasExpectedVideoContainer(buffer, extension) : ALLOWED_VIDEO_MIME_TYPES.includes(file.type);
   if (OCTET_STREAM_EXTENSIONS.has(extension)) return file.type === "" || file.type === "application/octet-stream";
   return ALLOWED_MIME_TYPES.includes(file.type);

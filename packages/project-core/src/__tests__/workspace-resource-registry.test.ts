@@ -47,6 +47,7 @@ describe("WorkspaceResourceRegistry", () => {
       ["demos/page-1/sketch.scene.json", "page-sketch-scene", "sketch-scene"],
       ["demos/page-1/sketch.meta.json", "page-sketch-meta", "json-object"],
       ["demos/page-1/convention.md", "page-convention", "text"],
+      ["demos/page-1/requirements.md", "page-requirements", "text"],
       ["project.config.schema.json", "project-schema", "json-object"],
       ["project.config.values.json", "project-config-values", "json-object"],
       ["workspace-tree.json", "workspace-tree", "workspace-tree"],
