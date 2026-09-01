@@ -133,7 +133,7 @@ function findByDomPath(root: ParentNode, path: string): Element | undefined {
   if (parts[0]?.toLowerCase() === "prototype-root") parts.shift();
   let parent: ParentNode = root;
   for (const part of parts) {
-    const match = /^([a-z][\w:-]*)(?:\:nth-of-type\((\d+)\))?$/i.exec(part);
+    const match = /^([a-z][\w:-]*)(?::nth-of-type\((\d+)\))?$/i.exec(part);
     if (!match) return undefined;
     const tag = match[1].toLowerCase();
     const wantedIndex = Number(match[2] ?? 1);

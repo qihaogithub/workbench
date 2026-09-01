@@ -1605,13 +1605,6 @@ function addRecentSketchColor(colors: string[], value: string): string[] {
   return [normalized, ...colors.filter((color) => color !== normalized)].slice(0, SKETCH_RECENT_COLOR_LIMIT);
 }
 
-function getNextSketchSwatchColor(value: unknown, fallback: string): string {
-  const normalized = typeof value === "string" ? normalizeSketchHexColor(value) : null;
-  const currentIndex = normalized ? SKETCH_COLOR_SWATCHES.indexOf(normalized) : -1;
-  if (currentIndex >= 0) return SKETCH_COLOR_SWATCHES[(currentIndex + 1) % SKETCH_COLOR_SWATCHES.length];
-  return normalizeSketchHexColor(fallback) ?? SKETCH_COLOR_SWATCHES[0];
-}
-
 function getSelectedNodes(scene: SketchSceneDocument, controller: SketchEditorController): SketchSceneNode[] {
   return scene.nodes.filter((node) => controller.selection.nodeIds.includes(node.id));
 }
@@ -6976,7 +6969,7 @@ export function SketchEditorCanvas({
   const toggleTextItalic = React.useCallback(() => {
     if (!textToolbarNode) return;
     const state = getTextStyleStateValue(textToolbarNode, textToolbarRange, "italic");
-    const nextItalic = state.mixed || !Boolean(state.value);
+    const nextItalic = state.mixed || !state.value;
     applyTextToolbarStyle({ italic: nextItalic }, { italic: nextItalic });
   }, [applyTextToolbarStyle, textToolbarNode, textToolbarRange]);
 

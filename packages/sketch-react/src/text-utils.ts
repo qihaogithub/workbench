@@ -1,7 +1,6 @@
 import type {
   SketchSceneNode,
   SketchSceneTextStyleOverride,
-  SketchSceneTextStyleRun,
 } from "@workbench/sketch-core";
 
 export const SKETCH_TEXT_PLACEHOLDER = "输入文本";
@@ -102,7 +101,7 @@ function getCanvasContext(): CanvasRenderingContext2D | null {
 
 function fallbackCharacterWidth(character: string, fontSize: number): number {
   if (/\s/.test(character)) return fontSize * 0.32;
-  if (/[^\u0000-\u00ff]/.test(character)) return fontSize;
+  if ((character.codePointAt(0) ?? 0) > 0xff) return fontSize;
   return fontSize * 0.56;
 }
 
