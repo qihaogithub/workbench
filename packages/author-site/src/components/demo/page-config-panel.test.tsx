@@ -592,9 +592,12 @@ describe("PageConfigPanel 配置项与资源规范折叠区", () => {
 
   it("配置项关联的设计规范说明为空时不展示整个规范模块", () => {
     render(
-      <ConfigForm
-        schema={typedPageSchema}
-        initialData={{ heroImage: "https://example.com/hero.png" }}
+      <PageConfigPanel
+        pages={[{ id: "page_a", name: "页面 A", order: 0, schema: typedPageSchema, configData: { heroImage: "https://example.com/hero.png" } }]}
+        activePageId="page_a"
+        detailPageId="page_a"
+        hideDetailHeader
+        readonly
         designSpecEntries={[
           {
             docId: "spec-1",
@@ -603,6 +606,7 @@ describe("PageConfigPanel 配置项与资源规范折叠区", () => {
             entryTitle: "主视觉图片",
             markdown: "  \n ",
             scope: "page",
+            pageId: "page_a",
             fieldKey: "heroImage",
           },
           {
@@ -612,16 +616,19 @@ describe("PageConfigPanel 配置项与资源规范折叠区", () => {
             entryTitle: "有内容的规范",
             markdown: "保留这条说明。",
             scope: "page",
+            pageId: "page_a",
             fieldKey: "heroImage",
           },
         ]}
-        onChange={() => {}}
       />,
     );
 
-    expect(screen.queryByRole("heading", { name: "主视觉图片" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "查看设计规范：主视觉图" }));
+
+    expect(screen.queryByText("主视觉图片")).not.toBeInTheDocument();
     expect(screen.queryByText("暂无说明")).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "有内容的规范" })).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "设计规范" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "主视觉图" })).toBeInTheDocument();
     expect(screen.getByText("保留这条说明。")).toBeInTheDocument();
   });
 
@@ -680,7 +687,9 @@ describe("PageConfigPanel 配置项与资源规范折叠区", () => {
 
     expect(screen.queryByText("资源规范")).not.toBeInTheDocument();
     expect(screen.queryByText("弹窗规范 · 配图")).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "配图" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "查看设计规范：标题" }));
+
+    expect(screen.getByRole("heading", { name: "标题" })).toBeInTheDocument();
     expect(screen.getByText("图片底部不留白。")).toBeInTheDocument();
   });
 

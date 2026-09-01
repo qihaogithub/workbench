@@ -11,18 +11,21 @@ const mockSchema = JSON.stringify({
       title: '标题',
       description: '请输入演示标题',
       default: '演示标题',
+      'ui:options': { group: '基础配置' },
     },
     showHeader: {
       type: 'boolean',
       title: '显示头部',
       description: '是否显示组件头部',
       default: true,
+      'ui:options': { group: '显示选项' },
     },
     themeColor: {
       type: 'string',
       title: '主题色',
       format: 'color',
       default: '#3b82f6',
+      'ui:options': { group: '颜色配置' },
     },
     fontSize: {
       type: 'number',
@@ -31,6 +34,7 @@ const mockSchema = JSON.stringify({
       minimum: 12,
       maximum: 32,
       default: 16,
+      'ui:options': { group: '尺寸设置' },
     },
     layout: {
       type: 'string',
@@ -38,6 +42,7 @@ const mockSchema = JSON.stringify({
       enum: ['horizontal', 'vertical', 'grid'],
       enumNames: ['水平布局', '垂直布局', '网格布局'],
       default: 'horizontal',
+      'ui:options': { group: '尺寸设置' },
     },
   },
   required: ['title', 'themeColor'],
@@ -199,8 +204,9 @@ describe('ConfigFormNew', () => {
       />
     );
 
-    // 滑块旁边应显示当前数值（字体大小字段）
-    expect(screen.getByText('16px')).toBeInTheDocument();
+    // 数字字段同时提供可编辑数值输入和滑块
+    expect(screen.getByDisplayValue('16')).toBeInTheDocument();
+    expect(screen.getByRole('slider')).toBeInTheDocument();
   });
 
   it('应渲染开关组件而不显示开启/关闭文字', () => {

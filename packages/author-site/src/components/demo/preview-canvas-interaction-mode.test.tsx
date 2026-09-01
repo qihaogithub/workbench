@@ -1823,7 +1823,7 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
 
     const resizeHandle = await waitFor(() => {
       const handle = container.querySelector(
-        "[data-page-id='page_1'] [data-resize-handle='se']",
+        "[data-page-id='page_1'] [data-canvas-resize-handle='se']",
       ) as HTMLElement | null;
       expect(handle).not.toBeNull();
       return handle as HTMLElement;
@@ -2258,12 +2258,12 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
     fireEvent.pointerDown(imageNode, {
       button: 0,
       clientX: 559,
-      clientY: 210,
+      clientY: 419,
       pointerId: 1,
     });
     fireEvent.pointerMove(imageNode, {
       clientX: 699,
-      clientY: 210,
+      clientY: 559,
       pointerId: 1,
     });
     fireEvent.pointerUp(imageNode, {
@@ -2279,9 +2279,9 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
         kind: "image",
         layout: {
           x: 320,
-          y: 85,
-          width: 840,
-          height: 630,
+          y: 190,
+          width: 933.3333333333333,
+          height: 700,
         },
       });
     });

@@ -1,10 +1,7 @@
-import { DELETE, POST } from "./route";
-
 const getActor = jest.fn();
 const listTrashedProjects = jest.fn();
 const restoreTrashedProject = jest.fn();
 const purgeTrashedProject = jest.fn();
-const reconcileTemplateKnowledge = jest.fn();
 
 jest.mock("@/lib/auth/current-user", () => ({
   getCurrentProjectActor: () => getActor(),
@@ -20,7 +17,15 @@ jest.mock("@/lib/project-admin-service", () => ({
       status: result.ok ? 200 : 403,
     }),
 }));
-jest.mock("@/lib/knowledge-service", () => ({ reconcileTemplateKnowledge }));
+jest.mock("@/lib/knowledge-service", () => ({
+  reconcileTemplateKnowledge: jest.fn(),
+}));
+
+import { DELETE, POST } from "./route";
+
+const { reconcileTemplateKnowledge } = jest.requireMock("@/lib/knowledge-service") as {
+  reconcileTemplateKnowledge: jest.Mock;
+};
 
 describe("/api/trash/projects/:id", () => {
   const actor = { id: "editor", name: "编辑者", role: "creator" };
