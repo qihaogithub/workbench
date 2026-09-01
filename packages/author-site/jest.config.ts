@@ -40,6 +40,7 @@ const config: Config = {
     '^\\./content-graph-admin\\.js$': '<rootDir>/../project-core/src/content-graph-admin.ts',
     '^\\./html-import-contract\\.js$': '<rootDir>/../project-core/src/html-import-contract.ts',
     '^\\./html-import\\.js$': '<rootDir>/../project-core/src/html-import.ts',
+    '^\\./shared-runtime\\.js$': '<rootDir>/../project-core/src/shared-runtime.ts',
     '^\\./local-preview-dev-server\\.js$': '<rootDir>/../project-scaffold/src/local-preview-dev-server.ts',
     '^\\./rules\\.js$': '<rootDir>/../preview-contract/src/rules.ts',
     '^\\./runtime\\.js$': '<rootDir>/../preview-contract/src/runtime.ts',
