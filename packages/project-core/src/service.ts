@@ -8,7 +8,7 @@ import {
 } from "@workbench/preview-contract/runtime";
 import { compilePreviewPageSource } from "@workbench/preview-contract/compiler";
 import { validateSketchSceneDocument } from "@workbench/sketch-core";
-import { checkConfigSchemaAgainstPrototype } from "@workbench/shared/demo/config-runtime-compatibility";
+import { checkConfigSchemaAgainstPrototype, parsePageRequirementsRefs } from "./shared-runtime.js";
 import type {
   DemoFiles,
   DemoFolderMeta,
@@ -31,10 +31,7 @@ import type {
   WorkspaceTree,
 } from "@workbench/shared/contracts";
 
-import {
-  parsePageRequirementsRefs,
-  type PageRequirementRef,
-} from "@workbench/shared/demo/page-requirements";
+import type { PageRequirementRef } from "@workbench/shared/demo/page-requirements";
 
 import type {
   AuditEvent,

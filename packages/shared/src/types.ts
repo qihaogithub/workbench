@@ -1,4 +1,4 @@
-import type { ProjectAuthoringPreferences } from "./workspace.js";
+import type { ProjectAuthoringPreferences } from "./workspace";
 
 export interface DemoMeta {
   id: string;

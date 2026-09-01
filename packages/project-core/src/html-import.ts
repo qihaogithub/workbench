@@ -19,7 +19,7 @@ import {
 import {
   applyPagePresentationToSchema,
   recommendHtmlImportPresentation,
-} from "@workbench/shared";
+} from "./shared-runtime.js";
 import { MAX_PROTOTYPE_CSS_LENGTH } from "./constants.js";
 
 interface HtmlNode {
