@@ -36,7 +36,8 @@ const ESM_SH_BASE = getCdnBaseUrl();
 
 function getPolicyPackageName(moduleName: string): string {
   if (moduleName === "react" || moduleName.startsWith("react/")) return "react";
-  if (moduleName === "react-dom" || moduleName.startsWith("react-dom/")) return "react-dom";
+  if (moduleName === "react-dom" || moduleName.startsWith("react-dom/"))
+    return "react-dom";
   return moduleName;
 }
 
@@ -51,7 +52,8 @@ function buildCdnPackageUrl(packageName: string): string {
         severity: "error",
         moduleName: packageName,
         message: `预览运行时未登记依赖 ${packageName}`,
-        instruction: "请改用 @preview/sdk 暴露的受控能力，或由开发团队先将该依赖加入 previewDependencyPolicy。",
+        instruction:
+          "请改用 @preview/sdk 暴露的受控能力，或由开发团队先将该依赖加入 previewDependencyPolicy。",
       },
     ]);
   }
@@ -93,7 +95,9 @@ function buildLocalPackageUrl(
   return null;
 }
 
-function createPreviewSdkSource(options: PreviewRuntimeResolveOptions = {}): string {
+function createPreviewSdkSource(
+  options: PreviewRuntimeResolveOptions = {},
+): string {
   const reactUrl = getPreviewDependencyUrl("react", options);
   const lucideUrl = getPreviewDependencyUrl("lucide-react", options);
   const svgaUrl = getPreviewDependencyUrl("svgaplayerweb", options);
@@ -569,6 +573,7 @@ export function SpinePlayer(props) {
     let sceneRenderer = null;
     let skeletonObj = null;
     let state = null;
+    let physicsMode = null;
     let animFrame = null;
     let lastTime = 0;
     let assetManager = null;
@@ -579,6 +584,19 @@ export function SpinePlayer(props) {
     const activeAudioSources = new Set();
     container.innerHTML = '';
     setFailed(false);
+
+    function fail(stage, error) {
+      if (disposed) return;
+      let message = 'Unknown Spine runtime error';
+      if (error instanceof Error) message = error.message;
+      else if (typeof error === 'string') message = error;
+      else {
+        try { message = JSON.stringify(error); } catch (ignored) { message = String(error); }
+      }
+      console.error('[SpinePlayer]', stage, message);
+      setFailed(true);
+      if (onError) onError(error instanceof Error ? error : new Error(message));
+    }
 
     const canvas = document.createElement('canvas');
     canvas.style.width = '100%';
@@ -641,7 +659,7 @@ export function SpinePlayer(props) {
       if (delta > 0 && delta < 1) {
         state.update(delta);
         state.apply(skeletonObj);
-        skeletonObj.updateWorldTransform(delta);
+        skeletonObj.updateWorldTransform(physicsMode);
       }
       sceneRenderer.begin();
       sceneRenderer.drawSkeleton(skeletonObj);
@@ -678,6 +696,7 @@ export function SpinePlayer(props) {
           ? new Spine.SkeletonBinary(loader).readSkeletonData(rawSkeleton)
           : new Spine.SkeletonJson(loader).readSkeletonData(new TextDecoder().decode(rawSkeleton));
         skeletonObj = new Spine.Skeleton(skeletonData);
+        physicsMode = Spine.Physics.update;
         const stateData = new Spine.AnimationStateData(skeletonData);
         state = new Spine.AnimationState(stateData);
         const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
@@ -693,7 +712,7 @@ export function SpinePlayer(props) {
         lastTime = 0;
         render();
       } catch (e) {
-        if (!disposed) { setFailed(true); if (onError) onError(e); }
+        fail('skeleton-parse', e);
       }
     }
 
@@ -704,21 +723,11 @@ export function SpinePlayer(props) {
         if (!gl) throw new Error('WebGL not available');
         assetManager = new Spine.AssetManager(gl);
         assetManager.loadTextureAtlas(asset.atlas);
-        function schedule() {
-          if (assetManager.isLoadingComplete()) onLoaded(Spine, rawSkeleton, asset, binary);
-          else {
-            const check = setInterval(() => {
-              if (assetManager.isLoadingComplete()) {
-                clearInterval(check);
-                onLoaded(Spine, rawSkeleton, asset, binary);
-              }
-            }, 50);
-          }
-        }
-        assetManager.loadAll();
-        schedule();
+        assetManager.loadAll()
+          .then(() => onLoaded(Spine, rawSkeleton, asset, binary))
+          .catch((e) => fail('atlas-or-texture-load', e));
       } catch (e) {
-        if (!disposed) { setFailed(true); if (onError) onError(e); }
+        fail('webgl-setup', e);
       }
     }
 
@@ -730,13 +739,15 @@ export function SpinePlayer(props) {
       if (cancelled || !asset) return;
       const base = asset.manifest.assetId ? (((typeof window !== 'undefined' && window.__WORKBENCH_SPINE_ASSET_BASE__) || '/assets/animations') + '/' + encodeURIComponent(asset.manifest.assetId) + '/') : '';
       const resolvedAsset = { ...asset, base, skeleton: asset.skeleton.startsWith('/') || asset.skeleton.startsWith('http') ? asset.skeleton : base + asset.skeleton, atlas: asset.atlas.startsWith('/') || asset.atlas.startsWith('http') ? asset.atlas : base + asset.atlas };
-      return fetch(resolvedAsset.skeleton, { credentials: 'same-origin' }).then((response) => response.arrayBuffer()).then((buf) => {
+      return fetch(resolvedAsset.skeleton, { credentials: 'same-origin' }).then((response) => { if (!response.ok) throw new Error('Spine skeleton unavailable'); return response.arrayBuffer(); }).then((buf) => {
         if (disposed) return;
         const binary = /\.skel(\.bytes)?$/i.test(resolvedAsset.skeleton);
-        return importRuntime(sniffVersion(buf, binary)).then((mod) => setup(mod, buf, resolvedAsset, binary)).catch((e) => { if (!disposed) { setFailed(true); if (onError) onError(e); } });
+        return importRuntime(asset.manifest.spineVersion || sniffVersion(buf, binary))
+          .then((mod) => setup(mod, buf, resolvedAsset, binary))
+          .catch((e) => fail('runtime-import', e));
       });
     })
-    .catch((e) => { if (!disposed) { setFailed(true); if (onError) onError(e); } });
+    .catch((e) => fail('manifest-or-skeleton-load', e));
     return () => {
       disposed = true;
       cancelled = true;

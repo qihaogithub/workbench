@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { Sparkles } from "lucide-react";
 import { cn } from "./utils";
-import type { ConfigFormProps } from "./types";
+import type { ConfigChangeMeta, ConfigFormProps } from "./types";
 import type { DesignSpecEntryLink } from "./types";
 import type { FieldConfig, FieldGroup, VisibleWhenCondition } from "./schema-parser";
 import { parseSchemaToFields } from "./schema-parser";
@@ -134,7 +134,7 @@ function FieldGroupSection({
 }: {
   group: FieldGroup;
   formData: Record<string, unknown>;
-  onChange: (key: string, value: unknown) => void;
+  onChange: (key: string, value: unknown, meta?: ConfigChangeMeta) => void;
   isFirst?: boolean;
   sessionId?: string;
   readonly?: boolean;
@@ -158,7 +158,7 @@ function FieldGroupSection({
               key={field.key}
               field={field}
               value={formData[field.key]}
-              onChange={(value) => onChange(field.key, value)}
+              onChange={(value, meta) => onChange(field.key, value, meta)}
               sessionId={sessionId}
               readonly={readonly}
               designSpecEntries={designSpecEntries}
@@ -190,7 +190,7 @@ function FieldGroupSection({
             key={field.key}
             field={field}
             value={formData[field.key]}
-            onChange={(value) => onChange(field.key, value)}
+            onChange={(value, meta) => onChange(field.key, value, meta)}
             sessionId={sessionId}
             readonly={readonly}
             designSpecEntries={designSpecEntries}
@@ -384,7 +384,7 @@ export function ConfigForm({
   }, [schema, fieldGroups]);
 
   const handleFieldChange = useCallback(
-    (key: string, value: unknown) => {
+    (key: string, value: unknown, meta?: ConfigChangeMeta) => {
       setFormData((prev) => {
         if (value === undefined || value === null) {
           const next = { ...prev };
@@ -393,7 +393,7 @@ export function ConfigForm({
         }
         return { ...prev, [key]: value };
       });
-      onChange({ [key]: value ?? null });
+      onChange({ [key]: value ?? null }, meta);
     },
     [onChange]
   );

@@ -39,7 +39,7 @@ import {
   getSchemaFieldCountByCategory,
 } from "./config-categories";
 import { cn } from "./utils";
-import type { DesignSpecEntryLink, PositionEditTarget, PositionableSizeItem, WhiteboardLauncher } from "./types";
+import type { ConfigChangeMeta, DesignSpecEntryLink, PositionEditTarget, PositionableSizeItem, WhiteboardLauncher } from "./types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -129,11 +129,11 @@ export interface PageConfigPanelProps {
     options?: { openConfigDetail?: boolean },
   ) => void;
   projectConfigSchema?: string;
-  onProjectConfigChange?: (data: Record<string, unknown>) => void;
+  onProjectConfigChange?: (data: Record<string, unknown>, meta?: ConfigChangeMeta) => void;
   onProjectSchemaChange?: (schema: string) => void;
   /** 管理器的定义变更；宿主负责应用运行值清理计划并进入协同持久化链路。 */
   onProjectDefinitionChange?: (mutation: SchemaDefinitionMutation) => void;
-  onPageConfigChange?: (pageId: string, data: Record<string, unknown>) => void;
+  onPageConfigChange?: (pageId: string, data: Record<string, unknown>, meta?: ConfigChangeMeta) => void;
   onPageSchemaChange?: (pageId: string, schema: string) => void;
   onPageDefinitionChange?: (pageId: string, mutation: SchemaDefinitionMutation) => void;
   onDefinitionSendToAI?: (scope: "project" | "page", mutation: SchemaDefinitionMutation) => void;
@@ -884,7 +884,7 @@ export function PageConfigPanel({
                   <ConfigForm
                     key={`project-${selectedPage.id}-${selectedProjectConfigSchema}`}
                     schema={selectedProjectConfigSchema!}
-                    onChange={(data) => onProjectConfigChange?.(data)}
+                    onChange={(data, meta) => onProjectConfigChange?.(data, meta)}
                     onSchemaChange={onProjectSchemaChange}
                     initialData={configData}
                     sessionId={sessionId}
@@ -914,7 +914,7 @@ export function PageConfigPanel({
                 <ConfigForm
                   key={`page-${selectedPage.id}-${selectedPage.schema}`}
                   schema={selectedPage.schema!}
-                  onChange={(data) => onPageConfigChange?.(selectedPage.id, data)}
+                  onChange={(data, meta) => onPageConfigChange?.(selectedPage.id, data, meta)}
                   onSchemaChange={(schema) =>
                     onPageSchemaChange?.(selectedPage.id, schema)
                   }

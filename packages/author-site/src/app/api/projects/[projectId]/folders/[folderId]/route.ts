@@ -7,10 +7,8 @@ import type {
   DemoPageMeta,
   WorkspaceTree,
 } from "@workbench/shared";
-import {
-  isManagedWorkspaceResource,
-  type WorkspaceMutationOperation,
-} from "@workbench/shared/contracts";
+import type { WorkspaceMutationOperation } from "@workbench/shared/contracts";
+import { createWorkspaceResourceRegistry } from "@workbench/project-core/workspace-resource-registry";
 import {
   createApiSuccess,
   createApiError,
@@ -33,6 +31,8 @@ import {
   commitWorkspaceMutation,
   WorkspaceAuthorityClientError,
 } from "@/lib/workspace-authority-client";
+
+const workspaceResourceRegistry = createWorkspaceResourceRegistry();
 
 function hashText(content: string): string {
   return crypto.createHash("sha256").update(content).digest("hex");
@@ -97,7 +97,7 @@ function createManagedPageDeleteOperations(
           .relative(workspacePath, fullPath)
           .split(path.sep)
           .join("/");
-        if (!isManagedWorkspaceResource(relativePath)) continue;
+        if (!workspaceResourceRegistry.describe(relativePath)) continue;
         const content = fs.readFileSync(fullPath, "utf-8");
         operations.push({
           type: "delete_path",

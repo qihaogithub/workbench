@@ -3,7 +3,7 @@ import * as path from "path";
 import { createHash, randomBytes, randomUUID } from "crypto";
 import { Type, type Static } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import { isManagedWorkspaceResource } from "@workbench/shared/contracts";
+import { createWorkspaceResourceRegistry } from "@workbench/project-core/workspace-resource-registry";
 import type { AgentConfig } from "../../core/types";
 import { logger } from "../../utils/logger";
 import { resolveLiveWorkspaceMutationContext } from "../../workspace/workspace-mutation-authority";
@@ -26,6 +26,7 @@ import { aiMutationDeniedResult, assertAiMutationAllowed } from "./ai-mutation-p
 
 const PERMISSION_TIMEOUT_MS = 60_000;
 const DELETION_PLAN_TTL_MS = 5 * 60_000;
+const workspaceResourceRegistry = createWorkspaceResourceRegistry();
 
 export interface DeletedPageChange {
   pageId: string;
@@ -348,7 +349,7 @@ function managedPageFiles(
           .relative(workingDir, fullPath)
           .split(path.sep)
           .join("/");
-        if (isManagedWorkspaceResource(relativePath)) {
+        if (workspaceResourceRegistry.describe(relativePath)) {
           files.push({
             path: relativePath,
             content: fs.readFileSync(fullPath, "utf-8"),

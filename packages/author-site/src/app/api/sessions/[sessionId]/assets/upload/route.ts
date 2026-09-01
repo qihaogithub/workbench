@@ -162,25 +162,26 @@ export async function POST(
         ];
         const pageId = formData.get("pageId");
         const configKey = formData.get("configKey");
-        if (typeof pageId === "string" && /^[A-Za-z0-9_-]+$/.test(pageId) && typeof configKey === "string" && /^[A-Za-z0-9_-]+$/.test(configKey)) {
-          const configPath = `demos/${pageId}/config.values.json`;
-          const absoluteConfigPath = path.join(workspacePath, configPath);
-          let previous: Record<string, unknown> = {};
-          let previousText: string | null = null;
-          try { previousText = fs.readFileSync(absoluteConfigPath, "utf8"); previous = JSON.parse(previousText) as Record<string, unknown>; } catch { /* an empty config is valid */ }
-          const content = JSON.stringify({ ...previous, [configKey]: asset.ref }, null, 2) + "\n";
+        const configScope = formData.get("configScope");
+        const configPath = configScope === "project"
+          ? "project.config.values.json"
+          : configScope === "page" && typeof pageId === "string" && /^[A-Za-z0-9_-]+$/.test(pageId)
+            ? `demos/${pageId}/config.values.json`
+            : null;
+        let configCommitted = false;
+        if (configPath && typeof configKey === "string" && /^[A-Za-z0-9_-]+$/.test(configKey)) {
           operations.push({
-            type: "put_text",
+            type: "patch_config_values",
             path: configPath,
-            content,
-            ...(previousText === null ? { expectedAbsent: true } : { expectedHash: crypto.createHash("sha256").update(previousText).digest("hex") }),
+            patch: { [configKey]: asset.ref },
           });
+          configCommitted = true;
         }
-        await commitWorkspaceMutation({
+        const receipt = await commitWorkspaceMutation({
           mutationId: crypto.randomUUID(), projectId, workspaceId: meta.workspaceId, sessionId,
           baseRevision: 0, actor: "author-site", reason: "commit_spine_asset", operations,
         });
-        return NextResponse.json(createApiSuccess({ ref: asset.ref, summary: asset.summary }));
+        return NextResponse.json(createApiSuccess({ ref: asset.ref, summary: asset.summary, receipt, configCommitted }));
       } catch (error) {
         if (error instanceof WorkspaceAuthorityClientError) {
           return NextResponse.json(

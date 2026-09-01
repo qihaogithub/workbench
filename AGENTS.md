@@ -271,6 +271,7 @@ Next 开发编译性能约束：
 - 编辑页和根布局不得从 `@workbench/demo-ui`、`@workbench/ai-chat-shared` 或 `date-fns/locale` 桶入口获取单个轻量能力；优先使用 package exports 公开的精确子路径，并维护高频路由静态导入测试。
 - 编辑页不得直接动态引用 `author-ai-chat`；保留 `deferred-author-ai-chat` 二级延迟边界，只在初始页面文件就绪后挂载 AI 对话，避免 Mermaid、Shiki 等富文本依赖与预览区争抢首屏资源。
 - author 校验适配器必须从 `@workbench/shared/validator` 精确子路径导入；`PreviewStage` 必须保留 `PreviewCanvas` 按 canvas 模式懒加载边界，不得让初始单页模式解析完整画布、Markdown 与几何子树。
+- `@preview/sdk` 的公共组件契约以 `packages/author-site/src/lib/preview-dependency-policy.ts` 为唯一源码；`scripts/build-preview-runtime.mjs` 必须从该源码生成 author/viewer 两端静态 runtime。修改 SDK 后运行 `pnpm build:preview-runtime`，并用生成产物测试锁定新接口、拒绝已删除接口，禁止在构建脚本中另行演进播放器实现。
 - Session Bootstrap 向 agent-service 推送模型配置与外部授权时应并发执行、共同完成后再返回；评论等 effect 的 target 对象必须使用稳定引用，并在资源 ID 就绪前禁用网络链路，避免启动期重复 REST/WS。
 - AI 对话本地消息 ID 不得只使用 `Date.now()`，统一通过带随机后缀的 `createLocalId` 生成；计划审批会将同一轮 assistant 消息分段归档，终态落库必须按该轮 ID 合并并保留已归档的工具卡，不得用 React key 加下标掩盖重复数据。
 - Docker 编辑页延迟诊断不能只看某一时刻的 `docker stats`；同时核对 author-site 容器 `cpu.stat` 的 `nr_throttled / nr_periods`、`RestartCount`、V8 heap OOM 日志和启动日志中的 Next.js 版本，避免周期性限流或重启被当前 `healthy` 状态掩盖。
@@ -428,6 +429,7 @@ Markdown 编辑器（DocumentEditor）：
 - **测试 ESM 坑**：`@milkdown/*`、`@prosemirror-adapter/*` 均为 ESM-only，author-site 的 Jest（CJS）无法解析，靠 `packages/author-site/jest-milkdown-mock.js` + jest.config `moduleNameMapper` 全局映射兜底；demo-ui 用 Vitest 直接跑真实 Milkdown（roundtrip 幂等 + 集成渲染测试）。`codemirror`/`@codemirror/*` 自带 CJS 构建，Jest 可直接解析、无需 mock。
 - **Node 24 + vitest 1.6.1 不兼容**：会报 `Cannot set property testPath`，demo-ui 已升级 vitest 2.1.9；其它包若在 Node 24 下跑 vitest 报此错，同样需升级 vitest。
 - 配置表单的 `format: "video"` 字段使用对象值；空对象（`{}` 或 `{ url: "" }`）表示未配置，不能按通用“无 `url` 对象”误判为 Spine 素材包。只有非视频字段的完整 Spine bundle 才展示 Spine 控件。
+- Workspace 受管资源策略的唯一事实源是 `packages/project-core/src/workspace-resource-registry.ts`。Authority、页面删除/移动和其他资源调用方都复用该 Registry；禁止在 `shared/contracts` 或业务路由复制路径白名单、大小限制或文本校验。页面 `demos/<pageId>/config.values.json` 与项目 `project.config.values.json` 都是 JSON 对象资源；需要与二进制资产原子提交字段更新时使用 Authority `patch_config_values`，不要在路由外提前读取并回写完整旧快照。
 
 Auth：
 

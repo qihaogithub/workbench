@@ -35,7 +35,7 @@ import {
   type MarkdownReferenceContext,
   type MarkdownReferenceProvider,
 } from "./DocumentEditor";
-import type { DesignSpecEntryLink, ImageConfigScope, WhiteboardLauncher } from "./types";
+import type { ConfigChangeMeta, DesignSpecEntryLink, ImageConfigScope, WhiteboardLauncher } from "./types";
 import { ImageInputActions } from "./ImageInputActions";
 
 export interface PositionFieldEntry {
@@ -108,7 +108,7 @@ export function FieldRenderer({
 }: {
   field: FieldConfig;
   value: unknown;
-  onChange: (value: unknown) => void;
+  onChange: (value: unknown, meta?: ConfigChangeMeta) => void;
   sessionId?: string;
   readonly?: boolean;
   designSpecEntries?: DesignSpecEntryLink[];
@@ -159,7 +159,7 @@ export function FieldRenderer({
           label={field.title}
           required={field.required}
           sessionId={sessionId}
-          options={{ ...(field.uiOptions as any), assetKind: "spine", accept: mergeSpinePackageAccept(field.uiOptions?.accept), pageId, configKey: field.key }}
+          options={{ ...(field.uiOptions as any), assetKind: "spine", accept: mergeSpinePackageAccept(field.uiOptions?.accept), pageId, configKey: field.key, configScope: imageConfigScope }}
         />
       );
     }
