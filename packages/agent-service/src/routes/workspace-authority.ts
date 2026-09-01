@@ -50,7 +50,19 @@ function failure(reply: { code: (status: number) => unknown }, error: unknown) {
   const code = stableErrorCode(error);
   const status = ERROR_STATUS[code];
   reply.code(status);
-  return { success: false, error: { code, message: code } };
+  const message = error instanceof WorkspaceMutationAuthorityError
+    ? error.message
+    : code;
+  return {
+    success: false,
+    error: {
+      code,
+      message,
+      ...(error instanceof WorkspaceMutationAuthorityError && error.details
+        ? { details: error.details }
+        : {}),
+    },
+  };
 }
 
 function parseRevision(value: string | undefined): number | null {

@@ -261,6 +261,7 @@ import type {
   SnapshotQuality,
   SnapshotRejectionReason,
   ImageConfigTarget,
+  ConfigChangeMeta,
 } from "@workbench/demo-ui/types";
 import type { WhiteboardCommitTarget } from "@/components/demo/WhiteboardDialog";
 import { WHITEBOARD_AUTHORING_ENABLED } from "@/lib/authoring-feature-flags";
@@ -1063,6 +1064,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const projectConfigPersistQueueRef = useRef<Promise<boolean>>(
     Promise.resolve(true),
   );
+  const projectConfigPersistPendingCountRef = useRef(0);
   const [pageSchemaMap, setPageSchemaMap] = useState<Record<string, string>>(
     {},
   );
@@ -1783,6 +1785,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     (values: Record<string, unknown>): Promise<boolean> => {
       if (!sessionId) return Promise.resolve(true);
       if (Object.keys(values).length === 0) return Promise.resolve(true);
+      projectConfigPersistPendingCountRef.current += 1;
       const persist = async (): Promise<boolean> => {
         try {
           const res = await fetch(`/api/projects/${demoId}/config-values`, {
@@ -1805,6 +1808,11 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
             variant: "destructive",
           });
           return false;
+        } finally {
+          projectConfigPersistPendingCountRef.current = Math.max(
+            0,
+            projectConfigPersistPendingCountRef.current - 1,
+          );
         }
       };
       const queued = projectConfigPersistQueueRef.current.then(
@@ -1817,14 +1825,14 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     [demoId, sessionId, toast],
   );
   const pageConfigPersistTimersRef = useRef<
-    Record<string, ReturnType<typeof setTimeout>>
+    Record<string, { timer: ReturnType<typeof setTimeout>; values: Record<string, unknown> }>
   >({});
   const persistPageConfigValues = useCallback(
-    (pageId: string, values: Record<string, unknown>) => {
+    (pageId: string, values: Record<string, unknown>, delayMs = 500) => {
       if (!sessionId) return;
       const timers = pageConfigPersistTimersRef.current;
-      if (timers[pageId]) clearTimeout(timers[pageId]);
-      timers[pageId] = setTimeout(async () => {
+      if (timers[pageId]) clearTimeout(timers[pageId].timer);
+      const timer = setTimeout(async () => {
         try {
           const response = await fetch(`/api/sessions/${sessionId}/files/${pageId}`, {
             method: "PUT",
@@ -1834,10 +1842,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           if (!response.ok) {
             throw new Error(`保存配置失败（${response.status}）`);
           }
-          delete timers[pageId];
+          if (timers[pageId]?.timer === timer) delete timers[pageId];
         } catch (error) {
           // 保留内存中的最新值和工作区 dirty 状态，下一次改动会重试。
-          delete timers[pageId];
+          if (timers[pageId]?.timer === timer) delete timers[pageId];
           toast({
             title: "配置尚未保存",
             description:
@@ -1845,7 +1853,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
             variant: "destructive",
           });
         }
-      }, 500);
+      }, delayMs);
+      timers[pageId] = { timer, values };
     },
     [sessionId, toast],
   );
@@ -4487,7 +4496,7 @@ ${context.details}
   }, []);
 
   const handlePageConfigPanelChange = useCallback(
-    (pageId: string, data: Record<string, unknown>) => {
+    (pageId: string, data: Record<string, unknown>, meta?: ConfigChangeMeta) => {
       const schema = pageSchemaMapRef.current[pageId];
       const dataClean = schema ? flattenNestedDelta(data, schema) : data;
       const prevClean = schema
@@ -4502,7 +4511,19 @@ ${context.details}
         ...prev,
         [pageId]: nextPageConfig,
       }));
-      persistPageConfigValues(pageId, nextPageConfig);
+      const pendingPersist = pageConfigPersistTimersRef.current[pageId];
+      if (meta?.persistence === "committed") {
+        if (pendingPersist) {
+          clearTimeout(pendingPersist.timer);
+          delete pageConfigPersistTimersRef.current[pageId];
+          // A change made while the ZIP was uploading may still carry an old
+          // full-page snapshot. Re-submit the latest merged values once so it
+          // cannot overwrite the already committed Spine reference.
+          persistPageConfigValues(pageId, nextPageConfig, 0);
+        }
+      } else {
+        persistPageConfigValues(pageId, nextPageConfig);
+      }
       markScreenshotDirty(pageId);
       markWorkspaceChanged();
     },
@@ -4602,7 +4623,7 @@ ${context.details}
   }, []);
 
   const handleProjectConfigPanelChange = useCallback(
-    (data: Record<string, unknown>) => {
+    (data: Record<string, unknown>, meta?: ConfigChangeMeta) => {
       const nextProjectConfigValues = {
         ...projectConfigValuesRef.current,
         ...data,
@@ -4610,7 +4631,13 @@ ${context.details}
       // 立即更新 ref，保证紧跟在本次输入后的发布会等待这次保存。
       projectConfigValuesRef.current = nextProjectConfigValues;
       setProjectConfigValues(nextProjectConfigValues);
-      void persistProjectConfigValues(nextProjectConfigValues);
+      if (meta?.persistence !== "committed") {
+        void persistProjectConfigValues(nextProjectConfigValues);
+      } else if (projectConfigPersistPendingCountRef.current > 0) {
+        // Append one latest snapshot behind any older queued request so an
+        // in-flight project save cannot overwrite the committed Spine ref.
+        void persistProjectConfigValues(nextProjectConfigValues);
+      }
       setConfigDataMap((prev) => {
         const next = { ...prev };
         for (const pageId of Object.keys(next)) {
@@ -6898,8 +6925,8 @@ ${context.details}
         clearTimeout(syncDebounceRef.current);
         syncDebounceRef.current = null;
       }
-      for (const timer of Object.values(pageConfigPersistTimersRef.current)) {
-        clearTimeout(timer);
+      for (const pending of Object.values(pageConfigPersistTimersRef.current)) {
+        clearTimeout(pending.timer);
       }
       pageConfigPersistTimersRef.current = {};
       for (const timer of Object.values(screenshotRegenerateTimerRef.current)) {

@@ -11,6 +11,7 @@ export type WorkspaceResourceKind =
   | "page-sandbox-html"
   | "page-html-import-meta"
   | "page-schema"
+  | "page-config-values"
   | "page-sketch-scene"
   | "page-sketch-meta"
   | "page-convention"
@@ -23,6 +24,8 @@ export type WorkspaceResourceKind =
   | "canvas-layout"
   | "knowledge-document"
   | "knowledge-manifest"
+  | "design-spec-manifest"
+  | "design-spec-entry"
   | "asset"
   | "whiteboard-document"
   | "whiteboard-bindings";
@@ -69,6 +72,7 @@ export class WorkspaceResourceRegistry {
     if (/^demos\/[^/]+\/sandbox\.html$/.test(normalized)) return { kind: "page-sandbox-html", text: true, maxBytes: TEXT_MAX_BYTES, validation: "text" };
     if (/^demos\/[^/]+\/html-import\.meta\.json$/.test(normalized)) return { kind: "page-html-import-meta", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
     if (/^demos\/[^/]+\/config\.schema\.json$/.test(normalized)) return { kind: "page-schema", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
+    if (/^demos\/[^/]+\/config\.values\.json$/.test(normalized)) return { kind: "page-config-values", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
     if (/^demos\/[^/]+\/sketch\.scene\.json$/.test(normalized)) return { kind: "page-sketch-scene", text: true, maxBytes: TEXT_MAX_BYTES, validation: "sketch-scene" };
     if (/^demos\/[^/]+\/sketch\.meta\.json$/.test(normalized)) return { kind: "page-sketch-meta", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
     if (/^demos\/[^/]+\/convention\.md$/.test(normalized)) return { kind: "page-convention", text: true, maxBytes: TEXT_MAX_BYTES, validation: "text" };
@@ -81,7 +85,9 @@ export class WorkspaceResourceRegistry {
     if (normalized === ".canvas-layout.json") return { kind: "canvas-layout", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
     if (/^knowledge\/[^/]+\.(md|markdown|mdown)$/i.test(normalized)) return { kind: "knowledge-document", text: true, maxBytes: TEXT_MAX_BYTES, validation: "text" };
     if (normalized === "knowledge/manifest.json") return { kind: "knowledge-manifest", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
-    if (/^assets\/.+/.test(normalized)) return { kind: "asset", text: false, maxBytes: 20 * 1024 * 1024, validation: "binary" };
+    if (normalized === "design-spec/manifest.json") return { kind: "design-spec-manifest", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
+    if (/^design-spec\/spec-[^/]+\.json$/.test(normalized)) return { kind: "design-spec-entry", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
+    if (/^assets\/.+/.test(normalized)) return { kind: "asset", text: false, maxBytes: 64 * 1024 * 1024, validation: "binary" };
     if (normalized === "whiteboards/bindings.json") return { kind: "whiteboard-bindings", text: true, maxBytes: TEXT_MAX_BYTES, validation: "whiteboard-bindings" };
     if (/^whiteboards\/[a-zA-Z0-9_-]{1,80}\.json$/.test(normalized)) return { kind: "whiteboard-document", text: true, maxBytes: WHITEBOARD_DOCUMENT_MAX_BYTES, validation: "whiteboard-document" };
     return null;

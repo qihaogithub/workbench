@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import path from "path";
-import {
-  isManagedWorkspaceResource,
-  type WorkspaceMutationOperation,
-} from "@workbench/shared/contracts";
+import type { WorkspaceMutationOperation } from "@workbench/shared/contracts";
+import { createWorkspaceResourceRegistry } from "@workbench/project-core/workspace-resource-registry";
 import type {
   DemoFolderMeta,
   DemoPageMeta,
@@ -36,6 +34,8 @@ import {
 } from "@/lib/workspace-authority-client";
 import { WORKSPACE_AUTHORITY_NOT_READY_MESSAGE } from "@/lib/workspace-authority-shared";
 import fs from "fs";
+
+const workspaceResourceRegistry = createWorkspaceResourceRegistry();
 
 function hashText(content: string): string {
   return crypto.createHash("sha256").update(content).digest("hex");
@@ -95,7 +95,7 @@ function createManagedPageDeleteOperations(
         .relative(workspacePath, fullPath)
         .split(path.sep)
         .join("/");
-      if (!isManagedWorkspaceResource(relativePath)) continue;
+      if (!workspaceResourceRegistry.describe(relativePath)) continue;
       const content = fs.readFileSync(fullPath, "utf-8");
       operations.push({
         type: "delete_path",
@@ -183,7 +183,7 @@ function createManagedPageRestoreOperations(input: {
         .split(path.sep)
         .join("/");
       const targetResourcePath = `demos/${input.demoId}/${relativeFromSnapshotDemo}`;
-      if (!isManagedWorkspaceResource(targetResourcePath)) continue;
+      if (!workspaceResourceRegistry.describe(targetResourcePath)) continue;
       operations.push({
         type: "put_text",
         path: targetResourcePath,

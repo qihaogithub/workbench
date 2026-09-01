@@ -14,7 +14,7 @@ export interface PreviewRuntimeResolveOptions {
   preferCdn?: boolean;
 }
 
-export const PREVIEW_RUNTIME_MANIFEST_VERSION = "2026-06-preview-runtime-v6";
+export const PREVIEW_RUNTIME_MANIFEST_VERSION = "2026-09-preview-runtime-v7";
 
 export const DEFAULT_PREVIEW_RUNTIME_IMPORTS: Record<string, string> = {
   react: "/preview-runtime/vendor/react.js",

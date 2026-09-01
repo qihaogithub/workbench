@@ -111,6 +111,27 @@ async function readPackageVersion(packageName) {
   return pkg.version;
 }
 
+async function readCanonicalPreviewSdkSource() {
+  const policyPath = path.join(
+    repoRoot,
+    "packages/author-site/src/lib/preview-dependency-policy.ts",
+  );
+  const policySource = await readFile(policyPath, "utf8");
+  const match = policySource.match(
+    /function createPreviewSdkSource\([^)]*\)[^{]*\{[\s\S]*?return `([\s\S]*?)`;\n\}/,
+  );
+
+  if (!match) {
+    throw new Error("Unable to extract canonical @preview/sdk source");
+  }
+
+  return match[1]
+    .replace("'${reactUrl}'", '"react"')
+    .replace("'${lucideUrl}'", '"lucide-react"')
+    .replace("'${svgaUrl}'", '"svgaplayerweb"')
+    .trimStart();
+}
+
 async function buildVendorEntries() {
   const entryPoints = [];
   const specifierByEntryPoint = new Map();
@@ -198,7 +219,7 @@ async function main() {
   await copyWasmAssets(files);
 
   imports["@preview/sdk"] = "/preview-runtime/vendor/preview-sdk.js";
-  const sdkSource = `
+  const legacyEmbeddedSdkSource = `
 import React from "react";
 import * as Lucide from "lucide-react";
 import SVGA from "svgaplayerweb";
@@ -553,6 +574,12 @@ export function Carousel(props) {
   return React.createElement("div", { className: cx("relative", className) }, typeof renderItem === "function" ? renderItem(item, index) : React.createElement("div", null, item == null ? "" : String(item)), items.length > 1 ? React.createElement("div", { className: "mt-3 flex justify-center gap-2" }, items.map((_, dotIndex) => React.createElement("button", { key: dotIndex, type: "button", "aria-label": "切换到第 " + (dotIndex + 1) + " 项", className: dotIndex === index ? "h-2 w-4 rounded-full bg-neutral-950" : "h-2 w-2 rounded-full bg-neutral-300", onClick: () => setIndex(dotIndex) }))) : null);
 }
 `;
+  // The author preview, viewer and published runtime must use the same SDK
+  // contract as the compiler. Keep the generated artifact sourced from the
+  // policy module so a component contract change cannot leave this bundle
+  // silently serving an older implementation.
+  const sdkSource = await readCanonicalPreviewSdkSource();
+  void legacyEmbeddedSdkSource;
   const sdkPath = path.join(vendorDir, "preview-sdk.js");
   await writeFile(sdkPath, sdkSource.trimStart(), "utf8");
   const sdkContent = await readFile(sdkPath, "utf8");
@@ -562,7 +589,7 @@ export function Carousel(props) {
   };
 
   const manifestContent = {
-    version: "2026-06-preview-runtime-v6",
+    version: "2026-09-preview-runtime-v7",
     imports,
     files,
     packages: {

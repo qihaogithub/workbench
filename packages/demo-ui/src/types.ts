@@ -1,4 +1,5 @@
 import type { PagePresentationProfile } from "@workbench/shared";
+import type { WorkspaceMutationReceipt } from "@workbench/shared/contracts";
 import type {
   ConsoleLogPayload,
   PositionableSizeItem,
@@ -197,7 +198,7 @@ export type PositionEditBoundary =
 
 export interface ConfigFormProps {
   schema: string;
-  onChange: (data: Record<string, unknown>) => void;
+  onChange: (data: Record<string, unknown>, meta?: ConfigChangeMeta) => void;
   onSchemaChange?: (schema: string) => void;
   initialData?: Record<string, unknown>;
   readonly?: boolean;
@@ -230,6 +231,12 @@ export interface ConfigFormProps {
   referenceContext?: MarkdownReferenceContext;
   referenceProvider?: MarkdownReferenceProvider;
   onReferenceClick?: MarkdownReferenceClickHandler;
+}
+
+export interface ConfigChangeMeta {
+  /** The server already durably committed this delta in an atomic mutation. */
+  persistence: "committed";
+  receipt: WorkspaceMutationReceipt;
 }
 
 export type ImageConfigScope = "project" | "page";

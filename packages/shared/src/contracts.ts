@@ -2,7 +2,6 @@ export * from "./index";
 
 import type { WorkspaceRevision } from "./workspace";
 import type { DemoPageRuntimeType, PagePresentationProfile } from "./index";
-import { isWhiteboardBinding, isWhiteboardDocument } from "./whiteboard";
 
 /**
  * Durable, single-writer contract for an active (live) Workspace.
@@ -96,6 +95,14 @@ export interface WorkspaceMutationPutStagedTextOperation {
   expectedAbsent?: boolean;
 }
 
+/** Atomically merges a partial JSON object into page/project runtime config.
+ * Authority expands this command inside the workspace serial section. */
+export interface WorkspaceMutationPatchConfigValuesOperation {
+  type: "patch_config_values";
+  path: string;
+  patch: Record<string, unknown>;
+}
+
 export interface WorkspaceMutationDeletePathOperation {
   type: "delete_path";
   path: string;
@@ -136,6 +143,7 @@ export type WorkspaceMutationOperation =
   | WorkspaceMutationPutTextOperation
   | WorkspaceMutationPutBinaryOperation
   | WorkspaceMutationPutStagedTextOperation
+  | WorkspaceMutationPatchConfigValuesOperation
   | WorkspaceMutationDeletePathOperation
   | WorkspaceMutationMovePathOperation
   | WorkspaceMutationCommitHtmlImportOperation;
@@ -212,50 +220,3 @@ export type WorkspaceAuthorityStreamEvent =
   | WorkspaceMutationCommittedEvent
   | WorkspaceProjectionAcknowledgedEvent
   | WorkspaceRevisionGapEvent;
-
-export function normalizeWorkspaceResourcePath(resourcePath: string): string | null {
-  const normalized = resourcePath.replace(/\\/g, "/").replace(/^\/+/, "");
-  if (!normalized || normalized.includes("\0") || normalized.split("/").includes("..")) return null;
-  return normalized;
-}
-
-export function isManagedWorkspaceResource(resourcePath: string): boolean {
-  const normalized = normalizeWorkspaceResourcePath(resourcePath);
-  return Boolean(normalized && (
-    /^demos\/[^/]+\/(index\.tsx|prototype\.(html|css|meta\.json)|sandbox\.html|html-import\.meta\.json|config\.schema\.json|sketch\.(scene|meta)\.json|(convention|requirements)\.md)$/.test(normalized)
-    || normalized === "project.config.schema.json"
-    || normalized === "project.config.values.json"
-    || normalized === "workspace-tree.json"
-    || normalized === ".canvas-layout.json"
-    || normalized === "convention.md"
-    || normalized === "memory.md"
-    || normalized === "knowledge/manifest.json"
-    || /^knowledge\/[^/]+\.(md|markdown|mdown)$/i.test(normalized)
-    || normalized === "design-spec/manifest.json"
-    || /^design-spec\/spec-[^/]+\.json$/.test(normalized)
-    || /^whiteboards\/[a-zA-Z0-9_-]{1,80}\.json$/.test(normalized)
-    || normalized === "whiteboards/bindings.json"
-    || /^assets\/.+/.test(normalized)
-  ));
-}
-
-export function assertManagedWorkspaceTextWrite(resourcePath: string, content: string): void {
-  if (!isManagedWorkspaceResource(resourcePath) || /^assets\//.test(resourcePath) || content.length > 2 * 1024 * 1024) {
-    throw new Error("WORKSPACE_INVALID_OPERATION");
-  }
-  if (/^whiteboards\/[a-zA-Z0-9_-]{1,80}\.json$/.test(resourcePath)) {
-    try {
-      if (!isWhiteboardDocument(JSON.parse(content))) throw new Error("invalid");
-    } catch {
-      throw new Error("WORKSPACE_INVALID_OPERATION");
-    }
-  }
-  if (resourcePath === "whiteboards/bindings.json") {
-    try {
-      const value = JSON.parse(content) as { bindings?: unknown };
-      if (!Array.isArray(value.bindings) || !value.bindings.every(isWhiteboardBinding)) throw new Error("invalid");
-    } catch {
-      throw new Error("WORKSPACE_INVALID_OPERATION");
-    }
-  }
-}

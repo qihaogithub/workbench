@@ -114,4 +114,60 @@ describe("PageConfigPanel design-spec bubble", () => {
     fireEvent.click(screen.getByRole("button", { name: "关闭设计规范" }));
     await waitFor(() => expect(screen.queryByRole("complementary", { name: "设计规范" })).not.toBeInTheDocument());
   });
+
+  it("将 Spine 上传回执作为已持久化的配置变更透传给宿主", async () => {
+    const onPageConfigChange = vi.fn();
+    const ref = { kind: "spine", version: 1, assetId: `spine_${"c".repeat(64)}` };
+    const receipt = {
+      committed: true,
+      mutationId: "mutation-1",
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      baseRevision: 0,
+      revision: 2,
+      rootHash: "hash",
+      actor: "author-site",
+      resources: [],
+      committedAt: 1,
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: { ref, receipt, configCommitted: true } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    ));
+    const spineSchema = JSON.stringify({
+      type: "object",
+      properties: {
+        spineAsset: {
+          type: "object",
+          format: "spine",
+          title: "Spine 素材",
+          properties: {
+            kind: { const: "spine" },
+            version: { const: 1 },
+            assetId: { type: "string", pattern: "^spine_[a-f0-9]{64}$" },
+          },
+          required: ["kind", "version", "assetId"],
+          additionalProperties: false,
+        },
+      },
+    });
+    const { container } = render(
+      <PageConfigPanel
+        pages={[{ id: "page-1", name: "示例页", schema: spineSchema, configData: {} }]}
+        detailPageId="page-1"
+        sessionId="session-1"
+        onPageConfigChange={onPageConfigChange}
+      />,
+    );
+    const file = new File([new Uint8Array([0x50, 0x4b, 3, 4])], "star_second.zip.flutter", { type: "application/zip" });
+    fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [file] } });
+
+    await waitFor(() => expect(onPageConfigChange).toHaveBeenCalledWith(
+      "page-1",
+      { spineAsset: ref },
+      { persistence: "committed", receipt },
+    ));
+  });
 });

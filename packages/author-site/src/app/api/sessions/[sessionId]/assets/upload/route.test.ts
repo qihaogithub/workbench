@@ -22,6 +22,14 @@ jest.mock("@/lib/fs-utils", () => ({
 }));
 jest.mock("@/lib/image-store", () => ({ uploadImage: jest.fn() }));
 jest.mock("@/lib/project-images", () => ({ addProjectImage: jest.fn() }));
+jest.mock("@/lib/live-workspace-route-context", () => ({ isLiveWorkspacePath: jest.fn(() => true) }));
+jest.mock("./spine-assets", () => ({ prepareSpineAsset: jest.fn() }));
+jest.mock("@/lib/workspace-authority-client", () => ({
+  stageWorkspaceBinary: jest.fn(),
+  commitWorkspaceMutation: jest.fn(),
+  reconcileWorkspaceAuthority: jest.fn(),
+  WorkspaceAuthorityClientError: class WorkspaceAuthorityClientError extends Error {},
+}));
 import fs from "fs";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import {
@@ -31,6 +39,8 @@ import {
 } from "@/lib/fs-utils";
 import { POST } from "./route";
 import { isAllowedAssetFile, MAX_VIDEO_SIZE } from "./asset-validation";
+import { prepareSpineAsset } from "./spine-assets";
+import { commitWorkspaceMutation, stageWorkspaceBinary } from "@/lib/workspace-authority-client";
 
 function requestWithFile(file: unknown): Request {
   return {
@@ -58,6 +68,50 @@ describe("session asset upload validation", () => {
     jest.mocked(sessionExists).mockReturnValue(true);
     jest.mocked(getSessionMeta).mockReturnValue({ demoId: "project-1" } as never);
     jest.mocked(getSessionWorkspacePath).mockReturnValue("/tmp/workspace-1");
+  });
+
+  it("commits Spine files and its page config ref in one Authority mutation", async () => {
+    jest.mocked(getSessionMeta).mockReturnValue({ demoId: "project-1", workspaceId: "workspace-1" } as never);
+    const ref = { kind: "spine", version: 1, assetId: `spine_${"a".repeat(64)}` } as const;
+    jest.mocked(prepareSpineAsset).mockResolvedValue({
+      ref,
+      manifest: { schemaVersion: 1 },
+      files: [{ path: "star/star.skel.bytes", content: Buffer.from([1]), sha256: "hash" }],
+      summary: { originalName: "star_second.zip.flutter" },
+    } as never);
+    let stagedIndex = 0;
+    jest.mocked(stageWorkspaceBinary).mockImplementation(async ({ content }) => ({
+      stagingId: `00000000-0000-0000-0000-00000000000${++stagedIndex}`,
+      hash: `hash-${content.length}-${stagedIndex}`,
+      size: content.length,
+    }));
+    const receipt = { committed: true, mutationId: "mutation-1", revision: 2 };
+    jest.mocked(commitWorkspaceMutation).mockResolvedValue(receipt as never);
+    const file = videoFile("star_second.zip.flutter", new Uint8Array([0x50, 0x4b, 3, 4]), "application/zip");
+    const entries = new Map<string, unknown>([
+      ["file", file],
+      ["assetKind", "spine"],
+      ["configScope", "page"],
+      ["pageId", "motion-formats_k4r2"],
+      ["configKey", "spineAsset"],
+    ]);
+    const request = { formData: async () => ({ get: (key: string) => entries.get(key) ?? null }) } as unknown as Request;
+
+    const response = await POST(request, params);
+
+    expect(response.status).toBe(200);
+    expect(commitWorkspaceMutation).toHaveBeenCalledWith(expect.objectContaining({
+      reason: "commit_spine_asset",
+      operations: expect.arrayContaining([
+        expect.objectContaining({ type: "put_binary", path: expect.stringContaining("star/star.skel.bytes") }),
+        {
+          type: "patch_config_values",
+          path: "demos/motion-formats_k4r2/config.values.json",
+          patch: { spineAsset: ref },
+        },
+      ]),
+    }));
+    expect(await response.json()).toMatchObject({ success: true, data: { ref, receipt, configCommitted: true } });
   });
 
   it("accepts an MP4 whose browser MIME type is generic when its bytes identify it as MP4", () => {

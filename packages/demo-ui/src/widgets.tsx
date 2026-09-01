@@ -16,6 +16,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { ImageInputActions } from './ImageInputActions';
 import type { SpineAssetRefV1 } from '@workbench/shared';
+import type { WorkspaceMutationReceipt } from '@workbench/shared/contracts';
+import type { ConfigChangeMeta } from './types';
 
 function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
@@ -102,6 +104,7 @@ export interface FileUploadWidgetOptions {
   /** Page field identity lets the server atomically attach a committed Spine ref. */
   pageId?: string;
   configKey?: string;
+  configScope?: "page" | "project";
   videoPreviewStyle?: "controls" | "compact" | "cover";
   maxSize?: number;
   placeholder?: string;
@@ -208,7 +211,7 @@ const DEFAULT_VIDEO_FILE_MAX_SIZE = 200 * 1024 * 1024;
 export interface FileUploadWidgetProps {
   id?: string;
   value?: string | SpineBundle | SpineAssetRefV1 | VideoValue;
-  onChange: (value: string | SpineBundle | SpineAssetRefV1 | VideoValue | undefined) => void;
+  onChange: (value: string | SpineBundle | SpineAssetRefV1 | VideoValue | undefined, meta?: ConfigChangeMeta) => void;
   label?: string;
   required?: boolean;
   disabled?: boolean;
@@ -216,6 +219,16 @@ export interface FileUploadWidgetProps {
   options?: FileUploadWidgetOptions;
   defaultValue?: string | VideoValue;
   onWhiteboard?: () => void;
+}
+
+function getCommittedUploadReceipt(payload: UploadResponsePayload | null): WorkspaceMutationReceipt | null {
+  if (!payload || payload.success !== true || !isRecord(payload.data) || payload.data.configCommitted !== true || !isRecord(payload.data.receipt)) return null;
+  const receipt = payload.data.receipt;
+  return receipt.committed === true
+    && typeof receipt.mutationId === 'string'
+    && typeof receipt.revision === 'number'
+    ? receipt as unknown as WorkspaceMutationReceipt
+    : null;
 }
 
 export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
@@ -303,6 +316,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
             formData.append('assetKind', 'spine');
             if (rawOptions.pageId) formData.append('pageId', rawOptions.pageId);
             if (rawOptions.configKey) formData.append('configKey', rawOptions.configKey);
+            if (rawOptions.configScope) formData.append('configScope', rawOptions.configScope);
           }
 
           const res = await fetch(`/api/sessions/${sessionId}/assets/upload`, {
@@ -319,6 +333,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
 
           const uploadedUrl = getUploadedUrl(data);
           const responseData = isRecord(data.data) && 'ref' in data.data ? data.data.ref : data.data;
+          const committedReceipt = getCommittedUploadReceipt(data);
           const isBundle = isSpineBundle(responseData);
           const isAssetRef = isSpineAssetRef(responseData);
           if (!uploadedUrl && !isBundle && !isAssetRef) {
@@ -330,7 +345,14 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
             await deleteServerFile(sessionId, value);
           }
 
-          onChange(isVideo ? { url: uploadedUrl! } : (isAssetRef ? responseData : isBundle ? responseData : uploadedUrl!));
+          const nextValue = isVideo
+            ? { url: uploadedUrl! }
+            : (isAssetRef ? responseData : isBundle ? responseData : uploadedUrl!);
+          if (isSpine && committedReceipt) {
+            onChange(nextValue, { persistence: 'committed', receipt: committedReceipt });
+          } else {
+            onChange(nextValue);
+          }
         } else {
           const dataUrl = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
@@ -346,7 +368,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
         setIsUploading(false);
       }
     },
-    [sessionId, maxSize, hasDimensionCheck, dimensionOptions, value, onChange, isVideo, isSpine, rawOptions.pageId, rawOptions.configKey]
+    [sessionId, maxSize, hasDimensionCheck, dimensionOptions, value, onChange, isVideo, isSpine, rawOptions.pageId, rawOptions.configKey, rawOptions.configScope]
   );
 
   const handlePosterChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {

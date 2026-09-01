@@ -60,6 +60,49 @@ describe("FileUploadWidget", () => {
     expect(container.querySelector('input[type="file"]')).not.toHaveAttribute("accept");
   });
 
+  it("reports a successful Spine upload as already committed", async () => {
+    const onChange = vi.fn();
+    const ref = { kind: "spine", version: 1, assetId: `spine_${"a".repeat(64)}` } as const;
+    const receipt = {
+      committed: true,
+      mutationId: "mutation-1",
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      baseRevision: 0,
+      revision: 2,
+      rootHash: "hash",
+      actor: "author-site",
+      resources: [],
+      committedAt: 1,
+    };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: { ref, summary: {}, receipt, configCommitted: true } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container } = render(
+      <FileUploadWidget
+        onChange={onChange}
+        sessionId="session-1"
+        options={{ assetKind: "spine", configScope: "page", pageId: "page-1", configKey: "spineAsset" }}
+      />,
+    );
+    const file = new File([new Uint8Array([0x50, 0x4b, 3, 4])], "star_second.zip.flutter", { type: "application/zip" });
+    fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [file] } });
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(ref, {
+      persistence: "committed",
+      receipt,
+    }));
+    const body = fetchMock.mock.calls[0][1]?.body as FormData;
+    expect(body.get("configScope")).toBe("page");
+    expect(body.get("pageId")).toBe("page-1");
+    expect(body.get("configKey")).toBe("spineAsset");
+  });
+
   it("stores the URL returned by the session upload endpoint", async () => {
     const onChange = vi.fn();
     vi.stubGlobal(
