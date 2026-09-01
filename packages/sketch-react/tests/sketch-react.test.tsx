@@ -366,6 +366,12 @@ function readRenderedScene(): SketchSceneDocument {
   return JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
 }
 
+function getPresetColorButtons(container: HTMLElement): HTMLButtonElement[] {
+  const grid = container.querySelector<HTMLElement>('[data-sketch-color-grid="true"][aria-label$="常用颜色"]');
+  expect(grid).not.toBeNull();
+  return Array.from(grid?.querySelectorAll<HTMLButtonElement>("[data-sketch-color]") ?? []);
+}
+
 function clickLayerNode(nodeId: string, options?: { shiftKey?: boolean }) {
   const row = getLayerRow(nodeId);
   const button = row.querySelector("button");
@@ -850,7 +856,7 @@ describe("sketch-react", () => {
     expect(screen.getByTestId("scene-json").textContent).toBe(originalSceneJson);
   });
 
-  it("enters semantic group child selection on double click and returns to the group with Escape", async () => {
+  it("enters semantic group child selection before allowing a second double click to edit text", async () => {
     const groupedScene: SketchSceneDocument = {
       version: 1,
       pageSize: { width: 400, height: 300 },
@@ -874,14 +880,25 @@ describe("sketch-react", () => {
     fireEvent.doubleClick(cardLabel as Element, { clientX: 120, clientY: 140 });
 
     await waitFor(() => {
-      expect(screen.getByPlaceholderText("对象文本")).not.toBeNull();
+      expect(screen.queryByLabelText("画布文本编辑")).toBeNull();
+      expect(getLayerRow("card").className).toContain("bg-[#2f5d97]");
     });
-    expect(screen.queryByLabelText("画布文本编辑")).toBeNull();
+
+    fireEvent.doubleClick(getSketchNodeLabelElement("card"), { clientX: 120, clientY: 140 });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("画布文本编辑")).not.toBeNull();
+    });
 
     fireEvent.keyDown(window, { key: "Escape" });
 
     await waitFor(() => {
-      expect(screen.queryByPlaceholderText("对象文本")).toBeNull();
+      expect(screen.queryByLabelText("画布文本编辑")).toBeNull();
+    });
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    await waitFor(() => {
+      expect(getLayerRow("group").className).toContain("bg-[#2f5d97]");
     });
     expect(screen.getByTestId("scene-json").textContent).toBe(originalSceneJson);
   });
@@ -1531,8 +1548,13 @@ describe("sketch-react", () => {
     expect(within(toolbar).getByLabelText("悬浮斜体")).not.toBeNull();
     expect(within(toolbar).getByLabelText("悬浮下划线")).not.toBeNull();
     expect(within(toolbar).getByLabelText("悬浮文字颜色")).not.toBeNull();
-    expect(within(toolbar).getByTestId("sketch-text-color-indicator")).not.toBeNull();
-    expect(within(toolbar).getByTestId("sketch-text-color-underline")).not.toBeNull();
+    const textColorIndicator = within(toolbar).getByTestId("sketch-text-color-indicator");
+    expect(textColorIndicator).not.toBeNull();
+    expect(textColorIndicator.className).toContain("h-[1.4rem]");
+    expect(textColorIndicator.className).toContain("w-[1.2rem]");
+    const textColorUnderline = within(toolbar).getByTestId("sketch-text-color-underline");
+    expect(textColorUnderline).not.toBeNull();
+    expect(textColorUnderline.className).toContain("bottom-0");
     expect(within(toolbar).getByLabelText("对齐方式")).not.toBeNull();
     expect(within(toolbar).getByLabelText("悬浮层级")).not.toBeNull();
     expect(within(toolbar).getByLabelText("悬浮更多")).not.toBeNull();
@@ -1555,6 +1577,58 @@ describe("sketch-react", () => {
     await waitFor(() => {
       const node = readRenderedScene().nodes.find((item) => item.id === "title");
       expect(node?.style).toMatchObject({ color: "#ef4444", textAlign: "center" });
+    });
+  });
+
+  it("shares one unique 10 by 6 palette across text, shape, and property color controls", async () => {
+    const textShapeScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [{
+        id: "rect",
+        type: "rect",
+        x: 20,
+        y: 30,
+        width: 120,
+        height: 60,
+        text: "Color target",
+        style: { fill: "#ffffff", stroke: "#111827", color: "#111827" },
+      }],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={textShapeScene} />);
+
+    clickLayerNode("rect");
+
+    for (const picker of screen.getAllByTestId("sketch-color-picker")) {
+      const colors = getPresetColorButtons(picker);
+      expect(colors).toHaveLength(60);
+      expect(new Set(colors.map((button) => button.dataset.sketchColor)).size).toBe(60);
+      expect(colors.some((button) => button.dataset.sketchColor === "#f59e0b")).toBe(true);
+    }
+
+    const toolbar = await screen.findByRole("toolbar", { name: "图文工具栏" });
+    fireEvent.click(within(toolbar).getByLabelText("悬浮填充"));
+    const fillMenu = screen.getByRole("menu", { name: "填充" });
+    expect(getPresetColorButtons(fillMenu)).toHaveLength(60);
+    const noFillColor = within(fillMenu).getByLabelText("填充 无颜色");
+    expect(noFillColor).toBeTruthy();
+    expect(noFillColor.className).toContain("w-6");
+    expect(noFillColor.className).not.toContain("w-full");
+    expect(within(fillMenu).queryByText("无颜色", { exact: true })).toBeNull();
+    fireEvent.click(within(fillMenu).getByLabelText("填充 #f59e0b"));
+
+    await waitFor(() => {
+      expect(readRenderedScene().nodes.find((node) => node.id === "rect")?.style?.fill).toBe("#f59e0b");
+    });
+
+    fireEvent.click(within(toolbar).getByLabelText("悬浮文字颜色"));
+    const textMenu = screen.getByRole("menu", { name: "文字颜色" });
+    expect(getPresetColorButtons(textMenu)).toHaveLength(60);
+    expect(within(textMenu).queryByLabelText(/无颜色/)).toBeNull();
+    fireEvent.change(within(textMenu).getByLabelText("文字颜色 其他颜色输入"), { target: { value: "#123456" } });
+
+    await waitFor(() => {
+      expect(readRenderedScene().nodes.find((node) => node.id === "rect")?.style?.color).toBe("#123456");
     });
   });
 
@@ -3076,34 +3150,33 @@ describe("sketch-react", () => {
     });
   });
 
-  it("keeps semantic groups out of layer order commands", async () => {
+  it("treats semantic groups as layer units in layer order commands", async () => {
     const groupedScene: SketchSceneDocument = {
       version: 1,
       pageSize: { width: 400, height: 300 },
       nodes: [
-        { id: "group", type: "group", x: 60, y: 100, width: 160, height: 90, visible: false, children: ["card"] },
-        { id: "card", type: "card", x: 60, y: 100, width: 160, height: 90, text: "Card" },
-        { id: "button", type: "button", x: 240, y: 100, width: 100, height: 42, text: "Button" },
+        { id: "outside", type: "rect", x: 20, y: 30, width: 40, height: 40, zIndex: 0 },
+        { id: "card", type: "card", x: 80, y: 60, width: 120, height: 70, text: "Card", zIndex: 1 },
+        { id: "accent", type: "rect", x: 100, y: 80, width: 40, height: 30, zIndex: 2 },
+        { id: "group", type: "group", x: 80, y: 60, width: 120, height: 70, visible: false, children: ["card", "accent"], zIndex: 3 },
+        { id: "top", type: "button", x: 240, y: 60, width: 100, height: 42, text: "Top", zIndex: 4 },
       ],
     };
     render(<ControlledPartsEditorWithToolbar initialScene={groupedScene} />);
 
     fireEvent.click(screen.getByTitle("分组"));
-    let menu = openCanvasContextMenu();
+    const menu = openCanvasContextMenu();
     expect((within(menu).getByRole("menuitem", { name: "复制" }) as HTMLButtonElement).disabled).toBe(false);
     expect((within(menu).getByRole("menuitem", { name: "删除" }) as HTMLButtonElement).disabled).toBe(false);
-    expect((within(menu).getByRole("menuitem", { name: "置顶" }) as HTMLButtonElement).disabled).toBe(true);
-    expect((within(menu).getByRole("menuitem", { name: "置底" }) as HTMLButtonElement).disabled).toBe(true);
-
-    fireEvent.click(screen.getByTitle("Card"), { shiftKey: true });
-    menu = openCanvasContextMenu();
-    fireEvent.click(within(menu).getByRole("menuitem", { name: "置顶" }));
+    expect((within(menu).getByRole("menuitem", { name: "置顶" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((within(menu).getByRole("menuitem", { name: "置底" }) as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "上移一层" }));
 
     await waitFor(() => {
-      const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
-      expect(parsed.nodes.map((node) => node.id)).toEqual(["group", "button", "card"]);
-      expect(parsed.nodes.find((node) => node.id === "group")).toMatchObject({ visible: false, zIndex: 0 });
-      expect(parsed.nodes.find((node) => node.id === "card")).toMatchObject({ zIndex: 2 });
+      const parsed = readRenderedScene();
+      expect(parsed.nodes.map((node) => node.id)).toEqual(["outside", "top", "card", "accent", "group"]);
+      expect(parsed.nodes.find((node) => node.id === "card")?.zIndex).toBeLessThan(parsed.nodes.find((node) => node.id === "accent")?.zIndex ?? -1);
+      expect(parsed.nodes.find((node) => node.id === "accent")?.zIndex).toBeLessThan(parsed.nodes.find((node) => node.id === "group")?.zIndex ?? -1);
     });
   });
 
@@ -4146,6 +4219,12 @@ describe("sketch-react", () => {
       expect(screen.getByTestId("scene-json").textContent).not.toContain("recentColors");
     });
 
+    fireEvent.click(screen.getByLabelText("填充 无颜色"));
+    await waitFor(() => {
+      expect(readRenderedScene().nodes.find((node) => node.id === "rect")?.style?.fill).toBe("transparent");
+    });
+    expect(screen.queryByLabelText("文字颜色 无颜色")).toBeNull();
+
     fireEvent.click(screen.getByTitle("重置填充"));
 
     await waitFor(() => {
@@ -4357,11 +4436,11 @@ describe("sketch-react", () => {
     fireEvent.click(within(toolbar).getByLabelText("悬浮填充"));
     await waitFor(() => expect(screen.queryByRole("menu", { name: "填充" })).toBeNull());
     fireEvent.click(within(toolbar).getByLabelText("悬浮填充"));
-    fireEvent.click(screen.getByLabelText("填充 #f8fafc"));
+    fireEvent.click(screen.getByLabelText("填充 #fafafa"));
 
     await waitFor(() => {
       const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
-      expect(parsed.nodes.find((node) => node.id === "rect")?.style?.fill).toBe("#f8fafc");
+      expect(parsed.nodes.find((node) => node.id === "rect")?.style?.fill).toBe("#fafafa");
     });
 
     fireEvent.doubleClick(getSketchNodeElement("rect"));
@@ -4492,6 +4571,9 @@ describe("sketch-react", () => {
     render(<ControlledPartsEditorWithToolbarAndProperties initialScene={menuScene} />);
     clickLayerNode("front");
     const toolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
+    const fillIndicator = within(toolbar).getByTestId("sketch-floating-fill-indicator");
+    expect(fillIndicator.className).toContain("h-3.5");
+    expect(fillIndicator.className).toContain("w-3.5");
 
     fireEvent.click(within(toolbar).getByLabelText("悬浮填充"));
     const fillMenu = screen.getByRole("menu", { name: "填充" });
@@ -4503,9 +4585,15 @@ describe("sketch-react", () => {
     fireEvent.click(within(toolbar).getByLabelText("悬浮描边"));
     const strokeMenu = screen.getByRole("menu", { name: "描边" });
     expect(within(strokeMenu).getByLabelText("描边 无颜色")).toBeTruthy();
+    const strokeIndicator = within(toolbar).getByTestId("sketch-floating-stroke-indicator");
+    const strokeIcon = strokeIndicator.querySelector("svg");
+    expect(strokeIcon).toBeTruthy();
+    expect(strokeIcon?.getAttribute("stroke")).toBe("currentColor");
+    expect(strokeIcon?.style.color).toBe("rgb(17, 24, 39)");
     fireEvent.click(within(strokeMenu).getByLabelText("描边 无颜色"));
     await waitFor(() => expect(readRenderedScene().nodes.find((node) => node.id === "front")?.style?.stroke).toBe("transparent"));
-    expect(within(toolbar).getByTestId("sketch-floating-stroke-indicator").querySelector("span")?.className).toContain("bg-slate-300");
+    const noStrokeIcon = within(toolbar).getByTestId("sketch-floating-stroke-indicator").querySelector("svg");
+    expect(noStrokeIcon?.style.color).toBe("rgb(203, 213, 225)");
 
     fireEvent.click(within(toolbar).getByLabelText("悬浮层级"));
     const layerMenu = screen.getByRole("menu", { name: "层级" });
@@ -4593,7 +4681,7 @@ describe("sketch-react", () => {
     }
   });
 
-  it("shows a multi-selection floating toolbar for arrange, grouping, copy, delete, and more actions", async () => {
+  it("shows the multi-selection floating toolbar matrix and moves distribution into more", async () => {
     const arrangeScene: SketchSceneDocument = {
       version: 1,
       pageSize: { width: 400, height: 300 },
@@ -4610,26 +4698,455 @@ describe("sketch-react", () => {
     clickLayerNode("c", { shiftKey: true });
 
     const toolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
-    expect(within(toolbar).getByLabelText("悬浮左对齐")).toBeTruthy();
-    expect(within(toolbar).getByLabelText("悬浮水平分布")).toBeTruthy();
-    expect(within(toolbar).getByLabelText("悬浮成组")).toBeTruthy();
-    expect(within(toolbar).getByLabelText("悬浮复制")).toBeTruthy();
-    expect(within(toolbar).getByLabelText("悬浮删除")).toBeTruthy();
-    expect(within(toolbar).getByLabelText("悬浮更多")).toBeTruthy();
+    const toolbarButtonLabels = Array.from(
+      within(toolbar).getAllByRole("button"),
+      (button) => button.getAttribute("aria-label"),
+    );
+    expect(toolbarButtonLabels).toEqual([
+      "悬浮边框",
+      "悬浮颜色",
+      "悬浮对齐方式",
+      "悬浮组合",
+      "悬浮图层",
+      "悬浮更多",
+    ]);
+    expect(within(toolbar).queryByLabelText("悬浮水平分布")).toBeNull();
+    expect(within(toolbar).queryByLabelText("悬浮复制")).toBeNull();
+    expect(within(toolbar).queryByLabelText("悬浮删除")).toBeNull();
+    expect(within(toolbar).getByLabelText("悬浮组合").querySelector('[data-sketch-icon="group"]')).not.toBeNull();
+    expect(within(toolbar).getByLabelText("悬浮组合").querySelector('[data-sketch-icon="ungroup"]')).toBeNull();
 
-    fireEvent.click(within(toolbar).getByLabelText("悬浮水平分布"));
+    fireEvent.click(within(toolbar).getByLabelText("悬浮对齐方式"));
+    const alignmentMenu = screen.getByRole("menu", { name: "对齐方式" });
+    expect(alignmentMenu.className).toContain("rounded-lg");
+    expect(alignmentMenu.className).toContain("p-1");
+    expect(alignmentMenu.className).not.toContain("rounded-2xl");
+    expect(alignmentMenu.className).not.toContain("p-2");
+    for (const button of alignmentMenu.querySelectorAll<HTMLButtonElement>("[data-sketch-alignment]")) {
+      expect(button.className).toContain("h-8");
+      expect(button.className).toContain("w-8");
+      expect(button.querySelector("svg")?.getAttribute("class")).toContain("h-3.5");
+      expect(button.querySelector("svg")?.getAttribute("class")).toContain("w-3.5");
+    }
+    expect(Array.from(alignmentMenu.querySelectorAll<HTMLElement>("[data-sketch-alignment]"), (element) => element.getAttribute("data-sketch-alignment"))).toEqual([
+      "left",
+      "center",
+      "right",
+      "top",
+      "middle",
+      "bottom",
+    ]);
+    expect(document.activeElement?.getAttribute("data-sketch-alignment")).toBe("left");
+    fireEvent.keyDown(alignmentMenu, { key: "ArrowRight" });
+    expect(document.activeElement?.getAttribute("data-sketch-alignment")).toBe("center");
+    fireEvent.keyDown(alignmentMenu, { key: "Escape" });
+    expect(screen.queryByRole("menu", { name: "对齐方式" })).toBeNull();
+
+    fireEvent.click(within(toolbar).getByLabelText("悬浮更多"));
+    const moreMenu = screen.getByRole("menu", { name: "更多操作" });
+    expect(within(moreMenu).getByRole("menuitem", { name: /^删除/ }).className).toContain("h-8");
+    expect(within(moreMenu).getByRole("menuitem", { name: "水平分布" })).toBeTruthy();
+    expect(within(moreMenu).getByRole("menuitem", { name: "垂直分布" })).toBeTruthy();
+    fireEvent.click(within(moreMenu).getByRole("menuitem", { name: "水平分布" }));
 
     await waitFor(() => {
       const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
       expect(parsed.nodes.find((node) => node.id === "b")?.x).toBe(120);
     });
 
-    fireEvent.click(within(toolbar).getByLabelText("悬浮成组"));
+    fireEvent.click(within(toolbar).getByLabelText("悬浮组合"));
 
     await waitFor(() => {
       const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
       expect(parsed.nodes.find((node) => node.type === "group")?.children).toEqual(["a", "b", "c"]);
     });
+    const groupedToolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
+    expect(within(groupedToolbar).getByLabelText("悬浮解组").querySelector('[data-sketch-icon="ungroup"]')).not.toBeNull();
+    expect(within(groupedToolbar).getByLabelText("悬浮解组").querySelector('[data-sketch-icon="group"]')).toBeNull();
+  });
+
+  it("batch-edits mixed graphic and pure-text selections without changing text styles", async () => {
+    const mixedScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "left", type: "rect", x: 20, y: 30, width: 60, height: 40, style: { fill: "#ffffff", stroke: "#111827" } },
+        { id: "right", type: "ellipse", x: 120, y: 80, width: 70, height: 50, style: { fill: "#ef4444", stroke: "#2563eb" } },
+        { id: "label", type: "text", x: 240, y: 120, width: 100, height: 30, text: "Label", style: { color: "#123456" } },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={mixedScene} />);
+
+    clickLayerNode("left");
+    clickLayerNode("right", { shiftKey: true });
+    clickLayerNode("label", { shiftKey: true });
+
+    const toolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
+    expect(Array.from(within(toolbar).getAllByRole("button"), (button) => button.getAttribute("aria-label"))).toEqual([
+      "悬浮边框",
+      "悬浮颜色",
+      "悬浮对齐方式",
+      "悬浮组合",
+      "悬浮图层",
+      "悬浮更多",
+    ]);
+    expect(within(toolbar).getByTestId("sketch-floating-fill-indicator").querySelector("span")).toBeTruthy();
+
+    fireEvent.click(within(toolbar).getByLabelText("悬浮颜色"));
+    const colorMenu = screen.getByRole("menu", { name: "颜色" });
+    expect(within(colorMenu).getByText("当前选区颜色不同")).toBeTruthy();
+    fireEvent.click(within(colorMenu).getByLabelText("颜色 #2563eb"));
+
+    await waitFor(() => {
+      const parsed = readRenderedScene();
+      expect(parsed.nodes.find((node) => node.id === "left")?.style?.fill).toBe("#2563eb");
+      expect(parsed.nodes.find((node) => node.id === "right")?.style?.fill).toBe("#2563eb");
+      expect(parsed.nodes.find((node) => node.id === "label")?.style).toMatchObject({ color: "#123456" });
+      expect(parsed.nodes.find((node) => node.id === "label")?.style?.fill).toBeUndefined();
+    });
+
+    fireEvent.click(within(toolbar).getByLabelText("悬浮边框"));
+    const strokeMenu = screen.getByRole("menu", { name: "边框" });
+    fireEvent.click(within(strokeMenu).getByLabelText("边框 #dc2626"));
+
+    await waitFor(() => {
+      const parsed = readRenderedScene();
+      expect(parsed.nodes.find((node) => node.id === "left")?.style?.stroke).toBe("#dc2626");
+      expect(parsed.nodes.find((node) => node.id === "right")?.style?.stroke).toBe("#dc2626");
+      expect(parsed.nodes.find((node) => node.id === "label")?.style).toMatchObject({ color: "#123456" });
+      expect(parsed.nodes.find((node) => node.id === "label")?.style?.stroke).toBeUndefined();
+    });
+  });
+
+  it("skips unsupported fill targets while keeping the border action available", async () => {
+    const capabilityScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "shape", type: "rect", x: 20, y: 30, width: 60, height: 40, style: { fill: "#ffffff", stroke: "#111827" } },
+        { id: "line", type: "line", x: 100, y: 40, width: 80, height: 30, style: { stroke: "#111827" } },
+        { id: "path", type: "path", x: 200, y: 40, width: 80, height: 30, path: "M 200 40 L 280 70", style: { stroke: "#111827" } },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={capabilityScene} />);
+
+    clickLayerNode("shape");
+    clickLayerNode("line", { shiftKey: true });
+    clickLayerNode("path", { shiftKey: true });
+    let toolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
+    expect((within(toolbar).getByLabelText("悬浮颜色") as HTMLButtonElement).disabled).toBe(false);
+    expect((within(toolbar).getByLabelText("悬浮边框") as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(within(toolbar).getByLabelText("悬浮颜色"));
+    fireEvent.click(within(screen.getByRole("menu", { name: "颜色" })).getByLabelText("颜色 #f59e0b"));
+    await waitFor(() => {
+      const parsed = readRenderedScene();
+      expect(parsed.nodes.find((node) => node.id === "shape")?.style?.fill).toBe("#f59e0b");
+      expect(parsed.nodes.find((node) => node.id === "line")?.style?.fill).toBeUndefined();
+      expect(parsed.nodes.find((node) => node.id === "path")?.style?.fill).toBeUndefined();
+    });
+
+    clickLayerNode("shape", { shiftKey: true });
+    toolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
+    expect((within(toolbar).getByLabelText("悬浮颜色") as HTMLButtonElement).disabled).toBe(true);
+    expect((within(toolbar).getByLabelText("悬浮边框") as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("applies all six alignment axes and closes the menu from Escape or outside pointer down", async () => {
+    const alignmentCases: Array<{ axis: string; label: string; expected: Record<string, number> }> = [
+      { axis: "left", label: "左对齐", expected: { a: 20, b: 20, c: 20 } },
+      { axis: "center", label: "水平居中", expected: { a: 125, b: 115, c: 120 } },
+      { axis: "right", label: "右对齐", expected: { a: 230, b: 210, c: 220 } },
+      { axis: "top", label: "顶对齐", expected: { a: 30, b: 30, c: 30 } },
+      { axis: "middle", label: "垂直居中", expected: { a: 80, b: 75, c: 70 } },
+      { axis: "bottom", label: "底对齐", expected: { a: 130, b: 120, c: 110 } },
+    ];
+
+    for (const alignmentCase of alignmentCases) {
+      const alignmentScene: SketchSceneDocument = {
+        version: 1,
+        pageSize: { width: 400, height: 300 },
+        nodes: [
+          { id: "a", type: "rect", x: 20, y: 30, width: 20, height: 20 },
+          { id: "b", type: "rect", x: 90, y: 70, width: 40, height: 30 },
+          { id: "c", type: "rect", x: 220, y: 110, width: 30, height: 40 },
+        ],
+      };
+      render(<ControlledPartsEditorWithToolbar initialScene={alignmentScene} />);
+      clickLayerNode("a");
+      clickLayerNode("b", { shiftKey: true });
+      clickLayerNode("c", { shiftKey: true });
+      const toolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
+      fireEvent.click(within(toolbar).getByLabelText("悬浮对齐方式"));
+      const menu = screen.getByRole("menu", { name: "对齐方式" });
+      fireEvent.click(within(menu).getByLabelText(alignmentCase.label));
+
+      await waitFor(() => {
+        const parsed = readRenderedScene();
+        const a = parsed.nodes.find((node) => node.id === "a");
+        const b = parsed.nodes.find((node) => node.id === "b");
+        const c = parsed.nodes.find((node) => node.id === "c");
+        const values = alignmentCase.axis === "left" || alignmentCase.axis === "center" || alignmentCase.axis === "right"
+          ? { a: a?.x, b: b?.x, c: c?.x }
+          : { a: a?.y, b: b?.y, c: c?.y };
+        expect(values).toEqual(alignmentCase.expected);
+      });
+      expect(screen.queryByRole("menu", { name: "对齐方式" })).toBeNull();
+      cleanup();
+    }
+
+    const closeScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "a", type: "rect", x: 20, y: 30, width: 40, height: 40 },
+        { id: "b", type: "rect", x: 100, y: 80, width: 40, height: 40 },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbar initialScene={closeScene} />);
+    clickLayerNode("a");
+    clickLayerNode("b", { shiftKey: true });
+    const toolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
+    fireEvent.click(within(toolbar).getByLabelText("悬浮对齐方式"));
+    expect(screen.getByRole("menu", { name: "对齐方式" })).toBeTruthy();
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole("menu", { name: "对齐方式" })).toBeNull();
+    fireEvent.click(within(toolbar).getByLabelText("悬浮对齐方式"));
+    fireEvent.keyDown(screen.getByRole("menu", { name: "对齐方式" }), { key: "Escape" });
+    expect(screen.queryByRole("menu", { name: "对齐方式" })).toBeNull();
+  });
+
+  it("renders group bounds and keeps group selection on an ordinary child click before drilling", async () => {
+    const groupedScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "group", type: "group", x: 0, y: 0, width: 12, height: 12, visible: false, children: ["rect", "line"] },
+        { id: "rect", type: "rect", x: 50, y: 40, width: 60, height: 40, style: { fill: "#ffffff", stroke: "#111827" } },
+        { id: "line", type: "line", x: 150, y: 100, width: 100, height: 20, style: { stroke: "#111827" } },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={groupedScene} />);
+
+    clickLayerNode("group");
+    const groupToolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
+    expect(Array.from(within(groupToolbar).getAllByRole("button"), (button) => button.getAttribute("aria-label"))).toEqual([
+      "悬浮边框",
+      "悬浮颜色",
+      "悬浮解组",
+      "悬浮图层",
+      "悬浮更多",
+    ]);
+    expect(screen.getByTestId("sketch-selection-box")).toMatchObject({
+      style: expect.objectContaining({ left: "50px", top: "40px", width: "200px", height: "80px" }),
+    });
+    expect(screen.queryByTestId("sketch-resize-handle")).toBeNull();
+    expect(screen.queryByTestId("sketch-rotate-handle")).toBeNull();
+
+    fireEvent.click(within(groupToolbar).getByLabelText("悬浮颜色"));
+    fireEvent.click(within(screen.getByRole("menu", { name: "颜色" })).getByLabelText("颜色 #2563eb"));
+    await waitFor(() => expect(readRenderedScene().nodes.find((node) => node.id === "rect")?.style?.fill).toBe("#2563eb"));
+
+    fireEvent.pointerDown(getSketchNodeElement("rect"), { button: 0, clientX: 80, clientY: 60 });
+    fireEvent.pointerUp(getCanvasStage(), { button: 0, clientX: 80, clientY: 60 });
+    await waitFor(() => {
+      const toolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
+      expect(within(toolbar).getByLabelText("悬浮解组")).toBeTruthy();
+      expect(within(toolbar).queryByLabelText("悬浮填充")).toBeNull();
+    });
+
+    fireEvent.doubleClick(getSketchNodeElement("rect"), { clientX: 80, clientY: 60 });
+    await waitFor(() => {
+      const toolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
+      expect(within(toolbar).getByLabelText("悬浮填充")).toBeTruthy();
+      expect(within(toolbar).getByLabelText("悬浮描边")).toBeTruthy();
+      expect(within(toolbar).queryByLabelText("悬浮解组")).toBeNull();
+    });
+  });
+
+  it("selects a group on the first canvas click and moves only visible unlocked descendants as one history step", async () => {
+    const groupedScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 500, height: 360 },
+      nodes: [
+        { id: "group", type: "group", x: 0, y: 0, width: 12, height: 12, visible: false, children: ["rect", "line", "arrow", "path", "image", "locked", "hidden"] },
+        { id: "rect", type: "rect", x: 40, y: 40, width: 60, height: 40 },
+        { id: "line", type: "line", x: 130, y: 50, width: 80, height: 20 },
+        { id: "arrow", type: "arrow", x: 230, y: 60, width: 70, height: 30 },
+        { id: "path", type: "path", x: 320, y: 70, width: 50, height: 30, path: "M 320 70 L 370 100" },
+        { id: "image", type: "image", x: 60, y: 150, width: 50, height: 40, src: "data:image/png;base64,AAAA" },
+        { id: "locked", type: "rect", x: 140, y: 150, width: 60, height: 40, locked: true },
+        { id: "hidden", type: "rect", x: 240, y: 150, width: 60, height: 40, visible: false },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbar initialScene={groupedScene} />);
+
+    const stage = getCanvasStage();
+    setCanvasStageRect(stage, 500, 360);
+    const originalPositions = new Map(
+      readRenderedScene().nodes.map((node) => [node.id, { x: node.x, y: node.y }]),
+    );
+    const rect = getSketchNodeElement("rect");
+    dispatchPointerEvent(rect, "pointerdown", 70, 60);
+    dispatchPointerEvent(stage, "pointermove", 100, 85);
+    await waitFor(() => {
+      expect(screen.getByTestId("sketch-selection-box")).toMatchObject({
+        style: expect.objectContaining({ left: "56px", top: "54.16666666666667px", width: "264px", height: "125px" }),
+      });
+    });
+    dispatchPointerEvent(stage, "pointerup", 100, 85);
+
+    await waitFor(() => {
+      const parsed = readRenderedScene();
+      for (const id of ["rect", "line", "arrow", "path", "image"]) {
+        const node = parsed.nodes.find((item) => item.id === id);
+        const original = originalPositions.get(id);
+        expect(node?.x).toBe((original?.x ?? 0) + 30);
+        expect(node?.y).toBe((original?.y ?? 0) + 25);
+      }
+      expect(parsed.nodes.find((node) => node.id === "locked")).toMatchObject(originalPositions.get("locked") ?? {});
+      expect(parsed.nodes.find((node) => node.id === "hidden")).toMatchObject(originalPositions.get("hidden") ?? {});
+      expect(parsed.nodes.find((node) => node.id === "group")).toMatchObject(originalPositions.get("group") ?? {});
+    });
+    expect(within(screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" })).getByLabelText("悬浮解组")).toBeTruthy();
+    expect(screen.getByTestId("sketch-selection-box")).toMatchObject({
+      style: expect.objectContaining({ left: "56px", top: "54.16666666666667px", width: "264px", height: "125px" }),
+    });
+
+    fireEvent.keyDown(window, { key: "z", metaKey: true });
+
+    await waitFor(() => {
+      const parsed = readRenderedScene();
+      for (const [id, position] of originalPositions) {
+        expect(parsed.nodes.find((node) => node.id === id)).toMatchObject(position);
+      }
+    });
+  });
+
+  it("keeps the group selected after a canvas click and drags the group as one unit", async () => {
+    const groupedScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "group", type: "group", x: 0, y: 0, width: 12, height: 12, visible: false, children: ["first", "second"] },
+        { id: "first", type: "rect", x: 40, y: 50, width: 80, height: 50 },
+        { id: "second", type: "ellipse", x: 180, y: 80, width: 70, height: 50 },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbar initialScene={groupedScene} />);
+
+    const stage = getCanvasStage();
+    setCanvasStageRect(stage);
+    dispatchPointerEvent(getSketchNodeElement("first"), "pointerdown", 70, 70);
+    dispatchPointerEvent(stage, "pointerup", 70, 70);
+
+    await waitFor(() => {
+      expect(within(screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" })).getByLabelText("悬浮解组")).toBeTruthy();
+    });
+
+    dispatchPointerEvent(getSketchNodeElement("first"), "pointerdown", 70, 70);
+    dispatchPointerEvent(stage, "pointermove", 90, 90);
+    dispatchPointerEvent(stage, "pointerup", 90, 90);
+
+    await waitFor(() => {
+      const toolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
+      expect(within(toolbar).getByLabelText("悬浮解组")).toBeTruthy();
+      const parsed = readRenderedScene();
+      expect(parsed.nodes.find((node) => node.id === "first")).toMatchObject({ x: 60, y: 70 });
+      expect(parsed.nodes.find((node) => node.id === "second")).toMatchObject({ x: 200, y: 100 });
+    });
+  });
+
+  it("moves every editable descendant when dragging an already selected group", async () => {
+    const groupedScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "group", type: "group", x: 0, y: 0, width: 12, height: 12, visible: false, children: ["first", "second"] },
+        { id: "first", type: "rect", x: 40, y: 50, width: 80, height: 50 },
+        { id: "second", type: "ellipse", x: 180, y: 80, width: 70, height: 50 },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbar initialScene={groupedScene} />);
+
+    const stage = getCanvasStage();
+    setCanvasStageRect(stage);
+    clickLayerNode("group");
+    const originalPositions = new Map(
+      readRenderedScene().nodes.map((node) => [node.id, { x: node.x, y: node.y }]),
+    );
+
+    dispatchPointerEvent(getSketchNodeElement("first"), "pointerdown", 70, 70);
+    dispatchPointerEvent(stage, "pointermove", 100, 95);
+    dispatchPointerEvent(stage, "pointerup", 100, 95);
+
+    await waitFor(() => {
+      const parsed = readRenderedScene();
+      for (const id of ["first", "second"]) {
+        const node = parsed.nodes.find((item) => item.id === id);
+        const original = originalPositions.get(id);
+        expect(node?.x).toBe((original?.x ?? 0) + 30);
+        expect(node?.y).toBe((original?.y ?? 0) + 25);
+      }
+      expect(within(screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" })).getByLabelText("悬浮解组")).toBeTruthy();
+    });
+  });
+
+  it("keeps an ordinary child click on the group and drills only on the first double click", async () => {
+    const groupedScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "group", type: "group", x: 0, y: 0, width: 12, height: 12, visible: false, children: ["first", "second"] },
+        { id: "first", type: "rect", x: 40, y: 50, width: 80, height: 50 },
+        { id: "second", type: "ellipse", x: 180, y: 80, width: 70, height: 50 },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbar initialScene={groupedScene} />);
+
+    const stage = getCanvasStage();
+    setCanvasStageRect(stage);
+    clickLayerNode("group");
+
+    dispatchPointerEvent(getSketchNodeElement("first"), "pointerdown", 70, 70);
+    dispatchPointerEvent(stage, "pointerup", 70, 70);
+    await waitFor(() => {
+      const toolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
+      expect(within(toolbar).getByLabelText("悬浮解组")).toBeTruthy();
+      expect(within(toolbar).queryByLabelText("悬浮填充")).toBeNull();
+    });
+
+    fireEvent.doubleClick(getSketchNodeElement("first"), { clientX: 70, clientY: 70 });
+    await waitFor(() => {
+      const toolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
+      expect(within(toolbar).getByLabelText("悬浮填充")).toBeTruthy();
+      expect(within(toolbar).queryByLabelText("悬浮解组")).toBeNull();
+    });
+  });
+
+  it("shows only ungroup for a mixed group selection", async () => {
+    const groupedScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "group", type: "group", x: 0, y: 0, width: 12, height: 12, visible: false, children: ["rect", "label"] },
+        { id: "rect", type: "rect", x: 30, y: 40, width: 80, height: 50, style: { fill: "#ffffff", stroke: "#111827" } },
+        { id: "label", type: "text", x: 150, y: 110, width: 100, height: 30, text: "Label", style: { color: "#123456" } },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbar initialScene={groupedScene} />);
+    clickLayerNode("group");
+
+    const toolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
+    expect(Array.from(within(toolbar).getAllByRole("button"), (button) => button.getAttribute("aria-label"))).toEqual([
+      "悬浮解组",
+      "悬浮图层",
+      "悬浮更多",
+    ]);
+    expect(within(toolbar).queryByLabelText("悬浮边框")).toBeNull();
+    expect(within(toolbar).queryByLabelText("悬浮颜色")).toBeNull();
+    expect(within(toolbar).queryByLabelText("悬浮对齐方式")).toBeNull();
+    expect(screen.getByTestId("sketch-selection-box")).toBeTruthy();
   });
 
   it("keeps the floating toolbar centered when it fits and shifts it away from horizontal edges", async () => {
