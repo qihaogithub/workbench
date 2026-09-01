@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 async function dragOnStage(page: Page, from: { x: number; y: number }, to: { x: number; y: number }) {
   const stage = page.locator("[data-sketch-stage]");
@@ -9,6 +9,30 @@ async function dragOnStage(page: Page, from: { x: number; y: number }, to: { x: 
   await page.mouse.down();
   await page.mouse.move(box.x + to.x, box.y + to.y);
   await page.mouse.up();
+}
+
+async function expectMenuReceivesPointer(page: Page, menu: Locator, label: string) {
+  const box = await menu.boundingBox();
+  expect(box).not.toBeNull();
+  if (!box) return;
+  const hitMenuLabel = await page.evaluate(({ x, y }) => {
+    const hit = document.elementFromPoint(x, y);
+    return hit?.closest<HTMLElement>('[role="menu"]')?.getAttribute("aria-label") ?? null;
+  }, { x: box.x + box.width / 2, y: box.y + box.height / 2 });
+  expect(hitMenuLabel).toBe(label);
+}
+
+async function expectPresetColorGrid(menu: Locator, label: string) {
+  const box = await menu.boundingBox();
+  expect(box).not.toBeNull();
+  if (box) expect(box.width).toBeLessThanOrEqual(320);
+  const grid = menu.locator(`[data-sketch-color-grid="true"][aria-label="${label}常用颜色"]`);
+  await expect(grid).toHaveCount(1);
+  const swatches = grid.locator("[data-sketch-color]");
+  await expect(swatches).toHaveCount(60);
+  const colors = await swatches.evaluateAll((elements) => elements.map((element) => element.getAttribute("data-sketch-color")));
+  expect(new Set(colors).size).toBe(60);
+  expect(colors).toContain("#f59e0b");
 }
 
 test("whiteboard opens as a clean blank canvas with a bottom tool tray", async ({ page }) => {
@@ -46,6 +70,12 @@ test("selection exposes contextual editing and on-demand details", async ({ page
   await contextToolbar.getByLabel("悬浮填充").hover();
   await page.waitForTimeout(250);
   await expect(page.getByRole("tooltip", { name: "填充", exact: true })).toBeVisible();
+  await contextToolbar.getByLabel("悬浮填充").click();
+  const fillMenu = page.getByRole("menu", { name: "填充" });
+  await expectPresetColorGrid(fillMenu, "填充");
+  await expect(fillMenu.getByLabel("填充 无颜色")).toBeVisible();
+  await expect(fillMenu.getByText("无颜色", { exact: true })).toHaveCount(0);
+  await fillMenu.getByLabel("填充 #f59e0b").click();
   await rect.dblclick();
   const shapeEditor = page.getByLabel("画布文本编辑");
   await expect(shapeEditor).toBeVisible();
@@ -114,6 +144,115 @@ test("selection exposes contextual editing and on-demand details", async ({ page
   await expect(page.getByRole("menu", { name: "更多操作" })).toHaveCount(0);
 });
 
+test("multi-selection exposes style, alignment, grouping, and layer-unit actions", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "矩形" }).click();
+  await dragOnStage(page, { x: 140, y: 100 }, { x: 260, y: 180 });
+  await page.getByRole("button", { name: "矩形" }).click();
+  await dragOnStage(page, { x: 360, y: 240 }, { x: 500, y: 340 });
+  await page.getByRole("button", { name: "选择", exact: true }).click();
+
+  const nodes = page.locator('[data-sketch-node-id^="sketch_"]');
+  await expect(nodes).toHaveCount(2);
+  await nodes.nth(0).click();
+  await nodes.nth(1).click({ modifiers: ["Shift"] });
+
+  const toolbar = page.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
+  await expect(toolbar.getByLabel("悬浮边框")).toBeVisible();
+  await expect(toolbar.getByLabel("悬浮颜色")).toBeVisible();
+  await expect(toolbar.getByLabel("悬浮对齐方式")).toBeVisible();
+  await expect(toolbar.getByLabel("悬浮组合")).toBeVisible();
+  await expect(toolbar.getByLabel("悬浮组合").locator('[data-sketch-icon="group"]')).toHaveCount(1);
+  await expect(toolbar.getByLabel("悬浮组合").locator('[data-sketch-icon="ungroup"]')).toHaveCount(0);
+  await expect(toolbar.getByLabel("悬浮图层")).toBeVisible();
+  await expect(toolbar.getByLabel("悬浮更多")).toBeVisible();
+  await expect(toolbar.getByRole("button")).toHaveCount(6);
+
+  await toolbar.getByLabel("悬浮对齐方式").click();
+  const alignmentMenu = page.getByRole("menu", { name: "对齐方式" });
+  await expectMenuReceivesPointer(page, alignmentMenu, "对齐方式");
+  await expect(alignmentMenu.locator("[data-sketch-alignment]")).toHaveCount(6);
+  const toolbarButtonBox = await toolbar.getByLabel("悬浮对齐方式").boundingBox();
+  const alignmentButtonBox = await alignmentMenu.locator("[data-sketch-alignment]").first().boundingBox();
+  const alignmentIconBox = await alignmentMenu.locator("[data-sketch-alignment] svg").first().boundingBox();
+  const alignmentMenuBox = await alignmentMenu.boundingBox();
+  expect(toolbarButtonBox).not.toBeNull();
+  expect(alignmentButtonBox).not.toBeNull();
+  expect(alignmentIconBox).not.toBeNull();
+  expect(alignmentMenuBox).not.toBeNull();
+  if (toolbarButtonBox && alignmentButtonBox && alignmentIconBox && alignmentMenuBox) {
+    expect(alignmentButtonBox.width).toBeCloseTo(toolbarButtonBox.width, 1);
+    expect(alignmentButtonBox.height).toBeCloseTo(toolbarButtonBox.height, 1);
+    expect(alignmentIconBox.width).toBeCloseTo(14, 1);
+    expect(alignmentIconBox.height).toBeCloseTo(14, 1);
+    expect(alignmentMenuBox.height).toBeCloseTo(42, 1);
+  }
+  await expect(alignmentMenu.getByLabel("水平居中")).toBeVisible();
+  await alignmentMenu.getByLabel("垂直居中").click();
+  await expect(alignmentMenu).toHaveCount(0);
+
+  await toolbar.getByLabel("悬浮更多").click();
+  const moreMenu = page.getByRole("menu", { name: "更多操作" });
+  const moreItemBox = await moreMenu.getByRole("menuitem", { name: "删除" }).boundingBox();
+  expect(moreItemBox).not.toBeNull();
+  if (moreItemBox) expect(moreItemBox.height).toBeCloseTo(32, 1);
+  await expect(moreMenu.getByRole("menuitem", { name: "水平分布" })).toBeVisible();
+  await expect(moreMenu.getByRole("menuitem", { name: "垂直分布" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(moreMenu).toHaveCount(0);
+
+  await toolbar.getByLabel("悬浮组合").click();
+  await expect(toolbar.getByLabel("悬浮解组")).toBeVisible();
+  await expect(toolbar.getByLabel("悬浮解组").locator('[data-sketch-icon="ungroup"]')).toHaveCount(1);
+  await expect(toolbar.getByLabel("悬浮解组").locator('[data-sketch-icon="group"]')).toHaveCount(0);
+  await expect(toolbar.getByLabel("悬浮边框")).toBeVisible();
+  await expect(toolbar.getByLabel("悬浮颜色")).toBeVisible();
+  await expect(page.getByTestId("sketch-resize-handle")).toHaveCount(0);
+
+  const groupedChildren = page.locator('[data-sketch-node-id^="sketch_"]');
+  await expect(groupedChildren).toHaveCount(2);
+  await groupedChildren.first().click({ position: { x: 10, y: 10 } });
+  await expect(toolbar.getByLabel("悬浮解组")).toBeVisible();
+
+  const beforeGroupDrag = await Promise.all(
+    [0, 1].map(async (index) => groupedChildren.nth(index).boundingBox()),
+  );
+  expect(beforeGroupDrag[0]).not.toBeNull();
+  expect(beforeGroupDrag[1]).not.toBeNull();
+  if (beforeGroupDrag[0] && beforeGroupDrag[1]) {
+    const dragTarget = page.locator('[data-sketch-node-id^="sketch_"]').first();
+    const dragBox = await dragTarget.boundingBox();
+    expect(dragBox).not.toBeNull();
+    if (dragBox) {
+      await page.mouse.move(dragBox.x + dragBox.width / 2, dragBox.y + dragBox.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(dragBox.x + dragBox.width / 2 + 32, dragBox.y + dragBox.height / 2 + 24);
+      await page.mouse.up();
+    }
+  }
+  await expect(toolbar.getByLabel("悬浮解组")).toBeVisible();
+  const afterGroupDrag = await Promise.all(
+    [0, 1].map(async (index) => page.locator('[data-sketch-node-id^="sketch_"]').nth(index).boundingBox()),
+  );
+  expect(afterGroupDrag[0]).not.toBeNull();
+  expect(afterGroupDrag[1]).not.toBeNull();
+  if (beforeGroupDrag[0] && beforeGroupDrag[1] && afterGroupDrag[0] && afterGroupDrag[1]) {
+    const firstDelta = { x: afterGroupDrag[0].x - beforeGroupDrag[0].x, y: afterGroupDrag[0].y - beforeGroupDrag[0].y };
+    const secondDelta = { x: afterGroupDrag[1].x - beforeGroupDrag[1].x, y: afterGroupDrag[1].y - beforeGroupDrag[1].y };
+    expect(secondDelta.x).toBeCloseTo(firstDelta.x, 1);
+    expect(secondDelta.y).toBeCloseTo(firstDelta.y, 1);
+  }
+
+  await page.locator("[data-sketch-stage]").click({ position: { x: 40, y: 40 } });
+  await page.locator('[data-sketch-node-id^="sketch_"]').first().dblclick({ position: { x: 10, y: 10 } });
+  await expect(page.getByLabel("画布文本编辑")).toHaveCount(0);
+  await page.waitForTimeout(500);
+  await page.locator('[data-sketch-node-id^="sketch_"]').first().dblclick({ position: { x: 10, y: 10 } });
+  await expect(page.getByLabel("画布文本编辑")).toBeVisible();
+  await page.getByLabel("画布文本编辑").press("Escape");
+});
+
 test("embedded text shapes expose combined shape and text controls", async ({ page }) => {
   await page.goto("/");
 
@@ -139,13 +278,18 @@ test("embedded text shapes expose combined shape and text controls", async ({ pa
   await expect(toolbar.getByLabel("悬浮层级")).toBeVisible();
   await expect(toolbar.getByLabel("悬浮更多")).toBeVisible();
   await expect(toolbar.getByLabel("悬浮文本")).toHaveCount(0);
-  await expect(toolbar.getByTestId("sketch-text-color-indicator")).toBeVisible();
+  const textColorIndicator = toolbar.getByTestId("sketch-text-color-indicator");
+  await expect(textColorIndicator).toBeVisible();
+  await expect(textColorIndicator).toHaveClass(/h-\[1\.4rem\]/);
+  await expect(textColorIndicator).toHaveClass(/w-\[1\.2rem\]/);
   await expect(toolbar.getByTestId("sketch-text-color-underline")).toBeVisible();
 
   await toolbar.getByLabel("悬浮文字颜色").click();
-  await expect(page.getByRole("menu", { name: "文字颜色" })).toBeVisible();
-  await expect(page.getByRole("menu", { name: "文字颜色" }).getByLabel("文字颜色 #2563eb")).toBeVisible();
-  await page.getByRole("menu", { name: "文字颜色" }).getByLabel("文字颜色 #2563eb").click();
+  const textMenu = page.getByRole("menu", { name: "文字颜色" });
+  await expect(textMenu).toBeVisible();
+  await expectPresetColorGrid(textMenu, "文字颜色");
+  await expect(textMenu.getByLabel(/无颜色/)).toHaveCount(0);
+  await textMenu.getByLabel("文字颜色 #f59e0b").click();
   await toolbar.getByLabel("悬浮加粗").click();
   await expect(page.locator('[data-sketch-node-id^="sketch_"]').first()).toBeVisible();
 });
@@ -281,17 +425,26 @@ test("pure text toolbar keeps layer access alongside style, color, and alignment
   await page.waitForTimeout(250);
   await expect(page.getByRole("tooltip", { name: "加粗", exact: true })).toBeVisible();
 
+  await toolbar.getByLabel("打开字号选项").click();
+  const sizeMenu = page.getByRole("menu", { name: "字号选项" });
+  await expect(sizeMenu).toBeVisible();
+  await expectMenuReceivesPointer(page, sizeMenu, "字号选项");
+  await toolbar.getByLabel("打开字号选项").click();
+
   await toolbar.getByLabel("悬浮文字颜色").click();
   const colorMenu = page.getByRole("menu", { name: "文字颜色" });
   await expect(colorMenu).toBeVisible();
+  await expectMenuReceivesPointer(page, colorMenu, "文字颜色");
+  await expectPresetColorGrid(colorMenu, "文字颜色");
   await expect(colorMenu.getByLabel(/无颜色/)).toHaveCount(0);
   await toolbar.getByLabel("悬浮文字颜色").click();
   await expect(page.getByRole("menu", { name: "文字颜色" })).toHaveCount(0);
   await toolbar.getByLabel("悬浮文字颜色").click();
-  await colorMenu.getByLabel("文字颜色 #2563eb").click();
+  await colorMenu.getByLabel("文字颜色 #f59e0b").click();
 
   await toolbar.getByLabel("对齐方式").click();
   const alignMenu = page.getByRole("menu", { name: "对齐方式" });
+  await expectMenuReceivesPointer(page, alignMenu, "对齐方式");
   await alignMenu.getByLabel("对齐方式 居中对齐").click();
 
   await toolbar.getByLabel("悬浮层级").click();
@@ -320,6 +473,7 @@ test("whiteboard bridge scene keeps a pixel-tolerant PNG golden", async ({ page 
   await page.locator("[data-sketch-stage]").click({ position: { x: 620, y: 220 } });
   await page.getByLabel("画布文本编辑").fill("Golden title");
   await page.getByRole("button", { name: "选择" }).click();
+  await page.locator("[data-sketch-stage]").hover({ position: { x: 40, y: 40 } });
 
   await expect(page.locator("[data-sketch-stage]")).toHaveScreenshot("whiteboard-bridge-scene.png", {
     animations: "disabled",
