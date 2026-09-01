@@ -731,6 +731,7 @@ describe("PageConfigPanel 配置项与资源规范折叠区", () => {
     expect(specButton).toBeInTheDocument();
     fireEvent.click(specButton);
     expect(screen.getByRole("complementary", { name: "设计规范" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "标题" })).toBeInTheDocument();
     expect(screen.getByText("图片底部不留白。")).toBeInTheDocument();
   });
 

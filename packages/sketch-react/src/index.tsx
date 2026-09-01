@@ -5,10 +5,26 @@ import { createPortal } from "react-dom";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
+  AlignHorizontalJustifyCenter,
+  AlignHorizontalJustifyEnd,
   AlignHorizontalJustifyStart,
+  AlignVerticalJustifyCenter,
+  AlignVerticalJustifyEnd,
   AlignVerticalJustifyStart,
+  ArrowDown,
+  ArrowDownToLine,
+  ArrowUp,
+  ArrowUpToLine,
   ArrowRight,
+  Bold,
+  Check,
+  ChevronDown,
+  ChevronRight,
   Circle,
+  ClipboardPaste,
   Command,
   Copy,
   Diamond,
@@ -18,6 +34,7 @@ import {
   Group,
   Hand,
   ImageIcon,
+  Italic,
   Keyboard,
   Link2,
   Lock,
@@ -29,13 +46,17 @@ import {
   Pencil,
   PenLine,
   Redo2,
+  RotateCcw,
   Rows3,
+  Scissors,
   Square,
   StickyNote,
   SlidersHorizontal,
   Trash2,
   Type,
+  Ungroup,
   Undo2,
+  Underline,
   Unlock,
   ZoomIn,
   ZoomOut,
@@ -79,9 +100,19 @@ import type {
   SketchLayerPanelProps,
   InlineTextSelectionState,
 } from "./types";
+import {
+  getSketchTextAutoSize,
+  getSketchTextComputedStyle,
+  SKETCH_TEXT_DEFAULT_COLOR,
+  SKETCH_TEXT_DEFAULT_FONT_SIZE,
+  SKETCH_TEXT_DEFAULT_FONT_WEIGHT,
+  SKETCH_TEXT_PLACEHOLDER,
+  SKETCH_TEXT_MIN_SIZE,
+  type SketchTextComputedStyle,
+} from "./text-utils";
 
 type SketchResizeInteractionHandle = SketchSceneResizeHandle | "line-start" | "line-end";
-type SketchSnapGuideKind = "grid" | "center" | "edge" | "spacing";
+type SketchSnapGuideKind = "grid" | "center" | "edge";
 
 interface SketchSnapGuide {
   id: string;
@@ -128,6 +159,8 @@ interface DragState {
   initialScene: SketchSceneDocument;
   hasHistoryCheckpoint: boolean;
   duplicateOnDrag?: boolean;
+  sourceNodeIds?: string[];
+  selectionNodeIds?: string[];
 }
 
 interface MarqueeState {
@@ -163,6 +196,8 @@ interface EraseState {
 interface InlineTextEditState {
   nodeId: string;
   value: string;
+  style: SketchSceneStyle;
+  textStyleRuns?: SketchSceneNode["textStyleRuns"];
   deleteWhenEmpty?: boolean;
 }
 
@@ -201,8 +236,31 @@ interface SketchFloatingToolbarAction {
   title?: string;
   icon: React.ReactNode;
   swatchColor?: string;
+  swatchKind?: "fill" | "stroke";
+  swatchMixed?: boolean;
+  ariaHasPopup?: React.AriaAttributes["aria-haspopup"];
+  ariaExpanded?: boolean;
   disabled?: boolean;
-  onClick: () => void;
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
+}
+
+const EMPTY_SKETCH_FLOATING_TOOLBAR_ACTIONS: SketchFloatingToolbarAction[] = [];
+
+const SKETCH_FLOATING_TOOLBAR_EDGE_PADDING = 16;
+const SKETCH_ALIGNMENT_MENU_WIDTH = 235;
+const SKETCH_ALIGNMENT_MENU_HEIGHT = 42;
+
+function resolveSketchFloatingToolbarLeft(
+  desiredLeft: number,
+  containerWidth: number,
+  toolbarWidth: number | null,
+): number {
+  if (!toolbarWidth || toolbarWidth <= 0 || !Number.isFinite(toolbarWidth)) return containerWidth / 2;
+
+  const minLeft = SKETCH_FLOATING_TOOLBAR_EDGE_PADDING + toolbarWidth / 2;
+  const maxLeft = containerWidth - SKETCH_FLOATING_TOOLBAR_EDGE_PADDING - toolbarWidth / 2;
+  if (maxLeft < minLeft) return containerWidth / 2;
+  return Math.min(maxLeft, Math.max(minLeft, desiredLeft));
 }
 
 interface PendingImageImportState {
@@ -299,14 +357,26 @@ function createNode(type: InsertableSketchTool): SketchSceneNode {
   };
 
   if (type === "text") {
-    return {
+    const textNode: SketchSceneNode = {
       ...base,
       type: "text",
-      width: 260,
-      height: 48,
+      width: SKETCH_TEXT_MIN_SIZE,
+      height: SKETCH_TEXT_MIN_SIZE,
       text: "",
-      style: { ...base.style, fill: "transparent", stroke: "transparent", fontSize: 24 },
+      style: {
+        ...base.style,
+        fill: "transparent",
+        stroke: "transparent",
+        color: SKETCH_TEXT_DEFAULT_COLOR,
+        fontSize: SKETCH_TEXT_DEFAULT_FONT_SIZE,
+        fontWeight: SKETCH_TEXT_DEFAULT_FONT_WEIGHT,
+        italic: false,
+        textDecoration: "none",
+        textAlign: "left",
+      },
     };
+    const size = getSketchTextAutoSize(textNode, "");
+    return { ...textNode, width: size.width, height: size.height };
   }
   if (type === "sticky") {
     return {
@@ -982,6 +1052,99 @@ function getSketchTargetNodeId(target: Element): string | null {
   ) ?? null;
 }
 
+function getSketchGroupParentMap(scene: SketchSceneDocument): Map<string, string> {
+  const parentByChild = new Map<string, string>();
+  scene.nodes
+    .filter((node) => node.type === "group")
+    .forEach((group) => {
+      (group.children ?? []).forEach((childId) => {
+        if (!parentByChild.has(childId)) parentByChild.set(childId, group.id);
+      });
+    });
+  return parentByChild;
+}
+
+function getSketchGroupAncestorIds(scene: SketchSceneDocument, nodeId: string): string[] {
+  const parentByChild = getSketchGroupParentMap(scene);
+  const ancestors: string[] = [];
+  const visited = new Set<string>();
+  let currentId = nodeId;
+  while (!visited.has(currentId)) {
+    visited.add(currentId);
+    const parentId = parentByChild.get(currentId);
+    if (!parentId) break;
+    ancestors.push(parentId);
+    currentId = parentId;
+  }
+  return ancestors;
+}
+
+function getSketchOutermostGroupId(scene: SketchSceneDocument, nodeId: string): string | null {
+  const ancestors = getSketchGroupAncestorIds(scene, nodeId);
+  return ancestors[ancestors.length - 1] ?? null;
+}
+
+function getSketchDirectGroupChildId(
+  scene: SketchSceneDocument,
+  groupId: string,
+  nodeId: string,
+): string | null {
+  const parentByChild = getSketchGroupParentMap(scene);
+  const visited = new Set<string>();
+  let currentId = nodeId;
+  while (!visited.has(currentId)) {
+    visited.add(currentId);
+    const parentId = parentByChild.get(currentId);
+    if (!parentId) return null;
+    if (parentId === groupId) return currentId;
+    currentId = parentId;
+  }
+  return null;
+}
+
+function getSketchCanvasHitNodeId(
+  scene: SketchSceneDocument,
+  target: Element,
+  point: { x: number; y: number } | null,
+  configData?: Record<string, unknown>,
+): string | null {
+  const directNodeId = getSketchTargetNodeId(target);
+  const directNode = directNodeId ? scene.nodes.find((node) => node.id === directNodeId) : null;
+  if (directNode && directNode.type !== "group" && isNodeVisibleForConfig(directNode, configData)) {
+    return directNode.id;
+  }
+  return point ? hitTestSketchScene(scene, point, configData)?.id ?? null : null;
+}
+
+interface SketchCanvasSelectionTarget {
+  hitNodeId: string;
+  groupId: string | null;
+  selectionNodeId: string;
+}
+
+function resolveSketchCanvasSelectionTarget(
+  scene: SketchSceneDocument,
+  hitNodeId: string,
+  focusedGroupId: string | null,
+): SketchCanvasSelectionTarget {
+  const outermostGroupId = getSketchOutermostGroupId(scene, hitNodeId);
+  if (focusedGroupId) {
+    const directChildId = getSketchDirectGroupChildId(scene, focusedGroupId, hitNodeId);
+    if (directChildId) {
+      return {
+        hitNodeId,
+        groupId: outermostGroupId ?? focusedGroupId,
+        selectionNodeId: directChildId,
+      };
+    }
+  }
+  return {
+    hitNodeId,
+    groupId: outermostGroupId,
+    selectionNodeId: outermostGroupId ?? hitNodeId,
+  };
+}
+
 export function useSketchSelection(
   scene: SketchSceneDocument,
   onSelectionChange?: (selection: SketchEditorSelection) => void,
@@ -1133,6 +1296,7 @@ function SelectionOverlay({
   bounds,
   scaleX,
   scaleY,
+  viewportScale = 1,
   onResizePointerDown,
   onRotatePointerDown,
   minimumSize = 0,
@@ -1144,8 +1308,9 @@ function SelectionOverlay({
   bounds: SketchSceneBounds | null;
   scaleX: number;
   scaleY: number;
+  viewportScale?: number;
   onResizePointerDown?: (event: React.PointerEvent<HTMLDivElement>, handle: SketchResizeInteractionHandle) => void;
-  onRotatePointerDown?: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onRotatePointerDown?: (event: React.PointerEvent<HTMLElement>) => void;
   minimumSize?: number;
   endpointHandles?: {
     start: { x: number; y: number };
@@ -1162,6 +1327,11 @@ function SelectionOverlay({
   const height = Math.max(scaledHeight, minimumSize);
   const left = bounds.x * scaleX - (width - scaledWidth) / 2;
   const top = bounds.y * scaleY - (height - scaledHeight) / 2;
+  const controlScale = Number.isFinite(viewportScale) && viewportScale > 0 ? viewportScale : 1;
+  const resizeHandleSize = 12 / controlScale;
+  const rotateHandleSize = 24 / controlScale;
+  const rotateHandleGap = 28 / controlScale;
+  const rotateIconSize = 14 / controlScale;
   const handles: Array<{
     handle: SketchSceneResizeHandle;
     className: string;
@@ -1208,13 +1378,23 @@ function SelectionOverlay({
         />
       ) : null}
       {onRotatePointerDown ? (
-        <div
-          className="pointer-events-auto absolute left-1/2 top-0 h-4 w-4 -translate-x-1/2 -translate-y-8 cursor-grab rounded-full border border-[#62b7ff] bg-[#1f1f1f] active:cursor-grabbing"
+        <button
+          type="button"
+          aria-label="旋转控制柄"
+          className="pointer-events-auto absolute bottom-0 left-0 inline-flex cursor-grab appearance-none items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 shadow-[0_1px_3px_rgba(15,23,42,0.18)] transition-colors hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 active:cursor-grabbing"
           data-testid="sketch-rotate-handle"
           data-sketch-rotate-handle="true"
           title="旋转"
+          style={{
+            width: rotateHandleSize,
+            height: rotateHandleSize,
+            left: -(rotateHandleSize + rotateHandleGap),
+            bottom: -(rotateHandleSize + rotateHandleGap),
+          }}
           onPointerDown={onRotatePointerDown}
-        />
+        >
+          <RotateCcw style={{ width: rotateIconSize, height: rotateIconSize }} strokeWidth={2} aria-hidden="true" />
+        </button>
       ) : null}
       {onResizePointerDown && endpointHandles
         ? ([
@@ -1223,12 +1403,14 @@ function SelectionOverlay({
           ]).map((item) => (
             <div
               key={item.key}
-              className="pointer-events-auto absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 cursor-move rounded-full border border-[#62b7ff] bg-[#1f1f1f]"
+              className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 cursor-move rounded-full border border-slate-300 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.16)] transition-colors hover:border-slate-400 hover:bg-slate-50"
               data-testid={item.testId}
               data-sketch-resize-handle={item.handle}
               style={{
                 left: item.point.x * scaleX - left,
                 top: item.point.y * scaleY - top,
+                width: resizeHandleSize,
+                height: resizeHandleSize,
               }}
               onPointerDown={(event) => onResizePointerDown(event, item.handle)}
             />
@@ -1239,12 +1421,13 @@ function SelectionOverlay({
             <div
               key={item.handle}
               className={cn(
-                "pointer-events-auto absolute h-3 w-3 border border-[#62b7ff] bg-[#1f1f1f]",
+                "pointer-events-auto absolute border border-slate-300 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.16)] transition-colors hover:border-slate-400 hover:bg-slate-50",
                 item.className,
                 item.cursor,
               )}
               data-testid={item.handle === "se" ? "sketch-resize-handle" : `sketch-resize-handle-${item.handle}`}
               data-sketch-resize-handle={item.handle}
+              style={{ width: resizeHandleSize, height: resizeHandleSize }}
               onPointerDown={(event) => onResizePointerDown(event, item.handle)}
             />
           ))
@@ -1397,20 +1580,18 @@ const LAYER_NODE_TYPE_ICONS: Partial<Record<SketchSceneNodeType, React.Component
   text: Type,
 };
 
-const SKETCH_COLOR_SWATCHES = [
-  "#ffffff",
-  "#f8fafc",
-  "#111827",
-  "#475569",
-  "#ef4444",
-  "#f97316",
-  "#eab308",
-  "#22c55e",
-  "#06b6d4",
-  "#3b82f6",
-  "#8b5cf6",
-  "#ec4899",
+const SKETCH_COLOR_PALETTE = [
+  ["#ffffff", "#000000", "#e5e7eb", "#475569", "#3b82f6", "#14b8a6", "#0ea5e9", "#7c3aed", "#f59e0b", "#ef4444"],
+  ["#fafafa", "#18181b", "#f3f4f6", "#e2e8f0", "#dbeafe", "#ccfbf1", "#e0f2fe", "#ede9fe", "#fffbeb", "#fef2f2"],
+  ["#f4f4f5", "#27272a", "#d1d5db", "#cbd5e1", "#bfdbfe", "#99f6e4", "#bae6fd", "#ddd6fe", "#fef3c7", "#fee2e2"],
+  ["#e4e4e7", "#3f3f46", "#9ca3af", "#94a3b8", "#93c5fd", "#5eead4", "#7dd3fc", "#c4b5fd", "#fde68a", "#fecaca"],
+  ["#d4d4d8", "#52525b", "#6b7280", "#64748b", "#2563eb", "#0d9488", "#0284c7", "#6d28d9", "#d97706", "#dc2626"],
+  ["#a1a1aa", "#71717a", "#4b5563", "#334155", "#1d4ed8", "#0f766e", "#0369a1", "#5b21b6", "#b45309", "#b91c1c"],
 ];
+
+const SKETCH_COLOR_SWATCHES = SKETCH_COLOR_PALETTE.flat();
+
+const SKETCH_TEXT_SIZE_PRESETS = [12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64];
 
 const SKETCH_RECENT_COLOR_LIMIT = 8;
 
@@ -1422,13 +1603,6 @@ function addRecentSketchColor(colors: string[], value: string): string[] {
   const normalized = normalizeSketchHexColor(value);
   if (!normalized) return colors;
   return [normalized, ...colors.filter((color) => color !== normalized)].slice(0, SKETCH_RECENT_COLOR_LIMIT);
-}
-
-function getNextSketchSwatchColor(value: unknown, fallback: string): string {
-  const normalized = typeof value === "string" ? normalizeSketchHexColor(value) : null;
-  const currentIndex = normalized ? SKETCH_COLOR_SWATCHES.indexOf(normalized) : -1;
-  if (currentIndex >= 0) return SKETCH_COLOR_SWATCHES[(currentIndex + 1) % SKETCH_COLOR_SWATCHES.length];
-  return normalizeSketchHexColor(fallback) ?? SKETCH_COLOR_SWATCHES[0];
 }
 
 function getSelectedNodes(scene: SketchSceneDocument, controller: SketchEditorController): SketchSceneNode[] {
@@ -1524,20 +1698,46 @@ function getInlineTextEditMetrics(node: SketchSceneNode, value: string): { style
   const height = Math.max(28, Math.abs(node.height));
   const fontSize = typeof style.fontSize === "number" ? style.fontSize : node.type === "text" ? 18 : 16;
   const isFreestandingText = node.type === "text";
+  const computedTextStyle = getSketchTextComputedStyle(node);
+  if (isFreestandingText) {
+    const autoSize = getSketchTextAutoSize(node, value);
+    return {
+      style: {
+        left: node.x,
+        top: node.y,
+        width: autoSize.width,
+        height: autoSize.height,
+        boxSizing: "border-box",
+        padding: 0,
+        overflowX: "hidden",
+        overflowY: "hidden",
+        fontFamily: computedTextStyle.fontFamily,
+        fontSize: computedTextStyle.fontSize,
+        fontWeight: computedTextStyle.fontWeight,
+        fontStyle: computedTextStyle.italic ? "italic" : "normal",
+        textDecoration: computedTextStyle.textDecoration,
+        color: computedTextStyle.color,
+        caretColor: computedTextStyle.color,
+        lineHeight: `${computedTextStyle.lineHeight}px`,
+        textAlign: style.textAlign ?? "left",
+        transform: node.rotation ? `rotate(${node.rotation}deg)` : undefined,
+        transformOrigin: "center",
+      },
+      overflowing: false,
+    };
+  }
   const fullTextRunStyle = supportsTextStyle(node) ? getFullTextStyleRunStyle(node) : {};
   const lineHeight = Math.round(fullTextRunStyle.lineHeight ?? fontSize * 1.35);
   const lineCount = Math.max(1, value.split("\n").length);
   const textHeight = Math.max(lineHeight, lineCount * lineHeight);
-  const paddingX = isFreestandingText ? 0 : Math.min(16, Math.max(8, width * 0.08));
-  const paddingY = isFreestandingText ? 0 : Math.min(12, Math.max(6, height * 0.12));
-  const editWidth = isFreestandingText ? width : Math.max(32, width - paddingX * 2);
-  const availableHeight = isFreestandingText ? height : Math.max(28, height - paddingY * 2);
-  const editHeight = isFreestandingText ? Math.max(height, textHeight) : Math.max(lineHeight, Math.min(availableHeight, textHeight));
-  const overflowing = !isFreestandingText && textHeight > availableHeight;
-  const left = node.x + (isFreestandingText ? 0 : (width - editWidth) / 2);
-  const top = isFreestandingText
-    ? node.y
-    : node.y + paddingY + Math.max(0, (availableHeight - editHeight) / 2);
+  const paddingX = Math.min(16, Math.max(8, width * 0.08));
+  const paddingY = Math.min(12, Math.max(6, height * 0.12));
+  const editWidth = Math.max(32, width - paddingX * 2);
+  const availableHeight = Math.max(28, height - paddingY * 2);
+  const editHeight = Math.max(lineHeight, Math.min(availableHeight, textHeight));
+  const overflowing = textHeight > availableHeight;
+  const left = node.x + (width - editWidth) / 2;
+  const top = node.y + paddingY + Math.max(0, (availableHeight - editHeight) / 2);
 
   return {
     style: {
@@ -1547,10 +1747,15 @@ function getInlineTextEditMetrics(node: SketchSceneNode, value: string): { style
       height: editHeight,
       boxSizing: "border-box",
       padding: 0,
+      overflowX: "auto",
       overflowY: overflowing ? "auto" : "hidden",
+      fontFamily: computedTextStyle.fontFamily,
       fontSize,
       fontWeight: style.fontWeight ?? (node.type === "text" ? 400 : 500),
+      fontStyle: computedTextStyle.italic ? "italic" : "normal",
+      textDecoration: computedTextStyle.textDecoration,
       color: style.color ?? "#111827",
+      caretColor: style.color ?? "#111827",
       lineHeight: `${lineHeight}px`,
       textAlign: style.textAlign ?? (isFreestandingText ? "left" : "center"),
       transform: node.rotation ? `rotate(${node.rotation}deg)` : undefined,
@@ -1560,8 +1765,17 @@ function getInlineTextEditMetrics(node: SketchSceneNode, value: string): { style
   };
 }
 
+function isSketchNoColor(value: unknown): boolean {
+  return value === "transparent" || value === null || typeof value === "undefined";
+}
+
 function toColorInputValue(value: unknown, fallback: string): string {
   return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value) ? value : fallback;
+}
+
+function getSketchColorFieldValue(value: unknown, fallback: string, allowNoColor = false): string {
+  if (allowNoColor && isSketchNoColor(value)) return "transparent";
+  return toColorInputValue(value, fallback);
 }
 
 function getPrimaryColorControl(node: SketchSceneNode): PrimaryColorControl | null {
@@ -1624,6 +1838,77 @@ function getFullTextStyleRunStyle(node: SketchSceneNode): SketchSceneTextStyleOv
   if (textLength <= 0) return {};
   const run = node.textStyleRuns?.find((item) => item.start === 0 && item.length >= textLength);
   return run?.style ?? {};
+}
+
+function getTextStyleStateValue<K extends keyof SketchTextComputedStyle>(
+  node: SketchSceneNode,
+  range: { start: number; end: number } | null,
+  property: K,
+): { value: SketchTextComputedStyle[K] | undefined; mixed: boolean } {
+  const textLength = node.text?.length ?? 0;
+  const start = range ? Math.max(0, Math.min(textLength, range.start)) : 0;
+  const end = range ? Math.max(start, Math.min(textLength, range.end)) : Math.min(1, textLength);
+  const values = range && end > start
+    ? Array.from({ length: end - start }, (_, index) => getSketchTextComputedStyle(node, start + index)[property])
+    : [getSketchTextComputedStyle(node)[property]];
+  const firstValue = values[0];
+  return {
+    value: firstValue,
+    mixed: values.some((value) => !valuesEqual(value, firstValue)),
+  };
+}
+
+function isSketchBoldFontWeight(value: SketchTextComputedStyle["fontWeight"] | undefined): boolean {
+  if (typeof value === "number") return value >= 600;
+  return value === "bold" || value === "bolder" || Number(value) >= 600;
+}
+
+function getTextStylePatchForRange(
+  node: SketchSceneNode,
+  range: { start: number; end: number } | null,
+  stylePatch: SketchSceneTextStyleOverride,
+  defaultStylePatch: SketchSceneStyle,
+): Partial<SketchSceneNode> {
+  if (!range) {
+    return { style: { ...node.style, ...defaultStylePatch } };
+  }
+  return {
+    textStyleRuns: updateTextStyleRunsForRange(node, range, (style) => ({
+      ...style,
+      ...stylePatch,
+    })),
+  };
+}
+
+function cloneSketchTextStyleRuns(runs: SketchSceneNode["textStyleRuns"]): SketchSceneNode["textStyleRuns"] {
+  return runs?.map((run) => ({ ...run, style: { ...run.style } }));
+}
+
+function normalizeSketchTextStyleRuns(
+  text: string,
+  runs: SketchSceneNode["textStyleRuns"],
+): SketchSceneNode["textStyleRuns"] {
+  if (!runs?.length || !text.length) return undefined;
+  const normalized = runs
+    .map((run) => {
+      const start = Math.max(0, Math.min(text.length, Math.floor(run.start)));
+      const end = Math.max(start, Math.min(text.length, Math.floor(run.start + run.length)));
+      return { ...run, start, length: end - start, style: { ...run.style } };
+    })
+    .filter((run) => run.length > 0)
+    .sort((left, right) => left.start - right.start);
+  if (!normalized.length) return undefined;
+  return normalized;
+}
+
+function createInlineTextEditState(node: SketchSceneNode, deleteWhenEmpty = false): InlineTextEditState {
+  return {
+    nodeId: node.id,
+    value: node.text ?? "",
+    style: { ...node.style },
+    textStyleRuns: cloneSketchTextStyleRuns(node.textStyleRuns),
+    deleteWhenEmpty,
+  };
 }
 
 function getActiveInlineTextRange(
@@ -1819,6 +2104,108 @@ function getVisualLayerNodes(scene: SketchSceneDocument): SketchSceneNode[] {
       return zDiff || a.index - b.index;
     })
     .map((entry) => entry.node);
+}
+
+interface SketchSelectionToolbarContext {
+  grouped: boolean;
+  groupNodes: SketchSceneNode[];
+  visibleLeafNodes: SketchSceneNode[];
+  graphicNodes: SketchSceneNode[];
+  pureTextNodes: SketchSceneNode[];
+  editableLeafNodes: SketchSceneNode[];
+  fillStyleNodes: SketchSceneNode[];
+  strokeStyleNodes: SketchSceneNode[];
+}
+
+function getSelectionVisibleLeafNodes(
+  scene: SketchSceneDocument,
+  nodes: SketchSceneNode[],
+  configData?: Record<string, unknown>,
+): SketchSceneNode[] {
+  const nodesById = new Map(scene.nodes.map((node) => [node.id, node]));
+  const leafIds = new Set<string>();
+  const leaves: SketchSceneNode[] = [];
+  const visit = (node: SketchSceneNode) => {
+    if (node.type === "group") {
+      for (const childId of node.children ?? []) {
+        const child = nodesById.get(childId);
+        if (child) visit(child);
+      }
+      return;
+    }
+    if (leafIds.has(node.id) || !isNodeVisibleForConfig(node, configData)) return;
+    leafIds.add(node.id);
+    leaves.push(node);
+  };
+  nodes.forEach(visit);
+  return leaves;
+}
+
+function getSelectionMoveNodes(
+  scene: SketchSceneDocument,
+  nodes: SketchSceneNode[],
+  configData?: Record<string, unknown>,
+): SketchSceneNode[] {
+  return getSelectionVisibleLeafNodes(scene, nodes, configData).filter(canEditNodeProperties);
+}
+
+function getSketchSelectionToolbarContext(
+  scene: SketchSceneDocument,
+  nodes: SketchSceneNode[],
+  configData?: Record<string, unknown>,
+): SketchSelectionToolbarContext {
+  const groupNodes = nodes.filter((node) => node.type === "group");
+  const visibleLeafNodes = getSelectionVisibleLeafNodes(scene, nodes, configData);
+  const graphicNodes = visibleLeafNodes.filter((node) => node.type !== "text");
+  const pureTextNodes = visibleLeafNodes.filter((node) => node.type === "text");
+  const editableLeafNodes = visibleLeafNodes.filter((node) => canEditNodeProperties(node));
+  return {
+    grouped: groupNodes.length > 0,
+    groupNodes,
+    visibleLeafNodes,
+    graphicNodes,
+    pureTextNodes,
+    editableLeafNodes,
+    fillStyleNodes: editableLeafNodes.filter(supportsFillStyle),
+    strokeStyleNodes: editableLeafNodes.filter(supportsStrokeStyle),
+  };
+}
+
+function getSketchSelectionVisualBounds(
+  scene: SketchSceneDocument,
+  nodes: SketchSceneNode[],
+  configData?: Record<string, unknown>,
+): SketchSceneBounds | null {
+  const context = getSketchSelectionToolbarContext(scene, nodes, configData);
+  if (context.visibleLeafNodes.length) return getSketchSelectionBounds(context.visibleLeafNodes);
+  const fallbackNodes = nodes.filter((node) => node.type === "group" || isNodeVisibleForConfig(node, configData));
+  return getSketchSelectionBounds(fallbackNodes);
+}
+
+function getLayerOperationSelectedNodes(
+  scene: SketchSceneDocument,
+  controller: SketchEditorController,
+  configData?: Record<string, unknown>,
+): SketchSceneNode[] {
+  const selectedIds = new Set<string>();
+  const visitedIds = new Set<string>();
+  const nodesById = new Map(scene.nodes.map((node) => [node.id, node]));
+  const include = (node: SketchSceneNode, fromGroup = false) => {
+    if (visitedIds.has(node.id)) return;
+    visitedIds.add(node.id);
+    if (node.type === "group") {
+      selectedIds.add(node.id);
+      for (const childId of node.children ?? []) {
+        const child = nodesById.get(childId);
+        if (child) include(child, true);
+      }
+      return;
+    }
+    if (!fromGroup && (node.locked || node.visible === false || !isNodeVisibleForConfig(node, configData))) return;
+    selectedIds.add(node.id);
+  };
+  getSelectedNodes(scene, controller).forEach((node) => include(node));
+  return getVisualLayerNodes(scene).filter((node) => selectedIds.has(node.id));
 }
 
 function getEditableMinSize(node: SketchSceneNode): number {
@@ -2213,7 +2600,10 @@ function getSketchSnapGuides(
   if (!bounds) return [];
   const threshold = 4;
   const guides: SketchSnapGuide[] = [];
-  const draggedIds = new Set(dragState.nodes.map((node) => node.id));
+  const draggedIds = new Set([
+    ...dragState.nodes.map((node) => node.id),
+    ...(dragState.sourceNodeIds ?? []),
+  ]);
   const pageCenterX = scene.pageSize.width / 2;
   const pageCenterY = scene.pageSize.height / 2;
   const boundsCenterX = bounds.x + bounds.width / 2;
@@ -2261,21 +2651,64 @@ function getSketchSnapGuides(
       pushNearestSnapGuide(guides, { kind: "center", orientation: "horizontal", position: targetCenterY, from: targetHorizontalFrom, to: targetHorizontalTo, label: "中心线" });
     }
 
-    const horizontalGap = bounds.x >= targetBounds.x + targetBounds.width
-      ? bounds.x - (targetBounds.x + targetBounds.width)
-      : targetBounds.x >= bounds.x + bounds.width
-        ? targetBounds.x - (bounds.x + bounds.width)
-        : null;
-    const verticalOverlap = bounds.y < targetBounds.y + targetBounds.height && bounds.y + bounds.height > targetBounds.y;
-    if (horizontalGap !== null && verticalOverlap && horizontalGap >= 8 && horizontalGap <= 80) {
-      const position = bounds.x >= targetBounds.x + targetBounds.width
-        ? targetBounds.x + targetBounds.width + horizontalGap / 2
-        : bounds.x + bounds.width + horizontalGap / 2;
-      pushNearestSnapGuide(guides, { kind: "spacing", orientation: "vertical", position, from: Math.min(bounds.y, targetBounds.y), to: Math.max(bounds.y + bounds.height, targetBounds.y + targetBounds.height), label: "间距" });
-    }
   }
 
   return guides.slice(0, 6);
+}
+
+interface SketchSnapDeltaCandidate {
+  distance: number;
+  delta: number;
+}
+
+function pickSketchSnapDelta(candidates: SketchSnapDeltaCandidate[]): number {
+  return [...candidates].sort((a, b) => a.distance - b.distance)[0]?.delta ?? 0;
+}
+
+function getSketchSnapDelta(
+  scene: SketchSceneDocument,
+  dragState: DragState,
+  previewNodes: SketchSceneNode[],
+  configData?: Record<string, unknown>,
+): { x: number; y: number } {
+  if (dragState.kind !== "move" || isSnapGuideSuppressed(dragState)) return { x: 0, y: 0 };
+  const bounds = getSketchSelectionBounds(previewNodes);
+  if (!bounds) return { x: 0, y: 0 };
+
+  const threshold = 4;
+  const verticalCandidates: SketchSnapDeltaCandidate[] = [];
+  const horizontalCandidates: SketchSnapDeltaCandidate[] = [];
+  const draggedIds = new Set([
+    ...dragState.nodes.map((node) => node.id),
+    ...(dragState.sourceNodeIds ?? []),
+  ]);
+  const boundsCenterX = bounds.x + bounds.width / 2;
+  const boundsCenterY = bounds.y + bounds.height / 2;
+  const addCandidate = (candidates: SketchSnapDeltaCandidate[], delta: number) => {
+    const distance = Math.abs(delta);
+    if (distance <= threshold) candidates.push({ distance, delta });
+  };
+
+  addCandidate(verticalCandidates, scene.pageSize.width / 2 - boundsCenterX);
+  addCandidate(horizontalCandidates, scene.pageSize.height / 2 - boundsCenterY);
+
+  for (const node of scene.nodes) {
+    if (draggedIds.has(node.id) || !isNodeVisibleForConfig(node, configData) || node.type === "group") continue;
+    const targetBounds = getSketchNodeBounds(node);
+    const targetCenterX = targetBounds.x + targetBounds.width / 2;
+    const targetCenterY = targetBounds.y + targetBounds.height / 2;
+    addCandidate(verticalCandidates, targetBounds.x - bounds.x);
+    addCandidate(verticalCandidates, targetBounds.x + targetBounds.width - (bounds.x + bounds.width));
+    addCandidate(verticalCandidates, targetCenterX - boundsCenterX);
+    addCandidate(horizontalCandidates, targetBounds.y - bounds.y);
+    addCandidate(horizontalCandidates, targetBounds.y + targetBounds.height - (bounds.y + bounds.height));
+    addCandidate(horizontalCandidates, targetCenterY - boundsCenterY);
+  }
+
+  return {
+    x: pickSketchSnapDelta(verticalCandidates),
+    y: pickSketchSnapDelta(horizontalCandidates),
+  };
 }
 
 function normalizeFiniteNumber(value: unknown): number | null {
@@ -2733,56 +3166,72 @@ function duplicateSelected(
   controller.setNodeIds(nodes.map((node) => node.id));
 }
 
+type SketchLayerOrderAction = "front" | "forward" | "backward" | "back";
+
+function moveSelectedLayerUnit(
+  visualNodes: SketchSceneNode[],
+  selectedIds: Set<string>,
+  action: SketchLayerOrderAction,
+): SketchSceneNode[] {
+  const selectedNodes = visualNodes.filter((node) => selectedIds.has(node.id));
+  if (!selectedNodes.length) return visualNodes;
+  if (action === "front") {
+    return [...visualNodes.filter((node) => !selectedIds.has(node.id)), ...selectedNodes];
+  }
+  if (action === "back") {
+    return [...selectedNodes, ...visualNodes.filter((node) => !selectedIds.has(node.id))];
+  }
+
+  const selectedIndexes = visualNodes
+    .map((node, index) => selectedIds.has(node.id) ? index : -1)
+    .filter((index) => index >= 0);
+  const firstSelectedIndex = Math.min(...selectedIndexes);
+  const lastSelectedIndex = Math.max(...selectedIndexes);
+  const remainingNodes = visualNodes.filter((node) => !selectedIds.has(node.id));
+  if (action === "forward") {
+    const nextNode = visualNodes.slice(lastSelectedIndex + 1).find((node) => !selectedIds.has(node.id));
+    if (!nextNode) return visualNodes;
+    const nextIndex = remainingNodes.indexOf(nextNode);
+    remainingNodes.splice(nextIndex + 1, 0, ...selectedNodes);
+    return remainingNodes;
+  }
+  const previousNode = [...visualNodes.slice(0, firstSelectedIndex)].reverse().find((node) => !selectedIds.has(node.id));
+  if (!previousNode) return visualNodes;
+  const previousIndex = remainingNodes.indexOf(previousNode);
+  remainingNodes.splice(previousIndex, 0, ...selectedNodes);
+  return remainingNodes;
+}
+
+function applyLayerOrderAction(
+  scene: SketchSceneDocument,
+  controller: SketchEditorController,
+  action: SketchLayerOrderAction,
+  configData?: Record<string, unknown>,
+) {
+  const selectedNodes = getLayerOperationSelectedNodes(scene, controller, configData);
+  if (!selectedNodes.length) return;
+  const currentNodes = getVisualLayerNodes(scene);
+  const nextNodes = moveSelectedLayerUnit(currentNodes, new Set(selectedNodes.map((node) => node.id)), action);
+  const currentIds = currentNodes.map((node) => node.id);
+  const nextIds = nextNodes.map((node) => node.id);
+  if (nextIds.every((nodeId, index) => nodeId === currentIds[index])) return;
+  controller.applyOperations([{ op: "reorder", nodeIds: nextIds }]);
+}
+
 function bringToFront(scene: SketchSceneDocument, controller: SketchEditorController, configData?: Record<string, unknown>) {
-  const editableNodes = getLayerEditableSelectedNodes(scene, controller, configData);
-  if (!editableNodes.length) return;
-  const selectedIds = new Set(editableNodes.map((node) => node.id));
-  const visualLayerIds = getVisualLayerNodes(scene).map((node) => node.id);
-  const editableIds = visualLayerIds.filter((nodeId) => selectedIds.has(nodeId));
-  const otherIds = visualLayerIds.filter((nodeId) => !selectedIds.has(nodeId));
-  const nextNodeIds = [...otherIds, ...editableIds];
-  if (nextNodeIds.every((nodeId, index) => nodeId === visualLayerIds[index])) return;
-  controller.applyOperations([{ op: "reorder", nodeIds: nextNodeIds }]);
+  applyLayerOrderAction(scene, controller, "front", configData);
 }
 
 function bringForward(scene: SketchSceneDocument, controller: SketchEditorController, configData?: Record<string, unknown>) {
-  const editableNodes = getLayerEditableSelectedNodes(scene, controller, configData);
-  if (!editableNodes.length) return;
-  const selectedIds = new Set(editableNodes.map((node) => node.id));
-  const nextNodeIds = getVisualLayerNodes(scene).map((node) => node.id);
-  for (let index = nextNodeIds.length - 2; index >= 0; index -= 1) {
-    if (!selectedIds.has(nextNodeIds[index]) || selectedIds.has(nextNodeIds[index + 1])) continue;
-    [nextNodeIds[index], nextNodeIds[index + 1]] = [nextNodeIds[index + 1], nextNodeIds[index]];
-  }
-  const currentNodeIds = getVisualLayerNodes(scene).map((node) => node.id);
-  if (nextNodeIds.every((nodeId, index) => nodeId === currentNodeIds[index])) return;
-  controller.applyOperations([{ op: "reorder", nodeIds: nextNodeIds }]);
+  applyLayerOrderAction(scene, controller, "forward", configData);
 }
 
 function sendToBack(scene: SketchSceneDocument, controller: SketchEditorController, configData?: Record<string, unknown>) {
-  const editableNodes = getLayerEditableSelectedNodes(scene, controller, configData);
-  if (!editableNodes.length) return;
-  const selectedIds = new Set(editableNodes.map((node) => node.id));
-  const visualLayerIds = getVisualLayerNodes(scene).map((node) => node.id);
-  const editableIds = visualLayerIds.filter((nodeId) => selectedIds.has(nodeId));
-  const otherIds = visualLayerIds.filter((nodeId) => !selectedIds.has(nodeId));
-  const nextNodeIds = [...editableIds, ...otherIds];
-  if (nextNodeIds.every((nodeId, index) => nodeId === visualLayerIds[index])) return;
-  controller.applyOperations([{ op: "reorder", nodeIds: nextNodeIds }]);
+  applyLayerOrderAction(scene, controller, "back", configData);
 }
 
 function sendBackward(scene: SketchSceneDocument, controller: SketchEditorController, configData?: Record<string, unknown>) {
-  const editableNodes = getLayerEditableSelectedNodes(scene, controller, configData);
-  if (!editableNodes.length) return;
-  const selectedIds = new Set(editableNodes.map((node) => node.id));
-  const nextNodeIds = getVisualLayerNodes(scene).map((node) => node.id);
-  for (let index = 1; index < nextNodeIds.length; index += 1) {
-    if (!selectedIds.has(nextNodeIds[index]) || selectedIds.has(nextNodeIds[index - 1])) continue;
-    [nextNodeIds[index - 1], nextNodeIds[index]] = [nextNodeIds[index], nextNodeIds[index - 1]];
-  }
-  const currentNodeIds = getVisualLayerNodes(scene).map((node) => node.id);
-  if (nextNodeIds.every((nodeId, index) => nodeId === currentNodeIds[index])) return;
-  controller.applyOperations([{ op: "reorder", nodeIds: nextNodeIds }]);
+  applyLayerOrderAction(scene, controller, "backward", configData);
 }
 
 function toggleLocked(scene: SketchSceneDocument, controller: SketchEditorController, configData?: Record<string, unknown>) {
@@ -2846,19 +3295,31 @@ function ungroupSelected(scene: SketchSceneDocument, controller: SketchEditorCon
   controller.setNodeIds(childIds);
 }
 
-function alignSelected(scene: SketchSceneDocument, controller: SketchEditorController, axis: "left" | "top", configData?: Record<string, unknown>) {
+type SketchAlignmentAxis = "left" | "center" | "right" | "top" | "middle" | "bottom";
+
+function alignSelected(scene: SketchSceneDocument, controller: SketchEditorController, axis: SketchAlignmentAxis, configData?: Record<string, unknown>) {
   const selectedNodes = getLayerEditableSelectedNodes(scene, controller, configData);
   const bounds = getSketchSelectionBounds(selectedNodes);
   if (!bounds || selectedNodes.length < 2) return;
   controller.applyOperations(
     selectedNodes.map((node) => {
       const nodeBounds = getSketchNodeBounds(node);
+      const targetLeft = axis === "left"
+        ? bounds.x
+        : axis === "center"
+          ? bounds.x + (bounds.width - nodeBounds.width) / 2
+          : bounds.x + bounds.width - nodeBounds.width;
+      const targetTop = axis === "top"
+        ? bounds.y
+        : axis === "middle"
+          ? bounds.y + (bounds.height - nodeBounds.height) / 2
+          : bounds.y + bounds.height - nodeBounds.height;
       return {
         op: "update",
         nodeId: node.id,
-        patch: axis === "left"
-          ? { x: node.x + bounds.x - nodeBounds.x }
-          : { y: node.y + bounds.y - nodeBounds.y },
+        patch: axis === "left" || axis === "center" || axis === "right"
+          ? { x: node.x + targetLeft - nodeBounds.x }
+          : { y: node.y + targetTop - nodeBounds.y },
       };
     }),
   );
@@ -2942,6 +3403,7 @@ function buildSketchActionEntries({
   selectedNodes,
   editableSelectedNodes,
   layerEditableSelectedNodes,
+  layerOperationSelectedNodes,
   lockableSelectedNodes,
   visibleToggleSelectedNodes,
   canGroupSelection,
@@ -2961,6 +3423,7 @@ function buildSketchActionEntries({
   selectedNodes: SketchSceneNode[];
   editableSelectedNodes: SketchSceneNode[];
   layerEditableSelectedNodes: SketchSceneNode[];
+  layerOperationSelectedNodes: SketchSceneNode[];
   lockableSelectedNodes: SketchSceneNode[];
   visibleToggleSelectedNodes: SketchSceneNode[];
   canGroupSelection: boolean;
@@ -2976,7 +3439,7 @@ function buildSketchActionEntries({
 }): SketchActionEntry[] {
   const noSelection = selectedNodes.length ? undefined : "需要先选择对象";
   const noEditableSelection = editableSelectedNodes.length ? undefined : "当前选择不可编辑";
-  const noLayerEditableSelection = layerEditableSelectedNodes.length ? undefined : "当前选择不可排序";
+  const noLayerEditableSelection = layerOperationSelectedNodes.length ? undefined : "当前选择不可排序";
   const tools = TOOL_OPTIONS.filter((item) => !controller.allowedTools || controller.allowedTools.includes(item.tool)).map<SketchActionEntry>((item) => ({
     id: `tool.${item.tool}`,
     section: "tool",
@@ -3094,6 +3557,42 @@ function buildSketchActionEntries({
       shortcuts: [],
       disabledReason: layerEditableSelectedNodes.length >= 2 ? undefined : "至少选择两个可编辑对象",
       run: () => alignSelected(scene, controller, "top", configData),
+    },
+    {
+      id: "arrange.alignCenter",
+      section: "arrange",
+      label: "水平居中",
+      description: "按选择边界水平中心对齐",
+      shortcuts: [],
+      disabledReason: layerEditableSelectedNodes.length >= 2 ? undefined : "至少选择两个可编辑对象",
+      run: () => alignSelected(scene, controller, "center", configData),
+    },
+    {
+      id: "arrange.alignRight",
+      section: "arrange",
+      label: "右对齐",
+      description: "按选择边界右侧对齐",
+      shortcuts: [],
+      disabledReason: layerEditableSelectedNodes.length >= 2 ? undefined : "至少选择两个可编辑对象",
+      run: () => alignSelected(scene, controller, "right", configData),
+    },
+    {
+      id: "arrange.alignMiddle",
+      section: "arrange",
+      label: "垂直居中",
+      description: "按选择边界垂直中心对齐",
+      shortcuts: [],
+      disabledReason: layerEditableSelectedNodes.length >= 2 ? undefined : "至少选择两个可编辑对象",
+      run: () => alignSelected(scene, controller, "middle", configData),
+    },
+    {
+      id: "arrange.alignBottom",
+      section: "arrange",
+      label: "底对齐",
+      description: "按选择边界底部对齐",
+      shortcuts: [],
+      disabledReason: layerEditableSelectedNodes.length >= 2 ? undefined : "至少选择两个可编辑对象",
+      run: () => alignSelected(scene, controller, "bottom", configData),
     },
     {
       id: "arrange.distributeHorizontal",
@@ -3317,6 +3816,179 @@ function SketchShortcutHelp({
   );
 }
 
+function SketchMainToolbarTooltip({ label, children }: { label: string; children: React.ReactNode }) {
+  const triggerRef = React.useRef<HTMLSpanElement>(null);
+  const timerRef = React.useRef<number | null>(null);
+  const [visible, setVisible] = React.useState(false);
+  const [position, setPosition] = React.useState<{ left: number; top: number } | null>(null);
+
+  const clearTimer = React.useCallback(() => {
+    if (timerRef.current === null) return;
+    window.clearTimeout(timerRef.current);
+    timerRef.current = null;
+  }, []);
+
+  const updatePosition = React.useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const center = rect.left + rect.width / 2;
+    setPosition({
+      left: Math.max(8, Math.min(window.innerWidth - 8, center)),
+      top: Math.max(8, rect.top - 8),
+    });
+  }, []);
+
+  const hide = React.useCallback(() => {
+    clearTimer();
+    setVisible(false);
+    setPosition(null);
+  }, [clearTimer]);
+
+  const show = React.useCallback(() => {
+    clearTimer();
+    timerRef.current = window.setTimeout(() => {
+      timerRef.current = null;
+      updatePosition();
+      setVisible(true);
+    }, 200);
+  }, [clearTimer, updatePosition]);
+
+  React.useEffect(() => () => clearTimer(), [clearTimer]);
+
+  React.useEffect(() => {
+    if (!visible) return undefined;
+    const handleViewportChange = () => updatePosition();
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
+    return () => {
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
+    };
+  }, [updatePosition, visible]);
+
+  return (
+    <>
+      <span
+        ref={triggerRef}
+        className="pointer-events-auto inline-flex shrink-0"
+        onPointerEnter={show}
+        onPointerLeave={hide}
+        onMouseEnter={show}
+        onMouseLeave={hide}
+        onFocusCapture={show}
+        onBlurCapture={hide}
+      >
+        {children}
+      </span>
+      {visible && position && typeof document !== "undefined"
+        ? createPortal(
+            <span
+              role="tooltip"
+              className="pointer-events-none fixed z-[10000] max-w-[calc(100vw-16px)] -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] font-medium leading-4 text-white shadow-lg"
+              style={{ left: position.left, top: position.top }}
+            >
+              {label}
+            </span>,
+            document.body,
+          )
+        : null}
+    </>
+  );
+}
+
+function SketchFloatingToolbarColorIndicator({
+  color,
+  kind,
+  mixed = false,
+}: {
+  color: string;
+  kind: "fill" | "stroke";
+  mixed?: boolean;
+}) {
+  if (mixed) {
+    return (
+      <span
+        data-testid={`sketch-floating-${kind}-indicator`}
+        className="relative inline-flex h-4 w-4 items-center justify-center overflow-hidden rounded-sm border border-slate-300 bg-white"
+        aria-hidden="true"
+      >
+        <span className="absolute inset-0 bg-[linear-gradient(135deg,transparent_42%,#94a3b8_42%,#94a3b8_58%,transparent_58%)]" />
+        <span className="absolute inset-x-0 top-1/2 h-px bg-slate-400/70" />
+      </span>
+    );
+  }
+  const transparent = color === "transparent";
+  if (kind === "stroke") {
+    return (
+      <span
+        data-testid="sketch-floating-stroke-indicator"
+        className="relative inline-flex h-4 w-4 items-center justify-center"
+        aria-hidden="true"
+      >
+        <Square
+          className="h-4 w-4"
+          style={{ color: transparent ? "#cbd5e1" : color }}
+          strokeWidth={2}
+        />
+        {transparent ? <span className="absolute h-px w-5 rotate-45 bg-slate-400" /> : null}
+      </span>
+    );
+  }
+  return (
+    <span
+      data-testid="sketch-floating-fill-indicator"
+      className={cn(
+        "relative inline-flex h-3.5 w-3.5 rounded-sm border border-slate-300",
+        transparent && "bg-white",
+      )}
+      style={transparent ? undefined : { backgroundColor: color }}
+      aria-hidden="true"
+    >
+      {transparent ? <span className="absolute inset-x-0 top-1/2 h-px rotate-45 bg-slate-400" /> : null}
+    </span>
+  );
+}
+
+function SketchTextColorIndicator({ color }: { color: string }) {
+  return (
+    <span
+      data-testid="sketch-text-color-indicator"
+      className="relative inline-flex h-[1.4rem] w-[1.2rem] items-start justify-center"
+      aria-hidden="true"
+    >
+      <span className="select-none pt-0.5 text-[15px] font-medium leading-4 text-slate-700">A</span>
+      <span
+        data-testid="sketch-text-color-underline"
+        className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
+        style={{ backgroundColor: color }}
+      />
+    </span>
+  );
+}
+
+function SketchFloatingToolbarActionButton({ action }: { action: SketchFloatingToolbarAction }) {
+  return (
+    <SketchMainToolbarTooltip label={action.label}>
+      <button
+        type="button"
+      className="pointer-events-auto inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
+        disabled={action.disabled}
+        aria-label={`悬浮${action.label}`}
+        aria-haspopup={action.ariaHasPopup}
+        aria-expanded={action.ariaExpanded}
+        onClick={action.onClick}
+      >
+        {action.swatchColor && action.swatchKind ? (
+          <SketchFloatingToolbarColorIndicator color={action.swatchColor} kind={action.swatchKind} mixed={action.swatchMixed} />
+        ) : (
+          action.icon
+        )}
+      </button>
+    </SketchMainToolbarTooltip>
+  );
+}
+
 export function SketchEditorToolbar({ scene: _scene, controller, configData: _configData = {}, className, allowedTools }: SketchEditorToolbarProps) {
   const toolButtonClass =
     "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-violet-50 hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:opacity-35";
@@ -3337,28 +4009,32 @@ export function SketchEditorToolbar({ scene: _scene, controller, configData: _co
       }).map((item) => {
         const Icon = item.icon;
         return (
-          <button
-            key={item.tool}
-            type="button"
-            title={item.label}
-            aria-label={item.label}
-            className={cn(
-              toolButtonClass,
-              controller.tool === item.tool && "bg-violet-600 text-white shadow-sm hover:bg-violet-600 hover:text-white",
-            )}
-            onClick={() => controller.setTool(item.tool)}
-          >
-            <Icon className="h-5 w-5" />
-          </button>
+          <SketchMainToolbarTooltip key={item.tool} label={item.label}>
+            <button
+              type="button"
+              aria-label={item.label}
+              className={cn(
+                toolButtonClass,
+                controller.tool === item.tool && "bg-violet-600 text-white shadow-sm hover:bg-violet-600 hover:text-white",
+              )}
+              onClick={() => controller.setTool(item.tool)}
+            >
+              <Icon className="h-5 w-5" />
+            </button>
+          </SketchMainToolbarTooltip>
         );
       })}
       <div className="mx-2 h-8 w-px shrink-0 bg-slate-200" />
-      <button type="button" title="撤销" aria-label="撤销" className={actionButtonClass} disabled={!controller.canUndo} onClick={controller.undo}>
-        <Undo2 className="h-4 w-4" />
-      </button>
-      <button type="button" title="重做" aria-label="重做" className={actionButtonClass} disabled={!controller.canRedo} onClick={controller.redo}>
-        <Redo2 className="h-4 w-4" />
-      </button>
+      <SketchMainToolbarTooltip label="撤销">
+        <button type="button" aria-label="撤销" className={actionButtonClass} disabled={!controller.canUndo} onClick={controller.undo}>
+          <Undo2 className="h-4 w-4" />
+        </button>
+      </SketchMainToolbarTooltip>
+      <SketchMainToolbarTooltip label="重做">
+        <button type="button" aria-label="重做" className={actionButtonClass} disabled={!controller.canRedo} onClick={controller.redo}>
+          <Redo2 className="h-4 w-4" />
+        </button>
+      </SketchMainToolbarTooltip>
       <span className="sr-only" aria-live="polite">
         {controller.selection.nodeIds.length ? `${controller.selection.nodeIds.length} selected` : "No selection"}
       </span>
@@ -3415,7 +4091,7 @@ export function SketchLayerPanel({ scene, controller, configData = {}, className
   const panelRef = React.useRef<HTMLDivElement>(null);
   const selectedNodes = getSelectedNodes(scene, controller);
   const editableSelectedNodes = selectedNodes.filter((node) => !node.locked && !isNodeHiddenByRuntimeConfig(node, configData));
-  const layerEditableSelectedNodes = getLayerEditableSelectedNodes(scene, controller, configData);
+  const layerOperationSelectedNodes = getLayerOperationSelectedNodes(scene, controller, configData);
   const lockableSelectedNodes = selectedNodes.filter((node) => node.type !== "group" && node.visible !== false && isNodeVisibleForConfig(node, configData));
   const visibleToggleSelectedNodes = selectedNodes.filter((node) => node.type !== "group" && !isNodeHiddenByRuntimeConfig(node, configData));
   const selectedGroupNodes = getSelectedGroupNodes(scene, controller);
@@ -3711,22 +4387,22 @@ export function SketchLayerPanel({ scene, controller, configData = {}, className
           <ContextMenuSeparator />
           <ContextMenuButton
             label="置顶"
-            disabled={!layerEditableSelectedNodes.length}
+            disabled={!layerOperationSelectedNodes.length}
             onClick={() => runLayerContextMenuAction(() => bringToFront(scene, controller, configData))}
           />
           <ContextMenuButton
             label="上移一层"
-            disabled={!layerEditableSelectedNodes.length}
+            disabled={!layerOperationSelectedNodes.length}
             onClick={() => runLayerContextMenuAction(() => bringForward(scene, controller, configData))}
           />
           <ContextMenuButton
             label="下移一层"
-            disabled={!layerEditableSelectedNodes.length}
+            disabled={!layerOperationSelectedNodes.length}
             onClick={() => runLayerContextMenuAction(() => sendBackward(scene, controller, configData))}
           />
           <ContextMenuButton
             label="置底"
-            disabled={!layerEditableSelectedNodes.length}
+            disabled={!layerOperationSelectedNodes.length}
             onClick={() => runLayerContextMenuAction(() => sendToBack(scene, controller, configData))}
           />
           <ContextMenuSeparator />
@@ -3779,6 +4455,10 @@ export function SketchPropertyPanel({ scene, controller, configData = {}, classN
     applySelectedPatch(scene, controller, patch, false);
   }, [beginContinuousHistory, controller, scene]);
   const commitColor = React.useCallback((value: string, applyColor: (nextValue: string) => void) => {
+    if (value === "transparent") {
+      applyColor(value);
+      return;
+    }
     const normalized = normalizeSketchHexColor(value);
     if (!normalized) return;
     setRecentColors((colors) => addRecentSketchColor(colors, normalized));
@@ -3789,6 +4469,7 @@ export function SketchPropertyPanel({ scene, controller, configData = {}, classN
   const selectedNode = selectedNodes.length === 1 ? selectedNodes[0] : null;
   const imageResourceStatus = selectedNode?.type === "image" ? getImageResourceStatus(selectedNode) : null;
   const layerEditableSelectedNodes = getLayerEditableSelectedNodes(scene, controller, configData);
+  const layerOperationSelectedNodes = getLayerOperationSelectedNodes(scene, controller, configData);
   const canGroupSelection = getGroupableSelectedNodes(scene, controller, configData).length >= 2;
   const canUngroupSelection = getSelectedGroupNodes(scene, controller).length > 0;
   const exportOptions = { scale: exportScale, withBackground: exportWithBackground };
@@ -3832,6 +4513,7 @@ export function SketchPropertyPanel({ scene, controller, configData = {}, classN
               controller={controller}
               configData={configData}
               layerEditableSelectedNodes={layerEditableSelectedNodes}
+              layerOperationSelectedNodes={layerOperationSelectedNodes}
               canGroupSelection={canGroupSelection}
               canUngroupSelection={canUngroupSelection}
             />
@@ -3869,7 +4551,8 @@ export function SketchPropertyPanel({ scene, controller, configData = {}, classN
                   {canBatchFill ? (
                     <ColorField
                       label="填充"
-                      value={toColorInputValue(fill.value, "#ffffff")}
+                      value={getSketchColorFieldValue(fill.value, "#ffffff", true)}
+                      allowNoColor
                       mixed={fill.mixed}
                       recentColors={recentColors}
                       continuousHistoryKey={`${selectedHistoryKey}:batch-fill`}
@@ -3882,7 +4565,8 @@ export function SketchPropertyPanel({ scene, controller, configData = {}, classN
                     <>
                       <ColorField
                         label="描边"
-                        value={toColorInputValue(stroke.value, "#1F2937")}
+                        value={getSketchColorFieldValue(stroke.value, "#1F2937", true)}
+                        allowNoColor
                         mixed={stroke.mixed}
                         recentColors={recentColors}
                         continuousHistoryKey={`${selectedHistoryKey}:batch-stroke`}
@@ -4235,6 +4919,7 @@ export function SketchPropertyPanel({ scene, controller, configData = {}, classN
             controller={controller}
             configData={configData}
             layerEditableSelectedNodes={layerEditableSelectedNodes}
+            layerOperationSelectedNodes={layerOperationSelectedNodes}
             canGroupSelection={canGroupSelection}
             canUngroupSelection={canUngroupSelection}
             defaultOpen={false}
@@ -4395,7 +5080,8 @@ export function SketchPropertyPanel({ scene, controller, configData = {}, classN
                 {supportsFillStyle(selectedNode) ? (
                   <ColorField
                     label="填充"
-                    value={toColorInputValue(style.fill, "#ffffff")}
+                    value={getSketchColorFieldValue(style.fill, "#ffffff", true)}
+                    allowNoColor
                     disabled={propertyReadOnly}
                     recentColors={recentColors}
                     continuousHistoryKey={`${selectedHistoryKey}:fill`}
@@ -4408,7 +5094,8 @@ export function SketchPropertyPanel({ scene, controller, configData = {}, classN
                 {supportsStrokeStyle(selectedNode) ? (
                   <ColorField
                     label="描边"
-                    value={toColorInputValue(style.stroke, "#1F2937")}
+                    value={getSketchColorFieldValue(style.stroke, "#1F2937", true)}
+                    allowNoColor
                     disabled={propertyReadOnly}
                     recentColors={recentColors}
                     continuousHistoryKey={`${selectedHistoryKey}:stroke`}
@@ -4778,6 +5465,7 @@ function SketchArrangeSection({
   controller,
   configData,
   layerEditableSelectedNodes,
+  layerOperationSelectedNodes,
   canGroupSelection,
   canUngroupSelection,
   defaultOpen = true,
@@ -4786,11 +5474,12 @@ function SketchArrangeSection({
   controller: SketchEditorController;
   configData?: Record<string, unknown>;
   layerEditableSelectedNodes: SketchSceneNode[];
+  layerOperationSelectedNodes: SketchSceneNode[];
   canGroupSelection: boolean;
   canUngroupSelection: boolean;
   defaultOpen?: boolean;
 }) {
-  const hasLayerEditableSelection = layerEditableSelectedNodes.length > 0;
+  const hasLayerOperationSelection = layerOperationSelectedNodes.length > 0;
   const canAlignSelection = layerEditableSelectedNodes.length >= 2;
   const canDistributeSelection = layerEditableSelectedNodes.length >= 3;
   return (
@@ -4798,25 +5487,25 @@ function SketchArrangeSection({
       <div className="grid grid-cols-2 gap-2">
         <PropertyCommandButton
           label="置顶"
-          disabled={!hasLayerEditableSelection}
+          disabled={!hasLayerOperationSelection}
           disabledReason="当前选择不可排序"
           onClick={() => bringToFront(scene, controller, configData)}
         />
         <PropertyCommandButton
           label="置底"
-          disabled={!hasLayerEditableSelection}
+          disabled={!hasLayerOperationSelection}
           disabledReason="当前选择不可排序"
           onClick={() => sendToBack(scene, controller, configData)}
         />
         <PropertyCommandButton
           label="上移一层"
-          disabled={!hasLayerEditableSelection}
+          disabled={!hasLayerOperationSelection}
           disabledReason="当前选择不可排序"
           onClick={() => bringForward(scene, controller, configData)}
         />
         <PropertyCommandButton
           label="下移一层"
-          disabled={!hasLayerEditableSelection}
+          disabled={!hasLayerOperationSelection}
           disabledReason="当前选择不可排序"
           onClick={() => sendBackward(scene, controller, configData)}
         />
@@ -5185,6 +5874,7 @@ function ColorField({
   value,
   disabled = false,
   mixed = false,
+  allowNoColor = false,
   recentColors = [],
   continuousHistoryKey,
   onContinuousStart,
@@ -5196,6 +5886,7 @@ function ColorField({
   value: string;
   disabled?: boolean;
   mixed?: boolean;
+  allowNoColor?: boolean;
   recentColors?: string[];
   continuousHistoryKey?: string;
   onContinuousStart?: (key: string) => void;
@@ -5203,7 +5894,9 @@ function ColorField({
   onReset?: () => void;
   onChange: (value: string, recordHistory?: boolean) => void;
 }) {
-  const normalizedValue = toColorInputValue(value, "#000000");
+  const fallbackColor = label === "填充" ? "#ffffff" : SKETCH_TEXT_DEFAULT_COLOR;
+  const noColor = allowNoColor && !mixed && isSketchNoColor(value);
+  const normalizedValue = toColorInputValue(value, fallbackColor);
   const continuousActiveRef = React.useRef(false);
   const endContinuousInput = () => {
     if (!continuousActiveRef.current) return;
@@ -5211,6 +5904,11 @@ function ColorField({
     onContinuousEnd?.();
   };
   const updateColor = (nextValue: string, recordHistory = true) => {
+    if (nextValue === "transparent") {
+      if (!allowNoColor || noColor) return;
+      onChange(nextValue);
+      return;
+    }
     const normalized = normalizeSketchHexColor(nextValue);
     if (!normalized) return;
     if (normalized === normalizedValue.toLowerCase()) return;
@@ -5241,8 +5939,9 @@ function ColorField({
         <input
           className="min-w-0 flex-1 border-0 bg-transparent font-mono text-[12px] text-foreground outline-none"
           disabled={disabled}
-          value={normalizedValue.toUpperCase()}
+          value={noColor ? "" : normalizedValue.toUpperCase()}
           maxLength={7}
+          placeholder={noColor ? "无颜色" : undefined}
           onChange={(event) => updateColor(event.target.value, false)}
           onBlur={endContinuousInput}
           onKeyDown={(event) => {
@@ -5266,61 +5965,217 @@ function ColorField({
           </button>
         ) : null}
       </div>
-      {recentColors.length > 0 ? (
-        <ColorSwatchRow
-          label={`${label}最近颜色`}
-          colors={recentColors}
-          normalizedValue={normalizedValue}
-          disabled={disabled}
-          getSwatchLabel={(color) => `${label} 最近 ${color.toUpperCase()}`}
-          onSelect={updateColor}
-        />
-      ) : null}
-      <ColorSwatchRow
-        label={`${label}常用颜色`}
-        colors={SKETCH_COLOR_SWATCHES}
-        normalizedValue={normalizedValue}
+      <SketchColorPicker
+        label={label}
+        value={noColor ? "transparent" : normalizedValue}
+        mixed={mixed}
         disabled={disabled}
-        getSwatchLabel={(color) => `${label} ${color.toUpperCase()}`}
+        allowNoColor={allowNoColor}
+        recentColors={recentColors}
+        customColorFallback={normalizedValue}
+        getSwatchLabel={(color, recent) => `${label}${recent ? " 最近" : ""} ${color.toUpperCase()}`}
         onSelect={updateColor}
       />
     </div>
   );
 }
 
-function ColorSwatchRow({
+function getSketchColorCheckColor(color: string): string {
+  const normalized = normalizeSketchHexColor(color);
+  if (!normalized) return "#ffffff";
+  const red = Number.parseInt(normalized.slice(1, 3), 16);
+  const green = Number.parseInt(normalized.slice(3, 5), 16);
+  const blue = Number.parseInt(normalized.slice(5, 7), 16);
+  return (red * 299 + green * 587 + blue * 114) / 1000 > 170 ? "#0f172a" : "#ffffff";
+}
+
+function SketchColorPicker({
+  label,
+  value,
+  disabled = false,
+  mixed = false,
+  allowNoColor = false,
+  recentColors = [],
+  choiceRole = "radio",
+  autoFocus = false,
+  customColorFallback = "#000000",
+  getSwatchLabel = (color, recent) => `${label}${recent ? " 最近" : ""} ${color}`,
+  onSelect,
+}: {
+  label: string;
+  value: string;
+  disabled?: boolean;
+  mixed?: boolean;
+  allowNoColor?: boolean;
+  recentColors?: string[];
+  choiceRole?: "menuitemradio" | "radio";
+  autoFocus?: boolean;
+  customColorFallback?: string;
+  getSwatchLabel?: (color: string, recent: boolean) => string;
+  onSelect: (value: string) => void;
+}) {
+  const customColorInputRef = React.useRef<HTMLInputElement>(null);
+  const initialChoiceRef = React.useRef<HTMLButtonElement>(null);
+  const noColor = !mixed && allowNoColor && isSketchNoColor(value);
+  const normalizedValue = noColor
+    ? "transparent"
+    : normalizeSketchHexColor(value) ?? toColorInputValue(value, customColorFallback);
+  const customColorValue = toColorInputValue(value, customColorFallback);
+  const normalizedRecentColors = recentColors
+    .map((color) => normalizeSketchHexColor(color))
+    .filter((color): color is string => Boolean(color));
+  const moveChoiceFocus = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
+    const choices = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(`[role="${choiceRole}"]`));
+    if (!choices.length) return;
+    const currentIndex = choices.indexOf(document.activeElement as HTMLElement);
+    const nextIndex = event.key === "Home"
+      ? 0
+      : event.key === "End"
+        ? choices.length - 1
+        : (currentIndex < 0 ? 0 : currentIndex + (event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : -1) + choices.length) % choices.length;
+    event.preventDefault();
+    choices[nextIndex]?.focus();
+  };
+
+  React.useEffect(() => {
+    if (!autoFocus) return;
+    initialChoiceRef.current?.focus();
+  }, [autoFocus]);
+
+  return (
+    <div
+      data-testid="sketch-color-picker"
+      role={choiceRole === "radio" ? "radiogroup" : undefined}
+      aria-label={choiceRole === "radio" ? `${label}颜色` : undefined}
+      className="grid w-full max-w-[288px] gap-1.5"
+      onKeyDown={moveChoiceFocus}
+    >
+      {mixed ? <span className="rounded bg-slate-50 px-1.5 py-1 text-[10px] text-slate-500">当前选区颜色不同</span> : null}
+      {allowNoColor ? (
+        <div className="flex h-6 items-center">
+          <button
+            type="button"
+            ref={initialChoiceRef}
+            role={choiceRole}
+            aria-checked={noColor}
+            data-sketch-color="transparent"
+            aria-label={`${label} 无颜色`}
+            title={`${label} 无颜色`}
+            disabled={disabled}
+            className={cn(
+              "relative inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:cursor-not-allowed disabled:opacity-40",
+              noColor && "ring-2 ring-slate-900 ring-offset-1",
+            )}
+            onClick={() => onSelect("transparent")}
+          >
+            <span className="absolute h-px w-7 rotate-45 bg-slate-400" aria-hidden="true" />
+            {noColor ? <Check className="relative h-3.5 w-3.5 text-slate-900" aria-hidden="true" /> : null}
+          </button>
+        </div>
+      ) : null}
+      {normalizedRecentColors.length ? (
+        <SketchColorSwatchGrid
+          label={`${label}最近颜色`}
+          colors={normalizedRecentColors}
+          normalizedValue={normalizedValue}
+          mixed={mixed}
+          disabled={disabled}
+          choiceRole={choiceRole}
+          autoFocus={autoFocus && !allowNoColor}
+          getSwatchLabel={(color) => getSwatchLabel(color, true)}
+          onSelect={onSelect}
+        />
+      ) : null}
+      <SketchColorSwatchGrid
+        label={`${label}常用颜色`}
+        colors={SKETCH_COLOR_SWATCHES}
+        normalizedValue={normalizedValue}
+        mixed={mixed}
+        disabled={disabled}
+        choiceRole={choiceRole}
+        autoFocus={autoFocus && !allowNoColor && !normalizedRecentColors.length}
+        getSwatchLabel={(color) => getSwatchLabel(color, false)}
+        onSelect={onSelect}
+      />
+      <button
+        type="button"
+        role={choiceRole === "menuitemradio" ? "menuitem" : undefined}
+        aria-label={`${label} 其他颜色`}
+        aria-haspopup="dialog"
+        disabled={disabled}
+        className="flex min-h-8 w-full items-center gap-2 border-t border-slate-100 px-1.5 text-left text-xs text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:cursor-not-allowed disabled:opacity-40"
+        onClick={() => customColorInputRef.current?.click()}
+      >
+        <PaintBucket className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+        <span>其他颜色</span>
+        <ChevronRight className="ml-auto h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+      </button>
+      <input
+        ref={customColorInputRef}
+        type="color"
+        value={customColorValue}
+        tabIndex={-1}
+        aria-label={`${label} 其他颜色输入`}
+        className="sr-only"
+        onChange={(event) => onSelect(event.target.value)}
+      />
+    </div>
+  );
+}
+
+function SketchColorSwatchGrid({
   label,
   colors,
   normalizedValue,
+  mixed = false,
   disabled,
+  choiceRole,
+  autoFocus = false,
   getSwatchLabel,
   onSelect,
 }: {
   label: string;
   colors: string[];
   normalizedValue: string;
+  mixed?: boolean;
   disabled: boolean;
+  choiceRole: "menuitemradio" | "radio";
+  autoFocus?: boolean;
   getSwatchLabel: (color: string) => string;
   onSelect: (color: string) => void;
 }) {
+  const firstSwatchRef = React.useRef<HTMLButtonElement>(null);
+
+  React.useEffect(() => {
+    if (autoFocus) firstSwatchRef.current?.focus();
+  }, [autoFocus]);
+
   return (
-    <div className="ml-14 flex flex-wrap gap-1" aria-label={label}>
-      {colors.map((color) => {
+    <div className="grid grid-cols-10 gap-1" data-sketch-color-grid="true" aria-label={label}>
+      {colors.map((color, index) => {
         const swatchLabel = getSwatchLabel(color);
+        const selected = !mixed && normalizedValue.toLowerCase() === color.toLowerCase();
         return (
           <button
             key={color}
             type="button"
+            ref={index === 0 ? firstSwatchRef : undefined}
             className={cn(
-              "h-4 w-4 rounded border border-border shadow-sm transition-transform hover:scale-110 disabled:cursor-not-allowed",
-              normalizedValue.toLowerCase() === color && "ring-1 ring-ring ring-offset-1 ring-offset-input",
+              "relative aspect-square w-full min-w-0 rounded-[4px] border border-slate-200 shadow-sm transition-transform hover:scale-105 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:cursor-not-allowed",
+              selected && "ring-2 ring-slate-900 ring-offset-1",
             )}
+            role={choiceRole}
+            aria-checked={selected}
+            data-sketch-color={color}
             style={{ backgroundColor: color }}
             disabled={disabled}
             title={swatchLabel}
             aria-label={swatchLabel}
             onClick={() => onSelect(color)}
-          />
+          >
+            {selected ? <Check className="absolute inset-0 m-auto h-4 w-4" style={{ color: getSketchColorCheckColor(color) }} strokeWidth={2.75} aria-hidden="true" /> : null}
+          </button>
         );
       })}
     </div>
@@ -5438,7 +6293,16 @@ export function SketchEditorCanvas({
   const [commandPaletteOpen, setCommandPaletteOpen] = React.useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = React.useState(false);
   const [detailsPanelOpen, setDetailsPanelOpen] = React.useState(false);
-  const [detailsPanelTab, setDetailsPanelTab] = React.useState<"properties" | "layers" | "fill" | "stroke" | "more">("properties");
+  const [detailsPanelTab, setDetailsPanelTab] = React.useState<"properties" | "layers" | "fill" | "stroke" | "more" | "position">("properties");
+  const [alignmentMenuOpen, setAlignmentMenuOpen] = React.useState(false);
+  const [alignmentMenuPosition, setAlignmentMenuPosition] = React.useState<{ left: number; top: number } | null>(null);
+  const detailsPanelOpenRef = React.useRef(false);
+  const detailsPanelTabRef = React.useRef(detailsPanelTab);
+  detailsPanelOpenRef.current = detailsPanelOpen;
+  detailsPanelTabRef.current = detailsPanelTab;
+  const [detailsPanelAnchorX, setDetailsPanelAnchorX] = React.useState<number | null>(null);
+  const [detailsPanelSize, setDetailsPanelSize] = React.useState<{ width: number; height: number } | null>(null);
+  const [floatingSizeRatioLocked, setFloatingSizeRatioLocked] = React.useState(false);
   const detailsPanelRef = React.useRef<HTMLDivElement>(null);
   const [clipboardVersion, setClipboardVersion] = React.useState(0);
   const [styleClipboardVersion, setStyleClipboardVersion] = React.useState(0);
@@ -5452,21 +6316,53 @@ export function SketchEditorCanvas({
   const pointerCaptureRef = React.useRef<{ element: HTMLElement; pointerId: number } | null>(null);
   const pendingImageImportRef = React.useRef<PendingImageImportState | null>(null);
   const focusedGroupIdRef = React.useRef<string | null>(null);
+  const lastGroupChildSelectionAtRef = React.useRef<number | null>(null);
+  const lastInlineTextPointerDownRef = React.useRef<{
+    nodeId: string;
+    clientX: number;
+    clientY: number;
+    timestamp: number;
+  } | null>(null);
+  const pendingInlineTextDoublePointerRef = React.useRef<{
+    nodeId: string;
+    clientX: number;
+    clientY: number;
+    timestamp: number;
+  } | null>(null);
+  const lastInlineTextPointerEditAtRef = React.useRef<number | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const stageRef = React.useRef<HTMLDivElement>(null);
   const inlineTextRef = React.useRef<HTMLTextAreaElement>(null);
   const imageFileInputRef = React.useRef<HTMLInputElement>(null);
-  const width = normalizeSize(previewSize, scene.pageSize.width, "width");
-  const height = normalizeSize(previewSize, scene.pageSize.height, "height");
+  const [canvasContainerWidth, setCanvasContainerWidth] = React.useState<number | null>(null);
+  const [canvasContainerHeight, setCanvasContainerHeight] = React.useState<number | null>(null);
+  const [floatingToolbarWidth, setFloatingToolbarWidth] = React.useState<number | null>(null);
+  const width = fillContainer ? scene.pageSize.width : normalizeSize(previewSize, scene.pageSize.width, "width");
+  const height = fillContainer ? scene.pageSize.height : normalizeSize(previewSize, scene.pageSize.height, "height");
   const selectedNodes = getSelectedNodes(scene, controller);
   const selectedNode = selectedNodes.length === 1 ? selectedNodes[0] : null;
-  const visibleSelectedNodes = selectedNodes.filter((node) => isNodeVisibleForConfig(node, configData));
-  const canvasSelectionBounds = getSketchSelectionBounds(visibleSelectedNodes);
+  const inlineTextSourceNode = inlineTextEdit
+    ? scene.nodes.find((node) => node.id === inlineTextEdit.nodeId) ?? null
+    : null;
+  const inlineTextNode = inlineTextSourceNode && inlineTextEdit
+    ? {
+        ...inlineTextSourceNode,
+        text: inlineTextEdit.value,
+        style: { ...inlineTextEdit.style },
+        textStyleRuns: cloneSketchTextStyleRuns(inlineTextEdit.textStyleRuns),
+      }
+    : inlineTextSourceNode;
+  const selectionNodes = selectedNodes.map((node) => node.id === inlineTextNode?.id ? inlineTextNode : node);
+  const visibleSelectedNodes = selectionNodes.filter((node) => isNodeVisibleForConfig(node, configData));
+  const selectionToolbarContext = getSketchSelectionToolbarContext(scene, selectionNodes, configData);
+  const canvasSelectionBounds = getSketchSelectionVisualBounds(scene, selectionNodes, configData);
   const hoveredNode = hoveredNodeId && !controller.selection.nodeIds.includes(hoveredNodeId)
     ? scene.nodes.find((node) => node.id === hoveredNodeId && isNodeVisibleForConfig(node, configData)) ?? null
     : null;
   const hoverSelectionBounds = hoveredNode ? getSketchNodeBounds(hoveredNode) : null;
-  const resizableSelectedNodes = getSelectionResizeNodes(selectedNodes).filter((node) => isNodeVisibleForConfig(node, configData));
+  const resizableSelectedNodes = selectionToolbarContext.grouped
+    ? []
+    : getSelectionResizeNodes(selectionNodes).filter((node) => isNodeVisibleForConfig(node, configData));
   const resizeSelectionBounds = getSketchSelectionBounds(resizableSelectedNodes);
   const canResizeSelection = Boolean(resizeSelectionBounds && resizableSelectedNodes.length);
   const lineEndpointHandles =
@@ -5478,9 +6374,6 @@ export function SketchEditorCanvas({
           end: { x: selectedNode.x + selectedNode.width, y: selectedNode.y + selectedNode.height },
         }
       : undefined;
-  const inlineTextNode = inlineTextEdit
-    ? scene.nodes.find((node) => node.id === inlineTextEdit.nodeId) ?? null
-    : null;
   const canEditInlineTextNode = inlineTextNode ? canInlineEditTextNode(inlineTextNode, configData) : false;
   const inlineTextEditMetrics = inlineTextEdit && inlineTextNode && canEditInlineTextNode
     ? getInlineTextEditMetrics(inlineTextNode, inlineTextEdit.value)
@@ -5491,6 +6384,7 @@ export function SketchEditorCanvas({
   const imageFitEditBounds = imageFitEditNode ? getSketchNodeBounds(imageFitEditNode) : null;
   const editableSelectedNodes = selectedNodes.filter((node) => !node.locked && !isNodeHiddenByRuntimeConfig(node, configData));
   const layerEditableSelectedNodes = getGroupableSelectedNodes(scene, controller, configData);
+  const layerOperationSelectedNodes = getLayerOperationSelectedNodes(scene, controller, configData);
   const lockableSelectedNodes = selectedNodes.filter((node) => node.type !== "group" && node.visible !== false && isNodeVisibleForConfig(node, configData));
   const visibleToggleSelectedNodes = selectedNodes.filter((node) => node.type !== "group" && !isNodeHiddenByRuntimeConfig(node, configData));
   const selectedGroupNodes = getSelectedGroupNodes(scene, controller);
@@ -5499,18 +6393,90 @@ export function SketchEditorCanvas({
     : null;
   const canGroupSelection = layerEditableSelectedNodes.length >= 2;
   const canUngroupSelection = selectedGroupNodes.length > 0;
-  const previewScene = drawingDraft?.node
-    ? { ...scene, nodes: [...scene.nodes, drawingDraft.node] }
+  const inlineTextPreviewNode = inlineTextNode && inlineTextEdit
+    ? {
+        ...inlineTextNode,
+        text: "",
+        bindings: inlineTextNode.bindings?.text
+          ? { ...inlineTextNode.bindings, text: undefined }
+          : inlineTextNode.bindings,
+      }
+    : null;
+  const inlineTextPreviewScene = inlineTextNode && inlineTextEdit
+    ? {
+        ...scene,
+        nodes: scene.nodes.map((node) => node.id === inlineTextNode.id ? inlineTextPreviewNode as SketchSceneNode : node),
+      }
     : scene;
+  const previewScene = drawingDraft?.node
+    ? { ...inlineTextPreviewScene, nodes: [...inlineTextPreviewScene.nodes, drawingDraft.node] }
+    : inlineTextPreviewScene;
   const connectorCandidatePoints = getConnectorCandidatePoints(scene, dragStart, configData);
   const snapGuides = getSketchSnapGuides(scene, dragStart, configData);
   const dragModifierHint = dragStart && dragStart.kind !== "rotate"
     ? [
         "Alt/Option 拖动复制",
         dragStart.kind === "resize" ? "Shift 等比缩放" : "Shift 约束比例",
-        "Cmd/Ctrl 临时隐藏吸附参考线",
+        "Cmd/Ctrl 暂停吸附与参考线",
       ].join(" · ")
     : null;
+
+  React.useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const updateContainerWidth = () => {
+      const nextWidth = container.clientWidth || container.getBoundingClientRect().width;
+      const nextHeight = container.clientHeight || container.getBoundingClientRect().height;
+      if (Number.isFinite(nextWidth) && nextWidth > 0) {
+        setCanvasContainerWidth((current) => (current === nextWidth ? current : nextWidth));
+      }
+      if (Number.isFinite(nextHeight) && nextHeight > 0) {
+        setCanvasContainerHeight((current) => (current === nextHeight ? current : nextHeight));
+      }
+    };
+
+    updateContainerWidth();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateContainerWidth);
+      return () => window.removeEventListener("resize", updateContainerWidth);
+    }
+
+    const observer = new ResizeObserver(updateContainerWidth);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  React.useLayoutEffect(() => {
+    if (!detailsPanelOpen) {
+      setDetailsPanelSize((current) => (current === null ? current : null));
+      return undefined;
+    }
+    const panel = detailsPanelRef.current;
+    if (!panel) return undefined;
+
+    const reportSize = () => {
+      const rect = panel.getBoundingClientRect();
+      const nextWidth = panel.offsetWidth || rect.width;
+      const nextHeight = panel.offsetHeight || rect.height;
+      if (!Number.isFinite(nextWidth) || !Number.isFinite(nextHeight) || nextWidth <= 0 || nextHeight <= 0) return;
+      setDetailsPanelSize((current) => (
+        current?.width === nextWidth && current.height === nextHeight
+          ? current
+          : { width: nextWidth, height: nextHeight }
+      ));
+    };
+
+    reportSize();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", reportSize);
+      return () => window.removeEventListener("resize", reportSize);
+    }
+
+    const observer = new ResizeObserver(reportSize);
+    observer.observe(panel);
+    return () => observer.disconnect();
+  }, [detailsPanelOpen, detailsPanelTab]);
 
   React.useEffect(() => {
     if (!inlineTextEdit) return;
@@ -5529,6 +6495,15 @@ export function SketchEditorCanvas({
     if (!controller.selection.nodeIds.length) setDetailsPanelOpen(false);
   }, [controller.selection.nodeIds.length]);
 
+  const closeAlignmentMenu = React.useCallback(() => {
+    setAlignmentMenuOpen(false);
+    setAlignmentMenuPosition(null);
+  }, []);
+
+  React.useEffect(() => {
+    if (!controller.selection.nodeIds.length || selectedNodes.length < 2) closeAlignmentMenu();
+  }, [closeAlignmentMenu, controller.selection.nodeIds.length, selectedNodes.length]);
+
   React.useEffect(() => {
     if (!contextMenu) return;
     const handlePointerDown = (event: PointerEvent) => {
@@ -5543,13 +6518,28 @@ export function SketchEditorCanvas({
   React.useEffect(() => {
     if (!detailsPanelOpen) return;
     const handlePointerDown = (event: PointerEvent) => {
-      if (detailsPanelRef.current && !detailsPanelRef.current.contains(event.target as Node)) {
-        setDetailsPanelOpen(false);
-      }
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (detailsPanelRef.current?.contains(target)) return;
+      if (target.closest("[data-sketch-text-toolbar], [data-sketch-floating-toolbar]")) return;
+      detailsPanelOpenRef.current = false;
+      setDetailsPanelOpen(false);
     };
     document.addEventListener("pointerdown", handlePointerDown);
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [detailsPanelOpen]);
+
+  React.useEffect(() => {
+    if (!alignmentMenuOpen) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest("[data-sketch-alignment-menu], [data-sketch-floating-toolbar]")) return;
+      closeAlignmentMenu();
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [alignmentMenuOpen, closeAlignmentMenu]);
 
   const updateInlineTextSelection = React.useCallback((element: HTMLTextAreaElement, nodeId: string) => {
     controller.setInlineTextSelection({
@@ -5602,6 +6592,12 @@ export function SketchEditorCanvas({
     setStyleClipboardVersion((version) => version + 1);
   }, [selectedNodes]);
 
+  const cutSelected = React.useCallback(() => {
+    copySelected();
+    deleteSelected(scene, controller, configData);
+    setDetailsPanelOpen(false);
+  }, [configData, controller, copySelected, scene]);
+
   const pasteStyle = React.useCallback(() => {
     const clipboard = styleClipboardRef.current;
     if (!clipboard) return;
@@ -5625,8 +6621,54 @@ export function SketchEditorCanvas({
       controller.clearSelection();
       return;
     }
-    if (node.text === edit.value) return;
-    controller.applyOperations([{ op: "update", nodeId: node.id, patch: { text: edit.value } }]);
+    if (node.type !== "text") {
+      const nextTextStyleRuns = normalizeSketchTextStyleRuns(edit.value, edit.textStyleRuns);
+      if (
+        node.text === edit.value &&
+        JSON.stringify(node.style ?? {}) === JSON.stringify(edit.style ?? {}) &&
+        JSON.stringify(node.textStyleRuns ?? []) === JSON.stringify(nextTextStyleRuns ?? [])
+      ) return;
+      controller.applyOperations([{
+        op: "update",
+        nodeId: node.id,
+        patch: {
+          text: edit.value,
+          style: edit.style,
+          textStyleRuns: nextTextStyleRuns,
+        },
+      }]);
+      return;
+    }
+    const draftNode: SketchSceneNode = {
+      ...node,
+      text: edit.value,
+      style: { ...edit.style },
+      textStyleRuns: normalizeSketchTextStyleRuns(edit.value, edit.textStyleRuns),
+    };
+    const size = getSketchTextAutoSize(draftNode, edit.value);
+    const nextNode = {
+      ...draftNode,
+      width: size.width,
+      height: size.height,
+    };
+    if (
+      node.text === nextNode.text &&
+      node.width === nextNode.width &&
+      node.height === nextNode.height &&
+      JSON.stringify(node.style ?? {}) === JSON.stringify(nextNode.style ?? {}) &&
+      JSON.stringify(node.textStyleRuns ?? []) === JSON.stringify(nextNode.textStyleRuns ?? [])
+    ) return;
+    controller.applyOperations([{
+      op: "update",
+      nodeId: node.id,
+      patch: {
+        text: nextNode.text,
+        width: nextNode.width,
+        height: nextNode.height,
+        style: nextNode.style,
+        textStyleRuns: nextNode.textStyleRuns,
+      },
+    }]);
   }, [configData, controller, inlineTextEdit, scene.nodes]);
 
   const cancelInlineTextEdit = React.useCallback(() => {
@@ -5665,6 +6707,7 @@ export function SketchEditorCanvas({
     selectedNodes,
     editableSelectedNodes,
     layerEditableSelectedNodes,
+    layerOperationSelectedNodes,
     lockableSelectedNodes,
     visibleToggleSelectedNodes,
     canGroupSelection,
@@ -5688,6 +6731,7 @@ export function SketchEditorCanvas({
     editableSelectedNodes,
     fitPageToViewport,
     layerEditableSelectedNodes,
+    layerOperationSelectedNodes,
     lockableSelectedNodes,
     pasteClipboard,
     pasteStyle,
@@ -5703,30 +6747,43 @@ export function SketchEditorCanvas({
     if (!node || !canInlineEditTextNode(node, configData)) return false;
     activateSketchKeyboardScope(controller);
     controller.setNodeIds([node.id]);
-    setInlineTextEdit({ nodeId: node.id, value: node.text ?? "" });
+    setDetailsPanelOpen(false);
+    setInlineTextEdit(createInlineTextEditState(node));
     return true;
   }, [configData, controller, scene.nodes]);
 
+  const clearInlineTextPointerInteraction = React.useCallback(() => {
+    dragStartRef.current = null;
+    marqueeRef.current = null;
+    setDragStart(null);
+    setMarquee(null);
+    const captured = pointerCaptureRef.current;
+    pointerCaptureRef.current = null;
+    if (!captured || typeof captured.element.releasePointerCapture !== "function") return;
+    try {
+      captured.element.releasePointerCapture(captured.pointerId);
+    } catch {
+      // Pointer capture may already be released by the browser after the double-click.
+    }
+  }, []);
+
   const enterFocusedGroupFromEvent = React.useCallback((target: Element, clientX: number, clientY: number): boolean => {
-    const directNodeId = getSketchTargetNodeId(target);
     const point = getClientScenePoint(clientX, clientY, stageRef.current, scene);
-    const hitNodeId = point ? hitTestSketchScene(scene, point, configData)?.id ?? null : null;
-    const targetNodeIds = [directNodeId, hitNodeId].filter((nodeId): nodeId is string => Boolean(nodeId));
-    if (!targetNodeIds.length) return false;
-    const groups = scene.nodes.filter((node) => node.type === "group" && node.children?.length);
-    const selectedNodeIds = new Set(controller.selection.nodeIds);
-    const group =
-      groups.find((node) => selectedNodeIds.has(node.id) && targetNodeIds.some((nodeId) => node.children?.includes(nodeId))) ??
-      groups.find((node) => targetNodeIds.some((nodeId) => node.children?.includes(nodeId))) ??
-      null;
-    if (!group?.children?.length || focusedGroupIdRef.current === group.id) return false;
-    const childId = targetNodeIds.find((nodeId) => group.children?.includes(nodeId)) ?? null;
-    if (!childId || !group.children.includes(childId)) return false;
+    const hitNodeId = getSketchCanvasHitNodeId(scene, target, point, configData);
+    if (!hitNodeId) return false;
+    const groupId = getSketchOutermostGroupId(scene, hitNodeId);
+    if (!groupId || focusedGroupIdRef.current === groupId) return false;
+    const childId = getSketchDirectGroupChildId(scene, groupId, hitNodeId);
+    if (!childId) return false;
     const childNode = scene.nodes.find((node) => node.id === childId);
-    if (!childNode || !isNodeVisibleForConfig(childNode, configData)) return false;
+    if (
+      !childNode ||
+      (childNode.type !== "group" && !isNodeVisibleForConfig(childNode, configData)) ||
+      (childNode.type === "group" && !getSelectionVisibleLeafNodes(scene, [childNode], configData).length)
+    ) return false;
     activateSketchKeyboardScope(controller);
-    focusedGroupIdRef.current = group.id;
-    setFocusedGroupId(group.id);
+    focusedGroupIdRef.current = groupId;
+    setFocusedGroupId(groupId);
     controller.setNodeIds([childNode.id]);
     return true;
   }, [configData, controller, scene]);
@@ -5737,23 +6794,23 @@ export function SketchEditorCanvas({
       controller.tool !== "select" ||
       !canvasSelectionBounds ||
       !selectedNodes.length ||
-      inlineTextEdit ||
       dragStart ||
       marquee ||
       drawingDraft
     ) return null;
     const scaleX = width / scene.pageSize.width;
     const scaleY = height / scene.pageSize.height;
-    const containerWidth = containerRef.current?.clientWidth ?? width + viewport.offsetX * 2;
-    const left = viewport.offsetX + (canvasSelectionBounds.x + canvasSelectionBounds.width / 2) * scaleX * viewport.scale;
+    const containerWidth = canvasContainerWidth ?? (containerRef.current?.clientWidth || width + viewport.offsetX * 2);
+    const desiredLeft = viewport.offsetX + (canvasSelectionBounds.x + canvasSelectionBounds.width / 2) * scaleX * viewport.scale;
     const top = viewport.offsetY + canvasSelectionBounds.y * scaleY * viewport.scale;
     const bottom = viewport.offsetY + (canvasSelectionBounds.y + canvasSelectionBounds.height) * scaleY * viewport.scale;
     return {
-      left: Math.max(16, Math.min(containerWidth - 16, left)),
+      left: resolveSketchFloatingToolbarLeft(desiredLeft, containerWidth, floatingToolbarWidth),
       top: top > 96 ? top - 84 : bottom + 32,
     };
   }, [
     canvasSelectionBounds,
+    canvasContainerWidth,
     controller.tool,
     dragStart,
     drawingDraft,
@@ -5764,6 +6821,7 @@ export function SketchEditorCanvas({
     scene.pageSize.height,
     scene.pageSize.width,
     selectedNodes.length,
+    floatingToolbarWidth,
     viewport.offsetX,
     viewport.offsetY,
     viewport.scale,
@@ -5775,17 +6833,171 @@ export function SketchEditorCanvas({
     action();
   }, [controller]);
 
-  const openDetailsBubble = React.useCallback((tab: "properties" | "layers" | "fill" | "stroke" | "more") => {
-    setShortcutHelpOpen(false);
-    setCommandPaletteOpen(false);
-    setDetailsPanelTab(tab);
-    setDetailsPanelOpen(true);
+  const handleFloatingToolbarWidthChange = React.useCallback((nextWidth: number) => {
+    if (!Number.isFinite(nextWidth) || nextWidth <= 0) return;
+    setFloatingToolbarWidth((current) => (current === nextWidth ? current : nextWidth));
   }, []);
 
+  const getDetailsPanelAnchorX = React.useCallback((trigger: HTMLElement | null): number | null => {
+    const fallback = quickToolbarPosition?.left ?? null;
+    if (!trigger) return fallback;
+    const container = containerRef.current;
+    const triggerRect = trigger.getBoundingClientRect();
+    if (!container || triggerRect.width <= 0) return fallback;
+    const containerRect = container.getBoundingClientRect();
+    return triggerRect.left + triggerRect.width / 2 - containerRect.left;
+  }, [quickToolbarPosition?.left]);
+
+  const openAlignmentMenu = React.useCallback((trigger: HTMLElement | null) => {
+    const container = containerRef.current;
+    if (!container || !trigger) return;
+    const containerRect = container.getBoundingClientRect();
+    const triggerRect = trigger.getBoundingClientRect();
+    const menuWidth = SKETCH_ALIGNMENT_MENU_WIDTH;
+    const menuHeight = SKETCH_ALIGNMENT_MENU_HEIGHT;
+    const left = Math.max(
+      menuWidth / 2 + 12,
+      Math.min(containerRect.width - menuWidth / 2 - 12, triggerRect.left - containerRect.left + triggerRect.width / 2),
+    );
+    const below = triggerRect.bottom - containerRect.top + 8;
+    const top = below + menuHeight <= containerRect.height - 12
+      ? below
+      : Math.max(12, triggerRect.top - containerRect.top - menuHeight - 8);
+    setDetailsPanelOpen(false);
+    detailsPanelOpenRef.current = false;
+    setAlignmentMenuPosition({ left, top });
+    setAlignmentMenuOpen(true);
+  }, []);
+
+  const openDetailsBubble = React.useCallback((
+    tab: "properties" | "layers" | "fill" | "stroke" | "more" | "position",
+    trigger?: HTMLElement | null,
+  ) => {
+    setShortcutHelpOpen(false);
+    setCommandPaletteOpen(false);
+    closeAlignmentMenu();
+    if (detailsPanelOpenRef.current && detailsPanelTabRef.current === tab) {
+      detailsPanelOpenRef.current = false;
+      setDetailsPanelOpen(false);
+      return;
+    }
+    detailsPanelOpenRef.current = true;
+    detailsPanelTabRef.current = tab;
+    setDetailsPanelTab(tab);
+    setDetailsPanelAnchorX(getDetailsPanelAnchorX(trigger ?? null));
+    setDetailsPanelSize(null);
+    setDetailsPanelOpen(true);
+  }, [closeAlignmentMenu, getDetailsPanelAnchorX]);
+
+  const textToolbarNode = selectedNodes.length === 1 && selectedNode && (
+    selectedNode.type === "text" ||
+    (supportsTextStyle(selectedNode) && (
+      Boolean(selectedNode.text?.length) ||
+      inlineTextEdit?.nodeId === selectedNode.id
+    ))
+  )
+    ? inlineTextEdit?.nodeId === selectedNode.id && inlineTextNode
+      ? inlineTextNode
+      : selectedNode
+    : null;
+  const isTextToolbarInlineEdit = Boolean(inlineTextEdit && textToolbarNode?.id === inlineTextEdit.nodeId);
+  const textToolbarRange = textToolbarNode && isTextToolbarInlineEdit
+    ? getActiveInlineTextRange(controller, textToolbarNode)
+    : null;
+
+  const applyTextToolbarStyle = React.useCallback(
+    (stylePatch: SketchSceneTextStyleOverride, defaultStylePatch: SketchSceneStyle) => {
+      const node = textToolbarNode;
+      if (!node || !canEditNodeProperties(node)) return;
+      const patch = getTextStylePatchForRange(node, textToolbarRange, stylePatch, defaultStylePatch);
+      if (isTextToolbarInlineEdit) {
+        setInlineTextEdit((current) => {
+          if (!current || current.nodeId !== node.id) return current;
+          const nextStyle = patch.style ? { ...patch.style } : { ...current.style };
+          const nextRuns = patch.textStyleRuns !== undefined
+            ? normalizeSketchTextStyleRuns(current.value, patch.textStyleRuns)
+            : cloneSketchTextStyleRuns(current.textStyleRuns);
+          return { ...current, style: nextStyle, textStyleRuns: nextRuns };
+        });
+        return;
+      }
+      const candidateNode: SketchSceneNode = {
+        ...node,
+        style: patch.style ? { ...patch.style } : { ...node.style },
+        textStyleRuns: patch.textStyleRuns !== undefined ? patch.textStyleRuns : cloneSketchTextStyleRuns(node.textStyleRuns),
+      };
+      const sizePatch = node.type === "text"
+        ? (() => {
+            const size = getSketchTextAutoSize(candidateNode, candidateNode.text ?? "");
+            return { width: size.width, height: size.height };
+          })()
+        : {};
+      applySelectedPatch(scene, controller, { ...patch, ...sizePatch });
+    },
+    [controller, isTextToolbarInlineEdit, scene, textToolbarNode, textToolbarRange],
+  );
+
+  const applyTextToolbarAlignment = React.useCallback(
+    (textAlign: NonNullable<NonNullable<SketchSceneNode["style"]>["textAlign"]>) => {
+      const node = textToolbarNode;
+      if (!node || !canEditNodeProperties(node)) return;
+      const nextStyle = { ...node.style, textAlign };
+      if (isTextToolbarInlineEdit) {
+        setInlineTextEdit((current) => current && current.nodeId === node.id ? { ...current, style: nextStyle } : current);
+        return;
+      }
+      applySelectedPatch(scene, controller, { style: nextStyle });
+    },
+    [controller, isTextToolbarInlineEdit, scene, textToolbarNode],
+  );
+
+  const openTextDetails = React.useCallback((tab: "layers" | "more", trigger?: HTMLElement | null) => {
+    if (isTextToolbarInlineEdit) commitInlineTextEdit();
+    openDetailsBubble(tab, trigger);
+  }, [commitInlineTextEdit, isTextToolbarInlineEdit, openDetailsBubble]);
+
+  const toggleTextBold = React.useCallback(() => {
+    if (!textToolbarNode) return;
+    const state = getTextStyleStateValue(textToolbarNode, textToolbarRange, "fontWeight");
+    const nextBold = state.mixed || !isSketchBoldFontWeight(state.value);
+    applyTextToolbarStyle(
+      { fontWeight: nextBold ? 700 : 400 },
+      { fontWeight: nextBold ? 700 : 400 },
+    );
+  }, [applyTextToolbarStyle, textToolbarNode, textToolbarRange]);
+
+  const toggleTextItalic = React.useCallback(() => {
+    if (!textToolbarNode) return;
+    const state = getTextStyleStateValue(textToolbarNode, textToolbarRange, "italic");
+    const nextItalic = state.mixed || !state.value;
+    applyTextToolbarStyle({ italic: nextItalic }, { italic: nextItalic });
+  }, [applyTextToolbarStyle, textToolbarNode, textToolbarRange]);
+
+  const toggleTextUnderline = React.useCallback(() => {
+    if (!textToolbarNode) return;
+    const state = getTextStyleStateValue(textToolbarNode, textToolbarRange, "textDecoration");
+    const nextDecoration = state.mixed || state.value !== "underline" ? "underline" : "none";
+    applyTextToolbarStyle(
+      { textDecoration: nextDecoration },
+      { textDecoration: nextDecoration },
+    );
+  }, [applyTextToolbarStyle, textToolbarNode, textToolbarRange]);
+
+  const setTextFontSize = React.useCallback((fontSize: number) => {
+    if (!Number.isInteger(fontSize) || fontSize < 1 || fontSize > 512) return;
+    applyTextToolbarStyle({ fontSize }, { fontSize });
+  }, [applyTextToolbarStyle]);
+
+  const setTextColor = React.useCallback((color: string) => {
+    const normalized = normalizeSketchHexColor(color);
+    if (!normalized) return;
+    applyTextToolbarStyle({ color: normalized }, { color: normalized });
+  }, [applyTextToolbarStyle]);
+
   const floatingToolbarActions = React.useMemo<SketchFloatingToolbarAction[]>(() => {
-    if (!quickToolbarPosition) return [];
-    const openMore = () => openDetailsBubble("more");
-    if (selectedNodes.length === 1 && selectedNode) {
+    if (!quickToolbarPosition || selectedNode?.type === "text") return [];
+    const openMore = (trigger?: HTMLElement | null) => openDetailsBubble("more", trigger);
+    if (selectedNodes.length === 1 && selectedNode && selectedNode.type !== "group") {
       const actions: SketchFloatingToolbarAction[] = [];
       if (supportsFillStyle(selectedNode)) {
         actions.push({
@@ -5793,9 +7005,10 @@ export function SketchEditorCanvas({
           label: "填充",
           title: "编辑填充",
           icon: <PaintBucket className="h-3.5 w-3.5" />,
-          swatchColor: toColorInputValue(selectedNode.style?.fill, "#ffffff"),
+          swatchColor: isSketchNoColor(selectedNode.style?.fill) ? "transparent" : toColorInputValue(selectedNode.style?.fill, "#ffffff"),
+          swatchKind: "fill",
           disabled: !canEditNodeProperties(selectedNode),
-          onClick: () => runQuickToolbarAction(() => openDetailsBubble("fill")),
+          onClick: (event) => runQuickToolbarAction(() => openDetailsBubble("fill", event.currentTarget)),
         });
       }
       if (supportsStrokeStyle(selectedNode)) {
@@ -5803,130 +7016,160 @@ export function SketchEditorCanvas({
           id: "stroke",
           label: "描边",
           title: "编辑描边",
-          icon: <PenLine className="h-3.5 w-3.5" />,
-          swatchColor: toColorInputValue(selectedNode.style?.stroke, "#111827"),
+          icon: <Square className="h-3.5 w-3.5" />,
+          swatchColor: isSketchNoColor(selectedNode.style?.stroke) ? "transparent" : toColorInputValue(selectedNode.style?.stroke, "#111827"),
+          swatchKind: "stroke",
           disabled: !canEditNodeProperties(selectedNode),
-          onClick: () => runQuickToolbarAction(() => openDetailsBubble("stroke")),
-        });
-      }
-      if (canInlineEditTextNode(selectedNode, configData)) {
-        actions.push({
-          id: "text",
-          label: "文本",
-          icon: <Type className="h-3.5 w-3.5" />,
-          onClick: () => runQuickToolbarAction(() => startInlineTextEdit(selectedNode.id)),
+          onClick: (event) => runQuickToolbarAction(() => openDetailsBubble("stroke", event.currentTarget)),
         });
       }
       actions.push(
         {
-          id: "copyStyle",
-          label: "复制样式",
-          icon: <Copy className="h-3.5 w-3.5" />,
-          disabled: !canEditNodeProperties(selectedNode),
-          onClick: () => runQuickToolbarAction(copyStyle),
-        },
-        {
-          id: "properties",
-          label: "属性",
-          icon: <SlidersHorizontal className="h-3.5 w-3.5" />,
-          onClick: () => runQuickToolbarAction(() => openDetailsBubble("properties")),
-        },
-        {
-          id: "layers",
-          label: "图层",
+          id: "layerOrder",
+          label: "层级",
           icon: <Layers className="h-3.5 w-3.5" />,
-          onClick: () => runQuickToolbarAction(() => openDetailsBubble("layers")),
+          disabled: !canEditNodeProperties(selectedNode),
+          onClick: (event) => runQuickToolbarAction(() => openDetailsBubble("layers", event.currentTarget)),
         },
         {
           id: "more",
           label: "更多",
           icon: <MoreHorizontal className="h-3.5 w-3.5" />,
-          onClick: () => runQuickToolbarAction(openMore),
+          onClick: (event) => runQuickToolbarAction(() => openMore(event.currentTarget)),
         },
       );
       return actions;
     }
-    return [
-      {
-        id: "alignLeft",
-        label: "左对齐",
+    const fill = getMixedStyleValue(selectionToolbarContext.fillStyleNodes, "fill");
+    const stroke = getMixedStyleValue(selectionToolbarContext.strokeStyleNodes, "stroke");
+    const showStyleActions = selectionToolbarContext.graphicNodes.length > 0 && (
+      !selectionToolbarContext.grouped || selectionToolbarContext.pureTextNodes.length === 0
+    );
+    const actions: SketchFloatingToolbarAction[] = [];
+    if (showStyleActions) {
+      actions.push(
+        {
+          id: "stroke",
+          label: "边框",
+          title: "编辑边框",
+          icon: <Square className="h-3.5 w-3.5" />,
+          swatchColor: getSketchColorFieldValue(stroke.value, "#111827", true),
+          swatchKind: "stroke",
+          swatchMixed: stroke.mixed,
+          disabled: !selectionToolbarContext.strokeStyleNodes.length,
+          onClick: (event) => runQuickToolbarAction(() => openDetailsBubble("stroke", event.currentTarget)),
+        },
+        {
+          id: "fill",
+          label: "颜色",
+          title: "编辑颜色",
+          icon: <PaintBucket className="h-3.5 w-3.5" />,
+          swatchColor: getSketchColorFieldValue(fill.value, "#ffffff", true),
+          swatchKind: "fill",
+          swatchMixed: fill.mixed,
+          disabled: !selectionToolbarContext.fillStyleNodes.length,
+          onClick: (event) => runQuickToolbarAction(() => openDetailsBubble("fill", event.currentTarget)),
+        },
+      );
+    }
+    if (!selectionToolbarContext.grouped) {
+      actions.push({
+        id: "alignment",
+        label: "对齐方式",
         icon: <AlignHorizontalJustifyStart className="h-3.5 w-3.5" />,
+        ariaHasPopup: "menu",
+        ariaExpanded: alignmentMenuOpen,
         disabled: layerEditableSelectedNodes.length < 2,
-        onClick: () => runQuickToolbarAction(() => alignSelected(scene, controller, "left", configData)),
-      },
-      {
-        id: "alignTop",
-        label: "顶对齐",
-        icon: <AlignVerticalJustifyStart className="h-3.5 w-3.5" />,
-        disabled: layerEditableSelectedNodes.length < 2,
-        onClick: () => runQuickToolbarAction(() => alignSelected(scene, controller, "top", configData)),
-      },
-      {
-        id: "distributeHorizontal",
-        label: "水平分布",
-        icon: <Rows3 className="h-3.5 w-3.5 rotate-90" />,
-        disabled: layerEditableSelectedNodes.length < 3,
-        onClick: () => runQuickToolbarAction(() => distributeSelectedHorizontally(scene, controller, configData)),
-      },
-      {
+        onClick: (event) => runQuickToolbarAction(() => openAlignmentMenu(event.currentTarget)),
+      });
+      actions.push({
         id: "group",
-        label: "成组",
-        icon: <Group className="h-3.5 w-3.5" />,
+        label: "组合",
+        icon: <Group data-sketch-icon="group" className="h-3.5 w-3.5" />,
         disabled: !canGroupSelection,
         onClick: () => runQuickToolbarAction(() => groupSelected(scene, controller, configData)),
-      },
+      });
+    } else {
+      actions.push({
+        id: "ungroup",
+        label: "解组",
+        icon: <Ungroup data-sketch-icon="ungroup" className="h-3.5 w-3.5" />,
+        disabled: !canUngroupSelection,
+        onClick: () => runQuickToolbarAction(() => ungroupSelected(scene, controller)),
+      });
+    }
+    actions.push(
       {
-        id: "duplicate",
-        label: "复制",
-        icon: <Copy className="h-3.5 w-3.5" />,
-        disabled: !editableSelectedNodes.length,
-        onClick: () => runQuickToolbarAction(() => duplicateSelected(scene, controller, configData)),
-      },
-      {
-        id: "delete",
-        label: "删除",
-        icon: <Trash2 className="h-3.5 w-3.5" />,
-        disabled: !editableSelectedNodes.length,
-        onClick: () => runQuickToolbarAction(() => deleteSelected(scene, controller, configData)),
+        id: "layerOrder",
+        label: "图层",
+        icon: <Layers className="h-3.5 w-3.5" />,
+        disabled: !layerOperationSelectedNodes.length,
+        onClick: (event) => runQuickToolbarAction(() => openDetailsBubble("layers", event.currentTarget)),
       },
       {
         id: "more",
         label: "更多",
         icon: <MoreHorizontal className="h-3.5 w-3.5" />,
-        onClick: () => runQuickToolbarAction(openMore),
+        onClick: (event) => runQuickToolbarAction(() => openMore(event.currentTarget)),
       },
-    ];
+    );
+    return actions;
   }, [
+    alignmentMenuOpen,
     canGroupSelection,
+    canUngroupSelection,
     configData,
     controller,
-    copyStyle,
-    editableSelectedNodes.length,
     layerEditableSelectedNodes.length,
+    layerOperationSelectedNodes.length,
+    openAlignmentMenu,
     openDetailsBubble,
     quickToolbarPosition,
     runQuickToolbarAction,
     scene,
     selectedNode,
     selectedNodes.length,
-    startInlineTextEdit,
+    selectionToolbarContext,
   ]);
 
+  const detailsStyleNodes = detailsPanelTab === "fill"
+    ? selectionToolbarContext.fillStyleNodes
+    : selectionToolbarContext.strokeStyleNodes;
+  const detailsStyleState = getMixedStyleValue(
+    detailsStyleNodes,
+    detailsPanelTab === "fill" ? "fill" : "stroke",
+  );
+  const detailsStyleLabel = detailsPanelTab === "fill"
+    ? selectionToolbarContext.grouped || selectedNodes.length > 1 ? "颜色" : "填充"
+    : selectionToolbarContext.grouped || selectedNodes.length > 1 ? "边框" : "描边";
+
   const detailsBubblePosition = React.useMemo(() => {
-    const bubbleWidth = 320;
-    const bubbleHeight = detailsPanelTab === "more" || detailsPanelTab === "fill" || detailsPanelTab === "stroke" ? 210 : 460;
-    const containerWidth = containerRef.current?.clientWidth ?? width;
-    const containerHeight = containerRef.current?.clientHeight ?? height;
+    const fallbackWidth = detailsPanelTab === "position"
+      ? 360
+      : detailsPanelTab === "fill" || detailsPanelTab === "stroke"
+        ? 236
+        : detailsPanelTab === "more"
+          ? 204
+          : detailsPanelTab === "layers"
+            ? 184
+            : 320;
+    const fallbackHeight = detailsPanelTab === "more" ? 268 : detailsPanelTab === "fill" || detailsPanelTab === "stroke" ? 210 : detailsPanelTab === "layers" ? 180 : 96;
+    const bubbleWidth = detailsPanelSize?.width ?? fallbackWidth;
+    const bubbleHeight = detailsPanelSize?.height ?? fallbackHeight;
+    const containerWidth = canvasContainerWidth ?? (containerRef.current?.clientWidth || width);
+    const containerHeight = canvasContainerHeight ?? (containerRef.current?.clientHeight || height);
     const toolbarTop = quickToolbarPosition?.top ?? 20;
     const below = toolbarTop + 44;
+    const anchorX = detailsPanelAnchorX ?? quickToolbarPosition?.left ?? containerWidth / 2;
     return {
-      left: Math.max(12, Math.min(containerWidth - bubbleWidth - 12, (quickToolbarPosition?.left ?? bubbleWidth / 2) - bubbleWidth / 2)),
+      left: Math.max(12, Math.min(containerWidth - bubbleWidth - 12, anchorX - bubbleWidth / 2)),
       top: below + bubbleHeight <= containerHeight - 12 ? below : Math.max(12, toolbarTop - bubbleHeight - 8),
     };
-  }, [detailsPanelTab, height, quickToolbarPosition, width]);
+  }, [canvasContainerHeight, canvasContainerWidth, detailsPanelAnchorX, detailsPanelSize, detailsPanelTab, height, quickToolbarPosition, width]);
 
   const getInlineTextEditNodeIdFromPoint = React.useCallback(
     (target: Element, clientX: number, clientY: number): string | null => {
+      if (target.closest("[data-sketch-inline-text-editor], [data-sketch-text-toolbar], [data-sketch-details-panel]")) return null;
       const directNodeId = getSketchTargetNodeId(target);
       if (directNodeId) {
         const directNode = scene.nodes.find((node) => node.id === directNodeId);
@@ -6025,36 +7268,112 @@ export function SketchEditorCanvas({
     if (mode !== "edit") return undefined;
     const stage = stageRef.current;
     if (!stage) return undefined;
-      const startEditFromNativeEvent = (event: MouseEvent) => {
+      const startEditFromNativeEvent = (event: MouseEvent, suppressFollowingNativeDoubleClick = false) => {
         const target = event.target;
         if (!(target instanceof Element)) return;
-        if (startImageFitEditFromTarget(target, event.clientX, event.clientY)) {
+        if (enterFocusedGroupFromEvent(target, event.clientX, event.clientY)) {
+          if (suppressFollowingNativeDoubleClick) lastGroupChildSelectionAtRef.current = Date.now();
+          clearInlineTextPointerInteraction();
           event.preventDefault();
           event.stopPropagation();
           return;
         }
-        if (enterFocusedGroupFromEvent(target, event.clientX, event.clientY)) {
+        if (startImageFitEditFromTarget(target, event.clientX, event.clientY)) {
           event.preventDefault();
           event.stopPropagation();
           return;
         }
         const nodeId = getInlineTextEditNodeIdFromPoint(target, event.clientX, event.clientY);
         if (!nodeId || !startInlineTextEdit(nodeId)) return;
+        clearInlineTextPointerInteraction();
         event.preventDefault();
         event.stopPropagation();
     };
-    const onNativeDoubleClick = (event: MouseEvent) => startEditFromNativeEvent(event);
-    const onNativeClick = (event: MouseEvent) => {
-      if (event.detail < 2) return;
+    const onNativePointerMove = (event: PointerEvent) => {
+      const previous = lastInlineTextPointerDownRef.current;
+      const pending = pendingInlineTextDoublePointerRef.current;
+      const origin = pending ?? previous;
+      if (!origin) return;
+      const distance = Math.hypot(event.clientX - origin.clientX, event.clientY - origin.clientY);
+      if (distance > 6) {
+        lastInlineTextPointerDownRef.current = null;
+        pendingInlineTextDoublePointerRef.current = null;
+      }
+    };
+    const onNativePointerDown = (event: PointerEvent) => {
+      if (event.button !== 0 && typeof event.button === "number") {
+        lastInlineTextPointerDownRef.current = null;
+        pendingInlineTextDoublePointerRef.current = null;
+        return;
+      }
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        lastInlineTextPointerDownRef.current = null;
+        pendingInlineTextDoublePointerRef.current = null;
+        return;
+      }
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        lastInlineTextPointerDownRef.current = null;
+        pendingInlineTextDoublePointerRef.current = null;
+        return;
+      }
+      const nodeId = getInlineTextEditNodeIdFromPoint(target, event.clientX, event.clientY);
+      if (!nodeId) {
+        lastInlineTextPointerDownRef.current = null;
+        pendingInlineTextDoublePointerRef.current = null;
+        return;
+      }
+      const timestamp = Date.now();
+      const previous = lastInlineTextPointerDownRef.current;
+      const isDoublePointerDown = Boolean(
+        previous &&
+        previous.nodeId === nodeId &&
+        timestamp - previous.timestamp <= 450 &&
+        Math.hypot(event.clientX - previous.clientX, event.clientY - previous.clientY) <= 6,
+      );
+      lastInlineTextPointerDownRef.current = isDoublePointerDown
+        ? null
+        : { nodeId, clientX: event.clientX, clientY: event.clientY, timestamp };
+      if (!isDoublePointerDown) return;
+      pendingInlineTextDoublePointerRef.current = { nodeId, clientX: event.clientX, clientY: event.clientY, timestamp };
+    };
+    const onNativePointerUp = (event: PointerEvent) => {
+      const pending = pendingInlineTextDoublePointerRef.current;
+      if (!pending) return;
+      const distance = Math.hypot(event.clientX - pending.clientX, event.clientY - pending.clientY);
+      if (distance > 6 || Date.now() - pending.timestamp > 450) {
+        pendingInlineTextDoublePointerRef.current = null;
+        return;
+      }
+      pendingInlineTextDoublePointerRef.current = null;
+      lastInlineTextPointerEditAtRef.current = Date.now();
+      startEditFromNativeEvent(event, true);
+    };
+    const onNativeDoubleClick = (event: MouseEvent) => {
+      const groupDetectedAt = lastGroupChildSelectionAtRef.current;
+      if (groupDetectedAt !== null && Date.now() - groupDetectedAt <= 450) {
+        lastGroupChildSelectionAtRef.current = null;
+        return;
+      }
+      if (groupDetectedAt !== null) lastGroupChildSelectionAtRef.current = null;
+      const detectedAt = lastInlineTextPointerEditAtRef.current;
+      if (detectedAt !== null && Date.now() - detectedAt <= 450) {
+        lastInlineTextPointerEditAtRef.current = null;
+        return;
+      }
       startEditFromNativeEvent(event);
     };
-    stage.addEventListener("click", onNativeClick);
+    stage.addEventListener("pointermove", onNativePointerMove);
+    stage.addEventListener("pointerdown", onNativePointerDown);
+    stage.addEventListener("pointerup", onNativePointerUp);
     stage.addEventListener("dblclick", onNativeDoubleClick);
     return () => {
-      stage.removeEventListener("click", onNativeClick);
+      stage.removeEventListener("pointermove", onNativePointerMove);
+      stage.removeEventListener("pointerdown", onNativePointerDown);
+      stage.removeEventListener("pointerup", onNativePointerUp);
       stage.removeEventListener("dblclick", onNativeDoubleClick);
     };
-  }, [enterFocusedGroupFromEvent, getInlineTextEditNodeIdFromPoint, mode, startImageFitEditFromTarget, startInlineTextEdit]);
+  }, [clearInlineTextPointerInteraction, enterFocusedGroupFromEvent, getInlineTextEditNodeIdFromPoint, mode, startImageFitEditFromTarget, startInlineTextEdit]);
 
   React.useEffect(() => {
     if (mode !== "edit") return undefined;
@@ -6144,19 +7463,14 @@ export function SketchEditorCanvas({
     if (mode !== "edit") return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
       if (!canHandleSketchKeyboardShortcut(controller)) return;
-      const target = event.target as HTMLElement | null;
-      if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA") return;
-      if (event.key === " ") {
-        event.preventDefault();
-        setIsSpacePanning(true);
-        return;
-      }
       if (event.key === "Escape") {
         event.preventDefault();
         if (commandPaletteOpen) {
           setCommandPaletteOpen(false);
         } else if (shortcutHelpOpen) {
           setShortcutHelpOpen(false);
+        } else if (alignmentMenuOpen) {
+          closeAlignmentMenu();
         } else if (detailsPanelOpen) {
           setDetailsPanelOpen(false);
         } else if (inlineTextEdit) {
@@ -6176,6 +7490,13 @@ export function SketchEditorCanvas({
           controller.clearSelection();
           controller.setTool("select");
         }
+        return;
+      }
+      const target = event.target as HTMLElement | null;
+      if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA") return;
+      if (event.key === " ") {
+        event.preventDefault();
+        setIsSpacePanning(true);
         return;
       }
       const runAction = (id: string): boolean => {
@@ -6265,7 +7586,7 @@ export function SketchEditorCanvas({
         );
       }
       if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key) && controller.selection.nodeIds.length) {
-        const editableSelectedNodes = selectedNodes.filter((node) => !node.locked && isNodeVisibleForConfig(node, configData));
+        const editableSelectedNodes = getSelectionMoveNodes(scene, selectedNodes, configData);
         if (!editableSelectedNodes.length) return;
         event.preventDefault();
         const step = event.shiftKey ? 10 : 1;
@@ -6477,9 +7798,17 @@ export function SketchEditorCanvas({
               )
             : null;
         const translatedNodes = activeDragStart.kind === "move" ? translateSketchNodes(activeDragStart.nodes, delta) : null;
+        const snapDelta = translatedNodes && activeDragStart.kind === "move"
+          ? getSketchSnapDelta(scene, nextDragStart, translatedNodes, configData)
+          : { x: 0, y: 0 };
+        const snappedNodes = translatedNodes?.map((node) => ({
+          ...node,
+          x: node.x + snapDelta.x,
+          y: node.y + snapDelta.y,
+        })) ?? null;
         const previewNodes =
           activeDragStart.kind === "move"
-            ? translatedNodes ?? activeDragStart.nodes
+            ? snappedNodes ?? activeDragStart.nodes
             : activeDragStart.kind === "resize"
               ? activeDragStart.nodes.map((node, index) => (
                   resizeLineLikeNodeEndpoint(node, activeDragStart.resizeHandle, delta) ??
@@ -6489,7 +7818,7 @@ export function SketchEditorCanvas({
               : activeDragStart.nodes;
         const operations: SketchScenePatchOperation[] =
           activeDragStart.duplicateOnDrag && activeDragStart.kind === "move" && !activeDragStart.hasHistoryCheckpoint
-            ? (translatedNodes ?? activeDragStart.nodes).map((node) => ({ op: "add" as const, node }))
+            ? (snappedNodes ?? activeDragStart.nodes).map((node) => ({ op: "add" as const, node }))
             : activeDragStart.nodes.flatMap((node, index) => {
           if (activeDragStart.kind === "resize") {
             const nextNode = previewNodes[index] ?? node;
@@ -6500,7 +7829,7 @@ export function SketchEditorCanvas({
               patch: { x: nextNode.x, y: nextNode.y, width: nextNode.width, height: nextNode.height },
             }];
           }
-          const nextNode = translatedNodes?.[index] ?? node;
+          const nextNode = snappedNodes?.[index] ?? node;
           return [{
             op: "update" as const,
             nodeId: node.id,
@@ -6515,7 +7844,7 @@ export function SketchEditorCanvas({
         if (operations.length && !activeDragStart.hasHistoryCheckpoint) {
           controller.recordHistoryCheckpoint(activeDragStart.initialScene);
           if (activeDragStart.duplicateOnDrag) {
-            controller.setNodeIds(activeDragStart.nodes.map((node) => node.id));
+            controller.setNodeIds(activeDragStart.selectionNodeIds ?? activeDragStart.nodes.map((node) => node.id));
           }
           setActiveDragStart({ ...nextDragStart, hasHistoryCheckpoint: true });
         }
@@ -6573,7 +7902,7 @@ export function SketchEditorCanvas({
             controller.setNodeIds([node.id]);
             controller.setTool("select");
             if (node.type === "text") {
-              setInlineTextEdit({ nodeId: node.id, value: node.text ?? "", deleteWhenEmpty: true });
+              setInlineTextEdit(createInlineTextEditState(node, true));
             }
           } else if (activeDrawingDraft.tool === "image") {
             requestImageFileImport({ point: finalPoint });
@@ -6690,52 +8019,104 @@ export function SketchEditorCanvas({
       {shortcutHelpOpen ? (
         <SketchShortcutHelp actions={actionEntries} onClose={() => setShortcutHelpOpen(false)} />
       ) : null}
+      {alignmentMenuOpen && alignmentMenuPosition ? (
+        <SketchAlignmentMenu
+          left={alignmentMenuPosition.left}
+          top={alignmentMenuPosition.top}
+          onAlign={(axis) => runQuickToolbarAction(() => alignSelected(scene, controller, axis, configData))}
+          onClose={closeAlignmentMenu}
+        />
+      ) : null}
       {detailsPanelOpen ? (
         <div
           ref={detailsPanelRef}
           role="dialog"
           aria-label="草图工具菜单"
-          className="absolute z-40 flex max-h-[min(460px,calc(100%-24px))] w-[min(320px,calc(100%-24px))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-xl"
+          data-sketch-details-panel="true"
+          className={cn(
+            "absolute z-40 max-h-[min(460px,calc(100%-24px))] overflow-hidden rounded-xl border border-slate-200 bg-white p-1 text-slate-900 shadow-[0_12px_32px_rgba(15,23,42,0.14)]",
+            detailsPanelTab === "position"
+              ? "w-[min(360px,calc(100%-24px))]"
+              : detailsPanelTab === "fill" || detailsPanelTab === "stroke"
+                ? "w-[min(304px,calc(100%-24px))]"
+                : detailsPanelTab === "more" || detailsPanelTab === "layers"
+                  ? "w-max max-w-[calc(100%-24px)]"
+                  : "w-[min(320px,calc(100%-24px))]",
+          )}
           style={detailsBubblePosition}
           onPointerDown={(event) => event.stopPropagation()}
+          onKeyDown={(event) => {
+            if (event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "Home" && event.key !== "End") return;
+            const items = Array.from(detailsPanelRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])') ?? []);
+            if (!items.length) return;
+            const currentIndex = items.indexOf(document.activeElement as HTMLElement);
+            const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : (currentIndex + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+            event.preventDefault();
+            items[nextIndex]?.focus();
+          }}
         >
-          <div className="flex h-10 shrink-0 items-center gap-1 border-b border-slate-100 px-2">
-            {detailsPanelTab !== "more" ? (
-              <button type="button" className="rounded-lg px-2 py-1 text-xs text-slate-500 hover:bg-slate-100" onClick={() => setDetailsPanelTab("more")}>返回</button>
-            ) : null}
-            <span className="min-w-0 flex-1 truncate px-1 text-xs font-semibold">
-              {detailsPanelTab === "properties" ? "属性" : detailsPanelTab === "layers" ? "图层" : detailsPanelTab === "fill" ? "图形填充" : detailsPanelTab === "stroke" ? "描边" : "更多操作"}
-            </span>
-            <button type="button" className="rounded-lg px-2 py-1 text-xs text-slate-500 hover:bg-slate-100" aria-label="关闭工具菜单" onClick={() => setDetailsPanelOpen(false)}>关闭</button>
-          </div>
           {detailsPanelTab === "more" ? (
-            <div className="grid gap-1 p-2">
-              <button type="button" className="rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50" onClick={() => setDetailsPanelTab("properties")}>属性与导出</button>
-              <button type="button" className="rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50" onClick={() => setDetailsPanelTab("layers")}>图层管理</button>
+            <div role="menu" aria-label="更多操作">
+              <FloatingMenuItem icon={<Trash2 className="h-4 w-4" />} label="删除" shortcut="Delete" disabled={!editableSelectedNodes.length} autoFocus onClick={() => { deleteSelected(scene, controller, configData); setDetailsPanelOpen(false); }} />
+              <FloatingMenuSeparator />
+              <FloatingMenuItem icon={<Scissors className="h-4 w-4" />} label="剪切" shortcut="⌘ X" disabled={!editableSelectedNodes.length} onClick={cutSelected} />
+              <FloatingMenuItem icon={<Copy className="h-4 w-4" />} label="复制" shortcut="⌘ C" disabled={!editableSelectedNodes.length} onClick={() => { copySelected(); setDetailsPanelOpen(false); }} />
+              <FloatingMenuSeparator />
+              <FloatingMenuItem icon={<Copy className="h-4 w-4" />} label="复制样式" shortcut="⌘⌥ C" disabled={!selectedNode || !canEditNodeProperties(selectedNode)} onClick={() => { copyStyle(); setDetailsPanelOpen(false); }} />
+              <FloatingMenuItem icon={<ClipboardPaste className="h-4 w-4" />} label="粘贴样式" shortcut="⌘⌥ V" disabled={!styleClipboardRef.current || !editableSelectedNodes.length} onClick={() => { pasteStyle(); setDetailsPanelOpen(false); }} />
+              <FloatingMenuSeparator />
+              <FloatingMenuItem icon={<SlidersHorizontal className="h-4 w-4" />} label="位置与大小" trailing={<ArrowRight className="h-4 w-4" />} disabled={!selectedNode || !canEditNodeProperties(selectedNode)} onClick={() => setDetailsPanelTab("position")} />
+              {!selectionToolbarContext.grouped && selectedNodes.length > 1 ? (
+                <>
+                  <FloatingMenuSeparator />
+                  <FloatingMenuItem icon={<Rows3 className="h-4 w-4 rotate-90" />} label="水平分布" disabled={layerEditableSelectedNodes.length < 3} onClick={() => { distributeSelectedHorizontally(scene, controller, configData); setDetailsPanelOpen(false); }} />
+                  <FloatingMenuItem icon={<Rows3 className="h-4 w-4" />} label="垂直分布" disabled={layerEditableSelectedNodes.length < 3} onClick={() => { distributeSelectedVertically(scene, controller, configData); setDetailsPanelOpen(false); }} />
+                </>
+              ) : null}
+            </div>
+          ) : detailsPanelTab === "layers" ? (
+            <div role="menu" aria-label="层级">
+              <FloatingMenuItem icon={<ArrowUpToLine className="h-4 w-4" />} label="置顶" shortcut="⌘⇧ ]" disabled={!layerOperationSelectedNodes.length} autoFocus onClick={() => { bringToFront(scene, controller, configData); setDetailsPanelOpen(false); }} />
+              <FloatingMenuItem icon={<ArrowUp className="h-4 w-4" />} label="上移一层" shortcut="⌘ ]" disabled={!layerOperationSelectedNodes.length} onClick={() => { bringForward(scene, controller, configData); setDetailsPanelOpen(false); }} />
+              <FloatingMenuItem icon={<ArrowDown className="h-4 w-4" />} label="下移一层" shortcut="⌘ [" disabled={!layerOperationSelectedNodes.length} onClick={() => { sendBackward(scene, controller, configData); setDetailsPanelOpen(false); }} />
+              <FloatingMenuItem icon={<ArrowDownToLine className="h-4 w-4" />} label="置底" shortcut="⌘⇧ [" disabled={!layerOperationSelectedNodes.length} onClick={() => { sendToBack(scene, controller, configData); setDetailsPanelOpen(false); }} />
             </div>
           ) : detailsPanelTab === "fill" || detailsPanelTab === "stroke" ? (
-            <div className="p-3">
-              <p className="mb-3 text-xs text-slate-500">选择常用颜色</p>
-              <div className="grid grid-cols-6 gap-2">
-                {SKETCH_COLOR_SWATCHES.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    aria-label={`${detailsPanelTab === "fill" ? "填充" : "描边"} ${color}`}
-                    className="h-8 rounded-lg border border-slate-200 ring-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
-                    style={{ backgroundColor: color }}
-                    onClick={() => updateSelectedStyle(scene, controller, detailsPanelTab === "fill" ? { fill: color } : { stroke: color })}
-                  />
-                ))}
-              </div>
-              <label className="mt-3 flex items-center justify-between text-xs text-slate-600">
-                自定义颜色
-                <input
-                  type="color"
-                  value={toColorInputValue(selectedNode?.style?.[detailsPanelTab === "fill" ? "fill" : "stroke"], detailsPanelTab === "fill" ? "#ffffff" : "#111827")}
-                  onChange={(event) => updateSelectedStyle(scene, controller, detailsPanelTab === "fill" ? { fill: event.target.value } : { stroke: event.target.value })}
-                />
-              </label>
+            <div role="menu" aria-label={detailsStyleLabel} className="p-1">
+              <SketchColorPicker
+                label={detailsStyleLabel}
+                value={getSketchColorFieldValue(
+                  detailsStyleState.value,
+                  detailsPanelTab === "fill" ? "#ffffff" : "#111827",
+                  true,
+                )}
+                mixed={detailsStyleState.mixed}
+                disabled={!detailsStyleNodes.length}
+                allowNoColor
+                choiceRole="menuitemradio"
+                autoFocus
+                customColorFallback={detailsPanelTab === "fill" ? "#ffffff" : "#111827"}
+                getSwatchLabel={(color) => `${detailsStyleLabel} ${color}`}
+                onSelect={(color) => {
+                  updateNodesStyle(
+                    controller,
+                    detailsStyleNodes,
+                    detailsPanelTab === "fill" ? { fill: color } : { stroke: color },
+                  );
+                  setDetailsPanelOpen(false);
+                }}
+              />
+            </div>
+          ) : detailsPanelTab === "position" && selectedNode ? (
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 p-2">
+              <FloatingNumberField label="水平位置" value={selectedNode.x} disabled={!canEditNodeProperties(selectedNode)} autoFocus onChange={(value) => applySelectedPatch(scene, controller, { x: value })} />
+              <FloatingNumberField label="垂直位置" value={selectedNode.y} disabled={!canEditNodeProperties(selectedNode)} onChange={(value) => applySelectedPatch(scene, controller, { y: value })} />
+              <span aria-hidden="true" />
+              <FloatingNumberField label="宽度" value={selectedNode.width} disabled={!canEditNodeProperties(selectedNode)} onChange={(value) => applySelectedPatch(scene, controller, floatingSizeRatioLocked && selectedNode.width ? { width: value, height: value * (selectedNode.height / selectedNode.width) } : { width: value })} />
+              <FloatingNumberField label="高度" value={selectedNode.height} disabled={!canEditNodeProperties(selectedNode)} onChange={(value) => applySelectedPatch(scene, controller, floatingSizeRatioLocked && selectedNode.height ? { height: value, width: value * (selectedNode.width / selectedNode.height) } : { height: value })} />
+              <button type="button" aria-label={floatingSizeRatioLocked ? "关闭尺寸比例锁定" : "开启尺寸比例锁定"} title={floatingSizeRatioLocked ? "关闭尺寸比例锁定" : "开启尺寸比例锁定"} disabled={!canEditNodeProperties(selectedNode) || selectedNode.width <= 0 || selectedNode.height <= 0} onClick={() => setFloatingSizeRatioLocked((locked) => !locked)} className={cn("inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 disabled:opacity-40", floatingSizeRatioLocked && "bg-slate-100 text-slate-900")}>
+                <Link2 className="h-3.5 w-3.5" />
+              </button>
             </div>
           ) : (
             <div className="min-h-0 flex-1 overflow-hidden">
@@ -6744,11 +8125,36 @@ export function SketchEditorCanvas({
           )}
         </div>
       ) : null}
-      {quickToolbarPosition && floatingToolbarActions.length ? (
+      {quickToolbarPosition && textToolbarNode ? (
+        <SketchTextFloatingToolbar
+          left={quickToolbarPosition.left}
+          top={quickToolbarPosition.top}
+          node={textToolbarNode}
+          range={textToolbarRange}
+          canEdit={canEditNodeProperties(textToolbarNode)}
+          toolbarLabel={textToolbarNode.type === "text" ? "纯文本工具栏" : "图文工具栏"}
+          leadingActions={textToolbarNode.type === "text"
+            ? EMPTY_SKETCH_FLOATING_TOOLBAR_ACTIONS
+            : floatingToolbarActions.filter((action) => action.id === "fill" || action.id === "stroke")}
+          useNodeDefaultColor={textToolbarNode.type !== "text"}
+          onWidthChange={handleFloatingToolbarWidthChange}
+          onPointerDown={() => activateSketchKeyboardScope(controller)}
+          onToggleBold={toggleTextBold}
+          onToggleItalic={toggleTextItalic}
+          onToggleUnderline={toggleTextUnderline}
+          onFontSize={setTextFontSize}
+          onColor={setTextColor}
+          onAlign={applyTextToolbarAlignment}
+          onOpenLayers={(trigger) => runQuickToolbarAction(() => openTextDetails("layers", trigger))}
+          onOpenMore={(trigger) => runQuickToolbarAction(() => openTextDetails("more", trigger))}
+        />
+      ) : null}
+      {quickToolbarPosition && floatingToolbarActions.length && !textToolbarNode ? (
         <SketchFloatingToolbar
           left={quickToolbarPosition.left}
           top={quickToolbarPosition.top}
           actions={floatingToolbarActions}
+          onWidthChange={handleFloatingToolbarWidthChange}
           onPointerDown={() => activateSketchKeyboardScope(controller)}
         />
       ) : null}
@@ -6757,36 +8163,25 @@ export function SketchEditorCanvas({
         data-sketch-stage
         className="absolute left-0 top-0 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.16)] ring-1 ring-slate-200"
         style={{
-          width: fillContainer ? "100%" : width,
-          height: fillContainer ? "100%" : height,
+          // Keep the stage in scene coordinates; fillContainer only affects its preview wrapper.
+          width,
+          height,
           transform: `translate(${viewport.offsetX}px, ${viewport.offsetY}px) scale(${viewport.scale})`,
           transformOrigin: "0 0",
         }}
         onPointerDown={(event) => {
-        setContextMenu(null);
-        if (mode !== "edit") return;
-        activateSketchKeyboardScope(controller);
-        updateHoveredNodeId(null);
-        setImageFitEditNodeId(null);
-        if (typeof event.button === "number" && event.button !== 0) {
-          event.preventDefault();
-          return;
-        }
-        if (isSpacePanning) return;
-          const target = event.target as Element;
-          const nodeId = getSketchTargetNodeId(target);
-          if (controller.tool === "hand") return;
-          if (controller.tool === "select" && event.detail >= 2) {
-            if (enterFocusedGroupFromEvent(target, event.clientX, event.clientY)) {
-              event.preventDefault();
-              return;
-            }
-            const editNodeId = getInlineTextEditNodeIdFromPoint(target, event.clientX, event.clientY);
-            if (editNodeId) {
-              event.preventDefault();
-              return;
-            }
+          setContextMenu(null);
+          if (mode !== "edit") return;
+          activateSketchKeyboardScope(controller);
+          updateHoveredNodeId(null);
+          setImageFitEditNodeId(null);
+          if (typeof event.button === "number" && event.button !== 0) {
+            event.preventDefault();
+            return;
           }
+          if (isSpacePanning) return;
+          const target = event.target as Element;
+          if (controller.tool === "hand") return;
           if (controller.tool === "eraser") {
             const point = getPointerScenePoint(event, stageRef.current, scene);
             if (!point) return;
@@ -6814,20 +8209,35 @@ export function SketchEditorCanvas({
             return;
           }
           const point = getPointerScenePoint(event, stageRef.current, scene);
+          const hitNodeId = getSketchCanvasHitNodeId(scene, target, point, configData);
           if ((event.metaKey || event.ctrlKey) && point) {
-            const candidateIds = getHitTestCandidateNodeIds(scene, point, configData);
+            const candidateIds = Array.from(new Set(
+              getHitTestCandidateNodeIds(scene, point, configData).map((candidateId) =>
+                resolveSketchCanvasSelectionTarget(scene, candidateId, focusedGroupIdRef.current).selectionNodeId,
+              ),
+            ));
             if (candidateIds.length) {
               event.preventDefault();
               const currentCandidateIndex = candidateIds.findIndex((id) => controller.selection.nodeIds.includes(id));
               const nextCandidateId = candidateIds[(currentCandidateIndex + 1) % candidateIds.length];
+              const nextTarget = resolveSketchCanvasSelectionTarget(scene, nextCandidateId, focusedGroupIdRef.current);
+              if (focusedGroupIdRef.current && nextTarget.groupId !== focusedGroupIdRef.current) {
+                focusedGroupIdRef.current = null;
+                setFocusedGroupId(null);
+              }
               controller.setNodeIds([nextCandidateId]);
               return;
             }
           }
-          if (nodeId) {
-            const node = scene.nodes.find((item) => item.id === nodeId);
-            if (!node) return;
-            const wasSelected = controller.selection.nodeIds.includes(node.id);
+          if (hitNodeId) {
+            const focusedGroupAtPointerDown = focusedGroupIdRef.current;
+            const resolvedTarget = resolveSketchCanvasSelectionTarget(scene, hitNodeId, focusedGroupAtPointerDown);
+            if (focusedGroupAtPointerDown && resolvedTarget.groupId !== focusedGroupAtPointerDown) {
+              focusedGroupIdRef.current = null;
+              setFocusedGroupId(null);
+            }
+            const targetSelectionId = resolvedTarget.selectionNodeId;
+            const wasSelected = controller.selection.nodeIds.includes(targetSelectionId);
             const keepCurrentSelection =
               !event.shiftKey &&
               controller.selection.nodeIds.length > 1 &&
@@ -6835,21 +8245,27 @@ export function SketchEditorCanvas({
             let nextIds: string[];
             if (event.shiftKey) {
               nextIds = wasSelected
-                ? controller.selection.nodeIds.filter((id) => id !== node.id)
-                : [...controller.selection.nodeIds, node.id];
+                ? controller.selection.nodeIds.filter((id) => id !== targetSelectionId)
+                : [...controller.selection.nodeIds, targetSelectionId];
             } else {
-              nextIds = keepCurrentSelection ? controller.selection.nodeIds : [node.id];
+              nextIds = keepCurrentSelection ? controller.selection.nodeIds : [targetSelectionId];
             }
             controller.setNodeIds(nextIds);
             if (event.shiftKey && wasSelected) return;
-            if (node.locked) return;
-            const dragNodes = scene.nodes.filter((item) => nextIds.includes(item.id) && !item.locked && isNodeVisibleForConfig(item, configData));
+            const selectedSceneNodes = scene.nodes.filter((item) => nextIds.includes(item.id));
+            const dragNodes = getSelectionMoveNodes(scene, selectedSceneNodes, configData);
             if (point && dragNodes.length) {
               const duplicateOnDrag = event.altKey && !event.shiftKey;
+              const duplicateSourceNodes = duplicateOnDrag
+                ? expandSketchNodesForInsert(scene, selectedSceneNodes, configData)
+                : [];
               const nodesForDrag = duplicateOnDrag
-                ? cloneSketchNodesForInsert(expandSketchNodesForInsert(scene, dragNodes, configData), { x: 0, y: 0 })
+                ? cloneSketchNodesForInsert(duplicateSourceNodes, { x: 0, y: 0 })
                 : dragNodes;
               if (!nodesForDrag.length) return;
+              const duplicateGroup = duplicateOnDrag && selectedSceneNodes.length === 1 && selectedSceneNodes[0].type === "group"
+                ? nodesForDrag.find((node) => node.type === "group")
+                : null;
               capturePointer(event);
               setActiveDragStart({
                 kind: "move",
@@ -6858,11 +8274,16 @@ export function SketchEditorCanvas({
                 initialScene: scene,
                 hasHistoryCheckpoint: false,
                 duplicateOnDrag,
+                sourceNodeIds: duplicateOnDrag ? duplicateSourceNodes.map((item) => item.id) : undefined,
+                selectionNodeIds: duplicateGroup ? [duplicateGroup.id] : undefined,
               });
             }
           } else {
-            const point = getPointerScenePoint(event, stageRef.current, scene);
             if (!point) return;
+            if (focusedGroupIdRef.current) {
+              focusedGroupIdRef.current = null;
+              setFocusedGroupId(null);
+            }
             controller.clearSelection();
             capturePointer(event);
             setActiveMarquee({ start: point, current: point });
@@ -6874,33 +8295,6 @@ export function SketchEditorCanvas({
               hasHistoryCheckpoint: false,
             });
           }
-        }}
-        onDoubleClick={(event) => {
-          if (mode !== "edit") return;
-          const target = event.target as Element;
-          if (enterFocusedGroupFromEvent(target, event.clientX, event.clientY)) {
-            event.preventDefault();
-            event.stopPropagation();
-            return;
-          }
-          const nodeId = getInlineTextEditNodeIdFromPoint(target, event.clientX, event.clientY);
-          if (!nodeId) return;
-          if (!startInlineTextEdit(nodeId)) return;
-          event.preventDefault();
-          event.stopPropagation();
-        }}
-        onClick={(event) => {
-          if (mode !== "edit" || event.detail < 2) return;
-          const target = event.target as Element;
-          if (enterFocusedGroupFromEvent(target, event.clientX, event.clientY)) {
-            event.preventDefault();
-            event.stopPropagation();
-            return;
-          }
-          const nodeId = getInlineTextEditNodeIdFromPoint(target, event.clientX, event.clientY);
-          if (!nodeId || !startInlineTextEdit(nodeId)) return;
-          event.preventDefault();
-          event.stopPropagation();
         }}
         onPointerLeave={() => updateHoveredNodeId(null)}
       >
@@ -6922,6 +8316,7 @@ export function SketchEditorCanvas({
           bounds={canResizeSelection ? resizeSelectionBounds : canvasSelectionBounds}
           scaleX={width / scene.pageSize.width}
           scaleY={height / scene.pageSize.height}
+          viewportScale={viewport.scale}
           minimumSize={8}
           endpointHandles={lineEndpointHandles}
           showCenterPoint={Boolean(canvasSelectionBounds)}
@@ -6991,7 +8386,6 @@ export function SketchEditorCanvas({
               guide.kind === "grid" && "bg-slate-400/70",
               guide.kind === "center" && "bg-blue-500/80",
               guide.kind === "edge" && "bg-emerald-500/80",
-              guide.kind === "spacing" && "bg-amber-500/80",
             )}
             style={
               guide.orientation === "vertical"
@@ -7008,20 +8402,7 @@ export function SketchEditorCanvas({
                     height: 1,
                   }
             }
-          >
-            <span
-              className={cn(
-                "absolute rounded px-1.5 py-0.5 text-[10px] font-medium text-white shadow-sm",
-                guide.orientation === "vertical" ? "left-1 top-1" : "left-1 -top-5",
-                guide.kind === "grid" && "bg-slate-600",
-                guide.kind === "center" && "bg-blue-600",
-                guide.kind === "edge" && "bg-emerald-600",
-                guide.kind === "spacing" && "bg-amber-600",
-              )}
-            >
-              {guide.label}
-            </span>
-          </span>
+          />
         ))}
         {connectorCandidatePoints.map((point) => (
           <span
@@ -7095,9 +8476,12 @@ export function SketchEditorCanvas({
             <textarea
               ref={inlineTextRef}
               aria-label="画布文本编辑"
-              className="absolute z-20 resize-none rounded-sm border border-[#3da0ff] bg-white/95 px-2 py-1 text-[#111827] outline-none ring-2 ring-[#3da0ff]/30"
+              data-sketch-inline-text-editor="true"
+              wrap="off"
+              spellCheck={false}
+              className="absolute z-20 resize-none rounded-sm border border-[#3da0ff] bg-transparent px-2 py-1 text-[#111827] outline-none ring-2 ring-[#3da0ff]/30 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
               style={inlineTextEditMetrics.style}
-              placeholder={inlineTextNode.type === "text" ? "输入文本" : "输入形状文本"}
+              placeholder={inlineTextNode.type === "text" && !inlineTextEdit.deleteWhenEmpty ? SKETCH_TEXT_PLACEHOLDER : inlineTextNode.type === "text" ? undefined : "输入形状文本"}
               value={inlineTextEdit.value}
               onPointerDown={(event) => {
                 event.stopPropagation();
@@ -7107,16 +8491,36 @@ export function SketchEditorCanvas({
               onSelect={(event) => updateInlineTextSelection(event.currentTarget, inlineTextNode.id)}
               onChange={(event) => {
                 updateInlineTextSelection(event.currentTarget, inlineTextNode.id);
-                setInlineTextEdit({ ...inlineTextEdit, value: event.target.value });
+                const nextValue = event.target.value;
+                setInlineTextEdit((current) => current ? {
+                  ...current,
+                  value: nextValue,
+                  textStyleRuns: normalizeSketchTextStyleRuns(nextValue, current.textStyleRuns),
+                } : current);
               }}
-              onBlur={commitInlineTextEdit}
+              onBlur={(event) => {
+                const relatedTarget = event.relatedTarget;
+                if (relatedTarget instanceof Element && relatedTarget.closest("[data-sketch-text-toolbar]")) return;
+                commitInlineTextEdit();
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Escape") {
                   event.preventDefault();
                   event.stopPropagation();
                   cancelInlineTextEdit();
                 }
-                if (event.key === "Enter" && !event.shiftKey) {
+                if (
+                  event.key === "Enter" &&
+                  !event.shiftKey &&
+                  inlineTextNode.type === "text" &&
+                  inlineTextEdit.deleteWhenEmpty &&
+                  inlineTextEdit.value.trim() === ""
+                ) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  commitInlineTextEdit();
+                }
+                if (event.key === "Enter" && !event.shiftKey && inlineTextNode.type !== "text") {
                   event.preventDefault();
                   event.stopPropagation();
                   commitInlineTextEdit();
@@ -7196,22 +8600,22 @@ export function SketchEditorCanvas({
           <ContextMenuSeparator />
           <ContextMenuButton
             label="置顶"
-            disabled={!layerEditableSelectedNodes.length}
+            disabled={!layerOperationSelectedNodes.length}
             onClick={() => runContextMenuAction(() => bringToFront(scene, controller, configData))}
           />
           <ContextMenuButton
             label="上移一层"
-            disabled={!layerEditableSelectedNodes.length}
+            disabled={!layerOperationSelectedNodes.length}
             onClick={() => runContextMenuAction(() => bringForward(scene, controller, configData))}
           />
           <ContextMenuButton
             label="下移一层"
-            disabled={!layerEditableSelectedNodes.length}
+            disabled={!layerOperationSelectedNodes.length}
             onClick={() => runContextMenuAction(() => sendBackward(scene, controller, configData))}
           />
           <ContextMenuButton
             label="置底"
-            disabled={!layerEditableSelectedNodes.length}
+            disabled={!layerOperationSelectedNodes.length}
             onClick={() => runContextMenuAction(() => sendToBack(scene, controller, configData))}
           />
           <ContextMenuSeparator />
@@ -7266,22 +8670,506 @@ export function SketchEditorCanvas({
   );
 }
 
+type SketchTextToolbarMenu = "size" | "color" | "align" | null;
+
+function SketchTextFloatingToolbar({
+  left,
+  top,
+  node,
+  range,
+  canEdit,
+  toolbarLabel = "纯文本工具栏",
+  leadingActions = EMPTY_SKETCH_FLOATING_TOOLBAR_ACTIONS,
+  useNodeDefaultColor = false,
+  onWidthChange,
+  onPointerDown,
+  onToggleBold,
+  onToggleItalic,
+  onToggleUnderline,
+  onFontSize,
+  onColor,
+  onAlign,
+  onOpenLayers,
+  onOpenMore,
+}: {
+  left: number;
+  top: number;
+  node: SketchSceneNode;
+  range: { start: number; end: number } | null;
+  canEdit: boolean;
+  toolbarLabel?: string;
+  leadingActions?: SketchFloatingToolbarAction[];
+  useNodeDefaultColor?: boolean;
+  onWidthChange: (width: number) => void;
+  onPointerDown: () => void;
+  onToggleBold: () => void;
+  onToggleItalic: () => void;
+  onToggleUnderline: () => void;
+  onFontSize: (value: number) => void;
+  onColor: (value: string) => void;
+  onAlign: (value: "left" | "center" | "right") => void;
+  onOpenLayers: (trigger: HTMLElement) => void;
+  onOpenMore: (trigger: HTMLElement) => void;
+}) {
+  const toolbarRef = React.useRef<HTMLDivElement>(null);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+  const menuAnchorRef = React.useRef<HTMLElement | null>(null);
+  const [openMenu, setOpenMenu] = React.useState<SketchTextToolbarMenu>(null);
+  const [menuPosition, setMenuPosition] = React.useState<{ left: number; top: number } | null>(null);
+  const fontSizeState = getTextStyleStateValue(node, range, "fontSize");
+  const fontSizeValue = typeof fontSizeState.value === "number" && Number.isFinite(fontSizeState.value)
+    ? String(Math.round(fontSizeState.value))
+    : "";
+  const [fontSizeDraft, setFontSizeDraft] = React.useState(fontSizeValue);
+  const boldState = getTextStyleStateValue(node, range, "fontWeight");
+  const italicState = getTextStyleStateValue(node, range, "italic");
+  const decorationState = getTextStyleStateValue(node, range, "textDecoration");
+  const colorState = getTextStyleStateValue(node, range, "color");
+  const resolvedTextColor = toColorInputValue(colorState.value, SKETCH_TEXT_DEFAULT_COLOR);
+  const currentColor = useNodeDefaultColor
+    ? toColorInputValue(node.style?.color, SKETCH_TEXT_DEFAULT_COLOR)
+    : resolvedTextColor;
+  const currentAlign = node.style?.textAlign ?? "left";
+  const AlignIcon = currentAlign === "center" ? AlignCenter : currentAlign === "right" ? AlignRight : AlignLeft;
+
+  React.useEffect(() => {
+    setFontSizeDraft(fontSizeState.mixed ? "" : fontSizeValue);
+  }, [fontSizeState.mixed, fontSizeValue]);
+
+  React.useEffect(() => {
+    if (!openMenu) return undefined;
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!toolbarRef.current?.contains(target) && !menuRef.current?.contains(target)) setOpenMenu(null);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setOpenMenu(null);
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [openMenu]);
+
+  const positionOpenMenu = React.useCallback(() => {
+    if (!openMenu) return;
+    const anchor = menuAnchorRef.current;
+    const menu = menuRef.current;
+    if (!anchor || !menu || typeof window === "undefined") return;
+    const anchorRect = anchor.getBoundingClientRect();
+    const menuRect = menu.getBoundingClientRect();
+    const margin = 12;
+    const gap = 6;
+    const preferredLeft = openMenu === "size"
+      ? anchorRect.left
+      : anchorRect.left + anchorRect.width / 2 - menuRect.width / 2;
+    const left = Math.min(
+      Math.max(margin, preferredLeft),
+      Math.max(margin, window.innerWidth - menuRect.width - margin),
+    );
+    const below = anchorRect.bottom + gap;
+    const above = anchorRect.top - gap - menuRect.height;
+    const top = below + menuRect.height <= window.innerHeight - margin || above < margin ? below : above;
+    const nextPosition = { left, top };
+    setMenuPosition((current) => (
+      current && current.left === nextPosition.left && current.top === nextPosition.top
+        ? current
+        : nextPosition
+    ));
+  }, [openMenu]);
+
+  React.useLayoutEffect(() => {
+    if (!openMenu) {
+      setMenuPosition(null);
+      return undefined;
+    }
+    setMenuPosition(null);
+    positionOpenMenu();
+    const handleViewportChange = () => positionOpenMenu();
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
+    return () => {
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
+    };
+  }, [openMenu, positionOpenMenu]);
+
+  React.useLayoutEffect(() => {
+    const toolbar = toolbarRef.current;
+    if (!toolbar) return;
+    const reportWidth = () => {
+      const nextWidth = toolbar.getBoundingClientRect().width || toolbar.offsetWidth;
+      if (!Number.isFinite(nextWidth) || nextWidth <= 0) return;
+      onWidthChange(nextWidth);
+    };
+    reportWidth();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", reportWidth);
+      return () => window.removeEventListener("resize", reportWidth);
+    }
+    const observer = new ResizeObserver(reportWidth);
+    observer.observe(toolbar);
+    return () => observer.disconnect();
+  }, [onWidthChange]);
+
+  const commitFontSize = React.useCallback(() => {
+    const value = Number(fontSizeDraft);
+    if (!Number.isInteger(value) || value < 1 || value > 512) {
+      setFontSizeDraft(fontSizeState.mixed ? "" : fontSizeValue);
+      return;
+    }
+    onFontSize(value);
+    setFontSizeDraft(String(value));
+  }, [fontSizeDraft, fontSizeState.mixed, fontSizeValue, onFontSize]);
+
+  const chooseColor = React.useCallback((color: string) => {
+    onColor(color);
+    setOpenMenu(null);
+  }, [onColor]);
+
+  const chooseAlign = React.useCallback((align: "left" | "center" | "right") => {
+    onAlign(align);
+    setOpenMenu(null);
+  }, [onAlign]);
+
+  const textColorControl = (
+    <SketchMainToolbarTooltip label="文字颜色">
+      <div className="relative pointer-events-auto shrink-0">
+        <button
+          type="button"
+          aria-label="悬浮文字颜色"
+          disabled={!canEdit}
+          className={cn(
+            "inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40",
+            openMenu === "color" && "bg-slate-100 text-slate-900",
+          )}
+          onClick={(event) => {
+            menuAnchorRef.current = event.currentTarget;
+            setOpenMenu((current) => current === "color" ? null : "color");
+          }}
+        >
+          <SketchTextColorIndicator color={currentColor} />
+        </button>
+      </div>
+    </SketchMainToolbarTooltip>
+  );
+
+  const textToolbarMenuPortal = openMenu && typeof document !== "undefined"
+    ? createPortal(
+        <div
+          ref={menuRef}
+          role="menu"
+          aria-label={openMenu === "size" ? "字号选项" : openMenu === "color" ? "文字颜色" : "对齐方式"}
+          className={cn(
+            "pointer-events-auto fixed z-[1000] rounded-lg border border-slate-200 bg-white text-slate-700 shadow-xl",
+            openMenu === "size" && "grid w-36 grid-cols-3 gap-1 p-1",
+            openMenu === "color" && "w-[min(304px,calc(100vw-24px))] p-2",
+            openMenu === "align" && "flex gap-1 p-1",
+          )}
+          style={{
+            left: menuPosition?.left ?? 0,
+            top: menuPosition?.top ?? 0,
+            visibility: menuPosition ? "visible" : "hidden",
+          }}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          {openMenu === "size" ? (
+            SKETCH_TEXT_SIZE_PRESETS.map((size) => (
+              <button
+                key={size}
+                type="button"
+                role="menuitemradio"
+                aria-checked={!fontSizeState.mixed && Number(fontSizeValue) === size}
+                className={cn(
+                  "h-8 rounded-md text-xs hover:bg-slate-50",
+                  !fontSizeState.mixed && Number(fontSizeValue) === size && "bg-slate-100 font-semibold text-slate-900",
+                )}
+                onClick={() => {
+                  onFontSize(size);
+                  setFontSizeDraft(String(size));
+                  setOpenMenu(null);
+                }}
+              >
+                {size}
+              </button>
+            ))
+          ) : openMenu === "color" ? (
+            <SketchColorPicker
+              label="文字颜色"
+              value={currentColor}
+              choiceRole="menuitemradio"
+              customColorFallback={SKETCH_TEXT_DEFAULT_COLOR}
+              getSwatchLabel={(color) => `文字颜色 ${color}`}
+              onSelect={chooseColor}
+            />
+          ) : (
+            ([
+              { value: "left" as const, label: "左对齐", icon: AlignLeft },
+              { value: "center" as const, label: "居中对齐", icon: AlignCenter },
+              { value: "right" as const, label: "右对齐", icon: AlignRight },
+            ]).map((option) => {
+              const Icon = option.icon;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={currentAlign === option.value}
+                  aria-label={`对齐方式 ${option.label}`}
+                  className={cn(
+                    "inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-600 hover:bg-slate-50 hover:text-slate-900",
+                    currentAlign === option.value && "bg-slate-100 text-slate-900",
+                  )}
+                  onClick={() => chooseAlign(option.value)}
+                >
+                  <Icon className="h-4 w-4" aria-hidden="true" />
+                </button>
+              );
+            })
+          )}
+        </div>,
+        document.body,
+      )
+    : null;
+
+  return (
+    <div
+      ref={toolbarRef}
+      role="toolbar"
+      aria-label={toolbarLabel}
+      data-testid="sketch-text-floating-toolbar"
+      data-sketch-text-toolbar="true"
+      className="pointer-events-none absolute z-30 flex max-w-[calc(100%-24px)] flex-nowrap -translate-x-1/2 items-center gap-0.5 overflow-x-auto rounded-lg border border-slate-200 bg-white/95 p-1 text-slate-900 shadow-[0_8px_24px_rgba(15,23,42,0.12)] backdrop-blur [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+      style={{ left, top }}
+      onPointerDown={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onPointerDown();
+      }}
+      onClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && openMenu) {
+          event.preventDefault();
+          setOpenMenu(null);
+        }
+      }}
+    >
+      {leadingActions.map((action) => (
+        <SketchFloatingToolbarActionButton key={action.id} action={action} />
+      ))}
+      {leadingActions.length ? <div className="mx-1 h-5 w-px shrink-0 bg-slate-200" role="separator" /> : null}
+      {leadingActions.length ? textColorControl : null}
+      <SketchMainToolbarTooltip label="字号">
+        <div className="relative pointer-events-auto flex shrink-0 items-center rounded-md border border-transparent focus-within:border-slate-200">
+        <input
+          type="number"
+          min={1}
+          max={512}
+          step={1}
+          value={fontSizeDraft}
+          disabled={!canEdit}
+          placeholder={fontSizeState.mixed ? "混合" : undefined}
+          aria-label="悬浮字号"
+          className="h-8 w-12 rounded-l-md border-0 bg-transparent px-1.5 text-center text-xs font-medium text-slate-700 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-40"
+          onPointerDown={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onPointerDown();
+            event.currentTarget.focus();
+          }}
+          onChange={(event) => {
+            const nextDraft = event.target.value;
+            setFontSizeDraft(nextDraft);
+            const nextValue = Number(nextDraft);
+            if (Number.isInteger(nextValue) && nextValue >= 1 && nextValue <= 512) onFontSize(nextValue);
+          }}
+          onBlur={commitFontSize}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              commitFontSize();
+            }
+          }}
+        />
+        <button
+          type="button"
+          aria-label="打开字号选项"
+          disabled={!canEdit}
+          className={cn(
+            "inline-flex h-8 w-6 items-center justify-center rounded-r-md text-slate-500 hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40",
+            openMenu === "size" && "bg-slate-100 text-slate-900",
+          )}
+          onClick={(event) => {
+            menuAnchorRef.current = event.currentTarget;
+            setOpenMenu((current) => current === "size" ? null : "size");
+          }}
+        >
+          <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+        </div>
+      </SketchMainToolbarTooltip>
+      {!leadingActions.length ? <div className="mx-1 h-5 w-px shrink-0 bg-slate-200" role="separator" /> : null}
+      <SketchMainToolbarTooltip label="加粗">
+        <SketchTextToolbarIconButton
+          label="加粗"
+          icon={<Bold className="h-4 w-4" strokeWidth={2.5} />}
+          active={!boldState.mixed && isSketchBoldFontWeight(boldState.value)}
+          mixed={boldState.mixed}
+          disabled={!canEdit}
+          onClick={onToggleBold}
+        />
+      </SketchMainToolbarTooltip>
+      <SketchMainToolbarTooltip label="斜体">
+        <SketchTextToolbarIconButton
+          label="斜体"
+          icon={<Italic className="h-4 w-4" />}
+          active={!italicState.mixed && italicState.value === true}
+          mixed={italicState.mixed}
+          disabled={!canEdit}
+          onClick={onToggleItalic}
+        />
+      </SketchMainToolbarTooltip>
+      <SketchMainToolbarTooltip label="下划线">
+        <SketchTextToolbarIconButton
+          label="下划线"
+          icon={<Underline className="h-4 w-4" />}
+          active={!decorationState.mixed && decorationState.value === "underline"}
+          mixed={decorationState.mixed}
+          disabled={!canEdit}
+          onClick={onToggleUnderline}
+        />
+      </SketchMainToolbarTooltip>
+      {!leadingActions.length ? <div className="mx-1 h-5 w-px shrink-0 bg-slate-200" role="separator" /> : null}
+      {!leadingActions.length ? textColorControl : null}
+      <SketchMainToolbarTooltip label="对齐方式">
+        <div className="relative pointer-events-auto">
+        <button
+          type="button"
+          aria-label="对齐方式"
+          disabled={!canEdit}
+          className={cn(
+            "inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40",
+            openMenu === "align" && "bg-slate-100 text-slate-900",
+          )}
+          onClick={(event) => {
+            menuAnchorRef.current = event.currentTarget;
+            setOpenMenu((current) => current === "align" ? null : "align");
+          }}
+        >
+          <AlignIcon className="h-4 w-4" aria-hidden="true" />
+        </button>
+        </div>
+      </SketchMainToolbarTooltip>
+      <SketchMainToolbarTooltip label="层级">
+        <SketchTextToolbarIconButton
+          label="层级"
+          icon={<Layers className="h-4 w-4" />}
+          disabled={!canEdit}
+          onClick={(event) => {
+            setOpenMenu(null);
+            onOpenLayers(event.currentTarget);
+          }}
+        />
+      </SketchMainToolbarTooltip>
+      <SketchMainToolbarTooltip label="更多">
+        <SketchTextToolbarIconButton
+          label="更多"
+          icon={<MoreHorizontal className="h-4 w-4" />}
+          onClick={(event) => {
+            setOpenMenu(null);
+            onOpenMore(event.currentTarget);
+          }}
+        />
+      </SketchMainToolbarTooltip>
+      {textToolbarMenuPortal}
+    </div>
+  );
+}
+
+function SketchTextToolbarIconButton({
+  label,
+  icon,
+  active = false,
+  mixed = false,
+  disabled = false,
+  onClick,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  active?: boolean;
+  mixed?: boolean;
+  disabled?: boolean;
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={`悬浮${label}`}
+      aria-pressed={mixed ? "mixed" : active}
+      disabled={disabled}
+      className={cn(
+        "pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40",
+        active && "bg-slate-100 text-slate-900",
+        mixed && "bg-slate-50 text-slate-700",
+      )}
+      onClick={onClick}
+    >
+      {icon}
+    </button>
+  );
+}
+
 function SketchFloatingToolbar({
   left,
   top,
   actions,
+  onWidthChange,
   onPointerDown,
 }: {
   left: number;
   top: number;
   actions: SketchFloatingToolbarAction[];
+  onWidthChange: (width: number) => void;
   onPointerDown: () => void;
 }) {
+  const toolbarRef = React.useRef<HTMLDivElement>(null);
+
+  React.useLayoutEffect(() => {
+    const toolbar = toolbarRef.current;
+    if (!toolbar) return;
+
+    const reportWidth = () => {
+      const nextWidth = toolbar.getBoundingClientRect().width || toolbar.offsetWidth;
+      if (!Number.isFinite(nextWidth) || nextWidth <= 0) return;
+      onWidthChange(nextWidth);
+    };
+
+    reportWidth();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", reportWidth);
+      return () => window.removeEventListener("resize", reportWidth);
+    }
+
+    const observer = new ResizeObserver(reportWidth);
+    observer.observe(toolbar);
+    return () => observer.disconnect();
+  }, [onWidthChange]);
+
   return (
     <div
+      ref={toolbarRef}
       role="toolbar"
       aria-label="草图悬浮快捷工具条"
-      className="pointer-events-none absolute z-30 flex -translate-x-1/2 items-center gap-1 rounded-lg border border-border bg-card/95 p-1 text-foreground shadow-2xl"
+      data-sketch-floating-toolbar="true"
+      className="pointer-events-none absolute z-30 flex -translate-x-1/2 items-center gap-1 rounded-lg border border-slate-200 bg-white/95 p-1 text-slate-900 shadow-[0_8px_24px_rgba(15,23,42,0.12)] backdrop-blur"
       style={{ left, top }}
       onPointerDown={(event) => {
         event.stopPropagation();
@@ -7289,30 +9177,192 @@ function SketchFloatingToolbar({
       }}
       onClick={(event) => event.stopPropagation()}
     >
-      {actions.map((action) => (
-        <button
-          key={action.id}
-          type="button"
-          className="pointer-events-auto inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-          disabled={action.disabled}
-          aria-label={`悬浮${action.label}`}
-          title={action.title ?? action.label}
-          onClick={action.onClick}
-        >
-          {action.swatchColor ? (
-            <span className="h-3.5 w-3.5 rounded-sm border border-border" style={{ backgroundColor: action.swatchColor }} aria-hidden="true" />
-          ) : (
-            action.icon
-          )}
-          <span className="max-w-14 truncate">{action.label}</span>
-        </button>
-      ))}
+      {actions.map((action) => <SketchFloatingToolbarActionButton key={action.id} action={action} />)}
+    </div>
+  );
+}
+
+const SKETCH_ALIGNMENT_MENU_ITEMS: Array<{
+  axis: SketchAlignmentAxis;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}> = [
+  { axis: "left", label: "左对齐", icon: AlignHorizontalJustifyStart },
+  { axis: "center", label: "水平居中", icon: AlignHorizontalJustifyCenter },
+  { axis: "right", label: "右对齐", icon: AlignHorizontalJustifyEnd },
+  { axis: "top", label: "顶对齐", icon: AlignVerticalJustifyStart },
+  { axis: "middle", label: "垂直居中", icon: AlignVerticalJustifyCenter },
+  { axis: "bottom", label: "底对齐", icon: AlignVerticalJustifyEnd },
+];
+
+function SketchAlignmentMenu({
+  left,
+  top,
+  onAlign,
+  onClose,
+}: {
+  left: number;
+  top: number;
+  onAlign: (axis: SketchAlignmentAxis) => void;
+  onClose: () => void;
+}) {
+  const menuRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const firstItem = menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]');
+    firstItem?.focus();
+  }, []);
+
+  const moveFocus = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+      return;
+    }
+    if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
+    const items = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []);
+    if (!items.length) return;
+    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+    const nextIndex = event.key === "Home"
+      ? 0
+      : event.key === "End"
+        ? items.length - 1
+        : (currentIndex < 0 ? 0 : currentIndex + (event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+    event.preventDefault();
+    event.stopPropagation();
+    items[nextIndex]?.focus();
+  };
+
+  return (
+    <div
+      ref={menuRef}
+      role="menu"
+      aria-label="对齐方式"
+      data-sketch-alignment-menu="true"
+      className="pointer-events-auto absolute z-40 flex items-center gap-1 rounded-lg border border-slate-200 bg-white/95 p-1 text-slate-900 shadow-[0_8px_24px_rgba(15,23,42,0.14)] backdrop-blur"
+      style={{ left, top, transform: "translateX(-50%)" }}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
+      onKeyDown={moveFocus}
+    >
+      {SKETCH_ALIGNMENT_MENU_ITEMS.slice(0, 3).map((item) => {
+        const Icon = item.icon;
+        return (
+          <button
+            key={item.axis}
+            type="button"
+            role="menuitem"
+            aria-label={item.label}
+            title={item.label}
+            data-sketch-alignment={item.axis}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+            onClick={() => {
+              onAlign(item.axis);
+              onClose();
+            }}
+          >
+            <Icon className="h-3.5 w-3.5" />
+          </button>
+        );
+      })}
+      <div className="mx-1 h-5 w-px shrink-0 bg-slate-200" role="separator" />
+      {SKETCH_ALIGNMENT_MENU_ITEMS.slice(3).map((item) => {
+        const Icon = item.icon;
+        return (
+          <button
+            key={item.axis}
+            type="button"
+            role="menuitem"
+            aria-label={item.label}
+            title={item.label}
+            data-sketch-alignment={item.axis}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+            onClick={() => {
+              onAlign(item.axis);
+              onClose();
+            }}
+          >
+            <Icon className="h-3.5 w-3.5" />
+          </button>
+        );
+      })}
     </div>
   );
 }
 
 function ContextMenuSeparator() {
   return <div className="my-1 h-px bg-border" role="separator" />;
+}
+
+function FloatingMenuSeparator() {
+  return <div className="my-1 h-px bg-slate-100" role="separator" />;
+}
+
+function FloatingMenuItem({
+  icon,
+  label,
+  shortcut,
+  trailing,
+  disabled,
+  autoFocus,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  shortcut?: string;
+  trailing?: React.ReactNode;
+  disabled?: boolean;
+  autoFocus?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      autoFocus={autoFocus}
+      disabled={disabled}
+      className="flex h-8 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+      onClick={onClick}
+    >
+      <span className="flex h-4 w-4 shrink-0 items-center justify-center text-slate-500" aria-hidden="true">{icon}</span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {shortcut ? <kbd className="rounded border border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-500">{shortcut}</kbd> : null}
+      {trailing ? <span className="shrink-0 text-slate-400" aria-hidden="true">{trailing}</span> : null}
+    </button>
+  );
+}
+
+function FloatingNumberField({
+  label,
+  value,
+  disabled,
+  autoFocus,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  disabled?: boolean;
+  autoFocus?: boolean;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="grid min-w-0 grid-cols-[3rem_minmax(0,1fr)] items-center gap-1.5 text-xs text-slate-600">
+      <span className="w-12 shrink-0">{label}</span>
+      <input
+        type="number"
+        value={formatNumberFieldValue(value, true)}
+        disabled={disabled}
+        autoFocus={autoFocus}
+        aria-label={label}
+        onChange={(event) => {
+          const next = Number(event.target.value);
+          if (Number.isFinite(next)) onChange(next);
+        }}
+        className="h-8 min-w-0 w-full rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 disabled:bg-slate-50 disabled:opacity-50"
+      />
+    </label>
+  );
 }
 
 function ContextMenuButton({

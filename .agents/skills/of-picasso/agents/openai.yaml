@@ -1,0 +1,6 @@
+interface:
+  display_name: "毕加索｜OF 体验组长"
+  short_description: "OneFlow 信息架构、操作流程、页面状态与交互体验负责人"
+  default_prompt: "使用 $of-picasso 设计这个 OneFlow 需求的体验流程和交互方案。"
+policy:
+  allow_implicit_invocation: false

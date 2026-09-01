@@ -7,11 +7,11 @@ describe("HTML sandbox deployment boundary", () => {
   });
 
   function subject() {
-    let module: typeof import("../html-sandbox-execution");
+    let loadedModule: typeof import("../html-sandbox-execution");
     jest.isolateModules(() => {
-      module = require("../html-sandbox-execution") as typeof import("../html-sandbox-execution");
+      loadedModule = require("../html-sandbox-execution") as typeof import("../html-sandbox-execution");
     });
-    return module!;
+    return loadedModule!;
   }
 
   it("rejects a sandbox hosted on the author origin or its cookie domain", () => {

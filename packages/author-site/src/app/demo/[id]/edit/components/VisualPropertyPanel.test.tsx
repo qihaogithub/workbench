@@ -326,7 +326,7 @@ describe("VisualPropertyPanel 配置项入口", () => {
 
     const onUpdateConfigMark = jest.fn();
     renderPanel({ selectedNode: imageNode, configMarks: [imageMark], onUpdateConfigMark });
-    fireEvent.click(screen.getByRole("button", { name: "替换图片编辑配置项" }));
+    fireEvent.click(screen.getByRole("button", { name: "封面 coverImage 编辑配置项" }));
 
     expect(screen.getByRole("dialog")).toHaveTextContent("格式限制");
     expect(screen.getByText("全部图片")).toBeInTheDocument();

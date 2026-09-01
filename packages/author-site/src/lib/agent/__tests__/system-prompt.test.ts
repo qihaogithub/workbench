@@ -76,7 +76,7 @@ describe('buildStaticSystemPrompt', () => {
   it('约束新建页面时不得自行添加配置项', () => {
     const prompt = buildStaticSystemPrompt();
     // 创建页面的详细配置约束已移入 page-lifecycle skill，基座保留 Tier 1 配置规则
-    expect(prompt).toContain('默认在 `demos/` 下创建 HTML/CSS 原型页目录');
+    expect(prompt).toContain('默认传入原型页的完整 `prototype.html` 与 `prototype.css`');
     expect(prompt).toContain('runtimeType: "prototype-html-css"');
     expect(prompt).toContain('properties` 必须为空对象');
     expect(prompt).toContain('required` 必须为空数组');

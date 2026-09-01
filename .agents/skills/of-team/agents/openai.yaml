@@ -1,0 +1,6 @@
+interface:
+  display_name: "OF Team（OF 团队）"
+  short_description: "OneFlow 任务意图分流、角色协作、交接与验收闭环总控"
+  default_prompt: "使用 $of-team 根据我的目标安排 OF 团队协作并汇总结果。"
+policy:
+  allow_implicit_invocation: true
