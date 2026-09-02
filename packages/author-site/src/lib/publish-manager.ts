@@ -28,8 +28,14 @@ import type {
   KnowledgeIndexItem,
   HtmlImportMeta,
   PagePresentationProfile,
+  VisibilityRulesDocument,
 } from "@workbench/shared";
-import { resolvePagePresentation } from "@workbench/shared";
+import {
+  resolvePagePresentation,
+  parseVisibilityRules,
+  resolveVisibility,
+  validateVisibilityRules,
+} from "@workbench/shared";
 import { getPageRuntimeCapabilities } from "@workbench/shared/page-runtime-capabilities";
 import {
   HTML_IMPORT_ANALYSIS_VERSION,
@@ -37,6 +43,7 @@ import {
   ProjectAdminService,
 } from "@workbench/project-core";
 import type { CanvasState } from "@workbench/demo-ui";
+import { findVisibilityDeadLinks } from "@/lib/visibility-quality";
 import { generateIframeHtml } from "@workbench/demo-ui/iframe-template";
 import { getCdnBaseUrl } from "@/lib/cdn-config";
 import {
@@ -145,6 +152,8 @@ export interface PublishedDemoPage {
   routeKey?: string;
   order: number;
   parentId: string | null;
+  /** 页面显式声明的可联动区域 ID，仅用于发布快照校验与只读解析。 */
+  regionIds?: string[];
   runtimeType?: DemoPageRuntimeType;
   compiledJsPath?: string;
   schemaPath?: string;
@@ -194,6 +203,8 @@ export interface PublishedProject {
   appGraph?: AppGraph;
   projectConfigSchema?: string;
   projectConfigValues?: Record<string, unknown>;
+  visibilityRules?: VisibilityRulesDocument;
+  visibilityRulesHash?: string;
   canvasState?: CanvasState;
   knowledge?: KnowledgeIndexItem[];
   designSpecs?: DesignSpecMeta[];
@@ -247,6 +258,7 @@ export class PublishError extends Error {
       | "VIDEO_LOCALIZATION_FAILED"
       | "PUBLISH_COMPILE_FAILED"
       | "PUBLISH_RUNTIME_UNSUPPORTED"
+      | "VISIBILITY_RULES_INVALID"
       | "SANDBOX_ORIGIN_NOT_CONFIGURED"
       | "SANDBOX_MANIFEST_INVALID",
     message: string,
@@ -287,6 +299,11 @@ export interface PublishDryRunReport {
     skipped?: boolean;
     reason?: string;
   }>;
+  visibility?: {
+    valid: boolean;
+    issues: Array<{ code: string; message: string; ruleId?: string; pageId?: string; regionId?: string }>;
+    deadLinks?: Array<{ source: string; sourcePageId?: string; targetPageId: string; message: string }>;
+  };
   duration: number;
 }
 
@@ -441,6 +458,41 @@ function normalizePublishedConfigValues(
   return replaceConfigValueAssetUrls(values, urlMap) as Record<string, unknown>;
 }
 
+function collectDeclaredRegionIds(
+  workspacePath: string,
+  page: DemoPageMeta,
+): string[] {
+  const pageDir = getDemoDirPath(workspacePath, page.id);
+  const candidates = [
+    path.join(pageDir, "index.tsx"),
+    path.join(pageDir, "prototype.html"),
+    path.join(pageDir, "sandbox.html"),
+  ];
+  const ids = new Set<string>();
+  // Region ids are an explicit source/runtime declaration.  We intentionally
+  // do not infer targets from DOM text or CSS selectors.
+  for (const filePath of candidates) {
+    if (!fs.existsSync(filePath)) continue;
+    const content = fs.readFileSync(filePath, "utf-8");
+    for (const match of content.matchAll(/data-region-id\s*=\s*["']([A-Za-z0-9_-]{1,100})["']/g)) {
+      if (match[1]) ids.add(match[1]);
+    }
+    for (const match of content.matchAll(/regionId\s*[:=]\s*["']([A-Za-z0-9_-]{1,100})["']/g)) {
+      if (match[1]) ids.add(match[1]);
+    }
+  }
+  return [...ids];
+}
+
+export function readVisibilityRulesForPublish(
+  workspacePath: string,
+): VisibilityRulesDocument | undefined {
+  const rulesPath = path.join(workspacePath, "project.visibility-rules.json");
+  if (!fs.existsSync(rulesPath)) return undefined;
+  const parsed = parseVisibilityRules(fs.readFileSync(rulesPath, "utf-8"));
+  return parsed;
+}
+
 function normalizeScreenshotHash(hash?: string | null): string | null {
   if (!hash) return null;
   return /^[a-f0-9]{16}$/i.test(hash) ? hash.toLowerCase() : null;
@@ -560,6 +612,43 @@ export async function publishProject(
     throw new PublishError("NO_CONTENT_TO_PUBLISH", "项目没有可发布的Demo页面");
   }
 
+  const rawProjectConfigSchema = getProjectConfigSchema(workspacePath);
+  const visibilityRulesPath = path.join(workspacePath, "project.visibility-rules.json");
+  const visibilityRules = readVisibilityRulesForPublish(workspacePath);
+  const visibilityValidation = fs.existsSync(visibilityRulesPath) && !visibilityRules
+    ? {
+        valid: false,
+        issues: [{
+          code: "DOCUMENT_INVALID" as const,
+          message: "project.visibility-rules.json 格式无效",
+        }],
+      }
+    : visibilityRules
+    ? validateVisibilityRules(visibilityRules, {
+        pageIds: demoPages.map((page) => page.id),
+        projectSchema: rawProjectConfigSchema,
+        pageSchemas: Object.fromEntries(
+          demoPages.flatMap((page) => {
+            const schemaPath = path.join(getDemoDirPath(workspacePath, page.id), "config.schema.json");
+            return fs.existsSync(schemaPath)
+              ? [[page.id, fs.readFileSync(schemaPath, "utf-8")]]
+              : [];
+          }),
+        ),
+        regionIds: Object.fromEntries(
+          demoPages.map((page) => [page.id, collectDeclaredRegionIds(workspacePath, page)]),
+        ),
+      })
+    : undefined;
+  let visibilityDeadLinks: ReturnType<typeof findVisibilityDeadLinks> = [];
+  if (visibilityValidation && !visibilityValidation.valid && !dryRun) {
+    throw new PublishError(
+      "VISIBILITY_RULES_INVALID",
+      "发布失败：页面联动规则未通过校验",
+      { issues: visibilityValidation.issues },
+    );
+  }
+
   const finalPublishedProjectDir = path.join(PUBLISHED_DIR, projectId);
   const publishedProjectDir = path.join(
     PUBLISHED_DIR,
@@ -638,7 +727,6 @@ export async function publishProject(
     );
   }
 
-  const rawProjectConfigSchema = getProjectConfigSchema(workspacePath);
   const projectConfigSchema =
     rawProjectConfigSchema && urlMap.size > 0
       ? replacePathsInContent(
@@ -656,6 +744,33 @@ export async function publishProject(
   );
   const canvasState = readCanvasStateFromWorkspace(workspacePath);
   const appGraph = readAppGraph(workspacePath);
+  if (visibilityRules && visibilityValidation?.valid) {
+    const resolution = resolveVisibility({
+      rules: visibilityRules,
+      projectSchema: rawProjectConfigSchema ?? undefined,
+      projectConfigValues,
+      pageIds: demoPages.map((page) => page.id),
+      regionIds: Object.fromEntries(
+        demoPages.map((page) => [page.id, collectDeclaredRegionIds(workspacePath, page)]),
+      ),
+    });
+    visibilityDeadLinks = findVisibilityDeadLinks({
+      hiddenPageIds: Object.values(resolution.pages)
+        .filter((page) => page.hidden)
+        .map((page) => page.pageId),
+      pageIds: demoPages.map((page) => page.id),
+      canvasState,
+      appGraph,
+    });
+    if (visibilityDeadLinks.length > 0 && !dryRun) {
+      cleanupTmpDir();
+      throw new PublishError(
+        "VISIBILITY_RULES_INVALID",
+        "发布失败：隐藏页面仍被导航或应用动作引用",
+        { issues: visibilityDeadLinks },
+      );
+    }
+  }
   const knowledge = copyKnowledgeForPublish(workspacePath, publishedProjectDir);
   const designSpecs = copyDesignSpecsForPublish(workspacePath, publishedProjectDir);
 
@@ -682,6 +797,7 @@ export async function publishProject(
     const sketchMetaPath = path.join(demoDir, "sketch.meta.json");
     const requirementsPath = path.join(demoDir, "requirements.md");
     const runtimeType = page.runtimeType;
+    const regionIds = collectDeclaredRegionIds(workspacePath, page);
 
     try {
       getPageRuntimeCapabilities(runtimeType);
@@ -771,6 +887,7 @@ export async function publishProject(
         routeKey: page.routeKey,
         order: page.order,
         parentId: page.parentId,
+        regionIds,
         runtimeType,
         schemaPath: schemaPublishPath,
         requirements,
@@ -834,6 +951,7 @@ export async function publishProject(
         routeKey: page.routeKey,
         order: page.order,
         parentId: page.parentId,
+        regionIds,
         runtimeType,
         schemaPath: schemaPublishPath,
         requirements,
@@ -893,6 +1011,7 @@ export async function publishProject(
         routeKey: page.routeKey,
         order: page.order,
         parentId: page.parentId,
+        regionIds,
         runtimeType,
         schemaPath: schemaPublishPath,
         requirements,
@@ -986,6 +1105,7 @@ export async function publishProject(
       routeKey: page.routeKey,
       order: page.order,
       parentId: page.parentId,
+      regionIds,
       runtimeType,
       compiledJsPath,
       schemaPath: schemaPublishPath,
@@ -1039,6 +1159,16 @@ export async function publishProject(
       },
       pages: dryRunPages,
       images: imageResult.outcomes,
+      visibility: visibilityValidation
+        ? {
+            valid: visibilityValidation.valid && visibilityDeadLinks.length === 0,
+            issues: [
+              ...visibilityValidation.issues,
+              ...visibilityDeadLinks.map((issue) => ({ code: issue.code, message: issue.message })),
+            ],
+            ...(visibilityDeadLinks.length > 0 ? { deadLinks: visibilityDeadLinks } : {}),
+          }
+        : undefined,
       duration: Date.now() - startTime,
     };
     cleanupTmpDir();
@@ -1061,6 +1191,13 @@ export async function publishProject(
     fs.writeFileSync(
       path.join(publishedProjectDir, "config-values.json"),
       JSON.stringify(projectConfigValues, null, 2),
+    );
+  }
+  if (visibilityRules) {
+    fs.writeFileSync(
+      path.join(publishedProjectDir, "visibility-rules.json"),
+      JSON.stringify(visibilityRules, null, 2) + "\n",
+      "utf-8",
     );
   }
 
@@ -1192,6 +1329,10 @@ export async function publishProject(
       Object.keys(projectConfigValues).length > 0
         ? projectConfigValues
         : undefined,
+    visibilityRules: visibilityRules ?? undefined,
+    visibilityRulesHash: visibilityRules
+      ? crypto.createHash("sha256").update(JSON.stringify(visibilityRules)).digest("hex")
+      : undefined,
     canvasState,
     knowledge,
     designSpecs,

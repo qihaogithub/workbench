@@ -18,6 +18,7 @@ describe('isPathAllowed', () => {
 
   it('允许 project.config.schema.json 顶层文件', () => {
     expect(isPathAllowed('project.config.schema.json', WORKSPACE, DEFAULT_WORKSPACE_PERMISSIONS)).toBe(true);
+    expect(isPathAllowed('project.visibility-rules.json', WORKSPACE, DEFAULT_WORKSPACE_PERMISSIONS)).toBe(true);
     expect(isPathAllowed('AGENTS.md', WORKSPACE, DEFAULT_WORKSPACE_PERMISSIONS)).toBe(true);
   });
 

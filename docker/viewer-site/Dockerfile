@@ -32,6 +32,9 @@ COPY packages/sketch-core/package.json ./packages/sketch-core/
 COPY packages/sketch-react/package.json ./packages/sketch-react/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/viewer-site/package.json ./packages/viewer-site/
+# The preview runtime generator reads the author site's canonical SDK policy,
+# even though the viewer image only ships the static viewer output.
+COPY packages/author-site/src/lib/preview-dependency-policy.ts ./packages/author-site/src/lib/preview-dependency-policy.ts
 
 RUN --mount=type=cache,id=workbench-pnpm-store,target=/pnpm/store \
     pnpm install --store-dir /pnpm/store --frozen-lockfile --ignore-scripts \

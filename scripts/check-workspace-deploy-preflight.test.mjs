@@ -63,15 +63,20 @@ test("deploy preflight passes registered clean Workspace and detects drift", () 
   }
 });
 
-test("deploy preflight uses the Authority managed-resource contract for sandbox and design-spec files", () => {
+test("deploy preflight uses the Authority managed-resource contract for all managed resource families", () => {
   for (const resourcePath of [
     "demos/home/sandbox.html",
     "demos/home/html-import.meta.json",
+    "demos/home/config.values.json",
     "demos/home/convention.md",
+    "demos/home/requirements.md",
     "convention.md",
     "memory.md",
+    "project.visibility-rules.json",
     "design-spec/manifest.json",
     "design-spec/spec-home.json",
+    "whiteboards/bindings.json",
+    "whiteboards/board-home.json",
   ]) {
     const fixture = createFixture(resourcePath);
     try {

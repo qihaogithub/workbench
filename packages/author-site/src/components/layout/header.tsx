@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SettingsButton } from "@/components/settings/settings-button";
@@ -16,9 +15,7 @@ interface HeaderProps {
 }
 
 export function Header({ breadcrumbs = [] }: HeaderProps) {
-  const pathname = usePathname();
-
-  const defaultBreadcrumbs: BreadcrumbItem[] = [{ label: "首页", href: "/" }];
+  const defaultBreadcrumbs: BreadcrumbItem[] = [{ label: "工作台", href: "/workbench" }];
 
   const allBreadcrumbs =
     breadcrumbs.length > 0 ? breadcrumbs : defaultBreadcrumbs;
@@ -27,7 +24,7 @@ export function Header({ breadcrumbs = [] }: HeaderProps) {
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/80 backdrop-blur-xl">
       <div className="container flex h-14 items-center px-4">
         <Link
-          href="/"
+          href="/workbench"
           className="mr-6 flex items-center space-x-2 text-lg font-medium tracking-tight"
         >
           <span className="text-foreground">OneFlow</span>

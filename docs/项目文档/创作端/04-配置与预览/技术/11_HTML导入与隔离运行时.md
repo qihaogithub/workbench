@@ -19,7 +19,6 @@ covers:
   - packages/author-site/src/components/demo/DemoPageTree.tsx
   - packages/author-site/src/app/demo/[id]/edit/page.tsx
   - packages/author-site/src/components/demo/HtmlFileDropZone.tsx
-  - packages/author-site/src/components/demo/PageViewportControl.tsx
   - packages/author-site/src/components/demo/useScreenshotGeneration.ts
   - packages/demo-ui/src/SandboxedHtmlFrame.tsx
   - packages/demo-ui/src/PreviewCanvas.tsx
@@ -59,7 +58,7 @@ HTML 导入分析器只负责确定输入属于静态原型还是需要隔离的
 
 导入分析会把来源资格与兼容性分开保存。只有 `.figma-export` 标记和有效固定画板尺寸同时成立的 HTML 才记为可信 Figma 导出物。页面树文件选择、预览区拖入，以及画布或单页面预览根容器的剪贴板 HTML 都会先进行 prepare：可信 Figma 直接以该 draft 的推荐展示配置 commit，不挂载工作台；普通 HTML 会撤销预判 draft 后交给工作台重新准备。画布只在原生粘贴事件中处理内部节点/页面剪贴板；单页面预览在空白容器获得焦点后使用同一套 HTML 提取器。二者都不抢占输入控件和 iframe 内部事件，因此系统 HTML 与文件优先进入导入分流，残留的内部剪贴板不会抢占它。这样接入层像分流闸门，只有可信 Figma 走直达通道，其他 HTML 仍完整保留预览、设置、确认和重试体验。直接提交失败会撤销 draft 并给出错误提示；含受限资源的成功项会提示数量，但资源仍依既有策略被阻断。其他页面的数字 viewport 属于中置信度；`device-width`、响应式或冲突信号属于低置信度，推荐 `1440×900` 电脑视口，且仍需要确认。移除文件、取消工作台或 draft 过期都会清理私有状态。
 
-`$demo.presentation` 是持久化展示的唯一真值：固定 Figma 画板使用 `fixed-canvas + fixed`，普通 HTML 使用 `responsive-page + content`。视口预设为电脑 `1440×900`、平板 `768×1024`、手机 `390×844`，自定义宽高经共享边界校验。单页工具栏的设备切换是临时投影，只有“设为页面默认”才写回 Schema；画布卡片几何独立持久化，不反向改写 presentation。
+`$demo.presentation` 是持久化展示的唯一真值：固定 Figma 画板使用 `fixed-canvas + fixed`，普通 HTML 使用 `responsive-page + content`。视口预设为电脑 `1440×900`、平板 `768×1024`、手机 `390×844`，自定义宽高经共享边界校验。单页预览直接使用已保存的 presentation；画布卡片几何独立持久化，不反向改写 presentation。
 
 单页与画布预览都以 execution URL 和 channel ID 创建 `allow-scripts` 的隔离 iframe；画布不得把交互 HTML 落入 React 代码预览。画布截图只是性能层，截图尚未生成或生成失败时仍由该 iframe 显示页面内容。
 

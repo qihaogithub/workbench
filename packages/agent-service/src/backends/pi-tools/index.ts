@@ -74,8 +74,14 @@ import {
   createSerializeWhiteboardCodeTool,
   createUndoWhiteboardEditTool,
 } from "./whiteboard-tool";
+import {
+  createCommitConfigVisibilityDraftTool,
+  createInspectConfigVisibilityTool,
+  createPrepareConfigVisibilityDraftTool,
+  createValidateConfigVisibilityTool,
+} from "./visibility-tools";
 
-export const WORKBENCH_TOOL_VERSION = 31;
+export const WORKBENCH_TOOL_VERSION = 32;
 
 const SKETCH_SCENE_TOOLS_ENABLED =
   process.env.PI_AGENT_SKETCH_TOOLS_ENABLED === "true";
@@ -107,7 +113,7 @@ const CONTROL_TOOL_NAMES = new Set([
 ]);
 
 const CAPABILITY_TOOL_NAMES: Record<Exclude<CapabilityName, "all">, ReadonlySet<string>> = {
-  workspace: new Set(["readFile", "readUploadedFile", "listFiles", "editFile", "writeFile", "deleteFile", "bash", "schemaValidate", "knowledgeReport", "readKnowledgeSource", "getConsoleLogs", "captureScreenshot", "readWhiteboardContext", "applyWhiteboardActions", "serializeWhiteboardCode", "importWhiteboardCode", "planWhiteboardComposition", "undoWhiteboardEdit"]),
+  workspace: new Set(["readFile", "readUploadedFile", "listFiles", "editFile", "writeFile", "deleteFile", "bash", "schemaValidate", "inspectConfigVisibility", "validateConfigVisibility", "prepareConfigVisibilityDraft", "commitConfigVisibilityDraft", "knowledgeReport", "readKnowledgeSource", "getConsoleLogs", "captureScreenshot", "readWhiteboardContext", "applyWhiteboardActions", "serializeWhiteboardCode", "importWhiteboardCode", "planWhiteboardComposition", "undoWhiteboardEdit"]),
   pages: new Set(["createPage", "listPages", "arrangeCanvasPages", "previewDeletePages", "executeDeletePagePlan", "deletePage", "deletePages"]),
   comments: new Set(["readComments", "inspectElement", "replyComment", "resolveComment", "submitFeedback"]),
   image: new Set(["saveImage", "listImages", "readUserImage", "captureScreenshot", "delegateTask", "generateWhiteboardAsset"]),
@@ -122,7 +128,7 @@ const INITIAL_TOOL_NAMES = new Set([
 
 export function formatCapabilityDirectory(): string {
   const entries = [
-    "- `workspace`：文件编辑、命令、校验、知识、诊断，以及（启用时）白板 document/代码/语义 action、只读 composition plan 与可确认撤销。",
+    "- `workspace`：文件编辑、命令、校验、配置联动上下文/规则草稿、知识、诊断，以及（启用时）白板 document/代码/语义 action、只读 composition plan 与可确认撤销。",
     "- `pages`：原子创建页面、页面列表、画布整理和受确认的页面删除。",
     "- `comments`：评论读取、定位、回复和解决。",
     "- `image`：图片素材、截图、白板候选资产与图像子 Agent。",
@@ -203,6 +209,10 @@ export function createWorkbenchTools(
     createKnowledgeReportTool(config),
     createReadKnowledgeSourceTool(config),
     createReadPreinstalledSkillTool(),
+    createInspectConfigVisibilityTool(config),
+    createValidateConfigVisibilityTool(config),
+    createPrepareConfigVisibilityDraftTool(config),
+    createCommitConfigVisibilityDraftTool(config),
     createActivateCapabilitiesTool(options.capabilityActivationHandler),
     createArrangeCanvasPagesTool(config),
     ...(WHITEBOARD_TOOLS_ENABLED

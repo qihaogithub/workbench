@@ -12,7 +12,7 @@ covers:
 
 # 测试环境 Docker 部署
 
-> 更新日期：2026-08-27
+> 更新日期：2026-09-02
 > 适用主机：`qihao@10.130.33.131`（Ubuntu 24.04，x86_64，已安装 1Panel）
 > 状态：已验证可用
 
@@ -100,6 +100,10 @@ docker compose --env-file .env.docker up -d --force-recreate --no-build author-s
 `scripts/deploy-fast.sh` 适合已有可用远端目录的增量部署；首次部署前若远端没有 Node.js 且 agent 容器尚未运行，脚本的 Workspace Authority 预检会提前中止，此时按本文的首次部署流程启动一次即可。
 
 `agent-service` 与 `author-site` 的 Docker 构建上下文都需包含 `packages/whiteboard-core`（其源码被 Agent 工具链和创作端白板入口引用）；使用 targeted sync 时，部署脚本会将该 workspace 包列入两个服务的必需同步清单。若任一 Dockerfile 或同步清单缺少它，esbuild/Webpack 会在构建阶段报 `Could not resolve "@workbench/whiteboard-core"`。
+
+`viewer-site` 的静态构建会先调用根目录的 `build:preview-runtime`，因此 Dockerfile 还需复制 `packages/author-site/src/lib/preview-dependency-policy.ts` 作为 canonical SDK policy 源文件。只同步 viewer-site 自身源码会在构建阶段报 `ENOENT ... preview-dependency-policy.ts`。
+
+部署前 Authority 资源扫描必须覆盖页面配置值、需求文档、项目可见性规则和白板绑定/状态等注册资源；本地契约测试使用 `corepack pnpm --silent exec node --test scripts/check-workspace-deploy-preflight.test.mjs` 验证这一点，避免合法资源被误判为 external drift。
 
 通过 `scripts/deploy.sh --remote-build` 构建时，测试机应设置 `DOCKER_BUILD_HTTP_PROXY=http://10.130.33.131:48179` 与 `DOCKER_BUILD_HTTPS_PROXY=http://10.130.33.131:48179`，脚本会把代理作为 BuildKit 参数传给各服务；不需要代理的环境保持为空即可。
 

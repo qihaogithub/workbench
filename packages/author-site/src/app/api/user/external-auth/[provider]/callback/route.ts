@@ -64,12 +64,12 @@ function buildPostAuthRedirectUrl(request: NextRequest): URL {
     process.env.FIGMA_OAUTH_REDIRECT_URI;
   if (configuredTarget) {
     try {
-      return new URL("/", configuredTarget);
+      return new URL("/workbench", configuredTarget);
     } catch {
       // Fall back to the request URL below if local configuration is malformed.
     }
   }
-  return new URL("/", request.url);
+  return new URL("/workbench", request.url);
 }
 
 function getMissingFigmaOAuthMessage(): string {

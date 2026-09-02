@@ -1,6 +1,6 @@
 ---
 name: react-high-fidelity
-description: 高保真 React 页的完整编码规范：DemoProps 声明、@preview/sdk 优先导入、单一文件约束、依赖策略。触发词：高保真、React 页面、index.tsx、DemoProps。仅适用于新建或重写 React 页，不适用于页面运行时类型转换（prototype ↔ high-fidelity-react），转换场景使用 page-runtime-conversion。
+description: 高保真 React 页的完整编码规范：DemoProps 声明、@preview/sdk 优先导入、单一文件约束、依赖策略，以及业务配置驱动区域声明。触发词：高保真、React 页面、index.tsx、DemoProps。仅适用于新建或重写 React 页，不适用于页面运行时类型转换（prototype ↔ high-fidelity-react），转换场景使用 page-runtime-conversion。
 ---
 
 # 高保真 React 页规范
@@ -18,6 +18,7 @@ description: 高保真 React 页的完整编码规范：DemoProps 声明、@prev
 - 代码完整可运行，包含必要的 import
 - 所有代码在单一文件中，不使用 `import './xxx'`
 - 复合类型配置（`array`/`imageList`/`richtext`/`cascade`/`enum` 多选/`type: "position"`）只能由高保真页消费，原型页不支持
+- 若业务配置需要控制本页局部可见性，为容器保留稳定 `data-region-id="meaningful-id"`；跨页面联动规则写入项目根 `project.visibility-rules.json`，不要在组件内自行读取其他页面配置。
 
 ## DemoProps 接口示例
 

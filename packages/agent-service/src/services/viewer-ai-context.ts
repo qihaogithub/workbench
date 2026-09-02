@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { DemoPageMeta, Project, WorkspaceTree } from "@workbench/shared/contracts";
+import { parseVisibilityRules } from "@workbench/shared";
 import { getSystemKnowledgeSnapshot } from "../config/system-knowledge";
 
 const MAX_TEXT_CHARS = 12000;
@@ -140,6 +141,8 @@ export function buildViewerAiPromptContext(input: ViewerAiContextInput): string 
   const pages = listWorkspacePages(project);
   const activePage = pages.find((page) => page.id === activePageId) || pages[0];
   const projectConfigSchema = readTextIfExists(path.join(project.workspacePath, "project.config.schema.json"));
+  const visibilityRulesRaw = readTextIfExists(path.join(project.workspacePath, "project.visibility-rules.json"));
+  const visibilityRules = visibilityRulesRaw ? parseVisibilityRules(visibilityRulesRaw) : undefined;
   const memory = readTextIfExists(path.join(project.workspacePath, "memory.md"));
 
   const detailPages = new Map<string, DemoPageMeta>();
@@ -167,6 +170,11 @@ export function buildViewerAiPromptContext(input: ViewerAiContextInput): string 
     "",
     "## 项目级配置项",
     projectConfigSchema ? truncateText(projectConfigSchema) : "（无项目级配置项）",
+    "",
+    "## 业务配置驱动的页面可见性",
+    visibilityRules
+      ? truncateText(JSON.stringify(visibilityRules, null, 2), 8000)
+      : "（未声明页面可见性规则；所有已发布页面按默认状态展示）",
     "",
     "## 页面内容与页面配置",
     detailPages.size > 0
@@ -198,6 +206,7 @@ export function buildViewerAiSystemPrompt(): string {
 ## 只读边界
 
 - 使用端只能查看和问答，不能修改、删除、保存、发布或执行命令。
+- 业务配置与页面可见性规则只能读取已发布快照；不要建议或声称可以在使用端修改业务配置、联动规则或页面可见性。
 - 如果用户要求你修改内容、删除页面、保存配置、生成文件或执行其他写操作，请明确说明：使用端 AI 只能解答和建议，不能替用户执行改动。
 - 不要声称你已经完成任何项目改动。
 

@@ -1,15 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { LoginForm } from "@/components/auth/login-form";
 import { useToast } from "@/components/ui/toast-provider";
+import { getSafeRedirectPath } from "@/lib/auth/redirect";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const redirect = getSafeRedirectPath(searchParams.get("redirect"));
 
   const handleRegister = async (username: string, password: string) => {
     setLoading(true);
@@ -24,7 +27,7 @@ export default function RegisterPage() {
       if (!data.success) throw new Error(data.error?.message || "注册失败");
 
       toast({ title: "注册成功", description: `欢迎，${data.data.user.username}！` });
-      router.push("/");
+      router.push(redirect);
       router.refresh();
     } catch (error) {
       toast({
@@ -42,7 +45,7 @@ export default function RegisterPage() {
       <LoginForm onSubmit={handleRegister} loading={loading} isRegister />
       <p className="text-center text-sm text-muted-foreground">
         已有账号？{" "}
-        <Link href="/login" className="text-primary hover:underline">
+        <Link href={`/login?redirect=${encodeURIComponent(redirect)}`} className="text-primary hover:underline">
           立即登录
         </Link>
       </p>

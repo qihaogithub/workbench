@@ -64,6 +64,7 @@ import type {
   CommentTarget,
   DemoPageRuntimeType,
 } from "@workbench/shared";
+import { resolveVisibility } from "@workbench/shared";
 import type { MarkdownReferenceTarget } from "@workbench/shared/markdown-reference";
 import {
   extractPrototypeConfigBindingKeys,
@@ -73,6 +74,8 @@ import {
   CommentLayer,
   CommentPanel,
   useComments,
+  filterConfigValuesByType,
+  stripConfigSchemaByType,
 } from "@/components/demo";
 import type {
   PreviewMode,
@@ -197,10 +200,11 @@ class ErrorBoundary extends React.Component<
 function parsePath(pathname: string): {
   view: "list" | "project";
   projectId?: string;
+  pageId?: string;
 } {
   const segments = pathname.split("/").filter(Boolean);
   if (segments.length === 0) return { view: "list" };
-  return { view: "project", projectId: segments[0] };
+  return { view: "project", projectId: segments[0], pageId: segments[1] };
 }
 
 function mergeConfigDefaults(
@@ -898,7 +902,7 @@ function buildTree(
   return rootItems;
 }
 
-function ProjectPreviewPage({ projectId }: { projectId: string }) {
+function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string; requestedPageId?: string }) {
   const router = useRouter();
   const [project, setProject] = useState<PublishedProject | null>(null);
   const [designSpecEntries, setDesignSpecEntries] = useState<
@@ -917,6 +921,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const [configDataMap, setConfigDataMap] = useState<
     Record<string, Record<string, unknown>>
   >({});
+  const [visibilitySessionOverrides, setVisibilitySessionOverrides] = useState<Record<string, unknown>>({});
   const [pageSchemaMap, setPageSchemaMap] = useState<Record<string, string>>(
     {},
   );
@@ -952,9 +957,92 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
+  const [visibilityNotice, setVisibilityNotice] = useState<string | null>(null);
   const projectLoadGenerationRef = useRef(0);
 
   const isLoggedIn = sessionId != null;
+
+  const visibilityResolution = useMemo(() => {
+    if (!project) return null;
+    return resolveVisibility({
+      rules: project.visibilityRules,
+      projectConfigValues: project.projectConfigValues,
+      projectSchema: project.projectConfigSchema,
+      pageIds: project.demoPages.map((page) => page.id),
+      regionIds: Object.fromEntries(
+        project.demoPages.map((page) => [page.id, page.regionIds ?? []]),
+      ),
+    }, {
+      values: visibilitySessionOverrides,
+      fieldKeys: Object.keys(visibilitySessionOverrides),
+      allowPageTargets: false,
+    });
+  }, [project, visibilitySessionOverrides]);
+
+  const visiblePages = useMemo(() => {
+    if (!project) return [];
+    if (!visibilityResolution?.valid) return project.demoPages;
+    return project.demoPages.filter(
+      (page) => visibilityResolution.pages[page.id]?.visible !== false,
+    );
+  }, [project, visibilityResolution]);
+
+  const visibleProjectConfigSchema = useMemo(
+    () => stripConfigSchemaByType(project?.projectConfigSchema, "business"),
+    [project?.projectConfigSchema],
+  );
+  const visiblePageSchemaMap = useMemo(() => {
+    const next: Record<string, string> = {};
+    for (const page of visiblePages) {
+      const schema = pageSchemaMap[page.id];
+      const sanitized = stripConfigSchemaByType(schema, "business");
+      if (sanitized) next[page.id] = sanitized;
+    }
+    return next;
+  }, [pageSchemaMap, visiblePages]);
+
+  useEffect(() => {
+    if (!project || !visibilityResolution) return;
+    const requested = requestedPageId
+      ? project.demoPages.find((page) => page.id === requestedPageId)
+      : undefined;
+    const requestedState = requested
+      ? visibilityResolution.pages[requested.id]
+      : undefined;
+    const requestedVisible = requested
+      ? !visibilityResolution.valid || requestedState?.visible !== false
+      : false;
+    const requestedEnabled = requested
+      ? !visibilityResolution.valid || requestedState?.enabled !== false
+      : false;
+    const requestedAvailable = requestedVisible && requestedEnabled;
+    const currentVisible = activePageId
+      ? visiblePages.find((page) => page.id === activePageId)
+      : undefined;
+    const currentAvailable = currentVisible && (
+      !visibilityResolution.valid
+      || visibilityResolution.pages[currentVisible.id]?.enabled !== false
+    )
+      ? currentVisible
+      : undefined;
+    const firstAvailable = visiblePages.find(
+      (page) => !visibilityResolution.valid || visibilityResolution.pages[page.id]?.enabled !== false,
+    );
+    const nextPage = requestedPageId
+      ? requestedAvailable
+        ? requested
+        : firstAvailable ?? project.demoPages[0]
+      : currentAvailable ?? firstAvailable ?? project.demoPages[0];
+    if (nextPage && nextPage.id !== activePageId) {
+      setActivePageId(nextPage.id);
+      setConfigData(configDataMap[nextPage.id] ?? {});
+    }
+    setVisibilityNotice(
+      requested && !requestedAvailable
+        ? `页面「${requested.name}」当前${requestedVisible ? "不可用" : "不可见"}，已切换到可用页面。`
+        : null,
+    );
+  }, [activePageId, configDataMap, project, requestedPageId, visibilityResolution, visiblePages]);
 
   // 评论功能：API 适配器 + WS 地址 + 当前作者身份
   const commentApi = useMemo(() => createCommentApi(projectId), [projectId]);
@@ -1095,9 +1183,11 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
     setProject(null);
     setConfigData({});
     setConfigDataMap({});
+    setVisibilitySessionOverrides({});
     setPageSchemaMap({});
     setSandboxExecutionMap({});
     setActivePageId("");
+    setVisibilityNotice(null);
 
     void getProjectData(projectId)
       .then(async (data) => {
@@ -1231,6 +1321,18 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const handlePageChange = useCallback(
     (pageId: string) => {
       if (!project) return;
+      const state = visibilityResolution?.valid
+        ? visibilityResolution.pages[pageId]
+        : undefined;
+      if (state?.visible === false || state?.enabled === false) {
+        const hiddenPage = project.demoPages.find((page) => page.id === pageId);
+        setVisibilityNotice(
+          hiddenPage
+            ? `页面「${hiddenPage.name}」当前${state.visible === false ? "不可见" : "不可用"}。`
+            : `该页面当前${state.visible === false ? "不可见" : "不可用"}。`,
+        );
+        return;
+      }
       setActivePageId(pageId);
 
       const pageConfig = configDataMap[pageId];
@@ -1238,7 +1340,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
         setConfigData(pageConfig);
       }
     },
-    [project, configDataMap],
+    [configDataMap, project, visibilityResolution],
   );
 
   const handleCommentThreadSelect = useCallback(
@@ -1312,8 +1414,21 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
         }
         return { ...prev, [activePageId]: pageConfig };
       });
+      setVisibilitySessionOverrides((prev) => {
+        const filtered = filterConfigValuesByType(
+          project?.projectConfigSchema,
+          filterConfigValuesByType(pageSchemaMap[activePageId], newData, "business"),
+          "business",
+        );
+        const next = { ...prev };
+        for (const [key, val] of Object.entries(filtered)) {
+          if (val === null || val === undefined) delete next[key];
+          else next[key] = val;
+        }
+        return next;
+      });
     },
-    [activePageId],
+    [activePageId, pageSchemaMap, project?.projectConfigSchema],
   );
 
   const handlePageConfigChange = useCallback(
@@ -1340,8 +1455,21 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
         }
         return next;
       });
+      setVisibilitySessionOverrides((prev) => {
+        const filtered = filterConfigValuesByType(
+          project?.projectConfigSchema,
+          newData,
+          "business",
+        );
+        const next = { ...prev };
+        for (const [key, val] of Object.entries(filtered)) {
+          if (val === null || val === undefined) delete next[key];
+          else next[key] = val;
+        }
+        return next;
+      });
     },
-    [],
+    [project?.projectConfigSchema],
   );
 
   const handleRestoreDefaults = useCallback(
@@ -1394,7 +1522,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
     } finally {
       setLoginLoading(false);
     }
-  }, [loginUsername, loginPassword]);
+  }, [loginPassword, loginUsername, projectId]);
 
   const handleLogout = useCallback(() => {
     setAuthToken(null);
@@ -1511,16 +1639,28 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
 
   const previewStagePages = useMemo<PreviewStagePage[]>(
     () =>
-      (project?.demoPages ?? []).map((page) =>
+      visiblePages.map((page) =>
         createPublishedPreviewStagePage({
           projectId,
           page,
           configData: configDataMap[page.id],
           schema: pageSchemaMap[page.id],
           sandboxExecution: sandboxExecutionMap[page.id],
+          visibilityStatus: visibilityResolution?.pages[page.id]
+            ? {
+                visible: visibilityResolution.pages[page.id].visible,
+                enabled: visibilityResolution.pages[page.id].enabled,
+                reasons: visibilityResolution.pages[page.id].reasons,
+              }
+            : undefined,
+          visibilityRegions: Object.fromEntries(
+            Object.entries(visibilityResolution?.regions ?? {})
+              .filter(([key]) => key.startsWith(`${page.id}:`))
+              .map(([key, state]) => [key, { visible: state.visible, enabled: state.enabled }]),
+          ),
         }),
       ),
-    [configDataMap, pageSchemaMap, project, projectId, sandboxExecutionMap],
+    [configDataMap, pageSchemaMap, projectId, sandboxExecutionMap, visibilityResolution, visiblePages],
   );
 
   if (isLoading) {
@@ -1547,10 +1687,10 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
     );
   }
 
-  const tree = buildTree(project.demoPages, project.demoFolders);
-  const activePage = project.demoPages.find((p) => p.id === activePageId);
-  const activePageSchema = activePage ? pageSchemaMap[activePage.id] : "";
-  const hasProjectConfig = !isSchemaEmpty(project.projectConfigSchema);
+  const tree = buildTree(visiblePages, project.demoFolders);
+  const activePage = visiblePages.find((p) => p.id === activePageId) ?? visiblePages[0];
+  const activePageSchema = activePage ? visiblePageSchemaMap[activePage.id] : "";
+  const hasProjectConfig = !isSchemaEmpty(visibleProjectConfigSchema);
   const hasPageConfig = !isSchemaEmpty(activePageSchema);
   const hasSchema = hasProjectConfig || hasPageConfig;
   const hasBothScopes = hasProjectConfig && hasPageConfig;
@@ -1558,7 +1698,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
     project.knowledge ?? [],
     project.designSpecs ?? [],
   );
-  const configPanelRequirements = project.demoPages.find(
+  const configPanelRequirements = visiblePages.find(
     (page) =>
       page.id ===
       (previewMode === "single" ? activePageId : configPanelDetailPageId),
@@ -1566,11 +1706,11 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
 
   const configPanel = (
     <PageConfigPanel
-      pages={project.demoPages.map((page) => ({
+      pages={visiblePages.map((page) => ({
         id: page.id,
         name: page.name,
         order: page.order,
-        schema: pageSchemaMap[page.id],
+        schema: visiblePageSchemaMap[page.id],
         configData: configDataMap[page.id],
         projectConfigBindings:
           page.runtimeType === "prototype-html-css"
@@ -1583,7 +1723,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
       }
       onDetailPageIdChange={setConfigPanelDetailPageId}
       onPageSelect={handlePageChange}
-      projectConfigSchema={project.projectConfigSchema}
+      projectConfigSchema={visibleProjectConfigSchema}
       onProjectConfigChange={handleProjectConfigChange}
       onPageConfigChange={handlePageConfigChange}
       onReferenceClick={({ target }) => handleReferenceNavigate(target)}
@@ -1607,7 +1747,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
       commentMode={commentModeActive}
       onCommentModeChange={setCommentModeActive}
       groupByPage={previewMode === "canvas"}
-      commentPages={project?.demoPages.map((page) => ({
+      commentPages={visiblePages.map((page) => ({
         id: page.id,
         name: page.name,
         order: page.order,
@@ -1633,6 +1773,11 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
         onPreviewModeChange={setPreviewMode}
         hasDocumentContent={hasDocumentContent}
       />
+      {visibilityNotice && (
+        <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
+          {visibilityNotice}
+        </div>
+      )}
       <ErrorBoundary>
         <div className="flex-1 flex min-h-0 overflow-hidden">
           {project && activePage && (
@@ -1648,7 +1793,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
             />
           )}
           {previewMode === "single" &&
-            (project.demoPages.length > 1 || isLoggedIn) && (
+            (visiblePages.length > 1 || isLoggedIn) && (
               <div className="w-56 border-r border-border shrink-0 flex flex-col">
                 <style>{`
               @keyframes dir-flash {
@@ -1694,7 +1839,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                       onDeletePage={handleDeletePage}
                       onMovePage={handleMovePage}
                       onRuntimeSwitch={handleRuntimeSwitch}
-                      demoPages={project.demoPages}
+                      demoPages={visiblePages}
                     />
                   </div>
                 </ScrollArea>
@@ -1710,7 +1855,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                 references={project.markdownReferences}
                 onReferenceNavigate={handleReferenceNavigate}
                 projectConfigSchema={project.projectConfigSchema}
-                pages={project.demoPages.map((page) => ({
+                pages={visiblePages.map((page) => ({
                   id: page.id,
                   name: page.name,
                   schema: pageSchemaMap[page.id],
@@ -1752,7 +1897,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
                   canvasState={canvasState}
                   onCanvasStateChange={setCanvasState}
                   interactionMode="viewer"
-                  showToolbar={project.demoPages.length >= 1}
+                  showToolbar={visiblePages.length >= 1}
                   canvasProps={{
                     projectId,
                     onPageConfigEdit: (pageId) => {
@@ -2220,7 +2365,7 @@ function Header({
 
 export default function ViewerApp() {
   const pathname = usePathname();
-  const { view, projectId } = parsePath(pathname);
+  const { view, projectId, pageId } = parsePath(pathname);
 
   if (pathname === "/feedback" || pathname === "/feedback/") {
     return <FeedbackPage />;
@@ -2230,6 +2375,6 @@ export default function ViewerApp() {
     case "list":
       return <ProjectListPage />;
     case "project":
-      return <ProjectPreviewPage projectId={projectId!} />;
+      return <ProjectPreviewPage projectId={projectId!} requestedPageId={pageId} />;
   }
 }

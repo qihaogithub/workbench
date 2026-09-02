@@ -12,6 +12,7 @@ import {
   SessionMeta,
   ERROR_MESSAGES,
   createDefaultSketchScene,
+  parseVisibilityRules,
 } from "@workbench/shared";
 import type {
   Project,
@@ -1648,7 +1649,18 @@ export function getWorkspaceMultiDemoFiles(
 
   const projectConfigSchema = getProjectConfigSchema(wsPath);
   const projectConfigValues = getProjectConfigValues(wsPath);
-  return { demos, projectConfigSchema, projectConfigValues };
+  const visibilityRulesPath = path.join(wsPath, "project.visibility-rules.json");
+  let visibilityRules: MultiDemoFiles["visibilityRules"];
+  if (fs.existsSync(visibilityRulesPath)) {
+    try {
+      visibilityRules = parseVisibilityRules(
+        JSON.parse(fs.readFileSync(visibilityRulesPath, "utf-8")),
+      );
+    } catch {
+      visibilityRules = undefined;
+    }
+  }
+  return { demos, projectConfigSchema, projectConfigValues, visibilityRules };
 }
 
 /**

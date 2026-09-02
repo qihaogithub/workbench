@@ -12,12 +12,16 @@ import {
   getAdminSecret,
 } from "@/lib/admin-auth";
 
-const PROTECTED_PAGE_ROUTES = ["/demo", "/cli"];
+const PROTECTED_PAGE_ROUTES = ["/workbench", "/demo", "/cli"];
 const PROTECTED_API_ROUTES = ["/api/sessions"];
 const AUTH_ROUTES = ["/login", "/register"];
 const ADMIN_ROUTES = ["/admin"];
-const ADMIN_API_ROUTES = ["/api/admin/"];
+const ADMIN_API_ROUTES = ["/api/admin"];
 const DEFAULT_CORS_ORIGINS = ["http://localhost:3300", "http://127.0.0.1:3300"];
+
+function matchesRoute(pathname: string, route: string): boolean {
+  return pathname === route || pathname.startsWith(`${route}/`);
+}
 
 function getAllowedCorsOrigins(): string[] {
   const configured = (process.env.CORS_ORIGINS || "")
@@ -78,24 +82,31 @@ export async function proxy(request: NextRequest) {
     return new NextResponse(null, { status: 204, headers });
   }
 
-  if (user && AUTH_ROUTES.some((route) => pathname.startsWith(route))) {
-    return NextResponse.redirect(new URL("/", request.url));
+  if (user && pathname === "/") {
+    return NextResponse.redirect(new URL("/workbench", request.url));
+  }
+
+  if (user && AUTH_ROUTES.some((route) => matchesRoute(pathname, route))) {
+    return NextResponse.redirect(new URL("/workbench", request.url));
   }
 
   // 对页面路由：未登录重定向到登录页
   if (
     !user &&
-    PROTECTED_PAGE_ROUTES.some((route) => pathname.startsWith(route))
+    PROTECTED_PAGE_ROUTES.some((route) => matchesRoute(pathname, route))
   ) {
     const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("redirect", pathname);
+    loginUrl.searchParams.set(
+      "redirect",
+      `${pathname}${request.nextUrl.search}`,
+    );
     return NextResponse.redirect(loginUrl);
   }
 
   // 对 API 路由：未登录返回 401 JSON，不重定向
   if (
     !user &&
-    PROTECTED_API_ROUTES.some((route) => pathname.startsWith(route))
+    PROTECTED_API_ROUTES.some((route) => matchesRoute(pathname, route))
   ) {
     return NextResponse.json(
       { success: false, error: { code: "UNAUTHORIZED", message: "未登录" } },
@@ -105,8 +116,8 @@ export async function proxy(request: NextRequest) {
 
   // Admin 路由鉴权
   if (
-    ADMIN_ROUTES.some((route) => pathname.startsWith(route)) ||
-    ADMIN_API_ROUTES.some((route) => pathname.startsWith(route))
+    ADMIN_ROUTES.some((route) => matchesRoute(pathname, route)) ||
+    ADMIN_API_ROUTES.some((route) => matchesRoute(pathname, route))
   ) {
     const isAdmin = await verifyAdminSecret(request);
 
@@ -123,7 +134,7 @@ export async function proxy(request: NextRequest) {
 
     // 验证通过,如果是通过 URL 参数访问的,设置 Cookie
     const secretParam = request.nextUrl.searchParams.get("secret");
-    if (secretParam && pathname.startsWith("/admin")) {
+    if (secretParam && matchesRoute(pathname, "/admin")) {
       const response = NextResponse.next();
       // 设置 admin_token Cookie (异步)
       const cookieValue = await hashSecret(getAdminSecret());

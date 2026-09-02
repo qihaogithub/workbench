@@ -1,6 +1,6 @@
 ---
 name: page-runtime-conversion
-description: 页面运行时类型转换（prototype ↔ high-fidelity-react）的完整规范：以源页面视觉为 ground truth、逐元素还原、禁用 @preview/sdk 通用组件替换、分运行时细则、自检清单。触发词：转换页面运行时、切换为 React 页、切换为原型页、prototype-html-css、high-fidelity-react，或原型页新增必须由 React 消费的复合配置。仅在既有页面需要转换时使用，不适用于新建或重写页面。
+description: 页面运行时类型转换（prototype ↔ high-fidelity-react）的完整规范：以源页面视觉为 ground truth、逐元素还原、禁用 @preview/sdk 通用组件替换、分运行时细则、自检清单，并保留业务配置联动区域声明。触发词：转换页面运行时、切换为 React 页、切换为原型页、prototype-html-css、high-fidelity-react，或原型页新增必须由 React 消费的复合配置。仅在既有页面需要转换时使用，不适用于新建或重写页面。
 ---
 
 # 页面运行时类型转换
@@ -8,6 +8,8 @@ description: 页面运行时类型转换（prototype ↔ high-fidelity-react）�
 除用户显式要求切换运行时外，当 `page-lifecycle` 规则要求原型页为复合配置（如 `format: "video"`）升级为 React 页时，也必须使用本规范。这是完成用户已明确配置诉求的必要实现步骤，不构成额外的审批理由。
 
 ## 核心约束
+
+转换不得删除配置字段的 `ui:options.configType` / `$demo.configType` 语义，也不得移除源码中的稳定 `data-region-id`。跨页面可见性继续由项目根 `project.visibility-rules.json` 驱动。
 
 以源页面当前渲染效果为视觉 ground truth，逐元素逐样式还原。不得擅自用 @preview/sdk 通用组件（Button/Card/Modal/Icon 等）替换源页面自定义视觉。只有源页面的某个视觉效果在当前目标运行时确实无法实现时，才允许替换，并需说明原因。
 

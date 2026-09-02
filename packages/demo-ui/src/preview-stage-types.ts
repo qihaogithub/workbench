@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import type { PagePresentationProfile } from "@workbench/shared";
 
 import type { IframePreviewFrameProps } from "./IframePreviewFrame";
 import type { PrototypePagePreviewProps } from "./PrototypePagePreview";
@@ -101,11 +100,6 @@ export interface PreviewStageProps {
   canvasState: CanvasState;
   onCanvasStateChange: (state: CanvasState) => void;
   interactionMode: CanvasInteractionMode;
-  /**
-   * 当前单页预览的非持久化视口投影。它不会传给画布，避免临时设备切换
-   * 改变画布页面的尺寸基准或自定义缩放语义。
-   */
-  singlePagePresentationOverride?: PagePresentationProfile;
   singlePageProps?: Omit<SinglePagePreviewProps, "page">;
   canvasProps?: Omit<
     PreviewCanvasProps,

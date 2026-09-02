@@ -20,6 +20,8 @@ interface CreatePublishedPreviewStagePageInput {
   configData?: Record<string, unknown>;
   schema?: string;
   sandboxExecution?: PublishedHtmlExecution;
+  visibilityStatus?: PreviewStagePage["visibilityStatus"];
+  visibilityRegions?: PreviewStagePage["visibilityRegions"];
 }
 
 function parseLegacyPreviewDimension(value: unknown): number | undefined {
@@ -82,6 +84,8 @@ export function createPublishedPreviewStagePage({
   configData,
   schema,
   sandboxExecution,
+  visibilityStatus,
+  visibilityRegions,
 }: CreatePublishedPreviewStagePageInput): PreviewStagePage {
   const runtimeType = page.runtimeType ?? "high-fidelity-react";
   const presentation = resolvePublishedPresentation(page, schema);
@@ -123,5 +127,7 @@ export function createPublishedPreviewStagePage({
     schema,
     presentation,
     previewSize: presentation?.viewport,
+    visibilityStatus,
+    visibilityRegions,
   };
 }

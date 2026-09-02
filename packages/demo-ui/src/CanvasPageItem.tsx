@@ -367,6 +367,11 @@ export function CanvasPagePreviewContent({
             fillContainer
             containerSizeOverride={containerSizeOverride}
             effectiveHeight={iframeEffectiveHeight}
+            visibilityRegions={Object.fromEntries(
+              Object.entries(page.visibilityRegions ?? {})
+                .filter(([key]) => key.startsWith(`${page.id}:`))
+                .map(([key, state]) => [key.slice(page.id.length + 1), state]),
+            )}
             onContentHeightChange={handleContentHeightChange}
           />
         </div>
@@ -506,6 +511,11 @@ export function CanvasPagePreviewContent({
             fillContainer
             containerSizeOverride={containerSizeOverride}
             effectiveHeight={iframeEffectiveHeight}
+            visibilityRegions={Object.fromEntries(
+              Object.entries(page.visibilityRegions ?? {})
+                .filter(([key]) => key.startsWith(`${page.id}:`))
+                .map(([key, state]) => [key.slice(page.id.length + 1), state]),
+            )}
             onContentHeightChange={handleContentHeightChange}
           />
           {page.snapshotQuality === "partial" && (
@@ -627,7 +637,8 @@ export function CanvasPageItem({
     titleInputRef.current?.select();
   }, [isTitleEditing]);
 
-  const canInteract = editable && toolMode === "select";
+  const visibilityDisabled = page.visibilityStatus?.enabled === false;
+  const canInteract = editable && toolMode === "select" && !visibilityDisabled;
   const showEdgeHandles =
     (isHovering || selected) && canInteract && !isDragging && !isResizing;
 
@@ -868,6 +879,8 @@ export function CanvasPageItem({
       data-page-id={page.id}
       className={cn(
         "absolute rounded-lg transition-shadow duration-200 select-none",
+        page.visibilityStatus?.visible === false && "opacity-60 grayscale",
+        visibilityDisabled && "ring-1 ring-amber-400/70",
         navigationTargetPending && "ring-2 ring-primary shadow-[0_0_0_4px_rgba(59,130,246,0.2)]",
         isEditing &&
           "ring-2 ring-white shadow-[0_0_0_1px_rgba(15,23,42,0.35),0_14px_34px_rgba(15,23,42,0.28)]",
@@ -989,6 +1002,14 @@ export function CanvasPageItem({
           />
         )}
       </div>
+
+      {visibilityDisabled && (
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-slate-900/20">
+          <span className="rounded-md bg-background/90 px-2 py-1 text-xs text-muted-foreground shadow-sm">
+            业务配置已禁用
+          </span>
+        </div>
+      )}
 
       <PageNavigationOverlay
         pageId={page.id}

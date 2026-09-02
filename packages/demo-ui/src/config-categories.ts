@@ -10,6 +10,8 @@ interface ConfigCategorySource {
   uiOptions?: Record<string, unknown>;
 }
 
+export type ConfigFieldType = "resource" | "business";
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -18,6 +20,97 @@ function normalizeCategory(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const category = value.trim();
   return category.length > 0 ? category : undefined;
+}
+
+/**
+ * 读取配置字段的业务语义。未标注的历史字段按 resource 处理，保持既有页面可用。
+ * 生成器可使用 ui:options.configType、$demo.configType 或 x-config-type。
+ */
+export function getConfigFieldType(field: Record<string, unknown>): ConfigFieldType {
+  const uiOptions = isRecord(field["ui:options"]) ? field["ui:options"] : undefined;
+  const demo = isRecord(field["$demo"]) ? field["$demo"] : undefined;
+  const marker = uiOptions?.configType ?? demo?.configType ?? field["x-config-type"];
+  return marker === "business" ? "business" : "resource";
+}
+
+/** 查看端只展示资源配置，业务配置仍保留在发布快照中供规则解析。 */
+export function stripConfigSchemaByType(
+  schema: string | undefined,
+  excludedType: ConfigFieldType,
+): string | undefined {
+  if (!schema) return schema;
+  try {
+    const root: unknown = JSON.parse(schema);
+    if (!isRecord(root)) return schema;
+    const walk = (value: unknown): unknown => {
+      if (Array.isArray(value)) return value.map(walk);
+      if (!isRecord(value)) return value;
+      const next: Record<string, unknown> = { ...value };
+      if (isRecord(next.properties)) {
+        const properties: Record<string, unknown> = {};
+        for (const [key, prop] of Object.entries(next.properties)) {
+          if (isRecord(prop) && getConfigFieldType(prop) === excludedType) continue;
+          properties[key] = walk(prop);
+        }
+        next.properties = properties;
+        if (Array.isArray(next.required)) {
+          next.required = next.required.filter((key): key is string => typeof key === "string" && key in properties);
+        }
+      }
+      if ("items" in next) next.items = walk(next.items);
+      return next;
+    };
+    return JSON.stringify(walk(root));
+  } catch {
+    return schema;
+  }
+}
+
+/**
+ * Remove values whose top-level schema fields carry an excluded semantic type.
+ * Unknown fields remain untouched for backwards-compatible embed parameters;
+ * published business values are still present in runtime defaults and are not
+ * affected by this session-override filter.
+ */
+export function filterConfigValuesByType(
+  schema: string | undefined,
+  values: Record<string, unknown>,
+  excludedType: ConfigFieldType,
+): Record<string, unknown> {
+  if (!schema) return { ...values };
+  try {
+    const parsed: unknown = JSON.parse(schema);
+    if (!isRecord(parsed) || !isRecord(parsed.properties)) return { ...values };
+    const OMIT = Symbol("omitted-config-value");
+    const filterValue = (field: unknown, value: unknown): unknown => {
+      if (!isRecord(field)) return value;
+      if (getConfigFieldType(field) === excludedType) return OMIT;
+      if (Array.isArray(value) && "items" in field) {
+        return value
+          .map((item) => filterValue(field.items, item))
+          .filter((item) => item !== OMIT);
+      }
+      if (isRecord(value) && isRecord(field.properties)) {
+        const nested: Record<string, unknown> = { ...value };
+        for (const [key, childValue] of Object.entries(value)) {
+          if (!(key in field.properties)) continue;
+          const filtered = filterValue(field.properties[key], childValue);
+          if (filtered === OMIT) delete nested[key];
+          else nested[key] = filtered;
+        }
+        return nested;
+      }
+      return value;
+    };
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(values)) {
+      const filtered = filterValue(parsed.properties[key], value);
+      if (filtered !== OMIT) result[key] = filtered;
+    }
+    return result;
+  } catch {
+    return { ...values };
+  }
 }
 
 function getSchemaProperties(

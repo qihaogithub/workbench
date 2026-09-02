@@ -16,6 +16,20 @@ import {
 } from "@/lib/fs-utils";
 import { type PreviewSize, extractPreviewSize } from "@/lib/preview-size";
 import { readCanvasStateFromWorkspace } from "@/lib/canvas-layout-file";
+import { parseVisibilityRules } from "@workbench/shared";
+
+function collectRegionIds(contents: string[]): string[] {
+  const ids = new Set<string>();
+  for (const content of contents) {
+    for (const match of content.matchAll(/data-region-id\s*=\s*["']([A-Za-z0-9_-]{1,100})["']/g)) {
+      if (match[1]) ids.add(match[1]);
+    }
+    for (const match of content.matchAll(/regionId\s*[:=]\s*["']([A-Za-z0-9_-]{1,100})["']/g)) {
+      if (match[1]) ids.add(match[1]);
+    }
+  }
+  return [...ids];
+}
 
 export async function GET(
   _request: NextRequest,
@@ -114,6 +128,7 @@ export async function GET(
 
       return {
         ...page,
+        regionIds: collectRegionIds([code, prototypeHtml ?? "", fs.existsSync(sandboxHtmlPath) ? fs.readFileSync(sandboxHtmlPath, "utf-8") : ""]),
         code,
         schema,
         previewSize,
@@ -134,6 +149,11 @@ export async function GET(
     const canvasState = readCanvasStateFromWorkspace(workspacePath);
     const appGraph = readAppGraph(workspacePath);
     const appGraphValidation = validateAppGraph(appGraph);
+    let visibilityRules: ReturnType<typeof parseVisibilityRules>;
+    const visibilityRulesPath = path.join(workspacePath, "project.visibility-rules.json");
+    if (fs.existsSync(visibilityRulesPath)) {
+      visibilityRules = parseVisibilityRules(fs.readFileSync(visibilityRulesPath, "utf-8"));
+    }
 
     return NextResponse.json(
       createApiSuccess({
@@ -150,6 +170,7 @@ export async function GET(
         canvasState,
         appGraph,
         appGraphValidation,
+        visibilityRules,
       }),
     );
   } catch (error) {

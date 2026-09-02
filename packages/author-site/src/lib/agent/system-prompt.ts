@@ -10,6 +10,9 @@ export interface SystemPromptContext {
   pageList: string;
   canvasTextSummary: string;
   workspacePath: string;
+  /** Compact project-scope config and visibility facts for creator AI. */
+  projectConfigSummary?: string;
+  visibilityRulesSummary?: string;
 }
 
 function render(template: string, vars: Record<string, string>): string {
@@ -45,6 +48,8 @@ export function buildDynamicContextPrefix(context: SystemPromptContext): string 
     PAGE_COUNT: String(context.pageCount),
     PAGE_LIST: context.pageList || '（暂无页面）',
     CANVAS_TEXT_SUMMARY: context.canvasTextSummary || '（暂无画布文本节点）',
+    PROJECT_CONFIG_SUMMARY: context.projectConfigSummary || '（未提供项目级字段摘要）',
+    VISIBILITY_RULES_SUMMARY: context.visibilityRulesSummary || '（未声明页面可见性规则）',
   });
 }
 

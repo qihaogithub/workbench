@@ -5,4 +5,12 @@ export const WORKSPACE_STATUS_TEMPLATE = `当前工作空间中的页面（系�
 当前画布文本语义节点（系统自动扫描）：
 
 {{CANVAS_TEXT_SUMMARY}}
+
+项目级配置与字段作用域（系统自动扫描）：
+
+{{PROJECT_CONFIG_SUMMARY}}
+
+配置驱动页面可见性规则摘要（系统自动扫描）：
+
+{{VISIBILITY_RULES_SUMMARY}}
 `;

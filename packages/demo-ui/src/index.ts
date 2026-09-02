@@ -102,7 +102,11 @@ export {
   getSchemaFieldCountByCategory,
   getSchemaFieldCountByBindings,
   orderConfigCategories,
+  getConfigFieldType,
+  filterConfigValuesByType,
+  stripConfigSchemaByType,
 } from "./config-categories";
+export type { ConfigFieldType } from "./config-categories";
 export {
   getCachedCompile,
   setCachedCompile,

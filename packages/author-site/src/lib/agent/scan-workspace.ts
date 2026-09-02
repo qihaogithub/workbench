@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { summarizeCanvasTextNodes } from "@workbench/demo-ui";
+import { parseVisibilityRules } from "@workbench/shared";
 import type { SystemPromptContext } from "./system-prompt";
 import { readCanvasStateFromWorkspace } from "../canvas-layout-file";
 import { listDemoPages } from "../fs-utils";
@@ -59,6 +60,54 @@ function formatCanvasTextSummary(workingDir: string): string {
     .join("\n");
 }
 
+function formatProjectConfigSummary(workingDir: string): string {
+  const schemaPath = path.join(workingDir, "project.config.schema.json");
+  if (!fs.existsSync(schemaPath)) return "（未声明项目级配置）";
+  try {
+    const parsed = JSON.parse(fs.readFileSync(schemaPath, "utf-8")) as {
+      properties?: Record<string, { type?: string; format?: string; [key: string]: unknown }>;
+    };
+    const properties = parsed.properties ?? {};
+    const entries = Object.entries(properties).map(([key, field]) => {
+      const uiOptions = field?.["ui:options"];
+      const demo = field?.["$demo"];
+      const marker = uiOptions && typeof uiOptions === "object" && !Array.isArray(uiOptions)
+        ? (uiOptions as Record<string, unknown>).configType
+        : demo && typeof demo === "object" && !Array.isArray(demo)
+          ? (demo as Record<string, unknown>).configType
+          : field?.["x-config-type"];
+      const configType = marker === "business"
+        ? "业务"
+        : "资源";
+      return `- ${key}（${configType}，${field.type ?? field.format ?? "unknown"}）`;
+    });
+    return entries.length > 0 ? entries.join("\n") : "（未声明项目级字段）";
+  } catch {
+    return "（项目级 Schema 无法解析，请通过 readFile 检查）";
+  }
+}
+
+function formatVisibilityRulesSummary(workingDir: string): string {
+  const rulesPath = path.join(workingDir, "project.visibility-rules.json");
+  if (!fs.existsSync(rulesPath)) return "（未声明页面可见性规则）";
+  try {
+    const document = parseVisibilityRules(fs.readFileSync(rulesPath, "utf-8"));
+    if (!document) return "（规则文件无效，请在发布前修复）";
+    if (document.rules.length === 0) return "（规则文件为空）";
+    return document.rules.map((rule) => {
+      const target = rule.target.type === "page"
+        ? `页面 ${rule.target.pageId}`
+        : `页面 ${rule.target.pageId} 的区域 ${rule.target.regionId}`;
+      const condition = rule.condition.kind === "truthy"
+        ? "truthy"
+        : `equals ${JSON.stringify(rule.condition.value)}`;
+      return `- ${rule.id}: 项目字段 ${rule.source.fieldKey} ${condition} → ${target} ${rule.effect}`;
+    }).join("\n");
+  } catch {
+    return "（规则文件无法读取，请通过 readFile 检查）";
+  }
+}
+
 export function scanWorkspaceContext(workingDir: string): SystemPromptContext {
   const pages: PageInfo[] = [];
 
@@ -99,6 +148,8 @@ export function scanWorkspaceContext(workingDir: string): SystemPromptContext {
 
   const pageList = formatPageList(pages);
   const canvasTextSummary = formatCanvasTextSummary(workingDir);
+  const projectConfigSummary = formatProjectConfigSummary(workingDir);
+  const visibilityRulesSummary = formatVisibilityRulesSummary(workingDir);
 
   const projectName = path.basename(workingDir);
 
@@ -109,6 +160,8 @@ export function scanWorkspaceContext(workingDir: string): SystemPromptContext {
     pageList,
     canvasTextSummary,
     workspacePath: workingDir,
+    projectConfigSummary,
+    visibilityRulesSummary,
   };
 }
 

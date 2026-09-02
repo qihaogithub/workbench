@@ -26,6 +26,7 @@ export const VIEWER_READONLY_PERMISSIONS: AgentConfig["permissions"] = {
     ".",
     "workspace-tree.json",
     "project.config.schema.json",
+    "project.visibility-rules.json",
     "memory.md",
     "demos",
     "demos/**",

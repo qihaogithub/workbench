@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import {
   SinglePagePreview,
   ConfigForm,
   ConfigScopeWrapper,
   isSchemaEmpty,
+  stripConfigSchemaByType,
+  filterConfigValuesByType,
 } from "../../../../../components/demo";
 import type {
   CanvasPageRuntimeType,
@@ -26,6 +28,7 @@ import {
   isViewerAppActionResolution,
   resolveViewerAppAction,
 } from "@/lib/viewer-app-graph-runtime";
+import { resolveVisibility } from "@workbench/shared";
 
 interface ViewerDemoPage {
   id: string;
@@ -33,6 +36,7 @@ interface ViewerDemoPage {
   routeKey?: string;
   order: number;
   parentId: string | null;
+  regionIds?: string[];
   code: string;
   schema?: string;
   previewSize?: PreviewSize;
@@ -49,6 +53,7 @@ interface ViewerData {
   demoPages: ViewerDemoPage[];
   projectConfigSchema?: string;
   projectConfigValues?: Record<string, unknown>;
+  visibilityRules?: unknown;
   appGraph?: AppGraph;
   appGraphValidation?: AppGraphValidationResult;
 }
@@ -116,11 +121,41 @@ export default function ViewerDemoPage() {
   const [appState, setAppState] = useState<Record<string, unknown>>({});
   const [routeParams, setRouteParams] = useState<Record<string, unknown>>({});
   const [sessionId, setSessionId] = useState<string | undefined>();
+  const [visibilityNotice, setVisibilityNotice] = useState<string | null>(null);
+  const [visibilitySessionOverrides, setVisibilitySessionOverrides] = useState<Record<string, unknown>>({});
 
   const urlConfigDataRef = useRef<Record<string, unknown> | null>(null);
   if (urlConfigDataRef.current === null) {
     urlConfigDataRef.current = parseConfigDataParam(configDataParam);
   }
+
+  const visibilityResolution = useMemo(() => {
+    if (!data) return null;
+    return resolveVisibility({
+      rules: data.visibilityRules,
+      projectConfigValues: data.projectConfigValues,
+      projectSchema: data.projectConfigSchema,
+      pageIds: data.demoPages.map((page) => page.id),
+      regionIds: Object.fromEntries(
+        data.demoPages.map((page) => [page.id, page.regionIds ?? []]),
+      ),
+    }, {
+      values: visibilitySessionOverrides,
+      fieldKeys: Object.keys(visibilitySessionOverrides),
+      allowPageTargets: false,
+    });
+  }, [data, visibilitySessionOverrides]);
+  const visiblePages = useMemo(() => {
+    if (!data) return [];
+    if (!visibilityResolution?.valid) return data.demoPages;
+    return data.demoPages.filter(
+      (page) => visibilityResolution.pages[page.id]?.visible !== false,
+    );
+  }, [data, visibilityResolution]);
+  const visibleProjectConfigSchema = useMemo(
+    () => stripConfigSchemaByType(data?.projectConfigSchema, "business"),
+    [data?.projectConfigSchema],
+  );
 
   const getSafeMergedDefaults = useCallback(
     (
@@ -145,10 +180,6 @@ export default function ViewerDemoPage() {
   }, [themeParam]);
 
   useEffect(() => {
-    setActiveDemoId(demoId);
-  }, [demoId]);
-
-  useEffect(() => {
     const loadData = async () => {
       try {
         setIsLoading(true);
@@ -164,9 +195,30 @@ export default function ViewerDemoPage() {
         const pageByRoute = routeParam
           ? pages.find((p: ViewerDemoPage) => p.routeKey === routeParam)
           : undefined;
-        const page = pageByRoute ?? pages.find(
+        const requestedPage = pageByRoute ?? pages.find(
           (p: ViewerDemoPage) => p.id === demoId
         );
+        const resolution = resolveVisibility({
+          rules: result.data.visibilityRules,
+          projectConfigValues: result.data.projectConfigValues,
+          projectSchema: result.data.projectConfigSchema,
+          pageIds: pages.map((item) => item.id),
+          regionIds: Object.fromEntries(pages.map((item) => [item.id, item.regionIds ?? []])),
+        });
+        const requestedState = requestedPage && resolution.valid
+          ? resolution.pages[requestedPage.id]
+          : undefined;
+        const requestedAvailable = !requestedState
+          || (requestedState.visible !== false && requestedState.enabled !== false);
+        const page = requestedPage && !requestedAvailable
+          ? pages.find((item) => {
+              const state = resolution.valid ? resolution.pages[item.id] : undefined;
+              return !state || (state.visible !== false && state.enabled !== false);
+            })
+          : requestedPage;
+        if (requestedPage && page?.id !== requestedPage.id) {
+          setVisibilityNotice(`页面「${requestedPage.name}」当前${requestedState?.visible === false ? "不可见" : "不可用"}，已切换到可用页面。`);
+        }
         if (page) {
           setActiveDemoId(page.id);
         }
@@ -180,10 +232,30 @@ export default function ViewerDemoPage() {
             result.data.projectConfigValues,
           );
           const urlConfig = urlConfigDataRef.current;
-          const merged = urlConfig ? { ...defaults, ...urlConfig } : defaults;
+          const safeUrlConfig = urlConfig
+            ? filterConfigValuesByType(
+                result.data.projectConfigSchema,
+                filterConfigValuesByType(page.schema, urlConfig, "business"),
+                "business",
+              )
+            : undefined;
+          const merged = safeUrlConfig ? { ...defaults, ...safeUrlConfig } : defaults;
           setConfigData(merged);
+          setVisibilitySessionOverrides(
+            filterConfigValuesByType(
+              result.data.projectConfigSchema,
+              filterConfigValuesByType(page.schema, safeUrlConfig ?? {}, "business"),
+              "business",
+            ),
+          );
         } else if (urlConfigDataRef.current) {
-          setConfigData(urlConfigDataRef.current);
+          const safeConfig = filterConfigValuesByType(
+            result.data.projectConfigSchema,
+            urlConfigDataRef.current,
+            "business",
+          );
+          setConfigData(safeConfig);
+          setVisibilitySessionOverrides(safeConfig);
         }
 
         // 创建 session 以支持图片上传
@@ -224,7 +296,14 @@ export default function ViewerDemoPage() {
 
       if (msg.type === "VIEWER_SET_CONFIG") {
         if (msg.configData && typeof msg.configData === "object") {
-          setConfigData((prev) => ({ ...prev, ...msg.configData }));
+          const pageSchema = data?.demoPages.find((page) => page.id === activeDemoId)?.schema;
+          const safeConfigData = filterConfigValuesByType(
+            data?.projectConfigSchema,
+            filterConfigValuesByType(pageSchema, msg.configData, "business"),
+            "business",
+          );
+          setConfigData((prev) => ({ ...prev, ...safeConfigData }));
+          setVisibilitySessionOverrides((prev) => ({ ...prev, ...safeConfigData }));
         }
       } else if (msg.type === "VIEWER_SET_PAGE") {
         if (typeof msg.pageId === "string") {
@@ -234,15 +313,22 @@ export default function ViewerDemoPage() {
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, []);
+  }, [activeDemoId, data]);
 
   const handleConfigChange = useCallback((newData: Record<string, unknown>) => {
+    const pageSchema = data?.demoPages.find((page) => page.id === activeDemoId)?.schema;
+    const safeData = filterConfigValuesByType(
+      data?.projectConfigSchema,
+      filterConfigValuesByType(pageSchema, newData, "business"),
+      "business",
+    );
     setConfigData((prev) => {
-      const merged = { ...prev, ...newData };
+      const merged = { ...prev, ...safeData };
       postOutgoing({ type: "VIEWER_CONFIG_CHANGE", configData: merged });
       return merged;
     });
-  }, []);
+    setVisibilitySessionOverrides((prev) => ({ ...prev, ...safeData }));
+  }, [activeDemoId, data]);
 
   const syncBrowserUrl = useCallback((page: ViewerDemoPage) => {
     const query = new URLSearchParams(window.location.search);
@@ -261,6 +347,13 @@ export default function ViewerDemoPage() {
     if (!data) return;
     const page = data.demoPages.find((p) => p.id === pageId);
     if (!page) return;
+    const state = visibilityResolution?.valid
+      ? visibilityResolution.pages[pageId]
+      : undefined;
+    if (state?.visible === false || state?.enabled === false) {
+      setVisibilityNotice(`页面「${page.name}」当前${state.visible === false ? "不可见" : "不可用"}。`);
+      return;
+    }
     setActiveDemoId(pageId);
     syncBrowserUrl(page);
     postOutgoing({ type: "VIEWER_PAGE_CHANGE", pageId });
@@ -272,7 +365,7 @@ export default function ViewerDemoPage() {
       );
       setConfigData(defaults);
     }
-  }, [data, getSafeMergedDefaults, syncBrowserUrl]);
+  }, [data, getSafeMergedDefaults, syncBrowserUrl, visibilityResolution]);
 
   const handleAppAction = useCallback((message: AppActionPayload & { pageId?: string }) => {
     if (!data?.appGraph) return;
@@ -324,8 +417,10 @@ export default function ViewerDemoPage() {
     );
   }
 
-  const currentPage = data.demoPages.find((p) => p.id === activeDemoId);
-  const currentPageSchema = currentPage?.schema;
+  const currentPage = visiblePages.find((p) => p.id === activeDemoId) ?? visiblePages[0];
+  const currentPageSchema = currentPage?.schema
+    ? stripConfigSchemaByType(currentPage.schema, "business")
+    : undefined;
   let previewStagePage: PreviewStagePage | undefined;
   if (currentPage) {
     const runtimeType = currentPage.runtimeType ?? "high-fidelity-react";
@@ -353,10 +448,22 @@ export default function ViewerDemoPage() {
       configData,
       schema: currentPage.schema,
       previewSize: currentPage.previewSize,
+      visibilityStatus: visibilityResolution?.pages[currentPage.id]
+        ? {
+            visible: visibilityResolution.pages[currentPage.id].visible,
+            enabled: visibilityResolution.pages[currentPage.id].enabled,
+            reasons: visibilityResolution.pages[currentPage.id].reasons,
+          }
+        : undefined,
+      visibilityRegions: Object.fromEntries(
+        Object.entries(visibilityResolution?.regions ?? {})
+          .filter(([key]) => key.startsWith(`${currentPage.id}:`))
+          .map(([key, state]) => [key, { visible: state.visible, enabled: state.enabled }]),
+      ),
     };
   }
 
-  const hasProjectConfig = !isSchemaEmpty(data.projectConfigSchema);
+  const hasProjectConfig = !isSchemaEmpty(visibleProjectConfigSchema);
   const hasPageConfig = !isSchemaEmpty(currentPageSchema);
   const showProjectConfig = hasProjectConfig;
   const showPageConfig = hasPageConfig;
@@ -366,14 +473,19 @@ export default function ViewerDemoPage() {
   return (
     <div className="flex flex-col h-screen bg-background">
       <div className="flex flex-1 overflow-hidden">
-        {showPageList && data.demoPages.length > 0 && (
+        {visibilityNotice && (
+          <div className="absolute left-0 right-0 top-0 z-20 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
+            {visibilityNotice}
+          </div>
+        )}
+        {showPageList && visiblePages.length > 0 && (
           <div className="w-48 border-r shrink-0 flex flex-col">
             <div className="px-3 py-3 border-b">
               <h2 className="text-xs font-medium text-muted-foreground">页面目录</h2>
             </div>
             <ScrollArea className="flex-1">
               <div className="p-2 space-y-1">
-                {data.demoPages.map((page) => (
+                {visiblePages.map((page) => (
                   <button
                     key={page.id}
                     onClick={() => handlePageSwitch(page.id)}
@@ -391,7 +503,7 @@ export default function ViewerDemoPage() {
           </div>
         )}
 
-        <div className="flex-1 overflow-hidden relative" style={{ backgroundColor: previewBackground }}>
+      <div className="flex-1 overflow-hidden relative" style={{ backgroundColor: previewBackground }}>
           {/* 悬浮配置按钮 */}
           {showConfig && (
             <button
@@ -433,7 +545,7 @@ export default function ViewerDemoPage() {
                       <ConfigScopeWrapper scope="project" hideHeader={!hasBothScopes}>
                         <ConfigForm
                           key={`project-${data.projectConfigSchema}`}
-                          schema={data.projectConfigSchema!}
+                          schema={visibleProjectConfigSchema!}
                           onChange={handleConfigChange}
                           initialData={configData}
                           sessionId={sessionId}
@@ -448,7 +560,7 @@ export default function ViewerDemoPage() {
 
                     {showPageConfig && (
                       <ConfigScopeWrapper scope="page" pageName={currentPage?.name} hideHeader={!hasBothScopes}>
-                        <ConfigForm
+          <ConfigForm
                           key={`page-${activeDemoId}`}
                           schema={currentPageSchema!}
                           onChange={handleConfigChange}

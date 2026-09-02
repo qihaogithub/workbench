@@ -31,6 +31,7 @@ const RESOURCE_KINDS: CollabResourceKind[] = [
   "page-schema",
   "page-sketch-scene",
   "project-schema",
+  "visibility-rules",
   "workspace-tree",
   "canvas-layout",
   "knowledge-document",

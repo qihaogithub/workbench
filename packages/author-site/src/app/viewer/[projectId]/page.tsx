@@ -7,6 +7,7 @@ import {
   PageConfigPanel,
   PreviewModeSwitcher,
   isSchemaEmpty,
+  filterConfigValuesByType,
 } from "../../../../components/demo";
 import type {
   PreviewMode,
@@ -16,6 +17,8 @@ import type {
   PreviewStagePage,
 } from "../../../../components/demo";
 import { mergeConfigToProps } from "@/lib/runtime-props";
+import { resolveVisibility } from "@workbench/shared";
+import { stripConfigSchemaByType } from "@workbench/demo-ui";
 import { getDefaultValues } from "../../../../lib/validator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -28,6 +31,7 @@ interface ViewerDemoPage {
   name: string;
   order: number;
   parentId: string | null;
+  regionIds?: string[];
   code: string;
   schema?: string;
   previewSize?: PreviewSize;
@@ -45,6 +49,7 @@ interface ViewerData {
   demoPages: ViewerDemoPage[];
   projectConfigSchema?: string;
   projectConfigValues?: Record<string, unknown>;
+  visibilityRules?: unknown;
   canvasState?: CanvasState;
 }
 
@@ -120,6 +125,7 @@ export default function ViewerProjectPage() {
   );
   const [configData, setConfigData] = useState<Record<string, unknown>>({});
   const [configDataMap, setConfigDataMap] = useState<Record<string, Record<string, unknown>>>({});
+  const [visibilitySessionOverrides, setVisibilitySessionOverrides] = useState<Record<string, unknown>>({});
   const [canvasState, setCanvasState] = useState<CanvasState>({
     viewport: { x: 40, y: 40, zoom: 0.5 },
     pages: {},
@@ -127,10 +133,46 @@ export default function ViewerProjectPage() {
   const [configPanelDetailPageId, setConfigPanelDetailPageId] = useState<string | null>(null);
   // 画布模式按需显示：选中页面 ID（仅 canvasConfig=onclick 模式使用）
   const [canvasSelectedPageId, setCanvasSelectedPageId] = useState<string | null>(null);
+  const [visibilityNotice, setVisibilityNotice] = useState<string | null>(null);
   const urlConfigDataRef = useRef<Record<string, unknown> | null>(null);
   if (urlConfigDataRef.current === null) {
     urlConfigDataRef.current = parseConfigDataParam(configDataParam);
   }
+
+  const visibilityResolution = useMemo(() => {
+    if (!data) return null;
+    return resolveVisibility({
+      rules: data.visibilityRules,
+      projectConfigValues: data.projectConfigValues,
+      projectSchema: data.projectConfigSchema,
+      pageIds: data.demoPages.map((page) => page.id),
+      regionIds: Object.fromEntries(
+        data.demoPages.map((page) => [page.id, page.regionIds ?? []]),
+      ),
+    }, {
+      values: visibilitySessionOverrides,
+      fieldKeys: Object.keys(visibilitySessionOverrides),
+      allowPageTargets: false,
+    });
+  }, [data, visibilitySessionOverrides]);
+  const visiblePages = useMemo(() => {
+    if (!data) return [];
+    if (!visibilityResolution?.valid) return data.demoPages;
+    return data.demoPages.filter(
+      (page) => visibilityResolution.pages[page.id]?.visible !== false,
+    );
+  }, [data, visibilityResolution]);
+  const visibleProjectConfigSchema = useMemo(
+    () => stripConfigSchemaByType(data?.projectConfigSchema, "business"),
+    [data?.projectConfigSchema],
+  );
+  const visiblePageSchemas = useMemo(() => {
+    const next: Record<string, string | undefined> = {};
+    for (const page of visiblePages) {
+      next[page.id] = stripConfigSchemaByType(page.schema, "business");
+    }
+    return next;
+  }, [visiblePages]);
 
   const getSafeMergedDefaults = useCallback(
     (
@@ -202,11 +244,25 @@ export default function ViewerProjectPage() {
           if (activePage?.schema) {
             const defaults = initialConfigDataMap[initialPageId] || {};
             const urlConfig = urlConfigDataRef.current;
-            const merged = urlConfig ? { ...defaults, ...urlConfig } : defaults;
+            const safeUrlConfig = urlConfig
+              ? filterConfigValuesByType(
+                  result.data.projectConfigSchema,
+                  filterConfigValuesByType(activePage.schema, urlConfig, "business"),
+                  "business",
+                )
+              : undefined;
+            const merged = safeUrlConfig ? { ...defaults, ...safeUrlConfig } : defaults;
             setConfigData(merged);
             initialConfigDataMap[initialPageId] = merged;
+            setVisibilitySessionOverrides(safeUrlConfig ?? {});
           } else if (urlConfigDataRef.current) {
-            setConfigData(urlConfigDataRef.current);
+            const safeUrlConfig = filterConfigValuesByType(
+              result.data.projectConfigSchema,
+              urlConfigDataRef.current,
+              "business",
+            );
+            setConfigData(safeUrlConfig);
+            setVisibilitySessionOverrides(safeUrlConfig);
           }
         }
 
@@ -219,6 +275,47 @@ export default function ViewerProjectPage() {
     };
     loadData();
   }, [projectId, pageParam, getSafeMergedDefaults]);
+
+  useEffect(() => {
+    if (!data || !visibilityResolution) return;
+    const requested = pageParam ? data.demoPages.find((page) => page.id === pageParam) : undefined;
+    const requestedState = requested
+      ? visibilityResolution.pages[requested.id]
+      : undefined;
+    const requestedVisible = requested
+      ? !visibilityResolution.valid || requestedState?.visible !== false
+      : false;
+    const requestedEnabled = requested
+      ? !visibilityResolution.valid || requestedState?.enabled !== false
+      : false;
+    const requestedAvailable = requestedVisible && requestedEnabled;
+    const currentVisible = activeDemoId
+      ? visiblePages.find((page) => page.id === activeDemoId)
+      : undefined;
+    const currentAvailable = currentVisible && (
+      !visibilityResolution.valid
+      || visibilityResolution.pages[currentVisible.id]?.enabled !== false
+    )
+      ? currentVisible
+      : undefined;
+    const firstAvailable = visiblePages.find(
+      (page) => !visibilityResolution.valid || visibilityResolution.pages[page.id]?.enabled !== false,
+    );
+    const nextPage = pageParam
+      ? requestedAvailable
+        ? requested
+        : firstAvailable ?? data.demoPages[0]
+      : currentAvailable ?? firstAvailable ?? data.demoPages[0];
+    if (nextPage && nextPage.id !== activeDemoId) {
+      setActiveDemoId(nextPage.id);
+      setConfigData(configDataMap[nextPage.id] ?? {});
+    }
+    setVisibilityNotice(
+      requested && !requestedAvailable
+        ? `页面「${requested.name}」当前${requestedVisible ? "不可用" : "不可见"}，已切换到可用页面。`
+        : null,
+    );
+  }, [activeDemoId, configDataMap, data, pageParam, visibilityResolution, visiblePages]);
 
   const isReadyRef = useRef(false);
   useEffect(() => {
@@ -236,14 +333,24 @@ export default function ViewerProjectPage() {
       switch (msg.type) {
         case "VIEWER_SET_CONFIG":
           if (msg.configData && typeof msg.configData === "object") {
-            setConfigData((prev) => ({ ...prev, ...msg.configData }));
+            const pageSafeConfigData = (data?.demoPages ?? []).reduce(
+              (values, page) => filterConfigValuesByType(page.schema, values, "business"),
+              { ...msg.configData },
+            );
+            const safeConfigData = filterConfigValuesByType(
+              data?.projectConfigSchema,
+              pageSafeConfigData,
+              "business",
+            );
+            setConfigData((prev) => ({ ...prev, ...safeConfigData }));
             setConfigDataMap((prev) => {
               const next = { ...prev };
               for (const pageId of Object.keys(next)) {
-                next[pageId] = { ...next[pageId], ...msg.configData };
+                next[pageId] = { ...next[pageId], ...safeConfigData };
               }
               return next;
             });
+            setVisibilitySessionOverrides((prev) => ({ ...prev, ...safeConfigData }));
           }
           break;
         case "VIEWER_SET_MODE":
@@ -265,7 +372,7 @@ export default function ViewerProjectPage() {
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, []);
+  }, [activeDemoId, canvasConfigMode, data, previewMode]);
 
   const handleConfigChange = useCallback((newData: Record<string, unknown>) => {
     setConfigData((prev) => {
@@ -277,7 +384,15 @@ export default function ViewerProjectPage() {
       ...prev,
       [activeDemoId]: { ...(prev[activeDemoId] ?? {}), ...newData },
     }));
-  }, [activeDemoId]);
+    setVisibilitySessionOverrides((prev) => {
+      const filtered = filterConfigValuesByType(
+        data?.projectConfigSchema,
+        filterConfigValuesByType(data?.demoPages.find((page) => page.id === activeDemoId)?.schema, newData, "business"),
+        "business",
+      );
+      return { ...prev, ...filtered };
+    });
+  }, [activeDemoId, data]);
 
   const handlePageConfigChange = useCallback((pageId: string, newData: Record<string, unknown>) => {
     setConfigData((prev) => {
@@ -306,11 +421,27 @@ export default function ViewerProjectPage() {
       }
       return next;
     });
-  }, []);
+    setVisibilitySessionOverrides((prev) => ({
+      ...prev,
+      ...filterConfigValuesByType(data?.projectConfigSchema, newData, "business"),
+    }));
+  }, [data?.projectConfigSchema]);
 
   const handlePageChange = useCallback(
     (pageId: string) => {
       if (!data) return;
+      const state = visibilityResolution?.valid
+        ? visibilityResolution.pages[pageId]
+        : undefined;
+      if (state?.visible === false || state?.enabled === false) {
+        const blockedPage = data.demoPages.find((page) => page.id === pageId);
+        setVisibilityNotice(
+          blockedPage
+            ? `页面「${blockedPage.name}」当前${state.visible === false ? "不可见" : "不可用"}。`
+            : `该页面当前${state.visible === false ? "不可见" : "不可用"}。`,
+        );
+        return;
+      }
       setActiveDemoId(pageId);
       setConfigPanelDetailPageId(pageId);
       postOutgoing({ type: "VIEWER_PAGE_CHANGE", pageId });
@@ -328,12 +459,12 @@ export default function ViewerProjectPage() {
         });
       }
     },
-    [data, getSafeMergedDefaults]
+    [data, getSafeMergedDefaults, visibilityResolution]
   );
 
   const previewStagePages = useMemo<PreviewStagePage[]>(
     () =>
-      (data?.demoPages ?? []).map((page) => {
+      visiblePages.map((page) => {
         const runtimeType = page.runtimeType ?? "high-fidelity-react";
         const runtimeData =
           runtimeType === "prototype-html-css"
@@ -359,9 +490,21 @@ export default function ViewerProjectPage() {
           ...runtimeData,
           configData: configDataMap[page.id],
           schema: page.schema,
+          visibilityStatus: visibilityResolution?.pages[page.id]
+            ? {
+                visible: visibilityResolution.pages[page.id].visible,
+                enabled: visibilityResolution.pages[page.id].enabled,
+                reasons: visibilityResolution.pages[page.id].reasons,
+              }
+            : undefined,
+          visibilityRegions: Object.fromEntries(
+            Object.entries(visibilityResolution?.regions ?? {})
+              .filter(([key]) => key.startsWith(`${page.id}:`))
+              .map(([key, state]) => [key, { visible: state.visible, enabled: state.enabled }]),
+          ),
         };
       }),
-    [configDataMap, data],
+    [configDataMap, visibilityResolution, visiblePages],
   );
 
   if (isLoading) {
@@ -385,12 +528,12 @@ export default function ViewerProjectPage() {
     );
   }
 
-  const activePage = data.demoPages.find((p) => p.id === activeDemoId);
+  const activePage = visiblePages.find((p) => p.id === activeDemoId) ?? visiblePages[0];
   const activePageSchema = activePage?.schema;
-  const hasMultiplePages = data.demoPages.length > 1;
+  const hasMultiplePages = visiblePages.length > 1;
 
-  const hasProjectConfig = !isSchemaEmpty(data.projectConfigSchema);
-  const hasPageConfig = !isSchemaEmpty(activePageSchema);
+  const hasProjectConfig = !isSchemaEmpty(visibleProjectConfigSchema);
+  const hasPageConfig = !isSchemaEmpty(activePage ? visiblePageSchemas[activePage.id] : undefined);
   const showProjectConfig = hasProjectConfig;
   const showPageConfig = hasPageConfig;
   const hasBothScopes = showProjectConfig && showPageConfig;
@@ -407,6 +550,11 @@ export default function ViewerProjectPage() {
           />
         </header>
       )}
+      {visibilityNotice && (
+        <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
+          {visibilityNotice}
+        </div>
+      )}
       <div className="flex flex-1 overflow-hidden">
         {showPageList && previewMode !== "canvas" && hasMultiplePages && (
           <div className="w-48 border-r shrink-0 flex flex-col">
@@ -415,7 +563,7 @@ export default function ViewerProjectPage() {
             </div>
             <ScrollArea className="flex-1">
               <div className="p-2 space-y-1">
-                {data.demoPages.map((page) => (
+                {visiblePages.map((page) => (
                   <button
                     key={page.id}
                     onClick={() => handlePageChange(page.id)}
@@ -472,11 +620,11 @@ export default function ViewerProjectPage() {
             style={{ width: configWidth }}
           >
             <PageConfigPanel
-              pages={data.demoPages.map((page) => ({
+              pages={visiblePages.map((page) => ({
                 id: page.id,
                 name: page.name,
                 order: page.order,
-                schema: page.schema,
+                schema: visiblePageSchemas[page.id],
                 configData: configDataMap[page.id],
               }))}
               activePageId={activeDemoId}
@@ -485,10 +633,10 @@ export default function ViewerProjectPage() {
               }
               onDetailPageIdChange={setConfigPanelDetailPageId}
               onPageSelect={handlePageChange}
-              projectConfigSchema={data.projectConfigSchema}
+              projectConfigSchema={visibleProjectConfigSchema}
               onProjectConfigChange={handleProjectConfigChange}
               onPageConfigChange={handlePageConfigChange}
-              requirements={data.demoPages.find((page) => page.id === (previewMode === "single" ? activeDemoId : configPanelDetailPageId))?.requirements}
+              requirements={visiblePages.find((page) => page.id === (previewMode === "single" ? activeDemoId : configPanelDetailPageId))?.requirements}
               readonly
               hideDetailHeader={previewMode === "single"}
               requirementsPosition="beforeConfig"

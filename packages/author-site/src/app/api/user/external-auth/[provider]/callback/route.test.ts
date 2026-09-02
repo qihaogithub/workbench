@@ -74,7 +74,7 @@ describe("Figma OAuth callback route", () => {
 
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe(
-      "https://figma-oauth.example.com/?externalAuth=failed",
+      "https://figma-oauth.example.com/workbench?externalAuth=failed",
     );
   });
 
@@ -95,7 +95,7 @@ describe("Figma OAuth callback route", () => {
 
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe(
-      "http://localhost:3200/?externalAuth=failed",
+      "http://localhost:3200/workbench?externalAuth=failed",
     );
   });
 });

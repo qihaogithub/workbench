@@ -95,6 +95,33 @@ describe('scanWorkspaceContext', () => {
     expect(ctx.projectConfigStatus).toBe('已设置');
   });
 
+  it('扫描项目级配置语义和页面可见性规则摘要', () => {
+    createDemoPage('membership');
+    fs.writeFileSync(path.join(tmpDir, 'project.config.schema.json'), JSON.stringify({
+      type: 'object',
+      properties: {
+        membershipEnabled: {
+          type: 'boolean',
+          'ui:options': { configType: 'business' },
+        },
+      },
+    }));
+    fs.writeFileSync(path.join(tmpDir, 'project.visibility-rules.json'), JSON.stringify({
+      version: 1,
+      rules: [{
+        id: 'membership-hidden',
+        source: { scope: 'project', fieldKey: 'membershipEnabled' },
+        condition: { kind: 'truthy' },
+        target: { type: 'page', pageId: 'membership' },
+        effect: 'hidden',
+      }],
+    }));
+    const ctx = scanWorkspaceContext(tmpDir);
+    expect(ctx.projectConfigSummary).toContain('membershipEnabled（业务');
+    expect(ctx.visibilityRulesSummary).toContain('membership-hidden');
+    expect(ctx.visibilityRulesSummary).toContain('membership');
+  });
+
   it('扫描 demos/ 目录下子目录作为页面', () => {
     createDemoPage('home');
     createDemoPage('about');

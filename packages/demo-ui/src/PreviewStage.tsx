@@ -27,7 +27,6 @@ export function PreviewStage({
   canvasState,
   onCanvasStateChange,
   interactionMode,
-  singlePagePresentationOverride,
   singlePageProps,
   canvasProps,
   showToolbar = true,
@@ -59,13 +58,6 @@ export function PreviewStage({
     [normalizedPages],
   );
   const activePage = normalizedPages.find((page) => page.id === activePageId);
-  const singlePage = useMemo(
-    () =>
-      activePage && singlePagePresentationOverride
-        ? { ...activePage, presentation: singlePagePresentationOverride }
-        : activePage,
-    [activePage, singlePagePresentationOverride],
-  );
   const [navigationActive, setNavigationActive] = useState(false);
 
   useEffect(() => {
@@ -154,13 +146,13 @@ export function PreviewStage({
     onCanvasStateChange({ ...canvasState, navigation: { hotspots, connections } });
   };
   const defaultSingleContent = (
-    <SinglePagePreview {...singlePageProps} page={singlePage}
+    <SinglePagePreview {...singlePageProps} page={activePage}
       onRequestPasteHtmlContent={
         canvasProps?.onRequestPasteHtmlContent ??
         singlePageProps?.onRequestPasteHtmlContent
       }
       navigationPages={normalizedPages}
-      navigationHotspots={singlePage ? Object.values(canvasState.navigation?.hotspots ?? {}).filter((hotspot) => hotspot.pageId === singlePage.id) : []}
+      navigationHotspots={activePage ? Object.values(canvasState.navigation?.hotspots ?? {}).filter((hotspot) => hotspot.pageId === activePage.id) : []}
       navigationConnections={Object.values(canvasState.navigation?.connections ?? {})}
       navigationEditable={interactionMode === "editor"}
       navigationActive={navigationActive}
@@ -173,9 +165,9 @@ export function PreviewStage({
     />
   );
   const customSingleContent = renderSingleContent?.({
-    activePage: singlePage,
-    resolvedPreviewSize: singlePage
-      ? resolvePreviewStageSize(singlePage)
+    activePage,
+    resolvedPreviewSize: activePage
+      ? resolvePreviewStageSize(activePage)
       : undefined,
     defaultContent: defaultSingleContent,
   });

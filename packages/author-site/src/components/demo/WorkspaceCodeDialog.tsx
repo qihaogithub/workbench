@@ -278,6 +278,7 @@ function getCollabResourceKind(filePath: string): CollabResourceKind | null {
   if (/^demos\/[^/]+\/prototype\.css$/.test(normalized)) return "page-prototype-css";
   if (/^demos\/[^/]+\/config\.schema\.json$/.test(normalized)) return "page-schema";
   if (normalized === "project.config.schema.json") return "project-schema";
+  if (normalized === "project.visibility-rules.json") return "visibility-rules";
   if (normalized === "workspace-tree.json") return "workspace-tree";
   if (normalized === ".canvas-layout.json") return "canvas-layout";
   return null;

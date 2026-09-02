@@ -6,6 +6,7 @@ import {
   isWhiteboardDocument,
   WHITEBOARD_DOCUMENT_MAX_BYTES,
 } from "./shared-runtime.js";
+import { parseVisibilityRules } from "@workbench/shared";
 
 export type WorkspaceResourceKind =
   | "page-code"
@@ -22,6 +23,7 @@ export type WorkspaceResourceKind =
   | "page-requirements"
   | "project-schema"
   | "project-config-values"
+  | "visibility-rules"
   | "workspace-tree"
   | "workspace-convention"
   | "workspace-memory"
@@ -38,7 +40,7 @@ export interface WorkspaceResourceDescriptor {
   kind: WorkspaceResourceKind;
   text: boolean;
   maxBytes: number;
-  validation: "text" | "json-object" | "workspace-tree" | "sketch-scene" | "whiteboard-document" | "whiteboard-bindings" | "binary";
+  validation: "text" | "json-object" | "workspace-tree" | "sketch-scene" | "whiteboard-document" | "whiteboard-bindings" | "visibility-rules" | "binary";
 }
 
 export interface WorkspaceRootManifest {
@@ -83,6 +85,7 @@ export class WorkspaceResourceRegistry {
     if (/^demos\/[^/]+\/requirements\.md$/.test(normalized)) return { kind: "page-requirements", text: true, maxBytes: TEXT_MAX_BYTES, validation: "text" };
     if (normalized === "project.config.schema.json") return { kind: "project-schema", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
     if (normalized === "project.config.values.json") return { kind: "project-config-values", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
+    if (normalized === "project.visibility-rules.json") return { kind: "visibility-rules", text: true, maxBytes: TEXT_MAX_BYTES, validation: "visibility-rules" };
     if (normalized === "workspace-tree.json") return { kind: "workspace-tree", text: true, maxBytes: TEXT_MAX_BYTES, validation: "workspace-tree" };
     if (normalized === "convention.md") return { kind: "workspace-convention", text: true, maxBytes: TEXT_MAX_BYTES, validation: "text" };
     if (normalized === "memory.md") return { kind: "workspace-memory", text: true, maxBytes: TEXT_MAX_BYTES, validation: "text" };
@@ -159,6 +162,10 @@ export class WorkspaceResourceRegistry {
         || !(parsed as { bindings: unknown[] }).bindings.every(isWhiteboardBinding)) {
         throw new Error("WORKSPACE_INVALID_OPERATION");
       }
+      return;
+    }
+    if (descriptor.validation === "visibility-rules") {
+      if (!parseVisibilityRules(parsed)) throw new Error("WORKSPACE_INVALID_OPERATION");
       return;
     }
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {

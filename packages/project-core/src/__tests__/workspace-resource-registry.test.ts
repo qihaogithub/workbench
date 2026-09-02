@@ -36,6 +36,27 @@ describe("WorkspaceResourceRegistry", () => {
     expect(() => registry.assertTextWrite("project.config.values.json", "{}")).not.toThrow();
   });
 
+  it("将项目级配置联动规则作为受管 JSON 资源", () => {
+    const registry = createWorkspaceResourceRegistry();
+    expect(registry.describe("project.visibility-rules.json")).toMatchObject({
+      kind: "visibility-rules",
+      text: true,
+      validation: "visibility-rules",
+    });
+    expect(() => registry.assertTextWrite("project.visibility-rules.json", JSON.stringify({
+      version: 1,
+      rules: [{
+        id: "rule-1",
+        source: { scope: "project", fieldKey: "enabled" },
+        condition: { kind: "truthy" },
+        target: { type: "page", pageId: "page-1" },
+        effect: "hidden",
+      }],
+    }))).not.toThrow();
+    expect(() => registry.assertTextWrite("project.visibility-rules.json", "{}"))
+      .toThrow("WORKSPACE_INVALID_OPERATION");
+  });
+
   it("将页面级配置运行值作为受管 JSON 对象", () => {
     const registry = createWorkspaceResourceRegistry();
     expect(registry.describe("demos/page-1/config.values.json")).toMatchObject({
@@ -64,6 +85,7 @@ describe("WorkspaceResourceRegistry", () => {
       ["demos/page-1/requirements.md", "page-requirements", "text"],
       ["project.config.schema.json", "project-schema", "json-object"],
       ["project.config.values.json", "project-config-values", "json-object"],
+      ["project.visibility-rules.json", "visibility-rules", "visibility-rules"],
       ["workspace-tree.json", "workspace-tree", "workspace-tree"],
       ["convention.md", "workspace-convention", "text"],
       ["memory.md", "workspace-memory", "text"],

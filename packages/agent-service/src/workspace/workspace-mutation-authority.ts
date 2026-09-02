@@ -17,6 +17,7 @@ import type {
   WorkspaceProjectionAck,
   WorkspaceProjectionAcknowledgedEvent,
 } from "@workbench/shared/contracts";
+import { validateVisibilityRules } from "@workbench/shared";
 import { logger } from "../utils/logger";
 
 import {
@@ -1048,9 +1049,119 @@ export class WorkspaceMutationAuthority {
         }
       }
     }
+    this.validateVisibilityRulesMutation(request, workspacePath);
     // A stale base is harmless only when every targeted resource still matched.
     if (request.baseRevision > state.revision) throw new WorkspaceMutationAuthorityError("WORKSPACE_RESOURCE_CONFLICT");
     return { request, payloadHash, previousState: state, before, preparedAt: Date.now() };
+  }
+
+  /**
+   * Visibility rules are a semantic resource, not merely valid JSON.  Keep
+   * this check inside Authority's prepare phase so a rule document can never
+   * be committed without its page/region/schema references being provable.
+   * The check is only run when the rules resource is part of the mutation;
+   * ordinary code or config-value writes remain independent.
+   */
+  private validateVisibilityRulesMutation(
+    request: WorkspaceMutationRequest,
+    workspacePath: string,
+  ): void {
+    const rulesOperation = request.operations.find(
+      (operation): operation is Extract<typeof operation, { type: "put_text" | "put_staged_text" }> =>
+        (operation.type === "put_text" || operation.type === "put_staged_text")
+        && normalizeWorkspaceResourcePath(operation.path) === "project.visibility-rules.json",
+    );
+    if (!rulesOperation) return;
+
+    let rulesContent: string;
+    if (rulesOperation.type === "put_text") {
+      rulesContent = rulesOperation.content;
+    } else {
+      try {
+        const staged = fs.readFileSync(this.stagingPath(request.workspaceId, rulesOperation.stagingId));
+        if (staged.length !== rulesOperation.size || hashWorkspaceContent(staged) !== rulesOperation.hash) {
+          throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+        }
+        rulesContent = staged.toString("utf8");
+      } catch (error) {
+        if (error instanceof WorkspaceMutationAuthorityError) throw error;
+        throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+      }
+    }
+
+    const pending = new Map<string, string>();
+    const deleted = new Set<string>();
+    for (const operation of request.operations) {
+      const normalized = "path" in operation
+        ? normalizeWorkspaceResourcePath(operation.path)
+        : null;
+      if (!normalized) continue;
+      if (operation.type === "put_text") pending.set(normalized, operation.content);
+      if (operation.type === "put_staged_text") {
+        try {
+          const staged = fs.readFileSync(this.stagingPath(request.workspaceId, operation.stagingId));
+          if (staged.length === operation.size && hashWorkspaceContent(staged) === operation.hash) {
+            pending.set(normalized, staged.toString("utf8"));
+          }
+        } catch {
+          // The normal prepare path reports the precise staging error; this
+          // semantic pass simply ignores an unreadable candidate here.
+        }
+      }
+      if (operation.type === "delete_path") deleted.add(normalized);
+    }
+    const read = (resourcePath: string): string | undefined => {
+      if (deleted.has(resourcePath)) return undefined;
+      const staged = pending.get(resourcePath);
+      if (staged !== undefined) return staged;
+      const absolute = this.resolve(workspacePath, resourcePath);
+      try { return fs.readFileSync(absolute, "utf8"); } catch { return undefined; }
+    };
+    const resources: Record<string, string> = {};
+    const treeRaw = read("workspace-tree.json");
+    if (treeRaw !== undefined) resources["workspace-tree.json"] = treeRaw;
+    let tree: { pages?: Array<{ id?: unknown; name?: unknown }> } = {};
+    try {
+      const parsed = treeRaw ? JSON.parse(treeRaw) as unknown : null;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) tree = parsed as typeof tree;
+    } catch {
+      throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION", "workspace-tree.json 无法解析，无法校验联动规则");
+    }
+    const pageIds = Array.isArray(tree.pages)
+      ? tree.pages.flatMap((page) => typeof page?.id === "string" ? [page.id] : [])
+      : [];
+    const projectSchema = read("project.config.schema.json");
+    const pageSchemas: Record<string, string> = {};
+    const regionIds: Record<string, string[]> = {};
+    for (const pageId of pageIds) {
+      const schemaPath = `demos/${pageId}/config.schema.json`;
+      const schema = read(schemaPath);
+      if (schema !== undefined) pageSchemas[pageId] = schema;
+      const ids = new Set<string>();
+      for (const fileName of ["index.tsx", "prototype.html", "sandbox.html"]) {
+        const source = read(`demos/${pageId}/${fileName}`) ?? "";
+        for (const match of source.matchAll(/data-region-id\s*=\s*["']([A-Za-z0-9_-]{1,100})["']/g)) {
+          if (match[1]) ids.add(match[1]);
+        }
+        for (const match of source.matchAll(/regionId\s*[:=]\s*["']([A-Za-z0-9_-]{1,100})["']/g)) {
+          if (match[1]) ids.add(match[1]);
+        }
+      }
+      regionIds[pageId] = [...ids];
+    }
+    const validation = validateVisibilityRules(rulesContent, {
+      pageIds,
+      regionIds,
+      projectSchema,
+      pageSchemas,
+    });
+    if (!validation.valid) {
+      throw new WorkspaceMutationAuthorityError(
+        "WORKSPACE_INVALID_OPERATION",
+        "联动规则引用或作用域校验失败",
+        { resourcePath: rulesOperation.path, issues: validation.issues },
+      );
+    }
   }
 
   private ensureBootstrap(projectId: string, workspaceId: string): WorkspaceAuthorityState {

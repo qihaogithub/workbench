@@ -54,6 +54,8 @@ export {
   CommentLayer,
   CommentPanel,
   useComments,
+  filterConfigValuesByType,
+  stripConfigSchemaByType,
 } from "@workbench/demo-ui";
 export { SketchPagePreview } from "@workbench/sketch-react/preview";
 export type {

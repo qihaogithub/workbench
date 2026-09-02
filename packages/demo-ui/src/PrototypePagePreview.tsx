@@ -51,6 +51,7 @@ export interface PrototypePagePreviewProps {
   onVisualNodeTreeChange?: (nodes: VisualNodeTreeItem[]) => void;
   visualAnnotations?: VisualAnnotation[];
   visualAnnotationMode?: boolean;
+  visibilityRegions?: Record<string, { visible: boolean; enabled: boolean }>;
   onVisualAnnotationCreate?: (
     node: VisualNodeInfo,
     text?: string,
@@ -449,9 +450,21 @@ export function PrototypePagePreview({
   visualAnnotations = [],
   visualAnnotationMode = false,
   onVisualAnnotationCreate,
+  visibilityRegions,
 }: PrototypePagePreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
+  const visibilityRegionStylesRef = useRef(
+    new WeakMap<HTMLElement | SVGElement, {
+      display: string;
+      displayPriority: string;
+      opacity: string;
+      opacityPriority: string;
+      pointerEvents: string;
+      pointerEventsPriority: string;
+      ariaDisabled: string | null;
+    }>(),
+  );
   const shadowRef = useRef<ShadowRoot | null>(null);
   // 内容高度回调保持最新引用，避免其身份变化触发下方测量 effect 重建 shadow DOM。
   // 重建会导致可滚动容器裁解除失效、root 瞬时回到一屏高度，进而与上报高度形成正反馈闪烁。
@@ -560,6 +573,42 @@ export function PrototypePagePreview({
     if (root) {
       applyPrototypeBindings(root, configData, assetRewrite);
       applyPropertyChanges(root, visualPropertyChanges);
+      for (const element of root.querySelectorAll<HTMLElement | SVGElement>("[data-region-id]")) {
+        const regionId = element.getAttribute("data-region-id");
+        const state = regionId ? visibilityRegions?.[regionId] : undefined;
+        if (!state) continue;
+        let original = visibilityRegionStylesRef.current.get(element);
+        if (!original) {
+          original = {
+            display: element.style.getPropertyValue("display"),
+            displayPriority: element.style.getPropertyPriority("display"),
+            opacity: element.style.getPropertyValue("opacity"),
+            opacityPriority: element.style.getPropertyPriority("opacity"),
+            pointerEvents: element.style.getPropertyValue("pointer-events"),
+            pointerEventsPriority: element.style.getPropertyPriority("pointer-events"),
+            ariaDisabled: element.getAttribute("aria-disabled"),
+          };
+          visibilityRegionStylesRef.current.set(element, original);
+        }
+        if (!state.visible) {
+          element.style.setProperty("display", "none", "important");
+        } else {
+          if (original.display) element.style.setProperty("display", original.display, original.displayPriority);
+          else element.style.removeProperty("display");
+        }
+        if (!state.enabled) {
+          element.style.setProperty("opacity", "0.55");
+          element.style.setProperty("pointer-events", "none");
+          element.setAttribute("aria-disabled", "true");
+        } else {
+          if (original.opacity) element.style.setProperty("opacity", original.opacity, original.opacityPriority);
+          else element.style.removeProperty("opacity");
+          if (original.pointerEvents) element.style.setProperty("pointer-events", original.pointerEvents, original.pointerEventsPriority);
+          else element.style.removeProperty("pointer-events");
+          if (original.ariaDisabled === null) element.removeAttribute("aria-disabled");
+          else element.setAttribute("aria-disabled", original.ariaDisabled);
+        }
+      }
     }
     if (!onContentHeightChangeRef.current || !shouldScaleToPreviewSize || !root) return;
     const reportHeight = (height: number) => {
@@ -607,6 +656,7 @@ export function PrototypePagePreview({
     sessionId,
     shouldScaleToPreviewSize,
     visualPropertyChanges,
+    visibilityRegions,
   ]);
 
   useEffect(() => {

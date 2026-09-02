@@ -19,6 +19,7 @@ export function resolveCollabResourceKind(resourcePath: string): CollabResourceK
   if (/^demos\/[^/]+\/sketch\.scene\.json$/.test(normalized)) return "page-sketch-scene";
   if (/^whiteboards\/[a-zA-Z0-9_-]{1,80}\.json$/.test(normalized)) return "whiteboard-document";
   if (normalized === "project.config.schema.json") return "project-schema";
+  if (normalized === "project.visibility-rules.json") return "visibility-rules";
   if (normalized === "workspace-tree.json") return "workspace-tree";
   if (normalized === ".canvas-layout.json") return "canvas-layout";
   if (/^knowledge\/[^/]+\.(md|markdown|mdown)$/i.test(normalized)) return "knowledge-document";
@@ -339,6 +340,7 @@ export class WorkspaceFilePersistence {
     if (kind === "page-sketch-scene") return /^demos\/[^/]+\/sketch\.scene\.json$/.test(resourcePath);
     if (kind === "whiteboard-document") return /^whiteboards\/[a-zA-Z0-9_-]{1,80}\.json$/.test(resourcePath);
     if (kind === "project-schema") return resourcePath === "project.config.schema.json";
+    if (kind === "visibility-rules") return resourcePath === "project.visibility-rules.json";
     if (kind === "workspace-tree") return resourcePath === "workspace-tree.json";
     if (kind === "canvas-layout") return resourcePath === ".canvas-layout.json";
     if (kind === "knowledge-document") {

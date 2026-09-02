@@ -13,9 +13,10 @@ function hashContent(content) {
 
 function isManagedWorkspaceResource(resourcePath) {
   return (
-    /^demos\/[^/]+\/(index\.tsx|prototype\.(html|css|meta\.json)|sandbox\.html|html-import\.meta\.json|config\.schema\.json|sketch\.(scene|meta)\.json|convention\.md)$/.test(resourcePath) ||
+    /^demos\/[^/]+\/(index\.tsx|prototype\.(html|css|meta\.json)|sandbox\.html|html-import\.meta\.json|config\.(schema|values)\.json|sketch\.(scene|meta)\.json|convention\.md|requirements\.md)$/.test(resourcePath) ||
     resourcePath === "project.config.schema.json" ||
     resourcePath === "project.config.values.json" ||
+    resourcePath === "project.visibility-rules.json" ||
     resourcePath === "workspace-tree.json" ||
     resourcePath === ".canvas-layout.json" ||
     resourcePath === "convention.md" ||
@@ -24,6 +25,8 @@ function isManagedWorkspaceResource(resourcePath) {
     /^knowledge\/[^/]+\.(md|markdown|mdown)$/i.test(resourcePath) ||
     resourcePath === "design-spec/manifest.json" ||
     /^design-spec\/spec-[^/]+\.json$/.test(resourcePath) ||
+    resourcePath === "whiteboards/bindings.json" ||
+    /^whiteboards\/[a-zA-Z0-9_-]{1,80}\.json$/.test(resourcePath) ||
     /^assets\/.+/.test(resourcePath)
   );
 }

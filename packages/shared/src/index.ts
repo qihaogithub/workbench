@@ -68,6 +68,30 @@ export {
 export { checkConfigSchemaAgainstPrototype } from "./demo/config-runtime-compatibility";
 export type { ConfigRuntimeCompatibilityResult } from "./demo/config-runtime-compatibility";
 export {
+  VISIBILITY_RULES_VERSION,
+  parseVisibilityRules,
+  resolveVisibility,
+  validateVisibilityRules,
+  visibilityRulesToJson,
+} from "./demo/visibility-rules";
+export type {
+  AllowedVisibilitySessionOverrides,
+  VisibilityPageState,
+  VisibilityRegionState,
+  VisibilityResolution,
+  VisibilityRule,
+  VisibilityRuleCondition,
+  VisibilityRuleEffect,
+  VisibilityRuleReason,
+  VisibilityRuleSource,
+  VisibilityRuleTarget,
+  VisibilityRulesDocument,
+  VisibilityScalar,
+  VisibilityValidationContext,
+  VisibilityValidationIssue,
+  VisibilityValidationResult,
+} from "./demo/visibility-rules";
+export {
   parsePageRequirementsRefs,
   findPageRequirementRefMatches,
   resolvePageRequirementRefs,
@@ -237,6 +261,8 @@ export interface MultiDemoFiles {
   demos: Record<string, DemoFiles>;
   projectConfigSchema?: string;
   projectConfigValues?: Record<string, unknown>;
+  /** Project-level declarative page/region visibility rules. */
+  visibilityRules?: import("./demo/visibility-rules").VisibilityRulesDocument;
 }
 
 /**
@@ -271,6 +297,7 @@ export type CollabResourceKind =
   | "page-schema"
   | "page-sketch-scene"
   | "project-schema"
+  | "visibility-rules"
   | "workspace-tree"
   | "canvas-layout"
   | "knowledge-document"
@@ -377,6 +404,7 @@ export const ErrorCode = {
     "HTML_IMPORT_INTERACTIVE_NOT_YET_SUPPORTED",
   HTML_IMPORT_RUNTIME_MISMATCH: "HTML_IMPORT_RUNTIME_MISMATCH",
   HTML_RUNTIME_FAILED: "HTML_RUNTIME_FAILED",
+  VISIBILITY_RULES_INVALID: "VISIBILITY_RULES_INVALID",
 } as const;
 
 export type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -434,6 +462,7 @@ export const ERROR_MESSAGES: Record<ErrorCodeType, string> = {
     "交互 HTML 将在隔离运行时启用后支持",
   HTML_IMPORT_RUNTIME_MISMATCH: "HTML 产物与页面运行时不匹配",
   HTML_RUNTIME_FAILED: "HTML 交互预览运行失败",
+  VISIBILITY_RULES_INVALID: "页面可见性规则无效",
 };
 
 export * from "./workspace";

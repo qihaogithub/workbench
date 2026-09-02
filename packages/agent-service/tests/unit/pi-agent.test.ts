@@ -1323,7 +1323,7 @@ describe('PiAgent 工具', () => {
         }),
       });
       
-      expect(tools).toHaveLength(36);
+      expect(tools).toHaveLength(40);
 
       const toolNames = tools.map(tool => tool.name);
       expect(toolNames).toContain('readFile');
@@ -1341,6 +1341,10 @@ describe('PiAgent 工具', () => {
       expect(toolNames).toContain('knowledgeReport');
       expect(toolNames).toContain('readKnowledgeSource');
       expect(toolNames).toContain('readPreinstalledSkill');
+      expect(toolNames).toContain('inspectConfigVisibility');
+      expect(toolNames).toContain('validateConfigVisibility');
+      expect(toolNames).toContain('prepareConfigVisibilityDraft');
+      expect(toolNames).toContain('commitConfigVisibilityDraft');
       expect(toolNames).toContain('activateCapabilities');
       expect(toolNames).toContain('arrangeCanvasPages');
       expect(toolNames).not.toContain('readSketchScene');
@@ -1370,7 +1374,7 @@ describe('PiAgent 工具', () => {
       const { createWorkbenchTools } = await import('../../src/backends/pi-tools');
       const tools = createWorkbenchTools(mockConfig, undefined, { includeDelegateTask: false });
 
-      expect(tools).toHaveLength(35);
+      expect(tools).toHaveLength(39);
       expect(tools.map(tool => tool.name)).not.toContain('delegateTask');
       expect(tools.map(tool => tool.name)).toContain('activateCapabilities');
       expect(tools.map(tool => tool.name)).toContain('readUploadedFile');
@@ -1446,6 +1450,10 @@ describe('PiAgent 工具', () => {
       expect(capabilities.toolNames).toContain('knowledgeReport');
       expect(capabilities.toolNames).toContain('readKnowledgeSource');
       expect(capabilities.toolNames).toContain('readPreinstalledSkill');
+      expect(capabilities.toolNames).toContain('inspectConfigVisibility');
+      expect(capabilities.toolNames).toContain('validateConfigVisibility');
+      expect(capabilities.toolNames).toContain('prepareConfigVisibilityDraft');
+      expect(capabilities.toolNames).toContain('commitConfigVisibilityDraft');
       expect(capabilities.toolNames).toContain('webRead');
       expect(capabilities.toolNames).not.toContain('readSketchScene');
       expect(capabilities.toolNames).not.toContain('patchSketchScene');

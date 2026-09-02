@@ -68,5 +68,6 @@ describe("workspace-file-utils", () => {
     expect(isFileEditable("demos/home/prototype.html")).toBe(true);
     expect(isFileEditable("demos/home/prototype.css")).toBe(true);
     expect(isFileEditable("demos/home/prototype.meta.json")).toBe(false);
+    expect(isFileEditable("project.visibility-rules.json")).toBe(true);
   });
 });

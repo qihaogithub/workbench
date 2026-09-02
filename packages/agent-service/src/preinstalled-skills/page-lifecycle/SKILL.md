@@ -1,9 +1,11 @@
 ---
 name: page-lifecycle
-description: 创建/重命名/排序页面和文件夹的完整规则：目录命名、默认文件结构、workspace-tree.json 编辑、配置项约束。触发词：创建新页面、新建 demo、重命名页面、调整页面顺序、创建文件夹、移动页面到文件夹。不适用于页面删除或运行时类型转换。
+description: 创建/重命名/排序页面和文件夹的完整规则：目录命名、默认文件结构、workspace-tree.json 编辑、配置项约束，以及业务配置驱动可见性资源的边界。触发词：创建新页面、新建 demo、重命名页面、调整页面顺序、创建文件夹、移动页面到文件夹。不适用于页面删除或运行时类型转换。
 ---
 
 # 页面生命周期操作
+
+涉及跨页面隐藏/禁用或业务开关时，先读取 `config-driven-behavior`。页面生命周期只负责页面树和文件结构，不把业务联动逻辑写进 `workspace-tree.json`。
 
 ## 创建页面
 
@@ -66,7 +68,7 @@ description: 创建/重命名/排序页面和文件夹的完整规则：目录�
       "type": "object",
       "title": "分组名称",
       "properties": {
-        "fieldName": { "type": "string", "title": "显示名称", "default": "默认值" },
+        "fieldName": { "type": "string", "title": "显示名称", "default": "默认值", "ui:options": { "configType": "resource" } },
         "count": { "type": "number", "title": "数量", "default": 0 },
         "enabled": { "type": "boolean", "title": "启用", "default": true },
         "bgColor": { "type": "string", "title": "背景颜色", "format": "color", "default": "#ffffff" },

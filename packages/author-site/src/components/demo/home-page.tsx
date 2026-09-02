@@ -15,6 +15,7 @@ import {
   Figma,
   FilePlus,
   Folder,
+  BookOpen,
   LayoutGrid,
   Search,
   Terminal,
@@ -722,9 +723,9 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
         <div className="border-b border-border">
           <div className="container flex h-16 items-center px-4">
           <div className="mr-8 flex items-center">
-            <span className="oneflow-wordmark text-lg font-semibold tracking-tight">
+            <Link href="/workbench" className="oneflow-wordmark text-lg font-semibold tracking-tight">
               OneFlow
-            </span>
+            </Link>
           </div>
 
           <div className="relative max-w-md flex-1">
@@ -758,6 +759,12 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
               <Link href="/cli">
                 <Terminal className="h-4 w-4" />
                 CLI
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm" className="gap-2">
+              <Link href="/manual">
+                <BookOpen className="h-4 w-4" />
+                用户手册
               </Link>
             </Button>
             <Button asChild variant="outline" size="sm" className="gap-2">

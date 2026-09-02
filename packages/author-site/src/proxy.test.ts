@@ -104,7 +104,31 @@ describe("proxy authentication and CORS contract", () => {
     const response = await proxy(request("/login", { cookie: "auth_token=valid" }));
 
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe("http://localhost/");
+    expect(response.headers.get("location")).toBe("http://localhost/workbench");
+  });
+
+  it("redirects an unauthenticated workbench deep link with its query string", async () => {
+    const response = await proxy(request("/workbench?tab=templates"));
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(
+      "http://localhost/login?redirect=%2Fworkbench%3Ftab%3Dtemplates",
+    );
+  });
+
+  it("redirects an authenticated visitor from the public homepage to the workbench", async () => {
+    verifyToken.mockResolvedValue({ userId: "u1", username: "alice" });
+
+    const response = await proxy(request("/", { cookie: "auth_token=valid" }));
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe("http://localhost/workbench");
+  });
+
+  it("keeps the public manual available without authentication", async () => {
+    const response = await proxy(request("/manual/quick-start"));
+
+    expect(response.status).toBe(200);
   });
 
   it("returns the sessions API contract instead of redirecting", async () => {

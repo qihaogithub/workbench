@@ -7,6 +7,7 @@ import { LoginForm } from "@/components/auth/login-form";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast-provider";
 import { Building2 } from "lucide-react";
+import { getSafeRedirectPath } from "@/lib/auth/redirect";
 
 interface DingtalkLoginConfig {
   enabled: boolean;
@@ -23,7 +24,7 @@ export default function LoginPage() {
   const [dingtalkLoading, setDingtalkLoading] = useState(false);
   const [dingtalkConfig, setDingtalkConfig] =
     useState<DingtalkLoginConfig | null>(null);
-  const redirect = searchParams.get("redirect") || "/";
+  const redirect = getSafeRedirectPath(searchParams.get("redirect"));
 
   const finishDingtalkLogin = async (authCode: string) => {
     setDingtalkLoading(true);
@@ -196,7 +197,7 @@ export default function LoginPage() {
       <div className="flex items-center justify-between text-sm">
         <p className="text-muted-foreground">
           还没有账号？{" "}
-          <Link href="/register" className="text-primary hover:underline">
+          <Link href={`/register?redirect=${encodeURIComponent(redirect)}`} className="text-primary hover:underline">
             立即注册
           </Link>
         </p>

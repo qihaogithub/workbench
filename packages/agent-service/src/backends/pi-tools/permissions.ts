@@ -13,6 +13,7 @@ export const DEFAULT_WORKSPACE_PERMISSIONS: PermissionConfig = {
     "demos/*/index.tsx",
     "demos/*/config.schema.json",
     "project.config.schema.json",
+    "project.visibility-rules.json",
     "workspace-tree.json",
     "AGENTS.md",
     "index.tsx",

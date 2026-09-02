@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import fs from "node:fs";
+import path from "node:path";
 import { getAgentClient } from "@/lib/agent-client";
 import {
   createApiSuccess,
@@ -31,6 +33,7 @@ import { readExternalAuthSessionConfigWithRefresh } from "@/lib/external-auth";
 import { getModelConfig } from "@/lib/model-config";
 import { readUserBackendProvidersConfig } from "@/lib/user-model-config";
 import { findUserById, type UserRole } from "@/lib/user";
+import { parseVisibilityRules } from "@workbench/shared";
 
 function createSessionBootstrap(input: {
   sessionId: string;
@@ -54,6 +57,19 @@ function createSessionBootstrap(input: {
   const activePageId = requestedPageExists
     ? input.activePageId!
     : demoPages[0]?.id ?? null;
+  let visibilityRules: ReturnType<typeof parseVisibilityRules> | undefined;
+  const visibilityRulesPath = input.workspacePath
+    ? path.join(input.workspacePath, "project.visibility-rules.json")
+    : null;
+  if (visibilityRulesPath && fs.existsSync(visibilityRulesPath)) {
+    try {
+      visibilityRules = parseVisibilityRules(
+        JSON.parse(fs.readFileSync(visibilityRulesPath, "utf-8")),
+      );
+    } catch {
+      visibilityRules = undefined;
+    }
+  }
 
   return {
     sessionId: input.sessionId,
@@ -76,6 +92,7 @@ function createSessionBootstrap(input: {
     projectConfigValues: input.workspacePath
       ? getProjectConfigValues(input.workspacePath)
       : {},
+    visibilityRules,
     activePageId,
     userRole: input.userRole,
   };

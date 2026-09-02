@@ -1,4 +1,5 @@
 import type { SketchSceneDocument } from "@workbench/sketch-core";
+import type { VisibilityRulesDocument } from "@workbench/shared";
 import type { DemoFolderMeta, DemoPageMeta, DemoPageRuntimeType, KnowledgeIndexItem, PagePresentationProfile } from "@workbench/shared";
 import type { CanvasState } from "@workbench/demo-ui";
 import type { MarkdownReferenceTarget } from "@workbench/shared/markdown-reference";
@@ -22,6 +23,7 @@ export interface PublishedDemoPage {
   name: string;
   order: number;
   parentId: string | null;
+  regionIds?: string[];
   runtimeType?: PublishedPageRuntimeType;
   compiledJsPath?: string;
   iframeHtmlPath?: string;
@@ -88,6 +90,8 @@ export interface PublishedProject {
   demoFolders: DemoFolderMeta[];
   projectConfigSchema?: string;
   projectConfigValues?: Record<string, unknown>;
+  visibilityRules?: VisibilityRulesDocument;
+  visibilityRulesHash?: string;
   canvasState?: CanvasState;
   knowledge?: KnowledgeIndexItem[];
   designSpecs?: PublishedDesignSpecMeta[];

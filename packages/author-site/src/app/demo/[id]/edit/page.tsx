@@ -43,7 +43,11 @@ import type {
   MarkdownReferenceProvider,
 } from "@workbench/demo-ui/DocumentEditor";
 import type { MarkdownReferenceCandidate } from "@workbench/shared/markdown-reference";
-import { classifyConfigField } from "@workbench/shared";
+import {
+  classifyConfigField,
+  parseVisibilityRules,
+  resolveVisibility,
+} from "@workbench/shared";
 import type { PreviewStagePage } from "@workbench/demo-ui/preview-stage-types";
 import type {
   CommentAuthor,
@@ -57,10 +61,10 @@ import type {
   PrototypePageMeta,
   SketchSceneDocument,
   SchemaDefinitionMutation,
+  VisibilityRulesDocument,
 } from "@workbench/shared";
 import type { WorkspaceMutationReceipt } from "@workbench/shared/contracts";
 import {
-  applyPagePresentationToSchema,
   resolvePagePresentation,
   type PagePresentationProfile,
 } from "@workbench/shared";
@@ -134,7 +138,6 @@ import { readWorkspaceAuthoritySnapshotFromBrowser } from "@/lib/workspace-autho
 import { Button } from "@/components/ui/button";
 import { DesignSpecWorkspaceProvider } from "@/components/demo/DesignSpecWorkspace";
 import { HtmlFileDropZone } from "@/components/demo/HtmlFileDropZone";
-import { PageViewportControl } from "@/components/demo/PageViewportControl";
 import {
   Popover,
   PopoverContent,
@@ -756,6 +759,7 @@ function isAiFileChangeRefreshTarget(normalizedPath: string): boolean {
   return (
     normalizedPath === "workspace-tree.json" ||
     normalizedPath === "project.config.schema.json" ||
+    normalizedPath === "project.visibility-rules.json" ||
     normalizedPath.startsWith("demos/")
   );
 }
@@ -807,6 +811,9 @@ function projectAuthoritySnapshotResources(resources: Record<string, string>) {
       projectConfigSchema: resources["project.config.schema.json"],
       projectConfigValues: parseJson<Record<string, unknown>>(
         resources["project.config.values.json"],
+      ),
+      visibilityRules: parseJson<VisibilityRulesDocument>(
+        resources["project.visibility-rules.json"],
       ),
     },
   };
@@ -1060,6 +1067,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [projectConfigValues, setProjectConfigValues] = useState<
     Record<string, unknown>
   >({});
+  const [projectVisibilityRules, setProjectVisibilityRules] =
+    useState<VisibilityRulesDocument | undefined>(undefined);
   const [whiteboardTarget, setWhiteboardTarget] =
     useState<WhiteboardCommitTarget | null>(null);
   const projectConfigValuesRef = useRef(projectConfigValues);
@@ -1224,8 +1233,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   const [workspacePath, setWorkspacePath] = useState("");
   const [previewSize, setPreviewSize] = useState<PreviewSize>();
-  const [temporaryPresentation, setTemporaryPresentation] =
-    useState<PagePresentationProfile>();
 
   useEffect(() => bindKeyboardShortcuts(), [bindKeyboardShortcuts]);
 
@@ -1330,7 +1337,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   demoPagesRef.current = demoPages;
   const [demoFolders, setDemoFolders] = useState<DemoFolderMeta[]>([]);
   const [activeDemoId, setActiveDemoId] = useState<string>("");
-  useEffect(() => setTemporaryPresentation(undefined), [activeDemoId]);
   const [runtimeConversions, setRuntimeConversions] = useState<
     Record<string, RuntimeConversionState>
   >({});
@@ -2523,6 +2529,18 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       : null,
     collabUser,
   );
+  const visibilityRulesCollab = useCollabDocument(
+    sessionId && workspaceId
+      ? {
+          projectId: demoId,
+          workspaceId,
+          sessionId,
+          resourcePath: "project.visibility-rules.json",
+          kind: "visibility-rules",
+        }
+      : null,
+    collabUser,
+  );
   const workspaceTreeCollab = useCollabDocument(
     sessionId && workspaceId
       ? {
@@ -2665,6 +2683,13 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         resourcePath: "project.config.schema.json",
         kind: "project-schema",
       },
+      visibilityRules: {
+        status: visibilityRulesCollab.status,
+        error: visibilityRulesCollab.error,
+        awarenessCount: visibilityRulesCollab.awareness.length,
+        resourcePath: "project.visibility-rules.json",
+        kind: "visibility-rules",
+      },
       workspaceTree: {
         status: workspaceTreeCollab.status,
         error: workspaceTreeCollab.error,
@@ -2704,6 +2729,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       projectSchemaCollab.awareness.length,
       projectSchemaCollab.error,
       projectSchemaCollab.status,
+      visibilityRulesCollab.awareness.length,
+      visibilityRulesCollab.error,
+      visibilityRulesCollab.status,
       workspaceTreeCollab.awareness.length,
       workspaceTreeCollab.error,
       workspaceTreeCollab.status,
@@ -3935,6 +3963,20 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     projectSchemaCollab.ytext,
   ]);
 
+  useEffect(() => {
+    if (visibilityRulesCollab.status !== "synced") return;
+    const value = visibilityRulesCollab.value.trim();
+    const parsed = value ? parseVisibilityRules(value) : undefined;
+    setProjectVisibilityRules((current) => {
+      const currentJson = current ? JSON.stringify(current) : "";
+      const nextJson = parsed ? JSON.stringify(parsed) : "";
+      return currentJson === nextJson ? current : parsed;
+    });
+  }, [
+    visibilityRulesCollab.status,
+    visibilityRulesCollab.value,
+  ]);
+
   const syncWorkspaceFileToCollab = useCallback(
     async (
       resourcePath: string,
@@ -4267,6 +4309,9 @@ ${context.details}
         setProjectConfigSchema(initialProjectSchema);
         projectConfigSchemaRef.current = initialProjectSchema;
         setProjectConfigValues(sessionData.data.projectConfigValues ?? {});
+        setProjectVisibilityRules(
+          parseVisibilityRules(sessionData.data.visibilityRules),
+        );
         const initialPageId = sessionData.data.activePageId || "";
         setActiveDemoId(initialPageId);
         activeDemoIdRef.current = initialPageId;
@@ -4318,6 +4363,7 @@ ${context.details}
           pendingProjectSchemaOverrideRef.current ?? multi.projectConfigSchema;
         setProjectConfigSchema(loadedProjectSchema);
         projectConfigSchemaRef.current = loadedProjectSchema;
+        setProjectVisibilityRules(parseVisibilityRules(multi.visibilityRules));
 
         // 记录每个页面的 previewSize
         const previewSizeMap: Record<string, PreviewSize> = {};
@@ -4759,49 +4805,6 @@ ${context.details}
       }
     },
     [handleSchemaChange],
-  );
-
-  const handleSavePagePresentation = useCallback(
-    (presentation: PagePresentationProfile) => {
-      const pageId = activeDemoIdRef.current;
-      if (!pageId) return;
-      const currentSchema = pageSchemaMapRef.current[pageId];
-      if (!currentSchema) {
-        toast({
-          title: "无法保存展示尺寸",
-          description: "页面配置尚未加载。",
-          variant: "destructive",
-        });
-        return;
-      }
-      try {
-        const nextSchema = applyPagePresentationToSchema(
-          currentSchema,
-          presentation,
-        );
-        handlePageSchemaChange(pageId, nextSchema);
-        const nextSize = { ...presentation.viewport };
-        setPagePreviewSizeMap((current) => ({
-          ...current,
-          [pageId]: nextSize,
-        }));
-        setPreviewSize(nextSize);
-        setTemporaryPresentation(undefined);
-        markScreenshotDirty(pageId);
-        markWorkspaceChanged();
-        toast({
-          title: "已设为页面默认视口",
-          description: `${presentation.viewport.width}×${presentation.viewport.height}`,
-        });
-      } catch (error) {
-        toast({
-          title: "无法保存展示尺寸",
-          description: error instanceof Error ? error.message : "页面配置无效",
-          variant: "destructive",
-        });
-      }
-    },
-    [handlePageSchemaChange, markScreenshotDirty, markWorkspaceChanged, toast],
   );
 
   const handlePageDefinitionChange = useCallback(
@@ -6453,6 +6456,11 @@ ${context.details}
           pendingProjectSchemaOverrideRef.current ?? multi.projectConfigSchema;
         setProjectConfigSchema(refreshedProjectSchema);
         projectConfigSchemaRef.current = refreshedProjectSchema;
+        setProjectVisibilityRules(parseVisibilityRules(multi.visibilityRules));
+        replaceCollabText(
+          visibilityRulesCollab.ytext,
+          multi.visibilityRules ? JSON.stringify(multi.visibilityRules, null, 2) + "\n" : "",
+        );
         replaceCollabText(
           projectSchemaCollab.ytext,
           multi.projectConfigSchema ?? "",
@@ -6677,6 +6685,7 @@ ${context.details}
       markWorkspaceChanged,
       previewMode,
       projectSchemaCollab.ytext,
+      visibilityRulesCollab.ytext,
       workspaceTreeCollab.ytext,
       reconcileRuntimeConversionsAfterAiFiles,
       recordDiagnosticEvent,
@@ -7200,6 +7209,7 @@ ${context.details}
     ...activePageCollabStatuses,
     activeSchemaCollab.status,
     projectSchemaCollab.status,
+    visibilityRulesCollab.status,
     workspaceTreeCollab.status,
     canvasLayoutCollab.status,
   ];
@@ -7291,7 +7301,7 @@ ${context.details}
     const finishExit = () => {
       exitHandlingRef.current = false;
       if (exitCancelledRef.current) return;
-      router.push("/");
+      router.push("/workbench");
     };
 
     try {
@@ -7340,7 +7350,7 @@ ${context.details}
     exitHandlingRef.current = false;
     exitCancelledRef.current = false;
     setShowExitDialog(false);
-    router.push("/");
+    router.push("/workbench");
   };
 
   const handleExitDialogOpenChange = (open: boolean) => {
@@ -7455,10 +7465,48 @@ ${context.details}
   );
 
   const activeDemoPage = demoPages.find((page) => page.id === activeDemoId);
-  const activePersistedPresentation = useMemo(
-    () => resolvePagePresentation(pageSchemaMap[activeDemoId] ?? schema),
-    [activeDemoId, pageSchemaMap, schema],
-  );
+  const visibilityResolution = useMemo(() => {
+    const regionIds: Record<string, string[]> = {};
+    for (const page of demoPages) {
+      const content = [
+        pageCodes[page.id],
+        pagePrototypeMap[page.id]?.html,
+        pageSandboxMap[page.id]?.html,
+      ]
+        .filter((value): value is string => typeof value === "string")
+        .join("\n");
+      regionIds[page.id] = Array.from(
+        new Set(
+          [...content.matchAll(/data-region-id\s*=\s*["']([A-Za-z0-9_-]{1,100})["']/g), ...content.matchAll(/regionId\s*[:=]\s*["']([A-Za-z0-9_-]{1,100})["']/g)]
+            .map((match) => match[1])
+            .filter((value): value is string => Boolean(value)),
+        ),
+      );
+    }
+    const rawRules = visibilityRulesCollab.value.trim();
+    return resolveVisibility({
+      // A non-empty collab payload is authoritative even when malformed so
+      // the preview surfaces validation issues instead of silently treating it
+      // as an absent rules file. Before collab sync, use the bootstrap value.
+      rules: rawRules ? rawRules : projectVisibilityRules,
+      projectConfigValues,
+      projectSchema: projectConfigSchema,
+      pageIds: demoPages.map((page) => page.id),
+      pageSchemas: pageSchemaMap,
+      regionIds,
+    });
+  }, [
+    demoPages,
+    pageCodes,
+    pagePrototypeMap,
+    pageSandboxMap,
+    pageSchemaMap,
+    projectConfigSchema,
+    projectConfigValues,
+    projectVisibilityRules,
+    visibilityRulesCollab.value,
+  ]);
+
   const previewStagePages = useMemo<PreviewStagePage[]>(() => {
     const activeCodePageId =
       pageCodes[activeDemoId] === code ? activeDemoId : undefined;
@@ -7550,6 +7598,18 @@ ${context.details}
         ...runtimeData,
         configData: configDataMap[page.id],
         schema: pageSchemaMap[page.id],
+        visibilityStatus: visibilityResolution.pages[page.id]
+          ? {
+              visible: visibilityResolution.pages[page.id].visible,
+              enabled: visibilityResolution.pages[page.id].enabled,
+              reasons: visibilityResolution.pages[page.id].reasons,
+            }
+          : undefined,
+        visibilityRegions: Object.fromEntries(
+          Object.entries(visibilityResolution.regions)
+            .filter(([key]) => key.startsWith(`${page.id}:`))
+            .map(([key, state]) => [key, { visible: state.visible, enabled: state.enabled }]),
+        ),
         configCount,
         presentation,
         previewSize: presentation?.viewport,
@@ -7572,8 +7632,7 @@ ${context.details}
     sandboxExecutionMap,
     pageSchemaMap,
     pageSnapshots,
-    previewSize,
-    temporaryPresentation,
+    visibilityResolution,
   ]);
   const activeSinglePreviewDocumentNode = useMemo(() => {
     if (singlePreviewTarget?.kind !== "document") return undefined;
@@ -8435,6 +8494,7 @@ ${context.details}
     ...activePageCollabStatuses,
     activeSchemaCollab.status,
     projectSchemaCollab.status,
+    visibilityRulesCollab.status,
     workspaceTreeCollab.status,
     canvasLayoutCollab.status,
   ];
@@ -8542,15 +8602,6 @@ ${context.details}
         </Button>
       </div>
     ) : undefined;
-
-  const viewportControl = activePersistedPresentation ? (
-    <PageViewportControl
-      presentation={activePersistedPresentation}
-      temporaryPresentation={temporaryPresentation}
-      onTemporaryChange={setTemporaryPresentation}
-      onSaveDefault={handleSavePagePresentation}
-    />
-  ) : undefined;
 
   return (
     <div
@@ -9488,6 +9539,22 @@ ${context.details}
                         <HtmlFileDropZone
                           onFilesDrop={handlePreviewHtmlFilesDrop}
                         >
+                          {!visibilityResolution.valid && visibilityResolution.issues.length > 0 && (
+                            <div
+                              role="alert"
+                              className="pointer-events-none absolute left-2 right-2 top-2 z-30 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 shadow-sm"
+                            >
+                              <div className="font-medium">配置联动规则存在问题，预览暂不应用该规则</div>
+                              <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                                {visibilityResolution.issues.slice(0, 3).map((issue, index) => (
+                                  <li key={`${issue.code}-${issue.ruleId ?? ""}-${index}`}>{issue.message}</li>
+                                ))}
+                              </ul>
+                              {visibilityResolution.issues.length > 3 && (
+                                <div className="mt-1 text-amber-800">还有 {visibilityResolution.issues.length - 3} 项问题。</div>
+                              )}
+                            </div>
+                          )}
                           <PreviewStage
                             pages={previewStagePages}
                             activePageId={activeDemoId}
@@ -9499,9 +9566,6 @@ ${context.details}
                             canvasState={canvasState}
                             onCanvasStateChange={setCanvasState}
                             interactionMode="editor"
-                            singlePagePresentationOverride={
-                              temporaryPresentation
-                            }
                             selectorSlot={
                               previewMode === "single" &&
                               demoPages.length > 0 ? (
@@ -9603,61 +9667,57 @@ ${context.details}
                             onSinglePageNext={handleSinglePreviewNext}
                             toolbarTrailing={
                               previewMode === "single" &&
-                              !singlePreviewViewingDocument ? (
-                                <div className="flex min-w-0 items-center gap-2">
-                                  {viewportControl}
-                                  {activeRuntimeConversion ? (
-                                    <div className="flex min-w-0 items-center gap-1">
-                                      <Badge
-                                        variant={
-                                          activeRuntimeConversion.status ===
+                              !singlePreviewViewingDocument &&
+                              activeRuntimeConversion ? (
+                                <div className="flex min-w-0 items-center gap-1">
+                                  <Badge
+                                    variant={
+                                      activeRuntimeConversion.status ===
+                                      "failed"
+                                        ? "destructive"
+                                        : activeRuntimeConversion.status ===
+                                            "completed"
+                                          ? "secondary"
+                                          : "outline"
+                                    }
+                                    className="h-6 max-w-[180px] rounded-md px-2 text-[11px] font-normal"
+                                    title={activeRuntimeConversion.message}
+                                  >
+                                    {(activeRuntimeConversion.status ===
+                                      "running" ||
+                                      activeRuntimeConversion.status ===
+                                        "applying") && (
+                                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                    )}
+                                    {activeRuntimeConversion.status ===
+                                    "completed"
+                                      ? "转换完成"
+                                      : activeRuntimeConversion.status ===
                                           "failed"
-                                            ? "destructive"
-                                            : activeRuntimeConversion.status ===
-                                                "completed"
-                                              ? "secondary"
-                                              : "outline"
-                                        }
-                                        className="h-6 max-w-[180px] rounded-md px-2 text-[11px] font-normal"
-                                        title={activeRuntimeConversion.message}
-                                      >
-                                        {(activeRuntimeConversion.status ===
-                                          "running" ||
-                                          activeRuntimeConversion.status ===
-                                            "applying") && (
-                                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                                        )}
-                                        {activeRuntimeConversion.status ===
-                                        "completed"
-                                          ? "转换完成"
-                                          : activeRuntimeConversion.status ===
-                                              "failed"
-                                            ? "转换失败"
-                                            : "转换中"}
-                                      </Badge>
-                                      {activeRuntimeConversion.status ===
-                                        "failed" && (
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-7 px-2 text-xs"
-                                          onClick={() =>
-                                            handleRequestRuntimeConversion(
-                                              activeRuntimeConversion.pageId,
-                                              activeRuntimeConversion.targetRuntimeType,
-                                            )
-                                          }
-                                          title={
-                                            activeRuntimeConversion.message ||
-                                            "重试转换"
-                                          }
-                                        >
-                                          <RefreshCw className="mr-1 h-3 w-3" />
-                                          重试
-                                        </Button>
-                                      )}
-                                    </div>
-                                  ) : null}
+                                        ? "转换失败"
+                                        : "转换中"}
+                                  </Badge>
+                                  {activeRuntimeConversion.status ===
+                                    "failed" && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 px-2 text-xs"
+                                      onClick={() =>
+                                        handleRequestRuntimeConversion(
+                                          activeRuntimeConversion.pageId,
+                                          activeRuntimeConversion.targetRuntimeType,
+                                        )
+                                      }
+                                      title={
+                                        activeRuntimeConversion.message ||
+                                        "重试转换"
+                                      }
+                                    >
+                                      <RefreshCw className="mr-1 h-3 w-3" />
+                                      重试
+                                    </Button>
+                                  )}
                                 </div>
                               ) : undefined
                             }

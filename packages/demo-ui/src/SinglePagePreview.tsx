@@ -111,6 +111,11 @@ function SinglePagePreviewInternal({
         css={page.prototypeCss}
         previewSize={previewSize}
         configData={page.configData}
+        visibilityRegions={Object.fromEntries(
+          Object.entries(page.visibilityRegions ?? {})
+            .filter(([key]) => key.startsWith(`${page.id}:`))
+            .map(([key, state]) => [key.slice(page.id.length + 1), state]),
+        )}
         demoId={prototypeProps?.demoId ?? page.id}
         allowScroll={prototypeProps?.allowScroll ?? true}
       />
@@ -204,6 +209,13 @@ function SinglePagePreviewInternal({
         }}
       >
         {content}
+        {page?.visibilityStatus && (page.visibilityStatus.visible === false || page.visibilityStatus.enabled === false) && (
+          <div className="pointer-events-none absolute inset-4 z-30 flex items-center justify-center rounded-md bg-slate-900/20">
+            <span className="rounded-md bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow-sm">
+              {page.visibilityStatus.visible === false ? "业务配置已隐藏" : "业务配置已禁用"}
+            </span>
+          </div>
+        )}
         {page && (
           <PageNavigationOverlay
             pageId={page.id}
@@ -264,7 +276,11 @@ function areSinglePagePreviewPropsEqual(
     p.previewSize === n.previewSize &&
     p.presentation === n.presentation &&
     p.schema === n.schema &&
-    p.runtimeType === n.runtimeType
+    p.runtimeType === n.runtimeType &&
+    p.visibilityStatus?.visible === n.visibilityStatus?.visible &&
+    p.visibilityStatus?.enabled === n.visibilityStatus?.enabled &&
+    p.visibilityStatus?.reasons === n.visibilityStatus?.reasons &&
+    p.visibilityRegions === n.visibilityRegions
   );
 }
 

@@ -18,6 +18,7 @@ const EDITABLE_PATTERNS: RegExp[] = [
   /^demos\/[^/]+\/sketch\.scene\.json$/,
   /^demos\/[^/]+\/sketch\.meta\.json$/,
   /^project\.config\.schema\.json$/,
+  /^project\.visibility-rules\.json$/,
   /^memory\.md$/,
   /^convention\.md$/,
   /^demos\/[^/]+\/convention\.md$/,

@@ -262,6 +262,34 @@ describe("getPublishStatus", () => {
     });
   });
 
+  it("发布快照同时保存联动规则正文与稳定哈希", async () => {
+    setupPublishableProject("proj-publish-visibility");
+    const workspacePath = path.join(tempDir, "projects", "proj-publish-visibility", "workspace");
+    fs.writeFileSync(path.join(workspacePath, "project.config.schema.json"), JSON.stringify({
+      type: "object", properties: { enabled: { type: "boolean", default: false } },
+    }));
+    const rules = {
+      version: 1,
+      rules: [{
+        id: "hide-home",
+        source: { scope: "project", fieldKey: "enabled" },
+        condition: { kind: "truthy" },
+        target: { type: "page", pageId: "home" },
+        effect: "hidden",
+      }],
+    };
+    fs.writeFileSync(path.join(workspacePath, "project.visibility-rules.json"), JSON.stringify(rules, null, 2) + "\n");
+
+    await publishProject("proj-publish-visibility");
+    const publishedDir = path.join(tempDir, "published", "proj-publish-visibility");
+    const publishedRules = JSON.parse(fs.readFileSync(path.join(publishedDir, "visibility-rules.json"), "utf8"));
+    const publishedProject = JSON.parse(fs.readFileSync(path.join(publishedDir, "project.json"), "utf8"));
+    expect(publishedProject.visibilityRules).toEqual(publishedRules);
+    expect(publishedProject.visibilityRulesHash).toBe(
+      crypto.createHash("sha256").update(JSON.stringify(publishedRules)).digest("hex"),
+    );
+  });
+
   it("发布时应将页面截图复制到发布包并写入静态路径", async () => {
     setupPublishableProject("proj-publish-screenshot");
     setupPageScreenshot("proj-publish-screenshot", "home");

@@ -27,6 +27,7 @@ covers:
   - scripts/local-production-preview.mjs
   - scripts/deploy.sh
   - scripts/check-workspace-deploy-preflight.mjs
+  - scripts/check-workspace-deploy-preflight.test.mjs
   - scripts/deploy-fast.sh
   - scripts/deploy-author-with-data.sh
   - scripts/sync-production-data-to-local.sh
@@ -34,6 +35,7 @@ covers:
   - packages/sketch-core/package.json
   - packages/sketch-react/package.json
   - packages/author-site/src/proxy.ts
+  - packages/author-site/src/lib/preview-dependency-policy.ts
   - scripts/build-preview-runtime.mjs
   - packages/author-site/public/preview-runtime/manifest.json
   - packages/viewer-site/public/preview-runtime/manifest.json
@@ -41,7 +43,7 @@ covers:
 
 # Docker 部署方案
 
-> 更新日期：2026-09-01
+> 更新日期：2026-09-02
 > 状态：已验证可用（Pi Agent 单后端架构）
 
 ## 一、系统架构
@@ -290,6 +292,8 @@ Chromium 是否能真实启动属于截图能力诊断，不作为默认容器�
 | `screenshot-service` | `screenshot-service`、`sketch-core`、`shared`                                                                                                                                    |
 | `viewer-site`        | `viewer-site`、`demo-ui`、`sketch-core`、`sketch-react`、`shared`                                                                                                                |
 
+`viewer-site` 虽然只发布静态 Nginx 产物，但构建前会生成同源 preview runtime；因此其 Dockerfile 还必须复制 `packages/author-site/src/lib/preview-dependency-policy.ts` 这一份 canonical SDK policy 源文件。该文件不是 viewer 的运行时依赖，不能把整个 author-site 源码包作为替代复制进去。
+
 如果新增 workspace 依赖，只更新本地 `package.json` 不足以保证 Docker build 通过；必须同步更新对应 Dockerfile 的复制清单和 `next.config.js` 的 `transpilePackages`。例如页面运行契约包 `preview-contract` 同时被 author-site、agent-service、project-core 和 project-cli 复用，相关服务镜像必须在 `pnpm install` 前复制它的 `package.json`，并在构建前复制源码目录。
 
 `.dockerignore` 是 Docker 构建上下文的一部分，必须排除 `.workbench/`、`.codegraph/`、`data/`、`test/`、包内 `.next/`、`dist/` 和本地依赖目录，避免把本地工作区、缓存、诊断数据或测试输出复制进镜像构建上下文。
@@ -368,6 +372,7 @@ Pi Agent 内置 5 个工具，通过 `beforeToolCall`/`afterToolCall` 拦截机�
 - 默认设置 `DEPLOY_BUILD_MODE=local`，在 M1 本机按 `DEPLOY_IMAGE_PLATFORM=linux/arm64` 构建 Docker 镜像，导出为压缩归档上传到 Mac mini；服务器只执行 `docker load` 和 `docker compose up --no-build`。
 - 默认设置 `COMPOSE_PARALLEL_LIMIT=1`，限制本地或兜底远程构建并发。
 - 在任何同步或构建前运行 Workspace Authority 部署前检查：Compose 检查确认四个写服务共用 `/app/data`，并强制 knowledge-service 仅内网暴露、SQLite 单实例及 Agent/创作端使用内部服务地址。
+- 部署前检查脚本的 managed-resource 规则必须与 Workspace Authority 注册表同步，覆盖页面 `config.schema.json`/`config.values.json`、`requirements.md`、项目可见性规则、设计规范、白板绑定与白板状态等资源；否则会把合法资源误报为 external drift 并阻断部署。对应契约测试位于 `scripts/check-workspace-deploy-preflight.test.mjs`。
 - 远程 Authority 扫描会阻断未注册 live Workspace、external drift、active/stale lease、prepared/reconcile-prepared 事务、committed backup 缺失/损坏和孤立 Authority state。部署脚本不会自动 adopt 或 restore，必须先通过显式运维命令收敛。
 - 在远端启动前根据 `.env.docker` 中的 `APP_DATA_DIR` 检查稳定持久数据目录；默认不自动创建缺失目录，避免正式环境误切到空 data。首次部署确需创建空目录时，必须显式设置 `ALLOW_CREATE_APP_DATA_DIR=true`。
 - 只有显式设置 `DEPLOY_BUILD_MODE=remote` 时才会在服务器执行限定服务集合的 `docker compose build`；该模式会先检查远端可用内存和 1 分钟负载，资源不足时拒绝构建。

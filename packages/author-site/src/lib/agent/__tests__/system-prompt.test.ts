@@ -209,4 +209,14 @@ describe('buildDynamicContextPrefix', () => {
     const out = buildDynamicContextPrefix(baseContext);
     expect(out).toMatch(/^当前工作空间中的页面/);
   });
+
+  it('包含可选的项目配置与联动规则摘要', () => {
+    const out = buildDynamicContextPrefix({
+      ...baseContext,
+      projectConfigSummary: '- membershipEnabled（业务，boolean）',
+      visibilityRulesSummary: '- membership-hidden: 项目字段 membershipEnabled truthy → 页面 membership hidden',
+    });
+    expect(out).toContain('membershipEnabled');
+    expect(out).toContain('membership-hidden');
+  });
 });

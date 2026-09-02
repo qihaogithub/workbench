@@ -109,29 +109,6 @@ describe("PreviewStage", () => {
     },
   );
 
-  it("临时单页视口不会进入画布页面尺寸", async () => {
-    const temporaryPresentation = {
-      version: 1 as const,
-      mode: "responsive-page" as const,
-      viewport: { width: 390, height: 844 },
-      heightBehavior: "content" as const,
-      preset: "mobile" as const,
-      source: "user" as const,
-    };
-
-    renderStage({ singlePagePresentationOverride: temporaryPresentation });
-    expect(screen.getByTestId("single-preview")).toHaveTextContent(
-      "page-b:390",
-    );
-
-    renderStage({
-      previewMode: "canvas",
-      singlePagePresentationOverride: temporaryPresentation,
-    });
-    const canvas = await screen.findByTestId("preview-canvas");
-    expect(canvas).toHaveAttribute("data-width", "1024");
-  });
-
   it("画布在页面 schema 尚未加载时仍使用已知的持久化尺寸", async () => {
     renderStage({
       previewMode: "canvas",
