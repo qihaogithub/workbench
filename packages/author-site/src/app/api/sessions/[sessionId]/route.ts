@@ -56,7 +56,6 @@ export async function GET(
     return NextResponse.json(
       createApiSuccess({
         ...meta,
-        isExpired: Date.now() > meta.expiresAt,
         workspacePath: getSessionPath(sessionId),
       }),
     );

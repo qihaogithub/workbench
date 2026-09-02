@@ -43,20 +43,17 @@ export async function persistMessages(
 
 export async function updateSessionTitle(
   sessionId: string,
-  userMessage: string,
-  isFirstMessage: boolean,
+  title: string,
+  isFirstMessage = true,
 ): Promise<void> {
   if (!isSessionPersistenceAvailable()) return;
-  if (!isFirstMessage || !userMessage.trim()) return;
+  if (!isFirstMessage || !title.trim()) return;
 
   try {
-    const title =
-      userMessage.trim().slice(0, 50) +
-      (userMessage.trim().length > 50 ? "..." : "");
     await fetch(`/api/sessions/${sessionId}/meta`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title }),
+      body: JSON.stringify({ title: title.trim() }),
     });
   } catch (e) {
     console.warn("[MessageService] Failed to update session title:", e);

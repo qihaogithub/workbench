@@ -144,6 +144,15 @@ type DesignSpecEntryLink = {
   fieldKey: string;
 };
 
+type PageDesignSpecEntryLink = {
+  docId: string;
+  docTitle: string;
+  entryId: string;
+  entryTitle: string;
+  markdown: string;
+  pageId: string;
+};
+
 const sortOptions: { value: SortOption; label: string }[] = [
   { value: "newest", label: "最新更新" },
   { value: "oldest", label: "最早更新" },
@@ -895,6 +904,9 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   const [designSpecEntries, setDesignSpecEntries] = useState<
     DesignSpecEntryLink[]
   >([]);
+  const [pageDesignSpecEntries, setPageDesignSpecEntries] = useState<
+    PageDesignSpecEntryLink[]
+  >([]);
   const [error, setError] = useState<Error | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activePageId, setActivePageId] = useState<string>("");
@@ -1016,34 +1028,56 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
   useEffect(() => {
     if (!project?.designSpecs?.length) {
       setDesignSpecEntries([]);
+      setPageDesignSpecEntries([]);
       return;
     }
     let cancelled = false;
     void Promise.all(
       project.designSpecs.map((meta) => getDesignSpecDoc(projectId, meta.id)),
     )
-      .then((docs) =>
-        docs.flatMap((doc) =>
-          doc.entries.flatMap((entry) =>
-            entry.refs.map(
-              (ref) =>
-                ({
+      .then((docs) => {
+        const config: DesignSpecEntryLink[] = [];
+        const page: PageDesignSpecEntryLink[] = [];
+        for (const doc of docs) {
+          for (const entry of doc.entries) {
+            if (entry.target.type === "config") {
+              for (const ref of entry.target.refs) {
+                config.push({
                   docId: doc.id,
                   docTitle: doc.title,
                   entryId: entry.id,
                   entryTitle: entry.title,
                   markdown: entry.markdown,
                   ...ref,
-                }) satisfies DesignSpecEntryLink,
-            ),
-          ),
-        ),
-      )
+                });
+              }
+            } else {
+              for (const pageId of entry.target.pageIds) {
+                page.push({
+                  docId: doc.id,
+                  docTitle: doc.title,
+                  entryId: entry.id,
+                  entryTitle: entry.title,
+                  markdown: entry.markdown,
+                  pageId,
+                });
+              }
+            }
+          }
+        }
+        return { config, page };
+      })
       .then((entries) => {
-        if (!cancelled) setDesignSpecEntries(entries);
+        if (!cancelled) {
+          setDesignSpecEntries(entries.config);
+          setPageDesignSpecEntries(entries.page);
+        }
       })
       .catch(() => {
-        if (!cancelled) setDesignSpecEntries([]);
+        if (!cancelled) {
+          setDesignSpecEntries([]);
+          setPageDesignSpecEntries([]);
+        }
       });
     return () => {
       cancelled = true;
@@ -1560,6 +1594,7 @@ function ProjectPreviewPage({ projectId }: { projectId: string }) {
       requirementsPosition="beforeConfig"
       hideEmptyRequirements
       designSpecEntries={designSpecEntries}
+      pageDesignSpecEntries={pageDesignSpecEntries}
     />
   );
 

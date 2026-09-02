@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -38,7 +38,12 @@ vi.mock("../src/lib/api", () => ({
       id: "entry-1",
       title: "品牌图片",
       markdown: "图片应使用 16:9。",
-      refs: [{ scope: "page", pageId: "page-1", fieldKey: "heroImage" }],
+      target: { type: "config", refs: [{ scope: "page", pageId: "page-1", fieldKey: "heroImage" }] },
+    }, {
+      id: "entry-2",
+      title: "玩法介绍",
+      markdown: "拖动选项填入空位。",
+      target: { type: "page", pageIds: ["page-1"] },
     }],
   }),
 }));
@@ -99,6 +104,25 @@ describe("ViewerDocumentView", () => {
     );
     expect(screen.getByText("图片应使用 16:9。").getAttribute("data-external-media")).toBe("true");
     expect(screen.getByText("图片应使用 16:9。").getAttribute("data-read-only")).toBeNull();
+  });
+
+  it("renders page specifications without a configuration-item table", async () => {
+    const { container } = render(
+      <ViewerDocumentView
+        projectId="project-1"
+        items={[]}
+        designSpecs={[{ id: "spec-1", title: "首页规范", createdAt: "", updatedAt: "" }]}
+        projectConfigSchema="{}"
+        pages={[{ id: "page-1", name: "首页", schema: "{}" }]}
+      />,
+    );
+
+    const pageSpecTitle = await within(container).findByText("玩法介绍");
+    const pageSpecCard = pageSpecTitle.closest("section");
+    expect(pageSpecCard).not.toBeNull();
+    expect(within(pageSpecCard!).getByText("页面规范 · 1 个页面")).toBeTruthy();
+    expect(within(container).getByText("拖动选项填入空位。")).toBeTruthy();
+    expect(pageSpecCard!.querySelector("table")).toBeNull();
   });
 
   it("uses the published reference directory for read-only navigation and status", async () => {

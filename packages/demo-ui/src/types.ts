@@ -218,7 +218,7 @@ export interface ConfigFormProps {
   /** 创作端从规范详情跳转至文档视图；浏览端不传。 */
   onEditDesignSpec?: (docId: string, entryId: string) => void;
   /** 打开配置项关联的设计规范侧边气泡。 */
-  onOpenDesignSpec?: (spec: DesignSpecEntryLink, fieldTitle: string, anchor?: { top: number; bottom: number }) => void;
+  onOpenDesignSpec?: (spec: DesignSpecEntryLink, fieldTitle: string, anchor?: { top: number; bottom: number }, trigger?: HTMLElement | null) => void;
   /** 创作端提供时，字段标题可打开对应的配置定义编辑器；浏览端不传。 */
   onEditConfigDefinition?: (fieldKey: string, field: FieldConfig) => void;
   /** 配置所在范围。未提供时由宿主自行解析归属。 */
@@ -269,6 +269,23 @@ export interface DesignSpecEntryLink {
   scope: "project" | "page";
   pageId?: string;
   fieldKey: string;
+}
+
+/** 页面配置侧边栏顶部消费的页面规范绑定。 */
+export interface PageDesignSpecEntryLink {
+  docId: string;
+  docTitle: string;
+  entryId: string;
+  entryTitle: string;
+  markdown: string;
+  pageId: string;
+}
+
+/** 外部请求配置面板打开指定字段定义编辑器。 */
+export interface ConfigDefinitionFocus {
+  scope: "project" | "page";
+  fieldKey: string;
+  pageId?: string;
 }
 
 export type PreviewMode = "single" | "canvas" | "document";

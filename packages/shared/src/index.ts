@@ -101,6 +101,7 @@ export {
 export type {
   ConfigDefinitionDraft,
   ConfigDefinitionKind,
+  ConfigDefinitionEnumWidget,
   SchemaDefinitionCommand,
   SchemaDefinitionDiff,
   SchemaDefinitionMutation,
@@ -252,6 +253,8 @@ export interface SessionMeta {
   demoId: string;
   userId?: string;
   createdAt: number;
+  /** 最后一次会话活动时间，按此计算历史保留期。 */
+  lastActivityAt?: number;
   expiresAt: number;
   status?: "editing" | "saved" | "discarded" | "archived";
   basedOnVersion?: string;

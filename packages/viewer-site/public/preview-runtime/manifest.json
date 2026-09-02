@@ -1,6 +1,6 @@
 {
   "version": "2026-09-preview-runtime-v7",
-  "generatedAt": "2026-09-01T08:36:00.512Z",
+  "generatedAt": "2026-09-01T10:29:04.789Z",
   "imports": {
     "lottie-web": "/preview-runtime/vendor/lottie-web.js",
     "@rive-app/canvas": "/preview-runtime/vendor/rive-app-canvas.js",
@@ -90,8 +90,8 @@
       "bytes": 1927601
     },
     "vendor/preview-sdk.js": {
-      "hash": "9fab1d4314d34447",
-      "bytes": 27478
+      "hash": "daf42cf3b58227de",
+      "bytes": 30292
     }
   },
   "packages": {

@@ -33,6 +33,12 @@ describe("generated preview runtime artifacts", () => {
       expect(sdk).toContain("window.__WORKBENCH_SPINE_ASSET_BASE__");
       expect(sdk).toContain("import('@esotericsoftware/spine-webgl-42')");
       expect(sdk).toContain("skeletonObj.updateWorldTransform(physicsMode)");
+      expect(sdk).toContain("skeletonObj.getBounds(offset, size)");
+      expect(sdk).toContain("fit = 'contain'");
+      expect(sdk).toContain("alignment = 'center'");
+      expect(sdk).toContain("camera.position.x");
+      expect(sdk).toContain("normalizeSpineFit(spineFit) === 'none'");
+      expect(sdk).toContain("sceneRenderer.camera.setViewport(w, h); frameSpineCamera()");
       expect(sdk).toContain("console.error('[SpinePlayer]', stage, message)");
       expect(sdk).toContain(".catch((e) => fail('atlas-or-texture-load', e))");
       expect(sdk).not.toContain("assetManager.loadAll();");

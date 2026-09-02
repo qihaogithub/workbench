@@ -92,6 +92,22 @@ export class AgentClient {
     });
   }
 
+  async generateConversationTitle(
+    sessionId: string,
+    options: { content: string; model?: string },
+  ): Promise<ApiResponse<{ title: string }>> {
+    return this.request<{ title: string }>(
+      `/api/agent/${encodeURIComponent(sessionId)}/title`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          content: options.content,
+          model: options.model,
+        }),
+      },
+    );
+  }
+
   async getSession(sessionId: string): Promise<ApiResponse<AgentInfo>> {
     return this.request<AgentInfo>(`/api/agent/${sessionId}`);
   }

@@ -6,7 +6,7 @@ import {
   sessionExists,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
-import { archiveSession } from "@/lib/session-manager";
+import { archiveSession, SESSION_LEASE_MS } from "@/lib/session-manager";
 import fs from "fs";
 import path from "path";
 
@@ -56,8 +56,12 @@ export async function PATCH(
       }
     }
 
+    if (updates.title !== undefined || updates.status !== undefined || updates.workspaceId !== undefined) {
+      meta.lastActivityAt = Date.now();
+    }
+
     if (updates.status === "editing") {
-      meta.expiresAt = Date.now() + 2 * 60 * 60 * 1000;
+      meta.expiresAt = Date.now() + SESSION_LEASE_MS;
     }
 
     // 当状态变为 discarded/archived 时，归档 Session（清理 workspace 但保留消息历史）

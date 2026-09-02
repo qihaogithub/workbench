@@ -24,6 +24,7 @@ const MIME_TYPES: Record<string, string> = {
   '.zip': 'application/octet-stream',
   '.mp4': 'video/mp4',
   '.webm': 'video/webm',
+  '.mp3': 'audio/mpeg',
   '.ico': 'image/x-icon',
   '.bmp': 'image/bmp',
   '.css': 'text/css',

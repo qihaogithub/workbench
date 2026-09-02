@@ -1,7 +1,13 @@
 import * as fs from "fs";
 import * as path from "path";
 import crypto from "crypto";
-import type { DesignSpecDoc, DesignSpecEntry, DesignSpecMeta } from "./types";
+import type {
+  DesignSpecDoc,
+  DesignSpecEntry,
+  DesignSpecMeta,
+  DesignSpecRef,
+  DesignSpecTarget,
+} from "./types";
 
 /**
  * 设计规范数据层：负责 `workspace/design-spec/` 目录的读写。
@@ -94,12 +100,33 @@ export function readDesignSpecDoc(
       title: parsed.title || "",
       createdAt: parsed.createdAt || new Date().toISOString(),
       updatedAt: parsed.updatedAt || new Date().toISOString(),
-      entries: Array.isArray(parsed.entries) ? parsed.entries : [],
+      entries: Array.isArray(parsed.entries)
+        ? parsed.entries.map((entry) =>
+            normalizeEntry(
+              entry as Partial<DesignSpecEntry> & { refs?: unknown },
+              typeof parsed.autoManagedPageId === "string"
+                ? parsed.autoManagedPageId
+                : undefined,
+            ),
+          )
+        : [],
       autoManagedPageId:
         typeof parsed.autoManagedPageId === "string"
           ? parsed.autoManagedPageId
           : undefined,
     };
+  } catch {
+    return null;
+  }
+}
+
+/** 保留磁盘原文，供 live mutation 用作并发校验基线。 */
+export function readDesignSpecDocRawContent(
+  workingDir: string,
+  id: string,
+): string | null {
+  try {
+    return fs.readFileSync(designSpecFilePath(workingDir, id), "utf-8");
   } catch {
     return null;
   }
@@ -220,35 +247,56 @@ export function isSafeDocId(id: string): boolean {
   return /^ds_[A-Za-z0-9_]+(_[A-Za-z0-9]+)?$/.test(id);
 }
 
-/** 归一化条目：去重 refs、补齐字段 */
-export function normalizeEntry(source: Partial<DesignSpecEntry>): DesignSpecEntry {
-  const refs = Array.isArray(source.refs)
-    ? source.refs
-        .filter(
-          (r) =>
-            r &&
-            (r.scope === "project" || r.scope === "page") &&
-            typeof r.fieldKey === "string" &&
-            r.fieldKey.length > 0,
-        )
-        .map((r) => ({
-          scope: r.scope,
-          pageId: r.scope === "page" ? r.pageId : undefined,
-          fieldKey: r.fieldKey,
-        }))
-    : [];
-  const seen = new Set<string>();
-  const uniqueRefs = refs.filter((r) => {
-    const key = `${r.scope}:${r.pageId || ""}:${r.fieldKey}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+/** 归一化条目：迁移旧 refs、规范化互斥的消费目标并补齐字段。 */
+export function normalizeEntry(
+  source: Partial<DesignSpecEntry> & { refs?: unknown },
+  fallbackPageId?: string,
+): DesignSpecEntry {
+  const normalizeRefs = (value: unknown): DesignSpecRef[] =>
+    Array.isArray(value)
+      ? value
+          .filter(
+            (r): r is DesignSpecRef =>
+              Boolean(r) &&
+              typeof r === "object" &&
+              ((r as DesignSpecRef).scope === "project" ||
+                (r as DesignSpecRef).scope === "page") &&
+              typeof (r as DesignSpecRef).fieldKey === "string" &&
+              (r as DesignSpecRef).fieldKey.length > 0,
+          )
+          .map((r) => ({
+            scope: r.scope,
+            pageId: r.scope === "page" ? r.pageId : undefined,
+            fieldKey: r.fieldKey,
+          }))
+      : [];
+  const normalizePageIds = (value: unknown): string[] =>
+    Array.isArray(value)
+      ? Array.from(new Set(value.filter((id): id is string => typeof id === "string" && id.length > 0)))
+      : [];
+  const legacyRefs = normalizeRefs(source.refs);
+  const candidateTarget = source.target as Partial<DesignSpecTarget> | undefined;
+  const target: DesignSpecTarget = candidateTarget?.type === "page"
+    ? { type: "page", pageIds: normalizePageIds(candidateTarget.pageIds) }
+    : candidateTarget?.type === "config"
+      ? { type: "config", refs: normalizeRefs(candidateTarget.refs) }
+      : legacyRefs.length > 0
+        ? { type: "config", refs: legacyRefs }
+        : { type: "page", pageIds: fallbackPageId ? [fallbackPageId] : [] };
+  if (target.type === "config") {
+    const seen = new Set<string>();
+    target.refs = target.refs.filter((r) => {
+      const key = `${r.scope}:${r.pageId || ""}:${r.fieldKey}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
   return {
     id: typeof source.id === "string" && source.id ? source.id : generateEntryId(),
     title: typeof source.title === "string" ? source.title : "",
     markdown: typeof source.markdown === "string" ? source.markdown : "",
-    refs: uniqueRefs,
+    target,
     autoManagedFieldKey:
       typeof source.autoManagedFieldKey === "string"
         ? source.autoManagedFieldKey

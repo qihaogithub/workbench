@@ -9,6 +9,8 @@ import {
 import type { CanvasDocumentNode } from "./types";
 import { cn } from "./utils";
 import { renderPageRequirementsMarkdown } from "./note-html";
+import { useMarkdownImageLightbox } from "./MarkdownImageLightbox";
+import "./markdown-image-lightbox.css";
 import { decodeMarkdownReferenceUri } from "@workbench/shared/markdown-reference";
 import type { MarkdownReferenceClickHandler } from "./DocumentEditor";
 
@@ -29,10 +31,12 @@ export function CanvasDocumentContent({
 }: CanvasDocumentContentProps) {
   const documentEntries = getCanvasDocumentEntries(node);
   const activeDocumentEntry = getActiveCanvasDocumentEntry(node);
+  const { handleMarkdownImageClick, lightbox } = useMarkdownImageLightbox();
   const renderedMarkdown = renderPageRequirementsMarkdown(
     node.markdown || "文档内容加载中...",
   );
   const handleReferenceClick = (event: MouseEvent<HTMLDivElement>) => {
+    if (handleMarkdownImageClick(event)) return;
     const target = (event.target as HTMLElement).closest<HTMLElement>("[data-reference-uri]");
     if (!target) return;
     const uri = target.getAttribute("data-reference-uri");
@@ -46,6 +50,7 @@ export function CanvasDocumentContent({
 
   if (documentEntries.length > 1) {
     return (
+      <>
       <div className={cn("flex h-full min-h-0", className)}>
         <div className="scrollbar-thin w-40 shrink-0 overflow-auto border-r bg-muted/30 py-2">
           {documentEntries.map((entry) => {
@@ -73,25 +78,30 @@ export function CanvasDocumentContent({
         </div>
         <div
           className={cn(
-            "markdown-editor-content scrollbar-thin h-full min-w-0 flex-1 overflow-auto px-4 py-3 text-sm",
+            "markdown-editor-content markdown-image-previewable scrollbar-thin h-full min-w-0 flex-1 overflow-auto px-4 py-3 text-sm",
             contentClassName,
           )}
           onClick={handleReferenceClick}
           dangerouslySetInnerHTML={{ __html: renderedMarkdown }}
         />
       </div>
+      {lightbox}
+      </>
     );
   }
 
   return (
-    <div
-      className={cn(
-        "markdown-editor-content scrollbar-thin h-full overflow-auto px-4 py-3 text-sm",
-        className,
-        contentClassName,
-      )}
-      onClick={handleReferenceClick}
-      dangerouslySetInnerHTML={{ __html: renderedMarkdown }}
-    />
+    <>
+      <div
+        className={cn(
+          "markdown-editor-content markdown-image-previewable scrollbar-thin h-full overflow-auto px-4 py-3 text-sm",
+          className,
+          contentClassName,
+        )}
+        onClick={handleReferenceClick}
+        dangerouslySetInnerHTML={{ __html: renderedMarkdown }}
+      />
+      {lightbox}
+    </>
   );
 }

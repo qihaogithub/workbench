@@ -2,8 +2,8 @@
 
 > 版本：v1.3
 > 创建日期：2026-05-11
-> 更新日期：2026-08-04
-> 更新说明：补充编辑消息重发数据流，新增 resync_history 协议和 appendHistoryMessage 后端方法
+> 更新日期：2026-09-01
+> 更新说明：补充首轮即时标题与模型后台标题生成、固定标题策略，以及历史 Popover 仅展示标题的约束
 > 关联需求：[AI对话\_需求文档.md](../AI对话_需求文档.md)
 > 上层文档：[INDEX.md](../INDEX.md)
 
@@ -26,6 +26,10 @@ covers:
 - packages/author-site/src/components/ai-elements/chat/types.ts
 - packages/agent-client/src/client.ts
 - packages/agent-client/src/types.ts
+- packages/agent-service/src/routes/agent.ts
+- packages/agent-service/src/services/conversation-title-service.ts
+- packages/ai-chat-shared/src/history-dialog.tsx
+- packages/ai-chat-shared/src/chat/services/title-service.ts
 
 ---
 
@@ -43,7 +47,8 @@ chat/
 │   └── use-chat-models.ts          # 模型列表获取、模型切换、思考深度
 ├── services/                       # Service 层 - 网络与持久化
 │   ├── stream-service.ts           # WebSocket 封装、事件解析、连接管理
-│   └── message-service.ts          # 消息持久化、会话标题更新、文件获取
+│   ├── message-service.ts          # 消息持久化、会话标题写入、文件获取
+│   └── title-service.ts            # 本地标题兜底、模型标题请求与结果规范化
 ├── utils/                          # Utils 层 - 纯工具函数
 │   ├── chat-file-utils.ts          # 文件路径匹配、代码/schema 提取
 │   └── chat-stream-utils.ts        # Parts 更新、工具调用解析
@@ -122,8 +127,16 @@ WebSocket 通信的核心封装，职责包括：
 消息持久化和会话元数据管理，提供三个纯异步函数：
 
 - `persistMessages`：将消息列表持久化到服务端。调用时机：①用户发送消息后立即持久化（fire-and-forget）、②流式回复过程中节流持久化（每 5 秒最多一次）、③`onFinish` 时最终持久化、④页面 visibilitychange 到 hidden 时兜底持久化
-- `updateSessionTitle`：首条消息时更新会话标题
+- `updateSessionTitle`：保存首轮即时标题或模型优化后的固定标题
 - `fetchSessionFiles`：从 HTTP API 获取代码/schema 文件内容（作为 WebSocket 事件的兜底）
+
+#### TitleService
+
+标题服务提供纯函数和独立网络请求：
+
+- `deriveConversationTitle` / `deriveConversationTitleFromMessages`：从首条真实用户消息生成即时短标题，并过滤自动修复、可视化隐藏上下文
+- `normalizeConversationTitle`：清理 Markdown、代码围栏、引号、标点和解释性输出，统一长度与“新对话”兜底
+- `requestConversationTitle`：调用无工具、无 Workspace 上下文的标题接口，失败时返回空结果
 
 ### 3.3 Utils 层
 

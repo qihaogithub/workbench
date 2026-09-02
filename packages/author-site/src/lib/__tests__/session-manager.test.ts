@@ -57,6 +57,7 @@ function writeSession(
         status: "archived",
         createdAt,
         expiresAt: createdAt + 1000,
+        lastActivityAt: createdAt,
       },
       null,
       2,
@@ -235,6 +236,21 @@ describe("编辑 Session 续期", () => {
 
     expect(renewEditSession(sessionId)).toBe(false);
   });
+
+  it("创建和续期时分别维护历史活动时间与 2 小时编辑租约", async () => {
+    const { fsUtils, sessionManager } = await importProjectModules(dataDir);
+    const project = fsUtils.createProject("会话活动时间项目");
+    const session = await sessionManager.createEditSession("user-1", project.id);
+    const created = sessionManager.getEditSession(session.sessionId);
+    expect(created?.lastActivityAt).toEqual(expect.any(Number));
+    expect(created?.expiresAt).toBeGreaterThan(created?.lastActivityAt ?? 0);
+
+    const beforeRenew = created?.lastActivityAt ?? 0;
+    expect(sessionManager.renewEditSession(session.sessionId)).toBe(true);
+    const renewed = sessionManager.getEditSession(session.sessionId);
+    expect(renewed?.lastActivityAt).toBeGreaterThanOrEqual(beforeRenew);
+    expect(renewed?.expiresAt).toBeGreaterThan(renewed?.lastActivityAt ?? 0);
+  });
 });
 
 describe("过期 Session 清理", () => {
@@ -251,7 +267,7 @@ describe("过期 Session 清理", () => {
     jest.resetModules();
   });
 
-  it("只返回本轮实际转为 expired 的 Session", async () => {
+  it("只返回本轮实际删除的历史 Session", async () => {
     const sessionId = "session-expired-editing";
     const sessionDir = path.join(
       dataDir,
@@ -269,8 +285,9 @@ describe("过期 Session 清理", () => {
         demoId: "project-1",
         workspaceId: null,
         status: "editing",
-        createdAt: Date.now() - 10_000,
-        expiresAt: Date.now() - 1_000,
+      createdAt: Date.now() - 10_000,
+      expiresAt: Date.now() - 1_000,
+      lastActivityAt: Date.now() - 7 * 24 * 60 * 60 * 1000 - 1_000,
       }),
       "utf-8",
     );
@@ -279,6 +296,28 @@ describe("过期 Session 清理", () => {
 
     expect(cleanupAllExpiredSessions()).toEqual([sessionId]);
     expect(cleanupAllExpiredSessions()).toEqual([]);
+  });
+
+  it("按最后活动时间删除历史，但保留近期会话和 live workspace", async () => {
+    const { fsUtils, sessionManager } = await importProjectModules(dataDir);
+    const project = fsUtils.createProject("历史保留期项目");
+    const recent = await sessionManager.createEditSession("user-1", project.id);
+    const stale = await sessionManager.createEditSession("user-1", project.id);
+    const stalePath = fsUtils.findSessionPath(stale.sessionId);
+    if (!stalePath) throw new Error("stale session path missing");
+    const staleMetaPath = path.join(stalePath, ".session.json");
+    const staleMeta = JSON.parse(fs.readFileSync(staleMetaPath, "utf-8"));
+    staleMeta.lastActivityAt =
+      Date.now() - sessionManager.SESSION_HISTORY_RETENTION_MS - 1_000;
+    fs.writeFileSync(staleMetaPath, JSON.stringify(staleMeta, null, 2), "utf-8");
+
+    expect(sessionManager.cleanupExpiredSessions("user-1", project.id)).toEqual([
+      stale.sessionId,
+    ]);
+    expect(fs.existsSync(stalePath)).toBe(false);
+    expect(fsUtils.findSessionPath(recent.sessionId)).toBeTruthy();
+    expect(fs.existsSync(recent.workspacePath)).toBe(true);
+    expect(sessionManager.cleanupExpiredSessions("user-1", project.id)).toEqual([]);
   });
 });
 

@@ -1,8 +1,10 @@
 const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"];
 export const MAX_VIDEO_SIZE = 200 * 1024 * 1024;
+export const MAX_AUDIO_SIZE = 1 * 1024 * 1024;
 const ALLOWED_VIDEO_MIME_TYPES = ["video/mp4", "video/webm"];
+const ALLOWED_AUDIO_MIME_TYPES = ["audio/mpeg"];
 const VIDEO_HEADER_SCAN_BYTES = 64 * 1024;
-const ALLOWED_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".svga", ".lottie", ".riv", ".json", ".skel", ".atlas", ".zip", ".mp4", ".webm"]);
+const ALLOWED_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".svga", ".lottie", ".riv", ".json", ".skel", ".atlas", ".zip", ".mp4", ".webm", ".mp3"]);
 const OCTET_STREAM_EXTENSIONS = new Set([".svga", ".lottie", ".riv", ".skel", ".atlas"]);
 const ZIP_MIME_TYPES = new Set(["", "application/octet-stream", "application/zip", "application/x-zip-compressed", "application/x-compressed"]);
 
@@ -66,6 +68,7 @@ export function isAllowedAssetFile(file: File, buffer?: Buffer): boolean {
   if (extension === ".json") return file.type === "" || file.type === "application/json";
   if (isSpinePackageFilename(file.name)) return ZIP_MIME_TYPES.has(file.type);
   if (extension === ".mp4" || extension === ".webm") return buffer ? hasExpectedVideoContainer(buffer, extension) : ALLOWED_VIDEO_MIME_TYPES.includes(file.type);
+  if (extension === ".mp3") return ALLOWED_AUDIO_MIME_TYPES.includes(file.type.toLowerCase());
   if (OCTET_STREAM_EXTENSIONS.has(extension)) return file.type === "" || file.type === "application/octet-stream";
   return ALLOWED_MIME_TYPES.includes(file.type);
 }

@@ -45,7 +45,7 @@ describe("设计规范数据层", () => {
           id: "e1",
           title: "主按钮",
           markdown: "**说明**",
-          refs: [{ scope: "project", fieldKey: "brandPrimary" }],
+          target: { type: "config", refs: [{ scope: "project", fieldKey: "brandPrimary" }] },
         },
       ],
     });
@@ -53,9 +53,12 @@ describe("设计规范数据层", () => {
 
     const read = readDesignSpecDoc(tmpDir, doc.id)!;
     expect(read.entries).toHaveLength(1);
-    expect(read.entries[0].refs[0]).toEqual({
+    expect(read.entries[0].target).toEqual({
+      type: "config",
+      refs: [{
       scope: "project",
       fieldKey: "brandPrimary",
+      }],
     });
   });
 
@@ -68,7 +71,7 @@ describe("设计规范数据层", () => {
         id: "e1",
         title: "头图",
         markdown: "说明",
-        refs: [{ scope: "page", pageId: "home", fieldKey: "hero" }],
+        target: { type: "config", refs: [{ scope: "page", pageId: "home", fieldKey: "hero" }] },
         autoManagedFieldKey: "hero",
       }],
     });
@@ -77,6 +80,47 @@ describe("设计规范数据层", () => {
     expect(saved.autoManagedPageId).toBe("home");
     expect(read.autoManagedPageId).toBe("home");
     expect(read.entries[0].autoManagedFieldKey).toBe("hero");
+  });
+
+  it("读取旧条目时按消费位置迁移，并为自动页面补齐页面绑定", () => {
+    const legacyDoc = {
+      id: "ds_legacy",
+      title: "旧规范",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      autoManagedPageId: "home",
+      entries: [
+        {
+          id: "field",
+          title: "字段规范",
+          markdown: "字段说明",
+          refs: [{ scope: "page", pageId: "home", fieldKey: "hero" }],
+        },
+        {
+          id: "intro",
+          title: "页面前言",
+          markdown: "页面说明",
+        },
+      ],
+    };
+    const dir = path.join(tmpDir, "design-spec");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "spec-ds_legacy.json"),
+      JSON.stringify(legacyDoc),
+      "utf-8",
+    );
+
+    const read = readDesignSpecDoc(tmpDir, legacyDoc.id)!;
+
+    expect(read.entries[0].target).toEqual({
+      type: "config",
+      refs: [{ scope: "page", pageId: "home", fieldKey: "hero" }],
+    });
+    expect(read.entries[1].target).toEqual({
+      type: "page",
+      pageIds: ["home"],
+    });
   });
 
   it("删除文档后列表与文件均移除", () => {

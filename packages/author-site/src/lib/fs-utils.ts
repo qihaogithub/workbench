@@ -1063,6 +1063,7 @@ export function createSession(projectId: string): SessionMeta {
     sessionId,
     demoId: projectId,
     createdAt: now,
+    lastActivityAt: now,
     expiresAt: now + SESSION_EXPIRY_MS,
   };
 
@@ -1099,9 +1100,11 @@ export function deleteSession(sessionId: string): boolean {
     return false;
   }
 
-  unregisterSessionPath(sessionId);
-
+  // Resolve the nested session path before removing its index entry. The new
+  // layout is sessions/{userId}/{projectId}/{sessionId}; resolving afterwards
+  // would fall back to the legacy flat path and leave the history on disk.
   const sessionPath = getSessionPath(sessionId);
+  unregisterSessionPath(sessionId);
 
   try {
     const metaPath = path.join(sessionPath, ".session.json");

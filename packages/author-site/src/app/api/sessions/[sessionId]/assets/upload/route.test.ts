@@ -38,7 +38,7 @@ import {
   sessionExists,
 } from "@/lib/fs-utils";
 import { POST } from "./route";
-import { isAllowedAssetFile, MAX_VIDEO_SIZE } from "./asset-validation";
+import { isAllowedAssetFile, MAX_AUDIO_SIZE, MAX_VIDEO_SIZE } from "./asset-validation";
 import { prepareSpineAsset } from "./spine-assets";
 import { commitWorkspaceMutation, stageWorkspaceBinary } from "@/lib/workspace-authority-client";
 
@@ -178,6 +178,34 @@ describe("session asset upload validation", () => {
     expect(fs.writeFileSync).toHaveBeenCalledTimes(2);
   });
 
+  it("uploads a valid MP3 into the session audio workspace and returns its resource URL", async () => {
+    const response = await POST(
+      requestWithFile(videoFile("bgm.mp3", new Uint8Array([0x49, 0x44, 0x33, 1, 2]), "audio/mpeg")),
+      params,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      success: true,
+      data: { url: expect.stringMatching(/\/assets\/audio\/[^/]+\/bgm\.mp3$/), mimeType: "audio/mpeg" },
+    });
+    expect(fs.mkdirSync).toHaveBeenCalledWith(expect.stringMatching(/assets[\\/]audio[\\/]/), { recursive: true });
+    expect(fs.writeFileSync).toHaveBeenCalledWith(expect.stringMatching(/assets[\\/]audio[\\/][^/]+[\\/]bgm\.mp3$/), expect.any(Buffer));
+  });
+
+  it("rejects an audio MIME with a non-MP3 extension using a clear message", async () => {
+    const response = await POST(
+      requestWithFile(videoFile("bgm.wav", new Uint8Array([1, 2]), "audio/wav")),
+      params,
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      success: false,
+      error: { code: "INVALID_FILE_TYPE", message: "音频仅支持 MP3 文件（扩展名需为 .mp3）" },
+    });
+  });
+
   it("returns a clear invalid-container error for a spoofed video", async () => {
     const response = await POST(
       requestWithFile(videoFile("intro.mp4", new Uint8Array([1, 2, 3]), "video/mp4")),
@@ -199,6 +227,20 @@ describe("session asset upload validation", () => {
 
     expect(response.status).toBe(413);
     expect(await response.json()).toMatchObject({ success: false, error: { code: "FILE_TOO_LARGE" } });
+    expect(arrayBuffer).not.toHaveBeenCalled();
+  });
+
+  it("returns 413 before reading an oversized MP3", async () => {
+    const arrayBuffer = jest.fn();
+    const oversized = { name: "large.mp3", type: "audio/mpeg", size: MAX_AUDIO_SIZE + 1, arrayBuffer };
+
+    const response = await POST(requestWithFile(oversized), params);
+
+    expect(response.status).toBe(413);
+    expect(await response.json()).toMatchObject({
+      success: false,
+      error: { code: "FILE_TOO_LARGE", message: "音频文件大小超过 1MB 限制" },
+    });
     expect(arrayBuffer).not.toHaveBeenCalled();
   });
 

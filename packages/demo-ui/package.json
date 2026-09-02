@@ -18,6 +18,7 @@
     "./compile-cache": "./src/compile-cache.ts",
     "./validator": "./src/validator.ts",
     "./DocumentEditor": "./src/DocumentEditor.tsx",
+    "./markdown/remote-image-localizer": "./src/markdown/remote-image-localizer.ts",
     "./PageConfigPanel": "./src/PageConfigPanel.tsx",
     "./PreviewModeSwitcher": "./src/PreviewModeSwitcher.tsx",
     "./PreviewStage": "./src/PreviewStage.tsx",

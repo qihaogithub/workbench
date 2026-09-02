@@ -12,7 +12,7 @@ import {
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { uploadImage } from "@/lib/image-store";
 import { addProjectImage, type ProjectImage } from "@/lib/project-images";
-import { getFileExtension, hasAllowedAssetExtension, isAllowedAssetFile, isSpinePackageFilename, MAX_VIDEO_SIZE } from "./asset-validation";
+import { getFileExtension, hasAllowedAssetExtension, isAllowedAssetFile, isSpinePackageFilename, MAX_AUDIO_SIZE, MAX_VIDEO_SIZE } from "./asset-validation";
 import { prepareSpineAsset } from "./spine-assets";
 import type { WorkspaceMutationOperation } from "@workbench/shared/contracts";
 import { isLiveWorkspacePath } from "@/lib/live-workspace-route-context";
@@ -27,6 +27,9 @@ function invalidAssetMessage(extension: string, mimeType: string): string {
   if (extension === ".mp4" || extension === ".webm") {
     const format = extension === ".mp4" ? "MP4" : "WebM";
     return `视频内容不是有效的 ${format} 容器，请选择有效的 ${format} 文件`;
+  }
+  if (extension === ".mp3") {
+    return "音频仅支持 MP3 文件（MIME 类型需为 audio/mpeg）";
   }
   return `不支持的文件类型或文件内容: ${mimeType || "未提供 MIME"}`;
 }
@@ -82,17 +85,25 @@ export async function POST(
     }
 
     if (!hasAllowedAssetExtension(file.name)) {
+      const message = file.type.toLowerCase().startsWith("audio/")
+        ? "音频仅支持 MP3 文件（扩展名需为 .mp3）"
+        : `不支持的文件类型: ${file.type}`;
       return NextResponse.json(
-        createApiError("INVALID_FILE_TYPE", `不支持的文件类型: ${file.type}`),
+        createApiError("INVALID_FILE_TYPE", message),
         { status: 400 },
       );
     }
 
     const ext = getFileExtension(file.name);
-    const maxSize = ext === ".mp4" || ext === ".webm" ? MAX_VIDEO_SIZE : DEFAULT_MAX_SIZE;
+    const maxSize = ext === ".mp4" || ext === ".webm"
+      ? MAX_VIDEO_SIZE
+      : ext === ".mp3"
+        ? MAX_AUDIO_SIZE
+        : DEFAULT_MAX_SIZE;
     if (file.size > maxSize) {
+      const label = ext === ".mp3" ? "音频文件" : "文件";
       return NextResponse.json(
-        createApiError("FILE_TOO_LARGE", `文件大小超过 ${maxSize / 1024 / 1024}MB 限制`),
+        createApiError("FILE_TOO_LARGE", `${label}大小超过 ${maxSize / 1024 / 1024}MB 限制`),
         { status: 413 },
       );
     }
@@ -119,6 +130,20 @@ export async function POST(
       fs.writeFileSync(path.join(destDir, filename), buffer);
       const url = `/api/sessions/${sessionId}/workspace/assets/videos/${stamp}/${filename}`;
       return NextResponse.json(createApiSuccess({ url, filename, size: file.size, mimeType: file.type }));
+    }
+
+    if (ext === ".mp3") {
+      const workspacePath = getSessionWorkspacePath(sessionId);
+      if (!workspacePath) {
+        return NextResponse.json(createApiError("SESSION_NOT_FOUND", "会话工作区不存在"), { status: 404 });
+      }
+      const stamp = Date.now().toString(36);
+      const destDir = path.join(workspacePath, "assets", "audio", stamp);
+      fs.mkdirSync(destDir, { recursive: true });
+      const filename = path.basename(file.name);
+      fs.writeFileSync(path.join(destDir, filename), buffer);
+      const url = `/api/sessions/${sessionId}/workspace/assets/audio/${stamp}/${filename}`;
+      return NextResponse.json(createApiSuccess({ url, filename, size: file.size, mimeType: file.type || "audio/mpeg" }));
     }
 
     if (isSpinePackageFilename(file.name)) {

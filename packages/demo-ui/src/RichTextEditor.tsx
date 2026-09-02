@@ -2,6 +2,7 @@
 
 import {
   DocumentEditor,
+  type DocumentRemoteImageHandler,
   type MarkdownReferenceClickHandler,
   type MarkdownReferenceContext,
   type MarkdownReferenceProvider,
@@ -22,6 +23,8 @@ interface RichTextEditorProps {
   content: string;
   onChange: (markdown: string) => void;
   uploadHandler?: NoteUploadHandler;
+  /** 提供时，粘贴的外链图片会保存到当前会话图床。 */
+  localizeRemoteImage?: DocumentRemoteImageHandler;
   /** 提供时，工具栏显示「插入引用」按钮，可从当前页配置项中选择并插入 @[label](key)。 */
   referenceCandidates?: ConfigReferenceCandidate[];
   referenceContext?: MarkdownReferenceContext;
@@ -36,6 +39,7 @@ export function RichTextEditor({
   content,
   onChange,
   uploadHandler,
+  localizeRemoteImage,
   referenceCandidates,
   referenceContext,
   referenceProvider,
@@ -47,6 +51,7 @@ export function RichTextEditor({
       value={content}
       onChange={onChange}
       uploadHandler={uploadHandler}
+      localizeRemoteImage={localizeRemoteImage}
       referenceCandidates={referenceCandidates}
       referenceContext={referenceContext}
       referenceProvider={referenceProvider}

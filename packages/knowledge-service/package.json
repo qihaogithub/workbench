@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@workbench/knowledge-core": "workspace:*",
-    "better-sqlite3": "12.11.1",
+    "better-sqlite3": "13.0.3",
     "dotenv": "^17.4.2",
     "fastify": "^4.26.0"
   },

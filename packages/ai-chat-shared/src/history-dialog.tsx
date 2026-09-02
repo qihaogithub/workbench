@@ -1,17 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from './ui/dialog'
+import { PopoverContent } from './ui/popover'
 import { Button } from './ui/button'
-import { Badge } from './ui/badge'
 import { ScrollArea } from './ui/scroll-area'
-import { Trash2, Plus, Clock, AlertCircle, MessageSquare, Download } from 'lucide-react'
+import { Trash2, Plus, Clock, Download } from 'lucide-react'
 import { cn } from './lib/utils'
 
 interface SessionItem {
@@ -20,16 +13,15 @@ interface SessionItem {
   workspaceId?: string | null
   title?: string | null
   createdAt: number
-  expiresAt: number
-  isExpired: boolean
-  messageCount: number
-  lastMessageAt: number
-  hasUnsavedChanges: boolean
+  lastActivityAt?: number
+  lastMessageAt?: number
 }
 
 interface HistoryDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** AIChat 宿主列宽；用于覆盖 Popover 首次测量异常时的宽度。 */
+  popoverWidth?: number | null
   projectId: string
   workspaceId?: string
   currentSessionId?: string
@@ -40,6 +32,7 @@ interface HistoryDialogProps {
 export function HistoryDialog({
   open,
   onOpenChange,
+  popoverWidth,
   projectId,
   workspaceId,
   currentSessionId,
@@ -128,127 +121,118 @@ export function HistoryDialog({
     onOpenChange(false)
   }
 
-  const formatTime = (timestamp: number) => {
-    const date = new Date(timestamp)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffMins = Math.floor(diffMs / 60000)
-    const diffHours = Math.floor(diffMs / 3600000)
-    const diffDays = Math.floor(diffMs / 86400000)
-
-    if (diffMins < 1) return '刚刚'
-    if (diffMins < 60) return `${diffMins} 分钟前`
-    if (diffHours < 24) return `${diffHours} 小时前`
-    if (diffDays < 7) return `${diffDays} 天前`
-    return date.toLocaleDateString('zh-CN')
-  }
-
+  // PromptInput 的 p-4 + 加号按钮 w-8 + gap-1，使历史按钮距侧栏左边缘 52px。
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] max-w-2xl overflow-hidden sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            对话历史
-          </DialogTitle>
-          <DialogDescription className="sr-only">
-            查看、新建、导出或删除当前项目的 AI 对话历史。
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="flex min-w-0 flex-col gap-4 overflow-hidden">
-          <Button onClick={handleNewSession} className="w-full min-w-0">
-            <Plus className="h-4 w-4 mr-2" />
+    <PopoverContent
+      side="top"
+      align="start"
+      alignOffset={-52}
+      sideOffset={8}
+      aria-label="对话历史"
+      style={{
+        width:
+          popoverWidth != null && popoverWidth > 0
+            ? `${popoverWidth}px`
+            : "min(360px, calc(100vw - 1rem))",
+      }}
+      className="w-[min(360px,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] min-w-0 overflow-hidden rounded-xl border border-muted-foreground/50 bg-popover p-3 shadow-xl"
+    >
+      <div className="flex min-w-0 flex-col gap-3">
+        <div className="flex items-center justify-between gap-2 px-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <Clock className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <h2 className="truncate text-base font-semibold leading-5">
+              对话历史
+            </h2>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 shrink-0 cursor-pointer px-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            onClick={handleNewSession}
+            aria-label="新建对话"
+            title="新建对话"
+          >
+            <Plus className="mr-1 h-3.5 w-3.5" />
             新建对话
           </Button>
+        </div>
 
-          <ScrollArea className="h-[300px] w-full min-w-0 pr-4">
-            {loading ? (
-              <div className="flex items-center justify-center py-8 text-muted-foreground">
-                加载中...
-              </div>
-            ) : sessions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                <Clock className="h-12 w-12 mb-2 opacity-50" />
-                <p>暂无历史对话</p>
-              </div>
-            ) : (
-              <div className="w-full min-w-0 space-y-2">
-                {sessions.map((session) => (
+        <ScrollArea className="max-h-[min(55vh,340px)] w-full min-w-0 pr-1">
+          {loading ? (
+            <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+              加载中...
+            </div>
+          ) : sessions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-sm text-muted-foreground">
+              <Clock className="mb-2 h-10 w-10 opacity-40" />
+              <p>暂无历史对话</p>
+            </div>
+          ) : (
+            <div className="w-full min-w-0 space-y-1.5">
+              {sessions.map((session) => {
+                return (
                   <div
                     key={session.sessionId}
                     className={cn(
-                      'flex w-full min-w-0 items-center gap-3 rounded-lg border p-3 transition-colors',
-                      session.isExpired
-                        ? 'bg-muted/50 opacity-60'
-                        : 'hover:bg-muted cursor-pointer',
+                      'group flex w-full min-w-0 items-center gap-2 rounded-lg border border-muted-foreground/50 p-2 transition-colors',
+                      'hover:bg-muted/70',
                       session.sessionId === currentSessionId &&
                         'border-primary bg-primary/5',
                     )}
-                    onClick={() => {
-                      onSelectSession(session.sessionId, session.workspaceId || undefined)
-                      onOpenChange(false)
-                    }}
                   >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="min-w-0 flex-1 truncate font-medium">
-                          {session.title || formatTime(session.createdAt)}
-                        </span>
-                        {session.isExpired && (
-                          <Badge variant="outline" className="shrink-0 text-orange-500 text-[10px] px-1.5 py-0">
-                            <AlertCircle className="h-3 w-3 mr-0.5" />
-                            已过期
-                          </Badge>
-                        )}
-                        {session.hasUnsavedChanges && !session.isExpired && (
-                          <Badge variant="outline" className="shrink-0 text-yellow-600 text-[10px] px-1.5 py-0">
-                            未保存
-                          </Badge>
-                        )}
-                        {session.messageCount > 0 && (
-                          <Badge variant="secondary" className="shrink-0 text-[10px] px-1.5 py-0">
-                            <MessageSquare className="h-3 w-3 mr-0.5" />
-                            {session.messageCount}
-                          </Badge>
-                        )}
+                    <button
+                      type="button"
+                      className="min-w-0 flex-1 cursor-pointer rounded-sm p-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      onClick={() => {
+                        onSelectSession(session.sessionId, session.workspaceId || undefined)
+                        onOpenChange(false)
+                      }}
+                    >
+                      <div className="truncate text-sm font-semibold">
+                        {session.title || '新对话'}
                       </div>
-                      <p className="text-xs text-muted-foreground truncate mt-0.5">
-                        {session.title ? formatTime(session.createdAt) : `Session: ${session.sessionId.slice(0, 16)}...`}
-                      </p>
+                    </button>
+                    <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 [@media(pointer:coarse)]:opacity-100">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 cursor-pointer text-muted-foreground hover:text-foreground"
+                        aria-label="导出对话"
+                        title="导出对话"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void handleExport(session.sessionId, session.createdAt)
+                        }}
+                        disabled={exportingId === session.sessionId}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 cursor-pointer text-muted-foreground hover:text-destructive"
+                        aria-label="删除对话"
+                        title="删除对话"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void handleDelete(session.sessionId)
+                        }}
+                        disabled={deletingId === session.sessionId}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleExport(session.sessionId, session.createdAt)
-                      }}
-                      disabled={exportingId === session.sessionId}
-                      title="导出对话"
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDelete(session.sessionId)
-                      }}
-                      disabled={deletingId === session.sessionId}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
                   </div>
-                ))}
-              </div>
-            )}
-          </ScrollArea>
-        </div>
-      </DialogContent>
-    </Dialog>
+                )
+              })}
+            </div>
+          )}
+        </ScrollArea>
+      </div>
+    </PopoverContent>
   )
 }

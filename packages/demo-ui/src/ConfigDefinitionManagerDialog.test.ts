@@ -9,7 +9,49 @@ const SCHEMA = JSON.stringify({
   properties: { heroImage: { type: "string", format: "image", default: "old" } },
 });
 
+const ENUM_SCHEMA = JSON.stringify({
+  type: "object",
+  properties: {
+    layout: {
+      type: "string",
+      title: "布局",
+      enum: ["list", "grid"],
+      "ui:widget": "segmented",
+    },
+  },
+});
+
 describe("configuration definition mutations", () => {
+  it("does not add enum presentation metadata to non-enum fields", () => {
+    expect(readConfigDefinitionFields(SCHEMA).find((item) => item.key === "heroImage")?.enumWidget).toBeUndefined();
+  });
+
+  it("round-trips enum presentation widgets and can return to the default select", () => {
+    const added = applySchemaDefinitionCommand(SCHEMA, {
+      type: "field.add",
+      field: { key: "layout", title: "布局", kind: "enum", enum: ["list", "grid"], enumWidget: "segmented", default: "list" },
+    });
+    expect(JSON.parse(added.schema).properties.layout["ui:widget"]).toBe("segmented");
+
+    const field = readConfigDefinitionFields(ENUM_SCHEMA).find((item) => item.key === "layout");
+    expect(field?.enumWidget).toBe("segmented");
+
+    const radio = applySchemaDefinitionCommand(ENUM_SCHEMA, {
+      type: "field.update",
+      key: "layout",
+      patch: { enumWidget: "radio" },
+    });
+    expect(JSON.parse(radio.schema).properties.layout["ui:widget"]).toBe("radio");
+
+    const select = applySchemaDefinitionCommand(radio.schema, {
+      type: "field.update",
+      key: "layout",
+      patch: { enumWidget: "select" },
+    });
+    expect(JSON.parse(select.schema).properties.layout["ui:widget"]).toBeUndefined();
+    expect(readConfigDefinitionFields(select.schema).find((item) => item.key === "layout")?.enumWidget).toBe("select");
+  });
+
   it("adds image constraints using one rule per dimension", () => {
     const result = applySchemaDefinitionCommand(SCHEMA, {
       type: "field.update",

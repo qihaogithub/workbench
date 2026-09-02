@@ -129,7 +129,8 @@ function ArrayItemHeader({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex min-h-9 flex-col gap-2.5 rounded-lg bg-foreground/[0.07] p-2 transition-[background-color,box-shadow,opacity,transform] duration-200",
+        "flex min-h-9 flex-col rounded-lg bg-foreground/[0.07] p-2 transition-[background-color,box-shadow,opacity,transform] duration-200",
+        isOpen ? "gap-2.5" : "gap-0",
         isDragging
           ? "bg-foreground/[0.11] shadow-md"
           : "hover:bg-foreground/[0.09]",

@@ -32,7 +32,7 @@ function readDoc() {
       id: string;
       title: string;
       markdown: string;
-      refs: unknown[];
+      target: unknown;
       autoManagedFieldKey?: string;
     }>;
   };
@@ -59,8 +59,8 @@ describe("页面设计规范自动同步", () => {
     expect(manifest.items[0].title).toBe("首页设计规范");
     expect(doc.autoManagedPageId).toBe("home");
     expect(doc.entries).toEqual(expect.arrayContaining([
-      expect.objectContaining({ title: "首屏图片", markdown: "", autoManagedFieldKey: "heroImage" }),
-      expect.objectContaining({ title: "入场动效", markdown: "", autoManagedFieldKey: "enterAnimation" }),
+      expect.objectContaining({ title: "首屏图片", markdown: "", autoManagedFieldKey: "heroImage", target: { type: "config", refs: [{ scope: "page", pageId: "home", fieldKey: "heroImage" }] } }),
+      expect.objectContaining({ title: "入场动效", markdown: "", autoManagedFieldKey: "enterAnimation", target: { type: "config", refs: [{ scope: "page", pageId: "home", fieldKey: "enterAnimation" }] } }),
     ]));
   });
 
@@ -73,7 +73,7 @@ describe("页面设计规范自动同步", () => {
     });
     applyPageDesignSpecSync({ workspacePath, pageId: "home", pageName: "首页", schema: initial });
     const { manifest, doc } = readDoc();
-    doc.entries.push({ id: "manual", title: "人工说明", markdown: "保留", refs: [] });
+    doc.entries.push({ id: "manual", title: "人工说明", markdown: "保留", target: { type: "page", pageIds: ["home"] } });
     fs.writeFileSync(
       path.join(workspacePath, "design-spec", `spec-${manifest.items[0].id}.json`),
       JSON.stringify(doc, null, 2),
@@ -117,5 +117,40 @@ describe("页面设计规范自动同步", () => {
       pageName: "首页",
       schema: JSON.stringify({ properties: { headline: { type: "string" } } }),
     })).toEqual([]);
+  });
+
+  it("同步配置项规范时不删除手工页面规范", () => {
+    applyPageDesignSpecSync({
+      workspacePath,
+      pageId: "home",
+      pageName: "首页",
+      schema: JSON.stringify({ properties: { hero: { type: "image", title: "首图" } } }),
+    });
+    const { manifest, doc } = readDoc();
+    doc.entries.push({
+      id: "page-rule",
+      title: "玩法介绍",
+      markdown: "拖动图片完成配对。",
+      target: { type: "page", pageIds: ["home", "lesson-2"] },
+    });
+    fs.writeFileSync(
+      path.join(workspacePath, "design-spec", `spec-${manifest.items[0].id}.json`),
+      JSON.stringify(doc, null, 2),
+      "utf-8",
+    );
+
+    applyPageDesignSpecSync({
+      workspacePath,
+      pageId: "home",
+      pageName: "首页",
+      schema: JSON.stringify({ properties: {} }),
+    });
+
+    expect(readDoc().doc.entries).toEqual([
+      expect.objectContaining({
+        id: "page-rule",
+        target: { type: "page", pageIds: ["home", "lesson-2"] },
+      }),
+    ]);
   });
 });

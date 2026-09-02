@@ -53,8 +53,8 @@ export function ViewerAiPanel({
     createViewerSessionId(projectId),
   );
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [historySessions, setHistorySessions] = useState<LocalChatSession[]>([]);
+  const [sessionTitle, setSessionTitle] = useState<string | null>(null);
   const createdAtRef = useRef(Date.now());
   // 首次打开后再挂载 AIChat，避免未使用 AI 时建立 WebSocket 连接
   const hasOpenedRef = useRef(false);
@@ -74,13 +74,13 @@ export function ViewerAiPanel({
     writeLocalChatSession({
       sessionId,
       projectId,
-      title: deriveLocalChatTitle(messages),
+      title: sessionTitle ?? deriveLocalChatTitle(messages),
       createdAt: createdAtRef.current,
       updatedAt: Date.now(),
       messages,
     });
     refreshHistory();
-  }, [messages, projectId, refreshHistory, sessionId]);
+  }, [messages, projectId, refreshHistory, sessionId, sessionTitle]);
 
   const viewerContext = useMemo(
     () => ({ activePageId, activeConfig }),
@@ -91,8 +91,8 @@ export function ViewerAiPanel({
     const previousSessionId = sessionId;
     setSessionId(createViewerSessionId(projectId));
     setMessages([]);
+    setSessionTitle(null);
     createdAtRef.current = Date.now();
-    setHistoryOpen(false);
     // 旧会话兜底销毁（WS 断开时服务端也会自动清理）
     void agentClient.destroySession(previousSessionId).catch(() => {});
   }, [projectId, sessionId]);
@@ -100,8 +100,8 @@ export function ViewerAiPanel({
   const handleSelectHistory = useCallback((session: LocalChatSession) => {
     setSessionId(session.sessionId);
     setMessages(session.messages);
+    setSessionTitle(session.title || null);
     createdAtRef.current = session.createdAt;
-    setHistoryOpen(false);
   }, []);
 
   const handleDeleteHistory = useCallback(
@@ -110,6 +110,7 @@ export function ViewerAiPanel({
       if (targetSessionId === sessionId) {
         setSessionId(createViewerSessionId(projectId));
         setMessages([]);
+        setSessionTitle(null);
         createdAtRef.current = Date.now();
       }
       refreshHistory();
@@ -167,23 +168,30 @@ export function ViewerAiPanel({
               viewerContext={viewerContext}
               externalMessages={messages}
               onMessagesChange={setMessages}
+              onSessionTitleChange={setSessionTitle}
               onHistoryOpen={() => {
                 refreshHistory();
-                setHistoryOpen(true);
               }}
+              historyContent={({ close, width }) => (
+                <ViewerAiHistoryDialog
+                  sessions={historySessions}
+                  currentSessionId={sessionId}
+                  popoverWidth={width}
+                  onSelect={(session) => {
+                    handleSelectHistory(session);
+                    close();
+                  }}
+                  onDelete={handleDeleteHistory}
+                  onNew={() => {
+                    handleNewSession();
+                    close();
+                  }}
+                />
+              )}
             />
           </ToastProviderWrapper>
         )}
       </div>
-      <ViewerAiHistoryDialog
-        open={historyOpen}
-        sessions={historySessions}
-        currentSessionId={sessionId}
-        onOpenChange={setHistoryOpen}
-        onSelect={handleSelectHistory}
-        onDelete={handleDeleteHistory}
-        onNew={handleNewSession}
-      />
     </aside>
   );
 }

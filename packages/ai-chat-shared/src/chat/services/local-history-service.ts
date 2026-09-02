@@ -1,4 +1,5 @@
 import type { ChatMessage } from "../../message";
+import { deriveConversationTitleFromMessages } from "./title-service";
 
 export interface LocalChatSession {
   sessionId: string;
@@ -11,6 +12,7 @@ export interface LocalChatSession {
 
 const STORAGE_PREFIX = "workbench:viewer-ai-history:";
 const MAX_SESSIONS_PER_PROJECT = 30;
+export const LOCAL_CHAT_HISTORY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 function storageKey(projectId: string): string {
   return `${STORAGE_PREFIX}${projectId}`;
@@ -48,11 +50,21 @@ export function readLocalChatSessions(
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed
+    const cutoff = Date.now() - LOCAL_CHAT_HISTORY_TTL_MS;
+    const sessions = parsed
       .filter(isLocalChatSession)
       .filter((session) => session.projectId === projectId)
+      .filter((session) => session.updatedAt >= cutoff)
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .slice(0, MAX_SESSIONS_PER_PROJECT);
+    if (sessions.length !== parsed.length) {
+      try {
+        storage.setItem(storageKey(projectId), JSON.stringify(sessions));
+      } catch {
+        // 清理失败不应阻断当前聊天读取。
+      }
+    }
+    return sessions;
   } catch {
     return [];
   }
@@ -100,8 +112,5 @@ export function deleteLocalChatSession(
 }
 
 export function deriveLocalChatTitle(messages: ChatMessage[]): string {
-  const firstUserMessage = messages.find(
-    (message) => message.role === "user" && message.content.trim(),
-  );
-  return firstUserMessage?.content.trim().slice(0, 40) || "新对话";
+  return deriveConversationTitleFromMessages(messages);
 }

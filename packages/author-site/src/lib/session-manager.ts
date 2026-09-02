@@ -33,7 +33,10 @@ import type {
   VersionHistoryEntryType,
 } from "@workbench/shared";
 import type { UserRole } from "./user";
-const SESSION_EXPIRY_MS = 2 * 60 * 60 * 1000;
+/** 编辑 Session 的活跃租约；仅用于内部鉴权和协同编辑。 */
+export const SESSION_LEASE_MS = 2 * 60 * 60 * 1000;
+/** 对话历史按最后活动时间滑动保留一周。 */
+export const SESSION_HISTORY_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const DIRECTORY_REPLACE_RETRY_DELAYS_MS = [80, 160, 320, 640];
 
 function sleepSync(ms: number): void {
@@ -61,6 +64,51 @@ function replaceDirectoryWithTemp(tempPath: string, targetPath: string): void {
     fs.rmSync(tempPath, { recursive: true, force: true });
   } catch {
     throw lastError;
+  }
+}
+
+function readLastMessageAt(sessionPath: string): number | null {
+  const messagesPath = path.join(sessionPath, ".messages.json");
+  if (!fs.existsSync(messagesPath)) return null;
+  try {
+    const messages = JSON.parse(fs.readFileSync(messagesPath, "utf-8"));
+    if (!Array.isArray(messages) || messages.length === 0) return null;
+    const timestamps = messages
+      .map((message) => (typeof message?.timestamp === "number" ? message.timestamp : 0))
+      .filter((timestamp) => timestamp > 0);
+    return timestamps.length > 0 ? Math.max(...timestamps) : null;
+  } catch {
+    return null;
+  }
+}
+
+function getLastActivityAt(meta: { lastActivityAt?: unknown; createdAt?: unknown }, sessionPath: string): number {
+  const lastMessageAt = readLastMessageAt(sessionPath);
+  const activityAt =
+    typeof meta.lastActivityAt === "number" && Number.isFinite(meta.lastActivityAt)
+      ? meta.lastActivityAt
+      : 0;
+  return Math.max(
+    activityAt,
+    lastMessageAt ?? 0,
+    typeof meta.createdAt === "number" && Number.isFinite(meta.createdAt)
+      ? meta.createdAt
+      : 0,
+  );
+}
+
+export function touchSessionActivity(sessionId: string, now = Date.now()): boolean {
+  const sessionPath = getSessionPath(sessionId);
+  if (!sessionPath || !fs.existsSync(sessionPath)) return false;
+  const metaPath = path.join(sessionPath, ".session.json");
+  if (!fs.existsSync(metaPath)) return false;
+  try {
+    const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+    meta.lastActivityAt = now;
+    fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -132,6 +180,7 @@ export function archiveActiveSession(
 
         if (meta.demoId === projectId) {
           meta.status = "archived";
+          meta.lastActivityAt = Date.now();
           fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
           return entry.name;
         }
@@ -235,23 +284,9 @@ export function findActiveSession(
           continue;
         }
 
-        // 发现过期 session，归档而非删除（保留消息历史）
+        // 编辑租约过期只影响活跃编辑资格；历史数据继续保留到最后活动后的 7 天。
+        // 不在这里改写状态或清理 Workspace，避免 2 小时租约与历史保留期耦合。
         if (Date.now() > meta.expiresAt) {
-          // 仅清理 workspace 临时文件，保留 session 元数据和消息
-          if (meta.workspaceId && !isLiveWorkspace(meta.workspaceId)) {
-            const wsPath = findWorkspacePath(meta.workspaceId);
-            if (wsPath && fs.existsSync(wsPath)) {
-              fs.rmSync(wsPath, { recursive: true, force: true });
-            }
-          }
-          // 更新状态为 expired 而非删除
-          if (meta.status === 'editing') {
-            meta.status = 'expired';
-            try {
-              fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
-            } catch { /* ignore write error */ }
-          }
-          console.log(`[Session] Archived expired session: ${entry.name}`);
           continue;
         }
 
@@ -467,7 +502,8 @@ export async function createEditSession(
     basedOnVersion: latestVersion?.versionId || 'v0',
     workbenchSessionId: null,
     createdAt: Date.now(),
-    expiresAt: Date.now() + SESSION_EXPIRY_MS,
+    expiresAt: Date.now() + SESSION_LEASE_MS,
+    lastActivityAt: Date.now(),
   };
   fs.writeFileSync(
     path.join(sessionPath, ".session.json"),
@@ -554,6 +590,7 @@ export function getEditSession(sessionId: string) {
     basedOnVersion: meta.basedOnVersion || 'v0',
     createdAt: meta.createdAt,
     expiresAt: meta.expiresAt,
+    lastActivityAt: getLastActivityAt(meta, sessionPath),
     code,
     schema,
     workspacePath,
@@ -574,7 +611,8 @@ export function renewEditSession(sessionId: string): boolean {
     if (status !== "editing" && status !== "expired") return false;
 
     meta.status = "editing";
-    meta.expiresAt = Date.now() + SESSION_EXPIRY_MS;
+    meta.expiresAt = Date.now() + SESSION_LEASE_MS;
+    meta.lastActivityAt = Date.now();
     fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
     return true;
   } catch {
@@ -618,6 +656,7 @@ export function saveEditSession(
         if (fs.existsSync(metaPath)) {
           const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
           meta.status = 'editing';
+          meta.lastActivityAt = Date.now();
           fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
           console.log(`[saveEditSession] 修复 session ${sessionId} 状态为 editing`);
         }
@@ -683,6 +722,7 @@ export function saveEditSession(
     }
 
     syncProjectDemoPagesFromWorkspace(projectId, workspacePath);
+    touchSessionActivity(sessionId);
 
     return {
       success: true,
@@ -768,6 +808,7 @@ export function saveEditSession(
         meta.status = 'saved';
         meta.savedAt = Date.now();
       }
+      meta.lastActivityAt = Date.now();
       fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
     }
 
@@ -879,6 +920,7 @@ export function archiveSession(sessionId: string, status: 'discarded' | 'saved' 
     // 更新状态
     meta.status = status;
     meta.archivedAt = Date.now();
+    meta.lastActivityAt = Date.now();
     fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
 
     return true;
@@ -897,57 +939,34 @@ export function discardEditSession(sessionId: string): boolean {
 }
 
 /**
- * 清理指定用户的过期 Session
- * 仅清理 workspace 临时文件，保留 session 元数据和消息历史
+ * 清理指定范围内最后活动超过历史保留期的 Session。
+ * 删除 Session 时由 deleteSession 负责清理非 live Workspace，live Workspace 永不随会话删除。
  */
-export function cleanupExpiredSessions(userId: string): string[] {
+export function cleanupExpiredSessions(userId: string, projectId?: string): string[] {
   const userSessionsDir = path.join(getSessionsDir(), userId);
-  if (!fs.existsSync(userSessionsDir)) {
-    return [];
-  }
+  if (!fs.existsSync(userSessionsDir)) return [];
 
   const cleaned: string[] = [];
   const projectDirs = fs.readdirSync(userSessionsDir, { withFileTypes: true });
+  const now = Date.now();
 
   for (const projectDir of projectDirs) {
-    if (!projectDir.isDirectory()) continue;
+    if (!projectDir.isDirectory() || (projectId && projectDir.name !== projectId)) continue;
 
     const projectSessionDir = path.join(userSessionsDir, projectDir.name);
-    const sessionDirs = fs.readdirSync(projectSessionDir, {
-      withFileTypes: true,
-    });
-
+    const sessionDirs = fs.readdirSync(projectSessionDir, { withFileTypes: true });
     for (const sessionDir of sessionDirs) {
       if (!sessionDir.isDirectory()) continue;
-
-      const metaPath = path.join(
-        projectSessionDir,
-        sessionDir.name,
-        ".session.json",
-      );
+      const sessionPath = path.join(projectSessionDir, sessionDir.name);
+      const metaPath = path.join(sessionPath, ".session.json");
       if (!fs.existsSync(metaPath)) continue;
 
       try {
         const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
-        if (Date.now() > meta.expiresAt) {
-          let changed = false;
-          // 仅清理 workspace，保留 session 元数据和消息
-          if (meta.workspaceId && !isLiveWorkspace(meta.workspaceId)) {
-            const wsPath = findWorkspacePath(meta.workspaceId);
-            if (wsPath && fs.existsSync(wsPath)) {
-              fs.rmSync(wsPath, { recursive: true, force: true });
-              changed = true;
-            }
-          }
-          // 更新状态为 expired
-          if (meta.status === 'editing') {
-            meta.status = 'expired';
-            fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
-            changed = true;
-          }
-          if (changed) {
-            cleaned.push(sessionDir.name);
-          }
+        const lastActivityAt = getLastActivityAt(meta, sessionPath);
+        if (!lastActivityAt || now - lastActivityAt <= SESSION_HISTORY_RETENTION_MS) continue;
+        if (deleteSession(meta.sessionId || sessionDir.name)) {
+          cleaned.push(meta.sessionId || sessionDir.name);
         }
       } catch {
         continue;
@@ -958,74 +977,16 @@ export function cleanupExpiredSessions(userId: string): string[] {
   return cleaned;
 }
 
-/**
- * 全局清理：遍历所有用户的过期 Session（用于后台定时任务）
- * 仅清理 workspace 临时文件，保留 session 元数据和消息历史
- */
+/** 全局清理：遍历所有用户并删除历史保留期之外的 Session。 */
 export function cleanupAllExpiredSessions(): string[] {
   const sessionsDir = getSessionsDir();
-  if (!fs.existsSync(sessionsDir)) {
-    return [];
-  }
+  if (!fs.existsSync(sessionsDir)) return [];
 
   const cleaned: string[] = [];
   const userDirs = fs.readdirSync(sessionsDir, { withFileTypes: true });
-
   for (const userDir of userDirs) {
     if (!userDir.isDirectory()) continue;
-
-    const userId = userDir.name;
-    const userSessionsDir = path.join(sessionsDir, userId);
-    const projectDirs = fs.readdirSync(userSessionsDir, {
-      withFileTypes: true,
-    });
-
-    for (const projectDir of projectDirs) {
-      if (!projectDir.isDirectory()) continue;
-
-      const projectSessionDir = path.join(userSessionsDir, projectDir.name);
-      const sessionDirs = fs.readdirSync(projectSessionDir, {
-        withFileTypes: true,
-      });
-
-      for (const sessionDir of sessionDirs) {
-        if (!sessionDir.isDirectory()) continue;
-
-        const metaPath = path.join(
-          projectSessionDir,
-          sessionDir.name,
-          ".session.json",
-        );
-        if (!fs.existsSync(metaPath)) continue;
-
-        try {
-          const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
-          if (Date.now() > meta.expiresAt) {
-            let changed = false;
-            // 仅清理 workspace，保留 session 元数据和消息
-            if (meta.workspaceId && !isLiveWorkspace(meta.workspaceId)) {
-              const wsPath = findWorkspacePath(meta.workspaceId);
-              if (wsPath && fs.existsSync(wsPath)) {
-                fs.rmSync(wsPath, { recursive: true, force: true });
-                changed = true;
-              }
-            }
-            // 更新状态为 expired
-            if (meta.status === 'editing') {
-              meta.status = 'expired';
-              fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
-              changed = true;
-            }
-            if (changed) {
-              cleaned.push(sessionDir.name);
-            }
-          }
-        } catch {
-          continue;
-        }
-      }
-    }
+    cleaned.push(...cleanupExpiredSessions(userDir.name));
   }
-
   return cleaned;
 }

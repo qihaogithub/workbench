@@ -5,7 +5,9 @@ import { renderPageRequirementsMarkdown, stripMarkdown } from "./note-html";
 import { cn } from "./utils";
 import type { MarkdownReferenceTarget } from "@workbench/shared/markdown-reference";
 import { decodeMarkdownReferenceUri } from "@workbench/shared/markdown-reference";
+import { useMarkdownImageLightbox } from "./MarkdownImageLightbox";
 import "./page-requirements.css";
+import "./markdown-image-lightbox.css";
 
 interface PageRequirementsProps {
   /** 页面配置要求 Markdown 内容（含行内软引用 @[名称](key)） */
@@ -41,6 +43,7 @@ export function PageRequirements({
   className,
 }: PageRequirementsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const { handleMarkdownImageClick, lightbox } = useMarkdownImageLightbox();
 
   const sanitized = renderPageRequirementsMarkdown(markdown, {
     allowExternalMedia,
@@ -50,6 +53,7 @@ export function PageRequirements({
 
   const handleClick = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
+      if (handleMarkdownImageClick(event)) return;
       const reference = (event.target as HTMLElement).closest<HTMLElement>("[data-reference-uri]");
       if (reference) {
         const uri = reference.getAttribute("data-reference-uri");
@@ -67,7 +71,7 @@ export function PageRequirements({
       const key = target?.getAttribute("data-ref-key");
       if (key) onRefClick(key);
     },
-    [onRefClick, onReferenceClick],
+    [handleMarkdownImageClick, onRefClick, onReferenceClick],
   );
 
   if (!plainText && !showEmptyPlaceholder) return null;
@@ -81,11 +85,14 @@ export function PageRequirements({
   }
 
   return (
-    <div
-      ref={containerRef}
-      className={cn("page-requirements-content text-muted-foreground", className)}
-      onClick={handleClick}
-      dangerouslySetInnerHTML={{ __html: sanitized }}
-    />
+    <>
+      <div
+        ref={containerRef}
+        className={cn("markdown-image-previewable page-requirements-content text-muted-foreground", className)}
+        onClick={handleClick}
+        dangerouslySetInnerHTML={{ __html: sanitized }}
+      />
+      {lightbox}
+    </>
   );
 }

@@ -5,6 +5,7 @@ import {
   getSessionPath,
   sessionExists,
 } from "@/lib/fs-utils";
+import { touchSessionActivity } from "@/lib/session-manager";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import fs from "fs";
 import path from "path";
@@ -96,6 +97,7 @@ export async function POST(
     const messagesPath = path.join(sessionPath, MESSAGES_FILE);
 
     fs.writeFileSync(messagesPath, JSON.stringify(messages, null, 2), "utf-8");
+    touchSessionActivity(sessionId);
     return NextResponse.json(createApiSuccess(null));
   } catch (error) {
     console.error("Error saving session messages:", error);

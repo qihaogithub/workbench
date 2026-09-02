@@ -442,6 +442,7 @@ Markdown 编辑器（DocumentEditor）：
 - **测试 ESM 坑**：`@milkdown/*`、`@prosemirror-adapter/*` 均为 ESM-only，author-site 的 Jest（CJS）无法解析，靠 `packages/author-site/jest-milkdown-mock.js` + jest.config `moduleNameMapper` 全局映射兜底；demo-ui 用 Vitest 直接跑真实 Milkdown（roundtrip 幂等 + 集成渲染测试）。`codemirror`/`@codemirror/*` 自带 CJS 构建，Jest 可直接解析、无需 mock。
 - **Node 24 + vitest 1.6.1 不兼容**：会报 `Cannot set property testPath`，demo-ui 已升级 vitest 2.1.9；其它包若在 Node 24 下跑 vitest 报此错，同样需升级 vitest。
 - 配置表单的 `format: "video"` 字段使用对象值；空对象（`{}` 或 `{ url: "" }`）表示未配置，不能按通用“无 `url` 对象”误判为 Spine 素材包。只有非视频字段的完整 Spine bundle 才展示 Spine 控件。
+- 配置表单的单值 `enum` 默认使用下拉选择器；需要同时比较少量选项时在 Schema 上声明 `ui:widget: "radio"`，需要快速切换 2–4 个短模式时声明 `ui:widget: "segmented"`。两者仍沿用原生 radio 语义，不新增独立数据类型。
 - Workspace 受管资源策略的唯一事实源是 `packages/project-core/src/workspace-resource-registry.ts`。Authority、页面删除/移动和其他资源调用方都复用该 Registry；禁止在 `shared/contracts` 或业务路由复制路径白名单、大小限制或文本校验。页面 `demos/<pageId>/config.values.json` 与项目 `project.config.values.json` 都是 JSON 对象资源；需要与二进制资产原子提交字段更新时使用 Authority `patch_config_values`，不要在路由外提前读取并回写完整旧快照。
 
 Auth：

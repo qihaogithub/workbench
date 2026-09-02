@@ -71,7 +71,9 @@ export interface PublishedDesignSpecDoc extends PublishedDesignSpecMeta {
     id: string;
     title: string;
     markdown: string;
-    refs: Array<{ scope: "project" | "page"; pageId?: string; fieldKey: string }>;
+    target:
+      | { type: "page"; pageIds: string[] }
+      | { type: "config"; refs: Array<{ scope: "project" | "page"; pageId?: string; fieldKey: string }> };
   }>;
 }
 

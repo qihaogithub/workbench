@@ -10,6 +10,8 @@ export type {
   ImageConfigTarget,
   WhiteboardLauncher,
   DesignSpecEntryLink,
+  PageDesignSpecEntryLink,
+  ConfigDefinitionFocus,
   PreviewMode,
   PreviewState,
   CanvasToolMode,
@@ -163,6 +165,12 @@ export {
 } from "./config-binding-utils";
 export type { PageConfigPanelPage } from "./PageConfigPanel";
 export { ConfigForm } from "./ConfigForm";
+export { OptionGroup } from "./OptionGroup";
+export type {
+  OptionGroupProps,
+  OptionGroupOption,
+  OptionGroupVariant,
+} from "./OptionGroup";
 export { parseSchemaToFields } from "./schema-parser";
 export type {
   FieldConfig,
@@ -225,10 +233,12 @@ export { DocumentEditor } from "./DocumentEditor";
 export type {
   DocumentEditorProps,
   DocumentUploadHandler,
+  DocumentRemoteImageHandler,
   MarkdownReferenceContext,
   MarkdownReferenceProvider,
   MarkdownReferenceClickHandler,
 } from "./DocumentEditor";
+export { localizeRemoteImageForSession } from "./markdown/remote-image-localizer";
 export { RichTextEditor } from "./RichTextEditor";
 export { customWidgets, ColorPickerWidget, FileUploadWidget } from "./widgets";
 export type {

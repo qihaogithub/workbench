@@ -7,7 +7,7 @@ import { buildConfigPool } from "@/lib/design-specs";
 import { resolveDesignSpecContext } from "@/lib/design-specs/route-helpers";
 import { getImageInfo } from "@/lib/image-store";
 
-/** GET /api/design-specs/config-pool?workingDir=&sessionId= → 配置项素材池 */
+/** GET /api/design-specs/config-pool?workingDir=&sessionId= → 配置项素材池与页面候选 */
 export async function GET(request: NextRequest) {
   const resolved = await resolveDesignSpecContext(request);
   if ("response" in resolved) return resolved.response;
@@ -35,7 +35,10 @@ export async function GET(request: NextRequest) {
         return image ? { width: image.width, height: image.height } : null;
       },
     });
-    return NextResponse.json(createApiSuccess(pool));
+    return NextResponse.json(createApiSuccess({
+      pool,
+      pages: pages.map(({ id, name }) => ({ id, name })),
+    }));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(

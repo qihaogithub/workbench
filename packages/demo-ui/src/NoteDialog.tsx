@@ -13,7 +13,9 @@ import { Button } from "@/components/ui/button";
 import { RichTextEditor, type NoteUploadHandler } from "./RichTextEditor";
 import { renderNoteMarkdown, stripMarkdown } from "./note-html";
 import { decodeMarkdownReferenceUri } from "@workbench/shared/markdown-reference";
-import type { MarkdownReferenceClickHandler } from "./DocumentEditor";
+import type { DocumentRemoteImageHandler, MarkdownReferenceClickHandler } from "./DocumentEditor";
+import { useMarkdownImageLightbox } from "./MarkdownImageLightbox";
+import "./markdown-image-lightbox.css";
 
 /** 默认上传实现：投递到 author-site 图床 /api/images/upload（同源，随 Cookie 鉴权） */
 async function uploadNoteFile(
@@ -54,6 +56,7 @@ interface NoteDialogProps {
   onSave: (markdown: string) => void;
   onDelete: () => void;
   uploadHandler?: NoteUploadHandler;
+  localizeRemoteImage?: DocumentRemoteImageHandler;
   onReferenceClick?: MarkdownReferenceClickHandler;
 }
 
@@ -66,10 +69,12 @@ export function NoteDialog({
   onSave,
   onDelete,
   uploadHandler,
+  localizeRemoteImage,
   onReferenceClick,
 }: NoteDialogProps) {
   const [editContent, setEditContent] = useState(note);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const { handleMarkdownImageClick, lightbox } = useMarkdownImageLightbox();
 
   const hasExistingNote = !!stripMarkdown(note);
   const hasContentChanged = editContent !== note;
@@ -120,23 +125,28 @@ export function NoteDialog({
 
         <div className="flex-1 min-h-0 overflow-hidden">
           {readonly ? (
-            <div
-              className="markdown-editor-content px-3 py-2 text-sm overflow-y-auto h-full rounded-md border"
-              onClick={(event) => {
-                const chip = (event.target as HTMLElement).closest<HTMLElement>("[data-reference-uri]");
-                const uri = chip?.getAttribute("data-reference-uri");
-                const target = uri ? decodeMarkdownReferenceUri(uri) : null;
-                if (!target) return;
-                event.preventDefault();
-                onReferenceClick?.({ target, labelSnapshot: chip?.textContent?.trim() || "" });
-              }}
-              dangerouslySetInnerHTML={{ __html: renderNoteMarkdown(note) }}
-            />
+            <>
+              <div
+                className="markdown-editor-content markdown-image-previewable px-3 py-2 text-sm overflow-y-auto h-full rounded-md border"
+                onClick={(event) => {
+                  if (handleMarkdownImageClick(event)) return;
+                  const chip = (event.target as HTMLElement).closest<HTMLElement>("[data-reference-uri]");
+                  const uri = chip?.getAttribute("data-reference-uri");
+                  const target = uri ? decodeMarkdownReferenceUri(uri) : null;
+                  if (!target) return;
+                  event.preventDefault();
+                  onReferenceClick?.({ target, labelSnapshot: chip?.textContent?.trim() || "" });
+                }}
+                dangerouslySetInnerHTML={{ __html: renderNoteMarkdown(note) }}
+              />
+              {lightbox}
+            </>
           ) : (
             <RichTextEditor
               content={editContent}
               onChange={setEditContent}
               uploadHandler={uploadHandler ?? uploadNoteFile}
+              localizeRemoteImage={localizeRemoteImage}
               onReferenceClick={onReferenceClick}
             />
           )}

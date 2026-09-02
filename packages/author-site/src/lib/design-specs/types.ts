@@ -7,12 +7,25 @@ export interface DesignSpecRef {
   fieldKey: string;
 }
 
+/** 规范块的消费位置。页面规范与配置项规范互斥，避免同一内容重复出现。 */
+export type DesignSpecTarget =
+  | {
+      type: "page";
+      /** 可复用到多个页面；空数组仅用于尚未完成迁移的历史条目。 */
+      pageIds: string[];
+    }
+  | {
+      type: "config";
+      /** 一条配置项规范可同时复用到多个配置项。 */
+      refs: DesignSpecRef[];
+    };
+
 /** 单个规范条目（卡片） */
 export interface DesignSpecEntry {
   id: string;
   title: string;
   markdown: string;
-  refs: DesignSpecRef[];
+  target: DesignSpecTarget;
   /** 系统自动维护条目的来源字段；缺省表示手工条目 */
   autoManagedFieldKey?: string;
 }

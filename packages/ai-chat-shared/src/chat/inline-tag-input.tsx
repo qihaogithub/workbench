@@ -217,7 +217,7 @@ export function InlineTagInput({
       tagSpan.dataset.tagContext = tag.context;
       tagSpan.contentEditable = "false";
       tagSpan.className = cn(
-        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium align-middle select-none cursor-default group",
+        "relative inline-flex items-center gap-1 rounded-md pl-1 pr-2 py-0.5 text-xs font-medium align-middle select-none cursor-default group",
         tag.type === "project"
           ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
           : tag.type === "element"
@@ -236,7 +236,7 @@ export function InlineTagInput({
 
       const removeBtn = document.createElement("span");
       removeBtn.className =
-        "ml-0.5 shrink-0 rounded-full p-0.5 opacity-0 group-hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer flex items-center";
+        "absolute right-1 top-1/2 -translate-y-1/2 rounded-full p-0.5 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer flex items-center";
       removeBtn.innerHTML =
         '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
       removeBtn.addEventListener("mousedown", (e) => {

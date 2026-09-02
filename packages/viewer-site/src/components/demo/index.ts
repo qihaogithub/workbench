@@ -60,6 +60,7 @@ export type {
   PreviewPanelProps,
   ConfigFormProps,
   DesignSpecEntryLink,
+  PageDesignSpecEntryLink,
   PageConfigPanelPage,
   DocumentEditorProps,
   ImageItem,

@@ -83,7 +83,7 @@ function buildConfigPool(projectSchema: string | undefined, pages: ViewerDocumen
   ];
 }
 
-function refToPoolId(ref: PublishedDesignSpecDoc["entries"][number]["refs"][number]) {
+function refToPoolId(ref: { scope: "project" | "page"; pageId?: string; fieldKey: string }) {
   return ref.scope === "project" ? `project:${ref.fieldKey}` : `page:${ref.pageId || ""}:${ref.fieldKey}`;
 }
 
@@ -114,8 +114,10 @@ function ReadonlyDesignSpec({
         <div className="flex h-full items-center justify-center rounded-lg border-2 border-dashed border-border text-sm text-muted-foreground">暂无规范条目</div>
       ) : <div className="flex flex-col gap-3">
         {doc.entries.map((entry) => {
-          const refs = entry.refs.map((ref) => poolById.get(refToPoolId(ref))).filter((item): item is ConfigPoolItem => Boolean(item));
-          const staleCount = entry.refs.length - refs.length;
+          const configRefs = entry.target.type === "config" ? entry.target.refs : [];
+          const refs = configRefs.map((ref) => poolById.get(refToPoolId(ref))).filter((item): item is ConfigPoolItem => Boolean(item));
+          const staleCount = configRefs.length - refs.length;
+          const pageCount = entry.target.type === "page" ? entry.target.pageIds.length : 0;
           const open = openIds.has(entry.id);
           return <section key={entry.id} className="overflow-hidden rounded-lg border bg-card">
             <button type="button" className="flex w-full items-center gap-2 px-3 py-2.5 text-left hover:bg-accent/50" onClick={() => setOpenIds((current) => {
@@ -123,15 +125,15 @@ function ReadonlyDesignSpec({
             })}>
               {open ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
               <span className="min-w-0 flex-1 px-1 py-0.5 text-sm font-semibold">{entry.title || "未命名条目"}</span>
-              <span className="shrink-0 text-[11px] text-muted-foreground">{entry.refs.length} 项配置</span>
+              <span className="shrink-0 text-[11px] text-muted-foreground">{entry.target.type === "config" ? `${configRefs.length} 项配置` : `页面规范 · ${pageCount} 个页面`}</span>
             </button>
             {open && <div className="border-t px-3 py-3">
               <div className="mx-auto w-full max-w-[760px]">
-                {entry.refs.length > 0 && <table className="w-full border-collapse text-xs"><thead><tr className="text-left text-muted-foreground"><th className="w-[52px] py-1 pr-2 font-medium" /><th className="py-1 pr-2 font-medium">配置项</th><th className="py-1 pr-2 font-medium">格式</th><th className="py-1 font-medium">尺寸</th></tr></thead><tbody>
+                {entry.target.type === "config" && configRefs.length > 0 && <table className="w-full border-collapse text-xs"><thead><tr className="text-left text-muted-foreground"><th className="w-[52px] py-1 pr-2 font-medium" /><th className="py-1 pr-2 font-medium">配置项</th><th className="py-1 pr-2 font-medium">格式</th><th className="py-1 font-medium">尺寸</th></tr></thead><tbody>
                   {refs.map((item) => <tr key={item.id} className="hover:bg-accent/40"><td className="py-1 pr-2"><ConfigThumbnail item={item} /></td><td className="font-medium">{item.title}</td><td className="text-muted-foreground">{item.format || "—"}</td><td className="text-muted-foreground">—</td></tr>)}
                   {Array.from({ length: staleCount }).map((_, index) => <tr key={`stale-${index}`} className="text-muted-foreground"><td className="py-1 pr-2"><span className="inline-flex h-[52px] w-[52px] items-center justify-center rounded-md border bg-secondary">?</span></td><td className="italic">已失效引用</td><td>—</td><td>—</td></tr>)}
                 </tbody></table>}
-                <div className={cn(entry.refs.length > 0 && "mt-3")}><div className="mb-1 text-[11px] font-medium text-muted-foreground">说明</div><PageRequirements markdown={entry.markdown} allowExternalMedia mediaBaseUrl={DATA_BASE} onReferenceClick={onReferenceClick} /></div>
+                <div className={cn(entry.target.type === "config" && configRefs.length > 0 && "mt-3")}><div className="mb-1 text-[11px] font-medium text-muted-foreground">说明</div><PageRequirements markdown={entry.markdown} allowExternalMedia mediaBaseUrl={DATA_BASE} onReferenceClick={onReferenceClick} /></div>
               </div>
             </div>}
           </section>;

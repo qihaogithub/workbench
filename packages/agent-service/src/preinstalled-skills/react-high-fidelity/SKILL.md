@@ -141,6 +141,8 @@ import { SpinePlayer } from "@preview/sdk";
   src={spineAsset}
   animation="idle"
   loop={true}
+  fit="contain"
+  alignment="center"
   audioEnabled={spineAudioEnabled}
   fallback={<div>动画加载中...</div>}
 />
@@ -151,11 +153,15 @@ import { SpinePlayer } from "@preview/sdk";
 | `src` | SpineAssetRefV1 | - | 已上传并校验的 Spine ZIP 素材引用 |
 | `animation` | string | - | 指定播放的动画名（不填默认第一条） |
 | `loop` | boolean | true | 是否循环 |
+| `fit` | `"contain" \| "cover" \| "none"` | `"contain"` | 基于骨骼可见 bounds 的适配方式；`contain` 完整显示，`cover` 填满并允许裁剪，`none` 保留原始世界坐标行为 |
+| `alignment` | 九宫格字符串 | `"center"` | bounds 在 viewport 中的对齐位置：`top-left`、`top`、`top-right`、`left`、`center`、`right`、`bottom-left`、`bottom`、`bottom-right` |
 | `audioEnabled` | boolean | true | 是否播放 Spine event 关联的压缩包内音效 |
 | `fallback` | ReactNode | null | 加载失败或素材引用缺失时展示 |
 | `onError` | function | - | 加载失败回调 |
 | `className` | string | - | 容器 class |
 | `style` | object | - | 容器样式 |
+
+播放器会在骨架解析、初始姿态应用并完成 `updateWorldTransform` 后读取可见 bounds 设置相机；动画播放过程中不持续追踪 bounds，因此外围特效不会造成镜头抖动。容器尺寸变化、素材或动画名称变化以及 `fit`/`alignment` 变化时会重新计算。需要兼容旧的世界原点行为时显式使用 `fit="none"`。
 
 Schema 配置示例：
 

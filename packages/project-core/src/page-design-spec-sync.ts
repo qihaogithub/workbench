@@ -18,16 +18,20 @@ export interface PageDesignSpecSyncWrite {
 }
 
 interface DesignSpecRef {
-  scope: "page";
-  pageId: string;
+  scope: "project" | "page";
+  pageId?: string;
   fieldKey: string;
 }
+
+type DesignSpecTarget =
+  | { type: "page"; pageIds: string[] }
+  | { type: "config"; refs: DesignSpecRef[] };
 
 interface DesignSpecEntry {
   id: string;
   title: string;
   markdown: string;
-  refs: DesignSpecRef[];
+  target: DesignSpecTarget;
   autoManagedFieldKey?: string;
 }
 
@@ -135,7 +139,7 @@ function synchronizeEntries(
     return {
       ...entry,
       title: field.title,
-      refs: [createPageRef(pageId, field.key)],
+      target: { type: "config" as const, refs: [createPageRef(pageId, field.key)] },
     };
   });
 
@@ -145,7 +149,7 @@ function synchronizeEntries(
       id: generateId("e"),
       title: field.title,
       markdown: "",
-      refs: [createPageRef(pageId, field.key)],
+      target: { type: "config", refs: [createPageRef(pageId, field.key)] },
       autoManagedFieldKey: field.key,
     });
   }
@@ -201,10 +205,62 @@ function readDoc(workspacePath: string, id: string): DesignSpecDoc | null {
     const raw = fs.readFileSync(path.join(workspacePath, DESIGN_SPEC_DIR, `spec-${id}.json`), "utf-8");
     const parsed = JSON.parse(raw) as Partial<DesignSpecDoc>;
     if (parsed.id !== id || !Array.isArray(parsed.entries)) return null;
-    return parsed as DesignSpecDoc;
+    return {
+      ...parsed,
+      id,
+      title: typeof parsed.title === "string" ? parsed.title : "",
+      createdAt: typeof parsed.createdAt === "string" ? parsed.createdAt : new Date().toISOString(),
+      updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : new Date().toISOString(),
+      entries: parsed.entries.map((entry) => normalizeEntry(entry, parsed.autoManagedPageId)),
+    } as DesignSpecDoc;
   } catch {
     return null;
   }
+}
+
+function normalizeEntry(value: unknown, fallbackPageId?: string): DesignSpecEntry {
+  const entry = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const legacyRefs = normalizeRefs(entry.refs);
+  const targetValue = entry.target && typeof entry.target === "object"
+    ? entry.target as Record<string, unknown>
+    : undefined;
+  const target: DesignSpecTarget = targetValue?.type === "config"
+    ? { type: "config", refs: normalizeRefs(targetValue.refs) }
+    : targetValue?.type === "page"
+      ? { type: "page", pageIds: normalizePageIds(targetValue.pageIds) }
+      : legacyRefs.length > 0
+        ? { type: "config", refs: legacyRefs }
+        : { type: "page", pageIds: fallbackPageId ? [fallbackPageId] : [] };
+  return {
+    id: typeof entry.id === "string" ? entry.id : generateId("e"),
+    title: typeof entry.title === "string" ? entry.title : "",
+    markdown: typeof entry.markdown === "string" ? entry.markdown : "",
+    target,
+    autoManagedFieldKey: typeof entry.autoManagedFieldKey === "string"
+      ? entry.autoManagedFieldKey
+      : undefined,
+  };
+}
+
+function normalizeRefs(value: unknown): DesignSpecRef[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  return value.flatMap((candidate) => {
+    if (!candidate || typeof candidate !== "object") return [];
+    const ref = candidate as Partial<DesignSpecRef>;
+    if ((ref.scope !== "project" && ref.scope !== "page") || typeof ref.fieldKey !== "string" || !ref.fieldKey) return [];
+    const normalized = { scope: ref.scope, pageId: ref.scope === "page" ? ref.pageId : undefined, fieldKey: ref.fieldKey } as DesignSpecRef;
+    const key = `${normalized.scope}:${normalized.pageId ?? ""}:${normalized.fieldKey}`;
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [normalized];
+  });
+}
+
+function normalizePageIds(value: unknown): string[] {
+  return Array.isArray(value)
+    ? Array.from(new Set(value.filter((id): id is string => typeof id === "string" && id.length > 0)))
+    : [];
 }
 
 function upsertManifestItem(

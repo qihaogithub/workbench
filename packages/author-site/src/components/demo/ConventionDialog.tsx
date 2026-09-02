@@ -21,6 +21,7 @@ import {
 import { DocumentEditor } from "@workbench/demo-ui";
 import { useToast } from "@/components/ui/toast-provider";
 import { cn } from "@/lib/utils";
+import { localizeRemoteImageForSession } from "@workbench/demo-ui/markdown/remote-image-localizer";
 
 type PageItem = { id: string; name: string };
 
@@ -86,6 +87,10 @@ export function ConventionDialog({
   const hasChanges = content !== savedContent;
   const canSave = isExisting && hasChanges && !isSaving;
   const canCreate = showPlaceholder && content !== "" && !isSaving;
+  const localizeRemoteImage = useCallback(
+    (url: string) => localizeRemoteImageForSession(sessionId, url),
+    [sessionId],
+  );
 
   const handleSave = useCallback(async () => {
     if (!sessionId) return;
@@ -202,6 +207,7 @@ export function ConventionDialog({
                   key={`${activeKey}-${open}`}
                   value={content}
                   onChange={setContent}
+                  localizeRemoteImage={localizeRemoteImage}
                 />
               </div>
             )}

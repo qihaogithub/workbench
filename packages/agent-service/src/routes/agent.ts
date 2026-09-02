@@ -24,6 +24,7 @@ import {
   type ViewerContextPayload,
   type ViewerReadonlySession,
 } from '../services/viewer-readonly-mode';
+import { generateConversationTitle } from '../services/conversation-title-service';
 
 interface SessionParams {
   sessionId: string;
@@ -67,8 +68,8 @@ async function resolveCurrentModelId(agent: unknown): Promise<string | undefined
   return modelInfo?.currentModelId || undefined;
 }
 
-function normalizeModelId(modelId: string | undefined): string | undefined {
-  const trimmed = modelId?.trim();
+function normalizeModelId(modelId: unknown): string | undefined {
+  const trimmed = typeof modelId === 'string' ? modelId.trim() : '';
   return trimmed || undefined;
 }
 
@@ -122,6 +123,65 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
     });
   });
 
+  scoped.post<{ Params: SessionParams; Body: { content?: string; model?: string } }>(
+    '/api/agent/:sessionId/title',
+    {
+      config: {
+        rateLimit: {
+          max: 20,
+          timeWindow: 60000,
+        },
+      },
+    },
+    async (
+      request: FastifyRequest<{
+        Params: SessionParams;
+        Body: { content?: string; model?: string };
+      }>,
+      reply: FastifyReply,
+    ) => {
+      const rawContent = request.body?.content;
+      const content = typeof rawContent === 'string' ? rawContent.trim() : '';
+      if (!content || content.length > 2000) {
+        return reply.code(400).send({
+          success: false,
+          error: {
+            code: 'INVALID_PARAMS',
+            message: '标题内容不能为空且不能超过 2000 个字符',
+          },
+        });
+      }
+
+      const sessionId = request.params.sessionId;
+      try {
+        const title = await generateConversationTitle({
+          sessionId,
+          content,
+          model: normalizeModelId(request.body?.model),
+          backendProviders: getSessionModelConfigs().get(sessionId),
+          externalAuth: getSessionExternalAuthConfigs().get(sessionId),
+        });
+
+        return reply.send({
+          success: true,
+          data: { title },
+        });
+      } catch (error) {
+        logger.warn(
+          { sessionId, error },
+          'Conversation title generation failed',
+        );
+        return reply.code(503).send({
+          success: false,
+          error: {
+            code: 'BACKEND_UNAVAILABLE',
+            message: '标题生成服务暂不可用',
+            retryable: true,
+          },
+        });
+      }
+    },
+  );
 
   scoped.post<{ Params: SessionParams; Body: SendMessageBody }>(
     '/api/agent/:sessionId/message',

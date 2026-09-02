@@ -3,6 +3,7 @@ export type {
   DesignSpecEntry,
   DesignSpecMeta,
   DesignSpecRef,
+  DesignSpecTarget,
   ConfigPoolItem,
   ConfigPoolItemKind,
 } from "./types";
@@ -22,6 +23,7 @@ export {
   listDesignSpecDocs,
   normalizeEntry,
   readDesignSpecDoc,
+  readDesignSpecDocRawContent,
   readDesignSpecManifest,
   saveDesignSpecDoc,
 } from "./storage";

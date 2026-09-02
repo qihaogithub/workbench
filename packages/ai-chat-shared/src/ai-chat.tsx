@@ -14,6 +14,7 @@ import { buildFullModelId } from "./lib/ai-models";
 import { ChatMessages } from "./chat/chat-messages";
 import { ChatPlan } from "./chat/chat-plan";
 import { ChatInput } from "./chat/chat-input";
+import { Popover } from "./ui/popover";
 import type { ProjectReference } from "./chat/inline-tag-input";
 import type { StreamService } from "./chat/services/stream-service";
 import type { ActiveViewContext } from "./lib/active-view-context";
@@ -130,6 +131,8 @@ interface AIChatProps {
   onIsStreamingChange?: (isStreaming: boolean) => void;
   onStreamContentChange?: (content: string) => void;
   onCurrentMessageChange?: (message: ChatMessage) => void;
+  /** 首轮用户消息生成标题时通知宿主更新本地/外部历史。 */
+  onSessionTitleChange?: (title: string) => void;
   onNewSession?: (workspaceId?: string) => void;
   onSelectSession?: (sessionId: string, workspaceId?: string) => void;
   currentSessionId?: string;
@@ -151,6 +154,11 @@ interface AIChatProps {
   externalStreamServiceRef?: React.MutableRefObject<StreamService | null>;
   /** 由宿主接管历史入口；viewer-site 使用项目级本地历史。 */
   onHistoryOpen?: () => void;
+  /** 宿主自定义历史菜单内容，渲染在共享 Popover 根节点内。 */
+  historyContent?: (controls: {
+    close: () => void;
+    width: number | null;
+  }) => React.ReactNode;
   selectedElement?: import("./chat/element-selection-chip").ChatElementRef | null;
   onRemoveElement?: () => void;
   /** 画布多选页面引用 */
@@ -181,6 +189,7 @@ export function AIChat({
   onIsStreamingChange,
   onStreamContentChange,
   onCurrentMessageChange,
+  onSessionTitleChange,
   onNewSession,
   onSelectSession,
   currentSessionId,
@@ -192,13 +201,18 @@ export function AIChat({
   beforeSend,
   externalStreamServiceRef,
   onHistoryOpen,
+  historyContent,
   selectedElement,
   onRemoveElement,
   selectedPages,
   onRemovePages,
   projects,
 }: AIChatProps) {
-  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [historyPopoverOpen, setHistoryPopoverOpen] = useState(false);
+  const [historyPopoverWidth, setHistoryPopoverWidth] = useState<number | null>(
+    null,
+  );
+  const chatRootRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   const {
@@ -293,6 +307,7 @@ export function AIChat({
     onModelsEvent: handleModelsEvent,
     onModelStateError: handleModelError,
     selectedModelId,
+    onSessionTitleChange,
     onDiagnosticEvent,
     beforeSend,
     externalStreamServiceRef,
@@ -391,11 +406,7 @@ export function AIChat({
       toast({ title: "AI 输出中，无法切换对话" });
       return;
     }
-    if (onHistoryOpen) {
-      onHistoryOpen();
-      return;
-    }
-    setHistoryDialogOpen(true);
+    onHistoryOpen?.();
   }, [isStreaming, onHistoryOpen, toast]);
 
   useEffect(() => {
@@ -433,8 +444,40 @@ export function AIChat({
 
   const queuedMessages = messages.filter((message) => message.queueStatus);
 
+  const supportsHistory =
+    mode !== "viewer-readonly" || Boolean(onHistoryOpen) || Boolean(historyContent);
+  const supportsHistoryPopover =
+    mode !== "viewer-readonly" || Boolean(historyContent);
+
+  useEffect(() => {
+    if (!supportsHistoryPopover) {
+      setHistoryPopoverWidth(null);
+      return;
+    }
+
+    const root = chatRootRef.current;
+    if (!root) return;
+
+    const updateWidth = () => {
+      const width = root.getBoundingClientRect().width;
+      if (width > 0) setHistoryPopoverWidth(width);
+    };
+
+    updateWidth();
+    if (typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [supportsHistoryPopover]);
+
   return (
-    <div className="flex flex-col h-full">
+    <div ref={chatRootRef} className="flex flex-col h-full">
+      <Popover
+        modal={false}
+        open={supportsHistoryPopover ? historyPopoverOpen : false}
+        onOpenChange={setHistoryPopoverOpen}
+      >
       <Conversation className="flex-1 min-h-0 relative">
         <ConversationContent ref={scrollContainerRef} onScroll={handleScroll}>
           <ChatMessages
@@ -545,6 +588,7 @@ export function AIChat({
         agentSessionId={agentSessionId}
         projectId={projectId}
         onHistoryClick={handleHistoryClick}
+        historyPopoverEnabled={supportsHistoryPopover}
         onModelChange={handleModelChange}
         onDepthChange={handleDepthChange}
         currentModelId={modelState.currentModelId}
@@ -554,7 +598,7 @@ export function AIChat({
         canSwitch={modelState.canSwitch}
         isModelLoading={modelState.isLoading}
         supportsFiles
-        supportsHistory={mode !== "viewer-readonly" || Boolean(onHistoryOpen)}
+        supportsHistory={supportsHistory}
         selectedElement={selectedElement}
         onRemoveElement={onRemoveElement}
         selectedPages={selectedPages}
@@ -562,17 +606,24 @@ export function AIChat({
         projects={projects}
       />
 
-      {mode !== "viewer-readonly" && (
+      {mode !== "viewer-readonly" ? (
         <HistoryDialog
-          open={historyDialogOpen}
-          onOpenChange={setHistoryDialogOpen}
+          open={historyPopoverOpen}
+          onOpenChange={setHistoryPopoverOpen}
+          popoverWidth={historyPopoverWidth}
           projectId={projectId || sessionId}
           workspaceId={workspaceId}
           currentSessionId={currentSessionId}
           onSelectSession={onSelectSession || (() => {})}
           onNewSession={onNewSession || (() => {})}
         />
-      )}
+      ) : historyContent ? (
+        historyContent({
+          close: () => setHistoryPopoverOpen(false),
+          width: historyPopoverWidth,
+        })
+      ) : null}
+      </Popover>
 
     </div>
   );

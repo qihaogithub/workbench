@@ -443,7 +443,7 @@ export function RivePlayer(props) {
 }
 
 export function SpinePlayer(props) {
-  const { src, animation, loop = true, audioEnabled = true, fallback, onError, className, style, ...rest } = props || {};
+  const { src, animation, loop = true, audioEnabled = true, fit = 'contain', alignment = 'center', fallback, onError, className, style, ...rest } = props || {};
   const containerRef = React.useRef(null);
   const canvasRef = React.useRef(null);
   const [failed, setFailed] = React.useState(false);
@@ -477,6 +477,8 @@ export function SpinePlayer(props) {
     let audioGestureObserved = false;
     const audioBufferCache = new Map();
     const activeAudioSources = new Set();
+    let spineFit = fit;
+    let spineAlignment = alignment;
     container.innerHTML = '';
     setFailed(false);
 
@@ -541,12 +543,54 @@ export function SpinePlayer(props) {
       }).catch(() => {});
     }
 
+    // Keep this framing math in sync with src/lib/spine-camera-framing.ts.
+    // The preview SDK is generated from this template, so it cannot import
+    // the author-site module at runtime.
+    function normalizeSpineFit(value) {
+      return value === 'contain' || value === 'cover' || value === 'none' ? value : 'contain';
+    }
+    function normalizeSpineAlignment(value) {
+      return value === 'top-left' || value === 'top' || value === 'top-right' || value === 'left' || value === 'center' || value === 'right' || value === 'bottom-left' || value === 'bottom' || value === 'bottom-right' ? value : 'center';
+    }
+    function frameSpineCamera() {
+      if (!sceneRenderer || !skeletonObj || normalizeSpineFit(spineFit) === 'none') return;
+      const viewportWidth = canvas.clientWidth || canvas.width || 300;
+      const viewportHeight = canvas.clientHeight || canvas.height || 300;
+      if (!(viewportWidth > 0) || !(viewportHeight > 0)) return;
+      const offset = { x: 0, y: 0, set(x, y) { this.x = x; this.y = y; return this; } };
+      const size = { x: 0, y: 0, set(x, y) { this.x = x; this.y = y; return this; } };
+      try { skeletonObj.getBounds(offset, size); } catch (e) { return; }
+      if (![offset.x, offset.y, size.x, size.y].every(Number.isFinite) || !(size.x > 0) || !(size.y > 0)) return;
+      const normalizedFit = normalizeSpineFit(spineFit);
+      const zoom = normalizedFit === 'cover'
+        ? Math.min(size.x / viewportWidth, size.y / viewportHeight)
+        : Math.max(size.x / viewportWidth, size.y / viewportHeight);
+      if (!(Number.isFinite(zoom) && zoom > 0)) return;
+      const visibleWidth = viewportWidth * zoom;
+      const visibleHeight = viewportHeight * zoom;
+      const normalizedAlignment = normalizeSpineAlignment(spineAlignment);
+      const horizontal = normalizedAlignment.indexOf('left') !== -1 ? 'left' : normalizedAlignment.indexOf('right') !== -1 ? 'right' : 'center';
+      const vertical = normalizedAlignment.indexOf('top') !== -1 ? 'top' : normalizedAlignment.indexOf('bottom') !== -1 ? 'bottom' : 'center';
+      const camera = sceneRenderer.camera;
+      camera.zoom = zoom;
+      camera.position.x = horizontal === 'left'
+        ? offset.x + visibleWidth / 2
+        : horizontal === 'right'
+          ? offset.x + size.x - visibleWidth / 2
+          : offset.x + size.x / 2;
+      camera.position.y = vertical === 'bottom'
+        ? offset.y + visibleHeight / 2
+        : vertical === 'top'
+          ? offset.y + size.y - visibleHeight / 2
+          : offset.y + size.y / 2;
+    }
+
     function render() {
       if (!gl || !sceneRenderer || !skeletonObj || !state) return;
       const w = canvas.clientWidth || canvas.width || 300;
       const h = canvas.clientHeight || canvas.height || 300;
       if (canvas.width !== w || canvas.height !== h) {
-        canvas.width = w; canvas.height = h; sceneRenderer.camera.setViewport(w, h);
+        canvas.width = w; canvas.height = h; sceneRenderer.camera.setViewport(w, h); frameSpineCamera();
       }
       const now = Date.now() / 1000;
       const delta = lastTime ? now - lastTime : 0;
@@ -604,6 +648,9 @@ export function SpinePlayer(props) {
         if (animation && skeletonData.findAnimation(animation)) state.setAnimation(0, animation, loop);
         else if (skeletonData.animations && skeletonData.animations.length > 0) state.setAnimation(0, skeletonData.animations[0].name, loop);
         sceneRenderer = new Spine.SceneRenderer(canvas, gl, false);
+        state.apply(skeletonObj);
+        skeletonObj.updateWorldTransform(physicsMode);
+        frameSpineCamera();
         lastTime = 0;
         render();
       } catch (e) {
@@ -657,7 +704,7 @@ export function SpinePlayer(props) {
       }
       if (containerRef.current) containerRef.current.innerHTML = '';
     };
-  }, [src, animation, loop, audioEnabled, hasSrc, onError]);
+  }, [src, animation, loop, audioEnabled, fit, alignment, hasSrc, onError]);
 
   if (!hasSrc || failed) {
     return fallback ? React.createElement('div', { className: cx('flex items-center justify-center overflow-hidden', className), style, ...rest }, fallback) : null;

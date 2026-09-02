@@ -56,6 +56,7 @@
     "check:workspace-deploy-compose": "node scripts/check-workspace-deploy-preflight.mjs --compose docker-compose.yml --skip-authority",
     "test:workspace-deploy-preflight": "node --test scripts/check-workspace-deploy-preflight.test.mjs",
     "test:docker-viewer-env-isolation": "node --test scripts/docker-viewer-env-isolation.test.mjs",
+    "test:better-sqlite3-runtime": "node --test scripts/better-sqlite3-runtime-compat.test.mjs",
     "check:docker-build": "scripts/docker-build-check.sh",
     "check:repo": "node scripts/check-repo.mjs",
     "check:automation": "node OPS/automations/bin/automation.mjs check-tools",

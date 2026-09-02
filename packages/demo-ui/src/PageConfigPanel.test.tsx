@@ -29,7 +29,7 @@ describe("PageConfigPanel design-spec bubble", () => {
             id: "target-entry",
             title: "目标封面规范",
             markdown: "不属于引用页",
-            refs: [{ scope: "page", pageId: "reference-page", fieldKey: "cover" }],
+            target: { type: "config", refs: [{ scope: "page", pageId: "reference-page", fieldKey: "cover" }] },
           }],
         },
       }) });
@@ -47,6 +47,58 @@ describe("PageConfigPanel design-spec bubble", () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     expect(screen.queryByRole("button", { name: "查看设计规范：封面" })).not.toBeInTheDocument();
+  });
+
+  it("仅显示当前页面的页面规范，常驻展示并复用规范详情气泡", async () => {
+    render(
+      <PageConfigPanel
+        pages={[
+          { id: "page-a", name: "页面 A", schema: pageSchema, configData: {} },
+          { id: "page-b", name: "页面 B", schema: pageSchema, configData: {} },
+        ]}
+        detailPageId="page-a"
+        onPageConfigChange={vi.fn()}
+        pageDesignSpecEntries={[
+          {
+            docId: "doc-1",
+            docTitle: "互动规范",
+            entryId: "intro",
+            entryTitle: "玩法介绍",
+            markdown: "拖动选项填入空位。",
+            pageId: "page-a",
+          },
+          {
+            docId: "doc-1",
+            docTitle: "互动规范",
+            entryId: "reference",
+            entryTitle: "往期资源参考",
+            markdown: "[查看录屏](https://example.test/video)",
+            pageId: "page-b",
+          },
+          {
+            docId: "doc-1",
+            docTitle: "互动规范",
+            entryId: "empty",
+            entryTitle: "空规范",
+            markdown: "   ",
+            pageId: "page-a",
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.queryByRole("heading", { name: "页面规范（1）" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "查看页面规范：玩法介绍" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "查看页面规范：往期资源参考" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "查看页面规范：玩法介绍" }));
+    const bubble = await screen.findByRole("complementary", { name: "设计规范" });
+    expect(bubble.querySelector("h3")).toHaveTextContent("玩法介绍");
+    expect(screen.getByText("拖动选项填入空位。")).toBeInTheDocument();
+
+    fireEvent.pointerDown(screen.getByRole("button", { name: "查看页面规范：玩法介绍" }));
+    fireEvent.click(screen.getByRole("button", { name: "查看页面规范：玩法介绍" }));
+    await waitFor(() => expect(screen.queryByRole("complementary", { name: "设计规范" })).not.toBeInTheDocument());
   });
 
   it("引用页也复用字段旁规范入口，不渲染旧的整块规范区", async () => {
@@ -110,6 +162,15 @@ describe("PageConfigPanel design-spec bubble", () => {
     );
     expect(bubble.style.height).toBe("");
     expect(bubble.style.maxHeight).not.toBe("");
+
+    expect(screen.getByRole("button", { name: "查看设计规范：封面" })).toHaveClass("bg-blue-600", "text-white");
+    fireEvent.pointerDown(screen.getByRole("button", { name: "查看设计规范：封面" }));
+    fireEvent.click(screen.getByRole("button", { name: "查看设计规范：封面" }));
+    await waitFor(() => expect(screen.queryByRole("complementary", { name: "设计规范" })).not.toBeInTheDocument());
+
+    fireEvent.pointerDown(screen.getByRole("button", { name: "查看设计规范：封面" }));
+    fireEvent.click(screen.getByRole("button", { name: "查看设计规范：封面" }));
+    await screen.findByRole("complementary", { name: "设计规范" });
 
     fireEvent.click(screen.getByRole("button", { name: "关闭设计规范" }));
     await waitFor(() => expect(screen.queryByRole("complementary", { name: "设计规范" })).not.toBeInTheDocument());

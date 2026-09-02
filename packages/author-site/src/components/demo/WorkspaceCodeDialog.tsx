@@ -16,6 +16,7 @@ import { DocumentEditor } from "@workbench/demo-ui";
 import type { CollabResourceKind, CollabRoomDescriptor } from "@workbench/shared";
 import { useCollabDocument } from "@/hooks/useCollabDocument";
 import { getFileLanguage, getFileEditorType } from "@/lib/workspace-file-utils";
+import { localizeRemoteImageForSession } from "@workbench/demo-ui/markdown/remote-image-localizer";
 
 interface WorkspaceCodeDialogProps {
   open: boolean;
@@ -70,6 +71,9 @@ export function WorkspaceCodeDialog({
     username: "当前用户",
   });
   const useCollab = Boolean(collabDescriptor && collab.ytext && collab.provider);
+  const localizeRemoteImage = sessionId
+    ? (url: string) => localizeRemoteImageForSession(sessionId, url)
+    : undefined;
 
   // 打开弹窗时重置状态
   useEffect(() => {
@@ -188,6 +192,7 @@ export function WorkspaceCodeDialog({
               key={filePath}
               value={editContent}
               onChange={handleChange}
+              localizeRemoteImage={localizeRemoteImage}
               readOnly={!editable}
             />
           ) : (

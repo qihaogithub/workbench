@@ -27,6 +27,7 @@ import { PreviewStage } from "@workbench/demo-ui/PreviewStage";
 import type {
   PreviewMode,
   PreviewSize,
+  ConfigDefinitionFocus,
   PositionEditTarget,
   ScreenshotRenderBox,
 } from "@workbench/demo-ui/types";
@@ -240,6 +241,7 @@ import {
   resolveSinglePreviewResourceHistoryTarget,
   type SinglePreviewTarget,
 } from "./single-preview-history";
+import { buildSinglePreviewNavigableItems } from "./single-preview-navigation";
 import {
   getAnnotationsFromCanvasState,
   getCanvasDocumentEntries,
@@ -281,6 +283,7 @@ import {
   hasLoadedPrototypeHtml,
   loadCanvasPageContent,
   type ReferencedDesignSpecEntry,
+  type ReferencedPageDesignSpecEntry,
 } from "@/lib/canvas-page-content-loader";
 import { useDemos } from "@/lib/api";
 import {
@@ -1073,10 +1076,14 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   >({});
   const [referencePageDesignSpecEntries, setReferencePageDesignSpecEntries] =
     useState<Record<string, ReferencedDesignSpecEntry[]>>({});
+  const [referencePagePageDesignSpecEntries, setReferencePagePageDesignSpecEntries] =
+    useState<Record<string, ReferencedPageDesignSpecEntry[]>>({});
   const [referencePageProjectSchemas, setReferencePageProjectSchemas] =
     useState<Record<string, string>>({});
   const pageSchemaMapRef = useRef(pageSchemaMap);
   pageSchemaMapRef.current = pageSchemaMap;
+  const pendingPageSchemaOverridesRef = useRef<Record<string, string>>({});
+  const pendingProjectSchemaOverrideRef = useRef<string | null>(null);
   const [requirementsMap, setRequirementsMap] = useState<
     Record<string, string>
   >({});
@@ -1085,6 +1092,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     docId: string;
     entryId: string;
   } | null>(null);
+  const [configDefinitionFocus, setConfigDefinitionFocus] =
+    useState<ConfigDefinitionFocus | null>(null);
+  const [configDefinitionPageId, setConfigDefinitionPageId] = useState<string | null>(null);
   const [pageCodes, setPageCodes] = useState<Record<string, string>>({});
   const pageCodesRef = useRef(pageCodes);
   pageCodesRef.current = pageCodes;
@@ -1279,6 +1289,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const syncInFlightRef = useRef(false);
   const scheduleWorkspaceSyncRef = useRef<() => void>(() => {});
   const flushSyncWorkspaceRef = useRef<() => Promise<void>>(() =>
+    Promise.resolve(),
+  );
+  const persistWorkspaceToProjectRef = useRef<() => Promise<void>>(() =>
     Promise.resolve(),
   );
   const previewTrackerRef = useRef<PreviewProjectionTracker>(
@@ -1857,6 +1870,32 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       timers[pageId] = { timer, values };
     },
     [sessionId, toast],
+  );
+  const cancelPendingPageConfigPersistence = useCallback((pageId: string) => {
+    const pending = pageConfigPersistTimersRef.current[pageId];
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    delete pageConfigPersistTimersRef.current[pageId];
+  }, []);
+  const persistPageDefinition = useCallback(
+    async (
+      pageId: string,
+      nextSchema: string,
+      nextValues: Record<string, unknown>,
+    ) => {
+      if (!sessionId) throw new Error("Session 未创建，无法保存配置定义");
+      const response = await fetch(`/api/sessions/${sessionId}/files/${pageId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ schema: nextSchema, configValues: nextValues }),
+      });
+      if (response.ok) return;
+      const result = await response.json().catch(() => null);
+      throw new Error(
+        result?.error?.message || `保存配置定义失败（${response.status}）`,
+      );
+    },
+    [sessionId],
   );
   const screenshotRegenerateTimerRef = useRef<
     Record<string, ReturnType<typeof setTimeout>>
@@ -3864,6 +3903,14 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   useEffect(() => {
     if (projectSchemaCollab.status !== "synced") return;
+    const pendingSchema = pendingProjectSchemaOverrideRef.current;
+    if (pendingSchema && projectSchemaCollab.value !== pendingSchema) {
+      replaceCollabText(projectSchemaCollab.ytext, pendingSchema);
+      return;
+    }
+    if (pendingSchema === projectSchemaCollab.value) {
+      pendingProjectSchemaOverrideRef.current = null;
+    }
     if (projectSchemaCollab.value === projectConfigSchema) return;
     if (
       projectSchemaCollab.value === "" &&
@@ -4214,8 +4261,11 @@ ${context.details}
         );
         setDemoPages(sessionData.data.demoPages || []);
         setDemoFolders(sessionData.data.demoFolders || []);
-        setProjectConfigSchema(sessionData.data.projectConfigSchema);
-        projectConfigSchemaRef.current = sessionData.data.projectConfigSchema;
+        const initialProjectSchema =
+          pendingProjectSchemaOverrideRef.current ??
+          sessionData.data.projectConfigSchema;
+        setProjectConfigSchema(initialProjectSchema);
+        projectConfigSchemaRef.current = initialProjectSchema;
         setProjectConfigValues(sessionData.data.projectConfigValues ?? {});
         const initialPageId = sessionData.data.activePageId || "";
         setActiveDemoId(initialPageId);
@@ -4264,8 +4314,10 @@ ${context.details}
         );
         setDemoPages(pagesWithSize);
         setDemoFolders(multi.demoFolders || []);
-        setProjectConfigSchema(multi.projectConfigSchema);
-        projectConfigSchemaRef.current = multi.projectConfigSchema;
+        const loadedProjectSchema =
+          pendingProjectSchemaOverrideRef.current ?? multi.projectConfigSchema;
+        setProjectConfigSchema(loadedProjectSchema);
+        projectConfigSchemaRef.current = loadedProjectSchema;
 
         // 记录每个页面的 previewSize
         const previewSizeMap: Record<string, PreviewSize> = {};
@@ -4390,14 +4442,18 @@ ${context.details}
         }
         setConfigDataMap(allDefaults);
         pageCodesRef.current = codes;
+        const schemasToApply = {
+          ...schemas,
+          ...pendingPageSchemaOverridesRef.current,
+        };
         pageSchemaMapRef.current = {
           ...pageSchemaMapRef.current,
-          ...schemas,
+          ...schemasToApply,
         };
         setPageCodes(codes);
         setPagePrototypeMap(prototypes);
         setPageSketchMap(sketches);
-        setPageSchemaMap((prev) => mergeLoadedPageSchemas(prev, schemas));
+        setPageSchemaMap((prev) => mergeLoadedPageSchemas(prev, schemasToApply));
 
         const size = getPreviewSize(loadedSchema);
         setPreviewSize(size);
@@ -4665,6 +4721,14 @@ ${context.details}
       setSchema(newSchema);
       const currentPageId = activeDemoIdRef.current;
       if (currentPageId) {
+        pendingPageSchemaOverridesRef.current = {
+          ...pendingPageSchemaOverridesRef.current,
+          [currentPageId]: newSchema,
+        };
+        pageSchemaMapRef.current = {
+          ...pageSchemaMapRef.current,
+          [currentPageId]: newSchema,
+        };
         setPageSchemaMap((prev) => ({ ...prev, [currentPageId]: newSchema }));
       }
       setEditorContent((prev) => {
@@ -4681,6 +4745,14 @@ ${context.details}
 
   const handlePageSchemaChange = useCallback(
     (pageId: string, nextSchema: string) => {
+      pendingPageSchemaOverridesRef.current = {
+        ...pendingPageSchemaOverridesRef.current,
+        [pageId]: nextSchema,
+      };
+      pageSchemaMapRef.current = {
+        ...pageSchemaMapRef.current,
+        [pageId]: nextSchema,
+      };
       setPageSchemaMap((prev) => ({ ...prev, [pageId]: nextSchema }));
       if (pageId === activeDemoIdRef.current) {
         handleSchemaChange(nextSchema);
@@ -4733,23 +4805,53 @@ ${context.details}
   );
 
   const handlePageDefinitionChange = useCallback(
-    (pageId: string, mutation: SchemaDefinitionMutation) => {
+    async (pageId: string, mutation: SchemaDefinitionMutation) => {
+      const current = configDataMapRef.current[pageId] ?? {};
+      const next = { ...current, ...mutation.valuePlan.setDefaults };
+      for (const key of mutation.valuePlan.removeKeys) delete next[key];
+
+      // 文档视图可以编辑非活动页；不能再依赖仅写入活动页的自动同步。
+      cancelPendingPageConfigPersistence(pageId);
+      try {
+        await persistPageDefinition(pageId, mutation.schema, next);
+        await persistWorkspaceToProjectRef.current();
+      } catch (error) {
+        toast({
+          title: "配置定义尚未保存",
+          description:
+            error instanceof Error ? error.message : "请稍后重试。",
+          variant: "destructive",
+        });
+        throw error;
+      }
+
+      // 在持久化完成后才让本地页面状态、协同文本和设计规范投影可见。
       handlePageSchemaChange(pageId, mutation.schema);
-      setConfigDataMap((previous) => {
-        const current = previous[pageId] ?? {};
-        const next = { ...current, ...mutation.valuePlan.setDefaults };
-        for (const key of mutation.valuePlan.removeKeys) delete next[key];
-        persistPageConfigValues(pageId, next);
-        return { ...previous, [pageId]: next };
-      });
+      configDataMapRef.current = {
+        ...configDataMapRef.current,
+        [pageId]: next,
+      };
+      setConfigDataMap((previous) => ({ ...previous, [pageId]: next }));
       markScreenshotDirty(pageId);
       markWorkspaceChanged();
+      window.dispatchEvent(
+        new CustomEvent("config-schema-updated", {
+          detail: {
+            scope: "page",
+            pageId,
+            schema: mutation.schema,
+            committed: true,
+          },
+        }),
+      );
     },
     [
+      cancelPendingPageConfigPersistence,
       handlePageSchemaChange,
       markScreenshotDirty,
       markWorkspaceChanged,
-      persistPageConfigValues,
+      persistPageDefinition,
+      toast,
     ],
   );
 
@@ -4851,6 +4953,7 @@ ${context.details}
   const handleProjectSchemaChange = useCallback(
     (newSchema: string) => {
       const previousProjectSchema = projectConfigSchemaRef.current;
+      pendingProjectSchemaOverrideRef.current = newSchema;
       replaceCollabText(projectSchemaCollab.ytext, newSchema);
       setProjectConfigSchema(newSchema);
       projectConfigSchemaRef.current = newSchema;
@@ -4891,7 +4994,7 @@ ${context.details}
   );
 
   const handleProjectDefinitionChange = useCallback(
-    (mutation: SchemaDefinitionMutation) => {
+    async (mutation: SchemaDefinitionMutation) => {
       handleProjectSchemaChange(mutation.schema);
       const nextProjectValues = {
         ...projectConfigValuesRef.current,
@@ -4901,7 +5004,6 @@ ${context.details}
         delete nextProjectValues[key];
       projectConfigValuesRef.current = nextProjectValues;
       setProjectConfigValues(nextProjectValues);
-      void persistProjectConfigValues(nextProjectValues);
       setConfigDataMap((previous) => {
         const next: Record<string, Record<string, unknown>> = {};
         for (const [pageId, values] of Object.entries(previous)) {
@@ -4911,6 +5013,18 @@ ${context.details}
         }
         return next;
       });
+      const saved = await persistProjectConfigValues(nextProjectValues);
+      if (!saved) throw new Error("共享配置保存失败");
+      await flushSyncWorkspaceRef.current();
+      window.dispatchEvent(
+        new CustomEvent("config-schema-updated", {
+          detail: {
+            scope: "project",
+            schema: mutation.schema,
+            committed: true,
+          },
+        }),
+      );
     },
     [handleProjectSchemaChange, persistProjectConfigValues],
   );
@@ -5253,7 +5367,15 @@ ${context.details}
         setPagePrototypeMap((prev) => ({ ...prev, ...nextPrototypes }));
         setPageSketchMap((prev) => ({ ...prev, ...nextSketches }));
         setPageSandboxMap((prev) => ({ ...prev, ...nextSandboxes }));
-        setPageSchemaMap((prev) => mergeLoadedPageSchemas(prev, nextSchemas));
+        const schemasToApply = {
+          ...nextSchemas,
+          ...pendingPageSchemaOverridesRef.current,
+        };
+        pageSchemaMapRef.current = {
+          ...pageSchemaMapRef.current,
+          ...schemasToApply,
+        };
+        setPageSchemaMap((prev) => mergeLoadedPageSchemas(prev, schemasToApply));
         setConfigDataMap((prev) => {
           const next = { ...prev };
           for (const [pageId, defaults] of Object.entries(nextDefaults)) {
@@ -5319,7 +5441,10 @@ ${context.details}
             | PrototypePageMeta
             | undefined;
           const nextCode = data.code ?? "";
-          const nextSchema = data.schema ?? "";
+          const nextSchema =
+            pendingPageSchemaOverridesRef.current[pageId] ??
+            data.schema ??
+            "";
           pageCodesRef.current = {
             ...pageCodesRef.current,
             [pageId]: nextCode,
@@ -5387,6 +5512,12 @@ ${context.details}
             setReferencePageDesignSpecEntries((prev) => ({
               ...prev,
               [pageId]: data.designSpecEntries ?? [],
+            }));
+          }
+          if (data.pageDesignSpecEntries !== undefined) {
+            setReferencePagePageDesignSpecEntries((prev) => ({
+              ...prev,
+              [pageId]: data.pageDesignSpecEntries ?? [],
             }));
           }
           if (data.projectConfigSchema !== undefined) {
@@ -5510,6 +5641,79 @@ ${context.details}
       setPreviewMode("document");
     },
     [demoId, setPreviewMode],
+  );
+  const ensureConfigDefinitionPageLoaded = useCallback(
+    async (pageId: string) => {
+      if (
+        pageSchemaMapRef.current[pageId] !== undefined ||
+        (pageId === activeDemoIdRef.current && schemaRef.current)
+      ) {
+        return true;
+      }
+      const page = demoPages.find((item) => item.id === pageId);
+      if (!page || !sessionId) return false;
+      try {
+        const data = await loadCanvasPageContent({
+          page,
+          projectId: demoId,
+          sessionId,
+        });
+        updatePageSchemaMapFromLoad(
+          pageId,
+          pendingPageSchemaOverridesRef.current[pageId] ?? data.schema ?? "",
+        );
+        if (data.projectConfigSchema !== undefined) {
+          setReferencePageProjectSchemas((current) => ({
+            ...current,
+            [pageId]: data.projectConfigSchema ?? "",
+          }));
+        }
+        return true;
+      } catch (error) {
+        console.error("加载配置项所属页面失败:", error);
+        return false;
+      }
+    },
+    [demoId, demoPages, sessionId, updatePageSchemaMapFromLoad],
+  );
+  const handleDesignSpecConfigDefinitionEdit = useCallback(
+    async (target: ConfigDefinitionFocus) => {
+      const targetPageId = target.scope === "page"
+        ? target.pageId
+        : activeDemoIdRef.current || demoPages[0]?.id;
+      if (!targetPageId) {
+        toast({
+          title: "无法编辑配置项",
+          description: "当前项目没有可用页面。",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (target.scope === "page" && !target.pageId) {
+        toast({
+          title: "无法编辑配置项",
+          description: "该设计规范引用缺少所属页面。",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!(await ensureConfigDefinitionPageLoaded(targetPageId))) {
+        toast({
+          title: "无法编辑配置项",
+          description: "所属页面加载失败，请稍后重试。",
+          variant: "destructive",
+        });
+        return;
+      }
+      setDesignSpecFocus(null);
+      setConfigDefinitionPageId(targetPageId);
+      setConfigDefinitionFocus({
+        scope: target.scope,
+        fieldKey: target.fieldKey,
+        pageId: target.scope === "page" ? targetPageId : undefined,
+      });
+    },
+    [demoPages, ensureConfigDefinitionPageLoaded, toast],
   );
   const handlePreviewHtmlFilesDrop = useCallback(
     (files: File[]) => {
@@ -6245,8 +6449,10 @@ ${context.details}
         });
         setDemoPages(pagesWithSize);
         setDemoFolders(snapshotFolders);
-        setProjectConfigSchema(multi.projectConfigSchema);
-        projectConfigSchemaRef.current = multi.projectConfigSchema;
+        const refreshedProjectSchema =
+          pendingProjectSchemaOverrideRef.current ?? multi.projectConfigSchema;
+        setProjectConfigSchema(refreshedProjectSchema);
+        projectConfigSchemaRef.current = refreshedProjectSchema;
         replaceCollabText(
           projectSchemaCollab.ytext,
           multi.projectConfigSchema ?? "",
@@ -6341,9 +6547,13 @@ ${context.details}
         pageSketchMapRef.current = { ...pageSketchMapRef.current, ...sketches };
 
         pageCodesRef.current = codes;
+        const initialSchemasToApply = {
+          ...schemas,
+          ...pendingPageSchemaOverridesRef.current,
+        };
         pageSchemaMapRef.current = {
           ...pageSchemaMapRef.current,
-          ...schemas,
+          ...initialSchemasToApply,
         };
         setPageCodes(codes);
         setPagePrototypeMap(prototypes);
@@ -6358,7 +6568,7 @@ ${context.details}
           }
           return merged;
         });
-        setPageSchemaMap((prev) => mergeLoadedPageSchemas(prev, schemas));
+        setPageSchemaMap((prev) => mergeLoadedPageSchemas(prev, initialSchemasToApply));
         setPagePreviewSizeMap(previewSizeMap);
 
         if (!authoritySnapshot) markWorkspaceChanged();
@@ -6702,6 +6912,7 @@ ${context.details}
       throw error;
     }
   }, [sessionId]);
+  persistWorkspaceToProjectRef.current = persistWorkspaceToProject;
 
   const syncWorkspaceToProject = useCallback(async () => {
     await runWorkspaceSyncStep(
@@ -6803,6 +7014,9 @@ ${context.details}
         });
         try {
           await syncWorkspaceToProject();
+          if (workspaceFlushRevisionRef.current === revisionAtStart) {
+            pendingPageSchemaOverridesRef.current = {};
+          }
           const elapsedMs = Date.now() - startedAt;
           performanceSamplerRef.current.sampleCommitLatency(elapsedMs);
           setHasPendingWorkspaceFlush(false);
@@ -6882,6 +7096,9 @@ ${context.details}
     });
     try {
       await syncWorkspaceToProject();
+      if (workspaceFlushRevisionRef.current === revisionAtStart) {
+        pendingPageSchemaOverridesRef.current = {};
+      }
       const elapsedMs = Date.now() - startedAt;
       performanceSamplerRef.current.sampleCommitLatency(elapsedMs);
       setHasPendingWorkspaceFlush(false);
@@ -7572,20 +7789,8 @@ ${context.details}
   );
 
   const singlePreviewNavigableItems = useMemo(() => {
-    const items: { value: string; group: "页面" | "文档"; label: string }[] =
-      [];
-    for (const page of demoPages) {
-      items.push({ value: `page:${page.id}`, group: "页面", label: page.name });
-    }
-    for (const node of singlePreviewDocumentNodes) {
-      items.push({
-        value: `document:${node.id}`,
-        group: "文档",
-        label: node.title,
-      });
-    }
-    return items;
-  }, [demoPages, singlePreviewDocumentNodes]);
+    return buildSinglePreviewNavigableItems(demoPages);
+  }, [demoPages]);
   const singlePreviewCurrentIndex = singlePreviewNavigableItems.findIndex(
     (item) => item.value === singlePreviewSelectValue,
   );
@@ -8276,7 +8481,7 @@ ${context.details}
 
   const toolbarCenter =
     previewMode === "single" &&
-    (demoPages.length > 0 || singlePreviewDocumentNodes.length > 0) ? (
+    demoPages.length > 0 ? (
       <div className="flex items-center gap-1.5">
         <Button
           type="button"
@@ -8298,7 +8503,7 @@ ${context.details}
           onValueChange={handleSinglePreviewSelectChange}
         >
           <SelectTrigger
-            aria-label="选择预览对象"
+            aria-label="选择预览页面"
             className="h-7 w-auto flex-[0_1_auto] justify-start gap-0 rounded-md border-transparent bg-transparent px-2 text-xs font-medium text-foreground shadow-none data-[placeholder]:text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:ring-0"
           >
             <SelectValue placeholder="选择页面" />
@@ -8310,19 +8515,6 @@ ${context.details}
                 <SelectLabel>页面</SelectLabel>
                 {singlePreviewNavigableItems
                   .filter((item) => item.group === "页面")
-                  .map((item) => (
-                    <SelectItem key={item.value} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-              </SelectGroup>
-            )}
-            {singlePreviewNavigableItems.filter((item) => item.group === "文档")
-              .length > 0 && (
-              <SelectGroup>
-                <SelectLabel>文档</SelectLabel>
-                {singlePreviewNavigableItems
-                  .filter((item) => item.group === "文档")
                   .map((item) => (
                     <SelectItem key={item.value} value={item.value}>
                       {item.label}
@@ -8756,20 +8948,6 @@ ${context.details}
                       }}
                       onSelectSession={async (newSessionId) => {
                         try {
-                          if (sessionId && sessionId !== newSessionId) {
-                            await fetch(`/api/sessions/${sessionId}/meta`, {
-                              method: "PATCH",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ status: "discarded" }),
-                            });
-                          }
-
-                          await fetch(`/api/sessions/${newSessionId}/meta`, {
-                            method: "PATCH",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ status: "editing" }),
-                          });
-
                           const sessionRes = await fetch(
                             `/api/sessions/${newSessionId}`,
                           );
@@ -8781,26 +8959,58 @@ ${context.details}
                             return;
                           }
                           const sessionData = await sessionRes.json();
-                          if (
-                            !sessionData.success ||
-                            sessionData.data?.isExpired
-                          ) {
-                            toast({
-                              title: "会话已过期",
-                              variant: "destructive",
-                            });
+                          if (!sessionData.success || !sessionData.data) {
+                            toast({ title: "会话不存在", variant: "destructive" });
                             return;
                           }
 
                           const messagesRes = await fetch(
                             `/api/sessions/${newSessionId}/messages`,
                           );
+                          if (!messagesRes.ok) {
+                            toast({
+                              title: "会话暂时无法恢复",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
                           const messagesData = await messagesRes.json();
+                          if (
+                            !messagesData.success ||
+                            !Array.isArray(messagesData.data)
+                          ) {
+                            toast({
+                              title: "会话暂时无法恢复",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          const activateRes = await fetch(
+                            `/api/sessions/${newSessionId}/meta`,
+                            {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ status: "editing" }),
+                            },
+                          );
+                          if (!activateRes.ok) {
+                            toast({
+                              title: "会话暂时无法恢复",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+
+                          if (sessionId && sessionId !== newSessionId) {
+                            await fetch(`/api/sessions/${sessionId}/meta`, {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ status: "discarded" }),
+                            });
+                          }
+
                           setAiMessages(
-                            messagesData.success &&
-                              Array.isArray(messagesData.data)
-                              ? sanitizeHydratedMessages(messagesData.data)
-                              : [],
+                            sanitizeHydratedMessages(messagesData.data),
                           );
                           setAiCurrentMessage({
                             role: "assistant",
@@ -9222,6 +9432,7 @@ ${context.details}
                         window.dispatchEvent(new Event("knowledge-updated"));
                       }}
                       designSpecFocus={designSpecFocus}
+                      onEditConfigDefinition={handleDesignSpecConfigDefinitionEdit}
                     />
                   ) : (
                     <>
@@ -9293,8 +9504,7 @@ ${context.details}
                             }
                             selectorSlot={
                               previewMode === "single" &&
-                              (demoPages.length > 0 ||
-                                singlePreviewDocumentNodes.length > 0) ? (
+                              demoPages.length > 0 ? (
                                 <>
                                   {activeDemoPage?.runtimeType ===
                                     "sketch-scene" && (
@@ -9829,29 +10039,77 @@ ${context.details}
               {isConfigPanelVisible && (
                 <ResizablePanel className="relative flex flex-col overflow-hidden border-l bg-card">
                   {previewMode === "document" ? (
-                    <DocumentModeRightPanel
-                      target={activeDocumentCommentTarget}
-                      threads={documentCommentsData.threads}
-                      currentUserId={currentUserId || undefined}
-                      currentUser={commentUser}
-                      mentionCandidates={[]}
-                      canMentionAgent={true}
-                      activeThreadId={activeCommentThreadId}
-                      onSelectThread={(id) => {
-                        setActiveCommentThreadId(id);
-                        setCommentModeActive(false);
-                      }}
-                      onCreateComment={documentCommentsData.createComment}
-                      selectionDraft={documentCommentSelection}
-                      onSelectionDraftHandled={() =>
-                        setDocumentCommentSelection(null)
-                      }
-                      unresolvedCount={
-                        documentCommentsData.threads.filter(
-                          (thread) => !thread.resolved,
-                        ).length
-                      }
-                    />
+                    <>
+                      <DocumentModeRightPanel
+                        target={activeDocumentCommentTarget}
+                        threads={documentCommentsData.threads}
+                        currentUserId={currentUserId || undefined}
+                        currentUser={commentUser}
+                        mentionCandidates={[]}
+                        canMentionAgent={true}
+                        activeThreadId={activeCommentThreadId}
+                        onSelectThread={(id) => {
+                          setActiveCommentThreadId(id);
+                          setCommentModeActive(false);
+                        }}
+                        onCreateComment={documentCommentsData.createComment}
+                        selectionDraft={documentCommentSelection}
+                        onSelectionDraftHandled={() =>
+                          setDocumentCommentSelection(null)
+                        }
+                        unresolvedCount={
+                          documentCommentsData.threads.filter(
+                            (thread) => !thread.resolved,
+                          ).length
+                        }
+                      />
+                      <div className="hidden">
+                        <PageConfigPanel
+                          pages={(() => {
+                            const page = demoPages.find(
+                              (item) =>
+                                item.id ===
+                                (configDefinitionPageId ?? activeDemoId),
+                            );
+                            return page
+                              ? [{
+                                  id: page.id,
+                                  name: page.name,
+                                  order: page.order,
+                                  schema:
+                                    pageSchemaMap[page.id] ||
+                                    (page.id === activeDemoId
+                                      ? schema
+                                      : undefined),
+                                  configData: configDataMap[page.id],
+                                  projectConfigSchema:
+                                    referencePageProjectSchemas[page.id],
+                                }]
+                              : [];
+                          })()}
+                          activePageId={configDefinitionPageId ?? activeDemoId}
+                          detailPageId={configDefinitionPageId ?? activeDemoId}
+                          projectConfigSchema={projectConfigSchema}
+                          onProjectDefinitionChange={
+                            handleProjectDefinitionChange
+                          }
+                          onDefinitionAnalyze={handleConfigDefinitionAnalyze}
+                          onPageDefinitionChange={handlePageDefinitionChange}
+                          readonly={
+                            !!demoPages.find(
+                              (item) =>
+                                item.id ===
+                                (configDefinitionPageId ?? activeDemoId),
+                            )?.reference
+                          }
+                          hideOverviewHeader
+                          configDefinitionFocus={configDefinitionFocus}
+                          onConfigDefinitionFocusConsumed={() =>
+                            setConfigDefinitionFocus(null)
+                          }
+                        />
+                      </div>
+                    </>
                   ) : previewMode === "single" ? (
                     <>
                       <Tabs
@@ -9965,6 +10223,8 @@ ${context.details}
                                 referencePageProjectSchemas[page.id],
                               designSpecEntries:
                                 referencePageDesignSpecEntries[page.id],
+                              pageDesignSpecEntries:
+                                referencePagePageDesignSpecEntries[page.id],
                               projectConfigBindings:
                                 page.runtimeType === "prototype-html-css"
                                   ? extractPrototypeConfigBindingKeys(
@@ -10074,6 +10334,10 @@ ${context.details}
                               setDesignSpecFocus({ docId, entryId });
                               setPreviewMode("document");
                             }}
+                            configDefinitionFocus={configDefinitionFocus}
+                            onConfigDefinitionFocusConsumed={() =>
+                              setConfigDefinitionFocus(null)
+                            }
                           />
                         </TabsContent>
                         <TabsContent
@@ -10143,6 +10407,8 @@ ${context.details}
                                 referencePageProjectSchemas[page.id],
                               designSpecEntries:
                                 referencePageDesignSpecEntries[page.id],
+                              pageDesignSpecEntries:
+                                referencePagePageDesignSpecEntries[page.id],
                               projectConfigBindings:
                                 page.runtimeType === "prototype-html-css"
                                   ? extractPrototypeConfigBindingKeys(
@@ -10259,6 +10525,10 @@ ${context.details}
                               setDesignSpecFocus({ docId, entryId });
                               setPreviewMode("document");
                             }}
+                            configDefinitionFocus={configDefinitionFocus}
+                            onConfigDefinitionFocusConsumed={() =>
+                              setConfigDefinitionFocus(null)
+                            }
                           />
                         </TabsContent>
                       )}

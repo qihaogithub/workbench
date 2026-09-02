@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { WidgetProps } from '@rjsf/utils';
-import { Upload, Repeat, Trash2, Loader2, AlertTriangle, FileArchive, Play, Video, Image as ImageIcon } from 'lucide-react';
+import { Upload, Repeat, Trash2, Loader2, AlertTriangle, FileArchive, Play, Video, Music2, Image as ImageIcon } from 'lucide-react';
 import { cn } from './utils';
 import { resolveConfigImageSrc } from './preview-config-utils';
 import {
@@ -99,7 +99,7 @@ export function ColorPickerWidget(props: WidgetProps) {
 
 export interface FileUploadWidgetOptions {
   accept?: string;
-  mediaType?: "image" | "video";
+  mediaType?: "image" | "video" | "audio";
   assetKind?: "spine";
   /** Page field identity lets the server atomically attach a committed Spine ref. */
   pageId?: string;
@@ -207,6 +207,7 @@ function getUploadedUrl(payload: UploadResponsePayload | null): string | null {
 
 const DEFAULT_IMAGE_FILE_MAX_SIZE = 50 * 1024 * 1024;
 const DEFAULT_VIDEO_FILE_MAX_SIZE = 200 * 1024 * 1024;
+const DEFAULT_AUDIO_FILE_MAX_SIZE = 1 * 1024 * 1024;
 
 export interface FileUploadWidgetProps {
   id?: string;
@@ -257,11 +258,24 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
   } | null>(null);
 
   const isVideo = rawOptions.mediaType === 'video';
+  const isAudio = rawOptions.mediaType === 'audio'
+    || rawOptions.accept?.split(',').some((token) => {
+      const normalized = token.trim().toLowerCase();
+      return normalized.startsWith('audio/') || normalized.endsWith('.mp3');
+    }) === true;
   const isSpine = rawOptions.assetKind === 'spine';
   // Finder does not consistently honor compound extensions such as `.zip.flutter`.
   // Spine validates after selection and on the server, so leave this picker unrestricted.
-  const accept = isSpine ? undefined : rawOptions.accept || 'image/*';
-  const maxSize = rawOptions.maxSize ?? (isVideo ? DEFAULT_VIDEO_FILE_MAX_SIZE : DEFAULT_IMAGE_FILE_MAX_SIZE);
+  const accept = isSpine
+    ? undefined
+    : rawOptions.accept || (isAudio ? 'audio/*' : isVideo ? 'video/*' : 'image/*');
+  const maxSize = rawOptions.maxSize ?? (
+    isAudio
+      ? DEFAULT_AUDIO_FILE_MAX_SIZE
+      : isVideo
+        ? DEFAULT_VIDEO_FILE_MAX_SIZE
+        : DEFAULT_IMAGE_FILE_MAX_SIZE
+  );
 
   const dimensionOptions: DimensionOptions = {
     widthRule: rawOptions.widthRule,
@@ -291,7 +305,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
         return;
       }
 
-      if (hasDimensionCheck && !skipDimensionCheck && !isVideo) {
+      if (hasDimensionCheck && !skipDimensionCheck && !isVideo && !isAudio) {
         try {
           const dims = await getImageDimensions(file);
           const result = validateImageDimensions(dims, dimensionOptions);
@@ -327,7 +341,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
           const data = await parseUploadResponse(res);
 
           if (!res.ok || data?.success !== true) {
-            setError(getUploadErrorMessage(res, data, isVideo ? '视频' : '文件'));
+            setError(getUploadErrorMessage(res, data, isAudio ? '音频' : isVideo ? '视频' : '文件'));
             return;
           }
 
@@ -368,7 +382,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
         setIsUploading(false);
       }
     },
-    [sessionId, maxSize, hasDimensionCheck, dimensionOptions, value, onChange, isVideo, isSpine, rawOptions.pageId, rawOptions.configKey, rawOptions.configScope]
+    [sessionId, maxSize, hasDimensionCheck, dimensionOptions, value, onChange, isVideo, isAudio, isSpine, rawOptions.pageId, rawOptions.configKey, rawOptions.configScope]
   );
 
   const handlePosterChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -398,9 +412,13 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
         setError('请选择 Spine 素材包（.zip 或 .zip.flutter）');
         return;
       }
+      if (isAudio && (!/\.mp3$/i.test(file.name) || file.type.toLowerCase() !== 'audio/mpeg')) {
+        setError('音频仅支持 MP3 文件（MIME 类型需为 audio/mpeg）');
+        return;
+      }
       doUpload(file);
     },
-    [doUpload, isSpine]
+    [doUpload, isAudio, isSpine]
   );
 
   const handleInputChange = useCallback(
@@ -557,6 +575,24 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
                 </button>
               </div>
             </div>
+          ) : isAudio ? (
+            <div className="relative flex h-20 w-[220px] max-w-full items-center gap-3 rounded-lg border border-border bg-muted px-3 group">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-background text-muted-foreground">
+                <Music2 className="h-6 w-6" aria-hidden="true" />
+              </span>
+              <span className="flex min-w-0 flex-1 items-baseline truncate text-sm text-foreground">
+                <span className="truncate">{typeof value === 'string' ? value.split('/').pop() || 'MP3 音频' : 'MP3 音频'}</span>
+                <span className="ml-1 shrink-0 text-xs text-muted-foreground">· 已上传</span>
+              </span>
+              <div className="flex shrink-0 items-center gap-1">
+                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={disabled || isUploading} className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50" aria-label="替换音频" title="替换音频">
+                  <Repeat className="h-4 w-4" aria-hidden="true" />
+                </button>
+                <button type="button" onClick={handleClear} disabled={disabled || isUploading} className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50" aria-label="删除音频" title="删除音频">
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
           ) : (
             <div className="relative w-[80px] h-[80px] rounded-lg border border-border overflow-hidden bg-muted shrink-0 group">
               <img
@@ -596,15 +632,15 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
                 <div className="p-1.5 rounded-full bg-muted">
                   <Upload className="w-4 h-4 text-muted-foreground" />
                 </div>
-                <span className="text-xs text-muted-foreground">Upload</span>
+                <span className="text-xs text-muted-foreground">{isAudio ? '上传音频' : 'Upload'}</span>
               </div>
             )}
-            <ImageInputActions onUpload={() => fileInputRef.current?.click()} onWhiteboard={onWhiteboard} disabled={disabled || isUploading} />
+            {!isAudio && <ImageInputActions onUpload={() => fileInputRef.current?.click()} onWhiteboard={onWhiteboard} disabled={disabled || isUploading} />}
           </div>
         )}
       </div>
 
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-4xl border-border bg-black p-2 text-white sm:p-3 [&>button]:text-white [&>button]:opacity-90">

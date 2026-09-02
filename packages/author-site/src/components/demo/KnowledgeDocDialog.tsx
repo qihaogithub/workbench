@@ -31,6 +31,7 @@ import {
 } from "./MarkdownReferenceLinksPanel";
 import { navigateToMarkdownMention } from "./markdown-reference-navigation";
 import { toKnowledgeItem } from "./document-api-adapter";
+import { localizeRemoteImageForSession } from "@workbench/demo-ui/markdown/remote-image-localizer";
 
 export interface KnowledgeItem {
   id: string;
@@ -130,6 +131,13 @@ export function KnowledgeDocDialog({
     };
   }, [activeMode, documentApiMode, item, open, projectId, sessionId, workspaceId]);
   const collab = useCollabDocument(collabDescriptor, collabUser);
+  const localizeRemoteImage = useCallback(
+    async (url: string): Promise<string> => {
+      if (!sessionId) throw new Error("当前会话不可用，无法保存外网图片");
+      return localizeRemoteImageForSession(sessionId, url);
+    },
+    [sessionId],
+  );
   const referenceProvider = useMemo<MarkdownReferenceProvider>(() => {
     return async ({ query, signal }) => {
       if (!projectId) return [];
@@ -393,6 +401,7 @@ export function KnowledgeDocDialog({
               <DocumentEditor
                 value={addContent}
                 onChange={setAddContent}
+                localizeRemoteImage={sessionId ? localizeRemoteImage : undefined}
                 referenceProvider={projectId ? referenceProvider : undefined}
                 onReferenceClick={onReferenceClick}
               />
@@ -424,6 +433,7 @@ export function KnowledgeDocDialog({
                   replaceCollabText(collab.ytext, nextValue);
                 }
               }}
+              localizeRemoteImage={sessionId ? localizeRemoteImage : undefined}
               referenceContext={referenceContext}
               referenceProvider={referenceContext ? referenceProvider : undefined}
               onReferenceClick={onReferenceClick}

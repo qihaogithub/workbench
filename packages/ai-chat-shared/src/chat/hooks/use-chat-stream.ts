@@ -38,6 +38,10 @@ import {
   fetchSessionFiles,
 } from "../services/message-service";
 import {
+  deriveConversationTitle,
+  requestConversationTitle,
+} from "../services/title-service";
+import {
   buildActiveViewContextPrefix,
   type ActiveViewContext,
 } from "../../lib/active-view-context";
@@ -477,6 +481,7 @@ interface UseChatStreamOptions {
   onModelsEvent?: (event: StreamEvent) => void;
   onModelStateError?: () => void;
   selectedModelId?: string;
+  onSessionTitleChange?: (title: string) => void;
   onDiagnosticEvent?: (event: {
     name: string;
     traceId?: string;
@@ -511,6 +516,7 @@ export function useChatStream(options: UseChatStreamOptions) {
     onModelsEvent,
     onModelStateError,
     selectedModelId,
+    onSessionTitleChange,
     onDiagnosticEvent,
     beforeSend,
     externalStreamServiceRef,
@@ -559,6 +565,45 @@ export function useChatStream(options: UseChatStreamOptions) {
   const throttlePersistTimerRef = useRef<NodeJS.Timeout | null>(null);
   const currentRunSummaryRef = useRef<RunSummary | null>(null);
   const checkpointVersionRef = useRef<number | undefined>(undefined);
+  const titleGenerationKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    titleGenerationKeyRef.current = null;
+    return () => {
+      titleGenerationKeyRef.current = null;
+    };
+  }, [agentSessionId, sessionId]);
+
+  const startTitleGeneration = useCallback(
+    (userMessage: string) => {
+      const trimmedMessage = userMessage.trim();
+      if (!trimmedMessage) return;
+
+      const generationKey = `${sessionId}:${agentSessionId}:${trimmedMessage}`;
+      if (titleGenerationKeyRef.current === generationKey) return;
+      titleGenerationKeyRef.current = generationKey;
+
+      const fallbackTitle = deriveConversationTitle(trimmedMessage);
+      onSessionTitleChange?.(fallbackTitle);
+      void updateSessionTitle(sessionId, fallbackTitle);
+
+      void requestConversationTitle(
+        agentSessionId,
+        trimmedMessage,
+        selectedModelId,
+      ).then((title) => {
+        if (!title || titleGenerationKeyRef.current !== generationKey) return;
+        onSessionTitleChange?.(title);
+        void updateSessionTitle(sessionId, title);
+      });
+    },
+    [
+      agentSessionId,
+      onSessionTitleChange,
+      selectedModelId,
+      sessionId,
+    ],
+  );
 
   const throttledPersistRef = useRef<() => void>(() => {});
   throttledPersistRef.current = () => {
@@ -784,7 +829,14 @@ export function useChatStream(options: UseChatStreamOptions) {
         : null;
       const isFirstUserMessage =
         !isSystemAutoRepair &&
-        messagesRef.current.every((message) => message.role !== "user");
+        messagesRef.current.every(
+          (message) =>
+            message.role !== "user" ||
+            message.queueStatus ||
+            message.visualProperty ||
+            message.kind === "auto_repair",
+        );
+
       const autoRepairMessageId = isSystemAutoRepair
         ? startOptions.displayMessageId || createLocalId("auto-repair")
         : undefined;
@@ -889,6 +941,14 @@ export function useChatStream(options: UseChatStreamOptions) {
         } catch (error) {
           beforeSendFailed = true;
           throw error;
+        }
+
+        // 工作区同步成功、消息即将交给 StreamService 时，才为首条真实用户消息启动标题生成。
+        // 标题请求 fire-and-forget，不阻塞 WebSocket 连接和 AI 输出。
+        if (isFirstUserMessage && !isVisualProperty) {
+          // @引用消息的 content 包含供 Agent 使用的隐藏上下文；标题只使用用户实际输入文本。
+          const titleSource = runOptions?.inlineRefs?.text?.trim() || trimmedMessage;
+          startTitleGeneration(titleSource);
         }
 
         const streamService = new StreamService({ mode });
@@ -1132,14 +1192,6 @@ export function useChatStream(options: UseChatStreamOptions) {
                 sessionId,
                 updatedMessages.filter((message) => !message.queueStatus),
               );
-              if (!isSystemAutoRepair) {
-                await updateSessionTitle(
-                  sessionId,
-                  userMessage,
-                  isFirstUserMessage,
-                );
-              }
-
               const finalFiles = result.files ?? [];
 
               if (finalFiles.length > 0) {
@@ -1570,6 +1622,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       startSilenceTracking,
       stopSilenceTracking,
       completeRunAndDrain,
+      startTitleGeneration,
     ],
   );
 

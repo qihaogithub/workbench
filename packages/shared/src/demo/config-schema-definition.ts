@@ -12,6 +12,9 @@ export type ConfigDefinitionKind =
   | "images"
   | "video";
 
+/** Presentation variants for single-value enum fields. */
+export type ConfigDefinitionEnumWidget = "select" | "radio" | "segmented";
+
 export type ImageDimensionOperator = "=" | ">" | "≥" | "<" | "≤";
 
 export interface ImageDimensionRule {
@@ -29,6 +32,7 @@ export interface ConfigDefinitionDraft {
   group?: string;
   category?: string;
   enum?: unknown[];
+  enumWidget?: ConfigDefinitionEnumWidget;
   accept?: string;
   maxSize?: number;
   widthRule?: ImageDimensionRule;
@@ -126,6 +130,9 @@ function propertyFromDraft(draft: ConfigDefinitionDraft): SchemaRecord {
       property.type = "string";
       if (!Array.isArray(draft.enum) || draft.enum.length === 0) throw new Error(`枚举字段 ${key} 至少需要一个选项`);
       property.enum = draft.enum;
+      if (draft.enumWidget === "radio" || draft.enumWidget === "segmented") {
+        property["ui:widget"] = draft.enumWidget;
+      }
       break;
     case "color": property.type = "string"; property.format = "color"; break;
     case "textarea": property.type = "string"; property["ui:widget"] = "textarea"; break;
@@ -181,6 +188,11 @@ function draftFromProperty(key: string, property: SchemaRecord, required: boolea
     required, group: typeof options.group === "string" ? options.group : undefined,
     category: typeof options.category === "string" ? options.category : undefined,
     enum: Array.isArray(property.enum) ? property.enum : undefined,
+    enumWidget: kind === "enum"
+      ? property["ui:widget"] === "radio" || property["ui:widget"] === "segmented"
+        ? property["ui:widget"]
+        : "select"
+      : undefined,
     accept: typeof options.accept === "string" ? options.accept : undefined,
     maxSize: typeof options.maxSize === "number" ? options.maxSize : undefined,
     widthRule: dimensionRule(options.widthRule, "宽度规则"),
@@ -230,6 +242,13 @@ function applyMetadataPatch(
       throw new Error(`枚举字段 ${next.key} 至少需要一个选项`);
     }
     property.enum = next.enum;
+  }
+  if (next.kind === "enum" && changed("enumWidget")) {
+    if (next.enumWidget === "radio" || next.enumWidget === "segmented") {
+      property["ui:widget"] = next.enumWidget;
+    } else if (property["ui:widget"] === "radio" || property["ui:widget"] === "segmented") {
+      delete property["ui:widget"];
+    }
   }
 
   const options = record(property["ui:options"]);

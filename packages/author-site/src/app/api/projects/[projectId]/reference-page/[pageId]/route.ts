@@ -192,7 +192,7 @@ export async function GET(
       .filter((doc): doc is NonNullable<typeof doc> => doc !== null);
     const designSpecEntries = designSpecs.flatMap((doc) =>
       doc.entries.flatMap((entry) =>
-        (entry.refs ?? [])
+        (entry.target.type === "config" ? entry.target.refs : [])
           .filter((ref) => ref.scope === "project" || ref.pageId === sourcePageId)
           .map((ref) => ({
             docId: doc.id,
@@ -204,6 +204,20 @@ export async function GET(
             ...(ref.scope === "page" ? { pageId } : {}),
             fieldKey: ref.fieldKey,
           })),
+      ),
+    );
+    const pageDesignSpecEntries = designSpecs.flatMap((doc) =>
+      doc.entries.flatMap((entry) =>
+        entry.target.type === "page" && entry.target.pageIds.includes(sourcePageId)
+          ? [{
+              docId: doc.id,
+              docTitle: doc.title,
+              entryId: entry.id,
+              entryTitle: entry.title,
+              markdown: entry.markdown ?? "",
+              pageId,
+            }]
+          : [],
       ),
     );
 
@@ -230,6 +244,7 @@ export async function GET(
         requirements: readFileIfExists(path.join(demoDir, "requirements.md")),
         designSpecs,
         designSpecEntries,
+        pageDesignSpecEntries,
       }),
     );
   } catch (error) {

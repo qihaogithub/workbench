@@ -19,6 +19,7 @@ import { ImageListWidget, type ImageItem } from "./ImageListWidget";
 import { ArrayFieldGroup } from "./ArrayFieldGroup";
 import { MultiSelect } from "./MultiSelect";
 import { CascadeSelect } from "./CascadeSelect";
+import { OptionGroup } from "./OptionGroup";
 import type { FieldConfig } from "./schema-parser";
 import { createContext, useContext, useMemo } from "react";
 import { Check, Edit3, FileText, Pencil } from "lucide-react";
@@ -37,6 +38,7 @@ import {
 } from "./DocumentEditor";
 import type { ConfigChangeMeta, DesignSpecEntryLink, ImageConfigScope, WhiteboardLauncher } from "./types";
 import { ImageInputActions } from "./ImageInputActions";
+import { localizeRemoteImageForSession } from "./markdown/remote-image-localizer";
 
 export interface PositionFieldEntry {
   instanceId: string;
@@ -69,6 +71,14 @@ function mergeSpinePackageAccept(value: unknown): string {
   return configured.includes(".zip.flutter")
     ? configured
     : [configured, SPINE_PACKAGE_ACCEPT].filter(Boolean).join(",");
+}
+
+function acceptsAudio(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  return value.split(",").some((token) => {
+    const normalized = token.trim().toLowerCase();
+    return normalized.startsWith("audio/") || normalized.endsWith(".mp3");
+  });
 }
 
 function normalizeImageDefaults(raw: unknown): ImageItem[] | undefined {
@@ -113,7 +123,7 @@ export function FieldRenderer({
   readonly?: boolean;
   designSpecEntries?: DesignSpecEntryLink[];
   onEditDesignSpec?: (docId: string, entryId: string) => void;
-  onOpenDesignSpec?: (spec: DesignSpecEntryLink, fieldTitle: string, anchor?: { top: number; bottom: number }) => void;
+  onOpenDesignSpec?: (spec: DesignSpecEntryLink, fieldTitle: string, anchor?: { top: number; bottom: number }, trigger?: HTMLElement | null) => void;
   onEditConfigDefinition?: (fieldKey: string, field: FieldConfig) => void;
   embedded?: boolean;
   fieldPath?: string;
@@ -172,7 +182,14 @@ export function FieldRenderer({
           label={field.title}
           required={field.required}
           sessionId={sessionId}
-          options={{ ...(field.uiOptions as any), ...(field.format === "video" ? { mediaType: "video", accept: field.uiOptions?.accept || "video/mp4,video/webm" } : {}) }}
+          options={{
+            ...(field.uiOptions as any),
+            ...(field.format === "video"
+              ? { mediaType: "video", accept: field.uiOptions?.accept || "video/mp4,video/webm" }
+              : acceptsAudio(field.uiOptions?.accept)
+                ? { mediaType: "audio" }
+                : {}),
+          }}
           defaultValue={
             field.format === "video"
               ? (effectiveDefault as any)
@@ -214,7 +231,10 @@ export function FieldRenderer({
           maxItems={maxItems}
           title={field.title}
           sessionId={sessionId}
-          options={field.uiOptions as any}
+          options={{
+            ...(field.uiOptions as any),
+            ...(acceptsAudio(field.uiOptions?.accept) ? { mediaType: "audio" } : {}),
+          }}
           defaultValue={normalizeImageDefaults(effectiveDefault)}
           renderItemActions={
             !readonly && onLaunchWhiteboard && fieldPath
@@ -255,6 +275,37 @@ export function FieldRenderer({
       );
     }
 
+    if ((field.uiWidget === "radio" || field.uiWidget === "segmented") && field.enum && field.enum.length > 0) {
+      const currentValue = value !== undefined && value !== null
+        ? value
+        : effectiveDefault !== undefined && effectiveDefault !== null
+          ? effectiveDefault
+          : field.enum[0];
+      const currentIndex = field.enum.findIndex((item) => Object.is(item, currentValue));
+      const options = field.enum.map((item, index) => ({
+        // Indexes keep the DOM value stable even when an enum contains numbers.
+        value: String(index),
+        label: field.enumNames?.[index] ?? String(item),
+      }));
+
+      return (
+        <OptionGroup
+          variant={field.uiWidget}
+          options={options}
+          value={currentIndex >= 0 ? String(currentIndex) : undefined}
+          onChange={(nextIndex) => {
+            const index = Number(nextIndex);
+            if (Number.isInteger(index) && index >= 0 && index < field.enum!.length) {
+              onChange(field.enum![index]);
+            }
+          }}
+          name={`config-${fieldPath ?? field.key}`}
+          ariaLabel={field.title || "单选项"}
+          disabled={readonly}
+        />
+      );
+    }
+
     if (field.format === "image" || field.format === "file") {
       const upload = (
         <FileUploadWidget
@@ -276,7 +327,7 @@ export function FieldRenderer({
 
     if (field.format === "color" || field.type === "color") {
       return (
-        <div className="ml-auto flex h-7 w-20 items-center gap-1 rounded-lg bg-black/40 px-1.5 py-1">
+        <div className="ml-auto flex h-7 w-full min-w-[132px] max-w-[180px] items-center gap-1 overflow-hidden rounded-lg bg-black/40 px-1.5 py-1">
           <span className="flex size-4 shrink-0 items-center justify-center overflow-hidden rounded-[4px]">
             <input
               type="color"
@@ -291,7 +342,7 @@ export function FieldRenderer({
             onChange={(e) => onChange(e.target.value)}
             placeholder="#000000"
             aria-label={`${field.title}色值`}
-            className="h-full min-w-0 flex-1 border-0 bg-transparent p-0 font-mono text-sm text-foreground shadow-none focus-visible:ring-0"
+            className="h-full min-w-0 flex-1 truncate border-0 bg-transparent p-0 font-mono text-sm text-foreground shadow-none focus-visible:ring-0"
           />
         </div>
       );
@@ -482,6 +533,7 @@ export function FieldRenderer({
           value={value}
           onChange={onChange}
           field={field}
+          sessionId={sessionId}
           readonly={readonly}
           referenceContext={referenceContext}
           referenceProvider={referenceProvider}
@@ -590,12 +642,12 @@ export function FieldRenderer({
                   onClick={(event) => {
                     const rect = event.currentTarget.getBoundingClientRect();
                     if (rect.width || rect.height) {
-                      onOpenDesignSpec(linkedSpecs[0], field.title, { top: rect.top, bottom: rect.bottom });
+                      onOpenDesignSpec(linkedSpecs[0], field.title, { top: rect.top, bottom: rect.bottom }, event.currentTarget);
                     } else {
-                      onOpenDesignSpec(linkedSpecs[0], field.title);
+                      onOpenDesignSpec(linkedSpecs[0], field.title, undefined, event.currentTarget);
                     }
                   }}
-                  className="inline-flex shrink-0 items-center gap-1 rounded-full bg-foreground/[0.08] px-1.5 py-0.5 text-[11px] font-medium text-foreground/55 transition-colors hover:bg-foreground/[0.14] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full bg-blue-600 px-1.5 py-0.5 text-[11px] font-medium text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                   aria-label={`查看设计规范：${field.title}`}
                 >
                   <FileText className="h-3 w-3" />规范
@@ -757,6 +809,7 @@ function RichTextInput({
   value,
   onChange,
   field,
+  sessionId,
   readonly,
   referenceContext,
   referenceProvider,
@@ -767,6 +820,7 @@ function RichTextInput({
   value: unknown;
   onChange: (value: unknown) => void;
   field: FieldConfig;
+  sessionId?: string;
   readonly?: boolean;
   referenceContext?: MarkdownReferenceContext;
   referenceProvider?: MarkdownReferenceProvider;
@@ -775,6 +829,9 @@ function RichTextInput({
   pageId?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const localizeRemoteImage = sessionId
+    ? (url: string) => localizeRemoteImageForSession(sessionId, url)
+    : undefined;
   const richTextReferenceContext = referenceContext && scope
     ? {
         ...referenceContext,
@@ -811,6 +868,7 @@ function RichTextInput({
               value={(value as string) || ""}
               onChange={(v) => onChange(v)}
               readOnly={readonly}
+              localizeRemoteImage={localizeRemoteImage}
               referenceContext={richTextReferenceContext}
               referenceProvider={referenceProvider}
               onReferenceClick={onReferenceClick}

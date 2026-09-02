@@ -68,6 +68,7 @@ import {
 } from "./preview-resource-cache";
 import { cn } from "./utils";
 import { extractHtmlImportFromClipboard } from "./html-import-clipboard";
+import { localizeRemoteImageForSession } from "./markdown/remote-image-localizer";
 import {
   buildNavigationConnectorRoute,
   toRoundedNavigationPath,
@@ -775,6 +776,13 @@ export function PreviewCanvas({
     interactionMode ?? (editable ? "editor" : "readonly");
   const isEditorMode = resolvedInteractionMode === "editor";
   const canInteractWithViewport = resolvedInteractionMode !== "readonly";
+  const localizeRemoteImage = useMemo(
+    () =>
+      isEditorMode && sessionId
+        ? (url: string) => localizeRemoteImageForSession(sessionId, url)
+        : undefined,
+    [isEditorMode, sessionId],
+  );
   const [internalState, setInternalState] = useState<CanvasState>({
     viewport: { x: 40, y: 40, zoom: 0.5 },
     pages: computeInitialCanvasLayout(pages),
@@ -4930,6 +4938,7 @@ export function PreviewCanvas({
                     )
                   }
                   placeholder="文档标题"
+                  localizeRemoteImage={localizeRemoteImage}
                 />
               </Suspense>
             </div>

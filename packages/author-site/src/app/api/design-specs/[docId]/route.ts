@@ -11,6 +11,7 @@ import {
   isSafeDocId,
   normalizeEntry,
   readDesignSpecDoc,
+  readDesignSpecDocRawContent,
   readDesignSpecManifest,
   saveDesignSpecDoc,
 } from "@/lib/design-specs";
@@ -88,7 +89,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       updatedAt: new Date().toISOString(),
       autoManagedPageId: existing.autoManagedPageId,
       entries: Array.isArray(inputDoc.entries)
-        ? inputDoc.entries.map((e: unknown) => normalizeEntry(e as never))
+        ? inputDoc.entries.map((e: unknown) =>
+            normalizeEntry(e as never, existing.autoManagedPageId),
+          )
         : existing.entries,
     };
 
@@ -100,7 +103,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
           type: "put_text",
           path: "design-spec/spec-" + docId + ".json",
           content: docContent,
-          expectedHash: hashText(JSON.stringify(existing, null, 2)),
+          expectedHash: hashText(
+            readDesignSpecDocRawContent(workingDir, docId)
+              ?? JSON.stringify(existing, null, 2),
+          ),
         },
         {
           type: "put_text",
@@ -155,7 +161,10 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
         {
           type: "delete_path",
           path: docPath,
-          expectedHash: hashText(JSON.stringify(existing, null, 2)),
+          expectedHash: hashText(
+            readDesignSpecDocRawContent(workingDir, docId)
+              ?? JSON.stringify(existing, null, 2),
+          ),
         },
         {
           type: "put_text",

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DocumentView } from "./DocumentView";
 
@@ -9,8 +9,23 @@ jest.mock("@/components/ui/toast-provider", () => ({
 }));
 
 jest.mock("@workbench/demo-ui/DocumentEditor", () => ({
-  DocumentEditor: ({ value }: { value: string }) => (
-    <div data-testid="document-editor">{value}</div>
+  DocumentEditor: ({
+    value,
+    onChange,
+  }: {
+    value: string;
+    onChange?: (value: string) => void;
+  }) => (
+    <div data-testid="document-editor">
+      <span data-testid="document-editor-value">{value}</span>
+      {onChange && (
+        <button
+          type="button"
+          data-testid="document-editor-edit"
+          onClick={() => onChange(`${value}!`)}
+        />
+      )}
+    </div>
   ),
 }));
 
@@ -24,6 +39,7 @@ function jsonResponse(data: unknown, ok = true) {
 
 describe("DocumentView knowledge creation", () => {
   beforeEach(() => {
+    jest.useRealTimers();
     toast.mockClear();
     global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -72,6 +88,79 @@ describe("DocumentView knowledge creation", () => {
       }
       return jsonResponse({ success: false }, false);
     }) as jest.Mock;
+  });
+
+  it("自动保存完成后不会用列表刷新覆盖当前编辑内容", async () => {
+    jest.useFakeTimers();
+    global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith("/api/knowledge?") && !init?.method) {
+        return jsonResponse({
+          success: true,
+          data: [{
+            id: "kb-existing",
+            title: "项目说明",
+            source: "user",
+            description: "项目说明",
+            fileName: "项目说明.md",
+            addedAt: "2026-08-12T00:00:00.000Z",
+            updatedAt: "2026-08-12T00:00:00.000Z",
+            sizeBytes: 0,
+          }],
+        });
+      }
+      if (url.startsWith("/api/knowledge/content")) {
+        return jsonResponse({ success: true, data: { content: "# 原文" } });
+      }
+      if (url.includes("/api/knowledge/kb-existing") && init?.method === "PUT") {
+        const body = JSON.parse(String(init.body));
+        return jsonResponse({
+          success: true,
+          data: {
+            id: "kb-existing",
+            title: "项目说明",
+            source: "user",
+            description: "项目说明",
+            fileName: "项目说明.md",
+            addedAt: "2026-08-12T00:00:00.000Z",
+            updatedAt: "2026-09-01T00:00:00.000Z",
+            sizeBytes: body.content.length,
+          },
+        });
+      }
+      if (url.includes("workspace/files?include=conventions") || url.startsWith("/api/design-specs")) {
+        return jsonResponse({ success: true, data: [] });
+      }
+      return jsonResponse({ success: false }, false);
+    }) as jest.Mock;
+
+    render(
+      <DocumentView
+        workingDir="/workspace"
+        projectId="project-1"
+        sessionId="session-1"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("document-editor-value")).toHaveTextContent("# 原文");
+    });
+    fireEvent.click(screen.getByTestId("document-editor-edit"));
+    expect(screen.getByTestId("document-editor-value")).toHaveTextContent("# 原文!");
+
+    act(() => {
+      jest.advanceTimersByTime(800);
+    });
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/api/knowledge/kb-existing?"),
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify({ content: "# 原文!" }),
+        }),
+      );
+    });
+    expect(screen.getByTestId("document-editor-value")).toHaveTextContent("# 原文!");
   });
 
   it("does not show or load chat attachments in the document view", async () => {

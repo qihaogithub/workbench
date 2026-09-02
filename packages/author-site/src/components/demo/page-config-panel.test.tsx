@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import {
   ConfigForm,
@@ -402,7 +402,7 @@ describe("PageConfigPanel", () => {
 
   });
 
-  it("字段名称打开单项编辑器，新增入口不再打开集合管理器", () => {
+  it("字段名称打开单项编辑器，新增入口不再打开集合管理器", async () => {
     const onPageDefinitionChange = jest.fn();
     render(
       <TooltipProvider>
@@ -421,11 +421,106 @@ describe("PageConfigPanel", () => {
     expect(screen.queryByText("管理配置项")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("名称"), { target: { value: "页面标题" } });
     fireEvent.click(screen.getByRole("button", { name: "保存字段" }));
-    expect(onPageDefinitionChange).toHaveBeenCalledWith("page_a", expect.objectContaining({ diff: expect.objectContaining({ updated: ["title"] }) }));
+    await waitFor(() => expect(onPageDefinitionChange).toHaveBeenCalledWith("page_a", expect.objectContaining({ diff: expect.objectContaining({ updated: ["title"] }) })));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByRole("button", { name: "更多配置操作" }));
     fireEvent.click(screen.getByRole("button", { name: "添加配置项" }));
     expect(screen.getByRole("dialog")).toHaveTextContent("添加配置项");
+  });
+
+  it("等待异步字段定义保存完成，失败时保留编辑对话框", async () => {
+    let resolveSave: (() => void) | undefined;
+    const onPageDefinitionChange = jest.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+    render(
+      <TooltipProvider>
+        <PageConfigPanel
+          pages={[{ id: "page_a", name: "页面 A", order: 0, schema: pageSchema, configData: {} }]}
+          activePageId="page_a"
+          detailPageId="page_a"
+          hideDetailHeader
+          onPageDefinitionChange={onPageDefinitionChange}
+        />
+      </TooltipProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "编辑配置项：标题" }));
+    fireEvent.click(screen.getByRole("button", { name: "保存字段" }));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "保存中…" })).toBeDisabled();
+    expect(onPageDefinitionChange).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveSave?.();
+    });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("字段定义异步保存失败时不关闭对话框", async () => {
+    const onPageDefinitionChange = jest.fn(async () => {
+      throw new Error("保存失败");
+    });
+    render(
+      <TooltipProvider>
+        <PageConfigPanel
+          pages={[{ id: "page_a", name: "页面 A", order: 0, schema: pageSchema, configData: {} }]}
+          activePageId="page_a"
+          detailPageId="page_a"
+          hideDetailHeader
+          onPageDefinitionChange={onPageDefinitionChange}
+        />
+      </TooltipProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "编辑配置项：标题" }));
+    fireEvent.click(screen.getByRole("button", { name: "保存字段" }));
+
+    await waitFor(() => expect(onPageDefinitionChange).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "保存字段" })).not.toBeDisabled();
+  });
+
+  it("消费外部配置焦点并打开对应字段定义编辑器", () => {
+    const onConsumed = jest.fn();
+    render(
+      <TooltipProvider>
+        <PageConfigPanel
+          pages={[{ id: "page_a", name: "页面 A", order: 0, schema: pageSchema, configData: {} }]}
+          activePageId="page_a"
+          detailPageId="page_a"
+          hideDetailHeader
+          onPageDefinitionChange={jest.fn()}
+          configDefinitionFocus={{ scope: "page", pageId: "page_a", fieldKey: "title" }}
+          onConfigDefinitionFocusConsumed={onConsumed}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByRole("dialog")).toHaveTextContent("编辑配置项");
+    expect(screen.getByLabelText("名称")).toHaveValue("标题");
+    expect(onConsumed).toHaveBeenCalledTimes(1);
+  });
+
+  it("忽略不存在的外部配置字段，不误打开新增编辑器", () => {
+    const onConsumed = jest.fn();
+    render(
+      <PageConfigPanel
+        pages={[{ id: "page_a", name: "页面 A", order: 0, schema: pageSchema, configData: {} }]}
+        activePageId="page_a"
+        detailPageId="page_a"
+        configDefinitionFocus={{ scope: "page", pageId: "page_a", fieldKey: "missing" }}
+        onConfigDefinitionFocusConsumed={onConsumed}
+      />,
+    );
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(onConsumed).toHaveBeenCalledTimes(1);
   });
 
   it("未传入配置项回调时不展示恢复与保存按钮", () => {

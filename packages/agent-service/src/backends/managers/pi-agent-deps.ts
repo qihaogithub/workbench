@@ -10,6 +10,7 @@ let NodeExecutionEnv: any;
 let InMemorySessionRepo: any;
 let getModel: any;
 let getModels: any;
+let complete: any;
 let estimateContextTokens: any;
 
 export async function loadPiAgentDeps(): Promise<void> {
@@ -25,6 +26,7 @@ export async function loadPiAgentDeps(): Promise<void> {
     const piAi = await import('@earendil-works/pi-ai');
     getModel = piAi.getModel;
     getModels = piAi.getModels;
+    complete = piAi.complete;
   }
 }
 
@@ -46,6 +48,10 @@ export function getGetModel(): any {
 
 export function getGetModels(): any {
   return getModels;
+}
+
+export function getComplete(): any {
+  return complete;
 }
 
 export function getEstimateContextTokens(): any {

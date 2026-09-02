@@ -4,6 +4,64 @@ import { describe, expect, it, vi } from "vitest";
 import { FileUploadWidget } from "./widgets";
 
 describe("FileUploadWidget", () => {
+  it("detects MP3 fields from accept, shows an audio upload affordance, and renders an audio status card", async () => {
+    const onChange = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: { url: "/api/sessions/session-1/workspace/assets/audio/abc/bgm.mp3" } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container, rerender } = render(
+      <FileUploadWidget
+        onChange={onChange}
+        sessionId="session-1"
+        options={{ accept: "audio/mpeg,.mp3" }}
+      />,
+    );
+
+    const input = container.querySelector('input[type="file"]')!;
+    expect(input).toHaveAttribute("accept", "audio/mpeg,.mp3");
+    expect(screen.getByText("上传音频")).toBeInTheDocument();
+
+    const file = new File([new Uint8Array([0x49, 0x44, 0x33])], "bgm.mp3", { type: "audio/mpeg" });
+    fireEvent.change(input, { target: { files: [file] } });
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith("/api/sessions/session-1/workspace/assets/audio/abc/bgm.mp3"));
+
+    rerender(
+      <FileUploadWidget
+        value="/api/sessions/session-1/workspace/assets/audio/abc/bgm.mp3"
+        onChange={onChange}
+        sessionId="session-1"
+        options={{ accept: "audio/mpeg,.mp3" }}
+      />,
+    );
+    expect(screen.getByText("bgm.mp3")).toBeInTheDocument();
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "替换音频" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "删除音频" })).toBeInTheDocument();
+  });
+
+  it("blocks an MP3 larger than 1MiB before sending it", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { container } = render(
+      <FileUploadWidget
+        onChange={vi.fn()}
+        sessionId="session-1"
+        options={{ accept: "audio/mpeg,.mp3" }}
+      />,
+    );
+
+    const file = new File([new Uint8Array(1024 * 1024 + 1)], "large.mp3", { type: "audio/mpeg" });
+    fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [file] } });
+
+    expect(await screen.findByText("文件大小超过 1MB 限制")).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("hides deletion for a default image and restores that default after replacement", () => {
     const onChange = vi.fn();
     const { rerender } = render(

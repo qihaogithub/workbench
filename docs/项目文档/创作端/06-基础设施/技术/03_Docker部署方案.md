@@ -11,6 +11,10 @@ covers:
   - packages/author-site/next.config.js
   - packages/viewer-site/next.config.js
   - packages/project-core/package.json
+  - packages/author-site/package.json
+  - packages/knowledge-service/package.json
+  - OPS/CLI/package.json
+  - scripts/better-sqlite3-runtime-compat.test.mjs
   - packages/prototype-core/package.json
   - scripts/docker-viewer-env-isolation.test.mjs
   - scripts/docker-orbstack-up.sh
@@ -37,7 +41,7 @@ covers:
 
 # Docker 部署方案
 
-> 更新日期：2026-08-28
+> 更新日期：2026-09-01
 > 状态：已验证可用（Pi Agent 单后端架构）
 
 ## 一、系统架构
@@ -293,6 +297,19 @@ Chromium 是否能真实启动属于截图能力诊断，不作为默认容器�
 各服务 Dockerfile 的 `pnpm install` 使用同一个 BuildKit cache mount：`id=workbench-pnpm-store,target=/pnpm/store`。首次冷构建仍需下载依赖；之后主应用镜像串行构建会复用同一份 pnpm store，避免每个服务重复从 registry 拉取同一批依赖。
 
 Builder 阶段的 workspace 安装统一使用 `pnpm install --frozen-lockfile`，这部分构建依赖必须与仓库 `pnpm-lock.yaml` 完全一致。新增或修改 workspace 依赖时，应先在仓库更新锁文件，再同步 Dockerfile 的 manifest 复制清单；禁止用 `--no-frozen-lockfile` 让 builder 临时解析新版本。
+
+#### 3.8.1 Node 24 与 SQLite 原生扩展兼容性
+
+所有会加载 SQLite 原生扩展的 workspace（`author-site`、`project-core`、`knowledge-service` 和 `OPS/CLI`）统一固定 `better-sqlite3@13.0.3`。该版本使用 Node-API，适配 Dockerfile 当前的 `node:24-bookworm-slim`；禁止将 `12.x` legacy `node::ObjectWrap` 构建产物带入 Node 24 镜像，否则进程退出阶段可能触发 `RemoveEnvironmentCleanupHook` 断言并被 Docker 重启策略反复拉起。
+
+依赖升级后必须重新生成 `pnpm-lock.yaml`，并在提交前运行：
+
+```bash
+corepack pnpm test:better-sqlite3-runtime
+corepack pnpm install --frozen-lockfile --ignore-scripts
+```
+
+部署验收除健康检查外，还要核对 `RestartCount`、`OOMKilled` 和启动日志中的 Node/Next 版本；健康检查在两次 native 崩溃之间可能短暂返回成功。
 
 根 `package.json` 的 `patchedDependencies` 也是依赖安装输入，因此所有 builder 都必须在 `pnpm install` 前复制 `patches/`。只复制 manifest 和锁文件会让 pnpm 在计算补丁摘要时失败；升级或移除补丁依赖时需同步维护该目录和根声明。
 

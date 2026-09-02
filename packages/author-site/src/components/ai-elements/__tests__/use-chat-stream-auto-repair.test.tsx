@@ -6,6 +6,7 @@ import {
   persistMessages,
   updateSessionTitle,
 } from "@workbench/ai-chat-shared/chat/services/message-service";
+import { requestConversationTitle } from "@workbench/ai-chat-shared/chat/services/title-service";
 
 const mockSendMessage = jest.fn();
 let mockHandlers: any;
@@ -14,6 +15,11 @@ jest.mock("@workbench/ai-chat-shared/chat/services/message-service", () => ({
   persistMessages: jest.fn().mockResolvedValue(undefined),
   updateSessionTitle: jest.fn().mockResolvedValue(undefined),
   fetchSessionFiles: jest.fn().mockResolvedValue(null),
+}));
+
+jest.mock("@workbench/ai-chat-shared/chat/services/title-service", () => ({
+  deriveConversationTitle: jest.fn(() => "即时标题"),
+  requestConversationTitle: jest.fn().mockResolvedValue(null),
 }));
 
 jest.mock("@workbench/ai-chat-shared/lib/active-view-context", () => ({
@@ -174,6 +180,112 @@ describe("useChatStream 自动修复发送", () => {
         undefined,
         undefined,
         { assistantMessageId: expect.any(String) },
+      );
+    });
+  });
+
+  it("首轮先保存即时标题，再异步替换为模型标题且不阻塞消息发送", async () => {
+    let resolveTitle: (title: string) => void = () => {};
+    const titlePromise = new Promise<string>((resolve) => {
+      resolveTitle = resolve;
+    });
+    (requestConversationTitle as jest.Mock).mockReturnValueOnce(titlePromise);
+
+    let messages: ChatMessage[] = [];
+    const messagesRef = { current: messages };
+    const setMessages = (
+      updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
+    ) => {
+      messages = typeof updater === "function" ? updater(messages) : updater;
+      messagesRef.current = messages;
+    };
+    const currentMessageRef = {
+      current: { role: "assistant", content: "", parts: [] } as ChatMessage,
+    };
+
+    const { result } = renderHook(() =>
+      useChatStream({
+        sessionId: "session-1",
+        agentSessionId: "agent-session-1",
+        messagesRef,
+        setMessages,
+        setIsStreaming: jest.fn(),
+        setStreamContent: jest.fn(),
+        currentMessageRef,
+        setCurrentMessage: jest.fn(),
+      }),
+    );
+
+    act(() => {
+      result.current.handleSend("请优化页面布局");
+    });
+
+    await waitFor(() => expect(mockSendMessage).toHaveBeenCalled());
+    await waitFor(() => {
+      expect(updateSessionTitle).toHaveBeenCalledWith("session-1", "即时标题");
+    });
+
+    resolveTitle("模型标题");
+    await waitFor(() => {
+      expect(updateSessionTitle).toHaveBeenCalledWith("session-1", "模型标题");
+    });
+    expect(requestConversationTitle).toHaveBeenCalledWith(
+      "agent-session-1",
+      "请优化页面布局",
+      undefined,
+    );
+  });
+
+  it("生成标题时不把引用的隐藏上下文发送给标题服务", async () => {
+    let messages: ChatMessage[] = [];
+    const messagesRef = { current: messages };
+    const setMessages = (
+      updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
+    ) => {
+      messages = typeof updater === "function" ? updater(messages) : updater;
+      messagesRef.current = messages;
+    };
+    const currentMessageRef = {
+      current: { role: "assistant", content: "", parts: [] } as ChatMessage,
+    };
+
+    const { result } = renderHook(() =>
+      useChatStream({
+        sessionId: "session-1",
+        agentSessionId: "agent-session-1",
+        messagesRef,
+        setMessages,
+        setIsStreaming: jest.fn(),
+        setStreamContent: jest.fn(),
+        currentMessageRef,
+        setCurrentMessage: jest.fn(),
+      }),
+    );
+
+    act(() => {
+      result.current.handleSend(
+        "引用上下文\n\n真实需求",
+        undefined,
+        {
+          inlineRefs: {
+            tags: [
+              {
+                type: "page",
+                label: "首页",
+                context: "隐藏页面源码和配置",
+              },
+            ],
+            text: "真实需求",
+          },
+        },
+      );
+    });
+
+    await waitFor(() => {
+      expect(requestConversationTitle).toHaveBeenCalledWith(
+        "agent-session-1",
+        "真实需求",
+        undefined,
       );
     });
   });

@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { PermissionDialog } from "@workbench/ai-chat-shared/permission-dialog";
 
 jest.mock("@workbench/demo-ui", () => ({
+  localizeRemoteImageForSession: jest.fn(),
   DocumentEditor: ({
     value,
     onChange,

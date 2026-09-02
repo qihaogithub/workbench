@@ -139,5 +139,14 @@ export {
   writeLocalChatSession,
   deleteLocalChatSession,
   deriveLocalChatTitle,
+  LOCAL_CHAT_HISTORY_TTL_MS,
   type LocalChatSession,
 } from "./chat/services/local-history-service";
+
+export {
+  CONVERSATION_TITLE_FALLBACK,
+  deriveConversationTitle,
+  deriveConversationTitleFromMessages,
+  normalizeConversationTitle,
+  requestConversationTitle,
+} from "./chat/services/title-service";

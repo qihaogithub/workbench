@@ -3,7 +3,12 @@ import type { DemoPageMeta } from "@workbench/shared";
 export type ReferencedDesignSpec = {
   id: string;
   title: string;
-  entries: Array<{ id: string; title: string; markdown: string }>;
+  entries: Array<{
+    id: string;
+    title: string;
+    markdown: string;
+    target: { type: "page"; pageIds: string[] } | { type: "config"; refs: Array<{ scope: "project" | "page"; pageId?: string; fieldKey: string }> };
+  }>;
 };
 
 export type ReferencedDesignSpecEntry = {
@@ -15,6 +20,15 @@ export type ReferencedDesignSpecEntry = {
   scope: "project" | "page";
   pageId?: string;
   fieldKey: string;
+};
+
+export type ReferencedPageDesignSpecEntry = {
+  docId: string;
+  docTitle: string;
+  entryId: string;
+  entryTitle: string;
+  markdown: string;
+  pageId: string;
 };
 
 export type CanvasPageContent = {
@@ -36,6 +50,7 @@ export type CanvasPageContent = {
   requirements?: string;
   designSpecs?: ReferencedDesignSpec[];
   designSpecEntries?: ReferencedDesignSpecEntry[];
+  pageDesignSpecEntries?: ReferencedPageDesignSpecEntry[];
 };
 
 type ApiResponse = {

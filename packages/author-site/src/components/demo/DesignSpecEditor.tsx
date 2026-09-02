@@ -1,11 +1,32 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  closestCenter,
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   ChevronDown,
   ChevronRight,
+  FileText,
   GripVertical,
   Loader2,
+  Pencil,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -22,9 +43,13 @@ import {
   formatSize,
   KIND_META,
   KindThumb,
-  pageLabel,
   refToPoolId,
 } from "./DesignSpecVisuals";
+import { localizeRemoteImageForSession } from "@workbench/demo-ui/markdown/remote-image-localizer";
+import {
+  getDesignSpecDropPosition,
+  type DesignSpecDropPosition,
+} from "./design-spec-order";
 
 interface DesignSpecEditorProps {
   docId: string;
@@ -33,6 +58,7 @@ interface DesignSpecEditorProps {
   workspaceId?: string;
   referenceProvider?: MarkdownReferenceProvider;
   onReferenceClick?: MarkdownReferenceClickHandler;
+  onEditConfigDefinition?: (target: DesignSpecRef) => void;
 }
 
 export function DesignSpecEditor({
@@ -42,8 +68,16 @@ export function DesignSpecEditor({
   workspaceId,
   referenceProvider,
   onReferenceClick,
+  onEditConfigDefinition,
 }: DesignSpecEditorProps) {
   const ws = useDesignSpecWorkspace();
+  const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
+  const [overEntryId, setOverEntryId] = useState<string | null>(null);
+  const [dropPosition, setDropPosition] = useState<DesignSpecDropPosition | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   // 选中当前设计规范文档；离开时清空
   const setActiveDocIdRef = useRef(ws.setActiveDocId);
@@ -57,6 +91,49 @@ export function DesignSpecEditor({
   useEffect(() => {
     if (focusEntryId) ws.openEntry(focusEntryId);
   }, [focusEntryId, ws.openEntry]);
+
+  const clearDragState = useCallback(() => {
+    setActiveEntryId(null);
+    setOverEntryId(null);
+    setDropPosition(null);
+  }, []);
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveEntryId(String(event.active.id));
+    setOverEntryId(null);
+    setDropPosition(null);
+  }, []);
+
+  const handleDragOver = useCallback((event: DragOverEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) {
+      setOverEntryId(null);
+      setDropPosition(null);
+      return;
+    }
+    const activeRect = active.rect.current.translated ?? active.rect.current.initial;
+    const overRect = over.rect;
+    if (!activeRect || !overRect) return;
+    setOverEntryId(String(over.id));
+    setDropPosition(getDesignSpecDropPosition(activeRect, overRect, getDragPointerY(event)));
+  }, []);
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const sourceId = String(event.active.id);
+      const targetId = event.over ? String(event.over.id) : null;
+      const activeRect = event.active.rect.current.translated ?? event.active.rect.current.initial;
+      // DragOver state can lag behind the final pointer event, so recompute the side at drop time.
+      const position =
+        (event.over && activeRect
+          ? getDesignSpecDropPosition(activeRect, event.over.rect, getDragPointerY(event))
+          : dropPosition);
+      clearDragState();
+      if (!targetId || !position || sourceId === targetId) return;
+      ws.reorderEntry(sourceId, targetId, position);
+    },
+    [clearDragState, dropPosition, ws],
+  );
 
   if (ws.loading) {
     return (
@@ -75,6 +152,9 @@ export function DesignSpecEditor({
   }
 
   const doc = ws.doc;
+  const activeEntry = activeEntryId
+    ? doc.entries.find((entry) => entry.id === activeEntryId) ?? null
+    : null;
 
   return (
     <div className="relative flex h-full min-w-0 flex-col overflow-hidden">
@@ -86,6 +166,8 @@ export function DesignSpecEditor({
         )}
         onDragOver={(e) => {
           if (readOnly) return;
+          const types = Array.from(e.dataTransfer.types);
+          if (!types.includes("text/plain")) return;
           e.preventDefault();
           e.dataTransfer.dropEffect = "copy";
         }}
@@ -94,36 +176,61 @@ export function DesignSpecEditor({
           e.preventDefault();
           const raw = e.dataTransfer.getData("text/plain");
           if (raw.startsWith("pool:")) ws.addEntryWithItem(raw.slice(5));
+          else if (raw.startsWith("page:")) ws.addEntryWithPage(raw.slice(5));
         }}
       >
         {doc.entries.length === 0 ? (
           <div className="flex flex-1 items-center justify-center rounded-lg border-2 border-dashed border-border text-center text-sm text-muted-foreground">
-            拖入配置项以创建规范
+            拖入页面或配置项以创建规范
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
-            {doc.entries.map((entry) => (
-              <EntryCard
-                key={entry.id}
-                docId={doc.id}
-                entry={entry}
-                open={ws.openIds.has(entry.id)}
-                readOnly={readOnly}
-                workspaceId={workspaceId}
-                referenceProvider={referenceProvider}
-                onReferenceClick={onReferenceClick}
-              />
-            ))}
-          </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+            onDragCancel={clearDragState}
+          >
+            <SortableContext
+              items={doc.entries.map((entry) => entry.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div data-testid="design-spec-sortable-list" className="flex flex-col gap-3">
+                {doc.entries.map((entry) => (
+                  <EntryCard
+                    key={entry.id}
+                    docId={doc.id}
+                    entry={entry}
+                    open={ws.openIds.has(entry.id)}
+                    readOnly={readOnly}
+                    workspaceId={workspaceId}
+                    referenceProvider={referenceProvider}
+                    onReferenceClick={onReferenceClick}
+                    onEditConfigDefinition={onEditConfigDefinition}
+                    isDropTarget={overEntryId === entry.id}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+            <DragOverlay dropAnimation={{ duration: 180, easing: "ease" }}>
+              {activeEntry ? <EntryCardOverlay entry={activeEntry} /> : null}
+            </DragOverlay>
+          </DndContext>
         )}
       </div>
-      {!readOnly && <button
-        className="absolute bottom-5 right-5 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-opacity hover:opacity-90"
-        title="新建条目"
-        onClick={() => ws.addEntry()}
-      >
-        <Plus className="h-5 w-5" />
-      </button>}
+      {!readOnly && (
+        <div className="absolute bottom-5 right-5 z-10">
+          <button
+            type="button"
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-opacity hover:opacity-90"
+            title="新建页面规范"
+            onClick={() => ws.addEntry()}
+          >
+            <Plus className="h-5 w-5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -136,6 +243,8 @@ function EntryCard({
   workspaceId,
   referenceProvider,
   onReferenceClick,
+  onEditConfigDefinition,
+  isDropTarget,
 }: {
   docId: string;
   entry: DesignSpecEntry;
@@ -144,26 +253,25 @@ function EntryCard({
   workspaceId?: string;
   referenceProvider?: MarkdownReferenceProvider;
   onReferenceClick?: MarkdownReferenceClickHandler;
+  onEditConfigDefinition?: (target: DesignSpecRef) => void;
+  isDropTarget: boolean;
 }) {
   const ws = useDesignSpecWorkspace();
-  const [dragover, setDragover] = useState(false);
-  const localizeRemoteImage = useCallback(
-    async (url: string): Promise<string> => {
-      if (!ws.sessionId) throw new Error("当前会话不可用，无法保存外网图片");
-      const response = await fetch(`/api/sessions/${ws.sessionId}/assets/localize`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source: { kind: "selected-image", src: url, currentSrc: url },
-        }),
-      });
-      const payload = await response.json();
-      if (!response.ok || !payload?.success || !payload?.data?.editPreviewUrl) {
-        throw new Error(payload?.error?.message || "外网图片保存失败");
-      }
-      return payload.data.editPreviewUrl;
-    },
-    [ws.sessionId],
+  const [nativeDragover, setNativeDragover] = useState(false);
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: entry.id, disabled: readOnly });
+  const localizeRemoteImage = useMemo(
+    () =>
+      !readOnly && ws.sessionId
+        ? (url: string) => localizeRemoteImageForSession(ws.sessionId!, url)
+        : undefined,
+    [readOnly, ws.sessionId],
   );
 
   const poolByRef = (ref: DesignSpecRef) => {
@@ -171,29 +279,64 @@ function EntryCard({
     return ws.pool.find((p) => p.id === id);
   };
 
-  const validRefs = entry.refs.filter((r) => poolByRef(r));
-  const staleRefs = entry.refs.filter((r) => !poolByRef(r));
-  const hasRefs = entry.refs.length > 0;
+  const configTarget = entry.target.type === "config" ? entry.target : null;
+  const isConfigSpec = configTarget !== null;
+  const refs = configTarget?.refs ?? [];
+  const validRefs = refs.filter((r) => poolByRef(r));
+  const staleRefs = refs.filter((r) => !poolByRef(r));
+  const hasRefs = refs.length > 0;
+  const pageIds = entry.target.type === "page" ? entry.target.pageIds : [];
+  const boundPages = pageIds.map((pageId) => ({
+    id: pageId,
+    name: ws.pages.find((page) => page.id === pageId)?.name ?? pageId,
+  }));
+  const bindingCount = isConfigSpec ? refs.length : pageIds.length;
+  const bindingStatus = bindingCount === 0
+    ? "待绑定"
+    : isConfigSpec
+      ? "配置项规范"
+      : "页面规范";
+
+  const isNativeDrop = (event: React.DragEvent) => {
+    return Array.from(event.dataTransfer.types).includes("text/plain");
+  };
 
   return (
     <div
-      onDragOver={(e) => {
-        if (readOnly) return;
-        e.preventDefault();
-        setDragover(true);
-      }}
-      onDragLeave={() => setDragover(false)}
-      onDrop={(e) => {
-        if (readOnly) return;
-        e.preventDefault();
-        setDragover(false);
-        const raw = e.dataTransfer.getData("text/plain");
-        if (raw.startsWith("pool:")) ws.bindRef(raw.slice(5), entry.id);
-        else if (raw.startsWith("entry:")) ws.reorderEntry(raw.slice(6), entry.id);
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
       }}
       className={cn(
-        "overflow-hidden rounded-lg border bg-card transition-colors",
-        dragover && "border-ring bg-accent/40",
+        "relative",
+        isDragging && "z-10 opacity-30",
+      )}
+    >
+      <div
+      onDragOver={(e) => {
+        if (readOnly) return;
+        if (!isNativeDrop(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+        setNativeDragover(true);
+      }}
+      onDragLeave={() => setNativeDragover(false)}
+      onDrop={(e) => {
+        if (readOnly) return;
+        if (!isNativeDrop(e)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setNativeDragover(false);
+        const raw = e.dataTransfer.getData("text/plain");
+        if (raw.startsWith("pool:")) ws.bindRef(raw.slice(5), entry.id);
+        else if (raw.startsWith("page:")) ws.bindPage(entry.id, raw.slice(5));
+      }}
+      className={cn(
+        "group overflow-hidden rounded-lg border bg-card transition-[background-color,border-color,box-shadow] duration-200",
+        nativeDragover && "border-ring bg-accent/40",
+        isDropTarget &&
+          "border-primary bg-accent/60 shadow-[0_0_0_2px_hsl(var(--primary)/0.12)]",
       )}
     >
       {/* 头部 */}
@@ -203,15 +346,12 @@ function EntryCard({
       >
         <button
           type="button"
-          draggable={!readOnly}
           aria-label={`拖动排序${entry.title}`}
           title="拖动排序"
           className="shrink-0 cursor-grab touch-none rounded p-0.5 text-muted-foreground hover:bg-accent active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
           onClick={(e) => e.stopPropagation()}
-          onDragStart={(e) => {
-            if (readOnly) return;
-            e.dataTransfer.setData("text/plain", "entry:" + entry.id);
-          }}
         >
           <GripVertical className="h-4 w-4" />
         </button>
@@ -228,10 +368,15 @@ function EntryCard({
           onChange={(e) => ws.renameEntry(entry.id, e.target.value)}
         />
         <span className="shrink-0 text-[11px] text-muted-foreground">
-          {entry.refs.length} 项配置
+          {bindingCount === 0
+            ? bindingStatus
+            : isConfigSpec
+              ? `${refs.length} 项配置`
+              : `${pageIds.length} 个页面`}
         </span>
         {!readOnly && <button
-          className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-destructive"
+          type="button"
+          className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 hover:text-destructive"
           title="删除条目"
           onClick={(e) => {
             e.stopPropagation();
@@ -246,7 +391,7 @@ function EntryCard({
       {open && (
         <div className="border-t px-3 py-3">
           {/* 已绑定的配置项表格 */}
-          {hasRefs && (
+          {isConfigSpec && hasRefs && (
             <table className="w-full border-collapse text-xs">
               <thead>
                 <tr className="text-left text-muted-foreground">
@@ -304,13 +449,32 @@ function EntryCard({
                         {formatSize(item)}
                       </td>
                       <td className="w-0 p-0 text-right">
-                        {!readOnly && <button
-                          className="hidden rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive group-hover/trow:inline-flex"
-                          title="解绑"
-                          onClick={() => ws.unbindRef(refToPoolId(ref), entry.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>}
+                        {!readOnly && <div className="flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover/trow:opacity-100 group-focus-within/trow:opacity-100">
+                          {onEditConfigDefinition && <button
+                            type="button"
+                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            title="编辑配置项"
+                            aria-label={`编辑配置项：${item.title}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onEditConfigDefinition(ref);
+                            }}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>}
+                          <button
+                            type="button"
+                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            title="解绑"
+                            aria-label={`解绑配置项：${item.title}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              ws.unbindRef(refToPoolId(ref), entry.id);
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>}
                       </td>
                     </tr>
                   );
@@ -343,8 +507,41 @@ function EntryCard({
             </table>
           )}
 
+          {/* 已绑定的页面名称 */}
+          {boundPages.length > 0 && (
+            <div className="mb-3">
+              <div className="mb-1 text-[11px] font-medium text-muted-foreground">页面</div>
+              <div className="flex flex-col gap-1">
+                {boundPages.map((page) => (
+                  <div
+                    key={page.id}
+                    aria-label={`绑定页面：${page.name}`}
+                    className="group flex items-center gap-2 rounded-md border bg-muted/20 px-2.5 py-2 text-xs"
+                  >
+                    <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1 truncate font-medium">{page.name}</span>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        title="解绑页面"
+                        aria-label={`解绑页面：${page.name}`}
+                        className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-destructive/15 hover:text-destructive"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          ws.unbindPage(page.id, entry.id);
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Markdown 说明 */}
-          <div className={cn(hasRefs && "mt-3")}>
+          <div className={cn(isConfigSpec && hasRefs && "mt-3")}>
             <div className="mb-1 flex items-center gap-1.5">
               <span className="text-[11px] font-medium text-muted-foreground">
                 说明
@@ -382,6 +579,38 @@ function EntryCard({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
+}
+
+function EntryCardOverlay({ entry }: { entry: DesignSpecEntry }) {
+  const bindingCount = entry.target.type === "config"
+    ? entry.target.refs.length
+    : entry.target.pageIds.length;
+  const bindingLabel = entry.target.type === "config" ? "项配置" : "个页面";
+
+  return (
+    <div className="w-full max-w-2xl rounded-lg border border-primary/60 bg-card/95 shadow-xl ring-2 ring-primary/15">
+      <div className="flex items-center gap-2 px-3 py-2.5">
+        <GripVertical className="h-4 w-4 shrink-0 text-primary" />
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold">{entry.title}</span>
+        <span className="shrink-0 text-[11px] text-muted-foreground">
+          {bindingCount > 0 ? `${bindingCount} ${bindingLabel}` : "待绑定"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function getDragPointerY(event: {
+  activatorEvent: Event;
+  delta: { y: number };
+}): number | undefined {
+  const activatorEvent = event.activatorEvent;
+  if ("clientY" in activatorEvent && typeof activatorEvent.clientY === "number") {
+    return activatorEvent.clientY + event.delta.y;
+  }
+  return undefined;
 }

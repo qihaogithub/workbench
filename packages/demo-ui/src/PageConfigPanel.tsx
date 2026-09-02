@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowLeft,
@@ -25,6 +25,7 @@ import type {
   MarkdownReferenceProvider,
 } from "./DocumentEditor";
 import { ConfigItemEditorDialog, type ConfigItemApplyPlanSnapshot } from "./ConfigItemEditorDialog";
+import { localizeRemoteImageForSession } from "./markdown/remote-image-localizer";
 import {
   applySchemaDefinitionCommand,
   readConfigDefinitionFields,
@@ -39,7 +40,7 @@ import {
   getSchemaFieldCountByCategory,
 } from "./config-categories";
 import { cn } from "./utils";
-import type { ConfigChangeMeta, DesignSpecEntryLink, PositionEditTarget, PositionableSizeItem, WhiteboardLauncher } from "./types";
+import type { ConfigChangeMeta, ConfigDefinitionFocus, DesignSpecEntryLink, PageDesignSpecEntryLink, PositionEditTarget, PositionableSizeItem, WhiteboardLauncher } from "./types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -56,6 +57,7 @@ import {
 } from "@/components/ui/popover";
 
 const EMPTY_DESIGN_SPEC_ENTRIES: DesignSpecEntryLink[] = [];
+const EMPTY_PAGE_DESIGN_SPEC_ENTRIES: PageDesignSpecEntryLink[] = [];
 const EMPTY_SCHEMA = '{\n  "type": "object",\n  "properties": {}\n}';
 export {
   extractCodeConfigBindingKeys,
@@ -73,6 +75,8 @@ export interface PageConfigPanelPage {
   projectConfigBindings?: string[];
   /** 页面级设计规范绑定；引用页由宿主从源项目映射后传入。 */
   designSpecEntries?: DesignSpecEntryLink[];
+  /** 页面规范绑定；仅在绑定页面的配置侧边栏顶部展示。 */
+  pageDesignSpecEntries?: PageDesignSpecEntryLink[];
 }
 
 type DefinitionEditorState = {
@@ -82,11 +86,28 @@ type DefinitionEditorState = {
   originalKey?: string;
 };
 
-type ActiveDesignSpec = {
-  spec: DesignSpecEntryLink;
-  fieldTitle: string;
-  anchor?: { top: number; bottom: number };
-};
+type ActiveDesignSpec =
+  | {
+      kind: "config";
+      spec: DesignSpecEntryLink;
+      fieldTitle: string;
+      anchor?: { top: number; bottom: number };
+    }
+  | {
+      kind: "page";
+      spec: PageDesignSpecEntryLink;
+      fieldTitle: string;
+      anchor?: { top: number; bottom: number };
+    };
+
+function isSameDesignSpec(
+  active: ActiveDesignSpec | null,
+  next: ActiveDesignSpec,
+) {
+  return active?.kind === next.kind
+    && active.spec.docId === next.spec.docId
+    && active.spec.entryId === next.spec.entryId;
+}
 
 type DesignSpecPanelBounds = {
   top: number;
@@ -110,7 +131,11 @@ function buildDefaultValueSchema(draft: ConfigDefinitionDraft) {
   if (draft.kind === "number") property.type = "number";
   else if (draft.kind === "integer") property.type = "integer";
   else if (draft.kind === "boolean") property.type = "boolean";
-  else if (draft.kind === "enum") { property.type = "string"; property.enum = draft.enum ?? []; }
+  else if (draft.kind === "enum") {
+    property.type = "string";
+    property.enum = draft.enum ?? [];
+    if (draft.enumWidget === "radio" || draft.enumWidget === "segmented") property["ui:widget"] = draft.enumWidget;
+  }
   else if (draft.kind === "color") { property.type = "string"; property.format = "color"; }
   else if (draft.kind === "image") { property.type = "string"; property.format = "image"; property["ui:options"] = { group: "", accept: draft.accept, maxSize: draft.maxSize, widthRule: draft.widthRule, heightRule: draft.heightRule }; }
   else if (draft.kind === "images") { property.type = "array"; property.items = { type: "string", format: "image" }; property["ui:options"] = { group: "", accept: draft.accept, maxSize: draft.maxSize, widthRule: draft.widthRule, heightRule: draft.heightRule }; }
@@ -132,10 +157,10 @@ export interface PageConfigPanelProps {
   onProjectConfigChange?: (data: Record<string, unknown>, meta?: ConfigChangeMeta) => void;
   onProjectSchemaChange?: (schema: string) => void;
   /** 管理器的定义变更；宿主负责应用运行值清理计划并进入协同持久化链路。 */
-  onProjectDefinitionChange?: (mutation: SchemaDefinitionMutation) => void;
+  onProjectDefinitionChange?: (mutation: SchemaDefinitionMutation) => void | Promise<void>;
   onPageConfigChange?: (pageId: string, data: Record<string, unknown>, meta?: ConfigChangeMeta) => void;
   onPageSchemaChange?: (pageId: string, schema: string) => void;
-  onPageDefinitionChange?: (pageId: string, mutation: SchemaDefinitionMutation) => void;
+  onPageDefinitionChange?: (pageId: string, mutation: SchemaDefinitionMutation) => void | Promise<void>;
   onDefinitionSendToAI?: (scope: "project" | "page", mutation: SchemaDefinitionMutation) => void;
   onDefinitionAnalyze?: (scope: "project" | "page", mutation: SchemaDefinitionMutation) => ConfigDefinitionImpactSummary;
   onSaveAsDefaults?: (pageId: string, values?: Record<string, unknown>) => void;
@@ -172,8 +197,14 @@ export interface PageConfigPanelProps {
   hideEmptyRequirements?: boolean;
   /** 已加载的设计规范绑定，用于配置字段旁的只读入口。 */
   designSpecEntries?: DesignSpecEntryLink[];
+  /** 已加载的页面规范绑定，用于当前页面配置侧边栏顶部。 */
+  pageDesignSpecEntries?: PageDesignSpecEntryLink[];
   /** 仅创作端提供：跳转到文档视图中的指定规范条目。 */
   onEditDesignSpec?: (docId: string, entryId: string) => void;
+  /** 外部请求打开指定配置字段的定义编辑器。 */
+  configDefinitionFocus?: ConfigDefinitionFocus | null;
+  /** 外部配置字段焦点已被消费。 */
+  onConfigDefinitionFocusConsumed?: () => void;
   /** 浏览端数据源地址；用于跨站访问创作端全局图床。 */
   mediaBaseUrl?: string;
   /** 创作端设计规范 API 上下文；提供后面板会按需读取绑定。 */
@@ -371,11 +402,21 @@ export function PageConfigPanel({
   requirementsPosition = "afterConfig",
   hideEmptyRequirements = false,
   designSpecEntries = EMPTY_DESIGN_SPEC_ENTRIES,
+  pageDesignSpecEntries = EMPTY_PAGE_DESIGN_SPEC_ENTRIES,
   onEditDesignSpec,
+  configDefinitionFocus,
+  onConfigDefinitionFocusConsumed,
   designSpecApiContext,
   mediaBaseUrl,
   onLaunchWhiteboard,
 }: PageConfigPanelProps) {
+  const localizeRemoteImage = useMemo(
+    () =>
+      !readonly && sessionId
+        ? (url: string) => localizeRemoteImageForSession(sessionId, url)
+        : undefined,
+    [readonly, sessionId],
+  );
   const [internalDetailPageId, setInternalDetailPageId] = useState<
     string | null
   >(null);
@@ -385,12 +426,20 @@ export function PageConfigPanel({
   const [editingRequirements, setEditingRequirements] = useState(false);
   const [requirementsDraft, setRequirementsDraft] = useState("");
   const [loadedDesignSpecEntries, setLoadedDesignSpecEntries] = useState<DesignSpecEntryLink[]>([]);
+  const [loadedPageDesignSpecEntries, setLoadedPageDesignSpecEntries] = useState<PageDesignSpecEntryLink[]>([]);
   const [definitionEditor, setDefinitionEditor] = useState<DefinitionEditorState | null>(null);
+  const [definitionSaving, setDefinitionSaving] = useState(false);
   const [activeDesignSpec, setActiveDesignSpec] = useState<ActiveDesignSpec | null>(null);
   const [designSpecPanelBounds, setDesignSpecPanelBounds] =
     useState<DesignSpecPanelBounds | null>(null);
   const configPanelRef = useRef<HTMLDivElement | null>(null);
   const designSpecPanelRef = useRef<HTMLElement | null>(null);
+  const designSpecTriggerRef = useRef<HTMLElement | null>(null);
+
+  const toggleDesignSpec = useCallback((next: ActiveDesignSpec, trigger?: HTMLElement | null) => {
+    designSpecTriggerRef.current = trigger ?? null;
+    setActiveDesignSpec((current) => isSameDesignSpec(current, next) ? null : next);
+  }, []);
 
   useEffect(() => {
     if (!designSpecApiContext?.workingDir) return;
@@ -406,23 +455,54 @@ export function PageConfigPanel({
           const res = await fetch(`/api/design-specs/${encodeURIComponent(meta.id)}?${params.toString()}`);
           const docResult = await res.json();
           const doc = docResult?.data;
-          if (!docResult?.success || !doc || !Array.isArray(doc.entries)) return [];
-          return doc.entries.flatMap((entry: { id: string; title: string; markdown?: string; refs?: Array<{ scope: "project" | "page"; pageId?: string; fieldKey: string }> }) =>
-            (entry.refs ?? []).map((ref) => ({
-              docId: doc.id,
-              docTitle: doc.title || meta.title,
-              entryId: entry.id,
-              entryTitle: entry.title,
-              markdown: entry.markdown ?? "",
-              ...ref,
-            } satisfies DesignSpecEntryLink)),
-          );
+          if (!docResult?.success || !doc || !Array.isArray(doc.entries)) return { config: [], page: [] };
+          const config: DesignSpecEntryLink[] = [];
+          const page: PageDesignSpecEntryLink[] = [];
+          for (const entry of doc.entries as Array<{
+            id: string;
+            title: string;
+            markdown?: string;
+            target?: { type?: string; refs?: Array<{ scope: "project" | "page"; pageId?: string; fieldKey: string }>; pageIds?: string[] };
+          }>) {
+            if (entry.target?.type === "config") {
+              for (const ref of entry.target.refs ?? []) {
+                config.push({
+                  docId: doc.id,
+                  docTitle: doc.title || meta.title,
+                  entryId: entry.id,
+                  entryTitle: entry.title,
+                  markdown: entry.markdown ?? "",
+                  ...ref,
+                });
+              }
+            } else if (entry.target?.type === "page") {
+              for (const pageId of entry.target.pageIds ?? []) {
+                page.push({
+                  docId: doc.id,
+                  docTitle: doc.title || meta.title,
+                  entryId: entry.id,
+                  entryTitle: entry.title,
+                  markdown: entry.markdown ?? "",
+                  pageId,
+                });
+              }
+            }
+          }
+          return { config, page };
         }));
       })
       .then((entryGroups) => {
-        if (!cancelled && Array.isArray(entryGroups)) setLoadedDesignSpecEntries(entryGroups.flat());
+        if (!cancelled && Array.isArray(entryGroups)) {
+          setLoadedDesignSpecEntries(entryGroups.flatMap((group) => group.config));
+          setLoadedPageDesignSpecEntries(entryGroups.flatMap((group) => group.page));
+        }
       })
-      .catch(() => { if (!cancelled) setLoadedDesignSpecEntries([]); });
+      .catch(() => {
+        if (!cancelled) {
+          setLoadedDesignSpecEntries([]);
+          setLoadedPageDesignSpecEntries([]);
+        }
+      });
     return () => { cancelled = true; };
   }, [designSpecApiContext?.workingDir, designSpecApiContext?.sessionId, designSpecApiContext?.projectId]);
 
@@ -434,19 +514,34 @@ export function PageConfigPanel({
   const selectedPageDesignSpecEntries = effectiveDetailPageId
     ? pages.find((page) => page.id === effectiveDetailPageId)?.designSpecEntries
     : undefined;
+  const selectedPagePageDesignSpecEntries = effectiveDetailPageId
+    ? pages.find((page) => page.id === effectiveDetailPageId)?.pageDesignSpecEntries
+    : undefined;
   const effectiveDesignSpecEntries =
     designSpecEntries.length > 0
       ? designSpecEntries
       : selectedPageDesignSpecEntries !== undefined
         ? selectedPageDesignSpecEntries
         : loadedDesignSpecEntries;
+  const effectivePageDesignSpecEntries =
+    pageDesignSpecEntries.length > 0
+      ? pageDesignSpecEntries
+      : selectedPagePageDesignSpecEntries !== undefined
+        ? selectedPagePageDesignSpecEntries
+        : loadedPageDesignSpecEntries;
   useEffect(() => {
     setActiveDesignSpec(null);
   }, [effectiveDetailPageId, configCategoryFilter]);
   useEffect(() => {
     if (!activeDesignSpec) return;
     const handlePointerDown = (event: PointerEvent) => {
-      if (!designSpecPanelRef.current?.contains(event.target as Node)) setActiveDesignSpec(null);
+      const target = event.target as Node;
+      if (
+        !designSpecPanelRef.current?.contains(target)
+        && !designSpecTriggerRef.current?.contains(target)
+      ) {
+        setActiveDesignSpec(null);
+      }
     };
     document.addEventListener("pointerdown", handlePointerDown);
     return () => document.removeEventListener("pointerdown", handlePointerDown);
@@ -526,6 +621,11 @@ export function PageConfigPanel({
     scopedPages.find((item) => item.page.id === effectiveDetailPageId) ?? null;
   const selectedPage = selectedPageConfig?.page ?? null;
   const selectedProjectConfigSchema = selectedPageConfig?.projectConfigSchema;
+  const selectedPageSpecs = selectedPage
+    ? effectivePageDesignSpecEntries.filter(
+        (entry) => entry.pageId === selectedPage.id && entry.markdown.trim(),
+      )
+    : [];
 
   const openDefinitionEditor = (scope: "page" | "project", key?: string) => {
     if (!selectedPage) return;
@@ -535,10 +635,46 @@ export function PageConfigPanel({
     const existing = key
       ? readConfigDefinitionFields(targetSchema).find((field) => field.key === key)
       : undefined;
+    if (key && !existing) return;
     setDefinitionEditor(existing
       ? { mode: "edit", scope, draft: existing, originalKey: existing.key }
       : { mode: "create", scope, draft: newConfigDefinitionDraft(targetSchema) });
   };
+
+  const consumedConfigDefinitionFocusRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!configDefinitionFocus) {
+      consumedConfigDefinitionFocusRef.current = null;
+      return;
+    }
+    const focusKey = [
+      configDefinitionFocus.scope,
+      configDefinitionFocus.pageId ?? "",
+      configDefinitionFocus.fieldKey,
+    ].join(":");
+    if (consumedConfigDefinitionFocusRef.current === focusKey || !selectedPage) {
+      return;
+    }
+    if (
+      configDefinitionFocus.scope === "page" &&
+      configDefinitionFocus.pageId !== selectedPage.id
+    ) {
+      return;
+    }
+    consumedConfigDefinitionFocusRef.current = focusKey;
+    openDefinitionEditor(
+      configDefinitionFocus.scope,
+      configDefinitionFocus.fieldKey,
+    );
+    onConfigDefinitionFocusConsumed?.();
+    // The focus request is consumed immediately; the parent clears it so a
+    // normal rerender cannot reopen the same dialog.
+  }, [
+    configDefinitionFocus,
+    selectedPage?.id,
+    selectedPage?.schema,
+    selectedProjectConfigSchema,
+  ]);
 
   const definitionImpact = useMemo<ConfigItemApplyPlanSnapshot | undefined>(() => {
     if (!definitionEditor || !selectedPage) return undefined;
@@ -558,7 +694,7 @@ export function PageConfigPanel({
     }
   }, [definitionEditor, onDefinitionAnalyze, selectedPage, selectedProjectConfigSchema]);
 
-  const saveDefinitionEditor = () => {
+  const saveDefinitionEditor = async () => {
     if (!definitionEditor || !selectedPage) return;
     const targetSchema = definitionEditor.scope === "project"
       ? selectedProjectConfigSchema || EMPTY_SCHEMA
@@ -567,11 +703,17 @@ export function PageConfigPanel({
       const mutation = applySchemaDefinitionCommand(targetSchema, definitionEditor.mode === "create"
         ? { type: "field.add", field: definitionEditor.draft }
         : { type: "field.update", key: definitionEditor.originalKey!, patch: definitionEditor.draft });
-      if (definitionEditor.scope === "project") onProjectDefinitionChange?.(mutation);
-      else onPageDefinitionChange?.(selectedPage.id, mutation);
+      setDefinitionSaving(true);
+      if (definitionEditor.scope === "project") {
+        await onProjectDefinitionChange?.(mutation);
+      } else {
+        await onPageDefinitionChange?.(selectedPage.id, mutation);
+      }
       setDefinitionEditor(null);
     } catch {
-      // The same validation error is shown in the editor's apply-plan panel.
+      // The host reports persistence failures. Keep the draft open for retry.
+    } finally {
+      setDefinitionSaving(false);
     }
   };
   const sharedAffectedPages = useMemo(
@@ -723,6 +865,7 @@ export function PageConfigPanel({
       hasRequirements);
   const configData = selectedPage.configData ?? {};
   const activeDesignSpecOptions = activeDesignSpec
+    && activeDesignSpec.kind === "config"
     ? effectiveDesignSpecEntries.filter((entry) =>
         entry.fieldKey === activeDesignSpec.spec.fieldKey &&
         entry.scope === activeDesignSpec.spec.scope &&
@@ -785,13 +928,13 @@ export function PageConfigPanel({
           <X className="h-4 w-4" />
         </button>
       </div>
-      {activeDesignSpecOptions.length > 1 && (
+      {activeDesignSpec.kind === "config" && activeDesignSpecOptions.length > 1 && (
         <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-border/80 px-3 py-2">
           {activeDesignSpecOptions.map((spec) => (
             <button
               key={`${spec.docId}:${spec.entryId}`}
               type="button"
-              onClick={() => setActiveDesignSpec({ spec, fieldTitle: activeDesignSpec.fieldTitle, anchor: activeDesignSpec.anchor })}
+              onClick={() => setActiveDesignSpec({ kind: "config", spec, fieldTitle: activeDesignSpec.fieldTitle, anchor: activeDesignSpec.anchor })}
               className={cn(
                 "max-w-[180px] shrink-0 truncate rounded-md px-2 py-1 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 spec.entryId === activeDesignSpec.spec.entryId
@@ -843,6 +986,36 @@ export function PageConfigPanel({
       {typeof document !== "undefined" && designSpecBubble && createPortal(designSpecBubble, document.body)}
       <div className={cn("min-h-0 flex-1 overflow-y-auto p-4", showConfigActions && "pb-20")}>
         <div className="flex flex-col gap-5">
+          {selectedPageSpecs.length > 0 && (
+            <section className="order-[-1] flex flex-col">
+              <div className="flex flex-col gap-1">
+                {selectedPageSpecs.map((spec) => (
+                  <button
+                    key={`${spec.docId}:${spec.entryId}:${spec.pageId}`}
+                    type="button"
+                    onPointerDown={(event) => {
+                      designSpecTriggerRef.current = event.currentTarget;
+                      event.stopPropagation();
+                    }}
+                    onClick={(event) => {
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      toggleDesignSpec({
+                        kind: "page",
+                        spec,
+                        fieldTitle: spec.entryTitle || "未命名规范",
+                        anchor: { top: rect.top, bottom: rect.bottom },
+                      }, event.currentTarget);
+                    }}
+                    className="flex min-h-10 min-w-0 items-center gap-2 rounded-lg bg-muted/45 px-2.5 py-2 text-left text-sm font-medium text-foreground/80 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label={`查看页面规范：${spec.entryTitle || "未命名规范"}`}
+                  >
+                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="truncate">{spec.entryTitle || "未命名规范"}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
           <section className="flex flex-col">
             {showSharedConfig && (
               <section className="flex flex-col gap-5">
@@ -893,7 +1066,7 @@ export function PageConfigPanel({
                     typeLimits={typeLimits}
                     designSpecEntries={effectiveDesignSpecEntries.filter((entry) => entry.scope === "project")}
                     onEditDesignSpec={onEditDesignSpec}
-                    onOpenDesignSpec={(spec, fieldTitle, anchor) => setActiveDesignSpec((current) => current?.spec.entryId === spec.entryId ? null : { spec, fieldTitle, anchor })}
+                    onOpenDesignSpec={(spec, fieldTitle, anchor, trigger) => toggleDesignSpec({ kind: "config", spec, fieldTitle, anchor }, trigger)}
                     onEditConfigDefinition={(key) => openDefinitionEditor("project", key)}
                     imageConfigScope="project"
                     referenceContext={referenceContext}
@@ -931,7 +1104,7 @@ export function PageConfigPanel({
                   onTogglePositionDimming={onTogglePositionDimming}
                   designSpecEntries={effectiveDesignSpecEntries.filter((entry) => entry.scope === "page" && entry.pageId === selectedPage.id)}
                   onEditDesignSpec={onEditDesignSpec}
-                  onOpenDesignSpec={(spec, fieldTitle, anchor) => setActiveDesignSpec((current) => current?.spec.entryId === spec.entryId ? null : { spec, fieldTitle, anchor })}
+                  onOpenDesignSpec={(spec, fieldTitle, anchor, trigger) => toggleDesignSpec({ kind: "config", spec, fieldTitle, anchor }, trigger)}
                   onEditConfigDefinition={(key) => openDefinitionEditor("page", key)}
                   imageConfigScope="page"
                   pageId={selectedPage.id}
@@ -1016,6 +1189,7 @@ export function PageConfigPanel({
                 <RichTextEditor
                   content={requirementsDraft}
                   onChange={setRequirementsDraft}
+                  localizeRemoteImage={localizeRemoteImage}
                   referenceCandidates={getReferenceCandidates(
                     selectedPage.schema,
                   )}
@@ -1126,6 +1300,7 @@ export function PageConfigPanel({
             />
           }
           readOnly={readonly}
+          busy={definitionSaving}
           onSave={definitionImpact?.kind === "ai_required" ? undefined : saveDefinitionEditor}
         />
       )}

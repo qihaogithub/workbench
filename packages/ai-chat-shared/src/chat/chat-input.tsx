@@ -297,6 +297,7 @@ interface ChatInputProps {
   agentSessionId: string;
   projectId?: string;
   onHistoryClick: () => void;
+  historyPopoverEnabled?: boolean;
   onModelChange: (modelId: string) => void;
   onDepthChange: (depth: ThinkingDepth) => void;
   currentModelId: string;
@@ -322,6 +323,7 @@ export function ChatInput({
   agentSessionId,
   projectId,
   onHistoryClick,
+  historyPopoverEnabled = false,
   onModelChange,
   onDepthChange,
   currentModelId,
@@ -577,18 +579,41 @@ export function ChatInput({
             onOpenProjectPicker={() => setProjectPickerOpen(true)}
           />
           {supportsHistory && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn(
-                "h-8 w-8",
-                isStreaming && "opacity-40 cursor-not-allowed",
-              )}
-              disabled={isStreaming}
-              onClick={onHistoryClick}
-            >
-              <History className="h-4 w-4" />
-            </Button>
+            historyPopoverEnabled ? (
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "h-8 w-8 cursor-pointer",
+                    isStreaming && "opacity-40 cursor-not-allowed",
+                  )}
+                  disabled={isStreaming}
+                  onClick={onHistoryClick}
+                  aria-label="对话历史"
+                  title="对话历史"
+                >
+                  <History className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+            ) : (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-8 w-8 cursor-pointer",
+                  isStreaming && "opacity-40 cursor-not-allowed",
+                )}
+                disabled={isStreaming}
+                onClick={onHistoryClick}
+                aria-label="对话历史"
+                title="对话历史"
+              >
+                <History className="h-4 w-4" />
+              </Button>
+            )
           )}
           <ModelSelectWithGuard
             currentModelId={currentModelId}

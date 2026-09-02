@@ -2,13 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Crepe } from "@milkdown/crepe";
-import { commandsCtx, editorViewCtx } from "@milkdown/kit/core";
+import { commandsCtx, editorViewCtx, parserCtx } from "@milkdown/kit/core";
 import {
   headingSchema,
   paragraphSchema,
   setBlockTypeCommand,
 } from "@milkdown/kit/preset/commonmark";
-import { insert, replaceAll } from "@milkdown/kit/utils";
+import { getMarkdown, insert, replaceAll } from "@milkdown/kit/utils";
 import { cn } from "./utils";
 import {
   buildCrepeConfig,
@@ -31,8 +31,10 @@ import {
   getMarkdownImagePaste,
   replaceMarkdownImageUrls,
 } from "./markdown/remote-image-paste";
+import { useMarkdownImageLightbox } from "./MarkdownImageLightbox";
 import "@milkdown/crepe/theme/common/style.css";
 import "./markdown/crepe-theme.css";
+import "./markdown-image-lightbox.css";
 
 export type DocumentUploadHandler = (
   file: File,
@@ -121,6 +123,7 @@ export function DocumentEditor({
   onCommentSelection,
   className,
 }: DocumentEditorProps) {
+  const { lightbox, openMarkdownImage } = useMarkdownImageLightbox();
   const rootRef = useRef<HTMLDivElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -130,6 +133,8 @@ export function DocumentEditor({
   const localizeRemoteImageRef = useRef(localizeRemoteImage);
   const referenceCandidatesRef = useRef(referenceCandidates);
   const lastEmittedRef = useRef(value);
+  const externalSyncRef = useRef(false);
+  const externalSyncTargetRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
   const readOnlyRef = useRef(readOnly);
   const onCommentSelectionRef = useRef(onCommentSelection);
@@ -227,6 +232,22 @@ export function DocumentEditor({
     crepe.setReadonly(readOnly);
     crepe.on((listener) => {
       listener.markdownUpdated((_ctx, markdown) => {
+        if (externalSyncRef.current) {
+          lastEmittedRef.current = markdown;
+          return;
+        }
+        if (externalSyncTargetRef.current !== null) {
+          const currentMarkdown =
+            crepeRef.current === crepe
+              ? crepe.editor.action(getMarkdown())
+              : null;
+          if (currentMarkdown === markdown) {
+            externalSyncTargetRef.current = null;
+            lastEmittedRef.current = markdown;
+            return;
+          }
+          externalSyncTargetRef.current = null;
+        }
         if (markdown === lastEmittedRef.current) return;
         lastEmittedRef.current = markdown;
         onChangeRef.current(markdown);
@@ -284,8 +305,9 @@ export function DocumentEditor({
         .then((localized) => {
           if (!mountedRef.current || crepeRef.current !== crepe) return;
           const replacements = new Map(localized);
-          const markdown = replaceMarkdownImageUrls(lastEmittedRef.current, replacements);
-          if (markdown !== lastEmittedRef.current) {
+          const currentMarkdown = crepe.editor.action(getMarkdown());
+          const markdown = replaceMarkdownImageUrls(currentMarkdown, replacements);
+          if (markdown !== currentMarkdown) {
             crepe.editor.action(replaceAll(markdown));
           }
         })
@@ -443,6 +465,11 @@ export function DocumentEditor({
 
     const handleReferenceInput = () => window.setTimeout(updateReferenceMenu, 0);
     const handleReferenceClick = (event: MouseEvent) => {
+      if (readOnlyRef.current && openMarkdownImage(event.target)) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       const anchor = (event.target as HTMLElement).closest<HTMLAnchorElement>("a[href]");
       const href = anchor?.getAttribute("href");
       if (!href?.startsWith("wb://")) return;
@@ -527,6 +554,7 @@ export function DocumentEditor({
       root.removeEventListener("click", handleReferenceClick, true);
       referenceRequestRef.current += 1;
       closeReferenceMenu();
+      externalSyncTargetRef.current = null;
       openReferenceMenuRef.current = null;
       insertReferenceCandidateRef.current = null;
       headingStyleToolbar?.destroy();
@@ -538,7 +566,7 @@ export function DocumentEditor({
     };
     // Crepe's feature graph is immutable after creation. Callback props use refs;
     // only changes that reshape the menu recreate the instance.
-  }, [placeholder, uploadsEnabled, referenceCandidateSignature, Boolean(referenceProvider), Boolean(referenceContext)]);
+  }, [placeholder, uploadsEnabled, referenceCandidateSignature, Boolean(referenceProvider), Boolean(referenceContext), openMarkdownImage]);
 
   useEffect(() => {
     crepeRef.current?.setReadonly(readOnly);
@@ -547,27 +575,62 @@ export function DocumentEditor({
   useEffect(() => {
     const crepe = crepeRef.current;
     if (!crepe || value === lastEmittedRef.current) return;
-    lastEmittedRef.current = value;
-    referenceTriggerRef.current = null;
-    referenceRequestRef.current += 1;
-    setReferenceMenu(null);
     queueMicrotask(() => {
-      if (crepeRef.current !== crepe) return;
-      crepe.editor.action(replaceAll(value));
+      if (!mountedRef.current || crepeRef.current !== crepe) return;
+      const view = crepe.editor.action((ctx) => ctx.get(editorViewCtx));
+      const currentMarkdown = crepe.editor.action(getMarkdown());
+      if (currentMarkdown === value) {
+        lastEmittedRef.current = value;
+        return;
+      }
+
+      const nextDoc = crepe.editor.action((ctx) => ctx.get(parserCtx)(value));
+      if (!nextDoc) return;
+
+      const currentDoc = view.state.doc;
+      const diffStart = currentDoc.content.findDiffStart(nextDoc.content);
+      if (diffStart === null) {
+        lastEmittedRef.current = value;
+        return;
+      }
+      const diffEnd = currentDoc.content.findDiffEnd(
+        nextDoc.content,
+        currentDoc.content.size,
+        nextDoc.content.size,
+      );
+      if (!diffEnd) return;
+
+      referenceTriggerRef.current = null;
+      referenceRequestRef.current += 1;
+      setReferenceMenu(null);
+      externalSyncRef.current = true;
+      externalSyncTargetRef.current = value;
+      try {
+        const transaction = view.state.tr
+          .replace(diffStart, diffEnd.a, nextDoc.slice(diffStart, diffEnd.b))
+          .setMeta("addToHistory", false)
+          .setMeta("document-editor-external-sync", true);
+        view.dispatch(transaction);
+        lastEmittedRef.current = value;
+      } finally {
+        externalSyncRef.current = false;
+      }
     });
   }, [value]);
 
   return (
-    <div
-      className={cn(
-        "document-editor-crepe relative",
-        scrollable ? "h-full min-h-[200px]" : "h-auto min-h-0",
-        className,
-      )}
-      data-document-editor="crepe"
-      data-readonly={readOnly}
-      data-scrollable={scrollable}
-    >
+    <>
+      <div
+        className={cn(
+          "document-editor-crepe relative",
+          readOnly && "markdown-image-previewable",
+          scrollable ? "h-full min-h-[200px]" : "h-auto min-h-0",
+          className,
+        )}
+        data-document-editor="crepe"
+        data-readonly={readOnly}
+        data-scrollable={scrollable}
+      >
       <div ref={rootRef} className="crepe h-full" />
       {referenceMenu && referenceMenu.candidates.length > 0 && (
         <div
@@ -618,6 +681,8 @@ export function DocumentEditor({
           event.target.value = "";
         }}
       />
-    </div>
+      </div>
+      {lightbox}
+    </>
   );
 }

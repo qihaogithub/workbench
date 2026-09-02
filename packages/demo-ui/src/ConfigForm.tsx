@@ -140,7 +140,7 @@ function FieldGroupSection({
   readonly?: boolean;
   designSpecEntries?: DesignSpecEntryLink[];
   onEditDesignSpec?: (docId: string, entryId: string) => void;
-  onOpenDesignSpec?: (spec: DesignSpecEntryLink, fieldTitle: string, anchor?: { top: number; bottom: number }) => void;
+  onOpenDesignSpec?: (spec: DesignSpecEntryLink, fieldTitle: string, anchor?: { top: number; bottom: number }, trigger?: HTMLElement | null) => void;
   onEditConfigDefinition?: (fieldKey: string, field: FieldConfig) => void;
   imageConfigScope?: ConfigFormProps["imageConfigScope"];
   pageId?: string;

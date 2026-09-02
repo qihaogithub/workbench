@@ -263,7 +263,12 @@ describe("AI 页面预览运行时策略", () => {
     expect(previewSdk).toContain('import("@rive-app/canvas")');
     expect(previewSdk).toContain('import("@esotericsoftware/spine-webgl")');
     expect(previewSdk).toContain('import("@esotericsoftware/spine-webgl-42")');
-    expect(previewSdk).toContain("const { src, animation, loop = true, audioEnabled = true");
+    expect(previewSdk).toContain("const { src, animation, loop = true, audioEnabled = true, fit = 'contain', alignment = 'center'");
+    expect(previewSdk).toContain("skeletonObj.getBounds(offset, size)");
+    expect(previewSdk).toContain("camera.position.x");
+    expect(previewSdk).toContain("normalizeSpineFit(spineFit) === 'none'");
+    expect(previewSdk).toContain("sceneRenderer.camera.setViewport(w, h); frameSpineCamera()");
+    expect(previewSdk).toContain("state.apply(skeletonObj);");
     expect(previewSdk).toContain("window.__WORKBENCH_SPINE_ASSET_BASE__");
     expect(previewSdk).toContain("SpinePlayer src 必须是 SpineAssetRefV1");
     expect(previewSdk).not.toContain("var skeleton = props.skeleton");

@@ -557,6 +557,43 @@ describe("cleanupOrphanWorkspaces", () => {
     ).toBe(true);
   });
 
+  it("2 小时编辑租约失效后仍保留 7 天历史窗口内的 non-live workspace", async () => {
+    const { workspaceManager } = await importModules(dataDir);
+    const workspaceId = "ws-history-retained";
+    const recentActivityAt = Date.now() - 24 * 60 * 60 * 1000;
+    writeWorkspaceWithMeta(dataDir, "user1", "proj-1", workspaceId, {
+      workspaceId,
+      scope: "session",
+      updatedAt: recentActivityAt,
+    });
+    const sessionDir = path.join(
+      dataDir,
+      "sessions",
+      "user1",
+      "proj-1",
+      "sess-history-retained",
+    );
+    fs.mkdirSync(sessionDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(sessionDir, ".session.json"),
+      JSON.stringify({
+        sessionId: "sess-history-retained",
+        workspaceId,
+        createdAt: recentActivityAt,
+        lastActivityAt: recentActivityAt,
+        expiresAt: Date.now() - 60 * 60 * 1000,
+      }),
+      "utf-8",
+    );
+
+    expect(workspaceManager.cleanupOrphanWorkspaces()).toEqual([]);
+    expect(
+      fs.existsSync(
+        path.join(dataDir, "workspaces", "user1", "proj-1", workspaceId),
+      ),
+    ).toBe(true);
+  });
+
   it("无 .workspace.json 时按 mtime 判断是否过期", async () => {
     const { workspaceManager } = await importModules(dataDir);
     const wsPath = path.join(

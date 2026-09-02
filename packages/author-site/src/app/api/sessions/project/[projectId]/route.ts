@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   createApiSuccess,
   createApiError,
-  getSessionPath,
-  sessionExists,
   getSessionsDir,
 } from "@/lib/fs-utils";
+import { cleanupExpiredSessions } from "@/lib/session-manager";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import fs from "fs";
 import path from "path";
@@ -34,6 +33,9 @@ export async function GET(
     const userId = payload.userId;
     const { projectId } = await params;
 
+    // 列表打开时先做一次当前项目的轻量历史清理，避免等待下一轮定时任务。
+    cleanupExpiredSessions(userId, projectId);
+
     const projectSessionsDir = path.join(
       getSessionsDir(),
       userId,
@@ -59,16 +61,19 @@ export async function GET(
       try {
         const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
 
-        let messageCount = 0;
         let lastMessageAt = meta.createdAt;
         const messagesPath = path.join(projectSessionsDir, dir.name, MESSAGES_FILE);
         if (fs.existsSync(messagesPath)) {
           try {
             const messages = JSON.parse(fs.readFileSync(messagesPath, "utf-8"));
             if (Array.isArray(messages)) {
-              messageCount = messages.length;
-              if (messages.length > 0 && messages[messages.length - 1].timestamp) {
-                lastMessageAt = messages[messages.length - 1].timestamp;
+              const messageTimestamps = messages
+                .map((message) =>
+                  typeof message?.timestamp === "number" ? message.timestamp : 0,
+                )
+                .filter((timestamp) => timestamp > 0);
+              if (messageTimestamps.length > 0) {
+                lastMessageAt = Math.max(...messageTimestamps);
               }
             }
           } catch {
@@ -76,24 +81,26 @@ export async function GET(
           }
         }
 
+        const lastActivityAt = Math.max(
+          typeof meta.lastActivityAt === "number" ? meta.lastActivityAt : 0,
+          typeof lastMessageAt === "number" ? lastMessageAt : 0,
+          typeof meta.createdAt === "number" ? meta.createdAt : 0,
+        );
+
         sessions.push({
           sessionId: meta.sessionId,
           demoId: meta.demoId,
           workspaceId: meta.workspaceId || null,
           title: meta.title || null,
           createdAt: meta.createdAt,
-          expiresAt: meta.expiresAt,
-          isExpired: Date.now() > meta.expiresAt,
-          messageCount,
-          lastMessageAt,
-          hasUnsavedChanges: meta.status === "editing",
+          lastActivityAt,
         });
       } catch {
         continue;
       }
     }
 
-    sessions.sort((a, b) => b.createdAt - a.createdAt);
+    sessions.sort((a, b) => b.lastActivityAt - a.lastActivityAt);
 
     return NextResponse.json(createApiSuccess(sessions));
   } catch (error) {

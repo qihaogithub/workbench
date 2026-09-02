@@ -33,6 +33,28 @@ const compactSchema = JSON.stringify({
   },
 });
 
+const optionGroupSchema = JSON.stringify({
+  type: "object",
+  properties: {
+    layout: {
+      type: "string",
+      title: "布局",
+      enum: ["list", "grid", "table"],
+      enumNames: ["列表", "网格", "表格"],
+      default: "grid",
+      "ui:widget": "segmented",
+    },
+    density: {
+      type: "string",
+      title: "密度",
+      enum: ["comfortable", "compact"],
+      enumNames: ["舒适", "紧凑"],
+      default: "comfortable",
+      "ui:widget": "radio",
+    },
+  },
+});
+
 const imageSchema = JSON.stringify({
   type: "object",
   properties: {
@@ -110,7 +132,7 @@ describe("ConfigForm configuration-definition entry", () => {
     fireEvent.click(screen.getByRole("button", { name: "编辑配置项：页面标题" }));
     expect(onEditConfigDefinition).toHaveBeenCalledWith("title", expect.anything());
     fireEvent.click(screen.getByRole("button", { name: "查看设计规范：页面标题" }));
-    expect(onOpenDesignSpec).toHaveBeenCalledWith(spec, "页面标题");
+    expect(onOpenDesignSpec).toHaveBeenCalledWith(spec, "页面标题", undefined, expect.any(HTMLElement));
   });
 
   it("没有非空设计规范时不显示规范标签", () => {
@@ -187,7 +209,40 @@ describe("ConfigForm configuration-definition entry", () => {
 
     expect(screen.getByRole("spinbutton")).toBeInTheDocument();
     expect(screen.getByRole("switch")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("#000000")).toBeInTheDocument();
+    const colorValue = screen.getByDisplayValue("#000000");
+    expect(colorValue).toBeInTheDocument();
+    expect(colorValue.parentElement?.parentElement).toHaveClass("w-full", "min-w-[132px]", "max-w-[180px]");
+  });
+
+  it("按 Schema 控件覆盖渲染枚举单选组和分段控件", () => {
+    const onChange = vi.fn();
+    render(<ConfigForm schema={optionGroupSchema} onChange={onChange} />);
+
+    expect(screen.getByRole("radiogroup", { name: "布局" })).toBeInTheDocument();
+    expect(screen.getByRole("radiogroup", { name: "密度" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "网格" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "舒适" })).toBeChecked();
+
+    fireEvent.click(screen.getByRole("radio", { name: "表格" }));
+    expect(onChange).toHaveBeenLastCalledWith({ layout: "table" }, undefined);
+  });
+
+  it("折叠数组项时上下内边距保持一致，展开后才显示内容间距", () => {
+    render(
+      <ConfigForm
+        schema={duplicatePositionArraySchema}
+        initialData={{ blanks: [{ position: { x: 100, y: 200 } }] }}
+        onChange={vi.fn()}
+      />,
+    );
+
+    const item = screen.getByRole("button", { name: "项目 1" });
+    const card = item.closest("div.min-h-9");
+    expect(card).toHaveClass("gap-0");
+    expect(card).not.toHaveClass("gap-2.5");
+
+    fireEvent.click(item);
+    expect(card).toHaveClass("gap-2.5");
   });
 
   it("将标准单图和当前图片列表项解析为无 IO 白板目标", () => {

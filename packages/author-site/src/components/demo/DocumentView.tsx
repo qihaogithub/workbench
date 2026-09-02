@@ -55,7 +55,7 @@ import {
 } from "./MarkdownReferenceLinksPanel";
 import { navigateToMarkdownMention } from "./markdown-reference-navigation";
 import { DocumentProposalReviewDialog } from "./DocumentProposalReviewDialog";
-import type { DesignSpecMeta } from "@/lib/design-specs";
+import type { DesignSpecMeta, DesignSpecRef } from "@/lib/design-specs";
 import type { UserRole } from "@/lib/user";
 import { cn } from "@/lib/utils";
 import {
@@ -63,6 +63,7 @@ import {
   isSupportedKnowledgeUpload,
 } from "./document-view-knowledge";
 import { toKnowledgeItem, toKnowledgeItems } from "./document-api-adapter";
+import { localizeRemoteImageForSession } from "@workbench/demo-ui/markdown/remote-image-localizer";
 
 export interface PageItem {
   id: string;
@@ -131,6 +132,7 @@ export interface DocumentViewProps {
   onDocHistory?: (item: KnowledgeItem) => void;
   onDocDeleted?: (item: KnowledgeItem) => void;
   designSpecFocus?: { docId: string; entryId: string } | null;
+  onEditConfigDefinition?: (target: DesignSpecRef) => void;
   onCommentTargetChange?: (target: CommentTarget | null) => void;
   onDocumentCommentSelection?: (anchor: DocumentCommentAnchor) => void;
   userRole?: UserRole | "";
@@ -149,6 +151,7 @@ export function DocumentView({
   onDocHistory,
   onDocDeleted,
   designSpecFocus,
+  onEditConfigDefinition,
   onCommentTargetChange,
   onDocumentCommentSelection,
   userRole = "",
@@ -239,23 +242,11 @@ export function DocumentView({
     contentCacheRef.current.clear();
   }, [documentApiMode, projectId, workingDir, sessionId]);
 
-  const localizeRemoteImage = useCallback(
-    async (url: string): Promise<string> => {
-      if (!sessionId) throw new Error("当前会话不可用，无法保存外网图片");
-
-      const response = await fetch(`/api/sessions/${sessionId}/assets/localize`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source: { kind: "selected-image", src: url, currentSrc: url },
-        }),
-      });
-      const payload = await response.json();
-      if (!response.ok || !payload?.success || !payload?.data?.editPreviewUrl) {
-        throw new Error(payload?.error?.message || "外网图片保存失败");
-      }
-      return payload.data.editPreviewUrl;
-    },
+  const localizeRemoteImage = useMemo(
+    () =>
+      sessionId
+        ? (url: string) => localizeRemoteImageForSession(sessionId, url)
+        : undefined,
     [sessionId],
   );
 
@@ -889,6 +880,11 @@ export function DocumentView({
   const handleUnlinkedMentionNavigate = useCallback((mention: MarkdownReferenceMention) => {
     navigateToMarkdownMention(referenceEditorContainerRef.current, content, mention);
   }, [content]);
+  const activeDocumentReadOnly = Boolean(
+    activeTarget &&
+      (activeTarget.kind === "convention" || activeTarget.kind === "pageConvention") &&
+      !canManageGovernance,
+  );
 
   return (
     <div className="flex h-full min-h-0">
@@ -1223,6 +1219,7 @@ export function DocumentView({
             workspaceId={workspaceId}
             referenceProvider={referenceProvider}
             onReferenceClick={onReferenceClick}
+            onEditConfigDefinition={onEditConfigDefinition}
           />
         ) : (
           <>
@@ -1239,11 +1236,8 @@ export function DocumentView({
                     setContent(next);
                     scheduleSave(activeTarget, next);
                   }}
-                  localizeRemoteImage={localizeRemoteImage}
-                  readOnly={
-                    (activeTarget.kind === "convention" || activeTarget.kind === "pageConvention") &&
-                    !canManageGovernance
-                  }
+                  localizeRemoteImage={activeDocumentReadOnly ? undefined : localizeRemoteImage}
+                  readOnly={activeDocumentReadOnly}
                   onCommentSelection={(selection) => onDocumentCommentSelection?.({ kind: "selection", ...selection, status: "active" })}
                   referenceContext={activeReferenceContext}
                   referenceProvider={activeReferenceContext ? referenceProvider : undefined}

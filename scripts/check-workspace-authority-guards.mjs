@@ -1286,15 +1286,22 @@ requireIncludes(
 const sessionManagerSource = read(
   "packages/author-site/src/lib/session-manager.ts",
 );
+const fsUtilsSource = read("packages/author-site/src/lib/fs-utils.ts");
 const sessionManagerTestSource = read(
   "packages/author-site/src/lib/__tests__/session-manager.test.ts",
 );
 requireMatchCountAtLeast(
   sessionManagerSource,
   /meta\.workspaceId && !isLiveWorkspace\(meta\.workspaceId\)/g,
-  3,
-  "session-manager live Workspace cleanup guard",
-  "session archive/expiration cleanup must never delete live Workspace directories",
+  1,
+  "session-manager live Workspace archive guard",
+  "session archive must never delete live Workspace directories",
+);
+requireIncludes(
+  fsUtilsSource,
+  'if (wsMeta?.scope !== "live")',
+  "session deletion live Workspace cleanup guard",
+  "session deletion must clean only non-live Workspace directories",
 );
 requireIncludes(
   sessionManagerTestSource,
@@ -1323,7 +1330,6 @@ const canonicalMaterializerSource = read(
   "packages/author-site/src/lib/canonical-materializer.ts",
 );
 const sharedWorkspaceSource = read("packages/shared/src/workspace.ts");
-const fsUtilsSource = read("packages/author-site/src/lib/fs-utils.ts");
 requireIncludes(
   sharedWorkspaceSource,
   "workspaceRevision?: WorkspaceRevision",

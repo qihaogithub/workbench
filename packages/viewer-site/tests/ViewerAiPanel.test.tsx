@@ -28,13 +28,53 @@ vi.mock("@workbench/ai-chat-shared", () => ({
     sessionId,
     externalMessages,
     onMessagesChange,
+    historyContent,
+    onSessionTitleChange,
   }: {
     sessionId: string;
     externalMessages: Array<{ id: string; role: string; content: string }>;
     onMessagesChange: (
       messages: Array<{ id: string; role: string; content: string }>,
     ) => void;
+    historyContent?: (controls: { close: () => void }) => React.ReactNode;
+    onSessionTitleChange?: (title: string) => void;
   }) => (
+    <MockAIChat
+      sessionId={sessionId}
+      externalMessages={externalMessages}
+      onMessagesChange={onMessagesChange}
+      historyContent={historyContent}
+      onSessionTitleChange={onSessionTitleChange}
+    />
+  ),
+  ToastProviderWrapper: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
+  configureAiChatShared: vi.fn(),
+  deleteLocalChatSession: vi.fn(),
+  deriveLocalChatTitle: vi.fn(() => "本次的问题"),
+  readLocalChatSessions: mocks.readLocalChatSessions,
+  writeLocalChatSession: mocks.writeLocalChatSession,
+}));
+
+function MockAIChat({
+  sessionId,
+  externalMessages,
+  onMessagesChange,
+  historyContent,
+  onSessionTitleChange,
+}: {
+  sessionId: string;
+  externalMessages: Array<{ id: string; role: string; content: string }>;
+  onMessagesChange: (
+    messages: Array<{ id: string; role: string; content: string }>,
+  ) => void;
+  historyContent?: (controls: { close: () => void }) => React.ReactNode;
+  onSessionTitleChange?: (title: string) => void;
+}) {
+  const [historyOpen, setHistoryOpen] = React.useState(false);
+
+  return (
     <div>
       <output data-testid="session-id">{sessionId}</output>
       <output data-testid="message-count">{externalMessages.length}</output>
@@ -49,17 +89,19 @@ vi.mock("@workbench/ai-chat-shared", () => ({
       >
         添加当前消息
       </button>
+      <button
+        type="button"
+        onClick={() => onSessionTitleChange?.("模型生成标题")}
+      >
+        模拟模型标题
+      </button>
+      <button type="button" onClick={() => setHistoryOpen(true)}>
+        打开历史
+      </button>
+      {historyOpen && historyContent?.({ close: () => setHistoryOpen(false) })}
     </div>
-  ),
-  ToastProviderWrapper: ({ children }: { children: React.ReactNode }) => (
-    <>{children}</>
-  ),
-  configureAiChatShared: vi.fn(),
-  deleteLocalChatSession: vi.fn(),
-  deriveLocalChatTitle: vi.fn(() => "本次的问题"),
-  readLocalChatSessions: mocks.readLocalChatSessions,
-  writeLocalChatSession: mocks.writeLocalChatSession,
-}));
+  );
+}
 
 vi.mock("@/components/ui/button", async () => {
   const ReactModule = await import("react");
@@ -143,6 +185,7 @@ describe("浏览端 AI 会话生命周期", () => {
   it("仍可从历史记录手动恢复旧对话", async () => {
     render(<ViewerAiPanel {...baseProps} open />);
 
+    fireEvent.click(screen.getByRole("button", { name: "打开历史" }));
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "恢复历史" })).not.toBeNull();
     });
@@ -152,5 +195,30 @@ describe("浏览端 AI 会话生命周期", () => {
       storedSession.sessionId,
     );
     expect(screen.getByTestId("message-count").textContent).toBe("1");
+  });
+
+  it("模型标题返回后，后续消息持久化不会覆盖模型标题", async () => {
+    render(<ViewerAiPanel {...baseProps} open />);
+
+    fireEvent.click(screen.getByRole("button", { name: "添加当前消息" }));
+    await waitFor(() => {
+      expect(mocks.writeLocalChatSession).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "本次的问题" }),
+      );
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "模拟模型标题" }));
+    await waitFor(() => {
+      expect(mocks.writeLocalChatSession).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "模型生成标题" }),
+      );
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "添加当前消息" }));
+    await waitFor(() => {
+      expect(mocks.writeLocalChatSession).toHaveBeenLastCalledWith(
+        expect.objectContaining({ title: "模型生成标题" }),
+      );
+    });
   });
 });

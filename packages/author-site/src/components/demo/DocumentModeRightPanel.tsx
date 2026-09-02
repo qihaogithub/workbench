@@ -10,7 +10,7 @@ import { DesignSpecConfigPanel } from "./DesignSpecConfigPanel";
 
 /**
  * 文档视图右侧栏：素材 + 评论 页签切换。
- * 仅当选中设计规范文档时出现「素材」页签（配置项素材池），与「评论」tab 切换。
+ * 仅当选中设计规范文档时出现「规范项」页签（页面与配置项绑定池），与「评论」tab 切换。
  */
 export function DocumentModeRightPanel({
   unresolvedCount = 0,
@@ -37,11 +37,11 @@ export function DocumentModeRightPanel({
       <TabsList className="w-full justify-start gap-2 rounded-none border-b px-2 h-12 bg-transparent">
         <TabsTrigger
           value="assets"
-          title="配置项"
+          title="规范项"
           className="gap-2 px-2 data-[state=inactive]:w-9 data-[state=inactive]:px-0"
         >
           <Layers className="h-4 w-4" />
-          {tab === "assets" && <span>配置项</span>}
+          {tab === "assets" && <span>规范项</span>}
         </TabsTrigger>
         <TabsTrigger
           value="comments"

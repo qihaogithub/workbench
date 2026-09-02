@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { cn } from './lib/utils'
 import { Button } from './ui/button'
 import { Shield, AlertTriangle, FileText, Check, X } from 'lucide-react'
-import { DocumentEditor } from '@workbench/demo-ui'
+import { DocumentEditor, localizeRemoteImageForSession } from '@workbench/demo-ui'
 import { ChatCard } from './chat-card'
 
 interface PermissionRequestData {
@@ -56,6 +56,13 @@ export function PermissionDialog({
   const initialPlan = request.toolCall.initialContent || request.toolCall.summary || ''
   const [isPlanOpen, setIsPlanOpen] = useState(false)
   const [editablePlan, setEditablePlan] = useState(initialPlan)
+  const localizeRemoteImage = useMemo(
+    () =>
+      request.sessionId
+        ? (url: string) => localizeRemoteImageForSession(request.sessionId, url)
+        : undefined,
+    [request.sessionId],
+  )
 
   if (isPlanApproval) {
     return (
@@ -109,6 +116,7 @@ export function PermissionDialog({
                   value={editablePlan}
                   onChange={setEditablePlan}
                   placeholder="编辑执行计划..."
+                  localizeRemoteImage={localizeRemoteImage}
                 />
               </div>
 

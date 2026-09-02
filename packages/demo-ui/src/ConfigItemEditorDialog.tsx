@@ -68,6 +68,12 @@ const KINDS: Array<[ConfigDefinitionKind, string]> = [
   ["enum", "枚举"], ["color", "颜色"], ["image", "单图"], ["images", "多图"], ["video", "视频"],
 ];
 
+const ENUM_WIDGETS = [
+  ["select", "下拉选择"],
+  ["radio", "单选按钮"],
+  ["segmented", "分段控件"],
+] as const;
+
 const ACCEPT_OPTIONS = [
   ["image/*", "全部图片"],
   ["image/png,image/jpeg", "PNG / JPEG"],
@@ -165,7 +171,20 @@ export function ConfigItemEditorDialog({
             </div>}
           </div>
 
-          {draft.kind === "enum" && <label className="block space-y-1.5 text-sm font-medium">枚举选项（每行一项）<Textarea value={(draft.enum ?? []).join("\n")} onChange={(event) => update({ enum: event.target.value.split("\n").map((item) => item.trim()).filter(Boolean) })} disabled={readOnly} /></label>}
+          {draft.kind === "enum" && <div className="space-y-4">
+            <label className="block space-y-1.5 text-sm font-medium">
+              枚举选项（每行一项）
+              <Textarea value={(draft.enum ?? []).join("\n")} onChange={(event) => update({ enum: event.target.value.split("\n").map((item) => item.trim()).filter(Boolean) })} disabled={readOnly} />
+            </label>
+            <label className="block space-y-1.5 text-sm font-medium">
+              展示控件
+              <Select value={draft.enumWidget ?? "select"} onValueChange={(enumWidget) => update({ enumWidget: enumWidget as NonNullable<ConfigDefinitionDraft["enumWidget"]> })} disabled={readOnly}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{ENUM_WIDGETS.map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
+              </Select>
+              <span className="block text-xs font-normal text-muted-foreground">选项较少且需要快速切换时，可使用单选按钮或分段控件。</span>
+            </label>
+          </div>}
 
           {imageField && <div className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -209,7 +228,7 @@ export function ConfigItemEditorDialog({
         <DialogFooter className="shrink-0 gap-2 border-t px-6 py-4 sm:justify-between">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>取消</Button>
           <div className="flex gap-2">
-            {onSave && <Button type="button" variant={canApply ? "outline" : "default"} onClick={onSave} disabled={busy || readOnly || plan.kind === "unsupported"}>保存字段</Button>}
+            {onSave && <Button type="button" variant={canApply ? "outline" : "default"} onClick={onSave} disabled={busy || readOnly || plan.kind === "unsupported"}>{busy ? "保存中…" : "保存字段"}</Button>}
             {canApply && <Button type="button" onClick={onApply} disabled={busy || readOnly}>{planActionLabel(plan)}</Button>}
           </div>
         </DialogFooter>

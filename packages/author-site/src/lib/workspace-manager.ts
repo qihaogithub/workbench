@@ -22,6 +22,10 @@ import {
 import type { MultiDemoFiles } from "@workbench/shared";
 import { appendServerEditorDiagnosticEvent } from "./editor-diagnostics/store";
 
+// Session 的 2 小时编辑租约不应让历史会话关联的 non-live Workspace 提前被孤儿清理。
+// 历史会话由 session-manager 按最后活动时间保留 7 天；这里使用同一窗口保护其 Workspace。
+const SESSION_HISTORY_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
 export interface CreateWorkspaceResult {
   workspaceId: string;
   workspacePath: string;
@@ -685,7 +689,8 @@ export function updateWorkspaceTimestamp(workspaceId: string): void {
 }
 
 /**
- * 收集所有活跃（未过期）session 引用的 workspaceId
+ * 收集仍在编辑租约或历史保留窗口内的 session 引用的 workspaceId。
+ * 这样 2 小时租约失效后，历史会话的 non-live Workspace 仍可恢复到 7 天保留期结束。
  */
 function collectActiveWorkspaceIds(): Set<string> {
   const ids = new Set<string>();
@@ -716,7 +721,43 @@ function collectActiveWorkspaceIds(): Set<string> {
         if (fs.existsSync(metaPath)) {
           try {
             const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
-            if (meta.workspaceId && Date.now() <= meta.expiresAt) {
+            if (!meta.workspaceId) continue;
+            const now = Date.now();
+            let lastActivityAt =
+              typeof meta.lastActivityAt === "number"
+                ? meta.lastActivityAt
+                : typeof meta.createdAt === "number"
+                  ? meta.createdAt
+                  : 0;
+            const messagesPath = path.join(
+              sessionsDir,
+              userDir.name,
+              projectDir.name,
+              sessionDir.name,
+              ".messages.json",
+            );
+            if (fs.existsSync(messagesPath)) {
+              try {
+                const messages = JSON.parse(fs.readFileSync(messagesPath, "utf-8"));
+                if (Array.isArray(messages)) {
+                  const lastMessageAt = messages.reduce(
+                    (latest, message) =>
+                      typeof message?.timestamp === "number"
+                        ? Math.max(latest, message.timestamp)
+                        : latest,
+                    0,
+                  );
+                  lastActivityAt = Math.max(lastActivityAt, lastMessageAt);
+                }
+              } catch {
+                // 损坏的消息文件不应阻断 Workspace 清理扫描。
+              }
+            }
+            const retainedByHistory =
+              lastActivityAt > 0 && now - lastActivityAt <= SESSION_HISTORY_RETENTION_MS;
+            const activeLease =
+              typeof meta.expiresAt === "number" && now <= meta.expiresAt;
+            if (retainedByHistory || activeLease) {
               ids.add(meta.workspaceId);
             }
           } catch {
