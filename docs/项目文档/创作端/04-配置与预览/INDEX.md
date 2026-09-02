@@ -1,6 +1,6 @@
 # 配置与预览模块 - 索引
 
-> 更新日期：2026-08-30
+> 更新日期：2026-09-02
 
 ## 文档列表
 
@@ -31,7 +31,7 @@
 | [11_HTML导入与隔离运行时.md](./技术/11_HTML导入与隔离运行时.md) | capability registry、presentation 统一真值、私有 draft 和 prepare/commit/cancel、Authority 原子提交、独立 origin 与短时 ticket、受控 iframe、截图指纹、发布/嵌入与脱敏诊断 |
 | [12_HTML资源Bundle与本地化.md](./技术/12_HTML资源Bundle与本地化.md) | ZIP/文件夹 bundle 安全门禁、相对资源重写、远程静态资源的显式授权本地化、内容寻址生命周期与外部 JavaScript 边界 |
 | [13_画布Section分区实现设计.md](./技术/13_画布Section分区实现设计.md) | 已实施的画布 Section：完整包裹自动收纳与越界释放、容器携带成员树整体移动、单色与填充透明度样式气泡框、页面与自由节点及 Alt/Option 复制、嵌套交互、全局渲染层级、记录级协作重放与验收覆盖 |
-| [14_配置图片白板实现设计.md](./技术/14_配置图片白板实现设计.md) | 标准图片配置的白板入口、`WhiteboardDocument` v2 与 `html-css-v1` bridge、由 `SketchEditorSurface` 统一的 Studio/Dialog 白板工作区、私有草稿、选区/安全区约束、受管 document/binding、AI draft 提案、PNG 回填与 live Authority / non-live 可恢复事务提交 |
+| [14_配置图片白板实现设计.md](./技术/14_配置图片白板实现设计.md) | 标准图片配置的白板入口、`WhiteboardDocument` v2 与 `html-css-v2` bridge、图片原始比例与 600px 默认尺寸、非破坏矩形/圆形裁剪及半透明原图预览、0–20px 浅色描边宽度控件、Studio/Dialog 浮动工具条尺寸对齐与中文诊断、原型绑定图片的 workspace URL 解析、由 `SketchEditorSurface` 统一的 Studio/Dialog 白板工作区、私有草稿、选区/安全区约束、受管 document/binding、默认值缺省回退与并发保护、内层 Esc 作用域、AI draft 提案、PNG 回填与 live Authority / non-live 可恢复事务提交 |
 
 ### 2026-06-21 补充
 
