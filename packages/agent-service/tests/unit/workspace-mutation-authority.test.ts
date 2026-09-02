@@ -127,6 +127,49 @@ describe("WorkspaceMutationAuthority", () => {
     ]));
   });
 
+  it("允许 live Workspace 原子写入页面级配置运行值", async () => {
+    const { authority, workspacePath } = createAuthority();
+    const values = JSON.stringify({ hero: "assets/whiteboards/hero.png" });
+
+    const receipt = await authority.mutate({
+      mutationId: "page-config-values",
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      baseRevision: 1,
+      actor: "author-site",
+      reason: "whiteboard_commit",
+      operations: [{ type: "put_text", path: "demos/home/config.values.json", content: values, expectedAbsent: true }],
+    });
+
+    expect(receipt.resources).toEqual([expect.objectContaining({ path: "demos/home/config.values.json", action: "created" })]);
+    expect(JSON.parse(fs.readFileSync(path.join(workspacePath, "demos", "home", "config.values.json"), "utf8"))).toEqual({ hero: "assets/whiteboards/hero.png" });
+  });
+
+  it("允许 live Workspace 原子写入白板绑定", async () => {
+    const { authority, workspacePath } = createAuthority();
+    const bindings = JSON.stringify({ bindings: [{
+      id: "wb_binding-1",
+      target: { scope: "page", pageId: "home", fieldPath: ["hero"] },
+      whiteboardId: "wb_document-1",
+      documentRevisionAtOutput: 1,
+      outputAssetHash: "0".repeat(64),
+      updatedAt: 1,
+    }] });
+
+    const receipt = await authority.mutate({
+      mutationId: "whiteboard-binding",
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      baseRevision: 1,
+      actor: "author-site",
+      reason: "whiteboard_commit",
+      operations: [{ type: "put_text", path: "whiteboards/bindings.json", content: bindings, expectedAbsent: true }],
+    });
+
+    expect(receipt.resources).toEqual([expect.objectContaining({ path: "whiteboards/bindings.json", action: "created" })]);
+    expect(JSON.parse(fs.readFileSync(path.join(workspacePath, "whiteboards", "bindings.json"), "utf8"))).toEqual(JSON.parse(bindings));
+  });
+
   it("提交 receipt 后才发布事件，Yjs-First 不再拒绝旧 hash 覆盖", async () => {
     const { authority, workspacePath } = createAuthority();
     const events: string[] = [];

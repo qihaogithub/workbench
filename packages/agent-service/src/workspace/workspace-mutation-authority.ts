@@ -895,6 +895,7 @@ export class WorkspaceMutationAuthority {
       const paths = operation.type === "move_path" ? [operation.from, operation.to] : [operation.path];
       for (const resourcePath of paths) {
         const normalized = normalizeWorkspaceResourcePath(resourcePath);
+        // Page-level config.values.json is a managed runtime resource alongside its schema.
         if (!normalized || !isManagedWorkspaceResource(normalized)) throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
         if (!(normalized in before)) before[normalized] = this.readResource(workspacePath, normalized);
       }
