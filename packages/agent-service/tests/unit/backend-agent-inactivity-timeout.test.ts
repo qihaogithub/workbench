@@ -201,6 +201,43 @@ describe("BackendAgent 超时防护", () => {
     expect(result.error?.code).toBe("MESSAGE_TIMEOUT");
   });
 
+  it("计划审批等待不消耗无进展或绝对执行预算，工具终态后恢复计时", async () => {
+    const backend = createMockBackend();
+    const agent = createAgent(backend);
+    await startAgent(agent);
+
+    const resultPromise = agent.sendMessage("执行计划");
+    agent.emit("permission_request", {
+      type: "permission_request",
+      sessionId: "test-session",
+      permissionRequest: {
+        sessionId: "test-session",
+        options: [],
+        toolCall: {
+          toolCallId: "plan-1",
+          approvalKind: "plan_approval",
+        },
+      },
+    });
+
+    expect(agent.status).toBe("awaiting_approval");
+    vi.advanceTimersByTime(10_000);
+    expect(backend.cancelPrompt).not.toHaveBeenCalled();
+
+    agent.emit("tool_call_update", {
+      type: "tool_call_update",
+      sessionId: "test-session",
+      toolCallId: "plan-1",
+      status: "failed",
+      content: "Plan approval timed out.",
+    });
+
+    expect(agent.status).toBe("processing");
+    vi.advanceTimersByTime(1_100);
+    const result = await resultPromise;
+    expect(result.error?.code).toBe("MESSAGE_TIMEOUT");
+  });
+
   it("工具已开始后遇到可重试错误，不会重放整轮", async () => {
     let streamHandler: ((event: any) => void) | undefined;
     const backend: IBackendAdapter = {

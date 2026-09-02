@@ -34,6 +34,7 @@ interface DesignSpecWorkspaceValue {
   pool: ConfigPoolItem[];
   loading: boolean;
   saving: boolean;
+  readOnly: boolean;
   dirty: boolean;
   save: () => void;
   addEntry: (title?: string) => void;
@@ -82,11 +83,13 @@ export function DesignSpecWorkspaceProvider({
   workingDir,
   sessionId,
   projectId,
+  readOnly = false,
   children,
 }: {
   workingDir?: string;
   sessionId?: string;
   projectId?: string;
+  readOnly?: boolean;
   children: ReactNode;
 }) {
   const [activeDocId, setActiveDocIdState] = useState<string | null>(null);
@@ -158,7 +161,7 @@ export function DesignSpecWorkspaceProvider({
   }, [activeDocId, qs]);
 
   const save = useCallback(async () => {
-    if (!doc) return;
+    if (!doc || readOnly) return;
     setSaving(true);
     try {
       const res = await fetch(`/api/design-specs/${doc.id}${qs}`, {
@@ -177,32 +180,34 @@ export function DesignSpecWorkspaceProvider({
     } finally {
       setSaving(false);
     }
-  }, [doc, qs]);
+  }, [doc, qs, readOnly]);
 
   const updateDoc = useCallback(
     (updater: (d: DesignSpecDoc) => DesignSpecDoc) => {
+      if (readOnly) return;
       setDoc((prev) => {
         if (!prev) return prev;
         return updater(prev);
       });
       setDirty(true);
     },
-    [],
+    [readOnly],
   );
 
   // 自动保存：脏数据出现后防抖 800ms 落盘
   const saveRef = useRef(save);
   saveRef.current = save;
   useEffect(() => {
-    if (!dirty || !doc) return;
+    if (!dirty || !doc || readOnly) return;
     const t = window.setTimeout(() => {
       void saveRef.current();
     }, 800);
     return () => window.clearTimeout(t);
-  }, [dirty, doc]);
+  }, [dirty, doc, readOnly]);
 
   const addEntry = useCallback(
     (title?: string) => {
+      if (readOnly) return;
       const finalTitle =
         title ??
         window.prompt("规范条目名称", `新规范 ${(doc?.entries.length || 0) + 1}`);
@@ -220,12 +225,13 @@ export function DesignSpecWorkspaceProvider({
         ],
       }));
     },
-    [doc, updateDoc],
+    [doc, updateDoc, readOnly],
   );
 
   /** 中栏空白区拖入配置项 → 新建条目并绑定 */
   const addEntryWithItem = useCallback(
     (itemId: string) => {
+      if (readOnly) return;
       const item = pool.find((p) => p.id === itemId);
       if (!item) return;
       updateDoc((d) => ({
@@ -243,7 +249,7 @@ export function DesignSpecWorkspaceProvider({
         ],
       }));
     },
-    [pool, updateDoc],
+    [pool, updateDoc, readOnly],
   );
 
   const deleteEntry = useCallback(
@@ -410,6 +416,7 @@ export function DesignSpecWorkspaceProvider({
       pool,
       loading,
       saving,
+      readOnly,
       dirty,
       save,
       addEntry,
@@ -447,6 +454,7 @@ export function DesignSpecWorkspaceProvider({
       pool,
       loading,
       saving,
+      readOnly,
       dirty,
       save,
       addEntry,

@@ -48,9 +48,16 @@ import {
   type ImageLocalizationOptions,
 } from "@/lib/publish/image-processor";
 import { processVideosForPublish } from "@/lib/publish/video-processor";
+import { processSpineAssetsForPublish } from "@/lib/publish/spine-processor";
 import { replacePathsInContent } from "@/lib/publish/path-replacer";
 import type { PublishContext } from "@/lib/publish/types";
 import type { DesignSpecMeta } from "@/lib/design-specs";
+import {
+  buildPublishedMarkdownReferenceSnapshot,
+  sanitizePublishedDesignSpecFiles,
+  sanitizePublishedMarkdown,
+  type PublishedMarkdownReferenceSnapshot,
+} from "@/lib/publish-markdown-references";
 
 const PUBLISHED_DIR = path.join(getDataDir(), "published");
 const SCREENSHOTS_DIR = path.join(getDataDir(), "screenshots");
@@ -190,12 +197,16 @@ export interface PublishedProject {
   canvasState?: CanvasState;
   knowledge?: KnowledgeIndexItem[];
   designSpecs?: DesignSpecMeta[];
+  /** 由本次不可变发布快照派生的只读引用目录和精简边索引。 */
+  markdownReferences?: PublishedMarkdownReferenceSnapshot;
   previewRuntime?: {
     version: string;
     source: "local" | "cdn";
     basePath?: string;
   };
 }
+
+export type { PublishedMarkdownReferenceSnapshot } from "@/lib/publish-markdown-references";
 
 export interface ProjectsIndex {
   projects: Array<{
@@ -603,6 +614,11 @@ export async function publishProject(
       { videos: videoResult.errors },
     );
   }
+  const spineResult = processSpineAssetsForPublish(publishContext);
+  if (spineResult.errors.length > 0 && !dryRun) {
+    cleanupTmpDir();
+    throw new PublishError("VIDEO_LOCALIZATION_FAILED", `发布失败：${spineResult.errors.length} 个 Spine 素材不可用`, { spine: spineResult.errors });
+  }
 
   onProgress?.(10, "正在编译页面...");
 
@@ -953,6 +969,7 @@ export async function publishProject(
       cdnBaseUrl: getCdnBaseUrl(),
       runtimeBaseUrl: publishedRuntimeBasePath,
       useCdnRuntime,
+      spineAssetBaseUrl: `/data/${projectId}/assets/animations`,
     });
     fs.writeFileSync(path.join(demoPublishDir, "iframe.html"), iframeHtml);
 
@@ -1087,6 +1104,37 @@ export async function publishProject(
   }
 
   const currentVersion = snapshotResult.version.versionId;
+  const markdownReferences = buildPublishedMarkdownReferenceSnapshot({
+    projectId,
+    projectName: project.name,
+    publishedVersion: currentVersion,
+    canonicalSnapshot: {
+      versionId: currentVersion,
+      workspaceId: snapshotResult.version.workspaceId,
+      workspaceRevision: snapshotResult.version.workspaceRevision,
+      workspaceRootHash: snapshotResult.version.workspaceRootHash,
+    },
+    publishedProjectDir,
+    pages: publishedDemoPages,
+    knowledge,
+    designSpecs,
+  });
+  // Keep the public source text and the public edge index consistent. Any
+  // unresolved/cross-project target is rendered as its label only, so IDs of
+  // non-public resources cannot be recovered from the published Markdown.
+  for (const page of publishedDemoPages) {
+    if (typeof page.requirements === "string") {
+      page.requirements = sanitizePublishedMarkdown(page.requirements, markdownReferences);
+    }
+  }
+  for (const item of knowledge ?? []) {
+    if (item.source === "system") continue;
+    const filePath = path.join(publishedProjectDir, "knowledge", item.fileName);
+    if (!fs.existsSync(filePath)) continue;
+    const content = fs.readFileSync(filePath, "utf-8");
+    fs.writeFileSync(filePath, sanitizePublishedMarkdown(content, markdownReferences), "utf-8");
+  }
+  sanitizePublishedDesignSpecFiles(publishedProjectDir, markdownReferences);
   let privateSandboxPublication: { finalDir: string; temporaryDir: string } | undefined;
   if (pendingSandboxPages.length > 0) {
     try {
@@ -1147,6 +1195,7 @@ export async function publishProject(
     canvasState,
     knowledge,
     designSpecs,
+    markdownReferences,
     previewRuntime: {
       version: PREVIEW_RUNTIME_MANIFEST_VERSION,
       source: useCdnRuntime ? "cdn" : "local",

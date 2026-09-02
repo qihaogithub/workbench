@@ -23,7 +23,9 @@ import {
   type WorkspacePage,
   type WorkspaceTree,
 } from "./workspace-page-utils";
+import { aiMutationDeniedResult, assertAiMutationAllowed } from "./ai-mutation-policy";
 import { validatePreviewFileWrite } from "./preview-validation";
+import { validateConfigSchemaContract } from "./schema-contract-validation";
 
 const MAX_PAGE_ID_LENGTH = 96;
 const MAX_PAGE_NAME_LENGTH = 120;
@@ -93,6 +95,10 @@ function parseAndValidateSchema(content: string): string | null {
     }
     if (!resolvePagePresentation(parsed as Record<string, unknown>)) {
       return "configSchema must contain a valid $demo.presentation.";
+    }
+    const contractIssues = validateConfigSchemaContract(parsed);
+    if (contractIssues.length > 0) {
+      return contractIssues.map((issue) => `${issue.code}: ${issue.message}`).join("; ");
     }
     return null;
   } catch {
@@ -285,6 +291,10 @@ export function createCreatePageTool(config: AgentConfig): AgentTool<typeof Crea
         }
 
         const nextTree = buildTree(tree, args);
+        const mutationDecision = assertAiMutationAllowed(config, WORKSPACE_TREE_FILENAME, {
+          content: JSON.stringify(nextTree),
+        });
+        if (!mutationDecision.allowed) return aiMutationDeniedResult(mutationDecision, WORKSPACE_TREE_FILENAME);
         const operations = pageOperations(args, tree);
         let receipt: unknown = null;
         if (liveWorkspace) {

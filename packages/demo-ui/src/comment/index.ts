@@ -5,11 +5,22 @@ export { CommentLayer } from "./CommentLayer";
 export { CommentPin } from "./CommentPin";
 export { CommentThreadPopover } from "./CommentThreadPopover";
 export { CommentCreatePopover } from "./CommentCreatePopover";
-export { MentionPicker, MentionTextarea, MentionContent } from "./MentionPicker";
+export {
+  MentionPicker,
+  MentionTextarea,
+  MentionContent,
+} from "./MentionPicker";
 export { CommentSidebar } from "./CommentSidebar";
 export { CommentPanel } from "./CommentPanel";
 export { DocumentCommentPanel } from "./DocumentCommentPanel";
+export { CommentUnreadDot } from "./CommentUnreadDot";
 export { useComments, threadMentionsUser } from "./useComments";
+export {
+  countUnresolvedCommentThreads,
+  countUnresolvedCommentThreadsByPage,
+  filterCommentThreadsByTarget,
+  filterPageCommentThreads,
+} from "./comment-thread-scope";
 export type {
   CommentApiAdapter,
   CommentFilter,
@@ -29,7 +40,8 @@ export type {
   MentionTextareaProps,
   MentionContentProps,
 } from "./MentionPicker";
-export type { CommentSidebarProps } from "./CommentSidebar";
+export type { CommentPageMeta, CommentSidebarProps } from "./CommentSidebar";
 export type { CommentPanelProps } from "./CommentPanel";
 export type { DocumentCommentPanelProps } from "./DocumentCommentPanel";
+export type { CommentUnreadDotProps } from "./CommentUnreadDot";
 export type { UseCommentsOptions, UseCommentsResult } from "./useComments";

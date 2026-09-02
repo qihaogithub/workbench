@@ -19,6 +19,7 @@ interface VisualEditSidebarProps {
   getNodeBadgeCount?: (node: VisualNodeInfo) => number;
   onSelectLayer?: (node: VisualNodeInfo, path: VisualNodeInfo[]) => void;
   onToggleNodeHidden?: (node: VisualNodeInfo) => void;
+  onAddNodeToChat?: (node: VisualNodeInfo) => void;
   onHoverLayerNodeId?: (nodeId: string | null) => void;
   /** 属性栏内容（原 VisualPropertyPanel） */
   children?: ReactNode;
@@ -31,6 +32,7 @@ export function VisualEditSidebar({
   getNodeBadgeCount,
   onSelectLayer,
   onToggleNodeHidden,
+  onAddNodeToChat,
   onHoverLayerNodeId,
   children,
 }: VisualEditSidebarProps) {
@@ -110,6 +112,7 @@ export function VisualEditSidebar({
           getNodeBadgeCount={getNodeBadgeCount}
           onSelectNode={onSelectLayer}
           onToggleNodeHidden={onToggleNodeHidden}
+          onAddNodeToChat={onAddNodeToChat}
           onHoverNodeIdChange={onHoverLayerNodeId}
           scrollClassName="layer-tree-menu-scrollbar"
         />

@@ -15,7 +15,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminRequest } from "@/lib/admin-auth";
-import { pushImageDescriptionConfig, pushImageGenConfig } from "@/lib/agent-providers";
+import { pushImageGenConfig } from "@/lib/agent-providers";
 import { syncBackendProvidersConfigToAgent } from "@/lib/backend-providers-sync";
 import { readDbConfig, writeDbConfig } from "@/lib/db-config";
 import { invalidateConfigCache } from "@/lib/model-config";
@@ -41,13 +41,6 @@ function getDefaultConfig() {
       blacklist,
       defaultModelIds,
       nameFilters,
-    },
-    multimodalModels: [] as string[],
-    imageDescription: {
-      enabled: true,
-      visionModelId: "",
-      timeout: 10000,
-      maxCacheSize: 500,
     },
     imageGen: {
       enabled: false,
@@ -208,8 +201,22 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json();
+    const allowedFields = new Set(["frontend", "backendProviders", "imageGen"]);
+    const unknownFields = Object.keys(body).filter((key) => !allowedFields.has(key));
+    if (unknownFields.length > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "INVALID_CONFIG",
+            message: `不支持的配置字段: ${unknownFields.join(", ")}`,
+          },
+        },
+        { status: 400 },
+      );
+    }
 
-    // 支持部分更新: frontend、backendProviders 和 multimodalModels 都不是必填
+    // 支持部分更新: frontend、backendProviders 和 imageGen 都不是必填
     // 单独更新任一字段时,保留 DB 中其他字段不变
     if (body.frontend !== undefined && (typeof body.frontend !== "object" || body.frontend === null)) {
       return NextResponse.json(
@@ -236,25 +243,8 @@ export async function PUT(request: NextRequest) {
       );
     }
     if (
-      body.multimodalModels !== undefined &&
-      !Array.isArray(body.multimodalModels)
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "INVALID_CONFIG",
-            message: "multimodalModels 字段必须是数组",
-          },
-        },
-        { status: 400 },
-      );
-    }
-    if (
       body.frontend === undefined &&
       body.backendProviders === undefined &&
-      body.multimodalModels === undefined &&
-      body.imageDescription === undefined &&
       body.imageGen === undefined
     ) {
       return NextResponse.json(
@@ -263,7 +253,7 @@ export async function PUT(request: NextRequest) {
           error: {
             code: "INVALID_CONFIG",
             message:
-              "请求体至少需要包含 frontend、backendProviders、multimodalModels、imageDescription 或 imageGen 字段之一",
+              "请求体至少需要包含 frontend、backendProviders 或 imageGen 字段之一",
           },
         },
         { status: 400 },
@@ -285,32 +275,6 @@ export async function PUT(request: NextRequest) {
         ...(existingConfig.frontend || {}),
         ...body.frontend,
         ...normalizedFrontend,
-      };
-    }
-
-    // 单独处理 multimodalModels
-    if (Array.isArray(body.multimodalModels)) {
-      updatedConfig.multimodalModels = body.multimodalModels;
-    }
-
-    // 单独处理 imageDescription: 合并已有配置，支持部分更新
-    if (body.imageDescription !== undefined) {
-      if (typeof body.imageDescription !== "object" || body.imageDescription === null) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: {
-              code: "INVALID_CONFIG",
-              message: "imageDescription 字段必须是对象",
-            },
-          },
-          { status: 400 },
-        );
-      }
-      const existingImg = existingConfig.imageDescription || {};
-      updatedConfig.imageDescription = {
-        ...existingImg,
-        ...body.imageDescription,
       };
     }
 
@@ -376,6 +340,12 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    delete updatedConfig.imageDescription;
+    delete updatedConfig.multimodalModels;
+    if (updatedConfig.backendProviders) {
+      delete updatedConfig.backendProviders.multimodalModels;
+    }
+
     // 写入数据库
     writeDbConfig(CONFIG_ID, updatedConfig, "admin");
 
@@ -386,20 +356,9 @@ export async function PUT(request: NextRequest) {
     let pushResult: { ok: boolean; message: string } | null = null;
     if (updatedConfig.backendProviders !== undefined) {
       pushResult = await syncBackendProvidersConfigToAgent(
-        {
-          ...updatedConfig.backendProviders,
-          multimodalModels: updatedConfig.multimodalModels,
-        },
+        updatedConfig.backendProviders,
         "save",
         { scheduleRetryOnFailure: true },
-      );
-    }
-
-    // 如果包含 imageDescription 字段,推送到 agent-service
-    let imagePushResult: { ok: boolean; message: string } | null = null;
-    if (body.imageDescription !== undefined) {
-      imagePushResult = await pushImageDescriptionConfig(
-        updatedConfig.imageDescription,
       );
     }
 
@@ -414,7 +373,6 @@ export async function PUT(request: NextRequest) {
       message: "配置已保存",
       data: updatedConfig,
       agentPushResult: pushResult,
-      imagePushResult,
       imageGenPushResult,
     });
   } catch (error) {

@@ -4,6 +4,7 @@ import * as path from "path";
 import * as fs from "fs";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { createApiError } from "@/lib/fs-utils";
+import { findUserById, type User } from "@/lib/user";
 import { getLiveWorkspaceRouteContext, isLiveWorkspacePath } from "@/lib/live-workspace-route-context";
 
 /** 设计规范 API 路由统一上下文 */
@@ -13,6 +14,15 @@ export interface DesignSpecRouteContext {
   projectId?: string;
   live: boolean;
   liveContext: ReturnType<typeof getLiveWorkspaceRouteContext>;
+  user: User;
+}
+
+/** 设计规范是项目治理资产，仅管理员可改变；所有已登录用户仍可读取。 */
+export function requireDesignSpecAdmin(ctx: DesignSpecRouteContext): NextResponse | null {
+  if (ctx.user.role === "admin") return null;
+  return NextResponse.json(createApiError("FORBIDDEN", "仅管理员可编辑设计规范"), {
+    status: 403,
+  });
 }
 
 /**
@@ -30,6 +40,12 @@ export async function resolveDesignSpecContext(
   if (!payload) {
     return {
       response: NextResponse.json(createApiError("UNAUTHORIZED", "登录已过期"), { status: 401 }),
+    };
+  }
+  const user = findUserById(payload.userId);
+  if (!user) {
+    return {
+      response: NextResponse.json(createApiError("UNAUTHORIZED", "用户不存在"), { status: 401 }),
     };
   }
 
@@ -61,6 +77,7 @@ export async function resolveDesignSpecContext(
       projectId,
       live,
       liveContext,
+      user,
     },
   };
 }

@@ -327,10 +327,11 @@ const ReplyCommentParams = Type.Object({
   threadId: Type.String({ description: "评论线程 ID" }),
   content: Type.String({ description: "回复内容" }),
   aiTaskStatus: Type.Optional(
-    Type.Union([Type.Literal("done"), Type.Literal("failed")], {
-      description: "同时更新该评论的 AI 任务状态（处理完成=done，处理失败=failed）",
+    Type.Union([Type.Literal("done"), Type.Literal("failed"), Type.Literal("awaiting_approval")], {
+      description: "同时更新该评论的 AI 任务状态（文档提案待用户审批=awaiting_approval）",
     }),
   ),
+  documentProposalId: Type.Optional(Type.String({ description: "文档提案 ID；仅在 awaiting_approval 时提供" })),
 });
 type ReplyCommentParams = Static<typeof ReplyCommentParams>;
 
@@ -381,6 +382,11 @@ export function createReplyCommentTool(
 
       if (args.aiTaskStatus) {
         thread.aiTaskStatus = args.aiTaskStatus;
+      }
+      if (args.aiTaskStatus === "awaiting_approval" && args.documentProposalId) {
+        thread.documentProposalId = args.documentProposalId;
+      } else if (args.aiTaskStatus && args.aiTaskStatus !== "awaiting_approval") {
+        delete thread.documentProposalId;
       }
 
       writeCommentStore(projectId, data);

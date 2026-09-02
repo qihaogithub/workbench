@@ -582,13 +582,15 @@ export function listDemoPages(workspacePath: string): DemoPageMeta[] {
     const hasPrototype = hasRuntimeFile(path.join(dir, "prototype.html"));
     const hasReact = hasRuntimeFile(path.join(dir, "index.tsx"));
     const hasSandbox = hasRuntimeFile(path.join(dir, "sandbox.html"));
-    const runtimeFiles = [hasSketch, hasPrototype, hasReact, hasSandbox].filter(Boolean).length;
     const runtimeMatches =
       (page.runtimeType === "sketch-scene" && hasSketch) ||
       (page.runtimeType === "prototype-html-css" && hasPrototype) ||
       (page.runtimeType === "high-fidelity-react" && hasReact) ||
       (page.runtimeType === "sandboxed-html" && hasSandbox);
-    if (hasSchema && runtimeFiles === 1 && runtimeMatches) {
+    // workspace-tree.json is authoritative for declared pages.  Validate the
+    // entrypoint for that runtime only; legacy files from an earlier runtime
+    // migration must not hide an otherwise valid page.
+    if (hasSchema && runtimeMatches) {
       result.push(page);
     }
   }

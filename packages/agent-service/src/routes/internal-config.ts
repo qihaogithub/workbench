@@ -7,8 +7,6 @@
  * 端点：
  * - POST /internal/backend-providers  设置完整配置
  * - GET  /internal/backend-providers  获取当前配置（用于调试/验证）
- * - GET  /internal/image-description  获取识图配置
- * - PUT  /internal/image-description  更新识图配置
  */
 
 import { createHash } from "crypto";
@@ -22,6 +20,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { getBackendProvidersManager } from "../config/backend-providers";
 import { getSessionModelConfigs } from "../config/session-model-configs";
 import { getSessionExternalAuthConfigs } from "../config/session-external-auth";
+import { getSessionAuthorizations, parseAuthorRole } from "../config/session-authorizations";
 import {
   getSystemKnowledgeSnapshot,
   setSystemKnowledgeSnapshot,
@@ -29,13 +28,6 @@ import {
 } from "../config/system-knowledge";
 import { getAgentManager } from "../core/agent-manager";
 import { logger } from "../utils/logger";
-import {
-  type ImageDescriberConfig,
-} from "../services/image-describer";
-import {
-  updateImageDescriberConfig,
-  getImageDescriberConfig,
-} from "../backends/pi-agent";
 import {
   getImageGenConfig,
   updateImageGenConfig,
@@ -338,6 +330,30 @@ function checkToken(request: FastifyRequest, reply: FastifyReply): boolean {
 }
 
 export async function registerInternalConfigRoutes(fastify: FastifyInstance) {
+  fastify.post(
+    "/internal/sessions/:sessionId/authorization",
+    async (
+      request: FastifyRequest<{ Params: { sessionId: string }; Body: Record<string, unknown> }>,
+      reply: FastifyReply,
+    ) => {
+      if (!checkToken(request, reply)) return;
+      const body = request.body || {};
+      const role = parseAuthorRole(body.role);
+      const userId = typeof body.userId === "string" ? body.userId : "";
+      const projectId = typeof body.projectId === "string" ? body.projectId : "";
+      const expiresAt = typeof body.expiresAt === "number" ? body.expiresAt : 0;
+      if (!role || !userId || !projectId || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+        return reply.code(400).send({ success: false, error: { code: "INVALID_BODY", message: "userId、role、projectId 和未来 expiresAt 必填" } });
+      }
+      const authorization = { userId, role, projectId, expiresAt, source: "author-session" as const };
+      getSessionAuthorizations().set(request.params.sessionId, authorization);
+      const agent = getAgentManager().get(request.params.sessionId);
+      if (agent) agent.updateConfig({ authorAuthorization: authorization });
+      logger.info({ sessionId: request.params.sessionId, projectId, role }, "Session author authorization pushed from author-site");
+      return reply.send({ success: true, data: { sessionId: request.params.sessionId, projectId, role, expiresAt } });
+    },
+  );
+
   /**
    * 设置完整配置（author-site 推送）
    */
@@ -379,7 +395,6 @@ export async function registerInternalConfigRoutes(fastify: FastifyInstance) {
         providers: body.providers,
         activeProviderId: body.activeProviderId,
         activeModelId: body.activeModelId,
-        multimodalModels: body.multimodalModels,
       };
 
       getBackendProvidersManager().setConfig(config);
@@ -444,7 +459,6 @@ export async function registerInternalConfigRoutes(fastify: FastifyInstance) {
         providers: body.providers,
         activeProviderId: body.activeProviderId,
         activeModelId: body.activeModelId,
-        multimodalModels: body.multimodalModels,
       };
 
       getSessionModelConfigs().set(request.params.sessionId, config);
@@ -673,63 +687,6 @@ export async function registerInternalConfigRoutes(fastify: FastifyInstance) {
   );
 
   fastify.get(
-    "/internal/image-description",
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      if (!checkToken(request, reply)) return;
-
-      const config = getImageDescriberConfig();
-      if (!config) {
-        return reply.code(503).send({
-          success: false,
-          error: {
-            code: "NOT_INITIALIZED",
-            message: "ImageDescriber 尚未初始化",
-          },
-        });
-      }
-
-      return reply.send({ success: true, data: config });
-    },
-  );
-
-  fastify.put(
-    "/internal/image-description",
-    async (
-      request: FastifyRequest<{
-        Body: Partial<ImageDescriberConfig>;
-      }>,
-      reply: FastifyReply,
-    ) => {
-      if (!checkToken(request, reply)) return;
-
-      const body = request.body as Partial<ImageDescriberConfig> & Record<string, unknown>;
-      const allowedKeys: (keyof ImageDescriberConfig)[] = [
-        "enabled",
-        "visionModelId",
-        "describePrompt",
-        "maxCacheSize",
-        "timeout",
-      ];
-      const config: Partial<ImageDescriberConfig> = {};
-      for (const key of allowedKeys) {
-        if (key in body) {
-          (config as Record<string, unknown>)[key] = body[key as string];
-        }
-      }
-
-      updateImageDescriberConfig(config);
-      const updated = getImageDescriberConfig();
-
-      logger.info(
-        { config: { ...updated, describePrompt: updated?.describePrompt?.slice(0, 40) + "..." } },
-        "Image description config updated via internal API",
-      );
-
-      return reply.send({ success: true, data: updated });
-    },
-  );
-
-  fastify.get(
     "/internal/image-gen",
     async (request: FastifyRequest, reply: FastifyReply) => {
       if (!checkToken(request, reply)) return;
@@ -776,7 +733,7 @@ export async function registerInternalConfigRoutes(fastify: FastifyInstance) {
     },
   );
 
-  logger.info("内部配置同步路由已注册: backend-providers + knowledge-documents + image-description + image-gen");
+  logger.info("内部配置同步路由已注册: backend-providers + knowledge-documents + image-gen");
 }
 
 /**

@@ -51,6 +51,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       content: body.content.trim(),
       author: authorResult.author,
       mentions,
+      aiTaskAuthorization: authorResult.userId && authorResult.role
+        ? { userId: authorResult.userId, role: authorResult.role, expiresAt: Date.now() + 2 * 60 * 60 * 1000 }
+        : undefined,
     });
 
     if (!result) {

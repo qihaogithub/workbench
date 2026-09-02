@@ -11,6 +11,10 @@ const turbopackRawTextLoader = path.resolve(
   __dirname,
   "../../scripts/turbopack-raw-text-loader.cjs",
 );
+// The asset route accepts files up to 200MiB. Leave a small allowance for the
+// multipart envelope so a file exactly at that limit is not truncated before
+// the route can enforce its own per-file validation.
+const sessionAssetBodySizeLimit = 201 * 1024 * 1024;
 if (fs.existsSync(rootEnvPath)) {
   const envContent = fs.readFileSync(rootEnvPath, "utf-8");
   for (const line of envContent.split("\n")) {
@@ -57,6 +61,9 @@ const nextConfig = {
   onDemandEntries: {
     maxInactiveAge: 5 * 60 * 1000,
     pagesBufferLength: 12,
+  },
+  experimental: {
+    proxyClientMaxBodySize: sessionAssetBodySizeLimit,
   },
   env: {
     NEXT_PUBLIC_PREVIEW_CDN_BASE_URL:

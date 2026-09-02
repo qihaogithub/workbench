@@ -19,6 +19,11 @@ import { ConfigForm } from "./ConfigForm";
 import { ConfigScopeWrapper } from "./ConfigScopeWrapper";
 import { PageRequirements } from "./PageRequirements";
 import { RichTextEditor } from "./RichTextEditor";
+import type {
+  MarkdownReferenceClickHandler,
+  MarkdownReferenceContext,
+  MarkdownReferenceProvider,
+} from "./DocumentEditor";
 import { ConfigItemEditorDialog, type ConfigItemApplyPlanSnapshot } from "./ConfigItemEditorDialog";
 import {
   applySchemaDefinitionCommand,
@@ -30,10 +35,11 @@ import type { ConfigDefinitionImpactSummary } from "./ConfigDefinitionManagerDia
 import { parseSchemaToFields } from "./schema-parser";
 import {
   getAvailableConfigCategories,
+  getSchemaFieldCountByBindings,
   getSchemaFieldCountByCategory,
 } from "./config-categories";
 import { cn } from "./utils";
-import type { DesignSpecEntryLink, PositionableSizeItem, WhiteboardLauncher } from "./types";
+import type { ConfigChangeMeta, DesignSpecEntryLink, PositionEditTarget, PositionableSizeItem, WhiteboardLauncher } from "./types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -65,12 +71,8 @@ export interface PageConfigPanelPage {
   /** 引用页使用源项目共享配置 Schema；普通页省略并继承面板项目 Schema。 */
   projectConfigSchema?: string;
   projectConfigBindings?: string[];
-  /** 跨项目引用页携带的源项目设计规范，只读展示。 */
-  referenceDesignSpecs?: Array<{
-    id: string;
-    title: string;
-    entries: Array<{ id: string; title: string; markdown: string }>;
-  }>;
+  /** 页面级设计规范绑定；引用页由宿主从源项目映射后传入。 */
+  designSpecEntries?: DesignSpecEntryLink[];
 }
 
 type DefinitionEditorState = {
@@ -121,13 +123,17 @@ export interface PageConfigPanelProps {
   activePageId?: string;
   detailPageId?: string | null;
   onDetailPageIdChange?: (pageId: string | null) => void;
-  onPageSelect?: (pageId: string) => void;
+  /** 选择页面；零配置页面只请求画布定位，不打开配置详情。 */
+  onPageSelect?: (
+    pageId: string,
+    options?: { openConfigDetail?: boolean },
+  ) => void;
   projectConfigSchema?: string;
-  onProjectConfigChange?: (data: Record<string, unknown>) => void;
+  onProjectConfigChange?: (data: Record<string, unknown>, meta?: ConfigChangeMeta) => void;
   onProjectSchemaChange?: (schema: string) => void;
   /** 管理器的定义变更；宿主负责应用运行值清理计划并进入协同持久化链路。 */
   onProjectDefinitionChange?: (mutation: SchemaDefinitionMutation) => void;
-  onPageConfigChange?: (pageId: string, data: Record<string, unknown>) => void;
+  onPageConfigChange?: (pageId: string, data: Record<string, unknown>, meta?: ConfigChangeMeta) => void;
   onPageSchemaChange?: (pageId: string, schema: string) => void;
   onPageDefinitionChange?: (pageId: string, mutation: SchemaDefinitionMutation) => void;
   onDefinitionSendToAI?: (scope: "project" | "page", mutation: SchemaDefinitionMutation) => void;
@@ -140,11 +146,14 @@ export interface PageConfigPanelProps {
   sessionId?: string;
   className?: string;
   title?: string;
+  /** 一级页面列表是否隐藏标题栏；详情页头部不受影响。 */
+  hideOverviewHeader?: boolean;
   hideDetailHeader?: boolean;
   typeLimits?: Record<string, number>;
-  onEnterPositionEdit?: (posKeys: string[], positions: Record<string, { x: number; y: number }>, posKeyMap: Record<string, string>) => void;
+  onEnterPositionEdit?: (target: PositionEditTarget) => void;
+  onPositionFieldPathChange?: (instanceId: string, fieldPath: string) => void;
   onExitPositionEdit?: () => void;
-  positionEditActive?: boolean;
+  positionEditActiveId?: string | null;
   positionEditDimming?: boolean;
   onTogglePositionDimming?: () => void;
   /** 当前页面的配置要求（页面配置要求文档，Markdown，含行内软引用）。 */
@@ -153,6 +162,10 @@ export interface PageConfigPanelProps {
   onRequirementsChange?: (markdown: string) => void;
   /** 配置要求加载中。 */
   requirementsLoading?: boolean;
+  /** 页面需求 Markdown 的项目实体引用上下文。 */
+  referenceContext?: MarkdownReferenceContext;
+  referenceProvider?: MarkdownReferenceProvider;
+  onReferenceClick?: MarkdownReferenceClickHandler;
   /** 资源规范折叠区的展示位置；创作端由文档视图承载时可隐藏。 */
   requirementsPosition?: "beforeConfig" | "afterConfig" | "hidden";
   /** 只读入口在没有页面资源规范时隐藏整个折叠区。 */
@@ -340,16 +353,21 @@ export function PageConfigPanel({
   sessionId,
   className,
   title = "配置面板",
+  hideOverviewHeader = false,
   hideDetailHeader = false,
   typeLimits,
   onEnterPositionEdit,
+  onPositionFieldPathChange,
   onExitPositionEdit,
-  positionEditActive,
+  positionEditActiveId,
   positionEditDimming,
   onTogglePositionDimming,
   requirements,
   onRequirementsChange,
   requirementsLoading,
+  referenceContext,
+  referenceProvider,
+  onReferenceClick,
   requirementsPosition = "afterConfig",
   hideEmptyRequirements = false,
   designSpecEntries = EMPTY_DESIGN_SPEC_ENTRIES,
@@ -408,13 +426,20 @@ export function PageConfigPanel({
     return () => { cancelled = true; };
   }, [designSpecApiContext?.workingDir, designSpecApiContext?.sessionId, designSpecApiContext?.projectId]);
 
-  const effectiveDesignSpecEntries = designSpecEntries.length > 0 ? designSpecEntries : loadedDesignSpecEntries;
-
   const [restoreDefaultsScope, setRestoreDefaultsScope] = useState<
     "page" | "project" | null
   >(null);
   const effectiveDetailPageId =
     detailPageId === undefined ? internalDetailPageId : detailPageId;
+  const selectedPageDesignSpecEntries = effectiveDetailPageId
+    ? pages.find((page) => page.id === effectiveDetailPageId)?.designSpecEntries
+    : undefined;
+  const effectiveDesignSpecEntries =
+    designSpecEntries.length > 0
+      ? designSpecEntries
+      : selectedPageDesignSpecEntries !== undefined
+        ? selectedPageDesignSpecEntries
+        : loadedDesignSpecEntries;
   useEffect(() => {
     setActiveDesignSpec(null);
   }, [effectiveDetailPageId, configCategoryFilter]);
@@ -568,8 +593,9 @@ export function PageConfigPanel({
     setRequirementsDraft(requirements ?? "");
   }, [effectiveDetailPageId, requirements]);
 
-  const openPageDetail = (pageId: string) => {
-    onPageSelect?.(pageId);
+  const openPageDetail = (pageId: string, hasConfig: boolean) => {
+    onPageSelect?.(pageId, { openConfigDetail: hasConfig });
+    if (!hasConfig) return;
     setInternalDetailPageId(pageId);
     onDetailPageIdChange?.(pageId);
   };
@@ -582,16 +608,25 @@ export function PageConfigPanel({
   if (!selectedPage) {
     return (
       <div className={cn("flex h-full flex-col bg-card", className)}>
-        <div className="border-b border-border/80 px-4 py-3">
-          <div className="flex min-w-0 items-center justify-between gap-3">
-            <h2 className="min-w-0 truncate text-[15px] font-semibold">{title}</h2>
-            <ConfigCategoryFilterSelect
-              value={configCategoryFilter}
-              onChange={setConfigCategoryFilter}
-              categories={availableCategories}
-            />
+        {(!hideOverviewHeader || availableCategories.length > 0) && (
+          <div className="border-b border-border/80 px-4 py-3">
+            <div
+              className={cn(
+                "flex min-w-0 items-center gap-3",
+                hideOverviewHeader ? "justify-end" : "justify-between",
+              )}
+            >
+              {!hideOverviewHeader && (
+                <h2 className="min-w-0 truncate text-[15px] font-semibold">{title}</h2>
+              )}
+              <ConfigCategoryFilterSelect
+                value={configCategoryFilter}
+                onChange={setConfigCategoryFilter}
+                categories={availableCategories}
+              />
+            </div>
           </div>
-        </div>
+        )}
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
           {sortedPages.length === 0 ? (
             <div className="flex h-full min-h-[160px] flex-col items-center justify-center px-4 text-center">
@@ -604,8 +639,9 @@ export function PageConfigPanel({
           ) : filteredPages.length > 0 ? (
             <div className="space-y-1">
               {filteredPages.map(({ page, projectConfigSchema: scopedProjectConfigSchema }) => {
-                const sharedCount = getSchemaFieldCountByCategory(
-                  scopedProjectConfigSchema,
+                const sharedCount = getSchemaFieldCountByBindings(
+                  page.projectConfigSchema ?? projectConfigSchema,
+                  page.projectConfigBindings,
                   configCategoryFilter,
                 );
                 const pageCount = getSchemaFieldCountByCategory(
@@ -618,7 +654,7 @@ export function PageConfigPanel({
                   <button
                     key={page.id}
                     type="button"
-                    onClick={() => openPageDetail(page.id)}
+                    onClick={() => openPageDetail(page.id, totalCount > 0)}
                     className={cn(
                       "flex w-full cursor-pointer items-center gap-2 rounded-lg border border-transparent px-3 py-2.5 text-left transition-colors hover:bg-foreground/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       isActive
@@ -632,19 +668,14 @@ export function PageConfigPanel({
                         {page.name}
                       </div>
                     </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <span
-                        className={cn(
-                          "rounded-full px-2 py-0.5 text-xs",
-                          totalCount > 0
-                            ? "bg-muted text-foreground"
-                            : "bg-muted/50 text-muted-foreground",
-                        )}
-                      >
-                        {totalCount}
-                      </span>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </div>
+                    {totalCount > 0 && (
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-foreground">
+                          {totalCount}
+                        </span>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    )}
                   </button>
                 );
               })}
@@ -667,8 +698,9 @@ export function PageConfigPanel({
     selectedPage.schema,
     configCategoryFilter,
   );
-  const selectedProjectCount = getSchemaFieldCountByCategory(
-    selectedProjectConfigSchema,
+  const selectedProjectCount = getSchemaFieldCountByBindings(
+    selectedPage.projectConfigSchema ?? projectConfigSchema,
+    selectedPage.projectConfigBindings,
     configCategoryFilter,
   );
   const showSharedConfig =
@@ -682,7 +714,6 @@ export function PageConfigPanel({
       : null;
   const showConfigActions = canAddConfig || restoreDefaultsTarget !== null;
   const configDefinitionCreateScope = onPageDefinitionChange ? "page" : "project";
-  const referenceDesignSpecs = selectedPage.referenceDesignSpecs ?? [];
   const hasRequirements = Boolean(requirements?.trim());
   const shouldShowRequirements =
     requirementsPosition !== "hidden" &&
@@ -853,7 +884,7 @@ export function PageConfigPanel({
                   <ConfigForm
                     key={`project-${selectedPage.id}-${selectedProjectConfigSchema}`}
                     schema={selectedProjectConfigSchema!}
-                    onChange={(data) => onProjectConfigChange?.(data)}
+                    onChange={(data, meta) => onProjectConfigChange?.(data, meta)}
                     onSchemaChange={onProjectSchemaChange}
                     initialData={configData}
                     sessionId={sessionId}
@@ -865,6 +896,9 @@ export function PageConfigPanel({
                     onOpenDesignSpec={(spec, fieldTitle, anchor) => setActiveDesignSpec((current) => current?.spec.entryId === spec.entryId ? null : { spec, fieldTitle, anchor })}
                     onEditConfigDefinition={(key) => openDefinitionEditor("project", key)}
                     imageConfigScope="project"
+                    referenceContext={referenceContext}
+                    referenceProvider={referenceProvider}
+                    onReferenceClick={onReferenceClick}
                     onLaunchWhiteboard={onLaunchWhiteboard}
                   />
                 </ConfigScopeWrapper>
@@ -880,7 +914,7 @@ export function PageConfigPanel({
                 <ConfigForm
                   key={`page-${selectedPage.id}-${selectedPage.schema}`}
                   schema={selectedPage.schema!}
-                  onChange={(data) => onPageConfigChange?.(selectedPage.id, data)}
+                  onChange={(data, meta) => onPageConfigChange?.(selectedPage.id, data, meta)}
                   onSchemaChange={(schema) =>
                     onPageSchemaChange?.(selectedPage.id, schema)
                   }
@@ -890,8 +924,9 @@ export function PageConfigPanel({
                   configCategoryFilter={configCategoryFilter}
                   typeLimits={typeLimits}
                   onEnterPositionEdit={onEnterPositionEdit}
+                  onPositionFieldPathChange={onPositionFieldPathChange}
                   onExitPositionEdit={onExitPositionEdit}
-                  positionEditActive={positionEditActive}
+                  positionEditActiveId={positionEditActiveId}
                   positionEditDimming={positionEditDimming}
                   onTogglePositionDimming={onTogglePositionDimming}
                   designSpecEntries={effectiveDesignSpecEntries.filter((entry) => entry.scope === "page" && entry.pageId === selectedPage.id)}
@@ -900,6 +935,9 @@ export function PageConfigPanel({
                   onEditConfigDefinition={(key) => openDefinitionEditor("page", key)}
                   imageConfigScope="page"
                   pageId={selectedPage.id}
+                  referenceContext={referenceContext}
+                  referenceProvider={referenceProvider}
+                  onReferenceClick={onReferenceClick}
                   onLaunchWhiteboard={onLaunchWhiteboard}
                 />
               </ConfigScopeWrapper>
@@ -916,36 +954,6 @@ export function PageConfigPanel({
             </div>
           )}
           </section>
-
-          {referenceDesignSpecs.length > 0 && (
-            <PanelSection
-              title="设计规范"
-              open={requirementsSectionOpen}
-              onToggle={() => setRequirementsSectionOpen((current) => !current)}
-            >
-              <div className="space-y-4 pt-3">
-                {referenceDesignSpecs.map((spec) => (
-                  <section key={spec.id} className="rounded-md border p-3">
-                    <h3 className="text-sm font-medium">{spec.title}</h3>
-                    {spec.entries.map((entry) => (
-                      <div key={entry.id} className="mt-3">
-                        <p className="text-xs font-medium text-muted-foreground">
-                          {entry.title}
-                        </p>
-                        {entry.markdown.trim() && (
-                          <PageRequirements
-                            markdown={entry.markdown}
-                            allowExternalMedia
-                            mediaBaseUrl={mediaBaseUrl}
-                          />
-                        )}
-                      </div>
-                    ))}
-                  </section>
-                ))}
-              </div>
-            </PanelSection>
-          )}
 
           {shouldShowRequirements && (
             <div
@@ -1011,6 +1019,9 @@ export function PageConfigPanel({
                   referenceCandidates={getReferenceCandidates(
                     selectedPage.schema,
                   )}
+                  referenceContext={referenceContext}
+                  referenceProvider={referenceProvider}
+                  onReferenceClick={onReferenceClick}
                 />
                 <p className="text-xs text-muted-foreground">
                   输入 @ 或使用工具栏「插入引用」选择当前页配置项，以 @[名称](key) 形式引用。
@@ -1018,7 +1029,12 @@ export function PageConfigPanel({
               </div>
             ) : hasRequirements ? (
               <div className="space-y-4 pt-2">
-                <PageRequirements markdown={requirements!} allowExternalMedia mediaBaseUrl={mediaBaseUrl} />
+                <PageRequirements
+                  markdown={requirements!}
+                  allowExternalMedia
+                  mediaBaseUrl={mediaBaseUrl}
+                  onReferenceClick={onReferenceClick}
+                />
               </div>
             ) : (
               <div className="flex min-h-[120px] flex-col items-center justify-center px-4 text-center">

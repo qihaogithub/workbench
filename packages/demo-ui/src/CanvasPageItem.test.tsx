@@ -79,6 +79,30 @@ function renderPageInViewport(toolMode: CanvasToolMode) {
 }
 
 describe("CanvasPageItem context menu", () => {
+  it("提供复制命令，并在执行后关闭菜单且不启动拖拽", () => {
+    const onCopy = vi.fn();
+    const onDragStart = vi.fn();
+    const { container } = render(
+      <CanvasPageItem
+        page={{ id: "page-1", name: "页面一", order: 0 }}
+        layout={{ x: 100, y: 120, width: 375, height: 812 }}
+        editable
+        renderMode="loading"
+        toolMode="select"
+        onCopy={onCopy}
+        onDragStart={onDragStart}
+      />,
+    );
+    const page = container.querySelector('[data-page-id="page-1"]')!;
+
+    fireEvent.contextMenu(page, { clientX: 240, clientY: 260 });
+    fireEvent.click(screen.getByRole("button", { name: "复制" }));
+
+    expect(onCopy).toHaveBeenCalledWith("page-1");
+    expect(onDragStart).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "复制" })).not.toBeInTheDocument();
+  });
+
   it.each(["select", "hand"] as const)(
     "%s 工具下按下菜单外区域会关闭菜单且不启动画布手势",
     (toolMode) => {
@@ -200,6 +224,69 @@ describe("CanvasPageItem title editing", () => {
     await waitFor(() =>
       expect(onRename).toHaveBeenCalledWith("page-1", "失焦名称"),
     );
+  });
+});
+
+describe("CanvasPageItem comment badge", () => {
+  it("只在有未处理评论时显示标签，点击标签不会启动拖拽", () => {
+    const onCommentBadgeClick = vi.fn();
+    const onDragStart = vi.fn();
+    const { rerender } = render(
+      <CanvasPageItem
+        page={{ id: "page-1", name: "页面一", order: 0 }}
+        layout={{ x: 0, y: 0, width: 375, height: 812 }}
+        editable
+        renderMode="loading"
+        toolMode="select"
+        commentCount={2}
+        onCommentBadgeClick={onCommentBadgeClick}
+        onDragStart={onDragStart}
+      />,
+    );
+
+    const badge = screen.getByRole("button", {
+      name: "页面一有 2 条未处理评论，打开评论列表",
+    });
+    fireEvent.pointerDown(badge, { button: 0, pointerId: 1 });
+    fireEvent.click(badge);
+
+    expect(onCommentBadgeClick).toHaveBeenCalledWith("page-1", expect.anything());
+    expect(onDragStart).not.toHaveBeenCalled();
+
+    rerender(
+      <CanvasPageItem
+        page={{ id: "page-1", name: "页面一", order: 0 }}
+        layout={{ x: 0, y: 0, width: 375, height: 812 }}
+        editable
+        renderMode="loading"
+        toolMode="select"
+        commentCount={0}
+        onCommentBadgeClick={onCommentBadgeClick}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", {
+        name: "页面一有 2 条未处理评论，打开评论列表",
+      }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("CanvasPageItem cursor", () => {
+  it("选择工具悬停页面内容时使用标准指针，而不是四向移动光标", () => {
+    const { container } = render(
+      <CanvasPageItem
+        page={{ id: "page-1", name: "页面一", order: 0 }}
+        layout={{ x: 0, y: 0, width: 375, height: 812 }}
+        editable
+        renderMode="loading"
+        toolMode="select"
+      />,
+    );
+
+    expect(container.querySelector("[data-page-id='page-1']")).toHaveStyle({
+      cursor: "default",
+    });
   });
 });
 

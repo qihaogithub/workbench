@@ -20,7 +20,7 @@ describe("CanvasToolbar", () => {
     const toolbar = screen.getByRole("toolbar", { name: "画布工具栏" });
     const navigationGroup = toolbar.children[0];
     const creationGroup = toolbar.children[1];
-    const sectionTool = screen.getByRole("button", { name: "Section 工具" });
+    const sectionTool = screen.getByRole("button", { name: "分组工具" });
     const connectorTool = screen.getByRole("button", { name: "连线工具" });
 
     expect(navigationGroup).toContainElement(screen.getByRole("button", { name: "拖动工具" }));

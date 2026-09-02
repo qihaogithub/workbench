@@ -6,7 +6,6 @@ export interface ModelCatalogItem {
   id: string;
   label: string;
   group: string;
-  supportsImages: boolean;
   supportsThinkingDepth: boolean;
 }
 
@@ -44,7 +43,6 @@ function toModelCatalogItem(model: { id: string; label: string }): ModelCatalogI
     id: model.id,
     label: model.label,
     group: slashIdx >= 0 ? model.id.slice(0, slashIdx) : "",
-    supportsImages: false,
     supportsThinkingDepth: false,
   };
 }

@@ -381,13 +381,6 @@ export function InlineTagInput({
       }
       if (imageFiles.length > 0) {
         e.preventDefault()
-        if (!promptCtx.supportsImages) {
-          toast({
-            title: '当前模型不支持图片处理',
-            description: '请联系管理员在管理后台启用识图代理功能，或切换为多模态模型。',
-          })
-          return
-        }
         promptCtx.addFiles(imageFiles)
         return
       }

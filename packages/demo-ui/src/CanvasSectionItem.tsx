@@ -60,7 +60,7 @@ export function CanvasSectionItem({
 
   const commit = () => {
     setEditing(false);
-    const next = title.trim() || "Section";
+    const next = title.trim() || "分组";
     setTitle(next);
     if (next !== section.title) onRename?.(section.id, next);
   };
@@ -126,7 +126,7 @@ export function CanvasSectionItem({
   };
   return (
     <div
-      aria-label={`Section: ${section.title}`}
+      aria-label={`分组: ${section.title}`}
       className="pointer-events-none absolute box-border"
       style={{
         left: section.layout.x,
@@ -150,7 +150,7 @@ export function CanvasSectionItem({
           {/* The edges are the only background hit targets. The interior stays transparent to members. */}
           <button
             type="button"
-            aria-label={`选择并移动 Section: ${section.title}`}
+            aria-label={`选择并移动分组: ${section.title}`}
             className="pointer-events-auto absolute -left-1 -right-1 -top-1 h-2 cursor-move bg-transparent p-0"
             onClick={selectSection}
             {...edgeHandlers}
@@ -194,7 +194,7 @@ export function CanvasSectionItem({
               ref={inputRef}
               value={title}
               maxLength={120}
-              aria-label="Section 标题"
+                  aria-label="分组标题"
               className="w-48 bg-transparent outline-none"
               style={{ fontSize: "inherit" }}
               onChange={(event) => setTitle(event.target.value)}
@@ -211,7 +211,7 @@ export function CanvasSectionItem({
             <button
               type="button"
               className="max-w-48 truncate text-left"
-              aria-label={`选择 Section: ${section.title}，${section.children.length} 个成员，双击改名称`}
+              aria-label={`选择分组: ${section.title}，${section.children.length} 个成员，双击改名称`}
               title="双击改名称"
               data-section-title-button
               onClick={() => onSelect?.(section.id)}

@@ -35,7 +35,7 @@ Header.Payload.Signature
 | **自包含** | Token 中包含用户 ID 和用户名，无需查询数据库 |
 | **签名验证** | 使用密钥签名，防止 Token 被篡改 |
 | **有效期** | 设置 7 天有效期，过期后需重新登录 |
-| **安全传输** | 通过 httpOnly Cookie 传输，防止 XSS 攻击 |
+| **安全传输** | 浏览器通过 httpOnly Cookie 传输；CLI 等非浏览器客户端通过 Bearer 请求头传输 |
 
 ## 2. Token 结构设计
 
@@ -233,9 +233,9 @@ author-site 的 workspace 脚本会显式读取仓库根目录的 `.env`（文�
 ```
 请求到达
   ↓
-从请求头中提取 Cookie
+优先读取配置的 Cookie
   ↓
-解析 auth_token
+Cookie 不存在时读取 Authorization: Bearer
   ↓
 返回 Token 字符串
 ```
@@ -243,7 +243,8 @@ author-site 的 workspace 脚本会显式读取仓库根目录的 `.env`（文�
 **关键代码逻辑**：
 
 ```
-cookies().get("auth_token")?.value
+cookies().get(AUTH_COOKIE_NAME)?.value
+// Cookie 缺失时：Authorization: Bearer <token>
 ```
 
 ### 4.4 Cookie 清除

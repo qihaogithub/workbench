@@ -275,8 +275,10 @@ export function PageNavigationOverlay({
     <div
       ref={rootRef}
       className={
-        enabled || (visible && editable)
+        enabled
           ? "absolute inset-0 z-30 cursor-crosshair"
+          : visible && editable
+            ? "absolute inset-0 z-30 cursor-default"
           : "pointer-events-none absolute inset-0 z-30"
       }
       aria-label={enabled ? "绘制页面跳转热区" : undefined}

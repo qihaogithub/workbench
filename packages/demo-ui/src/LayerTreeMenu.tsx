@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { ChevronDown, Eye, EyeOff } from "lucide-react";
+import { ChevronDown, Eye, EyeOff, MessageSquarePlus } from "lucide-react";
 
 import type { VisualNodeInfo, VisualNodeTreeItem } from "./iframe-types";
 import { cn } from "./utils";
@@ -17,6 +17,7 @@ interface LayerTreeMenuProps {
   getNodeBadgeCount?: (node: VisualNodeInfo) => number;
   onSelectNode?: (node: VisualNodeInfo, path: VisualNodeInfo[]) => void;
   onToggleNodeHidden?: (node: VisualNodeInfo) => void;
+  onAddNodeToChat?: (node: VisualNodeInfo) => void;
   onHoverNodeIdChange?: (nodeId: string | null) => void;
   /** menu: 浮动右键菜单；panel: 嵌入侧边栏的完整面板 */
   variant?: "menu" | "panel";
@@ -99,6 +100,7 @@ export function LayerTreeMenu({
   getNodeBadgeCount,
   onSelectNode,
   onToggleNodeHidden,
+  onAddNodeToChat,
   onHoverNodeIdChange,
   variant = "menu",
   collapsed = false,
@@ -161,7 +163,7 @@ export function LayerTreeMenu({
             }
           }}
           className={[
-            "grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded px-2 py-2 text-left text-xs transition-colors",
+            "group grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded px-2 py-2 text-left text-xs transition-colors",
             active ? "bg-primary/10 text-primary" : "hover:bg-muted focus-within:bg-muted",
             hidden ? "opacity-55" : "",
           ].join(" ")}
@@ -186,10 +188,30 @@ export function LayerTreeMenu({
                 {badgeCount}
               </span>
             )}
+            {variant === "panel" && onAddNodeToChat && (
+              <button
+                type="button"
+                className="pointer-events-none flex h-6 w-6 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
+                title="添加到对话"
+                aria-label="添加到对话"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onAddNodeToChat(node);
+                }}
+                onFocus={() => onHoverNodeIdChange?.(node.domPath)}
+              >
+                <MessageSquarePlus className="h-3.5 w-3.5" />
+              </button>
+            )}
             {onToggleNodeHidden && (
               <button
                 type="button"
-                className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className={cn(
+                  "flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  variant === "panel"
+                    ? "pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
+                    : "",
+                )}
                 title={hidden ? "临时显示图层" : "临时隐藏图层"}
                 aria-label={hidden ? "临时显示图层" : "临时隐藏图层"}
                 onClick={(event) => {

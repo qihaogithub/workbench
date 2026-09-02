@@ -1,6 +1,6 @@
 "use client";
 
-import MarkdownIt from "markdown-it";
+import type { MouseEvent } from "react";
 
 import {
   getActiveCanvasDocumentEntry,
@@ -8,18 +8,16 @@ import {
 } from "./canvas-kernel";
 import type { CanvasDocumentNode } from "./types";
 import { cn } from "./utils";
-
-const markdownRenderer = new MarkdownIt({
-  html: false,
-  linkify: true,
-  breaks: true,
-});
+import { renderPageRequirementsMarkdown } from "./note-html";
+import { decodeMarkdownReferenceUri } from "@workbench/shared/markdown-reference";
+import type { MarkdownReferenceClickHandler } from "./DocumentEditor";
 
 interface CanvasDocumentContentProps {
   node: CanvasDocumentNode;
   className?: string;
   contentClassName?: string;
   onActiveDocumentChange?: (nodeId: string, documentId: string) => void;
+  onReferenceClick?: MarkdownReferenceClickHandler;
 }
 
 export function CanvasDocumentContent({
@@ -27,12 +25,24 @@ export function CanvasDocumentContent({
   className,
   contentClassName,
   onActiveDocumentChange,
+  onReferenceClick,
 }: CanvasDocumentContentProps) {
   const documentEntries = getCanvasDocumentEntries(node);
   const activeDocumentEntry = getActiveCanvasDocumentEntry(node);
-  const renderedMarkdown = markdownRenderer.render(
+  const renderedMarkdown = renderPageRequirementsMarkdown(
     node.markdown || "文档内容加载中...",
   );
+  const handleReferenceClick = (event: MouseEvent<HTMLDivElement>) => {
+    const target = (event.target as HTMLElement).closest<HTMLElement>("[data-reference-uri]");
+    if (!target) return;
+    const uri = target.getAttribute("data-reference-uri");
+    if (!uri) return;
+    const reference = decodeMarkdownReferenceUri(uri);
+    if (!reference) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onReferenceClick?.({ target: reference, labelSnapshot: target.textContent?.trim() || "" });
+  };
 
   if (documentEntries.length > 1) {
     return (
@@ -66,6 +76,7 @@ export function CanvasDocumentContent({
             "markdown-editor-content scrollbar-thin h-full min-w-0 flex-1 overflow-auto px-4 py-3 text-sm",
             contentClassName,
           )}
+          onClick={handleReferenceClick}
           dangerouslySetInnerHTML={{ __html: renderedMarkdown }}
         />
       </div>
@@ -79,6 +90,7 @@ export function CanvasDocumentContent({
         className,
         contentClassName,
       )}
+      onClick={handleReferenceClick}
       dangerouslySetInnerHTML={{ __html: renderedMarkdown }}
     />
   );

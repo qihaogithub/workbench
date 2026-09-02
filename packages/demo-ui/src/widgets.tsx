@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { WidgetProps } from '@rjsf/utils';
-import { Upload, Repeat, Trash2, Loader2, AlertTriangle, FileArchive } from 'lucide-react';
+import { Upload, Repeat, Trash2, Loader2, AlertTriangle, FileArchive, Play, Video, Image as ImageIcon } from 'lucide-react';
 import { cn } from './utils';
 import { resolveConfigImageSrc } from './preview-config-utils';
 import {
@@ -15,6 +15,9 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ImageInputActions } from './ImageInputActions';
+import type { SpineAssetRefV1 } from '@workbench/shared';
+import type { WorkspaceMutationReceipt } from '@workbench/shared/contracts';
+import type { ConfigChangeMeta } from './types';
 
 function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
@@ -97,6 +100,11 @@ export function ColorPickerWidget(props: WidgetProps) {
 export interface FileUploadWidgetOptions {
   accept?: string;
   mediaType?: "image" | "video";
+  assetKind?: "spine";
+  /** Page field identity lets the server atomically attach a committed Spine ref. */
+  pageId?: string;
+  configKey?: string;
+  configScope?: "page" | "project";
   videoPreviewStyle?: "controls" | "compact" | "cover";
   maxSize?: number;
   placeholder?: string;
@@ -110,9 +118,91 @@ export interface SpineBundle {
   texture: string;
 }
 
+function isSpineAssetRef(value: unknown): value is SpineAssetRefV1 {
+  return isRecord(value)
+    && value.kind === 'spine'
+    && value.version === 1
+    && typeof value.assetId === 'string'
+    && /^spine_[a-f0-9]{64}$/.test(value.assetId);
+}
+
 export interface VideoValue {
-  url: string;
+  /** Empty objects are used by schemas as the initial, unconfigured value. */
+  url?: string;
   poster?: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isVideoValue(value: unknown): value is VideoValue & { url: string } {
+  return isRecord(value) && typeof value.url === 'string' && value.url.trim().length > 0;
+}
+
+function isVideoConfigValue(value: unknown): value is VideoValue {
+  return isRecord(value)
+    && (value.url === undefined || typeof value.url === 'string')
+    && (value.poster === undefined || typeof value.poster === 'string');
+}
+
+function isSpineBundle(value: unknown): value is SpineBundle {
+  return isRecord(value)
+    && typeof value.skeleton === 'string'
+    && typeof value.atlas === 'string'
+    && typeof value.texture === 'string';
+}
+
+interface UploadResponsePayload {
+  success?: boolean;
+  data?: unknown;
+  error?: {
+    code?: unknown;
+    message?: unknown;
+  };
+}
+
+async function parseUploadResponse(response: Response): Promise<UploadResponsePayload | null> {
+  try {
+    const body = await response.text();
+    if (!body.trim()) return null;
+    const parsed: unknown = JSON.parse(body);
+    return isRecord(parsed) ? parsed as UploadResponsePayload : null;
+  } catch {
+    return null;
+  }
+}
+
+function getUploadErrorMessage(
+  response: Response,
+  payload: UploadResponsePayload | null,
+  resourceLabel: string,
+): string {
+  const serverMessage = payload?.error && typeof payload.error.message === 'string'
+    ? payload.error.message.trim()
+    : '';
+  if (serverMessage) return serverMessage;
+
+  if (response.ok) return '服务器返回了无效的上传响应，请重试';
+
+  switch (response.status) {
+    case 401:
+      return '登录状态已失效，请刷新页面后重试';
+    case 404:
+      return '编辑会话已失效，请重新打开页面';
+    case 413:
+      return `${resourceLabel}超过服务器允许的大小限制`;
+    default:
+      return response.status > 0 ? `上传失败（HTTP ${response.status}）` : '上传失败，请重试';
+  }
+}
+
+function getUploadedUrl(payload: UploadResponsePayload | null): string | null {
+  if (!payload || payload.success !== true) return null;
+  if (typeof payload.data === 'string' && payload.data.trim()) return payload.data;
+  if (!isRecord(payload.data) || typeof payload.data.url !== 'string') return null;
+  const url = payload.data.url.trim();
+  return url || null;
 }
 
 const DEFAULT_IMAGE_FILE_MAX_SIZE = 50 * 1024 * 1024;
@@ -120,15 +210,25 @@ const DEFAULT_VIDEO_FILE_MAX_SIZE = 200 * 1024 * 1024;
 
 export interface FileUploadWidgetProps {
   id?: string;
-  value?: string | SpineBundle | VideoValue;
-  onChange: (value: string | SpineBundle | VideoValue | undefined) => void;
+  value?: string | SpineBundle | SpineAssetRefV1 | VideoValue;
+  onChange: (value: string | SpineBundle | SpineAssetRefV1 | VideoValue | undefined, meta?: ConfigChangeMeta) => void;
   label?: string;
   required?: boolean;
   disabled?: boolean;
   sessionId?: string;
   options?: FileUploadWidgetOptions;
-  defaultValue?: string;
+  defaultValue?: string | VideoValue;
   onWhiteboard?: () => void;
+}
+
+function getCommittedUploadReceipt(payload: UploadResponsePayload | null): WorkspaceMutationReceipt | null {
+  if (!payload || payload.success !== true || !isRecord(payload.data) || payload.data.configCommitted !== true || !isRecord(payload.data.receipt)) return null;
+  const receipt = payload.data.receipt;
+  return receipt.committed === true
+    && typeof receipt.mutationId === 'string'
+    && typeof receipt.revision === 'number'
+    ? receipt as unknown as WorkspaceMutationReceipt
+    : null;
 }
 
 export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
@@ -143,7 +243,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
 
   const sessionId = (props as any).sessionId ?? (props as any).formContext?.sessionId;
   const rawOptions = ((props as any).options || {}) as FileUploadWidgetOptions;
-  const defaultValue = (props as any).defaultValue as string | undefined;
+  const defaultValue = (props as any).defaultValue as string | VideoValue | undefined;
   const onWhiteboard = (props as any).onWhiteboard as (() => void) | undefined;
 
   const [isUploading, setIsUploading] = useState(false);
@@ -156,9 +256,11 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
     message: string;
   } | null>(null);
 
-  const accept = rawOptions.accept || 'image/*';
   const isVideo = rawOptions.mediaType === 'video';
-  const videoPreviewStyle = rawOptions.videoPreviewStyle || 'controls';
+  const isSpine = rawOptions.assetKind === 'spine';
+  // Finder does not consistently honor compound extensions such as `.zip.flutter`.
+  // Spine validates after selection and on the server, so leave this picker unrestricted.
+  const accept = isSpine ? undefined : rawOptions.accept || 'image/*';
   const maxSize = rawOptions.maxSize ?? (isVideo ? DEFAULT_VIDEO_FILE_MAX_SIZE : DEFAULT_IMAGE_FILE_MAX_SIZE);
 
   const dimensionOptions: DimensionOptions = {
@@ -168,8 +270,22 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
 
   const hasDimensionCheck = Object.values(dimensionOptions).some((rule) => !!rule);
 
+  // Video schemas use an object value, so an empty default (`{}`) must not be
+  // treated as an uploaded Spine bundle or as a playable video.
+  const hasValue = isVideo ? isVideoValue(value) : isSpine ? isSpineAssetRef(value) : Boolean(value);
+  const videoValue = isVideo && isVideoValue(value) ? value : null;
+  const posterValue = videoValue?.poster;
+  const posterSrc = posterValue ? resolveConfigImageSrc(posterValue, sessionId) : undefined;
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [posterError, setPosterError] = useState(false);
+
+  useEffect(() => {
+    setPosterError(false);
+  }, [posterValue]);
+
   const doUpload = useCallback(
     async (file: File, skipDimensionCheck = false) => {
+      setError('');
       if (file.size > maxSize) {
         setError(`文件大小超过 ${maxSize / 1024 / 1024}MB 限制`);
         return;
@@ -196,31 +312,47 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
         if (sessionId) {
           const formData = new FormData();
           formData.append('file', file);
+          if (isSpine) {
+            formData.append('assetKind', 'spine');
+            if (rawOptions.pageId) formData.append('pageId', rawOptions.pageId);
+            if (rawOptions.configKey) formData.append('configKey', rawOptions.configKey);
+            if (rawOptions.configScope) formData.append('configScope', rawOptions.configScope);
+          }
 
           const res = await fetch(`/api/sessions/${sessionId}/assets/upload`, {
             method: 'POST',
             body: formData,
           });
 
-          const data = res.headers.get('content-type')?.includes('application/json')
-            ? await res.json()
-            : null;
+          const data = await parseUploadResponse(res);
 
-          if (!res.ok || !data?.success) {
-            setError(data?.error?.message || `上传失败（HTTP ${res.status}）`);
+          if (!res.ok || data?.success !== true) {
+            setError(getUploadErrorMessage(res, data, isVideo ? '视频' : '文件'));
             return;
           }
 
-          const isBundle =
-            data.data &&
-            typeof data.data === 'object' &&
-            (data.data as SpineBundle).skeleton !== undefined;
+          const uploadedUrl = getUploadedUrl(data);
+          const responseData = isRecord(data.data) && 'ref' in data.data ? data.data.ref : data.data;
+          const committedReceipt = getCommittedUploadReceipt(data);
+          const isBundle = isSpineBundle(responseData);
+          const isAssetRef = isSpineAssetRef(responseData);
+          if (!uploadedUrl && !isBundle && !isAssetRef) {
+            setError('服务器未返回有效的上传地址，请重试');
+            return;
+          }
 
           if (typeof value === 'string' && value.startsWith('/api/sessions/')) {
             await deleteServerFile(sessionId, value);
           }
 
-          onChange(isVideo ? { url: data.data.url } : (isBundle ? (data.data as SpineBundle) : data.data.url));
+          const nextValue = isVideo
+            ? { url: uploadedUrl! }
+            : (isAssetRef ? responseData : isBundle ? responseData : uploadedUrl!);
+          if (isSpine && committedReceipt) {
+            onChange(nextValue, { persistence: 'committed', receipt: committedReceipt });
+          } else {
+            onChange(nextValue);
+          }
         } else {
           const dataUrl = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
@@ -231,12 +363,12 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
           onChange(isVideo ? { url: dataUrl } : dataUrl);
         }
       } catch {
-        setError('上传失败，请重试');
+        setError(sessionId ? '网络连接失败，请检查网络后重试' : '上传失败，请重试');
       } finally {
         setIsUploading(false);
       }
     },
-    [sessionId, maxSize, hasDimensionCheck, dimensionOptions, value, onChange, isVideo]
+    [sessionId, maxSize, hasDimensionCheck, dimensionOptions, value, onChange, isVideo, isSpine, rawOptions.pageId, rawOptions.configKey, rawOptions.configScope]
   );
 
   const handlePosterChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -249,18 +381,26 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
     try {
       const formData = new FormData(); formData.append('file', file);
       const res = await fetch(`/api/sessions/${sessionId}/assets/upload`, { method: 'POST', body: formData });
-      const data = await res.json();
-      if (!data.success) { setError(data.error?.message || '封面上传失败'); return; }
+      const data = await parseUploadResponse(res);
+      const uploadedUrl = getUploadedUrl(data);
+      if (!res.ok || data?.success !== true || !uploadedUrl) {
+        setError(getUploadErrorMessage(res, data, '封面图片'));
+        return;
+      }
       const current = typeof value === 'object' && value !== null && 'url' in value ? value as VideoValue : { url: '' };
-      onChange({ ...current, poster: data.data.url });
-    } catch { setError('封面上传失败，请重试'); } finally { setIsUploading(false); }
+      onChange({ ...current, poster: uploadedUrl });
+    } catch { setError('网络连接失败，请检查网络后重试'); } finally { setIsUploading(false); }
   }, [sessionId, isVideo, maxSize, value, onChange]);
 
   const handleFileSelect = useCallback(
     (file: File) => {
+      if (isSpine && !/\.zip(?:\.flutter)?$/i.test(file.name)) {
+        setError('请选择 Spine 素材包（.zip 或 .zip.flutter）');
+        return;
+      }
       doUpload(file);
     },
-    [doUpload]
+    [doUpload, isSpine]
   );
 
   const handleInputChange = useCallback(
@@ -285,22 +425,49 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
     [handleFileSelect]
   );
 
-const handleClear = useCallback(async () => {
-    if (sessionId && typeof value === 'object' && value !== null && !('url' in value)) {
-      // Spine bundle：清空字段即可，zip 解压文件留在 workspace（由项目资产收集统一管理）
-      onChange(defaultValue ?? undefined);
+  const handleClear = useCallback(async () => {
+    const defaultVideo = isVideo
+      ? (isVideoConfigValue(defaultValue)
+        ? defaultValue
+        : typeof defaultValue === 'string' && defaultValue.trim()
+          ? { url: defaultValue }
+          : undefined)
+      : undefined;
+    const nextValue = isVideo
+      ? defaultVideo
+      : typeof defaultValue === 'string'
+        ? defaultValue
+        : undefined;
+
+    if (!isVideo && isSpine && isSpineAssetRef(value)) {
+      onChange(nextValue);
       return;
     }
+
+    if (!isVideo && sessionId && isSpineBundle(value)) {
+      // Spine bundle：清空字段即可，zip 解压文件留在 workspace（由项目资产收集统一管理）
+      onChange(nextValue);
+      return;
+    }
+
+    if (isVideo) {
+      // The visual state should reset immediately; asset cleanup is best effort.
+      onChange(nextValue);
+      if (sessionId && isVideoValue(value)) {
+        if (value.url !== defaultVideo?.url) await deleteServerFile(sessionId, value.url);
+        if (value.poster && value.poster !== defaultVideo?.poster) {
+          await deleteServerFile(sessionId, value.poster);
+        }
+      }
+      return;
+    }
+
     if (sessionId && typeof value === 'string' && value.startsWith('/api/sessions/')) {
       await deleteServerFile(sessionId, value);
     }
-    onChange(defaultValue ?? undefined);
-  }, [sessionId, value, onChange, defaultValue]);
 
-  const isValueFromUpload = useMemo(() => {
-    if (typeof value === 'object' && value !== null && !('url' in value)) return true;
-    return typeof value === 'string' && value.startsWith('/api/sessions/');
-  }, [value]);
+    onChange(nextValue);
+  }, [sessionId, value, onChange, defaultValue, isVideo]);
 
   return (
     <div className="space-y-2">
@@ -314,33 +481,80 @@ const handleClear = useCallback(async () => {
       />
       {isVideo && <input ref={posterInputRef} type="file" accept="image/*" onChange={handlePosterChange} className="hidden" />}
       <div className="flex items-start gap-3">
-        {value ? (
-          typeof value === 'object' && !('url' in value) ? (
+        {hasValue ? (
+          isVideo && isVideoValue(value) ? (
+            <div className="w-full max-w-[360px] overflow-hidden rounded-lg border border-border bg-card">
+              <button
+                type="button"
+                onClick={() => setPreviewOpen(true)}
+                disabled={disabled}
+                className="group relative block aspect-video w-full overflow-hidden bg-muted text-left transition-colors hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-default disabled:opacity-80"
+                aria-label={`${label || '视频'}预览`}
+              >
+                {posterSrc && !posterError ? (
+                  <img
+                    src={posterSrc}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    onError={() => setPosterError(true)}
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-muted text-muted-foreground">
+                    <Video className="h-10 w-10" aria-hidden="true" />
+                    <span className="text-xs">暂无封面</span>
+                  </div>
+                )}
+                <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors duration-200 group-hover:bg-black/20 group-focus-visible:bg-black/20">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-white shadow-sm transition-transform duration-200 group-hover:scale-105 group-focus-visible:scale-105">
+                    <Play className="ml-0.5 h-5 w-5 fill-current" aria-hidden="true" />
+                  </span>
+                </span>
+              </button>
+              <div className="flex flex-wrap gap-2 border-t border-border/70 p-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={disabled || isUploading}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                >
+                  <Repeat className="h-3.5 w-3.5" aria-hidden="true" />
+                  替换视频
+                </button>
+                <button
+                  type="button"
+                  onClick={() => posterInputRef.current?.click()}
+                  disabled={disabled || isUploading}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                >
+                  <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                  {value.poster ? '更换封面' : '添加封面'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  disabled={disabled || isUploading}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-md px-2.5 text-xs text-destructive transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                >
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  删除
+                </button>
+              </div>
+            </div>
+          ) : !isVideo && (isSpineBundle(value) || isSpineAssetRef(value)) ? (
             <div className="relative w-[80px] h-[80px] rounded-lg border border-border overflow-hidden bg-muted shrink-0 flex flex-col items-center justify-center gap-1 group">
               <FileArchive className="w-5 h-5 text-muted-foreground" />
               <span className="text-[9px] text-muted-foreground px-1 text-center leading-tight">Spine 素材包</span>
               <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                 <button type="button" onClick={() => fileInputRef.current?.click()} disabled={disabled || isUploading} className="p-2 rounded-full bg-background/90 text-foreground hover:bg-primary hover:text-primary-foreground transition-colors disabled:opacity-50" aria-label="替换压缩包"><Repeat className="w-4 h-4" /></button>
-                {!(defaultValue && value === defaultValue) && (
-                  <button
-                    type="button"
-                    onClick={handleClear}
-                    disabled={disabled || isUploading}
-                    className="p-2 rounded-full bg-background/90 text-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-50"
-                    aria-label="删除压缩包"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-          ) : isVideo && typeof value === 'object' && 'url' in value ? (
-            <div className="relative w-[180px] rounded-lg border border-border overflow-hidden bg-muted group">
-              <video src={value.url} poster={value.poster} controls={videoPreviewStyle !== 'cover'} className={videoPreviewStyle === 'compact' ? 'block w-full max-h-20 object-contain' : 'block w-full max-h-32 object-contain'} />
-              <div className="flex gap-2 p-2">
-                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={disabled || isUploading} className="text-xs text-primary">替换视频</button>
-                <button type="button" onClick={() => posterInputRef.current?.click()} disabled={disabled || isUploading} className="text-xs text-primary">{value.poster ? '替换封面' : '添加封面'}</button>
-                {!(defaultValue && value.url === defaultValue) && <button type="button" onClick={handleClear} disabled={disabled || isUploading} className="text-xs text-destructive">删除</button>}
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  disabled={disabled || isUploading}
+                  className="p-2 rounded-full bg-background/90 text-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-50"
+                  aria-label="删除压缩包"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
             </div>
           ) : (
@@ -391,6 +605,27 @@ const handleClear = useCallback(async () => {
       </div>
 
       {error && <p className="text-xs text-destructive">{error}</p>}
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-4xl border-border bg-black p-2 text-white sm:p-3 [&>button]:text-white [&>button]:opacity-90">
+          <DialogHeader className="sr-only">
+            <DialogTitle>{label ? `${label}预览` : '视频预览'}</DialogTitle>
+            <DialogDescription>视频预览弹窗</DialogDescription>
+          </DialogHeader>
+          {videoValue && (
+            <div className="overflow-hidden rounded-md bg-black">
+              <video
+                key={videoValue.url}
+                src={videoValue.url}
+                poster={posterError ? undefined : posterSrc}
+                controls
+                preload="metadata"
+                className="max-h-[80vh] w-full object-contain"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!sizeWarning} onOpenChange={(open) => !open && setSizeWarning(null)}>
         <DialogContent className="sm:max-w-md">

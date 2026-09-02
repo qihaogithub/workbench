@@ -285,6 +285,17 @@ export class WorkspaceFilePersistence {
     return this.authority.mutate(request);
   }
 
+  async commitDocumentProposal(request: WorkspaceMutationRequest): Promise<WorkspaceMutationReceipt> {
+    if (!request.sessionId) throw new Error("SESSION_NOT_FOUND");
+    const validation = this.validateWorkspaceSession({
+      projectId: request.projectId,
+      workspaceId: request.workspaceId,
+      sessionId: request.sessionId,
+    });
+    if (!validation.ok) throw new Error(validation.reason || "COLLAB_FORBIDDEN");
+    return this.authority.commitDocumentProposal(request);
+  }
+
   async stageBinary(input: { projectId: string; workspaceId: string; sessionId: string; content: Buffer }) {
     const validation = this.validateWorkspaceSession(input);
     if (!validation.ok) throw new Error(validation.reason || "COLLAB_FORBIDDEN");

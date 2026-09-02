@@ -18,6 +18,8 @@ import {
 } from "../../workspace/workspace-mutation-authority";
 import { getHocuspocusCollabServer } from "../../collab/hocuspocus-server";
 import { resolveCollabResourceKind } from "../../collab/workspace-file-persistence";
+import { aiMutationDeniedResult, assertAiMutationAllowed } from "./ai-mutation-policy";
+import { createManagedDocumentProposalResult } from "./document-proposal-tool";
 
 /**
  * 知识库文档路径正则：匹配 knowledge/ 下的 .md/.markdown/.mdown 文件
@@ -351,6 +353,9 @@ export function createWriteFileTool(
         };
       }
 
+      const mutationDecision = assertAiMutationAllowed(config, args.path, { content: args.content });
+      if (!mutationDecision.allowed) return aiMutationDeniedResult(mutationDecision, args.path);
+
       try {
         const liveWorkspace = config.workingDir
           ? resolveLiveWorkspaceMutationContext(config.workingDir)
@@ -390,6 +395,32 @@ export function createWriteFileTool(
         const existing = snapshot
           ? (snapshot.resources[args.path] ?? null)
           : await fs.promises.readFile(filePath, "utf-8").catch(() => null);
+
+        // Validate page files before any collab or Authority write. In
+        // particular, schema contract errors must never be persisted first
+        // and reported only after the mutation has completed.
+        const preflightValidation = validatePreviewFileWrite(
+          args.path,
+          args.content,
+          resolvePageRuntimeType(args.path, snapshot?.resources),
+        );
+        if (preflightValidation && !preflightValidation.ok) {
+          return {
+            content: [{ type: "text", text: `Error: ${formatRuntimeValidationInstruction(preflightValidation).trim()}` }],
+            details: { path: args.path, runtimeValidation: preflightValidation },
+            isError: true,
+          };
+        }
+
+        if (liveWorkspace && snapshot) {
+          const proposalResult = createManagedDocumentProposalResult({
+            config, dataDir: liveWorkspace.dataDir, projectId: liveWorkspace.projectId,
+            workspaceId: liveWorkspace.workspaceId, snapshot, resourcePath: args.path,
+            operationIntent: existing === null ? "create" : "replace",
+            baseContent: existing, proposedContent: args.content,
+          });
+          if (proposalResult) return proposalResult;
+        }
 
         let receipt;
         if (liveWorkspace) {

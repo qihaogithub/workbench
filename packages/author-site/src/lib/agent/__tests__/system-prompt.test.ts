@@ -64,6 +64,15 @@ describe('buildStaticSystemPrompt', () => {
     expect(prompt).toContain('未完成必要澄清前，不要调用 `requestPlanApproval`');
   });
 
+  it('小范围视频配置与空文件读取均有确定行为约束', () => {
+    const prompt = buildStaticSystemPrompt();
+    expect(prompt).toContain('format: "video"');
+    expect(prompt).toContain('无需另行请求计划审批');
+    expect(prompt).toContain('size: 0');
+    expect(prompt).toContain('不得把它臆测为图片、截图或附件');
+    expect(prompt).toContain('停止反复比较方案并直接执行');
+  });
+
   it('约束新建页面时不得自行添加配置项', () => {
     const prompt = buildStaticSystemPrompt();
     // 创建页面的详细配置约束已移入 page-lifecycle skill，基座保留 Tier 1 配置规则
@@ -134,9 +143,9 @@ describe('buildStaticSystemPrompt', () => {
     expect(prompt).toContain("readPreinstalledSkill({ name: 'page-runtime-conversion' })");
   });
 
-  it('Tier 2 页面运行时转换包含不适用场景说明', () => {
+  it('Tier 2 页面运行时转换包含复合配置升级与不适用场景说明', () => {
     const prompt = buildStaticSystemPrompt();
-    expect(prompt).toContain('此规则仅适用于用户显式触发运行时类型切换');
+    expect(prompt).toContain('原型页因必须支持复合配置类型而需要升级');
     expect(prompt).toContain('不适用于新建或重写页面');
   });
 

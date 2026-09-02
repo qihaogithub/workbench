@@ -324,7 +324,7 @@ try {
 
   const { runCli: runCliInProcess } = await import("./index.js");
   let publishRequestUrl = "";
-  let publishCookie = "";
+  let publishAuthorization = "";
   let cloudPublishOutput = "";
   const originalFetch = globalThis.fetch;
   const originalStdoutWrite = process.stdout.write;
@@ -333,7 +333,7 @@ try {
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     publishRequestUrl = input.toString();
     const headers = new Headers(init?.headers);
-    publishCookie = headers.get("cookie") ?? "";
+    publishAuthorization = headers.get("authorization") ?? "";
     return Response.json({
       success: true,
       data: {
@@ -365,7 +365,7 @@ try {
   const cloudPublished = JSON.parse(cloudPublishOutput.trim()) as Record<string, unknown>;
   assert.equal(cloudPublished.ok, true);
   assert.equal(publishRequestUrl, `https://author-site.test/api/projects/${createdData.id}/publish`);
-  assert.equal(publishCookie.includes("auth_token=test-token"), true);
+  assert.equal(publishAuthorization, "Bearer test-token");
   const cloudPublishData = cloudPublished.data as {
     artifactSummary?: { demoCount: number; projectJsonPath?: string };
     accessUrls?: { viewerUrl?: string; dataUrl?: string };

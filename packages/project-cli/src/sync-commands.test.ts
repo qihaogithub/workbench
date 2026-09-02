@@ -35,8 +35,8 @@ try {
   globalThis.fetch = (async (input, init) => {
     const url = new URL(input.toString());
     assert.equal(
-      new Headers(init?.headers).get("cookie"),
-      "auth_token=test-token",
+      new Headers(init?.headers).get("authorization"),
+      "Bearer test-token",
     );
     if (url.pathname.endsWith("/import") && init?.method === "POST") {
       const archive = Buffer.from(await new Response(init.body).arrayBuffer());

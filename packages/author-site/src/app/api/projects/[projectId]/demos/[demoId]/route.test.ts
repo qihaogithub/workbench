@@ -311,6 +311,33 @@ describe("project demo route live Workspace page metadata writes", () => {
     expect(fs.readFileSync(path.join(workspacePath, "workspace-tree.json"), "utf-8")).toContain("旧名称");
   });
 
+  it("Authority 不可用时返回可操作提示，而不是底层 fetch 错误", async () => {
+    commitWorkspaceMutation.mockRejectedValueOnce(
+      new MockWorkspaceAuthorityClientError(
+        "WORKSPACE_AUTHORITY_NOT_READY",
+        "fetch failed",
+        503,
+      ),
+    );
+    const { DELETE } = await import("./route");
+
+    const response = await DELETE(
+      createRequest({ sessionId: "session-1" }),
+      { params: Promise.resolve({ projectId: "project-1", demoId: "page-1" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body).toMatchObject({
+      success: false,
+      error: {
+        code: "FILE_WRITE_ERROR",
+        message: "Workspace Authority 不可用，请确认 agent-service 已启动",
+        details: { authorityCode: "WORKSPACE_AUTHORITY_NOT_READY" },
+      },
+    });
+  });
+
   it("live Workspace 恢复删除页面通过 Authority 一次性提交页面文件和 workspace-tree", async () => {
     fs.rmSync(path.join(workspacePath, "demos", "page-1"), { recursive: true, force: true });
     fs.writeFileSync(

@@ -2,6 +2,7 @@ import { PreviewRuntimeContractError, type RuntimeContractIssue } from '@workben
 import { compilePreviewPageSource } from '@workbench/preview-contract/compiler';
 import { checkConfigSchemaAgainstPrototype } from '@workbench/shared/demo/config-runtime-compatibility';
 import { resolvePagePresentation } from '@workbench/shared';
+import { validateConfigSchemaContract } from './schema-contract-validation';
 
 type ToolRuntimeValidationStage = RuntimeContractIssue['stage'] | 'prototype_contract';
 type PrototypeGateDecision =
@@ -309,6 +310,24 @@ export function validatePreviewFileWrite(
               instruction: '请在 config.schema.json 的 $demo.presentation 中设置 version、mode、viewport、heightBehavior、preset 和 source；页面视口写入 presentation.viewport。',
             },
           ],
+        };
+      }
+
+      const contractIssues = validateConfigSchemaContract(parsed);
+      if (contractIssues.length > 0) {
+        return {
+          ok: false,
+          file: normalizedPath,
+          pageId,
+          issues: contractIssues.map((issue) => ({
+            file: normalizedPath,
+            pageId,
+            stage: 'schema_contract' as const,
+            code: issue.code,
+            severity: 'error' as const,
+            message: issue.message,
+            instruction: issue.instruction,
+          })),
         };
       }
 

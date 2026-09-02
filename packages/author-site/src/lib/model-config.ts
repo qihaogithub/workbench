@@ -10,7 +10,6 @@
 import { readDbConfig } from "./db-config";
 import { getModelEnvConfig } from "./runtime-config";
 import type { BackendProvidersConfig } from "@workbench/shared";
-import type { ImageDescriptionConfig } from "./agent-providers";
 
 const CONFIG_ID = "model_config";
 const CACHE_TTL = 60 * 1000; // 1 分钟缓存
@@ -45,13 +44,11 @@ export interface ModelConfigData {
     /** @deprecated 旧结构: 名称过滤器,从 autoEnableRules type=nameFilter 兼容 */
     nameFilters: string[];
   };
-  multimodalModels: string[];
   /**
    * AI 后端供应商配置(用于 agent-service 的 LLM 后端)
    * 字段缺失时视为空(agent-service 走 .env PI_AGENT_PROVIDERS fallback)
    */
   backendProviders?: BackendProvidersConfig;
-  imageDescription?: ImageDescriptionConfig;
 }
 
 let cachedConfig: CachedConfig | null = null;
@@ -77,7 +74,6 @@ function readFromEnv(): ModelConfigData {
       defaultModelIds,
       nameFilters,
     },
-    multimodalModels: [],
   };
 }
 
@@ -91,17 +87,10 @@ function readFromEnv(): ModelConfigData {
  */
 function normalizeConfig(dbConfig: Record<string, any>): ModelConfigData {
   const frontend = dbConfig.frontend || {};
-  const multimodalModels: string[] = Array.isArray(dbConfig.multimodalModels)
-    ? dbConfig.multimodalModels
-    : [];
   const backendProviders: BackendProvidersConfig | undefined =
     dbConfig.backendProviders &&
     Array.isArray(dbConfig.backendProviders.providers)
       ? (dbConfig.backendProviders as BackendProvidersConfig)
-      : undefined;
-  const imageDescription: ImageDescriptionConfig | undefined =
-    dbConfig.imageDescription && typeof dbConfig.imageDescription === "object"
-      ? (dbConfig.imageDescription as ImageDescriptionConfig)
       : undefined;
 
   // 读取新结构
@@ -163,9 +152,7 @@ function normalizeConfig(dbConfig: Record<string, any>): ModelConfigData {
       defaultModelIds,
       nameFilters,
     },
-    multimodalModels,
     backendProviders,
-    imageDescription,
   };
 }
 

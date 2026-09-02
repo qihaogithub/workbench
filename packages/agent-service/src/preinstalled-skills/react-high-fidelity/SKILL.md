@@ -124,7 +124,9 @@ import { RivePlayer } from "@preview/sdk";
 
 ### SpinePlayer
 
-播放 Spine 骨骼动画。素材需打包为 `.zip` 上传（内含骨架 + 图集 + 纹理），上传后 zip 服务端自动解压返回各文件 URL。
+播放 Spine 骨骼动画。作者配置层只能上传一个 `.zip` 或 Flutter `.zip.flutter` 素材包（内含骨架、图集、纹理和可选事件音频）。服务端会校验并解析素材包，配置值保存为 `SpineAssetRefV1`；骨架、图集、纹理和音频 URL 只是服务端/运行时内部结果，禁止在 schema 中拆成多个上传字段。
+
+`spineAsset` 是可选字段：未上传时不要提供空对象默认值，页面应使用静态 fallback。不得把 `/api/sessions/` URL、骨架路径、atlas 路径或纹理路径写入 Props、配置值或页面代码。
 
 支持的素材命名与版本：
 - 骨架：`.skel`（二进制）、`.skel.bytes`（Flutter/Unity 导出）、`.json`（JSON 格式）。
@@ -136,23 +138,21 @@ import { RivePlayer } from "@preview/sdk";
 import { SpinePlayer } from "@preview/sdk";
 
 <SpinePlayer
-  skeleton={spineFiles.skeleton}
-  atlas={spineFiles.atlas}
-  texture={spineFiles.texture}
+  src={spineAsset}
   animation="idle"
   loop={true}
+  audioEnabled={spineAudioEnabled}
   fallback={<div>动画加载中...</div>}
 />
 ```
 
 | Props | 类型 | 默认值 | 说明 |
 |-------|------|--------|------|
-| `skeleton` | string | - | `.skel`/`.skel.bytes` 或 `.json` 骨架文件 URL |
-| `atlas` | string | - | `.atlas`/`.atlas.txt` 图集文件 URL |
-| `texture` | string | - | `.png` 纹理文件 URL |
+| `src` | SpineAssetRefV1 | - | 已上传并校验的 Spine ZIP 素材引用 |
 | `animation` | string | - | 指定播放的动画名（不填默认第一条） |
 | `loop` | boolean | true | 是否循环 |
-| `fallback` | ReactNode | null | 加载失败或必填字段缺失时展示 |
+| `audioEnabled` | boolean | true | 是否播放 Spine event 关联的压缩包内音效 |
+| `fallback` | ReactNode | null | 加载失败或素材引用缺失时展示 |
 | `onError` | function | - | 加载失败回调 |
 | `className` | string | - | 容器 class |
 | `style` | object | - | 容器样式 |
@@ -161,6 +161,20 @@ Schema 配置示例：
 
 ```json
 {
-  "spineSrc": { "type": "string", "format": "file", "ui:options": { "accept": ".zip", "visibleWhen": { "field": "mediaType", "equals": "spine" } } }
+  "spineAsset": {
+    "type": "object",
+    "format": "spine",
+    "title": "Spine 素材",
+    "properties": {
+      "kind": { "const": "spine" },
+      "version": { "const": 1 },
+      "assetId": { "type": "string", "pattern": "^spine_[a-f0-9]{64}$" }
+    },
+    "required": ["kind", "version", "assetId"],
+    "additionalProperties": false,
+    "ui:options": { "accept": ".zip", "group": "Spine 动画" }
+  },
+  "spineAnimation": { "type": "string", "default": "", "ui:options": { "group": "Spine 动画" } },
+  "spineLoop": { "type": "boolean", "default": true, "ui:options": { "group": "Spine 动画" } }
 }
 ```

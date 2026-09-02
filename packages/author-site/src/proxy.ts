@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { verifyToken, getAuthCookieName } from "@/lib/auth/jwt";
+import {
+  extractBearerToken,
+  verifyToken,
+  getAuthCookieName,
+} from "@/lib/auth/jwt";
 import {
   verifyAdminSecret,
   setAdminCookie,
@@ -44,7 +48,8 @@ function applyPublicModuleCorsHeaders(headers: Headers) {
 }
 
 export async function proxy(request: NextRequest) {
-  const token = request.cookies.get(getAuthCookieName())?.value;
+  const cookieToken = request.cookies.get(getAuthCookieName())?.value;
+  const token = cookieToken || extractBearerToken(request.headers.get("authorization"));
   const user = token ? await verifyToken(token) : null;
   const pathname = request.nextUrl.pathname;
   const origin = request.headers.get("origin");

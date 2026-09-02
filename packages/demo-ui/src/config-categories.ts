@@ -113,3 +113,24 @@ export function getSchemaFieldCountByCategory(
     (prop) => getSchemaPropertyCategory(prop) === normalizedFilter,
   ).length;
 }
+
+/**
+ * 统计按页面绑定关系生效的项目级配置字段数量。
+ * bindings 未提供时表示调用方尚未提供绑定信息，沿用展示全部字段的兼容语义；
+ * 显式传入空数组表示该页面不消费项目级配置。
+ */
+export function getSchemaFieldCountByBindings(
+  schema: string | undefined,
+  bindings: string[] | undefined,
+  categoryFilter?: string,
+): number {
+  const properties = getSchemaProperties(schema);
+  const allowedKeys = bindings === undefined ? undefined : new Set(bindings);
+  return Object.entries(properties).filter(([key, property]) => {
+    if (allowedKeys && !allowedKeys.has(key)) return false;
+    return configFieldMatchesCategoryFilter(
+      { uiOptions: property["ui:options"] as Record<string, unknown> | undefined },
+      categoryFilter,
+    );
+  }).length;
+}

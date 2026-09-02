@@ -91,6 +91,65 @@ describe("DocumentView knowledge creation", () => {
     );
   });
 
+  it("project mode maps documentId to the UI id without sending workspace paths", async () => {
+    global.fetch = jest.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/projects/project-1/documents?sessionId=session-1") {
+        return jsonResponse({
+          success: true,
+          data: [{
+            projectId: "project-1",
+            documentId: "doc-1",
+            title: "项目规范",
+            description: "项目规范",
+            source: "user",
+            updatedAt: "2026-09-01T00:00:00.000Z",
+            contentHash: "hash",
+            sizeBytes: 12,
+          }],
+        });
+      }
+      if (url === "/api/projects/project-1/documents/doc-1?sessionId=session-1") {
+        return jsonResponse({
+          success: true,
+          data: {
+            projectId: "project-1",
+            documentId: "doc-1",
+            title: "项目规范",
+            description: "项目规范",
+            source: "user",
+            updatedAt: "2026-09-01T00:00:00.000Z",
+            contentHash: "hash",
+            sizeBytes: 12,
+            content: "# 项目规范",
+          },
+        });
+      }
+      if (url.startsWith("/api/design-specs") || url.includes("workspace/files?include=conventions")) {
+        return jsonResponse({ success: true, data: [] });
+      }
+      return jsonResponse({ success: false }, false);
+    }) as jest.Mock;
+
+    render(
+      <DocumentView
+        workingDir="/workspace"
+        projectId="project-1"
+        sessionId="session-1"
+        documentApiMode="project"
+      />,
+    );
+
+    expect(await screen.findByText("项目规范")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId("document-editor")).toHaveTextContent("# 项目规范");
+    });
+    const calls = (global.fetch as jest.Mock).mock.calls.map(([input]) => String(input));
+    expect(calls).toContain("/api/projects/project-1/documents?sessionId=session-1");
+    expect(calls).toContain("/api/projects/project-1/documents/doc-1?sessionId=session-1");
+    expect(calls.some((url) => url.startsWith("/api/knowledge"))).toBe(false);
+  });
+
   it("creates an unnamed document, opens it, and commits an inline rename", async () => {
     const user = userEvent.setup();
     render(
@@ -372,6 +431,7 @@ describe("DocumentView knowledge creation", () => {
         workingDir="/workspace"
         projectId="project-1"
         sessionId="session-1"
+        userRole="admin"
         pages={[{ id: "page-1", name: "未创建页面公约" }]}
       />,
     );
@@ -502,5 +562,61 @@ describe("DocumentView knowledge creation", () => {
       String(input).startsWith("/api/knowledge/content"),
     );
     expect(contentRequests).toHaveLength(2);
+  });
+
+  it("keeps the links tray collapsed and switches its relation tabs when opened", async () => {
+    (global.fetch as jest.Mock).mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/knowledge/content")) {
+        return jsonResponse({ success: true, data: { content: "正文" } });
+      }
+      if (url.startsWith("/api/knowledge?")) {
+        return jsonResponse({
+          success: true,
+          data: [{
+            id: "doc-1",
+            title: "项目说明",
+            source: "user",
+            description: "",
+            fileName: "project.md",
+            addedAt: "2026-08-12T00:00:00.000Z",
+            updatedAt: "2026-08-12T00:00:00.000Z",
+            sizeBytes: 10,
+          }],
+        });
+      }
+      if (url.includes("/markdown-references/outgoing")) {
+        return jsonResponse({ success: true, data: { records: [] } });
+      }
+      if (url.includes("/markdown-references/mentions")) {
+        return jsonResponse({ success: true, data: { mentions: [] } });
+      }
+      if (url.includes("/markdown-references/backlinks")) {
+        return jsonResponse({ success: true, data: { records: [] } });
+      }
+      if (url.includes("/attachments") || url.startsWith("/api/design-specs")) {
+        return jsonResponse({ success: true, data: [] });
+      }
+      return jsonResponse({ success: false }, false);
+    });
+    const user = userEvent.setup();
+    render(
+      <DocumentView
+        workingDir="/workspace"
+        projectId="project-1"
+        workspaceId="workspace-1"
+        sessionId="session-1"
+      />,
+    );
+
+    await screen.findByText("正文");
+    const toggle = await screen.findByTestId("markdown-reference-tray-toggle");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("tab", { name: /此文档链接到/ })).not.toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(screen.getByRole("tab", { name: /此文档链接到/ })).toHaveAttribute("data-state", "active");
+    expect(screen.getByRole("tab", { name: /链接到此文档/ })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /提及但未链接/ })).toBeInTheDocument();
   });
 });

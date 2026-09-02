@@ -7,10 +7,15 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./document-proposal": "./src/document-proposal.ts",
+    "./document-proposal-store": "./src/document-proposal-store.ts",
+    "./documents": "./src/documents/index.ts",
+    "./markdown-references": "./src/markdown-references/index.ts",
     "./html-import": "./src/html-import.ts",
     "./html-import-bundle": "./src/html-import-bundle.ts",
     "./html-import-asset-store": "./src/html-import-asset-store.ts",
-    "./page-design-spec-sync": "./src/page-design-spec-sync.ts"
+    "./page-design-spec-sync": "./src/page-design-spec-sync.ts",
+    "./workspace-resource-registry": "./src/workspace-resource-registry.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -22,11 +27,13 @@
     "@workbench/preview-contract": "workspace:*",
     "@workbench/shared": "workspace:*",
     "@workbench/sketch-core": "workspace:*",
+    "better-sqlite3": "12.11.1",
     "parse5": "7.3.0",
     "tar": "^7.4.3",
     "yauzl": "^3.4.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.11.16",
     "typescript": "^5.3.3",
     "@types/yauzl": "^2.10.3",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef, type MouseEvent } from "react";
 import {
   Dialog,
   DialogContent,
@@ -12,19 +12,32 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Save, Loader2, Pencil } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
-import { DocumentEditor } from "@workbench/demo-ui/DocumentEditor";
+import {
+  DocumentEditor,
+  type MarkdownReferenceClickHandler,
+  type MarkdownReferenceContext,
+  type MarkdownReferenceProvider,
+} from "@workbench/demo-ui/DocumentEditor";
 import type { CollabRoomDescriptor } from "@workbench/shared";
+import type { MarkdownReferenceCandidate, MarkdownReferenceTarget } from "@workbench/shared/markdown-reference";
+import { decodeMarkdownReferenceUri, serializeMarkdownReference } from "@workbench/shared/markdown-reference";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
 import { cjk } from "@streamdown/cjk";
 import { useCollabDocument, type CollabUser } from "@/hooks/useCollabDocument";
+import {
+  MarkdownReferenceLinksPanel,
+  type MarkdownReferenceMention,
+} from "./MarkdownReferenceLinksPanel";
+import { navigateToMarkdownMention } from "./markdown-reference-navigation";
+import { toKnowledgeItem } from "./document-api-adapter";
 
 export interface KnowledgeItem {
   id: string;
   title: string;
   source: "system" | "user";
   description: string;
-  fileName: string;
+  fileName?: string;
   addedAt: string;
   updatedAt: string;
   sizeBytes?: number;
@@ -45,8 +58,10 @@ interface KnowledgeDocDialogProps {
   item: KnowledgeItem | null;
   workingDir?: string;
   projectId?: string;
+  documentApiMode?: "legacy" | "project";
   workspaceId?: string;
   sessionId?: string;
+  onReferenceClick?: MarkdownReferenceClickHandler;
   collabUser?: Partial<CollabUser>;
   onSaved: (item?: KnowledgeItem) => void;
 }
@@ -71,8 +86,10 @@ export function KnowledgeDocDialog({
   item,
   workingDir,
   projectId,
+  documentApiMode = "legacy",
   workspaceId,
   sessionId,
+  onReferenceClick,
   collabUser,
   onSaved,
 }: KnowledgeDocDialogProps) {
@@ -88,12 +105,15 @@ export function KnowledgeDocDialog({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const referenceEditorContainerRef = useRef<HTMLDivElement>(null);
   const collabDescriptor = useMemo<CollabRoomDescriptor | null>(() => {
     if (
       !open ||
       activeMode !== "edit" ||
       !item ||
       item.source === "system" ||
+      documentApiMode !== "legacy" ||
+      !item.fileName ||
       !projectId ||
       !workspaceId ||
       !sessionId
@@ -108,8 +128,54 @@ export function KnowledgeDocDialog({
       resourcePath: `knowledge/${item.fileName}`,
       kind: "knowledge-document",
     };
-  }, [activeMode, item, open, projectId, sessionId, workspaceId]);
+  }, [activeMode, documentApiMode, item, open, projectId, sessionId, workspaceId]);
   const collab = useCollabDocument(collabDescriptor, collabUser);
+  const referenceProvider = useMemo<MarkdownReferenceProvider>(() => {
+    return async ({ query, signal }) => {
+      if (!projectId) return [];
+      const params = new URLSearchParams({ q: query, kind: "project,page,document" });
+      if (sessionId) params.set("sessionId", sessionId);
+      const response = await fetch(
+        `/api/projects/${encodeURIComponent(projectId)}/markdown-references/candidates?${params.toString()}`,
+        { signal },
+      );
+      if (!response.ok) return [];
+      const payload = await response.json();
+      const candidates = payload?.data?.candidates ?? payload?.data;
+      return Array.isArray(candidates) ? (candidates as MarkdownReferenceCandidate[]) : [];
+    };
+  }, [projectId, sessionId]);
+  const referenceContext = useMemo<MarkdownReferenceContext | undefined>(() => {
+    if (!projectId || !workspaceId || !item || item.source === "system") return undefined;
+    return {
+      source: { kind: "knowledge-document", projectId, workspaceId, docId: item.id },
+      policy: {
+        allowedTargetKinds: ["project", "page", "document"],
+        sameProjectOnly: true,
+        allowUnresolved: false,
+      },
+    };
+  }, [item, projectId, workspaceId]);
+  const referenceTarget = useMemo<MarkdownReferenceTarget | undefined>(() => {
+    if (!projectId || !item || item.source === "system") return undefined;
+    return { kind: "document", projectId, docId: item.id };
+  }, [item, projectId]);
+  const handleReferenceClick = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      const anchor = (event.target as HTMLElement).closest<HTMLAnchorElement>("a[href]");
+      const href = anchor?.getAttribute("href");
+      if (!href?.startsWith("wb://")) return;
+      const target = decodeMarkdownReferenceUri(href);
+      if (!target) return;
+      event.preventDefault();
+      onReferenceClick?.({ target, labelSnapshot: anchor?.textContent?.trim() || "" });
+    },
+    [onReferenceClick],
+  );
+  const handleUnlinkedMentionNavigate = useCallback((mention: MarkdownReferenceMention) => {
+    const current = activeMode === "edit" ? editContent : content;
+    navigateToMarkdownMention(referenceEditorContainerRef.current, current, mention);
+  }, [activeMode, content, editContent]);
 
   // 打开弹窗时重置模式并加载数据
   useEffect(() => {
@@ -124,10 +190,19 @@ export function KnowledgeDocDialog({
       return;
     }
 
-    if (item && workingDir) {
+    if (item && (workingDir || (documentApiMode === "project" && projectId))) {
       setLoading(true);
       setHasChanges(false);
-      readFileContent(workingDir, item.fileName)
+      const contentPromise = documentApiMode === "project" && projectId
+        ? fetch(`/api/projects/${encodeURIComponent(projectId)}/documents/${encodeURIComponent(item.id)}${sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : ""}`).then(async (response) => {
+            const payload = await response.json();
+            if (!response.ok || !payload?.success) throw new Error(payload?.error?.message || "读取失败");
+            return payload.data?.content || "";
+          })
+        : workingDir
+          ? readFileContent(workingDir, item.fileName || "")
+          : Promise.resolve("");
+      contentPromise
         .then((text) => {
           setContent(text);
           setEditContent(text);
@@ -139,7 +214,7 @@ export function KnowledgeDocDialog({
         })
         .finally(() => setLoading(false));
     }
-  }, [open, initialMode, item, workingDir]);
+  }, [documentApiMode, initialMode, item, open, projectId, sessionId, workingDir]);
 
   useEffect(() => {
     if (!collabDescriptor || activeMode !== "edit") return;
@@ -158,16 +233,18 @@ export function KnowledgeDocDialog({
   }, [editContent, editDescription, content, activeMode, item]);
 
   const handleSave = async () => {
-    if (!workingDir) return;
+    if (!workingDir && !(documentApiMode === "project" && projectId)) return;
     setSaving(true);
     try {
       if (activeMode === "add") {
         if (!addTitle.trim() || !addContent.trim()) return;
-        const params = new URLSearchParams({ workingDir });
-        if (projectId) params.set("projectId", projectId);
-        if (sessionId) params.set("sessionId", sessionId);
+        const params = workingDir ? new URLSearchParams({ workingDir }) : new URLSearchParams();
+        if (projectId && documentApiMode === "legacy") params.set("projectId", projectId);
+        if (sessionId && documentApiMode === "legacy") params.set("sessionId", sessionId);
         const res = await fetch(
-          `/api/knowledge?${params.toString()}`,
+          documentApiMode === "project" && projectId
+            ? `/api/projects/${encodeURIComponent(projectId)}/documents${sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : ""}`
+            : `/api/knowledge?${params.toString()}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -181,7 +258,7 @@ export function KnowledgeDocDialog({
         const data = await res.json();
         if (data.success) {
           toast({ title: "添加成功" });
-          onSaved(data.data);
+          onSaved(documentApiMode === "project" ? toKnowledgeItem(data.data.snapshot) : data.data as KnowledgeItem);
           onOpenChange(false);
         } else {
           toast({
@@ -197,13 +274,15 @@ export function KnowledgeDocDialog({
         const contentToSave = collabDescriptor
           ? collab.ytext?.toString() ?? editContent
           : editContent;
-        const params = new URLSearchParams({ workingDir });
-        if (projectId) params.set("projectId", projectId);
-        if (sessionId) params.set("sessionId", sessionId);
+        const params = workingDir ? new URLSearchParams({ workingDir }) : new URLSearchParams();
+        if (projectId && documentApiMode === "legacy") params.set("projectId", projectId);
+        if (sessionId && documentApiMode === "legacy") params.set("sessionId", sessionId);
         const res = await fetch(
-          `/api/knowledge/${item.id}?${params.toString()}`,
+          documentApiMode === "project" && projectId
+            ? `/api/projects/${encodeURIComponent(projectId)}/documents/${encodeURIComponent(item.id)}${sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : ""}`
+            : `/api/knowledge/${item.id}?${params.toString()}`,
           {
-            method: "PUT",
+            method: documentApiMode === "project" ? "PATCH" : "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               description: editDescription,
@@ -216,7 +295,7 @@ export function KnowledgeDocDialog({
           setContent(contentToSave);
           setEditContent(contentToSave);
           toast({ title: "保存成功" });
-          onSaved(data.data);
+          onSaved(documentApiMode === "project" ? toKnowledgeItem(data.data.snapshot) : data.data as KnowledgeItem);
           onOpenChange(false);
         } else {
           toast({
@@ -314,6 +393,8 @@ export function KnowledgeDocDialog({
               <DocumentEditor
                 value={addContent}
                 onChange={setAddContent}
+                referenceProvider={projectId ? referenceProvider : undefined}
+                onReferenceClick={onReferenceClick}
               />
             </div>
           </div>
@@ -343,6 +424,9 @@ export function KnowledgeDocDialog({
                   replaceCollabText(collab.ytext, nextValue);
                 }
               }}
+              referenceContext={referenceContext}
+              referenceProvider={referenceContext ? referenceProvider : undefined}
+              onReferenceClick={onReferenceClick}
             />
           </div>
           {collabDescriptor && (
@@ -357,7 +441,7 @@ export function KnowledgeDocDialog({
 
     // 阅读模式 - 使用 Streamdown 渲染 Markdown
     return (
-      <div className="markdown-editor-content text-sm overflow-y-auto h-full scrollbar-thin px-3 py-2">
+      <div className="markdown-editor-content text-sm overflow-y-auto h-full scrollbar-thin px-3 py-2" onClick={handleReferenceClick}>
         <Streamdown plugins={{ code, cjk }} controls={{ table: false, code: true }}>
           {content || "（无内容）"}
         </Streamdown>
@@ -431,8 +515,30 @@ export function KnowledgeDocDialog({
       <DialogContent className="max-w-4xl h-[85vh] flex flex-col">
         <DialogHeader>{renderTitle()}</DialogHeader>
 
-        <div className="flex-1 min-h-0 flex flex-col border rounded-md overflow-hidden p-4">
+        <div ref={referenceEditorContainerRef} className="relative flex-1 min-h-0 flex flex-col border rounded-md overflow-hidden p-4">
           {renderContent()}
+          {projectId && workspaceId && item?.source === "user" && (
+            <MarkdownReferenceLinksPanel
+              projectId={projectId}
+              sessionId={sessionId}
+              source={referenceContext?.source}
+              target={referenceTarget}
+              onTargetClick={(target, labelSnapshot) => onReferenceClick?.({ target, labelSnapshot })}
+              onMentionNavigate={handleUnlinkedMentionNavigate}
+              onMentionClick={(mention) => {
+                if (!window.confirm(`将「${mention.label}」转换为项目引用？`)) return;
+                const current = activeMode === "edit" ? editContent : content;
+                if (current.slice(mention.start, mention.end) !== mention.label) return;
+                const next = `${current.slice(0, mention.start)}${serializeMarkdownReference(mention.target, mention.label)}${current.slice(mention.end)}`;
+                if (activeMode === "edit") {
+                  setEditContent(next);
+                  if (collabDescriptor) replaceCollabText(collab.ytext, next);
+                } else {
+                  setContent(next);
+                }
+              }}
+            />
+          )}
         </div>
 
         {renderFooter()}

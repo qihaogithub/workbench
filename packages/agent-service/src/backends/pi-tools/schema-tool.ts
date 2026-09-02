@@ -2,6 +2,7 @@ import { Type, type Static } from 'typebox';
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type { AgentConfig } from '../../core/types';
 import { logger } from '../../utils/logger';
+import { validateConfigSchemaContract } from './schema-contract-validation';
 
 const SchemaValidateParams = Type.Object({
   schema: Type.String({ description: 'JSON schema string to validate' }),
@@ -22,6 +23,16 @@ export function createSchemaValidateTool(_config: AgentConfig): AgentTool<typeof
           return {
             content: [{ type: 'text', text: 'Error: Schema must be a valid JSON object' }],
             details: { valid: false, error: 'Not a valid JSON object' },
+            isError: true,
+          };
+        }
+
+        const contractIssues = validateConfigSchemaContract(schema);
+        if (contractIssues.length > 0) {
+          const summary = contractIssues.map((issue) => `${issue.code}: ${issue.message}`).join('\n');
+          return {
+            content: [{ type: 'text', text: `Error: Config schema contract validation failed.\n${summary}` }],
+            details: { valid: false, error: 'Config schema contract violation', issues: contractIssues },
             isError: true,
           };
         }
