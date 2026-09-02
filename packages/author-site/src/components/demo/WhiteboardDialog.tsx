@@ -92,7 +92,7 @@ function managedAssetIdFromSource(source: string | null): string | null {
 
 function newDocument(target?: WhiteboardCommitTarget): WhiteboardDocument {
   // The page editor's default scene includes a sticky note, which is outside
-  // the html-css-v1 bridge. Start whiteboard drafts with bridge-safe nodes so
+  // the html-css-v2 bridge. Start whiteboard drafts with bridge-safe nodes so
   // an untouched new draft can still be committed.
   const baseScene = createDefaultSketchScene();
   const scene = {
@@ -198,7 +198,8 @@ async function localizeDocumentAssets(
   projectId: string,
 ): Promise<WhiteboardDocumentV2> {
   // JSON cloning keeps this client component compatible with older browsers
-  // and the jsdom test runtime while the document contains only JSON data.
+  // and the jsdom test runtime while retaining JSON-only image dimensions and
+  // crop metadata through asset localization.
   const next = JSON.parse(JSON.stringify(document)) as WhiteboardDocumentV2;
   const localized = new Map<string, { imageId: string; url: string }>();
   for (const node of next.scene.nodes) {
@@ -434,7 +435,7 @@ export function WhiteboardDialog({
     if (!result.value) {
       setCodeError(
         result.diagnostics
-          .map((item) => `${item.code}: ${item.message}`)
+          .map((item) => item.message)
           .join("\n") || "代码导入失败",
       );
       onDiagnosticEvent?.({
@@ -656,6 +657,10 @@ export function WhiteboardDialog({
         <DialogContent
           className="flex h-[min(92vh,900px)] max-w-[min(96vw,1440px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(96vw,1440px)]"
           onEscapeKeyDown={(event) => {
+            if (event.target instanceof Element && event.target.closest('[data-sketch-escape-scope="local"]')) {
+              event.preventDefault();
+              return;
+            }
             if (dirty || saving) {
               event.preventDefault();
               requestClose();

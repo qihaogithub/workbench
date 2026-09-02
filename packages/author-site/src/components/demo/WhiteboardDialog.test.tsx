@@ -83,6 +83,19 @@ describe("WhiteboardDialog", () => {
     expect(onOpenChange).not.toHaveBeenCalled();
   });
 
+  it("does not close the host dialog for Escape from an inner sketch overlay", () => {
+    const { onOpenChange } = renderDialog();
+    const dialog = screen.getByRole("dialog", { name: "配置图片白板" });
+    const innerOverlay = globalThis.document.createElement("div");
+    innerOverlay.dataset.sketchEscapeScope = "local";
+    dialog.appendChild(innerOverlay);
+
+    fireEvent.keyDown(innerOverlay, { key: "Escape" });
+
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "配置图片白板" })).toBeInTheDocument();
+  });
+
   it("exports PNG, commits atomically, and returns committed config values", async () => {
     const { onOpenChange, onCommitted, onDiagnosticEvent } = renderDialog();
     (global.fetch as jest.Mock).mockResolvedValue({
@@ -210,6 +223,35 @@ describe("WhiteboardDialog", () => {
     expect(screen.getByText("有未回填的本地修改")).toBeInTheDocument();
     expect(onDiagnosticEvent).toHaveBeenCalledWith(
       expect.objectContaining({ name: "whiteboard.code_import.completed" }),
+    );
+  });
+
+  it("shows Chinese diagnostics when code import is rejected", () => {
+    renderDialog();
+    fireEvent.click(screen.getByRole("button", { name: "代码导入/导出" }));
+    fireEvent.change(screen.getByLabelText("白板 HTML 代码"), {
+      target: {
+        value:
+          '<main data-sketch-canvas="v1" data-width="100" data-height="100"><div data-sketch-id="box" data-sketch-kind="rect">不支持的文本</div></main>',
+      },
+    });
+    fireEvent.change(screen.getByLabelText("白板 CSS 代码"), {
+      target: {
+        value:
+          '[data-sketch-id="box"] { left:0; top:0; width:20px; height:20px; }',
+      },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "导入到白板" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "图形节点不能包含文本内容",
+    );
+    expect(screen.getByRole("alert")).not.toHaveTextContent(
+      "nodes cannot contain text content",
+    );
+    expect(screen.getByRole("alert")).not.toHaveTextContent(
+      "UNSUPPORTED_NODE_CONTENT",
     );
   });
 
