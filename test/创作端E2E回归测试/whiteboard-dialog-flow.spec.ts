@@ -132,9 +132,19 @@ test("宿主编辑页可打开白板、导入代码并提交带 revision 的 doc
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "回填图片" })).toBeEnabled();
 
-  for (const label of ["菱形", "线条", "箭头", "画笔", "便签", "橡皮"]) {
+  for (const label of ["选择", "抓手", "矩形", "圆形", "文本", "图片", "画笔"]) {
+    await expect(page.getByRole("button", { name: label, exact: true })).toHaveCount(1);
+  }
+  for (const label of ["菱形", "线条", "箭头", "便签", "橡皮", "橡皮擦"]) {
     await expect(page.getByRole("button", { name: label, exact: true })).toHaveCount(0);
   }
+  const brushGroup = page.getByRole("group", { name: "画笔工具" });
+  await expect(brushGroup.getByRole("button", { name: "打开画笔设置" })).toBeVisible();
+  await brushGroup.getByRole("button", { name: "打开画笔设置" }).click();
+  const brushSettings = page.getByRole("dialog", { name: "画笔设置" });
+  await expect(brushSettings.getByRole("button", { name: "画笔", exact: true })).toBeVisible();
+  await expect(brushSettings.getByRole("button", { name: "橡皮擦", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "关闭画笔设置" }).click();
 
   const commitRequests: Array<Record<string, unknown>> = [];
   await page.route(

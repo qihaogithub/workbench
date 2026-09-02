@@ -16,6 +16,8 @@ import {
   SketchPropertyPanel,
   SketchPageEditor,
   SketchPagePreview,
+  SKETCH_EDITOR_PROFILES,
+  WHITEBOARD_EDITOR_TOOLS,
   useSketchEditorState,
   useSketchHistory,
   type SketchEditorCanvasHandle,
@@ -90,8 +92,7 @@ function ControlledGroupedBrushSurfaceEditor({ initialScene }: { initialScene: S
     <>
       <SketchEditorSurface
         scene={value}
-        allowedTools={["select", "hand", "rect", "ellipse", "pencil", "eraser", "text", "image"]}
-        brushToolbarMode="grouped"
+        profile="whiteboard"
         fillContainer
         onSceneChange={setValue}
       />
@@ -1346,6 +1347,42 @@ describe("sketch-react", () => {
         expect.arrayContaining([expect.objectContaining({ type: "diamond", x: 40, y: 50 })]),
       );
     });
+  });
+
+  it("uses the shared whiteboard profile without filtering existing scene nodes", () => {
+    const whiteboardScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "existing-diamond", type: "diamond", x: 24, y: 24, width: 100, height: 70, text: "已有菱形" },
+        { id: "existing-path", type: "path", x: 40, y: 140, width: 140, height: 24, path: "M 40 152 L 180 152", points: [{ x: 40, y: 152 }, { x: 180, y: 152 }] },
+      ],
+    };
+
+    render(
+      <SketchEditorSurface
+        scene={whiteboardScene}
+        profile="whiteboard"
+        allowedTools={["select"]}
+        brushToolbarMode="individual"
+        fillContainer
+      />,
+    );
+
+    expect(SKETCH_EDITOR_PROFILES.whiteboard.visibleTools).toEqual(WHITEBOARD_EDITOR_TOOLS);
+    expect(SKETCH_EDITOR_PROFILES.whiteboard.creationTools).toBe(WHITEBOARD_EDITOR_TOOLS);
+    expect(SKETCH_EDITOR_PROFILES.whiteboard.brushToolbarMode).toBe("grouped");
+
+    for (const label of ["选择", "抓手", "矩形", "圆形", "文本", "图片"]) {
+      expect(screen.getByRole("button", { name: label })).toBeTruthy();
+    }
+    expect(screen.getByRole("group", { name: "画笔工具" })).toBeTruthy();
+    for (const label of ["菱形", "线条", "箭头", "便签", "橡皮"]) {
+      expect(screen.queryByRole("button", { name: label })).toBeNull();
+    }
+    expect(screen.queryByRole("button", { name: "橡皮擦" })).toBeNull();
+    expect(document.querySelector('[data-sketch-node-id="existing-diamond"]')).not.toBeNull();
+    expect(document.querySelector('[data-sketch-node-id="existing-path"]')).not.toBeNull();
   });
 
   it("presents the grouped brush entry with accessible secondary controls", async () => {

@@ -182,15 +182,6 @@ function newDocument(target?: WhiteboardCommitTarget, sessionId?: string): White
   };
 }
 
-const WHITEBOARD_ALLOWED_TOOLS = [
-  "select",
-  "hand",
-  "rect",
-  "ellipse",
-  "text",
-  "image",
-] as const;
-
 function draftFingerprint(value: WhiteboardDocument): string {
   return JSON.stringify({ ...asWhiteboardDocumentV3(value), updatedAt: 0 });
 }
@@ -813,7 +804,7 @@ export function WhiteboardDialog({
             ) : (
               <SketchEditorSurface
                 scene={document.scene}
-                allowedTools={WHITEBOARD_ALLOWED_TOOLS}
+                profile="whiteboard"
                 fillContainer
                 onSceneChange={handleSceneChange}
               />

@@ -8,14 +8,14 @@ jest.mock("@workbench/sketch-react", () => ({
   SketchEditorSurface: ({
     scene,
     onSceneChange,
-    allowedTools,
+    profile,
   }: {
     scene: { nodes?: Array<{ id: string }> };
     onSceneChange: (next: unknown) => void;
-    allowedTools?: readonly string[];
+    profile?: string;
   }) => (
     <div>
-      <output data-testid="allowed-tools">{allowedTools?.join(",")}</output>
+      <output data-testid="editor-profile">{profile}</output>
       <output data-testid="scene-node-ids">
         {(scene.nodes ?? []).map((node) => node.id).join(",")}
       </output>
@@ -64,15 +64,10 @@ describe("WhiteboardDialog", () => {
     global.fetch = jest.fn();
   });
 
-  it("exposes only the six creation-side whiteboard tools", () => {
+  it("uses the shared whiteboard editor profile", () => {
     renderDialog();
 
-    expect(screen.getByTestId("allowed-tools")).toHaveTextContent(
-      "select,hand,rect,ellipse,text,image",
-    );
-    expect(screen.getByTestId("allowed-tools")).not.toHaveTextContent(
-      /diamond|line|arrow|pencil|sticky|eraser/,
-    );
+    expect(screen.getByTestId("editor-profile")).toHaveTextContent("whiteboard");
   });
 
   it("starts a new whiteboard with the title but without the factory note", async () => {
