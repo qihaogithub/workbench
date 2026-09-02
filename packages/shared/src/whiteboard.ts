@@ -83,10 +83,30 @@ export interface WhiteboardSafeArea {
   height: number;
 }
 
-/** Current durable whiteboard envelope. */
+/** Durable whiteboard envelope used by the legacy bridge-era writer. */
 export interface WhiteboardDocumentV2 {
   id: string;
   version: 2;
+  /** Monotonic CAS revision owned by this document, independent of Workspace revision. */
+  documentRevision: number;
+  scene: SketchSceneDocument;
+  nodeSemantics: Record<string, WhiteboardNodeSemantics>;
+  safeArea?: WhiteboardSafeArea;
+  editorView: WhiteboardEditorView;
+  updatedAt: number;
+}
+
+/**
+ * Full-fidelity durable whiteboard envelope.
+ *
+ * `scene` is the single source of truth for editing and rendering.  Unlike
+ * the HTML/CSS bridge projection, this envelope intentionally retains every
+ * SketchScene field, including scene assets, bindings and metadata.
+ */
+export interface WhiteboardDocumentV3 {
+  id: string;
+  version: 3;
+  sceneFormat: "sketch-scene-v1";
   /** Monotonic CAS revision owned by this document, independent of Workspace revision. */
   documentRevision: number;
   scene: SketchSceneDocument;
@@ -105,8 +125,10 @@ export interface LegacyWhiteboardDocument {
   updatedAt: number;
 }
 
-/** Public type accepts legacy reads; all newly-created/serialized documents are v2. */
-export type WhiteboardDocument = WhiteboardDocumentV2 | LegacyWhiteboardDocument;
+/** Public type accepts legacy reads; new normalized documents are V3. */
+export type WhiteboardDocument = WhiteboardDocumentV3 | WhiteboardDocumentV2 | LegacyWhiteboardDocument;
+
+export type WhiteboardDocumentVersion = WhiteboardDocument["version"];
 
 export interface WhiteboardBinding {
   id: string;
@@ -114,6 +136,8 @@ export interface WhiteboardBinding {
   whiteboardId: string;
   /** Document revision represented by outputAssetHash. */
   documentRevisionAtOutput: number;
+  /** Version of the document represented by outputAssetHash. Optional for legacy bindings. */
+  documentVersion?: 2 | 3;
   /** @deprecated read-only alias accepted for pre-v2 bindings. */
   sceneRevision?: number;
   outputAssetHash: string;
@@ -121,7 +145,10 @@ export interface WhiteboardBinding {
 }
 
 export const WHITEBOARD_DOCUMENT_MAX_BYTES = 2 * 1024 * 1024;
-export const WHITEBOARD_DOCUMENT_VERSION = 2 as const;
+export const WHITEBOARD_DOCUMENT_VERSION = 3 as const;
+export const WHITEBOARD_DOCUMENT_V2_VERSION = 2 as const;
+export const WHITEBOARD_DOCUMENT_V3_VERSION = 3 as const;
+export const WHITEBOARD_SCENE_FORMAT = "sketch-scene-v1" as const;
 export const WHITEBOARD_BRIDGE_NODE_TYPES = ["group", "rect", "ellipse", "image", "text", "button"] as const;
 
 export function whiteboardDocumentPath(id: string): string {
@@ -134,17 +161,18 @@ export function isWhiteboardDocument(value: unknown): value is WhiteboardDocumen
   if (typeof document.id !== "string" || !/^[a-zA-Z0-9_-]{1,80}$/.test(document.id)) return false;
   const version = document.version;
   const scene = document.scene as SketchSceneDocument | undefined;
-  if ((version !== 1 && version !== 2) || !scene || !validateSketchSceneDocument(scene).valid) return false;
+  if ((version !== 1 && version !== 2 && version !== 3) || !scene || !validateSketchSceneDocument(scene).valid) return false;
+  if (version === 3 && document.sceneFormat !== WHITEBOARD_SCENE_FORMAT) return false;
+  if (version !== 3 && document.sceneFormat !== undefined) return false;
   const view = document.editorView as WhiteboardEditorView | undefined;
   if (!view || !Number.isFinite(view.zoom) || view.zoom <= 0) return false;
-  if (!Number.isFinite(view.offsetX) || !Number.isFinite(view.offsetY) || !Number.isFinite(document.updatedAt)) return false;
-  if (version === 2) {
+  if (!Number.isFinite(view.offsetX) || !Number.isFinite(view.offsetY) || !Number.isFinite(document.updatedAt) || (document.updatedAt as number) < 0) return false;
+  if (version === 2 || version === 3) {
     const documentRevision = document.documentRevision;
     const nodeSemantics = document.nodeSemantics;
     if (!Number.isInteger(documentRevision) || (documentRevision as number) < 0) return false;
     if (!nodeSemantics || typeof nodeSemantics !== "object" || Array.isArray(nodeSemantics)) return false;
     const nodeIds = new Set(scene.nodes.map((node) => node.id));
-    if (scene.nodes.some((node) => !(WHITEBOARD_BRIDGE_NODE_TYPES as readonly string[]).includes(node.type))) return false;
     for (const [nodeId, semantics] of Object.entries(nodeSemantics)) {
       if (!nodeIds.has(nodeId) || !semantics || typeof semantics !== "object" || Array.isArray(semantics)) return false;
       if (semantics.role !== undefined && !WHITEBOARD_NODE_ROLES.has(semantics.role)) return false;
@@ -164,6 +192,7 @@ export function isWhiteboardBinding(value: unknown): value is WhiteboardBinding 
   return typeof binding.id === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(binding.id)
     && typeof binding.whiteboardId === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(binding.whiteboardId)
     && typeof binding.outputAssetHash === "string" && Number.isInteger(documentRevision) && (documentRevision as number) >= 0
+    && (binding.documentVersion === undefined || binding.documentVersion === 2 || binding.documentVersion === 3)
     && Number.isFinite(binding.updatedAt) && Boolean(target)
     && (target!.scope === "page" || target!.scope === "project")
     && (target!.scope === "page"
@@ -196,21 +225,42 @@ function isSafeArea(value: WhiteboardSafeArea, scene: SketchSceneDocument): bool
 }
 
 export function getWhiteboardDocumentRevision(document: WhiteboardDocument | null | undefined): number {
-  return document?.version === 2 && Number.isInteger(document.documentRevision) ? document.documentRevision : 0;
+  return (document?.version === 2 || document?.version === 3) && Number.isInteger(document.documentRevision)
+    ? document.documentRevision
+    : 0;
 }
 
 export function asWhiteboardDocumentV2(document: WhiteboardDocument): WhiteboardDocumentV2 {
   if (document.version === 2) return document;
+  const { sceneFormat: _sceneFormat, ...legacyEnvelope } = document.version === 3 ? document : { ...document, sceneFormat: undefined };
   const nodeSemantics: Record<string, WhiteboardNodeSemantics> = {};
   return {
-    ...document,
+    ...legacyEnvelope,
     version: 2,
-    documentRevision: 0,
-    nodeSemantics,
-    // Legacy scene metadata/assets/bindings were never part of the whiteboard
-    // bridge. Strip those non-authoritative projections during the one-way
-    // read normalization; unsupported node kinds remain visible to the core
-    // validator and therefore still block an unsafe write.
-    scene: { ...document.scene, assets: [], bindings: {}, metadata: {} },
+    documentRevision: document.version === 3 ? document.documentRevision : 0,
+    nodeSemantics: document.version === 3 ? { ...document.nodeSemantics } : nodeSemantics,
+    // This is a compatibility envelope for the code bridge, not a scene
+    // canonicalizer. Keep the complete scene so callers can explicitly choose
+    // whether to project it through the restricted bridge.
+    scene: { ...document.scene },
   };
+}
+
+/** Upgrade a legacy/V2 read into the full-fidelity V3 envelope. */
+export function asWhiteboardDocumentV3(document: WhiteboardDocument): WhiteboardDocumentV3 {
+  if (document.version === 3) return document;
+  return {
+    ...document,
+    version: 3,
+    sceneFormat: WHITEBOARD_SCENE_FORMAT,
+    documentRevision: document.version === 2 && Number.isInteger(document.documentRevision)
+      ? document.documentRevision
+      : 0,
+    nodeSemantics: document.version === 2 ? { ...document.nodeSemantics } : {},
+    scene: { ...document.scene },
+  };
+}
+
+export function isWhiteboardDocumentV3(value: unknown): value is WhiteboardDocumentV3 {
+  return isWhiteboardDocument(value) && value.version === 3;
 }

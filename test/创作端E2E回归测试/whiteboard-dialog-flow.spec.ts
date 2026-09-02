@@ -132,6 +132,10 @@ test("宿主编辑页可打开白板、导入代码并提交带 revision 的 doc
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "回填图片" })).toBeEnabled();
 
+  for (const label of ["菱形", "线条", "箭头", "画笔", "便签", "橡皮"]) {
+    await expect(page.getByRole("button", { name: label, exact: true })).toHaveCount(0);
+  }
+
   const commitRequests: Array<Record<string, unknown>> = [];
   await page.route(
     `/api/projects/${projectId}/whiteboards/commit`,
@@ -175,7 +179,8 @@ test("宿主编辑页可打开白板、导入代码并提交带 revision 的 doc
   expect(commitRequests[0]).toMatchObject({
     baseDocumentRevision: null,
     document: {
-      version: 2,
+      version: 3,
+      sceneFormat: "sketch-scene-v1",
       documentRevision: 0,
       scene: { pageSize: { width: 240, height: 120 } },
     },

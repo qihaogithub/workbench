@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { applyWhiteboardActions, getWhiteboardSelection, parseWhiteboardCode, resolveWhiteboardAssetRefs, serializeWhiteboardCode, transitionWhiteboardAsset, validateWhiteboardDocument } from "../src";
+import {
+  applyWhiteboardActions,
+  canonicalizeWhiteboardDocument,
+  getWhiteboardSelection,
+  parseWhiteboardCode,
+  resolveWhiteboardAssetRefs,
+  serializeWhiteboardCode,
+  transitionWhiteboardAsset,
+  validateWhiteboardBridgeDocument,
+  validateWhiteboardDocument,
+} from "../src";
 
 const html = `<main data-sketch-canvas="v1" data-width="400" data-height="300"><div data-sketch-id="box" data-sketch-kind="rect" data-sketch-role="subject"></div><div data-sketch-id="title" data-sketch-kind="text">Hello&#10;world</div></main>`;
 const css = `[data-sketch-id="box"] { left:10px; top:20px; width:100px; height:80px; z-index:2; background:#fff; border-radius:4px; }\n[data-sketch-id="title"] { left:30px; top:40px; width:200px; height:30px; z-index:3; font-size:20px; color:#111; }`;
@@ -17,6 +27,109 @@ describe("whiteboard-core bridge", () => {
     const reparsed = parseWhiteboardCode(serialized.html, serialized.css, { id: "demo" }).value!;
     expect(reparsed.scene.nodes).toEqual(parsed.scene.nodes);
     expect(reparsed.nodeSemantics).toEqual(parsed.nodeSemantics);
+  });
+
+  it("validates and canonicalizes a full V3 scene without dropping renderable fields", () => {
+    const parsed = parseWhiteboardCode(html, css, { id: "demo" }).value!;
+    const full = {
+      ...parsed,
+      version: 3 as const,
+      sceneFormat: "sketch-scene-v1" as const,
+      scene: {
+        ...parsed.scene,
+        nodes: [
+          {
+            ...parsed.scene.nodes[0],
+            name: "named rectangle",
+            metadata: { source: "manual" },
+            style: {
+              ...parsed.scene.nodes[0].style,
+              italic: true,
+              textDecoration: "underline" as const,
+              lineDash: [4, 2],
+              startArrow: "arrow" as const,
+              endArrow: "none" as const,
+            },
+          },
+          {
+            id: "diamond",
+            type: "diamond" as const,
+            x: 120,
+            y: 20,
+            width: 50,
+            height: 40,
+            zIndex: 4,
+            style: { fill: "#fff" },
+          },
+          { id: "line", type: "line" as const, x: 10, y: 120, width: 80, height: 0, zIndex: 5 },
+          { id: "arrow", type: "arrow" as const, x: 10, y: 140, width: 80, height: 20, zIndex: 6, style: { endArrow: "arrow" as const } },
+          { id: "path", type: "path" as const, x: 10, y: 170, width: 80, height: 40, zIndex: 7, path: "M 0 0 L 80 40", points: [{ x: 0, y: 0 }, { x: 80, y: 40 }] },
+          { id: "sticky", type: "sticky" as const, x: 110, y: 120, width: 80, height: 50, zIndex: 8, text: "Note" },
+          { id: "input", type: "input" as const, x: 200, y: 120, width: 100, height: 32, zIndex: 9, text: "Input" },
+          { id: "card", type: "card" as const, x: 200, y: 170, width: 100, height: 60, zIndex: 10, text: "Card" },
+          { id: "group", type: "group" as const, x: 0, y: 0, width: 400, height: 300, zIndex: 11, visible: false, children: ["diamond"] },
+        ],
+        assets: [{ id: "source", type: "image" as const, src: "assets/source.png", width: 400, height: 300, alt: "source" }],
+        bindings: { title: { text: "bound-title" } },
+        metadata: { source: "whiteboard", nested: { preserved: true } },
+      },
+    };
+
+    expect(validateWhiteboardDocument(full).valid).toBe(true);
+    const normalized = canonicalizeWhiteboardDocument(full);
+    expect(normalized).toMatchObject({ version: 3, sceneFormat: "sketch-scene-v1" });
+    expect(normalized.scene.assets).toEqual(full.scene.assets);
+    expect(normalized.scene.bindings).toEqual(full.scene.bindings);
+    expect(normalized.scene.metadata).toEqual(full.scene.metadata);
+    expect(normalized.scene.nodes.find((node) => node.id === "path")).toEqual(full.scene.nodes.find((node) => node.id === "path"));
+    expect(normalized.scene.nodes.find((node) => node.id === "box")).toEqual(full.scene.nodes.find((node) => node.id === "box"));
+
+    const equalLayerDocument = {
+      ...full,
+      nodeSemantics: {},
+      scene: {
+        ...full.scene,
+        nodes: [
+          { ...full.scene.nodes[0], id: "under", zIndex: 2 },
+          { ...full.scene.nodes[0], id: "over", zIndex: 2 },
+        ],
+      },
+    };
+    expect(canonicalizeWhiteboardDocument(equalLayerDocument).scene.nodes.map((node) => node.id)).toEqual(["under", "over"]);
+  });
+
+  it("upgrades a full V2 read to V3 while preserving the complete scene", () => {
+    const parsed = parseWhiteboardCode(html, css, { id: "demo" }).value!;
+    const v2 = {
+      ...parsed,
+      scene: { ...parsed.scene, metadata: { imported: true }, bindings: { title: { text: "bound" } } },
+    };
+    expect(validateWhiteboardDocument(v2).valid).toBe(true);
+    const normalized = canonicalizeWhiteboardDocument(v2);
+    expect(normalized.version).toBe(3);
+    expect(normalized.sceneFormat).toBe("sketch-scene-v1");
+    expect(normalized.scene.metadata).toEqual(v2.scene.metadata);
+    expect(normalized.scene.bindings).toEqual(v2.scene.bindings);
+  });
+
+  it("keeps full validation independent from the restricted bridge validator", () => {
+    const parsed = parseWhiteboardCode(html, css, { id: "demo" }).value!;
+    const full = {
+      ...parsed,
+      version: 3 as const,
+      sceneFormat: "sketch-scene-v1" as const,
+      scene: {
+        ...parsed.scene,
+        metadata: { source: "editor" },
+        nodes: [{ ...parsed.scene.nodes[0], type: "diamond" as const, name: "full-node" }],
+      },
+    };
+    expect(validateWhiteboardDocument(full).valid).toBe(true);
+    expect(validateWhiteboardBridgeDocument(full).valid).toBe(false);
+    expect(validateWhiteboardBridgeDocument(full).diagnostics.map((item) => item.code)).toEqual(
+      expect.arrayContaining(["UNSUPPORTED_SCENE_FIELD", "UNSUPPORTED_NODE"]),
+    );
+    expect(serializeWhiteboardCode(full).value).toBeUndefined();
   });
   it("keeps numeric font weights stable across canonical serialization", () => {
     const parsed = parseWhiteboardCode(
@@ -41,7 +154,7 @@ describe("whiteboard-core bridge", () => {
   });
   it("round trips intrinsic image dimensions and crop metadata through the bridge", () => {
     const parsed = parseWhiteboardCode(
-      `<main data-sketch-canvas="v1" data-width="240" data-height="180"><img data-sketch-id="hero" data-sketch-kind="image" data-asset-ref="asset_1" data-sketch-image-size="1200,800" data-sketch-image-crop="rect|0.1,0.2,0.6,0.5|10,20,200,160|contain" /></main>`,
+      `<main data-sketch-canvas="v1" data-width="240" data-height="180"><img data-sketch-id="hero" data-sketch-kind="image" data-asset-ref="asset_1" data-sketch-image-size="1200,800" data-sketch-image-crop="rect|-0.2,-0.3,0.6,0.5|10,20,200,160|contain" /></main>`,
       `[data-sketch-id="hero"] { left:30px; top:40px; width:120px; height:80px; border-color:#2563EB; border-width:4px; object-fit:contain; }`,
       { id: "demo" },
     );
@@ -51,7 +164,7 @@ describe("whiteboard-core bridge", () => {
       intrinsicHeight: 800,
       imageCrop: {
         shape: "rect",
-        sourceRect: { x: 0.1, y: 0.2, width: 0.6, height: 0.5 },
+        sourceRect: { x: -0.2, y: -0.3, width: 0.6, height: 0.5 },
         originalFrame: { x: 10, y: 20, width: 200, height: 160 },
         originalImageFit: "contain",
       },
@@ -59,7 +172,7 @@ describe("whiteboard-core bridge", () => {
 
     const serialized = serializeWhiteboardCode(parsed.value!).value!;
     expect(serialized.html).toContain('data-sketch-image-size="1200,800"');
-    expect(serialized.html).toContain('data-sketch-image-crop="rect|0.1,0.2,0.6,0.5|10,20,200,160|contain"');
+    expect(serialized.html).toContain('data-sketch-image-crop="rect|-0.2,-0.3,0.6,0.5|10,20,200,160|contain"');
     const reparsed = parseWhiteboardCode(serialized.html, serialized.css, { id: "demo" }).value!;
     expect(reparsed.scene.nodes[0]).toEqual(parsed.value!.scene.nodes[0]);
   });
@@ -70,7 +183,7 @@ describe("whiteboard-core bridge", () => {
     ).value!;
     const crop = {
       shape: "circle" as const,
-      sourceRect: { x: 0.2, y: 0.1, width: 0.5, height: 0.5 },
+      sourceRect: { x: -0.2, y: -0.1, width: 0.5, height: 0.5 },
       originalFrame: { x: 10, y: 12, width: 80, height: 60 },
       originalImageFit: "contain" as const,
     };
@@ -148,8 +261,9 @@ describe("whiteboard-core bridge", () => {
       expect(nestedHtml.slice(diagnostic!.range!.start, diagnostic!.range!.end)).toContain(`data-sketch-id="${nodeId}"`);
     }
   });
-  it("validates bridge documents", () => {
+  it("validates bridge documents with the bridge validator", () => {
     const document = parseWhiteboardCode(html, css).value!;
+    expect(validateWhiteboardBridgeDocument(document).valid).toBe(true);
     expect(validateWhiteboardDocument(document).valid).toBe(true);
   });
   it("returns structured diagnostics for unsafe CSS and resources", () => {
@@ -219,7 +333,7 @@ describe("whiteboard-core bridge", () => {
 
   it("rejects bridge documents with scene metadata or unsafe style values", () => {
     const parsed = parseWhiteboardCode(html, css, { id: "demo" }).value!;
-    expect(validateWhiteboardDocument({ ...parsed, scene: { ...parsed.scene, metadata: { source: "editor" } } }).diagnostics.map((item) => item.code)).toContain("UNSUPPORTED_SCENE_FIELD");
+    expect(validateWhiteboardBridgeDocument({ ...parsed, scene: { ...parsed.scene, metadata: { source: "editor" } } }).diagnostics.map((item) => item.code)).toContain("UNSUPPORTED_SCENE_FIELD");
     const unsafe = { ...parsed, scene: { ...parsed.scene, nodes: parsed.scene.nodes.map((node) => node.id === "box" ? { ...node, style: { ...node.style, fill: "red; color: blue" } } : node) } };
     expect(serializeWhiteboardCode(unsafe).diagnostics.map((item) => item.code)).toContain("UNSAFE_STYLE");
   });
@@ -235,7 +349,7 @@ describe("whiteboard-core bridge", () => {
         ),
       },
     };
-    const messages = validateWhiteboardDocument(invalid).diagnostics.map(
+    const messages = validateWhiteboardBridgeDocument(invalid).diagnostics.map(
       (item) => item.message,
     );
     expect(messages).toContain("场景元数据不属于当前白板代码桥接范围");
@@ -246,7 +360,7 @@ describe("whiteboard-core bridge", () => {
 
   it("rejects unknown document and node fields instead of dropping them", () => {
     const parsed = parseWhiteboardCode(html, css, { id: "demo" }).value!;
-    const invalid = validateWhiteboardDocument({
+    const invalid = validateWhiteboardBridgeDocument({
       ...parsed,
       unexpected: true,
       scene: {
@@ -276,8 +390,8 @@ describe("whiteboard-core bridge", () => {
 
   it("reports malformed scene nodes without throwing", () => {
     const malformed = { id: "demo", version: 2, documentRevision: 0, scene: { version: 1, pageSize: { width: 100, height: 100 }, nodes: [null], assets: [], bindings: {}, metadata: {} }, nodeSemantics: {}, editorView: { zoom: 1, offsetX: 0, offsetY: 0 }, updatedAt: 1 };
-    expect(() => validateWhiteboardDocument(malformed)).not.toThrow();
-    expect(validateWhiteboardDocument(malformed).valid).toBe(false);
+    expect(() => validateWhiteboardBridgeDocument(malformed)).not.toThrow();
+    expect(validateWhiteboardBridgeDocument(malformed).valid).toBe(false);
   });
 
   it("does not silently drop type-incompatible node fields", () => {

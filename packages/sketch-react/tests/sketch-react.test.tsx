@@ -18,6 +18,7 @@ import {
   SketchPagePreview,
   useSketchEditorState,
   useSketchHistory,
+  type SketchEditorCanvasHandle,
   type SketchEditorSelection,
 } from "../src";
 import { SketchPagePreview as LightweightSketchPagePreview } from "../src/preview";
@@ -78,6 +79,22 @@ function ControlledSurfaceEditor({ initialScene = scene }: { initialScene?: Sket
   return (
     <>
       <SketchEditorSurface scene={value} fillContainer onSceneChange={setValue} />
+      <output data-testid="surface-scene-json">{JSON.stringify(value)}</output>
+    </>
+  );
+}
+
+function ControlledGroupedBrushSurfaceEditor({ initialScene }: { initialScene: SketchSceneDocument }) {
+  const [value, setValue] = React.useState(initialScene);
+  return (
+    <>
+      <SketchEditorSurface
+        scene={value}
+        allowedTools={["select", "hand", "rect", "ellipse", "pencil", "eraser", "text", "image"]}
+        brushToolbarMode="grouped"
+        fillContainer
+        onSceneChange={setValue}
+      />
       <output data-testid="surface-scene-json">{JSON.stringify(value)}</output>
     </>
   );
@@ -152,11 +169,15 @@ function ControlledPartsEditorWithToolbar({
 }) {
   const [value, setValue] = React.useState(initialScene);
   const controller = useSketchEditorState(value, setValue, undefined, configData);
+  const canvasRef = React.useRef<SketchEditorCanvasHandle>(null);
+  const openImageFilePicker = React.useCallback(() => {
+    canvasRef.current?.openImageFilePicker();
+  }, []);
   return (
     <>
       <SketchLayerPanel scene={value} controller={controller} configData={configData} />
-      <SketchEditorCanvas scene={value} controller={controller} configData={configData} previewSize={{ width: 400, height: 300 }} />
-      <SketchEditorToolbar scene={value} controller={controller} configData={configData} />
+      <SketchEditorCanvas ref={canvasRef} scene={value} controller={controller} configData={configData} previewSize={{ width: 400, height: 300 }} />
+      <SketchEditorToolbar scene={value} controller={controller} configData={configData} onImageUpload={openImageFilePicker} />
       <output data-testid="scene-json">{JSON.stringify(value)}</output>
     </>
   );
@@ -171,11 +192,15 @@ function ControlledPartsEditorWithToolbarAndProperties({
 }) {
   const [value, setValue] = React.useState(initialScene);
   const controller = useSketchEditorState(value, setValue, undefined, configData);
+  const canvasRef = React.useRef<SketchEditorCanvasHandle>(null);
+  const openImageFilePicker = React.useCallback(() => {
+    canvasRef.current?.openImageFilePicker();
+  }, []);
   return (
     <>
       <SketchLayerPanel scene={value} controller={controller} configData={configData} />
-      <SketchEditorCanvas scene={value} controller={controller} configData={configData} previewSize={{ width: 400, height: 300 }} />
-      <SketchEditorToolbar scene={value} controller={controller} configData={configData} />
+      <SketchEditorCanvas ref={canvasRef} scene={value} controller={controller} configData={configData} previewSize={{ width: 400, height: 300 }} />
+      <SketchEditorToolbar scene={value} controller={controller} configData={configData} onImageUpload={openImageFilePicker} />
       <SketchPropertyPanel scene={value} controller={controller} configData={configData} />
       <output data-testid="scene-json">{JSON.stringify(value)}</output>
     </>
@@ -383,6 +408,10 @@ function runCanvasContextMenuCommand(label: string) {
 
 function readRenderedScene(): SketchSceneDocument {
   return JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
+}
+
+function readSurfaceRenderedScene(): SketchSceneDocument {
+  return JSON.parse(screen.getByTestId("surface-scene-json").textContent ?? "{}") as SketchSceneDocument;
 }
 
 function getPresetColorButtons(container: HTMLElement): HTMLButtonElement[] {
@@ -704,7 +733,7 @@ describe("sketch-react", () => {
     });
   });
 
-  it("uses validated fallback scenes for invalid preview inputs", () => {
+  it("fails closed for invalid preview inputs instead of replacing them with defaults", () => {
     const invalidScene = {
       version: 1,
       pageSize: { width: 400, height: 300 },
@@ -721,7 +750,8 @@ describe("sketch-react", () => {
 
     expect(document.querySelector('[data-sketch-node-id="bad"]')).toBeNull();
     expect(screen.queryByTestId("sketch-selection-box")).toBeNull();
-    expect(document.body.innerHTML).toContain("手绘页面");
+    expect(screen.getByRole("alert").textContent).toContain("白板场景无效");
+    expect(document.body.innerHTML).not.toContain("手绘页面");
 
     unmount();
 
@@ -735,7 +765,8 @@ describe("sketch-react", () => {
 
     expect(document.querySelector('[data-sketch-node-id="bad"]')).toBeNull();
     expect(screen.queryByTestId("sketch-selection-box")).toBeNull();
-    expect(document.body.innerHTML).toContain("手绘页面");
+    expect(screen.getByRole("alert").textContent).toContain("白板场景无效");
+    expect(document.body.innerHTML).not.toContain("手绘页面");
   });
 
   it("emits scene changes from the controlled editor", () => {
@@ -1169,6 +1200,31 @@ describe("sketch-react", () => {
     });
   });
 
+  it("imports image files directly from the image command", async () => {
+    const emptyScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [],
+    };
+    render(<ControlledPartsEditorWithToolbar initialScene={emptyScene} />);
+
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    const palette = screen.getByRole("dialog", { name: "草图命令面板" });
+    fireEvent.change(within(palette).getByLabelText("搜索草图命令"), { target: { value: "图片" } });
+    fireEvent.click(within(palette).getByRole("button", { name: /图片/ }));
+    fireEvent.change(screen.getByLabelText("图片导入文件"), {
+      target: { files: [new File(["image-bytes"], "command.png", { type: "image/png" })] },
+    });
+
+    await waitFor(() => {
+      const parsed = readRenderedScene();
+      const imageNode = parsed.nodes.find((node) => node.type === "image");
+      expect(imageNode).toMatchObject({ type: "image", name: "command.png", alt: "command.png" });
+      expect(imageNode?.src).toContain("data:image/png;base64");
+      expect(screen.queryByRole("dialog", { name: "草图命令面板" })).toBeNull();
+    });
+  });
+
   it("keeps inner whiteboard Escape handling inside the overlay", () => {
     const outerKeyDown = vi.fn();
     render(
@@ -1290,6 +1346,151 @@ describe("sketch-react", () => {
         expect.arrayContaining([expect.objectContaining({ type: "diamond", x: 40, y: 50 })]),
       );
     });
+  });
+
+  it("presents the grouped brush entry with accessible secondary controls", async () => {
+    const emptyScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [],
+    };
+    render(<ControlledGroupedBrushSurfaceEditor initialScene={emptyScene} />);
+
+    const brushGroup = screen.getByRole("group", { name: "画笔工具" });
+    expect(within(brushGroup).getByRole("button", { name: "画笔" })).toBeTruthy();
+    expect(within(brushGroup).getByRole("button", { name: "打开画笔设置" })).toBeTruthy();
+    expect(within(brushGroup).queryByRole("button", { name: "橡皮擦" })).toBeNull();
+
+    fireEvent.click(within(brushGroup).getByRole("button", { name: "打开画笔设置" }));
+    const settings = screen.getByRole("dialog", { name: "画笔设置" });
+    expect(within(settings).getByRole("button", { name: "画笔" })).toBeTruthy();
+    expect(within(settings).getByRole("button", { name: "橡皮擦" })).toBeTruthy();
+    expect(within(settings).getByRole("radio", { name: "画笔颜色 #111827" }).getAttribute("aria-checked")).toBe("true");
+    expect(within(settings).getByRole("radio", { name: "画笔粗细 中" }).getAttribute("aria-checked")).toBe("true");
+
+    fireEvent.click(within(settings).getByRole("radio", { name: "画笔颜色 #7c3aed" }));
+    fireEvent.click(within(settings).getByRole("radio", { name: "画笔粗细 粗" }));
+    expect(within(settings).getByRole("radio", { name: "画笔颜色 #7c3aed" }).getAttribute("aria-checked")).toBe("true");
+    expect(within(settings).getByRole("radio", { name: "画笔粗细 粗" }).getAttribute("aria-checked")).toBe("true");
+
+    fireEvent.keyDown(settings, { key: "Escape" });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "画笔设置" })).toBeNull();
+      expect(within(brushGroup).getByRole("button", { name: "画笔" }).getAttribute("aria-pressed")).toBe("false");
+    });
+
+    fireEvent.click(within(brushGroup).getByRole("button", { name: "打开画笔设置" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "画笔设置" })).getByRole("button", { name: "画笔" }));
+    expect(within(brushGroup).getByRole("button", { name: "画笔" }).getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.pointerDown(getCanvasStage(), { clientX: 10, clientY: 10 });
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "画笔设置" })).toBeNull());
+  });
+
+  it("keeps the grouped brush active and writes temporary color and width into new paths", async () => {
+    const emptyScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [],
+    };
+    render(<ControlledGroupedBrushSurfaceEditor initialScene={emptyScene} />);
+    const stage = getCanvasStage();
+    setCanvasStageRect(stage);
+    const brushGroup = screen.getByRole("group", { name: "画笔工具" });
+
+    fireEvent.click(within(brushGroup).getByRole("button", { name: "打开画笔设置" }));
+    const settings = screen.getByRole("dialog", { name: "画笔设置" });
+    fireEvent.click(within(settings).getByRole("radio", { name: "画笔颜色 #7c3aed" }));
+    fireEvent.click(within(settings).getByRole("radio", { name: "画笔粗细 粗" }));
+    fireEvent.click(within(brushGroup).getByRole("button", { name: "画笔" }));
+
+    dispatchPointerEvent(stage, "pointerdown", 20, 20);
+    dispatchPointerEvent(stage, "pointerup", 20, 20);
+    expect(readSurfaceRenderedScene().nodes).toHaveLength(0);
+    dispatchPointerEvent(stage, "pointerdown", 20, 20);
+    dispatchPointerEvent(stage, "pointermove", 30, 30);
+    fireEvent.keyDown(window, { key: "Escape" });
+    dispatchPointerEvent(stage, "pointerup", 30, 30);
+    expect(readSurfaceRenderedScene().nodes).toHaveLength(0);
+
+    dispatchPointerEvent(stage, "pointerdown", 40, 50);
+    dispatchPointerEvent(stage, "pointermove", 80, 70);
+    dispatchPointerEvent(stage, "pointermove", 120, 90);
+    dispatchPointerEvent(stage, "pointerup", 120, 90);
+    dispatchPointerEvent(stage, "pointerdown", 180, 120);
+    dispatchPointerEvent(stage, "pointermove", 220, 135);
+    dispatchPointerEvent(stage, "pointerup", 220, 135);
+
+    await waitFor(() => {
+      const paths = readSurfaceRenderedScene().nodes.filter((node) => node.type === "path");
+      expect(paths).toHaveLength(2);
+      expect(paths).toEqual(expect.arrayContaining([
+        expect.objectContaining({ style: expect.objectContaining({ stroke: "#7c3aed", strokeWidth: 5 }) }),
+      ]));
+      expect(within(brushGroup).getByRole("button", { name: "画笔" }).getAttribute("aria-pressed")).toBe("true");
+    });
+
+    fireEvent.click(within(brushGroup).getByRole("button", { name: "打开画笔设置" }));
+    const openSettings = screen.getByRole("dialog", { name: "画笔设置" });
+    fireEvent.click(within(openSettings).getByRole("button", { name: "橡皮擦" }));
+    expect(within(brushGroup).getByRole("button", { name: "画笔" }).getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("erases only visible unlocked paths and keeps the deletion undoable", async () => {
+    const eraseScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "path-a", type: "path", x: 30, y: 39, width: 120, height: 2, path: "M 30 40 L 150 41", points: [{ x: 30, y: 40 }, { x: 150, y: 41 }] },
+        { id: "path-b", type: "path", x: 30, y: 69, width: 120, height: 2, path: "M 30 70 L 150 71", points: [{ x: 30, y: 70 }, { x: 150, y: 71 }] },
+        { id: "rect", type: "rect", x: 30, y: 100, width: 120, height: 40 },
+        { id: "text", type: "text", x: 30, y: 160, width: 120, height: 30, text: "Keep me" },
+        { id: "locked-path", type: "path", x: 30, y: 209, width: 120, height: 2, path: "M 30 210 L 150 211", points: [{ x: 30, y: 210 }, { x: 150, y: 211 }], locked: true },
+        { id: "hidden-path", type: "path", x: 30, y: 239, width: 120, height: 2, path: "M 30 240 L 150 241", points: [{ x: 30, y: 240 }, { x: 150, y: 241 }], visible: false },
+      ],
+    };
+    render(<ControlledGroupedBrushSurfaceEditor initialScene={eraseScene} />);
+    const stage = getCanvasStage();
+    setCanvasStageRect(stage);
+    const brushGroup = screen.getByRole("group", { name: "画笔工具" });
+    fireEvent.click(within(brushGroup).getByRole("button", { name: "打开画笔设置" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "画笔设置" })).getByRole("button", { name: "橡皮擦" }));
+
+    dispatchPointerEvent(stage, "pointerdown", 90, 40);
+    dispatchPointerEvent(stage, "pointermove", 90, 70);
+    dispatchPointerEvent(stage, "pointerup", 90, 70);
+
+    await waitFor(() => {
+      const parsed = readSurfaceRenderedScene();
+      expect(parsed.nodes.find((node) => node.id === "path-a")).toBeUndefined();
+      expect(parsed.nodes.find((node) => node.id === "path-b")).toBeUndefined();
+      expect(parsed.nodes.find((node) => node.id === "rect")).toBeDefined();
+      expect(parsed.nodes.find((node) => node.id === "text")).toBeDefined();
+      expect(parsed.nodes.find((node) => node.id === "locked-path")).toBeDefined();
+      expect(parsed.nodes.find((node) => node.id === "hidden-path")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("撤销"));
+    await waitFor(() => {
+      expect(readSurfaceRenderedScene().nodes.map((node) => node.id)).toEqual(expect.arrayContaining(["path-a", "path-b"]));
+    });
+    fireEvent.click(screen.getByLabelText("重做"));
+    await waitFor(() => {
+      expect(readSurfaceRenderedScene().nodes.map((node) => node.id)).not.toEqual(expect.arrayContaining(["path-a", "path-b"]));
+    });
+  });
+
+  it("keeps the default toolbar presentation with separate pencil and eraser actions", () => {
+    const emptyScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [],
+    };
+    render(<ControlledSurfaceEditor initialScene={emptyScene} />);
+
+    expect(screen.getByRole("button", { name: "画笔" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "橡皮" })).toBeTruthy();
+    expect(screen.queryByRole("group", { name: "画笔工具" })).toBeNull();
   });
 
   it("keeps fill-container stages in scene coordinates for pointer mapping", () => {
@@ -2715,7 +2916,7 @@ describe("sketch-react", () => {
     });
   });
 
-  it("creates image nodes from drawing drag bounds", async () => {
+  it("does not create an image placeholder from a blank canvas drag", async () => {
     render(<ControlledEditor />);
 
     const stage = document.querySelector("[data-sketch-stage]") as HTMLElement;
@@ -2733,28 +2934,17 @@ describe("sketch-react", () => {
         toJSON: () => ({}),
       }) as DOMRect;
 
+    const originalSceneJson = screen.getByTestId("scene-json").textContent;
     fireEvent.click(screen.getByLabelText("图片"));
     dispatchPointerEvent(stage, "pointerdown", 280, 180);
     dispatchPointerEvent(stage, "pointermove", 360, 225);
     dispatchPointerEvent(stage, "pointerup", 360, 225);
 
-    await waitFor(() => {
-      const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
-      const imageNode = parsed.nodes.find((node) => node.type === "image");
-      expect(imageNode).toMatchObject({
-        type: "image",
-        name: "图片",
-        x: 280,
-        y: 180,
-        width: 80,
-        height: 45,
-        alt: "图片占位",
-      });
-      expect(imageNode?.src).toContain("data:image/svg+xml");
-    });
+    expect(screen.getByTestId("scene-json").textContent).toBe(originalSceneJson);
+    expect(screen.getByLabelText("图片").className).not.toContain("bg-violet-600");
   });
 
-  it("imports image files from the image tool click entry", async () => {
+  it("imports image files directly from the image toolbar button", async () => {
     render(<ControlledEditor />);
 
     const stage = document.querySelector("[data-sketch-stage]") as HTMLElement;
@@ -2773,8 +2963,6 @@ describe("sketch-react", () => {
       }) as DOMRect;
 
     fireEvent.click(screen.getByLabelText("图片"));
-    dispatchPointerEvent(stage, "pointerdown", 280, 180);
-    dispatchPointerEvent(stage, "pointerup", 280, 180);
     fireEvent.change(screen.getByLabelText("图片导入文件"), {
       target: { files: [new File(["image-bytes"], "hero.png", { type: "image/png" })] },
     });
@@ -2786,6 +2974,32 @@ describe("sketch-react", () => {
         type: "image",
         name: "hero.png",
         alt: "hero.png",
+      });
+      expect(imageNode?.src).toContain("data:image/png;base64");
+    });
+  });
+
+  it("imports image files directly from the shared surface toolbar", async () => {
+    const emptyScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [],
+    };
+    render(<ControlledSurfaceEditor initialScene={emptyScene} />);
+
+    setCanvasStageRect(getCanvasStage());
+    fireEvent.click(screen.getByLabelText("图片"));
+    fireEvent.change(screen.getByLabelText("图片导入文件"), {
+      target: { files: [new File(["image-bytes"], "surface.png", { type: "image/png" })] },
+    });
+
+    await waitFor(() => {
+      const parsed = JSON.parse(screen.getByTestId("surface-scene-json").textContent ?? "{}") as SketchSceneDocument;
+      const imageNode = parsed.nodes.find((node) => node.type === "image");
+      expect(imageNode).toMatchObject({
+        type: "image",
+        name: "surface.png",
+        alt: "surface.png",
       });
       expect(imageNode?.src).toContain("data:image/png;base64");
     });
@@ -2806,8 +3020,6 @@ describe("sketch-react", () => {
         const stage = getCanvasStage();
         setCanvasStageRect(stage);
         fireEvent.click(screen.getByLabelText("图片"));
-        dispatchPointerEvent(stage, "pointerdown", 200, 140);
-        dispatchPointerEvent(stage, "pointerup", 200, 140);
         fireEvent.change(screen.getByLabelText("图片导入文件"), {
           target: { files: [new File(["image-bytes"], "decoded.png", { type: "image/png" })] },
         });
@@ -2928,7 +3140,9 @@ describe("sketch-react", () => {
       expect(screen.getByTestId("sketch-image-crop-dim").getAttribute("fill")).toBe("rgba(0,0,0,0.5)");
     });
 
-    fireEvent.keyDown(window, { key: "Escape" });
+    // Clicking outside both the crop frame and the current image content commits and exits crop mode.
+    dispatchPointerEvent(stage, "pointerdown", 350, 250);
+    dispatchPointerEvent(stage, "pointerup", 350, 250);
     await waitFor(() => expect(screen.queryByTestId("sketch-image-crop-overlay")).toBeNull());
     expect(readRenderedScene().nodes.find((node) => node.id === "image")?.imageCrop?.shape).toBe("rect");
 
@@ -2961,6 +3175,118 @@ describe("sketch-react", () => {
     });
   });
 
+  it("pans image content inside a fixed crop frame and preserves blank regions", async () => {
+    const imageScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [{
+        id: "image",
+        type: "image",
+        x: 80,
+        y: 60,
+        width: 200,
+        height: 100,
+        src: "data:image/png;base64,abc",
+        style: { imageFit: "contain", stroke: "#111827", strokeWidth: 2 },
+      }],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={imageScene} />);
+    clickLayerNode("image");
+    fireEvent.click(screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" }).querySelector('[aria-label="悬浮裁剪图片"]') as HTMLElement);
+    fireEvent.click(within(screen.getByRole("menu", { name: "裁剪图片" })).getByRole("menuitem", { name: "矩形裁剪" }));
+
+    await waitFor(() => expect(screen.getByTestId("sketch-image-crop-overlay")).toBeTruthy());
+    const stage = getCanvasStage();
+    setCanvasStageRect(stage);
+    const eastHandle = screen.getByTestId("sketch-resize-handle-e");
+    dispatchPointerEvent(eastHandle, "pointerdown", 280, 110);
+    dispatchPointerEvent(stage, "pointermove", 230, 110);
+    dispatchPointerEvent(stage, "pointerup", 230, 110);
+    await waitFor(() => expect(readRenderedScene().nodes.find((node) => node.id === "image")).toMatchObject({ width: 150, height: 100 }));
+
+    // Dragging inside the crop frame moves only the source content.
+    dispatchPointerEvent(stage, "pointerdown", 150, 100);
+    dispatchPointerEvent(stage, "pointermove", 150, 140);
+    dispatchPointerEvent(stage, "pointerup", 150, 140);
+    await waitFor(() => {
+      const node = readRenderedScene().nodes.find((item) => item.id === "image");
+      expect(node).toMatchObject({
+        x: 80,
+        y: 60,
+        width: 150,
+        height: 100,
+        imageCrop: { sourceRect: { x: 0, y: -0.4, width: 0.75, height: 1 } },
+      });
+      expect(document.querySelector('image[data-sketch-node-id="image"]')?.getAttribute("y")).toBe("100");
+      expect(document.querySelector('image[data-sketch-node-id="image"]')?.getAttribute("clip-path")).toBeNull();
+      expect(screen.getByTestId("sketch-image-crop-overlay").querySelector('mask rect[fill="white"]')?.getAttribute("y")).toBe("100");
+    });
+
+    // The part of the translated image outside the crop node remains draggable.
+    dispatchPointerEvent(stage, "pointerdown", 260, 120);
+    dispatchPointerEvent(stage, "pointermove", 260, 130);
+    dispatchPointerEvent(stage, "pointerup", 260, 130);
+    await waitFor(() => {
+      const node = readRenderedScene().nodes.find((item) => item.id === "image");
+      expect(node).toMatchObject({ x: 80, y: 60, width: 150, height: 100 });
+      expect(node?.imageCrop?.sourceRect).toMatchObject({ x: 0, y: -0.5, width: 0.75, height: 1 });
+      expect(document.querySelector('image[data-sketch-node-id="image"]')?.getAttribute("y")).toBe("110");
+      expect(screen.getByTestId("sketch-image-crop-overlay").querySelector('mask rect[fill="white"]')?.getAttribute("y")).toBe("110");
+    });
+
+    // Resizing after a pan keeps the translated content position while only changing the crop frame.
+    const resizedEastHandle = screen.getByTestId("sketch-resize-handle-e");
+    dispatchPointerEvent(resizedEastHandle, "pointerdown", 230, 110);
+    dispatchPointerEvent(stage, "pointermove", 210, 110);
+    dispatchPointerEvent(stage, "pointerup", 210, 110);
+    await waitFor(() => {
+      const node = readRenderedScene().nodes.find((item) => item.id === "image");
+      expect(node).toMatchObject({ x: 80, y: 60, width: 130, height: 100 });
+      expect(node?.imageCrop?.sourceRect).toMatchObject({ x: 0, y: -0.5, width: 0.65, height: 1 });
+      expect(document.querySelector('image[data-sketch-node-id="image"]')?.getAttribute("y")).toBe("110");
+    });
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByTestId("sketch-image-crop-overlay")).toBeNull());
+    expect(document.querySelector('image[data-sketch-node-id="image"]')?.getAttribute("clip-path")).toContain("sketch-image-crop-image");
+    expect(document.querySelector('image[data-sketch-node-id="image"]')?.getAttribute("y")).toBe("110");
+  });
+
+  it("records a continuous crop pan as one undo checkpoint", async () => {
+    const imageScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [{ id: "image", type: "image", x: 80, y: 60, width: 200, height: 100, src: "data:image/png;base64,abc" }],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={imageScene} />);
+    clickLayerNode("image");
+    fireEvent.click(screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" }).querySelector('[aria-label="悬浮裁剪图片"]') as HTMLElement);
+    fireEvent.click(within(screen.getByRole("menu", { name: "裁剪图片" })).getByRole("menuitem", { name: "矩形裁剪" }));
+    await waitFor(() => expect(screen.getByTestId("sketch-image-crop-overlay")).toBeTruthy());
+
+    const stage = getCanvasStage();
+    setCanvasStageRect(stage);
+    dispatchPointerEvent(stage, "pointerdown", 150, 100);
+    dispatchPointerEvent(stage, "pointermove", 150, 110);
+    dispatchPointerEvent(stage, "pointermove", 150, 120);
+    dispatchPointerEvent(stage, "pointerup", 150, 120);
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(readRenderedScene().nodes.find((node) => node.id === "image")?.imageCrop?.sourceRect.y).toBe(-0.2));
+
+    const undoButton = screen.getAllByRole("button", { name: "撤销" }).find((button) => !(button as HTMLButtonElement).disabled);
+    expect(undoButton).toBeTruthy();
+    fireEvent.click(undoButton as HTMLButtonElement);
+    await waitFor(() => {
+      expect(readRenderedScene().nodes.find((node) => node.id === "image")).toMatchObject({
+        x: 80,
+        y: 60,
+        width: 200,
+        height: 100,
+      });
+      expect(readRenderedScene().nodes.find((node) => node.id === "image")).not.toHaveProperty("imageCrop");
+    });
+  });
+
   it("adds a 0–20px stroke width slider for images while keeping exact input", async () => {
     const imageScene: SketchSceneDocument = {
       version: 1,
@@ -2971,20 +3297,29 @@ describe("sketch-react", () => {
     clickLayerNode("image");
 
     const propertySlider = screen.getByLabelText("描边宽度") as HTMLInputElement;
-    const strokeWidthControl = propertySlider.closest('[data-testid="sketch-stroke-width-control"]');
-    expect(strokeWidthControl?.className).toContain("bg-white");
-    expect(strokeWidthControl?.className).toContain("border-slate-200");
-    expect(strokeWidthControl?.className).toContain("text-slate-700");
+    const strokeWidthControl = propertySlider.closest('[data-testid="sketch-stroke-width-control"]') as HTMLElement;
+    expect(strokeWidthControl.className).toContain("bg-white");
+    expect(strokeWidthControl.className).toContain("border-slate-200");
+    expect(strokeWidthControl.className).toContain("text-slate-700");
+    expect(within(strokeWidthControl).getByText("描边宽度").className).toContain("text-xs");
+    expect(within(strokeWidthControl).getByText("描边宽度").className).not.toContain("font-semibold");
+    expect(propertySlider.className).toContain("appearance-none");
+    expect(propertySlider.style.colorScheme).toBe("light");
+    expect(strokeWidthControl.querySelector('[data-testid="sketch-stroke-width-track"]')).toBeTruthy();
     expect(propertySlider.min).toBe("0");
     expect(propertySlider.max).toBe("20");
     expect(propertySlider.step).toBe("1");
     fireEvent.change(propertySlider, { target: { value: "8" } });
-    await waitFor(() => expect(readRenderedScene().nodes.find((node) => node.id === "image")?.style?.strokeWidth).toBe(8));
+    await waitFor(() => {
+      expect(readRenderedScene().nodes.find((node) => node.id === "image")?.style?.strokeWidth).toBe(8);
+      expect((strokeWidthControl.querySelector('[data-testid="sketch-stroke-width-fill"]') as HTMLElement).style.width).toBe("40%");
+    });
 
     const toolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
     fireEvent.click(within(toolbar).getByLabelText("悬浮描边"));
     const floatingSlider = screen.getAllByLabelText("描边宽度").find((element) => element.closest('[role="menu"]')) as HTMLInputElement;
     expect(floatingSlider).toBeTruthy();
+    expect(floatingSlider.closest('[role="menu"]')?.className).toContain("gap-2");
     fireEvent.change(floatingSlider, { target: { value: "12" } });
     await waitFor(() => expect(readRenderedScene().nodes.find((node) => node.id === "image")?.style?.strokeWidth).toBe(12));
   });
