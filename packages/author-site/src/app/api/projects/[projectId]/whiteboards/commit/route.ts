@@ -33,8 +33,9 @@ import { isLiveWorkspacePath } from "@/lib/live-workspace-route-context";
 import { commitWorkspaceMutation, getWorkspaceAuthorityState, stageWorkspaceBinary, WorkspaceAuthorityClientError } from "@/lib/workspace-authority-client";
 import { getImageInfo } from "@/lib/image-store";
 import { canonicalizeWhiteboardDocument, validateWhiteboardDocument } from "@workbench/whiteboard-core";
+import { updateWhiteboardImageTarget, type WhiteboardTargetInput } from "@/lib/whiteboard-target";
 
-type TargetInput = { scope: "page" | "project"; pageId?: string; fieldPath: string; listItem?: { index: number; url: string }; currentValue?: string };
+type TargetInput = WhiteboardTargetInput;
 const RESERVED_CONFIG_KEYS = new Set(["__proto__", "prototype", "constructor"]);
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
@@ -77,31 +78,18 @@ function pendingWhiteboardGcOperations(workspacePath: string): WorkspaceMutation
 }
 function supportsImageTarget(workspacePath: string, target: TargetInput): boolean {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(target.fieldPath) || RESERVED_CONFIG_KEYS.has(target.fieldPath)) return false;
-  const schemaPath = target.scope === "project"
-    ? path.join(workspacePath, "project.config.schema.json")
-    : path.join(workspacePath, "demos", target.pageId ?? "", "config.schema.json");
-  const schema = json(schemaPath);
-  const property = record(record(schema.properties)?.[target.fieldPath]);
+  const property = getImageTargetSchemaProperty(workspacePath, target);
   if (!property) return false;
   if (!target.listItem) return property.type === "string" && property.format === "image";
   const items = record(property.items);
   return property.type === "array" && items?.type === "string" && items.format === "image";
 }
-function updateTarget(values: Record<string, unknown>, target: TargetInput, assetPath: string): string | null {
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(target.fieldPath) || RESERVED_CONFIG_KEYS.has(target.fieldPath)) return "不支持的图片字段";
-  if (!target.listItem) {
-    if (values[target.fieldPath] !== undefined && typeof values[target.fieldPath] !== "string") return "图片字段类型已变化";
-    if (target.currentValue !== undefined && values[target.fieldPath] !== target.currentValue) return "图片字段已被其他编辑者替换，请刷新后重试";
-    values[target.fieldPath] = assetPath;
-    return null;
-  }
-  const list = values[target.fieldPath];
-  if (!Array.isArray(list) || !Number.isInteger(target.listItem.index) || target.listItem.index < 0) return "图片列表项已变化";
-  const current = list[target.listItem.index];
-  const currentUrl = typeof current === "string" ? current : record(current)?.url;
-  if (currentUrl !== target.listItem.url) return "图片列表已被排序、删除或替换，请刷新后重试";
-  list[target.listItem.index] = typeof current === "string" ? assetPath : { ...record(current), url: assetPath };
-  return null;
+function getImageTargetSchemaProperty(workspacePath: string, target: TargetInput): Record<string, unknown> | null {
+  const schemaPath = target.scope === "project"
+    ? path.join(workspacePath, "project.config.schema.json")
+    : path.join(workspacePath, "demos", target.pageId ?? "", "config.schema.json");
+  const schema = json(schemaPath);
+  return record(record(schema.properties)?.[target.fieldPath]);
 }
 
 function sameTarget(a: ImageConfigTarget, b: TargetInput): boolean {
@@ -177,7 +165,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   } catch {
     return NextResponse.json(createApiError("FILE_READ_ERROR", "配置值文件损坏"), { status: 500 });
   }
-  const conflict = updateTarget(values, body.target, assetPath);
+  const schemaProperty = getImageTargetSchemaProperty(workspacePath, body.target);
+  const conflict = updateWhiteboardImageTarget(values, body.target, assetPath, schemaProperty?.default);
   if (conflict) return NextResponse.json(createApiError("VALIDATION_ERROR", conflict), { status: 409 });
   const bindingsPath = path.join(workspacePath, "whiteboards", "bindings.json");
   let bindingsRoot: Record<string, unknown> = {};

@@ -44,6 +44,7 @@ describe("WorkspaceResourceRegistry", () => {
       ["demos/page-1/prototype.css", "page-prototype-css", "text"],
       ["demos/page-1/prototype.meta.json", "page-prototype-meta", "json-object"],
       ["demos/page-1/config.schema.json", "page-schema", "json-object"],
+      ["demos/page-1/config.values.json", "page-config-values", "json-object"],
       ["demos/page-1/sketch.scene.json", "page-sketch-scene", "sketch-scene"],
       ["demos/page-1/sketch.meta.json", "page-sketch-meta", "json-object"],
       ["demos/page-1/convention.md", "page-convention", "text"],
@@ -77,6 +78,8 @@ describe("WorkspaceResourceRegistry", () => {
     const registry = createWorkspaceResourceRegistry();
     expect(() => registry.assertTextWrite("project.config.values.json", "[]")).toThrow("WORKSPACE_INVALID_OPERATION");
     expect(() => registry.assertTextWrite("project.config.values.json", "not-json")).toThrow("WORKSPACE_INVALID_OPERATION");
+    expect(() => registry.assertTextWrite("demos/page-1/config.values.json", '{"hero":"assets/hero.png"}')).not.toThrow();
+    expect(() => registry.assertTextWrite("demos/page-1/config.values.json", "not-json")).toThrow("WORKSPACE_INVALID_OPERATION");
     expect(() => registry.assertTextWrite("workspace-tree.json", '{"pages":[],"folders":[]}')).not.toThrow();
     expect(() => registry.assertTextWrite("workspace-tree.json", '{"pages":[]}')).toThrow("WORKSPACE_INVALID_OPERATION");
     expect(() => registry.assertTextWrite(

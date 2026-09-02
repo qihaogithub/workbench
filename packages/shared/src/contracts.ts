@@ -222,7 +222,7 @@ export function normalizeWorkspaceResourcePath(resourcePath: string): string | n
 export function isManagedWorkspaceResource(resourcePath: string): boolean {
   const normalized = normalizeWorkspaceResourcePath(resourcePath);
   return Boolean(normalized && (
-    /^demos\/[^/]+\/(index\.tsx|prototype\.(html|css|meta\.json)|sandbox\.html|html-import\.meta\.json|config\.schema\.json|sketch\.(scene|meta)\.json|convention\.md)$/.test(normalized)
+    /^demos\/[^/]+\/(index\.tsx|prototype\.(html|css|meta\.json)|sandbox\.html|html-import\.meta\.json|config\.(schema|values)\.json|sketch\.(scene|meta)\.json|convention\.md)$/.test(normalized)
     || normalized === "project.config.schema.json"
     || normalized === "project.config.values.json"
     || normalized === "workspace-tree.json"
@@ -243,7 +243,7 @@ export function assertManagedWorkspaceTextWrite(resourcePath: string, content: s
   if (!isManagedWorkspaceResource(resourcePath) || /^assets\//.test(resourcePath) || content.length > 2 * 1024 * 1024) {
     throw new Error("WORKSPACE_INVALID_OPERATION");
   }
-  if (/^whiteboards\/[a-zA-Z0-9_-]{1,80}\.json$/.test(resourcePath)) {
+  if (/^whiteboards\/[a-zA-Z0-9_-]{1,80}\.json$/.test(resourcePath) && resourcePath !== "whiteboards/bindings.json") {
     try {
       if (!isWhiteboardDocument(JSON.parse(content))) throw new Error("invalid");
     } catch {

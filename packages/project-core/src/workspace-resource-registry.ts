@@ -15,6 +15,7 @@ export type WorkspaceResourceKind =
   | "page-sandbox-html"
   | "page-html-import-meta"
   | "page-schema"
+  | "page-config-values"
   | "page-sketch-scene"
   | "page-sketch-meta"
   | "page-convention"
@@ -72,6 +73,7 @@ export class WorkspaceResourceRegistry {
     if (/^demos\/[^/]+\/sandbox\.html$/.test(normalized)) return { kind: "page-sandbox-html", text: true, maxBytes: TEXT_MAX_BYTES, validation: "text" };
     if (/^demos\/[^/]+\/html-import\.meta\.json$/.test(normalized)) return { kind: "page-html-import-meta", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
     if (/^demos\/[^/]+\/config\.schema\.json$/.test(normalized)) return { kind: "page-schema", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
+    if (/^demos\/[^/]+\/config\.values\.json$/.test(normalized)) return { kind: "page-config-values", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
     if (/^demos\/[^/]+\/sketch\.scene\.json$/.test(normalized)) return { kind: "page-sketch-scene", text: true, maxBytes: TEXT_MAX_BYTES, validation: "sketch-scene" };
     if (/^demos\/[^/]+\/sketch\.meta\.json$/.test(normalized)) return { kind: "page-sketch-meta", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
     if (/^demos\/[^/]+\/convention\.md$/.test(normalized)) return { kind: "page-convention", text: true, maxBytes: TEXT_MAX_BYTES, validation: "text" };
