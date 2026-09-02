@@ -33,6 +33,8 @@ export interface SketchPagePreviewProps {
   className?: string;
   selectedNodeId?: string | null;
   selectedNodeIds?: string[];
+  /** Render one cropped image's full source while its crop frame is being edited. */
+  imageCropEditingNodeId?: string | null;
   onNodeSelect?: (node: SketchSceneNode | null) => void;
   onSelectionChange?: (selection: SketchEditorSelection) => void;
 }
@@ -167,6 +169,7 @@ export function SketchPagePreview({
   className,
   selectedNodeId,
   selectedNodeIds,
+  imageCropEditingNodeId,
   onNodeSelect,
   onSelectionChange,
 }: SketchPagePreviewProps) {
@@ -174,8 +177,8 @@ export function SketchPagePreview({
   const width = normalizeSize(previewSize, parsedScene.pageSize.width, "width");
   const height = normalizeSize(previewSize, parsedScene.pageSize.height, "height");
   const svgMarkup = useMemo(
-    () => renderSketchSceneToSvgMarkup(parsedScene, configData),
-    [parsedScene, configData],
+    () => renderSketchSceneToSvgMarkup(parsedScene, configData, { imageCropEditingNodeId: imageCropEditingNodeId ?? undefined }),
+    [parsedScene, configData, imageCropEditingNodeId],
   );
   const imageNodes = useMemo(() => getResolvedImageNodes(parsedScene, configData), [configData, parsedScene]);
   const imageProbeKey = useMemo(() => imageNodes.map((node) => `${node.id}:${node.src}`).join("|"), [imageNodes]);
