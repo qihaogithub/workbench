@@ -12,8 +12,6 @@ const EMPTY_WHITEBOARD: SketchSceneDocument = {
   bindings: {},
 };
 
-const WHITEBOARD_ALLOWED_TOOLS = ["select", "hand", "rect", "ellipse", "pencil", "eraser", "text", "image"] as const;
-
 export function SketchPlaygroundApp() {
   const [scene, setScene] = React.useState<SketchSceneDocument>(EMPTY_WHITEBOARD);
 
@@ -24,8 +22,7 @@ export function SketchPlaygroundApp() {
       </div>
       <SketchEditorSurface
         scene={scene}
-        allowedTools={WHITEBOARD_ALLOWED_TOOLS}
-        brushToolbarMode="grouped"
+        profile="whiteboard"
         fillContainer
         className="h-full"
         onSceneChange={setScene}

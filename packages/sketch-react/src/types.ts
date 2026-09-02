@@ -28,6 +28,43 @@ export type SketchEditorMode = "edit" | "preview";
 
 export type SketchBrushToolbarMode = "individual" | "grouped";
 
+export type SketchEditorProfileName = "whiteboard";
+
+export interface SketchEditorProfileConfig {
+  /** Tools represented by the host's editor toolbar, including grouped entries. */
+  visibleTools: readonly SketchTool[];
+  /** Tools that may be activated for creation or direct tool interactions. */
+  creationTools: readonly SketchTool[];
+  brushToolbarMode: SketchBrushToolbarMode;
+}
+
+export const WHITEBOARD_EDITOR_TOOLS = [
+  "select",
+  "hand",
+  "rect",
+  "ellipse",
+  "pencil",
+  "eraser",
+  "text",
+  "image",
+] as const satisfies readonly SketchTool[];
+
+export const WHITEBOARD_EDITOR_PROFILE = {
+  visibleTools: WHITEBOARD_EDITOR_TOOLS,
+  creationTools: WHITEBOARD_EDITOR_TOOLS,
+  brushToolbarMode: "grouped",
+} as const satisfies SketchEditorProfileConfig;
+
+export const SKETCH_EDITOR_PROFILES = {
+  whiteboard: WHITEBOARD_EDITOR_PROFILE,
+} as const satisfies Record<SketchEditorProfileName, SketchEditorProfileConfig>;
+
+export function resolveSketchEditorProfile(
+  profile?: SketchEditorProfileName,
+): SketchEditorProfileConfig | undefined {
+  return profile ? SKETCH_EDITOR_PROFILES[profile] : undefined;
+}
+
 export interface SketchBrushSettings {
   color: string;
   strokeWidth: number;
@@ -64,6 +101,8 @@ export interface SketchPageEditorProps extends SketchPagePreviewProps {
 export interface SketchEditorSurfaceProps {
   scene: SketchSceneDocument;
   configData?: Record<string, unknown>;
+  /** Shared host profile; its tool and brush settings take precedence below. */
+  profile?: SketchEditorProfileName;
   /** Optional capability gate used by whiteboard bridge profiles. */
   allowedTools?: readonly SketchTool[];
   /** Controls whether pencil and eraser are presented as one grouped toolbar entry. */

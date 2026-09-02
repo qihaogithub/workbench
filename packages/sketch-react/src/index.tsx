@@ -107,6 +107,7 @@ import type {
   SketchLayerPanelProps,
   InlineTextSelectionState,
 } from "./types";
+import { resolveSketchEditorProfile } from "./types";
 import {
   getSketchTextAutoSize,
   getSketchTextComputedStyle,
@@ -10680,6 +10681,7 @@ export function SketchPageEditor({
 export function SketchEditorSurface({
   scene,
   configData = {},
+  profile,
   allowedTools,
   brushToolbarMode = "individual",
   fillContainer = false,
@@ -10687,9 +10689,13 @@ export function SketchEditorSurface({
   onSceneChange,
   onSelectionChange,
 }: SketchEditorSurfaceProps) {
+  const profileConfig = resolveSketchEditorProfile(profile);
+  const resolvedVisibleTools = profileConfig?.visibleTools ?? allowedTools;
+  const resolvedCreationTools = profileConfig?.creationTools ?? allowedTools;
+  const resolvedBrushToolbarMode = profileConfig?.brushToolbarMode ?? brushToolbarMode;
   const parsedSceneState = useMemo(() => parseScene(scene), [scene]);
   const parsedScene = parsedSceneState.scene;
-  const controller = useSketchEditorState(parsedScene, onSceneChange, onSelectionChange, configData, allowedTools);
+  const controller = useSketchEditorState(parsedScene, onSceneChange, onSelectionChange, configData, resolvedCreationTools);
   const canvasRef = React.useRef<SketchEditorCanvasHandle>(null);
   const openImageFilePicker = React.useCallback(() => {
     canvasRef.current?.openImageFilePicker();
@@ -10718,8 +10724,8 @@ export function SketchEditorSurface({
           scene={parsedScene}
           controller={controller}
           configData={configData}
-          allowedTools={allowedTools}
-          brushToolbarMode={brushToolbarMode}
+          allowedTools={resolvedVisibleTools}
+          brushToolbarMode={resolvedBrushToolbarMode}
           onImageUpload={openImageFilePicker}
           className="pointer-events-auto"
         />
@@ -10742,8 +10748,17 @@ export type {
   SketchEditorCanvasHandle,
   SketchBrushSettings,
   SketchBrushToolbarMode,
+  SketchEditorProfileName,
+  SketchEditorProfileConfig,
   SketchPropertyPanelProps,
   SketchEditorToolbarProps,
   SketchLayerPanelProps,
   InlineTextSelectionState,
+} from "./types";
+
+export {
+  resolveSketchEditorProfile,
+  SKETCH_EDITOR_PROFILES,
+  WHITEBOARD_EDITOR_PROFILE,
+  WHITEBOARD_EDITOR_TOOLS,
 } from "./types";
