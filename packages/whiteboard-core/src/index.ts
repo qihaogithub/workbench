@@ -8,7 +8,10 @@ import {
   type SketchSceneStyle,
 } from "@workbench/sketch-core";
 
-export const WHITEBOARD_DOCUMENT_VERSION = 2 as const;
+export const WHITEBOARD_DOCUMENT_VERSION = 3 as const;
+export const WHITEBOARD_DOCUMENT_V2_VERSION = 2 as const;
+export const WHITEBOARD_DOCUMENT_V3_VERSION = 3 as const;
+export const WHITEBOARD_SCENE_FORMAT = "sketch-scene-v1" as const;
 export const BRIDGE_PROFILE_VERSION = "html-css-v2" as const;
 export const WHITEBOARD_CONTEXT_SCHEMA_VERSION = "whiteboard-context-v1" as const;
 export const WHITEBOARD_PLAN_SCHEMA_VERSION = "whiteboard-plan-v1" as const;
@@ -24,7 +27,7 @@ export const BRIDGE_STYLE_FIELDS = [
 export interface WhiteboardNodeSemantics { role?: SemanticRole; assetRef?: string }
 export interface WhiteboardEditorView { zoom: number; offsetX: number; offsetY: number }
 export interface WhiteboardSafeArea { x: number; y: number; width: number; height: number }
-export interface WhiteboardDocument {
+export interface WhiteboardDocumentV2 {
   id: string;
   version: 2;
   documentRevision: number;
@@ -34,6 +37,20 @@ export interface WhiteboardDocument {
   editorView: WhiteboardEditorView;
   updatedAt: number;
 }
+
+export interface WhiteboardDocumentV3 {
+  id: string;
+  version: 3;
+  sceneFormat: typeof WHITEBOARD_SCENE_FORMAT;
+  documentRevision: number;
+  scene: SketchSceneDocument;
+  nodeSemantics: Record<string, WhiteboardNodeSemantics>;
+  safeArea?: WhiteboardSafeArea;
+  editorView: WhiteboardEditorView;
+  updatedAt: number;
+}
+
+export type WhiteboardDocument = WhiteboardDocumentV2 | WhiteboardDocumentV3;
 
 export interface WhiteboardContext {
   schemaVersion: typeof WHITEBOARD_CONTEXT_SCHEMA_VERSION;
@@ -111,7 +128,8 @@ const tagKinds: Record<string, BridgeNodeType[]> = {
   h1: ["text"], h2: ["text"], h3: ["text"], h4: ["text"], h5: ["text"], h6: ["text"], p: ["text"], span: ["text"],
 };
 const allowedAttrs = new Set(["data-sketch-id", "data-sketch-kind", "data-sketch-role", "data-asset-ref", "data-sketch-children", "data-sketch-image-size", "data-sketch-image-crop", "src", "alt"]);
-const allowedDocumentKeys = new Set(["id", "version", "documentRevision", "scene", "nodeSemantics", "safeArea", "editorView", "updatedAt"]);
+const allowedDocumentKeys = new Set(["id", "version", "sceneFormat", "documentRevision", "scene", "nodeSemantics", "safeArea", "editorView", "updatedAt"]);
+const nativeDocumentKeys = new Set(["id", "version", "sceneFormat", "documentRevision", "scene", "nodeSemantics", "safeArea", "editorView", "updatedAt"]);
 const allowedNodeKeys = new Set(["id", "type", "x", "y", "width", "height", "zIndex", "style", "text", "src", "alt", "intrinsicWidth", "intrinsicHeight", "imageCrop", "rotation", "children", "visible"]);
 const cssPropertySet = new Set<string>(BRIDGE_STYLE_FIELDS);
 const bridgeStyleKeys = new Set(["fill", "stroke", "strokeWidth", "opacity", "radius", "fontSize", "fontWeight", "textAlign", "color", "imageFit"]);
@@ -161,6 +179,7 @@ const WHITEBOARD_DIAGNOSTIC_MESSAGES: Record<string, string> = {
   INVALID_ROLE: "节点语义角色无效。",
   INVALID_SAFE_AREA: "安全区域必须位于画布范围内。",
   INVALID_SCENE: "场景不符合白板协议。",
+  INVALID_SCENE_FORMAT: "白板场景格式无效，应为 sketch-scene-v1。",
   INVALID_SELECTION: "至少需要选择两个节点。",
   INVALID_SEMANTICS: "节点语义信息无效。",
   INVALID_STYLE: "节点样式无效。",
@@ -393,12 +412,123 @@ function styleToCss(style: SketchSceneStyle | undefined, node: SketchSceneNode):
 
 export function isBridgeNodeType(value: unknown): value is BridgeNodeType { return typeof value === "string" && typeSet.has(value); }
 
-export function validateWhiteboardDocument(document: unknown): { valid: boolean; diagnostics: Diagnostic[] } {
+/**
+ * Validate the durable/native whiteboard envelope.
+ *
+ * This delegates scene validation to SketchSceneDocument and deliberately
+ * does not apply the html-css-v2 field allowlist. A native document may retain
+ * every field supported by the sketch protocol, including scene metadata,
+ * assets, bindings, paths, connectors and non-bridge node types.
+ */
+export function validateWhiteboardNativeDocument(document: unknown): { valid: boolean; diagnostics: Diagnostic[] } {
+  const diagnostics: Diagnostic[] = [];
+  if (!document || typeof document !== "object" || Array.isArray(document)) {
+    return { valid: false, diagnostics: [diag("INVALID_DOCUMENT", "document must be an object")] };
+  }
+
+  const d = document as Record<string, unknown>;
+  const version = d.version;
+  const scene = d.scene as SketchSceneDocument | undefined;
+  for (const key of Object.keys(d)) {
+    if (!nativeDocumentKeys.has(key)) diagnostics.push(diag("UNSUPPORTED_DOCUMENT_FIELD", `document field ${key} is not part of the native whiteboard document`));
+  }
+  if (typeof d.id !== "string" || !/^[A-Za-z0-9_-]{1,80}$/.test(d.id)) {
+    diagnostics.push(diag("INVALID_ID", "invalid document id"));
+  }
+  if (version !== 2 && version !== 3) {
+    diagnostics.push(diag("INVALID_VERSION", "version must be 2 or 3"));
+  }
+  if (version === 3 && d.sceneFormat !== WHITEBOARD_SCENE_FORMAT) {
+    diagnostics.push(diag("INVALID_SCENE_FORMAT", "sceneFormat must be sketch-scene-v1"));
+  }
+  if (version === 2 && d.sceneFormat !== undefined) {
+    diagnostics.push(diag("UNSUPPORTED_DOCUMENT_FIELD", "sceneFormat is only supported by V3 documents"));
+  }
+  if (version === 2 || version === 3) {
+    if (!Number.isInteger(d.documentRevision) || (d.documentRevision as number) < 0) {
+      diagnostics.push(diag("INVALID_VERSION", "documentRevision must be a non-negative integer"));
+    }
+  }
+
+  const view = d.editorView as Partial<WhiteboardEditorView> | undefined;
+  if (!view || typeof view !== "object" || Array.isArray(view)) {
+    diagnostics.push(diag("INVALID_EDITOR_VIEW", "editorView is required"));
+  } else {
+    for (const key of Object.keys(view)) {
+      if (!["zoom", "offsetX", "offsetY"].includes(key)) diagnostics.push(diag("UNSUPPORTED_EDITOR_VIEW_FIELD", `editorView field ${key} is not part of the native whiteboard document`));
+    }
+    if (![view.zoom, view.offsetX, view.offsetY].every((value) => typeof value === "number" && Number.isFinite(value)) || (view.zoom as number) <= 0) {
+      diagnostics.push(diag("INVALID_EDITOR_VIEW", "editorView values must be finite and zoom must be positive"));
+    }
+  }
+  if (typeof d.updatedAt !== "number" || !Number.isFinite(d.updatedAt) || d.updatedAt < 0) {
+    diagnostics.push(diag("INVALID_TIMESTAMP", "updatedAt must be a finite non-negative number"));
+  }
+  if (!scene || !validateSketchSceneDocument(scene).valid) {
+    diagnostics.push(diag("INVALID_SCENE", "scene does not satisfy the Sketch protocol"));
+  }
+
+  const semantics = d.nodeSemantics;
+  if (!semantics || typeof semantics !== "object" || Array.isArray(semantics)) {
+    diagnostics.push(diag("INVALID_SEMANTICS", "nodeSemantics is required"));
+  } else {
+    const nodes = scene?.nodes ?? [];
+    const nodeIds = new Set(nodes.map((node) => node.id));
+    const nodeById = new Map(nodes.map((node) => [node.id, node]));
+    for (const [nodeId, value] of Object.entries(semantics)) {
+      if (!nodeIds.has(nodeId)) diagnostics.push(diag("ORPHAN_SEMANTICS", "semantics references missing node", { nodeId }));
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        diagnostics.push(diag("INVALID_SEMANTICS", "node semantics must be an object", { nodeId }));
+        continue;
+      }
+      const semantic = value as Record<string, unknown>;
+      if (nodeById.get(nodeId)?.type === "group" && (semantic.role !== undefined || semantic.assetRef !== undefined)) {
+        diagnostics.push(diag("INVALID_GROUP_SEMANTICS", "group nodes cannot carry role or assetRef", { nodeId }));
+      }
+      if (semantic.role !== undefined && (typeof semantic.role !== "string" || !roleSet.has(semantic.role))) {
+        diagnostics.push(diag("INVALID_ROLE", "unsupported semantic role", { nodeId }));
+      }
+      if (semantic.assetRef !== undefined && (!assetIdPattern.test(String(semantic.assetRef)) || nodeById.get(nodeId)?.type !== "image")) {
+        diagnostics.push(diag("INVALID_ASSET_REF", "assetRef must be a managed id attached to an image node", { nodeId }));
+      }
+      if (Object.keys(semantic).some((key) => key !== "role" && key !== "assetRef")) {
+        diagnostics.push(diag("UNSUPPORTED_SEMANTICS", "unknown node semantics field", { nodeId }));
+      }
+    }
+  }
+
+  if (d.safeArea !== undefined) {
+    const safeArea = d.safeArea as Partial<WhiteboardSafeArea>;
+    for (const key of Object.keys(safeArea)) {
+      if (!["x", "y", "width", "height"].includes(key)) diagnostics.push(diag("UNSUPPORTED_SAFE_AREA_FIELD", `safeArea field ${key} is not part of the native whiteboard document`));
+    }
+    const valid = scene
+      && [safeArea.x, safeArea.y, safeArea.width, safeArea.height].every((value) => typeof value === "number" && Number.isFinite(value))
+      && safeArea.x! >= 0 && safeArea.y! >= 0 && safeArea.width! >= 0 && safeArea.height! >= 0
+      && safeArea.x! + safeArea.width! <= scene.pageSize.width
+      && safeArea.y! + safeArea.height! <= scene.pageSize.height;
+    if (!valid) diagnostics.push(diag("INVALID_SAFE_AREA", "safeArea must be within page bounds"));
+  }
+
+  return { valid: diagnostics.length === 0, diagnostics };
+}
+
+/** Preferred generic name for the full/native document validator. */
+export const validateWhiteboardDocument = validateWhiteboardNativeDocument;
+
+/**
+ * Validate the restricted html-css-v2 projection. This validator is only for
+ * code import/export and AI bridge actions; it is deliberately stricter than
+ * the native whiteboard document validator below.
+ */
+export function validateWhiteboardBridgeDocument(document: unknown): { valid: boolean; diagnostics: Diagnostic[] } {
   const diagnostics: Diagnostic[] = [];
   if (!document || typeof document !== "object" || Array.isArray(document)) return { valid: false, diagnostics: [diag("INVALID_DOCUMENT", "document must be an object")] };
-  const d = document as Partial<WhiteboardDocument>; const scene = d.scene;
+  const d = document as Partial<WhiteboardDocument> & { sceneFormat?: unknown }; const scene = d.scene;
   if (typeof d.id !== "string" || !/^[A-Za-z0-9_-]{1,80}$/.test(d.id)) diagnostics.push(diag("INVALID_ID", "invalid document id"));
-  if (d.version !== 2 || !Number.isInteger(d.documentRevision) || (d.documentRevision ?? -1) < 0) diagnostics.push(diag("INVALID_VERSION", "version must be 2 and documentRevision a non-negative integer"));
+  if ((d.version !== 2 && d.version !== 3) || !Number.isInteger(d.documentRevision) || (d.documentRevision ?? -1) < 0) diagnostics.push(diag("INVALID_VERSION", "version must be 2 or 3 and documentRevision a non-negative integer"));
+  if (d.version === 3 && d.sceneFormat !== WHITEBOARD_SCENE_FORMAT) diagnostics.push(diag("INVALID_SCENE_FORMAT", "sceneFormat must be sketch-scene-v1"));
+  if (d.version !== 3 && d.sceneFormat !== undefined) diagnostics.push(diag("UNSUPPORTED_DOCUMENT_FIELD", "sceneFormat is only supported by V3 documents"));
   for (const key of Object.keys(d)) if (!allowedDocumentKeys.has(key)) diagnostics.push(diag("UNSUPPORTED_DOCUMENT_FIELD", `document field ${key} is not supported by the bridge profile`));
   const editorView = d.editorView;
   if (!editorView || typeof editorView !== "object" || Array.isArray(editorView)) diagnostics.push(diag("INVALID_EDITOR_VIEW", "editorView is required"));
@@ -445,7 +575,7 @@ export function validateWhiteboardDocument(document: unknown): { valid: boolean;
     const intrinsicWidth = node.intrinsicWidth;
     const intrinsicHeight = node.intrinsicHeight;
     if (node.type === "image" && ((intrinsicWidth !== undefined) !== (intrinsicHeight !== undefined) || (intrinsicWidth !== undefined && intrinsicHeight !== undefined && (!Number.isFinite(intrinsicWidth) || intrinsicWidth <= 0 || !Number.isFinite(intrinsicHeight) || intrinsicHeight <= 0)))) diagnostics.push(diag("INVALID_IMAGE_SIZE", "image intrinsic dimensions must be two positive finite values", { nodeId: node.id }));
-    if (node.type === "image" && node.imageCrop !== undefined && !isValidSketchSceneImageCrop(node.imageCrop)) diagnostics.push(diag("INVALID_IMAGE_CROP", "imageCrop must use normalized source coordinates", { nodeId: node.id }));
+    if (node.type === "image" && node.imageCrop !== undefined && !isValidSketchSceneImageCrop(node.imageCrop)) diagnostics.push(diag("INVALID_IMAGE_CROP", "imageCrop must use finite source coordinates with a visible source intersection", { nodeId: node.id }));
   }
   const semantics = d.nodeSemantics;
   if (!semantics || typeof semantics !== "object" || Array.isArray(semantics)) diagnostics.push(diag("INVALID_SEMANTICS", "nodeSemantics is required"));
@@ -467,11 +597,68 @@ export function validateWhiteboardDocument(document: unknown): { valid: boolean;
   return { valid: diagnostics.length === 0, diagnostics };
 }
 
-export function canonicalizeWhiteboardDocument(document: WhiteboardDocument): WhiteboardDocument {
+function sortRecord<T>(record: Record<string, T>): Record<string, T> {
+  return Object.fromEntries(Object.entries(record).sort(([left], [right]) => left.localeCompare(right)));
+}
+
+/**
+ * Canonicalize a durable/native document without changing its renderable
+ * meaning. The only scene normalization is deterministic ordering; all scene
+ * fields and their values remain present.
+ */
+export function canonicalizeWhiteboardNativeDocument(document: WhiteboardDocument): WhiteboardDocumentV3 {
+  const validation = validateWhiteboardNativeDocument(document);
+  if (!validation.valid) throw new Error(validation.diagnostics.map((item) => item.message).join("；") || "白板文档无效");
+  // Keep the original array order for equal z-index values. The Sketch
+  // renderer uses that order as the final painter's-order tie breaker, so a
+  // lexical ID tie breaker would change the visual result of overlapping
+  // nodes while pretending to be a semantics-preserving normalization.
+  const nodes = document.scene.nodes
+    .map((node, index) => ({ node, index }))
+    .sort((left, right) => (left.node.zIndex ?? 0) - (right.node.zIndex ?? 0) || left.index - right.index)
+    .map(({ node }) => node);
+  const scene = {
+    ...document.scene,
+    nodes,
+    ...(document.scene.assets ? { assets: [...document.scene.assets].sort((a, b) => a.id.localeCompare(b.id)) } : {}),
+    ...(document.scene.bindings ? { bindings: sortRecord(document.scene.bindings) } : {}),
+    ...(document.scene.metadata ? { metadata: sortRecord(document.scene.metadata) } : {}),
+  };
+  const nodeSemantics: Record<string, WhiteboardNodeSemantics> = {};
+  for (const [nodeId, semantics] of Object.entries(document.nodeSemantics)) {
+    nodeSemantics[nodeId] = { ...semantics };
+  }
+  return {
+    ...document,
+    version: 3,
+    sceneFormat: WHITEBOARD_SCENE_FORMAT,
+    documentRevision: document.documentRevision,
+    scene,
+    nodeSemantics: sortRecord(nodeSemantics),
+  };
+}
+
+/** Preferred explicit name for the full/native canonicalizer. */
+export const canonicalizeWhiteboardDocument = canonicalizeWhiteboardNativeDocument;
+
+/**
+ * Canonicalize only the html-css-v2 bridge projection. This is intentionally
+ * lossy for fields the bridge cannot express and must never be used for
+ * durable/native persistence.
+ */
+export function canonicalizeWhiteboardBridgeDocument(document: WhiteboardDocument): WhiteboardDocumentV2 {
+  const validation = validateWhiteboardBridgeDocument(document);
+  if (!validation.valid) throw new Error(validation.diagnostics.map((item) => item.message).join("；") || "白板桥接文档无效");
   const nodes = [...document.scene.nodes].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0) || a.id.localeCompare(b.id)).map((node, index) => ({ ...node, zIndex: index }));
   const semantics: Record<string, WhiteboardNodeSemantics> = {};
   for (const node of nodes) if (document.nodeSemantics[node.id]) semantics[node.id] = { ...document.nodeSemantics[node.id] };
-  return { ...document, version: 2, scene: { ...document.scene, version: 1, nodes, assets: [], bindings: {}, metadata: {} }, nodeSemantics: semantics };
+  const { sceneFormat: _sceneFormat, ...envelope } = document.version === 3 ? document : { ...document, sceneFormat: undefined };
+  return {
+    ...envelope,
+    version: 2,
+    scene: { ...document.scene, version: 1, nodes, assets: [], bindings: {}, metadata: {} },
+    nodeSemantics: semantics,
+  };
 }
 
 /** Return a deterministic selection summary for AI context and plans. */
@@ -487,9 +674,9 @@ export function getWhiteboardSelection(document: WhiteboardDocument, nodeIds: re
 }
 
 export function serializeWhiteboardCode(document: WhiteboardDocument): ConversionResult<{ html: string; css: string }> {
-  const validation = validateWhiteboardDocument(document);
+  const validation = validateWhiteboardBridgeDocument(document);
   if (!validation.valid) return { diagnostics: validation.diagnostics };
-  const d = canonicalizeWhiteboardDocument(document);
+  const d = canonicalizeWhiteboardBridgeDocument(document);
   const htmlNodes = d.scene.nodes.map((node) => {
     const semantics = d.nodeSemantics[node.id] ?? {}; const attrs = [`data-sketch-id="${esc(node.id)}"`, `data-sketch-kind="${node.type}"`];
     if (semantics.role) attrs.push(`data-sketch-role="${semantics.role}"`); if (semantics.assetRef) attrs.push(`data-asset-ref="${esc(semantics.assetRef)}"`); if (node.children?.length) attrs.push(`data-sketch-children="${esc(node.children.join(","))}"`); if (node.type === "image") { attrs.push(`src="${esc(node.src ?? "")}"`); if (node.alt) attrs.push(`alt="${esc(node.alt)}"`); if (node.intrinsicWidth !== undefined && node.intrinsicHeight !== undefined) attrs.push(`data-sketch-image-size="${node.intrinsicWidth},${node.intrinsicHeight}"`); if (node.imageCrop) attrs.push(`data-sketch-image-crop="${serializeImageCrop(node.imageCrop)}"`); }
@@ -501,7 +688,7 @@ export function serializeWhiteboardCode(document: WhiteboardDocument): Conversio
   return { value: { html, css }, diagnostics: [] };
 }
 
-export function parseWhiteboardCode(html: string, css = "", options: { id?: string; maxBytes?: number; maxNodes?: number; maxDepth?: number } = {}): ConversionResult<WhiteboardDocument> {
+export function parseWhiteboardCode(html: string, css = "", options: { id?: string; maxBytes?: number; maxNodes?: number; maxDepth?: number } = {}): ConversionResult<WhiteboardDocumentV2> {
   const diagnostics: Diagnostic[] = []; const maxBytes = options.maxBytes ?? 2 * 1024 * 1024;
   if (typeof html !== "string" || typeof css !== "string") return { diagnostics: [diag("INVALID_INPUT", "HTML and CSS must be strings")] };
   if (new TextEncoder().encode(html).length + new TextEncoder().encode(css).length > maxBytes) return { diagnostics: [diag("INPUT_TOO_LARGE", "HTML/CSS exceeds input limit", { range: { start: 0, end: html.length + css.length } })] };
@@ -570,8 +757,8 @@ export function parseWhiteboardCode(html: string, css = "", options: { id?: stri
   if (body.replace(nodeRe, "").trim()) diagnostics.push(diag("UNSUPPORTED_HTML", "canvas contains text or elements outside the bridge grammar"));
   for (const id of rules.keys()) if (!seen.has(id)) diagnostics.push(diag("ORPHAN_CSS_RULE", `CSS rule ${id} has no matching bridge node`, { nodeId: id, suggestion: "Add the matching data-sketch-id element or remove the rule." }));
   if (diagnostics.length || !width || !height) return { diagnostics };
-  const document: WhiteboardDocument = { id: options.id ?? "whiteboard", version: 2, documentRevision: 0, scene: { version: 1, pageSize: { width, height }, nodes, assets: [], bindings: {}, metadata: {} }, nodeSemantics: semantics, editorView: { zoom: 1, offsetX: 0, offsetY: 0 }, updatedAt: Date.now() };
-  const validation = validateWhiteboardDocument(document); return validation.valid ? { value: canonicalizeWhiteboardDocument(document), diagnostics: [] } : { diagnostics: validation.diagnostics };
+  const document: WhiteboardDocumentV2 = { id: options.id ?? "whiteboard", version: 2, documentRevision: 0, scene: { version: 1, pageSize: { width, height }, nodes, assets: [], bindings: {}, metadata: {} }, nodeSemantics: semantics, editorView: { zoom: 1, offsetX: 0, offsetY: 0 }, updatedAt: Date.now() };
+  const validation = validateWhiteboardBridgeDocument(document); return validation.valid ? { value: canonicalizeWhiteboardBridgeDocument(document), diagnostics: [] } : { diagnostics: validation.diagnostics };
 }
 
 export type WhiteboardAction =
@@ -586,7 +773,7 @@ export type WhiteboardAction =
   | { type: "distribute"; nodeIds: string[]; axis: "horizontal" | "vertical" };
 
 export function applyWhiteboardActions(document: WhiteboardDocument, actions: readonly WhiteboardAction[]): ConversionResult<WhiteboardDocument> {
-  const initialValidation = validateWhiteboardDocument(document);
+  const initialValidation = validateWhiteboardBridgeDocument(document);
   if (!initialValidation.valid) return { diagnostics: initialValidation.diagnostics };
   const next = cloneJson(document) as WhiteboardDocument;
   const diagnostics: Diagnostic[] = [];
@@ -687,7 +874,7 @@ export function applyWhiteboardActions(document: WhiteboardDocument, actions: re
       }
     }
   }
-  if (diagnostics.length) return { diagnostics }; next.documentRevision += actions.length ? 1 : 0; next.updatedAt = Date.now(); const validation = validateWhiteboardDocument(next); return validation.valid ? { value: canonicalizeWhiteboardDocument(next), diagnostics: [], ...(Object.keys(idMapping).length ? { idMapping } : {}) } : { diagnostics: validation.diagnostics };
+  if (diagnostics.length) return { diagnostics }; next.documentRevision += actions.length ? 1 : 0; next.updatedAt = Date.now(); const validation = validateWhiteboardBridgeDocument(next); return validation.valid ? { value: canonicalizeWhiteboardBridgeDocument(next), diagnostics: [], ...(Object.keys(idMapping).length ? { idMapping } : {}) } : { diagnostics: validation.diagnostics };
 }
 
 function isManagedAssetPathForId(assetId: string, src: string): boolean {
@@ -742,9 +929,9 @@ export function resolveWhiteboardAssetRefs(
   document: WhiteboardDocument,
   records: readonly WhiteboardAssetRecord[],
 ): ConversionResult<WhiteboardDocument> {
-  const validation = validateWhiteboardDocument(document);
+  const validation = validateWhiteboardBridgeDocument(document);
   if (!validation.valid) return { diagnostics: validation.diagnostics };
-  const next = cloneJson(canonicalizeWhiteboardDocument(document)) as WhiteboardDocument;
+  const next = cloneJson(canonicalizeWhiteboardBridgeDocument(document)) as WhiteboardDocument;
   const byId = new Map(records.map((record) => [record.assetId, record]));
   const diagnostics: Diagnostic[] = [];
   for (const [nodeId, semantics] of Object.entries(next.nodeSemantics)) {
@@ -770,6 +957,6 @@ export function resolveWhiteboardAssetRefs(
     node.src = record.src;
   }
   if (diagnostics.length) return { diagnostics };
-  const result = validateWhiteboardDocument(next);
+  const result = validateWhiteboardBridgeDocument(next);
   return result.valid ? { value: next, diagnostics: [] } : { diagnostics: result.diagnostics };
 }

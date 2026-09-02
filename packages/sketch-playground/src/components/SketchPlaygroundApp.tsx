@@ -12,7 +12,7 @@ const EMPTY_WHITEBOARD: SketchSceneDocument = {
   bindings: {},
 };
 
-const WHITEBOARD_ALLOWED_TOOLS = ["select", "hand", "rect", "ellipse", "text", "image"] as const;
+const WHITEBOARD_ALLOWED_TOOLS = ["select", "hand", "rect", "ellipse", "pencil", "eraser", "text", "image"] as const;
 
 export function SketchPlaygroundApp() {
   const [scene, setScene] = React.useState<SketchSceneDocument>(EMPTY_WHITEBOARD);
@@ -22,7 +22,14 @@ export function SketchPlaygroundApp() {
       <div className="pointer-events-none absolute left-5 top-5 z-10 rounded-xl border border-slate-200 bg-white/95 px-4 py-2 text-sm font-semibold shadow-sm backdrop-blur">
         Whiteboard
       </div>
-      <SketchEditorSurface scene={scene} allowedTools={WHITEBOARD_ALLOWED_TOOLS} fillContainer className="h-full" onSceneChange={setScene} />
+      <SketchEditorSurface
+        scene={scene}
+        allowedTools={WHITEBOARD_ALLOWED_TOOLS}
+        brushToolbarMode="grouped"
+        fillContainer
+        className="h-full"
+        onSceneChange={setScene}
+      />
     </main>
   );
 }

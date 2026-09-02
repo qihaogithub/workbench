@@ -4,24 +4,29 @@ import { createDefaultSketchScene } from "@workbench/sketch-core";
 import type { WhiteboardDocument } from "@workbench/shared";
 import { WhiteboardDialog } from "./WhiteboardDialog";
 
-const pngExport = jest.fn();
-
 jest.mock("@workbench/sketch-react", () => ({
   SketchEditorSurface: ({
     scene,
     onSceneChange,
+    allowedTools,
   }: {
-    scene: unknown;
+    scene: { nodes?: Array<{ id: string }> };
     onSceneChange: (next: unknown) => void;
+    allowedTools?: readonly string[];
   }) => (
-    <button
-      type="button"
-      onClick={() => onSceneChange({ ...(scene as object), nodes: [] })}
-    >
-      修改场景
-    </button>
+    <div>
+      <output data-testid="allowed-tools">{allowedTools?.join(",")}</output>
+      <output data-testid="scene-node-ids">
+        {(scene.nodes ?? []).map((node) => node.id).join(",")}
+      </output>
+      <button
+        type="button"
+        onClick={() => onSceneChange({ ...scene, nodes: [] })}
+      >
+        修改场景
+      </button>
+    </div>
   ),
-  renderSketchSceneToPngBlob: (...args: unknown[]) => pngExport(...args),
 }));
 
 const document: WhiteboardDocument = {
@@ -56,10 +61,36 @@ function renderDialog(
 
 describe("WhiteboardDialog", () => {
   beforeEach(() => {
-    pngExport.mockResolvedValue({
-      arrayBuffer: async () => new Uint8Array([137, 80, 78, 71]).buffer,
-    });
     global.fetch = jest.fn();
+  });
+
+  it("exposes only the six creation-side whiteboard tools", () => {
+    renderDialog();
+
+    expect(screen.getByTestId("allowed-tools")).toHaveTextContent(
+      "select,hand,rect,ellipse,text,image",
+    );
+    expect(screen.getByTestId("allowed-tools")).not.toHaveTextContent(
+      /diamond|line|arrow|pencil|sticky|eraser/,
+    );
+  });
+
+  it("starts a new whiteboard with the title but without the factory note", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: { binding: null, document: null, documentRevision: 0 },
+      }),
+    });
+
+    renderDialog({ initialDocument: undefined });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("scene-node-ids")).toHaveTextContent("title"),
+    );
+    expect(screen.getByTestId("scene-node-ids")).not.toHaveTextContent("note");
+    expect(screen.getByTestId("scene-node-ids")).toHaveTextContent("title");
   });
 
   it("protects a dirty draft when the dialog is closed", () => {
@@ -96,7 +127,7 @@ describe("WhiteboardDialog", () => {
     expect(screen.getByRole("dialog", { name: "配置图片白板" })).toBeInTheDocument();
   });
 
-  it("exports PNG, commits atomically, and returns committed config values", async () => {
+  it("submits the full V3 scene and returns committed config values", async () => {
     const { onOpenChange, onCommitted, onDiagnosticEvent } = renderDialog();
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
@@ -108,7 +139,6 @@ describe("WhiteboardDialog", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "回填图片" }));
 
-    await waitFor(() => expect(pngExport).toHaveBeenCalled());
     await waitFor(() =>
       expect(global.fetch).toHaveBeenCalledWith(
         "/api/projects/project_1/whiteboards/commit",
@@ -119,8 +149,9 @@ describe("WhiteboardDialog", () => {
       .calls[0]?.[1] as RequestInit;
     expect(JSON.parse(String(commitRequest.body))).toMatchObject({
       baseDocumentRevision: 0,
-      document: { version: 2, documentRevision: 0 },
+      document: { version: 3, sceneFormat: "sketch-scene-v1", documentRevision: 0 },
     });
+    expect(JSON.parse(String(commitRequest.body))).not.toHaveProperty("pngBase64");
     expect(onCommitted).toHaveBeenCalledWith(
       expect.objectContaining({ fieldPath: "heroImage" }),
       { heroImage: "assets/whiteboards/a.png" },
@@ -129,6 +160,53 @@ describe("WhiteboardDialog", () => {
     expect(onDiagnosticEvent).toHaveBeenCalledWith(
       expect.objectContaining({ name: "whiteboard.commit.completed" }),
     );
+  });
+
+  it("removes semantics for deleted nodes before a later commit", async () => {
+    const imageDocument: WhiteboardDocument = {
+      id: "wb_deleted_image",
+      version: 3,
+      sceneFormat: "sketch-scene-v1",
+      documentRevision: 1,
+      scene: {
+        version: 1,
+        pageSize: { width: 100, height: 100 },
+        nodes: [
+          {
+            id: "hero",
+            type: "image",
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 100,
+            src: "/api/images/img_hero",
+          },
+        ],
+        assets: [],
+        bindings: {},
+        metadata: {},
+      },
+      nodeSemantics: { hero: { assetRef: "img_hero" } },
+      editorView: { zoom: 1, offsetX: 0, offsetY: 0 },
+      updatedAt: 1,
+    };
+    renderDialog({ initialDocument: imageDocument });
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: { values: { heroImage: "assets/whiteboards/a.png" } },
+      }),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "修改场景" }));
+    fireEvent.click(screen.getByRole("button", { name: "回填图片" }));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+    const commitRequest = (global.fetch as jest.Mock).mock.calls[0]?.[1] as RequestInit;
+    const commitBody = JSON.parse(String(commitRequest.body));
+    expect(commitBody.document.scene.nodes).toEqual([]);
+    expect(commitBody.document.nodeSemantics).toEqual({});
   });
 
   it("leaves loading after React Strict Mode restarts the initial read effect", async () => {
@@ -274,7 +352,13 @@ describe("WhiteboardDialog", () => {
             src: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E",
           },
         ],
-        assets: [],
+        assets: [
+          {
+            id: "library-image",
+            type: "image",
+            src: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E",
+          },
+        ],
         bindings: {},
         metadata: {},
       },
@@ -307,6 +391,9 @@ describe("WhiteboardDialog", () => {
     expect(commitBody.document.scene.nodes[0].src).toBe(
       "/api/images/img_local",
     );
+    expect(commitBody.document.scene.assets[0].src).toBe(
+      "/api/images/img_local",
+    );
     expect(commitBody.document.nodeSemantics.hero.assetRef).toBe("img_local");
   });
 
@@ -317,6 +404,13 @@ describe("WhiteboardDialog", () => {
         json: async () => ({
           success: true,
           data: { binding: null, document: null, documentRevision: 0 },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: { imageId: "img_source", url: "/api/images/img_source" },
         }),
       })
       .mockResolvedValueOnce({
@@ -340,10 +434,10 @@ describe("WhiteboardDialog", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "回填图片" }));
     await waitFor(() =>
-      expect((global.fetch as jest.Mock).mock.calls.length).toBe(2),
+      expect((global.fetch as jest.Mock).mock.calls.length).toBe(3),
     );
     const commitBody = JSON.parse(
-      String((global.fetch as jest.Mock).mock.calls[1]?.[1]?.body),
+      String((global.fetch as jest.Mock).mock.calls[2]?.[1]?.body),
     );
     const sourceNode = commitBody.document.scene.nodes.find(
       (node: { id: string }) => node.id === "source-background",
@@ -353,5 +447,70 @@ describe("WhiteboardDialog", () => {
       src: "/api/images/img_source",
     });
     expect(sourceNode.name).toBeUndefined();
+  });
+
+  it("migrates a legacy bound document with the current image background", async () => {
+    const legacyDocument: WhiteboardDocument = {
+      id: "wb_legacy_background",
+      version: 2,
+      documentRevision: 3,
+      scene: createDefaultSketchScene({ width: 100, height: 100 }),
+      nodeSemantics: {},
+      editorView: { zoom: 1, offsetX: 0, offsetY: 0 },
+      updatedAt: 1,
+    };
+    renderDialog({
+      initialDocument: legacyDocument,
+      target: {
+        scope: "page",
+        pageId: "page_1",
+        fieldPath: "heroImage",
+        currentValue: "/api/images/img_source",
+      },
+    });
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: {
+            imageId: "img_source",
+            assetRef: "img_source",
+            url: "/api/images/img_source",
+            width: 100,
+            height: 100,
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: { values: { heroImage: "assets/whiteboards/a.png" } },
+        }),
+      });
+
+    fireEvent.click(screen.getByRole("button", { name: "回填图片" }));
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+    const commitBody = JSON.parse(
+      String((global.fetch as jest.Mock).mock.calls[1]?.[1]?.body),
+    );
+    expect(commitBody.document).toMatchObject({
+      version: 3,
+      documentRevision: 3,
+      nodeSemantics: {
+        "source-background": {
+          role: "background",
+          assetRef: "img_source",
+        },
+      },
+    });
+    expect(commitBody.document.scene.nodes[0]).toMatchObject({
+      id: "source-background",
+      src: "/api/images/img_source",
+      width: 100,
+      height: 100,
+      style: { imageFit: "cover" },
+    });
   });
 });

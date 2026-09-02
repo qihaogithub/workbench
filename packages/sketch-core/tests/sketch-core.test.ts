@@ -7,6 +7,7 @@ import {
   buildSketchScenePreviewDocumentHtml,
   computeSketchSnapResult,
   createDefaultSketchScene,
+  getSketchImageCropRenderedFrame,
   getSketchNodeBounds,
   getSketchSceneHashSource,
   getSketchSelectionBounds,
@@ -16,6 +17,8 @@ import {
   rotateSketchNode,
   translateSketchNodes,
   validateSketchSceneDocument,
+  validateSketchSceneForRender,
+  SketchSceneRenderError,
   type SketchSceneDocument,
   type SketchSceneNode,
   type SketchScenePatchOperation,
@@ -51,6 +54,23 @@ describe("sketch-core", () => {
       ).valid,
     ).toBe(true);
     expect(validateSketchSceneDocument(testScene([{ id: "bad", type: "rect", x: 0, y: 0, width: 0, height: 12 }])).valid).toBe(false);
+  });
+
+  it("validates complete scene asset records", () => {
+    const valid = testScene([]);
+    valid.assets = [{ id: "library-image", type: "image", src: "assets/library.png", width: 120, height: 80 }];
+    expect(validateSketchSceneDocument(valid).valid).toBe(true);
+    expect(validateSketchSceneDocument({
+      ...valid,
+      assets: [{ id: "library-image", type: "image", src: "" }],
+    }).valid).toBe(false);
+    expect(validateSketchSceneDocument({
+      ...valid,
+      assets: [
+        { id: "library-image", type: "image", src: "assets/a.png" },
+        { id: "library-image", type: "image", src: "assets/b.png" },
+      ],
+    }).valid).toBe(false);
   });
 
   it("accepts directed line-like vectors with negative width or height", () => {
@@ -311,6 +331,88 @@ describe("sketch-core", () => {
     expect(svg).toContain('preserveAspectRatio="none"');
   });
 
+  it("renders every supported node type without dropping complete scene fields", () => {
+    const src = "data:image/png;base64,abc";
+    const scene = testScene([
+      {
+        id: "rect",
+        type: "rect",
+        x: 10,
+        y: 10,
+        width: 40,
+        height: 30,
+        name: "矩形",
+        metadata: { source: "test" },
+        style: { fill: "#E5E7EB", stroke: "#111827", strokeWidth: 2 },
+      },
+      { id: "diamond", type: "diamond", x: 60, y: 10, width: 40, height: 30 },
+      { id: "ellipse", type: "ellipse", x: 110, y: 10, width: 40, height: 30 },
+      { id: "line", type: "line", x: 10, y: 60, width: 40, height: 0 },
+      { id: "arrow", type: "arrow", x: 60, y: 60, width: 40, height: 20 },
+      { id: "path", type: "path", x: 110, y: 60, width: 40, height: 30, path: "M 110 60 L 150 60 L 150 90" },
+      {
+        id: "text",
+        type: "text",
+        x: 10,
+        y: 100,
+        width: 100,
+        height: 30,
+        text: "styled",
+        textStyleRuns: [{ start: 0, length: 6, style: { italic: true, textDecoration: "underline" } }],
+        style: { italic: true, textDecoration: "line-through" },
+      },
+      {
+        id: "image",
+        type: "image",
+        x: 120,
+        y: 100,
+        width: 80,
+        height: 60,
+        src,
+        name: "图片",
+        rotation: 12,
+        zIndex: 3,
+        style: { opacity: 0.8, stroke: "#2563EB", strokeWidth: 3, imageFit: "cover" },
+        imageCrop: {
+          shape: "circle",
+          sourceRect: { x: 0, y: 0, width: 1, height: 1 },
+          originalFrame: { x: 120, y: 100, width: 80, height: 60 },
+          originalImageFit: "cover",
+        },
+      },
+      { id: "sticky", type: "sticky", x: 10, y: 150, width: 80, height: 40, text: "sticky" },
+      { id: "button", type: "button", x: 100, y: 175, width: 80, height: 30, text: "button" },
+      { id: "input", type: "input", x: 190, y: 175, width: 80, height: 30, text: "input" },
+      { id: "card", type: "card", x: 280, y: 175, width: 80, height: 30, text: "card" },
+      { id: "group", type: "group", x: 0, y: 0, width: 200, height: 200, visible: false, children: ["rect"] },
+    ]);
+
+    expect(validateSketchSceneDocument(scene).valid).toBe(true);
+    const svg = renderSketchSceneToSvgMarkup(scene);
+
+    for (const nodeId of [
+      "rect",
+      "diamond",
+      "ellipse",
+      "line",
+      "arrow",
+      "path",
+      "text",
+      "image",
+      "sticky",
+      "button",
+      "input",
+      "card",
+    ]) {
+      expect(svg).toContain(`data-sketch-node-id="${nodeId}"`);
+    }
+    expect(svg).toContain('font-style="italic"');
+    expect(svg).toContain('text-decoration="line-through"');
+    expect(svg).toContain('data-sketch-node-border="image"');
+    expect(svg).toContain('transform="rotate(12 160 130)"');
+    expect(svg).not.toContain('data-sketch-node-id="group"');
+  });
+
   it("preserves intrinsic image dimensions and renders non-destructive crops", () => {
     const src = "data:image/png;base64,abc";
     const scene = testScene([
@@ -363,7 +465,33 @@ describe("sketch-core", () => {
           },
         ]),
       ).valid,
+    ).toBe(true);
+
+    const translatedCrop = {
+      ...scene.nodes[0],
+      imageCrop: {
+        ...scene.nodes[0].imageCrop!,
+        sourceRect: { x: -0.2, y: -0.3, width: 0.6, height: 0.5 },
+      },
+    };
+    expect(validateSketchSceneDocument(testScene([translatedCrop])).valid).toBe(true);
+    expect(
+      validateSketchSceneDocument(
+        testScene([{
+          ...translatedCrop,
+          imageCrop: {
+            ...translatedCrop.imageCrop!,
+            sourceRect: { x: -0.7, y: 0, width: 0.6, height: 0.5 },
+          },
+        }]),
+      ).valid,
     ).toBe(false);
+    expect(getSketchImageCropRenderedFrame(translatedCrop, translatedCrop.imageCrop!)).toEqual({
+      x: 60,
+      y: 78,
+      width: 200,
+      height: 160,
+    });
 
     const svg = renderSketchSceneToSvgMarkup(scene);
     expect(svg).toContain('id="sketch-image-crop-rect-crop"');
@@ -375,10 +503,16 @@ describe("sketch-core", () => {
     expect(svg).toContain('stroke="#EF4444" stroke-width="2"');
     const cropEditingSvg = renderSketchSceneToSvgMarkup(scene, {}, { imageCropEditingNodeId: "rect-crop" });
     const rectCropImageMarkup = cropEditingSvg.match(/<image[^>]*data-sketch-node-id="rect-crop"[^>]*><title>/)?.[0] ?? "";
-    expect(rectCropImageMarkup).toContain('x="10"');
+    expect(rectCropImageMarkup).toContain('x="0"');
+    expect(rectCropImageMarkup).toContain('y="-2"');
     expect(rectCropImageMarkup).toContain('width="200"');
     expect(rectCropImageMarkup).not.toContain("clip-path=");
     expect(renderSketchSceneToSvgMarkup(scene, {}, { withBackground: false })).not.toContain('fill="#FFFFFF"');
+    const translatedSvg = renderSketchSceneToSvgMarkup(testScene([translatedCrop]), {}, { imageCropEditingNodeId: "rect-crop" });
+    const translatedImageMarkup = translatedSvg.match(/<image[^>]*data-sketch-node-id="rect-crop"[^>]*><title>/)?.[0] ?? "";
+    expect(translatedImageMarkup).toContain('x="60"');
+    expect(translatedImageMarkup).toContain('y="78"');
+    expect(translatedImageMarkup).not.toContain("clip-path=");
   });
 
   it("rejects invalid style and binding payloads", () => {
@@ -1094,40 +1228,39 @@ describe("sketch-core", () => {
     expect(gridSnap.delta).toEqual({ x: -1, y: -3 });
   });
 
-  it("preserves valid page size when rendering fallback SVG for invalid scenes", () => {
+  it("fails closed instead of rendering a default scene for invalid scenes", () => {
     const invalidScene = {
       version: 1,
       pageSize: { width: 320, height: 180 },
       nodes: [{ id: "bad", type: "widget", x: 0, y: 0, width: 100, height: 60 }],
     } as unknown as SketchSceneDocument;
 
-    const svg = renderSketchSceneToSvgMarkup(invalidScene);
-
     expect(validateSketchSceneDocument(invalidScene).valid).toBe(false);
-    expect(svg).toContain('width="320" height="180" viewBox="0 0 320 180"');
-    expect(svg).toContain("手绘页面");
-    expect(svg).not.toContain('data-sketch-node-id="bad"');
+    expect(() => renderSketchSceneToSvgMarkup(invalidScene)).toThrowError(SketchSceneRenderError);
+    try {
+      renderSketchSceneToSvgMarkup(invalidScene);
+    } catch (error) {
+      expect(error).toBeInstanceOf(SketchSceneRenderError);
+      expect((error as SketchSceneRenderError).issues[0]).toMatchObject({
+        code: "INVALID_GEOMETRY",
+        nodeId: "bad",
+        severity: "error",
+      });
+    }
   });
 
-  it("uses safe dimensions when building fallback preview HTML for invalid scenes", () => {
+  it("fails closed when building preview HTML for invalid scenes", () => {
     const invalidPageScene = {
       version: 1,
       pageSize: { width: -1, height: Number.NaN },
       nodes: [{ id: "bad", type: "widget", x: 0, y: 0, width: 100, height: 60 }],
     } as unknown as SketchSceneDocument;
 
-    const defaultHtml = buildSketchScenePreviewDocumentHtml({ scene: invalidPageScene });
-    const previewHtml = buildSketchScenePreviewDocumentHtml({
+    expect(() => buildSketchScenePreviewDocumentHtml({ scene: invalidPageScene })).toThrowError(SketchSceneRenderError);
+    expect(() => buildSketchScenePreviewDocumentHtml({
       scene: invalidPageScene,
       previewSize: { width: 320, height: 180 },
-    });
-
-    expect(defaultHtml).toContain("width: 1440px; min-height: 900px");
-    expect(defaultHtml).toContain('width="1440" height="900" viewBox="0 0 1440 900"');
-    expect(defaultHtml).not.toContain("NaNpx");
-    expect(defaultHtml).not.toContain("-1px");
-    expect(previewHtml).toContain("width: 320px; min-height: 180px");
-    expect(previewHtml).toContain('width="320" height="180" viewBox="0 0 320 180"');
+    })).toThrowError(SketchSceneRenderError);
   });
 
   it("ignores config binding values whose runtime type does not match the bound property", () => {
@@ -1190,15 +1323,13 @@ describe("sketch-core", () => {
     expect(svg).not.toContain('<path d="M0,0 L0,6 L9,3 z" fill="#1F2937"');
   });
 
-  it("does not render invalid path nodes as fallback rectangles", () => {
+  it("fails closed for invalid path nodes instead of dropping them", () => {
     const invalidPathScene = {
       ...testScene([]),
       nodes: [{ id: "path", type: "path", x: 10, y: 20, width: 80, height: 40 } as SketchSceneNode],
     };
 
-    const svg = renderSketchSceneToSvgMarkup(invalidPathScene);
-
-    expect(svg).not.toContain('data-sketch-node-id="path"');
+    expect(() => renderSketchSceneToSvgMarkup(invalidPathScene)).toThrowError(SketchSceneRenderError);
   });
 
   it("keeps text tspans aligned with their rendered text anchor", () => {
@@ -1448,13 +1579,14 @@ describe("sketch-core", () => {
     expect(hitTestSketchScene(scene, { x: 40, y: 40 }, { showGroup: true })?.id).toBe("child");
   });
 
-  it("does not render or hit image nodes whose src binding is unresolved", () => {
+  it("fails closed when a visible image src binding is unresolved", () => {
     const scene = testScene([
       { id: "bound-image", type: "image", x: 20, y: 20, width: 100, height: 80, bindings: { src: "heroImage" } },
       { id: "back", type: "rect", x: 40, y: 40, width: 100, height: 80, zIndex: -1 },
     ]);
 
-    expect(renderSketchSceneToSvgMarkup(scene)).not.toContain('data-sketch-node-id="bound-image"');
+    expect(validateSketchSceneForRender(scene).valid).toBe(false);
+    expect(() => renderSketchSceneToSvgMarkup(scene)).toThrowError(SketchSceneRenderError);
     expect(hitTestSketchScene(scene, { x: 60, y: 60 })?.id).toBe("back");
     expect(hitTestSketchScene(scene, { x: 60, y: 60 }, { heroImage: "data:image/png;base64,abc" })?.id).toBe("bound-image");
     expect(hitTestSketchScene(scene, { x: 60, y: 60 }, { heroImage: 123 })?.id).toBe("back");

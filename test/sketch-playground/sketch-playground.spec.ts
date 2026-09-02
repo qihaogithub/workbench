@@ -40,9 +40,99 @@ test("whiteboard opens as a clean blank canvas with a bottom tool tray", async (
 
   await expect(page.getByText("Whiteboard", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "矩形" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "画笔", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "打开画笔设置" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "橡皮" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "橡皮擦" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "放大" })).toBeVisible();
   await expect(page.locator("[data-sketch-node-id]")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Dev Data" })).toHaveCount(0);
+});
+
+test("grouped brush draws continuous styled paths and erases paths without touching other nodes", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "矩形" }).click();
+  await dragOnStage(page, { x: 80, y: 100 }, { x: 280, y: 220 });
+
+  await page.getByRole("button", { name: "文本", exact: true }).click();
+  await page.locator("[data-sketch-stage]").click({ position: { x: 400, y: 120 } });
+  await page.getByLabel("画布文本编辑").fill("Keep text");
+  await page.getByRole("button", { name: "选择" }).click();
+
+  const fileChooserPromise = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "图片", exact: true }).click();
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles({
+    name: "keep.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64"),
+  });
+  await expect(page.locator('image[data-sketch-node-id]')).toHaveCount(1);
+
+  const brushGroup = page.getByRole("group", { name: "画笔工具" });
+  const primaryBrush = brushGroup.getByRole("button", { name: "画笔", exact: true });
+  await brushGroup.getByRole("button", { name: "打开画笔设置" }).click();
+  const settings = page.getByRole("dialog", { name: "画笔设置" });
+  await expect(settings).toHaveScreenshot("grouped-brush-settings.png", {
+    animations: "disabled",
+    caret: "hide",
+    maxDiffPixels: 100,
+    threshold: 0.2,
+  });
+  await settings.getByRole("radio", { name: "画笔颜色 #7c3aed" }).click();
+  await settings.getByRole("radio", { name: "画笔粗细 粗" }).click();
+  await primaryBrush.click();
+
+  await dragOnStage(page, { x: 100, y: 180 }, { x: 260, y: 190 });
+  await dragOnStage(page, { x: 360, y: 260 }, { x: 520, y: 280 });
+  const pathNodes = page.locator('path[data-sketch-node-id]');
+  await expect(pathNodes).toHaveCount(2);
+  await expect(pathNodes.first()).toHaveAttribute("stroke", "#7c3aed");
+  await expect(pathNodes.first()).toHaveAttribute("stroke-width", "5");
+  await expect(primaryBrush).toHaveAttribute("aria-pressed", "true");
+
+  await brushGroup.getByRole("button", { name: "打开画笔设置" }).click();
+  await settings.getByRole("button", { name: "橡皮擦", exact: true }).click();
+  await dragOnStage(page, { x: 180, y: 185 }, { x: 440, y: 270 });
+
+  await expect(pathNodes).toHaveCount(0);
+  await expect(page.locator('rect[data-sketch-node-id]')).toHaveCount(1);
+  await expect(page.locator('text[data-sketch-node-id]')).toHaveCount(1);
+  await expect(page.locator('image[data-sketch-node-id]')).toHaveCount(1);
+
+  await page.getByRole("button", { name: "撤销" }).click();
+  await expect(pathNodes).toHaveCount(2);
+  await page.getByRole("button", { name: "重做" }).click();
+  await expect(pathNodes).toHaveCount(0);
+  await expect(page.locator('rect[data-sketch-node-id]')).toHaveCount(1);
+  await expect(page.locator('text[data-sketch-node-id]')).toHaveCount(1);
+  await expect(page.locator('image[data-sketch-node-id]')).toHaveCount(1);
+
+  await page.getByRole("button", { name: "打开画笔设置" }).click();
+  await page.getByRole("dialog", { name: "画笔设置" }).getByRole("button", { name: "画笔", exact: true }).click();
+  await page.locator("[data-sketch-stage]").click({ position: { x: 700, y: 420 } });
+  await expect(page.getByRole("dialog", { name: "画笔设置" })).toHaveCount(0);
+  await expect(primaryBrush).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Escape");
+  await expect(primaryBrush).toHaveAttribute("aria-pressed", "false");
+});
+
+test("image toolbar action opens the picker and inserts the selected image", async ({ page }) => {
+  await page.goto("/");
+
+  const fileChooserPromise = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "图片", exact: true }).click();
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles({
+    name: "hero.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64"),
+  });
+
+  const imageNode = page.locator('[data-sketch-node-id^="sketch_"]');
+  await expect(imageNode).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "图片", exact: true })).not.toHaveClass(/bg-violet-600/);
 });
 
 test("selection exposes contextual editing and on-demand details", async ({ page }) => {
@@ -458,6 +548,9 @@ test("pure text toolbar keeps layer access alongside style, color, and alignment
 test("whiteboard bridge profile hides tools that cannot round-trip to HTML/CSS", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("button", { name: "矩形" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "画笔工具" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "打开画笔设置" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "橡皮擦" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "菱形" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "线条" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "箭头" })).toHaveCount(0);

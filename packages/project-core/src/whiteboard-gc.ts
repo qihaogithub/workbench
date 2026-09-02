@@ -25,7 +25,7 @@ function containsAssetReference(value: unknown, assetPath: string): boolean {
   return Object.values(value).some((item) => containsAssetReference(item, assetPath));
 }
 
-function whiteboardPngHashForAttachedAsset(document: Extract<import("@workbench/shared").WhiteboardDocument, { version: 2 }>): Set<string> {
+function whiteboardPngHashForAttachedAsset(document: Extract<import("@workbench/shared").WhiteboardDocument, { version: 2 | 3 }>): Set<string> {
   const hashes = new Set<string>();
   for (const [nodeId, semantics] of Object.entries(document.nodeSemantics)) {
     if (!semantics.assetRef) continue;
@@ -72,7 +72,7 @@ export function planWhiteboardGarbageCollection(
     // bound. An unreadable document means those references cannot be verified,
     // so no cleanup plan is safe.
     if (!isWhiteboardDocument(document)) return { documentPaths: [], assetPaths: [] };
-    if (document.version === 2) {
+    if (document.version === 2 || document.version === 3) {
       for (const hash of whiteboardPngHashForAttachedAsset(document)) protectedHashes.add(hash);
     }
     if (boundDocumentIds.has(document.id)) continue;

@@ -18,7 +18,7 @@ import {
   getWhiteboardSelection,
   parseWhiteboardCode,
   serializeWhiteboardCode,
-  validateWhiteboardDocument,
+  validateWhiteboardDocument as validateWhiteboardNativeDocument,
   type WhiteboardAction,
   type WhiteboardContext,
   type WhiteboardPlan,
@@ -53,8 +53,8 @@ const NodePatch = Type.Object({
   style: Type.Optional(StylePatch),
 }, { additionalProperties: false });
 const ImageCropRect = Type.Object({
-  x: Type.Number({ minimum: 0 }),
-  y: Type.Number({ minimum: 0 }),
+  x: Type.Number(),
+  y: Type.Number(),
   width: Type.Number({ exclusiveMinimum: 0, maximum: 1 }),
   height: Type.Number({ exclusiveMinimum: 0, maximum: 1 }),
 }, { additionalProperties: false });
@@ -192,7 +192,7 @@ async function readDocument(config: AgentConfig, whiteboardId: string): Promise<
   const raw = JSON.parse(await fs.promises.readFile(absoluteDocumentPath(config, whiteboardId), "utf8")) as unknown;
   if (!isWhiteboardDocument(raw)) throw new Error("Invalid whiteboard document");
   const document = asWhiteboardDocumentV2(raw);
-  const validation = validateWhiteboardDocument(document);
+  const validation = validateWhiteboardNativeDocument(document);
   if (!validation.valid) throw new Error(validation.diagnostics.map((item) => item.message).join("; "));
   return document;
 }

@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
-import { getWhiteboardDocumentRevision, isWhiteboardBinding, isWhiteboardConfigPath, isWhiteboardDocument, type ImageConfigTarget, whiteboardDocumentPath } from "@workbench/shared";
+import { getWhiteboardDocumentRevision, isWhiteboardBinding, isWhiteboardDocument, type ImageConfigTarget, type WhiteboardDocument, whiteboardDocumentPath } from "@workbench/shared";
+import { isWhiteboardConfigPath } from "@workbench/shared";
 import { createApiError, createApiSuccess, findWorkspacePath, getSessionMeta, isSessionExpired, projectExists, sessionExists } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { getImageInfo } from "@/lib/image-store";
@@ -13,14 +14,22 @@ function sameTarget(a: ImageConfigTarget, b: ImageConfigTarget) {
     && a.item?.itemValue === b.item?.itemValue;
 }
 
-function hasMissingManagedImage(document: Extract<import("@workbench/shared").WhiteboardDocument, { version: 2 }>): boolean {
-  return Object.entries(document.nodeSemantics).some(([nodeId, semantics]) => {
-    if (!semantics.assetRef) return false;
-    const node = document.scene.nodes.find((candidate) => candidate.id === nodeId);
-    if (!node || node.type !== "image" || typeof node.src !== "string") return false;
-    if (!node.src.startsWith("/api/images/")) return false;
-    const match = node.src.match(/^\/api\/images\/([A-Za-z0-9_-]+)$/);
-    return !match || match[1] !== semantics.assetRef || !getImageInfo(semantics.assetRef);
+function hasMissingManagedImage(document: WhiteboardDocument): boolean {
+  if (document.version !== 3) return false;
+  const hasMissingNodeAsset = document.scene.nodes.some((node) => {
+    if (node.type !== "image") return false;
+    const assetRef = document.nodeSemantics[node.id]?.assetRef;
+    const match = typeof node.src === "string" ? node.src.match(/^\/api\/images\/([A-Za-z0-9_-]+)$/) : null;
+    const info = assetRef ? getImageInfo(assetRef) : null;
+    return !assetRef || !match || match[1] !== assetRef || !info || info.mimeType !== "image/png";
+  });
+  if (hasMissingNodeAsset) return true;
+  return (document.scene.assets ?? []).some((asset) => {
+    const match = typeof asset.src === "string"
+      ? asset.src.match(/^\/api\/images\/([A-Za-z0-9_-]+)$/)
+      : null;
+    const info = match ? getImageInfo(match[1]) : null;
+    return !match || !info || info.mimeType !== "image/png";
   });
 }
 
@@ -89,8 +98,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json(createApiError("FILE_READ_ERROR", "白板绑定存在但文档损坏"), { status: 500 });
     }
     if (!isWhiteboardDocument(documentRaw)) return NextResponse.json(createApiError("FILE_READ_ERROR", "白板绑定存在但文档损坏"), { status: 500 });
-    if (documentRaw.version === 2 && !validateWhiteboardDocument(documentRaw).valid) return NextResponse.json(createApiError("FILE_READ_ERROR", "白板绑定存在但文档损坏"), { status: 500 });
-    if (documentRaw.version === 2 && hasMissingManagedImage(documentRaw)) return NextResponse.json(createApiError("FILE_READ_ERROR", "白板绑定引用的图片资产缺失"), { status: 500 });
+    if (!validateWhiteboardDocument(documentRaw).valid) return NextResponse.json(createApiError("FILE_READ_ERROR", "白板绑定存在但文档损坏"), { status: 500 });
+    if (hasMissingManagedImage(documentRaw)) return NextResponse.json(createApiError("FILE_READ_ERROR", "白板绑定引用的图片资产缺失"), { status: 500 });
     return NextResponse.json(createApiSuccess({ binding, document: documentRaw, documentRevision: getWhiteboardDocumentRevision(documentRaw) }));
   } catch {
     return NextResponse.json(createApiError("FILE_READ_ERROR", "无法读取白板绑定"), { status: 500 });

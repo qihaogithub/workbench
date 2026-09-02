@@ -26,6 +26,13 @@ export type SketchTool =
 
 export type SketchEditorMode = "edit" | "preview";
 
+export type SketchBrushToolbarMode = "individual" | "grouped";
+
+export interface SketchBrushSettings {
+  color: string;
+  strokeWidth: number;
+}
+
 export interface SketchEditorSelection {
   nodeIds: string[];
   bounds: SketchSceneBounds | null;
@@ -59,6 +66,8 @@ export interface SketchEditorSurfaceProps {
   configData?: Record<string, unknown>;
   /** Optional capability gate used by whiteboard bridge profiles. */
   allowedTools?: readonly SketchTool[];
+  /** Controls whether pencil and eraser are presented as one grouped toolbar entry. */
+  brushToolbarMode?: SketchBrushToolbarMode;
   fillContainer?: boolean;
   className?: string;
   onSceneChange?: (scene: SketchSceneDocument) => void;
@@ -76,6 +85,8 @@ export interface SketchEditorController {
   tool: SketchTool;
   setTool: (tool: SketchTool) => void;
   allowedTools?: readonly SketchTool[];
+  brushSettings: SketchBrushSettings;
+  setBrushSettings: (patch: Partial<SketchBrushSettings>) => void;
   selection: SketchEditorSelection;
   inlineTextSelection: InlineTextSelectionState | null;
   setInlineTextSelection: (selection: InlineTextSelectionState | null) => void;
@@ -103,6 +114,10 @@ export interface SketchEditorCanvasProps extends SketchEditorPartProps {
   mode?: SketchEditorMode;
 }
 
+export interface SketchEditorCanvasHandle {
+  openImageFilePicker: () => void;
+}
+
 export interface SketchPropertyPanelProps extends SketchEditorPartProps {
   configData?: Record<string, unknown>;
 }
@@ -110,6 +125,9 @@ export interface SketchPropertyPanelProps extends SketchEditorPartProps {
 export interface SketchEditorToolbarProps extends SketchEditorPartProps {
   configData?: Record<string, unknown>;
   allowedTools?: readonly SketchTool[];
+  brushToolbarMode?: SketchBrushToolbarMode;
+  /** Opens the canvas-owned image picker and inserts the selected file. */
+  onImageUpload: () => void;
 }
 
 export interface SketchLayerPanelProps extends SketchEditorPartProps {

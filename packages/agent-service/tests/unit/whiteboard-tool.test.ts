@@ -81,4 +81,39 @@ describe("whiteboard agent tools", () => {
     expect(result.isError).toBe(true);
     expect(result.details.error).toBe("asset_candidate_required");
   });
+
+  it("keeps translated image crop coordinates in the host-commit draft", async () => {
+    const documentPath = path.join(workspaceDir, "whiteboards", "wb_1.json");
+    const document = JSON.parse(await fs.readFile(documentPath, "utf8"));
+    document.scene.nodes.push({
+      id: "hero",
+      type: "image",
+      x: 20,
+      y: 20,
+      width: 60,
+      height: 40,
+      src: "assets/hero.png",
+    });
+    await fs.writeFile(documentPath, JSON.stringify(document), "utf8");
+
+    const result = await createApplyWhiteboardActionsTool(config).execute("apply-crop", {
+      whiteboardId: "wb_1",
+      baseDocumentRevision: 0,
+      actions: [{
+        type: "setImageCrop",
+        nodeId: "hero",
+        crop: {
+          shape: "rect",
+          sourceRect: { x: -0.2, y: -0.1, width: 0.6, height: 0.5 },
+          originalFrame: { x: 20, y: 20, width: 60, height: 40 },
+          originalImageFit: "contain",
+        },
+      }],
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(result.details.draft.scene.nodes.find((node: { id: string }) => node.id === "hero")).toMatchObject({
+      imageCrop: { sourceRect: { x: -0.2, y: -0.1, width: 0.6, height: 0.5 } },
+    });
+  });
 });

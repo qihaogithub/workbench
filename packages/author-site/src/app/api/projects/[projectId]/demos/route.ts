@@ -27,7 +27,7 @@ import { isSketchSceneAuthoringEnabled } from "@/lib/authoring-feature-flags";
 import { type PreviewSize, extractPreviewSize } from "@/lib/preview-size";
 import {
   createDefaultSketchScene,
-  asWhiteboardDocumentV2,
+  asWhiteboardDocumentV3,
   getWhiteboardDocumentRevision,
   isWhiteboardBinding,
   isWhiteboardDocument,
@@ -205,9 +205,9 @@ function appendWhiteboardCopyOperations(input: {
       const source = JSON.parse(fs.readFileSync(path.join(input.workspacePath, "whiteboards", `${binding.whiteboardId}.json`), "utf8"));
       if (!isWhiteboardDocument(source)) return [];
       const id = `wb_${crypto.randomUUID().replaceAll("-", "")}`;
-      const document = { ...asWhiteboardDocumentV2(source), id, documentRevision: getWhiteboardDocumentRevision(source), updatedAt: Date.now() };
-      const { sceneRevision: _legacySceneRevision, ...bindingWithoutLegacyRevision } = binding;
-      const next = { ...bindingWithoutLegacyRevision, id: `wb_${id}`, whiteboardId: id, documentRevisionAtOutput: document.documentRevision, target: { ...binding.target, pageId: input.demoId }, updatedAt: Date.now() };
+      const document = { ...asWhiteboardDocumentV3(source), id, documentRevision: getWhiteboardDocumentRevision(source), updatedAt: Date.now() };
+      const { sceneRevision: _legacySceneRevision, documentVersion: _legacyDocumentVersion, ...bindingWithoutLegacyRevision } = binding;
+      const next = { ...bindingWithoutLegacyRevision, id: `wb_${id}`, whiteboardId: id, documentRevisionAtOutput: document.documentRevision, documentVersion: 3 as const, target: { ...binding.target, pageId: input.demoId }, updatedAt: Date.now() };
       input.operations.push(createPutTextOperation({ workspacePath: input.workspacePath, resourcePath: `whiteboards/${id}.json`, content: JSON.stringify(document, null, 2), expectedAbsent: true }));
       return [next];
     } catch { return []; }
