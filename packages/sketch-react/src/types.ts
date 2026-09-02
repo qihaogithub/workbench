@@ -39,6 +39,8 @@ export interface SketchPagePreviewProps {
   className?: string;
   selectedNodeId?: string | null;
   selectedNodeIds?: string[];
+  /** Render one cropped image's full source while its crop frame is being edited. */
+  imageCropEditingNodeId?: string | null;
   onNodeSelect?: (node: SketchSceneNode | null) => void;
   onSelectionChange?: (selection: SketchEditorSelection) => void;
 }

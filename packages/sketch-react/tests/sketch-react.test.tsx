@@ -332,6 +332,25 @@ function setCanvasStageRect(stage: HTMLElement, width = 400, height = 300) {
     }) as DOMRect;
 }
 
+function mockDecodedImageDimensions(width: number, height: number) {
+  const originalDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Image");
+  const decodedImage = {
+    naturalWidth: width,
+    naturalHeight: height,
+    src: "",
+    decode: vi.fn().mockResolvedValue(undefined),
+  };
+  Object.defineProperty(globalThis, "Image", {
+    configurable: true,
+    writable: true,
+    value: vi.fn(() => decodedImage),
+  });
+  return () => {
+    if (originalDescriptor) Object.defineProperty(globalThis, "Image", originalDescriptor);
+    else Reflect.deleteProperty(globalThis, "Image");
+  };
+}
+
 function mockFloatingToolbarRect(width: number, height = 44) {
   const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
   return vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
@@ -1148,6 +1167,29 @@ describe("sketch-react", () => {
       expect(parsed.nodes.filter((node) => node.type === "card")).toHaveLength(2);
       expect(screen.queryByRole("dialog", { name: "草图命令面板" })).toBeNull();
     });
+  });
+
+  it("keeps inner whiteboard Escape handling inside the overlay", () => {
+    const outerKeyDown = vi.fn();
+    render(
+      <div onKeyDown={outerKeyDown}>
+        <ControlledPartsEditorWithToolbar initialScene={scene} />
+      </div>,
+    );
+
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    const palette = screen.getByRole("dialog", { name: "草图命令面板" });
+    fireEvent.keyDown(within(palette).getByLabelText("搜索草图命令"), { key: "Escape" });
+
+    expect(outerKeyDown).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog", { name: "草图命令面板" })).toBeNull();
+
+    fireEvent.click(screen.getByLabelText("打开快捷键帮助"));
+    const help = screen.getByRole("dialog", { name: "草图快捷键帮助" });
+    fireEvent.keyDown(help, { key: "Escape" });
+
+    expect(outerKeyDown).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog", { name: "草图快捷键帮助" })).toBeNull();
   });
 
   it("renders shortcut help from registered actions", () => {
@@ -2749,6 +2791,44 @@ describe("sketch-react", () => {
     });
   });
 
+  it("uses decoded image pixels for the default display size with a 600px cap", async () => {
+    const cases = [
+      { width: 100, height: 50, expected: { width: 100, height: 50 } },
+      { width: 1200, height: 600, expected: { width: 600, height: 300 } },
+      { width: 600, height: 1200, expected: { width: 300, height: 600 } },
+    ];
+
+    for (const item of cases) {
+      cleanup();
+      const restoreImage = mockDecodedImageDimensions(item.width, item.height);
+      try {
+        render(<ControlledEditor />);
+        const stage = getCanvasStage();
+        setCanvasStageRect(stage);
+        fireEvent.click(screen.getByLabelText("图片"));
+        dispatchPointerEvent(stage, "pointerdown", 200, 140);
+        dispatchPointerEvent(stage, "pointerup", 200, 140);
+        fireEvent.change(screen.getByLabelText("图片导入文件"), {
+          target: { files: [new File(["image-bytes"], "decoded.png", { type: "image/png" })] },
+        });
+
+        await waitFor(() => {
+          const imageNode = readRenderedScene().nodes.find((node) => node.type === "image");
+          expect(imageNode).toMatchObject({
+            width: item.expected.width,
+            height: item.expected.height,
+            intrinsicWidth: item.width,
+            intrinsicHeight: item.height,
+            style: { imageFit: "contain", stroke: "transparent", strokeWidth: 0 },
+          });
+        });
+      } finally {
+        restoreImage();
+        cleanup();
+      }
+    }
+  });
+
   it("opens canvas image fit editing on double click", async () => {
     const imageScene: SketchSceneDocument = {
       version: 1,
@@ -2777,7 +2857,139 @@ describe("sketch-react", () => {
     });
   });
 
-  it("replaces an image by dropping a file over it while preserving geometry style bindings and layer order", async () => {
+  it("exposes image crop modes, masks the crop area, and resets repeated crops", async () => {
+    const imageScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        {
+          id: "image",
+          type: "image",
+          x: 80,
+          y: 60,
+          width: 200,
+          height: 100,
+          src: "data:image/png;base64,abc",
+          style: { imageFit: "contain", stroke: "#111827", strokeWidth: 2 },
+        },
+      ],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={imageScene} />);
+    clickLayerNode("image");
+
+    const toolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
+    expect(Array.from(within(toolbar).getAllByRole("button"), (button) => button.getAttribute("aria-label"))).toEqual([
+      "悬浮更换图片",
+      "悬浮裁剪图片",
+      "悬浮描边",
+      "悬浮图层",
+      "悬浮更多",
+    ]);
+
+    fireEvent.click(within(toolbar).getByLabelText("悬浮裁剪图片"));
+    const cropMenu = screen.getByRole("menu", { name: "裁剪图片" });
+    expect(within(cropMenu).getByRole("menuitem", { name: "矩形裁剪" })).toBeTruthy();
+    expect(within(cropMenu).getByRole("menuitem", { name: "圆形裁剪" })).toBeTruthy();
+    expect(within(cropMenu).getByRole("menuitem", { name: "重置" })).toBeTruthy();
+    fireEvent.click(within(cropMenu).getByRole("menuitem", { name: "矩形裁剪" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("sketch-image-crop-overlay")).toBeTruthy();
+      expect(screen.getByTestId("sketch-image-crop-dim")).toBeTruthy();
+      expect(screen.getByTestId("sketch-image-crop-frame")).toBeTruthy();
+      expect(screen.queryByRole("toolbar", { name: "草图悬浮快捷工具条" })).toBeNull();
+      expect(screen.queryByTestId("sketch-selection-box")).toBeNull();
+    });
+
+    const stage = getCanvasStage();
+    setCanvasStageRect(stage);
+    const eastHandle = screen.getByTestId("sketch-resize-handle-e");
+    dispatchPointerEvent(eastHandle, "pointerdown", 280, 110);
+    dispatchPointerEvent(stage, "pointermove", 230, 110);
+    dispatchPointerEvent(stage, "pointerup", 230, 110);
+
+    await waitFor(() => {
+      expect(readRenderedScene().nodes.find((node) => node.id === "image")).toMatchObject({
+        x: 80,
+        y: 60,
+        width: 150,
+        height: 100,
+        imageCrop: {
+          shape: "rect",
+          sourceRect: { x: 0, y: 0, width: 0.75, height: 1 },
+          originalFrame: { x: 80, y: 60, width: 200, height: 100 },
+          originalImageFit: "contain",
+        },
+      });
+      const sourceImage = document.querySelector('image[data-sketch-node-id="image"]');
+      expect(sourceImage?.getAttribute("clip-path")).toBeNull();
+      expect(sourceImage?.getAttribute("x")).toBe("80");
+      expect(sourceImage?.getAttribute("width")).toBe("200");
+      expect(screen.getByTestId("sketch-image-crop-dim").getAttribute("fill")).toBe("rgba(0,0,0,0.5)");
+    });
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByTestId("sketch-image-crop-overlay")).toBeNull());
+    expect(readRenderedScene().nodes.find((node) => node.id === "image")?.imageCrop?.shape).toBe("rect");
+
+    clickLayerNode("image");
+    fireEvent.click(screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" }).querySelector('[aria-label="悬浮裁剪图片"]') as HTMLElement);
+    fireEvent.click(within(screen.getByRole("menu", { name: "裁剪图片" })).getByRole("menuitem", { name: "圆形裁剪" }));
+
+    await waitFor(() => {
+      const node = readRenderedScene().nodes.find((item) => item.id === "image");
+      expect(node).toMatchObject({ x: 80, y: 60, width: 150, height: 100, imageCrop: { shape: "circle" } });
+      expect(screen.getByTestId("sketch-image-crop-overlay").getAttribute("data-sketch-image-crop-shape")).toBe("circle");
+      expect(document.querySelector('[data-sketch-node-border="image"]')?.tagName).toBe("ellipse");
+    });
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByTestId("sketch-image-crop-overlay")).toBeNull());
+    clickLayerNode("image");
+    fireEvent.click(screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" }).querySelector('[aria-label="悬浮裁剪图片"]') as HTMLElement);
+    fireEvent.click(within(screen.getByRole("menu", { name: "裁剪图片" })).getByRole("menuitem", { name: "重置" }));
+
+    await waitFor(() => {
+      expect(readRenderedScene().nodes.find((node) => node.id === "image")).toMatchObject({
+        x: 80,
+        y: 60,
+        width: 200,
+        height: 100,
+      });
+      expect(readRenderedScene().nodes.find((node) => node.id === "image")).not.toHaveProperty("imageCrop");
+      expect(screen.queryByTestId("sketch-image-crop-overlay")).toBeNull();
+    });
+  });
+
+  it("adds a 0–20px stroke width slider for images while keeping exact input", async () => {
+    const imageScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [{ id: "image", type: "image", x: 40, y: 50, width: 120, height: 80, src: "data:image/png;base64,abc" }],
+    };
+    render(<ControlledPartsEditorWithToolbarAndProperties initialScene={imageScene} />);
+    clickLayerNode("image");
+
+    const propertySlider = screen.getByLabelText("描边宽度") as HTMLInputElement;
+    const strokeWidthControl = propertySlider.closest('[data-testid="sketch-stroke-width-control"]');
+    expect(strokeWidthControl?.className).toContain("bg-white");
+    expect(strokeWidthControl?.className).toContain("border-slate-200");
+    expect(strokeWidthControl?.className).toContain("text-slate-700");
+    expect(propertySlider.min).toBe("0");
+    expect(propertySlider.max).toBe("20");
+    expect(propertySlider.step).toBe("1");
+    fireEvent.change(propertySlider, { target: { value: "8" } });
+    await waitFor(() => expect(readRenderedScene().nodes.find((node) => node.id === "image")?.style?.strokeWidth).toBe(8));
+
+    const toolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
+    fireEvent.click(within(toolbar).getByLabelText("悬浮描边"));
+    const floatingSlider = screen.getAllByLabelText("描边宽度").find((element) => element.closest('[role="menu"]')) as HTMLInputElement;
+    expect(floatingSlider).toBeTruthy();
+    fireEvent.change(floatingSlider, { target: { value: "12" } });
+    await waitFor(() => expect(readRenderedScene().nodes.find((node) => node.id === "image")?.style?.strokeWidth).toBe(12));
+  });
+
+  it("replaces an image by dropping a file over it while preserving position style bindings and layer order", async () => {
     const imageScene: SketchSceneDocument = {
       version: 1,
       pageSize: { width: 400, height: 300 },
@@ -2818,8 +3030,8 @@ describe("sketch-react", () => {
       expect(image).toMatchObject({
         x: 60,
         y: 50,
-        width: 120,
-        height: 80,
+        width: 240,
+        height: 135,
         alt: "replacement.png",
         style: { radius: 10, imageFit: "cover" },
         bindings: { text: "heroLabel" },
@@ -4572,8 +4784,8 @@ describe("sketch-react", () => {
     clickLayerNode("front");
     const toolbar = screen.getByRole("toolbar", { name: "草图悬浮快捷工具条" });
     const fillIndicator = within(toolbar).getByTestId("sketch-floating-fill-indicator");
-    expect(fillIndicator.className).toContain("h-3.5");
-    expect(fillIndicator.className).toContain("w-3.5");
+    expect(fillIndicator.className).toContain("h-4");
+    expect(fillIndicator.className).toContain("w-4");
 
     fireEvent.click(within(toolbar).getByLabelText("悬浮填充"));
     const fillMenu = screen.getByRole("menu", { name: "填充" });
