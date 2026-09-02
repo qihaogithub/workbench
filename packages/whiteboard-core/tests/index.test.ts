@@ -39,6 +39,60 @@ describe("whiteboard-core bridge", () => {
     expect(reparsed.scene.nodes[0]).toMatchObject({ rotation: -6, style: { opacity: 0.75, imageFit: "contain" }, zIndex: 0 });
     expect(reparsed.nodeSemantics.hero.assetRef).toBe("asset_1");
   });
+  it("round trips intrinsic image dimensions and crop metadata through the bridge", () => {
+    const parsed = parseWhiteboardCode(
+      `<main data-sketch-canvas="v1" data-width="240" data-height="180"><img data-sketch-id="hero" data-sketch-kind="image" data-asset-ref="asset_1" data-sketch-image-size="1200,800" data-sketch-image-crop="rect|0.1,0.2,0.6,0.5|10,20,200,160|contain" /></main>`,
+      `[data-sketch-id="hero"] { left:30px; top:40px; width:120px; height:80px; border-color:#2563EB; border-width:4px; object-fit:contain; }`,
+      { id: "demo" },
+    );
+    expect(parsed.diagnostics).toEqual([]);
+    expect(parsed.value?.scene.nodes[0]).toMatchObject({
+      intrinsicWidth: 1200,
+      intrinsicHeight: 800,
+      imageCrop: {
+        shape: "rect",
+        sourceRect: { x: 0.1, y: 0.2, width: 0.6, height: 0.5 },
+        originalFrame: { x: 10, y: 20, width: 200, height: 160 },
+        originalImageFit: "contain",
+      },
+    });
+
+    const serialized = serializeWhiteboardCode(parsed.value!).value!;
+    expect(serialized.html).toContain('data-sketch-image-size="1200,800"');
+    expect(serialized.html).toContain('data-sketch-image-crop="rect|0.1,0.2,0.6,0.5|10,20,200,160|contain"');
+    const reparsed = parseWhiteboardCode(serialized.html, serialized.css, { id: "demo" }).value!;
+    expect(reparsed.scene.nodes[0]).toEqual(parsed.value!.scene.nodes[0]);
+  });
+  it("applies and resets the image crop action without losing the image node", () => {
+    const document = parseWhiteboardCode(
+      '<main data-sketch-canvas="v1" data-width="100" data-height="100"><img data-sketch-id="hero" data-sketch-kind="image" data-asset-ref="asset_1" /></main>',
+      '[data-sketch-id="hero"] { left:10px; top:12px; width:80px; height:60px; object-fit:contain; }',
+    ).value!;
+    const crop = {
+      shape: "circle" as const,
+      sourceRect: { x: 0.2, y: 0.1, width: 0.5, height: 0.5 },
+      originalFrame: { x: 10, y: 12, width: 80, height: 60 },
+      originalImageFit: "contain" as const,
+    };
+    const cropped = applyWhiteboardActions(document, [{
+      type: "setImageCrop",
+      nodeId: "hero",
+      crop,
+      frame: { x: 20, y: 16, width: 40, height: 40 },
+    }]);
+    expect(cropped.diagnostics).toEqual([]);
+    expect(cropped.value?.scene.nodes[0]).toMatchObject({ x: 20, y: 16, width: 40, height: 40, imageCrop: crop });
+
+    const reset = applyWhiteboardActions(cropped.value!, [{
+      type: "setImageCrop",
+      nodeId: "hero",
+      crop: null,
+      frame: crop.originalFrame,
+    }]);
+    expect(reset.diagnostics).toEqual([]);
+    expect(reset.value?.scene.nodes[0]).toMatchObject({ x: 10, y: 12, width: 80, height: 60 });
+    expect(reset.value?.scene.nodes[0]).not.toHaveProperty("imageCrop");
+  });
   it("rejects unsupported nodes and duplicate IDs", () => {
     const result = parseWhiteboardCode(`<main data-sketch-canvas="v1" data-width="10" data-height="10"><div data-sketch-id="x" data-sketch-kind="card"></div><div data-sketch-id="x" data-sketch-kind="rect"></div></main>`, "");
     expect(result.value).toBeUndefined();
@@ -168,6 +222,26 @@ describe("whiteboard-core bridge", () => {
     expect(validateWhiteboardDocument({ ...parsed, scene: { ...parsed.scene, metadata: { source: "editor" } } }).diagnostics.map((item) => item.code)).toContain("UNSUPPORTED_SCENE_FIELD");
     const unsafe = { ...parsed, scene: { ...parsed.scene, nodes: parsed.scene.nodes.map((node) => node.id === "box" ? { ...node, style: { ...node.style, fill: "red; color: blue" } } : node) } };
     expect(serializeWhiteboardCode(unsafe).diagnostics.map((item) => item.code)).toContain("UNSAFE_STYLE");
+  });
+  it("keeps bridge validation errors in Chinese for user-facing surfaces", () => {
+    const parsed = parseWhiteboardCode(html, css, { id: "demo" }).value!;
+    const invalid = {
+      ...parsed,
+      scene: {
+        ...parsed.scene,
+        metadata: { source: "editor" },
+        nodes: parsed.scene.nodes.map((node) =>
+          node.id === "box" ? { ...node, text: "不支持的文本" } : node,
+        ),
+      },
+    };
+    const messages = validateWhiteboardDocument(invalid).diagnostics.map(
+      (item) => item.message,
+    );
+    expect(messages).toContain("场景元数据不属于当前白板代码桥接范围");
+    expect(messages).toContain("仅文本节点和按钮节点支持文本内容");
+    expect(messages.join("；")).not.toContain("scene metadata");
+    expect(messages.join("；")).not.toContain("text is only supported");
   });
 
   it("rejects unknown document and node fields instead of dropping them", () => {

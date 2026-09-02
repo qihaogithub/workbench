@@ -1,15 +1,18 @@
 import {
+  isValidSketchSceneImageCrop,
   validateSketchSceneDocument,
   type SketchSceneDocument,
+  type SketchSceneFrame,
+  type SketchSceneImageCrop,
   type SketchSceneNode,
   type SketchSceneStyle,
 } from "@workbench/sketch-core";
 
 export const WHITEBOARD_DOCUMENT_VERSION = 2 as const;
-export const BRIDGE_PROFILE_VERSION = "html-css-v1" as const;
+export const BRIDGE_PROFILE_VERSION = "html-css-v2" as const;
 export const WHITEBOARD_CONTEXT_SCHEMA_VERSION = "whiteboard-context-v1" as const;
 export const WHITEBOARD_PLAN_SCHEMA_VERSION = "whiteboard-plan-v1" as const;
-export const WHITEBOARD_ACTION_SCHEMA_VERSION = "whiteboard-action-v1" as const;
+export const WHITEBOARD_ACTION_SCHEMA_VERSION = "whiteboard-action-v2" as const;
 export const BRIDGE_NODE_TYPES = ["group", "rect", "ellipse", "image", "text", "button"] as const;
 export type BridgeNodeType = (typeof BRIDGE_NODE_TYPES)[number];
 export type SemanticRole = "background" | "subject" | "logo" | "decor" | "title" | "subtitle" | "label";
@@ -107,17 +110,152 @@ const tagKinds: Record<string, BridgeNodeType[]> = {
   div: ["group", "rect", "ellipse", "text"], button: ["button"], img: ["image"],
   h1: ["text"], h2: ["text"], h3: ["text"], h4: ["text"], h5: ["text"], h6: ["text"], p: ["text"], span: ["text"],
 };
-const allowedAttrs = new Set(["data-sketch-id", "data-sketch-kind", "data-sketch-role", "data-asset-ref", "data-sketch-children", "src", "alt"]);
+const allowedAttrs = new Set(["data-sketch-id", "data-sketch-kind", "data-sketch-role", "data-asset-ref", "data-sketch-children", "data-sketch-image-size", "data-sketch-image-crop", "src", "alt"]);
 const allowedDocumentKeys = new Set(["id", "version", "documentRevision", "scene", "nodeSemantics", "safeArea", "editorView", "updatedAt"]);
-const allowedNodeKeys = new Set(["id", "type", "x", "y", "width", "height", "zIndex", "style", "text", "src", "alt", "rotation", "children", "visible"]);
+const allowedNodeKeys = new Set(["id", "type", "x", "y", "width", "height", "zIndex", "style", "text", "src", "alt", "intrinsicWidth", "intrinsicHeight", "imageCrop", "rotation", "children", "visible"]);
 const cssPropertySet = new Set<string>(BRIDGE_STYLE_FIELDS);
 const bridgeStyleKeys = new Set(["fill", "stroke", "strokeWidth", "opacity", "radius", "fontSize", "fontWeight", "textAlign", "color", "imageFit"]);
-const whiteboardActionTypes = new Set(["updateNode", "updateRole", "placeAsset", "setImageFit", "removeNode", "addText", "align", "distribute"]);
+const whiteboardActionTypes = new Set(["updateNode", "updateRole", "placeAsset", "setImageFit", "setImageCrop", "removeNode", "addText", "align", "distribute"]);
 const updateNodeKeys = new Set(["x", "y", "width", "height", "text", "rotation", "style"]);
 const idPattern = /^[A-Za-z][A-Za-z0-9_-]{0,79}$/;
 const assetIdPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
-function diag(code: string, message: string, extra: Partial<Diagnostic> = {}): Diagnostic { return { code, severity: "error", message, ...extra }; }
+const WHITEBOARD_DIAGNOSTIC_FALLBACK = "白板内容不符合当前支持范围，请检查后重试。";
+const NODE_KIND_LABELS: Record<string, string> = {
+  group: "分组",
+  rect: "图形",
+  ellipse: "椭圆",
+  image: "图片",
+  text: "文本",
+  button: "按钮",
+};
+
+const WHITEBOARD_DIAGNOSTIC_MESSAGES: Record<string, string> = {
+  ASSET_IN_USE: "已附加或已输出的资源不能丢弃。",
+  ASSET_NOT_ATTACHED: "资源尚未附加到白板节点，请先确认并附加资源。",
+  ASSET_NOT_RESOLVED: "找不到关联的白板资源，请先确认资源后重试。",
+  CSS_TOKEN_LIMIT: "CSS 内容超过安全限制，请减少声明数量。",
+  DEPTH_LIMIT: "HTML 嵌套层级超过安全限制。",
+  DUPLICATE_CSS_PROPERTY: "CSS 属性重复。",
+  DUPLICATE_CSS_RULE: "CSS 规则重复。",
+  DUPLICATE_NODE_ID: "节点 ID 必须唯一。",
+  INPUT_TOO_LARGE: "HTML/CSS 内容超过输入限制。",
+  INVALID_ACTION: "白板操作无效。",
+  INVALID_ASSET_REF: "资源引用无效。",
+  INVALID_CANVAS: "缺少有效的白板画布根节点。",
+  INVALID_CSS: "CSS 包含未闭合或不支持的规则。",
+  INVALID_DECLARATION: "CSS 声明必须包含属性和值。",
+  INVALID_DOCUMENT: "白板文档必须是对象。",
+  INVALID_EDITOR_VIEW: "白板视图参数无效。",
+  INVALID_GEOMETRY: "节点几何尺寸无效或超出画布范围。",
+  INVALID_GROUP: "分组包含未知子节点。",
+  INVALID_GROUP_SEMANTICS: "分组节点不能携带该语义信息。",
+  INVALID_ID: "白板文档 ID 无效。",
+  INVALID_IMAGE_CROP: "图片裁剪数据无效。",
+  INVALID_IMAGE_SIZE: "图片原始尺寸必须是两个正的有限数值。",
+  INVALID_INPUT: "HTML 和 CSS 必须是文本。",
+  INVALID_NODE: "节点必须是对象。",
+  INVALID_NODE_ID: "节点必须提供有效的 data-sketch-id。",
+  INVALID_NODE_TYPE: "节点类型不支持该操作。",
+  INVALID_PAGE_SIZE: "画布宽高必须为正数且不能超过限制。",
+  INVALID_ROLE: "节点语义角色无效。",
+  INVALID_SAFE_AREA: "安全区域必须位于画布范围内。",
+  INVALID_SCENE: "场景不符合白板协议。",
+  INVALID_SELECTION: "至少需要选择两个节点。",
+  INVALID_SEMANTICS: "节点语义信息无效。",
+  INVALID_STYLE: "节点样式无效。",
+  INVALID_TIMESTAMP: "更新时间必须是非负有限数值。",
+  INVALID_VERSION: "白板版本或文档修订号无效。",
+  MISSING_CSS_RULE: "节点缺少对应的 CSS 规则。",
+  MISSING_GEOMETRY: "节点必须提供 left、top、width 和 height。",
+  NESTED_NODE: "不支持嵌套可编辑节点，请使用分组子节点元数据。",
+  NODE_LIMIT: "节点数量超过限制。",
+  NODE_NOT_FOUND: "操作目标节点不存在。",
+  ORPHAN_CSS_RULE: "CSS 规则没有对应的白板节点。",
+  ORPHAN_SEMANTICS: "节点语义引用了不存在的节点。",
+  OUTSIDE_SAFE_AREA: "操作会使节点超出安全区域。",
+  TAG_KIND_MISMATCH: "HTML 标签与节点类型不匹配。",
+  UNLOCALIZED_RESOURCE: "图片必须引用已本地化的 workspace 资源。",
+  UNSAFE_STYLE: "节点样式值不适合跨环境渲染。",
+  UNSUPPORTED_CONTENT: "不支持脚本、嵌入内容、style 标签和 CSS at-rule。",
+  UNSUPPORTED_HTML: "画布中包含不支持的 HTML 内容。",
+  UNSUPPORTED_NODE: "节点类型不在白板代码桥接范围内。",
+  UNSUPPORTED_NODE_CONTENT: "节点包含不支持的文本内容。",
+  UNSUPPORTED_SAFE_AREA_FIELD: "安全区域字段不受支持。",
+  UNSUPPORTED_SCENE_FIELD: "场景字段不属于当前白板代码桥接范围。",
+  UNSUPPORTED_SELECTOR: "CSS 选择器不受支持。",
+  UNSUPPORTED_SEMANTICS: "节点语义字段不受支持。",
+  UNSUPPORTED_STYLE: "节点样式字段不受支持。",
+};
+
+function localizeWhiteboardDiagnosticMessage(code: string, message: string): string {
+  const normalized = message.trim();
+  if (!normalized) return WHITEBOARD_DIAGNOSTIC_FALLBACK;
+  if (/[\u3400-\u9fff]/u.test(normalized)) return normalized;
+
+  if (normalized === "scene metadata is not part of the whiteboard bridge") {
+    return "场景元数据不属于当前白板代码桥接范围";
+  }
+  if (normalized === "scene bindings are not part of the whiteboard bridge") {
+    return "场景绑定不属于当前白板代码桥接范围";
+  }
+  if (normalized === "scene assets must be represented by nodeSemantics.assetRef") {
+    return "场景资源必须通过节点语义中的 assetRef 表示";
+  }
+  if (normalized === "text is only supported on text and button nodes") {
+    return "仅文本节点和按钮节点支持文本内容";
+  }
+  const nodeContent = normalized.match(/^([a-z]+) nodes cannot contain text content$/u);
+  if (nodeContent) {
+    return `${NODE_KIND_LABELS[nodeContent[1]] ?? "节点"}节点不能包含文本内容`;
+  }
+  const duplicateAttribute = normalized.match(/^duplicate (?:canvas )?attribute (.+)$/u);
+  if (duplicateAttribute) return `属性 ${duplicateAttribute[1]} 重复`;
+  const unsupportedAttribute = normalized.match(/^(?:attribute|canvas attribute) (.+) is not supported$/u);
+  if (unsupportedAttribute) return `属性 ${unsupportedAttribute[1]} 不受支持`;
+  const unsupportedSelector = normalized.match(/^selector (.+) is not supported$/u);
+  if (unsupportedSelector) return `CSS 选择器 ${unsupportedSelector[1]} 不受支持`;
+  const unsupportedCss = normalized.match(/^CSS property (.+) is not supported$/u);
+  if (unsupportedCss) return `CSS 属性 ${unsupportedCss[1]} 不受支持`;
+  const duplicateCssProperty = normalized.match(/^duplicate CSS property (.+)$/u);
+  if (duplicateCssProperty) return `CSS 属性 ${duplicateCssProperty[1]} 重复`;
+  const unsupportedNodeField = normalized.match(/^node field (.+) is not supported by the bridge profile$/u);
+  if (unsupportedNodeField) return `节点字段 ${unsupportedNodeField[1]} 不属于当前白板代码桥接范围`;
+  const unsupportedNodeType = normalized.match(/^node type (.+) is not in bridge profile$/u);
+  if (unsupportedNodeType) return `节点类型 ${unsupportedNodeType[1]} 不在当前白板代码桥接范围内`;
+  const unsupportedStyle = normalized.match(/^style field (.+) is not supported by the bridge profile$/u);
+  if (unsupportedStyle) return `样式字段 ${unsupportedStyle[1]} 不属于当前白板代码桥接范围`;
+  const unsafeStyle = normalized.match(/^style value for (.+) is not portable$/u);
+  if (unsafeStyle) return `样式字段 ${unsafeStyle[1]} 的值无法安全跨环境渲染`;
+  const unsupportedRole = normalized.match(/^unsupported role (.+)$/u);
+  if (unsupportedRole) return `语义角色 ${unsupportedRole[1]} 不受支持`;
+  const unsupportedAction = normalized.match(/^unsupported whiteboard action (.+)$/u);
+  if (unsupportedAction) return `白板操作 ${unsupportedAction[1]} 不受支持`;
+  const unsupportedPatchFields = normalized.match(/^updateNode fields are not supported: (.+)$/u);
+  if (unsupportedPatchFields) return `节点更新字段不受支持：${unsupportedPatchFields[1]}`;
+  const invalidCssNumber = normalized.match(/^(.+) must be a finite px number$/u);
+  if (invalidCssNumber) return `${invalidCssNumber[1]} 必须是有限的像素数值`;
+  const invalidCssProperty = normalized.match(/^(.+) must be an integer$/u);
+  if (invalidCssProperty) return `${invalidCssProperty[1]} 必须是整数`;
+  const invalidCssRange = normalized.match(/^(.+) must be between 0 and 1$/u);
+  if (invalidCssRange) return `${invalidCssRange[1]} 必须在 0 到 1 之间`;
+  const invalidCssEnum = normalized.match(/^(.+) must be (.+)$/u);
+  if (invalidCssEnum && ["text-align", "object-fit"].includes(invalidCssEnum[1])) {
+    return `${invalidCssEnum[1]} 的取值必须为 ${invalidCssEnum[2]}`;
+  }
+  const managedAssetMissing = normalized.match(/^managed asset (.+) was not found$/u);
+  if (managedAssetMissing) return `找不到关联的资源 ${managedAssetMissing[1]}`;
+  const managedAssetState = normalized.match(/^managed asset (.+) is (.+), not attached$/u);
+  if (managedAssetState) return `资源 ${managedAssetState[1]} 当前为${managedAssetState[2]}状态，尚未附加`;
+  const managedAssetUnsafe = normalized.match(/^managed asset (.+) has no safe render path$/u);
+  if (managedAssetUnsafe) return `资源 ${managedAssetUnsafe[1]} 没有安全的渲染路径`;
+
+  return WHITEBOARD_DIAGNOSTIC_MESSAGES[code] ?? WHITEBOARD_DIAGNOSTIC_FALLBACK;
+}
+
+function diag(code: string, message: string, extra: Partial<Diagnostic> = {}): Diagnostic {
+  return { code, severity: "error", message: localizeWhiteboardDiagnosticMessage(code, message), ...extra };
+}
 function esc(value: string): string { return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 function textEsc(value: string): string { return esc(value).replace(/\n/g, "&#10;"); }
 function decodeText(value: string): string { return value.replace(/&#10;|&#x0a;/gi, "\n").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"); }
@@ -126,6 +264,43 @@ function numeric(value: string | undefined): number | undefined {
   if (value === undefined || !/^-?(?:\d+\.?\d*|\.\d+)(?:px)?$/.test(value.trim())) return undefined;
   const parsed = Number(value.trim().replace(/px$/, ""));
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function numberTuple(value: string | undefined, length: number): number[] | undefined {
+  if (value === undefined) return undefined;
+  const values = value.split(",").map((part) => Number(part.trim()));
+  return values.length === length && values.every((part) => Number.isFinite(part)) ? values : undefined;
+}
+
+function serializeImageCrop(crop: SketchSceneImageCrop): string {
+  const source = crop.sourceRect;
+  const frame = crop.originalFrame;
+  return [
+    crop.shape,
+    [source.x, source.y, source.width, source.height].join(","),
+    [frame.x, frame.y, frame.width, frame.height].join(","),
+    crop.originalImageFit,
+  ].join("|");
+}
+
+function parseImageCrop(value: string | undefined, nodeId: string, diagnostics: Diagnostic[]): SketchSceneImageCrop | undefined {
+  if (value === undefined) return undefined;
+  const parts = value.split("|");
+  const source = numberTuple(parts[1], 4);
+  const frame = numberTuple(parts[2], 4);
+  const crop = parts.length === 4 && (parts[0] === "rect" || parts[0] === "circle") && source && frame && (parts[3] === "cover" || parts[3] === "contain" || parts[3] === "fill")
+    ? {
+        shape: parts[0],
+        sourceRect: { x: source[0], y: source[1], width: source[2], height: source[3] },
+        originalFrame: { x: frame[0], y: frame[1], width: frame[2], height: frame[3] },
+        originalImageFit: parts[3],
+      } as SketchSceneImageCrop
+    : undefined;
+  if (!crop || !isValidSketchSceneImageCrop(crop)) {
+    diagnostics.push(diag("INVALID_IMAGE_CROP", "data-sketch-image-crop must encode a valid image crop", { nodeId }));
+    return undefined;
+  }
+  return crop;
 }
 
 function isSafeCssToken(value: unknown): value is string {
@@ -266,6 +441,11 @@ export function validateWhiteboardDocument(document: unknown): { valid: boolean;
     if (node.text !== undefined && node.type !== "text" && node.type !== "button") diagnostics.push(diag("UNSUPPORTED_NODE_FIELD", "text is only supported on text and button nodes", { nodeId: node.id }));
     if (node.src !== undefined && node.type !== "image") diagnostics.push(diag("UNSUPPORTED_NODE_FIELD", "src is only supported on image nodes", { nodeId: node.id }));
     if (node.alt !== undefined && node.type !== "image") diagnostics.push(diag("UNSUPPORTED_NODE_FIELD", "alt is only supported on image nodes", { nodeId: node.id }));
+    if (node.type !== "image" && (node.intrinsicWidth !== undefined || node.intrinsicHeight !== undefined || node.imageCrop !== undefined)) diagnostics.push(diag("UNSUPPORTED_NODE_FIELD", "image dimensions and crop data are only supported on image nodes", { nodeId: node.id }));
+    const intrinsicWidth = node.intrinsicWidth;
+    const intrinsicHeight = node.intrinsicHeight;
+    if (node.type === "image" && ((intrinsicWidth !== undefined) !== (intrinsicHeight !== undefined) || (intrinsicWidth !== undefined && intrinsicHeight !== undefined && (!Number.isFinite(intrinsicWidth) || intrinsicWidth <= 0 || !Number.isFinite(intrinsicHeight) || intrinsicHeight <= 0)))) diagnostics.push(diag("INVALID_IMAGE_SIZE", "image intrinsic dimensions must be two positive finite values", { nodeId: node.id }));
+    if (node.type === "image" && node.imageCrop !== undefined && !isValidSketchSceneImageCrop(node.imageCrop)) diagnostics.push(diag("INVALID_IMAGE_CROP", "imageCrop must use normalized source coordinates", { nodeId: node.id }));
   }
   const semantics = d.nodeSemantics;
   if (!semantics || typeof semantics !== "object" || Array.isArray(semantics)) diagnostics.push(diag("INVALID_SEMANTICS", "nodeSemantics is required"));
@@ -312,7 +492,7 @@ export function serializeWhiteboardCode(document: WhiteboardDocument): Conversio
   const d = canonicalizeWhiteboardDocument(document);
   const htmlNodes = d.scene.nodes.map((node) => {
     const semantics = d.nodeSemantics[node.id] ?? {}; const attrs = [`data-sketch-id="${esc(node.id)}"`, `data-sketch-kind="${node.type}"`];
-    if (semantics.role) attrs.push(`data-sketch-role="${semantics.role}"`); if (semantics.assetRef) attrs.push(`data-asset-ref="${esc(semantics.assetRef)}"`); if (node.children?.length) attrs.push(`data-sketch-children="${esc(node.children.join(","))}"`); if (node.type === "image") { attrs.push(`src="${esc(node.src ?? "")}"`); if (node.alt) attrs.push(`alt="${esc(node.alt)}"`); }
+    if (semantics.role) attrs.push(`data-sketch-role="${semantics.role}"`); if (semantics.assetRef) attrs.push(`data-asset-ref="${esc(semantics.assetRef)}"`); if (node.children?.length) attrs.push(`data-sketch-children="${esc(node.children.join(","))}"`); if (node.type === "image") { attrs.push(`src="${esc(node.src ?? "")}"`); if (node.alt) attrs.push(`alt="${esc(node.alt)}"`); if (node.intrinsicWidth !== undefined && node.intrinsicHeight !== undefined) attrs.push(`data-sketch-image-size="${node.intrinsicWidth},${node.intrinsicHeight}"`); if (node.imageCrop) attrs.push(`data-sketch-image-crop="${serializeImageCrop(node.imageCrop)}"`); }
     const body = node.type === "text" || node.type === "button" ? textEsc(node.text ?? "") : ""; const tag = (tagFor as Record<string, string>)[node.type];
     return `  <${tag} ${attrs.join(" ")}>${body}</${tag}>`;
   }).join("\n");
@@ -372,13 +552,18 @@ export function parseWhiteboardCode(html: string, css = "", options: { id?: stri
     if (kindValue !== "text" && kindValue !== "button" && content.replace(/<[^>]*>/g, "").trim()) diagnostics.push(diag("UNSUPPORTED_NODE_CONTENT", `${kindValue} nodes cannot contain text content`, { nodeId: id }));
     if (attrs.has("src") && kindValue !== "image") diagnostics.push(diag("UNSUPPORTED_ATTRIBUTE", "src is only supported on image nodes", { nodeId: id }));
     if (attrs.has("data-sketch-children") && kindValue !== "group") diagnostics.push(diag("UNSUPPORTED_ATTRIBUTE", "data-sketch-children is only supported on group nodes", { nodeId: id }));
+    if (attrs.has("data-sketch-image-size") && kindValue !== "image") diagnostics.push(diag("UNSUPPORTED_ATTRIBUTE", "data-sketch-image-size is only supported on image nodes", { nodeId: id }));
+    if (attrs.has("data-sketch-image-crop") && kindValue !== "image") diagnostics.push(diag("UNSUPPORTED_ATTRIBUTE", "data-sketch-image-crop is only supported on image nodes", { nodeId: id }));
+    const imageSize = kindValue === "image" ? numberTuple(attrs.get("data-sketch-image-size"), 2) : undefined;
+    if (kindValue === "image" && attrs.has("data-sketch-image-size") && (!imageSize || !imageSize.every((part) => part > 0))) diagnostics.push(diag("INVALID_IMAGE_SIZE", "data-sketch-image-size must contain two positive pixel values", { nodeId: id }));
+    const imageCrop = kindValue === "image" ? parseImageCrop(attrs.get("data-sketch-image-crop"), id, diagnostics) : undefined;
     const declarations = rules.get(id); if (!declarations) { diagnostics.push(diag("MISSING_CSS_RULE", `missing CSS rule for ${id}`, { nodeId: id })); continue; }
     const x = numeric(declarations.get("left")); const y = numeric(declarations.get("top")); const w = numeric(declarations.get("width")); const h = numeric(declarations.get("height")); if ([x, y, w, h].some((value) => value === undefined)) { diagnostics.push(diag("MISSING_GEOMETRY", "left/top/width/height are required", { nodeId: id })); continue; }
     const style: SketchSceneStyle = {}; if (declarations.has("background")) style.fill = declarations.get("background"); if (declarations.has("color")) style.color = declarations.get("color"); if (declarations.has("border-color")) style.stroke = declarations.get("border-color"); const strokeWidth = numeric(declarations.get("border-width")); if (strokeWidth !== undefined) style.strokeWidth = strokeWidth; const radius = numeric(declarations.get("border-radius")); if (radius !== undefined) style.radius = radius; const opacity = declarations.has("opacity") ? Number(declarations.get("opacity")) : undefined; if (opacity !== undefined && Number.isFinite(opacity)) style.opacity = opacity; const fontSize = numeric(declarations.get("font-size")); if (fontSize !== undefined) style.fontSize = fontSize; const fontWeight = declarations.get("font-weight"); if (fontWeight) style.fontWeight = /^\d+(?:\.\d+)?$/.test(fontWeight) ? Number(fontWeight) : fontWeight; const textAlign = declarations.get("text-align"); if (textAlign === "left" || textAlign === "center" || textAlign === "right") style.textAlign = textAlign; const imageFit = declarations.get("object-fit"); if (imageFit === "cover" || imageFit === "contain" || imageFit === "fill") style.imageFit = imageFit;
     const transform = declarations.get("transform"); let rotation: number | undefined; if (transform) { const parsedRotation = transform.match(/^rotate\((-?(?:\d+\.?\d*|\.\d+))deg\)$/); if (!parsedRotation) diagnostics.push(diag("UNSUPPORTED_CSS_VALUE", "only rotate(<degrees>deg) is supported", { nodeId: id })); else rotation = Number(parsedRotation[1]); }
     const assetRef = attrs.get("data-asset-ref");
     const imageSrc = attrs.get("src") || (assetRef && assetIdPattern.test(assetRef) ? `assets/${assetRef}` : "");
-    const node: SketchSceneNode = { id, type: kindValue, x: x!, y: y!, width: w!, height: h!, zIndex: Number(declarations.get("z-index") ?? 0), ...(kindValue === "group" ? { visible: false } : {}), ...(rotation === undefined ? {} : { rotation }), ...(Object.keys(style).length ? { style } : {}), ...(kindValue === "text" || kindValue === "button" ? { text: decodeText(content.replace(/<[^>]*>/g, "")) } : {}), ...(kindValue === "image" ? { src: imageSrc } : {}), ...(attrs.get("alt") ? { alt: attrs.get("alt") } : {}), ...(attrs.get("data-sketch-children") ? { children: attrs.get("data-sketch-children")!.split(",").filter(Boolean) } : {}) };
+    const node: SketchSceneNode = { id, type: kindValue, x: x!, y: y!, width: w!, height: h!, zIndex: Number(declarations.get("z-index") ?? 0), ...(kindValue === "group" ? { visible: false } : {}), ...(rotation === undefined ? {} : { rotation }), ...(Object.keys(style).length ? { style } : {}), ...(kindValue === "text" || kindValue === "button" ? { text: decodeText(content.replace(/<[^>]*>/g, "")) } : {}), ...(kindValue === "image" ? { src: imageSrc, ...(imageSize ? { intrinsicWidth: imageSize[0], intrinsicHeight: imageSize[1] } : {}), ...(imageCrop ? { imageCrop } : {}) } : {}), ...(attrs.get("alt") ? { alt: attrs.get("alt") } : {}), ...(attrs.get("data-sketch-children") ? { children: attrs.get("data-sketch-children")!.split(",").filter(Boolean) } : {}) };
     if (node.type === "image" && node.src && !isManagedAssetPath(node.src)) diagnostics.push(diag("UNLOCALIZED_RESOURCE", "image src must reference a localized workspace asset", { nodeId: id, suggestion: "Upload or place the image as a managed asset before import." }));
     nodes.push(node); const role = attrs.get("data-sketch-role"); if (role !== undefined && !roleSet.has(role)) diagnostics.push(diag("INVALID_ROLE", `unsupported role ${role}`, { nodeId: id })); if (assetRef !== undefined && !assetIdPattern.test(assetRef)) diagnostics.push(diag("INVALID_ASSET_REF", "assetRef must be a managed asset id", { nodeId: id })); if (role !== undefined || assetRef !== undefined) semantics[id] = { ...(role && roleSet.has(role) ? { role: role as SemanticRole } : {}), ...(assetRef && assetIdPattern.test(assetRef) ? { assetRef } : {}) };
   }
@@ -394,6 +579,7 @@ export type WhiteboardAction =
   | { type: "updateRole"; nodeId: string; role?: SemanticRole }
   | { type: "placeAsset"; nodeId: string; assetId: string; src: string }
   | { type: "setImageFit"; nodeId: string; fit: "cover" | "contain" | "fill" }
+  | { type: "setImageCrop"; nodeId: string; crop: SketchSceneImageCrop | null; frame?: SketchSceneFrame }
   | { type: "removeNode"; nodeId: string }
   | { type: "addText"; nodeId?: string; text: string; x: number; y: number; width: number; height: number; role?: SemanticRole }
   | { type: "align"; nodeIds: string[]; axis: "left" | "center" | "right" | "top" | "middle" | "bottom" }
@@ -423,6 +609,15 @@ export function applyWhiteboardActions(document: WhiteboardDocument, actions: re
     if (action.type === "setImageFit" && !["cover", "contain", "fill"].includes(action.fit)) {
       diagnostics.push(diag("INVALID_ACTION", "setImageFit fit must be cover, contain or fill"));
       continue;
+    }
+    if (action.type === "setImageCrop") {
+      const frame = action.frame;
+      const validFrame = frame === undefined
+        || (frame && Number.isFinite(frame.x) && Number.isFinite(frame.y) && Number.isFinite(frame.width) && Number.isFinite(frame.height) && frame.x >= 0 && frame.y >= 0 && frame.width > 0 && frame.height > 0);
+      if ((action.crop !== null && !isValidSketchSceneImageCrop(action.crop)) || !validFrame) {
+        diagnostics.push(diag("INVALID_ACTION", "setImageCrop requires valid crop data and an optional positive frame", { nodeId: action.nodeId }));
+        continue;
+      }
     }
     if ((action.type === "align" && !["left", "center", "right", "top", "middle", "bottom"].includes(action.axis)) || (action.type === "distribute" && !["horizontal", "vertical"].includes(action.axis))) {
       diagnostics.push(diag("INVALID_ACTION", "alignment axis is not supported"));
@@ -466,6 +661,20 @@ export function applyWhiteboardActions(document: WhiteboardDocument, actions: re
     else if (action.type === "updateRole") { if (action.role && !roleSet.has(action.role)) diagnostics.push(diag("INVALID_ROLE", "unsupported semantic role", { nodeId: action.nodeId })); else if (node.type === "group" && action.role) diagnostics.push(diag("INVALID_GROUP_SEMANTICS", "group nodes cannot carry a role", { nodeId: action.nodeId })); else if (action.role) next.nodeSemantics[action.nodeId] = { ...next.nodeSemantics[action.nodeId], role: action.role }; else if (next.nodeSemantics[action.nodeId]) { const { role: _role, ...rest } = next.nodeSemantics[action.nodeId]; if (Object.keys(rest).length) next.nodeSemantics[action.nodeId] = rest; else delete next.nodeSemantics[action.nodeId]; } }
     else if (action.type === "placeAsset") { if (node.type !== "image" || !assetIdPattern.test(action.assetId) || !isManagedAssetPathForId(action.assetId, action.src)) diagnostics.push(diag("INVALID_ASSET_REF", "placeAsset requires an image node and its matching managed asset source", { nodeId: action.nodeId })); else { node.src = action.src; next.nodeSemantics[action.nodeId] = { ...next.nodeSemantics[action.nodeId], assetRef: action.assetId }; } }
     else if (action.type === "setImageFit") { if (node.type !== "image") diagnostics.push(diag("INVALID_NODE_TYPE", "setImageFit requires an image node", { nodeId: action.nodeId })); else node.style = { ...node.style, imageFit: action.fit }; }
+    else if (action.type === "setImageCrop") {
+      if (node.type !== "image") diagnostics.push(diag("INVALID_NODE_TYPE", "setImageCrop requires an image node", { nodeId: action.nodeId }));
+      else {
+        if (action.crop === null) delete node.imageCrop;
+        else node.imageCrop = cloneJson(action.crop);
+        if (action.frame) {
+          node.x = action.frame.x;
+          node.y = action.frame.y;
+          node.width = action.frame.width;
+          node.height = action.frame.height;
+          touchedGeometry.add(action.nodeId);
+        }
+      }
+    }
     else if (action.type === "updateNode") { next.scene.nodes[index] = { ...node, ...action.patch, style: action.patch.style ? { ...node.style, ...action.patch.style } : node.style }; if (action.patch.x !== undefined || action.patch.y !== undefined || action.patch.width !== undefined || action.patch.height !== undefined) touchedGeometry.add(action.nodeId); }
   }
   if (next.safeArea) {
