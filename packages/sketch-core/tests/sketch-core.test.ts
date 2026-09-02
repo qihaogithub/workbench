@@ -88,9 +88,8 @@ describe("sketch-core", () => {
             style: { startArrow: "diamond" } as unknown as SketchSceneNode["style"],
           },
         ]),
-      ).valid,
+    ).valid,
     ).toBe(false);
-
     const svg = renderSketchSceneToSvgMarkup(scene);
     expect(svg).toContain('orient="auto-start-reverse"');
     expect(svg).toContain('markerWidth="10" markerHeight="10" refX="9" refY="3"');
@@ -295,6 +294,11 @@ describe("sketch-core", () => {
             style: { imageFit: "crop" } as unknown as SketchSceneNode["style"],
           },
         ]),
+    ).valid,
+    ).toBe(false);
+    expect(
+      validateSketchSceneDocument(
+        testScene([{ ...scene.nodes[1], intrinsicWidth: 80 }]),
       ).valid,
     ).toBe(false);
 
@@ -305,6 +309,76 @@ describe("sketch-core", () => {
     expect(svg).toContain('preserveAspectRatio="xMidYMid meet"');
     expect(svg).toContain('data-sketch-node-id="fill"');
     expect(svg).toContain('preserveAspectRatio="none"');
+  });
+
+  it("preserves intrinsic image dimensions and renders non-destructive crops", () => {
+    const src = "data:image/png;base64,abc";
+    const scene = testScene([
+      {
+        id: "rect-crop",
+        type: "image",
+        x: 20,
+        y: 30,
+        width: 120,
+        height: 80,
+        src,
+        intrinsicWidth: 1200,
+        intrinsicHeight: 800,
+        imageCrop: {
+          shape: "rect",
+          sourceRect: { x: 0.1, y: 0.2, width: 0.6, height: 0.5 },
+          originalFrame: { x: 10, y: 20, width: 200, height: 160 },
+          originalImageFit: "contain",
+        },
+        style: { stroke: "#2563EB", strokeWidth: 4 },
+      },
+      {
+        id: "circle-crop",
+        type: "image",
+        x: 220,
+        y: 30,
+        width: 80,
+        height: 80,
+        src,
+        imageCrop: {
+          shape: "circle",
+          sourceRect: { x: 0, y: 0, width: 1, height: 1 },
+          originalFrame: { x: 220, y: 30, width: 80, height: 80 },
+          originalImageFit: "cover",
+        },
+        style: { stroke: "#EF4444", strokeWidth: 2 },
+      },
+    ]);
+
+    expect(validateSketchSceneDocument(scene).valid).toBe(true);
+    expect(
+      validateSketchSceneDocument(
+        testScene([
+          {
+            ...scene.nodes[0],
+            imageCrop: {
+              ...scene.nodes[0].imageCrop!,
+              sourceRect: { x: 0.5, y: 0, width: 0.6, height: 0.5 },
+            },
+          },
+        ]),
+      ).valid,
+    ).toBe(false);
+
+    const svg = renderSketchSceneToSvgMarkup(scene);
+    expect(svg).toContain('id="sketch-image-crop-rect-crop"');
+    expect(svg).toContain('clip-path="url(#sketch-image-crop-rect-crop)"');
+    expect(svg).toContain('data-sketch-node-border="rect-crop"');
+    expect(svg).toContain('stroke="#2563EB" stroke-width="4"');
+    expect(svg).toContain('id="sketch-image-crop-circle-crop"');
+    expect(svg).toContain('<circle data-sketch-node-border="circle-crop"');
+    expect(svg).toContain('stroke="#EF4444" stroke-width="2"');
+    const cropEditingSvg = renderSketchSceneToSvgMarkup(scene, {}, { imageCropEditingNodeId: "rect-crop" });
+    const rectCropImageMarkup = cropEditingSvg.match(/<image[^>]*data-sketch-node-id="rect-crop"[^>]*><title>/)?.[0] ?? "";
+    expect(rectCropImageMarkup).toContain('x="10"');
+    expect(rectCropImageMarkup).toContain('width="200"');
+    expect(rectCropImageMarkup).not.toContain("clip-path=");
+    expect(renderSketchSceneToSvgMarkup(scene, {}, { withBackground: false })).not.toContain('fill="#FFFFFF"');
   });
 
   it("rejects invalid style and binding payloads", () => {

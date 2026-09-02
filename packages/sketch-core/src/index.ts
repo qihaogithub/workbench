@@ -15,6 +15,28 @@ export type SketchSceneNodeType =
   | "card"
   | "group";
 
+export type SketchSceneImageFit = "cover" | "contain" | "fill";
+export type SketchSceneImageCropShape = "rect" | "circle";
+
+export interface SketchSceneFrame {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface SketchSceneImageCrop {
+  shape: SketchSceneImageCropShape;
+  sourceRect: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  originalFrame: SketchSceneFrame;
+  originalImageFit: SketchSceneImageFit;
+}
+
 const SKETCH_SCENE_NODE_TYPES = new Set<string>([
   "rect",
   "diamond",
@@ -51,7 +73,7 @@ export interface SketchSceneStyle {
   lineDash?: number[];
   startArrow?: "none" | "arrow";
   endArrow?: "none" | "arrow";
-  imageFit?: "cover" | "contain" | "fill";
+  imageFit?: SketchSceneImageFit;
 }
 
 export interface SketchSceneTextStyleOverride {
@@ -149,6 +171,9 @@ export interface SketchSceneNode {
   textStyleRuns?: SketchSceneTextStyleRun[];
   src?: string;
   alt?: string;
+  intrinsicWidth?: number;
+  intrinsicHeight?: number;
+  imageCrop?: SketchSceneImageCrop;
   path?: string;
   points?: Array<{ x: number; y: number }>;
   style?: SketchSceneStyle;
@@ -366,6 +391,10 @@ function isOptionalFiniteNumber(value: unknown): boolean {
   return value === undefined || isFiniteNumber(value);
 }
 
+function isOptionalPositiveNumber(value: unknown): boolean {
+  return value === undefined || isFinitePositive(value);
+}
+
 function isOptionalBoolean(value: unknown): boolean {
   return value === undefined || typeof value === "boolean";
 }
@@ -423,6 +452,18 @@ function isValidOptionalObject(value: unknown): boolean {
   return value === undefined || isObject(value);
 }
 
+export function isValidSketchSceneImageCrop(value: unknown): value is SketchSceneImageCrop {
+  if (!isObject(value)) return false;
+  if (value.shape !== "rect" && value.shape !== "circle") return false;
+  if (!isObject(value.sourceRect) || !isFiniteNonNegative(value.sourceRect.x) || !isFiniteNonNegative(value.sourceRect.y)) return false;
+  if (!isFinitePositive(value.sourceRect.width) || !isFinitePositive(value.sourceRect.height)) return false;
+  if (value.sourceRect.x + value.sourceRect.width > 1 || value.sourceRect.y + value.sourceRect.height > 1) return false;
+  if (!isObject(value.originalFrame)) return false;
+  if (!isFiniteNonNegative(value.originalFrame.x) || !isFiniteNonNegative(value.originalFrame.y)) return false;
+  if (!isFinitePositive(value.originalFrame.width) || !isFinitePositive(value.originalFrame.height)) return false;
+  return SKETCH_SCENE_IMAGE_FIT_VALUES.has(String(value.originalImageFit));
+}
+
 function isValidSketchSceneNodeOptionalFields(node: Record<string, unknown>): boolean {
   return (
     isOptionalFiniteNumber(node.rotation) &&
@@ -432,6 +473,9 @@ function isValidSketchSceneNodeOptionalFields(node: Record<string, unknown>): bo
     isOptionalString(node.text) &&
     isOptionalString(node.src) &&
     isOptionalString(node.alt) &&
+    isOptionalPositiveNumber(node.intrinsicWidth) &&
+    isOptionalPositiveNumber(node.intrinsicHeight) &&
+    isValidOptionalObject(node.imageCrop) &&
     isOptionalString(node.path) &&
     isOptionalString(node.name) &&
     isValidSketchScenePoints(node.points) &&
@@ -737,6 +781,27 @@ export function validateSketchSceneDocument(
         issues.push({
           code: "INVALID_NODE",
           message: "Sketch scene node contains invalid optional fields.",
+          nodeId,
+          severity: "error",
+        });
+      }
+      const hasIntrinsicWidth = node.intrinsicWidth !== undefined;
+      const hasIntrinsicHeight = node.intrinsicHeight !== undefined;
+      if (
+        hasIntrinsicWidth !== hasIntrinsicHeight ||
+        (hasIntrinsicWidth && node.type !== "image")
+      ) {
+        issues.push({
+          code: "INVALID_NODE",
+          message: "Sketch scene intrinsic image dimensions must be provided together on image nodes.",
+          nodeId,
+          severity: "error",
+        });
+      }
+      if (node.imageCrop !== undefined && (node.type !== "image" || !isValidSketchSceneImageCrop(node.imageCrop))) {
+        issues.push({
+          code: "INVALID_NODE",
+          message: "Sketch scene imageCrop is only valid on image nodes and must use normalized source coordinates.",
           nodeId,
           severity: "error",
         });
@@ -1311,9 +1376,48 @@ function renderCenteredNodeLabel(
   return `<text ${labelCommon} x="${labelX}" y="${labelY}" fill="${escapeAttr(color)}" font-size="${fontSize}" font-weight="${escapeAttr(style.fontWeight ?? 500)}"${renderBaseTextStyleAttributes(style)} text-anchor="middle">${renderTextLinesWithStyleRuns(label, labelX, node.textStyleRuns)}</text>`;
 }
 
+function getSketchImageCropClipId(nodeId: string): string {
+  return `sketch-image-crop-${nodeId.replace(/[^A-Za-z0-9_-]/g, "_")}`;
+}
+
+function getSketchImageCropBaseFrame(crop: SketchSceneImageCrop): SketchSceneFrame {
+  return {
+    x: crop.originalFrame.x + crop.sourceRect.x * crop.originalFrame.width,
+    y: crop.originalFrame.y + crop.sourceRect.y * crop.originalFrame.height,
+    width: crop.sourceRect.width * crop.originalFrame.width,
+    height: crop.sourceRect.height * crop.originalFrame.height,
+  };
+}
+
+function getSketchImageCropRenderedFrame(node: SketchSceneNode, crop: SketchSceneImageCrop): SketchSceneFrame {
+  const baseFrame = getSketchImageCropBaseFrame(crop);
+  const scaleX = node.width / baseFrame.width;
+  const scaleY = node.height / baseFrame.height;
+  return {
+    x: node.x + (crop.originalFrame.x - baseFrame.x) * scaleX,
+    y: node.y + (crop.originalFrame.y - baseFrame.y) * scaleY,
+    width: crop.originalFrame.width * scaleX,
+    height: crop.originalFrame.height * scaleY,
+  };
+}
+
+function renderSketchImageCropClipPath(node: SketchSceneNode): string {
+  const crop = node.imageCrop;
+  if (!crop) return "";
+  if (crop.shape === "circle") {
+    const cx = node.x + node.width / 2;
+    const cy = node.y + node.height / 2;
+    return Math.abs(node.width - node.height) < 0.001
+      ? `<circle cx="${cx}" cy="${cy}" r="${node.width / 2}" />`
+      : `<ellipse cx="${cx}" cy="${cy}" rx="${node.width / 2}" ry="${node.height / 2}" />`;
+  }
+  return `<rect x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" />`;
+}
+
 function renderSketchNode(
   node: SketchSceneNode,
   configData?: Record<string, unknown>,
+  options: { imageCropEditingNodeId?: string } = {},
 ): string {
   if (node.type === "group") return "";
   const visible = resolveBindingValue(node, "visible", node.visible ?? true, configData);
@@ -1321,7 +1425,7 @@ function renderSketchNode(
 
   const style = node.style ?? {};
   const fill = resolveBindingValue(node, "fill", style.fill ?? "transparent", configData);
-  const stroke = resolveBindingValue(node, "stroke", style.stroke ?? "#1F2937", configData);
+  const stroke = resolveBindingValue(node, "stroke", style.stroke ?? (node.type === "image" ? "transparent" : "#1F2937"), configData);
   const color = resolveBindingValue(node, "color", style.color ?? "#111827", configData);
   const opacity = styleNumber(style.opacity, 1);
   const strokeWidth = styleNumber(style.strokeWidth, 1);
@@ -1367,13 +1471,35 @@ function renderSketchNode(
   if (node.type === "image") {
     const src = resolveBindingValue(node, "src", node.src ?? "", configData);
     if (!src) return "";
-    const preserveAspectRatio =
-      style.imageFit === "fill"
-        ? "none"
-        : style.imageFit === "contain"
-          ? "xMidYMid meet"
-          : "xMidYMid slice";
-    return `<image ${common} href="${escapeAttr(src)}" x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" preserveAspectRatio="${preserveAspectRatio}"><title>${escapeHtml(node.alt ?? node.name ?? "")}</title></image>`;
+    const crop = node.imageCrop;
+    const isEditingCrop = crop !== undefined && options.imageCropEditingNodeId === node.id;
+    const imageFit = crop?.originalImageFit ?? style.imageFit;
+    const preserveAspectRatio = imageFit === "fill"
+      ? "none"
+      : imageFit === "contain"
+        ? "xMidYMid meet"
+        : "xMidYMid slice";
+    // Keep the source image in the first-crop frame and clip that rendered
+    // content to the current frame. This preserves contain/cover placement
+    // while the crop handles change only the visible boundary.
+    const imageFrame = crop
+      ? isEditingCrop
+        ? crop.originalFrame
+        : getSketchImageCropRenderedFrame(node, crop)
+      : { x: node.x, y: node.y, width: node.width, height: node.height };
+    const imageX = imageFrame.x;
+    const imageY = imageFrame.y;
+    const imageWidth = imageFrame.width;
+    const imageHeight = imageFrame.height;
+    const clip = crop && !isEditingCrop ? ` clip-path="url(#${getSketchImageCropClipId(node.id)})"` : "";
+    const image = `<image ${common} href="${escapeAttr(src)}" x="${imageX}" y="${imageY}" width="${imageWidth}" height="${imageHeight}" preserveAspectRatio="${preserveAspectRatio}"${clip}><title>${escapeHtml(node.alt ?? node.name ?? "")}</title></image>`;
+    const borderCommon = `data-sketch-node-border="${escapeAttr(node.id)}" opacity="${opacity}"${transform}`;
+    const border = crop?.shape === "circle"
+      ? Math.abs(node.width - node.height) < 0.001
+        ? `<circle ${borderCommon} cx="${node.x + node.width / 2}" cy="${node.y + node.height / 2}" r="${node.width / 2}" fill="none" stroke="${escapeAttr(stroke)}" stroke-width="${strokeWidth}"${dash} />`
+        : `<ellipse ${borderCommon} cx="${node.x + node.width / 2}" cy="${node.y + node.height / 2}" rx="${node.width / 2}" ry="${node.height / 2}" fill="none" stroke="${escapeAttr(stroke)}" stroke-width="${strokeWidth}"${dash} />`
+      : `<rect ${borderCommon} x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="${crop ? 0 : radius}" ry="${crop ? 0 : radius}" fill="none" stroke="${escapeAttr(stroke)}" stroke-width="${strokeWidth}"${dash} />`;
+    return `${image}${border}`;
   }
 
   if (node.type === "text") {
@@ -1403,6 +1529,7 @@ function renderSketchNode(
 export function renderSketchSceneToSvgMarkup(
   scene: SketchSceneDocument,
   configData: Record<string, unknown> = {},
+  options: { withBackground?: boolean; imageCropEditingNodeId?: string } = {},
 ): string {
   const validation = validateSketchSceneDocument(scene);
   const safeScene = validation.valid ? scene : createDefaultSketchScene(getValidSketchScenePageSize(scene));
@@ -1415,9 +1542,12 @@ export function renderSketchSceneToSvgMarkup(
     '<marker id="sketch-arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto-start-reverse" markerUnits="strokeWidth">',
     '<path d="M0,0 L0,6 L9,3 z" fill="context-stroke" />',
     "</marker>",
+    ...nodes
+      .filter((node) => node.type === "image" && node.imageCrop)
+      .map((node) => `<clipPath id="${getSketchImageCropClipId(node.id)}" clipPathUnits="userSpaceOnUse">${renderSketchImageCropClipPath(node)}</clipPath>`),
     "</defs>",
-    `<rect x="0" y="0" width="${width}" height="${height}" fill="#FFFFFF" />`,
-    ...nodes.map((node) => renderSketchNode(node, configData)),
+    options.withBackground === false ? "" : `<rect x="0" y="0" width="${width}" height="${height}" fill="#FFFFFF" />`,
+    ...nodes.map((node) => renderSketchNode(node, configData, options)),
     "</svg>",
   ].join("");
 }
