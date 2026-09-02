@@ -1741,7 +1741,7 @@ export function VisualPropertyPanel({
               variant="outline"
               size="sm"
               className="h-7 shrink-0 px-2 text-xs"
-              onClick={onAddToChat}
+              onClick={() => onAddToChat()}
             >
               <Plus className="mr-1 h-3 w-3" />
               添加到对话

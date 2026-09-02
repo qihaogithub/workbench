@@ -36,6 +36,19 @@ describe("WorkspaceResourceRegistry", () => {
     expect(() => registry.assertTextWrite("project.config.values.json", "{}")).not.toThrow();
   });
 
+  it("将页面级配置运行值作为受管 JSON 对象", () => {
+    const registry = createWorkspaceResourceRegistry();
+    expect(registry.describe("demos/page-1/config.values.json")).toMatchObject({
+      kind: "page-config-values",
+      text: true,
+      validation: "json-object",
+    });
+    expect(() => registry.assertTextWrite("demos/page-1/config.values.json", "{}"))
+      .not.toThrow();
+    expect(() => registry.assertTextWrite("demos/page-1/config.values.json", "[]"))
+      .toThrow("WORKSPACE_INVALID_OPERATION");
+  });
+
   it("覆盖所有活动 Workspace 资源 adapter", () => {
     const registry = createWorkspaceResourceRegistry();
     const cases = [
@@ -48,6 +61,7 @@ describe("WorkspaceResourceRegistry", () => {
       ["demos/page-1/sketch.scene.json", "page-sketch-scene", "sketch-scene"],
       ["demos/page-1/sketch.meta.json", "page-sketch-meta", "json-object"],
       ["demos/page-1/convention.md", "page-convention", "text"],
+      ["demos/page-1/requirements.md", "page-requirements", "text"],
       ["project.config.schema.json", "project-schema", "json-object"],
       ["project.config.values.json", "project-config-values", "json-object"],
       ["workspace-tree.json", "workspace-tree", "workspace-tree"],
@@ -56,6 +70,8 @@ describe("WorkspaceResourceRegistry", () => {
       [".canvas-layout.json", "canvas-layout", "json-object"],
       ["knowledge/guide.md", "knowledge-document", "text"],
       ["knowledge/manifest.json", "knowledge-manifest", "json-object"],
+      ["design-spec/manifest.json", "design-spec-manifest", "json-object"],
+      ["design-spec/spec-page-1.json", "design-spec-entry", "json-object"],
       ["whiteboards/wb_1.json", "whiteboard-document", "whiteboard-document"],
       ["whiteboards/bindings.json", "whiteboard-bindings", "whiteboard-bindings"],
       ["assets/image.png", "asset", "binary"],
@@ -64,6 +80,7 @@ describe("WorkspaceResourceRegistry", () => {
     for (const [resourcePath, kind, validation] of cases) {
       expect(registry.describe(resourcePath)).toMatchObject({ kind, validation });
     }
+    expect(registry.describe("assets/image.png")?.maxBytes).toBe(64 * 1024 * 1024);
     expect(registry.describe("other/unmanaged.txt")).toBeNull();
   });
 

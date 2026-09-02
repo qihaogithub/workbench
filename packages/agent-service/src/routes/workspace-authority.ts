@@ -50,7 +50,19 @@ function failure(reply: { code: (status: number) => unknown }, error: unknown) {
   const code = stableErrorCode(error);
   const status = ERROR_STATUS[code];
   reply.code(status);
-  return { success: false, error: { code, message: code } };
+  const message = error instanceof WorkspaceMutationAuthorityError
+    ? error.message
+    : code;
+  return {
+    success: false,
+    error: {
+      code,
+      message,
+      ...(error instanceof WorkspaceMutationAuthorityError && error.details
+        ? { details: error.details }
+        : {}),
+    },
+  };
 }
 
 function parseRevision(value: string | undefined): number | null {
@@ -224,9 +236,21 @@ export async function registerWorkspaceAuthorityRoutes(
     },
   );
 
+  fastify.post<{ Params: WorkspaceParams; Body: WorkspaceMutationRequest }>(
+    "/api/workspace-authority/projects/:projectId/workspaces/:workspaceId/document-proposal-commit",
+    async (request, reply) => {
+      const body = request.body;
+      if (!body || body.projectId !== request.params.projectId || body.workspaceId !== request.params.workspaceId) {
+        reply.code(400); return { success: false, error: { code: "INVALID_REQUEST", message: "Document proposal commit 参数不匹配" } };
+      }
+      try { return { success: true, data: await persistence.commitDocumentProposal(body) }; }
+      catch (error) { return failure(reply, error); }
+    },
+  );
+
   fastify.post<{ Params: WorkspaceParams; Querystring: SessionQuery; Body: Buffer }>(
     "/api/workspace-authority/projects/:projectId/workspaces/:workspaceId/staging",
-    { bodyLimit: 20 * 1024 * 1024 },
+    { bodyLimit: 64 * 1024 * 1024 },
     async (request, reply) => {
       if (!request.query.sessionId || !Buffer.isBuffer(request.body)) {
         reply.code(400);

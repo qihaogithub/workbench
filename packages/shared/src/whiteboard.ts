@@ -9,6 +9,52 @@ export interface ImageConfigTarget {
   item?: { indexHint: number; itemValue: string };
 }
 
+/** A parsed, canonical configuration path used by image whiteboard bindings. */
+export type WhiteboardConfigPathSegment = string | number;
+
+const WHITEBOARD_CONFIG_PATH_MAX_SEGMENTS = 32;
+
+/**
+ * Parses the deliberately small path grammar accepted by whiteboard targets:
+ * `field`, `items[0]`, or `items[0].image`. It is shared by binding reads and
+ * writes so a persisted binding cannot describe a path the commit endpoint
+ * would reject.
+ */
+export function parseWhiteboardConfigPath(value: string): WhiteboardConfigPathSegment[] | null {
+  if (!value || value.length > 512) return null;
+  const segments: WhiteboardConfigPathSegment[] = [];
+  let offset = 0;
+  let expectsProperty = true;
+  while (offset < value.length) {
+    if (expectsProperty) {
+      const match = /^[A-Za-z_][A-Za-z0-9_]*/.exec(value.slice(offset));
+      if (!match || RESERVED_CONFIG_KEYS.has(match[0])) return null;
+      segments.push(match[0]);
+      offset += match[0].length;
+      expectsProperty = false;
+    }
+    while (value[offset] === "[") {
+      const match = /^\[(0|[1-9][0-9]*)\]/.exec(value.slice(offset));
+      if (!match) return null;
+      const index = Number(match[1]);
+      if (!Number.isSafeInteger(index)) return null;
+      segments.push(index);
+      offset += match[0].length;
+    }
+    if (offset === value.length) break;
+    if (value[offset] !== ".") return null;
+    offset += 1;
+    expectsProperty = true;
+  }
+  return !expectsProperty && segments.length > 0 && segments.length <= WHITEBOARD_CONFIG_PATH_MAX_SEGMENTS
+    ? segments
+    : null;
+}
+
+export function isWhiteboardConfigPath(value: unknown): value is string {
+  return typeof value === "string" && parseWhiteboardConfigPath(value) !== null;
+}
+
 export interface WhiteboardEditorView {
   zoom: number;
   offsetX: number;
@@ -124,9 +170,7 @@ export function isWhiteboardBinding(value: unknown): value is WhiteboardBinding 
       ? typeof target!.pageId === "string" && /^[A-Za-z0-9_-]+$/.test(target!.pageId)
       : target!.pageId === undefined)
     && Array.isArray(target!.fieldPath) && target!.fieldPath.length === 1
-    && typeof target!.fieldPath[0] === "string"
-    && /^[A-Za-z_][A-Za-z0-9_]*$/.test(target!.fieldPath[0])
-    && !RESERVED_CONFIG_KEYS.has(target!.fieldPath[0])
+    && isWhiteboardConfigPath(target!.fieldPath[0])
     && (!target!.item || (Number.isInteger(target!.item.indexHint) && target!.item.indexHint >= 0 && typeof target!.item.itemValue === "string"));
 }
 

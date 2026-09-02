@@ -6,6 +6,8 @@ import { pipeline } from "node:stream/promises";
 
 import { create as tarCreate, extract as tarExtract } from "tar";
 
+import { WORKSPACE_TREE_FILENAME } from "./constants.js";
+
 /**
  * 项目原始数据同步（data/projects/<id>/ 目录级 push/pull/diff）领域逻辑。
  * 供 author-site import/export API 与 project-cli sync 命令复用。
@@ -231,6 +233,36 @@ function normalizeImportedProjectMeta(projectJsonPath: string): string[] {
   if (Array.isArray(meta.versions) && meta.versions.length > 0) {
     meta.versions = [];
     cleared.push("versions");
+  }
+  // workspace-tree.json is the canonical live page/folder source.  Keep the
+  // project.json fields as a derived projection so cross-environment imports
+  // cannot carry a stale page list into the target environment.
+  const workspaceTreePath = path.join(
+    path.dirname(projectJsonPath),
+    "workspace",
+    WORKSPACE_TREE_FILENAME,
+  );
+  if (fs.existsSync(workspaceTreePath)) {
+    let tree: { pages?: unknown; folders?: unknown };
+    try {
+      tree = JSON.parse(fs.readFileSync(workspaceTreePath, "utf-8")) as {
+        pages?: unknown;
+        folders?: unknown;
+      };
+    } catch {
+      throw new ProjectTransferError(
+        "ARCHIVE_INVALID",
+        "包内 workspace-tree.json 不是合法 JSON",
+      );
+    }
+    if (!tree || typeof tree !== "object") {
+      throw new ProjectTransferError(
+        "ARCHIVE_INVALID",
+        "包内 workspace-tree.json 必须是对象",
+      );
+    }
+    meta.demoPages = Array.isArray(tree.pages) ? tree.pages : [];
+    meta.demoFolders = Array.isArray(tree.folders) ? tree.folders : [];
   }
   meta.canonicalSyncedAt = Date.now();
   meta.updatedAt = Date.now();

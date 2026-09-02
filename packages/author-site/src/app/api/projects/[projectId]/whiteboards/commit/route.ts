@@ -33,15 +33,16 @@ import { isLiveWorkspacePath } from "@/lib/live-workspace-route-context";
 import { commitWorkspaceMutation, getWorkspaceAuthorityState, stageWorkspaceBinary, WorkspaceAuthorityClientError } from "@/lib/workspace-authority-client";
 import { getImageInfo } from "@/lib/image-store";
 import { canonicalizeWhiteboardDocument, validateWhiteboardDocument } from "@workbench/whiteboard-core";
-import { updateWhiteboardImageTarget, type WhiteboardTargetInput } from "@/lib/whiteboard-target";
+import {
+  isWhiteboardImageTargetInput,
+  supportsWhiteboardImageTarget,
+  updateWhiteboardImageTarget,
+  type WhiteboardImageTargetInput,
+} from "@/lib/whiteboard-image-target";
 
-type TargetInput = WhiteboardTargetInput;
-const RESERVED_CONFIG_KEYS = new Set(["__proto__", "prototype", "constructor"]);
+type TargetInput = WhiteboardImageTargetInput;
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
-}
-function json(pathname: string): Record<string, unknown> {
-  try { return record(JSON.parse(fs.readFileSync(pathname, "utf8"))) ?? {}; } catch { return {}; }
 }
 function text(value: unknown) { return `${JSON.stringify(value, null, 2)}\n`; }
 function validateManagedImageRefs(document: ReturnType<typeof asWhiteboardDocumentV2>): { code: string; message: string; nodeId?: string }[] {
@@ -57,18 +58,6 @@ function validateManagedImageRefs(document: ReturnType<typeof asWhiteboardDocume
   }
   return diagnostics;
 }
-function isTargetInput(value: unknown): value is TargetInput {
-  const target = record(value);
-  if (!target || (target.scope !== "page" && target.scope !== "project") || typeof target.fieldPath !== "string") return false;
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(target.fieldPath) || RESERVED_CONFIG_KEYS.has(target.fieldPath)) return false;
-  if (target.pageId !== undefined && (typeof target.pageId !== "string" || !/^[A-Za-z0-9_-]+$/.test(target.pageId))) return false;
-  if (target.currentValue !== undefined && typeof target.currentValue !== "string") return false;
-  if (target.listItem !== undefined) {
-    const item = record(target.listItem);
-    if (!item || typeof item.index !== "number" || !Number.isInteger(item.index) || item.index < 0 || typeof item.url !== "string") return false;
-  }
-  return target.scope === "page" ? typeof target.pageId === "string" : target.pageId === undefined;
-}
 function pendingWhiteboardGcOperations(workspacePath: string): WorkspaceMutationDeletePathOperation[] {
   return whiteboardGcPathsToDelete(planWhiteboardGarbageCollection(workspacePath)).flatMap((resourcePath) => {
     const absolutePath = path.join(workspacePath, resourcePath);
@@ -76,22 +65,6 @@ function pendingWhiteboardGcOperations(workspacePath: string): WorkspaceMutation
     return [{ type: "delete_path" as const, path: resourcePath, expectedHash: hashWorkspaceContent(fs.readFileSync(absolutePath)) }];
   });
 }
-function supportsImageTarget(workspacePath: string, target: TargetInput): boolean {
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(target.fieldPath) || RESERVED_CONFIG_KEYS.has(target.fieldPath)) return false;
-  const property = getImageTargetSchemaProperty(workspacePath, target);
-  if (!property) return false;
-  if (!target.listItem) return property.type === "string" && property.format === "image";
-  const items = record(property.items);
-  return property.type === "array" && items?.type === "string" && items.format === "image";
-}
-function getImageTargetSchemaProperty(workspacePath: string, target: TargetInput): Record<string, unknown> | null {
-  const schemaPath = target.scope === "project"
-    ? path.join(workspacePath, "project.config.schema.json")
-    : path.join(workspacePath, "demos", target.pageId ?? "", "config.schema.json");
-  const schema = json(schemaPath);
-  return record(record(schema.properties)?.[target.fieldPath]);
-}
-
 function sameTarget(a: ImageConfigTarget, b: TargetInput): boolean {
   return a.scope === b.scope && a.pageId === b.pageId && a.fieldPath[0] === b.fieldPath
     && a.item?.itemValue === b.listItem?.url;
@@ -109,7 +82,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const user = token ? await verifyToken(token) : null;
   if (!user) return NextResponse.json(createApiError("UNAUTHORIZED", "登录已过期"), { status: 401 });
   const body = await request.json().catch(() => null) as null | { sessionId?: string; target?: TargetInput; document?: unknown; baseDocumentRevision?: number | null; pngBase64?: string };
-  if (!body?.sessionId || !isTargetInput(body.target) || !isWhiteboardDocument(body.document) || typeof body.pngBase64 !== "string") {
+  if (!body?.sessionId || !isWhiteboardImageTargetInput(body.target) || !isWhiteboardDocument(body.document) || typeof body.pngBase64 !== "string") {
     return NextResponse.json(createApiError("INVALID_REQUEST", "白板提交参数无效"), { status: 400 });
   }
   if (body.baseDocumentRevision !== null && (!Number.isInteger(body.baseDocumentRevision) || (body.baseDocumentRevision as number) < 0)) {
@@ -127,7 +100,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
   const workspacePath = findWorkspacePath(meta.workspaceId);
   if (!workspacePath) return NextResponse.json(createApiError("FILE_READ_ERROR", "工作空间不存在"), { status: 500 });
-  if (!supportsImageTarget(workspacePath, body.target)) {
+  const schemaPath = body.target.scope === "project"
+    ? path.join(workspacePath, "project.config.schema.json")
+    : path.join(workspacePath, "demos", body.target.pageId ?? "", "config.schema.json");
+  let schema: Record<string, unknown>;
+  try {
+    const parsed = record(JSON.parse(fs.readFileSync(schemaPath, "utf8")));
+    if (!parsed) throw new Error("invalid schema");
+    schema = parsed;
+  } catch {
+    return NextResponse.json(createApiError("FILE_READ_ERROR", "配置定义损坏"), { status: 500 });
+  }
+  if (!supportsWhiteboardImageTarget(schema, body.target)) {
     return NextResponse.json(createApiError("VALIDATION_ERROR", "该字段不是一期支持的图片目标"), { status: 422 });
   }
   const submittedDocument = asWhiteboardDocumentV2(body.document);
@@ -165,8 +149,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   } catch {
     return NextResponse.json(createApiError("FILE_READ_ERROR", "配置值文件损坏"), { status: 500 });
   }
-  const schemaProperty = getImageTargetSchemaProperty(workspacePath, body.target);
-  const conflict = updateWhiteboardImageTarget(values, body.target, assetPath, schemaProperty?.default);
+  const conflict = updateWhiteboardImageTarget(values, body.target, assetPath, schema);
   if (conflict) return NextResponse.json(createApiError("VALIDATION_ERROR", conflict), { status: 409 });
   const bindingsPath = path.join(workspacePath, "whiteboards", "bindings.json");
   let bindingsRoot: Record<string, unknown> = {};

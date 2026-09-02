@@ -31,4 +31,14 @@ describe("canvas resize interaction", () => {
     expect(container.querySelector('[data-canvas-resize-handle="nw"]')).toHaveStyle({ cursor: "nwse-resize" });
     expect(container.querySelector('[data-canvas-resize-handle="ne"]')).toHaveStyle({ cursor: "nesw-resize" });
   });
+
+  it("keeps edge hit areas above page overlays", () => {
+    const { container } = render(<CanvasResizeHandles visible options={allHandles} />);
+
+    for (const edge of ["n", "s", "e", "w"]) {
+      expect(
+        container.querySelector(`[data-canvas-resize-handle="${edge}"]`),
+      ).toHaveClass("z-50");
+    }
+  });
 });

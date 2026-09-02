@@ -98,6 +98,9 @@ export async function POST(
       content: body.content.trim(),
       author: authorResult.author,
       mentions,
+      aiTaskAuthorization: authorResult.userId && authorResult.role
+        ? { userId: authorResult.userId, role: authorResult.role, expiresAt: Date.now() + 2 * 60 * 60 * 1000 }
+        : undefined,
     });
 
     return NextResponse.json(createApiSuccess({ thread }), { status: 201 });

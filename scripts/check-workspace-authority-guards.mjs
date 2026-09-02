@@ -223,10 +223,13 @@ for (const guard of guardedRoutes) {
 const authorityClientSource = read(
   "packages/author-site/src/lib/workspace-authority-client.ts",
 );
+const authoritySharedSource = read(
+  "packages/author-site/src/lib/workspace-authority-shared.ts",
+);
 requireIncludes(
-  authorityClientSource,
+  `${authorityClientSource}\n${authoritySharedSource}`,
   "Workspace Authority 不可用",
-  "workspace authority client",
+  "workspace authority client/shared",
 );
 requireIncludes(
   authorityClientSource,

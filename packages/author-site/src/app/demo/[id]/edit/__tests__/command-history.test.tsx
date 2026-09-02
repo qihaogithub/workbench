@@ -79,6 +79,31 @@ describe("useCommandHistory", () => {
     expect(result.current.canRedo).toBe(true);
   });
 
+  it("初次执行失败时上报错误但不产生未处理拒绝", async () => {
+    const onError = jest.fn();
+    const { result } = renderHook(() => useCommandHistory({ onError }));
+
+    await act(async () => {
+      await expect(
+        result.current.executeCommand({
+          label: "删除页面",
+          redo: async () => {
+            throw new Error("Workspace Authority 不可用");
+          },
+          undo: jest.fn(),
+        }),
+      ).resolves.toBeUndefined();
+    });
+
+    expect(onError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ label: "删除页面" }),
+      "redo",
+    );
+    expect(result.current.canUndo).toBe(false);
+    expect(result.current.canRedo).toBe(false);
+  });
+
   it("reset 清空撤回和重做栈", async () => {
     const { result } = renderHook(() => useCommandHistory());
 

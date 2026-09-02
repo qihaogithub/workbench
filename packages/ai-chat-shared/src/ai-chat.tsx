@@ -231,7 +231,6 @@ export function AIChat({
   const {
     modelState,
     currentAvailableDepths,
-    currentSupportsImages,
     handleModelChange,
     handleDepthChange,
     handleModelsEvent,
@@ -286,6 +285,7 @@ export function AIChat({
     onWorkspaceMutationCommitted,
     messagesRef,
     setMessages,
+    isStreaming,
     setIsStreaming,
     setStreamContent,
     currentMessageRef,
@@ -553,10 +553,8 @@ export function AIChat({
         models={modelState.models}
         canSwitch={modelState.canSwitch}
         isModelLoading={modelState.isLoading}
-        supportsImages={mode === "viewer-readonly" || currentSupportsImages}
         supportsFiles
         supportsHistory={mode !== "viewer-readonly" || Boolean(onHistoryOpen)}
-        imageDescriptionEnabled={modelState.imageDescriptionEnabled}
         selectedElement={selectedElement}
         onRemoveElement={onRemoveElement}
         selectedPages={selectedPages}

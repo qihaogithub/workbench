@@ -1,11 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
-import { getWhiteboardDocumentRevision, isWhiteboardBinding, isWhiteboardDocument, type ImageConfigTarget, whiteboardDocumentPath } from "@workbench/shared";
+import { getWhiteboardDocumentRevision, isWhiteboardBinding, isWhiteboardConfigPath, isWhiteboardDocument, type ImageConfigTarget, whiteboardDocumentPath } from "@workbench/shared";
 import { createApiError, createApiSuccess, findWorkspacePath, getSessionMeta, isSessionExpired, projectExists, sessionExists } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { getImageInfo } from "@/lib/image-store";
 import { validateWhiteboardDocument } from "@workbench/whiteboard-core";
+import { supportsWhiteboardImageTarget } from "@/lib/whiteboard-image-target";
 
 function sameTarget(a: ImageConfigTarget, b: ImageConfigTarget) {
   return a.scope === b.scope && a.pageId === b.pageId && a.fieldPath[0] === b.fieldPath[0]
@@ -23,8 +24,6 @@ function hasMissingManagedImage(document: Extract<import("@workbench/shared").Wh
   });
 }
 
-const RESERVED_CONFIG_KEYS = new Set(["__proto__", "prototype", "constructor"]);
-
 /** Reads only an already-bound document; it never infers ownership from a reusable PNG asset. */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
@@ -37,7 +36,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const fieldPath = search.get("fieldPath");
   const pageId = search.get("pageId") || undefined;
   const itemValue = search.get("itemUrl") || undefined;
-  if (!user || !sessionId || (scope !== "page" && scope !== "project") || !fieldPath || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(fieldPath) || RESERVED_CONFIG_KEYS.has(fieldPath)) {
+  if (!user || !sessionId || (scope !== "page" && scope !== "project") || !fieldPath || !isWhiteboardConfigPath(fieldPath)) {
     return NextResponse.json(createApiError("INVALID_REQUEST", "白板读取参数无效"), { status: 400 });
   }
   if ((scope === "page" && (!pageId || !/^[A-Za-z0-9_-]+$/.test(pageId))) || (scope === "project" && pageId)) {
@@ -49,6 +48,25 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
   const workspacePath = findWorkspacePath(meta.workspaceId);
   if (!workspacePath) return NextResponse.json(createApiError("FILE_READ_ERROR", "工作空间不存在"), { status: 500 });
+  const schemaPath = scope === "project"
+    ? path.join(workspacePath, "project.config.schema.json")
+    : path.join(workspacePath, "demos", pageId ?? "", "config.schema.json");
+  let schema: Record<string, unknown>;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid schema");
+    schema = parsed as Record<string, unknown>;
+  } catch {
+    return NextResponse.json(createApiError("FILE_READ_ERROR", "配置定义损坏"), { status: 500 });
+  }
+  if (!supportsWhiteboardImageTarget(schema, {
+    scope,
+    ...(pageId ? { pageId } : {}),
+    fieldPath,
+    ...(itemValue ? { listItem: { index: 0, url: itemValue } } : {}),
+  })) {
+    return NextResponse.json(createApiError("VALIDATION_ERROR", "该字段不是支持的图片目标"), { status: 422 });
+  }
   const target: ImageConfigTarget = { scope, ...(pageId ? { pageId } : {}), fieldPath: [fieldPath], ...(itemValue ? { item: { indexHint: -1, itemValue } } : {}) };
   try {
     const bindingsPath = path.join(workspacePath, "whiteboards", "bindings.json");

@@ -67,6 +67,7 @@ export function readCanvasClipboard(): CanvasClipboardData | null {
 export function remapCanvasSectionsForPaste(input: {
   sections: CanvasSection[];
   pageIdMapping: Map<string, string>;
+  pageGroupIdMapping?: Map<string, string>;
   nodeIdMapping: Map<string, string>;
   offset: { x: number; y: number };
   now: number;
@@ -81,7 +82,9 @@ export function remapCanvasSectionsForPaste(input: {
     const children = section.children.flatMap((child) => {
       const mappedId = child.kind === "page"
         ? input.pageIdMapping.get(child.id)
-        : child.kind === "node"
+        : child.kind === "page-group"
+          ? input.pageGroupIdMapping?.get(child.id) ?? child.id
+          : child.kind === "node"
           ? input.nodeIdMapping.get(child.id)
           : sectionIdMapping.get(child.id);
       return mappedId ? [{ kind: child.kind, id: mappedId }] : [];

@@ -3,6 +3,7 @@ import {
   assignCanvasObjectToSection,
   assignCanvasSectionToSection,
   computeCanvasSectionAutoLayout,
+  createCanvasSection,
   fitCanvasSectionToChildren,
   moveCanvasSectionWithChildren,
   normalizeCanvasSections,
@@ -39,6 +40,15 @@ const textNode: CanvasFreeNode = {
 };
 
 describe("canvas Section graph", () => {
+  it("uses 分组 as the default and normalizes the legacy Section title", () => {
+    expect(createCanvasSection({ id: "section_new", layout }).title).toBe("分组");
+    const normalized = normalizeCanvasSections(
+      { section_old: { ...section("section_old"), title: "Section" } },
+      { pages: {}, nodes: {} },
+    );
+    expect(normalized.section_old.title).toBe("分组");
+  });
+
   it("keeps only one deterministic parent and rejects cycles and dangling references", () => {
     const sections = normalizeCanvasSections(
       {

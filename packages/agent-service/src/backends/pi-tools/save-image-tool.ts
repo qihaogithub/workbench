@@ -16,7 +16,6 @@ import {
 import {
   uploadToGlobalImageStore,
 } from './global-image-store';
-import { describeImageAlt } from '../../services/image-alt-generator';
 
 const SUPPORTED_FORMATS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']);
 
@@ -49,6 +48,9 @@ const SaveImageParams = Type.Object({
   })),
   filename: Type.Optional(Type.String({
     description: '保存的文件名，如 product.png',
+  })),
+  alt: Type.Optional(Type.String({
+    description: '图片的显式替代文本；未提供时不会自动生成',
   })),
   assetId: Type.Optional(Type.String({
     description: 'source=assetId 时的项目资产 ID，如 asset_7007557cac7e',
@@ -300,6 +302,7 @@ async function saveImageBuffer(
   filename: string,
   source: string,
   originalUrl: string | undefined,
+  explicitAlt: string | undefined,
   _workspaceDir: string,
   manifestProjectId: string | null,
   _sessionId: string,
@@ -328,25 +331,7 @@ async function saveImageBuffer(
     const entryId = result.sha256.slice(0, 12);
     const existingManifestEntry = findProjectImageManifestEntry(manifestProjectId, entryId);
 
-    alt = existingManifestEntry?.alt
-      || (await (async () => {
-        const base64Data = buffer.toString('base64');
-        const ext = path.extname(filename).slice(1).toLowerCase();
-        const mimeType = {
-          png: 'image/png',
-          jpg: 'image/jpeg',
-          jpeg: 'image/jpeg',
-          gif: 'image/gif',
-          webp: 'image/webp',
-          svg: 'image/svg+xml',
-        }[ext] || 'image/png';
-
-        return await describeImageAlt({
-          data: base64Data,
-          mimeType,
-          name: filename,
-        }) ?? undefined;
-      })());
+    alt = existingManifestEntry?.alt || explicitAlt;
 
     const entry: ProjectImageEntry = {
       id: entryId,
@@ -449,6 +434,7 @@ async function saveImageBatch(
         filename,
         'url',
         item.url,
+        undefined,
         workspaceDir,
         manifestProjectId,
         sessionId,
@@ -533,29 +519,7 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
           };
         }
 
-        let assetAlt = entry.alt;
-        if (!assetAlt) {
-          try {
-            const buffer = await fs.promises.readFile(absolutePath);
-            const base64 = buffer.toString('base64');
-            const ext = path.extname(workspacePath).slice(1).toLowerCase();
-            const mimeType = {
-              png: 'image/png',
-              jpg: 'image/jpeg',
-              jpeg: 'image/jpeg',
-              gif: 'image/gif',
-              webp: 'image/webp',
-              svg: 'image/svg+xml',
-            }[ext] || 'image/png';
-            assetAlt = await describeImageAlt({ data: base64, mimeType, name: path.basename(workspacePath) }) ?? undefined;
-            if (assetAlt) {
-              entry.alt = assetAlt;
-              addProjectImageManifestEntry(manifestProjectId, entry);
-            }
-          } catch (err) {
-            logger.warn({ assetId, error: err }, 'saveImage: failed to generate alt for existing asset');
-          }
-        }
+        const assetAlt = entry.alt;
 
         const altNote = assetAlt ? ` 图片内容：${assetAlt}` : '';
         return {
@@ -702,6 +666,7 @@ export function createSaveImageTool(config: AgentConfig): AgentTool<typeof SaveI
         filename,
         source === 'sessionAsset' ? 'session_asset' : source,
         source === 'url' ? args.data : source === 'sessionAsset' ? (args.url ?? args.data) : undefined,
+        args.alt,
         workspaceDir,
         manifestProjectId,
         config.sessionId,

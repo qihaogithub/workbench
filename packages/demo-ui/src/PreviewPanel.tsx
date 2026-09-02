@@ -38,6 +38,38 @@ const COMPILE_DEBOUNCE_MS = 250;
 const SHELL_DEADLINE_MS = 10_000;
 const RENDER_DEADLINE_MS = 15_000;
 
+function readConfigPathValue(
+  config: Record<string, unknown> | undefined,
+  path: string,
+): unknown {
+  if (!config || !path) return undefined;
+  const keys = path.replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean);
+  let current: unknown = config;
+  for (const key of keys) {
+    if (current === null || typeof current !== "object") return undefined;
+    current = (current as Record<string, unknown>)[key];
+  }
+  return current;
+}
+
+function getActivePosition(
+  target: NonNullable<PreviewPanelProps["positionEditMode"]>["target"],
+  configData: Record<string, unknown> | undefined,
+): { x: number; y: number } | undefined {
+  if (!target) return undefined;
+  const value = readConfigPathValue(configData, target.fieldPath);
+  if (
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    typeof (value as Record<string, unknown>).x === "number" &&
+    typeof (value as Record<string, unknown>).y === "number"
+  ) {
+    return value as { x: number; y: number };
+  }
+  return target.position;
+}
+
 interface VisualContextMenuState {
   x: number;
   y: number;
@@ -409,6 +441,7 @@ function PreviewPanelInternal({
   const onConsoleEntryRef = useRef(onConsoleEntry);
   onConsoleEntryRef.current = onConsoleEntry;
   const prevPositionEditEnabledRef = useRef(positionEditMode?.enabled ?? false);
+  const enteredPositionEditIdRef = useRef<string | null>(null);
   const skipConfigUpdateOnExitRef = useRef(false);
   const justEnteredPositionEditRef = useRef(false);
 
@@ -513,6 +546,9 @@ function PreviewPanelInternal({
         sessionId,
         demoId,
       });
+      const spineAssetBaseUrl = sessionId && typeof window !== "undefined"
+        ? `${window.location.origin}/api/sessions/${encodeURIComponent(sessionId)}/workspace/assets/animations`
+        : undefined;
       updateCodeSentAtRef.current =
         typeof performance !== "undefined" ? performance.now() : null;
       reportTiming("parent_update_code_url_sent", {
@@ -528,6 +564,7 @@ function PreviewPanelInternal({
           configData: resolvedConfig,
           appState: appStateRef.current || {},
           routeParams: routeParamsRef.current || {},
+          spineAssetBaseUrl,
           cssImports: cssList,
           requestId,
         },
@@ -568,6 +605,9 @@ function PreviewPanelInternal({
         sessionId,
         demoId,
       });
+      const spineAssetBaseUrl = sessionId && typeof window !== "undefined"
+        ? `${window.location.origin}/api/sessions/${encodeURIComponent(sessionId)}/workspace/assets/animations`
+        : undefined;
       updateCodeSentAtRef.current =
         typeof performance !== "undefined" ? performance.now() : null;
       reportTiming("parent_update_code_sent", {
@@ -582,6 +622,7 @@ function PreviewPanelInternal({
           configData: resolvedConfig,
           appState: appStateRef.current || {},
           routeParams: routeParamsRef.current || {},
+          spineAssetBaseUrl,
           cssImports: result.cssImports,
           requestId,
         },
@@ -606,6 +647,9 @@ function PreviewPanelInternal({
         sessionId,
         demoId,
       });
+      const spineAssetBaseUrl = sessionId && typeof window !== "undefined"
+        ? `${window.location.origin}/api/sessions/${encodeURIComponent(sessionId)}/workspace/assets/animations`
+        : undefined;
       const requestId = activePreviewRequestIdRef.current;
 
       iframe.contentWindow.postMessage(
@@ -614,6 +658,7 @@ function PreviewPanelInternal({
           configData: resolvedConfig,
           appState: appStateRef.current || {},
           routeParams: routeParamsRef.current || {},
+          spineAssetBaseUrl,
           requestId,
         },
         "*",
@@ -1012,7 +1057,7 @@ function PreviewPanelInternal({
   }, [demoId, isSleeping, reportTiming, requestState]);
 
   // 位置编辑模式进入/退出（在 configData effect 之前声明，确保 EXIT_POSITION_EDIT
-  // 先于 UPDATE_CONFIG 到达 iframe，iframe 先清理 dimming/data-pos-key 再重渲染）
+  // 先于 UPDATE_CONFIG 到达 iframe，iframe 先清理 dimming/临时定位标记再重渲染）
   useEffect(() => {
     const iframe = iframeRef.current;
     if (!iframe || !iframe.contentWindow) return;
@@ -1023,24 +1068,36 @@ function PreviewPanelInternal({
     prevPositionEditEnabledRef.current = isEnabled;
 
     if (isEnabled) {
+      const target = positionEditMode?.target;
+      if (!target || !iframeReady) return;
+      // 拖动坐标变化只需用 APPLY_POSITIONS 同步。同一实例重复
+      // ENTER 会让 iframe 清理 transform 并按新坐标重新匹配重复 DOM key，
+      // 从而在拖动结束时回弹或串到另一个数组项。
+      if (enteredPositionEditIdRef.current === target.id) return;
+      enteredPositionEditIdRef.current = target.id;
       justEnteredPositionEditRef.current = true;
       iframe.contentWindow.postMessage(
         {
           type: "ENTER_POSITION_EDIT",
-          items: positionEditMode!.items,
-          positions: positionEditMode!.positions,
-          boundary: positionEditMode!.boundary,
+          target: {
+            id: target.id,
+            domKey: target.domKey,
+            domOccurrence: target.domOccurrence,
+            position: target.position,
+            boundary: target.boundary,
+          },
         },
         "*",
       );
-    } else if (wasEnabled) {
+    } else if (wasEnabled || enteredPositionEditIdRef.current) {
+      enteredPositionEditIdRef.current = null;
       skipConfigUpdateOnExitRef.current = true;
       iframe.contentWindow.postMessage({ type: "EXIT_POSITION_EDIT" }, "*");
       if (iframeReadyRef.current) {
         sendUpdateConfig(configDataRef.current || {});
       }
     }
-  }, [positionEditMode, activityState, sendUpdateConfig]);
+  }, [positionEditMode, activityState, iframeReady, sendUpdateConfig]);
 
   useEffect(() => {
     if (!iframeReady) return;
@@ -1058,7 +1115,10 @@ function PreviewPanelInternal({
         justEnteredPositionEditRef.current = false;
         return;
       }
-      const positions = configData?.__positions as Record<string, { x: number; y: number }> | undefined;
+      const activePosition = getActivePosition(positionEditMode.target, configData);
+      const positions = positionEditMode.target && activePosition
+        ? { [positionEditMode.target.id]: activePosition }
+        : (configData?.__positions as Record<string, { x: number; y: number }> | undefined);
       if (positions) {
         const iframe = iframeRef.current;
         if (iframe && iframe.contentWindow) {
@@ -1345,9 +1405,9 @@ function PreviewPanelInternal({
           break;
 
         case "POSITION_DRAG":
-          if (typeof event.data?.key === "string") {
+          if (typeof event.data?.id === "string") {
             onPositionDrag?.(
-              event.data.key,
+              event.data.id,
               Number(event.data.x) || 0,
               Number(event.data.y) || 0,
             );
@@ -1355,9 +1415,9 @@ function PreviewPanelInternal({
           break;
 
         case "POSITION_CHANGE":
-          if (typeof event.data?.key === "string") {
+          if (typeof event.data?.id === "string") {
             onPositionChange?.(
-              event.data.key,
+              event.data.id,
               Number(event.data.x) || 0,
               Number(event.data.y) || 0,
             );

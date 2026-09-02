@@ -137,6 +137,71 @@ describe("PreviewPanel iframe sleep", () => {
     });
   });
 
+  it("定位拖动中同一实例坐标变化不会重新进入编辑或全量重渲染", async () => {
+    const target = {
+      id: "blanks:blanks-sortable-0:position",
+      fieldPath: "blanks[0].position",
+      domKey: "blank",
+      domOccurrence: 0,
+      position: { x: 100, y: 200 },
+    };
+    const { rerender, getByTitle } = render(
+      <PreviewPanel
+        compiledJsUrl="/compiled.js"
+        configData={{ blanks: [{ position: target.position }] }}
+        positionEditMode={{ enabled: true, target }}
+        fillContainer
+      />,
+    );
+
+    const iframe = getByTitle("预览") as HTMLIFrameElement;
+    const postMessage = jest.fn();
+    Object.defineProperty(iframe, "contentWindow", {
+      value: { postMessage },
+      configurable: true,
+    });
+
+    act(() => {
+      dispatchIframeMessage(iframe, { type: "READY" });
+    });
+
+    await waitFor(() => {
+      expect(
+        postMessage.mock.calls.filter(
+          ([message]) => (message as { type?: string }).type === "ENTER_POSITION_EDIT",
+        ),
+      ).toHaveLength(1);
+    });
+
+    postMessage.mockClear();
+    const movedPosition = { x: 320, y: 240 };
+    rerender(
+      <PreviewPanel
+        compiledJsUrl="/compiled.js"
+        configData={{ blanks: [{ position: movedPosition }] }}
+        positionEditMode={{
+          enabled: true,
+          target: { ...target, position: movedPosition },
+        }}
+        fillContainer
+      />,
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(
+      postMessage.mock.calls.some(
+        ([message]) => (message as { type?: string }).type === "ENTER_POSITION_EDIT",
+      ),
+    ).toBe(false);
+    expect(
+      postMessage.mock.calls.some(
+        ([message]) => (message as { type?: string }).type === "UPDATE_CONFIG",
+      ),
+    ).toBe(false);
+  });
+
   it("编译接口返回 HTML 时回传明确的非 JSON 错误", async () => {
     const onError = jest.fn();
     global.fetch = jest.fn().mockResolvedValue({

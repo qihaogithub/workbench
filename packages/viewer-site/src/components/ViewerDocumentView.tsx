@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BookOpen, ChevronDown, ChevronRight, FileText, FolderOpen, Loader2 } from "lucide-react";
 import type { KnowledgeIndexItem } from "@workbench/shared";
+import type { MarkdownReferenceTarget } from "@workbench/shared/markdown-reference";
 import { DocumentEditor, PageRequirements, parseSchemaToFields } from "@workbench/demo-ui";
 import { cn } from "@/lib/utils";
 import {
@@ -12,6 +13,7 @@ import {
   getKnowledgeDocContent,
   type PublishedDesignSpecDoc,
   type PublishedDesignSpecMeta,
+  type PublishedMarkdownReferenceSnapshot,
 } from "../lib/api";
 
 interface ViewerDocumentViewProps {
@@ -20,6 +22,8 @@ interface ViewerDocumentViewProps {
   designSpecs: PublishedDesignSpecMeta[];
   projectConfigSchema?: string;
   pages: Array<{ id: string; name: string; schema?: string }>;
+  references?: PublishedMarkdownReferenceSnapshot;
+  onReferenceNavigate?: (target: MarkdownReferenceTarget) => void;
 }
 
 type ConfigPoolItemKind = "color" | "text" | "image" | "number" | "motion";
@@ -83,11 +87,25 @@ function refToPoolId(ref: PublishedDesignSpecDoc["entries"][number]["refs"][numb
   return ref.scope === "project" ? `project:${ref.fieldKey}` : `page:${ref.pageId || ""}:${ref.fieldKey}`;
 }
 
+function referenceTargetKey(target: MarkdownReferenceTarget): string {
+  if (target.kind === "project") return `project:${target.projectId}`;
+  if (target.kind === "page") return `page:${target.projectId}:${target.pageId}`;
+  return `document:${target.projectId}:${target.docId}`;
+}
+
 function kindText(kind: ConfigPoolItemKind) {
   return kind === "color" ? "●" : kind === "image" ? "🖼" : kind === "motion" ? "▶" : kind === "number" ? "#" : "Aa";
 }
 
-function ReadonlyDesignSpec({ doc, pool }: { doc: PublishedDesignSpecDoc; pool: ConfigPoolItem[] }) {
+function ReadonlyDesignSpec({
+  doc,
+  pool,
+  onReferenceClick,
+}: {
+  doc: PublishedDesignSpecDoc;
+  pool: ConfigPoolItem[];
+  onReferenceClick?: (input: { target: MarkdownReferenceTarget; labelSnapshot: string }) => void;
+}) {
   const [openIds, setOpenIds] = useState(() => new Set(doc.entries.map((entry) => entry.id)));
   const poolById = useMemo(() => new Map(pool.map((item) => [item.id, item])), [pool]);
   return (
@@ -113,7 +131,7 @@ function ReadonlyDesignSpec({ doc, pool }: { doc: PublishedDesignSpecDoc; pool: 
                   {refs.map((item) => <tr key={item.id} className="hover:bg-accent/40"><td className="py-1 pr-2"><ConfigThumbnail item={item} /></td><td className="font-medium">{item.title}</td><td className="text-muted-foreground">{item.format || "—"}</td><td className="text-muted-foreground">—</td></tr>)}
                   {Array.from({ length: staleCount }).map((_, index) => <tr key={`stale-${index}`} className="text-muted-foreground"><td className="py-1 pr-2"><span className="inline-flex h-[52px] w-[52px] items-center justify-center rounded-md border bg-secondary">?</span></td><td className="italic">已失效引用</td><td>—</td><td>—</td></tr>)}
                 </tbody></table>}
-                <div className={cn(entry.refs.length > 0 && "mt-3")}><div className="mb-1 text-[11px] font-medium text-muted-foreground">说明</div><PageRequirements markdown={entry.markdown} allowExternalMedia mediaBaseUrl={DATA_BASE} /></div>
+                <div className={cn(entry.refs.length > 0 && "mt-3")}><div className="mb-1 text-[11px] font-medium text-muted-foreground">说明</div><PageRequirements markdown={entry.markdown} allowExternalMedia mediaBaseUrl={DATA_BASE} onReferenceClick={onReferenceClick} /></div>
               </div>
             </div>}
           </section>;
@@ -138,6 +156,8 @@ export function ViewerDocumentView({
   designSpecs,
   projectConfigSchema,
   pages,
+  references,
+  onReferenceNavigate,
 }: ViewerDocumentViewProps) {
   const configPool = useMemo(() => buildConfigPool(projectConfigSchema, pages), [pages, projectConfigSchema]);
   const userItems = useMemo(
@@ -155,6 +175,12 @@ export function ViewerDocumentView({
   const [content, setContent] = useState("");
   const [designSpec, setDesignSpec] = useState<PublishedDesignSpecDoc | null>(null);
   const [loading, setLoading] = useState(false);
+  const [referenceNotice, setReferenceNotice] = useState<string | null>(null);
+
+  const referenceTargets = useMemo(
+    () => new Map((references?.targets ?? []).map((entry) => [referenceTargetKey(entry.target), entry])),
+    [references],
+  );
 
   useEffect(() => {
     if (!active && userItems.length > 0) {
@@ -214,6 +240,28 @@ export function ViewerDocumentView({
   const handleDesignSpecSelect = useCallback((item: PublishedDesignSpecMeta) => {
     setActive({ kind: "designSpec", item });
   }, []);
+
+  const handleReferenceClick = useCallback(
+    ({ target }: { target: MarkdownReferenceTarget; labelSnapshot: string }) => {
+      const entry = referenceTargets.get(referenceTargetKey(target));
+      if (!entry) {
+        setReferenceNotice("该引用在当前发布版本中不可用");
+        return;
+      }
+      setReferenceNotice(null);
+      if (target.kind === "document") {
+        const item = userItems.find((candidate) => candidate.id === target.docId);
+        if (item) {
+          setActive({ kind: "knowledge", item });
+          return;
+        }
+        setReferenceNotice("该文档在当前发布版本中不可用");
+        return;
+      }
+      onReferenceNavigate?.(target);
+    },
+    [onReferenceNavigate, referenceTargets, userItems],
+  );
 
   return (
     <div className="flex h-full min-h-0">
@@ -295,6 +343,16 @@ export function ViewerDocumentView({
             )}
           </div>
         </div>
+        {referenceNotice && (
+          <div role="status" className="border-b bg-muted/40 px-4 py-1.5 text-xs text-muted-foreground">
+            {referenceNotice}
+          </div>
+        )}
+        {!referenceNotice && (references?.unresolvedCount ?? 0) > 0 && (
+          <div role="status" className="border-b bg-muted/40 px-4 py-1.5 text-xs text-muted-foreground">
+            当前发布版本中有 {references?.unresolvedCount} 个引用不可用
+          </div>
+        )}
         <div className="min-h-0 flex-1 p-4">
           {loading ? (
             <div className="flex h-full items-center justify-center">
@@ -306,9 +364,10 @@ export function ViewerDocumentView({
               onChange={() => {}}
               readOnly
               className="h-full"
+              onReferenceClick={handleReferenceClick}
             />
           ) : active?.kind === "designSpec" && designSpec ? (
-            <ReadonlyDesignSpec doc={designSpec} pool={configPool} />
+            <ReadonlyDesignSpec doc={designSpec} pool={configPool} onReferenceClick={handleReferenceClick} />
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
               <BookOpen className="mr-2 h-4 w-4" />

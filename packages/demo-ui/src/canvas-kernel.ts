@@ -134,6 +134,7 @@ export function normalizeCanvasStateLayers(state: CanvasState): CanvasState {
   const sections = normalizeCanvasSections(state.sections, {
     pages: state.pages,
     nodes: annotationNodes,
+    pageGroups: state.pageGroups,
   });
   const documents = Object.fromEntries(
     Object.entries(annotationNodes).filter(

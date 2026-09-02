@@ -26,6 +26,39 @@ export type {
   WorkspaceRootManifest,
 } from "./workspace-resource-registry";
 export {
+  classifyManagedDocumentPath,
+  hashDocumentProposalContent,
+  isManagedDocumentOperation,
+  resolveManagedDocumentPath,
+} from "./document-proposal";
+export {
+  DocumentProposalStore,
+  DocumentProposalStoreError,
+  buildDocumentProposalDiff,
+  createDocumentProposalDiff,
+  isDocumentProposalHash,
+} from "./document-proposal-store";
+export type {
+  CreateDocumentProposalInput,
+  DocumentProposalActor,
+  DocumentProposalAuditEvent,
+  DocumentProposalDiff,
+  DocumentProposalFinalizationOutboxRecord,
+  DocumentProposalListFilter,
+  DocumentProposalStoreOptions,
+  DocumentProposalTargetInput,
+  DocumentProposalTransition,
+} from "./document-proposal-store";
+export type {
+  DocumentEditProposal,
+  DocumentProposalDiffHunk,
+  DocumentProposalOperationIntent,
+  DocumentProposalStatus,
+  DocumentProposalTarget,
+  ManagedDocumentKind,
+  ManagedDocumentPath,
+} from "./document-proposal";
+export {
   WHITEBOARD_GC_GRACE_MS,
   planWhiteboardGarbageCollection,
   whiteboardGcPathsToDelete,
@@ -46,6 +79,29 @@ export type {
   PageDesignSpecSyncInput,
   PageDesignSpecSyncWrite,
 } from "./page-design-spec-sync";
+export {
+  EntityResolver,
+  ResourceDirectory,
+  createEntityResolver,
+  createResourceDirectory,
+  InMemoryMarkdownReferenceIndex,
+  SqliteMarkdownReferenceIndex,
+  findUnlinkedMentions,
+  MarkdownReferenceProjector,
+} from "./markdown-references/index.js";
+export type * from "./markdown-references/types.js";
+export type {
+  IncrementalMarkdownReferenceIndexInput,
+  MarkdownReferenceIndexScope,
+  MarkdownReferenceIndexStore,
+  MarkdownReferenceIndexStatus,
+  ParsedIndexReference,
+  RebuildMarkdownReferenceIndexInput,
+  MarkdownUnlinkedMention,
+  SqliteMarkdownReferenceIndexOptions,
+  MarkdownReferenceCommittedReceipt,
+  MarkdownReferenceProjectionInput,
+} from "./markdown-references/index.js";
 export {
   HTML_IMPORT_ANALYSIS_VERSION,
   HTML_IMPORT_MAX_DATA_URL_BYTES,
@@ -89,3 +145,12 @@ export type {
   HtmlUnsupportedCapability,
   HtmlUnsupportedCapabilityCode,
 } from "./html-import-contract";
+export {
+  DocumentApplicationService,
+  createDocumentApplicationService,
+  DocumentApplicationError,
+  DocumentPolicy,
+  ResourceVersionDocumentAdapter,
+  WorkspaceDocumentRepository,
+} from "./documents/index.js";
+export type * from "./documents/types.js";

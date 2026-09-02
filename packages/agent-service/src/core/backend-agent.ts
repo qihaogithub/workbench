@@ -119,9 +119,16 @@ export class BackendAgent extends BaseAgent {
     );
 
     let inactivityTimer: ReturnType<typeof setTimeout> | undefined;
+    let absoluteTimer: ReturnType<typeof setTimeout> | undefined;
     let timedOut = false;
+    let awaitingPlanApproval = false;
+    let pendingPlanApprovalToolCallId: string | undefined;
+    const absoluteTimeoutMs = options?.timeout ?? ABSOLUTE_TIMEOUT_MS;
+    let remainingAbsoluteTimeoutMs = absoluteTimeoutMs;
+    let absoluteTimerStartedAt: number | undefined;
 
     const resetInactivityTimer = () => {
+      if (awaitingPlanApproval) return;
       this.lastActivityAt = new Date();
       if (inactivityTimer) clearTimeout(inactivityTimer);
       inactivityTimer = setTimeout(() => {
@@ -135,6 +142,51 @@ export class BackendAgent extends BaseAgent {
       inactivityTimer.unref?.();
     };
 
+    const clearAbsoluteTimer = () => {
+      if (absoluteTimer) clearTimeout(absoluteTimer);
+      absoluteTimer = undefined;
+      absoluteTimerStartedAt = undefined;
+    };
+
+    const startAbsoluteTimer = () => {
+      if (awaitingPlanApproval || remainingAbsoluteTimeoutMs <= 0) return;
+      absoluteTimerStartedAt = Date.now();
+      absoluteTimer = setTimeout(() => {
+        logger.warn(
+          { sessionId: this.sessionId, absoluteMs: absoluteTimeoutMs },
+          "Absolute timeout fired, calling cancel()",
+        );
+        timedOut = true;
+        void this.cancel();
+      }, remainingAbsoluteTimeoutMs);
+      absoluteTimer.unref?.();
+    };
+
+    const pauseExecutionTimersForApproval = (toolCallId: string) => {
+      if (awaitingPlanApproval) return;
+      awaitingPlanApproval = true;
+      pendingPlanApprovalToolCallId = toolCallId;
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      inactivityTimer = undefined;
+      if (absoluteTimerStartedAt !== undefined) {
+        remainingAbsoluteTimeoutMs = Math.max(
+          0,
+          remainingAbsoluteTimeoutMs - (Date.now() - absoluteTimerStartedAt),
+        );
+      }
+      clearAbsoluteTimer();
+      this.setStatus("awaiting_approval");
+    };
+
+    const resumeExecutionTimersAfterApproval = (toolCallId: string) => {
+      if (!awaitingPlanApproval || toolCallId !== pendingPlanApprovalToolCallId) return;
+      awaitingPlanApproval = false;
+      pendingPlanApprovalToolCallId = undefined;
+      if (!this.cancellationRequested) this.setStatus("processing");
+      resetInactivityTimer();
+      startAbsoluteTimer();
+    };
+
     // 进度事件：只有“实质性输出”才重置无进展计时器。
     // 注意：不包含 thought——stuck 场景下模型可能持续产出 reasoning 事件，
     // 此时不应被视为“有活动”，否则前端 silence 提示和后端超时都无法触发。
@@ -143,21 +195,22 @@ export class BackendAgent extends BaseAgent {
     for (const evt of activityEvents) {
       this.on(evt, resetInactivityTimer);
     }
+    const onPermissionRequest = (event: import("./types").PermissionRequestEvent) => {
+      if (event.permissionRequest.toolCall.approvalKind === "plan_approval") {
+        pauseExecutionTimersForApproval(event.permissionRequest.toolCall.toolCallId);
+      }
+    };
+    const onToolCallUpdate = (event: import("./types").ToolCallUpdateEvent) => {
+      resumeExecutionTimersAfterApproval(event.toolCallId);
+    };
+    this.on("permission_request", onPermissionRequest);
+    this.on("tool_call_update", onToolCallUpdate);
 
     // 启动无进展定时器
     resetInactivityTimer();
 
-    // 启动绝对超时定时器（永不重置）；调用方显式 timeout 已在路由层完成边界校验。
-    const absoluteTimeoutMs = options?.timeout ?? ABSOLUTE_TIMEOUT_MS;
-    const absoluteTimer = setTimeout(() => {
-      logger.warn(
-        { sessionId: this.sessionId, absoluteMs: absoluteTimeoutMs },
-        "Absolute timeout fired, calling cancel()",
-      );
-      timedOut = true;
-      void this.cancel();
-    }, absoluteTimeoutMs);
-    absoluteTimer.unref?.();
+    // 审批等待属于人工输入阶段，不消耗模型执行预算；由 PermissionManager 的独立审批超时约束。
+    startAbsoluteTimer();
 
     try {
       if (!this.initialized) {
@@ -326,10 +379,12 @@ export class BackendAgent extends BaseAgent {
     } finally {
       // 清理所有定时器和事件监听器
       if (inactivityTimer) clearTimeout(inactivityTimer);
-      if (absoluteTimer) clearTimeout(absoluteTimer);
+      clearAbsoluteTimer();
       for (const evt of activityEvents) {
         this.off(evt, resetInactivityTimer);
       }
+      this.off("permission_request", onPermissionRequest);
+      this.off("tool_call_update", onToolCallUpdate);
     }
   }
 

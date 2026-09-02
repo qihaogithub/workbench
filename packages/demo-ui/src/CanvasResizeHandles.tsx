@@ -86,7 +86,7 @@ export function CanvasResizeHandles({ visible, options }: { visible: boolean; op
               key={edge}
               aria-hidden="true"
               data-canvas-resize-handle={edge}
-              className="absolute z-20"
+              className="absolute z-50"
               style={{
                 ...(edge === "n" ? { top: 0, left: 0, right: 0, height: options.edgeHitSize } : {}),
                 ...(edge === "s" ? { bottom: 0, left: 0, right: 0, height: options.edgeHitSize } : {}),

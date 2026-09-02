@@ -1,3 +1,7 @@
+/**
+ * @deprecated Transitional compatibility route. New callers must use
+ * `/api/projects/:projectId/documents` and the DocumentApplicationService.
+ */
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import type { WorkspaceMutationOperation } from '@workbench/shared/contracts';

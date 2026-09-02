@@ -14,6 +14,8 @@ export interface CrepeProjectActions {
   uploadVideo: () => void;
   uploadFile: () => void;
   insertReference: (candidate: ConfigReferenceCandidate) => void;
+  /** Opens the typed project/page/document reference picker at the cursor. */
+  openProjectReference?: () => void;
 }
 
 interface BuildCrepeConfigOptions {
@@ -21,6 +23,7 @@ interface BuildCrepeConfigOptions {
   actions: CrepeProjectActions;
   enableUploads?: boolean;
   referenceCandidates?: ConfigReferenceCandidate[];
+  enableProjectReferences?: boolean;
 }
 
 export function buildCrepeConfig({
@@ -28,6 +31,7 @@ export function buildCrepeConfig({
   actions,
   enableUploads = false,
   referenceCandidates = [],
+  enableProjectReferences = false,
 }: BuildCrepeConfigOptions): Pick<CrepeConfig, "features" | "featureConfigs"> {
   return {
     features: {
@@ -96,6 +100,16 @@ export function buildCrepeConfig({
                 onRun: () => actions.insertReference(candidate),
               });
             });
+          }
+
+          if (enableProjectReferences && actions.openProjectReference) {
+            builder
+              .addGroup("entity-references", "插入项目引用")
+              .addItem("insert-project-reference", {
+                label: "选择项目 / 页面 / 文档",
+                icon: referenceIcon,
+                onRun: actions.openProjectReference,
+              });
           }
 
           if (enableUploads) {

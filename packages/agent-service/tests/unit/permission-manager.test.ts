@@ -103,6 +103,38 @@ describe('PermissionManager', () => {
       expect(result.approved).toBe(true);
       expect(result.planMarkdown).toBe('# 修改后计划');
     });
+
+    it('AbortSignal 取消审批等待时应立即解析、清理 pending 状态', async () => {
+      const controller = new AbortController();
+      const promise = manager.requestPlanApproval('plan_cancelled', {
+        title: '执行重构计划',
+        planMarkdown: '# 计划',
+      }, controller.signal);
+
+      expect(manager.hasPendingPermissions()).toBe(true);
+      controller.abort();
+
+      await expect(promise).resolves.toEqual({
+        approved: false,
+        reason: 'cancelled',
+      });
+      expect(manager.hasPendingPermissions()).toBe(false);
+    });
+
+    it('清理 pending 权限时应解除计划审批等待', async () => {
+      const promise = manager.requestPlanApproval('plan_cleared', {
+        title: '执行重构计划',
+        planMarkdown: '# 计划',
+      });
+
+      manager.clearPendingPermissions();
+
+      await expect(promise).resolves.toEqual({
+        approved: false,
+        reason: 'cancelled',
+      });
+      expect(manager.hasPendingPermissions()).toBe(false);
+    });
   });
 });
 

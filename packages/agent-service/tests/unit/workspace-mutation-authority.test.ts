@@ -196,6 +196,28 @@ describe("WorkspaceMutationAuthority", () => {
     expect(events).toEqual(["mutation-1", "mutation-2"]);
   });
 
+  it("批准的文档提案在 Authority 临界区严格校验冻结 hash", async () => {
+    const { authority, workspacePath } = createAuthority();
+    fs.mkdirSync(path.join(workspacePath, "knowledge"), { recursive: true });
+    fs.writeFileSync(path.join(workspacePath, "knowledge", "rules.md"), "first", "utf-8");
+
+    const receipt = await authority.commitDocumentProposal({
+      mutationId: "proposal-1", projectId: "project-1", workspaceId: "workspace-1", baseRevision: 1,
+      actor: "author-site", reason: "ignored-by-strict-api", operations: [
+        { type: "put_text", path: "knowledge/rules.md", content: "approved", expectedHash: hash("first") },
+      ],
+    });
+    expect(receipt.resources).toEqual([expect.objectContaining({ path: "knowledge/rules.md", action: "modified" })]);
+
+    await expect(authority.commitDocumentProposal({
+      mutationId: "proposal-stale", projectId: "project-1", workspaceId: "workspace-1", baseRevision: 1,
+      actor: "author-site", reason: "ignored-by-strict-api", operations: [
+        { type: "put_text", path: "knowledge/rules.md", content: "stale", expectedHash: hash("first") },
+      ],
+    })).rejects.toMatchObject({ code: "WORKSPACE_RESOURCE_CONFLICT" });
+    expect(fs.readFileSync(path.join(workspacePath, "knowledge", "rules.md"), "utf-8")).toBe("approved");
+  });
+
   it("允许旧 revision 在目标资源 hash 未变化时安全 rebase", async () => {
     const { authority, workspacePath } = createAuthority();
     fs.mkdirSync(path.join(workspacePath, "demos", "other"), { recursive: true });
@@ -376,6 +398,77 @@ describe("WorkspaceMutationAuthority", () => {
     expect(fs.readFileSync(path.join(workspacePath, "assets", "images", "image.bin"))).toEqual(bytes);
     expect(receipt.resources).toEqual([expect.objectContaining({ path: "assets/images/image.bin", afterHash: staged.hash })]);
     expect(fs.existsSync(path.join(path.dirname(workspacePath), "data", "workspace-authority", "workspace-1", "staging", `${staged.stagingId}.bin`))).toBe(false);
+  });
+
+  it("在同一 mutation 内提交二进制资产并合并页面配置字段", async () => {
+    const { authority, workspacePath } = createAuthority();
+    const configPath = path.join(workspacePath, "demos", "home", "config.values.json");
+    fs.writeFileSync(configPath, JSON.stringify({ theme: "dark" }), "utf8");
+    const staged = await authority.stageBinary("project-1", "workspace-1", Buffer.from([1, 2, 3]));
+    const ref = { kind: "spine", version: 1, assetId: `spine_${"a".repeat(64)}` };
+
+    await authority.mutate({
+      mutationId: "spine-config-patch",
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      baseRevision: 0,
+      actor: "author-site",
+      reason: "commit_spine_asset",
+      operations: [
+        { type: "put_binary", path: "assets/animations/spine_a/file.bin", stagingId: staged.stagingId, hash: staged.hash, size: staged.size },
+        { type: "patch_config_values", path: "demos/home/config.values.json", patch: { spineAsset: ref } },
+      ],
+    });
+
+    expect(fs.readFileSync(path.join(workspacePath, "assets", "animations", "spine_a", "file.bin"))).toEqual(Buffer.from([1, 2, 3]));
+    expect(JSON.parse(fs.readFileSync(configPath, "utf8"))).toEqual({ theme: "dark", spineAsset: ref });
+  });
+
+  it("在普通配置写入之后串行合并 Spine ref，不覆盖其他字段", async () => {
+    const { authority, workspacePath } = createAuthority();
+    const configPath = path.join(workspacePath, "demos", "home", "config.values.json");
+    const ref = { kind: "spine", version: 1, assetId: `spine_${"b".repeat(64)}` };
+    const ordinarySave = authority.mutate({
+      mutationId: "ordinary-config-save",
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      baseRevision: 0,
+      actor: "author-site",
+      reason: "update_demo_page_files",
+      operations: [{ type: "put_text", path: "demos/home/config.values.json", content: JSON.stringify({ title: "latest" }) }],
+    });
+    const spinePatch = authority.mutate({
+      mutationId: "spine-after-config-save",
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      baseRevision: 0,
+      actor: "author-site",
+      reason: "commit_spine_asset",
+      operations: [{ type: "patch_config_values", path: "demos/home/config.values.json", patch: { spineAsset: ref } }],
+    });
+
+    await Promise.all([ordinarySave, spinePatch]);
+    expect(JSON.parse(fs.readFileSync(configPath, "utf8"))).toEqual({ title: "latest", spineAsset: ref });
+  });
+
+  it("提交前校验失败时回收该 mutation 引用的 staging 文件", async () => {
+    const { authority, workspacePath } = createAuthority();
+    const staged = await authority.stageBinary("project-1", "workspace-1", Buffer.from([1, 2, 3]));
+    const stagedPath = path.join(path.dirname(workspacePath), "data", "workspace-authority", "workspace-1", "staging", `${staged.stagingId}.bin`);
+
+    await expect(authority.mutate({
+      mutationId: "invalid-binary-target",
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      baseRevision: 0,
+      actor: "author-site",
+      reason: "test",
+      operations: [{ type: "put_binary", path: "demos/home/not-managed.bin", stagingId: staged.stagingId, hash: staged.hash, size: staged.size }],
+    })).rejects.toMatchObject({
+      code: "WORKSPACE_INVALID_OPERATION",
+      details: { operationType: "put_binary", resourcePath: "demos/home/not-managed.bin" },
+    });
+    expect(fs.existsSync(stagedPath)).toBe(false);
   });
 
   it("大文本可经 staging 原子写入受管页面资源，且仍拒绝 assets 路径", async () => {

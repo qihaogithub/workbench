@@ -137,6 +137,20 @@ describe("workspace authority client", () => {
     } satisfies Partial<WorkspaceAuthorityClientError>);
   });
 
+  it("Authority 网络不可达时返回可操作提示，不暴露底层 fetch 错误", async () => {
+    global.fetch = jest.fn().mockRejectedValue(new Error("fetch failed")) as unknown as typeof fetch;
+    const request = createTextWorkspaceMutation({
+      projectId: "project-1", workspaceId: "workspace-1", sessionId: "session-1",
+      path: "demos/home/index.tsx", content: "after", previousContent: "before", reason: "test",
+    });
+
+    await expect(commitWorkspaceMutation(request)).rejects.toMatchObject({
+      code: "WORKSPACE_AUTHORITY_NOT_READY",
+      status: 503,
+      message: "Workspace Authority 不可用，请确认 agent-service 已启动",
+    });
+  });
+
   it("二进制内容先上传 Authority staging，mutation 不携带 bytes", async () => {
     global.fetch = jest.fn(async () => ({
       ok: true,

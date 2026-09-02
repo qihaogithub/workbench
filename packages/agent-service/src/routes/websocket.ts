@@ -4,6 +4,7 @@ import { createAgentBusyResult, getAgentManager } from "../core/agent-manager";
 import { BackendAgent } from "../core/backend-agent";
 import {
   AgentConfig,
+  AgentAuthorAuthorization,
   FileAttachment,
   ImageAttachment,
   UserChoiceResponse,
@@ -17,6 +18,7 @@ import {
 import { getSessionStore } from "../session/session-store";
 import { getSessionModelConfigs } from "../config/session-model-configs";
 import { getSessionExternalAuthConfigs } from "../config/session-external-auth";
+import { getSessionAuthorizations } from "../config/session-authorizations";
 import { workspaceManager } from "../workspace/workspace-manager";
 import { snapshotService } from "../session/snapshot-service";
 import { consoleBuffer } from "../session/console-buffer";
@@ -48,6 +50,23 @@ function resolveDefaultModelId(): string {
 }
 
 const DEFAULT_MODEL_ID = resolveDefaultModelId();
+
+function resolveAuthorAuthorization(
+  sessionId: string,
+  requestedProjectId?: string,
+): AgentAuthorAuthorization {
+  const authorization = getSessionAuthorizations().get(sessionId);
+  if (authorization && requestedProjectId && authorization.projectId !== requestedProjectId) {
+    throw new Error("SESSION_PROJECT_MISMATCH");
+  }
+  return authorization ?? {
+    userId: "",
+    role: null,
+    projectId: requestedProjectId || "",
+    expiresAt: 0,
+    source: "author-session",
+  };
+}
 
 interface StreamParams {
   sessionId: string;
@@ -324,16 +343,21 @@ export async function registerWebSocketRoutes(
               const currentModelId = await resolveCurrentModelId(existingAgent);
               const requestedModelId = normalizeModelId(message.model);
 
+              const authorAuthorization = mode === "viewer-readonly"
+                ? undefined
+                : resolveAuthorAuthorization(sessionId, message.projectId);
               const config: AgentConfig = {
                 sessionId,
                 workingDir: message.workingDir,
-                projectId: message.projectId,
+                projectId: authorAuthorization?.projectId || message.projectId,
                 demoId: message.demoId,
                 referencedProjects: message.referencedProjects,
                 model: requestedModelId || currentModelId || DEFAULT_MODEL_ID,
                 toolVersion: getWorkbenchToolCapabilities().toolVersion,
                 backendProviders: getSessionModelConfigs().get(sessionId),
                 externalAuth: getSessionExternalAuthConfigs().get(sessionId),
+                // Never accept role from the websocket message.
+                authorAuthorization,
                 // viewer-readonly：服务端强制 workingDir/toolMode/permissions，忽略客户端同名字段
                 ...(viewerSession ? viewerSession.configPatch : {}),
               };
@@ -641,10 +665,14 @@ export async function registerWebSocketRoutes(
               const existingAgent = manager.get(resumeSessionId);
               const currentModelId = await resolveCurrentModelId(existingAgent);
 
+              const authorAuthorization = resolveAuthorAuthorization(
+                resumeSessionId,
+                message.projectId,
+              );
               const config: AgentConfig = {
                 sessionId: resumeSessionId,
                 workingDir: message.workingDir,
-                projectId: message.projectId,
+                projectId: authorAuthorization.projectId || message.projectId,
                 demoId: message.demoId,
                 referencedProjects: message.referencedProjects,
                 model: currentModelId || DEFAULT_MODEL_ID,
@@ -652,6 +680,7 @@ export async function registerWebSocketRoutes(
                 backendProviders: getSessionModelConfigs().get(resumeSessionId),
                 externalAuth:
                   getSessionExternalAuthConfigs().get(resumeSessionId),
+                authorAuthorization,
               };
 
               const agent = manager.getOrCreate(resumeSessionId, config);
@@ -797,18 +826,22 @@ export async function registerWebSocketRoutes(
               }
 
               let agent = manager.get(sessionId);
+              const authorAuthorization = mode === "viewer-readonly"
+                ? undefined
+                : resolveAuthorAuthorization(sessionId, message.projectId);
               const sessionBackendProviders =
                 getSessionModelConfigs().get(sessionId);
               if (!agent) {
                 const config: AgentConfig = {
                   sessionId,
                   workingDir: message.workingDir || process.cwd(),
-                  projectId: message.projectId,
+                  projectId: authorAuthorization?.projectId || message.projectId,
                   demoId: message.demoId,
                   model: DEFAULT_MODEL_ID,
                   toolVersion: getWorkbenchToolCapabilities().toolVersion,
                   backendProviders: sessionBackendProviders,
                   externalAuth: getSessionExternalAuthConfigs().get(sessionId),
+                  authorAuthorization,
                   ...(viewerPatch ?? {}),
                 };
                 agent = manager.getOrCreate(sessionId, config);
@@ -823,16 +856,17 @@ export async function registerWebSocketRoutes(
                   });
                   await agent.start();
                 }
-              } else if (sessionBackendProviders) {
+              } else if (sessionBackendProviders || authorAuthorization !== undefined) {
                 agent = manager.getOrCreate(sessionId, {
                   ...agent.getConfig(),
                   workingDir:
                     message.workingDir || agent.getConfig().workingDir,
-                  projectId: message.projectId || agent.getConfig().projectId,
+                  projectId: authorAuthorization?.projectId || message.projectId || agent.getConfig().projectId,
                   demoId: message.demoId || agent.getConfig().demoId,
                   toolVersion: getWorkbenchToolCapabilities().toolVersion,
                   backendProviders: sessionBackendProviders,
                   externalAuth: getSessionExternalAuthConfigs().get(sessionId),
+                  authorAuthorization,
                 });
               }
               if (agent && "getModelInfo" in agent) {

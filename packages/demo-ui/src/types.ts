@@ -1,4 +1,5 @@
 import type { PagePresentationProfile } from "@workbench/shared";
+import type { WorkspaceMutationReceipt } from "@workbench/shared/contracts";
 import type {
   ConsoleLogPayload,
   PositionableSizeItem,
@@ -11,6 +12,11 @@ import type {
   AppActionPayload,
 } from "./iframe-types";
 import type { FieldConfig } from "./schema-parser";
+import type {
+  MarkdownReferenceClickHandler,
+  MarkdownReferenceContext,
+  MarkdownReferenceProvider,
+} from "./DocumentEditor";
 
 export type {
   IframeOutMessageType,
@@ -139,24 +145,35 @@ export interface PreviewPanelProps {
   ) => void;
   /** 当前是否有自动修复正在进行中，控制"正在修复预览"覆盖层的显示 */
   isAutoRepairing?: boolean;
-  /** 位置编辑模式配置，设置 enabled: true 进入编辑模式 */
+  /** 位置编辑模式配置；一次只激活一个定位字段实例。 */
   positionEditMode?: PositionEditMode;
   /** 位置编辑模式下的置灰开关状态 */
   positionEditDimming?: boolean;
-  /** 位置编辑模式下元素拖拽结果回调 */
-  onPositionChange?: (key: string, x: number, y: number) => void;
+  /** 位置编辑模式下元素拖拽结果回调。第一个参数为定位字段实例 ID。 */
+  onPositionChange?: (instanceId: string, x: number, y: number) => void;
   /** 位置编辑模式下拖拽过程中的实时坐标回调（不触发截图再生，仅用于输入框回显） */
-  onPositionDrag?: (key: string, x: number, y: number) => void;
+  onPositionDrag?: (instanceId: string, x: number, y: number) => void;
   /** 位置编辑模式退出回调 */
   onPositionEditExit?: () => void;
 }
 
 export interface PositionEditMode {
   enabled: boolean;
-  items: string[];
-  positions: Record<string, { x: number; y: number }>;
-  /** 按 position key 指定的拖动边界。未在 map 中的 key 退化为全容器约束。整体缺省时所有元素退化为全容器约束。 */
-  boundary?: Record<string, PositionEditBoundary>;
+  target: PositionEditTarget | null;
+}
+
+/** 宿主与配置表单之间传递的单个定位字段实例。 */
+export interface PositionEditTarget {
+  /** 稳定的字段实例 ID；数组项必须包含稳定排序 ID，不得只使用数组下标。 */
+  id: string;
+  /** 宿主配置中的真实字段路径。 */
+  fieldPath: string;
+  /** 预览 DOM 中声明式 data-pos-key 的值。 */
+  domKey: string;
+  /** 同一 DOM key 在当前页面中的出现序号。 */
+  domOccurrence?: number;
+  position: { x: number; y: number };
+  boundary?: PositionEditBoundary;
 }
 
 export interface PositionEditBoundaryAbsolute {
@@ -181,7 +198,7 @@ export type PositionEditBoundary =
 
 export interface ConfigFormProps {
   schema: string;
-  onChange: (data: Record<string, unknown>) => void;
+  onChange: (data: Record<string, unknown>, meta?: ConfigChangeMeta) => void;
   onSchemaChange?: (schema: string) => void;
   initialData?: Record<string, unknown>;
   readonly?: boolean;
@@ -189,9 +206,11 @@ export interface ConfigFormProps {
   sessionId?: string;
   configCategoryFilter?: string;
   typeLimits?: Record<string, number>;
-  onEnterPositionEdit?: (posKeys: string[], positions: Record<string, { x: number; y: number }>, posKeyMap: Record<string, string>) => void;
+  onEnterPositionEdit?: (target: PositionEditTarget) => void;
+  /** 定位字段实例注册或数组重排后，通知宿主最新真实字段路径。 */
+  onPositionFieldPathChange?: (instanceId: string, fieldPath: string) => void;
   onExitPositionEdit?: () => void;
-  positionEditActive?: boolean;
+  positionEditActiveId?: string | null;
   positionEditDimming?: boolean;
   onTogglePositionDimming?: () => void;
   /** 与当前配置范围匹配的设计规范条目（宿主加载，只读展示）。 */
@@ -208,6 +227,16 @@ export interface ConfigFormProps {
   pageId?: string;
   /** 无 IO capability：宿主打开白板并负责草稿、提交与持久化。 */
   onLaunchWhiteboard?: WhiteboardLauncher;
+  /** Optional typed references for richtext fields and field notes. */
+  referenceContext?: MarkdownReferenceContext;
+  referenceProvider?: MarkdownReferenceProvider;
+  onReferenceClick?: MarkdownReferenceClickHandler;
+}
+
+export interface ConfigChangeMeta {
+  /** The server already durably committed this delta in an atomic mutation. */
+  persistence: "committed";
+  receipt: WorkspaceMutationReceipt;
 }
 
 export type ImageConfigScope = "project" | "page";
@@ -342,6 +371,8 @@ export interface CanvasPageData {
   sketchMeta?: Record<string, unknown>;
   configData?: Record<string, unknown>;
   schema?: string;                    // config.schema.json 原始 JSON 字符串
+  /** 未筛选的页面配置总数；未知时省略，画布入口沿用默认详情行为。 */
+  configCount?: number;
   isReference?: boolean;              // 是否为引用页
   sourceProjectId?: string;           // 引用页的源项目 ID
   previewSize?: PreviewSize;
@@ -373,7 +404,7 @@ export interface CanvasPageGroup {
   updatedAt: number;
 }
 
-export type CanvasSectionChildKind = "page" | "node" | "section";
+export type CanvasSectionChildKind = "page" | "page-group" | "node" | "section";
 
 export interface CanvasSectionChild {
   kind: CanvasSectionChildKind;
@@ -475,7 +506,8 @@ export interface CanvasLayersState {
 export interface CanvasKnowledgeDocument {
   id: string;
   title: string;
-  fileName: string;
+  /** @deprecated Display-only compatibility field; document identity is `id`. */
+  fileName?: string;
   description?: string;
 }
 
@@ -559,7 +591,10 @@ export interface PreviewCanvasProps {
   onRequestDeletePages?: (pageIds: string[]) => void | Promise<void>;
   /** 画布选中的页面添加到 AI 对话 */
   onAddPagesToChat?: (pageIds: string[]) => void;
-  onPageConfigEdit?: (pageId: string) => void;
+  onPageConfigEdit?: (
+    pageId: string,
+    options?: { openConfigDetail?: boolean },
+  ) => void;
   /** 在画布中重命名项目页面；成功后同步全部页面名称引用。 */
   onPageRename?: (pageId: string, name: string) => Promise<boolean>;
   /** 评论模式下点击画布页面，以其点击位置创建页面级评论。 */
@@ -570,6 +605,10 @@ export interface PreviewCanvasProps {
     clientX: number;
     clientY: number;
   }) => void;
+  /** 页面标题旁评论标签点击；宿主负责打开评论面板并同步页面选择。 */
+  onPageCommentBadgeClick?: (pageId: string) => void;
+  /** 各页面未处理评论数量，供画布标题标签展示。 */
+  commentCounts?: Record<string, number>;
   onCanvasClick?: () => void;
   className?: string;
   editingPageId?: string;

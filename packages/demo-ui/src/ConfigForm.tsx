@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { Sparkles } from "lucide-react";
 import { cn } from "./utils";
-import type { ConfigFormProps } from "./types";
+import type { ConfigChangeMeta, ConfigFormProps } from "./types";
 import type { DesignSpecEntryLink } from "./types";
 import type { FieldConfig, FieldGroup, VisibleWhenCondition } from "./schema-parser";
 import { parseSchemaToFields } from "./schema-parser";
@@ -11,6 +11,7 @@ import { getPageTypeLimits } from "./type-limits-store";
 import { FieldRenderer, PositionConfigContext, type PositionConfigContextValue, type PositionFieldEntry } from "./FieldRenderer";
 import { configFieldMatchesCategoryFilter } from "./config-categories";
 import { getPreviewSize } from "./validator";
+import { isAtomicConfigField } from "@workbench/shared";
 
 function isFieldVisible(
   field: FieldConfig,
@@ -81,7 +82,7 @@ function computeFlattenPathMap(schema: string): Record<string, string> {
     const map: Record<string, string> = {};
     for (const [key, prop] of Object.entries(properties)) {
       const p = prop as any;
-      if (p?.type === "object" && p?.properties && typeof p.properties === "object" && !Array.isArray(p.properties)) {
+      if (p?.type === "object" && !isAtomicConfigField(p) && p?.properties && typeof p.properties === "object" && !Array.isArray(p.properties)) {
         if (p.$demo?.positionable) continue;
         for (const nestedKey of Object.keys(p.properties)) {
           map[nestedKey] = key;
@@ -127,10 +128,13 @@ function FieldGroupSection({
   imageConfigScope,
   pageId,
   onLaunchWhiteboard,
+  referenceContext,
+  referenceProvider,
+  onReferenceClick,
 }: {
   group: FieldGroup;
   formData: Record<string, unknown>;
-  onChange: (key: string, value: unknown) => void;
+  onChange: (key: string, value: unknown, meta?: ConfigChangeMeta) => void;
   isFirst?: boolean;
   sessionId?: string;
   readonly?: boolean;
@@ -141,6 +145,9 @@ function FieldGroupSection({
   imageConfigScope?: ConfigFormProps["imageConfigScope"];
   pageId?: string;
   onLaunchWhiteboard?: ConfigFormProps["onLaunchWhiteboard"];
+  referenceContext?: ConfigFormProps["referenceContext"];
+  referenceProvider?: ConfigFormProps["referenceProvider"];
+  onReferenceClick?: ConfigFormProps["onReferenceClick"];
 }) {
   if (group.title === "") {
     return (
@@ -151,7 +158,7 @@ function FieldGroupSection({
               key={field.key}
               field={field}
               value={formData[field.key]}
-              onChange={(value) => onChange(field.key, value)}
+              onChange={(value, meta) => onChange(field.key, value, meta)}
               sessionId={sessionId}
               readonly={readonly}
               designSpecEntries={designSpecEntries}
@@ -162,6 +169,9 @@ function FieldGroupSection({
               imageConfigScope={imageConfigScope}
               pageId={pageId}
               onLaunchWhiteboard={onLaunchWhiteboard}
+              referenceContext={referenceContext}
+              referenceProvider={referenceProvider}
+              onReferenceClick={onReferenceClick}
             />
           ))}
         </div>
@@ -180,7 +190,7 @@ function FieldGroupSection({
             key={field.key}
             field={field}
             value={formData[field.key]}
-            onChange={(value) => onChange(field.key, value)}
+            onChange={(value, meta) => onChange(field.key, value, meta)}
             sessionId={sessionId}
             readonly={readonly}
             designSpecEntries={designSpecEntries}
@@ -191,6 +201,9 @@ function FieldGroupSection({
             imageConfigScope={imageConfigScope}
             pageId={pageId}
             onLaunchWhiteboard={onLaunchWhiteboard}
+            referenceContext={referenceContext}
+            referenceProvider={referenceProvider}
+            onReferenceClick={onReferenceClick}
           />
         ))}
       </div>
@@ -209,8 +222,9 @@ export function ConfigForm({
   typeLimits,
   className,
   onEnterPositionEdit,
+  onPositionFieldPathChange,
   onExitPositionEdit,
-  positionEditActive,
+  positionEditActiveId,
   positionEditDimming,
   onTogglePositionDimming,
   designSpecEntries,
@@ -220,6 +234,9 @@ export function ConfigForm({
   imageConfigScope,
   pageId,
   onLaunchWhiteboard,
+  referenceContext,
+  referenceProvider,
+  onReferenceClick,
 }: ConfigFormProps) {
   const [formData, setFormData] = useState<Record<string, unknown>>(
     () => {
@@ -267,30 +284,46 @@ export function ConfigForm({
   }, [schema]);
 
   const positionRegistryRef = useRef(new Map<string, PositionFieldEntry>());
-  const positionEditActiveRef = useRef(false);
+  const activePositionIdRef = useRef<string | null>(positionEditActiveId ?? null);
+  const onPositionFieldPathChangeRef = useRef(onPositionFieldPathChange);
+  const onExitPositionEditRef = useRef(onExitPositionEdit);
+  activePositionIdRef.current = positionEditActiveId ?? null;
+  onPositionFieldPathChangeRef.current = onPositionFieldPathChange;
+  onExitPositionEditRef.current = onExitPositionEdit;
 
   const registerPositionField = useCallback((entry: PositionFieldEntry) => {
-    positionRegistryRef.current.set(entry.posKey, entry);
+    positionRegistryRef.current.set(entry.instanceId, entry);
+    onPositionFieldPathChangeRef.current?.(entry.instanceId, entry.fieldPath);
     return () => {
-      positionRegistryRef.current.delete(entry.posKey);
+      if (positionRegistryRef.current.get(entry.instanceId) === entry) {
+        positionRegistryRef.current.delete(entry.instanceId);
+      }
+      if (activePositionIdRef.current === entry.instanceId) {
+        queueMicrotask(() => {
+          if (
+            activePositionIdRef.current === entry.instanceId &&
+            !positionRegistryRef.current.has(entry.instanceId)
+          ) {
+            onExitPositionEditRef.current?.();
+          }
+        });
+      }
     };
   }, []);
 
-  const requestPositionEdit = useCallback(() => {
-    const entries = Array.from(positionRegistryRef.current.values());
-    const posKeys: string[] = entries.map((e) => e.posKey);
-    const positions: Record<string, { x: number; y: number }> = {};
-    const posKeyMap: Record<string, string> = {};
-    for (const entry of entries) {
-      positions[entry.posKey] = entry.currentValue;
-      posKeyMap[entry.posKey] = entry.fieldPath;
-    }
-    positionEditActiveRef.current = true;
-    onEnterPositionEdit?.(posKeys, positions, posKeyMap);
+  const requestPositionEdit = useCallback((instanceId: string) => {
+    const entry = positionRegistryRef.current.get(instanceId);
+    if (!entry) return;
+    onEnterPositionEdit?.({
+      id: entry.instanceId,
+      fieldPath: entry.fieldPath,
+      domKey: entry.posKey,
+      domOccurrence: entry.domOccurrence,
+      position: entry.currentValue,
+    });
   }, [onEnterPositionEdit]);
 
   const exitPositionEdit = useCallback(() => {
-    positionEditActiveRef.current = false;
     onExitPositionEdit?.();
   }, [onExitPositionEdit]);
 
@@ -299,7 +332,7 @@ export function ConfigForm({
       registerPositionField,
       requestPositionEdit,
       exitPositionEdit,
-      positionEditActive: positionEditActive ?? false,
+      activePositionId: positionEditActiveId ?? null,
       dimming: positionEditDimming ?? false,
       onToggleDimming: onTogglePositionDimming,
     };
@@ -307,12 +340,10 @@ export function ConfigForm({
     registerPositionField,
     requestPositionEdit,
     exitPositionEdit,
-    positionEditActive,
+    positionEditActiveId,
     positionEditDimming,
     onTogglePositionDimming,
   ]);
-
-  const hasPositionEdit = !!onEnterPositionEdit; 
 
   console.log(
     "[ConfigForm] Parsed field groups:",
@@ -353,7 +384,7 @@ export function ConfigForm({
   }, [schema, fieldGroups]);
 
   const handleFieldChange = useCallback(
-    (key: string, value: unknown) => {
+    (key: string, value: unknown, meta?: ConfigChangeMeta) => {
       setFormData((prev) => {
         if (value === undefined || value === null) {
           const next = { ...prev };
@@ -362,7 +393,7 @@ export function ConfigForm({
         }
         return { ...prev, [key]: value };
       });
-      onChange({ [key]: value ?? null });
+      onChange({ [key]: value ?? null }, meta);
     },
     [onChange]
   );
@@ -409,6 +440,9 @@ export function ConfigForm({
                 imageConfigScope={imageConfigScope}
                 pageId={pageId}
                 onLaunchWhiteboard={onLaunchWhiteboard}
+                referenceContext={referenceContext}
+                referenceProvider={referenceProvider}
+                onReferenceClick={onReferenceClick}
               />
             </div>
           ))}

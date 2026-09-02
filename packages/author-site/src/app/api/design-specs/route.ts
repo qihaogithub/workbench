@@ -14,7 +14,7 @@ import {
   listDesignSpecDocs,
   readDesignSpecManifest,
 } from "@/lib/design-specs";
-import { resolveDesignSpecContext } from "@/lib/design-specs/route-helpers";
+import { requireDesignSpecAdmin, resolveDesignSpecContext } from "@/lib/design-specs/route-helpers";
 import {
   commitWorkspaceMutation,
   WorkspaceAuthorityClientError,
@@ -47,6 +47,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const resolved = await resolveDesignSpecContext(request);
   if ("response" in resolved) return resolved.response;
+  const authorizationError = requireDesignSpecAdmin(resolved.ctx);
+  if (authorizationError) return authorizationError;
   const { workingDir, live, liveContext } = resolved.ctx;
 
   const body = await request.json().catch(() => null);

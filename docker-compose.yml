@@ -64,9 +64,6 @@ services:
       - FIGMA_MCP_REGION=${FIGMA_MCP_REGION:-}
       - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-}
       - KNOWLEDGE_SERVICE_URL=http://knowledge-service:3203
-      - IMAGE_DESCRIPTION_ENABLED=${IMAGE_DESCRIPTION_ENABLED:-false}
-      - IMAGE_DESCRIPTION_MODEL=${IMAGE_DESCRIPTION_MODEL:-}
-      - IMAGE_DESCRIPTION_TIMEOUT=${IMAGE_DESCRIPTION_TIMEOUT:-60000}
     volumes:
       - ${APP_DATA_DIR:-/opt/workbench/data}:/app/data
     depends_on:

@@ -3,6 +3,10 @@ import type {
   WorkspaceRevision,
 } from "@workbench/shared/contracts";
 
+/** Stable user-facing guidance for a temporarily unavailable Authority. */
+export const WORKSPACE_AUTHORITY_NOT_READY_MESSAGE =
+  "Workspace Authority 不可用，请确认 agent-service 已启动";
+
 /**
  * Shared types and error class used by both the server-side
  * workspace-authority-client and the browser-side workspace-authority-browser-client.

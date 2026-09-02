@@ -62,7 +62,9 @@ export function useCommandHistory(options: UseCommandHistoryOptions = {}) {
         syncCounts();
       } catch (error) {
         onErrorRef.current?.(error, command, "redo");
-        throw error;
+        // executeCommand is used by UI event handlers that intentionally
+        // start commands without awaiting them. Keep the error observable via
+        // onError, but do not leak a rejected promise to the browser runtime.
       } finally {
         setRunning(false);
       }

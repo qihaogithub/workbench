@@ -11,6 +11,7 @@ import type {
   CommentReply,
   CommentStoreData,
   CommentAiTaskStatus,
+  CommentAiTaskAuthorization,
   CommentMention,
   CommentWsEvent,
 } from "@workbench/shared";
@@ -107,6 +108,27 @@ export function getCommentThread(
   return threads.find((t) => t.id === threadId) ?? null;
 }
 
+/** Project the durable proposal outcome back to its originating comment task.
+ * This does not grant write authority; it is purely a user-visible task state. */
+export async function setDocumentProposalTaskStatus(
+  projectId: string,
+  proposalId: string,
+  status: Extract<CommentAiTaskStatus, "awaiting_approval" | "done" | "failed">,
+): Promise<void> {
+  const data = readCommentStore(projectId);
+  const affected = data.threads.filter((thread) => thread.documentProposalId === proposalId);
+  if (!affected.length) return;
+  const now = Date.now();
+  for (const thread of affected) {
+    thread.aiTaskStatus = status;
+    thread.updatedAt = now;
+  }
+  writeCommentStore(projectId, data);
+  await Promise.all(affected.map((thread) => notifyWsEvent(projectId, {
+    type: "comment:ai-status", threadId: thread.id, aiTaskStatus: status,
+  })));
+}
+
 export interface CreateCommentInput {
   projectId: string;
   target: CommentThread["target"];
@@ -116,6 +138,7 @@ export interface CreateCommentInput {
   content: string;
   author: CommentThread["author"];
   mentions?: CommentThread["mentions"];
+  aiTaskAuthorization?: CommentAiTaskAuthorization;
 }
 
 export async function createCommentThread(
@@ -143,6 +166,10 @@ export async function createCommentThread(
   };
 
   data.threads.push(thread);
+  if (hasAgentMention && input.aiTaskAuthorization) {
+    data.aiTaskAuthorizations ??= {};
+    data.aiTaskAuthorizations[thread.id] = input.aiTaskAuthorization;
+  }
   writeCommentStore(input.projectId, data);
   await notifyWsEvent(input.projectId, {
     type: "comment:created",
@@ -151,7 +178,7 @@ export async function createCommentThread(
 
   // @AI 提及 → 通知 agent-service 入队
   if (hasAgentMention) {
-    await enqueueAiTask(input.projectId, thread.id);
+    await enqueueAiTask(input.projectId, thread.id, input.aiTaskAuthorization);
   }
 
   return thread;
@@ -162,6 +189,7 @@ export interface UpdateCommentInput {
   content?: string;
   mentions?: CommentMention[];
   aiTaskStatus?: CommentAiTaskStatus;
+  aiTaskAuthorization?: CommentAiTaskAuthorization;
 }
 
 export async function updateCommentThread(
@@ -188,7 +216,13 @@ export async function updateCommentThread(
   }
   const hasAgentMention = thread.mentions?.some((mention) => mention.type === "agent") ?? false;
   const shouldEnqueueAgent = updates.mentions !== undefined && hasAgentMention && !hadAgentMention;
-  if (shouldEnqueueAgent) thread.aiTaskStatus = "pending";
+  if (shouldEnqueueAgent) {
+    thread.aiTaskStatus = "pending";
+    if (updates.aiTaskAuthorization) {
+      data.aiTaskAuthorizations ??= {};
+      data.aiTaskAuthorizations[threadId] = updates.aiTaskAuthorization;
+    }
+  }
   thread.updatedAt = Date.now();
 
   writeCommentStore(projectId, data);
@@ -211,7 +245,7 @@ export async function updateCommentThread(
 
   if (shouldEnqueueAgent) {
     await notifyWsEvent(projectId, { type: "comment:ai-status", threadId, aiTaskStatus: "pending" });
-    await enqueueAiTask(projectId, threadId);
+    await enqueueAiTask(projectId, threadId, updates.aiTaskAuthorization);
   }
 
   return thread;
@@ -226,6 +260,7 @@ export async function deleteCommentThread(
   if (index === -1) return false;
 
   data.threads.splice(index, 1);
+  if (data.aiTaskAuthorizations) delete data.aiTaskAuthorizations[threadId];
   writeCommentStore(projectId, data);
   await notifyWsEvent(projectId, { type: "comment:deleted", threadId });
   return true;
@@ -237,6 +272,7 @@ export interface CreateReplyInput {
   content: string;
   author: CommentReply["author"];
   mentions?: CommentReply["mentions"];
+  aiTaskAuthorization?: CommentAiTaskAuthorization;
 }
 
 export async function createReply(
@@ -261,6 +297,10 @@ export async function createReply(
   const hasAgentMention = input.mentions?.some((m) => m.type === "agent");
   if (hasAgentMention) {
     thread.aiTaskStatus = "pending";
+    if (input.aiTaskAuthorization) {
+      data.aiTaskAuthorizations ??= {};
+      data.aiTaskAuthorizations[thread.id] = input.aiTaskAuthorization;
+    }
   }
 
   writeCommentStore(input.projectId, data);
@@ -276,7 +316,7 @@ export async function createReply(
       threadId: thread.id,
       aiTaskStatus: "pending",
     });
-    await enqueueAiTask(input.projectId, thread.id);
+    await enqueueAiTask(input.projectId, thread.id, input.aiTaskAuthorization);
   }
 
   return { thread, reply };
@@ -304,7 +344,7 @@ export async function updateReply(
   projectId: string,
   threadId: string,
   replyId: string,
-  updates: { content: string; mentions?: CommentMention[] },
+  updates: { content: string; mentions?: CommentMention[]; aiTaskAuthorization?: CommentAiTaskAuthorization },
 ): Promise<{ thread: CommentThread; reply: CommentReply } | null> {
   const data = readCommentStore(projectId);
   const thread = data.threads.find((candidate) => candidate.id === threadId);
@@ -316,12 +356,18 @@ export async function updateReply(
   reply.mentions = updates.mentions;
   thread.updatedAt = Date.now();
   const hasAgentMention = reply.mentions?.some((mention) => mention.type === "agent") ?? false;
-  if (hasAgentMention && !hadAgentMention) thread.aiTaskStatus = "pending";
+  if (hasAgentMention && !hadAgentMention) {
+    thread.aiTaskStatus = "pending";
+    if (updates.aiTaskAuthorization) {
+      data.aiTaskAuthorizations ??= {};
+      data.aiTaskAuthorizations[threadId] = updates.aiTaskAuthorization;
+    }
+  }
   writeCommentStore(projectId, data);
   await notifyWsEvent(projectId, { type: "comment:updated", thread });
   if (hasAgentMention && !hadAgentMention) {
     await notifyWsEvent(projectId, { type: "comment:ai-status", threadId, aiTaskStatus: "pending" });
-    await enqueueAiTask(projectId, threadId);
+    await enqueueAiTask(projectId, threadId, updates.aiTaskAuthorization);
   }
   return { thread, reply };
 }
@@ -343,6 +389,7 @@ export function getPendingAiComments(projectId: string): CommentThread[] {
 export async function retryAiTask(
   projectId: string,
   threadId: string,
+  aiTaskAuthorization?: CommentAiTaskAuthorization,
 ): Promise<CommentThread | null> {
   const data = readCommentStore(projectId);
   const thread = data.threads.find((t) => t.id === threadId);
@@ -351,6 +398,10 @@ export async function retryAiTask(
 
   thread.aiTaskStatus = "pending";
   thread.updatedAt = Date.now();
+  if (aiTaskAuthorization) {
+    data.aiTaskAuthorizations ??= {};
+    data.aiTaskAuthorizations[threadId] = aiTaskAuthorization;
+  }
   writeCommentStore(projectId, data);
 
   await notifyWsEvent(projectId, {
@@ -358,7 +409,7 @@ export async function retryAiTask(
     threadId,
     aiTaskStatus: "pending",
   });
-  await enqueueAiTask(projectId, threadId);
+  await enqueueAiTask(projectId, threadId, aiTaskAuthorization);
   return thread;
 }
 
@@ -368,6 +419,7 @@ export async function retryAiTask(
 async function enqueueAiTask(
   projectId: string,
   threadId: string,
+  authorization?: CommentAiTaskAuthorization,
 ): Promise<void> {
   const token = getInternalApiToken();
   try {
@@ -377,7 +429,17 @@ async function enqueueAiTask(
         "Content-Type": "application/json",
         ...(token ? { "X-Internal-Token": token } : {}),
       },
-      body: JSON.stringify({ projectId, threadId }),
+      body: JSON.stringify({
+        projectId,
+        threadId,
+        ...(authorization
+          ? {
+              userId: authorization.userId,
+              role: authorization.role,
+              expiresAt: authorization.expiresAt,
+            }
+          : {}),
+      }),
     });
   } catch {
     // agent-service 不可用时不阻塞评论创建

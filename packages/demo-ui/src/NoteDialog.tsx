@@ -12,6 +12,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { RichTextEditor, type NoteUploadHandler } from "./RichTextEditor";
 import { renderNoteMarkdown, stripMarkdown } from "./note-html";
+import { decodeMarkdownReferenceUri } from "@workbench/shared/markdown-reference";
+import type { MarkdownReferenceClickHandler } from "./DocumentEditor";
 
 /** 默认上传实现：投递到 author-site 图床 /api/images/upload（同源，随 Cookie 鉴权） */
 async function uploadNoteFile(
@@ -52,6 +54,7 @@ interface NoteDialogProps {
   onSave: (markdown: string) => void;
   onDelete: () => void;
   uploadHandler?: NoteUploadHandler;
+  onReferenceClick?: MarkdownReferenceClickHandler;
 }
 
 export function NoteDialog({
@@ -63,6 +66,7 @@ export function NoteDialog({
   onSave,
   onDelete,
   uploadHandler,
+  onReferenceClick,
 }: NoteDialogProps) {
   const [editContent, setEditContent] = useState(note);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -118,6 +122,14 @@ export function NoteDialog({
           {readonly ? (
             <div
               className="markdown-editor-content px-3 py-2 text-sm overflow-y-auto h-full rounded-md border"
+              onClick={(event) => {
+                const chip = (event.target as HTMLElement).closest<HTMLElement>("[data-reference-uri]");
+                const uri = chip?.getAttribute("data-reference-uri");
+                const target = uri ? decodeMarkdownReferenceUri(uri) : null;
+                if (!target) return;
+                event.preventDefault();
+                onReferenceClick?.({ target, labelSnapshot: chip?.textContent?.trim() || "" });
+              }}
               dangerouslySetInnerHTML={{ __html: renderNoteMarkdown(note) }}
             />
           ) : (
@@ -125,6 +137,7 @@ export function NoteDialog({
               content={editContent}
               onChange={setEditContent}
               uploadHandler={uploadHandler ?? uploadNoteFile}
+              onReferenceClick={onReferenceClick}
             />
           )}
         </div>

@@ -11,6 +11,7 @@
 | 路径 | 说明 |
 | --- | --- |
 | `src/service.ts` | 项目、模板、页面、文件夹、配置、发布检查等领域操作 |
+| `src/documents/` | 知识文档应用层、Workspace/Authority 适配和 ResourceVersion 视图 |
 | `src/types.ts` | CLI 与 Web API 可复用的稳定业务类型 |
 | `src/cli-prompt.ts` | CLI 使用提示词与命令速查生成 |
 | `src/__tests__/` | 使用临时目录的单元测试 |

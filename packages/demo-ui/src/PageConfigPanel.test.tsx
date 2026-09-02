@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PageConfigPanel } from "./PageConfigPanel";
 
@@ -11,6 +11,72 @@ const pageSchema = JSON.stringify({
 });
 
 describe("PageConfigPanel design-spec bubble", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("引用页明确没有绑定时不回退到目标项目的规范", async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.startsWith("/api/design-specs?")) {
+        return Promise.resolve({ json: async () => ({ success: true, data: [{ id: "target-doc", title: "目标项目规范" }] }) });
+      }
+      return Promise.resolve({ json: async () => ({
+        success: true,
+        data: {
+          id: "target-doc",
+          title: "目标项目规范",
+          entries: [{
+            id: "target-entry",
+            title: "目标封面规范",
+            markdown: "不属于引用页",
+            refs: [{ scope: "page", pageId: "reference-page", fieldKey: "cover" }],
+          }],
+        },
+      }) });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <PageConfigPanel
+        pages={[{ id: "reference-page", name: "引用页", schema: pageSchema, configData: {}, designSpecEntries: [] }]}
+        detailPageId="reference-page"
+        onPageConfigChange={vi.fn()}
+        designSpecApiContext={{ workingDir: "/target-workspace" }}
+      />,
+    );
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(screen.queryByRole("button", { name: "查看设计规范：封面" })).not.toBeInTheDocument();
+  });
+
+  it("引用页也复用字段旁规范入口，不渲染旧的整块规范区", async () => {
+    render(
+      <PageConfigPanel
+        pages={[{
+          id: "reference-page",
+          name: "引用页",
+          schema: pageSchema,
+          configData: {},
+          designSpecEntries: [{
+            docId: "doc-1",
+            docTitle: "设计规范",
+            entryId: "entry-1",
+            entryTitle: "封面样式",
+            markdown: "引用页规范",
+            scope: "page",
+            pageId: "reference-page",
+            fieldKey: "cover",
+          }],
+        }]}
+        detailPageId="reference-page"
+        onPageConfigChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText("旧规范区")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "查看设计规范：封面" })).toBeInTheDocument();
+  });
+
   it("将规范气泡挂到文档根层，避免分栏容器裁切", async () => {
     render(
       <PageConfigPanel
@@ -47,5 +113,61 @@ describe("PageConfigPanel design-spec bubble", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "关闭设计规范" }));
     await waitFor(() => expect(screen.queryByRole("complementary", { name: "设计规范" })).not.toBeInTheDocument());
+  });
+
+  it("将 Spine 上传回执作为已持久化的配置变更透传给宿主", async () => {
+    const onPageConfigChange = vi.fn();
+    const ref = { kind: "spine", version: 1, assetId: `spine_${"c".repeat(64)}` };
+    const receipt = {
+      committed: true,
+      mutationId: "mutation-1",
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      baseRevision: 0,
+      revision: 2,
+      rootHash: "hash",
+      actor: "author-site",
+      resources: [],
+      committedAt: 1,
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: { ref, receipt, configCommitted: true } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    ));
+    const spineSchema = JSON.stringify({
+      type: "object",
+      properties: {
+        spineAsset: {
+          type: "object",
+          format: "spine",
+          title: "Spine 素材",
+          properties: {
+            kind: { const: "spine" },
+            version: { const: 1 },
+            assetId: { type: "string", pattern: "^spine_[a-f0-9]{64}$" },
+          },
+          required: ["kind", "version", "assetId"],
+          additionalProperties: false,
+        },
+      },
+    });
+    const { container } = render(
+      <PageConfigPanel
+        pages={[{ id: "page-1", name: "示例页", schema: spineSchema, configData: {} }]}
+        detailPageId="page-1"
+        sessionId="session-1"
+        onPageConfigChange={onPageConfigChange}
+      />,
+    );
+    const file = new File([new Uint8Array([0x50, 0x4b, 3, 4])], "star_second.zip.flutter", { type: "application/zip" });
+    fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [file] } });
+
+    await waitFor(() => expect(onPageConfigChange).toHaveBeenCalledWith(
+      "page-1",
+      { spineAsset: ref },
+      { persistence: "committed", receipt },
+    ));
   });
 });

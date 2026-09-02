@@ -3,7 +3,7 @@ import * as path from "path";
 import { createHash, randomBytes, randomUUID } from "crypto";
 import { Type, type Static } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import { isManagedWorkspaceResource } from "@workbench/shared/contracts";
+import { createWorkspaceResourceRegistry } from "@workbench/project-core/workspace-resource-registry";
 import type { AgentConfig } from "../../core/types";
 import { logger } from "../../utils/logger";
 import { resolveLiveWorkspaceMutationContext } from "../../workspace/workspace-mutation-authority";
@@ -22,9 +22,11 @@ import {
   readWorkspaceTree,
   listPages,
 } from "./workspace-page-utils";
+import { aiMutationDeniedResult, assertAiMutationAllowed } from "./ai-mutation-policy";
 
 const PERMISSION_TIMEOUT_MS = 60_000;
 const DELETION_PLAN_TTL_MS = 5 * 60_000;
+const workspaceResourceRegistry = createWorkspaceResourceRegistry();
 
 export interface DeletedPageChange {
   pageId: string;
@@ -142,6 +144,7 @@ export interface PermissionRequestInfo {
 export type PermissionHandler = (
   toolCallId: string,
   request: PermissionRequestInfo,
+  signal?: AbortSignal,
 ) => Promise<boolean>;
 
 export function createDeletionPlanStore(
@@ -346,7 +349,7 @@ function managedPageFiles(
           .relative(workingDir, fullPath)
           .split(path.sep)
           .join("/");
-        if (isManagedWorkspaceResource(relativePath)) {
+        if (workspaceResourceRegistry.describe(relativePath)) {
           files.push({
             path: relativePath,
             content: fs.readFileSync(fullPath, "utf-8"),
@@ -365,6 +368,14 @@ async function deleteOnePage(
   pageId: string,
   pageName?: string,
 ) {
+  const mutationDecision = assertAiMutationAllowed(
+    config,
+    `demos/${pageId}/index.tsx`,
+    { pageIds: [pageId] },
+  );
+  if (!mutationDecision.allowed) {
+    return { ok: false as const, result: aiMutationDeniedResult(mutationDecision, pageId) };
+  }
   if (!isSafePageId(pageId)) {
     return {
       ok: false as const,
@@ -481,6 +492,14 @@ async function deletePageBatch(
   workingDir: string,
   pageIds: string[],
 ) {
+  const mutationDecision = assertAiMutationAllowed(
+    config,
+    "demos",
+    { pageIds },
+  );
+  if (!mutationDecision.allowed) {
+    return { ok: false as const, result: aiMutationDeniedResult(mutationDecision, pageIds.join(",")) };
+  }
   const tree = readWorkspaceTree(workingDir);
   const pages = listPages(workingDir);
   const byId = new Map(pages.map((page) => [page.id, page]));
@@ -800,7 +819,7 @@ export function createExecuteDeletePagePlanTool(
     description:
       "Execute a page deletion plan returned by previewDeletePages. Never pass page IDs directly to this tool.",
     parameters: ExecuteDeletePagePlanParams,
-    execute: async (toolCallId: string, args: ExecuteDeletePagePlanParams) => {
+    execute: async (toolCallId: string, args: ExecuteDeletePagePlanParams, signal?: AbortSignal) => {
       const workingDir = getWorkingDir(config);
       if (!workingDir) {
         return {
@@ -874,11 +893,14 @@ export function createExecuteDeletePagePlanTool(
         }
 
         if (permissionHandler) {
-          const approved = await permissionHandler(toolCallId, {
+          const permissionRequest = {
             title: `删除 ${plan.pages.length} 个页面`,
             summary: plan.confirmationSummary,
             planId: plan.planId,
-          });
+          };
+          const approved = signal
+            ? await permissionHandler(toolCallId, permissionRequest, signal)
+            : await permissionHandler(toolCallId, permissionRequest);
           if (!approved) {
             return {
               content: [
@@ -942,7 +964,7 @@ export function createDeletePageTool(
     description:
       "Delete exactly one existing page by exact ID from listPages. Do not use this for batch/all/multiple page deletion; use deletePages instead.",
     parameters: DeletePageParams,
-    execute: async (toolCallId: string, args: DeletePageParams) => {
+    execute: async (toolCallId: string, args: DeletePageParams, signal?: AbortSignal) => {
       const workingDir = getWorkingDir(config);
       if (!workingDir) {
         return {
@@ -965,9 +987,12 @@ export function createDeletePageTool(
         }
 
         if (permissionHandler) {
-          const approved = await permissionHandler(toolCallId, {
+          const permissionRequest = {
             title: `删除页面: ${page.name} (${page.id})`,
-          });
+          };
+          const approved = signal
+            ? await permissionHandler(toolCallId, permissionRequest, signal)
+            : await permissionHandler(toolCallId, permissionRequest);
           if (!approved) {
             return {
               content: [
@@ -1025,7 +1050,7 @@ export function createDeletePagesTool(
     description:
       'Delete multiple existing pages by exact pageIds from listPages. Use this for any batch/all/multiple deletion request, including "delete all copy pages". This asks for confirmation once.',
     parameters: DeletePagesParams,
-    execute: async (toolCallId: string, args: DeletePagesParams) => {
+    execute: async (toolCallId: string, args: DeletePagesParams, signal?: AbortSignal) => {
       const workingDir = getWorkingDir(config);
       if (!workingDir) {
         return {
@@ -1065,10 +1090,13 @@ export function createDeletePagesTool(
           })
           .join(", ");
         if (permissionHandler) {
-          const approved = await permissionHandler(toolCallId, {
+          const permissionRequest = {
             title: `删除 ${requestedIds.length} 个页面`,
             summary: confirmLabel,
-          });
+          };
+          const approved = signal
+            ? await permissionHandler(toolCallId, permissionRequest, signal)
+            : await permissionHandler(toolCallId, permissionRequest);
           if (!approved) {
             return {
               content: [

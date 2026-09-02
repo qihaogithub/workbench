@@ -35,12 +35,16 @@ export interface FieldConfig {
   visibleWhen?: VisibleWhenCondition;
   note?: string;
   itemsType?: string;
+  itemsFormat?: string;
+  itemsUiWidget?: string;
   children?: FieldConfig[];
   oneOf?: OneOfConfig;
   multiple?: boolean;
   options?: CascadeOption[];
   positionable?: { key?: string; size?: { width: number; height: number } };
 }
+
+import { isAtomicConfigField } from "@workbench/shared";
 
 export interface FieldGroup {
   title: string;
@@ -105,7 +109,7 @@ export function flattenSchema(parsed: Record<string, unknown>): Record<string, u
 
     if (
       propObj.type === "object" &&
-      propObj.format !== "video" &&
+      !isAtomicConfigField(propObj) &&
       isPlainRecord(propObj.properties) &&
       !hasPositionable(propObj)
     ) {
@@ -192,6 +196,12 @@ function parseProperties(
             ?.note as string | undefined
         : undefined,
       itemsType: (prop.items as Record<string, unknown>)?.type as
+        | string
+        | undefined,
+      itemsFormat: (prop.items as Record<string, unknown>)?.format as
+        | string
+        | undefined,
+      itemsUiWidget: (prop.items as Record<string, unknown>)?.["ui:widget"] as
         | string
         | undefined,
     };
@@ -349,6 +359,12 @@ title: typeof prop.title === "string" ? prop.title : formatFieldName(key),
                 | undefined
             : undefined,
           itemsType: (prop.items as Record<string, unknown>)?.type as
+            | string
+            | undefined,
+          itemsFormat: (prop.items as Record<string, unknown>)?.format as
+            | string
+            | undefined,
+          itemsUiWidget: (prop.items as Record<string, unknown>)?.["ui:widget"] as
             | string
             | undefined,
         };

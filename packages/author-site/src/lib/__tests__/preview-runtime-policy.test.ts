@@ -239,6 +239,9 @@ describe("AI 页面预览运行时策略", () => {
     expect(html).toContain(
       '"@esotericsoftware/spine-webgl": "/preview-runtime/vendor/spine-webgl.js"',
     );
+    expect(html).toContain(
+      '"@esotericsoftware/spine-webgl-42": "/preview-runtime/vendor/spine-webgl-42.js"',
+    );
   });
 
   it("CDN 回退模式包含 lottie 和 rive 映射，不包含 spine", () => {
@@ -259,6 +262,12 @@ describe("AI 页面预览运行时策略", () => {
     expect(previewSdk).toContain('import("lottie-web")');
     expect(previewSdk).toContain('import("@rive-app/canvas")');
     expect(previewSdk).toContain('import("@esotericsoftware/spine-webgl")');
+    expect(previewSdk).toContain('import("@esotericsoftware/spine-webgl-42")');
+    expect(previewSdk).toContain("const { src, animation, loop = true, audioEnabled = true");
+    expect(previewSdk).toContain("window.__WORKBENCH_SPINE_ASSET_BASE__");
+    expect(previewSdk).toContain("SpinePlayer src 必须是 SpineAssetRefV1");
+    expect(previewSdk).not.toContain("var skeleton = props.skeleton");
+    expect(previewSdk).not.toContain("skeleton && atlas && texture");
   });
 
   it("发布产物挂载时包含动画运行时映射", () => {

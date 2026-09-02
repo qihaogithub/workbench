@@ -126,6 +126,48 @@ describe("ProjectAdminService", () => {
     expect(list.data?.map((project) => project.id)).toEqual([created.data?.id]);
   });
 
+  it("项目列表、详情和 project.json 投影统一读取 workspace tree", () => {
+    const created = service.createProject({ name: "投影一致性项目" });
+    const projectId = created.data?.id ?? "";
+    const workspacePath = path.join(tempDir, "projects", projectId, "workspace");
+    const pageIds = ["page-a", "page-b", "page-c"];
+    for (const pageId of pageIds) {
+      const pageDir = path.join(workspacePath, "demos", pageId);
+      fs.mkdirSync(pageDir, { recursive: true });
+      fs.writeFileSync(path.join(pageDir, "index.tsx"), "// page", "utf-8");
+      fs.writeFileSync(path.join(pageDir, "config.schema.json"), "{}", "utf-8");
+    }
+    fs.writeFileSync(
+      path.join(workspacePath, "workspace-tree.json"),
+      JSON.stringify({
+        folders: [],
+        pages: pageIds.map((id, order) => ({
+          id,
+          name: id,
+          order,
+          parentId: null,
+          runtimeType: "high-fidelity-react",
+        })),
+      }),
+      "utf-8",
+    );
+
+    const projectJsonPath = path.join(tempDir, "projects", projectId, "project.json");
+    const staleMeta = JSON.parse(fs.readFileSync(projectJsonPath, "utf-8"));
+    staleMeta.demoPages = [{ id: "stale", name: "旧页面", order: 0, parentId: null }];
+    fs.writeFileSync(projectJsonPath, JSON.stringify(staleMeta), "utf-8");
+
+    const listed = service.listProjects().data?.find((item) => item.id === projectId);
+    expect(listed?.demoPages?.map((page) => page.id)).toEqual(pageIds);
+    expect(service.getProject(projectId).data?.pages.map((page) => page.id)).toEqual(pageIds);
+
+    service.updateProject({ projectId, name: "投影一致性项目（已写回）" });
+    const persisted = JSON.parse(fs.readFileSync(projectJsonPath, "utf-8")) as {
+      demoPages?: Array<{ id: string }>;
+    };
+    expect(persisted.demoPages?.map((page) => page.id)).toEqual(pageIds);
+  });
+
   it("保存并返回项目级手绘编辑引擎偏好", () => {
     const created = service.createProject({ name: "手绘偏好项目" });
     const projectId = created.data?.id ?? "";
@@ -572,6 +614,23 @@ describe("ProjectAdminService", () => {
       workspaceRevision: 41,
       workspaceRootHash: "version-root-hash",
     });
+  });
+
+  it("为已删除知识文档创建不可物化的 tombstone 版本", () => {
+    const created = service.createProject({ name: "知识删除 tombstone 项目" });
+    const projectId = created.data?.id ?? "";
+    const item = {
+      id: "kb_deleted", title: "已删除文档", source: "user" as const, description: "删除前快照",
+      fileName: "deleted.md", addedAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    const tombstone = service.resourceVersionCreateKnowledgeTombstone({
+      projectId, resourceId: item.id, item, content: "# 删除前正文\n",
+      workspaceId: "live-delete", workspaceRevision: 52, workspaceRootHash: "delete-root",
+    });
+    expect(tombstone.ok).toBe(true);
+    const version = service.resourceVersionGet({ projectId, kind: "knowledge_document", resourceId: item.id, versionId: tombstone.data!.id });
+    expect(version.data?.version.metadata).toMatchObject({ tombstone: true, item: { id: item.id } });
+    expect(service.projectCommitList(projectId).data?.commits[0]?.audit).toMatchObject({ workspaceId: "live-delete", workspaceRevision: 52 });
   });
 
   it("恢复页面资源版本时记录 restore snapshot 和 commit 的 workspace proof", () => {

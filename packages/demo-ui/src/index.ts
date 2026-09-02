@@ -52,6 +52,7 @@ export type {
   PositionItem,
   PositionableSizeItem,
   PositionEditMode,
+  PositionEditTarget,
   PositionEditBoundary,
   PositionEditBoundaryAbsolute,
   PositionEditBoundaryPadding,
@@ -97,6 +98,7 @@ export {
   getConfigFieldCategory,
   getSchemaConfigCategories,
   getSchemaFieldCountByCategory,
+  getSchemaFieldCountByBindings,
   orderConfigCategories,
 } from "./config-categories";
 export {
@@ -223,10 +225,18 @@ export { DocumentEditor } from "./DocumentEditor";
 export type {
   DocumentEditorProps,
   DocumentUploadHandler,
+  MarkdownReferenceContext,
+  MarkdownReferenceProvider,
+  MarkdownReferenceClickHandler,
 } from "./DocumentEditor";
 export { RichTextEditor } from "./RichTextEditor";
 export { customWidgets, ColorPickerWidget, FileUploadWidget } from "./widgets";
-export type { FileUploadWidgetOptions, FileUploadWidgetProps, VideoValue } from "./widgets";
+export type {
+  FileUploadWidgetOptions,
+  FileUploadWidgetProps,
+  SpineBundle,
+  VideoValue,
+} from "./widgets";
 export { ImageInputActions } from "./ImageInputActions";
 export type { ImageInputActionsProps } from "./ImageInputActions";
 export { ImageListWidget } from "./ImageListWidget";
@@ -243,20 +253,28 @@ export {
   CommentSidebar,
   CommentPanel,
   DocumentCommentPanel,
+  CommentUnreadDot,
   useComments,
   threadMentionsUser,
+  countUnresolvedCommentThreads,
+  countUnresolvedCommentThreadsByPage,
+  filterCommentThreadsByTarget,
+  filterPageCommentThreads,
 } from "./comment";
 export type {
   CommentApiAdapter,
   CommentFilter,
   CommentLayerProps,
+  CanvasCommentDraft,
   CreateCommentInput,
   AddReplyInput,
   UpdateCommentContentInput,
   IframeViewState,
   MentionCandidate,
   CommentPanelProps,
+  CommentPageMeta,
   DocumentCommentPanelProps,
+  CommentUnreadDotProps,
 } from "./comment";
 export { PreviewCanvas } from "./PreviewCanvas";
 export { CanvasViewport } from "./CanvasViewport";

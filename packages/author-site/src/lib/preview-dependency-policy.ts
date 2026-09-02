@@ -36,7 +36,8 @@ const ESM_SH_BASE = getCdnBaseUrl();
 
 function getPolicyPackageName(moduleName: string): string {
   if (moduleName === "react" || moduleName.startsWith("react/")) return "react";
-  if (moduleName === "react-dom" || moduleName.startsWith("react-dom/")) return "react-dom";
+  if (moduleName === "react-dom" || moduleName.startsWith("react-dom/"))
+    return "react-dom";
   return moduleName;
 }
 
@@ -51,7 +52,8 @@ function buildCdnPackageUrl(packageName: string): string {
         severity: "error",
         moduleName: packageName,
         message: `预览运行时未登记依赖 ${packageName}`,
-        instruction: "请改用 @preview/sdk 暴露的受控能力，或由开发团队先将该依赖加入 previewDependencyPolicy。",
+        instruction:
+          "请改用 @preview/sdk 暴露的受控能力，或由开发团队先将该依赖加入 previewDependencyPolicy。",
       },
     ]);
   }
@@ -93,7 +95,9 @@ function buildLocalPackageUrl(
   return null;
 }
 
-function createPreviewSdkSource(options: PreviewRuntimeResolveOptions = {}): string {
+function createPreviewSdkSource(
+  options: PreviewRuntimeResolveOptions = {},
+): string {
   const reactUrl = getPreviewDependencyUrl("react", options);
   const lucideUrl = getPreviewDependencyUrl("lucide-react", options);
   const svgaUrl = getPreviewDependencyUrl("svgaplayerweb", options);
@@ -544,12 +548,21 @@ export function RivePlayer(props) {
 }
 
 export function SpinePlayer(props) {
-  const { skeleton, atlas, texture, animation, loop = true, fallback, onError, className, style, ...rest } = props || {};
+  const { src, animation, loop = true, audioEnabled = true, fallback, onError, className, style, ...rest } = props || {};
   const containerRef = React.useRef(null);
   const canvasRef = React.useRef(null);
   const [failed, setFailed] = React.useState(false);
-  const hasSrc = !!(skeleton && atlas && texture);
-  const isBinary = !!skeleton && (/\.skel(\.bytes)?$/.test(skeleton) || skeleton.indexOf('.skel') !== -1);
+  const [hasAudio, setHasAudio] = React.useState(false);
+  const [audioMuted, setAudioMuted] = React.useState(!audioEnabled);
+  const audioMutedRef = React.useRef(!audioEnabled);
+  const unlockAudioRef = React.useRef(() => {});
+  const hasSrc = !!src;
+
+  React.useEffect(() => {
+    const muted = !audioEnabled;
+    audioMutedRef.current = muted;
+    setAudioMuted(muted);
+  }, [audioEnabled]);
 
   React.useEffect(() => {
     const container = containerRef.current;
@@ -560,11 +573,30 @@ export function SpinePlayer(props) {
     let sceneRenderer = null;
     let skeletonObj = null;
     let state = null;
+    let physicsMode = null;
     let animFrame = null;
     let lastTime = 0;
     let assetManager = null;
+    let audioContext = null;
+    let audioUnlocked = false;
+    let audioGestureObserved = false;
+    const audioBufferCache = new Map();
+    const activeAudioSources = new Set();
     container.innerHTML = '';
     setFailed(false);
+
+    function fail(stage, error) {
+      if (disposed) return;
+      let message = 'Unknown Spine runtime error';
+      if (error instanceof Error) message = error.message;
+      else if (typeof error === 'string') message = error;
+      else {
+        try { message = JSON.stringify(error); } catch (ignored) { message = String(error); }
+      }
+      console.error('[SpinePlayer]', stage, message);
+      setFailed(true);
+      if (onError) onError(error instanceof Error ? error : new Error(message));
+    }
 
     const canvas = document.createElement('canvas');
     canvas.style.width = '100%';
@@ -572,6 +604,47 @@ export function SpinePlayer(props) {
     canvas.style.display = 'block';
     container.appendChild(canvas);
     canvasRef.current = canvas;
+
+    function unlockAudio() {
+      audioGestureObserved = true;
+      if (!audioEnabled || !audioContext || audioUnlocked) return;
+      audioContext.resume().then(() => { audioUnlocked = audioContext.state === 'running'; }).catch(() => {});
+    }
+    unlockAudioRef.current = unlockAudio;
+    const unlockEvents = ['pointerdown', 'touchstart', 'keydown'];
+    unlockEvents.forEach((eventName) => window.addEventListener(eventName, unlockAudio, { passive: true }));
+
+    function normalizedAudioKey(value) {
+      return String(value || '').replaceAll('\\\\', '/').replace(/^\.\//, '').toLowerCase();
+    }
+    function resolveAudio(asset, audioPath) {
+      const requested = normalizedAudioKey(audioPath);
+      const files = Array.isArray(asset.manifest.audio) ? asset.manifest.audio : (asset.manifest.files || [])
+        .filter((file) => /\.(mp3|ogg|wav|m4a)$/i.test(file.path))
+        .map((file) => ({ ...file, keys: [file.path, './' + file.path, file.path.replace(/\.(mp3|ogg|wav|m4a)$/i, ''), file.path.split('/').pop(), file.path.split('/').pop().replace(/\.(mp3|ogg|wav|m4a)$/i, '')] }));
+      return files.find((file) => (file.keys || []).some((key) => normalizedAudioKey(key) === requested)) || null;
+    }
+    function playAudio(asset, audioPath) {
+      if (!audioEnabled || audioMutedRef.current || !audioUnlocked || !audioContext || !audioPath) return;
+      const audio = resolveAudio(asset, audioPath);
+      if (!audio) return;
+      const url = asset.base + audio.path;
+      const load = audioBufferCache.get(url) || fetch(url, { credentials: 'same-origin' })
+        .then((response) => { if (!response.ok) throw new Error('Spine audio unavailable'); return response.arrayBuffer(); })
+        .then((data) => audioContext.decodeAudioData(data.slice(0)));
+      audioBufferCache.set(url, load);
+      load.then((buffer) => {
+        if (disposed || audioMutedRef.current || !audioUnlocked || !audioContext) return;
+        const source = audioContext.createBufferSource();
+        const gain = audioContext.createGain();
+        source.buffer = buffer;
+        gain.gain.value = 1;
+        source.connect(gain).connect(audioContext.destination);
+        activeAudioSources.add(source);
+        source.onended = () => activeAudioSources.delete(source);
+        source.start(0);
+      }).catch(() => {});
+    }
 
     function render() {
       if (!gl || !sceneRenderer || !skeletonObj || !state) return;
@@ -586,7 +659,7 @@ export function SpinePlayer(props) {
       if (delta > 0 && delta < 1) {
         state.update(delta);
         state.apply(skeletonObj);
-        skeletonObj.updateWorldTransform(delta);
+        skeletonObj.updateWorldTransform(physicsMode);
       }
       sceneRenderer.begin();
       sceneRenderer.drawSkeleton(skeletonObj);
@@ -599,14 +672,14 @@ export function SpinePlayer(props) {
       return is42 ? import('@esotericsoftware/spine-webgl-42') : import('@esotericsoftware/spine-webgl');
     }
 
-    function sniffVersion(buf) {
+    function sniffVersion(buf, binary) {
       try {
         const bytes = new Uint8Array(buf);
-        if (isBinary && bytes.length > 9) {
+        if (binary && bytes.length > 9) {
           const len = bytes[8];
           if (len > 0 && len < 64) return new TextDecoder().decode(bytes.subarray(9, 9 + len));
         }
-        if (!isBinary && buf.byteLength > 0) {
+        if (!binary && buf.byteLength > 0) {
           const obj = JSON.parse(new TextDecoder().decode(buf));
           if (obj && obj.skeleton && typeof obj.skeleton.spine === 'string') return obj.skeleton.spine;
         }
@@ -614,79 +687,95 @@ export function SpinePlayer(props) {
       return null;
     }
 
-    function onLoaded(Spine, rawSkeleton) {
+    function onLoaded(Spine, rawSkeleton, asset, binary) {
       if (disposed || !gl) return;
       try {
-        const atlasData = assetManager.get(atlas);
+        const atlasData = assetManager.get(asset.atlas);
         const loader = new Spine.AtlasAttachmentLoader(atlasData);
-        const skeletonData = isBinary
+        const skeletonData = binary
           ? new Spine.SkeletonBinary(loader).readSkeletonData(rawSkeleton)
           : new Spine.SkeletonJson(loader).readSkeletonData(new TextDecoder().decode(rawSkeleton));
         skeletonObj = new Spine.Skeleton(skeletonData);
+        physicsMode = Spine.Physics.update;
         const stateData = new Spine.AnimationStateData(skeletonData);
         state = new Spine.AnimationState(stateData);
+        const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+        if (audioEnabled && AudioContextCtor) {
+          audioContext = new AudioContextCtor();
+          if (audioGestureObserved) unlockAudio();
+          state.addListener({ event: (_entry, event) => playAudio(asset, event && event.data && event.data.audioPath) });
+          setHasAudio(Array.isArray(asset.manifest.audio) ? asset.manifest.audio.length > 0 : (asset.manifest.files || []).some((file) => /\.(mp3|ogg|wav|m4a)$/i.test(file.path)));
+        }
         if (animation && skeletonData.findAnimation(animation)) state.setAnimation(0, animation, loop);
         else if (skeletonData.animations && skeletonData.animations.length > 0) state.setAnimation(0, skeletonData.animations[0].name, loop);
         sceneRenderer = new Spine.SceneRenderer(canvas, gl, false);
         lastTime = 0;
         render();
       } catch (e) {
-        if (!disposed) { setFailed(true); if (onError) onError(e); }
+        fail('skeleton-parse', e);
       }
     }
 
-    function setup(Spine, rawSkeleton) {
+    function setup(Spine, rawSkeleton, asset, binary) {
       if (disposed) return;
       try {
         gl = canvas.getContext('webgl', { alpha: true }) || canvas.getContext('experimental-webgl', { alpha: true });
         if (!gl) throw new Error('WebGL not available');
         assetManager = new Spine.AssetManager(gl);
-        assetManager.loadTextureAtlas(atlas);
-        function schedule() {
-          if (assetManager.isLoadingComplete()) onLoaded(Spine, rawSkeleton);
-          else {
-            const check = setInterval(() => {
-              if (assetManager.isLoadingComplete()) {
-                clearInterval(check);
-                onLoaded(Spine, rawSkeleton);
-              }
-            }, 50);
-          }
-        }
-        assetManager.loadAll();
-        schedule();
+        assetManager.loadTextureAtlas(asset.atlas);
+        assetManager.loadAll()
+          .then(() => onLoaded(Spine, rawSkeleton, asset, binary))
+          .catch((e) => fail('atlas-or-texture-load', e));
       } catch (e) {
-        if (!disposed) { setFailed(true); if (onError) onError(e); }
+        fail('webgl-setup', e);
       }
     }
 
-    fetch(skeleton, { credentials: 'same-origin' })
-      .then((response) => response.arrayBuffer())
-      .then((buf) => {
+    let cancelled = false;
+    const loadAsset = src && src.kind === 'spine' && src.version === 1 && src.assetId
+      ? fetch(((typeof window !== 'undefined' && window.__WORKBENCH_SPINE_ASSET_BASE__) || '/assets/animations') + '/' + encodeURIComponent(src.assetId) + '/manifest.json', { credentials: 'same-origin' }).then((r) => { if (!r.ok) throw new Error('Spine manifest unavailable'); return r.json(); }).then((manifest) => ({ manifest, skeleton: manifest.skeleton, atlas: manifest.atlas, textures: manifest.textures || [] }))
+      : Promise.reject(new Error('SpinePlayer src 必须是 SpineAssetRefV1'));
+    loadAsset.then((asset) => {
+      if (cancelled || !asset) return;
+      const base = asset.manifest.assetId ? (((typeof window !== 'undefined' && window.__WORKBENCH_SPINE_ASSET_BASE__) || '/assets/animations') + '/' + encodeURIComponent(asset.manifest.assetId) + '/') : '';
+      const resolvedAsset = { ...asset, base, skeleton: asset.skeleton.startsWith('/') || asset.skeleton.startsWith('http') ? asset.skeleton : base + asset.skeleton, atlas: asset.atlas.startsWith('/') || asset.atlas.startsWith('http') ? asset.atlas : base + asset.atlas };
+      return fetch(resolvedAsset.skeleton, { credentials: 'same-origin' }).then((response) => { if (!response.ok) throw new Error('Spine skeleton unavailable'); return response.arrayBuffer(); }).then((buf) => {
         if (disposed) return;
-        return importRuntime(sniffVersion(buf)).then((mod) => setup(mod, buf)).catch((e) => {
-          if (!disposed) { setFailed(true); if (onError) onError(e); }
-        });
-      })
-      .catch((e) => {
-        if (!disposed) { setFailed(true); if (onError) onError(e); }
+        const binary = /\.skel(\.bytes)?$/i.test(resolvedAsset.skeleton);
+        return importRuntime(asset.manifest.spineVersion || sniffVersion(buf, binary))
+          .then((mod) => setup(mod, buf, resolvedAsset, binary))
+          .catch((e) => fail('runtime-import', e));
       });
-
+    })
+    .catch((e) => fail('manifest-or-skeleton-load', e));
     return () => {
       disposed = true;
+      cancelled = true;
+      unlockAudioRef.current = () => {};
+      unlockEvents.forEach((eventName) => window.removeEventListener(eventName, unlockAudio));
       if (animFrame) cancelAnimationFrame(animFrame);
+      activeAudioSources.forEach((source) => { try { source.stop(); } catch (e) {} });
+      if (audioContext) audioContext.close().catch(() => {});
       if (gl) {
         const ext = gl.getExtension('WEBGL_lose_context');
         if (ext) ext.loseContext();
       }
       if (containerRef.current) containerRef.current.innerHTML = '';
     };
-  }, [skeleton, atlas, texture, animation, loop, hasSrc, isBinary, onError]);
+  }, [src, animation, loop, audioEnabled, hasSrc, onError]);
 
   if (!hasSrc || failed) {
     return fallback ? React.createElement('div', { className: cx('flex items-center justify-center overflow-hidden', className), style, ...rest }, fallback) : null;
   }
-  return React.createElement('div', { ref: containerRef, className: cx('overflow-hidden', className), style, ...rest });
+  return React.createElement('div', { className: cx('relative overflow-hidden', className), style, ...rest },
+    React.createElement('div', { ref: containerRef, className: 'h-full w-full' }),
+    hasAudio ? React.createElement('button', {
+      type: 'button',
+      className: 'absolute right-2 top-2 rounded-full bg-black/45 px-2 py-1 text-xs text-white transition hover:bg-black/65',
+      'aria-label': audioMuted ? '开启 Spine 音效' : '静音 Spine 音效',
+      onClick: () => { const next = !audioMutedRef.current; audioMutedRef.current = next; setAudioMuted(next); if (!next) unlockAudioRef.current(); },
+    }, audioMuted ? '🔇' : '🔊') : null,
+  );
 }
 
 export function MediaViz(props) {

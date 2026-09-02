@@ -16,6 +16,10 @@ export const AI_STATUS_LABEL: Record<
     text: "执行中",
     className: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
   },
+  awaiting_approval: {
+    text: "待审核",
+    className: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
+  },
   done: {
     text: "已完成",
     className: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",

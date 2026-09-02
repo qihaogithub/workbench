@@ -4,6 +4,11 @@ import path from "node:path";
 
 import { buildPageDesignSpecSyncWrites } from "@workbench/project-core/page-design-spec-sync";
 import { normalizeHtmlImport } from "@workbench/project-core/html-import";
+import { classifyManagedDocumentPath } from "@workbench/project-core/document-proposal";
+import {
+  createWorkspaceResourceRegistry,
+  normalizeWorkspaceResourcePath,
+} from "@workbench/project-core/workspace-resource-registry";
 
 import type {
   WorkspaceMutationCommittedEvent,
@@ -12,12 +17,6 @@ import type {
   WorkspaceProjectionAck,
   WorkspaceProjectionAcknowledgedEvent,
 } from "@workbench/shared/contracts";
-import {
-  assertManagedWorkspaceTextWrite,
-  isManagedWorkspaceResource,
-  normalizeWorkspaceResourcePath,
-} from "@workbench/shared/contracts";
-
 import { logger } from "../utils/logger";
 
 import {
@@ -28,6 +27,8 @@ import {
 function hashWorkspaceContent(content: string | Buffer): string {
   return crypto.createHash("sha256").update(content).digest("hex");
 }
+
+const workspaceResourceRegistry = createWorkspaceResourceRegistry();
 
 export interface WorkspaceAuthorityState {
   workspaceId: string;
@@ -474,7 +475,7 @@ export class WorkspaceMutationAuthority {
   /** Store untrusted bytes outside the editable Workspace until a subsequent
    * staged mutation validates and commits their exact hash. */
   async stageBinary(projectId: string, workspaceId: string, content: Buffer): Promise<{ stagingId: string; hash: string; size: number }> {
-    if (content.length === 0 || content.length > 20 * 1024 * 1024) {
+    if (content.length === 0 || content.length > 64 * 1024 * 1024) {
       throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
     }
     return this.serial(workspaceId, async () => this.withLease(workspaceId, async () => {
@@ -498,11 +499,17 @@ export class WorkspaceMutationAuthority {
       operationCount: request.operations.length,
     });
     try {
-      if (request.actor !== "collab") {
+      // Approved document proposals must flush their affected collaborative
+      // drafts only after acquiring the Authority critical section; otherwise
+      // a draft can change between an outside-the-lock flush and CAS.
+      if (request.actor !== "collab" && request.reason !== "document_proposal_apply") {
         await this.flushDraftsForMutation(request);
       }
       const queuedAt = Date.now();
       return await this.serial(request.workspaceId, async () => this.withLease(request.workspaceId, async () => {
+        if (request.reason === "document_proposal_apply") {
+          await this.flushDraftsForMutation(request);
+        }
         const queueWaitMs = Date.now() - queuedAt;
         let state = this.ensureBootstrap(request.projectId, request.workspaceId);
         if (state.projectId !== request.projectId) throw new WorkspaceMutationAuthorityError("WORKSPACE_NOT_FOUND");
@@ -532,6 +539,7 @@ export class WorkspaceMutationAuthority {
 
         const workspacePath = this.workspacePath(request.workspaceId);
         request = this.expandHtmlImportCommand(request, workspacePath);
+        request = this.expandConfigValuesPatchCommands(request, workspacePath);
         request = this.withPageDesignSpecSync(request, workspacePath);
         const actual = this.readResourceHashes(workspacePath);
         if (this.rootHash(actual) !== state.rootHash) {
@@ -652,10 +660,12 @@ export class WorkspaceMutationAuthority {
             actor: request.actor,
             resourcePaths,
             errorCode,
+            ...(error instanceof WorkspaceMutationAuthorityError ? error.details : {}),
             outcome: conflicted ? undefined : "rejected_before_prepare",
             durationMs: Date.now() - startedAt,
           },
         );
+        this.removeStagedBinaries(request);
         if (errorCode === "WORKSPACE_EXTERNAL_DRIFT") {
           this.recordMutationDiagnostic(request, "workspace.external_drift_detected", "error", {
             mutationId: request.mutationId,
@@ -670,6 +680,33 @@ export class WorkspaceMutationAuthority {
       }
       throw error;
     }
+  }
+
+  /**
+   * The sole Workspace write entry point for an already-approved document
+   * proposal. Unlike ordinary Yjs-first mutations, this preserves per-file
+   * preconditions and validates them while the Authority owns its workspace
+   * lease. Callers must compile operations from a frozen server-side proposal;
+   * this API intentionally accepts no client supplied proposal payload.
+   */
+  async commitDocumentProposal(request: WorkspaceMutationRequest): Promise<WorkspaceMutationReceipt> {
+    const paths = this.mutationResourcePaths(request);
+    const documentPaths = paths.filter((resourcePath) => classifyManagedDocumentPath(resourcePath));
+    if (documentPaths.length === 0 || paths.some((resourcePath) => (
+      resourcePath !== "knowledge/manifest.json" && !classifyManagedDocumentPath(resourcePath)
+    ))) {
+      throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+    }
+    for (const operation of request.operations) {
+      if (operation.type === "move_path" || operation.type === "commit_html_import" || operation.type === "patch_config_values") {
+        throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+      }
+      if (operation.type === "delete_path") continue;
+      if (!operation.expectedAbsent && !operation.expectedHash) {
+        throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+      }
+    }
+    return this.mutate({ ...request, reason: "document_proposal_apply" });
   }
 
   private mutationResourcePaths(request: WorkspaceMutationRequest): string[] {
@@ -888,6 +925,63 @@ export class WorkspaceMutationAuthority {
     return { ...request, operations };
   }
 
+  private expandConfigValuesPatchCommands(
+    request: WorkspaceMutationRequest,
+    workspacePath: string,
+  ): WorkspaceMutationRequest {
+    const commands = request.operations.filter(
+      (operation): operation is Extract<typeof operation, { type: "patch_config_values" }> =>
+        operation.type === "patch_config_values",
+    );
+    if (commands.length === 0) return request;
+
+    const seenPaths = new Set<string>();
+    return {
+      ...request,
+      operations: request.operations.map((operation) => {
+        if (operation.type !== "patch_config_values") return operation;
+        const normalized = normalizeWorkspaceResourcePath(operation.path);
+        const isConfigValuesPath = normalized === "project.config.values.json"
+          || Boolean(normalized && /^demos\/[^/]+\/config\.values\.json$/.test(normalized));
+        const patch = operation.patch;
+        const patchKeys = patch && typeof patch === "object" && !Array.isArray(patch)
+          ? Object.keys(patch)
+          : [];
+        if (
+          !normalized
+          || !isConfigValuesPath
+          || seenPaths.has(normalized)
+          || patchKeys.length === 0
+          || patchKeys.some((key) => !key || ["__proto__", "prototype", "constructor"].includes(key))
+        ) {
+          throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION", "Invalid config values patch", {
+            operationType: operation.type,
+            resourcePath: operation.path,
+          });
+        }
+        seenPaths.add(normalized);
+
+        let current: Record<string, unknown> = {};
+        const targetPath = this.resolve(workspacePath, normalized);
+        if (fs.existsSync(targetPath)) {
+          try {
+            const parsed = JSON.parse(fs.readFileSync(targetPath, "utf8")) as unknown;
+            if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid config values");
+            current = parsed as Record<string, unknown>;
+          } catch {
+            throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION", "Config values file is invalid", {
+              operationType: operation.type,
+              resourcePath: normalized,
+            });
+          }
+        }
+        const content = JSON.stringify({ ...current, ...patch }, null, 2) + "\n";
+        this.assertManagedTextWrite(normalized, content, operation.type);
+        return { type: "put_text" as const, path: normalized, content };
+      }),
+    };
+  }
+
   private prepare(request: WorkspaceMutationRequest, payloadHash: string, state: WorkspaceAuthorityState, workspacePath: string): PreparedMutation {
     if (!request.mutationId || request.operations.length === 0) throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
     const before: PreparedMutation["before"] = {};
@@ -895,14 +989,18 @@ export class WorkspaceMutationAuthority {
       const paths = operation.type === "move_path" ? [operation.from, operation.to] : [operation.path];
       for (const resourcePath of paths) {
         const normalized = normalizeWorkspaceResourcePath(resourcePath);
-        // Page-level config.values.json is a managed runtime resource alongside its schema.
-        if (!normalized || !isManagedWorkspaceResource(normalized)) throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+        if (!normalized || !workspaceResourceRegistry.describe(normalized)) {
+          throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION", "Workspace resource is not registered", {
+            operationType: operation.type,
+            resourcePath,
+          });
+        }
         if (!(normalized in before)) before[normalized] = this.readResource(workspacePath, normalized);
       }
       if (operation.type === "put_text") {
-        assertManagedWorkspaceTextWrite(operation.path, operation.content);
+        this.assertManagedTextWrite(operation.path, operation.content, operation.type);
       } else if (operation.type === "put_binary") {
-        if (!operation.path.startsWith("assets/") || !/^[0-9a-f-]{36}$/i.test(operation.stagingId) || operation.size <= 0 || operation.size > 20 * 1024 * 1024) {
+        if (!operation.path.startsWith("assets/") || !/^[0-9a-f-]{36}$/i.test(operation.stagingId) || operation.size <= 0 || operation.size > 64 * 1024 * 1024) {
           throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
         }
         const staged = this.stagingPath(request.workspaceId, operation.stagingId);
@@ -910,6 +1008,14 @@ export class WorkspaceMutationAuthority {
         const content = fs.readFileSync(staged);
         if (content.length !== operation.size || hashWorkspaceContent(content) !== operation.hash) {
           throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+        }
+        try {
+          workspaceResourceRegistry.assertBinaryWrite(operation.path, content);
+        } catch {
+          throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION", "Invalid managed binary resource", {
+            operationType: operation.type,
+            resourcePath: operation.path,
+          });
         }
       } else if (operation.type === "put_staged_text") {
         if (operation.path.startsWith("assets/") || !/^[0-9a-f-]{36}$/i.test(operation.stagingId) || operation.size <= 0 || operation.size > 2 * 1024 * 1024) {
@@ -925,11 +1031,22 @@ export class WorkspaceMutationAuthority {
         if (!Buffer.from(text, "utf8").equals(content)) {
           throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
         }
-        assertManagedWorkspaceTextWrite(operation.path, text);
+        this.assertManagedTextWrite(operation.path, text, operation.type);
       }
-      // Yjs-First: assertExpected() removed for all operation types — Authority no
-      // longer does per-resource hash conflict detection. All writes are routed
-      // through the Yjs room, which handles CRDT merging.
+      // Normal Yjs-first writes merge in the collab room. An approved document
+      // proposal is deliberately different: users approved a frozen snapshot,
+      // so its preconditions are checked inside this serial + lease section.
+      if (request.reason === "document_proposal_apply") {
+        if (operation.type === "move_path" || operation.type === "commit_html_import" || operation.type === "patch_config_values") {
+          throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+        }
+        const current = before[operation.path];
+        if (operation.type === "delete_path") {
+          this.assertExpected(current, operation.expectedHash, false, operation.path);
+        } else {
+          this.assertExpected(current, operation.expectedHash, operation.expectedAbsent, operation.path);
+        }
+      }
     }
     // A stale base is harmless only when every targeted resource still matched.
     if (request.baseRevision > state.revision) throw new WorkspaceMutationAuthorityError("WORKSPACE_RESOURCE_CONFLICT");
@@ -979,6 +1096,11 @@ export class WorkspaceMutationAuthority {
         const content = fs.readFileSync(this.stagingPath(prepared.request.workspaceId, operation.stagingId));
         this.writeTextAtomic(this.resolve(workspacePath, operation.path), content.toString("utf8"));
         changes.push({ path: operation.path, action: before.exists ? "modified" : "created", beforeHash: before.hash, afterHash: operation.hash });
+      } else if (operation.type === "patch_config_values") {
+        throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION", "Unexpanded config values patch", {
+          operationType: operation.type,
+          resourcePath: operation.path,
+        });
       } else if (operation.type === "delete_path") {
         const before = prepared.before[operation.path];
         fs.rmSync(this.resolve(workspacePath, operation.path), { force: true });
@@ -1029,7 +1151,7 @@ export class WorkspaceMutationAuthority {
         if (entry.isDirectory()) walk(fullPath);
         else if (entry.isFile()) {
           const relative = path.relative(workspacePath, fullPath).split(path.sep).join("/");
-          if (isManagedWorkspaceResource(relative)) result[relative] = hashWorkspaceContent(fs.readFileSync(fullPath));
+          if (workspaceResourceRegistry.describe(relative)) result[relative] = hashWorkspaceContent(fs.readFileSync(fullPath));
         }
       }
     };
@@ -1058,6 +1180,17 @@ export class WorkspaceMutationAuthority {
     const normalized = normalizeWorkspaceResourcePath(resourcePath);
     if (!normalized) throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
     return path.resolve(workspacePath, normalized);
+  }
+
+  private assertManagedTextWrite(resourcePath: string, content: string, operationType: string): void {
+    try {
+      workspaceResourceRegistry.assertTextWrite(resourcePath, content);
+    } catch {
+      throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION", "Invalid managed text resource", {
+        operationType,
+        resourcePath,
+      });
+    }
   }
 
   private serial<T>(workspaceId: string, work: () => Promise<T>): Promise<T> {
@@ -1334,6 +1467,8 @@ export function registerCollabDraftProvider(dataDir: string, provider: CollabDra
 /** Returns a live-workspace Authority request context, or null for branch/non-workspace paths. */
 export function resolveLiveWorkspaceMutationContext(workspacePath: string): {
   authority: WorkspaceMutationAuthority;
+  /** Shared durable data root for proposal snapshots and outbox records. */
+  dataDir: string;
   projectId: string;
   workspaceId: string;
 } | null {
@@ -1351,6 +1486,7 @@ export function resolveLiveWorkspaceMutationContext(workspacePath: string): {
     if (path.basename(current) !== "workspaces") return null;
     const dataDir = path.dirname(current);
     return {
+      dataDir,
       projectId,
       workspaceId: meta.workspaceId,
       authority: new WorkspaceMutationAuthority({ dataDir, resolveWorkspacePath: (id) => id === meta.workspaceId ? workspacePath : null }),

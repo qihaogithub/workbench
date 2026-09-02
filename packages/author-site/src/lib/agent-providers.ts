@@ -14,11 +14,52 @@ import {
   getInternalApiToken,
   getServerAgentServiceUrl,
 } from "./runtime-config";
+import type { UserRole } from "./user";
 
 export interface PushResult {
   ok: boolean;
   message: string;
   data?: unknown;
+}
+
+/** 服务端绑定编辑 Session 的 AI 写入授权，角色绝不来自浏览器请求。 */
+export async function pushSessionAuthorizationToAgent(
+  sessionId: string,
+  authorization: {
+    userId: string;
+    role: UserRole;
+    projectId: string;
+    expiresAt: number;
+  },
+): Promise<PushResult> {
+  const internalToken = getInternalApiToken();
+  if (!internalToken) {
+    return { ok: false, message: "INTERNAL_API_TOKEN 未配置，无法推送 Session 授权" };
+  }
+  try {
+    const res = await fetch(
+      `${getServerAgentServiceUrl()}/internal/sessions/${encodeURIComponent(sessionId)}/authorization`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Internal-Token": internalToken,
+        },
+        body: JSON.stringify(authorization),
+      },
+    );
+    const body = await res.json().catch(() => null);
+    if (!res.ok) {
+      return {
+        ok: false,
+        message: body?.error?.message || `agent-service 响应 ${res.status}`,
+        data: body,
+      };
+    }
+    return { ok: true, message: "已推送 Session 授权", data: body?.data };
+  } catch (err) {
+    return { ok: false, message: `推送失败: ${err instanceof Error ? err.message : String(err)}` };
+  }
 }
 
 /**
@@ -316,83 +357,6 @@ export async function disconnectDingtalkAuthOnAgent(userId: string): Promise<Pus
     return {
       ok: false,
       message: `断开钉钉授权失败: ${err instanceof Error ? err.message : String(err)}`,
-    };
-  }
-}
-
-export interface ImageDescriptionConfig {
-  enabled: boolean;
-  visionModelId: string;
-  describePrompt: string;
-  maxCacheSize: number;
-  timeout: number;
-}
-
-export async function pushImageDescriptionConfig(
-  config: Partial<ImageDescriptionConfig>,
-): Promise<PushResult> {
-  const internalToken = getInternalApiToken();
-  if (!internalToken) {
-    return { ok: false, message: "INTERNAL_API_TOKEN 未配置" };
-  }
-
-  try {
-    const res = await fetch(
-      `${getServerAgentServiceUrl()}/internal/image-description`,
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Internal-Token": internalToken,
-        },
-        body: JSON.stringify(config),
-      },
-    );
-
-    const body = await res.json().catch(() => null);
-    if (!res.ok || !body?.success) {
-      return {
-        ok: false,
-        message: body?.error?.message || `agent-service 响应 ${res.status}`,
-        data: body,
-      };
-    }
-    return { ok: true, message: "识图配置已推送到 agent-service", data: body.data };
-  } catch (err) {
-    return {
-      ok: false,
-      message: `推送识图配置失败: ${err instanceof Error ? err.message : String(err)}`,
-    };
-  }
-}
-
-export async function fetchImageDescriptionConfig(): Promise<{
-  ok: boolean;
-  config?: ImageDescriptionConfig;
-  message?: string;
-}> {
-  const internalToken = getInternalApiToken();
-  if (!internalToken) {
-    return { ok: false, message: "INTERNAL_API_TOKEN 未配置" };
-  }
-
-  try {
-    const res = await fetch(
-      `${getServerAgentServiceUrl()}/internal/image-description`,
-      {
-        method: "GET",
-        headers: { "X-Internal-Token": internalToken },
-      },
-    );
-    const body = await res.json().catch(() => null);
-    if (!res.ok || !body?.success) {
-      return { ok: false, message: body?.error?.message || "拉取识图配置失败" };
-    }
-    return { ok: true, config: body.data };
-  } catch (err) {
-    return {
-      ok: false,
-      message: `拉取识图配置失败: ${err instanceof Error ? err.message : String(err)}`,
     };
   }
 }
