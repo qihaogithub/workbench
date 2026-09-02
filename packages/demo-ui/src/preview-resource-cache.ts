@@ -88,6 +88,12 @@ function isLikelyImageUrl(value: string): boolean {
   return IMAGE_EXT_RE.test(value);
 }
 
+function isWorkspaceImagePath(value: string): boolean {
+  return value.startsWith("assets/")
+    && !value.split("/").some((part) => part === "." || part === "..")
+    && IMAGE_EXT_RE.test(value);
+}
+
 export function normalizePreviewImageUrl(
   value: string,
   options: Pick<PreviewResourceInput, "sessionId" | "demoId" | "origin"> = {},
@@ -103,6 +109,10 @@ export function normalizePreviewImageUrl(
   }
 
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
+
+  if (options.sessionId && isWorkspaceImagePath(trimmed)) {
+    return `${origin}/api/sessions/${options.sessionId}/workspace/${trimmed}`;
+  }
 
   const basePath = options.demoId ? `demos/${options.demoId}/` : "";
   if (
