@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useRef, type ReactNode } from "react";
 import {
   SketchEditorCanvas,
   SketchEditorToolbar,
@@ -8,6 +8,7 @@ import {
   SketchPropertyPanel,
   useSketchEditorState,
   type SketchEditorController,
+  type SketchEditorCanvasHandle,
 } from "@workbench/sketch-react";
 import type { SketchSceneDocument } from "@workbench/shared";
 import type { PreviewSize } from "@workbench/demo-ui";
@@ -76,9 +77,14 @@ export function SketchEditorEngineStage({
   previewSize?: PreviewSize;
 }) {
   const host = useSketchEditorEngineContext();
+  const canvasRef = useRef<SketchEditorCanvasHandle>(null);
+  const openImageFilePicker = useCallback(() => {
+    canvasRef.current?.openImageFilePicker();
+  }, []);
   return (
     <div className="relative h-full min-h-0 overflow-hidden">
       <SketchEditorCanvas
+        ref={canvasRef}
         scene={scene}
         controller={host.nativeController}
         configData={configData}
@@ -86,7 +92,7 @@ export function SketchEditorEngineStage({
         fillContainer
       />
       <div className="pointer-events-none absolute inset-x-0 bottom-5 z-20 flex justify-center px-4">
-        <SketchEditorToolbar scene={scene} controller={host.nativeController} className="pointer-events-auto" />
+        <SketchEditorToolbar scene={scene} controller={host.nativeController} onImageUpload={openImageFilePicker} className="pointer-events-auto" />
       </div>
     </div>
   );
@@ -94,8 +100,10 @@ export function SketchEditorEngineStage({
 
 export function SketchEditorEngineToolbar({
   scene,
+  onImageUpload,
 }: {
   scene: SketchSceneDocument;
+  onImageUpload: () => void;
 }) {
   const host = useSketchEditorEngineContext();
   if (host.engine !== "native") return null;
@@ -103,6 +111,7 @@ export function SketchEditorEngineToolbar({
     <SketchEditorToolbar
       scene={scene}
       controller={host.nativeController}
+      onImageUpload={onImageUpload}
     />
   );
 }
