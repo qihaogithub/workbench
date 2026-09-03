@@ -539,13 +539,14 @@ export class ProjectApiClient {
     projectId: string,
     schema: string,
     sessionId: string,
+    contextPageId: string,
   ): Promise<void> {
     const response = await this.localRequest<{
       schema: string;
       exists: boolean;
     }>(`/api/projects/${projectId}/config`, {
       method: "PUT",
-      body: JSON.stringify({ sessionId, schema }),
+      body: JSON.stringify({ sessionId, schema, ...(contextPageId ? { contextPageId } : {}) }),
     });
     if (!response.success) {
       throw new Error(response.error?.message || "更新项目配置失败");
@@ -558,9 +559,12 @@ export class ProjectApiClient {
   async deleteProjectConfig(
     projectId: string,
     sessionId: string,
+    contextPageId: string,
   ): Promise<void> {
+    const query = new URLSearchParams({ sessionId });
+    if (contextPageId) query.set("contextPageId", contextPageId);
     const response = await this.localRequest<{ removed: boolean }>(
-      `/api/projects/${projectId}/config?sessionId=${encodeURIComponent(sessionId)}`,
+      `/api/projects/${projectId}/config?${query.toString()}`,
       { method: "DELETE" },
     );
     if (!response.success) {

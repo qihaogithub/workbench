@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "33fb608c-f133-43bb-8b5a-f1a70a83a3d7",
+  "projectId": "proj_1788403767054_cnw6og",
+  "workspaceId": "live-1788403767118-m77iph2h9",
+  "baseRevision": 0,
+  "revision": 2,
+  "rootHash": "324ce2aab69c42a1ad9daa80d3f9a3eb63a9f9a47e66dc1f4caa9a286a956eec",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_ol7g/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f"
+    },
+    {
+      "path": "demos/page_ol7g/prototype.css",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/page_ol7g/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e1c118a2c54911913d4ffbf47809ce89c404706cd8a6262198c81674f23a3750"
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "b8f84cb18b1d4fb04f8db0fdb7867802b916f6365d4816c8289777a7893570ab",
+      "afterHash": "c2f893e766357ea78803e6bc64bca4f5e67f5c259065c14c84bc67ff6dbefaaf"
+    }
+  ],
+  "committedAt": 1788403800949
+}

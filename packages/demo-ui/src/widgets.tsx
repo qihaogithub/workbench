@@ -69,7 +69,7 @@ async function deleteServerFile(sessionId: string, url: string) {
 }
 
 export function ColorPickerWidget(props: WidgetProps) {
-  const { id, value, onChange, label, required } = props;
+  const { id, value, onChange, label, required, disabled } = props;
 
   return (
     <div className="mb-4">
@@ -81,12 +81,14 @@ export function ColorPickerWidget(props: WidgetProps) {
         <input
           type="color"
           id={id}
+          disabled={disabled}
           value={value || '#000000'}
           onChange={(e) => onChange(e.target.value)}
           className="w-10 h-10 rounded border border-border cursor-pointer"
         />
         <input
           type="text"
+          disabled={disabled}
           value={value || ''}
           onChange={(e) => onChange(e.target.value)}
           placeholder="#000000"
@@ -103,6 +105,8 @@ export interface FileUploadWidgetOptions {
   assetKind?: "spine";
   /** Page field identity lets the server atomically attach a committed Spine ref. */
   pageId?: string;
+  /** Current page context used to authorize project-scoped config patches. */
+  contextPageId?: string;
   configKey?: string;
   configScope?: "page" | "project";
   videoPreviewStyle?: "controls" | "compact" | "cover";
@@ -299,6 +303,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
 
   const doUpload = useCallback(
     async (file: File, skipDimensionCheck = false) => {
+      if (disabled) return;
       setError('');
       if (file.size > maxSize) {
         setError(`文件大小超过 ${maxSize / 1024 / 1024}MB 限制`);
@@ -329,6 +334,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
           if (isSpine) {
             formData.append('assetKind', 'spine');
             if (rawOptions.pageId) formData.append('pageId', rawOptions.pageId);
+            if (rawOptions.contextPageId) formData.append('contextPageId', rawOptions.contextPageId);
             if (rawOptions.configKey) formData.append('configKey', rawOptions.configKey);
             if (rawOptions.configScope) formData.append('configScope', rawOptions.configScope);
           }
@@ -382,10 +388,11 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
         setIsUploading(false);
       }
     },
-    [sessionId, maxSize, hasDimensionCheck, dimensionOptions, value, onChange, isVideo, isAudio, isSpine, rawOptions.pageId, rawOptions.configKey, rawOptions.configScope]
+    [disabled, sessionId, maxSize, hasDimensionCheck, dimensionOptions, value, onChange, isVideo, isAudio, isSpine, rawOptions.pageId, rawOptions.contextPageId, rawOptions.configKey, rawOptions.configScope]
   );
 
   const handlePosterChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (disabled) return;
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file || !sessionId || !isVideo) return;
@@ -404,10 +411,11 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
       const current = typeof value === 'object' && value !== null && 'url' in value ? value as VideoValue : { url: '' };
       onChange({ ...current, poster: uploadedUrl });
     } catch { setError('网络连接失败，请检查网络后重试'); } finally { setIsUploading(false); }
-  }, [sessionId, isVideo, maxSize, value, onChange]);
+  }, [disabled, sessionId, isVideo, maxSize, value, onChange]);
 
   const handleFileSelect = useCallback(
     (file: File) => {
+      if (disabled) return;
       if (isSpine && !/\.zip(?:\.flutter)?$/i.test(file.name)) {
         setError('请选择 Spine 素材包（.zip 或 .zip.flutter）');
         return;
@@ -418,7 +426,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
       }
       doUpload(file);
     },
-    [doUpload, isAudio, isSpine]
+    [disabled, doUpload, isAudio, isSpine]
   );
 
   const handleInputChange = useCallback(
@@ -435,15 +443,17 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
+      if (disabled) return;
       const file = e.dataTransfer.files?.[0];
       if (file) {
         handleFileSelect(file);
       }
     },
-    [handleFileSelect]
+    [disabled, handleFileSelect]
   );
 
   const handleClear = useCallback(async () => {
+    if (disabled) return;
     const defaultVideo = isVideo
       ? (isVideoConfigValue(defaultValue)
         ? defaultValue
@@ -485,7 +495,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
     }
 
     onChange(nextValue);
-  }, [sessionId, value, onChange, defaultValue, isVideo]);
+  }, [disabled, sessionId, value, onChange, defaultValue, isVideo]);
 
   return (
     <div className="space-y-2">
@@ -497,7 +507,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
         disabled={disabled || isUploading}
         className="hidden"
       />
-      {isVideo && <input ref={posterInputRef} type="file" accept="image/*" onChange={handlePosterChange} className="hidden" />}
+      {isVideo && <input ref={posterInputRef} type="file" accept="image/*" onChange={handlePosterChange} disabled={disabled || isUploading} className="hidden" />}
       <div className="flex items-start gap-3">
         {hasValue ? (
           isVideo && isVideoValue(value) ? (
@@ -620,7 +630,9 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
             className={cn(
               'group relative',
               'w-[80px] h-[80px] flex flex-col items-center justify-center gap-1.5 border-2 border-dashed rounded-lg cursor-pointer transition-colors shrink-0',
-              isUploading
+              disabled
+                ? 'cursor-not-allowed border-border bg-muted/30 opacity-70'
+                : isUploading
                 ? 'border-primary bg-primary/5'
                 : 'border-border hover:border-primary/50 hover:bg-muted/50'
             )}

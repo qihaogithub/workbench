@@ -1,6 +1,7 @@
 import {
   mergeConfigToProps,
   mergeConfigWithUserValues,
+  mergeRefreshedConfigValues,
   SchemaConflictError,
 } from "../runtime-props";
 
@@ -174,5 +175,28 @@ describe("mergeConfigWithUserValues", () => {
     // 用户未修改（与旧默认值相同）
     const result = mergeConfigWithUserValues(currentConfig, newSchema, oldSchema);
     expect(result).toEqual({ title: "New Default" });
+  });
+});
+
+describe("mergeRefreshedConfigValues", () => {
+  it("Authority 有页面配置值时不让旧结构覆盖新结构", () => {
+    const refreshed = {
+      modules: [{ type: "level", levels: [{ position: { x: 14, y: 1 } }] }],
+    };
+    const previous = {
+      modules: [{ type: "level", levels: [{ x: 28, y: 2 }] }],
+    };
+
+    expect(mergeRefreshedConfigValues(refreshed, previous, true)).toEqual(refreshed);
+  });
+
+  it("没有页面配置值时仍保留现有用户值", () => {
+    const refreshed = { title: "默认标题" };
+    const previous = { title: "用户标题" };
+
+    expect(mergeRefreshedConfigValues(refreshed, previous, false)).toEqual({
+      ...refreshed,
+      ...previous,
+    });
   });
 });

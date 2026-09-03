@@ -80,7 +80,17 @@ export interface DocumentCommentTarget {
   resourceLabel: string;
 }
 
-export type CommentTarget = PageCommentTarget | DocumentCommentTarget;
+/** 配置项评论目标。字段 key 是稳定身份，标题仅为创建时的展示快照。 */
+export interface ConfigCommentTarget {
+  kind: "config";
+  scope: "project" | "page";
+  /** 页面级配置项必填；项目级配置项不应传入。 */
+  pageId?: string;
+  fieldKey: string;
+  fieldTitleSnapshot?: string;
+}
+
+export type CommentTarget = PageCommentTarget | DocumentCommentTarget | ConfigCommentTarget;
 
 /** 文档选区锚点。prefix/suffix 用于正文改动后的重新定位。 */
 export interface DocumentCommentAnchor {

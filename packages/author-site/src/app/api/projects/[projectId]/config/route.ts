@@ -14,6 +14,7 @@ import {
   getSessionMeta,
   sessionExists,
   isSessionExpired,
+  readDemoPageMeta,
   findWorkspacePath,
   listDemoPages,
   getDemoDirPath,
@@ -61,6 +62,7 @@ export async function GET(
 interface SessionContext {
   workspaceId: string;
   workspacePath: string;
+  userRole?: "admin" | "editor";
 }
 
 async function resolveSessionWorkspace(
@@ -172,7 +174,7 @@ async function resolveSessionWorkspace(
 
   return {
     ok: true,
-    ctx: { workspaceId: meta.workspaceId, workspacePath: wsPath },
+    ctx: { workspaceId: meta.workspaceId, workspacePath: wsPath, userRole: payload.role },
   };
 }
 
@@ -196,8 +198,9 @@ function hashText(content: string): string {
 }
 
 function createMutationErrorResponse(error: WorkspaceAuthorityClientError) {
+  const code = error.code === "CONFIG_READONLY" ? "CONFIG_READONLY" : "FILE_WRITE_ERROR";
   return NextResponse.json(
-    createApiError("FILE_WRITE_ERROR", error.message, {
+    createApiError(code, error.message, {
       authorityCode: error.code,
     }),
     { status: error.status },
@@ -217,9 +220,10 @@ export async function PUT(
     }
 
     const body = await request.json().catch(() => ({}));
-    const { sessionId, schema } = body as {
+    const { sessionId, schema, contextPageId } = body as {
       sessionId?: string;
       schema?: string;
+      contextPageId?: string;
     };
 
     if (typeof schema !== "string") {
@@ -231,6 +235,32 @@ export async function PUT(
 
     const ctx = await resolveSessionWorkspace(request, projectId, sessionId);
     if (!ctx.ok) return ctx.response;
+    if (!contextPageId) {
+      return NextResponse.json(
+        createApiError("CONFIG_READONLY", "项目级配置写入需要页面上下文"),
+        { status: 403 },
+      );
+    }
+    {
+      const pageMeta = readDemoPageMeta(ctx.ctx.workspacePath, contextPageId);
+      if (!pageMeta) {
+        return NextResponse.json(
+          createApiError("CONFIG_READONLY", "页面上下文不存在"),
+          { status: 403 },
+        );
+      }
+      if (pageMeta.reference || (pageMeta.isTemplatePage && ctx.ctx.userRole !== "admin")) {
+        return NextResponse.json(
+          createApiError(
+            "CONFIG_READONLY",
+            pageMeta.reference
+              ? "引用页面的共享配置不可编辑"
+              : "普通编辑者不能编辑模板页面的共享配置",
+          ),
+          { status: 403 },
+        );
+      }
+    }
     const resolvedSessionId = sessionId;
     if (!resolvedSessionId) {
       return NextResponse.json(
@@ -309,11 +339,15 @@ export async function DELETE(
 
     const url = new URL(request.url);
     let sessionId = url.searchParams.get("sessionId") ?? undefined;
+    let contextPageId = url.searchParams.get("contextPageId") ?? undefined;
     if (!sessionId) {
       try {
         const body = await request.clone().json();
         if (body && typeof body.sessionId === "string") {
           sessionId = body.sessionId;
+        }
+        if (body && typeof body.contextPageId === "string") {
+          contextPageId = body.contextPageId;
         }
       } catch {
         // 忽略 body 解析失败
@@ -322,6 +356,32 @@ export async function DELETE(
 
     const ctx = await resolveSessionWorkspace(request, projectId, sessionId);
     if (!ctx.ok) return ctx.response;
+    if (!contextPageId) {
+      return NextResponse.json(
+        createApiError("CONFIG_READONLY", "项目级配置删除需要页面上下文"),
+        { status: 403 },
+      );
+    }
+    {
+      const pageMeta = readDemoPageMeta(ctx.ctx.workspacePath, contextPageId);
+      if (!pageMeta) {
+        return NextResponse.json(
+          createApiError("CONFIG_READONLY", "页面上下文不存在"),
+          { status: 403 },
+        );
+      }
+      if (pageMeta.reference || (pageMeta.isTemplatePage && ctx.ctx.userRole !== "admin")) {
+        return NextResponse.json(
+          createApiError(
+            "CONFIG_READONLY",
+            pageMeta.reference
+              ? "引用页面的共享配置不可编辑"
+              : "普通编辑者不能编辑模板页面的共享配置",
+          ),
+          { status: 403 },
+        );
+      }
+    }
     const resolvedSessionId = sessionId;
     if (!resolvedSessionId) {
       return NextResponse.json(

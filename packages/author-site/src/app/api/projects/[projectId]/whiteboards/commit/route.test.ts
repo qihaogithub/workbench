@@ -26,6 +26,7 @@ jest.mock("@/lib/fs-utils", () => ({
     expiresAt: Date.now() + 10_000,
   })),
   isSessionExpired: jest.fn(() => false),
+  listDemoPages: jest.fn(() => [{ id: "page-1", name: "页面 1", order: 0 }]),
   projectExists: jest.fn(() => true),
   sessionExists: jest.fn(() => true),
 }));
@@ -97,13 +98,13 @@ function whiteboardDocument() {
   };
 }
 
-function commitBody(currentValue: string) {
+function commitBody(currentValue: string, pageId = "page-1", fieldPath = "heroImage") {
   return {
     sessionId: "session-1",
     target: {
       scope: "page",
-      pageId: "page-1",
-      fieldPath: "heroImage",
+      pageId,
+      fieldPath,
       currentValue,
     },
     document: whiteboardDocument(),
@@ -252,5 +253,73 @@ describe("whiteboard commit route config defaults", () => {
       error: { code: "INVALID_REQUEST" },
     });
     expect(writeWhiteboardTransaction).not.toHaveBeenCalled();
+  });
+
+  it("commits an image target on a Unicode page through a oneOf schema", async () => {
+    const pageId = "闯关活动页-进行中_ec853d";
+    const pageDir = path.join(workspacePath, "demos", pageId);
+    fs.mkdirSync(pageDir, { recursive: true });
+    fs.writeFileSync(path.join(pageDir, "index.tsx"), "export default function Page() { return null; }", "utf8");
+    fs.writeFileSync(path.join(pageDir, "config.schema.json"), JSON.stringify({
+      type: "object",
+      properties: {
+        modules: {
+          type: "array",
+          items: {
+            oneOf: [
+              {
+                properties: {
+                  type: { const: "image" },
+                  image: { type: "string", format: "image" },
+                },
+                required: ["type", "image"],
+              },
+              {
+                properties: {
+                  type: { const: "text" },
+                  text: { type: "string" },
+                },
+                required: ["type"],
+              },
+            ],
+          },
+        },
+      },
+    }), "utf8");
+    fs.writeFileSync(path.join(pageDir, "config.values.json"), JSON.stringify({
+      modules: [{ type: "image", image: "/original.png" }],
+    }), "utf8");
+    const fsUtils = await import("@/lib/fs-utils");
+    jest.mocked(fsUtils.listDemoPages).mockReturnValue([{
+      id: pageId,
+      name: "闯关活动页（进行中）",
+      order: 0,
+      parentId: null,
+      runtimeType: "high-fidelity-react",
+    }]);
+
+    const { POST } = await import("./route");
+    const response = await POST(
+      jsonRequest({
+        ...commitBody("/original.png", pageId, "modules[0].image"),
+        document: whiteboardDocument(),
+      }),
+      { params: Promise.resolve({ projectId: "project-1" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      success: true,
+      data: { values: { modules: [{ type: "image", image: expect.stringMatching(/^assets\/whiteboards\/.+\.png$/) }] } },
+    });
+    expect(writeWhiteboardTransaction).toHaveBeenCalledWith(
+      workspacePath,
+      expect.objectContaining({
+        writes: expect.arrayContaining([
+          expect.objectContaining({ path: `demos/${pageId}/config.values.json` }),
+        ]),
+      }),
+    );
   });
 });

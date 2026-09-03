@@ -1,8 +1,15 @@
+---
+covers:
+  - packages/demo-ui/src/schema-parser.ts
+  - packages/demo-ui/src/schema-parser.test.ts
+  - packages/demo-ui/src/ConfigForm.tsx
+---
+
 # 配置系统 - Schema 解析器
 
 > 版本：v1.1
 > 创建日期：2026-04-06
-> 更新日期：2026-05-03
+> 更新日期：2026-09-03
 
 ---
 
@@ -81,6 +88,22 @@ interface ParsedContent {
 | `schema` | string | JSON Schema 配置 |
 
 **返回值**：分隔符格式的完整文本
+
+### 3.3 parseSchemaToFields
+
+**文件位置**：`packages/demo-ui/src/schema-parser.ts`
+
+**功能**：把页面 Schema 转换为配置面板可消费的字段组。顶层字段和数组项目内部字段使用同一套解析规则，避免嵌套结构进入 `oneOf` 分支后丢失控件信息。
+
+数组项目的解析规则如下：
+
+- `items.oneOf` 生成对象数组的变体列表，并递归解析每个变体的字段；
+- `items.properties` 生成普通对象数组的子字段，并继续递归处理其中的数组；
+- `position` 字段保留可拖动标记、定位键和容器尺寸，使坐标输入与画布拖动共用同一字段；
+- `typeLimits` 沿递归路径传递，数组深度不会改变字段限制；
+- 因此 `modules.items.oneOf → levels.items.oneOf` 仍会得到对象数组和 `position` 控件，不会降级为多图上传列表。
+
+关卡图坐标单位约定：`position.x/y` 使用 1 倍像素值，`w/h` 继续使用 2 倍值，渲染时仅对 `w/h` 除以 2。
 
 ### 3.4 isValidFigmaFormat
 

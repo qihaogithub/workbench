@@ -9,8 +9,7 @@ interface LevelCard {
   unlockedImage?: string;
   completedImage?: string;
   animation?: string;
-  x?: number;
-  y?: number;
+  position?: { x: number; y: number };
   w?: number;
   h?: number;
 }
@@ -309,10 +308,10 @@ function LevelModule({
         <div style={{ width: 375, height: 656, background: "#DBDBDB" }} />
       )}
 
-      {/* 关卡图：按 2 倍坐标换算后定位 */}
+      {/* 关卡图：position 使用 1 倍像素，w/h 使用 2 倍值 */}
       {cards.map((card, i) => {
-        const x = (card.x ?? 0) / 2;
-        const y = (card.y ?? 0) / 2;
+        const x = card.position?.x ?? 0;
+        const y = card.position?.y ?? 0;
         const w = (card.w ?? 0) / 2;
         const h = (card.h ?? 0) / 2;
         const img = resolveLevelImage(card);
@@ -326,18 +325,23 @@ function LevelModule({
         };
         if (card.animation) {
           return (
-            <SvgaPlayer
+            <div
               key={i}
-              src={card.animation}
-              loop
-              autoplay
-              style={style}
-              fallback={img ? <img src={img} alt={`关卡${i + 1}动画兜底`} style={style} /> : null}
-            />
+              data-pos-key="levelCard"
+              style={{ position: "absolute", left: x, top: y, width: w, height: h }}
+            >
+              <SvgaPlayer
+                src={card.animation}
+                loop
+                autoplay
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                fallback={img ? <img src={img} alt={`关卡${i + 1}动画兜底`} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
+              />
+            </div>
           );
         }
         if (!img) return null;
-        return <img key={i} src={img} alt={`关卡${i + 1}`} style={style} />;
+        return <img key={i} src={img} data-pos-key="levelCard" alt={`关卡${i + 1}`} style={style} />;
       })}
 
       {/* 闯关引导形象（Spine） */}
@@ -750,8 +754,7 @@ const DEFAULT_MODULES: Module[] = [
         type: "levelCard",
         state: "已解锁",
         unlockedImage: "https://img.onlywnn.cn/figma/h_e589fc90.png",
-        x: 28,
-        y: 2,
+        position: { x: 14, y: 1 },
         w: 330,
         h: 368,
       },
@@ -759,8 +762,7 @@ const DEFAULT_MODULES: Module[] = [
         type: "levelCard",
         state: "未解锁",
         lockedImage: "https://img.onlywnn.cn/figma/h_70aef182.png",
-        x: 392,
-        y: 294,
+        position: { x: 196, y: 147 },
         w: 330,
         h: 368,
       },
@@ -768,8 +770,7 @@ const DEFAULT_MODULES: Module[] = [
         type: "levelCard",
         state: "未解锁",
         lockedImage: "https://img.onlywnn.cn/figma/h_61c26d1d.png",
-        x: 80,
-        y: 632,
+        position: { x: 40, y: 316 },
         w: 342,
         h: 390,
       },

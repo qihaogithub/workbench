@@ -79,6 +79,8 @@ async function notifyWsEvent(
 export interface ListCommentsOptions {
   pageId?: string;
   resourceId?: string;
+  configScope?: "project" | "page";
+  fieldKey?: string;
   resolved?: boolean;
 }
 
@@ -88,7 +90,19 @@ export function listComments(
 ): CommentThread[] {
   const { threads } = readCommentStore(projectId);
   let result = threads;
-  if (options.pageId) {
+  if (options.configScope) {
+    result = result.filter((t) =>
+      t.target.kind === "config" &&
+      t.target.scope === options.configScope &&
+      (options.configScope === "page" || !t.target.pageId),
+    );
+    if (options.configScope === "page" && options.pageId) {
+      result = result.filter((t) => t.target.kind === "config" && t.target.pageId === options.pageId);
+    }
+    if (options.fieldKey) {
+      result = result.filter((t) => t.target.kind === "config" && t.target.fieldKey === options.fieldKey);
+    }
+  } else if (options.pageId) {
     result = result.filter((t) => t.target.kind === "page" && t.target.pageId === options.pageId);
   }
   if (options.resourceId) {
@@ -337,6 +351,10 @@ export async function deleteReply(
   thread.replies.splice(index, 1);
   thread.updatedAt = Date.now();
   writeCommentStore(projectId, data);
+  // Reply deletion changes the complete thread shape. Broadcast the updated
+  // thread so other author/viewer clients remove it without waiting for a
+  // full refresh (the event type is already part of the comment protocol).
+  await notifyWsEvent(projectId, { type: "comment:updated", thread });
   return true;
 }
 

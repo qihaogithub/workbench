@@ -221,6 +221,7 @@ export class HocuspocusCollabServer {
       kind: descriptor.kind,
       userId: validation.userId,
       username: validation.username,
+      ...(validation.role ? { role: validation.role } : {}),
       workspacePath: validation.workspacePath,
     };
 

@@ -33,7 +33,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { FieldRenderer } from "./FieldRenderer";
 import type { FieldConfig } from "./schema-parser";
-import type { ImageConfigScope, WhiteboardLauncher } from "./types";
+import type { ConfigCommentTarget, ConfigItemCapabilities, ImageConfigScope, WhiteboardLauncher } from "./types";
 
 function createItemDefault(
   field: FieldConfig,
@@ -198,7 +198,11 @@ export interface ArrayFieldGroupProps {
   defaultValueOverride?: unknown;
   imageConfigScope?: ImageConfigScope;
   pageId?: string;
+  configContextPageId?: string;
   onLaunchWhiteboard?: WhiteboardLauncher;
+  configItemCapabilities?: ConfigItemCapabilities;
+  onEditConfigDefinition?: (fieldKey: string, field: FieldConfig) => void;
+  onAddConfigComment?: (target: ConfigCommentTarget, trigger?: HTMLElement | null) => void;
 }
 
 function AddMenu({
@@ -307,7 +311,11 @@ export function ArrayFieldGroup({
   defaultValueOverride,
   imageConfigScope,
   pageId,
+  configContextPageId,
   onLaunchWhiteboard,
+  configItemCapabilities,
+  onEditConfigDefinition,
+  onAddConfigComment,
 }: ArrayFieldGroupProps) {
   const sortableIdSequenceRef = useRef(0);
   const createSortableId = useCallback(
@@ -513,7 +521,11 @@ export function ArrayFieldGroup({
                                 }
                                 imageConfigScope={imageConfigScope}
                                 pageId={pageId}
+                                configContextPageId={configContextPageId}
                                 onLaunchWhiteboard={onLaunchWhiteboard}
+                                configItemCapabilities={configItemCapabilities}
+                                onEditConfigDefinition={onEditConfigDefinition}
+                                onAddConfigComment={onAddConfigComment}
                                 positionInstanceId={
                                   childField.positionable
                                     ? `${field.key}:${sortableId}:${childField.key}`

@@ -295,6 +295,8 @@ Next 开发编译性能约束：
 
 ## 白板独立开发边界
 
+- 白板外部图片在代理 Fake-IP 环境可能解析到 `198.18.0.0/15`。不得放宽内网地址校验或直接连接 Fake-IP；使用 `whiteboard-image-assets.ts` 的有界加密 DNS 复核，并将校验后的公网 IP 固定到实际连接。浏览器能显示跨域图片不代表 canvas 能读取像素，服务端资产准备链路必须独立验证。
+
 - `@workbench/sketch-core` 是白板协议、几何、操作与只读渲染内核；`@workbench/sketch-react` 是可嵌入编辑器 UI 和状态层；两者不得依赖 `author-site` 的路由、项目数据、登录会话、AI 或截图服务。
 - `@workbench/sketch-playground` 是 Whiteboard Studio，使用 `pnpm dev:whiteboard` 单独启动（端口 3400）；`pnpm dev:sketch` 是兼容同义命令。白板的交互、性能、工具栏和布局优化应先在 Studio 的 fixtures 与性能面板中完成。
 - `author-site` 只保留白板入口、document/binding 持久化、PNG 导出和配置回填适配。只有宿主尺寸、权限、写回冲突或集成契约问题才应在创作端编辑页修改。

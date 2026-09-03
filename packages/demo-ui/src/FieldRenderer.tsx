@@ -5,7 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Select,
   SelectContent,
@@ -21,8 +21,8 @@ import { MultiSelect } from "./MultiSelect";
 import { CascadeSelect } from "./CascadeSelect";
 import { OptionGroup } from "./OptionGroup";
 import type { FieldConfig } from "./schema-parser";
-import { createContext, useContext, useMemo } from "react";
-import { Check, Edit3, FileText, Pencil } from "lucide-react";
+import { createContext, useContext } from "react";
+import { Check, Edit3, FileText, MessageSquare, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -30,13 +30,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   DocumentEditor,
   type MarkdownReferenceClickHandler,
   type MarkdownReferenceContext,
   type MarkdownReferenceProvider,
 } from "./DocumentEditor";
-import type { ConfigChangeMeta, DesignSpecEntryLink, ImageConfigScope, WhiteboardLauncher } from "./types";
+import type { ConfigChangeMeta, ConfigCommentTarget, ConfigItemCapabilities, DesignSpecEntryLink, ImageConfigScope, WhiteboardLauncher } from "./types";
 import { ImageInputActions } from "./ImageInputActions";
 import { localizeRemoteImageForSession } from "./markdown/remote-image-localizer";
 
@@ -104,6 +105,9 @@ export function FieldRenderer({
   onEditDesignSpec,
   onOpenDesignSpec,
   onEditConfigDefinition,
+  configItemCapabilities,
+  onAddConfigComment,
+  configCommentCount = 0,
   embedded,
   fieldPath,
   defaultValueOverride,
@@ -111,6 +115,7 @@ export function FieldRenderer({
   positionDomOccurrence,
   imageConfigScope,
   pageId,
+  configContextPageId,
   onLaunchWhiteboard,
   referenceContext,
   referenceProvider,
@@ -125,6 +130,9 @@ export function FieldRenderer({
   onEditDesignSpec?: (docId: string, entryId: string) => void;
   onOpenDesignSpec?: (spec: DesignSpecEntryLink, fieldTitle: string, anchor?: { top: number; bottom: number }, trigger?: HTMLElement | null) => void;
   onEditConfigDefinition?: (fieldKey: string, field: FieldConfig) => void;
+  configItemCapabilities?: ConfigItemCapabilities;
+  onAddConfigComment?: (target: ConfigCommentTarget, trigger?: HTMLElement | null) => void;
+  configCommentCount?: number;
   embedded?: boolean;
   fieldPath?: string;
   /** Parent object-array defaults are resolved at the current array index. */
@@ -133,11 +141,17 @@ export function FieldRenderer({
   positionDomOccurrence?: number;
   imageConfigScope?: ImageConfigScope;
   pageId?: string;
+  configContextPageId?: string;
   onLaunchWhiteboard?: WhiteboardLauncher;
   referenceContext?: MarkdownReferenceContext;
   referenceProvider?: MarkdownReferenceProvider;
   onReferenceClick?: MarkdownReferenceClickHandler;
 }) {
+  const canEditValue = !readonly && (configItemCapabilities?.canEditValue ?? true);
+  const canEditDefinition = !readonly && (configItemCapabilities?.canEditDefinition ?? Boolean(onEditConfigDefinition));
+  const canAddComment =
+    (configItemCapabilities?.canAddComment ?? true) && Boolean(onAddConfigComment);
+  const effectiveReadonly = !canEditValue;
   const effectiveDefault = defaultValueOverride !== undefined
     ? defaultValueOverride
     : field.default;
@@ -166,10 +180,11 @@ export function FieldRenderer({
         <FileUploadWidget
           value={value as any}
           onChange={onChange}
+          disabled={effectiveReadonly}
           label={field.title}
           required={field.required}
           sessionId={sessionId}
-          options={{ ...(field.uiOptions as any), assetKind: "spine", accept: mergeSpinePackageAccept(field.uiOptions?.accept), pageId, configKey: field.key, configScope: imageConfigScope }}
+          options={{ ...(field.uiOptions as any), assetKind: "spine", accept: mergeSpinePackageAccept(field.uiOptions?.accept), pageId, contextPageId: configContextPageId, configKey: field.key, configScope: imageConfigScope }}
         />
       );
     }
@@ -197,7 +212,8 @@ export function FieldRenderer({
                 ? effectiveDefault
                 : undefined
           }
-          onWhiteboard={!readonly && isSingleImageField && onLaunchWhiteboard && fieldPath ? () => onLaunchWhiteboard({ scope: imageConfigScope, pageId, fieldPath, ...(typeof value === "string" ? { currentValue: value } : {}) }) : undefined}
+          disabled={effectiveReadonly}
+          onWhiteboard={!effectiveReadonly && isSingleImageField && onLaunchWhiteboard && fieldPath ? () => onLaunchWhiteboard({ scope: imageConfigScope, pageId, fieldPath, ...(typeof value === "string" ? { currentValue: value } : {}) }) : undefined}
         />
       );
 
@@ -229,6 +245,7 @@ export function FieldRenderer({
             }
           }}
           maxItems={maxItems}
+          disabled={effectiveReadonly}
           title={field.title}
           sessionId={sessionId}
           options={{
@@ -237,7 +254,7 @@ export function FieldRenderer({
           }}
           defaultValue={normalizeImageDefaults(effectiveDefault)}
           renderItemActions={
-            !readonly && onLaunchWhiteboard && fieldPath
+            !effectiveReadonly && onLaunchWhiteboard && fieldPath
               ? (item, index, onUpload) => (
                   <ImageInputActions
                     onUpload={onUpload}
@@ -261,6 +278,7 @@ export function FieldRenderer({
           options={options}
           value={(value as string[]) || []}
           onChange={(v) => onChange(v)}
+          disabled={effectiveReadonly}
         />
       );
     }
@@ -271,6 +289,7 @@ export function FieldRenderer({
           options={field.options || []}
           value={(value as string[]) || []}
           onChange={(v) => onChange(v)}
+          disabled={effectiveReadonly}
         />
       );
     }
@@ -301,7 +320,7 @@ export function FieldRenderer({
           }}
           name={`config-${fieldPath ?? field.key}`}
           ariaLabel={field.title || "单选项"}
-          disabled={readonly}
+          disabled={effectiveReadonly}
         />
       );
     }
@@ -318,7 +337,8 @@ export function FieldRenderer({
           defaultValue={
             typeof effectiveDefault === "string" ? effectiveDefault : undefined
           }
-          onWhiteboard={!readonly && isSingleImageField && onLaunchWhiteboard && fieldPath ? () => onLaunchWhiteboard({ scope: imageConfigScope, pageId, fieldPath, ...(typeof value === "string" ? { currentValue: value } : {}) }) : undefined}
+          disabled={effectiveReadonly}
+          onWhiteboard={!effectiveReadonly && isSingleImageField && onLaunchWhiteboard && fieldPath ? () => onLaunchWhiteboard({ scope: imageConfigScope, pageId, fieldPath, ...(typeof value === "string" ? { currentValue: value } : {}) }) : undefined}
         />
       );
 
@@ -331,6 +351,7 @@ export function FieldRenderer({
           <span className="flex size-4 shrink-0 items-center justify-center overflow-hidden rounded-[4px]">
             <input
               type="color"
+              disabled={effectiveReadonly}
               value={(value as string) || "#000000"}
               onChange={(e) => onChange(e.target.value)}
               aria-label={`${field.title}颜色选择器`}
@@ -338,6 +359,7 @@ export function FieldRenderer({
             />
           </span>
           <Input
+            disabled={effectiveReadonly}
             value={(value as string) || ""}
             onChange={(e) => onChange(e.target.value)}
             placeholder="#000000"
@@ -356,12 +378,16 @@ export function FieldRenderer({
             value={(value as Record<string, unknown>[]) || []}
             onChange={(newValue) => onChange(newValue)}
             sessionId={sessionId}
-            readonly={readonly}
+            readonly={effectiveReadonly}
             fieldPath={fieldPath}
             defaultValueOverride={effectiveDefault}
             imageConfigScope={imageConfigScope}
-            pageId={pageId}
+                                pageId={pageId}
+                                configContextPageId={configContextPageId}
             onLaunchWhiteboard={onLaunchWhiteboard}
+            configItemCapabilities={configItemCapabilities}
+            onEditConfigDefinition={onEditConfigDefinition}
+            onAddConfigComment={onAddConfigComment}
           />
         );
       }
@@ -369,6 +395,7 @@ export function FieldRenderer({
       if (field.itemsType === "object") {
         return (
           <Textarea
+            disabled={effectiveReadonly}
             value={JSON.stringify(value, null, 2)}
             onChange={(e) => {
               try {
@@ -407,12 +434,13 @@ export function FieldRenderer({
             }
           }}
           maxItems={maxItems}
+          disabled={effectiveReadonly}
           title={field.title}
           sessionId={sessionId}
           options={field.uiOptions as any}
           defaultValue={normalizeImageDefaults(effectiveDefault)}
           renderItemActions={
-            isImageListField && !readonly && onLaunchWhiteboard && fieldPath
+            isImageListField && !effectiveReadonly && onLaunchWhiteboard && fieldPath
               ? (item, index, onUpload) => (
                   <ImageInputActions
                     onUpload={onUpload}
@@ -433,7 +461,8 @@ export function FieldRenderer({
     if (field.type === "boolean") {
       return (
         <div className="flex items-center">
-          <Switch
+        <Switch
+            disabled={effectiveReadonly}
             checked={(value as boolean) || false}
             onCheckedChange={(checked: boolean) => onChange(checked)}
             className="ml-auto h-[21px] w-[39px] border-0 shadow-none data-[state=checked]:bg-[#575765] data-[state=unchecked]:bg-[#3a3a40] [&>span]:size-[17px] [&>span]:data-[state=checked]:translate-x-[18px]"
@@ -449,6 +478,7 @@ export function FieldRenderer({
         return (
           <div className="ml-auto flex min-w-0 items-center gap-2">
             <Input
+              disabled={effectiveReadonly}
               type="number"
               value={currentValue.toString()}
               onChange={(event) => {
@@ -462,6 +492,7 @@ export function FieldRenderer({
               className="h-7 w-[60px] shrink-0 border-0 bg-black/40 px-1.5 text-center font-mono text-sm shadow-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0"
             />
             <Slider
+              disabled={effectiveReadonly}
               value={[currentValue]}
               min={field.minimum}
               max={field.maximum}
@@ -475,6 +506,7 @@ export function FieldRenderer({
 
       return (
         <Input
+          disabled={effectiveReadonly}
           type="number"
           value={(value as number)?.toString() || ""}
           onChange={(e) =>
@@ -499,6 +531,7 @@ export function FieldRenderer({
 
       return (
         <Select
+          disabled={effectiveReadonly}
           value={currentValue?.toString() || undefined}
           onValueChange={(val: string) => {
             const index = field.enum!.indexOf(val as any);
@@ -534,7 +567,7 @@ export function FieldRenderer({
           onChange={onChange}
           field={field}
           sessionId={sessionId}
-          readonly={readonly}
+          readonly={effectiveReadonly}
           referenceContext={referenceContext}
           referenceProvider={referenceProvider}
           onReferenceClick={onReferenceClick}
@@ -547,6 +580,7 @@ export function FieldRenderer({
     if (field.type === "text") {
       return (
         <Textarea
+          disabled={effectiveReadonly}
           value={(value as string) || ""}
           onChange={(e) => onChange(e.target.value)}
           placeholder={`请输入${field.title}`}
@@ -559,6 +593,7 @@ export function FieldRenderer({
     if (field.maxLength && field.maxLength > 100) {
       return (
         <Textarea
+          disabled={effectiveReadonly}
           value={(value as string) || ""}
           onChange={(e) => onChange(e.target.value)}
           placeholder={`请输入${field.title}`}
@@ -575,6 +610,7 @@ export function FieldRenderer({
           field={field}
           value={value as { x: number; y: number } | undefined}
           onChange={onChange}
+          disabled={effectiveReadonly}
           fieldPath={fieldPath}
           instanceId={positionInstanceId}
           domOccurrence={positionDomOccurrence}
@@ -584,6 +620,7 @@ export function FieldRenderer({
 
     return (
       <Input
+        disabled={effectiveReadonly}
         type="text"
         value={(value as string) || ""}
         onChange={(e) => onChange(e.target.value)}
@@ -611,6 +648,116 @@ export function FieldRenderer({
       {field.required && <span className="ml-0.5 text-red-500">*</span>}
     </>
   );
+  const configCommentScope = imageConfigScope ?? "page";
+  const configCommentTarget: ConfigCommentTarget = {
+    kind: "config",
+    scope: configCommentScope,
+    ...(configCommentScope === "page" && pageId ? { pageId } : {}),
+    fieldKey: field.key,
+    fieldTitleSnapshot: field.title,
+  };
+  const canAddCommentAction = canAddComment && Boolean(onAddConfigComment);
+  const hasConfigActions =
+    (canEditDefinition && Boolean(onEditConfigDefinition)) || canAddCommentAction;
+  const [titleMenuOpen, setTitleMenuOpen] = useState(false);
+  const ignoreTitleFocusRef = useRef(false);
+  const titleMenuCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelTitleMenuClose = useCallback(() => {
+    if (titleMenuCloseTimerRef.current !== null) {
+      clearTimeout(titleMenuCloseTimerRef.current);
+      titleMenuCloseTimerRef.current = null;
+    }
+  }, []);
+  const scheduleTitleMenuClose = useCallback(() => {
+    cancelTitleMenuClose();
+    titleMenuCloseTimerRef.current = setTimeout(() => {
+      setTitleMenuOpen(false);
+      titleMenuCloseTimerRef.current = null;
+    }, 180);
+  }, [cancelTitleMenuClose]);
+  useEffect(() => () => cancelTitleMenuClose(), [cancelTitleMenuClose]);
+  const titleTrigger = (
+    <button
+      type="button"
+      aria-label={`${field.title}配置项操作`}
+      onMouseEnter={() => {
+        cancelTitleMenuClose();
+        if (hasConfigActions) setTitleMenuOpen(true);
+      }}
+      onMouseLeave={scheduleTitleMenuClose}
+      onFocus={() => {
+        cancelTitleMenuClose();
+        if (ignoreTitleFocusRef.current) {
+          ignoreTitleFocusRef.current = false;
+          return;
+        }
+        if (hasConfigActions) setTitleMenuOpen(true);
+      }}
+      className="flex min-w-0 max-w-full cursor-pointer items-center gap-1 truncate rounded-sm text-left text-sm font-medium text-foreground/70 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+    >
+      <span className="truncate">{fieldLabel}</span>
+      {configCommentCount > 0 && (
+        <span
+          aria-label={`${configCommentCount}条未解决批注`}
+          className="inline-flex size-1.5 shrink-0 rounded-full bg-blue-500"
+        />
+      )}
+    </button>
+  );
+  const titleContent = hasConfigActions ? (
+    <Popover open={titleMenuOpen} onOpenChange={setTitleMenuOpen}>
+      <PopoverTrigger asChild>{titleTrigger}</PopoverTrigger>
+      <PopoverContent
+        align="start"
+        side="bottom"
+        sideOffset={6}
+        className="w-40 p-1"
+        onMouseEnter={cancelTitleMenuClose}
+        onMouseLeave={scheduleTitleMenuClose}
+        onFocus={cancelTitleMenuClose}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            scheduleTitleMenuClose();
+          }
+        }}
+      >
+        {canEditDefinition && onEditConfigDefinition && (
+          <button
+            type="button"
+            className="flex h-9 w-full items-center gap-2 rounded-md px-2 text-left text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={`编辑配置项：${field.title}`}
+            onClick={() => {
+              ignoreTitleFocusRef.current = true;
+              setTitleMenuOpen(false);
+              onEditConfigDefinition(field.key, field);
+            }}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            <span>编辑配置项</span>
+          </button>
+        )}
+        {canAddCommentAction && (
+          <button
+            type="button"
+            className="flex h-9 w-full items-center gap-2 rounded-md px-2 text-left text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={`添加批注：${field.title}`}
+            onClick={(event) => {
+              ignoreTitleFocusRef.current = true;
+              setTitleMenuOpen(false);
+              onAddConfigComment?.(configCommentTarget, event.currentTarget);
+            }}
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            <span>添加批注</span>
+          </button>
+        )}
+      </PopoverContent>
+    </Popover>
+  ) : (
+    <Label className="block min-w-0 truncate text-sm font-medium text-foreground/70">
+      {fieldLabel}
+    </Label>
+  );
 
   return (
     <div
@@ -622,54 +769,34 @@ export function FieldRenderer({
       )}
     >
       {field.title !== "" && (
-      <div className={cn("flex min-w-0 items-center gap-1", isInlineControl ? "min-w-0 flex-1" : "w-full")}>
-          <div className="min-w-0 flex-1">
-            {linkedSpecs.length > 0 && onOpenDesignSpec ? (
-              <div className="flex min-w-0 items-center gap-2">
-                {onEditConfigDefinition && !readonly ? (
-                  <button
-                    type="button"
-                    onClick={() => onEditConfigDefinition(field.key, field)}
-                    className="min-w-0 max-w-full truncate rounded-sm text-left text-sm font-medium text-foreground/70 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    aria-label={`编辑配置项：${field.title}`}
-                  >
-                    {fieldLabel}
-                  </button>
-                ) : <Label className="min-w-0 truncate text-sm font-medium text-foreground/70">{fieldLabel}</Label>}
-                <button
-                  type="button"
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onClick={(event) => {
-                    const rect = event.currentTarget.getBoundingClientRect();
-                    if (rect.width || rect.height) {
-                      onOpenDesignSpec(linkedSpecs[0], field.title, { top: rect.top, bottom: rect.bottom }, event.currentTarget);
-                    } else {
-                      onOpenDesignSpec(linkedSpecs[0], field.title, undefined, event.currentTarget);
-                    }
-                  }}
-                  className="inline-flex shrink-0 items-center gap-1 rounded-full bg-blue-600 px-1.5 py-0.5 text-[11px] font-medium text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-                  aria-label={`查看设计规范：${field.title}`}
-                >
-                  <FileText className="h-3 w-3" />规范
-                </button>
-              </div>
-            ) : onEditConfigDefinition && !readonly ? (
-              <button
-                type="button"
-                onClick={() => onEditConfigDefinition(field.key, field)}
-                className="min-w-0 max-w-full truncate rounded-sm text-left text-sm font-medium text-foreground/70 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label={`编辑配置项：${field.title}`}
-              >
-                {fieldLabel}
-              </button>
-            ) : (
-              <Label className="block min-w-0 truncate text-sm font-medium text-foreground/70">
-                {fieldLabel}
-              </Label>
-            )}
-            {showImageHint && <p className="mt-0.5 truncate text-[13px] font-medium text-foreground/30">{imageDimensions}</p>}
-          </div>
+      <div className={cn("flex min-w-0 items-start gap-1", isInlineControl ? "min-w-0 flex-1" : "w-full")}>
+        <div className="min-w-0 flex-1">
+          {titleContent}
+          {showImageHint && <p className="mt-0.5 truncate text-[13px] font-medium text-foreground/30">{imageDimensions}</p>}
         </div>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+          {linkedSpecs.length > 0 && onOpenDesignSpec && (
+            <button
+              type="button"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                const rect = event.currentTarget.getBoundingClientRect();
+                onOpenDesignSpec(
+                  linkedSpecs[0],
+                  field.title,
+                  rect.width || rect.height ? { top: rect.top, bottom: rect.bottom } : undefined,
+                  event.currentTarget,
+                );
+              }}
+              className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full bg-blue-600 px-1.5 py-0.5 text-[11px] font-medium text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+              aria-label={`查看设计规范：${field.title}`}
+            >
+              <FileText className="h-3 w-3" />规范
+            </button>
+          )}
+        </div>
+      </div>
       )}
       <div className={cn("min-w-0", isInlineControl ? "flex-1" : "w-full")}>
         {renderInput()}
@@ -713,6 +840,7 @@ function PositionFieldInput({
   fieldPath,
   instanceId: providedInstanceId,
   domOccurrence,
+  disabled = false,
 }: {
   field: FieldConfig;
   value: { x: number; y: number } | undefined;
@@ -720,6 +848,7 @@ function PositionFieldInput({
   fieldPath?: string;
   instanceId?: string;
   domOccurrence?: number;
+  disabled?: boolean;
 }) {
   const posConfig = usePositionConfig();
   const pos = value || { x: 0, y: 0 };
@@ -758,6 +887,7 @@ function PositionFieldInput({
           type="number"
           value={pos.x}
           onChange={(e) => handleCoordChange("x", e.target.value)}
+          disabled={disabled}
           className="h-6 w-16 text-xs px-1.5"
           min={0}
           max={containerWidth > 0 ? containerWidth : undefined}
@@ -769,6 +899,7 @@ function PositionFieldInput({
           type="number"
           value={pos.y}
           onChange={(e) => handleCoordChange("y", e.target.value)}
+          disabled={disabled}
           className="h-6 w-16 text-xs px-1.5"
           min={0}
           max={containerHeight > 0 ? containerHeight : undefined}
@@ -782,6 +913,7 @@ function PositionFieldInput({
               variant={isEditing ? "default" : "outline"}
               size="sm"
               className="h-6 text-xs px-2 shrink-0"
+              disabled={disabled}
               onClick={() => isEditing ? posConfig.exitPositionEdit() : posConfig.requestPositionEdit(instanceId)}
             >
               {isEditing ? <Check className="h-3 w-3 mr-1" /> : <Pencil className="h-3 w-3 mr-1" />}
@@ -792,6 +924,7 @@ function PositionFieldInput({
                 <input
                   type="checkbox"
                   checked={posConfig.dimming}
+                  disabled={disabled}
                   onChange={posConfig.onToggleDimming}
                   className="h-3 w-3"
                 />

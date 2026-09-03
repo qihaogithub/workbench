@@ -32,6 +32,7 @@ import {
 import { isLiveWorkspacePath } from "@/lib/live-workspace-route-context";
 import { validateNoSchemaConflictFromStrings } from "@/lib/schema-validator";
 import { resolvePageRuntimeType } from "@/lib/fs-utils";
+import { getProjectPath } from "@/lib/paths";
 import { commitWorkspaceMutation, WorkspaceAuthorityClientError } from "@/lib/workspace-authority-client";
 
 const DEFAULT_PROTOTYPE_META = {
@@ -165,8 +166,9 @@ function validateRestoredPageSchema(input: {
 }
 
 function createMutationErrorResponse(error: WorkspaceAuthorityClientError) {
+  const code = error.code === "CONFIG_READONLY" ? "CONFIG_READONLY" : "FILE_WRITE_ERROR";
   return NextResponse.json(
-    createApiError("FILE_WRITE_ERROR", error.message, { authorityCode: error.code }),
+    createApiError(code, error.message, { authorityCode: error.code }),
     { status: error.status },
   );
 }
@@ -261,6 +263,33 @@ export async function POST(
           { status: 409 },
         );
       }
+    }
+
+    // Restoring a page version rewrites both config.schema.json and (when
+    // present) config.values.json. Protect the same reference/template page
+    // contexts as the regular config endpoints, including the canonical
+    // project workspace when no explicit Session workspace was supplied.
+    const configTargetWorkspacePath =
+      restoreWorkspacePath ?? path.join(getProjectPath(projectId), "workspace");
+    const targetPageMeta = listDemoPages(configTargetWorkspacePath).find(
+      (page) => page.id === resourceId,
+    );
+    if (
+      !targetPageMeta ||
+      targetPageMeta.reference ||
+      (targetPageMeta.isTemplatePage && payload.role !== "admin")
+    ) {
+      return NextResponse.json(
+        createApiError(
+          "CONFIG_READONLY",
+          !targetPageMeta
+            ? "页面配置元数据不存在"
+            : targetPageMeta.reference
+            ? "引用页面的配置不可编辑"
+            : "普通编辑者不能编辑模板页面配置",
+        ),
+        { status: 403 },
+      );
     }
 
     if (restoreWorkspaceId && restoreWorkspacePath && isLiveWorkspacePath(restoreWorkspacePath)) {

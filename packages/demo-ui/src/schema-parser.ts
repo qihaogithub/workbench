@@ -163,99 +163,128 @@ function getGroupColor(index: number): string {
   return colors[index % colors.length];
 }
 
+function parseFieldConfig(
+  key: string,
+  prop: Record<string, unknown>,
+  required: boolean,
+  typeLimits?: Record<string, number>,
+): FieldConfig {
+  const uiOptions = isPlainRecord(prop["ui:options"])
+    ? (prop["ui:options"] as Record<string, unknown>)
+    : undefined;
+  const field: FieldConfig = {
+    key,
+    title: typeof prop.title === "string" ? prop.title : formatFieldName(key),
+    type: (prop.type as string) || "string",
+    description: prop.description as string | undefined,
+    required,
+    default: prop.default,
+    enum: prop.enum as unknown[] | undefined,
+    enumNames: prop.enumNames as string[] | undefined,
+    minimum: prop.minimum as number | undefined,
+    maximum: prop.maximum as number | undefined,
+    maxLength: prop.maxLength as number | undefined,
+    format: prop.format as string | undefined,
+    uiWidget: prop["ui:widget"] as string | undefined,
+    uiOptions,
+    category:
+      typeof uiOptions?.category === "string"
+        ? uiOptions.category.trim()
+        : undefined,
+    visibleWhen:
+      parseVisibleWhen(uiOptions?.visibleWhen) ||
+      parseVisibleWhen(prop.visibleWhen),
+    note: prop.$demo
+      ? ((prop.$demo as Record<string, unknown>)?.note as string | undefined)
+      : undefined,
+    itemsType: (prop.items as Record<string, unknown>)?.type as
+      | string
+      | undefined,
+    itemsFormat: (prop.items as Record<string, unknown>)?.format as
+      | string
+      | undefined,
+    itemsUiWidget: (prop.items as Record<string, unknown>)?.["ui:widget"] as
+      | string
+      | undefined,
+  };
+
+  if (prop["ui:widget"] === "multiselect") {
+    const items = prop.items as Record<string, unknown> | undefined;
+    if (items) {
+      field.enum = items.enum as unknown[] | undefined;
+      field.enumNames = items.enumNames as string[] | undefined;
+    }
+    field.multiple = true;
+  }
+
+  if (prop["ui:widget"] === "cascade") {
+    field.options = uiOptions?.cascadeOptions as CascadeOption[] | undefined;
+  }
+
+  if (prop.type === "enum" && prop.multiple === true) {
+    field.uiWidget = "multiselect";
+    field.multiple = true;
+  }
+
+  if (prop.type === "cascade" && Array.isArray(prop.options)) {
+    field.uiWidget = "cascade";
+    field.options = prop.options as CascadeOption[];
+  }
+
+  if (prop.type === "imageList") {
+    field.uiWidget = "imageList";
+  }
+
+  if (prop.type === "object") {
+    const demo = prop.$demo as Record<string, unknown> | undefined;
+    if (demo?.positionable && typeof demo.positionable === "object") {
+      const pos = demo.positionable as Record<string, unknown>;
+      field.positionable = {
+        key: typeof pos.key === "string" ? pos.key : undefined,
+        size: pos.size as { width: number; height: number } | undefined,
+      };
+    }
+  }
+
+  if (prop.type === "position") {
+    field.positionable = {
+      key: typeof prop.key === "string" ? prop.key : undefined,
+      size: prop.size as { width: number; height: number } | undefined,
+    };
+  }
+
+  const items = prop.items as Record<string, unknown> | undefined;
+  if (
+    field.type === "array" &&
+    items &&
+    (items.type === "object" || items.oneOf || items.properties)
+  ) {
+    const oneOf = resolveOneOf(items, typeLimits);
+    if (oneOf) {
+      field.oneOf = oneOf;
+    } else {
+      const children = resolveChildren(items, typeLimits);
+      if (children) field.children = children;
+    }
+  }
+
+  return field;
+}
+
 function parseProperties(
   properties: Record<string, Record<string, unknown>>,
   required: string[],
+  typeLimits?: Record<string, number>,
 ): FieldConfig[] {
-  return Object.entries(properties).map(([key, prop]) => {
-    const uiOptions = isPlainRecord(prop["ui:options"])
-      ? (prop["ui:options"] as Record<string, unknown>)
-      : undefined;
-    const field: FieldConfig = {
-      key,
-      title: typeof prop.title === "string" ? prop.title : formatFieldName(key),
-      type: (prop.type as string) || "string",
-      description: prop.description as string | undefined,
-      required: required.includes(key),
-      default: prop.default,
-      enum: prop.enum as unknown[] | undefined,
-      enumNames: prop.enumNames as string[] | undefined,
-      minimum: prop.minimum as number | undefined,
-      maximum: prop.maximum as number | undefined,
-      maxLength: prop.maxLength as number | undefined,
-      format: prop.format as string | undefined,
-      uiWidget: prop["ui:widget"] as string | undefined,
-      uiOptions,
-      category:
-        typeof uiOptions?.category === "string"
-          ? uiOptions.category.trim()
-          : undefined,
-      visibleWhen: parseVisibleWhen(uiOptions?.visibleWhen) || parseVisibleWhen(prop.visibleWhen),
-      note: (prop as Record<string, unknown>).$demo
-        ? ((prop as Record<string, unknown>).$demo as Record<string, unknown>)
-            ?.note as string | undefined
-        : undefined,
-      itemsType: (prop.items as Record<string, unknown>)?.type as
-        | string
-        | undefined,
-      itemsFormat: (prop.items as Record<string, unknown>)?.format as
-        | string
-        | undefined,
-      itemsUiWidget: (prop.items as Record<string, unknown>)?.["ui:widget"] as
-        | string
-        | undefined,
-    };
-
-    if (prop["ui:widget"] === "multiselect") {
-      const items = prop.items as Record<string, unknown> | undefined;
-      if (items) {
-        field.enum = items.enum as unknown[] | undefined;
-        field.enumNames = items.enumNames as string[] | undefined;
-      }
-      field.multiple = true;
-    }
-
-    if (prop["ui:widget"] === "cascade") {
-      field.options = uiOptions?.cascadeOptions as CascadeOption[] | undefined;
-    }
-
-    if (prop.type === "enum" && prop.multiple === true) {
-      field.uiWidget = "multiselect";
-      field.multiple = true;
-    }
-
-    if (prop.type === "cascade" && Array.isArray(prop.options)) {
-      field.uiWidget = "cascade";
-      field.options = prop.options as CascadeOption[];
-    }
-
-    if (prop.type === "imageList") {
-      field.uiWidget = "imageList";
-    }
-
-    if (prop.type === "object") {
-      const demo = (prop as Record<string, unknown>).$demo as Record<string, unknown> | undefined;
-      if (demo?.positionable && typeof demo.positionable === "object") {
-        const pos = demo.positionable as Record<string, unknown>;
-        field.positionable = {
-          key: typeof pos.key === "string" ? pos.key : undefined,
-          size: pos.size as { width: number; height: number } | undefined,
-        };
-      }
-    }
-
-    if (prop.type === "position") {
-      field.positionable = {
-        key: typeof prop.key === "string" ? prop.key : undefined,
-        size: prop.size as { width: number; height: number } | undefined,
-      };
-    }
-
-    return field;
-  });
+  return Object.entries(properties).map(([key, prop]) =>
+    parseFieldConfig(key, prop, required.includes(key), typeLimits),
+  );
 }
 
-function resolveOneOf(items: Record<string, unknown>): OneOfConfig | undefined {
+function resolveOneOf(
+  items: Record<string, unknown>,
+  typeLimits?: Record<string, number>,
+): OneOfConfig | undefined {
   const oneOf = items.oneOf as Record<string, unknown>[] | undefined;
   if (!Array.isArray(oneOf) || oneOf.length === 0) return undefined;
 
@@ -291,13 +320,27 @@ function resolveOneOf(items: Record<string, unknown>): OneOfConfig | undefined {
     const value = props[discriminator]?.const;
     if (value === undefined || value === null) continue;
 
-    const demo = isPlainRecord(variant.$demo) ? variant.$demo as Record<string, unknown> : undefined;
-    const maxItems = demo && typeof demo.maxItems === "number" ? demo.maxItems as number : undefined;
+    const demo = isPlainRecord(variant.$demo)
+      ? (variant.$demo as Record<string, unknown>)
+      : undefined;
+    const declaredMaxItems =
+      demo && typeof demo.maxItems === "number"
+        ? (demo.maxItems as number)
+        : undefined;
+    // Schema 声明的 $demo.maxItems 是单一真相源；代码探测值仅在未声明时兜底。
+    const maxItems =
+      declaredMaxItems ??
+      (typeLimits ? typeLimits[String(value)] : undefined);
 
+    const parsedFields = parseProperties(
+      variantProps,
+      (variant.required as string[]) || [],
+      typeLimits,
+    );
     variants.push({
       title: (variant.title as string) || String(value),
       value: value as string | number,
-      fields: parseProperties(variantProps, (variant.required as string[]) || []),
+      fields: parsedFields,
       maxItems: maxItems !== undefined ? maxItems : undefined,
     });
   }
@@ -308,6 +351,7 @@ function resolveOneOf(items: Record<string, unknown>): OneOfConfig | undefined {
 
 function resolveChildren(
   items: Record<string, unknown>,
+  typeLimits?: Record<string, number>,
 ): FieldConfig[] | undefined {
   const itemProps = items.properties as
     | Record<string, Record<string, unknown>>
@@ -316,7 +360,7 @@ function resolveChildren(
     return undefined;
   }
   const required = Array.isArray(items.required) ? (items.required as string[]) : [];
-  return parseProperties(itemProps, required);
+  return parseProperties(itemProps, required, typeLimits);
 }
 
 export function parseSchemaToFields(schema: string, typeLimits?: Record<string, number>): FieldGroup[] {
@@ -328,125 +372,25 @@ export function parseSchemaToFields(schema: string, typeLimits?: Record<string, 
 
     const groups: Record<string, FieldConfig[]> = {};
 
-    Object.entries(properties).forEach(
-      ([key, prop]: [string, any]) => {
-        const uiOptions = isPlainRecord(prop["ui:options"])
-          ? (prop["ui:options"] as Record<string, unknown>)
-          : undefined;
-        const field: FieldConfig = {
-          key,
-title: typeof prop.title === "string" ? prop.title : formatFieldName(key),
-          type: (prop.type as string) || "string",
-          description: prop.description as string | undefined,
-          required: required.includes(key),
-          default: prop.default,
-          enum: prop.enum as unknown[] | undefined,
-          enumNames: prop.enumNames as string[] | undefined,
-          minimum: prop.minimum as number | undefined,
-          maximum: prop.maximum as number | undefined,
-          maxLength: prop.maxLength as number | undefined,
-          format: prop.format as string | undefined,
-          uiWidget: prop["ui:widget"] as string | undefined,
-          uiOptions,
-          category:
-            typeof uiOptions?.category === "string"
-              ? uiOptions.category.trim()
-              : undefined,
-          visibleWhen: parseVisibleWhen(uiOptions?.visibleWhen) || parseVisibleWhen(prop.visibleWhen),
-          note: prop.$demo
-            ? (prop.$demo as Record<string, unknown>)?.note as
-                | string
-                | undefined
-            : undefined,
-          itemsType: (prop.items as Record<string, unknown>)?.type as
-            | string
-            | undefined,
-          itemsFormat: (prop.items as Record<string, unknown>)?.format as
-            | string
-            | undefined,
-          itemsUiWidget: (prop.items as Record<string, unknown>)?.["ui:widget"] as
-            | string
-            | undefined,
-        };
-
-        if (prop["ui:widget"] === "multiselect") {
-          const propItems = prop.items as Record<string, unknown> | undefined;
-          if (propItems) {
-            field.enum = propItems.enum as unknown[] | undefined;
-            field.enumNames = propItems.enumNames as string[] | undefined;
-          }
-          field.multiple = true;
-        }
-
-        if (prop["ui:widget"] === "cascade") {
-          field.options = uiOptions?.cascadeOptions as CascadeOption[] | undefined;
-        }
-
-        if (prop.type === "enum" && prop.multiple === true) {
-          field.uiWidget = "multiselect";
-          field.multiple = true;
-        }
-
-        if (prop.type === "cascade" && Array.isArray(prop.options)) {
-          field.uiWidget = "cascade";
-          field.options = prop.options as CascadeOption[];
-        }
-
-        if (prop.type === "object") {
-          const pdemo = prop.$demo as Record<string, unknown> | undefined;
-          if (pdemo?.positionable && typeof pdemo.positionable === "object") {
-            const pos = pdemo.positionable as Record<string, unknown>;
-            field.positionable = {
-              key: typeof pos.key === "string" ? pos.key : undefined,
-              size: pos.size as { width: number; height: number } | undefined,
-            };
-          }
-        }
-
-        if (prop.type === "position") {
-          field.positionable = {
-            key: typeof prop.key === "string" ? prop.key : undefined,
-            size: prop.size as { width: number; height: number } | undefined,
-          };
-        }
-
-        const items = prop.items as Record<string, unknown> | undefined;
-        if (
-          field.type === "array" &&
-          items &&
-          (items.type === "object" || items.oneOf || items.properties)
-        ) {
-          const oneOf = resolveOneOf(items);
-          if (oneOf) {
-            if (typeLimits) {
-              for (const variant of oneOf.variants) {
-                // schema 声明的 $demo.maxItems 是单一真相源；代码探测值仅在未声明时兜底
-                if (variant.maxItems == null) {
-                  const limit = typeLimits[variant.value];
-                  if (limit != null) variant.maxItems = limit;
-                }
-              }
-            }
-            field.oneOf = oneOf;
-          } else {
-            const children = resolveChildren(items);
-            if (children) {
-              field.children = children;
-            }
-          }
-        }
-
-        const explicitGroup = uiOptions && typeof uiOptions.group === "string"
+    Object.entries(properties).forEach(([key, prop]) => {
+      const field = parseFieldConfig(
+        key,
+        prop as Record<string, unknown>,
+        required.includes(key),
+        typeLimits,
+      );
+      const uiOptions = field.uiOptions;
+      const explicitGroup =
+        uiOptions && typeof uiOptions.group === "string"
           ? uiOptions.group.trim()
           : undefined;
-        // Grouping is authored metadata. Fields without an explicit group render flat.
-        const groupName = explicitGroup ?? "";
-        if (!groups[groupName]) {
-          groups[groupName] = [];
-        }
-        groups[groupName].push(field);
-      },
-    );
+      // Grouping is authored metadata. Fields without an explicit group render flat.
+      const groupName = explicitGroup ?? "";
+      if (!groups[groupName]) {
+        groups[groupName] = [];
+      }
+      groups[groupName].push(field);
+    });
 
     return Object.entries(groups).map(([title, fields], index) => ({
       title,

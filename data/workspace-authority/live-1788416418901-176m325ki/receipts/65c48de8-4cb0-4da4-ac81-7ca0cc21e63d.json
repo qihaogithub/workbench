@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "65c48de8-4cb0-4da4-ac81-7ca0cc21e63d",
+  "projectId": "proj_1788416418878_9a3oyq",
+  "workspaceId": "live-1788416418901-176m325ki",
+  "baseRevision": 0,
+  "revision": 3,
+  "rootHash": "efb901bea759a7e664b727a56b1c9d7ef5ee6a683ab40c87873e16c82d3125e9",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_vey5/index.tsx",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "64a1d4ce7ada1e289d829208342623ed53d68c41d33f1578ea243899f7afc740"
+    },
+    {
+      "path": "demos/page_vey5/config.schema.json",
+      "action": "modified",
+      "beforeHash": "e1c118a2c54911913d4ffbf47809ce89c404706cd8a6262198c81674f23a3750",
+      "afterHash": "396ccb59004b1e32afcd65c9018092e1037f7dcc9c0fb09606b272762f93b56e"
+    },
+    {
+      "path": "design-spec/spec-ds_1788416419492_b15819a4.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "415dca62b6f30e2d6fcc30333c34e4174726569ba6de6bfe9781e5e5ed48004e"
+    },
+    {
+      "path": "design-spec/manifest.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "5cf648679d66aefe681cd7ebee27f668bf8a975de447d116581e5550a187096c"
+    }
+  ],
+  "committedAt": 1788416419499
+}

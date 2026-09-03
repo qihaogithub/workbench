@@ -416,13 +416,14 @@ describe("PageConfigPanel", () => {
       </TooltipProvider>,
     );
 
+    fireEvent.click(screen.getByRole("button", { name: "标题配置项操作" }));
     fireEvent.click(screen.getByRole("button", { name: "编辑配置项：标题" }));
     expect(screen.getByRole("dialog")).toHaveTextContent("编辑配置项");
     expect(screen.queryByText("管理配置项")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("名称"), { target: { value: "页面标题" } });
     fireEvent.click(screen.getByRole("button", { name: "保存字段" }));
     await waitFor(() => expect(onPageDefinitionChange).toHaveBeenCalledWith("page_a", expect.objectContaining({ diff: expect.objectContaining({ updated: ["title"] }) })));
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("button", { name: "保存字段" })).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByRole("button", { name: "更多配置操作" }));
     fireEvent.click(screen.getByRole("button", { name: "添加配置项" }));
@@ -449,17 +450,17 @@ describe("PageConfigPanel", () => {
       </TooltipProvider>,
     );
 
+    fireEvent.click(screen.getByRole("button", { name: "标题配置项操作" }));
     fireEvent.click(screen.getByRole("button", { name: "编辑配置项：标题" }));
     fireEvent.click(screen.getByRole("button", { name: "保存字段" }));
 
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "保存中…" })).toBeDisabled();
     expect(onPageDefinitionChange).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       resolveSave?.();
     });
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("button", { name: "保存中…" })).not.toBeInTheDocument());
   });
 
   it("字段定义异步保存失败时不关闭对话框", async () => {
@@ -478,11 +479,11 @@ describe("PageConfigPanel", () => {
       </TooltipProvider>,
     );
 
+    fireEvent.click(screen.getByRole("button", { name: "标题配置项操作" }));
     fireEvent.click(screen.getByRole("button", { name: "编辑配置项：标题" }));
     fireEvent.click(screen.getByRole("button", { name: "保存字段" }));
 
     await waitFor(() => expect(onPageDefinitionChange).toHaveBeenCalledTimes(1));
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "保存字段" })).not.toBeDisabled();
   });
 
@@ -549,7 +550,7 @@ describe("PageConfigPanel", () => {
     expect(screen.queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
   });
 
-  it("只读模式的更多菜单只保留恢复默认", () => {
+  it("只读模式不展示配置写入菜单", () => {
     const onRestoreDefaults = jest.fn();
     render(
       <PageConfigPanel
@@ -571,14 +572,10 @@ describe("PageConfigPanel", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "更多配置操作" }));
-    expect(screen.getByRole("button", { name: "恢复默认" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "添加配置项" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "更多配置操作" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "恢复默认" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "恢复默认" }));
-    fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
-    expect(onRestoreDefaults).toHaveBeenCalledTimes(1);
+    expect(onRestoreDefaults).not.toHaveBeenCalled();
   });
 });
 

@@ -6,6 +6,8 @@ export type {
   DemoSchema,
   PreviewPanelProps,
   ConfigFormProps,
+  ConfigItemCapabilities,
+  ConfigCommentTarget,
   ImageConfigScope,
   ImageConfigTarget,
   WhiteboardLauncher,

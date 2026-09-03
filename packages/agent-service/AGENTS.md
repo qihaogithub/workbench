@@ -94,6 +94,8 @@ tests/
 
 白板代码/语义工具（`readWhiteboardContext`、`applyWhiteboardActions`、`serializeWhiteboardCode`、`importWhiteboardCode`、`planWhiteboardComposition`、`undoWhiteboardEdit`）默认不加入主工具集；设置 `PI_AGENT_WHITEBOARD_TOOLS_ENABLED=true` 后按 workspace capability 注册。写入型动作和代码导入要求 `permissionHandler` 确认，并携带 document revision；`undoWhiteboardEdit` 只恢复最近一次已确认修改。它们只写 `whiteboards/<id>.json`，不允许修改 binding target 或配置值。
 
+配置 Schema/值和白板文档的协同持久化还必须经过 `assertConfigResourceWriteAllowed`：普通页面允许原有编辑路径，引用页面一律只读，模板页面仅 admin 可写；缺失或无法解析页面元数据时 fail-closed，并返回 `CONFIG_READONLY`。HTTP 配置入口与 author-site 的 `contextPageId` 规则保持一致，新增写入口时必须同时补充该守卫和对应单元测试。
+
 | 工具 | 用途 |
 |:-----|:-----|
 | `readFile` | 读取工作空间内文件（支持 offset/limit 分页，自动截断 2000 行/50KB） |

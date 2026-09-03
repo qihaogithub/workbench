@@ -4,6 +4,7 @@
 export { CommentLayer } from "./CommentLayer";
 export { CommentPin } from "./CommentPin";
 export { CommentThreadPopover } from "./CommentThreadPopover";
+export { ConfigCommentPopover } from "./ConfigCommentPopover";
 export { CommentCreatePopover } from "./CommentCreatePopover";
 export {
   MentionPicker,
@@ -28,12 +29,14 @@ export type {
   CanvasCommentDraft,
   CreateCommentInput,
   AddReplyInput,
+  ConfigCommentController,
   UpdateCommentContentInput,
   IframeViewState,
   MentionCandidate,
 } from "./types";
 export type { CommentPinProps } from "./CommentPin";
 export type { CommentThreadPopoverProps } from "./CommentThreadPopover";
+export type { ConfigCommentPopoverProps } from "./ConfigCommentPopover";
 export type { CommentCreatePopoverProps } from "./CommentCreatePopover";
 export type {
   MentionPickerProps,

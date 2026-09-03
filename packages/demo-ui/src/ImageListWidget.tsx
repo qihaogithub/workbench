@@ -85,6 +85,7 @@ export interface ImageListWidgetProps {
   };
   /** 由字段宿主在当前项上渲染的附加操作，不负责图片存储 IO。 */
   renderItemActions?: (item: ImageItem, index: number, onUpload: () => void) => ReactNode;
+  disabled?: boolean;
 }
 
 export function ImageListWidget({
@@ -96,6 +97,7 @@ export function ImageListWidget({
   defaultValue,
   options = {},
   renderItemActions,
+  disabled = false,
 }: ImageListWidgetProps) {
   const maxItems = propMaxItems ?? options.maxItems ?? 20;
   const maxSize = options.maxSize ?? 50 * 1024 * 1024;
@@ -120,6 +122,7 @@ export function ImageListWidget({
 
   const handleDelete = useCallback(
     async (index: number) => {
+      if (disabled) return;
       const item = value[index];
       if (sessionId && item?.url?.startsWith('/api/sessions/')) {
         await deleteServerFile(sessionId, item.url);
@@ -127,11 +130,12 @@ export function ImageListWidget({
       const newValue = value.filter((_, i) => i !== index);
       onChange(newValue);
     },
-    [value, onChange, sessionId]
+    [disabled, value, onChange, sessionId]
   );
 
   const doUpload = useCallback(
     async (file: File, skipDimensionCheck = false) => {
+      if (disabled) return;
       if (file.size > maxSize) {
         setUploadError(`文件大小超过 ${maxSize / 1024 / 1024}MB 限制`);
         return;
@@ -194,14 +198,15 @@ export function ImageListWidget({
         setIsUploading(false);
       }
     },
-    [sessionId, maxSize, hasDimensionCheck, dimensionOptions, value, onChange]
+    [disabled, sessionId, maxSize, hasDimensionCheck, dimensionOptions, value, onChange]
   );
 
   const handleFileUpload = useCallback(
     (file: File) => {
+      if (disabled) return;
       doUpload(file);
     },
-    [doUpload]
+    [disabled, doUpload]
   );
 
   const handleInputChange = useCallback(
@@ -221,13 +226,14 @@ export function ImageListWidget({
     (e: React.DragEvent) => {
       e.preventDefault();
       const files = e.dataTransfer.files;
+      if (disabled) return;
       if (files && files.length > 0) {
         Array.from(files).forEach((file) => {
           handleFileUpload(file);
         });
       }
     },
-    [handleFileUpload]
+    [disabled, handleFileUpload]
   );
 
   const canAddMore = value.length < maxItems;
@@ -239,8 +245,9 @@ export function ImageListWidget({
   }, [defaultValue, value]);
 
   const handleRestore = useCallback(() => {
+    if (disabled) return;
     onChange([...defaultValue!]);
-  }, [defaultValue, onChange]);
+  }, [disabled, defaultValue, onChange]);
 
   return (
     <div className="relative">
@@ -251,6 +258,7 @@ export function ImageListWidget({
             variant="ghost"
             size="sm"
             onClick={handleRestore}
+            disabled={disabled}
             className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
           >
             <Undo2 className="w-3.5 h-3.5 mr-1" />
@@ -294,6 +302,7 @@ export function ImageListWidget({
                   <ZoomIn className="w-4 h-4" />
                 </button>
                 <button
+                  disabled={disabled}
                   type="button"
                   onClick={() => handleDelete(index)}
                   className="p-2 rounded-full bg-background/90 text-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors"
@@ -316,7 +325,7 @@ export function ImageListWidget({
           </div>
         )}
 
-        {canAddMore && !isUploading && (
+        {canAddMore && !isUploading && !disabled && (
           <div
             onClick={() => fileInputRef.current?.click()}
             onDrop={handleDrop}
@@ -334,7 +343,7 @@ export function ImageListWidget({
         type="file"
         accept={accept}
         onChange={handleInputChange}
-        disabled={isUploading}
+        disabled={disabled || isUploading}
         className="hidden"
         multiple
       />

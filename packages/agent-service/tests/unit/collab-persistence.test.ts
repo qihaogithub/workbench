@@ -119,6 +119,43 @@ describe("WorkspaceFilePersistence", () => {
     expect(result.workspacePath).toContain(path.join("workspaces", "user-1", "proj-1", "ws-1"));
   });
 
+  it("协同持久化拒绝普通编辑者写入引用页和模板页配置资源", () => {
+    const workspacePath = path.join(tempDir, "workspaces", "user-1", "proj-1", "ws-1");
+    writeJson(path.join(workspacePath, "workspace-tree.json"), {
+      pages: [
+        { id: "page-1", reference: { sourceProjectId: "source", sourcePageId: "source-page" } },
+        { id: "template-1", isTemplatePage: true },
+        { id: "normal-1" },
+      ],
+    });
+    const persistence = new WorkspaceFilePersistence(tempDir);
+
+    expect(() => persistence.assertConfigResourceWriteAllowed({
+      workspacePath,
+      resourcePath: "demos/page-1/config.schema.json",
+      kind: "page-schema",
+      role: "editor",
+    })).toThrow("CONFIG_READONLY");
+    expect(() => persistence.assertConfigResourceWriteAllowed({
+      workspacePath,
+      resourcePath: "demos/template-1/config.schema.json",
+      kind: "page-schema",
+      role: "editor",
+    })).toThrow("CONFIG_READONLY");
+    expect(() => persistence.assertConfigResourceWriteAllowed({
+      workspacePath,
+      resourcePath: "demos/normal-1/config.schema.json",
+      kind: "page-schema",
+      role: "editor",
+    })).not.toThrow();
+    expect(() => persistence.assertConfigResourceWriteAllowed({
+      workspacePath,
+      resourcePath: "demos/template-1/config.schema.json",
+      kind: "page-schema",
+      role: "admin",
+    })).not.toThrow();
+  });
+
   it("允许 HTML/CSS 原型页源码进入独立协同房间", () => {
     const persistence = new WorkspaceFilePersistence(tempDir);
 

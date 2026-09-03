@@ -1,9 +1,17 @@
 import fs from "node:fs";
 import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
-import { getWhiteboardDocumentRevision, isWhiteboardBinding, isWhiteboardDocument, type ImageConfigTarget, type WhiteboardDocument, whiteboardDocumentPath } from "@workbench/shared";
-import { isWhiteboardConfigPath } from "@workbench/shared";
-import { createApiError, createApiSuccess, findWorkspacePath, getSessionMeta, isSessionExpired, projectExists, sessionExists } from "@/lib/fs-utils";
+import {
+  getWhiteboardDocumentRevision,
+  isWhiteboardBinding,
+  isWhiteboardConfigPath,
+  isWhiteboardDocument,
+  isWhiteboardPageId,
+  type ImageConfigTarget,
+  type WhiteboardDocument,
+  whiteboardDocumentPath,
+} from "@workbench/shared";
+import { createApiError, createApiSuccess, findWorkspacePath, getSessionMeta, isSessionExpired, listDemoPages, projectExists, sessionExists } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { getImageInfo } from "@/lib/image-store";
 import { validateWhiteboardDocument } from "@workbench/whiteboard-core";
@@ -48,7 +56,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!user || !sessionId || (scope !== "page" && scope !== "project") || !fieldPath || !isWhiteboardConfigPath(fieldPath)) {
     return NextResponse.json(createApiError("INVALID_REQUEST", "白板读取参数无效"), { status: 400 });
   }
-  if ((scope === "page" && (!pageId || !/^[A-Za-z0-9_-]+$/.test(pageId))) || (scope === "project" && pageId)) {
+  if ((scope === "page" && !isWhiteboardPageId(pageId)) || (scope === "project" && pageId)) {
     return NextResponse.json(createApiError("INVALID_REQUEST", "白板目标无效"), { status: 400 });
   }
   const meta = sessionExists(sessionId) ? getSessionMeta(sessionId) : null;
@@ -57,6 +65,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
   const workspacePath = findWorkspacePath(meta.workspaceId);
   if (!workspacePath) return NextResponse.json(createApiError("FILE_READ_ERROR", "工作空间不存在"), { status: 500 });
+  if (scope === "page" && !listDemoPages(workspacePath).some((page) => page.id === pageId)) {
+    return NextResponse.json(createApiError("INVALID_REQUEST", "白板目标无效"), { status: 400 });
+  }
   const schemaPath = scope === "project"
     ? path.join(workspacePath, "project.config.schema.json")
     : path.join(workspacePath, "demos", pageId ?? "", "config.schema.json");

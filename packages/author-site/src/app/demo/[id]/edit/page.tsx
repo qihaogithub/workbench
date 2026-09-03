@@ -51,6 +51,7 @@ import {
 import type { PreviewStagePage } from "@workbench/demo-ui/preview-stage-types";
 import type {
   CommentAuthor,
+  ConfigCommentTarget,
   CommentTarget,
   DocumentCommentAnchor,
   DemoPageRuntimeType,
@@ -78,6 +79,8 @@ import {
   filterPageCommentThreads,
   useComments,
   type CanvasCommentDraft,
+  type MentionCandidate,
+  type ConfigCommentController,
 } from "@workbench/demo-ui/comment";
 import { getBrowserAgentServiceUrl } from "@/lib/runtime-config";
 import {
@@ -105,6 +108,7 @@ import {
 import {
   mergeConfigToProps,
   mergeConfigWithUserValues,
+  mergeRefreshedConfigValues,
   SchemaConflictError,
 } from "@/lib/runtime-props";
 import {
@@ -694,6 +698,7 @@ interface RuntimeConversionState {
 interface RuntimeConversionFileSnapshot {
   code?: string;
   schema?: string;
+  configValues?: Record<string, unknown>;
   prototypeHtml?: string;
   prototypeCss?: string;
   prototypeMeta?: PrototypePageMeta;
@@ -783,6 +788,9 @@ function projectAuthoritySnapshotResources(resources: Record<string, string>) {
   for (const page of demoPages) {
     const prefix = `demos/${page.id}/`;
     const schema = resources[`${prefix}config.schema.json`];
+    const configValues = parseJson<Record<string, unknown>>(
+      resources[`${prefix}config.values.json`],
+    );
     const code = resources[`${prefix}index.tsx`];
     const prototypeHtml = resources[`${prefix}prototype.html`];
     const sketchScene = resources[`${prefix}sketch.scene.json`];
@@ -792,6 +800,7 @@ function projectAuthoritySnapshotResources(resources: Record<string, string>) {
     demos[page.id] = {
       code: code ?? "",
       schema,
+      configValues,
       prototypeHtml,
       prototypeCss: resources[`${prefix}prototype.css`],
       prototypeMeta: parseJson<PrototypePageMeta>(
@@ -1391,6 +1400,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     sessionId,
     projectId: demoId,
   });
+  const configWriteContextPageId =
+    previewMode === "canvas"
+      ? (configPanelDetailPageId ?? activeDemoId)
+      : activeDemoId;
 
   const markdownReferenceProvider = useCallback<MarkdownReferenceProvider>(
     async ({ query, signal }) => {
@@ -1810,7 +1823,13 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           const res = await fetch(`/api/projects/${demoId}/config-values`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sessionId, values }),
+            body: JSON.stringify({
+              sessionId,
+              values,
+              // The server uses this page context to enforce reference and
+              // template-page restrictions for shared configuration writes.
+              contextPageId: configWriteContextPageId,
+            }),
           });
           const result = await res.json().catch(() => null);
           if (!res.ok || !result?.success) {
@@ -1841,7 +1860,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       projectConfigPersistQueueRef.current = queued.catch(() => false);
       return queued;
     },
-    [demoId, sessionId, toast],
+    [configWriteContextPageId, demoId, sessionId, toast],
   );
   const pageConfigPersistTimersRef = useRef<
     Record<string, { timer: ReturnType<typeof setTimeout>; values: Record<string, unknown> }>
@@ -2387,14 +2406,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     useState<DocumentCommentAnchor | null>(null);
   const [canvasCommentDraft, setCanvasCommentDraft] =
     useState<CanvasCommentDraft | null>(null);
-  const activePageCommentTarget = useMemo<CommentTarget>(
-    () => ({ kind: "page", pageId: activeDemoId }),
-    [activeDemoId],
-  );
-  const commentQueryTarget = useMemo<CommentTarget | undefined>(() => {
-    if (previewMode === "canvas") return undefined;
-    return activePageCommentTarget;
-  }, [activePageCommentTarget, previewMode]);
+  // 配置项批注与页面评论共用项目级订阅。按页面筛选会导致右侧配置栏
+  // 无法读取其它页面以及项目级配置项的线程，并且会为每个字段引入额外请求。
+  // 页面/画布评论仍在下方通过 filterPageCommentThreads 派生，不改变现有侧栏语义。
+  const commentQueryTarget = useMemo<CommentTarget | undefined>(() => undefined, []);
   const commentsData = useComments({
     projectId: demoId,
     target: commentQueryTarget,
@@ -2402,6 +2417,101 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     wsUrl: commentWsUrl,
     enabled: Boolean(activeDemoId),
   });
+  const [commentMentionCandidates, setCommentMentionCandidates] = useState<MentionCandidate[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeDemoId) {
+      setCommentMentionCandidates([]);
+      return () => {
+        cancelled = true;
+      };
+    }
+    void commentApi.listMentionCandidates()
+      .then((candidates) => {
+        if (!cancelled) setCommentMentionCandidates(candidates);
+      })
+      .catch(() => {
+        if (!cancelled) setCommentMentionCandidates([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeDemoId, commentApi]);
+  const configCommentController = useMemo<ConfigCommentController>(
+    () => ({
+      threads: commentsData.threads,
+      currentUser: commentUser,
+      mentionCandidates: commentMentionCandidates,
+      canMentionAgent: false,
+      readOnly: false,
+      onCreateComment: commentsData.createComment,
+      onAddReply: commentsData.addReply,
+      onUpdateComment: commentsData.updateComment,
+      onUpdateReply: commentsData.updateReply,
+      onSetResolved: commentsData.setResolved,
+      onDeleteThread: commentsData.deleteThread,
+      onDeleteReply: commentsData.deleteReply,
+    }),
+    [
+      commentMentionCandidates,
+      commentUser,
+      commentsData.addReply,
+      commentsData.createComment,
+      commentsData.deleteThread,
+      commentsData.setResolved,
+      commentsData.threads,
+      commentsData.updateComment,
+      commentsData.updateReply,
+      commentsData.deleteReply,
+    ],
+  );
+  const canEditConfigRole =
+    currentUserRole === "admin" ||
+    currentUserRole === "editor" ||
+    currentUserRole === "creator";
+  const getConfigCommentCount = useCallback(
+    (target: ConfigCommentTarget) => commentsData.threads.filter((thread) => {
+      if (thread.resolved || thread.target.kind !== "config") return false;
+      if (thread.target.scope !== target.scope || thread.target.fieldKey !== target.fieldKey) return false;
+      if (target.scope === "page" && !target.pageId) return false;
+      return target.scope === "project"
+        ? !thread.target.pageId && !target.pageId
+        : thread.target.pageId === target.pageId;
+    }).length,
+    [commentsData.threads],
+  );
+  const getPageConfigCapabilities = useCallback(
+    (page: DemoPageMeta) => {
+      const isReference = Boolean(page.reference);
+      const isTemplate = Boolean(page.isTemplatePage);
+      const canEdit =
+        canEditConfigRole &&
+        !isReference &&
+        (!isTemplate || currentUserRole === "admin");
+      const reason = isReference
+        ? "reference"
+        : isTemplate && !canEdit
+          ? "template-page"
+          : !canEdit
+            ? "readonly"
+            : "none";
+      return {
+        project: {
+          canEditDefinition: canEdit,
+          canEditValue: canEdit,
+          canAddComment: true,
+          reason,
+        },
+        page: {
+          canEditDefinition: canEdit,
+          canEditValue: canEdit,
+          canAddComment: true,
+          reason,
+        },
+      } as const;
+    },
+    [canEditConfigRole, currentUserRole],
+  );
   const documentCommentsData = useComments({
     projectId: demoId,
     target: activeDocumentCommentTarget ?? {
@@ -2517,8 +2627,15 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       : null,
     collabUser,
   );
+  const projectConfigContextPage = demoPages.find(
+    (page) => page.id === configWriteContextPageId,
+  );
+  const projectConfigCollabWritable =
+    canEditConfigRole &&
+    !projectConfigContextPage?.reference &&
+    (!projectConfigContextPage?.isTemplatePage || currentUserRole === "admin");
   const projectSchemaCollab = useCollabDocument(
-    sessionId && workspaceId
+    sessionId && workspaceId && projectConfigCollabWritable
       ? {
           projectId: demoId,
           workspaceId,
@@ -3024,6 +3141,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     (params: {
       code?: string;
       schema?: string;
+      /** Complete config state from the latest Authority snapshot. When set,
+       * it is authoritative and must not be merged with stale local values. */
+      configValues?: Record<string, unknown>;
       source:
         | "ai-realtime"
         | "ai-finish"
@@ -3035,6 +3155,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       const {
         code: newCode,
         schema: newSchema,
+        configValues: authoritativeConfigValues,
         source,
         syncCollab = true,
       } = params;
@@ -3052,6 +3173,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           codeLength: newCode?.length,
           hasSchema: newSchema !== undefined,
           schemaLength: newSchema?.length,
+          hasConfigValues: authoritativeConfigValues !== undefined,
         },
       });
 
@@ -3106,19 +3228,29 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
           return { ...prev, [targetPageId]: size };
         });
 
-        try {
+        if (authoritativeConfigValues !== undefined) {
           setConfigDataMap((prev) => {
             if (!targetPageId) return prev;
-            const current = prev[targetPageId] ?? {};
-            const merged = mergeConfigWithUserValues(
-              current,
-              newSchema,
-              oldSchema,
-            );
-            return { ...prev, [targetPageId]: merged };
+            return {
+              ...prev,
+              [targetPageId]: { ...authoritativeConfigValues },
+            };
           });
-        } catch (e) {
-          console.warn("[DemoEditPage] Failed to merge schema defaults:", e);
+        } else {
+          try {
+            setConfigDataMap((prev) => {
+              if (!targetPageId) return prev;
+              const current = prev[targetPageId] ?? {};
+              const merged = mergeConfigWithUserValues(
+                current,
+                newSchema,
+                oldSchema,
+              );
+              return { ...prev, [targetPageId]: merged };
+            });
+          } catch (e) {
+            console.warn("[DemoEditPage] Failed to merge schema defaults:", e);
+          }
         }
       }
 
@@ -4653,12 +4785,13 @@ ${context.details}
     setWhiteboardTarget({
       scope: target.scope,
       ...(target.pageId ? { pageId: target.pageId } : {}),
+      contextPageId: target.pageId ?? configWriteContextPageId,
       fieldPath: target.fieldPath,
       ...(target.listItem ? { listItem: target.listItem } : {}),
       ...(target.currentValue ? { currentValue: target.currentValue } : {}),
       ...(target.onCommit ? { onCommit: target.onCommit } : {}),
     });
-  }, []);
+  }, [configWriteContextPageId]);
 
   handlePageConfigPanelChangeRef.current = handlePageConfigPanelChange;
 
@@ -6476,6 +6609,7 @@ ${context.details}
 
         const codes: Record<string, string> = {};
         const allDefaults: Record<string, Record<string, unknown>> = {};
+        const authoritativeConfigPageIds = new Set<string>();
         const schemas: Record<string, string> = {};
         const prototypes: Record<
           string,
@@ -6520,6 +6654,13 @@ ${context.details}
               ...allDefaults[pageId],
               ...loadedProjectConfigValues,
             };
+            if (demo.configValues !== undefined) {
+              authoritativeConfigPageIds.add(pageId);
+              allDefaults[pageId] = {
+                ...allDefaults[pageId],
+                ...demo.configValues,
+              };
+            }
             schemas[pageId] = demo.schema || "";
             if (
               demo.prototypeHtml !== undefined ||
@@ -6569,10 +6710,11 @@ ${context.details}
         setConfigDataMap((prev) => {
           const merged: Record<string, Record<string, unknown>> = {};
           for (const pageId of Object.keys(allDefaults)) {
-            merged[pageId] = {
-              ...allDefaults[pageId],
-              ...(prev[pageId] || {}),
-            };
+            merged[pageId] = mergeRefreshedConfigValues(
+              allDefaults[pageId],
+              prev[pageId],
+              authoritativeConfigPageIds.has(pageId),
+            );
           }
           return merged;
         });
@@ -6602,6 +6744,10 @@ ${context.details}
             applyDemoSnapshot({
               code: target.code || "",
               schema: target.schema || "",
+              configValues:
+                target.configValues !== undefined
+                  ? allDefaults[nextActiveId]
+                  : undefined,
               source: "ai-finish",
               syncCollab: false,
             });
@@ -10105,7 +10251,7 @@ ${context.details}
                         threads={documentCommentsData.threads}
                         currentUserId={currentUserId || undefined}
                         currentUser={commentUser}
-                        mentionCandidates={[]}
+                        mentionCandidates={commentMentionCandidates}
                         canMentionAgent={true}
                         activeThreadId={activeCommentThreadId}
                         onSelectThread={(id) => {
@@ -10136,6 +10282,8 @@ ${context.details}
                                   id: page.id,
                                   name: page.name,
                                   order: page.order,
+                                  reference: page.reference,
+                                  isTemplatePage: page.isTemplatePage,
                                   schema:
                                     pageSchemaMap[page.id] ||
                                     (page.id === activeDemoId
@@ -10144,6 +10292,7 @@ ${context.details}
                                   configData: configDataMap[page.id],
                                   projectConfigSchema:
                                     referencePageProjectSchemas[page.id],
+                                  configItemCapabilities: getPageConfigCapabilities(page),
                                 }]
                               : [];
                           })()}
@@ -10153,6 +10302,8 @@ ${context.details}
                           onProjectDefinitionChange={
                             handleProjectDefinitionChange
                           }
+                          configComments={configCommentController}
+                          getConfigCommentCount={getConfigCommentCount}
                           onDefinitionAnalyze={handleConfigDefinitionAnalyze}
                           onPageDefinitionChange={handlePageDefinitionChange}
                           readonly={
@@ -10275,12 +10426,15 @@ ${context.details}
                               id: page.id,
                               name: page.name,
                               order: page.order,
+                              reference: page.reference,
+                              isTemplatePage: page.isTemplatePage,
                               schema:
                                 pageSchemaMap[page.id] ||
                                 (page.id === activeDemoId ? schema : undefined),
                               configData: configDataMap[page.id],
                               projectConfigSchema:
                                 referencePageProjectSchemas[page.id],
+                              configItemCapabilities: getPageConfigCapabilities(page),
                               designSpecEntries:
                                 referencePageDesignSpecEntries[page.id],
                               pageDesignSpecEntries:
@@ -10325,6 +10479,8 @@ ${context.details}
                             onProjectDefinitionChange={
                               handleProjectDefinitionChange
                             }
+                            configComments={configCommentController}
+                            getConfigCommentCount={getConfigCommentCount}
                             onDefinitionSendToAI={
                               handleConfigDefinitionSendToAI
                             }
@@ -10459,12 +10615,15 @@ ${context.details}
                               id: page.id,
                               name: page.name,
                               order: page.order,
+                              reference: page.reference,
+                              isTemplatePage: page.isTemplatePage,
                               schema:
                                 pageSchemaMap[page.id] ||
                                 (page.id === activeDemoId ? schema : undefined),
                               configData: configDataMap[page.id],
                               projectConfigSchema:
                                 referencePageProjectSchemas[page.id],
+                              configItemCapabilities: getPageConfigCapabilities(page),
                               designSpecEntries:
                                 referencePageDesignSpecEntries[page.id],
                               pageDesignSpecEntries:
@@ -10518,6 +10677,8 @@ ${context.details}
                             onProjectDefinitionChange={
                               handleProjectDefinitionChange
                             }
+                            configComments={configCommentController}
+                            getConfigCommentCount={getConfigCommentCount}
                             onDefinitionSendToAI={
                               handleConfigDefinitionSendToAI
                             }
@@ -10575,7 +10736,7 @@ ${context.details}
                               )
                             }
                             requirementsLoading={requirementsLoading}
-                            readonly={!!activeDemoPage?.reference}
+                            readonly={Boolean(projectConfigContextPage?.reference)}
                             designSpecApiContext={{
                               workingDir: workspacePath || undefined,
                               sessionId,
@@ -10742,7 +10903,12 @@ ${context.details}
         onOpenChange={setWsCodeDialogOpen}
         filePath={wsCodeDialogData.filePath}
         content={wsCodeDialogData.content}
-        editable={wsCodeDialogData.editable}
+        editable={
+          wsCodeDialogData.editable &&
+          (!/^\/?project\.config\.(?:schema|values)\.json$/.test(
+            wsCodeDialogData.filePath.replace(/^\/+/, ""),
+          ) || projectConfigCollabWritable)
+        }
         projectId={demoId}
         workspaceId={workspaceId}
         sessionId={sessionId}
@@ -10753,7 +10919,12 @@ ${context.details}
             {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ content }),
+              body: JSON.stringify({
+                content,
+                ...(configWriteContextPageId
+                  ? { contextPageId: configWriteContextPageId }
+                  : {}),
+              }),
             },
           );
           const data = await res.json();

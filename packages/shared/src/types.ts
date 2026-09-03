@@ -75,7 +75,8 @@ export type ErrorCode =
   | "HTML_IMPORT_CAPABILITY_RESTRICTED"
   | "HTML_IMPORT_INTERACTIVE_NOT_YET_SUPPORTED"
   | "HTML_IMPORT_RUNTIME_MISMATCH"
-  | "HTML_RUNTIME_FAILED";
+  | "HTML_RUNTIME_FAILED"
+  | "CONFIG_READONLY";
 
 export type ErrorCodeType = ErrorCode;
 
@@ -109,4 +110,5 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
     "交互 HTML 将在隔离运行时启用后支持",
   HTML_IMPORT_RUNTIME_MISMATCH: "HTML 产物与页面运行时不匹配",
   HTML_RUNTIME_FAILED: "HTML 交互预览运行失败",
+  CONFIG_READONLY: "当前配置不可编辑",
 };

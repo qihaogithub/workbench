@@ -1,3 +1,46 @@
 {
-  "threads": []
+  "threads": [
+    {
+      "id": "cmt_mtl1t6pr_uqwtep",
+      "projectId": "proj_1785135808250_r4cb4a",
+      "target": {
+        "kind": "config",
+        "scope": "page",
+        "pageId": "闯关活动页-进行中_ec853d",
+        "fieldKey": "image",
+        "fieldTitleSnapshot": "图片"
+      },
+      "content": "测试下批注",
+      "author": {
+        "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+        "name": "qihao",
+        "isAnonymous": false
+      },
+      "createdAt": 1788411128894,
+      "updatedAt": 1788411128894,
+      "resolved": false,
+      "replies": []
+    },
+    {
+      "id": "cmt_mtl1tj3e_8a6yr1",
+      "projectId": "proj_1785135808250_r4cb4a",
+      "target": {
+        "kind": "config",
+        "scope": "page",
+        "pageId": "闯关活动页-进行中_ec853d",
+        "fieldKey": "bgm",
+        "fieldTitleSnapshot": "闯关背景音乐"
+      },
+      "content": "测试批注",
+      "author": {
+        "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+        "name": "qihao",
+        "isAnonymous": false
+      },
+      "createdAt": 1788411144938,
+      "updatedAt": 1788411144938,
+      "resolved": false,
+      "replies": []
+    }
+  ]
 }

@@ -3,6 +3,7 @@ import {
   createCommentThread,
   createReply,
   readCommentStore,
+  listComments,
   updateCommentThread,
   updateReply,
 } from "./comment-store";
@@ -176,6 +177,44 @@ describe("createReply @AI 触发任务", () => {
 describe("readCommentStore 兜底", () => {
   it("文件不存在时返回空线程列表", () => {
     expect(readCommentStore("no-such")).toEqual({ threads: [] });
+  });
+});
+
+describe("配置项评论", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    Object.keys(mockedWriteData).forEach((k) => delete mockedWriteData[k]);
+    mockedFs.existsSync.mockReturnValue(true);
+    mockedFs.readFileSync.mockImplementation(((filePath: string) => {
+      const raw = mockedWriteData[filePath as string];
+      if (!raw) throw new Error("ENOENT");
+      return raw;
+    }) as typeof mockedFs.readFileSync);
+    mockedFs.writeFileSync.mockImplementation(((filePath: string, data: string) => {
+      mockedWriteData[filePath as string] = data;
+      return undefined;
+    }) as typeof mockedFs.writeFileSync);
+    mockedFs.mkdirSync.mockImplementation((() => undefined) as unknown as typeof mockedFs.mkdirSync);
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({}) }) as unknown as typeof fetch;
+  });
+
+  it("按 scope、页面和字段 key 精确列出配置评论", async () => {
+    await createCommentThread({
+      projectId: "p1",
+      target: { kind: "config", scope: "page", pageId: "page-1", fieldKey: "hero.title", fieldTitleSnapshot: "标题" },
+      content: "页面标题要求",
+      author,
+    });
+    await createCommentThread({
+      projectId: "p1",
+      target: { kind: "config", scope: "project", fieldKey: "theme.color" },
+      content: "共享主题要求",
+      author,
+    });
+
+    expect(listComments("p1", { configScope: "page", pageId: "page-1", fieldKey: "hero.title" })).toHaveLength(1);
+    expect(listComments("p1", { configScope: "project", fieldKey: "theme.color" })).toHaveLength(1);
+    expect(listComments("p1", { pageId: "page-1" })).toHaveLength(0);
   });
 });
 

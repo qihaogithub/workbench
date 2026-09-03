@@ -1,0 +1,80 @@
+{
+  "id": "wb_8944507229b044b68c7c5d8d28f74406",
+  "version": 3,
+  "sceneFormat": "sketch-scene-v1",
+  "documentRevision": 2,
+  "scene": {
+    "version": 1,
+    "pageSize": {
+      "width": 1440,
+      "height": 900
+    },
+    "nodes": [
+      {
+        "id": "source-background",
+        "type": "image",
+        "x": 0,
+        "y": 0,
+        "width": 1440,
+        "height": 900,
+        "src": "/api/images/img_AhIxhkKusZ6vWg",
+        "alt": "原图片背景",
+        "intrinsicWidth": 750,
+        "intrinsicHeight": 572,
+        "zIndex": 0
+      },
+      {
+        "id": "sketch_1788420287817_gfn1rt",
+        "name": "矩形",
+        "x": 514,
+        "y": 131,
+        "width": 276,
+        "height": 302,
+        "style": {
+          "fill": "#FFFFFF",
+          "stroke": "#1F2937",
+          "strokeWidth": 2,
+          "radius": 10,
+          "color": "#111827",
+          "fontSize": 18,
+          "fontWeight": 500
+        },
+        "type": "rect",
+        "zIndex": 1
+      },
+      {
+        "id": "title",
+        "type": "text",
+        "x": 582,
+        "y": 255,
+        "width": 520,
+        "height": 64,
+        "text": "手绘页面",
+        "style": {
+          "fontSize": 40,
+          "fontWeight": 700,
+          "color": "#111827",
+          "textAlign": "left"
+        },
+        "zIndex": 2
+      }
+    ],
+    "assets": [],
+    "bindings": {},
+    "metadata": {
+      "createdBy": "system",
+      "updatedAt": 1788420307967
+    }
+  },
+  "nodeSemantics": {
+    "source-background": {
+      "assetRef": "img_AhIxhkKusZ6vWg"
+    }
+  },
+  "editorView": {
+    "zoom": 1,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "updatedAt": 1788420310834
+}

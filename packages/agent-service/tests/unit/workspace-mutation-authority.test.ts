@@ -280,6 +280,27 @@ describe("WorkspaceMutationAuthority", () => {
       .map((event) => event.receipt.mutationId)).toEqual(["catchup-second"]);
   });
 
+  it("读取 catch-up 事件不重复扫描整个 Workspace", async () => {
+    const { authority, workspacePath } = createAuthority();
+    const receipt = await authority.mutate({
+      mutationId: "read-only-catchup", projectId: "project-1", workspaceId: "workspace-1", baseRevision: 1,
+      actor: "ai", reason: "test", operations: [{ type: "put_text", path: "demos/home/index.tsx", content: "after", expectedHash: hash("before") }],
+    });
+
+    const targetPath = path.join(workspacePath, "demos", "home", "index.tsx");
+    const leasePath = path.join(path.dirname(workspacePath), "data", "workspace-authority", "leases", "workspace-1.lock");
+    fs.mkdirSync(path.dirname(leasePath), { recursive: true });
+    fs.writeFileSync(leasePath, "other-instance", "utf-8");
+    const readSpy = vi.spyOn(fs, "readFileSync");
+    try {
+      await expect(authority.getCommittedEventsSince("project-1", "workspace-1", receipt.revision - 1))
+        .resolves.toHaveLength(1);
+      expect(readSpy.mock.calls.some(([file]) => path.resolve(String(file)) === targetPath)).toBe(false);
+    } finally {
+      readSpy.mockRestore();
+    }
+  });
+
   it("bootstrap 只生成 revision 1 状态和备份，不修改业务内容", async () => {
     const { authority, workspacePath } = createAuthority();
     const targetPath = path.join(workspacePath, "demos", "home", "index.tsx");

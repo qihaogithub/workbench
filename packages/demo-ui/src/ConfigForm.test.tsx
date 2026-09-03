@@ -103,6 +103,42 @@ const nestedImageArraySchema = JSON.stringify({
   },
 });
 
+const nestedOneOfPositionSchema = JSON.stringify({
+  type: "object",
+  properties: {
+    modules: {
+      type: "array",
+      title: "模块",
+      items: {
+        oneOf: [{
+          title: "关卡模块",
+          properties: {
+            type: { const: "level" },
+            levels: {
+              type: "array",
+              title: "关卡图",
+              items: {
+                oneOf: [{
+                  title: "关卡卡片",
+                  properties: {
+                    type: { const: "levelCard" },
+                    position: {
+                      type: "position",
+                      title: "坐标",
+                      key: "levelCard",
+                      size: { width: 375, height: 656 },
+                    },
+                  },
+                }],
+              },
+            },
+          },
+        }],
+      },
+    },
+  },
+});
+
 describe("ConfigForm configuration-definition entry", () => {
   it("有非空设计规范时标题仍编辑配置项，规范标签打开气泡", () => {
     const onOpenDesignSpec = vi.fn();
@@ -129,7 +165,8 @@ describe("ConfigForm configuration-definition entry", () => {
     );
 
     expect(screen.getByText("规范")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "编辑配置项：页面标题" }));
+    fireEvent.click(screen.getByRole("button", { name: "页面标题配置项操作" }));
+    fireEvent.click(screen.getByRole("button", { name: /编辑配置项/ }));
     expect(onEditConfigDefinition).toHaveBeenCalledWith("title", expect.anything());
     fireEvent.click(screen.getByRole("button", { name: "查看设计规范：页面标题" }));
     expect(onOpenDesignSpec).toHaveBeenCalledWith(spec, "页面标题", undefined, expect.any(HTMLElement));
@@ -157,7 +194,7 @@ describe("ConfigForm configuration-definition entry", () => {
     expect(screen.queryByText("规范")).not.toBeInTheDocument();
   });
 
-  it("在提供编辑回调时将字段标题呈现为可操作入口", () => {
+  it("通过标题操作入口编辑配置项，字段标题保持普通文本", () => {
     const onEditConfigDefinition = vi.fn();
 
     render(
@@ -168,8 +205,9 @@ describe("ConfigForm configuration-definition entry", () => {
       />,
     );
 
-    const trigger = screen.getByRole("button", { name: "编辑配置项：页面标题" });
+    const trigger = screen.getByRole("button", { name: "页面标题配置项操作" });
     fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("button", { name: /编辑配置项/ }));
 
     expect(onEditConfigDefinition).toHaveBeenCalledWith(
       "title",
@@ -180,7 +218,7 @@ describe("ConfigForm configuration-definition entry", () => {
   it("未提供回调或只读时保持静态字段标题", () => {
     const { rerender } = render(<ConfigForm schema={schema} onChange={vi.fn()} />);
 
-    expect(screen.queryByRole("button", { name: "编辑配置项：页面标题" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "页面标题配置项操作" })).not.toBeInTheDocument();
 
     rerender(
       <ConfigForm
@@ -191,8 +229,37 @@ describe("ConfigForm configuration-definition entry", () => {
       />,
     );
 
-    expect(screen.queryByRole("button", { name: "编辑配置项：页面标题" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "页面标题配置项操作" })).not.toBeInTheDocument();
     expect(screen.getByText(/页面标题/).closest("label")?.tagName).toBe("LABEL");
+  });
+
+  it("不可编辑配置项仍显示批注入口但不显示定义编辑入口", () => {
+    const onAddConfigComment = vi.fn();
+    render(
+      <ConfigForm
+        schema={schema}
+        onChange={vi.fn()}
+        configItemCapabilities={{ canEditDefinition: false, canEditValue: false, canAddComment: true, reason: "template-page" }}
+        onEditConfigDefinition={vi.fn()}
+        onAddConfigComment={onAddConfigComment}
+        imageConfigScope="page"
+        pageId="page-1"
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: "页面标题配置项操作" });
+    fireEvent.click(trigger);
+    const commentButton = screen.getByRole("button", { name: "添加批注：页面标题" });
+    expect(commentButton).toBeVisible();
+    fireEvent.click(commentButton);
+    expect(screen.queryByRole("button", { name: /编辑配置项/ })).not.toBeInTheDocument();
+    expect(onAddConfigComment).toHaveBeenCalledWith(expect.objectContaining({
+      kind: "config",
+      scope: "page",
+      pageId: "page-1",
+      fieldKey: "title",
+    }), expect.anything());
+    expect(screen.getByPlaceholderText("请输入页面标题")).toBeDisabled();
   });
 
   it("分组始终展示字段，字段固定呈现完整编辑态", () => {
@@ -322,6 +389,28 @@ describe("ConfigForm configuration-definition entry", () => {
     // The only delete affordance belongs to the multi-image item; the nested
     // default single image remains protected.
     expect(screen.getAllByRole("button", { name: "删除图片" })).toHaveLength(1);
+  });
+
+  it("嵌套 oneOf 关卡图显示对象数组坐标控件而不是多图上传控件", () => {
+    render(
+      <ConfigForm
+        schema={nestedOneOfPositionSchema}
+        initialData={{
+          modules: [{
+            type: "level",
+            levels: [{ type: "levelCard", position: { x: 14, y: 1 } }],
+          }],
+        }}
+        onChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "关卡模块" }));
+    fireEvent.click(screen.getByRole("button", { name: "关卡卡片" }));
+
+    expect(screen.getAllByRole("button", { name: "拖动" })).toHaveLength(1);
+    expect(screen.getAllByRole("spinbutton")).toHaveLength(2);
+    expect(screen.queryByText(/\d+\s*\/\s*20/)).not.toBeInTheDocument();
   });
 
   it("重复 DOM key 的数组定位项只激活当前实例并回传稳定路径", () => {

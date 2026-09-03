@@ -8,6 +8,7 @@ import {
   createApiError,
   getSessionMeta,
   getSessionWorkspacePath,
+  listDemoPages,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { uploadImage } from "@/lib/image-store";
@@ -186,6 +187,7 @@ export async function POST(
           { type: "put_binary", path: `${prefix}/manifest.json`, stagingId: stagedManifest.stagingId, hash: stagedManifest.hash, size: stagedManifest.size },
         ];
         const pageId = formData.get("pageId");
+        const contextPageId = formData.get("contextPageId");
         const configKey = formData.get("configKey");
         const configScope = formData.get("configScope");
         const configPath = configScope === "project"
@@ -193,6 +195,39 @@ export async function POST(
           : configScope === "page" && typeof pageId === "string" && /^[A-Za-z0-9_-]+$/.test(pageId)
             ? `demos/${pageId}/config.values.json`
             : null;
+        if (configPath) {
+          const contextId = configScope === "page"
+            ? (typeof pageId === "string" ? pageId : undefined)
+            : (typeof contextPageId === "string" ? contextPageId : undefined);
+          if (!contextId) {
+            return NextResponse.json(
+              createApiError("CONFIG_READONLY", "配置上传需要页面上下文"),
+              { status: 403 },
+            );
+          }
+          if (contextId) {
+            const contextPage = listDemoPages(workspacePath).find(
+              (page) => page.id === contextId,
+            );
+            if (
+              !contextPage ||
+              contextPage.reference ||
+              (contextPage.isTemplatePage && payload.role !== "admin")
+            ) {
+              return NextResponse.json(
+                createApiError(
+                  "CONFIG_READONLY",
+                  !contextPage
+                    ? "页面配置元数据不存在"
+                    : contextPage.reference
+                      ? "引用页面的配置不可编辑"
+                      : "普通编辑者不能编辑模板页面配置",
+                ),
+                { status: 403 },
+              );
+            }
+          }
+        }
         let configCommitted = false;
         if (configPath && typeof configKey === "string" && /^[A-Za-z0-9_-]+$/.test(configKey)) {
           operations.push({

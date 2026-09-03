@@ -150,18 +150,16 @@ export class WorkspaceMutationAuthority {
     workspaceId: string,
     afterRevision: number,
   ): Promise<WorkspaceMutationCommittedEvent[]> {
-    return this.serial(workspaceId, async () => this.withLease(workspaceId, async () => {
-      const state = this.ensureBootstrap(projectId, workspaceId);
-      if (state.projectId !== projectId) throw new WorkspaceMutationAuthorityError("WORKSPACE_NOT_FOUND");
-      const directory = path.join(this.authorityDir(workspaceId), "receipts");
-      if (!fs.existsSync(directory)) return [];
-      return fs.readdirSync(directory, { withFileTypes: true })
-        .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
-        .map((entry) => this.readJson<WorkspaceMutationReceipt>(path.join(directory, entry.name)))
-        .filter((receipt) => receipt.projectId === projectId && receipt.workspaceId === workspaceId && receipt.revision > afterRevision)
-        .sort((left, right) => left.revision - right.revision)
-        .map((receipt) => ({ type: "workspace_mutation_committed" as const, receipt }));
-    }));
+    const state = await this.ensureStateForRead(projectId, workspaceId);
+    if (state.projectId !== projectId) throw new WorkspaceMutationAuthorityError("WORKSPACE_NOT_FOUND");
+    const directory = path.join(this.authorityDir(workspaceId), "receipts");
+    if (!fs.existsSync(directory)) return [];
+    return fs.readdirSync(directory, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+      .map((entry) => this.readJson<WorkspaceMutationReceipt>(path.join(directory, entry.name)))
+      .filter((receipt) => receipt.projectId === projectId && receipt.workspaceId === workspaceId && receipt.revision > afterRevision)
+      .sort((left, right) => left.revision - right.revision)
+      .map((receipt) => ({ type: "workspace_mutation_committed" as const, receipt }));
   }
 
   async getProjectionAcks(
@@ -169,20 +167,18 @@ export class WorkspaceMutationAuthority {
     workspaceId: string,
     afterRevision = 0,
   ): Promise<WorkspaceProjectionAck[]> {
-    return this.serial(workspaceId, async () => this.withLease(workspaceId, async () => {
-      const state = this.ensureBootstrap(projectId, workspaceId);
-      if (state.projectId !== projectId) throw new WorkspaceMutationAuthorityError("WORKSPACE_NOT_FOUND");
-      const file = path.join(this.authorityDir(workspaceId), "projection-acks.jsonl");
-      if (!fs.existsSync(file)) return [];
-      return fs.readFileSync(file, "utf-8").split("\n").filter(Boolean).flatMap((line) => {
-        try {
-          const ack = JSON.parse(line) as WorkspaceProjectionAck;
-          return ack.projectId === projectId && ack.workspaceId === workspaceId && ack.revision > afterRevision ? [ack] : [];
-        } catch {
-          return [];
-        }
-      }).sort((left, right) => left.acknowledgedAt - right.acknowledgedAt);
-    }));
+    const state = await this.ensureStateForRead(projectId, workspaceId);
+    if (state.projectId !== projectId) throw new WorkspaceMutationAuthorityError("WORKSPACE_NOT_FOUND");
+    const file = path.join(this.authorityDir(workspaceId), "projection-acks.jsonl");
+    if (!fs.existsSync(file)) return [];
+    return fs.readFileSync(file, "utf-8").split("\n").filter(Boolean).flatMap((line) => {
+      try {
+        const ack = JSON.parse(line) as WorkspaceProjectionAck;
+        return ack.projectId === projectId && ack.workspaceId === workspaceId && ack.revision > afterRevision ? [ack] : [];
+      } catch {
+        return [];
+      }
+    }).sort((left, right) => left.acknowledgedAt - right.acknowledgedAt);
   }
 
   static registerDraftProvider(dataDir: string, provider: CollabDraftProvider): () => void {
@@ -229,7 +225,9 @@ export class WorkspaceMutationAuthority {
   }
 
   async getState(projectId: string, workspaceId: string): Promise<WorkspaceAuthorityState> {
-    return this.serial(workspaceId, async () => this.withLease(workspaceId, async () => this.ensureBootstrap(projectId, workspaceId)));
+    const state = await this.ensureStateForRead(projectId, workspaceId);
+    if (state.projectId !== projectId) throw new WorkspaceMutationAuthorityError("WORKSPACE_NOT_FOUND");
+    return state;
   }
 
   async getSnapshot(projectId: string, workspaceId: string): Promise<WorkspaceAuthoritySnapshot> {
@@ -1189,6 +1187,36 @@ export class WorkspaceMutationAuthority {
     this.persistCommittedBackups(workspaceId, workspacePath, resourceHashes);
     this.writeJsonAtomic(this.statePath(workspaceId), state);
     return state;
+  }
+
+  /**
+   * Read-only Authority endpoints only need the durable state cursor. Rehashing
+   * every managed resource here would make the editor's 2s polling loop scan
+   * the whole workspace and contend on the write lease. Full drift checks stay
+   * in mutation/snapshot/health paths; a missing state is bootstrapped once.
+   */
+  private async ensureStateForRead(projectId: string, workspaceId: string): Promise<WorkspaceAuthorityState> {
+    const existing = this.readState(workspaceId);
+    if (existing && !this.hasRecoveryArtifacts(workspaceId)) return existing;
+
+    // Recovery is the one exception for a read path: an interrupted mutation
+    // must be resolved before exposing the durable cursor. Only enter the
+    // serialized lease section when prepared artifacts actually exist, so the
+    // normal polling path remains lock-free and does not scan the workspace.
+    return this.serial(workspaceId, async () => this.withLease(workspaceId, async () => {
+      const workspacePath = this.workspacePath(workspaceId);
+      const state = this.readState(workspaceId);
+      if (!state) return this.ensureBootstrap(projectId, workspaceId);
+      this.recoverPreparedMutations(workspaceId, workspacePath);
+      this.recoverPreparedReconciles(workspaceId, workspacePath);
+      return this.readState(workspaceId) ?? state;
+    }));
+  }
+
+  private hasRecoveryArtifacts(workspaceId: string): boolean {
+    const authorityDir = this.authorityDir(workspaceId);
+    return this.countFiles(path.join(authorityDir, "prepared"), ".json") > 0
+      || this.countFiles(path.join(authorityDir, "reconcile-prepared"), ".json") > 0;
   }
 
   private apply(prepared: PreparedMutation, workspacePath: string): WorkspaceMutationReceipt["resources"] {

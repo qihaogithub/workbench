@@ -105,6 +105,8 @@ docker compose --env-file .env.docker up -d --force-recreate --no-build author-s
 
 部署前 Authority 资源扫描必须覆盖页面配置值、需求文档、项目可见性规则和白板绑定/状态等注册资源；本地契约测试使用 `corepack pnpm --silent exec node --test scripts/check-workspace-deploy-preflight.test.mjs` 验证这一点，避免合法资源被误判为 external drift。
 
+若测试编辑页右上角长期显示“连接中”且左下角模型列表为空，先查看 `docker compose ps` 和 `docker compose logs --tail=100 agent-service`。旧版 agent-service 可能在 Authority 只读轮询中反复扫描大型 Workspace，造成高 CPU 与 WebSocket 饥饿；更新 agent-service 镜像后，应确认 `/health` 为 healthy、`/models` 能返回模型，再刷新浏览器。不要通过删除活动 lease 规避问题，部署前 Authority 门禁仍需按状态结果显式收敛。
+
 通过 `scripts/deploy.sh --remote-build` 构建时，测试机应设置 `DOCKER_BUILD_HTTP_PROXY=http://10.130.33.131:48179` 与 `DOCKER_BUILD_HTTPS_PROXY=http://10.130.33.131:48179`，脚本会把代理作为 BuildKit 参数传给各服务；不需要代理的环境保持为空即可。
 
 ### 数据覆盖权限

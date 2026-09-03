@@ -30,6 +30,7 @@ jest.mock("@/lib/fs-utils", () => ({
     expiresAt: Date.now() + 1000,
   })),
   isSessionExpired: jest.fn(() => false),
+  readDemoPageMeta: jest.fn(() => ({ id: "page-1", name: "页面 1", order: 0 })),
   projectExists: jest.fn(() => true),
   saveProjectConfigValues: jest.fn(),
   sessionExists: jest.fn(() => true),
@@ -143,7 +144,7 @@ describe("project config values route", () => {
       modalImage: "/api/sessions/session-1/assets/popup.png",
     };
     const response = await PUT(
-      jsonRequest({ sessionId: "session-1", values }),
+      jsonRequest({ sessionId: "session-1", contextPageId: "page-1", values }),
       { params: Promise.resolve({ projectId: "project-1" }) },
     );
     const body = await response.json();
@@ -172,5 +173,18 @@ describe("project config values route", () => {
     });
     expect(fsUtils.saveProjectConfigValues).not.toHaveBeenCalled();
     expect(workspaceManager.updateWorkspaceTimestamp).not.toHaveBeenCalled();
+  });
+
+  it("缺少页面上下文时拒绝共享配置运行值写入", async () => {
+    const { PUT } = await import("./route");
+    const response = await PUT(
+      jsonRequest({ sessionId: "session-1", values: { title: "x" } }),
+      { params: Promise.resolve({ projectId: "project-1" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error.code).toBe("CONFIG_READONLY");
+    expect(commitWorkspaceMutation).not.toHaveBeenCalled();
   });
 });

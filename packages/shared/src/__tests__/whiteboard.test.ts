@@ -5,6 +5,7 @@ import {
   isWhiteboardBinding,
   isWhiteboardDocument,
   isWhiteboardDocumentV3,
+  isWhiteboardPageId,
   type WhiteboardDocumentV3,
 } from "../whiteboard";
 
@@ -74,5 +75,37 @@ describe("shared whiteboard document contract", () => {
     expect(isWhiteboardBinding(binding)).toBe(true);
     expect(isWhiteboardBinding({ ...binding, documentVersion: 99 })).toBe(false);
     expect(isWhiteboardBinding({ ...binding, documentVersion: undefined })).toBe(true);
+  });
+
+  it("accepts Unicode page ids only when they are safe single path segments", () => {
+    expect(isWhiteboardPageId("闯关活动页-进行中_ec853d")).toBe(true);
+    expect(isWhiteboardPageId("🎨画板")).toBe(true);
+    expect(isWhiteboardPageId("page_1")).toBe(true);
+    expect(isWhiteboardPageId("")).toBe(false);
+    expect(isWhiteboardPageId(".")).toBe(false);
+    expect(isWhiteboardPageId("..")).toBe(false);
+    expect(isWhiteboardPageId("page/other")).toBe(false);
+    expect(isWhiteboardPageId("page\\other")).toBe(false);
+    expect(isWhiteboardPageId("page\u0000other")).toBe(false);
+    expect(isWhiteboardPageId("page\u0085other")).toBe(false);
+    expect(isWhiteboardPageId("page\ud800other")).toBe(false);
+  });
+
+  it("accepts bindings targeting an existing Unicode page id", () => {
+    const binding = {
+      id: "binding_unicode",
+      target: { scope: "page" as const, pageId: "闯关活动页-进行中_ec853d", fieldPath: ["image"] as const },
+      whiteboardId: "wb_full",
+      documentRevisionAtOutput: 4,
+      documentVersion: 3 as const,
+      outputAssetHash: "a".repeat(64),
+      updatedAt: 1,
+    };
+    expect(isWhiteboardBinding(binding)).toBe(true);
+    expect(isWhiteboardBinding({ ...binding, target: { ...binding.target, pageId: "../other" } })).toBe(false);
+    expect(isWhiteboardBinding({
+      ...binding,
+      target: { scope: "project" as const, pageId: "page-1", fieldPath: ["image"] as const },
+    })).toBe(false);
   });
 });

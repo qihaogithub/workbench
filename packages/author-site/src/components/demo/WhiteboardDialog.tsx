@@ -33,6 +33,8 @@ import {
 export interface WhiteboardCommitTarget {
   scope: "page" | "project";
   pageId?: string;
+  /** 页面上下文用于校验共享配置是否来自引用页/模板页。 */
+  contextPageId?: string;
   fieldPath: string;
   listItem?: { index: number; url: string };
   currentValue?: string;
@@ -657,6 +659,7 @@ export function WhiteboardDialog({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             sessionId,
+            ...(target.contextPageId ? { contextPageId: target.contextPageId } : {}),
             baseDocumentRevision: baseRevisionToken,
             target,
             document: commitDocument,

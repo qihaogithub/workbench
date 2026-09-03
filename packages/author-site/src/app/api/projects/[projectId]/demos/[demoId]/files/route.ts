@@ -49,8 +49,9 @@ function createPutTextOperation(input: {
 }
 
 function createMutationErrorResponse(error: WorkspaceAuthorityClientError) {
+  const code = error.code === "CONFIG_READONLY" ? "CONFIG_READONLY" : "FILE_WRITE_ERROR";
   return NextResponse.json(
-    createApiError("FILE_WRITE_ERROR", error.message, {
+    createApiError(code, error.message, {
       authorityCode: error.code,
     }),
     { status: error.status },
@@ -169,6 +170,32 @@ export async function PUT(
       return NextResponse.json(createApiError("DEMO_PAGE_NOT_FOUND"), {
         status: 404,
       });
+    }
+
+    // A schema write is a configuration-definition mutation.  Keep this
+    // guard here as well as in the dedicated config endpoints because this
+    // legacy file route is still used by some authoring flows.
+    if (typeof schema === "string") {
+      const pageMeta = listDemoPages(wsPath).find(
+        (page) => page.id === demoId,
+      );
+      if (
+        !pageMeta ||
+        pageMeta.reference ||
+        (pageMeta.isTemplatePage && payload.role !== "admin")
+      ) {
+        return NextResponse.json(
+          createApiError(
+            "CONFIG_READONLY",
+            pageMeta?.reference
+              ? "引用页面的配置不可编辑"
+              : pageMeta
+                ? "普通编辑者不能编辑模板页面配置"
+                : "页面配置元数据不存在",
+          ),
+          { status: 403 },
+        );
+      }
     }
 
     // Schema 冲突校验：仅当本次 PUT 修改 schema 时进行

@@ -19,6 +19,7 @@ jest.mock("@/lib/fs-utils", () => ({
   })),
   getSessionMeta: jest.fn(),
   getSessionWorkspacePath: jest.fn(),
+  listDemoPages: jest.fn(() => [{ id: "motion-formats_k4r2" }]),
 }));
 jest.mock("@/lib/image-store", () => ({ uploadImage: jest.fn() }));
 jest.mock("@/lib/project-images", () => ({ addProjectImage: jest.fn() }));
@@ -93,6 +94,7 @@ describe("session asset upload validation", () => {
       ["assetKind", "spine"],
       ["configScope", "page"],
       ["pageId", "motion-formats_k4r2"],
+      ["contextPageId", "motion-formats_k4r2"],
       ["configKey", "spineAsset"],
     ]);
     const request = { formData: async () => ({ get: (key: string) => entries.get(key) ?? null }) } as unknown as Request;

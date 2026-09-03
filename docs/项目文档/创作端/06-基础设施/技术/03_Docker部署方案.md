@@ -374,6 +374,7 @@ Pi Agent 内置 5 个工具，通过 `beforeToolCall`/`afterToolCall` 拦截机�
 - 在任何同步或构建前运行 Workspace Authority 部署前检查：Compose 检查确认四个写服务共用 `/app/data`，并强制 knowledge-service 仅内网暴露、SQLite 单实例及 Agent/创作端使用内部服务地址。
 - 部署前检查脚本的 managed-resource 规则必须与 Workspace Authority 注册表同步，覆盖页面 `config.schema.json`/`config.values.json`、`requirements.md`、项目可见性规则、设计规范、白板绑定与白板状态等资源；否则会把合法资源误报为 external drift 并阻断部署。对应契约测试位于 `scripts/check-workspace-deploy-preflight.test.mjs`。
 - 远程 Authority 扫描会阻断未注册 live Workspace、external drift、active/stale lease、prepared/reconcile-prepared 事务、committed backup 缺失/损坏和孤立 Authority state。部署脚本不会自动 adopt 或 restore，必须先通过显式运维命令收敛。
+- 编辑页的 Authority 事件与 projection-ack 读取属于只读热路径，只应读取已持久化的 state cursor 和增量记录，不得在每次轮询时重新哈希整个 Workspace 或争用写锁。全量漂移检查仍保留在 mutation、snapshot、health 和部署前检查路径；若旧镜像导致 agent-service 高 CPU、不健康，且编辑页同步持续“连接中”、模型列表为空，应先升级 agent-service，再检查 `/health` 与 `/models`，不要手工删除活动 lease。
 - 在远端启动前根据 `.env.docker` 中的 `APP_DATA_DIR` 检查稳定持久数据目录；默认不自动创建缺失目录，避免正式环境误切到空 data。首次部署确需创建空目录时，必须显式设置 `ALLOW_CREATE_APP_DATA_DIR=true`。
 - 只有显式设置 `DEPLOY_BUILD_MODE=remote` 时才会在服务器执行限定服务集合的 `docker compose build`；该模式会先检查远端可用内存和 1 分钟负载，资源不足时拒绝构建。
 - 部署前校验 `.env.docker` 必须包含非空 `INTERNAL_API_TOKEN`。
@@ -463,6 +464,7 @@ docker compose exec knowledge-service node -e \
 | 管理后台配置重启后丢失                   | `/app/data` 未绑定到稳定宿主机目录，或误删了持久数据目录                                    | 检查 `APP_DATA_DIR` 是否固定，确认 `users.db` 及 WAL 文件存在                                                                 |
 | 管理后台显示 `INTERNAL_API_TOKEN 未配置` | author-site 容器没有读取到内部接口密钥                                                      | 检查 `.env.docker` 是否包含非空 `INTERNAL_API_TOKEN`，并用部署脚本重建 author-site                                            |
 | agent-service 显示不可达或模型供应商回退 | 运行时内存配置尚未恢复，或 author-site 与 agent-service 的 `INTERNAL_API_TOKEN` 不一致      | 重新部署 `author-site agent-service`，确认部署后内部模型配置接口自检通过，并检查 author-site 日志中的 `BackendProviders Sync` |
+| 编辑页同步持续“连接中”、选择模型为空         | 旧版 agent-service 在 Authority 只读轮询中重复扫描整个 Workspace，事件循环被哈希和写锁争用拖慢；模型目录本身可能仍可用 | 先更新 `agent-service` 镜像并确认容器健康、`/models` 返回模型，再刷新编辑页；保留活动 lease，按 Authority 状态命令处理真正的恢复事务 |
 | `SSE stream timeout`                     | LLM API 响应超时                                                                            | 检查网络连接或增大 `PI_AGENT_TIMEOUT`                                                                                         |
 | `Cannot find module` 或类型声明缺失      | Dockerfile 未复制 workspace 传递依赖或包内缺少声明依赖                                      | 补齐 Dockerfile 复制清单、`transpilePackages` 和包级依赖                                                                      |
 | CORS 预检返回 405                        | author-site 未在路由处理前响应 OPTIONS                                                      | 检查 `CORS_ORIGINS` 是否包含使用端来源，并确认中间件先处理预检                                                                |

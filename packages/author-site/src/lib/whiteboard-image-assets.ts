@@ -172,14 +172,22 @@ async function resolvePublicRemoteUrl(rawUrl: string, deadline: number): Promise
     if (isPrivateIp(hostname)) throw new WhiteboardImageAssetError("PRIVATE_NETWORK_BLOCKED", "出于安全原因，不能读取内网图片地址");
     return { url, address: hostname, family: net.isIPv4(hostname) ? 4 : 6 };
   }
-  const records = await withDeadline(dns.lookup(hostname, { all: true }), deadline);
+  let records = await withDeadline(dns.lookup(hostname, { all: true }), deadline);
+  // TUN proxies can synthesize benchmarking-range addresses even for public
+  // names. Never connect to those addresses: independently resolve the name
+  // over authenticated HTTPS, then apply the same public-address policy.
+  const isFakeIp = (address: string) => net.isIPv4(address) && /^198\.(18|19)\./.test(address);
+  if (records.some((record) => isFakeIp(record.address))
+    && records.every((record) => isFakeIp(record.address) || !isPrivateIp(record.address))) {
+    records = await resolveFakeIpHostname(hostname, deadline);
+  }
   if (!records.length || records.some((record) => isPrivateIp(record.address))) throw new WhiteboardImageAssetError("PRIVATE_NETWORK_BLOCKED", "出于安全原因，不能读取内网图片地址");
   const record = records[0];
   if (record.family !== 4 && record.family !== 6) throw new WhiteboardImageAssetError("PRIVATE_NETWORK_BLOCKED", "出于安全原因，不能读取内网图片地址");
   return { url, address: record.address, family: record.family };
 }
 
-function requestRemoteImage(target: ResolvedRemoteUrl, signal: AbortSignal): Promise<IncomingMessage> {
+function requestRemoteImage(target: ResolvedRemoteUrl, signal: AbortSignal, accept = "image/*"): Promise<IncomingMessage> {
   return new Promise((resolve, reject) => {
     const requestOptions = {
       protocol: target.url.protocol,
@@ -189,7 +197,7 @@ function requestRemoteImage(target: ResolvedRemoteUrl, signal: AbortSignal): Pro
       method: "GET",
       headers: {
         host: target.url.host,
-        accept: "image/*",
+        accept,
         "accept-encoding": "identity",
       },
       // The hostname was resolved and checked above. Returning this exact
@@ -223,7 +231,7 @@ function requestRemoteImage(target: ResolvedRemoteUrl, signal: AbortSignal): Pro
   });
 }
 
-async function readRemoteImageBody(response: IncomingMessage, signal: AbortSignal): Promise<Buffer> {
+async function readRemoteImageBody(response: IncomingMessage, signal: AbortSignal, maxBytes = MAX_WHITEBOARD_IMAGE_BYTES): Promise<Buffer> {
   const chunks: Buffer[] = [];
   let total = 0;
   const onAbort = () => response.destroy(new Error("remote image response aborted"));
@@ -234,7 +242,7 @@ async function readRemoteImageBody(response: IncomingMessage, signal: AbortSigna
       if (signal.aborted) throw new WhiteboardImageAssetError("DOWNLOAD_TIMEOUT", "图片下载超时，请改用上传图片");
       const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
       total += buffer.length;
-      if (total > MAX_WHITEBOARD_IMAGE_BYTES) {
+      if (total > maxBytes) {
         response.destroy();
         throw new WhiteboardImageAssetError("ASSET_TOO_LARGE", "图片大小超过 10MB 限制");
       }
@@ -251,13 +259,51 @@ async function readRemoteImageBody(response: IncomingMessage, signal: AbortSigna
   return Buffer.concat(chunks, total);
 }
 
+async function resolveFakeIpHostname(hostname: string, deadline: number): Promise<Array<{ address: string; family: 4 | 6 }>> {
+  const remainingMs = deadline - Date.now();
+  if (remainingMs <= 0) throw new WhiteboardImageAssetError("DOWNLOAD_TIMEOUT", "图片下载超时，请改用上传图片");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), remainingMs);
+  try {
+    const answers = await Promise.all(([1, 28] as const).map(async (type) => {
+      // Fixed provider and socket address; neither proxy DNS nor the image URL
+      // can redirect this lookup. TLS still validates cloudflare-dns.com.
+      const url = new URL("https://cloudflare-dns.com/dns-query");
+      url.searchParams.set("name", hostname);
+      url.searchParams.set("type", String(type));
+      const response = await requestRemoteImage({ url, address: "1.1.1.1", family: 4 }, controller.signal, "application/dns-json");
+      if (response.statusCode !== 200) {
+        response.destroy();
+        throw new Error("DNS HTTPS response failed");
+      }
+      const buffer = await readRemoteImageBody(response, controller.signal, 64 * 1024);
+      const result = JSON.parse(buffer.toString("utf8")) as { Status?: unknown; Answer?: Array<{ type?: unknown; data?: unknown }> };
+      if (result.Status !== 0 || (result.Answer !== undefined && !Array.isArray(result.Answer))) throw new Error("Invalid DNS response");
+      return (result.Answer ?? []).filter((answer) => answer.type === 1 || answer.type === 28).map((answer) => {
+        const family = answer.type === 1 ? 4 : 6;
+        if (typeof answer.data !== "string" || net.isIP(answer.data) !== family) throw new Error("Invalid DNS address");
+        return { address: answer.data, family } as { address: string; family: 4 | 6 };
+      });
+    }));
+    return answers.flat();
+  } catch {
+    if (controller.signal.aborted) throw new WhiteboardImageAssetError("DOWNLOAD_TIMEOUT", "图片下载超时，请改用上传图片");
+    throw new WhiteboardImageAssetError("DNS_RESOLUTION_FAILED", "无法验证图片的公网地址，请稍后重试或上传图片");
+  } finally {
+    clearTimeout(timer);
+    controller.abort();
+  }
+}
+
 async function downloadWhiteboardImageInternal(urlString: string, redirectCount: number, deadline: number): Promise<{ buffer: Buffer; mimeType: string }> {
   if (redirectCount > MAX_REMOTE_REDIRECTS) throw new WhiteboardImageAssetError("TOO_MANY_REDIRECTS", "图片地址重定向次数过多");
   const remainingMs = deadline - Date.now();
   if (remainingMs <= 0) throw new WhiteboardImageAssetError("DOWNLOAD_TIMEOUT", "图片下载超时，请改用上传图片");
   const target = await resolvePublicRemoteUrl(urlString, deadline);
+  const downloadRemainingMs = deadline - Date.now();
+  if (downloadRemainingMs <= 0) throw new WhiteboardImageAssetError("DOWNLOAD_TIMEOUT", "图片下载超时，请改用上传图片");
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), remainingMs);
+  const timer = setTimeout(() => controller.abort(), downloadRemainingMs);
   try {
     const response = await requestRemoteImage(target, controller.signal);
     const statusCode = response.statusCode ?? 0;

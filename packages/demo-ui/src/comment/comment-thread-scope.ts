@@ -14,6 +14,18 @@ export function filterCommentThreadsByTarget(
     );
   }
 
+  if (target.kind === "config") {
+    if (target.scope === "page" && !target.pageId) return [];
+    return threads.filter((thread) =>
+      thread.target.kind === "config" &&
+      thread.target.scope === target.scope &&
+      thread.target.fieldKey === target.fieldKey &&
+      (target.scope === "project"
+        ? !thread.target.pageId && !target.pageId
+        : thread.target.pageId === target.pageId),
+    );
+  }
+
   return threads.filter(
     (thread) =>
       thread.target.kind === "document" &&

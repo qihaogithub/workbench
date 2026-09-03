@@ -1,4 +1,4 @@
-import type { PagePresentationProfile } from "@workbench/shared";
+import type { ConfigCommentTarget as SharedConfigCommentTarget, PagePresentationProfile } from "@workbench/shared";
 import type { WorkspaceMutationReceipt } from "@workbench/shared/contracts";
 import type {
   ConsoleLogPayload,
@@ -221,10 +221,18 @@ export interface ConfigFormProps {
   onOpenDesignSpec?: (spec: DesignSpecEntryLink, fieldTitle: string, anchor?: { top: number; bottom: number }, trigger?: HTMLElement | null) => void;
   /** 创作端提供时，字段标题可打开对应的配置定义编辑器；浏览端不传。 */
   onEditConfigDefinition?: (fieldKey: string, field: FieldConfig) => void;
+  /** Per-field capabilities. Omit to retain the legacy readonly behaviour. */
+  configItemCapabilities?: ConfigItemCapabilities;
+  /** Opens the host-owned config comment flow for a field. */
+  onAddConfigComment?: (target: ConfigCommentTarget, trigger?: HTMLElement | null) => void;
+  /** Returns the number of unresolved comments for a field target. */
+  getConfigCommentCount?: (target: ConfigCommentTarget) => number;
   /** 配置所在范围。未提供时由宿主自行解析归属。 */
   imageConfigScope?: ImageConfigScope;
   /** page 范围配置所属的页面；项目范围和独立表单可不提供。 */
   pageId?: string;
+  /** 当前配置面板页面，用于项目级上传/写入的权限上下文。 */
+  configContextPageId?: string;
   /** 无 IO capability：宿主打开白板并负责草稿、提交与持久化。 */
   onLaunchWhiteboard?: WhiteboardLauncher;
   /** Optional typed references for richtext fields and field notes. */
@@ -232,6 +240,15 @@ export interface ConfigFormProps {
   referenceProvider?: MarkdownReferenceProvider;
   onReferenceClick?: MarkdownReferenceClickHandler;
 }
+
+export interface ConfigItemCapabilities {
+  canEditDefinition: boolean;
+  canEditValue: boolean;
+  canAddComment: boolean;
+  reason?: "reference" | "template-page" | "readonly" | "none";
+}
+
+export type ConfigCommentTarget = SharedConfigCommentTarget;
 
 export interface ConfigChangeMeta {
   /** The server already durably committed this delta in an atomic mutation. */

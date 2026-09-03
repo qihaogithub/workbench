@@ -405,6 +405,7 @@ export const ErrorCode = {
   HTML_IMPORT_RUNTIME_MISMATCH: "HTML_IMPORT_RUNTIME_MISMATCH",
   HTML_RUNTIME_FAILED: "HTML_RUNTIME_FAILED",
   VISIBILITY_RULES_INVALID: "VISIBILITY_RULES_INVALID",
+  CONFIG_READONLY: "CONFIG_READONLY",
 } as const;
 
 export type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -463,6 +464,7 @@ export const ERROR_MESSAGES: Record<ErrorCodeType, string> = {
   HTML_IMPORT_RUNTIME_MISMATCH: "HTML 产物与页面运行时不匹配",
   HTML_RUNTIME_FAILED: "HTML 交互预览运行失败",
   VISIBILITY_RULES_INVALID: "页面可见性规则无效",
+  CONFIG_READONLY: "当前配置不可编辑",
 };
 
 export * from "./workspace";

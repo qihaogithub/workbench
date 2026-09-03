@@ -7,9 +7,9 @@ import {
 } from "@workbench/shared/markdown-reference";
 
 /**
- * 配置项备注的 Markdown 安全渲染工具。
- * 备注内容以 Markdown 字符串存储于属性级 `$demo.note`，
- * 展示态统一经 markdown-it 渲染后再用扩展白名单清洗，见 sanitizeNoteHtml。
+ * 配置项与历史备注共用的 Markdown 安全渲染工具。
+ * 新配置项批注存储在 comments.json 的评论线程中；属性级 `$demo.note`
+ * 仅作为历史兼容数据读取。展示态统一经 markdown-it 渲染后再用扩展白名单清洗。
  */
 
 const md = new MarkdownIt({ html: true, linkify: false, typographer: false });

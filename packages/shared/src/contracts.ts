@@ -31,6 +31,7 @@ export type WorkspaceMutationErrorCode =
 export type WorkspaceAuthorityApiErrorCode =
   | WorkspaceMutationErrorCode
   | "INVALID_REQUEST"
+  | "CONFIG_READONLY"
   | "SESSION_NOT_FOUND"
   | "SESSION_EXPIRED"
   | "PROJECT_MISMATCH"
@@ -41,6 +42,7 @@ export type WorkspaceAuthorityApiErrorCode =
 
 export const WORKSPACE_AUTHORITY_API_ERROR_CODES = [
   "INVALID_REQUEST",
+  "CONFIG_READONLY",
   "SESSION_NOT_FOUND",
   "SESSION_EXPIRED",
   "PROJECT_MISMATCH",

@@ -126,3 +126,20 @@ export function mergeConfigWithUserValues(
 
   return result;
 }
+
+/**
+ * Apply a refreshed page snapshot without allowing stale editor state to win.
+ * A page config.values.json is an Authority-owned snapshot; when present it
+ * already contains the latest shape and must replace the old page state.
+ * Pages without that file retain the existing user-value merge behavior.
+ */
+export function mergeRefreshedConfigValues(
+  refreshedDefaults: Record<string, unknown>,
+  previousValues: Record<string, unknown> | undefined,
+  hasAuthoritativeValues: boolean,
+): Record<string, unknown> {
+  return {
+    ...refreshedDefaults,
+    ...(hasAuthoritativeValues ? {} : previousValues ?? {}),
+  };
+}

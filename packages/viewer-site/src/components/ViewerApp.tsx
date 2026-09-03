@@ -1099,7 +1099,6 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
       isAnonymous: true,
     };
   }, [isLoggedIn, sessionId, sessionUsername]);
-
   // 已登录用户打开项目时记录访问（供 @候选人列表使用）
   useEffect(() => {
     if (isLoggedIn && project) {

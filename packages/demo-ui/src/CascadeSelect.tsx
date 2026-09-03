@@ -14,6 +14,7 @@ interface CascadeSelectProps {
   value: string[];
   onChange: (value: string[]) => void;
   placeholder?: string;
+  disabled?: boolean;
 }
 
 export function CascadeSelect({
@@ -21,6 +22,7 @@ export function CascadeSelect({
   value,
   onChange,
   placeholder = "请选择",
+  disabled = false,
 }: CascadeSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -54,18 +56,20 @@ export function CascadeSelect({
 
   const handleChildClick = useCallback(
     (childValue: string) => {
+      if (disabled || !activeParent) return;
       onChange([activeParent!, childValue]);
       setOpen(false);
     },
-    [activeParent, onChange],
+    [activeParent, disabled, onChange],
   );
 
   const handleParentOnlyClick = useCallback(
     (parentValue: string) => {
+      if (disabled) return;
       onChange([parentValue]);
       setOpen(false);
     },
-    [onChange],
+    [disabled, onChange],
   );
 
   const displayText = (() => {
@@ -78,12 +82,13 @@ export function CascadeSelect({
   })();
 
   return (
-    <Popover open={open} onOpenChange={setOpen} modal>
+    <Popover open={open} onOpenChange={disabled ? undefined : setOpen} modal>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
           role="combobox"
           aria-expanded={open}
+          disabled={disabled}
           className={cn(
             "h-8 w-full justify-between font-normal",
             value.length === 0 && "text-muted-foreground",
@@ -116,6 +121,8 @@ export function CascadeSelect({
                 const hasChildren = opt.children && opt.children.length > 0;
                 return (
                   <button
+                    type="button"
+                    disabled={disabled}
                     key={opt.value}
                     onClick={() => {
                       if (hasChildren) {
@@ -150,6 +157,8 @@ export function CascadeSelect({
                     value.length === 2 && value[1] === child.value;
                   return (
                     <button
+                      type="button"
+                      disabled={disabled}
                       key={child.value}
                       onClick={() => handleChildClick(child.value)}
                       className={cn(

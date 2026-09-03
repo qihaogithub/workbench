@@ -39,6 +39,7 @@ export interface SessionValidation {
   reason?: string;
   userId?: string;
   username?: string;
+  role?: "admin" | "editor";
   workspacePath?: string;
 }
 
@@ -60,6 +61,7 @@ interface SessionMetaFile {
   demoId?: string;
   userId?: string;
   username?: string;
+  role?: "admin" | "editor";
   workspaceId?: string;
   expiresAt?: number;
 }
@@ -153,8 +155,69 @@ export class WorkspaceFilePersistence {
       ok: true,
       userId: session.userId,
       username: session.username ?? session.userId,
+      ...(session.role ? { role: session.role } : {}),
       workspacePath,
     };
+  }
+
+  /**
+   * Collab rooms can write through Yjs without passing the author-site HTTP
+   * route. Keep the template/reference guard at the persistence boundary for
+   * page schemas and whiteboard documents as well.
+   */
+  assertConfigResourceWriteAllowed(input: {
+    workspacePath: string;
+    resourcePath: string;
+    kind: CollabResourceKind;
+    role?: "admin" | "editor";
+  }): void {
+    const normalized = input.resourcePath.replace(/\\/g, "/").replace(/^\/+/, "");
+    const pageIds: string[] = [];
+    if (input.kind === "page-schema") {
+      const match = /^demos\/([^/]+)\/config\.schema\.json$/.exec(normalized);
+      if (match) pageIds.push(match[1]);
+    } else if (input.kind === "whiteboard-document") {
+      const match = /^whiteboards\/([A-Za-z0-9_-]{1,80})\.json$/.exec(normalized);
+      if (match) {
+        try {
+          const bindingsPath = path.join(input.workspacePath, "whiteboards", "bindings.json");
+          if (!fs.existsSync(bindingsPath)) throw new Error("INVALID_WHITEBOARD_BINDINGS");
+          const parsed = JSON.parse(fs.readFileSync(bindingsPath, "utf8")) as {
+            bindings?: Array<{ whiteboardId?: unknown; target?: { scope?: unknown; pageId?: unknown } }>;
+          };
+          if (!Array.isArray(parsed.bindings)) throw new Error("INVALID_WHITEBOARD_BINDINGS");
+          for (const binding of parsed.bindings) {
+            if (binding?.whiteboardId !== match[1]) continue;
+            if (binding.target?.scope === "page" && typeof binding.target.pageId === "string") {
+              pageIds.push(binding.target.pageId);
+            }
+          }
+        } catch {
+          throw new Error("CONFIG_READONLY");
+        }
+      }
+    }
+
+    // Non-config resources are unaffected; admins retain their existing
+    // access to those resources. Config resources still need page metadata
+    // because reference pages are immutable for every role.
+    if (pageIds.length === 0) return;
+    let tree: { pages?: Array<{ id?: unknown; reference?: unknown; isTemplatePage?: unknown }> };
+    try {
+      tree = JSON.parse(fs.readFileSync(path.join(input.workspacePath, "workspace-tree.json"), "utf8")) as typeof tree;
+    } catch {
+      throw new Error("CONFIG_READONLY");
+    }
+    if (!Array.isArray(tree.pages)) throw new Error("CONFIG_READONLY");
+    for (const pageId of pageIds) {
+      const page = tree.pages.find((candidate) => candidate?.id === pageId);
+      if (!page) throw new Error("CONFIG_READONLY");
+      // `reference` is persisted as a source-page object, not a boolean flag.
+      // Treat any present reference object as immutable for every role.
+      if (Boolean(page?.reference) || (page?.isTemplatePage === true && input.role !== "admin")) {
+        throw new Error("CONFIG_READONLY");
+      }
+    }
   }
 
   readResource(workspacePath: string, resourcePath: string, kind: CollabResourceKind): string {

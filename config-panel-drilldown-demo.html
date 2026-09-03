@@ -1,0 +1,2316 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OneFlow 配置面板 · 层级导航 Demo</title>
+    <style>
+      :root {
+        --bg: #101010;
+        --panel: #171717;
+        --surface: #1c1c1c;
+        --surface-strong: #232323;
+        --surface-hover: #2b2b2b;
+        --line: rgba(255, 255, 255, 0.09);
+        --line-strong: rgba(255, 255, 255, 0.16);
+        --text: #f5f5f5;
+        --text-soft: #d1d1d1;
+        --muted: #9a9a9a;
+        --faint: #676767;
+        --blue: #08aef5;
+        --blue-soft: rgba(8, 174, 245, 0.14);
+        --green: #65cf9a;
+        --amber: #f2bd62;
+        --red: #ff7f7f;
+        --radius: 12px;
+        color-scheme: dark;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        min-height: 100%;
+      }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.45 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      button,
+      input,
+      select {
+        color: inherit;
+        font: inherit;
+      }
+
+      button {
+        border: 0;
+      }
+
+      button:focus-visible,
+      input:focus-visible,
+      select:focus-visible {
+        outline: 2px solid var(--blue);
+        outline-offset: 2px;
+      }
+
+      .icon {
+        width: 16px;
+        height: 16px;
+        flex: 0 0 auto;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.8;
+      }
+
+      .icon-defs {
+        position: absolute;
+        width: 0;
+        height: 0;
+        overflow: hidden;
+      }
+
+      .app {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 520px;
+        height: 100vh;
+        min-height: 600px;
+      }
+
+      .preview-pane {
+        position: relative;
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 18% 0%, rgba(8, 174, 245, 0.1), transparent 30%),
+          linear-gradient(140deg, #161616 0%, #0d0d0d 72%);
+      }
+
+      .preview-topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 58px;
+        padding: 0 28px;
+        border-bottom: 1px solid var(--line);
+        color: var(--muted);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--text);
+        font-weight: 650;
+        letter-spacing: -0.02em;
+      }
+
+      .brand-mark {
+        display: grid;
+        place-items: center;
+        width: 26px;
+        height: 26px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        color: var(--blue);
+        background: rgba(8, 174, 245, 0.08);
+      }
+
+      .brand-mark .icon {
+        width: 14px;
+        height: 14px;
+      }
+
+      .preview-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .ghost-button,
+      .outline-button,
+      .primary-button,
+      .icon-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        min-height: 34px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+      }
+
+      .ghost-button {
+        padding: 0 10px;
+        color: var(--muted);
+        background: transparent;
+      }
+
+      .ghost-button:hover {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.07);
+      }
+
+      .outline-button {
+        min-height: 32px;
+        padding: 0 11px;
+        border: 1px solid var(--line-strong);
+        color: var(--text-soft);
+        background: transparent;
+      }
+
+      .outline-button:hover {
+        border-color: rgba(255, 255, 255, 0.28);
+        background: rgba(255, 255, 255, 0.07);
+      }
+
+      .primary-button {
+        min-height: 34px;
+        padding: 0 13px;
+        color: #041117;
+        background: var(--blue);
+        font-weight: 650;
+      }
+
+      .primary-button:hover {
+        background: #39bdff;
+      }
+
+      .preview-stage {
+        display: grid;
+        place-items: center;
+        height: calc(100% - 58px);
+        padding: 40px;
+      }
+
+      .stage-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        width: min(680px, 100%);
+      }
+
+      .stage-caption {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .stage-caption strong {
+        color: var(--text-soft);
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .artboard {
+        position: relative;
+        aspect-ratio: 1.47 / 1;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 22px;
+        background:
+          radial-gradient(circle at 83% 18%, rgba(252, 184, 84, 0.9), transparent 17%),
+          radial-gradient(circle at 14% 86%, rgba(62, 202, 192, 0.8), transparent 26%),
+          linear-gradient(145deg, #e1f5f2 0%, #bde9e6 42%, #75b7d3 100%);
+        box-shadow: 0 28px 90px rgba(0, 0, 0, 0.45);
+      }
+
+      .artboard-nav {
+        position: absolute;
+        top: 0;
+        right: 0;
+        left: 0;
+        z-index: 2;
+        height: 9px;
+        background: var(--nav-color, var(--blue));
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.16);
+      }
+
+      .artboard::before,
+      .artboard::after {
+        position: absolute;
+        content: "";
+        border-radius: 999px;
+        transform: rotate(-14deg);
+      }
+
+      .artboard::before {
+        right: 5%;
+        bottom: 12%;
+        width: 58%;
+        height: 36%;
+        background: linear-gradient(135deg, #a7ecdd, #65c3a7);
+        box-shadow: -34px 20px 0 rgba(248, 210, 113, 0.95), -70px 31px 0 rgba(92, 189, 184, 0.85);
+      }
+
+      .artboard::after {
+        top: 8%;
+        left: 10%;
+        width: 24%;
+        height: 11%;
+        background: rgba(255, 255, 255, 0.42);
+        filter: blur(1px);
+      }
+
+      .artboard-card {
+        position: absolute;
+        top: 14%;
+        left: 9%;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        width: 31%;
+        padding: 15px;
+        border: 1px solid rgba(255, 255, 255, 0.62);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.48);
+        color: #173a47;
+        backdrop-filter: blur(10px);
+      }
+
+      .artboard-card span:first-child {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .artboard-card strong {
+        font-size: clamp(18px, 2.6vw, 30px);
+        line-height: 1.08;
+        letter-spacing: -0.04em;
+      }
+
+      .artboard-card small {
+        color: rgba(23, 58, 71, 0.72);
+        font-size: 11px;
+      }
+
+      .artboard-level {
+        position: absolute;
+        right: 14%;
+        bottom: 25%;
+        display: grid;
+        place-items: center;
+        width: 18%;
+        aspect-ratio: 1;
+        border: 5px solid rgba(255, 255, 255, 0.8);
+        border-radius: 26px;
+        background: linear-gradient(140deg, #fdca55, #ef7a62);
+        box-shadow: 0 11px 30px rgba(98, 56, 37, 0.24);
+        color: #fff;
+        font-size: clamp(18px, 3vw, 35px);
+        font-weight: 800;
+      }
+
+      .artboard-level::after {
+        position: absolute;
+        right: -16%;
+        bottom: -18%;
+        width: 38%;
+        height: 38%;
+        border: 3px solid rgba(255, 255, 255, 0.72);
+        border-radius: 50%;
+        background: #5eafdc;
+        content: "";
+      }
+
+      .preview-note {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .preview-note .icon {
+        color: var(--blue);
+      }
+
+      .config-pane {
+        display: flex;
+        min-width: 0;
+        min-height: 0;
+        flex-direction: column;
+        border-left: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      .config-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 60px;
+        padding: 0 18px 0 22px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .config-title {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      .config-title .icon {
+        width: 17px;
+        height: 17px;
+        color: var(--blue);
+      }
+
+      .head-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .head-actions .icon-button,
+      .icon-button {
+        width: 32px;
+        height: 32px;
+        min-height: 32px;
+        padding: 0;
+        color: var(--muted);
+        background: transparent;
+      }
+
+      .head-actions .icon-button:hover,
+      .icon-button:hover {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .config-main {
+        position: relative;
+        min-height: 0;
+        flex: 1;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-color: rgba(255, 255, 255, 0.24) transparent;
+        scrollbar-width: thin;
+      }
+
+      .config-main::-webkit-scrollbar {
+        width: 7px;
+      }
+
+      .config-main::-webkit-scrollbar-thumb {
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      .config-view {
+        padding: 24px 24px 96px;
+      }
+
+      /* Drill-down keeps a compact master list visible beside the editor. */
+      .drilldown-layout {
+        display: flex;
+        flex-direction: column;
+        min-height: 100%;
+      }
+
+      .context-rail {
+        display: flex;
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        min-width: 0;
+        min-height: 0;
+        flex-direction: column;
+        gap: 9px;
+        padding: 12px 18px 11px;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+        background: rgba(23, 23, 23, 0.94);
+        backdrop-filter: blur(14px);
+      }
+
+      .context-rail-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 7px;
+        padding: 0 1px;
+      }
+
+      .context-rail-head strong {
+        color: var(--text-soft);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+
+      .context-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        padding: 3px 4px;
+        border-radius: 5px;
+        color: var(--muted);
+        background: transparent;
+        cursor: pointer;
+        font-size: 11px;
+      }
+
+      .context-back:hover {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.07);
+      }
+
+      .context-back .icon {
+        width: 13px;
+        height: 13px;
+      }
+
+      .context-rail-label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 0 4px;
+        color: var(--faint);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .context-rail-label span:last-child {
+        color: var(--muted);
+        font-weight: 550;
+        letter-spacing: 0;
+        text-transform: none;
+      }
+
+      .context-module-list,
+      .context-level-list {
+        display: flex;
+        flex-direction: row;
+        gap: 6px;
+        overflow-x: auto;
+        padding-bottom: 2px;
+        scrollbar-width: none;
+      }
+
+      .context-module-list::-webkit-scrollbar,
+      .context-level-list::-webkit-scrollbar {
+        display: none;
+      }
+
+      .context-module-row,
+      .context-level-row {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        min-width: 0;
+        border-radius: 8px;
+        color: var(--muted);
+        background: transparent;
+        cursor: pointer;
+        text-align: left;
+        transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+      }
+
+      .context-module-row {
+        flex: 0 0 auto;
+        gap: 7px;
+        width: auto;
+        min-width: 112px;
+        min-height: 34px;
+        padding: 5px 8px;
+      }
+
+      .context-module-row:hover,
+      .context-level-row:hover {
+        color: var(--text-soft);
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .context-module-row.is-active,
+      .context-level-row.is-active {
+        color: var(--text);
+        background: var(--blue-soft);
+        box-shadow: inset 2px 0 0 var(--blue);
+      }
+
+      .context-module-row .icon {
+        width: 14px;
+        height: 14px;
+        color: var(--faint);
+      }
+
+      .context-module-row.is-active .icon {
+        color: var(--blue);
+      }
+
+      .context-module-row > span:nth-child(2),
+      .context-level-row > span:nth-child(2) {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .context-module-row .context-count {
+        margin-left: auto;
+        color: var(--faint);
+        font-size: 10px;
+      }
+
+      .context-level-row {
+        flex: 0 0 auto;
+        gap: 7px;
+        width: auto;
+        min-width: 88px;
+        min-height: 31px;
+        padding: 5px 7px;
+        font-size: 11px;
+      }
+
+      .context-level-index {
+        display: grid;
+        place-items: center;
+        width: 20px;
+        height: 20px;
+        flex: 0 0 auto;
+        border-radius: 6px;
+        color: var(--muted);
+        background: rgba(255, 255, 255, 0.07);
+        font: 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .context-level-row.is-active .context-level-index {
+        color: #041117;
+        background: var(--blue);
+      }
+
+      .context-status-dot {
+        width: 5px;
+        height: 5px;
+        margin-left: auto;
+        flex: 0 0 auto;
+        border-radius: 50%;
+        background: var(--faint);
+      }
+
+      .context-status-dot.is-ready {
+        background: var(--green);
+      }
+
+      .context-rail-divider {
+        height: 1px;
+        margin: 1px 4px 0;
+        background: var(--line);
+      }
+
+      .context-rail-note {
+        display: flex;
+        gap: 6px;
+        margin-top: 0;
+        padding: 0 2px;
+        border-top: 0;
+        color: var(--faint);
+        font-size: 10px;
+        line-height: 1.5;
+      }
+
+      .context-rail-note .icon {
+        width: 13px;
+        height: 13px;
+        color: var(--blue);
+      }
+
+      .drilldown-editor {
+        min-width: 0;
+        min-height: 100%;
+        animation: drilldown-in 220ms ease both;
+      }
+
+      .drilldown-editor .config-view {
+        padding-right: 18px;
+        padding-left: 18px;
+      }
+
+      .drilldown-editor .view-title-row {
+        display: flex;
+      }
+
+      .drilldown-editor .view-title-actions {
+        margin-top: 0;
+      }
+
+      .drilldown-editor .field-row {
+        align-items: center;
+        flex-direction: row;
+        gap: 18px;
+        padding: 0;
+      }
+
+      .drilldown-editor .field-meta {
+        flex: 1 1 auto;
+      }
+
+      .drilldown-editor .asset-control,
+      .drilldown-editor .position-actions {
+        flex: 0 1 auto;
+      }
+
+      .drilldown-editor .position-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      @keyframes drilldown-in {
+        from {
+          opacity: 0;
+          transform: translateX(12px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+
+      .view-heading {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        margin-bottom: 26px;
+      }
+
+      .breadcrumbs {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+        gap: 5px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .crumb-button {
+        max-width: 180px;
+        overflow: hidden;
+        padding: 2px 4px;
+        border-radius: 5px;
+        color: var(--muted);
+        background: transparent;
+        cursor: pointer;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .crumb-button:hover {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.07);
+      }
+
+      .crumb-current {
+        min-width: 0;
+        overflow: hidden;
+        color: var(--text-soft);
+        font-weight: 550;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .crumb-separator {
+        color: var(--faint);
+      }
+
+      .view-title-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px;
+      }
+
+      .view-title-row h1 {
+        margin: 0;
+        font-size: 23px;
+        line-height: 1.2;
+        letter-spacing: -0.04em;
+      }
+
+      .view-title-row p {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .view-title-actions {
+        display: flex;
+        flex: 0 0 auto;
+        align-items: center;
+        gap: 7px;
+      }
+
+      .dirty-badge,
+      .state-badge,
+      .count-badge,
+      .type-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        min-height: 22px;
+        padding: 0 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        white-space: nowrap;
+      }
+
+      .dirty-badge {
+        color: #ffd999;
+        background: rgba(242, 189, 98, 0.12);
+      }
+
+      .dirty-badge::before {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--amber);
+        content: "";
+      }
+
+      .state-badge {
+        color: #a2ecc5;
+        background: rgba(101, 207, 154, 0.11);
+      }
+
+      .state-badge.muted-state {
+        color: var(--muted);
+        background: rgba(255, 255, 255, 0.07);
+      }
+
+      .count-badge {
+        color: #c7ebfb;
+        background: var(--blue-soft);
+      }
+
+      .type-badge {
+        color: var(--muted);
+        background: rgba(255, 255, 255, 0.07);
+      }
+
+      .section-block {
+        margin-top: 26px;
+      }
+
+      .section-block:first-of-type {
+        margin-top: 0;
+      }
+
+      .section-heading {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .section-heading h2 {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+
+      .section-heading p,
+      .section-heading .section-hint {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .section-hint {
+        white-space: nowrap;
+      }
+
+      .settings-list {
+        display: flex;
+        flex-direction: column;
+        border-top: 1px solid var(--line);
+      }
+
+      .field-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        min-height: 58px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .field-meta {
+        min-width: 0;
+      }
+
+      .field-label {
+        display: block;
+        color: var(--text-soft);
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .field-help {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .input,
+      .select,
+      .color-input {
+        height: 36px;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        color: var(--text);
+        background: #101010;
+        transition: border-color 160ms ease, background-color 160ms ease;
+      }
+
+      .input,
+      .select {
+        width: 190px;
+        padding: 0 11px;
+      }
+
+      .input:hover,
+      .select:hover,
+      .color-input:hover {
+        background: #151515;
+      }
+
+      .input:focus,
+      .select:focus,
+      .color-input:focus {
+        border-color: rgba(8, 174, 245, 0.7);
+        outline: none;
+      }
+
+      .select {
+        appearance: none;
+        padding-right: 32px;
+        background-image: linear-gradient(45deg, transparent 50%, #888 50%), linear-gradient(135deg, #888 50%, transparent 50%);
+        background-position: calc(100% - 15px) 15px, calc(100% - 10px) 15px;
+        background-repeat: no-repeat;
+        background-size: 5px 5px, 5px 5px;
+      }
+
+      .segmented {
+        display: inline-flex;
+        padding: 3px;
+        border-radius: 9px;
+        background: #101010;
+      }
+
+      .segmented button {
+        min-width: 66px;
+        height: 30px;
+        padding: 0 10px;
+        border-radius: 6px;
+        color: var(--muted);
+        background: transparent;
+        cursor: pointer;
+        font-size: 12px;
+      }
+
+      .segmented button:hover {
+        color: var(--text-soft);
+      }
+
+      .segmented button.active {
+        color: var(--text);
+        background: #2b2b2b;
+        box-shadow: 0 1px 5px rgba(0, 0, 0, 0.28);
+      }
+
+      .color-input {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 190px;
+        padding: 4px 8px 4px 5px;
+      }
+
+      .color-input input[type="color"] {
+        width: 26px;
+        height: 26px;
+        padding: 0;
+        border: 0;
+        border-radius: 7px;
+        background: transparent;
+        cursor: pointer;
+      }
+
+      .color-input input[type="color"]::-webkit-color-swatch-wrapper {
+        padding: 0;
+      }
+
+      .color-input input[type="color"]::-webkit-color-swatch {
+        border: 0;
+        border-radius: 6px;
+      }
+
+      .color-input code {
+        overflow: hidden;
+        color: var(--text-soft);
+        font: 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .upload-tile {
+        display: flex;
+        min-height: 100px;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        width: 112px;
+        border: 1px dashed rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        color: var(--muted);
+        background: rgba(0, 0, 0, 0.16);
+        cursor: pointer;
+        transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+      }
+
+      .upload-tile:hover {
+        border-color: rgba(8, 174, 245, 0.65);
+        color: var(--text);
+        background: rgba(8, 174, 245, 0.08);
+      }
+
+      .upload-tile .icon {
+        width: 18px;
+        height: 18px;
+      }
+
+      .upload-tile span {
+        font-size: 12px;
+      }
+
+      .module-list,
+      .collection-list {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: rgba(255, 255, 255, 0.018);
+      }
+
+      .module-row,
+      .collection-row {
+        position: relative;
+        display: grid;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+        border-bottom: 1px solid var(--line);
+        transition: background-color 160ms ease, border-color 160ms ease;
+      }
+
+      .module-row:last-child,
+      .collection-row:last-child {
+        border-bottom: 0;
+      }
+
+      .module-row {
+        grid-template-columns: 22px 32px minmax(0, 1fr) auto 25px;
+        min-height: 66px;
+        padding: 8px 12px;
+      }
+
+      .module-row:hover,
+      .collection-row:hover {
+        background: rgba(255, 255, 255, 0.045);
+      }
+
+      .module-row.is-selected,
+      .collection-row.is-selected {
+        background: linear-gradient(90deg, rgba(8, 174, 245, 0.13), rgba(8, 174, 245, 0.04));
+        box-shadow: inset 2px 0 0 var(--blue);
+      }
+
+      .drag-handle {
+        display: grid;
+        place-items: center;
+        width: 22px;
+        height: 34px;
+        color: var(--faint);
+        cursor: grab;
+      }
+
+      .drag-handle:active {
+        cursor: grabbing;
+      }
+
+      .drag-handle .icon {
+        width: 15px;
+        height: 15px;
+      }
+
+      .module-symbol,
+      .thumb {
+        display: grid;
+        place-items: center;
+        flex: 0 0 auto;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 9px;
+      }
+
+      .module-symbol {
+        width: 32px;
+        height: 32px;
+        color: var(--blue);
+        background: var(--blue-soft);
+      }
+
+      .module-symbol.green {
+        color: var(--green);
+        background: rgba(101, 207, 154, 0.12);
+      }
+
+      .module-symbol.amber {
+        color: var(--amber);
+        background: rgba(242, 189, 98, 0.12);
+      }
+
+      .module-symbol.pink {
+        color: #de9af5;
+        background: rgba(222, 154, 245, 0.12);
+      }
+
+      .module-symbol .icon {
+        width: 16px;
+        height: 16px;
+      }
+
+      .row-main,
+      .row-title {
+        min-width: 0;
+      }
+
+      .row-title {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        overflow: hidden;
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 650;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .row-subtitle {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin-top: 4px;
+        overflow: hidden;
+        color: var(--muted);
+        font-size: 11px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .row-subtitle .dot {
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: var(--faint);
+      }
+
+      .row-arrow {
+        display: grid;
+        place-items: center;
+        width: 25px;
+        height: 30px;
+        color: var(--faint);
+        background: transparent;
+        cursor: pointer;
+      }
+
+      .row-arrow:hover {
+        color: var(--text);
+      }
+
+      .module-row[draggable="true"],
+      .collection-row[draggable="true"] {
+        cursor: pointer;
+      }
+
+      .module-row.is-dragging,
+      .collection-row.is-dragging {
+        opacity: 0.45;
+      }
+
+      .collection-row {
+        grid-template-columns: 22px 44px minmax(0, 1fr) auto 25px;
+        min-height: 76px;
+        padding: 10px 12px;
+      }
+
+      .collection-row .thumb {
+        width: 44px;
+        height: 52px;
+      }
+
+      .thumb-art {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 68% 25%, #fff0b3 0 14%, transparent 15%),
+          linear-gradient(145deg, #74d4d2 0%, #a2e2bb 44%, #f4ca6d 100%);
+      }
+
+      .thumb-art.pink {
+        background:
+          radial-gradient(circle at 68% 24%, #fff3a6 0 12%, transparent 13%),
+          linear-gradient(145deg, #f3a9cf 0%, #a16ed0 54%, #5540a2 100%);
+      }
+
+      .thumb-art.orange {
+        background:
+          radial-gradient(circle at 34% 30%, #fff7cb 0 9%, transparent 10%),
+          linear-gradient(145deg, #f3c25c 0%, #f48c55 54%, #c94f62 100%);
+      }
+
+      .thumb-art::after {
+        position: absolute;
+        right: 10%;
+        bottom: 11%;
+        width: 42%;
+        height: 26%;
+        border-radius: 999px 999px 22% 22%;
+        background: rgba(255, 255, 255, 0.44);
+        content: "";
+        transform: rotate(-18deg);
+      }
+
+      .collection-actions {
+        display: flex;
+        justify-content: flex-end;
+        padding: 12px;
+        border-top: 1px solid var(--line);
+      }
+
+      .add-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        width: 100%;
+        height: 36px;
+        border: 1px dashed rgba(255, 255, 255, 0.18);
+        border-radius: 8px;
+        color: var(--muted);
+        background: transparent;
+        cursor: pointer;
+        transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+      }
+
+      .add-button:hover {
+        border-color: rgba(8, 174, 245, 0.62);
+        color: var(--text);
+        background: rgba(8, 174, 245, 0.08);
+      }
+
+      .detail-card {
+        border-top: 1px solid var(--line);
+      }
+
+      .detail-card .field-row {
+        min-height: 64px;
+      }
+
+      .detail-card .field-row:first-child {
+        border-top: 0;
+      }
+
+      .detail-card .field-row.asset-row {
+        align-items: flex-start;
+        min-height: 92px;
+        padding: 15px 0;
+      }
+
+      .asset-control {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        min-width: 0;
+      }
+
+      .asset-preview {
+        position: relative;
+        display: grid;
+        place-items: center;
+        width: 58px;
+        height: 58px;
+        overflow: hidden;
+        border: 1px solid var(--line-strong);
+        border-radius: 10px;
+        background: #111;
+      }
+
+      .asset-preview .thumb-art {
+        width: 100%;
+        height: 100%;
+      }
+
+      .asset-preview.empty {
+        border-style: dashed;
+        color: var(--faint);
+      }
+
+      .asset-preview.empty .icon {
+        width: 18px;
+        height: 18px;
+      }
+
+      .asset-text {
+        min-width: 0;
+      }
+
+      .asset-text strong,
+      .asset-text span {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .asset-text strong {
+        color: var(--text-soft);
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .asset-text span {
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .asset-button {
+        min-height: 30px;
+        padding: 0 9px;
+        border: 1px solid var(--line-strong);
+        border-radius: 7px;
+        color: var(--text-soft);
+        background: transparent;
+        cursor: pointer;
+        font-size: 11px;
+      }
+
+      .asset-button:hover {
+        background: rgba(255, 255, 255, 0.07);
+      }
+
+      .position-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+        width: 250px;
+      }
+
+      .position-input {
+        position: relative;
+      }
+
+      .position-input span {
+        position: absolute;
+        top: 50%;
+        left: 10px;
+        z-index: 1;
+        color: var(--faint);
+        font: 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+        pointer-events: none;
+        transform: translateY(-50%);
+      }
+
+      .position-input input {
+        width: 100%;
+        height: 34px;
+        padding: 0 7px 0 23px;
+        border: 1px solid transparent;
+        border-radius: 7px;
+        color: var(--text);
+        background: #101010;
+        font: 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .position-input input:focus {
+        border-color: rgba(8, 174, 245, 0.7);
+        outline: none;
+      }
+
+      .position-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .position-actions .outline-button.is-active {
+        border-color: rgba(8, 174, 245, 0.65);
+        color: #bcecff;
+        background: var(--blue-soft);
+      }
+
+      .helper-callout {
+        display: flex;
+        align-items: flex-start;
+        gap: 9px;
+        margin-top: 16px;
+        padding: 11px 12px;
+        border: 1px solid rgba(8, 174, 245, 0.2);
+        border-radius: 9px;
+        color: #aadcf0;
+        background: rgba(8, 174, 245, 0.06);
+        font-size: 11px;
+      }
+
+      .helper-callout .icon {
+        margin-top: 1px;
+        color: var(--blue);
+      }
+
+      .floating-footer {
+        position: absolute;
+        right: 18px;
+        bottom: 18px;
+        left: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 12px 10px 14px;
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        background: rgba(27, 27, 27, 0.93);
+        box-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+        backdrop-filter: blur(16px);
+      }
+
+      .floating-footer span {
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .footer-actions {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+
+      .footer-actions .ghost-button,
+      .footer-actions .primary-button {
+        min-height: 31px;
+        font-size: 12px;
+      }
+
+      .menu-wrap {
+        position: relative;
+      }
+
+      .action-menu {
+        position: absolute;
+        right: 0;
+        top: calc(100% + 6px);
+        z-index: 20;
+        display: none;
+        min-width: 126px;
+        padding: 5px;
+        border: 1px solid var(--line-strong);
+        border-radius: 9px;
+        background: #252525;
+        box-shadow: 0 14px 30px rgba(0, 0, 0, 0.4);
+      }
+
+      .action-menu.is-open {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .action-menu button {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        min-height: 32px;
+        padding: 0 9px;
+        border-radius: 6px;
+        color: var(--text-soft);
+        background: transparent;
+        cursor: pointer;
+        text-align: left;
+        font-size: 12px;
+      }
+
+      .action-menu button:hover {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .action-menu button.danger {
+        color: var(--red);
+      }
+
+      .toast {
+        position: fixed;
+        right: 24px;
+        bottom: 24px;
+        z-index: 50;
+        max-width: min(360px, calc(100vw - 48px));
+        padding: 10px 13px;
+        border: 1px solid var(--line-strong);
+        border-radius: 9px;
+        color: var(--text);
+        background: #292929;
+        box-shadow: 0 14px 30px rgba(0, 0, 0, 0.4);
+        font-size: 12px;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(8px);
+        transition: opacity 180ms ease, transform 180ms ease;
+      }
+
+      .toast.is-visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      @media (max-width: 1080px) {
+        .app {
+          grid-template-columns: minmax(0, 1fr) 480px;
+        }
+
+        .preview-stage {
+          padding: 28px;
+        }
+
+        .config-view {
+          padding-right: 20px;
+          padding-left: 20px;
+        }
+      }
+
+      @media (max-width: 820px) {
+        body {
+          overflow: auto;
+        }
+
+        .app {
+          display: block;
+          min-height: 100vh;
+          height: auto;
+        }
+
+        .preview-pane {
+          display: none;
+        }
+
+        .config-pane {
+          min-height: 100vh;
+          border-left: 0;
+        }
+
+        .config-main {
+          overflow-y: visible;
+        }
+      }
+
+      @media (max-width: 520px) {
+        .drilldown-layout {
+          display: block;
+        }
+
+        .context-rail {
+          position: sticky;
+          top: 0;
+          z-index: 4;
+          min-height: 0;
+          flex-direction: row;
+          align-items: center;
+          gap: 8px;
+          overflow-x: auto;
+          padding: 10px 16px;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+          background: rgba(23, 23, 23, 0.96);
+          backdrop-filter: blur(14px);
+        }
+
+        .context-rail-head {
+          flex: 0 0 auto;
+        }
+
+        .context-rail-head strong,
+        .context-rail-label,
+        .context-rail-divider,
+        .context-rail-note {
+          display: none;
+        }
+
+        .context-module-list,
+        .context-level-list {
+          flex: 0 0 auto;
+          flex-direction: row;
+          gap: 4px;
+        }
+
+        .context-module-row {
+          width: auto;
+          min-width: 112px;
+        }
+
+        .context-level-row {
+          width: auto;
+          min-width: 82px;
+        }
+
+        .drilldown-editor .config-view {
+          padding-right: 16px;
+          padding-left: 16px;
+        }
+
+        .config-head {
+          padding-right: 12px;
+          padding-left: 16px;
+        }
+
+        .config-view {
+          padding: 20px 16px 92px;
+        }
+
+        .view-title-row h1 {
+          font-size: 21px;
+        }
+
+        .field-row {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 10px;
+          padding: 13px 0;
+        }
+
+        .input,
+        .select,
+        .color-input,
+        .position-grid {
+          width: 100%;
+        }
+
+        .detail-card .field-row.asset-row {
+          gap: 12px;
+        }
+
+        .position-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .module-row {
+          grid-template-columns: 22px 32px minmax(0, 1fr) 25px;
+        }
+
+        .module-row > .state-badge {
+          display: none;
+        }
+
+        .floating-footer {
+          right: 12px;
+          bottom: 12px;
+          left: 12px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <svg class="icon-defs" aria-hidden="true" focusable="false">
+      <symbol id="i-sliders" viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" /><circle cx="8" cy="6" r="2" /><circle cx="16" cy="12" r="2" /><circle cx="10" cy="18" r="2" /></symbol>
+      <symbol id="i-message" viewBox="0 0 24 24"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H7l-4 3v-5.4A7.4 7.4 0 0 1 4.5 5.8 7.5 7.5 0 0 1 20 11.5Z" /><path d="M8 11.5h.01M12 11.5h.01M16 11.5h.01" /></symbol>
+      <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3 9 4.5-9 4.5-9-4.5L12 3Z" /><path d="m3 12 9 4.5 9-4.5" /><path d="m3 16.5 9 4.5 9-4.5" /></symbol>
+      <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9" r="1.5" /><path d="m4 17 5-5 3.5 3 2.5-2.5L20 17" /></symbol>
+      <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3" /><path d="M3.5 19a5.5 5.5 0 0 1 11 0" /><path d="M15 5.5a3 3 0 0 1 0 5.8M17 14a5 5 0 0 1 3.5 5" /></symbol>
+      <symbol id="i-video" viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2" /><path d="m16 10 5-3v10l-5-3Z" /></symbol>
+      <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><rect x="14" y="14" width="6" height="6" rx="1" /></symbol>
+      <symbol id="i-grip" viewBox="0 0 24 24"><circle cx="8" cy="6" r="1" /><circle cx="16" cy="6" r="1" /><circle cx="8" cy="12" r="1" /><circle cx="16" cy="12" r="1" /><circle cx="8" cy="18" r="1" /><circle cx="16" cy="18" r="1" /></symbol>
+      <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" /></symbol>
+      <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" /></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></symbol>
+      <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2" /><circle cx="12" cy="12" r="1.2" /><circle cx="19" cy="12" r="1.2" /></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h2" /></symbol>
+      <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="m6 11 6-6 6 6M12 5v14" /></symbol>
+      <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="m6 13 6 6 6-6M12 19V5" /></symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5" /><path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4" /></symbol>
+      <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5l10-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="16" cy="16" r="3" /></symbol>
+      <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0 0 18h1.5a2 2 0 0 0 0-4H12a2 2 0 0 1 0-4h4a5 5 0 0 0 0-10h-4Z" /><circle cx="7.5" cy="10" r="1" /><circle cx="10" cy="6.5" r="1" /><circle cx="15" cy="6.5" r="1" /></symbol>
+      <symbol id="i-lock-open" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 7.5-2" /></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></symbol>
+      <symbol id="i-move" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M8 7l4-4 4 4M8 17l4 4 4-4M7 8l-4 4 4 4M17 8l4 4-4 4" /></symbol>
+      <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 9" /><path d="M20 4v5h-5" /><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15" /><path d="M4 20v-5h5" /></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6" /></symbol>
+      <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" /></symbol>
+      <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9" /><path d="M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5" /></symbol>
+    </svg>
+
+    <main class="app">
+      <section class="preview-pane" aria-label="预览区域">
+        <header class="preview-topbar">
+          <div class="brand">
+            <span class="brand-mark"><svg class="icon"><use href="#i-layers"></use></svg></span>
+            <span>OneFlow · 闯关活动</span>
+          </div>
+          <div class="preview-actions">
+            <button class="ghost-button" type="button" data-action="preview-refresh"><svg class="icon"><use href="#i-rotate"></use></svg>刷新预览</button>
+            <button class="outline-button" type="button" data-action="preview-open"><svg class="icon"><use href="#i-external"></use></svg>打开页面</button>
+          </div>
+        </header>
+        <div class="preview-stage">
+          <div class="stage-wrap">
+            <div class="stage-caption">
+              <strong>页面预览</strong>
+              <span>当前会话 · 草稿值即时生效</span>
+            </div>
+            <div class="artboard" id="artboard" aria-label="闯关活动页面预览">
+              <div class="artboard-card">
+                <span>OneFlow Playground</span>
+                <strong>趣味闯关赛</strong>
+                <small>配置面板中的修改会即时反映在这里</small>
+              </div>
+              <div class="artboard-nav" id="artboardNav" aria-label="导航栏颜色预览"></div>
+              <div class="artboard-level" id="artboardLevel">01</div>
+            </div>
+            <div class="preview-note"><svg class="icon"><use href="#i-info"></use></svg><span>这是静态演示预览，不会写入真实项目或保存接口。</span></div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="config-pane" aria-label="配置面板">
+        <header class="config-head">
+          <div class="config-title"><svg class="icon"><use href="#i-sliders"></use></svg><span>配置</span></div>
+          <div class="head-actions">
+            <button class="icon-button" type="button" data-action="show-help" aria-label="查看演示说明"><svg class="icon"><use href="#i-info"></use></svg></button>
+            <button class="icon-button" type="button" data-action="reset" aria-label="恢复默认"><svg class="icon"><use href="#i-rotate"></use></svg></button>
+          </div>
+        </header>
+        <div class="config-main" id="configMain"></div>
+        <div class="toast" id="toast" role="status" aria-live="polite"></div>
+        <input id="assetPicker" type="file" hidden />
+      </aside>
+    </main>
+
+    <script>
+      (() => {
+        const icon = (name, className = "") => `<svg class="icon ${className}" aria-hidden="true"><use href="#i-${name}"></use></svg>`;
+        const configMain = document.querySelector("#configMain");
+        const toast = document.querySelector("#toast");
+        const assetPicker = document.querySelector("#assetPicker");
+        const artboard = document.querySelector("#artboard");
+        const artboardLevel = document.querySelector("#artboardLevel");
+
+        const initialData = {
+          screen: "overview",
+          selectedLevelId: null,
+          history: [],
+          dirty: false,
+          navColor: "#07abff",
+          audioName: "未上传音频",
+          moduleTitle: "关卡模块",
+          moduleStatus: "enabled",
+          positionEditing: false,
+          levels: [
+            {
+              id: "level-1",
+              title: "关卡 01",
+              status: "已解锁",
+              thumb: "teal",
+              assets: { locked: "未配置", unlocked: "彩虹星球.png", completed: "未配置", effect: "未配置" },
+              coords: { x: 85, y: 0, w: 330, h: 368 },
+            },
+            {
+              id: "level-2",
+              title: "关卡 02",
+              status: "未解锁",
+              thumb: "pink",
+              assets: { locked: "锁定卡片.png", unlocked: "未配置", completed: "未配置", effect: "未配置" },
+              coords: { x: 460, y: 0, w: 330, h: 368 },
+            },
+            {
+              id: "level-3",
+              title: "关卡 03",
+              status: "未解锁",
+              thumb: "orange",
+              assets: { locked: "锁定卡片.png", unlocked: "未配置", completed: "未配置", effect: "未配置" },
+              coords: { x: 835, y: 0, w: 330, h: 368 },
+            },
+          ],
+        };
+
+        let state = clone(initialData);
+        let toastTimer;
+        let draggedId = null;
+        const scrollPositions = { overview: 0, module: 0, level: 0 };
+
+        function clone(value) {
+          return JSON.parse(JSON.stringify(value));
+        }
+
+        function escapeHtml(value) {
+          return String(value)
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+        }
+
+        function currentLevel() {
+          return state.levels.find((level) => level.id === state.selectedLevelId) || state.levels[0];
+        }
+
+        function markDirty(message) {
+          state.dirty = true;
+          if (message) showToast(message);
+        }
+
+        function showToast(message) {
+          window.clearTimeout(toastTimer);
+          toast.textContent = message;
+          toast.classList.add("is-visible");
+          toastTimer = window.setTimeout(() => toast.classList.remove("is-visible"), 2300);
+        }
+
+        function rememberScroll() {
+          if (configMain && state.screen in scrollPositions) {
+            scrollPositions[state.screen] = configMain.scrollTop;
+          }
+        }
+
+        function setScreen(screen, options = {}) {
+          rememberScroll();
+          state.screen = screen;
+          if (options.selectedLevelId !== undefined) state.selectedLevelId = options.selectedLevelId;
+          if (options.history) state.history = options.history;
+          render();
+        }
+
+        function openOverview() {
+          setScreen("overview", { history: [], selectedLevelId: null });
+        }
+
+        function openModule() {
+          setScreen("module", { history: [{ screen: "overview" }], selectedLevelId: null });
+        }
+
+        function openLevel(levelId) {
+          scrollPositions.level = 0;
+          setScreen("level", { history: [{ screen: "overview" }, { screen: "module" }], selectedLevelId: levelId });
+        }
+
+        function goBack() {
+          const previous = state.history.at(-1);
+          if (!previous) return openOverview();
+          const history = state.history.slice(0, -1);
+          setScreen(previous.screen, { history, selectedLevelId: previous.selectedLevelId ?? null });
+        }
+
+        function renderBreadcrumbs(items) {
+          return `<nav class="breadcrumbs" aria-label="配置路径">${items.map((item, index) => {
+            const separator = index > 0 ? `<span class="crumb-separator">/</span>` : "";
+            if (item.action) {
+              return `${separator}<button type="button" class="crumb-button" data-nav="${item.action}">${escapeHtml(item.label)}</button>`;
+            }
+            return `${separator}<span class="crumb-current" aria-current="page">${escapeHtml(item.label)}</span>`;
+          }).join("")}</nav>`;
+        }
+
+        function renderHeading({ breadcrumbs, title, description, actions = "" }) {
+          return `<div class="view-heading">
+            ${renderBreadcrumbs(breadcrumbs)}
+            <div class="view-title-row">
+              <div>
+                <h1>${escapeHtml(title)}</h1>
+                ${description ? `<p>${escapeHtml(description)}</p>` : ""}
+              </div>
+              <div class="view-title-actions">${actions}</div>
+            </div>
+          </div>`;
+        }
+
+        function moduleItems() {
+          return [
+            { id: "images", title: "图片模块", kind: "媒体组件", meta: "2 个资源", status: "已配置", icon: "image", tone: "" },
+            { id: "participants", title: "参与人数模块", kind: "数据组件", meta: "1 个字段", status: "已配置", icon: "users", tone: "green" },
+            { id: "video", title: "视频模块", kind: "媒体组件", meta: "1 个资源", status: "待配置", icon: "video", tone: "amber" },
+            { id: "levels", title: state.moduleTitle, kind: "内容组件", meta: `${state.levels.length} 个关卡`, status: "已配置", icon: "grid", tone: "pink" },
+          ];
+        }
+
+        function renderContextRail(screen) {
+          const modules = moduleItems();
+          return `<aside class="context-rail" aria-label="配置上下文">
+            <div class="context-rail-head">
+              <button class="context-back" type="button" data-nav="overview" aria-label="返回本页配置">${icon("chevron-left")}<span>全部模块</span></button>
+              <strong>上下文</strong>
+            </div>
+            <div class="context-rail-label"><span>内容模块</span><span>${modules.length}</span></div>
+            <div class="context-module-list">
+              ${modules.map((module) => `<button class="context-module-row ${module.id === "levels" ? "is-active" : ""}" type="button" data-action="context-module" data-module-id="${module.id}" aria-label="${escapeHtml(module.title)}">
+                ${icon(module.icon)}<span>${escapeHtml(module.title)}</span><span class="context-count">${escapeHtml(module.meta)}</span>
+              </button>`).join("")}
+            </div>
+            ${screen === "level" ? `<div class="context-rail-divider"></div>
+              <div class="context-rail-label"><span>关卡图</span><span>${state.levels.length}</span></div>
+              <div class="context-level-list" aria-label="关卡上下文">
+                ${state.levels.map((level, index) => `<button class="context-level-row ${state.selectedLevelId === level.id ? "is-active" : ""}" type="button" data-action="context-level" data-level-id="${level.id}" aria-label="打开${escapeHtml(level.title)}">
+                  <span class="context-level-index">${String(index + 1).padStart(2, "0")}</span><span>${escapeHtml(level.title)}</span><span class="context-status-dot ${level.status === "已解锁" ? "is-ready" : ""}"></span>
+                </button>`).join("")}
+              </div>` : ""}
+            <div class="context-rail-note">${icon("layers")}<span>列表持续保留，右侧只编辑当前条目。</span></div>
+          </aside>`;
+        }
+
+        function renderDirtyBadge() {
+          return state.dirty ? `<span class="dirty-badge">已修改</span>` : `<span class="state-badge muted-state">已同步</span>`;
+        }
+
+        function renderOverview() {
+          const modules = moduleItems();
+
+          return `<div class="config-view">
+            ${renderHeading({
+              breadcrumbs: [{ label: "本页配置" }],
+              title: "本页配置",
+              description: "先选择一个模块，再进入它的单层编辑器。",
+              actions: `${renderDirtyBadge()}`,
+            })}
+
+            <section class="section-block">
+              <div class="section-heading"><h2>页面设置</h2><span class="section-hint">2 项</span></div>
+              <div class="settings-list">
+                <div class="field-row">
+                  <div class="field-meta"><span class="field-label">闯关背景音乐</span><span class="field-help">MP3 · 仅用于当前预览会话</span></div>
+                  <button class="upload-tile" type="button" data-action="pick-audio" aria-label="上传闯关背景音乐">${icon("music")}<span>${escapeHtml(state.audioName === "未上传音频" ? "上传音频" : state.audioName)}</span></button>
+                </div>
+                <div class="field-row">
+                  <div class="field-meta"><span class="field-label">导航栏颜色</span><span class="field-help">即时反映到左侧预览</span></div>
+                  <label class="color-input"><input type="color" value="${escapeHtml(state.navColor)}" data-bind="navColor" aria-label="导航栏颜色" /><code id="navColorValue">${escapeHtml(state.navColor)}</code></label>
+                </div>
+              </div>
+            </section>
+
+            <section class="section-block">
+              <div class="section-heading"><h2>内容模块</h2><span class="section-hint">${modules.length} 个模块</span></div>
+              <div class="module-list" aria-label="内容模块列表">
+                ${modules.map((module) => `<div class="module-row ${module.id === "levels" ? "is-selected" : ""}" data-module-id="${module.id}" draggable="${module.id === "levels" ? "true" : "false"}">
+                  <span class="drag-handle" aria-label="拖动${escapeHtml(module.title)}">${icon("grip")}</span>
+                  <span class="module-symbol ${module.tone}">${icon(module.icon)}</span>
+                  <div class="row-main"><div class="row-title">${escapeHtml(module.title)}</div><div class="row-subtitle"><span>${escapeHtml(module.kind)}</span><span class="dot"></span><span>${escapeHtml(module.meta)}</span></div></div>
+                  <span class="state-badge ${module.status === "待配置" ? "muted-state" : ""}">${escapeHtml(module.status)}</span>
+                  <button class="row-arrow" type="button" data-action="open-module" data-module-id="${module.id}" aria-label="打开${escapeHtml(module.title)}">${icon("chevron-right")}</button>
+                </div>`).join("")}
+              </div>
+            </section>
+
+            <div class="helper-callout">${icon("info")}<span>层级只用于定位；编辑器每次只展示当前模块或当前关卡的直接字段，避免卡片无限嵌套。</span></div>
+          </div>`;
+        }
+
+        function renderModule() {
+          const levelCount = state.levels.length;
+          return `<div class="drilldown-layout">${renderContextRail("module")}<div class="drilldown-editor"><div class="config-view">
+            ${renderHeading({
+              breadcrumbs: [{ label: "内容模块", action: "overview" }, { label: state.moduleTitle }],
+              title: state.moduleTitle,
+              description: "直接字段保持平面展示，关卡图作为一个可进入的子列表。",
+              actions: `${renderDirtyBadge()}<div class="menu-wrap"><button class="icon-button" type="button" data-action="toggle-menu" aria-label="更多模块操作">${icon("more")}</button><div class="action-menu" data-menu="module">${menuItem("copy-module", "复制模块", "copy")}${menuItem("delete-module", "删除模块", "trash", "danger")}</div></div>`,
+            })}
+
+            <section class="section-block">
+              <div class="section-heading"><h2>基础设置</h2><span class="section-hint">模块级字段</span></div>
+              <div class="settings-list">
+                <div class="field-row"><div class="field-meta"><span class="field-label">模块状态</span><span class="field-help">关闭后预览中隐藏该模块</span></div><div class="segmented" role="group" aria-label="模块状态"><button type="button" class="${state.moduleStatus === "enabled" ? "active" : ""}" data-action="module-status" data-value="enabled">启用</button><button type="button" class="${state.moduleStatus === "paused" ? "active" : ""}" data-action="module-status" data-value="paused">暂停</button></div></div>
+                <div class="field-row"><div class="field-meta"><span class="field-label">模块标题</span><span class="field-help">列表摘要使用这个名称</span></div><input class="input" value="${escapeHtml(state.moduleTitle)}" aria-label="模块标题" data-action="module-title" /></div>
+              </div>
+            </section>
+
+            <section class="section-block">
+              <div class="section-heading"><h2>关卡图</h2><span class="section-hint">${levelCount} 个关卡 · 拖拽排序</span></div>
+              <div class="collection-list" aria-label="关卡列表">
+                ${state.levels.map((level, index) => renderLevelRow(level, index)).join("")}
+                <div class="collection-actions"><button class="add-button" type="button" data-action="add-level">${icon("plus")}添加关卡</button></div>
+              </div>
+            </section>
+            <div class="helper-callout">${icon("info")}<span>左侧列表持续保留，点击关卡后只替换右侧编辑器。</span></div>
+          </div></div></div>`;
+        }
+
+        function menuItem(action, label, iconName, tone = "") {
+          return `<button type="button" data-action="${action}" class="${tone}">${icon(iconName)}<span>${escapeHtml(label)}</span></button>`;
+        }
+
+        function renderLevelRow(level, index) {
+          const statusIcon = level.status === "已解锁" ? "lock-open" : "lock";
+          const isSelected = state.selectedLevelId === level.id;
+          return `<div class="collection-row ${isSelected ? "is-selected" : ""}" data-level-id="${level.id}" draggable="true">
+            <span class="drag-handle" aria-label="拖动${escapeHtml(level.title)}">${icon("grip")}</span>
+            <span class="thumb"><span class="thumb-art ${level.thumb}"></span></span>
+            <div class="row-main"><div class="row-title">${escapeHtml(level.title)}<span class="type-badge">${icon(statusIcon)}${escapeHtml(level.status)}</span></div><div class="row-subtitle"><span>${Object.values(level.assets).filter((name) => name !== "未配置").length} 个资源</span><span class="dot"></span><span>X ${level.coords.x} · Y ${level.coords.y}</span></div></div>
+            <span class="count-badge">${index + 1}/${state.levels.length}</span>
+            <div class="menu-wrap"><button class="icon-button" type="button" data-action="toggle-row-menu" data-level-id="${level.id}" aria-label="${escapeHtml(level.title)}更多操作">${icon("more")}</button><div class="action-menu" data-menu="${level.id}">${menuItem("move-up", "上移", "arrow-up")}${menuItem("move-down", "下移", "arrow-down")}${menuItem("copy-level", "复制", "copy")}${menuItem("delete-level", "删除", "trash", "danger")}</div></div>
+          </div>`;
+        }
+
+        function assetRow(level, key, label, tone, accept) {
+          const value = level.assets[key];
+          const configured = value !== "未配置";
+          return `<div class="field-row asset-row"><div class="field-meta"><span class="field-label">${escapeHtml(label)}</span><span class="field-help">${configured ? "已配置资源" : "可选资源"}</span></div><div class="asset-control"><span class="asset-preview ${configured ? "" : "empty"}">${configured ? `<span class="thumb-art ${tone}"></span>` : icon("upload")}</span><span class="asset-text"><strong>${escapeHtml(value)}</strong><span>${configured ? "点击替换当前资源" : "尚未上传"}</span></span><button class="asset-button" type="button" data-action="pick-asset" data-asset-key="${key}" data-accept="${accept}">${configured ? "替换" : "上传"}</button></div></div>`;
+        }
+
+        function renderLevel() {
+          const level = currentLevel();
+          if (!level) return renderModule();
+          return `<div class="drilldown-layout">${renderContextRail("level")}<div class="drilldown-editor"><div class="config-view">
+            ${renderHeading({
+              breadcrumbs: [{ label: "内容模块", action: "overview" }, { label: "关卡模块", action: "module" }, { label: "关卡图", action: "module" }, { label: level.title }],
+              title: level.title,
+              description: "当前只编辑这一张关卡卡片，其他关卡不会被推入同一滚动流。",
+              actions: `${renderDirtyBadge()}<div class="menu-wrap"><button class="icon-button" type="button" data-action="toggle-menu" aria-label="更多关卡操作">${icon("more")}</button><div class="action-menu" data-menu="level">${menuItem("copy-level", "复制关卡", "copy")}${menuItem("delete-level", "删除关卡", "trash", "danger")}</div></div>`,
+            })}
+
+            <section class="section-block">
+              <div class="section-heading"><h2>关卡设置</h2><span class="section-hint">直接字段</span></div>
+              <div class="detail-card">
+                ${assetRow(level, "locked", "未解锁图", "orange", "image/*")}
+                ${assetRow(level, "unlocked", "已解锁图", "teal", "image/*")}
+                ${assetRow(level, "completed", "已完成图", "pink", "image/*")}
+                ${assetRow(level, "effect", "SVGA 动效", "orange", ".svga,.zip")}
+                <div class="field-row"><div class="field-meta"><span class="field-label">当前状态</span><span class="field-help">决定预览中展示哪一张状态图</span></div><select class="select" data-bind="levelStatus" aria-label="当前状态"><option ${level.status === "已解锁" ? "selected" : ""}>已解锁</option><option ${level.status === "未解锁" ? "selected" : ""}>未解锁</option><option ${level.status === "已完成" ? "selected" : ""}>已完成</option></select></div>
+              </div>
+            </section>
+
+            <section class="section-block">
+              <div class="section-heading"><h2>自由坐标</h2><span class="section-hint">画布尺寸 1240 × 656</span></div>
+              <div class="detail-card">
+                <div class="field-row"><div class="field-meta"><span class="field-label">位置与尺寸</span><span class="field-help">拖动定位会同步更新 X / Y</span></div><div class="position-actions"><div class="position-grid">${positionInput("x", level.coords.x)}${positionInput("y", level.coords.y)}${positionInput("w", level.coords.w)}${positionInput("h", level.coords.h)}</div><button class="outline-button ${state.positionEditing ? "is-active" : ""}" type="button" data-action="toggle-position">${icon(state.positionEditing ? "check" : "move")}${state.positionEditing ? "完成" : "拖动定位"}</button></div></div>
+              </div>
+              <div class="helper-callout">${icon("info")}<span>“拖动定位”只影响当前关卡卡片；完成后一次性回写 X / Y，避免拖动过程中频繁提交。</span></div>
+            </section>
+          </div></div></div>`;
+        }
+
+        function positionInput(axis, value) {
+          const labels = { x: "X", y: "Y", w: "W", h: "H" };
+          return `<label class="position-input"><span>${labels[axis]}</span><input type="number" value="${Number(value)}" data-position="${axis}" aria-label="${labels[axis]} 坐标" /></label>`;
+        }
+
+        function render() {
+          const markup = state.screen === "overview" ? renderOverview() : state.screen === "module" ? renderModule() : renderLevel();
+          configMain.innerHTML = markup;
+          window.requestAnimationFrame(() => {
+            configMain.scrollTop = scrollPositions[state.screen] || 0;
+          });
+          artboard.style.setProperty("--nav-color", state.navColor);
+          artboardLevel.textContent = currentLevel()?.title?.replace(/[^0-9]/g, "").padStart(2, "0") || "01";
+          artboardLevel.style.outline = state.positionEditing ? `2px solid ${state.navColor}` : "none";
+        }
+
+        function closeMenus(except) {
+          document.querySelectorAll(".action-menu.is-open").forEach((menu) => {
+            if (menu !== except) menu.classList.remove("is-open");
+          });
+        }
+
+        function moveLevel(levelId, direction) {
+          const index = state.levels.findIndex((level) => level.id === levelId);
+          const nextIndex = index + direction;
+          if (index < 0 || nextIndex < 0 || nextIndex >= state.levels.length) {
+            showToast(direction < 0 ? "已经是第一项" : "已经是最后一项");
+            return;
+          }
+          const [moved] = state.levels.splice(index, 1);
+          state.levels.splice(nextIndex, 0, moved);
+          markDirty("关卡顺序已更新");
+          render();
+        }
+
+        function deleteLevel(levelId) {
+          if (state.levels.length <= 1) {
+            showToast("至少保留一个关卡");
+            return;
+          }
+          const deleted = state.levels.find((level) => level.id === levelId);
+          state.levels = state.levels.filter((level) => level.id !== levelId);
+          markDirty(`${deleted?.title || "关卡"}已删除`);
+          if (state.screen === "level" && state.selectedLevelId === levelId) {
+            state.selectedLevelId = state.levels[0].id;
+            state.screen = "module";
+            state.history = [{ screen: "overview" }];
+          }
+          render();
+        }
+
+        function copyLevel(levelId) {
+          const source = state.levels.find((level) => level.id === levelId);
+          if (!source) return;
+          const copy = clone(source);
+          copy.id = `level-${Date.now()}`;
+          copy.title = `${source.title} 副本`;
+          state.levels.splice(state.levels.findIndex((level) => level.id === levelId) + 1, 0, copy);
+          markDirty("已复制关卡");
+          render();
+        }
+
+        function addLevel() {
+          const nextNumber = state.levels.length + 1;
+          const level = {
+            id: `level-${Date.now()}`,
+            title: `关卡 ${String(nextNumber).padStart(2, "0")}`,
+            status: "未解锁",
+            thumb: ["teal", "pink", "orange"][nextNumber % 3],
+            assets: { locked: "未配置", unlocked: "未配置", completed: "未配置", effect: "未配置" },
+            coords: { x: 85 + (nextNumber - 1) * 375, y: 0, w: 330, h: 368 },
+          };
+          state.levels.push(level);
+          state.selectedLevelId = level.id;
+          state.dirty = true;
+          state.screen = "level";
+          state.history = [{ screen: "overview" }, { screen: "module" }];
+          scrollPositions.level = 0;
+          showToast("已添加关卡，正在编辑新条目");
+          render();
+        }
+
+        configMain.addEventListener("click", (event) => {
+          const target = event.target.closest("button, .module-row, .collection-row");
+          if (!target) return;
+
+          if (target.matches(".context-module-row")) {
+            if (target.dataset.moduleId === "levels") openModule();
+            else {
+              openOverview();
+              showToast("这个模块在 Demo 中只展示列表摘要");
+            }
+            return;
+          }
+
+          if (target.matches(".context-level-row")) {
+            openLevel(target.dataset.levelId);
+            return;
+          }
+
+          if (target.matches(".module-row")) {
+            if (target.dataset.moduleId === "levels") openModule();
+            else showToast("这个模块在 Demo 中只展示列表摘要");
+            return;
+          }
+
+          if (target.matches(".collection-row")) {
+            if (!event.target.closest("button, .drag-handle, .action-menu")) openLevel(target.dataset.levelId);
+            return;
+          }
+
+          const action = target.dataset.action;
+          if (!action) return;
+
+          if (action === "open-module") {
+            if (target.dataset.moduleId === "levels") openModule();
+            else showToast("这个模块在 Demo 中只展示列表摘要");
+          } else if (action === "toggle-menu") {
+            const menu = target.parentElement.querySelector(".action-menu");
+            closeMenus(menu);
+            menu.classList.toggle("is-open");
+          } else if (action === "toggle-row-menu") {
+            const menu = target.parentElement.querySelector(".action-menu");
+            closeMenus(menu);
+            menu.classList.toggle("is-open");
+          } else if (action === "module-status") {
+            state.moduleStatus = target.dataset.value;
+            markDirty(`模块已${target.dataset.value === "enabled" ? "启用" : "暂停"}`);
+            render();
+          } else if (action === "add-level") {
+            addLevel();
+          } else if (action === "move-up") {
+            moveLevel(target.closest(".collection-row").dataset.levelId, -1);
+          } else if (action === "move-down") {
+            moveLevel(target.closest(".collection-row").dataset.levelId, 1);
+          } else if (action === "copy-level") {
+            const levelId = target.closest(".collection-row")?.dataset.levelId || state.selectedLevelId;
+            copyLevel(levelId);
+          } else if (action === "delete-level") {
+            const levelId = target.closest(".collection-row")?.dataset.levelId || state.selectedLevelId;
+            deleteLevel(levelId);
+          } else if (action === "copy-module") {
+            markDirty("已复制关卡模块（演示）");
+          } else if (action === "delete-module") {
+            showToast("Demo 保留关卡模块入口，未执行删除");
+          } else if (action === "toggle-position") {
+            state.positionEditing = !state.positionEditing;
+            showToast(state.positionEditing ? "已进入拖动定位模式" : "定位完成，已回写当前位置");
+            render();
+          } else if (action === "pick-audio") {
+            assetPicker.accept = "audio/mpeg,.mp3";
+            assetPicker.dataset.target = "audio";
+            assetPicker.click();
+          } else if (action === "pick-asset") {
+            assetPicker.accept = target.dataset.accept || "image/*";
+            assetPicker.dataset.target = target.dataset.assetKey || "asset";
+            assetPicker.click();
+          } else if (action === "preview-refresh") {
+            showToast("预览已刷新（演示）");
+          } else if (action === "preview-open") {
+            showToast("Demo 不会打开真实页面");
+          } else if (action === "show-help") {
+            showToast("建议路径：模块列表 → 模块详情 → 关卡详情");
+          }
+        });
+
+        configMain.addEventListener("click", (event) => {
+          const nav = event.target.closest("[data-nav]");
+          if (!nav) return;
+          if (nav.dataset.nav === "overview") openOverview();
+          if (nav.dataset.nav === "module") openModule();
+        });
+
+        configMain.addEventListener("input", (event) => {
+          const input = event.target;
+          if (input.matches("[data-bind='navColor']")) {
+            state.navColor = input.value;
+            document.querySelector("#navColorValue").textContent = input.value;
+            artboardLevel.style.outlineColor = input.value;
+            markDirty();
+          }
+          if (input.matches("[data-position]")) {
+            const level = currentLevel();
+            if (!level) return;
+            const axis = input.dataset.position;
+            level.coords[axis] = Number(input.value) || 0;
+            markDirty();
+          }
+          if (input.matches("[data-action='module-title']")) {
+            state.moduleTitle = input.value.trim() || "关卡模块";
+            markDirty();
+          }
+        });
+
+        configMain.addEventListener("change", (event) => {
+          const input = event.target;
+          if (input.matches("[data-bind='levelStatus']")) {
+            const level = currentLevel();
+            if (!level) return;
+            level.status = input.value;
+            markDirty(`当前状态已切换为“${input.value}”`);
+            render();
+          }
+        });
+
+        configMain.addEventListener("dragstart", (event) => {
+          const row = event.target.closest(".collection-row, .module-row");
+          if (!row || row.getAttribute("draggable") !== "true") return;
+          draggedId = row.dataset.levelId || row.dataset.moduleId;
+          row.classList.add("is-dragging");
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", draggedId);
+        });
+
+        configMain.addEventListener("dragend", (event) => {
+          event.target.closest(".collection-row, .module-row")?.classList.remove("is-dragging");
+          draggedId = null;
+        });
+
+        configMain.addEventListener("dragover", (event) => {
+          if (event.target.closest(".collection-row")) event.preventDefault();
+        });
+
+        configMain.addEventListener("drop", (event) => {
+          const targetRow = event.target.closest(".collection-row");
+          if (!targetRow || !draggedId) return;
+          event.preventDefault();
+          const from = state.levels.findIndex((level) => level.id === draggedId);
+          const to = state.levels.findIndex((level) => level.id === targetRow.dataset.levelId);
+          if (from < 0 || to < 0 || from === to) return;
+          const [moved] = state.levels.splice(from, 1);
+          state.levels.splice(to, 0, moved);
+          markDirty("关卡顺序已更新");
+          render();
+        });
+
+        assetPicker.addEventListener("change", () => {
+          const file = assetPicker.files?.[0];
+          if (!file) return;
+          if (assetPicker.dataset.target === "audio") {
+            state.audioName = file.name;
+            markDirty("已选择背景音乐");
+            render();
+          } else {
+            const level = currentLevel();
+            if (!level) return;
+            level.assets[assetPicker.dataset.target] = file.name;
+            markDirty(`已更新${assetPicker.dataset.target}资源`);
+            render();
+          }
+          assetPicker.value = "";
+        });
+
+        document.addEventListener("click", (event) => {
+          if (!event.target.closest(".menu-wrap")) closeMenus();
+        });
+
+        document.querySelector("[data-action='reset']").addEventListener("click", () => {
+          state = clone(initialData);
+          scrollPositions.overview = 0;
+          scrollPositions.module = 0;
+          scrollPositions.level = 0;
+          showToast("已恢复演示初始状态");
+          render();
+        });
+
+        render();
+      })();
+    </script>
+  </body>
+</html>

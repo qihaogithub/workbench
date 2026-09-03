@@ -55,6 +55,21 @@ export function isWhiteboardConfigPath(value: unknown): value is string {
   return typeof value === "string" && parseWhiteboardConfigPath(value) !== null;
 }
 
+/**
+ * Validates a page id before it is used as a single workspace path segment.
+ * Page ids may contain Unicode because imported workspaces can retain their
+ * original directory names; path separators and control characters are never
+ * valid ids.
+ */
+export function isWhiteboardPageId(value: unknown): value is string {
+  return typeof value === "string"
+    && value.length > 0
+    && value !== "."
+    && value !== ".."
+    && !/[\\/]/u.test(value)
+    && !/[\p{Cc}\p{Cs}]/u.test(value);
+}
+
 export interface WhiteboardEditorView {
   zoom: number;
   offsetX: number;
@@ -196,7 +211,7 @@ export function isWhiteboardBinding(value: unknown): value is WhiteboardBinding 
     && Number.isFinite(binding.updatedAt) && Boolean(target)
     && (target!.scope === "page" || target!.scope === "project")
     && (target!.scope === "page"
-      ? typeof target!.pageId === "string" && /^[A-Za-z0-9_-]+$/.test(target!.pageId)
+      ? isWhiteboardPageId(target!.pageId)
       : target!.pageId === undefined)
     && Array.isArray(target!.fieldPath) && target!.fieldPath.length === 1
     && isWhiteboardConfigPath(target!.fieldPath[0])

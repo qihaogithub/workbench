@@ -37,7 +37,115 @@ function fakeResponse(statusCode: number, body: Readable, headers: Record<string
 describe("whiteboard remote image transport", () => {
   beforeEach(() => {
     jest.restoreAllMocks();
+    jest.clearAllMocks();
     (dns.lookup as jest.Mock).mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
+  });
+
+  function mockDnsHttps(addresses: string[] = ["104.21.95.83"], statusCode = 200) {
+    return jest.spyOn(https, "request").mockImplementation(((options: https.RequestOptions, callback: (value: ReturnType<typeof fakeResponse>) => void) => {
+      const isDns = options.hostname === "1.1.1.1";
+      const type = new URL(`https://cloudflare-dns.com${options.path}`).searchParams.get("type");
+      const response = isDns
+        ? fakeResponse(statusCode, Readable.from([JSON.stringify({
+          Status: 0,
+          Answer: type === "1" ? addresses.map((data) => ({ type: 1, data })) : [],
+        })]))
+        : fakeResponse(200, Readable.from([Buffer.from("image")]), { "content-type": "image/png" });
+      process.nextTick(() => callback(response));
+      return fakeRequest();
+    }) as unknown as typeof https.request);
+  }
+
+  it("resolves proxy Fake-IP names independently and connects only to the verified public address", async () => {
+    (dns.lookup as jest.Mock).mockResolvedValue([{ address: "198.18.3.20", family: 4 }]);
+    const requestMock = mockDnsHttps();
+    const { downloadWhiteboardImage } = await import("./whiteboard-image-assets");
+    await expect(downloadWhiteboardImage("https://img.onlywnn.cn/figma/image.png")).resolves.toMatchObject({ buffer: Buffer.from("image") });
+    const calls = requestMock.mock.calls.map(([options]) => options as https.RequestOptions);
+    expect(calls).toHaveLength(3);
+    expect(calls.slice(0, 2)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ hostname: "1.1.1.1", servername: "cloudflare-dns.com", path: "/dns-query?name=img.onlywnn.cn&type=1" }),
+      expect.objectContaining({ hostname: "1.1.1.1", servername: "cloudflare-dns.com", path: "/dns-query?name=img.onlywnn.cn&type=28" }),
+    ]));
+    expect(calls[2]).toMatchObject({ hostname: "104.21.95.83", servername: "img.onlywnn.cn", path: "/figma/image.png" });
+  });
+
+  it.each([["127.0.0.1"], ["198.18.3.20"], ["104.21.95.83", "10.0.0.1"], []])("rejects unsafe or empty independent DNS answers: %j", async (...addresses) => {
+    (dns.lookup as jest.Mock).mockResolvedValue([{ address: "198.18.3.20", family: 4 }]);
+    const requestMock = mockDnsHttps(addresses);
+    const { downloadWhiteboardImage } = await import("./whiteboard-image-assets");
+    await expect(downloadWhiteboardImage("https://example.com/image.png")).rejects.toMatchObject({ code: "PRIVATE_NETWORK_BLOCKED" });
+    expect(requestMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not follow redirects from the fixed DNS provider", async () => {
+    (dns.lookup as jest.Mock).mockResolvedValue([{ address: "198.19.0.1", family: 4 }]);
+    const requestMock = mockDnsHttps([], 302);
+    const { downloadWhiteboardImage } = await import("./whiteboard-image-assets");
+    await expect(downloadWhiteboardImage("https://example.com/image.png")).rejects.toMatchObject({ code: "DNS_RESOLUTION_FAILED" });
+    expect(requestMock).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["http://198.18.3.20/image.png", "http://127.0.0.1/image.png"])("keeps literal non-public addresses blocked: %s", async (url) => {
+    const requestMock = mockDnsHttps();
+    const { downloadWhiteboardImage } = await import("./whiteboard-image-assets");
+    await expect(downloadWhiteboardImage(url)).rejects.toMatchObject({ code: "PRIVATE_NETWORK_BLOCKED" });
+    expect(requestMock).not.toHaveBeenCalled();
+  });
+
+  it("does not use public DNS to override real private or mixed local DNS answers", async () => {
+    (dns.lookup as jest.Mock).mockResolvedValue([{ address: "198.18.3.20", family: 4 }, { address: "10.0.0.1", family: 4 }]);
+    const requestMock = mockDnsHttps();
+    const { downloadWhiteboardImage } = await import("./whiteboard-image-assets");
+    await expect(downloadWhiteboardImage("https://example.com/image.png")).rejects.toMatchObject({ code: "PRIVATE_NETWORK_BLOCKED" });
+    expect(requestMock).not.toHaveBeenCalled();
+  });
+
+  it("bounds the independent DNS response size", async () => {
+    (dns.lookup as jest.Mock).mockResolvedValue([{ address: "198.18.3.20", family: 4 }]);
+    mockDnsHttps(["x".repeat(65 * 1024)]);
+    const { downloadWhiteboardImage } = await import("./whiteboard-image-assets");
+    await expect(downloadWhiteboardImage("https://example.com/image.png")).rejects.toMatchObject({ code: "DNS_RESOLUTION_FAILED" });
+  });
+
+  it("aborts stalled independent DNS requests within the total deadline", async () => {
+    jest.useFakeTimers();
+    try {
+      (dns.lookup as jest.Mock).mockResolvedValue([{ address: "198.18.3.20", family: 4 }]);
+      const requests: FakeRequest[] = [];
+      jest.spyOn(https, "request").mockImplementation((() => {
+        const request = fakeRequest();
+        requests.push(request);
+        return request;
+      }) as unknown as typeof https.request);
+      const { downloadWhiteboardImage } = await import("./whiteboard-image-assets");
+      const pending = expect(downloadWhiteboardImage("https://example.com/image.png")).rejects.toMatchObject({ code: "DOWNLOAD_TIMEOUT" });
+      await jest.advanceTimersByTimeAsync(10_000);
+      await pending;
+      expect(requests).toHaveLength(2);
+      expect(requests.every((request) => request.destroy.mock.calls.length > 0)).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("subtracts DNS time from the remaining image download budget", async () => {
+    jest.useFakeTimers();
+    try {
+      (dns.lookup as jest.Mock).mockImplementation(async () => {
+        jest.setSystemTime(Date.now() + 9_000);
+        return [{ address: "93.184.216.34", family: 4 }];
+      });
+      const request = fakeRequest();
+      jest.spyOn(https, "request").mockReturnValue(request as unknown as http.ClientRequest);
+      const { downloadWhiteboardImage } = await import("./whiteboard-image-assets");
+      const pending = expect(downloadWhiteboardImage("https://example.com/image.png")).rejects.toMatchObject({ code: "DOWNLOAD_TIMEOUT" });
+      await jest.advanceTimersByTimeAsync(1_000);
+      await pending;
+      expect(request.destroy).toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("stops reading a chunked response as soon as it exceeds 10MB", async () => {
@@ -106,9 +214,7 @@ describe("whiteboard remote image transport", () => {
 
       const { downloadWhiteboardImage } = await import("./whiteboard-image-assets");
       const pending = downloadWhiteboardImage("http://example.com/start");
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
+      await jest.advanceTimersByTimeAsync(0);
 
       expect(requestMock).toHaveBeenCalledTimes(2);
       jest.advanceTimersByTime(9_999);

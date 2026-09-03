@@ -52,12 +52,35 @@ export interface UpdateCommentContentInput {
   mentions?: CommentMention[];
 }
 
+/** 配置项批注浮窗的数据与写入能力；浏览端只提供 threads 并将 readOnly 设为 true。 */
+export interface ConfigCommentController {
+  threads: CommentThread[];
+  currentUser?: CommentAuthor | null;
+  mentionCandidates?: MentionCandidate[];
+  canMentionAgent?: boolean;
+  readOnly?: boolean;
+  onCreateComment?: (input: CreateCommentInput) => Promise<unknown>;
+  onAddReply?: (threadId: string, input: AddReplyInput) => Promise<unknown>;
+  onUpdateComment?: (
+    threadId: string,
+    input: UpdateCommentContentInput,
+  ) => Promise<unknown>;
+  onUpdateReply?: (
+    threadId: string,
+    replyId: string,
+    input: UpdateCommentContentInput,
+  ) => Promise<unknown>;
+  onSetResolved?: (threadId: string, resolved: boolean) => Promise<unknown>;
+  onDeleteThread?: (threadId: string) => Promise<unknown>;
+  onDeleteReply?: (threadId: string, replyId: string) => Promise<unknown>;
+}
+
 /**
  * 评论 REST API 适配器。
  * 由宿主（viewer-site / author-site）实现，屏蔽鉴权与跨域细节。
  */
 export interface CommentApiAdapter {
-  /** 列出评论线程（可按页面或文档目标过滤） */
+  /** 列出评论线程（可按页面、文档或配置项目标过滤） */
   listComments(target?: CommentTarget): Promise<CommentThread[]>;
   /** 创建评论线程 */
   createComment(input: CreateCommentInput): Promise<CommentThread>;

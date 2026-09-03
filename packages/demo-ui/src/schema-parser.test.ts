@@ -38,4 +38,56 @@ describe("parseSchemaToFields grouping", () => {
     expect(fields.find((field) => field.key === "spineAsset")?.format).toBe("spine");
     expect(fields.find((field) => field.key === "enabled")?.uiOptions?.group).toBe("普通设置");
   });
+
+  it("recursively parses oneOf arrays nested inside oneOf object arrays", () => {
+    const groups = parseSchemaToFields(JSON.stringify({
+      type: "object",
+      properties: {
+        modules: {
+          type: "array",
+          title: "模块",
+          items: {
+            oneOf: [{
+              title: "关卡模块",
+              properties: {
+                type: { const: "level" },
+                levels: {
+                  type: "array",
+                  title: "关卡图",
+                  items: {
+                    oneOf: [{
+                      title: "关卡卡片",
+                      properties: {
+                        type: { const: "levelCard" },
+                        position: {
+                          type: "position",
+                          title: "坐标",
+                          key: "levelCard",
+                          size: { width: 375, height: 656 },
+                        },
+                      },
+                    }],
+                  },
+                },
+              },
+            }],
+          },
+        },
+      },
+    }), { levelCard: 3 });
+
+    const modules = groups.flatMap((group) => group.fields)
+      .find((field) => field.key === "modules");
+    const levels = modules?.oneOf?.variants[0]?.fields
+      .find((field) => field.key === "levels");
+    const position = levels?.oneOf?.variants[0]?.fields
+      .find((field) => field.key === "position");
+
+    expect(levels?.oneOf?.variants[0]?.title).toBe("关卡卡片");
+    expect(levels?.oneOf?.variants[0]?.maxItems).toBe(3);
+    expect(position).toEqual(expect.objectContaining({
+      type: "position",
+      positionable: { key: "levelCard", size: { width: 375, height: 656 } },
+    }));
+  });
 });

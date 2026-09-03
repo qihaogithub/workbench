@@ -10,6 +10,7 @@ import {
   createApiError,
   findWorkspacePath,
   ensureMemoryFile,
+  listDemoPages,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { findUserById } from "@/lib/user";
@@ -266,6 +267,39 @@ export async function PUT(
 
     const { relativePath, absolutePath } = resolved;
 
+    let body: { content?: unknown; contextPageId?: unknown } | null = null;
+    const configPageMatch = /^demos\/([^/]+)\/config\.(?:schema|values)\.json$/.exec(relativePath);
+    const isProjectConfigFile =
+      relativePath === "project.config.schema.json" ||
+      relativePath === "project.config.values.json";
+    if (configPageMatch || isProjectConfigFile) {
+      body = await request.json().catch(() => null) as
+        | { content?: unknown; contextPageId?: unknown }
+        | null;
+      const contextPageId = configPageMatch?.[1]
+        ?? (typeof body?.contextPageId === "string" ? body.contextPageId : undefined);
+      if (!contextPageId) {
+        return NextResponse.json(
+          createApiError("CONFIG_READONLY", "配置写入需要页面上下文"),
+          { status: 403 },
+        );
+      }
+      const pageMeta = listDemoPages(wsPath).find((page) => page.id === contextPageId);
+      if (!pageMeta || pageMeta.reference || (pageMeta.isTemplatePage && payload.role !== "admin")) {
+        return NextResponse.json(
+          createApiError(
+            "CONFIG_READONLY",
+            !pageMeta
+              ? "页面上下文不存在"
+              : pageMeta.reference
+              ? "引用页面的配置不可编辑"
+              : "普通编辑者不能编辑模板页面配置",
+          ),
+          { status: 403 },
+        );
+      }
+    }
+
     if (isConventionPath(relativePath) && !isAdminUserId(payload.userId)) {
       return NextResponse.json(createApiError("FORBIDDEN", "仅管理员可编辑项目公约"), {
         status: 403,
@@ -277,6 +311,12 @@ export async function PUT(
       return NextResponse.json(createApiError("FORBIDDEN", "该文件不可编辑"), {
         status: 403,
       });
+    }
+
+    if (!body) {
+      body = await request.json().catch(() => null) as
+        | { content?: unknown; contextPageId?: unknown }
+        | null;
     }
 
     const fileExists = fs.existsSync(absolutePath);
@@ -292,7 +332,6 @@ export async function PUT(
       }
     }
 
-    const body = await request.json().catch(() => null);
     if (!body || typeof body.content !== "string") {
       return NextResponse.json(
         createApiError("INVALID_REQUEST", "content 字段必须为字符串"),

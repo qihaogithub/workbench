@@ -36,7 +36,19 @@ const documentThread = createThread("document", {
   resourceId: "docs/brief.md",
   resourceLabel: "需求说明",
 });
-const threads = [pageA, pageBResolved, documentThread];
+const pageConfigThread = createThread("page-config", {
+  kind: "config",
+  scope: "page",
+  pageId: "page_a",
+  fieldKey: "hero.title",
+  fieldTitleSnapshot: "标题",
+});
+const projectConfigThread = createThread("project-config", {
+  kind: "config",
+  scope: "project",
+  fieldKey: "theme.color",
+});
+const threads = [pageA, pageBResolved, documentThread, pageConfigThread, projectConfigThread];
 
 describe("comment thread scope", () => {
   it("按页面 target 筛选，且项目级查询不丢弃任何线程", () => {
@@ -47,6 +59,20 @@ describe("comment thread scope", () => {
       }),
     ).toEqual([pageA]);
     expect(filterCommentThreadsByTarget(threads)).toEqual(threads);
+  });
+
+  it("按配置 scope、页面和字段 key 精确筛选", () => {
+    expect(filterCommentThreadsByTarget(threads, {
+      kind: "config",
+      scope: "page",
+      pageId: "page_a",
+      fieldKey: "hero.title",
+    })).toEqual([pageConfigThread]);
+    expect(filterCommentThreadsByTarget(threads, {
+      kind: "config",
+      scope: "project",
+      fieldKey: "theme.color",
+    })).toEqual([projectConfigThread]);
   });
 
   it("项目级红点只统计页面评论，并按 resolved 计数", () => {

@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { Sparkles } from "lucide-react";
 import { cn } from "./utils";
-import type { ConfigChangeMeta, ConfigFormProps } from "./types";
+import type { ConfigChangeMeta, ConfigFormProps, ConfigCommentTarget, ConfigItemCapabilities } from "./types";
 import type { DesignSpecEntryLink } from "./types";
 import type { FieldConfig, FieldGroup, VisibleWhenCondition } from "./schema-parser";
 import { parseSchemaToFields } from "./schema-parser";
@@ -125,8 +125,12 @@ function FieldGroupSection({
   onEditDesignSpec,
   onOpenDesignSpec,
   onEditConfigDefinition,
+  configItemCapabilities,
+  onAddConfigComment,
+  getConfigCommentCount,
   imageConfigScope,
   pageId,
+  configContextPageId,
   onLaunchWhiteboard,
   referenceContext,
   referenceProvider,
@@ -142,13 +146,24 @@ function FieldGroupSection({
   onEditDesignSpec?: (docId: string, entryId: string) => void;
   onOpenDesignSpec?: (spec: DesignSpecEntryLink, fieldTitle: string, anchor?: { top: number; bottom: number }, trigger?: HTMLElement | null) => void;
   onEditConfigDefinition?: (fieldKey: string, field: FieldConfig) => void;
+  configItemCapabilities?: ConfigItemCapabilities;
+  onAddConfigComment?: (target: ConfigCommentTarget, trigger?: HTMLElement | null) => void;
+  getConfigCommentCount?: (target: ConfigCommentTarget) => number;
   imageConfigScope?: ConfigFormProps["imageConfigScope"];
   pageId?: string;
+  configContextPageId?: string;
   onLaunchWhiteboard?: ConfigFormProps["onLaunchWhiteboard"];
   referenceContext?: ConfigFormProps["referenceContext"];
   referenceProvider?: ConfigFormProps["referenceProvider"];
   onReferenceClick?: ConfigFormProps["onReferenceClick"];
 }) {
+  const configCommentScope = imageConfigScope ?? "page";
+  const getFieldCommentCount = (fieldKey: string) => getConfigCommentCount?.({
+    kind: "config",
+    scope: configCommentScope,
+    ...(configCommentScope === "page" && pageId ? { pageId } : {}),
+    fieldKey,
+  }) ?? 0;
   if (group.title === "") {
     return (
       <div className="flex flex-col gap-5">
@@ -165,9 +180,13 @@ function FieldGroupSection({
               onEditDesignSpec={onEditDesignSpec}
               onOpenDesignSpec={onOpenDesignSpec}
               onEditConfigDefinition={onEditConfigDefinition}
+              configItemCapabilities={configItemCapabilities}
+              onAddConfigComment={onAddConfigComment}
+              configCommentCount={getFieldCommentCount(field.key)}
               fieldPath={field.key}
               imageConfigScope={imageConfigScope}
               pageId={pageId}
+              configContextPageId={configContextPageId}
               onLaunchWhiteboard={onLaunchWhiteboard}
               referenceContext={referenceContext}
               referenceProvider={referenceProvider}
@@ -197,9 +216,13 @@ function FieldGroupSection({
             onEditDesignSpec={onEditDesignSpec}
             onOpenDesignSpec={onOpenDesignSpec}
             onEditConfigDefinition={onEditConfigDefinition}
+            configItemCapabilities={configItemCapabilities}
+            onAddConfigComment={onAddConfigComment}
+            configCommentCount={getFieldCommentCount(field.key)}
             fieldPath={field.key}
             imageConfigScope={imageConfigScope}
             pageId={pageId}
+            configContextPageId={configContextPageId}
             onLaunchWhiteboard={onLaunchWhiteboard}
             referenceContext={referenceContext}
             referenceProvider={referenceProvider}
@@ -231,8 +254,12 @@ export function ConfigForm({
   onEditDesignSpec,
   onOpenDesignSpec,
   onEditConfigDefinition,
+  configItemCapabilities,
+  onAddConfigComment,
+  getConfigCommentCount,
   imageConfigScope,
   pageId,
+  configContextPageId,
   onLaunchWhiteboard,
   referenceContext,
   referenceProvider,
@@ -437,8 +464,12 @@ export function ConfigForm({
                 onEditDesignSpec={onEditDesignSpec}
                 onOpenDesignSpec={onOpenDesignSpec}
                 onEditConfigDefinition={onEditConfigDefinition}
+                configItemCapabilities={configItemCapabilities}
+                onAddConfigComment={onAddConfigComment}
+                getConfigCommentCount={getConfigCommentCount}
                 imageConfigScope={imageConfigScope}
                 pageId={pageId}
+                configContextPageId={configContextPageId}
                 onLaunchWhiteboard={onLaunchWhiteboard}
                 referenceContext={referenceContext}
                 referenceProvider={referenceProvider}

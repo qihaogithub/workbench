@@ -49,8 +49,9 @@ function createPutTextOperation(input: {
 }
 
 function createMutationErrorResponse(error: WorkspaceAuthorityClientError) {
+  const code = error.code === "CONFIG_READONLY" ? "CONFIG_READONLY" : "FILE_WRITE_ERROR";
   return NextResponse.json(
-    createApiError("FILE_WRITE_ERROR", error.message, {
+    createApiError(code, error.message, {
       authorityCode: error.code,
     }),
     { status: error.status },
@@ -212,6 +213,26 @@ export async function PUT(
         `默认保存到第一个页面 ${targetDemoId}。` +
         `前端应改用 PUT /api/sessions/${sessionId}/files/{demoId}`,
     );
+    if (typeof schema === "string") {
+      const targetPage = demoPages.find((page) => page.id === targetDemoId);
+      if (
+        !targetPage ||
+        targetPage.reference ||
+        (targetPage.isTemplatePage && payload.role !== "admin")
+      ) {
+        return NextResponse.json(
+          createApiError(
+            "CONFIG_READONLY",
+            targetPage?.reference
+              ? "引用页面的配置不可编辑"
+              : targetPage
+                ? "普通编辑者不能编辑模板页面配置"
+                : "页面配置元数据不存在",
+          ),
+          { status: 403 },
+        );
+      }
+    }
     if (isLiveWorkspacePath(workspacePath)) {
       const operations: WorkspaceMutationOperation[] = [];
       if (typeof code === "string") {

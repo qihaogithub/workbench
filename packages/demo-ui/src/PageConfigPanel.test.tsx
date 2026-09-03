@@ -176,6 +176,65 @@ describe("PageConfigPanel design-spec bubble", () => {
     await waitFor(() => expect(screen.queryByRole("complementary", { name: "设计规范" })).not.toBeInTheDocument());
   });
 
+  it("标题操作菜单打开批注气泡，并按最新顺序展示线程", async () => {
+    const target = {
+      kind: "config" as const,
+      scope: "page" as const,
+      pageId: "page-1",
+      fieldKey: "cover",
+      fieldTitleSnapshot: "封面",
+    };
+    render(
+      <PageConfigPanel
+        pages={[{ id: "page-1", name: "示例页", schema: pageSchema, configData: {} }]}
+        detailPageId="page-1"
+        onPageConfigChange={vi.fn()}
+        configComments={{
+          readOnly: true,
+          threads: [
+            {
+              id: "old",
+              projectId: "project-1",
+              target,
+              content: "较早批注",
+              author: { id: "u1", name: "甲", isAnonymous: false },
+              createdAt: 10,
+              updatedAt: 10,
+              resolved: false,
+              replies: [],
+            },
+            {
+              id: "new",
+              projectId: "project-1",
+              target,
+              content: "最新批注",
+              author: { id: "u2", name: "乙", isAnonymous: false },
+              createdAt: 20,
+              updatedAt: 20,
+              resolved: true,
+              replies: [],
+            },
+          ],
+        }}
+      />,
+    );
+
+    const titleTrigger = screen.getByRole("button", { name: "封面配置项操作" });
+    expect(titleTrigger).toBeVisible();
+    fireEvent.click(titleTrigger);
+    fireEvent.click(screen.getByRole("button", { name: "添加批注：封面" }));
+    const bubble = await screen.findByRole("complementary", { name: "配置项批注" });
+    expect(bubble).toHaveTextContent("最新批注");
+    expect(bubble).toHaveTextContent("较早批注");
+    expect(bubble.textContent!.indexOf("最新批注")).toBeLessThan(bubble.textContent!.indexOf("较早批注"));
+    expect(screen.queryByText("新增批注")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "编辑" })).not.toBeInTheDocument();
+
+    fireEvent.pointerDown(document.body);
+    await waitFor(() => expect(screen.queryByRole("complementary", { name: "配置项批注" })).not.toBeInTheDocument());
+
+  });
+
   it("将 Spine 上传回执作为已持久化的配置变更透传给宿主", async () => {
     const onPageConfigChange = vi.fn();
     const ref = { kind: "spine", version: 1, assetId: `spine_${"c".repeat(64)}` };

@@ -14,6 +14,7 @@ interface MultiSelectProps {
   value: string[];
   onChange: (value: string[]) => void;
   placeholder?: string;
+  disabled?: boolean;
 }
 
 export function MultiSelect({
@@ -21,6 +22,7 @@ export function MultiSelect({
   value,
   onChange,
   placeholder = "请选择",
+  disabled = false,
 }: MultiSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -43,20 +45,22 @@ export function MultiSelect({
 
   const toggleOption = useCallback(
     (val: string) => {
+      if (disabled) return;
       if (selectedSet.has(val)) {
         onChange(value.filter((v) => v !== val));
       } else {
         onChange([...value, val]);
       }
     },
-    [value, onChange, selectedSet],
+    [disabled, value, onChange, selectedSet],
   );
 
   const removeOption = useCallback(
     (val: string) => {
+      if (disabled) return;
       onChange(value.filter((v) => v !== val));
     },
-    [value, onChange],
+    [disabled, value, onChange],
   );
 
   const selectedLabels = value
@@ -71,12 +75,13 @@ export function MultiSelect({
         : `${selectedLabels.slice(0, 2).join(", ")} +${value.length - 2}`;
 
   return (
-    <Popover open={open} onOpenChange={setOpen} modal>
+    <Popover open={open} onOpenChange={disabled ? undefined : setOpen} modal>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
           role="combobox"
           aria-expanded={open}
+          disabled={disabled}
           className={cn(
             "h-8 w-full justify-between font-normal",
             value.length === 0 && "text-muted-foreground",
@@ -108,6 +113,8 @@ export function MultiSelect({
                 >
                   {label}
                   <button
+                    type="button"
+                    disabled={disabled}
                     onClick={(e) => {
                       e.stopPropagation();
                       removeOption(val);
@@ -132,6 +139,8 @@ export function MultiSelect({
                 const selected = selectedSet.has(opt.value);
                 return (
                   <button
+                    type="button"
+                    disabled={disabled}
                     key={opt.value}
                     onClick={() => toggleOption(opt.value)}
                     className={cn(
@@ -162,6 +171,7 @@ export function MultiSelect({
             <Button
               variant="ghost"
               size="sm"
+              disabled={disabled}
               className="h-7 w-full text-xs text-muted-foreground"
               onClick={() => onChange([])}
             >

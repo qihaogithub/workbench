@@ -17,6 +17,7 @@ export interface CollabConnectionContext {
   kind: string;
   userId?: string;
   username?: string;
+  role?: "admin" | "editor";
   workspacePath: string;
 }
 
@@ -74,6 +75,7 @@ export class SessionAuthExtension implements Extension {
       kind: descriptor.kind,
       userId: validation.userId,
       username: validation.username,
+      ...(validation.role ? { role: validation.role } : {}),
       workspacePath: validation.workspacePath,
     };
   }

@@ -11452,6 +11452,23 @@
       "projectRefs": [
         "proj_1785135808250_r4cb4a"
       ]
+    },
+    {
+      "id": "img_AhIxhkKusZ6vWg",
+      "sha256": "c5f7c1bb32074eba21188021744c750c70a04a9af2cc2324ccbb13fe8deb374b",
+      "filename": "whiteboard-source-background.png",
+      "mimeType": "image/png",
+      "sizeBytes": 412985,
+      "width": 750,
+      "height": 572,
+      "sourceType": "user_upload",
+      "createdAt": 1788420310398,
+      "createdBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "projectRefs": [],
+      "whiteboardManaged": true,
+      "whiteboardRefs": [
+        "wb_8944507229b044b68c7c5d8d28f74406"
+      ]
     }
   ]
 }

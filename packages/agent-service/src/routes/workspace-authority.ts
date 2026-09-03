@@ -20,6 +20,7 @@ interface ResourceParams extends WorkspaceParams { "*": string; }
 
 const ERROR_STATUS: Record<WorkspaceAuthorityApiErrorCode, number> = {
   INVALID_REQUEST: 400,
+  CONFIG_READONLY: 403,
   SESSION_NOT_FOUND: 401,
   SESSION_EXPIRED: 401,
   PROJECT_MISMATCH: 403,

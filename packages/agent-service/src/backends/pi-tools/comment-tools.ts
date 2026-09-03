@@ -105,7 +105,9 @@ export function formatThread(thread: CommentThread): string {
   const lines: string[] = [];
   const target = thread.target.kind === "page"
     ? `页面: ${thread.target.pageId}`
-    : `文档: ${thread.target.resourceLabel} (${thread.target.resourceId})`;
+    : thread.target.kind === "config"
+      ? `配置项: ${thread.target.scope}${thread.target.pageId ? `/${thread.target.pageId}` : ""} · ${thread.target.fieldKey}`
+      : `文档: ${thread.target.resourceLabel} (${thread.target.resourceId})`;
   lines.push(`[评论 #${shortId}] id=${thread.id} | ${target} | 状态: ${status}`);
   if (thread.aiTaskStatus) {
     lines.push(`  AI任务状态: ${thread.aiTaskStatus}`);

@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "48f2a1a9-4b91-46ed-8769-838558b20e9e",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "baseRevision": 1283,
+  "revision": 1284,
+  "rootHash": "da4ea18192d73139a9c6af6c342398c38f18964f81ce2edff1af99f1ac428843",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "assets/whiteboards/1312e5eea70ea0001032b9a717370a380427b124e8c94c345f9a736b8c20a02f.png",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "1312e5eea70ea0001032b9a717370a380427b124e8c94c345f9a736b8c20a02f"
+    },
+    {
+      "path": "whiteboards/wb_8944507229b044b68c7c5d8d28f74406.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "7e147dfa2e0ee16a5b67348139ba644497854b7083ba2d468380f2a97538fec9"
+    },
+    {
+      "path": "whiteboards/bindings.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "264e1576c5fd01b80b9eedc58e1488e73a614bb5b1e65979ae68cc2e380eba3b"
+    },
+    {
+      "path": "demos/闯关活动页-进行中_ec853d/config.values.json",
+      "action": "modified",
+      "beforeHash": "7fb180379069d0515f5d9bb0a5cd479f02ead5b4866344c1e9558f4ca9a5dec0",
+      "afterHash": "b4fce5954501fe3305456bef9e5f18faf3ec40a0116af9245a69eedd083b7376"
+    }
+  ],
+  "committedAt": 1788420296368
+}

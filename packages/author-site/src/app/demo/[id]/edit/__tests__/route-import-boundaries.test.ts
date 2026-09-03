@@ -34,14 +34,11 @@ describe("编辑路由导入边界", () => {
     expect(knowledgeDialog).not.toContain('from "@workbench/demo-ui"');
   });
 
-  it("评论启动链在画布中维护项目级线程，并派生页面分组", () => {
+  it("评论启动链维护项目级线程，并派生页面与配置项目标", () => {
     const page = readAuthorFile("src/app/demo/[id]/edit/page.tsx");
 
-    expect(page).toMatch(
-      /const activePageCommentTarget = useMemo<CommentTarget>\([\s\S]*?pageId: activeDemoId[\s\S]*?\[activeDemoId\][\s\S]*?\);/,
-    );
-    expect(page).toMatch(
-      /const commentQueryTarget = useMemo<CommentTarget \| undefined>\(\(\) => \{[\s\S]*?if \(previewMode === "canvas"\) return undefined;[\s\S]*?return activePageCommentTarget;[\s\S]*?\}\);/,
+    expect(page).toContain(
+      "const commentQueryTarget = useMemo<CommentTarget | undefined>(() => undefined, []);",
     );
     expect(page).toMatch(
       /const commentsData = useComments\(\{[\s\S]*?target: commentQueryTarget,[\s\S]*?enabled: Boolean\(activeDemoId\),[\s\S]*?\}\);/,
@@ -53,6 +50,9 @@ describe("编辑路由导入边界", () => {
     expect(page).toContain(
       "<CommentUnreadDot count={unresolvedCommentCount} />",
     );
+    expect(page).toContain("const configCommentController = useMemo<ConfigCommentController>");
+    expect(page).toContain("configComments={configCommentController}");
+    expect(page).not.toContain("<ConfigCommentDialog");
     expect(page).toMatch(
       /onCanvasClick: \(\) => \{[\s\S]*?setCanvasEditingPageId\(null\);/,
     );

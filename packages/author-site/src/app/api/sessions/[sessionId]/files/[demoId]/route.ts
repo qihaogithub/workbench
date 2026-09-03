@@ -94,8 +94,9 @@ function createPutTextOperation(input: {
 }
 
 function createMutationErrorResponse(error: WorkspaceAuthorityClientError) {
+  const code = error.code === "CONFIG_READONLY" ? "CONFIG_READONLY" : "FILE_WRITE_ERROR";
   return NextResponse.json(
-    createApiError("FILE_WRITE_ERROR", error.message, {
+    createApiError(code, error.message, {
       authorityCode: error.code,
     }),
     { status: error.status },
@@ -601,6 +602,29 @@ export async function PUT(
       });
     }
 
+    // Config-panel writes must respect page ownership/editability on the
+    // server. Code and other file writes keep their existing authorization
+    // semantics; this guard only covers schema/value mutations.
+    const pageMeta = listDemoPages(wsPath).find((page) => page.id === demoId);
+    if (
+      (schema !== undefined || configValues !== undefined) &&
+      (!pageMeta ||
+        pageMeta.reference ||
+        (pageMeta.isTemplatePage && payload.role !== "admin"))
+    ) {
+      return NextResponse.json(
+        createApiError(
+          "CONFIG_READONLY",
+          pageMeta?.reference
+            ? "引用页面的配置不可编辑"
+            : pageMeta
+              ? "普通编辑者不能编辑模板页面配置"
+              : "页面配置元数据不存在",
+        ),
+        { status: 403 },
+      );
+    }
+
     if (typeof schema === "string") {
       const allDemoPages = listDemoPages(wsPath);
       const pageSchemas: Record<string, string> = {};
@@ -639,7 +663,6 @@ export async function PUT(
     }
 
     let runtimeValidation: RuntimeValidationResult | undefined;
-    const pageMeta = listDemoPages(wsPath).find((page) => page.id === demoId);
     const pageRuntimeType = pageMeta?.runtimeType;
     const isPrototypePage = pageRuntimeType === "prototype-html-css";
     const isSandboxPage = pageRuntimeType === "sandboxed-html";

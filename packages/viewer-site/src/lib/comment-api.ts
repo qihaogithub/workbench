@@ -111,7 +111,9 @@ export function createCommentApi(projectId: string): CommentApiAdapter {
         ? `?pageId=${encodeURIComponent(target.pageId)}`
         : target?.kind === "document"
           ? `?resourceId=${encodeURIComponent(target.resourceId)}`
-          : "";
+          : target?.kind === "config"
+            ? `?configScope=${encodeURIComponent(target.scope)}${target.pageId ? `&pageId=${encodeURIComponent(target.pageId)}` : ""}&fieldKey=${encodeURIComponent(target.fieldKey)}`
+            : "";
       const data = await commentRequest<{ threads: CommentThread[] }>(`${base}${qs}`);
       return data.threads;
     },

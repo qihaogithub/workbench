@@ -6,6 +6,7 @@ import type { WorkspaceMutationDeletePathOperation, WorkspaceMutationOperation }
 import {
   isWhiteboardDocument,
   isWhiteboardBinding,
+  isWhiteboardPageId,
   asWhiteboardDocumentV3,
   getWhiteboardDocumentRevision,
   type ImageConfigTarget,
@@ -26,6 +27,7 @@ import {
   findWorkspacePath,
   getSessionMeta,
   isSessionExpired,
+  listDemoPages,
   projectExists,
   sessionExists,
 } from "@/lib/fs-utils";
@@ -171,7 +173,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const token = await getAuthCookie();
   const user = token ? await verifyToken(token) : null;
   if (!user) return NextResponse.json(createApiError("UNAUTHORIZED", "登录已过期"), { status: 401 });
-  const body = await request.json().catch(() => null) as null | { sessionId?: string; target?: TargetInput; document?: unknown; baseDocumentRevision?: number | null };
+  const body = await request.json().catch(() => null) as null | { sessionId?: string; contextPageId?: string; target?: TargetInput; document?: unknown; baseDocumentRevision?: number | null };
   if (!body?.sessionId || !isWhiteboardImageTargetInput(body.target) || !isWhiteboardDocument(body.document) || Object.prototype.hasOwnProperty.call(body, "pngBase64")) {
     return NextResponse.json(createApiError("INVALID_REQUEST", "白板提交参数无效"), { status: 400 });
   }
@@ -182,7 +184,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!meta || meta.demoId !== projectId || (meta.userId && meta.userId !== user.userId) || isSessionExpired(meta) || !meta.workspaceId) {
     return NextResponse.json(createApiError("FORBIDDEN", "无权提交此白板"), { status: 403 });
   }
-  if (body.target.scope === "page" && (!body.target.pageId || !/^[A-Za-z0-9_-]+$/.test(body.target.pageId))) {
+  if (body.target.scope === "page" && !isWhiteboardPageId(body.target.pageId)) {
     return NextResponse.json(createApiError("INVALID_REQUEST", "页面目标无效"), { status: 400 });
   }
   if (body.target.scope === "project" && body.target.pageId !== undefined) {
@@ -190,6 +192,48 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
   const workspacePath = findWorkspacePath(meta.workspaceId);
   if (!workspacePath) return NextResponse.json(createApiError("FILE_READ_ERROR", "工作空间不存在"), { status: 500 });
+  if (body.target.scope === "project" && !body.contextPageId) {
+    return NextResponse.json(
+      createApiError("CONFIG_READONLY", "项目级白板提交需要页面上下文"),
+      { status: 403 },
+    );
+  }
+  if (body.contextPageId) {
+    const contextPage = listDemoPages(workspacePath).find((page) => page.id === body.contextPageId);
+    if (!contextPage) {
+      return NextResponse.json(
+        createApiError("CONFIG_READONLY", "页面上下文不存在"),
+        { status: 403 },
+      );
+    }
+    if (contextPage.reference || (contextPage.isTemplatePage && user.role !== "admin")) {
+      return NextResponse.json(
+        createApiError(
+          "CONFIG_READONLY",
+          contextPage.reference
+            ? "引用页面的配置不可编辑"
+            : "普通编辑者不能编辑模板页面配置",
+        ),
+        { status: 403 },
+      );
+    }
+  }
+  if (body.target.scope === "page") {
+    const pageMeta = listDemoPages(workspacePath).find((page) => page.id === body.target?.pageId);
+    if (!pageMeta || pageMeta.reference || (pageMeta.isTemplatePage && user.role !== "admin")) {
+      return NextResponse.json(
+        createApiError(
+          "CONFIG_READONLY",
+          !pageMeta
+            ? "页面上下文不存在"
+            : pageMeta.reference
+            ? "引用页面的配置不可编辑"
+            : "普通编辑者不能编辑模板页面配置",
+        ),
+        { status: 403 },
+      );
+    }
+  }
   const schemaPath = body.target.scope === "project"
     ? path.join(workspacePath, "project.config.schema.json")
     : path.join(workspacePath, "demos", body.target.pageId ?? "", "config.schema.json");

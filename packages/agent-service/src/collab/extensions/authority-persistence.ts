@@ -159,6 +159,12 @@ export class AuthorityPersistenceExtension implements Extension {
     }
 
     try {
+      this.persistence.assertConfigResourceWriteAllowed({
+        workspacePath: ctx.workspacePath,
+        resourcePath: ctx.resourcePath,
+        kind: ctx.kind as never,
+        role: ctx.role,
+      });
       await this.persistence.commitResource({
         projectId: ctx.projectId,
         workspaceId: ctx.workspaceId,

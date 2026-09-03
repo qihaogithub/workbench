@@ -135,6 +135,7 @@ describe("project config route", () => {
       })),
       isSessionExpired: jest.fn(() => false),
       listDemoPages: jest.fn(() => [{ id: "page-1", name: "页面 1", order: 0 }]),
+      readDemoPageMeta: jest.fn(() => ({ id: "page-1", name: "页面 1", order: 0 })),
       projectExists: jest.fn(() => true),
       saveProjectConfigSchema,
       sessionExists: jest.fn(() => true),
@@ -153,7 +154,7 @@ describe("project config route", () => {
     const schema = "{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"}}}";
 
     const response = await PUT(
-      jsonRequest({ sessionId: "session-1", schema }),
+      jsonRequest({ sessionId: "session-1", contextPageId: "page-1", schema }),
       { params: Promise.resolve({ projectId: "project-1" }) },
     );
     const body = await response.json();
@@ -182,7 +183,7 @@ describe("project config route", () => {
     const { DELETE } = await import("./route");
 
     const response = await DELETE(
-      jsonRequest({ sessionId: "session-1" }),
+      jsonRequest({ sessionId: "session-1", contextPageId: "page-1" }),
       { params: Promise.resolve({ projectId: "project-1" }) },
     );
     const body = await response.json();
@@ -205,5 +206,18 @@ describe("project config route", () => {
     }));
     expect(deleteProjectConfigSchema).not.toHaveBeenCalled();
     expect(fs.existsSync(path.join(workspacePath, "project.config.schema.json"))).toBe(true);
+  });
+
+  it("缺少页面上下文时拒绝项目级 Schema 写入", async () => {
+    const { PUT } = await import("./route");
+    const response = await PUT(
+      jsonRequest({ sessionId: "session-1", schema: "{}" }),
+      { params: Promise.resolve({ projectId: "project-1" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error.code).toBe("CONFIG_READONLY");
+    expect(commitWorkspaceMutation).not.toHaveBeenCalled();
   });
 });

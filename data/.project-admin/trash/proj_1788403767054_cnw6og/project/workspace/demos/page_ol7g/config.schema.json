@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "白板宿主回归配置",
+  "type": "object",
+  "properties": {
+    "heroImage": {
+      "type": "string",
+      "format": "image",
+      "title": "主视觉图片",
+      "default": ""
+    }
+  },
+  "required": [
+    "heroImage"
+  ]
+}

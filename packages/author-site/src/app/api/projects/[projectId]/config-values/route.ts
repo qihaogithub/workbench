@@ -8,6 +8,7 @@ import {
   getProjectPath,
   getSessionMeta,
   isSessionExpired,
+  readDemoPageMeta,
   projectExists,
   saveProjectConfigValues,
   sessionExists,
@@ -25,6 +26,7 @@ import {
 interface SessionContext {
   workspaceId: string;
   workspacePath: string;
+  userRole?: "admin" | "editor";
 }
 
 function isPlainConfigObject(value: unknown): value is Record<string, unknown> {
@@ -32,8 +34,9 @@ function isPlainConfigObject(value: unknown): value is Record<string, unknown> {
 }
 
 function createMutationErrorResponse(error: WorkspaceAuthorityClientError) {
+  const code = error.code === "CONFIG_READONLY" ? "CONFIG_READONLY" : "FILE_WRITE_ERROR";
   return NextResponse.json(
-    createApiError("FILE_WRITE_ERROR", error.message, {
+    createApiError(code, error.message, {
       authorityCode: error.code,
     }),
     { status: error.status },
@@ -146,7 +149,14 @@ async function resolveSessionWorkspace(
     };
   }
 
-  return { ok: true, ctx: { workspaceId: meta.workspaceId, workspacePath } };
+  return {
+    ok: true,
+    ctx: {
+      workspaceId: meta.workspaceId,
+      workspacePath,
+      userRole: payload.role,
+    },
+  };
 }
 
 export async function GET(
@@ -191,9 +201,10 @@ export async function PUT(
     }
 
     const body = await request.json().catch(() => ({}));
-    const { sessionId, values } = body as {
+    const { sessionId, values, contextPageId } = body as {
       sessionId?: string;
       values?: unknown;
+      contextPageId?: string;
     };
 
     if (!isPlainConfigObject(values)) {
@@ -205,6 +216,36 @@ export async function PUT(
 
     const ctx = await resolveSessionWorkspace(projectId, sessionId);
     if (!ctx.ok) return ctx.response;
+    // The config panel may be opened while a reference/template page is
+    // selected. Keep this guard server-side as well as in the UI. A page
+    // context is required so the server can make the same decision as the
+    // capability matrix shown by the editor.
+    if (!contextPageId) {
+      return NextResponse.json(
+        createApiError("CONFIG_READONLY", "项目级配置写入需要页面上下文"),
+        { status: 403 },
+      );
+    }
+    {
+      const pageMeta = readDemoPageMeta(ctx.ctx.workspacePath, contextPageId);
+      if (!pageMeta) {
+        return NextResponse.json(
+          createApiError("CONFIG_READONLY", "页面上下文不存在"),
+          { status: 403 },
+        );
+      }
+      if (pageMeta.reference || (pageMeta.isTemplatePage && ctx.ctx.userRole !== "admin")) {
+        return NextResponse.json(
+          createApiError(
+            "CONFIG_READONLY",
+            pageMeta.reference
+              ? "引用页面的共享配置不可编辑"
+              : "普通编辑者不能编辑模板页面的共享配置",
+          ),
+          { status: 403 },
+        );
+      }
+    }
     const resolvedSessionId = sessionId;
     if (!resolvedSessionId) {
       return NextResponse.json(

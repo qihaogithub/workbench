@@ -6,7 +6,8 @@ import { resolveCommentAuthor } from "@/lib/comment-auth";
 
 /**
  * GET /api/projects/[projectId]/comments?pageId=&resolved=
- * 列出评论（公开接口）
+ *   | configScope=project|page&fieldKey=&pageId=&resolved=
+ * 列出评论（公开接口）。配置项查询使用显式 scope/fieldKey 条件。
  */
 export async function GET(
   request: NextRequest,
@@ -17,11 +18,34 @@ export async function GET(
     const { searchParams } = request.nextUrl;
     const pageId = searchParams.get("pageId") || undefined;
     const resourceId = searchParams.get("resourceId") || undefined;
+    const configScopeParam = searchParams.get("configScope");
+    const configScope = configScopeParam === "project" || configScopeParam === "page"
+      ? configScopeParam
+      : undefined;
+    const fieldKey = searchParams.get("fieldKey") || undefined;
+    if (configScopeParam && !configScope) {
+      return NextResponse.json(createApiError("VALIDATION_ERROR", "configScope 必须为 project 或 page"), { status: 400 });
+    }
+    if (configScope && resourceId) {
+      return NextResponse.json(createApiError("VALIDATION_ERROR", "配置评论不能包含 resourceId"), { status: 400 });
+    }
+    if (configScope === "project" && pageId) {
+      return NextResponse.json(createApiError("VALIDATION_ERROR", "项目级配置评论不能包含 pageId"), { status: 400 });
+    }
+    if (configScope === "page" && !pageId) {
+      return NextResponse.json(createApiError("VALIDATION_ERROR", "页面级配置评论需要 pageId"), { status: 400 });
+    }
+    if (fieldKey && !configScope) {
+      return NextResponse.json(createApiError("VALIDATION_ERROR", "fieldKey 需要 configScope"), { status: 400 });
+    }
+    if (configScope && (!fieldKey || !fieldKey.trim())) {
+      return NextResponse.json(createApiError("VALIDATION_ERROR", "配置评论需要 fieldKey"), { status: 400 });
+    }
     const resolvedParam = searchParams.get("resolved");
     const resolved =
       resolvedParam === "true" ? true : resolvedParam === "false" ? false : undefined;
 
-    const threads = listComments(projectId, { pageId, resourceId, resolved });
+    const threads = listComments(projectId, { pageId, resourceId, configScope, fieldKey, resolved });
     return NextResponse.json(createApiSuccess({ threads }));
   } catch (error) {
     console.error("获取评论列表失败:", error);
@@ -60,15 +84,34 @@ export async function POST(
         status: 400,
       });
     }
-    if (!body.target || (body.target.kind !== "page" && body.target.kind !== "document")) {
+    if (!body.target || !["page", "document", "config"].includes(body.target.kind)) {
       return NextResponse.json(createApiError("VALIDATION_ERROR", "target 必填"), { status: 400 });
     }
     if (body.target.kind === "page") {
       if (!body.target.pageId || !body.anchor?.domPath || !body.anchor.tagName || !body.pin || typeof body.pin.xRatio !== "number" || typeof body.pin.yRatio !== "number") {
         return NextResponse.json(createApiError("VALIDATION_ERROR", "页面评论需要 pageId、anchor 与 pin"), { status: 400 });
       }
-    } else if (!body.target.resourceId || !body.target.resourceLabel || !body.documentAnchor || !["document", "selection"].includes(body.documentAnchor.kind)) {
+    } else if (body.target.kind === "document" && (!body.target.resourceId || !body.target.resourceLabel || !body.documentAnchor || !["document", "selection"].includes(body.documentAnchor.kind))) {
       return NextResponse.json(createApiError("VALIDATION_ERROR", "文档评论需要资源与文档锚点"), { status: 400 });
+    } else if (body.target.kind === "config") {
+      const target = body.target;
+      const validPageTarget = target.scope === "page"
+        && typeof target.pageId === "string"
+        && target.pageId.trim().length > 0;
+      const validProjectTarget = target.scope === "project"
+        && target.pageId === undefined;
+      if (
+        (!validPageTarget && !validProjectTarget) ||
+        typeof target.fieldKey !== "string" ||
+        !target.fieldKey.trim() ||
+        (target.fieldTitleSnapshot !== undefined &&
+          typeof target.fieldTitleSnapshot !== "string") ||
+        body.anchor ||
+        body.pin ||
+        body.documentAnchor
+      ) {
+        return NextResponse.json(createApiError("VALIDATION_ERROR", "配置评论需要合法的 scope、fieldKey，且不能包含锚点"), { status: 400 });
+      }
     }
 
     // 身份解析

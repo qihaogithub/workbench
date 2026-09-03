@@ -156,7 +156,7 @@
               "levels": {
                 "type": "array",
                 "title": "关卡图",
-                "description": "每张关卡图支持三状态与自定义位置，坐标/尺寸为 2 倍值（750 设计稿），可拖拽排序",
+                "description": "每张关卡图支持三状态、自由坐标定位与自定义尺寸；坐标在预览区内拖拽调整（1 倍像素），尺寸为 2 倍值，可拖拽排序",
                 "$demo": {
                   "sortable": true
                 },
@@ -205,14 +205,19 @@
                         "accept": ".svga"
                       }
                     },
-                    "x": {
-                      "type": "number",
-                      "title": "X（相对背景图，2倍）",
-                      "description": "关卡图左上角相对于背景图的 X，2 倍坐标"
-                    },
-                    "y": {
-                      "type": "number",
-                      "title": "Y（相对背景图，2倍）"
+                    "position": {
+                      "type": "position",
+                      "key": "levelCard",
+                      "title": "自由坐标",
+                      "description": "在预览区内拖拽定位关卡图（1 倍像素，相对背景图）",
+                      "size": {
+                        "width": 375,
+                        "height": 656
+                      },
+                      "default": {
+                        "x": 14,
+                        "y": 1
+                      }
                     },
                     "w": {
                       "type": "number",
@@ -267,8 +272,10 @@
               "type": "levelCard",
               "state": "已解锁",
               "unlockedImage": "https://img.onlywnn.cn/figma/h_e589fc90.png",
-              "x": 28,
-              "y": 2,
+              "position": {
+                "x": 14,
+                "y": 1
+              },
               "w": 330,
               "h": 368
             },
@@ -276,8 +283,10 @@
               "type": "levelCard",
               "state": "未解锁",
               "lockedImage": "https://img.onlywnn.cn/figma/h_70aef182.png",
-              "x": 392,
-              "y": 294,
+              "position": {
+                "x": 196,
+                "y": 147
+              },
               "w": 330,
               "h": 368
             },
@@ -285,8 +294,10 @@
               "type": "levelCard",
               "state": "未解锁",
               "lockedImage": "https://img.onlywnn.cn/figma/h_61c26d1d.png",
-              "x": 80,
-              "y": 632,
+              "position": {
+                "x": 40,
+                "y": 316
+              },
               "w": 342,
               "h": 390
             }

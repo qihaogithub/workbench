@@ -1,0 +1,19 @@
+{
+  "bindings": [
+    {
+      "id": "wb_wb_8944507229b044b68c7c5d8d28f74406",
+      "target": {
+        "scope": "page",
+        "pageId": "闯关活动页-进行中_ec853d",
+        "fieldPath": [
+          "modules[0].image"
+        ]
+      },
+      "whiteboardId": "wb_8944507229b044b68c7c5d8d28f74406",
+      "documentRevisionAtOutput": 2,
+      "documentVersion": 3,
+      "outputAssetHash": "696297d3aa6473a508f7085e8889a4f6b21a1822b108edc5c7d032c1540e7d4c",
+      "updatedAt": 1788420310834
+    }
+  ]
+}

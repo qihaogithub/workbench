@@ -39,8 +39,11 @@ export async function POST(request: NextRequest) {
     if (!page) {
       return NextResponse.json(createApiError("DEMO_PAGE_NOT_FOUND", "页面不存在"), { status: 404 });
     }
+    if ((page as { reference?: unknown }).reference) {
+      return NextResponse.json(createApiError("CONFIG_READONLY", "引用页面的配置不可编辑"), { status: 403 });
+    }
     if ((user as { role?: string } | null)?.role !== "admin" && (page as { isTemplatePage?: boolean }).isTemplatePage) {
-      return NextResponse.json(createApiError("FORBIDDEN", "编辑者不能对模板页使用可视化配置"), { status: 403 });
+      return NextResponse.json(createApiError("CONFIG_READONLY", "普通编辑者不能编辑模板页面配置"), { status: 403 });
     }
 
     if (typeof body.code !== "string" || typeof body.schema !== "string") {

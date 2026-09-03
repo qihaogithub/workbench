@@ -16,6 +16,8 @@ import {
   X,
 } from "lucide-react";
 import { ConfigForm } from "./ConfigForm";
+import { ConfigCommentPopover } from "./comment/ConfigCommentPopover";
+import type { ConfigCommentController } from "./comment/types";
 import { ConfigScopeWrapper } from "./ConfigScopeWrapper";
 import { PageRequirements } from "./PageRequirements";
 import { RichTextEditor } from "./RichTextEditor";
@@ -24,6 +26,7 @@ import type {
   MarkdownReferenceContext,
   MarkdownReferenceProvider,
 } from "./DocumentEditor";
+import type { DemoPageMeta } from "@workbench/shared";
 import { ConfigItemEditorDialog, type ConfigItemApplyPlanSnapshot } from "./ConfigItemEditorDialog";
 import { localizeRemoteImageForSession } from "./markdown/remote-image-localizer";
 import {
@@ -40,7 +43,7 @@ import {
   getSchemaFieldCountByCategory,
 } from "./config-categories";
 import { cn } from "./utils";
-import type { ConfigChangeMeta, ConfigDefinitionFocus, DesignSpecEntryLink, PageDesignSpecEntryLink, PositionEditTarget, PositionableSizeItem, WhiteboardLauncher } from "./types";
+import type { ConfigChangeMeta, ConfigCommentTarget, ConfigDefinitionFocus, ConfigItemCapabilities, DesignSpecEntryLink, PageDesignSpecEntryLink, PositionEditTarget, PositionableSizeItem, WhiteboardLauncher } from "./types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -68,6 +71,9 @@ export interface PageConfigPanelPage {
   id: string;
   name: string;
   order?: number;
+  /** 页面来源/模板元数据；宿主可据此计算配置项能力矩阵。 */
+  reference?: DemoPageMeta["reference"];
+  isTemplatePage?: boolean;
   schema?: string;
   configData?: Record<string, unknown>;
   /** 引用页使用源项目共享配置 Schema；普通页省略并继承面板项目 Schema。 */
@@ -77,6 +83,11 @@ export interface PageConfigPanelPage {
   designSpecEntries?: DesignSpecEntryLink[];
   /** 页面规范绑定；仅在绑定页面的配置侧边栏顶部展示。 */
   pageDesignSpecEntries?: PageDesignSpecEntryLink[];
+  /** 配置定义和值的独立能力；项目级和页面级可分别控制。 */
+  configItemCapabilities?: {
+    project?: ConfigItemCapabilities;
+    page?: ConfigItemCapabilities;
+  };
 }
 
 type DefinitionEditorState = {
@@ -99,6 +110,12 @@ type ActiveDesignSpec =
       fieldTitle: string;
       anchor?: { top: number; bottom: number };
     };
+
+type ActiveConfigComment = {
+  target: ConfigCommentTarget;
+  fieldTitle: string;
+  anchor?: { top: number; bottom: number };
+};
 
 function isSameDesignSpec(
   active: ActiveDesignSpec | null,
@@ -158,6 +175,12 @@ export interface PageConfigPanelProps {
   onProjectSchemaChange?: (schema: string) => void;
   /** 管理器的定义变更；宿主负责应用运行值清理计划并进入协同持久化链路。 */
   onProjectDefinitionChange?: (mutation: SchemaDefinitionMutation) => void | Promise<void>;
+  /** 字段批注数据与写入能力；浏览端可传入 readOnly 控制器。 */
+  configComments?: ConfigCommentController;
+  /** 兼容未接入共享气泡的宿主，打开字段批注入口。 */
+  onAddConfigComment?: (target: ConfigCommentTarget, trigger?: HTMLElement | null) => void;
+  /** 返回指定配置项未解决批注数量，用于标题徽标。 */
+  getConfigCommentCount?: (target: ConfigCommentTarget) => number;
   onPageConfigChange?: (pageId: string, data: Record<string, unknown>, meta?: ConfigChangeMeta) => void;
   onPageSchemaChange?: (pageId: string, schema: string) => void;
   onPageDefinitionChange?: (pageId: string, mutation: SchemaDefinitionMutation) => void | Promise<void>;
@@ -371,6 +394,9 @@ export function PageConfigPanel({
   onProjectConfigChange,
   onProjectSchemaChange,
   onProjectDefinitionChange,
+  configComments,
+  onAddConfigComment,
+  getConfigCommentCount,
   onPageConfigChange,
   onPageSchemaChange,
   onPageDefinitionChange,
@@ -430,16 +456,55 @@ export function PageConfigPanel({
   const [definitionEditor, setDefinitionEditor] = useState<DefinitionEditorState | null>(null);
   const [definitionSaving, setDefinitionSaving] = useState(false);
   const [activeDesignSpec, setActiveDesignSpec] = useState<ActiveDesignSpec | null>(null);
+  const [activeConfigComment, setActiveConfigComment] = useState<ActiveConfigComment | null>(null);
   const [designSpecPanelBounds, setDesignSpecPanelBounds] =
     useState<DesignSpecPanelBounds | null>(null);
   const configPanelRef = useRef<HTMLDivElement | null>(null);
   const designSpecPanelRef = useRef<HTMLElement | null>(null);
   const designSpecTriggerRef = useRef<HTMLElement | null>(null);
+  const configCommentPanelRef = useRef<HTMLElement | null>(null);
+  const configCommentTriggerRef = useRef<HTMLElement | null>(null);
 
   const toggleDesignSpec = useCallback((next: ActiveDesignSpec, trigger?: HTMLElement | null) => {
     designSpecTriggerRef.current = trigger ?? null;
+    setActiveConfigComment(null);
+    configCommentTriggerRef.current = null;
     setActiveDesignSpec((current) => isSameDesignSpec(current, next) ? null : next);
   }, []);
+
+  const isSameConfigComment = useCallback(
+    (current: ActiveConfigComment | null, next: ConfigCommentTarget) => Boolean(
+      current
+      && current.target.scope === next.scope
+      && current.target.fieldKey === next.fieldKey
+      && (next.scope === "project"
+        ? !current.target.pageId && !next.pageId
+        : current.target.pageId === next.pageId),
+    ),
+    [],
+  );
+
+  const handleOpenConfigComment = useCallback((target: ConfigCommentTarget, trigger?: HTMLElement | null) => {
+    if (!configComments) {
+      onAddConfigComment?.(target, trigger);
+      return;
+    }
+    configCommentTriggerRef.current = trigger ?? null;
+    const rect = trigger?.getBoundingClientRect();
+    setActiveDesignSpec(null);
+    designSpecTriggerRef.current = null;
+    setActiveConfigComment((current) => (
+      isSameConfigComment(current, target)
+        ? null
+        : {
+            target,
+            fieldTitle: target.fieldTitleSnapshot || target.fieldKey,
+            anchor: rect && (rect.width || rect.height)
+              ? { top: rect.top, bottom: rect.bottom }
+              : undefined,
+          }
+    ));
+  }, [configComments, isSameConfigComment, onAddConfigComment]);
 
   useEffect(() => {
     if (!designSpecApiContext?.workingDir) return;
@@ -531,23 +596,30 @@ export function PageConfigPanel({
         : loadedPageDesignSpecEntries;
   useEffect(() => {
     setActiveDesignSpec(null);
+    setActiveConfigComment(null);
+    designSpecTriggerRef.current = null;
+    configCommentTriggerRef.current = null;
   }, [effectiveDetailPageId, configCategoryFilter]);
   useEffect(() => {
-    if (!activeDesignSpec) return;
+    if (!activeDesignSpec && !activeConfigComment) return;
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
       if (
         !designSpecPanelRef.current?.contains(target)
         && !designSpecTriggerRef.current?.contains(target)
+        && !configCommentPanelRef.current?.contains(target)
+        && !configCommentTriggerRef.current?.contains(target)
       ) {
         setActiveDesignSpec(null);
+        setActiveConfigComment(null);
       }
     };
     document.addEventListener("pointerdown", handlePointerDown);
     return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [activeDesignSpec]);
+  }, [activeDesignSpec, activeConfigComment]);
   useLayoutEffect(() => {
-    if (!activeDesignSpec || !configPanelRef.current) {
+    const activeAnchor = activeDesignSpec?.anchor ?? activeConfigComment?.anchor;
+    if ((!activeDesignSpec && !activeConfigComment) || !configPanelRef.current) {
       setDesignSpecPanelBounds(null);
       return;
     }
@@ -560,8 +632,8 @@ export function PageConfigPanel({
       left: rect.left,
       height: rect.height,
       availableLeftWidth: rect.left,
-      anchorTop: activeDesignSpec.anchor?.top,
-      anchorBottom: activeDesignSpec.anchor?.bottom,
+      anchorTop: activeAnchor?.top,
+      anchorBottom: activeAnchor?.bottom,
     });
     };
 
@@ -575,7 +647,7 @@ export function PageConfigPanel({
       observer?.disconnect();
       window.removeEventListener("resize", updateBounds);
     };
-  }, [activeDesignSpec]);
+  }, [activeDesignSpec, activeConfigComment]);
   const sortedPages = useMemo(() => getSortedPages(pages), [pages]);
   const scopedPages = useMemo<ScopedPageConfig[]>(
     () =>
@@ -629,6 +701,11 @@ export function PageConfigPanel({
 
   const openDefinitionEditor = (scope: "page" | "project", key?: string) => {
     if (!selectedPage) return;
+    if (readonly) return;
+    const capabilities = scope === "project"
+      ? selectedPage.configItemCapabilities?.project
+      : selectedPage.configItemCapabilities?.page;
+    if (capabilities && !capabilities.canEditDefinition) return;
     const targetSchema = scope === "project"
       ? selectedProjectConfigSchema || EMPTY_SCHEMA
       : selectedPage.schema || EMPTY_SCHEMA;
@@ -848,14 +925,27 @@ export function PageConfigPanel({
   const showSharedConfig =
     selectedProjectCount > 0 && !!selectedProjectConfigSchema;
   const showPageConfig = pageCount > 0 && !!selectedPage.schema;
-  const canAddConfig = !readonly && Boolean(onProjectDefinitionChange || onPageDefinitionChange);
-  const restoreDefaultsTarget = onRestoreDefaults
+  const projectCapabilities = selectedPage.configItemCapabilities?.project;
+  const pageCapabilities = selectedPage.configItemCapabilities?.page;
+  const canCreateProjectConfig =
+    Boolean(onProjectDefinitionChange) &&
+    (projectCapabilities?.canEditDefinition ?? !readonly);
+  const canCreatePageConfig =
+    Boolean(onPageDefinitionChange) &&
+    (pageCapabilities?.canEditDefinition ?? !readonly);
+  const canAddConfig = !readonly && (canCreateProjectConfig || canCreatePageConfig);
+  const canRestorePageDefaults =
+    Boolean(onRestoreDefaults) && (pageCapabilities?.canEditValue ?? !readonly);
+  const canRestoreProjectDefaults =
+    Boolean(onProjectRestoreDefaults) &&
+    (projectCapabilities?.canEditValue ?? !readonly);
+  const restoreDefaultsTarget = canRestorePageDefaults
     ? "page"
-    : onProjectRestoreDefaults
+    : canRestoreProjectDefaults
       ? "project"
       : null;
   const showConfigActions = canAddConfig || restoreDefaultsTarget !== null;
-  const configDefinitionCreateScope = onPageDefinitionChange ? "page" : "project";
+  const configDefinitionCreateScope = canCreatePageConfig ? "page" : "project";
   const hasRequirements = Boolean(requirements?.trim());
   const shouldShowRequirements =
     requirementsPosition !== "hidden" &&
@@ -883,8 +973,9 @@ export function PageConfigPanel({
     : Math.max(240, designSpecPanelBounds.height);
   const bubbleTop = hasRoomForSideBubble ? designSpecPanelBounds?.top ?? 0 : 16;
   const sideBubbleTop = hasRoomForSideBubble ? Math.max(8, bubbleTop - 48) : bubbleTop;
-  const bubbleArrowTop = activeDesignSpec?.anchor && designSpecPanelBounds
-    ? Math.max(18, Math.min(Math.max(18, designSpecPanelBounds.height - 18), ((activeDesignSpec.anchor.top + activeDesignSpec.anchor.bottom) / 2) - sideBubbleTop))
+  const activeOverlayAnchor = activeDesignSpec?.anchor ?? activeConfigComment?.anchor;
+  const bubbleArrowTop = activeOverlayAnchor && designSpecPanelBounds
+    ? Math.max(18, Math.min(Math.max(18, designSpecPanelBounds.height - 18), ((activeOverlayAnchor.top + activeOverlayAnchor.bottom) / 2) - sideBubbleTop))
     : 36;
   const designSpecBubble = activeDesignSpec && designSpecPanelBounds && (
     <aside
@@ -957,6 +1048,44 @@ export function PageConfigPanel({
       </div>
     </aside>
   );
+  const configCommentBubble = activeConfigComment && designSpecPanelBounds && configComments && (
+    <aside
+      ref={configCommentPanelRef}
+      aria-label="配置项批注"
+      className="fixed z-[70] flex max-w-[calc(100vw-16px)] flex-col overflow-visible rounded-xl border border-border/70 bg-card shadow-[0_20px_55px_-20px_rgb(0_0_0_/_0.65)] ring-1 ring-black/5"
+      style={hasRoomForSideBubble
+        ? {
+            top: sideBubbleTop,
+            left: Math.max(8, designSpecPanelBounds.left - Math.min(380, designSpecPanelBounds.availableLeftWidth - 20) - 12),
+            width: Math.min(380, designSpecPanelBounds.availableLeftWidth - 20),
+            maxHeight: bubbleMaxHeight ? bubbleMaxHeight + (bubbleTop - sideBubbleTop) : undefined,
+          }
+        : { top: 16, right: 8, left: 8, maxHeight: "calc(100dvh - 32px)" }}
+    >
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-2 z-0 h-0 w-0 border-y-[8px] border-y-transparent border-l-[8px] border-l-card"
+        style={{ top: bubbleArrowTop - 8 }}
+      />
+      <div className="relative z-10 flex min-h-14 shrink-0 items-center gap-3 rounded-t-xl border-b border-border/70 bg-muted/30 px-4 py-2.5">
+        <h3 className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight">
+          {activeConfigComment.fieldTitle}
+        </h3>
+        <button
+          type="button"
+          onClick={() => {
+            setActiveConfigComment(null);
+            configCommentTriggerRef.current = null;
+          }}
+          aria-label="关闭批注"
+          className="inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <ConfigCommentPopover target={activeConfigComment.target} {...configComments} />
+    </aside>
+  );
   return (
     <div ref={configPanelRef} className={cn("relative flex h-full flex-col bg-card", className)}>
       {!hideDetailHeader && (
@@ -983,7 +1112,7 @@ export function PageConfigPanel({
           </div>
         </div>
       )}
-      {typeof document !== "undefined" && designSpecBubble && createPortal(designSpecBubble, document.body)}
+      {typeof document !== "undefined" && (designSpecBubble || configCommentBubble) && createPortal(designSpecBubble || configCommentBubble, document.body)}
       <div className={cn("min-h-0 flex-1 overflow-y-auto p-4", showConfigActions && "pb-20")}>
         <div className="flex flex-col gap-5">
           {selectedPageSpecs.length > 0 && (
@@ -1068,7 +1197,11 @@ export function PageConfigPanel({
                     onEditDesignSpec={onEditDesignSpec}
                     onOpenDesignSpec={(spec, fieldTitle, anchor, trigger) => toggleDesignSpec({ kind: "config", spec, fieldTitle, anchor }, trigger)}
                     onEditConfigDefinition={(key) => openDefinitionEditor("project", key)}
+                    configItemCapabilities={selectedPage.configItemCapabilities?.project}
+                    onAddConfigComment={configComments || onAddConfigComment ? handleOpenConfigComment : undefined}
+                    getConfigCommentCount={getConfigCommentCount}
                     imageConfigScope="project"
+                    configContextPageId={selectedPage.id}
                     referenceContext={referenceContext}
                     referenceProvider={referenceProvider}
                     onReferenceClick={onReferenceClick}
@@ -1106,8 +1239,12 @@ export function PageConfigPanel({
                   onEditDesignSpec={onEditDesignSpec}
                   onOpenDesignSpec={(spec, fieldTitle, anchor, trigger) => toggleDesignSpec({ kind: "config", spec, fieldTitle, anchor }, trigger)}
                   onEditConfigDefinition={(key) => openDefinitionEditor("page", key)}
+                  configItemCapabilities={selectedPage.configItemCapabilities?.page}
+                  onAddConfigComment={configComments || onAddConfigComment ? handleOpenConfigComment : undefined}
+                  getConfigCommentCount={getConfigCommentCount}
                   imageConfigScope="page"
                   pageId={selectedPage.id}
+                  configContextPageId={selectedPage.id}
                   referenceContext={referenceContext}
                   referenceProvider={referenceProvider}
                   onReferenceClick={onReferenceClick}
@@ -1297,6 +1434,14 @@ export function PageConfigPanel({
                 if (value !== undefined) setDefinitionEditor((current) => current ? { ...current, draft: { ...current.draft, default: value } } : current);
               }}
               readonly={readonly}
+              configItemCapabilities={
+                definitionEditor.scope === "page"
+                  ? selectedPage.configItemCapabilities?.page
+                  : selectedPage.configItemCapabilities?.project
+              }
+              imageConfigScope={definitionEditor.scope}
+              pageId={definitionEditor.scope === "page" ? selectedPage.id : undefined}
+              configContextPageId={selectedPage.id}
             />
           }
           readOnly={readonly}
