@@ -152,18 +152,28 @@ function shouldRewritePrototypeAssetUrl(value: string): boolean {
   return IMAGE_EXT_RE.test(trimmed);
 }
 
+function shouldRewriteWorkspaceAssetUrl(value: string): boolean {
+  const trimmed = value.trim().replace(/^\//u, "");
+  return trimmed.startsWith("assets/")
+    && !trimmed.split("/").some((part) => part === "." || part === "..")
+    && IMAGE_EXT_RE.test(trimmed);
+}
+
 function rewritePrototypeAssetUrl(
   value: string,
   context?: PrototypeAssetRewriteContext,
 ): string {
-  if (
-    !context?.sessionId ||
-    !context.demoId ||
-    !shouldRewritePrototypeAssetUrl(value)
-  ) {
+  if (!context?.sessionId) {
     return value;
   }
-  const resolved = resolvePrototypeRelativePath(value, `demos/${context.demoId}/`);
+  const trimmed = value.trim();
+  const isWorkspaceAsset = shouldRewriteWorkspaceAssetUrl(trimmed);
+  if (!isWorkspaceAsset && (!context.demoId || !shouldRewritePrototypeAssetUrl(trimmed))) {
+    return value;
+  }
+  const resolved = isWorkspaceAsset
+    ? trimmed.replace(/^\//u, "")
+    : resolvePrototypeRelativePath(trimmed, `demos/${context.demoId}/`);
   const encodedPath = resolved
     .split("/")
     .map((part) => encodeURIComponent(part))
@@ -176,7 +186,7 @@ export function rewritePrototypeAssetUrls(
   content: string,
   context?: PrototypeAssetRewriteContext,
 ): string {
-  if (!context?.sessionId || !context.demoId) return content;
+  if (!context?.sessionId) return content;
   return content
     .replace(
       HTML_ASSET_ATTR_RE,

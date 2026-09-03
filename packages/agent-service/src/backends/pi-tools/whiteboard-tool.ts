@@ -12,12 +12,13 @@ import {
 import {
   applyWhiteboardActions,
   WHITEBOARD_ACTION_SCHEMA_VERSION,
+  BRIDGE_PROFILE_VERSION,
   WHITEBOARD_CONTEXT_SCHEMA_VERSION,
   WHITEBOARD_PLAN_SCHEMA_VERSION,
   getWhiteboardSelection,
   parseWhiteboardCode,
   serializeWhiteboardCode,
-  validateWhiteboardDocument,
+  validateWhiteboardDocument as validateWhiteboardNativeDocument,
   type WhiteboardAction,
   type WhiteboardContext,
   type WhiteboardPlan,
@@ -51,11 +52,30 @@ const NodePatch = Type.Object({
   rotation: Type.Optional(Type.Number()),
   style: Type.Optional(StylePatch),
 }, { additionalProperties: false });
+const ImageCropRect = Type.Object({
+  x: Type.Number(),
+  y: Type.Number(),
+  width: Type.Number({ exclusiveMinimum: 0, maximum: 1 }),
+  height: Type.Number({ exclusiveMinimum: 0, maximum: 1 }),
+}, { additionalProperties: false });
+const ImageCropFrame = Type.Object({
+  x: Type.Number({ minimum: 0 }),
+  y: Type.Number({ minimum: 0 }),
+  width: Type.Number({ exclusiveMinimum: 0 }),
+  height: Type.Number({ exclusiveMinimum: 0 }),
+}, { additionalProperties: false });
+const ImageCrop = Type.Object({
+  shape: Type.Union([Type.Literal("rect"), Type.Literal("circle")]),
+  sourceRect: ImageCropRect,
+  originalFrame: ImageCropFrame,
+  originalImageFit: Type.Union([Type.Literal("cover"), Type.Literal("contain"), Type.Literal("fill")]),
+}, { additionalProperties: false });
 const WhiteboardActionSchema = Type.Union([
   Type.Object({ type: Type.Literal("updateNode"), nodeId: Type.String(), patch: NodePatch }, { additionalProperties: false }),
   Type.Object({ type: Type.Literal("updateRole"), nodeId: Type.String(), role: Type.Optional(SemanticRole) }, { additionalProperties: false }),
   Type.Object({ type: Type.Literal("placeAsset"), nodeId: Type.String(), assetId: Type.String(), src: Type.String() }, { additionalProperties: false }),
   Type.Object({ type: Type.Literal("setImageFit"), nodeId: Type.String(), fit: Type.Union([Type.Literal("cover"), Type.Literal("contain"), Type.Literal("fill")]) }, { additionalProperties: false }),
+  Type.Object({ type: Type.Literal("setImageCrop"), nodeId: Type.String(), crop: Type.Union([ImageCrop, Type.Null()]), frame: Type.Optional(ImageCropFrame) }, { additionalProperties: false }),
   Type.Object({ type: Type.Literal("removeNode"), nodeId: Type.String() }, { additionalProperties: false }),
   Type.Object({ type: Type.Literal("addText"), nodeId: Type.Optional(Type.String()), text: Type.String(), x: Type.Number(), y: Type.Number(), width: Type.Number(), height: Type.Number(), role: Type.Optional(SemanticRole) }, { additionalProperties: false }),
   Type.Object({ type: Type.Literal("align"), nodeIds: Type.Array(Type.String()), axis: Type.Union(["left", "center", "right", "top", "middle", "bottom"].map((axis) => Type.Literal(axis))) }, { additionalProperties: false }),
@@ -172,7 +192,7 @@ async function readDocument(config: AgentConfig, whiteboardId: string): Promise<
   const raw = JSON.parse(await fs.promises.readFile(absoluteDocumentPath(config, whiteboardId), "utf8")) as unknown;
   if (!isWhiteboardDocument(raw)) throw new Error("Invalid whiteboard document");
   const document = asWhiteboardDocumentV2(raw);
-  const validation = validateWhiteboardDocument(document);
+  const validation = validateWhiteboardNativeDocument(document);
   if (!validation.valid) throw new Error(validation.diagnostics.map((item) => item.message).join("; "));
   return document;
 }
@@ -344,8 +364,8 @@ export function createPlanWhiteboardCompositionTool(config: AgentConfig): AgentT
           selectedNodeIds,
           selection,
           ...(document.safeArea ? { safeArea: document.safeArea } : {}),
-          constraints: { bridgeProfile: "html-css-v1", safeAreaEnforced: Boolean(document.safeArea), coordinateSpace: "page-px" },
-          suggestedActionTypes: ["updateNode", "updateRole", "addText", "placeAsset", "setImageFit", "align", "distribute", "removeNode"],
+          constraints: { bridgeProfile: BRIDGE_PROFILE_VERSION, safeAreaEnforced: Boolean(document.safeArea), coordinateSpace: "page-px" },
+          suggestedActionTypes: ["updateNode", "updateRole", "addText", "placeAsset", "setImageFit", "setImageCrop", "align", "distribute", "removeNode"],
           requiresConfirmation: true,
         };
         return {

@@ -17,13 +17,13 @@ import {
 } from "@workbench/sketch-core";
 import {
   SketchEditorSurface,
-  renderSketchSceneToPngBlob,
 } from "@workbench/sketch-react";
 import {
+  asWhiteboardDocumentV3,
   asWhiteboardDocumentV2,
   getWhiteboardDocumentRevision,
   type WhiteboardDocument,
-  type WhiteboardDocumentV2,
+  type WhiteboardDocumentV3,
 } from "@workbench/shared";
 import {
   parseWhiteboardCode,
@@ -79,10 +79,7 @@ type CommitResult = {
 
 function localBackgroundSource(target: WhiteboardCommitTarget): string | null {
   const source = target.listItem?.url ?? target.currentValue;
-  return source &&
-    (source.startsWith("data:image/") || source.startsWith("/api/"))
-    ? source
-    : null;
+  return typeof source === "string" && source.trim() ? source.trim() : null;
 }
 
 function managedAssetIdFromSource(source: string | null): string | null {
@@ -90,23 +87,69 @@ function managedAssetIdFromSource(source: string | null): string | null {
   return match?.[1] ?? null;
 }
 
-function newDocument(target?: WhiteboardCommitTarget): WhiteboardDocument {
-  // The page editor's default scene includes a sticky note, which is outside
-  // the html-css-v1 bridge. Start whiteboard drafts with bridge-safe nodes so
-  // an untouched new draft can still be committed.
+function resolveWorkspaceImagePreviewSource(source: string, sessionId?: string): string {
+  if (!sessionId) return source;
+  if (source.startsWith("assets/")) return `/api/sessions/${encodeURIComponent(sessionId)}/workspace/${source}`;
+  if (source.startsWith("/assets/")) return `/api/sessions/${encodeURIComponent(sessionId)}/workspace/${source.slice(1)}`;
+  return source;
+}
+
+function addLegacySourceBackground(
+  value: WhiteboardDocument,
+  target: WhiteboardCommitTarget | undefined,
+  sessionId?: string,
+): WhiteboardDocumentV3 {
+  const next = asWhiteboardDocumentV3(value);
+  // V3 records an intentional background deletion in the scene itself. Only
+  // migrate older envelopes, whose format had no reliable deletion marker.
+  if (value.version === 3 || !target || next.scene.nodes.some((node) => node.id === "source-background")) {
+    return next;
+  }
+  const source = localBackgroundSource(target);
+  if (!source) return next;
+  const backgroundSource = resolveWorkspaceImagePreviewSource(source, sessionId);
+  const backgroundNode = {
+    id: "source-background",
+    type: "image" as const,
+    x: 0,
+    y: 0,
+    width: next.scene.pageSize.width,
+    height: next.scene.pageSize.height,
+    src: backgroundSource,
+    alt: "原图片背景",
+    style: { imageFit: "cover" as const },
+  };
+  const assetRef = managedAssetIdFromSource(backgroundSource);
+  return {
+    ...next,
+    scene: {
+      ...next.scene,
+      nodes: [backgroundNode, ...next.scene.nodes],
+    },
+    nodeSemantics: assetRef
+      ? {
+          ...next.nodeSemantics,
+          "source-background": { role: "background", assetRef },
+        }
+      : next.nodeSemantics,
+  };
+}
+
+function newDocument(target?: WhiteboardCommitTarget, sessionId?: string): WhiteboardDocumentV3 {
+  // The full whiteboard scene, rather than the code bridge projection, is the
+  // durable editing truth. The host owns the initial content policy: keep the
+  // confirmed title, but do not expose the factory's instructional sticky note
+  // in a newly opened creation-side whiteboard.
   const baseScene = createDefaultSketchScene();
   const scene = {
     ...baseScene,
-    nodes: baseScene.nodes.filter((node) =>
-      ["group", "rect", "ellipse", "image", "text", "button"].includes(
-        node.type,
-      ),
-    ),
-    assets: [],
-    bindings: {},
-    metadata: {},
+    nodes: baseScene.nodes.filter((node) => node.id !== "note"),
   };
-  const background = target ? localBackgroundSource(target) : null;
+  const background = target
+    ? localBackgroundSource(target)
+      ? resolveWorkspaceImagePreviewSource(localBackgroundSource(target)!, sessionId)
+      : null
+    : null;
   if (background) {
     scene.nodes.unshift({
       id: "source-background",
@@ -121,7 +164,8 @@ function newDocument(target?: WhiteboardCommitTarget): WhiteboardDocument {
   }
   return {
     id: `wb_${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID().replaceAll("-", "") : Date.now().toString(36)}`,
-    version: 2,
+    version: 3,
+    sceneFormat: "sketch-scene-v1",
     documentRevision: 0,
     scene,
     nodeSemantics:
@@ -138,25 +182,21 @@ function newDocument(target?: WhiteboardCommitTarget): WhiteboardDocument {
   };
 }
 
-const WHITEBOARD_ALLOWED_TOOLS = [
-  "select",
-  "hand",
-  "rect",
-  "ellipse",
-  "text",
-  "image",
-] as const;
-
 function draftFingerprint(value: WhiteboardDocument): string {
-  return JSON.stringify({ ...asWhiteboardDocumentV2(value), updatedAt: 0 });
+  return JSON.stringify({ ...asWhiteboardDocumentV3(value), updatedAt: 0 });
 }
 
 function normalizeManagedAssetSemantics(
-  value: WhiteboardDocumentV2,
-): WhiteboardDocumentV2 {
-  const next = JSON.parse(JSON.stringify(value)) as WhiteboardDocumentV2;
+  value: WhiteboardDocument,
+  sessionId?: string,
+  target?: WhiteboardCommitTarget,
+): WhiteboardDocumentV3 {
+  const next = JSON.parse(
+    JSON.stringify(addLegacySourceBackground(value, target, sessionId)),
+  ) as WhiteboardDocumentV3;
   for (const node of next.scene.nodes) {
     if (node.type !== "image" || typeof node.src !== "string") continue;
+    node.src = resolveWorkspaceImagePreviewSource(node.src, sessionId);
     const assetRef = managedAssetIdFromSource(node.src);
     if (assetRef)
       next.nodeSemantics[node.id] = {
@@ -185,71 +225,119 @@ async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(binary);
 }
 
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = "";
-  for (let index = 0; index < bytes.length; index += 0x8000)
-    binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
-  return btoa(binary);
+const WHITEBOARD_IMAGE_CAPTURE_TIMEOUT_MS = 2_000;
+
+async function captureStaticImageFrame(source: string): Promise<{ mimeType: string; dataBase64: string } | null> {
+  if (typeof Image === "undefined" || typeof document === "undefined") return null;
+  // jsdom cannot decode image resources and does not reliably dispatch the
+  // browser image lifecycle events. The server-side asset pipeline remains
+  // the authoritative fallback for this environment.
+  if (typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent)) return null;
+  try {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const finish = (callback: () => void) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutId);
+        callback();
+      };
+      const timeoutId = setTimeout(
+        () => finish(() => reject(new Error("IMAGE_LOAD_TIMEOUT"))),
+        WHITEBOARD_IMAGE_CAPTURE_TIMEOUT_MS,
+      );
+      image.onload = () => finish(resolve);
+      image.onerror = () => finish(() => reject(new Error("IMAGE_LOAD_FAILED")));
+      image.src = source;
+      // `complete` can be true for a newly assigned data URL while decoding
+      // is still pending. Only resolve the fast path when dimensions are
+      // already available; otherwise let onload/onerror (or the bounded
+      // timeout) decide. This is important for capturing an animated image's
+      // current browser frame instead of falling back to its first frame.
+      if (image.complete && (image.naturalWidth || image.width)) finish(resolve);
+    });
+    const width = image.naturalWidth || image.width;
+    const height = image.naturalHeight || image.height;
+    if (!width || !height) return null;
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    context.drawImage(image, 0, 0, width, height);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!blob) return null;
+    return { mimeType: "image/png", dataBase64: await blobToBase64(blob) };
+  } catch {
+    // The server still receives the original managed/data/remote source and
+    // can decode it through its controlled asset pipeline.
+    return null;
+  }
 }
 
-/** Convert temporary editor data URLs into managed image-store references. */
-async function localizeDocumentAssets(
-  document: WhiteboardDocumentV2,
+/** Normalize every image node to a managed static PNG before commit. */
+async function prepareDocumentAssets(
+  document: WhiteboardDocumentV3,
   projectId: string,
-): Promise<WhiteboardDocumentV2> {
-  // JSON cloning keeps this client component compatible with older browsers
-  // and the jsdom test runtime while the document contains only JSON data.
-  const next = JSON.parse(JSON.stringify(document)) as WhiteboardDocumentV2;
-  const localized = new Map<string, { imageId: string; url: string }>();
-  for (const node of next.scene.nodes) {
-    if (node.type !== "image" || typeof node.src !== "string") continue;
-    const managedId = managedAssetIdFromSource(node.src);
-    if (managedId) {
-      next.nodeSemantics[node.id] = {
-        ...next.nodeSemantics[node.id],
-        assetRef: managedId,
-      };
-      continue;
-    }
-    const match = node.src.match(
-      /^data:(image\/[A-Za-z0-9.+-]+)(?:;([^,]*))?,([\s\S]*)$/i,
-    );
-    if (!match) continue;
-    let localizedAsset = localized.get(node.src);
-    if (!localizedAsset) {
-      const extension =
-        match[1].toLowerCase() === "image/svg+xml"
-          ? "svg"
-          : match[1].split("/")[1]?.split("+")[0]?.replace("jpeg", "jpg") ||
-            "png";
-      const encoded = match[2]?.toLowerCase().includes("base64")
-        ? match[3]
-        : bytesToBase64(new TextEncoder().encode(decodeURIComponent(match[3])));
-      const response = await fetch("/api/images/upload", {
+  sessionId: string,
+): Promise<WhiteboardDocumentV3> {
+  const next = JSON.parse(JSON.stringify(document)) as WhiteboardDocumentV3;
+  const prepared = new Map<string, { assetRef: string; url: string; width?: number; height?: number }>();
+  const prepareSource = async (source: string, nodeId: string) => {
+    let asset = prepared.get(source);
+    if (!asset) {
+      const browserBlob = await captureStaticImageFrame(source);
+      const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}/whiteboards/assets`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          data: encoded,
-          filename: `whiteboard-${node.id}.${extension}`,
-          projectId,
+          sessionId,
+          draftId: document.id,
+          nodeId,
+          source: { src: source },
+          ...(browserBlob ? { browserBlob } : {}),
         }),
       });
       const payload = (await response.json().catch(() => ({}))) as ApiEnvelope<{
+        assetRef?: string;
         imageId?: string;
         url?: string;
+        width?: number;
+        height?: number;
       }>;
-      if (!response.ok || !payload.success || !payload.data?.imageId)
-        throw new Error(readError(payload, "图片资产本地化失败，请重试。"));
-      localizedAsset = {
-        imageId: payload.data.imageId,
-        url: payload.data.url || `/api/images/${payload.data.imageId}`,
+      if (!response.ok || !payload.success || !(payload.data?.assetRef || payload.data?.imageId) || !payload.data.url) {
+        throw new Error(readError(payload, `图片节点“${nodeId}”无法处理，请重新上传图片。`));
+      }
+      asset = {
+        assetRef: payload.data.assetRef || payload.data.imageId!,
+        url: payload.data.url,
+        width: payload.data.width,
+        height: payload.data.height,
       };
-      localized.set(node.src, localizedAsset);
+      prepared.set(source, asset);
     }
-    node.src = localizedAsset.url;
+    return asset;
+  };
+  for (const libraryAsset of next.scene.assets ?? []) {
+    if (libraryAsset.type !== "image" || typeof libraryAsset.src !== "string" || !libraryAsset.src) continue;
+    const asset = await prepareSource(libraryAsset.src, libraryAsset.id);
+    libraryAsset.src = asset.url;
+    if (asset.width !== undefined) libraryAsset.width = asset.width;
+    if (asset.height !== undefined) libraryAsset.height = asset.height;
+  }
+  for (const node of next.scene.nodes) {
+    if (node.type !== "image" || typeof node.src !== "string" || !node.src) continue;
+    const asset = await prepareSource(node.src, node.id);
+    node.src = asset.url;
+    if (asset.width !== undefined && asset.height !== undefined) {
+      node.intrinsicWidth = asset.width;
+      node.intrinsicHeight = asset.height;
+    }
     next.nodeSemantics[node.id] = {
       ...next.nodeSemantics[node.id],
-      assetRef: localizedAsset.imageId,
+      assetRef: asset.assetRef,
     };
   }
   return next;
@@ -257,6 +345,11 @@ async function localizeDocumentAssets(
 
 function readError(response: ApiEnvelope<unknown>, fallback: string): string {
   return response.error?.message || fallback;
+}
+
+function whiteboardUserError(cause: unknown, fallback: string): string {
+  const message = cause instanceof Error ? cause.message.trim() : "";
+  return message && /[\u3400-\u9fff]/u.test(message) ? message : fallback;
 }
 
 /**
@@ -273,13 +366,13 @@ export function WhiteboardDialog({
   onCommitted,
   onDiagnosticEvent,
 }: WhiteboardDialogProps) {
-  const initialDraftRef = useRef<WhiteboardDocument | null>(null);
+  const initialDraftRef = useRef<WhiteboardDocumentV3 | null>(null);
   if (!initialDraftRef.current)
     initialDraftRef.current = initialDocument
-      ? normalizeManagedAssetSemantics(asWhiteboardDocumentV2(initialDocument))
-      : newDocument(target);
+      ? normalizeManagedAssetSemantics(initialDocument, sessionId, target)
+      : newDocument(target, sessionId);
   const initialDraft = initialDraftRef.current;
-  const [document, setDocument] = useState<WhiteboardDocument>(
+  const [document, setDocument] = useState<WhiteboardDocumentV3>(
     () => initialDraft!,
   );
   const [baseline, setBaseline] = useState(() =>
@@ -317,9 +410,7 @@ export function WhiteboardDialog({
       next: WhiteboardDocument,
       revisionToken: number | null = getWhiteboardDocumentRevision(next),
     ) => {
-      const normalized = normalizeManagedAssetSemantics(
-        asWhiteboardDocumentV2(next),
-      );
+      const normalized = normalizeManagedAssetSemantics(next, sessionId, target);
       setDocument(normalized);
       setBaseline(draftFingerprint(normalized));
       setBaselineRevision(normalized.documentRevision);
@@ -328,7 +419,7 @@ export function WhiteboardDialog({
       setCodeError(null);
       setError(null);
     },
-    [],
+    [sessionId, target],
   );
 
   useEffect(() => {
@@ -361,7 +452,7 @@ export function WhiteboardDialog({
           .catch(() => ({}))) as ApiEnvelope<ReadResult>;
         if (!response.ok || !payload.success)
           throw new Error(readError(payload, "无法读取已有白板"));
-        const remoteDocument = payload.data?.document ?? newDocument(target);
+        const remoteDocument = payload.data?.document ?? newDocument(target, sessionId);
         adopt(
           remoteDocument,
           payload.data?.binding
@@ -376,11 +467,9 @@ export function WhiteboardDialog({
         // the next commit. Keep the current draft visible, but block writes
         // until the user explicitly retries and the read succeeds.
         setLoadBlocked(true);
-        setLoadNotice(
-          cause instanceof Error
-            ? `${cause.message}。请刷新远端版本后继续。`
-            : "无法读取已有白板。请刷新远端版本后继续。",
-        );
+        const message = whiteboardUserError(cause, "无法读取已有白板")
+          .replace(/[。！？.!?]+$/u, "");
+        setLoadNotice(`${message}。请刷新远端版本后继续。`);
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
@@ -408,7 +497,15 @@ export function WhiteboardDialog({
   }, [dirty, onOpenChange, saving]);
 
   const handleSceneChange = useCallback((scene: SketchSceneDocument) => {
-    setDocument((current) => ({ ...current, scene, updatedAt: Date.now() }));
+    setDocument((current) => {
+      const nodeIds = new Set(scene.nodes.map((node) => node.id));
+      const nodeSemantics: WhiteboardDocumentV3["nodeSemantics"] = Object.fromEntries(
+        Object.entries(current.nodeSemantics).filter(([nodeId]) =>
+          nodeIds.has(nodeId),
+        ),
+      );
+      return { ...current, scene, nodeSemantics, updatedAt: Date.now() };
+    });
   }, []);
 
   const exportCode = useCallback(() => {
@@ -434,7 +531,7 @@ export function WhiteboardDialog({
     if (!result.value) {
       setCodeError(
         result.diagnostics
-          .map((item) => `${item.code}: ${item.message}`)
+          .map((item) => item.message)
           .join("\n") || "代码导入失败",
       );
       onDiagnosticEvent?.({
@@ -453,6 +550,8 @@ export function WhiteboardDialog({
     const current = asWhiteboardDocumentV2(document);
     setDocument({
       ...normalizeManagedAssetSemantics(result.value),
+      version: 3,
+      sceneFormat: "sketch-scene-v1",
       editorView: current.editorView,
       ...(current.safeArea ? { safeArea: current.safeArea } : {}),
       documentRevision: current.documentRevision,
@@ -508,19 +607,10 @@ export function WhiteboardDialog({
     setSaving(true);
     setError(null);
     try {
-      const png = await renderSketchSceneToPngBlob(document.scene, {
-        scale: 1,
-        withBackground: true,
-      });
-      // Render first while the browser still has any temporary data URL
-      // available, then persist only localized, managed asset references.
       const assetStartedAt = Date.now();
-      let normalized: WhiteboardDocumentV2;
+      let normalized: WhiteboardDocumentV3;
       try {
-        normalized = await localizeDocumentAssets(
-          asWhiteboardDocumentV2(document),
-          projectId,
-        );
+        normalized = await prepareDocumentAssets(asWhiteboardDocumentV3(document), projectId, sessionId);
       } catch (cause) {
         onDiagnosticEvent?.({
           category: "project",
@@ -555,7 +645,7 @@ export function WhiteboardDialog({
           success: true,
         },
       });
-      const commitDocument: WhiteboardDocumentV2 = {
+      const commitDocument: WhiteboardDocumentV3 = {
         ...normalized,
         documentRevision: baselineRevision,
         updatedAt: Date.now(),
@@ -570,7 +660,6 @@ export function WhiteboardDialog({
             baseDocumentRevision: baseRevisionToken,
             target,
             document: commitDocument,
-            pngBase64: await blobToBase64(png),
           }),
         },
       );
@@ -580,7 +669,7 @@ export function WhiteboardDialog({
       if (!response.ok || !payload.success || !payload.data?.values)
         throw new Error(readError(payload, "白板回填失败，请重试。"));
       const committedDocument = payload.data.document
-        ? asWhiteboardDocumentV2(payload.data.document)
+        ? asWhiteboardDocumentV3(payload.data.document)
         : { ...commitDocument, documentRevision: baselineRevision + 1 };
       setDocument(committedDocument);
       setBaseline(draftFingerprint(committedDocument));
@@ -615,9 +704,7 @@ export function WhiteboardDialog({
       });
       onOpenChange(false);
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "白板回填失败，请重试。",
-      );
+      setError(whiteboardUserError(cause, "白板回填失败，请重试。"));
       onDiagnosticEvent?.({
         category: "project",
         name: "whiteboard.commit.failed",
@@ -656,6 +743,10 @@ export function WhiteboardDialog({
         <DialogContent
           className="flex h-[min(92vh,900px)] max-w-[min(96vw,1440px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(96vw,1440px)]"
           onEscapeKeyDown={(event) => {
+            if (event.target instanceof Element && event.target.closest('[data-sketch-escape-scope="local"]')) {
+              event.preventDefault();
+              return;
+            }
             if (dirty || saving) {
               event.preventDefault();
               requestClose();
@@ -713,7 +804,7 @@ export function WhiteboardDialog({
             ) : (
               <SketchEditorSurface
                 scene={document.scene}
-                allowedTools={WHITEBOARD_ALLOWED_TOOLS}
+                profile="whiteboard"
                 fillContainer
                 onSceneChange={handleSceneChange}
               />

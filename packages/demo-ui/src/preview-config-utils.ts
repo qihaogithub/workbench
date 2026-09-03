@@ -4,6 +4,12 @@ const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico)(\?[^'")\s]*)?$/i;
 
 const RELATIVE_PATH_RE = /^\.\.?\/[^'")\s]*$/;
 
+function isWorkspaceImagePath(value: string): boolean {
+  return value.startsWith("assets/")
+    && !value.split("/").some((part) => part === "." || part === "..")
+    && IMAGE_EXT_RE.test(value);
+}
+
 export function resolveRelativePath(relativePath: string, basePath: string): string {
   const parts = basePath.split("/").filter((part) => part !== "");
   const relativeParts = relativePath.split("/");
@@ -40,6 +46,9 @@ export function resolvePreviewConfigAssetUrls(
       if (value.startsWith("/api/sessions/")) {
         return origin + value;
       }
+      if (options.sessionId && isWorkspaceImagePath(value)) {
+        return `${origin}/api/sessions/${options.sessionId}/workspace/${value}`;
+      }
       if (
         options.sessionId &&
         basePath &&
@@ -73,6 +82,9 @@ export function resolveConfigImageSrc(
   if (!value || !sessionId) return value;
   if (value.startsWith("http://") || value.startsWith("https://") || value.startsWith("/api/")) {
     return value;
+  }
+  if (isWorkspaceImagePath(value)) {
+    return `/api/sessions/${sessionId}/workspace/${value}`;
   }
   if (RELATIVE_PATH_RE.test(value) && IMAGE_EXT_RE.test(value)) {
     const resolved = resolveRelativePath(value, "demos/_/");

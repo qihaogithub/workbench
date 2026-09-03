@@ -45,6 +45,18 @@ describe("whiteboard image targets", () => {
     expect(values.blanks).toEqual([{ image: "assets/whiteboards/blank.png", gallery: ["assets/whiteboards/detail.png"] }]);
   });
 
+  it("hydrates only the target branch when a nested target is absent", () => {
+    const values: Record<string, unknown> = {};
+
+    expect(updateWhiteboardImageTarget(values, {
+      scope: "page", pageId: "page_1", fieldPath: "blanks[0].image", currentValue: "/blank.png",
+    }, "assets/whiteboards/blank.png", schema)).toBeNull();
+
+    expect(values).toEqual({
+      blanks: [{ image: "assets/whiteboards/blank.png", gallery: ["/detail.png"] }],
+    });
+  });
+
   it("rejects a stale nested image before changing the value", () => {
     const values = mergeConfigWithSchemaDefaults(schema, {});
     expect(updateWhiteboardImageTarget(values, {

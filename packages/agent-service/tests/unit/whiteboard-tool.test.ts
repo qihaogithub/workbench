@@ -67,6 +67,36 @@ describe("whiteboard agent tools", () => {
     expect(saved.scene.nodes[0].x).toBe(0);
   });
 
+  it("applies actions to a UI-created native V3 document and preserves its metadata", async () => {
+    const documentPath = path.join(workspaceDir, "whiteboards", "wb_1.json");
+    const document = JSON.parse(await fs.readFile(documentPath, "utf8"));
+    document.version = 3;
+    document.sceneFormat = "sketch-scene-v1";
+    document.scene.metadata = { createdBy: "system" };
+    document.scene.bindings = { title: { field: "title" } };
+    document.scene.assets = [{ id: "source", type: "image", src: "assets/source.png" }];
+    await fs.writeFile(documentPath, JSON.stringify(document), "utf8");
+
+    const result = await createApplyWhiteboardActionsTool(config).execute("apply-native-v3", {
+      whiteboardId: "wb_1",
+      baseDocumentRevision: 0,
+      actions: [{ type: "updateNode", nodeId: "box", patch: { x: 10 } }],
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(result.details.draft).toMatchObject({
+      version: 3,
+      sceneFormat: "sketch-scene-v1",
+      scene: {
+        metadata: document.scene.metadata,
+        bindings: document.scene.bindings,
+        assets: document.scene.assets,
+      },
+    });
+    const saved = JSON.parse(await fs.readFile(documentPath, "utf8"));
+    expect(saved.documentRevision).toBe(0);
+  });
+
   it("rejects placing an asset that was not generated or already attached", async () => {
     const documentPath = path.join(workspaceDir, "whiteboards", "wb_1.json");
     const document = JSON.parse(await fs.readFile(documentPath, "utf8"));
@@ -80,5 +110,40 @@ describe("whiteboard agent tools", () => {
     });
     expect(result.isError).toBe(true);
     expect(result.details.error).toBe("asset_candidate_required");
+  });
+
+  it("keeps translated image crop coordinates in the host-commit draft", async () => {
+    const documentPath = path.join(workspaceDir, "whiteboards", "wb_1.json");
+    const document = JSON.parse(await fs.readFile(documentPath, "utf8"));
+    document.scene.nodes.push({
+      id: "hero",
+      type: "image",
+      x: 20,
+      y: 20,
+      width: 60,
+      height: 40,
+      src: "assets/hero.png",
+    });
+    await fs.writeFile(documentPath, JSON.stringify(document), "utf8");
+
+    const result = await createApplyWhiteboardActionsTool(config).execute("apply-crop", {
+      whiteboardId: "wb_1",
+      baseDocumentRevision: 0,
+      actions: [{
+        type: "setImageCrop",
+        nodeId: "hero",
+        crop: {
+          shape: "rect",
+          sourceRect: { x: -0.2, y: -0.1, width: 0.6, height: 0.5 },
+          originalFrame: { x: 20, y: 20, width: 60, height: 40 },
+          originalImageFit: "contain",
+        },
+      }],
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(result.details.draft.scene.nodes.find((node: { id: string }) => node.id === "hero")).toMatchObject({
+      imageCrop: { sourceRect: { x: -0.2, y: -0.1, width: 0.6, height: 0.5 } },
+    });
   });
 });

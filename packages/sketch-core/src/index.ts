@@ -15,6 +15,28 @@ export type SketchSceneNodeType =
   | "card"
   | "group";
 
+export type SketchSceneImageFit = "cover" | "contain" | "fill";
+export type SketchSceneImageCropShape = "rect" | "circle";
+
+export interface SketchSceneFrame {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface SketchSceneImageCrop {
+  shape: SketchSceneImageCropShape;
+  sourceRect: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  originalFrame: SketchSceneFrame;
+  originalImageFit: SketchSceneImageFit;
+}
+
 const SKETCH_SCENE_NODE_TYPES = new Set<string>([
   "rect",
   "diamond",
@@ -51,7 +73,7 @@ export interface SketchSceneStyle {
   lineDash?: number[];
   startArrow?: "none" | "arrow";
   endArrow?: "none" | "arrow";
-  imageFit?: "cover" | "contain" | "fill";
+  imageFit?: SketchSceneImageFit;
 }
 
 export interface SketchSceneTextStyleOverride {
@@ -149,6 +171,9 @@ export interface SketchSceneNode {
   textStyleRuns?: SketchSceneTextStyleRun[];
   src?: string;
   alt?: string;
+  intrinsicWidth?: number;
+  intrinsicHeight?: number;
+  imageCrop?: SketchSceneImageCrop;
   path?: string;
   points?: Array<{ x: number; y: number }>;
   style?: SketchSceneStyle;
@@ -241,6 +266,16 @@ export interface SketchSceneValidationIssue {
 export interface SketchSceneValidationResult {
   valid: boolean;
   issues: SketchSceneValidationIssue[];
+}
+
+export class SketchSceneRenderError extends Error {
+  readonly issues: SketchSceneValidationIssue[];
+
+  constructor(message: string, issues: SketchSceneValidationIssue[]) {
+    super(message);
+    this.name = "SketchSceneRenderError";
+    this.issues = issues;
+  }
 }
 
 export interface SketchScenePatchSummary {
@@ -366,6 +401,10 @@ function isOptionalFiniteNumber(value: unknown): boolean {
   return value === undefined || isFiniteNumber(value);
 }
 
+function isOptionalPositiveNumber(value: unknown): boolean {
+  return value === undefined || isFinitePositive(value);
+}
+
 function isOptionalBoolean(value: unknown): boolean {
   return value === undefined || typeof value === "boolean";
 }
@@ -423,6 +462,20 @@ function isValidOptionalObject(value: unknown): boolean {
   return value === undefined || isObject(value);
 }
 
+export function isValidSketchSceneImageCrop(value: unknown): value is SketchSceneImageCrop {
+  if (!isObject(value)) return false;
+  if (value.shape !== "rect" && value.shape !== "circle") return false;
+  if (!isObject(value.sourceRect) || !isFiniteNumber(value.sourceRect.x) || !isFiniteNumber(value.sourceRect.y)) return false;
+  if (!isFinitePositive(value.sourceRect.width) || !isFinitePositive(value.sourceRect.height)) return false;
+  if (value.sourceRect.width > 1 || value.sourceRect.height > 1) return false;
+  if (value.sourceRect.x >= 1 || value.sourceRect.x + value.sourceRect.width <= 0) return false;
+  if (value.sourceRect.y >= 1 || value.sourceRect.y + value.sourceRect.height <= 0) return false;
+  if (!isObject(value.originalFrame)) return false;
+  if (!isFiniteNonNegative(value.originalFrame.x) || !isFiniteNonNegative(value.originalFrame.y)) return false;
+  if (!isFinitePositive(value.originalFrame.width) || !isFinitePositive(value.originalFrame.height)) return false;
+  return SKETCH_SCENE_IMAGE_FIT_VALUES.has(String(value.originalImageFit));
+}
+
 function isValidSketchSceneNodeOptionalFields(node: Record<string, unknown>): boolean {
   return (
     isOptionalFiniteNumber(node.rotation) &&
@@ -432,6 +485,9 @@ function isValidSketchSceneNodeOptionalFields(node: Record<string, unknown>): bo
     isOptionalString(node.text) &&
     isOptionalString(node.src) &&
     isOptionalString(node.alt) &&
+    isOptionalPositiveNumber(node.intrinsicWidth) &&
+    isOptionalPositiveNumber(node.intrinsicHeight) &&
+    isValidOptionalObject(node.imageCrop) &&
     isOptionalString(node.path) &&
     isOptionalString(node.name) &&
     isValidSketchScenePoints(node.points) &&
@@ -741,6 +797,27 @@ export function validateSketchSceneDocument(
           severity: "error",
         });
       }
+      const hasIntrinsicWidth = node.intrinsicWidth !== undefined;
+      const hasIntrinsicHeight = node.intrinsicHeight !== undefined;
+      if (
+        hasIntrinsicWidth !== hasIntrinsicHeight ||
+        (hasIntrinsicWidth && node.type !== "image")
+      ) {
+        issues.push({
+          code: "INVALID_NODE",
+          message: "Sketch scene intrinsic image dimensions must be provided together on image nodes.",
+          nodeId,
+          severity: "error",
+        });
+      }
+      if (node.imageCrop !== undefined && (node.type !== "image" || !isValidSketchSceneImageCrop(node.imageCrop))) {
+        issues.push({
+          code: "INVALID_NODE",
+          message: "Sketch scene imageCrop is only valid on image nodes and must use finite source coordinates with a visible source intersection.",
+          nodeId,
+          severity: "error",
+        });
+      }
       if (node.type === "group") {
         if (node.visible !== false || node.locked === true) {
           issues.push({
@@ -842,12 +919,104 @@ export function validateSketchSceneDocument(
     }
   }
 
-  if (scene.assets !== undefined && !Array.isArray(scene.assets)) {
-    issues.push({
-      code: "INVALID_ASSET",
-      message: "Sketch scene assets must be an array.",
-      severity: "error",
-    });
+  if (scene.assets !== undefined) {
+    if (!Array.isArray(scene.assets)) {
+      issues.push({
+        code: "INVALID_ASSET",
+        message: "Sketch scene assets must be an array.",
+        severity: "error",
+      });
+    } else {
+      const assetIds = new Set<string>();
+      for (const candidate of scene.assets as unknown[]) {
+        if (!isObject(candidate)) {
+          issues.push({
+            code: "INVALID_ASSET",
+            message: "Sketch scene asset must be an object.",
+            severity: "error",
+          });
+          continue;
+        }
+        const assetId = typeof candidate.id === "string" ? candidate.id : "";
+        if (!assetId || assetIds.has(assetId)) {
+          issues.push({
+            code: "INVALID_ASSET",
+            message: "Sketch scene asset id must be unique and non-empty.",
+            severity: "error",
+          });
+        } else {
+          assetIds.add(assetId);
+        }
+        if (candidate.type !== "image") {
+          issues.push({
+            code: "INVALID_ASSET",
+            message: "Sketch scene assets must use the image type.",
+            severity: "error",
+          });
+        }
+        if (typeof candidate.src !== "string" || !candidate.src.trim()) {
+          issues.push({
+            code: "INVALID_ASSET",
+            message: "Sketch scene image assets must include a non-empty src.",
+            severity: "error",
+          });
+        }
+        const hasWidth = candidate.width !== undefined;
+        const hasHeight = candidate.height !== undefined;
+        if (
+          hasWidth !== hasHeight ||
+          (hasWidth &&
+            (!isFinitePositive(candidate.width) || !isFinitePositive(candidate.height)))
+        ) {
+          issues.push({
+            code: "INVALID_ASSET",
+            message: "Sketch scene asset dimensions must be two positive values.",
+            severity: "error",
+          });
+        }
+        if (candidate.alt !== undefined && typeof candidate.alt !== "string") {
+          issues.push({
+            code: "INVALID_ASSET",
+            message: "Sketch scene asset alt must be a string.",
+            severity: "error",
+          });
+        }
+      }
+    }
+  }
+
+  return {
+    valid: !issues.some((issue) => issue.severity === "error"),
+    issues,
+  };
+}
+
+export function validateSketchSceneForRender(
+  value: unknown,
+  configData: Record<string, unknown> = {},
+): SketchSceneValidationResult {
+  const validation = validateSketchSceneDocument(value);
+  if (!validation.valid) return validation;
+
+  const scene = parseSketchSceneDocument(value);
+  if (!scene) return validation;
+
+  const issues = [...validation.issues];
+  for (const node of scene.nodes) {
+    if (node.type === "group" || resolveBindingValue(node, "visible", node.visible ?? true, configData) === false) {
+      continue;
+    }
+    if (node.type !== "image") continue;
+
+    const src = resolveBindingValue(node, "src", node.src ?? "", configData);
+    if (typeof src !== "string" || src.trim().length === 0) {
+      issues.push({
+        code: "INVALID_ASSET",
+        message: `Sketch scene visible image node ${node.id} has no resolved image source.`,
+        nodeId: node.id,
+        severity: "error",
+      });
+    }
   }
 
   return {
@@ -1311,9 +1480,48 @@ function renderCenteredNodeLabel(
   return `<text ${labelCommon} x="${labelX}" y="${labelY}" fill="${escapeAttr(color)}" font-size="${fontSize}" font-weight="${escapeAttr(style.fontWeight ?? 500)}"${renderBaseTextStyleAttributes(style)} text-anchor="middle">${renderTextLinesWithStyleRuns(label, labelX, node.textStyleRuns)}</text>`;
 }
 
+function getSketchImageCropClipId(nodeId: string): string {
+  return `sketch-image-crop-${nodeId.replace(/[^A-Za-z0-9_-]/g, "_")}`;
+}
+
+function getSketchImageCropBaseFrame(crop: SketchSceneImageCrop): SketchSceneFrame {
+  return {
+    x: crop.originalFrame.x + crop.sourceRect.x * crop.originalFrame.width,
+    y: crop.originalFrame.y + crop.sourceRect.y * crop.originalFrame.height,
+    width: crop.sourceRect.width * crop.originalFrame.width,
+    height: crop.sourceRect.height * crop.originalFrame.height,
+  };
+}
+
+export function getSketchImageCropRenderedFrame(node: SketchSceneNode, crop: SketchSceneImageCrop): SketchSceneFrame {
+  const baseFrame = getSketchImageCropBaseFrame(crop);
+  const scaleX = node.width / baseFrame.width;
+  const scaleY = node.height / baseFrame.height;
+  return {
+    x: node.x + (crop.originalFrame.x - baseFrame.x) * scaleX,
+    y: node.y + (crop.originalFrame.y - baseFrame.y) * scaleY,
+    width: crop.originalFrame.width * scaleX,
+    height: crop.originalFrame.height * scaleY,
+  };
+}
+
+function renderSketchImageCropClipPath(node: SketchSceneNode): string {
+  const crop = node.imageCrop;
+  if (!crop) return "";
+  if (crop.shape === "circle") {
+    const cx = node.x + node.width / 2;
+    const cy = node.y + node.height / 2;
+    return Math.abs(node.width - node.height) < 0.001
+      ? `<circle cx="${cx}" cy="${cy}" r="${node.width / 2}" />`
+      : `<ellipse cx="${cx}" cy="${cy}" rx="${node.width / 2}" ry="${node.height / 2}" />`;
+  }
+  return `<rect x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" />`;
+}
+
 function renderSketchNode(
   node: SketchSceneNode,
   configData?: Record<string, unknown>,
+  options: { imageCropEditingNodeId?: string } = {},
 ): string {
   if (node.type === "group") return "";
   const visible = resolveBindingValue(node, "visible", node.visible ?? true, configData);
@@ -1321,7 +1529,7 @@ function renderSketchNode(
 
   const style = node.style ?? {};
   const fill = resolveBindingValue(node, "fill", style.fill ?? "transparent", configData);
-  const stroke = resolveBindingValue(node, "stroke", style.stroke ?? "#1F2937", configData);
+  const stroke = resolveBindingValue(node, "stroke", style.stroke ?? (node.type === "image" ? "transparent" : "#1F2937"), configData);
   const color = resolveBindingValue(node, "color", style.color ?? "#111827", configData);
   const opacity = styleNumber(style.opacity, 1);
   const strokeWidth = styleNumber(style.strokeWidth, 1);
@@ -1367,13 +1575,32 @@ function renderSketchNode(
   if (node.type === "image") {
     const src = resolveBindingValue(node, "src", node.src ?? "", configData);
     if (!src) return "";
-    const preserveAspectRatio =
-      style.imageFit === "fill"
-        ? "none"
-        : style.imageFit === "contain"
-          ? "xMidYMid meet"
-          : "xMidYMid slice";
-    return `<image ${common} href="${escapeAttr(src)}" x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" preserveAspectRatio="${preserveAspectRatio}"><title>${escapeHtml(node.alt ?? node.name ?? "")}</title></image>`;
+    const crop = node.imageCrop;
+    const isEditingCrop = crop !== undefined && options.imageCropEditingNodeId === node.id;
+    const imageFit = crop?.originalImageFit ?? style.imageFit;
+    const preserveAspectRatio = imageFit === "fill"
+      ? "none"
+      : imageFit === "contain"
+        ? "xMidYMid meet"
+        : "xMidYMid slice";
+    // During crop editing, keep the full source image visible at its current
+    // translated frame. The committed scene still clips it to the crop frame.
+    const imageFrame = crop
+      ? getSketchImageCropRenderedFrame(node, crop)
+      : { x: node.x, y: node.y, width: node.width, height: node.height };
+    const imageX = imageFrame.x;
+    const imageY = imageFrame.y;
+    const imageWidth = imageFrame.width;
+    const imageHeight = imageFrame.height;
+    const clip = crop && !isEditingCrop ? ` clip-path="url(#${getSketchImageCropClipId(node.id)})"` : "";
+    const image = `<image ${common} href="${escapeAttr(src)}" x="${imageX}" y="${imageY}" width="${imageWidth}" height="${imageHeight}" preserveAspectRatio="${preserveAspectRatio}"${clip}><title>${escapeHtml(node.alt ?? node.name ?? "")}</title></image>`;
+    const borderCommon = `data-sketch-node-border="${escapeAttr(node.id)}" opacity="${opacity}"${transform}`;
+    const border = crop?.shape === "circle"
+      ? Math.abs(node.width - node.height) < 0.001
+        ? `<circle ${borderCommon} cx="${node.x + node.width / 2}" cy="${node.y + node.height / 2}" r="${node.width / 2}" fill="none" stroke="${escapeAttr(stroke)}" stroke-width="${strokeWidth}"${dash} />`
+        : `<ellipse ${borderCommon} cx="${node.x + node.width / 2}" cy="${node.y + node.height / 2}" rx="${node.width / 2}" ry="${node.height / 2}" fill="none" stroke="${escapeAttr(stroke)}" stroke-width="${strokeWidth}"${dash} />`
+      : `<rect ${borderCommon} x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="${crop ? 0 : radius}" ry="${crop ? 0 : radius}" fill="none" stroke="${escapeAttr(stroke)}" stroke-width="${strokeWidth}"${dash} />`;
+    return `${image}${border}`;
   }
 
   if (node.type === "text") {
@@ -1403,21 +1630,49 @@ function renderSketchNode(
 export function renderSketchSceneToSvgMarkup(
   scene: SketchSceneDocument,
   configData: Record<string, unknown> = {},
+  options: { withBackground?: boolean; imageCropEditingNodeId?: string } = {},
 ): string {
-  const validation = validateSketchSceneDocument(scene);
-  const safeScene = validation.valid ? scene : createDefaultSketchScene(getValidSketchScenePageSize(scene));
-  const nodes = [...safeScene.nodes].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
-  const width = safeScene.pageSize.width;
-  const height = safeScene.pageSize.height;
+  const validation = validateSketchSceneForRender(scene, configData);
+  if (!validation.valid) {
+    const details = validation.issues
+      .filter((issue) => issue.severity === "error")
+      .map((issue) => issue.nodeId ? `${issue.nodeId}: ${issue.message}` : issue.message)
+      .join("; ");
+    throw new SketchSceneRenderError(`Sketch scene cannot be rendered: ${details}`, validation.issues);
+  }
+
+  const nodes = [...scene.nodes].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+  const renderedNodes = nodes.map((node) => renderSketchNode(node, configData, options));
+  const unrenderedIssues = nodes.flatMap((node, index) => {
+    if (!isSketchNodeRenderable(node, configData) || renderedNodes[index]) return [];
+    return [{
+      code: "INVALID_NODE" as const,
+      message: `Sketch scene node ${node.id} produced no SVG output.`,
+      nodeId: node.id,
+      severity: "error" as const,
+    }];
+  });
+  if (unrenderedIssues.length) {
+    throw new SketchSceneRenderError(
+      `Sketch scene cannot be rendered: ${unrenderedIssues.map((issue) => `${issue.nodeId}: ${issue.message}`).join("; ")}`,
+      unrenderedIssues,
+    );
+  }
+
+  const width = scene.pageSize.width;
+  const height = scene.pageSize.height;
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="Sketch scene">`,
     "<defs>",
     '<marker id="sketch-arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto-start-reverse" markerUnits="strokeWidth">',
     '<path d="M0,0 L0,6 L9,3 z" fill="context-stroke" />',
     "</marker>",
+    ...nodes
+      .filter((node) => node.type === "image" && node.imageCrop)
+      .map((node) => `<clipPath id="${getSketchImageCropClipId(node.id)}" clipPathUnits="userSpaceOnUse">${renderSketchImageCropClipPath(node)}</clipPath>`),
     "</defs>",
-    `<rect x="0" y="0" width="${width}" height="${height}" fill="#FFFFFF" />`,
-    ...nodes.map((node) => renderSketchNode(node, configData)),
+    options.withBackground === false ? "" : `<rect x="0" y="0" width="${width}" height="${height}" fill="#FFFFFF" />`,
+    ...renderedNodes,
     "</svg>",
   ].join("");
 }
@@ -1440,10 +1695,7 @@ export function buildSketchScenePreviewDocumentHtml(input: {
     : getValidSketchScenePageSize(scene);
   const width = pageSize.width;
   const height = pageSize.height;
-  const svg = renderSketchSceneToSvgMarkup(
-    validateSketchSceneDocument(scene).valid ? scene : createDefaultSketchScene(pageSize),
-    input.configData,
-  );
+  const svg = renderSketchSceneToSvgMarkup(scene, input.configData);
   return `<!doctype html>
 <html>
 <head>

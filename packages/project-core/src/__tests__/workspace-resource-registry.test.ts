@@ -117,6 +117,8 @@ describe("WorkspaceResourceRegistry", () => {
     const registry = createWorkspaceResourceRegistry();
     expect(() => registry.assertTextWrite("project.config.values.json", "[]")).toThrow("WORKSPACE_INVALID_OPERATION");
     expect(() => registry.assertTextWrite("project.config.values.json", "not-json")).toThrow("WORKSPACE_INVALID_OPERATION");
+    expect(() => registry.assertTextWrite("demos/page-1/config.values.json", '{"hero":"assets/hero.png"}')).not.toThrow();
+    expect(() => registry.assertTextWrite("demos/page-1/config.values.json", "not-json")).toThrow("WORKSPACE_INVALID_OPERATION");
     expect(() => registry.assertTextWrite("workspace-tree.json", '{"pages":[],"folders":[]}')).not.toThrow();
     expect(() => registry.assertTextWrite("workspace-tree.json", '{"pages":[]}')).toThrow("WORKSPACE_INVALID_OPERATION");
     expect(() => registry.assertTextWrite(
@@ -132,6 +134,39 @@ describe("WorkspaceResourceRegistry", () => {
       updatedAt: 1,
     };
     expect(() => registry.assertTextWrite("whiteboards/wb_1.json", JSON.stringify(whiteboard))).not.toThrow();
+    const fullV3Whiteboard = {
+      id: "wb_v3",
+      version: 3,
+      sceneFormat: "sketch-scene-v1",
+      documentRevision: 0,
+      scene: {
+        version: 1,
+        pageSize: { width: 240, height: 160 },
+        nodes: [
+          {
+            id: "diamond",
+            type: "diamond",
+            x: 20,
+            y: 20,
+            width: 80,
+            height: 60,
+            text: "保留完整字段",
+            name: "命名图形",
+            path: "M 0 0 L 10 10",
+            style: { fill: "#bfdbfe", italic: true, textDecoration: "underline" },
+            metadata: { source: "manual" },
+          },
+          { id: "path", type: "path", x: 20, y: 100, width: 100, height: 20, path: "M 20 110 L 120 110" },
+        ],
+        assets: [{ id: "library-image", type: "image", src: "assets/library.png" }],
+        bindings: { title: "heroTitle" },
+        metadata: { source: "whiteboard" },
+      },
+      nodeSemantics: {},
+      editorView: { zoom: 1, offsetX: 0, offsetY: 0 },
+      updatedAt: 1,
+    };
+    expect(() => registry.assertTextWrite("whiteboards/wb_v3.json", JSON.stringify(fullV3Whiteboard))).not.toThrow();
     expect(() => registry.assertTextWrite("whiteboards/wb_1.json", "{}")).toThrow("WORKSPACE_INVALID_OPERATION");
     expect(() => registry.assertTextWrite("whiteboards/bindings.json", JSON.stringify({ bindings: [{
       id: "binding-1", target: { scope: "page", pageId: "page-1", fieldPath: ["image"] }, whiteboardId: "wb_1", sceneRevision: 1, outputAssetHash: "a", updatedAt: 1,

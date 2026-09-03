@@ -38,6 +38,14 @@ function documentWithAttachedWhiteboardPng(id: string, hash: string, updatedAt =
   };
 }
 
+function documentV3WithAttachedWhiteboardPng(id: string, hash: string, updatedAt = old) {
+  return {
+    ...documentWithAttachedWhiteboardPng(id, hash, updatedAt),
+    version: 3,
+    sceneFormat: "sketch-scene-v1",
+  };
+}
+
 function workspace() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "whiteboard-gc-"));
   workspaces.push(root);
@@ -87,6 +95,24 @@ describe("planWhiteboardGarbageCollection", () => {
     const attachedHash = "d".repeat(64);
     const orphanHash = "e".repeat(64);
     fs.writeFileSync(path.join(root, "whiteboards", "wb_attached.json"), JSON.stringify(documentWithAttachedWhiteboardPng("wb_attached", attachedHash, now - 1)));
+    fs.writeFileSync(path.join(root, "whiteboards", "bindings.json"), JSON.stringify({ bindings: [] }));
+    for (const hash of [attachedHash, orphanHash]) {
+      const asset = path.join(root, "assets", "whiteboards", `${hash}.png`);
+      fs.writeFileSync(asset, "png");
+      fs.utimesSync(asset, old / 1000, old / 1000);
+    }
+
+    expect(planWhiteboardGarbageCollection(root, now)).toEqual({
+      documentPaths: [],
+      assetPaths: [`assets/whiteboards/${orphanHash}.png`],
+    });
+  });
+
+  it("protects an attached whiteboard PNG referenced by a V3 document", () => {
+    const root = workspace();
+    const attachedHash = "1".repeat(64);
+    const orphanHash = "2".repeat(64);
+    fs.writeFileSync(path.join(root, "whiteboards", "wb_v3.json"), JSON.stringify(documentV3WithAttachedWhiteboardPng("wb_v3", attachedHash, now - 1)));
     fs.writeFileSync(path.join(root, "whiteboards", "bindings.json"), JSON.stringify({ bindings: [] }));
     for (const hash of [attachedHash, orphanHash]) {
       const asset = path.join(root, "assets", "whiteboards", `${hash}.png`);

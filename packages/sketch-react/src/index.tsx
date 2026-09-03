@@ -65,6 +65,7 @@ import {
   applySketchScenePatchOperations,
   createDefaultSketchScene,
   getSketchConnectorAnchorPoint,
+  getSketchImageCropRenderedFrame,
   getSketchSelectionBounds,
   getSketchNodeBounds,
   hitTestSketchScene,
@@ -75,9 +76,13 @@ import {
   rotateSketchNode,
   translateSketchNodes,
   validateSketchSceneDocument,
+  validateSketchSceneForRender,
   type SketchSceneBounds,
   type SketchSceneConnectorAnchor,
   type SketchSceneDocument,
+  type SketchSceneFrame,
+  type SketchSceneImageCrop as SketchImageCrop,
+  type SketchSceneImageFit,
   type SketchSceneNode,
   type SketchSceneNodeType,
   type SketchScenePatchOperation,
@@ -95,11 +100,14 @@ import type {
   SketchEditorSurfaceProps,
   SketchEditorController,
   SketchEditorCanvasProps,
+  SketchEditorCanvasHandle,
+  SketchBrushSettings,
   SketchPropertyPanelProps,
   SketchEditorToolbarProps,
   SketchLayerPanelProps,
   InlineTextSelectionState,
 } from "./types";
+import { resolveSketchEditorProfile } from "./types";
 import {
   getSketchTextAutoSize,
   getSketchTextComputedStyle,
@@ -163,6 +171,19 @@ interface DragState {
   selectionNodeIds?: string[];
 }
 
+interface ImageCropEditState {
+  nodeId: string;
+  shape: SketchImageCrop["shape"];
+  originalFrame: SketchSceneFrame;
+  originalImageFit: SketchSceneImageFit;
+  pointer?: { x: number; y: number };
+  currentPointer?: { x: number; y: number };
+  activeGesture?: "resize" | "pan";
+  activeHandle?: SketchSceneResizeHandle;
+  initialScene: SketchSceneDocument;
+  hasHistoryCheckpoint: boolean;
+}
+
 interface MarqueeState {
   start: { x: number; y: number };
   current: { x: number; y: number };
@@ -186,6 +207,7 @@ interface DrawingDraftState {
   start: { x: number; y: number };
   current: { x: number; y: number };
   points: Array<{ x: number; y: number }>;
+  brushSettings?: SketchBrushSettings;
   node: SketchSceneNode | null;
 }
 
@@ -235,6 +257,7 @@ interface SketchFloatingToolbarAction {
   label: string;
   title?: string;
   icon: React.ReactNode;
+  separatorBefore?: boolean;
   swatchColor?: string;
   swatchKind?: "fill" | "stroke";
   swatchMixed?: boolean;
@@ -274,6 +297,16 @@ interface ImageResourceStatus {
   overLimit: boolean;
 }
 
+const SKETCH_IMAGE_MAX_DISPLAY_SIZE = 600;
+const SKETCH_IMAGE_FALLBACK_WIDTH = 240;
+const SKETCH_IMAGE_FALLBACK_HEIGHT = 135;
+
+interface DecodedImageSource {
+  src: string;
+  width?: number;
+  height?: number;
+}
+
 function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs));
 }
@@ -281,11 +314,53 @@ function cn(...inputs: ClassValue[]): string {
 const DRAWING_COMMIT_THRESHOLD = 4;
 const PENCIL_SAMPLE_DISTANCE = 2;
 
-function parseScene(scene?: string | SketchSceneDocument | null): SketchSceneDocument {
-  if (!scene) return createDefaultSketchScene();
+const DEFAULT_SKETCH_BRUSH_SETTINGS: SketchBrushSettings = {
+  color: "#111827",
+  strokeWidth: 3,
+};
+
+const SKETCH_BRUSH_WIDTH_PRESETS = [
+  { label: "细", value: 2 },
+  { label: "中", value: 3 },
+  { label: "粗", value: 5 },
+] as const;
+
+const SKETCH_BRUSH_QUICK_COLORS = [
+  "#111827",
+  "#475569",
+  "#2563eb",
+  "#0d9488",
+  "#7c3aed",
+  "#d97706",
+  "#dc2626",
+] as const;
+
+interface ParsedSketchScene {
+  scene: SketchSceneDocument;
+  error: string | null;
+}
+
+function emptySceneForError(pageSize: SketchSceneDocument["pageSize"]): SketchSceneDocument {
+  return {
+    version: 1,
+    pageSize,
+    nodes: [],
+    assets: [],
+    bindings: {},
+    metadata: {},
+  };
+}
+
+function parseScene(scene?: string | SketchSceneDocument | null): ParsedSketchScene {
+  if (!scene) return { scene: createDefaultSketchScene(), error: null };
   const parsed = parseSketchSceneDocument(scene);
-  if (!parsed) return createDefaultSketchScene();
-  if (validateSketchSceneDocument(parsed).valid) return parsed;
+  if (!parsed) {
+    return {
+      scene: emptySceneForError(createDefaultSketchScene().pageSize),
+      error: "白板场景无法解析，未渲染任何内容。",
+    };
+  }
+  if (validateSketchSceneDocument(parsed).valid) return { scene: parsed, error: null };
   const pageSize = parsed.pageSize;
   if (
     pageSize &&
@@ -296,9 +371,30 @@ function parseScene(scene?: string | SketchSceneDocument | null): SketchSceneDoc
     Number.isFinite(pageSize.height) &&
     pageSize.height > 0
   ) {
-    return createDefaultSketchScene(pageSize);
+    return {
+      scene: emptySceneForError(pageSize),
+      error: "白板场景校验失败，未渲染任何内容。",
+    };
   }
-  return createDefaultSketchScene();
+  return {
+    scene: emptySceneForError(createDefaultSketchScene().pageSize),
+    error: "白板场景校验失败，未渲染任何内容。",
+  };
+}
+
+function SketchSceneErrorNotice({ className }: { className?: string }) {
+  return (
+    <div
+      role="alert"
+      data-sketch-scene-error
+      className={cn(
+        "flex min-h-24 items-center justify-center border border-amber-200 bg-amber-50 px-4 text-center text-sm text-amber-900",
+        className,
+      )}
+    >
+      白板场景无效，未渲染任何内容，请刷新或修复文档后重试。
+    </div>
+  );
 }
 
 function normalizeSize(previewSize: PreviewSize | undefined, fallback: number, key: "width" | "height"): number {
@@ -425,7 +521,15 @@ function createNode(type: InsertableSketchTool): SketchSceneNode {
     const src = `data:image/svg+xml;utf8,${encodeURIComponent(
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180"><rect width="320" height="180" fill="#e2e8f0"/><path d="M52 132 126 72l54 44 38-28 50 44" fill="none" stroke="#475569" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><circle cx="238" cy="54" r="18" fill="#64748b"/></svg>',
     )}`;
-    return { ...base, type: "image", width: 240, height: 135, src, alt: "图片占位" };
+    return {
+      ...base,
+      type: "image",
+      width: 240,
+      height: 135,
+      src,
+      alt: "图片占位",
+      style: { ...base.style, fill: "transparent", stroke: "transparent", strokeWidth: 0, imageFit: "contain" },
+    };
   }
   return { ...base, type: type as SketchSceneNodeType };
 }
@@ -439,13 +543,38 @@ function createNodeAtPoint(type: InsertableSketchTool, point: { x: number; y: nu
   };
 }
 
-function createImportedImageNode(file: File, src: string, point: { x: number; y: number }): SketchSceneNode {
-  const displayName = file.name || "导入图片";
+function getDefaultImageDisplaySize(width: number | undefined, height: number | undefined): { width: number; height: number } {
+  if (!width || !height || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return { width: SKETCH_IMAGE_FALLBACK_WIDTH, height: SKETCH_IMAGE_FALLBACK_HEIGHT };
+  }
+  const scale = Math.min(1, SKETCH_IMAGE_MAX_DISPLAY_SIZE / Math.max(width, height));
   return {
-    ...createNodeAtPoint("image", point),
+    width: Math.round(width * scale * 1000) / 1000,
+    height: Math.round(height * scale * 1000) / 1000,
+  };
+}
+
+function createImportedImageNode(file: File, source: DecodedImageSource, point: { x: number; y: number }): SketchSceneNode {
+  const displayName = file.name || "导入图片";
+  const size = getDefaultImageDisplaySize(source.width, source.height);
+  const baseNode = createNodeAtPoint("image", point);
+  return {
+    ...baseNode,
+    x: Math.max(0, Math.round(point.x - size.width / 2)),
+    y: Math.max(0, Math.round(point.y - size.height / 2)),
+    width: size.width,
+    height: size.height,
     name: displayName,
-    src,
+    src: source.src,
     alt: displayName,
+    ...(source.width && source.height ? { intrinsicWidth: source.width, intrinsicHeight: source.height } : {}),
+    style: {
+      ...baseNode.style,
+      fill: "transparent",
+      stroke: "transparent",
+      strokeWidth: 0,
+      imageFit: "contain",
+    },
   };
 }
 
@@ -459,6 +588,56 @@ function readImageFileAsDataUrl(file: File): Promise<string | null> {
     reader.addEventListener("error", () => resolve(null));
     reader.readAsDataURL(file);
   });
+}
+
+function readDecodedImageSource(file: File): Promise<DecodedImageSource | null> {
+  return readImageFileAsDataUrl(file).then((src) => {
+    if (!src) return null;
+    if (typeof Image === "undefined") return null;
+    let image: HTMLImageElement;
+    try {
+      image = new Image();
+    } catch {
+      return null;
+    }
+    const getDimensions = (): { width: number; height: number } | null => {
+      const width = image.naturalWidth;
+      const height = image.naturalHeight;
+      return width > 0 && height > 0 ? { width, height } : null;
+    };
+    image.src = src;
+    if (typeof image.decode === "function") {
+      return image.decode()
+        .then(() => {
+          const dimensions = getDimensions();
+          return dimensions ? { src, ...dimensions } : null;
+        })
+        .catch(() => null);
+    }
+    if (typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent)) return { src };
+    return new Promise((resolve) => {
+      image.onload = () => {
+        const dimensions = getDimensions();
+        resolve(dimensions ? { src, ...dimensions } : null);
+      };
+      image.onerror = () => resolve(null);
+      const dimensions = getDimensions();
+      if (dimensions) resolve({ src, ...dimensions });
+    });
+  });
+}
+
+function getImageReplacementPatch(node: SketchSceneNode, source: DecodedImageSource, alt: string): Partial<SketchSceneNode> {
+  const size = getDefaultImageDisplaySize(source.width, source.height);
+  const preserveFrame = node.id === "source-background";
+  return {
+    src: source.src,
+    alt: alt || node.alt || "导入图片",
+    ...(preserveFrame ? {} : { width: size.width, height: size.height }),
+    ...(source.width && source.height ? { intrinsicWidth: source.width, intrinsicHeight: source.height } : { intrinsicWidth: undefined, intrinsicHeight: undefined }),
+    imageCrop: undefined,
+    style: { ...node.style, imageFit: node.style?.imageFit ?? (preserveFrame ? "cover" : "contain") },
+  };
 }
 
 function firstImageFile(files: FileList | File[] | null | undefined): File | null {
@@ -494,9 +673,159 @@ function getImageResourceStatus(node: SketchSceneNode): ImageResourceStatus {
   };
 }
 
+function getImageNodeFrame(node: SketchSceneNode): SketchSceneFrame {
+  return { x: node.x, y: node.y, width: node.width, height: node.height };
+}
+
+function getSourceRectForFrame(
+  sourceRect: SketchImageCrop["sourceRect"],
+  fromFrame: SketchSceneFrame,
+  toFrame: SketchSceneFrame,
+): SketchImageCrop["sourceRect"] {
+  const safeWidth = Math.max(1, fromFrame.width);
+  const safeHeight = Math.max(1, fromFrame.height);
+  const nextX = sourceRect.x + ((toFrame.x - fromFrame.x) / safeWidth) * sourceRect.width;
+  const nextY = sourceRect.y + ((toFrame.y - fromFrame.y) / safeHeight) * sourceRect.height;
+  const nextWidth = sourceRect.width * (toFrame.width / safeWidth);
+  const nextHeight = sourceRect.height * (toFrame.height / safeHeight);
+  const width = Math.max(0.0001, Math.min(1, nextWidth));
+  const height = Math.max(0.0001, Math.min(1, nextHeight));
+  return {
+    x: nextX,
+    y: nextY,
+    width,
+    height,
+  };
+}
+
+function getImageCropForEdit(node: SketchSceneNode, state: ImageCropEditState): SketchImageCrop {
+  return node.imageCrop ?? {
+    shape: state.shape,
+    sourceRect: { x: 0, y: 0, width: 1, height: 1 },
+    originalFrame: state.originalFrame,
+    originalImageFit: state.originalImageFit,
+  };
+}
+
+function roundCropCoordinate(value: number): number {
+  return Math.round(value * 1000) / 1000;
+}
+
+function roundVisibleCropCoordinate(value: number, sourceSize: number): number {
+  // Keep a positive source intersection after rounding. Without this guard,
+  // a clamped value such as -0.7499 can round to -0.75 and be rejected by the
+  // scene validator even though the pointer is still touching the source.
+  const epsilon = Math.min(0.0001, sourceSize / 2);
+  const minimum = -sourceSize + epsilon;
+  const maximum = 1 - epsilon;
+  return Math.max(minimum, Math.min(maximum, roundCropCoordinate(value)));
+}
+
+function getImageCropNodeForContentDelta(
+  node: SketchSceneNode,
+  state: ImageCropEditState,
+  delta: { x: number; y: number },
+): SketchSceneNode {
+  const crop = getImageCropForEdit(node, state);
+  const safeWidth = Math.max(0.0001, node.width);
+  const safeHeight = Math.max(0.0001, node.height);
+  const minimumVisibleSource = 0.0001;
+  const nextX = crop.sourceRect.x - (delta.x * crop.sourceRect.width) / safeWidth;
+  const nextY = crop.sourceRect.y - (delta.y * crop.sourceRect.height) / safeHeight;
+  const clampedX = Math.max(-crop.sourceRect.width + minimumVisibleSource, Math.min(1 - minimumVisibleSource, nextX));
+  const clampedY = Math.max(-crop.sourceRect.height + minimumVisibleSource, Math.min(1 - minimumVisibleSource, nextY));
+  return {
+    ...node,
+    imageCrop: {
+      ...crop,
+      sourceRect: {
+        ...crop.sourceRect,
+        x: roundVisibleCropCoordinate(clampedX, crop.sourceRect.width),
+        y: roundVisibleCropCoordinate(clampedY, crop.sourceRect.height),
+      },
+    },
+  };
+}
+
+function getImageCropFrameForDelta(
+  node: SketchSceneNode,
+  handle: SketchSceneResizeHandle,
+  delta: { x: number; y: number },
+  originalFrame: SketchSceneFrame,
+): SketchSceneFrame {
+  let left = node.x;
+  let top = node.y;
+  let right = node.x + node.width;
+  let bottom = node.y + node.height;
+  if (handle.includes("e")) right += delta.x;
+  if (handle.includes("s")) bottom += delta.y;
+  if (handle.includes("w")) left += delta.x;
+  if (handle.includes("n")) top += delta.y;
+
+  const minimumSize = Math.min(8, originalFrame.width, originalFrame.height);
+  const clampAxis = (start: number, end: number, minimum: number, maximum: number, negativeHandle: boolean, positiveHandle: boolean) => {
+    let nextStart = start;
+    let nextEnd = end;
+    if (negativeHandle) nextStart = Math.max(minimum, Math.min(nextStart, maximum - minimumSize));
+    if (positiveHandle) nextEnd = Math.min(maximum, Math.max(nextEnd, minimum + minimumSize));
+    if (nextEnd - nextStart < minimumSize) {
+      if (negativeHandle) nextStart = nextEnd - minimumSize;
+      else nextEnd = nextStart + minimumSize;
+    }
+    return { start: Math.max(minimum, nextStart), end: Math.min(maximum, nextEnd) };
+  };
+  const horizontal = clampAxis(left, right, originalFrame.x, originalFrame.x + originalFrame.width, handle.includes("w"), handle.includes("e"));
+  const vertical = clampAxis(top, bottom, originalFrame.y, originalFrame.y + originalFrame.height, handle.includes("n"), handle.includes("s"));
+  left = horizontal.start;
+  right = horizontal.end;
+  top = vertical.start;
+  bottom = vertical.end;
+
+  return {
+    x: Math.round(left * 1000) / 1000,
+    y: Math.round(top * 1000) / 1000,
+    width: Math.round((right - left) * 1000) / 1000,
+    height: Math.round((bottom - top) * 1000) / 1000,
+  };
+}
+
+function applyImageCropFrame(
+  node: SketchSceneNode,
+  state: ImageCropEditState,
+  handle: SketchSceneResizeHandle,
+  delta: { x: number; y: number },
+): SketchSceneNode {
+  const frame = getImageCropFrameForDelta(node, handle, delta, state.originalFrame);
+  const sourceRect = getSourceRectForFrame(
+    node.imageCrop?.sourceRect ?? { x: 0, y: 0, width: 1, height: 1 },
+    getImageNodeFrame(node),
+    frame,
+  );
+  return {
+    ...node,
+    ...frame,
+    imageCrop: {
+      shape: state.shape,
+      sourceRect,
+      originalFrame: state.originalFrame,
+      originalImageFit: state.originalImageFit,
+    },
+  };
+}
+
 function isPointInsideNodeBounds(point: { x: number; y: number }, node: SketchSceneNode): boolean {
   const bounds = getSketchNodeBounds(node);
   return point.x >= bounds.x && point.x <= bounds.x + bounds.width && point.y >= bounds.y && point.y <= bounds.y + bounds.height;
+}
+
+function isPointInsideFrame(point: { x: number; y: number }, frame: SketchSceneFrame): boolean {
+  return point.x >= frame.x && point.x <= frame.x + frame.width && point.y >= frame.y && point.y <= frame.y + frame.height;
+}
+
+function isPointInsideImageCropInteraction(point: { x: number; y: number }, node: SketchSceneNode, state: ImageCropEditState): boolean {
+  if (isPointInsideNodeBounds(point, node)) return true;
+  const imageFrame = getSketchImageCropRenderedFrame(node, getImageCropForEdit(node, state));
+  return isPointInsideFrame(point, imageFrame);
 }
 
 function clampScenePoint(point: { x: number; y: number }, scene: SketchSceneDocument): { x: number; y: number } {
@@ -508,6 +837,10 @@ function clampScenePoint(point: { x: number; y: number }, scene: SketchSceneDocu
 
 function getDrawingDistance(start: { x: number; y: number }, current: { x: number; y: number }): number {
   return Math.hypot(current.x - start.x, current.y - start.y);
+}
+
+function getPencilMovementDistance(points: Array<{ x: number; y: number }>): number {
+  return points.slice(1).reduce((distance, point, index) => distance + getDrawingDistance(points[index], point), 0);
 }
 
 function constrainLineEndPoint(
@@ -623,7 +956,12 @@ function createDrawingNode(
   start: { x: number; y: number },
   current: { x: number; y: number },
   scene: SketchSceneDocument,
-  options: { shiftKey?: boolean; points?: Array<{ x: number; y: number }>; allowClickText?: boolean } = {},
+  options: {
+    shiftKey?: boolean;
+    points?: Array<{ x: number; y: number }>;
+    allowClickText?: boolean;
+    brushSettings?: SketchBrushSettings;
+  } = {},
 ): SketchSceneNode | null {
   const safeStart = clampScenePoint(start, scene);
   const safeCurrent = clampScenePoint(current, scene);
@@ -646,13 +984,23 @@ function createDrawingNode(
 
   if (tool === "pencil") {
     const points = (options.points ?? [safeStart, safeCurrent]).map((point) => clampScenePoint(point, scene));
-    if (points.length < 2 || getDrawingDistance(points[0], points[points.length - 1]) < DRAWING_COMMIT_THRESHOLD) return null;
+    if (points.length < 2 || getPencilMovementDistance(points) < DRAWING_COMMIT_THRESHOLD) return null;
     const bounds = getPathPointsBounds(points);
+    const pencilNode = createNode("pencil");
     return {
-      ...createNode("pencil"),
+      ...pencilNode,
       ...bounds,
       path: createPathData(points),
       points,
+      style: {
+        ...pencilNode.style,
+        ...(options.brushSettings
+          ? {
+              stroke: options.brushSettings.color,
+              strokeWidth: options.brushSettings.strokeWidth,
+            }
+          : {}),
+      },
     };
   }
 
@@ -1269,13 +1617,31 @@ export function useSketchEditorState(
 ) {
   const keyboardScopeId = React.useId();
   const [tool, setToolState] = React.useState<SketchTool>("select");
+  const [brushSettings, setBrushSettingsState] = React.useState<SketchBrushSettings>(DEFAULT_SKETCH_BRUSH_SETTINGS);
   const [inlineTextSelection, setInlineTextSelection] = React.useState<InlineTextSelectionState | null>(null);
   const selectionState = useSketchSelection(scene, onSelectionChange, configData);
   const history = useSketchHistory(scene, onSceneChange);
   const setTool = React.useCallback((nextTool: SketchTool) => {
     if (allowedTools && !allowedTools.includes(nextTool)) return;
+    if (nextTool === "pencil" || nextTool === "eraser") selectionState.clearSelection();
     setToolState(nextTool);
-  }, [allowedTools]);
+  }, [allowedTools, selectionState.clearSelection]);
+  const setBrushSettings = React.useCallback((patch: Partial<SketchBrushSettings>) => {
+    setBrushSettingsState((current) => {
+      const next = { ...current };
+      if (patch.color !== undefined) {
+        const color = normalizeSketchHexColor(patch.color);
+        if (!color) return current;
+        next.color = color;
+      }
+      if (patch.strokeWidth !== undefined) {
+        if (!Number.isFinite(patch.strokeWidth)) return current;
+        next.strokeWidth = Math.round(Math.min(20, Math.max(1, patch.strokeWidth)) * 10) / 10;
+      }
+      if (next.color === current.color && next.strokeWidth === current.strokeWidth) return current;
+      return next;
+    });
+  }, []);
   React.useEffect(() => {
     if (allowedTools && !allowedTools.includes(tool)) setToolState("select");
   }, [allowedTools, tool]);
@@ -1285,6 +1651,8 @@ export function useSketchEditorState(
     tool,
     setTool,
     allowedTools,
+    brushSettings,
+    setBrushSettings,
     inlineTextSelection,
     setInlineTextSelection,
     ...selectionState,
@@ -1302,6 +1670,7 @@ function SelectionOverlay({
   minimumSize = 0,
   endpointHandles,
   variant = "selection",
+  borderShape = "rect",
   showCenterPoint = false,
   testId = "sketch-selection-box",
 }: {
@@ -1317,6 +1686,7 @@ function SelectionOverlay({
     end: { x: number; y: number };
   };
   variant?: "selection" | "hover" | "marquee";
+  borderShape?: "rect" | "circle";
   showCenterPoint?: boolean;
   testId?: string;
 }) {
@@ -1351,6 +1721,7 @@ function SelectionOverlay({
       className={cn(
         "pointer-events-none absolute",
         variant === "selection" && "border border-[#62b7ff]",
+        variant === "selection" && borderShape === "circle" && "rounded-full",
         variant === "hover" && "border border-[#38bdf8]/80 bg-[#38bdf8]/10",
         variant === "marquee" && "border border-dashed border-[#62b7ff] bg-[#62b7ff]/10",
       )}
@@ -1436,6 +1807,98 @@ function SelectionOverlay({
   );
 }
 
+function ImageCropOverlay({
+  node,
+  imageContentFrame,
+  shape,
+  stageWidth,
+  stageHeight,
+  scaleX,
+  scaleY,
+  viewportScale,
+  onResizePointerDown,
+}: {
+  node: SketchSceneNode;
+  imageContentFrame: SketchSceneFrame;
+  shape: SketchImageCrop["shape"];
+  stageWidth: number;
+  stageHeight: number;
+  scaleX: number;
+  scaleY: number;
+  viewportScale: number;
+  onResizePointerDown: (event: React.PointerEvent<HTMLDivElement>, handle: SketchResizeInteractionHandle) => void;
+}) {
+  const frame = getImageNodeFrame(node);
+  const maskId = `sketch-image-crop-mask-${node.id.replace(/[^A-Za-z0-9_-]/g, "_")}`;
+  const imageContentX = imageContentFrame.x * scaleX;
+  const imageContentY = imageContentFrame.y * scaleY;
+  const imageContentWidth = imageContentFrame.width * scaleX;
+  const imageContentHeight = imageContentFrame.height * scaleY;
+  const cropX = frame.x * scaleX;
+  const cropY = frame.y * scaleY;
+  const cropWidth = frame.width * scaleX;
+  const cropHeight = frame.height * scaleY;
+  return (
+    <div
+      className="pointer-events-none absolute inset-0 z-30"
+      data-testid="sketch-image-crop-overlay"
+      data-sketch-image-crop-shape={shape}
+      aria-label={shape === "circle" ? "圆形裁剪" : "矩形裁剪"}
+    >
+      <svg
+        className="pointer-events-none absolute inset-0 overflow-visible"
+        width={stageWidth}
+        height={stageHeight}
+        viewBox={`0 0 ${stageWidth} ${stageHeight}`}
+        aria-hidden="true"
+      >
+        <defs>
+          <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width={stageWidth} height={stageHeight}>
+            <rect width={stageWidth} height={stageHeight} fill="black" />
+            <rect x={imageContentX} y={imageContentY} width={imageContentWidth} height={imageContentHeight} fill="white" />
+            {shape === "circle" ? (
+              Math.abs(cropWidth - cropHeight) < 0.001 ? (
+                <circle
+                  cx={cropX + cropWidth / 2}
+                  cy={cropY + cropHeight / 2}
+                  r={cropWidth / 2}
+                  fill="black"
+                />
+              ) : (
+                <ellipse
+                  cx={cropX + cropWidth / 2}
+                  cy={cropY + cropHeight / 2}
+                  rx={cropWidth / 2}
+                  ry={cropHeight / 2}
+                  fill="black"
+                />
+              )
+            ) : (
+              <rect x={cropX} y={cropY} width={cropWidth} height={cropHeight} fill="black" />
+            )}
+          </mask>
+        </defs>
+        <rect
+          data-testid="sketch-image-crop-dim"
+          width={stageWidth}
+          height={stageHeight}
+          fill="rgba(0,0,0,0.5)"
+          mask={`url(#${maskId})`}
+        />
+      </svg>
+      <SelectionOverlay
+        bounds={frame}
+        scaleX={scaleX}
+        scaleY={scaleY}
+        viewportScale={viewportScale}
+        borderShape={shape}
+        onResizePointerDown={onResizePointerDown}
+        testId="sketch-image-crop-frame"
+      />
+    </div>
+  );
+}
+
 export function SketchPagePreview({
   scene,
   configData = {},
@@ -1444,15 +1907,30 @@ export function SketchPagePreview({
   className,
   selectedNodeId,
   selectedNodeIds,
+  imageCropEditingNodeId,
   onNodeSelect,
   onSelectionChange,
 }: SketchPagePreviewProps) {
-  const parsedScene = useMemo(() => parseScene(scene), [scene]);
+  const parsedSceneState = useMemo(() => parseScene(scene), [scene]);
+  const parsedScene = parsedSceneState.scene;
   const width = normalizeSize(previewSize, parsedScene.pageSize.width, "width");
   const height = normalizeSize(previewSize, parsedScene.pageSize.height, "height");
+  const renderError = useMemo(() => {
+    if (parsedSceneState.error) return parsedSceneState.error;
+    return validateSketchSceneForRender(parsedScene, configData).valid
+      ? null
+      : "白板场景无法渲染，未渲染任何内容。";
+  }, [configData, parsedScene, parsedSceneState.error]);
   const svgMarkup = useMemo(
-    () => renderSketchSceneToSvgMarkup(parsedScene, configData),
-    [parsedScene, configData],
+    () => {
+      if (renderError) return "";
+      try {
+        return renderSketchSceneToSvgMarkup(parsedScene, configData, { imageCropEditingNodeId: imageCropEditingNodeId ?? undefined });
+      } catch {
+        return "";
+      }
+    },
+    [configData, imageCropEditingNodeId, parsedScene, renderError],
   );
   const imageNodes = useMemo(() => getResolvedImageNodes(parsedScene, configData), [configData, parsedScene]);
   const imageProbeKey = useMemo(() => imageNodes.map((node) => `${node.id}:${node.src}`).join("|"), [imageNodes]);
@@ -1463,6 +1941,14 @@ export function SketchPagePreview({
   React.useEffect(() => {
     setFailedImageIds(new Set());
   }, [imageProbeKey]);
+
+  if (renderError) {
+    return (
+      <SketchSceneErrorNotice
+        className={cn(fillContainer ? "h-full w-full" : "", className)}
+      />
+    );
+  }
 
   return (
     <div
@@ -1779,7 +2265,7 @@ function getSketchColorFieldValue(value: unknown, fallback: string, allowNoColor
 }
 
 function getPrimaryColorControl(node: SketchSceneNode): PrimaryColorControl | null {
-  if (node.type === "group" || node.type === "image") return null;
+  if (node.type === "group") return null;
   if (node.type === "text") {
     return {
       label: "文字颜色",
@@ -1787,7 +2273,7 @@ function getPrimaryColorControl(node: SketchSceneNode): PrimaryColorControl | nu
       value: toColorInputValue(node.style?.color, "#111827"),
     };
   }
-  if (node.type === "line" || node.type === "arrow" || node.type === "path") {
+  if (node.type === "line" || node.type === "arrow" || node.type === "path" || node.type === "image") {
     return {
       label: "描边",
       property: "stroke",
@@ -1806,7 +2292,7 @@ function supportsFillStyle(node: SketchSceneNode): boolean {
 }
 
 function supportsStrokeStyle(node: SketchSceneNode): boolean {
-  return node.type !== "group" && node.type !== "image" && node.type !== "text";
+  return node.type !== "group" && node.type !== "text";
 }
 
 function supportsTextStyle(node: SketchSceneNode): boolean {
@@ -2905,10 +3391,7 @@ function createExportScene(scene: SketchSceneDocument, nodes: SketchSceneNode[])
 }
 
 function renderExportSvgMarkup(scene: SketchSceneDocument, options: Pick<SketchExportOptions, "withBackground">): string {
-  const svgMarkup = renderSketchSceneToSvgMarkup(scene);
-  if (!options.withBackground) return svgMarkup;
-  const background = `<rect x="0" y="0" width="${scene.pageSize.width}" height="${scene.pageSize.height}" fill="#ffffff" />`;
-  return svgMarkup.replace(/(<svg[^>]*>)/, `$1${background}`);
+  return renderSketchSceneToSvgMarkup(scene, {}, { withBackground: options.withBackground });
 }
 
 async function copySvgToClipboardOrDownload(
@@ -2976,7 +3459,7 @@ async function renderSvgToPngBlob(
   try {
     await new Promise<void>((resolve, reject) => {
       image.onload = () => resolve();
-      image.onerror = () => reject(new Error("Failed to rasterize SVG"));
+      image.onerror = () => reject(new Error("SVG 栅格化失败"));
       image.src = svgUrl;
     });
     context.clearRect(0, 0, canvas.width, canvas.height);
@@ -3416,6 +3899,7 @@ function buildSketchActionEntries({
   pasteStyle,
   fitPageToViewport,
   zoomToSelection,
+  onImageUpload,
 }: {
   scene: SketchSceneDocument;
   controller: SketchEditorController;
@@ -3436,6 +3920,7 @@ function buildSketchActionEntries({
   pasteStyle: () => void;
   fitPageToViewport: () => void;
   zoomToSelection: () => void;
+  onImageUpload: () => void;
 }): SketchActionEntry[] {
   const noSelection = selectedNodes.length ? undefined : "需要先选择对象";
   const noEditableSelection = editableSelectedNodes.length ? undefined : "当前选择不可编辑";
@@ -3444,9 +3929,9 @@ function buildSketchActionEntries({
     id: `tool.${item.tool}`,
     section: "tool",
     label: item.label,
-    description: `切换到${item.label}工具`,
+    description: item.tool === "image" ? "选择图片并插入画布" : `切换到${item.label}工具`,
     shortcuts: [],
-    run: () => controller.setTool(item.tool),
+    run: item.tool === "image" ? onImageUpload : () => controller.setTool(item.tool),
   }));
   return [
     ...tools,
@@ -3719,6 +4204,7 @@ function SketchCommandPalette({
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.preventDefault();
+          event.stopPropagation();
           onClose();
         }
       }}
@@ -3782,6 +4268,7 @@ function SketchShortcutHelp({
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.preventDefault();
+          event.stopPropagation();
           onClose();
         }
       }}
@@ -3939,7 +4426,7 @@ function SketchFloatingToolbarColorIndicator({
     <span
       data-testid="sketch-floating-fill-indicator"
       className={cn(
-        "relative inline-flex h-3.5 w-3.5 rounded-sm border border-slate-300",
+        "relative inline-flex h-4 w-4 rounded-sm border border-slate-300",
         transparent && "bg-white",
       )}
       style={transparent ? undefined : { backgroundColor: color }}
@@ -3969,44 +4456,315 @@ function SketchTextColorIndicator({ color }: { color: string }) {
 
 function SketchFloatingToolbarActionButton({ action }: { action: SketchFloatingToolbarAction }) {
   return (
-    <SketchMainToolbarTooltip label={action.label}>
-      <button
-        type="button"
-      className="pointer-events-auto inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
-        disabled={action.disabled}
-        aria-label={`悬浮${action.label}`}
-        aria-haspopup={action.ariaHasPopup}
-        aria-expanded={action.ariaExpanded}
-        onClick={action.onClick}
-      >
-        {action.swatchColor && action.swatchKind ? (
-          <SketchFloatingToolbarColorIndicator color={action.swatchColor} kind={action.swatchKind} mixed={action.swatchMixed} />
-        ) : (
-          action.icon
-        )}
-      </button>
-    </SketchMainToolbarTooltip>
+    <React.Fragment>
+      {action.separatorBefore ? <div className="mx-1 h-5 w-px shrink-0 bg-slate-200" aria-hidden="true" /> : null}
+      <SketchMainToolbarTooltip label={action.label}>
+        <button
+          type="button"
+          className="pointer-events-auto inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={action.disabled}
+          aria-label={`悬浮${action.label}`}
+          aria-haspopup={action.ariaHasPopup}
+          aria-expanded={action.ariaExpanded}
+          onClick={action.onClick}
+        >
+          {action.swatchColor && action.swatchKind ? (
+            <SketchFloatingToolbarColorIndicator color={action.swatchColor} kind={action.swatchKind} mixed={action.swatchMixed} />
+          ) : (
+            action.icon
+          )}
+        </button>
+      </SketchMainToolbarTooltip>
+    </React.Fragment>
   );
 }
 
-export function SketchEditorToolbar({ scene: _scene, controller, configData: _configData = {}, className, allowedTools }: SketchEditorToolbarProps) {
+function SketchBrushToolbarGroup({
+  controller,
+  availableTools,
+  toolButtonClass,
+}: {
+  controller: SketchEditorController;
+  availableTools?: readonly SketchTool[];
+  toolButtonClass: string;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [panelPosition, setPanelPosition] = React.useState<{ left: number; top: number } | null>(null);
+  const groupRef = React.useRef<HTMLDivElement>(null);
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  const customColorInputRef = React.useRef<HTMLInputElement>(null);
+  const pencilButtonRef = React.useRef<HTMLButtonElement>(null);
+  const previousToolRef = React.useRef(controller.tool);
+  const eraserAvailable = !availableTools || availableTools.includes("eraser");
+  const brushIsActive = controller.tool === "pencil" || controller.tool === "eraser";
+
+  const updatePanelPosition = React.useCallback(() => {
+    const group = groupRef.current;
+    if (!group) return;
+    const rect = group.getBoundingClientRect();
+    setPanelPosition({ left: rect.left + rect.width / 2, top: rect.top - 8 });
+  }, []);
+
+  React.useLayoutEffect(() => {
+    if (!open) {
+      setPanelPosition(null);
+      return undefined;
+    }
+    updatePanelPosition();
+    window.addEventListener("resize", updatePanelPosition);
+    window.addEventListener("scroll", updatePanelPosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePanelPosition);
+      window.removeEventListener("scroll", updatePanelPosition, true);
+    };
+  }, [open, updatePanelPosition]);
+
+  React.useEffect(() => {
+    if (!open) return undefined;
+    const onDocumentPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (groupRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDocumentPointerDown);
+    return () => document.removeEventListener("pointerdown", onDocumentPointerDown);
+  }, [open]);
+
+  React.useEffect(() => {
+    if (open) pencilButtonRef.current?.focus();
+  }, [open]);
+
+  React.useEffect(() => {
+    if (
+      open &&
+      controller.tool !== previousToolRef.current &&
+      controller.tool !== "pencil" &&
+      controller.tool !== "eraser"
+    ) {
+      setOpen(false);
+    }
+    previousToolRef.current = controller.tool;
+  }, [controller.tool, open]);
+
+  const activateBrushTool = (tool: "pencil" | "eraser") => {
+    if (tool === "eraser" && !eraserAvailable) return;
+    controller.setTool(tool);
+  };
+
+  const settingsPanel = panelPosition && typeof document !== "undefined"
+    ? createPortal(
+        <div
+          ref={panelRef}
+          role="dialog"
+          aria-label="画笔设置"
+          data-testid="sketch-brush-settings"
+          className="pointer-events-auto fixed z-[10000] flex max-w-[calc(100vw-24px)] flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-[0_12px_32px_rgba(15,23,42,0.16)]"
+          style={{ left: panelPosition.left, top: panelPosition.top, transform: "translate(-50%, -100%)" }}
+          onPointerDown={(event) => event.stopPropagation()}
+          onKeyDown={(event) => {
+            if (event.key !== "Escape") return;
+            event.preventDefault();
+            event.stopPropagation();
+            setOpen(false);
+            controller.setTool("select");
+          }}
+        >
+          <div className="flex items-center gap-1" role="group" aria-label="画笔模式">
+            <button
+              ref={pencilButtonRef}
+              type="button"
+              aria-label="画笔"
+              aria-pressed={controller.tool === "pencil"}
+              data-testid="sketch-brush-pencil"
+              className={cn(
+                "inline-flex h-8 w-8 items-center justify-center rounded-md border text-slate-600 transition-colors hover:bg-violet-50 hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500",
+                controller.tool === "pencil" ? "border-violet-500 bg-violet-50 text-violet-700" : "border-slate-200",
+              )}
+              onClick={() => activateBrushTool("pencil")}
+            >
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+            </button>
+            {eraserAvailable ? (
+              <button
+                type="button"
+                aria-label="橡皮擦"
+                aria-pressed={controller.tool === "eraser"}
+                data-testid="sketch-brush-eraser"
+                className={cn(
+                  "inline-flex h-8 w-8 items-center justify-center rounded-md border text-slate-600 transition-colors hover:bg-violet-50 hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500",
+                  controller.tool === "eraser" ? "border-violet-500 bg-violet-50 text-violet-700" : "border-slate-200",
+                )}
+                onClick={() => activateBrushTool("eraser")}
+              >
+                <Eraser className="h-4 w-4" aria-hidden="true" />
+              </button>
+            ) : null}
+          </div>
+
+          <div className="h-8 w-px bg-slate-200" aria-hidden="true" />
+
+          <div className="flex items-center gap-1.5" role="radiogroup" aria-label="颜色">
+            <span className="text-[11px] font-semibold text-slate-500">颜色</span>
+            {SKETCH_BRUSH_QUICK_COLORS.map((color) => {
+              const selected = controller.brushSettings.color === color;
+              return (
+                <button
+                  key={color}
+                  type="button"
+                  role="radio"
+                  aria-label={`画笔颜色 ${color}`}
+                  aria-checked={selected}
+                  data-sketch-brush-color={color}
+                  className={cn(
+                    "relative inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500",
+                    selected && "ring-2 ring-violet-500 ring-offset-1",
+                  )}
+                  style={{ backgroundColor: color }}
+                  onClick={() => controller.setBrushSettings({ color })}
+                >
+                  {selected ? <Check className="h-3.5 w-3.5" style={{ color: getSketchColorCheckColor(color) }} strokeWidth={2.75} aria-hidden="true" /> : null}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              aria-label="画笔其他颜色"
+              title="其他颜色"
+              className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+              onClick={() => customColorInputRef.current?.click()}
+            >
+              <PaintBucket className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+            <input
+              ref={customColorInputRef}
+              type="color"
+              value={controller.brushSettings.color}
+              tabIndex={-1}
+              aria-label="画笔其他颜色输入"
+              className="sr-only"
+              onChange={(event) => controller.setBrushSettings({ color: event.target.value })}
+            />
+          </div>
+
+          <div className="h-8 w-px bg-slate-200" aria-hidden="true" />
+
+          <div className="flex items-center gap-1" role="radiogroup" aria-label="粗细">
+            <span className="text-[11px] font-semibold text-slate-500">粗细</span>
+            {SKETCH_BRUSH_WIDTH_PRESETS.map((preset) => {
+              const selected = controller.brushSettings.strokeWidth === preset.value;
+              return (
+                <button
+                  key={preset.label}
+                  type="button"
+                  role="radio"
+                  aria-label={`画笔粗细 ${preset.label}`}
+                  aria-checked={selected}
+                  data-sketch-brush-width={preset.value}
+                  className={cn(
+                    "inline-flex h-7 min-w-8 items-center justify-center rounded-md px-2 text-[11px] font-medium text-slate-600 transition-colors hover:bg-violet-50 hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500",
+                    selected && "bg-violet-50 text-violet-700 ring-1 ring-violet-300",
+                  )}
+                  onClick={() => controller.setBrushSettings({ strokeWidth: preset.value })}
+                >
+                  {preset.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>,
+        document.body,
+      )
+    : null;
+
+  return (
+    <>
+      <div ref={groupRef} role="group" aria-label="画笔工具" className="relative flex shrink-0">
+        <SketchMainToolbarTooltip label="画笔">
+          <button
+            type="button"
+            aria-label="画笔"
+            aria-pressed={controller.tool === "pencil"}
+            className={cn(
+              toolButtonClass,
+              "rounded-r-none",
+              brushIsActive && "bg-violet-600 text-white shadow-sm hover:bg-violet-600 hover:text-white",
+            )}
+            onClick={() => {
+              setOpen(false);
+              activateBrushTool("pencil");
+            }}
+          >
+            <Pencil className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </SketchMainToolbarTooltip>
+        {open ? (
+          <button
+            type="button"
+            aria-label="关闭画笔设置"
+            aria-haspopup="dialog"
+            aria-expanded="true"
+            className={cn(
+              "inline-flex h-10 w-6 shrink-0 items-center justify-center rounded-r-lg border-l border-white/40 text-slate-600 transition-colors hover:bg-violet-50 hover:text-violet-700 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500",
+              brushIsActive && "bg-violet-600 text-white hover:bg-violet-600 hover:text-white",
+            )}
+            onClick={(event) => {
+              event.stopPropagation();
+              setOpen(false);
+            }}
+          >
+            <ChevronDown className="h-3.5 w-3.5 rotate-180 transition-transform" aria-hidden="true" />
+          </button>
+        ) : (
+          <SketchMainToolbarTooltip label="打开画笔设置">
+            <button
+              type="button"
+              aria-label="打开画笔设置"
+              aria-haspopup="dialog"
+              aria-expanded="false"
+              className={cn(
+                "inline-flex h-10 w-6 shrink-0 items-center justify-center rounded-r-lg border-l border-white/40 text-slate-600 transition-colors hover:bg-violet-50 hover:text-violet-700 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500",
+                brushIsActive && "bg-violet-600 text-white hover:bg-violet-600 hover:text-white",
+              )}
+              onClick={(event) => {
+                event.stopPropagation();
+                setOpen(true);
+              }}
+            >
+              <ChevronDown className="h-3.5 w-3.5 transition-transform" aria-hidden="true" />
+            </button>
+          </SketchMainToolbarTooltip>
+        )}
+      </div>
+      {settingsPanel}
+    </>
+  );
+}
+
+export function SketchEditorToolbar({ scene: _scene, controller, configData: _configData = {}, className, allowedTools, brushToolbarMode = "individual", onImageUpload }: SketchEditorToolbarProps) {
   const toolButtonClass =
     "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-violet-50 hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:opacity-35";
   const actionButtonClass =
     "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-violet-50 hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:opacity-35";
+  const tools = allowedTools ?? controller.allowedTools;
+  const groupedBrush = brushToolbarMode === "grouped" && (!tools || tools.includes("pencil"));
 
   return (
     <div
       className={cn(
-        "flex min-h-12 w-fit max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white/95 p-1.5 text-slate-900 shadow-lg backdrop-blur",
+        "relative flex min-h-12 w-fit max-w-full items-center overflow-visible rounded-2xl border border-slate-200 bg-white/95 p-1.5 text-slate-900 shadow-lg backdrop-blur",
         className,
       )}
       onPointerDownCapture={() => activateSketchKeyboardScope(controller)}
     >
+      <div className="flex max-w-full items-center gap-1 overflow-x-auto">
       {TOOL_OPTIONS.filter((item) => {
-        const tools = allowedTools ?? controller.allowedTools;
         return !tools || tools.includes(item.tool);
       }).map((item) => {
+        if (groupedBrush && item.tool === "eraser") return null;
+        if (groupedBrush && item.tool === "pencil") {
+          return <SketchBrushToolbarGroup key="brush-group" controller={controller} availableTools={tools} toolButtonClass={toolButtonClass} />;
+        }
         const Icon = item.icon;
         return (
           <SketchMainToolbarTooltip key={item.tool} label={item.label}>
@@ -4015,9 +4773,15 @@ export function SketchEditorToolbar({ scene: _scene, controller, configData: _co
               aria-label={item.label}
               className={cn(
                 toolButtonClass,
-                controller.tool === item.tool && "bg-violet-600 text-white shadow-sm hover:bg-violet-600 hover:text-white",
+                item.tool !== "image" && controller.tool === item.tool && "bg-violet-600 text-white shadow-sm hover:bg-violet-600 hover:text-white",
               )}
-              onClick={() => controller.setTool(item.tool)}
+              onClick={() => {
+                if (item.tool === "image") {
+                  onImageUpload();
+                  return;
+                }
+                controller.setTool(item.tool);
+              }}
             >
               <Icon className="h-5 w-5" />
             </button>
@@ -4035,6 +4799,7 @@ export function SketchEditorToolbar({ scene: _scene, controller, configData: _co
           <Redo2 className="h-4 w-4" />
         </button>
       </SketchMainToolbarTooltip>
+      </div>
       <span className="sr-only" aria-live="polite">
         {controller.selection.nodeIds.length ? `${controller.selection.nodeIds.length} selected` : "No selection"}
       </span>
@@ -4578,8 +5343,18 @@ export function SketchPropertyPanel({ scene, controller, configData = {}, classN
                         label="线宽"
                         value={typeof strokeWidth.value === "number" ? strokeWidth.value : 1}
                         min={0}
+                        max={20}
                         mixed={strokeWidth.mixed}
                         continuousHistoryKey={`${selectedHistoryKey}:batch-strokeWidth`}
+                        onContinuousStart={beginContinuousHistory}
+                        onContinuousEnd={endContinuousHistory}
+                        onChange={(value, recordHistory = true) => updateNodesStyle(controller, editableNodes, { strokeWidth: value }, recordHistory)}
+                      />
+                      <StrokeWidthSlider
+                        value={typeof strokeWidth.value === "number" ? strokeWidth.value : 1}
+                        mixed={strokeWidth.mixed}
+                        disabled={!editableNodes.length}
+                        continuousHistoryKey={`${selectedHistoryKey}:batch-strokeWidth-slider`}
                         onContinuousStart={beginContinuousHistory}
                         onContinuousEnd={endContinuousHistory}
                         onChange={(value, recordHistory = true) => updateNodesStyle(controller, editableNodes, { strokeWidth: value }, recordHistory)}
@@ -4898,13 +5673,13 @@ export function SketchPropertyPanel({ scene, controller, configData = {}, classN
                       const file = firstImageFile(event.target.files);
                       event.currentTarget.value = "";
                       if (!file || propertyReadOnly) return;
-                      void readImageFileAsDataUrl(file).then((src) => {
-                        if (!src) return;
+                      void readDecodedImageSource(file).then((source) => {
+                        if (!source) return;
                         controller.applyOperations([
                           {
                             op: "update",
                             nodeId: selectedNode.id,
-                            patch: { src, alt: file.name || selectedNode.alt || "导入图片" },
+                            patch: getImageReplacementPatch(selectedNode, source, file.name),
                           },
                         ]);
                       });
@@ -5110,12 +5885,23 @@ export function SketchPropertyPanel({ scene, controller, configData = {}, classN
                     label="线宽"
                     value={style.strokeWidth ?? 1}
                     min={0}
+                    max={20}
                     disabled={propertyReadOnly}
                     continuousHistoryKey={`${selectedHistoryKey}:strokeWidth`}
                     onContinuousStart={beginContinuousHistory}
                     onContinuousEnd={endContinuousHistory}
                     onChange={(value, recordHistory = true) => updateSelectedStyle(scene, controller, { strokeWidth: value }, recordHistory)}
                     onReset={() => resetSelectedStyleKeys(scene, controller, ["strokeWidth"])}
+                  />
+                ) : null}
+                {supportsStrokeStyle(selectedNode) ? (
+                  <StrokeWidthSlider
+                    value={style.strokeWidth ?? 1}
+                    disabled={propertyReadOnly}
+                    continuousHistoryKey={`${selectedHistoryKey}:strokeWidth-slider`}
+                    onContinuousStart={beginContinuousHistory}
+                    onContinuousEnd={endContinuousHistory}
+                    onChange={(value, recordHistory = true) => updateSelectedStyle(scene, controller, { strokeWidth: value }, recordHistory)}
                   />
                 ) : null}
                 <NumberField
@@ -5869,6 +6655,91 @@ function NumberField({
   );
 }
 
+function StrokeWidthSlider({
+  value,
+  mixed = false,
+  disabled = false,
+  continuousHistoryKey,
+  onContinuousStart,
+  onContinuousEnd,
+  onChange,
+}: {
+  value: number;
+  mixed?: boolean;
+  disabled?: boolean;
+  continuousHistoryKey?: string;
+  onContinuousStart?: (key: string) => void;
+  onContinuousEnd?: () => void;
+  onChange: (value: number, recordHistory?: boolean) => void;
+}) {
+  const continuousActiveRef = React.useRef(false);
+  const sliderValue = Number.isFinite(value) ? Math.max(0, Math.min(20, Math.round(value))) : 0;
+  const sliderProgress = `${(sliderValue / 20) * 100}%`;
+  const beginContinuousInput = () => {
+    if (continuousActiveRef.current || !continuousHistoryKey || !onContinuousStart) return;
+    continuousActiveRef.current = true;
+    onContinuousStart(continuousHistoryKey);
+  };
+  const endContinuousInput = () => {
+    if (!continuousActiveRef.current) return;
+    continuousActiveRef.current = false;
+    onContinuousEnd?.();
+  };
+
+  React.useEffect(() => endContinuousInput, []);
+
+  return (
+    <div
+      data-testid="sketch-stroke-width-control"
+      className={cn(
+        "grid gap-1 rounded-lg border border-slate-200 bg-white/95 px-2 py-2 text-xs text-slate-700 shadow-[0_4px_12px_rgba(15,23,42,0.06)] backdrop-blur",
+        disabled && "opacity-60",
+      )}
+    >
+      <div className="flex min-h-8 items-center justify-between gap-2 text-xs text-slate-700">
+        <span className="text-xs text-slate-700">描边宽度</span>
+        <span className="tabular-nums text-xs text-slate-700">{mixed ? "混合" : `${formatNumberFieldValue(value, false)}px`}</span>
+      </div>
+      <div data-testid="sketch-stroke-width-track" className="relative h-4 w-full">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 overflow-hidden rounded-full bg-slate-200">
+          <div
+            data-testid="sketch-stroke-width-fill"
+            className="h-full rounded-full bg-sky-500 transition-[width] duration-100"
+            style={{ width: sliderProgress }}
+          />
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={20}
+          step={1}
+          value={sliderValue}
+          disabled={disabled}
+          aria-label="描边宽度"
+          aria-valuemin={0}
+          aria-valuemax={20}
+          aria-valuenow={sliderValue}
+          style={{ colorScheme: "light" }}
+          className={cn(
+            "relative z-10 h-4 w-full cursor-pointer appearance-none bg-transparent accent-sky-500 outline-none disabled:cursor-not-allowed",
+            "[&::-webkit-slider-runnable-track]:h-1.5 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-transparent",
+            "[&::-webkit-slider-thumb]:mt-[-5px] [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-sky-500 [&::-webkit-slider-thumb]:shadow-[0_1px_3px_rgba(15,23,42,0.18)]",
+            "[&::-moz-range-track]:h-1.5 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-transparent [&::-moz-range-progress]:bg-transparent",
+            "[&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-sky-500 [&::-moz-range-thumb]:shadow-[0_1px_3px_rgba(15,23,42,0.18)]",
+          )}
+          onPointerDown={beginContinuousInput}
+          onKeyDown={(event) => {
+            if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) beginContinuousInput();
+          }}
+          onChange={(event) => onChange(Number(event.target.value), false)}
+          onPointerUp={endContinuousInput}
+          onBlur={endContinuousInput}
+        />
+      </div>
+    </div>
+  );
+}
+
 function ColorField({
   label,
   value,
@@ -6257,7 +7128,7 @@ function BadgeLike({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function SketchEditorCanvas({
+export const SketchEditorCanvas = React.forwardRef<SketchEditorCanvasHandle, SketchEditorCanvasProps>(function SketchEditorCanvas({
   scene,
   controller,
   configData = {},
@@ -6265,7 +7136,7 @@ export function SketchEditorCanvas({
   fillContainer = false,
   mode = "edit",
   className,
-}: SketchEditorCanvasProps) {
+}: SketchEditorCanvasProps, ref) {
   const [dragStart, setDragStart] = React.useState<DragState | null>(null);
   const [marquee, setMarquee] = React.useState<MarqueeState | null>(null);
   const [viewport, setViewport] = React.useState<SketchCanvasViewport>({ scale: 1, offsetX: 24, offsetY: 24 });
@@ -6273,6 +7144,7 @@ export function SketchEditorCanvas({
   const [drawingDraft, setDrawingDraft] = React.useState<DrawingDraftState | null>(null);
   const [inlineTextEdit, setInlineTextEdit] = React.useState<InlineTextEditState | null>(null);
   const [imageFitEditNodeId, setImageFitEditNodeId] = React.useState<string | null>(null);
+  const [imageCropEditState, setImageCropEditState] = React.useState<ImageCropEditState | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = React.useState<string | null>(null);
   const [focusedGroupId, setFocusedGroupId] = React.useState<string | null>(null);
   const [contextMenu, setContextMenu] = React.useState<ContextMenuState | null>(null);
@@ -6293,7 +7165,7 @@ export function SketchEditorCanvas({
   const [commandPaletteOpen, setCommandPaletteOpen] = React.useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = React.useState(false);
   const [detailsPanelOpen, setDetailsPanelOpen] = React.useState(false);
-  const [detailsPanelTab, setDetailsPanelTab] = React.useState<"properties" | "layers" | "fill" | "stroke" | "more" | "position">("properties");
+  const [detailsPanelTab, setDetailsPanelTab] = React.useState<"properties" | "layers" | "fill" | "stroke" | "more" | "imageCrop" | "position">("properties");
   const [alignmentMenuOpen, setAlignmentMenuOpen] = React.useState(false);
   const [alignmentMenuPosition, setAlignmentMenuPosition] = React.useState<{ left: number; top: number } | null>(null);
   const detailsPanelOpenRef = React.useRef(false);
@@ -6307,6 +7179,9 @@ export function SketchEditorCanvas({
   const [clipboardVersion, setClipboardVersion] = React.useState(0);
   const [styleClipboardVersion, setStyleClipboardVersion] = React.useState(0);
   const dragStartRef = React.useRef<DragState | null>(null);
+  const imageCropEditStateRef = React.useRef<ImageCropEditState | null>(null);
+  imageCropEditStateRef.current = imageCropEditState;
+  const detailsStrokeWidthHistoryKeyRef = React.useRef<string | null>(null);
   const marqueeRef = React.useRef<MarqueeState | null>(null);
   const panStartRef = React.useRef<PanState | null>(null);
   const drawingDraftRef = React.useRef<DrawingDraftState | null>(null);
@@ -6315,6 +7190,10 @@ export function SketchEditorCanvas({
   const styleClipboardRef = React.useRef<StyleClipboardState | null>(null);
   const pointerCaptureRef = React.useRef<{ element: HTMLElement; pointerId: number } | null>(null);
   const pendingImageImportRef = React.useRef<PendingImageImportState | null>(null);
+  const imageUploadActionRef = React.useRef<(() => void) | null>(null);
+  const requestImageUploadAction = React.useCallback(() => {
+    imageUploadActionRef.current?.();
+  }, []);
   const focusedGroupIdRef = React.useRef<string | null>(null);
   const lastGroupChildSelectionAtRef = React.useRef<number | null>(null);
   const lastInlineTextPointerDownRef = React.useRef<{
@@ -6382,6 +7261,12 @@ export function SketchEditorCanvas({
     ? scene.nodes.find((node) => node.id === imageFitEditNodeId && node.type === "image" && isNodeVisibleForConfig(node, configData)) ?? null
     : null;
   const imageFitEditBounds = imageFitEditNode ? getSketchNodeBounds(imageFitEditNode) : null;
+  const imageCropEditNode = imageCropEditState
+    ? scene.nodes.find((node) => node.id === imageCropEditState.nodeId && node.type === "image" && isNodeVisibleForConfig(node, configData)) ?? null
+    : null;
+  const imageCropEditContentFrame = imageCropEditNode && imageCropEditState
+    ? getSketchImageCropRenderedFrame(imageCropEditNode, getImageCropForEdit(imageCropEditNode, imageCropEditState))
+    : null;
   const editableSelectedNodes = selectedNodes.filter((node) => !node.locked && !isNodeHiddenByRuntimeConfig(node, configData));
   const layerEditableSelectedNodes = getGroupableSelectedNodes(scene, controller, configData);
   const layerOperationSelectedNodes = getLayerOperationSelectedNodes(scene, controller, configData);
@@ -6408,8 +7293,19 @@ export function SketchEditorCanvas({
         nodes: scene.nodes.map((node) => node.id === inlineTextNode.id ? inlineTextPreviewNode as SketchSceneNode : node),
       }
     : scene;
-  const previewScene = drawingDraft?.node
-    ? { ...inlineTextPreviewScene, nodes: [...inlineTextPreviewScene.nodes, drawingDraft.node] }
+  const previewDrawingNode = drawingDraft?.node
+    ? {
+        ...drawingDraft.node,
+        // Drawing drafts are render-only. Keep them above the current scene
+        // without changing the node that is eventually committed on pointerup.
+        zIndex: inlineTextPreviewScene.nodes.reduce(
+          (max, node) => Math.max(max, typeof node.zIndex === "number" && Number.isFinite(node.zIndex) ? node.zIndex : 0),
+          -1,
+        ) + 1,
+      }
+    : null;
+  const previewScene = previewDrawingNode
+    ? { ...inlineTextPreviewScene, nodes: [...inlineTextPreviewScene.nodes, previewDrawingNode] }
     : inlineTextPreviewScene;
   const connectorCandidatePoints = getConnectorCandidatePoints(scene, dragStart, configData);
   const snapGuides = getSketchSnapGuides(scene, dragStart, configData);
@@ -6720,6 +7616,7 @@ export function SketchEditorCanvas({
     pasteStyle,
     fitPageToViewport,
     zoomToSelection,
+    onImageUpload: requestImageUploadAction,
   }), [
     canGroupSelection,
     canUngroupSelection,
@@ -6735,6 +7632,7 @@ export function SketchEditorCanvas({
     lockableSelectedNodes,
     pasteClipboard,
     pasteStyle,
+    requestImageUploadAction,
     scene,
     selectedNodes,
     styleClipboardVersion,
@@ -6796,7 +7694,8 @@ export function SketchEditorCanvas({
       !selectedNodes.length ||
       dragStart ||
       marquee ||
-      drawingDraft
+      drawingDraft ||
+      imageCropEditState
     ) return null;
     const scaleX = width / scene.pageSize.width;
     const scaleY = height / scene.pageSize.height;
@@ -6814,6 +7713,7 @@ export function SketchEditorCanvas({
     controller.tool,
     dragStart,
     drawingDraft,
+    imageCropEditState,
     height,
     inlineTextEdit,
     marquee,
@@ -6832,6 +7732,15 @@ export function SketchEditorCanvas({
     activateSketchKeyboardScope(controller);
     action();
   }, [controller]);
+
+  const beginDetailsContinuousHistory = React.useCallback((key: string) => {
+    if (detailsStrokeWidthHistoryKeyRef.current === key) return;
+    controller.recordHistoryCheckpoint(scene);
+    detailsStrokeWidthHistoryKeyRef.current = key;
+  }, [controller, scene]);
+  const endDetailsContinuousHistory = React.useCallback(() => {
+    detailsStrokeWidthHistoryKeyRef.current = null;
+  }, []);
 
   const handleFloatingToolbarWidthChange = React.useCallback((nextWidth: number) => {
     if (!Number.isFinite(nextWidth) || nextWidth <= 0) return;
@@ -6870,7 +7779,7 @@ export function SketchEditorCanvas({
   }, []);
 
   const openDetailsBubble = React.useCallback((
-    tab: "properties" | "layers" | "fill" | "stroke" | "more" | "position",
+    tab: "properties" | "layers" | "fill" | "stroke" | "more" | "imageCrop" | "position",
     trigger?: HTMLElement | null,
   ) => {
     setShortcutHelpOpen(false);
@@ -6888,6 +7797,101 @@ export function SketchEditorCanvas({
     setDetailsPanelSize(null);
     setDetailsPanelOpen(true);
   }, [closeAlignmentMenu, getDetailsPanelAnchorX]);
+
+  const exitImageCropMode = React.useCallback(() => {
+    imageCropEditStateRef.current = null;
+    setImageCropEditState(null);
+    setDetailsPanelOpen(false);
+    detailsPanelOpenRef.current = false;
+    closeAlignmentMenu();
+  }, [closeAlignmentMenu]);
+
+  const resetImageCrop = React.useCallback((nodeId?: string) => {
+    const targetId = nodeId ?? imageCropEditStateRef.current?.nodeId ?? selectedNode?.id;
+    const node = targetId ? scene.nodes.find((candidate) => candidate.id === targetId) : null;
+    const crop = node?.type === "image" ? node.imageCrop : undefined;
+    if (!node || node.type !== "image" || !crop || !canEditNodeProperties(node)) {
+      exitImageCropMode();
+      return;
+    }
+    controller.applyOperations([{
+      op: "update",
+      nodeId: node.id,
+      patch: {
+        x: crop.originalFrame.x,
+        y: crop.originalFrame.y,
+        width: crop.originalFrame.width,
+        height: crop.originalFrame.height,
+        style: { ...node.style, imageFit: crop.originalImageFit },
+        imageCrop: undefined,
+      },
+    }]);
+    exitImageCropMode();
+  }, [controller, exitImageCropMode, scene.nodes, selectedNode?.id]);
+
+  const enterImageCropMode = React.useCallback((nodeId: string, shape: SketchImageCrop["shape"]) => {
+    const node = scene.nodes.find((candidate) => candidate.id === nodeId);
+    if (!node || node.type !== "image" || node.locked || !canEditNodeProperties(node) || !isNodeVisibleForConfig(node, configData)) return;
+    const currentFrame = getImageNodeFrame(node);
+    const currentCrop = node.imageCrop;
+    const originalFrame = currentCrop?.originalFrame ?? currentFrame;
+    const originalImageFit = currentCrop?.originalImageFit ?? node.style?.imageFit ?? "contain";
+    const nextFrame = currentFrame;
+    const nextCrop: SketchImageCrop = {
+      shape,
+      sourceRect: currentCrop
+        ? getSourceRectForFrame(currentCrop.sourceRect, currentFrame, nextFrame)
+        : getSourceRectForFrame({ x: 0, y: 0, width: 1, height: 1 }, currentFrame, nextFrame),
+      originalFrame,
+      originalImageFit,
+    };
+    const shouldCommitCrop = Boolean(currentCrop) || shape === "circle";
+    let initialScene = scene;
+    if (shouldCommitCrop) {
+      const nextScene = applySketchScenePatchOperations(scene, [{
+        op: "update",
+        nodeId: node.id,
+        patch: { ...nextFrame, imageCrop: nextCrop },
+      }]);
+      if (nextScene !== scene) {
+        controller.commitScene(nextScene);
+        initialScene = nextScene;
+      }
+    }
+    activateSketchKeyboardScope(controller);
+    controller.setNodeIds([node.id]);
+    setImageFitEditNodeId(null);
+    setDetailsPanelOpen(false);
+    detailsPanelOpenRef.current = false;
+    closeAlignmentMenu();
+    const nextState: ImageCropEditState = {
+      nodeId: node.id,
+      shape,
+      originalFrame,
+      originalImageFit,
+      initialScene,
+      hasHistoryCheckpoint: false,
+    };
+    imageCropEditStateRef.current = nextState;
+    setImageCropEditState(nextState);
+  }, [closeAlignmentMenu, configData, controller, scene]);
+
+  React.useEffect(() => {
+    if (!imageCropEditState) return undefined;
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest("[data-sketch-image-crop-overlay], [data-sketch-details-panel], [data-sketch-floating-toolbar], [data-sketch-text-toolbar]")) return;
+      const cropNode = scene.nodes.find((node) => node.id === imageCropEditState.nodeId && node.type === "image");
+      if (cropNode && stageRef.current?.contains(target)) {
+        const point = getClientScenePoint(event.clientX, event.clientY, stageRef.current, scene);
+        if (point && isPointInsideImageCropInteraction(point, cropNode, imageCropEditState)) return;
+      }
+      exitImageCropMode();
+    };
+    document.addEventListener("pointerdown", handleOutsidePointerDown, true);
+    return () => document.removeEventListener("pointerdown", handleOutsidePointerDown, true);
+  }, [exitImageCropMode, imageCropEditState, scene]);
 
   const textToolbarNode = selectedNodes.length === 1 && selectedNode && (
     selectedNode.type === "text" ||
@@ -6999,6 +8003,29 @@ export function SketchEditorCanvas({
     const openMore = (trigger?: HTMLElement | null) => openDetailsBubble("more", trigger);
     if (selectedNodes.length === 1 && selectedNode && selectedNode.type !== "group") {
       const actions: SketchFloatingToolbarAction[] = [];
+      if (selectedNode.type === "image") {
+        actions.push(
+          {
+            id: "replaceImage",
+            label: "更换图片",
+            icon: <ImageIcon className="h-3.5 w-3.5" />,
+            disabled: !canEditNodeProperties(selectedNode),
+            onClick: () => runQuickToolbarAction(() => {
+              pendingImageImportRef.current = { replaceNodeId: selectedNode.id };
+              imageFileInputRef.current?.click();
+            }),
+          },
+          {
+            id: "cropImage",
+            label: "裁剪图片",
+            icon: <Scissors className="h-3.5 w-3.5" />,
+            ariaHasPopup: "menu",
+            ariaExpanded: detailsPanelOpen && detailsPanelTab === "imageCrop",
+            disabled: !canEditNodeProperties(selectedNode),
+            onClick: (event) => runQuickToolbarAction(() => openDetailsBubble("imageCrop", event.currentTarget)),
+          },
+        );
+      }
       if (supportsFillStyle(selectedNode)) {
         actions.push({
           id: "fill",
@@ -7017,6 +8044,7 @@ export function SketchEditorCanvas({
           label: "描边",
           title: "编辑描边",
           icon: <Square className="h-3.5 w-3.5" />,
+          separatorBefore: selectedNode.type === "image",
           swatchColor: isSketchNoColor(selectedNode.style?.stroke) ? "transparent" : toColorInputValue(selectedNode.style?.stroke, "#111827"),
           swatchKind: "stroke",
           disabled: !canEditNodeProperties(selectedNode),
@@ -7026,7 +8054,7 @@ export function SketchEditorCanvas({
       actions.push(
         {
           id: "layerOrder",
-          label: "层级",
+          label: selectedNode.type === "image" ? "图层" : "层级",
           icon: <Layers className="h-3.5 w-3.5" />,
           disabled: !canEditNodeProperties(selectedNode),
           onClick: (event) => runQuickToolbarAction(() => openDetailsBubble("layers", event.currentTarget)),
@@ -7120,6 +8148,9 @@ export function SketchEditorCanvas({
     canUngroupSelection,
     configData,
     controller,
+    detailsPanelOpen,
+    detailsPanelTab,
+    enterImageCropMode,
     layerEditableSelectedNodes.length,
     layerOperationSelectedNodes.length,
     openAlignmentMenu,
@@ -7139,6 +8170,7 @@ export function SketchEditorCanvas({
     detailsStyleNodes,
     detailsPanelTab === "fill" ? "fill" : "stroke",
   );
+  const detailsStrokeWidthState = getMixedStyleValue(detailsStyleNodes, "strokeWidth");
   const detailsStyleLabel = detailsPanelTab === "fill"
     ? selectionToolbarContext.grouped || selectedNodes.length > 1 ? "颜色" : "填充"
     : selectionToolbarContext.grouped || selectedNodes.length > 1 ? "边框" : "描边";
@@ -7148,12 +8180,14 @@ export function SketchEditorCanvas({
       ? 360
       : detailsPanelTab === "fill" || detailsPanelTab === "stroke"
         ? 236
-        : detailsPanelTab === "more"
+      : detailsPanelTab === "more"
           ? 204
           : detailsPanelTab === "layers"
             ? 184
+            : detailsPanelTab === "imageCrop"
+              ? 176
             : 320;
-    const fallbackHeight = detailsPanelTab === "more" ? 268 : detailsPanelTab === "fill" || detailsPanelTab === "stroke" ? 210 : detailsPanelTab === "layers" ? 180 : 96;
+    const fallbackHeight = detailsPanelTab === "more" ? 268 : detailsPanelTab === "fill" || detailsPanelTab === "stroke" ? 210 : detailsPanelTab === "layers" ? 180 : detailsPanelTab === "imageCrop" ? 132 : 96;
     const bubbleWidth = detailsPanelSize?.width ?? fallbackWidth;
     const bubbleHeight = detailsPanelSize?.height ?? fallbackHeight;
     const containerWidth = canvasContainerWidth ?? (containerRef.current?.clientWidth || width);
@@ -7201,19 +8235,19 @@ export function SketchEditorCanvas({
 
   const importImageFile = React.useCallback(
     async (file: File, intent: PendingImageImportState) => {
-      const src = await readImageFileAsDataUrl(file);
-      if (!src) return;
+      const source = await readDecodedImageSource(file);
+      if (!source) return;
       if (intent.replaceNodeId) {
         const target = scene.nodes.find((node) => node.id === intent.replaceNodeId);
         if (!target || target.type !== "image" || !canEditNodeProperties(target) || !isNodeVisibleForConfig(target, configData)) return;
         controller.applyOperations([
-          { op: "update", nodeId: target.id, patch: { src, alt: file.name || target.alt || "导入图片" } },
+          { op: "update", nodeId: target.id, patch: getImageReplacementPatch(target, source, file.name) },
         ]);
         controller.setNodeIds([target.id]);
         return;
       }
       const point = intent.point ?? getViewportCenterScenePoint();
-      const node = createImportedImageNode(file, src, point);
+      const node = createImportedImageNode(file, source, point);
       controller.applyOperations([{ op: "add", node }]);
       controller.setNodeIds([node.id]);
       controller.setTool("select");
@@ -7225,6 +8259,14 @@ export function SketchEditorCanvas({
     pendingImageImportRef.current = intent;
     imageFileInputRef.current?.click();
   }, []);
+
+  const openImageFilePicker = React.useCallback(() => {
+    if (mode !== "edit") return;
+    requestImageFileImport({ point: getViewportCenterScenePoint() });
+  }, [getViewportCenterScenePoint, mode, requestImageFileImport]);
+
+  imageUploadActionRef.current = openImageFilePicker;
+  React.useImperativeHandle(ref, () => ({ openImageFilePicker }), [openImageFilePicker]);
 
   const getImageReplaceTargetId = React.useCallback(
     (target: Element | null, point?: { x: number; y: number }): string | null => {
@@ -7269,6 +8311,7 @@ export function SketchEditorCanvas({
     const stage = stageRef.current;
     if (!stage) return undefined;
       const startEditFromNativeEvent = (event: MouseEvent, suppressFollowingNativeDoubleClick = false) => {
+        if (imageCropEditStateRef.current) return;
         const target = event.target;
         if (!(target instanceof Element)) return;
         if (enterFocusedGroupFromEvent(target, event.clientX, event.clientY)) {
@@ -7301,6 +8344,7 @@ export function SketchEditorCanvas({
       }
     };
     const onNativePointerDown = (event: PointerEvent) => {
+      if (imageCropEditStateRef.current) return;
       if (event.button !== 0 && typeof event.button === "number") {
         lastInlineTextPointerDownRef.current = null;
         pendingInlineTextDoublePointerRef.current = null;
@@ -7404,11 +8448,16 @@ export function SketchEditorCanvas({
   const getEraseTargetNodeId = React.useCallback(
     (point: { x: number; y: number }, target?: Element): string | null => {
       const targetNodeId = target ? getSketchTargetNodeId(target) : null;
-      const nodeId = targetNodeId ?? hitTestSketchScene(scene, point, configData)?.id ?? null;
-      if (!nodeId) return null;
-      const node = scene.nodes.find((item) => item.id === nodeId);
-      if (!node || node.locked || node.visible === false || !isNodeVisibleForConfig(node, configData)) return null;
-      return node.id;
+      const candidateNodeIds = Array.from(new Set([
+        ...(targetNodeId ? [targetNodeId] : []),
+        ...getHitTestCandidateNodeIds(scene, point, configData),
+      ]));
+      for (const nodeId of candidateNodeIds) {
+        const node = scene.nodes.find((item) => item.id === nodeId);
+        if (!node || node.type !== "path" || node.locked || node.visible === false || !isNodeVisibleForConfig(node, configData)) continue;
+        return node.id;
+      }
+      return null;
     },
     [configData, scene],
   );
@@ -7469,6 +8518,8 @@ export function SketchEditorCanvas({
           setCommandPaletteOpen(false);
         } else if (shortcutHelpOpen) {
           setShortcutHelpOpen(false);
+        } else if (imageCropEditStateRef.current) {
+          exitImageCropMode();
         } else if (alignmentMenuOpen) {
           closeAlignmentMenu();
         } else if (detailsPanelOpen) {
@@ -7615,11 +8666,12 @@ export function SketchEditorCanvas({
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
     };
-  }, [actionEntries, cancelInlineTextEdit, commandPaletteOpen, configData, controller, detailsPanelOpen, inlineTextEdit, mode, scene, selectedNodes, setActiveDrawingDraft, shortcutHelpOpen]);
+  }, [actionEntries, cancelInlineTextEdit, closeAlignmentMenu, commandPaletteOpen, configData, controller, detailsPanelOpen, exitImageCropMode, inlineTextEdit, mode, scene, selectedNodes, setActiveDrawingDraft, shortcutHelpOpen]);
 
   return (
     <div
       ref={containerRef}
+      data-sketch-escape-scope={commandPaletteOpen || shortcutHelpOpen ? "local" : undefined}
       className={cn(
         "relative min-h-0 flex-1 overflow-hidden bg-[#f8fafc] [background-image:radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:20px_20px]",
         panStartRef.current ? "cursor-grabbing" : isSpacePanning || controller.tool === "hand" ? "cursor-grab" : "cursor-default",
@@ -7683,6 +8735,81 @@ export function SketchEditorCanvas({
       }}
       onPointerMove={(event) => {
         updateHoveredNodeId(getHoverTargetNodeId(event.target as Element, event.clientX, event.clientY));
+        const activeCropState = imageCropEditStateRef.current;
+        if (activeCropState?.activeHandle && activeCropState.pointer) {
+          event.preventDefault();
+          const point = getPointerScenePoint(event, stageRef.current, scene);
+          const node = scene.nodes.find((candidate) => candidate.id === activeCropState.nodeId && candidate.type === "image");
+          if (!point || !node) return;
+          const previousPointer = activeCropState.currentPointer ?? activeCropState.pointer;
+          const nextNode = applyImageCropFrame(
+            node,
+            activeCropState,
+            activeCropState.activeHandle,
+            { x: point.x - previousPointer.x, y: point.y - previousPointer.y },
+          );
+          const nextStateWithPointer = { ...activeCropState, currentPointer: point };
+          imageCropEditStateRef.current = nextStateWithPointer;
+          setImageCropEditState(nextStateWithPointer);
+          if (
+            nextNode.x === node.x &&
+            nextNode.y === node.y &&
+            nextNode.width === node.width &&
+            nextNode.height === node.height &&
+            JSON.stringify(nextNode.imageCrop) === JSON.stringify(node.imageCrop)
+          ) return;
+          const nextScene = applySketchScenePatchOperations(scene, [{
+            op: "update",
+            nodeId: node.id,
+            patch: {
+              x: nextNode.x,
+              y: nextNode.y,
+              width: nextNode.width,
+              height: nextNode.height,
+              imageCrop: nextNode.imageCrop,
+            },
+          }]);
+          if (nextScene === scene) return;
+          if (!activeCropState.hasHistoryCheckpoint) {
+            controller.recordHistoryCheckpoint(activeCropState.initialScene);
+            const nextState = { ...nextStateWithPointer, hasHistoryCheckpoint: true };
+            imageCropEditStateRef.current = nextState;
+            setImageCropEditState(nextState);
+          }
+          controller.commitScene(nextScene, false);
+          return;
+        }
+        if (activeCropState?.activeGesture === "pan" && activeCropState.pointer) {
+          event.preventDefault();
+          const point = getPointerScenePoint(event, stageRef.current, scene);
+          const node = scene.nodes.find((candidate) => candidate.id === activeCropState.nodeId && candidate.type === "image");
+          if (!point || !node) return;
+          const previousPointer = activeCropState.currentPointer ?? activeCropState.pointer;
+          const nextNode = getImageCropNodeForContentDelta(
+            node,
+            activeCropState,
+            { x: point.x - previousPointer.x, y: point.y - previousPointer.y },
+          );
+          const nextStateWithPointer = { ...activeCropState, currentPointer: point };
+          imageCropEditStateRef.current = nextStateWithPointer;
+          setImageCropEditState(nextStateWithPointer);
+          if (JSON.stringify(nextNode.imageCrop) === JSON.stringify(node.imageCrop)) return;
+          const nextScene = applySketchScenePatchOperations(scene, [{
+            op: "update",
+            nodeId: node.id,
+            patch: { imageCrop: nextNode.imageCrop },
+          }]);
+          if (nextScene === scene) return;
+          if (!activeCropState.hasHistoryCheckpoint) {
+            controller.recordHistoryCheckpoint(activeCropState.initialScene);
+            const nextState = { ...nextStateWithPointer, hasHistoryCheckpoint: true };
+            imageCropEditStateRef.current = nextState;
+            setImageCropEditState(nextState);
+          }
+          controller.commitScene(nextScene, false);
+          return;
+        }
+        if (activeCropState) return;
         const activePanStart = panStartRef.current;
         if (activePanStart) {
           event.preventDefault();
@@ -7719,6 +8846,7 @@ export function SketchEditorCanvas({
               shiftKey: event.shiftKey,
               points: nextPoints,
               allowClickText: activeDrawingDraft.tool === "text",
+              brushSettings: activeDrawingDraft.brushSettings,
             }),
           });
           return;
@@ -7851,6 +8979,15 @@ export function SketchEditorCanvas({
         controller.commitScene(nextScene, false);
       }}
       onPointerUp={(event) => {
+        const activeCropState = imageCropEditStateRef.current;
+        if (activeCropState?.activeGesture) {
+          const nextState = { ...activeCropState, activeGesture: undefined, activeHandle: undefined, pointer: undefined, currentPointer: undefined };
+          imageCropEditStateRef.current = nextState;
+          setImageCropEditState(nextState);
+          releasePointerCapture();
+          return;
+        }
+        if (activeCropState) return;
         const activeDragState = dragStartRef.current;
         if (
           activeDragState?.kind === "resize" &&
@@ -7896,16 +9033,19 @@ export function SketchEditorCanvas({
               shiftKey: event.shiftKey,
               points: activeDrawingDraft.points,
               allowClickText: activeDrawingDraft.tool === "text",
+              brushSettings: activeDrawingDraft.brushSettings,
             });
           if (node) {
             controller.applyOperations([{ op: "add", node }]);
-            controller.setNodeIds([node.id]);
-            controller.setTool("select");
+            if (activeDrawingDraft.tool === "pencil") {
+              controller.clearSelection();
+            } else {
+              controller.setNodeIds([node.id]);
+              controller.setTool("select");
+            }
             if (node.type === "text") {
               setInlineTextEdit(createInlineTextEditState(node, true));
             }
-          } else if (activeDrawingDraft.tool === "image") {
-            requestImageFileImport({ point: finalPoint });
           }
         }
         const activeEraseState = eraseStateRef.current;
@@ -7933,6 +9073,13 @@ export function SketchEditorCanvas({
         setActiveMarquee(null);
       }}
       onPointerCancel={() => {
+        const activeCropState = imageCropEditStateRef.current;
+        if (activeCropState) {
+          imageCropEditStateRef.current = { ...activeCropState, activeGesture: undefined, activeHandle: undefined, pointer: undefined, currentPointer: undefined };
+          setImageCropEditState(imageCropEditStateRef.current);
+          releasePointerCapture();
+          return;
+        }
         releasePointerCapture();
         panStartRef.current = null;
         eraseStateRef.current = null;
@@ -8041,6 +9188,8 @@ export function SketchEditorCanvas({
                 ? "w-[min(304px,calc(100%-24px))]"
                 : detailsPanelTab === "more" || detailsPanelTab === "layers"
                   ? "w-max max-w-[calc(100%-24px)]"
+                  : detailsPanelTab === "imageCrop"
+                    ? "w-[min(220px,calc(100%-24px))]"
                   : "w-[min(320px,calc(100%-24px))]",
           )}
           style={detailsBubblePosition}
@@ -8055,7 +9204,34 @@ export function SketchEditorCanvas({
             items[nextIndex]?.focus();
           }}
         >
-          {detailsPanelTab === "more" ? (
+          {detailsPanelTab === "imageCrop" ? (
+            <div role="menu" aria-label="裁剪图片">
+              <FloatingMenuItem
+                icon={<Square className="h-4 w-4" />}
+                label="矩形裁剪"
+                autoFocus
+                disabled={!selectedNode || selectedNode.type !== "image" || !canEditNodeProperties(selectedNode)}
+                onClick={() => {
+                  if (selectedNode?.type === "image") enterImageCropMode(selectedNode.id, "rect");
+                }}
+              />
+              <FloatingMenuItem
+                icon={<Circle className="h-4 w-4" />}
+                label="圆形裁剪"
+                disabled={!selectedNode || selectedNode.type !== "image" || !canEditNodeProperties(selectedNode)}
+                onClick={() => {
+                  if (selectedNode?.type === "image") enterImageCropMode(selectedNode.id, "circle");
+                }}
+              />
+              <FloatingMenuSeparator />
+              <FloatingMenuItem
+                icon={<RotateCcw className="h-4 w-4" />}
+                label="重置"
+                disabled={!selectedNode?.imageCrop}
+                onClick={() => resetImageCrop(selectedNode?.id)}
+              />
+            </div>
+          ) : detailsPanelTab === "more" ? (
             <div role="menu" aria-label="更多操作">
               <FloatingMenuItem icon={<Trash2 className="h-4 w-4" />} label="删除" shortcut="Delete" disabled={!editableSelectedNodes.length} autoFocus onClick={() => { deleteSelected(scene, controller, configData); setDetailsPanelOpen(false); }} />
               <FloatingMenuSeparator />
@@ -8082,7 +9258,18 @@ export function SketchEditorCanvas({
               <FloatingMenuItem icon={<ArrowDownToLine className="h-4 w-4" />} label="置底" shortcut="⌘⇧ [" disabled={!layerOperationSelectedNodes.length} onClick={() => { sendToBack(scene, controller, configData); setDetailsPanelOpen(false); }} />
             </div>
           ) : detailsPanelTab === "fill" || detailsPanelTab === "stroke" ? (
-            <div role="menu" aria-label={detailsStyleLabel} className="p-1">
+            <div role="menu" aria-label={detailsStyleLabel} className="grid gap-2 p-1">
+              {detailsPanelTab === "stroke" ? (
+                <StrokeWidthSlider
+                  value={typeof detailsStrokeWidthState.value === "number" ? detailsStrokeWidthState.value : 1}
+                  mixed={detailsStrokeWidthState.mixed}
+                  disabled={!detailsStyleNodes.length}
+                  continuousHistoryKey="floating-stroke-width"
+                  onContinuousStart={beginDetailsContinuousHistory}
+                  onContinuousEnd={endDetailsContinuousHistory}
+                  onChange={(value, recordHistory = true) => updateNodesStyle(controller, detailsStyleNodes, { strokeWidth: value }, recordHistory)}
+                />
+              ) : null}
               <SketchColorPicker
                 label={detailsStyleLabel}
                 value={getSketchColorFieldValue(
@@ -8161,7 +9348,10 @@ export function SketchEditorCanvas({
       <div
         ref={stageRef}
         data-sketch-stage
-        className="absolute left-0 top-0 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.16)] ring-1 ring-slate-200"
+        className={cn(
+          "absolute left-0 top-0 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.16)] ring-1 ring-slate-200",
+          imageCropEditNode && (imageCropEditState?.activeGesture === "pan" ? "cursor-grabbing" : "cursor-grab"),
+        )}
         style={{
           // Keep the stage in scene coordinates; fillContainer only affects its preview wrapper.
           width,
@@ -8169,11 +9359,34 @@ export function SketchEditorCanvas({
           transform: `translate(${viewport.offsetX}px, ${viewport.offsetY}px) scale(${viewport.scale})`,
           transformOrigin: "0 0",
         }}
-        onPointerDown={(event) => {
-          setContextMenu(null);
-          if (mode !== "edit") return;
+      onPointerDown={(event) => {
+        setContextMenu(null);
+        if (mode !== "edit") return;
           activateSketchKeyboardScope(controller);
           updateHoveredNodeId(null);
+          const activeCropState = imageCropEditStateRef.current;
+          if (activeCropState) {
+            event.preventDefault();
+            const point = getPointerScenePoint(event, stageRef.current, scene);
+            const cropNode = scene.nodes.find((node) => node.id === activeCropState.nodeId && node.type === "image");
+            if (!point || !cropNode || !isPointInsideImageCropInteraction(point, cropNode, activeCropState)) {
+              exitImageCropMode();
+              return;
+            }
+            if (typeof event.button === "number" && event.button !== 0) return;
+            capturePointer(event);
+            const nextState = {
+              ...activeCropState,
+              activeGesture: "pan" as const,
+              pointer: point,
+              currentPointer: point,
+              initialScene: scene,
+              hasHistoryCheckpoint: false,
+            };
+            imageCropEditStateRef.current = nextState;
+            setImageCropEditState(nextState);
+            return;
+          }
           setImageFitEditNodeId(null);
           if (typeof event.button === "number" && event.button !== 0) {
             event.preventDefault();
@@ -8191,6 +9404,11 @@ export function SketchEditorCanvas({
             eraseStateRef.current = { nodeIds: new Set(nodeId ? [nodeId] : []) };
             return;
           }
+          if (controller.tool === "image") {
+            event.preventDefault();
+            openImageFilePicker();
+            return;
+          }
           if (controller.tool !== "select") {
             const point = getPointerScenePoint(event, stageRef.current, scene);
             if (!point) return;
@@ -8202,6 +9420,7 @@ export function SketchEditorCanvas({
               start,
               current: start,
               points: [start],
+              brushSettings: controller.tool === "pencil" ? controller.brushSettings : undefined,
               node: controller.tool === "text"
                 ? createDrawingNode(controller.tool, start, start, scene, { allowClickText: true })
                 : null,
@@ -8300,19 +9519,52 @@ export function SketchEditorCanvas({
       >
         <SketchPagePreview
           scene={previewScene}
+          imageCropEditingNodeId={imageCropEditNode?.id}
           configData={configData}
           previewSize={{ width, height }}
           fillContainer={fillContainer}
         />
-        <SelectionOverlay
+        {imageCropEditNode && imageCropEditState ? (
+          <ImageCropOverlay
+            node={imageCropEditNode}
+            imageContentFrame={imageCropEditContentFrame ?? imageCropEditState.originalFrame}
+            shape={imageCropEditState.shape}
+            stageWidth={width}
+            stageHeight={height}
+            scaleX={width / scene.pageSize.width}
+            scaleY={height / scene.pageSize.height}
+            viewportScale={viewport.scale}
+            onResizePointerDown={(event, handle) => {
+              event.preventDefault();
+              event.stopPropagation();
+              if (handle === "line-start" || handle === "line-end") return;
+              const point = getPointerScenePoint(event, stageRef.current, scene);
+              const currentState = imageCropEditStateRef.current;
+              if (!point || !currentState) return;
+              const nextState = {
+                ...currentState,
+                activeGesture: "resize" as const,
+                activeHandle: handle,
+                pointer: point,
+                currentPointer: point,
+                initialScene: scene,
+                hasHistoryCheckpoint: false,
+              };
+              imageCropEditStateRef.current = nextState;
+              setImageCropEditState(nextState);
+              capturePointer(event);
+            }}
+          />
+        ) : null}
+        {!imageCropEditNode ? <SelectionOverlay
           bounds={hoverSelectionBounds}
           scaleX={width / scene.pageSize.width}
           scaleY={height / scene.pageSize.height}
           minimumSize={8}
           variant="hover"
           testId="sketch-hover-highlight"
-        />
-        <SelectionOverlay
+        /> : null}
+        {!imageCropEditNode ? <SelectionOverlay
           bounds={canResizeSelection ? resizeSelectionBounds : canvasSelectionBounds}
           scaleX={width / scene.pageSize.width}
           scaleY={height / scene.pageSize.height}
@@ -8367,15 +9619,15 @@ export function SketchEditorCanvas({
                 }
               : undefined
           }
-        />
-        <SelectionOverlay
+        /> : null}
+        {!imageCropEditNode ? <SelectionOverlay
           bounds={marquee ? boundsFromPoints(marquee.start, marquee.current) : null}
           scaleX={width / scene.pageSize.width}
           scaleY={height / scene.pageSize.height}
           variant="marquee"
           testId="sketch-marquee-box"
-        />
-        {snapGuides.map((guide) => (
+        /> : null}
+        {!imageCropEditNode ? snapGuides.map((guide) => (
           <span
             key={guide.id}
             data-testid="sketch-snap-guide"
@@ -8403,8 +9655,8 @@ export function SketchEditorCanvas({
                   }
             }
           />
-        ))}
-        {connectorCandidatePoints.map((point) => (
+        )) : null}
+        {!imageCropEditNode ? connectorCandidatePoints.map((point) => (
           <span
             key={point.id}
             data-testid="sketch-connector-candidate-point"
@@ -8419,8 +9671,8 @@ export function SketchEditorCanvas({
               top: point.y * (height / scene.pageSize.height),
             }}
           />
-        ))}
-        {dragModifierHint ? (
+        )) : null}
+        {!imageCropEditNode && dragModifierHint ? (
           <span
             data-testid="sketch-drag-modifier-hint"
             className="pointer-events-none absolute bottom-3 left-3 z-20 rounded-md border border-border bg-card/95 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-xl"
@@ -8428,7 +9680,7 @@ export function SketchEditorCanvas({
             {dragModifierHint}
           </span>
         ) : null}
-        {imageFitEditNode && imageFitEditBounds ? (
+        {!imageCropEditNode && imageFitEditNode && imageFitEditBounds ? (
           <div
             role="toolbar"
             aria-label="图片裁剪适配编辑"
@@ -8668,7 +9920,7 @@ export function SketchEditorCanvas({
       ) : null}
     </div>
   );
-}
+});
 
 type SketchTextToolbarMenu = "size" | "color" | "align" | null;
 
@@ -9397,12 +10649,22 @@ export function SketchPageEditor({
   onSceneChange,
   onSelectionChange,
 }: SketchPageEditorProps) {
-  const parsedScene = useMemo(() => parseScene(scene), [scene]);
+  const parsedSceneState = useMemo(() => parseScene(scene), [scene]);
+  const parsedScene = parsedSceneState.scene;
   const controller = useSketchEditorState(parsedScene, onSceneChange, onSelectionChange, configData);
+  const canvasRef = React.useRef<SketchEditorCanvasHandle>(null);
+  const openImageFilePicker = React.useCallback(() => {
+    canvasRef.current?.openImageFilePicker();
+  }, []);
+
+  if (parsedSceneState.error) {
+    return <SketchSceneErrorNotice className={className} />;
+  }
 
   return (
     <div className={cn("relative flex h-full min-h-0 flex-col overflow-hidden bg-slate-100", className)}>
       <SketchEditorCanvas
+        ref={canvasRef}
         scene={parsedScene}
         controller={controller}
         configData={configData}
@@ -9412,7 +10674,7 @@ export function SketchPageEditor({
       />
       {mode === "edit" ? (
         <>
-          <SketchEditorToolbar scene={parsedScene} controller={controller} configData={configData} />
+          <SketchEditorToolbar scene={parsedScene} controller={controller} configData={configData} onImageUpload={openImageFilePicker} />
           <div className="max-h-72 min-h-0 border-t border-slate-200 bg-white">
             <SketchPropertyPanel scene={parsedScene} controller={controller} configData={configData} className="h-full" />
           </div>
@@ -9430,25 +10692,54 @@ export function SketchPageEditor({
 export function SketchEditorSurface({
   scene,
   configData = {},
+  profile,
   allowedTools,
+  brushToolbarMode = "individual",
   fillContainer = false,
   className,
   onSceneChange,
   onSelectionChange,
 }: SketchEditorSurfaceProps) {
-  const controller = useSketchEditorState(scene, onSceneChange, onSelectionChange, configData, allowedTools);
+  const profileConfig = resolveSketchEditorProfile(profile);
+  const resolvedVisibleTools = profileConfig?.visibleTools ?? allowedTools;
+  const resolvedCreationTools = profileConfig?.creationTools ?? allowedTools;
+  const resolvedBrushToolbarMode = profileConfig?.brushToolbarMode ?? brushToolbarMode;
+  const parsedSceneState = useMemo(() => parseScene(scene), [scene]);
+  const parsedScene = parsedSceneState.scene;
+  const controller = useSketchEditorState(parsedScene, onSceneChange, onSelectionChange, configData, resolvedCreationTools);
+  const canvasRef = React.useRef<SketchEditorCanvasHandle>(null);
+  const openImageFilePicker = React.useCallback(() => {
+    canvasRef.current?.openImageFilePicker();
+  }, []);
+
+  if (parsedSceneState.error) {
+    return (
+      <div data-sketch-editor-surface className={cn("relative flex h-full min-h-0 flex-col overflow-hidden bg-slate-100", className)}>
+        <SketchSceneErrorNotice className="m-4" />
+      </div>
+    );
+  }
 
   return (
     <div data-sketch-editor-surface className={cn("relative flex h-full min-h-0 flex-col overflow-hidden bg-slate-100", className)}>
       <SketchEditorCanvas
-        scene={scene}
+        ref={canvasRef}
+        scene={parsedScene}
         controller={controller}
         configData={configData}
         fillContainer={fillContainer}
         className="h-full"
       />
       <div className="pointer-events-none absolute inset-x-0 bottom-5 z-20 flex justify-center px-4">
-        <SketchEditorToolbar scene={scene} controller={controller} configData={configData} allowedTools={allowedTools} className="pointer-events-auto" />
+        <SketchEditorToolbar
+          scene={parsedScene}
+          controller={controller}
+          configData={configData}
+          allowedTools={resolvedVisibleTools}
+          brushToolbarMode={resolvedBrushToolbarMode}
+          onImageUpload={openImageFilePicker}
+          className="pointer-events-auto"
+        />
       </div>
     </div>
   );
@@ -9465,8 +10756,20 @@ export type {
   SketchEditorController,
   SketchEditorPartProps,
   SketchEditorCanvasProps,
+  SketchEditorCanvasHandle,
+  SketchBrushSettings,
+  SketchBrushToolbarMode,
+  SketchEditorProfileName,
+  SketchEditorProfileConfig,
   SketchPropertyPanelProps,
   SketchEditorToolbarProps,
   SketchLayerPanelProps,
   InlineTextSelectionState,
+} from "./types";
+
+export {
+  resolveSketchEditorProfile,
+  SKETCH_EDITOR_PROFILES,
+  WHITEBOARD_EDITOR_PROFILE,
+  WHITEBOARD_EDITOR_TOOLS,
 } from "./types";

@@ -79,6 +79,43 @@ function materializeSchemaDefault(schema: JsonRecord | null): unknown {
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
+function hasOwn(value: JsonRecord, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
+/** Hydrate only the ancestor branch needed by a target, leaving unrelated config defaults absent. */
+function hydrateTargetParents(values: JsonRecord, schema: JsonRecord, path: readonly WhiteboardConfigPathSegment[]): boolean {
+  let current: unknown = values;
+  let currentSchema: JsonRecord | null = schema;
+  for (let index = 0; index < path.length - 1; index += 1) {
+    const segment = path[index];
+    if (typeof segment === "string") {
+      const object = record(current);
+      const childSchema = record(record(currentSchema?.properties)?.[segment]);
+      if (!object || !childSchema) return false;
+      if (!hasOwn(object, segment) || object[segment] === undefined) {
+        const fallback = materializeSchemaDefault(childSchema);
+        if (fallback !== undefined) object[segment] = clone(fallback);
+        else if (typeof path[index + 1] === "string" && (childSchema.type === "object" || childSchema.properties)) object[segment] = {};
+        else return false;
+      }
+      current = object[segment];
+      currentSchema = childSchema;
+    } else {
+      const itemSchema = record(currentSchema?.items);
+      if (!Array.isArray(current) || !itemSchema || segment < 0) return false;
+      if (current[segment] === undefined) {
+        const fallback = materializeSchemaDefault(itemSchema);
+        if (fallback === undefined) return false;
+        current[segment] = clone(fallback);
+      }
+      current = current[segment];
+      currentSchema = itemSchema;
+    }
+  }
+  return true;
+}
+
 /** Schema defaults fill absent branches only; persisted values always win. */
 export function mergeConfigWithSchemaDefaults(schema: JsonRecord, persisted: JsonRecord): JsonRecord {
   const merge = (node: JsonRecord | null, value: unknown): unknown => {
@@ -134,22 +171,29 @@ export function updateWhiteboardImageTarget(
   values: JsonRecord,
   target: WhiteboardImageTargetInput,
   assetPath: string,
+  schema?: JsonRecord,
 ): string | null {
   const path = parseWhiteboardConfigPath(target.fieldPath);
   if (!path) return "不支持的图片字段";
+  const targetSchema = schema ? schemaAtPath(schema, path) : null;
+  if (schema && !hydrateTargetParents(values, schema, path)) return "图片字段路径已变化";
   const current = valueAtPath(values, path);
+  const schemaDefault = current === undefined ? materializeSchemaDefault(targetSchema) : undefined;
   if (!target.listItem) {
-    if (current !== undefined && typeof current !== "string") return "图片字段类型已变化";
-    if (target.currentValue !== undefined && current !== target.currentValue) return "图片字段已被其他编辑者替换，请刷新后重试";
+    const currentValue = current === undefined ? schemaDefault : current;
+    if (currentValue !== undefined && typeof currentValue !== "string") return "图片字段类型已变化";
+    if (target.currentValue !== undefined && currentValue !== target.currentValue) return "图片字段已被其他编辑者替换，请刷新后重试";
     return replaceAtPath(values, path, assetPath) ? null : "图片字段路径已变化";
   }
-  if (!Array.isArray(current)) return "图片列表项已变化";
-  const item = current[target.listItem.index];
+  const sourceList = current === undefined ? schemaDefault : current;
+  if (!Array.isArray(sourceList)) return "图片列表项已变化";
+  const item = sourceList[target.listItem.index];
   const itemRecord = record(item);
   const currentUrl = typeof item === "string" ? item : itemRecord?.url;
   if (currentUrl !== target.listItem.url) return "图片列表已被排序、删除或替换，请刷新后重试";
-  current[target.listItem.index] = typeof item === "string"
+  const list: unknown[] = current === undefined ? clone(sourceList) as unknown[] : sourceList;
+  list[target.listItem.index] = typeof item === "string"
     ? assetPath
     : { ...itemRecord, url: assetPath };
-  return null;
+  return replaceAtPath(values, path, list) ? null : "图片字段路径已变化";
 }

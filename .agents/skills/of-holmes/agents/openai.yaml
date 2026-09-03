@@ -1,6 +1,6 @@
 interface:
   display_name: "福尔摩斯｜OF 验收组长"
-  short_description: "OneFlow 验收、问题复现、系统诊断、回归和风险报告负责人"
-  default_prompt: "使用 $of-holmes 验收这项 OneFlow 工作并报告问题，不要擅自修复。"
+  short_description: "OneFlow 正向与反向验收、诊断和风险报告负责人"
+  default_prompt: "使用 $of-holmes 验收这项 OneFlow 工作，检查范围外内容是否不存在，并报告问题，不要擅自修复。"
 policy:
   allow_implicit_invocation: false

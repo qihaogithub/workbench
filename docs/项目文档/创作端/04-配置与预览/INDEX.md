@@ -1,6 +1,6 @@
 # 配置与预览模块 - 索引
 
-> 更新日期：2026-09-02
+> 更新日期：2026-09-03
 
 ## 文档列表
 
@@ -31,7 +31,7 @@
 | [11_HTML导入与隔离运行时.md](./技术/11_HTML导入与隔离运行时.md)        | capability registry、presentation 统一真值、私有 draft 和 prepare/commit/cancel、Authority 原子提交、独立 origin 与短时 ticket、受控 iframe、截图指纹、发布/嵌入与脱敏诊断                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | [12_HTML资源Bundle与本地化.md](./技术/12_HTML资源Bundle与本地化.md)    | ZIP/文件夹 bundle 安全门禁、相对资源重写、远程静态资源的显式授权本地化、内容寻址生命周期与外部 JavaScript 边界                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | [13\_画布Section分区实现设计.md](./技术/13_画布Section分区实现设计.md) | 已实施的画布 Section：完整包裹自动收纳与越界释放、容器携带成员树整体移动、单色与填充透明度样式气泡框、页面与自由节点及 Alt/Option 复制、嵌套交互、全局渲染层级、记录级协作重放与验收覆盖                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| [14\_配置图片白板实现设计.md](./技术/14_配置图片白板实现设计.md)       | 图片配置（含嵌套对象数组）的白板入口、默认单图恢复、受限路径 target、`WhiteboardDocument` v2 与 `html-css-v1` bridge、私有草稿、受管 document/binding、PNG 回填与可恢复事务提交                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| [14\_配置图片白板实现设计.md](./技术/14_配置图片白板实现设计.md)       | 图片配置（含嵌套对象数组）的白板入口、默认单图恢复、受限路径 target、`WhiteboardDocument` v3 原生文档与 `html-css-v2` bridge 边界、私有草稿、受管 document/binding、PNG 回填与可恢复事务提交；远程图片逐块读取并限制 10 MiB，DNS 校验后的 IP 固定用于实际连接，AI action 保留 metadata/assets/bindings |
 
 ### 2026-06-21 补充
 

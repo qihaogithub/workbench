@@ -10,6 +10,7 @@ import {
   renderSketchSceneToSvgMarkup,
   resolveSketchSceneBindingValue,
   validateSketchSceneDocument,
+  validateSketchSceneForRender,
   type SketchSceneBounds,
   type SketchSceneDocument,
   type SketchSceneNode,
@@ -33,6 +34,8 @@ export interface SketchPagePreviewProps {
   className?: string;
   selectedNodeId?: string | null;
   selectedNodeIds?: string[];
+  /** Render one cropped image's full source while its crop frame is being edited. */
+  imageCropEditingNodeId?: string | null;
   onNodeSelect?: (node: SketchSceneNode | null) => void;
   onSelectionChange?: (selection: SketchEditorSelection) => void;
 }
@@ -41,11 +44,32 @@ function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs));
 }
 
-function parseScene(scene?: string | SketchSceneDocument | null): SketchSceneDocument {
-  if (!scene) return createDefaultSketchScene();
+interface ParsedSketchScene {
+  scene: SketchSceneDocument;
+  error: string | null;
+}
+
+function emptySceneForError(pageSize: SketchSceneDocument["pageSize"]): SketchSceneDocument {
+  return {
+    version: 1,
+    pageSize,
+    nodes: [],
+    assets: [],
+    bindings: {},
+    metadata: {},
+  };
+}
+
+function parseScene(scene?: string | SketchSceneDocument | null): ParsedSketchScene {
+  if (!scene) return { scene: createDefaultSketchScene(), error: null };
   const parsed = parseSketchSceneDocument(scene);
-  if (!parsed) return createDefaultSketchScene();
-  if (validateSketchSceneDocument(parsed).valid) return parsed;
+  if (!parsed) {
+    return {
+      scene: emptySceneForError(createDefaultSketchScene().pageSize),
+      error: "白板场景无法解析，未渲染任何内容。",
+    };
+  }
+  if (validateSketchSceneDocument(parsed).valid) return { scene: parsed, error: null };
   const pageSize = parsed.pageSize;
   if (
     pageSize &&
@@ -56,9 +80,30 @@ function parseScene(scene?: string | SketchSceneDocument | null): SketchSceneDoc
     Number.isFinite(pageSize.height) &&
     pageSize.height > 0
   ) {
-    return createDefaultSketchScene(pageSize);
+    return {
+      scene: emptySceneForError(pageSize),
+      error: "白板场景校验失败，未渲染任何内容。",
+    };
   }
-  return createDefaultSketchScene();
+  return {
+    scene: emptySceneForError(createDefaultSketchScene().pageSize),
+    error: "白板场景校验失败，未渲染任何内容。",
+  };
+}
+
+function SketchSceneErrorNotice({ className }: { className?: string }) {
+  return (
+    <div
+      role="alert"
+      data-sketch-scene-error
+      className={cn(
+        "flex min-h-24 items-center justify-center border border-amber-200 bg-amber-50 px-4 text-center text-sm text-amber-900",
+        className,
+      )}
+    >
+      白板场景无效，未渲染任何内容，请刷新或修复文档后重试。
+    </div>
+  );
 }
 
 function normalizeSize(previewSize: PreviewSize | undefined, fallback: number, key: "width" | "height"): number {
@@ -167,15 +212,30 @@ export function SketchPagePreview({
   className,
   selectedNodeId,
   selectedNodeIds,
+  imageCropEditingNodeId,
   onNodeSelect,
   onSelectionChange,
 }: SketchPagePreviewProps) {
-  const parsedScene = useMemo(() => parseScene(scene), [scene]);
+  const parsedSceneState = useMemo(() => parseScene(scene), [scene]);
+  const parsedScene = parsedSceneState.scene;
   const width = normalizeSize(previewSize, parsedScene.pageSize.width, "width");
   const height = normalizeSize(previewSize, parsedScene.pageSize.height, "height");
+  const renderError = useMemo(() => {
+    if (parsedSceneState.error) return parsedSceneState.error;
+    return validateSketchSceneForRender(parsedScene, configData).valid
+      ? null
+      : "白板场景无法渲染，未渲染任何内容。";
+  }, [configData, parsedScene, parsedSceneState.error]);
   const svgMarkup = useMemo(
-    () => renderSketchSceneToSvgMarkup(parsedScene, configData),
-    [parsedScene, configData],
+    () => {
+      if (renderError) return "";
+      try {
+        return renderSketchSceneToSvgMarkup(parsedScene, configData, { imageCropEditingNodeId: imageCropEditingNodeId ?? undefined });
+      } catch {
+        return "";
+      }
+    },
+    [configData, imageCropEditingNodeId, parsedScene, renderError],
   );
   const imageNodes = useMemo(() => getResolvedImageNodes(parsedScene, configData), [configData, parsedScene]);
   const imageProbeKey = useMemo(() => imageNodes.map((node) => `${node.id}:${node.src}`).join("|"), [imageNodes]);
@@ -186,6 +246,14 @@ export function SketchPagePreview({
   React.useEffect(() => {
     setFailedImageIds(new Set());
   }, [imageProbeKey]);
+
+  if (renderError) {
+    return (
+      <SketchSceneErrorNotice
+        className={cn(fillContainer ? "h-full w-full" : "", className)}
+      />
+    );
+  }
 
   return (
     <div

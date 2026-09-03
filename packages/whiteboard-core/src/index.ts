@@ -1,15 +1,21 @@
 import {
+  isValidSketchSceneImageCrop,
   validateSketchSceneDocument,
   type SketchSceneDocument,
+  type SketchSceneFrame,
+  type SketchSceneImageCrop,
   type SketchSceneNode,
   type SketchSceneStyle,
 } from "@workbench/sketch-core";
 
-export const WHITEBOARD_DOCUMENT_VERSION = 2 as const;
-export const BRIDGE_PROFILE_VERSION = "html-css-v1" as const;
+export const WHITEBOARD_DOCUMENT_VERSION = 3 as const;
+export const WHITEBOARD_DOCUMENT_V2_VERSION = 2 as const;
+export const WHITEBOARD_DOCUMENT_V3_VERSION = 3 as const;
+export const WHITEBOARD_SCENE_FORMAT = "sketch-scene-v1" as const;
+export const BRIDGE_PROFILE_VERSION = "html-css-v2" as const;
 export const WHITEBOARD_CONTEXT_SCHEMA_VERSION = "whiteboard-context-v1" as const;
 export const WHITEBOARD_PLAN_SCHEMA_VERSION = "whiteboard-plan-v1" as const;
-export const WHITEBOARD_ACTION_SCHEMA_VERSION = "whiteboard-action-v1" as const;
+export const WHITEBOARD_ACTION_SCHEMA_VERSION = "whiteboard-action-v2" as const;
 export const BRIDGE_NODE_TYPES = ["group", "rect", "ellipse", "image", "text", "button"] as const;
 export type BridgeNodeType = (typeof BRIDGE_NODE_TYPES)[number];
 export type SemanticRole = "background" | "subject" | "logo" | "decor" | "title" | "subtitle" | "label";
@@ -21,7 +27,7 @@ export const BRIDGE_STYLE_FIELDS = [
 export interface WhiteboardNodeSemantics { role?: SemanticRole; assetRef?: string }
 export interface WhiteboardEditorView { zoom: number; offsetX: number; offsetY: number }
 export interface WhiteboardSafeArea { x: number; y: number; width: number; height: number }
-export interface WhiteboardDocument {
+export interface WhiteboardDocumentV2 {
   id: string;
   version: 2;
   documentRevision: number;
@@ -31,6 +37,20 @@ export interface WhiteboardDocument {
   editorView: WhiteboardEditorView;
   updatedAt: number;
 }
+
+export interface WhiteboardDocumentV3 {
+  id: string;
+  version: 3;
+  sceneFormat: typeof WHITEBOARD_SCENE_FORMAT;
+  documentRevision: number;
+  scene: SketchSceneDocument;
+  nodeSemantics: Record<string, WhiteboardNodeSemantics>;
+  safeArea?: WhiteboardSafeArea;
+  editorView: WhiteboardEditorView;
+  updatedAt: number;
+}
+
+export type WhiteboardDocument = WhiteboardDocumentV2 | WhiteboardDocumentV3;
 
 export interface WhiteboardContext {
   schemaVersion: typeof WHITEBOARD_CONTEXT_SCHEMA_VERSION;
@@ -107,17 +127,154 @@ const tagKinds: Record<string, BridgeNodeType[]> = {
   div: ["group", "rect", "ellipse", "text"], button: ["button"], img: ["image"],
   h1: ["text"], h2: ["text"], h3: ["text"], h4: ["text"], h5: ["text"], h6: ["text"], p: ["text"], span: ["text"],
 };
-const allowedAttrs = new Set(["data-sketch-id", "data-sketch-kind", "data-sketch-role", "data-asset-ref", "data-sketch-children", "src", "alt"]);
-const allowedDocumentKeys = new Set(["id", "version", "documentRevision", "scene", "nodeSemantics", "safeArea", "editorView", "updatedAt"]);
-const allowedNodeKeys = new Set(["id", "type", "x", "y", "width", "height", "zIndex", "style", "text", "src", "alt", "rotation", "children", "visible"]);
+const allowedAttrs = new Set(["data-sketch-id", "data-sketch-kind", "data-sketch-role", "data-asset-ref", "data-sketch-children", "data-sketch-image-size", "data-sketch-image-crop", "src", "alt"]);
+const allowedDocumentKeys = new Set(["id", "version", "sceneFormat", "documentRevision", "scene", "nodeSemantics", "safeArea", "editorView", "updatedAt"]);
+const nativeDocumentKeys = new Set(["id", "version", "sceneFormat", "documentRevision", "scene", "nodeSemantics", "safeArea", "editorView", "updatedAt"]);
+const allowedNodeKeys = new Set(["id", "type", "x", "y", "width", "height", "zIndex", "style", "text", "src", "alt", "intrinsicWidth", "intrinsicHeight", "imageCrop", "rotation", "children", "visible"]);
 const cssPropertySet = new Set<string>(BRIDGE_STYLE_FIELDS);
 const bridgeStyleKeys = new Set(["fill", "stroke", "strokeWidth", "opacity", "radius", "fontSize", "fontWeight", "textAlign", "color", "imageFit"]);
-const whiteboardActionTypes = new Set(["updateNode", "updateRole", "placeAsset", "setImageFit", "removeNode", "addText", "align", "distribute"]);
+const whiteboardActionTypes = new Set(["updateNode", "updateRole", "placeAsset", "setImageFit", "setImageCrop", "removeNode", "addText", "align", "distribute"]);
 const updateNodeKeys = new Set(["x", "y", "width", "height", "text", "rotation", "style"]);
 const idPattern = /^[A-Za-z][A-Za-z0-9_-]{0,79}$/;
 const assetIdPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
-function diag(code: string, message: string, extra: Partial<Diagnostic> = {}): Diagnostic { return { code, severity: "error", message, ...extra }; }
+const WHITEBOARD_DIAGNOSTIC_FALLBACK = "白板内容不符合当前支持范围，请检查后重试。";
+const NODE_KIND_LABELS: Record<string, string> = {
+  group: "分组",
+  rect: "图形",
+  ellipse: "椭圆",
+  image: "图片",
+  text: "文本",
+  button: "按钮",
+};
+
+const WHITEBOARD_DIAGNOSTIC_MESSAGES: Record<string, string> = {
+  ASSET_IN_USE: "已附加或已输出的资源不能丢弃。",
+  ASSET_NOT_ATTACHED: "资源尚未附加到白板节点，请先确认并附加资源。",
+  ASSET_NOT_RESOLVED: "找不到关联的白板资源，请先确认资源后重试。",
+  CSS_TOKEN_LIMIT: "CSS 内容超过安全限制，请减少声明数量。",
+  DEPTH_LIMIT: "HTML 嵌套层级超过安全限制。",
+  DUPLICATE_CSS_PROPERTY: "CSS 属性重复。",
+  DUPLICATE_CSS_RULE: "CSS 规则重复。",
+  DUPLICATE_NODE_ID: "节点 ID 必须唯一。",
+  INPUT_TOO_LARGE: "HTML/CSS 内容超过输入限制。",
+  INVALID_ACTION: "白板操作无效。",
+  INVALID_ASSET_REF: "资源引用无效。",
+  INVALID_CANVAS: "缺少有效的白板画布根节点。",
+  INVALID_CSS: "CSS 包含未闭合或不支持的规则。",
+  INVALID_DECLARATION: "CSS 声明必须包含属性和值。",
+  INVALID_DOCUMENT: "白板文档必须是对象。",
+  INVALID_EDITOR_VIEW: "白板视图参数无效。",
+  INVALID_GEOMETRY: "节点几何尺寸无效或超出画布范围。",
+  INVALID_GROUP: "分组包含未知子节点。",
+  INVALID_GROUP_SEMANTICS: "分组节点不能携带该语义信息。",
+  INVALID_ID: "白板文档 ID 无效。",
+  INVALID_IMAGE_CROP: "图片裁剪数据无效。",
+  INVALID_IMAGE_SIZE: "图片原始尺寸必须是两个正的有限数值。",
+  INVALID_INPUT: "HTML 和 CSS 必须是文本。",
+  INVALID_NODE: "节点必须是对象。",
+  INVALID_NODE_ID: "节点必须提供有效的 data-sketch-id。",
+  INVALID_NODE_TYPE: "节点类型不支持该操作。",
+  INVALID_PAGE_SIZE: "画布宽高必须为正数且不能超过限制。",
+  INVALID_ROLE: "节点语义角色无效。",
+  INVALID_SAFE_AREA: "安全区域必须位于画布范围内。",
+  INVALID_SCENE: "场景不符合白板协议。",
+  INVALID_SCENE_FORMAT: "白板场景格式无效，应为 sketch-scene-v1。",
+  INVALID_SELECTION: "至少需要选择两个节点。",
+  INVALID_SEMANTICS: "节点语义信息无效。",
+  INVALID_STYLE: "节点样式无效。",
+  INVALID_TIMESTAMP: "更新时间必须是非负有限数值。",
+  INVALID_VERSION: "白板版本或文档修订号无效。",
+  MISSING_CSS_RULE: "节点缺少对应的 CSS 规则。",
+  MISSING_GEOMETRY: "节点必须提供 left、top、width 和 height。",
+  NESTED_NODE: "不支持嵌套可编辑节点，请使用分组子节点元数据。",
+  NODE_LIMIT: "节点数量超过限制。",
+  NODE_NOT_FOUND: "操作目标节点不存在。",
+  ORPHAN_CSS_RULE: "CSS 规则没有对应的白板节点。",
+  ORPHAN_SEMANTICS: "节点语义引用了不存在的节点。",
+  OUTSIDE_SAFE_AREA: "操作会使节点超出安全区域。",
+  TAG_KIND_MISMATCH: "HTML 标签与节点类型不匹配。",
+  UNLOCALIZED_RESOURCE: "图片必须引用已本地化的 workspace 资源。",
+  UNSAFE_STYLE: "节点样式值不适合跨环境渲染。",
+  UNSUPPORTED_CONTENT: "不支持脚本、嵌入内容、style 标签和 CSS at-rule。",
+  UNSUPPORTED_HTML: "画布中包含不支持的 HTML 内容。",
+  UNSUPPORTED_NODE: "节点类型不在白板代码桥接范围内。",
+  UNSUPPORTED_NODE_CONTENT: "节点包含不支持的文本内容。",
+  UNSUPPORTED_SAFE_AREA_FIELD: "安全区域字段不受支持。",
+  UNSUPPORTED_SCENE_FIELD: "场景字段不属于当前白板代码桥接范围。",
+  UNSUPPORTED_SELECTOR: "CSS 选择器不受支持。",
+  UNSUPPORTED_SEMANTICS: "节点语义字段不受支持。",
+  UNSUPPORTED_STYLE: "节点样式字段不受支持。",
+};
+
+function localizeWhiteboardDiagnosticMessage(code: string, message: string): string {
+  const normalized = message.trim();
+  if (!normalized) return WHITEBOARD_DIAGNOSTIC_FALLBACK;
+  if (/[\u3400-\u9fff]/u.test(normalized)) return normalized;
+
+  if (normalized === "scene metadata is not part of the whiteboard bridge") {
+    return "场景元数据不属于当前白板代码桥接范围";
+  }
+  if (normalized === "scene bindings are not part of the whiteboard bridge") {
+    return "场景绑定不属于当前白板代码桥接范围";
+  }
+  if (normalized === "scene assets must be represented by nodeSemantics.assetRef") {
+    return "场景资源必须通过节点语义中的 assetRef 表示";
+  }
+  if (normalized === "text is only supported on text and button nodes") {
+    return "仅文本节点和按钮节点支持文本内容";
+  }
+  const nodeContent = normalized.match(/^([a-z]+) nodes cannot contain text content$/u);
+  if (nodeContent) {
+    return `${NODE_KIND_LABELS[nodeContent[1]] ?? "节点"}节点不能包含文本内容`;
+  }
+  const duplicateAttribute = normalized.match(/^duplicate (?:canvas )?attribute (.+)$/u);
+  if (duplicateAttribute) return `属性 ${duplicateAttribute[1]} 重复`;
+  const unsupportedAttribute = normalized.match(/^(?:attribute|canvas attribute) (.+) is not supported$/u);
+  if (unsupportedAttribute) return `属性 ${unsupportedAttribute[1]} 不受支持`;
+  const unsupportedSelector = normalized.match(/^selector (.+) is not supported$/u);
+  if (unsupportedSelector) return `CSS 选择器 ${unsupportedSelector[1]} 不受支持`;
+  const unsupportedCss = normalized.match(/^CSS property (.+) is not supported$/u);
+  if (unsupportedCss) return `CSS 属性 ${unsupportedCss[1]} 不受支持`;
+  const duplicateCssProperty = normalized.match(/^duplicate CSS property (.+)$/u);
+  if (duplicateCssProperty) return `CSS 属性 ${duplicateCssProperty[1]} 重复`;
+  const unsupportedNodeField = normalized.match(/^node field (.+) is not supported by the bridge profile$/u);
+  if (unsupportedNodeField) return `节点字段 ${unsupportedNodeField[1]} 不属于当前白板代码桥接范围`;
+  const unsupportedNodeType = normalized.match(/^node type (.+) is not in bridge profile$/u);
+  if (unsupportedNodeType) return `节点类型 ${unsupportedNodeType[1]} 不在当前白板代码桥接范围内`;
+  const unsupportedStyle = normalized.match(/^style field (.+) is not supported by the bridge profile$/u);
+  if (unsupportedStyle) return `样式字段 ${unsupportedStyle[1]} 不属于当前白板代码桥接范围`;
+  const unsafeStyle = normalized.match(/^style value for (.+) is not portable$/u);
+  if (unsafeStyle) return `样式字段 ${unsafeStyle[1]} 的值无法安全跨环境渲染`;
+  const unsupportedRole = normalized.match(/^unsupported role (.+)$/u);
+  if (unsupportedRole) return `语义角色 ${unsupportedRole[1]} 不受支持`;
+  const unsupportedAction = normalized.match(/^unsupported whiteboard action (.+)$/u);
+  if (unsupportedAction) return `白板操作 ${unsupportedAction[1]} 不受支持`;
+  const unsupportedPatchFields = normalized.match(/^updateNode fields are not supported: (.+)$/u);
+  if (unsupportedPatchFields) return `节点更新字段不受支持：${unsupportedPatchFields[1]}`;
+  const invalidCssNumber = normalized.match(/^(.+) must be a finite px number$/u);
+  if (invalidCssNumber) return `${invalidCssNumber[1]} 必须是有限的像素数值`;
+  const invalidCssProperty = normalized.match(/^(.+) must be an integer$/u);
+  if (invalidCssProperty) return `${invalidCssProperty[1]} 必须是整数`;
+  const invalidCssRange = normalized.match(/^(.+) must be between 0 and 1$/u);
+  if (invalidCssRange) return `${invalidCssRange[1]} 必须在 0 到 1 之间`;
+  const invalidCssEnum = normalized.match(/^(.+) must be (.+)$/u);
+  if (invalidCssEnum && ["text-align", "object-fit"].includes(invalidCssEnum[1])) {
+    return `${invalidCssEnum[1]} 的取值必须为 ${invalidCssEnum[2]}`;
+  }
+  const managedAssetMissing = normalized.match(/^managed asset (.+) was not found$/u);
+  if (managedAssetMissing) return `找不到关联的资源 ${managedAssetMissing[1]}`;
+  const managedAssetState = normalized.match(/^managed asset (.+) is (.+), not attached$/u);
+  if (managedAssetState) return `资源 ${managedAssetState[1]} 当前为${managedAssetState[2]}状态，尚未附加`;
+  const managedAssetUnsafe = normalized.match(/^managed asset (.+) has no safe render path$/u);
+  if (managedAssetUnsafe) return `资源 ${managedAssetUnsafe[1]} 没有安全的渲染路径`;
+
+  return WHITEBOARD_DIAGNOSTIC_MESSAGES[code] ?? WHITEBOARD_DIAGNOSTIC_FALLBACK;
+}
+
+function diag(code: string, message: string, extra: Partial<Diagnostic> = {}): Diagnostic {
+  return { code, severity: "error", message: localizeWhiteboardDiagnosticMessage(code, message), ...extra };
+}
 function esc(value: string): string { return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 function textEsc(value: string): string { return esc(value).replace(/\n/g, "&#10;"); }
 function decodeText(value: string): string { return value.replace(/&#10;|&#x0a;/gi, "\n").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"); }
@@ -126,6 +283,43 @@ function numeric(value: string | undefined): number | undefined {
   if (value === undefined || !/^-?(?:\d+\.?\d*|\.\d+)(?:px)?$/.test(value.trim())) return undefined;
   const parsed = Number(value.trim().replace(/px$/, ""));
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function numberTuple(value: string | undefined, length: number): number[] | undefined {
+  if (value === undefined) return undefined;
+  const values = value.split(",").map((part) => Number(part.trim()));
+  return values.length === length && values.every((part) => Number.isFinite(part)) ? values : undefined;
+}
+
+function serializeImageCrop(crop: SketchSceneImageCrop): string {
+  const source = crop.sourceRect;
+  const frame = crop.originalFrame;
+  return [
+    crop.shape,
+    [source.x, source.y, source.width, source.height].join(","),
+    [frame.x, frame.y, frame.width, frame.height].join(","),
+    crop.originalImageFit,
+  ].join("|");
+}
+
+function parseImageCrop(value: string | undefined, nodeId: string, diagnostics: Diagnostic[]): SketchSceneImageCrop | undefined {
+  if (value === undefined) return undefined;
+  const parts = value.split("|");
+  const source = numberTuple(parts[1], 4);
+  const frame = numberTuple(parts[2], 4);
+  const crop = parts.length === 4 && (parts[0] === "rect" || parts[0] === "circle") && source && frame && (parts[3] === "cover" || parts[3] === "contain" || parts[3] === "fill")
+    ? {
+        shape: parts[0],
+        sourceRect: { x: source[0], y: source[1], width: source[2], height: source[3] },
+        originalFrame: { x: frame[0], y: frame[1], width: frame[2], height: frame[3] },
+        originalImageFit: parts[3],
+      } as SketchSceneImageCrop
+    : undefined;
+  if (!crop || !isValidSketchSceneImageCrop(crop)) {
+    diagnostics.push(diag("INVALID_IMAGE_CROP", "data-sketch-image-crop must encode a valid image crop", { nodeId }));
+    return undefined;
+  }
+  return crop;
 }
 
 function isSafeCssToken(value: unknown): value is string {
@@ -218,12 +412,128 @@ function styleToCss(style: SketchSceneStyle | undefined, node: SketchSceneNode):
 
 export function isBridgeNodeType(value: unknown): value is BridgeNodeType { return typeof value === "string" && typeSet.has(value); }
 
-export function validateWhiteboardDocument(document: unknown): { valid: boolean; diagnostics: Diagnostic[] } {
+/**
+ * Validate the durable/native whiteboard envelope.
+ *
+ * This delegates scene validation to SketchSceneDocument and deliberately
+ * does not apply the html-css-v2 field allowlist. A native document may retain
+ * every field supported by the sketch protocol, including scene metadata,
+ * assets, bindings, paths, connectors and non-bridge node types.
+ */
+export function validateWhiteboardNativeDocument(document: unknown): { valid: boolean; diagnostics: Diagnostic[] } {
+  const diagnostics: Diagnostic[] = [];
+  if (!document || typeof document !== "object" || Array.isArray(document)) {
+    return { valid: false, diagnostics: [diag("INVALID_DOCUMENT", "document must be an object")] };
+  }
+
+  const d = document as Record<string, unknown>;
+  const version = d.version;
+  const scene = d.scene as SketchSceneDocument | undefined;
+  for (const key of Object.keys(d)) {
+    if (!nativeDocumentKeys.has(key)) diagnostics.push(diag("UNSUPPORTED_DOCUMENT_FIELD", `document field ${key} is not part of the native whiteboard document`));
+  }
+  if (typeof d.id !== "string" || !/^[A-Za-z0-9_-]{1,80}$/.test(d.id)) {
+    diagnostics.push(diag("INVALID_ID", "invalid document id"));
+  }
+  if (version !== 2 && version !== 3) {
+    diagnostics.push(diag("INVALID_VERSION", "version must be 2 or 3"));
+  }
+  if (version === 3 && d.sceneFormat !== WHITEBOARD_SCENE_FORMAT) {
+    diagnostics.push(diag("INVALID_SCENE_FORMAT", "sceneFormat must be sketch-scene-v1"));
+  }
+  if (version === 2 && d.sceneFormat !== undefined) {
+    diagnostics.push(diag("UNSUPPORTED_DOCUMENT_FIELD", "sceneFormat is only supported by V3 documents"));
+  }
+  if (version === 2 || version === 3) {
+    if (!Number.isInteger(d.documentRevision) || (d.documentRevision as number) < 0) {
+      diagnostics.push(diag("INVALID_VERSION", "documentRevision must be a non-negative integer"));
+    }
+  }
+
+  const view = d.editorView as Partial<WhiteboardEditorView> | undefined;
+  if (!view || typeof view !== "object" || Array.isArray(view)) {
+    diagnostics.push(diag("INVALID_EDITOR_VIEW", "editorView is required"));
+  } else {
+    for (const key of Object.keys(view)) {
+      if (!["zoom", "offsetX", "offsetY"].includes(key)) diagnostics.push(diag("UNSUPPORTED_EDITOR_VIEW_FIELD", `editorView field ${key} is not part of the native whiteboard document`));
+    }
+    if (![view.zoom, view.offsetX, view.offsetY].every((value) => typeof value === "number" && Number.isFinite(value)) || (view.zoom as number) <= 0) {
+      diagnostics.push(diag("INVALID_EDITOR_VIEW", "editorView values must be finite and zoom must be positive"));
+    }
+  }
+  if (typeof d.updatedAt !== "number" || !Number.isFinite(d.updatedAt) || d.updatedAt < 0) {
+    diagnostics.push(diag("INVALID_TIMESTAMP", "updatedAt must be a finite non-negative number"));
+  }
+  if (!scene || !validateSketchSceneDocument(scene).valid) {
+    diagnostics.push(diag("INVALID_SCENE", "scene does not satisfy the Sketch protocol"));
+  }
+
+  const semantics = d.nodeSemantics;
+  if (!semantics || typeof semantics !== "object" || Array.isArray(semantics)) {
+    diagnostics.push(diag("INVALID_SEMANTICS", "nodeSemantics is required"));
+  } else {
+    const nodes = scene?.nodes ?? [];
+    const nodeIds = new Set(nodes.map((node) => node.id));
+    const nodeById = new Map(nodes.map((node) => [node.id, node]));
+    for (const [nodeId, value] of Object.entries(semantics)) {
+      if (!nodeIds.has(nodeId)) diagnostics.push(diag("ORPHAN_SEMANTICS", "semantics references missing node", { nodeId }));
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        diagnostics.push(diag("INVALID_SEMANTICS", "node semantics must be an object", { nodeId }));
+        continue;
+      }
+      const semantic = value as Record<string, unknown>;
+      if (nodeById.get(nodeId)?.type === "group" && (semantic.role !== undefined || semantic.assetRef !== undefined)) {
+        diagnostics.push(diag("INVALID_GROUP_SEMANTICS", "group nodes cannot carry role or assetRef", { nodeId }));
+      }
+      if (semantic.role !== undefined && (typeof semantic.role !== "string" || !roleSet.has(semantic.role))) {
+        diagnostics.push(diag("INVALID_ROLE", "unsupported semantic role", { nodeId }));
+      }
+      if (semantic.assetRef !== undefined && (!assetIdPattern.test(String(semantic.assetRef)) || nodeById.get(nodeId)?.type !== "image")) {
+        diagnostics.push(diag("INVALID_ASSET_REF", "assetRef must be a managed id attached to an image node", { nodeId }));
+      }
+      if (Object.keys(semantic).some((key) => key !== "role" && key !== "assetRef")) {
+        diagnostics.push(diag("UNSUPPORTED_SEMANTICS", "unknown node semantics field", { nodeId }));
+      }
+    }
+  }
+
+  if (d.safeArea !== undefined) {
+    const safeArea = d.safeArea as Partial<WhiteboardSafeArea> | null;
+    const safeAreaObject = safeArea !== null && typeof safeArea === "object" && !Array.isArray(safeArea);
+    if (safeAreaObject) {
+      for (const key of Object.keys(safeArea)) {
+        if (!["x", "y", "width", "height"].includes(key)) diagnostics.push(diag("UNSUPPORTED_SAFE_AREA_FIELD", `safeArea field ${key} is not part of the native whiteboard document`));
+      }
+    }
+    const pageSize = scene && typeof scene === "object" && !Array.isArray(scene) ? scene.pageSize : undefined;
+    const valid = safeAreaObject
+      && pageSize
+      && [safeArea.x, safeArea.y, safeArea.width, safeArea.height].every((value) => typeof value === "number" && Number.isFinite(value))
+      && safeArea.x! >= 0 && safeArea.y! >= 0 && safeArea.width! >= 0 && safeArea.height! >= 0
+      && safeArea.x! + safeArea.width! <= pageSize.width
+      && safeArea.y! + safeArea.height! <= pageSize.height;
+    if (!valid) diagnostics.push(diag("INVALID_SAFE_AREA", "safeArea must be within page bounds"));
+  }
+
+  return { valid: diagnostics.length === 0, diagnostics };
+}
+
+/** Preferred generic name for the full/native document validator. */
+export const validateWhiteboardDocument = validateWhiteboardNativeDocument;
+
+/**
+ * Validate the restricted html-css-v2 projection. This validator is only for
+ * code import/export and AI bridge actions; it is deliberately stricter than
+ * the native whiteboard document validator below.
+ */
+export function validateWhiteboardBridgeDocument(document: unknown): { valid: boolean; diagnostics: Diagnostic[] } {
   const diagnostics: Diagnostic[] = [];
   if (!document || typeof document !== "object" || Array.isArray(document)) return { valid: false, diagnostics: [diag("INVALID_DOCUMENT", "document must be an object")] };
-  const d = document as Partial<WhiteboardDocument>; const scene = d.scene;
+  const d = document as Partial<WhiteboardDocument> & { sceneFormat?: unknown }; const scene = d.scene;
   if (typeof d.id !== "string" || !/^[A-Za-z0-9_-]{1,80}$/.test(d.id)) diagnostics.push(diag("INVALID_ID", "invalid document id"));
-  if (d.version !== 2 || !Number.isInteger(d.documentRevision) || (d.documentRevision ?? -1) < 0) diagnostics.push(diag("INVALID_VERSION", "version must be 2 and documentRevision a non-negative integer"));
+  if ((d.version !== 2 && d.version !== 3) || !Number.isInteger(d.documentRevision) || (d.documentRevision ?? -1) < 0) diagnostics.push(diag("INVALID_VERSION", "version must be 2 or 3 and documentRevision a non-negative integer"));
+  if (d.version === 3 && d.sceneFormat !== WHITEBOARD_SCENE_FORMAT) diagnostics.push(diag("INVALID_SCENE_FORMAT", "sceneFormat must be sketch-scene-v1"));
+  if (d.version !== 3 && d.sceneFormat !== undefined) diagnostics.push(diag("UNSUPPORTED_DOCUMENT_FIELD", "sceneFormat is only supported by V3 documents"));
   for (const key of Object.keys(d)) if (!allowedDocumentKeys.has(key)) diagnostics.push(diag("UNSUPPORTED_DOCUMENT_FIELD", `document field ${key} is not supported by the bridge profile`));
   const editorView = d.editorView;
   if (!editorView || typeof editorView !== "object" || Array.isArray(editorView)) diagnostics.push(diag("INVALID_EDITOR_VIEW", "editorView is required"));
@@ -266,6 +576,11 @@ export function validateWhiteboardDocument(document: unknown): { valid: boolean;
     if (node.text !== undefined && node.type !== "text" && node.type !== "button") diagnostics.push(diag("UNSUPPORTED_NODE_FIELD", "text is only supported on text and button nodes", { nodeId: node.id }));
     if (node.src !== undefined && node.type !== "image") diagnostics.push(diag("UNSUPPORTED_NODE_FIELD", "src is only supported on image nodes", { nodeId: node.id }));
     if (node.alt !== undefined && node.type !== "image") diagnostics.push(diag("UNSUPPORTED_NODE_FIELD", "alt is only supported on image nodes", { nodeId: node.id }));
+    if (node.type !== "image" && (node.intrinsicWidth !== undefined || node.intrinsicHeight !== undefined || node.imageCrop !== undefined)) diagnostics.push(diag("UNSUPPORTED_NODE_FIELD", "image dimensions and crop data are only supported on image nodes", { nodeId: node.id }));
+    const intrinsicWidth = node.intrinsicWidth;
+    const intrinsicHeight = node.intrinsicHeight;
+    if (node.type === "image" && ((intrinsicWidth !== undefined) !== (intrinsicHeight !== undefined) || (intrinsicWidth !== undefined && intrinsicHeight !== undefined && (!Number.isFinite(intrinsicWidth) || intrinsicWidth <= 0 || !Number.isFinite(intrinsicHeight) || intrinsicHeight <= 0)))) diagnostics.push(diag("INVALID_IMAGE_SIZE", "image intrinsic dimensions must be two positive finite values", { nodeId: node.id }));
+    if (node.type === "image" && node.imageCrop !== undefined && !isValidSketchSceneImageCrop(node.imageCrop)) diagnostics.push(diag("INVALID_IMAGE_CROP", "imageCrop must use finite source coordinates with a visible source intersection", { nodeId: node.id }));
   }
   const semantics = d.nodeSemantics;
   if (!semantics || typeof semantics !== "object" || Array.isArray(semantics)) diagnostics.push(diag("INVALID_SEMANTICS", "nodeSemantics is required"));
@@ -287,11 +602,68 @@ export function validateWhiteboardDocument(document: unknown): { valid: boolean;
   return { valid: diagnostics.length === 0, diagnostics };
 }
 
-export function canonicalizeWhiteboardDocument(document: WhiteboardDocument): WhiteboardDocument {
+function sortRecord<T>(record: Record<string, T>): Record<string, T> {
+  return Object.fromEntries(Object.entries(record).sort(([left], [right]) => left.localeCompare(right)));
+}
+
+/**
+ * Canonicalize a durable/native document without changing its renderable
+ * meaning. The only scene normalization is deterministic ordering; all scene
+ * fields and their values remain present.
+ */
+export function canonicalizeWhiteboardNativeDocument(document: WhiteboardDocument): WhiteboardDocumentV3 {
+  const validation = validateWhiteboardNativeDocument(document);
+  if (!validation.valid) throw new Error(validation.diagnostics.map((item) => item.message).join("；") || "白板文档无效");
+  // Keep the original array order for equal z-index values. The Sketch
+  // renderer uses that order as the final painter's-order tie breaker, so a
+  // lexical ID tie breaker would change the visual result of overlapping
+  // nodes while pretending to be a semantics-preserving normalization.
+  const nodes = document.scene.nodes
+    .map((node, index) => ({ node, index }))
+    .sort((left, right) => (left.node.zIndex ?? 0) - (right.node.zIndex ?? 0) || left.index - right.index)
+    .map(({ node }) => node);
+  const scene = {
+    ...document.scene,
+    nodes,
+    ...(document.scene.assets ? { assets: [...document.scene.assets].sort((a, b) => a.id.localeCompare(b.id)) } : {}),
+    ...(document.scene.bindings ? { bindings: sortRecord(document.scene.bindings) } : {}),
+    ...(document.scene.metadata ? { metadata: sortRecord(document.scene.metadata) } : {}),
+  };
+  const nodeSemantics: Record<string, WhiteboardNodeSemantics> = {};
+  for (const [nodeId, semantics] of Object.entries(document.nodeSemantics)) {
+    nodeSemantics[nodeId] = { ...semantics };
+  }
+  return {
+    ...document,
+    version: 3,
+    sceneFormat: WHITEBOARD_SCENE_FORMAT,
+    documentRevision: document.documentRevision,
+    scene,
+    nodeSemantics: sortRecord(nodeSemantics),
+  };
+}
+
+/** Preferred explicit name for the full/native canonicalizer. */
+export const canonicalizeWhiteboardDocument = canonicalizeWhiteboardNativeDocument;
+
+/**
+ * Canonicalize only the html-css-v2 bridge projection. This is intentionally
+ * lossy for fields the bridge cannot express and must never be used for
+ * durable/native persistence.
+ */
+export function canonicalizeWhiteboardBridgeDocument(document: WhiteboardDocument): WhiteboardDocumentV2 {
+  const validation = validateWhiteboardBridgeDocument(document);
+  if (!validation.valid) throw new Error(validation.diagnostics.map((item) => item.message).join("；") || "白板桥接文档无效");
   const nodes = [...document.scene.nodes].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0) || a.id.localeCompare(b.id)).map((node, index) => ({ ...node, zIndex: index }));
   const semantics: Record<string, WhiteboardNodeSemantics> = {};
   for (const node of nodes) if (document.nodeSemantics[node.id]) semantics[node.id] = { ...document.nodeSemantics[node.id] };
-  return { ...document, version: 2, scene: { ...document.scene, version: 1, nodes, assets: [], bindings: {}, metadata: {} }, nodeSemantics: semantics };
+  const { sceneFormat: _sceneFormat, ...envelope } = document.version === 3 ? document : { ...document, sceneFormat: undefined };
+  return {
+    ...envelope,
+    version: 2,
+    scene: { ...document.scene, version: 1, nodes, assets: [], bindings: {}, metadata: {} },
+    nodeSemantics: semantics,
+  };
 }
 
 /** Return a deterministic selection summary for AI context and plans. */
@@ -307,12 +679,12 @@ export function getWhiteboardSelection(document: WhiteboardDocument, nodeIds: re
 }
 
 export function serializeWhiteboardCode(document: WhiteboardDocument): ConversionResult<{ html: string; css: string }> {
-  const validation = validateWhiteboardDocument(document);
+  const validation = validateWhiteboardBridgeDocument(document);
   if (!validation.valid) return { diagnostics: validation.diagnostics };
-  const d = canonicalizeWhiteboardDocument(document);
+  const d = canonicalizeWhiteboardBridgeDocument(document);
   const htmlNodes = d.scene.nodes.map((node) => {
     const semantics = d.nodeSemantics[node.id] ?? {}; const attrs = [`data-sketch-id="${esc(node.id)}"`, `data-sketch-kind="${node.type}"`];
-    if (semantics.role) attrs.push(`data-sketch-role="${semantics.role}"`); if (semantics.assetRef) attrs.push(`data-asset-ref="${esc(semantics.assetRef)}"`); if (node.children?.length) attrs.push(`data-sketch-children="${esc(node.children.join(","))}"`); if (node.type === "image") { attrs.push(`src="${esc(node.src ?? "")}"`); if (node.alt) attrs.push(`alt="${esc(node.alt)}"`); }
+    if (semantics.role) attrs.push(`data-sketch-role="${semantics.role}"`); if (semantics.assetRef) attrs.push(`data-asset-ref="${esc(semantics.assetRef)}"`); if (node.children?.length) attrs.push(`data-sketch-children="${esc(node.children.join(","))}"`); if (node.type === "image") { attrs.push(`src="${esc(node.src ?? "")}"`); if (node.alt) attrs.push(`alt="${esc(node.alt)}"`); if (node.intrinsicWidth !== undefined && node.intrinsicHeight !== undefined) attrs.push(`data-sketch-image-size="${node.intrinsicWidth},${node.intrinsicHeight}"`); if (node.imageCrop) attrs.push(`data-sketch-image-crop="${serializeImageCrop(node.imageCrop)}"`); }
     const body = node.type === "text" || node.type === "button" ? textEsc(node.text ?? "") : ""; const tag = (tagFor as Record<string, string>)[node.type];
     return `  <${tag} ${attrs.join(" ")}>${body}</${tag}>`;
   }).join("\n");
@@ -321,7 +693,7 @@ export function serializeWhiteboardCode(document: WhiteboardDocument): Conversio
   return { value: { html, css }, diagnostics: [] };
 }
 
-export function parseWhiteboardCode(html: string, css = "", options: { id?: string; maxBytes?: number; maxNodes?: number; maxDepth?: number } = {}): ConversionResult<WhiteboardDocument> {
+export function parseWhiteboardCode(html: string, css = "", options: { id?: string; maxBytes?: number; maxNodes?: number; maxDepth?: number } = {}): ConversionResult<WhiteboardDocumentV2> {
   const diagnostics: Diagnostic[] = []; const maxBytes = options.maxBytes ?? 2 * 1024 * 1024;
   if (typeof html !== "string" || typeof css !== "string") return { diagnostics: [diag("INVALID_INPUT", "HTML and CSS must be strings")] };
   if (new TextEncoder().encode(html).length + new TextEncoder().encode(css).length > maxBytes) return { diagnostics: [diag("INPUT_TOO_LARGE", "HTML/CSS exceeds input limit", { range: { start: 0, end: html.length + css.length } })] };
@@ -372,21 +744,26 @@ export function parseWhiteboardCode(html: string, css = "", options: { id?: stri
     if (kindValue !== "text" && kindValue !== "button" && content.replace(/<[^>]*>/g, "").trim()) diagnostics.push(diag("UNSUPPORTED_NODE_CONTENT", `${kindValue} nodes cannot contain text content`, { nodeId: id }));
     if (attrs.has("src") && kindValue !== "image") diagnostics.push(diag("UNSUPPORTED_ATTRIBUTE", "src is only supported on image nodes", { nodeId: id }));
     if (attrs.has("data-sketch-children") && kindValue !== "group") diagnostics.push(diag("UNSUPPORTED_ATTRIBUTE", "data-sketch-children is only supported on group nodes", { nodeId: id }));
+    if (attrs.has("data-sketch-image-size") && kindValue !== "image") diagnostics.push(diag("UNSUPPORTED_ATTRIBUTE", "data-sketch-image-size is only supported on image nodes", { nodeId: id }));
+    if (attrs.has("data-sketch-image-crop") && kindValue !== "image") diagnostics.push(diag("UNSUPPORTED_ATTRIBUTE", "data-sketch-image-crop is only supported on image nodes", { nodeId: id }));
+    const imageSize = kindValue === "image" ? numberTuple(attrs.get("data-sketch-image-size"), 2) : undefined;
+    if (kindValue === "image" && attrs.has("data-sketch-image-size") && (!imageSize || !imageSize.every((part) => part > 0))) diagnostics.push(diag("INVALID_IMAGE_SIZE", "data-sketch-image-size must contain two positive pixel values", { nodeId: id }));
+    const imageCrop = kindValue === "image" ? parseImageCrop(attrs.get("data-sketch-image-crop"), id, diagnostics) : undefined;
     const declarations = rules.get(id); if (!declarations) { diagnostics.push(diag("MISSING_CSS_RULE", `missing CSS rule for ${id}`, { nodeId: id })); continue; }
     const x = numeric(declarations.get("left")); const y = numeric(declarations.get("top")); const w = numeric(declarations.get("width")); const h = numeric(declarations.get("height")); if ([x, y, w, h].some((value) => value === undefined)) { diagnostics.push(diag("MISSING_GEOMETRY", "left/top/width/height are required", { nodeId: id })); continue; }
     const style: SketchSceneStyle = {}; if (declarations.has("background")) style.fill = declarations.get("background"); if (declarations.has("color")) style.color = declarations.get("color"); if (declarations.has("border-color")) style.stroke = declarations.get("border-color"); const strokeWidth = numeric(declarations.get("border-width")); if (strokeWidth !== undefined) style.strokeWidth = strokeWidth; const radius = numeric(declarations.get("border-radius")); if (radius !== undefined) style.radius = radius; const opacity = declarations.has("opacity") ? Number(declarations.get("opacity")) : undefined; if (opacity !== undefined && Number.isFinite(opacity)) style.opacity = opacity; const fontSize = numeric(declarations.get("font-size")); if (fontSize !== undefined) style.fontSize = fontSize; const fontWeight = declarations.get("font-weight"); if (fontWeight) style.fontWeight = /^\d+(?:\.\d+)?$/.test(fontWeight) ? Number(fontWeight) : fontWeight; const textAlign = declarations.get("text-align"); if (textAlign === "left" || textAlign === "center" || textAlign === "right") style.textAlign = textAlign; const imageFit = declarations.get("object-fit"); if (imageFit === "cover" || imageFit === "contain" || imageFit === "fill") style.imageFit = imageFit;
     const transform = declarations.get("transform"); let rotation: number | undefined; if (transform) { const parsedRotation = transform.match(/^rotate\((-?(?:\d+\.?\d*|\.\d+))deg\)$/); if (!parsedRotation) diagnostics.push(diag("UNSUPPORTED_CSS_VALUE", "only rotate(<degrees>deg) is supported", { nodeId: id })); else rotation = Number(parsedRotation[1]); }
     const assetRef = attrs.get("data-asset-ref");
     const imageSrc = attrs.get("src") || (assetRef && assetIdPattern.test(assetRef) ? `assets/${assetRef}` : "");
-    const node: SketchSceneNode = { id, type: kindValue, x: x!, y: y!, width: w!, height: h!, zIndex: Number(declarations.get("z-index") ?? 0), ...(kindValue === "group" ? { visible: false } : {}), ...(rotation === undefined ? {} : { rotation }), ...(Object.keys(style).length ? { style } : {}), ...(kindValue === "text" || kindValue === "button" ? { text: decodeText(content.replace(/<[^>]*>/g, "")) } : {}), ...(kindValue === "image" ? { src: imageSrc } : {}), ...(attrs.get("alt") ? { alt: attrs.get("alt") } : {}), ...(attrs.get("data-sketch-children") ? { children: attrs.get("data-sketch-children")!.split(",").filter(Boolean) } : {}) };
+    const node: SketchSceneNode = { id, type: kindValue, x: x!, y: y!, width: w!, height: h!, zIndex: Number(declarations.get("z-index") ?? 0), ...(kindValue === "group" ? { visible: false } : {}), ...(rotation === undefined ? {} : { rotation }), ...(Object.keys(style).length ? { style } : {}), ...(kindValue === "text" || kindValue === "button" ? { text: decodeText(content.replace(/<[^>]*>/g, "")) } : {}), ...(kindValue === "image" ? { src: imageSrc, ...(imageSize ? { intrinsicWidth: imageSize[0], intrinsicHeight: imageSize[1] } : {}), ...(imageCrop ? { imageCrop } : {}) } : {}), ...(attrs.get("alt") ? { alt: attrs.get("alt") } : {}), ...(attrs.get("data-sketch-children") ? { children: attrs.get("data-sketch-children")!.split(",").filter(Boolean) } : {}) };
     if (node.type === "image" && node.src && !isManagedAssetPath(node.src)) diagnostics.push(diag("UNLOCALIZED_RESOURCE", "image src must reference a localized workspace asset", { nodeId: id, suggestion: "Upload or place the image as a managed asset before import." }));
     nodes.push(node); const role = attrs.get("data-sketch-role"); if (role !== undefined && !roleSet.has(role)) diagnostics.push(diag("INVALID_ROLE", `unsupported role ${role}`, { nodeId: id })); if (assetRef !== undefined && !assetIdPattern.test(assetRef)) diagnostics.push(diag("INVALID_ASSET_REF", "assetRef must be a managed asset id", { nodeId: id })); if (role !== undefined || assetRef !== undefined) semantics[id] = { ...(role && roleSet.has(role) ? { role: role as SemanticRole } : {}), ...(assetRef && assetIdPattern.test(assetRef) ? { assetRef } : {}) };
   }
   if (body.replace(nodeRe, "").trim()) diagnostics.push(diag("UNSUPPORTED_HTML", "canvas contains text or elements outside the bridge grammar"));
   for (const id of rules.keys()) if (!seen.has(id)) diagnostics.push(diag("ORPHAN_CSS_RULE", `CSS rule ${id} has no matching bridge node`, { nodeId: id, suggestion: "Add the matching data-sketch-id element or remove the rule." }));
   if (diagnostics.length || !width || !height) return { diagnostics };
-  const document: WhiteboardDocument = { id: options.id ?? "whiteboard", version: 2, documentRevision: 0, scene: { version: 1, pageSize: { width, height }, nodes, assets: [], bindings: {}, metadata: {} }, nodeSemantics: semantics, editorView: { zoom: 1, offsetX: 0, offsetY: 0 }, updatedAt: Date.now() };
-  const validation = validateWhiteboardDocument(document); return validation.valid ? { value: canonicalizeWhiteboardDocument(document), diagnostics: [] } : { diagnostics: validation.diagnostics };
+  const document: WhiteboardDocumentV2 = { id: options.id ?? "whiteboard", version: 2, documentRevision: 0, scene: { version: 1, pageSize: { width, height }, nodes, assets: [], bindings: {}, metadata: {} }, nodeSemantics: semantics, editorView: { zoom: 1, offsetX: 0, offsetY: 0 }, updatedAt: Date.now() };
+  const validation = validateWhiteboardBridgeDocument(document); return validation.valid ? { value: canonicalizeWhiteboardBridgeDocument(document), diagnostics: [] } : { diagnostics: validation.diagnostics };
 }
 
 export type WhiteboardAction =
@@ -394,13 +771,17 @@ export type WhiteboardAction =
   | { type: "updateRole"; nodeId: string; role?: SemanticRole }
   | { type: "placeAsset"; nodeId: string; assetId: string; src: string }
   | { type: "setImageFit"; nodeId: string; fit: "cover" | "contain" | "fill" }
+  | { type: "setImageCrop"; nodeId: string; crop: SketchSceneImageCrop | null; frame?: SketchSceneFrame }
   | { type: "removeNode"; nodeId: string }
   | { type: "addText"; nodeId?: string; text: string; x: number; y: number; width: number; height: number; role?: SemanticRole }
   | { type: "align"; nodeIds: string[]; axis: "left" | "center" | "right" | "top" | "middle" | "bottom" }
   | { type: "distribute"; nodeIds: string[]; axis: "horizontal" | "vertical" };
 
 export function applyWhiteboardActions(document: WhiteboardDocument, actions: readonly WhiteboardAction[]): ConversionResult<WhiteboardDocument> {
-  const initialValidation = validateWhiteboardDocument(document);
+  // Actions operate on the durable/native scene, not the lossy HTML/CSS
+  // bridge projection. Native V3 scenes intentionally retain metadata,
+  // bindings and asset-library entries that the bridge validator rejects.
+  const initialValidation = validateWhiteboardNativeDocument(document);
   if (!initialValidation.valid) return { diagnostics: initialValidation.diagnostics };
   const next = cloneJson(document) as WhiteboardDocument;
   const diagnostics: Diagnostic[] = [];
@@ -423,6 +804,15 @@ export function applyWhiteboardActions(document: WhiteboardDocument, actions: re
     if (action.type === "setImageFit" && !["cover", "contain", "fill"].includes(action.fit)) {
       diagnostics.push(diag("INVALID_ACTION", "setImageFit fit must be cover, contain or fill"));
       continue;
+    }
+    if (action.type === "setImageCrop") {
+      const frame = action.frame;
+      const validFrame = frame === undefined
+        || (frame && Number.isFinite(frame.x) && Number.isFinite(frame.y) && Number.isFinite(frame.width) && Number.isFinite(frame.height) && frame.x >= 0 && frame.y >= 0 && frame.width > 0 && frame.height > 0);
+      if ((action.crop !== null && !isValidSketchSceneImageCrop(action.crop)) || !validFrame) {
+        diagnostics.push(diag("INVALID_ACTION", "setImageCrop requires valid crop data and an optional positive frame", { nodeId: action.nodeId }));
+        continue;
+      }
     }
     if ((action.type === "align" && !["left", "center", "right", "top", "middle", "bottom"].includes(action.axis)) || (action.type === "distribute" && !["horizontal", "vertical"].includes(action.axis))) {
       diagnostics.push(diag("INVALID_ACTION", "alignment axis is not supported"));
@@ -466,6 +856,20 @@ export function applyWhiteboardActions(document: WhiteboardDocument, actions: re
     else if (action.type === "updateRole") { if (action.role && !roleSet.has(action.role)) diagnostics.push(diag("INVALID_ROLE", "unsupported semantic role", { nodeId: action.nodeId })); else if (node.type === "group" && action.role) diagnostics.push(diag("INVALID_GROUP_SEMANTICS", "group nodes cannot carry a role", { nodeId: action.nodeId })); else if (action.role) next.nodeSemantics[action.nodeId] = { ...next.nodeSemantics[action.nodeId], role: action.role }; else if (next.nodeSemantics[action.nodeId]) { const { role: _role, ...rest } = next.nodeSemantics[action.nodeId]; if (Object.keys(rest).length) next.nodeSemantics[action.nodeId] = rest; else delete next.nodeSemantics[action.nodeId]; } }
     else if (action.type === "placeAsset") { if (node.type !== "image" || !assetIdPattern.test(action.assetId) || !isManagedAssetPathForId(action.assetId, action.src)) diagnostics.push(diag("INVALID_ASSET_REF", "placeAsset requires an image node and its matching managed asset source", { nodeId: action.nodeId })); else { node.src = action.src; next.nodeSemantics[action.nodeId] = { ...next.nodeSemantics[action.nodeId], assetRef: action.assetId }; } }
     else if (action.type === "setImageFit") { if (node.type !== "image") diagnostics.push(diag("INVALID_NODE_TYPE", "setImageFit requires an image node", { nodeId: action.nodeId })); else node.style = { ...node.style, imageFit: action.fit }; }
+    else if (action.type === "setImageCrop") {
+      if (node.type !== "image") diagnostics.push(diag("INVALID_NODE_TYPE", "setImageCrop requires an image node", { nodeId: action.nodeId }));
+      else {
+        if (action.crop === null) delete node.imageCrop;
+        else node.imageCrop = cloneJson(action.crop);
+        if (action.frame) {
+          node.x = action.frame.x;
+          node.y = action.frame.y;
+          node.width = action.frame.width;
+          node.height = action.frame.height;
+          touchedGeometry.add(action.nodeId);
+        }
+      }
+    }
     else if (action.type === "updateNode") { next.scene.nodes[index] = { ...node, ...action.patch, style: action.patch.style ? { ...node.style, ...action.patch.style } : node.style }; if (action.patch.x !== undefined || action.patch.y !== undefined || action.patch.width !== undefined || action.patch.height !== undefined) touchedGeometry.add(action.nodeId); }
   }
   if (next.safeArea) {
@@ -478,7 +882,13 @@ export function applyWhiteboardActions(document: WhiteboardDocument, actions: re
       }
     }
   }
-  if (diagnostics.length) return { diagnostics }; next.documentRevision += actions.length ? 1 : 0; next.updatedAt = Date.now(); const validation = validateWhiteboardDocument(next); return validation.valid ? { value: canonicalizeWhiteboardDocument(next), diagnostics: [], ...(Object.keys(idMapping).length ? { idMapping } : {}) } : { diagnostics: validation.diagnostics };
+  if (diagnostics.length) return { diagnostics };
+  next.documentRevision += actions.length ? 1 : 0;
+  next.updatedAt = Date.now();
+  const validation = validateWhiteboardNativeDocument(next);
+  return validation.valid
+    ? { value: canonicalizeWhiteboardNativeDocument(next), diagnostics: [], ...(Object.keys(idMapping).length ? { idMapping } : {}) }
+    : { diagnostics: validation.diagnostics };
 }
 
 function isManagedAssetPathForId(assetId: string, src: string): boolean {
@@ -533,9 +943,9 @@ export function resolveWhiteboardAssetRefs(
   document: WhiteboardDocument,
   records: readonly WhiteboardAssetRecord[],
 ): ConversionResult<WhiteboardDocument> {
-  const validation = validateWhiteboardDocument(document);
+  const validation = validateWhiteboardBridgeDocument(document);
   if (!validation.valid) return { diagnostics: validation.diagnostics };
-  const next = cloneJson(canonicalizeWhiteboardDocument(document)) as WhiteboardDocument;
+  const next = cloneJson(canonicalizeWhiteboardBridgeDocument(document)) as WhiteboardDocument;
   const byId = new Map(records.map((record) => [record.assetId, record]));
   const diagnostics: Diagnostic[] = [];
   for (const [nodeId, semantics] of Object.entries(next.nodeSemantics)) {
@@ -561,6 +971,6 @@ export function resolveWhiteboardAssetRefs(
     node.src = record.src;
   }
   if (diagnostics.length) return { diagnostics };
-  const result = validateWhiteboardDocument(next);
+  const result = validateWhiteboardBridgeDocument(next);
   return result.valid ? { value: next, diagnostics: [] } : { diagnostics: result.diagnostics };
 }
