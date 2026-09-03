@@ -112,6 +112,35 @@ describe("whiteboard-core bridge", () => {
     expect(normalized.scene.bindings).toEqual(v2.scene.bindings);
   });
 
+  it("applies actions to native V3 documents without dropping native scene fields", () => {
+    const parsed = parseWhiteboardCode(html, css, { id: "demo" }).value!;
+    const native = {
+      ...parsed,
+      version: 3 as const,
+      sceneFormat: "sketch-scene-v1" as const,
+      scene: {
+        ...parsed.scene,
+        assets: [{ id: "source", type: "image" as const, src: "assets/source.png" }],
+        bindings: { title: { field: "title" } },
+        metadata: { createdBy: "system" },
+      },
+    };
+
+    const result = applyWhiteboardActions(native, [{ type: "updateNode", nodeId: "box", patch: { x: 55 } }]);
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.value).toMatchObject({
+      version: 3,
+      sceneFormat: "sketch-scene-v1",
+      scene: {
+        assets: native.scene.assets,
+        bindings: native.scene.bindings,
+        metadata: native.scene.metadata,
+      },
+    });
+    expect(result.value?.scene.nodes.find((node) => node.id === "box")?.x).toBe(55);
+  });
+
   it("keeps full validation independent from the restricted bridge validator", () => {
     const parsed = parseWhiteboardCode(html, css, { id: "demo" }).value!;
     const full = {

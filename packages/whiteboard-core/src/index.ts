@@ -498,15 +498,20 @@ export function validateWhiteboardNativeDocument(document: unknown): { valid: bo
   }
 
   if (d.safeArea !== undefined) {
-    const safeArea = d.safeArea as Partial<WhiteboardSafeArea>;
-    for (const key of Object.keys(safeArea)) {
-      if (!["x", "y", "width", "height"].includes(key)) diagnostics.push(diag("UNSUPPORTED_SAFE_AREA_FIELD", `safeArea field ${key} is not part of the native whiteboard document`));
+    const safeArea = d.safeArea as Partial<WhiteboardSafeArea> | null;
+    const safeAreaObject = safeArea !== null && typeof safeArea === "object" && !Array.isArray(safeArea);
+    if (safeAreaObject) {
+      for (const key of Object.keys(safeArea)) {
+        if (!["x", "y", "width", "height"].includes(key)) diagnostics.push(diag("UNSUPPORTED_SAFE_AREA_FIELD", `safeArea field ${key} is not part of the native whiteboard document`));
+      }
     }
-    const valid = scene
+    const pageSize = scene && typeof scene === "object" && !Array.isArray(scene) ? scene.pageSize : undefined;
+    const valid = safeAreaObject
+      && pageSize
       && [safeArea.x, safeArea.y, safeArea.width, safeArea.height].every((value) => typeof value === "number" && Number.isFinite(value))
       && safeArea.x! >= 0 && safeArea.y! >= 0 && safeArea.width! >= 0 && safeArea.height! >= 0
-      && safeArea.x! + safeArea.width! <= scene.pageSize.width
-      && safeArea.y! + safeArea.height! <= scene.pageSize.height;
+      && safeArea.x! + safeArea.width! <= pageSize.width
+      && safeArea.y! + safeArea.height! <= pageSize.height;
     if (!valid) diagnostics.push(diag("INVALID_SAFE_AREA", "safeArea must be within page bounds"));
   }
 
@@ -773,7 +778,10 @@ export type WhiteboardAction =
   | { type: "distribute"; nodeIds: string[]; axis: "horizontal" | "vertical" };
 
 export function applyWhiteboardActions(document: WhiteboardDocument, actions: readonly WhiteboardAction[]): ConversionResult<WhiteboardDocument> {
-  const initialValidation = validateWhiteboardBridgeDocument(document);
+  // Actions operate on the durable/native scene, not the lossy HTML/CSS
+  // bridge projection. Native V3 scenes intentionally retain metadata,
+  // bindings and asset-library entries that the bridge validator rejects.
+  const initialValidation = validateWhiteboardNativeDocument(document);
   if (!initialValidation.valid) return { diagnostics: initialValidation.diagnostics };
   const next = cloneJson(document) as WhiteboardDocument;
   const diagnostics: Diagnostic[] = [];
@@ -874,7 +882,13 @@ export function applyWhiteboardActions(document: WhiteboardDocument, actions: re
       }
     }
   }
-  if (diagnostics.length) return { diagnostics }; next.documentRevision += actions.length ? 1 : 0; next.updatedAt = Date.now(); const validation = validateWhiteboardBridgeDocument(next); return validation.valid ? { value: canonicalizeWhiteboardBridgeDocument(next), diagnostics: [], ...(Object.keys(idMapping).length ? { idMapping } : {}) } : { diagnostics: validation.diagnostics };
+  if (diagnostics.length) return { diagnostics };
+  next.documentRevision += actions.length ? 1 : 0;
+  next.updatedAt = Date.now();
+  const validation = validateWhiteboardNativeDocument(next);
+  return validation.valid
+    ? { value: canonicalizeWhiteboardNativeDocument(next), diagnostics: [], ...(Object.keys(idMapping).length ? { idMapping } : {}) }
+    : { diagnostics: validation.diagnostics };
 }
 
 function isManagedAssetPathForId(assetId: string, src: string): boolean {

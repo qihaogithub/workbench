@@ -67,6 +67,36 @@ describe("whiteboard agent tools", () => {
     expect(saved.scene.nodes[0].x).toBe(0);
   });
 
+  it("applies actions to a UI-created native V3 document and preserves its metadata", async () => {
+    const documentPath = path.join(workspaceDir, "whiteboards", "wb_1.json");
+    const document = JSON.parse(await fs.readFile(documentPath, "utf8"));
+    document.version = 3;
+    document.sceneFormat = "sketch-scene-v1";
+    document.scene.metadata = { createdBy: "system" };
+    document.scene.bindings = { title: { field: "title" } };
+    document.scene.assets = [{ id: "source", type: "image", src: "assets/source.png" }];
+    await fs.writeFile(documentPath, JSON.stringify(document), "utf8");
+
+    const result = await createApplyWhiteboardActionsTool(config).execute("apply-native-v3", {
+      whiteboardId: "wb_1",
+      baseDocumentRevision: 0,
+      actions: [{ type: "updateNode", nodeId: "box", patch: { x: 10 } }],
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(result.details.draft).toMatchObject({
+      version: 3,
+      sceneFormat: "sketch-scene-v1",
+      scene: {
+        metadata: document.scene.metadata,
+        bindings: document.scene.bindings,
+        assets: document.scene.assets,
+      },
+    });
+    const saved = JSON.parse(await fs.readFile(documentPath, "utf8"));
+    expect(saved.documentRevision).toBe(0);
+  });
+
   it("rejects placing an asset that was not generated or already attached", async () => {
     const documentPath = path.join(workspaceDir, "whiteboards", "wb_1.json");
     const document = JSON.parse(await fs.readFile(documentPath, "utf8"));
