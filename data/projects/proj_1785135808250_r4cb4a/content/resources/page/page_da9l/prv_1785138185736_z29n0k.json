@@ -1,0 +1,42 @@
+{
+  "id": "prv_1785138185736_z29n0k",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "kind": "page",
+  "resourceId": "page_da9l",
+  "workspaceId": "live-1785135808672-fhbugbqns",
+  "workspaceRevision": 26,
+  "workspaceRootHash": "6415e9982c496ff8859047d801a9aac57a4d19f5d6a3740baaef0bc74cdfa86d",
+  "contentHash": "49a9450cef01e4b46626e37c39ce979537894a41b85ffc96b552f0e20df92f97",
+  "blobRefs": [
+    "8243f0af367f188a376f2c17b5eabe872a2f7a979813e0d4e2be6d594c2aa259",
+    "70fc0a6bcb2fc5a9d44aeac685d4ebd0bd537570026d93c48f25516ad572fdd9",
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1"
+  ],
+  "metadata": {
+    "page": {
+      "id": "page_da9l",
+      "name": "排行榜",
+      "routeKey": "page-2",
+      "order": 1,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    "files": {
+      "schema": "8243f0af367f188a376f2c17b5eabe872a2f7a979813e0d4e2be6d594c2aa259",
+      "prototypeHtml": "70fc0a6bcb2fc5a9d44aeac685d4ebd0bd537570026d93c48f25516ad572fdd9",
+      "prototypeCss": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "prototypeMeta": "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1785138185738,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录排行榜"
+}

@@ -1,0 +1,13 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "config-showcase_a1b3",
+      "name": "配置项类型展示",
+      "runtimeType": "prototype-html-css",
+      "order": 1,
+      "parentId": null,
+      "routeKey": "page"
+    }
+  ]
+}

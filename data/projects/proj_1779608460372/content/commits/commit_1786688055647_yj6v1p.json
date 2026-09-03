@@ -1,0 +1,31 @@
+{
+  "id": "commit_1786688055647_yj6v1p",
+  "projectId": "proj_1779608460372",
+  "parentCommitId": "commit_1786627562353_bfhwud",
+  "visibility": "protected",
+  "intent": "publish",
+  "title": "发布项目 v32",
+  "resourcePointers": [
+    {
+      "kind": "knowledge_document",
+      "resourceId": "kb_1786532517206_r7k6au",
+      "versionId": "krv_1786601275960_nshcqb"
+    },
+    {
+      "kind": "page",
+      "resourceId": "demo_1779608460501_abc123",
+      "versionId": "prv_1785915741753_ij33t6"
+    },
+    {
+      "kind": "page",
+      "resourceId": "demo_1779608460502_def456",
+      "versionId": "prv_1786627562348_ywt264"
+    }
+  ],
+  "changedResources": [],
+  "createdAt": 1786688055647,
+  "createdBy": "Author Site",
+  "audit": {
+    "actorType": "user"
+  }
+}

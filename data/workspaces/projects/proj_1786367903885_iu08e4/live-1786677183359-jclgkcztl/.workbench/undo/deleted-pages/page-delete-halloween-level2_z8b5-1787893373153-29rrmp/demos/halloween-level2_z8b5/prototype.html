@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>第2关 · 南瓜屋大搜索</title>
+  <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+  <div class="wf-container">
+
+    <!-- 关卡头部 -->
+    <header class="wf-levelbar">
+      <a class="wf-back">‹</a>
+      <div class="wf-levelbar-title">
+        <span class="wf-levelbar-tag">第2关</span>
+        <h1>南瓜屋大搜索</h1>
+      </div>
+      <span class="wf-levelbar-icon">🔎</span>
+    </header>
+
+    <!-- 游戏引导 -->
+    <section class="wf-guide">
+      <div class="wf-guide-icon">🧽</div>
+      <div class="wf-guide-body">
+        <h2 class="wf-guide-title">擦一擦，发现角色！</h2>
+        <p class="wf-guide-desc">小朋友，快来动手擦一擦，看看 Domi 的朋友们都扮成了哪些角色吧！</p>
+      </div>
+    </section>
+
+    <!-- 进度 -->
+    <div class="wf-progress">
+      <div class="wf-progress-fill" style="width: 33%;"></div>
+      <span class="wf-progress-text">已擦出 1 / 3</span>
+    </div>
+
+    <!-- 擦除游戏区 -->
+    <section class="wf-scratch">
+      <div class="wf-scratch-grid">
+        <!-- witch -->
+        <div class="wf-scratch-card">
+          <div class="wf-scratch-area">
+            <span class="wf-scratch-hint">擦一擦</span>
+          </div>
+          <div class="wf-word-reveal">
+            <p class="wf-word-en">witch</p>
+            <p class="wf-word-cn">女巫</p>
+          </div>
+        </div>
+        <!-- ghost -->
+        <div class="wf-scratch-card">
+          <div class="wf-scratch-area">
+            <span class="wf-scratch-hint">擦一擦</span>
+          </div>
+          <div class="wf-word-reveal">
+            <p class="wf-word-en">ghost</p>
+            <p class="wf-word-cn">幽灵</p>
+          </div>
+        </div>
+        <!-- monster -->
+        <div class="wf-scratch-card">
+          <div class="wf-scratch-area">
+            <span class="wf-scratch-hint">擦一擦</span>
+          </div>
+          <div class="wf-word-reveal">
+            <p class="wf-word-en">monster</p>
+            <p class="wf-word-cn">怪兽</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 单词卡收集 -->
+    <section class="wf-collected">
+      <h3 class="wf-collected-title">已收集单词卡</h3>
+      <div class="wf-collected-tags">
+        <span class="wf-tag">witch 女巫</span>
+        <span class="wf-tag">ghost 幽灵</span>
+        <span class="wf-tag wf-tag-active">monster 怪兽 ✓</span>
+      </div>
+    </section>
+
+    <!-- 底部按钮 -->
+    <section class="wf-actions">
+      <button class="wf-btn wf-btn-primary">完成第 2 关</button>
+      <p class="wf-actions-hint">无判断输入 · 词语认知难度 🌟</p>
+    </section>
+
+  </div>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "auditId": "audit_1782639503756_0s93az",
+  "at": 1782639503756,
+  "actor": {
+    "id": "local-codex",
+    "name": "Local Codex",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L3",
+  "tool": "project_delete_execute",
+  "projectId": "proj_1782639465473_o9u5jt",
+  "resourceId": "proj_1782639465473_o9u5jt",
+  "ok": true,
+  "diffSummary": {
+    "deleted": [
+      "project:proj_1782639465473_o9u5jt"
+    ]
+  }
+}

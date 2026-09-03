@@ -1,0 +1,304 @@
+interface DemoProps {
+  activeSubject?: string;
+  themeColor?: string;
+  padHeaderBgReading?: string;
+  padHeaderBgThinking?: string;
+  padHeaderBgEnglish?: string;
+  padHeaderBgWriter?: string;
+  padHeaderBgAesthetic?: string;
+}
+
+// 各科目 Pad 素材（2732×1488）
+const SUBJECTS = [
+  { key: 'reading', label: '阅读', bottom: '/api/images/img_2Y6cNADGIUTNyw', top: '/api/images/img_uJiIlQv0qfdkWQ' },
+  { key: 'thinking', label: '思维', bottom: '/api/images/img_F_vOdbsBBPMsDg', top: '/api/images/img_gDTg2-XpKAnSVQ' },
+  { key: 'aesthetic', label: '美育', bottom: '/api/images/img_XK1pvCdr88938Q', top: '/api/images/img_NZImhS-OZZo6JA' },
+  { key: 'english', label: '英语', bottom: '/api/images/img_4FdS0bju2F1CQQ', top: '/api/images/img_CvRtuMj8MGw-TA' },
+  { key: 'writer', label: '小作家', bottom: '/api/images/img_hqjzkcVjcCBDVw', top: '/api/images/img_EPIIE3m8EU5kDg' },
+];
+
+const TABS = ['阅读', '思维', '英语', '创作', '美育', '综合'];
+
+const NAV_ITEMS = [
+  { label: '广场', icon: 'M3 3h7v7H3zm11 0h7v7h-7zM3 14h7v7H3zm11 0h7v7h-7z' },
+  { label: '学习', icon: 'M12 6.01L20 18H4l8-11.99z' },
+  { label: '伴读', icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z' },
+  { label: '我的', icon: 'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z' },
+];
+
+function cap(key: string) {
+  return key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+function FlameIcon({ color }: { color: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill={color}>
+      <path d="M12 23c-4.97 0-9-3.58-9-8 0-3.19 2.17-5.96 3.5-7.26.53-.51 1.43-.15 1.43.59v2.17c0 1.1.9 2 2 2h.17c.73 0 1.4-.32 1.83-.87L12 10.7c.43.55 1.1.87 1.83.87h.17c1.1 0 2-.9 2-2v-2.17c0-.74.9-1.1 1.43-.59C18.83 9.04 21 11.81 21 15c0 4.42-4.03 8-9 8z" />
+    </svg>
+  );
+}
+
+function StarIcon({ color }: { color: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill={color}>
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+    </svg>
+  );
+}
+
+function ClockIcon({ color }: { color: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill={color}>
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z" />
+    </svg>
+  );
+}
+
+export default function PadHeaderPreview(props: DemoProps) {
+  const { activeSubject = 'reading', themeColor = '#4CAF50' } = props;
+  const p = props as Record<string, unknown>;
+
+  const current = SUBJECTS.find((s) => s.key === activeSubject) || SUBJECTS[0];
+  const bg = (p[`padHeaderBg${cap(current.key)}`] as string) || '';
+
+  const themeLight = `${themeColor}20`;
+  const themeDark = `${themeColor}E0`;
+
+  return (
+    <div
+      className="relative w-full overflow-hidden rounded-[20px] bg-white"
+      style={{ aspectRatio: '1366 / 744' }}
+    >
+      {/* 第 1 层：Pad 底层图 */}
+      <img
+        src={current.bottom}
+        alt={`${current.label}Pad底层`}
+        className="absolute inset-0 h-full w-full object-cover"
+        style={{ zIndex: 1 }}
+      />
+
+      {/* 第 2 层：上传的 Pad 头图背景 */}
+      {bg ? (
+        <img
+          src={bg}
+          alt={`${current.label}Pad头图背景`}
+          className="absolute left-0 top-0 w-full object-cover"
+          style={{ zIndex: 2, aspectRatio: '1366 / 270' }}
+        />
+      ) : null}
+
+      {/* 第 3 层：Pad 上层图 */}
+      <img
+        src={current.top}
+        alt={`${current.label}Pad上层`}
+        className="absolute inset-0 h-full w-full object-cover"
+        style={{ zIndex: 3 }}
+      />
+
+      {/* 第 4 层：UI 元素层（使用绝对定位 + vw 单位） */}
+      <div className="absolute inset-0" style={{ zIndex: 4 }}>
+        {/* Tabs */}
+        <div
+          className="flex items-center gap-[2%]"
+          style={{ position: 'absolute', left: '8%', top: '4%', width: '80%' }}
+        >
+          {TABS.map((tab) => {
+            const isCurrent = current.label === tab;
+            return (
+              <span
+                key={tab}
+                className="px-[2.5%] py-[1%] rounded-full whitespace-nowrap flex-1 text-center"
+                style={{
+                  color: isCurrent ? themeColor : '#999',
+                  backgroundColor: isCurrent ? themeLight : 'transparent',
+                  fontWeight: isCurrent ? 600 : 400,
+                  fontSize: '2.2vw',
+                }}
+              >
+                {tab}
+              </span>
+            );
+          })}
+        </div>
+
+        {/* 积分/星星/时长 */}
+        <div
+          className="flex items-center gap-[3%]"
+          style={{ position: 'absolute', left: '8%', top: '12%', width: '70%' }}
+        >
+          <div className="flex items-center gap-[1%]">
+            <FlameIcon color="#FF6B35" />
+            <span style={{ color: themeColor, fontWeight: 700, fontSize: '2.4vw' }}>256</span>
+          </div>
+          <div className="flex items-center gap-[1%]">
+            <StarIcon color="#FFD700" />
+            <span style={{ color: themeColor, fontWeight: 700, fontSize: '2.4vw' }}>12</span>
+          </div>
+          <div className="flex items-center gap-[1%]">
+            <ClockIcon color={themeColor} />
+            <span style={{ color: themeColor, fontWeight: 700, fontSize: '2.4vw' }}>230</span>
+          </div>
+        </div>
+
+        {/* 卡通形象 - 使用 SVG 星星 */}
+        <div
+          className="rounded-full flex items-center justify-center"
+          style={{
+            position: 'absolute',
+            right: '8%',
+            top: '10%',
+            width: '6vw',
+            height: '6vw',
+            backgroundColor: '#FFF8DC',
+            border: `2px solid ${themeDark}`,
+          }}
+        >
+          <svg width="3vw" height="3vw" viewBox="0 0 24 24" fill={themeColor}>
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+          </svg>
+        </div>
+
+        {/* 限时活动进度条 */}
+        <div
+          style={{
+            position: 'absolute',
+            left: '8%',
+            right: '8%',
+            top: '20%',
+          }}
+        >
+          <div className="flex items-center justify-between mb-[1%]">
+            <span style={{ fontSize: '2vw', fontWeight: 600, color: '#333' }}>
+              限时完成50课 赢超萌装扮
+            </span>
+            <span style={{ fontSize: '2vw', fontWeight: 700, color: themeColor }}>
+              10 / 20
+            </span>
+          </div>
+          <div
+            className="rounded-full overflow-hidden"
+            style={{ height: '1.2vw', backgroundColor: '#F0F0F0' }}
+          >
+            <div
+              className="rounded-full"
+              style={{
+                width: '50%',
+                height: '100%',
+                background: `linear-gradient(90deg, ${themeColor}, ${themeDark})`,
+              }}
+            />
+          </div>
+        </div>
+
+        {/* 课程列表标题 */}
+        <div
+          className="flex items-center justify-between"
+          style={{
+            position: 'absolute',
+            left: '8%',
+            right: '8%',
+            top: '28%',
+          }}
+        >
+          <span style={{ fontSize: '2.8vw', fontWeight: 700, color: '#333' }}>
+            全年系统包-L3
+          </span>
+          <span style={{ fontSize: '1.6vw', color: '#999' }}>共20课</span>
+        </div>
+
+        {/* 课程卡片列表 */}
+        <div
+          className="flex flex-col gap-[1.5%]"
+          style={{
+            position: 'absolute',
+            left: '8%',
+            right: '8%',
+            top: '34%',
+            bottom: '16%',
+          }}
+        >
+          {[
+            { lesson: '第2课', title: '神奇的字母表', duration: '25分钟', active: false },
+            { lesson: '第3课', title: '故事里的秘密', duration: '30分钟', active: true },
+            { lesson: '第4课', title: '创意无限', duration: '28分钟', active: false },
+          ].map((item) => (
+            <div
+              key={item.lesson}
+              className="flex items-center gap-[3%] rounded-xl p-[2%]"
+              style={{
+                backgroundColor: item.active ? themeLight : '#FAFAFA',
+                border: item.active ? `2px solid ${themeColor}` : '2px solid transparent',
+              }}
+            >
+              <div
+                className="rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{
+                  width: '8vw',
+                  height: '5.5vw',
+                  backgroundColor: item.active ? themeColor : '#E0E0E0',
+                  color: '#FFF',
+                  fontSize: '1.6vw',
+                  fontWeight: 600,
+                }}
+              >
+                {item.lesson}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div style={{ fontSize: '1.8vw', fontWeight: 600, color: item.active ? themeColor : '#333' }}>
+                  {item.title}
+                </div>
+                <div style={{ fontSize: '1.3vw', color: '#999', marginTop: '0.5vw' }}>
+                  {item.duration}
+                </div>
+              </div>
+              {item.active && (
+                <div
+                  className="rounded-full px-[4%] py-[1.5%] flex-shrink-0"
+                  style={{
+                    backgroundColor: themeColor,
+                    color: '#FFF',
+                    fontSize: '1.5vw',
+                    fontWeight: 600,
+                  }}
+                >
+                  去学习
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* 底部导航栏 */}
+        <div
+          className="flex items-center justify-around"
+          style={{
+            position: 'absolute',
+            left: '5%',
+            right: '5%',
+            bottom: '3%',
+            height: '7vw',
+            backgroundColor: 'rgba(255,255,255,0.95)',
+            borderRadius: '24px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+          }}
+        >
+          {NAV_ITEMS.map((item, i) => {
+            const isActive = i === 1;
+            return (
+              <div
+                key={item.label}
+                className="flex flex-col items-center justify-center"
+                style={{ color: isActive ? themeColor : '#999', fontSize: '1.4vw' }}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                  <path d={item.icon} />
+                </svg>
+                <span style={{ marginTop: '0.5vw' }}>{item.label}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}

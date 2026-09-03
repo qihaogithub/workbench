@@ -1,0 +1,21 @@
+{
+  "auditId": "audit_1785826045837_2w8wka",
+  "at": 1785826045837,
+  "actor": {
+    "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+    "name": "qihao",
+    "role": "creator",
+    "source": "author-site"
+  },
+  "level": "L2",
+  "tool": "project_restore_version",
+  "projectId": "proj_1785742777589_ncs6r6",
+  "ok": true,
+  "diffSummary": {
+    "updated": [],
+    "notes": [
+      "从版本 v14 恢复整个项目",
+      "生成新版本 v15"
+    ]
+  }
+}

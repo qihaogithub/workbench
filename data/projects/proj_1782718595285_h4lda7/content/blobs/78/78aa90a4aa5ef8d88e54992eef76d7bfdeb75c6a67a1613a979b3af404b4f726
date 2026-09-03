@@ -1,0 +1,219 @@
+/* === 全局重置（限定在页面容器内） === */
+.page-container {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
+  background: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.page-container * {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* === 可滑动内容区域 === */
+.scrollable-content {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* 隐藏滚动条 */
+.scrollable-content::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.scrollable-content {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.content-wrapper {
+  width: 1133px;
+  min-height: 100vh;
+  position: relative;
+  margin: 0 auto;
+  background: #ffffff;
+}
+
+/* === 装饰层图片 === */
+.decorative-image {
+  position: absolute;
+  left: 177px;
+  top: 20px;
+  width: 780px;
+  height: 527px;
+  object-fit: cover;
+}
+
+/* === 模块通用 === */
+.section {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.invite-section {
+  position: absolute;
+  left: 177px;
+  top: 587px;
+  width: 780px;
+}
+
+.mall-section {
+  position: absolute;
+  left: 177px;
+  top: 761px;
+  width: 780px;
+}
+
+/* === 模块头部 === */
+.section-header {
+  width: 100%;
+  height: 34px;
+  padding: 0 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.section-title {
+  color: #666666;
+  font-size: 22.5px;
+  font-weight: 500;
+  line-height: 33.75px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.section-link {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 2px;
+}
+
+.section-link.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.link-text {
+  color: #b2b2b2;
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 27px;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.link-arrow {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* === 卡片行 === */
+.card-row {
+  width: 100%;
+  display: inline-flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 20px;
+  width: 385px;
+  height: 80px;
+}
+
+.card-image {
+  height: 100%;
+  width: auto;
+  object-fit: contain;
+}
+
+/* === 底部 Logo === */
+.footer-logo {
+  position: absolute;
+  left: 177px;
+  top: 915px;
+  width: 780px;
+  padding: 24px 10px;
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-image {
+  width: 156.98px;
+  height: 39.85px;
+  flex-shrink: 0;
+}
+
+/* === 底部广告图 === */
+.bottom-ad {
+  position: absolute;
+  left: 0;
+  top: 1024px;
+  width: 1133px;
+}
+
+.ad-image {
+  width: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* === 固定顶部导航栏 === */
+.fixed-top-bar {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1133px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.top-bar-image {
+  width: 100%;
+  height: 20px;
+  object-fit: cover;
+  display: block;
+}
+
+/* === 固定底部标签栏 === */
+.fixed-bottom-bar {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1133px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.bottom-bar-image {
+  width: 100%;
+  object-fit: contain;
+  display: block;
+}

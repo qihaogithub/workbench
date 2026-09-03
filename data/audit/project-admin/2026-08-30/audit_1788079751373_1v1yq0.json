@@ -1,0 +1,20 @@
+{
+  "auditId": "audit_1788079751373_1v1yq0",
+  "at": 1788079751373,
+  "actor": {
+    "id": "f0a7b4eb-bc05-4112-b412-672cf8037a5a",
+    "name": "test",
+    "role": "creator",
+    "source": "author-site"
+  },
+  "level": "L3",
+  "tool": "project_trash",
+  "projectId": "proj_1788000733881_l91myq",
+  "resourceId": "proj_1788000733881_l91myq",
+  "ok": true,
+  "diffSummary": {
+    "deleted": [
+      "project:proj_1788000733881_l91myq"
+    ]
+  }
+}

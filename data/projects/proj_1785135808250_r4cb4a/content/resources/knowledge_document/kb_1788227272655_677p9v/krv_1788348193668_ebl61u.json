@@ -1,0 +1,34 @@
+{
+  "id": "krv_1788348193668_ebl61u",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "kind": "knowledge_document",
+  "resourceId": "kb_1788227272655_677p9v",
+  "previousVersionId": "krv_1788348190864_s67e6w",
+  "contentHash": "33ca5fc3ccad58810ce4dc10ad6296e9703b98794712fe6f229701e02a3949e3",
+  "blobRefs": [
+    "b3d8cf968648b10d50bd259687d5f38a8d98d82a65181f9e29a71f29cb2c829d"
+  ],
+  "metadata": {
+    "item": {
+      "id": "kb_1788227272655_677p9v",
+      "title": "闯关活动",
+      "source": "user",
+      "description": "闯关活动",
+      "fileName": "闯关活动.md",
+      "addedAt": "2026-09-01T01:47:52.654Z",
+      "updatedAt": "2026-09-02T11:23:08.890Z",
+      "sizeBytes": 155136
+    },
+    "files": {
+      "markdown": "b3d8cf968648b10d50bd259687d5f38a8d98d82a65181f9e29a71f29cb2c829d"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1788348193671,
+  "createdBy": "qihao",
+  "source": "user"
+}

@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "c5f0f91e-43a3-4d1e-b275-dc8c326d5912",
+  "projectId": "proj_1788144496725_oi5vie",
+  "workspaceId": "live-1788144497312-6bv0nfrgd",
+  "baseRevision": 0,
+  "revision": 8,
+  "rootHash": "d41ee7c0ace3e73ac8cfd6f6b03099fc1109fcba38f9f7954cd88fe3b823c228",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/page_6f3v/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "cb3a191179d4c3a0a3feb8c90639c1ebcdac7e301e5a93dd678514600fd9a71e"
+    }
+  ],
+  "committedAt": 1788144528482
+}

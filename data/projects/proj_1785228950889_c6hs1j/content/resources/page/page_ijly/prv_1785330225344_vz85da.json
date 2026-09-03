@@ -1,0 +1,43 @@
+{
+  "id": "prv_1785330225344_vz85da",
+  "projectId": "proj_1785228950889_c6hs1j",
+  "kind": "page",
+  "resourceId": "page_ijly",
+  "workspaceId": "live-1785228952059-e70ctz1pw",
+  "workspaceRevision": 18,
+  "workspaceRootHash": "6415b7da7121dca9b8cc12239513a5f251991822bbd6dfdce4ef15608cd1ebd3",
+  "previousVersionId": "prv_1785231830223_qflm37",
+  "contentHash": "00d3981d16c92cb140a74372a8e6dd9ecfcff10fac49b2e563fc87198d3868e6",
+  "blobRefs": [
+    "510e7a947e67de57503457c53a93734cfe9b1f745f01e6284db844ed7512ecf9",
+    "2d10f12536ac8509515a0be53c6c4800aba412b450d6bef24587617da74ed2c0",
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "5be6a873dc0b04d74796a438d75f23e379f59f780631875a7bfb4a0ece8f0bea"
+  ],
+  "metadata": {
+    "page": {
+      "id": "page_ijly",
+      "name": "明星赛-手机",
+      "routeKey": "page",
+      "order": 2,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    "files": {
+      "schema": "510e7a947e67de57503457c53a93734cfe9b1f745f01e6284db844ed7512ecf9",
+      "prototypeHtml": "2d10f12536ac8509515a0be53c6c4800aba412b450d6bef24587617da74ed2c0",
+      "prototypeCss": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "prototypeMeta": "5be6a873dc0b04d74796a438d75f23e379f59f780631875a7bfb4a0ece8f0bea"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1785330225346,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录明星赛-手机"
+}

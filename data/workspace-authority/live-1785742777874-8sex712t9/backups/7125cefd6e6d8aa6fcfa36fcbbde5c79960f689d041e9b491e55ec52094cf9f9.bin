@@ -1,0 +1,13 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "config-demo_m7p2",
+      "name": "配置项类型示例",
+      "runtimeType": "high-fidelity-react",
+      "order": 0,
+      "parentId": null,
+      "routeKey": "page"
+    }
+  ]
+}

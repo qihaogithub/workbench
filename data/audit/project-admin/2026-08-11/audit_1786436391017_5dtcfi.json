@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1786436391017_5dtcfi",
+  "at": 1786436391017,
+  "actor": {
+    "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+    "name": "qihao",
+    "role": "creator",
+    "source": "author-site"
+  },
+  "level": "L2",
+  "tool": "page_create_version",
+  "projectId": "proj_1786367903885_iu08e4",
+  "resourceId": "quiet-studio_q7m4",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "page-version:quiet-studio_q7m4:prv_1786436391003_o4vx2p"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "de57b0e8-f03a-48cf-8fe4-82146489d055",
+  "projectId": "proj_1788141806566_0aps89",
+  "workspaceId": "live-1788141807256-9xerzl5sd",
+  "baseRevision": 0,
+  "revision": 290,
+  "rootHash": "ecb244ac142682436450f09bd28756a0985d9941f8cf82381af3d848505b7922",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/clipboard-import_e05e9d/config.schema.json",
+      "action": "modified",
+      "beforeHash": "d1e4969efd9ebbb2cdcd21ea008a0fd49065200fcedc1551c8928714707695f1",
+      "afterHash": "a16e63f6815ffbd2d44540da15cc3bfcdd15385933490f63bc45a4433308f9b0"
+    }
+  ],
+  "committedAt": 1788315988061
+}

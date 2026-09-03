@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "886ab57c-2359-47b9-a7f5-f93ee339cc33",
+  "projectId": "proj_1785687393956_aa29zz",
+  "workspaceId": "live-1785687394721-g7dafuhq4",
+  "baseRevision": 0,
+  "revision": 47,
+  "rootHash": "74014eb76a0d654529f294fc9f6c06f1fff9edc89ee96e5253c2e09f57d77ad5",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/basic-fields_xa3k/index.tsx",
+      "action": "modified",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/basic-fields_xa3k/config.schema.json",
+      "action": "modified",
+      "beforeHash": "de31e6703a39937445205e8f79a6ff15447696c9fe89ac62bd70b72d18eaecf4",
+      "afterHash": "de31e6703a39937445205e8f79a6ff15447696c9fe89ac62bd70b72d18eaecf4"
+    },
+    {
+      "path": "demos/basic-fields_xa3k/prototype.html",
+      "action": "modified",
+      "beforeHash": "977c7e72dbe3252bd19c0d1bc4a7dfffee07bac20bbbf9a54c7a690f7d879ae6",
+      "afterHash": "977c7e72dbe3252bd19c0d1bc4a7dfffee07bac20bbbf9a54c7a690f7d879ae6"
+    },
+    {
+      "path": "demos/basic-fields_xa3k/prototype.css",
+      "action": "modified",
+      "beforeHash": "ba34015efb0f63c6c2d0c57adb82d632ce7b63c3a7c667eb36eb6f56bef1b4dd",
+      "afterHash": "ba34015efb0f63c6c2d0c57adb82d632ce7b63c3a7c667eb36eb6f56bef1b4dd"
+    }
+  ],
+  "committedAt": 1785714879751
+}

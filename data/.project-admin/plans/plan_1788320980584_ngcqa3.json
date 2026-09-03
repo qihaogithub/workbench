@@ -1,0 +1,12 @@
+{
+  "planId": "plan_1788320980584_ngcqa3",
+  "operation": "project_delete",
+  "resourceId": "proj_1788320370753_csdemc",
+  "impact": [
+    "将项目 游戏题答题反馈 移入回收站",
+    "保留 0 个页面和项目工作空间 30 天",
+    "立即下线已发布产物；恢复后需要重新发布"
+  ],
+  "reversible": true,
+  "confirmToken": "confirm_1788320980584_yoqz0x"
+}

@@ -1,0 +1,25 @@
+{
+  "committed": true,
+  "mutationId": "7580503c-20b2-4ff3-a60b-5212a7a84362",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "baseRevision": 0,
+  "revision": 333,
+  "rootHash": "c3afbc4c59ddd6dc227157271dfe4f023c85e065ce5f4b178e68e14f6753e0fb",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/quiz-wrong_b7k9/index.tsx",
+      "action": "modified",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/quiz-wrong_b7k9/config.schema.json",
+      "action": "modified",
+      "beforeHash": "8eb694face506cec58fe1cf33da82291f93657d7d84d6c27980977a8fb380e26",
+      "afterHash": "8eb694face506cec58fe1cf33da82291f93657d7d84d6c27980977a8fb380e26"
+    }
+  ],
+  "committedAt": 1785492713409
+}

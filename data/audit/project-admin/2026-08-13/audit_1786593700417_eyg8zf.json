@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1786593700417_eyg8zf",
+  "at": 1786593700417,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1786593700417_2o5g7z",
+  "inputSummary": {
+    "name": "E2E:20260813T035949365Z-j6msnb:配置功能回归",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1786593700417_2o5g7z"
+    ]
+  }
+}

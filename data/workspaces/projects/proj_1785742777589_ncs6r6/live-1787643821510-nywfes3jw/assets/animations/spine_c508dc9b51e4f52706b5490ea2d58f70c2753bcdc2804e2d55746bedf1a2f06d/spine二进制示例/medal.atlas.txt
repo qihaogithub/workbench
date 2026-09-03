@@ -1,0 +1,472 @@
+medal.png
+	size: 1524, 1032
+	filter: Linear, Linear
+03_star1
+	bounds: 1243, 75, 64, 78
+03_star2
+	bounds: 1309, 108, 49, 70
+03_star3
+	bounds: 1309, 52, 49, 54
+1000_badge_1
+	bounds: 1023, 33, 21, 22
+	rotate: 90
+1000_badge_15
+	bounds: 1108, 38, 61, 98
+1000_badge_16
+	bounds: 1370, 374, 64, 98
+1000_badge_17
+	bounds: 178, 40, 186, 101
+	offsets: 1, 0, 187, 101
+	rotate: 90
+1000_badge_18
+	bounds: 419, 551, 186, 101
+1000_badge_19
+	bounds: 155, 34, 17, 16
+1000_badge_2
+	bounds: 419, 654, 239, 128
+1000_badge_20
+	bounds: 1047, 33, 22, 21
+1000_badge_21
+	bounds: 1110, 700, 17, 17
+1000_badge_22
+	bounds: 604, 19, 22, 23
+1000_badge_23
+	bounds: 1497, 163, 25, 25
+1000_badge_24
+	bounds: 521, 2, 12, 12
+	offsets: 1, 1, 13, 13
+1000_badge_25
+	bounds: 961, 11, 27, 27
+1000_badge_26
+	bounds: 1023, 56, 83, 83
+1000_badge_27
+	bounds: 673, 88, 130, 134
+1000_badge_28
+	bounds: 1019, 15, 16, 17
+	rotate: 90
+1000_badge_29
+	bounds: 1038, 15, 16, 16
+1000_badge_3
+	bounds: 1360, 115, 64, 69
+1000_badge_30
+	bounds: 1497, 49, 22, 22
+1000_badge_31
+	bounds: 1497, 98, 22, 23
+1000_badge_32
+	bounds: 907, 79, 79, 114
+	rotate: 90
+1000_badge_33
+	bounds: 1051, 436, 79, 114
+1000_badge_34
+	bounds: 2, 649, 415, 381
+1000_badge_4
+	bounds: 1360, 44, 64, 69
+1000_badge_5
+	bounds: 636, 35, 51, 69
+	rotate: 90
+1000_badge_6
+	bounds: 1196, 879, 43, 75
+1000_badge_7
+	bounds: 1433, 589, 89, 68
+1000_badge_8
+	bounds: 1413, 190, 94, 68
+1000_badge_9
+	bounds: 1279, 2, 22, 47
+1000_badge_glass1
+	bounds: 578, 2, 16, 15
+1000_badge_glass10
+	bounds: 1188, 759, 24, 18
+	rotate: 90
+1000_badge_glass11
+	bounds: 1089, 700, 19, 17
+1000_badge_glass12
+	bounds: 797, 2, 32, 18
+	rotate: 90
+1000_badge_glass13
+	bounds: 403, 2, 30, 29
+	offsets: 1, 2, 32, 32
+	rotate: 90
+1000_badge_glass14
+	bounds: 1171, 48, 70, 90
+1000_badge_glass15
+	bounds: 1273, 340, 104, 95
+	rotate: 90
+1000_badge_glass16
+	bounds: 1245, 911, 189, 119
+	offsets: 2, 3, 193, 124
+1000_badge_glass17
+	bounds: 699, 224, 165, 96
+	rotate: 90
+1000_badge_glass2
+	bounds: 434, 2, 30, 27
+	rotate: 90
+1000_badge_glass3
+	bounds: 463, 2, 30, 27
+	rotate: 90
+1000_badge_glass4
+	bounds: 1342, 577, 13, 11
+	offsets: 0, 0, 13, 12
+1000_badge_glass5
+	bounds: 1188, 302, 14, 12
+	offsets: 0, 1, 14, 13
+1000_badge_glass6
+	bounds: 492, 2, 30, 27
+	rotate: 90
+1000_badge_glass7
+	bounds: 1497, 123, 38, 19
+	rotate: 90
+1000_badge_glass8
+	bounds: 378, 436, 28, 40
+	offsets: 0, 0, 28, 42
+1000_badge_glass9
+	bounds: 1342, 474, 101, 94
+	offsets: 2, 2, 105, 98
+	rotate: 90
+1000_badge_light
+	bounds: 1059, 552, 146, 70
+	rotate: 90
+1000_badge_light2
+	bounds: 660, 651, 208, 87
+1000_badge_num
+	bounds: 749, 396, 143, 44
+	offsets: 0, 0, 143, 45
+	rotate: 90
+1000_ld_arm1
+	bounds: 1357, 577, 88, 74
+	rotate: 90
+1000_ld_arm2
+	bounds: 1436, 362, 87, 74
+	rotate: 90
+1000_ld_arm_light
+	bounds: 1019, 302, 132, 115
+	rotate: 90
+1000_ld_arm_light2
+	bounds: 907, 160, 133, 114
+	rotate: 90
+1000_ld_body
+	bounds: 2, 228, 212, 210
+1000_ld_body_light
+	bounds: 668, 805, 226, 225
+	offsets: 1, 1, 228, 227
+1000_ld_brow
+	bounds: 378, 478, 50, 28
+	rotate: 90
+1000_ld_cl1
+	bounds: 1416, 793, 24, 22
+	rotate: 90
+1000_ld_cl2
+	bounds: 521, 16, 27, 26
+1000_ld_cl3
+	bounds: 1188, 785, 92, 31
+	rotate: 90
+1000_ld_cl4
+	bounds: 1221, 785, 92, 31
+	rotate: 90
+1000_ld_cl5
+	bounds: 2, 440, 374, 88
+1000_ld_cl_light
+	bounds: 2, 530, 404, 117
+	offsets: 1, 1, 406, 119
+1000_ld_ear1
+	bounds: 1438, 451, 65, 84
+	rotate: 90
+1000_ld_ear2
+	bounds: 1438, 518, 69, 84
+	offsets: 1, 0, 70, 84
+	rotate: 90
+1000_ld_ear3
+	bounds: 1440, 737, 80, 82
+	rotate: 90
+1000_ld_ear_light
+	bounds: 1416, 819, 85, 106
+	rotate: 90
+1000_ld_eye
+	bounds: 1426, 119, 69, 69
+1000_ld_eye2
+	bounds: 1426, 48, 69, 69
+1000_ld_eyeball
+	bounds: 951, 40, 37, 37
+1000_ld_face1
+	bounds: 870, 700, 38, 24
+	rotate: 90
+1000_ld_face2
+	bounds: 544, 391, 39, 24
+1000_ld_hand1
+	bounds: 1171, 2, 52, 44
+1000_ld_hand2
+	bounds: 1225, 2, 52, 44
+1000_ld_hand3
+	bounds: 1426, 2, 44, 42
+	rotate: 90
+1000_ld_hand4
+	bounds: 1470, 2, 44, 42
+	rotate: 90
+1000_ld_hand5
+	bounds: 1089, 719, 34, 40
+	rotate: 90
+1000_ld_hand6
+	bounds: 216, 228, 34, 39
+1000_ld_hand7
+	bounds: 859, 48, 46, 38
+1000_ld_hand8
+	bounds: 814, 44, 43, 42
+	offsets: 0, 0, 43, 43
+1000_ld_hand9
+	bounds: 907, 40, 42, 37
+	offsets: 0, 0, 42, 38
+1000_ld_leg1_1
+	bounds: 155, 2, 30, 62
+	rotate: 90
+1000_ld_leg1_2
+	bounds: 990, 17, 27, 27
+	offsets: 1, 0, 28, 27
+1000_ld_leg1_3
+	bounds: 323, 9, 27, 43
+	rotate: 90
+1000_ld_leg2_1
+	bounds: 1243, 51, 22, 60
+	rotate: 90
+1000_ld_leg2_2
+	bounds: 252, 230, 27, 37
+1000_ld_leg2_3
+	bounds: 876, 4, 27, 42
+	offsets: 1, 1, 28, 43
+1000_ld_leg_light
+	bounds: 1440, 659, 76, 82
+	rotate: 90
+1000_ld_leg_light2
+	bounds: 405, 34, 59, 104
+	rotate: 90
+1000_ld_mouth
+	bounds: 281, 38, 122, 39
+1000_ld_point1
+	bounds: 368, 8, 28, 33
+	offsets: 2, 4, 31, 41
+	rotate: 90
+1000_ld_point2
+	bounds: 1370, 340, 38, 32
+	offsets: 6, 4, 49, 41
+1000_ld_point3
+	bounds: 293, 2, 28, 34
+	offsets: 3, 8, 33, 49
+1000_ld_point4
+	bounds: 762, 2, 32, 33
+	offsets: 5, 6, 41, 45
+	rotate: 90
+1000_ld_s1
+	bounds: 905, 9, 26, 29
+1000_ld_s2
+	bounds: 933, 9, 26, 29
+1000_light1_01
+	bounds: 1023, 141, 83, 159
+1000_light1_02
+	bounds: 1188, 316, 83, 118
+1000_light1_03
+	bounds: 1436, 906, 84, 124
+1000_light1_04
+	bounds: 1256, 446, 84, 142
+1000_light_point1
+	bounds: 1433, 660, 5, 5
+	offsets: 1, 0, 7, 6
+1000_light_point10
+	bounds: 1273, 319, 19, 19
+	offsets: 2, 2, 23, 23
+1000_light_point11
+	bounds: 589, 541, 8, 9
+	offsets: 2, 1, 11, 11
+	rotate: 90
+1000_light_point2
+	bounds: 596, 3, 14, 14
+	offsets: 2, 1, 17, 17
+1000_light_point3
+	bounds: 673, 224, 10, 10
+	offsets: 1, 1, 12, 12
+1000_light_point4
+	bounds: 892, 241, 7, 7
+	offsets: 1, 1, 9, 9
+1000_light_point5
+	bounds: 408, 638, 9, 9
+	offsets: 2, 1, 12, 12
+1000_light_point6
+	bounds: 660, 776, 6, 6
+	offsets: 1, 1, 8, 8
+1000_light_point7
+	bounds: 797, 233, 6, 6
+	offsets: 1, 1, 8, 8
+1000_light_point8
+	bounds: 1051, 555, 6, 6
+	offsets: 1, 1, 8, 8
+1000_light_point9
+	bounds: 1071, 32, 22, 22
+	offsets: 1, 1, 24, 24
+1000_line1_01
+	bounds: 896, 819, 290, 64
+1000_line1_02
+	bounds: 896, 755, 290, 62
+1000_point1_01
+	bounds: 990, 46, 31, 31
+	offsets: 3, 4, 38, 38
+1000_point1_02
+	bounds: 707, 35, 51, 53
+	offsets: 5, 4, 60, 62
+	rotate: 90
+1000_point1_03
+	bounds: 219, 2, 34, 36
+	offsets: 0, 0, 35, 36
+1000_robat_1
+	bounds: 376, 420, 14, 30
+	rotate: 90
+1000_robat_2
+	bounds: 255, 2, 34, 36
+	rotate: 90
+1000_robat_3
+	bounds: 841, 2, 33, 36
+1000_robat_4
+	bounds: 762, 36, 50, 50
+1000_robat_e1
+	bounds: 578, 19, 24, 23
+	offsets: 1, 1, 26, 25
+1000_robat_e2
+	bounds: 1497, 73, 22, 23
+	offsets: 1, 1, 24, 25
+1000_robat_m
+	bounds: 870, 417, 17, 17
+	offsets: 2, 2, 22, 22
+1000_robat_wine1
+	bounds: 892, 250, 13, 43
+1000_robat_wine2
+	bounds: 817, 2, 40, 22
+	rotate: 90
+100_100
+	bounds: 1413, 260, 100, 100
+250_badge_num_0
+	bounds: 511, 44, 123, 46
+250_badge_num_1
+	bounds: 1136, 302, 133, 50
+	offsets: 4, 1, 141, 52
+	rotate: 90
+250_badge_num_2
+	bounds: 1203, 436, 152, 51
+	offsets: 0, 1, 152, 52
+	rotate: 90
+250_badge_num_3
+	bounds: 896, 700, 191, 53
+	offsets: 4, 2, 200, 57
+250_badge_num_4
+	bounds: 1360, 186, 152, 51
+	offsets: 0, 1, 153, 53
+	rotate: 90
+250_badge_num_5
+	bounds: 1108, 138, 162, 51
+	offsets: 5, 2, 171, 55
+	rotate: 90
+250_point1
+	bounds: 1342, 446, 26, 26
+400_badge_line1
+	bounds: 896, 885, 69, 298
+	rotate: 90
+Fx_tex_point1
+	bounds: 1327, 667, 111, 111
+	offsets: 9, 9, 128, 128
+fx_light_cycle1
+	bounds: 2, 52, 174, 174
+fx_light_cycle2
+	bounds: 544, 236, 153, 153
+fx_light_star1
+	bounds: 1209, 662, 116, 116
+	offsets: 6, 6, 128, 128
+fx_rainbow
+	bounds: 419, 784, 247, 246
+	offsets: 7, 6, 256, 256
+guangci2
+	bounds: 216, 269, 169, 158
+	offsets: 14, 13, 197, 184
+	rotate: 90
+guangci3
+	bounds: 376, 270, 145, 166
+	offsets: 13, 14, 172, 194
+	rotate: 90
+kongyuan2
+	bounds: 550, 16, 26, 26
+	offsets: 4, 4, 34, 34
+lightning1
+	bounds: 1256, 839, 70, 158
+	offsets: 29, 21, 200, 200
+	rotate: 90
+lightning10
+	bounds: 1256, 780, 57, 158
+	offsets: 104, 23, 200, 200
+	rotate: 90
+lightning11
+	bounds: 1161, 140, 63, 160
+	offsets: 98, 23, 200, 200
+lightning12
+	bounds: 1294, 180, 64, 158
+	offsets: 97, 25, 200, 200
+lightning13
+	bounds: 1226, 155, 66, 159
+	offsets: 95, 25, 200, 200
+lightning14
+	bounds: 1132, 437, 69, 151
+	offsets: 92, 33, 200, 200
+lightning15
+	bounds: 1209, 590, 70, 146
+	offsets: 92, 38, 200, 200
+	rotate: 90
+lightning2
+	bounds: 795, 490, 73, 159
+	offsets: 30, 20, 200, 200
+lightning3
+	bounds: 1131, 590, 76, 163
+	offsets: 30, 17, 200, 200
+lightning4
+	bounds: 797, 241, 93, 171
+	offsets: 32, 18, 200, 200
+lightning5
+	bounds: 390, 95, 137, 173
+	offsets: 35, 12, 200, 200
+lightning6
+	bounds: 589, 391, 148, 158
+	offsets: 35, 24, 200, 200
+	rotate: 90
+lightning7
+	bounds: 529, 92, 142, 142
+	offsets: 37, 32, 200, 200
+lightning8
+	bounds: 892, 295, 125, 139
+	offsets: 55, 22, 200, 200
+lightning9
+	bounds: 2, 2, 48, 151
+	offsets: 113, 22, 200, 200
+	rotate: 90
+pop_purple1
+	bounds: 805, 88, 100, 151
+	offsets: 2, 6, 108, 163
+pop_purple2
+	bounds: 870, 436, 125, 179
+	offsets: 8, 5, 142, 190
+	rotate: 90
+pop_purple3
+	bounds: 408, 417, 132, 179
+	offsets: 5, 5, 143, 190
+	rotate: 90
+pop_purple4
+	bounds: 870, 563, 135, 187
+	offsets: 2, 5, 139, 198
+	rotate: 90
+pop_purple6
+	bounds: 607, 541, 108, 186
+	offsets: 3, 3, 113, 194
+	rotate: 90
+pop_purple8
+	bounds: 281, 79, 107, 188
+	offsets: 3, 2, 112, 195
+vfx_shexian_02
+	bounds: 896, 956, 347, 74
+	offsets: 1, 2, 353, 78
+yuandian
+	bounds: 795, 414, 73, 74
+	offsets: 8, 8, 89, 90
+zhuixing
+	bounds: 668, 740, 226, 63
+	offsets: 6, 3, 237, 69

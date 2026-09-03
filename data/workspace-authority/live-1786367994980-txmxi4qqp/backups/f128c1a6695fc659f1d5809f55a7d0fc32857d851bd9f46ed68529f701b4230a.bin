@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "projectId": "proj_1786367903885_iu08e4",
+  "updatedAt": 1786508994715,
+  "state": {
+    "viewport": {
+      "x": 140.4409600841004,
+      "y": 199.9034394600434,
+      "zoom": 0.2552937386868927
+    },
+    "pages": {
+      "quiet-studio_q7m4": {
+        "x": -196.58309386973178,
+        "y": -2.4365122126436782,
+        "width": 375,
+        "height": 1587,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x667"
+      },
+      "sunny-reading_k4m8": {
+        "x": 242.90832584724546,
+        "y": -2.4365122126436782,
+        "width": 375,
+        "height": 1558,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_x992": {
+        "x": 792.9440512459406,
+        "y": -2.4365122126436782,
+        "width": 418.0047848861307,
+        "height": 905.1196942067684,
+        "sizeMode": "custom",
+        "previewSizeKey": "375x812",
+        "zIndex": 2
+      },
+      "page_tbq2": {
+        "x": 1358.8430658697337,
+        "y": 6.355759399604949,
+        "width": 375,
+        "height": 812,
+        "zIndex": 2,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

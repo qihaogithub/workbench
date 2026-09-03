@@ -1,0 +1,38 @@
+{
+  "id": "prv_1784735248568_td89hz",
+  "projectId": "proj_1779608460378",
+  "kind": "page",
+  "resourceId": "demo_1779608460379_a1b2c3",
+  "workspaceId": "live-1784734361025-mhywhcp7c",
+  "workspaceRevision": 7,
+  "workspaceRootHash": "8cae8c4bd3e33ae2d64f3777d9adc8e9076d9e5d6fb9499b5c70f06fba65330f",
+  "previousVersionId": "prv_1784734346623_r3oq2j",
+  "contentHash": "2d919ef8d4eec02995d8a57132832014ef5cee6bedaecad96471d6cb7b8f6d3e",
+  "blobRefs": [
+    "be3bc6a86a19f296fe7fdd9d2831ba12575a863aa451a82e36bd2ea61649c15f",
+    "467aedea1ad83837cb853de51ef6e854de035f134d564a6694b5110d83372e15"
+  ],
+  "metadata": {
+    "page": {
+      "id": "demo_1779608460379_a1b2c3",
+      "name": "广场页面-手机",
+      "order": 0,
+      "parentId": null,
+      "routeKey": "page"
+    },
+    "files": {
+      "schema": "be3bc6a86a19f296fe7fdd9d2831ba12575a863aa451a82e36bd2ea61649c15f",
+      "code": "467aedea1ad83837cb853de51ef6e854de035f134d564a6694b5110d83372e15"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "high-fidelity-react",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1784735248571,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录广场页面-手机"
+}

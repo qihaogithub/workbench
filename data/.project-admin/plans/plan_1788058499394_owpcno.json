@@ -1,0 +1,12 @@
+{
+  "planId": "plan_1788058499394_owpcno",
+  "operation": "project_delete",
+  "resourceId": "proj_1788000675500_fcpt6k",
+  "impact": [
+    "删除项目 E2E:20260829T105112314Z-wivmd2:配置图片白板宿主回归",
+    "删除 0 个页面",
+    "删除项目工作空间和元数据"
+  ],
+  "reversible": true,
+  "confirmToken": "confirm_1788058499394_puwin6"
+}

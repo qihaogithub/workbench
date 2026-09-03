@@ -1,0 +1,29 @@
+{
+  "id": "commit_1785229956768_yy2evd",
+  "projectId": "proj_1785228950889_c6hs1j",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录明星赛pad",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "pad_lawk",
+      "versionId": "prv_1785229956767_28noej"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "pad_lawk",
+      "toVersionId": "prv_1785229956767_28noej"
+    }
+  ],
+  "createdAt": 1785229956768,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785228952059-e70ctz1pw",
+    "workspaceRevision": 22,
+    "workspaceRootHash": "acec361258681c2eca367d33d72018497d611d865193a9997227a83c6021617d"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1787810961796_huozts",
+  "at": 1787810961796,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1787810961794_3w2mu8",
+  "inputSummary": {
+    "name": "E2E:20260827T060920267Z-sie4bf:画布 Section 回归",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1787810961794_3w2mu8"
+    ]
+  }
+}

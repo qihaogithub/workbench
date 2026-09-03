@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "50c769cd-6661-48df-a9e6-4e9ca5479e3c",
+  "projectId": "proj_1785421657423_1ptong",
+  "workspaceId": "live-1785423063401-lv7iqwmfa",
+  "baseRevision": 0,
+  "revision": 87,
+  "rootHash": "78d9b006727e2d2593daf4ba8b62e333560b35712833e165ff86b50082fb9561",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/config-demo_x7k2/index.tsx",
+      "action": "modified",
+      "beforeHash": "982715ea18b935e8946c8b36a3247f5e0a2a2daa9c353ee65a7c6e6245c2d3c2",
+      "afterHash": "7aa2227f33888f52b153257cb1156a00f2ffd70d9d58882e260b6d279dde24da"
+    }
+  ],
+  "committedAt": 1785550100819
+}

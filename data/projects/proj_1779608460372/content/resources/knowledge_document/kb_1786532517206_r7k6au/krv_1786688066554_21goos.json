@@ -1,0 +1,35 @@
+{
+  "id": "krv_1786688066554_21goos",
+  "projectId": "proj_1779608460372",
+  "kind": "knowledge_document",
+  "resourceId": "kb_1786532517206_r7k6au",
+  "previousVersionId": "krv_1786688065621_pyxpz9",
+  "contentHash": "5fe9b7558f4f66293343132dedc62b8107afe57b3c6f4b915f27fa319ef16689",
+  "blobRefs": [
+    "921fef2844dd3818cefa1dec9dc9aa1cfc049aa98d448b95160de9aacc682521"
+  ],
+  "metadata": {
+    "item": {
+      "id": "kb_1786532517206_r7k6au",
+      "title": "未命名文档",
+      "source": "user",
+      "description": "未命名文档",
+      "fileName": "未命名文档.md",
+      "addedAt": "2026-08-12T11:01:57.206Z",
+      "updatedAt": "2026-08-14T06:14:26.390Z",
+      "sizeBytes": 143
+    },
+    "files": {
+      "markdown": "921fef2844dd3818cefa1dec9dc9aa1cfc049aa98d448b95160de9aacc682521"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1786688066558,
+  "createdBy": "Author Site",
+  "source": "user",
+  "note": "更新知识文档 未命名文档"
+}

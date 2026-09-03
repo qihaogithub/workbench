@@ -1,0 +1,347 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: #0f0f14;
+  color: #e8e8ed;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ========== 主容器 — flex 列，支持 CSS order 排序 ========== */
+.showcase {
+  max-width: 375px;
+  margin: 0 auto;
+  padding: 0 0 40px;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #13131a 0%, #0f0f14 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ========== 每个 section 为一个 flex 项，order 由 data-bind 控制 ========== */
+.section {
+  margin: 0 16px;
+  display: block;
+}
+
+/* ========== 类型标签 ========== */
+.section-type {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b6b7b;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 6px;
+  padding-left: 4px;
+}
+
+/* ========== 卡片 ========== */
+.section-card {
+  padding: 20px;
+  background: #1a1a24;
+  border-radius: 12px;
+  border: 1px solid #2a2a38;
+}
+
+/* ========== 标题（string） ========== */
+.section-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background: linear-gradient(135deg, #FF6B35, #FF9A5C);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 8px;
+}
+
+/* ========== 描述文字 ========== */
+.section-desc {
+  margin-top: 12px;
+  font-size: 11px;
+  color: #4a4a5a;
+  line-height: 1.5;
+  padding-top: 12px;
+  border-top: 1px solid #22222e;
+}
+
+/* ========== 配置行（number） ========== */
+.config-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.config-label {
+  font-size: 14px;
+  color: #9898aa;
+}
+
+.config-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: #e8e8ed;
+}
+
+.config-value.highlight {
+  color: #FF6B35;
+  font-weight: 700;
+  font-size: 24px;
+}
+
+/* ========== 开关行（boolean） ========== */
+.toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.toggle-badge {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ========== 作者信息（object） ========== */
+.author-block {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #FF6B35, #FF9A5C);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.author-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.author-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #e8e8ed;
+}
+
+.author-level {
+  font-size: 12px;
+  color: #FF9A5C;
+  background: rgba(255, 107, 53, 0.12);
+  padding: 2px 8px;
+  border-radius: 10px;
+  display: inline-block;
+  width: fit-content;
+}
+
+/* ========== 标签（array） ========== */
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag {
+  display: inline-block;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: #FF9A5C;
+  background: rgba(255, 107, 53, 0.1);
+  border: 1px solid rgba(255, 107, 53, 0.25);
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+/* ========== 颜色（color） ========== */
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 0;
+}
+
+.color-swatch {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 2px solid #2a2a38;
+  flex-shrink: 0;
+  transition: background-color 0.3s;
+}
+
+.color-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.color-name {
+  font-size: 13px;
+  color: #9898aa;
+}
+
+.color-hex {
+  font-size: 14px;
+  font-weight: 600;
+  font-family: "SF Mono", "Fira Code", monospace;
+  color: #e8e8ed;
+}
+
+/* ========== 枚举（enum） ========== */
+.theme-indicator {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.theme-label {
+  font-size: 14px;
+  color: #9898aa;
+}
+
+.theme-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #FF6B35;
+  padding: 4px 14px;
+  background: rgba(255, 107, 53, 0.12);
+  border: 1px solid rgba(255, 107, 53, 0.25);
+  border-radius: 8px;
+}
+
+/* ========== 图片预览（image） ========== */
+.image-preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #22222e;
+  border: 1px dashed #3a3a4a;
+}
+
+.preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.preview-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #4a4a5a;
+  font-size: 13px;
+}
+
+.preview-img[src=""] + .preview-placeholder { display: flex; }
+.preview-img:not([src=""]) ~ .preview-placeholder { display: none; }
+
+/* ========== 模块数组（oneOf） ========== */
+.modules {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.module-item {
+  position: relative;
+  padding: 16px;
+  background: #22222e;
+  border-radius: 10px;
+  border: 1px solid #2a2a38;
+}
+
+.module-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #e8e8ed;
+  background: rgba(255, 107, 53, 0.85);
+  border-radius: 8px;
+  letter-spacing: 0.3px;
+}
+
+.module-item.module-video .module-badge {
+  background: rgba(0, 78, 137, 0.85);
+}
+
+.module-img,
+.module-cover {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+}
+
+.module-placeholder {
+  width: 100%;
+  padding: 32px 0;
+  text-align: center;
+  color: #4a4a5a;
+  font-size: 12px;
+  font-family: "SF Mono", "Fira Code", monospace;
+}
+
+.module-caption,
+.module-title {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #9898aa;
+}
+
+.module-content {
+  font-size: 14px;
+  color: #e8e8ed;
+  line-height: 1.6;
+}
+
+/* ========== 底部类型总结 ========== */
+.footer {
+  margin: 12px 16px 0;
+  padding: 20px;
+  background: linear-gradient(135deg, #1a1a24, #22222e);
+  border-radius: 12px;
+  border: 1px solid #2a2a38;
+}
+
+.type-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.type-item {
+  padding: 8px 12px;
+  font-size: 11px;
+  font-family: "SF Mono", "Fira Code", monospace;
+  color: #6bcb77;
+  background: rgba(107, 203, 119, 0.06);
+  border-radius: 6px;
+  text-align: center;
+}

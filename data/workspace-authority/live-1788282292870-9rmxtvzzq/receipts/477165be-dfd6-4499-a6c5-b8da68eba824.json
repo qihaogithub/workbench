@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "477165be-dfd6-4499-a6c5-b8da68eba824",
+  "projectId": "proj_1788282292856_cfotkh",
+  "workspaceId": "live-1788282292870-9rmxtvzzq",
+  "baseRevision": 5,
+  "revision": 6,
+  "rootHash": "deaba885b3470b4b488b5bd491ef17c9145e5f9d9782e77f23f4a6e42eb510f1",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "assets/whiteboards/d7dbb1ea359b3d87b652bd56b99f342faeeb77f4ecc5c583906e46c23dff40a3.png",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "d7dbb1ea359b3d87b652bd56b99f342faeeb77f4ecc5c583906e46c23dff40a3"
+    },
+    {
+      "path": "whiteboards/wb_ac709954daaf4487a2c0c54075db326c.json",
+      "action": "modified",
+      "beforeHash": "95d6935d66f1333b06badb1ce9a82d70eb117bbaf7ec3f79e4a3d93163a1c51b",
+      "afterHash": "7816a86caeff25d2c05f429866130a68f9a24c7ea60cd7bfd7cf0c3d9f915b43"
+    },
+    {
+      "path": "whiteboards/bindings.json",
+      "action": "modified",
+      "beforeHash": "95f52a005f0b2c0d1d254a76085edb9157abd4baa40755590185c12481ee2dfc",
+      "afterHash": "b54472ca5298b680a45f5f2177462a9222aea57e52ed67c2236ee3d69d735836"
+    },
+    {
+      "path": "project.config.values.json",
+      "action": "modified",
+      "beforeHash": "285fd402c49b5fbbeed90da7ef43739d8616b582f723434c58e2e445b74d0983",
+      "afterHash": "dfd8a2b9fe3c4edeb64538c5c16bd0665c2cefa982c68df1a36ab0c43c089ce7"
+    }
+  ],
+  "committedAt": 1788282308456
+}

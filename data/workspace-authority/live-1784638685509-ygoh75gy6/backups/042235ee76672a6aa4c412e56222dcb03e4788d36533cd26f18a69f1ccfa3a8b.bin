@@ -1,0 +1,19 @@
+{
+  "id": "ds_1786529528454_m0bp4t",
+  "title": "手机",
+  "createdAt": "2026-08-12T10:12:08.454Z",
+  "updatedAt": "2026-08-29T07:14:19.849Z",
+  "entries": [
+    {
+      "id": "e_1786529533692_29v96j",
+      "title": "弹窗配图",
+      "markdown": "### **样式一：配图没有文字**\n\n文字单独配置到图片下方\n\n此时建议配图高度不大于300px，\n\n底板的渐变色需保证最下方为白色#ffffff，底板左上和右上圆角建议~~32~~ 24（在375宽情况下）\n\n![width:266](/api/images/img_qS5VuulIiCefIw)\n\n### **样式二：文字全部放到配图中**\n\n，图片下方不单独配置文字，只有按钮。\n\n主体唯一，避免主要文字或元素脱离背景面板。\n\n底板的渐变色需保证最下方为白色#ffffff，底板左上和右上圆角建议 24（在375宽情况下）\n\n![width:188](/api/images/img_oVqbxRwRllH5bw)\n\n导出的图片，在底部和底部的左右两侧，不要有空白像素\n\n![width:292](/api/images/img_8_5ZQuNaBaKSbw)\n\n注意pad端效果，左右两侧不可以有锐角截断\n\n<br />\n\n![1.00](/api/images/img_OkVjuxA8kTCtTQ)\n\n",
+      "refs": [
+        {
+          "scope": "project",
+          "fieldKey": "popupImage"
+        }
+      ]
+    }
+  ]
+}

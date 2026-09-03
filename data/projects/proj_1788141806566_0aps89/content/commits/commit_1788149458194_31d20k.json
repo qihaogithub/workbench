@@ -1,0 +1,29 @@
+{
+  "id": "commit_1788149458194_31d20k",
+  "projectId": "proj_1788141806566_0aps89",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录答错",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "page_9z9z",
+      "versionId": "prv_1788149458191_r0sj50"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "page_9z9z",
+      "toVersionId": "prv_1788149458191_r0sj50"
+    }
+  ],
+  "createdAt": 1788149458194,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1788141807256-9xerzl5sd",
+    "workspaceRevision": 37,
+    "workspaceRootHash": "f44c082337107519f240268704f376589de7aabcd113ca28713913ac90633a32"
+  }
+}

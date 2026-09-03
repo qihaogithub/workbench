@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>配置类型原型演示</title>
+  <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+  <div class="container">
+    <h1 class="title" data-bind-text="title">Hello World</h1>
+    <p class="desc" data-bind-text="description">这是一个原型页面。</p>
+  </div>
+</body>
+</html>

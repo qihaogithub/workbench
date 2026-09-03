@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "projectId": "proj_1785858256243_p2zs4y",
+  "updatedAt": 1786014195168,
+  "state": {
+    "viewport": {
+      "x": 373.0147393745323,
+      "y": 39.510320273172425,
+      "zoom": 0.16882955612762257
+    },
+    "pages": {
+      "summer-camp_k3m7": {
+        "x": -612.5875684557105,
+        "y": 227.72112533505634,
+        "width": 375,
+        "height": 2917,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_igom": {
+        "x": -67.25769497799922,
+        "y": 81.19045157873724,
+        "width": 375,
+        "height": 2916.6875,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_6zuf": {
+        "x": 917.1932167274666,
+        "y": 1468.335729595669,
+        "width": 375,
+        "height": 2916.6875,
+        "zIndex": 2,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "hiddenKnowledgeDocumentIds": [],
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    }
+  }
+}

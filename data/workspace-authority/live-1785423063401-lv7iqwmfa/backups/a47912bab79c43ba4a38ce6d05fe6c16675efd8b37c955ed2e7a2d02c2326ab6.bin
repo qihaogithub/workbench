@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "projectId": "proj_1785421657423_1ptong",
+  "updatedAt": 1785675383706,
+  "state": {
+    "viewport": {
+      "x": 294.34665600647674,
+      "y": -116.82672502807793,
+      "zoom": 0.9266009852216749
+    },
+    "pages": {
+      "config-demo_x7k2": {
+        "x": 11.780323395455717,
+        "y": 171.19205306060502,
+        "width": 375,
+        "height": 2162,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "hiddenKnowledgeDocumentIds": [],
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    }
+  }
+}

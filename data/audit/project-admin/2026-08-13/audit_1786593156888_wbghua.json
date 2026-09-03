@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1786593156888_wbghua",
+  "at": 1786593156888,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1786593156882_ms9221",
+  "inputSummary": {
+    "name": "E2E:20260813T035230923Z-8h4hz7:画布退出恢复回归",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1786593156882_ms9221"
+    ]
+  }
+}

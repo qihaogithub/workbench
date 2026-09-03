@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "64fb576a-4bcc-4752-bf98-086f2ef7e2ed",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "baseRevision": 0,
+  "revision": 1255,
+  "rootHash": "94b2ba3323b830375002982f05fa4b398f73c76d651542b023ce34e50f97e298",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_g5ky/index.tsx",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/page_g5ky/config.schema.json",
+      "action": "modified",
+      "beforeHash": "361e3896fc1658b279d910b2e0cea95bc54f88cd5d50b0b7c4b2b27b936b9f78",
+      "afterHash": "361e3896fc1658b279d910b2e0cea95bc54f88cd5d50b0b7c4b2b27b936b9f78"
+    },
+    {
+      "path": "demos/page_g5ky/prototype.html",
+      "action": "modified",
+      "beforeHash": "1af9ffbf4bb5d5b9b92c0e0fa1aca3fc7c7ed650bb1814ba598524fb76ba9b71",
+      "afterHash": "1af9ffbf4bb5d5b9b92c0e0fa1aca3fc7c7ed650bb1814ba598524fb76ba9b71"
+    },
+    {
+      "path": "demos/page_g5ky/prototype.css",
+      "action": "modified",
+      "beforeHash": "b423425c58aa5e9268a66274fba1259efb2f0053c26c24d8e27bc0f2d686ada0",
+      "afterHash": "b423425c58aa5e9268a66274fba1259efb2f0053c26c24d8e27bc0f2d686ada0"
+    }
+  ],
+  "committedAt": 1788399892656
+}

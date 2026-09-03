@@ -1,0 +1,183 @@
+import React from "react";
+
+interface DemoProps {}
+
+const SUBJECTS = [
+  { key: "reading", label: "阅读", ui: "/api/images/img_zqEm0PFAyqds3Q" },
+  { key: "thinking", label: "思维", ui: "/api/images/img_Za_pljX94fLiog" },
+  { key: "art", label: "美育", ui: "/api/images/img_hlc5wbP1e5b0Pg" },
+  { key: "english", label: "英语", ui: "/api/images/img_ooOzlSbai4C74A" },
+  { key: "writer", label: "小作家", ui: "/api/images/img__idWmfdsgepgkw" },
+];
+
+function cap(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function UploadHint({ onClick }: { onClick: () => void }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: 270,
+        cursor: "pointer",
+        zIndex: 3,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "rgba(0,0,0,0.4)",
+      }}
+    >
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+        style={{
+          background: "transparent",
+          color: "white",
+          border: "2px solid white",
+          padding: "10px 20px",
+          borderRadius: 20,
+          fontSize: 14,
+          cursor: "pointer",
+          backdropFilter: "blur(5px)",
+          transform: "scale(1.429)",
+          transformOrigin: "center",
+        }}
+      >
+        上传头部背景
+      </button>
+    </div>
+  );
+}
+
+export default function MobileHeaderPreview(props: DemoProps) {
+  const p = props as Record<string, unknown>;
+  const initial = (p.activeSubject as string) || "reading";
+  const [subject, setSubject] = React.useState(
+    SUBJECTS.find((s) => s.key === initial) ? initial : "reading"
+  );
+  const [bg, setBg] = React.useState<Record<string, string>>({});
+  const fileRef = React.useRef<HTMLInputElement>(null);
+
+  const current = SUBJECTS.find((s) => s.key === subject) || SUBJECTS[0];
+  const bgUrl = bg[subject] || "";
+
+  function handleUpload() {
+    fileRef.current?.click();
+  }
+
+  function handleFileChange(e: any) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      if (img.width === 750 && img.height === 540) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          setBg((prev) => ({ ...prev, [subject]: ev.target?.result as string }));
+        };
+        reader.readAsDataURL(file);
+      } else {
+        alert("请上传750×540大小的图片");
+      }
+      e.target.value = "";
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      alert("图片加载失败，请重新选择");
+      e.target.value = "";
+    };
+    img.src = url;
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#f5f5f5] py-5">
+      {/* Tab 导航 */}
+      <div className="flex gap-[5px] rounded-xl bg-white p-2 shadow-md">
+        {SUBJECTS.map((s) => (
+          <button
+            key={s.key}
+            onClick={() => setSubject(s.key)}
+            className="whitespace-nowrap rounded-lg px-5 py-3 text-sm font-medium transition-all"
+            style={{
+              border: subject === s.key ? "2px solid #333" : "2px solid transparent",
+              color: subject === s.key ? "#333" : "#666",
+              fontWeight: subject === s.key ? 600 : 500,
+              background: "transparent",
+              cursor: "pointer",
+            }}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 手机容器 375×812 → 缩放 0.7 */}
+      <div style={{ width: 262.5, height: 568.4, position: "relative" }}>
+        <div
+          style={{
+            width: 375,
+            height: 812,
+            position: "relative",
+            background: "white",
+            borderRadius: 20,
+            overflow: "hidden",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
+            transform: "scale(0.7)",
+            transformOrigin: "top left",
+          }}
+        >
+          {/* 第 1 层：上传的背景 */}
+          {bgUrl ? (
+            <img
+              src={bgUrl}
+              alt="头图背景"
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: 270,
+                objectFit: "cover",
+                zIndex: 1,
+              }}
+            />
+          ) : null}
+
+          {/* 第 2 层：UI 透明镂空层 */}
+          <img
+            src={current.ui}
+            alt={`${current.label}手机UI`}
+            style={{
+              width: "100%",
+              height: "100%",
+              display: "block",
+              objectFit: "cover",
+              position: "relative",
+              zIndex: 2,
+            }}
+          />
+
+          {/* 第 3 层：上传提示覆盖层 */}
+          {!bgUrl ? <UploadHint onClick={handleUpload} /> : null}
+        </div>
+      </div>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={handleFileChange}
+      />
+    </div>
+  );
+}

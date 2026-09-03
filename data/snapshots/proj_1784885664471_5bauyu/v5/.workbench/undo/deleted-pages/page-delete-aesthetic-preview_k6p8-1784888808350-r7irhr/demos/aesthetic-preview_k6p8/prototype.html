@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>美育·头图预览</title>
+  <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+  <div class="page-wrapper">
+    <!-- 页面标题 -->
+    <h1 class="page-title">美育·头图预览</h1>
+
+    <div class="preview-container">
+      <!-- ========== 手机预览 ========== -->
+      <div class="device-wrapper phone-wrapper">
+        <span class="device-label">📱 手机端</span>
+        <div class="phone-device">
+          <!-- 状态栏 -->
+          <div class="phone-status-bar">
+            <span class="phone-time">9:41</span>
+            <span class="phone-notch"></span>
+            <span class="phone-icons">
+              <span class="icon-signal"></span>
+              <span class="icon-wifi"></span>
+              <span class="icon-battery"></span>
+            </span>
+          </div>
+          <!-- 头图区域 270px -->
+          <div class="phone-header-area">
+            <div class="header-placeholder">
+              <span class="placeholder-icon">🖼️</span>
+              <span class="placeholder-text">上传头部背景</span>
+            </div>
+            <img
+              class="header-bg-img"
+              data-bind-src="headerBgAesthetic"
+              alt=""
+            />
+          </div>
+          <!-- 模拟内容区 -->
+          <div class="phone-content">
+            <div class="content-card">
+              <div class="card-avatar"></div>
+              <div class="card-body">
+                <div class="card-line card-line-short"></div>
+                <div class="card-line card-line-long"></div>
+              </div>
+            </div>
+            <div class="content-card">
+              <div class="card-avatar"></div>
+              <div class="card-body">
+                <div class="card-line card-line-medium"></div>
+                <div class="card-line card-line-long"></div>
+              </div>
+            </div>
+            <div class="content-card">
+              <div class="card-avatar"></div>
+              <div class="card-body">
+                <div class="card-line card-line-short"></div>
+                <div class="card-line card-line-long"></div>
+              </div>
+            </div>
+            <div class="content-card">
+              <div class="card-avatar"></div>
+              <div class="card-body">
+                <div class="card-line card-line-medium"></div>
+                <div class="card-line card-line-long"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== Pad 预览 ========== -->
+      <div class="device-wrapper pad-wrapper">
+        <span class="device-label">📋 Pad 端</span>
+        <div class="pad-device">
+          <!-- 底层 UI：侧边栏 + 主内容区 -->
+          <div class="pad-bottom-ui">
+            <div class="pad-sidebar">
+              <div class="sidebar-item sidebar-active"></div>
+              <div class="sidebar-item"></div>
+              <div class="sidebar-item"></div>
+              <div class="sidebar-item"></div>
+              <div class="sidebar-item"></div>
+            </div>
+            <div class="pad-main-area">
+              <div class="pad-top-controls">
+                <span class="ctrl-dot ctrl-red"></span>
+                <span class="ctrl-dot ctrl-yellow"></span>
+                <span class="ctrl-dot ctrl-green"></span>
+              </div>
+              <div class="pad-content-body">
+                <div class="pad-content-row">
+                  <div class="pad-card"></div>
+                  <div class="pad-card"></div>
+                  <div class="pad-card"></div>
+                  <div class="pad-card"></div>
+                </div>
+                <div class="pad-content-row">
+                  <div class="pad-card pad-card-wide"></div>
+                  <div class="pad-card pad-card-wide"></div>
+                </div>
+                <div class="pad-content-row">
+                  <div class="pad-card"></div>
+                  <div class="pad-card"></div>
+                  <div class="pad-card"></div>
+                  <div class="pad-card"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 中层：头图区域 -->
+          <div class="pad-header-area">
+            <div class="header-placeholder">
+              <span class="placeholder-icon">🖼️</span>
+              <span class="placeholder-text">上传头部背景</span>
+            </div>
+            <img
+              class="header-bg-img"
+              data-bind-src="padHeaderBgAesthetic"
+              alt=""
+            />
+          </div>
+
+          <!-- 上层 UI 覆盖：导航栏 + 标签栏 -->
+          <div class="pad-top-ui">
+            <div class="pad-nav-bar">
+              <span class="nav-dot nav-dot-red"></span>
+              <span class="nav-dot nav-dot-yellow"></span>
+              <span class="nav-dot nav-dot-green"></span>
+              <span class="nav-title">美育课程</span>
+              <span class="nav-search">🔍</span>
+            </div>
+            <div class="pad-tab-bar">
+              <span class="tab tab-active">推荐</span>
+              <span class="tab">分类</span>
+              <span class="tab">榜单</span>
+              <span class="tab">我的</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

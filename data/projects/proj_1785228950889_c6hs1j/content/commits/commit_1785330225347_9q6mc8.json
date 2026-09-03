@@ -1,0 +1,36 @@
+{
+  "id": "commit_1785330225347_9q6mc8",
+  "projectId": "proj_1785228950889_c6hs1j",
+  "parentCommitId": "commit_1785231830225_k7w23d",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录明星赛-手机",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "pad_lawk",
+      "versionId": "prv_1785229956767_28noej"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_ijly",
+      "versionId": "prv_1785330225344_vz85da"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "page_ijly",
+      "fromVersionId": "prv_1785231830223_qflm37",
+      "toVersionId": "prv_1785330225344_vz85da"
+    }
+  ],
+  "createdAt": 1785330225347,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785228952059-e70ctz1pw",
+    "workspaceRevision": 18,
+    "workspaceRootHash": "6415b7da7121dca9b8cc12239513a5f251991822bbd6dfdce4ef15608cd1ebd3"
+  }
+}

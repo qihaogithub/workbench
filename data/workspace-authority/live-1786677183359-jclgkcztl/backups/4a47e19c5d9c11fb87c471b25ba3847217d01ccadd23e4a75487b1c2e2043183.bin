@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "projectId": "proj_1786367903885_iu08e4",
+  "updatedAt": 1787818878878,
+  "state": {
+    "viewport": {
+      "x": -240.15693656531766,
+      "y": -70.47139993067947,
+      "zoom": 0.8405599149789671
+    },
+    "pages": {
+      "kids-edu_b3xw": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 2471,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "clipboard-import_4d9ab0": {
+        "x": 440.33927984212704,
+        "y": -49.974794971660145,
+        "width": 375,
+        "height": 812,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "clipboard-import_5f6c8b": {
+        "x": 954.1145358609542,
+        "y": -82.09917355371897,
+        "width": 375,
+        "height": 812,
+        "zIndex": 2,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "pageGroups": {},
+    "sections": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [],
+    "navigation": {
+      "hotspots": {
+        "navigation_hotspot_1787818862455_mnma5x": {
+          "id": "navigation_hotspot_1787818862455_mnma5x",
+          "pageId": "clipboard-import_4d9ab0",
+          "rect": {
+            "x": 0.07936966947713837,
+            "y": 0.5229543019369998,
+            "width": 0.8364084552216354,
+            "height": 0.07898213547220057
+          },
+          "createdAt": 1787818862455,
+          "updatedAt": 1787818862455
+        }
+      },
+      "connections": {
+        "navigation_connection_1787818862455_entl5j": {
+          "id": "navigation_connection_1787818862455_entl5j",
+          "source": {
+            "pageId": "clipboard-import_4d9ab0",
+            "hotspotId": "navigation_hotspot_1787818862455_mnma5x"
+          },
+          "target": {
+            "pageId": "clipboard-import_5f6c8b"
+          },
+          "createdAt": 1787818862455,
+          "updatedAt": 1787818862455
+        }
+      }
+    }
+  }
+}

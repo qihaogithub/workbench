@@ -1,0 +1,15 @@
+{
+  "sessionId": "session-1788314977480-6dvejs4zg",
+  "userId": "a5862615-26bb-4688-924d-7fd68c132e21",
+  "role": "admin",
+  "demoId": "proj_1788141806566_0aps89",
+  "workspaceId": "live-1788141807256-9xerzl5sd",
+  "status": "discarded",
+  "basedOnVersion": "v10",
+  "workbenchSessionId": null,
+  "createdAt": 1788314977482,
+  "expiresAt": 1788324669537,
+  "lastActivityAt": 1788317474421,
+  "title": "拖动模式配置缺失",
+  "archivedAt": 1788317474348
+}

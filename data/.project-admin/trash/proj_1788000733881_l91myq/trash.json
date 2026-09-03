@@ -1,0 +1,41 @@
+{
+  "project": {
+    "id": "proj_1788000733881_l91myq",
+    "name": "E2E:20260829T105209219Z-vs64mh:配置图片白板宿主回归",
+    "projectType": "standard",
+    "category": "__e2e__",
+    "workspacePath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/projects/proj_1788000733881_l91myq/workspace",
+    "demoPages": [],
+    "demoFolders": [],
+    "versions": [
+      {
+        "versionId": "v1",
+        "type": "named_version",
+        "savedAt": 1788000736476,
+        "savedBy": "qihao",
+        "sessionId": "session-1788000734039-dz7zm5vpj",
+        "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1788000733881_l91myq/v1",
+        "fileCount": 10,
+        "workspaceId": "live-1788000734026-x3w8z9c32",
+        "workspaceRevision": 3,
+        "workspaceRootHash": "08b7e0da5d5ee100085fc29c3792b964bfd799f488fdd7ab251db4636df3dce4",
+        "note": "配置图片白板宿主回归"
+      }
+    ],
+    "createdAt": 1788000733885,
+    "updatedAt": 1788000736479,
+    "activeWorkspaceId": "live-1788000734026-x3w8z9c32",
+    "activeWorkspaceUpdatedAt": 1788000734037,
+    "canonicalSyncedWorkspaceId": "live-1788000734026-x3w8z9c32",
+    "canonicalSyncedRevision": 3,
+    "canonicalSyncedRootHash": "08b7e0da5d5ee100085fc29c3792b964bfd799f488fdd7ab251db4636df3dce4",
+    "canonicalSyncedAt": 1788000736158
+  },
+  "deletedAt": 1788079751351,
+  "purgeAt": 1790671751351,
+  "deletedBy": {
+    "id": "f0a7b4eb-bc05-4112-b412-672cf8037a5a",
+    "name": "test",
+    "role": "creator"
+  }
+}

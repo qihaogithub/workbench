@@ -1,0 +1,44 @@
+{
+  "id": "prv_1788149292806_m9z9xz",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "kind": "page",
+  "resourceId": "page_swfq",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "workspaceRevision": 521,
+  "workspaceRootHash": "36e193802a9481294823bb5f3a38c32d8ce3686cc3b31ec83937294ec80c0f1f",
+  "previousVersionId": "prv_1788084403529_d0lck1",
+  "contentHash": "56c498c9c978cf23636c9f5aa32203eaf9ed40d2260c2a999d09943ebfbf8aa6",
+  "blobRefs": [
+    "fa1892b60b1893afc883d135d1fa2973a67415ecc1ba459bc6059e74de025c4f",
+    "caca32e59b1d8c4e623900c8757db75c793550ef796ff5bcbd36e25610c0df17",
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1"
+  ],
+  "metadata": {
+    "page": {
+      "id": "page_swfq",
+      "name": "闯关开场引入-视频",
+      "routeKey": "page-10",
+      "order": 0,
+      "parentId": "folder_1785397477311_od13vu",
+      "runtimeType": "prototype-html-css",
+      "isTemplatePage": false
+    },
+    "files": {
+      "schema": "fa1892b60b1893afc883d135d1fa2973a67415ecc1ba459bc6059e74de025c4f",
+      "prototypeHtml": "caca32e59b1d8c4e623900c8757db75c793550ef796ff5bcbd36e25610c0df17",
+      "prototypeCss": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "prototypeMeta": "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1788149292809,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录闯关开场引入-视频"
+}

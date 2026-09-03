@@ -1,0 +1,13 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "config-highfidelity_p3n5",
+      "name": "配置高保真演示",
+      "runtimeType": "high-fidelity-react",
+      "order": 2,
+      "parentId": null,
+      "routeKey": "page"
+    }
+  ]
+}

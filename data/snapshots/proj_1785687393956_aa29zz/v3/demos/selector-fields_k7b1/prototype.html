@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>选择器配置</title>
+  <link rel="stylesheet" href="prototype.css" />
+</head>
+<body>
+  <div class="selector-page">
+    <!-- 页面标题 -->
+    <div class="page-header">
+      <h1 class="page-title">偏好设置</h1>
+    </div>
+
+    <!-- 主题设置分组 -->
+    <div class="setting-group">
+      <div class="group-title">主题设置</div>
+
+      <div class="setting-row">
+        <div class="setting-label">主题风格</div>
+        <div class="setting-value" data-bind-text="theme">{{theme}}</div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-label">界面语言</div>
+        <div class="setting-value" data-bind-text="language">{{language}}</div>
+      </div>
+    </div>
+
+    <!-- 个人偏好分组 -->
+    <div class="setting-group">
+      <div class="group-title">个人偏好</div>
+
+      <div class="setting-row">
+        <div class="setting-label">兴趣爱好</div>
+        <div class="setting-value" data-bind-text="interests">{{interests}}</div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-label">所在地区</div>
+        <div class="setting-value" data-bind-text="region">{{region}}</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

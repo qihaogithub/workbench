@@ -1,0 +1,49 @@
+{
+  "committed": true,
+  "mutationId": "15d8f838-d38a-4c58-b095-d9156eaa5f79",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "baseRevision": 0,
+  "revision": 231,
+  "rootHash": "7423de9bb0dec1060ea46672bcadbd568f920a1fa93a78c2a3ed77810db9c7a9",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_da9l/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "caa4dded1c46311d8aaa611752a2a39998cd09de0af6953aa717f16a2012e746",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_da9l/index.tsx",
+      "action": "deleted",
+      "beforeHash": "a3e0cdbd6c321642e201a49303df988073cec442f51cd7147dc17ca604e3ede3",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_da9l/prototype.css",
+      "action": "deleted",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_da9l/prototype.html",
+      "action": "deleted",
+      "beforeHash": "3de71635837ee5868bbe1abffd9b511d2f27c98eac30d3bba6be62f44c752e13",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_da9l/prototype.meta.json",
+      "action": "deleted",
+      "beforeHash": "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "a8a0f95afc341d6f26432619751f3eefc621ca378e07e12e11eb9fdc621ae115",
+      "afterHash": "6d8040ca3b7361624b2e7696a743d72dedebe98a5aacb07fe4dd77f1b480f77f"
+    }
+  ],
+  "committedAt": 1785397564809
+}

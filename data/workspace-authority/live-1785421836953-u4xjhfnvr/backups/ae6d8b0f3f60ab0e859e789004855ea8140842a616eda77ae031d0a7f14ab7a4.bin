@@ -1,0 +1,4 @@
+<div class="demo-page">
+  <h1>{{title}}</h1>
+  <p>{{subtitle}}</p>
+</div>

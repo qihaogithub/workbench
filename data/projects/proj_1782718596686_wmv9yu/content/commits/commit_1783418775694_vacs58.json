@@ -1,0 +1,14 @@
+{
+  "id": "commit_1783418775694_vacs58",
+  "projectId": "proj_1782718596686_wmv9yu",
+  "visibility": "protected",
+  "intent": "publish",
+  "title": "发布项目 v13",
+  "resourcePointers": [],
+  "changedResources": [],
+  "createdAt": 1783418775694,
+  "createdBy": "qh2",
+  "audit": {
+    "actorType": "cli"
+  }
+}

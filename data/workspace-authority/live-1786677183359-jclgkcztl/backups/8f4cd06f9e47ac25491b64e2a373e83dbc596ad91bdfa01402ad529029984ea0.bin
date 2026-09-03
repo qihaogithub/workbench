@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "projectId": "proj_1786367903885_iu08e4",
+  "updatedAt": 1787747725902,
+  "state": {
+    "viewport": {
+      "x": 418.35204977740295,
+      "y": 50.68828124999999,
+      "zoom": 0.23091865641440715
+    },
+    "pages": {
+      "kids-edu_b3xw": {
+        "x": -1144,
+        "y": 0,
+        "width": 375,
+        "height": 2471,
+        "zIndex": 4,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "sunny-reading_k4m8": {
+        "x": -629.985083409876,
+        "y": 0,
+        "width": 1440,
+        "height": 900,
+        "sizeMode": "preview",
+        "previewSizeKey": "1440x900"
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

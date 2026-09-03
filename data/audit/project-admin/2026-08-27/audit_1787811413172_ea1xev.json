@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1787811413172_ea1xev",
+  "at": 1787811413172,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1787811413171_cwsipz",
+  "inputSummary": {
+    "name": "E2E:20260827T061651588Z-jeetfw:画布 Section 回归",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1787811413171_cwsipz"
+    ]
+  }
+}

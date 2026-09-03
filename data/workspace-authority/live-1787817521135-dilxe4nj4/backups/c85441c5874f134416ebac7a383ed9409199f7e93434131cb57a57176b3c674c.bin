@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "projectId": "proj_1787817520818_4qmrrg",
+  "updatedAt": 1787817532616,
+  "state": {
+    "viewport": {
+      "x": 244,
+      "y": 222,
+      "zoom": 3
+    },
+    "pages": {},
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {
+      "text-2dbfe22d-495d-46b2-ab14-37f9034fccfc": {
+        "id": "text-2dbfe22d-495d-46b2-ab14-37f9034fccfc",
+        "kind": "text",
+        "title": "文字",
+        "text": "",
+        "fontSize": 18,
+        "color": "#ffffff",
+        "autoWidth": true,
+        "layout": {
+          "x": 16,
+          "y": 16,
+          "width": 18,
+          "height": 25
+        },
+        "createdAt": 1787817531392,
+        "updatedAt": 1787817531392
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [],
+    "layers": {
+      "annotations": {
+        "nodes": {
+          "text-2dbfe22d-495d-46b2-ab14-37f9034fccfc": {
+            "id": "text-2dbfe22d-495d-46b2-ab14-37f9034fccfc",
+            "kind": "text",
+            "title": "文字",
+            "text": "",
+            "fontSize": 18,
+            "color": "#ffffff",
+            "autoWidth": true,
+            "layout": {
+              "x": 16,
+              "y": 16,
+              "width": 18,
+              "height": 25
+            },
+            "createdAt": 1787817531392,
+            "updatedAt": 1787817531392
+          }
+        }
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "sections": {
+      "section_984026c2-45e9-4ec0-a854-4aefce701d02": {
+        "id": "section_984026c2-45e9-4ec0-a854-4aefce701d02",
+        "kind": "section",
+        "title": "登录流程",
+        "layout": {
+          "x": -30.666666666666668,
+          "y": -30.666666666666668,
+          "width": 111.33333333333334,
+          "height": 118.33333333333334,
+          "zIndex": 1
+        },
+        "children": [
+          {
+            "kind": "node",
+            "id": "text-2dbfe22d-495d-46b2-ab14-37f9034fccfc"
+          }
+        ],
+        "createdAt": 1787817532348,
+        "updatedAt": 1787817532588
+      }
+    }
+  }
+}

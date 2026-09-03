@@ -1,0 +1,141 @@
+{
+  "id": "proj_1784885664471_5bauyu",
+  "name": "学习页头图",
+  "publishedVersion": "v18",
+  "commitId": "commit_1785915380994_ir5emb",
+  "publishedAt": 1785915381002,
+  "demoPages": [
+    {
+      "id": "mobile-header-preview_b3f1",
+      "name": "手机预览",
+      "routeKey": "page",
+      "order": 1,
+      "parentId": null,
+      "runtimeType": "high-fidelity-react",
+      "compiledJsPath": "demos/mobile-header-preview_b3f1/compiled.js",
+      "schemaPath": "demos/mobile-header-preview_b3f1/schema.json",
+      "previewSize": {
+        "width": 375,
+        "height": 812
+      },
+      "screenshotPath": "screenshots/mobile-header-preview_b3f1.png",
+      "iframeHtmlPath": "demos/mobile-header-preview_b3f1/iframe.html?v=1785915379499",
+      "embedCode": "<iframe\n  src=\"/data/proj_1784885664471_5bauyu/demos/mobile-header-preview_b3f1/iframe.html?v=1785915379499\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
+    },
+    {
+      "id": "pad-header-preview_x7k2",
+      "name": "Pad预览",
+      "routeKey": "pad",
+      "order": 2,
+      "parentId": null,
+      "runtimeType": "high-fidelity-react",
+      "compiledJsPath": "demos/pad-header-preview_x7k2/compiled.js",
+      "schemaPath": "demos/pad-header-preview_x7k2/schema.json",
+      "previewSize": {
+        "width": 1024,
+        "height": 558
+      },
+      "screenshotPath": "screenshots/pad-header-preview_x7k2.png",
+      "iframeHtmlPath": "demos/pad-header-preview_x7k2/iframe.html?v=1785915379499",
+      "embedCode": "<iframe\n  src=\"/data/proj_1784885664471_5bauyu/demos/pad-header-preview_x7k2/iframe.html?v=1785915379499\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
+    }
+  ],
+  "demoFolders": [],
+  "appGraph": {
+    "version": 1,
+    "entry": "page",
+    "pages": {
+      "page": {
+        "pageId": "mobile-header-preview_b3f1",
+        "title": "手机预览"
+      },
+      "pad": {
+        "pageId": "pad-header-preview_x7k2",
+        "title": "Pad预览"
+      }
+    },
+    "actions": [],
+    "state": {}
+  },
+  "projectConfigSchema": "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"activeSubject\": {\n      \"type\": \"string\",\n      \"title\": \"当前科目\",\n      \"default\": \"reading\",\n      \"enum\": [\"reading\", \"thinking\", \"aesthetic\", \"english\", \"writer\"],\n      \"enumNames\": [\"阅读\", \"思维\", \"美育\", \"英语\", \"小作家\"]\n    },\n    \"headerBgReading\": {\n      \"type\": \"string\",\n      \"title\": \"阅读·手机头图\",\n      \"default\": \"/data/proj_1784885664471_5bauyu/assets/images/dffe5901b6f1a8b2346391df.png\",\n      \"format\": \"image\",\n      \"visibleWhen\": { \"field\": \"activeSubject\", \"equals\": \"reading\" },\n      \"ui:options\": {\n        \"minWidth\": 750,\n        \"minHeight\": 540,\n        \"maxWidth\": 750,\n        \"maxHeight\": 540\n      }\n    },\n    \"headerBgThinking\": {\n      \"type\": \"string\",\n      \"title\": \"思维·手机头图\",\n      \"default\": \"/data/proj_1784885664471_5bauyu/assets/images/c730d8a3005a8870a5b443ba.png\",\n      \"format\": \"image\",\n      \"visibleWhen\": { \"field\": \"activeSubject\", \"equals\": \"thinking\" },\n      \"ui:options\": {\n        \"minWidth\": 750,\n        \"minHeight\": 540,\n        \"maxWidth\": 750,\n        \"maxHeight\": 540\n      }\n    },\n    \"headerBgAesthetic\": {\n      \"type\": \"string\",\n      \"title\": \"美育·手机头图\",\n      \"default\": \"/data/proj_1784885664471_5bauyu/assets/images/63fdee7805cfb8918e1e71b6.png\",\n      \"format\": \"image\",\n      \"visibleWhen\": { \"field\": \"activeSubject\", \"equals\": \"aesthetic\" },\n      \"ui:options\": {\n        \"minWidth\": 750,\n        \"minHeight\": 540,\n        \"maxWidth\": 750,\n        \"maxHeight\": 540\n      }\n    },\n    \"headerBgEnglish\": {\n      \"type\": \"string\",\n      \"title\": \"英语·手机头图\",\n      \"default\": \"/data/proj_1784885664471_5bauyu/assets/images/df671bfa55be442520563abc.png\",\n      \"format\": \"image\",\n      \"visibleWhen\": { \"field\": \"activeSubject\", \"equals\": \"english\" },\n      \"ui:options\": {\n        \"minWidth\": 750,\n        \"minHeight\": 540,\n        \"maxWidth\": 750,\n        \"maxHeight\": 540\n      }\n    },\n    \"headerBgWriter\": {\n      \"type\": \"string\",\n      \"title\": \"小作家·手机头图\",\n      \"default\": \"/data/proj_1784885664471_5bauyu/assets/images/c8b90413e4094aef700109a5.png\",\n      \"format\": \"image\",\n      \"visibleWhen\": { \"field\": \"activeSubject\", \"equals\": \"writer\" },\n      \"ui:options\": {\n        \"minWidth\": 750,\n        \"minHeight\": 540,\n        \"maxWidth\": 750,\n        \"maxHeight\": 540\n      }\n    },\n    \"padHeaderBgReading\": {\n      \"type\": \"string\",\n      \"title\": \"阅读·Pad头图\",\n      \"default\": \"/data/proj_1784885664471_5bauyu/assets/images/b5afe1419c6984b1585705bb.png\",\n      \"format\": \"image\",\n      \"visibleWhen\": { \"field\": \"activeSubject\", \"equals\": \"reading\" },\n      \"ui:options\": {\n        \"minWidth\": 2732,\n        \"minHeight\": 540,\n        \"maxWidth\": 2732,\n        \"maxHeight\": 540\n      }\n    },\n    \"padHeaderBgThinking\": {\n      \"type\": \"string\",\n      \"title\": \"思维·Pad头图\",\n      \"default\": \"/data/proj_1784885664471_5bauyu/assets/images/a7290e75f6df696780a9c1a8.png\",\n      \"format\": \"image\",\n      \"visibleWhen\": { \"field\": \"activeSubject\", \"equals\": \"thinking\" },\n      \"ui:options\": {\n        \"minWidth\": 2732,\n        \"minHeight\": 540,\n        \"maxWidth\": 2732,\n        \"maxHeight\": 540\n      }\n    },\n    \"padHeaderBgAesthetic\": {\n      \"type\": \"string\",\n      \"title\": \"美育·Pad头图\",\n      \"default\": \"/data/proj_1784885664471_5bauyu/assets/images/8f598407250ef17e89c7fe36.png\",\n      \"format\": \"image\",\n      \"visibleWhen\": { \"field\": \"activeSubject\", \"equals\": \"aesthetic\" },\n      \"ui:options\": {\n        \"minWidth\": 2732,\n        \"minHeight\": 540,\n        \"maxWidth\": 2732,\n        \"maxHeight\": 540\n      }\n    },\n    \"padHeaderBgEnglish\": {\n      \"type\": \"string\",\n      \"title\": \"英语·Pad头图\",\n      \"default\": \"/data/proj_1784885664471_5bauyu/assets/images/819ffcef955c65b9b0443a21.png\",\n      \"format\": \"image\",\n      \"visibleWhen\": { \"field\": \"activeSubject\", \"equals\": \"english\" },\n      \"ui:options\": {\n        \"minWidth\": 2732,\n        \"minHeight\": 540,\n        \"maxWidth\": 2732,\n        \"maxHeight\": 540\n      }\n    },\n    \"padHeaderBgWriter\": {\n      \"type\": \"string\",\n      \"title\": \"小作家·Pad头图\",\n      \"default\": \"/data/proj_1784885664471_5bauyu/assets/images/f97d1816e32cc062a3bdcff7.png\",\n      \"format\": \"image\",\n      \"visibleWhen\": { \"field\": \"activeSubject\", \"equals\": \"writer\" },\n      \"ui:options\": {\n        \"minWidth\": 2732,\n        \"minHeight\": 540,\n        \"maxWidth\": 2732,\n        \"maxHeight\": 540\n      }\n    }\n  },\n  \"required\": []\n}\n",
+  "canvasState": {
+    "viewport": {
+      "x": -3.1997499092426267,
+      "y": 124.14969242933137,
+      "zoom": 0.42368435569476254
+    },
+    "pages": {
+      "phone-preview_a3f2": {
+        "x": -62.06654066242231,
+        "y": 1.3349818099137103,
+        "width": 834,
+        "height": 1194,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "834x1194"
+      },
+      "pad-preview_m7k2": {
+        "x": 409.92306416738074,
+        "y": 1.3349818099137103,
+        "width": 834,
+        "height": 1194,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "834x1194"
+      },
+      "english-preview_t2w7": {
+        "x": 3.774758283725532e-15,
+        "y": 852,
+        "width": 1200,
+        "height": 600,
+        "zIndex": 3,
+        "sizeMode": "preview",
+        "previewSizeKey": "1200x600"
+      },
+      "aesthetic-preview_k6p8": {
+        "x": 0.8103306881289629,
+        "y": -4.107825191113079e-14,
+        "width": 1200,
+        "height": 600,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "1200x600"
+      },
+      "pad-header-preview_x7k2": {
+        "x": 478.9051179394153,
+        "y": 10.925048318436847,
+        "width": 1024,
+        "height": 558,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "1024x768"
+      },
+      "mobile-header-preview_b3f1": {
+        "x": 87.40023873793058,
+        "y": 10.925048318436847,
+        "width": 375,
+        "height": 812,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  },
+  "previewRuntime": {
+    "version": "2026-06-preview-runtime-v4",
+    "source": "local",
+    "basePath": "/data/proj_1784885664471_5bauyu/preview-runtime"
+  }
+}

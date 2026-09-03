@@ -1,0 +1,22 @@
+{
+  "id": "ds_1788166913695_ecd7d6fb",
+  "title": "N对N填空题设计规范",
+  "createdAt": "2026-08-31T09:01:53.695Z",
+  "updatedAt": "2026-09-01T10:11:33.097Z",
+  "autoManagedPageId": "clipboard-import_e05e9d",
+  "entries": [
+    {
+      "id": "e_1788166913696_0322c59d",
+      "title": "背景图",
+      "markdown": "除了背景图了看见了非示例\n",
+      "refs": [
+        {
+          "scope": "page",
+          "pageId": "clipboard-import_e05e9d",
+          "fieldKey": "backgroundImage"
+        }
+      ],
+      "autoManagedFieldKey": "backgroundImage"
+    }
+  ]
+}

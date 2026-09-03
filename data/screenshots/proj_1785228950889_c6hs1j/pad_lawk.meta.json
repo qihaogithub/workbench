@@ -1,0 +1,87 @@
+{
+  "currentHash": "f388b332978b1282",
+  "generatedAt": "2026-07-28T09:14:59.544Z",
+  "elapsed": 4456,
+  "history": [
+    "f388b332978b1282",
+    "b774e0a484c0eb57",
+    "e8e080938151b181",
+    "6e011acf21fed75f",
+    "5dae47eccf36b7c6"
+  ],
+  "renderBoxes": {
+    "f388b332978b1282": {
+      "width": 771,
+      "height": 958,
+      "viewportWidth": 771,
+      "viewportHeight": 918,
+      "bodyWidth": 791,
+      "bodyHeight": 958,
+      "documentWidth": 791,
+      "documentHeight": 958,
+      "fullPage": true
+    },
+    "b774e0a484c0eb57": {
+      "width": 771,
+      "height": 958,
+      "viewportWidth": 771,
+      "viewportHeight": 918,
+      "bodyWidth": 791,
+      "bodyHeight": 958,
+      "documentWidth": 791,
+      "documentHeight": 958,
+      "fullPage": true
+    },
+    "e8e080938151b181": {
+      "width": 812,
+      "height": 918,
+      "viewportWidth": 812,
+      "viewportHeight": 918,
+      "bodyWidth": 832,
+      "bodyHeight": 958,
+      "documentWidth": 832,
+      "documentHeight": 958,
+      "fullPage": false
+    },
+    "6e011acf21fed75f": {
+      "width": 812,
+      "height": 918,
+      "viewportWidth": 812,
+      "viewportHeight": 918,
+      "bodyWidth": 832,
+      "bodyHeight": 958,
+      "documentWidth": 832,
+      "documentHeight": 958,
+      "fullPage": false
+    },
+    "5dae47eccf36b7c6": {
+      "width": 1440,
+      "height": 1240,
+      "viewportWidth": 1440,
+      "viewportHeight": 1200,
+      "bodyWidth": 1460,
+      "bodyHeight": 1240,
+      "documentWidth": 1460,
+      "documentHeight": 1240,
+      "fullPage": true
+    }
+  },
+  "variants": {
+    "4684dcc539022987:fast": {
+      "variant": "fast",
+      "generatedAt": "2026-07-28T09:15:24.561Z",
+      "elapsed": 365,
+      "renderBox": {
+        "width": 375,
+        "height": 852,
+        "viewportWidth": 375,
+        "viewportHeight": 812,
+        "bodyWidth": 395,
+        "bodyHeight": 852,
+        "documentWidth": 395,
+        "documentHeight": 852,
+        "fullPage": true
+      }
+    }
+  }
+}

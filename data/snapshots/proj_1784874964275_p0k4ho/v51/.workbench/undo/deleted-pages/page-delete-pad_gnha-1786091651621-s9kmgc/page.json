@@ -1,0 +1,8 @@
+{
+  "id": "pad_gnha",
+  "name": "学习页头图-Pad",
+  "routeKey": "pad-2",
+  "order": 5,
+  "parentId": null,
+  "runtimeType": "high-fidelity-react"
+}

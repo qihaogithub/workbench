@@ -1,0 +1,31 @@
+{
+  "id": "commit_1785732093546_k4dru4",
+  "projectId": "proj_1779608460378",
+  "parentCommitId": "commit_1784735248572_s16dqd",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "修改了广场页面-手机",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "demo_1779608460379_a1b2c3",
+      "versionId": "prv_1785732093542_q2e3f6"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "demo_1779608460379_a1b2c3",
+      "fromVersionId": "prv_1784735248568_td89hz",
+      "toVersionId": "prv_1785732093542_q2e3f6"
+    }
+  ],
+  "createdAt": 1785732093546,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1784794256464-47k47sgqn",
+    "workspaceRevision": 23,
+    "workspaceRootHash": "e42f26a8463c92212b09deda99fabc94702a6e7d565c25a7fd75c4ddf883f38b"
+  }
+}

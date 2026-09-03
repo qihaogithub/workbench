@@ -1,0 +1,25 @@
+{
+  "committed": true,
+  "mutationId": "0b114162-6e43-49b6-acd0-80604d63d64a",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 47,
+  "rootHash": "573e0203c09c32441e0fe519baf32ef1ef442ab9279996139cd77809849c4781",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/kids-edu_b3xw/index.tsx",
+      "action": "modified",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/kids-edu_b3xw/config.schema.json",
+      "action": "modified",
+      "beforeHash": "77dc4cae6b9c4767c3942470b90725cb33f8dd0b061b09dcb61bee60a691e485",
+      "afterHash": "77dc4cae6b9c4767c3942470b90725cb33f8dd0b061b09dcb61bee60a691e485"
+    }
+  ],
+  "committedAt": 1787190787277
+}

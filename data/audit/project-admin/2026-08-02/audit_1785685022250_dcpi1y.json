@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1785685022250_dcpi1y",
+  "at": 1785685022250,
+  "actor": {
+    "id": "local-codex",
+    "name": "local-codex",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1785685022249_aevplm",
+  "inputSummary": {
+    "name": "配置项示例",
+    "category": "测试"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1785685022249_aevplm"
+    ]
+  }
+}

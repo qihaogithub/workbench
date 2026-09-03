@@ -1,0 +1,19 @@
+{
+  "id": "ds_1786529528454_m0bp4t",
+  "title": "手机",
+  "createdAt": "2026-08-12T10:12:08.454Z",
+  "updatedAt": "2026-08-14T05:53:51.338Z",
+  "entries": [
+    {
+      "id": "e_1786529533692_29v96j",
+      "title": "弹窗配图",
+      "markdown": "### **样式一：**\n\n配图没有文字，文字单独配置到图片下方\n\n此时建议配图高度不大于300px，\n\n底板的渐变色需保证最下方为白色#ffffff，底板左上和右上圆角建议~~32~~ 24（在375宽情况下）\n\n可以下载此弹窗界面资源，叠加后查看实际效果：\n\n![](https://alidocs.oss-cn-zhangjiakou.aliyuncs.com/res/1GXn45Po4v7LMqDQ/img/3855e2fa-ecce-42f4-9990-18c0de97d934.png)\n\n### **样式二：**\n\n文字全部放到配图中，图片下方不单独配置文字，只有按钮。\n\n主体唯一，避免主要文字或元素脱离背景面板。\n\n底板的渐变色需保证最下方为白色#ffffff，底板左上和右上圆角建议 24（在375宽情况下）\n\n![](https://alidocs.dingtalk.com/core/api/resources/img/5eecdaf48460cde5523d0ce9998c057eedf3c0567998f8cc75b8339e1c4c2483d23cd25c3e4de2798d68742cd653602aa3ba6b64951bcf7e0144c92ab19511dbc9fa34cdc87fea684ee2836a282b4a33540d7346dcb1e7a16a798168eee8f57d?tmpCode=35dc526b-3d55-40a9-98c0-c52c9b42ea8a)\n\n",
+      "refs": [
+        {
+          "scope": "project",
+          "fieldKey": "popupImage"
+        }
+      ]
+    }
+  ]
+}

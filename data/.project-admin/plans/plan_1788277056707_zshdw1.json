@@ -1,0 +1,12 @@
+{
+  "planId": "plan_1788277056707_zshdw1",
+  "operation": "project_delete",
+  "resourceId": "proj_1788277002336_y4dquk",
+  "impact": [
+    "将项目 E2E:20260901T153639798Z-cwrp9e:配置图片白板宿主回归 移入回收站",
+    "保留 1 个页面和项目工作空间 30 天",
+    "立即下线已发布产物；恢复后需要重新发布"
+  ],
+  "reversible": true,
+  "confirmToken": "confirm_1788277056707_ouj7mc"
+}

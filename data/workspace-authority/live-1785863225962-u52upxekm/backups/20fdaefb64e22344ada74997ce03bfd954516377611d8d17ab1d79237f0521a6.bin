@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "projectId": "proj_1784885664471_5bauyu",
+  "updatedAt": 1785900177726,
+  "state": {
+    "viewport": {
+      "x": 98.17405611861926,
+      "y": 158.3254798005542,
+      "zoom": 0.30357681814736104
+    },
+    "pages": {
+      "phone-preview_a3f2": {
+        "x": -62.06654066242231,
+        "y": 1.3349818099137103,
+        "width": 834,
+        "height": 1194,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "834x1194"
+      },
+      "pad-preview_m7k2": {
+        "x": 409.92306416738074,
+        "y": 1.3349818099137103,
+        "width": 834,
+        "height": 1194,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "834x1194"
+      },
+      "english-preview_t2w7": {
+        "x": 3.774758283725532e-15,
+        "y": 852,
+        "width": 1200,
+        "height": 600,
+        "zIndex": 3,
+        "sizeMode": "preview",
+        "previewSizeKey": "1200x600"
+      },
+      "aesthetic-preview_k6p8": {
+        "x": 0.8103306881289629,
+        "y": -4.107825191113079e-14,
+        "width": 1200,
+        "height": 600,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "1200x600"
+      },
+      "pad-header-preview_x7k2": {
+        "x": 478.41915428464256,
+        "y": 10.925048318436847,
+        "width": 1024,
+        "height": 558,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "1024x768"
+      },
+      "mobile-header-preview_b3f1": {
+        "x": 87.40023873793058,
+        "y": 10.925048318436847,
+        "width": 375,
+        "height": 812,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

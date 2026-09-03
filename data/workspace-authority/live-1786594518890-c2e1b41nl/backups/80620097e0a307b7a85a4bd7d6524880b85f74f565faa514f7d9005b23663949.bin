@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "projectId": "proj_1786594518341_bx5win",
+  "updatedAt": 1786599646396,
+  "state": {
+    "viewport": {
+      "x": 218.7398399014778,
+      "y": 35.549999999999955,
+      "zoom": 0.7880541871921183
+    },
+    "pages": {},
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "hiddenKnowledgeDocumentIds": [],
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    }
+  }
+}

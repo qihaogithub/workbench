@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "e9e95fc3-8ca4-45cc-87d2-7b1002b2c549",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "baseRevision": 0,
+  "revision": 465,
+  "rootHash": "480ad29f7f2b5a51b3a88a588b7d16feb4731a7e1c23f8d8ce76e75df7a58e37",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/quiz-wrong_b7k9/prototype.html",
+      "action": "modified",
+      "beforeHash": "7c058893f74a5b4ac4811a29d3e3a88184f8995b16fea9fde8d9a4168109f9e9",
+      "afterHash": "1af9ffbf4bb5d5b9b92c0e0fa1aca3fc7c7ed650bb1814ba598524fb76ba9b71"
+    }
+  ],
+  "committedAt": 1788141108780
+}

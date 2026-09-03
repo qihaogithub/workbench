@@ -1,0 +1,21 @@
+{
+  "id": "ds_1787817366889_b3f3996f",
+  "title": "clipboard-import设计规范",
+  "createdAt": "2026-08-27T07:56:06.888Z",
+  "updatedAt": "2026-08-27T07:58:07.817Z",
+  "autoManagedPageId": "clipboard-import_5f6c8b",
+  "entries": [
+    {
+      "id": "e_1787817464091_ag5d3h",
+      "title": "主视觉图片",
+      "markdown": "快点睡觉啊理发卡时间段放假\n\n",
+      "refs": [
+        {
+          "scope": "page",
+          "pageId": "kids-edu_b3xw",
+          "fieldKey": "heroImage"
+        }
+      ]
+    }
+  ]
+}

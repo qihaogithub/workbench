@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1783211533639_hulcpa",
+  "at": 1783211533639,
+  "actor": {
+    "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+    "name": "qihao",
+    "role": "creator",
+    "source": "author-site"
+  },
+  "level": "L2",
+  "tool": "page_create_version",
+  "projectId": "proj_1783208595412_2kyuwx",
+  "resourceId": "page_sketch_config_parity",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "page-version:page_sketch_config_parity:prv_1783211533637_xfa47z"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

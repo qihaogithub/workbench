@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "activeSubject": {
+      "type": "string",
+      "title": "当前科目",
+      "default": "reading",
+      "enum": ["reading", "thinking", "aesthetic", "english", "writer"],
+      "enumNames": ["阅读", "思维", "美育", "英语", "小作家"]
+    },
+    "headerBgReading": {
+      "type": "string",
+      "title": "阅读·手机头图",
+      "default": "/data/proj_1784885664471_5bauyu/assets/images/dffe5901b6f1a8b2346391df.png",
+      "format": "image",
+      "visibleWhen": { "field": "activeSubject", "equals": "reading" },
+      "ui:options": {
+        "minWidth": 750,
+        "minHeight": 540,
+        "maxWidth": 750,
+        "maxHeight": 540
+      }
+    },
+    "headerBgThinking": {
+      "type": "string",
+      "title": "思维·手机头图",
+      "default": "/data/proj_1784885664471_5bauyu/assets/images/c730d8a3005a8870a5b443ba.png",
+      "format": "image",
+      "visibleWhen": { "field": "activeSubject", "equals": "thinking" },
+      "ui:options": {
+        "minWidth": 750,
+        "minHeight": 540,
+        "maxWidth": 750,
+        "maxHeight": 540
+      }
+    },
+    "headerBgAesthetic": {
+      "type": "string",
+      "title": "美育·手机头图",
+      "default": "/data/proj_1784885664471_5bauyu/assets/images/63fdee7805cfb8918e1e71b6.png",
+      "format": "image",
+      "visibleWhen": { "field": "activeSubject", "equals": "aesthetic" },
+      "ui:options": {
+        "minWidth": 750,
+        "minHeight": 540,
+        "maxWidth": 750,
+        "maxHeight": 540
+      }
+    },
+    "headerBgEnglish": {
+      "type": "string",
+      "title": "英语·手机头图",
+      "default": "/data/proj_1784885664471_5bauyu/assets/images/df671bfa55be442520563abc.png",
+      "format": "image",
+      "visibleWhen": { "field": "activeSubject", "equals": "english" },
+      "ui:options": {
+        "minWidth": 750,
+        "minHeight": 540,
+        "maxWidth": 750,
+        "maxHeight": 540
+      }
+    },
+    "headerBgWriter": {
+      "type": "string",
+      "title": "小作家·手机头图",
+      "default": "/data/proj_1784885664471_5bauyu/assets/images/c8b90413e4094aef700109a5.png",
+      "format": "image",
+      "visibleWhen": { "field": "activeSubject", "equals": "writer" },
+      "ui:options": {
+        "minWidth": 750,
+        "minHeight": 540,
+        "maxWidth": 750,
+        "maxHeight": 540
+      }
+    },
+    "padHeaderBgReading": {
+      "type": "string",
+      "title": "阅读·Pad头图",
+      "default": "/data/proj_1784885664471_5bauyu/assets/images/b5afe1419c6984b1585705bb.png",
+      "format": "image",
+      "visibleWhen": { "field": "activeSubject", "equals": "reading" },
+      "ui:options": {
+        "minWidth": 2732,
+        "minHeight": 540,
+        "maxWidth": 2732,
+        "maxHeight": 540
+      }
+    },
+    "padHeaderBgThinking": {
+      "type": "string",
+      "title": "思维·Pad头图",
+      "default": "/data/proj_1784885664471_5bauyu/assets/images/a7290e75f6df696780a9c1a8.png",
+      "format": "image",
+      "visibleWhen": { "field": "activeSubject", "equals": "thinking" },
+      "ui:options": {
+        "minWidth": 2732,
+        "minHeight": 540,
+        "maxWidth": 2732,
+        "maxHeight": 540
+      }
+    },
+    "padHeaderBgAesthetic": {
+      "type": "string",
+      "title": "美育·Pad头图",
+      "default": "/data/proj_1784885664471_5bauyu/assets/images/8f598407250ef17e89c7fe36.png",
+      "format": "image",
+      "visibleWhen": { "field": "activeSubject", "equals": "aesthetic" },
+      "ui:options": {
+        "minWidth": 2732,
+        "minHeight": 540,
+        "maxWidth": 2732,
+        "maxHeight": 540
+      }
+    },
+    "padHeaderBgEnglish": {
+      "type": "string",
+      "title": "英语·Pad头图",
+      "default": "/data/proj_1784885664471_5bauyu/assets/images/819ffcef955c65b9b0443a21.png",
+      "format": "image",
+      "visibleWhen": { "field": "activeSubject", "equals": "english" },
+      "ui:options": {
+        "minWidth": 2732,
+        "minHeight": 540,
+        "maxWidth": 2732,
+        "maxHeight": 540
+      }
+    },
+    "padHeaderBgWriter": {
+      "type": "string",
+      "title": "小作家·Pad头图",
+      "default": "/data/proj_1784885664471_5bauyu/assets/images/f97d1816e32cc062a3bdcff7.png",
+      "format": "image",
+      "visibleWhen": { "field": "activeSubject", "equals": "writer" },
+      "ui:options": {
+        "minWidth": 2732,
+        "minHeight": 540,
+        "maxWidth": 2732,
+        "maxHeight": 540
+      }
+    }
+  },
+  "required": []
+}

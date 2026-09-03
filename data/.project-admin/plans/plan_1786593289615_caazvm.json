@@ -1,0 +1,12 @@
+{
+  "planId": "plan_1786593289615_caazvm",
+  "operation": "project_delete",
+  "resourceId": "proj_1786593156882_ms9221",
+  "impact": [
+    "删除项目 E2E:20260813T035230923Z-8h4hz7:画布退出恢复回归",
+    "删除 3 个页面",
+    "删除项目工作空间和元数据"
+  ],
+  "reversible": true,
+  "confirmToken": "confirm_1786593289615_xsstk0"
+}

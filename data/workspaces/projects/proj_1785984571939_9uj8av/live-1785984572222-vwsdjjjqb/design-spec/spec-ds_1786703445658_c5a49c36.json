@@ -1,0 +1,48 @@
+{
+  "id": "ds_1786703445658_c5a49c36",
+  "title": "pad设计规范",
+  "createdAt": "2026-08-14T10:30:45.657Z",
+  "updatedAt": "2026-08-14T10:30:45.657Z",
+  "entries": [
+    {
+      "id": "e_1786703445658_aa5e8746",
+      "title": "广告图",
+      "markdown": "",
+      "refs": [
+        {
+          "scope": "page",
+          "pageId": "pad_s5xn",
+          "fieldKey": "adImage"
+        }
+      ],
+      "autoManagedFieldKey": "adImage"
+    },
+    {
+      "id": "e_1786703445658_4ed1f817",
+      "title": "pad前景图",
+      "markdown": "",
+      "refs": [
+        {
+          "scope": "page",
+          "pageId": "pad_s5xn",
+          "fieldKey": "padForeground"
+        }
+      ],
+      "autoManagedFieldKey": "padForeground"
+    },
+    {
+      "id": "e_1786703445658_b0e5ab07",
+      "title": "pad背景图",
+      "markdown": "",
+      "refs": [
+        {
+          "scope": "page",
+          "pageId": "pad_s5xn",
+          "fieldKey": "padBackground"
+        }
+      ],
+      "autoManagedFieldKey": "padBackground"
+    }
+  ],
+  "autoManagedPageId": "pad_s5xn"
+}

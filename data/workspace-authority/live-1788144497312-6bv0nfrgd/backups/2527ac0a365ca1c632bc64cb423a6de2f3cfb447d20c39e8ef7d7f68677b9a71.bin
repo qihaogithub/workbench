@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "projectId": "proj_1788144496725_oi5vie",
+  "updatedAt": 1788144520932,
+  "state": {
+    "viewport": {
+      "x": -192.92917883912435,
+      "y": -333.8353497807201,
+      "zoom": 0.6314082034209331
+    },
+    "pages": {
+      "page_6f3v": {
+        "x": 677,
+        "y": 579,
+        "width": 418.0047848861307,
+        "height": 905.1196942067684,
+        "sizeMode": "custom",
+        "previewSizeKey": "375x812",
+        "zIndex": 1
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "hiddenKnowledgeDocumentIds": [],
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "sections": {}
+  }
+}

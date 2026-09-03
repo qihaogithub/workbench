@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "0d541022-0ea0-4f71-95fc-98624b727ca0",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 129,
+  "rootHash": "f9aff61ac4c3ab3143a4898f8d7f784066f55c77e208d274811777f40f30ec0c",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/quiet-studio_q7m4/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "2c49123028bbdc0100a45cc5a4f0333fb1d117f1e9309fd49c5602fe7c08b037",
+      "afterHash": null
+    },
+    {
+      "path": "demos/quiet-studio_q7m4/index.tsx",
+      "action": "deleted",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": null
+    },
+    {
+      "path": "demos/quiet-studio_q7m4/prototype.css",
+      "action": "deleted",
+      "beforeHash": "6566723982712ac42d14ddd65e992ecb78f8ac19978aa4b1d8e66e68adf52571",
+      "afterHash": null
+    },
+    {
+      "path": "demos/quiet-studio_q7m4/prototype.html",
+      "action": "deleted",
+      "beforeHash": "ecb90cd5785d0ae9bc4c1f19bbb029aaa8ea6d18738daf2be8a8868aa3ca53bb",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "926b8ef8cdb2f94055a745a936e4b266df18a0608e7e3fc36241ddcf8e844d3b",
+      "afterHash": "34d75db9d1ad47965f15ff04d145e4d384a2f2a5ea4e6c1e4f809fadbb04a4dd"
+    }
+  ],
+  "committedAt": 1787736216154
+}

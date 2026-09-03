@@ -1,0 +1,8 @@
+{
+  "id": "reading-preview_r8k2",
+  "name": "阅读·头图预览",
+  "runtimeType": "prototype-html-css",
+  "order": 1,
+  "parentId": null,
+  "routeKey": "page"
+}

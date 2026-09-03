@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1783244610698_kh2n5x",
+  "at": 1783244610698,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L2",
+  "tool": "asset_upload",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "resourceId": "assets/football/lottery/machine-front.webp",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "assets/football/lottery/machine-front.webp"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

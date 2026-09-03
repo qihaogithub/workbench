@@ -1,0 +1,8 @@
+{
+  "id": "page_da9l",
+  "name": "排行榜",
+  "routeKey": "page-2",
+  "order": 0,
+  "parentId": null,
+  "runtimeType": "high-fidelity-react"
+}

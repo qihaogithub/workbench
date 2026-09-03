@@ -1,0 +1,25 @@
+{
+  "committed": true,
+  "mutationId": "bf0b68a4-5e82-4945-a110-76d95e5436d9",
+  "projectId": "proj_1786594518341_bx5win",
+  "workspaceId": "live-1786594518890-c2e1b41nl",
+  "baseRevision": 0,
+  "revision": 3,
+  "rootHash": "04ddac952fcef637d3f76ca775140391dd18b0178e416921a86fee909818baab",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_f2qb/index.tsx",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e580c0b5883251747f696697b48c6901373430c82f9319a85aba981213de2fea"
+    },
+    {
+      "path": "demos/page_f2qb/config.schema.json",
+      "action": "modified",
+      "beforeHash": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+      "afterHash": "385d149a239df1df3d6a81c92a029a761e897b581f71957823577ad92c98d9aa"
+    }
+  ],
+  "committedAt": 1786594523631
+}

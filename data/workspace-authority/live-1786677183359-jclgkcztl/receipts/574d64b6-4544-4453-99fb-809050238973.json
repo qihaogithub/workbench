@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "574d64b6-4544-4453-99fb-809050238973",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 667,
+  "rootHash": "511ab05abd387875e68bb253e93d143d8ba0f0d2fd73f5bee1d008fbc5c69213",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/halloween-poster_t1v8/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "1dc93550734ab7cc72213593bd98a549dab87230c924489520ecc96df88bfa7a"
+    }
+  ],
+  "committedAt": 1787892050393
+}

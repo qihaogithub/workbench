@@ -1,0 +1,77 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "halloween-intro_q7m1",
+      "name": "线索引入页",
+      "runtimeType": "prototype-html-css",
+      "order": 2,
+      "parentId": null,
+      "routeKey": "page-2"
+    },
+    {
+      "id": "halloween-level1_f3n9",
+      "name": "第1关·精灵失踪线索站",
+      "runtimeType": "prototype-html-css",
+      "order": 3,
+      "parentId": null,
+      "routeKey": "1"
+    },
+    {
+      "id": "halloween-level2_z8b5",
+      "name": "第2关·南瓜屋大搜索",
+      "runtimeType": "prototype-html-css",
+      "order": 4,
+      "parentId": null,
+      "routeKey": "2"
+    },
+    {
+      "id": "halloween-level3_w2p7",
+      "name": "第3关",
+      "runtimeType": "prototype-html-css",
+      "order": 5,
+      "parentId": null,
+      "routeKey": "3"
+    },
+    {
+      "id": "halloween-level4_j6c3",
+      "name": "第4关",
+      "runtimeType": "prototype-html-css",
+      "order": 6,
+      "parentId": null,
+      "routeKey": "4"
+    },
+    {
+      "id": "halloween-level5_r9d4",
+      "name": "第5关·魔法召唤南瓜金曲秀",
+      "runtimeType": "prototype-html-css",
+      "order": 7,
+      "parentId": null,
+      "routeKey": "5"
+    },
+    {
+      "id": "halloween-poster_t1v8",
+      "name": "成就海报生成·分享",
+      "runtimeType": "prototype-html-css",
+      "order": 8,
+      "parentId": null,
+      "routeKey": "page-3"
+    },
+    {
+      "id": "halloween-prize_y3n6",
+      "name": "我的奖品页",
+      "runtimeType": "prototype-html-css",
+      "order": 9,
+      "parentId": null,
+      "routeKey": "page-4"
+    },
+    {
+      "id": "halloween-share_u5b9",
+      "name": "转介绍·分享集赞赢大奖",
+      "runtimeType": "prototype-html-css",
+      "order": 10,
+      "parentId": null,
+      "routeKey": "page-5"
+    }
+  ]
+}

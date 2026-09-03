@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "projectId": "proj_1786367903885_iu08e4",
+  "updatedAt": 1786523578662,
+  "state": {
+    "viewport": {
+      "x": 220.3642470439686,
+      "y": 83.19941244834712,
+      "zoom": 0.21694878527497857
+    },
+    "pages": {
+      "quiet-studio_q7m4": {
+        "x": -733.7320721374226,
+        "y": 0,
+        "width": 375,
+        "height": 1267,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "sunny-reading_k4m8": {
+        "x": -283.66118561160215,
+        "y": 0,
+        "width": 375,
+        "height": 1558,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "kids-edu_b3xw": {
+        "x": -1140.4575886015323,
+        "y": 14.638247126436871,
+        "width": 375,
+        "height": 2471,
+        "zIndex": 4,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "kids-edu-h5_p9m2": {
+        "x": -1321.0303520114944,
+        "y": 0,
+        "width": 375,
+        "height": 2779,
+        "zIndex": 5,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_zp3o": {
+        "x": 805.661030352012,
+        "y": -27.447435344827454,
+        "width": 418.0047848861307,
+        "height": 905.1196942067684,
+        "sizeMode": "custom",
+        "previewSizeKey": "375x812",
+        "zIndex": 7
+      },
+      "page_5xir": {
+        "x": 1302.5984290718898,
+        "y": -27.180532546048653,
+        "width": 375,
+        "height": 812,
+        "zIndex": 7,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "kids-edu-wireframe_x8k3": {
+        "x": 415,
+        "y": 852,
+        "width": 375,
+        "height": 2858,
+        "zIndex": 4,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_zdwh": {
+        "x": 286.62233565316296,
+        "y": -37.09322037248444,
+        "width": 418.0047848861307,
+        "height": 905.1196942067684,
+        "sizeMode": "custom",
+        "previewSizeKey": "375x812",
+        "zIndex": 5
+      },
+      "page_yvbe": {
+        "x": 783.5597343730408,
+        "y": -36.82631757370564,
+        "width": 904.5858886092107,
+        "height": 678.439416456908,
+        "sizeMode": "custom",
+        "previewSizeKey": "1024x768",
+        "zIndex": 5
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

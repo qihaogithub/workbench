@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "projectId": "proj_1787811413171_cwsipz",
+  "updatedAt": 1787811419399,
+  "state": {
+    "viewport": {
+      "x": 191.19057881773398,
+      "y": 30.749999999999943,
+      "zoom": 0.6816502463054188
+    },
+    "pages": {
+      "section_mu1x": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 812,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "hiddenKnowledgeDocumentIds": [],
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "sections": {
+      "section_d855299f-9abc-4324-ad28-bcb47e26cf9d": {
+        "id": "section_d855299f-9abc-4324-ad28-bcb47e26cf9d",
+        "kind": "section",
+        "title": "登录流程",
+        "layout": {
+          "x": -17.604375741023016,
+          "y": -17.604336043360348,
+          "width": 410.208751482046,
+          "height": 847.2086720867206,
+          "zIndex": 1
+        },
+        "children": [
+          {
+            "kind": "page",
+            "id": "section_mu1x"
+          }
+        ],
+        "createdAt": 1787811417723,
+        "updatedAt": 1787811419370,
+        "collapsed": true
+      }
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "mode": "replace-image",
+  "backgroundImage": "https://img.onlywnn.cn/figma/h_dc3eff70.png",
+  "blanks": [
+    {
+      "image": "https://img.onlywnn.cn/figma/h_dfd47404.png",
+      "replacedImage": "",
+      "position": {
+        "x": 629,
+        "y": 157
+      }
+    },
+    {
+      "image": "https://img.onlywnn.cn/figma/h_dfd47404.png",
+      "replacedImage": "",
+      "position": {
+        "x": 1002,
+        "y": 316
+      }
+    }
+  ],
+  "options": [
+    {
+      "image": "https://img.onlywnn.cn/figma/h_d59a9b95.png",
+      "position": {
+        "x": 579,
+        "y": 612
+      }
+    },
+    {
+      "image": "https://img.onlywnn.cn/figma/h_c56dd669.png",
+      "position": {
+        "x": 863,
+        "y": 612
+      }
+    },
+    {
+      "image": "https://img.onlywnn.cn/figma/h_d9b8d53a.png",
+      "position": {
+        "x": 1145,
+        "y": 612
+      }
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "168e88ed-7f78-4b14-b155-f66deb4db87f",
+  "projectId": "proj_1785421657423_1ptong",
+  "workspaceId": "live-1785422310448-qtzamayu8",
+  "baseRevision": 0,
+  "revision": 2,
+  "rootHash": "dbed174a8644d844d0dee556c06cd26c34d4b7f76a10afb493c2f7a44ee0f8ba",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/config-demo_x7k2/prototype.css",
+      "action": "modified",
+      "beforeHash": "d6632b1a71f880d652e115bf2b801d6f2ceac23c415ac10b1531b2f33a594b4f",
+      "afterHash": "86ced5279f3a4c726a448af07fb7c47cf02add1315ff43b1036496d7fbf36a5c"
+    }
+  ],
+  "committedAt": 1785422362269
+}

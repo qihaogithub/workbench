@@ -1,0 +1,140 @@
+{
+  "id": "proj_1785934852171_oire9m",
+  "name": "OneFlow介绍",
+  "projectType": "standard",
+  "category": "未分类",
+  "workspacePath": "/Users/jojo/Documents/workbench/data/projects/proj_1785934852171_oire9m/workspace",
+  "demoPages": [
+    {
+      "id": "demo_1785935720859_01of",
+      "name": "封面",
+      "routeKey": "slide-1",
+      "order": 0,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "demo_1785935720859_02of",
+      "name": "为什么需要 OneFlow",
+      "routeKey": "slide-2",
+      "order": 1,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "demo_1785935720859_03of",
+      "name": "过去 vs 未来",
+      "routeKey": "slide-3",
+      "order": 2,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "demo_1785935720860_04of",
+      "name": "角色变化",
+      "routeKey": "slide-4",
+      "order": 3,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "demo_1785935720860_05of",
+      "name": "中心产物：可交互活动原型",
+      "routeKey": "slide-5",
+      "order": 4,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "demo_1785935720860_06of",
+      "name": "AI 的三层作用",
+      "routeKey": "slide-6",
+      "order": 5,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "demo_1785935720860_07of",
+      "name": "运营设计视角",
+      "routeKey": "slide-7",
+      "order": 6,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "demo_1785935720860_08of",
+      "name": "团队协作平台",
+      "routeKey": "slide-8",
+      "order": 7,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "demo_1785935720860_09of",
+      "name": "完整闭环",
+      "routeKey": "slide-9",
+      "order": 8,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    }
+  ],
+  "demoFolders": [],
+  "versions": [
+    {
+      "versionId": "v1",
+      "type": "named_version",
+      "savedAt": 1785935775461,
+      "savedBy": "jojo",
+      "sessionId": "edit_1785935572204_2xn15w",
+      "snapshotPath": "/Users/jojo/Documents/workbench/data/snapshots/proj_1785934852171_oire9m/v1",
+      "fileCount": 41
+    },
+    {
+      "versionId": "v2",
+      "type": "auto_checkpoint",
+      "savedAt": 1785936265136,
+      "savedBy": "qihao",
+      "sessionId": "session-1785934852683-c3lbgk0ln",
+      "snapshotPath": "/app/data/snapshots/proj_1785934852171_oire9m/v2",
+      "fileCount": 42,
+      "workspaceId": "live-1785935881009-qhes8gqe3",
+      "workspaceRevision": 10,
+      "workspaceRootHash": "a0626b1afffbd9b38715bdf544c5ac594f83330e2eee12f36e381dfd6d973554",
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v3",
+      "type": "auto_checkpoint",
+      "savedAt": 1785999950690,
+      "savedBy": "qihao",
+      "sessionId": "session-1785998432193-koosj906l",
+      "snapshotPath": "/app/data/snapshots/proj_1785934852171_oire9m/v3",
+      "fileCount": 45,
+      "workspaceId": "live-1785935881009-qhes8gqe3",
+      "workspaceRevision": 43,
+      "workspaceRootHash": "0697416a8dd664eed49d16ec20a3f8cc9f42aa440b2aa6ba35004a9cc3880c32",
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v4",
+      "type": "auto_checkpoint",
+      "savedAt": 1786001098691,
+      "savedBy": "qihao",
+      "sessionId": "session-1785998432193-koosj906l",
+      "snapshotPath": "/app/data/snapshots/proj_1785934852171_oire9m/v4",
+      "fileCount": 45,
+      "workspaceId": "live-1785935881009-qhes8gqe3",
+      "workspaceRevision": 50,
+      "workspaceRootHash": "49ebd0c1841559792db424b7ce5c236273107d51a989d35cee95496b2add9644",
+      "note": "停止编辑后自动保存记录"
+    }
+  ],
+  "createdAt": 1785934852294,
+  "updatedAt": 1786367815094,
+  "activeWorkspaceId": "live-1785935881009-qhes8gqe3",
+  "activeWorkspaceUpdatedAt": 1786001098693,
+  "canonicalSyncedWorkspaceId": "live-1785935881009-qhes8gqe3",
+  "canonicalSyncedRevision": 82,
+  "canonicalSyncedRootHash": "0532428e2f88a6fd8f54bd30540bbf1a83df8b7c1e4da79b2bbf516bdad93e94",
+  "canonicalSyncedAt": 1786367815094
+}

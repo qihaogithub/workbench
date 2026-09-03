@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "properties": {
+    "autosaveProjectMarker": {
+      "type": "string",
+      "title": "自动保存项目配置 c2a542",
+      "default": "autosave-regression-project: c2a542"
+    }
+  }
+}

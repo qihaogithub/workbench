@@ -1,0 +1,13 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "prototype-mvp_a1b2",
+      "name": "配置原型演示",
+      "runtimeType": "prototype-html-css",
+      "order": 1,
+      "parentId": null,
+      "routeKey": "page"
+    }
+  ]
+}

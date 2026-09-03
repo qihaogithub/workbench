@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "47d4910e-fda3-4dbc-8698-84d7d3f1ef07",
+  "projectId": "proj_1786593610509_wjbkml",
+  "workspaceId": "live-1786593610524-lj5m22sga",
+  "baseRevision": 0,
+  "revision": 3,
+  "rootHash": "dc410d13117a4a8ceddd0a88ea164094aedbebfd71ceaaef25775e8f50ab13b1",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_t2fp/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f"
+    },
+    {
+      "path": "demos/page_t2fp/prototype.css",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/page_t2fp/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355"
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "ad2c956fd41e3a49864ec450bc88bb9f7b0cd04d5fe3cb8dadc331d5143e6207",
+      "afterHash": "c172c1e3bb86004c6ebb452ad7a4f708ee7bb20c9b837cf8311d00137bc626f2"
+    }
+  ],
+  "committedAt": 1786593614948
+}

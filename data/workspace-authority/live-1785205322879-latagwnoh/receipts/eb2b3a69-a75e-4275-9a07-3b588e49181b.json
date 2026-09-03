@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "eb2b3a69-a75e-4275-9a07-3b588e49181b",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "baseRevision": 0,
+  "revision": 233,
+  "rootHash": "77ca08f7fbd67d0b9d9364ff85cd12625c72ac8c6d8241dc1fb6ad3b6395cabc",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_j2zv/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "caa4dded1c46311d8aaa611752a2a39998cd09de0af6953aa717f16a2012e746",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_j2zv/prototype.css",
+      "action": "deleted",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_j2zv/prototype.html",
+      "action": "deleted",
+      "beforeHash": "4b31583523bcada34c53033a22567c628a4381f6543022f9e5483443e4be502b",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_j2zv/prototype.meta.json",
+      "action": "deleted",
+      "beforeHash": "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "b64da185140054d4d57a9b9fd79d21f62ca5b4a685b223af63f783d6b4bc8b2b",
+      "afterHash": "8f3b0734205185990c8a087ab33f81ca9acda9d89c3dbb59c3025cd612b37202"
+    }
+  ],
+  "committedAt": 1785397565066
+}

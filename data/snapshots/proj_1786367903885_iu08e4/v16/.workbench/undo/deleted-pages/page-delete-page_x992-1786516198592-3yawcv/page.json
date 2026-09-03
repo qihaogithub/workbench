@@ -1,0 +1,12 @@
+{
+  "id": "page_x992",
+  "name": "手机",
+  "order": 3,
+  "parentId": null,
+  "runtimeType": "prototype-html-css",
+  "reference": {
+    "sourceProjectId": "proj_1779608460372",
+    "sourcePageId": "demo_1779608460501_abc123"
+  },
+  "routeKey": "page"
+}

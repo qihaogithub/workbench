@@ -1,0 +1,12 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "1_04es",
+      "name": "配置页 1",
+      "routeKey": "1",
+      "order": 0,
+      "parentId": null
+    }
+  ]
+}

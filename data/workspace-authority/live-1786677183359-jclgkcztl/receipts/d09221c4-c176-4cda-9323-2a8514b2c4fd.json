@@ -1,0 +1,25 @@
+{
+  "committed": true,
+  "mutationId": "d09221c4-c176-4cda-9323-2a8514b2c4fd",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 696,
+  "rootHash": "51884e8d0ce969350965046f5db13d5c999c2270f7627f233fb8b218738dc4c3",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/halloween-level5_r9d4/index.tsx",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/halloween-level5_r9d4/config.schema.json",
+      "action": "modified",
+      "beforeHash": "d953bcd9c5e41101c3bd8e1e3181bc20f338e75488f4530014dfd6c8dca0b430",
+      "afterHash": "d953bcd9c5e41101c3bd8e1e3181bc20f338e75488f4530014dfd6c8dca0b430"
+    }
+  ],
+  "committedAt": 1787892696197
+}

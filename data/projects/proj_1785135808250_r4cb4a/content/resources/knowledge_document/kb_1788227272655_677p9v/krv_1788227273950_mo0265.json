@@ -1,0 +1,34 @@
+{
+  "id": "krv_1788227273950_mo0265",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "kind": "knowledge_document",
+  "resourceId": "kb_1788227272655_677p9v",
+  "contentHash": "91ffed62a0c3470c48acffc5dba29df612a438dc9acb5b99ed145749d0ba387e",
+  "blobRefs": [
+    "993ac27708ab941a52d5f69ca0d13f44f56c04794e99e31348627d22176ac1f6"
+  ],
+  "metadata": {
+    "item": {
+      "id": "kb_1788227272655_677p9v",
+      "title": "闯关活动",
+      "source": "user",
+      "description": "闯关活动",
+      "fileName": "闯关活动.md",
+      "addedAt": "2026-09-01T01:47:52.654Z",
+      "updatedAt": "2026-09-01T01:47:52.654Z",
+      "sizeBytes": 48745
+    },
+    "files": {
+      "markdown": "993ac27708ab941a52d5f69ca0d13f44f56c04794e99e31348627d22176ac1f6"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1788227273952,
+  "createdBy": "Author Site",
+  "source": "user",
+  "note": "创建知识文档 闯关活动"
+}

@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1787888581427_cnt6if",
+  "at": 1787888581427,
+  "actor": {
+    "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+    "name": "qihao",
+    "role": "creator",
+    "source": "author-site"
+  },
+  "level": "L2",
+  "tool": "page_create_version",
+  "projectId": "proj_1786367903885_iu08e4",
+  "resourceId": "kids-edu_b3xw",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "page-version:kids-edu_b3xw:prv_1787888581412_jus50f"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

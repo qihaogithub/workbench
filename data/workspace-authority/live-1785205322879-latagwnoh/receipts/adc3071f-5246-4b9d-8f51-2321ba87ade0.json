@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "adc3071f-5246-4b9d-8f51-2321ba87ade0",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "baseRevision": 0,
+  "revision": 313,
+  "rootHash": "406ea09f85ca26ab9cd0cbae75e4d622f86c0b5d9f43adc13c2fe87e78488bd8",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/quiz-wrong_b7k9/index.tsx",
+      "action": "modified",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/quiz-wrong_b7k9/config.schema.json",
+      "action": "modified",
+      "beforeHash": "8eb694face506cec58fe1cf33da82291f93657d7d84d6c27980977a8fb380e26",
+      "afterHash": "8eb694face506cec58fe1cf33da82291f93657d7d84d6c27980977a8fb380e26"
+    },
+    {
+      "path": "demos/quiz-wrong_b7k9/prototype.html",
+      "action": "modified",
+      "beforeHash": "7c058893f74a5b4ac4811a29d3e3a88184f8995b16fea9fde8d9a4168109f9e9",
+      "afterHash": "7c058893f74a5b4ac4811a29d3e3a88184f8995b16fea9fde8d9a4168109f9e9"
+    },
+    {
+      "path": "demos/quiz-wrong_b7k9/prototype.css",
+      "action": "modified",
+      "beforeHash": "7811fedd99fd24d56b74c1bf9577a0994000454193bc8863f25af93b80fb336e",
+      "afterHash": "7811fedd99fd24d56b74c1bf9577a0994000454193bc8863f25af93b80fb336e"
+    }
+  ],
+  "committedAt": 1785487623784
+}

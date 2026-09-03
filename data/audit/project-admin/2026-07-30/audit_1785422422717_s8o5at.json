@@ -1,0 +1,15 @@
+{
+  "auditId": "audit_1785422422717_s8o5at",
+  "at": 1785422422717,
+  "actor": {
+    "id": "jojo",
+    "name": "jojo",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L1",
+  "tool": "edit_begin",
+  "projectId": "proj_1785421657423_1ptong",
+  "resourceId": "edit_1785422422712_azoh54",
+  "ok": true
+}

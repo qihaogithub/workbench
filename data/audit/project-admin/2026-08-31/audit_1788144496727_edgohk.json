@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1788144496727_edgohk",
+  "at": 1788144496727,
+  "actor": {
+    "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+    "name": "qihao",
+    "role": "admin",
+    "source": "author-site"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1788144496725_oi5vie",
+  "inputSummary": {
+    "name": "12",
+    "category": "未分类"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1788144496725_oi5vie"
+    ]
+  }
+}

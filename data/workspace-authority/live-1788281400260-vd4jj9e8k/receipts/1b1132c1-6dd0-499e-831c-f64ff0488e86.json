@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "1b1132c1-6dd0-499e-831c-f64ff0488e86",
+  "projectId": "proj_1788281400242_5w9y5n",
+  "workspaceId": "live-1788281400260-vd4jj9e8k",
+  "baseRevision": 0,
+  "revision": 3,
+  "rootHash": "e17de7700ff9252d991e728b2eb6d0bfcb05d8698a70fe936591ee699d07bbdd",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_t2bq/index.tsx",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "d4f16c6fd02bac4de0a81b96791451c106a5e531a6d0d3c95f9de5b753155d5e"
+    },
+    {
+      "path": "demos/page_t2bq/config.schema.json",
+      "action": "modified",
+      "beforeHash": "e1c118a2c54911913d4ffbf47809ce89c404706cd8a6262198c81674f23a3750",
+      "afterHash": "91a2a46273c7e9ce5be33a0a788a6254af30cfc5ad36a140a6850fcfbfdb58cb"
+    },
+    {
+      "path": "design-spec/spec-ds_1788281400544_2bebcc97.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "c5e35660930c63509352a81b11bebed76a900e3820d379378b5237c11c937146"
+    },
+    {
+      "path": "design-spec/manifest.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "103be1182a2f392ace0e8a352145aaf4b59f9ee652a63e33c06daddf32cfe1a8"
+    }
+  ],
+  "committedAt": 1788281400546
+}

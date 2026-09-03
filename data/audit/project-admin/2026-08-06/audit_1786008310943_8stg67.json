@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1786008310943_8stg67",
+  "at": 1786008310943,
+  "actor": {
+    "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+    "name": "qihao",
+    "role": "creator",
+    "source": "author-site"
+  },
+  "level": "L2",
+  "tool": "page_create_version",
+  "projectId": "proj_1785858256243_p2zs4y",
+  "resourceId": "summer-camp_k3m7",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "page-version:summer-camp_k3m7:prv_1786008310939_esz0n6"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

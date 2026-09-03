@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1783255139529_loku8d",
+  "at": 1783255139529,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L2",
+  "tool": "asset_upload",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "resourceId": "assets/football/source-screenshots/22-age-gate-confirm.png",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "assets/football/source-screenshots/22-age-gate-confirm.png"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

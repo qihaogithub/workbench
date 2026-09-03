@@ -1,0 +1,46 @@
+{
+  "$demo": {
+    "previewSize": { "width": 1024, "height": 768 }
+  },
+  "type": "object",
+  "properties": {
+
+    "themeColor": {
+      "type": "string",
+      "format": "color",
+      "title": "主题色",
+      "default": "#4CAF50"
+    },
+    "padHeaderBgReading": {
+      "type": "string",
+      "format": "image",
+      "title": "阅读头图背景"
+    },
+    "padHeaderBgThinking": {
+      "type": "string",
+      "format": "image",
+      "title": "思维头图背景"
+    },
+    "padHeaderBgEnglish": {
+      "type": "string",
+      "format": "image",
+      "title": "英语头图背景"
+    },
+    "padHeaderBgWriter": {
+      "type": "string",
+      "format": "image",
+      "title": "小作家头图背景"
+    },
+    "padHeaderBgAesthetic": {
+      "type": "string",
+      "format": "image",
+      "title": "美育头图背景"
+    },
+    "padUiImage": {
+      "type": "string",
+      "format": "image",
+      "title": "Pad UI 图片"
+    }
+  },
+  "required": []
+}

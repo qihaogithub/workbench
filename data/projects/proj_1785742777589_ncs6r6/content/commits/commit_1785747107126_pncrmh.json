@@ -1,0 +1,31 @@
+{
+  "id": "commit_1785747107126_pncrmh",
+  "projectId": "proj_1785742777589_ncs6r6",
+  "parentCommitId": "commit_1785746578159_597bzb",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "示例",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "config-demo_m7p2",
+      "versionId": "prv_1785747107123_57k12x"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "config-demo_m7p2",
+      "fromVersionId": "prv_1785746578034_a9yrln",
+      "toVersionId": "prv_1785747107123_57k12x"
+    }
+  ],
+  "createdAt": 1785747107126,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785742777874-8sex712t9",
+    "workspaceRevision": 37,
+    "workspaceRootHash": "800beea05919d6be426999760b83e5e7f1f529e983d75d083997700b45b23ffd"
+  }
+}

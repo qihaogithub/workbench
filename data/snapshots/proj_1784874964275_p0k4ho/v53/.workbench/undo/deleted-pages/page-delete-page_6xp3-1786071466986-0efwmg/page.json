@@ -1,0 +1,8 @@
+{
+  "id": "page_6xp3",
+  "name": "手机预览",
+  "routeKey": "page-2",
+  "order": 2,
+  "parentId": null,
+  "runtimeType": "high-fidelity-react"
+}

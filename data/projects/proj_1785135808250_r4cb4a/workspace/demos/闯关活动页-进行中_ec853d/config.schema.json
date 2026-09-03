@@ -1,0 +1,311 @@
+{
+  "type": "object",
+  "properties": {
+    "bgm": {
+      "type": "string",
+      "format": "file",
+      "title": "闯关背景音乐",
+      "description": "仅支持 MP3 格式，文件大小需小于 1M",
+      "ui:options": {
+        "accept": "audio/mpeg,.mp3"
+      },
+      "default": ""
+    },
+    "navColor": {
+      "type": "string",
+      "format": "color",
+      "title": "导航栏颜色",
+      "default": "#07abff"
+    },
+    "modules": {
+      "type": "array",
+      "title": "内容模块",
+      "$demo": {
+        "sortable": true
+      },
+      "items": {
+        "oneOf": [
+          {
+            "title": "图片模块",
+            "properties": {
+              "type": {
+                "const": "image"
+              },
+              "image": {
+                "type": "string",
+                "format": "image",
+                "title": "图片",
+                "accept": "image/png,image/gif"
+              }
+            },
+            "required": [
+              "type",
+              "image"
+            ]
+          },
+          {
+            "title": "参与人数模块",
+            "$demo": {
+              "maxItems": 1
+            },
+            "properties": {
+              "type": {
+                "const": "participant"
+              },
+              "bgImage": {
+                "type": "string",
+                "format": "image",
+                "title": "参与人数背景图",
+                "accept": "image/png"
+              },
+              "count": {
+                "type": "number",
+                "title": "参与人数",
+                "default": 0
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          {
+            "title": "视频模块",
+            "$demo": {
+              "maxItems": 1
+            },
+            "properties": {
+              "type": {
+                "const": "video"
+              },
+              "videoBg": {
+                "type": "string",
+                "format": "image",
+                "title": "视频背景图",
+                "accept": "image/png"
+              },
+              "video": {
+                "type": "object",
+                "title": "视频",
+                "format": "video",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "title": "视频地址"
+                  },
+                  "poster": {
+                    "type": "string",
+                    "title": "封面地址",
+                    "format": "image"
+                  }
+                },
+                "required": [
+                  "url"
+                ],
+                "ui:options": {
+                  "accept": "video/mp4,video/webm",
+                  "videoPreviewStyle": "controls"
+                }
+              }
+            },
+            "required": [
+              "type",
+              "video"
+            ]
+          },
+          {
+            "title": "关卡模块",
+            "properties": {
+              "type": {
+                "const": "level"
+              },
+              "bgImage": {
+                "type": "string",
+                "format": "image",
+                "title": "关卡背景图",
+                "description": "仅支持 png，宽 375px，高度需覆盖关卡总高，导出 2 倍图，大小不超过 1024KB",
+                "accept": "image/png"
+              },
+              "guide": {
+                "type": "object",
+                "format": "spine",
+                "title": "闯关引导形象",
+                "description": "Spine 骨骼动画素材包，尺寸 W=80px H=130px（导出两倍）",
+                "properties": {
+                  "kind": {
+                    "const": "spine"
+                  },
+                  "version": {
+                    "const": 1
+                  },
+                  "assetId": {
+                    "type": "string",
+                    "pattern": "^spine_[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "version",
+                  "assetId"
+                ],
+                "additionalProperties": false,
+                "ui:options": {
+                  "accept": ".zip",
+                  "group": "闯关引导形象"
+                }
+              },
+              "levels": {
+                "type": "array",
+                "title": "关卡图",
+                "description": "每张关卡图支持三状态与自定义位置，坐标/尺寸为 2 倍值（750 设计稿），可拖拽排序",
+                "$demo": {
+                  "sortable": true
+                },
+                "items": {
+                  "oneOf": [
+                    {
+                      "title": "关卡",
+                      "properties": {
+                        "type": {
+                          "const": "levelCard"
+                        },
+                        "state": {
+                      "type": "string",
+                      "enum": [
+                        "未解锁",
+                        "已解锁",
+                        "已完成"
+                      ],
+                      "title": "当前状态",
+                      "default": "未解锁"
+                    },
+                    "lockedImage": {
+                      "type": "string",
+                      "format": "image",
+                      "title": "未解锁图",
+                      "accept": "image/png,image/jpeg"
+                    },
+                    "unlockedImage": {
+                      "type": "string",
+                      "format": "image",
+                      "title": "已解锁图",
+                      "accept": "image/png,image/jpeg"
+                    },
+                    "completedImage": {
+                      "type": "string",
+                      "format": "image",
+                      "title": "已完成图",
+                      "accept": "image/png,image/jpeg"
+                    },
+                    "animation": {
+                      "type": "string",
+                      "format": "file",
+                      "title": "SVGA 动效",
+                      "description": "动效格式 svga，循环播放，配置后优先于静态图",
+                      "ui:options": {
+                        "accept": ".svga"
+                      }
+                    },
+                    "x": {
+                      "type": "number",
+                      "title": "X（相对背景图，2倍）",
+                      "description": "关卡图左上角相对于背景图的 X，2 倍坐标"
+                    },
+                    "y": {
+                      "type": "number",
+                      "title": "Y（相对背景图，2倍）"
+                    },
+                    "w": {
+                      "type": "number",
+                      "title": "W（2倍）"
+                    },
+                    "h": {
+                      "type": "number",
+                      "title": "H（2倍）"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ]
+                }
+                ]
+              }
+              }
+            },
+            "required": [
+              "type"
+            ]
+          }
+        ]
+      },
+      "default": [
+        {
+          "type": "image",
+          "image": "https://img.onlywnn.cn/figma/h_c61916f5.png"
+        },
+        {
+          "type": "participant",
+          "bgImage": "https://img.onlywnn.cn/figma/h_19dbcc85.png",
+          "count": 128
+        },
+        {
+          "type": "video",
+          "videoBg": "",
+          "video": {
+            "url": "",
+            "poster": ""
+          }
+        },
+        {
+          "type": "image",
+          "image": "https://img.onlywnn.cn/figma/h_483ae3df.png"
+        },
+        {
+          "type": "level",
+          "bgImage": "https://img.onlywnn.cn/figma/h_6e2a6768.png",
+          "levels": [
+            {
+              "type": "levelCard",
+              "state": "已解锁",
+              "unlockedImage": "https://img.onlywnn.cn/figma/h_e589fc90.png",
+              "x": 28,
+              "y": 2,
+              "w": 330,
+              "h": 368
+            },
+            {
+              "type": "levelCard",
+              "state": "未解锁",
+              "lockedImage": "https://img.onlywnn.cn/figma/h_70aef182.png",
+              "x": 392,
+              "y": 294,
+              "w": 330,
+              "h": 368
+            },
+            {
+              "type": "levelCard",
+              "state": "未解锁",
+              "lockedImage": "https://img.onlywnn.cn/figma/h_61c26d1d.png",
+              "x": 80,
+              "y": 632,
+              "w": 342,
+              "h": 390
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "fixed-canvas",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "fixed",
+      "preset": "custom",
+      "source": "figma"
+    }
+  }
+}

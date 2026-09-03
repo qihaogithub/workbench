@@ -1,0 +1,29 @@
+{
+  "workspaceId": "live-1785302408913-7b2kczoud",
+  "projectId": "proj_1784874964275_p0k4ho",
+  "revision": 5,
+  "rootHash": "927ba63d53b100dfc96b4e4ef0c465f7c1d50acd27064439cba4a1a8215bfa17",
+  "resourceHashes": {
+    ".canvas-layout.json": "dc28f6fbfc456ec5360e40c6da1d47c39a3eb09a41f57be712bac9a09d890328",
+    "assets/images/345cff787d4e-image-module-1.png": "345cff787d4ead5b8bacc2bd43da0265104262f65e9393ccbaf1cd1ff8c47b85",
+    "assets/images/4ea96ecddfd3-video-bg.png": "4ea96ecddfd306e91705d243d54f1547efd666d2cf37aba5c54e0a9195b15f96",
+    "assets/images/766653d583e6-image-module-3.png": "766653d583e6f9fcb76f31840c3bcd19e6e9bbc9c866ecad82e1bb6f2ce02f68",
+    "assets/images/805ed928744e-progress-bg-middle.png": "805ed928744ee218f133e8d06500feef6f1049be930bf28763c82ea90273ad64",
+    "assets/images/83cf4a932984-levels.png": "83cf4a9329843d4b5d1fdc302d0d4bd8708571dae43d7e0d186e44349ea13d45",
+    "assets/images/ab9472005108-image-module-2.png": "ab9472005108b9e0a8fc05b34b57de2bafacbc517543550c8d1d13c2d906d078",
+    "assets/images/b0b1a87384e6-progress-bg-bottom.png": "b0b1a87384e6d7181be09cc40e67449be8168eeab47d1c340d4d3e4ef75e8176",
+    "assets/images/e42da6dcf611-progress-bg-top.png": "e42da6dcf611db3d2d1ebd5003af86f95e24fee7486b3dede9f7bb8da4bf83d5",
+    "assets/images/ef6aa004c215-video-cover.png": "ef6aa004c2158bdab3634f29f20bdc9a259c09d6cdd4424df4a2ecde70397e1d",
+    "demos/course-complete_a7k3/config.schema.json": "cc879f39bf59f4bb9903d424a7ddab9110a2f534482f960fe6472f3214176354",
+    "demos/course-complete_a7k3/index.tsx": "c2c0e532f02daccc8d826083b8e8ae5278ca112489c7e14a0c75e239fb55133a",
+    "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
+    "workspace-tree.json": "e0bb2da09a4d2ccf980a7f7d085fd19ae28a86fb4d8c1da35495939d7a6ad472"
+  },
+  "mutationPayloads": {
+    "8a122172-ace8-4fd3-b05f-4e41fb868f26": "8ebbaf3eaf3c5d8e15e2326d705381569bc54a539954f5f6a0e57c3894a4637c",
+    "0bb8257b-e579-4f02-b235-9c71122bbccb": "95d4d4dac5b84e5563fab4cb07670e8dbf0e9df812d5f5f33a9e5670cb8059ae",
+    "a55519e5-d61f-4525-aee7-6fca7741eb6b": "5fcf86d20aaa63b61820cc7406304c604e50bd4649d044f5585e85ea67367844",
+    "e8215cc3-860b-46e9-b801-6ac7c2c55b72": "3bb351956c7b9758556f7bbbb4dde3c8a8966e24cb696ff6fffeb23bc45fb935"
+  },
+  "updatedAt": 1785305777265
+}

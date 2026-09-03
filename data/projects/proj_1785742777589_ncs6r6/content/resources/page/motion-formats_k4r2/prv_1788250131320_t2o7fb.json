@@ -1,0 +1,40 @@
+{
+  "id": "prv_1788250131320_t2o7fb",
+  "projectId": "proj_1785742777589_ncs6r6",
+  "kind": "page",
+  "resourceId": "motion-formats_k4r2",
+  "workspaceId": "live-1787643821510-nywfes3jw",
+  "workspaceRevision": 24,
+  "workspaceRootHash": "c25a54b08f715bfbf69b9f7ddce187e41170a92afacce381e7ec1e7cf2938e5a",
+  "previousVersionId": "prv_1788245877171_h7ls9f",
+  "contentHash": "813b2ab44a890f6bff822f61ccfc22289b43573904beb861337119caa06b655b",
+  "blobRefs": [
+    "7970ff6a88c7d142a51bb979189a8f636690cbdb0c356a1a8a54c1d24ef17e85",
+    "b6138fee5d1ce14e6ec2da17831a67ce40796c3f90d45066f951a09275e44ad6"
+  ],
+  "metadata": {
+    "page": {
+      "id": "motion-formats_k4r2",
+      "name": "动效格式展示",
+      "runtimeType": "high-fidelity-react",
+      "order": 3,
+      "parentId": null,
+      "routeKey": "page-3",
+      "isTemplatePage": false
+    },
+    "files": {
+      "schema": "7970ff6a88c7d142a51bb979189a8f636690cbdb0c356a1a8a54c1d24ef17e85",
+      "code": "b6138fee5d1ce14e6ec2da17831a67ce40796c3f90d45066f951a09275e44ad6"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "high-fidelity-react",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1788250131324,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录动效格式展示"
+}

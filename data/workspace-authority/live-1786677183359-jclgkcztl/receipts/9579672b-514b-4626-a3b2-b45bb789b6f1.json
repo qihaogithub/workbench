@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "9579672b-514b-4626-a3b2-b45bb789b6f1",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 173,
+  "rootHash": "7502237e7739025ecfd2acd8293249ef17f2b92b78c1d5b68ca34db25d4ab017",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/group-2424_aaa9af/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "a5cc8f9538b24a7fc1f0c791c5c0132bc2ace54aa34bc9c6689bf7e9c25de4f7"
+    },
+    {
+      "path": "demos/group-2424_aaa9af/prototype.css",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/group-2424_aaa9af/prototype.meta.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "c8ff789088a244de5f3aeec94c77db2c953ba0e62122a274a9bbfe2989b7ab87"
+    },
+    {
+      "path": "demos/group-2424_aaa9af/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "fa1892b60b1893afc883d135d1fa2973a67415ecc1ba459bc6059e74de025c4f"
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "c5f3c53d93a0d18d4b7e51864c3aad3db0f9124b78946e57a9c480e61c71cdce",
+      "afterHash": "6673d243e765eea2967d2767fc03ffcaad09840347bb7865530fbae5ba5ea701"
+    }
+  ],
+  "committedAt": 1787760693821
+}

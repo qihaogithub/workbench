@@ -1,0 +1,8 @@
+{
+  "id": "worldcup-lottery_h7k3",
+  "name": "世界杯抽奖页",
+  "order": 3,
+  "parentId": null,
+  "routeKey": "page-3",
+  "runtimeType": "prototype-html-css"
+}

@@ -1,0 +1,103 @@
+{
+  "threads": [
+    {
+      "id": "cmt_mtckqoz3_l33bzv",
+      "projectId": "proj_1784874964275_p0k4ho",
+      "target": {
+        "kind": "page",
+        "pageId": "page_na8k"
+      },
+      "anchor": {
+        "domPath": "div:nth-of-type(1)>div:nth-of-type(1)>div:nth-of-type(3)>div:nth-of-type(1)>div:nth-of-type(1)",
+        "tagName": "div",
+        "componentName": "div",
+        "textSnippet": "限时完成50课 赢超萌装扮",
+        "snapshot": {
+          "outerHtml": "<div style=\"flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgb(107, 45, 3); font-size: 14px; font-family: &quot;PingFang SC&quot;; font-weight: 400; line-height: 21px;\">限时完成50课 赢超萌装扮</div>",
+          "computedStyle": {
+            "color": "rgb(107, 45, 3)",
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "backgroundImage": "none",
+            "borderColor": "rgb(229, 231, 235)",
+            "borderWidth": "0px",
+            "borderStyle": "solid",
+            "borderRadius": "0px",
+            "borderTopLeftRadius": "0px",
+            "borderTopRightRadius": "0px",
+            "borderBottomRightRadius": "0px",
+            "borderBottomLeftRadius": "0px",
+            "boxShadow": "none",
+            "boxSizing": "border-box",
+            "filter": "none",
+            "overflow": "hidden",
+            "opacity": "1",
+            "fontFamily": "\"PingFang SC\"",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "lineHeight": "21px",
+            "letterSpacing": "normal",
+            "textAlign": "start",
+            "width": "161.469px",
+            "height": "21px",
+            "padding": "0px",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "margin": "0px",
+            "marginTop": "0px",
+            "marginRight": "0px",
+            "marginBottom": "0px",
+            "marginLeft": "0px",
+            "display": "block",
+            "flexDirection": "row",
+            "justifyContent": "normal",
+            "alignItems": "normal",
+            "gap": "normal"
+          },
+          "attrs": {},
+          "editCapabilities": [
+            "annotate",
+            "style",
+            "text",
+            "structure"
+          ]
+        }
+      },
+      "pin": {
+        "xRatio": 0.424,
+        "yRatio": 0.2623152709359606
+      },
+      "content": "11@AI 助手",
+      "author": {
+        "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+        "name": "qihao",
+        "isAnonymous": false
+      },
+      "mentions": [
+        {
+          "id": "agent",
+          "name": "AI 助手",
+          "type": "agent"
+        }
+      ],
+      "aiTaskStatus": "failed",
+      "createdAt": 1787898729711,
+      "updatedAt": 1787898733093,
+      "resolved": false,
+      "replies": [
+        {
+          "id": "rep_mtckqrl1_h27eli",
+          "content": "处理失败：AI 未能在本轮完成处理，请重试",
+          "author": {
+            "id": "agent",
+            "name": "AI 助手",
+            "isAnonymous": false,
+            "isAgent": true
+          },
+          "createdAt": 1787898733093
+        }
+      ]
+    }
+  ]
+}

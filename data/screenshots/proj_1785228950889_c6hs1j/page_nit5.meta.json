@@ -1,0 +1,23 @@
+{
+  "generatedAt": "2026-07-28T08:56:28.606Z",
+  "elapsed": 541,
+  "history": [],
+  "variants": {
+    "f07dfd918972a8f6:fast": {
+      "variant": "fast",
+      "generatedAt": "2026-07-28T08:56:28.606Z",
+      "elapsed": 541,
+      "renderBox": {
+        "width": 375,
+        "height": 1086,
+        "viewportWidth": 375,
+        "viewportHeight": 1046,
+        "bodyWidth": 395,
+        "bodyHeight": 1086,
+        "documentWidth": 395,
+        "documentHeight": 1086,
+        "fullPage": true
+      }
+    }
+  }
+}

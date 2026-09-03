@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "866e638f-de15-4931-92d3-298ae097fbe6",
+  "projectId": "proj_1785421657423_1ptong",
+  "workspaceId": "live-1785421836953-u4xjhfnvr",
+  "baseRevision": 0,
+  "revision": 2,
+  "rootHash": "270841ce28c5bf31e814c45c73430915174639bc3ef372cacdd2d893d687bacf",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/config-demo_x7k2/index.tsx",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/config-demo_x7k2/config.schema.json",
+      "action": "modified",
+      "beforeHash": "f39b7671b75aa6a9e22884d371bf89c73524ed06f3c8b580bd7d4ef5d7fff1a8",
+      "afterHash": "f39b7671b75aa6a9e22884d371bf89c73524ed06f3c8b580bd7d4ef5d7fff1a8"
+    },
+    {
+      "path": "demos/config-demo_x7k2/prototype.html",
+      "action": "modified",
+      "beforeHash": "ae6d8b0f3f60ab0e859e789004855ea8140842a616eda77ae031d0a7f14ab7a4",
+      "afterHash": "ae6d8b0f3f60ab0e859e789004855ea8140842a616eda77ae031d0a7f14ab7a4"
+    },
+    {
+      "path": "demos/config-demo_x7k2/prototype.css",
+      "action": "modified",
+      "beforeHash": "8628fa03b4dad967a2cd18a4bababdff4899af9bf9233821fa1da463d95ff83f",
+      "afterHash": "8628fa03b4dad967a2cd18a4bababdff4899af9bf9233821fa1da463d95ff83f"
+    }
+  ],
+  "committedAt": 1785422023663
+}

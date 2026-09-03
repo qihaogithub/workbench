@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "cca1ac75-f389-44bf-888c-a6b627af807d",
+  "projectId": "proj_1786592778148_j42wbh",
+  "workspaceId": "live-1786592778271-nbeovjaij",
+  "baseRevision": 0,
+  "revision": 2,
+  "rootHash": "6e705d7bd483035f51b2b825aabfbaa12a0fd98dc6f7c62f49336a790c909aeb",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_gddo/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f"
+    },
+    {
+      "path": "demos/page_gddo/prototype.css",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/page_gddo/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355"
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "b8f84cb18b1d4fb04f8db0fdb7867802b916f6365d4816c8289777a7893570ab",
+      "afterHash": "f56f3f945a3dbd453380126a6b216d4328856450b144b06d22fd5835bc486c1a"
+    }
+  ],
+  "committedAt": 1786592779921
+}

@@ -1,0 +1,42 @@
+{
+  "id": "prv_1785203239478_6y8top",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "kind": "page",
+  "resourceId": "page_pqyt",
+  "workspaceId": "live-1785135808672-fhbugbqns",
+  "workspaceRevision": 122,
+  "workspaceRootHash": "33b34ea7d8863ef3b6eef1ae9f0576459017e6699ab795918d4095eb009c9d7d",
+  "contentHash": "c5030c7fa24e208136a0e2d2c82ff1858f10c7028a5cd0bfebd4613a09e899b9",
+  "blobRefs": [
+    "caa4dded1c46311d8aaa611752a2a39998cd09de0af6953aa717f16a2012e746",
+    "ca1b443ae9ef620e3c2f759bdb51eab2b6ff72c38df2a0d729265779f207ecd1",
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "5693ef20e1fd723f2abb393b27818fc460285d6abeb38c9be2e2f4de4d192624"
+  ],
+  "metadata": {
+    "page": {
+      "id": "page_pqyt",
+      "name": "闯关活动",
+      "routeKey": "page-6",
+      "order": 6,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    "files": {
+      "schema": "caa4dded1c46311d8aaa611752a2a39998cd09de0af6953aa717f16a2012e746",
+      "prototypeHtml": "ca1b443ae9ef620e3c2f759bdb51eab2b6ff72c38df2a0d729265779f207ecd1",
+      "prototypeCss": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "prototypeMeta": "5693ef20e1fd723f2abb393b27818fc460285d6abeb38c9be2e2f4de4d192624"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1785203239481,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录闯关活动"
+}

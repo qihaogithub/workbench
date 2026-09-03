@@ -1,0 +1,22 @@
+{
+  "auditId": "audit_1783208654558_rxz71y",
+  "at": 1783208654558,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L1",
+  "tool": "page_update_prototype",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "resourceId": "worldcup_03_active_voted",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      "page:worldcup_03_active_voted:prototypeHtml",
+      "page:worldcup_03_active_voted:prototypeCss",
+      "page:worldcup_03_active_voted:prototypeMeta"
+    ]
+  }
+}

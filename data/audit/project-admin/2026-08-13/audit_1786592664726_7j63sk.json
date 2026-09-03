@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1786592664726_7j63sk",
+  "at": 1786592664726,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1786592664725_hrrrvm",
+  "inputSummary": {
+    "name": "E2E:20260813T034420540Z-xvqrvr:核心流程回归",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1786592664725_hrrrvm"
+    ]
+  }
+}

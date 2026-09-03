@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "4f5602d6-de74-4a25-8502-75a4fc665b68",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 697,
+  "rootHash": "51c75e948fc9ac55b24d39176b5f58ced933f64a050be8b9e33a400510dfdd4f",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/halloween-map_x4k2/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "d953bcd9c5e41101c3bd8e1e3181bc20f338e75488f4530014dfd6c8dca0b430",
+      "afterHash": null
+    },
+    {
+      "path": "demos/halloween-map_x4k2/prototype.css",
+      "action": "deleted",
+      "beforeHash": "a258c2c1df76617d05bc81420f39d2fbd12fabddca3f5043228a917a29a0293f",
+      "afterHash": null
+    },
+    {
+      "path": "demos/halloween-map_x4k2/prototype.html",
+      "action": "deleted",
+      "beforeHash": "2e332b1184812ff51cf45eecd513ed54567b8eeff22f4943f244236362af97f6",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "c4cae3afe0510951c6c7a23f529f36d0da2764de2645ea0317a7dd165fc615c7",
+      "afterHash": "b09a105c75b5a78e9507f2d19e1778c271891d897f11887822d6d4987f535711"
+    }
+  ],
+  "committedAt": 1787893258979
+}

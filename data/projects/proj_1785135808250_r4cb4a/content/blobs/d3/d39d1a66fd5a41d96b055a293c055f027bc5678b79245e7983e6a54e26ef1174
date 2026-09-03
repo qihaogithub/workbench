@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "$demo": {
+    "previewSize": {
+      "width": 375,
+      "height": 812
+    }
+  },
+  "properties": {
+    "backgroundImage": {
+      "type": "string",
+      "format": "image",
+      "title": "关卡背景图",
+      "default": "/api/images/img_kLxZeqfJjszDiA"
+    },
+    "levels": {
+      "type": "array",
+      "title": "关卡列表",
+      "description": "可增删关卡，配置每个关卡的位置、图片和状态",
+      "items": {
+        "type": "object",
+        "title": "关卡",
+        "properties": {
+          "imageLocked": {
+            "type": "string",
+            "format": "image",
+            "title": "未解锁图片",
+            "default": ""
+          },
+          "imageUnlocked": {
+            "type": "string",
+            "format": "image",
+            "title": "已解锁图片",
+            "default": ""
+          },
+          "imageCompleted": {
+            "type": "string",
+            "format": "image",
+            "title": "已完成图片",
+            "default": ""
+          },
+          "state": {
+            "type": "string",
+            "title": "显示状态",
+            "enum": ["locked", "unlocked", "completed"],
+            "enumNames": ["未解锁", "已解锁", "已完成"],
+            "default": "locked"
+          },
+          "x": {
+            "type": "number",
+            "title": "X坐标(px)",
+            "default": 0
+          },
+          "y": {
+            "type": "number",
+            "title": "Y坐标(px)",
+            "default": 0
+          },
+          "width": {
+            "type": "number",
+            "title": "宽度(px)",
+            "default": 165
+          },
+          "height": {
+            "type": "number",
+            "title": "高度(px)",
+            "default": 184
+          }
+        },
+        "required": ["x", "y"]
+      },
+      "default": [
+        {
+          "imageLocked": "/api/images/img_mfLUQLiSRORQYg",
+          "imageUnlocked": "/api/images/img_mfLUQLiSRORQYg",
+          "imageCompleted": "/api/images/img_mfLUQLiSRORQYg",
+          "state": "unlocked",
+          "x": 14,
+          "y": 1,
+          "width": 165,
+          "height": 184
+        },
+        {
+          "imageLocked": "/api/images/img_4NHsdlWk2wLGFA",
+          "imageUnlocked": "/api/images/img_4NHsdlWk2wLGFA",
+          "imageCompleted": "/api/images/img_4NHsdlWk2wLGFA",
+          "state": "locked",
+          "x": 196,
+          "y": 147,
+          "width": 165,
+          "height": 184
+        },
+        {
+          "imageLocked": "/api/images/img_Rez-6_dmtwwmug",
+          "imageUnlocked": "/api/images/img_Rez-6_dmtwwmug",
+          "imageCompleted": "/api/images/img_Rez-6_dmtwwmug",
+          "state": "locked",
+          "x": 40,
+          "y": 316,
+          "width": 171,
+          "height": 195
+        }
+      ]
+    }
+  },
+  "required": []
+}

@@ -1,0 +1,20 @@
+{
+  "auditId": "audit_1786599658561_ca8dgx",
+  "at": 1786599658561,
+  "actor": {
+    "id": "local-codex",
+    "name": "local-codex",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L3",
+  "tool": "project_delete_execute",
+  "projectId": "proj_1786594536530_g8erpn",
+  "resourceId": "proj_1786594536530_g8erpn",
+  "ok": true,
+  "diffSummary": {
+    "deleted": [
+      "project:proj_1786594536530_g8erpn"
+    ]
+  }
+}

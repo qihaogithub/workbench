@@ -1,0 +1,8 @@
+{
+  "id": "page_guiv",
+  "name": "基础字段配置",
+  "routeKey": "page-5",
+  "order": 4,
+  "parentId": null,
+  "runtimeType": "prototype-html-css"
+}

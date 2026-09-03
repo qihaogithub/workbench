@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "f366787b-b32f-4b3d-b120-37e2f8c4e12c",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 52,
+  "rootHash": "abe469c7e2fc889df6678ee8f42d27e0122582ef665b187f124cd0aae68cc45c",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_yvbe/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "bf870a7a11c79d2318e1f62992adb52607d79fb4f5bf557639ad1063b4a3b9a9",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_yvbe/index.tsx",
+      "action": "deleted",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_yvbe/prototype.css",
+      "action": "deleted",
+      "beforeHash": "bf206d454a20f907cc589ea4bcdc3081677b13815abb5dd16e7d14ee36aa97aa",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_yvbe/prototype.html",
+      "action": "deleted",
+      "beforeHash": "a1b7204c3371b72528894634422b351ab2fef679ff011d590f9579b77bfb5fb8",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "16c99ec5ad1b1cce7e697965428587db1d0a57af91363f3a47a9e0f12500d3c8",
+      "afterHash": "926b8ef8cdb2f94055a745a936e4b266df18a0608e7e3fc36241ddcf8e844d3b"
+    }
+  ],
+  "committedAt": 1787643578725
+}

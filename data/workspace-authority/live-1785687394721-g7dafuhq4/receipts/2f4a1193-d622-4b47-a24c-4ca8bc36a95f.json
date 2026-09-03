@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "2f4a1193-d622-4b47-a24c-4ca8bc36a95f",
+  "projectId": "proj_1785687393956_aa29zz",
+  "workspaceId": "live-1785687394721-g7dafuhq4",
+  "baseRevision": 212,
+  "revision": 213,
+  "rootHash": "95559f9eea9e20294fcca8b1957037d7a6575de9b1a5780b2df953691bed43ba",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "demos/scalar-types_p4m7/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "8dc4265aae307df97059332c3c6d502780a771bd9c99d6c6ced83210ec71bf8e",
+      "afterHash": null
+    }
+  ],
+  "committedAt": 1785735997399
+}

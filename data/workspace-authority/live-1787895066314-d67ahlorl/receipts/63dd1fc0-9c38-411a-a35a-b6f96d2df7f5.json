@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "63dd1fc0-9c38-411a-a35a-b6f96d2df7f5",
+  "projectId": "proj_1787895065566_5wgvzx",
+  "workspaceId": "live-1787895066314-d67ahlorl",
+  "baseRevision": 5,
+  "revision": 6,
+  "rootHash": "76303d9b1d398b5e9bd5bd584da08853a27dfaff4656d07710b9eb2560b7e61a",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "demos/word-king-palace_m9c1/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "93d731f93a25e8f90ef7307b90766fd2fdfe1795454c7bf186c3fdfb2b61977a"
+    },
+    {
+      "path": "demos/word-king-palace_m9c1/prototype.css",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "de769d6f6e89eb3ed50a99306dfcca449172133d16a2ae6d59aa3f9d942dd320"
+    },
+    {
+      "path": "demos/word-king-palace_m9c1/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "bf968b60e665eb9354fd9ba166069d20d5f937e76f9a350a69137fb25334dd65"
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "c6fc74db0ae88333b57510bfd3d805a3d3fa72d679653b9d567a57e9ffd0c83a",
+      "afterHash": "3c0e522202b807c25ef81d49ecd8f05ab67c3d0b1d9d8fd2eb71c5d550bf1214"
+    }
+  ],
+  "committedAt": 1787895415736
+}

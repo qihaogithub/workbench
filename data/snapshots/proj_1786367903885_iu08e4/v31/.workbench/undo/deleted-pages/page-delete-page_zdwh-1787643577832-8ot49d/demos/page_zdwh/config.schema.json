@@ -1,0 +1,28 @@
+{
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "content",
+      "preset": "custom",
+      "source": "user"
+    }
+  },
+  "type": "object",
+  "properties": {
+    "heroImage": {
+      "type": "string",
+      "format": "image",
+      "title": "主视觉图片",
+      "ui:options": {
+        "minWidth": 750,
+        "minHeight": 420
+      }
+    }
+  },
+  "required": []
+}

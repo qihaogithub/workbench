@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "e6236ea9-5fa9-4787-8df3-2a25f9eda076",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 571,
+  "rootHash": "1b47e5662ba91ec745058f023ef112768fa63bfec9114097ec958e964627ed08",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/video-page_p3v9/index.tsx",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "afb67d4966f162763bfcd068ec67c1954056649aba74f8bb44abf041942017fd"
+    }
+  ],
+  "committedAt": 1787889095490
+}

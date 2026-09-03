@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "style": {
+      "type": "string",
+      "title": "视觉风格",
+      "enum": [
+        "minimal",
+        "festival",
+        "luxury"
+      ],
+      "enumNames": [
+        "极简",
+        "节日",
+        "奢华"
+      ],
+      "default": "festival",
+      "ui:options": {
+        "group": "单选风格"
+      }
+    },
+    "tags": {
+      "type": "array",
+      "ui:widget": "multiselect",
+      "items": {
+        "type": "string",
+        "enum": [
+          "discount",
+          "new",
+          "hot",
+          "limited"
+        ],
+        "enumNames": [
+          "折扣",
+          "新品",
+          "热门",
+          "限量"
+        ]
+      },
+      "title": "活动标签",
+      "default": [
+        "discount",
+        "hot"
+      ],
+      "ui:options": {
+        "group": "多选标签"
+      }
+    },
+    "region": {
+      "type": "array",
+      "ui:widget": "cascade",
+      "title": "投放地区",
+      "default": [
+        "zhejiang",
+        "hangzhou"
+      ],
+      "ui:options": {
+        "cascadeOptions": [
+          {
+            "value": "beijing",
+            "label": "北京",
+            "children": [
+              {
+                "value": "chaoyang",
+                "label": "朝阳"
+              },
+              {
+                "value": "haidian",
+                "label": "海淀"
+              }
+            ]
+          },
+          {
+            "value": "zhejiang",
+            "label": "浙江",
+            "children": [
+              {
+                "value": "hangzhou",
+                "label": "杭州"
+              },
+              {
+                "value": "ningbo",
+                "label": "宁波"
+              }
+            ]
+          },
+          {
+            "value": "guangdong",
+            "label": "广东",
+            "children": [
+              {
+                "value": "guangzhou",
+                "label": "广州"
+              },
+              {
+                "value": "shenzhen",
+                "label": "深圳"
+              }
+            ]
+          }
+        ],
+        "group": "投放地区"
+      }
+    }
+  },
+  "required": [],
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "content",
+      "preset": "custom",
+      "source": "user"
+    }
+  }
+}

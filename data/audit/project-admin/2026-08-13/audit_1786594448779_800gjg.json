@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1786594448779_800gjg",
+  "at": 1786594448779,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1786594448778_anw3kf",
+  "inputSummary": {
+    "name": "E2E:20260813T041309617Z-r7nhg4:项目创建和代码编辑完整流程",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1786594448778_anw3kf"
+    ]
+  }
+}

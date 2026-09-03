@@ -1,0 +1,29 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "page_sio0",
+      "name": "自动保存重命名页-479105",
+      "routeKey": "page",
+      "order": 0,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "page_irux",
+      "name": "自动保存顺序页",
+      "routeKey": "page-2",
+      "order": 1,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "1132f6_jia4",
+      "name": "自动保存复制页-1132f6",
+      "routeKey": "1132f6",
+      "order": 2,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "id": "prv_1787882332395_5f4u1s",
+  "projectId": "proj_1787814377754_4243v7",
+  "kind": "page",
+  "resourceId": "clipboard-import_c6b554",
+  "workspaceId": "live-1787814378221-9l0h1v70v",
+  "workspaceRevision": 43,
+  "workspaceRootHash": "dd3b6c531ee8e19a1213c0efeecf17ceb3aa425ab9afa4053d6f9cdfbc8da23a",
+  "previousVersionId": "prv_1787816205235_xcw5ep",
+  "contentHash": "c1f70434a171137b7129df7f942b10971a10d73917f961f1c62d8fedd24c5fa8",
+  "blobRefs": [
+    "fc5e2f74b9e3a24eaffbc9e6970463ba6d3864a5c2df57c5ab4b59891aa6d66e",
+    "48082d0d7f1aa653e662d90445515a0285b468bcb21e059c7bce5e496a7f3c86",
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "e05ff62d13acfe6f1b5cb7b3394c7aa7842521335717e56553c5e11e2ffa9129"
+  ],
+  "metadata": {
+    "page": {
+      "id": "clipboard-import_c6b554",
+      "name": "clipboard-import",
+      "routeKey": "clipboard-import",
+      "order": 0,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    "files": {
+      "schema": "fc5e2f74b9e3a24eaffbc9e6970463ba6d3864a5c2df57c5ab4b59891aa6d66e",
+      "prototypeHtml": "48082d0d7f1aa653e662d90445515a0285b468bcb21e059c7bce5e496a7f3c86",
+      "prototypeCss": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "prototypeMeta": "e05ff62d13acfe6f1b5cb7b3394c7aa7842521335717e56553c5e11e2ffa9129"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1787882332397,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录clipboard-import"
+}

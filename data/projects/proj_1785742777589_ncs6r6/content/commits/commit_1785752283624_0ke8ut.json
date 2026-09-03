@@ -1,0 +1,31 @@
+{
+  "id": "commit_1785752283624_0ke8ut",
+  "projectId": "proj_1785742777589_ncs6r6",
+  "parentCommitId": "commit_1785751845218_f0qe85",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "修复多选错误",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "config-demo_m7p2",
+      "versionId": "prv_1785752283623_nujcth"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "config-demo_m7p2",
+      "fromVersionId": "prv_1785751845215_lucnm2",
+      "toVersionId": "prv_1785752283623_nujcth"
+    }
+  ],
+  "createdAt": 1785752283624,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785742777874-8sex712t9",
+    "workspaceRevision": 90,
+    "workspaceRootHash": "95846a66fc6aada25a3907c96953d4fb2789f6faa156e3a1712c060f9f44a48a"
+  }
+}

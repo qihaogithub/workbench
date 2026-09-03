@@ -1,0 +1,18 @@
+{
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "fixed-canvas",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "fixed",
+      "preset": "custom",
+      "source": "figma"
+    }
+  },
+  "type": "object",
+  "properties": {},
+  "required": []
+}

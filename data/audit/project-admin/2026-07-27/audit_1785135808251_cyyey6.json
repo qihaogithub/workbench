@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1785135808251_cyyey6",
+  "at": 1785135808251,
+  "actor": {
+    "id": "local-codex",
+    "name": "local-codex",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "inputSummary": {
+    "name": "闯关活动-竖版",
+    "category": "营销活动"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1785135808250_r4cb4a"
+    ]
+  }
+}

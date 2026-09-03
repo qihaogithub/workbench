@@ -1,0 +1,44 @@
+{
+  "id": "prv_1788164049883_u2mr38",
+  "projectId": "proj_1788141806566_0aps89",
+  "kind": "page",
+  "resourceId": "page_9z9z",
+  "workspaceId": "live-1788141807256-9xerzl5sd",
+  "workspaceRevision": 106,
+  "workspaceRootHash": "27620309e7febe4c9c2aba4159c2b4b51baaf2a5384f27f34423fcf61a43e58d",
+  "previousVersionId": "prv_1788149458191_r0sj50",
+  "contentHash": "262a9b6a80e04e1f93dd0c42d9bdaec414059665153c0ed8039f2d6ca012c8de",
+  "blobRefs": [
+    "7cfea273c4dce9300ee50e66ff2baa1ae6f01e293a32e0b790c77a0a5bd8d65a",
+    "1af9ffbf4bb5d5b9b92c0e0fa1aca3fc7c7ed650bb1814ba598524fb76ba9b71",
+    "b423425c58aa5e9268a66274fba1259efb2f0053c26c24d8e27bc0f2d686ada0",
+    "42bb61975c959b9e8e56b31d6fa28b53b41c6ebb78b938fe239279d811a6fe96"
+  ],
+  "metadata": {
+    "page": {
+      "id": "page_9z9z",
+      "name": "答错",
+      "routeKey": "page-2",
+      "order": 1,
+      "parentId": null,
+      "runtimeType": "prototype-html-css",
+      "isTemplatePage": false
+    },
+    "files": {
+      "schema": "7cfea273c4dce9300ee50e66ff2baa1ae6f01e293a32e0b790c77a0a5bd8d65a",
+      "prototypeHtml": "1af9ffbf4bb5d5b9b92c0e0fa1aca3fc7c7ed650bb1814ba598524fb76ba9b71",
+      "prototypeCss": "b423425c58aa5e9268a66274fba1259efb2f0053c26c24d8e27bc0f2d686ada0",
+      "prototypeMeta": "42bb61975c959b9e8e56b31d6fa28b53b41c6ebb78b938fe239279d811a6fe96"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1788164049887,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录答错"
+}

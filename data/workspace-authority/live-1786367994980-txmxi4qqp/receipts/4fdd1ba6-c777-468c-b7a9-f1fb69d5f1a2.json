@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "4fdd1ba6-c777-468c-b7a9-f1fb69d5f1a2",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786367994980-txmxi4qqp",
+  "baseRevision": 0,
+  "revision": 4,
+  "rootHash": "0bf1451f79b270aa77e2f8a0b89142b9d3ab47abfffcf3a5cced6477b807f7c1",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/quiet-studio_q7m4/prototype.css",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "f1da751b98bd8ddc820062daf7e7a2b968d5fe14fbecd90e72bf74c598d528f0"
+    }
+  ],
+  "committedAt": 1786368506725
+}

@@ -1,0 +1,49 @@
+{
+  "committed": true,
+  "mutationId": "160b9306-afa2-496a-8d3b-d96633d4cf84",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "baseRevision": 0,
+  "revision": 1035,
+  "rootHash": "4ee0084ed84fe5f2aaf9911ae45db7f74bc06ba19a4dd71b7fd3faaf627b9bc3",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "assets/animations/spine_c508dc9b51e4f52706b5490ea2d58f70c2753bcdc2804e2d55746bedf1a2f06d/spine二进制示例/math_medal_1000_max.mp3",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "3eb32bb9e975be213fcfc8b47cc0d969124e46a6c044e736c7b8f707f8319fe2"
+    },
+    {
+      "path": "assets/animations/spine_c508dc9b51e4f52706b5490ea2d58f70c2753bcdc2804e2d55746bedf1a2f06d/spine二进制示例/medal.atlas.txt",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "6c3036af64e8c765ff46e4f9ff572fce5026c53b4b8ad910714869cd9be539ad"
+    },
+    {
+      "path": "assets/animations/spine_c508dc9b51e4f52706b5490ea2d58f70c2753bcdc2804e2d55746bedf1a2f06d/spine二进制示例/medal.png",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "2caf71e1efceee769353c8b767a56299c58c0e33e19420ed43c765c37b52001b"
+    },
+    {
+      "path": "assets/animations/spine_c508dc9b51e4f52706b5490ea2d58f70c2753bcdc2804e2d55746bedf1a2f06d/spine二进制示例/medal.skel.bytes",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "25e159ff157547b91f45efcaed72a774ed2e220b4eb9c62f224de85925eb3e04"
+    },
+    {
+      "path": "assets/animations/spine_c508dc9b51e4f52706b5490ea2d58f70c2753bcdc2804e2d55746bedf1a2f06d/manifest.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "9d811c63decc1dac6c2172e091c73a2469ec4003d59a8d0a8ab42c82c157378b"
+    },
+    {
+      "path": "demos/page_yw72/config.values.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "faf38d71167d0d6a8dfe1014759529c48d3b88bea985e931002772c10019ee44"
+    }
+  ],
+  "committedAt": 1788255578319
+}

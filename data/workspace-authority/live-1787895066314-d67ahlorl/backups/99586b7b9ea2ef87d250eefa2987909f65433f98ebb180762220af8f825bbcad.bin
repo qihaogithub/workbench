@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "projectId": "proj_1787895065566_5wgvzx",
+  "updatedAt": 1787895575790,
+  "state": {
+    "viewport": {
+      "x": 126.04451650943395,
+      "y": 36.24999999999994,
+      "zoom": 0.3847287735849057
+    },
+    "pages": {
+      "word-king-tower_b7d4": {
+        "x": 430,
+        "y": 0,
+        "width": 390,
+        "height": 887,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "390x844"
+      },
+      "word-king-palace_m9c1": {
+        "x": 860,
+        "y": 0,
+        "width": 390,
+        "height": 933,
+        "zIndex": 2,
+        "sizeMode": "preview",
+        "previewSizeKey": "390x844"
+      },
+      "word-king-channel_k4s8": {
+        "x": 0,
+        "y": 852,
+        "width": 390,
+        "height": 903,
+        "zIndex": 3,
+        "sizeMode": "preview",
+        "previewSizeKey": "390x844"
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "hiddenKnowledgeDocumentIds": [],
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "sections": {}
+  }
+}

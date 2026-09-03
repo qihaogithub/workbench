@@ -1,0 +1,32 @@
+{
+  "images": [
+    {
+      "id": "0a9f21c79449",
+      "filename": "ChatGPT Image 2026年8月18日 18_07_21.png",
+      "url": "/api/images/img_NL65VrNtbASdfg",
+      "size": 988919,
+      "format": "png",
+      "createdAt": 1787815756613,
+      "createdBy": "user",
+      "width": 1024,
+      "height": 1536,
+      "contentHash": "0a9f21c7944950b5baaef891c71feb79043ec346af79c28815f46a44a87a3f5d",
+      "mimeType": "image/png",
+      "sourceType": "upload"
+    },
+    {
+      "id": "c34a5608f44b",
+      "filename": "Slot.png",
+      "url": "/api/images/img_HTePc--u-O1gEw",
+      "size": 16449,
+      "format": "png",
+      "createdAt": 1787815764429,
+      "createdBy": "user",
+      "width": 210,
+      "height": 210,
+      "contentHash": "c34a5608f44be16def3d7f887f6e3c7c447f5d2de33d8399a98a6fa4d2f59c83",
+      "mimeType": "image/png",
+      "sourceType": "upload"
+    }
+  ]
+}

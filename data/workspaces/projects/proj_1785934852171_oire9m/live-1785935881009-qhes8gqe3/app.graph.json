@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "entry": "slide-1",
+  "pages": {
+    "slide-1": {
+      "pageId": "demo_1785935720859_01of",
+      "title": "封面"
+    },
+    "slide-2": {
+      "pageId": "demo_1785935720859_02of",
+      "title": "为什么需要 OneFlow"
+    },
+    "slide-3": {
+      "pageId": "demo_1785935720859_03of",
+      "title": "过去 vs 未来"
+    },
+    "slide-4": {
+      "pageId": "demo_1785935720860_04of",
+      "title": "角色变化"
+    },
+    "slide-5": {
+      "pageId": "demo_1785935720860_05of",
+      "title": "中心产物：可交互活动原型"
+    },
+    "slide-6": {
+      "pageId": "demo_1785935720860_06of",
+      "title": "AI 的三层作用"
+    },
+    "slide-7": {
+      "pageId": "demo_1785935720860_07of",
+      "title": "运营设计视角"
+    },
+    "slide-8": {
+      "pageId": "demo_1785935720860_08of",
+      "title": "团队协作平台"
+    },
+    "slide-9": {
+      "pageId": "demo_1785935720860_09of",
+      "title": "完整闭环"
+    }
+  },
+  "actions": [],
+  "state": {}
+}

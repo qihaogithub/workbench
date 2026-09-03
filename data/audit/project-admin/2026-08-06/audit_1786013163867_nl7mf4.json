@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1786013163867_nl7mf4",
+  "at": 1786013163867,
+  "actor": {
+    "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+    "name": "qihao",
+    "role": "creator",
+    "source": "author-site"
+  },
+  "level": "L2",
+  "tool": "page_create_version",
+  "projectId": "proj_1785742777589_ncs6r6",
+  "resourceId": "motion-formats_k4r2",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "page-version:motion-formats_k4r2:prv_1786013163818_4sx4gb"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

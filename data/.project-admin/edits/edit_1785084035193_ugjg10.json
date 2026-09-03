@@ -1,0 +1,17 @@
+{
+  "editId": "edit_1785084035193_ugjg10",
+  "projectId": "proj_1784874964275_p0k4ho",
+  "workspaceId": "cli_edit_1785084035193_ugjg10",
+  "workspacePath": "/Users/jojo/Documents/workbench/data/workspaces/jojo/proj_1784874964275_p0k4ho/cli_edit_1785084035193_ugjg10",
+  "workspaceScope": "branch",
+  "baseVersion": "v18",
+  "actor": {
+    "id": "jojo",
+    "name": "jojo",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "createdAt": 1785084035203,
+  "expiresAt": 1785091235203,
+  "status": "discarded"
+}

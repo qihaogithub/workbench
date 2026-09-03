@@ -1,0 +1,29 @@
+{
+  "$demo": { "previewSize": { "width": 375, "height": 812 } },
+  "type": "object",
+  "properties": {
+    "主题设置": {
+      "type": "object",
+      "title": "主题设置",
+      "properties": {
+        "theme": { "type": "string", "title": "主题风格", "enum": ["light", "dark", "colorful"], "enumNames": ["明亮", "暗黑", "多彩"], "default": "light" },
+        "language": { "type": "string", "title": "界面语言", "enum": ["zh", "en", "ja"], "enumNames": ["中文", "English", "日本語"], "default": "zh" }
+      },
+      "required": []
+    },
+    "个人偏好": {
+      "type": "object",
+      "title": "个人偏好",
+      "properties": {
+        "interests": { "type": "array", "title": "兴趣爱好", "items": { "type": "string", "enum": ["sports", "music", "reading", "travel", "tech"], "enumNames": ["运动", "音乐", "阅读", "旅行", "科技"] }, "default": ["reading", "tech"] },
+        "region": { "type": "cascade", "title": "所在地区", "default": ["zhejiang", "hangzhou"], "options": [
+          { "value": "beijing", "label": "北京", "children": [{ "value": "haidian", "label": "海淀区" }, { "value": "chaoyang", "label": "朝阳区" }] },
+          { "value": "zhejiang", "label": "浙江", "children": [{ "value": "hangzhou", "label": "杭州" }, { "value": "ningbo", "label": "宁波" }] },
+          { "value": "guangdong", "label": "广东", "children": [{ "value": "guangzhou", "label": "广州" }, { "value": "shenzhen", "label": "深圳" }] }
+        ] }
+      },
+      "required": []
+    }
+  },
+  "required": []
+}

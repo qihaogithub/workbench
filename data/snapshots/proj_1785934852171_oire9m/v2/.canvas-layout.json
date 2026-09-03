@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "projectId": "proj_1785934852171_oire9m",
+  "updatedAt": 1785936215824,
+  "state": {
+    "viewport": {
+      "x": 524.6978672985782,
+      "y": 44.99999999999994,
+      "zoom": 0.3199052132701422
+    },
+    "pages": {
+      "demo_1785935720859_01of": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 812,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "demo_1785935720859_02of": {
+        "x": 423,
+        "y": 0,
+        "width": 375,
+        "height": 812,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "demo_1785935720859_03of": {
+        "x": 846,
+        "y": 0,
+        "width": 375,
+        "height": 812,
+        "zIndex": 2,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "demo_1785935720860_04of": {
+        "x": 0,
+        "y": 860,
+        "width": 375,
+        "height": 812,
+        "zIndex": 3,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "demo_1785935720860_05of": {
+        "x": 423,
+        "y": 860,
+        "width": 375,
+        "height": 812,
+        "zIndex": 4,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "demo_1785935720860_06of": {
+        "x": 846,
+        "y": 860,
+        "width": 375,
+        "height": 812,
+        "zIndex": 5,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "demo_1785935720860_07of": {
+        "x": 0,
+        "y": 1720,
+        "width": 375,
+        "height": 812,
+        "zIndex": 6,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "demo_1785935720860_08of": {
+        "x": 423,
+        "y": 1720,
+        "width": 375,
+        "height": 812,
+        "zIndex": 7,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "demo_1785935720860_09of": {
+        "x": 846,
+        "y": 1720,
+        "width": 375,
+        "height": 812,
+        "zIndex": 8,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

@@ -1,0 +1,157 @@
+import { Icon } from "@preview/sdk";
+
+type ModuleItem =
+  | { type: "banner"; text: string }
+  | { type: "notice"; message: string }
+  | { type: "counter"; label: string; value: number };
+
+interface DemoProps {
+  title: string;
+  count: number;
+  showPanel: boolean;
+  size: "small" | "medium" | "large";
+  bgColor: string;
+  logo: string;
+  position: "left" | "center" | "right";
+  modules: ModuleItem[];
+}
+
+const SIZE_LABEL: Record<string, string> = { small: "小", medium: "中", large: "大" };
+const POSITION_LABEL: Record<string, string> = { left: "居左", center: "居中", right: "居右" };
+
+function Row({ label, type, children }: { label: string; type: string; children: React.ReactNode }) {
+  return (
+    <div className="py-4 border-b border-gray-100 last:border-b-0">
+      <div className="flex items-baseline gap-2 mb-2">
+        <span className="font-mono text-xs text-white bg-gray-400 px-1.5 py-0.5 rounded">{type}</span>
+        <span className="text-sm font-medium text-gray-700">{label}</span>
+      </div>
+      <div className="pl-1">{children}</div>
+    </div>
+  );
+}
+
+export default function Demo({
+  title = "配置类型演示",
+  count = 10,
+  showPanel = true,
+  size = "medium",
+  bgColor = "#3B82F6",
+  logo = "",
+  position = "center",
+  modules = [],
+}: DemoProps) {
+  return (
+    <div className="min-h-screen bg-white">
+      {/* 标题 */}
+      <div className="px-5 pt-8 pb-4">
+        <h1 className="text-xl font-bold text-gray-900">{title}</h1>
+        <p className="text-sm text-gray-400 mt-1">配置类型效果预览</p>
+      </div>
+
+      {/* 文档式配置列表 */}
+      <div className="px-5 pb-10 divide-y divide-gray-100">
+
+        {/* string */}
+        <Row label="标题文本" type="string">
+          <p className="text-gray-800 font-medium">{title}</p>
+        </Row>
+
+        {/* number */}
+        <Row label="数量" type="number">
+          <span className="inline-flex items-center justify-center min-w-[3rem] h-8 rounded-lg bg-gray-100 text-gray-800 font-mono font-bold text-lg px-3">
+            {count}
+          </span>
+        </Row>
+
+        {/* boolean */}
+        <Row label="显示面板" type="boolean">
+          {showPanel ? (
+            <span className="inline-flex items-center gap-1 text-sm text-green-600">
+              <Icon name="check-circle" className="w-4 h-4" />
+              true — 面板可见
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-sm text-gray-400">
+              <Icon name="x-circle" className="w-4 h-4" />
+              false — 面板隐藏
+            </span>
+          )}
+        </Row>
+
+        {/* enum (size) */}
+        <Row label="尺寸" type="enum">
+          <div className="flex items-center gap-2">
+            {["small", "medium", "large"].map((s) => (
+              <span
+                key={s}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  s === size
+                    ? "border-transparent text-white"
+                    : "border-gray-200 text-gray-400"
+                }`}
+                style={s === size ? { backgroundColor: bgColor } : undefined}
+              >
+                {SIZE_LABEL[s]}
+              </span>
+            ))}
+          </div>
+        </Row>
+
+        {/* color */}
+        <Row label="主题色" type="color">
+          <div className="flex items-center gap-2">
+            <span
+              className="w-8 h-8 rounded-lg border border-gray-200 shadow-sm"
+              style={{ backgroundColor: bgColor }}
+            />
+            <span className="font-mono text-sm text-gray-500">{bgColor}</span>
+          </div>
+        </Row>
+
+        {/* image */}
+        <Row label="Logo 图片" type="image">
+          {logo ? (
+            <img src={logo} alt="Logo" className="w-12 h-12 rounded-lg object-cover border border-gray-200" />
+          ) : (
+            <span className="text-sm text-gray-400">未设置</span>
+          )}
+        </Row>
+
+        {/* enum (position) */}
+        <Row label="对齐位置" type="enum">
+          <div className="w-full h-10 bg-gray-50 rounded-lg flex items-center"
+            style={{ justifyContent: position === "left" ? "flex-start" : position === "right" ? "flex-end" : "center" }}
+          >
+            <span className="px-3 py-1 rounded text-xs font-medium text-white" style={{ backgroundColor: bgColor }}>
+              {POSITION_LABEL[position]}
+            </span>
+          </div>
+        </Row>
+
+        {/* array · oneOf */}
+        <Row label="模块列表" type="array · oneOf">
+          {sorted.length === 0 ? (
+            <span className="text-sm text-gray-400">暂无模块</span>
+          ) : (
+            <div className="space-y-2">
+              {sorted.map((item, i) => (
+                <div key={i} className="flex items-center gap-2 text-sm">
+                  <span className="font-mono text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">
+                    [{i}]
+                  </span>
+                  <span className="font-medium text-gray-600">{item.type}</span>
+                  <span className="text-gray-400">·</span>
+                  <span className="text-gray-500 truncate">
+                    {item.type === "banner" ? item.text : item.type === "notice" ? item.message : `${item.label}: ${item.value}`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Row>
+
+      </div>
+    </div>
+  );
+}

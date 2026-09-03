@@ -1,0 +1,195 @@
+interface DemoProps {
+  title: string;
+  subtitle: string;
+  showBanner: boolean;
+  fontSize: number;
+  gap: number;
+  bgColor: string;
+  textColor: string;
+  layout: string;
+  tags: string[];
+  logo: string;
+  gallery: string[];
+  description: string;
+  region: string[];
+  blocks: Array<{ type: string; content?: string; pic?: string; caption?: string }>;
+}
+
+export default function Page(props: DemoProps) {
+  const {
+    title,
+    subtitle,
+    showBanner,
+    fontSize,
+    gap,
+    bgColor,
+    textColor,
+    layout,
+    tags,
+    logo,
+    gallery,
+    description,
+    region,
+    blocks,
+  } = props;
+  const { __positions } = props as unknown as Record<string, unknown>;
+  const pos = (__positions as Record<string, { x: number; y: number }>) || {};
+  const safeTags = Array.isArray(tags) ? tags : [];
+  const safeGallery = Array.isArray(gallery) ? gallery : [];
+  const safeRegion = Array.isArray(region) ? region : [];
+  const safeBlocks = Array.isArray(blocks) ? blocks : [];
+
+  return (
+    <div
+      className="min-h-screen px-4 py-8 font-sans transition-colors"
+      style={{ backgroundColor: bgColor, color: textColor }}
+    >
+      <div
+        className="max-w-md mx-auto"
+        style={{ display: 'flex', flexDirection: 'column', gap: `${gap}px` }}
+      >
+        {/* 页面第一个模块：顶部定位模块（高 200，只放图片） */}
+        <div className="rounded-xl bg-white/10 p-4 shadow-sm">
+          <div
+            className="relative rounded-lg overflow-hidden"
+            style={{
+              height: 200,
+              border: '1px dashed rgba(128,128,128,0.4)',
+              background:
+                'linear-gradient(135deg, rgba(128,128,128,0.12), rgba(128,128,128,0.04))',
+            }}
+          >
+            {(safeGallery[0] || logo) && (
+              <img
+                src={safeGallery[0] || logo}
+                alt="顶部图片"
+                style={{
+                  position: 'absolute',
+                  left: pos.bannerImage?.x ?? 20,
+                  top: pos.bannerImage?.y ?? 20,
+                  width: 120,
+                  height: 120,
+                  borderRadius: 12,
+                  objectFit: 'cover',
+                }}
+              />
+            )}
+            <span
+              className="text-[10px] opacity-40"
+              style={{ position: 'absolute', right: 10, bottom: 8 }}
+            >
+              顶部定位模块 · 拖拽图片
+            </span>
+          </div>
+        </div>
+
+        {showBanner && (
+          <div className="rounded-2xl bg-white/10 p-6 shadow-sm">
+            <div className="flex items-center gap-4">
+              {logo && (
+                <img
+                  src={logo}
+                  alt="Logo"
+                  className="w-14 h-14 rounded-xl object-cover shrink-0"
+                />
+              )}
+              <div className="min-w-0">
+                <h1 className="font-bold truncate" style={{ fontSize: `${fontSize}px` }}>
+                  {title}
+                </h1>
+                <p className="text-sm opacity-60 mt-1 line-clamp-2">{subtitle}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-2 flex-wrap">
+          <span className="px-3 py-1 rounded-full text-xs bg-white/10">布局: {layout}</span>
+          <span className="px-3 py-1 rounded-full text-xs bg-white/10">
+            横幅: {showBanner ? '开' : '关'}
+          </span>
+          {safeTags.map((tag) => (
+            <span key={tag} className="px-3 py-1 rounded-full text-xs bg-white/10">
+              标签: {tag}
+            </span>
+          ))}
+          {safeRegion.length > 0 && (
+            <span className="px-3 py-1 rounded-full text-xs bg-white/10">
+              地区: {safeRegion.join(' / ')}
+            </span>
+          )}
+        </div>
+
+        {description && (
+          <div
+            className="rounded-xl bg-white/10 p-4 shadow-sm text-sm leading-relaxed"
+            dangerouslySetInnerHTML={{ __html: description }}
+          />
+        )}
+
+        {safeGallery.length > 0 && (
+          <div className="grid grid-cols-2 gap-3">
+            {safeGallery.map((src, i) => (
+              <img
+                key={i}
+                src={src}
+                alt={`画廊图片 ${i + 1}`}
+                className="w-full h-28 rounded-xl object-cover"
+              />
+            ))}
+          </div>
+        )}
+
+        <div className="space-y-3">
+          {safeBlocks.map((block, i) => (
+            <div key={i} className="rounded-xl bg-white/10 p-4 shadow-sm">
+              {block.type === 'actionPos' ? (
+                <div
+                  className="relative rounded-lg overflow-hidden"
+                  style={{
+                    height: 100,
+                    border: '1px dashed rgba(128,128,128,0.4)',
+                    background:
+                      'linear-gradient(135deg, rgba(128,128,128,0.12), rgba(128,128,128,0.04))',
+                  }}
+                >
+                  <button
+                    className="px-5 py-2 rounded-full text-sm font-medium"
+                    style={{
+                      position: 'absolute',
+                      left: pos.bottomBtn?.x ?? 20,
+                      top: Math.max(0, (pos.bottomBtn?.y ?? 220) - 200),
+                      backgroundColor: textColor,
+                      color: bgColor,
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    立即参与
+                  </button>
+                  <span
+                    className="text-[10px] opacity-40"
+                    style={{ position: 'absolute', right: 10, bottom: 8 }}
+                  >
+                    底部定位模块 · 拖拽按钮
+                  </span>
+                </div>
+              ) : block.type === 'text' ? (
+                <p className="text-sm leading-relaxed">{block.content}</p>
+              ) : (
+                <div className="space-y-2">
+                  {block.pic && (
+                    <img src={block.pic} className="w-full rounded-lg object-cover" alt="模块配图" />
+                  )}
+                  {block.caption && (
+                    <p className="text-xs opacity-50">{block.caption}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "projectId": "proj_1779608460378",
+  "updatedAt": 1785753936013,
+  "state": {
+    "viewport": {
+      "x": 36.64999999999998,
+      "y": 114.0659878621714,
+      "zoom": 0.4444187491079522
+    },
+    "pages": {
+      "demo_1779608460379_a1b2c3": {
+        "x": 3.550986548537049,
+        "y": 3.863576125695545e-14,
+        "width": 375,
+        "height": 812,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "demo_1779608460380_d4e5f6": {
+        "x": 406.69035316178895,
+        "y": 3.709649511393309,
+        "width": 1077.7204673181423,
+        "height": 808.2903504886067,
+        "sizeMode": "custom",
+        "previewSizeKey": "1024x768"
+      }
+    },
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    }
+  }
+}

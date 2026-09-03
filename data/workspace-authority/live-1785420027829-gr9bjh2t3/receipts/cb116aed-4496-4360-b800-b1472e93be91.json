@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "cb116aed-4496-4360-b800-b1472e93be91",
+  "projectId": "proj_1784874964275_p0k4ho",
+  "workspaceId": "live-1785420027829-gr9bjh2t3",
+  "baseRevision": 0,
+  "revision": 24,
+  "rootHash": "1de3b23bee017d3cfd914879b4410b0f030a1ab49760dc6741d92c82695b6b74",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": ".canvas-layout.json",
+      "action": "modified",
+      "beforeHash": "626355faeba05f269b91202d954563d30bb173d1a915bb394e56ac54978fabad",
+      "afterHash": "776135ad378d5de4394e43fe139c5f890da18b765511f19540f339f9b9712f86"
+    }
+  ],
+  "committedAt": 1785719830691
+}

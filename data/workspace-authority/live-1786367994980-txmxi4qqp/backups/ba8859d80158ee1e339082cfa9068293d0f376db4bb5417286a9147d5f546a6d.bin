@@ -1,0 +1,22 @@
+{
+  "id": "ds_1786523105584_0d335ed4",
+  "title": "quiet studio设计规范",
+  "createdAt": "2026-08-12T08:25:05.584Z",
+  "updatedAt": "2026-08-12T08:25:05.584Z",
+  "entries": [
+    {
+      "id": "e_1786523105584_2a3bc4b6",
+      "title": "主视觉图片",
+      "markdown": "",
+      "refs": [
+        {
+          "scope": "page",
+          "pageId": "quiet-studio_q7m4",
+          "fieldKey": "heroImage"
+        }
+      ],
+      "autoManagedFieldKey": "heroImage"
+    }
+  ],
+  "autoManagedPageId": "quiet-studio_q7m4"
+}

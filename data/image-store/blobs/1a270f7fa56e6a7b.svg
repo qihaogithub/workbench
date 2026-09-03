@@ -1,0 +1,21 @@
+<svg width="19" height="19" viewBox="0 0 19 19" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g filter="url(#filter0_d_9176_71393)">
+<path d="M15.4287 4.38474C16.174 4.43631 16.6029 4.8197 16.7153 5.53489C16.6629 6.25636 16.2674 6.67112 15.5287 6.77917L13.4266 6.85917L13.7091 13.6234C13.8616 15.2964 13.0936 16.185 11.4053 16.2892C10.5018 16.4036 9.63787 16.4764 8.81348 16.5078C7.81921 16.4257 7.26336 15.9672 7.14591 15.1323C7.1159 14.414 7.53371 14.0383 8.39931 14.0054C8.52297 14.0007 8.74968 13.9921 9.07943 13.9795C9.49329 14.0037 9.78266 14.0127 9.94754 14.0064C10.734 14.0564 11.0875 13.6233 11.008 12.707L10.8504 8.93576C9.21089 11.1965 7.084 13.1561 4.46976 14.8145C3.66204 15.2449 2.99669 15.1303 2.47372 14.4707C2.07107 13.7266 2.29172 13.0787 3.13565 12.527C5.71201 10.95 7.74085 9.11406 9.22217 7.01919L3.22475 7.24744C2.52069 7.19429 2.11243 6.81012 1.99999 6.09493C2.05242 5.37346 2.42733 4.95949 3.12473 4.853L10.6679 4.56593L10.6179 3.36871C10.667 2.56743 11.102 2.11119 11.9231 2C12.7096 2.05001 13.1607 2.47252 13.2765 3.26753L13.3265 4.46474L15.4287 4.38474Z" fill="url(#paint0_linear_9176_71393)"/>
+</g>
+<defs>
+<filter id="filter0_d_9176_71393" x="0" y="0" width="18.7153" height="18.5078" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset/>
+<feGaussianBlur stdDeviation="1"/>
+<feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.5 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_9176_71393"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_9176_71393" result="shape"/>
+</filter>
+<linearGradient id="paint0_linear_9176_71393" x1="-13.3662" y1="-9.51763" x2="11.2604" y2="22.1263" gradientUnits="userSpaceOnUse">
+<stop stop-color="#EF8D00"/>
+<stop offset="0.927889" stop-color="#DC5800"/>
+<stop offset="1" stop-color="#DA5400"/>
+</linearGradient>
+</defs>
+</svg>

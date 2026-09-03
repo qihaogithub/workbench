@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1784874964276_q7h2dd",
+  "at": 1784874964276,
+  "actor": {
+    "id": "local-codex",
+    "name": "local-codex",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1784874964275_p0k4ho",
+  "inputSummary": {
+    "name": "完课活动",
+    "category": "未分类"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1784874964275_p0k4ho"
+    ]
+  }
+}

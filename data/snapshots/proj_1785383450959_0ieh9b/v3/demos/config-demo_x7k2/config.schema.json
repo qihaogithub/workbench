@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "content",
+      "preset": "custom",
+      "source": "user"
+    }
+  },
+  "properties": {
+    "title": {
+      "type": "string",
+      "title": "标题文本",
+      "default": "配置类型演示"
+    },
+    "count": {
+      "type": "number",
+      "title": "数量",
+      "default": 10,
+      "minimum": 0,
+      "maximum": 100
+    },
+    "showPanel": {
+      "type": "boolean",
+      "title": "显示面板",
+      "default": true
+    },
+    "size": {
+      "type": "string",
+      "title": "尺寸",
+      "enum": [
+        "small",
+        "medium",
+        "large"
+      ],
+      "enumNames": [
+        "小",
+        "中",
+        "大"
+      ],
+      "default": "medium"
+    },
+    "bgColor": {
+      "type": "string",
+      "title": "背景色",
+      "format": "color",
+      "default": "#3B82F6"
+    },
+    "logo": {
+      "type": "string",
+      "title": "Logo 图片",
+      "format": "image",
+      "default": ""
+    },
+    "position": {
+      "type": "string",
+      "title": "对齐位置",
+      "enum": [
+        "left",
+        "center",
+        "right"
+      ],
+      "enumNames": [
+        "居左",
+        "居中",
+        "居右"
+      ],
+      "default": "center"
+    },
+    "modules": {
+      "type": "array",
+      "title": "模块列表",
+      "$demo": {
+        "sortable": true
+      },
+      "items": {
+        "oneOf": [
+          {
+            "title": "Banner 模块",
+            "properties": {
+              "type": {
+                "const": "banner",
+                "title": "模块类型"
+              },
+              "text": {
+                "type": "string",
+                "title": "文案",
+                "default": "Banner 文案"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          {
+            "title": "通知模块",
+            "$demo": {
+              "maxItems": 1
+            },
+            "properties": {
+              "type": {
+                "const": "notice",
+                "title": "模块类型"
+              },
+              "message": {
+                "type": "string",
+                "title": "通知内容",
+                "default": "这是一条通知"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          {
+            "title": "计数模块",
+            "$demo": {
+              "maxItems": 1
+            },
+            "properties": {
+              "type": {
+                "const": "counter",
+                "title": "模块类型"
+              },
+              "label": {
+                "type": "string",
+                "title": "标签",
+                "default": "计数"
+              },
+              "value": {
+                "type": "number",
+                "title": "数值",
+                "default": 0
+              }
+            },
+            "required": [
+              "type"
+            ]
+          }
+        ]
+      },
+      "default": [
+        {
+          "type": "banner",
+          "text": "欢迎使用 OneFlow"
+        },
+        {
+          "type": "notice",
+          "message": "系统维护通知"
+        },
+        {
+          "type": "counter",
+          "label": "访问量",
+          "value": 1280
+        }
+      ]
+    }
+  },
+  "required": []
+}

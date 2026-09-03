@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "content",
+      "preset": "custom",
+      "source": "user"
+    }
+  },
+  "title": "课后服务 - 手机版配置",
+  "type": "object",
+  "properties": {
+    "serviceTitle": {
+      "type": "string",
+      "title": "服务标题",
+      "description": "课后服务包名称",
+      "default": "全年系统包-L1"
+    }
+  }
+}

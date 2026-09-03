@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1785398993214_c05uke",
+  "at": 1785398993214,
+  "actor": {
+    "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+    "name": "qihao",
+    "role": "creator",
+    "source": "author-site"
+  },
+  "level": "L2",
+  "tool": "page_create_version",
+  "projectId": "proj_1784874964275_p0k4ho",
+  "resourceId": "course-complete_a7k3",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "page-version:course-complete_a7k3:prv_1785398993199_ic0yeh"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

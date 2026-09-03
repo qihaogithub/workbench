@@ -1,0 +1,8 @@
+{
+  "id": "pad_lawk",
+  "name": "明星赛pad",
+  "routeKey": "pad-2",
+  "order": 2,
+  "parentId": null,
+  "runtimeType": "prototype-html-css"
+}

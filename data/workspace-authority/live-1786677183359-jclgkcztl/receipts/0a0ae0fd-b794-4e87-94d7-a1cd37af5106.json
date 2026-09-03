@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "0a0ae0fd-b794-4e87-94d7-a1cd37af5106",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 702,
+  "rootHash": "756947ac3ed82e5dc9b44fd57ec2521eacc0c9bb08f868d928f3c517d7c53dc0",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/halloween-intro_q7m1/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "d953bcd9c5e41101c3bd8e1e3181bc20f338e75488f4530014dfd6c8dca0b430",
+      "afterHash": null
+    },
+    {
+      "path": "demos/halloween-intro_q7m1/index.tsx",
+      "action": "deleted",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": null
+    },
+    {
+      "path": "demos/halloween-intro_q7m1/prototype.css",
+      "action": "deleted",
+      "beforeHash": "1cfda59b8dfc33b634df0688c2508f71feaac884a2d49700ee48893d641610c1",
+      "afterHash": null
+    },
+    {
+      "path": "demos/halloween-intro_q7m1/prototype.html",
+      "action": "deleted",
+      "beforeHash": "bff87ad4d92758446fa2728a209e03ed6900f76dea3d931db0ca9bdcce47b83f",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "b09a105c75b5a78e9507f2d19e1778c271891d897f11887822d6d4987f535711",
+      "afterHash": "4c41884ce9e84cbff45cf14133af441f1c7c28f5d45a24ddc31da93da6d79d39"
+    }
+  ],
+  "committedAt": 1787893371952
+}

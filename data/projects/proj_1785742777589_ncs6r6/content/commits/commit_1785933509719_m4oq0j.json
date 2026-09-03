@@ -1,0 +1,35 @@
+{
+  "id": "commit_1785933509719_m4oq0j",
+  "projectId": "proj_1785742777589_ncs6r6",
+  "parentCommitId": "commit_1785911067917_qsj5p9",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录动效格式展示",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "config-demo_m7p2",
+      "versionId": "prv_1785911067911_1veoni"
+    },
+    {
+      "kind": "page",
+      "resourceId": "motion-formats_k4r2",
+      "versionId": "prv_1785933509704_ula0xl"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "motion-formats_k4r2",
+      "toVersionId": "prv_1785933509704_ula0xl"
+    }
+  ],
+  "createdAt": 1785933509719,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785832228941-ay0onrwn3",
+    "workspaceRevision": 53,
+    "workspaceRootHash": "b7b536da0042bae64e74a2f83a932d03fade6de7314b41f15372c457c02c22ab"
+  }
+}

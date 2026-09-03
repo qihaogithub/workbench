@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "projectId": "proj_1786367903885_iu08e4",
+  "updatedAt": 1787750995993,
+  "state": {
+    "viewport": {
+      "x": 482.80795519905917,
+      "y": 98.81016260645356,
+      "zoom": 0.3380880048563336
+    },
+    "pages": {
+      "kids-edu_b3xw": {
+        "x": -1144,
+        "y": 0,
+        "width": 375,
+        "height": 2471,
+        "zIndex": 4,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "committed": true,
+  "mutationId": "15fb07e8-3ff9-4355-858a-69061aacb14d",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "baseRevision": 0,
+  "revision": 536,
+  "rootHash": "617c6b29d9e6c7dc25c70335df34a4c2c084efb8ef35018dff4ee7103c98f01a",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_yw72/index.tsx",
+      "action": "modified",
+      "beforeHash": "794ed90f5369ec496c75ebf879a53dd8ac8b48a563b1b21196828a8a0359913b",
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/page_yw72/config.schema.json",
+      "action": "modified",
+      "beforeHash": "fa448b30b39259cbeb3b1b680009b2bd6d34d8e849f168c16ec28448312ee64b",
+      "afterHash": "5b493640852310cc0056eec4906852ef08475872d6fe9c7f212d87c7e1967f83"
+    }
+  ],
+  "committedAt": 1788162159781
+}

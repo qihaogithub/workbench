@@ -1,0 +1,31 @@
+{
+  "committed": true,
+  "mutationId": "6e7dfd3b-a208-4dc0-85ef-7d95d1f0ac10",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786367994980-txmxi4qqp",
+  "baseRevision": 0,
+  "revision": 339,
+  "rootHash": "4d2af011b72dc7f5df836b83c24c406e78117d7bc9bfd842fd11204a3f9a7ad3",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/page_zdwh/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "bf870a7a11c79d2318e1f62992adb52607d79fb4f5bf557639ad1063b4a3b9a9"
+    },
+    {
+      "path": "design-spec/spec-ds_1786523588053_c2cd4932.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "a507f82cc612f8e75628321c017c4fdde57435d4f9a0489ddae94dc24e7a3acf"
+    },
+    {
+      "path": "design-spec/manifest.json",
+      "action": "modified",
+      "beforeHash": "5b6a1bc98945f34e21b84701f6c4f714709443cb0863012704ee3d59626db902",
+      "afterHash": "e31ab9192821601c88cd3680402deb220b120e7d1edeeaba36e5212f9c71ed23"
+    }
+  ],
+  "committedAt": 1786523588101
+}

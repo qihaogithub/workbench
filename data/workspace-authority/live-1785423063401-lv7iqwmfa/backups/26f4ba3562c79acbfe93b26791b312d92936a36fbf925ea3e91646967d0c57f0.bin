@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "projectId": "proj_1785421657423_1ptong",
+  "updatedAt": 1785425376655,
+  "state": {
+    "viewport": {
+      "x": 162.50277093596057,
+      "y": 53.049999999999955,
+      "zoom": 1.175985221674877
+    },
+    "pages": {},
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "hiddenKnowledgeDocumentIds": [],
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    }
+  }
+}

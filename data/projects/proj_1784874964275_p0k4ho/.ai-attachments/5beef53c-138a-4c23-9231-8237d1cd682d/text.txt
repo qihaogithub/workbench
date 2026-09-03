@@ -1,0 +1,251 @@
+# 创作端预览：HTML 快照替代画布缩略态截图方案
+
+## 背景
+
+### 现状问题
+
+画布中非选中高保真页面的缩略态当前走「Puppeteer PNG 截图」替代 iframe 渲染（受 `MIN_CANVAS_SCREENSHOT_PAGE_COUNT=6` 和 iframe 预算 `12+12` 约束），存在以下痛点：
+
+1. **服务器资源消耗高**：每次截图需要在 `screenshot-service` 中启动独立 Puppeteer Chrome 实例，占用服务端 CPU/内存（单截图 ~100-300MB 内存、5-30s 完成）
+2. **延迟高**：截图服务队列 + Puppeteer 冷启动 + 编译等待 + PNG 编码，用户画布缩略态从空白到显示完整截图的等待时间显著
+3. **清晰度受限**：PNG 是固定 DPI 位图，画布缩放下会模糊；矢量 DOM 天然支持任意缩放
+4. **截图服务稳定性风险**：空白图、超时、网络波动、渲染不一致已持续出现在诊断日志中
+
+### 用户原始提议
+
+> 是否可以都用 React 页面，但自动编译生成 HTML 页面，显示用 HTML 页面，选中或配置变动时切换为 iframe，等最新编译结果生成再切换为 HTML？这样也许可以避免高频截图来用截图替代画布中的页面，截图服务速度慢还很消耗服务器资源。
+
+### 结论收敛过程（为什么前两轮有偏差）
+
+| 轮次 | 结论 | 偏差原因 | 修正点 |
+|:---|:---|:---|:---|
+| 第一轮 | 不建议 | 1. 把「前端抽取 HTML」与「服务器 Puppeteer 截图」资源开销混为一谈（这是数量级差距，前者零服务器成本）；2. 把 DOM 功能完整性（脚本/事件是否保留）和静态视觉完整性混淆；3. 没有结合"项目自生成页面多数是同源 CSS + 同步渲染"这个业务现实，过度泛化了跨域 CSS/canvas 等边界场景的影响 | 资源开销维度是方案最大收益点，不能跳过 |
+| 第二轮 | 建议，给具体百分比 | 1. 给出「截图调用量下降 60%+」无实测数据支撑的数字；2. 提出「统一创作源为 React」属于产品级决策，超出技术方案边界；3. 未考虑「可视化编辑」对两种页面类型架构级差异的约束 | Phase 0 验证优先，不在无数据时拍板产品决策；保留 runtimeType 二分语义 |
+| 第三轮（最终） | Phase 0 验证 → Phase 1 增量落地 | 见下文 | 见下文 |
+
+---
+
+## 一、最终结论
+
+### 核心决策
+
+1. **不做"统一所有页面为 React"的产品级改动**。保留 `runtimeType` 二分语义（`prototype-html-css` vs `high-fidelity-react`），原因见「可视化编辑场景约束」章节。
+2. **仅做技术增量改造：在画布缩略态中，优先消费 HTML 快照替代 PNG 截图**。HTML 快照由前端 iframe 在内容稳定后抽取并缓存，不占用服务器资源。
+3. **保留 PNG 截图作为兜底**，覆盖 HTML 快照无法正确还原的边界场景。
+4. **Phase 0 实数据验证优先**。不拍脑袋给 ROI 数字，先在真实业务数据上跑 5 个关键假设，验证通过再推进改造。
+
+### 为什么这个方向是正确的
+
+画布缩略态的本质需求是「用户能快速识别内容、不糊、不占太多资源」，不是「像素级复现单页预览」。HTML 快照（静态 DOM + 内联样式）完全满足前者，且：
+
+- 对项目自生成的高保真 React 页面（同源 CSS + 同步渲染 + 无 canvas/video），HTML 快照与 iframe 当下静态显示效果**近乎完全一致**
+- 服务器开销从「Puppeteer 全流程」降为「零」
+- 清晰度从「固定 DPI 位图」升为「矢量 DOM，任意缩放不糊」
+
+---
+
+## 二、可视化编辑场景的约束（保留 runtimeType 二分的核心理由）
+
+### 2.1 可视化编辑对两类页面的能力差异是架构级别的
+
+| 能力 | 原型页（prototype-html-css） | 高保真页（high-fidelity-react） |
+|:---|:---|:---|
+| 编辑器类型 | PrototypePageEditor：直接编辑 HTML/CSS 源码 | MonacoEditor：编辑 TSX 源码 + 编译 |
+| 画布渲染通道 | PrototypePagePreview（Shadow DOM 直出） | PreviewPanel（iframe + `/api/compile` + postMessage） |
+| **可视化属性编辑（改 div 颜色/字号/边距等）** | **直接生效**：选中 DOM 节点 → 改 style → 回写 `prototype.html` 的 CSS 规则 → 画布与预览同步更新 | **做不到直接改**：选中 React 渲染出的 DOM 节点不等于"改 TSX 源码中的样式"；源码是 TSX（JSX + CSS Modules/内联样式/UI组件），编译后 DOM 结构可能被组件嵌套包裹，不存在"改 DOM → 回写源码"的双向映射 |
+| 运行时转换 | 已存在 `switchPageRuntime` 高保真→原型（`extractStaticPrototypeSnapshot` 抽 DOM） | 已存在 `switchPageRuntime` 原型→高保真（HTML/CSS → TSX，质量依赖 AI 代码转换，不稳定） |
+
+### 2.2 如果"统一所有页面为 React"会损失什么
+
+1. **丢失原型页可视化属性编辑的"即改即所见"能力**。React 页可视化编辑只能做「props 级配置面板 → UPDATE_CONFIG postMessage → iframe 内部 props 更新」，不能做到「选中任意 DOM 节点直接改 style 属性回写源码」。
+2. **模糊了产品层面"快速原型 vs 高保真"的语义边界**。原型页的定位是"AI 快速产出可直接改细节的静态原型"，高保真页是"完整组件化交互页"，两者用户预期不同。
+3. **运行时转换链路反而更复杂**。本来只在用户显式点"转换为 React"时才做 HTML→TSX AI 转换，统一后所有页面都要先经过 React→HTML 快照再显示，多了一层转换且质量不可控。
+
+### 2.3 runtimeType 二分语义保留后的 HTML 快照职责
+
+HTML 快照只承担「画布缩略态渲染优化」，**不改变两类页面的源码格式、编辑模式和运行时转换逻辑**。
+
+---
+
+## 三、HTML 快照 vs PNG 截图的还原度对比（严格版）
+
+### 3.1 画布场景下完全不构成差异的点
+
+| 被质疑的点 | 画布场景下的实际情况 | 依据 |
+|:---|:---|:---|
+| 滚动位置重置 | 画布卡片按完整内容高度渲染（视口高度 = 内容高度），iframe 自身不滚动，不存在"需要保留滚动位置" | [CanvasPageItem.tsx#L270-L289](file:///workspace/packages/demo-ui/src/CanvasPageItem.tsx#L270-L289) + [07文档#L170-L178](file:///workspace/docs/项目文档/创作端/04-配置与预览/技术/07_截图服务与预览快照机制.md#L170-L178) |
+| 脚本移除 | 只移除 `<script>` 标签本身，脚本执行后产生的 DOM 变更已保留在 cloneNode 结果中。画布缩略态不需要交互，不影响视觉 | DOM cloneNode 语义 |
+| 事件属性移除 | 同上，只移除 `onclick` 等属性，不影响 DOM 静态结构和样式 | [sanitizeStaticPrototypeElement](file:///workspace/packages/demo-ui/src/PreviewPanel.tsx#L137-L156) |
+| 图片/字体重新加载 | iframe 渲染稳定后抽取的 `<img src>` 和字体资源 URL 不变，HTML 加载时浏览器走缓存拿到同一份资源 | 浏览器缓存语义 |
+
+### 3.2 真正可能产生视觉差异的场景（仅 4 类，DOM 语义硬限制）
+
+| 差异场景 | HTML 快照表现 | PNG 截图表现 | 检测方式 |
+|:---|:---|:---|:---|
+| **跨域外部 stylesheet**（如 `<link href="https://cdn.tailwind.com/...">`） | 规则丢失。`doc.styleSheets` 中跨域 stylesheet 读取 `cssRules` 抛 SecurityError 被静默忽略，class 对应的样式不在快照的 `<style>` 中 | 完整（Puppeteer 直接渲染完整文档） | 遍历 `doc.styleSheets`，检测是否有 `href` 非同源且读取 `cssRules` 失败 |
+| **`<canvas>` / WebGL 绘制内容** | 空 `<canvas>` 标签。位图在 GPU 显存/内部 bitmap，不在 DOM，cloneNode 不拷贝 | 完整位图 | 搜索 DOM 中 `<canvas>` 标签存在性 |
+| **Shadow DOM 内部节点** | 只拷贝宿主标签，shadowRoot 内部节点丢失。`cloneNode(true)` 标准行为不深拷贝 shadowRoot | 完整 | 遍历 DOM，检测 `Element.shadowRoot != null` |
+| **`<video>` 当前帧** | 只拿 `<video>` 标签 + src，当前帧位图丢失，显示首帧或空白 | 当前帧位图固化 | 搜索 DOM 中 `<video>` 标签存在性 |
+
+### 3.3 对项目自生成页面的实际还原度判断
+
+项目自生成的高保真 React 页面（占绝大多数业务场景）：
+
+- 编译产物是同源 ESM 模块，CSS 走本地 PostCSS 编译 + 注入到 `<style>` 标签 → **不会触发跨域 stylesheet 丢失**
+- lucide-react 图标是 SVG（在 DOM 内） → **能完整 clone**
+- 不使用 Shadow DOM（主流 React UI 库不用） → **不触发 shadowRoot 丢失**
+- 默认不含 canvas/video（除非用户/AI 显式用图表库或视频组件） → **不触发位图丢失**
+
+结论：**项目自生成的高保真 React 页面中，HTML 快照对 iframe 当下静态显示效果的还原度接近 100%**。4 类边界场景占比预计较低，可检测后自动降级 PNG。
+
+---
+
+## 四、完整方案
+
+### Phase 0：实数据验证（必须先做，无数据不推进）
+
+目标：在真实业务数据上验证 5 个关键假设，获取量化结果。
+
+| 假设编号 | 假设内容 | 验证方法 | 通过阈值 |
+|:---|:---|:---|:---|
+| H1 | 现有项目中高保真页 HTML 快照还原度达标率 ≥ 90% | 从 `data/projects/` 随机抽 N 个项目的高保真页，生成 HTML 快照 + PNG 截图，人工/自动视觉比对 | ≥ 90% 页面还原度 ≥ 95%（像素级相似度或人工判断） |
+| H2 | 4 类边界场景（跨域 CSS/canvas/shadowRoot/video）在业务页中占比 ≤ 10% | 对同一批页面用 DOM 检测脚本自动计数 | ≤ 10% 页面命中任意边界场景 |
+| H3 | HTML 快照抽取 + 缓存 + 画布渲染，端到端延迟显著低于 PNG 截图 | 同一批页面分别跑两条路径，记录 P50/P95 耗时 | HTML 路径 P50 比 PNG 路径快 ≥ 3 倍 |
+| H4 | HTML 快照占用的前端内存增量可控 | 同时在画布中渲染 N 张 HTML 快照卡片 vs N 张 PNG，对比 JS Heap 差值 | 每卡片内存增量 ≤ PNG 的 80%（DOM 文本占内存通常比 PNG 小） |
+| H5 | 非选中页 HTML 快照 → 选中切 iframe → 取消选中切回快照，状态机切换无视觉抖动 | 人工跑 20 次选中/取消选中循环 | 无白屏闪烁、无高度跳变、opacity 渐隐流畅 |
+
+验证输出：
+- 每个假设的实测数据表格
+- 结论：通过/不通过/部分通过+需要调整的点
+- 若 H1 或 H2 不通过，重新评估方案可行性
+
+### Phase 1：HTML 快照作为画布缩略态的优先消费层（不改 runtimeType，纯增量）
+
+目标：画布非选中高保真页优先消费 HTML 快照，快照不可用时 fallback PNG，再 fallback iframe。
+
+#### 4.2.1 快照生产链路
+
+```
+选中态 iframe 加载 → 内容稳定信号（与截图 fast 模式相同：5 轮稳定测量 + animationFrame pair）
+    → 调用 extractStaticPrototypeSnapshot（已存在能力）
+        → 产出 snapshotHtml（#root outerHTML）、snapshotCss（内联 style 规则）、snapshotQuality
+        → 计算 contentHash = hash(TSX内容 + 当前 props + 编译产物 URL)
+        → 写入页面持久化字段（pages[].snapshotHtml / snapshotCss / snapshotHash / snapshotQuality）
+        → 存入 snapshotCache keyed by contentHash
+```
+
+新增字段（`workspace.ts` 中 `Page` 类型，不破坏向后兼容）：
+
+```typescript
+snapshotHtml?: string;        // HTML 快照 body 内容
+snapshotCss?: string;         // 抽取的内联 CSS
+snapshotHash?: string;        // 内容 hash，用于校验是否过期
+snapshotQuality?: 'good' | 'partial' | 'failed';
+snapshotRejectionReasons?: Array<'cross-origin-css' | 'canvas' | 'shadow-dom' | 'video'>;
+```
+
+#### 4.2.2 画布消费链路
+
+改动集中在 `CanvasPageItem.tsx` 的渲染决策与 `canvas-render-scheduler.ts` 的调度：
+
+1. `CanvasPageRenderMode.screenshot` 模式的含义**扩展**（不新增 mode 枚举，避免状态机膨胀）：
+   - 优先级 1：`snapshotHash` 与当前 `contentHash` 匹配且 `snapshotQuality === 'good'` → 渲染 HTML 快照
+   - 优先级 2：`snapshotHash` 匹配但 `snapshotQuality === 'partial'` → 用户可配置的开关决定优先 HTML 还是 PNG（默认 HTML）
+   - 优先级 3：PNG 截图存在且 hash 匹配 → 渲染 PNG
+   - 优先级 4：fallback iframe（遵守 iframe 预算）
+
+2. HTML 快照渲染通道复用原型页的 Shadow DOM 注入逻辑（`PrototypePagePreview` 中已有成熟实现），不要新写一套。
+
+3. 调度器 `scheduleCanvasRender` 中增加「HTML 快照就绪」事件，替代部分「PNG 就绪」事件的渐隐切换。
+
+#### 4.2.3 切换触发事件矩阵
+
+| 事件 | 页面选中态 | 渲染策略 | 说明 |
+|:---|:---|:---|:---|
+| 项目打开、初始加载 | 非选中 | HTML 快照（若存在且 hash 匹配）→ 否则 PNG → 否则 iframe | 非选中页缩略态 |
+| 点击选中页面 | 选中 → true | iframe | 需要实时交互、属性编辑、UPDATE_CONFIG |
+| 配置表单 onChange | 选中（保持） | iframe 内部 postMessage(UPDATE_CONFIG)，~16ms props 更新 | 不切快照，配置变更不走快照 |
+| TSX 代码变更（AI 重写/手动编辑） | 选中 | iframe 重新编译 → 稳定后异步生成新快照 | 新快照在 iframe 稳定后后台生成，不阻塞当前操作 |
+| 取消选中（点击空白/切到其他页） | 选中 → false | HTML 快照渐入 + iframe 渐出卸载 | 回收 iframe 预算 |
+| 页面滚出视口 | 非选中 | 保持 HTML 快照 | 非选中页本来就不开 iframe |
+| 新的 HTML 快照就绪（hash 从旧变新） | 非选中 | 旧快照 opacity 渐出 → 新快照渐入 | 与当前 PNG→iframe 切换同构 |
+| snapshotHash 与当前 contentHash 不匹配 | 非选中 | 先显示旧快照 + loading 遮罩 → 后台排队 iframe 抽新快照 → 就绪后切换 | 符合"最新真实优先"原则，旧快照避免白屏 |
+| 边界场景检测命中（canvas/video/跨域 CSS/shadowRoot） | 非选中 | snapshotQuality = failed → fallback PNG | 4 类边界场景自动降级 |
+| 可视化编辑模式激活（选中 DOM 节点编辑） | 选中 | 若是原型页：Shadow DOM 直接改 → 同步更新 prototype.html<br>若是高保真页：强制 iframe + props 级配置面板（不支持直接 DOM 改源码） | 保留 runtimeType 二分的核心差异 |
+
+#### 4.2.4 兜底机制
+
+- `snapshotQuality = partial/failed` 时页面卡片上显示一个小标识（如「缩略图基于静态 DOM，效果可能与预览略有差异」），避免用户误以为是真实效果
+- 用户右键菜单提供「强制刷新缩略图（PNG）」入口，手动覆盖 HTML 快照
+- `switchPageRuntime` 高保真→原型路径继续使用 `extractStaticPrototypeSnapshot`，与 HTML 快照能力复用同一份实现
+
+#### 4.2.5 改动范围
+
+| 文件 | 改动类型 | 说明 |
+|:---|:---|:---|
+| `packages/shared/src/workspace.ts` | `Page` 类型新增可选字段 | `snapshotHtml/snapshotCss/snapshotHash/snapshotQuality/snapshotRejectionReasons`，向后兼容 |
+| `packages/demo-ui/src/PreviewPanel.tsx` | `extractStaticPrototypeSnapshot` 扩展 | 增加边界场景检测（canvas/video/shadowRoot/跨域CSS）+ quality 输出 |
+| `packages/demo-ui/src/CanvasPageItem.tsx` | 渲染决策扩展 | `shouldRenderScreenshot` 分支优先消费 HTML 快照 |
+| `packages/demo-ui/src/canvas-render-scheduler.ts` | 调度事件扩展 | 增加「HTML 快照就绪」事件类型 |
+| `packages/author-site/src/components/demo/useScreenshotGeneration.ts` | 新增快照任务 | 增加 snapshotHtml 任务类型，与 screenshot 任务同优先级 |
+| `packages/author-site/src/components/demo/DemoCanvas.tsx` | 画布上下文扩展 | 暴露 snapshotCache 与快照刷新方法 |
+
+**不改动**：
+- runtimeType 枚举与语义
+- PrototypePagePreview / PrototypePageEditor 的可视化编辑逻辑
+- PreviewPanel iframe 编译与 postMessage 协议
+- screenshot-service 服务端逻辑（PNG 仍作为兜底 + 导出/AI 视觉）
+
+### Phase 2（可选，Phase 1 验证后再决策）：统一创建入口默认高保真
+
+前提：Phase 1 数据证明 HTML 快照质量足够好，且用户反馈「新建页选类型」是痛点。不在本方案中展开。
+
+### Phase 3（不建议，除非数据强烈支持）：完全淘汰画布缩略态 PNG
+
+需要 Phase 1 上线后积累足够数据证明 4 类边界场景占比极低且兜底机制用户无感知。本方案不做承诺。
+
+---
+
+## 五、验证方式
+
+| 层级 | 验证内容 | 命令/方式 |
+|:---|:---|:---|
+| 类型检查 | shared/demo-ui/author-site | `pnpm check:author && pnpm check:demo-ui && pnpm check:shared` |
+| 单元测试 | 新增 snapshotQuality 边界场景检测逻辑的单测 | `pnpm --filter @workbench/demo-ui test` |
+| Phase 0 验证脚本 | H1-H5 数据采集 | `scripts/development/` 下新建 `validate-html-snapshot.ts`，跑真实项目批量输出报告 |
+| 人工回归 | 选中/取消选中切换流畅度、配置编辑不切快照、可视化编辑模式差异 | 启动 author-site 手工验证 |
+| E2E | 新增画布缩略态 HTML 快照模式的 Playwright spec | `pnpm test:e2e`（放到 `test/创作端E2E回归测试/` 下） |
+
+---
+
+## 六、风险与待确认事项
+
+- **风险 1：H1 还原度不达标**。如果实际业务中跨域 CDN stylesheet 使用率高于预期（例如大量页面用 CDN Tailwind/Bootstrap），HTML 快照还原度会显著下降，方案直接降级为「兜底场景变多」而非「优先消费」。Phase 0 必须先验证。
+- **风险 2：contentHash 计算不稳定导致快照频繁过期**。TSX 内容、props、编译产物 URL 任一微小变动都会让快照 hash 不匹配，如果 hash 粒度过细，会导致快照命中率低、用户经常看到旧快照+loading。需要在 Phase 0 中确认 hash 口径。
+- **风险 3：HTML 快照体积超出预期**。大量复杂 DOM 的 `snapshotHtml` 字符串如果每个 200KB+，100 张页面占 20MB，可能超过 `data/projects/` 单项目 JSON 文件的合理体积。需要在 Phase 0 H4 中确认实际体积分布，必要时加 LRU 缓存 + 只在内存中存非持久化。
+- **待确认 1：用户对「HTML 快照 vs 真实预览可能略有差异」的容忍度**。画布缩略态本质是预览缩略，不是单页预览的精确复现，但需要确认产品侧是否接受在卡片上放「缩略图基于静态 DOM」的小标识。
+- **待确认 2：Phase 0 验证数据从哪里来**。需要有真实项目数据（非 demo 空项目）才能得到可信的 H1-H5 结果。如果 `data/projects/` 下没有足够样本，需要提前准备。
+
+---
+
+## 七、进度记录
+
+- [x] 2026-08-04：方案文档撰写完成（背景、结论收敛、约束、差异分析、Phase 0-1 方案、验证、风险）
+- [ ] Phase 0 验证脚本开发与执行
+- [ ] 根据 Phase 0 结果调整方案或确认推进
+- [ ] Phase 1 代码实现
+- [ ] 回归验证与上线
+
+---
+
+## 相关文件/命令
+
+- [PreviewPanel.tsx extractStaticPrototypeSnapshot](file:///workspace/packages/demo-ui/src/PreviewPanel.tsx#L122-L211)
+- [sanitizeStaticPrototypeElement](file:///workspace/packages/demo-ui/src/PreviewPanel.tsx#L137-L156)
+- [extractStaticPrototypeCss](file:///workspace/packages/demo-ui/src/PreviewPanel.tsx#L165-L176)
+- [CanvasPageItem.tsx](file:///workspace/packages/demo-ui/src/CanvasPageItem.tsx)
+- [canvas-render-scheduler.ts](file:///workspace/packages/demo-ui/src/canvas-render-scheduler.ts)
+- [useScreenshotGeneration.ts](file:///workspace/packages/author-site/src/components/demo/useScreenshotGeneration.ts)
+- [07_截图服务与预览快照机制.md](file:///workspace/docs/项目文档/创作端/04-配置与预览/技术/07_截图服务与预览快照机制.md)
+- [02_实时预览机制.md](file:///workspace/docs/项目文档/创作端/04-配置与预览/技术/02_实时预览机制.md)
+- 诊断命令：`pnpm diagnostics:preview -- --project <projectId> --since 24h`

@@ -1,0 +1,8 @@
+{
+  "id": "page_y0ms",
+  "name": "手机",
+  "routeKey": "page",
+  "order": 0,
+  "parentId": null,
+  "runtimeType": "prototype-html-css"
+}

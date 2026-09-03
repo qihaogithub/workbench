@@ -1,0 +1,41 @@
+{
+  "id": "commit_1786627562353_bfhwud",
+  "projectId": "proj_1779608460372",
+  "parentCommitId": "commit_1786601275963_azudd5",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录平板",
+  "resourcePointers": [
+    {
+      "kind": "knowledge_document",
+      "resourceId": "kb_1786532517206_r7k6au",
+      "versionId": "krv_1786601275960_nshcqb"
+    },
+    {
+      "kind": "page",
+      "resourceId": "demo_1779608460501_abc123",
+      "versionId": "prv_1785915741753_ij33t6"
+    },
+    {
+      "kind": "page",
+      "resourceId": "demo_1779608460502_def456",
+      "versionId": "prv_1786627562348_ywt264"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "demo_1779608460502_def456",
+      "fromVersionId": "prv_1784862322468_c595t6",
+      "toVersionId": "prv_1786627562348_ywt264"
+    }
+  ],
+  "createdAt": 1786627562353,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1784638685509-ygoh75gy6",
+    "workspaceRevision": 94,
+    "workspaceRootHash": "5c5a0b0f691f182316a8a1fa17926d11ca33de6762647ac23cd22d69a97beeb1"
+  }
+}

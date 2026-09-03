@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "projectId": "proj_1786367903885_iu08e4",
+  "updatedAt": 1786455245348,
+  "state": {
+    "viewport": {
+      "x": 433.029452690167,
+      "y": 44.05000000000001,
+      "zoom": 0.24517625231910944
+    },
+    "pages": {
+      "quiet-studio_q7m4": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 3155,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x667"
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

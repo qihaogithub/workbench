@@ -1,0 +1,29 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "video-page_p3v9",
+      "name": "视频演示页面",
+      "runtimeType": "high-fidelity-react",
+      "order": 1,
+      "parentId": null,
+      "routeKey": "page"
+    },
+    {
+      "id": "page_sbpw",
+      "name": "视频演示页面",
+      "routeKey": "page-2",
+      "order": 2,
+      "parentId": null,
+      "runtimeType": "high-fidelity-react"
+    },
+    {
+      "id": "kids-edu_xk19",
+      "name": "kids edu",
+      "routeKey": "kids-edu",
+      "order": 3,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "id": "commit_1786514264878_bs9aht",
+  "projectId": "proj_1785742777589_ncs6r6",
+  "parentCommitId": "commit_1786013163853_08bfcw",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "持续编辑自动记录HTML原型页配置示例",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "config-demo_m7p2",
+      "versionId": "prv_1785911067911_1veoni"
+    },
+    {
+      "kind": "page",
+      "resourceId": "motion-formats_k4r2",
+      "versionId": "prv_1786013163818_4sx4gb"
+    },
+    {
+      "kind": "page",
+      "resourceId": "prototype-config_b3k9",
+      "versionId": "prv_1786514264870_3gwsm8"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "prototype-config_b3k9",
+      "toVersionId": "prv_1786514264870_3gwsm8"
+    }
+  ],
+  "createdAt": 1786514264878,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785832228941-ay0onrwn3",
+    "workspaceRevision": 121,
+    "workspaceRootHash": "175711e3941f718e17711385930dd0f818a5a40471c3d14d9b2c40f46c7bcf49"
+  }
+}

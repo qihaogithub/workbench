@@ -1,0 +1,74 @@
+import React from 'react';
+
+interface DemoProps {}
+
+const SUBJECTS = [
+  { key: 'reading', label: '阅读', color: '#4f8ef7' },
+  { key: 'thinking', label: '思维', color: '#8b5cf6' },
+  { key: 'aesthetic', label: '美育', color: '#f472b6' },
+  { key: 'english', label: '英语', color: '#10b981' },
+  { key: 'writer', label: '小作家', color: '#f59e0b' },
+];
+
+function cap(key: string) {
+  return key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+export default function MobileHeaderPreview(props: DemoProps) {
+  const p = props as Record<string, unknown>;
+  const subject = (p.activeSubject as string) || 'reading';
+
+  const current = SUBJECTS.find((s) => s.key === subject) || SUBJECTS[0];
+  const bg = (p[`headerBg${cap(current.key)}`] as string) || '';
+
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[#eef1f6] px-4 py-6">
+      {/* 手机模型 */}
+      <div className="w-[300px] rounded-[38px] border-[6px] border-slate-800 bg-white shadow-xl">
+        {/* 状态栏 + 刘海 */}
+        <div className="relative flex h-8 items-center justify-center rounded-t-[32px] bg-slate-800">
+          <div className="h-2 w-20 rounded-full bg-slate-700" />
+        </div>
+
+        {/* 头图区域 */}
+        <div className="relative mx-1.5 mt-1.5 aspect-[750/540] overflow-hidden rounded-2xl">
+          {bg ? (
+            <img src={bg} alt={`${current.label}手机头图`} className="h-full w-full object-cover" />
+          ) : (
+            <div
+              className="flex h-full w-full flex-col items-center justify-center gap-2"
+              style={{ background: `linear-gradient(135deg, ${current.color}2e, ${current.color}12)` }}
+            >
+              <div
+                className="flex h-9 w-9 items-center justify-center rounded-full text-base font-bold"
+                style={{ backgroundColor: `${current.color}26`, color: current.color }}
+              >
+                {current.label.charAt(0)}
+              </div>
+              <p className="text-xs" style={{ color: current.color }}>
+                未上传头图
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* 模拟页面内容 */}
+        <div className="flex flex-col gap-2 px-4 py-4">
+          <div className="h-3 w-3/5 rounded bg-slate-200" />
+          <div className="h-2 w-full rounded bg-slate-100" />
+          <div className="h-2 w-4/5 rounded bg-slate-100" />
+          <div className="mt-1 grid grid-cols-3 gap-1.5">
+            <div className="h-16 rounded-lg bg-slate-100" />
+            <div className="h-16 rounded-lg bg-slate-100" />
+            <div className="h-16 rounded-lg bg-slate-100" />
+          </div>
+        </div>
+      </div>
+
+      {/* 底部提示 */}
+      <p className="mt-5 max-w-[280px] text-center text-[11px] leading-relaxed text-slate-500">
+        在右侧配置面板切换「当前科目」，并上传对应科目的手机头图，即可实时预览效果
+      </p>
+    </div>
+  );
+}

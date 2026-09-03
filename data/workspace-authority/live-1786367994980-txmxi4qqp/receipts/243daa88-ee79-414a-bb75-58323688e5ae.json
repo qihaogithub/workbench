@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "243daa88-ee79-414a-bb75-58323688e5ae",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786367994980-txmxi4qqp",
+  "baseRevision": 0,
+  "revision": 145,
+  "rootHash": "dcc8d19b97f2a53a29058c4f819104df077c2de91d5a6feeb3035a906b304420",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/sunny-reading_k4m8/index.tsx",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "24b46268999c42c5b510e8514b8ecc5cbdff04dbf20100a88717a19348b07d36"
+    }
+  ],
+  "committedAt": 1786501078692
+}

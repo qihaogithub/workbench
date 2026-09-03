@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>阅读·头图预览</title>
+  <link rel="stylesheet" href="prototype.css" />
+</head>
+<body>
+  <div class="page-wrapper">
+    <!-- 页面标题 -->
+    <h1 class="page-title">阅读·头图预览</h1>
+
+    <!-- 双端预览容器 -->
+    <div class="preview-row">
+
+      <!-- ===== 手机预览 ===== -->
+      <div class="device-col">
+        <span class="device-label">📱 手机预览</span>
+        <div class="phone-frame">
+          <div class="phone-screen">
+
+            <!-- 状态栏 -->
+            <div class="phone-status-bar">
+              <span class="status-time">9:41</span>
+              <span class="status-icons">
+                <span class="icon-signal">●●●●</span>
+                <span class="icon-wifi">WiFi</span>
+                <span class="icon-battery">▮▮▮</span>
+              </span>
+            </div>
+
+            <!-- 头图区域 270px -->
+            <div class="phone-header-area">
+              <!-- 占位提示（图片未上传时可见） -->
+              <div class="header-placeholder">
+                <div class="placeholder-inner">
+                  <span class="placeholder-icon">🖼️</span>
+                  <span class="placeholder-text">上传头部背景</span>
+                </div>
+              </div>
+              <!-- 头图 -->
+              <img
+                class="header-bg-img"
+                data-bind-src="headerBgReading"
+                alt="手机头部背景图"
+              />
+              <!-- 头图上层渐变遮罩 + 标题 -->
+              <div class="phone-header-overlay">
+                <span class="phone-header-title">阅读</span>
+              </div>
+            </div>
+
+            <!-- 模拟内容区 -->
+            <div class="phone-content">
+              <!-- 分类标签 -->
+              <div class="content-tabs">
+                <span class="tab active">推荐</span>
+                <span class="tab">小说</span>
+                <span class="tab">社科</span>
+                <span class="tab">历史</span>
+                <span class="tab">经管</span>
+              </div>
+              <!-- 书籍列表 -->
+              <div class="book-list">
+                <div class="book-card">
+                  <div class="book-cover" style="background:#E8D5B7;"></div>
+                  <div class="book-info">
+                    <span class="book-title">长安的荔枝</span>
+                    <span class="book-author">马伯庸</span>
+                  </div>
+                </div>
+                <div class="book-card">
+                  <div class="book-cover" style="background:#D4C5B9;"></div>
+                  <div class="book-info">
+                    <span class="book-title">三体</span>
+                    <span class="book-author">刘慈欣</span>
+                  </div>
+                </div>
+                <div class="book-card">
+                  <div class="book-cover" style="background:#C9B99A;"></div>
+                  <div class="book-info">
+                    <span class="book-title">活着</span>
+                    <span class="book-author">余华</span>
+                  </div>
+                </div>
+                <div class="book-card">
+                  <div class="book-cover" style="background:#B8A78E;"></div>
+                  <div class="book-info">
+                    <span class="book-title">围城</span>
+                    <span class="book-author">钱锺书</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Pad 预览 ===== -->
+      <div class="device-col">
+        <span class="device-label">📋 Pad 预览</span>
+        <div class="pad-frame">
+          <div class="pad-screen">
+
+            <!-- 第一层：底层 UI（阅读主界面） -->
+            <div class="pad-base-ui">
+              <!-- 左侧栏 -->
+              <div class="pad-sidebar">
+                <div class="sidebar-item active">
+                  <span class="sidebar-icon">📚</span>
+                  <span>书架</span>
+                </div>
+                <div class="sidebar-item">
+                  <span class="sidebar-icon">🔍</span>
+                  <span>发现</span>
+                </div>
+                <div class="sidebar-item">
+                  <span class="sidebar-icon">📖</span>
+                  <span>书单</span>
+                </div>
+                <div class="sidebar-item">
+                  <span class="sidebar-icon">👤</span>
+                  <span>我的</span>
+                </div>
+              </div>
+              <!-- 主内容区 -->
+              <div class="pad-main">
+                <div class="pad-content-header">
+                  <span class="pad-section-title">今日推荐</span>
+                </div>
+                <div class="pad-book-grid">
+                  <div class="pad-book-item">
+                    <div class="pad-book-cover" style="background:#E8D5B7;"></div>
+                    <span class="pad-book-name">长安的荔枝</span>
+                  </div>
+                  <div class="pad-book-item">
+                    <div class="pad-book-cover" style="background:#D4C5B9;"></div>
+                    <span class="pad-book-name">三体</span>
+                  </div>
+                  <div class="pad-book-item">
+                    <div class="pad-book-cover" style="background:#C9B99A;"></div>
+                    <span class="pad-book-name">活着</span>
+                  </div>
+                  <div class="pad-book-item">
+                    <div class="pad-book-cover" style="background:#B8A78E;"></div>
+                    <span class="pad-book-name">围城</span>
+                  </div>
+                  <div class="pad-book-item">
+                    <div class="pad-book-cover" style="background:#D9C8A8;"></div>
+                    <span class="pad-book-name">百年孤独</span>
+                  </div>
+                  <div class="pad-book-item">
+                    <div class="pad-book-cover" style="background:#C4B49A;"></div>
+                    <span class="pad-book-name">红楼梦</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 第二层：头图 -->
+            <div class="pad-header-layer">
+              <div class="header-placeholder pad-placeholder">
+                <div class="placeholder-inner">
+                  <span class="placeholder-icon">🖼️</span>
+                  <span class="placeholder-text">上传头部背景</span>
+                </div>
+              </div>
+              <img
+                class="header-bg-img"
+                data-bind-src="padHeaderBgReading"
+                alt="Pad 头部背景图"
+              />
+              <div class="pad-header-gradient"></div>
+            </div>
+
+            <!-- 第三层：上层 UI 覆盖 -->
+            <div class="pad-top-ui">
+              <div class="pad-status-row">
+                <span class="pad-time">9:41</span>
+                <span class="pad-icons">WiFi · ▮▮▮</span>
+              </div>
+              <div class="pad-nav-row">
+                <button class="pad-back-btn">← 返回</button>
+                <span class="pad-nav-title">阅读</span>
+                <button class="pad-action-btn">🔍</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</body>
+</html>

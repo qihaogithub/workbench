@@ -1,0 +1,53 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "page_da9l",
+      "name": "排行榜",
+      "routeKey": "page-2",
+      "order": 1,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "page_g5wy",
+      "name": "完读任务",
+      "routeKey": "page-3",
+      "order": 2,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "page_j2zv",
+      "name": "完读任务-已完成",
+      "routeKey": "page-4",
+      "order": 3,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "page_15oa",
+      "name": "闯关活动",
+      "routeKey": "page",
+      "order": 4,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "page_13po",
+      "name": "闯关活动",
+      "routeKey": "page-5",
+      "order": 5,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "figma_jthz",
+      "name": "从Figma导入的页面",
+      "routeKey": "figma",
+      "order": 6,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    }
+  ]
+}

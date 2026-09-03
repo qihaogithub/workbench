@@ -1,0 +1,46 @@
+{
+  "id": "commit_1785205299315_4shguz",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "parentCommitId": "commit_1785203239482_5amwqb",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "打开历史前记录闯关活动",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "page_da9l",
+      "versionId": "prv_1785138185736_z29n0k"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_gfbs",
+      "versionId": "prv_1785136734038_5bt9sp"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_pqyt",
+      "versionId": "prv_1785205299313_c3158x"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_yw72",
+      "versionId": "prv_1785202917458_dt0dg5"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "page_pqyt",
+      "fromVersionId": "prv_1785203239478_6y8top",
+      "toVersionId": "prv_1785205299313_c3158x"
+    }
+  ],
+  "createdAt": 1785205299315,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785135808672-fhbugbqns",
+    "workspaceRevision": 138,
+    "workspaceRootHash": "6c6b0ae3ee565083395b73896fef9191ff255aede6cdffd18b27ef97a5db0a55"
+  }
+}

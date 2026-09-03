@@ -1,0 +1,143 @@
+{
+  "id": "proj_1785984571939_9uj8av",
+  "name": "伴读首页",
+  "publishedVersion": "v10",
+  "commitId": "commit_1787191739760_c8v32s",
+  "publishedAt": 1787191739760,
+  "demoPages": [
+    {
+      "id": "pad_s5xn",
+      "name": "pad",
+      "routeKey": "pad-2",
+      "order": 2,
+      "parentId": null,
+      "runtimeType": "prototype-html-css",
+      "schemaPath": "demos/pad_s5xn/schema.json",
+      "previewSize": {
+        "width": 860,
+        "height": 968
+      },
+      "screenshotPath": "screenshots/pad_s5xn.png",
+      "prototypeHtml": "<!DOCTYPE html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Figma Export</title>\n  <style>\n    /* Reset default margins */\n    * {\n      margin: 0;\n      padding: 0;\n      box-sizing: border-box;\n    }\n    \n    body {\n      min-height: 100vh;\n      display: flex;\n      justify-content: center;\n      align-items: flex-start;\n      padding: 20px;\n      background-color: #f5f5f5;\n    }\n    \n    /* Figma export container */\n    .figma-export {\n      background: white;\n      width: 860px;\n      height: 968px;\n      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);\n    }\n  </style>\n</head>\n<body>\n  <div class=\"figma-export\">\n<div data-layer=\"pad\" class=\"Pad\" style=\"width: 860px; height: 968px; position: relative; background: white; overflow: hidden\">\n  <div data-layer=\"主推区\" style=\"width: 860px; height: 413px; left: 0px; top: 0px; position: absolute; overflow: hidden\">\n    <img data-layer=\"pad背景图\" class=\"Pad\" style=\"width: 1366px; height: 413px; left: -253px; top: 0px; position: absolute\" src=\"/data/proj_1785984571939_9uj8av/assets/images/80ad58ef03b3576eda8d8c8a.png\" data-bind-src=\"padBackground\" />\n    <div data-layer=\"Rectangle\" class=\"Rectangle\" style=\"width: 1133px; height: 413px; left: -137px; top: 0px; position: absolute; opacity: 0; background: #249699\"></div>\n    <img src=\"/data/proj_1785984571939_9uj8av/assets/images/85b4fa10cc4edcde4e834a7e.svg\" alt=\"vector\" data-layer=\"Vector\" class=\"Vector\" style=\"left: -1px; top: 393px; position: absolute; width: 861px; height: 20px; object-fit: contain\" data-figma-id=\"417:20437\" />\n    <div data-layer=\"Auto Layout Horizontal\" class=\"AutoLayoutHorizontal\" style=\"width: 860px; height: 250px; left: -1px; top: 118px; position: absolute; justify-content: center; align-items: flex-end; gap: 14px; display: inline-flex\">\n      <img src=\"/data/proj_1785984571939_9uj8av/assets/images/99032792b42093e840912c2f.png\" alt=\"static layer\" data-layer=\"#static 01\" class=\"Static01\" style=\"position: relative; width: 560px; height: 200px; object-fit: cover\" data-figma-id=\"417:20439\" />\n      <img src=\"/data/proj_1785984571939_9uj8av/assets/images/3c22c329e0935298eafc2c2c.png\" alt=\"static layer\" data-layer=\"#static pad前景图\" class=\"StaticPad\" style=\"position: relative; width: 700px; height: 275px; object-fit: cover\" data-figma-id=\"428:18200\" data-bind-src=\"padForeground\" />\n      <img src=\"/data/proj_1785984571939_9uj8av/assets/images/ce11a16743f7b3cf6a76692d.png\" alt=\"static layer\" data-layer=\"#static 03\" class=\"Static03\" style=\"position: relative; width: 560px; height: 200px; object-fit: cover\" data-figma-id=\"417:20442\" />\n      <div data-layer=\"分页指示器\" data-property-1=\"1\" style=\"flex-shrink: 0; padding: 9.54px; left: 401px; top: 248px; position: absolute; border-top-left-radius: 14.31px; justify-content: flex-start; align-items: flex-start; gap: 4.77px; display: flex\">\n        <div data-layer=\"Rectangle\" class=\"Rectangle\" style=\"width: 16.69px; height: 7.15px; flex-shrink: 0; position: relative; background: white; border-radius: 85.83px; outline: 1.19px rgba(0, 0, 0, 0.10) solid\"></div>\n        <div data-layer=\"Ellipse\" class=\"Ellipse\" style=\"width: 7.15px; height: 7.15px; flex-shrink: 0; position: relative; background: rgba(255, 255, 255, 0.50); border-radius: 9999px; outline: 1.19px rgba(0, 0, 0, 0.10) solid\"></div>\n        <div data-layer=\"Ellipse\" class=\"Ellipse\" style=\"width: 7.15px; height: 7.15px; flex-shrink: 0; position: relative; background: rgba(255, 255, 255, 0.50); border-radius: 9999px; outline: 1.19px rgba(0, 0, 0, 0.10) solid\"></div>\n      </div>\n    </div>\n  </div>\n  <img src=\"/data/proj_1785984571939_9uj8av/assets/images/f6bbfd2e1a7a48275bef2e2c.png\" alt=\"static layer\" data-layer=\"#static 头部固定\" class=\"Static\" style=\"left: 0px; top: 0px; position: absolute; width: 860px; height: 112px; object-fit: cover\" data-figma-id=\"417:13655\" />\n  <div data-layer=\"信息流\" style=\"width: 860px; left: 0px; top: 413px; position: absolute; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 16px; display: inline-flex\">\n    <div data-layer=\"Auto Layout Vertical\" class=\"AutoLayoutVertical\" style=\"align-self: stretch; flex-shrink: 0; padding-left: 40px; padding-right: 40px; position: relative; justify-content: space-between; align-items: flex-start; display: inline-flex\">\n      <img src=\"/data/proj_1785984571939_9uj8av/assets/images/a76628abb412a3494b7d1972.png\" alt=\"static layer\" data-layer=\"#static 金刚位\" class=\"Static\" style=\"position: relative; width: 100px; height: 108px; object-fit: cover\" data-figma-id=\"417:13660\" />\n      <img src=\"/data/proj_1785984571939_9uj8av/assets/images/ef27fb3a27cf8e0e96faab09.png\" alt=\"static layer\" data-layer=\"#static 金刚位\" class=\"Static\" style=\"position: relative; width: 100px; height: 108px; object-fit: cover\" data-figma-id=\"417:13661\" />\n      <img src=\"/data/proj_1785984571939_9uj8av/assets/images/f136baac346e3798fc493285.png\" alt=\"static layer\" data-layer=\"#static 金刚位\" class=\"Static\" style=\"position: relative; width: 100px; height: 108px; object-fit: cover\" data-figma-id=\"417:13662\" />\n      <img src=\"/data/proj_1785984571939_9uj8av/assets/images/c775b5502740c3110001ff13.png\" alt=\"static layer\" data-layer=\"#static 金刚位\" class=\"Static\" style=\"position: relative; width: 100px; height: 108px; object-fit: cover\" data-figma-id=\"417:13663\" />\n      <img src=\"/data/proj_1785984571939_9uj8av/assets/images/228f5f857ef0e47e3fda1178.png\" alt=\"static layer\" data-layer=\"#static 金刚位\" class=\"Static\" style=\"position: relative; width: 100px; height: 108px; object-fit: cover\" data-figma-id=\"417:13664\" />\n      <img src=\"/data/proj_1785984571939_9uj8av/assets/images/9f9b043decdc93c47eb0f0e6.png\" alt=\"static layer\" data-layer=\"#static 金刚位\" class=\"Static\" style=\"position: relative; width: 100px; height: 108px; object-fit: cover\" data-figma-id=\"417:13665\" />\n      <img src=\"/data/proj_1785984571939_9uj8av/assets/images/bc3ab86e73653cead9871f17.png\" alt=\"static layer\" data-layer=\"#static 金刚位\" class=\"Static\" style=\"position: relative; width: 100px; height: 108px; object-fit: cover\" data-figma-id=\"417:13666\" />\n      <img src=\"/data/proj_1785984571939_9uj8av/assets/images/50dc83c5af64f50c944defaf.png\" alt=\"static layer\" data-layer=\"#static 金刚位\" class=\"Static\" style=\"position: relative; width: 100px; height: 108px; object-fit: cover\" data-figma-id=\"417:13667\" />\n    </div>\n    <div data-layer=\"Frame 3466321\" class=\"Frame3466321\" style=\"align-self: stretch; flex-shrink: 0; padding-left: 40px; position: relative; justify-content: flex-start; align-items: flex-start; gap: 16px; display: inline-flex\">\n      <img src=\"/data/proj_1785984571939_9uj8av/assets/images/bb8912d9c03a7b3ee050415e.png\" alt=\"static layer\" data-layer=\"#static 最近在看\" class=\"Static\" style=\"position: relative; width: 402px; height: 140px; object-fit: cover\" data-figma-id=\"417:13669\" />\n      <img src=\"/data/proj_1785984571939_9uj8av/assets/images/c87e88c8c0490ceca24912e5.png\" alt=\"static layer\" data-layer=\"#static 我的专属\" data-property-1=\"2\" class=\"Static\" style=\"position: relative; width: 402px; height: 140px; object-fit: cover\" data-figma-id=\"417:13672\" />\n    </div>\n    <div data-layer=\"配图卡片-单卡片\" style=\"align-self: stretch; flex-shrink: 0; position: relative; flex-direction: column; justify-content: flex-start; align-items: flex-start; display: flex\">\n      <div data-layer=\"导航/模块标题\" style=\"align-self: stretch; height: 46px; flex-shrink: 0; padding-left: 40px; padding-right: 40px; padding-top: 8px; padding-bottom: 8px; position: relative; justify-content: space-between; align-items: center; display: inline-flex\">\n        <div data-layer=\"标题\" style=\"flex-shrink: 0; position: relative; justify-content: flex-start; align-items: center; gap: 8px; display: flex\">\n          <div data-layer=\"Auto Layout Horizontal\" class=\"AutoLayoutHorizontal\" style=\"flex-shrink: 0; position: relative; justify-content: flex-start; align-items: center; gap: 4px; display: flex\">\n            <div data-layer=\"icon\" class=\"Icon\" style=\"width: 28px; height: 28px; flex-shrink: 0; position: relative; overflow: hidden\">\n              <img src=\"/data/proj_1785984571939_9uj8av/assets/images/671dd26d74ba276879867055.svg\" alt=\"vector\" data-layer=\"􀤟\" style=\"left: 5.76px; top: 4.10px; position: absolute; width: 16px; height: 20px; object-fit: contain\" data-figma-id=\"428:18237\" />\n            </div>\n            <div data-layer=\"配图卡片-单卡片\" style=\"flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #DBAF00; font-size: 20px; font-family: PingFang SC; font-weight: 500; line-height: 30px; white-space: nowrap\">配图卡片-单卡片</div>\n          </div>\n        </div>\n        <div data-layer=\"按钮\" style=\"height: 26px; flex-shrink: 0; padding-left: 12px; position: relative; background: white; box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 0px 2px rgba(0, 0, 0, 0.06) inset; border-radius: 999px; justify-content: flex-end; align-items: center; display: flex\">\n          <div data-layer=\"更多\" style=\"flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #DBAF00; font-size: 14px; font-family: PingFang SC; font-weight: 400; white-space: nowrap\">更多</div>\n          <div data-layer=\"Frame\" class=\"Frame\" style=\"width: 20px; height: 20px; flex-shrink: 0; position: relative; transform: rotate(180deg); transform-origin: top left\">\n            <img src=\"/data/proj_1785984571939_9uj8av/assets/images/ad0915f870b70f6ad619d270.svg\" alt=\"vector\" data-layer=\"Vector\" class=\"Vector\" style=\"left: 4.52px; top: 3.64px; position: absolute; width: 10px; height: 8px; object-fit: contain\" data-figma-id=\"428:18236\" />\n          </div>\n        </div>\n      </div>\n      <div data-layer=\"Frame 48095927\" class=\"Frame48095927\" style=\"align-self: stretch; flex-shrink: 0; padding-left: 40px; padding-right: 40px; position: relative; overflow: hidden; border-radius: 10px; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 10px; display: flex\">\n        <div data-layer=\"Frame 48095931\" class=\"Frame48095931\" style=\"align-self: stretch; height: 139.70px; flex-shrink: 0; position: relative; overflow: hidden; border-radius: 10px\">\n          <img data-layer=\"一行1卡-pad 1\" class=\"1Pad1\" style=\"width: 780px; height: 139.70px; left: 0px; top: 0px; position: absolute\" src=\"/data/proj_1785984571939_9uj8av/assets/images/9f4a7076e6c5ed94ddfb8765.png\" data-bind-src=\"adImage\" />\n        </div>\n      </div>\n    </div>\n  </div>\n  <img src=\"/data/proj_1785984571939_9uj8av/assets/images/4fb4fc92249f3e8df6f39927.png\" alt=\"static layer\" data-layer=\"#static 吸底标签栏\" data-设备=\"pad\" data-选中tab=\"伴读\" class=\"Static\" style=\"left: 0px; top: 906px; position: absolute; width: 860px; height: 62px; object-fit: cover\" data-figma-id=\"417:13680\" />\n</div>\n  </div>\n</body>\n</html>",
+      "prototypeCss": "",
+      "prototypeMeta": {
+        "width": 860,
+        "height": 968,
+        "generatedBy": "figma-import"
+      },
+      "prototypeHtmlPath": "demos/pad_s5xn/prototype.html",
+      "prototypeCssPath": "demos/pad_s5xn/prototype.css",
+      "prototypeMetaPath": "demos/pad_s5xn/prototype.meta.json"
+    },
+    {
+      "id": "page_0it3",
+      "name": "手机",
+      "routeKey": "page-2",
+      "order": 3,
+      "parentId": null,
+      "runtimeType": "prototype-html-css",
+      "schemaPath": "demos/page_0it3/schema.json",
+      "previewSize": {
+        "width": 375,
+        "height": 812
+      },
+      "screenshotPath": "screenshots/page_0it3.png",
+      "prototypeHtml": "<!DOCTYPE html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Figma Export</title>\n  <style>\n    /* Reset default margins */\n    * {\n      margin: 0;\n      padding: 0;\n      box-sizing: border-box;\n    }\n    \n    body {\n      min-height: 100vh;\n      display: flex;\n      justify-content: center;\n      align-items: flex-start;\n      padding: 20px;\n      background-color: #f5f5f5;\n    }\n    \n    /* Figma export container */\n    .figma-export {\n      background: white;\n      width: 375px;\n      height: 812px;\n      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);\n      overflow: hidden;\n      position: relative;\n    }\n    \n    /* 可滚动内容区域 */\n    .scrollable-content {\n      width: 375px;\n      height: 812px;\n      overflow-y: auto;\n      overflow-x: hidden;\n      padding-bottom: 90px;\n      -webkit-overflow-scrolling: touch;\n    }\n    \n    /* 隐藏滚动条 */\n    .scrollable-content::-webkit-scrollbar {\n      display: none;\n    }\n    \n    /* 吸底标签栏 */\n    .bottom-tab-bar {\n      position: absolute;\n      bottom: 0;\n      left: 0;\n      width: 375px;\n      height: 90px;\n      z-index: 100;\n    }\n    \n    /* 头部固定 */\n    .fixed-header {\n      position: absolute;\n      top: 0;\n      left: 0;\n      width: 375px;\n      height: 132px;\n      z-index: 100;\n    }\n  </style>\n</head>\n<body>\n  <div class=\"figma-export\">\n<div data-layer=\"手机\" style=\"width: 375px; height: 812px; position: relative; background: white; overflow: hidden\">\n  <!-- 可滚动内容区域 -->\n  <div class=\"scrollable-content\">\n    <div data-layer=\"主推区\" style=\"width: 375px; height: 380px; position: relative\">\n      <img src=\"/data/proj_1785984571939_9uj8av/assets/images/1237fc3be4d60ec535152836.png\" alt=\"static layer\" data-layer=\"#static 手机背景图\" data-property-1=\"#static 手机背景图\" class=\"Static\" style=\"left: 0px; top: 0px; position: absolute; width: 375px; height: 380px; object-fit: cover\" data-figma-id=\"417:21331\" data-bind-src=\"phoneBackground\">\n      <img src=\"/data/proj_1785984571939_9uj8av/assets/images/6c89aa390874fce8820cdc37.png\" alt=\"static layer\" data-layer=\"#static 手机前景图\" data-property-1=\"#static 手机前景图\" class=\"Static\" style=\"left: 17.50px; top: 144px; position: absolute; width: 340px; height: 190px; object-fit: cover\" data-figma-id=\"417:21326\" data-bind-src=\"phoneForeground\">\n      <div data-layer=\"Rectangle\" class=\"Rectangle\" style=\"width: 375px; height: 24px; left: 0px; top: 356px; position: absolute; background: white; border-top-left-radius: 24px; border-top-right-radius: 24px\"></div>\n    </div>\n    <div data-layer=\"信息流\" style=\"width: 375px; position: relative; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 16px; display: inline-flex\">\n      <div data-layer=\"3-6岁\" class=\"6\" style=\"align-self: stretch; flex-shrink: 0; padding-left: 20px; padding-right: 20px; position: relative; background: white; border-radius: 20px; flex-direction: column; justify-content: flex-start; align-items: center; gap: 8px; display: flex\">\n        <div data-layer=\"Auto Layout Horizontal\" class=\"AutoLayoutHorizontal\" style=\"flex-shrink: 0; position: relative; justify-content: flex-start; align-items: flex-start; gap: 14px; display: inline-flex\">\n          <img src=\"/data/proj_1785984571939_9uj8av/assets/images/6e45f89d65c8bbdbda51981a.png\" alt=\"static layer\" data-layer=\"#static 金刚位\" class=\"Static\" style=\"position: relative; width: 78px; height: 84px; object-fit: cover\" data-figma-id=\"417:26365\" />\n          <img src=\"/data/proj_1785984571939_9uj8av/assets/images/cea04075f6b4e48b23653fdd.png\" alt=\"static layer\" data-layer=\"#static 金刚位\" class=\"Static\" style=\"position: relative; width: 78px; height: 84px; object-fit: cover\" data-figma-id=\"417:26368\" />\n          <img src=\"/data/proj_1785984571939_9uj8av/assets/images/a803e55516aa4352e11250ba.png\" alt=\"static layer\" data-layer=\"#static 金刚位\" class=\"Static\" style=\"position: relative; width: 78px; height: 84px; object-fit: cover\" data-figma-id=\"417:26369\" />\n          <img src=\"/data/proj_1785984571939_9uj8av/assets/images/1cdb0041a386e3645a4574dd.png\" alt=\"static layer\" data-layer=\"#static 金刚位\" class=\"Static\" style=\"position: relative; width: 78px; height: 84px; object-fit: cover\" data-figma-id=\"417:26370\" />\n        </div>\n        <div data-layer=\"Auto Layout Horizontal\" class=\"AutoLayoutHorizontal\" style=\"flex-shrink: 0; position: relative; justify-content: flex-start; align-items: flex-start; gap: 14px; display: inline-flex\">\n          <img src=\"/data/proj_1785984571939_9uj8av/assets/images/993b09190564e69d55c6bedd.png\" alt=\"static layer\" data-layer=\"#static 金刚位\" class=\"Static\" style=\"position: relative; width: 78px; height: 84px; object-fit: cover\" data-figma-id=\"417:26372\" />\n          <img src=\"/data/proj_1785984571939_9uj8av/assets/images/3808011f19c35456be04cd86.png\" alt=\"static layer\" data-layer=\"#static 金刚位\" class=\"Static\" style=\"position: relative; width: 78px; height: 84px; object-fit: cover\" data-figma-id=\"417:26373\" />\n          <img src=\"/data/proj_1785984571939_9uj8av/assets/images/4301f1928e0abaa54ea98792.png\" alt=\"static layer\" data-layer=\"#static 金刚位\" class=\"Static\" style=\"position: relative; width: 78px; height: 84px; object-fit: cover\" data-figma-id=\"417:26374\" />\n          <img src=\"/data/proj_1785984571939_9uj8av/assets/images/07450ed6d41b601cbea531a2.png\" alt=\"static layer\" data-layer=\"#static 金刚位\" class=\"Static\" style=\"position: relative; width: 78px; height: 84px; object-fit: cover\" data-figma-id=\"417:26375\" />\n        </div>\n      </div>\n      <img src=\"/data/proj_1785984571939_9uj8av/assets/images/2ffd5411c194cbef3506791f.png\" alt=\"static layer\" data-layer=\"#static 最近在看\" class=\"Static\" style=\"position: relative; width: 375px; height: 132px; object-fit: cover\" data-figma-id=\"428:14400\" />\n      <div data-layer=\"配图卡片-单卡片\" style=\"align-self: stretch; flex-shrink: 0; position: relative; flex-direction: column; justify-content: flex-start; align-items: center; display: flex\">\n        <div data-layer=\"Frame 3466298\" class=\"Frame3466298\" style=\"align-self: stretch; flex-shrink: 0; position: relative; flex-direction: column; justify-content: flex-start; align-items: flex-start; display: flex\">\n          <div data-layer=\"导航/模块标题\" data-pad=\"off\" data-show-辅助文案=\"false\" data-更多按钮=\"true\" style=\"width: 375px; flex-shrink: 0; padding-left: 20px; padding-right: 20px; padding-top: 8px; padding-bottom: 8px; position: relative; justify-content: space-between; align-items: center; display: inline-flex\">\n            <div data-layer=\"标题\" style=\"flex-grow: 1; flex-basis: 0px; min-width: 0px; position: relative; justify-content: flex-start; align-items: center; gap: 4px; display: flex\">\n              <div data-layer=\"配图\" style=\"width: 28px; height: 28px; flex-shrink: 0; position: relative; overflow: hidden\">\n                <div data-layer=\"􀤟\" style=\"width: 28px; left: 0px; top: 0px; position: absolute; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #DBAF00; font-size: 19px; font-family: SF Pro; font-weight: 700; line-height: 28.50px; word-wrap: break-word\">􀤟</div>\n              </div>\n              <div data-layer=\"文字\" style=\"flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #DBAF00; font-size: 18px; font-family: PingFang SC; font-weight: 500; line-height: 27px; white-space: nowrap\">配图卡片-单卡片</div>\n            </div>\n            <div data-layer=\"按钮\" style=\"height: 26px; flex-shrink: 0; padding-left: 12px; position: relative; background: white; box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 0px 2px rgba(0, 0, 0, 0.06) inset; border-radius: 999px; justify-content: flex-end; align-items: center; display: flex\">\n              <div data-layer=\"更多\" style=\"flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #DBAF00; font-size: 14px; font-family: PingFang SC; font-weight: 400; white-space: nowrap\">更多</div>\n              <div data-layer=\"Frame\" class=\"Frame\" style=\"width: 20px; height: 20px; flex-shrink: 0; position: relative; transform: rotate(180deg); transform-origin: top left\">\n                <img src=\"/data/proj_1785984571939_9uj8av/assets/images/ad0915f870b70f6ad619d270.svg\" alt=\"vector\" data-layer=\"Vector\" class=\"Vector\" style=\"left: 4.52px; top: 3.64px; position: absolute; width: 10px; height: 8px; object-fit: contain\" data-figma-id=\"I417:26380;12104:86932\" />\n              </div>\n            </div>\n          </div>\n        </div>\n        <div data-layer=\"一行一个\" style=\"width: 344px; height: 180px; flex-shrink: 0; position: relative; overflow: hidden; border-radius: 10px\">\n          <img data-layer=\"未命名项目-图层 1 (1) 1\" class=\"111\" style=\"width: 344px; height: 180px; left: -0.50px; top: 0px; position: absolute\" src=\"/data/proj_1785984571939_9uj8av/assets/images/d2319a065e01ba7510f539c3.png\" data-bind-src=\"adImage\" />\n        </div>\n      </div>\n    </div>\n  </div>\n  <!-- 吸底标签栏 -->\n  <div class=\"bottom-tab-bar\">\n    <img src=\"/data/proj_1785984571939_9uj8av/assets/images/ac04bf0653a7c8cb9e0fbc77.png\" alt=\"static layer\" data-layer=\"#static 吸底标签栏\" class=\"Static\" style=\"width: 375px; height: 90px; object-fit: cover\" data-figma-id=\"417:23036\" />\n  </div>\n  <!-- 头部固定 -->\n  <div class=\"fixed-header\">\n    <img src=\"/data/proj_1785984571939_9uj8av/assets/images/a76ef54db7f0c237aab93148.png\" alt=\"static layer\" data-layer=\"#static 头部固定\" class=\"Static\" style=\"width: 375px; height: 132px; object-fit: cover\" data-figma-id=\"417:13621\" />\n  </div>\n</div>\n  </div>\n</body>\n</html>",
+      "prototypeCss": "",
+      "prototypeMeta": {
+        "width": 375,
+        "height": 1065,
+        "generatedBy": "figma-import"
+      },
+      "prototypeHtmlPath": "demos/page_0it3/prototype.html",
+      "prototypeCssPath": "demos/page_0it3/prototype.css",
+      "prototypeMetaPath": "demos/page_0it3/prototype.meta.json"
+    }
+  ],
+  "demoFolders": [],
+  "appGraph": {
+    "version": 1,
+    "entry": "pad-2",
+    "pages": {
+      "pad-2": {
+        "pageId": "pad_s5xn",
+        "title": "pad"
+      },
+      "page-2": {
+        "pageId": "page_0it3",
+        "title": "手机"
+      }
+    },
+    "actions": [],
+    "state": {}
+  },
+  "canvasState": {
+    "viewport": {
+      "x": -422.7029974761107,
+      "y": 187.4799928426476,
+      "zoom": 0.5061336016235655
+    },
+    "pages": {
+      "page_0it3": {
+        "x": 907.5726171955528,
+        "y": -162.3209359964326,
+        "width": 366.43195346996634,
+        "height": 1016.2379509567066,
+        "sizeMode": "custom",
+        "previewSizeKey": "375x812"
+      },
+      "pad_s5xn": {
+        "x": 1349.3841144618227,
+        "y": -162.3209359964326,
+        "width": 861.5992975986185,
+        "height": 969.800139622631,
+        "sizeMode": "custom",
+        "previewSizeKey": "860x968"
+      },
+      "page_8usi": {
+        "x": 2365.3703934939294,
+        "y": -4.513618163647607,
+        "width": 347.8091656656511,
+        "height": 753.1227800546899,
+        "zIndex": 3,
+        "sizeMode": "custom",
+        "previewSizeKey": "375x812"
+      },
+      "pad_yvnd": {
+        "x": 2733.1826079234606,
+        "y": -0.3908381089577233,
+        "width": 1133,
+        "height": 749,
+        "zIndex": 3,
+        "sizeMode": "preview",
+        "previewSizeKey": "1133x749"
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  },
+  "knowledge": [],
+  "designSpecs": [
+    {
+      "id": "ds_1786703445658_c5a49c36",
+      "title": "pad设计规范",
+      "createdAt": "2026-08-14T10:30:45.657Z",
+      "updatedAt": "2026-08-14T10:30:45.657Z"
+    }
+  ],
+  "previewRuntime": {
+    "version": "2026-06-preview-runtime-v6",
+    "source": "local",
+    "basePath": "/data/proj_1785984571939_9uj8av/preview-runtime"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1785934852297_97sdwz",
+  "at": 1785934852297,
+  "actor": {
+    "id": "local-codex",
+    "name": "local-codex",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1785934852171_oire9m",
+  "inputSummary": {
+    "name": "OneFlow介绍",
+    "category": "未分类"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1785934852171_oire9m"
+    ]
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "$demo": {
+    "previewSize": {
+      "width": 375,
+      "height": 812
+    }
+  },
+  "properties": {
+    "levelBgImage": {
+      "type": "string",
+      "format": "image",
+      "title": "关卡背景图",
+      "default": ""
+    },
+    "levelLockedImage": {
+      "type": "string",
+      "format": "image",
+      "title": "未解锁关卡图",
+      "default": ""
+    },
+    "levelUnlockedImage": {
+      "type": "string",
+      "format": "image",
+      "title": "已解锁关卡图",
+      "default": ""
+    },
+    "levelCompletedImage": {
+      "type": "string",
+      "format": "image",
+      "title": "已完成关卡图",
+      "default": ""
+    },
+    "showPathLines": {
+      "type": "boolean",
+      "title": "显示关卡连线",
+      "default": true
+    },
+    "pathLineColor": {
+      "type": "string",
+      "format": "color",
+      "title": "连线颜色",
+      "default": "#FFD700"
+    },
+    "levels": {
+      "type": "array",
+      "title": "关卡列表",
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "关卡名称",
+            "default": "关卡"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["locked", "unlocked", "completed"],
+            "enumNames": ["未解锁", "已解锁", "已完成"],
+            "title": "状态",
+            "default": "locked"
+          },
+          "posX": {
+            "type": "number",
+            "title": "位置X(%)",
+            "default": 50,
+            "minimum": 0,
+            "maximum": 100
+          },
+          "posY": {
+            "type": "number",
+            "title": "位置Y(%)",
+            "default": 50,
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": ["label", "status", "posX", "posY"]
+      },
+      "default": [
+        { "label": "第1关", "status": "completed", "posX": 15, "posY": 15 },
+        { "label": "第2关", "status": "unlocked", "posX": 45, "posY": 35 },
+        { "label": "第3关", "status": "locked", "posX": 75, "posY": 20 },
+        { "label": "第4关", "status": "locked", "posX": 25, "posY": 60 },
+        { "label": "第5关", "status": "locked", "posX": 55, "posY": 70 },
+        { "label": "第6关", "status": "locked", "posX": 80, "posY": 55 }
+      ]
+    }
+  },
+  "required": []
+}

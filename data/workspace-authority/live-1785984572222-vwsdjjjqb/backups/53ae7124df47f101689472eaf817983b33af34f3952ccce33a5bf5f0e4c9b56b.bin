@@ -1,0 +1,38 @@
+{
+  "type": "object",
+  "$demo": {
+    "previewSize": {
+      "width": 860,
+      "height": 720
+    }
+  },
+  "properties": {
+    "padForeground": {
+      "type": "string",
+      "title": "pad前景图",
+      "default": "/api/images/img_1AmDUQBPRMSeUQ",
+      "format": "image",
+      "ui:options": {
+        "category": "设计",
+        "widthOperator": "=",
+        "widthValue": 1400,
+        "heightOperator": "=",
+        "heightValue": 550
+      }
+    },
+    "padBackground": {
+      "type": "string",
+      "title": "pad背景图",
+      "default": "/api/images/img_176L1bNTbMhQfg",
+      "format": "image",
+      "ui:options": {
+        "category": "设计",
+        "widthOperator": "=",
+        "widthValue": 2732,
+        "heightOperator": "=",
+        "heightValue": 826
+      }
+    }
+  },
+  "required": []
+}

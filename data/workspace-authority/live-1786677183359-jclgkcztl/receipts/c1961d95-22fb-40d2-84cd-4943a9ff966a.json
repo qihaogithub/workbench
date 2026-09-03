@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "c1961d95-22fb-40d2-84cd-4943a9ff966a",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 238,
+  "rootHash": "a5d755e5c6fad3d531f6e58f4b46f1ad02399e076041299542ab2b06051fe744",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/clipboard-import_4702e5/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "b6b0b597e6fd5499994ca755a422da7d729f981543d44a315e5540501b657e3d"
+    },
+    {
+      "path": "demos/clipboard-import_4702e5/prototype.css",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/clipboard-import_4702e5/prototype.meta.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "c8ff789088a244de5f3aeec94c77db2c953ba0e62122a274a9bbfe2989b7ab87"
+    },
+    {
+      "path": "demos/clipboard-import_4702e5/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "fa1892b60b1893afc883d135d1fa2973a67415ecc1ba459bc6059e74de025c4f"
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "c283f38357dc6f4273ceaa68068d939ea8aea0c369027356270e20f467549c2f",
+      "afterHash": "f9c15d4f2d4bba0681f9c2e85e08f963a3ccc89d6398621861d11f9b2266c9b1"
+    }
+  ],
+  "committedAt": 1787807060225
+}

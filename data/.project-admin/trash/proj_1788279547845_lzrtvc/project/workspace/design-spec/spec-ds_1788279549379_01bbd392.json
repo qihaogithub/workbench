@@ -1,0 +1,25 @@
+{
+  "id": "ds_1788279549379_01bbd392",
+  "title": "首页设计规范",
+  "createdAt": "2026-09-01T16:19:09.379Z",
+  "updatedAt": "2026-09-01T16:19:09.379Z",
+  "entries": [
+    {
+      "id": "e_1788279549380_42d148d3",
+      "title": "主视觉图片",
+      "markdown": "",
+      "target": {
+        "type": "config",
+        "refs": [
+          {
+            "scope": "page",
+            "pageId": "page_ztds",
+            "fieldKey": "heroImage"
+          }
+        ]
+      },
+      "autoManagedFieldKey": "heroImage"
+    }
+  ],
+  "autoManagedPageId": "page_ztds"
+}

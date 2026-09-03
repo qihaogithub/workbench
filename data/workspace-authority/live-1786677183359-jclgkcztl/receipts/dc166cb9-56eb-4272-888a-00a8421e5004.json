@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "dc166cb9-56eb-4272-888a-00a8421e5004",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 672,
+  "rootHash": "fc7a6de1890b087d2d6067135fbe91454352348e79eaa6ecf5f4f0f357010713",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/halloween-prize_y3n6/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "d953bcd9c5e41101c3bd8e1e3181bc20f338e75488f4530014dfd6c8dca0b430"
+    }
+  ],
+  "committedAt": 1787892120979
+}

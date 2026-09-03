@@ -1,0 +1,115 @@
+{
+  "committed": true,
+  "mutationId": "a1fd2a9d-42b2-43f2-8c7e-851b6acc2d8a",
+  "projectId": "proj_1785687393956_aa29zz",
+  "workspaceId": "live-1785687394721-g7dafuhq4",
+  "baseRevision": 0,
+  "revision": 127,
+  "rootHash": "100b4bef3f4f6e2d78ee6bfab3c6495db4b5b5f27cbef09ff946bcaee1a1748a",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "demos/basic-fields_xa3k/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "eef5f4e6d6067b35991f557119628610279d7fd1963aea16925391d8c18b6d7d",
+      "afterHash": null
+    },
+    {
+      "path": "demos/basic-fields_xa3k/index.tsx",
+      "action": "deleted",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": null
+    },
+    {
+      "path": "demos/basic-fields_xa3k/prototype.css",
+      "action": "deleted",
+      "beforeHash": "ba34015efb0f63c6c2d0c57adb82d632ce7b63c3a7c667eb36eb6f56bef1b4dd",
+      "afterHash": null
+    },
+    {
+      "path": "demos/basic-fields_xa3k/prototype.html",
+      "action": "deleted",
+      "beforeHash": "a0c40456a03ac6a9f58fe7a7a353cca542c4b8d455dc615cfad96e3f5fd6a252",
+      "afterHash": null
+    },
+    {
+      "path": "demos/media-color_m2p9/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "80934a34a4ca9ba05b28bc06ef16c52a5bf63177b28db4a0bd58eec20ce03a68",
+      "afterHash": null
+    },
+    {
+      "path": "demos/media-color_m2p9/index.tsx",
+      "action": "deleted",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": null
+    },
+    {
+      "path": "demos/media-color_m2p9/prototype.css",
+      "action": "deleted",
+      "beforeHash": "7be1b2a389c7ffc38da898dc26a60d6dbd1a83ad5f4ddcedb62e4cbf6ced710b",
+      "afterHash": null
+    },
+    {
+      "path": "demos/media-color_m2p9/prototype.html",
+      "action": "deleted",
+      "beforeHash": "5d603b4551344098070d648bba2df55263c30650284c72f8b7e0917f26bb8169",
+      "afterHash": null
+    },
+    {
+      "path": "demos/selector-fields_k7b1/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "866067e2663e3ecdbdf24d1b4e5fa1409a774bdeabe1f22fc18956d28678b7ef",
+      "afterHash": null
+    },
+    {
+      "path": "demos/selector-fields_k7b1/index.tsx",
+      "action": "deleted",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": null
+    },
+    {
+      "path": "demos/selector-fields_k7b1/prototype.css",
+      "action": "deleted",
+      "beforeHash": "77095f6404838c68dd6da01048e2b8e50ea039dc14e0d9ab18112312ff87a63d",
+      "afterHash": null
+    },
+    {
+      "path": "demos/selector-fields_k7b1/prototype.html",
+      "action": "deleted",
+      "beforeHash": "eebea2a5de0dd3e461b112d029d7bf903ab975a38cd61221969ef139faf8e0cd",
+      "afterHash": null
+    },
+    {
+      "path": "demos/array-modules_v5n2/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "06e9524b7d00622cb7c4b3d34dff4d5aa0a31a64ad7efb80dc06e2a02db88c03",
+      "afterHash": null
+    },
+    {
+      "path": "demos/array-modules_v5n2/index.tsx",
+      "action": "deleted",
+      "beforeHash": "a9059f19515e3db6fa51656cc828a8256a958cf3f3e0a3d412cfcdc98dfd32d3",
+      "afterHash": null
+    },
+    {
+      "path": "demos/array-modules_v5n2/prototype.css",
+      "action": "deleted",
+      "beforeHash": "e47f34f1b7abbb393b7254fe77fff18e793f1a580a7b50de71d2a54e89a6b490",
+      "afterHash": null
+    },
+    {
+      "path": "demos/array-modules_v5n2/prototype.html",
+      "action": "deleted",
+      "beforeHash": "eff8bff63585a534a0b7963e9a1128f13efb453140fe2ed6321296b3f2abb555",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "4eba273cfe0a09a2ff3104d3495b40d7091f07fb766b4d3f361136e1cb2dd7a9",
+      "afterHash": "28278a3e526161c4a2952ef85ae2ea1a2836dd9c35db669bf18b1ddcfa60cf0a"
+    }
+  ],
+  "committedAt": 1785728895593
+}

@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "projectId": "proj_1787812837921_s2iw6a",
+  "updatedAt": 1787812849774,
+  "state": {
+    "viewport": {
+      "x": 191.19057881773398,
+      "y": 30.749999999999943,
+      "zoom": 0.6816502463054188
+    },
+    "pages": {},
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "hiddenKnowledgeDocumentIds": [],
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "sections": {}
+  }
+}

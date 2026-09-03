@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "ffcd5bd0-4135-46b1-aa63-64d62987f4e3",
+  "projectId": "proj_1785228950889_c6hs1j",
+  "workspaceId": "live-1785228952059-e70ctz1pw",
+  "baseRevision": 0,
+  "revision": 35,
+  "rootHash": "7c5037314690053a51772d48ecaebd6e123a4ec864ee819c3c967f48e90d63ad",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_ijly/index.tsx",
+      "action": "modified",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/page_ijly/config.schema.json",
+      "action": "modified",
+      "beforeHash": "552a68ebc1f5dcfd8998f0934dd0c7132f26a78a7686ba46c25c09987b24c7a6",
+      "afterHash": "552a68ebc1f5dcfd8998f0934dd0c7132f26a78a7686ba46c25c09987b24c7a6"
+    },
+    {
+      "path": "demos/page_ijly/prototype.html",
+      "action": "modified",
+      "beforeHash": "6b8f3502ed5d705ef130de6555b26fe1bc77e05c74edc479b31b5ec0a0c249af",
+      "afterHash": "6b8f3502ed5d705ef130de6555b26fe1bc77e05c74edc479b31b5ec0a0c249af"
+    },
+    {
+      "path": "demos/page_ijly/prototype.css",
+      "action": "modified",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/page_ijly/prototype.meta.json",
+      "action": "modified",
+      "beforeHash": "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1",
+      "afterHash": "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1"
+    }
+  ],
+  "committedAt": 1785376331489
+}

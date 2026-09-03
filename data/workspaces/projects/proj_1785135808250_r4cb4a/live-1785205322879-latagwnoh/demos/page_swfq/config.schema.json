@@ -1,0 +1,25 @@
+{
+  "type": "object",
+  "properties": {
+    "video": {
+      "type": "object",
+      "format": "video",
+      "title": "开场引入视频",
+      "description": "页面全屏播放的开场引入视频，仅支持 MP4 / WebM 格式",
+      "default": {}
+    }
+  },
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "fixed-canvas",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "fixed",
+      "preset": "custom",
+      "source": "figma"
+    }
+  }
+}

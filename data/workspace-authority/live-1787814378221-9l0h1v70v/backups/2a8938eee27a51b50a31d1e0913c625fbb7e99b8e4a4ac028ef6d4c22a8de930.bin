@@ -1,0 +1,48 @@
+<!DOCTYPE html><html lang="zh-CN"><head>
+  <meta charset="UTF-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>拍摄前提示（视频）</title>
+  <style>
+    /* Reset default margins */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    
+    /* Figma export container */
+    .figma-export {
+      background: white;
+      width: 375px;
+      height: 812px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+  </style>
+</head>
+<body>
+  <div class="figma-export">
+<div data-layer="拍摄前提示（视频）" style="width: 375px; height: 812px; position: relative; background: black; overflow: hidden; background-image: url(https://img.onlywnn.cn/figma/h_9da56bb.png)">
+  <img alt="static layer" class="Static" data-figma-id="9265:13105" data-layer="#static 背景" src="https://img.onlywnn.cn/figma/h_6257a3ce.png" style="left: 0px; top: 0px; position: absolute; width: 375px; height: 812px; object-fit: cover">
+  <div class="Rectangle" data-layer="Rectangle" style="width: 375px; height: 812px; left: 0px; top: 0px; position: absolute; background: rgba(0, 0, 0, 0.80)"></div>
+  <div class="Frame3466251" data-layer="Frame 3466251" style="left: 20px; top: 142.83px; position: absolute; flex-direction: column; justify-content: flex-start; align-items: center; gap: 32px; display: inline-flex">
+    <div class="Frame3466252" data-layer="Frame 3466252" style="width: 334px; height: 447px; flex-shrink: 0; position: relative; overflow: hidden; border-radius: 8px">
+      <img class="Rectangle" data-layer="Rectangle" src="https://img.onlywnn.cn/figma/h_2868a927.png" style="width: 335px; height: 446.67px; left: -1px; top: -0.33px; position: absolute; background: #BBD4DF">
+      <div data-layer="进度条" style="width: 334px; height: 4px; left: 0px; top: 443.17px; position: absolute; background: white">
+        <div class="Rectangle" data-layer="Rectangle" style="width: 258px; height: 4px; left: -20.50px; top: -0.17px; position: absolute; background: #FFD738"></div>
+      </div>
+    </div>
+    <img alt="static layer" class="Static" data-figma-id="9195:23313" data-layer="#static 按钮" src="https://img.onlywnn.cn/figma/h_5ec5d895.png" style="position: relative; width: 136px; height: 47px; object-fit: cover">
+  </div>
+</div>
+  </div>
+
+</body></html>

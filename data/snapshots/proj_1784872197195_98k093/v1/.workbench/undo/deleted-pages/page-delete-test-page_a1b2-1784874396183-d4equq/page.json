@@ -1,0 +1,8 @@
+{
+  "id": "test-page_a1b2",
+  "name": "测试页",
+  "routeKey": "page-2",
+  "order": 1,
+  "parentId": null,
+  "runtimeType": "high-fidelity-react"
+}

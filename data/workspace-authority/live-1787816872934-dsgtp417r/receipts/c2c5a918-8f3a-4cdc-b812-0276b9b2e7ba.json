@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "c2c5a918-8f3a-4cdc-b812-0276b9b2e7ba",
+  "projectId": "proj_1787816872316_ywiron",
+  "workspaceId": "live-1787816872934-dsgtp417r",
+  "baseRevision": 0,
+  "revision": 3,
+  "rootHash": "173e5eb1b9ea88d09121c0af973b7dfd158d847d39d2254177b4a06471a14bd2",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": ".canvas-layout.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "1367d3f14d2ba75c57f1a8b1fb9fbd8d26383be9488e5611c05e62abade9f82d"
+    }
+  ],
+  "committedAt": 1787816928658
+}

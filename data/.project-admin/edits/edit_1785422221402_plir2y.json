@@ -1,0 +1,17 @@
+{
+  "editId": "edit_1785422221402_plir2y",
+  "projectId": "proj_1785421657423_1ptong",
+  "workspaceId": "cli_edit_1785422221402_plir2y",
+  "workspacePath": "/Users/jojo/Documents/workbench/data/workspaces/jojo/proj_1785421657423_1ptong/cli_edit_1785422221402_plir2y",
+  "workspaceScope": "branch",
+  "baseVersion": "v1",
+  "actor": {
+    "id": "jojo",
+    "name": "jojo",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "createdAt": 1785422221407,
+  "expiresAt": 1785429421407,
+  "status": "committed"
+}

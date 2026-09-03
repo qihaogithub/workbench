@@ -1,0 +1,23 @@
+{
+  "$demo": { "previewSize": { "width": 375, "height": 812 } },
+  "type": "object",
+  "properties": {
+    "heroTitle": { "type": "string", "title": "页面标题", "default": "原型页配置演示" },
+    "heroSubtitle": { "type": "string", "title": "副标题", "default": "标量配置类型实时绑定展示" },
+    "badgeText": { "type": "string", "title": "角标文字", "default": "PROTOTYPE" },
+    "username": { "type": "string", "title": "用户名", "default": "张三" },
+    "bio": { "type": "text", "title": "个人简介", "default": "一名热爱技术的前端开发者，专注于 Web 交互和用户体验设计。" },
+    "score": { "type": "number", "title": "评分", "default": 4.8 },
+    "visitCount": { "type": "integer", "title": "访问次数", "default": 1024 },
+    "enabled": { "type": "boolean", "title": "是否开启", "default": true },
+    "plan": { "type": "string", "title": "套餐", "enum": ["free", "pro", "max"], "enumNames": ["免费版", "专业版", "旗舰版"], "default": "pro" },
+    "themeColor": { "type": "string", "title": "主题色", "format": "color", "default": "#6366f1" },
+    "bgColor": { "type": "string", "title": "卡片背景色", "format": "color", "default": "#eef2ff" },
+    "borderColor": { "type": "string", "title": "卡片边框色", "format": "color", "default": "#c7d2fe" },
+    "avatar": { "type": "string", "title": "头像", "format": "image", "default": "/api/images/img_GwsXRx4Q2c0A0g" },
+    "banner": { "type": "string", "title": "横幅图片", "format": "image", "default": "/api/images/img__3I8yQBnAyUtHA" },
+    "linkText": { "type": "string", "title": "链接文字", "default": "查看详情" },
+    "linkUrl": { "type": "string", "title": "链接地址", "default": "https://example.com" }
+  },
+  "required": []
+}

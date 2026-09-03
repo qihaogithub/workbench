@@ -1,0 +1,21 @@
+{
+  "id": "commit_1785380349203_jyjuki",
+  "projectId": "proj_1784874964275_p0k4ho",
+  "parentCommitId": "commit_1785306918525_cpwkil",
+  "visibility": "protected",
+  "intent": "publish",
+  "title": "发布项目 v32",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "course-complete_a7k3",
+      "versionId": "prv_1785306918519_d2rtri"
+    }
+  ],
+  "changedResources": [],
+  "createdAt": 1785380349203,
+  "createdBy": "Author Site",
+  "audit": {
+    "actorType": "user"
+  }
+}

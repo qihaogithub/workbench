@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "eb0cec3d-d3f2-43c7-8463-e688ce247d65",
+  "projectId": "proj_1785685022249_aevplm",
+  "workspaceId": "live-1785685023211-6or8kf4le",
+  "baseRevision": 12,
+  "revision": 14,
+  "rootHash": "73941814ccee38e3acc9cb9c15eaaa499dac751bd7c026c7c047c8492efbb72a",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "demos/config-structure_v4r6/config.schema.json",
+      "action": "modified",
+      "beforeHash": "9a31803aaaf3f32c195b7d1e30963be5cadce7177eb6ea74c0edca73bcb7622c",
+      "afterHash": "b8444ed66f07bfcae7bb3bf985690de97d1d7b5587975765f270718afeb4c873"
+    }
+  ],
+  "committedAt": 1785685331955
+}

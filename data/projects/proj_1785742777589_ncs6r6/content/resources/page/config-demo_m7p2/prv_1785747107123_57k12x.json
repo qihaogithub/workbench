@@ -1,0 +1,39 @@
+{
+  "id": "prv_1785747107123_57k12x",
+  "projectId": "proj_1785742777589_ncs6r6",
+  "kind": "page",
+  "resourceId": "config-demo_m7p2",
+  "workspaceId": "live-1785742777874-8sex712t9",
+  "workspaceRevision": 37,
+  "workspaceRootHash": "800beea05919d6be426999760b83e5e7f1f529e983d75d083997700b45b23ffd",
+  "previousVersionId": "prv_1785746578034_a9yrln",
+  "contentHash": "955e002256a722b13dbe9d5dbc77171bb6faa60430121eaba8f0366442f340eb",
+  "blobRefs": [
+    "e29d6333ada53d5ea9e21ef837076e77e0d61909f924fe0c5c70e1c97264b4e2",
+    "4e65ed1e46cdbb00360267fc3fe007d134f1052c1b670e1b567ba3ab16b54d9f"
+  ],
+  "metadata": {
+    "page": {
+      "id": "config-demo_m7p2",
+      "name": "配置项类型示例",
+      "runtimeType": "high-fidelity-react",
+      "order": 1,
+      "parentId": null,
+      "routeKey": "page"
+    },
+    "files": {
+      "schema": "e29d6333ada53d5ea9e21ef837076e77e0d61909f924fe0c5c70e1c97264b4e2",
+      "code": "4e65ed1e46cdbb00360267fc3fe007d134f1052c1b670e1b567ba3ab16b54d9f"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "high-fidelity-react",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1785747107125,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "示例"
+}

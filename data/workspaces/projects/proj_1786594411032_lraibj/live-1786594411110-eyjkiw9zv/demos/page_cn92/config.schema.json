@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "properties": {
+    "autosaveSchemaMarker": {
+      "type": "string",
+      "title": "自动保存 Schema 4d5f5e",
+      "default": "autosave-regression-schema: 4d5f5e"
+    }
+  },
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "content",
+      "preset": "custom",
+      "source": "recommended"
+    }
+  }
+}

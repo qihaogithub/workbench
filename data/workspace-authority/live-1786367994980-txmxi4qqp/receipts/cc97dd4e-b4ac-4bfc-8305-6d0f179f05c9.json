@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "cc97dd4e-b4ac-4bfc-8305-6d0f179f05c9",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786367994980-txmxi4qqp",
+  "baseRevision": 0,
+  "revision": 288,
+  "rootHash": "84420ff8d7a6b12c227ec02d66d9e2deb3d6e4a9d58868add80e4f160f799240",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/kids-edu-wireframe_x8k3/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "69046a9996254002d0beb4021b3ee521fe9ddc4c9b83c50210d44e3d7be12424"
+    }
+  ],
+  "committedAt": 1786517870854
+}

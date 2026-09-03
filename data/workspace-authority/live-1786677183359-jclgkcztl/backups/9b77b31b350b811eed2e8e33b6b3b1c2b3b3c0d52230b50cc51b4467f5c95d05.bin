@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "projectId": "proj_1786367903885_iu08e4",
+  "updatedAt": 1787891191182,
+  "state": {
+    "viewport": {
+      "x": 797.4013030953378,
+      "y": 34.41692893722592,
+      "zoom": 0.4678039467826793
+    },
+    "pages": {
+      "video-page_p3v9": {
+        "x": -738.0474451388889,
+        "y": 213.21454027777776,
+        "width": 375,
+        "height": 812,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_sbpw": {
+        "x": -1324.9612799538697,
+        "y": 213.21454027777776,
+        "width": 375,
+        "height": 812,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "kids-edu_xk19": {
+        "x": -1774.016103472222,
+        "y": 213.21454027777776,
+        "width": 375,
+        "height": 2471,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "pageGroups": {},
+    "sections": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [
+      "kb_1787885153658_t9h54b"
+    ],
+    "navigation": {
+      "hotspots": {
+        "navigation_hotspot_1787889544695_am7b4c": {
+          "id": "navigation_hotspot_1787889544695_am7b4c",
+          "pageId": "video-page_p3v9",
+          "kind": "point",
+          "rect": {
+            "x": 0.6347981007937316,
+            "y": 0.614235704469431,
+            "width": 0.002,
+            "height": 0.002
+          },
+          "createdAt": 1787889544695,
+          "updatedAt": 1787889544695
+        },
+        "navigation_hotspot_1787891191147_p2w5n4": {
+          "id": "navigation_hotspot_1787891191147_p2w5n4",
+          "pageId": "page_sbpw",
+          "kind": "point",
+          "rect": {
+            "x": 0.667965286891463,
+            "y": 0.5713845735585372,
+            "width": 0.002,
+            "height": 0.002
+          },
+          "createdAt": 1787891191147,
+          "updatedAt": 1787891191147
+        }
+      },
+      "connections": {
+        "navigation_connection_1787891191147_n8de21": {
+          "id": "navigation_connection_1787891191147_n8de21",
+          "source": {
+            "pageId": "page_sbpw",
+            "hotspotId": "navigation_hotspot_1787891191147_p2w5n4"
+          },
+          "target": {
+            "pageId": "video-page_p3v9"
+          },
+          "createdAt": 1787891191147,
+          "updatedAt": 1787891191147
+        }
+      }
+    }
+  }
+}

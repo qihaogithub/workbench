@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1785421657424_gv6j3u",
+  "at": 1785421657424,
+  "actor": {
+    "id": "jojo",
+    "name": "jojo",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1785421657423_1ptong",
+  "inputSummary": {
+    "name": "config-ts测试",
+    "category": "未分类"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1785421657423_1ptong"
+    ]
+  }
+}

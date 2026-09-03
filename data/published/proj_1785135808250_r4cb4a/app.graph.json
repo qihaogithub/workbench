@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "entry": "page-10",
+  "pages": {
+    "page-10": {
+      "pageId": "page_swfq",
+      "title": "闯关开场引入-视频"
+    },
+    "page": {
+      "pageId": "page_yw72",
+      "title": "闯关开场"
+    },
+    "page-9": {
+      "pageId": "page_p8a2",
+      "title": "闯关活动页（进行中）"
+    },
+    "page-8": {
+      "pageId": "page_pwcf",
+      "title": "查看卡片"
+    },
+    "spine": {
+      "pageId": "spine_dqxs",
+      "title": "获得卡片-spine"
+    },
+    "page-7": {
+      "pageId": "page_dous",
+      "title": "分享闯关"
+    },
+    "page-6": {
+      "pageId": "page_duak",
+      "title": "规则页面"
+    },
+    "page-5": {
+      "pageId": "page_xix9",
+      "title": "闯关通关动画"
+    },
+    "page-11": {
+      "pageId": "quiz-level_a2f3",
+      "title": "答题关卡"
+    },
+    "page-12": {
+      "pageId": "quiz-wrong_b7k9",
+      "title": "答错"
+    },
+    "page-13": {
+      "pageId": "quiz-correct_m5n8",
+      "title": "答对"
+    }
+  },
+  "actions": [],
+  "state": {}
+}

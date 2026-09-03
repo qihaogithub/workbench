@@ -1,0 +1,8 @@
+{
+  "id": "page_wmas",
+  "name": "学习页头图-手机",
+  "routeKey": "page-3",
+  "order": 4,
+  "parentId": null,
+  "runtimeType": "high-fidelity-react"
+}

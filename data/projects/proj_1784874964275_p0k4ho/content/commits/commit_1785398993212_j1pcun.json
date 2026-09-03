@@ -1,0 +1,31 @@
+{
+  "id": "commit_1785398993212_j1pcun",
+  "projectId": "proj_1784874964275_p0k4ho",
+  "parentCommitId": "commit_1785389950567_r0fn3n",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录完课活动",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "course-complete_a7k3",
+      "versionId": "prv_1785398993199_ic0yeh"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "course-complete_a7k3",
+      "fromVersionId": "prv_1785389950555_gq2vzf",
+      "toVersionId": "prv_1785398993199_ic0yeh"
+    }
+  ],
+  "createdAt": 1785398993212,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785380343962-4sk17ymt3",
+    "workspaceRevision": 21,
+    "workspaceRootHash": "b7de8aa5ca048bb8252d57c8f3d03c278263d02915c892d46b1c0fe8d5d7ee50"
+  }
+}

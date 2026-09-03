@@ -1,0 +1,8 @@
+{
+  "id": "page_2kbs",
+  "name": "手机",
+  "routeKey": "page-2",
+  "order": 2,
+  "parentId": null,
+  "runtimeType": "prototype-html-css"
+}

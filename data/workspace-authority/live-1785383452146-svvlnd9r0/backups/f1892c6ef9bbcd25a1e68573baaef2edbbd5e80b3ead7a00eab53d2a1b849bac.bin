@@ -1,0 +1,12 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "config-demo_x7k2",
+      "name": "配置类型演示",
+      "runtimeType": "high-fidelity-react",
+      "order": 1,
+      "parentId": null
+    }
+  ]
+}

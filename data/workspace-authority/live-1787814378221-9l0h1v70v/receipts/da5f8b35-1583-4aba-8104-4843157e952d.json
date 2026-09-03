@@ -1,0 +1,31 @@
+{
+  "committed": true,
+  "mutationId": "da5f8b35-1583-4aba-8104-4843157e952d",
+  "projectId": "proj_1787814377754_4243v7",
+  "workspaceId": "live-1787814378221-9l0h1v70v",
+  "baseRevision": 0,
+  "revision": 14,
+  "rootHash": "294fdabbe5bae5917d7aa1bfbd5f3eff84c20d3ffe68fb299bd4d509adc4d273",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/clipboard-import_c6b554/config.schema.json",
+      "action": "modified",
+      "beforeHash": "fa1892b60b1893afc883d135d1fa2973a67415ecc1ba459bc6059e74de025c4f",
+      "afterHash": "5a946697486aca5f5a644522223f024372b2737d1f8a533cfd19cf9e8d61cf52"
+    },
+    {
+      "path": "design-spec/spec-ds_1787815724129_a45d7050.json",
+      "action": "modified",
+      "beforeHash": "9429376e6a688034d65ce8b693f2a5dc0fe20177160b0cf059ef76be3a1107cd",
+      "afterHash": "1157af54baf5c4cc09d12a687c344dd83f24f70e5c01cfe4f57c52661d07ac8b"
+    },
+    {
+      "path": "design-spec/manifest.json",
+      "action": "modified",
+      "beforeHash": "c31e2474cbe2030f031eb14d9aa4e6c1613f1b0ba9e07e7658c92cf3726c46b9",
+      "afterHash": "c1bbfb814a58cb474f7c693a3608a2fe9e7aa4e827d18528e42f70c77ec5aa0f"
+    }
+  ],
+  "committedAt": 1787815738317
+}

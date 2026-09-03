@@ -1,0 +1,31 @@
+{
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": { "width": 390, "height": 844 },
+      "heightBehavior": "content",
+      "preset": "mobile",
+      "source": "user"
+    }
+  },
+  "type": "object",
+  "properties": {
+    "视频配置": {
+      "type": "object",
+      "title": "视频配置",
+      "properties": {
+        "video": {
+          "type": "object",
+          "title": "视频",
+          "format": "video",
+          "default": {
+            "url": "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+          }
+        }
+      },
+      "required": []
+    }
+  },
+  "required": []
+}

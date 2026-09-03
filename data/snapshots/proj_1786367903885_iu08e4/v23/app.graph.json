@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "entry": "kids-edu",
+  "pages": {
+    "kids-edu": {
+      "pageId": "kids-edu_b3xw",
+      "title": "kids edu"
+    },
+    "quiet-studio": {
+      "pageId": "quiet-studio_q7m4",
+      "title": "quiet studio"
+    },
+    "sunny-reading": {
+      "pageId": "sunny-reading_k4m8",
+      "title": "sunny reading"
+    },
+    "page": {
+      "pageId": "page_zdwh",
+      "title": "手机"
+    },
+    "page-2": {
+      "pageId": "page_yvbe",
+      "title": "平板"
+    },
+    "kids-edu-h5p9m2": {
+      "pageId": "kids-edu-h5_p9m2",
+      "title": "kids edu h5"
+    },
+    "kids-edu-wireframex8": {
+      "pageId": "kids-edu-wireframe_x8k3",
+      "title": "kids edu wireframe"
+    }
+  },
+  "actions": [],
+  "state": {}
+}

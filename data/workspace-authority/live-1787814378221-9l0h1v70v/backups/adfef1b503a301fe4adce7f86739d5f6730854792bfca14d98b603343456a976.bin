@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "projectId": "proj_1787814377754_4243v7",
+  "updatedAt": 1787883931112,
+  "state": {
+    "viewport": {
+      "x": 339.25768156109666,
+      "y": 145.45932451391315,
+      "zoom": 0.5488500980612175
+    },
+    "pages": {
+      "clipboard-import_c6b554": {
+        "x": -211.95543055555555,
+        "y": -12.594361111111112,
+        "width": 375,
+        "height": 812,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "pageGroups": {},
+    "sections": {},
+    "hiddenPageIds": [],
+    "nodes": {
+      "text-2f1fc97f-59f4-41ab-b46f-785d00513c91": {
+        "id": "text-2f1fc97f-59f4-41ab-b46f-785d00513c91",
+        "title": "苏打粉",
+        "layout": {
+          "x": -421.6657923424782,
+          "y": 305.49729929747554,
+          "width": 56,
+          "height": 25
+        },
+        "createdAt": 1787882032170,
+        "updatedAt": 1787883884938,
+        "kind": "text",
+        "text": "苏打粉",
+        "fontSize": 18,
+        "color": "#ffffff"
+      }
+    },
+    "layers": {
+      "annotations": {
+        "nodes": {
+          "text-2f1fc97f-59f4-41ab-b46f-785d00513c91": {
+            "id": "text-2f1fc97f-59f4-41ab-b46f-785d00513c91",
+            "title": "苏打粉",
+            "layout": {
+              "x": -421.6657923424782,
+              "y": 305.49729929747554,
+              "width": 56,
+              "height": 25
+            },
+            "createdAt": 1787882032170,
+            "updatedAt": 1787883884938,
+            "kind": "text",
+            "text": "苏打粉",
+            "fontSize": 18,
+            "color": "#ffffff"
+          }
+        }
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

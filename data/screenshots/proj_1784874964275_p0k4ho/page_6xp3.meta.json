@@ -1,0 +1,21 @@
+{
+  "currentHash": "350c97bc0dd61d6f",
+  "generatedAt": "2026-08-07T02:57:08.664Z",
+  "elapsed": 2513,
+  "history": [
+    "350c97bc0dd61d6f"
+  ],
+  "renderBoxes": {
+    "350c97bc0dd61d6f": {
+      "width": 375,
+      "height": 812,
+      "viewportWidth": 375,
+      "viewportHeight": 812,
+      "bodyWidth": 375,
+      "bodyHeight": 812,
+      "documentWidth": 375,
+      "documentHeight": 812,
+      "fullPage": true
+    }
+  }
+}

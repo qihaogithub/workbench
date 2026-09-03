@@ -1,0 +1,8 @@
+{
+  "id": "video-page_p3v9",
+  "name": "视频演示页面",
+  "runtimeType": "high-fidelity-react",
+  "order": 1,
+  "parentId": null,
+  "routeKey": "page"
+}

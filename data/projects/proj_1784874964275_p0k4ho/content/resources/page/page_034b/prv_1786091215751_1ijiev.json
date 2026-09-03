@@ -1,0 +1,39 @@
+{
+  "id": "prv_1786091215751_1ijiev",
+  "projectId": "proj_1784874964275_p0k4ho",
+  "kind": "page",
+  "resourceId": "page_034b",
+  "workspaceId": "live-1785739340495-r9pfl4l9u",
+  "workspaceRevision": 98,
+  "workspaceRootHash": "18df9038ffc3755cdc8bdb906c4021a57410e7ec686c12f96098a3721b0695cb",
+  "previousVersionId": "prv_1786072892265_sy5dep",
+  "contentHash": "57acba736979667e3210287079fb443431325cef1049a48745cdf0a36600cb9e",
+  "blobRefs": [
+    "69046a9996254002d0beb4021b3ee521fe9ddc4c9b83c50210d44e3d7be12424",
+    "8f8028c17e3688ce14f72dc1b23a669d92269d42878f46956084941df3b762ad"
+  ],
+  "metadata": {
+    "page": {
+      "id": "page_034b",
+      "name": "学习页头图-手机",
+      "routeKey": "page-2",
+      "order": 2,
+      "parentId": null,
+      "runtimeType": "high-fidelity-react"
+    },
+    "files": {
+      "schema": "69046a9996254002d0beb4021b3ee521fe9ddc4c9b83c50210d44e3d7be12424",
+      "code": "8f8028c17e3688ce14f72dc1b23a669d92269d42878f46956084941df3b762ad"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "high-fidelity-react",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1786091215752,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录学习页头图-手机"
+}

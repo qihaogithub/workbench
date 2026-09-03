@@ -1,0 +1,36 @@
+{
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "content",
+      "preset": "custom",
+      "source": "user"
+    }
+  },
+  "type": "object",
+  "properties": {
+    "内容": {
+      "type": "object",
+      "title": "内容",
+      "properties": {
+        "title": {
+          "type": "string",
+          "title": "标题",
+          "default": "Hello World"
+        },
+        "description": {
+          "type": "string",
+          "title": "描述",
+          "default": "这是一个原型页面。"
+        }
+      },
+      "required": []
+    }
+  },
+  "required": []
+}

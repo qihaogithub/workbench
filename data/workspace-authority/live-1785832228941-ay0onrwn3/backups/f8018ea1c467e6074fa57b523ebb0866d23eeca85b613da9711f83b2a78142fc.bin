@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HTML 原型页配置示例</title>
+  <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+  <div class="container">
+    <!-- 头部 -->
+    <header class="header">
+      <div class="avatar-wrapper">
+        <img class="avatar" data-bind-src="avatar" alt="头像">
+      </div>
+      <h1 class="title" data-bind-text="title">HTML 原型页配置示例</h1>
+      <p class="subtitle" data-bind-text="subtitle">这是长文本类型，支持多行内容。
+原型页通过插值或 data-bind 绑定消费配置值。</p>
+    </header>
+
+    <!-- 数值卡片 -->
+    <section class="card">
+      <h2 class="card-title">数值类型</h2>
+      <div class="stat-grid">
+        <div class="stat-item">
+          <span class="stat-label">数值 (number)</span>
+          <span class="stat-value" data-bind-text="count">128.5</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">整数 (integer)</span>
+          <span class="stat-value" data-bind-text="level">5</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 开关状态 -->
+    <section class="card">
+      <h2 class="card-title">开关类型</h2>
+      <div class="toggle-row">
+        <span class="toggle-label">开关 (boolean)</span>
+        <span class="toggle-badge" data-bind-text="enabled">已开启</span>
+      </div>
+    </section>
+
+    <!-- 颜色展示 -->
+    <section class="card">
+      <h2 class="card-title">颜色类型</h2>
+      <div class="color-grid">
+        <div class="color-item">
+          <div class="color-swatch" data-bind-style-background-color="primaryColor"></div>
+          <span class="color-label">主色 (color)</span>
+        </div>
+        <div class="color-item">
+          <div class="color-swatch" data-bind-style-background-color="bgColor"></div>
+          <span class="color-label">背景色 (color)</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 选项 -->
+    <section class="card">
+      <h2 class="card-title">枚举类型</h2>
+      <div class="enum-row">
+        <span class="enum-label">主题 (enum)</span>
+        <span class="enum-value" data-bind-text="theme">light</span>
+      </div>
+    </section>
+
+    <!-- 说明 -->
+    <section class="card info-card">
+      <h2 class="card-title">原型页支持的配置绑定</h2>
+      <ul class="bind-list">
+        <li><code>data-bind-text</code> — 文本内容绑定</li>
+        <li><code>data-bind-src</code> — 图片地址绑定</li>
+        <li><code>data-bind-href</code> — 链接地址绑定</li>
+        <li><code>data-bind-style-color</code> — 文字颜色绑定</li>
+        <li><code>data-bind-style-background-color</code> — 背景色绑定</li>
+        <li><code>data-bind-style-border-color</code> — 边框色绑定</li>
+        <li><code>{{fieldKey}}</code> — 文本插值</li>
+      </ul>
+    </section>
+  </div>
+</body>
+</html>

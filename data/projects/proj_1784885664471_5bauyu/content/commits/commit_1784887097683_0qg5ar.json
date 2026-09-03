@@ -1,0 +1,29 @@
+{
+  "id": "commit_1784887097683_0qg5ar",
+  "projectId": "proj_1784885664471_5bauyu",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录Pad 头图背景预览",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "pad-preview_m7k2",
+      "versionId": "prv_1784887097681_1m1yzx"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "pad-preview_m7k2",
+      "toVersionId": "prv_1784887097681_1m1yzx"
+    }
+  ],
+  "createdAt": 1784887097683,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1784885665853-hte2rzhnj",
+    "workspaceRevision": 44,
+    "workspaceRootHash": "ba0e51d8410c352fdd10aeb483e9a0a2ab5ae69df29febecd6ba84e9e0bb729d"
+  }
+}

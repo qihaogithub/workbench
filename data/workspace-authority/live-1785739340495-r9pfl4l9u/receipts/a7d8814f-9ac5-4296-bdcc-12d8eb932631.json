@@ -1,0 +1,25 @@
+{
+  "committed": true,
+  "mutationId": "a7d8814f-9ac5-4296-bdcc-12d8eb932631",
+  "projectId": "proj_1784874964275_p0k4ho",
+  "workspaceId": "live-1785739340495-r9pfl4l9u",
+  "baseRevision": 0,
+  "revision": 191,
+  "rootHash": "61a4ed28c53d3ff410d6042df88255fc92e28efcf7ad491def7a92c38956903d",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/course-complete_a7k3/index.tsx",
+      "action": "modified",
+      "beforeHash": "e3e0807a1473e2cd82b0c7b5016a9ca8dace9ccfc41469abc2f82fb4d341bf64",
+      "afterHash": "e3e0807a1473e2cd82b0c7b5016a9ca8dace9ccfc41469abc2f82fb4d341bf64"
+    },
+    {
+      "path": "demos/course-complete_a7k3/config.schema.json",
+      "action": "modified",
+      "beforeHash": "152733919602a9289f348e21ff6492d6429bcf9ef2f3db8ce63d3131f63758a7",
+      "afterHash": "152733919602a9289f348e21ff6492d6429bcf9ef2f3db8ce63d3131f63758a7"
+    }
+  ],
+  "committedAt": 1786367690315
+}

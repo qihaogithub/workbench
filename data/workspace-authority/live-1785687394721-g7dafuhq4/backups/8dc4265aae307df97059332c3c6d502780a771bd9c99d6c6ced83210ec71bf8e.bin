@@ -1,0 +1,31 @@
+{
+  "$demo": {
+    "previewSize": { "width": 375, "height": 812 }
+  },
+  "type": "object",
+  "properties": {
+    "基础信息": {
+      "type": "object",
+      "title": "基础信息",
+      "properties": {
+        "title": { "type": "string", "title": "标题", "default": "简约卡片" },
+        "price": { "type": "number", "title": "价格", "default": 99.9 },
+        "count": { "type": "integer", "title": "库存", "default": 42 },
+        "description": { "type": "string", "title": "简介", "default": "这是一张简约的演示卡片，展示了多种配置项类型。" },
+        "coverImage": { "type": "string", "title": "封面图", "format": "image" }
+      },
+      "required": []
+    },
+    "样式设置": {
+      "type": "object",
+      "title": "样式设置",
+      "properties": {
+        "themeColor": { "type": "string", "title": "主题色", "format": "color", "default": "#6366f1" },
+        "layoutMode": { "type": "string", "title": "布局模式", "enum": ["card", "list", "compact"], "enumNames": ["卡片", "列表", "简洁"], "default": "card" },
+        "showBadge": { "type": "boolean", "title": "显示徽章", "default": true }
+      },
+      "required": []
+    }
+  },
+  "required": []
+}

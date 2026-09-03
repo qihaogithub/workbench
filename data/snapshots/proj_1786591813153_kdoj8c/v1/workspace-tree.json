@@ -1,0 +1,13 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "page_u9ma",
+      "name": "首页",
+      "routeKey": "page",
+      "order": 0,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    }
+  ]
+}

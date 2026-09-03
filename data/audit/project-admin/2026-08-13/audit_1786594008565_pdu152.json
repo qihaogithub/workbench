@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1786594008565_pdu152",
+  "at": 1786594008565,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1786594008564_wa8kkm",
+  "inputSummary": {
+    "name": "E2E:20260813T040647350Z-3qoqp8:画布删除撤回重做回归",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1786594008564_wa8kkm"
+    ]
+  }
+}

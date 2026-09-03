@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "$demo": {
+    "previewSize": {
+      "width": 375,
+      "height": 812
+    }
+  },
+  "properties": {
+    "modules": {
+      "type": "object",
+      "title": "",
+      "properties": {
+        "items": {
+          "type": "array",
+          "title": "",
+          "description": "拖拽调整模块顺序；图片模块可添加任意数量，视频和进度模块各只能添加一个",
+          "items": {
+            "type": "object",
+            "oneOf": [
+              {
+                "title": "图片模块",
+                "properties": {
+                  "type": { "const": "image", "type": "string", "title": "模块类型" },
+                  "imageUrl": { "type": "string", "title": "图片", "format": "image", "ui:options": { "minWidth": 750, "maxWidth": 750 } }
+                },
+                "required": ["type"]
+              },
+              {
+                "title": "视频模块",
+                "properties": {
+                  "type": { "const": "video", "type": "string", "title": "模块类型" },
+                  "videoBg": { "type": "string", "title": "视频背景", "format": "image", "ui:options": { "minWidth": 750, "maxWidth": 750 } },
+                  "videoCover": { "type": "string", "title": "视频封面", "format": "image", "ui:options": { "minWidth": 670, "maxWidth": 670, "minHeight": 376, "maxHeight": 376 } }
+                },
+                "required": ["type"]
+              },
+              {
+                "title": "进度模块",
+                "properties": {
+                  "type": { "const": "progress", "type": "string", "title": "模块类型" },
+                  "progressBgTop": { "type": "string", "title": "进度背景-上", "format": "image", "ui:options": { "minWidth": 750, "maxWidth": 750, "minHeight": 100, "maxHeight": 100 } },
+                  "progressBgMiddle": { "type": "string", "title": "进度背景-中(可重复)", "format": "image", "ui:options": { "minWidth": 750, "maxWidth": 750, "minHeight": 20, "maxHeight": 20 } },
+                  "progressBgBottom": { "type": "string", "title": "进度背景-下", "format": "image", "ui:options": { "minWidth": 750, "maxWidth": 750, "minHeight": 140, "maxHeight": 140 } }
+                },
+                "required": ["type"]
+              }
+            ]
+          },
+          "default": [
+            {
+              "type": "image",
+              "imageUrl": "/data/proj_1784874964275_p0k4ho/assets/images/ab9472005108b9e0a8fc05b3.png"
+            },
+            {
+              "type": "progress",
+              "progressBgTop": "/data/proj_1784874964275_p0k4ho/assets/images/e42da6dcf611db3d2d1ebd50.png",
+              "progressBgMiddle": "/data/proj_1784874964275_p0k4ho/assets/images/805ed928744ee218f133e8d0.png",
+              "progressBgBottom": "/data/proj_1784874964275_p0k4ho/assets/images/b0b1a87384e6d7181be09cc4.png"
+            },
+            {
+              "type": "image",
+              "imageUrl": "/data/proj_1784874964275_p0k4ho/assets/images/345cff787d4ead5b8bacc2bd.png"
+            },
+            {
+              "type": "video",
+              "videoBg": "/data/proj_1784874964275_p0k4ho/assets/images/4ea96ecddfd306e91705d243.png",
+              "videoCover": "/data/proj_1784874964275_p0k4ho/assets/images/ef6aa004c2158bdab3634f29.png"
+            },
+            {
+              "type": "image",
+              "imageUrl": "/data/proj_1784874964275_p0k4ho/assets/images/766653d583e6f9fcb76f3184.png"
+            }
+          ]
+        }
+      },
+      "required": []
+    }
+  },
+  "required": []
+}

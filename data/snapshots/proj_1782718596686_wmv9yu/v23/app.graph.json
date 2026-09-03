@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "entry": "page",
+  "pages": {
+    "page": {
+      "pageId": "pad-popup_a3f2",
+      "title": "通用弹窗 - 平板版"
+    },
+    "page-2": {
+      "pageId": "phone-popup_k8m2",
+      "title": "通用弹窗 - 手机版"
+    }
+  },
+  "actions": [],
+  "state": {}
+}

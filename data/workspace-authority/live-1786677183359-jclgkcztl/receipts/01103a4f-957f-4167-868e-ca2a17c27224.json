@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "01103a4f-957f-4167-868e-ca2a17c27224",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 174,
+  "rootHash": "a4823361a8e53050740834c0915f180e69b1c42b5332559c19865a843b3d6136",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/group-2424_478a93/index.tsx",
+      "action": "modified",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/group-2424_478a93/config.schema.json",
+      "action": "modified",
+      "beforeHash": "fa1892b60b1893afc883d135d1fa2973a67415ecc1ba459bc6059e74de025c4f",
+      "afterHash": "fa1892b60b1893afc883d135d1fa2973a67415ecc1ba459bc6059e74de025c4f"
+    },
+    {
+      "path": "demos/group-2424_478a93/prototype.html",
+      "action": "modified",
+      "beforeHash": "a5cc8f9538b24a7fc1f0c791c5c0132bc2ace54aa34bc9c6689bf7e9c25de4f7",
+      "afterHash": "a5cc8f9538b24a7fc1f0c791c5c0132bc2ace54aa34bc9c6689bf7e9c25de4f7"
+    },
+    {
+      "path": "demos/group-2424_478a93/prototype.css",
+      "action": "modified",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/group-2424_478a93/prototype.meta.json",
+      "action": "modified",
+      "beforeHash": "c8ff789088a244de5f3aeec94c77db2c953ba0e62122a274a9bbfe2989b7ab87",
+      "afterHash": "e05ff62d13acfe6f1b5cb7b3394c7aa7842521335717e56553c5e11e2ffa9129"
+    }
+  ],
+  "committedAt": 1787760698401
+}

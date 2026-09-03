@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Figma Export</title>
+  <style>
+    /* Reset default margins */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    
+    /* Figma export container */
+    .figma-export {
+      background: white;
+      width: 375px;
+      height: 1165px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+  </style>
+</head>
+<body>
+  <div class="figma-export">
+<style>[data-figma-scrollbar-hide="true"]{-ms-overflow-style:none;scrollbar-width:none;}[data-figma-scrollbar-hide="true"]::-webkit-scrollbar{display:none;width:0;height:0;}</style>
+<div data-figma-scrollbar-hide="true" data-layer="实际效果" style="width: 375px; height: 1165px; position: relative; background: white; overflow: hidden; overflow-y: auto; overflow-x: hidden; -ms-overflow-style: none; scrollbar-width: none">
+  <div data-layer="进度模块" style="width: 375px; height: 510px; left: 0px; top: 203px; position: absolute">
+    <div data-layer="模块背景" style="left: 0px; top: 0px; position: absolute; flex-direction: column; justify-content: flex-start; align-items: flex-start; display: inline-flex">
+      <img src="https://img.onlywnn.cn/figma/h_5dde2c41.png" alt="static layer" data-layer="#static 进度背景-上" class="Static" style="position: relative; width: 375px; height: 50px; object-fit: cover" data-figma-id="318:7505" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7506" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7507" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7508" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7509" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7510" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7511" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7512" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7513" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7514" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7515" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7516" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7517" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7518" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7519" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7520" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7521" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7522" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7523" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7524" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7525" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7526" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7527" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7528" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7529" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7530" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7531" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7532" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7533" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7534" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7535" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7536" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7537" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7538" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7539" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7540" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7541" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7542" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7543" />
+      <img src="https://img.onlywnn.cn/figma/h_5e3058f0.png" alt="static layer" data-layer="#static 进度背景-中" class="Static" style="position: relative; width: 375px; height: 10px; object-fit: cover" data-figma-id="318:7544" />
+      <img src="https://img.onlywnn.cn/figma/h_11277108.png" alt="static layer" data-layer="#static 进度背景-下" class="Static" style="position: relative; width: 375px; height: 70px; object-fit: cover" data-figma-id="318:7545" />
+    </div>
+    <div data-layer="模块内容" style="left: 20px; top: 30px; position: absolute; flex-direction: column; justify-content: flex-start; align-items: center; gap: 20px; display: inline-flex">
+      <img src="https://img.onlywnn.cn/figma/h_c7c75a9d.png" alt="static layer" data-layer="#static 关卡" data-property-1="R3" class="Static" style="position: relative; width: 335px; height: 383px; object-fit: cover" data-figma-id="318:7547" />
+      <div data-layer="去学习按钮" data-主次="主按钮" data-大小="H44*W280" data-状态="默认" style="width: 180px; height: 44px; flex-shrink: 0; position: relative; background: #FCDA00; border-radius: 30px; outline: 3px white solid; outline-offset: -3px">
+        <div data-layer="开始学习" style="left: 62.43px; top: 8.50px; position: absolute; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--主-黄---6, #544300); font-size: 18px; font-family: PingFang SC; font-weight: 500; line-height: 27px; white-space: nowrap">去学习</div>
+      </div>
+    </div>
+  </div>
+  <img src="https://img.onlywnn.cn/figma/h_86e6412b.png" alt="static layer" data-layer="#static 图片模块" class="Static" style="left: 0px; top: 713px; position: absolute; width: 375px; height: 102px; object-fit: cover" data-figma-id="318:7549" />
+  <img src="https://img.onlywnn.cn/figma/h_3a32b452.png" alt="static layer" data-layer="#static 图片模块" class="Static" style="left: 0px; top: 88px; position: absolute; width: 375px; height: 115px; object-fit: cover" data-figma-id="318:7550" />
+  <div data-layer="视频模块" style="width: 375px; height: 272px; left: 0px; top: 815px; position: absolute">
+    <img src="https://img.onlywnn.cn/figma/h_8fc66c07.png" alt="static layer" data-layer="#static 视频背景" class="Static" style="left: 0px; top: 0px; position: absolute; width: 375px; height: 272px; object-fit: cover" data-figma-id="318:9104" />
+    <div data-layer="视频" style="width: 375px; height: 272px; left: 0px; top: 0px; position: absolute; overflow: hidden">
+      <img data-layer="视频封面" style="width: 335px; height: 188px; left: 20px; top: 42px; position: absolute; border-radius: 20px" src="https://img.onlywnn.cn/figma/h_77d7a9ac.png" />
+      <div data-layer="播放按钮" data-状态="播放" style="width: 70px; height: 70px; left: 152px; top: 101px; position: absolute; overflow: hidden">
+        <div data-svg-wrapper data-layer="Oval" class="Oval" style="left: 3.18px; top: 3.18px; position: absolute">
+          <svg width="70" height="70" viewBox="0 0 70 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <g filter="url(#filter0_d_318_9109)">
+          <circle cx="35.0001" cy="35" r="31.8182" fill="black" fill-opacity="0.4"/>
+          </g>
+          <defs>
+          <filter id="filter0_d_318_9109" x="6.62804e-05" y="5.24521e-06" width="70.0001" height="70" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+          <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+          <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+          <feOffset/>
+          <feGaussianBlur stdDeviation="1.59091"/>
+          <feColorMatrix type="matrix" values="0 0 0 0 0.0392157 0 0 0 0 0.121569 0 0 0 0 0.266667 0 0 0 0.12 0"/>
+          <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_318_9109"/>
+          <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_318_9109" result="shape"/>
+          </filter>
+          </defs>
+          </svg>
+        </div>
+        <div data-svg-wrapper data-layer="Polygon" class="Polygon" style="left: 27.05px; top: 20.68px; position: absolute">
+          <svg width="23" height="29" viewBox="0 0 23 29" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M21.4069 16.6669L4.92891 27.4926C3.46024 28.4575 1.48745 28.0491 0.522562 26.5805C0.181649 26.0616 0 25.4542 0 24.8334L0 3.18182C0 1.42455 1.42455 0 3.18182 0C3.80269 0 4.41 0.181649 4.92891 0.522562L21.4069 11.3483C22.8755 12.3132 23.2839 14.286 22.319 15.7547C22.0805 16.1178 21.77 16.4283 21.4069 16.6669Z" fill="white"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+  <img src="https://img.onlywnn.cn/figma/h_9e5189d7.png" alt="static layer" data-layer="#static 图片模块" class="Static" style="left: 0px; top: 1087px; position: absolute; width: 375px; height: 81px; object-fit: cover" data-figma-id="318:7552" />
+  <div data-layer="原生/状态栏" style="width: 375px; padding-left: 44px; padding-right: 44px; padding-top: 12px; padding-bottom: 12px; left: 0px; top: 0px; position: absolute; justify-content: space-between; align-items: center; display: inline-flex">
+    <div data-layer="↳ Time" class="Time" style="flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap"><span style="color: var(--基础-控件, black); font-size: 14px; font-family: PingFang SC; font-weight: 500; white-space: nowrap">9:4</span><span style="color: var(--基础-控件, black); font-size: 14px; font-family: PingFang SC; font-weight: 500; white-space: nowrap">1</span></div>
+    <div data-svg-wrapper data-layer="Union" class="Union" style="position: relative">
+      <svg width="67" height="12" viewBox="0 0 67 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M61.6055 9.11511e-05C63.0782 9.11511e-05 64.2725 1.19432 64.2725 2.66708V8.66708L64.2588 8.93954C64.1222 10.2842 62.9861 11.3331 61.6055 11.3331H44.9395L44.666 11.3194C43.4112 11.1918 42.4136 10.1944 42.2861 8.93954L42.2725 8.66708V2.66708C42.2725 1.28652 43.3215 0.150529 44.666 0.013763L44.9395 9.11511e-05H61.6055ZM27.4268 8.40048C28.7023 7.32169 30.5711 7.3217 31.8467 8.40048C31.9107 8.45846 31.9474 8.54072 31.9492 8.62704C31.9509 8.71346 31.9171 8.79694 31.8555 8.85751L29.8584 10.8731C29.7999 10.9324 29.72 10.9659 29.6367 10.9659C29.5535 10.9659 29.4736 10.9323 29.415 10.8731L27.417 8.85751C27.3555 8.79693 27.3215 8.71339 27.3232 8.62704C27.3251 8.54066 27.3627 8.45842 27.4268 8.40048ZM2 6.66708C2.55228 6.66708 3 7.1148 3 7.66708V9.66708C2.99982 10.2192 2.55218 10.6671 2 10.6671H1C0.447824 10.6671 0.000175969 10.2192 0 9.66708V7.66708C0 7.1148 0.447715 6.66708 1 6.66708H2ZM6.66699 4.66708C7.21913 4.66726 7.66699 5.11491 7.66699 5.66708V9.66708C7.66682 10.2191 7.21902 10.6669 6.66699 10.6671H5.66699C5.11482 10.6671 4.66717 10.2192 4.66699 9.66708V5.66708C4.66699 5.1148 5.11471 4.66708 5.66699 4.66708H6.66699ZM11.333 2.3331C11.8852 2.3331 12.3328 2.78096 12.333 3.3331V9.66708C12.3328 10.2192 11.8852 10.6671 11.333 10.6671H10.333C9.78098 10.6669 9.33318 10.2191 9.33301 9.66708V3.3331C9.33318 2.78107 9.78098 2.33327 10.333 2.3331H11.333ZM16 9.11511e-05C16.5523 9.11511e-05 17 0.447806 17 1.00009V9.66708C16.9998 10.2192 16.5522 10.6671 16 10.6671H15C14.4478 10.6671 14.0002 10.2192 14 9.66708V1.00009C14 0.447806 14.4477 9.11511e-05 15 9.11511e-05H16ZM44.9395 1.00009C44.019 1.00009 43.2725 1.74661 43.2725 2.66708V8.66708C43.2726 9.58741 44.0191 10.3331 44.9395 10.3331H61.6055C62.5258 10.3331 63.2723 9.58741 63.2725 8.66708V2.66708C63.2725 1.74661 62.5259 1.00009 61.6055 1.00009H44.9395ZM60.9395 2.00009C61.6756 2.00027 62.2723 2.59698 62.2725 3.3331V8.00009C62.2725 8.73636 61.6757 9.33292 60.9395 9.3331H45.6055C44.8692 9.33292 44.2725 8.73636 44.2725 8.00009V3.3331C44.2726 2.59698 44.8693 2.00027 45.6055 2.00009H60.9395ZM65.2725 3.66708C66.0771 4.00589 66.6006 4.79399 66.6006 5.66708C66.6005 6.54009 66.0771 7.32835 65.2725 7.66708V3.66708ZM24.7617 5.71103C27.5098 3.15509 31.7656 3.15515 34.5137 5.71103C34.5756 5.77084 34.6113 5.85349 34.6123 5.93954C34.6132 6.02569 34.5792 6.10884 34.5186 6.17001L33.3643 7.33701C33.2453 7.45611 33.0527 7.45876 32.9307 7.34286C32.0282 6.52573 30.8541 6.07329 29.6367 6.07333C28.4201 6.07384 27.2466 6.52624 26.3447 7.34286C26.2227 7.45868 26.0301 7.45608 25.9111 7.33701L24.7568 6.17001C24.6962 6.10895 24.6623 6.0256 24.6631 5.93954C24.6641 5.85348 24.6998 5.77083 24.7617 5.71103ZM22.0967 3.02939C26.3118 -1.00967 32.9618 -1.00992 37.1768 3.02939C37.2376 3.08929 37.2718 3.17154 37.2725 3.25693C37.273 3.34245 37.2389 3.42473 37.1787 3.48544L36.0225 4.65243C35.9033 4.77191 35.7107 4.77316 35.5898 4.65536C33.9839 3.12869 31.8525 2.27756 29.6367 2.27743C27.4207 2.27743 25.2888 3.12853 23.6826 4.65536C23.5618 4.77335 23.369 4.77213 23.25 4.65243L22.0938 3.48544C22.0335 3.42469 21.9994 3.34246 22 3.25693C22.0007 3.17148 22.0357 3.08927 22.0967 3.02939Z" fill="black"/>
+      </svg>
+    </div>
+  </div>
+  <div data-layer="原生/导航栏" style="width: 375px; padding-right: 44px; left: 0px; top: 44px; position: absolute; justify-content: space-between; align-items: center; display: inline-flex">
+    <div data-svg-wrapper data-layer="返回按钮" style="position: relative">
+      <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M26.318 13.4393C25.7773 12.8986 24.9264 12.857 24.338 13.3146L24.1967 13.4393L18.818 18.818C17.1309 20.5051 17.0634 23.1984 18.6155 24.966L18.818 25.182L24.1967 30.5607C24.7825 31.1464 25.7322 31.1464 26.318 30.5607C26.8587 30.0199 26.9003 29.1691 26.4428 28.5807L26.318 28.4393L20.9393 23.0607C20.3986 22.5199 20.357 21.6691 20.8145 21.0807L20.9393 20.9393L26.318 15.5607C26.9038 14.9749 26.9038 14.0251 26.318 13.4393Z" fill="#404040"/>
+      </svg>
+    </div>
+    <div data-layer="✏️标题" style="width: 266px; height: 26px; flex-shrink: 0; text-align: center; justify-content: center; display: flex; flex-direction: column; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--基础-控件, black); font-size: 18px; font-family: PingFang SC; font-weight: 500; line-height: 27px; word-wrap: break-word">活动详情</div>
+  </div>
+</div>
+  </div>
+</body>
+</html>

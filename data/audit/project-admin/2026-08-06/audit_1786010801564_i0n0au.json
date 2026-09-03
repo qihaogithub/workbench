@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1786010801564_i0n0au",
+  "at": 1786010801564,
+  "actor": {
+    "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+    "name": "qihao",
+    "role": "creator",
+    "source": "author-site"
+  },
+  "level": "L2",
+  "tool": "page_create_version",
+  "projectId": "proj_1783042627508_t1czw2",
+  "resourceId": "page_lib0",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "page-version:page_lib0:prv_1786010801560_xgd353"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

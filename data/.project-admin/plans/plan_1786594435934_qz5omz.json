@@ -1,0 +1,12 @@
+{
+  "planId": "plan_1786594435934_qz5omz",
+  "operation": "project_delete",
+  "resourceId": "proj_1786594402117_7h98rf",
+  "impact": [
+    "删除项目 E2E:20260813T041309617Z-r7nhg4:核心流程回归",
+    "删除 1 个页面",
+    "删除项目工作空间和元数据"
+  ],
+  "reversible": true,
+  "confirmToken": "confirm_1786594435934_woxbay"
+}

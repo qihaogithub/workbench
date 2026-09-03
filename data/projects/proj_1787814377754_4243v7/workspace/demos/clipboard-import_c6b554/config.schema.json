@@ -1,0 +1,27 @@
+{
+  "type": "object",
+  "properties": {
+    "video": {
+      "type": "string",
+      "title": "拍摄提示视频",
+      "default": "",
+      "format": "video",
+      "ui:options": {
+        "accept": "video/*"
+      }
+    }
+  },
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "fixed-canvas",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "fixed",
+      "preset": "custom",
+      "source": "figma"
+    }
+  }
+}

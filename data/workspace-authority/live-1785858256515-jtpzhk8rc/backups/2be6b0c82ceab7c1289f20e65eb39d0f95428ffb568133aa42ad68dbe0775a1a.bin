@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>暑期衔接 2日创作体验</title>
+  <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+  <div class="page-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-badge">🔥 限时报名</div>
+      <h1 class="header-title">暑期衔接<br>2日创作体验</h1>
+      <p class="header-subtitle">即学即练 · 当堂成文</p>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="hero-illustration">
+        <div class="chicken">🐔</div>
+        <div class="pencil">✏️</div>
+        <div class="book">📖</div>
+        <div class="paper">📝</div>
+      </div>
+      <div class="hero-text">
+        <h2 class="hero-title">让孩子爱上写作</h2>
+        <p class="hero-desc">
+          趣味引导 + 实战练习<br>
+          两天时间，从不会写到自信表达
+        </p>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="features">
+      <h2 class="section-title">课程特色</h2>
+      <div class="feature-list">
+        <div class="feature-item">
+          <div class="feature-icon">🎯</div>
+          <h3 class="feature-title">趣味启蒙</h3>
+          <p class="feature-desc">通过故事、游戏激发写作兴趣</p>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">✍️</div>
+          <h3 class="feature-title">即学即练</h3>
+          <p class="feature-desc">当堂完成创作，即时获得反馈</p>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">🌟</div>
+          <h3 class="feature-title">自信表达</h3>
+          <p class="feature-desc">分享作品，建立写作自信心</p>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">🏆</div>
+          <h3 class="feature-title">成果展示</h3>
+          <p class="feature-desc">结课作品集结成册，家长见证成长</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Schedule -->
+    <section class="schedule">
+      <h2 class="section-title">课程安排</h2>
+      <div class="schedule-day">
+        <div class="day-badge">Day 1</div>
+        <h3 class="day-title">创作启蒙</h3>
+        <ul class="schedule-list">
+          <li class="schedule-item">
+            <span class="time">09:00 - 10:30</span>
+            <span class="content">写作入门：如何找到灵感</span>
+          </li>
+          <li class="schedule-item">
+            <span class="time">10:45 - 12:00</span>
+            <span class="content">创意写作：我的故事开始了</span>
+          </li>
+          <li class="schedule-item">
+            <span class="time">14:00 - 15:30</span>
+            <span class="content">写作技巧：让文字活起来</span>
+          </li>
+          <li class="schedule-item">
+            <span class="time">15:45 - 17:00</span>
+            <span class="content">实战练习：完成第一篇作品</span>
+          </li>
+        </ul>
+      </div>
+      <div class="schedule-day">
+        <div class="day-badge">Day 2</div>
+        <h3 class="day-title">创作进阶</h3>
+        <ul class="schedule-list">
+          <li class="schedule-item">
+            <span class="time">09:00 - 10:30</span>
+            <span class="content">修改润色：让作品更精彩</span>
+          </li>
+          <li class="schedule-item">
+            <span class="time">10:45 - 12:00</span>
+            <span class="content">主题写作：写我身边的人和事</span>
+          </li>
+          <li class="schedule-item">
+            <span class="time">14:00 - 15:30</span>
+            <span class="content">合作创作：小组故事接龙</span>
+          </li>
+          <li class="schedule-item">
+            <span class="time">15:45 - 17:00</span>
+            <span class="content">作品分享：小小作家发布会</span>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta">
+      <div class="cta-content">
+        <h2 class="cta-title">立即报名</h2>
+        <p class="cta-desc">名额有限，先到先得</p>
+        <button class="cta-button">📞 咨询热线</button>
+        <p class="cta-note">扫码添加客服了解详情</p>
+        <div class="qr-placeholder">
+          <div class="qr-icon">📱</div>
+          <span>二维码</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p class="footer-text">© 2026 暑期创作体验营</p>
+    </footer>
+  </div>
+</body>
+</html>

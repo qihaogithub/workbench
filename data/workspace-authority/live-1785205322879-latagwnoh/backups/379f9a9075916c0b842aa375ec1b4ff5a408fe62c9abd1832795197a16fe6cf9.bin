@@ -1,0 +1,23 @@
+{
+  "bgm": "/api/sessions/session-1788322086757-6e2xrzrpj/workspace/assets/audio/mtjnzhvy/audio_event_star_second_play.mp3",
+  "navColor": "#C4C4C4",
+  "modules": [
+    {
+      "type": "participant",
+      "bgImage": "https://img.onlywnn.cn/figma/h_19dbcc85.png",
+      "count": 128
+    },
+    {
+      "type": "video",
+      "videoBg": "",
+      "video": {
+        "url": "",
+        "poster": ""
+      }
+    },
+    {
+      "type": "image",
+      "image": "https://img.onlywnn.cn/figma/h_483ae3df.png"
+    }
+  ]
+}

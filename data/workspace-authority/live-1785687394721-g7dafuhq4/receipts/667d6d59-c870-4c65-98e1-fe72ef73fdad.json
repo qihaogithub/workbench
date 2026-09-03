@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "667d6d59-c870-4c65-98e1-fe72ef73fdad",
+  "projectId": "proj_1785687393956_aa29zz",
+  "workspaceId": "live-1785687394721-g7dafuhq4",
+  "baseRevision": 0,
+  "revision": 208,
+  "rootHash": "aec1086f86e14f803c7af4ec818eb7b64c7ce90f632fc8b12a03d278cb74bd5d",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/scalar-types_p4m7/prototype.css",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "65b84c96bea0ff07753d87cba393179f8b33d718f7133074cbf3054babc948a4"
+    }
+  ],
+  "committedAt": 1785735949447
+}

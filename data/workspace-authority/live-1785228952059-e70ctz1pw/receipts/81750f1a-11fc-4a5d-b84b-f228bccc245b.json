@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "81750f1a-11fc-4a5d-b84b-f228bccc245b",
+  "projectId": "proj_1785228950889_c6hs1j",
+  "workspaceId": "live-1785228952059-e70ctz1pw",
+  "baseRevision": 0,
+  "revision": 40,
+  "rootHash": "52fbbfd3157ebd5443914eb946a5cdfed6cc7257e622aa4051b6fb4092c694ac",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/page_ijly/prototype.html",
+      "action": "modified",
+      "beforeHash": "74c46da9141e05519c81d76e08a49dc755dc0f21cc540ca93b5b6fd69db8906d",
+      "afterHash": "f1f8e216db4c0591d84008103d03bd49aab28140215e9a800e3860834d85af87"
+    }
+  ],
+  "committedAt": 1785376570901
+}

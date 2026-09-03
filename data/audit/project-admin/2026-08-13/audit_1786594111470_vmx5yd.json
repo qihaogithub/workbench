@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1786594111470_vmx5yd",
+  "at": 1786594111470,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1786594111469_293vqh",
+  "inputSummary": {
+    "name": "E2E:20260813T040743016Z-fifj2u:配置功能回归",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1786594111469_293vqh"
+    ]
+  }
+}

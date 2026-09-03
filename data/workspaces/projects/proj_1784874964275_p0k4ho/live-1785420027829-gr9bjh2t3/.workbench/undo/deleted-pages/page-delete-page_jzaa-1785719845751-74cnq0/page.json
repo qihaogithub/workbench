@@ -1,0 +1,8 @@
+{
+  "id": "page_jzaa",
+  "name": "基础字段配置",
+  "routeKey": "page-2",
+  "order": 2,
+  "parentId": null,
+  "runtimeType": "prototype-html-css"
+}

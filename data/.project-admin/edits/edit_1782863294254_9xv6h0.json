@@ -1,0 +1,16 @@
+{
+  "editId": "edit_1782863294254_9xv6h0",
+  "projectId": "proj_1782839405716_tqjl1f",
+  "workspaceId": "core_edit_1782863294254_9xv6h0",
+  "workspacePath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/workspaces/qh2/proj_1782839405716_tqjl1f/core_edit_1782863294254_9xv6h0",
+  "baseVersion": "v1",
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-inline-image-fix"
+  },
+  "createdAt": 1782863294287,
+  "expiresAt": 1782870494287,
+  "status": "committed"
+}

@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "entry": "page",
+  "pages": {
+    "page": {
+      "pageId": "course-complete_a7k3",
+      "title": "完课活动"
+    },
+    "page-2": {
+      "pageId": "page_034b",
+      "title": "学习页头图-手机"
+    },
+    "pad": {
+      "pageId": "pad_49pb",
+      "title": "学习页头图-Pad"
+    },
+    "page-3": {
+      "pageId": "page_na8k",
+      "title": "学习页完课活动"
+    }
+  },
+  "actions": [],
+  "state": {}
+}

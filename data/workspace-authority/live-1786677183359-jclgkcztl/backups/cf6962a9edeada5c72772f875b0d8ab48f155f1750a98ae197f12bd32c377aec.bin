@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "projectId": "proj_1786367903885_iu08e4",
+  "updatedAt": 1787888236251,
+  "state": {
+    "viewport": {
+      "x": 234.92108678707655,
+      "y": 191.57830496882102,
+      "zoom": 0.27807417394471584
+    },
+    "pages": {
+      "kids-edu_b3xw": {
+        "x": -319.15870800639726,
+        "y": -85.9998190899943,
+        "width": 375,
+        "height": 2471,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "clipboard-import_4d9ab0": {
+        "x": 549.1688741936314,
+        "y": 26.59478305785112,
+        "width": 375,
+        "height": 812,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "pageGroups": {},
+    "sections": {},
+    "hiddenPageIds": [],
+    "nodes": {
+      "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c": {
+        "id": "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c",
+        "title": "文档",
+        "layout": {
+          "x": 201.39493937032313,
+          "y": -38.165059192088,
+          "width": 223.08961578965517,
+          "height": 352.7284130872072,
+          "zIndex": 1
+        },
+        "createdAt": 1787885153164,
+        "updatedAt": 1787886795792,
+        "kind": "document",
+        "knowledgeDocument": {
+          "id": "kb_1787885153658_t9h54b",
+          "title": "文档",
+          "fileName": "文档.md",
+          "description": "文档"
+        }
+      }
+    },
+    "layers": {
+      "annotations": {
+        "nodes": {
+          "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c": {
+            "id": "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c",
+            "title": "文档",
+            "layout": {
+              "x": 201.39493937032313,
+              "y": -38.165059192088,
+              "width": 223.08961578965517,
+              "height": 352.7284130872072,
+              "zIndex": 1
+            },
+            "createdAt": 1787885153164,
+            "updatedAt": 1787886795792,
+            "kind": "document",
+            "knowledgeDocument": {
+              "id": "kb_1787885153658_t9h54b",
+              "title": "文档",
+              "fileName": "文档.md",
+              "description": "文档"
+            }
+          }
+        }
+      },
+      "documents": {
+        "nodes": {
+          "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c": {
+            "id": "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c",
+            "title": "文档",
+            "layout": {
+              "x": 201.39493937032313,
+              "y": -38.165059192088,
+              "width": 223.08961578965517,
+              "height": 352.7284130872072,
+              "zIndex": 1
+            },
+            "createdAt": 1787885153164,
+            "updatedAt": 1787886795792,
+            "kind": "document",
+            "knowledgeDocument": {
+              "id": "kb_1787885153658_t9h54b",
+              "title": "文档",
+              "fileName": "文档.md",
+              "description": "文档"
+            }
+          }
+        }
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [],
+    "navigation": {
+      "hotspots": {},
+      "connections": {}
+    }
+  }
+}

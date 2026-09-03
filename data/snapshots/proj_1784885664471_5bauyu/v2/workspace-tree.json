@@ -1,0 +1,21 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "mobile-header-preview_b3f1",
+      "name": "手机头图预览",
+      "runtimeType": "high-fidelity-react",
+      "order": 1,
+      "parentId": null,
+      "routeKey": "page"
+    },
+    {
+      "id": "pad-header-preview_x7k2",
+      "name": "Pad头图预览",
+      "runtimeType": "high-fidelity-react",
+      "order": 2,
+      "parentId": null,
+      "routeKey": "pad"
+    }
+  ]
+}

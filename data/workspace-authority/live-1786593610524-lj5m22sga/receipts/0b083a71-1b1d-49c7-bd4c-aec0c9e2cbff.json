@@ -1,0 +1,25 @@
+{
+  "committed": true,
+  "mutationId": "0b083a71-1b1d-49c7-bd4c-aec0c9e2cbff",
+  "projectId": "proj_1786593610509_wjbkml",
+  "workspaceId": "live-1786593610524-lj5m22sga",
+  "baseRevision": 0,
+  "revision": 4,
+  "rootHash": "bc52ae2adb8dded396d5be2e827ca0ee7bafadfe195d6214f7758c556d5c78de",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_4kzo/index.tsx",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "8dd089a70e527a56df3098269dd19bf4555c477f71622a0e5899a91c24d2d230"
+    },
+    {
+      "path": "demos/page_4kzo/config.schema.json",
+      "action": "modified",
+      "beforeHash": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+      "afterHash": "b86a5f163cd5535e4eba1a807d17ee465a6c571d0a1f80ee96043d6bb421b26e"
+    }
+  ],
+  "committedAt": 1786593615563
+}

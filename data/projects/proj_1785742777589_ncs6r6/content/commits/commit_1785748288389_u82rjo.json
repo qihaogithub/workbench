@@ -1,0 +1,31 @@
+{
+  "id": "commit_1785748288389_u82rjo",
+  "projectId": "proj_1785742777589_ncs6r6",
+  "parentCommitId": "commit_1785747107126_pncrmh",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "修改了配置项类型示例",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "config-demo_m7p2",
+      "versionId": "prv_1785748288386_55acia"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "config-demo_m7p2",
+      "fromVersionId": "prv_1785747107123_57k12x",
+      "toVersionId": "prv_1785748288386_55acia"
+    }
+  ],
+  "createdAt": 1785748288389,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785742777874-8sex712t9",
+    "workspaceRevision": 48,
+    "workspaceRootHash": "4e9260704b67694d6e4049ab37b97243cce2f7479abd374cbb38118f688fc647"
+  }
+}

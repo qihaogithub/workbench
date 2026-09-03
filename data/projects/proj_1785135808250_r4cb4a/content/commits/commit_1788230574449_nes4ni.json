@@ -1,0 +1,91 @@
+{
+  "id": "commit_1788230574449_nes4ni",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "parentCommitId": "commit_1788227437438_reuop6",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录闯关活动页（进行中）",
+  "resourcePointers": [
+    {
+      "kind": "knowledge_document",
+      "resourceId": "kb_1788227272655_677p9v",
+      "versionId": "krv_1788227284701_expppl"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_5rsp",
+      "versionId": "prv_1785222248758_v0zhj5"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_da9l",
+      "versionId": "prv_1785316177703_45jh4a"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_gfbs",
+      "versionId": "prv_1785136734038_5bt9sp"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_p8a2",
+      "versionId": "prv_1788230574409_vikfdl"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_pqyt",
+      "versionId": "prv_1785205299313_c3158x"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_sgfq",
+      "versionId": "prv_1785321973637_sq9mhi"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_swfq",
+      "versionId": "prv_1788227437434_n9x0w7"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_wcfh",
+      "versionId": "prv_1785206677053_mzslur"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_xix9",
+      "versionId": "prv_1785397932241_fpmkja"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_yw72",
+      "versionId": "prv_1788162160282_75y7a3"
+    },
+    {
+      "kind": "page",
+      "resourceId": "quiz-correct_m5n8",
+      "versionId": "prv_1788143379368_qfhy32"
+    },
+    {
+      "kind": "page",
+      "resourceId": "quiz-wrong_b7k9",
+      "versionId": "prv_1788099086697_i20kcq"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "page_p8a2",
+      "fromVersionId": "prv_1787820483768_pu1kvj",
+      "toVersionId": "prv_1788230574409_vikfdl"
+    }
+  ],
+  "createdAt": 1788230574449,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785205322879-latagwnoh",
+    "workspaceRevision": 975,
+    "workspaceRootHash": "c9fb6837e518df2f8da058a9fda9eaf92a07e5ec8209da87525253736addb85a"
+  }
+}

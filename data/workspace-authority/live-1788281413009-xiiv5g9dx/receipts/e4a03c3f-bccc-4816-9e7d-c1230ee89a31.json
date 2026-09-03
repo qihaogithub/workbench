@@ -1,0 +1,25 @@
+{
+  "committed": true,
+  "mutationId": "e4a03c3f-bccc-4816-9e7d-c1230ee89a31",
+  "projectId": "proj_1788281412990_mwa5mq",
+  "workspaceId": "live-1788281413009-xiiv5g9dx",
+  "baseRevision": 0,
+  "revision": 3,
+  "rootHash": "fd99cea3dcb7116c04dbd45f03b37cc3705bd6ca130fe1b5bbd3d06196215f03",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_zwrc/index.tsx",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "bf5223ef5fe89a0c42e6b63c3e48e445715bff529599bb1808c1d2c7788fb340"
+    },
+    {
+      "path": "demos/page_zwrc/config.schema.json",
+      "action": "modified",
+      "beforeHash": "e1c118a2c54911913d4ffbf47809ce89c404706cd8a6262198c81674f23a3750",
+      "afterHash": "256a31b01fcf7159e6f6d661a675eeea18b66e36c85bed51d4e7c57158591d35"
+    }
+  ],
+  "committedAt": 1788281413880
+}

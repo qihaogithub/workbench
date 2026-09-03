@@ -1,0 +1,8 @@
+{
+  "id": "page_80i7",
+  "name": "画布待删除页面",
+  "routeKey": "page-2",
+  "order": 1,
+  "parentId": null,
+  "runtimeType": "prototype-html-css"
+}

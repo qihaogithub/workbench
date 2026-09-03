@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "id": "kb_1786433295995_07guz2",
+      "title": "231",
+      "source": "user",
+      "description": "123",
+      "fileName": "231.md",
+      "addedAt": "2026-08-11T07:28:15.995Z",
+      "updatedAt": "2026-08-11T08:59:09.250Z",
+      "sizeBytes": 152
+    },
+    {
+      "id": "kb_1786438927948_tudv9j",
+      "title": "未命名文档34",
+      "source": "user",
+      "description": "未命名文档",
+      "fileName": "未命名文档.md",
+      "addedAt": "2026-08-11T09:02:07.948Z",
+      "updatedAt": "2026-08-11T09:02:10.764Z",
+      "sizeBytes": 0
+    }
+  ]
+}

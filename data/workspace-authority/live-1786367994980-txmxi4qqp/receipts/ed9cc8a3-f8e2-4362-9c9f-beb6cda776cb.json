@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "ed9cc8a3-f8e2-4362-9c9f-beb6cda776cb",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786367994980-txmxi4qqp",
+  "baseRevision": 0,
+  "revision": 357,
+  "rootHash": "122ae479577ca13099a14123dab63bb56f2f40053d9a08214a2ded1382f50d65",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/kids-edu_b3xw/index.tsx",
+      "action": "modified",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/kids-edu_b3xw/config.schema.json",
+      "action": "modified",
+      "beforeHash": "7fc956e40905683f06ab7d606976bafe49fe770dad6166989fe9050b55b4ada4",
+      "afterHash": "7fc956e40905683f06ab7d606976bafe49fe770dad6166989fe9050b55b4ada4"
+    },
+    {
+      "path": "demos/kids-edu_b3xw/prototype.html",
+      "action": "modified",
+      "beforeHash": "3e46448c2ce575544487f2fbafb825e0f1f266811198f42e64a5a2a60ed8f1d0",
+      "afterHash": "3e46448c2ce575544487f2fbafb825e0f1f266811198f42e64a5a2a60ed8f1d0"
+    },
+    {
+      "path": "demos/kids-edu_b3xw/prototype.css",
+      "action": "modified",
+      "beforeHash": "5c7e7a4e39f966ad474fc54d82e62add4428ae642c9a14b7a98c000132e82259",
+      "afterHash": "5c7e7a4e39f966ad474fc54d82e62add4428ae642c9a14b7a98c000132e82259"
+    }
+  ],
+  "committedAt": 1786528326321
+}

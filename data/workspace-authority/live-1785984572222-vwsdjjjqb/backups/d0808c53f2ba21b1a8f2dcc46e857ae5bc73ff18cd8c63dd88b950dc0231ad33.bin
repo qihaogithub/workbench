@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Figma Export</title>
+  <style>
+    /* Reset default margins */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    
+    /* Figma export container */
+    .figma-export {
+      background: white;
+      width: 375px;
+      height: 812px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+      position: relative;
+    }
+    
+    /* 可滚动内容区域 */
+    .scrollable-content {
+      width: 375px;
+      height: 812px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    /* 隐藏滚动条 */
+    .scrollable-content::-webkit-scrollbar {
+      display: none;
+    }
+    
+    /* 吸底标签栏 */
+    .bottom-tab-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 375px;
+      height: 90px;
+      z-index: 100;
+    }
+    
+    /* 头部固定 */
+    .fixed-header {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 375px;
+      height: 132px;
+      z-index: 100;
+    }
+  </style>
+</head>
+<body>
+  <div class="figma-export">
+<div data-layer="手机" style="width: 375px; height: 812px; position: relative; background: white; overflow: hidden">
+  <!-- 可滚动内容区域 -->
+  <div class="scrollable-content">
+    <div data-layer="主推区" style="width: 375px; height: 380px; position: relative">
+      <img src="/api/images/img_ZO_cMaoYgouRfA" alt="static layer" data-layer="#static 手机背景图" data-property-1="#static 手机背景图" class="Static" style="left: 0px; top: 0px; position: absolute; width: 375px; height: 380px; object-fit: cover" data-figma-id="417:21331" data-bind-src="phoneBackground">
+      <img src="/api/images/img_f9y1nONlI30sBg" alt="static layer" data-layer="#static 手机前景图" data-property-1="#static 手机前景图" class="Static" style="left: 17.50px; top: 144px; position: absolute; width: 340px; height: 190px; object-fit: cover" data-figma-id="417:21326" data-bind-src="phoneForeground">
+      <div data-layer="Rectangle" class="Rectangle" style="width: 375px; height: 24px; left: 0px; top: 356px; position: absolute; background: white; border-top-left-radius: 24px; border-top-right-radius: 24px"></div>
+    </div>
+    <div data-layer="信息流" style="width: 375px; position: relative; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 16px; display: inline-flex">
+      <div data-layer="3-6岁" class="6" style="align-self: stretch; flex-shrink: 0; padding-left: 20px; padding-right: 20px; position: relative; background: white; border-radius: 20px; flex-direction: column; justify-content: flex-start; align-items: center; gap: 8px; display: flex">
+        <div data-layer="Auto Layout Horizontal" class="AutoLayoutHorizontal" style="flex-shrink: 0; position: relative; justify-content: flex-start; align-items: flex-start; gap: 14px; display: inline-flex">
+          <img src="/api/images/img_KdXOyQxmhghPaQ" alt="static layer" data-layer="#static 金刚位" class="Static" style="position: relative; width: 78px; height: 84px; object-fit: cover" data-figma-id="417:26365" />
+          <img src="/api/images/img_uvA2MebaZHrRKA" alt="static layer" data-layer="#static 金刚位" class="Static" style="position: relative; width: 78px; height: 84px; object-fit: cover" data-figma-id="417:26368" />
+          <img src="/api/images/img_M8puiAvJXlRg9Q" alt="static layer" data-layer="#static 金刚位" class="Static" style="position: relative; width: 78px; height: 84px; object-fit: cover" data-figma-id="417:26369" />
+          <img src="/api/images/img_2to02r-rBum5Tg" alt="static layer" data-layer="#static 金刚位" class="Static" style="position: relative; width: 78px; height: 84px; object-fit: cover" data-figma-id="417:26370" />
+        </div>
+        <div data-layer="Auto Layout Horizontal" class="AutoLayoutHorizontal" style="flex-shrink: 0; position: relative; justify-content: flex-start; align-items: flex-start; gap: 14px; display: inline-flex">
+          <img src="/api/images/img_YzE4L2ylGFSWxQ" alt="static layer" data-layer="#static 金刚位" class="Static" style="position: relative; width: 78px; height: 84px; object-fit: cover" data-figma-id="417:26372" />
+          <img src="/api/images/img_XOvD5WMEB-60yg" alt="static layer" data-layer="#static 金刚位" class="Static" style="position: relative; width: 78px; height: 84px; object-fit: cover" data-figma-id="417:26373" />
+          <img src="/api/images/img_QRT7BA28njm6Vg" alt="static layer" data-layer="#static 金刚位" class="Static" style="position: relative; width: 78px; height: 84px; object-fit: cover" data-figma-id="417:26374" />
+          <img src="/api/images/img_Pq0_tNtRWP0NRA" alt="static layer" data-layer="#static 金刚位" class="Static" style="position: relative; width: 78px; height: 84px; object-fit: cover" data-figma-id="417:26375" />
+        </div>
+      </div>
+      <img src="/api/images/img_H_fkutRDAAxkjw" alt="static layer" data-layer="#static 最近在看" class="Static" style="position: relative; width: 375px; height: 132px; object-fit: cover" data-figma-id="428:14400" />
+      <div data-layer="配图卡片-单卡片" style="align-self: stretch; flex-shrink: 0; position: relative; flex-direction: column; justify-content: flex-start; align-items: center; display: flex">
+        <div data-layer="Frame 3466298" class="Frame3466298" style="align-self: stretch; flex-shrink: 0; position: relative; flex-direction: column; justify-content: flex-start; align-items: flex-start; display: flex">
+          <div data-layer="导航/模块标题" data-pad="off" data-show-辅助文案="false" data-更多按钮="true" style="width: 375px; flex-shrink: 0; padding-left: 20px; padding-right: 20px; padding-top: 8px; padding-bottom: 8px; position: relative; justify-content: space-between; align-items: center; display: inline-flex">
+            <div data-layer="标题" style="flex-grow: 1; flex-basis: 0px; min-width: 0px; position: relative; justify-content: flex-start; align-items: center; gap: 4px; display: flex">
+              <div data-layer="配图" style="width: 28px; height: 28px; flex-shrink: 0; position: relative; overflow: hidden">
+                <div data-layer="􀤟" style="width: 28px; left: 0px; top: 0px; position: absolute; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #DBAF00; font-size: 19px; font-family: SF Pro; font-weight: 700; line-height: 28.50px; word-wrap: break-word">􀤟</div>
+              </div>
+              <div data-layer="文字" style="flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #DBAF00; font-size: 18px; font-family: PingFang SC; font-weight: 500; line-height: 27px; white-space: nowrap">配图卡片-单卡片</div>
+            </div>
+            <div data-layer="按钮" style="height: 26px; flex-shrink: 0; padding-left: 12px; position: relative; background: white; box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.06), 0px 0px 2px rgba(0, 0, 0, 0.06) inset; border-radius: 999px; justify-content: flex-end; align-items: center; display: flex">
+              <div data-layer="更多" style="flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #DBAF00; font-size: 14px; font-family: PingFang SC; font-weight: 400; white-space: nowrap">更多</div>
+              <div data-layer="Frame" class="Frame" style="width: 20px; height: 20px; flex-shrink: 0; position: relative; transform: rotate(180deg); transform-origin: top left">
+                <img src="/api/images/img_uV3m6pOeOg86Ow" alt="vector" data-layer="Vector" class="Vector" style="left: 4.52px; top: 3.64px; position: absolute; width: 10px; height: 8px; object-fit: contain" data-figma-id="I417:26380;12104:86932" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div data-layer="一行一个" style="width: 344px; height: 180px; flex-shrink: 0; position: relative; overflow: hidden; border-radius: 10px">
+          <img data-layer="未命名项目-图层 1 (1) 1" class="111" style="width: 344px; height: 180px; left: -0.50px; top: 0px; position: absolute" src="https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/手机/一行一个广告图.png" data-bind-src="adImage" />
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- 吸底标签栏 -->
+  <div class="bottom-tab-bar">
+    <img src="/api/images/img_gXn5MPP_MLxW3A" alt="static layer" data-layer="#static 吸底标签栏" class="Static" style="width: 375px; height: 90px; object-fit: cover" data-figma-id="417:23036" />
+  </div>
+  <!-- 头部固定 -->
+  <div class="fixed-header">
+    <img src="/api/images/img_u_hUjqiQnHuRmQ" alt="static layer" data-layer="#static 头部固定" class="Static" style="width: 375px; height: 132px; object-fit: cover" data-figma-id="417:13621" />
+  </div>
+</div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>配置类型原型演示</title>
+  <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="card-header" data-bind-style-background-color="themeColor">
+        <h1 class="card-title" data-bind-text="title">简约卡片</h1>
+        <div class="badge" data-bind-text="showBadge" data-bind-style-background-color="themeColor">true</div>
+      </div>
+      <div class="card-body">
+        <div class="card-info">
+          <div class="info-row">
+            <span class="info-label">价格</span>
+            <span class="info-value">¥<span data-bind-text="price">99.9</span></span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">库存</span>
+            <span class="info-value"><span data-bind-text="count">42</span> 件</span>
+          </div>
+          <div class="info-row info-desc">
+            <span class="info-label">简介</span>
+            <span class="info-value" data-bind-text="description">这是一张简约的演示卡片。</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">布局模式</span>
+            <span class="info-value" data-bind-text="layoutMode">card</span>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer">
+        <span class="footer-hint">💡 在右侧面板调整配置查看效果</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "1122ab00-77b4-4b0d-abcf-19a3095ef465",
+  "projectId": "proj_1785984571939_9uj8av",
+  "workspaceId": "live-1785984572222-vwsdjjjqb",
+  "baseRevision": 0,
+  "revision": 152,
+  "rootHash": "3a22c3becf0ec72a0c284a33dca75784a6747f87c1112dbcebb19720889ae190",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_0it3/index.tsx",
+      "action": "modified",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/page_0it3/config.schema.json",
+      "action": "modified",
+      "beforeHash": "53d519b2ddd59d83a6727e88e7471dfe18fcbab69463e62b8b0cc916c3dff3ee",
+      "afterHash": "8601b9f8cf501edc6dd20abe7bad0bf601f4c38cde0465a8802811e9c793378e"
+    },
+    {
+      "path": "demos/page_0it3/prototype.html",
+      "action": "modified",
+      "beforeHash": "82474c6c6d64a1c16548ef9b2d4a3ab3c030c3a19e77453619911931bde75b74",
+      "afterHash": "82474c6c6d64a1c16548ef9b2d4a3ab3c030c3a19e77453619911931bde75b74"
+    },
+    {
+      "path": "demos/page_0it3/prototype.css",
+      "action": "modified",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/page_0it3/prototype.meta.json",
+      "action": "modified",
+      "beforeHash": "021cf0af5257cbc3e8494189d8c5d0e3bdf4fbbcf8d5d41ea918b4ab52c72784",
+      "afterHash": "021cf0af5257cbc3e8494189d8c5d0e3bdf4fbbcf8d5d41ea918b4ab52c72784"
+    }
+  ],
+  "committedAt": 1786011102505
+}

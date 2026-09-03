@@ -1,0 +1,21 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "kids-edu_b3xw",
+      "name": "kids edu",
+      "order": 0,
+      "parentId": null,
+      "runtimeType": "prototype-html-css",
+      "routeKey": "kids-edu"
+    },
+    {
+      "id": "拍摄前动画_e39bf7",
+      "name": "拍摄前动画",
+      "routeKey": "page",
+      "order": 1,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "cb57f657-223b-43ec-9ce0-7b72264fa39f",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786367994980-txmxi4qqp",
+  "baseRevision": 0,
+  "revision": 58,
+  "rootHash": "f666ecff74082cdea48763c4f07810303beff7187db1388d20b02bf3d86707ec",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "convention.md",
+      "action": "modified",
+      "beforeHash": "000bf007afebea46075a0389fc560b07c3eb85ad9baa51cdc166c1f1c7e6bb70",
+      "afterHash": "34501ff14dd1092d716270152d64ce3ebe3047205022ccb7cd895d66d26e28ad"
+    }
+  ],
+  "committedAt": 1786432491602
+}

@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1784786021660_2e9ml2",
+  "at": 1784786021660,
+  "actor": {
+    "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+    "name": "qihao",
+    "role": "creator",
+    "source": "author-site"
+  },
+  "level": "L2",
+  "tool": "page_create_version",
+  "projectId": "proj_1783334663364_30hsrv",
+  "resourceId": "worldcup-lottery_h7k3",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "page-version:worldcup-lottery_h7k3:prv_1784786021654_pbot2y"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

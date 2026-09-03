@@ -1,0 +1,21 @@
+{
+  "id": "commit_1785082642720_2u9fa8",
+  "projectId": "proj_1784874964275_p0k4ho",
+  "parentCommitId": "commit_1785082264814_fvm1en",
+  "visibility": "protected",
+  "intent": "publish",
+  "title": "发布项目 v17",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "course-complete_a7k3",
+      "versionId": "prv_1785082264810_qie5gy"
+    }
+  ],
+  "changedResources": [],
+  "createdAt": 1785082642720,
+  "createdBy": "Author Site",
+  "audit": {
+    "actorType": "user"
+  }
+}

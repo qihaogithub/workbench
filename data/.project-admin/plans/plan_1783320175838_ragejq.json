@@ -1,0 +1,12 @@
+{
+  "planId": "plan_1783320175838_ragejq",
+  "operation": "project_delete",
+  "resourceId": "proj_1783320156458_aoxx4h",
+  "impact": [
+    "删除项目 E2E:20260706T064222124Z-t0xo5f:手绘双引擎互开回归",
+    "删除 0 个页面",
+    "删除项目工作空间和元数据"
+  ],
+  "reversible": true,
+  "confirmToken": "confirm_1783320175839_ztoxy4"
+}

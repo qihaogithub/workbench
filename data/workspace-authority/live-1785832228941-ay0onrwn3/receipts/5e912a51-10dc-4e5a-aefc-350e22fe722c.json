@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "5e912a51-10dc-4e5a-aefc-350e22fe722c",
+  "projectId": "proj_1785742777589_ncs6r6",
+  "workspaceId": "live-1785832228941-ay0onrwn3",
+  "baseRevision": 0,
+  "revision": 68,
+  "rootHash": "a80e0a725565607f58df84fce2da8c9e92027ecb8c2a0455d3787d6171c187be",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/motion-formats_k4r2/index.tsx",
+      "action": "modified",
+      "beforeHash": "8d648655d542bb365b24025b027c7d09cd38eedaaa989be628795fc250f3ea09",
+      "afterHash": "fcae1003c55592b6a1e7f62eba0cd57031fafd41e74f310b2ad1be39e4a79957"
+    }
+  ],
+  "committedAt": 1785934741629
+}

@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1786594518350_qw00ny",
+  "at": 1786594518350,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1786594518341_bx5win",
+  "inputSummary": {
+    "name": "E2E:20260813T041309617Z-r7nhg4:共享项目回归",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1786594518341_bx5win"
+    ]
+  }
+}

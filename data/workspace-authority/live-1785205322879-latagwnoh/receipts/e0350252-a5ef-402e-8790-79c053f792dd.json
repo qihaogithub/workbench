@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "e0350252-a5ef-402e-8790-79c053f792dd",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "baseRevision": 0,
+  "revision": 2,
+  "rootHash": "f822a9d02037710e7db23d222b6017df10519b733b1aa80a075e0f7447f16d80",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_5rsp/prototype.html",
+      "action": "modified",
+      "beforeHash": "d4a84087da60a5f15a082124ba4d73c1ca61dc2a26a22596d6e33334071b8c4a",
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/page_5rsp/prototype.css",
+      "action": "modified",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/page_5rsp/prototype.meta.json",
+      "action": "modified",
+      "beforeHash": "5693ef20e1fd723f2abb393b27818fc460285d6abeb38c9be2e2f4de4d192624",
+      "afterHash": "42bb61975c959b9e8e56b31d6fa28b53b41c6ebb78b938fe239279d811a6fe96"
+    },
+    {
+      "path": "demos/page_5rsp/config.schema.json",
+      "action": "modified",
+      "beforeHash": "552a68ebc1f5dcfd8998f0934dd0c7132f26a78a7686ba46c25c09987b24c7a6",
+      "afterHash": "552a68ebc1f5dcfd8998f0934dd0c7132f26a78a7686ba46c25c09987b24c7a6"
+    }
+  ],
+  "committedAt": 1785311527040
+}

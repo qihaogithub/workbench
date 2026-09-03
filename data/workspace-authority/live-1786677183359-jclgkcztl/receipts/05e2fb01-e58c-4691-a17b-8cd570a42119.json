@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "05e2fb01-e58c-4691-a17b-8cd570a42119",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 654,
+  "rootHash": "049626e1f1fa121844e0617242bf76b35b30fc40a90608d4476ade15812456ae",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/halloween-level1_f3n9/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "d953bcd9c5e41101c3bd8e1e3181bc20f338e75488f4530014dfd6c8dca0b430"
+    }
+  ],
+  "committedAt": 1787891800773
+}

@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "kind": "spine",
+  "assetId": "spine_c508dc9b51e4f52706b5490ea2d58f70c2753bcdc2804e2d55746bedf1a2f06d",
+  "sourceHash": "c508dc9b51e4f52706b5490ea2d58f70c2753bcdc2804e2d55746bedf1a2f06d",
+  "originalName": "spine二进制示例.zip",
+  "spineVersion": "4.2",
+  "skeleton": "spine二进制示例/medal.skel.bytes",
+  "atlas": "spine二进制示例/medal.atlas.txt",
+  "textures": [
+    "spine二进制示例/medal.png"
+  ],
+  "audio": [
+    {
+      "path": "spine二进制示例/math_medal_1000_max.mp3",
+      "size": 98163,
+      "sha256": "3eb32bb9e975be213fcfc8b47cc0d969124e46a6c044e736c7b8f707f8319fe2",
+      "keys": [
+        "spine二进制示例/math_medal_1000_max.mp3",
+        "./spine二进制示例/math_medal_1000_max.mp3",
+        "spine二进制示例/math_medal_1000_max",
+        "./spine二进制示例/math_medal_1000_max",
+        "math_medal_1000_max.mp3",
+        "math_medal_1000_max"
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "spine二进制示例/math_medal_1000_max.mp3",
+      "size": 98163,
+      "sha256": "3eb32bb9e975be213fcfc8b47cc0d969124e46a6c044e736c7b8f707f8319fe2"
+    },
+    {
+      "path": "spine二进制示例/medal.atlas.txt",
+      "size": 9370,
+      "sha256": "6c3036af64e8c765ff46e4f9ff572fce5026c53b4b8ad910714869cd9be539ad"
+    },
+    {
+      "path": "spine二进制示例/medal.png",
+      "size": 223068,
+      "sha256": "2caf71e1efceee769353c8b767a56299c58c0e33e19420ed43c765c37b52001b"
+    },
+    {
+      "path": "spine二进制示例/medal.skel.bytes",
+      "size": 363845,
+      "sha256": "25e159ff157547b91f45efcaed72a774ed2e220b4eb9c62f224de85925eb3e04"
+    }
+  ]
+}

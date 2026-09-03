@@ -1,0 +1,31 @@
+{
+  "auditId": "audit_1782551841567_ed22qb",
+  "at": 1782551841567,
+  "actor": {
+    "id": "local-codex",
+    "name": "Local Codex",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L2",
+  "tool": "edit_commit",
+  "projectId": "proj_1782547891917_g0e1l9",
+  "resourceId": "edit_1782551841349_x1vt6w",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      "knowledge\\FAQ与客服口径.md",
+      "knowledge\\manifest.json",
+      "knowledge\\中奖履约SOP.md",
+      "knowledge\\玩法规则.md",
+      "knowledge\\风控与异常处理.md"
+    ],
+    "notes": [
+      "生成版本 v4"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

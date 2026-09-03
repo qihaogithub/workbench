@@ -1,0 +1,27 @@
+{
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": { "width": 390, "height": 844 },
+      "heightBehavior": "content",
+      "preset": "mobile",
+      "source": "user"
+    }
+  },
+  "type": "object",
+  "properties": {
+    "heroVideo": {
+      "type": "object",
+      "title": "主视频",
+      "format": "video",
+      "properties": {
+        "url": { "type": "string", "title": "视频地址" },
+        "poster": { "type": "string", "title": "封面地址", "format": "image" }
+      },
+      "required": ["url"],
+      "ui:options": { "accept": "video/mp4,video/webm", "videoPreviewStyle": "controls" }
+    }
+  },
+  "required": []
+}

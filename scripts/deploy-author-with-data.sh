@@ -314,13 +314,21 @@ echo "STOPPING_SERVICES"
 docker compose --env-file .env.docker stop viewer-site screenshot-service author-site agent-service
 
 echo "SYNC_APP_DATA_DIR=$app_data_dir"
-rsync -a --delete "$staging"/ "$app_data_dir"/
-chown -R root:root "$app_data_dir"
+rsync -a --no-o --no-g --no-p --no-t --delete "$staging"/ "$app_data_dir"/
+if [ "$(id -u)" -eq 0 ]; then
+    chown -R root:root "$app_data_dir"
+else
+    echo "SKIP_CHOWN_APP_DATA_DIR=non-root-user"
+fi
 
 if [ -n "$volume_path" ] && [ -d "$volume_path" ]; then
     echo "SYNC_LEGACY_VOLUME=$volume_path"
-    rsync -a --delete "$staging"/ "$volume_path"/
-    chown -R root:root "$volume_path"
+    rsync -a --no-o --no-g --no-p --no-t --delete "$staging"/ "$volume_path"/
+    if [ "$(id -u)" -eq 0 ]; then
+        chown -R root:root "$volume_path"
+    else
+        echo "SKIP_CHOWN_LEGACY_VOLUME=non-root-user"
+    fi
 fi
 
 sync

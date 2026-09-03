@@ -1,0 +1,154 @@
+{
+  "version": 1,
+  "projectId": "proj_1786367903885_iu08e4",
+  "updatedAt": 1787885309923,
+  "state": {
+    "viewport": {
+      "x": -580.9901457315239,
+      "y": 343.48707896327517,
+      "zoom": 1.2133629597726028
+    },
+    "pages": {
+      "kids-edu_b3xw": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 2471,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "clipboard-import_4d9ab0": {
+        "x": 549.1688741936314,
+        "y": 26.59478305785112,
+        "width": 375,
+        "height": 812,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "pageGroups": {},
+    "sections": {},
+    "hiddenPageIds": [],
+    "nodes": {
+      "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c": {
+        "id": "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c",
+        "kind": "document",
+        "title": "文档",
+        "knowledgeDocument": {
+          "id": "kb_1787885153658_t9h54b",
+          "title": "文档",
+          "fileName": "文档.md",
+          "description": "文档"
+        },
+        "layout": {
+          "x": 401.475382346924,
+          "y": 0.5464406222049547,
+          "width": 180,
+          "height": 360,
+          "zIndex": 1
+        },
+        "createdAt": 1787885153164,
+        "updatedAt": 1787885157781
+      },
+      "text-08661fa0-38e0-408f-b708-d96189ce5725": {
+        "id": "text-08661fa0-38e0-408f-b708-d96189ce5725",
+        "kind": "text",
+        "title": "c二十号i",
+        "text": "c二十号i",
+        "fontSize": 18,
+        "color": "#ffffff",
+        "textAlign": "left",
+        "fontWeight": 400,
+        "lineHeight": 1.5,
+        "stylePreset": "body",
+        "autoWidth": false,
+        "layout": {
+          "x": 737.4869110534884,
+          "y": 74.91996098531031,
+          "width": 131.86937706756467,
+          "height": 54
+        },
+        "createdAt": 1787885291834,
+        "updatedAt": 1787885305407
+      }
+    },
+    "layers": {
+      "annotations": {
+        "nodes": {
+          "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c": {
+            "id": "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c",
+            "kind": "document",
+            "title": "文档",
+            "knowledgeDocument": {
+              "id": "kb_1787885153658_t9h54b",
+              "title": "文档",
+              "fileName": "文档.md",
+              "description": "文档"
+            },
+            "layout": {
+              "x": 401.475382346924,
+              "y": 0.5464406222049547,
+              "width": 180,
+              "height": 360,
+              "zIndex": 1
+            },
+            "createdAt": 1787885153164,
+            "updatedAt": 1787885157781
+          },
+          "text-08661fa0-38e0-408f-b708-d96189ce5725": {
+            "id": "text-08661fa0-38e0-408f-b708-d96189ce5725",
+            "kind": "text",
+            "title": "c二十号i",
+            "text": "c二十号i",
+            "fontSize": 18,
+            "color": "#ffffff",
+            "textAlign": "left",
+            "fontWeight": 400,
+            "lineHeight": 1.5,
+            "stylePreset": "body",
+            "autoWidth": false,
+            "layout": {
+              "x": 737.4869110534884,
+              "y": 74.91996098531031,
+              "width": 131.86937706756467,
+              "height": 54
+            },
+            "createdAt": 1787885291834,
+            "updatedAt": 1787885305407
+          }
+        }
+      },
+      "documents": {
+        "nodes": {
+          "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c": {
+            "id": "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c",
+            "kind": "document",
+            "title": "文档",
+            "knowledgeDocument": {
+              "id": "kb_1787885153658_t9h54b",
+              "title": "文档",
+              "fileName": "文档.md",
+              "description": "文档"
+            },
+            "layout": {
+              "x": 401.475382346924,
+              "y": 0.5464406222049547,
+              "width": 180,
+              "height": 360,
+              "zIndex": 1
+            },
+            "createdAt": 1787885153164,
+            "updatedAt": 1787885157781
+          }
+        }
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [],
+    "navigation": {
+      "hotspots": {},
+      "connections": {}
+    }
+  }
+}

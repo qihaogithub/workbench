@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1788320370771_bvsgm8",
+  "at": 1788320370771,
+  "actor": {
+    "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+    "name": "qihao",
+    "role": "admin",
+    "source": "author-site"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1788320370753_csdemc",
+  "inputSummary": {
+    "name": "游戏题答题反馈",
+    "category": "课中游戏题"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1788320370753_csdemc"
+    ]
+  }
+}

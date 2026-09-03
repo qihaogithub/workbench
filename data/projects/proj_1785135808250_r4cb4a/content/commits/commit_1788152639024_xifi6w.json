@@ -1,0 +1,86 @@
+{
+  "id": "commit_1788152639024_xifi6w",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "parentCommitId": "commit_1788149292811_d91djz",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录闯关开场引入-视频",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "page_5rsp",
+      "versionId": "prv_1785222248758_v0zhj5"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_da9l",
+      "versionId": "prv_1785316177703_45jh4a"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_gfbs",
+      "versionId": "prv_1785136734038_5bt9sp"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_p8a2",
+      "versionId": "prv_1787820483768_pu1kvj"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_pqyt",
+      "versionId": "prv_1785205299313_c3158x"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_sgfq",
+      "versionId": "prv_1785321973637_sq9mhi"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_swfq",
+      "versionId": "prv_1788152639013_kvfhgz"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_wcfh",
+      "versionId": "prv_1785206677053_mzslur"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_xix9",
+      "versionId": "prv_1785397932241_fpmkja"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_yw72",
+      "versionId": "prv_1785511294748_qetlnw"
+    },
+    {
+      "kind": "page",
+      "resourceId": "quiz-correct_m5n8",
+      "versionId": "prv_1788143379368_qfhy32"
+    },
+    {
+      "kind": "page",
+      "resourceId": "quiz-wrong_b7k9",
+      "versionId": "prv_1788099086697_i20kcq"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "page_swfq",
+      "fromVersionId": "prv_1788149292806_m9z9xz",
+      "toVersionId": "prv_1788152639013_kvfhgz"
+    }
+  ],
+  "createdAt": 1788152639024,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785205322879-latagwnoh",
+    "workspaceRevision": 530,
+    "workspaceRootHash": "7f534f99a4163c281a31e13446afc79f53e4bac8d197559e494913b119df996f"
+  }
+}

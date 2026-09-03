@@ -1,0 +1,371 @@
+{
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "content",
+      "preset": "custom",
+      "source": "user"
+    }
+  },
+  "type": "object",
+  "properties": {
+    "标题与描述": {
+      "type": "object",
+      "title": "标题与描述",
+      "properties": {
+        "title": {
+          "type": "string",
+          "title": "标题",
+          "default": "配置项示例 Demo"
+        },
+        "description": {
+          "type": "text",
+          "title": "描述文本",
+          "default": "这是一个展示所有高保真页面配置项类型的示例页面，你可以在右侧面板中调整各项配置。右击画布页面选择「配置」打开配置面板，或点击右上角工具栏的配置图标。"
+        },
+        "enabled": {
+          "type": "boolean",
+          "title": "启用状态",
+          "default": true
+        },
+        "count": {
+          "type": "integer",
+          "title": "展示数量",
+          "default": 3
+        },
+        "price": {
+          "type": "number",
+          "title": "价格 (¥)",
+          "default": 99.99
+        }
+      },
+      "required": []
+    },
+    "样式与颜色": {
+      "type": "object",
+      "title": "样式与颜色",
+      "properties": {
+        "bgColor": {
+          "type": "string",
+          "format": "color",
+          "title": "背景色",
+          "default": "#f0f4ff"
+        },
+        "accentColor": {
+          "type": "string",
+          "format": "color",
+          "title": "强调色",
+          "default": "#6366f1"
+        },
+        "coverImage": {
+          "type": "string",
+          "format": "image",
+          "title": "封面图片"
+        },
+        "gallery": {
+          "type": "array",
+          "title": "图片集（imageList）",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      },
+      "required": []
+    },
+    "选择与富文本": {
+      "type": "object",
+      "title": "选择与富文本",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "title": "展示模式（enum）",
+          "enum": [
+            "card",
+            "list",
+            "grid"
+          ],
+          "enumNames": [
+            "卡片模式",
+            "列表模式",
+            "网格模式"
+          ],
+          "default": "card"
+        },
+        "tags": {
+          "type": "string",
+          "title": "标签（多选）",
+          "enum": [
+            "react",
+            "typescript",
+            "tailwind",
+            "api",
+            "config"
+          ],
+          "enumNames": [
+            "React",
+            "TypeScript",
+            "Tailwind",
+            "API",
+            "配置系统"
+          ],
+          "multiple": true,
+          "default": [
+            "react",
+            "typescript"
+          ]
+        },
+        "region": {
+          "type": "cascade",
+          "title": "地区（级联选择）",
+          "options": [
+            {
+              "value": "beijing",
+              "label": "北京"
+            },
+            {
+              "value": "shanghai",
+              "label": "上海"
+            },
+            {
+              "value": "zhejiang",
+              "label": "浙江",
+              "children": [
+                {
+                  "value": "hangzhou",
+                  "label": "杭州"
+                },
+                {
+                  "value": "ningbo",
+                  "label": "宁波"
+                }
+              ]
+            },
+            {
+              "value": "guangdong",
+              "label": "广东",
+              "children": [
+                {
+                  "value": "guangzhou",
+                  "label": "广州"
+                },
+                {
+                  "value": "shenzhen",
+                  "label": "深圳"
+                }
+              ]
+            }
+          ],
+          "default": [
+            "zhejiang",
+            "hangzhou"
+          ]
+        },
+        "richtextContent": {
+          "type": "richtext",
+          "title": "富文本内容",
+          "default": "<p>这是一段<strong>富文本</strong>内容，支持<em>斜体</em>、<u>下划线</u>、<span style=\"color: #6366f1\">彩色文字</span>等样式。你可以在这里编辑富文本内容，它会在页面中实时渲染。</p>"
+        }
+      },
+      "required": []
+    },
+    "模块列表": {
+      "type": "object",
+      "title": "模块列表",
+      "properties": {
+        "modules": {
+          "type": "array",
+          "title": "模块列表（可拖拽排序）",
+          "$demo": {
+            "sortable": true
+          },
+          "items": {
+            "oneOf": [
+              {
+                "title": "标题模块",
+                "properties": {
+                  "type": {
+                    "const": "heading"
+                  },
+                  "label": {
+                    "type": "string",
+                    "title": "标题",
+                    "default": "章节标题"
+                  },
+                  "level": {
+                    "type": "integer",
+                    "title": "标题级别",
+                    "default": 2
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              },
+              {
+                "title": "卡片模块",
+                "properties": {
+                  "type": {
+                    "const": "card"
+                  },
+                  "title": {
+                    "type": "string",
+                    "title": "卡片标题",
+                    "default": "卡片标题"
+                  },
+                  "description": {
+                    "type": "text",
+                    "title": "卡片描述",
+                    "default": "这是一张卡片的内容描述。"
+                  },
+                  "icon": {
+                    "type": "string",
+                    "title": "图标",
+                    "default": "⚡"
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              },
+              {
+                "title": "图片模块",
+                "properties": {
+                  "type": {
+                    "const": "imageBlock"
+                  },
+                  "src": {
+                    "type": "string",
+                    "format": "image",
+                    "title": "图片"
+                  },
+                  "caption": {
+                    "type": "string",
+                    "title": "说明文字",
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              },
+              {
+                "title": "进度模块",
+                "$demo": {
+                  "maxItems": 1
+                },
+                "properties": {
+                  "type": {
+                    "const": "progress"
+                  },
+                  "label": {
+                    "type": "string",
+                    "title": "标签",
+                    "default": "进度"
+                  },
+                  "value": {
+                    "type": "integer",
+                    "title": "进度值",
+                    "default": 75,
+                    "minimum": 0,
+                    "maximum": 100
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              }
+            ]
+          },
+          "default": [
+            {
+              "type": "heading",
+              "label": "功能模块",
+              "level": 2
+            },
+            {
+              "type": "card",
+              "title": "配置系统",
+              "description": "OneFlow 支持 12 种配置类型，满足各种业务需求。",
+              "icon": "⚙️"
+            },
+            {
+              "type": "progress",
+              "label": "系统完成度",
+              "value": 75
+            },
+            {
+              "type": "card",
+              "title": "拖拽排序",
+              "description": "模块列表支持拖拽排序，调整顺序更灵活。",
+              "icon": "🔄"
+            }
+          ]
+        }
+      },
+      "required": []
+    },
+    "定位与条件": {
+      "type": "object",
+      "title": "定位与条件",
+      "properties": {
+        "badgeText": {
+          "type": "string",
+          "title": "徽章文字",
+          "default": "NEW"
+        },
+        "badgePosition": {
+          "type": "position",
+          "key": "badge",
+          "title": "徽章位置（position）",
+          "size": {
+            "width": 375,
+            "height": 812
+          },
+          "default": {
+            "x": 280,
+            "y": 20
+          }
+        },
+        "showMode": {
+          "type": "string",
+          "title": "显示模式（条件表单）",
+          "enum": [
+            "text",
+            "image"
+          ],
+          "enumNames": [
+            "文本模式",
+            "图片模式"
+          ],
+          "default": "text"
+        },
+        "customText": {
+          "type": "string",
+          "title": "自定义文本",
+          "default": "这个字段仅在文本模式下显示",
+          "visibleWhen": {
+            "field": "showMode",
+            "equals": "text"
+          }
+        },
+        "customImage": {
+          "type": "string",
+          "format": "image",
+          "title": "自定义图片",
+          "visibleWhen": {
+            "field": "showMode",
+            "equals": "image"
+          }
+        }
+      },
+      "required": []
+    }
+  },
+  "required": []
+}

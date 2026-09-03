@@ -1,0 +1,77 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "demo_1785935720859_01of",
+      "name": "封面",
+      "routeKey": "slide-1",
+      "order": 0,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "demo_1785935720859_02of",
+      "name": "为什么需要 OneFlow",
+      "routeKey": "slide-2",
+      "order": 1,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "demo_1785935720859_03of",
+      "name": "过去 vs 未来",
+      "routeKey": "slide-3",
+      "order": 2,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "demo_1785935720860_04of",
+      "name": "角色变化",
+      "routeKey": "slide-4",
+      "order": 3,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "demo_1785935720860_05of",
+      "name": "中心产物：可交互活动原型",
+      "routeKey": "slide-5",
+      "order": 4,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "demo_1785935720860_06of",
+      "name": "AI 的三层作用",
+      "routeKey": "slide-6",
+      "order": 5,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "demo_1785935720860_07of",
+      "name": "运营设计视角",
+      "routeKey": "slide-7",
+      "order": 6,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "demo_1785935720860_08of",
+      "name": "团队协作平台",
+      "routeKey": "slide-8",
+      "order": 7,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "demo_1785935720860_09of",
+      "name": "完整闭环",
+      "routeKey": "slide-9",
+      "order": 8,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    }
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "id": "commit_1788162160286_yms5vn",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "parentCommitId": "commit_1788152639024_xifi6w",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录闯关开场",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "page_5rsp",
+      "versionId": "prv_1785222248758_v0zhj5"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_da9l",
+      "versionId": "prv_1785316177703_45jh4a"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_gfbs",
+      "versionId": "prv_1785136734038_5bt9sp"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_p8a2",
+      "versionId": "prv_1787820483768_pu1kvj"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_pqyt",
+      "versionId": "prv_1785205299313_c3158x"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_sgfq",
+      "versionId": "prv_1785321973637_sq9mhi"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_swfq",
+      "versionId": "prv_1788152639013_kvfhgz"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_wcfh",
+      "versionId": "prv_1785206677053_mzslur"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_xix9",
+      "versionId": "prv_1785397932241_fpmkja"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_yw72",
+      "versionId": "prv_1788162160282_75y7a3"
+    },
+    {
+      "kind": "page",
+      "resourceId": "quiz-correct_m5n8",
+      "versionId": "prv_1788143379368_qfhy32"
+    },
+    {
+      "kind": "page",
+      "resourceId": "quiz-wrong_b7k9",
+      "versionId": "prv_1788099086697_i20kcq"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "page_yw72",
+      "fromVersionId": "prv_1785511294748_qetlnw",
+      "toVersionId": "prv_1788162160282_75y7a3"
+    }
+  ],
+  "createdAt": 1788162160286,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785205322879-latagwnoh",
+    "workspaceRevision": 536,
+    "workspaceRootHash": "617c6b29d9e6c7dc25c70335df34a4c2c084efb8ef35018dff4ee7103c98f01a"
+  }
+}

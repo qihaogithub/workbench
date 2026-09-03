@@ -1,0 +1,31 @@
+{
+  "committed": true,
+  "mutationId": "14605eee-1b50-4a0c-a58f-88fba2b1ad28",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786367994980-txmxi4qqp",
+  "baseRevision": 0,
+  "revision": 254,
+  "rootHash": "11aa5008a81540ed9d936f15e928c1c1aab674db8439b168d53829dbdbb19ad3",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_x992/prototype.css",
+      "action": "deleted",
+      "beforeHash": "1dedeaf138364e1e502ae6e22718150f7dc03daa5b237feffd88bbe401ccd6a7",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_x992/prototype.html",
+      "action": "deleted",
+      "beforeHash": "cb3a191179d4c3a0a3feb8c90639c1ebcdac7e301e5a93dd678514600fd9a71e",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "37e5bfdc3f2c9bedee4863471171ca5cc3e05894821194b6bb5c7d6180d62d3c",
+      "afterHash": "ca41b76c6b410204b558098d4b3ce200a777d7279b48d93ee30c1e8365df5211"
+    }
+  ],
+  "committedAt": 1786516198862
+}

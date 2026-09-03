@@ -1,0 +1,12 @@
+{
+  "planId": "plan_1786594164501_eupnjh",
+  "operation": "project_delete",
+  "resourceId": "proj_1786594111469_293vqh",
+  "impact": [
+    "删除项目 E2E:20260813T040743016Z-fifj2u:配置功能回归",
+    "删除 2 个页面",
+    "删除项目工作空间和元数据"
+  ],
+  "reversible": true,
+  "confirmToken": "confirm_1786594164501_6nwmdn"
+}

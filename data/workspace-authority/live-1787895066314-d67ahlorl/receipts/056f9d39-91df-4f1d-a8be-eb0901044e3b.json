@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "056f9d39-91df-4f1d-a8be-eb0901044e3b",
+  "projectId": "proj_1787895065566_5wgvzx",
+  "workspaceId": "live-1787895066314-d67ahlorl",
+  "baseRevision": 0,
+  "revision": 22,
+  "rootHash": "18732c3fc70b5c3f2c0ca7b186a1daee6930a99d1157549b29b704928d54ead3",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/word-king-ladder_l3a2/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "bf968b60e665eb9354fd9ba166069d20d5f937e76f9a350a69137fb25334dd65",
+      "afterHash": null
+    },
+    {
+      "path": "demos/word-king-ladder_l3a2/prototype.css",
+      "action": "deleted",
+      "beforeHash": "217cc33d13c8cfa8404914adfb431aa29f1a863225154de55f348702d2910e76",
+      "afterHash": null
+    },
+    {
+      "path": "demos/word-king-ladder_l3a2/prototype.html",
+      "action": "deleted",
+      "beforeHash": "116b8996157906088ba50a84303389dabdf737129cb668d12b3d7cc2a92fe493",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "e4b74bedd845bd444c638f0015340083560cbaf01c75e33b282a787c5223c606",
+      "afterHash": "2048713349992d1453736034a06dfbf503f28c0b6c4893d781c9ead9b7408888"
+    }
+  ],
+  "committedAt": 1787898382687
+}

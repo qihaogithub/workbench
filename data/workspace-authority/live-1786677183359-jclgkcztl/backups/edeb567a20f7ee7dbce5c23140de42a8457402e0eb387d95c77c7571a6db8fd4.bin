@@ -1,0 +1,21 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "kids-edu_b3xw",
+      "name": "kids edu",
+      "order": 0,
+      "parentId": null,
+      "runtimeType": "prototype-html-css",
+      "routeKey": "kids-edu"
+    },
+    {
+      "id": "clipboard-import_10a08f",
+      "name": "clipboard-import",
+      "routeKey": "clipboard-import",
+      "order": 1,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 1133,
+        "height": 749
+      },
+      "heightBehavior": "content",
+      "preset": "custom",
+      "source": "user"
+    }
+  },
+  "title": "伴读广告 - 平板版配置",
+  "type": "object",
+  "properties": {
+    "field": {
+      "title": "广告图",
+      "type": "string",
+      "format": "image",
+      "default": "https://uiweb.oss-cn-chengdu.aliyuncs.com/img/伴读/轮播广告/pad/一行1个.png"
+    }
+  },
+  "required": []
+}

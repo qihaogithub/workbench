@@ -1,0 +1,12 @@
+{
+  "planId": "plan_1786599678255_gentbb",
+  "operation": "project_delete",
+  "resourceId": "proj_1786592532197_5xx8xm",
+  "impact": [
+    "删除项目 E2E:20260813T034018935Z-y22g9d:画布退出恢复回归",
+    "删除 1 个页面",
+    "删除项目工作空间和元数据"
+  ],
+  "reversible": true,
+  "confirmToken": "confirm_1786599678255_pzgjbr"
+}

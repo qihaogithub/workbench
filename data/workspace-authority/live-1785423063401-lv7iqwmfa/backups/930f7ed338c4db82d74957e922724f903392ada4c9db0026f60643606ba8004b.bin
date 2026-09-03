@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "title": "标题",
+      "default": "配置面板测试",
+      "ui:options": {
+        "group": "基础信息"
+      }
+    },
+    "subtitle": {
+      "type": "string",
+      "maxLength": 1000,
+      "title": "副标题",
+      "default": "这是一个通过 config.ts 编译的配置面板",
+      "ui:options": {
+        "group": "基础信息"
+      }
+    },
+    "showBanner": {
+      "type": "boolean",
+      "title": "显示横幅",
+      "default": true,
+      "ui:options": {
+        "group": "基础信息"
+      }
+    },
+    "bgColor": {
+      "type": "string",
+      "format": "color",
+      "title": "背景颜色",
+      "default": "#f5f5f5",
+      "ui:options": {
+        "group": "样式配置"
+      }
+    },
+    "textColor": {
+      "type": "string",
+      "format": "color",
+      "title": "文字颜色",
+      "default": "#333333",
+      "ui:options": {
+        "group": "样式配置"
+      }
+    },
+    "layout": {
+      "type": "string",
+      "title": "布局",
+      "enum": [
+        "grid",
+        "list"
+      ],
+      "enumNames": [
+        "网格",
+        "列表"
+      ],
+      "default": "grid",
+      "ui:options": {
+        "group": "样式配置"
+      }
+    },
+    "logo": {
+      "type": "string",
+      "format": "image",
+      "title": "Logo",
+      "ui:options": {
+        "accept": "image/*",
+        "maxSize": 1048576,
+        "group": "素材"
+      }
+    },
+    "blocks": {
+      "type": "array",
+      "title": "内容模块",
+      "default": [
+        {
+          "type": "text",
+          "content": "第一段文本"
+        },
+        {
+          "type": "image",
+          "pic": "",
+          "caption": "配图说明"
+        }
+      ],
+      "ui:options": {
+        "group": "模块列表"
+      },
+      "items": {
+        "type": "object",
+        "oneOf": [
+          {
+            "title": "文本模块",
+            "properties": {
+              "type": {
+                "const": "text",
+                "type": "string",
+                "title": "模块类型"
+              },
+              "content": {
+                "type": "string",
+                "maxLength": 1000,
+                "title": "文本内容",
+                "default": ""
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          {
+            "title": "图片模块",
+            "properties": {
+              "type": {
+                "const": "image",
+                "type": "string",
+                "title": "模块类型"
+              },
+              "pic": {
+                "type": "string",
+                "format": "image",
+                "title": "图片"
+              },
+              "caption": {
+                "type": "string",
+                "title": "说明",
+                "default": ""
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "$demo": {
+              "maxItems": 1
+            }
+          }
+        ]
+      }
+    }
+  },
+  "required": [],
+  "$demo": {
+    "previewSize": {
+      "width": 375,
+      "height": 812
+    }
+  }
+}

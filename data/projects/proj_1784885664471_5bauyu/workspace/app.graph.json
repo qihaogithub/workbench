@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "entry": "page",
+  "pages": {
+    "page": {
+      "pageId": "mobile-header-preview_b3f1",
+      "title": "手机预览"
+    },
+    "pad": {
+      "pageId": "pad-header-preview_x7k2",
+      "title": "Pad预览"
+    }
+  },
+  "actions": [],
+  "state": {}
+}

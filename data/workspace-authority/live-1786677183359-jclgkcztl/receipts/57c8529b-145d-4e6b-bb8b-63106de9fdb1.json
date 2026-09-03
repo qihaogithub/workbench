@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "57c8529b-145d-4e6b-bb8b-63106de9fdb1",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 674,
+  "rootHash": "196d98907dd847a465302c88cc80848ad59d8fd0c40a8ed6c4c70d2a0d05d3f3",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/halloween-share_u5b9/prototype.css",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "97a5d9689779ab037161c01b72b5016a24565717d9c9d3b712fc74615871d6cc"
+    }
+  ],
+  "committedAt": 1787892161824
+}

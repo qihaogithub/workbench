@@ -1,0 +1,17 @@
+{
+  "projectId": "proj_1787814377754_4243v7",
+  "references": [
+    {
+      "from": {
+        "kind": "canvas",
+        "resourceId": "main"
+      },
+      "to": {
+        "kind": "page",
+        "resourceId": "clipboard-import_c6b554"
+      },
+      "reason": "canvas_node"
+    }
+  ],
+  "updatedAt": 1787884191494
+}

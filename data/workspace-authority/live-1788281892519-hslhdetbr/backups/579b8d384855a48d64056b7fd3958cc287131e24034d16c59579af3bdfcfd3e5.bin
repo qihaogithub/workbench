@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"白板回填应用回归-项目共享","type":"object","properties":{"popupImage":{"type":"string","format":"image","title":"弹窗图片","default":""}}}

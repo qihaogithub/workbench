@@ -1,0 +1,20 @@
+{
+  "auditId": "audit_1785687366870_olyjup",
+  "at": 1785687366870,
+  "actor": {
+    "id": "local-codex",
+    "name": "local-codex",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L3",
+  "tool": "project_delete_execute",
+  "projectId": "proj_1785685022249_aevplm",
+  "resourceId": "proj_1785685022249_aevplm",
+  "ok": true,
+  "diffSummary": {
+    "deleted": [
+      "project:proj_1785685022249_aevplm"
+    ]
+  }
+}

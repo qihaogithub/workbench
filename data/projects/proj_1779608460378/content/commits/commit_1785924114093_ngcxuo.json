@@ -1,0 +1,21 @@
+{
+  "id": "commit_1785924114093_ngcxuo",
+  "projectId": "proj_1779608460378",
+  "parentCommitId": "commit_1785922967171_a8od8w",
+  "visibility": "protected",
+  "intent": "publish",
+  "title": "发布项目 v75",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "demo_1779608460379_a1b2c3",
+      "versionId": "prv_1785836955270_6mxvg3"
+    }
+  ],
+  "changedResources": [],
+  "createdAt": 1785924114093,
+  "createdBy": "Author Site",
+  "audit": {
+    "actorType": "user"
+  }
+}

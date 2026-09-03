@@ -1,0 +1,42 @@
+{
+  "id": "prv_1786514264870_3gwsm8",
+  "projectId": "proj_1785742777589_ncs6r6",
+  "kind": "page",
+  "resourceId": "prototype-config_b3k9",
+  "workspaceId": "live-1785832228941-ay0onrwn3",
+  "workspaceRevision": 121,
+  "workspaceRootHash": "175711e3941f718e17711385930dd0f818a5a40471c3d14d9b2c40f46c7bcf49",
+  "contentHash": "600a249b8a84afb48e367d81de26a23d245f10f3b40207fceb1797a8048694ce",
+  "blobRefs": [
+    "1891feba5a51b411895d17815cec394487a94e38c013cb1deb7922e4a46ecfea",
+    "b298d45aaf3d52718768bd258ee1bb945ee35ea1eaf1d0dde3d7b0dc3653909a",
+    "e258459c293b2f153c3f2ac69289102c0097c2de9bbe9d6b7e4a300d87595946",
+    "42bb61975c959b9e8e56b31d6fa28b53b41c6ebb78b938fe239279d811a6fe96"
+  ],
+  "metadata": {
+    "page": {
+      "id": "prototype-config_b3k9",
+      "name": "HTML原型页配置示例",
+      "runtimeType": "prototype-html-css",
+      "order": 2,
+      "parentId": null,
+      "routeKey": "page-2"
+    },
+    "files": {
+      "schema": "1891feba5a51b411895d17815cec394487a94e38c013cb1deb7922e4a46ecfea",
+      "prototypeHtml": "b298d45aaf3d52718768bd258ee1bb945ee35ea1eaf1d0dde3d7b0dc3653909a",
+      "prototypeCss": "e258459c293b2f153c3f2ac69289102c0097c2de9bbe9d6b7e4a300d87595946",
+      "prototypeMeta": "42bb61975c959b9e8e56b31d6fa28b53b41c6ebb78b938fe239279d811a6fe96"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1786514264875,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "持续编辑自动记录HTML原型页配置示例"
+}

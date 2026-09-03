@@ -1,0 +1,7 @@
+export default function Demo() {
+  return (
+    <div className="w-[375px] bg-white min-h-[812px] flex items-center justify-center">
+      <p className="text-lg text-gray-600">完课活动页面</p>
+    </div>
+  );
+}

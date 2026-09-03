@@ -1,0 +1,17 @@
+{
+  "type": "object",
+  "properties": {},
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "heightBehavior": "content",
+      "preset": "desktop",
+      "source": "user"
+    }
+  }
+}

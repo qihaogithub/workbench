@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1788141806568_iri5v8",
+  "at": 1788141806568,
+  "actor": {
+    "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+    "name": "qihao",
+    "role": "admin",
+    "source": "author-site"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1788141806566_0aps89",
+  "inputSummary": {
+    "name": "填空题",
+    "category": "未分类"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1788141806566_0aps89"
+    ]
+  }
+}

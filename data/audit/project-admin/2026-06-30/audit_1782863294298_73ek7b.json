@@ -1,0 +1,25 @@
+{
+  "auditId": "audit_1782863294298_73ek7b",
+  "at": 1782863294298,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-inline-image-fix"
+  },
+  "level": "L1",
+  "tool": "page_update",
+  "projectId": "proj_1782839405716_tqjl1f",
+  "resourceId": "prototype-02",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      "page:prototype-02:code",
+      "page:prototype-02:schema"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

@@ -1,0 +1,376 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "配置项类型展示",
+  "type": "object",
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "content",
+      "preset": "custom",
+      "source": "user"
+    }
+  },
+  "properties": {
+    "sections": {
+      "type": "array",
+      "title": "页面模块（拖拽排序）",
+      "items": {
+        "oneOf": [
+          {
+            "title": "📝 标题模块（string）",
+            "$demo": {
+              "maxItems": 1
+            },
+            "properties": {
+              "type": {
+                "const": "header"
+              },
+              "pageTitle": {
+                "type": "string",
+                "title": "页面标题",
+                "default": "配置项类型全览"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          {
+            "title": "🔢 数值模块（number）",
+            "$demo": {
+              "maxItems": 1
+            },
+            "properties": {
+              "type": {
+                "const": "numberSection"
+              },
+              "discount": {
+                "type": "number",
+                "title": "折扣力度（%）",
+                "default": 85
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          {
+            "title": "🔘 开关模块（boolean）",
+            "$demo": {
+              "maxItems": 1
+            },
+            "properties": {
+              "type": {
+                "const": "booleanSection"
+              },
+              "showBanner": {
+                "type": "boolean",
+                "title": "展示横幅",
+                "default": true
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          {
+            "title": "📦 对象模块（object）",
+            "$demo": {
+              "maxItems": 1
+            },
+            "properties": {
+              "type": {
+                "const": "objectSection"
+              },
+              "author": {
+                "type": "object",
+                "title": "作者信息",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "title": "作者名",
+                    "default": "设计师小张"
+                  },
+                  "level": {
+                    "type": "integer",
+                    "title": "等级",
+                    "default": 5
+                  }
+                },
+                "default": {
+                  "name": "设计师小张",
+                  "level": 5
+                }
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          {
+            "title": "📋 数组模块（array）",
+            "$demo": {
+              "maxItems": 1
+            },
+            "properties": {
+              "type": {
+                "const": "arraySection"
+              },
+              "tags": {
+                "type": "array",
+                "title": "标签列表",
+                "items": {
+                  "type": "string"
+                },
+                "default": [
+                  "新品",
+                  "限时",
+                  "爆款"
+                ]
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          {
+            "title": "🎨 颜色模块（format: color）",
+            "$demo": {
+              "maxItems": 1
+            },
+            "properties": {
+              "type": {
+                "const": "colorSection"
+              },
+              "primaryColor": {
+                "type": "string",
+                "title": "主题色",
+                "format": "color",
+                "default": "#FF6B35"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          {
+            "title": "📑 枚举模块（enum + enumNames）",
+            "$demo": {
+              "maxItems": 1
+            },
+            "properties": {
+              "type": {
+                "const": "enumSection"
+              },
+              "theme": {
+                "type": "string",
+                "title": "主题风格",
+                "enum": [
+                  "dark",
+                  "light",
+                  "colorful",
+                  "minimal"
+                ],
+                "enumNames": [
+                  "深色",
+                  "浅色",
+                  "多彩",
+                  "极简"
+                ],
+                "default": "dark"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          {
+            "title": "🖼️ 图片模块（format: image）",
+            "$demo": {
+              "maxItems": 1
+            },
+            "properties": {
+              "type": {
+                "const": "imageSection"
+              },
+              "bannerImage": {
+                "type": "string",
+                "title": "展示图片",
+                "format": "image",
+                "default": ""
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          {
+            "title": "🧩 模块数组（array + oneOf + maxItems）",
+            "$demo": {
+              "maxItems": 1
+            },
+            "properties": {
+              "type": {
+                "const": "modules"
+              },
+              "modules": {
+                "type": "array",
+                "title": "内容子模块",
+                "items": {
+                  "oneOf": [
+                    {
+                      "title": "图片子模块",
+                      "properties": {
+                        "subType": {
+                          "const": "image"
+                        },
+                        "imageUrl": {
+                          "type": "string",
+                          "format": "image",
+                          "title": "图片"
+                        },
+                        "caption": {
+                          "type": "string",
+                          "title": "说明",
+                          "default": "图片模块示例"
+                        }
+                      },
+                      "required": [
+                        "subType"
+                      ]
+                    },
+                    {
+                      "title": "文字子模块",
+                      "properties": {
+                        "subType": {
+                          "const": "text"
+                        },
+                        "content": {
+                          "type": "string",
+                          "title": "文本内容",
+                          "default": "这是一段文字模块的内容"
+                        }
+                      },
+                      "required": [
+                        "subType"
+                      ]
+                    },
+                    {
+                      "title": "视频子模块",
+                      "$demo": {
+                        "maxItems": 1
+                      },
+                      "properties": {
+                        "subType": {
+                          "const": "video"
+                        },
+                        "videoCover": {
+                          "type": "string",
+                          "format": "image",
+                          "title": "视频封面"
+                        },
+                        "videoTitle": {
+                          "type": "string",
+                          "title": "视频标题",
+                          "default": "视频模块示例"
+                        }
+                      },
+                      "required": [
+                        "subType"
+                      ]
+                    }
+                  ]
+                },
+                "default": [
+                  {
+                    "subType": "image",
+                    "imageUrl": "",
+                    "caption": "图片模块示例"
+                  },
+                  {
+                    "subType": "text",
+                    "content": "这是一段文字模块的内容"
+                  },
+                  {
+                    "subType": "video",
+                    "videoCover": "",
+                    "videoTitle": "视频模块示例"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "type"
+            ]
+          }
+        ]
+      },
+      "default": [
+        {
+          "type": "header",
+          "pageTitle": "配置项类型全览"
+        },
+        {
+          "type": "numberSection",
+          "discount": 85
+        },
+        {
+          "type": "booleanSection",
+          "showBanner": true
+        },
+        {
+          "type": "objectSection",
+          "author": {
+            "name": "设计师小张",
+            "level": 5
+          }
+        },
+        {
+          "type": "arraySection",
+          "tags": [
+            "新品",
+            "限时",
+            "爆款"
+          ]
+        },
+        {
+          "type": "colorSection",
+          "primaryColor": "#FF6B35"
+        },
+        {
+          "type": "enumSection",
+          "theme": "dark"
+        },
+        {
+          "type": "imageSection",
+          "bannerImage": ""
+        },
+        {
+          "type": "modules",
+          "modules": [
+            {
+              "subType": "image",
+              "imageUrl": "",
+              "caption": "图片模块示例"
+            },
+            {
+              "subType": "text",
+              "content": "这是一段文字模块的内容"
+            },
+            {
+              "subType": "video",
+              "videoCover": "",
+              "videoTitle": "视频模块示例"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "required": []
+}

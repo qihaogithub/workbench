@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "de4f5b70-aaf3-40eb-b975-dacdda3be493",
+  "projectId": "proj_1785742777589_ncs6r6",
+  "workspaceId": "live-1785832228941-ay0onrwn3",
+  "baseRevision": 0,
+  "revision": 75,
+  "rootHash": "8f0ac9d66d90c2cd0aeb1e9895e44a0125daee9cb4affb83a869c3b38c9140f0",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/config-demo_m7p2/config.schema.json",
+      "action": "modified",
+      "beforeHash": "d0f9f2a793178a1bf0ea9cc2ddb3de78d1a67d772f3a36cd11a253604d392418",
+      "afterHash": "71ae334ab73ac19c153d28de13975b60318446ca6c862a4ebf8a0d29a60998fa"
+    }
+  ],
+  "committedAt": 1785938559502
+}

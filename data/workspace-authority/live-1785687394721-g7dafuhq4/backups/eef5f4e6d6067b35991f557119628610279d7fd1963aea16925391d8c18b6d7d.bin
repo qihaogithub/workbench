@@ -1,0 +1,13 @@
+{
+  "$demo": { "previewSize": { "width": 375, "height": 812 } },
+  "type": "object",
+  "properties": {
+    "bannerTitle": { "type": "string", "title": "横幅标题", "default": "用户信息" },
+    "username": { "type": "string", "title": "用户名", "default": "张三" },
+    "age": { "type": "integer", "title": "年龄", "default": 28 },
+    "visitCount": { "type": "integer", "title": "访问次数", "default": 1024 },
+    "enableNotify": { "type": "boolean", "title": "启用通知", "default": true },
+    "bio": { "type": "text", "title": "个人简介", "default": "一名热爱技术的前端开发者，专注于 Web 交互和用户体验设计。" }
+  },
+  "required": []
+}

@@ -1,0 +1,9 @@
+{
+  "$demo": { "previewSize": { "width": 375, "height": 812 } },
+  "type": "object",
+  "properties": {
+    "heroImage": { "type": "string", "title": "主视觉图片", "format": "image", "default": "/api/images/img_VSzZ9tDtmcpUOg" },
+    "imageCaption": { "type": "string", "title": "图片说明", "default": "A slower way to move forward" }
+  },
+  "required": []
+}

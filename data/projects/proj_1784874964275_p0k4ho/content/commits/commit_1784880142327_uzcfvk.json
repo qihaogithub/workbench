@@ -1,0 +1,31 @@
+{
+  "id": "commit_1784880142327_uzcfvk",
+  "projectId": "proj_1784874964275_p0k4ho",
+  "parentCommitId": "commit_1784876622047_rct8mp",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "修改了完课活动",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "course-complete_a7k3",
+      "versionId": "prv_1784880142325_dqf06t"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "course-complete_a7k3",
+      "fromVersionId": "prv_1784876622045_keg124",
+      "toVersionId": "prv_1784880142325_dqf06t"
+    }
+  ],
+  "createdAt": 1784880142327,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1784874964638-kfdgu6fcm",
+    "workspaceRevision": 24,
+    "workspaceRootHash": "a1dfb78e048908055dd5eeac52773e9314fe2cd4a57cfffc9070d8279012fe86"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "$demo": { "previewSize": { "width": 375, "height": 667 } },
+  "type": "object",
+  "properties": {
+    "brandName": { "type": "string", "title": "品牌名称", "default": "小芽星球" },
+    "primaryButtonText": { "type": "string", "title": "主按钮文字", "default": "免费领取任务卡" },
+    "heroAccent": { "type": "string", "title": "主标题强调句", "default": "变成小小发现。" },
+    "accentColor": { "type": "string", "format": "color", "title": "强调色", "default": "#ef765d" },
+    "buttonColor": { "type": "string", "format": "color", "title": "主按钮背景色", "default": "#16324a" },
+    "pageBackground": { "type": "string", "format": "color", "title": "页面背景色", "default": "#eaf7f7" }
+  },
+  "required": []
+}

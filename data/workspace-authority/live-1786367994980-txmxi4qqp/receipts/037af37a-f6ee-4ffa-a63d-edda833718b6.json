@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "037af37a-f6ee-4ffa-a63d-edda833718b6",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786367994980-txmxi4qqp",
+  "baseRevision": 0,
+  "revision": 170,
+  "rootHash": "898061a97483fe1bf0606fe2755c28ef81744e54541eacb41ba4cab1f7ecb8f0",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/sunny-reading_k4m8/convention.md",
+      "action": "modified",
+      "beforeHash": "b79f17d26f324e34177c80d373af0dc8cc463ae76f0e66b857c9d6bc2bf8822a",
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "committedAt": 1786505987401
+}

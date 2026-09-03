@@ -1,0 +1,17 @@
+{
+  "images": [
+    {
+      "id": "f939417e38e9",
+      "filename": "image_1785229453851_0.png",
+      "url": "/api/images/img_zOgonM_K5ibItg",
+      "size": 647664,
+      "format": "png",
+      "createdAt": 1785229617660,
+      "createdBy": "ai",
+      "contentHash": "f939417e38e96b96c8bcf065864d304a125313cb5533c2d4f52e9c03cac2fba6",
+      "mimeType": "image/png",
+      "sourceType": "upload",
+      "alt": "伴读VIP页面截图，显示明星赛活动和本期精彩作品"
+    }
+  ]
+}

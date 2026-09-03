@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "92fdcca5-cdcb-4833-91c4-09ff531f83bd",
+  "projectId": "proj_1788279547845_lzrtvc",
+  "workspaceId": "live-1788279547864-sjue7duun",
+  "baseRevision": 3,
+  "revision": 4,
+  "rootHash": "88734c5257fe02212d758d0846a1aac49b52c5c8a6c37f9510526f17d512a337",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "assets/whiteboards/774149972a624cec1be6da34c48dd87feda02df2942fc3bd5051e2e98ba3d548.png",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "774149972a624cec1be6da34c48dd87feda02df2942fc3bd5051e2e98ba3d548"
+    },
+    {
+      "path": "whiteboards/wb_570a643c3529483fa7698164e86d4532.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "3bc7a0b3e6ccb4cad59077ab463736d51c71079bbf0fb91298eab0bfce100176"
+    },
+    {
+      "path": "whiteboards/bindings.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "cb7be8b1d21d7e6a24ed4d6afc7f9758abb5ba3d9dcc8be419557a3a823f228d"
+    },
+    {
+      "path": "demos/page_ztds/config.values.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "465273620da8d1ef24a2f4a76bb2806c4514cda6a18b51c9702078210643d108"
+    }
+  ],
+  "committedAt": 1788279557401
+}

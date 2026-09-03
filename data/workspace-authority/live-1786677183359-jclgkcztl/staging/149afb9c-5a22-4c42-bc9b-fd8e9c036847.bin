@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>拍摄前动画</title>
+  <style>
+    /* Reset default margins */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    
+    /* Figma export container */
+    .figma-export {
+      background: white;
+      width: 375px;
+      height: 812px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+  </style>
+</head>
+<body>
+  <div class="figma-export">
+<div data-layer="拍摄前动画" style="width: 375px; height: 812px; position: relative; overflow: hidden">
+  <img data-layer="IMG_3677 1" class="Img36771" style="width: 376px; height: 812px; left: -1px; top: 0px; position: absolute" src="https://img.onlywnn.cn/figma/h_42bffd33.png" />
+  <img src="https://img.onlywnn.cn/figma/h_fbd44301.png" alt="static layer" data-layer="#static element/btn/skip" class="StaticElementBtnSkip" style="left: 271px; top: 724px; position: absolute; width: 88px; height: 34px; object-fit: cover" data-figma-id="9194:20894" />
+</div>
+  </div>
+</body>
+</html>

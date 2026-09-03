@@ -1,0 +1,31 @@
+{
+  "committed": true,
+  "mutationId": "ffbabf87-4e6d-469e-a283-35864c970846",
+  "projectId": "proj_1788282245932_q3h58p",
+  "workspaceId": "live-1788282245948-8o5mrusyr",
+  "baseRevision": 0,
+  "revision": 3,
+  "rootHash": "f6e11178d9c4cbaab100cfc19adbf93a43366ce1adc39fce2980ec507e5c0c1f",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_azql/index.tsx",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "d4f16c6fd02bac4de0a81b96791451c106a5e531a6d0d3c95f9de5b753155d5e"
+    },
+    {
+      "path": "demos/page_azql/config.schema.json",
+      "action": "modified",
+      "beforeHash": "e1c118a2c54911913d4ffbf47809ce89c404706cd8a6262198c81674f23a3750",
+      "afterHash": "256a31b01fcf7159e6f6d661a675eeea18b66e36c85bed51d4e7c57158591d35"
+    },
+    {
+      "path": "demos/page_azql/prototype.html",
+      "action": "modified",
+      "beforeHash": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
+      "afterHash": "f02b0c0fdae2d292a273e255c4ac9eb5c1508309aef799f2e41e7e977e749994"
+    }
+  ],
+  "committedAt": 1788282246238
+}

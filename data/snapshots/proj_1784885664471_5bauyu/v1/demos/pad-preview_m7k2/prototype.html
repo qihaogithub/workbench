@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>头图背景预览 - Pad</title>
+  <link rel="stylesheet" href="prototype.css" />
+</head>
+<body>
+  <div class="prototype-root">
+  <div class="app">
+    <!-- 顶部标题栏 -->
+    <header class="header">
+      <h1 class="header-title">头图背景预览</h1>
+      <p class="header-subtitle">平板端 · 分类头图背景配置预览</p>
+    </header>
+
+    <!-- 分类标签栏 -->
+    <nav class="tab-bar">
+      <button class="tab active" data-tab="reading">阅读</button>
+      <button class="tab" data-tab="thinking">思维</button>
+      <button class="tab" data-tab="aesthetic">美育</button>
+      <button class="tab" data-tab="english">英语</button>
+      <button class="tab" data-tab="writer">小作家</button>
+    </nav>
+
+    <!-- 预览区域 -->
+    <main class="preview-grid">
+      <!-- 阅读 -->
+      <section class="preview-card" data-category="reading">
+        <div class="preview-header" data-bind-style-background-image="{{headerBgReading}}">
+          <div class="preview-overlay">
+            <span class="preview-label">阅读</span>
+          </div>
+        </div>
+        <div class="preview-actions">
+          <span class="upload-btn">上传头部背景</span>
+        </div>
+      </section>
+
+      <!-- 思维 -->
+      <section class="preview-card" data-category="thinking">
+        <div class="preview-header" data-bind-style-background-image="{{headerBgThinking}}">
+          <div class="preview-overlay">
+            <span class="preview-label">思维</span>
+          </div>
+        </div>
+        <div class="preview-actions">
+          <span class="upload-btn">上传头部背景</span>
+        </div>
+      </section>
+
+      <!-- 美育 -->
+      <section class="preview-card" data-category="aesthetic">
+        <div class="preview-header" data-bind-style-background-image="{{headerBgAesthetic}}">
+          <div class="preview-overlay">
+            <span class="preview-label">美育</span>
+          </div>
+        </div>
+        <div class="preview-actions">
+          <span class="upload-btn">上传头部背景</span>
+        </div>
+      </section>
+
+      <!-- 英语 -->
+      <section class="preview-card" data-category="english">
+        <div class="preview-header" data-bind-style-background-image="{{headerBgEnglish}}">
+          <div class="preview-overlay">
+            <span class="preview-label">英语</span>
+          </div>
+        </div>
+        <div class="preview-actions">
+          <span class="upload-btn">上传头部背景</span>
+        </div>
+      </section>
+
+      <!-- 小作家 -->
+      <section class="preview-card" data-category="writer">
+        <div class="preview-header" data-bind-style-background-image="{{headerBgWriter}}">
+          <div class="preview-overlay">
+            <span class="preview-label">小作家</span>
+          </div>
+        </div>
+        <div class="preview-actions">
+          <span class="upload-btn">上传头部背景</span>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+</body>
+</html>

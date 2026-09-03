@@ -1,0 +1,8 @@
+{
+  "id": "page_u7xv",
+  "name": "完课活动",
+  "routeKey": "page",
+  "order": 0,
+  "parentId": null,
+  "runtimeType": "high-fidelity-react"
+}

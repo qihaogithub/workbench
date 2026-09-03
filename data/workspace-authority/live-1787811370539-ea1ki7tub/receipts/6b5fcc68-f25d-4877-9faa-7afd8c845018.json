@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "6b5fcc68-f25d-4877-9faa-7afd8c845018",
+  "projectId": "proj_1787811370513_nn08a4",
+  "workspaceId": "live-1787811370539-ea1ki7tub",
+  "baseRevision": 0,
+  "revision": 2,
+  "rootHash": "1f81241c2bda2e29816ae388e7cbdb9213c3c85fd7f61c832e4841da231cbdd5",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/section_uu2j/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f"
+    },
+    {
+      "path": "demos/section_uu2j/prototype.css",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/section_uu2j/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e1c118a2c54911913d4ffbf47809ce89c404706cd8a6262198c81674f23a3750"
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "b8f84cb18b1d4fb04f8db0fdb7867802b916f6365d4816c8289777a7893570ab",
+      "afterHash": "14bb4988dede08af5013710746ad4f27ee223e076f9043dbeb6c4d708158554e"
+    }
+  ],
+  "committedAt": 1787811370810
+}

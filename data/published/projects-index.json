@@ -1,0 +1,77 @@
+{
+  "projects": [
+    {
+      "id": "proj_1785984571939_9uj8av",
+      "name": "伴读首页",
+      "publishedAt": 1787191739760,
+      "publishedVersion": "v10",
+      "demoCount": 2
+    },
+    {
+      "id": "proj_1779608460372",
+      "name": "底部弹窗",
+      "publishedAt": 1786699513985,
+      "publishedVersion": "v36",
+      "demoCount": 2
+    },
+    {
+      "id": "proj_1779608460378",
+      "name": "广场页面",
+      "publishedAt": 1786010306277,
+      "publishedVersion": "v76",
+      "demoCount": 2
+    },
+    {
+      "id": "proj_1785135808250_r4cb4a",
+      "name": "闯关活动-竖版",
+      "publishedAt": 1786007287360,
+      "publishedVersion": "v30",
+      "demoCount": 11
+    },
+    {
+      "id": "proj_1782718596686_wmv9yu",
+      "name": "App通用广告弹窗",
+      "description": "叫叫App的通用广告弹窗，用于在启动App时弹一个广告弹窗。",
+      "publishedAt": 1785922541966,
+      "publishedVersion": "v23",
+      "demoCount": 2
+    },
+    {
+      "id": "proj_1784874964275_p0k4ho",
+      "name": "完课活动",
+      "publishedAt": 1785920932164,
+      "publishedVersion": "v43",
+      "demoCount": 1
+    },
+    {
+      "id": "proj_1784885664471_5bauyu",
+      "name": "学习页头图",
+      "publishedAt": 1785915381002,
+      "publishedVersion": "v18",
+      "demoCount": 2
+    },
+    {
+      "id": "proj_1783585261167_7h7prw",
+      "name": "成长豆商城",
+      "publishedAt": 1785162285410,
+      "publishedVersion": "v9",
+      "demoCount": 2
+    },
+    {
+      "id": "proj_1782718595285_h4lda7",
+      "name": "我的页面",
+      "description": "资源预览",
+      "publishedAt": 1784780881178,
+      "publishedVersion": "v24",
+      "demoCount": 2
+    },
+    {
+      "id": "proj_1779608458649",
+      "name": "学习页-课后",
+      "publishedAt": 1783418226700,
+      "publishedVersion": "v14",
+      "demoCount": 2
+    }
+  ],
+  "generatedAt": 1788320980616
+}

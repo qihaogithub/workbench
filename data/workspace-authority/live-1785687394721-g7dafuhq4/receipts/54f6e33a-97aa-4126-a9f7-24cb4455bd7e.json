@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "54f6e33a-97aa-4126-a9f7-24cb4455bd7e",
+  "projectId": "proj_1785687393956_aa29zz",
+  "workspaceId": "live-1785687394721-g7dafuhq4",
+  "baseRevision": 0,
+  "revision": 10,
+  "rootHash": "f8a4079b38a3192b7b039b011f63cf82ed1295995647868db9f255b8b7603944",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/basic-fields_xa3k/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "a8b366e8f3a09ea738440e5dd6abe86aec090d84b4afb6234620c8944733b1f8"
+    }
+  ],
+  "committedAt": 1785687545589
+}

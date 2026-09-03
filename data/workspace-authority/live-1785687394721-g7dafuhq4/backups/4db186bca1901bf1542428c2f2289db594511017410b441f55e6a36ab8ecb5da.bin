@@ -1,0 +1,111 @@
+{
+  "$demo": { "previewSize": { "width": 375, "height": 812 } },
+  "type": "object",
+  "properties": {
+    "主题设置": {
+      "type": "object",
+      "title": "主题设置",
+      "properties": {
+        "theme": {
+          "type": "string",
+          "title": "主题风格",
+          "enum": ["浅色", "深色", "跟随系统"],
+          "default": "浅色"
+        },
+        "language": {
+          "type": "string",
+          "title": "界面语言",
+          "enum": ["简体中文", "English", "日本語"],
+          "default": "简体中文"
+        }
+      },
+      "required": []
+    },
+    "个人偏好": {
+      "type": "object",
+      "title": "个人偏好",
+      "properties": {
+        "interests": {
+          "type": "array",
+          "title": "兴趣爱好",
+          "items": {
+            "type": "string",
+            "enum": ["阅读", "音乐", "运动", "摄影", "旅行", "美食"]
+          },
+          "multiple": true,
+          "uniqueItems": true,
+          "default": ["阅读", "音乐"]
+        },
+        "region": {
+          "type": "cascade",
+          "title": "所在地区",
+          "options": [
+            {
+              "label": "北京市",
+              "value": "北京市",
+              "children": [
+                { "label": "东城区", "value": "东城区" },
+                { "label": "朝阳区", "value": "朝阳区" }
+              ]
+            },
+            {
+              "label": "上海市",
+              "value": "上海市",
+              "children": [
+                { "label": "黄浦区", "value": "黄浦区" },
+                { "label": "浦东新区", "value": "浦东新区" }
+              ]
+            },
+            {
+              "label": "浙江省",
+              "value": "浙江省",
+              "children": [
+                {
+                  "label": "杭州市",
+                  "value": "杭州市",
+                  "children": [
+                    { "label": "西湖区", "value": "西湖区" },
+                    { "label": "滨江区", "value": "滨江区" }
+                  ]
+                },
+                {
+                  "label": "宁波市",
+                  "value": "宁波市",
+                  "children": [
+                    { "label": "海曙区", "value": "海曙区" },
+                    { "label": "鄞州区", "value": "鄞州区" }
+                  ]
+                }
+              ]
+            },
+            {
+              "label": "广东省",
+              "value": "广东省",
+              "children": [
+                {
+                  "label": "广州市",
+                  "value": "广州市",
+                  "children": [
+                    { "label": "天河区", "value": "天河区" },
+                    { "label": "越秀区", "value": "越秀区" }
+                  ]
+                },
+                {
+                  "label": "深圳市",
+                  "value": "深圳市",
+                  "children": [
+                    { "label": "南山区", "value": "南山区" },
+                    { "label": "福田区", "value": "福田区" }
+                  ]
+                }
+              ]
+            }
+          ],
+          "default": ["浙江省", "杭州市"]
+        }
+      },
+      "required": []
+    }
+  },
+  "required": []
+}

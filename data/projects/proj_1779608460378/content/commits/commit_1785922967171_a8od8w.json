@@ -1,0 +1,21 @@
+{
+  "id": "commit_1785922967171_a8od8w",
+  "projectId": "proj_1779608460378",
+  "parentCommitId": "commit_1785839734116_us7zkf",
+  "visibility": "protected",
+  "intent": "publish",
+  "title": "发布项目 v74",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "demo_1779608460379_a1b2c3",
+      "versionId": "prv_1785836955270_6mxvg3"
+    }
+  ],
+  "changedResources": [],
+  "createdAt": 1785922967171,
+  "createdBy": "Author Site",
+  "audit": {
+    "actorType": "user"
+  }
+}

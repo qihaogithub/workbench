@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "81e6b5eb-2c7f-4174-adcc-91be4f7e789a",
+  "projectId": "proj_1785685022249_aevplm",
+  "workspaceId": "live-1785685023211-6or8kf4le",
+  "baseRevision": 0,
+  "revision": 15,
+  "rootHash": "fba1b626067685872964ca19dce38f2dd2d3f024fa33b01764dfd7b9d926779c",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/config-media_p7q3/index.tsx",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "52106ed2308195b443dfd7a3c392c6028b7469d4f200f783c19a46dfdadf864f"
+    }
+  ],
+  "committedAt": 1785685332013
+}

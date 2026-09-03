@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1785732093548_60rvor",
+  "at": 1785732093548,
+  "actor": {
+    "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+    "name": "qihao",
+    "role": "creator",
+    "source": "author-site"
+  },
+  "level": "L2",
+  "tool": "page_create_version",
+  "projectId": "proj_1779608460378",
+  "resourceId": "demo_1779608460379_a1b2c3",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "page-version:demo_1779608460379_a1b2c3:prv_1785732093542_q2e3f6"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

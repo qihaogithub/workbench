@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "55bb148b-1168-432d-bbdb-e010c72418e7",
+  "projectId": "proj_1787816872316_ywiron",
+  "workspaceId": "live-1787816872934-dsgtp417r",
+  "baseRevision": 0,
+  "revision": 2,
+  "rootHash": "a8d41c135f04c462f5418ffcc60411a903bbe81c081800077aa2b0baa99efdbe",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/section_mhg2/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f"
+    },
+    {
+      "path": "demos/section_mhg2/prototype.css",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/section_mhg2/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e1c118a2c54911913d4ffbf47809ce89c404706cd8a6262198c81674f23a3750"
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "b8f84cb18b1d4fb04f8db0fdb7867802b916f6365d4816c8289777a7893570ab",
+      "afterHash": "5f16727ee0ff6710df1217d6900aef808c4f0215b6437a76c0d7a6f3635eebf0"
+    }
+  ],
+  "committedAt": 1787816875967
+}

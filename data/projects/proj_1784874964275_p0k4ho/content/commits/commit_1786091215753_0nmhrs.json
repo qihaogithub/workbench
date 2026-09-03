@@ -1,0 +1,36 @@
+{
+  "id": "commit_1786091215753_0nmhrs",
+  "projectId": "proj_1784874964275_p0k4ho",
+  "parentCommitId": "commit_1786085384980_oga5a8",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录学习页头图-手机",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "course-complete_a7k3",
+      "versionId": "prv_1786085384969_m8c4hc"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_034b",
+      "versionId": "prv_1786091215751_1ijiev"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "page_034b",
+      "fromVersionId": "prv_1786072892265_sy5dep",
+      "toVersionId": "prv_1786091215751_1ijiev"
+    }
+  ],
+  "createdAt": 1786091215753,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785739340495-r9pfl4l9u",
+    "workspaceRevision": 98,
+    "workspaceRootHash": "18df9038ffc3755cdc8bdb906c4021a57410e7ec686c12f96098a3721b0695cb"
+  }
+}

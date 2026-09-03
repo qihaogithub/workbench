@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "c19ce3d7-810a-4891-ad1f-32d69fa86fd2",
+  "projectId": "proj_1784874964275_p0k4ho",
+  "workspaceId": "live-1785420027829-gr9bjh2t3",
+  "baseRevision": 0,
+  "revision": 17,
+  "rootHash": "579d662434dc82b532276a80672ae110a3d0cd8104614c57590e41af4d65ef4a",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_jzaa/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f"
+    },
+    {
+      "path": "demos/page_jzaa/prototype.css",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/page_jzaa/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355"
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "e0bb2da09a4d2ccf980a7f7d085fd19ae28a86fb4d8c1da35495939d7a6ad472",
+      "afterHash": "4f9f518230ba067c007b59822b78a1d36e29cf5716459a2d8d9f7ed9192ce32f"
+    }
+  ],
+  "committedAt": 1785719815890
+}

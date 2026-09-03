@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1787895065568_verwtd",
+  "at": 1787895065568,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1787895065566_5wgvzx",
+  "inputSummary": {
+    "name": "测试",
+    "category": "测试"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1787895065566_5wgvzx"
+    ]
+  }
+}

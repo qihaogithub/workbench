@@ -1,0 +1,26 @@
+{
+  "workspaceId": "live-1786594537420-vvme4o0yp",
+  "projectId": "proj_1786594536530_g8erpn",
+  "revision": 5,
+  "rootHash": "5a2c9f96628dc228c181bc60d8bc214d317fdbdee671c1d0cb4a6c1ce5ab5bb9",
+  "resourceHashes": {
+    "demos/1_ebuu/config.schema.json": "65cf92d66fe574e9b9f6ca014d35ead34d95572c6203fed3b5d7297e0fa1ff4c",
+    "demos/1_ebuu/index.tsx": "0d69655e166a76a200bd46f9e67caca0191040c2228562c859e4aa2223bc0208",
+    "demos/1_ebuu/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "demos/1_ebuu/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
+    "demos/2_5b6h/config.schema.json": "b9e998e9736581dafd6e87bb1e8ae08e0c852be55afc0bb5277ef9589da54463",
+    "demos/2_5b6h/index.tsx": "68f9b1f156f2ed1b648d9a7984e4cfb7466587aebda0021466a54a6c0592263b",
+    "demos/2_5b6h/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "demos/2_5b6h/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
+    "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
+    "memory.md": "ac647ba40af49cc702b3b182334eadaada557ab7a3651246de2ea8d94da7b210",
+    "workspace-tree.json": "9b5e23c079026953fcb140c18a59b717d82e32a6a2b1fb27cebe0215c7eb46f4"
+  },
+  "mutationPayloads": {
+    "1d69f662-4b94-4c1e-8fe3-c8171d4cb5c8": "9f2f6fb1d9cc14d8d25ed6772a9d80954e9b58b81961b51482e41f9297fb8a39",
+    "40dc0308-dba0-4dad-b67b-2831dd7abe05": "32a42c64f84d60296bf75222266c63f5180d8f759553235d90fa47b47e6adb32",
+    "7268514e-aec9-498b-b6f8-89355392f66e": "6cc49b7449628547f2af212bf58038db127ebf3417fc00c428dfb983b642980d",
+    "148501ba-2e4c-4a36-b71a-3d17219ff862": "1d9ae6ca212e45b21cd8afebfed80f500c98b10dca3ad845d0e05e3bec17a0fe"
+  },
+  "updatedAt": 1786594552582
+}

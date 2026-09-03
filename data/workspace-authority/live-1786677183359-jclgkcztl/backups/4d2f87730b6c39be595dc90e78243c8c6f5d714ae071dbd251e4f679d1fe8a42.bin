@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "projectId": "proj_1786367903885_iu08e4",
+  "updatedAt": 1787892204583,
+  "state": {
+    "viewport": {
+      "x": 255.5536789255362,
+      "y": 53.73437942634547,
+      "zoom": 0.3195163901254554
+    },
+    "pages": {
+      "halloween-map_x4k2": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 2051,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "390x844"
+      },
+      "halloween-level1_f3n9": {
+        "x": 860,
+        "y": 0,
+        "width": 390,
+        "height": 1565,
+        "zIndex": 2,
+        "sizeMode": "preview",
+        "previewSizeKey": "390x844"
+      },
+      "halloween-level2_z8b5": {
+        "x": 0,
+        "y": 852,
+        "width": 390,
+        "height": 858,
+        "zIndex": 3,
+        "sizeMode": "preview",
+        "previewSizeKey": "390x844"
+      },
+      "halloween-level3_w2p7": {
+        "x": 430,
+        "y": 852,
+        "width": 390,
+        "height": 1447,
+        "zIndex": 4,
+        "sizeMode": "preview",
+        "previewSizeKey": "390x844"
+      },
+      "halloween-level4_j6c3": {
+        "x": 860,
+        "y": 852,
+        "width": 390,
+        "height": 1058,
+        "zIndex": 5,
+        "sizeMode": "preview",
+        "previewSizeKey": "390x844"
+      },
+      "halloween-level5_r9d4": {
+        "x": 0,
+        "y": 1704,
+        "width": 390,
+        "height": 1185,
+        "zIndex": 6,
+        "sizeMode": "preview",
+        "previewSizeKey": "390x844"
+      },
+      "halloween-poster_t1v8": {
+        "x": 430,
+        "y": 1704,
+        "width": 390,
+        "height": 1088,
+        "zIndex": 7,
+        "sizeMode": "preview",
+        "previewSizeKey": "390x844"
+      },
+      "halloween-prize_y3n6": {
+        "x": 860,
+        "y": 1704,
+        "width": 390,
+        "height": 1453,
+        "zIndex": 8,
+        "sizeMode": "preview",
+        "previewSizeKey": "390x844"
+      }
+    },
+    "pageGroups": {},
+    "sections": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [
+      "kb_1787885153658_t9h54b"
+    ],
+    "navigation": {
+      "hotspots": {},
+      "connections": {}
+    }
+  }
+}

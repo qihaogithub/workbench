@@ -1,0 +1,25 @@
+interface DemoProps {
+  modules?: ModuleConfig[];
+}
+
+interface ModuleConfig {
+  type: "image" | "video" | "progress";
+  imageUrl?: string;
+  videoBg?: string;
+  videoCover?: string;
+  progressBgTop?: string;
+  progressBgMiddle?: string;
+  progressBgBottom?: string;
+}
+
+export default function Demo({ modules }: DemoProps) {
+  return (
+    <div className="w-[375px] bg-white min-h-screen p-4">
+      <h1 className="text-lg font-bold">完课活动</h1>
+      <p className="text-gray-500 text-sm">页面加载成功</p>
+      <p className="text-xs text-gray-400 mt-2">
+        模块数量: {modules?.length ?? 0}
+      </p>
+    </div>
+  );
+}

@@ -1,0 +1,19 @@
+{
+  "images": [
+    {
+      "id": "8524150bae1d",
+      "filename": "2464ee67-e74c-423c-8ca4-3bfc7eaa8980.png",
+      "url": "/api/images/img_Vp2eXQhSL2DhRA",
+      "size": 346935,
+      "format": "png",
+      "createdAt": 1788277765199,
+      "createdBy": "user",
+      "width": 3136,
+      "height": 1682,
+      "contentHash": "8524150bae1de939fbb9fe04d703081a302f2f8d8bd46ceaf27d430d5de76eec",
+      "mimeType": "image/png",
+      "originalUrl": "https://alidocs.oss-cn-zhangjiakou.aliyuncs.com/res/a2QnVZeK0W8yn4XB/img/2464ee67-e74c-423c-8ca4-3bfc7eaa8980.png",
+      "sourceType": "remote_url"
+    }
+  ]
+}

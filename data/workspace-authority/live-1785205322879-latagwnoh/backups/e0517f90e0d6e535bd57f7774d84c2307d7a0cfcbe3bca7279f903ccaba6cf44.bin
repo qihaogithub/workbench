@@ -1,0 +1,219 @@
+{
+  "version": 1,
+  "projectId": "proj_1785135808250_r4cb4a",
+  "updatedAt": 1785389524060,
+  "state": {
+    "viewport": {
+      "x": 280.7167973742375,
+      "y": 33.85187073264876,
+      "zoom": 0.14400977995110026
+    },
+    "pages": {
+      "page_p8a2": {
+        "x": -1224.3209372337278,
+        "y": -30.566470792077308,
+        "width": 375,
+        "height": 3681,
+        "zIndex": 9,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_gfbs": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 1075,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x1075"
+      },
+      "page_da9l": {
+        "x": -630.2500622302603,
+        "y": 1887.7002599406537,
+        "width": 393.4729064039409,
+        "height": 852,
+        "sizeMode": "custom",
+        "previewSizeKey": "375x812"
+      },
+      "page_g5wy": {
+        "x": -205.80395473095882,
+        "y": 1887.7002599406537,
+        "width": 375,
+        "height": 812,
+        "zIndex": 2,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_j2zv": {
+        "x": 215.74993776973974,
+        "y": 1887.7002599406537,
+        "width": 375,
+        "height": 812,
+        "zIndex": 3,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_13po": {
+        "x": 423,
+        "y": 943.0772140522876,
+        "width": 375,
+        "height": 812,
+        "zIndex": 4,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_1gre": {
+        "x": -31.6723259762309,
+        "y": 20,
+        "width": 375,
+        "height": 812,
+        "zIndex": 3,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_yw72": {
+        "x": -682.5446932505165,
+        "y": -21.752268664581912,
+        "width": 375,
+        "height": 812,
+        "zIndex": 3,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_xix9": {
+        "x": 1488.1526795726354,
+        "y": -30.566470792077308,
+        "width": 407.99599481895444,
+        "height": 883.447327447976,
+        "sizeMode": "custom",
+        "previewSizeKey": "375x812"
+      },
+      "page_9u6t": {
+        "x": 798,
+        "y": 926.1934179883457,
+        "width": 375,
+        "height": 812,
+        "zIndex": 5,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "activity-figma_k4m9": {
+        "x": -91.29152501431818,
+        "y": -1.5987211554602254e-14,
+        "width": 375,
+        "height": 812,
+        "zIndex": 6,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_iate": {
+        "x": 856.5125363404753,
+        "y": 927.1185789580131,
+        "width": 375,
+        "height": 812,
+        "zIndex": 5,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_pqyt": {
+        "x": -8.902021368260582,
+        "y": 7.105427357601002e-15,
+        "width": 375,
+        "height": 852,
+        "zIndex": 5,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_wcfh": {
+        "x": -76.75505139627523,
+        "y": 20.000000000000014,
+        "width": 375,
+        "height": 812,
+        "zIndex": 5,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_5rsp": {
+        "x": -35.82503130634481,
+        "y": -8.072541359930682,
+        "width": 375,
+        "height": 852,
+        "zIndex": 5,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_sgfq": {
+        "x": -1420.8864108545322,
+        "y": 324.7241114429684,
+        "width": 375,
+        "height": 11043,
+        "zIndex": 9,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_pwcf": {
+        "x": 383.1112492122936,
+        "y": -30.566470792077308,
+        "width": 373.3996312606112,
+        "height": 808.5346682229767,
+        "sizeMode": "custom",
+        "previewSizeKey": "375x812"
+      },
+      "spine_dqxs": {
+        "x": 935.6319643924644,
+        "y": -30.566470792077308,
+        "width": 375,
+        "height": 812,
+        "zIndex": 8,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_dous": {
+        "x": -172.31570459872853,
+        "y": -30.566470792077308,
+        "width": 375.6897473017221,
+        "height": 813.4935328239956,
+        "sizeMode": "custom",
+        "previewSizeKey": "375x812"
+      },
+      "page_duak": {
+        "x": 2040.673394752806,
+        "y": -30.566470792077308,
+        "width": 375,
+        "height": 812,
+        "zIndex": 5,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_gb69": {
+        "x": -1352.087402797934,
+        "y": 453.45326213950244,
+        "width": 375,
+        "height": 812,
+        "zIndex": 9,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_vz12": {
+        "x": 1341.2188776944759,
+        "y": 1494.7228263966974,
+        "width": 324.864403339212,
+        "height": 703.4397213638404,
+        "sizeMode": "custom",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

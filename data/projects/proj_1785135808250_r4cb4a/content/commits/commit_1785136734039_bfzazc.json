@@ -1,0 +1,31 @@
+{
+  "id": "commit_1785136734039_bfzazc",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "parentCommitId": "commit_1785136392265_gt3pb9",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录闯关活动",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "page_gfbs",
+      "versionId": "prv_1785136734038_5bt9sp"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "page_gfbs",
+      "fromVersionId": "prv_1785136392262_knztc5",
+      "toVersionId": "prv_1785136734038_5bt9sp"
+    }
+  ],
+  "createdAt": 1785136734039,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785135808672-fhbugbqns",
+    "workspaceRevision": 19,
+    "workspaceRootHash": "12710bb40e44985ad3e21d2b8369e77bb63cdf429d29ebf36e8cd00985575489"
+  }
+}

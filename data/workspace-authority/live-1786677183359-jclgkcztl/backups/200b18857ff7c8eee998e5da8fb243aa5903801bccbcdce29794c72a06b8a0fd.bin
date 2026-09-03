@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "projectId": "proj_1786367903885_iu08e4",
+  "updatedAt": 1787886782708,
+  "state": {
+    "viewport": {
+      "x": -147.0367506392654,
+      "y": 222.61232855332491,
+      "zoom": 0.8727158783413472
+    },
+    "pages": {
+      "kids-edu_b3xw": {
+        "x": -213.58563713832734,
+        "y": -45.924520192575216,
+        "width": 375,
+        "height": 2471,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "clipboard-import_4d9ab0": {
+        "x": 549.1688741936314,
+        "y": 26.59478305785112,
+        "width": 375,
+        "height": 812,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "pageGroups": {},
+    "sections": {},
+    "hiddenPageIds": [],
+    "nodes": {
+      "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c": {
+        "id": "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c",
+        "title": "文档",
+        "layout": {
+          "x": 208.89057759846293,
+          "y": -41.56084327376694,
+          "width": 223.08961578965517,
+          "height": 352.7284130872072,
+          "zIndex": 1
+        },
+        "createdAt": 1787885153164,
+        "updatedAt": 1787886779147,
+        "kind": "document",
+        "knowledgeDocument": {
+          "id": "kb_1787885153658_t9h54b",
+          "title": "文档",
+          "fileName": "文档.md",
+          "description": "文档"
+        }
+      },
+      "text-b36118fd-de31-42b0-aa62-1c9e0c46c024": {
+        "id": "text-b36118fd-de31-42b0-aa62-1c9e0c46c024",
+        "kind": "text",
+        "title": "dd'f's",
+        "text": "dd'f's ",
+        "fontSize": 18,
+        "color": "#ffffff",
+        "textAlign": "left",
+        "fontWeight": 400,
+        "lineHeight": 1.5,
+        "stylePreset": "body",
+        "autoWidth": true,
+        "layout": {
+          "x": 509.807636632966,
+          "y": -7.16771126040892,
+          "width": 69,
+          "height": 27
+        },
+        "createdAt": 1787886781649,
+        "updatedAt": 1787886781976
+      }
+    },
+    "layers": {
+      "annotations": {
+        "nodes": {
+          "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c": {
+            "id": "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c",
+            "title": "文档",
+            "layout": {
+              "x": 208.89057759846293,
+              "y": -41.56084327376694,
+              "width": 223.08961578965517,
+              "height": 352.7284130872072,
+              "zIndex": 1
+            },
+            "createdAt": 1787885153164,
+            "updatedAt": 1787886779147,
+            "kind": "document",
+            "knowledgeDocument": {
+              "id": "kb_1787885153658_t9h54b",
+              "title": "文档",
+              "fileName": "文档.md",
+              "description": "文档"
+            }
+          },
+          "text-b36118fd-de31-42b0-aa62-1c9e0c46c024": {
+            "id": "text-b36118fd-de31-42b0-aa62-1c9e0c46c024",
+            "kind": "text",
+            "title": "dd'f's",
+            "text": "dd'f's ",
+            "fontSize": 18,
+            "color": "#ffffff",
+            "textAlign": "left",
+            "fontWeight": 400,
+            "lineHeight": 1.5,
+            "stylePreset": "body",
+            "autoWidth": true,
+            "layout": {
+              "x": 509.807636632966,
+              "y": -7.16771126040892,
+              "width": 69,
+              "height": 27
+            },
+            "createdAt": 1787886781649,
+            "updatedAt": 1787886781976
+          }
+        }
+      },
+      "documents": {
+        "nodes": {
+          "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c": {
+            "id": "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c",
+            "title": "文档",
+            "layout": {
+              "x": 208.89057759846293,
+              "y": -41.56084327376694,
+              "width": 223.08961578965517,
+              "height": 352.7284130872072,
+              "zIndex": 1
+            },
+            "createdAt": 1787885153164,
+            "updatedAt": 1787886779147,
+            "kind": "document",
+            "knowledgeDocument": {
+              "id": "kb_1787885153658_t9h54b",
+              "title": "文档",
+              "fileName": "文档.md",
+              "description": "文档"
+            }
+          }
+        }
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [],
+    "navigation": {
+      "hotspots": {},
+      "connections": {}
+    }
+  }
+}

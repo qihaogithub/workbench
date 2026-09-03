@@ -1,0 +1,28 @@
+{
+  "id": "ds_1788166913695_ecd7d6fb",
+  "title": "N对N填空题设计规范",
+  "createdAt": "2026-08-31T09:01:53.695Z",
+  "updatedAt": "2026-09-01T10:37:55.981Z",
+  "autoManagedPageId": "clipboard-import_e05e9d",
+  "entries": [
+    {
+      "id": "e_1788166913696_0322c59d",
+      "title": "背景图",
+      "markdown": "",
+      "refs": [
+        {
+          "scope": "page",
+          "pageId": "clipboard-import_e05e9d",
+          "fieldKey": "backgroundImage"
+        }
+      ],
+      "autoManagedFieldKey": "backgroundImage"
+    },
+    {
+      "id": "e_1788259071711_pp1s2m",
+      "title": "玩法介绍",
+      "markdown": "### **玩法介绍**\n\n有两种模式，一种是拖动后问题图直接替换成选项图，如下图左边的形式。另一种是拖动后问题图替换成另一张图，如右边的形式，两者在资源上的区别是第二种会多出替换后的图。\n\n![](https://alidocs.oss-cn-zhangjiakou.aliyuncs.com/res/a2QnVZeK0W8yn4XB/img/2464ee67-e74c-423c-8ca4-3bfc7eaa8980.png)\n\n### **判对逻辑**\n\n支持选项和空数量不同，支持不判对\n\n比如2个选项，3个空，2个选项填到任意空都算对\n\n### **新手引导**\n\n可配置自定义新手引导\n",
+      "refs": []
+    }
+  ]
+}

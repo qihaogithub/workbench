@@ -1,0 +1,13 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "config-highfidelity_p3n5",
+      "name": "config highfidelity",
+      "order": 0,
+      "parentId": null,
+      "runtimeType": "high-fidelity-react",
+      "routeKey": "config-highfidelity"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+1、pad端背景最下面颜色必须是透明才能在真实界面上没有明显分界；
+
+2、pad端背景中间1133宽为安全区，超出范围的内容在一些机型上会裁剪左右两边背景
+
+3、由于界面头部内容较多，且不同科目主色不同， **做图后请务必打开下面链接上传头图背景检查实际效果。头图效果预览地址👇** 打不开情况可多刷新几次试试，有疑问可联系@王丹(PP)
+
+[头图背景预览地址](https://headbg-preview.netlify.app/)
+
+4、【2025年11月11日新增要求】头图背景整体色调须和科目色一致，即在阅读下的活动头图背景必须为橙色系，且保证整体页面和谐，请参考下图的正确和错误示意。
+
+![](https://alidocs.dingtalk.com/core/api/resources/img/5eecdaf48460cde55779fa9f7a914b2ccf8d309c55fc710875b8339e1c4c2483d23cd25c3e4de2798d68742cd653602a473a1bc8310192c06b103963b1aa2542a5dcb9d8d4aa54abedc246b52a2ddebbe4c070c83f4c2a0b60d92a100776e60e?tmpCode=fcc88654-57d1-4293-8a26-788072536a8d)![](https://alidocs.dingtalk.com/core/api/resources/img/5eecdaf48460cde55779fa9f7a914b2ccf8d309c55fc710875b8339e1c4c2483d23cd25c3e4de2798d68742cd653602a0d50ecb3f30f832e4c268aa5adab6ff8bad763f1663642af4356ebfd338b1cf5c35f2cf9a6048fcb6a3be37a07a109d0?tmpCode=fcc88654-57d1-4293-8a26-788072536a8d)
+
+<br />
+
+无活动时，各科目的头 部背景颜色为
+
+![](https://alidocs.dingtalk.com/core/api/resources/img/5eecdaf48460cde55779fa9f7a914b2ccf8d309c55fc710875b8339e1c4c2483d23cd25c3e4de2798d68742cd653602afa4cc552274ccc035f954fba65f6175d02e3b9380209c280ce935b4115f15f25825342b38b835525b9cbd007c8a55206?tmpCode=fcc88654-57d1-4293-8a26-788072536a8d)
+
+可参考方案：取活动落地页头部底纹样式调整不透明度，通过混合模式“颜色”叠加各科目主色，达到理想效果，科目主色如下。
+
+![](https://alidocs.dingtalk.com/core/api/resources/img/5eecdaf48460cde55779fa9f7a914b2ccf8d309c55fc710875b8339e1c4c2483d23cd25c3e4de2798d68742cd653602a15464a86392b1bf5c519dd9abbee9490ce9942db0c7afd515b5c3cbac9dd84a845aff6b161cd607087f032c574ba682e?tmpCode=fcc88654-57d1-4293-8a26-788072536a8d)
+

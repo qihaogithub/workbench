@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "8870c689-dd37-448d-801b-82c7d8f4e337",
+  "projectId": "proj_1788141806566_0aps89",
+  "workspaceId": "live-1788141807256-9xerzl5sd",
+  "baseRevision": 0,
+  "revision": 303,
+  "rootHash": "044c51e2ce0a66db9e121cfa42b653907aa4335ffe6db9bbcdd5fc8d21de9a64",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/clipboard-import_e05e9d/index.tsx",
+      "action": "modified",
+      "beforeHash": "cb8ee88e1109f94afaeaf2dbe94a552a0b8df5e34951cbcc20da7cd3cd97e15f",
+      "afterHash": "cb8ee88e1109f94afaeaf2dbe94a552a0b8df5e34951cbcc20da7cd3cd97e15f"
+    },
+    {
+      "path": "demos/clipboard-import_e05e9d/config.schema.json",
+      "action": "modified",
+      "beforeHash": "a16e63f6815ffbd2d44540da15cc3bfcdd15385933490f63bc45a4433308f9b0",
+      "afterHash": "a16e63f6815ffbd2d44540da15cc3bfcdd15385933490f63bc45a4433308f9b0"
+    },
+    {
+      "path": "demos/clipboard-import_e05e9d/prototype.html",
+      "action": "modified",
+      "beforeHash": "fd38f8e7d6c10349e024457c294926f654ef6097bb7fb49a90ff884faf641e73",
+      "afterHash": "fd38f8e7d6c10349e024457c294926f654ef6097bb7fb49a90ff884faf641e73"
+    },
+    {
+      "path": "demos/clipboard-import_e05e9d/prototype.css",
+      "action": "modified",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/clipboard-import_e05e9d/prototype.meta.json",
+      "action": "modified",
+      "beforeHash": "e05ff62d13acfe6f1b5cb7b3394c7aa7842521335717e56553c5e11e2ffa9129",
+      "afterHash": "e05ff62d13acfe6f1b5cb7b3394c7aa7842521335717e56553c5e11e2ffa9129"
+    }
+  ],
+  "committedAt": 1788316117329
+}

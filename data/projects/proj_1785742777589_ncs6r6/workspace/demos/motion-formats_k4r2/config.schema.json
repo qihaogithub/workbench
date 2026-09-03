@@ -1,0 +1,115 @@
+{
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "content",
+      "preset": "custom",
+      "source": "user"
+    }
+  },
+  "type": "object",
+  "properties": {
+    "lottieSrc": {
+      "type": "string",
+      "title": "Lottie 素材 (.json)",
+      "format": "file",
+      "ui:options": {
+        "accept": ".json"
+      }
+    },
+    "lottieLoop": {
+      "type": "boolean",
+      "title": "Lottie 循环播放",
+      "default": true
+    },
+    "lottieAutoplay": {
+      "type": "boolean",
+      "title": "Lottie 自动播放",
+      "default": true
+    },
+    "svgaSrc": {
+      "type": "string",
+      "title": "SVGA 素材 (.svga)",
+      "format": "file",
+      "ui:options": {
+        "accept": ".svga"
+      }
+    },
+    "spineAsset": {
+      "type": "object",
+      "format": "spine",
+      "title": "Spine 素材 (.zip / .zip.flutter)",
+      "properties": {
+        "kind": { "const": "spine" },
+        "version": { "const": 1 },
+        "assetId": { "type": "string", "pattern": "^spine_[a-f0-9]{64}$" }
+      },
+      "required": ["kind", "version", "assetId"],
+      "additionalProperties": false,
+      "ui:options": {
+        "accept": ".zip,.zip.flutter,application/zip,application/x-zip-compressed",
+        "group": "Spine 动画"
+      }
+    },
+    "spineAnimation": {
+      "type": "string",
+      "title": "Spine 动画名",
+      "default": "",
+      "ui:options": { "group": "Spine 动画" }
+    },
+    "spineLoop": {
+      "type": "boolean",
+      "title": "Spine 循环播放",
+      "default": true,
+      "ui:options": { "group": "Spine 动画" }
+    },
+    "spineAudioEnabled": {
+      "type": "boolean",
+      "title": "Spine 音效",
+      "default": true,
+      "ui:options": { "group": "Spine 动画" }
+    },
+    "riveSrc": {
+      "type": "string",
+      "title": "Rive 素材 (.riv)",
+      "format": "file",
+      "ui:options": {
+        "accept": ".riv"
+      }
+    },
+    "riveFit": {
+      "type": "string",
+      "title": "Rive 填充方式",
+      "enum": [
+        "cover",
+        "contain",
+        "fill",
+        "fitWidth",
+        "fitHeight",
+        "none",
+        "scaleDown"
+      ],
+      "enumNames": [
+        "cover",
+        "contain",
+        "fill",
+        "fitWidth",
+        "fitHeight",
+        "none",
+        "scaleDown"
+      ],
+      "default": "cover"
+    },
+    "riveAutoplay": {
+      "type": "boolean",
+      "title": "Rive 自动播放",
+      "default": true
+    }
+  },
+  "required": []
+}

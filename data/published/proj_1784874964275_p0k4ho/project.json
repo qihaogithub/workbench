@@ -1,0 +1,82 @@
+{
+  "id": "proj_1784874964275_p0k4ho",
+  "name": "完课活动",
+  "publishedVersion": "v43",
+  "commitId": "commit_1785920932163_44bri7",
+  "publishedAt": 1785920932164,
+  "demoPages": [
+    {
+      "id": "course-complete_a7k3",
+      "name": "完课活动",
+      "routeKey": "page",
+      "order": 1,
+      "parentId": null,
+      "runtimeType": "high-fidelity-react",
+      "compiledJsPath": "demos/course-complete_a7k3/compiled.js",
+      "schemaPath": "demos/course-complete_a7k3/schema.json",
+      "previewSize": {
+        "width": 375,
+        "height": 812
+      },
+      "screenshotPath": "screenshots/course-complete_a7k3.png",
+      "iframeHtmlPath": "demos/course-complete_a7k3/iframe.html?v=1785920927848",
+      "embedCode": "<iframe\n  src=\"/data/proj_1784874964275_p0k4ho/demos/course-complete_a7k3/iframe.html?v=1785920927848\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
+    }
+  ],
+  "demoFolders": [],
+  "appGraph": {
+    "version": 1,
+    "entry": "page",
+    "pages": {
+      "page": {
+        "pageId": "course-complete_a7k3",
+        "title": "完课活动"
+      }
+    },
+    "actions": [],
+    "state": {}
+  },
+  "canvasState": {
+    "viewport": {
+      "x": 398.5527492668464,
+      "y": -13.996202509255738,
+      "zoom": 0.4550214592274678
+    },
+    "pages": {
+      "course-complete_a7k3": {
+        "x": -295.9298432882966,
+        "y": 98.95848392667982,
+        "width": 375,
+        "height": 1165,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_jzaa": {
+        "x": 504.8669894142595,
+        "y": 88.50211989306594,
+        "width": 375,
+        "height": 812,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  },
+  "previewRuntime": {
+    "version": "2026-06-preview-runtime-v4",
+    "source": "local",
+    "basePath": "/data/proj_1784874964275_p0k4ho/preview-runtime"
+  }
+}

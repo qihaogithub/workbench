@@ -1,0 +1,18 @@
+{
+  "bindings": [
+    {
+      "id": "wb_wb_be8d59cd2a064ae4b4f4ba608a9adf7e",
+      "target": {
+        "scope": "page",
+        "pageId": "page_0f1r",
+        "fieldPath": [
+          "heroImage"
+        ]
+      },
+      "whiteboardId": "wb_be8d59cd2a064ae4b4f4ba608a9adf7e",
+      "documentRevisionAtOutput": 2,
+      "outputAssetHash": "d7dbb1ea359b3d87b652bd56b99f342faeeb77f4ecc5c583906e46c23dff40a3",
+      "updatedAt": 1788282291496
+    }
+  ]
+}

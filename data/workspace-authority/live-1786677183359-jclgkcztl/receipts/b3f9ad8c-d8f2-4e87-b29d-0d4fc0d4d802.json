@@ -1,0 +1,25 @@
+{
+  "committed": true,
+  "mutationId": "b3f9ad8c-d8f2-4e87-b29d-0d4fc0d4d802",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 64,
+  "rootHash": "4082db212e703803ee512a3c278e15f8f84b1aebb690b7cefbb0b65deb22a0ea",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/demo_ehpm/index.tsx",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/demo_ehpm/config.schema.json",
+      "action": "modified",
+      "beforeHash": "8243f0af367f188a376f2c17b5eabe872a2f7a979813e0d4e2be6d594c2aa259",
+      "afterHash": "8243f0af367f188a376f2c17b5eabe872a2f7a979813e0d4e2be6d594c2aa259"
+    }
+  ],
+  "committedAt": 1787671188136
+}

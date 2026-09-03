@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "projectId": "proj_1786367903885_iu08e4",
+  "updatedAt": 1786517443425,
+  "state": {
+    "viewport": {
+      "x": 307.8778324064711,
+      "y": 161.25429562937958,
+      "zoom": 0.258276358402303
+    },
+    "pages": {
+      "quiet-studio_q7m4": {
+        "x": -216,
+        "y": 0,
+        "width": 375,
+        "height": 1587,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x667"
+      },
+      "sunny-reading_k4m8": {
+        "x": 240,
+        "y": 0,
+        "width": 375,
+        "height": 1559,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "kids-edu_b3xw": {
+        "x": -912,
+        "y": 0,
+        "width": 375,
+        "height": 2471,
+        "zIndex": 4,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "kids-edu-h5_p9m2": {
+        "x": -1321.0303520114944,
+        "y": 0,
+        "width": 375,
+        "height": 2779,
+        "zIndex": 5,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "kids-edu-wire_r5t3": {
+        "x": -1733.3094588122601,
+        "y": 0,
+        "width": 375,
+        "height": 2467,
+        "zIndex": 6,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_zp3o": {
+        "x": 805.661030352012,
+        "y": -27.447435344827454,
+        "width": 418.0047848861307,
+        "height": 905.1196942067684,
+        "sizeMode": "custom",
+        "previewSizeKey": "375x812",
+        "zIndex": 7
+      },
+      "page_5xir": {
+        "x": 1302.5984290718898,
+        "y": -27.180532546048653,
+        "width": 904.5858886092107,
+        "height": 678.439416456908,
+        "sizeMode": "custom",
+        "previewSizeKey": "1024x768",
+        "zIndex": 7
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

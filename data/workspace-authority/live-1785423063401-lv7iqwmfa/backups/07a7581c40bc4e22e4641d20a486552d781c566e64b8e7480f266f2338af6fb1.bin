@@ -1,0 +1,129 @@
+export default {
+  $preview: { width: 375, height: 812 },
+
+  $positionable: {
+    items: ["logo", "title", "subtitle", "ctaButton", "badge", "topBanner", "topTitle", "topCountdown", "topBtn"],
+    defaults: {
+      logo: { x: 20, y: 20 },
+      title: { x: 100, y: 24 },
+      subtitle: { x: 100, y: 64 },
+      ctaButton: { x: 100, y: 120 },
+      badge: { x: 290, y: 20 },
+      topBanner: { x: 10, y: 10 },
+      topTitle: { x: 130, y: 30 },
+      topCountdown: { x: 130, y: 70 },
+      topBtn: { x: 130, y: 120 },
+    },
+    size: { width: 375, height: 200 },
+  },
+
+  "基础信息": {
+    title: { type: "string", title: "标题", default: "配置面板测试" },
+    subtitle: { type: "text", title: "副标题", default: "这是一个通过 config.ts 编译的配置面板" },
+    showBanner: { type: "boolean", title: "显示横幅", default: true },
+  },
+
+  "数值配置": {
+    fontSize: { type: "number", title: "标题字号", default: 24 },
+    gap: { type: "integer", title: "模块间距", default: 16 },
+  },
+
+  "样式配置": {
+    bgColor: { type: "color", title: "背景颜色", default: "#f5f5f5" },
+    textColor: { type: "color", title: "文字颜色", default: "#333333" },
+    layout: { type: "enum", title: "布局", enum: ["grid", "list"], enumNames: ["网格", "列表"], default: "grid" },
+    tags: {
+      type: "enum",
+      title: "标签",
+      enum: ["hot", "new", "recommend"],
+      enumNames: ["热门", "新品", "推荐"],
+      multiple: true,
+      default: ["hot"],
+    },
+  },
+
+  "素材": {
+    logo: { type: "image", title: "Logo", default: "/api/images/img_hM5VzGditbEPwA", accept: "image/*", maxSize: 1048576 },
+    gallery: {
+      type: "imageList",
+      title: "画廊图片",
+      default: [
+        "/api/images/img_E-_IZCqwr_grEA",
+        "/api/images/img_MMqz5MjkhLG9EQ",
+        "/api/images/img_5o-S8McbM_F3ow",
+      ],
+    },
+  },
+
+  "富文本与地区": {
+    description: {
+      type: "richtext",
+      title: "富文本描述",
+      default: "<p>这是一个<b>富文本</b>配置项，支持<strong>加粗</strong>、<em>斜体</em>等样式。</p>",
+    },
+    region: {
+      type: "cascade",
+      title: "地区",
+      default: ["zhejiang", "hangzhou"],
+      options: [
+        {
+          value: "beijing",
+          label: "北京",
+          children: [
+            { value: "chaoyang", label: "朝阳区" },
+            { value: "haidian", label: "海淀区" },
+          ],
+        },
+        {
+          value: "zhejiang",
+          label: "浙江",
+          children: [
+            { value: "hangzhou", label: "杭州" },
+            { value: "ningbo", label: "宁波" },
+          ],
+        },
+        {
+          value: "guangdong",
+          label: "广东",
+          children: [
+            { value: "guangzhou", label: "广州" },
+            { value: "shenzhen", label: "深圳" },
+          ],
+        },
+      ],
+    },
+  },
+
+  "模块列表": {
+    blocks: {
+      type: "array",
+      title: "内容模块",
+      variants: {
+        positionable: {
+          title: "下方元素定位模块",
+          _maxItems: 1,
+        },
+        positionableTop: {
+          title: "上方元素定位模块",
+          _maxItems: 1,
+        },
+        text: {
+          title: "文本模块",
+          content: { type: "text", title: "文本内容", default: "" },
+        },
+        image: {
+          title: "图片模块",
+          _maxItems: 1,
+          pic: { type: "image", title: "图片" },
+          caption: { type: "string", title: "说明", default: "" },
+        },
+      },
+      default: [
+        { type: "positionableTop" },
+        { type: "positionable" },
+        { type: "text", content: "第一段文本" },
+        { type: "image", pic: "/api/images/img_-MQ7DX4cdUa5Mw", caption: "示例配图" },
+      ],
+    },
+  },
+};

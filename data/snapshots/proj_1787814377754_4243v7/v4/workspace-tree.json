@@ -1,0 +1,13 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "clipboard-import_c6b554",
+      "name": "clipboard-import",
+      "routeKey": "clipboard-import",
+      "order": 0,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    }
+  ]
+}

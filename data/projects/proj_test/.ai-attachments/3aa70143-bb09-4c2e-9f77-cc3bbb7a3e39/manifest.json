@@ -1,0 +1,14 @@
+{
+  "id": "3aa70143-bb09-4c2e-9f77-cc3bbb7a3e39",
+  "name": "test.md",
+  "mimeType": "text/markdown",
+  "size": 14,
+  "textExtracted": true,
+  "textPreview": "hello markdown",
+  "lineCount": 1,
+  "truncated": false,
+  "originalFilename": "test.md",
+  "storedFilename": "test.md",
+  "sha256": "01b2c4ac1cb1aa026dca654d05d7100b004c58de94cd8040f19dea510771ca0e",
+  "createdAt": "2026-08-05T09:56:47.545Z"
+}

@@ -1,0 +1,14 @@
+{
+  "pages": [
+    {
+      "id": "config-showcase",
+      "name": "配置项全量示例",
+      "runtimeType": "high-fidelity-react",
+      "order": 1,
+      "parentId": null,
+      "routeKey": "page"
+    }
+  ],
+  "folders": []
+}
+

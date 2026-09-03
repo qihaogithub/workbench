@@ -1,0 +1,39 @@
+{
+  "id": "prv_1785205299313_c3158x",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "kind": "page",
+  "resourceId": "page_pqyt",
+  "workspaceId": "live-1785135808672-fhbugbqns",
+  "workspaceRevision": 138,
+  "workspaceRootHash": "6c6b0ae3ee565083395b73896fef9191ff255aede6cdffd18b27ef97a5db0a55",
+  "previousVersionId": "prv_1785203239478_6y8top",
+  "contentHash": "1eed6932faf746beff43188b90646321ee4b2a735ebee686835b92f97c06ab5b",
+  "blobRefs": [
+    "b2e6a6d0b5ca3bd9d420f0bdc3e59325ba1706d5f07261602bec421bab0e9f18",
+    "1bf394da3e7ec437ccba1f714356348c62d0da47d2a920f6f24e0f20d580879a"
+  ],
+  "metadata": {
+    "page": {
+      "id": "page_pqyt",
+      "name": "闯关活动",
+      "routeKey": "page-6",
+      "order": 6,
+      "parentId": null,
+      "runtimeType": "high-fidelity-react"
+    },
+    "files": {
+      "schema": "b2e6a6d0b5ca3bd9d420f0bdc3e59325ba1706d5f07261602bec421bab0e9f18",
+      "code": "1bf394da3e7ec437ccba1f714356348c62d0da47d2a920f6f24e0f20d580879a"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "high-fidelity-react",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1785205299314,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "打开历史前记录闯关活动"
+}

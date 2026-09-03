@@ -1,0 +1,16 @@
+{
+  "editId": "edit_1782867443532_usinbp",
+  "projectId": "proj_1782839405716_tqjl1f",
+  "workspaceId": "cli_edit_1782867443532_usinbp",
+  "workspacePath": "/Users/qh2/Documents/PGM/1·Work/opencode-workbench/data/workspaces/qh2/proj_1782839405716_tqjl1f/cli_edit_1782867443532_usinbp",
+  "baseVersion": "v5",
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "createdAt": 1782867443559,
+  "expiresAt": 1782874643559,
+  "status": "committed"
+}

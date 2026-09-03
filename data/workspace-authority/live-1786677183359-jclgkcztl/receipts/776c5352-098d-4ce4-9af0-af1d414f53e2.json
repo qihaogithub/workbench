@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "776c5352-098d-4ce4-9af0-af1d414f53e2",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 559,
+  "rootHash": "c42e9f3342fc66c764e698b1d7d057fc9247272d8f1bb2b960bab2ed50dfa509",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/kids-edu_cl49/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "ed6c9e960db84829fc5a1400e65c2a561602d63271f0f9759b131ec6e01e285e",
+      "afterHash": null
+    },
+    {
+      "path": "demos/kids-edu_cl49/prototype.css",
+      "action": "deleted",
+      "beforeHash": "5c7e7a4e39f966ad474fc54d82e62add4428ae642c9a14b7a98c000132e82259",
+      "afterHash": null
+    },
+    {
+      "path": "demos/kids-edu_cl49/prototype.html",
+      "action": "deleted",
+      "beforeHash": "3e2c71687ebbab51d8d590a19de64f24ed6d6c66ba244de18bbd5078809c4f2e",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "557c8582ded1157f26371af78169c74e34dc03f595913bb4184274365e68425f",
+      "afterHash": "15080c5a29ca466760c03911b1bad727b12a6d2e9dc5780126a1313aea033862"
+    }
+  ],
+  "committedAt": 1787888816634
+}

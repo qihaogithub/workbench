@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "bc6a1524-f8f4-481c-a4e8-85ba7ba1f2ae",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 649,
+  "rootHash": "b233024562dbe8c3059a745a3692b6de9e8b4cbb0fade45791903fb31a59a1e3",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/halloween-intro_q7m1/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "bff87ad4d92758446fa2728a209e03ed6900f76dea3d931db0ca9bdcce47b83f"
+    }
+  ],
+  "committedAt": 1787891716198
+}

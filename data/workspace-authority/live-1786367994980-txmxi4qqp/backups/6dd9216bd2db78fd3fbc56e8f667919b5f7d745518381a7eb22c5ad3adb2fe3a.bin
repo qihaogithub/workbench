@@ -1,0 +1,20 @@
+{
+  "$demo": {
+    "previewSize": { "width": 375, "height": 812 }
+  },
+  "type": "object",
+  "properties": {
+    "heroImage": {
+      "type": "string",
+      "format": "image",
+      "title": "主视觉图片",
+      "ui:options": {
+        "minWidth": 200,
+        "minHeight": 100,
+        "maxWidth": 200,
+        "maxHeight": 100
+      }
+    }
+  },
+  "required": []
+}

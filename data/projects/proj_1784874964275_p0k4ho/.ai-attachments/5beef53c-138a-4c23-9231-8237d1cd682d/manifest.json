@@ -1,0 +1,14 @@
+{
+  "id": "5beef53c-138a-4c23-9231-8237d1cd682d",
+  "name": "创作端预览-HTML快照替代画布缩略态截图方案.md",
+  "mimeType": "text/markdown",
+  "size": 19879,
+  "textExtracted": true,
+  "textPreview": "# 创作端预览：HTML 快照替代画布缩略态截图方案\n\n## 背景\n\n### 现状问题\n\n画布中非选中高保真页面的缩略态当前走「Puppeteer PNG 截图」替代 iframe 渲染（受 `MIN_CANVAS_SCREENSHOT_PAGE_COUNT=6` 和 iframe 预算 `12+12` 约束），存在以下痛点：\n\n1. **服务器资源消耗高**：每次截图需要在 `screenshot-service` 中启动独立 Puppeteer Chrome 实例，占用服务端 CPU/内存（单截图 ~100-300MB 内存、5-30s 完成）\n2. **延迟高**：截图服务队列 + Puppeteer 冷启动 + 编译等待 + PNG 编码，用户画布缩略态从空白到显示完整截图的等待时间显著\n3. **清晰度受限**：PNG 是固定 DPI 位图，画布缩放下会模糊；矢量 DOM 天然支持任意缩放\n4. **截图服务稳定性风险**：空白图、超时、网络波动、渲染不一致已持续出现在诊断日志中\n\n### 用户原始提议\n\n> 是否可以都用 React 页面，但自动编译生成 HTML 页面，显",
+  "lineCount": 251,
+  "truncated": false,
+  "originalFilename": "创作端预览-HTML快照替代画布缩略态截图方案.md",
+  "storedFilename": "_____-HTML_____________.md",
+  "sha256": "82334296fd549c1ec31cfcebbee3aef42feb7d594c5c9032a27e419e454822ef",
+  "createdAt": "2026-08-05T10:58:58.904Z"
+}

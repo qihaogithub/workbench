@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "entry": "page",
+  "pages": {
+    "page": {
+      "pageId": "config-demo_x7k2",
+      "title": "配置面板测试"
+    }
+  },
+  "actions": [],
+  "state": {}
+}

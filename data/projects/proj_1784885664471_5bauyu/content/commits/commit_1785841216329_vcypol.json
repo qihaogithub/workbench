@@ -1,0 +1,35 @@
+{
+  "id": "commit_1785841216329_vcypol",
+  "projectId": "proj_1784885664471_5bauyu",
+  "parentCommitId": "commit_1784887097683_0qg5ar",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录手机头图预览",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "mobile-header-preview_b3f1",
+      "versionId": "prv_1785841216326_96n9dw"
+    },
+    {
+      "kind": "page",
+      "resourceId": "pad-preview_m7k2",
+      "versionId": "prv_1784887097681_1m1yzx"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "mobile-header-preview_b3f1",
+      "toVersionId": "prv_1785841216326_96n9dw"
+    }
+  ],
+  "createdAt": 1785841216329,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1784885665853-hte2rzhnj",
+    "workspaceRevision": 14,
+    "workspaceRootHash": "42353730a2cd58d2a0ac5bc330f85508ab646bcc8ad4c5b18da762bbecff7933"
+  }
+}

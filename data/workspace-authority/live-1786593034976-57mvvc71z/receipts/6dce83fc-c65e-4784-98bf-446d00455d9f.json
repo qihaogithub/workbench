@@ -1,0 +1,25 @@
+{
+  "committed": true,
+  "mutationId": "6dce83fc-c65e-4784-98bf-446d00455d9f",
+  "projectId": "proj_1786593034898_oubm00",
+  "workspaceId": "live-1786593034976-57mvvc71z",
+  "baseRevision": 0,
+  "revision": 4,
+  "rootHash": "ef19c23d36beaec88c7e759ae0a1cce14e10f082523176aa2710cf39cc452451",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_zcvc/index.tsx",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "ccae4c5a2f734e120a5c30b0730bed313a20d7a8271531e0d7f5ba6f4d968b14"
+    },
+    {
+      "path": "demos/page_zcvc/config.schema.json",
+      "action": "modified",
+      "beforeHash": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+      "afterHash": "e76467bacafd52960a3d8830f4af125c07a5fbc62c91a9ae91891de75bc08830"
+    }
+  ],
+  "committedAt": 1786593053723
+}

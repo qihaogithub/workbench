@@ -1,0 +1,41 @@
+{
+  "id": "commit_1785905647089_mxbw7s",
+  "projectId": "proj_1784885664471_5bauyu",
+  "parentCommitId": "commit_1785901751206_c51z4j",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录Pad预览",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "mobile-header-preview_b3f1",
+      "versionId": "prv_1785898920342_ge3rgm"
+    },
+    {
+      "kind": "page",
+      "resourceId": "pad-header-preview_x7k2",
+      "versionId": "prv_1785905647085_h9u8h0"
+    },
+    {
+      "kind": "page",
+      "resourceId": "pad-preview_m7k2",
+      "versionId": "prv_1784887097681_1m1yzx"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "pad-header-preview_x7k2",
+      "fromVersionId": "prv_1785901751202_tk9ctc",
+      "toVersionId": "prv_1785905647085_h9u8h0"
+    }
+  ],
+  "createdAt": 1785905647089,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785863225962-u52upxekm",
+    "workspaceRevision": 54,
+    "workspaceRootHash": "88c0d222a6a466a74f2693534c690f39e60e1108a16bd38d3a5c239081b3594c"
+  }
+}

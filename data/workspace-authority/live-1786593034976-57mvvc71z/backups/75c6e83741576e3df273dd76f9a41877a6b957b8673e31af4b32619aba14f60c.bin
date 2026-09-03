@@ -1,0 +1,37 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "page_zcvc",
+      "name": "自动保存重命名页-62fa2c",
+      "routeKey": "page",
+      "order": 0,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "page_oe78",
+      "name": "自动保存顺序页",
+      "routeKey": "page-2",
+      "order": 1,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "c37202_v8uf",
+      "name": "自动保存复制页-c37202",
+      "routeKey": "c37202",
+      "order": 2,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "page_kz70",
+      "name": "自动保存待删除页",
+      "routeKey": "page-3",
+      "order": 3,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    }
+  ]
+}

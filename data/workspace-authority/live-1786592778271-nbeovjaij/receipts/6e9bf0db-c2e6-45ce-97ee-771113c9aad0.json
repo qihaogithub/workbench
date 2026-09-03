@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "6e9bf0db-c2e6-45ce-97ee-771113c9aad0",
+  "projectId": "proj_1786592778148_j42wbh",
+  "workspaceId": "live-1786592778271-nbeovjaij",
+  "baseRevision": 0,
+  "revision": 6,
+  "rootHash": "9ba0e07f93cb0fd6cebb12c1c252e2d066d77ad902e5ef80364652e1306074ed",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/993cbb_i3w5/index.tsx",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "ab2aad2738aa930daf93b32170670ce102e061ff50c5a5a1f7297872e44b0cb9"
+    },
+    {
+      "path": "demos/993cbb_i3w5/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "1076744cda5d7cff7d8774a8cf1183ac0ac046f9a396292c64565c9266a5e94f"
+    },
+    {
+      "path": "demos/993cbb_i3w5/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f"
+    },
+    {
+      "path": "demos/993cbb_i3w5/prototype.css",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "3e7c9931b66bce493547858fa1da83c969fed51767b1d97be1b078aac470a1a7",
+      "afterHash": "04f9e2c475fa204d4b97c270478c3ad5046480f9ab5a478b02465a5b8115bf13"
+    }
+  ],
+  "committedAt": 1786592884768
+}

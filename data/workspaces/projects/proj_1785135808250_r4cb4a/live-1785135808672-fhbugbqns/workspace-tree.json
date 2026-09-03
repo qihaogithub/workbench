@@ -1,0 +1,53 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "page_da9l",
+      "name": "排行榜",
+      "routeKey": "page-2",
+      "order": 1,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "page_g5wy",
+      "name": "完读任务",
+      "routeKey": "page-3",
+      "order": 2,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "page_j2zv",
+      "name": "完读任务-已完成",
+      "routeKey": "page-4",
+      "order": 3,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "page_yw72",
+      "name": "闯关开场",
+      "routeKey": "page",
+      "order": 4,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "page_xix9",
+      "name": "闯关通关动画",
+      "routeKey": "page-5",
+      "order": 5,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "page_pqyt",
+      "name": "闯关活动",
+      "routeKey": "page-6",
+      "order": 6,
+      "parentId": null,
+      "runtimeType": "high-fidelity-react"
+    }
+  ]
+}

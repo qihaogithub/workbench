@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "1cf25b63-206f-4e85-8629-59e8a5a58a48",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 709,
+  "rootHash": "cf4d5bda3f01176476b99b3e80fca5275078e62f1e2aa637a3735adf9c769c41",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/halloween-prize_y3n6/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "d953bcd9c5e41101c3bd8e1e3181bc20f338e75488f4530014dfd6c8dca0b430",
+      "afterHash": null
+    },
+    {
+      "path": "demos/halloween-prize_y3n6/prototype.css",
+      "action": "deleted",
+      "beforeHash": "e86fa2724084f8e4020ee6a75a1f2184773a93fd43de03c3eb667f0a2577ff78",
+      "afterHash": null
+    },
+    {
+      "path": "demos/halloween-prize_y3n6/prototype.html",
+      "action": "deleted",
+      "beforeHash": "63b4a73a60b5b942e41921c10ca561b4d7e23725fa4ea539b529baa784b9066a",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "214bb6f70e46ef667a88b500b6075ce9f726abe62f9c4c32be81aecaaa3d8403",
+      "afterHash": "fd696b17fca78964cfcd84f3ffb0e9cce9f5608c7f9e6edcc283abb591b45eb5"
+    }
+  ],
+  "committedAt": 1787893376332
+}

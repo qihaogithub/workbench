@@ -1,0 +1,39 @@
+{
+  "id": "prv_1785906692097_lm14ch",
+  "projectId": "proj_1784885664471_5bauyu",
+  "kind": "page",
+  "resourceId": "pad-header-preview_x7k2",
+  "workspaceId": "live-1785863225962-u52upxekm",
+  "workspaceRevision": 60,
+  "workspaceRootHash": "baadea9e076591c2197d8c9ab8e94dbe673e187f4d2dec3c11d8826fd99b6c72",
+  "previousVersionId": "prv_1785905647085_h9u8h0",
+  "contentHash": "04174f33ebe1373bcf3caf90858dda506589312293ddee26b4cc26cc64771143",
+  "blobRefs": [
+    "924d77977610213ce9197b15fa7745186e38c8f45eccaaab223bd0b06296653e",
+    "81b148e47dcf18dee0103725b01f93694d1b9cceb81c2537beca4cde8aa0dbe0"
+  ],
+  "metadata": {
+    "page": {
+      "id": "pad-header-preview_x7k2",
+      "name": "Pad预览",
+      "runtimeType": "high-fidelity-react",
+      "order": 2,
+      "parentId": null,
+      "routeKey": "pad"
+    },
+    "files": {
+      "schema": "924d77977610213ce9197b15fa7745186e38c8f45eccaaab223bd0b06296653e",
+      "code": "81b148e47dcf18dee0103725b01f93694d1b9cceb81c2537beca4cde8aa0dbe0"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "high-fidelity-react",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1785906692099,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录Pad预览"
+}

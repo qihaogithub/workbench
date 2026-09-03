@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "14518c71-b2ef-45a2-a40e-1dc2a8098843",
+  "projectId": "proj_1785687393956_aa29zz",
+  "workspaceId": "live-1785687394721-g7dafuhq4",
+  "baseRevision": 0,
+  "revision": 43,
+  "rootHash": "66abf058f0f1b3bbc052522bca8da6aae5bb9686500cb991f48d91864d918fc4",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/selector-fields_k7b1/index.tsx",
+      "action": "modified",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/selector-fields_k7b1/config.schema.json",
+      "action": "modified",
+      "beforeHash": "4db186bca1901bf1542428c2f2289db594511017410b441f55e6a36ab8ecb5da",
+      "afterHash": "4db186bca1901bf1542428c2f2289db594511017410b441f55e6a36ab8ecb5da"
+    },
+    {
+      "path": "demos/selector-fields_k7b1/prototype.html",
+      "action": "modified",
+      "beforeHash": "eebea2a5de0dd3e461b112d029d7bf903ab975a38cd61221969ef139faf8e0cd",
+      "afterHash": "eebea2a5de0dd3e461b112d029d7bf903ab975a38cd61221969ef139faf8e0cd"
+    },
+    {
+      "path": "demos/selector-fields_k7b1/prototype.css",
+      "action": "modified",
+      "beforeHash": "77095f6404838c68dd6da01048e2b8e50ea039dc14e0d9ab18112312ff87a63d",
+      "afterHash": "77095f6404838c68dd6da01048e2b8e50ea039dc14e0d9ab18112312ff87a63d"
+    }
+  ],
+  "committedAt": 1785714592631
+}

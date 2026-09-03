@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "1b4633d6-354b-4666-9e47-fe764cf9f00a",
+  "projectId": "proj_1787895065566_5wgvzx",
+  "workspaceId": "live-1787895066314-d67ahlorl",
+  "baseRevision": 0,
+  "revision": 32,
+  "rootHash": "ee53b5b99881eeb0f6b4f9c87a76fb447dcbbc2e13a58a38c0e6309ab6fd3d08",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/video-demo_ab12/config.values.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "d2b37b42480d47c7bb3db9e9a513602ca57ce74e72ba97886eb498bbd3074a2d"
+    }
+  ],
+  "committedAt": 1788347975228
+}

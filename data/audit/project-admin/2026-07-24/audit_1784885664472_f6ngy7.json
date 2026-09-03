@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1784885664472_f6ngy7",
+  "at": 1784885664472,
+  "actor": {
+    "id": "local-codex",
+    "name": "local-codex",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1784885664471_5bauyu",
+  "inputSummary": {
+    "name": "学习页头图",
+    "category": "APP资源位"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1784885664471_5bauyu"
+    ]
+  }
+}

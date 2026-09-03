@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$demo": {
+    "previewSize": {
+      "width": 768,
+      "height": 1024
+    }
+  },
+  "type": "object",
+  "properties": {},
+  "required": []
+}

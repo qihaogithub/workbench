@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>闯关活动</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { min-height: 100vh; display: flex; justify-content: center; background: #F5F5F5; }
+    .page { width: 375px; min-height: 100vh; background: #FFEAA3; position: relative; }
+    
+    /* 导航栏 */
+    .nav { height: 44px; background: #08ADFF; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; }
+    .nav-back { width: 10px; height: 18px; border-left: 2px solid white; border-bottom: 2px solid white; transform: rotate(45deg); }
+    .nav-title { color: white; font-size: 18px; font-weight: 500; }
+    .nav-btn { width: 18px; height: 18px; border: 2px solid white; border-radius: 50%; position: relative; }
+    .nav-btn::after { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 2px; height: 6px; background: white; border-radius: 1px; }
+    .nav-btn::before { content: ''; position: absolute; top: 3px; left: 50%; transform: translateX(-50%); width: 2px; height: 2px; background: white; border-radius: 50%; }
+    
+    /* 头图 */
+    .hero { height: 286px; position: relative; overflow: hidden; background: linear-gradient(180deg, #04E1FF 0%, #D6FFE8 100%); }
+    .hero-circle1 { position: absolute; top: -20px; right: -30px; width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,0.2); }
+    .hero-circle2 { position: absolute; top: 40px; left: -40px; width: 160px; height: 160px; border-radius: 50%; background: rgba(255,255,255,0.15); }
+    .hero-circle3 { position: absolute; bottom: 40px; right: 20px; width: 80px; height: 80px; border-radius: 50%; background: rgba(255,255,255,0.2); }
+    .hero-title { position: absolute; top: 70px; left: 0; width: 100%; text-align: center; }
+    .hero-title h1 { color: white; font-size: 32px; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.1); letter-spacing: 4px; }
+    .hero-title p { color: rgba(255,255,255,0.8); font-size: 14px; margin-top: 8px; letter-spacing: 1px; }
+    .hero-tags { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
+    .hero-tag { padding: 4px 12px; background: rgba(255,255,255,0.3); border-radius: 999px; color: white; font-size: 12px; }
+    .hero-rules { position: absolute; top: 12px; right: 12px; padding: 4px 12px; background: rgba(0,0,0,0.3); border-radius: 14px; color: white; font-size: 12px; }
+    
+    /* 参与人数条 */
+    .participants { height: 45px; background: linear-gradient(90deg, #0FC1A7, #86E8FF); display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .participants span { color: white; font-size: 14px; }
+    
+    /* 关卡区域 */
+    .level-area { height: 656px; position: relative; overflow: hidden; }
+    .level-bg { position: absolute; left: 0; top: 0; width: 375px; height: 656px; object-fit: cover; }
+    .level-container { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+    .level-slot { position: absolute; overflow: hidden; }
+    .level-slot img { position: absolute; width: 100%; height: 100%; object-fit: contain; top: 0; left: 0; }
+    
+    /* 我的作品 */
+    .my-work { padding: 12px 16px; background: #FFEAA3; }
+    .my-work-card { background: white; border-radius: 20px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; align-items: center; gap: 12px; }
+    .my-work-avatar { width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #FCDA00, #F2B61B); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; font-weight: bold; flex-shrink: 0; }
+    .my-work-info { flex: 1; }
+    .my-work-name { color: #404040; font-size: 15px; font-weight: 500; }
+    .my-work-desc { color: #B2B2B2; font-size: 12px; margin-top: 2px; }
+    .my-work-btn { padding: 8px 24px; background: #FCDA00; border: none; border-radius: 999px; color: #6B410B; font-size: 14px; font-weight: 500; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    
+    /* 优秀作品 */
+    .excellent { padding: 0 16px 12px; background: #FFEAA3; }
+    .excellent-card { border-radius: 20px; padding: 16px; min-height: 160px; background: linear-gradient(180deg, #FFBA39, #FFA500); }
+    .excellent-title { color: white; font-size: 18px; font-weight: bold; margin-bottom: 12px; }
+    .excellent-grid { display: flex; gap: 8px; }
+    .excellent-item { width: 100px; height: 100px; border-radius: 12px; background: rgba(255,255,255,0.3); border: 1px solid rgba(255,255,255,0.5); display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.6); font-size: 13px; }
+    
+    /* 排行榜 */
+    .rank { padding: 0 16px 24px; background: #FFEAA3; }
+    .rank-card { border-radius: 20px; padding: 16px; min-height: 200px; background: linear-gradient(180deg, #FFC575, #FFB347); }
+    .rank-title { color: white; font-size: 18px; font-weight: bold; margin-bottom: 12px; }
+    .rank-list { background: rgba(255,255,255,0.9); border-radius: 12px; padding: 8px 12px; }
+    .rank-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+    .rank-item:last-child { border-bottom: none; }
+    .rank-left { display: flex; align-items: center; gap: 8px; }
+    .rank-num { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; }
+    .rank-num.top { background: #FCDA00; color: #6B410B; }
+    .rank-num.normal { color: #B2B2B2; }
+    .rank-avatar { width: 36px; height: 36px; border-radius: 8px; background: #E8E8E8; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #999; }
+    .rank-name { color: #404040; font-size: 14px; }
+    .rank-likes { color: #FF715C; font-size: 13px; }
+    .rank-more { text-align: center; margin-top: 8px; color: rgba(255,255,255,0.7); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- ===== 导航栏 ===== -->
+    <div class="nav">
+      <div class="nav-back"></div>
+      <div class="nav-title">闯关活动</div>
+      <div class="nav-btn"></div>
+    </div>
+
+    <!-- ===== 头图区域 ===== -->
+    <div class="hero">
+      <div class="hero-circle1"></div>
+      <div class="hero-circle2"></div>
+      <div class="hero-circle3"></div>
+      <div class="hero-title">
+        <h1>叫叫明星赛</h1>
+        <p>平板、小天才手表带回家</p>
+      </div>
+      <div class="hero-tags">
+        <span class="hero-tag">🏆 冠军大奖</span>
+        <span class="hero-tag">🎁 参与有礼</span>
+      </div>
+      <div class="hero-rules">规则</div>
+    </div>
+
+    <!-- ===== 参与人数条 ===== -->
+    <div class="participants">
+      <span>👥 已有 <strong style="color:#FFEAA3;">12,345</strong> 位小朋友参与</span>
+    </div>
+
+    <!-- ===== 关卡区域（可配置） ===== -->
+    <div class="level-area">
+      <img class="level-bg" data-bind-src="backgroundImage" alt="" />
+      <div class="level-container">
+        <!-- 关卡 1 -->
+        <div class="level-slot" style="left: {{level_1_x}}px; top: {{level_1_y}}px; width: {{level_1_w}}px; height: {{level_1_h}}px;">
+          <img data-bind-src="level_1_imageLocked" alt="" />
+          <img data-bind-src="level_1_imageUnlocked" alt="" />
+          <img data-bind-src="level_1_imageCompleted" alt="" />
+        </div>
+        <!-- 关卡 2 -->
+        <div class="level-slot" style="left: {{level_2_x}}px; top: {{level_2_y}}px; width: {{level_2_w}}px; height: {{level_2_h}}px;">
+          <img data-bind-src="level_2_imageLocked" alt="" />
+          <img data-bind-src="level_2_imageUnlocked" alt="" />
+          <img data-bind-src="level_2_imageCompleted" alt="" />
+        </div>
+        <!-- 关卡 3 -->
+        <div class="level-slot" style="left: {{level_3_x}}px; top: {{level_3_y}}px; width: {{level_3_w}}px; height: {{level_3_h}}px;">
+          <img data-bind-src="level_3_imageLocked" alt="" />
+          <img data-bind-src="level_3_imageUnlocked" alt="" />
+          <img data-bind-src="level_3_imageCompleted" alt="" />
+        </div>
+        <!-- 关卡 4 -->
+        <div class="level-slot" style="left: {{level_4_x}}px; top: {{level_4_y}}px; width: {{level_4_w}}px; height: {{level_4_h}}px;">
+          <img data-bind-src="level_4_imageLocked" alt="" />
+          <img data-bind-src="level_4_imageUnlocked" alt="" />
+          <img data-bind-src="level_4_imageCompleted" alt="" />
+        </div>
+        <!-- 关卡 5 -->
+        <div class="level-slot" style="left: {{level_5_x}}px; top: {{level_5_y}}px; width: {{level_5_w}}px; height: {{level_5_h}}px;">
+          <img data-bind-src="level_5_imageLocked" alt="" />
+          <img data-bind-src="level_5_imageUnlocked" alt="" />
+          <img data-bind-src="level_5_imageCompleted" alt="" />
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 我的作品 ===== -->
+    <div class="my-work">
+      <div class="my-work-card">
+        <div class="my-work-avatar">我</div>
+        <div class="my-work-info">
+          <div class="my-work-name">我的作品</div>
+          <div class="my-work-desc">点击查看我的参赛作品</div>
+        </div>
+        <button class="my-work-btn">立即分享</button>
+      </div>
+    </div>
+
+    <!-- ===== 优秀作品 ===== -->
+    <div class="excellent">
+      <div class="excellent-card">
+        <div class="excellent-title">✨ 优秀作品</div>
+        <div class="excellent-grid">
+          <div class="excellent-item">作品 1</div>
+          <div class="excellent-item">作品 2</div>
+          <div class="excellent-item">作品 3</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 排行榜 ===== -->
+    <div class="rank">
+      <div class="rank-card">
+        <div class="rank-title">🏆 排行榜</div>
+        <div class="rank-list">
+          <div class="rank-item">
+            <div class="rank-left">
+              <span class="rank-num top">1</span>
+              <span class="rank-avatar">吴</span>
+              <span class="rank-name">吴*萱</span>
+            </div>
+            <span class="rank-likes">❤️ 999+</span>
+          </div>
+          <div class="rank-item">
+            <div class="rank-left">
+              <span class="rank-num top">2</span>
+              <span class="rank-avatar">骋</span>
+              <span class="rank-name">骋骋。</span>
+            </div>
+            <span class="rank-likes">❤️ 999+</span>
+          </div>
+          <div class="rank-item">
+            <div class="rank-left">
+              <span class="rank-num top">3</span>
+              <span class="rank-avatar">骋</span>
+              <span class="rank-name">骋骋。</span>
+            </div>
+            <span class="rank-likes">❤️ 999+</span>
+          </div>
+          <div class="rank-item">
+            <div class="rank-left">
+              <span class="rank-num normal">4</span>
+              <span class="rank-avatar">李</span>
+              <span class="rank-name">李梓发</span>
+            </div>
+            <span class="rank-likes">❤️ 997</span>
+          </div>
+          <div class="rank-item">
+            <div class="rank-left">
+              <span class="rank-num normal">5</span>
+              <span class="rank-avatar">李</span>
+              <span class="rank-name">李世海</span>
+            </div>
+            <span class="rank-likes">❤️ 934</span>
+          </div>
+        </div>
+        <div class="rank-more">查看更多 →</div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

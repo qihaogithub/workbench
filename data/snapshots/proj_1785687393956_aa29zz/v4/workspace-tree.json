@@ -1,0 +1,37 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "basic-fields_xa3k",
+      "name": "基础字段配置",
+      "runtimeType": "prototype-html-css",
+      "order": 0,
+      "parentId": null,
+      "routeKey": "page"
+    },
+    {
+      "id": "media-color_m2p9",
+      "name": "媒体与颜色配置",
+      "runtimeType": "prototype-html-css",
+      "order": 1,
+      "parentId": null,
+      "routeKey": "page-2"
+    },
+    {
+      "id": "selector-fields_k7b1",
+      "name": "选择器配置",
+      "runtimeType": "prototype-html-css",
+      "order": 2,
+      "parentId": null,
+      "routeKey": "page-3"
+    },
+    {
+      "id": "array-modules_v5n2",
+      "name": "模块数组配置",
+      "runtimeType": "high-fidelity-react",
+      "order": 3,
+      "parentId": null,
+      "routeKey": "page-4"
+    }
+  ]
+}

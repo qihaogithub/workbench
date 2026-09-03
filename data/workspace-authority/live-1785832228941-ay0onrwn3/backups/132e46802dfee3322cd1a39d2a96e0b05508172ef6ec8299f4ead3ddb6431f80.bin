@@ -1,0 +1,52 @@
+{
+  "$demo": {
+    "previewSize": { "width": 375, "height": 812 }
+  },
+  "type": "object",
+  "properties": {
+    "pageTitle": { "type": "string", "title": "页面标题", "default": "动效格式展示" },
+    "subtitle": { "type": "string", "title": "副标题", "default": "Lottie · SVGA · Spine · Rive" },
+    "bgColor": { "type": "string", "title": "背景色", "format": "color", "default": "#0f172a" },
+    "accentColor": { "type": "string", "title": "强调色", "format": "color", "default": "#6366f1" },
+    "Lottie 动效": {
+      "type": "object",
+      "title": "Lottie 动效",
+      "properties": {
+        "src": { "type": "string", "title": "Lottie JSON 资源", "format": "file", "ui:options": { "accept": ".json" } },
+        "loop": { "type": "boolean", "title": "循环播放", "default": true },
+        "autoplay": { "type": "boolean", "title": "自动播放", "default": true }
+      },
+      "required": []
+    },
+    "SVGA 动效": {
+      "type": "object",
+      "title": "SVGA 动效",
+      "properties": {
+        "src": { "type": "string", "title": "SVGA 资源 (.svga)", "format": "file", "ui:options": { "accept": ".svga" } }
+      },
+      "required": []
+    },
+    "Spine 动效": {
+      "type": "object",
+      "title": "Spine 动效",
+      "properties": {
+        "skeleton": { "type": "string", "title": "骨架文件 (.skel/.json)", "format": "file", "ui:options": { "accept": ".skel,.json" } },
+        "atlas": { "type": "string", "title": "图集文件 (.atlas)", "format": "file", "ui:options": { "accept": ".atlas" } },
+        "texture": { "type": "string", "title": "纹理文件 (.png)", "format": "file", "ui:options": { "accept": ".png" } },
+        "loop": { "type": "boolean", "title": "循环播放", "default": true }
+      },
+      "required": []
+    },
+    "Rive 动效": {
+      "type": "object",
+      "title": "Rive 动效",
+      "properties": {
+        "src": { "type": "string", "title": "Rive 资源 (.riv)", "format": "file", "ui:options": { "accept": ".riv" } },
+        "fit": { "type": "string", "title": "填充方式", "enum": ["cover", "contain", "fill", "fitWidth", "fitHeight", "none", "scaleDown"], "enumNames": ["cover", "contain", "fill", "fitWidth", "fitHeight", "none", "scaleDown"], "default": "cover" },
+        "autoplay": { "type": "boolean", "title": "自动播放", "default": true }
+      },
+      "required": []
+    }
+  },
+  "required": []
+}

@@ -1,0 +1,23 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "demo_1779608460501_abc123",
+      "name": "手机",
+      "routeKey": "demo",
+      "runtimeType": "prototype-html-css",
+      "isTemplatePage": true,
+      "order": 0,
+      "parentId": null
+    },
+    {
+      "id": "demo_1779608460502_def456",
+      "name": "平板",
+      "routeKey": "demo-2",
+      "runtimeType": "prototype-html-css",
+      "isTemplatePage": true,
+      "order": 1,
+      "parentId": null
+    }
+  ]
+}

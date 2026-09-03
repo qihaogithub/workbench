@@ -1,0 +1,40 @@
+{
+  "id": "prv_1788274953779_eaefcr",
+  "projectId": "proj_1788141806566_0aps89",
+  "kind": "page",
+  "resourceId": "clipboard-import_e05e9d",
+  "workspaceId": "live-1788141807256-9xerzl5sd",
+  "workspaceRevision": 249,
+  "workspaceRootHash": "bd3dc91450102aa4ef2e47debff0e30e5d08ea3b58e3929c42ba69158e7d8f38",
+  "previousVersionId": "prv_1788261079954_gzgh2d",
+  "contentHash": "97915fa0a7596d76c5c405d2e5797cf7c4bc1b89f73fa98dad8e49e5dc9eec7c",
+  "blobRefs": [
+    "d1e4969efd9ebbb2cdcd21ea008a0fd49065200fcedc1551c8928714707695f1",
+    "e1941e23879a6b1e1cb388b8a103895676e59671f0314d6b8962ebbaa3f09c15"
+  ],
+  "metadata": {
+    "page": {
+      "id": "clipboard-import_e05e9d",
+      "name": "N对N填空题",
+      "routeKey": "clipboard-import",
+      "order": 3,
+      "parentId": null,
+      "runtimeType": "high-fidelity-react",
+      "isTemplatePage": false
+    },
+    "files": {
+      "schema": "d1e4969efd9ebbb2cdcd21ea008a0fd49065200fcedc1551c8928714707695f1",
+      "code": "e1941e23879a6b1e1cb388b8a103895676e59671f0314d6b8962ebbaa3f09c15"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "high-fidelity-react",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1788274953785,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录N对N填空题"
+}

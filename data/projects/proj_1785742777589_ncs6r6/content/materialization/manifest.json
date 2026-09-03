@@ -1,0 +1,18 @@
+{
+  "projectId": "proj_1785742777589_ncs6r6",
+  "commitId": "commit_1788250131326_ssjqxq",
+  "materializerVersion": "project-core-content-graph-v1",
+  "resources": [
+    {
+      "kind": "page",
+      "resourceId": "motion-formats_k4r2",
+      "versionId": "prv_1788250131320_t2o7fb",
+      "contentHash": "813b2ab44a890f6bff822f61ccfc22289b43573904beb861337119caa06b655b",
+      "blobRefs": [
+        "7970ff6a88c7d142a51bb979189a8f636690cbdb0c356a1a8a54c1d24ef17e85",
+        "b6138fee5d1ce14e6ec2da17831a67ce40796c3f90d45066f951a09275e44ad6"
+      ]
+    }
+  ],
+  "updatedAt": 1788250131327
+}

@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "properties": {
+    "pageTitle": {
+      "type": "string",
+      "title": "Page One Title E2E",
+      "default": "page-one-default-e2e"
+    }
+  },
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "content",
+      "preset": "custom",
+      "source": "recommended"
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "entry": "page",
+  "pages": {
+    "page": {
+      "pageId": "config-demo_m7p2",
+      "title": "配置项类型示例"
+    }
+  },
+  "actions": [],
+  "state": {}
+}

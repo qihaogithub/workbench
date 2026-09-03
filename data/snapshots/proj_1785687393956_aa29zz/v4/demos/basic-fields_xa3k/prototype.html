@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>基础字段配置</title>
+  <link rel="stylesheet" href="prototype.css" />
+</head>
+<body>
+  <div class="page">
+    <!-- 横幅区域 -->
+    <div class="banner">
+      <img src="/api/images/img_TAHdeo7PUJQMmg" alt="封面背景" class="banner-img" />
+      <div class="banner-overlay"></div>
+      <div class="banner-title">用户信息</div>
+    </div>
+
+    <!-- 信息卡片 -->
+    <div class="card">
+      <div class="card-section">
+        <h3 class="section-title">基础信息</h3>
+
+        <div class="field-row">
+          <span class="field-label">用户名</span>
+          <span class="field-value" data-bind-text="{{username}}">张三</span>
+        </div>
+
+        <div class="field-row">
+          <span class="field-label">年龄</span>
+          <span class="field-value" data-bind-text="{{age}}">28</span>
+        </div>
+
+        <div class="field-row">
+          <span class="field-label">访问次数</span>
+          <span class="field-value" data-bind-text="{{visitCount}}">1024</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="card-section">
+        <h3 class="section-title">设置</h3>
+
+        <div class="field-row">
+          <span class="field-label">启用通知</span>
+          <span class="field-value status-badge" data-bind-text="{{enableNotify}}">true</span>
+        </div>
+
+        <div class="field-row bio-row">
+          <span class="field-label">个人简介</span>
+          <span class="field-value bio-text" data-bind-text="{{bio}}">一名热爱技术的前端开发者，专注于 Web 交互和用户体验设计。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部提示 -->
+    <div class="footer-note">右侧配置面板可调整以上字段</div>
+  </div>
+</body>
+</html>

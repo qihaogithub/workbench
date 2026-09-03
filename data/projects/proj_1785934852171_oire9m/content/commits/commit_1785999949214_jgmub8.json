@@ -1,0 +1,35 @@
+{
+  "id": "commit_1785999949214_jgmub8",
+  "projectId": "proj_1785934852171_oire9m",
+  "parentCommitId": "commit_1785936264775_fekhk6",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录封面",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "demo_1785935720859_01of",
+      "versionId": "prv_1785999949212_eehg8z"
+    },
+    {
+      "kind": "page",
+      "resourceId": "demo_1785935720860_06of",
+      "versionId": "prv_1785936264773_xcym0j"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "demo_1785935720859_01of",
+      "toVersionId": "prv_1785999949212_eehg8z"
+    }
+  ],
+  "createdAt": 1785999949214,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785935881009-qhes8gqe3",
+    "workspaceRevision": 43,
+    "workspaceRootHash": "0697416a8dd664eed49d16ec20a3f8cc9f42aa440b2aa6ba35004a9cc3880c32"
+  }
+}

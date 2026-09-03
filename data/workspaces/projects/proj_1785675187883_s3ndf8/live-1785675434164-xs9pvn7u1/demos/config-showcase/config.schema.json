@@ -1,0 +1,438 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "title": "标题",
+      "default": "配置项示例",
+      "ui:options": {
+        "group": "基础字段"
+      }
+    },
+    "subtitle": {
+      "type": "string",
+      "maxLength": 1000,
+      "title": "副标题",
+      "default": "这是一个展示所有配置项类型的示例页面",
+      "ui:options": {
+        "group": "基础字段"
+      }
+    },
+    "showHeader": {
+      "type": "boolean",
+      "title": "显示头部",
+      "default": true,
+      "ui:options": {
+        "group": "基础字段"
+      }
+    },
+    "count": {
+      "type": "number",
+      "title": "数量",
+      "default": 5,
+      "minimum": 1,
+      "maximum": 20,
+      "ui:options": {
+        "group": "基础字段"
+      }
+    },
+    "gap": {
+      "type": "integer",
+      "title": "间距",
+      "default": 12,
+      "minimum": 0,
+      "maximum": 48,
+      "ui:options": {
+        "group": "基础字段"
+      }
+    },
+    "bgColor": {
+      "type": "string",
+      "format": "color",
+      "title": "背景颜色",
+      "default": "#f0f4ff",
+      "ui:options": {
+        "group": "样式配置"
+      }
+    },
+    "textColor": {
+      "type": "string",
+      "format": "color",
+      "title": "文字颜色",
+      "default": "#1a1a2e",
+      "ui:options": {
+        "group": "样式配置"
+      }
+    },
+    "accentColor": {
+      "type": "string",
+      "format": "color",
+      "title": "强调色",
+      "default": "#4f46e5",
+      "ui:options": {
+        "group": "样式配置"
+      }
+    },
+    "fontSize": {
+      "type": "number",
+      "title": "字号",
+      "default": 16,
+      "minimum": 12,
+      "maximum": 32,
+      "ui:options": {
+        "group": "样式配置"
+      }
+    },
+    "fontWeight": {
+      "type": "string",
+      "title": "字重",
+      "enum": [
+        "normal",
+        "medium",
+        "bold"
+      ],
+      "enumNames": [
+        "常规",
+        "中等",
+        "粗体"
+      ],
+      "default": "normal",
+      "ui:options": {
+        "group": "样式配置"
+      }
+    },
+    "layout": {
+      "type": "string",
+      "title": "布局模式",
+      "enum": [
+        "grid",
+        "list",
+        "card"
+      ],
+      "enumNames": [
+        "网格",
+        "列表",
+        "卡片"
+      ],
+      "default": "grid",
+      "ui:options": {
+        "group": "枚举与选择"
+      }
+    },
+    "tags": {
+      "type": "array",
+      "ui:widget": "multiselect",
+      "items": {
+        "type": "string",
+        "enum": [
+          "hot",
+          "new",
+          "recommend",
+          "limited"
+        ],
+        "enumNames": [
+          "热门",
+          "新品",
+          "推荐",
+          "限量"
+        ]
+      },
+      "title": "标签",
+      "default": [
+        "hot",
+        "new"
+      ],
+      "ui:options": {
+        "group": "枚举与选择"
+      }
+    },
+    "region": {
+      "type": "array",
+      "ui:widget": "cascade",
+      "title": "地区",
+      "default": [
+        "zhejiang",
+        "hangzhou"
+      ],
+      "ui:options": {
+        "cascadeOptions": [
+          {
+            "value": "beijing",
+            "label": "北京",
+            "children": [
+              {
+                "value": "chaoyang",
+                "label": "朝阳区"
+              },
+              {
+                "value": "haidian",
+                "label": "海淀区"
+              }
+            ]
+          },
+          {
+            "value": "shanghai",
+            "label": "上海",
+            "children": [
+              {
+                "value": "pudong",
+                "label": "浦东新区"
+              },
+              {
+                "value": "jingan",
+                "label": "静安区"
+              }
+            ]
+          },
+          {
+            "value": "zhejiang",
+            "label": "浙江",
+            "children": [
+              {
+                "value": "hangzhou",
+                "label": "杭州"
+              },
+              {
+                "value": "ningbo",
+                "label": "宁波"
+              }
+            ]
+          }
+        ],
+        "group": "枚举与选择"
+      }
+    },
+    "logo": {
+      "type": "string",
+      "format": "image",
+      "title": "Logo",
+      "ui:options": {
+        "accept": "image/*",
+        "maxSize": 1048576,
+        "group": "图片与素材"
+      }
+    },
+    "banner": {
+      "type": "string",
+      "format": "image",
+      "title": "横幅图",
+      "ui:options": {
+        "accept": "image/*",
+        "minWidth": 320,
+        "minHeight": 160,
+        "group": "图片与素材"
+      }
+    },
+    "gallery": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "title": "图库",
+      "ui:options": {
+        "maxItems": 6,
+        "group": "图片与素材"
+      }
+    },
+    "description": {
+      "type": "string",
+      "ui:widget": "richtext",
+      "title": "详细介绍",
+      "default": "<p>这是一个<b>富文本</b>配置项示例。</p>",
+      "ui:options": {
+        "group": "富文本与长文本"
+      }
+    },
+    "note": {
+      "type": "string",
+      "maxLength": 1000,
+      "title": "备注",
+      "default": "可以通过 text 类型配置较长文本，最大 1000 字",
+      "ui:options": {
+        "group": "富文本与长文本"
+      }
+    },
+    "bannerPosition": {
+      "type": "object",
+      "properties": {
+        "x": {
+          "type": "number",
+          "default": 20
+        },
+        "y": {
+          "type": "number",
+          "default": 16
+        }
+      },
+      "$demo": {
+        "positionable": {
+          "key": "bannerImage",
+          "size": {
+            "width": 375,
+            "height": 220
+          }
+        }
+      },
+      "title": "横幅图片位置",
+      "ui:options": {
+        "group": "位置字段"
+      }
+    },
+    "badgePosition": {
+      "type": "object",
+      "properties": {
+        "x": {
+          "type": "number",
+          "default": 280
+        },
+        "y": {
+          "type": "number",
+          "default": 10
+        }
+      },
+      "$demo": {
+        "positionable": {
+          "key": "badgeImage",
+          "size": {
+            "width": 375,
+            "height": 60
+          }
+        }
+      },
+      "title": "徽章位置",
+      "ui:options": {
+        "group": "位置字段"
+      }
+    },
+    "blocks": {
+      "type": "array",
+      "title": "内容模块",
+      "default": [
+        {
+          "type": "text",
+          "content": "第一段示例文本内容"
+        },
+        {
+          "type": "positionBlock",
+          "label": "立即购买"
+        },
+        {
+          "type": "text",
+          "content": "第二段示例文本内容"
+        }
+      ],
+      "ui:options": {
+        "group": "模块列表"
+      },
+      "items": {
+        "type": "object",
+        "oneOf": [
+          {
+            "title": "文本模块",
+            "properties": {
+              "type": {
+                "const": "text",
+                "type": "string",
+                "title": "模块类型"
+              },
+              "content": {
+                "type": "string",
+                "maxLength": 1000,
+                "title": "文本内容",
+                "default": ""
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          {
+            "title": "图片模块",
+            "properties": {
+              "type": {
+                "const": "image",
+                "type": "string",
+                "title": "模块类型"
+              },
+              "pic": {
+                "type": "string",
+                "format": "image",
+                "title": "图片"
+              },
+              "caption": {
+                "type": "string",
+                "title": "说明",
+                "default": ""
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "$demo": {
+              "maxItems": 1
+            }
+          },
+          {
+            "title": "定位模块",
+            "properties": {
+              "type": {
+                "const": "positionBlock",
+                "type": "string",
+                "title": "模块类型"
+              },
+              "label": {
+                "type": "string",
+                "title": "标签",
+                "default": "按钮"
+              },
+              "position": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number",
+                    "default": 20
+                  },
+                  "y": {
+                    "type": "number",
+                    "default": 60
+                  }
+                },
+                "$demo": {
+                  "positionable": {
+                    "key": "floatingBtn",
+                    "size": {
+                      "width": 375,
+                      "height": 300
+                    }
+                  }
+                },
+                "title": "按钮位置"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "$demo": {
+              "maxItems": 3
+            }
+          }
+        ]
+      }
+    }
+  },
+  "required": [],
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "content",
+      "preset": "custom",
+      "source": "user"
+    }
+  }
+}

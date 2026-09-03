@@ -1,0 +1,87 @@
+{
+  "id": "commit_1788227273953_3ulhpi",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "parentCommitId": "commit_1788173254709_jenpks",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "创建知识文档 闯关活动",
+  "resourcePointers": [
+    {
+      "kind": "knowledge_document",
+      "resourceId": "kb_1788227272655_677p9v",
+      "versionId": "krv_1788227273950_mo0265"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_5rsp",
+      "versionId": "prv_1785222248758_v0zhj5"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_da9l",
+      "versionId": "prv_1785316177703_45jh4a"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_gfbs",
+      "versionId": "prv_1785136734038_5bt9sp"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_p8a2",
+      "versionId": "prv_1787820483768_pu1kvj"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_pqyt",
+      "versionId": "prv_1785205299313_c3158x"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_sgfq",
+      "versionId": "prv_1785321973637_sq9mhi"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_swfq",
+      "versionId": "prv_1788173254705_5kg3cg"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_wcfh",
+      "versionId": "prv_1785206677053_mzslur"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_xix9",
+      "versionId": "prv_1785397932241_fpmkja"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_yw72",
+      "versionId": "prv_1788162160282_75y7a3"
+    },
+    {
+      "kind": "page",
+      "resourceId": "quiz-correct_m5n8",
+      "versionId": "prv_1788143379368_qfhy32"
+    },
+    {
+      "kind": "page",
+      "resourceId": "quiz-wrong_b7k9",
+      "versionId": "prv_1788099086697_i20kcq"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "knowledge_document",
+      "resourceId": "kb_1788227272655_677p9v",
+      "toVersionId": "krv_1788227273950_mo0265"
+    }
+  ],
+  "createdAt": 1788227273953,
+  "createdBy": "Author Site",
+  "audit": {
+    "actorType": "user"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "b18df54c-e54e-49f1-8f7c-d0318e2528ce",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 703,
+  "rootHash": "b87f66548c12cdf4bdf57ae25a4d3a726f3ee683553e5b9cf1a534a3304c7144",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/halloween-level1_f3n9/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "d953bcd9c5e41101c3bd8e1e3181bc20f338e75488f4530014dfd6c8dca0b430",
+      "afterHash": null
+    },
+    {
+      "path": "demos/halloween-level1_f3n9/prototype.css",
+      "action": "deleted",
+      "beforeHash": "52baaf974db12e7d9757c47eba3e68424bef7a758f35bb1a514a635d164f691a",
+      "afterHash": null
+    },
+    {
+      "path": "demos/halloween-level1_f3n9/prototype.html",
+      "action": "deleted",
+      "beforeHash": "52212e20023c30c87f083eb2ffb4995e7077f51962510072e82f6c66cf6ca292",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "4c41884ce9e84cbff45cf14133af441f1c7c28f5d45a24ddc31da93da6d79d39",
+      "afterHash": "012eece19bb09cfe170af7bbf78344309ba8dcc9b7b21ef93bd189f48b002d1e"
+    }
+  ],
+  "committedAt": 1787893372934
+}

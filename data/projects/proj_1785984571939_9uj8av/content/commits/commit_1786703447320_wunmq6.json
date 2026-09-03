@@ -1,0 +1,41 @@
+{
+  "id": "commit_1786703447320_wunmq6",
+  "projectId": "proj_1785984571939_9uj8av",
+  "parentCommitId": "commit_1786703144610_ti62fb",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录pad",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "pad_s5xn",
+      "versionId": "prv_1786703447295_z6peb4"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_0it3",
+      "versionId": "prv_1786012225580_c53mor"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_y0ms",
+      "versionId": "prv_1785998324056_j2ozmy"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "pad_s5xn",
+      "fromVersionId": "prv_1786012894483_759qgs",
+      "toVersionId": "prv_1786703447295_z6peb4"
+    }
+  ],
+  "createdAt": 1786703447320,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785984572222-vwsdjjjqb",
+    "workspaceRevision": 202,
+    "workspaceRootHash": "919fab004970d385c35b9ccf19e3b3d0ce482b20c555812b6d52ef0442a6927c"
+  }
+}

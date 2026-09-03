@@ -1,0 +1,317 @@
+{
+  "version": 1,
+  "projectId": "proj_1785135808250_r4cb4a",
+  "updatedAt": 1785983767873,
+  "state": {
+    "viewport": {
+      "x": 715.6239079586173,
+      "y": 97.01491257303542,
+      "zoom": 0.1984424167301951
+    },
+    "pages": {
+      "page_p8a2": {
+        "x": -1275.2003501032164,
+        "y": -82.7486706022927,
+        "width": 375,
+        "height": 3681,
+        "zIndex": 9,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_gfbs": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 1075,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x1075"
+      },
+      "page_da9l": {
+        "x": 4045.6166603775528,
+        "y": 945.2626088880747,
+        "width": 393.4729064039409,
+        "height": 852,
+        "sizeMode": "custom",
+        "previewSizeKey": "375x812"
+      },
+      "page_g5wy": {
+        "x": 4470.062767876854,
+        "y": 945.2626088880747,
+        "width": 375,
+        "height": 812,
+        "zIndex": 2,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_j2zv": {
+        "x": 4891.616660377553,
+        "y": 945.2626088880747,
+        "width": 375,
+        "height": 812,
+        "zIndex": 3,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_13po": {
+        "x": 423,
+        "y": 943.0772140522876,
+        "width": 375,
+        "height": 812,
+        "zIndex": 4,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_1gre": {
+        "x": -31.6723259762309,
+        "y": 20,
+        "width": 375,
+        "height": 812,
+        "zIndex": 3,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_yw72": {
+        "x": -1735.1322650847223,
+        "y": -82.7486706022927,
+        "width": 375,
+        "height": 2436,
+        "zIndex": 3,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_xix9": {
+        "x": 1043.3378813999316,
+        "y": -82.7486706022927,
+        "width": 404.2727307258541,
+        "height": 875.3852195983827,
+        "sizeMode": "custom",
+        "previewSizeKey": "375x812"
+      },
+      "page_9u6t": {
+        "x": 798,
+        "y": 926.1934179883457,
+        "width": 375,
+        "height": 812,
+        "zIndex": 5,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "activity-figma_k4m9": {
+        "x": -91.29152501431818,
+        "y": -1.5987211554602254e-14,
+        "width": 375,
+        "height": 812,
+        "zIndex": 6,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_iate": {
+        "x": 856.5125363404753,
+        "y": 927.1185789580131,
+        "width": 375,
+        "height": 812,
+        "zIndex": 5,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_pqyt": {
+        "x": -8.902021368260582,
+        "y": 7.105427357601002e-15,
+        "width": 375,
+        "height": 852,
+        "zIndex": 5,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_wcfh": {
+        "x": -76.75505139627523,
+        "y": 20.000000000000014,
+        "width": 375,
+        "height": 812,
+        "zIndex": 5,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_5rsp": {
+        "x": -35.82503130634481,
+        "y": -8.072541359930682,
+        "width": 375,
+        "height": 852,
+        "zIndex": 5,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_sgfq": {
+        "x": -1420.8864108545322,
+        "y": 324.7241114429684,
+        "width": 375,
+        "height": 11043,
+        "zIndex": 9,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_pwcf": {
+        "x": -811.6967789109112,
+        "y": -74.12040624074324,
+        "width": 387.8029499151104,
+        "height": 839.7226542161857,
+        "sizeMode": "custom",
+        "previewSizeKey": "375x812"
+      },
+      "spine_dqxs": {
+        "x": -337.3269873807052,
+        "y": -74.12040624074324,
+        "width": 375,
+        "height": 812,
+        "zIndex": 8,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_dous": {
+        "x": 124.23985423439046,
+        "y": -74.12040624074324,
+        "width": 375.6897473017221,
+        "height": 813.4935328239956,
+        "sizeMode": "custom",
+        "previewSizeKey": "375x812"
+      },
+      "page_duak": {
+        "x": 579.9105319850212,
+        "y": -96.92924732812152,
+        "width": 363.37336249048354,
+        "height": 786.8244542460603,
+        "sizeMode": "custom",
+        "previewSizeKey": "375x812"
+      },
+      "page_gb69": {
+        "x": -1352.087402797934,
+        "y": 453.45326213950244,
+        "width": 375,
+        "height": 812,
+        "zIndex": 9,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_vz12": {
+        "x": 1341.2188776944759,
+        "y": 1494.7228263966974,
+        "width": 324.864403339212,
+        "height": 703.4397213638404,
+        "sizeMode": "custom",
+        "previewSizeKey": "375x812"
+      },
+      "page_swfq": {
+        "x": -2196.397303756198,
+        "y": -74.12040624074324,
+        "width": 375,
+        "height": 812,
+        "zIndex": 10,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "quiz-wrong_b7k9": {
+        "x": -1869.841604954277,
+        "y": 3915.1423364452617,
+        "width": 812,
+        "height": 1125,
+        "sizeMode": "preview",
+        "previewSizeKey": "812x375"
+      },
+      "quiz-correct_m5n8": {
+        "x": -995.9023744235377,
+        "y": 3924.367526043613,
+        "width": 756.2141409403632,
+        "height": 378.1070704701816,
+        "sizeMode": "custom",
+        "previewSizeKey": "750x375"
+      },
+      "quiz-level_a2f3": {
+        "x": -117.0316361140006,
+        "y": 3925.2604322764782,
+        "width": 754.2141875342693,
+        "height": 377.10709376713464,
+        "sizeMode": "custom",
+        "previewSizeKey": "750x375"
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {
+      "text-1785397325156-vhgvciloxbf": {
+        "id": "text-1785397325156-vhgvciloxbf",
+        "title": "活动页",
+        "layout": {
+          "x": -2727.9036287559793,
+          "y": -82.7486706022927,
+          "width": 309.2317383381655,
+          "height": 130
+        },
+        "createdAt": 1785397325156,
+        "updatedAt": 1785593585626,
+        "kind": "text",
+        "text": "活动页",
+        "fontSize": 96,
+        "color": "#ffffff"
+      },
+      "text-1785397421271-xqsc5hgugsr": {
+        "id": "text-1785397421271-xqsc5hgugsr",
+        "title": "6种关卡类型",
+        "layout": {
+          "x": -2841.842816753044,
+          "y": 3884.9522845239726,
+          "width": 477.66237431798675,
+          "height": 185.692045286979
+        },
+        "createdAt": 1785397421271,
+        "updatedAt": 1785480299593,
+        "kind": "text",
+        "text": "6种关卡类型",
+        "fontSize": 76,
+        "color": "#ffffff"
+      }
+    },
+    "layers": {
+      "annotations": {
+        "nodes": {
+          "text-1785397325156-vhgvciloxbf": {
+            "id": "text-1785397325156-vhgvciloxbf",
+            "title": "活动页",
+            "layout": {
+              "x": -2727.9036287559793,
+              "y": -82.7486706022927,
+              "width": 309.2317383381655,
+              "height": 130
+            },
+            "createdAt": 1785397325156,
+            "updatedAt": 1785593585626,
+            "kind": "text",
+            "text": "活动页",
+            "fontSize": 96,
+            "color": "#ffffff"
+          },
+          "text-1785397421271-xqsc5hgugsr": {
+            "id": "text-1785397421271-xqsc5hgugsr",
+            "title": "6种关卡类型",
+            "layout": {
+              "x": -2841.842816753044,
+              "y": 3884.9522845239726,
+              "width": 477.66237431798675,
+              "height": 185.692045286979
+            },
+            "createdAt": 1785397421271,
+            "updatedAt": 1785480299593,
+            "kind": "text",
+            "text": "6种关卡类型",
+            "fontSize": 76,
+            "color": "#ffffff"
+          }
+        }
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

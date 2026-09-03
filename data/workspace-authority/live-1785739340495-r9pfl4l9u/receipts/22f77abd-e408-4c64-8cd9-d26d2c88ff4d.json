@@ -1,0 +1,31 @@
+{
+  "committed": true,
+  "mutationId": "22f77abd-e408-4c64-8cd9-d26d2c88ff4d",
+  "projectId": "proj_1784874964275_p0k4ho",
+  "workspaceId": "live-1785739340495-r9pfl4l9u",
+  "baseRevision": 0,
+  "revision": 113,
+  "rootHash": "c0f0c68c0dcf7e756067c64086d2c49ff5bf1bc08bbe5424a2c67200ac811fad",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/pad_gnha/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "542ad361a20f1bb359f129183d7de78722ab63404b7cb101951df65aec879098",
+      "afterHash": null
+    },
+    {
+      "path": "demos/pad_gnha/index.tsx",
+      "action": "deleted",
+      "beforeHash": "0d446901ed8cea3ca1350912cf06b694bf54c627b264bf72f00a89f2f7177e7a",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "5d30704d4e19eec29d011ac91d3e12c5314dc2d043408b599f27357764e0548e",
+      "afterHash": "861a0399f7c800835b6cd767a17aedd688c8fa42066618fc6e3038a34d018d3b"
+    }
+  ],
+  "committedAt": 1786091651721
+}

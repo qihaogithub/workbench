@@ -1,0 +1,31 @@
+{
+  "id": "commit_1784713806934_k7hvjz",
+  "projectId": "proj_1779608460378",
+  "parentCommitId": "commit_1784713511150_isyj0h",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录广场页面-手机",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "demo_1779608460379_a1b2c3",
+      "versionId": "prv_1784713806931_cvg333"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "demo_1779608460379_a1b2c3",
+      "fromVersionId": "prv_1784701026469_8bevr2",
+      "toVersionId": "prv_1784713806931_cvg333"
+    }
+  ],
+  "createdAt": 1784713806934,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1784711007775-0bq9top30",
+    "workspaceRevision": 6,
+    "workspaceRootHash": "e130a30cbebe29dd03c161dad71a498f7b82576957d14acf442fa227b096d414"
+  }
+}

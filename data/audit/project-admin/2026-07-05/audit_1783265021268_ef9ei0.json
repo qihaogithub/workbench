@@ -1,0 +1,29 @@
+{
+  "auditId": "audit_1783265021268_ef9ei0",
+  "at": 1783265021268,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L2",
+  "tool": "edit_commit",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "resourceId": "edit_1783264569593_5f0ztm",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      "demos/worldcup_02_active_no_vote/config.schema.json",
+      "demos/worldcup_02_active_no_vote/index.tsx",
+      "workspace-tree.json"
+    ],
+    "notes": [
+      "生成版本 v6"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

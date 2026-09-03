@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1788143379376_ddaaif",
+  "at": 1788143379376,
+  "actor": {
+    "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+    "name": "qihao",
+    "role": "creator",
+    "source": "author-site"
+  },
+  "level": "L2",
+  "tool": "page_create_version",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "resourceId": "quiz-correct_m5n8",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "page-version:quiz-correct_m5n8:prv_1788143379368_qfhy32"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

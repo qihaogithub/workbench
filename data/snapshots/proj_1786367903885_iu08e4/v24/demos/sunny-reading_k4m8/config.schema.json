@@ -1,0 +1,56 @@
+{
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "content",
+      "preset": "custom",
+      "source": "user"
+    }
+  },
+  "type": "object",
+  "properties": {
+    "brandName": {
+      "type": "string",
+      "title": "品牌名称",
+      "default": "晨光阅读屋"
+    },
+    "badgeText": {
+      "type": "string",
+      "title": "顶部徽章文字",
+      "default": "今日开放"
+    },
+    "heroAccent": {
+      "type": "string",
+      "title": "主标题强调句",
+      "default": "打开一扇窗。"
+    },
+    "primaryButtonText": {
+      "type": "string",
+      "title": "主按钮文字",
+      "default": "开始今日共读"
+    },
+    "storyTitle": {
+      "type": "string",
+      "title": "今日故事书名",
+      "default": "云朵邮差"
+    },
+    "accentColor": {
+      "type": "string",
+      "format": "color",
+      "title": "强调色",
+      "default": "#df765b"
+    },
+    "buttonBg": {
+      "type": "string",
+      "format": "color",
+      "title": "主按钮背景色",
+      "default": "#20344a"
+    }
+  },
+  "required": []
+}

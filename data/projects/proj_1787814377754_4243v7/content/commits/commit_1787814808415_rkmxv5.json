@@ -1,0 +1,29 @@
+{
+  "id": "commit_1787814808415_rkmxv5",
+  "projectId": "proj_1787814377754_4243v7",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录clipboard-import",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "clipboard-import_c6b554",
+      "versionId": "prv_1787814808413_bthf56"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "clipboard-import_c6b554",
+      "toVersionId": "prv_1787814808413_bthf56"
+    }
+  ],
+  "createdAt": 1787814808415,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1787814378221-9l0h1v70v",
+    "workspaceRevision": 10,
+    "workspaceRootHash": "ec4adb56e5cb68240784fa37b04decf3ac6f5f23cc77ab7c4f99650186fe5cfe"
+  }
+}

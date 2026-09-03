@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>第3关 · 拼图</title>
+  <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+  <div class="wf-container">
+
+    <!-- 关卡头部 -->
+    <header class="wf-levelbar">
+      <a class="wf-back">‹</a>
+      <div class="wf-levelbar-title">
+        <span class="wf-levelbar-tag">第3关</span>
+        <h1>线索拼图</h1>
+      </div>
+      <span class="wf-levelbar-icon">🧩</span>
+    </header>
+
+    <!-- 游戏引导 -->
+    <section class="wf-guide">
+      <div class="wf-guide-icon">🦇</div>
+      <div class="wf-guide-body">
+        <h2 class="wf-guide-title">拼一拼，找出线索动物！</h2>
+        <p class="wf-guide-desc">什么动物会和万圣节有关系呢？小朋友，快来拼一拼！</p>
+      </div>
+    </section>
+
+    <!-- 进度 -->
+    <div class="wf-progress">
+      <div class="wf-progress-fill" style="width: 50%;"></div>
+      <span class="wf-progress-text">已拼好 1 / 2</span>
+    </div>
+
+    <!-- 拼图游戏区 -->
+    <section class="wf-puzzle">
+      <!-- bat -->
+      <div class="wf-puzzle-card">
+        <div class="wf-puzzle-head">
+          <span class="wf-puzzle-label">题目 1</span>
+          <span class="wf-puzzle-progress">已拼好 ✓</span>
+        </div>
+        <div class="wf-puzzle-board">
+          <div class="wf-puzzle-cell wf-puzzle-filled">🦇</div>
+          <div class="wf-puzzle-cell wf-puzzle-filled"></div>
+          <div class="wf-puzzle-cell wf-puzzle-filled"></div>
+          <div class="wf-puzzle-cell wf-puzzle-filled"></div>
+          <div class="wf-puzzle-cell wf-puzzle-empty">?</div>
+          <div class="wf-puzzle-cell wf-puzzle-filled"></div>
+          <div class="wf-puzzle-cell wf-puzzle-filled"></div>
+          <div class="wf-puzzle-cell wf-puzzle-filled"></div>
+          <div class="wf-puzzle-cell wf-puzzle-filled"></div>
+        </div>
+        <div class="wf-puzzle-answer">
+          <span class="wf-answer-piece">🧩 拖拽碎片放置</span>
+        </div>
+        <div class="wf-word-reveal wf-word-reveal-inline">
+          <p class="wf-word-en">bat</p>
+          <p class="wf-word-cn">蝙蝠</p>
+        </div>
+      </div>
+
+      <!-- spider -->
+      <div class="wf-puzzle-card">
+        <div class="wf-puzzle-head">
+          <span class="wf-puzzle-label">题目 2</span>
+          <span class="wf-puzzle-progress">拼图中…</span>
+        </div>
+        <div class="wf-puzzle-board">
+          <div class="wf-puzzle-cell wf-puzzle-filled">🕷️</div>
+          <div class="wf-puzzle-cell wf-puzzle-empty">?</div>
+          <div class="wf-puzzle-cell wf-puzzle-empty">?</div>
+          <div class="wf-puzzle-cell wf-puzzle-empty">?</div>
+          <div class="wf-puzzle-cell wf-puzzle-empty">?</div>
+          <div class="wf-puzzle-cell wf-puzzle-empty">?</div>
+          <div class="wf-puzzle-cell wf-puzzle-empty">?</div>
+          <div class="wf-puzzle-cell wf-puzzle-empty">?</div>
+          <div class="wf-puzzle-cell wf-puzzle-empty">?</div>
+        </div>
+        <div class="wf-puzzle-answer">
+          <span class="wf-answer-piece">🧩 拖拽碎片放置</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 已收集单词卡 -->
+    <section class="wf-collected">
+      <h3 class="wf-collected-title">已收集单词卡</h3>
+      <div class="wf-collected-tags">
+        <span class="wf-tag wf-tag-active">bat 蝙蝠 ✓</span>
+        <span class="wf-tag">spider 蜘蛛</span>
+      </div>
+    </section>
+
+    <!-- 底部按钮 -->
+    <section class="wf-actions">
+      <button class="wf-btn wf-btn-primary">完成第 3 关</button>
+      <p class="wf-actions-hint">无判断输入 · 词语认知难度 🌟</p>
+    </section>
+
+  </div>
+</body>
+</html>

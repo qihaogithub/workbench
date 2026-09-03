@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+  <div class="page-wrapper">
+    <!-- ====== 左侧：手机预览 ====== -->
+    <div class="device-col">
+      <div class="device-label">📱 手机端</div>
+      <div class="phone-frame">
+        <!-- 状态栏 -->
+        <div class="phone-status-bar">
+          <span class="time">9:41</span>
+          <span class="status-icons">
+            <span class="icon-signal">●●●●</span>
+            <span class="icon-wifi">WiFi</span>
+            <span class="icon-battery">🔋</span>
+          </span>
+        </div>
+
+        <!-- 头图区域 (270px) -->
+        <div class="phone-header-zone">
+          <!-- 占位提示层 -->
+          <div class="header-placeholder">
+            <div class="placeholder-inner">
+              <span class="placeholder-icon">🖼️</span>
+              <span class="placeholder-text">上传头部背景</span>
+            </div>
+          </div>
+          <!-- 头图 -->
+          <img
+            class="phone-header-bg"
+            data-bind-src="headerBgThinking"
+            alt="头图"
+          />
+        </div>
+
+        <!-- 内容区 -->
+        <div class="phone-content">
+          <div class="content-nav">
+            <span class="nav-title">思维科目</span>
+          </div>
+          <div class="content-card">
+            <div class="card-row">
+              <span class="card-icon">📝</span>
+              <div class="card-info">
+                <span class="card-title">逻辑推理</span>
+                <span class="card-sub">每日一练 · 10题</span>
+              </div>
+            </div>
+            <div class="card-row">
+              <span class="card-icon">🧩</span>
+              <div class="card-info">
+                <span class="card-title">图形思维</span>
+                <span class="card-sub">专项突破 · 8题</span>
+              </div>
+            </div>
+            <div class="card-row">
+              <span class="card-icon">🔢</span>
+              <div class="card-info">
+                <span class="card-title">数理思维</span>
+                <span class="card-sub">进阶挑战 · 12题</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 底部导航 -->
+        <div class="phone-tab-bar">
+          <span class="tab active">首页</span>
+          <span class="tab">练习</span>
+          <span class="tab">我的</span>
+        </div>
+      </div>
+      <div class="device-info">375 × 812 · scale(0.7)</div>
+    </div>
+
+    <!-- ====== 右侧：Pad 预览 ====== -->
+    <div class="device-col">
+      <div class="device-label">📋 Pad 端</div>
+      <div class="pad-frame">
+        <!-- 底层：基础 UI 框架 -->
+        <div class="pad-base-ui">
+          <div class="pad-toolbar">
+            <span class="toolbar-dot"></span>
+            <span class="toolbar-dot"></span>
+            <span class="toolbar-dot"></span>
+            <span class="toolbar-title">思维科目 · 网页版</span>
+          </div>
+          <div class="pad-sidebar">
+            <div class="sidebar-item active">📊 仪表盘</div>
+            <div class="sidebar-item">📝 题库</div>
+            <div class="sidebar-item">📈 成绩</div>
+            <div class="sidebar-item">⚙️ 设置</div>
+          </div>
+          <div class="pad-main-area">
+            <!-- 头图层 -->
+            <div class="pad-header-zone">
+              <!-- 占位提示层 -->
+              <div class="header-placeholder">
+                <div class="placeholder-inner">
+                  <span class="placeholder-icon">🖼️</span>
+                  <span class="placeholder-text">上传头部背景</span>
+                </div>
+              </div>
+              <img
+                class="pad-header-bg"
+                data-bind-src="padHeaderBgThinking"
+                alt="头图"
+              />
+            </div>
+
+            <!-- 上层 UI 覆盖 -->
+            <div class="pad-overlay-ui">
+              <div class="pad-breadcrumb">
+                <span>首页</span>
+                <span class="sep">›</span>
+                <span>思维科目</span>
+              </div>
+              <div class="pad-hero-text">
+                <h2 class="pad-hero-title">思维·每日训练</h2>
+                <p class="pad-hero-desc">培养逻辑思维与创造力</p>
+              </div>
+            </div>
+
+            <!-- 内容卡片区 -->
+            <div class="pad-content-cards">
+              <div class="pad-card">
+                <span class="pad-card-icon">🧠</span>
+                <span class="pad-card-label">逻辑推理</span>
+                <span class="pad-card-count">10题</span>
+              </div>
+              <div class="pad-card">
+                <span class="pad-card-icon">🎯</span>
+                <span class="pad-card-label">图形思维</span>
+                <span class="pad-card-count">8题</span>
+              </div>
+              <div class="pad-card">
+                <span class="pad-card-icon">💡</span>
+                <span class="pad-card-label">数理思维</span>
+                <span class="pad-card-count">12题</span>
+              </div>
+              <div class="pad-card">
+                <span class="pad-card-icon">🏆</span>
+                <span class="pad-card-label">综合挑战</span>
+                <span class="pad-card-count">15题</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="device-info">1366 × 744 · scale(0.6)</div>
+    </div>
+  </div>
+</body>
+</html>

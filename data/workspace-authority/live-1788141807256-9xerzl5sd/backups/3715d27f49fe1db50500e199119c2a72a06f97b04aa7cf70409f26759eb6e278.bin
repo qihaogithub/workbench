@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "projectId": "proj_1788141806566_0aps89",
+  "updatedAt": 1788320350450,
+  "state": {
+    "viewport": {
+      "x": 419.638711262061,
+      "y": 296.1577004940198,
+      "zoom": 0.3382446402432814
+    },
+    "pages": {
+      "page_t7cj": {
+        "x": -92.05473026614072,
+        "y": -2.1316282072803006e-14,
+        "width": 818,
+        "height": 378,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "818x378"
+      },
+      "clipboard-import_e05e9d": {
+        "x": -826.6474467864493,
+        "y": -0.8070575893410705,
+        "width": 673.4347690477174,
+        "height": 378.80705758934107,
+        "sizeMode": "custom",
+        "previewSizeKey": "1920x1080"
+      }
+    },
+    "pageGroups": {},
+    "sections": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

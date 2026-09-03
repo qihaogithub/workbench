@@ -1,0 +1,28 @@
+{
+  "auditId": "audit_1785422240500_q7mrmh",
+  "at": 1785422240500,
+  "actor": {
+    "id": "jojo",
+    "name": "jojo",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L2",
+  "tool": "edit_commit",
+  "projectId": "proj_1785421657423_1ptong",
+  "resourceId": "edit_1785422221402_plir2y",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      "demos/config-demo_x7k2/config.schema.json",
+      "demos/config-demo_x7k2/config.ts"
+    ],
+    "notes": [
+      "生成版本 v2"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

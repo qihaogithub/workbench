@@ -1,0 +1,23 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+
+.pp-slide { position: relative; width: 100vw; height: 100vh; aspect-ratio: 16/9; overflow: hidden; background: linear-gradient(135deg, #0a0e1a 0%, #0d1220 45%, #141a2e 100%); color: #e6ecff; display: flex; flex-direction: column; padding: 36px 56px; }
+
+.bg-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(120,140,200,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(120,140,200,.06) 1px, transparent 1px); background-size: 40px 40px; mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%); pointer-events: none; }
+.bg-glow { position: absolute; border-radius: 50%; filter: blur(90px); opacity: .5; pointer-events: none; }
+.glow-a { width: 420px; height: 420px; background: #22d3ee; top: -120px; left: -60px; opacity: .22; }
+.glow-b { width: 400px; height: 400px; background: #a78bfa; bottom: -140px; right: -80px; opacity: .22; }
+
+.slide-head { position: relative; margin-bottom: 24px; }
+.kicker { font-size: 14px; letter-spacing: 3px; color: #a5f3fc; margin-bottom: 8px; font-weight: 600; }
+.slide-title { font-size: 34px; font-weight: 800; line-height: 1.25; }
+
+.role-grid { position: relative; display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; flex: 1; }
+.role-card { background: rgba(20, 26, 46, 0.6); border: 1px solid rgba(148, 163, 255, 0.18); border-radius: 16px; padding: 18px 16px; display: flex; flex-direction: column; }
+.role-icon { font-size: 30px; margin-bottom: 8px; }
+.role-name { font-size: 18px; font-weight: 700; color: #a5f3fc; margin-bottom: 8px; }
+.role-change { font-size: 13px; color: #fca5a5; margin-bottom: 4px; }
+.role-arrow { color: #67e8f9; font-size: 14px; margin: 2px 0; }
+.role-result { font-size: 13px; color: #dbe4ff; line-height: 1.5; }
+
+.bottom-note { position: relative; margin-top: 18px; text-align: center; font-size: 16px; font-weight: 600; color: #c7d6ff; background: rgba(148, 163, 255, 0.08); border: 1px solid rgba(148, 163, 255, 0.25); border-radius: 12px; padding: 13px 20px; }

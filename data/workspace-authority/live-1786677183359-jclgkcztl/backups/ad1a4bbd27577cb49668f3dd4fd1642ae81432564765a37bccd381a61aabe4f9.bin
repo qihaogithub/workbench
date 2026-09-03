@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "projectId": "proj_1786367903885_iu08e4",
+  "updatedAt": 1787817122090,
+  "state": {
+    "viewport": {
+      "x": -402.0593539595858,
+      "y": 103.99349853185089,
+      "zoom": 0.6946776156850966
+    },
+    "pages": {
+      "kids-edu_b3xw": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 2471,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "clipboard-import_4d9ab0": {
+        "x": 414.6911877394636,
+        "y": 6,
+        "width": 375,
+        "height": 812,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "clipboard-import_0f8b25": {
+        "x": 830,
+        "y": 0,
+        "width": 375,
+        "height": 818,
+        "zIndex": 2,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "pageGroups": {},
+    "sections": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

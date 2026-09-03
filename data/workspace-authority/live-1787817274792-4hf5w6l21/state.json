@@ -1,0 +1,18 @@
+{
+  "workspaceId": "live-1787817274792-4hf5w6l21",
+  "projectId": "proj_1787817274612_o9dirf",
+  "revision": 2,
+  "rootHash": "d66ad83b2daffa31b3e1b25a0d1ba1aa960beeb06b6e043630b98f28f5690900",
+  "resourceHashes": {
+    "demos/section_2yfr/config.schema.json": "e1c118a2c54911913d4ffbf47809ce89c404706cd8a6262198c81674f23a3750",
+    "demos/section_2yfr/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "demos/section_2yfr/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
+    "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
+    "memory.md": "48154b93957f8b6110505afd34139407eb21d3408afb84c6ad8b3343a22d39a5",
+    "workspace-tree.json": "426dd837ef6fe858878978d8e48caf4eb45c355783ddcbec9435a95f5318ddf5"
+  },
+  "mutationPayloads": {
+    "287cdc44-d3de-4e7e-8ba0-428a75c4f911": "018005854c06b03ff8b2b3117fb183e4b25eb6a22539cb4473c7da95bbc7625f"
+  },
+  "updatedAt": 1787817275542
+}

@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "配置项类型展示",
+  "type": "object",
+  "$demo": {
+    "previewSize": {
+      "width": 375,
+      "height": 812
+    }
+  },
+  "properties": {
+    "header": {
+      "type": "object",
+      "title": "📝 标题模块（string）",
+      "properties": {
+        "visible": { "type": "boolean", "title": "显示", "default": true },
+        "position": { "type": "integer", "title": "排序位置", "default": 1 },
+        "pageTitle": { "type": "string", "title": "页面标题", "default": "配置项类型全览" }
+      },
+      "default": { "visible": true, "position": 1, "pageTitle": "配置项类型全览" }
+    },
+    "numberSection": {
+      "type": "object",
+      "title": "🔢 数值模块（number）",
+      "properties": {
+        "visible": { "type": "boolean", "title": "显示", "default": true },
+        "position": { "type": "integer", "title": "排序位置", "default": 2 },
+        "discount": { "type": "number", "title": "折扣力度（%）", "default": 85 }
+      },
+      "default": { "visible": true, "position": 2, "discount": 85 }
+    },
+    "booleanSection": {
+      "type": "object",
+      "title": "🔘 开关模块（boolean）",
+      "properties": {
+        "visible": { "type": "boolean", "title": "显示", "default": true },
+        "position": { "type": "integer", "title": "排序位置", "default": 3 },
+        "showBanner": { "type": "boolean", "title": "展示横幅", "default": true }
+      },
+      "default": { "visible": true, "position": 3, "showBanner": true }
+    },
+    "objectSection": {
+      "type": "object",
+      "title": "📦 对象模块（object）",
+      "properties": {
+        "visible": { "type": "boolean", "title": "显示", "default": true },
+        "position": { "type": "integer", "title": "排序位置", "default": 4 },
+        "author": {
+          "type": "object",
+          "title": "作者信息",
+          "properties": {
+            "name": { "type": "string", "title": "作者名", "default": "设计师小张" },
+            "level": { "type": "integer", "title": "等级", "default": 5 }
+          },
+          "default": { "name": "设计师小张", "level": 5 }
+        }
+      },
+      "default": { "visible": true, "position": 4, "author": { "name": "设计师小张", "level": 5 } }
+    },
+    "arraySection": {
+      "type": "object",
+      "title": "📋 数组模块（array）",
+      "properties": {
+        "visible": { "type": "boolean", "title": "显示", "default": true },
+        "position": { "type": "integer", "title": "排序位置", "default": 5 },
+        "tags": {
+          "type": "array",
+          "title": "标签列表",
+          "items": { "type": "string" },
+          "default": ["新品", "限时", "爆款"]
+        }
+      },
+      "default": { "visible": true, "position": 5, "tags": ["新品", "限时", "爆款"] }
+    },
+    "colorSection": {
+      "type": "object",
+      "title": "🎨 颜色模块（format: color）",
+      "properties": {
+        "visible": { "type": "boolean", "title": "显示", "default": true },
+        "position": { "type": "integer", "title": "排序位置", "default": 6 },
+        "primaryColor": {
+          "type": "string",
+          "title": "主题色",
+          "format": "color",
+          "default": "#FF6B35"
+        }
+      },
+      "default": { "visible": true, "position": 6, "primaryColor": "#FF6B35" }
+    },
+    "enumSection": {
+      "type": "object",
+      "title": "📑 枚举模块（enum + enumNames）",
+      "properties": {
+        "visible": { "type": "boolean", "title": "显示", "default": true },
+        "position": { "type": "integer", "title": "排序位置", "default": 7 },
+        "theme": {
+          "type": "string",
+          "title": "主题风格",
+          "enum": ["dark", "light", "colorful", "minimal"],
+          "enumNames": ["深色", "浅色", "多彩", "极简"],
+          "default": "dark"
+        }
+      },
+      "default": { "visible": true, "position": 7, "theme": "dark" }
+    },
+    "imageSection": {
+      "type": "object",
+      "title": "🖼️ 图片模块（format: image）",
+      "properties": {
+        "visible": { "type": "boolean", "title": "显示", "default": true },
+        "position": { "type": "integer", "title": "排序位置", "default": 8 },
+        "bannerImage": {
+          "type": "string",
+          "title": "展示图片",
+          "format": "image",
+          "default": ""
+        }
+      },
+      "default": { "visible": true, "position": 8, "bannerImage": "" }
+    },
+    "modulesSection": {
+      "type": "object",
+      "title": "🧩 模块数组（array + oneOf）",
+      "properties": {
+        "visible": { "type": "boolean", "title": "显示", "default": true },
+        "position": { "type": "integer", "title": "排序位置", "default": 9 },
+        "modules": {
+          "type": "array",
+          "title": "内容模块",
+          "items": {
+            "oneOf": [
+              {
+                "title": "图片模块",
+                "properties": {
+                  "type": { "const": "image" },
+                  "imageUrl": { "type": "string", "format": "image", "title": "图片" },
+                  "caption": { "type": "string", "title": "图片说明", "default": "图片模块示例" }
+                },
+                "required": ["type"]
+              },
+              {
+                "title": "文字模块",
+                "properties": {
+                  "type": { "const": "text" },
+                  "content": { "type": "string", "title": "文本内容", "default": "这是一段文字模块的内容" },
+                  "fontSize": { "type": "number", "title": "字号（px）", "default": 16 }
+                },
+                "required": ["type"]
+              },
+              {
+                "title": "视频模块",
+                "$demo": { "maxItems": 1 },
+                "properties": {
+                  "type": { "const": "video" },
+                  "videoCover": { "type": "string", "format": "image", "title": "视频封面" },
+                  "title": { "type": "string", "title": "视频标题", "default": "视频模块示例" }
+                },
+                "required": ["type"]
+              }
+            ]
+          },
+          "default": [
+            { "type": "image", "imageUrl": "", "caption": "图片模块示例" },
+            { "type": "text", "content": "这是一段文字模块的内容", "fontSize": 16 },
+            { "type": "video", "videoCover": "", "title": "视频模块示例" }
+          ]
+        }
+      },
+      "default": { "visible": true, "position": 9, "modules": [
+        { "type": "image", "imageUrl": "", "caption": "图片模块示例" },
+        { "type": "text", "content": "这是一段文字模块的内容", "fontSize": 16 },
+        { "type": "video", "videoCover": "", "title": "视频模块示例" }
+      ]}
+    }
+  },
+  "required": []
+}

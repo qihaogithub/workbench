@@ -1,0 +1,39 @@
+{
+  "id": "prv_1785910577957_e4dfhp",
+  "projectId": "proj_1784885664471_5bauyu",
+  "kind": "page",
+  "resourceId": "mobile-header-preview_b3f1",
+  "workspaceId": "live-1785863225962-u52upxekm",
+  "workspaceRevision": 79,
+  "workspaceRootHash": "3446db27269c529a966d49b207fb040380cc9f5aeed13ce0b8ec26b3b1ad5b6e",
+  "previousVersionId": "prv_1785898920342_ge3rgm",
+  "contentHash": "fda7dd787919b8d8718ba3003e2826e0203c6d3f22a142c7872a5006b02fdc0d",
+  "blobRefs": [
+    "69046a9996254002d0beb4021b3ee521fe9ddc4c9b83c50210d44e3d7be12424",
+    "9e7993f243169415d4df5313551e9f84b245e0cdfb748eb11cf74d1aaf81a797"
+  ],
+  "metadata": {
+    "page": {
+      "id": "mobile-header-preview_b3f1",
+      "name": "手机预览",
+      "runtimeType": "high-fidelity-react",
+      "order": 1,
+      "parentId": null,
+      "routeKey": "page"
+    },
+    "files": {
+      "schema": "69046a9996254002d0beb4021b3ee521fe9ddc4c9b83c50210d44e3d7be12424",
+      "code": "9e7993f243169415d4df5313551e9f84b245e0cdfb748eb11cf74d1aaf81a797"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "high-fidelity-react",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1785910577959,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "备份"
+}

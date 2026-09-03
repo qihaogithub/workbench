@@ -1,0 +1,29 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "page_y0ms",
+      "name": "手机",
+      "routeKey": "page",
+      "order": 0,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "pad_1uhj",
+      "name": "pad",
+      "routeKey": "pad",
+      "order": 1,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "pad_ajag",
+      "name": "pad",
+      "routeKey": "pad-2",
+      "order": 3,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    }
+  ]
+}

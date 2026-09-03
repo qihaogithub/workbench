@@ -1,0 +1,12 @@
+{
+  "planId": "plan_1786599663273_yzd16l",
+  "operation": "project_delete",
+  "resourceId": "proj_1786594448778_anw3kf",
+  "impact": [
+    "删除项目 E2E:20260813T041309617Z-r7nhg4:项目创建和代码编辑完整流程",
+    "删除 0 个页面",
+    "删除项目工作空间和元数据"
+  ],
+  "reversible": true,
+  "confirmToken": "confirm_1786599663273_odwrjz"
+}

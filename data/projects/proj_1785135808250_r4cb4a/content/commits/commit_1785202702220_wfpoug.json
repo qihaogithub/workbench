@@ -1,0 +1,31 @@
+{
+  "id": "commit_1785202702220_wfpoug",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "parentCommitId": "commit_1785166435791_kiiq64",
+  "visibility": "protected",
+  "intent": "publish",
+  "title": "发布项目 v5",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "page_da9l",
+      "versionId": "prv_1785138185736_z29n0k"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_gfbs",
+      "versionId": "prv_1785136734038_5bt9sp"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_yw72",
+      "versionId": "prv_1785166435787_oz4c56"
+    }
+  ],
+  "changedResources": [],
+  "createdAt": 1785202702220,
+  "createdBy": "Author Site",
+  "audit": {
+    "actorType": "user"
+  }
+}

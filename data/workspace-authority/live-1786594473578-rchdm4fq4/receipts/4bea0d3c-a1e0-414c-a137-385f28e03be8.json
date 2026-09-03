@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "4bea0d3c-a1e0-414c-a137-385f28e03be8",
+  "projectId": "proj_1786594473562_unsc1p",
+  "workspaceId": "live-1786594473578-rchdm4fq4",
+  "baseRevision": 0,
+  "revision": 6,
+  "rootHash": "84f075a05f177b366270d321828b4cbcb01231884d1cd0b46c0dc25ff0dd33ca",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_snye/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355"
+    },
+    {
+      "path": "demos/page_snye/prototype.css",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/page_snye/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f"
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "d0c1cb18d6df803bac942bf825f9b6ad11b36252e86cca0809e835b58990c2e0",
+      "afterHash": "f3b53a8a0843a0305fc787fac0813e29ebf432ed54a1e7ee6f39786205592f81"
+    }
+  ],
+  "committedAt": 1786594483698
+}

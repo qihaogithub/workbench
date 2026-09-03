@@ -1,0 +1,27 @@
+.page { min-height: 100vh; padding: 20px 16px; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+.header { text-align: center; margin-bottom: 20px; }
+.logo { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; margin-bottom: 8px; }
+h1 { font-size: 22px; font-weight: 700; margin: 0 0 4px; }
+.subtitle { font-size: 13px; opacity: 0.6; margin: 0; }
+.status-bar { display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; flex-wrap: wrap; }
+.badge { padding: 4px 10px; border-radius: 20px; font-size: 12px; background: rgba(128,128,128,0.1); }
+.preview-note { font-size: 12px; opacity: 0.5; text-align: center; }
+.preview-note p { margin: 2px 0; }
+.page { min-height: 100vh; padding: 20px 16px; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+.header { text-align: center; margin-bottom: 20px; }
+.logo { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; margin-bottom: 8px; }
+h1 { font-size: 22px; font-weight: 700; margin: 0 0 4px; }
+.subtitle { font-size: 13px; opacity: 0.6; margin: 0; }
+.status-bar { display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; flex-wrap: wrap; }
+.badge { padding: 4px 10px; border-radius: 20px; font-size: 12px; background: rgba(128,128,128,0.1); }
+.preview-note { font-size: 12px; opacity: 0.5; text-align: center; }
+.preview-note p { margin: 2px 0; }
+.page { min-height: 100vh; padding: 20px 16px; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+.header { text-align: center; margin-bottom: 20px; }
+.logo { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; margin-bottom: 8px; }
+h1 { font-size: 22px; font-weight: 700; margin: 0 0 4px; }
+.subtitle { font-size: 13px; opacity: 0.6; margin: 0; }
+.status-bar { display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; flex-wrap: wrap; }
+.badge { padding: 4px 10px; border-radius: 20px; font-size: 12px; background: rgba(128,128,128,0.1); }
+.preview-note { font-size: 12px; opacity: 0.5; text-align: center; }
+.preview-note p { margin: 2px 0; }

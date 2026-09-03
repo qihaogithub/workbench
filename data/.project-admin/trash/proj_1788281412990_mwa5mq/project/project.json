@@ -1,0 +1,42 @@
+{
+  "id": "proj_1788281412990_mwa5mq",
+  "name": "E2E:20260901T164958801Z-9shuvv:白板回填应用回归",
+  "projectType": "standard",
+  "category": "__e2e__",
+  "workspacePath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/projects/proj_1788281412990_mwa5mq/workspace",
+  "demoPages": [
+    {
+      "id": "page_zwrc",
+      "name": "首页",
+      "routeKey": "page",
+      "order": 0,
+      "parentId": null,
+      "runtimeType": "prototype-html-css",
+      "isTemplatePage": false
+    }
+  ],
+  "demoFolders": [],
+  "versions": [
+    {
+      "versionId": "v1",
+      "type": "named_version",
+      "savedAt": 1788281414399,
+      "savedBy": "qihao",
+      "sessionId": "session-1788281413013-7q3qqk0w2",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1788281412990_mwa5mq/v1",
+      "fileCount": 8,
+      "workspaceId": "live-1788281413009-xiiv5g9dx",
+      "workspaceRevision": 3,
+      "workspaceRootHash": "fd99cea3dcb7116c04dbd45f03b37cc3705bd6ca130fe1b5bbd3d06196215f03",
+      "note": "白板回填应用回归"
+    }
+  ],
+  "createdAt": 1788281412991,
+  "updatedAt": 1788281414401,
+  "activeWorkspaceId": "live-1788281413009-xiiv5g9dx",
+  "activeWorkspaceUpdatedAt": 1788281413012,
+  "canonicalSyncedWorkspaceId": "live-1788281413009-xiiv5g9dx",
+  "canonicalSyncedRevision": 3,
+  "canonicalSyncedRootHash": "fd99cea3dcb7116c04dbd45f03b37cc3705bd6ca130fe1b5bbd3d06196215f03",
+  "canonicalSyncedAt": 1788281414241
+}

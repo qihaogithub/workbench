@@ -1,0 +1,19 @@
+{
+  "auditId": "audit_1785924937758_ur1rpk",
+  "at": 1785924937758,
+  "actor": {
+    "id": "local-codex",
+    "name": "local-codex",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_rename",
+  "projectId": "proj_1784874964275_p0k4ho",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      "project.category"
+    ]
+  }
+}

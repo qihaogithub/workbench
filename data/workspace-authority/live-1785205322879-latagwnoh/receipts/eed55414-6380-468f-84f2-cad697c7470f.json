@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "eed55414-6380-468f-84f2-cad697c7470f",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "baseRevision": 0,
+  "revision": 17,
+  "rootHash": "a1491b78004860ede3a04002b11dbba919343ef9d45698ce18dd5e83a4113595",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/spine_dqxs/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f"
+    },
+    {
+      "path": "demos/spine_dqxs/prototype.css",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/spine_dqxs/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355"
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "a41efa35463534a2fca962b8e2e5dfe650d212a9d3df6229bbf3abe0cecab02c",
+      "afterHash": "d5398970bd6da6cf2550d2300527f7ea3dfba93152bf663ebf390ac5797e76ae"
+    }
+  ],
+  "committedAt": 1785314232082
+}

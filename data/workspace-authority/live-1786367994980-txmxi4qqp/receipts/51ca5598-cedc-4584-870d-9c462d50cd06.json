@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "51ca5598-cedc-4584-870d-9c462d50cd06",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786367994980-txmxi4qqp",
+  "baseRevision": 0,
+  "revision": 249,
+  "rootHash": "60842d085ae5562310cfe4481dafe58080b321c6ee2b380f6091f3df018c7f65",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/page_tbq2/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "a1b7204c3371b72528894634422b351ab2fef679ff011d590f9579b77bfb5fb8"
+    }
+  ],
+  "committedAt": 1786516176418
+}

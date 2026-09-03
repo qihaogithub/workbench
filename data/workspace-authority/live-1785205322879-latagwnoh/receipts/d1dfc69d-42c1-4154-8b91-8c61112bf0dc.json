@@ -1,0 +1,49 @@
+{
+  "committed": true,
+  "mutationId": "d1dfc69d-42c1-4154-8b91-8c61112bf0dc",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "baseRevision": 0,
+  "revision": 232,
+  "rootHash": "1320aaa897c6362e79b3a42d879da8a817c66aa1d0a6b78790594d85496bb30d",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_g5wy/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "caa4dded1c46311d8aaa611752a2a39998cd09de0af6953aa717f16a2012e746",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_g5wy/index.tsx",
+      "action": "deleted",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_g5wy/prototype.css",
+      "action": "deleted",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_g5wy/prototype.html",
+      "action": "deleted",
+      "beforeHash": "3354cc2970f65f669cca95bdc3c299f122cd5bfac522d9cbd75b61addebc2724",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_g5wy/prototype.meta.json",
+      "action": "deleted",
+      "beforeHash": "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "6d8040ca3b7361624b2e7696a743d72dedebe98a5aacb07fe4dd77f1b480f77f",
+      "afterHash": "b64da185140054d4d57a9b9fd79d21f62ca5b4a685b223af63f783d6b4bc8b2b"
+    }
+  ],
+  "committedAt": 1785397564897
+}

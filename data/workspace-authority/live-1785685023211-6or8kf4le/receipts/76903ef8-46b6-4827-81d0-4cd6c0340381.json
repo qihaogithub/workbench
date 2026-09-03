@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "76903ef8-46b6-4827-81d0-4cd6c0340381",
+  "projectId": "proj_1785685022249_aevplm",
+  "workspaceId": "live-1785685023211-6or8kf4le",
+  "baseRevision": 3,
+  "revision": 7,
+  "rootHash": "55e22d7487599379d14c1695766642a62395aacf97c9df95f4aa92311708b4e1",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "demos/config-media_p7q3/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "fe7e221fafcb7aba56b1d3f6d2e2d11d8d5b601aeb9fb937194d2e46a3ff4551"
+    }
+  ],
+  "committedAt": 1785685252519
+}

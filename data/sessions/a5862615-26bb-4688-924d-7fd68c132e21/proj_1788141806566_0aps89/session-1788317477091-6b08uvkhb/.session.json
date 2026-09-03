@@ -1,0 +1,14 @@
+{
+  "sessionId": "session-1788317477091-6b08uvkhb",
+  "userId": "a5862615-26bb-4688-924d-7fd68c132e21",
+  "role": "admin",
+  "demoId": "proj_1788141806566_0aps89",
+  "workspaceId": "live-1788141807256-9xerzl5sd",
+  "status": "archived",
+  "basedOnVersion": "v10",
+  "workbenchSessionId": null,
+  "createdAt": 1788317477091,
+  "expiresAt": 1788324804670,
+  "lastActivityAt": 1788317679824,
+  "title": "模式选择空图处理"
+}

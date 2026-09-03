@@ -1,0 +1,31 @@
+{
+  "committed": true,
+  "mutationId": "9e30b6cb-1efe-49b3-95e3-a15f5958f390",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786367994980-txmxi4qqp",
+  "baseRevision": 0,
+  "revision": 341,
+  "rootHash": "bab8c0693db830a2536eb6880afdc626e42926bf9a4ff4814ce649124c7e3bfe",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/page_yvbe/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "bf870a7a11c79d2318e1f62992adb52607d79fb4f5bf557639ad1063b4a3b9a9"
+    },
+    {
+      "path": "design-spec/spec-ds_1786523594506_63db2ecc.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "19fc0e785786a0cbb84912faf23eedcc546bd11e4fedae909105e19c48e3cc43"
+    },
+    {
+      "path": "design-spec/manifest.json",
+      "action": "modified",
+      "beforeHash": "e31ab9192821601c88cd3680402deb220b120e7d1edeeaba36e5212f9c71ed23",
+      "afterHash": "792255fc0850bd3f33a6ea0d06ef4a1244ada772057f938f84c9c5521c7c950e"
+    }
+  ],
+  "committedAt": 1786523594523
+}

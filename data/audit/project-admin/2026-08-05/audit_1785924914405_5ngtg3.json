@@ -1,0 +1,19 @@
+{
+  "auditId": "audit_1785924914405_5ngtg3",
+  "at": 1785924914405,
+  "actor": {
+    "id": "local-codex",
+    "name": "local-codex",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "template_update_meta",
+  "resourceId": "proj_1779608460372",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      "template:proj_1779608460372"
+    ]
+  }
+}

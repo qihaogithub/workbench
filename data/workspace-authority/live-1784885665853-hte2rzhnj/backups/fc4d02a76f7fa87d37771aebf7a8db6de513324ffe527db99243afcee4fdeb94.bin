@@ -1,0 +1,195 @@
+import { useState, useRef } from "react";
+
+interface DemoProps {}
+
+const SUBJECTS = [
+  { key: "reading", label: "阅读", bottom: "/api/images/img_2Y6cNADGIUTNyw", top: "/api/images/img_uJiIlQv0qfdkWQ" },
+  { key: "thinking", label: "思维", bottom: "/api/images/img_F_vOdbsBBPMsDg", top: "/api/images/img_gDTg2-XpKAnSVQ" },
+  { key: "art", label: "美育", bottom: "/api/images/img_XK1pvCdr88938Q", top: "/api/images/img_NZImhS-OZZo6JA" },
+  { key: "english", label: "英语", bottom: "/api/images/img_4FdS0bju2F1CQQ", top: "/api/images/img_CvRtuMj8MGw-TA" },
+  { key: "writer", label: "小作家", bottom: "/api/images/img_hqjzkcVjcCBDVw", top: "/api/images/img_EPIIE3m8EU5kDg" },
+];
+
+function UploadHint({ onClick }: { onClick: () => void }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: 270,
+        cursor: "pointer",
+        zIndex: 4,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "rgba(0,0,0,0.4)",
+      }}
+    >
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+        style={{
+          background: "transparent",
+          color: "white",
+          border: "2px solid white",
+          padding: "10px 20px",
+          borderRadius: 20,
+          fontSize: 14,
+          cursor: "pointer",
+          backdropFilter: "blur(5px)",
+          transform: "scale(1.667)",
+          transformOrigin: "center",
+        }}
+      >
+        上传头部背景
+      </button>
+    </div>
+  );
+}
+
+export default function PadHeaderPreview(props: DemoProps) {
+  const p = props as Record<string, unknown>;
+  const initial = (p.activeSubject as string) || "reading";
+  const [subject, setSubject] = useState(
+    SUBJECTS.find((s) => s.key === initial) ? initial : "reading"
+  );
+  const [bg, setBg] = useState<Record<string, string>>({});
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const current = SUBJECTS.find((s) => s.key === subject) || SUBJECTS[0];
+  const bgUrl = bg[subject] || "";
+
+  function handleUpload() {
+    fileRef.current?.click();
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      if (img.width === 2732 && img.height === 540) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          setBg((prev) => ({ ...prev, [subject]: ev.target?.result as string }));
+        };
+        reader.readAsDataURL(file);
+      } else {
+        alert("请上传2732×540大小的图片");
+      }
+      e.target.value = "";
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      alert("图片加载失败，请重新选择");
+      e.target.value = "";
+    };
+    img.src = url;
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-[#f5f5f5] py-6">
+      {/* Tab 导航 */}
+      <div className="flex gap-[5px] rounded-xl bg-white p-2 shadow-md">
+        {SUBJECTS.map((s) => (
+          <button
+            key={s.key}
+            onClick={() => setSubject(s.key)}
+            className="whitespace-nowrap rounded-lg px-5 py-3 text-sm font-medium transition-all"
+            style={{
+              border: subject === s.key ? "2px solid #333" : "2px solid transparent",
+              color: subject === s.key ? "#333" : "#666",
+              fontWeight: subject === s.key ? 600 : 500,
+              background: "transparent",
+              cursor: "pointer",
+            }}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Pad 容器 1366×744 → 缩放 0.6 */}
+      <div style={{ width: 819.6, height: 446.4, position: "relative" }}>
+        <div
+          style={{
+            width: 1366,
+            height: 744,
+            position: "relative",
+            background: "white",
+            borderRadius: 20,
+            overflow: "hidden",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
+            transform: "scale(0.6)",
+            transformOrigin: "top left",
+          }}
+        >
+          {/* 第 1 层：Pad 底层图 */}
+          <img
+            src={current.bottom}
+            alt={`${current.label}Pad底层`}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              zIndex: 1,
+            }}
+          />
+
+          {/* 第 2 层：上传的背景 */}
+          {bgUrl ? (
+            <img
+              src={bgUrl}
+              alt="头图背景"
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: 270,
+                objectFit: "cover",
+                zIndex: 2,
+              }}
+            />
+          ) : null}
+
+          {/* 第 3 层：Pad 上层图 */}
+          <img
+            src={current.top}
+            alt={`${current.label}Pad上层`}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              zIndex: 3,
+            }}
+          />
+
+          {/* 第 4 层：上传提示覆盖层 */}
+          {!bgUrl ? <UploadHint onClick={handleUpload} /> : null}
+        </div>
+      </div>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={handleFileChange}
+      />
+    </div>
+  );
+}

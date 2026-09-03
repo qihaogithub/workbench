@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1783068457408_7w9032",
+  "at": 1783068457408,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L1",
+  "tool": "config_set_project_schema",
+  "projectId": "proj_1782718596686_wmv9yu",
+  "resourceId": "edit_1783068271536_wz386f",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      "project.config.schema.json"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

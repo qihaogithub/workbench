@@ -1,0 +1,44 @@
+{
+  "id": "prv_1788230574409_vikfdl",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "kind": "page",
+  "resourceId": "page_p8a2",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "workspaceRevision": 975,
+  "workspaceRootHash": "c9fb6837e518df2f8da058a9fda9eaf92a07e5ec8209da87525253736addb85a",
+  "previousVersionId": "prv_1787820483768_pu1kvj",
+  "contentHash": "33963c4653ac98e4d3e3bcad5473ecfff555b467eff76636dadb2f5dbf9914c4",
+  "blobRefs": [
+    "c13e02687384ef24424478990e361e94b0eb4afeff20d64adb59f900a9198b8c",
+    "8ec3e1aee8d6d39040409e8c06ae2dddcdf1042642dada1bdc31c6762937beab",
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "5997450302b1989a6709a0111fb4891eed12d5739ee5a1a426511dd6500f7867"
+  ],
+  "metadata": {
+    "page": {
+      "id": "page_p8a2",
+      "name": "闯关活动页（进行中）",
+      "routeKey": "page-9",
+      "order": 2,
+      "parentId": "folder_1785397477311_od13vu",
+      "runtimeType": "prototype-html-css",
+      "isTemplatePage": false
+    },
+    "files": {
+      "schema": "c13e02687384ef24424478990e361e94b0eb4afeff20d64adb59f900a9198b8c",
+      "prototypeHtml": "8ec3e1aee8d6d39040409e8c06ae2dddcdf1042642dada1bdc31c6762937beab",
+      "prototypeCss": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "prototypeMeta": "5997450302b1989a6709a0111fb4891eed12d5739ee5a1a426511dd6500f7867"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1788230574421,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录闯关活动页（进行中）"
+}

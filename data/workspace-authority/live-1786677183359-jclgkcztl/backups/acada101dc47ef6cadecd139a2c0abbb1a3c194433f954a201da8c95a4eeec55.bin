@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "projectId": "proj_1786367903885_iu08e4",
+  "updatedAt": 1787891375369,
+  "state": {
+    "viewport": {
+      "x": 670.3109914101876,
+      "y": 95.17468292670941,
+      "zoom": 0.3195163901254554
+    },
+    "pages": {},
+    "pageGroups": {},
+    "sections": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [
+      "kb_1787885153658_t9h54b"
+    ],
+    "navigation": {
+      "hotspots": {},
+      "connections": {}
+    }
+  }
+}

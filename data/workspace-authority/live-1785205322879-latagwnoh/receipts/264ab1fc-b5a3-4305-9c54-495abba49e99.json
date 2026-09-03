@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "264ab1fc-b5a3-4305-9c54-495abba49e99",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "baseRevision": 0,
+  "revision": 1029,
+  "rootHash": "44d85a1f62bdd622edfbd286d05379f23e31b9f748822f57f53bb427f50485f5",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "convention.md",
+      "action": "modified",
+      "beforeHash": "93ede876aba4adaa1c3b582df5a9c31c1bbfb8fe3f9fbab840de96a276d8cad2",
+      "afterHash": "d3375f815e14e0fdeaa96704c25ab673d98dda0f5480817fd05331e443bfd97d"
+    }
+  ],
+  "committedAt": 1788244854704
+}

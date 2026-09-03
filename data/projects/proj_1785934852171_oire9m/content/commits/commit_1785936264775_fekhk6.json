@@ -1,0 +1,29 @@
+{
+  "id": "commit_1785936264775_fekhk6",
+  "projectId": "proj_1785934852171_oire9m",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录AI 的三层作用",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "demo_1785935720860_06of",
+      "versionId": "prv_1785936264773_xcym0j"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "demo_1785935720860_06of",
+      "toVersionId": "prv_1785936264773_xcym0j"
+    }
+  ],
+  "createdAt": 1785936264775,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785935881009-qhes8gqe3",
+    "workspaceRevision": 10,
+    "workspaceRootHash": "a0626b1afffbd9b38715bdf544c5ac594f83330e2eee12f36e381dfd6d973554"
+  }
+}

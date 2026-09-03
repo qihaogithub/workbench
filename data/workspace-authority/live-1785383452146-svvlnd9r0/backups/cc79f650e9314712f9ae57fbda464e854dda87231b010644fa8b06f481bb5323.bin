@@ -1,0 +1,235 @@
+import { Icon } from "@preview/sdk";
+
+type ModuleItem =
+  | { type: "banner"; text: string }
+  | { type: "notice"; message: string }
+  | { type: "counter"; label: string; value: number };
+
+interface DemoProps {
+  title: string;
+  count: number;
+  showPanel: boolean;
+  size: "small" | "medium" | "large";
+  bgColor: string;
+  logo: string;
+  sortOrder: "asc" | "desc";
+  position: "left" | "center" | "right";
+  modules: ModuleItem[];
+}
+
+const SIZE_MAP = {
+  small: { text: "text-sm", badge: "px-2 py-0.5 text-xs", icon: 14 },
+  medium: { text: "text-base", badge: "px-3 py-1 text-sm", icon: 18 },
+  large: { text: "text-lg", badge: "px-4 py-1.5 text-base", icon: 22 },
+} as const;
+
+function ModuleRenderer({ item }: { item: ModuleItem }) {
+  switch (item.type) {
+    case "banner":
+      return (
+        <div className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl p-4 shadow">
+          <div className="flex items-center gap-2">
+            <Icon name="megaphone" className="w-5 h-5" />
+            <span className="font-semibold">{item.text}</span>
+          </div>
+        </div>
+      );
+    case "notice":
+      return (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+          <Icon name="bell" className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+          <span className="text-amber-800 text-sm">{item.message}</span>
+        </div>
+      );
+    case "counter":
+      return (
+        <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
+          <span className="text-gray-500">{item.label}</span>
+          <span className="text-2xl font-bold text-gray-800 tabular-nums">
+            {item.value.toLocaleString()}
+          </span>
+        </div>
+      );
+    default:
+      return null;
+  }
+}
+
+export default function Demo({
+  title = "配置类型演示",
+  count = 10,
+  showPanel = true,
+  size = "medium",
+  bgColor = "#3B82F6",
+  logo = "",
+  sortOrder = "asc",
+  position = "center",
+  modules = [],
+}: DemoProps) {
+  const sz = SIZE_MAP[size];
+  const sortedModules = sortOrder === "desc" ? [...modules].reverse() : modules;
+
+  return (
+    <div className="min-h-screen bg-gray-50" style={{ backgroundColor: bgColor + "0D" }}>
+      {/* Header */}
+      <div
+        className="px-5 pt-10 pb-6 text-white"
+        style={{ backgroundColor: bgColor }}
+      >
+        <div className="flex items-center gap-3 mb-2">
+          {logo ? (
+            <img
+              src={logo}
+              alt="Logo"
+              className="w-10 h-10 rounded-lg object-cover bg-white/20"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center">
+              <Icon name="layers" className="w-5 h-5" />
+            </div>
+          )}
+          <h1 className={`font-bold ${sz.text} tracking-tight`}>{title}</h1>
+        </div>
+
+        {/* Count + Size badge */}
+        <div className="flex items-center gap-2 mt-3">
+          <span className={`bg-white/20 rounded-full ${sz.badge} font-medium`}>
+            {SIZE_MAP[size].text === "text-sm" ? "小" : SIZE_MAP[size].text === "text-base" ? "中" : "大"}号尺寸
+          </span>
+          <span className={`bg-white/20 rounded-full ${sz.badge} font-mono`}>
+            数量: {count}
+          </span>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="px-4 py-5 space-y-4">
+        {/* Conditional Panel */}
+        {showPanel && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: bgColor }}
+              />
+              <span className={`font-semibold text-gray-800 ${sz.text}`}>
+                Boolean 控制面板
+              </span>
+            </div>
+            <p className="text-gray-500 text-sm">
+              当 <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">showPanel</code> 为
+              <span className="text-green-600 font-medium"> true</span> 时显示此面板
+            </p>
+
+            {/* Size Demo Block */}
+            <div className="mt-3 flex items-center gap-3">
+              <div
+                className={`rounded-lg flex items-center justify-center transition-all ${
+                  size === "small"
+                    ? "w-16 h-16 text-xs"
+                    : size === "medium"
+                      ? "w-20 h-20 text-sm"
+                      : "w-24 h-24 text-base"
+                }`}
+                style={{ backgroundColor: bgColor + "20", color: bgColor }}
+              >
+                <Icon name="box" className={`w-${sz.icon / 4} h-${sz.icon / 4}`} />
+              </div>
+              <div className="text-sm text-gray-500">
+                <p>Enum 枚举：尺寸 = <strong>{size}</strong></p>
+                <p>Number 数值：count = <strong>{count}</strong></p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Position Demo */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Icon name="align-left" className="w-4 h-4 text-gray-400" />
+            <span className={`font-semibold text-gray-800 ${sz.text}`}>
+              Enum · 位置对齐
+            </span>
+          </div>
+          <div
+            className="p-4 bg-gray-50 rounded-xl transition-all"
+            style={{ textAlign: position }}
+          >
+            <span className="text-gray-600">
+              position = <strong>{position}</strong>（{position === "left" ? "居左" : position === "center" ? "居中" : "居右"}）
+            </span>
+          </div>
+        </div>
+
+        {/* Sort Order Indicator */}
+        <div className="flex items-center gap-2 px-1">
+          <Icon name="arrow-up-down" className="w-4 h-4 text-gray-400" />
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+            Enum · 排序方向：{sortOrder === "asc" ? "升序 ↑" : "降序 ↓"}
+          </span>
+        </div>
+
+        {sortedModules.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-3 px-1">
+              <Icon name="package" className="w-4 h-4 text-gray-400" />
+              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                Array · oneOf 模块列表
+              </span>
+            </div>
+            <div className="space-y-3">
+              {sortedModules.map((item, i) => (
+                <ModuleRenderer key={i} item={item} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Config Type Summary */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Icon name="list" className="w-4 h-4 text-gray-400" />
+            <span className={`font-semibold text-gray-800 ${sz.text}`}>
+              配置类型一览
+            </span>
+          </div>
+          <div className="space-y-2 text-sm">
+            {[
+              { label: "string", value: title, color: "text-blue-600" },
+              { label: "number", value: String(count), color: "text-emerald-600" },
+              { label: "boolean", value: String(showPanel), color: "text-violet-600" },
+              { label: "enum", value: size, color: "text-amber-600" },
+              { label: "color", value: bgColor, color: "text-rose-600" },
+              { label: "image", value: logo || "（未设置）", color: "text-cyan-600" },
+              { label: "enum (order)", value: sortOrder === "asc" ? "升序" : "降序", color: "text-orange-600" },
+              { label: "enum (position)", value: position, color: "text-teal-600" },
+              { label: "array · oneOf", value: `${modules.length} 个模块 (可拖拽排序)`, color: "text-pink-600" },
+            ].map((row) => (
+              <div key={row.label} className="flex items-center justify-between">
+                <span className={`font-mono text-xs ${row.color} bg-gray-50 px-2 py-0.5 rounded`}>
+                  {row.label}
+                </span>
+                <span className="text-gray-700 truncate max-w-[180px] text-right">
+                  {row.label === "color" ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <span
+                        className="w-3.5 h-3.5 rounded border border-gray-200 inline-block"
+                        style={{ backgroundColor: bgColor }}
+                      />
+                      {bgColor}
+                    </span>
+                  ) : (
+                    row.value
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Color Bar */}
+        <div className="h-2 rounded-full" style={{ backgroundColor: bgColor }} />
+      </div>
+    </div>
+  );
+}

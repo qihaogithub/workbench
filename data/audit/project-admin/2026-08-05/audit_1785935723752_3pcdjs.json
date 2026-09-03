@@ -1,0 +1,20 @@
+{
+  "auditId": "audit_1785935723752_3pcdjs",
+  "at": 1785935723752,
+  "actor": {
+    "id": "jojo",
+    "name": "jojo",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L1",
+  "tool": "page_create",
+  "projectId": "proj_1785934852171_oire9m",
+  "resourceId": "demo_1785935720859_01of",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "page:demo_1785935720859_01of"
+    ]
+  }
+}

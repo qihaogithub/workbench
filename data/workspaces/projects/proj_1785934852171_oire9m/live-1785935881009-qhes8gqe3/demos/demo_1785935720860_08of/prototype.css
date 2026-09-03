@@ -1,0 +1,25 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+
+.pp-slide { position: relative; width: 100vw; height: 100vh; aspect-ratio: 16/9; overflow: hidden; background: linear-gradient(135deg, #0a0e1a 0%, #0d1220 45%, #141a2e 100%); color: #e6ecff; display: flex; flex-direction: column; padding: 40px 64px; }
+
+.bg-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(120,140,200,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(120,140,200,.06) 1px, transparent 1px); background-size: 40px 40px; mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%); pointer-events: none; }
+.bg-glow { position: absolute; border-radius: 50%; filter: blur(90px); opacity: .5; pointer-events: none; }
+.glow-a { width: 420px; height: 420px; background: #22d3ee; top: -120px; left: -60px; opacity: .22; }
+.glow-b { width: 400px; height: 400px; background: #a78bfa; bottom: -140px; right: -80px; opacity: .22; }
+
+.slide-head { position: relative; margin-bottom: 30px; }
+.kicker { font-size: 14px; letter-spacing: 3px; color: #a5b4fc; margin-bottom: 8px; font-weight: 600; }
+.slide-title { font-size: 36px; font-weight: 800; line-height: 1.25; }
+
+.compare-grid { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; flex: 1; }
+.compare-panel { border-radius: 18px; padding: 22px 26px; }
+.compare-panel.bad { background: rgba(148, 163, 184, 0.07); border: 1px solid rgba(148, 163, 184, 0.25); }
+.compare-panel.good { background: rgba(165, 180, 252, 0.07); border: 1px solid rgba(165, 180, 252, 0.4); }
+.panel-title { font-size: 19px; font-weight: 700; margin-bottom: 16px; }
+.panel-title.bad { color: #9fb0d0; }
+.panel-title.good { color: #c7d2fe; }
+.panel-item { font-size: 16px; color: #dbe4ff; line-height: 1.6; padding-left: 14px; border-left: 2px solid rgba(148, 163, 255, 0.3); margin-bottom: 12px; }
+.compare-panel.good .panel-item { border-left-color: rgba(165, 180, 252, 0.6); }
+
+.bottom-note { position: relative; margin-top: 24px; text-align: center; font-size: 17px; font-weight: 600; color: #dbe4ff; background: rgba(165, 180, 252, 0.1); border: 1px solid rgba(165, 180, 252, 0.35); border-radius: 14px; padding: 16px 22px; }

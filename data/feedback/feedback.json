@@ -1,0 +1,126 @@
+{
+  "items": [
+    {
+      "id": "fb_msfz8cj1_gvu5ln",
+      "category": "bug",
+      "severity": "medium",
+      "tags": [
+        "预览",
+        "分享"
+      ],
+      "title": "预览分享弹窗复制按钮显示已复制但剪贴板无内容",
+      "content": "用户在创作端预览页面点击「分享」打开弹窗后，点击复制按钮界面显示「已复制」，但实际粘贴时剪贴板中没有内容。",
+      "report": {
+        "background": "用户在创作端预览「完课活动」页面时，点击预览工具栏的分享按钮，打开分享弹窗后点击复制按钮。",
+        "symptom": "复制按钮点击后显示「已复制」成功状态，但随后粘贴时发现剪贴板为空，分享链接未复制成功。",
+        "expected": "点击复制按钮后，分享链接应真实写入系统剪贴板，粘贴可获得链接。",
+        "stepsToReproduce": "1. 打开任一活动页面预览；2. 点击预览区的分享按钮；3. 在弹窗中点击复制按钮；4. 界面提示「已复制」；5. 在任意输入框粘贴，发现内容为空。",
+        "aiAssessment": "已核查当前页面源码 demos/course-complete_a7k3/index.tsx，页面内没有分享按钮或弹窗，确认该分享弹窗属于平台层预览 UI（PreviewPanel 分享功能）而非页面代码。现象符合沙箱 iframe 剪贴板权限缺失的特征：iframe 缺少 clipboard-write 权限策略或运行环境非安全上下文（如 http），navigator.clipboard.writeText() 被拒绝，而复制成功状态的代码未正确校验写入结果（或 fallback execCommand('copy') 失败仍置为成功），导致界面显示已复制但剪贴板为空。",
+        "diagnosticClues": [
+          "页面源码无分享弹窗，判定为平台层 UI 问题",
+          "成功提示与真实剪贴板写入不一致，符合权限策略拦截但状态未回退的特征",
+          "疑似 navigator.clipboard.writeText 在 iframe 沙箱中缺少 clipboard-write allow 权限或非安全上下文不可用"
+        ]
+      },
+      "author": {
+        "id": "agent",
+        "name": "AI 助手",
+        "isAnonymous": false,
+        "isAgent": true,
+        "contact": "jojo"
+      },
+      "channel": "chat",
+      "source": "author-site",
+      "status": "open",
+      "context": {
+        "projectId": "proj_1784874964275_p0k4ho",
+        "sessionId": "session-1785913347390-hg4p6pmwq"
+      },
+      "createdAt": 1785927684205,
+      "updatedAt": 1785927684205,
+      "history": []
+    },
+    {
+      "id": "fb_msgxkfee_w3cvh6",
+      "category": "bug",
+      "severity": "medium",
+      "tags": [
+        "预览",
+        "保存",
+        "AI行为"
+      ],
+      "title": "原型页 config.schema.json 编辑被错误同步到其他页面，导致 pad 页面尺寸被改",
+      "content": "用户报告「pad 页面尺寸被改了」。排查发现：编辑手机页（demos/page_y0ms/config.schema.json）时，内容被错误写入/同步到了 pad 页（demos/pad_1uhj/config.schema.json），导致 pad 页面预览尺寸从 860×720 变为手机尺寸 375×812。",
+      "report": {
+        "background": "用户通过右侧属性面板把手机页主推区两张图片设为页面级配置项，AI 按指示编辑手机页 demos/page_y0ms/config.schema.json（新增 previewSize 375×812 与 phoneBackground/phoneForeground 字段）",
+        "symptom": "编辑完成后，读取 demos/pad_1uhj/config.schema.json 发现其内容与手机页完全相同（含 $demo.previewSize 375×812 和 phoneBackground/phoneForeground），pad 页面预览尺寸显示为手机尺寸 375×812",
+        "expected": "编辑 page_y0ms 的配置不应影响 pad_1uhj；pad 页面应保持 860×720",
+        "stepsToReproduce": "1. 编辑 demos/page_y0ms/config.schema.json；2. 读取 demos/pad_1uhj/config.schema.json，可见手机页配置内容",
+        "aiAssessment": "editFile 目标路径明确为 demos/page_y0ms/config.schema.json 且返回成功，但 pad_1uhj/config.schema.json 出现了完全相同的手机页内容；随后用 writeFile 将 pad_1uhj 修复为 860×720 空配置后，page_y0ms 的配置未受影响，证明两文件在文件系统层面独立，编辑阶段发生了跨页面写回/同步异常",
+        "diagnosticClues": [
+          "readFile demos/pad_1uhj/config.schema.json 显示 phoneBackground/phoneForeground + previewSize 375×812（与手机页一致）",
+          "readFile demos/page_y0ms/config.schema.json 亦为相同手机页内容",
+          "writeFile 修复 pad_1uhj（860×720 空配置）后，readFile page_y0ms 仍保持手机配置，两文件独立"
+        ]
+      },
+      "author": {
+        "id": "agent",
+        "name": "AI 助手",
+        "isAnonymous": false,
+        "isAgent": true
+      },
+      "channel": "chat",
+      "source": "author-site",
+      "status": "open",
+      "context": {
+        "projectId": "proj_1785984571939_9uj8av",
+        "sessionId": "session-1785984572229-28bu006xv"
+      },
+      "createdAt": 1785985354742,
+      "updatedAt": 1785985354742,
+      "history": []
+    },
+    {
+      "id": "fb_mtgz23kp_rg1125",
+      "category": "bug",
+      "severity": "medium",
+      "tags": [
+        "配置",
+        "上传",
+        "预览"
+      ],
+      "title": "配置面板将 format:\"video\" 视频字段渲染为 Spine 素材包上传控件",
+      "content": "页面「闯关开场引入-视频」(page_swfq) 的开场引入视频配置项，schema 使用标准视频字段定义（type: object + format: \"video\"，仅支持 MP4/WebM），但右侧配置面板将其渲染为「上传 Spine 素材包」的上传控件，而非 MP4 视频上传控件，导致用户无法按预期上传 MP4 视频文件。",
+      "report": {
+        "background": "用户要求把开场引入视频改为一个可配置项。已按规范将原型页升级为 high-fidelity-react，并在 config.schema.json 新增 video 字段。",
+        "symptom": "配置面板中 video 字段显示为 Spine 素材包上传控件，而不是 MP4 视频上传控件。",
+        "expected": "配置面板应识别 format: \"video\" 并渲染 MP4/WebM 视频上传控件，允许用户上传 MP4 视频文件。",
+        "stepsToReproduce": "1. 新建/升级 React 页 2. 在 config.schema.json 定义 video: {type: object, format: video, default: {}} 3. 打开该页配置面板，观察 video 字段控件类型。",
+        "aiAssessment": "schema 严格遵循平台规范（type: object + format: video + default {}），页面 runtimeType 已正确设为 high-fidelity-react，index.tsx 正确消费 video.url。schema 正确、运行时正确，但面板控件识别错误，属于配置面板对 video 格式的控件映射异常。",
+        "diagnosticClues": [
+          "page_swfq/config.schema.json 中 video 字段为 type:object + format:video + default:{}，符合规范",
+          "无 project.config.schema.json，无项目级同名字段冲突",
+          "workspace-tree.json 中 page_swfq runtimeType=high-fidelity-react",
+          "index.tsx 已用 video?.url 渲染 <video> 标签，消费方式正确",
+          "无控制台 error 日志"
+        ]
+      },
+      "author": {
+        "id": "agent",
+        "name": "AI 助手",
+        "isAnonymous": false,
+        "isAgent": true
+      },
+      "channel": "chat",
+      "source": "author-site",
+      "status": "open",
+      "context": {
+        "projectId": "proj_1785135808250_r4cb4a",
+        "sessionId": "session-1788161314637-hlinc1wgv"
+      },
+      "createdAt": 1788164641177,
+      "updatedAt": 1788164641177,
+      "history": []
+    }
+  ]
+}

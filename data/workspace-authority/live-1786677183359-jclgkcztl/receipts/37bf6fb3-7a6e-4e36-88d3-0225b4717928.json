@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "37bf6fb3-7a6e-4e36-88d3-0225b4717928",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 181,
+  "rootHash": "22221945cbd59a42ab68adf9d6c404be7e0ad43479fd1736742328d5270139c4",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/拍摄前动画_e39bf7/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "b6b0b597e6fd5499994ca755a422da7d729f981543d44a315e5540501b657e3d"
+    },
+    {
+      "path": "demos/拍摄前动画_e39bf7/prototype.css",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/拍摄前动画_e39bf7/prototype.meta.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "c8ff789088a244de5f3aeec94c77db2c953ba0e62122a274a9bbfe2989b7ab87"
+    },
+    {
+      "path": "demos/拍摄前动画_e39bf7/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "fa1892b60b1893afc883d135d1fa2973a67415ecc1ba459bc6059e74de025c4f"
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "c283f38357dc6f4273ceaa68068d939ea8aea0c369027356270e20f467549c2f",
+      "afterHash": "5edc8cc917c1f9950600f9e4a4f8ad73183fde84369eb446f0a1e66946871190"
+    }
+  ],
+  "committedAt": 1787805941350
+}

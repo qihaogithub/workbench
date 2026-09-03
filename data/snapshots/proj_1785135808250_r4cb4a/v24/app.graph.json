@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "entry": "page-2",
+  "pages": {
+    "page-2": {
+      "pageId": "page_da9l",
+      "title": "排行榜"
+    },
+    "page-3": {
+      "pageId": "page_g5wy",
+      "title": "完读任务"
+    },
+    "page-4": {
+      "pageId": "page_j2zv",
+      "title": "完读任务-已完成"
+    },
+    "page": {
+      "pageId": "page_yw72",
+      "title": "闯关开场"
+    },
+    "page-5": {
+      "pageId": "page_xix9",
+      "title": "闯关通关动画"
+    },
+    "page-6": {
+      "pageId": "page_pqyt",
+      "title": "闯关活动"
+    }
+  },
+  "actions": [],
+  "state": {}
+}

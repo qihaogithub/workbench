@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "projectId": "proj_1788141806566_0aps89",
+  "updatedAt": 1788152980510,
+  "state": {
+    "viewport": {
+      "x": 102.1614610329984,
+      "y": 219.66939040227115,
+      "zoom": 0.22150717316650628
+    },
+    "pages": {
+      "page_sw8g": {
+        "x": 915.4538829202668,
+        "y": -8.881784197001252e-16,
+        "width": 750,
+        "height": 375,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "750x375"
+      },
+      "page_9z9z": {
+        "x": 1729.798622391551,
+        "y": 0,
+        "width": 750,
+        "height": 375,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "750x375"
+      },
+      "page_t7cj": {
+        "x": 2665.616363959398,
+        "y": -2.9999999999999907,
+        "width": 818,
+        "height": 378,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "818x378"
+      },
+      "clipboard-import_e05e9d": {
+        "x": -307.59431810388764,
+        "y": -7.671558013087633,
+        "width": 680.3049920232669,
+        "height": 382.67155801308763,
+        "sizeMode": "custom",
+        "previewSizeKey": "1920x1080"
+      }
+    },
+    "pageGroups": {},
+    "sections": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

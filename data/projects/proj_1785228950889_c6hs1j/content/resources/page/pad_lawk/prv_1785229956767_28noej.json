@@ -1,0 +1,42 @@
+{
+  "id": "prv_1785229956767_28noej",
+  "projectId": "proj_1785228950889_c6hs1j",
+  "kind": "page",
+  "resourceId": "pad_lawk",
+  "workspaceId": "live-1785228952059-e70ctz1pw",
+  "workspaceRevision": 22,
+  "workspaceRootHash": "acec361258681c2eca367d33d72018497d611d865193a9997227a83c6021617d",
+  "contentHash": "e43e47c05ff002db29c233c1b9aba0ad7e568fc4a07016308b719a361bbf51a3",
+  "blobRefs": [
+    "8243f0af367f188a376f2c17b5eabe872a2f7a979813e0d4e2be6d594c2aa259",
+    "9279334d8bddc21bc64301cba7b30c6b43c12efd4494cb6ad1792120605b8244",
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "e0704621ae9a9bd02cf4fff963136c396dcd605596ca9d8e1d9058d24fbf34a9"
+  ],
+  "metadata": {
+    "page": {
+      "id": "pad_lawk",
+      "name": "明星赛pad",
+      "routeKey": "pad-2",
+      "order": 2,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    "files": {
+      "schema": "8243f0af367f188a376f2c17b5eabe872a2f7a979813e0d4e2be6d594c2aa259",
+      "prototypeHtml": "9279334d8bddc21bc64301cba7b30c6b43c12efd4494cb6ad1792120605b8244",
+      "prototypeCss": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "prototypeMeta": "e0704621ae9a9bd02cf4fff963136c396dcd605596ca9d8e1d9058d24fbf34a9"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1785229956768,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录明星赛pad"
+}

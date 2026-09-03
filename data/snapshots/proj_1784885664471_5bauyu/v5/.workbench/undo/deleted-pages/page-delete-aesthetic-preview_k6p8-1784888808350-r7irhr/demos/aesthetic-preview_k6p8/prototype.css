@@ -1,0 +1,475 @@
+/* ============================================
+   美育·头图预览 — 手机 + Pad 双端预览样式
+   主色：#E85D9A（粉玫色系）
+   ============================================ */
+
+/* ---------- 基础 ---------- */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  background: #f5f0f3;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.page-wrapper {
+  text-align: center;
+  padding: 32px 20px 48px;
+}
+
+/* ---------- 页面标题 ---------- */
+.page-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 36px;
+  letter-spacing: 2px;
+}
+
+/* ---------- 预览容器 ---------- */
+.preview-container {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 60px;
+  flex-wrap: wrap;
+}
+
+/* ---------- 设备包装 ---------- */
+.device-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.device-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: #8c7380;
+  letter-spacing: 1px;
+}
+
+/* ========================================
+   手机端
+   ======================================== */
+
+.phone-device {
+  width: 375px;
+  height: 812px;
+  background: #fff;
+  border-radius: 44px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 3px #1a1a1a,
+    0 0 0 6px #2d2d2d,
+    0 20px 50px rgba(0, 0, 0, 0.25);
+  transform: scale(0.7);
+  transform-origin: top center;
+  position: relative;
+}
+
+/* 状态栏 */
+.phone-status-bar {
+  height: 48px;
+  background: #fff;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 28px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a1a;
+  position: relative;
+  z-index: 10;
+}
+
+.phone-notch {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 140px;
+  height: 30px;
+  background: #1a1a1a;
+  border-radius: 0 0 20px 20px;
+}
+
+.phone-icons {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.icon-signal::after {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 10px;
+  background: linear-gradient(to right,
+    #1a1a1a 0%, #1a1a1a 20%,
+    transparent 20%, transparent 35%,
+    #1a1a1a 35%, #1a1a1a 55%,
+    transparent 55%, transparent 70%,
+    #1a1a1a 70%, #1a1a1a 90%,
+    transparent 90%
+  );
+  border-radius: 1px;
+}
+
+.icon-wifi::after {
+  content: "";
+  display: inline-block;
+  width: 13px;
+  height: 10px;
+  background: radial-gradient(circle at 50% 80%, transparent 30%, #1a1a1a 30%, #1a1a1a 42%, transparent 42%),
+    radial-gradient(circle at 50% 55%, transparent 30%, #1a1a1a 30%, #1a1a1a 42%, transparent 42%),
+    radial-gradient(circle at 50% 30%, transparent 30%, #1a1a1a 30%, #1a1a1a 42%, transparent 42%);
+}
+
+.icon-battery::after {
+  content: "";
+  display: inline-block;
+  width: 22px;
+  height: 10px;
+  border: 1.5px solid #1a1a1a;
+  border-radius: 2px;
+  padding: 1px;
+  background: linear-gradient(to right, #1a1a1a 70%, transparent 70%);
+  background-clip: content-box;
+}
+
+/* 头图区域 270px */
+.phone-header-area {
+  width: 100%;
+  height: 270px;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #fce4ec, #f8bbd0);
+}
+
+/* 占位提示 */
+.header-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(232, 93, 154, 0.06);
+  border: 2px dashed #e85d9a;
+  border-radius: 4px;
+  margin: 12px;
+  z-index: 0;
+}
+
+.placeholder-icon {
+  font-size: 32px;
+  opacity: 0.6;
+}
+
+.placeholder-text {
+  font-size: 14px;
+  color: #e85d9a;
+  font-weight: 500;
+  letter-spacing: 1px;
+  opacity: 0.8;
+}
+
+/* 头图 img（覆盖在占位提示上方） */
+.header-bg-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
+}
+
+/* 无图片时隐藏 img，露出占位提示 */
+.header-bg-img[src=""],
+.header-bg-img:not([src]) {
+  display: none;
+}
+
+/* 模拟内容区 */
+.phone-content {
+  padding: 20px 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.content-card {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #fafafa;
+  border-radius: 12px;
+  align-items: center;
+}
+
+.card-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f8bbd0, #f48fb1);
+  flex-shrink: 0;
+}
+
+.card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card-line {
+  height: 8px;
+  border-radius: 4px;
+  background: #e0d6db;
+}
+
+.card-line-short {
+  width: 40%;
+}
+
+.card-line-medium {
+  width: 65%;
+}
+
+.card-line-long {
+  width: 90%;
+}
+
+/* ========================================
+   Pad 端
+   ======================================== */
+
+.pad-device {
+  width: 1366px;
+  height: 744px;
+  background: #f0f2f5;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 3px #2a2a2a,
+    0 0 0 7px #3a3a3a,
+    0 25px 60px rgba(0, 0, 0, 0.3);
+  transform: scale(0.6);
+  transform-origin: top center;
+  position: relative;
+}
+
+/* ---------- 底层 UI ---------- */
+.pad-bottom-ui {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  z-index: 1;
+}
+
+/* 侧边栏 */
+.pad-sidebar {
+  width: 80px;
+  background: #2c2c2e;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding-top: 90px;
+  flex-shrink: 0;
+}
+
+.sidebar-item {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-active {
+  background: #e85d9a;
+}
+
+/* 主内容区 */
+.pad-main-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.pad-top-controls {
+  height: 40px;
+  background: #fafafa;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.ctrl-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+}
+
+.ctrl-red {
+  background: #ff5f57;
+}
+
+.ctrl-yellow {
+  background: #ffbd2e;
+}
+
+.ctrl-green {
+  background: #28c840;
+}
+
+.pad-content-body {
+  flex: 1;
+  padding: 220px 28px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow: hidden;
+}
+
+.pad-content-row {
+  display: flex;
+  gap: 20px;
+}
+
+.pad-card {
+  flex: 1;
+  height: 110px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.pad-card-wide {
+  flex: 2;
+}
+
+/* ---------- 中层：头图区域 ---------- */
+.pad-header-area {
+  position: absolute;
+  top: 40px;
+  left: 80px;
+  right: 0;
+  height: 180px;
+  z-index: 2;
+  overflow: hidden;
+  background: linear-gradient(135deg, #fce4ec, #f8bbd0);
+}
+
+/* 占位提示 */
+.pad-header-area .header-placeholder {
+  margin: 10px;
+}
+
+/* 头图 img */
+.pad-header-area .header-bg-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
+}
+
+.pad-header-area .header-bg-img[src=""],
+.pad-header-area .header-bg-img:not([src]) {
+  display: none;
+}
+
+/* ---------- 上层 UI 覆盖 ---------- */
+.pad-top-ui {
+  position: absolute;
+  top: 0;
+  left: 80px;
+  right: 0;
+  z-index: 3;
+}
+
+/* 导航栏 */
+.pad-nav-bar {
+  height: 40px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.nav-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+}
+
+.nav-dot-red {
+  background: #ff5f57;
+}
+
+.nav-dot-yellow {
+  background: #ffbd2e;
+}
+
+.nav-dot-green {
+  background: #28c840;
+}
+
+.nav-title {
+  flex: 1;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+  letter-spacing: 1px;
+}
+
+.nav-search {
+  font-size: 14px;
+  opacity: 0.6;
+}
+
+/* 标签栏 */
+.pad-tab-bar {
+  display: flex;
+  gap: 32px;
+  padding: 14px 28px;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.tab {
+  font-size: 16px;
+  color: #999;
+  font-weight: 500;
+  cursor: default;
+  padding-bottom: 4px;
+  border-bottom: 2px solid transparent;
+}
+
+.tab-active {
+  color: #e85d9a;
+  border-bottom-color: #e85d9a;
+}

@@ -1,0 +1,25 @@
+{
+  "committed": true,
+  "mutationId": "30c4c255-16b5-4af5-9b39-464d8119aad3",
+  "projectId": "proj_1786594289063_qqgwvd",
+  "workspaceId": "live-1786594289082-8th7y2fs0",
+  "baseRevision": 0,
+  "revision": 5,
+  "rootHash": "3f65daf45411d75393e8fb2c5e8f384e2bb6cbd2bc1da41b7a68fc0e9264ba27",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/2_zaga/index.tsx",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "68f9b1f156f2ed1b648d9a7984e4cfb7466587aebda0021466a54a6c0592263b"
+    },
+    {
+      "path": "demos/2_zaga/config.schema.json",
+      "action": "modified",
+      "beforeHash": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+      "afterHash": "b9e998e9736581dafd6e87bb1e8ae08e0c852be55afc0bb5277ef9589da54463"
+    }
+  ],
+  "committedAt": 1786594289659
+}

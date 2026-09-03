@@ -1,0 +1,12 @@
+{
+  "planId": "plan_1786594164595_ikk87j",
+  "operation": "project_delete",
+  "resourceId": "proj_1786594155691_z30u7e",
+  "impact": [
+    "删除项目 E2E:20260813T040743016Z-fifj2u:Yjs-First无冲突",
+    "删除 1 个页面",
+    "删除项目工作空间和元数据"
+  ],
+  "reversible": true,
+  "confirmToken": "confirm_1786594164595_8uhdzk"
+}

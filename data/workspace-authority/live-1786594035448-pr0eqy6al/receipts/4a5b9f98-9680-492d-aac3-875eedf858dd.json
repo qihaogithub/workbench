@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "4a5b9f98-9680-492d-aac3-875eedf858dd",
+  "projectId": "proj_1786594035427_wbtem8",
+  "workspaceId": "live-1786594035448-pr0eqy6al",
+  "baseRevision": 0,
+  "revision": 7,
+  "rootHash": "fa81dfbe9f6c668eff9280de41f45b2a56280f5411b00211e901e38b9b985928",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_ynl8/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355"
+    },
+    {
+      "path": "demos/page_ynl8/prototype.css",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/page_ynl8/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f"
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "e5c54cb5f38817ba7e0be4ffbf1da1ca465fe4079d5d36f1ce2c10f108a9af7c",
+      "afterHash": "56e9853adc6acce3cdca876ef972acf3ef1d0d57548298a60e4a4c2f7d149b29"
+    }
+  ],
+  "committedAt": 1786594048089
+}

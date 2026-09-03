@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "projectId": "proj_1785685022249_aevplm",
+  "updatedAt": 1785685336740,
+  "state": {
+    "viewport": {
+      "x": 446.5715144230769,
+      "y": 41.80000000000001,
+      "zoom": 0.45216346153846154
+    },
+    "pages": {},
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "hiddenKnowledgeDocumentIds": [],
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    }
+  }
+}

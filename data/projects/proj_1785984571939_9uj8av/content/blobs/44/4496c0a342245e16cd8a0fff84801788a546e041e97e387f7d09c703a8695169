@@ -1,0 +1,48 @@
+{
+  "type": "object",
+  "$demo": {
+    "previewSize": {
+      "width": 375,
+      "height": 812
+    },
+    "groupOrder": ["头部banner", "配图卡片-1行1个"]
+  },
+  "properties": {
+    "adImage": {
+      "type": "string",
+      "title": "广告图",
+      "format": "image",
+      "default": "/api/images/img_iCbilU1Lf0lJCQ",
+      "ui:options": {
+        "group": "配图卡片-1行1个"
+      }
+    },
+    "phoneBackground": {
+      "type": "string",
+      "title": "手机背景图",
+      "format": "image",
+      "default": "/api/images/img_ZO_cMaoYgouRfA",
+      "ui:options": {
+        "group": "头部banner",
+        "widthOperator": "=",
+        "widthValue": 375,
+        "heightOperator": "=",
+        "heightValue": 380
+      }
+    },
+    "phoneForeground": {
+      "type": "string",
+      "title": "手机前景图",
+      "format": "image",
+      "default": "/api/images/img_f9y1nONlI30sBg",
+      "ui:options": {
+        "group": "头部banner",
+        "widthOperator": "=",
+        "widthValue": 340,
+        "heightOperator": "=",
+        "heightValue": 190
+      }
+    }
+  },
+  "required": []
+}

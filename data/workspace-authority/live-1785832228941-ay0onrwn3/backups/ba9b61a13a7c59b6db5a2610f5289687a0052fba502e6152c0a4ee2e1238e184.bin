@@ -1,0 +1,20 @@
+{
+  "id": "ds_1786510243183_3g1m6o",
+  "title": "设计规范 1",
+  "createdAt": "2026-08-12T04:50:43.183Z",
+  "updatedAt": "2026-08-12T04:50:46.658Z",
+  "entries": [
+    {
+      "id": "e_1786510245838_famk1a",
+      "title": "标题 (string)",
+      "markdown": "",
+      "refs": [
+        {
+          "scope": "page",
+          "pageId": "config-demo_m7p2",
+          "fieldKey": "title"
+        }
+      ]
+    }
+  ]
+}

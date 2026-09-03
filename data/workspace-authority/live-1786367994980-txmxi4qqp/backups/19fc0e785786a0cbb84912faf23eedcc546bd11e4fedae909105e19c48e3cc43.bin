@@ -1,0 +1,22 @@
+{
+  "id": "ds_1786523594506_63db2ecc",
+  "title": "平板设计规范",
+  "createdAt": "2026-08-12T08:33:14.506Z",
+  "updatedAt": "2026-08-12T08:33:14.506Z",
+  "entries": [
+    {
+      "id": "e_1786523594506_5d02f4d4",
+      "title": "主视觉图片",
+      "markdown": "",
+      "refs": [
+        {
+          "scope": "page",
+          "pageId": "page_yvbe",
+          "fieldKey": "heroImage"
+        }
+      ],
+      "autoManagedFieldKey": "heroImage"
+    }
+  ],
+  "autoManagedPageId": "page_yvbe"
+}

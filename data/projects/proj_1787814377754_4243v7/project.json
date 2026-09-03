@@ -1,0 +1,80 @@
+{
+  "id": "proj_1787814377754_4243v7",
+  "name": "趣味拍工具",
+  "projectType": "standard",
+  "category": "营销活动",
+  "workspacePath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/projects/proj_1787814377754_4243v7/workspace",
+  "demoPages": [
+    {
+      "id": "clipboard-import_c6b554",
+      "name": "clipboard-import",
+      "routeKey": "clipboard-import",
+      "order": 0,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    }
+  ],
+  "demoFolders": [],
+  "versions": [
+    {
+      "versionId": "v1",
+      "type": "auto_checkpoint",
+      "savedAt": 1787814808952,
+      "savedBy": "qihao",
+      "sessionId": "session-1787814378230-uypfa88yz",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1787814377754_4243v7/v1",
+      "fileCount": 9,
+      "workspaceId": "live-1787814378221-9l0h1v70v",
+      "workspaceRevision": 10,
+      "workspaceRootHash": "ec4adb56e5cb68240784fa37b04decf3ac6f5f23cc77ab7c4f99650186fe5cfe",
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v2",
+      "type": "auto_checkpoint",
+      "savedAt": 1787816205940,
+      "savedBy": "qihao",
+      "sessionId": "session-1787814378230-uypfa88yz",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1787814377754_4243v7/v2",
+      "fileCount": 11,
+      "workspaceId": "live-1787814378221-9l0h1v70v",
+      "workspaceRevision": 33,
+      "workspaceRootHash": "283040b288bab02ca517609dc31d3a506501dc58f2b410eb3abb1a5371350fdf",
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v3",
+      "type": "auto_checkpoint",
+      "savedAt": 1787882333436,
+      "savedBy": "qihao",
+      "sessionId": "session-1787880952278-q2stdlxbe",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1787814377754_4243v7/v3",
+      "fileCount": 11,
+      "workspaceId": "live-1787814378221-9l0h1v70v",
+      "workspaceRevision": 43,
+      "workspaceRootHash": "dd3b6c531ee8e19a1213c0efeecf17ceb3aa425ab9afa4053d6f9cdfbc8da23a",
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v4",
+      "type": "auto_checkpoint",
+      "savedAt": 1787884193192,
+      "savedBy": "qihao",
+      "sessionId": "session-1787880952278-q2stdlxbe",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1787814377754_4243v7/v4",
+      "fileCount": 11,
+      "workspaceId": "live-1787814378221-9l0h1v70v",
+      "workspaceRevision": 51,
+      "workspaceRootHash": "fbd003c6b223b88d0afd219c7601732eb482f9d25aa8754eb7fd31d3bd865961",
+      "note": "停止编辑后自动保存记录"
+    }
+  ],
+  "createdAt": 1787814377756,
+  "updatedAt": 1787884193192,
+  "activeWorkspaceId": "live-1787814378221-9l0h1v70v",
+  "activeWorkspaceUpdatedAt": 1787882333443,
+  "canonicalSyncedWorkspaceId": "live-1787814378221-9l0h1v70v",
+  "canonicalSyncedRevision": 51,
+  "canonicalSyncedRootHash": "fbd003c6b223b88d0afd219c7601732eb482f9d25aa8754eb7fd31d3bd865961",
+  "canonicalSyncedAt": 1787884192889
+}

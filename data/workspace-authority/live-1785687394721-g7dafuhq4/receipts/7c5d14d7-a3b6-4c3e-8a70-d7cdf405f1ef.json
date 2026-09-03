@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "7c5d14d7-a3b6-4c3e-8a70-d7cdf405f1ef",
+  "projectId": "proj_1785687393956_aa29zz",
+  "workspaceId": "live-1785687394721-g7dafuhq4",
+  "baseRevision": 0,
+  "revision": 200,
+  "rootHash": "a42ce7202f9fe0d8a640b8cafa4d837c7ba07f82bd316fcf87dee14b34118402",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "89ce44af1f45e4f7d8d7d929893314afd505dae3f2bbda25315ac4e39ecb7675",
+      "afterHash": "5e5b8189e56f80ae29f6e22411d0e1ff7dbf42164385976bdb8dde4024cd9e42"
+    }
+  ],
+  "committedAt": 1785735901828
+}

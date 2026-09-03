@@ -1,0 +1,36 @@
+{
+  "id": "commit_1788259938527_6z0tyv",
+  "projectId": "proj_1788141806566_0aps89",
+  "parentCommitId": "commit_1788168411175_228i45",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录N对N填空题",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "clipboard-import_e05e9d",
+      "versionId": "prv_1788259938522_5kt1ye"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_9z9z",
+      "versionId": "prv_1788164049883_u2mr38"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "clipboard-import_e05e9d",
+      "fromVersionId": "prv_1788168411169_ynwlhi",
+      "toVersionId": "prv_1788259938522_5kt1ye"
+    }
+  ],
+  "createdAt": 1788259938527,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1788141807256-9xerzl5sd",
+    "workspaceRevision": 190,
+    "workspaceRootHash": "6aa5e588c07b37b8751ca1adcd4cca63e97ed3c894177bd656b19c72540c275a"
+  }
+}

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Figma Export</title>
+  <style>
+    /* Reset default margins */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    
+    /* Figma export container */
+    .figma-export {
+      background: white;
+      width: 375px;
+      height: 812px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+  </style>
+</head>
+<body>
+  <div class="figma-export">
+<div data-layer="手机" style="width: 375px; height: 812px; position: relative; background: white; overflow: hidden">
+  <div data-layer="主推区" style="width: 375px; height: 380px; left: 0px; top: 0px; position: absolute">
+    <img src="/api/images/img_LhVnl2MXkHfqgw" alt="static layer" data-layer="#static 手机背景图" data-property-1="#static 手机背景图" class="Static" style="left: 0px; top: 0px; position: absolute; width: 375px; height: 380px; object-fit: cover" data-figma-id="417:21331" />
+    <img src="https://img.onlywnn.cn/figma/h_ba94b053.png" alt="static layer" data-layer="#static 手机前景图" data-property-1="#static 手机前景图" class="Static" style="left: 17.50px; top: 144px; position: absolute; width: 340px; height: 190px; object-fit: cover" data-figma-id="417:21326" />
+    <div data-layer="Rectangle" class="Rectangle" style="width: 375px; height: 24px; left: 0px; top: 356px; position: absolute; background: white; border-top-left-radius: 24px; border-top-right-radius: 24px"></div>
+  </div>
+  <img src="/api/images/img_cn4aXR1M-13o-A" alt="static layer" data-layer="#static 信息流" class="Static" style="left: 0px; top: 380px; position: absolute; width: 375px; height: 432px; object-fit: cover" data-figma-id="417:26360" />
+  <img src="/api/images/img_gXn5MPP_MLxW3A" alt="static layer" data-layer="#static 吸底标签栏" class="Static" style="left: 0px; top: 722px; position: absolute; width: 375px; height: 90px; object-fit: cover" data-figma-id="417:23036" />
+  <img src="/api/images/img_u_hUjqiQnHuRmQ" alt="static layer" data-layer="#static 头部固定" class="Static" style="left: 0px; top: 0px; position: absolute; width: 375px; height: 132px; object-fit: cover" data-figma-id="417:13621" />
+</div>
+  </div>
+</body>
+</html>

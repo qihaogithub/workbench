@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "49d89703-c2e7-4adc-a7c4-7bad8c3e72fb",
+  "projectId": "proj_1785858256243_p2zs4y",
+  "workspaceId": "live-1785858256515-jtpzhk8rc",
+  "baseRevision": 0,
+  "revision": 32,
+  "rootHash": "22f30cf18a3607e00d09c1b2600fde6c01bea2e8cf83a399bfecc58b4926255d",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/summer-camp_k3m7/prototype.html",
+      "action": "modified",
+      "beforeHash": "ae33325c87eba4d0dacc29ef488ed0cefa45a6d083c060b6417ea15b9e7dfaea",
+      "afterHash": "bf34a8c251eb4b28e72e3a015b273b5dd6d57a88e212eb9b61c2ad36143b5faf"
+    }
+  ],
+  "committedAt": 1785922659906
+}

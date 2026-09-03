@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "projectId": "proj_1784874964275_p0k4ho",
+  "updatedAt": 1786071463826,
+  "state": {
+    "viewport": {
+      "x": 409.29531933615857,
+      "y": 504.4214016110318,
+      "zoom": 0.3946821100015158
+    },
+    "pages": {
+      "course-complete_a7k3": {
+        "x": -295.9298432882966,
+        "y": 99.53252185304828,
+        "width": 375,
+        "height": 1165,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_jzaa": {
+        "x": 504.8669894142595,
+        "y": 88.50211989306594,
+        "width": 375,
+        "height": 812,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_6xp3": {
+        "x": -295.9298432882966,
+        "y": -822.5919798351142,
+        "width": 375,
+        "height": 812,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "pad_mo43": {
+        "x": 95.32015612351368,
+        "y": -822.5919798351142,
+        "width": 1024,
+        "height": 558,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "1024x558"
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

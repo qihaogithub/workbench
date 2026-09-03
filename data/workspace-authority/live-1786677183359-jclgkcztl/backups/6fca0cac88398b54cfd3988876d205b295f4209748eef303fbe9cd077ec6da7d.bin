@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "projectId": "proj_1786367903885_iu08e4",
+  "updatedAt": 1787818512085,
+  "state": {
+    "viewport": {
+      "x": -115.98103478064934,
+      "y": 120.81216856971142,
+      "zoom": 0.5741137319711541
+    },
+    "pages": {
+      "kids-edu_b3xw": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 2471,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "clipboard-import_4d9ab0": {
+        "x": 414.0107911938892,
+        "y": 6,
+        "width": 375,
+        "height": 812,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "clipboard-import_5f6c8b": {
+        "x": 830.2109229291281,
+        "y": 6,
+        "width": 375,
+        "height": 812,
+        "zIndex": 2,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "pageGroups": {},
+    "sections": {
+      "section_80b523d1-3485-4bf1-b97f-fe9d726cdce5": {
+        "id": "section_80b523d1-3485-4bf1-b97f-fe9d726cdce5",
+        "kind": "section",
+        "title": "Section",
+        "layout": {
+          "x": 391.43311858971623,
+          "y": -45.511147643171554,
+          "width": 838.1124648385453,
+          "height": 903.0767270099891,
+          "zIndex": 3
+        },
+        "children": [
+          {
+            "kind": "page",
+            "id": "clipboard-import_4d9ab0"
+          },
+          {
+            "kind": "page",
+            "id": "clipboard-import_5f6c8b"
+          }
+        ],
+        "createdAt": 1787818511964,
+        "updatedAt": 1787818511964
+      }
+    },
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

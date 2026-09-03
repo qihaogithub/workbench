@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "828c254e-23d3-4519-a8a1-d824313fceb0",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 646,
+  "rootHash": "c9c12c7c13121fbd5a45e380c27362885a0cc768d75d7f052adbd7f77acd9831",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/halloween-map_x4k2/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "2e332b1184812ff51cf45eecd513ed54567b8eeff22f4943f244236362af97f6"
+    }
+  ],
+  "committedAt": 1787891660189
+}

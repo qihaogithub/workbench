@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "entry": "demo",
+  "pages": {
+    "demo": {
+      "pageId": "demo_1779608460501_abc123",
+      "title": "手机"
+    },
+    "demo-2": {
+      "pageId": "demo_1779608460502_def456",
+      "title": "平板"
+    }
+  },
+  "actions": [],
+  "state": {}
+}

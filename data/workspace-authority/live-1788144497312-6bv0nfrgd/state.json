@@ -1,0 +1,29 @@
+{
+  "workspaceId": "live-1788144497312-6bv0nfrgd",
+  "projectId": "proj_1788144496725_oi5vie",
+  "revision": 13,
+  "rootHash": "58a81f8b45c82dbb032a0818d0c199be4047e6904c3c678d13530d7061161297",
+  "resourceHashes": {
+    ".canvas-layout.json": "a65ddb074607b0e990bb84f5726c30b29c0c23b9df0e063d5a8d7806dc4d45ae",
+    "demos/page_6f3v/config.schema.json": "7ea65b6833c2f34bb23dfeac18201105dbe9ea74682967008de5ba733c4f2c5c",
+    "demos/page_6f3v/index.tsx": "98e010c7971991145b0641108ce28ffb99773bbdb2b9aed5085c67b99d257869",
+    "demos/page_6f3v/prototype.css": "1dedeaf138364e1e502ae6e22718150f7dc03daa5b237feffd88bbe401ccd6a7",
+    "demos/page_6f3v/prototype.html": "cb3a191179d4c3a0a3feb8c90639c1ebcdac7e301e5a93dd678514600fd9a71e",
+    "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
+    "memory.md": "b7945090d0f1593dc2a69e6d9048776c737b91b1e230d6db192faad06f96eb28",
+    "workspace-tree.json": "072c3f67cf2965b5acc98b6ad834f842763425bcf43fd99e34ee561d9051afc2"
+  },
+  "mutationPayloads": {
+    "4f948a6e-2ec0-4b6c-9970-f7f1163f230e": "1045d6976204e5fa300908c3fa25ab2abb11f4718ce8d323c914f45e6f198456",
+    "2cceade6-662f-41ca-b276-e10260cea079": "89fef7f7e681c4db82f0d3c77f4a54b304f2d1a07b4c66289278ea4a1085fb02",
+    "372922ae-6794-4409-8f90-df6309015b02": "0628c765db5a4493a11a5a718c170b2eaacc342deb6635640ab845075be45dc5",
+    "5fca82ae-7667-4fe5-9567-2bc9cc0e9098": "0d3334deda6f68dc03475ffe2699fb9de9bb42e8d2bedeaaa91d95ca5f44dd7b",
+    "c5f0f91e-43a3-4d1e-b275-dc8c326d5912": "dd80eda4a6c659dc11ae4b56d79708b40280073b4671df895be594d3fe78b5f6",
+    "87f1b2ce-624a-4feb-9615-607970ea267a": "dd6241c3edf51c6520818508a628ec0e87884cea5fca5fbed5c5dfbd7005ef78",
+    "17ab7004-90b9-4e22-bf8e-74213dd1afaf": "e7214ddbd9f28f5e1414960c6d57850f681a1ec483818b66acd0130b26a77e63",
+    "982e19a9-a84a-4be7-885b-015e4c1f33f6": "513a782ae6b111aebd11fd388cad0e2bfbb624c5519a62a86f06c0290257ec9a",
+    "8efcf117-9ad2-4b2f-87a5-ceb9ac573799": "38b14284d5b0efeeb86dac8d66f6e12a02682c42dbfc3f3c510b590594a1e7f4",
+    "c8e5d03a-411f-4f10-ab48-dbe959b7a22f": "42c83c315134f2d7b224cbfd356ea36f95d9b3e8c61bf67720cbd88a1b358c8c"
+  },
+  "updatedAt": 1788146288722
+}

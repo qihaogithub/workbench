@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1783335187886_wey1mn",
+  "at": 1783335187886,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1783335187880_t199xu",
+  "inputSummary": {
+    "name": "E2E:20260706T105248422Z-myu8ca:OpenPencil 协同冲突回归",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1783335187880_t199xu"
+    ]
+  }
+}

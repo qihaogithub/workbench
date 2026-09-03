@@ -1,0 +1,56 @@
+{
+  "id": "commit_1785321497651_c1ggeb",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "parentCommitId": "commit_1785316177704_ctlb8p",
+  "visibility": "protected",
+  "intent": "publish",
+  "title": "发布项目 v17",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "page_5rsp",
+      "versionId": "prv_1785222248758_v0zhj5"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_da9l",
+      "versionId": "prv_1785316177703_45jh4a"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_gfbs",
+      "versionId": "prv_1785136734038_5bt9sp"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_pqyt",
+      "versionId": "prv_1785205299313_c3158x"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_sgfq",
+      "versionId": "prv_1785316040405_wwt9u0"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_wcfh",
+      "versionId": "prv_1785206677053_mzslur"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_xix9",
+      "versionId": "prv_1785314149346_1nqy90"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_yw72",
+      "versionId": "prv_1785312674587_adecy4"
+    }
+  ],
+  "changedResources": [],
+  "createdAt": 1785321497651,
+  "createdBy": "Author Site",
+  "audit": {
+    "actorType": "user"
+  }
+}

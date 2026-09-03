@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1788001243179_ns45zs",
+  "at": 1788001243179,
+  "actor": {
+    "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+    "name": "qihao",
+    "role": "admin",
+    "source": "author-site"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1788001243177_iwr0t5",
+  "inputSummary": {
+    "name": "E2E:20260829T110040326Z-7jfs04:配置图片白板宿主回归",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1788001243177_iwr0t5"
+    ]
+  }
+}

@@ -1,0 +1,428 @@
+/* ============================================
+   小作家·头图预览 — 手机 + Pad 双端
+   ============================================ */
+
+/* ---------- 基础 ---------- */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  background: #f0f2f5;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 40px 20px;
+}
+
+/* ---------- 容器 ---------- */
+.preview-container {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 60px;
+  flex-wrap: wrap;
+}
+
+/* ---------- 预览组 ---------- */
+.preview-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.preview-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #86909c;
+  letter-spacing: 0.5px;
+}
+
+/* ============================================
+   手机预览
+   ============================================ */
+.phone-wrapper {
+  width: 262.5px;   /* 375 × 0.7 */
+  height: 568.4px;  /* 812 × 0.7 */
+  overflow: hidden;
+  border-radius: 24px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.08);
+  background: #fff;
+}
+
+.phone-frame {
+  width: 375px;
+  height: 812px;
+  transform: scale(0.7);
+  transform-origin: top left;
+  background: #f7f8fa;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 头图区 */
+.phone-header {
+  position: relative;
+  width: 100%;
+  height: 270px;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 50%, #a5d6a7 100%);
+}
+
+/* 占位提示 */
+.header-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 2px dashed #5cb85c;
+  border-radius: 4px;
+  margin: 16px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.placeholder-icon {
+  font-size: 32px;
+  opacity: 0.5;
+}
+
+.placeholder-text {
+  font-size: 13px;
+  color: #5cb85c;
+  font-weight: 500;
+}
+
+/* 头图图片 */
+.header-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 2;
+}
+
+/* 图片有 src 时覆盖占位 */
+.header-img[src]:not([src=""]) {
+  display: block;
+}
+
+/* 内容区 */
+.phone-content {
+  flex: 1;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+}
+
+.content-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card-title {
+  width: 40%;
+  height: 16px;
+  background: #e8e8e8;
+  border-radius: 4px;
+}
+
+.card-line {
+  width: 100%;
+  height: 10px;
+  background: #f2f2f2;
+  border-radius: 3px;
+}
+
+.card-line.short {
+  width: 60%;
+}
+
+.card-line.medium {
+  width: 80%;
+}
+
+/* ============================================
+   Pad 预览
+   ============================================ */
+.pad-wrapper {
+  width: 819.6px;   /* 1366 × 0.6 */
+  height: 446.4px;  /* 744 × 0.6 */
+  overflow: hidden;
+  border-radius: 16px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.08);
+  background: #fff;
+}
+
+.pad-frame {
+  width: 1366px;
+  height: 744px;
+  transform: scale(0.6);
+  transform-origin: top left;
+  background: #f7f8fa;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ---- 底层 UI (z: 1) ---- */
+.pad-bottom-ui {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  background: #f7f8fa;
+}
+
+.pad-status-bar {
+  height: 32px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  color: #333;
+  background: #fff;
+}
+
+.pad-nav {
+  height: 48px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+}
+
+.pad-back {
+  font-size: 18px;
+  color: #5cb85c;
+  font-weight: 500;
+}
+
+.pad-nav-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1d2129;
+}
+
+.pad-action {
+  font-size: 20px;
+  color: #86909c;
+  letter-spacing: 2px;
+}
+
+.pad-content-area {
+  flex: 1;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pad-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.pad-card-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #e8e8e8;
+  flex-shrink: 0;
+}
+
+.pad-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pad-card-line {
+  width: 100%;
+  height: 12px;
+  background: #f2f2f2;
+  border-radius: 4px;
+}
+
+.pad-card-line.wide {
+  width: 70%;
+  height: 15px;
+}
+
+.pad-card-line.short {
+  width: 45%;
+}
+
+.pad-card-line.medium {
+  width: 60%;
+}
+
+/* ---- 头图层 (z: 2) ---- */
+.pad-header-bg {
+  position: absolute;
+  top: 80px;       /* 状态栏 + 导航栏高度 */
+  left: 0;
+  right: 0;
+  height: 260px;
+  z-index: 2;
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 50%, #a5d6a7 100%);
+  overflow: hidden;
+}
+
+.pad-header-bg .header-placeholder {
+  margin: 20px;
+  border-color: #5cb85c;
+}
+
+.pad-header-bg .placeholder-text {
+  font-size: 15px;
+}
+
+.pad-header-bg .header-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 2;
+}
+
+/* ---- 上层 UI 覆盖 (z: 3) ---- */
+.pad-top-ui {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.pad-overlay-status {
+  height: 32px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.pad-overlay-nav {
+  height: 48px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pad-overlay-back {
+  font-size: 28px;
+  color: #fff;
+  font-weight: 300;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  line-height: 1;
+}
+
+.pad-overlay-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.pad-overlay-actions {
+  position: absolute;
+  top: 290px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pad-action-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+/* ============================================
+   响应式
+   ============================================ */
+@media (max-width: 1200px) {
+  .preview-container {
+    flex-direction: column;
+    align-items: center;
+    gap: 40px;
+  }
+
+  .pad-wrapper {
+    width: 546.4px;   /* 1366 × 0.4 */
+    height: 297.6px;  /* 744 × 0.4 */
+  }
+
+  .pad-frame {
+    transform: scale(0.4);
+  }
+}
+
+@media (max-width: 640px) {
+  .preview-container {
+    gap: 32px;
+    padding: 20px 0;
+  }
+
+  .phone-wrapper {
+    width: 206.25px;  /* 375 × 0.55 */
+    height: 446.6px;  /* 812 × 0.55 */
+  }
+
+  .phone-frame {
+    transform: scale(0.55);
+  }
+
+  .pad-wrapper {
+    width: 409.8px;   /* 1366 × 0.3 */
+    height: 223.2px;  /* 744 × 0.3 */
+  }
+
+  .pad-frame {
+    transform: scale(0.3);
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "content",
+      "preset": "custom",
+      "source": "user"
+    }
+  },
+  "type": "object",
+  "properties": {
+    "基础信息": {
+      "type": "object",
+      "title": "基础信息",
+      "properties": {
+        "username": {
+          "type": "string",
+          "title": "用户名",
+          "default": "张三"
+        },
+        "age": {
+          "type": "number",
+          "title": "年龄",
+          "default": 28
+        },
+        "visitCount": {
+          "type": "integer",
+          "title": "访问次数",
+          "default": 1024
+        }
+      },
+      "required": []
+    },
+    "设置": {
+      "type": "object",
+      "title": "设置",
+      "properties": {
+        "enableNotify": {
+          "type": "boolean",
+          "title": "启用通知",
+          "default": true
+        },
+        "bio": {
+          "type": "text",
+          "title": "个人简介",
+          "default": "一名热爱技术的前端开发者，专注于 Web 交互和用户体验设计。"
+        }
+      },
+      "required": []
+    }
+  },
+  "required": []
+}

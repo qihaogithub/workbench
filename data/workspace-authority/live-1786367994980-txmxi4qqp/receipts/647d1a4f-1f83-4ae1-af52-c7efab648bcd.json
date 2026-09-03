@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "647d1a4f-1f83-4ae1-af52-c7efab648bcd",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786367994980-txmxi4qqp",
+  "baseRevision": 0,
+  "revision": 116,
+  "rootHash": "bee4073079d96cdf367c4deae9c552592fdfcb7ce72a55bfff5f6d289979e112",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/quiet-studio_q7m4/convention.md",
+      "action": "modified",
+      "beforeHash": "85f9e670e348874964f0709006ffc0a0ef77b908450790e6c8049ac4f650408d",
+      "afterHash": "c6b5c6512110d05bca30495bf920f051ad77dfde42f435fc7e7adc89c10388d8"
+    }
+  ],
+  "committedAt": 1786441340754
+}

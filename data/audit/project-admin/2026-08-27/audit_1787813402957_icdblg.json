@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1787813402957_icdblg",
+  "at": 1787813402957,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1787813402956_orr1s2",
+  "inputSummary": {
+    "name": "E2E:20260827T065001554Z-144mvd:画布 Alt 拖拽复制回归",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1787813402956_orr1s2"
+    ]
+  }
+}

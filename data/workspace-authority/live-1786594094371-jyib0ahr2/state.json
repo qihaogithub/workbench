@@ -1,0 +1,27 @@
+{
+  "workspaceId": "live-1786594094371-jyib0ahr2",
+  "projectId": "proj_1786594094351_cad1j5",
+  "revision": 9,
+  "rootHash": "361309f7372c37e966e8f66b6a5c40717df4b22fff502e0b4fb14b5a6ad0902e",
+  "resourceHashes": {
+    ".canvas-layout.json": "e464854f0cd339609957bda1e9f583aef44d0a9bd760103360887b481669eeb7",
+    "demos/page_phtz/config.schema.json": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+    "demos/page_phtz/index.tsx": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "demos/page_phtz/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "demos/page_phtz/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
+    "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
+    "memory.md": "ac647ba40af49cc702b3b182334eadaada557ab7a3651246de2ea8d94da7b210",
+    "workspace-tree.json": "a7160f3e52d584314f25aa8286dc94afe00d2b29391d0081d1185dc9341a52bc"
+  },
+  "mutationPayloads": {
+    "86fdbd15-cf74-47bb-9d8d-8a65f491d564": "efee4e6f48cb1763439e6d3455290616b90b59a2e88f5e40a08bd5536448a41c",
+    "3cdadbdb-9229-4277-84f0-de2f904d478f": "1cbf41f62129f185f1acb7f1f4e9ef55911ab23a20fcfa400d7c301fa5b9001c",
+    "baa14592-54f7-4739-918b-fcfd45ce60c2": "08ffb374aac6f5ffa9a2ace86abdabc45d052dca517c43b4f7a4da99bd414bf4",
+    "e93f830f-5f22-4df6-9424-f71f879b496d": "ef07bb5be248256e3ad863d1307f3a83a65409433d4a266ba9037703ed09c9c9",
+    "a874866a-36bb-4cb4-aa68-8e07beb7eab4": "a8ee7145721ced93b3e64bbd30df2334afe8f0ddd8db05aea4c54f58d46dadb0",
+    "bc7dc17e-ec6e-4ff1-9801-acef15dcf1af": "f8db748881708385a446ffa4d80cf0961bf460d5783c9776fe4c9f985d3280be",
+    "d8d59655-1c88-446e-ab73-9a737621145b": "f984395b52de126177534157eb11a5cb864abb931261266f141f0abc75cd4df7",
+    "9b439e18-cd90-488c-beff-294dfb6ad833": "99955d62cd66340044ffd957a23cb2f54d93d14331d70b4c132e9a7edc1f05e4"
+  },
+  "updatedAt": 1786594107192
+}

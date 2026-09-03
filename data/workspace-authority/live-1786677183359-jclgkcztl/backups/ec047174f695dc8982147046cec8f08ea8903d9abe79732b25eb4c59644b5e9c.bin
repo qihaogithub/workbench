@@ -1,0 +1,123 @@
+{
+  "version": 1,
+  "projectId": "proj_1786367903885_iu08e4",
+  "updatedAt": 1787892230977,
+  "state": {
+    "viewport": {
+      "x": 27.650698016771344,
+      "y": -1133.92873927072,
+      "zoom": 0.5048358096646048
+    },
+    "pages": {
+      "halloween-map_x4k2": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 2051,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "390x844"
+      },
+      "halloween-intro_q7m1": {
+        "x": 438,
+        "y": 0,
+        "width": 390,
+        "height": 844,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "390x844"
+      },
+      "halloween-level1_f3n9": {
+        "x": 876,
+        "y": 0,
+        "width": 390,
+        "height": 1565,
+        "zIndex": 2,
+        "sizeMode": "preview",
+        "previewSizeKey": "390x844"
+      },
+      "halloween-level2_z8b5": {
+        "x": 0,
+        "y": 2099,
+        "width": 390,
+        "height": 858,
+        "zIndex": 3,
+        "sizeMode": "preview",
+        "previewSizeKey": "390x844"
+      },
+      "halloween-level3_w2p7": {
+        "x": 438,
+        "y": 2099,
+        "width": 390,
+        "height": 1447,
+        "zIndex": 4,
+        "sizeMode": "preview",
+        "previewSizeKey": "390x844"
+      },
+      "halloween-level4_j6c3": {
+        "x": 876,
+        "y": 2099,
+        "width": 390,
+        "height": 1058,
+        "zIndex": 5,
+        "sizeMode": "preview",
+        "previewSizeKey": "390x844"
+      },
+      "halloween-level5_r9d4": {
+        "x": 0,
+        "y": 3594,
+        "width": 390,
+        "height": 1185,
+        "zIndex": 6,
+        "sizeMode": "preview",
+        "previewSizeKey": "390x844"
+      },
+      "halloween-poster_t1v8": {
+        "x": 438,
+        "y": 3594,
+        "width": 390,
+        "height": 1088,
+        "zIndex": 7,
+        "sizeMode": "preview",
+        "previewSizeKey": "390x844"
+      },
+      "halloween-prize_y3n6": {
+        "x": 876,
+        "y": 3594,
+        "width": 390,
+        "height": 1453,
+        "zIndex": 8,
+        "sizeMode": "preview",
+        "previewSizeKey": "390x844"
+      },
+      "halloween-share_u5b9": {
+        "x": 0,
+        "y": 5095,
+        "width": 390,
+        "height": 1876,
+        "zIndex": 9,
+        "sizeMode": "preview",
+        "previewSizeKey": "390x844"
+      }
+    },
+    "pageGroups": {},
+    "sections": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [
+      "kb_1787885153658_t9h54b"
+    ],
+    "navigation": {
+      "hotspots": {},
+      "connections": {}
+    }
+  }
+}

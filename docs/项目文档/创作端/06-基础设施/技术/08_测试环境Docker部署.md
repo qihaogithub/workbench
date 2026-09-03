@@ -12,7 +12,7 @@ covers:
 
 # 测试环境 Docker 部署
 
-> 更新日期：2026-09-02
+> 更新日期：2026-09-03
 > 适用主机：`qihao@10.130.33.131`（Ubuntu 24.04，x86_64，已安装 1Panel）
 > 状态：已验证可用
 
@@ -106,6 +106,12 @@ docker compose --env-file .env.docker up -d --force-recreate --no-build author-s
 部署前 Authority 资源扫描必须覆盖页面配置值、需求文档、项目可见性规则和白板绑定/状态等注册资源；本地契约测试使用 `corepack pnpm --silent exec node --test scripts/check-workspace-deploy-preflight.test.mjs` 验证这一点，避免合法资源被误判为 external drift。
 
 通过 `scripts/deploy.sh --remote-build` 构建时，测试机应设置 `DOCKER_BUILD_HTTP_PROXY=http://10.130.33.131:48179` 与 `DOCKER_BUILD_HTTPS_PROXY=http://10.130.33.131:48179`，脚本会把代理作为 BuildKit 参数传给各服务；不需要代理的环境保持为空即可。
+
+### 数据覆盖权限
+
+容器通常以 root 写入 `/opt/opencode-workbench/data`，而部署 SSH 用户是 `qihao`。执行本机 data 覆盖前，应由 root 为 `qihao` 添加该目录的 ACL（包括目录默认 ACL），使其能够读取、创建和删除数据，但不需要开放 `/var/lib/docker` 或加入 `root` 组。`setfacl` 不可用时先安装 Debian `acl` 包。
+
+`scripts/deploy-author-with-data.sh` 在非 root SSH 会话中只同步文件内容，不保留 owner、group、permission 和 mtime，并跳过无权限的 root 重设；因此测试机调用时应使用 `LEGACY_DATA_VOLUME=__skip__`（当前 Compose 实际使用 bind data，旧 named volume 不参与运行）。覆盖前脚本仍会在远端 staging 之外生成 bind-data 备份。
 
 ## 四、验收与故障定位
 

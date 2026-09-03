@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "58ba106e-1a0f-4903-9c75-cb4a17b60173",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 570,
+  "rootHash": "f28975fdb46c654ac82c6f8fddadf0800af077e7930a22800b70cb11298af10e",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/video-page_p3v9/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "0ce433ad578c92e9c3ae4768b1f98f7d2fd725b9e0c8c23ef1929f227090fc7b"
+    }
+  ],
+  "committedAt": 1787889095284
+}

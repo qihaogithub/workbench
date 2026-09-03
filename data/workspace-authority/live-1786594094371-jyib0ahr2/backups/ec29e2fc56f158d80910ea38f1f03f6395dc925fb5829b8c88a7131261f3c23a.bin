@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "projectId": "proj_1786594094351_cad1j5",
+  "updatedAt": 1786594100238,
+  "state": {
+    "viewport": {
+      "x": 49.748152709359545,
+      "y": 30.749999999999943,
+      "zoom": 0.6816502463054188
+    },
+    "pages": {},
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "hiddenKnowledgeDocumentIds": [],
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    }
+  }
+}

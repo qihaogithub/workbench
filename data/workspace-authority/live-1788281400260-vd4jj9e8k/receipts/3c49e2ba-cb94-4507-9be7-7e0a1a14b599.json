@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "3c49e2ba-cb94-4507-9be7-7e0a1a14b599",
+  "projectId": "proj_1788281400242_5w9y5n",
+  "workspaceId": "live-1788281400260-vd4jj9e8k",
+  "baseRevision": 4,
+  "revision": 5,
+  "rootHash": "77447468b08a70e875c5e30f1c0d36792d62bdf35b96452924d2a458bfd68a3e",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "assets/whiteboards/d7dbb1ea359b3d87b652bd56b99f342faeeb77f4ecc5c583906e46c23dff40a3.png",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "d7dbb1ea359b3d87b652bd56b99f342faeeb77f4ecc5c583906e46c23dff40a3"
+    },
+    {
+      "path": "whiteboards/wb_a2957d9a6ce2456f9422ce077bef062e.json",
+      "action": "modified",
+      "beforeHash": "26f6bdb2ef317438c8a31d3363b250bf751814fc45145da28011738c22ddccfd",
+      "afterHash": "6e671b262845615ade4cd3ae26668420f818f808fc35d49658c528008acc18c4"
+    },
+    {
+      "path": "whiteboards/bindings.json",
+      "action": "modified",
+      "beforeHash": "8fa9fabd4f6d94a95c3fcc267d901f20482d233a27c71ad0998c9c023e255b9b",
+      "afterHash": "20f90b4126b7b38fb129ec5241f3c5449d64b5ea0ced151798ff6281a031315e"
+    },
+    {
+      "path": "demos/page_t2bq/config.values.json",
+      "action": "modified",
+      "beforeHash": "465273620da8d1ef24a2f4a76bb2806c4514cda6a18b51c9702078210643d108",
+      "afterHash": "c2f287e3c62fc992a4672261fe46469ea0930f0f5fbca9f37a994930fba4af12"
+    }
+  ],
+  "committedAt": 1788281411691
+}

@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "05922668-cab4-4f05-bbf6-12d0862c99f2",
+  "projectId": "proj_1785742777589_ncs6r6",
+  "workspaceId": "live-1785832228941-ay0onrwn3",
+  "baseRevision": 0,
+  "revision": 154,
+  "rootHash": "c1ef68245b492973a2bfacb9c4c60c53e0f04622f78849625bc12b686e9922e9",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/motion-formats_k4r2/index.tsx",
+      "action": "modified",
+      "beforeHash": "e233e19d6410262e55d48b4e6a8c1400c02ecb61010381e49eb7a7f2f450e07f",
+      "afterHash": "73d3a1763a422f664c2b89eaca9e31f6952174e3216a6dfe548b81177edb91a2"
+    },
+    {
+      "path": "demos/motion-formats_k4r2/config.schema.json",
+      "action": "modified",
+      "beforeHash": "227ea016b0d9543876cd556c9cb408596f072448271a0734a8bf54eaf39a157f",
+      "afterHash": "d77a916a59af34254499d72567c3e6f52c2c452d791326d73403a90cf9f068d3"
+    },
+    {
+      "path": "design-spec/spec-ds_1787208159089_856f1c2d.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "21d92fe7bf0cfc615796d3cb1dac7cf5bfa2729652cd173d4cbdeeb0855baa96"
+    },
+    {
+      "path": "design-spec/manifest.json",
+      "action": "modified",
+      "beforeHash": "a60dbc26d30bf552824460825428dfc44edda35757d9a2075147008d35ecdac7",
+      "afterHash": "e7913cebfb10c29e53ff1dcd390d4e8e5ae4ae6f956c022daacf20dd7818eccd"
+    }
+  ],
+  "committedAt": 1787208159286
+}

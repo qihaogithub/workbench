@@ -1,0 +1,20 @@
+{
+  "auditId": "audit_1782552216375_ckf1cd",
+  "at": 1782552216375,
+  "actor": {
+    "id": "local-codex",
+    "name": "Local Codex",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L2",
+  "tool": "template_create_from_project",
+  "projectId": "proj_1782547891917_g0e1l9",
+  "resourceId": "tmpl_1782552216325_16w6v4",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "template:tmpl_1782552216325_16w6v4"
+    ]
+  }
+}

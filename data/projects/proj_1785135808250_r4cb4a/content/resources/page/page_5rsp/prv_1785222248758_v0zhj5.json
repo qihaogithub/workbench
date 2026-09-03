@@ -1,0 +1,39 @@
+{
+  "id": "prv_1785222248758_v0zhj5",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "kind": "page",
+  "resourceId": "page_5rsp",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "workspaceRevision": 83,
+  "workspaceRootHash": "dfe2841e507242192036b89a699c75f2179db24b0d5f377b3cbee21fb136add3",
+  "previousVersionId": "prv_1785207270062_i6sc6q",
+  "contentHash": "6d12b50dbfd115aaec6d3a8fab9140e0f910fd35c3bb95e541c72e4325eb9177",
+  "blobRefs": [
+    "552a68ebc1f5dcfd8998f0934dd0c7132f26a78a7686ba46c25c09987b24c7a6",
+    "a973a2d6953db6470e9740f9f0545a4d5c81dd794f40d71fc8f2ef9c67bea067"
+  ],
+  "metadata": {
+    "page": {
+      "id": "page_5rsp",
+      "name": "闯关活动",
+      "routeKey": "page-6",
+      "order": 0,
+      "parentId": null,
+      "runtimeType": "high-fidelity-react"
+    },
+    "files": {
+      "schema": "552a68ebc1f5dcfd8998f0934dd0c7132f26a78a7686ba46c25c09987b24c7a6",
+      "code": "a973a2d6953db6470e9740f9f0545a4d5c81dd794f40d71fc8f2ef9c67bea067"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "high-fidelity-react",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1785222248759,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录闯关活动"
+}

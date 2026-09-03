@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "449ef7db-c36a-4923-9deb-ccdded50e6a0",
+  "projectId": "proj_1788141806566_0aps89",
+  "workspaceId": "live-1788141807256-9xerzl5sd",
+  "baseRevision": 0,
+  "revision": 159,
+  "rootHash": "b2aac229f3648f45e7b60dc0b91007b5ddeaadea046bb2a6316234303354d796",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_9z9z/index.tsx",
+      "action": "modified",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/page_9z9z/config.schema.json",
+      "action": "modified",
+      "beforeHash": "7cfea273c4dce9300ee50e66ff2baa1ae6f01e293a32e0b790c77a0a5bd8d65a",
+      "afterHash": "361e3896fc1658b279d910b2e0cea95bc54f88cd5d50b0b7c4b2b27b936b9f78"
+    },
+    {
+      "path": "demos/page_9z9z/prototype.html",
+      "action": "modified",
+      "beforeHash": "1af9ffbf4bb5d5b9b92c0e0fa1aca3fc7c7ed650bb1814ba598524fb76ba9b71",
+      "afterHash": "1af9ffbf4bb5d5b9b92c0e0fa1aca3fc7c7ed650bb1814ba598524fb76ba9b71"
+    },
+    {
+      "path": "demos/page_9z9z/prototype.css",
+      "action": "modified",
+      "beforeHash": "b423425c58aa5e9268a66274fba1259efb2f0053c26c24d8e27bc0f2d686ada0",
+      "afterHash": "b423425c58aa5e9268a66274fba1259efb2f0053c26c24d8e27bc0f2d686ada0"
+    }
+  ],
+  "committedAt": 1788167375227
+}

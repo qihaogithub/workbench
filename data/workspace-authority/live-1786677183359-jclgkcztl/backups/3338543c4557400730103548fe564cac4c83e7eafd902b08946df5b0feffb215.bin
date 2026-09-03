@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "projectId": "proj_1786367903885_iu08e4",
+  "updatedAt": 1787814181644,
+  "state": {
+    "viewport": {
+      "x": 1188.4489997422788,
+      "y": 206.29684215408474,
+      "zoom": 0.5660427756070422
+    },
+    "pages": {
+      "kids-edu_b3xw": {
+        "x": -1814.66422911715,
+        "y": -140.98484097608969,
+        "width": 375,
+        "height": 2471,
+        "zIndex": 4,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "clipboard-import_4d9ab0": {
+        "x": -1318.0702582016286,
+        "y": -155.3070505728263,
+        "width": 375,
+        "height": 812,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "pageGroups": {},
+    "sections": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [],
+    "navigation": {
+      "hotspots": {
+        "navigation_hotspot_1787806921463_3x3idx": {
+          "id": "navigation_hotspot_1787806921463_3x3idx",
+          "pageId": "kids-edu_b3xw",
+          "rect": {
+            "x": 0.2953236947731116,
+            "y": 0.08294374660610737,
+            "width": 0.46518124992272336,
+            "height": 0.033781570074293416
+          },
+          "createdAt": 1787806921463,
+          "updatedAt": 1787806921463
+        },
+        "navigation_hotspot_1787814180064_p0p0l3": {
+          "id": "navigation_hotspot_1787814180064_p0p0l3",
+          "pageId": "clipboard-import_4d9ab0",
+          "rect": {
+            "x": 0.4497682822816958,
+            "y": 0.12027138633767821,
+            "width": 0.13577284318461286,
+            "height": 0.11854183644067999
+          },
+          "createdAt": 1787814180064,
+          "updatedAt": 1787814180064
+        }
+      },
+      "connections": {
+        "navigation_connection_1787814180064_vsl8o7": {
+          "id": "navigation_connection_1787814180064_vsl8o7",
+          "source": {
+            "pageId": "clipboard-import_4d9ab0",
+            "hotspotId": "navigation_hotspot_1787814180064_p0p0l3"
+          },
+          "target": {
+            "pageId": "kids-edu_b3xw"
+          },
+          "createdAt": 1787814180064,
+          "updatedAt": 1787814180064
+        }
+      }
+    }
+  }
+}

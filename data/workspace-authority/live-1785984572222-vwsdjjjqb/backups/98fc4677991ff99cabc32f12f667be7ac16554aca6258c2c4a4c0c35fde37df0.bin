@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "properties": {
+    "field": {
+      "type": "string",
+      "title": "pad背景图",
+      "default": "/api/images/img_WrkYvtH9z8L_qA",
+      "format": "image",
+      "ui:options": {
+        "category": "设计",
+        "widthOperator": "=",
+        "widthValue": 2732,
+        "heightOperator": "=",
+        "heightValue": 826
+      }
+    }
+  },
+  "required": []
+}

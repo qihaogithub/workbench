@@ -1,0 +1,34 @@
+{
+  "id": "prv_1783328376107_sponhj",
+  "projectId": "proj_1779608460372",
+  "kind": "page",
+  "resourceId": "demo_1779608460501_abc123",
+  "contentHash": "bd053bcdae59042c6c994d3337b6881b14ea91731c58745bb60b55c0992df285",
+  "blobRefs": [
+    "ca09ae46d14bca062c8e68c1cb6bb599f545e6100a9f87b34c5b1ca4287d4b4d",
+    "e9ab342908803e01e9ac76afdb53868be2ccd71eb0cfd025588115ed9344081d"
+  ],
+  "metadata": {
+    "page": {
+      "id": "demo_1779608460501_abc123",
+      "name": "手机",
+      "routeKey": "demo",
+      "order": 0,
+      "parentId": null
+    },
+    "files": {
+      "schema": "ca09ae46d14bca062c8e68c1cb6bb599f545e6100a9f87b34c5b1ca4287d4b4d",
+      "code": "e9ab342908803e01e9ac76afdb53868be2ccd71eb0cfd025588115ed9344081d"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "high-fidelity-react",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1783328376111,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录手机"
+}

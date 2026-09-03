@@ -1,0 +1,212 @@
+{
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "content",
+      "preset": "custom",
+      "source": "user"
+    }
+  },
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "title": "标题 (string)",
+      "default": "配置项示例"
+    },
+    "description": {
+      "type": "text",
+      "title": "描述 (text)",
+      "default": "每个配置类型仅保留一个示例，简化配置结构"
+    },
+    "count": {
+      "type": "number",
+      "title": "数量 (number)",
+      "default": 42
+    },
+    "level": {
+      "type": "integer",
+      "title": "等级 (integer)",
+      "default": 3
+    },
+    "enabled": {
+      "type": "boolean",
+      "title": "启用 (boolean)",
+      "default": true
+    },
+    "bgColor": {
+      "type": "string",
+      "title": "背景色 (color)",
+      "format": "color",
+      "default": "#f0f4ff"
+    },
+    "accentColor": {
+      "type": "string",
+      "title": "强调色 (color)",
+      "format": "color",
+      "default": "#6366f1"
+    },
+    "coverImage": {
+      "type": "string",
+      "title": "封面 (image)",
+      "format": "image"
+    },
+    "gallery": {
+      "type": "array",
+      "title": "图片集 (imageList)",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "mode": {
+      "type": "string",
+      "title": "模式 (enum)",
+      "enum": [
+        "card",
+        "list",
+        "grid"
+      ],
+      "enumNames": [
+        "卡片",
+        "列表",
+        "网格"
+      ],
+      "default": "card"
+    },
+    "tags": {
+      "type": "enum",
+      "title": "标签 (enum+multiple)",
+      "enum": [
+        "react",
+        "typescript",
+        "tailwind"
+      ],
+      "enumNames": [
+        "React",
+        "TypeScript",
+        "Tailwind"
+      ],
+      "multiple": true,
+      "default": [
+        "react"
+      ]
+    },
+    "region": {
+      "type": "cascade",
+      "title": "地区 (cascade)",
+      "default": [
+        "zhejiang",
+        "hangzhou"
+      ],
+      "options": [
+        {
+          "value": "zhejiang",
+          "label": "浙江",
+          "children": [
+            {
+              "value": "hangzhou",
+              "label": "杭州"
+            }
+          ]
+        }
+      ]
+    },
+    "richtextContent": {
+      "type": "string",
+      "title": "富文本 (richtext)",
+      "format": "richtext",
+      "default": "<p>这是 <strong>富文本</strong> 内容。</p>"
+    },
+    "layoutItem": {
+      "type": "image",
+      "title": "布局设置 - 图片",
+      "format": "image"
+    },
+    "layoutPosition": {
+      "type": "position",
+      "title": "布局设置 - 元素位置",
+      "key": "layoutItem",
+      "size": {
+        "width": 340,
+        "height": 260
+      },
+      "default": {
+        "x": 120,
+        "y": 60
+      }
+    },
+    "modules": {
+      "type": "array",
+      "title": "可排序列表 (array+sortable)",
+      "$demo": {
+        "sortable": true
+      },
+      "items": {
+        "oneOf": [
+          {
+            "title": "文本项",
+            "properties": {
+              "type": {
+                "const": "text"
+              },
+              "content": {
+                "type": "string",
+                "title": "内容",
+                "default": "列表项"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          {
+            "title": "进度项",
+            "$demo": {
+              "maxItems": 1
+            },
+            "properties": {
+              "type": {
+                "const": "progress"
+              },
+              "label": {
+                "type": "string",
+                "title": "标签",
+                "default": "进度"
+              },
+              "value": {
+                "type": "number",
+                "title": "进度值",
+                "default": 65
+              }
+            },
+            "required": [
+              "type"
+            ]
+          }
+        ]
+      },
+      "default": [
+        {
+          "type": "text",
+          "content": "第一项：可拖拽排序"
+        },
+        {
+          "type": "progress",
+          "label": "完成度",
+          "value": 65
+        },
+        {
+          "type": "text",
+          "content": "第三项：进度模块最多 1 个"
+        }
+      ]
+    }
+  },
+  "required": []
+}

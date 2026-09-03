@@ -1,0 +1,8 @@
+{
+  "id": "拍摄前动画_e39bf7",
+  "name": "拍摄前动画",
+  "routeKey": "page",
+  "order": 1,
+  "parentId": null,
+  "runtimeType": "prototype-html-css"
+}

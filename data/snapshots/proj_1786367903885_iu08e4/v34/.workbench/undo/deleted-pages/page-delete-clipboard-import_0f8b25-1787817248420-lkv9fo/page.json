@@ -1,0 +1,8 @@
+{
+  "id": "clipboard-import_0f8b25",
+  "name": "clipboard-import",
+  "routeKey": "clipboard-import-2",
+  "order": 2,
+  "parentId": null,
+  "runtimeType": "prototype-html-css"
+}

@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "2354739d-a3b9-4337-95ef-cbcb454e39f0",
+  "projectId": "proj_1779608460378",
+  "workspaceId": "live-1785837911228-j4n9ftklg",
+  "baseRevision": 0,
+  "revision": 6,
+  "rootHash": "dc0e3d862d1108555ad5cd8b9332d219e74a93c5b05107022b845ee53d5bdee2",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/demo_1779608460379_a1b2c3/index.tsx",
+      "action": "modified",
+      "beforeHash": "467aedea1ad83837cb853de51ef6e854de035f134d564a6694b5110d83372e15",
+      "afterHash": "5d6e9d6ed8083eefbc7a374bb14af49f63668d2304eaf647e469d3c6f4336229"
+    }
+  ],
+  "committedAt": 1785839563738
+}

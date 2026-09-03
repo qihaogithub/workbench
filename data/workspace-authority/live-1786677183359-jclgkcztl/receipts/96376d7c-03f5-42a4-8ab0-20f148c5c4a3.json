@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "96376d7c-03f5-42a4-8ab0-20f148c5c4a3",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 99,
+  "rootHash": "b59ac8fa02cc74f881b9998ff7e84651574c8d11ff2688dc52aba0fc19ec890f",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/8-0717_gchw/sandbox.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "f4bc6d0da46dd61902e6beb6505d017680ce0f537fc2be16dd426342d9799688"
+    },
+    {
+      "path": "demos/8-0717_gchw/html-import.meta.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "b42001add3a17038df1ec84c5ccc9fdf865aa7b5de67bcaa92c371aaf5d63a1c"
+    },
+    {
+      "path": "demos/8-0717_gchw/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "8243f0af367f188a376f2c17b5eabe872a2f7a979813e0d4e2be6d594c2aa259"
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "926b8ef8cdb2f94055a745a936e4b266df18a0608e7e3fc36241ddcf8e844d3b",
+      "afterHash": "1d96ea4fe772c946f27f90a41a642c7ef35c9498e1f7c6446f8891709a6cbe9c"
+    }
+  ],
+  "committedAt": 1787708337868
+}

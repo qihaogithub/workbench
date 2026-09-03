@@ -1,0 +1,42 @@
+{
+  "folders": [
+    {
+      "id": "folder_1786594429317_t88blt",
+      "name": "自动保存文件夹-81b30e",
+      "parentId": null,
+      "order": 0
+    },
+    {
+      "id": "folder_1786594430211_zjhu9g",
+      "name": "自动保存待删文件夹-c33155",
+      "parentId": null,
+      "order": 1
+    }
+  ],
+  "pages": [
+    {
+      "id": "page_cn92",
+      "name": "自动保存重命名页-ae12e5",
+      "routeKey": "page",
+      "order": 0,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "page_7dtg",
+      "name": "自动保存顺序页",
+      "routeKey": "page-2",
+      "order": 1,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "fa2dc9_y4bs",
+      "name": "自动保存复制页-fa2dc9",
+      "routeKey": "fa2dc9",
+      "order": 2,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    }
+  ]
+}

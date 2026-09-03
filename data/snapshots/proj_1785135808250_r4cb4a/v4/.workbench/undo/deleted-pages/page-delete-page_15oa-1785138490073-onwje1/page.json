@@ -1,0 +1,8 @@
+{
+  "id": "page_15oa",
+  "name": "闯关活动",
+  "routeKey": "page",
+  "order": 4,
+  "parentId": null,
+  "runtimeType": "prototype-html-css"
+}

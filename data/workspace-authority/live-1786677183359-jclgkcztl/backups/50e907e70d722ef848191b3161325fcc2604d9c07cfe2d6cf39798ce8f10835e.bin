@@ -1,0 +1,27 @@
+{
+  "$demo": {
+    "previewSize": {
+      "width": 375,
+      "height": 812
+    }
+  },
+  "type": "object",
+  "properties": {
+    "heroImage": {
+      "title": "主视觉图片",
+      "default": "/api/images/img_KjjBIeda6Uigqg",
+      "type": "string",
+      "format": "image",
+      "ui:options": {
+        "group": "banner",
+        "minWidth": 200,
+        "maxWidth": 200,
+        "minHeight": 100,
+        "maxHeight": 100
+      }
+    }
+  },
+  "required": [
+    "heroImage"
+  ]
+}

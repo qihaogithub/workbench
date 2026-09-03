@@ -1,0 +1,35 @@
+{
+  "id": "ds_1786964161341_7a481cfa",
+  "title": "配置项类型示例设计规范",
+  "createdAt": "2026-08-17T10:56:01.341Z",
+  "updatedAt": "2026-08-17T10:56:01.341Z",
+  "entries": [
+    {
+      "id": "e_1786964161341_4c17e94a",
+      "title": "封面 (image)",
+      "markdown": "",
+      "refs": [
+        {
+          "scope": "page",
+          "pageId": "config-demo_m7p2",
+          "fieldKey": "coverImage"
+        }
+      ],
+      "autoManagedFieldKey": "coverImage"
+    },
+    {
+      "id": "e_1786964161341_4969bd2a",
+      "title": "布局设置 - 图片",
+      "markdown": "",
+      "refs": [
+        {
+          "scope": "page",
+          "pageId": "config-demo_m7p2",
+          "fieldKey": "layoutItem"
+        }
+      ],
+      "autoManagedFieldKey": "layoutItem"
+    }
+  ],
+  "autoManagedPageId": "config-demo_m7p2"
+}

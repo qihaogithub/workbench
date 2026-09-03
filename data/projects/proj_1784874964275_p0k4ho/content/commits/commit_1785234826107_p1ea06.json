@@ -1,0 +1,31 @@
+{
+  "id": "commit_1785234826107_p1ea06",
+  "projectId": "proj_1784874964275_p0k4ho",
+  "parentCommitId": "commit_1785202488211_iwo6r1",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "手动恢复",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "course-complete_a7k3",
+      "versionId": "prv_1785234826102_459nq9"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "course-complete_a7k3",
+      "fromVersionId": "prv_1785163889218_9agjm1",
+      "toVersionId": "prv_1785234826102_459nq9"
+    }
+  ],
+  "createdAt": 1785234826107,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1784874964638-kfdgu6fcm",
+    "workspaceRevision": 152,
+    "workspaceRootHash": "5b39168d2c69101ed35d6801ab60f8e7494ca62fa0e8fcfa46dbbc7ac31c5667"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "bgm": "",
+  "navColor": "#000000",
+  "modules": [
+    {
+      "type": "participant",
+      "bgImage": "https://img.onlywnn.cn/figma/h_19dbcc85.png",
+      "count": 128
+    },
+    {
+      "type": "video",
+      "videoBg": "",
+      "video": {
+        "url": "",
+        "poster": ""
+      }
+    },
+    {
+      "type": "image",
+      "image": "https://img.onlywnn.cn/figma/h_483ae3df.png"
+    }
+  ]
+}

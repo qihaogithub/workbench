@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>配置项类型展示</title>
+  <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+  <div class="showcase">
+    <!-- 页面标题 -->
+    <header class="header">
+      <h1 class="title" data-bind-text="pageTitle">{{pageTitle}}</h1>
+      <p class="subtitle">覆盖所有配置项类型的展示页</p>
+    </header>
+
+    <!-- 横幅区域（boolean 控制显隐） -->
+    <section class="banner" data-bind-style-display="showBanner">
+      <div class="banner-inner">
+        <img class="banner-img" data-bind-src="bannerImage" alt="横幅图片">
+        <div class="banner-placeholder">请在右侧配置面板上传横幅图片</div>
+      </div>
+    </section>
+
+    <!-- 基础信息卡片：number + boolean -->
+    <section class="card">
+      <h2 class="card-title">基础配置</h2>
+      <div class="config-row">
+        <span class="config-label">折扣力度</span>
+        <span class="config-value highlight" data-bind-text="discount">{{discount}}%</span>
+      </div>
+      <div class="config-row">
+        <span class="config-label">横幅展示</span>
+        <span class="config-value" data-bind-text="showBanner">{{showBanner ? '已开启' : '已关闭'}}</span>
+      </div>
+      <div class="config-row">
+        <span class="config-label">主题风格</span>
+        <span class="config-value" data-bind-text="theme">{{theme}}</span>
+      </div>
+    </section>
+
+    <!-- 嵌套对象：author -->
+    <section class="card">
+      <h2 class="card-title">嵌套对象（object）</h2>
+      <div class="author-block">
+        <div class="avatar">{{author.name[0]}}</div>
+        <div class="author-info">
+          <div class="author-name" data-bind-text="author.name">{{author.name}}</div>
+          <div class="author-level">Lv.<span data-bind-text="author.level">{{author.level}}</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 数组：tags -->
+    <section class="card">
+      <h2 class="card-title">标签列表（array）</h2>
+      <div class="tags" data-bind-text="tags">
+        <span class="tag">{{tags.join(', ')}}</span>
+      </div>
+    </section>
+
+    <!-- 颜色：primaryColor + secondaryColor -->
+    <section class="card">
+      <h2 class="card-title">颜色选择（format: color）</h2>
+      <div class="color-row">
+        <div class="color-swatch" data-bind-style-background-color="primaryColor"></div>
+        <div class="color-info">
+          <span class="color-name">主色调</span>
+          <span class="color-hex" data-bind-text="primaryColor">{{primaryColor}}</span>
+        </div>
+      </div>
+      <div class="color-row">
+        <div class="color-swatch" data-bind-style-background-color="secondaryColor"></div>
+        <div class="color-info">
+          <span class="color-name">辅助色</span>
+          <span class="color-hex" data-bind-text="secondaryColor">{{secondaryColor}}</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 枚举：theme -->
+    <section class="card">
+      <h2 class="card-title">下拉选择（enum + enumNames）</h2>
+      <div class="theme-grid">
+        <div class="theme-item active" data-bind-text="theme">
+          <span class="theme-label">{{theme}}</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 图片：bannerImage -->
+    <section class="card">
+      <h2 class="card-title">图片选择（format: image）</h2>
+      <div class="image-preview">
+        <img class="preview-img" data-bind-src="bannerImage" alt="图片预览">
+        <div class="preview-placeholder">右侧配置面板可上传图片</div>
+      </div>
+    </section>
+
+    <!-- 模块数组：modules (oneOf + $demo.maxItems) -->
+    <section class="card">
+      <h2 class="card-title">模块数组（array + oneOf）</h2>
+      <div class="modules">
+        <!-- 图片模块 -->
+        <div class="module-item module-image">
+          <div class="module-badge">图片模块</div>
+          <img class="module-img" data-bind-src="modules[0].imageUrl" alt="模块图片">
+          <div class="module-placeholder">modules[0].imageUrl</div>
+          <p class="module-caption" data-bind-text="modules[0].caption">{{modules[0].caption}}</p>
+        </div>
+        <!-- 文字模块 -->
+        <div class="module-item module-text">
+          <div class="module-badge">文字模块</div>
+          <p class="module-content" data-bind-text="modules[1].content" data-bind-style-font-size="modules[1].fontSize">{{modules[1].content}}</p>
+        </div>
+        <!-- 视频模块 -->
+        <div class="module-item module-video">
+          <div class="module-badge">视频模块（maxItems: 1）</div>
+          <img class="module-cover" data-bind-src="modules[2].videoCover" alt="视频封面">
+          <div class="module-placeholder">modules[2].videoCover</div>
+          <p class="module-title" data-bind-text="modules[2].title">{{modules[2].title}}</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 类型总结 -->
+    <footer class="footer">
+      <div class="type-grid">
+        <div class="type-item">✅ string</div>
+        <div class="type-item">✅ number</div>
+        <div class="type-item">✅ integer</div>
+        <div class="type-item">✅ boolean</div>
+        <div class="type-item">✅ object</div>
+        <div class="type-item">✅ array</div>
+        <div class="type-item">✅ format: color</div>
+        <div class="type-item">✅ format: image</div>
+        <div class="type-item">✅ enum + enumNames</div>
+        <div class="type-item">✅ oneOf + maxItems</div>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

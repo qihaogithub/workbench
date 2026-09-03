@@ -1,0 +1,21 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "pad_tdn7",
+      "name": "明星赛-pad",
+      "routeKey": "pad",
+      "order": 1,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "page_ijly",
+      "name": "明星赛-手机",
+      "routeKey": "page",
+      "order": 2,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    }
+  ]
+}

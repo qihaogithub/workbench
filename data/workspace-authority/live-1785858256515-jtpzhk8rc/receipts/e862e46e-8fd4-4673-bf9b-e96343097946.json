@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "e862e46e-8fd4-4673-bf9b-e96343097946",
+  "projectId": "proj_1785858256243_p2zs4y",
+  "workspaceId": "live-1785858256515-jtpzhk8rc",
+  "baseRevision": 0,
+  "revision": 16,
+  "rootHash": "f90d04b794aadcf9e743b0b620f82c0e00a95dbd97482b3cddcff62975a35212",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/summer-camp_k3m7/index.tsx",
+      "action": "modified",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/summer-camp_k3m7/config.schema.json",
+      "action": "modified",
+      "beforeHash": "69046a9996254002d0beb4021b3ee521fe9ddc4c9b83c50210d44e3d7be12424",
+      "afterHash": "69046a9996254002d0beb4021b3ee521fe9ddc4c9b83c50210d44e3d7be12424"
+    },
+    {
+      "path": "demos/summer-camp_k3m7/prototype.html",
+      "action": "modified",
+      "beforeHash": "37539d3ad068e72df72d9ae2e2c33042ac9f7d0010a730c3303dd729ee0ff9e7",
+      "afterHash": "37539d3ad068e72df72d9ae2e2c33042ac9f7d0010a730c3303dd729ee0ff9e7"
+    },
+    {
+      "path": "demos/summer-camp_k3m7/prototype.css",
+      "action": "modified",
+      "beforeHash": "3933770ea95f1e402f4f27e4f5454dbbf74486d8156771608a35fcfe11115b7a",
+      "afterHash": "3933770ea95f1e402f4f27e4f5454dbbf74486d8156771608a35fcfe11115b7a"
+    }
+  ],
+  "committedAt": 1785918491693
+}

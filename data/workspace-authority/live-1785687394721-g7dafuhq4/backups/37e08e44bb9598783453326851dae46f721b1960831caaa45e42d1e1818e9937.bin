@@ -1,0 +1,19 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "prototype-demo_h2k9",
+      "name": "配置原型演示",
+      "runtimeType": "prototype-html-css",
+      "order": 1,
+      "parentId": null
+    },
+    {
+      "id": "config-highfidelity_p3n5",
+      "name": "配置高保真演示",
+      "runtimeType": "high-fidelity-react",
+      "order": 2,
+      "parentId": null
+    }
+  ]
+}

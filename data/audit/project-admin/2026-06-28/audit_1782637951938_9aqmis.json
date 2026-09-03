@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1782637951938_9aqmis",
+  "at": 1782637951938,
+  "actor": {
+    "id": "local-codex",
+    "name": "Local Codex",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1782637951931_hsuqsm",
+  "inputSummary": {
+    "name": "画布退出恢复回归-b4407363",
+    "category": "未分类"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1782637951931_hsuqsm"
+    ]
+  }
+}

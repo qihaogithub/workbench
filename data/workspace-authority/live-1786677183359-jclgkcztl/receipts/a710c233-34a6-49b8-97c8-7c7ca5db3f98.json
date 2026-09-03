@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "a710c233-34a6-49b8-97c8-7c7ca5db3f98",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 51,
+  "rootHash": "d5709e14159440ff302ba403a9fad7acf09dd0e41feccac462bdcec473211b3a",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_zdwh/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "bf870a7a11c79d2318e1f62992adb52607d79fb4f5bf557639ad1063b4a3b9a9",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_zdwh/index.tsx",
+      "action": "deleted",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_zdwh/prototype.css",
+      "action": "deleted",
+      "beforeHash": "1dedeaf138364e1e502ae6e22718150f7dc03daa5b237feffd88bbe401ccd6a7",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_zdwh/prototype.html",
+      "action": "deleted",
+      "beforeHash": "cb3a191179d4c3a0a3feb8c90639c1ebcdac7e301e5a93dd678514600fd9a71e",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "40f129d8cf5b544adbabbbd9e518983b86c953ab62861e232fc8f2ca11e3293d",
+      "afterHash": "16c99ec5ad1b1cce7e697965428587db1d0a57af91363f3a47a9e0f12500d3c8"
+    }
+  ],
+  "committedAt": 1787643578038
+}

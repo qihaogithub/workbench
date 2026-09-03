@@ -1,0 +1,21 @@
+{
+  "id": "commit_1784713511150_isyj0h",
+  "projectId": "proj_1779608460378",
+  "parentCommitId": "commit_1784701026471_sejylu",
+  "visibility": "protected",
+  "intent": "publish",
+  "title": "发布项目 v66",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "demo_1779608460379_a1b2c3",
+      "versionId": "prv_1784701026469_8bevr2"
+    }
+  ],
+  "changedResources": [],
+  "createdAt": 1784713511150,
+  "createdBy": "Author Site",
+  "audit": {
+    "actorType": "user"
+  }
+}

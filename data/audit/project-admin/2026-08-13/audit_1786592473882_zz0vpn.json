@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1786592473882_zz0vpn",
+  "at": 1786592473882,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1786592473880_3mxkhf",
+  "inputSummary": {
+    "name": "E2E:20260813T034018935Z-y22g9d:核心流程回归",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1786592473880_3mxkhf"
+    ]
+  }
+}

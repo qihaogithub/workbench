@@ -1,0 +1,31 @@
+{
+  "committed": true,
+  "mutationId": "fcd8d78e-d604-4230-8cda-14f761636bb2",
+  "projectId": "proj_1785858256243_p2zs4y",
+  "workspaceId": "live-1785858256515-jtpzhk8rc",
+  "baseRevision": 0,
+  "revision": 51,
+  "rootHash": "e3b9d1f3bb9000670b78055521f4fec4c77ac07897c5687a35ea19426f7051a2",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_igom/config.schema.json",
+      "action": "modified",
+      "beforeHash": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+      "afterHash": "69046a9996254002d0beb4021b3ee521fe9ddc4c9b83c50210d44e3d7be12424"
+    },
+    {
+      "path": "demos/page_igom/prototype.html",
+      "action": "modified",
+      "beforeHash": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
+      "afterHash": "f61d40740096eef37f01de2a230d41ce5022533c2a95e6d3f9cf652a708664e4"
+    },
+    {
+      "path": "demos/page_igom/prototype.css",
+      "action": "modified",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": "737b404dd3c3745815dfd6d2ce88e9ba2b7b37b7d58dec87150870fb413cadb3"
+    }
+  ],
+  "committedAt": 1786014191164
+}

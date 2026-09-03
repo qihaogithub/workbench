@@ -1,0 +1,44 @@
+{
+  "id": "prv_1788162160282_75y7a3",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "kind": "page",
+  "resourceId": "page_yw72",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "workspaceRevision": 536,
+  "workspaceRootHash": "617c6b29d9e6c7dc25c70335df34a4c2c084efb8ef35018dff4ee7103c98f01a",
+  "previousVersionId": "prv_1785511294748_qetlnw",
+  "contentHash": "968170c59a4ba4d23b0a91307f4fc86ba1e45e28f69e51dbac6e4cb8654b5d27",
+  "blobRefs": [
+    "5b493640852310cc0056eec4906852ef08475872d6fe9c7f212d87c7e1967f83",
+    "93d3031bd9c381129dca2189cceb00bb4596781e15bad7f8c567a9ddb10b397d",
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1"
+  ],
+  "metadata": {
+    "page": {
+      "id": "page_yw72",
+      "name": "闯关开场",
+      "routeKey": "page",
+      "order": 1,
+      "parentId": "folder_1785397477311_od13vu",
+      "runtimeType": "prototype-html-css",
+      "isTemplatePage": false
+    },
+    "files": {
+      "schema": "5b493640852310cc0056eec4906852ef08475872d6fe9c7f212d87c7e1967f83",
+      "prototypeHtml": "93d3031bd9c381129dca2189cceb00bb4596781e15bad7f8c567a9ddb10b397d",
+      "prototypeCss": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "prototypeMeta": "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1788162160284,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录闯关开场"
+}

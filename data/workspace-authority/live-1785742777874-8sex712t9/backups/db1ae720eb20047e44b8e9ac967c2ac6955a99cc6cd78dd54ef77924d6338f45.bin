@@ -1,0 +1,882 @@
+interface DemoProps {
+  title?: string;
+  description?: string;
+  count?: number;
+  level?: number;
+  enabled?: boolean;
+  bgColor?: string;
+  accentColor?: string;
+  coverImage?: string;
+  gallery?: string[];
+  mode?: string;
+  tags?: string[];
+  region?: string[];
+  richtextContent?: string;
+  badgePosition?: { x: number; y: number };
+  modules?: Array<Record<string, unknown>>;
+}
+
+const TAG_MAP: Record<string, { label: string; color: string }> = {
+  react: { label: 'React', color: '#61dafb' },
+  typescript: { label: 'TypeScript', color: '#3178c6' },
+  tailwind: { label: 'Tailwind', color: '#06b6d4' },
+};
+
+function renderRegion(region: string[] | undefined): string {
+  if (!region || region.length === 0) return '未选择';
+  const regionMap: Record<string, string> = {
+    zhejiang: '浙江',
+    hangzhou: '杭州',
+  };
+  return region.map((v) => regionMap[v] || v).join(' / ');
+}
+
+export default function ConfigDemo(props: DemoProps) {
+  const safeArray = (val: unknown): string[] =>
+    Array.isArray(val) ? val : typeof val === 'string' ? val.split(',') : [];
+
+  const {
+    title = '配置项示例',
+    description = '每个配置类型仅保留一个示例',
+    count = 42,
+    level = 3,
+    enabled = true,
+    bgColor = '#f0f4ff',
+    accentColor = '#6366f1',
+    coverImage = '',
+    gallery = [],
+    mode = 'card',
+    tags = [],
+    region = [],
+    richtextContent = '',
+    badgePosition = { x: 280, y: 20 },
+    modules = [],
+  } = props as Record<string, unknown>;
+
+  const safeTags = safeArray(tags);
+  const safeRegion = safeArray(region);
+  const safeGallery = safeArray(gallery);
+  const safeModules = Array.isArray(modules) ? modules : [];
+
+  return (
+    <div
+      className="min-h-screen relative overflow-hidden"
+      style={{ backgroundColor: bgColor }}
+    >
+      {/* 定位徽章 */}
+      <div
+        data-pos-key="badge"
+        className="absolute z-10 px-2 py-0.5 rounded-full text-[10px] font-bold text-white shadow-sm"
+        style={{
+          left: typeof badgePosition?.x === 'number' ? badgePosition.x : 280,
+          top: typeof badgePosition?.y === 'number' ? badgePosition.y : 20,
+          backgroundColor: accentColor,
+        }}
+      >
+        NEW
+      </div>
+
+      {/* 封面图片 */}
+      {coverImage && (
+        <div className="w-full h-40 overflow-hidden">
+          <img src={coverImage} alt="封面" className="w-full h-full object-cover" />
+        </div>
+      )}
+
+      <div className="px-4 pt-4 pb-6 space-y-5">
+        {/* 标题与描述 */}
+        <div>
+          <h1 className="text-xl font-bold text-gray-800">{title}</h1>
+          {description && (
+            <p className="text-xs text-gray-500 mt-1 leading-relaxed">{description}</p>
+          )}
+        </div>
+
+        {/* 基础信息 */}
+        <div className="flex items-center gap-2 text-xs">
+          <span
+            className="inline-block w-2 h-2 rounded-full"
+            style={{ backgroundColor: enabled ? '#22c55e' : '#ef4444' }}
+          />
+          <span className="text-gray-500">
+            {enabled ? '已启用' : '已禁用'} · 数量: {count} · 等级: {level}
+          </span>
+        </div>
+
+        {/* 样式与颜色 */}
+        <div className="bg-white/60 backdrop-blur rounded-xl p-4 space-y-3">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+            样式与颜色
+          </h2>
+          <div className="flex items-center gap-3">
+            <div className="text-xs text-gray-500">强调色:</div>
+            <div
+              className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
+              style={{ backgroundColor: accentColor }}
+            />
+            <div
+              className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
+              style={{ backgroundColor: bgColor }}
+            />
+            <div className="text-xs text-gray-400">背景色</div>
+          </div>
+
+          {/* 图片集 */}
+          {safeGallery.length > 0 && (
+            <div>
+              <div className="text-xs text-gray-400 mb-1">图片集 ({safeGallery.length} 张)</div>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {safeGallery.map((url, i) => (
+                  <img
+                    key={i}
+                    src={url}
+                    alt={`图片 ${i + 1}`}
+                    className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+          {safeGallery.length === 0 && (
+            <div className="text-xs text-gray-300 italic">图片集为空</div>
+          )}
+        </div>
+
+        {/* 选择与富文本 */}
+        <div className="bg-white/60 backdrop-blur rounded-xl p-4 space-y-3">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+            选择与富文本
+          </h2>
+
+          {/* 模式 */}
+          <div>
+            <div className="text-xs text-gray-400 mb-1">模式: {mode}</div>
+            <div className="flex gap-1">
+              {['card', 'list', 'grid'].map((m) => (
+                <span
+                  key={m}
+                  className="text-[10px] px-2 py-0.5 rounded-full"
+                  style={{
+                    backgroundColor: mode === m ? accentColor : '#e5e7eb',
+                    color: mode === m ? '#fff' : '#6b7280',
+                  }}
+                >
+                  {m === 'card' ? '卡片' : m === 'list' ? '列表' : '网格'}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* 标签 */}
+          {safeTags.length > 0 && (
+            <div>
+              <div className="text-xs text-gray-400 mb-1">标签 ({safeTags.length} 个)</div>
+              <div className="flex flex-wrap gap-1">
+                {safeTags.map((tag) => {
+                  const info = TAG_MAP[tag] || { label: tag, color: '#9ca3af' };
+                  return (
+                    <span
+                      key={tag}
+                      className="text-[10px] px-2 py-0.5 rounded-full text-white"
+                      style={{ backgroundColor: info.color }}
+                    >
+                      {info.label}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 地区 */}
+          <div>
+            <div className="text-xs text-gray-400 mb-1">地区 (cascade)</div>
+            <div className="text-xs font-medium text-gray-700">
+              {renderRegion(safeRegion)}
+            </div>
+          </div>
+
+          {/* 富文本 */}
+          {richtextContent && (
+            <div>
+              <div className="text-xs text-gray-400 mb-1">富文本内容</div>
+              <div
+                className="text-xs text-gray-700 bg-white rounded-lg p-3 border leading-relaxed [&_strong]:font-bold [&_em]:italic [&_u]:underline"
+                dangerouslySetInnerHTML={{ __html: richtextContent }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* 可排序列表 */}
+        <div className="bg-white/60 backdrop-blur rounded-xl p-4 space-y-3">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+            可排序列表
+          </h2>
+          <div className="text-[10px] text-gray-400 -mt-1">
+            可拖拽排序 · 进度项最多 1 个
+          </div>
+          <div className="space-y-2">
+            {safeModules.length > 0 ? (
+              safeModules.map((mod, i) => {
+                const type = (mod as Record<string, unknown>).type as string;
+                if (type === 'text') {
+                  const content = (mod as Record<string, unknown>).content as string || '';
+                  return (
+                    <div key={i} className="bg-white rounded-lg p-3 border text-xs text-gray-700">
+                      {content}
+                    </div>
+                  );
+                }
+                if (type === 'progress') {
+                  const label = (mod as Record<string, unknown>).label as string || '进度';
+                  const value = (mod as Record<string, unknown>).value as number || 0;
+                  return (
+                    <div key={i} className="bg-white rounded-lg p-3 border" style={{ borderColor: `${accentColor}20` }}>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-xs font-medium text-gray-600">{label}</span>
+                        <span className="text-xs font-bold" style={{ color: accentColor }}>{value}%</span>
+                      </div>
+                      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${value}%`, backgroundColor: accentColor }}
+                        />
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })
+            ) : (
+              <div className="text-xs text-gray-300 italic text-center py-4">
+                暂无列表项
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 底部配置类型说明 */}
+        <div className="bg-white/60 backdrop-blur rounded-xl p-4">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+            配置类型一览
+          </h2>
+          <div className="grid grid-cols-2 gap-1 text-[10px] text-gray-500">
+            {[
+              ['string', '文本'],
+              ['number', '数字'],
+              ['integer', '整数'],
+              ['boolean', '布尔'],
+              ['text', '长文本'],
+              ['color', '颜色'],
+              ['image', '图片'],
+              ['imageList', '图片列表'],
+              ['richtext', '富文本'],
+              ['enum', '枚举单选'],
+              ['enum+multiple', '枚举多选'],
+              ['cascade', '级联选择'],
+              ['array+sortable', '可排序列表'],
+              ['maxItems', '数量限制'],
+              ['position', '坐标定位'],
+            ].map(([type, label]) => (
+              <div key={type} className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accentColor }} />
+                <span className="font-mono">{type}</span>
+                <span className="text-gray-300">-</span>
+                <span>{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+interface DemoProps {
+  title?: string;
+  description?: string;
+  count?: number;
+  level?: number;
+  enabled?: boolean;
+  bgColor?: string;
+  accentColor?: string;
+  coverImage?: string;
+  gallery?: string[];
+  mode?: string;
+  tags?: string[];
+  region?: string[];
+  richtextContent?: string;
+  badgePosition?: { x: number; y: number };
+  modules?: Array<Record<string, unknown>>;
+}
+
+const TAG_MAP: Record<string, { label: string; color: string }> = {
+  react: { label: 'React', color: '#61dafb' },
+  typescript: { label: 'TypeScript', color: '#3178c6' },
+  tailwind: { label: 'Tailwind', color: '#06b6d4' },
+};
+
+function renderRegion(region: string[] | undefined): string {
+  if (!region || region.length === 0) return '未选择';
+  const regionMap: Record<string, string> = {
+    zhejiang: '浙江',
+    hangzhou: '杭州',
+  };
+  return region.map((v) => regionMap[v] || v).join(' / ');
+}
+
+export default function ConfigDemo(props: DemoProps) {
+  const safeArray = (val: unknown): string[] =>
+    Array.isArray(val) ? val : typeof val === 'string' ? val.split(',') : [];
+
+  const {
+    title = '配置项示例',
+    description = '每个配置类型仅保留一个示例',
+    count = 42,
+    level = 3,
+    enabled = true,
+    bgColor = '#f0f4ff',
+    accentColor = '#6366f1',
+    coverImage = '',
+    gallery = [],
+    mode = 'card',
+    tags = [],
+    region = [],
+    richtextContent = '',
+    badgePosition = { x: 280, y: 20 },
+    modules = [],
+  } = props as Record<string, unknown>;
+
+  const safeTags = safeArray(tags);
+  const safeRegion = safeArray(region);
+  const safeGallery = safeArray(gallery);
+  const safeModules = Array.isArray(modules) ? modules : [];
+
+  return (
+    <div
+      className="min-h-screen relative overflow-hidden"
+      style={{ backgroundColor: bgColor }}
+    >
+      {/* 定位徽章 */}
+      <div
+        data-pos-key="badge"
+        className="absolute z-10 px-2 py-0.5 rounded-full text-[10px] font-bold text-white shadow-sm"
+        style={{
+          left: typeof badgePosition?.x === 'number' ? badgePosition.x : 280,
+          top: typeof badgePosition?.y === 'number' ? badgePosition.y : 20,
+          backgroundColor: accentColor,
+        }}
+      >
+        NEW
+      </div>
+
+      {/* 封面图片 */}
+      {coverImage && (
+        <div className="w-full h-40 overflow-hidden">
+          <img src={coverImage} alt="封面" className="w-full h-full object-cover" />
+        </div>
+      )}
+
+      <div className="px-4 pt-4 pb-6 space-y-5">
+        {/* 标题与描述 */}
+        <div>
+          <h1 className="text-xl font-bold text-gray-800">{title}</h1>
+          {description && (
+            <p className="text-xs text-gray-500 mt-1 leading-relaxed">{description}</p>
+          )}
+        </div>
+
+        {/* 基础信息 */}
+        <div className="flex items-center gap-2 text-xs">
+          <span
+            className="inline-block w-2 h-2 rounded-full"
+            style={{ backgroundColor: enabled ? '#22c55e' : '#ef4444' }}
+          />
+          <span className="text-gray-500">
+            {enabled ? '已启用' : '已禁用'} · 数量: {count} · 等级: {level}
+          </span>
+        </div>
+
+        {/* 样式与颜色 */}
+        <div className="bg-white/60 backdrop-blur rounded-xl p-4 space-y-3">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+            样式与颜色
+          </h2>
+          <div className="flex items-center gap-3">
+            <div className="text-xs text-gray-500">强调色:</div>
+            <div
+              className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
+              style={{ backgroundColor: accentColor }}
+            />
+            <div
+              className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
+              style={{ backgroundColor: bgColor }}
+            />
+            <div className="text-xs text-gray-400">背景色</div>
+          </div>
+
+          {/* 图片集 */}
+          {safeGallery.length > 0 && (
+            <div>
+              <div className="text-xs text-gray-400 mb-1">图片集 ({safeGallery.length} 张)</div>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {safeGallery.map((url, i) => (
+                  <img
+                    key={i}
+                    src={url}
+                    alt={`图片 ${i + 1}`}
+                    className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+          {safeGallery.length === 0 && (
+            <div className="text-xs text-gray-300 italic">图片集为空</div>
+          )}
+        </div>
+
+        {/* 选择与富文本 */}
+        <div className="bg-white/60 backdrop-blur rounded-xl p-4 space-y-3">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+            选择与富文本
+          </h2>
+
+          {/* 模式 */}
+          <div>
+            <div className="text-xs text-gray-400 mb-1">模式: {mode}</div>
+            <div className="flex gap-1">
+              {['card', 'list', 'grid'].map((m) => (
+                <span
+                  key={m}
+                  className="text-[10px] px-2 py-0.5 rounded-full"
+                  style={{
+                    backgroundColor: mode === m ? accentColor : '#e5e7eb',
+                    color: mode === m ? '#fff' : '#6b7280',
+                  }}
+                >
+                  {m === 'card' ? '卡片' : m === 'list' ? '列表' : '网格'}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* 标签 */}
+          {safeTags.length > 0 && (
+            <div>
+              <div className="text-xs text-gray-400 mb-1">标签 ({safeTags.length} 个)</div>
+              <div className="flex flex-wrap gap-1">
+                {safeTags.map((tag) => {
+                  const info = TAG_MAP[tag] || { label: tag, color: '#9ca3af' };
+                  return (
+                    <span
+                      key={tag}
+                      className="text-[10px] px-2 py-0.5 rounded-full text-white"
+                      style={{ backgroundColor: info.color }}
+                    >
+                      {info.label}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 地区 */}
+          <div>
+            <div className="text-xs text-gray-400 mb-1">地区 (cascade)</div>
+            <div className="text-xs font-medium text-gray-700">
+              {renderRegion(safeRegion)}
+            </div>
+          </div>
+
+          {/* 富文本 */}
+          {richtextContent && (
+            <div>
+              <div className="text-xs text-gray-400 mb-1">富文本内容</div>
+              <div
+                className="text-xs text-gray-700 bg-white rounded-lg p-3 border leading-relaxed [&_strong]:font-bold [&_em]:italic [&_u]:underline"
+                dangerouslySetInnerHTML={{ __html: richtextContent }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* 可排序列表 */}
+        <div className="bg-white/60 backdrop-blur rounded-xl p-4 space-y-3">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+            可排序列表
+          </h2>
+          <div className="text-[10px] text-gray-400 -mt-1">
+            可拖拽排序 · 进度项最多 1 个
+          </div>
+          <div className="space-y-2">
+            {safeModules.length > 0 ? (
+              safeModules.map((mod, i) => {
+                const type = (mod as Record<string, unknown>).type as string;
+                if (type === 'text') {
+                  const content = (mod as Record<string, unknown>).content as string || '';
+                  return (
+                    <div key={i} className="bg-white rounded-lg p-3 border text-xs text-gray-700">
+                      {content}
+                    </div>
+                  );
+                }
+                if (type === 'progress') {
+                  const label = (mod as Record<string, unknown>).label as string || '进度';
+                  const value = (mod as Record<string, unknown>).value as number || 0;
+                  return (
+                    <div key={i} className="bg-white rounded-lg p-3 border" style={{ borderColor: `${accentColor}20` }}>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-xs font-medium text-gray-600">{label}</span>
+                        <span className="text-xs font-bold" style={{ color: accentColor }}>{value}%</span>
+                      </div>
+                      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${value}%`, backgroundColor: accentColor }}
+                        />
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })
+            ) : (
+              <div className="text-xs text-gray-300 italic text-center py-4">
+                暂无列表项
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 底部配置类型说明 */}
+        <div className="bg-white/60 backdrop-blur rounded-xl p-4">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+            配置类型一览
+          </h2>
+          <div className="grid grid-cols-2 gap-1 text-[10px] text-gray-500">
+            {[
+              ['string', '文本'],
+              ['number', '数字'],
+              ['integer', '整数'],
+              ['boolean', '布尔'],
+              ['text', '长文本'],
+              ['color', '颜色'],
+              ['image', '图片'],
+              ['imageList', '图片列表'],
+              ['richtext', '富文本'],
+              ['enum', '枚举单选'],
+              ['enum+multiple', '枚举多选'],
+              ['cascade', '级联选择'],
+              ['array+sortable', '可排序列表'],
+              ['maxItems', '数量限制'],
+              ['position', '坐标定位'],
+            ].map(([type, label]) => (
+              <div key={type} className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accentColor }} />
+                <span className="font-mono">{type}</span>
+                <span className="text-gray-300">-</span>
+                <span>{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+interface DemoProps {
+  title?: string;
+  description?: string;
+  count?: number;
+  level?: number;
+  enabled?: boolean;
+  bgColor?: string;
+  accentColor?: string;
+  coverImage?: string;
+  gallery?: string[];
+  mode?: string;
+  tags?: string[];
+  region?: string[];
+  richtextContent?: string;
+  badgePosition?: { x: number; y: number };
+  modules?: Array<Record<string, unknown>>;
+}
+
+const TAG_MAP: Record<string, { label: string; color: string }> = {
+  react: { label: 'React', color: '#61dafb' },
+  typescript: { label: 'TypeScript', color: '#3178c6' },
+  tailwind: { label: 'Tailwind', color: '#06b6d4' },
+};
+
+function renderRegion(region: string[] | undefined): string {
+  if (!region || region.length === 0) return '未选择';
+  const regionMap: Record<string, string> = {
+    zhejiang: '浙江',
+    hangzhou: '杭州',
+  };
+  return region.map((v) => regionMap[v] || v).join(' / ');
+}
+
+export default function ConfigDemo(props: DemoProps) {
+  const safeArray = (val: unknown): string[] =>
+    Array.isArray(val) ? val : typeof val === 'string' ? val.split(',') : [];
+
+  const {
+    title = '配置项示例',
+    description = '每个配置类型仅保留一个示例',
+    count = 42,
+    level = 3,
+    enabled = true,
+    bgColor = '#f0f4ff',
+    accentColor = '#6366f1',
+    coverImage = '',
+    gallery = [],
+    mode = 'card',
+    tags = [],
+    region = [],
+    richtextContent = '',
+    badgePosition = { x: 280, y: 20 },
+    modules = [],
+  } = props as Record<string, unknown>;
+
+  const safeTags = safeArray(tags);
+  const safeRegion = safeArray(region);
+  const safeGallery = safeArray(gallery);
+  const safeModules = Array.isArray(modules) ? modules : [];
+
+  return (
+    <div
+      className="min-h-screen relative overflow-hidden"
+      style={{ backgroundColor: bgColor }}
+    >
+      {/* 定位徽章 */}
+      <div
+        data-pos-key="badge"
+        className="absolute z-10 px-2 py-0.5 rounded-full text-[10px] font-bold text-white shadow-sm"
+        style={{
+          left: typeof badgePosition?.x === 'number' ? badgePosition.x : 280,
+          top: typeof badgePosition?.y === 'number' ? badgePosition.y : 20,
+          backgroundColor: accentColor,
+        }}
+      >
+        NEW
+      </div>
+
+      {/* 封面图片 */}
+      {coverImage && (
+        <div className="w-full h-40 overflow-hidden">
+          <img src={coverImage} alt="封面" className="w-full h-full object-cover" />
+        </div>
+      )}
+
+      <div className="px-4 pt-4 pb-6 space-y-5">
+        {/* 标题与描述 */}
+        <div>
+          <h1 className="text-xl font-bold text-gray-800">{title}</h1>
+          {description && (
+            <p className="text-xs text-gray-500 mt-1 leading-relaxed">{description}</p>
+          )}
+        </div>
+
+        {/* 基础信息 */}
+        <div className="flex items-center gap-2 text-xs">
+          <span
+            className="inline-block w-2 h-2 rounded-full"
+            style={{ backgroundColor: enabled ? '#22c55e' : '#ef4444' }}
+          />
+          <span className="text-gray-500">
+            {enabled ? '已启用' : '已禁用'} · 数量: {count} · 等级: {level}
+          </span>
+        </div>
+
+        {/* 样式与颜色 */}
+        <div className="bg-white/60 backdrop-blur rounded-xl p-4 space-y-3">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+            样式与颜色
+          </h2>
+          <div className="flex items-center gap-3">
+            <div className="text-xs text-gray-500">强调色:</div>
+            <div
+              className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
+              style={{ backgroundColor: accentColor }}
+            />
+            <div
+              className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
+              style={{ backgroundColor: bgColor }}
+            />
+            <div className="text-xs text-gray-400">背景色</div>
+          </div>
+
+          {/* 图片集 */}
+          {safeGallery.length > 0 && (
+            <div>
+              <div className="text-xs text-gray-400 mb-1">图片集 ({safeGallery.length} 张)</div>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {safeGallery.map((url, i) => (
+                  <img
+                    key={i}
+                    src={url}
+                    alt={`图片 ${i + 1}`}
+                    className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+          {safeGallery.length === 0 && (
+            <div className="text-xs text-gray-300 italic">图片集为空</div>
+          )}
+        </div>
+
+        {/* 选择与富文本 */}
+        <div className="bg-white/60 backdrop-blur rounded-xl p-4 space-y-3">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+            选择与富文本
+          </h2>
+
+          {/* 模式 */}
+          <div>
+            <div className="text-xs text-gray-400 mb-1">模式: {mode}</div>
+            <div className="flex gap-1">
+              {['card', 'list', 'grid'].map((m) => (
+                <span
+                  key={m}
+                  className="text-[10px] px-2 py-0.5 rounded-full"
+                  style={{
+                    backgroundColor: mode === m ? accentColor : '#e5e7eb',
+                    color: mode === m ? '#fff' : '#6b7280',
+                  }}
+                >
+                  {m === 'card' ? '卡片' : m === 'list' ? '列表' : '网格'}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* 标签 */}
+          {safeTags.length > 0 && (
+            <div>
+              <div className="text-xs text-gray-400 mb-1">标签 ({safeTags.length} 个)</div>
+              <div className="flex flex-wrap gap-1">
+                {safeTags.map((tag) => {
+                  const info = TAG_MAP[tag] || { label: tag, color: '#9ca3af' };
+                  return (
+                    <span
+                      key={tag}
+                      className="text-[10px] px-2 py-0.5 rounded-full text-white"
+                      style={{ backgroundColor: info.color }}
+                    >
+                      {info.label}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 地区 */}
+          <div>
+            <div className="text-xs text-gray-400 mb-1">地区 (cascade)</div>
+            <div className="text-xs font-medium text-gray-700">
+              {renderRegion(safeRegion)}
+            </div>
+          </div>
+
+          {/* 富文本 */}
+          {richtextContent && (
+            <div>
+              <div className="text-xs text-gray-400 mb-1">富文本内容</div>
+              <div
+                className="text-xs text-gray-700 bg-white rounded-lg p-3 border leading-relaxed [&_strong]:font-bold [&_em]:italic [&_u]:underline"
+                dangerouslySetInnerHTML={{ __html: richtextContent }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* 可排序列表 */}
+        <div className="bg-white/60 backdrop-blur rounded-xl p-4 space-y-3">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+            可排序列表
+          </h2>
+          <div className="text-[10px] text-gray-400 -mt-1">
+            可拖拽排序 · 进度项最多 1 个
+          </div>
+          <div className="space-y-2">
+            {safeModules.length > 0 ? (
+              safeModules.map((mod, i) => {
+                const type = (mod as Record<string, unknown>).type as string;
+                if (type === 'text') {
+                  const content = (mod as Record<string, unknown>).content as string || '';
+                  return (
+                    <div key={i} className="bg-white rounded-lg p-3 border text-xs text-gray-700">
+                      {content}
+                    </div>
+                  );
+                }
+                if (type === 'progress') {
+                  const label = (mod as Record<string, unknown>).label as string || '进度';
+                  const value = (mod as Record<string, unknown>).value as number || 0;
+                  return (
+                    <div key={i} className="bg-white rounded-lg p-3 border" style={{ borderColor: `${accentColor}20` }}>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-xs font-medium text-gray-600">{label}</span>
+                        <span className="text-xs font-bold" style={{ color: accentColor }}>{value}%</span>
+                      </div>
+                      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${value}%`, backgroundColor: accentColor }}
+                        />
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })
+            ) : (
+              <div className="text-xs text-gray-300 italic text-center py-4">
+                暂无列表项
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 底部配置类型说明 */}
+        <div className="bg-white/60 backdrop-blur rounded-xl p-4">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+            配置类型一览
+          </h2>
+          <div className="grid grid-cols-2 gap-1 text-[10px] text-gray-500">
+            {[
+              ['string', '文本'],
+              ['number', '数字'],
+              ['integer', '整数'],
+              ['boolean', '布尔'],
+              ['text', '长文本'],
+              ['color', '颜色'],
+              ['image', '图片'],
+              ['imageList', '图片列表'],
+              ['richtext', '富文本'],
+              ['enum', '枚举单选'],
+              ['enum+multiple', '枚举多选'],
+              ['cascade', '级联选择'],
+              ['array+sortable', '可排序列表'],
+              ['maxItems', '数量限制'],
+              ['position', '坐标定位'],
+            ].map(([type, label]) => (
+              <div key={type} className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accentColor }} />
+                <span className="font-mono">{type}</span>
+                <span className="text-gray-300">-</span>
+                <span>{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

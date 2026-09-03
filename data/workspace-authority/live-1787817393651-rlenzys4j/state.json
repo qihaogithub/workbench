@@ -1,0 +1,16 @@
+{
+  "workspaceId": "live-1787817393651-rlenzys4j",
+  "projectId": "proj_1787817393464_5oox0r",
+  "revision": 2,
+  "rootHash": "1e07e24326c6e5287d694e64cfa547953db0c1e3a2cecdfeafe2f5b4e9dd1ff3",
+  "resourceHashes": {
+    ".canvas-layout.json": "7f4a0bf6368262e8be5131edfc4177a2955ba6a049145d37af5ad3d9cee7bd47",
+    "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
+    "memory.md": "48154b93957f8b6110505afd34139407eb21d3408afb84c6ad8b3343a22d39a5",
+    "workspace-tree.json": "b8f84cb18b1d4fb04f8db0fdb7867802b916f6365d4816c8289777a7893570ab"
+  },
+  "mutationPayloads": {
+    "1521fe02-7cc8-4746-889d-9b0d3c6cc4c8": "f78654926703b335cc94d34053b9bc1c55672bd1b69c05697d3d9aa2ea9304a4"
+  },
+  "updatedAt": 1787817408808
+}

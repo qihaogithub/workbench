@@ -1,0 +1,120 @@
+{
+  "$demo": {
+    "previewSize": { "width": 375, "height": 812 }
+  },
+  "type": "object",
+  "properties": {
+    "内容配置": {
+      "type": "object",
+      "title": "内容配置",
+      "properties": {
+        "richContent": {
+          "type": "richtext",
+          "title": "富文本内容",
+          "default": "<h2>欢迎体验配置系统</h2><p>这是一段<strong>富文本</strong>内容，您可以在右侧面板编辑它。</p><ul><li>支持加粗、斜体</li><li>支持列表</li><li>支持链接</li></ul>"
+        },
+        "gallery": {
+          "type": "array",
+          "title": "图片集",
+          "items": { "type": "string", "format": "image" },
+          "default": []
+        },
+        "tags": {
+          "type": "string",
+          "title": "标签",
+          "enum": ["tech", "design", "art", "music"],
+          "enumNames": ["技术", "设计", "艺术", "音乐"],
+          "multiple": true,
+          "default": ["tech", "design"]
+        },
+        "region": {
+          "type": "cascade",
+          "title": "地区",
+          "default": ["zhejiang", "hangzhou"],
+          "options": [
+            {
+              "value": "zhejiang",
+              "label": "浙江",
+              "children": [
+                { "value": "hangzhou", "label": "杭州" },
+                { "value": "ningbo", "label": "宁波" }
+              ]
+            },
+            {
+              "value": "jiangsu",
+              "label": "江苏",
+              "children": [
+                { "value": "nanjing", "label": "南京" },
+                { "value": "suzhou", "label": "苏州" }
+              ]
+            }
+          ]
+        }
+      },
+      "required": []
+    },
+    "模块列表": {
+      "type": "object",
+      "title": "模块列表",
+      "properties": {
+        "modules": {
+          "type": "array",
+          "title": "模块列表",
+          "$demo": { "sortable": true },
+          "items": {
+            "oneOf": [
+              {
+                "title": "文本模块",
+                "properties": {
+                  "type": { "const": "text" },
+                  "content": { "type": "text", "title": "文本内容", "default": "这是一段文本模块的内容" }
+                },
+                "required": ["type"]
+              },
+              {
+                "title": "图片模块",
+                "properties": {
+                  "type": { "const": "image" },
+                  "pic": { "type": "string", "title": "图片", "format": "image" },
+                  "caption": { "type": "string", "title": "说明", "default": "图片说明" }
+                },
+                "required": ["type"]
+              },
+              {
+                "title": "色块模块",
+                "properties": {
+                  "type": { "const": "colorBlock" },
+                  "label": { "type": "string", "title": "标签", "default": "色块" },
+                  "color": { "type": "string", "title": "颜色", "format": "color", "default": "#6366f1" }
+                },
+                "required": ["type"]
+              }
+            ]
+          },
+          "default": [
+            { "type": "text", "content": "欢迎使用配置系统，您可以自由调整模块顺序。" },
+            { "type": "image", "pic": "", "caption": "示例图片" },
+            { "type": "colorBlock", "label": "主色调", "color": "#6366f1" }
+          ]
+        }
+      },
+      "required": []
+    },
+    "定位元素": {
+      "type": "object",
+      "title": "定位元素",
+      "properties": {
+        "decoText": { "type": "string", "title": "装饰文字", "default": "✨" },
+        "decoPosition": {
+          "type": "position",
+          "key": "deco",
+          "title": "装饰位置",
+          "size": { "width": 375, "height": 300 },
+          "default": { "x": 280, "y": 20 }
+        }
+      },
+      "required": []
+    }
+  },
+  "required": []
+}

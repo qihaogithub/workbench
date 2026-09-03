@@ -1,0 +1,27 @@
+{
+  "id": "proj_1787895065566_5wgvzx",
+  "name": "测试",
+  "projectType": "standard",
+  "category": "测试",
+  "workspacePath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/projects/proj_1787895065566_5wgvzx/workspace",
+  "demoPages": [
+    {
+      "id": "video-demo_ab12",
+      "name": "视频展示页面",
+      "parentId": null,
+      "order": 0,
+      "runtimeType": "high-fidelity-react",
+      "routeKey": "page"
+    }
+  ],
+  "demoFolders": [],
+  "versions": [],
+  "createdAt": 1787895065567,
+  "updatedAt": 1788347996416,
+  "activeWorkspaceId": "live-1787895066314-d67ahlorl",
+  "activeWorkspaceUpdatedAt": 1787895066324,
+  "canonicalSyncedWorkspaceId": "live-1787895066314-d67ahlorl",
+  "canonicalSyncedRevision": 34,
+  "canonicalSyncedRootHash": "ee53b5b99881eeb0f6b4f9c87a76fb447dcbbc2e13a58a38c0e6309ab6fd3d08",
+  "canonicalSyncedAt": 1788347996416
+}

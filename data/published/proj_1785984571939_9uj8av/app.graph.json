@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "entry": "pad-2",
+  "pages": {
+    "pad-2": {
+      "pageId": "pad_s5xn",
+      "title": "pad"
+    },
+    "page-2": {
+      "pageId": "page_0it3",
+      "title": "手机"
+    }
+  },
+  "actions": [],
+  "state": {}
+}

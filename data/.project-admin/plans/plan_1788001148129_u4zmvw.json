@@ -1,0 +1,12 @@
+{
+  "planId": "plan_1788001148129_u4zmvw",
+  "operation": "project_delete",
+  "resourceId": "proj_1788001121392_w0mlbl",
+  "impact": [
+    "删除项目 E2E:20260829T105837940Z-b8fmiu:配置图片白板宿主回归",
+    "删除 0 个页面",
+    "删除项目工作空间和元数据"
+  ],
+  "reversible": true,
+  "confirmToken": "confirm_1788001148129_62i4ik"
+}

@@ -1,0 +1,13 @@
+{
+  "workspaceId": "live-1788320705966-tfeq1txwi",
+  "projectId": "proj_1788320370753_csdemc",
+  "revision": 1,
+  "rootHash": "e8ad33a8da5e848ff812e765526ea3cf624ac68c7e475be39084885b7b437a44",
+  "resourceHashes": {
+    "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
+    "memory.md": "33009d41c94793c6b247e480920c3e52b6e102df3c4ab804e1a537a6c0976a52",
+    "workspace-tree.json": "b8f84cb18b1d4fb04f8db0fdb7867802b916f6365d4816c8289777a7893570ab"
+  },
+  "mutationPayloads": {},
+  "updatedAt": 1788320707487
+}

@@ -1,0 +1,8 @@
+{
+  "id": "pad_p8ac",
+  "name": "明星赛pad",
+  "routeKey": "pad",
+  "order": 1,
+  "parentId": null,
+  "runtimeType": "prototype-html-css"
+}

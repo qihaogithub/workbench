@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "themeColor": {
+      "type": "string",
+      "format": "color",
+      "title": "主题色",
+      "default": "#f43f5e",
+      "ui:options": {
+        "group": "主题与主图"
+      }
+    },
+    "heroImage": {
+      "type": "string",
+      "format": "image",
+      "title": "主图",
+      "default": "/api/images/img_LDDSS0632xDWLA",
+      "ui:options": {
+        "group": "主题与主图"
+      }
+    },
+    "gallery": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "title": "画廊图片",
+      "default": [
+        "/api/images/img_LPmD-Ejr7hK3Hg",
+        "/api/images/img_iCIA2TYtQ_JCog",
+        "/api/images/img_q7MaRl3m0tHzbg"
+      ],
+      "ui:options": {
+        "group": "画廊与介绍"
+      }
+    },
+    "article": {
+      "type": "string",
+      "ui:widget": "richtext",
+      "title": "富文本介绍",
+      "default": "<h3>活动亮点</h3><p>精选 <strong>100+</strong> 款人气商品，<em>低至 5 折</em>。每日 10 点限量秒杀，先到先得！</p><ul><li>全场包邮</li><li>7 天无理由退换</li></ul>",
+      "ui:options": {
+        "group": "画廊与介绍"
+      }
+    }
+  },
+  "required": [],
+  "$demo": {
+    "previewSize": {
+      "width": 375,
+      "height": 812
+    }
+  }
+}

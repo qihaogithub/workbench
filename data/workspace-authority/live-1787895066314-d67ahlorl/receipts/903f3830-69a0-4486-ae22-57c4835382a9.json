@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "903f3830-69a0-4486-ae22-57c4835382a9",
+  "projectId": "proj_1787895065566_5wgvzx",
+  "workspaceId": "live-1787895066314-d67ahlorl",
+  "baseRevision": 0,
+  "revision": 23,
+  "rootHash": "ceb8d967ea90ffa8e4eef2ca71048faf4bdab24548e8b95bb04f56a2fe4db606",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/word-king-tower_b7d4/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "bf968b60e665eb9354fd9ba166069d20d5f937e76f9a350a69137fb25334dd65",
+      "afterHash": null
+    },
+    {
+      "path": "demos/word-king-tower_b7d4/prototype.css",
+      "action": "deleted",
+      "beforeHash": "bda26cda6993bab100e9276cadb9bf7bda6f8e3fbc024e4beaac3e82283b3180",
+      "afterHash": null
+    },
+    {
+      "path": "demos/word-king-tower_b7d4/prototype.html",
+      "action": "deleted",
+      "beforeHash": "3e191a2bc7fca70fea2dc46b7b1256e3981e71210d807dd0a31e13e3052344ec",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "2048713349992d1453736034a06dfbf503f28c0b6c4893d781c9ead9b7408888",
+      "afterHash": "eb54faa64775bf78adbb7b03f88a50fb5d2394b336425b74db4f0e72895355fb"
+    }
+  ],
+  "committedAt": 1787898383118
+}

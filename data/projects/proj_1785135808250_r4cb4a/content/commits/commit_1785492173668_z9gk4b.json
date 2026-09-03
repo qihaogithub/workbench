@@ -1,0 +1,76 @@
+{
+  "id": "commit_1785492173668_z9gk4b",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "parentCommitId": "commit_1785488410735_q2wm61",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录闯关开场引入-视频",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "page_5rsp",
+      "versionId": "prv_1785222248758_v0zhj5"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_da9l",
+      "versionId": "prv_1785316177703_45jh4a"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_gfbs",
+      "versionId": "prv_1785136734038_5bt9sp"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_pqyt",
+      "versionId": "prv_1785205299313_c3158x"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_sgfq",
+      "versionId": "prv_1785321973637_sq9mhi"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_swfq",
+      "versionId": "prv_1785492173664_bc7rn0"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_wcfh",
+      "versionId": "prv_1785206677053_mzslur"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_xix9",
+      "versionId": "prv_1785397932241_fpmkja"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_yw72",
+      "versionId": "prv_1785312674587_adecy4"
+    },
+    {
+      "kind": "page",
+      "resourceId": "quiz-wrong_b7k9",
+      "versionId": "prv_1785483602685_6xd2vx"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "page_swfq",
+      "fromVersionId": "prv_1785488410732_kc04lv",
+      "toVersionId": "prv_1785492173664_bc7rn0"
+    }
+  ],
+  "createdAt": 1785492173668,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785205322879-latagwnoh",
+    "workspaceRevision": 330,
+    "workspaceRootHash": "bd0870038427d4db73e2a7f766d54727ee8a9b6b56d3264c69fc3627f63f77d0"
+  }
+}

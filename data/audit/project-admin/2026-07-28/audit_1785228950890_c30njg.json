@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1785228950890_c30njg",
+  "at": 1785228950890,
+  "actor": {
+    "id": "jojo",
+    "name": "jojo",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1785228950889_c6hs1j",
+  "inputSummary": {
+    "name": "伴读明星赛",
+    "category": "APP资源位"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1785228950889_c6hs1j"
+    ]
+  }
+}

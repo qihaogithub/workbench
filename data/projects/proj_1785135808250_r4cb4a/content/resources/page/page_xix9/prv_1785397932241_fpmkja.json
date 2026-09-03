@@ -1,0 +1,43 @@
+{
+  "id": "prv_1785397932241_fpmkja",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "kind": "page",
+  "resourceId": "page_xix9",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "workspaceRevision": 257,
+  "workspaceRootHash": "2cdf1bad51c449c033bc1ce9bec6622198ade2c1f6c89675b9c7a132b54bca2c",
+  "previousVersionId": "prv_1785314149346_1nqy90",
+  "contentHash": "a0daa83c8aa4ded9ed13d0b7a49f3331102236412c0b55704037b061204c4e81",
+  "blobRefs": [
+    "caa4dded1c46311d8aaa611752a2a39998cd09de0af6953aa717f16a2012e746",
+    "6a5aaafea24449dba7fe6f2562aa25000f1097f33e105fad9ed1e95db69f566e",
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1"
+  ],
+  "metadata": {
+    "page": {
+      "id": "page_xix9",
+      "name": "闯关通关动画",
+      "routeKey": "page-5",
+      "order": 7,
+      "parentId": "folder_1785397477311_od13vu",
+      "runtimeType": "prototype-html-css"
+    },
+    "files": {
+      "schema": "caa4dded1c46311d8aaa611752a2a39998cd09de0af6953aa717f16a2012e746",
+      "prototypeHtml": "6a5aaafea24449dba7fe6f2562aa25000f1097f33e105fad9ed1e95db69f566e",
+      "prototypeCss": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "prototypeMeta": "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1785397932243,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录闯关通关动画"
+}

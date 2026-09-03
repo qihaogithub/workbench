@@ -1,0 +1,12 @@
+{
+  "planId": "plan_1787812859252_x1iu41",
+  "operation": "project_delete",
+  "resourceId": "proj_1787812802774_9w72dd",
+  "impact": [
+    "删除项目 E2E:20260827T063959764Z-s272l3:画布 Alt 拖拽复制回归",
+    "删除 2 个页面",
+    "删除项目工作空间和元数据"
+  ],
+  "reversible": true,
+  "confirmToken": "confirm_1787812859252_xy0969"
+}

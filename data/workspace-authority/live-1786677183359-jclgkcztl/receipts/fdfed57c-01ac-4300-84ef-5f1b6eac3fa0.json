@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "fdfed57c-01ac-4300-84ef-5f1b6eac3fa0",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 74,
+  "rootHash": "85e7c1fe7367d96244035fda7d33a47b8fe7b22873d07ffe9834125acddbedde",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/demo_ubmp/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "8243f0af367f188a376f2c17b5eabe872a2f7a979813e0d4e2be6d594c2aa259",
+      "afterHash": null
+    },
+    {
+      "path": "demos/demo_ubmp/html-import.meta.json",
+      "action": "deleted",
+      "beforeHash": "b60fed8ce85bfbfd0528a640296301d4cc79231a3c3192d1ffe410e6396ae766",
+      "afterHash": null
+    },
+    {
+      "path": "demos/demo_ubmp/index.tsx",
+      "action": "deleted",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": null
+    },
+    {
+      "path": "demos/demo_ubmp/sandbox.html",
+      "action": "deleted",
+      "beforeHash": "84dba86fd46c560f5939649ce887a5b0fcf1eb54cc0e17430a572e22adf9bd2e",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "d2a48d016beadabcc1430316c10e52793fbd9a1708aa01c01487f7f53d0d57af",
+      "afterHash": "926b8ef8cdb2f94055a745a936e4b266df18a0608e7e3fc36241ddcf8e844d3b"
+    }
+  ],
+  "committedAt": 1787672467241
+}

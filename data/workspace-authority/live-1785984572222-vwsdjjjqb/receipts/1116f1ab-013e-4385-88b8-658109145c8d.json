@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "1116f1ab-013e-4385-88b8-658109145c8d",
+  "projectId": "proj_1785984571939_9uj8av",
+  "workspaceId": "live-1785984572222-vwsdjjjqb",
+  "baseRevision": 0,
+  "revision": 103,
+  "rootHash": "241bebce700260c401faaf0457ec9123b4231cd3b7b3190b5c40100fc697dfd9",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_8usi/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f"
+    },
+    {
+      "path": "demos/page_8usi/prototype.css",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/page_8usi/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355"
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "76b90c9b73bbe18d9d953182f91c0747047aed29543a9375f39f87b23f546a75",
+      "afterHash": "5c16f8fed1a158ee582743b08f30794ab74cf1f8d4b1341d2a06eff8f48f7947"
+    }
+  ],
+  "committedAt": 1786010510993
+}

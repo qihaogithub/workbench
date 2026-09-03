@@ -1,0 +1,31 @@
+{
+  "committed": true,
+  "mutationId": "c4e3d82b-1abe-44d5-9720-a8cde87f5c4c",
+  "projectId": "proj_1785984571939_9uj8av",
+  "workspaceId": "live-1785984572222-vwsdjjjqb",
+  "baseRevision": 0,
+  "revision": 137,
+  "rootHash": "a42456db34df4aabb6401177fd5a0aa7589ae0cfdf23805e977644a905b7a527",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/pad_yvnd/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "699d597b88f65d8b5a475efe4a644da578a511fc8e55508fbfaab5785307894b",
+      "afterHash": null
+    },
+    {
+      "path": "demos/pad_yvnd/index.tsx",
+      "action": "deleted",
+      "beforeHash": "1411bf5f1a2ba822dbf5bfb15ddb09de0438812217ab1ef96b2b8bdf05907c44",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "0d70e31f1a61a71061b53c59657968999a6060a3e95a20f2b373cd5f093cb80a",
+      "afterHash": "76b90c9b73bbe18d9d953182f91c0747047aed29543a9375f39f87b23f546a75"
+    }
+  ],
+  "committedAt": 1786010831579
+}

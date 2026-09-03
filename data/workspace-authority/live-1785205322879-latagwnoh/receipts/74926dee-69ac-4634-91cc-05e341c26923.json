@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "74926dee-69ac-4634-91cc-05e341c26923",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "baseRevision": 0,
+  "revision": 1002,
+  "rootHash": "9fef88a36b668eb53023e2f7562e79ff2173a3a182bc18fc8cd5dfb7aa61a52f",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/闯关活动页-进行中_ec853d/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "517c0f81813d1e06f92386144f8f991b3f9e4249d5b024a304e01abd78e72571"
+    },
+    {
+      "path": "demos/闯关活动页-进行中_ec853d/prototype.css",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/闯关活动页-进行中_ec853d/prototype.meta.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "c8ff789088a244de5f3aeec94c77db2c953ba0e62122a274a9bbfe2989b7ab87"
+    },
+    {
+      "path": "demos/闯关活动页-进行中_ec853d/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "41e819787e89b80c9629968cf6797ba7faeec7b8601c3718df630f3fc6f1670c"
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "5d06b5936648bb4ffd9297843407c1768423ed2a65e958af669d675eb2e613f6",
+      "afterHash": "76282b8a8e57d504211af622985d858d03c9196a285c23d2aee060a85ea382d6"
+    }
+  ],
+  "committedAt": 1788239608082
+}

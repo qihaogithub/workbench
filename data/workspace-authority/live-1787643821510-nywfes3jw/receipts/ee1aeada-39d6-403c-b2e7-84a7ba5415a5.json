@@ -1,0 +1,49 @@
+{
+  "committed": true,
+  "mutationId": "ee1aeada-39d6-403c-b2e7-84a7ba5415a5",
+  "projectId": "proj_1785742777589_ncs6r6",
+  "workspaceId": "live-1787643821510-nywfes3jw",
+  "baseRevision": 0,
+  "revision": 51,
+  "rootHash": "50f99a840f256db223282358d8402512ef32a8bddca18435aeb8fb4893e5e060",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "assets/animations/spine_16f442e1f415cf3a45b2b8cc6961212224c5c0c56291663f1d5edc7397d228cc/star_second/Audio/audio_event_star_second_play.mp3",
+      "action": "modified",
+      "beforeHash": "8d9f2f380c8d2290421516f387b366f06396ef0a50291bea2b627f160084d4df",
+      "afterHash": "8d9f2f380c8d2290421516f387b366f06396ef0a50291bea2b627f160084d4df"
+    },
+    {
+      "path": "assets/animations/spine_16f442e1f415cf3a45b2b8cc6961212224c5c0c56291663f1d5edc7397d228cc/star_second/star_second.atlas.txt",
+      "action": "modified",
+      "beforeHash": "b52dd2c3222077b332fc3c4207cde25a23f71c2e7763bc108950e17f7b8391a3",
+      "afterHash": "b52dd2c3222077b332fc3c4207cde25a23f71c2e7763bc108950e17f7b8391a3"
+    },
+    {
+      "path": "assets/animations/spine_16f442e1f415cf3a45b2b8cc6961212224c5c0c56291663f1d5edc7397d228cc/star_second/star_second.png",
+      "action": "modified",
+      "beforeHash": "b74b83a3f962af9fb98b20239e7c0c9d511cf9515f417cee2fff2e6b0e7c93b1",
+      "afterHash": "b74b83a3f962af9fb98b20239e7c0c9d511cf9515f417cee2fff2e6b0e7c93b1"
+    },
+    {
+      "path": "assets/animations/spine_16f442e1f415cf3a45b2b8cc6961212224c5c0c56291663f1d5edc7397d228cc/star_second/star_second.skel.bytes",
+      "action": "modified",
+      "beforeHash": "f00bbd27292027161fda3d8c934e9856ef3c58c1896255e5398a1140584ed5cd",
+      "afterHash": "f00bbd27292027161fda3d8c934e9856ef3c58c1896255e5398a1140584ed5cd"
+    },
+    {
+      "path": "assets/animations/spine_16f442e1f415cf3a45b2b8cc6961212224c5c0c56291663f1d5edc7397d228cc/manifest.json",
+      "action": "modified",
+      "beforeHash": "98b0fdd64d7617a54c867e897cfbf9bf78ad8fffa27cd6117ba1bdfc5b87773a",
+      "afterHash": "98b0fdd64d7617a54c867e897cfbf9bf78ad8fffa27cd6117ba1bdfc5b87773a"
+    },
+    {
+      "path": "demos/motion-formats_k4r2/config.values.json",
+      "action": "modified",
+      "beforeHash": "307760bd02e7c6e0aece09dd4bac28a219f684fbda5f78c67b638811c46a4e66",
+      "afterHash": "7c2c47b9bd39c1198bba6f82d0b1cbcdbff87a776e26277090863400e49998da"
+    }
+  ],
+  "committedAt": 1788347742403
+}

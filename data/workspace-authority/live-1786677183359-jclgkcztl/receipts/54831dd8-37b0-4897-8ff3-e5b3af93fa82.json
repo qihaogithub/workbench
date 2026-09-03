@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "54831dd8-37b0-4897-8ff3-e5b3af93fa82",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 69,
+  "rootHash": "98f0e5d891ff72d024f71b122dc30911073cfede67127af95b58a0f1be148644",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/8-0717_umup/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "8243f0af367f188a376f2c17b5eabe872a2f7a979813e0d4e2be6d594c2aa259",
+      "afterHash": null
+    },
+    {
+      "path": "demos/8-0717_umup/html-import.meta.json",
+      "action": "deleted",
+      "beforeHash": "b42001add3a17038df1ec84c5ccc9fdf865aa7b5de67bcaa92c371aaf5d63a1c",
+      "afterHash": null
+    },
+    {
+      "path": "demos/8-0717_umup/index.tsx",
+      "action": "deleted",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": null
+    },
+    {
+      "path": "demos/8-0717_umup/sandbox.html",
+      "action": "deleted",
+      "beforeHash": "f4bc6d0da46dd61902e6beb6505d017680ce0f537fc2be16dd426342d9799688",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "83ec3ef7e59a1c6782c39d6fbec245a93ca96f0fb9a7927191938c8cc94c21d6",
+      "afterHash": "926b8ef8cdb2f94055a745a936e4b266df18a0608e7e3fc36241ddcf8e844d3b"
+    }
+  ],
+  "committedAt": 1787672450266
+}

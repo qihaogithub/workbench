@@ -1,0 +1,35 @@
+{
+  "id": "ds_1787208159089_856f1c2d",
+  "title": "动效格式展示设计规范",
+  "createdAt": "2026-08-20T06:42:39.089Z",
+  "updatedAt": "2026-08-20T06:42:39.089Z",
+  "entries": [
+    {
+      "id": "e_1787208159090_3525fc8c",
+      "title": "封面 (image)",
+      "markdown": "",
+      "refs": [
+        {
+          "scope": "page",
+          "pageId": "motion-formats_k4r2",
+          "fieldKey": "coverImage"
+        }
+      ],
+      "autoManagedFieldKey": "coverImage"
+    },
+    {
+      "id": "e_1787208159090_3c5293fc",
+      "title": "布局设置 - 图片",
+      "markdown": "",
+      "refs": [
+        {
+          "scope": "page",
+          "pageId": "motion-formats_k4r2",
+          "fieldKey": "layoutItem"
+        }
+      ],
+      "autoManagedFieldKey": "layoutItem"
+    }
+  ],
+  "autoManagedPageId": "motion-formats_k4r2"
+}

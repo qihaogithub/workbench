@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "projectId": "proj_1785687393956_aa29zz",
+  "updatedAt": 1785727655156,
+  "state": {
+    "viewport": {
+      "x": 110.23181619795275,
+      "y": 132.12556975730033,
+      "zoom": 0.2801844802775854
+    },
+    "pages": {
+      "selector-fields_k7b1": {
+        "x": 830,
+        "y": -2.886579864025407e-14,
+        "width": 375,
+        "height": 812,
+        "zIndex": 2,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "array-modules_v5n2": {
+        "x": 1233.1689323332005,
+        "y": 0,
+        "width": 375,
+        "height": 967,
+        "zIndex": 3,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_guiv": {
+        "x": 1785.5508057428358,
+        "y": 56.34293260503302,
+        "width": 375,
+        "height": 812,
+        "zIndex": 4,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_mv9h": {
+        "x": 1906.5306316716205,
+        "y": 183.91647662162018,
+        "width": 375,
+        "height": 812,
+        "zIndex": 4,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_c4ac": {
+        "x": 1765.4538434414537,
+        "y": 0,
+        "width": 375,
+        "height": 812,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812",
+        "zIndex": 4
+      },
+      "basic-fields_xa3k": {
+        "x": -46.34502324017126,
+        "y": -12.483404671574917,
+        "width": 375,
+        "height": 812,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_of0d": {
+        "x": 2220.0134491298945,
+        "y": 0,
+        "width": 375,
+        "height": 598,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812",
+        "zIndex": 5
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "hiddenKnowledgeDocumentIds": [],
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    }
+  }
+}

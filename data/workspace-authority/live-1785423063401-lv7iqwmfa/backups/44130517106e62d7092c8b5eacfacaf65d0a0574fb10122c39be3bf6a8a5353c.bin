@@ -1,0 +1,314 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "title": "标题",
+      "default": "配置面板测试",
+      "ui:options": {
+        "group": "基础信息"
+      }
+    },
+    "subtitle": {
+      "type": "string",
+      "maxLength": 1000,
+      "title": "副标题",
+      "default": "这是一个通过 config.ts 编译的配置面板",
+      "ui:options": {
+        "group": "基础信息"
+      }
+    },
+    "showBanner": {
+      "type": "boolean",
+      "title": "显示横幅",
+      "default": true,
+      "ui:options": {
+        "group": "基础信息"
+      }
+    },
+    "fontSize": {
+      "type": "number",
+      "title": "标题字号",
+      "default": 24,
+      "ui:options": {
+        "group": "数值配置"
+      }
+    },
+    "gap": {
+      "type": "integer",
+      "title": "模块间距",
+      "default": 16,
+      "ui:options": {
+        "group": "数值配置"
+      }
+    },
+    "bgColor": {
+      "type": "string",
+      "format": "color",
+      "title": "背景颜色",
+      "default": "#f5f5f5",
+      "ui:options": {
+        "group": "样式配置"
+      }
+    },
+    "textColor": {
+      "type": "string",
+      "format": "color",
+      "title": "文字颜色",
+      "default": "#333333",
+      "ui:options": {
+        "group": "样式配置"
+      }
+    },
+    "layout": {
+      "type": "string",
+      "title": "布局",
+      "enum": [
+        "grid",
+        "list"
+      ],
+      "enumNames": [
+        "网格",
+        "列表"
+      ],
+      "default": "grid",
+      "ui:options": {
+        "group": "样式配置"
+      }
+    },
+    "tags": {
+      "type": "array",
+      "ui:widget": "multiselect",
+      "items": {
+        "type": "string",
+        "enum": [
+          "hot",
+          "new",
+          "recommend"
+        ],
+        "enumNames": [
+          "热门",
+          "新品",
+          "推荐"
+        ]
+      },
+      "title": "标签",
+      "default": [
+        "hot"
+      ],
+      "ui:options": {
+        "group": "样式配置"
+      }
+    },
+    "logo": {
+      "type": "string",
+      "format": "image",
+      "title": "Logo",
+      "default": "/api/images/img_hM5VzGditbEPwA",
+      "ui:options": {
+        "accept": "image/*",
+        "maxSize": 1048576,
+        "group": "素材"
+      }
+    },
+    "gallery": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "title": "画廊图片",
+      "default": [
+        "/api/images/img_90wInKJd_qRI0Q",
+        "/api/images/img_5I6WtUlYtpf0dQ"
+      ],
+      "ui:options": {
+        "group": "素材"
+      }
+    },
+    "description": {
+      "type": "string",
+      "ui:widget": "richtext",
+      "title": "富文本描述",
+      "default": "<p>这是一个<b>富文本</b>配置项，支持<strong>加粗</strong>、<em>斜体</em>等样式。</p>",
+      "ui:options": {
+        "group": "富文本与地区"
+      }
+    },
+    "region": {
+      "type": "array",
+      "ui:widget": "cascade",
+      "title": "地区",
+      "default": [
+        "zhejiang",
+        "hangzhou"
+      ],
+      "ui:options": {
+        "cascadeOptions": [
+          {
+            "value": "beijing",
+            "label": "北京",
+            "children": [
+              {
+                "value": "chaoyang",
+                "label": "朝阳区"
+              },
+              {
+                "value": "haidian",
+                "label": "海淀区"
+              }
+            ]
+          },
+          {
+            "value": "zhejiang",
+            "label": "浙江",
+            "children": [
+              {
+                "value": "hangzhou",
+                "label": "杭州"
+              },
+              {
+                "value": "ningbo",
+                "label": "宁波"
+              }
+            ]
+          },
+          {
+            "value": "guangdong",
+            "label": "广东",
+            "children": [
+              {
+                "value": "guangzhou",
+                "label": "广州"
+              },
+              {
+                "value": "shenzhen",
+                "label": "深圳"
+              }
+            ]
+          }
+        ],
+        "group": "富文本与地区"
+      }
+    },
+    "blocks": {
+      "type": "array",
+      "title": "内容模块",
+      "default": [
+        {
+          "type": "positionable"
+        },
+        {
+          "type": "text",
+          "content": "第一段文本"
+        },
+        {
+          "type": "image",
+          "pic": "",
+          "caption": "配图说明"
+        }
+      ],
+      "ui:options": {
+        "group": "模块列表"
+      },
+      "items": {
+        "type": "object",
+        "oneOf": [
+          {
+            "title": "元素定位模块",
+            "properties": {
+              "type": {
+                "const": "positionable",
+                "type": "string",
+                "title": "模块类型"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "$demo": {
+              "maxItems": 1
+            }
+          },
+          {
+            "title": "文本模块",
+            "properties": {
+              "type": {
+                "const": "text",
+                "type": "string",
+                "title": "模块类型"
+              },
+              "content": {
+                "type": "string",
+                "maxLength": 1000,
+                "title": "文本内容",
+                "default": ""
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          {
+            "title": "图片模块",
+            "properties": {
+              "type": {
+                "const": "image",
+                "type": "string",
+                "title": "模块类型"
+              },
+              "pic": {
+                "type": "string",
+                "format": "image",
+                "title": "图片"
+              },
+              "caption": {
+                "type": "string",
+                "title": "说明",
+                "default": ""
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "$demo": {
+              "maxItems": 1
+            }
+          }
+        ]
+      }
+    }
+  },
+  "required": [],
+  "$demo": {
+    "previewSize": {
+      "width": 375,
+      "height": 812
+    },
+    "positionable": {
+      "items": [
+        "logo",
+        "title",
+        "subtitle"
+      ],
+      "defaults": {
+        "logo": {
+          "x": 20,
+          "y": 20
+        },
+        "title": {
+          "x": 100,
+          "y": 24
+        },
+        "subtitle": {
+          "x": 100,
+          "y": 64
+        }
+      },
+      "size": {
+        "width": 375,
+        "height": 812
+      }
+    }
+  }
+}

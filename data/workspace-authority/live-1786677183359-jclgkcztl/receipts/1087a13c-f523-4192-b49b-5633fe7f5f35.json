@@ -1,0 +1,25 @@
+{
+  "committed": true,
+  "mutationId": "1087a13c-f523-4192-b49b-5633fe7f5f35",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 134,
+  "rootHash": "80e71579682a7180519fcedce094c35197e1ede6afc4deb7bcceb981b89c55fe",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/sunny-reading_k4m8/index.tsx",
+      "action": "modified",
+      "beforeHash": "471ec34b04e835dc9ffa7393d2d64c406dea1d641f5c89bec0000a6fc989d446",
+      "afterHash": "471ec34b04e835dc9ffa7393d2d64c406dea1d641f5c89bec0000a6fc989d446"
+    },
+    {
+      "path": "demos/sunny-reading_k4m8/config.schema.json",
+      "action": "modified",
+      "beforeHash": "f75259926d2caa71a391da66518f3a625836d73c5656d8b179fca527d0205760",
+      "afterHash": "f75259926d2caa71a391da66518f3a625836d73c5656d8b179fca527d0205760"
+    }
+  ],
+  "committedAt": 1787736258662
+}

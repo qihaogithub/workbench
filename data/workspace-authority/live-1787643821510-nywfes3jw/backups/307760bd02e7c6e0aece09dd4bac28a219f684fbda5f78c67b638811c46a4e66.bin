@@ -1,0 +1,15 @@
+{
+  "lottieLoop": true,
+  "lottieAutoplay": true,
+  "spineAnimation": "",
+  "spineLoop": true,
+  "spineAudioEnabled": true,
+  "riveFit": "cover",
+  "riveAutoplay": true,
+  "spineAsset": {
+    "kind": "spine",
+    "version": 1,
+    "assetId": "spine_c508dc9b51e4f52706b5490ea2d58f70c2753bcdc2804e2d55746bedf1a2f06d"
+  },
+  "riveSrc": "/api/sessions/session-1788347677672-s7p40fion/workspace/assets/animations/mtk021u2/rive示例.riv"
+}

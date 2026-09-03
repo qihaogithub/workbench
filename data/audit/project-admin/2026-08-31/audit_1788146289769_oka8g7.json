@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1788146289769_oka8g7",
+  "at": 1788146289769,
+  "actor": {
+    "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+    "name": "qihao",
+    "role": "creator",
+    "source": "author-site"
+  },
+  "level": "L2",
+  "tool": "page_create_version",
+  "projectId": "proj_1788144496725_oi5vie",
+  "resourceId": "page_6f3v",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "page-version:page_6f3v:prv_1788146289765_l8k0nu"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

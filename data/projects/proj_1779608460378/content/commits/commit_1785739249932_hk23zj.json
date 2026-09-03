@@ -1,0 +1,31 @@
+{
+  "id": "commit_1785739249932_hk23zj",
+  "projectId": "proj_1779608460378",
+  "parentCommitId": "commit_1785735908028_iqznug",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "恢复图片列表",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "demo_1779608460379_a1b2c3",
+      "versionId": "prv_1785739249927_w5tuwy"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "demo_1779608460379_a1b2c3",
+      "fromVersionId": "prv_1785735908025_8jmrn0",
+      "toVersionId": "prv_1785739249927_w5tuwy"
+    }
+  ],
+  "createdAt": 1785739249932,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785738974823-sz2qmb5cu",
+    "workspaceRevision": 10,
+    "workspaceRootHash": "d6cbcce555e5c1cf2a9f7653f2de1e2b5285b5a10e05850dc07de10f75b1d86b"
+  }
+}

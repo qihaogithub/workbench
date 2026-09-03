@@ -1,0 +1,163 @@
+export default {
+  $preview: { width: 375, height: 812 },
+
+  "基础字段": {
+    title: { type: "string", title: "标题", default: "配置项示例" },
+    subtitle: { type: "text", title: "副标题", default: "这是一个展示所有配置项类型的示例页面" },
+    showHeader: { type: "boolean", title: "显示头部", default: true },
+    count: { type: "number", title: "数量", default: 5, min: 1, max: 20 },
+    gap: { type: "integer", title: "间距", default: 12, min: 0, max: 48 },
+  },
+
+  "样式配置": {
+    bgColor: { type: "color", title: "背景颜色", default: "#f0f4ff" },
+    textColor: { type: "color", title: "文字颜色", default: "#1a1a2e" },
+    accentColor: { type: "color", title: "强调色", default: "#4f46e5" },
+    fontSize: {
+      type: "number",
+      title: "字号",
+      default: 16,
+      min: 12,
+      max: 32,
+    },
+    fontWeight: {
+      type: "enum",
+      title: "字重",
+      enum: ["normal", "medium", "bold"],
+      enumNames: ["常规", "中等", "粗体"],
+      default: "normal",
+    },
+  },
+
+  "枚举与选择": {
+    layout: {
+      type: "enum",
+      title: "布局模式",
+      enum: ["grid", "list", "card"],
+      enumNames: ["网格", "列表", "卡片"],
+      default: "grid",
+    },
+    tags: {
+      type: "enum",
+      title: "标签",
+      enum: ["hot", "new", "recommend", "limited"],
+      enumNames: ["热门", "新品", "推荐", "限量"],
+      multiple: true,
+      default: ["hot", "new"],
+    },
+    region: {
+      type: "cascade",
+      title: "地区",
+      default: ["zhejiang", "hangzhou"],
+      options: [
+        {
+          value: "beijing",
+          label: "北京",
+          children: [
+            { value: "chaoyang", label: "朝阳区" },
+            { value: "haidian", label: "海淀区" },
+          ],
+        },
+        {
+          value: "shanghai",
+          label: "上海",
+          children: [
+            { value: "pudong", label: "浦东新区" },
+            { value: "jingan", label: "静安区" },
+          ],
+        },
+        {
+          value: "zhejiang",
+          label: "浙江",
+          children: [
+            { value: "hangzhou", label: "杭州" },
+            { value: "ningbo", label: "宁波" },
+          ],
+        },
+      ],
+    },
+  },
+
+  "图片与素材": {
+    logo: { type: "image", title: "Logo", accept: "image/*", maxSize: 1048576 },
+    banner: {
+      type: "image",
+      title: "横幅图",
+      accept: "image/*",
+      minWidth: 320,
+      minHeight: 160,
+    },
+    gallery: {
+      type: "imageList",
+      title: "图库",
+      maxItems: 6,
+    },
+  },
+
+  "富文本与长文本": {
+    description: {
+      type: "richtext",
+      title: "详细介绍",
+      default: "<p>这是一个<b>富文本</b>配置项示例。</p>",
+    },
+    note: {
+      type: "text",
+      title: "备注",
+      default: "可以通过 text 类型配置较长文本，最大 1000 字",
+    },
+  },
+
+  "位置字段": {
+    bannerPosition: {
+      type: "position",
+      key: "bannerImage",
+      title: "横幅图片位置",
+      size: { width: 375, height: 220 },
+      default: { x: 20, y: 16 },
+    },
+    badgePosition: {
+      type: "position",
+      key: "badgeImage",
+      title: "徽章位置",
+      size: { width: 375, height: 60 },
+      default: { x: 280, y: 10 },
+    },
+  },
+
+  "模块列表": {
+    blocks: {
+      type: "array",
+      title: "内容模块",
+      variants: {
+        text: {
+          title: "文本模块",
+          content: { type: "text", title: "文本内容", default: "" },
+        },
+        image: {
+          title: "图片模块",
+          _maxItems: 1,
+          pic: { type: "image", title: "图片" },
+          caption: { type: "string", title: "说明", default: "" },
+        },
+        positionBlock: {
+          title: "定位模块",
+          _maxItems: 3,
+          label: { type: "string", title: "标签", default: "按钮" },
+          position: {
+            type: "position",
+            key: "floatingBtn",
+            title: "按钮位置",
+            size: { width: 375, height: 300 },
+            default: { x: 20, y: 60 },
+          },
+        },
+      },
+      default: [
+        { type: "text", content: "第一段示例文本内容" },
+        { type: "positionBlock", label: "立即购买" },
+        { type: "text", content: "第二段示例文本内容" },
+      ],
+    },
+  },
+};
+

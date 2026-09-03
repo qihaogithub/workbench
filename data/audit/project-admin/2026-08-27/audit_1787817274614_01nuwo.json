@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1787817274614_01nuwo",
+  "at": 1787817274614,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1787817274612_o9dirf",
+  "inputSummary": {
+    "name": "E2E:20260827T075431462Z-m4kdil:画布 Section 回归",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1787817274612_o9dirf"
+    ]
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "version": "2026-06-preview-runtime-v6",
+  "generatedAt": "2026-08-12T14:59:04.722Z",
+  "imports": {
+    "lottie-web": "/preview-runtime/vendor/lottie-web.js",
+    "@rive-app/canvas": "/preview-runtime/vendor/rive-app-canvas.js",
+    "@esotericsoftware/spine-webgl": "/preview-runtime/vendor/spine-webgl.js",
+    "@esotericsoftware/spine-webgl-42": "/preview-runtime/vendor/spine-webgl-42.js",
+    "react": "/preview-runtime/vendor/react.js",
+    "react-dom": "/preview-runtime/vendor/react-dom.js",
+    "react-dom/client": "/preview-runtime/vendor/react-dom-client.js",
+    "react/jsx-runtime": "/preview-runtime/vendor/react-jsx-runtime.js",
+    "react/jsx-dev-runtime": "/preview-runtime/vendor/react-jsx-dev-runtime.js",
+    "lucide-react": "/preview-runtime/vendor/lucide-react.js",
+    "framer-motion": "/preview-runtime/vendor/framer-motion.js",
+    "svgaplayerweb": "/preview-runtime/vendor/svgaplayerweb.js",
+    "@preview/sdk": "/preview-runtime/vendor/preview-sdk.js"
+  },
+  "files": {
+    "vendor/lottie-web.js": {
+      "hash": "c683bc1f25e0d40f",
+      "bytes": 308337
+    },
+    "vendor/rive-app-canvas.js": {
+      "hash": "5d67ffcd925b2e03",
+      "bytes": 153728
+    },
+    "vendor/spine-webgl.js": {
+      "hash": "9092d559d319471f",
+      "bytes": 257717
+    },
+    "vendor/spine-webgl-42.js": {
+      "hash": "9a74a9774a96fc45",
+      "bytes": 229881
+    },
+    "vendor/react.js": {
+      "hash": "12125570f1e95003",
+      "bytes": 377
+    },
+    "vendor/react-dom.js": {
+      "hash": "44d21ee67b530aa4",
+      "bytes": 228
+    },
+    "vendor/react-dom-client.js": {
+      "hash": "079a237e2cc96f20",
+      "bytes": 180854
+    },
+    "vendor/chunks/chunk-HR4HLCNU.js": {
+      "hash": "b58d3db3cd23600b",
+      "bytes": 3953
+    },
+    "vendor/react-jsx-runtime.js": {
+      "hash": "0a474bc50e2e1f79",
+      "bytes": 228
+    },
+    "vendor/react-jsx-dev-runtime.js": {
+      "hash": "705361af89692e34",
+      "bytes": 656
+    },
+    "vendor/lucide-react.js": {
+      "hash": "2461b338a96bf345",
+      "bytes": 1005166
+    },
+    "vendor/framer-motion.js": {
+      "hash": "bed6993d4a6dec1c",
+      "bytes": 180741
+    },
+    "vendor/chunks/chunk-TIQQ3JNY.js": {
+      "hash": "43425ecb4af20880",
+      "bytes": 797
+    },
+    "vendor/chunks/chunk-X4NV3N53.js": {
+      "hash": "e741e9bbb9b17d09",
+      "bytes": 7901
+    },
+    "vendor/svgaplayerweb.js": {
+      "hash": "3b578881f8229577",
+      "bytes": 123489
+    },
+    "vendor/chunks/chunk-UFN2LDR4.js": {
+      "hash": "3b2fde7f79aa3c21",
+      "bytes": 1061
+    },
+    "vendor/tailwindcss.js": {
+      "hash": "2f0570ef81afaa41",
+      "bytes": 366531
+    },
+    "vendor/rive.wasm": {
+      "hash": "0a4b12ad03c9c21b",
+      "bytes": 1927601
+    },
+    "vendor/preview-sdk.js": {
+      "hash": "4a1b256099096736",
+      "bytes": 20922
+    }
+  },
+  "packages": {
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "lucide-react": "0.575.0",
+    "framer-motion": "12.38.0",
+    "svgaplayerweb": "2.3.1",
+    "lottie-web": "5.13.0",
+    "@rive-app/canvas": "2.38.1",
+    "@esotericsoftware/spine-webgl": "4.3.13",
+    "@esotericsoftware/spine-webgl-42": "4.2.112",
+    "tailwindcss-cdn": "3.4.10"
+  }
+}

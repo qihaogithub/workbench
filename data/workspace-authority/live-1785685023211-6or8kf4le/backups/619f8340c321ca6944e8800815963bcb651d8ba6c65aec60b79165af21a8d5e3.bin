@@ -1,0 +1,37 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "config-basics_m2k8",
+      "name": "配置类型演示 · 基础字段",
+      "runtimeType": "high-fidelity-react",
+      "order": 1,
+      "parentId": null,
+      "routeKey": "page"
+    },
+    {
+      "id": "config-media_p7q3",
+      "name": "配置类型演示 · 视觉与媒体",
+      "runtimeType": "high-fidelity-react",
+      "order": 2,
+      "parentId": null,
+      "routeKey": "page-2"
+    },
+    {
+      "id": "config-choice_x9z1",
+      "name": "配置类型演示 · 选择类",
+      "runtimeType": "high-fidelity-react",
+      "order": 3,
+      "parentId": null,
+      "routeKey": "page-3"
+    },
+    {
+      "id": "config-structure_v4r6",
+      "name": "配置类型演示 · 高级结构",
+      "runtimeType": "high-fidelity-react",
+      "order": 4,
+      "parentId": null,
+      "routeKey": "page-4"
+    }
+  ]
+}

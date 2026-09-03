@@ -1,0 +1,76 @@
+{
+  "id": "wb_acdb3017d7c845a4b00606a45feedd7a",
+  "version": 2,
+  "documentRevision": 3,
+  "scene": {
+    "version": 1,
+    "pageSize": {
+      "width": 1440,
+      "height": 900
+    },
+    "nodes": [
+      {
+        "id": "sketch_1788278793551_ib3s87",
+        "type": "rect",
+        "x": 512,
+        "y": 92,
+        "width": 338,
+        "height": 270,
+        "zIndex": 0,
+        "style": {
+          "fill": "#FFFFFF",
+          "stroke": "#1F2937",
+          "strokeWidth": 2,
+          "radius": 10,
+          "fontSize": 18,
+          "fontWeight": 500,
+          "color": "#111827"
+        }
+      },
+      {
+        "id": "title",
+        "type": "text",
+        "x": 600.5,
+        "y": 196.5,
+        "width": 161,
+        "height": 61,
+        "zIndex": 1,
+        "style": {
+          "fontSize": 40,
+          "fontWeight": 700,
+          "color": "#111827",
+          "textAlign": "left"
+        },
+        "text": "手绘页面"
+      },
+      {
+        "id": "sketch_1788314991375_44ydzz",
+        "type": "ellipse",
+        "x": 763,
+        "y": 27,
+        "width": 169,
+        "height": 169,
+        "zIndex": 2,
+        "style": {
+          "fill": "#FFFFFF",
+          "stroke": "#1F2937",
+          "strokeWidth": 2,
+          "radius": 10,
+          "fontSize": 18,
+          "fontWeight": 500,
+          "color": "#111827"
+        }
+      }
+    ],
+    "assets": [],
+    "bindings": {},
+    "metadata": {}
+  },
+  "nodeSemantics": {},
+  "editorView": {
+    "zoom": 1,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "updatedAt": 1788314992396
+}

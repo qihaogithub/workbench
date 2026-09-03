@@ -1,0 +1,43 @@
+{
+  "id": "prv_1785492713731_8j9sw6",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "kind": "page",
+  "resourceId": "quiz-wrong_b7k9",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "workspaceRevision": 333,
+  "workspaceRootHash": "c3afbc4c59ddd6dc227157271dfe4f023c85e065ce5f4b178e68e14f6753e0fb",
+  "previousVersionId": "prv_1785483602685_6xd2vx",
+  "contentHash": "7d09167abc552caf70025550ebd53451ac4541af97cf4a575c6760db07c11adc",
+  "blobRefs": [
+    "8eb694face506cec58fe1cf33da82291f93657d7d84d6c27980977a8fb380e26",
+    "7c058893f74a5b4ac4811a29d3e3a88184f8995b16fea9fde8d9a4168109f9e9",
+    "7811fedd99fd24d56b74c1bf9577a0994000454193bc8863f25af93b80fb336e",
+    "42bb61975c959b9e8e56b31d6fa28b53b41c6ebb78b938fe239279d811a6fe96"
+  ],
+  "metadata": {
+    "page": {
+      "id": "quiz-wrong_b7k9",
+      "name": "答错",
+      "routeKey": "page-12",
+      "order": 9,
+      "parentId": "folder_1785397626658_xft2kd",
+      "runtimeType": "prototype-html-css"
+    },
+    "files": {
+      "schema": "8eb694face506cec58fe1cf33da82291f93657d7d84d6c27980977a8fb380e26",
+      "prototypeHtml": "7c058893f74a5b4ac4811a29d3e3a88184f8995b16fea9fde8d9a4168109f9e9",
+      "prototypeCss": "7811fedd99fd24d56b74c1bf9577a0994000454193bc8863f25af93b80fb336e",
+      "prototypeMeta": "42bb61975c959b9e8e56b31d6fa28b53b41c6ebb78b938fe239279d811a6fe96"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1785492713733,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录答错"
+}

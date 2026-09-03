@@ -1,0 +1,27 @@
+{
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "content",
+      "preset": "custom",
+      "source": "user"
+    }
+  },
+  "type": "object",
+  "properties": {
+    "heroImage": {
+      "title": "主视觉图片",
+      "default": "/api/images/img_KjjBIeda6Uigqg",
+      "type": "string",
+      "format": "image",
+      "ui:options": {
+        "group": "-"
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "sessionId": "session-1788316405732-awz9wxzjg",
+  "userId": "a5862615-26bb-4688-924d-7fd68c132e21",
+  "role": "admin",
+  "demoId": "proj_1788141806566_0aps89",
+  "workspaceId": "live-1788141807256-9xerzl5sd",
+  "status": "discarded",
+  "basedOnVersion": "v10",
+  "workbenchSessionId": null,
+  "createdAt": 1788316405732,
+  "expiresAt": 1788324667262,
+  "lastActivityAt": 1788317469416,
+  "title": "模式选择放到配置项第一个",
+  "archivedAt": 1788317469324
+}

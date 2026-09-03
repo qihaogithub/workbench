@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "e98ba491-1278-4835-9b4f-e0c5864d7906",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786367994980-txmxi4qqp",
+  "baseRevision": 0,
+  "revision": 208,
+  "rootHash": "ed08a9def04f90b459327c15b3f67cc7532b8bd6ab7b8e186f746a4d4800bba7",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/kids-edu-h5_p9m2/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "affe1d8173a6839e05a395270db4c05796b00a8b2fe72caac649e33acdd5c4f0"
+    }
+  ],
+  "committedAt": 1786509634646
+}

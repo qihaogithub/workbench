@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>第4关 · 线索点选</title>
+  <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+  <div class="wf-container">
+
+    <!-- 关卡头部 -->
+    <header class="wf-levelbar">
+      <a class="wf-back">‹</a>
+      <div class="wf-levelbar-title">
+        <span class="wf-levelbar-tag">第4关</span>
+        <h1>糖果与南瓜大搜索</h1>
+      </div>
+      <span class="wf-levelbar-icon">🍬</span>
+    </header>
+
+    <!-- 游戏引导 -->
+    <section class="wf-guide">
+      <div class="wf-guide-icon">🎃</div>
+      <div class="wf-guide-body">
+        <h2 class="wf-guide-title">找一找，它们藏在哪！</h2>
+        <p class="wf-guide-desc">房间里藏了好多糖果，你能找到它们吗？原来南瓜精灵就藏在小镇里，快把它们找出来吧！</p>
+      </div>
+    </section>
+
+    <!-- 进度 -->
+    <div class="wf-progress">
+      <div class="wf-progress-fill" style="width: 50%;"></div>
+      <span class="wf-progress-text">已找到 1 / 2</span>
+    </div>
+
+    <!-- 坐标点选游戏区 -->
+    <section class="wf-game">
+      <!-- 找糖果 -->
+      <div class="wf-game-card">
+        <div class="wf-game-head">
+          <span class="wf-game-label">任务 1</span>
+          <span class="wf-game-progress">已找到 ✓</span>
+        </div>
+        <p class="wf-game-q">点击找到藏起来的糖果</p>
+        <div class="wf-game-map">
+          <div class="wf-game-item wf-game-item-found" style="left: 24%; top: 30%;">🍬</div>
+          <div class="wf-game-item" style="left: 62%; top: 22%;">🛌</div>
+          <div class="wf-game-item" style="left: 70%; top: 58%;">🪑</div>
+          <div class="wf-game-item" style="left: 30%; top: 64%;">🕯️</div>
+          <div class="wf-game-item wf-game-item-found" style="left: 48%; top: 78%;">🍬</div>
+          <span class="wf-game-map-note">房间坐标点选区</span>
+        </div>
+        <div class="wf-word-reveal wf-word-reveal-inline">
+          <p class="wf-word-en">candy</p>
+          <p class="wf-word-cn">糖果</p>
+        </div>
+      </div>
+
+      <!-- 找南瓜 -->
+      <div class="wf-game-card">
+        <div class="wf-game-head">
+          <span class="wf-game-label">任务 2</span>
+          <span class="wf-game-progress">寻找中…</span>
+        </div>
+        <p class="wf-game-q">点击找到藏在小镇里的南瓜精灵</p>
+        <div class="wf-game-map">
+          <div class="wf-game-item" style="left: 20%; top: 40%;">🏠</div>
+          <div class="wf-game-item wf-game-item-found" style="left: 56%; top: 30%;">🎃</div>
+          <div class="wf-game-item" style="left: 72%; top: 52%;">🌳</div>
+          <div class="wf-game-item" style="left: 34%; top: 72%;">💡</div>
+          <span class="wf-game-map-note">小镇坐标点选区</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 已收集单词卡 -->
+    <section class="wf-collected">
+      <h3 class="wf-collected-title">已收集单词卡</h3>
+      <div class="wf-collected-tags">
+        <span class="wf-tag wf-tag-active">candy 糖果 ✓</span>
+        <span class="wf-tag">pumpkin 南瓜</span>
+      </div>
+    </section>
+
+    <!-- 底部按钮 -->
+    <section class="wf-actions">
+      <button class="wf-btn wf-btn-primary">完成第 4 关</button>
+      <p class="wf-actions-hint">互动性强 · 常识认知难度 🌟🌟</p>
+    </section>
+
+  </div>
+</body>
+</html>

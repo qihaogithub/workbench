@@ -1,0 +1,34 @@
+{
+  "id": "krv_1786532517266_f983s5",
+  "projectId": "proj_1779608460372",
+  "kind": "knowledge_document",
+  "resourceId": "kb_1786532517206_r7k6au",
+  "contentHash": "752386b87085e4591b1707a2372813d6a3e9dc821a50fc2397a17766a7c525ea",
+  "blobRefs": [
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  ],
+  "metadata": {
+    "item": {
+      "id": "kb_1786532517206_r7k6au",
+      "title": "未命名文档",
+      "source": "user",
+      "description": "未命名文档",
+      "fileName": "未命名文档.md",
+      "addedAt": "2026-08-12T11:01:57.206Z",
+      "updatedAt": "2026-08-12T11:01:57.206Z",
+      "sizeBytes": 0
+    },
+    "files": {
+      "markdown": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1786532517268,
+  "createdBy": "Author Site",
+  "source": "user",
+  "note": "创建知识文档 未命名文档"
+}

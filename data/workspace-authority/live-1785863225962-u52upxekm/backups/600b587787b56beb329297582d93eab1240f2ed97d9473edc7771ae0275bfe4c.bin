@@ -1,0 +1,51 @@
+{
+  "$demo": {
+    "previewSize": { "width": 375, "height": 812 }
+  },
+  "type": "object",
+  "properties": {
+    "activeSubject": {
+      "type": "string",
+      "title": "学科",
+      "enum": ["reading", "thinking", "aesthetic", "english", "writer"],
+      "enumNames": ["阅读", "思维", "美育", "英语", "小作家"],
+      "default": "reading"
+    },
+    "headerBgReading": {
+      "type": "string",
+      "title": "阅读头图背景",
+      "format": "image",
+      "default": "",
+      "ui:options": { "minWidth": 750, "minHeight": 540, "maxWidth": 750, "maxHeight": 540 }
+    },
+    "headerBgThinking": {
+      "type": "string",
+      "title": "思维头图背景",
+      "format": "image",
+      "default": "",
+      "ui:options": { "minWidth": 750, "minHeight": 540, "maxWidth": 750, "maxHeight": 540 }
+    },
+    "headerBgAesthetic": {
+      "type": "string",
+      "title": "美育头图背景",
+      "format": "image",
+      "default": "",
+      "ui:options": { "minWidth": 750, "minHeight": 540, "maxWidth": 750, "maxHeight": 540 }
+    },
+    "headerBgEnglish": {
+      "type": "string",
+      "title": "英语头图背景",
+      "format": "image",
+      "default": "",
+      "ui:options": { "minWidth": 750, "minHeight": 540, "maxWidth": 750, "maxHeight": 540 }
+    },
+    "headerBgWriter": {
+      "type": "string",
+      "title": "小作家头图背景",
+      "format": "image",
+      "default": "",
+      "ui:options": { "minWidth": 750, "minHeight": 540, "maxWidth": 750, "maxHeight": 540 }
+    }
+  },
+  "required": []
+}

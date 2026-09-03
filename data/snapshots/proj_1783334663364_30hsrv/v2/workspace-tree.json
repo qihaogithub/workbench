@@ -1,0 +1,29 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "product-showcase_a3f2",
+      "name": "品牌展示页",
+      "order": 1,
+      "parentId": null,
+      "routeKey": "page",
+      "runtimeType": "high-fidelity-react"
+    },
+    {
+      "id": "contact-section_k8m2",
+      "name": "联系我们页",
+      "order": 2,
+      "parentId": null,
+      "routeKey": "page-2",
+      "runtimeType": "high-fidelity-react"
+    },
+    {
+      "id": "worldcup-lottery_h7k3",
+      "name": "世界杯抽奖页",
+      "order": 3,
+      "parentId": null,
+      "routeKey": "page-3",
+      "runtimeType": "prototype-html-css"
+    }
+  ]
+}

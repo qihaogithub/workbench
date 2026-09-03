@@ -1,0 +1,49 @@
+{
+  "committed": true,
+  "mutationId": "f60b9d61-8be0-419f-842a-afb7604a42ce",
+  "projectId": "proj_1785742777589_ncs6r6",
+  "workspaceId": "live-1787643821510-nywfes3jw",
+  "baseRevision": 0,
+  "revision": 46,
+  "rootHash": "632b76a9eebdee84b315fa57be68817b68b36f629660b34cd155fb61a8c7c11e",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "assets/animations/spine_c508dc9b51e4f52706b5490ea2d58f70c2753bcdc2804e2d55746bedf1a2f06d/spine二进制示例/math_medal_1000_max.mp3",
+      "action": "modified",
+      "beforeHash": "3eb32bb9e975be213fcfc8b47cc0d969124e46a6c044e736c7b8f707f8319fe2",
+      "afterHash": "3eb32bb9e975be213fcfc8b47cc0d969124e46a6c044e736c7b8f707f8319fe2"
+    },
+    {
+      "path": "assets/animations/spine_c508dc9b51e4f52706b5490ea2d58f70c2753bcdc2804e2d55746bedf1a2f06d/spine二进制示例/medal.atlas.txt",
+      "action": "modified",
+      "beforeHash": "6c3036af64e8c765ff46e4f9ff572fce5026c53b4b8ad910714869cd9be539ad",
+      "afterHash": "6c3036af64e8c765ff46e4f9ff572fce5026c53b4b8ad910714869cd9be539ad"
+    },
+    {
+      "path": "assets/animations/spine_c508dc9b51e4f52706b5490ea2d58f70c2753bcdc2804e2d55746bedf1a2f06d/spine二进制示例/medal.png",
+      "action": "modified",
+      "beforeHash": "2caf71e1efceee769353c8b767a56299c58c0e33e19420ed43c765c37b52001b",
+      "afterHash": "2caf71e1efceee769353c8b767a56299c58c0e33e19420ed43c765c37b52001b"
+    },
+    {
+      "path": "assets/animations/spine_c508dc9b51e4f52706b5490ea2d58f70c2753bcdc2804e2d55746bedf1a2f06d/spine二进制示例/medal.skel.bytes",
+      "action": "modified",
+      "beforeHash": "25e159ff157547b91f45efcaed72a774ed2e220b4eb9c62f224de85925eb3e04",
+      "afterHash": "25e159ff157547b91f45efcaed72a774ed2e220b4eb9c62f224de85925eb3e04"
+    },
+    {
+      "path": "assets/animations/spine_c508dc9b51e4f52706b5490ea2d58f70c2753bcdc2804e2d55746bedf1a2f06d/manifest.json",
+      "action": "modified",
+      "beforeHash": "9d811c63decc1dac6c2172e091c73a2469ec4003d59a8d0a8ab42c82c157378b",
+      "afterHash": "9d811c63decc1dac6c2172e091c73a2469ec4003d59a8d0a8ab42c82c157378b"
+    },
+    {
+      "path": "demos/motion-formats_k4r2/config.values.json",
+      "action": "modified",
+      "beforeHash": "420489f67e18a4b3c590283a65cdff2836549a1325bf7cbac3eeb0c71af95e42",
+      "afterHash": "420489f67e18a4b3c590283a65cdff2836549a1325bf7cbac3eeb0c71af95e42"
+    }
+  ],
+  "committedAt": 1788347704016
+}

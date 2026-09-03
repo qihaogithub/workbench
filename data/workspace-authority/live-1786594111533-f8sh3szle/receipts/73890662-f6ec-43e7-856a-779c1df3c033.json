@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "73890662-f6ec-43e7-856a-779c1df3c033",
+  "projectId": "proj_1786594111469_293vqh",
+  "workspaceId": "live-1786594111533-f8sh3szle",
+  "baseRevision": 0,
+  "revision": 3,
+  "rootHash": "b340a8de97ae0485d0fd506cd32f3e59ccf694aa2fe156ebd6a32eb741317d9b",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/2_upsp/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f"
+    },
+    {
+      "path": "demos/2_upsp/prototype.css",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/2_upsp/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355"
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "56b27cd39db659fc8e41fd3cd8c4f920a838c4efe1ddb2b61d0140bc0f36c905",
+      "afterHash": "c7d664bcb3e9c1b189d4285891c7bffbeeda3cb5345af9ad20fee4cf14026bc0"
+    }
+  ],
+  "committedAt": 1786594112236
+}

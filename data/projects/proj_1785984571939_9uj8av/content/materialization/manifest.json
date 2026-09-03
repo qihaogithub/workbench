@@ -1,0 +1,20 @@
+{
+  "projectId": "proj_1785984571939_9uj8av",
+  "commitId": "commit_1786703447320_wunmq6",
+  "materializerVersion": "project-core-content-graph-v1",
+  "resources": [
+    {
+      "kind": "page",
+      "resourceId": "pad_s5xn",
+      "versionId": "prv_1786703447295_z6peb4",
+      "contentHash": "c6d5b610d6ecf9fc6f9d808a5ace2b96fd1347b4740600d21cc2a7c90e19556c",
+      "blobRefs": [
+        "8bd27aadcee30ff9dff8ac8fcecbaca59973d0d58e64203971a5a5c60f39e56c",
+        "fed086214659536ab84ccd6d8fcb5ce5f70e5a3070bf22265663629549b6e2d3",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "49027771f36adea79ed861c4992295989c71ccef20968276954254f9b0409d73"
+      ]
+    }
+  ],
+  "updatedAt": 1786703447328
+}

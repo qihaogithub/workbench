@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "fixed-canvas",
+      "viewport": {
+        "width": 375,
+        "height": 1046
+      },
+      "heightBehavior": "fixed",
+      "preset": "custom",
+      "source": "figma"
+    }
+  },
+  "properties": {},
+  "required": []
+}

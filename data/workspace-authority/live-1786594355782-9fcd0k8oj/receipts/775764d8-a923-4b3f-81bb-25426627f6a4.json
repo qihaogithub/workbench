@@ -1,0 +1,25 @@
+{
+  "committed": true,
+  "mutationId": "775764d8-a923-4b3f-81bb-25426627f6a4",
+  "projectId": "proj_1786594355767_w0amfo",
+  "workspaceId": "live-1786594355782-9fcd0k8oj",
+  "baseRevision": 0,
+  "revision": 16,
+  "rootHash": "a973107b305bf35143e53f0de3199b9d6348a8172f613519b5294f096dd737b3",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "knowledge/自动保存知识库-5fbe01.md",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "8d891d281d20822ac85dc458a13b9a345be742f8b8b58abb8c33549b9f2a3217"
+    },
+    {
+      "path": "knowledge/manifest.json",
+      "action": "modified",
+      "beforeHash": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
+      "afterHash": "6c3cf1bc534b0f3c3b051cdb9184f55bd93a25730eed25a1c4008bb72ec3ecd2"
+    }
+  ],
+  "committedAt": 1786594368146
+}

@@ -1,0 +1,43 @@
+{
+  "id": "prv_1784781113880_5k754h",
+  "projectId": "proj_1782718595285_h4lda7",
+  "kind": "page",
+  "resourceId": "demo_omrf",
+  "workspaceId": "live-1784712426263-20cofvjfq",
+  "workspaceRevision": 39,
+  "workspaceRootHash": "676606cc8587f2bb7c5fcb8e9c433b117e3963c95d845b2d918cc44c0216d217",
+  "previousVersionId": "prv_1784771582407_g0zm6n",
+  "contentHash": "48ccbcb4774078830a33b15b6955df52b7c083ed59d72fa3dec103eadf95a781",
+  "blobRefs": [
+    "281b9ec59a12f41b6de1e18d9f6ed83af8726b0c63877b5625c4a8f4960f69d8",
+    "af492046d1f7155aa6c17a84370ba48518adf3f1ab58758b881f9091142731ab",
+    "ea1715a8b89053870c8e6a5788b1f2b020b364dc752484379edd1051cc4afbcc",
+    "2b2692ea9cb9594ba7ab6dc68814a49184bf362207f3281055b1092316c95b2e"
+  ],
+  "metadata": {
+    "page": {
+      "id": "demo_omrf",
+      "name": "平板",
+      "routeKey": "demo-3",
+      "runtimeType": "prototype-html-css",
+      "order": 2,
+      "parentId": null
+    },
+    "files": {
+      "schema": "281b9ec59a12f41b6de1e18d9f6ed83af8726b0c63877b5625c4a8f4960f69d8",
+      "prototypeHtml": "af492046d1f7155aa6c17a84370ba48518adf3f1ab58758b881f9091142731ab",
+      "prototypeCss": "ea1715a8b89053870c8e6a5788b1f2b020b364dc752484379edd1051cc4afbcc",
+      "prototypeMeta": "2b2692ea9cb9594ba7ab6dc68814a49184bf362207f3281055b1092316c95b2e"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1784781113884,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录平板"
+}

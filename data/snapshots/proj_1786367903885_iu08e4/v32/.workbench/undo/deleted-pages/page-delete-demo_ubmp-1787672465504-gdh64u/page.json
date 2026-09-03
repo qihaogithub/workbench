@@ -1,0 +1,8 @@
+{
+  "id": "demo_ubmp",
+  "name": "数据看板demo",
+  "routeKey": "demo",
+  "order": 3,
+  "parentId": null,
+  "runtimeType": "sandboxed-html"
+}

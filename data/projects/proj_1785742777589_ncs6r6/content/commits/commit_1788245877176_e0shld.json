@@ -1,0 +1,41 @@
+{
+  "id": "commit_1788245877176_e0shld",
+  "projectId": "proj_1785742777589_ncs6r6",
+  "parentCommitId": "commit_1787042927291_u31nqm",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录动效格式展示",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "config-demo_m7p2",
+      "versionId": "prv_1787042927282_fxbhje"
+    },
+    {
+      "kind": "page",
+      "resourceId": "motion-formats_k4r2",
+      "versionId": "prv_1788245877171_h7ls9f"
+    },
+    {
+      "kind": "page",
+      "resourceId": "prototype-config_b3k9",
+      "versionId": "prv_1786514264870_3gwsm8"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "motion-formats_k4r2",
+      "fromVersionId": "prv_1786013163818_4sx4gb",
+      "toVersionId": "prv_1788245877171_h7ls9f"
+    }
+  ],
+  "createdAt": 1788245877176,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1787643821510-nywfes3jw",
+    "workspaceRevision": 6,
+    "workspaceRootHash": "d270d9b9b804ba1817bda8b6cb6794f2312b4471282c62b063b0d07d87dc5fa9"
+  }
+}

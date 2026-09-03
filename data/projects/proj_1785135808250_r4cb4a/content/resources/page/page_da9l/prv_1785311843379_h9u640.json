@@ -1,0 +1,39 @@
+{
+  "id": "prv_1785311843379_h9u640",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "kind": "page",
+  "resourceId": "page_da9l",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "workspaceRevision": 5,
+  "workspaceRootHash": "d1309614d45157da046a1f7397fcac16fa9109d09e061896f24a723bb2af9268",
+  "previousVersionId": "prv_1785138185736_z29n0k",
+  "contentHash": "4da2fe0686ff4c708cf78d0ab9436ced3cd73b9e32cb823dda49e6a50546de88",
+  "blobRefs": [
+    "caa4dded1c46311d8aaa611752a2a39998cd09de0af6953aa717f16a2012e746",
+    "a3e0cdbd6c321642e201a49303df988073cec442f51cd7147dc17ca604e3ede3"
+  ],
+  "metadata": {
+    "page": {
+      "id": "page_da9l",
+      "name": "排行榜",
+      "routeKey": "page-2",
+      "order": 1,
+      "parentId": null,
+      "runtimeType": "high-fidelity-react"
+    },
+    "files": {
+      "schema": "caa4dded1c46311d8aaa611752a2a39998cd09de0af6953aa717f16a2012e746",
+      "code": "a3e0cdbd6c321642e201a49303df988073cec442f51cd7147dc17ca604e3ede3"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "high-fidelity-react",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1785311843381,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录排行榜"
+}

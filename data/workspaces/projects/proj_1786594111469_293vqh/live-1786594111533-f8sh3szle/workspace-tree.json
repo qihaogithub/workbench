@@ -1,0 +1,21 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "1_hgd0",
+      "name": "配置页 1",
+      "routeKey": "1",
+      "order": 0,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "2_upsp",
+      "name": "配置页 2",
+      "routeKey": "2",
+      "order": 1,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    }
+  ]
+}

@@ -1,0 +1,490 @@
+{
+  "id": "proj_1779608460378",
+  "name": "广场页面",
+  "projectType": "standard",
+  "category": "APP资源位",
+  "workspacePath": "/app/data/projects/proj_1779608460378/workspace",
+  "demoPages": [
+    {
+      "id": "demo_1779608460379_a1b2c3",
+      "name": "广场页面-手机",
+      "order": 0,
+      "parentId": null,
+      "routeKey": "page",
+      "runtimeType": "high-fidelity-react"
+    },
+    {
+      "id": "demo_1779608460380_d4e5f6",
+      "name": "广场页面-平板",
+      "order": 1,
+      "parentId": null,
+      "routeKey": "page-2",
+      "runtimeType": "high-fidelity-react"
+    }
+  ],
+  "demoFolders": [],
+  "versions": [
+    {
+      "versionId": "v26",
+      "savedAt": 1780470749603,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780470730747-tprm1ce7f",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v26",
+      "fileCount": 8
+    },
+    {
+      "versionId": "v27",
+      "savedAt": 1780470768349,
+      "savedBy": "user",
+      "sessionId": "restore",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v27_backup",
+      "fileCount": 8,
+      "note": "从 v23 恢复"
+    },
+    {
+      "versionId": "v28",
+      "savedAt": 1780470771192,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780470751017-q16bcx7yt",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v28",
+      "fileCount": 8
+    },
+    {
+      "versionId": "v29",
+      "savedAt": 1780471114510,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780470828009-8nmvqyg2q",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v29",
+      "fileCount": 12
+    },
+    {
+      "versionId": "v30",
+      "savedAt": 1780473171551,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780471179133-vle85846b",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v30",
+      "fileCount": 12
+    },
+    {
+      "versionId": "v31",
+      "savedAt": 1780476730572,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780473782284-4y2l9clvp",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v31",
+      "fileCount": 14
+    },
+    {
+      "versionId": "v32",
+      "savedAt": 1780478189869,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780476748206-nmopjpqhy",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v32",
+      "fileCount": 16
+    },
+    {
+      "versionId": "v33",
+      "savedAt": 1780480626870,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780478222891-ifk64qnbf",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v33",
+      "fileCount": 13
+    },
+    {
+      "versionId": "v34",
+      "savedAt": 1780538500884,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780536323230-c3sd8dfte",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v34",
+      "fileCount": 11
+    },
+    {
+      "versionId": "v35",
+      "savedAt": 1780542589486,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780542213567-ra5huxmi6",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v35",
+      "fileCount": 13
+    },
+    {
+      "versionId": "v36",
+      "savedAt": 1780542748434,
+      "savedBy": "user",
+      "sessionId": "restore",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v36_backup",
+      "fileCount": 15,
+      "note": "从 v34 恢复"
+    },
+    {
+      "versionId": "v37",
+      "savedAt": 1780542754023,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780542600919-etg6y2oaj",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v37",
+      "fileCount": 13
+    },
+    {
+      "versionId": "v38",
+      "savedAt": 1780545963055,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780545889228-lm3s56jdv",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v38",
+      "fileCount": 13
+    },
+    {
+      "versionId": "v39",
+      "savedAt": 1780546340419,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780546070330-xtfgry1ld",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v39",
+      "fileCount": 13
+    },
+    {
+      "versionId": "v40",
+      "savedAt": 1780550317332,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780550141181-dem6z6klg",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v40",
+      "fileCount": 11
+    },
+    {
+      "versionId": "v41",
+      "savedAt": 1780552311968,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780550327359-wuy0tuimj",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v41",
+      "fileCount": 12
+    },
+    {
+      "versionId": "v42",
+      "savedAt": 1780552444739,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780552315761-ludl063o3",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v42",
+      "fileCount": 12
+    },
+    {
+      "versionId": "v43",
+      "savedAt": 1780554399463,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780553024377-1jpulm22w",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v43",
+      "fileCount": 12
+    },
+    {
+      "versionId": "v44",
+      "savedAt": 1780558334525,
+      "savedBy": "user",
+      "sessionId": "restore",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v44",
+      "fileCount": 10,
+      "note": "从 v42 恢复"
+    },
+    {
+      "versionId": "v45",
+      "savedAt": 1780558358599,
+      "savedBy": "user",
+      "sessionId": "restore",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v45",
+      "fileCount": 12,
+      "note": "从 v40 恢复"
+    },
+    {
+      "versionId": "v46",
+      "savedAt": 1780563011153,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780562610561-a23d8shao",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v46",
+      "fileCount": 10
+    },
+    {
+      "versionId": "v47",
+      "savedAt": 1780563317845,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780563158112-6wi35jzi6",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v47",
+      "fileCount": 10
+    },
+    {
+      "versionId": "v48",
+      "savedAt": 1780563528903,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780563322912-klt3qs6ze",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v48",
+      "fileCount": 10
+    },
+    {
+      "versionId": "v49",
+      "savedAt": 1780563574846,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780563533539-p7grfabhl",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v49",
+      "fileCount": 10
+    },
+    {
+      "versionId": "v50",
+      "savedAt": 1780564359479,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780564310980-leaik9xmb",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v50",
+      "fileCount": 10
+    },
+    {
+      "versionId": "v51",
+      "savedAt": 1780565122662,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780564361150-fmuug2oor",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v51",
+      "fileCount": 10
+    },
+    {
+      "versionId": "v51",
+      "savedAt": 1780565560538,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780565421435-tr49rz3nq",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v51",
+      "fileCount": 10
+    },
+    {
+      "versionId": "v51",
+      "savedAt": 1780566009485,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780565760730-xn5u5wk8u",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v51",
+      "fileCount": 10
+    },
+    {
+      "versionId": "v51",
+      "savedAt": 1780566626611,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780566016724-c087p2tc0",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v51",
+      "fileCount": 10
+    },
+    {
+      "versionId": "v51",
+      "savedAt": 1780630855286,
+      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "sessionId": "session-1780630282972-k1at81rax",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v51",
+      "fileCount": 11
+    },
+    {
+      "versionId": "v51",
+      "savedAt": 1780637821806,
+      "savedBy": "qihao",
+      "sessionId": "session-1780636925548-36gjeoi41",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v51",
+      "fileCount": 11
+    },
+    {
+      "versionId": "v51",
+      "savedAt": 1780671345039,
+      "savedBy": "qihao",
+      "sessionId": "session-1780667670139-a580ohnlo",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\workbench\\data\\snapshots\\proj_1779608460378\\v51",
+      "fileCount": 36
+    },
+    {
+      "versionId": "v53",
+      "savedAt": 1782042340995,
+      "savedBy": "qihao",
+      "sessionId": "session-1782038090256-d9oyuugm6",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\workbench\\data\\snapshots\\proj_1779608460378\\v53",
+      "fileCount": 36
+    },
+    {
+      "versionId": "v55",
+      "savedAt": 1782042472032,
+      "savedBy": "qihao",
+      "sessionId": "session-1782042356895-dd6zq72a6",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\workbench\\data\\snapshots\\proj_1779608460378\\v55",
+      "fileCount": 36
+    },
+    {
+      "versionId": "v57",
+      "savedAt": 1782045286247,
+      "savedBy": "qihao",
+      "sessionId": "session-1782045205124-h1c2mqzey",
+      "snapshotPath": "E:\\重要文件\\Programming\\1_Work\\workbench\\data\\snapshots\\proj_1779608460378\\v57",
+      "fileCount": 36
+    },
+    {
+      "versionId": "v59",
+      "savedAt": 1782193292671,
+      "savedBy": "qihao",
+      "sessionId": "session-1782193269136-swnag25c6",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v59",
+      "fileCount": 9
+    },
+    {
+      "versionId": "v61",
+      "savedAt": 1782404228716,
+      "savedBy": "qihao",
+      "sessionId": "session-1782404072077-lrzfea106",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v61",
+      "fileCount": 9
+    },
+    {
+      "versionId": "v63",
+      "savedAt": 1782404782662,
+      "savedBy": "qihao",
+      "sessionId": "session-1782404674680-a51lrebl5",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v63",
+      "fileCount": 9
+    },
+    {
+      "versionId": "v65",
+      "savedAt": 1782405320642,
+      "savedBy": "qihao",
+      "sessionId": "session-1782404806357-yb3dw1b6s",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v65",
+      "fileCount": 9
+    },
+    {
+      "versionId": "v66",
+      "type": "publish_snapshot",
+      "savedAt": 1784729600183,
+      "savedBy": "system",
+      "sessionId": "publish-1784729600168",
+      "snapshotPath": "/Users/henryhuang/sift-project/祁昊/OneFlow/data/snapshots/proj_1779608460378/v66",
+      "fileCount": 8,
+      "note": "发布快照"
+    },
+    {
+      "versionId": "v67",
+      "type": "named_version",
+      "savedAt": 1785732094372,
+      "savedBy": "qihao",
+      "sessionId": "session-1785731809479-cf5vd3yeg",
+      "snapshotPath": "/app/data/snapshots/proj_1779608460378/v67",
+      "fileCount": 38,
+      "workspaceId": "live-1784794256464-47k47sgqn",
+      "workspaceRevision": 23,
+      "workspaceRootHash": "e42f26a8463c92212b09deda99fabc94702a6e7d565c25a7fd75c4ddf883f38b"
+    },
+    {
+      "versionId": "v68",
+      "type": "named_version",
+      "savedAt": 1785735908449,
+      "savedBy": "qihao",
+      "sessionId": "session-1785731809479-cf5vd3yeg",
+      "snapshotPath": "/app/data/snapshots/proj_1779608460378/v68",
+      "fileCount": 38,
+      "workspaceId": "live-1784794256464-47k47sgqn",
+      "workspaceRevision": 32,
+      "workspaceRootHash": "e37a9c3a663268c08ed2dd84d8a75a25a5cbdeabc916d645d48e4af95128af27",
+      "note": "恢复"
+    },
+    {
+      "versionId": "v69",
+      "type": "restore_snapshot",
+      "savedAt": 1785738969479,
+      "savedBy": "qihao",
+      "sessionId": "restore-v68",
+      "snapshotPath": "/app/data/snapshots/proj_1779608460378/v69",
+      "fileCount": 38,
+      "workspaceId": "live-1784794256464-47k47sgqn",
+      "workspaceRevision": 35,
+      "workspaceRootHash": "e37a9c3a663268c08ed2dd84d8a75a25a5cbdeabc916d645d48e4af95128af27",
+      "note": "从项目版本 v68 恢复"
+    },
+    {
+      "versionId": "v70",
+      "type": "restore_snapshot",
+      "savedAt": 1785738974383,
+      "savedBy": "qihao",
+      "sessionId": "restore-v69",
+      "snapshotPath": "/app/data/snapshots/proj_1779608460378/v70",
+      "fileCount": 38,
+      "workspaceId": "live-1785738969875-nfiq0pvkh",
+      "workspaceRevision": 1,
+      "workspaceRootHash": "7e140d2d4ab62dacb2cc48d959a0c15c3dbc9f570aad0512514eff0ab59b68ea",
+      "note": "从项目版本 v69 恢复"
+    },
+    {
+      "versionId": "v71",
+      "type": "named_version",
+      "savedAt": 1785739250917,
+      "savedBy": "qihao",
+      "sessionId": "session-1785731809479-cf5vd3yeg",
+      "snapshotPath": "/app/data/snapshots/proj_1779608460378/v71",
+      "fileCount": 39,
+      "workspaceId": "live-1785738974823-sz2qmb5cu",
+      "workspaceRevision": 10,
+      "workspaceRootHash": "d6cbcce555e5c1cf2a9f7653f2de1e2b5285b5a10e05850dc07de10f75b1d86b",
+      "note": "恢复图片列表"
+    },
+    {
+      "versionId": "v72",
+      "type": "restore_snapshot",
+      "savedAt": 1785740946263,
+      "savedBy": "qihao",
+      "sessionId": "session-1785731809479-cf5vd3yeg",
+      "snapshotPath": "/app/data/snapshots/proj_1779608460378/v72",
+      "fileCount": 39,
+      "note": "从页面版本 prv_1785739249927_w5tuwy 恢复"
+    },
+    {
+      "versionId": "v73",
+      "type": "publish_snapshot",
+      "savedAt": 1785839734112,
+      "savedBy": "system",
+      "sessionId": "publish-1785839734092",
+      "snapshotPath": "/app/data/snapshots/proj_1779608460378/v73",
+      "fileCount": 39,
+      "workspaceId": "live-1785837911228-j4n9ftklg",
+      "workspaceRevision": 9,
+      "workspaceRootHash": "493bb0632a1ff3807a0004dba6a15eb2f4cd728a64f8aac8f9bef3b1ccdaabce",
+      "note": "发布快照"
+    },
+    {
+      "versionId": "v74",
+      "type": "publish_snapshot",
+      "savedAt": 1785922967050,
+      "savedBy": "system",
+      "sessionId": "publish-1785922966957",
+      "snapshotPath": "/app/data/snapshots/proj_1779608460378/v74",
+      "fileCount": 39,
+      "workspaceId": "live-1785837911228-j4n9ftklg",
+      "workspaceRevision": 21,
+      "workspaceRootHash": "0c26e3a88f947461c2fee6bd3e27781326db6b7e13870e483b4e130d3b573ba2",
+      "note": "发布快照"
+    },
+    {
+      "versionId": "v75",
+      "type": "publish_snapshot",
+      "savedAt": 1785924114090,
+      "savedBy": "system",
+      "sessionId": "publish-1785924114073",
+      "snapshotPath": "/Users/jojo/Documents/workbench/data/snapshots/proj_1779608460378/v75",
+      "fileCount": 39,
+      "workspaceId": "live-1785837911228-j4n9ftklg",
+      "workspaceRevision": 23,
+      "workspaceRootHash": "2545995da1a8642da1363b56a19fe27a3e7a136090cb744cd825fbefef7ce6e5",
+      "note": "发布快照"
+    },
+    {
+      "versionId": "v76",
+      "type": "publish_snapshot",
+      "savedAt": 1786010306272,
+      "savedBy": "system",
+      "sessionId": "publish-1786010306258",
+      "snapshotPath": "/app/data/snapshots/proj_1779608460378/v76",
+      "fileCount": 39,
+      "workspaceId": "live-1785837911228-j4n9ftklg",
+      "workspaceRevision": 27,
+      "workspaceRootHash": "a451ed8800edecdf3d23a113c28c720d3d893fc0f9fc61c8349937faa5b6c0f7",
+      "note": "发布快照"
+    }
+  ],
+  "createdAt": 1779608460378,
+  "updatedAt": 1786373653654,
+  "activeWorkspaceId": "live-1786369936216-n1m4g1g8f",
+  "activeWorkspaceUpdatedAt": 1786369936253,
+  "publishedVersion": "v76",
+  "publishedAt": 1786010306377,
+  "canonicalSyncedWorkspaceId": "live-1786369936216-n1m4g1g8f",
+  "canonicalSyncedRevision": 2,
+  "canonicalSyncedRootHash": "7b3a94ba8bc36402ed278b49c3a59ec4ddd7a12c50fa54e021acdd43a119435e",
+  "canonicalSyncedAt": 1786373653654
+}

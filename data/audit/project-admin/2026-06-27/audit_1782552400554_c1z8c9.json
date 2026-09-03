@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1782552400554_c1z8c9",
+  "at": 1782552400554,
+  "actor": {
+    "id": "local-codex",
+    "name": "Local Codex",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1782552400514_oib5ti",
+  "inputSummary": {
+    "name": "知识库AI跨项目提问验证",
+    "templateId": "tmpl_1782552216325_16w6v4"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1782552400514_oib5ti"
+    ]
+  }
+}

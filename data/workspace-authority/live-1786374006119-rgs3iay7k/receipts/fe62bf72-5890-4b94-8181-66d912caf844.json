@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "fe62bf72-5890-4b94-8181-66d912caf844",
+  "projectId": "proj_1784874964275_p0k4ho",
+  "workspaceId": "live-1786374006119-rgs3iay7k",
+  "baseRevision": 0,
+  "revision": 27,
+  "rootHash": "97698868d15a43a79fddf7e61a42e67280a1e0a0278a011676e6549d9b64e3e0",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_na8k/index.tsx",
+      "action": "modified",
+      "beforeHash": "a3df42a11ed67b7faec3fbf0cf023080b30a40b35ae58684352d379c2da48b20",
+      "afterHash": "a3df42a11ed67b7faec3fbf0cf023080b30a40b35ae58684352d379c2da48b20"
+    },
+    {
+      "path": "demos/page_na8k/config.schema.json",
+      "action": "modified",
+      "beforeHash": "3fec580c1e47302156e1c24c853e09eedb048cee547ab046cc024f3b51cc812a",
+      "afterHash": "3fec580c1e47302156e1c24c853e09eedb048cee547ab046cc024f3b51cc812a"
+    },
+    {
+      "path": "demos/page_na8k/prototype.html",
+      "action": "modified",
+      "beforeHash": "30afe667c6e4b0cf1c439bd88ef980f081499c2bc8dcaae92a81a666778a5489",
+      "afterHash": "30afe667c6e4b0cf1c439bd88ef980f081499c2bc8dcaae92a81a666778a5489"
+    },
+    {
+      "path": "demos/page_na8k/prototype.css",
+      "action": "modified",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/page_na8k/prototype.meta.json",
+      "action": "modified",
+      "beforeHash": "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1",
+      "afterHash": "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1"
+    }
+  ],
+  "committedAt": 1786422857236
+}

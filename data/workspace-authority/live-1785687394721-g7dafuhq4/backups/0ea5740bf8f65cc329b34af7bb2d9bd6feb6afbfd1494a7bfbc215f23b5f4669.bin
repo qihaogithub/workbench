@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>原型页配置演示</title>
+  <link rel="stylesheet" href="./prototype.css" />
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <p class="hero-badge">{{badgeText}}</p>
+      <h1>{{heroTitle}}</h1>
+      <p class="hero-sub">{{heroSubtitle}}</p>
+    </header>
+
+    <section class="section">
+      <h2 class="section-title">文本类</h2>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="tag tag-string">string · 文本</span>
+          <code>username</code>
+        </div>
+        <p class="value value-xl" data-bind-text="username">张三</p>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="tag tag-string">text · 长文本</span>
+          <code>bio</code>
+        </div>
+        <p class="value text-body">{{bio}}</p>
+      </article>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">数字 / 布尔 / 枚举</h2>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="tag tag-number">number · 数字</span>
+          <code>score</code>
+        </div>
+        <p class="value">评分：<strong>{{score}}</strong> / 5.0</p>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="tag tag-number">integer · 整数</span>
+          <code>visitCount</code>
+        </div>
+        <p class="value">累计访问：<strong>{{visitCount}}</strong> 次</p>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="tag tag-number">boolean · 布尔</span>
+          <code>enabled</code>
+        </div>
+        <p class="value">开关状态：<strong>{{enabled}}</strong></p>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="tag tag-enum">enum · 单选</span>
+          <code>plan</code>
+        </div>
+        <p class="value">当前套餐：<strong>{{plan}}</strong></p>
+      </article>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">颜色</h2>
+
+      <article class="card card-border" data-bind-style-border-color="borderColor">
+        <div class="card-head">
+          <span class="tag tag-color">color · 边框色</span>
+          <code>borderColor</code>
+        </div>
+        <p class="value">卡片边框颜色随配置变化</p>
+      </article>
+
+      <article class="card card-bg" data-bind-style-background-color="bgColor">
+        <div class="card-head">
+          <span class="tag tag-color">color · 背景色</span>
+          <code>bgColor</code>
+        </div>
+        <p class="value">卡片背景颜色随配置变化</p>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="tag tag-color">color · 文字色</span>
+          <code>themeColor</code>
+        </div>
+        <div class="row">
+          <p class="value value-theme" data-bind-style-color="themeColor">主题色文字</p>
+          <span class="swatch" data-bind-style-background-color="themeColor"></span>
+        </div>
+      </article>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">图片 / 链接</h2>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="tag tag-image">image · 头像</span>
+          <code>avatar</code>
+        </div>
+        <img class="avatar" data-bind-src="avatar" alt="头像示例图片" />
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="tag tag-image">image · 横幅</span>
+          <code>banner</code>
+        </div>
+        <img class="banner" data-bind-src="banner" alt="横幅示例图片" />
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="tag tag-link">string · 链接</span>
+          <code>linkUrl</code>
+        </div>
+        <a class="link" data-bind-href="linkUrl" data-bind-text="linkText">查看详情 →</a>
+      </article>
+    </section>
+
+    <footer class="footer">
+      <p>HTML 原型页 · 标量配置类型实时绑定</p>
+    </footer>
+  </main>
+</body>
+</html>

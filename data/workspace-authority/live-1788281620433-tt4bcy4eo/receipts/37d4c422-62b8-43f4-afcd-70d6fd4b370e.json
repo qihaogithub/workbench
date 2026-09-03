@@ -1,0 +1,25 @@
+{
+  "committed": true,
+  "mutationId": "37d4c422-62b8-43f4-afcd-70d6fd4b370e",
+  "projectId": "proj_1788281620414_qdma8j",
+  "workspaceId": "live-1788281620433-tt4bcy4eo",
+  "baseRevision": 0,
+  "revision": 3,
+  "rootHash": "999288ee61be98746a7217123784347907ddf8962eca055aad1ebfafc51676d6",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_fkv7/index.tsx",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "bf5223ef5fe89a0c42e6b63c3e48e445715bff529599bb1808c1d2c7788fb340"
+    },
+    {
+      "path": "demos/page_fkv7/config.schema.json",
+      "action": "modified",
+      "beforeHash": "e1c118a2c54911913d4ffbf47809ce89c404706cd8a6262198c81674f23a3750",
+      "afterHash": "256a31b01fcf7159e6f6d661a675eeea18b66e36c85bed51d4e7c57158591d35"
+    }
+  ],
+  "committedAt": 1788281620700
+}

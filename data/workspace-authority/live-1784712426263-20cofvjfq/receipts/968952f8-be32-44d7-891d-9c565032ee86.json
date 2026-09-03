@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "968952f8-be32-44d7-891d-9c565032ee86",
+  "projectId": "proj_1782718595285_h4lda7",
+  "workspaceId": "live-1784712426263-20cofvjfq",
+  "baseRevision": 0,
+  "revision": 2,
+  "rootHash": "0be6ddfec92afd211daab7637292b5ad9978839f1ad093a3174da8c164152cb0",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/demo_omrf/index.tsx",
+      "action": "modified",
+      "beforeHash": "4af5a89953ef44665a9424bc2bd8d394bda9255ee71c62eb34e025057e1acf87",
+      "afterHash": "4af5a89953ef44665a9424bc2bd8d394bda9255ee71c62eb34e025057e1acf87"
+    },
+    {
+      "path": "demos/demo_omrf/config.schema.json",
+      "action": "modified",
+      "beforeHash": "281b9ec59a12f41b6de1e18d9f6ed83af8726b0c63877b5625c4a8f4960f69d8",
+      "afterHash": "281b9ec59a12f41b6de1e18d9f6ed83af8726b0c63877b5625c4a8f4960f69d8"
+    },
+    {
+      "path": "demos/demo_omrf/prototype.html",
+      "action": "modified",
+      "beforeHash": "af492046d1f7155aa6c17a84370ba48518adf3f1ab58758b881f9091142731ab",
+      "afterHash": "af492046d1f7155aa6c17a84370ba48518adf3f1ab58758b881f9091142731ab"
+    },
+    {
+      "path": "demos/demo_omrf/prototype.css",
+      "action": "modified",
+      "beforeHash": "ea1715a8b89053870c8e6a5788b1f2b020b364dc752484379edd1051cc4afbcc",
+      "afterHash": "ea1715a8b89053870c8e6a5788b1f2b020b364dc752484379edd1051cc4afbcc"
+    },
+    {
+      "path": "demos/demo_omrf/prototype.meta.json",
+      "action": "modified",
+      "beforeHash": "2b2692ea9cb9594ba7ab6dc68814a49184bf362207f3281055b1092316c95b2e",
+      "afterHash": "2b2692ea9cb9594ba7ab6dc68814a49184bf362207f3281055b1092316c95b2e"
+    }
+  ],
+  "committedAt": 1785376707623
+}

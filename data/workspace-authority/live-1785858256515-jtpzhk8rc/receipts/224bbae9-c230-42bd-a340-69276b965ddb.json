@@ -1,0 +1,25 @@
+{
+  "committed": true,
+  "mutationId": "224bbae9-c230-42bd-a340-69276b965ddb",
+  "projectId": "proj_1785858256243_p2zs4y",
+  "workspaceId": "live-1785858256515-jtpzhk8rc",
+  "baseRevision": 0,
+  "revision": 47,
+  "rootHash": "c9d5f6a67a82741396a69f46fce4f2c94d4de997db78d2b836d4879314ed777c",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/summer-camp_k3m7/index.tsx",
+      "action": "modified",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/summer-camp_k3m7/config.schema.json",
+      "action": "modified",
+      "beforeHash": "69046a9996254002d0beb4021b3ee521fe9ddc4c9b83c50210d44e3d7be12424",
+      "afterHash": "69046a9996254002d0beb4021b3ee521fe9ddc4c9b83c50210d44e3d7be12424"
+    }
+  ],
+  "committedAt": 1786008310613
+}

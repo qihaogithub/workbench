@@ -1,0 +1,88 @@
+{
+  "folders": [
+    {
+      "id": "folder_1785397477311_od13vu",
+      "name": "活动页",
+      "parentId": null,
+      "order": 0
+    },
+    {
+      "id": "folder_1785397619636_rl8i8j",
+      "name": "6种关卡类型",
+      "parentId": null,
+      "order": 1
+    },
+    {
+      "id": "folder_1785397626658_xft2kd",
+      "name": "题目关卡",
+      "parentId": "folder_1785397619636_rl8i8j",
+      "order": 0
+    }
+  ],
+  "pages": [
+    {
+      "id": "page_yw72",
+      "name": "开场引入-动画",
+      "routeKey": "page",
+      "order": 1,
+      "parentId": "folder_1785397477311_od13vu",
+      "runtimeType": "high-fidelity-react"
+    },
+    {
+      "id": "page_xix9",
+      "name": "闯关通关动画",
+      "routeKey": "page-5",
+      "order": 7,
+      "parentId": "folder_1785397477311_od13vu",
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "page_duak",
+      "name": "规则页面",
+      "routeKey": "page-6",
+      "order": 6,
+      "parentId": "folder_1785397477311_od13vu",
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "page_dous",
+      "name": "分享闯关",
+      "routeKey": "page-7",
+      "order": 5,
+      "parentId": "folder_1785397477311_od13vu",
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "page_pwcf",
+      "name": "查看卡片",
+      "routeKey": "page-8",
+      "order": 3,
+      "parentId": "folder_1785397477311_od13vu",
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "spine_dqxs",
+      "name": "获得卡片-spine",
+      "routeKey": "spine",
+      "order": 4,
+      "parentId": "folder_1785397477311_od13vu",
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "page_swfq",
+      "name": "开场引入-视频",
+      "routeKey": "page-10",
+      "order": 0,
+      "parentId": "folder_1785397477311_od13vu",
+      "runtimeType": "high-fidelity-react"
+    },
+    {
+      "id": "闯关活动页-进行中_ec853d",
+      "name": "闯关活动页（进行中）",
+      "routeKey": "page-2",
+      "order": 0,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    }
+  ]
+}

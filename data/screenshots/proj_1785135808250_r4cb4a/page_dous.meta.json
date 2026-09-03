@@ -1,0 +1,87 @@
+{
+  "currentHash": "ff295b3cf7508f3f",
+  "generatedAt": "2026-07-30T03:28:46.615Z",
+  "elapsed": 786,
+  "history": [
+    "ff295b3cf7508f3f",
+    "350f6df92fd2746d",
+    "f840f446cd7e193d",
+    "e5fe28f04fce48ba",
+    "91214b48b4dd43c4"
+  ],
+  "renderBoxes": {
+    "ff295b3cf7508f3f": {
+      "width": 375,
+      "height": 812,
+      "viewportWidth": 375,
+      "viewportHeight": 812,
+      "bodyWidth": 375,
+      "bodyHeight": 812,
+      "documentWidth": 375,
+      "documentHeight": 812,
+      "fullPage": true
+    },
+    "350f6df92fd2746d": {
+      "width": 375,
+      "height": 812,
+      "viewportWidth": 375,
+      "viewportHeight": 812,
+      "bodyWidth": 375,
+      "bodyHeight": 812,
+      "documentWidth": 375,
+      "documentHeight": 812,
+      "fullPage": true
+    },
+    "f840f446cd7e193d": {
+      "width": 375,
+      "height": 812,
+      "viewportWidth": 375,
+      "viewportHeight": 812,
+      "bodyWidth": 375,
+      "bodyHeight": 812,
+      "documentWidth": 375,
+      "documentHeight": 812,
+      "fullPage": true
+    },
+    "e5fe28f04fce48ba": {
+      "width": 375,
+      "height": 812,
+      "viewportWidth": 375,
+      "viewportHeight": 812,
+      "bodyWidth": 375,
+      "bodyHeight": 812,
+      "documentWidth": 375,
+      "documentHeight": 812,
+      "fullPage": true
+    },
+    "91214b48b4dd43c4": {
+      "width": 375,
+      "height": 812,
+      "viewportWidth": 375,
+      "viewportHeight": 812,
+      "bodyWidth": 375,
+      "bodyHeight": 812,
+      "documentWidth": 375,
+      "documentHeight": 812,
+      "fullPage": true
+    }
+  },
+  "variants": {
+    "ff295b3cf7508f3f:fast": {
+      "variant": "fast",
+      "generatedAt": "2026-07-30T03:46:51.966Z",
+      "elapsed": 298,
+      "renderBox": {
+        "width": 375,
+        "height": 812,
+        "viewportWidth": 375,
+        "viewportHeight": 812,
+        "bodyWidth": 375,
+        "bodyHeight": 812,
+        "documentWidth": 375,
+        "documentHeight": 812,
+        "fullPage": true
+      }
+    }
+  }
+}

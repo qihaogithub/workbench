@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "projectId": "proj_1786593394391_mif9ud",
+  "updatedAt": 1786593464417,
+  "state": {
+    "viewport": {
+      "x": 31.899999999999977,
+      "y": 114.03510373443982,
+      "zoom": 0.4765145228215768
+    },
+    "pages": {},
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "hiddenKnowledgeDocumentIds": [],
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    }
+  }
+}

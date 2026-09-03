@@ -1,0 +1,16 @@
+{
+  "workspaceId": "live-1785422111997-il9frbtf1",
+  "projectId": "proj_1785421657423_1ptong",
+  "revision": 1,
+  "rootHash": "361b2244c8c112ec0d0486e591f41d54f53671abfff78f5e39915b6cfa7286fc",
+  "resourceHashes": {
+    "demos/config-demo_x7k2/config.schema.json": "f39b7671b75aa6a9e22884d371bf89c73524ed06f3c8b580bd7d4ef5d7fff1a8",
+    "demos/config-demo_x7k2/index.tsx": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "demos/config-demo_x7k2/prototype.css": "d6632b1a71f880d652e115bf2b801d6f2ceac23c415ac10b1531b2f33a594b4f",
+    "demos/config-demo_x7k2/prototype.html": "a25152c619737e6f562e28fb85439c507714f2faa78d6849a14914975424016f",
+    "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
+    "workspace-tree.json": "02c0713558dcbe479bf3f7c1a00a2f88330b89d8c6a3b6b5b23056488904a4ee"
+  },
+  "mutationPayloads": {},
+  "updatedAt": 1785422112448
+}

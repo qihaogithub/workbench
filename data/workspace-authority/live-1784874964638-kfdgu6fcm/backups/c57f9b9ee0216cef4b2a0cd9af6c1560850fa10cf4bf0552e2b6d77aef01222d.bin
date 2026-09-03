@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "$demo": {
+    "previewSize": {
+      "width": 375,
+      "height": 812
+    }
+  },
+  "properties": {
+    "modules": {
+      "type": "array",
+      "title": "模块列表",
+      "description": "拖拽调整模块顺序；图片模块可添加任意数量，视频和进度模块各只能添加一个",
+      "items": {
+        "type": "object",
+        "oneOf": [
+          {
+            "title": "图片模块",
+            "properties": {
+              "type": { "const": "image", "type": "string", "title": "模块类型" },
+              "imageUrl": { "type": "string", "title": "图片", "format": "image" }
+            },
+            "required": ["type"]
+          },
+          {
+            "title": "视频模块",
+            "properties": {
+              "type": { "const": "video", "type": "string", "title": "模块类型" },
+              "videoBg": { "type": "string", "title": "视频背景", "format": "image" },
+              "videoCover": { "type": "string", "title": "视频封面", "format": "image" }
+            },
+            "required": ["type"]
+          },
+          {
+            "title": "进度模块",
+            "properties": {
+              "type": { "const": "progress", "type": "string", "title": "模块类型" },
+              "progressBgTop": { "type": "string", "title": "进度背景-上", "format": "image" },
+              "progressBgMiddle": { "type": "string", "title": "进度背景-中(可重复)", "format": "image" },
+              "progressBgBottom": { "type": "string", "title": "进度背景-下", "format": "image" }
+            },
+            "required": ["type"]
+          }
+        ]
+      },
+      "default": [
+        {
+          "type": "image",
+          "imageUrl": "/api/images/img_orZ0LZGXh8O1mw"
+        },
+        {
+          "type": "progress",
+          "progressBgTop": "/api/images/img_ytMvu7I-I927NA",
+          "progressBgMiddle": "/api/images/img_JbMJK0oLfn3H1g",
+          "progressBgBottom": "/api/images/img_nA-93L4aqz-F8g"
+        },
+        {
+          "type": "image",
+          "imageUrl": "/api/images/img_3__hTlQMR1t_xg"
+        },
+        {
+          "type": "video",
+          "videoBg": "/api/images/img_TyJJligftGkkSQ",
+          "videoCover": "/api/images/img_eRVIoyp5nYcUSg"
+        },
+        {
+          "type": "image",
+          "imageUrl": "/api/images/img_knKhY1uFtPrPXA"
+        }
+      ]
+    }
+  },
+  "required": []
+}

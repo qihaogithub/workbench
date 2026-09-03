@@ -1,0 +1,8 @@
+{
+  "id": "page_vz12",
+  "name": "规则页面",
+  "routeKey": "page-9",
+  "order": 10,
+  "parentId": null,
+  "runtimeType": "prototype-html-css"
+}

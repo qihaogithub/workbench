@@ -1,0 +1,19 @@
+{
+  "auditId": "audit_1782723552830_5adof7",
+  "at": 1782723552830,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_rename",
+  "projectId": "proj_1779608458649",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      "project.category"
+    ]
+  }
+}

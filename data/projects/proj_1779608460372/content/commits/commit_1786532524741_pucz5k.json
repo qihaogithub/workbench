@@ -1,0 +1,38 @@
+{
+  "id": "commit_1786532524741_pucz5k",
+  "projectId": "proj_1779608460372",
+  "parentCommitId": "commit_1786532522559_91nn8w",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "更新知识文档 未命名文档",
+  "resourcePointers": [
+    {
+      "kind": "knowledge_document",
+      "resourceId": "kb_1786532517206_r7k6au",
+      "versionId": "krv_1786532524740_xezkco"
+    },
+    {
+      "kind": "page",
+      "resourceId": "demo_1779608460501_abc123",
+      "versionId": "prv_1785915741753_ij33t6"
+    },
+    {
+      "kind": "page",
+      "resourceId": "demo_1779608460502_def456",
+      "versionId": "prv_1784862322468_c595t6"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "knowledge_document",
+      "resourceId": "kb_1786532517206_r7k6au",
+      "fromVersionId": "krv_1786532522556_4j7vok",
+      "toVersionId": "krv_1786532524740_xezkco"
+    }
+  ],
+  "createdAt": 1786532524741,
+  "createdBy": "Author Site",
+  "audit": {
+    "actorType": "user"
+  }
+}

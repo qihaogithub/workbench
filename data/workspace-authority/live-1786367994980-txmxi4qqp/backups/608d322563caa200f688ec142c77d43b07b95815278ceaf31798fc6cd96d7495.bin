@@ -1,0 +1,39 @@
+<main class="kids-page">
+  <header class="kids-header">
+    <a class="kids-brand" href="#top" aria-label="小芽星球首页"><span class="brand-sprout" aria-hidden="true">✦</span>小芽星球</a>
+    <a class="header-link" href="#join">立即参加 <span aria-hidden="true">↗</span></a>
+  </header>
+
+  <section class="kids-hero" id="top">
+    <div class="hero-copy">
+      <p class="eyebrow">7天亲子小挑战</p>
+      <h1>把好奇心，<br><span>变成小小发现。</span></h1>
+      <p class="hero-text">每天10分钟，和孩子一起观察、提问、动手做。</p>
+      <a class="primary-button" href="#join">免费领取任务卡 <span aria-hidden="true">↗</span></a>
+    </div>
+    <div class="planet-art" aria-label="一颗长着叶子的蓝色小星球插画" role="img">
+      <span class="star star-one" aria-hidden="true">✦</span>
+      <span class="star star-two" aria-hidden="true">✧</span>
+      <div class="planet"><span class="planet-face" aria-hidden="true">•ᴗ•</span><span class="leaf leaf-left" aria-hidden="true"></span><span class="leaf leaf-right" aria-hidden="true"></span></div>
+      <span class="orbit orbit-one" aria-hidden="true"></span>
+      <span class="orbit orbit-two" aria-hidden="true"></span>
+    </div>
+  </section>
+
+  <section class="challenge" aria-labelledby="challenge-title">
+    <p class="eyebrow">本周主题</p>
+    <h2 id="challenge-title">寻找身边的<br><span>小小自然家。</span></h2>
+    <div class="task-list">
+      <article class="task"><span class="task-number">01</span><div><h3>听一听</h3><p>闭上眼睛，找出三种声音。</p></div><span class="task-mark" aria-hidden="true">◒</span></article>
+      <article class="task"><span class="task-number">02</span><div><h3>看一看</h3><p>发现一片特别的叶子或云。</p></div><span class="task-mark" aria-hidden="true">◒</span></article>
+      <article class="task"><span class="task-number">03</span><div><h3>画下来</h3><p>把今天的发现画进任务卡。</p></div><span class="task-mark" aria-hidden="true">◒</span></article>
+    </div>
+  </section>
+
+  <section class="join-card" id="join" aria-labelledby="join-title">
+    <div><p class="eyebrow">准备好了吗</p><h2 id="join-title">让探索，<br>从今天开始。</h2></div>
+    <a class="join-button" href="mailto:hello@xiaoyastar.example">领取任务卡 <span aria-hidden="true">↗</span></a>
+  </section>
+
+  <footer class="kids-footer"><span>小芽星球</span><span>陪孩子把世界看得更近</span></footer>
+</main>

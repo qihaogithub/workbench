@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>英语·头图预览</title>
+  <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+  <div class="page">
+    <h1 class="page-title">英语 · 头图预览</h1>
+
+    <div class="previews">
+
+      <!-- ===== 手机预览 ===== -->
+      <div class="device-col">
+        <div class="device-label">
+          <span class="label-dot phone-dot"></span>
+          手机预览
+          <span class="label-size">375 × 812</span>
+        </div>
+        <div class="device-wrapper phone-wrapper">
+          <div class="phone-frame">
+            <!-- 顶部状态栏 -->
+            <div class="phone-statusbar">
+              <span class="phone-time">9:41</span>
+              <span class="phone-icons">●●●●○ ▸</span>
+            </div>
+
+            <!-- 头图区域 270px -->
+            <div class="phone-header" data-bind-src="headerBgEnglish">
+              <div class="header-placeholder">
+                <div class="placeholder-border">
+                  <svg class="placeholder-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
+                    <rect x="2" y="6" width="28" height="20" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M2 22l7-5 5 3 8-6 8 6" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                    <circle cx="11" cy="13" r="2" stroke="currentColor" stroke-width="1.5"/>
+                  </svg>
+                  <span class="placeholder-text">上传头部背景</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 模拟内容区 -->
+            <div class="phone-content">
+              <div class="content-nav">
+                <span class="nav-back">← 返回</span>
+                <span class="nav-title">英语课程</span>
+                <span class="nav-action">⋮</span>
+              </div>
+
+              <div class="content-card">
+                <div class="card-tag">今日推荐</div>
+                <div class="card-title-line"></div>
+                <div class="card-sub-line short"></div>
+                <div class="card-progress">
+                  <div class="progress-bar"><div class="progress-fill"></div></div>
+                  <span class="progress-text">68%</span>
+                </div>
+              </div>
+
+              <div class="content-list">
+                <div class="list-item">
+                  <div class="list-thumb"></div>
+                  <div class="list-info">
+                    <div class="list-line"></div>
+                    <div class="list-line short"></div>
+                  </div>
+                </div>
+                <div class="list-item">
+                  <div class="list-thumb"></div>
+                  <div class="list-info">
+                    <div class="list-line"></div>
+                    <div class="list-line short"></div>
+                  </div>
+                </div>
+                <div class="list-item">
+                  <div class="list-thumb"></div>
+                  <div class="list-info">
+                    <div class="list-line"></div>
+                    <div class="list-line short"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="content-tabs">
+                <div class="tab active"></div>
+                <div class="tab"></div>
+                <div class="tab"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Pad 预览 ===== -->
+      <div class="device-col">
+        <div class="device-label">
+          <span class="label-dot pad-dot"></span>
+          Pad 预览
+          <span class="label-size">1366 × 744</span>
+        </div>
+        <div class="device-wrapper pad-wrapper">
+          <div class="pad-frame">
+            <!-- 底层：系统 UI -->
+            <div class="pad-layer pad-layer-bottom">
+              <div class="pad-bottom-bar">
+                <div class="pad-dock">
+                  <div class="dock-icon"></div>
+                  <div class="dock-icon active"></div>
+                  <div class="dock-icon"></div>
+                  <div class="dock-icon"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 中层：头图 -->
+            <div class="pad-layer pad-layer-header" data-bind-src="padHeaderBgEnglish">
+              <div class="header-placeholder">
+                <div class="placeholder-border">
+                  <svg class="placeholder-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
+                    <rect x="2" y="6" width="28" height="20" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M2 22l7-5 5 3 8-6 8 6" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                    <circle cx="11" cy="13" r="2" stroke="currentColor" stroke-width="1.5"/>
+                  </svg>
+                  <span class="placeholder-text">上传头部背景</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 上层：覆盖 UI -->
+            <div class="pad-layer pad-layer-top">
+              <div class="pad-topbar">
+                <span class="pad-time">9:41</span>
+                <span class="pad-icons">●●●●○ ▸</span>
+              </div>
+              <div class="pad-nav">
+                <span class="pad-nav-back">〈 返回</span>
+                <span class="pad-nav-title">英语课程</span>
+              </div>
+              <div class="pad-overlay-card">
+                <div class="pad-card-title-line"></div>
+                <div class="pad-card-sub-line"></div>
+                <div class="pad-card-btn"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "da83f1dc-bef2-4fb4-a37d-5aed35643417",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 105,
+  "rootHash": "26f2439aca6e42cfd2f6ca4487e8bc4f17a6e2128fccf2e8eda2ae97f41f9e13",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/8-0717_gchw/index.tsx",
+      "action": "modified",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": "471ec34b04e835dc9ffa7393d2d64c406dea1d641f5c89bec0000a6fc989d446"
+    }
+  ],
+  "committedAt": 1787708375120
+}

@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1787817520821_rfnorc",
+  "at": 1787817520821,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1787817520818_4qmrrg",
+  "inputSummary": {
+    "name": "E2E:20260827T075837518Z-vap03w:画布 Section 回归",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1787817520818_4qmrrg"
+    ]
+  }
+}

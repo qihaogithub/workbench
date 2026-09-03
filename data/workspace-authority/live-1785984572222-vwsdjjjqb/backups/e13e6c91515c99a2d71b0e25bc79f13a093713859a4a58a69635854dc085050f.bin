@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "$demo": {
+    "previewSize": {
+      "width": 860,
+      "height": 720
+    }
+  },
+  "properties": {},
+  "required": []
+}

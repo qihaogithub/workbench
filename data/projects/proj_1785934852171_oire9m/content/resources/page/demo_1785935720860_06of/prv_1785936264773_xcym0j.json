@@ -1,0 +1,42 @@
+{
+  "id": "prv_1785936264773_xcym0j",
+  "projectId": "proj_1785934852171_oire9m",
+  "kind": "page",
+  "resourceId": "demo_1785935720860_06of",
+  "workspaceId": "live-1785935881009-qhes8gqe3",
+  "workspaceRevision": 10,
+  "workspaceRootHash": "a0626b1afffbd9b38715bdf544c5ac594f83330e2eee12f36e381dfd6d973554",
+  "contentHash": "27c4e4aa439572c9c8cbca1ff7da09eeca0bf1d5226037699078f98d7173d481",
+  "blobRefs": [
+    "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+    "d729376e48f6ab1c6fc19c2ceb15d21754b64724701877484063332e40e05ed8",
+    "d2ada08d0f5a799938492e6c378906775bacc2ddf84fa69b3796b1551ae35f8e",
+    "4e885cc8944f13b26eb36de774c92771243be58af29ce6595a8c68e02d72addf"
+  ],
+  "metadata": {
+    "page": {
+      "id": "demo_1785935720860_06of",
+      "name": "AI 的三层作用",
+      "routeKey": "slide-6",
+      "order": 5,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    "files": {
+      "schema": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+      "prototypeHtml": "d729376e48f6ab1c6fc19c2ceb15d21754b64724701877484063332e40e05ed8",
+      "prototypeCss": "d2ada08d0f5a799938492e6c378906775bacc2ddf84fa69b3796b1551ae35f8e",
+      "prototypeMeta": "4e885cc8944f13b26eb36de774c92771243be58af29ce6595a8c68e02d72addf"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1785936264775,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录AI 的三层作用"
+}

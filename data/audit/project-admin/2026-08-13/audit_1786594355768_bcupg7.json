@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1786594355768_bcupg7",
+  "at": 1786594355768,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1786594355767_w0amfo",
+  "inputSummary": {
+    "name": "E2E:20260813T041213417Z-s9pt07:画布退出恢复回归",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1786594355767_w0amfo"
+    ]
+  }
+}

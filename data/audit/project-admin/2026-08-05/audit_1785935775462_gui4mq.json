@@ -1,0 +1,63 @@
+{
+  "auditId": "audit_1785935775462_gui4mq",
+  "at": 1785935775462,
+  "actor": {
+    "id": "jojo",
+    "name": "jojo",
+    "role": "admin",
+    "source": "project-admin-cli"
+  },
+  "level": "L2",
+  "tool": "edit_commit",
+  "projectId": "proj_1785934852171_oire9m",
+  "resourceId": "edit_1785935572204_2xn15w",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      "demos/demo_1785935720859_01of/config.schema.json",
+      "demos/demo_1785935720859_01of/prototype.css",
+      "demos/demo_1785935720859_01of/prototype.html",
+      "demos/demo_1785935720859_01of/prototype.meta.json",
+      "demos/demo_1785935720859_02of/config.schema.json",
+      "demos/demo_1785935720859_02of/prototype.css",
+      "demos/demo_1785935720859_02of/prototype.html",
+      "demos/demo_1785935720859_02of/prototype.meta.json",
+      "demos/demo_1785935720859_03of/config.schema.json",
+      "demos/demo_1785935720859_03of/prototype.css",
+      "demos/demo_1785935720859_03of/prototype.html",
+      "demos/demo_1785935720859_03of/prototype.meta.json",
+      "demos/demo_1785935720860_04of/config.schema.json",
+      "demos/demo_1785935720860_04of/prototype.css",
+      "demos/demo_1785935720860_04of/prototype.html",
+      "demos/demo_1785935720860_04of/prototype.meta.json",
+      "demos/demo_1785935720860_05of/config.schema.json",
+      "demos/demo_1785935720860_05of/prototype.css",
+      "demos/demo_1785935720860_05of/prototype.html",
+      "demos/demo_1785935720860_05of/prototype.meta.json",
+      "demos/demo_1785935720860_06of/config.schema.json",
+      "demos/demo_1785935720860_06of/prototype.css",
+      "demos/demo_1785935720860_06of/prototype.html",
+      "demos/demo_1785935720860_06of/prototype.meta.json",
+      "demos/demo_1785935720860_07of/config.schema.json",
+      "demos/demo_1785935720860_07of/prototype.css",
+      "demos/demo_1785935720860_07of/prototype.html",
+      "demos/demo_1785935720860_07of/prototype.meta.json",
+      "demos/demo_1785935720860_08of/config.schema.json",
+      "demos/demo_1785935720860_08of/prototype.css",
+      "demos/demo_1785935720860_08of/prototype.html",
+      "demos/demo_1785935720860_08of/prototype.meta.json",
+      "demos/demo_1785935720860_09of/config.schema.json",
+      "demos/demo_1785935720860_09of/prototype.css",
+      "demos/demo_1785935720860_09of/prototype.html",
+      "demos/demo_1785935720860_09of/prototype.meta.json",
+      "workspace-tree.json"
+    ],
+    "notes": [
+      "生成版本 v1"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "105be7b7-741d-4d77-91bb-286ac55ef80a",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 68,
+  "rootHash": "790420f815e773f70aaeb6f537c533d19f1bf5c3204d38ab0f92885dfd58aecc",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/demo_ehpm/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "8243f0af367f188a376f2c17b5eabe872a2f7a979813e0d4e2be6d594c2aa259",
+      "afterHash": null
+    },
+    {
+      "path": "demos/demo_ehpm/html-import.meta.json",
+      "action": "deleted",
+      "beforeHash": "b60fed8ce85bfbfd0528a640296301d4cc79231a3c3192d1ffe410e6396ae766",
+      "afterHash": null
+    },
+    {
+      "path": "demos/demo_ehpm/index.tsx",
+      "action": "deleted",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": null
+    },
+    {
+      "path": "demos/demo_ehpm/sandbox.html",
+      "action": "deleted",
+      "beforeHash": "84dba86fd46c560f5939649ce887a5b0fcf1eb54cc0e17430a572e22adf9bd2e",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "2568dbf3df23631afa8d050d290a6b4ef75601109dd58592c75ddaa8efc17ad2",
+      "afterHash": "83ec3ef7e59a1c6782c39d6fbec245a93ca96f0fb9a7927191938c8cc94c21d6"
+    }
+  ],
+  "committedAt": 1787672447473
+}

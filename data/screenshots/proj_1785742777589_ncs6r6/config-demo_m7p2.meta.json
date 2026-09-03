@@ -1,0 +1,69 @@
+{
+  "currentHash": "a65c3a48cf256288",
+  "generatedAt": "2026-08-10T13:15:26.937Z",
+  "elapsed": 8052,
+  "history": [
+    "a65c3a48cf256288",
+    "fc720d99a3252ab6",
+    "2488adaad1ee1b76",
+    "9577480b03a88080",
+    "53ed003f331a87fe"
+  ],
+  "renderBoxes": {
+    "a65c3a48cf256288": {
+      "width": 375,
+      "height": 1706,
+      "viewportWidth": 375,
+      "viewportHeight": 812,
+      "bodyWidth": 375,
+      "bodyHeight": 1706,
+      "documentWidth": 375,
+      "documentHeight": 1706,
+      "fullPage": true
+    },
+    "fc720d99a3252ab6": {
+      "width": 375,
+      "height": 1706,
+      "viewportWidth": 375,
+      "viewportHeight": 812,
+      "bodyWidth": 375,
+      "bodyHeight": 1706,
+      "documentWidth": 375,
+      "documentHeight": 1706,
+      "fullPage": true
+    },
+    "2488adaad1ee1b76": {
+      "width": 375,
+      "height": 1706,
+      "viewportWidth": 375,
+      "viewportHeight": 812,
+      "bodyWidth": 375,
+      "bodyHeight": 1706,
+      "documentWidth": 375,
+      "documentHeight": 1706,
+      "fullPage": true
+    },
+    "9577480b03a88080": {
+      "width": 375,
+      "height": 1706,
+      "viewportWidth": 375,
+      "viewportHeight": 812,
+      "bodyWidth": 375,
+      "bodyHeight": 1706,
+      "documentWidth": 375,
+      "documentHeight": 1706,
+      "fullPage": true
+    },
+    "53ed003f331a87fe": {
+      "width": 375,
+      "height": 1706,
+      "viewportWidth": 375,
+      "viewportHeight": 812,
+      "bodyWidth": 375,
+      "bodyHeight": 1706,
+      "documentWidth": 375,
+      "documentHeight": 1706,
+      "fullPage": true
+    }
+  }
+}

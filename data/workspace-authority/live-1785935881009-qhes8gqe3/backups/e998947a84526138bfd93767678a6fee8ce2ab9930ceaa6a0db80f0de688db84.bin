@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OneFlow 介绍 · 过去 vs 未来</title>
+  <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+  <div class="pp-slide">
+    <div class="bg-glow glow-a"></div>
+    <div class="bg-glow glow-b"></div>
+    <div class="bg-grid"></div>
+
+    <div class="slide-head">
+      <div class="kicker">协作方式之变</div>
+      <h1 class="slide-title">从「人画原型、人查规范」到「AI 承接执行与整合」</h1>
+    </div>
+
+    <div class="vs-grid">
+      <div class="vs-col past">
+        <div class="vs-badge past-badge">过去</div>
+        <div class="vs-list">
+          <div class="vs-item">✍️ 人画原型、人补页面与配置项</div>
+          <div class="vs-item">📂 规范分散在多个文档，靠人查找</div>
+          <div class="vs-item">💬 产品、UI 人肉回答常规问题</div>
+          <div class="vs-item">🔁 每个活动重新拼知识、重新对齐</div>
+        </div>
+      </div>
+
+      <div class="vs-arrow">→</div>
+
+      <div class="vs-col future">
+        <div class="vs-badge future-badge">未来</div>
+        <div class="vs-list">
+          <div class="vs-item">🤖 AI 生成原型、整合知识和规范</div>
+          <div class="vs-item">🗂 项目内配置上下文，自助查询</div>
+          <div class="vs-item">🛎 AI 承接活动系统常规咨询</div>
+          <div class="vs-item">♻️ 经验沉淀为模板，反哺下一次</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-note">
+      AI 先行承接执行、整合与咨询，人则维护标准、判断边界、处理例外
+    </div>
+  </div>
+</body>
+</html>

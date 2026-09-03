@@ -1,0 +1,40 @@
+{
+  "id": "prv_1788255895048_1aqrfd",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "kind": "page",
+  "resourceId": "page_yw72",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "workspaceRevision": 1037,
+  "workspaceRootHash": "4ee0084ed84fe5f2aaf9911ae45db7f74bc06ba19a4dd71b7fd3faaf627b9bc3",
+  "previousVersionId": "prv_1788238999597_nxhrce",
+  "contentHash": "115a96adcaaecd4a01648cf3d396f673d5e19c7a5eb126a023b7edcc698549f3",
+  "blobRefs": [
+    "0fe55c33ab8f10075f285dd5ccffc5ae0623a07b88d70ae3509e09a50620ef33",
+    "0d57e7bcb54948886e6561ef06739848d7f2bebe270c7abf8d143e39fe21c488"
+  ],
+  "metadata": {
+    "page": {
+      "id": "page_yw72",
+      "name": "开场引入-动画",
+      "routeKey": "page",
+      "order": 1,
+      "parentId": "folder_1785397477311_od13vu",
+      "runtimeType": "high-fidelity-react",
+      "isTemplatePage": false
+    },
+    "files": {
+      "schema": "0fe55c33ab8f10075f285dd5ccffc5ae0623a07b88d70ae3509e09a50620ef33",
+      "code": "0d57e7bcb54948886e6561ef06739848d7f2bebe270c7abf8d143e39fe21c488"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "high-fidelity-react",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1788255895054,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录开场引入-动画"
+}

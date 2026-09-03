@@ -513,6 +513,7 @@ scripts/data-sync.sh local2prod --yes      # 跳过交互确认
 - 底层复用 `scripts/sync-production-data-to-local.sh`（prod2local）与 `scripts/deploy-author-with-data.sh`（local2prod），环境变量（`SERVER_IP`/`SERVER_USER`/`SSH_PASSWORD` 等）可覆盖透传。
 - 覆盖前自动备份；正式备份 `/Users/jojo/workbench-data-backups`，本地备份 `../workbench-data-backups`。
 - 注意：覆盖只改磁盘 data，已运行的 Docker 容器需重新构建/重启才生效。
+- 测试机 `qihao@10.130.33.131` 通过 ACL 访问 `/opt/opencode-workbench/data`；非 root 覆盖时脚本跳过 owner/group/permission/mtime 保留，并用 `LEGACY_DATA_VOLUME=__skip__` 跳过未挂载的旧 named volume。
 
 OrbStack 代理配置（开发必备）：
 

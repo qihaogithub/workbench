@@ -1,0 +1,24 @@
+{
+  "workspaceId": "live-1786594383716-odepv2ypt",
+  "projectId": "proj_1786594383657_2pmaok",
+  "revision": 4,
+  "rootHash": "b5b45154a381732b221e96af7691b9d483463b607be434cc827ab6c586646d0e",
+  "resourceHashes": {
+    ".canvas-layout.json": "680a346e317dc54d70d61e20ca3ff8d3c56de444beb6ca117f91573d3a723a71",
+    "demos/page_s0ql/config.schema.json": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+    "demos/page_s0ql/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "demos/page_s0ql/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
+    "demos/page_t5v4/config.schema.json": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+    "demos/page_t5v4/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "demos/page_t5v4/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
+    "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
+    "memory.md": "ac647ba40af49cc702b3b182334eadaada557ab7a3651246de2ea8d94da7b210",
+    "workspace-tree.json": "ba192ed2ac068bfe756b7e83503d23f39ff85bb3080872add4e561de75e3023c"
+  },
+  "mutationPayloads": {
+    "e736fa0c-1689-4a92-b61c-ed177c54471b": "9b4d5c69a7a418f89767ee7df219974392273b445fbea37536da0ce4f6b53924",
+    "9efe6c83-6da6-4d31-b082-7510198f31d9": "31f11f744d00878a69ba9f079166a26943908b165470826ec8bac0ab5bd55b78",
+    "723459b0-3f9b-4fca-b09d-5fb312bb4723": "982ddf675ae09b2ca0254e6e58b00096783d3c4dd910d01ae280e1700f626d20"
+  },
+  "updatedAt": 1786594392534
+}

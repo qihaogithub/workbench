@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "projectId": "proj_1785934852171_oire9m",
+  "updatedAt": 1786001357651,
+  "state": {
+    "viewport": {
+      "x": 76.34828486630363,
+      "y": 99.00508050333161,
+      "zoom": 0.10209704370523018
+    },
+    "pages": {
+      "demo_1785935720859_01of": {
+        "x": -130.15625,
+        "y": -156.328125,
+        "width": 2000,
+        "height": 4330.6640625,
+        "sizeMode": "custom",
+        "previewSizeKey": "1920x1080"
+      },
+      "demo_1785935720859_02of": {
+        "x": 1968,
+        "y": 0,
+        "width": 1920,
+        "height": 1080,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "1920x1080"
+      },
+      "demo_1785935720859_03of": {
+        "x": 4221.9375,
+        "y": -96.796875,
+        "width": 1920,
+        "height": 1080,
+        "zIndex": 2,
+        "sizeMode": "preview",
+        "previewSizeKey": "1920x1080"
+      },
+      "demo_1785935720860_04of": {
+        "x": -368.75,
+        "y": 4189.5625,
+        "width": 1920,
+        "height": 1080,
+        "zIndex": 3,
+        "sizeMode": "preview",
+        "previewSizeKey": "1920x1080"
+      },
+      "demo_1785935720860_05of": {
+        "x": 1968,
+        "y": 4208,
+        "width": 1920,
+        "height": 1080,
+        "zIndex": 4,
+        "sizeMode": "preview",
+        "previewSizeKey": "1920x1080"
+      },
+      "demo_1785935720860_06of": {
+        "x": 4504.28125,
+        "y": 4174.3359375,
+        "width": 1920,
+        "height": 1080,
+        "zIndex": 5,
+        "sizeMode": "preview",
+        "previewSizeKey": "1920x1080"
+      },
+      "demo_1785935720860_07of": {
+        "x": -338.75,
+        "y": 8537.815,
+        "width": 1920,
+        "height": 1080,
+        "zIndex": 6,
+        "sizeMode": "preview",
+        "previewSizeKey": "1920x1080"
+      },
+      "demo_1785935720860_08of": {
+        "x": 1976.6977494706646,
+        "y": 8526.51074311864,
+        "width": 1920,
+        "height": 1080,
+        "zIndex": 7,
+        "sizeMode": "preview",
+        "previewSizeKey": "1920x1080"
+      },
+      "demo_1785935720860_09of": {
+        "x": 4534.17037770644,
+        "y": 8526.51074311864,
+        "width": 1920,
+        "height": 1080,
+        "zIndex": 8,
+        "sizeMode": "preview",
+        "previewSizeKey": "1920x1080"
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

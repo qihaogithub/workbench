@@ -1,0 +1,20 @@
+{
+  "workspaceId": "live-1787816872934-dsgtp417r",
+  "projectId": "proj_1787816872316_ywiron",
+  "revision": 3,
+  "rootHash": "173e5eb1b9ea88d09121c0af973b7dfd158d847d39d2254177b4a06471a14bd2",
+  "resourceHashes": {
+    ".canvas-layout.json": "1367d3f14d2ba75c57f1a8b1fb9fbd8d26383be9488e5611c05e62abade9f82d",
+    "demos/section_mhg2/config.schema.json": "e1c118a2c54911913d4ffbf47809ce89c404706cd8a6262198c81674f23a3750",
+    "demos/section_mhg2/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "demos/section_mhg2/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
+    "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
+    "memory.md": "48154b93957f8b6110505afd34139407eb21d3408afb84c6ad8b3343a22d39a5",
+    "workspace-tree.json": "5f16727ee0ff6710df1217d6900aef808c4f0215b6437a76c0d7a6f3635eebf0"
+  },
+  "mutationPayloads": {
+    "55bb148b-1168-432d-bbdb-e010c72418e7": "bc0cafaa31d26112bf0f81b142f9adb6711add2320d751e823f20d632e825ce3",
+    "c2c5a918-8f3a-4cdc-b812-0276b9b2e7ba": "5d641c382913645047b0797e3683bc6958cff3cb9e0bd1e703db525595b9cf8d"
+  },
+  "updatedAt": 1787816928658
+}

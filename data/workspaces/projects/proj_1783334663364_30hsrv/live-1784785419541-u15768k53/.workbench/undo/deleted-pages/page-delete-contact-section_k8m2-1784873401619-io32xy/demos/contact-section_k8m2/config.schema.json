@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "content",
+      "preset": "custom",
+      "source": "user"
+    }
+  },
+  "type": "object",
+  "properties": {
+    "contactEmail": {
+      "type": "string",
+      "default": "contact@startech.com",
+      "description": "联系邮箱"
+    },
+    "contactPhone": {
+      "type": "string",
+      "default": "400-888-9999",
+      "description": "联系电话"
+    },
+    "address": {
+      "type": "string",
+      "default": "北京市朝阳区科技大厦 A 座 18 层",
+      "description": "地址"
+    },
+    "workingHours": {
+      "type": "string",
+      "default": "周一至周五 9:00 - 18:00",
+      "description": "工作时间"
+    },
+    "showFooter": {
+      "type": "boolean",
+      "default": true,
+      "description": "是否显示底部版权信息"
+    },
+    "moduleOrder": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "hero",
+          "cards",
+          "form"
+        ],
+        "enumNames": [
+          "页面标题区",
+          "联系卡片网格",
+          "联系表单区域"
+        ]
+      },
+      "uniqueItems": true,
+      "default": [
+        "hero",
+        "cards",
+        "form"
+      ],
+      "description": "模块顺序（拖拽调整）"
+    }
+  },
+  "required": [
+    "contactEmail",
+    "contactPhone"
+  ]
+}

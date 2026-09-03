@@ -1,0 +1,25 @@
+{
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "heightBehavior": "content",
+      "preset": "custom",
+      "source": "user"
+    }
+  },
+  "type": "object",
+  "properties": {
+    "themeColor": {
+      "type": "string",
+      "format": "color",
+      "title": "主题色",
+      "default": "#4CAF50"
+    }
+  },
+  "required": []
+}

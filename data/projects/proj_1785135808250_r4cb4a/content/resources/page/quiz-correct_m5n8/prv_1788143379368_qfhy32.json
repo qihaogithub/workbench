@@ -1,0 +1,43 @@
+{
+  "id": "prv_1788143379368_qfhy32",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "kind": "page",
+  "resourceId": "quiz-correct_m5n8",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "workspaceRevision": 516,
+  "workspaceRootHash": "36e193802a9481294823bb5f3a38c32d8ce3686cc3b31ec83937294ec80c0f1f",
+  "contentHash": "76f35e3fd21294a8fb475022aa708d7689170277d473fc073f8a72766bf77797",
+  "blobRefs": [
+    "d48fe24cc89386b15a34d7746b0d1808e5183076c760bcbed49aaba99899b461",
+    "cac5cba1710cbb8d5c533cd257213ca9cdbf64ae35d09e8f6ba36d623878afa9",
+    "8d42993574836e38ead817bf31063822ca290f546255bbc96f4ebc72d3a2180a",
+    "42bb61975c959b9e8e56b31d6fa28b53b41c6ebb78b938fe239279d811a6fe96"
+  ],
+  "metadata": {
+    "page": {
+      "id": "quiz-correct_m5n8",
+      "name": "答对",
+      "routeKey": "page-13",
+      "order": 10,
+      "parentId": "folder_1785397626658_xft2kd",
+      "runtimeType": "prototype-html-css",
+      "isTemplatePage": false
+    },
+    "files": {
+      "schema": "d48fe24cc89386b15a34d7746b0d1808e5183076c760bcbed49aaba99899b461",
+      "prototypeHtml": "cac5cba1710cbb8d5c533cd257213ca9cdbf64ae35d09e8f6ba36d623878afa9",
+      "prototypeCss": "8d42993574836e38ead817bf31063822ca290f546255bbc96f4ebc72d3a2180a",
+      "prototypeMeta": "42bb61975c959b9e8e56b31d6fa28b53b41c6ebb78b938fe239279d811a6fe96"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1788143379370,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录答对"
+}

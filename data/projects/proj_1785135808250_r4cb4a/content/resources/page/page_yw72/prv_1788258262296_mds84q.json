@@ -1,0 +1,37 @@
+{
+  "id": "prv_1788258262296_mds84q",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "kind": "page",
+  "resourceId": "page_yw72",
+  "previousVersionId": "prv_1788256635513_5ojftn",
+  "contentHash": "bba6390276d9cc31834a46ea7b3dd2b4c83508960bda18e666df3bc8323518f0",
+  "blobRefs": [
+    "0fe55c33ab8f10075f285dd5ccffc5ae0623a07b88d70ae3509e09a50620ef33",
+    "a9f793f9ba85baab487381bf7e6dee2566dd3bceb1d57a5655ada8c288d60926"
+  ],
+  "metadata": {
+    "page": {
+      "id": "page_yw72",
+      "name": "开场引入-动画",
+      "routeKey": "page",
+      "order": 1,
+      "parentId": "folder_1785397477311_od13vu",
+      "runtimeType": "high-fidelity-react",
+      "isTemplatePage": false
+    },
+    "files": {
+      "schema": "0fe55c33ab8f10075f285dd5ccffc5ae0623a07b88d70ae3509e09a50620ef33",
+      "code": "a9f793f9ba85baab487381bf7e6dee2566dd3bceb1d57a5655ada8c288d60926"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "high-fidelity-react",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1788258262302,
+  "createdBy": "qh2",
+  "source": "user",
+  "note": "对齐 Spine 播放页当前 Workspace"
+}

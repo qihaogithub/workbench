@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1788281412991_z0feuy",
+  "at": 1788281412991,
+  "actor": {
+    "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+    "name": "qihao",
+    "role": "admin",
+    "source": "author-site"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1788281412990_mwa5mq",
+  "inputSummary": {
+    "name": "E2E:20260901T164958801Z-9shuvv:白板回填应用回归",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1788281412990_mwa5mq"
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "halloween-prize_y3n6",
+      "name": "我的奖品页",
+      "runtimeType": "prototype-html-css",
+      "order": 9,
+      "parentId": null,
+      "routeKey": "page-4"
+    },
+    {
+      "id": "halloween-share_u5b9",
+      "name": "转介绍·分享集赞赢大奖",
+      "runtimeType": "prototype-html-css",
+      "order": 10,
+      "parentId": null,
+      "routeKey": "page-5"
+    }
+  ]
+}

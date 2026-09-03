@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "modules": {
+      "type": "array",
+      "title": "模块列表",
+      "default": [
+        {
+          "type": "text",
+          "content": "这是文本模块，展示一段活动说明内容，可直接在配置面板中编辑。"
+        },
+        {
+          "type": "colorBlock",
+          "label": "品牌主色",
+          "value": "#6366f1"
+        },
+        {
+          "type": "image",
+          "pic": "/api/images/img_4wrwVLkwcsYUeQ",
+          "caption": "活动主视觉"
+        }
+      ],
+      "ui:options": {
+        "group": "模块列表"
+      }
+    },
+    "bannerText": {
+      "type": "string",
+      "title": "横幅文案",
+      "default": "限时抢购 5 折起",
+      "ui:options": {
+        "group": "横幅定位"
+      }
+    },
+    "bannerX": {
+      "type": "number",
+      "title": "水平位置",
+      "default": 24,
+      "ui:options": {
+        "group": "横幅定位"
+      }
+    },
+    "bannerY": {
+      "type": "number",
+      "title": "垂直位置",
+      "default": 520,
+      "ui:options": {
+        "group": "横幅定位"
+      }
+    }
+  },
+  "required": [],
+  "$demo": {
+    "previewSize": {
+      "width": 375,
+      "height": 812
+    }
+  }
+}

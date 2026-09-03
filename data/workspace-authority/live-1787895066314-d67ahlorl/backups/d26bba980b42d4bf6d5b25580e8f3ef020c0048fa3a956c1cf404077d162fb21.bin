@@ -1,0 +1,36 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "word-king-ladder_l3a2",
+      "name": "OP1 · 王者天梯",
+      "parentId": null,
+      "order": 0,
+      "runtimeType": "prototype-html-css",
+      "routeKey": "op1"
+    },
+    {
+      "id": "word-king-tower_b7d4",
+      "name": "OP2 · 单词魔塔",
+      "parentId": null,
+      "order": 1,
+      "runtimeType": "prototype-html-css",
+      "routeKey": "op2"
+    },
+    {
+      "id": "word-king-palace_m9c1",
+      "name": "OP3 · 宫殿大门",
+      "parentId": null,
+      "order": 2,
+      "runtimeType": "prototype-html-css",
+      "routeKey": "op3"
+    },
+    {
+      "id": "word-king-channel_k4s8",
+      "name": "OP4 · 能量通道",
+      "parentId": null,
+      "order": 3,
+      "runtimeType": "prototype-html-css"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "7d3a7c72-2670-41b9-9b99-1a5909920edd",
+  "projectId": "proj_1784874964275_p0k4ho",
+  "workspaceId": "live-1785739340495-r9pfl4l9u",
+  "baseRevision": 0,
+  "revision": 130,
+  "rootHash": "70b89be24209f155a2390599c3f88fa3f5e467c0210e901a54336096f4a6a5a3",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_hx94/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "8243f0af367f188a376f2c17b5eabe872a2f7a979813e0d4e2be6d594c2aa259",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_hx94/prototype.css",
+      "action": "deleted",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_hx94/prototype.html",
+      "action": "deleted",
+      "beforeHash": "10cc2d4b8a6577d6e30af01dfd92e8adc93976744e8c52aff2953323034aebf8",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_hx94/prototype.meta.json",
+      "action": "deleted",
+      "beforeHash": "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "e1b0fd5a072914947a0ffd29d2743da27ff6b88e570e96f1e35fc09c78987a61",
+      "afterHash": "c2b4ceb222d1a1971ce7448a6af84e5fc8611f2559b0b8bb288ffec1c1351a15"
+    }
+  ],
+  "committedAt": 1786097920223
+}

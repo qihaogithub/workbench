@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1786594155692_4g62nj",
+  "at": 1786594155692,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1786594155691_z30u7e",
+  "inputSummary": {
+    "name": "E2E:20260813T040743016Z-fifj2u:Yjs-First无冲突",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1786594155691_z30u7e"
+    ]
+  }
+}

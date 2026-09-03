@@ -1,0 +1,38 @@
+{
+  "type": "object",
+  "$demo": {
+    "previewSize": {
+      "width": 375,
+      "height": 1065
+    }
+  },
+  "properties": {
+    "phoneBackground": {
+      "type": "string",
+      "title": "手机背景图",
+      "default": "/api/images/img_ZO_cMaoYgouRfA",
+      "format": "image",
+      "ui:options": {
+        "category": "设计",
+        "widthOperator": "=",
+        "widthValue": 750,
+        "heightOperator": "=",
+        "heightValue": 760
+      }
+    },
+    "phoneForeground": {
+      "type": "string",
+      "title": "手机前景图",
+      "default": "/api/images/img_f9y1nONlI30sBg",
+      "format": "image",
+      "ui:options": {
+        "category": "设计",
+        "widthOperator": "=",
+        "widthValue": 1020,
+        "heightOperator": "=",
+        "heightValue": 570
+      }
+    }
+  },
+  "required": []
+}

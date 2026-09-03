@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1785984571945_0pe57q",
+  "at": 1785984571945,
+  "actor": {
+    "id": "local-codex",
+    "name": "local-codex",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1785984571939_9uj8av",
+  "inputSummary": {
+    "name": "伴读首页",
+    "category": "APP资源位"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1785984571939_9uj8av"
+    ]
+  }
+}

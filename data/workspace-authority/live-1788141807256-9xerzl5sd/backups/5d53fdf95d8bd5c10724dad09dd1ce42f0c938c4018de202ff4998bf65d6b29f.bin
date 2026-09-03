@@ -1,0 +1,36 @@
+{
+  "id": "ds_1788166913695_ecd7d6fb",
+  "title": "N对N填空题设计规范",
+  "createdAt": "2026-08-31T09:01:53.695Z",
+  "updatedAt": "2026-09-01T14:51:03.105Z",
+  "autoManagedPageId": "clipboard-import_e05e9d",
+  "entries": [
+    {
+      "id": "e_1788259071711_pp1s2m",
+      "title": "玩法介绍",
+      "markdown": "### **玩法介绍**\n\n提供两种拖动模式：\n\n* **替换为选项图**：拖动后，问题图直接替换为对应的选项图（见左图）。\n* **替换为另一张图**：拖动后，问题图替换为另一张图（见右图）。\n\n![1.00](https://alidocs.oss-cn-zhangjiakou.aliyuncs.com/res/a2QnVZeK0W8yn4XB/img/2464ee67-e74c-423c-8ca4-3bfc7eaa8980.png)\n\n资源差异：第二种模式需额外配置\"替换后的图\"\n\n### **判对逻辑**\n\n* 支持选项数与空位数不同。\n* 支持不判对。\n* 示例：2 个选项、3 个空，任意把 2 个选项填入空位均判为正确。\n\n### **新手引导**\n\n支持自定义新手引导。\n",
+      "target": {
+        "type": "page",
+        "pageIds": [
+          "clipboard-import_e05e9d"
+        ]
+      }
+    },
+    {
+      "id": "e_1788166913696_0322c59d",
+      "title": "背景图",
+      "markdown": "",
+      "target": {
+        "type": "config",
+        "refs": [
+          {
+            "scope": "page",
+            "pageId": "clipboard-import_e05e9d",
+            "fieldKey": "backgroundImage"
+          }
+        ]
+      },
+      "autoManagedFieldKey": "backgroundImage"
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "projectId": "proj_1783585261167_7h7prw",
+  "updatedAt": 1785222578089,
+  "state": {
+    "viewport": {
+      "x": 458.2844883102079,
+      "y": 95.36401202103684,
+      "zoom": 0.49048272901222456
+    },
+    "pages": {
+      "growth-bean-mall_x8k2": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 812,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "figma_s4v2": {
+        "x": 422.53011852126957,
+        "y": -5.645484080218921e-14,
+        "width": 375,
+        "height": 812,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

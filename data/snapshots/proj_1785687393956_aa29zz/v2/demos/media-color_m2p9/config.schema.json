@@ -1,0 +1,67 @@
+{
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "content",
+      "preset": "custom",
+      "source": "user"
+    }
+  },
+  "type": "object",
+  "properties": {
+    "品牌配置": {
+      "type": "object",
+      "title": "品牌配置",
+      "properties": {
+        "bgColor": {
+          "type": "string",
+          "title": "背景色",
+          "format": "color",
+          "default": "#f0f4ff"
+        },
+        "themeColor": {
+          "type": "string",
+          "title": "主题色",
+          "format": "color",
+          "default": "#4f46e5"
+        },
+        "logo": {
+          "type": "string",
+          "title": "Logo 图片",
+          "format": "image",
+          "default": "/api/images/img__3I8yQBnAyUtHA"
+        }
+      },
+      "required": []
+    },
+    "内容": {
+      "type": "object",
+      "title": "内容",
+      "properties": {
+        "gallery": {
+          "type": "array",
+          "title": "图片画廊",
+          "format": "imageList",
+          "default": [
+            "/api/images/img_GwsXRx4Q2c0A0g",
+            "/api/images/img_TAHdeo7PUJQMmg",
+            "/api/images/img_y3J3ubDJMTF5qw"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "title": "品牌描述",
+          "format": "richtext",
+          "default": "<h3>关于我们</h3><p>我们是一家专注于<strong>创新设计</strong>的科技公司，致力于为用户提供卓越的视觉体验。</p><ul><li>专业团队</li><li>创新理念</li><li>用户至上</li></ul>"
+        }
+      },
+      "required": []
+    }
+  },
+  "required": []
+}

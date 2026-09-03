@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1783298932418_ipd8vr",
+  "at": 1783298932418,
+  "actor": {
+    "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+    "name": "qihao",
+    "role": "creator",
+    "source": "author-site"
+  },
+  "level": "L2",
+  "tool": "page_create_version",
+  "projectId": "proj_1783263373417_l9zosv",
+  "resourceId": "openpencil_spike_scene",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "page-version:openpencil_spike_scene:prv_1783298932416_0ow9y8"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

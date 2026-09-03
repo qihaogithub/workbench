@@ -1,0 +1,29 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "kids-edu_b3xw",
+      "name": "kids edu",
+      "order": 0,
+      "parentId": null,
+      "runtimeType": "prototype-html-css",
+      "routeKey": "kids-edu"
+    },
+    {
+      "id": "quiet-studio_q7m4",
+      "name": "quiet studio",
+      "order": 1,
+      "parentId": null,
+      "runtimeType": "prototype-html-css",
+      "routeKey": "quiet-studio"
+    },
+    {
+      "id": "sunny-reading_k4m8",
+      "name": "sunny reading",
+      "order": 2,
+      "parentId": null,
+      "runtimeType": "high-fidelity-react",
+      "routeKey": "sunny-reading"
+    }
+  ]
+}

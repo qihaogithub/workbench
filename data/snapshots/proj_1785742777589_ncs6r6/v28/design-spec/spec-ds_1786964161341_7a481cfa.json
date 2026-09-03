@@ -1,0 +1,47 @@
+{
+  "id": "ds_1786964161341_7a481cfa",
+  "title": "配置项类型示例设计规范",
+  "createdAt": "2026-08-17T10:56:01.341Z",
+  "updatedAt": "2026-08-18T06:06:56.241Z",
+  "autoManagedPageId": "config-demo_m7p2",
+  "entries": [
+    {
+      "id": "e_1787032884614_lxfwkh",
+      "title": "封面 (image)",
+      "markdown": "### **样式一：**\n\n配图没有文字，文字单独配置到图片下方\n\n此时建议配图高度不大于300px，\n\n底板的渐变色需保证最下方为白色#ffffff，底板左上和右上圆角建议~~32~~ 24（在375宽情况下）\n\n可以下载此弹窗界面资源，叠加后查看实际效果：\n\n![1.00](/api/images/img_qS5VuulIiCefIw)\n\n### **样式二：**\n\n文字全部放到配图中，图片下方不单独配置文字，只有按钮。\n\n主体唯一，避免主要文字或元素脱离背景面板。\n\n底板的渐变色需保证最下方为白色#ffffff，底板左上和右上圆角建议 24（在375宽情况下）\n\n![1.00](/api/images/img_oVqbxRwRllH5bw)\n\n导出的图片，在底部和底部的左右两侧，不要有空白像素\n\n![1.00](/api/images/img_8_5ZQuNaBaKSbw)\n\n注意pad端效果，左右两侧不可以有锐角截断\n\n<br />\n\n![1.00](/api/images/img_OkVjuxA8kTCtTQ)\n\n",
+      "refs": [
+        {
+          "scope": "page",
+          "pageId": "config-demo_m7p2",
+          "fieldKey": "coverImage"
+        }
+      ]
+    },
+    {
+      "id": "e_1787033216241_53d05f38",
+      "title": "封面 (image)",
+      "markdown": "",
+      "refs": [
+        {
+          "scope": "page",
+          "pageId": "config-demo_m7p2",
+          "fieldKey": "coverImage"
+        }
+      ],
+      "autoManagedFieldKey": "coverImage"
+    },
+    {
+      "id": "e_1787033216242_d7c66d53",
+      "title": "布局设置 - 图片",
+      "markdown": "",
+      "refs": [
+        {
+          "scope": "page",
+          "pageId": "config-demo_m7p2",
+          "fieldKey": "layoutItem"
+        }
+      ],
+      "autoManagedFieldKey": "layoutItem"
+    }
+  ]
+}

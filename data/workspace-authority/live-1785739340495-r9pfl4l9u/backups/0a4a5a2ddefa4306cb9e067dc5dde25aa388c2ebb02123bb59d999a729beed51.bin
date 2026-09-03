@@ -1,0 +1,29 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "course-complete_a7k3",
+      "name": "完课活动",
+      "runtimeType": "high-fidelity-react",
+      "order": 1,
+      "parentId": null,
+      "routeKey": "page"
+    },
+    {
+      "id": "page_6xp3",
+      "name": "手机预览",
+      "routeKey": "page-2",
+      "order": 2,
+      "parentId": null,
+      "runtimeType": "high-fidelity-react"
+    },
+    {
+      "id": "pad_mo43",
+      "name": "Pad预览",
+      "routeKey": "pad",
+      "order": 3,
+      "parentId": null,
+      "runtimeType": "high-fidelity-react"
+    }
+  ]
+}

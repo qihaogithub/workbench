@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "projectId": "proj_1787895065566_5wgvzx",
+  "updatedAt": 1787898318936,
+  "state": {
+    "viewport": {
+      "x": 134.1282051282051,
+      "y": 36.25,
+      "zoom": 0.3717948717948718
+    },
+    "pages": {
+      "word-king-tower_b7d4": {
+        "x": 448.1551724137931,
+        "y": 56.48275862068965,
+        "width": 390,
+        "height": 887,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "390x844"
+      },
+      "word-king-palace_m9c1": {
+        "x": 1114.8553340517242,
+        "y": 23.639547413793103,
+        "width": 390,
+        "height": 933,
+        "zIndex": 2,
+        "sizeMode": "preview",
+        "previewSizeKey": "390x844"
+      },
+      "word-king-channel_k4s8": {
+        "x": 0,
+        "y": 852,
+        "width": 390,
+        "height": 903,
+        "zIndex": 3,
+        "sizeMode": "preview",
+        "previewSizeKey": "390x844"
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "hiddenKnowledgeDocumentIds": [],
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "sections": {},
+    "navigation": {
+      "hotspots": {
+        "navigation_hotspot_1787898318881_y1x28m": {
+          "id": "navigation_hotspot_1787898318881_y1x28m",
+          "pageId": "word-king-tower_b7d4",
+          "kind": "area",
+          "rect": {
+            "x": 0.04748493063038793,
+            "y": 0.6545941542607838,
+            "width": 0.8928071120689655,
+            "height": 0.07684999987969976
+          },
+          "createdAt": 1787898318881,
+          "updatedAt": 1787898318881
+        }
+      },
+      "connections": {
+        "navigation_connection_1787898318881_ucdy9h": {
+          "id": "navigation_connection_1787898318881_ucdy9h",
+          "source": {
+            "pageId": "word-king-tower_b7d4",
+            "hotspotId": "navigation_hotspot_1787898318881_y1x28m"
+          },
+          "target": {
+            "pageId": "word-king-palace_m9c1"
+          },
+          "createdAt": 1787898318881,
+          "updatedAt": 1787898318881
+        }
+      }
+    }
+  }
+}

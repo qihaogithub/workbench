@@ -1,0 +1,25 @@
+{
+  "committed": true,
+  "mutationId": "f14d8469-6848-4a13-88ea-9b14ab1c28ed",
+  "projectId": "proj_1786592778148_j42wbh",
+  "workspaceId": "live-1786592778271-nbeovjaij",
+  "baseRevision": 0,
+  "revision": 4,
+  "rootHash": "3437d4181e87ee40f970bbba82ebc1922cfbf1333dc205b7ebc0cb9ce2407023",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_gddo/index.tsx",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "ab2aad2738aa930daf93b32170670ce102e061ff50c5a5a1f7297872e44b0cb9"
+    },
+    {
+      "path": "demos/page_gddo/config.schema.json",
+      "action": "modified",
+      "beforeHash": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+      "afterHash": "1076744cda5d7cff7d8774a8cf1183ac0ac046f9a396292c64565c9266a5e94f"
+    }
+  ],
+  "committedAt": 1786592830532
+}

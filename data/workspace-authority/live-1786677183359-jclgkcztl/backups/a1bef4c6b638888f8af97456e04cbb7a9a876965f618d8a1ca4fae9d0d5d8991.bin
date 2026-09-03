@@ -1,0 +1,150 @@
+{
+  "version": 1,
+  "projectId": "proj_1786367903885_iu08e4",
+  "updatedAt": 1787886062481,
+  "state": {
+    "viewport": {
+      "x": -322.4321432687775,
+      "y": 361.0137841584374,
+      "zoom": 0.9116175505428984
+    },
+    "pages": {
+      "kids-edu_b3xw": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 2471,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "clipboard-import_4d9ab0": {
+        "x": 549.1688741936314,
+        "y": 26.59478305785112,
+        "width": 375,
+        "height": 812,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "pageGroups": {},
+    "sections": {},
+    "hiddenPageIds": [],
+    "nodes": {
+      "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c": {
+        "id": "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c",
+        "title": "文档",
+        "layout": {
+          "x": 401.475382346924,
+          "y": 0.5464406222049547,
+          "width": 180,
+          "height": 360,
+          "zIndex": 1
+        },
+        "createdAt": 1787885153164,
+        "updatedAt": 1787885157781,
+        "kind": "document",
+        "knowledgeDocument": {
+          "id": "kb_1787885153658_t9h54b",
+          "title": "文档",
+          "fileName": "文档.md",
+          "description": "文档"
+        }
+      },
+      "text-08661fa0-38e0-408f-b708-d96189ce5725": {
+        "id": "text-08661fa0-38e0-408f-b708-d96189ce5725",
+        "title": "文字",
+        "layout": {
+          "x": 645.7996559236116,
+          "y": 10.781864886041921,
+          "width": 108.323685707256,
+          "height": 53
+        },
+        "createdAt": 1787885291834,
+        "updatedAt": 1787886062427,
+        "kind": "text",
+        "text": "",
+        "fontSize": 39,
+        "color": "#3d66bd",
+        "fontWeight": 600,
+        "lineHeight": 1.35,
+        "autoWidth": false
+      }
+    },
+    "layers": {
+      "annotations": {
+        "nodes": {
+          "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c": {
+            "id": "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c",
+            "title": "文档",
+            "layout": {
+              "x": 401.475382346924,
+              "y": 0.5464406222049547,
+              "width": 180,
+              "height": 360,
+              "zIndex": 1
+            },
+            "createdAt": 1787885153164,
+            "updatedAt": 1787885157781,
+            "kind": "document",
+            "knowledgeDocument": {
+              "id": "kb_1787885153658_t9h54b",
+              "title": "文档",
+              "fileName": "文档.md",
+              "description": "文档"
+            }
+          },
+          "text-08661fa0-38e0-408f-b708-d96189ce5725": {
+            "id": "text-08661fa0-38e0-408f-b708-d96189ce5725",
+            "title": "文字",
+            "layout": {
+              "x": 645.7996559236116,
+              "y": 10.781864886041921,
+              "width": 108.323685707256,
+              "height": 53
+            },
+            "createdAt": 1787885291834,
+            "updatedAt": 1787886062427,
+            "kind": "text",
+            "text": "",
+            "fontSize": 39,
+            "color": "#3d66bd",
+            "fontWeight": 600,
+            "lineHeight": 1.35,
+            "autoWidth": false
+          }
+        }
+      },
+      "documents": {
+        "nodes": {
+          "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c": {
+            "id": "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c",
+            "title": "文档",
+            "layout": {
+              "x": 401.475382346924,
+              "y": 0.5464406222049547,
+              "width": 180,
+              "height": 360,
+              "zIndex": 1
+            },
+            "createdAt": 1787885153164,
+            "updatedAt": 1787885157781,
+            "kind": "document",
+            "knowledgeDocument": {
+              "id": "kb_1787885153658_t9h54b",
+              "title": "文档",
+              "fileName": "文档.md",
+              "description": "文档"
+            }
+          }
+        }
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [],
+    "navigation": {
+      "hotspots": {},
+      "connections": {}
+    }
+  }
+}

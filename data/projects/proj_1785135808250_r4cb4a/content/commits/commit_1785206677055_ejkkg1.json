@@ -1,0 +1,51 @@
+{
+  "id": "commit_1785206677055_ejkkg1",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "parentCommitId": "commit_1785205873219_2gz40y",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "打开历史前记录闯关活动",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "page_da9l",
+      "versionId": "prv_1785138185736_z29n0k"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_gfbs",
+      "versionId": "prv_1785136734038_5bt9sp"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_pqyt",
+      "versionId": "prv_1785205299313_c3158x"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_wcfh",
+      "versionId": "prv_1785206677053_mzslur"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_yw72",
+      "versionId": "prv_1785202917458_dt0dg5"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "page_wcfh",
+      "fromVersionId": "prv_1785205873216_vyujzo",
+      "toVersionId": "prv_1785206677053_mzslur"
+    }
+  ],
+  "createdAt": 1785206677055,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785205322879-latagwnoh",
+    "workspaceRevision": 21,
+    "workspaceRootHash": "cf80588765632f97d680e067b23220c4e427af6af08d120b0820524882321c9a"
+  }
+}

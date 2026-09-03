@@ -1,0 +1,49 @@
+{
+  "committed": true,
+  "mutationId": "6b414484-22b4-4228-8625-41017f74fbcd",
+  "projectId": "proj_1785984571939_9uj8av",
+  "workspaceId": "live-1785984572222-vwsdjjjqb",
+  "baseRevision": 0,
+  "revision": 95,
+  "rootHash": "08c4db1130f63a6d03924ca2542208087cf69d9e547fa825046b7b78f739f092",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_y0ms/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "4c8b37f7056ed552c191ba2ea05dba251c913ae03d1db3174a8d709ed10abb86",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_y0ms/index.tsx",
+      "action": "deleted",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_y0ms/prototype.css",
+      "action": "deleted",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_y0ms/prototype.html",
+      "action": "deleted",
+      "beforeHash": "60f2383c71e7735df95374c45029c486d58100b0084052248331115543684dde",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_y0ms/prototype.meta.json",
+      "action": "deleted",
+      "beforeHash": "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "00034b80e83c8fd5deb83844528ca549b2f1d606fadf411950c9640071eed5e8",
+      "afterHash": "76b90c9b73bbe18d9d953182f91c0747047aed29543a9375f39f87b23f546a75"
+    }
+  ],
+  "committedAt": 1786009466170
+}

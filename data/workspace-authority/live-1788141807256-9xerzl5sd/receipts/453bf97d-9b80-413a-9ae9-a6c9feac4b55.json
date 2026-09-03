@@ -1,0 +1,31 @@
+{
+  "committed": true,
+  "mutationId": "453bf97d-9b80-413a-9ae9-a6c9feac4b55",
+  "projectId": "proj_1788141806566_0aps89",
+  "workspaceId": "live-1788141807256-9xerzl5sd",
+  "baseRevision": 0,
+  "revision": 7,
+  "rootHash": "296ea378341f048f734a1a00030335c5e0091c5fea2bf7bba035d2f9f8bd6bc7",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_t7cj/config.schema.json",
+      "action": "modified",
+      "beforeHash": "e1c118a2c54911913d4ffbf47809ce89c404706cd8a6262198c81674f23a3750",
+      "afterHash": "d48fe24cc89386b15a34d7746b0d1808e5183076c760bcbed49aaba99899b461"
+    },
+    {
+      "path": "demos/page_t7cj/prototype.html",
+      "action": "modified",
+      "beforeHash": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
+      "afterHash": "cac5cba1710cbb8d5c533cd257213ca9cdbf64ae35d09e8f6ba36d623878afa9"
+    },
+    {
+      "path": "demos/page_t7cj/prototype.css",
+      "action": "modified",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": "8d42993574836e38ead817bf31063822ca290f546255bbc96f4ebc72d3a2180a"
+    }
+  ],
+  "committedAt": 1788142787705
+}

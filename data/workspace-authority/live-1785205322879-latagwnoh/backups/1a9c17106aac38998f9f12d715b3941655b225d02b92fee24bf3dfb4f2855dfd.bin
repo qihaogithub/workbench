@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "fixed-canvas",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "fixed",
+      "preset": "custom",
+      "source": "figma"
+    }
+  },
+  "properties": {
+    "spine": {
+      "type": "object",
+      "title": "弹窗 Spine 动画",
+      "properties": {
+        "skeleton": {
+          "type": "string",
+          "format": "file",
+          "title": "骨架文件",
+          "description": "Spine 骨架文件：.skel / .skel.bytes / .json",
+          "ui:options": {
+            "accept": ".skel,.skel.bytes,.json"
+          }
+        },
+        "atlas": {
+          "type": "string",
+          "format": "file",
+          "title": "图集文件",
+          "description": "Spine 图集文件：.atlas / .atlas.txt",
+          "ui:options": {
+            "accept": ".atlas,.atlas.txt"
+          }
+        },
+        "texture": {
+          "type": "string",
+          "format": "image",
+          "title": "纹理图片",
+          "description": "Spine 纹理图片：.png"
+        },
+        "animation": {
+          "type": "string",
+          "title": "动画名",
+          "description": "要播放的动画名，留空则播放第一条",
+          "default": ""
+        },
+        "loop": {
+          "type": "boolean",
+          "title": "循环播放",
+          "default": true
+        }
+      },
+      "required": []
+    }
+  },
+  "required": []
+}

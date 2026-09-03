@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "42e89ab6-d41f-4608-8f2a-8cacf8d85a3e",
+  "projectId": "proj_1788281620414_qdma8j",
+  "workspaceId": "live-1788281620433-tt4bcy4eo",
+  "baseRevision": 0,
+  "revision": 2,
+  "rootHash": "ad2d13e621cf0bf8b3326928c06edf3e4086940ae1d9ae27463ce3f2a539216a",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_fkv7/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f"
+    },
+    {
+      "path": "demos/page_fkv7/prototype.css",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/page_fkv7/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e1c118a2c54911913d4ffbf47809ce89c404706cd8a6262198c81674f23a3750"
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "b8f84cb18b1d4fb04f8db0fdb7867802b916f6365d4816c8289777a7893570ab",
+      "afterHash": "69b619c77937cd3ecb0dd09de196d01005f530b5f24d4b157ed058763860f89f"
+    }
+  ],
+  "committedAt": 1788281620569
+}

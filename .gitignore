@@ -13,7 +13,6 @@ out
 .worktrees
 .qoder
 /test/**/test-outputs/
-/data/
 memory.md
 
 # 官方参考代码（只读，不入库）

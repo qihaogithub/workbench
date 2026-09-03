@@ -1,0 +1,17 @@
+{
+  "workspaceId": "live-1787817521135-dilxe4nj4",
+  "projectId": "proj_1787817520818_4qmrrg",
+  "revision": 3,
+  "rootHash": "75d9b64a57bae4b40952217bdc7a25d1d33038a9b828afbb488967aa560ac026",
+  "resourceHashes": {
+    ".canvas-layout.json": "c85441c5874f134416ebac7a383ed9409199f7e93434131cb57a57176b3c674c",
+    "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
+    "memory.md": "48154b93957f8b6110505afd34139407eb21d3408afb84c6ad8b3343a22d39a5",
+    "workspace-tree.json": "b8f84cb18b1d4fb04f8db0fdb7867802b916f6365d4816c8289777a7893570ab"
+  },
+  "mutationPayloads": {
+    "743a1934-6681-4f31-895b-e745c3253dbc": "a634ab520141978bfed146bde6e1c7f8d02145e23897b07a2458e970b884963c",
+    "bfabfe61-a5bb-412b-bc76-4daa00543978": "c638d47a257668d5674ad18670213a7653209182a76d04060c0fd631e0d74377"
+  },
+  "updatedAt": 1787817536676
+}

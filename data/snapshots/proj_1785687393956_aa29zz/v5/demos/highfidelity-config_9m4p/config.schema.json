@@ -1,0 +1,283 @@
+{
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "content",
+      "preset": "custom",
+      "source": "user"
+    }
+  },
+  "type": "object",
+  "properties": {
+    "标题区": {
+      "type": "object",
+      "title": "标题区",
+      "properties": {
+        "title": {
+          "type": "string",
+          "title": "页面标题",
+          "default": "高保真页配置演示"
+        },
+        "subtitle": {
+          "type": "string",
+          "title": "副标题",
+          "default": "仅高保真页面支持的复合配置类型"
+        }
+      },
+      "required": []
+    },
+    "模块列表": {
+      "type": "object",
+      "title": "模块列表（array + 排序）",
+      "properties": {
+        "modules": {
+          "type": "array",
+          "title": "功能模块",
+          "$demo": {
+            "sortable": true
+          },
+          "items": {
+            "oneOf": [
+              {
+                "title": "横幅模块",
+                "$demo": {
+                  "maxItems": 1
+                },
+                "properties": {
+                  "type": {
+                    "const": "banner"
+                  },
+                  "imageUrl": {
+                    "type": "string",
+                    "title": "横幅图片",
+                    "format": "image",
+                    "default": "/api/images/img__3I8yQBnAyUtHA"
+                  },
+                  "text": {
+                    "type": "string",
+                    "title": "横幅文字",
+                    "default": "欢迎光临"
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              },
+              {
+                "title": "图文模块",
+                "properties": {
+                  "type": {
+                    "const": "media"
+                  },
+                  "pic": {
+                    "type": "string",
+                    "title": "图片",
+                    "format": "image",
+                    "default": "/api/images/img_GwsXRx4Q2c0A0g"
+                  },
+                  "caption": {
+                    "type": "string",
+                    "title": "图片说明",
+                    "default": "图文模块说明"
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              },
+              {
+                "title": "进度模块",
+                "$demo": {
+                  "maxItems": 1
+                },
+                "properties": {
+                  "type": {
+                    "const": "progress"
+                  },
+                  "label": {
+                    "type": "string",
+                    "title": "标签",
+                    "default": "完成进度"
+                  },
+                  "percent": {
+                    "type": "integer",
+                    "title": "进度（%）",
+                    "default": 72
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              }
+            ]
+          },
+          "default": [
+            {
+              "type": "banner",
+              "imageUrl": "/api/images/img__3I8yQBnAyUtHA",
+              "text": "欢迎光临"
+            },
+            {
+              "type": "media",
+              "pic": "/api/images/img_GwsXRx4Q2c0A0g",
+              "caption": "图文模块说明"
+            },
+            {
+              "type": "progress",
+              "label": "完成进度",
+              "percent": 72
+            }
+          ]
+        }
+      },
+      "required": []
+    },
+    "图片画廊": {
+      "type": "object",
+      "title": "图片画廊（imageList）",
+      "properties": {
+        "gallery": {
+          "type": "imageList",
+          "title": "画廊图片",
+          "default": [
+            "/api/images/img__3I8yQBnAyUtHA",
+            "/api/images/img_GwsXRx4Q2c0A0g",
+            "/api/images/img_TAHdeo7PUJQMmg",
+            "/api/images/img_y3J3ubDJMTF5qw"
+          ]
+        }
+      },
+      "required": []
+    },
+    "富文本": {
+      "type": "object",
+      "title": "富文本（richtext）",
+      "properties": {
+        "article": {
+          "type": "richtext",
+          "title": "文章内容",
+          "default": "<h3>富文本标题</h3><p>这是一段由 <strong>richtext</strong> 配置项提供的富文本内容，支持标题、加粗、列表等样式。</p><ul><li>要点一：清晰展示效果</li><li>要点二：配置即所得</li></ul>"
+        }
+      },
+      "required": []
+    },
+    "级联选择": {
+      "type": "object",
+      "title": "级联选择（cascade）",
+      "properties": {
+        "region": {
+          "type": "cascade",
+          "title": "地区",
+          "default": [
+            "zhejiang",
+            "hangzhou"
+          ],
+          "options": [
+            {
+              "value": "zhejiang",
+              "label": "浙江",
+              "children": [
+                {
+                  "value": "hangzhou",
+                  "label": "杭州"
+                },
+                {
+                  "value": "ningbo",
+                  "label": "宁波"
+                }
+              ]
+            },
+            {
+              "value": "jiangsu",
+              "label": "江苏",
+              "children": [
+                {
+                  "value": "nanjing",
+                  "label": "南京"
+                },
+                {
+                  "value": "suzhou",
+                  "label": "苏州"
+                }
+              ]
+            },
+            {
+              "value": "guangdong",
+              "label": "广东",
+              "children": [
+                {
+                  "value": "guangzhou",
+                  "label": "广州"
+                },
+                {
+                  "value": "shenzhen",
+                  "label": "深圳"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "required": []
+    },
+    "多选标签": {
+      "type": "object",
+      "title": "多选标签（enum 多选）",
+      "properties": {
+        "tags": {
+          "type": "enum",
+          "title": "兴趣标签",
+          "enum": [
+            "tech",
+            "design",
+            "music",
+            "sports"
+          ],
+          "enumNames": [
+            "科技",
+            "设计",
+            "音乐",
+            "运动"
+          ],
+          "multiple": true,
+          "default": [
+            "tech",
+            "design"
+          ]
+        }
+      },
+      "required": []
+    },
+    "定位元素": {
+      "type": "object",
+      "title": "定位元素（position）",
+      "properties": {
+        "floatText": {
+          "type": "string",
+          "title": "标签文字",
+          "default": "拖动我"
+        },
+        "floatPos": {
+          "type": "position",
+          "key": "floatBadge",
+          "title": "位置",
+          "size": {
+            "width": 375,
+            "height": 200
+          },
+          "default": {
+            "x": 24,
+            "y": 24
+          }
+        }
+      },
+      "required": []
+    }
+  },
+  "required": []
+}

@@ -1,0 +1,31 @@
+{
+  "committed": true,
+  "mutationId": "a90c9604-bab6-41ea-9239-912ff756871c",
+  "projectId": "proj_1787814377754_4243v7",
+  "workspaceId": "live-1787814378221-9l0h1v70v",
+  "baseRevision": 0,
+  "revision": 11,
+  "rootHash": "78babb6bd2f80690b57299f41add6a8326e87707dd0c4015ad0c17acadf666e4",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/clipboard-import_c6b554/config.schema.json",
+      "action": "modified",
+      "beforeHash": "fa1892b60b1893afc883d135d1fa2973a67415ecc1ba459bc6059e74de025c4f",
+      "afterHash": "487c15414c9961ed79b771ba2c0507a1d616b803fc15244e7c3d90f5dcabd111"
+    },
+    {
+      "path": "design-spec/spec-ds_1787815724129_a45d7050.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e709a1b85d8710ad51e38050bf73c1d582ef7fce16a6ac2f35fbdc2dfe437947"
+    },
+    {
+      "path": "design-spec/manifest.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "3d7f902680e8d152c4142ae385e38c36d060f9e2bc333cf25c761d4e4dfc2aee"
+    }
+  ],
+  "committedAt": 1787815724139
+}

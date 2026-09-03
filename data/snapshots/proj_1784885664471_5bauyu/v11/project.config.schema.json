@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "activeSubject": {
+      "type": "string",
+      "title": "当前科目",
+      "default": "reading",
+      "enum": ["reading", "thinking", "aesthetic", "english", "writer"],
+      "enumNames": ["阅读", "思维", "美育", "英语", "小作家"]
+    },
+    "headerBgReading": {
+      "type": "string",
+      "title": "阅读·手机头图",
+      "default": "",
+      "format": "image",
+      "ui:options": {
+        "minWidth": 750,
+        "minHeight": 540
+      }
+    },
+    "headerBgThinking": {
+      "type": "string",
+      "title": "思维·手机头图",
+      "default": "",
+      "format": "image",
+      "ui:options": {
+        "minWidth": 750,
+        "minHeight": 540
+      }
+    },
+    "headerBgAesthetic": {
+      "type": "string",
+      "title": "美育·手机头图",
+      "default": "",
+      "format": "image",
+      "ui:options": {
+        "minWidth": 750,
+        "minHeight": 540
+      }
+    },
+    "headerBgEnglish": {
+      "type": "string",
+      "title": "英语·手机头图",
+      "default": "",
+      "format": "image",
+      "ui:options": {
+        "minWidth": 750,
+        "minHeight": 540
+      }
+    },
+    "headerBgWriter": {
+      "type": "string",
+      "title": "小作家·手机头图",
+      "default": "",
+      "format": "image",
+      "ui:options": {
+        "minWidth": 750,
+        "minHeight": 540
+      }
+    },
+    "padHeaderBgReading": {
+      "type": "string",
+      "title": "阅读·Pad头图",
+      "default": "",
+      "format": "image",
+      "ui:options": {
+        "minWidth": 2732,
+        "minHeight": 540
+      }
+    },
+    "padHeaderBgThinking": {
+      "type": "string",
+      "title": "思维·Pad头图",
+      "default": "",
+      "format": "image",
+      "ui:options": {
+        "minWidth": 2732,
+        "minHeight": 540
+      }
+    },
+    "padHeaderBgAesthetic": {
+      "type": "string",
+      "title": "美育·Pad头图",
+      "default": "",
+      "format": "image",
+      "ui:options": {
+        "minWidth": 2732,
+        "minHeight": 540
+      }
+    },
+    "padHeaderBgEnglish": {
+      "type": "string",
+      "title": "英语·Pad头图",
+      "default": "",
+      "format": "image",
+      "ui:options": {
+        "minWidth": 2732,
+        "minHeight": 540
+      }
+    },
+    "padHeaderBgWriter": {
+      "type": "string",
+      "title": "小作家·Pad头图",
+      "default": "",
+      "format": "image",
+      "ui:options": {
+        "minWidth": 2732,
+        "minHeight": 540
+      }
+    }
+  },
+  "required": []
+}

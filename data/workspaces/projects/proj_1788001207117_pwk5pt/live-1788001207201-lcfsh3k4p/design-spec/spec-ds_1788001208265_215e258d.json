@@ -1,0 +1,22 @@
+{
+  "id": "ds_1788001208265_215e258d",
+  "title": "首页设计规范",
+  "createdAt": "2026-08-29T11:00:08.265Z",
+  "updatedAt": "2026-08-29T11:00:08.265Z",
+  "entries": [
+    {
+      "id": "e_1788001208265_0e360dfb",
+      "title": "主视觉图片",
+      "markdown": "",
+      "refs": [
+        {
+          "scope": "page",
+          "pageId": "page_x51t",
+          "fieldKey": "heroImage"
+        }
+      ],
+      "autoManagedFieldKey": "heroImage"
+    }
+  ],
+  "autoManagedPageId": "page_x51t"
+}

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="prototype.css" />
+</head>
+<body>
+  <div class="page" data-bind-style-background-color="bgColor">
+    <!-- 品牌头部 -->
+    <header class="brand-header">
+      <img class="brand-logo" data-bind-src="logo" alt="品牌 Logo" />
+      <h1 class="brand-title" data-bind-style-color="themeColor">品牌展示</h1>
+    </header>
+
+    <!-- 画廊区域 -->
+    <section class="gallery-section">
+      <h2 class="section-title" data-bind-style-color="themeColor">图片画廊</h2>
+      <div class="gallery-grid">
+        <img class="gallery-item" data-bind-src="gallery[0]" alt="画廊图片 1" />
+        <img class="gallery-item" data-bind-src="gallery[1]" alt="画廊图片 2" />
+        <img class="gallery-item" data-bind-src="gallery[2]" alt="画廊图片 3" />
+      </div>
+    </section>
+
+    <!-- 富文本描述 -->
+    <section class="description-section">
+      <h2 class="section-title" data-bind-style-color="themeColor">品牌介绍</h2>
+      <div class="description-content" data-bind-text="description"></div>
+    </section>
+
+    <!-- 底部按钮 -->
+    <button class="action-btn" data-bind-style-background-color="themeColor">了解更多</button>
+  </div>
+</body>
+</html>

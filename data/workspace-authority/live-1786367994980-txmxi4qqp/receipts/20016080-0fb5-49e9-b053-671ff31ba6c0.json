@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "20016080-0fb5-49e9-b053-671ff31ba6c0",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786367994980-txmxi4qqp",
+  "baseRevision": 0,
+  "revision": 228,
+  "rootHash": "8ce2acbab7eabf2aff8f1c4d7f249fa3232f89e5699542c1b0c03dccce9cc8fb",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/kids-edu-wire_r5t3/prototype.css",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "2f6577bf0d78fe4b86b61279101a264d218ff9e7cc457262f00cae4fa1dbadbf"
+    }
+  ],
+  "committedAt": 1786510000401
+}

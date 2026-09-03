@@ -1,0 +1,12 @@
+{
+  "planId": "plan_1786594164621_8nvpgf",
+  "operation": "project_delete",
+  "resourceId": "proj_1786594163760_j3755x",
+  "impact": [
+    "删除项目 E2E:20260813T040743016Z-fifj2u:revision-gap恢复",
+    "删除 0 个页面",
+    "删除项目工作空间和元数据"
+  ],
+  "reversible": true,
+  "confirmToken": "confirm_1786594164621_vp74y4"
+}

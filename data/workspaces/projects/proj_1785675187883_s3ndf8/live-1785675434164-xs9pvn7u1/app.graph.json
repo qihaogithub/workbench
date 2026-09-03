@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "entry": "page",
+  "pages": {
+    "page": {
+      "pageId": "config-showcase",
+      "title": "配置项全量示例"
+    }
+  },
+  "actions": [],
+  "state": {}
+}

@@ -1,0 +1,86 @@
+{
+  "$demo": {
+    "previewSize": { "width": 375, "height": 812 }
+  },
+  "type": "object",
+  "properties": {
+    "基础文本": {
+      "type": "object",
+      "title": "基础文本",
+      "properties": {
+        "title": {
+          "type": "string",
+          "title": "标题 (string)",
+          "default": "HTML 原型页配置示例"
+        },
+        "subtitle": {
+          "type": "text",
+          "title": "副标题 (text)",
+          "default": "这是长文本类型，支持多行内容。\n原型页通过插值或 data-bind 绑定消费配置值。"
+        }
+      },
+      "required": []
+    },
+    "数值与开关": {
+      "type": "object",
+      "title": "数值与开关",
+      "properties": {
+        "count": {
+          "type": "number",
+          "title": "数值 (number)",
+          "default": 128.5
+        },
+        "level": {
+          "type": "integer",
+          "title": "整数 (integer)",
+          "default": 5
+        },
+        "enabled": {
+          "type": "boolean",
+          "title": "开关 (boolean)",
+          "default": true
+        }
+      },
+      "required": []
+    },
+    "颜色与图片": {
+      "type": "object",
+      "title": "颜色与图片",
+      "properties": {
+        "primaryColor": {
+          "type": "string",
+          "title": "主色 (color)",
+          "format": "color",
+          "default": "#6366f1"
+        },
+        "bgColor": {
+          "type": "string",
+          "title": "背景色 (color)",
+          "format": "color",
+          "default": "#f0f4ff"
+        },
+        "avatar": {
+          "type": "string",
+          "title": "头像 (image)",
+          "format": "image"
+        }
+      },
+      "required": []
+    },
+    "选项": {
+      "type": "object",
+      "title": "选项",
+      "properties": {
+        "theme": {
+          "type": "string",
+          "title": "主题 (enum)",
+          "enum": ["light", "dark", "auto"],
+          "enumNames": ["浅色", "深色", "自动"],
+          "default": "light"
+        }
+      },
+      "required": []
+    }
+  },
+  "required": []
+}

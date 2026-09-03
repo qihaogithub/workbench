@@ -1,0 +1,11 @@
+{
+  "previewSize": {
+    "width": 1133,
+    "height": 768
+  },
+  "bindings": {
+    "project": [
+      "bannerImage"
+    ]
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "id": "commit_1788348183923_twzsff",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "parentCommitId": "commit_1788321107512_v89s3i",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "更新知识文档 闯关活动",
+  "resourcePointers": [
+    {
+      "kind": "knowledge_document",
+      "resourceId": "kb_1788227272655_677p9v",
+      "versionId": "krv_1788348183919_nmdkzr"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_5rsp",
+      "versionId": "prv_1785222248758_v0zhj5"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_da9l",
+      "versionId": "prv_1785316177703_45jh4a"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_gfbs",
+      "versionId": "prv_1785136734038_5bt9sp"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_p8a2",
+      "versionId": "prv_1788230574409_vikfdl"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_pqyt",
+      "versionId": "prv_1785205299313_c3158x"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_sgfq",
+      "versionId": "prv_1785321973637_sq9mhi"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_swfq",
+      "versionId": "prv_1788321107509_fzby7n"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_wcfh",
+      "versionId": "prv_1785206677053_mzslur"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_xix9",
+      "versionId": "prv_1785397932241_fpmkja"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_yw72",
+      "versionId": "prv_1788260488619_vm21ek"
+    },
+    {
+      "kind": "page",
+      "resourceId": "quiz-correct_m5n8",
+      "versionId": "prv_1788143379368_qfhy32"
+    },
+    {
+      "kind": "page",
+      "resourceId": "quiz-wrong_b7k9",
+      "versionId": "prv_1788099086697_i20kcq"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "knowledge_document",
+      "resourceId": "kb_1788227272655_677p9v",
+      "fromVersionId": "krv_1788227284701_expppl",
+      "toVersionId": "krv_1788348183919_nmdkzr"
+    }
+  ],
+  "createdAt": 1788348183923,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user"
+  }
+}

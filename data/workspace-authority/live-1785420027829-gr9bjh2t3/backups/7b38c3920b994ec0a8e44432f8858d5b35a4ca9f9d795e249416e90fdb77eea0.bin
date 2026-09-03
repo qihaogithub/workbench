@@ -1,0 +1,34 @@
+export default {
+  "$preview": { "width": 375, "height": 812 },
+  "常规": {
+    "modules": {
+      "type": "array",
+      "title": "模块列表",
+      "description": "拖拽调整模块顺序；图片模块可添加任意数量，视频和进度模块各只能添加一个",
+      "default": [
+        { "type": "image", "imageUrl": "../../assets/images/ab9472005108-image-module-2.png" },
+        { "type": "progress", "progressBgTop": "../../assets/images/e42da6dcf611-progress-bg-top.png", "progressBgMiddle": "../../assets/images/805ed928744e-progress-bg-middle.png", "progressBgBottom": "../../assets/images/b0b1a87384e6-progress-bg-bottom.png" },
+        { "type": "image", "imageUrl": "../../assets/images/345cff787d4e-image-module-1.png" },
+        { "type": "video", "videoBg": "../../assets/images/4ea96ecddfd3-video-bg.png", "videoCover": "../../assets/images/ef6aa004c215-video-cover.png" },
+        { "type": "image", "imageUrl": "../../assets/images/766653d583e6-image-module-3.png" },
+      ],
+      "variants": {
+        "image": {
+          "title": "图片模块",
+          "imageUrl": { "type": "image", "title": "图片" },
+        },
+        "video": {
+          "title": "视频模块",
+          "videoBg": { "type": "image", "title": "视频背景" },
+          "videoCover": { "type": "image", "title": "视频封面" },
+        },
+        "progress": {
+          "title": "进度模块",
+          "progressBgTop": { "type": "image", "title": "进度背景-上" },
+          "progressBgMiddle": { "type": "image", "title": "进度背景-中(可重复)" },
+          "progressBgBottom": { "type": "image", "title": "进度背景-下" },
+        },
+      },
+    },
+  },
+};

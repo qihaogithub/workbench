@@ -1,0 +1,75 @@
+{
+  "id": "proj_1785228950889_c6hs1j",
+  "name": "伴读明星赛",
+  "projectType": "standard",
+  "category": "APP资源位",
+  "workspacePath": "/Users/jojo/Documents/workbench/data/projects/proj_1785228950889_c6hs1j/workspace",
+  "demoPages": [
+    {
+      "id": "pad_tdn7",
+      "name": "明星赛-pad",
+      "routeKey": "pad",
+      "order": 1,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "page_ijly",
+      "name": "明星赛-手机",
+      "routeKey": "page",
+      "order": 2,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    }
+  ],
+  "demoFolders": [],
+  "versions": [
+    {
+      "versionId": "v1",
+      "type": "auto_checkpoint",
+      "savedAt": 1785229958400,
+      "savedBy": "qihao",
+      "sessionId": "session-1785229600012-e5vpejj7o",
+      "snapshotPath": "/Users/jojo/Documents/workbench/data/snapshots/proj_1785228950889_c6hs1j/v1",
+      "fileCount": 14,
+      "workspaceId": "live-1785228952059-e70ctz1pw",
+      "workspaceRevision": 22,
+      "workspaceRootHash": "acec361258681c2eca367d33d72018497d611d865193a9997227a83c6021617d",
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v2",
+      "type": "auto_checkpoint",
+      "savedAt": 1785330225587,
+      "savedBy": "qihao",
+      "sessionId": "session-1785329803695-swmce5529",
+      "snapshotPath": "/app/data/snapshots/proj_1785228950889_c6hs1j/v2",
+      "fileCount": 14,
+      "workspaceId": "live-1785228952059-e70ctz1pw",
+      "workspaceRevision": 18,
+      "workspaceRootHash": "6415b7da7121dca9b8cc12239513a5f251991822bbd6dfdce4ef15608cd1ebd3",
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v3",
+      "type": "auto_checkpoint",
+      "savedAt": 1785376145804,
+      "savedBy": "qihao",
+      "sessionId": "session-1785375507800-0xhrhtdnl",
+      "snapshotPath": "/app/data/snapshots/proj_1785228950889_c6hs1j/v3",
+      "fileCount": 14,
+      "workspaceId": "live-1785228952059-e70ctz1pw",
+      "workspaceRevision": 25,
+      "workspaceRootHash": "53331977ede4f02c39a4034ce0a0a8459682223cd31cf33b06199d9cb57514ba",
+      "note": "停止编辑后自动保存记录"
+    }
+  ],
+  "createdAt": 1785228950889,
+  "updatedAt": 1785983677525,
+  "activeWorkspaceId": "live-1785228952059-e70ctz1pw",
+  "activeWorkspaceUpdatedAt": 1785376145805,
+  "canonicalSyncedWorkspaceId": "live-1785228952059-e70ctz1pw",
+  "canonicalSyncedRevision": 50,
+  "canonicalSyncedRootHash": "a0bd78497adf96be8985f49070b9f77cab6328ef6318bf37c89bdec5c0f953e0",
+  "canonicalSyncedAt": 1785983677525
+}

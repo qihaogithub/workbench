@@ -1,0 +1,49 @@
+{
+  "committed": true,
+  "mutationId": "420480df-9942-4c3f-87bf-e41d55d38def",
+  "projectId": "proj_1785984571939_9uj8av",
+  "workspaceId": "live-1785984572222-vwsdjjjqb",
+  "baseRevision": 0,
+  "revision": 91,
+  "rootHash": "5ed63f2f33786a608a0c4849c9e33e35baba5e557f6eb25a818616feaec69a78",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/pad_1uhj/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "53ae7124df47f101689472eaf817983b33af34f3952ccce33a5bf5f0e4c9b56b",
+      "afterHash": null
+    },
+    {
+      "path": "demos/pad_1uhj/index.tsx",
+      "action": "deleted",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": null
+    },
+    {
+      "path": "demos/pad_1uhj/prototype.css",
+      "action": "deleted",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": null
+    },
+    {
+      "path": "demos/pad_1uhj/prototype.html",
+      "action": "deleted",
+      "beforeHash": "dbaee0ea098cbd9c9148a5defb27526d47a8aca650d2528d6f3488e1793bbdc1",
+      "afterHash": null
+    },
+    {
+      "path": "demos/pad_1uhj/prototype.meta.json",
+      "action": "deleted",
+      "beforeHash": "29a16ede64d5ce15bb98e24e2b8c8cc650e49b6991fc894b85be7ca52580342c",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "ac7e412c92e8c3fff289ea0149185525dfe8da553dfb41440b70782ad3c9ea5f",
+      "afterHash": "00034b80e83c8fd5deb83844528ca549b2f1d606fadf411950c9640071eed5e8"
+    }
+  ],
+  "committedAt": 1786009460721
+}

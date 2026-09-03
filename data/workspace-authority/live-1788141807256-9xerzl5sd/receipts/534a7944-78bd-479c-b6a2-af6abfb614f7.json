@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "534a7944-78bd-479c-b6a2-af6abfb614f7",
+  "projectId": "proj_1788141806566_0aps89",
+  "workspaceId": "live-1788141807256-9xerzl5sd",
+  "baseRevision": 0,
+  "revision": 391,
+  "rootHash": "edbda766645947ec0fc7e5a47e6b584c8acd885cd7af1c4eefa7c96197a7842e",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/clipboard-import_e05e9d/config.values.json",
+      "action": "modified",
+      "beforeHash": "6fe781db03143645225345801768cd8065a01058b17493e4810a3d032ea85778",
+      "afterHash": "167222c3845c507fba42110352c6dba58541623e49e05cc130f11d593bc4e43c"
+    }
+  ],
+  "committedAt": 1788346263918
+}

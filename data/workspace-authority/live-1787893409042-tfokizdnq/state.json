@@ -1,0 +1,13 @@
+{
+  "workspaceId": "live-1787893409042-tfokizdnq",
+  "projectId": "proj_1787893408775_xq74on",
+  "revision": 1,
+  "rootHash": "9570ca304bf7459db65cd5014b006f683bcf13151033d15293e4e3290a7baa56",
+  "resourceHashes": {
+    "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
+    "memory.md": "38017b9b949cada4d726383fcb6921012fae9735be4bc1ab556cf3732eba97ae",
+    "workspace-tree.json": "b8f84cb18b1d4fb04f8db0fdb7867802b916f6365d4816c8289777a7893570ab"
+  },
+  "mutationPayloads": {},
+  "updatedAt": 1787893409937
+}

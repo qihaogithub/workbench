@@ -1,0 +1,114 @@
+{
+  "$demo": {
+    "previewSize": { "width": 375, "height": 812 }
+  },
+  "type": "object",
+  "properties": {
+    "基本内容": {
+      "type": "object",
+      "title": "基本内容",
+      "properties": {
+        "title": { "type": "string", "title": "标题", "default": "配置项示例 Demo" },
+        "description": { "type": "string", "title": "描述", "default": "这是一个展示所有配置项类型的示例页面，你可以在右侧配置面板中调整每个字段的值，看看页面如何实时响应。" },
+        "enabled": { "type": "boolean", "title": "启用状态", "default": true },
+        "count": { "type": "number", "title": "数量", "default": 3 },
+        "price": { "type": "number", "title": "价格", "default": 29.99 }
+      },
+      "required": []
+    },
+    "样式与颜色": {
+      "type": "object",
+      "title": "样式与颜色",
+      "properties": {
+        "bgColor": { "type": "string", "title": "背景颜色", "format": "color", "default": "#f0f4ff" },
+        "accentColor": { "type": "string", "title": "强调色", "format": "color", "default": "#6366f1" },
+        "coverImage": { "type": "string", "title": "封面图片", "format": "image" },
+        "gallery": { "type": "array", "title": "图片集", "items": { "type": "string" }, "default": [] }
+      },
+      "required": []
+    },
+    "选择与富文本": {
+      "type": "object",
+      "title": "选择与富文本",
+      "properties": {
+        "mode": { "type": "string", "title": "展示模式", "enum": ["card", "list", "grid"], "enumNames": ["卡片", "列表", "网格"], "default": "card" },
+        "tags": { "type": "string", "title": "标签", "enum": ["react", "typescript", "tailwind", "api", "config"], "enumNames": ["React", "TypeScript", "Tailwind", "API", "配置系统"], "multiple": true, "default": ["react", "config"] },
+        "region": { "type": "cascade", "title": "地区", "default": ["zhejiang", "hangzhou"], "options": [{ "value": "beijing", "label": "北京", "children": [] }, { "value": "shanghai", "label": "上海", "children": [] }, { "value": "zhejiang", "label": "浙江", "children": [{ "value": "hangzhou", "label": "杭州" }, { "value": "ningbo", "label": "宁波" }] }, { "value": "guangdong", "label": "广东", "children": [{ "value": "guangzhou", "label": "广州" }, { "value": "shenzhen", "label": "深圳" }] }] },
+        "richtextContent": { "type": "string", "title": "富文本内容", "format": "richtext", "default": "<p>这是 <strong>富文本</strong> 内容，支持 <em>斜体</em> 和 <u>下划线</u>。</p>" }
+      },
+      "required": []
+    },
+    "定位与条件": {
+      "type": "object",
+      "title": "定位与条件",
+      "properties": {
+        "badgeText": { "type": "string", "title": "徽章文字", "default": "NEW" },
+        "badgePosition": { "type": "position", "title": "徽章位置", "key": "badge", "size": { "width": 375, "height": 812 }, "default": { "x": 280, "y": 20 } },
+        "showMode": { "type": "string", "title": "显示模式", "enum": ["text", "image"], "enumNames": ["文本模式", "图片模式"], "default": "text" },
+        "customText": { "type": "text", "title": "自定义文本", "default": "这是一段通过条件表单展示的文本内容。当显示模式为「文本模式」时，此字段才会显示。", "visibleWhen": { "field": "showMode", "equals": "text" } },
+        "customImage": { "type": "string", "title": "自定义图片", "format": "image", "visibleWhen": { "field": "showMode", "equals": "image" } }
+      },
+      "required": []
+    },
+    "模块列表": {
+      "type": "object",
+      "title": "模块列表",
+      "properties": {
+        "modules": {
+          "type": "array",
+          "title": "模块列表",
+          "$demo": { "sortable": true },
+          "items": {
+            "oneOf": [
+              {
+                "title": "标题模块",
+                "properties": {
+                  "type": { "const": "heading" },
+                  "label": { "type": "string", "title": "标题文字", "default": "章节标题" },
+                  "level": { "type": "integer", "title": "标题层级", "enum": [1, 2, 3], "enumNames": ["一级", "二级", "三级"], "default": 2 }
+                },
+                "required": ["type"]
+              },
+              {
+                "title": "卡片模块",
+                "properties": {
+                  "type": { "const": "card" },
+                  "title": { "type": "string", "title": "卡片标题", "default": "卡片标题" },
+                  "description": { "type": "text", "title": "卡片描述", "default": "这是卡片模块的描述内容" },
+                  "icon": { "type": "string", "title": "图标", "default": "✨" }
+                },
+                "required": ["type"]
+              },
+              {
+                "title": "图片模块",
+                "properties": {
+                  "type": { "const": "imageBlock" },
+                  "src": { "type": "string", "title": "图片", "format": "image" },
+                  "caption": { "type": "string", "title": "图片说明", "default": "" }
+                },
+                "required": ["type"]
+              },
+              {
+                "title": "进度模块",
+                "$demo": { "maxItems": 1 },
+                "properties": {
+                  "type": { "const": "progress" },
+                  "label": { "type": "string", "title": "进度标签", "default": "进度" },
+                  "value": { "type": "number", "title": "进度值", "default": 65 }
+                },
+                "required": ["type"]
+              }
+            ]
+          },
+          "default": [
+            { "type": "heading", "label": "欢迎使用配置系统", "level": 2 },
+            { "type": "card", "title": "配置项示例", "description": "右侧配置面板中可调整所有字段，试试修改看看效果", "icon": "⚙️" },
+            { "type": "progress", "label": "完成度", "value": 65 }
+          ]
+        }
+      },
+      "required": []
+    }
+  },
+  "required": []
+}

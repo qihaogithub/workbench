@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "projectId": "proj_1784885664471_5bauyu",
+  "updatedAt": 1784888812473,
+  "state": {
+    "viewport": {
+      "x": 314.0763791593694,
+      "y": 226.48538633975465,
+      "zoom": 0.27959264448336296
+    },
+    "pages": {
+      "phone-preview_a3f2": {
+        "x": -62.06654066242231,
+        "y": 1.3349818099137103,
+        "width": 834,
+        "height": 1194,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "834x1194"
+      },
+      "pad-preview_m7k2": {
+        "x": 409.92306416738074,
+        "y": 1.3349818099137103,
+        "width": 834,
+        "height": 1194,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "834x1194"
+      },
+      "english-preview_t2w7": {
+        "x": 3.774758283725532e-15,
+        "y": 852,
+        "width": 1200,
+        "height": 600,
+        "zIndex": 3,
+        "sizeMode": "preview",
+        "previewSizeKey": "1200x600"
+      },
+      "aesthetic-preview_k6p8": {
+        "x": 0.8103306881289629,
+        "y": -4.107825191113079e-14,
+        "width": 1200,
+        "height": 600,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "1200x600"
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "hiddenKnowledgeDocumentIds": [],
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    }
+  }
+}

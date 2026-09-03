@@ -1,0 +1,25 @@
+{
+  "committed": true,
+  "mutationId": "7268514e-aec9-498b-b6f8-89355392f66e",
+  "projectId": "proj_1786594536530_g8erpn",
+  "workspaceId": "live-1786594537420-vvme4o0yp",
+  "baseRevision": 0,
+  "revision": 4,
+  "rootHash": "36359bd9d3cdbc4be6cf349a69347a692f68344e0892704855cd210735e7f18a",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/1_ebuu/index.tsx",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "0d69655e166a76a200bd46f9e67caca0191040c2228562c859e4aa2223bc0208"
+    },
+    {
+      "path": "demos/1_ebuu/config.schema.json",
+      "action": "modified",
+      "beforeHash": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+      "afterHash": "65cf92d66fe574e9b9f6ca014d35ead34d95572c6203fed3b5d7297e0fa1ff4c"
+    }
+  ],
+  "committedAt": 1786594546006
+}

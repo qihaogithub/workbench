@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>快乐学堂 · 暑期成长营</title>
+  <link rel="stylesheet" href="prototype.css" />
+</head>
+<body>
+  <!-- 顶部导航 -->
+  <header class="topbar">
+    <div class="logo">
+      <span class="logo-mark">LOGO</span>
+      <span class="logo-name">快乐学堂</span>
+    </div>
+    <div class="nav-placeholder">菜单占位</div>
+  </header>
+
+  <!-- 主视觉 -->
+  <section class="hero">
+    <div class="hero-tag">2026 暑期活动</div>
+    <h1 class="hero-title">小小科学家<br />亲子探索营</h1>
+    <p class="hero-desc">5-12 岁儿童 · 16 课时 · 科学启蒙与动手实践</p>
+    <a class="btn btn-primary" href="#register">立即报名</a>
+    <div class="hero-image">
+      <span>主视觉图片占位<br />建议尺寸 750 × 420</span>
+    </div>
+  </section>
+
+  <!-- 活动信息条 -->
+  <section class="info-bar">
+    <div class="info-item">
+      <span class="info-icon">■</span>
+      <div>
+        <p class="info-label">活动时间</p>
+        <p class="info-value">7.13 - 8.24</p>
+      </div>
+    </div>
+    <div class="info-item">
+      <span class="info-icon">▲</span>
+      <div>
+        <p class="info-label">活动地点</p>
+        <p class="info-value">市中心校区</p>
+      </div>
+    </div>
+    <div class="info-item">
+      <span class="info-icon">●</span>
+      <div>
+        <p class="info-label">招募人数</p>
+        <p class="info-value">限 30 人</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 活动亮点 -->
+  <section class="section">
+    <h2 class="section-title">活动亮点</h2>
+    <div class="card-list">
+      <article class="card">
+        <div class="card-icon">图<br />片</div>
+        <h3>趣味科学实验</h3>
+        <p>每节课一个动手小实验，激发好奇心与探索欲。</p>
+      </article>
+      <article class="card">
+        <div class="card-icon">图<br />片</div>
+        <h3>名师面对面</h3>
+        <p>资深科学教师带队，小班教学，关注每个孩子成长。</p>
+      </article>
+      <article class="card">
+        <div class="card-icon">图<br />片</div>
+        <h3>成果展示日</h3>
+        <p>结营举办作品展，邀请家长见证孩子的收获与成长。</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- 课程安排 -->
+  <section class="section">
+    <h2 class="section-title">课程安排</h2>
+    <ol class="timeline">
+      <li class="timeline-item">
+        <span class="timeline-badge">1</span>
+        <div class="timeline-body">
+          <h3>第1周 · 神奇的光</h3>
+          <p>三棱镜彩虹实验 · 光影小屋</p>
+        </div>
+      </li>
+      <li class="timeline-item">
+        <span class="timeline-badge">2</span>
+        <div class="timeline-body">
+          <h3>第2周 · 空气大力士</h3>
+          <p>气压火箭 · 气球动力小车</p>
+        </div>
+      </li>
+      <li class="timeline-item">
+        <span class="timeline-badge">3</span>
+        <div class="timeline-body">
+          <h3>第3周 · 植物生长记</h3>
+          <p>种子发芽观察 · 绿植养护计划</p>
+        </div>
+      </li>
+      <li class="timeline-item">
+        <span class="timeline-badge">4</span>
+        <div class="timeline-body">
+          <h3>第4周 · 小小发明家</h3>
+          <p>创意发明工作坊 · 结营作品展</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <!-- 师资团队 -->
+  <section class="section">
+    <h2 class="section-title">师资团队</h2>
+    <div class="team-list">
+      <div class="team-item">
+        <div class="avatar">头像</div>
+        <p class="team-name">李老师</p>
+        <p class="team-role">科学启蒙教研组长</p>
+      </div>
+      <div class="team-item">
+        <div class="avatar">头像</div>
+        <p class="team-name">王老师</p>
+        <p class="team-role">STEM 课程讲师</p>
+      </div>
+      <div class="team-item">
+        <div class="avatar">头像</div>
+        <p class="team-name">张老师</p>
+        <p class="team-role">儿童心理辅导师</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 家长评价 -->
+  <section class="section">
+    <h2 class="section-title">家长评价</h2>
+    <div class="review-list">
+      <blockquote class="review">
+        <div class="stars">★★★★★</div>
+        <p>孩子每周都盼着来上课，回家还主动给我们做小实验！</p>
+        <footer>—— 乐乐妈妈</footer>
+      </blockquote>
+      <blockquote class="review">
+        <div class="stars">★★★★★</div>
+        <p>课程设计很用心，老师耐心又专业，强烈推荐。</p>
+        <footer>—— 豆豆爸爸</footer>
+      </blockquote>
+      <blockquote class="review">
+        <div class="stars">★★★★☆</div>
+        <p>孩子动手能力明显提升，结营作品展特别有意义。</p>
+        <footer>—— 果果奶奶</footer>
+      </blockquote>
+    </div>
+  </section>
+
+  <!-- 报名表单 -->
+  <section class="section register" id="register">
+    <h2 class="section-title">立即报名</h2>
+    <form class="form">
+      <label class="field">
+        <span class="field-label">孩子姓名</span>
+        <input type="text" placeholder="请输入姓名" />
+      </label>
+      <label class="field">
+        <span class="field-label">家长电话</span>
+        <input type="tel" placeholder="请输入手机号" />
+      </label>
+      <label class="field">
+        <span class="field-label">孩子年龄</span>
+        <select>
+          <option value="">请选择年龄段</option>
+          <option value="5-7">5 - 7 岁</option>
+          <option value="8-10">8 - 10 岁</option>
+          <option value="11-12">11 - 12 岁</option>
+        </select>
+      </label>
+      <button type="submit" class="btn btn-primary btn-block">提交报名</button>
+      <p class="form-note">提交后 24 小时内将有老师与您联系</p>
+    </form>
+  </section>
+
+  <!-- 底部 -->
+  <footer class="footer">
+    <p>快乐学堂教育 · 咨询热线 400-000-0000</p>
+    <p>本页面为线框原型示意图</p>
+  </footer>
+</body>
+</html>

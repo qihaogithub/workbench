@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "projectId": "proj_1787810659495_zmf4co",
+  "updatedAt": 1787810676961,
+  "state": {
+    "viewport": {
+      "x": 191.19057881773398,
+      "y": 30.749999999999943,
+      "zoom": 0.6816502463054188
+    },
+    "pages": {},
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "hiddenKnowledgeDocumentIds": [],
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "sections": {
+      "section_1abcffc5-c19b-4475-8ed8-5cd77515d4bf": {
+        "id": "section_1abcffc5-c19b-4475-8ed8-5cd77515d4bf",
+        "kind": "section",
+        "title": "Section",
+        "layout": {
+          "x": -17.604375741023016,
+          "y": -17.604336043360348,
+          "width": 410.208751482046,
+          "height": 847.2086720867206,
+          "zIndex": 1
+        },
+        "children": [],
+        "createdAt": 1787810676109,
+        "updatedAt": 1787810676109
+      }
+    }
+  }
+}

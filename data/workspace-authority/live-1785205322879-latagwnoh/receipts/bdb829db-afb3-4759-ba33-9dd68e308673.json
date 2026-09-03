@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "bdb829db-afb3-4759-ba33-9dd68e308673",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "baseRevision": 0,
+  "revision": 298,
+  "rootHash": "1223b5df273a993f095ccfc9bcf52483605a6dc39e2f875c6d00b69bd77027cd",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/quiz-correct_m5n8/config.schema.json",
+      "action": "modified",
+      "beforeHash": "caa4dded1c46311d8aaa611752a2a39998cd09de0af6953aa717f16a2012e746",
+      "afterHash": "8eb694face506cec58fe1cf33da82291f93657d7d84d6c27980977a8fb380e26"
+    }
+  ],
+  "committedAt": 1785481699856
+}

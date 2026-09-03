@@ -1,0 +1,39 @@
+{
+  "id": "prv_1785084059857_1wrwc8",
+  "projectId": "proj_1784874964275_p0k4ho",
+  "kind": "page",
+  "resourceId": "course-complete_a7k3",
+  "workspaceId": "live-1784874964638-kfdgu6fcm",
+  "workspaceRevision": 105,
+  "workspaceRootHash": "1b88a611c3e8ab14c6f5f7f198364e77c66813e0867b440251db5a856eb0b61c",
+  "previousVersionId": "prv_1785083339658_mo9o8h",
+  "contentHash": "318846eabd35c4b1f3293f984111b28528570ebf69a3ab121aa7580fc1e915d6",
+  "blobRefs": [
+    "7802e56a9e792d230f28ff3443668d2379f4f25b93baa55d7b3b0d85fb731ec5",
+    "19fa90e6c8cc6ec4a525e494c87bf3bcee696514e100a152de2cebe1a04d500f"
+  ],
+  "metadata": {
+    "page": {
+      "id": "course-complete_a7k3",
+      "name": "完课活动",
+      "runtimeType": "high-fidelity-react",
+      "order": 1,
+      "parentId": null,
+      "routeKey": "page"
+    },
+    "files": {
+      "schema": "7802e56a9e792d230f28ff3443668d2379f4f25b93baa55d7b3b0d85fb731ec5",
+      "code": "19fa90e6c8cc6ec4a525e494c87bf3bcee696514e100a152de2cebe1a04d500f"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "high-fidelity-react",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1785084059861,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录完课活动"
+}

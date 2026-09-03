@@ -1,0 +1,31 @@
+{
+  "id": "commit_1785824703670_zbwora",
+  "projectId": "proj_1785742777589_ncs6r6",
+  "parentCommitId": "commit_1785815472486_j60b5v",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录配置项类型示例",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "config-demo_m7p2",
+      "versionId": "prv_1785824703665_gmc9no"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "config-demo_m7p2",
+      "fromVersionId": "prv_1785815472428_0zcwi3",
+      "toVersionId": "prv_1785824703665_gmc9no"
+    }
+  ],
+  "createdAt": 1785824703670,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785742777874-8sex712t9",
+    "workspaceRevision": 111,
+    "workspaceRootHash": "95846a66fc6aada25a3907c96953d4fb2789f6faa156e3a1712c060f9f44a48a"
+  }
+}

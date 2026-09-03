@@ -1,0 +1,27 @@
+{
+  "type": "object",
+  "properties": {
+    "image": {
+      "type": "string",
+      "title": "图片",
+      "default": "https://img.onlywnn.cn/figma/h_2868a927.png",
+      "format": "image",
+      "ui:options": {
+        "accept": "image/*"
+      }
+    }
+  },
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "fixed-canvas",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "fixed",
+      "preset": "custom",
+      "source": "figma"
+    }
+  }
+}

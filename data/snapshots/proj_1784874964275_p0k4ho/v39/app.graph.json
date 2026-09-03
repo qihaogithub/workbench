@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "entry": "page",
+  "pages": {
+    "page": {
+      "pageId": "course-complete_a7k3",
+      "title": "完课活动"
+    }
+  },
+  "actions": [],
+  "state": {}
+}

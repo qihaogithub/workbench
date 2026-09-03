@@ -1,0 +1,12 @@
+{
+  "planId": "plan_1786591580550_nr7q3q",
+  "operation": "project_delete",
+  "resourceId": "proj_1786591519812_lm0c6d",
+  "impact": [
+    "删除项目 E2E:20260813T032516595Z-gs05e0:核心流程回归",
+    "删除 1 个页面",
+    "删除项目工作空间和元数据"
+  ],
+  "reversible": true,
+  "confirmToken": "confirm_1786591580550_klb020"
+}

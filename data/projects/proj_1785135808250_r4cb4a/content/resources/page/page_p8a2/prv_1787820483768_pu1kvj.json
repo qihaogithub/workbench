@@ -1,0 +1,42 @@
+{
+  "id": "prv_1787820483768_pu1kvj",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "kind": "page",
+  "resourceId": "page_p8a2",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "workspaceRevision": 429,
+  "workspaceRootHash": "915d81454428ffa9414ee8691cd6d5c99a4dc802af73db2d27eb5e1040f76c98",
+  "contentHash": "ab83073d95f09e0c7ef1f69831977f3908734f97119b54aa67f0739bfa87eb52",
+  "blobRefs": [
+    "c13e02687384ef24424478990e361e94b0eb4afeff20d64adb59f900a9198b8c",
+    "8ec3e1aee8d6d39040409e8c06ae2dddcdf1042642dada1bdc31c6762937beab",
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "5997450302b1989a6709a0111fb4891eed12d5739ee5a1a426511dd6500f7867"
+  ],
+  "metadata": {
+    "page": {
+      "id": "page_p8a2",
+      "name": "闯关活动页（进行中）",
+      "routeKey": "page-9",
+      "order": 2,
+      "parentId": "folder_1785397477311_od13vu",
+      "runtimeType": "prototype-html-css"
+    },
+    "files": {
+      "schema": "c13e02687384ef24424478990e361e94b0eb4afeff20d64adb59f900a9198b8c",
+      "prototypeHtml": "8ec3e1aee8d6d39040409e8c06ae2dddcdf1042642dada1bdc31c6762937beab",
+      "prototypeCss": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "prototypeMeta": "5997450302b1989a6709a0111fb4891eed12d5739ee5a1a426511dd6500f7867"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1787820483774,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录闯关活动页（进行中）"
+}

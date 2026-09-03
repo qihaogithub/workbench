@@ -1,0 +1,49 @@
+{
+  "committed": true,
+  "mutationId": "638a3bd2-2b79-42ff-81d9-446e35b9ca71",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "baseRevision": 0,
+  "revision": 1038,
+  "rootHash": "280cf01a453b348b3b46118d11e2013df39070cffbd8525d3f81afdb038f4c14",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "assets/animations/spine_16f442e1f415cf3a45b2b8cc6961212224c5c0c56291663f1d5edc7397d228cc/star_second/Audio/audio_event_star_second_play.mp3",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "8d9f2f380c8d2290421516f387b366f06396ef0a50291bea2b627f160084d4df"
+    },
+    {
+      "path": "assets/animations/spine_16f442e1f415cf3a45b2b8cc6961212224c5c0c56291663f1d5edc7397d228cc/star_second/star_second.atlas.txt",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "b52dd2c3222077b332fc3c4207cde25a23f71c2e7763bc108950e17f7b8391a3"
+    },
+    {
+      "path": "assets/animations/spine_16f442e1f415cf3a45b2b8cc6961212224c5c0c56291663f1d5edc7397d228cc/star_second/star_second.png",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "b74b83a3f962af9fb98b20239e7c0c9d511cf9515f417cee2fff2e6b0e7c93b1"
+    },
+    {
+      "path": "assets/animations/spine_16f442e1f415cf3a45b2b8cc6961212224c5c0c56291663f1d5edc7397d228cc/star_second/star_second.skel.bytes",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "f00bbd27292027161fda3d8c934e9856ef3c58c1896255e5398a1140584ed5cd"
+    },
+    {
+      "path": "assets/animations/spine_16f442e1f415cf3a45b2b8cc6961212224c5c0c56291663f1d5edc7397d228cc/manifest.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "98b0fdd64d7617a54c867e897cfbf9bf78ad8fffa27cd6117ba1bdfc5b87773a"
+    },
+    {
+      "path": "demos/page_yw72/config.values.json",
+      "action": "modified",
+      "beforeHash": "faf38d71167d0d6a8dfe1014759529c48d3b88bea985e931002772c10019ee44",
+      "afterHash": "f6c92e8d4df33acd45cdd688d5a5fe9e50cb73d424649338343cb1e986d0b3ff"
+    }
+  ],
+  "committedAt": 1788256308468
+}

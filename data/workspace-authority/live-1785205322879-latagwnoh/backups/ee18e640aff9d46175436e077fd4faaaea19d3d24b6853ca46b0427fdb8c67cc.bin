@@ -1,0 +1,34 @@
+{
+  "type": "object",
+  "properties": {
+    "bgm": {
+      "type": "string",
+      "format": "file",
+      "title": "闯关背景音乐",
+      "description": "仅支持 MP3 格式，文件大小需小于 1M",
+      "ui:options": {
+        "accept": "audio/mpeg,.mp3"
+      },
+      "default": ""
+    },
+    "navColor": {
+      "type": "string",
+      "format": "color",
+      "title": "导航栏颜色",
+      "default": "#C4C4C4"
+    }
+  },
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "fixed-canvas",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "fixed",
+      "preset": "custom",
+      "source": "figma"
+    }
+  }
+}

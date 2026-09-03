@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1788258262304_bsa209",
+  "at": 1788258262304,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "creator",
+    "source": "project-admin-cli"
+  },
+  "level": "L2",
+  "tool": "page_create_version",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "resourceId": "page_yw72",
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "page-version:page_yw72:prv_1788258262296_mds84q"
+    ]
+  },
+  "validation": {
+    "ok": true,
+    "issues": []
+  }
+}

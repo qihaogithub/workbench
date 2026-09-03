@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "projectId": "proj_1786367903885_iu08e4",
+  "updatedAt": 1787674045464,
+  "state": {
+    "viewport": {
+      "x": 268.15759319615984,
+      "y": -66.86421948207956,
+      "zoom": 0.2777660831370691
+    },
+    "pages": {
+      "kids-edu_b3xw": {
+        "x": -1140.4575886015323,
+        "y": 14.638247126436871,
+        "width": 375,
+        "height": 2471,
+        "zIndex": 4,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "quiet-studio_q7m4": {
+        "x": -733.7320721374226,
+        "y": 0,
+        "width": 375,
+        "height": 1267,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "sunny-reading_k4m8": {
+        "x": -283.66118561160215,
+        "y": 0,
+        "width": 375,
+        "height": 1558,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "demo_ubmp": {
+        "x": 330.28491523266956,
+        "y": 400.03693810013385,
+        "width": 375,
+        "height": 812,
+        "zIndex": 3,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "demo_wyps": {
+        "x": 280.446322613332,
+        "y": 360.2957989057193,
+        "width": 375,
+        "height": 812,
+        "zIndex": 3,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "8-0717_7lxr": {
+        "x": 643.5034771490016,
+        "y": 745.9999999999999,
+        "width": 375,
+        "height": 812,
+        "zIndex": 4,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

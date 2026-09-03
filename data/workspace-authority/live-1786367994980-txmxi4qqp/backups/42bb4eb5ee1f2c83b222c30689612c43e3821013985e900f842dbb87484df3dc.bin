@@ -1,0 +1,43 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "quiet-studio_q7m4",
+      "name": "Stillroom 创意工作室",
+      "runtimeType": "prototype-html-css",
+      "order": 1,
+      "parentId": null,
+      "routeKey": "stillroom"
+    },
+    {
+      "id": "sunny-reading_k4m8",
+      "name": "晨光阅读屋 React 演示",
+      "runtimeType": "high-fidelity-react",
+      "order": 2,
+      "parentId": null,
+      "routeKey": "sunny-reading"
+    },
+    {
+      "id": "page_x992",
+      "name": "手机",
+      "order": 3,
+      "parentId": null,
+      "runtimeType": "prototype-html-css",
+      "reference": {
+        "sourceProjectId": "proj_1779608460372",
+        "sourcePageId": "demo_1779608460501_abc123"
+      }
+    },
+    {
+      "id": "page_tbq2",
+      "name": "平板",
+      "order": 4,
+      "parentId": null,
+      "runtimeType": "prototype-html-css",
+      "reference": {
+        "sourceProjectId": "proj_1779608460372",
+        "sourcePageId": "demo_1779608460502_def456"
+      }
+    }
+  ]
+}

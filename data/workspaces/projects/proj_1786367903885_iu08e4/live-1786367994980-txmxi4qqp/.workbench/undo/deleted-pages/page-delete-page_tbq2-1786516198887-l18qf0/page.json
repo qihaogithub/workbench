@@ -1,0 +1,12 @@
+{
+  "id": "page_tbq2",
+  "name": "平板",
+  "order": 4,
+  "parentId": null,
+  "runtimeType": "prototype-html-css",
+  "reference": {
+    "sourceProjectId": "proj_1779608460372",
+    "sourcePageId": "demo_1779608460502_def456"
+  },
+  "routeKey": "page-2"
+}

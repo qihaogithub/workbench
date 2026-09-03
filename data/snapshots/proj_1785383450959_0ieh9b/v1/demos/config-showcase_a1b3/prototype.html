@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>配置项类型展示</title>
+  <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+  <div class="showcase">
+
+    <!-- ========== 1. string 标题模块 ========== -->
+    <section class="section" data-bind-style-order="header.position" data-bind-style-display="header.visible">
+      <div class="section-type">📝 string</div>
+      <div class="section-card">
+        <h1 class="section-title" data-bind-text="header.pageTitle">{{header.pageTitle}}</h1>
+        <p class="section-desc">文本输入 — 修改右侧面板「标题模块」的「页面标题」</p>
+      </div>
+    </section>
+
+    <!-- ========== 2. number 数值模块 ========== -->
+    <section class="section" data-bind-style-order="numberSection.position" data-bind-style-display="numberSection.visible">
+      <div class="section-type">🔢 number</div>
+      <div class="section-card">
+        <div class="config-row">
+          <span class="config-label">折扣力度</span>
+          <span class="config-value highlight" data-bind-text="numberSection.discount">{{numberSection.discount}}%</span>
+        </div>
+        <p class="section-desc">数值输入 — 修改右侧面板「数值模块」的「折扣力度」</p>
+      </div>
+    </section>
+
+    <!-- ========== 3. boolean 开关模块 ========== -->
+    <section class="section" data-bind-style-order="booleanSection.position" data-bind-style-display="booleanSection.visible">
+      <div class="section-type">🔘 boolean</div>
+      <div class="section-card">
+        <div class="toggle-row">
+          <span class="config-label">横幅展示</span>
+          <span class="toggle-badge" data-bind-text="booleanSection.showBanner">{{booleanSection.showBanner ? '🟢 已开启' : '🔴 已关闭'}}</span>
+        </div>
+        <p class="section-desc">开关 — 在右侧面板「开关模块」切换「展示横幅」</p>
+      </div>
+    </section>
+
+    <!-- ========== 4. object 对象模块 ========== -->
+    <section class="section" data-bind-style-order="objectSection.position" data-bind-style-display="objectSection.visible">
+      <div class="section-type">📦 object</div>
+      <div class="section-card">
+        <div class="author-block">
+          <div class="avatar">{{objectSection.author.name[0]}}</div>
+          <div class="author-info">
+            <div class="author-name" data-bind-text="objectSection.author.name">{{objectSection.author.name}}</div>
+            <div class="author-level">Lv.<span data-bind-text="objectSection.author.level">{{objectSection.author.level}}</span></div>
+          </div>
+        </div>
+        <p class="section-desc">嵌套对象 — 修改右侧面板「对象模块」的「作者信息」</p>
+      </div>
+    </section>
+
+    <!-- ========== 5. array 数组模块 ========== -->
+    <section class="section" data-bind-style-order="arraySection.position" data-bind-style-display="arraySection.visible">
+      <div class="section-type">📋 array</div>
+      <div class="section-card">
+        <div class="tags">
+          <span class="tag" data-bind-text="arraySection.tags">{{arraySection.tags.join(', ')}}</span>
+        </div>
+        <p class="section-desc">数组 — 修改右侧面板「数组模块」的「标签列表」</p>
+      </div>
+    </section>
+
+    <!-- ========== 6. color 颜色模块 ========== -->
+    <section class="section" data-bind-style-order="colorSection.position" data-bind-style-display="colorSection.visible">
+      <div class="section-type">🎨 format: color</div>
+      <div class="section-card">
+        <div class="color-row">
+          <div class="color-swatch" data-bind-style-background-color="colorSection.primaryColor"></div>
+          <div class="color-info">
+            <span class="color-name">主题色</span>
+            <span class="color-hex" data-bind-text="colorSection.primaryColor">{{colorSection.primaryColor}}</span>
+          </div>
+        </div>
+        <p class="section-desc">颜色选择器 — 修改右侧面板「颜色模块」的「主题色」</p>
+      </div>
+    </section>
+
+    <!-- ========== 7. enum 枚举模块 ========== -->
+    <section class="section" data-bind-style-order="enumSection.position" data-bind-style-display="enumSection.visible">
+      <div class="section-type">📑 enum + enumNames</div>
+      <div class="section-card">
+        <div class="theme-indicator">
+          <span class="theme-label">当前主题</span>
+          <span class="theme-value" data-bind-text="enumSection.theme">{{enumSection.theme}}</span>
+        </div>
+        <p class="section-desc">下拉选择 — 修改右侧面板「枚举模块」的「主题风格」</p>
+      </div>
+    </section>
+
+    <!-- ========== 8. image 图片模块 ========== -->
+    <section class="section" data-bind-style-order="imageSection.position" data-bind-style-display="imageSection.visible">
+      <div class="section-type">🖼️ format: image</div>
+      <div class="section-card">
+        <div class="image-preview">
+          <img class="preview-img" data-bind-src="imageSection.bannerImage" alt="展示图片">
+          <div class="preview-placeholder">请在右侧面板上传图片</div>
+        </div>
+        <p class="section-desc">图片选择器 — 修改右侧面板「图片模块」的「展示图片」</p>
+      </div>
+    </section>
+
+    <!-- ========== 9. modules 模块数组（oneOf） ========== -->
+    <section class="section" data-bind-style-order="modulesSection.position" data-bind-style-display="modulesSection.visible">
+      <div class="section-type">🧩 array + oneOf + maxItems</div>
+      <div class="section-card">
+        <div class="modules">
+          <!-- 图片模块 -->
+          <div class="module-item module-image">
+            <div class="module-badge">图片模块</div>
+            <img class="module-img" data-bind-src="modulesSection.modules[0].imageUrl" alt="模块图片">
+            <div class="module-placeholder">modules[0].imageUrl</div>
+            <p class="module-caption" data-bind-text="modulesSection.modules[0].caption">{{modulesSection.modules[0].caption}}</p>
+          </div>
+          <!-- 文字模块 -->
+          <div class="module-item module-text">
+            <div class="module-badge">文字模块</div>
+            <p class="module-content" data-bind-text="modulesSection.modules[1].content">{{modulesSection.modules[1].content}}</p>
+          </div>
+          <!-- 视频模块 -->
+          <div class="module-item module-video">
+            <div class="module-badge">视频模块（maxItems: 1）</div>
+            <img class="module-cover" data-bind-src="modulesSection.modules[2].videoCover" alt="视频封面">
+            <div class="module-placeholder">modules[2].videoCover</div>
+            <p class="module-title" data-bind-text="modulesSection.modules[2].title">{{modulesSection.modules[2].title}}</p>
+          </div>
+        </div>
+        <p class="section-desc">模块数组 — 在右侧面板「模块数组」中增删/排序子模块</p>
+      </div>
+    </section>
+
+    <!-- ========== 底部类型总结 ========== -->
+    <footer class="footer">
+      <div class="type-grid">
+        <div class="type-item">✅ string</div>
+        <div class="type-item">✅ number</div>
+        <div class="type-item">✅ boolean</div>
+        <div class="type-item">✅ object</div>
+        <div class="type-item">✅ array</div>
+        <div class="type-item">✅ format: color</div>
+        <div class="type-item">✅ format: image</div>
+        <div class="type-item">✅ enum + enumNames</div>
+        <div class="type-item">✅ oneOf + maxItems</div>
+      </div>
+    </footer>
+
+  </div>
+</body>
+</html>

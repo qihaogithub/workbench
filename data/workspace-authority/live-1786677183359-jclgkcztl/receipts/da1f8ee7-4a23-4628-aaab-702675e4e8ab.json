@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "da1f8ee7-4a23-4628-aaab-702675e4e8ab",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 143,
+  "rootHash": "d1eee4de698f602351cdd6bf328e45b984cb6a26264a78ad4d1ba2ba60d552c0",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/8阶阶段报-0717_d2cd65/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "40c1a8648f6a5d5a71a61f6a45f6c127de5518f040d49b9fcd61f27fd6377e8f",
+      "afterHash": null
+    },
+    {
+      "path": "demos/8阶阶段报-0717_d2cd65/html-import.meta.json",
+      "action": "deleted",
+      "beforeHash": "b42001add3a17038df1ec84c5ccc9fdf865aa7b5de67bcaa92c371aaf5d63a1c",
+      "afterHash": null
+    },
+    {
+      "path": "demos/8阶阶段报-0717_d2cd65/sandbox.html",
+      "action": "deleted",
+      "beforeHash": "f4bc6d0da46dd61902e6beb6505d017680ce0f537fc2be16dd426342d9799688",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "d69439d96828bafa3dfc37f49ca8f1254fef7cc6cf9cd199f83f1e7cf9802283",
+      "afterHash": "34d75db9d1ad47965f15ff04d145e4d384a2f2a5ea4e6c1e4f809fadbb04a4dd"
+    }
+  ],
+  "committedAt": 1787741495149
+}

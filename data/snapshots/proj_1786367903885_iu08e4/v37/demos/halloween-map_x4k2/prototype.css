@@ -1,0 +1,446 @@
+/* ============================================================
+   黑白灰线框原型 · 活动地图页
+   统一视觉：占位框用虚线 + 灰阶，强调结构而非视觉
+   ============================================================ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: #f0f0f0;
+  color: #2b2b2b;
+  line-height: 1.6;
+}
+
+.wf-container {
+  max-width: 390px;
+  margin: 0 auto;
+  background: #ffffff;
+  min-height: 100vh;
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+/* ---------- 头部 ---------- */
+.wf-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid #e3e3e3;
+  background: #ffffff;
+}
+
+.wf-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wf-logo-box {
+  width: 34px;
+  height: 34px;
+  border: 2px solid #2b2b2b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: #2b2b2b;
+  background: #f7f7f7;
+}
+
+.wf-logo-text {
+  font-size: 15px;
+  font-weight: 700;
+  color: #2b2b2b;
+}
+
+.wf-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #666;
+}
+
+.wf-action-dot {
+  color: #ccc;
+}
+
+/* ---------- 领课 Banner ---------- */
+.wf-banner {
+  display: flex;
+  gap: 14px;
+  padding: 14px 18px;
+  background: #f7f7f7;
+  border-bottom: 1px solid #e3e3e3;
+  align-items: center;
+}
+
+.wf-banner-illust {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  border: 1px dashed #bdbdbd;
+  background: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.wf-pumpkin-placeholder {
+  font-size: 34px;
+}
+
+.wf-banner-label {
+  position: absolute;
+  bottom: 4px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 9px;
+  color: #999;
+}
+
+.wf-banner-body {
+  flex: 1;
+}
+
+.wf-banner-shout {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2b2b2b;
+  margin-bottom: 4px;
+}
+
+.wf-banner-desc {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 10px;
+}
+
+.wf-btn-banner {
+  width: auto;
+  padding: 7px 18px;
+  font-size: 13px;
+  margin: 0;
+}
+
+/* ---------- 主视觉 ---------- */
+.wf-hero {
+  position: relative;
+  text-align: center;
+  padding: 30px 22px 26px;
+  border-bottom: 1px solid #e3e3e3;
+}
+
+.wf-hero-kicker {
+  display: inline-block;
+  font-size: 12px;
+  color: #2b2b2b;
+  border: 1px solid #2b2b2b;
+  padding: 3px 12px;
+  border-radius: 999px;
+  margin-bottom: 14px;
+}
+
+.wf-hero-title {
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #1c1c1c;
+  line-height: 1.2;
+}
+
+.wf-hero-sub {
+  font-size: 13px;
+  letter-spacing: 2px;
+  color: #888;
+  text-transform: uppercase;
+  margin: 4px 0 10px;
+}
+
+.wf-hero-tag {
+  font-size: 14px;
+  color: #4a4a4a;
+  margin-bottom: 18px;
+  font-weight: 600;
+}
+
+.wf-hero-story {
+  font-size: 13px;
+  color: #555;
+  text-align: left;
+  background: #fafafa;
+  border: 1px solid #ececec;
+  padding: 14px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.wf-hero-story p + p {
+  margin-top: 6px;
+}
+
+.wf-hero-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+  background: #5a5a5a;
+  padding: 5px 14px;
+  border-radius: 6px;
+}
+
+/* ---------- 时间条 ---------- */
+.wf-datebar {
+  display: flex;
+  border-bottom: 1px solid #e3e3e3;
+}
+
+.wf-date-item {
+  flex: 1;
+  text-align: center;
+  padding: 14px 8px;
+}
+
+.wf-date-item + .wf-date-item {
+  border-left: 1px solid #e3e3e3;
+}
+
+.wf-date-label {
+  display: block;
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.wf-date-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2b2b2b;
+}
+
+/* ---------- 区块通用 ---------- */
+.wf-section {
+  padding: 26px 18px;
+  border-bottom: 1px solid #e3e3e3;
+}
+
+.wf-section-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1c1c1c;
+  margin-bottom: 6px;
+  position: relative;
+  padding-left: 12px;
+}
+
+.wf-section-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 4px;
+  background: #2b2b2b;
+  border-radius: 2px;
+}
+
+.wf-section-hint {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 18px;
+  padding-left: 12px;
+}
+
+/* ---------- 冲突地图 ---------- */
+.wf-map {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.wf-map-node {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid #dcdcdc;
+  border-radius: 10px;
+  background: #fcfcfc;
+}
+
+.wf-map-node-start {
+  border-color: #2b2b2b;
+  background: #f2f2f2;
+}
+
+.wf-map-node-icon {
+  width: 46px;
+  height: 46px;
+  border: 1px dashed #b0b0b0;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  background: #fff;
+  flex-shrink: 0;
+}
+
+.wf-map-node-body {
+  flex: 1;
+}
+
+.wf-map-node-status {
+  display: inline-block;
+  font-size: 10px;
+  color: #888;
+  background: #eee;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-bottom: 4px;
+}
+
+.wf-map-node-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #2b2b2b;
+  margin-bottom: 2px;
+}
+
+.wf-map-node-desc {
+  font-size: 12px;
+  color: #777;
+}
+
+/* ---------- 按钮 ---------- */
+.wf-btn {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+  border-radius: 8px;
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+}
+
+.wf-btn-primary {
+  background: #2b2b2b;
+  color: #ffffff;
+}
+
+.wf-btn-outline {
+  background: #ffffff;
+  color: #2b2b2b;
+  border: 2px solid #2b2b2b;
+  width: auto;
+  padding: 8px 22px;
+  margin: 0 auto;
+  font-size: 13px;
+}
+
+.wf-btn-cta {
+  margin: 0 auto;
+}
+
+/* ---------- 奖品 ---------- */
+.wf-prize-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.wf-prize-card {
+  text-align: center;
+  padding: 14px 8px;
+  border: 1px solid #dcdcdc;
+  border-radius: 10px;
+  background: #fcfcfc;
+}
+
+.wf-prize-img {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 8px;
+  border: 1px dashed #b0b0b0;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  background: #fff;
+}
+
+.wf-prize-card h3 {
+  font-size: 12px;
+  font-weight: 700;
+  color: #2b2b2b;
+  margin-bottom: 4px;
+}
+
+.wf-prize-card p {
+  font-size: 10px;
+  color: #777;
+  line-height: 1.35;
+}
+
+.wf-prize-card span {
+  display: block;
+  margin-top: 6px;
+  font-size: 10px;
+  color: #555;
+  font-weight: 600;
+}
+
+/* ---------- 转介绍 ---------- */
+.wf-refer-card {
+  text-align: center;
+  padding: 20px;
+  border: 1px dashed #b0b0b0;
+  border-radius: 10px;
+  background: #fafafa;
+}
+
+.wf-refer-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #2b2b2b;
+  margin-bottom: 6px;
+}
+
+.wf-refer-desc {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 14px;
+}
+
+/* ---------- 底部 ---------- */
+.wf-footer {
+  padding: 24px 18px;
+  text-align: center;
+  background: #f7f7f7;
+}
+
+.wf-footer-note {
+  font-size: 11px;
+  color: #999;
+  margin-bottom: 6px;
+}
+
+.wf-footer-copy {
+  font-size: 11px;
+  color: #aaa;
+}

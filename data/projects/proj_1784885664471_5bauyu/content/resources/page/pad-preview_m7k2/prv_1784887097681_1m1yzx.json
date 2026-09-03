@@ -1,0 +1,42 @@
+{
+  "id": "prv_1784887097681_1m1yzx",
+  "projectId": "proj_1784885664471_5bauyu",
+  "kind": "page",
+  "resourceId": "pad-preview_m7k2",
+  "workspaceId": "live-1784885665853-hte2rzhnj",
+  "workspaceRevision": 44,
+  "workspaceRootHash": "ba0e51d8410c352fdd10aeb483e9a0a2ab5ae69df29febecd6ba84e9e0bb729d",
+  "contentHash": "1c39fdd5813b0061504bf524a453a8fcfa02735fdad1ce344d328b56c9bc7e64",
+  "blobRefs": [
+    "8c119ea6b68f8cacde411dcf1a2530c63f4139d9817c6949ab2bf16bb6908e2f",
+    "4f9e4fa8cf7355a0b8ab2d1192cd15f64078188ef691de15c133200aeab5775e",
+    "9b80147ad362ddbb0491d52cd37afba96aef9eeb2667730aaae7aea4deb791ce",
+    "42bb61975c959b9e8e56b31d6fa28b53b41c6ebb78b938fe239279d811a6fe96"
+  ],
+  "metadata": {
+    "page": {
+      "id": "pad-preview_m7k2",
+      "name": "Pad 头图背景预览",
+      "runtimeType": "prototype-html-css",
+      "order": 2,
+      "parentId": null,
+      "routeKey": "pad"
+    },
+    "files": {
+      "schema": "8c119ea6b68f8cacde411dcf1a2530c63f4139d9817c6949ab2bf16bb6908e2f",
+      "prototypeHtml": "4f9e4fa8cf7355a0b8ab2d1192cd15f64078188ef691de15c133200aeab5775e",
+      "prototypeCss": "9b80147ad362ddbb0491d52cd37afba96aef9eeb2667730aaae7aea4deb791ce",
+      "prototypeMeta": "42bb61975c959b9e8e56b31d6fa28b53b41c6ebb78b938fe239279d811a6fe96"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1784887097682,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录Pad 头图背景预览"
+}

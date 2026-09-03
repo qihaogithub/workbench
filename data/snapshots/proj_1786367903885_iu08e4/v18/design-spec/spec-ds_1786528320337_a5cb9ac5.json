@@ -1,0 +1,22 @@
+{
+  "id": "ds_1786528320337_a5cb9ac5",
+  "title": "kids edu设计规范",
+  "createdAt": "2026-08-12T09:52:00.337Z",
+  "updatedAt": "2026-08-13T09:36:10.486Z",
+  "autoManagedPageId": "kids-edu_b3xw",
+  "entries": [
+    {
+      "id": "e_1786528320338_eff99572",
+      "title": "主视觉图片",
+      "markdown": "<br />\n\n~~entry:e\\_1786528320338\\_eff99572~~\n",
+      "refs": [
+        {
+          "scope": "page",
+          "pageId": "kids-edu_b3xw",
+          "fieldKey": "heroImage"
+        }
+      ],
+      "autoManagedFieldKey": "heroImage"
+    }
+  ]
+}

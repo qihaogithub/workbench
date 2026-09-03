@@ -1,0 +1,39 @@
+{
+  "id": "commit_1786688452373_ebkdf9",
+  "projectId": "proj_1779608460372",
+  "parentCommitId": "commit_1786688069385_3166lq",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "删除知识文档 未命名文档",
+  "resourcePointers": [
+    {
+      "kind": "knowledge_document",
+      "resourceId": "kb_1786532517206_r7k6au",
+      "versionId": "krv_1786688069375_gzphcq",
+      "deleted": true
+    },
+    {
+      "kind": "page",
+      "resourceId": "demo_1779608460501_abc123",
+      "versionId": "prv_1785915741753_ij33t6"
+    },
+    {
+      "kind": "page",
+      "resourceId": "demo_1779608460502_def456",
+      "versionId": "prv_1786627562348_ywt264"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "knowledge_document",
+      "resourceId": "kb_1786532517206_r7k6au",
+      "fromVersionId": "krv_1786688069375_gzphcq",
+      "deleted": true
+    }
+  ],
+  "createdAt": 1786688452373,
+  "createdBy": "Author Site",
+  "audit": {
+    "actorType": "user"
+  }
+}

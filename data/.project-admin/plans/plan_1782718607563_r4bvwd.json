@@ -1,0 +1,12 @@
+{
+  "planId": "plan_1782718607563_r4bvwd",
+  "operation": "project_delete",
+  "resourceId": "proj_1779608460373",
+  "impact": [
+    "删除项目 学习页活动卡片",
+    "删除 2 个页面",
+    "删除项目工作空间和元数据"
+  ],
+  "reversible": true,
+  "confirmToken": "confirm_1782718607563_hek54p"
+}

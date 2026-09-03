@@ -1,0 +1,39 @@
+{
+  "id": "prv_1785912028640_2ein9t",
+  "projectId": "proj_1784885664471_5bauyu",
+  "kind": "page",
+  "resourceId": "mobile-header-preview_b3f1",
+  "workspaceId": "live-1785863225962-u52upxekm",
+  "workspaceRevision": 90,
+  "workspaceRootHash": "e89c115d81610eaaae929b49307974e2234a57c8ecb58301a8183a9ec7d058ef",
+  "previousVersionId": "prv_1785910577957_e4dfhp",
+  "contentHash": "faa7f950d76d0b6a56feea2ce5647d4b9c42efdf908fb3ecf9fb4eefba673a68",
+  "blobRefs": [
+    "69046a9996254002d0beb4021b3ee521fe9ddc4c9b83c50210d44e3d7be12424",
+    "ed866f128314bc32c1a62631752cc8237a7d375e7e1cd3a9f9a24e3302ed2341"
+  ],
+  "metadata": {
+    "page": {
+      "id": "mobile-header-preview_b3f1",
+      "name": "手机预览",
+      "runtimeType": "high-fidelity-react",
+      "order": 1,
+      "parentId": null,
+      "routeKey": "page"
+    },
+    "files": {
+      "schema": "69046a9996254002d0beb4021b3ee521fe9ddc4c9b83c50210d44e3d7be12424",
+      "code": "ed866f128314bc32c1a62631752cc8237a7d375e7e1cd3a9f9a24e3302ed2341"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "high-fidelity-react",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1785912028643,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录手机预览"
+}

@@ -1,0 +1,136 @@
+{
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "content",
+      "preset": "custom",
+      "source": "user"
+    }
+  },
+  "type": "object",
+  "properties": {
+    "主题设置": {
+      "type": "object",
+      "title": "主题设置",
+      "properties": {
+        "theme": {
+          "type": "string",
+          "title": "主题风格",
+          "enum": [
+            "浅色",
+            "深色",
+            "跟随系统"
+          ],
+          "default": "浅色"
+        },
+        "language": {
+          "type": "string",
+          "title": "界面语言",
+          "enum": [
+            "简体中文",
+            "English",
+            "日本語"
+          ],
+          "default": "简体中文"
+        }
+      },
+      "required": []
+    },
+    "个人偏好": {
+      "type": "object",
+      "title": "个人偏好",
+      "properties": {
+        "interests": {
+          "type": "enum",
+          "title": "兴趣爱好",
+          "enum": [
+            "阅读",
+            "音乐",
+            "运动",
+            "摄影",
+            "旅行",
+            "美食"
+          ],
+          "multiple": true,
+          "default": [
+            "阅读",
+            "音乐"
+          ]
+        },
+        "region": {
+          "type": "cascade",
+          "title": "所在地区",
+          "options": [
+            {
+              "value": "北京市",
+              "label": "北京市",
+              "children": [
+                {
+                  "value": "东城区",
+                  "label": "东城区"
+                },
+                {
+                  "value": "朝阳区",
+                  "label": "朝阳区"
+                }
+              ]
+            },
+            {
+              "value": "上海市",
+              "label": "上海市",
+              "children": [
+                {
+                  "value": "黄浦区",
+                  "label": "黄浦区"
+                },
+                {
+                  "value": "浦东新区",
+                  "label": "浦东新区"
+                }
+              ]
+            },
+            {
+              "value": "浙江省",
+              "label": "浙江省",
+              "children": [
+                {
+                  "value": "杭州市",
+                  "label": "杭州市"
+                },
+                {
+                  "value": "宁波市",
+                  "label": "宁波市"
+                }
+              ]
+            },
+            {
+              "value": "广东省",
+              "label": "广东省",
+              "children": [
+                {
+                  "value": "广州市",
+                  "label": "广州市"
+                },
+                {
+                  "value": "深圳市",
+                  "label": "深圳市"
+                }
+              ]
+            }
+          ],
+          "default": [
+            "浙江省",
+            "杭州市"
+          ]
+        }
+      },
+      "required": []
+    }
+  },
+  "required": []
+}

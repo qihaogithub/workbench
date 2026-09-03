@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>模块数组配置</title>
+  <link rel="stylesheet" href="prototype.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- 页面标题 -->
+    <header class="page-header">
+      <h1 class="page-title" data-bind-text="页面标题.title">{{页面标题.title}}</h1>
+      <p class="page-subtitle" data-bind-text="页面标题.subtitle">{{页面标题.subtitle}}</p>
+    </header>
+
+    <!-- 模块列表容器 -->
+    <main class="module-list">
+      <!-- 横幅模块 -->
+      <section class="module banner-module">
+        <div class="banner-wrapper">
+          <img class="banner-image" src="/api/images/img__3I8yQBnAyUtHA" alt="横幅" data-bind-src="模块列表.modules.0.imageUrl" />
+          <div class="banner-overlay">
+            <span class="banner-text" data-bind-text="模块列表.modules.0.bannerText">{{模块列表.modules.0.bannerText}}</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 图片模块 -->
+      <section class="module image-module" data-bind-style-border-color="模块列表.modules.1.borderColor">
+        <div class="image-card">
+          <img class="card-image" src="/api/images/img_GwsXRx4Q2c0A0g" alt="展示图片" data-bind-src="模块列表.modules.1.pic" />
+          <p class="card-caption" data-bind-text="模块列表.modules.1.caption">{{模块列表.modules.1.caption}}</p>
+        </div>
+      </section>
+
+      <!-- 文本模块 -->
+      <section class="module text-module">
+        <div class="text-content" data-bind-text="模块列表.modules.2.content">{{模块列表.modules.2.content}}</div>
+      </section>
+
+      <!-- 定位元素模块 -->
+      <section class="module positioned-module">
+        <div class="positioned-container">
+          <div class="floating-label" data-pos-key="floatingLabel"
+               style="position: absolute; left: 20px; top: 20px;"
+               data-bind-text="模块列表.modules.3.label">
+            {{模块列表.modules.3.label}}
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

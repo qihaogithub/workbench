@@ -1,0 +1,156 @@
+interface Position {
+  x: number;
+  y: number;
+}
+
+interface BannerModule {
+  type: "banner";
+  imageUrl?: string;
+  bannerText?: string;
+}
+
+interface ImageModule {
+  type: "image";
+  pic?: string;
+  caption?: string;
+  borderColor?: string;
+}
+
+interface TextModule {
+  type: "text";
+  content?: string;
+}
+
+interface PositionedModule {
+  type: "positioned";
+  label?: string;
+  position?: Position;
+}
+
+type ModuleItem = BannerModule | ImageModule | TextModule | PositionedModule;
+
+interface DemoProps {
+  title?: string;
+  subtitle?: string;
+  modules?: ModuleItem[];
+}
+
+const DEFAULT_BANNER_IMG = "/api/images/img__3I8yQBnAyUtHA";
+const DEFAULT_PIC = "/api/images/img_GwsXRx4Q2c0A0g";
+
+const DEFAULT_MODULES: ModuleItem[] = [
+  { type: "banner", imageUrl: "/api/images/img__3I8yQBnAyUtHA", bannerText: "欢迎光临" },
+  { type: "image", pic: "/api/images/img_GwsXRx4Q2c0A0g", caption: "精美的展示图片", borderColor: "#e5e7eb" },
+  { type: "text", content: "这是一段可编辑的文本内容，支持长文本。" },
+  { type: "positioned", label: "浮动标签", position: { x: 20, y: 20 } },
+];
+
+export default function ModuleArrayDemo({
+  title = "我的作品集",
+  subtitle = "精选项目展示",
+  modules = DEFAULT_MODULES,
+}: DemoProps) {
+  return (
+    <div className="mx-auto min-h-screen w-full max-w-[375px] bg-white pb-8">
+      <header
+        className="px-5 pb-6 pt-8 text-center text-white"
+        style={{ background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}
+      >
+        <h1 className="mb-1.5 text-[26px] font-bold tracking-[0.5px]">{title}</h1>
+        <p className="text-sm font-normal opacity-85">{subtitle}</p>
+      </header>
+
+      <main className="flex flex-col gap-4 p-4">
+        {modules.map((module, index) => {
+          switch (module.type) {
+            case "banner":
+              return (
+                <section
+                  key={index}
+                  className="overflow-hidden rounded-xl bg-white"
+                  style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)" }}
+                >
+                  <div className="relative h-[200px] w-full overflow-hidden">
+                    <img
+                      className="block h-full w-full object-cover"
+                      src={module.imageUrl || DEFAULT_BANNER_IMG}
+                      alt="横幅"
+                    />
+                    <div
+                      className="absolute inset-0 flex items-end p-5"
+                      style={{
+                        background:
+                          "linear-gradient(to top, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.1) 60%, transparent 100%)",
+                      }}
+                    >
+                      <span
+                        className="text-xl font-semibold text-white"
+                        style={{ textShadow: "0 1px 4px rgba(0,0,0,0.3)" }}
+                      >
+                        {module.bannerText}
+                      </span>
+                    </div>
+                  </div>
+                </section>
+              );
+            case "image":
+              return (
+                <section
+                  key={index}
+                  className="overflow-hidden rounded-xl bg-white"
+                  style={{
+                    border: `1px solid ${module.borderColor || "#e5e7eb"}`,
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)",
+                  }}
+                >
+                  <img className="block h-[220px] w-full object-cover" src={module.pic || DEFAULT_PIC} alt="展示图片" />
+                  <p className="px-4 py-3 text-center text-sm leading-relaxed text-gray-500">{module.caption}</p>
+                </section>
+              );
+            case "text":
+              return (
+                <section
+                  key={index}
+                  className="rounded-xl bg-white px-4 py-5"
+                  style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)" }}
+                >
+                  <div className="text-[15px] leading-relaxed text-gray-700">{module.content}</div>
+                </section>
+              );
+            case "positioned":
+              return (
+                <section
+                  key={index}
+                  className="overflow-hidden rounded-xl bg-white"
+                  style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)" }}
+                >
+                  <div className="relative h-[200px] w-full overflow-hidden rounded-xl bg-gray-50">
+                    <div
+                      data-pos-key="floatingLabel"
+                      className="select-none whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium text-white"
+                      style={{
+                        position: "absolute",
+                        left: module.position?.x ?? 20,
+                        top: module.position?.y ?? 20,
+                        background: "#667eea",
+                        boxShadow: "0 2px 8px rgba(102, 126, 234, 0.4)",
+                        cursor: "move",
+                      }}
+                    >
+                      {module.label}
+                    </div>
+                  </div>
+                </section>
+              );
+            default:
+              return (
+                <section key={index} className="rounded-xl bg-white px-4 py-5 text-center text-sm text-gray-400">
+                  未知模块类型
+                </section>
+              );
+          }
+        })}
+      </main>
+    </div>
+  );
+}

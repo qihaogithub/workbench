@@ -1,0 +1,84 @@
+{
+  "$demo": { "previewSize": { "width": 375, "height": 812 } },
+  "type": "object",
+  "properties": {
+    "页面标题": {
+      "type": "object",
+      "title": "页面标题",
+      "properties": {
+        "title": { "type": "string", "title": "标题", "default": "我的作品集" },
+        "subtitle": { "type": "string", "title": "副标题", "default": "精选项目展示" }
+      },
+      "required": []
+    },
+    "模块列表": {
+      "type": "object",
+      "title": "模块列表",
+      "properties": {
+        "modules": {
+          "type": "array",
+          "title": "页面模块",
+          "$demo": { "sortable": true },
+          "items": {
+            "oneOf": [
+              {
+                "title": "横幅模块",
+                "$demo": { "maxItems": 1 },
+                "properties": {
+                  "type": { "const": "banner" },
+                  "imageUrl": { "type": "string", "title": "横幅图片", "format": "image", "default": "/api/images/img__3I8yQBnAyUtHA" },
+                  "bannerText": { "type": "string", "title": "横幅文字", "default": "欢迎光临" }
+                },
+                "required": ["type"]
+              },
+              {
+                "title": "图片模块",
+                "properties": {
+                  "type": { "const": "image" },
+                  "pic": { "type": "string", "title": "图片", "format": "image", "default": "/api/images/img_GwsXRx4Q2c0A0g" },
+                  "caption": { "type": "string", "title": "图片说明", "default": "精美的展示图片" },
+                  "borderEnabled": { "type": "boolean", "title": "显示边框", "default": true },
+                  "borderColor": { "type": "string", "title": "边框颜色", "format": "color", "default": "#e5e7eb", "visibleWhen": { "field": "borderEnabled", "equals": true } }
+                },
+                "required": ["type"]
+              },
+              {
+                "title": "文本模块",
+                "properties": {
+                  "type": { "const": "text" },
+                  "content": { "type": "text", "title": "文本内容", "default": "这是一段可编辑的文本内容，支持长文本。" },
+                  "align": { "type": "string", "title": "对齐方式", "enum": ["left", "center", "right"], "enumNames": ["左对齐", "居中", "右对齐"], "default": "left" }
+                },
+                "required": ["type"]
+              },
+              {
+                "title": "定位元素模块",
+                "$demo": { "maxItems": 1 },
+                "properties": {
+                  "type": { "const": "positioned" },
+                  "label": { "type": "string", "title": "标签文字", "default": "浮动标签" },
+                  "position": {
+                    "type": "position",
+                    "key": "floatingLabel",
+                    "title": "位置",
+                    "size": { "width": 375, "height": 200 },
+                    "default": { "x": 20, "y": 20 }
+                  }
+                },
+                "required": ["type"]
+              }
+            ]
+          },
+          "default": [
+            { "type": "banner", "imageUrl": "/api/images/img__3I8yQBnAyUtHA", "bannerText": "欢迎光临" },
+            { "type": "image", "pic": "/api/images/img_GwsXRx4Q2c0A0g", "caption": "精美的展示图片", "borderEnabled": true, "borderColor": "#e5e7eb" },
+            { "type": "text", "content": "这是一段可编辑的文本内容，支持长文本。", "align": "left" },
+            { "type": "positioned", "label": "浮动标签", "position": { "x": 20, "y": 20 } }
+          ]
+        }
+      },
+      "required": []
+    }
+  },
+  "required": []
+}

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>配置项类型展示</title>
+  <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+  <div class="showcase">
+
+    <!-- 页面头部提示 -->
+    <div class="showcase-header">
+      <p>👇 右侧「页面模块」数组支持<span class="accent">拖拽排序</span>，每种模块仅限一个</p>
+    </div>
+
+    <!-- ========== sections[0] — 标题（string） ========== -->
+    <div class="section" data-bind-style-display="sections[0].pageTitle">
+      <div class="section-badge">📝 string</div>
+      <div class="card" data-bind-style-border-color="sections[6].primaryColor">
+        <h1 class="page-title" data-bind-text="sections[0].pageTitle">{{sections[0].pageTitle}}</h1>
+      </div>
+    </div>
+
+    <!-- ========== sections[1] — 数值（number） ========== -->
+    <div class="section" data-bind-style-display="sections[1].discount">
+      <div class="section-badge">🔢 number</div>
+      <div class="card">
+        <div class="kv-row">
+          <span class="kv-label">折扣力度</span>
+          <span class="kv-value big accent" data-bind-text="sections[1].discount">{{sections[1].discount}}%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== sections[2] — 开关（boolean） ========== -->
+    <div class="section" data-bind-style-display="sections[2].showBanner">
+      <div class="section-badge">🔘 boolean</div>
+      <div class="card">
+        <div class="kv-row">
+          <span class="kv-label">展示横幅</span>
+          <span class="kv-value badge">{{sections[2].showBanner ? '🟢 开启' : '🔴 关闭'}}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== sections[3] — 对象（object） ========== -->
+    <div class="section" data-bind-style-display="sections[3].author.name">
+      <div class="section-badge">📦 object</div>
+      <div class="card">
+        <div class="author-row">
+          <div class="avatar">{{sections[3].author.name[0]}}</div>
+          <div>
+            <div class="author-name" data-bind-text="sections[3].author.name">{{sections[3].author.name}}</div>
+            <div class="author-lv">Lv.<span data-bind-text="sections[3].author.level">{{sections[3].author.level}}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== sections[4] — 数组（array） ========== -->
+    <div class="section" data-bind-style-display="sections[4].tags">
+      <div class="section-badge">📋 array</div>
+      <div class="card">
+        <div class="tag-list">
+          <span class="tag">{{sections[4].tags.join(' · ')}}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== sections[5] — 颜色（format: color） ========== -->
+    <div class="section" data-bind-style-display="sections[5].primaryColor">
+      <div class="section-badge">🎨 format: color</div>
+      <div class="card">
+        <div class="color-row">
+          <div class="swatch" data-bind-style-background-color="sections[5].primaryColor"></div>
+          <div>
+            <div class="color-label">主题色</div>
+            <div class="color-hex" data-bind-text="sections[5].primaryColor">{{sections[5].primaryColor}}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== sections[6] — 枚举（enum + enumNames） ========== -->
+    <div class="section" data-bind-style-display="sections[6].theme">
+      <div class="section-badge">📑 enum</div>
+      <div class="card">
+        <div class="kv-row">
+          <span class="kv-label">主题风格</span>
+          <span class="kv-value accent" data-bind-text="sections[6].theme">{{sections[6].theme}}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== sections[7] — 图片（format: image） ========== -->
+    <div class="section" data-bind-style-display="sections[7].bannerImage">
+      <div class="section-badge">🖼️ format: image</div>
+      <div class="card">
+        <div class="img-box">
+          <img class="img-box-img" data-bind-src="sections[7].bannerImage" alt="">
+          <div class="img-box-empty">右侧面板上传图片</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== sections[8] — 模块数组（array + oneOf） ========== -->
+    <div class="section" data-bind-style-display="sections[8].modules">
+      <div class="section-badge">🧩 array + oneOf</div>
+      <div class="card">
+        <div class="sub-modules">
+          <!-- 图片子模块 -->
+          <div class="sub-item sub-image">
+            <span class="sub-badge">图片</span>
+            <img class="sub-img" data-bind-src="sections[8].modules[0].imageUrl" alt="">
+            <div class="sub-empty">图片子模块</div>
+            <p class="sub-cap" data-bind-text="sections[8].modules[0].caption">{{sections[8].modules[0].caption}}</p>
+          </div>
+          <!-- 文字子模块 -->
+          <div class="sub-item sub-text">
+            <span class="sub-badge">文字</span>
+            <p class="sub-content" data-bind-text="sections[8].modules[1].content">{{sections[8].modules[1].content}}</p>
+          </div>
+          <!-- 视频子模块 -->
+          <div class="sub-item sub-video">
+            <span class="sub-badge">视频 · max 1</span>
+            <img class="sub-img" data-bind-src="sections[8].modules[2].videoCover" alt="">
+            <div class="sub-empty">视频子模块</div>
+            <p class="sub-cap" data-bind-text="sections[8].modules[2].videoTitle">{{sections[8].modules[2].videoTitle}}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部总结 -->
+    <footer class="footer">
+      <div class="type-grid">
+        <div class="type-chip">✅ string</div>
+        <div class="type-chip">✅ number</div>
+        <div class="type-chip">✅ boolean</div>
+        <div class="type-chip">✅ object</div>
+        <div class="type-chip">✅ array</div>
+        <div class="type-chip">✅ color</div>
+        <div class="type-chip">✅ enum</div>
+        <div class="type-chip">✅ image</div>
+        <div class="type-chip">✅ oneOf</div>
+      </div>
+    </footer>
+
+  </div>
+</body>
+</html>

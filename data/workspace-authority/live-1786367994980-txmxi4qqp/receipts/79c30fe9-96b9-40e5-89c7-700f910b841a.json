@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "79c30fe9-96b9-40e5-89c7-700f910b841a",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786367994980-txmxi4qqp",
+  "baseRevision": 0,
+  "revision": 271,
+  "rootHash": "edcda21a5176f8e0bbea0dbc39cf7c51dd5f0b7668648b5eae2684a50edd05e7",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/page_5xir/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "a1b7204c3371b72528894634422b351ab2fef679ff011d590f9579b77bfb5fb8"
+    }
+  ],
+  "committedAt": 1786516280286
+}

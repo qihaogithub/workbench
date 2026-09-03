@@ -1,0 +1,41 @@
+{
+  "id": "commit_1786100299268_p8f289",
+  "projectId": "proj_1784874964275_p0k4ho",
+  "parentCommitId": "commit_1786099815679_q9dqdz",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "备份",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "course-complete_a7k3",
+      "versionId": "prv_1786097867093_1ugj1t"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_034b",
+      "versionId": "prv_1786091991162_1wwfjh"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_na8k",
+      "versionId": "prv_1786100299264_hvm4k4"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "page_na8k",
+      "fromVersionId": "prv_1786099815564_cclx9k",
+      "toVersionId": "prv_1786100299264_hvm4k4"
+    }
+  ],
+  "createdAt": 1786100299268,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785739340495-r9pfl4l9u",
+    "workspaceRevision": 176,
+    "workspaceRootHash": "4379549be0bd1d4c9e292acdcf82275c5f754cc3c5642184dafbde3fc70a6444"
+  }
+}

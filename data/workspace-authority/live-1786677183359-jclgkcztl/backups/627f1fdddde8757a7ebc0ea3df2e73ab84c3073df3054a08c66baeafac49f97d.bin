@@ -1,0 +1,146 @@
+{
+  "version": 1,
+  "projectId": "proj_1786367903885_iu08e4",
+  "updatedAt": 1787888252133,
+  "state": {
+    "viewport": {
+      "x": 366.8597671364016,
+      "y": 230.4205708758435,
+      "zoom": 0.8727158783413484
+    },
+    "pages": {
+      "kids-edu_b3xw": {
+        "x": -531.1393076033285,
+        "y": -58.76169538165655,
+        "width": 375,
+        "height": 2471,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "clipboard-import_4d9ab0": {
+        "x": 549.1688741936314,
+        "y": 26.59478305785112,
+        "width": 375,
+        "height": 812,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "kids-edu_cl49": {
+        "x": -103.54856477296579,
+        "y": -48.050330797006154,
+        "width": 375,
+        "height": 2471,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812",
+        "zIndex": 2
+      }
+    },
+    "pageGroups": {},
+    "sections": {},
+    "hiddenPageIds": [],
+    "nodes": {
+      "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c": {
+        "id": "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c",
+        "title": "文档",
+        "layout": {
+          "x": 955.8165142833086,
+          "y": -30.804163460696056,
+          "width": 223.08961578965517,
+          "height": 352.7284130872072,
+          "zIndex": 1
+        },
+        "createdAt": 1787885153164,
+        "updatedAt": 1787888242969,
+        "kind": "document",
+        "knowledgeDocument": {
+          "id": "kb_1787885153658_t9h54b",
+          "title": "文档",
+          "fileName": "文档.md",
+          "description": "文档"
+        }
+      }
+    },
+    "layers": {
+      "annotations": {
+        "nodes": {
+          "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c": {
+            "id": "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c",
+            "title": "文档",
+            "layout": {
+              "x": 955.8165142833086,
+              "y": -30.804163460696056,
+              "width": 223.08961578965517,
+              "height": 352.7284130872072,
+              "zIndex": 1
+            },
+            "createdAt": 1787885153164,
+            "updatedAt": 1787888242969,
+            "kind": "document",
+            "knowledgeDocument": {
+              "id": "kb_1787885153658_t9h54b",
+              "title": "文档",
+              "fileName": "文档.md",
+              "description": "文档"
+            }
+          }
+        }
+      },
+      "documents": {
+        "nodes": {
+          "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c": {
+            "id": "doc-2b7a51de-2256-4e12-b2c7-708858f9da7c",
+            "title": "文档",
+            "layout": {
+              "x": 955.8165142833086,
+              "y": -30.804163460696056,
+              "width": 223.08961578965517,
+              "height": 352.7284130872072,
+              "zIndex": 1
+            },
+            "createdAt": 1787885153164,
+            "updatedAt": 1787888242969,
+            "kind": "document",
+            "knowledgeDocument": {
+              "id": "kb_1787885153658_t9h54b",
+              "title": "文档",
+              "fileName": "文档.md",
+              "description": "文档"
+            }
+          }
+        }
+      }
+    },
+    "hiddenKnowledgeDocumentIds": [],
+    "navigation": {
+      "hotspots": {
+        "navigation_hotspot_1787888250708_wys5pr": {
+          "id": "navigation_hotspot_1787888250708_wys5pr",
+          "pageId": "kids-edu_b3xw",
+          "rect": {
+            "x": 0.7967121961511968,
+            "y": 0.05872694393416354,
+            "width": 0.09198403882314243,
+            "height": 0.017031117985064917
+          },
+          "createdAt": 1787888250708,
+          "updatedAt": 1787888250708
+        }
+      },
+      "connections": {
+        "navigation_connection_1787888250708_f7jl9d": {
+          "id": "navigation_connection_1787888250708_f7jl9d",
+          "source": {
+            "pageId": "kids-edu_b3xw",
+            "hotspotId": "navigation_hotspot_1787888250708_wys5pr"
+          },
+          "target": {
+            "pageId": "kids-edu_cl49"
+          },
+          "createdAt": 1787888250708,
+          "updatedAt": 1787888250708
+        }
+      }
+    }
+  }
+}

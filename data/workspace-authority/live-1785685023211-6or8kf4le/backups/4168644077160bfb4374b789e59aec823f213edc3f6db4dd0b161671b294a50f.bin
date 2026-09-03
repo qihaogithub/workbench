@@ -1,0 +1,140 @@
+type ModuleItem =
+  | { type: "text"; content: string }
+  | { type: "image"; pic: string; caption: string }
+  | { type: "colorBlock"; label: string; value: string };
+
+interface DemoProps {
+  modules: ModuleItem[];
+  bannerText: string;
+  bannerX: number;
+  bannerY: number;
+}
+
+const TYPE_BADGES = ["array", "sortable", "maxItems", "number 定位"];
+
+export default function ConfigStructure({
+  modules,
+  bannerText,
+  bannerX,
+  bannerY,
+}: DemoProps) {
+  return (
+    <div className="min-h-screen bg-slate-50 px-5 pb-12 pt-8 font-sans text-slate-800">
+      <header className="mb-6">
+        <p className="text-[11px] font-semibold tracking-[0.2em] text-sky-500">
+          CONFIG TYPES DEMO
+        </p>
+        <h1 className="mt-1 text-xl font-bold text-slate-900">高级结构类型</h1>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {TYPE_BADGES.map((t) => (
+            <span
+              key={t}
+              className="rounded-full bg-sky-100 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700"
+            >
+              {t}
+            </span>
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-slate-500">
+          模块数组（多变体 + 排序 + 数量上限）与数值定位演示
+        </p>
+      </header>
+
+      <section className="mb-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-1.5">
+          <h2 className="text-sm font-semibold text-slate-900">模块列表</h2>
+          <div className="flex gap-1">
+            <span className="rounded-md bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-700">
+              array
+            </span>
+            <span className="rounded-md bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-700">
+              variants
+            </span>
+            <span className="rounded-md bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-700">
+              sortable
+            </span>
+            <span className="rounded-md bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-700">
+              maxItems
+            </span>
+          </div>
+        </div>
+
+        <div className="space-y-2.5">
+          {modules.length === 0 ? (
+            <div className="flex h-24 items-center justify-center rounded-xl bg-slate-100 text-xs text-slate-400">
+              暂无模块，请在配置面板中添加
+            </div>
+          ) : (
+            modules.map((m, i) => (
+              <div
+                key={i}
+                className="flex items-start gap-2.5 rounded-xl border border-slate-100 bg-slate-50/70 p-3"
+              >
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-600 text-[10px] font-bold text-white">
+                  {i + 1}
+                </span>
+                {m.type === "text" && (
+                  <p className="flex-1 text-sm leading-relaxed text-slate-600">
+                    {m.content}
+                  </p>
+                )}
+                {m.type === "image" && (
+                  <div className="min-w-0 flex-1">
+                    <img
+                      src={m.pic}
+                      alt={m.caption || "图片模块"}
+                      className="h-28 w-full rounded-lg object-cover"
+                    />
+                    {m.caption && (
+                      <p className="mt-1 text-xs text-slate-500">{m.caption}</p>
+                    )}
+                  </div>
+                )}
+                {m.type === "colorBlock" && (
+                  <div className="flex flex-1 items-center gap-3">
+                    <span
+                      className="h-9 w-9 shrink-0 rounded-lg shadow-inner"
+                      style={{ backgroundColor: m.value }}
+                    />
+                    <div>
+                      <p className="text-sm font-semibold text-slate-700">
+                        {m.label}
+                      </p>
+                      <p className="font-mono text-[11px] text-slate-400">
+                        {m.value}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+        <p className="mt-3 text-[11px] text-slate-400">
+          配置面板中可拖拽手柄排序模块；色块模块最多 1 个（maxItems）
+        </p>
+      </section>
+
+      <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-900">悬浮横幅定位</h2>
+          <span className="rounded-md bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-700">
+            number
+          </span>
+        </div>
+        <div className="relative h-64 overflow-hidden rounded-xl bg-gradient-to-br from-sky-100 via-indigo-100 to-violet-100">
+          <div
+            className="absolute max-w-[calc(100%-16px)] rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-lg"
+            style={{ left: bannerX, top: bannerY }}
+          >
+            {bannerText}
+          </div>
+        </div>
+        <p className="mt-2 text-[11px] text-slate-400">
+          通过 bannerX / bannerY 两个 number 字段控制横幅位置：x={bannerX}，y=
+          {bannerY}
+        </p>
+      </section>
+    </div>
+  );
+}

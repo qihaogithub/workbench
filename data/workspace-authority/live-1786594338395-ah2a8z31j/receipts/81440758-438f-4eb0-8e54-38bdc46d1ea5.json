@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "81440758-438f-4eb0-8e54-38bdc46d1ea5",
+  "projectId": "proj_1786594337456_uafur2",
+  "workspaceId": "live-1786594338395-ah2a8z31j",
+  "baseRevision": 0,
+  "revision": 2,
+  "rootHash": "67125e77a77bfba9401dcdd65960780e6f0acda78814be16aa439afc78cd2e87",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_ixfq/prototype.html",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f"
+    },
+    {
+      "path": "demos/page_ixfq/prototype.css",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/page_ixfq/config.schema.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355"
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "b8f84cb18b1d4fb04f8db0fdb7867802b916f6365d4816c8289777a7893570ab",
+      "afterHash": "526ba8efc139d50d2279f0ac23aa25e0f8bde3096e1f7f1d5843d8ccfae36674"
+    }
+  ],
+  "committedAt": 1786594339818
+}

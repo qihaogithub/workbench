@@ -1,0 +1,20 @@
+{
+  "auditId": "audit_1784785029097_yua1qb",
+  "at": 1784785029097,
+  "actor": {
+    "id": "local-codex",
+    "name": "local-codex",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L2",
+  "tool": "template_create_from_project",
+  "projectId": "proj_1783185620923_o5e6rr",
+  "resourceId": "proj_1783185620923_o5e6rr",
+  "ok": true,
+  "diffSummary": {
+    "updated": [
+      "project:proj_1783185620923_o5e6rr.projectType"
+    ]
+  }
+}

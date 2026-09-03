@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "a8680cd6-4651-48f7-9ca4-82a91f4ac1b3",
+  "projectId": "proj_1785687393956_aa29zz",
+  "workspaceId": "live-1785687394721-g7dafuhq4",
+  "baseRevision": 176,
+  "revision": 178,
+  "rootHash": "5345b9e30b15e9fb4a261901ab4d3c36daa36f70d291f72e1b8cac3413c76191",
+  "actor": "ai",
+  "resources": [
+    {
+      "path": "demos/config-prototype_k8m2/prototype.html",
+      "action": "deleted",
+      "beforeHash": "0838892f77ddaa1f70a38a2ae7da9e8df28cd6465d075699f5cc509fe4dcfee1",
+      "afterHash": null
+    }
+  ],
+  "committedAt": 1785735746768
+}

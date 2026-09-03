@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "content",
+      "preset": "custom",
+      "source": "user"
+    }
+  },
+  "properties": {
+    "modules": {
+      "type": "object",
+      "title": "",
+      "properties": {
+        "items": {
+          "type": "array",
+          "title": "",
+          "description": "拖拽调整模块顺序；图片模块可添加任意数量，视频和进度模块各只能添加一个",
+          "items": {
+            "type": "object",
+            "oneOf": [
+              {
+                "title": "图片模块",
+                "properties": {
+                  "type": {
+                    "const": "image",
+                    "type": "string",
+                    "title": "模块类型"
+                  },
+                  "imageUrl": {
+                    "type": "string",
+                    "title": "图片",
+                    "format": "image"
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              },
+              {
+                "title": "视频模块",
+                "properties": {
+                  "type": {
+                    "const": "video",
+                    "type": "string",
+                    "title": "模块类型"
+                  },
+                  "videoBg": {
+                    "type": "string",
+                    "title": "视频背景",
+                    "format": "image"
+                  },
+                  "videoCover": {
+                    "type": "string",
+                    "title": "视频封面",
+                    "format": "image",
+                    "ui:options": {
+                      "minWidth": 670,
+                      "maxWidth": 670,
+                      "minHeight": 376,
+                      "maxHeight": 376
+                    }
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              },
+              {
+                "title": "进度模块",
+                "properties": {
+                  "type": {
+                    "const": "progress",
+                    "type": "string",
+                    "title": "模块类型"
+                  },
+                  "progressBgTop": {
+                    "type": "string",
+                    "title": "进度背景-上",
+                    "format": "image"
+                  },
+                  "progressBgMiddle": {
+                    "type": "string",
+                    "title": "进度背景-中(可重复)",
+                    "format": "image"
+                  },
+                  "progressBgBottom": {
+                    "type": "string",
+                    "title": "进度背景-下",
+                    "format": "image"
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              }
+            ]
+          },
+          "default": [
+            {
+              "type": "image",
+              "imageUrl": "../../assets/images/ab9472005108-image-module-2.png"
+            },
+            {
+              "type": "progress",
+              "progressBgTop": "../../assets/images/e42da6dcf611-progress-bg-top.png",
+              "progressBgMiddle": "../../assets/images/805ed928744e-progress-bg-middle.png",
+              "progressBgBottom": "../../assets/images/b0b1a87384e6-progress-bg-bottom.png"
+            },
+            {
+              "type": "image",
+              "imageUrl": "../../assets/images/345cff787d4e-image-module-1.png"
+            },
+            {
+              "type": "video",
+              "videoBg": "../../assets/images/4ea96ecddfd3-video-bg.png",
+              "videoCover": "../../assets/images/ef6aa004c215-video-cover.png"
+            },
+            {
+              "type": "image",
+              "imageUrl": "../../assets/images/766653d583e6-image-module-3.png"
+            }
+          ]
+        }
+      },
+      "required": []
+    }
+  },
+  "required": []
+}

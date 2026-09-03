@@ -1,0 +1,33 @@
+{
+  "currentHash": "56a38730a969f4bf",
+  "generatedAt": "2026-08-03T03:35:21.117Z",
+  "elapsed": 1405,
+  "history": [
+    "56a38730a969f4bf",
+    "c4aa7bac54a97a1b"
+  ],
+  "renderBoxes": {
+    "56a38730a969f4bf": {
+      "width": 375,
+      "height": 812,
+      "viewportWidth": 375,
+      "viewportHeight": 812,
+      "bodyWidth": 375,
+      "bodyHeight": 812,
+      "documentWidth": 375,
+      "documentHeight": 812,
+      "fullPage": true
+    },
+    "c4aa7bac54a97a1b": {
+      "width": 375,
+      "height": 812,
+      "viewportWidth": 375,
+      "viewportHeight": 812,
+      "bodyWidth": 375,
+      "bodyHeight": 812,
+      "documentWidth": 375,
+      "documentHeight": 812,
+      "fullPage": true
+    }
+  }
+}

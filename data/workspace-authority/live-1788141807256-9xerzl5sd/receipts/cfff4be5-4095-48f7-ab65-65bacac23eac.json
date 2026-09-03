@@ -1,0 +1,25 @@
+{
+  "committed": true,
+  "mutationId": "cfff4be5-4095-48f7-ab65-65bacac23eac",
+  "projectId": "proj_1788141806566_0aps89",
+  "workspaceId": "live-1788141807256-9xerzl5sd",
+  "baseRevision": 0,
+  "revision": 206,
+  "rootHash": "f9e6c6da0f0a14eb1a501b39999f0eb10e3ea0642812b18ddd0a9516e76dac69",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "design-spec/spec-ds_1788166913695_ecd7d6fb.json",
+      "action": "modified",
+      "beforeHash": "79b2c4ae186adb2b90d9f04bc6146b0a3bc0d265941ae7f91dd595ce276a97f1",
+      "afterHash": "d09f5267e0941651af3f5a0e0cf05af78fd0586ff1aca8ac375cf8bfb76e0709"
+    },
+    {
+      "path": "design-spec/manifest.json",
+      "action": "modified",
+      "beforeHash": "0bd146c2d05b426bb26aadcbe8b0e6b23109a3008f0c96f4d4bbd14483956628",
+      "afterHash": "bb6ddff91d70cbecf4e5d4e7c489220b95349f55746296e065f8b404a9a8e6da"
+    }
+  ],
+  "committedAt": 1788271408374
+}

@@ -1,0 +1,12 @@
+{
+  "planId": "plan_1785634913040_n303ry",
+  "operation": "template_delete",
+  "resourceId": "proj_1783185620923_o5e6rr",
+  "impact": [
+    "删除模板项目 世界杯活动",
+    "删除项目工作区、发布产物和模板知识索引",
+    "不会删除已从该模板创建的其他项目"
+  ],
+  "reversible": true,
+  "confirmToken": "confirm_1785634913040_s8mbwo"
+}

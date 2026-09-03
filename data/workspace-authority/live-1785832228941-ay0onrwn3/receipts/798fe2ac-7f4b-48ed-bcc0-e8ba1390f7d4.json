@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "798fe2ac-7f4b-48ed-bcc0-e8ba1390f7d4",
+  "projectId": "proj_1785742777589_ncs6r6",
+  "workspaceId": "live-1785832228941-ay0onrwn3",
+  "baseRevision": 0,
+  "revision": 36,
+  "rootHash": "76db318699c607457e62a80d0e474ad5d9daa582ba24b54a0600013189be5f04",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/prototype-config_b3k9/prototype.css",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e258459c293b2f153c3f2ac69289102c0097c2de9bbe9d6b7e4a300d87595946"
+    }
+  ],
+  "committedAt": 1785921378393
+}

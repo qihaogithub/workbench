@@ -1,0 +1,26 @@
+{
+  "id": "commit_1786010839834_qfgya9",
+  "projectId": "proj_1785984571939_9uj8av",
+  "parentCommitId": "commit_1786009809160_89zwhs",
+  "visibility": "protected",
+  "intent": "publish",
+  "title": "发布项目 v4",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "pad_s5xn",
+      "versionId": "prv_1786009809156_mbdovk"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_y0ms",
+      "versionId": "prv_1785998324056_j2ozmy"
+    }
+  ],
+  "changedResources": [],
+  "createdAt": 1786010839834,
+  "createdBy": "Author Site",
+  "audit": {
+    "actorType": "user"
+  }
+}

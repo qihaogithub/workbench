@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "98eeee18-681f-48fd-95bb-33b574baf4a7",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "baseRevision": 0,
+  "revision": 22,
+  "rootHash": "5d06c8a4213fe42e7a9787e674a148cb7d6f7433ccd02caf507c8f9e25bb95ed",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/spine_dqxs/index.tsx",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/spine_dqxs/config.schema.json",
+      "action": "modified",
+      "beforeHash": "8243f0af367f188a376f2c17b5eabe872a2f7a979813e0d4e2be6d594c2aa259",
+      "afterHash": "8243f0af367f188a376f2c17b5eabe872a2f7a979813e0d4e2be6d594c2aa259"
+    },
+    {
+      "path": "demos/spine_dqxs/prototype.html",
+      "action": "modified",
+      "beforeHash": "f2b2262c36c490e792cd8a95a61cb78716f7aa6cbf9fa4f851389f02327ed742",
+      "afterHash": "f2b2262c36c490e792cd8a95a61cb78716f7aa6cbf9fa4f851389f02327ed742"
+    },
+    {
+      "path": "demos/spine_dqxs/prototype.css",
+      "action": "modified",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/spine_dqxs/prototype.meta.json",
+      "action": "modified",
+      "beforeHash": "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1",
+      "afterHash": "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1"
+    }
+  ],
+  "committedAt": 1785314275916
+}

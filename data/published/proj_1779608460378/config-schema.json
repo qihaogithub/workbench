@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "广场页面 - 项目级共享配置",
+  "type": "object",
+  "properties": {
+    "bigBannerForeground": {
+      "type": "string",
+      "format": "image",
+      "title": "大Banner前景图",
+      "description": "手机和平板共用的大Banner前景图片，推荐尺寸 1248×384",
+      "default": "/data/proj_1779608460378/assets/images/a5b9ed28a447cc7ed5a5216a.png",
+      "ui:options": {
+        "accept": "image/*",
+        "maxSize": 5242880,
+        "minWidth": 1248,
+        "maxWidth": 1248,
+        "minHeight": 384,
+        "maxHeight": 384
+      }
+    },
+    "bigBannerBackground": {
+      "type": "string",
+      "format": "image",
+      "title": "大Banner背景图",
+      "description": "手机和平板共用的大Banner背景图片，推荐尺寸 1248×344",
+      "default": "/data/proj_1779608460378/assets/images/54ae7aef6bd771a728037113.png",
+      "ui:options": {
+        "accept": "image/*",
+        "maxSize": 5242880,
+        "minWidth": 1248,
+        "maxWidth": 1248,
+        "minHeight": 344,
+        "maxHeight": 344
+      }
+    },
+    "miniBanners": {
+      "type": "array",
+      "title": "小Banner图片列表",
+      "description": "小Banner滚动区域的图片列表，每张推荐尺寸 480×270",
+      "ui:widget": "imageList",
+      "ui:options": {
+        "maxItems": 10,
+        "minWidth": 480,
+        "maxWidth": 480,
+        "minHeight": 270,
+        "maxHeight": 270
+      },
+      "items": {
+        "type": "string",
+        "format": "image"
+      },
+      "default": [
+        "/data/proj_1779608460378/assets/images/febf858c881f562d9f93760d.png",
+        "/data/proj_1779608460378/assets/images/86d76ee04b2d6ec2e87907d0.png",
+        "/data/proj_1779608460378/assets/images/473f0b45c9266c867cf9a942.png",
+        "/data/proj_1779608460378/assets/images/61e147c8b72a4b2a0f96a1fa.png",
+        "/data/proj_1779608460378/assets/images/65cc0cd1305c527ebac81d08.png"
+      ]
+    }
+  }
+}

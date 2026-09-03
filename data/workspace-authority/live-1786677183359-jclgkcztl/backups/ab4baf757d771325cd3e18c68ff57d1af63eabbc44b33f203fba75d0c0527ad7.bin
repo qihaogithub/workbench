@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "projectId": "proj_1786367903885_iu08e4",
+  "updatedAt": 1787741294975,
+  "state": {
+    "viewport": {
+      "x": 305.12725131355444,
+      "y": 294.91747813354675,
+      "zoom": 0.17349260436845013
+    },
+    "pages": {
+      "kids-edu_b3xw": {
+        "x": -1144,
+        "y": 0,
+        "width": 375,
+        "height": 2471,
+        "zIndex": 4,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "sunny-reading_k4m8": {
+        "x": -674.8329409282776,
+        "y": 0,
+        "width": 375,
+        "height": 1558,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "quiet-studio_q7m4": {
+        "x": 415,
+        "y": 0,
+        "width": 375,
+        "height": 812,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "8阶阶段报-0717_d2cd65": {
+        "x": -237.67980927123244,
+        "y": 30.591289578711006,
+        "width": 1440,
+        "height": 900,
+        "zIndex": 2,
+        "sizeMode": "preview",
+        "previewSizeKey": "1440x900"
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

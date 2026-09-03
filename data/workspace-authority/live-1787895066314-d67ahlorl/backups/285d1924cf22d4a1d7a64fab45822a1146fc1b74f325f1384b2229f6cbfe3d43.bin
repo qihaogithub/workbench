@@ -1,0 +1,13 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "video-demo_ab12",
+      "name": "视频展示页面",
+      "parentId": null,
+      "order": 0,
+      "runtimeType": "high-fidelity-react",
+      "routeKey": "page"
+    }
+  ]
+}

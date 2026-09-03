@@ -1,0 +1,22 @@
+{
+  "id": "ds_1786627016541_e4dc31e9",
+  "title": "手机设计规范",
+  "createdAt": "2026-08-13T13:16:56.541Z",
+  "updatedAt": "2026-08-13T13:16:56.541Z",
+  "entries": [
+    {
+      "id": "e_1786627016547_eedda0bc",
+      "title": "主视觉图片",
+      "markdown": "",
+      "refs": [
+        {
+          "scope": "page",
+          "pageId": "page_zdwh",
+          "fieldKey": "heroImage"
+        }
+      ],
+      "autoManagedFieldKey": "heroImage"
+    }
+  ],
+  "autoManagedPageId": "page_zdwh"
+}

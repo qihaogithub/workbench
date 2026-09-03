@@ -1,0 +1,43 @@
+{
+  "id": "prv_1786012894483_759qgs",
+  "projectId": "proj_1785984571939_9uj8av",
+  "kind": "page",
+  "resourceId": "pad_s5xn",
+  "workspaceId": "live-1785984572222-vwsdjjjqb",
+  "workspaceRevision": 187,
+  "workspaceRootHash": "f9c19e1e2c2951f185f38b3af90d505516983155d27c0b9696c8a4cc96e6bafa",
+  "previousVersionId": "prv_1786009809156_mbdovk",
+  "contentHash": "c6d5b610d6ecf9fc6f9d808a5ace2b96fd1347b4740600d21cc2a7c90e19556c",
+  "blobRefs": [
+    "8bd27aadcee30ff9dff8ac8fcecbaca59973d0d58e64203971a5a5c60f39e56c",
+    "fed086214659536ab84ccd6d8fcb5ce5f70e5a3070bf22265663629549b6e2d3",
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "49027771f36adea79ed861c4992295989c71ccef20968276954254f9b0409d73"
+  ],
+  "metadata": {
+    "page": {
+      "id": "pad_s5xn",
+      "name": "pad",
+      "routeKey": "pad-2",
+      "order": 2,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    "files": {
+      "schema": "8bd27aadcee30ff9dff8ac8fcecbaca59973d0d58e64203971a5a5c60f39e56c",
+      "prototypeHtml": "fed086214659536ab84ccd6d8fcb5ce5f70e5a3070bf22265663629549b6e2d3",
+      "prototypeCss": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "prototypeMeta": "49027771f36adea79ed861c4992295989c71ccef20968276954254f9b0409d73"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1786012894487,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录pad"
+}

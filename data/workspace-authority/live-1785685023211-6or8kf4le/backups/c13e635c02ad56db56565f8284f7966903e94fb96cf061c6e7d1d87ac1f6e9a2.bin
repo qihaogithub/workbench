@@ -1,0 +1,71 @@
+export default {
+  $preview: { width: 375, height: 812 },
+
+  "模块列表": {
+    modules: {
+      type: "array",
+      title: "模块列表",
+      "$demo": { sortable: true },
+      items: {
+        oneOf: [
+          {
+            title: "文本模块",
+            properties: {
+              type: { const: "text" },
+              content: { type: "text", title: "文本内容", default: "" },
+            },
+            required: ["type"],
+          },
+          {
+            title: "图片模块",
+            properties: {
+              type: { const: "image" },
+              pic: { type: "image", title: "图片", default: "" },
+              caption: { type: "string", title: "说明", default: "" },
+            },
+            required: ["type"],
+          },
+          {
+            title: "色块模块",
+            "$demo": { maxItems: 1 },
+            properties: {
+              type: { const: "colorBlock" },
+              label: { type: "string", title: "标签", default: "" },
+              value: { type: "color", title: "颜色", default: "#6366f1" },
+            },
+            required: ["type"],
+          },
+        ],
+      },
+      default: [
+        {
+          type: "text",
+          content: "这是文本模块，展示一段活动说明内容，可直接在配置面板中编辑。",
+        },
+        {
+          type: "colorBlock",
+          label: "品牌主色",
+          value: "#6366f1",
+        },
+        {
+          type: "image",
+          pic: "/api/images/img_4wrwVLkwcsYUeQ",
+          caption: "活动主视觉",
+        },
+      ],
+    },
+  },
+
+  "横幅定位": {
+    banner: {
+      title: "悬浮横幅",
+      text: { type: "string", title: "文案", default: "限时抢购 5 折起" },
+      position: {
+        type: "position",
+        key: "floatBanner",
+        title: "位置",
+        default: { x: 24, y: 520 },
+      },
+    },
+  },
+};

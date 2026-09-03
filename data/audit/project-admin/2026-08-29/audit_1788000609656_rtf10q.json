@@ -1,0 +1,23 @@
+{
+  "auditId": "audit_1788000609656_rtf10q",
+  "at": 1788000609656,
+  "actor": {
+    "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+    "name": "qihao",
+    "role": "admin",
+    "source": "author-site"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1788000609655_976bu8",
+  "inputSummary": {
+    "name": "E2E:20260829T105005756Z-dey8hx:配置图片白板宿主回归",
+    "category": "__e2e__"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1788000609655_976bu8"
+    ]
+  }
+}

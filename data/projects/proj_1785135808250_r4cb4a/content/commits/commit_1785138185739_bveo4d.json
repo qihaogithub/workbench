@@ -1,0 +1,35 @@
+{
+  "id": "commit_1785138185739_bveo4d",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "parentCommitId": "commit_1785136734039_bfzazc",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录排行榜",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "page_da9l",
+      "versionId": "prv_1785138185736_z29n0k"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_gfbs",
+      "versionId": "prv_1785136734038_5bt9sp"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "page_da9l",
+      "toVersionId": "prv_1785138185736_z29n0k"
+    }
+  ],
+  "createdAt": 1785138185739,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785135808672-fhbugbqns",
+    "workspaceRevision": 26,
+    "workspaceRootHash": "6415e9982c496ff8859047d801a9aac57a4d19f5d6a3740baaef0bc74cdfa86d"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "661c1fcf-00fb-49dd-85fd-187897d7528e",
+  "projectId": "proj_1786593637900_97xynq",
+  "workspaceId": "live-1786593637953-zujpqkj46",
+  "baseRevision": 0,
+  "revision": 5,
+  "rootHash": "cc3661fc6d7c986d3c83b58550e7554528d3d00fdf9e789f911d553ee566dff0",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/page_gfzf/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_gfzf/prototype.css",
+      "action": "deleted",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": null
+    },
+    {
+      "path": "demos/page_gfzf/prototype.html",
+      "action": "deleted",
+      "beforeHash": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "b687c69f12335cebcaf863e109afa8fa1521ad7d986bb2fedc6736f16eceff80",
+      "afterHash": "eb14658d6906793ad4dd4c50ad9162dcb4166f52aac707b7b702fa4952423165"
+    }
+  ],
+  "committedAt": 1786593645420
+}

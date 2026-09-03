@@ -1,0 +1,50 @@
+{
+  "id": "commit_1785205873219_2gz40y",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "parentCommitId": "commit_1785205299315_4shguz",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "加入闯关首页",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "page_da9l",
+      "versionId": "prv_1785138185736_z29n0k"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_gfbs",
+      "versionId": "prv_1785136734038_5bt9sp"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_pqyt",
+      "versionId": "prv_1785205299313_c3158x"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_wcfh",
+      "versionId": "prv_1785205873216_vyujzo"
+    },
+    {
+      "kind": "page",
+      "resourceId": "page_yw72",
+      "versionId": "prv_1785202917458_dt0dg5"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "page_wcfh",
+      "toVersionId": "prv_1785205873216_vyujzo"
+    }
+  ],
+  "createdAt": 1785205873219,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785205322879-latagwnoh",
+    "workspaceRevision": 12,
+    "workspaceRootHash": "0ee5d7c8c4215430cf5e7903b8d8ccf3c6cce0bd3f744236e5585b112370b49a"
+  }
+}

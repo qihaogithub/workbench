@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "projectId": "proj_1787814377754_4243v7",
+  "updatedAt": 1787883995205,
+  "state": {
+    "viewport": {
+      "x": 351.36020095236233,
+      "y": 310.04526262553037,
+      "zoom": 0.1923686111002207
+    },
+    "pages": {
+      "clipboard-import_c6b554": {
+        "x": -211.95543055555555,
+        "y": -12.594361111111112,
+        "width": 375,
+        "height": 812,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "pageGroups": {},
+    "sections": {
+      "section_4836e494-f4da-4739-8ed2-9d246cc9c56d": {
+        "id": "section_4836e494-f4da-4739-8ed2-9d246cc9c56d",
+        "kind": "section",
+        "title": "Section",
+        "layout": {
+          "x": -273.1347335832598,
+          "y": -88.78354205646518,
+          "width": 585.485456111111,
+          "height": 951.0722428472222,
+          "zIndex": 1
+        },
+        "children": [
+          {
+            "kind": "page",
+            "id": "clipboard-import_c6b554"
+          }
+        ],
+        "createdAt": 1787883943722,
+        "updatedAt": 1787883943722
+      }
+    },
+    "hiddenPageIds": [],
+    "nodes": {
+      "text-2f1fc97f-59f4-41ab-b46f-785d00513c91": {
+        "id": "text-2f1fc97f-59f4-41ab-b46f-785d00513c91",
+        "title": "苏打粉",
+        "layout": {
+          "x": -421.6657923424782,
+          "y": 305.49729929747554,
+          "width": 56,
+          "height": 25
+        },
+        "createdAt": 1787882032170,
+        "updatedAt": 1787883884938,
+        "kind": "text",
+        "text": "苏打粉",
+        "fontSize": 18,
+        "color": "#ffffff"
+      }
+    },
+    "layers": {
+      "annotations": {
+        "nodes": {
+          "text-2f1fc97f-59f4-41ab-b46f-785d00513c91": {
+            "id": "text-2f1fc97f-59f4-41ab-b46f-785d00513c91",
+            "title": "苏打粉",
+            "layout": {
+              "x": -421.6657923424782,
+              "y": 305.49729929747554,
+              "width": 56,
+              "height": 25
+            },
+            "createdAt": 1787882032170,
+            "updatedAt": 1787883884938,
+            "kind": "text",
+            "text": "苏打粉",
+            "fontSize": 18,
+            "color": "#ffffff"
+          }
+        }
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

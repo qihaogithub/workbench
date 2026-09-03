@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "92b9aa63-180b-426a-b4e3-9c7ddded2122",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "baseRevision": 0,
+  "revision": 531,
+  "rootHash": "7ab0087a66af03d634bdfe10d83e00390ac149f4c25bb668e313ad74a3857acf",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/page_swfq/config.schema.json",
+      "action": "modified",
+      "beforeHash": "fa1892b60b1893afc883d135d1fa2973a67415ecc1ba459bc6059e74de025c4f",
+      "afterHash": "fa448b30b39259cbeb3b1b680009b2bd6d34d8e849f168c16ec28448312ee64b"
+    }
+  ],
+  "committedAt": 1788161653361
+}

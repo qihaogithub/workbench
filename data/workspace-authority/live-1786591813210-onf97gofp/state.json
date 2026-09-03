@@ -1,0 +1,20 @@
+{
+  "workspaceId": "live-1786591813210-onf97gofp",
+  "projectId": "proj_1786591813153_kdoj8c",
+  "revision": 3,
+  "rootHash": "967f5231cb38be79380b72431e47e1fc69e9045027e471ec1a64574e98219ca7",
+  "resourceHashes": {
+    "demos/page_u9ma/config.schema.json": "a0d29e038c5cfc38267e6ecfd72e62fa6e0533aa4d50b6b6bb1946bffe037dcf",
+    "demos/page_u9ma/index.tsx": "03e0f95e4daca3264a7924d8bf79da5d693442950e777aa20f68a06520fdd714",
+    "demos/page_u9ma/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "demos/page_u9ma/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
+    "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
+    "memory.md": "ac647ba40af49cc702b3b182334eadaada557ab7a3651246de2ea8d94da7b210",
+    "workspace-tree.json": "38da5e4b4affecdea4726943cd4a3f784b350be8c5537a15983beaf1447b40c0"
+  },
+  "mutationPayloads": {
+    "dc7fc389-bd24-4a51-8ff1-b9efbc75c99f": "79f45e1b6afd930b63498b20a152696108c50aa2b97590b65892af857d595129",
+    "74227c1a-1ccb-4d3c-8bf3-fa0a7a1f88c1": "2dbe17da3d3b75b7e4159326af0caa971a8f6718acb376beaaa4a60f223d4bf9"
+  },
+  "updatedAt": 1786591814539
+}

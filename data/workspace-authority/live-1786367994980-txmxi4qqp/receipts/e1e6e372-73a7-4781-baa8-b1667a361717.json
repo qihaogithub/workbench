@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "e1e6e372-73a7-4781-baa8-b1667a361717",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786367994980-txmxi4qqp",
+  "baseRevision": 0,
+  "revision": 284,
+  "rootHash": "05104ca5bfbd57a15a7d2bc18ecf4dac4080c5347075d0939e5412909ffa340e",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/kids-edu-wire_r5t3/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "69046a9996254002d0beb4021b3ee521fe9ddc4c9b83c50210d44e3d7be12424",
+      "afterHash": null
+    },
+    {
+      "path": "demos/kids-edu-wire_r5t3/index.tsx",
+      "action": "deleted",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": null
+    },
+    {
+      "path": "demos/kids-edu-wire_r5t3/prototype.css",
+      "action": "deleted",
+      "beforeHash": "3f9f3bb27e7b4509241dbe3c442c76053f5e56099963d8c29c549a33b11bc38b",
+      "afterHash": null
+    },
+    {
+      "path": "demos/kids-edu-wire_r5t3/prototype.html",
+      "action": "deleted",
+      "beforeHash": "c18d9e1f3ee021601619a1c8d2447a5ad4719afb1083fbaddf140a0c3f9e2073",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "7e7df52ebd8137d997e51d99f072c015880aca0942695cc84108499cf956ce96",
+      "afterHash": "9be727e78f42f64856787a14da12a06455cacfd6d6b1de81c2c049267366a5a8"
+    }
+  ],
+  "committedAt": 1786517742046
+}

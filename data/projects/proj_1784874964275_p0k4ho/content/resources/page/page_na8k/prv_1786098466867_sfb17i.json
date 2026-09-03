@@ -1,0 +1,42 @@
+{
+  "id": "prv_1786098466867_sfb17i",
+  "projectId": "proj_1784874964275_p0k4ho",
+  "kind": "page",
+  "resourceId": "page_na8k",
+  "workspaceId": "live-1785739340495-r9pfl4l9u",
+  "workspaceRevision": 157,
+  "workspaceRootHash": "c0f108e511a4977b36d1d8ec10b993352a8efd904eecdc05afe7ecef2a147511",
+  "contentHash": "9884f20a315dfde34a1a0179ad2a6f6cd237121d69c6c269cb2110bb1ed4fc1a",
+  "blobRefs": [
+    "8243f0af367f188a376f2c17b5eabe872a2f7a979813e0d4e2be6d594c2aa259",
+    "30afe667c6e4b0cf1c439bd88ef980f081499c2bc8dcaae92a81a666778a5489",
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1"
+  ],
+  "metadata": {
+    "page": {
+      "id": "page_na8k",
+      "name": "学习页完课活动",
+      "routeKey": "page-3",
+      "order": 4,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    "files": {
+      "schema": "8243f0af367f188a376f2c17b5eabe872a2f7a979813e0d4e2be6d594c2aa259",
+      "prototypeHtml": "30afe667c6e4b0cf1c439bd88ef980f081499c2bc8dcaae92a81a666778a5489",
+      "prototypeCss": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "prototypeMeta": "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1786098466869,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "停止编辑后自动记录学习页完课活动"
+}

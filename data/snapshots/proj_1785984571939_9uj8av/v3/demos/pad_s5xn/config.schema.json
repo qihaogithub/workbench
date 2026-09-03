@@ -1,0 +1,45 @@
+{
+  "type": "object",
+  "$demo": {
+    "presentation": {
+      "version": 1,
+      "mode": "fixed-canvas",
+      "viewport": {
+        "width": 860,
+        "height": 968
+      },
+      "heightBehavior": "fixed",
+      "preset": "custom",
+      "source": "figma"
+    }
+  },
+  "properties": {
+    "padForeground": {
+      "type": "string",
+      "title": "pad前景图",
+      "default": "/api/images/img_H4OzBi946o_WTw",
+      "format": "image",
+      "ui:options": {
+        "category": "设计",
+        "widthOperator": "=",
+        "widthValue": 1400,
+        "heightOperator": "=",
+        "heightValue": 550
+      }
+    },
+    "padBackground": {
+      "type": "string",
+      "title": "pad背景图",
+      "default": "/api/images/img_rJSXpV4TKQbgEQ",
+      "format": "image",
+      "ui:options": {
+        "category": "设计",
+        "widthOperator": "=",
+        "widthValue": 2732,
+        "heightOperator": "=",
+        "heightValue": 826
+      }
+    }
+  },
+  "required": []
+}

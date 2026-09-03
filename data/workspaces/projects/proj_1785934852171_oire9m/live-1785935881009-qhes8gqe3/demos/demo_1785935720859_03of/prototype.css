@@ -1,0 +1,26 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+
+.pp-slide { position: relative; width: 100vw; height: 100vh; aspect-ratio: 16/9; overflow: hidden; background: linear-gradient(135deg, #0a0e1a 0%, #0d1220 45%, #141a2e 100%); color: #e6ecff; display: flex; flex-direction: column; padding: 40px 64px; }
+
+.bg-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(120,140,200,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(120,140,200,.06) 1px, transparent 1px); background-size: 40px 40px; mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%); pointer-events: none; }
+.bg-glow { position: absolute; border-radius: 50%; filter: blur(90px); opacity: .5; pointer-events: none; }
+.glow-a { width: 420px; height: 420px; background: #22d3ee; top: -120px; left: -60px; opacity: .22; }
+.glow-b { width: 400px; height: 400px; background: #a78bfa; bottom: -140px; right: -80px; opacity: .22; }
+
+.slide-head { position: relative; margin-bottom: 30px; }
+.kicker { font-size: 14px; letter-spacing: 3px; color: #22d3ee; margin-bottom: 8px; font-weight: 600; }
+.slide-title { font-size: 36px; font-weight: 800; line-height: 1.25; }
+
+.vs-grid { position: relative; display: grid; grid-template-columns: 1fr auto 1fr; gap: 24px; align-items: center; flex: 1; }
+.vs-col { border-radius: 18px; padding: 22px 26px; }
+.vs-col.past { background: rgba(148, 163, 184, 0.08); border: 1px solid rgba(148, 163, 184, 0.25); }
+.vs-col.future { background: rgba(34, 211, 238, 0.06); border: 1px solid rgba(34, 211, 238, 0.35); }
+.vs-badge { display: inline-block; font-size: 15px; font-weight: 700; letter-spacing: 2px; padding: 5px 16px; border-radius: 999px; margin-bottom: 16px; }
+.past-badge { color: #cbd5e1; background: rgba(148, 163, 184, 0.2); }
+.future-badge { color: #a5f3fc; background: rgba(34, 211, 238, 0.18); }
+.vs-list { display: flex; flex-direction: column; gap: 13px; }
+.vs-item { font-size: 16px; color: #dbe4ff; line-height: 1.5; }
+.vs-arrow { font-size: 40px; color: #67e8f9; font-weight: 800; }
+
+.bottom-note { position: relative; margin-top: 22px; text-align: center; font-size: 17px; font-weight: 600; color: #c7d6ff; background: rgba(148, 163, 255, 0.08); border: 1px solid rgba(148, 163, 255, 0.25); border-radius: 14px; padding: 16px 22px; }

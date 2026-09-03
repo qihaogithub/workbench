@@ -1,0 +1,22 @@
+{
+  "id": "ds_1787815724129_a45d7050",
+  "title": "clipboard-import设计规范",
+  "createdAt": "2026-08-27T07:28:44.129Z",
+  "updatedAt": "2026-08-27T07:29:57.099Z",
+  "entries": [
+    {
+      "id": "e_1787815738314_983e90ed",
+      "title": "图片",
+      "markdown": "",
+      "refs": [
+        {
+          "scope": "page",
+          "pageId": "clipboard-import_c6b554",
+          "fieldKey": "image"
+        }
+      ],
+      "autoManagedFieldKey": "image"
+    }
+  ],
+  "autoManagedPageId": "clipboard-import_c6b554"
+}

@@ -1,0 +1,20 @@
+{
+  "auditId": "audit_1786599655884_40sfh4",
+  "at": 1786599655884,
+  "actor": {
+    "id": "local-codex",
+    "name": "local-codex",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L3",
+  "tool": "project_delete_execute",
+  "projectId": "proj_1786594518341_bx5win",
+  "resourceId": "proj_1786594518341_bx5win",
+  "ok": true,
+  "diffSummary": {
+    "deleted": [
+      "project:proj_1786594518341_bx5win"
+    ]
+  }
+}

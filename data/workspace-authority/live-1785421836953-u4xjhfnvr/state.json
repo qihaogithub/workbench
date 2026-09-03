@@ -1,0 +1,18 @@
+{
+  "workspaceId": "live-1785421836953-u4xjhfnvr",
+  "projectId": "proj_1785421657423_1ptong",
+  "revision": 2,
+  "rootHash": "270841ce28c5bf31e814c45c73430915174639bc3ef372cacdd2d893d687bacf",
+  "resourceHashes": {
+    "demos/config-demo_x7k2/config.schema.json": "f39b7671b75aa6a9e22884d371bf89c73524ed06f3c8b580bd7d4ef5d7fff1a8",
+    "demos/config-demo_x7k2/index.tsx": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "demos/config-demo_x7k2/prototype.css": "8628fa03b4dad967a2cd18a4bababdff4899af9bf9233821fa1da463d95ff83f",
+    "demos/config-demo_x7k2/prototype.html": "ae6d8b0f3f60ab0e859e789004855ea8140842a616eda77ae031d0a7f14ab7a4",
+    "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
+    "workspace-tree.json": "02c0713558dcbe479bf3f7c1a00a2f88330b89d8c6a3b6b5b23056488904a4ee"
+  },
+  "mutationPayloads": {
+    "866e638f-de15-4931-92d3-298ae097fbe6": "73e01e294ae03182876a223f55174e5d25044dcd433c59a6956b1fe18916f75b"
+  },
+  "updatedAt": 1785422023663
+}

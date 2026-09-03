@@ -1,0 +1,20 @@
+{
+  "auditId": "audit_1788148410861_v44ly3",
+  "at": 1788148410861,
+  "actor": {
+    "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+    "name": "qihao",
+    "role": "admin",
+    "source": "author-site"
+  },
+  "level": "L3",
+  "tool": "project_trash",
+  "projectId": "proj_1788144496725_oi5vie",
+  "resourceId": "proj_1788144496725_oi5vie",
+  "ok": true,
+  "diffSummary": {
+    "deleted": [
+      "project:proj_1788144496725_oi5vie"
+    ]
+  }
+}

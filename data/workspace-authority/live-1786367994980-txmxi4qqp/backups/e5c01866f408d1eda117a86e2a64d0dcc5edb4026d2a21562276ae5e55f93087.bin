@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "projectId": "proj_1786367903885_iu08e4",
+  "updatedAt": 1786510036692,
+  "state": {
+    "viewport": {
+      "x": 1380.148936235084,
+      "y": -53.35806466389704,
+      "zoom": 0.6849117584845212
+    },
+    "pages": {
+      "kids-edu_b3xw": {
+        "x": -912,
+        "y": 0,
+        "width": 375,
+        "height": 2471,
+        "zIndex": 4,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "quiet-studio_q7m4": {
+        "x": -216,
+        "y": 0,
+        "width": 375,
+        "height": 1587,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x667"
+      },
+      "sunny-reading_k4m8": {
+        "x": 240,
+        "y": 0,
+        "width": 375,
+        "height": 1559,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_x992": {
+        "x": 792,
+        "y": 0,
+        "width": 418.0047848861307,
+        "height": 905.1196942067684,
+        "zIndex": 2,
+        "sizeMode": "custom",
+        "previewSizeKey": "375x812"
+      },
+      "page_tbq2": {
+        "x": 1360,
+        "y": 0,
+        "width": 375,
+        "height": 812,
+        "zIndex": 2,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "kids-edu-h5_p9m2": {
+        "x": -1321.0303520114944,
+        "y": 0,
+        "width": 375,
+        "height": 2779,
+        "zIndex": 5,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "kids-edu-wire_r5t3": {
+        "x": -1733.3094588122601,
+        "y": 0,
+        "width": 375,
+        "height": 2266,
+        "zIndex": 6,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

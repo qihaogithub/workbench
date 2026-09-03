@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>小作家·头图预览</title>
+  <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+  <div class="preview-container">
+
+    <!-- ========== 手机预览 ========== -->
+    <div class="preview-group">
+      <div class="preview-label">📱 手机端</div>
+      <div class="phone-wrapper">
+        <div class="phone-frame">
+          <!-- 头图区 270px -->
+          <div class="phone-header">
+            <div class="header-placeholder">
+              <div class="placeholder-icon">🖼️</div>
+              <div class="placeholder-text">上传头部背景</div>
+            </div>
+            <img class="header-img" data-bind-src="headerBgWriter" alt="" />
+          </div>
+          <!-- 模拟内容区 -->
+          <div class="phone-content">
+            <div class="content-card">
+              <div class="card-title"></div>
+              <div class="card-line short"></div>
+              <div class="card-line"></div>
+              <div class="card-line medium"></div>
+            </div>
+            <div class="content-card">
+              <div class="card-title"></div>
+              <div class="card-line short"></div>
+              <div class="card-line"></div>
+            </div>
+            <div class="content-card">
+              <div class="card-title"></div>
+              <div class="card-line"></div>
+              <div class="card-line medium"></div>
+              <div class="card-line short"></div>
+            </div>
+            <div class="content-card">
+              <div class="card-title"></div>
+              <div class="card-line"></div>
+              <div class="card-line short"></div>
+              <div class="card-line"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== Pad 预览 ========== -->
+    <div class="preview-group">
+      <div class="preview-label">📋 Pad 端</div>
+      <div class="pad-wrapper">
+        <div class="pad-frame">
+          <!-- 底层 UI -->
+          <div class="pad-bottom-ui">
+            <div class="pad-status-bar">
+              <span class="pad-time">9:41</span>
+              <span class="pad-icons">📶 🔋</span>
+            </div>
+            <div class="pad-nav">
+              <span class="pad-back">‹ 返回</span>
+              <span class="pad-nav-title">小作家</span>
+              <span class="pad-action">⋯</span>
+            </div>
+            <div class="pad-content-area">
+              <div class="pad-card">
+                <div class="pad-card-avatar"></div>
+                <div class="pad-card-body">
+                  <div class="pad-card-line wide"></div>
+                  <div class="pad-card-line"></div>
+                  <div class="pad-card-line short"></div>
+                </div>
+              </div>
+              <div class="pad-card">
+                <div class="pad-card-avatar"></div>
+                <div class="pad-card-body">
+                  <div class="pad-card-line wide"></div>
+                  <div class="pad-card-line"></div>
+                </div>
+              </div>
+              <div class="pad-card">
+                <div class="pad-card-avatar"></div>
+                <div class="pad-card-body">
+                  <div class="pad-card-line"></div>
+                  <div class="pad-card-line medium"></div>
+                  <div class="pad-card-line short"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- 头图层 -->
+          <div class="pad-header-bg">
+            <div class="header-placeholder pad-placeholder">
+              <div class="placeholder-icon">🖼️</div>
+              <div class="placeholder-text">上传头部背景</div>
+            </div>
+            <img class="header-img" data-bind-src="padHeaderBgWriter" alt="" />
+          </div>
+          <!-- 上层 UI 覆盖 -->
+          <div class="pad-top-ui">
+            <div class="pad-overlay-status">
+              <span>9:41</span>
+              <span>📶 🔋</span>
+            </div>
+            <div class="pad-overlay-nav">
+              <span class="pad-overlay-back">‹</span>
+              <span class="pad-overlay-title">小作家</span>
+            </div>
+            <div class="pad-overlay-actions">
+              <div class="pad-action-btn"></div>
+              <div class="pad-action-btn"></div>
+              <div class="pad-action-btn"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

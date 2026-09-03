@@ -422,7 +422,7 @@ scripts/deploy-fast.sh --dry-run author viewer
 
 生产 data 与本地 data 的双向覆盖被拆成独立脚本，避免和日常代码部署混用：
 
-- `scripts/deploy-author-with-data.sh` 用本地 `data/` 覆盖正式环境 data。执行覆盖时必须传 `--overwrite-data --confirm-overwrite-production-data`，脚本会先备份正式 data，再通过 staging 覆盖远端数据并重启共享 data 的服务。
+- `scripts/deploy-author-with-data.sh` 用本地 `data/` 覆盖正式环境 data。执行覆盖时必须传 `--overwrite-data --confirm-overwrite-production-data`，脚本会先备份正式 data，再通过 staging 覆盖远端数据并重启共享 data 的服务。非 root SSH 用户覆盖 bind data 时只同步内容（不保留 owner、group、permission 和 mtime），并跳过无权限的 root 重设；运行中的测试机应先配置 data ACL，未使用的 legacy named volume 可通过 `LEGACY_DATA_VOLUME=__skip__` 跳过。
 - `scripts/sync-production-data-to-local.sh` 用正式环境 data 覆盖本地 `data/`。执行覆盖时必须传 `--overwrite-local-data --confirm-overwrite-local-data`，脚本会先拉取正式 data 到本地 staging，再备份当前本地 data，最后覆盖本地目录。
 - 两个脚本的备份和 staging 默认都位于被覆盖目录之外，防止 `rsync --delete` 删除安全副本。
 

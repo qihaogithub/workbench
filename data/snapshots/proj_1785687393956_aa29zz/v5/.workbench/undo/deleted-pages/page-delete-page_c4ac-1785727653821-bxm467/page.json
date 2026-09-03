@@ -1,0 +1,12 @@
+{
+  "id": "page_c4ac",
+  "name": "完课活动",
+  "order": 4,
+  "parentId": null,
+  "runtimeType": "high-fidelity-react",
+  "reference": {
+    "sourceProjectId": "proj_1784874964275_p0k4ho",
+    "sourcePageId": "course-complete_a7k3"
+  },
+  "routeKey": "page-5"
+}

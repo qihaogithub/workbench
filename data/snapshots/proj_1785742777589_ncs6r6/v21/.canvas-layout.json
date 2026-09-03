@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "projectId": "proj_1785742777589_ncs6r6",
+  "updatedAt": 1785849913702,
+  "state": {
+    "viewport": {
+      "x": 388.9274446894771,
+      "y": -773.4389068701253,
+      "zoom": 1.0051670496931455
+    },
+    "pages": {
+      "config-demo_m7p2": {
+        "x": -77.8056616556884,
+        "y": 31.585593556264826,
+        "width": 375,
+        "height": 1765,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      }
+    },
+    "pageGroups": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}

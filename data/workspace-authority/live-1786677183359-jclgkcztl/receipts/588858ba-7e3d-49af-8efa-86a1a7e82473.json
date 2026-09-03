@@ -1,0 +1,31 @@
+{
+  "committed": true,
+  "mutationId": "588858ba-7e3d-49af-8efa-86a1a7e82473",
+  "projectId": "proj_1786367903885_iu08e4",
+  "workspaceId": "live-1786677183359-jclgkcztl",
+  "baseRevision": 0,
+  "revision": 641,
+  "rootHash": "b98c7d8fceec1e64e34aa3d53d6e57c9334c13b787e5c1a8be8f1ce7c0bcbb65",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/video-page_p3v9/config.schema.json",
+      "action": "deleted",
+      "beforeHash": "fa1892b60b1893afc883d135d1fa2973a67415ecc1ba459bc6059e74de025c4f",
+      "afterHash": null
+    },
+    {
+      "path": "demos/video-page_p3v9/index.tsx",
+      "action": "deleted",
+      "beforeHash": "afb67d4966f162763bfcd068ec67c1954056649aba74f8bb44abf041942017fd",
+      "afterHash": null
+    },
+    {
+      "path": "workspace-tree.json",
+      "action": "modified",
+      "beforeHash": "3e2c7fcdc5d77b3f7825af839d6de12b849a99a6400c865cacf6e72aff17cc0a",
+      "afterHash": "9f84fd7da79cd0bb78cd97385fdb17f90fe2a500a4ea16392b053bd41e8968e7"
+    }
+  ],
+  "committedAt": 1787891332289
+}

@@ -1,0 +1,8 @@
+{
+  "id": "page_ehh1",
+  "name": "自动保存待删除页",
+  "routeKey": "page-3",
+  "order": 3,
+  "parentId": null,
+  "runtimeType": "prototype-html-css"
+}

@@ -1,0 +1,20 @@
+{
+  "auditId": "audit_1786592929746_cexaz1",
+  "at": 1786592929747,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L3",
+  "tool": "project_delete_execute",
+  "projectId": "proj_1786592778148_j42wbh",
+  "resourceId": "proj_1786592778148_j42wbh",
+  "ok": true,
+  "diffSummary": {
+    "deleted": [
+      "project:proj_1786592778148_j42wbh"
+    ]
+  }
+}

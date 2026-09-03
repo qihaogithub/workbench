@@ -1,0 +1,24 @@
+{
+  "auditId": "audit_1782718595291_tcnj06",
+  "at": 1782718595291,
+  "actor": {
+    "id": "qh2",
+    "name": "qh2",
+    "role": "admin",
+    "source": "project-admin-core"
+  },
+  "level": "L1",
+  "tool": "project_create",
+  "projectId": "proj_1782718595285_h4lda7",
+  "inputSummary": {
+    "name": "我的页面",
+    "category": "资源预览",
+    "templateId": "tmpl_1782034379371_2h90ao"
+  },
+  "ok": true,
+  "diffSummary": {
+    "created": [
+      "project:proj_1782718595285_h4lda7"
+    ]
+  }
+}

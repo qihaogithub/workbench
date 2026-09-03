@@ -1,0 +1,584 @@
+interface DemoProps {}
+
+// 各科目头图默认背景（750×540，与项目配置默认一致，配置面板 activeSubject + headerBg{科目} 可覆盖）
+const HEADER_DEFAULTS: Record<string, string> = {
+  reading: '/api/images/img_58Nvlmtce0YIpQ',
+  thinking: '/api/images/img_1CNWpq51stui3Q',
+  aesthetic: '/api/images/img_7EYcNE_vqIGKcQ',
+  english: '/api/images/img_IoWnJYEMC0NyDg',
+  writer: '/api/images/img_9svWLq4_hZ0KsQ',
+};
+
+// 各科目完课进度背景（与项目配置默认一致，配置面板 progressBg{科目} 可覆盖）
+const PROGRESS_DEFAULTS: Record<string, string> = {
+  reading: '/api/images/img_5dPgaXqQz3QwQw',
+  thinking: '/api/images/img_U36XTEX5p93-EA',
+  aesthetic: '/api/images/img_LxDILgDuc6rE7Q',
+  english: '/api/images/img_XMB2iQfiivmpFA',
+  writer: '/api/images/img_1maztsLNuShKfQ',
+};
+
+// 各科目主题色板（与设计色卡一一对应，随 activeSubject 切换）
+// light=浅底/描边内衬, border=焦点描边, mid=状态点, main=主色文本, dark=深色文本
+const SUBJECT_PALETTES: Record<string, { light: string; border: string; mid: string; main: string; dark: string }> = {
+  reading: { light: '#FFEBDE', border: '#FFA66B', mid: '#FF9045', main: '#E35B00', dark: '#6B2D03' },
+  thinking: { light: '#DBF3FF', border: '#87D7FF', mid: '#33BBFF', main: '#0090D9', dark: '#0C567A' },
+  english: { light: '#FFDBE4', border: '#FF9EB5', mid: '#FF7A99', main: '#CC2D52', dark: '#780A23' },
+  writer: { light: '#D2F7C6', border: '#A0D98D', mid: '#5DC43B', main: '#4AA12D', dark: '#155200' },
+  aesthetic: { light: '#F3EBFC', border: '#C8A0FA', mid: '#AE84E3', main: '#8D4BDE', dark: '#4E2680' },
+};
+
+function cap(key: string) {
+  return key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+export default function CourseCompleteActivity(props: DemoProps) {
+  const p = props as Record<string, unknown>;
+  const subject = (p.activeSubject as string) || 'reading';
+  const bg =
+    (p[`headerBg${cap(subject)}`] as string) || HEADER_DEFAULTS[subject] || '';
+  const progressBg =
+    (p[`progressBg${cap(subject)}`] as string) || PROGRESS_DEFAULTS[subject] || '';
+  const pal = SUBJECT_PALETTES[subject] || SUBJECT_PALETTES.thinking;
+
+  return (
+    <div
+      style={{
+        width: 375,
+        height: 812,
+        position: 'relative',
+        background: 'white',
+        overflow: 'hidden',
+      }}
+    >
+      {/* 第 1 层：头部背景（750×540，宽度撑满，高度按原比例 270px，顶部对齐，由配置 activeSubject + headerBg{科目} 驱动） */}
+      {bg ? (
+        <img
+          src={bg}
+          alt={`${subject}头部背景`}
+          style={{ left: 0, top: 0, position: 'absolute', width: 375, height: 270, objectFit: 'cover' }}
+        />
+      ) : null}
+
+      {/* 状态栏 */}
+      <div style={{ width: 375, height: 44, left: 0, top: 0, position: 'absolute' }}>
+        <div style={{ width: 375, height: 44, left: 0, top: 0, position: 'absolute' }} />
+        <img
+          src="/api/images/img_JZ8v8Mk1UqiAyw"
+          alt="状态栏信号与电量"
+          style={{ left: 293.67, top: 17.33, position: 'absolute', width: 67, height: 11, objectFit: 'contain' }}
+        />
+        <img
+          src="/api/images/img_BaMdiXq1aEcuzg"
+          alt="时间"
+          style={{ left: 20.6, top: 16.81, position: 'absolute', width: 24, height: 10, objectFit: 'contain' }}
+        />
+      </div>
+
+      {/* 连续学 */}
+      <img
+        src="/api/images/img_CjfDGmUT0y3vKQ"
+        alt="连续学"
+        style={{ left: 14, top: 103, position: 'absolute', width: 163, height: 88, objectFit: 'cover' }}
+      />
+      {/* 角色 */}
+      <img
+        src="/api/images/img_mZI86hCZSbzPVA"
+        alt="角色"
+        style={{ left: 200, top: 80, position: 'absolute', width: 185, height: 222, objectFit: 'cover' }}
+      />
+      {/* 学科tab */}
+      <img
+        src="/api/images/img_f-yV_D0OyCW3GA"
+        alt="学科tab"
+        style={{ left: 13, top: 44, position: 'absolute', width: 349, height: 44, objectFit: 'cover' }}
+      />
+
+      {/* 课表 */}
+      <div style={{ width: 375, height: 539, left: 0, top: 273, position: 'absolute', overflow: 'hidden' }}>
+        <div
+          style={{
+            width: 335,
+            left: 20,
+            top: -129,
+            position: 'absolute',
+            flexDirection: 'column',
+            justifyContent: 'flex-start',
+            alignItems: 'center',
+            display: 'inline-flex',
+          }}
+        >
+          {/* 刻度标题占位（透明） */}
+          <div
+            style={{
+              alignSelf: 'stretch',
+              height: 20,
+              flexShrink: 0,
+              paddingLeft: 28,
+              paddingRight: 28,
+              paddingTop: 8,
+              paddingBottom: 8,
+              position: 'relative',
+              opacity: 0,
+              background: 'linear-gradient(180deg, white 0%, rgba(255,255,255,0.80) 50%, rgba(255,255,255,0) 100%)',
+            }}
+          />
+          {/* 主题月标题 */}
+          <div
+            style={{
+              alignSelf: 'stretch',
+              height: 46,
+              flexShrink: 0,
+              paddingTop: 8,
+              paddingBottom: 8,
+              position: 'relative',
+              background: 'linear-gradient(180deg, white 0%, rgba(255,255,255,0.80) 50%, rgba(255,255,255,0) 100%)',
+              overflow: 'hidden',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              display: 'inline-flex',
+            }}
+          >
+            <div
+              style={{
+                width: 200,
+                flexShrink: 0,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                color: '#666666',
+                fontSize: 16,
+                fontFamily: 'PingFang SC',
+                fontWeight: 500,
+                lineHeight: '24px',
+              }}
+            >
+              妙趣横生的成语故事
+            </div>
+            <div style={{ flexShrink: 0, position: 'relative', justifyContent: 'flex-start', alignItems: 'center', gap: 4.57, display: 'flex' }}>
+              <div
+                style={{
+                  flexShrink: 0,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  color: '#666666',
+                  fontSize: 14,
+                  fontFamily: 'PingFang SC',
+                  fontWeight: 400,
+                  lineHeight: '21px',
+                }}
+              >
+                待补 999
+              </div>
+              <div
+                style={{
+                  width: 16,
+                  height: 16,
+                  flexShrink: 0,
+                  position: 'relative',
+                  transform: 'rotate(180deg)',
+                  transformOrigin: 'top left',
+                }}
+              >
+                <div style={{ width: 6.17, height: 12, left: 11, top: 14, position: 'absolute', transform: 'rotate(180deg)', transformOrigin: 'top left', background: '#666666' }} />
+                <div style={{ width: 16, height: 16, left: 0, top: 0, position: 'absolute', background: 'rgba(0,0,0,0)' }} />
+              </div>
+            </div>
+          </div>
+          {/* 单元标题（第一周） */}
+          <div
+            style={{
+              alignSelf: 'stretch',
+              flexShrink: 0,
+              paddingTop: 8,
+              paddingBottom: 4,
+              paddingRight: 35,
+              position: 'relative',
+              overflow: 'hidden',
+              justifyContent: 'flex-start',
+              alignItems: 'flex-start',
+              gap: 14,
+              display: 'inline-flex',
+              flexWrap: 'wrap',
+              rowGap: 14,
+            }}
+          >
+            <div style={{ width: 28, height: 28, flexShrink: 0, position: 'relative' }}>
+              <div style={{ width: 28, height: 28, left: 0, top: 0, position: 'absolute' }}>
+                <div
+                  style={{
+                    width: 8,
+                    height: 8,
+                    left: 10,
+                    top: 10,
+                    position: 'absolute',
+                    background: '#DBF3FF',
+                    borderRadius: 9999,
+                    outline: '4px solid white',
+                  }}
+                />
+              </div>
+            </div>
+            <div style={{ flexGrow: 1, flexBasis: 0, minWidth: 0, position: 'relative', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'inline-flex' }}>
+              <div
+                style={{
+                  alignSelf: 'stretch',
+                  flexShrink: 0,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  color: '#0090D9',
+                  fontSize: 16,
+                  fontFamily: 'PingFang SC',
+                  fontWeight: 400,
+                  lineHeight: '24px',
+                }}
+              >
+                第一周
+              </div>
+            </div>
+          </div>
+
+          {/* 一周 */}
+          <div style={{ alignSelf: 'stretch', flexShrink: 0, position: 'relative', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'flex' }}>
+            {/* 周奖励：开课结课视频 */}
+            <div style={{ width: 335, flexShrink: 0, paddingTop: 8, paddingBottom: 8, position: 'relative', justifyContent: 'flex-start', alignItems: 'center', gap: 4, display: 'inline-flex' }}>
+              <img src="/api/images/img_MgrLPCQQW0OEwA" alt="" style={{ left: 14, top: 51, position: 'absolute', width: 0, height: 33, objectFit: 'contain' }} />
+              <div style={{ width: 28, height: 28, flexShrink: 0, position: 'relative' }}>
+                <img src="/api/images/img_T4CtE-lgzc71rg" alt="状态标记" style={{ left: 4, top: 4, position: 'absolute', width: 20, height: 20, objectFit: 'contain' }} />
+              </div>
+              <div style={{ flexGrow: 1, flexBasis: 0, minWidth: 0, padding: 14, position: 'relative', overflow: 'hidden', borderRadius: 24, justifyContent: 'flex-start', alignItems: 'center', gap: 4, display: 'flex' }}>
+                <div style={{ flexShrink: 0, position: 'relative', justifyContent: 'flex-start', alignItems: 'center', gap: 8, display: 'flex' }}>
+                  {renderRewardIcon()}
+                  <div style={{ flexShrink: 0, position: 'relative', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start', display: 'inline-flex' }}>
+                    <div
+                      style={{
+                        flexShrink: 0,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        color: '#404040',
+                        fontSize: 16,
+                        fontFamily: 'PingFang SC',
+                        fontWeight: 500,
+                        lineHeight: '24px',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      开课结课视频
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 补：第2课 自以为是的驴子 */}
+            <div style={{ width: 335, flexShrink: 0, paddingTop: 8, paddingBottom: 8, position: 'relative', justifyContent: 'flex-start', alignItems: 'center', gap: 4, display: 'inline-flex' }}>
+              <img src="/api/images/img_K-QwoAjWxGE4Tw" alt="" style={{ left: 14, top: 0, position: 'absolute', width: 0, height: 49, objectFit: 'contain' }} />
+              <img src="/api/images/img_SG8Q0qpf8MDYUg" alt="" style={{ left: 14, top: 47, position: 'absolute', width: 0, height: 37, objectFit: 'contain' }} />
+              <div style={{ width: 28, height: 28, flexShrink: 0, position: 'relative' }}>
+                <div style={{ width: 28, height: 28, left: 0, top: 0, position: 'absolute' }}>
+                  <div style={{ width: 24, height: 24, left: 2, top: 2, position: 'absolute' }}>
+                    <img src="/api/images/img_hqXKeM5jeFbiUA" alt="" style={{ left: 0, top: 0, position: 'absolute', width: 24, height: 24, objectFit: 'contain' }} />
+                  </div>
+                  <div style={{ left: 7, top: 3, position: 'absolute', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'white', fontSize: 14, fontFamily: 'PingFang SC', fontWeight: 600, lineHeight: '21px' }}>补</div>
+                </div>
+              </div>
+              <div style={{ width: 300, flexShrink: 0, padding: 14, position: 'relative', borderRadius: 24, justifyContent: 'flex-start', alignItems: 'center', gap: 4, display: 'flex' }}>
+                <div style={{ flexGrow: 1, flexBasis: 0, minWidth: 0, position: 'relative', justifyContent: 'flex-start', alignItems: 'center', gap: 8, display: 'flex' }}>
+                  <div style={{ width: 40, height: 40, flexShrink: 0, position: 'relative' }}>
+                    <img src="/api/images/img_bseUuj_xJFtoDQ" alt="课时封面" style={{ width: 40, height: 40, left: 0, top: 0, position: 'absolute', borderRadius: 6.95 }} />
+                  </div>
+                  <div style={{ flexShrink: 0, position: 'relative', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start', display: 'inline-flex' }}>
+                    <div style={{ flexShrink: 0, position: 'relative', justifyContent: 'flex-start', alignItems: 'center', gap: 2, display: 'inline-flex' }}>
+                      <div style={{ flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#404040', fontSize: 16, fontFamily: 'PingFang SC', fontWeight: 500, lineHeight: '24px' }}>第2课</div>
+                      <div style={{ flexShrink: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', color: '#404040', fontSize: 16, fontFamily: 'PingFang SC', fontWeight: 500, lineHeight: '24px', whiteSpace: 'nowrap' }}>自以为是的驴子</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 聚焦-今：第5课 面包房的猫 */}
+            <div style={{ width: 335, flexShrink: 0, paddingTop: 14, paddingBottom: 14, position: 'relative', justifyContent: 'flex-end', alignItems: 'center', gap: 4, display: 'inline-flex' }}>
+              <div style={{ width: 28, height: 28, flexShrink: 0, position: 'relative' }}>
+                <div style={{ width: 28, height: 28, left: 0, top: 0, position: 'absolute' }}>
+                  <div style={{ width: 24, height: 24, left: 2, top: 2, position: 'absolute' }}>
+                    <img src="/api/images/img_hqXKeM5jeFbiUA" alt="" style={{ left: 0, top: 0, position: 'absolute', width: 24, height: 24, objectFit: 'contain' }} />
+                  </div>
+                  <div style={{ left: 7, top: 3, position: 'absolute', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'white', fontSize: 14, fontFamily: 'PingFang SC', fontWeight: 600, lineHeight: '21px' }}>今</div>
+                </div>
+              </div>
+              <div style={{ flexGrow: 1, flexBasis: 0, minWidth: 0, padding: 14, position: 'relative', background: 'white', borderRadius: 24, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'center', gap: 4, display: 'inline-flex' }}>
+                <div style={{ alignSelf: 'stretch', flexShrink: 0, position: 'relative', justifyContent: 'flex-start', alignItems: 'center', gap: 14, display: 'inline-flex' }}>
+                  <div style={{ width: 72, height: 72, flexShrink: 0, position: 'relative' }}>
+                    <img src="/api/images/img_GyAWTaxurC6vnw" alt="课时封面" style={{ width: 72, height: 72, left: 0, top: 0, position: 'absolute', borderRadius: 12.16 }} />
+                  </div>
+                  <div style={{ flexGrow: 1, flexBasis: 0, minWidth: 0, position: 'relative', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start', gap: 2, display: 'inline-flex' }}>
+                    <div style={{ alignSelf: 'stretch', flexShrink: 0, position: 'relative', justifyContent: 'flex-start', alignItems: 'center', gap: 2, display: 'inline-flex' }}>
+                      <div style={{ flexGrow: 1, flexBasis: 0, minWidth: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', color: '#0C567A', fontSize: 18, fontFamily: 'PingFang SC', fontWeight: 500, lineHeight: '27px' }}>第5课 面包房的猫</div>
+                    </div>
+                    <div style={{ flexShrink: 0, position: 'relative', justifyContent: 'flex-start', alignItems: 'center', gap: 1, display: 'inline-flex' }}>
+                      <div style={{ width: 12, height: 12, flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
+                        <img src="/api/images/img_KO6J0vUvUPaVBw" alt="" style={{ left: 2.65, top: 1.51, position: 'absolute', width: 7, height: 9, objectFit: 'contain' }} />
+                      </div>
+                      <div style={{ flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#0090D9', fontSize: 14, fontFamily: 'PingFang SC', fontWeight: 400, lineHeight: '21px' }}>去学习</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div style={{ width: 355, height: 100, flexShrink: 0, left: -10, top: 14, position: 'absolute' }}>
+                <div style={{ width: 355, height: 100, left: 0, top: 0, position: 'absolute', borderRadius: 24, border: '4px solid #87D7FF' }} />
+              </div>
+              <img src="/api/images/img_W97crVk4oYS3QA" alt="" style={{ left: 14, top: 0, position: 'absolute', width: 0, height: 14, objectFit: 'contain' }} />
+              <img src="/api/images/img_W97crVk4oYS3QA" alt="" style={{ left: 14, top: 114, position: 'absolute', width: 0, height: 14, objectFit: 'contain' }} />
+            </div>
+
+            {/* 锁：第3课 独一无二的我 */}
+            {renderLockedRow(
+              '/api/images/img_mqnWVxy9IplBKA',
+              '第3课',
+              '独一无二的我',
+              '/api/images/img_K-QwoAjWxGE4Tw',
+              '/api/images/img_SG8Q0qpf8MDYUg'
+            )}
+
+            {/* 锁：第4课 独一无二的我 */}
+            {renderLockedRow(
+              '/api/images/img_3QWUy-I6znTJ8g',
+              '第4课',
+              '独一无二的我',
+              '/api/images/img_K-QwoAjWxGE4Tw',
+              '/api/images/img_SG8Q0qpf8MDYUg'
+            )}
+
+            {/* 锁：第5课 独一无二的我 */}
+            {renderLockedRow(
+              '/api/images/img_ATB48aINE-pAOA',
+              '第5课',
+              '独一无二的我',
+              '/api/images/img_K-QwoAjWxGE4Tw',
+              '/api/images/img_SG8Q0qpf8MDYUg'
+            )}
+
+            {/* 周奖励（未解锁，opacity 0.70） */}
+            <div style={{ width: 335, flexShrink: 0, paddingTop: 8, paddingBottom: 8, position: 'relative', justifyContent: 'flex-start', alignItems: 'center', gap: 4, display: 'inline-flex' }}>
+              <img src="/api/images/img_MSc1eWKd_OwmTg" alt="" style={{ left: 14, top: 0, position: 'absolute', width: 0, height: 43, objectFit: 'contain' }} />
+              <div style={{ width: 28, height: 28, flexShrink: 0, position: 'relative' }}>
+                <div style={{ width: 28, height: 28, left: 0, top: 0, position: 'absolute' }}>
+                  <div style={{ width: 20, height: 20, left: 4, top: 4, position: 'absolute' }}>
+                    <div style={{ width: 20, height: 20, left: 0, top: 0, position: 'absolute', background: 'white' }} />
+                  </div>
+                </div>
+              </div>
+              <div style={{ flexGrow: 1, flexBasis: 0, minWidth: 0, padding: 14, position: 'relative', borderRadius: 24, justifyContent: 'flex-start', alignItems: 'center', gap: 4, display: 'flex' }}>
+                <div style={{ flexShrink: 0, position: 'relative', justifyContent: 'flex-start', alignItems: 'center', gap: 8, display: 'flex' }}>
+                  {renderRewardIconColored()}
+                  <div style={{ flexShrink: 0, position: 'relative', opacity: 0.7, flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start', display: 'inline-flex' }}>
+                    <div
+                      style={{
+                        flexShrink: 0,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        color: '#B2B2B2',
+                        fontSize: 16,
+                        fontFamily: 'PingFang SC',
+                        fontWeight: 500,
+                        lineHeight: '24px',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      周奖励
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 收集物 */}
+            <img src="/api/images/img_-_k_skDOwXJ5ww" alt="收集物" style={{ left: 273, top: 197, position: 'absolute', width: 70, height: 70, objectFit: 'cover' }} />
+            <img src="/api/images/img_wt7rqTj0i1VRRQ" alt="收集物" style={{ left: 273, top: 91, position: 'absolute', width: 70, height: 70, objectFit: 'cover' }} />
+          </div>
+        </div>
+
+        {/* 课程导航tab */}
+        <div style={{ width: 375, height: 60, left: 0, top: 0, position: 'absolute', background: 'white', borderTopLeftRadius: 14, borderTopRightRadius: 14 }}>
+          <div
+            style={{
+              left: 20,
+              top: 18,
+              position: 'absolute',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              color: '#004161',
+              fontSize: 16,
+              fontFamily: 'PingFang SC',
+              fontWeight: 500,
+              lineHeight: '24px',
+            }}
+          >
+            全年系统包-L3
+          </div>
+        </div>
+      </div>
+
+      {/* 完课进度 */}
+      <div style={{ width: 375, height: 74, left: 0, top: 199, position: 'absolute' }}>
+        {progressBg ? (
+          <img src={progressBg} alt="进度背景图" style={{ left: 0, top: 0, position: 'absolute', width: 375, height: 74, objectFit: 'cover' }} />
+        ) : null}
+        <div style={{ left: 25, top: 10, position: 'absolute', justifyContent: 'center', alignItems: 'center', gap: 4, display: 'inline-flex' }}>
+          <div style={{ flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#0C567A', fontSize: 14, fontFamily: 'PingFang SC', fontWeight: 400, lineHeight: '21px' }}>限时完成50课 赢超萌装扮</div>
+          <div style={{ flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span style={{ color: '#0090D9', fontSize: 14, fontFamily: 'PingFang SC', fontWeight: 500, lineHeight: '21px', whiteSpace: 'nowrap' }}>10</span>
+            <span style={{ color: '#0C567A', fontSize: 14, fontFamily: 'PingFang SC', fontWeight: 500, lineHeight: '21px', whiteSpace: 'nowrap' }}>/20</span>
+          </div>
+        </div>
+        <div style={{ width: 254, height: 31, left: 25, top: 38, position: 'absolute' }}>
+          <div style={{ width: 250, height: 6, left: 0, top: 7, position: 'absolute' }}>
+            <div style={{ width: 250, height: 6, left: 0, top: 0, position: 'absolute', background: '#DBF3FF', borderRadius: 10 }} />
+            <img src="/api/images/img_NpgRYKl0M_f3yw" alt="当前进度" style={{ left: 0, top: 0, position: 'absolute', width: 128, height: 6, objectFit: 'contain' }} />
+          </div>
+          {renderProgressNode(230, '未完成', '6', false)}
+          {renderProgressNode(85, '已完成', '3', true)}
+          {renderProgressNode(140, '未完成', '4', false)}
+          {renderProgressNode(34, '已完成', '2', true)}
+        </div>
+        <img src="/api/images/img_pwhjtnb7aRomVw" alt="目标图" style={{ left: 290, top: 10, position: 'absolute', width: 60, height: 60, objectFit: 'cover' }} />
+      </div>
+
+      {/* 课后菜单 */}
+      <img src="/api/images/img_HCkR71v-niHXzw" alt="课后菜单" style={{ left: 341, top: 638.5, position: 'absolute', width: 34, height: 40, objectFit: 'cover' }} />
+      {/* 吸底标签栏 */}
+      <img src="/api/images/img_RDwV0uzhYNVR1w" alt="吸底标签栏" style={{ left: 0, top: 722, position: 'absolute', width: 375, height: 90, objectFit: 'cover' }} />
+    </div>
+  );
+}
+
+// 周奖励图标（已解锁，金色描边版）
+function renderRewardIcon() {
+  return (
+    <div style={{ width: 40, height: 40, flexShrink: 0, position: 'relative' }}>
+      <div style={{ width: 40, height: 40, left: 0, top: 0, position: 'absolute' }}>
+        <div style={{ width: 31.22, height: 14.71, left: 4.39, top: 21.29, position: 'absolute' }}>
+          <img src="/api/images/img_09OX4PBz1s4cLw" alt="" style={{ left: 0.82, top: 0, position: 'absolute', width: 30, height: 15, objectFit: 'contain' }} />
+          <div style={{ width: 31.22, height: 14.71, left: 0, top: 0, position: 'absolute' }}>
+            <div style={{ width: 24, height: 5.6, left: 3.61, top: 9.11, position: 'absolute', background: '#FFCE2B', border: '0.80px solid #CC8F15' }} />
+            <img src="/api/images/img_RMGW28cSO4S2MA" alt="" style={{ left: 0, top: 0, position: 'absolute', width: 6, height: 15, objectFit: 'contain' }} />
+            <img src="/api/images/img_FRNYFSKx-wcYiA" alt="" style={{ left: 25.43, top: 0, position: 'absolute', width: 6, height: 15, objectFit: 'contain' }} />
+          </div>
+        </div>
+        <img src="/api/images/img_G0XTZlMG6Ao60A" alt="" style={{ left: 2.75, top: 5.48, position: 'absolute', width: 35, height: 17, objectFit: 'contain' }} />
+        <div style={{ width: 35.2, height: 18.4, left: 2.4, top: 4, position: 'absolute' }}>
+          <div style={{ width: 26.4, height: 7.2, left: 4.8, top: 11.2, position: 'absolute', background: '#FFE258', border: '0.80px solid #D29418' }} />
+          <img src="/api/images/img_q32hsMGDu87OzQ" alt="" style={{ left: 0, top: 0, position: 'absolute', width: 8, height: 18, objectFit: 'contain' }} />
+          <img src="/api/images/img_uktndx6VrgJ41w" alt="" style={{ left: 27.2, top: 0, position: 'absolute', width: 8, height: 18, objectFit: 'contain' }} />
+        </div>
+        <div style={{ width: 9.04, height: 10.68, left: 15.89, top: 13.89, position: 'absolute', background: '#FFCE2B', borderRadius: 3.29, border: '0.80px solid #D29418' }} />
+        <div style={{ width: 2.46, height: 4.11, left: 19.18, top: 17.18, position: 'absolute', background: '#FF881A', borderRadius: 3.29 }} />
+        <div style={{ width: 2.4, height: 2.4, left: 32.32, top: 6.1, position: 'absolute', opacity: 0.3, background: '#D29418', borderRadius: 9999 }} />
+        <div style={{ width: 2.4, height: 2.4, left: 5.6, top: 31.2, position: 'absolute', opacity: 0.3, background: '#CC8F15', borderRadius: 9999 }} />
+        <div style={{ width: 2.4, height: 2.4, left: 31.12, top: 31.27, position: 'absolute', opacity: 0.3, background: '#CC8F15', borderRadius: 9999 }} />
+        <div style={{ width: 2.4, height: 2.4, left: 5.6, top: 6.1, position: 'absolute', opacity: 0.3, background: '#D29418', borderRadius: 9999 }} />
+      </div>
+    </div>
+  );
+}
+
+// 周奖励图标（未解锁，彩色版）
+function renderRewardIconColored() {
+  return (
+    <div style={{ width: 40, height: 40, flexShrink: 0, position: 'relative' }}>
+      <div style={{ width: 40, height: 40, left: 0, top: 0, position: 'absolute' }}>
+        <div style={{ width: 31.22, height: 14.71, left: 4.39, top: 21.29, position: 'absolute' }}>
+          <div style={{ width: 29.57, height: 14.71, left: 0.82, top: 0, position: 'absolute', background: '#EF7F18' }} />
+          <div style={{ width: 31.22, height: 14.71, left: 0, top: 0, position: 'absolute' }}>
+            <div style={{ width: 24, height: 5.6, left: 3.61, top: 9.11, position: 'absolute', background: '#FFCE2B', border: '0.80px solid #CC8F15' }} />
+            <div style={{ width: 5.79, height: 14.71, left: 0, top: 0, position: 'absolute', background: '#FFCE2B', border: '0.80px solid #CC8F15' }} />
+            <div style={{ width: 5.79, height: 14.71, left: 25.43, top: 0, position: 'absolute', background: '#FFCE2B', border: '0.80px solid #CC8F15' }} />
+          </div>
+        </div>
+        <div style={{ width: 34.5, height: 16.63, left: 2.75, top: 5.48, position: 'absolute', background: '#FF881A', borderRadius: 4.93, border: '0.80px solid #EF7F18' }} />
+        <div style={{ width: 35.2, height: 18.4, left: 2.4, top: 4, position: 'absolute' }}>
+          <div style={{ width: 26.4, height: 7.2, left: 4.8, top: 11.2, position: 'absolute', background: '#FFE258', border: '0.80px solid #D29418' }} />
+          <div style={{ width: 8, height: 18.4, left: 0, top: 0, position: 'absolute', background: '#FFE258', border: '0.80px solid #D29418' }} />
+          <div style={{ width: 8, height: 18.4, left: 27.2, top: 0, position: 'absolute', background: '#FFE258', border: '0.80px solid #D29418' }} />
+        </div>
+        <div style={{ width: 9.04, height: 10.68, left: 15.89, top: 13.89, position: 'absolute', background: '#FFCE2B', borderRadius: 3.29, border: '0.80px solid #D29418' }} />
+        <div style={{ width: 2.46, height: 4.11, left: 19.18, top: 17.18, position: 'absolute', background: '#FF881A', borderRadius: 3.29 }} />
+        <div style={{ width: 2.4, height: 2.4, left: 32.32, top: 6.1, position: 'absolute', opacity: 0.3, background: '#D29418', borderRadius: 9999 }} />
+        <div style={{ width: 2.4, height: 2.4, left: 5.6, top: 31.2, position: 'absolute', opacity: 0.3, background: '#CC8F15', borderRadius: 9999 }} />
+        <div style={{ width: 2.4, height: 2.4, left: 31.12, top: 31.27, position: 'absolute', opacity: 0.3, background: '#CC8F15', borderRadius: 9999 }} />
+        <div style={{ width: 2.4, height: 2.4, left: 5.6, top: 6.1, position: 'absolute', opacity: 0.3, background: '#D29418', borderRadius: 9999 }} />
+      </div>
+    </div>
+  );
+}
+
+// 进度节点（已完成/未完成）
+function renderProgressNode(left: number, stateText: string, value: string, isDone: boolean) {
+  return (
+    <div style={{ left, top: -2, position: 'absolute', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'inline-flex' }}>
+      <div style={{ width: 24, height: 24, flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
+        {isDone ? (
+          <div style={{ width: 16, height: 16, left: 4, top: 4, position: 'absolute' }}>
+            <div style={{ width: 16, height: 16, left: 0, top: 0, position: 'absolute', background: '#33BBFF', borderRadius: 9999, outline: '1.5px solid white' }} />
+            <img src="/api/images/img_OnX4S1pJumYSXg" alt="盖章" style={{ left: 3, top: 4, position: 'absolute', width: 10, height: 9, objectFit: 'contain' }} />
+          </div>
+        ) : (
+          <div style={{ width: 15.92, height: 16.92, left: 4, top: 2, position: 'absolute' }}>
+            <img src="/api/images/img_e_qjOlLFXJ4DHg" alt="" style={{ left: 0, top: 0.26, position: 'absolute', width: 16, height: 17, objectFit: 'contain' }} />
+            <img src="/api/images/img_NAY_Yur-yX91JQ" alt="" style={{ left: 0.8, top: 4.78, position: 'absolute', width: 14, height: 12, objectFit: 'contain' }} />
+            <img src="/api/images/img_QiicMZTXDIFiDg" alt="" style={{ left: 6.11, top: 8.23, position: 'absolute', width: 4, height: 9, objectFit: 'contain' }} />
+            <img src="/api/images/img_iMwnQvIhuGE7lw" alt="" style={{ left: 7.43, top: 0, position: 'absolute', width: 7, height: 4, objectFit: 'contain' }} />
+            <img src="/api/images/img_I2iybgpcYQxGfg" alt="" style={{ left: 8.49, top: 3.98, position: 'absolute', width: 7, height: 4, objectFit: 'contain' }} />
+            <div style={{ width: 15.92, height: 4.25, left: 0, top: 3.98, position: 'absolute', background: '#FF9751', borderRadius: 0.47 }} />
+            <img src="/api/images/img_R-ECKWAjftQ96w" alt="" style={{ left: 6.24, top: 2.39, position: 'absolute', width: 4, height: 2, objectFit: 'contain' }} />
+            <img src="/api/images/img_HdRQu5VSfnE_Bw" alt="" style={{ left: 5.84, top: 3.98, position: 'absolute', width: 4, height: 4, objectFit: 'contain' }} />
+          </div>
+        )}
+      </div>
+      <div style={{ alignSelf: 'stretch', flexShrink: 0, opacity: 0.3, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#0C567A', fontSize: 12, fontFamily: 'MohrRounded-SemiBold', fontWeight: 400, lineHeight: '18px' }}>{value}</div>
+    </div>
+  );
+}
+
+// 锁定的课时行
+function renderLockedRow(cover: string, orderText: string, nameText: string, upImg: string, downImg: string) {
+  return (
+    <div style={{ width: 335, flexShrink: 0, paddingTop: 8, paddingBottom: 8, position: 'relative', justifyContent: 'flex-start', alignItems: 'center', gap: 4, display: 'inline-flex' }}>
+      <img src={upImg} alt="" style={{ left: 14, top: 0, position: 'absolute', width: 0, height: 49, objectFit: 'contain' }} />
+      <img src={downImg} alt="" style={{ left: 14, top: 47, position: 'absolute', width: 0, height: 37, objectFit: 'contain' }} />
+      <div style={{ width: 28, height: 28, flexShrink: 0, position: 'relative' }}>
+        <div style={{ width: 28, height: 28, left: 0, top: 0, position: 'absolute' }}>
+          <img src="/api/images/img__E0ZvuSG5y2lTw" alt="" style={{ left: 2.33, top: 2.33, position: 'absolute', width: 23, height: 23, objectFit: 'contain' }} />
+          <img src="/api/images/img_nmdBWxxZMn1uZw" alt="" style={{ left: 8.17, top: 6.81, position: 'absolute', width: 12, height: 13, objectFit: 'contain' }} />
+          <div style={{ width: 28, height: 28, left: 0, top: 0, position: 'absolute', background: 'rgba(0,0,0,0)' }} />
+        </div>
+        <div style={{ width: 25, left: 2, top: 20, position: 'absolute', background: 'white', borderRadius: 15, justifyContent: 'center', alignItems: 'center', gap: 5, display: 'inline-flex' }}>
+          <div style={{ flexShrink: 0, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#B2B2B2', fontSize: 10, fontFamily: 'PingFang SC', fontWeight: 400, lineHeight: '15px' }}>2.23</div>
+        </div>
+      </div>
+      <div style={{ width: 300, flexShrink: 0, padding: 14, position: 'relative', background: 'white', borderRadius: 24, justifyContent: 'flex-start', alignItems: 'center', gap: 4, display: 'flex' }}>
+        <div style={{ flexGrow: 1, flexBasis: 0, minWidth: 0, position: 'relative', justifyContent: 'flex-start', alignItems: 'center', gap: 8, display: 'flex' }}>
+          <div style={{ width: 40, height: 40, flexShrink: 0, position: 'relative' }}>
+            <img src={cover} alt="课时封面" style={{ width: 40, height: 40, left: 0, top: 0, position: 'absolute', borderRadius: 6.95, border: '0.58px solid rgba(0,0,0,0.10)' }} />
+          </div>
+          <div style={{ width: 140, flexShrink: 0, position: 'relative', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'inline-flex' }}>
+            <div style={{ alignSelf: 'stretch', flexShrink: 0, position: 'relative', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start', gap: 2, display: 'flex' }}>
+              <div style={{ flexShrink: 0, position: 'relative', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 2, display: 'inline-flex' }}>
+                <div style={{ flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#B2B2B2', fontSize: 16, fontFamily: 'PingFang SC', fontWeight: 500, lineHeight: '24px' }}>{orderText}</div>
+                <div style={{ flexShrink: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', color: '#B2B2B2', fontSize: 16, fontFamily: 'PingFang SC', fontWeight: 500, lineHeight: '24px', whiteSpace: 'nowrap' }}>{nameText}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

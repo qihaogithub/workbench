@@ -1,0 +1,48 @@
+{
+  "type": "object",
+  "$demo": {
+    "previewSize": {
+      "width": 860,
+      "height": 968
+    },
+    "groupOrder": ["头部banner", "配图卡片-1行1个"]
+  },
+  "properties": {
+    "adImage": {
+      "type": "string",
+      "title": "广告图",
+      "format": "image",
+      "default": "/api/images/img_iCbilU1Lf0lJCQ",
+      "ui:options": {
+        "group": "配图卡片-1行1个"
+      }
+    },
+    "padForeground": {
+      "type": "string",
+      "title": "pad前景图",
+      "default": "/api/images/img_H4OzBi946o_WTw",
+      "format": "image",
+      "ui:options": {
+        "group": "头部banner",
+        "widthOperator": "=",
+        "widthValue": 1400,
+        "heightOperator": "=",
+        "heightValue": 550
+      }
+    },
+    "padBackground": {
+      "type": "string",
+      "title": "pad背景图",
+      "default": "/api/images/img_rJSXpV4TKQbgEQ",
+      "format": "image",
+      "ui:options": {
+        "group": "头部banner",
+        "widthOperator": "=",
+        "widthValue": 2732,
+        "heightOperator": "=",
+        "heightValue": 826
+      }
+    }
+  },
+  "required": []
+}

@@ -1,0 +1,20 @@
+{
+  "$demo": {
+    "previewSize": { "width": 1024, "height": 768 }
+  },
+  "type": "object",
+  "properties": {
+    "themeColor": {
+      "type": "string",
+      "format": "color",
+      "title": "主题色",
+      "default": "#4CAF50"
+    },
+    "padUiImage": {
+      "type": "string",
+      "format": "image",
+      "title": "Pad UI 图片"
+    }
+  },
+  "required": []
+}

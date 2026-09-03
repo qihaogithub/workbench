@@ -1,0 +1,21 @@
+{
+  "folders": [],
+  "pages": [
+    {
+      "id": "page_t7cj",
+      "name": "答对",
+      "routeKey": "page-3",
+      "order": 2,
+      "parentId": null,
+      "runtimeType": "prototype-html-css"
+    },
+    {
+      "id": "clipboard-import_e05e9d",
+      "name": "N对N填空题",
+      "routeKey": "clipboard-import",
+      "order": 3,
+      "parentId": null,
+      "runtimeType": "high-fidelity-react"
+    }
+  ]
+}

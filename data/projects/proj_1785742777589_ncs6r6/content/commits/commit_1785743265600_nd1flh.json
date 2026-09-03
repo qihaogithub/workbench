@@ -1,0 +1,29 @@
+{
+  "id": "commit_1785743265600_nd1flh",
+  "projectId": "proj_1785742777589_ncs6r6",
+  "visibility": "semantic",
+  "intent": "edit",
+  "title": "停止编辑后自动记录配置项类型示例",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "config-demo_m7p2",
+      "versionId": "prv_1785743265397_8996dv"
+    }
+  ],
+  "changedResources": [
+    {
+      "kind": "page",
+      "resourceId": "config-demo_m7p2",
+      "toVersionId": "prv_1785743265397_8996dv"
+    }
+  ],
+  "createdAt": 1785743265600,
+  "createdBy": "qihao",
+  "audit": {
+    "actorType": "user",
+    "workspaceId": "live-1785742777874-8sex712t9",
+    "workspaceRevision": 7,
+    "workspaceRootHash": "f5aeeb40009a8b7a20621249dffce455b910467469123c87a0e8c11666b5243d"
+  }
+}

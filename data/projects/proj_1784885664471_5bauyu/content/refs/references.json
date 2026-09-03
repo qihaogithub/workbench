@@ -1,0 +1,17 @@
+{
+  "projectId": "proj_1784885664471_5bauyu",
+  "references": [
+    {
+      "from": {
+        "kind": "canvas",
+        "resourceId": "main"
+      },
+      "to": {
+        "kind": "page",
+        "resourceId": "mobile-header-preview_b3f1"
+      },
+      "reason": "canvas_node"
+    }
+  ],
+  "updatedAt": 1786071746756
+}

@@ -1,0 +1,28 @@
+{
+  "workspaceId": "live-1786594111533-f8sh3szle",
+  "projectId": "proj_1786594111469_293vqh",
+  "revision": 6,
+  "rootHash": "5eccf5d45e82c6d4e778d78ab7782016251d6865ca2685d818528fca3855deee",
+  "resourceHashes": {
+    "demos/1_hgd0/config.schema.json": "65cf92d66fe574e9b9f6ca014d35ead34d95572c6203fed3b5d7297e0fa1ff4c",
+    "demos/1_hgd0/index.tsx": "0d69655e166a76a200bd46f9e67caca0191040c2228562c859e4aa2223bc0208",
+    "demos/1_hgd0/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "demos/1_hgd0/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
+    "demos/2_upsp/config.schema.json": "b9e998e9736581dafd6e87bb1e8ae08e0c852be55afc0bb5277ef9589da54463",
+    "demos/2_upsp/index.tsx": "68f9b1f156f2ed1b648d9a7984e4cfb7466587aebda0021466a54a6c0592263b",
+    "demos/2_upsp/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "demos/2_upsp/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
+    "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
+    "memory.md": "ac647ba40af49cc702b3b182334eadaada557ab7a3651246de2ea8d94da7b210",
+    "project.config.schema.json": "00d96630579f775e6752844af3c3013ed43ee86981afc89c407eb4401e766b9e",
+    "workspace-tree.json": "c7d664bcb3e9c1b189d4285891c7bffbeeda3cb5345af9ad20fee4cf14026bc0"
+  },
+  "mutationPayloads": {
+    "2ed5f2e5-bb9a-4e51-b31d-c3d962fdd316": "d9613dedd9682432c12da6daf7d0a074a740987db6c13cdf65caf4dab725e289",
+    "73890662-f6ec-43e7-856a-779c1df3c033": "4ca54ce01ef6b74491b364ff8c9b90cb8a5479da2ffe3191a251c838ea8a8ffd",
+    "079a6c62-d9f7-4b6b-9fa6-6c578ba5829f": "aa63c0f881943332aaa50a4a35ed0c31f79e067025c66d31730470e8d61bba94",
+    "d1dfe648-9132-4c1c-80a3-6651ffa739ff": "6e9d60fea71f06d4fd5561f3063c3b039fb7a1044822ab323265dd9856d8f2a0",
+    "f778a9ba-7dfc-4da7-9f8b-4ed967078cc7": "610deda50ae949fdeb8c735ddf48fc03fe2527758df72f852db3214e07273ab5"
+  },
+  "updatedAt": 1786594113161
+}

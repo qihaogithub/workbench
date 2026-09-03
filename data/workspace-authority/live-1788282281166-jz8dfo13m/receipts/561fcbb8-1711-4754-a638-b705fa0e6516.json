@@ -1,0 +1,37 @@
+{
+  "committed": true,
+  "mutationId": "561fcbb8-1711-4754-a638-b705fa0e6516",
+  "projectId": "proj_1788282281151_79la8v",
+  "workspaceId": "live-1788282281166-jz8dfo13m",
+  "baseRevision": 3,
+  "revision": 4,
+  "rootHash": "cf91ed2e5d38375680edc279d23846c1893d172dfd382d772fbae1f0217765e3",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "assets/whiteboards/774149972a624cec1be6da34c48dd87feda02df2942fc3bd5051e2e98ba3d548.png",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "774149972a624cec1be6da34c48dd87feda02df2942fc3bd5051e2e98ba3d548"
+    },
+    {
+      "path": "whiteboards/wb_be8d59cd2a064ae4b4f4ba608a9adf7e.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "2866f7b3a6924e5b49b62d54c3c4f3c80fa38ec3eec09e964eaf261fc3a26c96"
+    },
+    {
+      "path": "whiteboards/bindings.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "1d972768330b2414bc5e3713b7feb4e118e430819b71b089379824f8be6143bc"
+    },
+    {
+      "path": "demos/page_0f1r/config.values.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "465273620da8d1ef24a2f4a76bb2806c4514cda6a18b51c9702078210643d108"
+    }
+  ],
+  "committedAt": 1788282289527
+}

@@ -1,0 +1,21 @@
+{
+  "id": "commit_1785727913937_3ozioo",
+  "projectId": "proj_1784874964275_p0k4ho",
+  "parentCommitId": "commit_1785723279716_jg5yp3",
+  "visibility": "protected",
+  "intent": "publish",
+  "title": "发布项目 v40",
+  "resourcePointers": [
+    {
+      "kind": "page",
+      "resourceId": "course-complete_a7k3",
+      "versionId": "prv_1785723279708_ld05nv"
+    }
+  ],
+  "changedResources": [],
+  "createdAt": 1785727913937,
+  "createdBy": "Author Site",
+  "audit": {
+    "actorType": "user"
+  }
+}

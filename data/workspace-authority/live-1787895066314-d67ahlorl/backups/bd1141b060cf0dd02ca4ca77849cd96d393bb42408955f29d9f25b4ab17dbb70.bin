@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>能量通道：解锁知识圣殿</title>
+</head>
+<body>
+<main class="scene">
+
+  <!-- 背景 -->
+  <div class="bg" aria-hidden="true">
+    <div class="particles">
+      <span class="particle" style="left:12%;top:80%;animation-duration:8s"></span>
+      <span class="particle" style="left:34%;top:90%;animation-duration:10s;animation-delay:1s"></span>
+      <span class="particle" style="left:58%;top:85%;animation-duration:9s;animation-delay:.5s"></span>
+      <span class="particle" style="left:78%;top:92%;animation-duration:11s;animation-delay:2s"></span>
+    </div>
+  </div>
+
+  <!-- 能量通道视觉 -->
+  <div class="channel-wrap" aria-hidden="true">
+    <div class="channel dark">
+      <div class="channel-inner"></div>
+      <span class="node node-1"></span>
+      <span class="node node-2"></span>
+    </div>
+    <!-- 知识水晶 -->
+    <div class="crystal"></div>
+    <!-- 圣殿 -->
+    <div class="temple"></div>
+  </div>
+
+  <!-- 文案 -->
+  <header class="hero">
+    <p class="eyebrow">知识水晶 · 能量灌注</p>
+    <h1 class="title">能量通道</h1>
+    <p class="subtitle">完课 = 核心能量灌注（10 节课）<br>发射知识水晶，打通通往 PK 圣殿的通道</p>
+  </header>
+
+  <!-- 按钮 -->
+  <footer class="actions">
+    <button class="btn btn-primary" type="button">发&nbsp;射&nbsp;水&nbsp;晶</button>
+    <p class="hint">能量灌注 · 解锁 PK 权益</p>
+    <button class="btn btn-ghost" type="button">查看能量进度</button>
+    <button class="btn btn-disabled" type="button" disabled>通道已开启 · 明日再来</button>
+  </footer>
+
+</main>
+</body>
+</html>

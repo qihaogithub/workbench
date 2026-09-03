@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "projectId": "proj_1785135808250_r4cb4a",
+  "updatedAt": 1788320341735,
+  "state": {
+    "viewport": {
+      "x": 217.30172474373998,
+      "y": 9.240160540933118,
+      "zoom": 0.09376489913753458
+    },
+    "pages": {
+      "page_swfq": {
+        "x": 30.936628715654468,
+        "y": -272.82910971591605,
+        "width": 375,
+        "height": 812,
+        "zIndex": 0,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "闯关活动页-进行中_4cb05b": {
+        "x": 1070.9919695463618,
+        "y": -281.9749131959925,
+        "width": 375,
+        "height": 3681,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x3681"
+      },
+      "page_yw72": {
+        "x": 508.34472117937844,
+        "y": -281.9749131959925,
+        "width": 375,
+        "height": 812,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_pwcf": {
+        "x": 2020.8399607921624,
+        "y": -276.81069402352,
+        "width": 375,
+        "height": 812,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "spine_dqxs": {
+        "x": 1472.9430176789513,
+        "y": -276.81069402352,
+        "width": 375,
+        "height": 812,
+        "zIndex": 4,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_dous": {
+        "x": 2568.7369039053733,
+        "y": -285.95649750359644,
+        "width": 375,
+        "height": 812,
+        "zIndex": 5,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_duak": {
+        "x": 3116.633847018584,
+        "y": -276.81069402352,
+        "width": 375,
+        "height": 812,
+        "zIndex": 6,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_xix9": {
+        "x": 3627.3956190385047,
+        "y": -276.81069402352006,
+        "width": 375,
+        "height": 812,
+        "zIndex": 7,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "闯关活动页-进行中_ec853d": {
+        "x": 978.1272576729332,
+        "y": -295.669336594383,
+        "width": 375,
+        "height": 3681,
+        "zIndex": 1,
+        "sizeMode": "preview",
+        "previewSizeKey": "375x812"
+      },
+      "page_g5ky": {
+        "x": 117.0337248582216,
+        "y": 4400.92136260158,
+        "width": 750,
+        "height": 375,
+        "zIndex": 8,
+        "sizeMode": "preview",
+        "previewSizeKey": "750x375"
+      }
+    },
+    "pageGroups": {},
+    "sections": {},
+    "hiddenPageIds": [],
+    "nodes": {},
+    "layers": {
+      "annotations": {
+        "nodes": {}
+      },
+      "documents": {
+        "nodes": {}
+      }
+    },
+    "hiddenKnowledgeDocumentIds": []
+  }
+}
