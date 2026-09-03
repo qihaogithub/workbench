@@ -4559,7 +4559,7 @@ function SketchBrushToolbarGroup({
           role="dialog"
           aria-label="画笔设置"
           data-testid="sketch-brush-settings"
-          className="fixed z-[10000] flex max-w-[calc(100vw-24px)] flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-[0_12px_32px_rgba(15,23,42,0.16)]"
+          className="pointer-events-auto fixed z-[10000] flex max-w-[calc(100vw-24px)] flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-[0_12px_32px_rgba(15,23,42,0.16)]"
           style={{ left: panelPosition.left, top: panelPosition.top, transform: "translate(-50%, -100%)" }}
           onPointerDown={(event) => event.stopPropagation()}
           onKeyDown={(event) => {
@@ -7293,8 +7293,19 @@ export const SketchEditorCanvas = React.forwardRef<SketchEditorCanvasHandle, Ske
         nodes: scene.nodes.map((node) => node.id === inlineTextNode.id ? inlineTextPreviewNode as SketchSceneNode : node),
       }
     : scene;
-  const previewScene = drawingDraft?.node
-    ? { ...inlineTextPreviewScene, nodes: [...inlineTextPreviewScene.nodes, drawingDraft.node] }
+  const previewDrawingNode = drawingDraft?.node
+    ? {
+        ...drawingDraft.node,
+        // Drawing drafts are render-only. Keep them above the current scene
+        // without changing the node that is eventually committed on pointerup.
+        zIndex: inlineTextPreviewScene.nodes.reduce(
+          (max, node) => Math.max(max, typeof node.zIndex === "number" && Number.isFinite(node.zIndex) ? node.zIndex : 0),
+          -1,
+        ) + 1,
+      }
+    : null;
+  const previewScene = previewDrawingNode
+    ? { ...inlineTextPreviewScene, nodes: [...inlineTextPreviewScene.nodes, previewDrawingNode] }
     : inlineTextPreviewScene;
   const connectorCandidatePoints = getConnectorCandidatePoints(scene, dragStart, configData);
   const snapGuides = getSketchSnapGuides(scene, dragStart, configData);

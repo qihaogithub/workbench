@@ -1473,6 +1473,50 @@ describe("sketch-react", () => {
     expect(within(brushGroup).getByRole("button", { name: "画笔" }).getAttribute("aria-pressed")).toBe("false");
   });
 
+  it("renders an in-progress pencil path above images without persisting its preview layer", async () => {
+    const imageScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        {
+          id: "cover-image",
+          type: "image",
+          x: 40,
+          y: 40,
+          width: 240,
+          height: 160,
+          src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='2' height='2' fill='%23e2e8f0'/%3E%3C/svg%3E",
+          zIndex: 12,
+        },
+      ],
+    };
+    render(<ControlledSurfaceEditor initialScene={imageScene} />);
+    const stage = getCanvasStage();
+    setCanvasStageRect(stage);
+    fireEvent.click(screen.getByRole("button", { name: "画笔" }));
+
+    dispatchPointerEvent(stage, "pointerdown", 20, 120);
+    dispatchPointerEvent(stage, "pointermove", 240, 140);
+
+    await waitFor(() => {
+      const renderedNodes = Array.from(stage.querySelectorAll("[data-sketch-node-id]"));
+      const imageIndex = renderedNodes.findIndex((node) => node.getAttribute("data-sketch-node-id") === "cover-image");
+      const pathIndex = renderedNodes.findIndex((node) => node.tagName.toLowerCase() === "path");
+      expect(imageIndex).toBeGreaterThanOrEqual(0);
+      expect(pathIndex).toBeGreaterThan(imageIndex);
+    });
+    expect(readSurfaceRenderedScene().nodes).toEqual(imageScene.nodes);
+
+    dispatchPointerEvent(stage, "pointerup", 240, 140);
+    await waitFor(() => {
+      const committed = readSurfaceRenderedScene();
+      const image = committed.nodes.find((node) => node.id === "cover-image");
+      const path = committed.nodes.find((node) => node.type === "path");
+      expect(path).toBeDefined();
+      expect(path?.zIndex).toBeGreaterThan(image?.zIndex ?? -1);
+    });
+  });
+
   it("erases only visible unlocked paths and keeps the deletion undoable", async () => {
     const eraseScene: SketchSceneDocument = {
       version: 1,

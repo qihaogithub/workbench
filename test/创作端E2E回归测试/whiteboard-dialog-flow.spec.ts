@@ -144,6 +144,25 @@ test("宿主编辑页可打开白板、导入代码并提交带 revision 的 doc
   const brushSettings = page.getByRole("dialog", { name: "画笔设置" });
   await expect(brushSettings.getByRole("button", { name: "画笔", exact: true })).toBeVisible();
   await expect(brushSettings.getByRole("button", { name: "橡皮擦", exact: true })).toBeVisible();
+  await expect(
+    brushSettings.getByRole("radio", { name: "画笔颜色 #111827" }),
+  ).toHaveAttribute("aria-checked", "true");
+  await brushSettings.getByRole("radio", { name: "画笔颜色 #475569" }).click();
+  await expect(
+    brushSettings.getByRole("radio", { name: "画笔颜色 #475569" }),
+  ).toHaveAttribute("aria-checked", "true");
+  await brushSettings.getByRole("radio", { name: "画笔粗细 粗" }).click();
+  await expect(
+    brushSettings.getByRole("radio", { name: "画笔粗细 粗" }),
+  ).toHaveAttribute("aria-checked", "true");
+  await brushSettings.getByRole("button", { name: "橡皮擦", exact: true }).click();
+  await expect(
+    brushSettings.getByRole("button", { name: "橡皮擦", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await brushSettings.getByRole("button", { name: "画笔", exact: true }).click();
+  await expect(
+    brushSettings.getByRole("button", { name: "画笔", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "关闭画笔设置" }).click();
 
   const commitRequests: Array<Record<string, unknown>> = [];
