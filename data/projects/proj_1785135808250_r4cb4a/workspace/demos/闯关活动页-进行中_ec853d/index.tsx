@@ -791,6 +791,14 @@ const DEFAULT_MODULES: Module[] = [
   { type: "participant", bgImage: "https://img.onlywnn.cn/figma/h_19dbcc85.png", count: 128 },
   { type: "video", videoBg: "", video: { url: "", poster: "" } },
   {
+    type: "collectCard",
+    bgImage: "",
+    total: 4,
+    collected: 1,
+    obtainedImage: "",
+    unobtainedImage: "",
+  },
+  {
     type: "level",
     bgImage: "https://img.onlywnn.cn/figma/h_6e2a6768.png",
     levels: [
@@ -817,19 +825,11 @@ const DEFAULT_MODULES: Module[] = [
       },
     ],
   },
-  {
-    type: "collectCard",
-    bgImage: "",
-    total: 4,
-    collected: 1,
-    obtainedImage: "",
-    unobtainedImage: "",
-  },
   { type: "image", image: "https://img.onlywnn.cn/figma/h_483ae3df.png" },
   { type: "button", image: "https://img.onlywnn.cn/figma/h_4dce23b9.png" },
   {
     type: "myWorks",
-    headerImage: "https://img.onlywnn.cn/figma/h_5d121fd1.png",
+    headerImage: "/api/images/img_S5_tiyYeuTb0Tw",
     bgColor: "#FFEAA3",
     innerBgColor: "#FFBA39",
   },

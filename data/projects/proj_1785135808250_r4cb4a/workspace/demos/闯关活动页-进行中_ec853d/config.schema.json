@@ -316,6 +316,7 @@
                 "title": "模块背景头图",
                 "description": "仅支持 png，宽 686px、高 452px（2 倍图，展示 343x226），不配置时展示占位样式",
                 "accept": "image/png",
+                "default": "/api/images/img_S5_tiyYeuTb0Tw",
                 "ui:options": {
                   "minWidth": 686,
                   "minHeight": 452,
@@ -391,6 +392,14 @@
           }
         },
         {
+          "type": "collectCard",
+          "bgImage": "",
+          "total": 4,
+          "collected": 1,
+          "obtainedImage": "",
+          "unobtainedImage": ""
+        },
+        {
           "type": "level",
           "bgImage": "https://img.onlywnn.cn/figma/h_6e2a6768.png",
           "levels": [
@@ -427,14 +436,6 @@
           ]
         },
         {
-          "type": "collectCard",
-          "bgImage": "",
-          "total": 4,
-          "collected": 1,
-          "obtainedImage": "",
-          "unobtainedImage": ""
-        },
-        {
           "type": "image",
           "image": "https://img.onlywnn.cn/figma/h_483ae3df.png"
         },
@@ -444,7 +445,7 @@
         },
         {
           "type": "myWorks",
-          "headerImage": "https://img.onlywnn.cn/figma/h_5d121fd1.png",
+          "headerImage": "/api/images/img_S5_tiyYeuTb0Tw",
           "bgColor": "#FFEAA3",
           "innerBgColor": "#FFBA39"
         },

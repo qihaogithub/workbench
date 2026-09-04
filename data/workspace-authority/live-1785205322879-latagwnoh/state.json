@@ -1,8 +1,8 @@
 {
   "workspaceId": "live-1785205322879-latagwnoh",
   "projectId": "proj_1785135808250_r4cb4a",
-  "revision": 1411,
-  "rootHash": "c2d1e6eca00581f1f7c3c4678700ff67d38ef54c6ba10f8358c6d7328d72129e",
+  "revision": 1417,
+  "rootHash": "d98c502b919c99c14d71af8bcad234bb49c1f4f818b86891c00e066507a6d23b",
   "resourceHashes": {
     ".canvas-layout.json": "a544bae5974e2412337586da870631a6a5d1a0e2627891adec75f5129a27ac39",
     "assets/animations/spine_16f442e1f415cf3a45b2b8cc6961212224c5c0c56291663f1d5edc7397d228cc/manifest.json": "98b0fdd64d7617a54c867e897cfbf9bf78ad8fffa27cd6117ba1bdfc5b87773a",
@@ -71,9 +71,9 @@
     "demos/spine_dqxs/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/spine_dqxs/prototype.html": "f2b2262c36c490e792cd8a95a61cb78716f7aa6cbf9fa4f851389f02327ed742",
     "demos/spine_dqxs/prototype.meta.json": "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1",
-    "demos/闯关活动页-进行中_ec853d/config.schema.json": "ae24a0af52a180c54de65ec44cbd113559a5d1936519f19569e8e1506f868bca",
-    "demos/闯关活动页-进行中_ec853d/config.values.json": "47581f60d82a209970c5e4853a7a4d5c93f781b6c3159268e21baccf4b3a0ab9",
-    "demos/闯关活动页-进行中_ec853d/index.tsx": "69d5d50b447ae47486c6abd0fe77fc45d3c66796bad0ef89d3644885153ef1c5",
+    "demos/闯关活动页-进行中_ec853d/config.schema.json": "30be2e2788d2250c897e50a3f6a4729f98df41f3d322d813ad3133dd8b8189a9",
+    "demos/闯关活动页-进行中_ec853d/config.values.json": "1b23d007c3cba95d92a734ffd866ea286542461b645b317f7fd1929a82232445",
+    "demos/闯关活动页-进行中_ec853d/index.tsx": "e013fabdf1e0d676970e458bb1637c22238351246f4703280647c926e0170d0f",
     "demos/闯关活动页-进行中_ec853d/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/闯关活动页-进行中_ec853d/prototype.html": "831d98f4947fa48dc6eb89476a71607c172c5a361bf35eaf913b8729a95d3575",
     "demos/闯关活动页-进行中_ec853d/prototype.meta.json": "e05ff62d13acfe6f1b5cb7b3394c7aa7842521335717e56553c5e11e2ffa9129",
@@ -1480,7 +1480,13 @@
     "8e480cce-a163-42c0-9a58-dd3c22a40804": "651ba831140c441634a3e13bcc1608aab807fd172a18b655ec4038af7902a5f8",
     "ae8c5963-f503-477b-acea-a42b1b315772": "e99c015bafb0e6075072d5999e30d08a6f4e619c59c9edac2c79fdc3657fe14d",
     "78cd1570-d4e6-44e4-b394-1c917d64125c": "4c5c55a47950110dd56f46a21a6049f5f2ae5d64a9aab5eb3ede68cc7cd2a416",
-    "6275cb02-0a57-4f51-802b-9c1bf934516d": "eff70d86f21b72cbb06fc659111a7c1ddf12df16ec7d6f4ebb76204b8cee3db9"
+    "6275cb02-0a57-4f51-802b-9c1bf934516d": "eff70d86f21b72cbb06fc659111a7c1ddf12df16ec7d6f4ebb76204b8cee3db9",
+    "065f6503-c250-4227-9957-02c45d71a19d": "1f3bee18a7a48345c08ff56215f057246f4a1dff8476b37b6befe41ab5f5a159",
+    "84eb5c10-928e-4959-9cf1-c8aba0a6594b": "5442cfb1d85eb29424a127d9b829c6ee6df4c91384597b8326d60e745a0b1f00",
+    "0b7fc1a4-5065-475b-b1c2-3b7676ea3814": "75715e12e9f2322d295eab333b7532a51e17c48eece585caca0cc5ff9827846a",
+    "b21b099a-0128-4716-96be-b9cd4a96541d": "439015eea2ecc7953c25e5505a8741a80c96d23b721632c488988deb1c394884",
+    "37738c57-eb04-4ec3-92b0-ed429dc021ba": "93835135d0b44fd283a460c018581774213946ec8c98988ed7ee8ccd4ddcea97",
+    "5b9e78e5-6874-4838-b8dd-93cf9fe996f7": "b8995cc4f8e48a42005cef54c27335a271f70dcd12beb7fb58ec1c0b1e22fdc8"
   },
-  "updatedAt": 1788493665437
+  "updatedAt": 1788509930696
 }

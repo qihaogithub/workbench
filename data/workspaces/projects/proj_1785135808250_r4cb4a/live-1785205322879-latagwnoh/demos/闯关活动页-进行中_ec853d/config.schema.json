@@ -392,6 +392,14 @@
           }
         },
         {
+          "type": "collectCard",
+          "bgImage": "",
+          "total": 4,
+          "collected": 1,
+          "obtainedImage": "",
+          "unobtainedImage": ""
+        },
+        {
           "type": "level",
           "bgImage": "https://img.onlywnn.cn/figma/h_6e2a6768.png",
           "levels": [
@@ -426,14 +434,6 @@
               "h": 390
             }
           ]
-        },
-        {
-          "type": "collectCard",
-          "bgImage": "",
-          "total": 4,
-          "collected": 1,
-          "obtainedImage": "",
-          "unobtainedImage": ""
         },
         {
           "type": "image",
