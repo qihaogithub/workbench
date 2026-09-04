@@ -185,8 +185,26 @@ describe("DesignSpecConfigPanel", () => {
 
     const { rerender } = render(<DesignSpecConfigPanel />);
     expect(screen.getAllByText("图片").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("内容模块 / 图片模块 / 图片")).toBeInTheDocument();
-    expect(screen.getAllByText("未绑定").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("内容模块")).toBeInTheDocument();
+    expect(screen.getByText("图片模块")).toBeInTheDocument();
+    const configTree = screen.getByRole("tree", { name: "配置项树" });
+    expect(
+      within(configTree).getByText("内容模块").closest('[role="treeitem"]'),
+    ).toHaveAttribute("aria-level", "2");
+    expect(
+      within(configTree).getByText("图片模块").closest('[role="treeitem"]'),
+    ).toHaveAttribute("aria-level", "3");
+    expect(
+      within(configTree).getByText("图片").closest('[role="treeitem"]'),
+    ).toHaveAttribute("aria-level", "4");
+    expect(
+      screen.queryByText("内容模块 / 图片模块 / 图片"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("未绑定")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("图片模块"));
+    expect(workspace.toggleGroup).toHaveBeenCalledWith(
+      expect.stringContaining("page-a/root/modules/[type=image]"),
+    );
     const configRow = screen
       .getByTitle("内容模块 / 图片模块 / 图片")
       .closest('[draggable="true"]');

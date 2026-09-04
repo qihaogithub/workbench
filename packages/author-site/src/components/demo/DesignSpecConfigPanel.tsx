@@ -1,14 +1,14 @@
 "use client";
 
-import { ChevronDown, FileText, ListFilter } from "lucide-react";
+import { ChevronDown, FileText, Folder, ListFilter } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ConfigPoolItem } from "@/lib/design-specs";
 import { useDesignSpecWorkspace } from "./DesignSpecWorkspace";
 import {
   CATEGORY_ORDER,
   KIND_META,
-  pageLabel,
   Swatch,
+  type HoverPopState,
 } from "./DesignSpecVisuals";
 import {
   Popover,
@@ -157,7 +157,9 @@ export function DesignSpecConfigPanel() {
             <EmptyState>无匹配页面</EmptyState>
           )
         ) : ws.poolGroups?.length ? (
-          <ConfigGroups groups={ws.poolGroups} />
+          <div role="tree" aria-label="配置项树" data-design-spec-config-tree>
+            <ConfigGroups groups={ws.poolGroups} />
+          </div>
         ) : (
           <EmptyState>无匹配规范项</EmptyState>
         )}
@@ -209,15 +211,32 @@ function ConfigGroups({ groups }: { groups: [string, ConfigPoolItem[]][] }) {
         const page = ws.pages.find((candidate) => candidate.name === name);
         const collapsed = ws.collapsedGroups?.has(name) ?? false;
         const hasItems = items.length > 0;
+        const tree = buildConfigTree(items);
         return (
-          <div key={name} className="mb-1">
+          <div
+            key={page?.id ?? name}
+            className="mb-1"
+            data-design-spec-page-tree
+          >
             <div
+              role="treeitem"
+              aria-level={1}
+              aria-selected={false}
+              aria-expanded={hasItems ? !collapsed : undefined}
               draggable={Boolean(page)}
+              tabIndex={0}
               className={cn(
                 "flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 text-sm font-semibold",
                 page && "cursor-grab hover:bg-accent",
               )}
               onClick={() => hasItems && ws.toggleGroup?.(name)}
+              onKeyDown={(event) => {
+                if (!hasItems || (event.key !== "Enter" && event.key !== " ")) {
+                  return;
+                }
+                event.preventDefault();
+                ws.toggleGroup?.(name);
+              }}
               onDragStart={(event) => {
                 if (!page) return;
                 event.dataTransfer.effectAllowed = "copy";
@@ -242,12 +261,22 @@ function ConfigGroups({ groups }: { groups: [string, ConfigPoolItem[]][] }) {
               </span>
             </div>
             {!collapsed && items.length > 0 && (
-              <div data-design-spec-group-items className="ml-5 border-l pl-2">
-                {items.map((item) => (
-                  <PoolItem
-                    key={item.id}
-                    item={item}
-                    bound={ws.boundIds.has(item.id)}
+              <div
+                role="group"
+                data-design-spec-group-items
+                className="ml-5 border-l pl-1"
+              >
+                {tree.map((node) => (
+                  <ConfigTreeNode
+                    key={node.key}
+                    node={node}
+                    pageKey={page?.id ?? name}
+                    level={2}
+                    boundIds={ws.boundIds}
+                    collapsedGroups={ws.collapsedGroups}
+                    toggleGroup={ws.toggleGroup}
+                    setHoverPop={ws.setHoverPop}
+                    setZoomed={ws.setZoomed}
                   />
                 ))}
               </div>
@@ -256,6 +285,179 @@ function ConfigGroups({ groups }: { groups: [string, ConfigPoolItem[]][] }) {
         );
       })}
     </>
+  );
+}
+
+interface ConfigTreeNode {
+  /** Stable path assembled from the canonical schema key. */
+  key: string;
+  title: string;
+  item?: ConfigPoolItem;
+  children: ConfigTreeNode[];
+}
+
+/**
+ * Turns the recursive schema catalogue into a layer-like tree. `breadcrumbs`
+ * carry the human labels (including oneOf branch labels), while the canonical
+ * key keeps similarly named fields in separate branches.
+ */
+function buildConfigTree(items: ConfigPoolItem[]): ConfigTreeNode[] {
+  const roots: ConfigTreeNode[] = [];
+  const nodes = new Map<string, ConfigTreeNode>();
+
+  for (const item of items) {
+    const labels = item.breadcrumbs?.filter((label) => label.trim()) ?? [];
+    const displayLabels = labels.length > 0 ? labels : [item.title];
+    const stableParts = splitSchemaPath(item.key);
+    const depth = Math.max(displayLabels.length, stableParts.length, 1);
+    let parent: ConfigTreeNode[] = roots;
+    let parentKey = "root";
+
+    for (let index = 0; index < depth; index += 1) {
+      const label = displayLabels[index] ?? stableParts[index] ?? item.title;
+      const part = stableParts[index] ?? `label:${label}`;
+      const nodeKey = `${parentKey}/${part}`;
+      let node = nodes.get(nodeKey);
+      if (!node) {
+        node = { key: nodeKey, title: label, children: [] };
+        nodes.set(nodeKey, node);
+        parent.push(node);
+      }
+      if (index === depth - 1) node.item = item;
+      parent = node.children;
+      parentKey = nodeKey;
+    }
+  }
+
+  return roots;
+}
+
+/** Split `modules[type=image].image` into `modules`, `[type=image]`, `image`. */
+function splitSchemaPath(key: string): string[] {
+  const parts: string[] = [];
+  let segment = "";
+  let bracketDepth = 0;
+  const pushSegment = () => {
+    if (segment) parts.push(segment);
+    segment = "";
+  };
+
+  for (const character of key) {
+    if (character === "[" ) bracketDepth += 1;
+    if (character === "]" ) bracketDepth = Math.max(0, bracketDepth - 1);
+    if (character === "." && bracketDepth === 0) {
+      pushSegment();
+      continue;
+    }
+    segment += character;
+  }
+  pushSegment();
+
+  // Array/oneOf markers are part of a property segment in the canonical key;
+  // split the marker out so it can become its own synthetic tree group.
+  return parts.flatMap((part) => {
+    const matches = part.match(/[^\[\]]+|\[[^\]]*\]/g);
+    return matches?.length ? matches : [part];
+  });
+}
+
+function ConfigTreeNode({
+  node,
+  pageKey,
+  level,
+  boundIds,
+  collapsedGroups,
+  toggleGroup,
+  setHoverPop,
+  setZoomed,
+}: {
+  node: ConfigTreeNode;
+  pageKey: string;
+  level: number;
+  boundIds: Set<string>;
+  collapsedGroups?: Set<string>;
+  toggleGroup?: (name: string) => void;
+  setHoverPop: (value: HoverPopState | null) => void;
+  setZoomed: (value: ConfigPoolItem | null) => void;
+}) {
+  const hasChildren = node.children.length > 0;
+  const collapseKey = `${pageKey}/${node.key}`;
+  const collapsed = collapsedGroups?.has(collapseKey) ?? false;
+  const item = node.item;
+
+  return (
+    <div data-design-spec-tree-node>
+      <div
+        role="treeitem"
+        aria-level={level}
+        aria-selected={false}
+        aria-expanded={hasChildren ? !collapsed : undefined}
+        draggable={Boolean(item)}
+        tabIndex={0}
+        onClick={() => {
+          if (hasChildren) toggleGroup?.(collapseKey);
+        }}
+        onKeyDown={(event) => {
+          if (!hasChildren || (event.key !== "Enter" && event.key !== " ")) {
+            return;
+          }
+          event.preventDefault();
+          toggleGroup?.(collapseKey);
+        }}
+        onDragStart={(event) => {
+          if (!item) return;
+          event.dataTransfer.effectAllowed = "copy";
+          event.dataTransfer.setData("text/plain", `pool:${item.id}`);
+        }}
+        className={cn(
+          "flex min-w-0 items-center gap-1 rounded-md px-1.5 py-1.5 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          item && "cursor-grab active:cursor-grabbing",
+          item && boundIds.has(item.id) && "opacity-80",
+        )}
+        title={item?.breadcrumbs?.join(" / ") || (item ? item.title : undefined)}
+      >
+        <ChevronDown
+          data-design-spec-expander
+          className={cn(
+            "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
+            collapsed && "-rotate-90",
+            !hasChildren && "invisible",
+          )}
+        />
+        {item ? (
+          <PoolItemContent
+            item={item}
+            bound={boundIds.has(item.id)}
+            setHoverPop={setHoverPop}
+            setZoomed={setZoomed}
+          />
+        ) : (
+          <>
+            <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
+              {node.title}
+            </span>
+          </>
+        )}
+      </div>
+      {!collapsed && hasChildren && (
+        <div role="group" className="ml-4 border-l pl-1">
+          {node.children.map((child) => (
+            <ConfigTreeNode
+              key={child.key}
+              node={child}
+              pageKey={pageKey}
+              level={level + 1}
+              boundIds={boundIds}
+              collapsedGroups={collapsedGroups}
+              toggleGroup={toggleGroup}
+              setHoverPop={setHoverPop}
+              setZoomed={setZoomed}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -341,67 +543,49 @@ function PageItem({
   );
 }
 
-function PoolItem({ item, bound }: { item: ConfigPoolItem; bound: boolean }) {
-  const ws = useDesignSpecWorkspace();
+function PoolItemContent({
+  item,
+  bound,
+  setHoverPop,
+  setZoomed,
+}: {
+  item: ConfigPoolItem;
+  bound: boolean;
+  setHoverPop: (value: HoverPopState | null) => void;
+  setZoomed: (value: ConfigPoolItem | null) => void;
+}) {
   const isImage = item.kind === "image";
-  const breadcrumbs =
-    item.breadcrumbs && item.breadcrumbs.length > 1
-      ? item.breadcrumbs.join(" / ")
-      : pageLabel(item);
   return (
-    <div
-      draggable
-      tabIndex={0}
-      onDragStart={(event) => {
-        event.dataTransfer.effectAllowed = "copy";
-        event.dataTransfer.setData("text/plain", `pool:${item.id}`);
-      }}
-      className={cn(
-        "flex cursor-grab items-center gap-2 rounded-md px-1.5 py-1.5 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing",
-        bound && "opacity-80",
-      )}
-    >
+    <>
       <span
         draggable={false}
         tabIndex={0}
         className="shrink-0 cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onMouseMove={(event) =>
-          ws.setHoverPop({ item, x: event.clientX, y: event.clientY })
+          setHoverPop({ item, x: event.clientX, y: event.clientY })
         }
-        onMouseLeave={() => ws.setHoverPop(null)}
+        onMouseLeave={() => setHoverPop(null)}
         onFocus={(event) => {
           const rect = event.currentTarget.getBoundingClientRect();
-          ws.setHoverPop({ item, x: rect.right, y: rect.top });
+          setHoverPop({ item, x: rect.right, y: rect.top });
         }}
-        onBlur={() => ws.setHoverPop(null)}
-        onClick={isImage ? () => ws.setZoomed(item) : undefined}
+        onBlur={() => setHoverPop(null)}
+        onClick={(event) => {
+          event.stopPropagation();
+          if (isImage) setZoomed(item);
+        }}
         title={isImage ? "查看大图" : undefined}
       >
         <Swatch item={item} />
       </span>
-      <div className="min-w-0 flex-1">
-        <div
-          className={cn(
-            "truncate text-[13px] font-medium",
-            bound && "text-muted-foreground",
-          )}
-        >
-          {item.title}
-        </div>
-        <div
-          className="truncate text-[11px] text-muted-foreground"
-          title={breadcrumbs}
-        >
-          {breadcrumbs}
-        </div>
-        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-          <span>{KIND_META[item.kind].label}</span>
-          <span>{pageLabel(item)}</span>
-          <span className="rounded-full border px-1">
-            {bound ? "已绑定" : "未绑定"}
-          </span>
-        </div>
-      </div>
-    </div>
+      <span
+        className={cn(
+          "min-w-0 flex-1 truncate text-[13px] font-medium",
+          bound && "text-muted-foreground",
+        )}
+      >
+        {item.title}
+      </span>
+    </>
   );
 }
