@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { Sparkles } from "lucide-react";
 import { cn } from "./utils";
-import type { ConfigChangeMeta, ConfigFormProps, ConfigCommentTarget, ConfigItemCapabilities } from "./types";
+import type { ConfigBreadcrumb, ConfigChangeMeta, ConfigFormProps, ConfigCommentTarget, ConfigItemCapabilities, ConfigItemDetailHandler } from "./types";
 import type { DesignSpecEntryLink } from "./types";
 import type { FieldConfig, FieldGroup, VisibleWhenCondition } from "./schema-parser";
 import { parseSchemaToFields } from "./schema-parser";
@@ -127,7 +127,7 @@ function FieldGroupSection({
   onEditConfigDefinition,
   configItemCapabilities,
   onAddConfigComment,
-  getConfigCommentCount,
+  hasConfigComment,
   imageConfigScope,
   pageId,
   configContextPageId,
@@ -135,6 +135,12 @@ function FieldGroupSection({
   referenceContext,
   referenceProvider,
   onReferenceClick,
+  onOpenItemDetail,
+  activeItemDetailId,
+  activeItemDetailFieldPath,
+  onItemDetailInvalidated,
+  breadcrumb,
+  arrayDepth,
 }: {
   group: FieldGroup;
   formData: Record<string, unknown>;
@@ -148,7 +154,7 @@ function FieldGroupSection({
   onEditConfigDefinition?: (fieldKey: string, field: FieldConfig) => void;
   configItemCapabilities?: ConfigItemCapabilities;
   onAddConfigComment?: (target: ConfigCommentTarget, trigger?: HTMLElement | null) => void;
-  getConfigCommentCount?: (target: ConfigCommentTarget) => number;
+  hasConfigComment?: (target: ConfigCommentTarget) => boolean;
   imageConfigScope?: ConfigFormProps["imageConfigScope"];
   pageId?: string;
   configContextPageId?: string;
@@ -156,14 +162,13 @@ function FieldGroupSection({
   referenceContext?: ConfigFormProps["referenceContext"];
   referenceProvider?: ConfigFormProps["referenceProvider"];
   onReferenceClick?: ConfigFormProps["onReferenceClick"];
+  onOpenItemDetail?: ConfigItemDetailHandler;
+  activeItemDetailId?: string | null;
+  activeItemDetailFieldPath?: string;
+  onItemDetailInvalidated?: (itemId: string) => void;
+  breadcrumb?: ConfigBreadcrumb[];
+  arrayDepth?: number;
 }) {
-  const configCommentScope = imageConfigScope ?? "page";
-  const getFieldCommentCount = (fieldKey: string) => getConfigCommentCount?.({
-    kind: "config",
-    scope: configCommentScope,
-    ...(configCommentScope === "page" && pageId ? { pageId } : {}),
-    fieldKey,
-  }) ?? 0;
   if (group.title === "") {
     return (
       <div className="flex flex-col gap-5">
@@ -182,8 +187,9 @@ function FieldGroupSection({
               onEditConfigDefinition={onEditConfigDefinition}
               configItemCapabilities={configItemCapabilities}
               onAddConfigComment={onAddConfigComment}
-              configCommentCount={getFieldCommentCount(field.key)}
+              hasConfigComment={hasConfigComment}
               fieldPath={field.key}
+              schemaFieldPath={field.schemaPath ?? field.key}
               imageConfigScope={imageConfigScope}
               pageId={pageId}
               configContextPageId={configContextPageId}
@@ -191,6 +197,12 @@ function FieldGroupSection({
               referenceContext={referenceContext}
               referenceProvider={referenceProvider}
               onReferenceClick={onReferenceClick}
+              onOpenItemDetail={onOpenItemDetail}
+              activeItemDetailId={activeItemDetailId}
+              activeItemDetailFieldPath={activeItemDetailFieldPath}
+              onItemDetailInvalidated={onItemDetailInvalidated}
+              breadcrumb={breadcrumb}
+              arrayDepth={arrayDepth}
             />
           ))}
         </div>
@@ -218,8 +230,9 @@ function FieldGroupSection({
             onEditConfigDefinition={onEditConfigDefinition}
             configItemCapabilities={configItemCapabilities}
             onAddConfigComment={onAddConfigComment}
-            configCommentCount={getFieldCommentCount(field.key)}
+            hasConfigComment={hasConfigComment}
             fieldPath={field.key}
+            schemaFieldPath={field.schemaPath ?? field.key}
             imageConfigScope={imageConfigScope}
             pageId={pageId}
             configContextPageId={configContextPageId}
@@ -227,6 +240,12 @@ function FieldGroupSection({
             referenceContext={referenceContext}
             referenceProvider={referenceProvider}
             onReferenceClick={onReferenceClick}
+            onOpenItemDetail={onOpenItemDetail}
+            activeItemDetailId={activeItemDetailId}
+            activeItemDetailFieldPath={activeItemDetailFieldPath}
+            onItemDetailInvalidated={onItemDetailInvalidated}
+            breadcrumb={breadcrumb}
+            arrayDepth={arrayDepth}
           />
         ))}
       </div>
@@ -256,7 +275,7 @@ export function ConfigForm({
   onEditConfigDefinition,
   configItemCapabilities,
   onAddConfigComment,
-  getConfigCommentCount,
+  hasConfigComment,
   imageConfigScope,
   pageId,
   configContextPageId,
@@ -264,6 +283,10 @@ export function ConfigForm({
   referenceContext,
   referenceProvider,
   onReferenceClick,
+  onOpenItemDetail,
+  activeItemDetailId,
+  activeItemDetailFieldPath,
+  onItemDetailInvalidated,
 }: ConfigFormProps) {
   const [formData, setFormData] = useState<Record<string, unknown>>(
     () => {
@@ -466,7 +489,7 @@ export function ConfigForm({
                 onEditConfigDefinition={onEditConfigDefinition}
                 configItemCapabilities={configItemCapabilities}
                 onAddConfigComment={onAddConfigComment}
-                getConfigCommentCount={getConfigCommentCount}
+                hasConfigComment={hasConfigComment}
                 imageConfigScope={imageConfigScope}
                 pageId={pageId}
                 configContextPageId={configContextPageId}
@@ -474,6 +497,10 @@ export function ConfigForm({
                 referenceContext={referenceContext}
                 referenceProvider={referenceProvider}
                 onReferenceClick={onReferenceClick}
+                onOpenItemDetail={onOpenItemDetail}
+                activeItemDetailId={activeItemDetailId}
+                activeItemDetailFieldPath={activeItemDetailFieldPath}
+                onItemDetailInvalidated={onItemDetailInvalidated}
               />
             </div>
           ))}

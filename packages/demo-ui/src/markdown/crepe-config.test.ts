@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { Crepe } from "@milkdown/crepe";
-import {
-  buildCrepeConfig,
-  type CrepeProjectActions,
-} from "./crepe-config";
+import { buildCrepeConfig, type CrepeProjectActions } from "./crepe-config";
 
 function createActions(): CrepeProjectActions {
   return {
@@ -29,15 +26,24 @@ describe("buildCrepeConfig", () => {
     expect(config.features?.[Crepe.Feature.AI]).toBe(false);
   });
 
+  it("允许批注编辑器隐藏固定 TopBar，同时保留选区浮动 Toolbar", () => {
+    const config = buildCrepeConfig({
+      placeholder: "输入内容...",
+      actions: createActions(),
+      showTopBar: false,
+    });
+
+    expect(config.features?.[Crepe.Feature.TopBar]).toBe(false);
+    expect(config.features?.[Crepe.Feature.Toolbar]).toBe(true);
+  });
+
   it("只在能力可用时向 Crepe 块菜单追加项目操作", () => {
     const actions = createActions();
     const config = buildCrepeConfig({
       placeholder: "输入内容...",
       actions,
       enableUploads: true,
-      referenceCandidates: [
-        { key: "theme.primary", label: "主题色" },
-      ],
+      referenceCandidates: [{ key: "theme.primary", label: "主题色" }],
     });
     const groups: Array<{
       key: string;
@@ -46,10 +52,17 @@ describe("buildCrepeConfig", () => {
     }> = [];
     const builder = {
       addGroup(key: string, label: string) {
-        const group = { key, label, items: [] as typeof groups[number]["items"] };
+        const group = {
+          key,
+          label,
+          items: [] as (typeof groups)[number]["items"],
+        };
         groups.push(group);
         return {
-          addItem(itemKey: string, item: Omit<typeof group.items[number], "key">) {
+          addItem(
+            itemKey: string,
+            item: Omit<(typeof group.items)[number], "key">,
+          ) {
             group.items.push({ key: itemKey, ...item });
             return this;
           },

@@ -99,7 +99,9 @@ interface ParsedContent {
 
 - `items.oneOf` 生成对象数组的变体列表，并递归解析每个变体的字段；
 - `items.properties` 生成普通对象数组的子字段，并继续递归处理其中的数组；
+- 对象数组字段读取 `$demo.sortable` 作为当前层的排序能力；该字段必须是布尔值，`true` 开启排序，`false` 关闭排序，缺失或非法值按 `false` 处理。`ui:options.sortable` 不再参与解析；父子数组分别解析，不引入额外的 `tree` 类型；
 - `position` 字段保留可拖动标记、定位键和容器尺寸，使坐标输入与画布拖动共用同一字段；
+- 对象数组字段可在 `ui:options` 中显式声明 `detailPresentation: "sheet"`，并可用 `detailBreadcrumbTitle` 指定详情路由的列表节点名称、`itemTitleTemplate` 指定条目标题模板（`{index}` 为从 1 开始的两位序号）；列表节点可保留在内部路由上下文，但 Sheet 顶部只展示当前条目，未声明时继续使用原有内联折叠。
 - `typeLimits` 沿递归路径传递，数组深度不会改变字段限制；
 - 因此 `modules.items.oneOf → levels.items.oneOf` 仍会得到对象数组和 `position` 控件，不会降级为多图上传列表。
 

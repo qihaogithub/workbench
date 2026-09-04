@@ -1,0 +1,75 @@
+{
+  "bgm": "",
+  "navColor": "#05ffe2",
+  "modules": [
+    {
+      "type": "image",
+      "image": "https://img.onlywnn.cn/figma/h_c61916f5.png"
+    },
+    {
+      "type": "participant",
+      "bgImage": "https://img.onlywnn.cn/figma/h_19dbcc85.png",
+      "count": 128
+    },
+    {
+      "type": "video",
+      "videoBg": "",
+      "video": {
+        "url": "",
+        "poster": ""
+      }
+    },
+    {
+      "type": "level",
+      "bgImage": "https://img.onlywnn.cn/figma/h_6e2a6768.png",
+      "levels": [
+        {
+          "type": "levelCard",
+          "unlockedImage": "https://img.onlywnn.cn/figma/h_e589fc90.png",
+          "position": {
+            "x": 14,
+            "y": 1
+          },
+          "w": 330,
+          "h": 368
+        },
+        {
+          "type": "levelCard",
+          "lockedImage": "https://img.onlywnn.cn/figma/h_70aef182.png",
+          "position": {
+            "x": 196,
+            "y": 147
+          },
+          "w": 330,
+          "h": 368
+        },
+        {
+          "type": "levelCard",
+          "lockedImage": "https://img.onlywnn.cn/figma/h_61c26d1d.png",
+          "position": {
+            "x": 40,
+            "y": 316
+          },
+          "w": 342,
+          "h": 390
+        }
+      ]
+    },
+    {
+      "type": "collectCard",
+      "bgImage": "",
+      "total": 4,
+      "collected": 1,
+      "obtainedImage": "",
+      "unobtainedImage": ""
+    },
+    {
+      "type": "image",
+      "image": "https://img.onlywnn.cn/figma/h_483ae3df.png"
+    },
+    {
+      "type": "button",
+      "image": "https://img.onlywnn.cn/figma/h_4dce23b9.png"
+    }
+  ]
+}

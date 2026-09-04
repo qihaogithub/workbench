@@ -16,8 +16,11 @@ import {
   X,
 } from "lucide-react";
 import { ConfigForm } from "./ConfigForm";
+import { ConfigDetailSheet } from "./ConfigDetailSheet";
+import { FieldRenderer, PositionConfigContext, type PositionConfigContextValue, type PositionFieldEntry } from "./FieldRenderer";
 import { ConfigCommentPopover } from "./comment/ConfigCommentPopover";
 import type { ConfigCommentController } from "./comment/types";
+import { filterCommentThreadsByTarget } from "./comment/comment-thread-scope";
 import { ConfigScopeWrapper } from "./ConfigScopeWrapper";
 import { PageRequirements } from "./PageRequirements";
 import { RichTextEditor } from "./RichTextEditor";
@@ -43,7 +46,7 @@ import {
   getSchemaFieldCountByCategory,
 } from "./config-categories";
 import { cn } from "./utils";
-import type { ConfigChangeMeta, ConfigCommentTarget, ConfigDefinitionFocus, ConfigItemCapabilities, DesignSpecEntryLink, PageDesignSpecEntryLink, PositionEditTarget, PositionableSizeItem, WhiteboardLauncher } from "./types";
+import type { ConfigBreadcrumb, ConfigChangeMeta, ConfigCommentTarget, ConfigDefinitionFocus, ConfigItemCapabilities, ConfigItemDetail, DesignSpecEntryLink, PageDesignSpecEntryLink, PositionEditTarget, PositionableSizeItem, WhiteboardLauncher } from "./types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -127,14 +130,55 @@ function isSameDesignSpec(
 }
 
 type DesignSpecPanelBounds = {
-  top: number;
   left: number;
-  height: number;
   /** 配置栏左侧可供气泡使用的宽度。 */
   availableLeftWidth: number;
-  anchorTop?: number;
-  anchorBottom?: number;
 };
+
+type OverlayPlacement = {
+  top: number;
+  maxHeight: number;
+  /** 用于箭头定位的当前触发器中心。 */
+  anchorCenter: number;
+  /** 受 maxHeight 限制后的浮窗高度，用于箭头钳制。 */
+  height: number;
+};
+
+const OVERLAY_VIEWPORT_MARGIN = 16;
+const OVERLAY_ARROW_MARGIN = 18;
+
+function clampOverlayValue(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function resolveOverlayPlacement({
+  anchorCenter,
+  bubbleHeight,
+  viewportHeight,
+}: {
+  anchorCenter: number;
+  bubbleHeight: number;
+  viewportHeight: number;
+}): OverlayPlacement {
+  const maxHeight = Math.max(0, viewportHeight - OVERLAY_VIEWPORT_MARGIN * 2);
+  const fallbackHeight = Math.min(240, maxHeight);
+  const height = Math.min(
+    maxHeight,
+    Number.isFinite(bubbleHeight) && bubbleHeight > 0 ? bubbleHeight : fallbackHeight,
+  );
+  const maxTop = Math.max(
+    OVERLAY_VIEWPORT_MARGIN,
+    viewportHeight - OVERLAY_VIEWPORT_MARGIN - height,
+  );
+  const idealTop = anchorCenter - height / 2;
+
+  return {
+    top: clampOverlayValue(idealTop, OVERLAY_VIEWPORT_MARGIN, maxTop),
+    maxHeight,
+    anchorCenter,
+    height,
+  };
+}
 
 function newConfigDefinitionDraft(schema: string): ConfigDefinitionDraft {
   const keys = new Set(readConfigDefinitionFields(schema).map((field) => field.key));
@@ -179,8 +223,6 @@ export interface PageConfigPanelProps {
   configComments?: ConfigCommentController;
   /** 兼容未接入共享气泡的宿主，打开字段批注入口。 */
   onAddConfigComment?: (target: ConfigCommentTarget, trigger?: HTMLElement | null) => void;
-  /** 返回指定配置项未解决批注数量，用于标题徽标。 */
-  getConfigCommentCount?: (target: ConfigCommentTarget) => number;
   onPageConfigChange?: (pageId: string, data: Record<string, unknown>, meta?: ConfigChangeMeta) => void;
   onPageSchemaChange?: (pageId: string, schema: string) => void;
   onPageDefinitionChange?: (pageId: string, mutation: SchemaDefinitionMutation) => void | Promise<void>;
@@ -242,6 +284,17 @@ function getSortedPages(pages: PageConfigPanelPage[]) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getDetailFields(
+  field: ConfigItemDetail["field"],
+  item: Record<string, unknown>,
+) {
+  if (field.oneOf) {
+    const itemType = String(item[field.oneOf.discriminator] ?? "");
+    return field.oneOf.variants.find((variant) => String(variant.value) === itemType)?.fields ?? [];
+  }
+  return field.children ?? [];
 }
 
 /**
@@ -396,7 +449,6 @@ export function PageConfigPanel({
   onProjectDefinitionChange,
   configComments,
   onAddConfigComment,
-  getConfigCommentCount,
   onPageConfigChange,
   onPageSchemaChange,
   onPageDefinitionChange,
@@ -448,6 +500,9 @@ export function PageConfigPanel({
   >(null);
   const [configCategoryFilter, setConfigCategoryFilter] = useState("");
   const [configActionsOpen, setConfigActionsOpen] = useState(false);
+  const [saveDefaultsScope, setSaveDefaultsScope] = useState<
+    "page" | "project" | null
+  >(null);
   const [requirementsSectionOpen, setRequirementsSectionOpen] = useState(true);
   const [editingRequirements, setEditingRequirements] = useState(false);
   const [requirementsDraft, setRequirementsDraft] = useState("");
@@ -459,11 +514,22 @@ export function PageConfigPanel({
   const [activeConfigComment, setActiveConfigComment] = useState<ActiveConfigComment | null>(null);
   const [designSpecPanelBounds, setDesignSpecPanelBounds] =
     useState<DesignSpecPanelBounds | null>(null);
+  const [overlayPlacement, setOverlayPlacement] =
+    useState<OverlayPlacement | null>(null);
   const configPanelRef = useRef<HTMLDivElement | null>(null);
+  const configContentRef = useRef<HTMLDivElement | null>(null);
+  const sheetTriggerRef = useRef<HTMLElement | null>(null);
+  const sheetParentScrollTopRef = useRef(0);
+  const sheetPageIdRef = useRef<string | null>(null);
+  const sheetActivePositionIdRef = useRef<string | null>(positionEditActiveId ?? null);
+  const sheetOnExitPositionEditRef = useRef(onExitPositionEdit);
+  sheetActivePositionIdRef.current = positionEditActiveId ?? null;
+  sheetOnExitPositionEditRef.current = onExitPositionEdit;
   const designSpecPanelRef = useRef<HTMLElement | null>(null);
   const designSpecTriggerRef = useRef<HTMLElement | null>(null);
   const configCommentPanelRef = useRef<HTMLElement | null>(null);
   const configCommentTriggerRef = useRef<HTMLElement | null>(null);
+  const [sheetRoute, setSheetRoute] = useState<ConfigItemDetail | null>(null);
 
   const toggleDesignSpec = useCallback((next: ActiveDesignSpec, trigger?: HTMLElement | null) => {
     designSpecTriggerRef.current = trigger ?? null;
@@ -618,7 +684,6 @@ export function PageConfigPanel({
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [activeDesignSpec, activeConfigComment]);
   useLayoutEffect(() => {
-    const activeAnchor = activeDesignSpec?.anchor ?? activeConfigComment?.anchor;
     if ((!activeDesignSpec && !activeConfigComment) || !configPanelRef.current) {
       setDesignSpecPanelBounds(null);
       return;
@@ -627,14 +692,10 @@ export function PageConfigPanel({
     const updateBounds = () => {
       const rect = configPanelRef.current?.getBoundingClientRect();
       if (!rect) return;
-    setDesignSpecPanelBounds({
-      top: rect.top,
-      left: rect.left,
-      height: rect.height,
-      availableLeftWidth: rect.left,
-      anchorTop: activeAnchor?.top,
-      anchorBottom: activeAnchor?.bottom,
-    });
+      setDesignSpecPanelBounds({
+        left: rect.left,
+        availableLeftWidth: rect.left,
+      });
     };
 
     updateBounds();
@@ -648,6 +709,73 @@ export function PageConfigPanel({
       window.removeEventListener("resize", updateBounds);
     };
   }, [activeDesignSpec, activeConfigComment]);
+  useLayoutEffect(() => {
+    if ((!activeDesignSpec && !activeConfigComment) || !designSpecPanelBounds) {
+      setOverlayPlacement(null);
+      return;
+    }
+
+    const overlay = designSpecPanelRef.current ?? configCommentPanelRef.current;
+    if (!overlay) return;
+
+    const fallbackAnchor = activeDesignSpec?.anchor ?? activeConfigComment?.anchor;
+
+    const updatePlacement = () => {
+      const viewportHeight = typeof window === "undefined"
+        ? 0
+        : Math.max(0, window.visualViewport?.height ?? window.innerHeight);
+      if (!viewportHeight) return;
+
+      const trigger = activeDesignSpec
+        ? designSpecTriggerRef.current
+        : configCommentTriggerRef.current;
+      const triggerRect = trigger?.getBoundingClientRect();
+      const hasTriggerRect = Boolean(
+        triggerRect
+        && Number.isFinite(triggerRect.top)
+        && Number.isFinite(triggerRect.bottom)
+        && (triggerRect.width > 0 || triggerRect.height > 0),
+      );
+      const anchorCenter = hasTriggerRect && triggerRect
+        ? (triggerRect.top + triggerRect.bottom) / 2
+        : fallbackAnchor && Number.isFinite(fallbackAnchor.top) && Number.isFinite(fallbackAnchor.bottom)
+          ? (fallbackAnchor.top + fallbackAnchor.bottom) / 2
+          : viewportHeight / 2;
+      const next = resolveOverlayPlacement({
+        anchorCenter,
+        bubbleHeight: overlay.getBoundingClientRect().height,
+        viewportHeight,
+      });
+
+      setOverlayPlacement((current) => (
+        current
+        && current.top === next.top
+        && current.maxHeight === next.maxHeight
+        && current.anchorCenter === next.anchorCenter
+        && current.height === next.height
+          ? current
+          : next
+      ));
+    };
+
+    updatePlacement();
+    const observer = typeof ResizeObserver === "undefined"
+      ? undefined
+      : new ResizeObserver(updatePlacement);
+    observer?.observe(overlay);
+    const scrollContainer = configContentRef.current;
+    scrollContainer?.addEventListener("scroll", updatePlacement, { passive: true });
+    window.addEventListener("resize", updatePlacement);
+    window.addEventListener("scroll", updatePlacement, true);
+    window.visualViewport?.addEventListener("resize", updatePlacement);
+    return () => {
+      observer?.disconnect();
+      scrollContainer?.removeEventListener("scroll", updatePlacement);
+      window.removeEventListener("resize", updatePlacement);
+      window.removeEventListener("scroll", updatePlacement, true);
+      window.visualViewport?.removeEventListener("resize", updatePlacement);
+    };
+  }, [activeDesignSpec, activeConfigComment, designSpecPanelBounds]);
   const sortedPages = useMemo(() => getSortedPages(pages), [pages]);
   const scopedPages = useMemo<ScopedPageConfig[]>(
     () =>
@@ -706,6 +834,10 @@ export function PageConfigPanel({
       ? selectedPage.configItemCapabilities?.project
       : selectedPage.configItemCapabilities?.page;
     if (capabilities && !capabilities.canEditDefinition) return;
+    setActiveDesignSpec(null);
+    setActiveConfigComment(null);
+    designSpecTriggerRef.current = null;
+    configCommentTriggerRef.current = null;
     const targetSchema = scope === "project"
       ? selectedProjectConfigSchema || EMPTY_SCHEMA
       : selectedPage.schema || EMPTY_SCHEMA;
@@ -717,6 +849,12 @@ export function PageConfigPanel({
       ? { mode: "edit", scope, draft: existing, originalKey: existing.key }
       : { mode: "create", scope, draft: newConfigDefinitionDraft(targetSchema) });
   };
+
+  const hasConfigComment = useCallback(
+    (target: ConfigCommentTarget) =>
+      filterCommentThreadsByTarget(configComments?.threads ?? [], target).length > 0,
+    [configComments?.threads],
+  );
 
   const consumedConfigDefinitionFocusRef = useRef<string | null>(null);
   useEffect(() => {
@@ -823,6 +961,124 @@ export function PageConfigPanel({
     setInternalDetailPageId(null);
     onDetailPageIdChange?.(null);
   };
+
+  const sheetHistoryRef = useRef<ConfigItemDetail[]>([]);
+  const sheetPositionRegistryRef = useRef<Map<string, PositionFieldEntry>>(new Map());
+
+  const openConfigItemSheet = useCallback((detail: ConfigItemDetail) => {
+    const scrollTop = configContentRef.current?.scrollTop ?? 0;
+    sheetParentScrollTopRef.current = scrollTop;
+    sheetPageIdRef.current = selectedPage?.id ?? null;
+    if (sheetRoute) sheetHistoryRef.current.push(sheetRoute);
+    sheetTriggerRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    setSheetRoute({
+      ...detail,
+      breadcrumb: detail.breadcrumb.filter((item, index, all) =>
+        index === 0 || item.id !== all[index - 1]?.id,
+      ),
+      onChangeField: (key, value, meta) => {
+        detail.onChangeField(key, value, meta);
+        setSheetRoute((current) => current && current.itemId === detail.itemId
+          ? { ...current, item: { ...current.item, [key]: value } }
+          : current);
+      },
+      parentScrollTop: scrollTop,
+      parentFocusKey: detail.itemId,
+    });
+  }, [selectedPage?.id, sheetRoute]);
+
+  const handleSheetBack = useCallback(() => {
+    const previous = sheetHistoryRef.current.pop();
+    if (previous) {
+      setSheetRoute(previous);
+      return;
+    }
+    setSheetRoute(null);
+  }, []);
+
+  const handleSheetBreadcrumb = useCallback((_: ConfigBreadcrumb, index: number) => {
+    if (!sheetRoute) return;
+    const target = sheetHistoryRef.current
+      .slice()
+      .reverse()
+      .find((candidate) => candidate.breadcrumb.length - 1 <= index);
+    if (target) {
+      sheetHistoryRef.current = sheetHistoryRef.current.slice(0, sheetHistoryRef.current.lastIndexOf(target));
+      setSheetRoute(target);
+    } else {
+      sheetHistoryRef.current = [];
+      setSheetRoute(null);
+    }
+  }, [sheetRoute]);
+
+  const handleItemDetailInvalidated = useCallback((itemId: string) => {
+    if (sheetRoute?.itemId !== itemId) return;
+    sheetHistoryRef.current = [];
+    sheetPageIdRef.current = null;
+    setSheetRoute(null);
+  }, [sheetRoute?.itemId]);
+
+  useLayoutEffect(() => {
+    if (sheetRoute) return;
+    const scrollContainer = configContentRef.current;
+    if (scrollContainer) {
+      // Preserve the current list position when the Sheet closes. Browsers
+      // may clamp this value after a delete, so use the nearest valid offset.
+      const max = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+      scrollContainer.scrollTop = Math.min(sheetParentScrollTopRef.current, max);
+    }
+    const trigger = sheetTriggerRef.current;
+    if (trigger && document.contains(trigger)) trigger.focus();
+    else configContentRef.current?.focus();
+    sheetTriggerRef.current = null;
+  }, [sheetRoute]);
+
+  useEffect(() => {
+    if (sheetRoute && (!selectedPage || sheetPageIdRef.current !== selectedPage.id || sheetRoute.fieldPath.length === 0)) {
+      sheetHistoryRef.current = [];
+      setSheetRoute(null);
+      sheetPageIdRef.current = null;
+    }
+  }, [selectedPage, sheetRoute]);
+
+  const sheetPositionContext = useMemo<PositionConfigContextValue>(() => ({
+    registerPositionField: (entry) => {
+      sheetPositionRegistryRef.current.set(entry.instanceId, entry);
+      onPositionFieldPathChange?.(entry.instanceId, entry.fieldPath);
+      return () => {
+        if (sheetPositionRegistryRef.current.get(entry.instanceId) === entry) {
+          sheetPositionRegistryRef.current.delete(entry.instanceId);
+        }
+        if (sheetActivePositionIdRef.current === entry.instanceId) {
+          queueMicrotask(() => {
+            if (
+              sheetActivePositionIdRef.current === entry.instanceId &&
+              !sheetPositionRegistryRef.current.has(entry.instanceId)
+            ) {
+              sheetOnExitPositionEditRef.current?.();
+            }
+          });
+        }
+      };
+    },
+    requestPositionEdit: (instanceId) => {
+      const entry = sheetPositionRegistryRef.current.get(instanceId);
+      if (!entry) return;
+      onEnterPositionEdit?.({
+        id: entry.instanceId,
+        fieldPath: entry.fieldPath,
+        domKey: entry.posKey,
+        domOccurrence: entry.domOccurrence,
+        position: entry.currentValue,
+      });
+    },
+    exitPositionEdit: () => onExitPositionEdit?.(),
+    activePositionId: positionEditActiveId ?? null,
+    dimming: positionEditDimming ?? false,
+    onToggleDimming: onTogglePositionDimming,
+  }), [onEnterPositionEdit, onExitPositionEdit, onPositionFieldPathChange, onTogglePositionDimming, positionEditActiveId, positionEditDimming]);
 
   if (!selectedPage) {
     return (
@@ -939,12 +1195,25 @@ export function PageConfigPanel({
   const canRestoreProjectDefaults =
     Boolean(onProjectRestoreDefaults) &&
     (projectCapabilities?.canEditValue ?? !readonly);
+  const canSavePageDefaults =
+    Boolean(onSaveAsDefaults) && (pageCapabilities?.canEditValue ?? !readonly);
+  const canSaveProjectDefaults =
+    Boolean(onProjectSaveAsDefaults) &&
+    (projectCapabilities?.canEditValue ?? !readonly);
   const restoreDefaultsTarget = canRestorePageDefaults
     ? "page"
     : canRestoreProjectDefaults
       ? "project"
       : null;
-  const showConfigActions = canAddConfig || restoreDefaultsTarget !== null;
+  const saveDefaultsTarget = canSavePageDefaults
+    ? "page"
+    : canSaveProjectDefaults
+      ? "project"
+      : null;
+  const showConfigActions =
+    canAddConfig ||
+    restoreDefaultsTarget !== null ||
+    saveDefaultsTarget !== null;
   const configDefinitionCreateScope = canCreatePageConfig ? "page" : "project";
   const hasRequirements = Boolean(requirements?.trim());
   const shouldShowRequirements =
@@ -968,15 +1237,23 @@ export function PageConfigPanel({
     designSpecPanelBounds.availableLeftWidth >= 320 &&
     typeof window !== "undefined" &&
     window.innerWidth >= 768;
-  const bubbleMaxHeight = !designSpecPanelBounds
-    ? undefined
-    : Math.max(240, designSpecPanelBounds.height);
-  const bubbleTop = hasRoomForSideBubble ? designSpecPanelBounds?.top ?? 0 : 16;
-  const sideBubbleTop = hasRoomForSideBubble ? Math.max(8, bubbleTop - 48) : bubbleTop;
   const activeOverlayAnchor = activeDesignSpec?.anchor ?? activeConfigComment?.anchor;
-  const bubbleArrowTop = activeOverlayAnchor && designSpecPanelBounds
-    ? Math.max(18, Math.min(Math.max(18, designSpecPanelBounds.height - 18), ((activeOverlayAnchor.top + activeOverlayAnchor.bottom) / 2) - sideBubbleTop))
-    : 36;
+  const overlayTop = overlayPlacement?.top ?? OVERLAY_VIEWPORT_MARGIN;
+  const overlayMaxHeight = overlayPlacement
+    ? `${overlayPlacement.maxHeight}px`
+    : "calc(100dvh - 32px)";
+  const overlayHeight = overlayPlacement?.height ?? 240;
+  const overlayAnchorCenter = overlayPlacement?.anchorCenter
+    ?? (activeOverlayAnchor
+      ? (activeOverlayAnchor.top + activeOverlayAnchor.bottom) / 2
+      : undefined);
+  const bubbleArrowTop = overlayAnchorCenter === undefined
+    ? 36
+    : clampOverlayValue(
+        overlayAnchorCenter - overlayTop,
+        OVERLAY_ARROW_MARGIN,
+        Math.max(OVERLAY_ARROW_MARGIN, overlayHeight - OVERLAY_ARROW_MARGIN),
+      );
   const designSpecBubble = activeDesignSpec && designSpecPanelBounds && (
     <aside
       ref={designSpecPanelRef}
@@ -984,12 +1261,12 @@ export function PageConfigPanel({
       className="fixed z-[70] flex max-w-[calc(100vw-16px)] flex-col overflow-visible rounded-xl border border-border/70 bg-card shadow-[0_20px_55px_-20px_rgb(0_0_0_/_0.65)] ring-1 ring-black/5"
       style={hasRoomForSideBubble
         ? {
-            top: sideBubbleTop,
+            top: `${overlayTop}px`,
             left: Math.max(8, designSpecPanelBounds.left - Math.min(380, designSpecPanelBounds.availableLeftWidth - 20) - 12),
             width: Math.min(380, designSpecPanelBounds.availableLeftWidth - 20),
-            maxHeight: bubbleMaxHeight ? bubbleMaxHeight + (bubbleTop - sideBubbleTop) : undefined,
+            maxHeight: overlayMaxHeight,
           }
-        : { top: 16, right: 8, left: 8, maxHeight: "calc(100dvh - 32px)" }}
+        : { top: `${overlayTop}px`, right: 8, left: 8, maxHeight: overlayMaxHeight }}
     >
       <span
         aria-hidden="true"
@@ -1055,12 +1332,12 @@ export function PageConfigPanel({
       className="fixed z-[70] flex max-w-[calc(100vw-16px)] flex-col overflow-visible rounded-xl border border-border/70 bg-card shadow-[0_20px_55px_-20px_rgb(0_0_0_/_0.65)] ring-1 ring-black/5"
       style={hasRoomForSideBubble
         ? {
-            top: sideBubbleTop,
+            top: `${overlayTop}px`,
             left: Math.max(8, designSpecPanelBounds.left - Math.min(380, designSpecPanelBounds.availableLeftWidth - 20) - 12),
             width: Math.min(380, designSpecPanelBounds.availableLeftWidth - 20),
-            maxHeight: bubbleMaxHeight ? bubbleMaxHeight + (bubbleTop - sideBubbleTop) : undefined,
+            maxHeight: overlayMaxHeight,
           }
-        : { top: 16, right: 8, left: 8, maxHeight: "calc(100dvh - 32px)" }}
+        : { top: `${overlayTop}px`, right: 8, left: 8, maxHeight: overlayMaxHeight }}
     >
       <span
         aria-hidden="true"
@@ -1086,8 +1363,72 @@ export function PageConfigPanel({
       <ConfigCommentPopover target={activeConfigComment.target} {...configComments} />
     </aside>
   );
+  const sheetCurrentIndex = sheetRoute
+    ? Math.max(0, sheetRoute.getCurrentIndex?.() ?? sheetRoute.index)
+    : 0;
+  const sheetItem = sheetRoute?.getCurrentItem?.() ?? sheetRoute?.item;
+  const sheetFields = sheetRoute
+    ? getDetailFields(sheetRoute.field, sheetItem ?? sheetRoute.item)
+    : [];
+  const sheetSchemaChildPath = (fieldKey: string) => {
+    const parentPath = sheetRoute?.schemaFieldPath ?? sheetRoute?.field.key ?? "";
+    if (sheetRoute?.field.oneOf) {
+      const discriminator = sheetRoute.field.oneOf.discriminator;
+      return `${parentPath}[${discriminator}=${String((sheetItem ?? sheetRoute.item)[discriminator])}].${fieldKey}`;
+    }
+    return `${parentPath}[].${fieldKey}`;
+  };
+  const sheetFieldContent = sheetRoute && (
+    <PositionConfigContext.Provider value={sheetPositionContext}>
+      <div className="flex min-w-0 flex-col gap-5">
+        {sheetFields.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-foreground/20 px-4 py-8 text-center text-sm text-muted-foreground">
+            无配置项
+          </div>
+        ) : (
+          sheetFields.map((field) => (
+            <FieldRenderer
+              key={field.key}
+              field={field}
+              value={(sheetItem ?? sheetRoute.item)[field.key]}
+              onChange={(value, meta) => sheetRoute.onChangeField(field.key, value, meta)}
+              sessionId={sessionId}
+              readonly={readonly}
+              embedded
+              fieldPath={`${sheetRoute.fieldPath}[${sheetCurrentIndex}].${field.key}`}
+              schemaFieldPath={sheetSchemaChildPath(field.key)}
+              imageConfigScope="page"
+              pageId={selectedPage.id}
+              configContextPageId={selectedPage.id}
+              configItemCapabilities={selectedPage.configItemCapabilities?.page}
+              designSpecEntries={effectiveDesignSpecEntries.filter((entry) => entry.scope === "page" && entry.pageId === selectedPage.id)}
+              onEditDesignSpec={onEditDesignSpec}
+              onOpenDesignSpec={(spec, fieldTitle, anchor, trigger) =>
+                toggleDesignSpec({ kind: "config", spec, fieldTitle, anchor }, trigger)}
+              onEditConfigDefinition={onPageDefinitionChange
+                ? (key) => openDefinitionEditor("page", key)
+                : undefined}
+              onAddConfigComment={configComments || onAddConfigComment ? handleOpenConfigComment : undefined}
+              hasConfigComment={configComments ? hasConfigComment : undefined}
+              onLaunchWhiteboard={onLaunchWhiteboard}
+              referenceContext={referenceContext}
+              referenceProvider={referenceProvider}
+              onReferenceClick={onReferenceClick}
+              onOpenItemDetail={openConfigItemSheet}
+              activeItemDetailId={sheetRoute.itemId}
+              activeItemDetailFieldPath={sheetRoute.fieldPath}
+              onItemDetailInvalidated={handleItemDetailInvalidated}
+              breadcrumb={sheetRoute.breadcrumb}
+              arrayDepth={sheetRoute.level}
+              positionInstanceId={field.positionable ? `${sheetRoute.itemId}:${field.key}` : undefined}
+            />
+          ))
+        )}
+      </div>
+    </PositionConfigContext.Provider>
+  );
   return (
-    <div ref={configPanelRef} className={cn("relative flex h-full flex-col bg-card", className)}>
+    <div ref={configPanelRef} className={cn("relative isolate flex h-full flex-col overflow-hidden bg-card", className)}>
       {!hideDetailHeader && (
         <div className="border-b border-border/80 px-4 py-3">
           <div className="flex min-w-0 items-center justify-between gap-3">
@@ -1113,7 +1454,7 @@ export function PageConfigPanel({
         </div>
       )}
       {typeof document !== "undefined" && (designSpecBubble || configCommentBubble) && createPortal(designSpecBubble || configCommentBubble, document.body)}
-      <div className={cn("min-h-0 flex-1 overflow-y-auto p-4", showConfigActions && "pb-20")}>
+      <div ref={configContentRef} tabIndex={-1} className={cn("min-h-0 flex-1 overflow-y-auto p-4", showConfigActions && "pb-20")}>
         <div className="flex flex-col gap-5">
           {selectedPageSpecs.length > 0 && (
             <section className="order-[-1] flex flex-col">
@@ -1196,10 +1537,10 @@ export function PageConfigPanel({
                     designSpecEntries={effectiveDesignSpecEntries.filter((entry) => entry.scope === "project")}
                     onEditDesignSpec={onEditDesignSpec}
                     onOpenDesignSpec={(spec, fieldTitle, anchor, trigger) => toggleDesignSpec({ kind: "config", spec, fieldTitle, anchor }, trigger)}
-                    onEditConfigDefinition={(key) => openDefinitionEditor("project", key)}
+                    onEditConfigDefinition={onProjectDefinitionChange ? (key) => openDefinitionEditor("project", key) : undefined}
                     configItemCapabilities={selectedPage.configItemCapabilities?.project}
                     onAddConfigComment={configComments || onAddConfigComment ? handleOpenConfigComment : undefined}
-                    getConfigCommentCount={getConfigCommentCount}
+                    hasConfigComment={configComments ? hasConfigComment : undefined}
                     imageConfigScope="project"
                     configContextPageId={selectedPage.id}
                     referenceContext={referenceContext}
@@ -1238,10 +1579,10 @@ export function PageConfigPanel({
                   designSpecEntries={effectiveDesignSpecEntries.filter((entry) => entry.scope === "page" && entry.pageId === selectedPage.id)}
                   onEditDesignSpec={onEditDesignSpec}
                   onOpenDesignSpec={(spec, fieldTitle, anchor, trigger) => toggleDesignSpec({ kind: "config", spec, fieldTitle, anchor }, trigger)}
-                  onEditConfigDefinition={(key) => openDefinitionEditor("page", key)}
+                  onEditConfigDefinition={onPageDefinitionChange ? (key) => openDefinitionEditor("page", key) : undefined}
                   configItemCapabilities={selectedPage.configItemCapabilities?.page}
                   onAddConfigComment={configComments || onAddConfigComment ? handleOpenConfigComment : undefined}
-                  getConfigCommentCount={getConfigCommentCount}
+                  hasConfigComment={configComments ? hasConfigComment : undefined}
                   imageConfigScope="page"
                   pageId={selectedPage.id}
                   configContextPageId={selectedPage.id}
@@ -1249,6 +1590,10 @@ export function PageConfigPanel({
                   referenceProvider={referenceProvider}
                   onReferenceClick={onReferenceClick}
                   onLaunchWhiteboard={onLaunchWhiteboard}
+                  onOpenItemDetail={openConfigItemSheet}
+                  activeItemDetailId={sheetRoute?.itemId}
+                  activeItemDetailFieldPath={sheetRoute?.fieldPath}
+                  onItemDetailInvalidated={handleItemDetailInvalidated}
                 />
               </ConfigScopeWrapper>
             </section>
@@ -1364,6 +1709,24 @@ export function PageConfigPanel({
         </div>
       </div>
 
+      <ConfigDetailSheet
+        open={sheetRoute !== null}
+        title={sheetRoute?.title ?? "关卡设置"}
+        // The first two levels live in the parent configuration panel, not in
+        // the Sheet. Keep the full route on `sheetRoute` for back/history
+        // semantics, but expose only the currently opened item in the header.
+        breadcrumb={sheetRoute?.breadcrumb.slice(-1)}
+        onClose={handleSheetBack}
+        onNavigate={handleSheetBreadcrumb}
+        closeLabel="关闭关卡设置"
+        backLabel="返回关卡列表"
+        containerRef={configPanelRef}
+        underlayRef={configContentRef}
+        lockBodyScroll={false}
+      >
+        {sheetFieldContent}
+      </ConfigDetailSheet>
+
       {showConfigActions && (
         <Popover open={configActionsOpen} onOpenChange={setConfigActionsOpen}>
           <PopoverTrigger asChild>
@@ -1395,6 +1758,19 @@ export function PageConfigPanel({
                 >
                   <Plus className="h-4 w-4 shrink-0" />
                   <span>添加配置项</span>
+                </button>
+              )}
+              {saveDefaultsTarget && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfigActionsOpen(false);
+                    setSaveDefaultsScope(saveDefaultsTarget);
+                  }}
+                  className="flex h-10 w-full cursor-pointer items-center gap-2 rounded-md px-3 text-left text-sm text-foreground transition-colors duration-200 hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Save className="h-4 w-4 shrink-0" />
+                  <span>保存为默认</span>
                 </button>
               )}
               {restoreDefaultsTarget && (
@@ -1449,6 +1825,46 @@ export function PageConfigPanel({
           onSave={definitionImpact?.kind === "ai_required" ? undefined : saveDefinitionEditor}
         />
       )}
+
+      <Dialog
+        open={saveDefaultsScope !== null}
+        onOpenChange={(open) => {
+          if (!open) setSaveDefaultsScope(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>保存为默认配置</DialogTitle>
+            <DialogDescription>
+              {saveDefaultsScope === "project"
+                ? `将使用当前共享配置值覆盖项目级默认配置，影响 ${sharedAffectedPages.length} 个页面，所有页面将使用新默认值。确认保存？`
+                : "将使用当前本页配置覆盖默认配置，新项目或新增页面将使用新默认值。确认保存？"}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSaveDefaultsScope(null)}
+            >
+              取消
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                if (saveDefaultsScope === "project") {
+                  onProjectSaveAsDefaults?.();
+                } else if (saveDefaultsScope === "page" && selectedPage) {
+                  onSaveAsDefaults?.(selectedPage.id);
+                }
+                setSaveDefaultsScope(null);
+              }}
+            >
+              确认
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={restoreDefaultsScope !== null}

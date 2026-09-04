@@ -24,6 +24,8 @@ interface BuildCrepeConfigOptions {
   enableUploads?: boolean;
   referenceCandidates?: ConfigReferenceCandidate[];
   enableProjectReferences?: boolean;
+  /** 是否显示固定顶部格式工具栏；选区浮动工具栏由 Toolbar 特性独立控制。 */
+  showTopBar?: boolean;
 }
 
 export function buildCrepeConfig({
@@ -32,6 +34,7 @@ export function buildCrepeConfig({
   enableUploads = false,
   referenceCandidates = [],
   enableProjectReferences = false,
+  showTopBar = true,
 }: BuildCrepeConfigOptions): Pick<CrepeConfig, "features" | "featureConfigs"> {
   return {
     features: {
@@ -45,7 +48,7 @@ export function buildCrepeConfig({
       [Crepe.Feature.CodeMirror]: true,
       [Crepe.Feature.Table]: true,
       [Crepe.Feature.Latex]: false,
-      [Crepe.Feature.TopBar]: true,
+      [Crepe.Feature.TopBar]: showTopBar,
       [Crepe.Feature.AI]: false,
     },
     featureConfigs: {

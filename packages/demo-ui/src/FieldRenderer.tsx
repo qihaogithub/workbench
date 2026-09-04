@@ -5,7 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Select,
   SelectContent,
@@ -30,14 +30,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   DocumentEditor,
   type MarkdownReferenceClickHandler,
   type MarkdownReferenceContext,
   type MarkdownReferenceProvider,
 } from "./DocumentEditor";
-import type { ConfigChangeMeta, ConfigCommentTarget, ConfigItemCapabilities, DesignSpecEntryLink, ImageConfigScope, WhiteboardLauncher } from "./types";
+import type { ConfigBreadcrumb, ConfigChangeMeta, ConfigCommentTarget, ConfigItemCapabilities, ConfigItemDetailHandler, DesignSpecEntryLink, ImageConfigScope, WhiteboardLauncher } from "./types";
 import { ImageInputActions } from "./ImageInputActions";
 import { localizeRemoteImageForSession } from "./markdown/remote-image-localizer";
 
@@ -107,9 +106,10 @@ export function FieldRenderer({
   onEditConfigDefinition,
   configItemCapabilities,
   onAddConfigComment,
-  configCommentCount = 0,
+  hasConfigComment,
   embedded,
   fieldPath,
+  schemaFieldPath,
   defaultValueOverride,
   positionInstanceId,
   positionDomOccurrence,
@@ -120,6 +120,12 @@ export function FieldRenderer({
   referenceContext,
   referenceProvider,
   onReferenceClick,
+  onOpenItemDetail,
+  activeItemDetailId,
+  activeItemDetailFieldPath,
+  onItemDetailInvalidated,
+  breadcrumb,
+  arrayDepth,
 }: {
   field: FieldConfig;
   value: unknown;
@@ -132,9 +138,11 @@ export function FieldRenderer({
   onEditConfigDefinition?: (fieldKey: string, field: FieldConfig) => void;
   configItemCapabilities?: ConfigItemCapabilities;
   onAddConfigComment?: (target: ConfigCommentTarget, trigger?: HTMLElement | null) => void;
-  configCommentCount?: number;
+  hasConfigComment?: (target: ConfigCommentTarget) => boolean;
   embedded?: boolean;
   fieldPath?: string;
+  /** Canonical schema path used by design-spec links; unlike fieldPath it has no array indexes. */
+  schemaFieldPath?: string;
   /** Parent object-array defaults are resolved at the current array index. */
   defaultValueOverride?: unknown;
   positionInstanceId?: string;
@@ -146,11 +154,21 @@ export function FieldRenderer({
   referenceContext?: MarkdownReferenceContext;
   referenceProvider?: MarkdownReferenceProvider;
   onReferenceClick?: MarkdownReferenceClickHandler;
+  onOpenItemDetail?: ConfigItemDetailHandler;
+  activeItemDetailId?: string | null;
+  activeItemDetailFieldPath?: string;
+  onItemDetailInvalidated?: (itemId: string) => void;
+  breadcrumb?: ConfigBreadcrumb[];
+  arrayDepth?: number;
 }) {
   const canEditValue = !readonly && (configItemCapabilities?.canEditValue ?? true);
-  const canEditDefinition = !readonly && (configItemCapabilities?.canEditDefinition ?? Boolean(onEditConfigDefinition));
-  const canAddComment =
-    (configItemCapabilities?.canAddComment ?? true) && Boolean(onAddConfigComment);
+  const canEditDefinition = !readonly && !field.isConst && (!schemaFieldPath || schemaFieldPath === field.key)
+    && (configItemCapabilities?.canEditDefinition ?? Boolean(onEditConfigDefinition));
+  // A read-only host still needs the entry point to inspect existing threads;
+  // the popover controller owns whether write controls are available.
+  const canShowCommentTag = Boolean(onAddConfigComment) && (
+    (configItemCapabilities?.canAddComment ?? true) || Boolean(hasConfigComment)
+  );
   const effectiveReadonly = !canEditValue;
   const effectiveDefault = defaultValueOverride !== undefined
     ? defaultValueOverride
@@ -376,10 +394,11 @@ export function FieldRenderer({
           <ArrayFieldGroup
             field={field}
             value={(value as Record<string, unknown>[]) || []}
-            onChange={(newValue) => onChange(newValue)}
+            onChange={(newValue, meta) => onChange(newValue, meta)}
             sessionId={sessionId}
             readonly={effectiveReadonly}
             fieldPath={fieldPath}
+            schemaFieldPath={schemaFieldPath}
             defaultValueOverride={effectiveDefault}
             imageConfigScope={imageConfigScope}
                                 pageId={pageId}
@@ -388,6 +407,19 @@ export function FieldRenderer({
             configItemCapabilities={configItemCapabilities}
             onEditConfigDefinition={onEditConfigDefinition}
             onAddConfigComment={onAddConfigComment}
+            hasConfigComment={hasConfigComment}
+            designSpecEntries={designSpecEntries}
+            onEditDesignSpec={onEditDesignSpec}
+            onOpenDesignSpec={onOpenDesignSpec}
+            referenceContext={referenceContext}
+            referenceProvider={referenceProvider}
+            onReferenceClick={onReferenceClick}
+            onOpenItemDetail={onOpenItemDetail}
+            activeItemDetailId={activeItemDetailId}
+            activeItemDetailFieldPath={activeItemDetailFieldPath}
+            onItemDetailInvalidated={onItemDetailInvalidated}
+            breadcrumb={breadcrumb}
+            arrayDepth={arrayDepth}
           />
         );
       }
@@ -632,7 +664,7 @@ export function FieldRenderer({
   };
 
   const linkedSpecs = designSpecEntries.filter(
-    (entry) => entry.fieldKey === field.key && entry.markdown.trim(),
+    (entry) => entry.fieldKey === (schemaFieldPath ?? field.key) && entry.markdown.trim(),
   );
   const imageDimensions = formatImageDimensions(field.uiOptions);
   const showImageHint =
@@ -653,111 +685,27 @@ export function FieldRenderer({
     kind: "config",
     scope: configCommentScope,
     ...(configCommentScope === "page" && pageId ? { pageId } : {}),
-    fieldKey: field.key,
+    // Comments follow the same canonical schema identity as design-spec refs;
+    // runtime array indexes are intentionally absent from this key.
+    fieldKey: schemaFieldPath ?? field.key,
     fieldTitleSnapshot: field.title,
   };
-  const canAddCommentAction = canAddComment && Boolean(onAddConfigComment);
-  const hasConfigActions =
-    (canEditDefinition && Boolean(onEditConfigDefinition)) || canAddCommentAction;
-  const [titleMenuOpen, setTitleMenuOpen] = useState(false);
-  const ignoreTitleFocusRef = useRef(false);
-  const titleMenuCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cancelTitleMenuClose = useCallback(() => {
-    if (titleMenuCloseTimerRef.current !== null) {
-      clearTimeout(titleMenuCloseTimerRef.current);
-      titleMenuCloseTimerRef.current = null;
-    }
-  }, []);
-  const scheduleTitleMenuClose = useCallback(() => {
-    cancelTitleMenuClose();
-    titleMenuCloseTimerRef.current = setTimeout(() => {
-      setTitleMenuOpen(false);
-      titleMenuCloseTimerRef.current = null;
-    }, 180);
-  }, [cancelTitleMenuClose]);
-  useEffect(() => () => cancelTitleMenuClose(), [cancelTitleMenuClose]);
-  const titleTrigger = (
+  const commentTagActive = hasConfigComment?.(configCommentTarget) ?? false;
+  const titleContent = canEditDefinition && onEditConfigDefinition ? (
     <button
       type="button"
-      aria-label={`${field.title}配置项操作`}
-      onMouseEnter={() => {
-        cancelTitleMenuClose();
-        if (hasConfigActions) setTitleMenuOpen(true);
-      }}
-      onMouseLeave={scheduleTitleMenuClose}
-      onFocus={() => {
-        cancelTitleMenuClose();
-        if (ignoreTitleFocusRef.current) {
-          ignoreTitleFocusRef.current = false;
-          return;
-        }
-        if (hasConfigActions) setTitleMenuOpen(true);
-      }}
-      className="flex min-w-0 max-w-full cursor-pointer items-center gap-1 truncate rounded-sm text-left text-sm font-medium text-foreground/70 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+      aria-label={`编辑配置项：${field.title}`}
+      onClick={() => onEditConfigDefinition(field.key, field)}
+      className="flex min-w-0 cursor-pointer items-center truncate rounded-sm text-left text-sm font-medium text-foreground/70 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
     >
       <span className="truncate">{fieldLabel}</span>
-      {configCommentCount > 0 && (
-        <span
-          aria-label={`${configCommentCount}条未解决批注`}
-          className="inline-flex size-1.5 shrink-0 rounded-full bg-blue-500"
-        />
-      )}
     </button>
-  );
-  const titleContent = hasConfigActions ? (
-    <Popover open={titleMenuOpen} onOpenChange={setTitleMenuOpen}>
-      <PopoverTrigger asChild>{titleTrigger}</PopoverTrigger>
-      <PopoverContent
-        align="start"
-        side="bottom"
-        sideOffset={6}
-        className="w-40 p-1"
-        onMouseEnter={cancelTitleMenuClose}
-        onMouseLeave={scheduleTitleMenuClose}
-        onFocus={cancelTitleMenuClose}
-        onBlur={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-            scheduleTitleMenuClose();
-          }
-        }}
-      >
-        {canEditDefinition && onEditConfigDefinition && (
-          <button
-            type="button"
-            className="flex h-9 w-full items-center gap-2 rounded-md px-2 text-left text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label={`编辑配置项：${field.title}`}
-            onClick={() => {
-              ignoreTitleFocusRef.current = true;
-              setTitleMenuOpen(false);
-              onEditConfigDefinition(field.key, field);
-            }}
-          >
-            <Pencil className="h-3.5 w-3.5" />
-            <span>编辑配置项</span>
-          </button>
-        )}
-        {canAddCommentAction && (
-          <button
-            type="button"
-            className="flex h-9 w-full items-center gap-2 rounded-md px-2 text-left text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label={`添加批注：${field.title}`}
-            onClick={(event) => {
-              ignoreTitleFocusRef.current = true;
-              setTitleMenuOpen(false);
-              onAddConfigComment?.(configCommentTarget, event.currentTarget);
-            }}
-          >
-            <MessageSquare className="h-3.5 w-3.5" />
-            <span>添加批注</span>
-          </button>
-        )}
-      </PopoverContent>
-    </Popover>
   ) : (
     <Label className="block min-w-0 truncate text-sm font-medium text-foreground/70">
       {fieldLabel}
     </Label>
   );
+  const tagBaseClassName = "inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
   return (
     <div
@@ -769,32 +717,53 @@ export function FieldRenderer({
       )}
     >
       {field.title !== "" && (
-      <div className={cn("flex min-w-0 items-start gap-1", isInlineControl ? "min-w-0 flex-1" : "w-full")}>
+      <div className={cn("group flex min-w-0 items-start gap-1", isInlineControl ? "min-w-0 flex-1" : "w-full")}>
         <div className="min-w-0 flex-1">
-          {titleContent}
+          <div className="flex min-w-0 items-center gap-2">
+            {titleContent}
+            {linkedSpecs.length > 0 && onOpenDesignSpec && (
+              <button
+                type="button"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  onOpenDesignSpec(
+                    linkedSpecs[0],
+                    field.title,
+                    rect.width || rect.height ? { top: rect.top, bottom: rect.bottom } : undefined,
+                    event.currentTarget,
+                  );
+                }}
+                className={cn(tagBaseClassName, "bg-blue-600 text-white shadow-sm hover:bg-blue-700 focus-visible:ring-blue-500")}
+                aria-label={`查看设计规范：${field.title}`}
+              >
+                <FileText className="h-3 w-3" />规范
+              </button>
+            )}
+            {canShowCommentTag && onAddConfigComment && (
+              <div className="pointer-events-none flex shrink-0 items-center opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+                <button
+                  type="button"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onAddConfigComment(configCommentTarget, event.currentTarget);
+                  }}
+                  className={cn(
+                    tagBaseClassName,
+                    commentTagActive
+                      ? "bg-amber-400 text-amber-950 shadow-sm hover:bg-amber-300 focus-visible:ring-amber-400"
+                      : "bg-foreground/[0.08] text-foreground/55 hover:bg-foreground/[0.14] hover:text-foreground focus-visible:ring-ring",
+                  )}
+                  aria-label={`查看或添加批注：${field.title}`}
+                >
+                  <MessageSquare className="h-3 w-3" />批注
+                </button>
+              </div>
+            )}
+          </div>
           {showImageHint && <p className="mt-0.5 truncate text-[13px] font-medium text-foreground/30">{imageDimensions}</p>}
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-          {linkedSpecs.length > 0 && onOpenDesignSpec && (
-            <button
-              type="button"
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
-                event.stopPropagation();
-                const rect = event.currentTarget.getBoundingClientRect();
-                onOpenDesignSpec(
-                  linkedSpecs[0],
-                  field.title,
-                  rect.width || rect.height ? { top: rect.top, bottom: rect.bottom } : undefined,
-                  event.currentTarget,
-                );
-              }}
-              className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full bg-blue-600 px-1.5 py-0.5 text-[11px] font-medium text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-              aria-label={`查看设计规范：${field.title}`}
-            >
-              <FileText className="h-3 w-3" />规范
-            </button>
-          )}
         </div>
       </div>
       )}

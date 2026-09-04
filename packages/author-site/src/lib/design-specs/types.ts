@@ -4,6 +4,7 @@
 export interface DesignSpecRef {
   scope: "project" | "page";
   pageId?: string;
+  /** Schema field key or canonical nested path without runtime array indexes. */
   fieldKey: string;
 }
 
@@ -65,6 +66,10 @@ export interface ConfigPoolItem {
   pageName?: string;
   key: string;
   title: string;
+  /** Field hierarchy from the schema root to this field. */
+  breadcrumbs?: string[];
+  /** Discriminator/const fields are inspectable but have no definition editor. */
+  isConst?: boolean;
   kind: ConfigPoolItemKind;
   value?: unknown;
   category?: string;
@@ -80,6 +85,6 @@ export interface ConfigPoolItem {
     hMin?: boolean;
     hAny?: boolean;
   } | null;
-  /** 项目级配置项受影响的页面标题，用于素材池拆分展示 */
-  pages?: string[];
+  /** 项目级配置项受影响的页面 IDs，用于页面筛选。 */
+  pageIds?: string[];
 }

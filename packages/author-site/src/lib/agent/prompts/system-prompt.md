@@ -254,9 +254,11 @@ blocks.map(block => {
   "type": "array",
   "title": "模块列表",
   "$demo": { "sortable": true },
-  "items": { ... }
+"items": { ... }
 }
 ```
+
+需要父子层级但不允许条目换序时，继续使用嵌套对象数组（父项的 `items.properties` 中声明子数组），并且每个对象数组都必须显式写 `"$demo": { "sortable": true/false }`。`false` 表示该层只维护父子关系，配置面板仍提供展开、添加和删除；`true` 才显示拖拽手柄并允许当前数组排序。父级是否可排序不会传递给子级；不要为此新增 `tree` 类型或扁平化 `parentId` 字段。
 
 - **模块数量限制（`$demo.maxItems`）**：与 `sortable` 配合使用。当某模块类型有数量上限，在该 variant 上声明 `"$demo": { "maxItems": N }`（单例模块写 `1`）；未声明 `maxItems` 的模块类型视为不限数量。声明后配置面板会自动置灰添加按钮并显示 `(n/max)`，**页面代码无需再为该类型编写去重逻辑**；`default` 数组中各类型的数量也必须符合 `maxItems` 约束。`$demo.maxItems` 是模块数量元数据，不属于"配置字段增删"，创建模块数组时应主动声明，无需用户逐条指示。
 

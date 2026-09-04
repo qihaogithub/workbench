@@ -36,6 +36,7 @@
     "blanks": {
       "type": "array",
       "title": "空",
+      "$demo": { "sortable": true },
       "items": {
         "type": "object",
         "properties": {
@@ -90,6 +91,7 @@
     "options": {
       "type": "array",
       "title": "选项",
+      "$demo": { "sortable": true },
       "items": {
         "type": "object",
         "properties": {

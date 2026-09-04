@@ -15,6 +15,7 @@
     "./config-binding-utils": "./src/config-binding-utils.ts",
     "./ConfigDefinitionManagerDialog": "./src/ConfigDefinitionManagerDialog.tsx",
     "./ConfigItemEditorDialog": "./src/ConfigItemEditorDialog.tsx",
+    "./ConfigDetailSheet": "./src/ConfigDetailSheet.tsx",
     "./compile-cache": "./src/compile-cache.ts",
     "./validator": "./src/validator.ts",
     "./DocumentEditor": "./src/DocumentEditor.tsx",

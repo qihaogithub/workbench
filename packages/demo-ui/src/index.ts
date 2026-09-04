@@ -6,6 +6,9 @@ export type {
   DemoSchema,
   PreviewPanelProps,
   ConfigFormProps,
+  ConfigBreadcrumb,
+  ConfigItemDetail,
+  ConfigItemDetailHandler,
   ConfigItemCapabilities,
   ConfigCommentTarget,
   ImageConfigScope,
@@ -171,6 +174,8 @@ export {
 } from "./config-binding-utils";
 export type { PageConfigPanelPage } from "./PageConfigPanel";
 export { ConfigForm } from "./ConfigForm";
+export { ConfigDetailSheet } from "./ConfigDetailSheet";
+export type { ConfigDetailSheetProps } from "./ConfigDetailSheet";
 export { OptionGroup } from "./OptionGroup";
 export type {
   OptionGroupProps,
@@ -240,12 +245,14 @@ export type {
   DocumentEditorProps,
   DocumentUploadHandler,
   DocumentRemoteImageHandler,
+  MarkdownMentionCandidate,
   MarkdownReferenceContext,
   MarkdownReferenceProvider,
   MarkdownReferenceClickHandler,
 } from "./DocumentEditor";
 export { localizeRemoteImageForSession } from "./markdown/remote-image-localizer";
 export { RichTextEditor } from "./RichTextEditor";
+export type { RichTextEditorProps } from "./RichTextEditor";
 export { customWidgets, ColorPickerWidget, FileUploadWidget } from "./widgets";
 export type {
   FileUploadWidgetOptions,
@@ -262,6 +269,8 @@ export {
   CommentLayer,
   CommentPin,
   CommentThreadPopover,
+  ConfigCommentPopover,
+  CommentMarkdownEditor,
   CommentCreatePopover,
   MentionPicker,
   MentionTextarea,
@@ -291,6 +300,8 @@ export type {
   CommentPageMeta,
   DocumentCommentPanelProps,
   CommentUnreadDotProps,
+  ConfigCommentPopoverProps,
+  CommentMarkdownEditorProps,
 } from "./comment";
 export { PreviewCanvas } from "./PreviewCanvas";
 export { CanvasViewport } from "./CanvasViewport";

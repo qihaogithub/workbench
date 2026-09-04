@@ -1,0 +1,40 @@
+{
+  "id": "prv_1788450881608_uplyf9",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "kind": "page",
+  "resourceId": "page_swfq",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "workspaceRevision": 1370,
+  "workspaceRootHash": "8817fc22ff7396725353a160f37be7fd8f271b70600ff890424c9549dfa919e0",
+  "previousVersionId": "prv_1788321107509_fzby7n",
+  "contentHash": "827f945a34c7232b3a889e2980343f3770129ef7d004dbbc0392d6be40ce4c60",
+  "blobRefs": [
+    "fa448b30b39259cbeb3b1b680009b2bd6d34d8e849f168c16ec28448312ee64b",
+    "794ed90f5369ec496c75ebf879a53dd8ac8b48a563b1b21196828a8a0359913b"
+  ],
+  "metadata": {
+    "page": {
+      "id": "page_swfq",
+      "name": "开场引入-视频",
+      "routeKey": "page-10",
+      "order": 0,
+      "parentId": "folder_1785397477311_od13vu",
+      "runtimeType": "high-fidelity-react",
+      "isTemplatePage": false
+    },
+    "files": {
+      "schema": "fa448b30b39259cbeb3b1b680009b2bd6d34d8e849f168c16ec28448312ee64b",
+      "code": "794ed90f5369ec496c75ebf879a53dd8ac8b48a563b1b21196828a8a0359913b"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "high-fidelity-react",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1788450881616,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "持续编辑自动记录开场引入-视频"
+}

@@ -431,6 +431,8 @@ pnpm --filter @workbench/project-cli test
 
 Markdown 编辑器（DocumentEditor）：
 
+- 自动聚焦必须通过当前 Crepe 实例的 `editorViewCtx`，不能查询宿主内第一个 `.ProseMirror`；StrictMode 重挂载时旧实例的异步销毁会短暂留下重复正文节点。焦点/挂载回归必须包含真实 Milkdown 与 StrictMode，模拟编辑器不能覆盖该竞态。
+
 - `packages/demo-ui/src/DocumentEditor.tsx` 是项目唯一的 Markdown 富文本编辑器，基于 **Milkdown Crepe v7**；Markdown 即主线模型，实现实时渲染输入。**已不再使用 TipTap、自研 Milkdown native-ui 或 prosemirror-markdown**，勿再引用旧实现。
 - Crepe 统一提供 `/` 块菜单、选中文本浮动格式条、块拖拽、链接、图片、表格、代码块、列表、光标与占位体验；项目能力通过 `packages/demo-ui/src/markdown/crepe-config.ts` 的 `BlockEdit.buildMenu` 追加配置引用、视频和附件，图片上传复用 `ImageBlock` 配置。TopBar 已启用，Latex 和 Crepe AI 明确关闭。
 - `DocumentEditor` 直接管理单一 Crepe 实例；受控 `value`/`onChange` 用 `lastEmittedRef` 防回环，外部同步用底层 Milkdown `replaceAll`，只读切换用 `crepe.setReadonly`，卸载必须销毁实例。

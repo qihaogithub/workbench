@@ -1,0 +1,44 @@
+{
+  "id": "prv_1788450929633_7hkbw2",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "kind": "page",
+  "resourceId": "page_duak",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "workspaceRevision": 1375,
+  "workspaceRootHash": "dd541b4abe0e5e20d8583231df6fdd63e040c68ab1c39170ec2b5fa2f44036be",
+  "previousVersionId": "prv_1788450895313_vdewkd",
+  "contentHash": "d7c771c1c3d397de13aaa393180228c275ff5d4031212a0e6564af093af828ff",
+  "blobRefs": [
+    "e3ee6c8dcc01eea6e995236998664acad88c5a705ccf74f9a8d76240e93ebb86",
+    "005531d43579f55329c88fc4030a6c8b8a26dc9c5c4f8627fb6fb0bb4bc1295b",
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1"
+  ],
+  "metadata": {
+    "page": {
+      "id": "page_duak",
+      "name": "规则页面",
+      "routeKey": "page-6",
+      "order": 6,
+      "parentId": "folder_1785397477311_od13vu",
+      "runtimeType": "prototype-html-css",
+      "isTemplatePage": false
+    },
+    "files": {
+      "schema": "e3ee6c8dcc01eea6e995236998664acad88c5a705ccf74f9a8d76240e93ebb86",
+      "prototypeHtml": "005531d43579f55329c88fc4030a6c8b8a26dc9c5c4f8627fb6fb0bb4bc1295b",
+      "prototypeCss": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "prototypeMeta": "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1"
+    }
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "runtimeType": "prototype-html-css",
+    "materializerVersion": "project-core-content-graph-v1",
+    "migrationStatus": "native"
+  },
+  "createdAt": 1788450929636,
+  "createdBy": "qihao",
+  "source": "user",
+  "note": "持续编辑自动记录规则页面"
+}

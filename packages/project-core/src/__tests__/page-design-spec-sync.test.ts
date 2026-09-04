@@ -97,6 +97,34 @@ describe("页面设计规范自动同步", () => {
     ]);
   });
 
+  it("自动字段改名时保留已有 Markdown 说明", () => {
+    const input = {
+      workspacePath,
+      pageId: "home",
+      pageName: "首页",
+      schema: JSON.stringify({ properties: { hero: { type: "image", title: "首图" } } }),
+    };
+    applyPageDesignSpecSync(input);
+    const { manifest, doc } = readDoc();
+    const entry = doc.entries.find((candidate) => candidate.autoManagedFieldKey === "hero");
+    expect(entry).toBeDefined();
+    entry!.markdown = "保留 **Markdown**";
+    fs.writeFileSync(
+      path.join(workspacePath, "design-spec", `spec-${manifest.items[0].id}.json`),
+      JSON.stringify(doc, null, 2),
+      "utf-8",
+    );
+
+    applyPageDesignSpecSync({
+      ...input,
+      schema: JSON.stringify({ properties: { hero: { type: "image", title: "新版首图" } } }),
+    });
+
+    expect(readDoc().doc.entries).toEqual([
+      expect.objectContaining({ title: "新版首图", markdown: "保留 **Markdown**", autoManagedFieldKey: "hero" }),
+    ]);
+  });
+
   it("页面改名时更新自动文档标题", () => {
     const input = {
       workspacePath,
@@ -152,5 +180,30 @@ describe("页面设计规范自动同步", () => {
         target: { type: "page", pageIds: ["home", "lesson-2"] },
       }),
     ]);
+  });
+
+  it("递归同步 oneOf 分支中的图片和动效字段", () => {
+    applyPageDesignSpecSync({
+      workspacePath,
+      pageId: "home",
+      pageName: "首页",
+      schema: JSON.stringify({
+        properties: {
+          modules: {
+            type: "array",
+            items: { oneOf: [{ properties: {
+              type: { const: "hero" },
+              poster: { type: "string", format: "image", title: "封面" },
+              animation: { type: "motion", title: "动效" },
+            } }] },
+          },
+        },
+      }),
+    });
+    const { doc } = readDoc();
+    expect(doc.entries).toEqual(expect.arrayContaining([
+      expect.objectContaining({ autoManagedFieldKey: "modules[type=hero].poster" }),
+      expect.objectContaining({ autoManagedFieldKey: "modules[type=hero].animation" }),
+    ]));
   });
 });

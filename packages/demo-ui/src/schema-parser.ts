@@ -18,6 +18,8 @@ export interface CascadeOption {
 
 export interface FieldConfig {
   key: string;
+  /** Canonical path in the original schema when an object group is flattened. */
+  schemaPath?: string;
   title: string;
   type: string;
   description?: string;
@@ -31,6 +33,14 @@ export interface FieldConfig {
   format?: string;
   uiWidget?: string;
   uiOptions?: Record<string, unknown>;
+  /** Whether object-array rows can be reordered; missing declarations are treated as non-sortable. */
+  sortable?: boolean;
+  /** Opt-in presentation for object-array item details. */
+  detailPresentation?: "inline" | "sheet";
+  /** Optional label used for the item-detail breadcrumb. */
+  detailBreadcrumbTitle?: string;
+  /** Optional title template for object-array rows; `{index}` is a 1-based, zero-padded index. */
+  itemTitleTemplate?: string;
   category?: string;
   visibleWhen?: VisibleWhenCondition;
   note?: string;
@@ -42,6 +52,8 @@ export interface FieldConfig {
   multiple?: boolean;
   options?: CascadeOption[];
   positionable?: { key?: string; size?: { width: number; height: number } };
+  /** Discriminator/const fields are read-only values, not definition-editable fields. */
+  isConst?: boolean;
 }
 
 import { isAtomicConfigField } from "@workbench/shared";
@@ -89,6 +101,12 @@ function formatFieldName(key: string): string {
     .trim();
 }
 
+function constType(value: unknown): string {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "array";
+  return typeof value;
+}
+
 function hasPositionable(prop: Record<string, unknown>): boolean {
   const demo = prop.$demo as Record<string, unknown> | undefined;
   return !!(demo?.positionable);
@@ -126,6 +144,7 @@ export function flattenSchema(parsed: Record<string, unknown>): Record<string, u
 
       for (const [nestedKey, nestedProp] of Object.entries(nestedProps)) {
         const nestedObj = { ...nestedProp };
+        nestedObj.__schemaPath = `${key}.${nestedKey}`;
         const existingUi = isPlainRecord(nestedObj["ui:options"])
           ? { ...(nestedObj["ui:options"] as Record<string, unknown>) }
           : {};
@@ -172,10 +191,15 @@ function parseFieldConfig(
   const uiOptions = isPlainRecord(prop["ui:options"])
     ? (prop["ui:options"] as Record<string, unknown>)
     : undefined;
+  const demoOptions = isPlainRecord(prop.$demo)
+    ? (prop.$demo as Record<string, unknown>)
+    : undefined;
   const field: FieldConfig = {
     key,
+    schemaPath: typeof prop.__schemaPath === "string" ? prop.__schemaPath : undefined,
     title: typeof prop.title === "string" ? prop.title : formatFieldName(key),
-    type: (prop.type as string) || "string",
+    type: (prop.type as string) || (prop.const !== undefined ? constType(prop.const) : "string"),
+    isConst: prop.const !== undefined,
     description: prop.description as string | undefined,
     required,
     default: prop.default,
@@ -187,6 +211,19 @@ function parseFieldConfig(
     format: prop.format as string | undefined,
     uiWidget: prop["ui:widget"] as string | undefined,
     uiOptions,
+    sortable: typeof demoOptions?.sortable === "boolean" ? demoOptions.sortable : false,
+    detailPresentation:
+      uiOptions?.detailPresentation === "sheet" || uiOptions?.detailPresentation === "inline"
+        ? uiOptions.detailPresentation
+        : undefined,
+    detailBreadcrumbTitle:
+      typeof uiOptions?.detailBreadcrumbTitle === "string"
+        ? uiOptions.detailBreadcrumbTitle
+        : undefined,
+    itemTitleTemplate:
+      typeof uiOptions?.itemTitleTemplate === "string"
+        ? uiOptions.itemTitleTemplate
+        : undefined,
     category:
       typeof uiOptions?.category === "string"
         ? uiOptions.category.trim()

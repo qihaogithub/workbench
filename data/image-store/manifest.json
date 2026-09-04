@@ -11469,6 +11469,69 @@
       "whiteboardRefs": [
         "wb_8944507229b044b68c7c5d8d28f74406"
       ]
+    },
+    {
+      "id": "img_wPhRqRzidFRrnQ",
+      "sha256": "1197c0b3b1704ad33cdfda0fddf25abc44d4cd6b25132596299694785cc1da94",
+      "filename": "image_1788431474293_0.png",
+      "mimeType": "image/png",
+      "sizeBytes": 83087,
+      "width": 682,
+      "height": 1258,
+      "sourceType": "user_upload",
+      "createdAt": 1788431474301,
+      "createdBy": "ai-agent",
+      "projectRefs": [
+        "proj_1785135808250_r4cb4a"
+      ]
+    },
+    {
+      "id": "img_tFdqWf6UOyAQdA",
+      "sha256": "cccc2f6c583bb4d36d22e110e0891550eb495ba3ee28619f1ca6cbf028ffd0f3",
+      "filename": "whiteboard-source-background.png",
+      "mimeType": "image/png",
+      "sizeBytes": 91897,
+      "width": 330,
+      "height": 368,
+      "sourceType": "remote_url",
+      "sourceUrl": "https://img.onlywnn.cn/figma/h_e589fc90.png",
+      "createdAt": 1788442376129,
+      "createdBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "projectRefs": [],
+      "whiteboardManaged": true,
+      "whiteboardRefs": [
+        "wb_74787e16fe3943f7a4d359aa191abded"
+      ]
+    },
+    {
+      "id": "img_stp_GjewB69v7A",
+      "sha256": "82c13270c1c628d32ebbde91be97cde86eda1730a9a8fde1109ab8f076be0997",
+      "filename": "image_1788486856353_0.png",
+      "mimeType": "image/png",
+      "sizeBytes": 259492,
+      "width": 892,
+      "height": 1101,
+      "sourceType": "user_upload",
+      "createdAt": 1788486856381,
+      "createdBy": "ai-agent",
+      "projectRefs": [
+        "proj_1785135808250_r4cb4a"
+      ]
+    },
+    {
+      "id": "img_S5_tiyYeuTb0Tw",
+      "sha256": "154a1c60e3897e68251639cd953c4f8b134c61db56b4f32b19c68a7d0196b66e",
+      "filename": "image_1788493615410_0.png",
+      "mimeType": "image/png",
+      "sizeBytes": 210652,
+      "width": 686,
+      "height": 452,
+      "sourceType": "user_upload",
+      "createdAt": 1788493615425,
+      "createdBy": "ai-agent",
+      "projectRefs": [
+        "proj_1785135808250_r4cb4a"
+      ]
     }
   ]
 }

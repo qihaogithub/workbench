@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { BookOpen, ChevronDown, ChevronRight, FileText, FolderOpen, Loader2 } from "lucide-react";
 import type { KnowledgeIndexItem } from "@workbench/shared";
 import type { MarkdownReferenceTarget } from "@workbench/shared/markdown-reference";
-import { DocumentEditor, PageRequirements, parseSchemaToFields } from "@workbench/demo-ui";
+import { DocumentEditor, PageRequirements } from "@workbench/demo-ui";
+import { enumerateSchemaFields, type SchemaCatalogField } from "@workbench/shared/demo/config-schema-fields";
 import { cn } from "@/lib/utils";
 import {
   DATA_BASE,
@@ -38,6 +39,9 @@ type ConfigPoolItem = {
   kind: ConfigPoolItemKind;
   value?: unknown;
   format?: string;
+  breadcrumbs?: string[];
+  isConst?: boolean;
+  pageIds?: string[];
 };
 
 /**
@@ -51,19 +55,22 @@ export function hasViewerDocumentContent(
 }
 
 function buildConfigPool(projectSchema: string | undefined, pages: ViewerDocumentViewProps["pages"]): ConfigPoolItem[] {
-  const readFields = (schema?: string) => schema ? parseSchemaToFields(schema).flatMap((group) => group.fields) : [];
-  const kindOf = (field: { type: string; format?: string; uiWidget?: string; key: string; default?: unknown }): ConfigPoolItemKind => {
+  const readFields = (schema?: string) => schema ? enumerateSchemaFields(schema) : [];
+  const pageIds = Array.from(new Set(pages.map((item) => item.id).filter(Boolean)));
+  const kindOf = (field: SchemaCatalogField): ConfigPoolItemKind => {
     const type = field.type.toLowerCase();
     const format = (field.format || "").toLowerCase();
     const widget = (field.uiWidget || "").toLowerCase();
-    const key = field.key.toLowerCase();
+    // oneOf discriminator markers are part of the stable path, but they are
+    // not the field name used for kind inference.
+    const key = field.key.split(".").pop()?.toLowerCase() || field.key.toLowerCase();
     if (format === "color" || type.includes("color")) return "color";
     if (format === "image" || type === "image" || type === "imagelist" || widget === "image" || widget === "imagelist" || (typeof field.default === "string" && /\.(svg|png|jpe?g|gif|webp|bmp|avif)$/i.test(field.default)) || /(image|img|logo|banner|pic|thumb|background)/.test(key)) return "image";
     if (type === "number" || type === "integer") return "number";
     if (widget === "motion" || type === "motion" || /(motion|animation|transition)/.test(key)) return "motion";
     return "text";
   };
-  const toItem = (field: ReturnType<typeof readFields>[number], scope: ConfigPoolItem["scope"], page?: ViewerDocumentViewProps["pages"][number]): ConfigPoolItem => {
+  const toItem = (field: SchemaCatalogField, scope: ConfigPoolItem["scope"], page?: ViewerDocumentViewProps["pages"][number]): ConfigPoolItem => {
     const kind = kindOf(field);
     return {
       id: scope === "project" ? `project:${field.key}` : `page:${page!.id}:${field.key}`,
@@ -72,6 +79,9 @@ function buildConfigPool(projectSchema: string | undefined, pages: ViewerDocumen
       pageName: page?.name,
       key: field.key,
       title: field.title,
+      breadcrumbs: field.breadcrumbs,
+      isConst: field.isConst,
+      pageIds: scope === "project" ? pageIds : undefined,
       kind,
       value: field.default,
       format: kind === "image" && typeof field.default === "string" ? field.default.split(".").pop()?.toUpperCase() : field.format?.toUpperCase(),
@@ -130,7 +140,7 @@ function ReadonlyDesignSpec({
             {open && <div className="border-t px-3 py-3">
               <div className="mx-auto w-full max-w-[760px]">
                 {entry.target.type === "config" && configRefs.length > 0 && <table className="w-full border-collapse text-xs"><thead><tr className="text-left text-muted-foreground"><th className="w-[52px] py-1 pr-2 font-medium" /><th className="py-1 pr-2 font-medium">配置项</th><th className="py-1 pr-2 font-medium">格式</th><th className="py-1 font-medium">尺寸</th></tr></thead><tbody>
-                  {refs.map((item) => <tr key={item.id} className="hover:bg-accent/40"><td className="py-1 pr-2"><ConfigThumbnail item={item} /></td><td className="font-medium">{item.title}</td><td className="text-muted-foreground">{item.format || "—"}</td><td className="text-muted-foreground">—</td></tr>)}
+                  {refs.map((item) => <tr key={item.id} className="hover:bg-accent/40"><td className="py-1 pr-2"><ConfigThumbnail item={item} /></td><td className="font-medium"><div>{item.title}</div>{item.breadcrumbs && item.breadcrumbs.length > 1 && <div className="text-[11px] font-normal text-muted-foreground">{item.breadcrumbs.join(" / ")}</div>}</td><td className="text-muted-foreground">{item.format || "—"}</td><td className="text-muted-foreground">—</td></tr>)}
                   {Array.from({ length: staleCount }).map((_, index) => <tr key={`stale-${index}`} className="text-muted-foreground"><td className="py-1 pr-2"><span className="inline-flex h-[52px] w-[52px] items-center justify-center rounded-md border bg-secondary">?</span></td><td className="italic">已失效引用</td><td>—</td><td>—</td></tr>)}
                 </tbody></table>}
                 <div className={cn(entry.target.type === "config" && configRefs.length > 0 && "mt-3")}><div className="mb-1 text-[11px] font-medium text-muted-foreground">说明</div><PageRequirements markdown={entry.markdown} allowExternalMedia mediaBaseUrl={DATA_BASE} onReferenceClick={onReferenceClick} /></div>

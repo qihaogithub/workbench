@@ -1,0 +1,17 @@
+{
+  "bindings": [
+    {
+      "id": "wb_wb_acdb3017d7c845a4b00606a45feedd7a",
+      "target": {
+        "scope": "project",
+        "fieldPath": [
+          "popupImage"
+        ]
+      },
+      "whiteboardId": "wb_acdb3017d7c845a4b00606a45feedd7a",
+      "documentRevisionAtOutput": 3,
+      "outputAssetHash": "c7967a3f2125104c3bc299cbfac57d71cb956d0cf001a1ef50337d673b11a666",
+      "updatedAt": 1788314992396
+    }
+  ]
+}

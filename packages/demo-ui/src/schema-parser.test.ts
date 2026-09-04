@@ -46,6 +46,7 @@ describe("parseSchemaToFields grouping", () => {
         modules: {
           type: "array",
           title: "模块",
+          $demo: { sortable: true },
           items: {
             oneOf: [{
               title: "关卡模块",
@@ -54,6 +55,7 @@ describe("parseSchemaToFields grouping", () => {
                 levels: {
                   type: "array",
                   title: "关卡图",
+                  $demo: { sortable: false },
                   items: {
                     oneOf: [{
                       title: "关卡卡片",
@@ -83,11 +85,65 @@ describe("parseSchemaToFields grouping", () => {
     const position = levels?.oneOf?.variants[0]?.fields
       .find((field) => field.key === "position");
 
+    expect(modules?.sortable).toBe(true);
+    expect(levels?.sortable).toBe(false);
     expect(levels?.oneOf?.variants[0]?.title).toBe("关卡卡片");
     expect(levels?.oneOf?.variants[0]?.maxItems).toBe(3);
     expect(position).toEqual(expect.objectContaining({
       type: "position",
       positionable: { key: "levelCard", size: { width: 375, height: 656 } },
     }));
+  });
+
+  it("reads object-array sorting only from the explicit $demo capability", () => {
+    const groups = parseSchemaToFields(JSON.stringify({
+      type: "object",
+      properties: {
+        tree: {
+          type: "array",
+          title: "层级列表",
+          $demo: { sortable: false },
+          items: { type: "object", properties: { label: { type: "string" } } },
+        },
+        ignoredUiOption: {
+          type: "array",
+          title: "忽略旧 UI 选项",
+          "ui:options": { sortable: true },
+          items: { type: "object", properties: { label: { type: "string" } } },
+        },
+        demoWins: {
+          type: "array",
+          title: "新声明优先",
+          $demo: { sortable: false },
+          "ui:options": { sortable: true },
+          items: { type: "object", properties: { label: { type: "string" } } },
+        },
+        ordered: {
+          type: "array",
+          title: "可排序列表",
+          $demo: { sortable: true },
+          items: { type: "object", properties: { label: { type: "string" } } },
+        },
+        unconfigured: {
+          type: "array",
+          title: "未声明列表",
+          items: { type: "object", properties: { label: { type: "string" } } },
+        },
+        invalidDeclaration: {
+          type: "array",
+          title: "非法声明列表",
+          $demo: { sortable: "true" },
+          items: { type: "object", properties: { label: { type: "string" } } },
+        },
+      },
+    }));
+
+    const fields = groups.flatMap((group) => group.fields);
+    expect(fields.find((field) => field.key === "tree")?.sortable).toBe(false);
+    expect(fields.find((field) => field.key === "ignoredUiOption")?.sortable).toBe(false);
+    expect(fields.find((field) => field.key === "demoWins")?.sortable).toBe(false);
+    expect(fields.find((field) => field.key === "ordered")?.sortable).toBe(true);
+    expect(fields.find((field) => field.key === "unconfigured")?.sortable).toBe(false);
+    expect(fields.find((field) => field.key === "invalidDeclaration")?.sortable).toBe(false);
   });
 });

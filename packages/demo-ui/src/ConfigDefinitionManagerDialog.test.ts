@@ -112,7 +112,8 @@ describe("configuration definition mutations", () => {
               { title: "图片项", properties: { image: { type: "string", format: "image" } } },
             ],
           },
-          "ui:options": { sortable: true, group: "内容" },
+          "$demo": { sortable: true },
+          "ui:options": { group: "内容" },
         },
       },
     });

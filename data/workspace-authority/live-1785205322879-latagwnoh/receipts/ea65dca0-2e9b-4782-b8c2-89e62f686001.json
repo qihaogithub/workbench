@@ -1,0 +1,19 @@
+{
+  "committed": true,
+  "mutationId": "ea65dca0-2e9b-4782-b8c2-89e62f686001",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "baseRevision": 0,
+  "revision": 1406,
+  "rootHash": "c8e90849913962a7cbcc537c21244ce74af3c345f5345e9b676be7191ce511f1",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/闯关活动页-进行中_ec853d/config.values.json",
+      "action": "modified",
+      "beforeHash": "a0c55dca27b686c0b8536b5c9f5f1ef2f36caa2a736b5e61bfce37a0dfd72577",
+      "afterHash": "5c44da0c4b4ca355d2675a04a7f4a83dde01ad2dc0e6b9d295b5b429be373288"
+    }
+  ],
+  "committedAt": 1788493594530
+}

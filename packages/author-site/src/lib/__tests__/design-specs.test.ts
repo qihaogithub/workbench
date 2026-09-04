@@ -247,4 +247,69 @@ describe("配置项素材池聚合", () => {
     const pool = buildConfigPool("{}", []);
     expect(pool).toEqual([]);
   });
+
+  it("递归展开对象、数组 oneOf 与 const 字段，并按 pageId 记录项目级影响页面", () => {
+    const pool = buildConfigPool(JSON.stringify({
+      properties: {
+        modules: {
+          type: "array",
+          items: {
+            oneOf: [
+              { properties: {
+                type: { const: "image", title: "类型" },
+                image: { type: "string", format: "image", title: "图片" },
+              } },
+              { properties: {
+                type: { const: "video", title: "类型" },
+                video: { type: "object", title: "视频", properties: {
+                  url: { type: "string", title: "地址" },
+                } },
+                caption: { type: "string", title: "说明" },
+              } },
+            ],
+          },
+        },
+      },
+    }), [{ id: "page-a", name: "页面 A", schema: "{}" }, { id: "page-b", name: "页面 B", schema: "{}" }]);
+
+    expect(pool.map((item) => item.key)).toEqual(expect.arrayContaining([
+      "modules",
+      "modules[type=image].type",
+      "modules[type=image].image",
+      "modules[type=video].type",
+      "modules[type=video].video",
+      "modules[type=video].video.url",
+    ]));
+    const image = pool.find((item) => item.key === "modules[type=image].image");
+    expect(image?.breadcrumbs).toEqual(["modules", "image", "图片"]);
+    expect(image?.pageIds).toEqual(["page-a", "page-b"]);
+    expect(pool.find((item) => item.key === "modules[type=image].type")?.isConst).toBe(true);
+    expect(pool.find((item) => item.key === "modules[type=video].caption")?.kind).toBe("text");
+  });
+
+  it("malformed schema is tolerated", () => {
+    expect(buildConfigPool("not-json", [{ id: "p", name: "页面", schema: "not-json" }])).toEqual([]);
+  });
+
+  it("支持根级 oneOf 分支并保持同名字段路径隔离", () => {
+    const pool = buildConfigPool(undefined, [{
+      id: "p",
+      name: "页面",
+      schema: JSON.stringify({
+        oneOf: [
+          { title: "图片模块", properties: { type: { const: "image" }, value: { type: "string", title: "值" } } },
+          { title: "视频模块", properties: { type: { const: "video" }, value: { type: "string", title: "值" } } },
+        ],
+      }),
+    }]);
+
+    expect(pool.map((item) => item.key)).toEqual(expect.arrayContaining([
+      "[type=image].value",
+      "[type=video].value",
+    ]));
+    expect(pool.find((item) => item.key === "[type=image].value")?.breadcrumbs).toEqual([
+      "图片模块",
+      "值",
+    ]);
+  });
 });

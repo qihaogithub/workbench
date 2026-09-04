@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PageConfigPanel } from "./PageConfigPanel";
@@ -10,9 +10,136 @@ const pageSchema = JSON.stringify({
   },
 });
 
+function makeRect(top: number, height: number, left = 700, width = 500): DOMRect {
+  return {
+    top,
+    bottom: top + height,
+    left,
+    right: left + width,
+    width,
+    height,
+    x: left,
+    y: top,
+    toJSON: () => ({}),
+  } as DOMRect;
+}
+
+function mockRect(element: Element, rect: DOMRect | (() => DOMRect)) {
+  Object.defineProperty(element, "getBoundingClientRect", {
+    configurable: true,
+    value: typeof rect === "function" ? rect : () => rect,
+  });
+}
+
+async function openMeasuredSpecBubble({
+  triggerTop,
+  bubbleHeight,
+  viewportHeight = 800,
+}: {
+  triggerTop: number;
+  bubbleHeight: number;
+  viewportHeight?: number;
+}) {
+  window.innerHeight = viewportHeight;
+  const result = render(
+    <PageConfigPanel
+      pages={[{ id: "page-1", name: "示例页", schema: pageSchema, configData: {} }]}
+      detailPageId="page-1"
+      onPageConfigChange={vi.fn()}
+      designSpecEntries={[{
+        docId: "doc-1",
+        docTitle: "设计规范",
+        entryId: "entry-1",
+        entryTitle: "封面样式",
+        markdown: "规范正文",
+        scope: "page",
+        pageId: "page-1",
+        fieldKey: "cover",
+      }]}
+    />,
+  );
+
+  const panel = result.container.firstElementChild as HTMLElement;
+  mockRect(panel, makeRect(100, 700));
+  const trigger = screen.getByRole("button", { name: "查看设计规范：封面" });
+  mockRect(trigger, makeRect(triggerTop, 24, 900, 80));
+  fireEvent.pointerDown(trigger);
+  fireEvent.click(trigger);
+
+  const bubble = await screen.findByRole("complementary", { name: "设计规范" });
+  mockRect(bubble, makeRect(0, bubbleHeight, 300, 380));
+  fireEvent(window, new Event("resize"));
+  return { ...result, bubble, trigger };
+}
+
 describe("PageConfigPanel design-spec bubble", () => {
   afterEach(() => {
+    window.innerHeight = 768;
     vi.unstubAllGlobals();
+  });
+
+  it("以点击的规范标签中心为浮窗中心定位", async () => {
+    const { bubble } = await openMeasuredSpecBubble({ triggerTop: 360, bubbleHeight: 240 });
+
+    await waitFor(() => expect(bubble.style.top).toBe("252px"));
+    expect(bubble.style.maxHeight).toBe("768px");
+  });
+
+  it("规范标签靠近视口边缘时将浮窗钳制在安全区域内", async () => {
+    const topResult = await openMeasuredSpecBubble({ triggerTop: 20, bubbleHeight: 240 });
+    await waitFor(() => expect(topResult.bubble.style.top).toBe("16px"));
+
+    topResult.unmount();
+    const bottomResult = await openMeasuredSpecBubble({ triggerTop: 740, bubbleHeight: 240 });
+    await waitFor(() => expect(bottomResult.bubble.style.top).toBe("544px"));
+  });
+
+  it("规范内容过高时限制浮窗高度并让正文区域滚动", async () => {
+    const { bubble } = await openMeasuredSpecBubble({
+      triggerTop: 280,
+      bubbleHeight: 1000,
+      viewportHeight: 600,
+    });
+
+    await waitFor(() => expect(bubble.style.top).toBe("16px"));
+    expect(bubble.style.maxHeight).toBe("568px");
+    expect(bubble.querySelector('[class*="overflow-y-auto"]')).not.toBeNull();
+  });
+
+  it("配置栏滚动后浮窗跟随当前规范标签位置", async () => {
+    let triggerTop = 300;
+    const result = render(
+      <PageConfigPanel
+        pages={[{ id: "page-1", name: "示例页", schema: pageSchema, configData: {} }]}
+        detailPageId="page-1"
+        onPageConfigChange={vi.fn()}
+        designSpecEntries={[{
+          docId: "doc-1",
+          docTitle: "设计规范",
+          entryId: "entry-1",
+          entryTitle: "封面样式",
+          markdown: "规范正文",
+          scope: "page",
+          pageId: "page-1",
+          fieldKey: "cover",
+        }]}
+      />,
+    );
+    mockRect(result.container.firstElementChild as HTMLElement, makeRect(100, 700));
+    const trigger = screen.getByRole("button", { name: "查看设计规范：封面" });
+    mockRect(trigger, () => makeRect(triggerTop, 24, 900, 80));
+    fireEvent.pointerDown(trigger);
+    fireEvent.click(trigger);
+    const bubble = await screen.findByRole("complementary", { name: "设计规范" });
+    mockRect(bubble, makeRect(0, 240, 300, 380));
+    fireEvent(window, new Event("resize"));
+    await waitFor(() => expect(bubble.style.top).toBe("192px"));
+
+    triggerTop = 500;
+    const configContent = result.container.querySelector('[tabindex="-1"]');
+    expect(configContent).not.toBeNull();
+    fireEvent.scroll(configContent!);
+    await waitFor(() => expect(bubble.style.top).toBe("392px"));
   });
 
   it("引用页明确没有绑定时不回退到目标项目的规范", async () => {
@@ -176,7 +303,7 @@ describe("PageConfigPanel design-spec bubble", () => {
     await waitFor(() => expect(screen.queryByRole("complementary", { name: "设计规范" })).not.toBeInTheDocument());
   });
 
-  it("标题操作菜单打开批注气泡，并按最新顺序展示线程", async () => {
+  it("标题直接编辑，批注标签打开气泡并按最新顺序展示线程", async () => {
     const target = {
       kind: "config" as const,
       scope: "page" as const,
@@ -219,10 +346,11 @@ describe("PageConfigPanel design-spec bubble", () => {
       />,
     );
 
-    const titleTrigger = screen.getByRole("button", { name: "封面配置项操作" });
-    expect(titleTrigger).toBeVisible();
-    fireEvent.click(titleTrigger);
-    fireEvent.click(screen.getByRole("button", { name: "添加批注：封面" }));
+    const commentButton = screen.getByRole("button", { name: "查看或添加批注：封面" });
+    expect(commentButton).toBeVisible();
+    expect(commentButton).toHaveClass("bg-amber-400", "text-amber-950");
+    expect(screen.queryByRole("button", { name: "编辑配置项：封面" })).not.toBeInTheDocument();
+    fireEvent.click(commentButton);
     const bubble = await screen.findByRole("complementary", { name: "配置项批注" });
     expect(bubble).toHaveTextContent("最新批注");
     expect(bubble).toHaveTextContent("较早批注");
@@ -231,6 +359,11 @@ describe("PageConfigPanel design-spec bubble", () => {
     expect(screen.queryByRole("button", { name: "编辑" })).not.toBeInTheDocument();
 
     fireEvent.pointerDown(document.body);
+    await waitFor(() => expect(screen.queryByRole("complementary", { name: "配置项批注" })).not.toBeInTheDocument());
+
+    fireEvent.click(commentButton);
+    await screen.findByRole("complementary", { name: "配置项批注" });
+    fireEvent.click(commentButton);
     await waitFor(() => expect(screen.queryByRole("complementary", { name: "配置项批注" })).not.toBeInTheDocument());
 
   });
@@ -289,5 +422,82 @@ describe("PageConfigPanel design-spec bubble", () => {
       { spineAsset: ref },
       { persistence: "committed", receipt },
     ));
+  });
+
+  it("三级关卡入口打开单实例 Sheet，并把字段修改写回页面配置", async () => {
+    const onPageConfigChange = vi.fn();
+    const schema = JSON.stringify({
+      type: "object",
+      properties: {
+        modules: {
+          type: "array",
+          title: "内容模块",
+          $demo: { sortable: true },
+          items: {
+            oneOf: [{
+              title: "关卡模块",
+              properties: {
+                type: { const: "level" },
+                levels: {
+                  type: "array",
+                  title: "关卡图",
+                  $demo: { sortable: false },
+                  "ui:options": {
+                    detailPresentation: "sheet",
+                    detailBreadcrumbTitle: "关卡列表",
+                    itemTitleTemplate: "关卡 {index}",
+                  },
+                  items: {
+                    oneOf: [{
+                      title: "关卡",
+                      properties: {
+                        type: { const: "levelCard" },
+                        status: { type: "string", title: "当前状态", enum: ["locked", "open"], "ui:widget": "segmented" },
+                        position: { type: "position", title: "自由坐标", key: "levelCard", size: { width: 375, height: 656 } },
+                      },
+                    }],
+                  },
+                },
+              },
+            }],
+          },
+        },
+      },
+    });
+
+    render(
+      <PageConfigPanel
+        pages={[{
+          id: "page-1",
+          name: "闯关页",
+          schema,
+          configData: { modules: [{ type: "level", levels: [{ type: "levelCard", status: "locked", position: { x: 1, y: 2 } }] }] },
+        }]}
+        detailPageId="page-1"
+        onPageConfigChange={onPageConfigChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "关卡模块" }));
+    fireEvent.click(screen.getByRole("button", { name: "关卡 01" }));
+    const sheet = await screen.findByRole("dialog");
+    expect(sheet.querySelectorAll('[data-config-detail-sheet="true"]')).toHaveLength(0);
+    const breadcrumb = within(sheet).getByRole("navigation", { name: "配置层级" });
+    expect(breadcrumb.querySelectorAll("li")).toHaveLength(1);
+    expect(breadcrumb).toHaveTextContent("关卡 01");
+    expect(breadcrumb).not.toHaveTextContent("关卡模块");
+    expect(breadcrumb).not.toHaveTextContent("关卡列表");
+    expect(sheet).toHaveTextContent("当前状态");
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("radio", { name: "open" }));
+    expect(onPageConfigChange).toHaveBeenLastCalledWith(
+      "page-1",
+      { modules: [{ type: "level", levels: [{ type: "levelCard", status: "open", position: { x: 1, y: 2 } }] }] },
+      undefined,
+    );
+
+    fireEvent.keyDown(sheet, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 });

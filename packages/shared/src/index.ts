@@ -477,6 +477,7 @@ export * from "./ai-error-normalizer";
 export * from "./comment";
 export * from "./feedback";
 export * from "./whiteboard";
+export * from "./demo/config-schema-fields";
 
 /** 图片附件，Base64 编码 */
 export interface ImageAttachment {

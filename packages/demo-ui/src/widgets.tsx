@@ -629,7 +629,7 @@ export function FileUploadWidget(props: WidgetProps | FileUploadWidgetProps) {
             onClick={() => fileInputRef.current?.click()}
             className={cn(
               'group relative',
-              'w-[80px] h-[80px] flex flex-col items-center justify-center gap-1.5 border-2 border-dashed rounded-lg cursor-pointer transition-colors shrink-0',
+              'w-[80px] h-[80px] flex flex-col items-center justify-center gap-1.5 border-2 border-dashed rounded-lg bg-black/10 cursor-pointer transition-colors shrink-0',
               disabled
                 ? 'cursor-not-allowed border-border bg-muted/30 opacity-70'
                 : isUploading

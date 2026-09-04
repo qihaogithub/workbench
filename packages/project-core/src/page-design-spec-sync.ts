@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { enumerateSchemaFields } from "@workbench/shared/demo/config-schema-fields";
 
 const DESIGN_SPEC_DIR = "design-spec";
 const MANIFEST_PATH = `${DESIGN_SPEC_DIR}/manifest.json`;
@@ -157,24 +158,12 @@ function synchronizeEntries(
 }
 
 function collectEligibleFields(schema: string): EligibleField[] {
-  try {
-    const parsed = JSON.parse(schema) as { properties?: Record<string, unknown> };
-    if (!parsed.properties || typeof parsed.properties !== "object") return [];
-    return Object.entries(parsed.properties).flatMap(([key, value]) => {
-      if (!value || typeof value !== "object" || Array.isArray(value)) return [];
-      const field = value as Record<string, unknown>;
-      return isImageOrMotionField(key, field)
-        ? [{ key, title: typeof field.title === "string" && field.title.trim() ? field.title : key }]
-        : [];
-    });
-  } catch {
-    // Invalid schemas are handled by the normal schema validation path; do not
-    // create or remove design-spec entries from unparseable input.
-    return [];
-  }
+  return enumerateSchemaFields(schema)
+    .filter((field) => isImageOrMotionField(field.key, field))
+    .map((field) => ({ key: field.key, title: field.title }));
 }
 
-function isImageOrMotionField(_key: string, field: Record<string, unknown>): boolean {
+function isImageOrMotionField(_key: string, field: { type?: string; uiWidget?: string; format?: string }): boolean {
   const type = String(field.type ?? "").toLowerCase();
   const widget = String(field.uiWidget ?? "").toLowerCase();
   const format = String(field.format ?? "").toLowerCase();

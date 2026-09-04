@@ -112,9 +112,7 @@ describe("Crepe 宿主主题契约", () => {
   });
 
   it("对齐浮动标题触发器，并允许其菜单逃离工具栏裁切", () => {
-    expect(theme).toMatch(
-      /\.milkdown-toolbar\s*\{[^}]*overflow:\s*visible;/s,
-    );
+    expect(theme).toMatch(/\.milkdown-toolbar\s*\{[^}]*overflow:\s*visible;/s);
     expect(theme).toMatch(
       /\.heading-style-selector\s*\{[^}]*display:\s*flex;[^}]*align-items:\s*center;[^}]*margin:\s*6px;/s,
     );
@@ -142,9 +140,7 @@ describe("Crepe 宿主主题契约", () => {
   });
 
   it("保留 Crepe 对表格单元格和节点类型各自的选中反馈", () => {
-    expect(theme).not.toMatch(
-      /\.ProseMirror-selectednode\s*\{[^}]*outline:/s,
-    );
+    expect(theme).not.toMatch(/\.ProseMirror-selectednode\s*\{[^}]*outline:/s);
     expect(theme).not.toMatch(/\.selectedCell(?:::after)?\s*\{/s);
     expect(theme).not.toMatch(/\b(?:th|td)\s*\{[^}]*border:/s);
   });
@@ -164,6 +160,21 @@ describe("Crepe 宿主主题契约", () => {
     );
     expect(theme).toMatch(
       /@media\s*\(max-width:\s*640px\)[^{]*\{[\s\S]*?\.ProseMirror\s*\{[^}]*padding:\s*12px\s+56px\s+32px;/s,
+    );
+  });
+
+  it("为批注简版编辑器提供单行自动增高和八行滚动上限", () => {
+    expect(theme).toMatch(
+      /\.document-editor-crepe\[data-auto-grow=["']true["']\][^{]*\{[^}]*overflow:\s*visible/s,
+    );
+    expect(theme).toMatch(
+      /\.document-editor-crepe\[data-auto-grow=["']true["']\][^}]*\.ProseMirror\s*\{[^}]*min-height:\s*24px;[^}]*max-height:\s*176px;[^}]*overflow-y:\s*auto;/s,
+    );
+  });
+
+  it("隐藏批注编辑器左侧的块级拖拽手柄", () => {
+    expect(theme).toMatch(
+      /\.document-editor-crepe\.config-comment-editor\s+\.milkdown\s+\.milkdown-block-handle\s*\{[^}]*display:\s*none\s*!important;/s,
     );
   });
 });

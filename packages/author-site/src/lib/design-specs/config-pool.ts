@@ -1,4 +1,4 @@
-import { parseSchemaToFields } from "@workbench/demo-ui";
+import { enumerateSchemaFields, type SchemaCatalogField } from "@workbench/shared/demo/config-schema-fields";
 import type { ConfigPoolItem, ConfigPoolItemKind } from "./types";
 
 /** 页面元信息（用于聚合配置项池） */
@@ -28,7 +28,7 @@ export function buildConfigPool(
 ): ConfigPoolItem[] {
   const items: ConfigPoolItem[] = [];
   const seen = new Set<string>();
-  const pageNames = pages.map((p) => p.name).filter(Boolean);
+  const pageIds = Array.from(new Set(pages.map((p) => p.id).filter(Boolean)));
 
   const push = (item: ConfigPoolItem) => {
     if (seen.has(item.id)) return;
@@ -37,26 +37,28 @@ export function buildConfigPool(
   };
 
   if (projectSchema) {
-    for (const field of flattenFields(projectSchema)) {
+    for (const field of enumerateSchemaFields(projectSchema)) {
       const kind = inferKind(field);
       push({
         id: `project:${field.key}`,
         scope: "project",
         key: field.key,
         title: field.title,
+        breadcrumbs: field.breadcrumbs,
+        isConst: field.isConst,
         kind,
         value: field.default,
         category: field.category,
         format: inferFormat(field),
         size: resolveImageSize(field, kind, options),
         // 项目级配置项拆分到各受影响页面（真实 schema 无 usage 信息，默认归入全部页面）
-        pages: pageNames.length ? pageNames : undefined,
+        pageIds,
       });
     }
   }
 
   for (const page of pages) {
-    for (const field of flattenFields(page.schema)) {
+    for (const field of enumerateSchemaFields(page.schema)) {
       const kind = inferKind(field);
       push({
         id: `page:${page.id}:${field.key}`,
@@ -65,6 +67,8 @@ export function buildConfigPool(
         pageName: page.name,
         key: field.key,
         title: field.title,
+        breadcrumbs: field.breadcrumbs,
+        isConst: field.isConst,
         kind,
         value: field.default,
         category: field.category,
@@ -78,7 +82,7 @@ export function buildConfigPool(
 }
 
 function resolveImageSize(
-  field: FlatField,
+  field: SchemaCatalogField,
   kind: ConfigPoolItemKind,
   options: ConfigPoolBuildOptions,
 ): ConfigPoolItem["size"] | undefined {
@@ -109,38 +113,6 @@ function isPositivePixel(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
-type FlatField = {
-  key: string;
-  title: string;
-  type: string;
-  format?: string;
-  uiWidget?: string;
-  default?: unknown;
-  category?: string;
-  uiOptions?: Record<string, unknown>;
-};
-
-/** 展平 schema 顶层字段（parseSchemaToFields 已按分组返回） */
-function flattenFields(schema: string): FlatField[] {
-  const groups = parseSchemaToFields(schema);
-  const fields: FlatField[] = [];
-  for (const group of groups) {
-    for (const field of group.fields) {
-      if (!field.key) continue;
-      fields.push({
-        key: field.key,
-        title: field.title,
-        type: field.type,
-        format: field.format,
-        uiWidget: field.uiWidget,
-        default: field.default,
-        category: field.category,
-        uiOptions: field.uiOptions,
-      });
-    }
-  }
-  return fields;
-}
 
 /** 常见图片扩展名 */
 const IMAGE_EXTENSIONS = new Set([
@@ -154,11 +126,14 @@ const IMAGE_EXTENSIONS = new Set([
   "avif",
 ]);
 
-function inferKind(field: FlatField): ConfigPoolItemKind {
+function inferKind(field: SchemaCatalogField): ConfigPoolItemKind {
   const t = (field.type || "").toLowerCase();
   const w = (field.uiWidget || "").toLowerCase();
   const f = (field.format || "").toLowerCase();
-  const k = field.key.toLowerCase();
+  // Stable paths include oneOf markers (for example `type=image`).  Type
+  // heuristics must only inspect the leaf property, otherwise every field in
+  // an image branch would be classified as an image.
+  const k = field.key.split(".").pop()?.toLowerCase() || field.key.toLowerCase();
   if (f === "color" || t.includes("color")) return "color";
   if (f === "image" || t === "image" || t === "imagelist" || w === "imagelist" || w === "image")
     return "image";
@@ -182,7 +157,7 @@ function inferKind(field: FlatField): ConfigPoolItemKind {
   return "text";
 }
 
-function inferFormat(field: FlatField): string | undefined {
+function inferFormat(field: SchemaCatalogField): string | undefined {
   const kind = inferKind(field);
   if (kind === "image") {
     const accept = typeof field.uiOptions?.accept === "string"

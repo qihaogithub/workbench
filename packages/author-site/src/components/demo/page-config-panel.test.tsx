@@ -365,8 +365,9 @@ describe("PageConfigPanel", () => {
     expect(screen.queryByText("标题")).not.toBeInTheDocument();
   });
 
-  it("配置内容无标题且不折叠，恢复入口收入右下角更多菜单", () => {
+  it("配置内容无标题且不折叠，保存和恢复入口收入右下角更多菜单", () => {
     const onRestoreDefaults = jest.fn();
+    const onSaveAsDefaults = jest.fn();
     render(
       <TooltipProvider>
         <PageConfigPanel
@@ -382,6 +383,7 @@ describe("PageConfigPanel", () => {
           activePageId="page_a"
           detailPageId="page_a"
           hideDetailHeader
+          onSaveAsDefaults={onSaveAsDefaults}
           onRestoreDefaults={onRestoreDefaults}
         />
       </TooltipProvider>,
@@ -400,6 +402,14 @@ describe("PageConfigPanel", () => {
     expect(onRestoreDefaults).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("恢复默认配置")).not.toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("button", { name: "更多配置操作" }));
+    fireEvent.click(screen.getByRole("button", { name: "保存为默认" }));
+    expect(screen.getByText("保存为默认配置")).toBeInTheDocument();
+    expect(screen.getByText(/当前本页配置覆盖默认配置/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "确认" }));
+    expect(onSaveAsDefaults).toHaveBeenCalledWith("page_a");
+    expect(screen.queryByText("保存为默认配置")).not.toBeInTheDocument();
+
   });
 
   it("字段名称打开单项编辑器，新增入口不再打开集合管理器", async () => {
@@ -416,7 +426,6 @@ describe("PageConfigPanel", () => {
       </TooltipProvider>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "标题配置项操作" }));
     fireEvent.click(screen.getByRole("button", { name: "编辑配置项：标题" }));
     expect(screen.getByRole("dialog")).toHaveTextContent("编辑配置项");
     expect(screen.queryByText("管理配置项")).not.toBeInTheDocument();
@@ -450,7 +459,6 @@ describe("PageConfigPanel", () => {
       </TooltipProvider>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "标题配置项操作" }));
     fireEvent.click(screen.getByRole("button", { name: "编辑配置项：标题" }));
     fireEvent.click(screen.getByRole("button", { name: "保存字段" }));
 
@@ -479,7 +487,6 @@ describe("PageConfigPanel", () => {
       </TooltipProvider>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "标题配置项操作" }));
     fireEvent.click(screen.getByRole("button", { name: "编辑配置项：标题" }));
     fireEvent.click(screen.getByRole("button", { name: "保存字段" }));
 

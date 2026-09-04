@@ -426,15 +426,75 @@
         min-height: 100%;
       }
 
+      .sheet-scene {
+        position: relative;
+        min-height: 100%;
+        overflow: visible;
+      }
+
+      .sheet-underlay {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        background: #121212;
+      }
+
+      .underlay-frame {
+        --underlay-scroll-y: 0px;
+        min-height: 100%;
+        opacity: 0.48;
+        filter: saturate(0.72);
+        transform: none;
+      }
+
+      .underlay-frame::after {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, rgba(12, 12, 12, 0.1), rgba(12, 12, 12, 0.66));
+        content: "";
+        pointer-events: none;
+      }
+
+      .sheet-surface {
+        position: relative;
+        z-index: 2;
+        min-height: 100%;
+        margin-left: 74px;
+        border-left: 1px solid var(--line-strong);
+        background: var(--panel);
+        box-shadow: -24px 0 45px rgba(0, 0, 0, 0.3);
+        opacity: 1;
+        transform: translateX(30px);
+        transition: transform 300ms ease-in-out;
+        will-change: transform;
+      }
+
+      .sheet-surface.is-visible {
+        transform: translateX(0);
+      }
+
+      .sheet-surface::before {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: -1px;
+        width: 1px;
+        background: linear-gradient(180deg, rgba(8, 174, 245, 0.85), transparent 45%);
+        content: "";
+        pointer-events: none;
+      }
+
       .context-rail {
         display: flex;
         position: sticky;
         top: 0;
         z-index: 5;
+        align-items: center;
+        justify-content: space-between;
         min-width: 0;
         min-height: 0;
-        flex-direction: column;
-        gap: 9px;
+        flex-direction: row;
+        gap: 10px;
         padding: 12px 18px 11px;
         border-right: 0;
         border-bottom: 1px solid var(--line);
@@ -442,19 +502,32 @@
         backdrop-filter: blur(14px);
       }
 
-      .context-rail-head {
+      .context-path {
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        min-width: 0;
         gap: 7px;
-        padding: 0 1px;
       }
 
-      .context-rail-head strong {
+      .context-separator {
+        color: var(--faint);
+        font-size: 11px;
+      }
+
+      .context-current {
+        min-width: 0;
+        overflow: hidden;
         color: var(--text-soft);
         font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.02em;
+        font-weight: 600;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .context-summary {
+        flex: 0 0 auto;
+        color: var(--muted);
+        font-size: 11px;
       }
 
       .context-back {
@@ -469,6 +542,25 @@
         font-size: 11px;
       }
 
+      .context-link {
+        min-width: 0;
+        padding: 3px 4px;
+        border-radius: 5px;
+        color: var(--muted);
+        background: transparent;
+        cursor: pointer;
+        font-size: 11px;
+        text-decoration: underline;
+        text-decoration-color: rgba(255, 255, 255, 0.24);
+        text-underline-offset: 3px;
+      }
+
+      .context-link:hover {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.07);
+        text-decoration-color: currentColor;
+      }
+
       .context-back:hover {
         color: var(--text);
         background: rgba(255, 255, 255, 0.07);
@@ -479,168 +571,9 @@
         height: 13px;
       }
 
-      .context-rail-label {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        padding: 0 4px;
-        color: var(--faint);
-        font-size: 10px;
-        font-weight: 700;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-      }
-
-      .context-rail-label span:last-child {
-        color: var(--muted);
-        font-weight: 550;
-        letter-spacing: 0;
-        text-transform: none;
-      }
-
-      .context-module-list,
-      .context-level-list {
-        display: flex;
-        flex-direction: row;
-        gap: 6px;
-        overflow-x: auto;
-        padding-bottom: 2px;
-        scrollbar-width: none;
-      }
-
-      .context-module-list::-webkit-scrollbar,
-      .context-level-list::-webkit-scrollbar {
-        display: none;
-      }
-
-      .context-module-row,
-      .context-level-row {
-        display: flex;
-        align-items: center;
-        width: 100%;
-        min-width: 0;
-        border-radius: 8px;
-        color: var(--muted);
-        background: transparent;
-        cursor: pointer;
-        text-align: left;
-        transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
-      }
-
-      .context-module-row {
-        flex: 0 0 auto;
-        gap: 7px;
-        width: auto;
-        min-width: 112px;
-        min-height: 34px;
-        padding: 5px 8px;
-      }
-
-      .context-module-row:hover,
-      .context-level-row:hover {
-        color: var(--text-soft);
-        background: rgba(255, 255, 255, 0.06);
-      }
-
-      .context-module-row.is-active,
-      .context-level-row.is-active {
-        color: var(--text);
-        background: var(--blue-soft);
-        box-shadow: inset 2px 0 0 var(--blue);
-      }
-
-      .context-module-row .icon {
-        width: 14px;
-        height: 14px;
-        color: var(--faint);
-      }
-
-      .context-module-row.is-active .icon {
-        color: var(--blue);
-      }
-
-      .context-module-row > span:nth-child(2),
-      .context-level-row > span:nth-child(2) {
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .context-module-row .context-count {
-        margin-left: auto;
-        color: var(--faint);
-        font-size: 10px;
-      }
-
-      .context-level-row {
-        flex: 0 0 auto;
-        gap: 7px;
-        width: auto;
-        min-width: 88px;
-        min-height: 31px;
-        padding: 5px 7px;
-        font-size: 11px;
-      }
-
-      .context-level-index {
-        display: grid;
-        place-items: center;
-        width: 20px;
-        height: 20px;
-        flex: 0 0 auto;
-        border-radius: 6px;
-        color: var(--muted);
-        background: rgba(255, 255, 255, 0.07);
-        font: 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-      }
-
-      .context-level-row.is-active .context-level-index {
-        color: #041117;
-        background: var(--blue);
-      }
-
-      .context-status-dot {
-        width: 5px;
-        height: 5px;
-        margin-left: auto;
-        flex: 0 0 auto;
-        border-radius: 50%;
-        background: var(--faint);
-      }
-
-      .context-status-dot.is-ready {
-        background: var(--green);
-      }
-
-      .context-rail-divider {
-        height: 1px;
-        margin: 1px 4px 0;
-        background: var(--line);
-      }
-
-      .context-rail-note {
-        display: flex;
-        gap: 6px;
-        margin-top: 0;
-        padding: 0 2px;
-        border-top: 0;
-        color: var(--faint);
-        font-size: 10px;
-        line-height: 1.5;
-      }
-
-      .context-rail-note .icon {
-        width: 13px;
-        height: 13px;
-        color: var(--blue);
-      }
-
       .drilldown-editor {
         min-width: 0;
         min-height: 100%;
-        animation: drilldown-in 220ms ease both;
       }
 
       .drilldown-editor .config-view {
@@ -674,17 +607,6 @@
 
       .drilldown-editor .position-grid {
         grid-template-columns: repeat(4, minmax(0, 1fr));
-      }
-
-      @keyframes drilldown-in {
-        from {
-          opacity: 0;
-          transform: translateX(12px);
-        }
-        to {
-          opacity: 1;
-          transform: translateX(0);
-        }
       }
 
       .view-heading {
@@ -1046,6 +968,137 @@
       .collection-row.is-selected {
         background: linear-gradient(90deg, rgba(8, 174, 245, 0.13), rgba(8, 174, 245, 0.04));
         box-shadow: inset 2px 0 0 var(--blue);
+      }
+
+      .module-row.is-expanded .row-arrow .icon {
+        transform: rotate(90deg);
+      }
+
+      .module-inline-panel {
+        padding: 16px 14px 18px;
+        border-bottom: 1px solid var(--line);
+        background: #252525;
+      }
+
+      .inline-panel-heading,
+      .inline-section-heading,
+      .inline-field-row,
+      .module-asset-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+      }
+
+      .inline-panel-heading {
+        margin-bottom: 15px;
+      }
+
+      .inline-panel-heading strong {
+        display: block;
+        color: var(--text);
+        font-size: 13px;
+      }
+
+      .inline-panel-heading span:not(.state-badge) {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .inline-section {
+        padding-top: 13px;
+        border-top: 1px solid rgba(255, 255, 255, 0.07);
+      }
+
+      .inline-section + .inline-section {
+        margin-top: 14px;
+      }
+
+      .inline-section-heading {
+        margin-bottom: 8px;
+        color: var(--text-soft);
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      .inline-section-heading small {
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 400;
+      }
+
+      .inline-settings {
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .inline-field-row {
+        min-height: 51px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      }
+
+      .inline-field-row .input {
+        width: 170px;
+      }
+
+      .inline-asset-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .module-asset-row {
+        min-height: 68px;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      }
+
+      .module-asset-row:last-child {
+        border-bottom: 0;
+      }
+
+      .module-asset-control {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .module-asset-preview {
+        display: grid;
+        place-items: center;
+        width: 48px;
+        height: 48px;
+        overflow: hidden;
+        border: 1px solid var(--line-strong);
+        border-radius: 9px;
+        background: #111;
+      }
+
+      .module-asset-preview .thumb-art {
+        width: 100%;
+        height: 100%;
+      }
+
+      .module-asset-preview.empty {
+        border-style: dashed;
+        color: var(--faint);
+      }
+
+      .module-asset-preview.empty .icon {
+        width: 16px;
+        height: 16px;
+      }
+
+      .inline-levels-section .inline-collection-list {
+        border-color: rgba(255, 255, 255, 0.11);
+        background: rgba(0, 0, 0, 0.12);
+      }
+
+      .inline-levels-section .collection-row {
+        min-height: 68px;
+        padding: 8px 10px;
       }
 
       .drag-handle {
@@ -1553,6 +1606,16 @@
       }
 
       @media (max-width: 520px) {
+        .sheet-underlay {
+          display: none;
+        }
+
+        .sheet-surface {
+          margin-left: 0;
+          border-left: 0;
+          box-shadow: none;
+        }
+
         .drilldown-layout {
           display: block;
         }
@@ -1571,34 +1634,6 @@
           border-bottom: 1px solid var(--line);
           background: rgba(23, 23, 23, 0.96);
           backdrop-filter: blur(14px);
-        }
-
-        .context-rail-head {
-          flex: 0 0 auto;
-        }
-
-        .context-rail-head strong,
-        .context-rail-label,
-        .context-rail-divider,
-        .context-rail-note {
-          display: none;
-        }
-
-        .context-module-list,
-        .context-level-list {
-          flex: 0 0 auto;
-          flex-direction: row;
-          gap: 4px;
-        }
-
-        .context-module-row {
-          width: auto;
-          min-width: 112px;
-        }
-
-        .context-level-row {
-          width: auto;
-          min-width: 82px;
         }
 
         .drilldown-editor .config-view {
@@ -1649,6 +1684,32 @@
           display: none;
         }
 
+        .module-inline-panel {
+          padding: 14px 12px 16px;
+        }
+
+        .inline-field-row,
+        .module-asset-row {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 8px;
+          padding: 10px 0;
+        }
+
+        .inline-field-row .input {
+          width: 100%;
+        }
+
+        .module-asset-control {
+          width: 100%;
+        }
+
+        .inline-section-heading {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 3px;
+        }
+
         .floating-footer {
           right: 12px;
           bottom: 12px;
@@ -1662,6 +1723,7 @@
         *::after {
           scroll-behavior: auto !important;
           transition-duration: 0.01ms !important;
+          animation: none !important;
         }
       }
     </style>
@@ -1761,6 +1823,7 @@
           audioName: "未上传音频",
           moduleTitle: "关卡模块",
           moduleStatus: "enabled",
+          moduleAssets: { background: "关卡背景.png", guide: "未配置" },
           positionEditing: false,
           levels: [
             {
@@ -1870,7 +1933,7 @@
 
         function renderHeading({ breadcrumbs, title, description, actions = "" }) {
           return `<div class="view-heading">
-            ${renderBreadcrumbs(breadcrumbs)}
+            ${breadcrumbs?.length ? renderBreadcrumbs(breadcrumbs) : ""}
             <div class="view-title-row">
               <div>
                 <h1>${escapeHtml(title)}</h1>
@@ -1891,26 +1954,18 @@
         }
 
         function renderContextRail(screen) {
-          const modules = moduleItems();
-          return `<aside class="context-rail" aria-label="配置上下文">
-            <div class="context-rail-head">
-              <button class="context-back" type="button" data-nav="overview" aria-label="返回本页配置">${icon("chevron-left")}<span>全部模块</span></button>
-              <strong>上下文</strong>
-            </div>
-            <div class="context-rail-label"><span>内容模块</span><span>${modules.length}</span></div>
-            <div class="context-module-list">
-              ${modules.map((module) => `<button class="context-module-row ${module.id === "levels" ? "is-active" : ""}" type="button" data-action="context-module" data-module-id="${module.id}" aria-label="${escapeHtml(module.title)}">
-                ${icon(module.icon)}<span>${escapeHtml(module.title)}</span><span class="context-count">${escapeHtml(module.meta)}</span>
-              </button>`).join("")}
-            </div>
-            ${screen === "level" ? `<div class="context-rail-divider"></div>
-              <div class="context-rail-label"><span>关卡图</span><span>${state.levels.length}</span></div>
-              <div class="context-level-list" aria-label="关卡上下文">
-                ${state.levels.map((level, index) => `<button class="context-level-row ${state.selectedLevelId === level.id ? "is-active" : ""}" type="button" data-action="context-level" data-level-id="${level.id}" aria-label="打开${escapeHtml(level.title)}">
-                  <span class="context-level-index">${String(index + 1).padStart(2, "0")}</span><span>${escapeHtml(level.title)}</span><span class="context-status-dot ${level.status === "已解锁" ? "is-ready" : ""}"></span>
-                </button>`).join("")}
-              </div>` : ""}
-            <div class="context-rail-note">${icon("layers")}<span>列表持续保留，右侧只编辑当前条目。</span></div>
+          const level = currentLevel();
+          const parentNav = screen === "level" ? "module" : "overview";
+          const parentLabel = screen === "level" ? state.moduleTitle : "内容模块";
+          const currentLabel = state.moduleTitle;
+          const levelPath = screen === "level"
+            ? `<button class="context-back" type="button" data-nav="${parentNav}" aria-label="返回关卡列表">${icon("chevron-left")}</button><span class="context-current" aria-current="page">${escapeHtml(level?.title || "关卡")}</span>`
+            : `<button class="context-back" type="button" data-nav="${parentNav}" aria-label="返回${escapeHtml(parentLabel)}">${icon("chevron-left")}<span>${escapeHtml(parentLabel)}</span></button><span class="context-separator">/</span><span class="context-current" aria-current="page">${escapeHtml(currentLabel)}</span>`;
+          return `<aside class="context-rail" aria-label="配置路径">
+            <nav class="context-path" aria-label="当前配置路径">
+              ${levelPath}
+            </nav>
+            ${screen === "level" ? "" : `<span class="context-summary">${state.levels.length} 个关卡</span>`}
           </aside>`;
         }
 
@@ -1918,14 +1973,14 @@
           return state.dirty ? `<span class="dirty-badge">已修改</span>` : `<span class="state-badge muted-state">已同步</span>`;
         }
 
-        function renderOverview() {
+        function renderOverview(expandedModule = state.screen === "module") {
           const modules = moduleItems();
 
           return `<div class="config-view">
             ${renderHeading({
               breadcrumbs: [{ label: "本页配置" }],
               title: "本页配置",
-              description: "先选择一个模块，再进入它的单层编辑器。",
+              description: expandedModule ? "页面字段保持原位，关卡模块在列表中展开。" : "页面设置和内容模块保持在同一层，点击关卡模块展开更多设置。",
               actions: `${renderDirtyBadge()}`,
             })}
 
@@ -1946,27 +2001,51 @@
             <section class="section-block">
               <div class="section-heading"><h2>内容模块</h2><span class="section-hint">${modules.length} 个模块</span></div>
               <div class="module-list" aria-label="内容模块列表">
-                ${modules.map((module) => `<div class="module-row ${module.id === "levels" ? "is-selected" : ""}" data-module-id="${module.id}" draggable="${module.id === "levels" ? "true" : "false"}">
+                ${modules.map((module) => {
+                  const isLevels = module.id === "levels";
+                  const isExpanded = isLevels && expandedModule;
+                  return `<div class="module-row ${isExpanded ? "is-selected is-expanded" : ""}" data-module-id="${module.id}" draggable="${isLevels ? "true" : "false"}">
                   <span class="drag-handle" aria-label="拖动${escapeHtml(module.title)}">${icon("grip")}</span>
                   <span class="module-symbol ${module.tone}">${icon(module.icon)}</span>
                   <div class="row-main"><div class="row-title">${escapeHtml(module.title)}</div><div class="row-subtitle"><span>${escapeHtml(module.kind)}</span><span class="dot"></span><span>${escapeHtml(module.meta)}</span></div></div>
                   <span class="state-badge ${module.status === "待配置" ? "muted-state" : ""}">${escapeHtml(module.status)}</span>
-                  <button class="row-arrow" type="button" data-action="open-module" data-module-id="${module.id}" aria-label="打开${escapeHtml(module.title)}">${icon("chevron-right")}</button>
-                </div>`).join("")}
+                  <button class="row-arrow" type="button" data-action="open-module" data-module-id="${module.id}" aria-label="${isExpanded ? "收起" : "展开"}${escapeHtml(module.title)}">${icon("chevron-right")}</button>
+                </div>${isExpanded ? renderModuleInlinePanel() : ""}`;
+                }).join("")}
               </div>
             </section>
 
-            <div class="helper-callout">${icon("info")}<span>层级只用于定位；编辑器每次只展示当前模块或当前关卡的直接字段，避免卡片无限嵌套。</span></div>
+            <div class="helper-callout">${icon("info")}<span>一级、二级沿用当前面板展开；进入三级关卡设置时，详情会以 Sheet 叠层打开。</span></div>
           </div>`;
         }
 
-        function renderModule() {
+        function moduleAssetRow(key, label, tone, accept) {
+          const value = state.moduleAssets?.[key] || "未配置";
+          const configured = value !== "未配置";
+          return `<div class="module-asset-row"><div class="field-meta"><span class="field-label">${escapeHtml(label)}</span><span class="field-help">${configured ? "已配置资源" : "可选资源"}</span></div><div class="module-asset-control"><span class="module-asset-preview ${configured ? "" : "empty"}">${configured ? `<span class="thumb-art ${tone}"></span>` : icon("upload")}</span><span class="asset-text"><strong>${escapeHtml(value)}</strong><span>${configured ? "点击替换当前资源" : "尚未上传"}</span></span><button class="asset-button" type="button" data-action="pick-asset" data-asset-scope="module" data-asset-key="${key}" data-accept="${accept}">${configured ? "替换" : "上传"}</button></div></div>`;
+        }
+
+        function renderModuleInlinePanel() {
           const levelCount = state.levels.length;
-          return `<div class="drilldown-layout">${renderContextRail("module")}<div class="drilldown-editor"><div class="config-view">
+          return `<div class="module-inline-panel" data-module-panel="levels">
+            <section class="inline-section">
+              <div class="inline-section-heading"><span>关卡素材</span><small>图片资源</small></div>
+              <div class="inline-asset-list">${moduleAssetRow("background", "关卡背景图", "teal", "image/*")}${moduleAssetRow("guide", "闯关引导形象", "pink", "image/*")}</div>
+            </section>
+            <section class="inline-section inline-levels-section">
+              <div class="inline-section-heading"><span>关卡图</span><small>${levelCount} 个关卡 · 点击条目进入三级设置</small></div>
+              <div class="collection-list inline-collection-list" aria-label="关卡列表">${state.levels.map((level, index) => renderLevelRow(level, index)).join("")}<div class="collection-actions"><button class="add-button" type="button" data-action="add-level">${icon("plus")}添加关卡</button></div></div>
+            </section>
+          </div>`;
+        }
+
+        function renderModuleContent() {
+          const levelCount = state.levels.length;
+          return `<div class="config-view">
             ${renderHeading({
-              breadcrumbs: [{ label: "内容模块", action: "overview" }, { label: state.moduleTitle }],
+              breadcrumbs: [],
               title: state.moduleTitle,
-              description: "直接字段保持平面展示，关卡图作为一个可进入的子列表。",
+              description: "直接字段保持平面展示，关卡列表作为一个可进入的子列表。",
               actions: `${renderDirtyBadge()}<div class="menu-wrap"><button class="icon-button" type="button" data-action="toggle-menu" aria-label="更多模块操作">${icon("more")}</button><div class="action-menu" data-menu="module">${menuItem("copy-module", "复制模块", "copy")}${menuItem("delete-module", "删除模块", "trash", "danger")}</div></div>`,
             })}
 
@@ -1979,14 +2058,18 @@
             </section>
 
             <section class="section-block">
-              <div class="section-heading"><h2>关卡图</h2><span class="section-hint">${levelCount} 个关卡 · 拖拽排序</span></div>
+              <div class="section-heading"><h2>关卡列表</h2><span class="section-hint">${levelCount} 个关卡 · 拖拽排序</span></div>
               <div class="collection-list" aria-label="关卡列表">
                 ${state.levels.map((level, index) => renderLevelRow(level, index)).join("")}
                 <div class="collection-actions"><button class="add-button" type="button" data-action="add-level">${icon("plus")}添加关卡</button></div>
               </div>
             </section>
-            <div class="helper-callout">${icon("info")}<span>左侧列表持续保留，点击关卡后只替换右侧编辑器。</span></div>
-          </div></div></div>`;
+              <div class="helper-callout">${icon("info")}<span>进入三级关卡详情时，详情会在当前面板中滑入；返回时保留列表位置。</span></div>
+          </div>`;
+        }
+
+        function renderModuleSurface() {
+          return `<div class="drilldown-layout">${renderContextRail("module")}<div class="drilldown-editor">${renderModuleContent()}</div></div>`;
         }
 
         function menuItem(action, label, iconName, tone = "") {
@@ -2011,12 +2094,12 @@
           return `<div class="field-row asset-row"><div class="field-meta"><span class="field-label">${escapeHtml(label)}</span><span class="field-help">${configured ? "已配置资源" : "可选资源"}</span></div><div class="asset-control"><span class="asset-preview ${configured ? "" : "empty"}">${configured ? `<span class="thumb-art ${tone}"></span>` : icon("upload")}</span><span class="asset-text"><strong>${escapeHtml(value)}</strong><span>${configured ? "点击替换当前资源" : "尚未上传"}</span></span><button class="asset-button" type="button" data-action="pick-asset" data-asset-key="${key}" data-accept="${accept}">${configured ? "替换" : "上传"}</button></div></div>`;
         }
 
-        function renderLevel() {
+        function renderLevelContent() {
           const level = currentLevel();
-          if (!level) return renderModule();
-          return `<div class="drilldown-layout">${renderContextRail("level")}<div class="drilldown-editor"><div class="config-view">
+          if (!level) return renderModuleContent();
+          return `<div class="config-view">
             ${renderHeading({
-              breadcrumbs: [{ label: "内容模块", action: "overview" }, { label: "关卡模块", action: "module" }, { label: "关卡图", action: "module" }, { label: level.title }],
+              breadcrumbs: [],
               title: level.title,
               description: "当前只编辑这一张关卡卡片，其他关卡不会被推入同一滚动流。",
               actions: `${renderDirtyBadge()}<div class="menu-wrap"><button class="icon-button" type="button" data-action="toggle-menu" aria-label="更多关卡操作">${icon("more")}</button><div class="action-menu" data-menu="level">${menuItem("copy-level", "复制关卡", "copy")}${menuItem("delete-level", "删除关卡", "trash", "danger")}</div></div>`,
@@ -2040,7 +2123,30 @@
               </div>
               <div class="helper-callout">${icon("info")}<span>“拖动定位”只影响当前关卡卡片；完成后一次性回写 X / Y，避免拖动过程中频繁提交。</span></div>
             </section>
-          </div></div></div>`;
+          </div>`;
+        }
+
+        function renderLevelSurface() {
+          return `<div class="drilldown-layout">${renderContextRail("level")}<div class="drilldown-editor">${renderLevelContent()}</div></div>`;
+        }
+
+        function renderStackedScreen(screen) {
+          const underlay = renderModule();
+          const surface = renderLevelSurface();
+          return `<div class="sheet-scene">
+            <div class="sheet-underlay" aria-hidden="true" inert><div class="underlay-frame" style="--underlay-scroll-y: ${Number(scrollPositions.module) || 0}px">${underlay}</div></div>
+            <div class="sheet-surface">${surface}</div>
+          </div>`;
+        }
+
+        function renderModule() {
+          // 一级、二级沿用创作端的同页展开；三级关卡设置才进入 Sheet。
+          return renderOverview(true);
+        }
+
+        function renderLevel() {
+          if (!currentLevel()) return renderModule();
+          return renderStackedScreen("level");
         }
 
         function positionInput(axis, value) {
@@ -2052,6 +2158,7 @@
           const markup = state.screen === "overview" ? renderOverview() : state.screen === "module" ? renderModule() : renderLevel();
           configMain.innerHTML = markup;
           window.requestAnimationFrame(() => {
+            configMain.querySelector(".sheet-surface")?.classList.add("is-visible");
             configMain.scrollTop = scrollPositions[state.screen] || 0;
           });
           artboard.style.setProperty("--nav-color", state.navColor);
@@ -2129,22 +2236,11 @@
           const target = event.target.closest("button, .module-row, .collection-row");
           if (!target) return;
 
-          if (target.matches(".context-module-row")) {
-            if (target.dataset.moduleId === "levels") openModule();
-            else {
-              openOverview();
-              showToast("这个模块在 Demo 中只展示列表摘要");
-            }
-            return;
-          }
-
-          if (target.matches(".context-level-row")) {
-            openLevel(target.dataset.levelId);
-            return;
-          }
-
           if (target.matches(".module-row")) {
-            if (target.dataset.moduleId === "levels") openModule();
+            if (target.dataset.moduleId === "levels") {
+              if (state.screen === "module") openOverview();
+              else openModule();
+            }
             else showToast("这个模块在 Demo 中只展示列表摘要");
             return;
           }
@@ -2158,7 +2254,10 @@
           if (!action) return;
 
           if (action === "open-module") {
-            if (target.dataset.moduleId === "levels") openModule();
+            if (target.dataset.moduleId === "levels") {
+              if (state.screen === "module") openOverview();
+              else openModule();
+            }
             else showToast("这个模块在 Demo 中只展示列表摘要");
           } else if (action === "toggle-menu") {
             const menu = target.parentElement.querySelector(".action-menu");
@@ -2198,14 +2297,14 @@
             assetPicker.click();
           } else if (action === "pick-asset") {
             assetPicker.accept = target.dataset.accept || "image/*";
-            assetPicker.dataset.target = target.dataset.assetKey || "asset";
+            assetPicker.dataset.target = `${target.dataset.assetScope === "module" ? "module:" : ""}${target.dataset.assetKey || "asset"}`;
             assetPicker.click();
           } else if (action === "preview-refresh") {
             showToast("预览已刷新（演示）");
           } else if (action === "preview-open") {
             showToast("Demo 不会打开真实页面");
           } else if (action === "show-help") {
-            showToast("建议路径：模块列表 → 模块详情 → 关卡详情");
+            showToast("建议路径：页面配置 → 展开关卡模块 → 关卡设置 Sheet");
           }
         });
 
@@ -2285,6 +2384,11 @@
           if (assetPicker.dataset.target === "audio") {
             state.audioName = file.name;
             markDirty("已选择背景音乐");
+            render();
+          } else if (assetPicker.dataset.target?.startsWith("module:")) {
+            const key = assetPicker.dataset.target.slice("module:".length);
+            state.moduleAssets[key] = file.name;
+            markDirty("已更新关卡模块资源");
             render();
           } else {
             const level = currentLevel();

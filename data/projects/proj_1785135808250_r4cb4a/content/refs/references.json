@@ -7,11 +7,11 @@
         "resourceId": "main"
       },
       "to": {
-        "kind": "knowledge_document",
-        "resourceId": "kb_1788227272655_677p9v"
+        "kind": "page",
+        "resourceId": "page_duak"
       },
       "reason": "canvas_node"
     }
   ],
-  "updatedAt": 1788348193672
+  "updatedAt": 1788450929637
 }

@@ -70,6 +70,7 @@ const duplicatePositionArraySchema = JSON.stringify({
     blanks: {
       type: "array",
       title: "空",
+      $demo: { sortable: true },
       items: {
         type: "object",
         properties: {
@@ -109,6 +110,7 @@ const nestedOneOfPositionSchema = JSON.stringify({
     modules: {
       type: "array",
       title: "模块",
+      $demo: { sortable: true },
       items: {
         oneOf: [{
           title: "关卡模块",
@@ -117,6 +119,7 @@ const nestedOneOfPositionSchema = JSON.stringify({
             levels: {
               type: "array",
               title: "关卡图",
+              $demo: { sortable: false },
               items: {
                 oneOf: [{
                   title: "关卡卡片",
@@ -139,10 +142,56 @@ const nestedOneOfPositionSchema = JSON.stringify({
   },
 });
 
+const nonSortableObjectArraySchema = JSON.stringify({
+  type: "object",
+  properties: {
+    levels: {
+      type: "array",
+      title: "关卡列表",
+      $demo: { sortable: false },
+      "ui:options": { itemTitleTemplate: "关卡 {index}" },
+      items: {
+        type: "object",
+        properties: {
+          label: { type: "string", title: "名称", default: "" },
+        },
+      },
+      default: [{ label: "第一关" }, { label: "第二关" }],
+    },
+  },
+});
+
+const nestedNonSortableTreeSchema = JSON.stringify({
+  type: "object",
+  properties: {
+    groups: {
+      type: "array",
+      title: "分组",
+      $demo: { sortable: false },
+      items: {
+        type: "object",
+        properties: {
+          label: { type: "string", title: "名称" },
+          children: {
+            type: "array",
+            title: "子项",
+            $demo: { sortable: false },
+            items: {
+              type: "object",
+              properties: { label: { type: "string", title: "名称" } },
+            },
+          },
+        },
+      },
+    },
+  },
+});
+
 describe("ConfigForm configuration-definition entry", () => {
-  it("有非空设计规范时标题仍编辑配置项，规范标签打开气泡", () => {
+  it("标题直接编辑配置项，规范和批注标签紧跟标题排列", () => {
     const onOpenDesignSpec = vi.fn();
     const onEditConfigDefinition = vi.fn();
+    const onAddConfigComment = vi.fn();
     const spec = {
       docId: "doc-1",
       docTitle: "页面规范",
@@ -161,15 +210,38 @@ describe("ConfigForm configuration-definition entry", () => {
         designSpecEntries={[spec]}
         onOpenDesignSpec={onOpenDesignSpec}
         onEditConfigDefinition={onEditConfigDefinition}
+        onAddConfigComment={onAddConfigComment}
+        hasConfigComment={() => false}
+        imageConfigScope="page"
+        pageId="page-1"
       />,
     );
 
     expect(screen.getByText("规范")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "页面标题配置项操作" }));
-    fireEvent.click(screen.getByRole("button", { name: /编辑配置项/ }));
+    const titleButton = screen.getByRole("button", { name: "编辑配置项：页面标题" });
+    fireEvent.mouseEnter(titleButton);
+    fireEvent.focus(titleButton);
+    expect(screen.queryByText("添加批注")).not.toBeInTheDocument();
+    fireEvent.click(titleButton);
     expect(onEditConfigDefinition).toHaveBeenCalledWith("title", expect.anything());
     fireEvent.click(screen.getByRole("button", { name: "查看设计规范：页面标题" }));
     expect(onOpenDesignSpec).toHaveBeenCalledWith(spec, "页面标题", undefined, expect.any(HTMLElement));
+    const commentButton = screen.getByRole("button", { name: "查看或添加批注：页面标题" });
+    expect(commentButton.closest(".group")).toHaveClass("group");
+    expect(commentButton.parentElement).toHaveClass(
+      "pointer-events-none",
+      "opacity-0",
+      "group-hover:pointer-events-auto",
+      "group-hover:opacity-100",
+      "group-focus-within:pointer-events-auto",
+      "group-focus-within:opacity-100",
+    );
+    expect(commentButton).toHaveClass("bg-foreground/[0.08]");
+    fireEvent.click(commentButton);
+    expect(onAddConfigComment).toHaveBeenCalledWith(expect.objectContaining({
+      kind: "config",
+      fieldKey: "title",
+    }), expect.any(HTMLElement));
   });
 
   it("没有非空设计规范时不显示规范标签", () => {
@@ -194,7 +266,7 @@ describe("ConfigForm configuration-definition entry", () => {
     expect(screen.queryByText("规范")).not.toBeInTheDocument();
   });
 
-  it("通过标题操作入口编辑配置项，字段标题保持普通文本", () => {
+  it("点击字段标题直接触发配置定义编辑", () => {
     const onEditConfigDefinition = vi.fn();
 
     render(
@@ -205,9 +277,8 @@ describe("ConfigForm configuration-definition entry", () => {
       />,
     );
 
-    const trigger = screen.getByRole("button", { name: "页面标题配置项操作" });
+    const trigger = screen.getByRole("button", { name: "编辑配置项：页面标题" });
     fireEvent.click(trigger);
-    fireEvent.click(screen.getByRole("button", { name: /编辑配置项/ }));
 
     expect(onEditConfigDefinition).toHaveBeenCalledWith(
       "title",
@@ -218,7 +289,7 @@ describe("ConfigForm configuration-definition entry", () => {
   it("未提供回调或只读时保持静态字段标题", () => {
     const { rerender } = render(<ConfigForm schema={schema} onChange={vi.fn()} />);
 
-    expect(screen.queryByRole("button", { name: "页面标题配置项操作" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "编辑配置项：页面标题" })).not.toBeInTheDocument();
 
     rerender(
       <ConfigForm
@@ -229,7 +300,7 @@ describe("ConfigForm configuration-definition entry", () => {
       />,
     );
 
-    expect(screen.queryByRole("button", { name: "页面标题配置项操作" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "编辑配置项：页面标题" })).not.toBeInTheDocument();
     expect(screen.getByText(/页面标题/).closest("label")?.tagName).toBe("LABEL");
   });
 
@@ -247,12 +318,12 @@ describe("ConfigForm configuration-definition entry", () => {
       />,
     );
 
-    const trigger = screen.getByRole("button", { name: "页面标题配置项操作" });
-    fireEvent.click(trigger);
-    const commentButton = screen.getByRole("button", { name: "添加批注：页面标题" });
+    const title = screen.getByText("页面标题");
+    expect(title.closest("label")).toBeTruthy();
+    const commentButton = screen.getByRole("button", { name: "查看或添加批注：页面标题" });
     expect(commentButton).toBeVisible();
+    expect(commentButton).toHaveClass("bg-foreground/[0.08]");
     fireEvent.click(commentButton);
-    expect(screen.queryByRole("button", { name: /编辑配置项/ })).not.toBeInTheDocument();
     expect(onAddConfigComment).toHaveBeenCalledWith(expect.objectContaining({
       kind: "config",
       scope: "page",
@@ -260,6 +331,24 @@ describe("ConfigForm configuration-definition entry", () => {
       fieldKey: "title",
     }), expect.anything());
     expect(screen.getByPlaceholderText("请输入页面标题")).toBeDisabled();
+  });
+
+  it("有批注时高亮批注标签且不显示数量", () => {
+    render(
+      <ConfigForm
+        schema={schema}
+        onChange={vi.fn()}
+        onAddConfigComment={vi.fn()}
+        hasConfigComment={() => true}
+        imageConfigScope="page"
+        pageId="page-1"
+      />,
+    );
+
+    const commentButton = screen.getByRole("button", { name: "查看或添加批注：页面标题" });
+    expect(commentButton.parentElement).toHaveClass("opacity-0", "group-hover:opacity-100");
+    expect(commentButton).toHaveClass("bg-amber-400", "text-amber-950");
+    expect(screen.queryByText(/批注\s*\d/)).not.toBeInTheDocument();
   });
 
   it("分组始终展示字段，字段固定呈现完整编辑态", () => {
@@ -304,6 +393,9 @@ describe("ConfigForm configuration-definition entry", () => {
     );
 
     const item = screen.getByRole("button", { name: "项目 1" });
+    expect(item).toHaveClass("flex-1");
+    expect(item.parentElement).toHaveClass("flex-1");
+    expect(screen.getByRole("button", { name: "拖动项目 1" })).toBeInTheDocument();
     const card = item.closest("div.min-h-9");
     expect(card).toHaveClass("gap-0");
     expect(card).not.toHaveClass("gap-2.5");
@@ -413,6 +505,60 @@ describe("ConfigForm configuration-definition entry", () => {
     expect(screen.queryByText(/\d+\s*\/\s*20/)).not.toBeInTheDocument();
   });
 
+  it("不可排序的对象数组仍支持展开、添加和删除，但隐藏拖拽手柄", () => {
+    const onChange = vi.fn();
+    render(
+      <ConfigForm
+        schema={nonSortableObjectArraySchema}
+        onChange={onChange}
+      />,
+    );
+
+    expect(screen.getAllByRole("button", { name: /^关卡 \d{2}$/ })).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: /拖动/ })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "添加" }));
+    expect(onChange).toHaveBeenLastCalledWith({
+      levels: [{ label: "第一关" }, { label: "第二关" }, { label: "" }],
+    }, undefined);
+
+    fireEvent.click(screen.getByRole("button", { name: "删除关卡 01" }));
+    expect(onChange).toHaveBeenLastCalledWith({
+      levels: [{ label: "第二关" }, { label: "" }],
+    }, undefined);
+  });
+
+  it("对象数组条目标题热区覆盖行内剩余宽度，删除操作保持独立", () => {
+    render(<ConfigForm schema={nonSortableObjectArraySchema} onChange={vi.fn()} />);
+
+    const titleButton = screen.getByRole("button", { name: "关卡 01" });
+    const deleteButton = screen.getByRole("button", { name: "删除关卡 01" });
+    expect(titleButton).toHaveClass("flex-1");
+    expect(titleButton.parentElement).toHaveClass("flex-1");
+    expect(deleteButton).toBeInTheDocument();
+    expect(deleteButton.parentElement).toHaveClass(
+      "pointer-events-none",
+      "opacity-0",
+      "group-hover:pointer-events-auto",
+      "group-hover:opacity-100",
+      "group-focus-within:pointer-events-auto",
+      "group-focus-within:opacity-100",
+    );
+  });
+
+  it("父子数组分别维护层级，新增父项会把子数组初始化为空数组", () => {
+    const onChange = vi.fn();
+    render(<ConfigForm schema={nestedNonSortableTreeSchema} onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "添加" }));
+    expect(onChange).toHaveBeenLastCalledWith({ groups: [{ label: "", children: [] }] }, undefined);
+    expect(screen.queryByRole("button", { name: /拖动/ })).not.toBeInTheDocument();
+
+    const addButtons = screen.getAllByRole("button", { name: "添加" });
+    fireEvent.click(addButtons[0]!);
+    expect(onChange).toHaveBeenLastCalledWith({ groups: [{ label: "", children: [{ label: "" }] }] }, undefined);
+  });
+
   it("重复 DOM key 的数组定位项只激活当前实例并回传稳定路径", () => {
     const onEnterPositionEdit = vi.fn();
     const onExitPositionEdit = vi.fn();
@@ -511,5 +657,61 @@ describe("ConfigForm configuration-definition entry", () => {
     );
     expect(screen.getAllByRole("button", { name: "拖动" })).toHaveLength(2);
 
+  });
+
+  it("仅对显式 detailPresentation=sheet 的数组项触发详情回调", () => {
+    const onOpenItemDetail = vi.fn();
+    const sheetSchema = JSON.stringify({
+      type: "object",
+      properties: {
+        modules: {
+          type: "array",
+          title: "模块",
+          $demo: { sortable: true },
+          items: {
+            oneOf: [{
+              title: "关卡模块",
+              properties: {
+                type: { const: "level" },
+                levels: {
+                  type: "array",
+                  title: "关卡列表",
+                  $demo: { sortable: false },
+                  "ui:options": { detailPresentation: "sheet", detailBreadcrumbTitle: "关卡列表", itemTitleTemplate: "关卡 {index}" },
+                  items: {
+                    oneOf: [{
+                      title: "关卡卡片",
+                      properties: {
+                        type: { const: "levelCard" },
+                        status: { type: "string", title: "状态", enum: ["locked", "open"] },
+                      },
+                    }],
+                  },
+                },
+              },
+            }],
+          },
+        },
+      },
+    });
+
+    render(
+      <ConfigForm
+        schema={sheetSchema}
+        initialData={{ modules: [{ type: "level", levels: [{ type: "levelCard", status: "open" }] }] }}
+        onChange={vi.fn()}
+        onOpenItemDetail={onOpenItemDetail}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "关卡模块" }));
+    fireEvent.click(screen.getByRole("button", { name: "关卡 01" }));
+    expect(onOpenItemDetail).toHaveBeenCalledWith(expect.objectContaining({
+      title: "关卡 01",
+      level: 3,
+      breadcrumb: expect.arrayContaining([
+        expect.objectContaining({ label: "关卡列表" }),
+      ]),
+    }));
   });
 });

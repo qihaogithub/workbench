@@ -1,27 +1,6 @@
 {
   "threads": [
     {
-      "id": "cmt_mtl1t6pr_uqwtep",
-      "projectId": "proj_1785135808250_r4cb4a",
-      "target": {
-        "kind": "config",
-        "scope": "page",
-        "pageId": "闯关活动页-进行中_ec853d",
-        "fieldKey": "image",
-        "fieldTitleSnapshot": "图片"
-      },
-      "content": "测试下批注",
-      "author": {
-        "id": "a5862615-26bb-4688-924d-7fd68c132e21",
-        "name": "qihao",
-        "isAnonymous": false
-      },
-      "createdAt": 1788411128894,
-      "updatedAt": 1788411128894,
-      "resolved": false,
-      "replies": []
-    },
-    {
       "id": "cmt_mtl1tj3e_8a6yr1",
       "projectId": "proj_1785135808250_r4cb4a",
       "target": {
@@ -31,14 +10,120 @@
         "fieldKey": "bgm",
         "fieldTitleSnapshot": "闯关背景音乐"
       },
-      "content": "测试批注",
+      "content": "测试批注\n\n<br />\n\n地方就\n\n打开放假\n\n<br />\n\n<br />\n\n<br />\n\n<br />",
       "author": {
         "id": "a5862615-26bb-4688-924d-7fd68c132e21",
         "name": "qihao",
         "isAnonymous": false
       },
       "createdAt": 1788411144938,
-      "updatedAt": 1788411144938,
+      "updatedAt": 1788450809110,
+      "resolved": false,
+      "replies": [],
+      "mentions": []
+    },
+    {
+      "id": "cmt_mtlpfykc_tkvfs1",
+      "projectId": "proj_1785135808250_r4cb4a",
+      "target": {
+        "kind": "config",
+        "scope": "page",
+        "pageId": "闯关活动页-进行中_ec853d",
+        "fieldKey": "bgm",
+        "fieldTitleSnapshot": "闯关背景音乐"
+      },
+      "content": "第三方\n\n苏打粉\n\n速度fa\n\n的dfsa放大\n\nfsad \n\n是d",
+      "author": {
+        "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+        "name": "qihao",
+        "isAnonymous": false
+      },
+      "mentions": [],
+      "createdAt": 1788450822588,
+      "updatedAt": 1788450822588,
+      "resolved": false,
+      "replies": []
+    },
+    {
+      "id": "cmt_mtmes3ee_qxv63c",
+      "projectId": "proj_1785135808250_r4cb4a",
+      "target": {
+        "kind": "page",
+        "pageId": "闯关活动页-进行中_ec853d"
+      },
+      "anchor": {
+        "domPath": "div:nth-of-type(1)>div:nth-of-type(1)>div:nth-of-type(1)>img:nth-of-type(3)",
+        "tagName": "img",
+        "componentName": "img",
+        "snapshot": {
+          "outerHtml": "<img alt=\"按钮组件\" src=\"https://img.onlywnn.cn/figma/h_4dce23b9.png\" style=\"width: 375px; height: 97px; object-fit: cover; display: block; flex-shrink: 0;\">",
+          "computedStyle": {
+            "color": "rgb(0, 0, 0)",
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "backgroundImage": "none",
+            "borderColor": "rgb(229, 231, 235)",
+            "borderWidth": "0px",
+            "borderStyle": "solid",
+            "borderRadius": "0px",
+            "borderTopLeftRadius": "0px",
+            "borderTopRightRadius": "0px",
+            "borderBottomRightRadius": "0px",
+            "borderBottomLeftRadius": "0px",
+            "boxShadow": "none",
+            "boxSizing": "border-box",
+            "filter": "none",
+            "overflow": "clip",
+            "opacity": "1",
+            "fontFamily": "system-ui, -apple-system, \"system-ui\", \"Segoe UI\", Roboto, \"PingFang SC\", \"Hiragino Sans GB\", \"Microsoft YaHei\", \"Noto Sans SC\", sans-serif",
+            "fontSize": "16px",
+            "fontWeight": "400",
+            "lineHeight": "24px",
+            "letterSpacing": "normal",
+            "textAlign": "start",
+            "width": "375px",
+            "height": "97px",
+            "padding": "0px",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "margin": "0px",
+            "marginTop": "0px",
+            "marginRight": "0px",
+            "marginBottom": "0px",
+            "marginLeft": "0px",
+            "display": "block",
+            "flexDirection": "row",
+            "justifyContent": "normal",
+            "alignItems": "normal",
+            "gap": "normal"
+          },
+          "attrs": {
+            "src": "https://img.onlywnn.cn/figma/h_4dce23b9.png",
+            "currentSrc": "https://img.onlywnn.cn/figma/h_4dce23b9.png",
+            "alt": "按钮组件"
+          },
+          "editCapabilities": [
+            "annotate",
+            "style",
+            "image",
+            "structure"
+          ]
+        }
+      },
+      "pin": {
+        "xRatio": 0.7626666666666667,
+        "yRatio": 0.5127782357790602
+      },
+      "content": "测试评论",
+      "author": {
+        "id": "a5862615-26bb-4688-924d-7fd68c132e21",
+        "name": "qihao",
+        "isAnonymous": false
+      },
+      "mentions": [],
+      "createdAt": 1788493379126,
+      "updatedAt": 1788493379126,
       "resolved": false,
       "replies": []
     }

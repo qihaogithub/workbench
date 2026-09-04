@@ -28,5 +28,10 @@ describe("viewer config panel contract", () => {
     expect(viewerAppSource).toContain(
       "<CommentUnreadDot count={unresolvedCommentCount} />",
     );
+    expect(viewerAppSource).toContain(
+      "const configCommentController = useMemo<ConfigCommentController>",
+    );
+    expect(viewerAppSource).toContain("configComments={configCommentController}");
+    expect(viewerAppSource).toContain("readOnly: true");
   });
 });

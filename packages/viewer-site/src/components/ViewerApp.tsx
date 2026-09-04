@@ -88,6 +88,7 @@ import {
   countUnresolvedCommentThreadsByPage,
   filterPageCommentThreads,
   type CanvasCommentDraft,
+  type ConfigCommentController,
 } from "@workbench/demo-ui/comment";
 import {
   createCommentApi,
@@ -1047,10 +1048,7 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
   // 评论功能：API 适配器 + WS 地址 + 当前作者身份
   const commentApi = useMemo(() => createCommentApi(projectId), [projectId]);
   const commentWsUrl = useMemo(() => getCommentWsUrl(), []);
-  const commentQueryTarget = useMemo<CommentTarget | undefined>(() => {
-    if (previewMode === "canvas") return undefined;
-    return { kind: "page", pageId: activePageId };
-  }, [activePageId, previewMode]);
+  const commentQueryTarget = useMemo<CommentTarget | undefined>(() => undefined, []);
   const commentsData = useComments({
     projectId,
     target: commentQueryTarget,
@@ -1099,6 +1097,14 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
       isAnonymous: true,
     };
   }, [isLoggedIn, sessionId, sessionUsername]);
+  const configCommentController = useMemo<ConfigCommentController>(
+    () => ({
+      threads: commentsData.threads,
+      currentUser: commentUser,
+      readOnly: true,
+    }),
+    [commentUser, commentsData.threads],
+  );
   // 已登录用户打开项目时记录访问（供 @候选人列表使用）
   useEffect(() => {
     if (isLoggedIn && project) {
@@ -1734,6 +1740,7 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
       hideEmptyRequirements
       designSpecEntries={designSpecEntries}
       pageDesignSpecEntries={pageDesignSpecEntries}
+      configComments={configCommentController}
     />
   );
 

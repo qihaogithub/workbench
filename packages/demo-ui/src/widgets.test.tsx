@@ -25,6 +25,8 @@ describe("FileUploadWidget", () => {
     const input = container.querySelector('input[type="file"]')!;
     expect(input).toHaveAttribute("accept", "audio/mpeg,.mp3");
     expect(screen.getByText("上传音频")).toBeInTheDocument();
+    const uploadTile = screen.getByText("上传音频").closest(".group");
+    expect(uploadTile).toHaveClass("bg-black/10");
 
     const file = new File([new Uint8Array([0x49, 0x44, 0x33])], "bgm.mp3", { type: "audio/mpeg" });
     fireEvent.change(input, { target: { files: [file] } });
@@ -60,6 +62,14 @@ describe("FileUploadWidget", () => {
 
     expect(await screen.findByText("文件大小超过 1MB 限制")).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("uses the same subtle black fill for an empty image upload tile", () => {
+    const { container } = render(<FileUploadWidget onChange={vi.fn()} />);
+
+    const uploadTile = screen.getByText("Upload").closest(".group");
+    expect(uploadTile).toHaveClass("bg-black/10");
+    expect(container.querySelector('input[type="file"]')).toBeInTheDocument();
   });
 
   it("hides deletion for a default image and restores that default after replacement", () => {

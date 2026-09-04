@@ -33,7 +33,15 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { FieldRenderer } from "./FieldRenderer";
 import type { FieldConfig } from "./schema-parser";
-import type { ConfigCommentTarget, ConfigItemCapabilities, ImageConfigScope, WhiteboardLauncher } from "./types";
+import type { ConfigBreadcrumb, ConfigChangeMeta, ConfigCommentTarget, ConfigItemCapabilities, ConfigItemDetailHandler, DesignSpecEntryLink, ImageConfigScope, WhiteboardLauncher } from "./types";
+import type { MarkdownReferenceClickHandler, MarkdownReferenceContext, MarkdownReferenceProvider } from "./DocumentEditor";
+
+function getFieldDefault(field: FieldConfig): unknown {
+  if (field.default !== undefined) return field.default;
+  if (field.type === "array") return [];
+  if (field.type === "object") return {};
+  return "";
+}
 
 function createItemDefault(
   field: FieldConfig,
@@ -48,7 +56,7 @@ function createItemDefault(
       [field.oneOf.discriminator]: variant.value,
     };
     for (const f of variant.fields) {
-      item[f.key] = f.default ?? "";
+      item[f.key] = getFieldDefault(f);
     }
     return item;
   }
@@ -56,7 +64,7 @@ function createItemDefault(
   if (field.children) {
     const item: Record<string, unknown> = {};
     for (const f of field.children) {
-      item[f.key] = f.default ?? "";
+      item[f.key] = getFieldDefault(f);
     }
     return item;
   }
@@ -69,6 +77,14 @@ function getItemTitle(
   item: Record<string, unknown>,
   index: number,
 ): string {
+  const itemTitleTemplate = field.itemTitleTemplate;
+  if (itemTitleTemplate) {
+    const oneBasedIndex = index + 1;
+    return itemTitleTemplate
+      .replace(/\{index\}/g, String(oneBasedIndex).padStart(2, "0"))
+      .replace(/\{index1\}/g, String(oneBasedIndex));
+  }
+
   if (field.oneOf) {
     const discriminator = field.oneOf.discriminator;
     const itemType = item[discriminator];
@@ -86,13 +102,71 @@ function getItemTitle(
   return `项目 ${index + 1}`;
 }
 
+function getItemIdentity(item: Record<string, unknown>): string {
+  for (const key of ["id", "key", "uid", "uuid"]) {
+    const value = item[key];
+    if (typeof value === "string" || typeof value === "number") {
+      const normalized = String(value).trim();
+      if (normalized) return `id:${key}:${normalized}`;
+    }
+  }
+  try {
+    return `json:${JSON.stringify(item)}`;
+  } catch {
+    return "json:[unserializable]";
+  }
+}
+
+function reconcileItemIds(
+  previousIds: string[],
+  previousItems: Record<string, unknown>[],
+  nextItems: Record<string, unknown>[],
+  createId: () => string,
+): string[] {
+  const availableByIdentity = new Map<string, string[]>();
+  previousItems.forEach((item, index) => {
+    const id = previousIds[index];
+    if (!id) return;
+    const identity = getItemIdentity(item);
+    const ids = availableByIdentity.get(identity) ?? [];
+    ids.push(id);
+    availableByIdentity.set(identity, ids);
+  });
+
+  const used = new Set<string>();
+  const nextIds = nextItems.map((item, index) => {
+    const identity = getItemIdentity(item);
+    const ids = availableByIdentity.get(identity);
+    const matched = ids?.find((id) => !used.has(id));
+    if (matched) {
+      used.add(matched);
+      return matched;
+    }
+
+    // A field edit changes the JSON fingerprint. Preserve the same-position
+    // ID in that case so an open Sheet route keeps targeting the edited item.
+    const samePosition = previousIds[index];
+    if (samePosition && !used.has(samePosition)) {
+      used.add(samePosition);
+      return samePosition;
+    }
+
+    const created = createId();
+    used.add(created);
+    return created;
+  });
+  return nextIds;
+}
+
 function ArrayItemHeader({
   field,
   item,
   index,
   sortableId,
+  sortable = false,
   isOpen,
   onToggle,
+  onOpenDetail,
   onRemove,
   readonly,
   children,
@@ -101,8 +175,10 @@ function ArrayItemHeader({
   item: Record<string, unknown>;
   index: number;
   sortableId: string;
+  sortable?: boolean;
   isOpen: boolean;
   onToggle: () => void;
+  onOpenDetail?: () => void;
   onRemove: () => void;
   readonly?: boolean;
   children?: ReactNode;
@@ -114,7 +190,7 @@ function ArrayItemHeader({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: sortableId });
+  } = useSortable({ id: sortableId, disabled: !sortable });
 
   const style = {
     transform: CSS.Translate.toString(transform),
@@ -136,9 +212,9 @@ function ArrayItemHeader({
           : "hover:bg-foreground/[0.09]",
       )}
     >
-      <div className="flex min-w-0 items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2.5">
-          {!readonly && (
+      <div className="group flex min-w-0 items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          {!readonly && sortable && (
             <button
               type="button"
               className="shrink-0 cursor-grab touch-none text-foreground/40 transition-colors hover:text-foreground/70 active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -152,14 +228,15 @@ function ArrayItemHeader({
 
           <button
             type="button"
-            className="flex min-w-0 items-center gap-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            onClick={onToggle}
-            aria-expanded={isOpen}
+            className="flex min-w-0 flex-1 items-center gap-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={onOpenDetail ?? onToggle}
+            aria-expanded={onOpenDetail ? undefined : isOpen}
+            aria-haspopup={onOpenDetail ? "dialog" : undefined}
           >
             <ChevronDown
               className={cn(
                 "h-4 w-4 shrink-0 text-foreground/40 transition-transform duration-200",
-                !isOpen && "-rotate-90",
+                onOpenDetail ? "-rotate-90" : !isOpen && "-rotate-90",
               )}
             />
             <span className="truncate text-sm font-normal leading-5 text-foreground">{title}</span>
@@ -167,7 +244,7 @@ function ArrayItemHeader({
         </div>
 
         {!readonly && (
-          <div className="flex shrink-0 items-center">
+          <div className="pointer-events-none flex shrink-0 items-center opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
             <Button
               variant="ghost"
               size="icon"
@@ -191,10 +268,12 @@ function ArrayItemHeader({
 export interface ArrayFieldGroupProps {
   field: FieldConfig;
   value: Record<string, unknown>[];
-  onChange: (value: Record<string, unknown>[]) => void;
+  onChange: (value: Record<string, unknown>[], meta?: ConfigChangeMeta) => void;
   sessionId?: string;
   readonly?: boolean;
   fieldPath?: string;
+  /** Canonical schema path without array indexes, shared by design-spec refs. */
+  schemaFieldPath?: string;
   defaultValueOverride?: unknown;
   imageConfigScope?: ImageConfigScope;
   pageId?: string;
@@ -203,6 +282,19 @@ export interface ArrayFieldGroupProps {
   configItemCapabilities?: ConfigItemCapabilities;
   onEditConfigDefinition?: (fieldKey: string, field: FieldConfig) => void;
   onAddConfigComment?: (target: ConfigCommentTarget, trigger?: HTMLElement | null) => void;
+  hasConfigComment?: (target: ConfigCommentTarget) => boolean;
+  designSpecEntries?: DesignSpecEntryLink[];
+  onEditDesignSpec?: (docId: string, entryId: string) => void;
+  onOpenDesignSpec?: (spec: DesignSpecEntryLink, fieldTitle: string, anchor?: { top: number; bottom: number }, trigger?: HTMLElement | null) => void;
+  referenceContext?: MarkdownReferenceContext;
+  referenceProvider?: MarkdownReferenceProvider;
+  onReferenceClick?: MarkdownReferenceClickHandler;
+  onOpenItemDetail?: ConfigItemDetailHandler;
+  activeItemDetailId?: string | null;
+  activeItemDetailFieldPath?: string;
+  onItemDetailInvalidated?: (itemId: string) => void;
+  breadcrumb?: ConfigBreadcrumb[];
+  arrayDepth?: number;
 }
 
 function AddMenu({
@@ -308,6 +400,7 @@ export function ArrayFieldGroup({
   sessionId,
   readonly,
   fieldPath,
+  schemaFieldPath,
   defaultValueOverride,
   imageConfigScope,
   pageId,
@@ -316,13 +409,33 @@ export function ArrayFieldGroup({
   configItemCapabilities,
   onEditConfigDefinition,
   onAddConfigComment,
+  hasConfigComment,
+  designSpecEntries,
+  onEditDesignSpec,
+  onOpenDesignSpec,
+  referenceContext,
+  referenceProvider,
+  onReferenceClick,
+  onOpenItemDetail,
+  activeItemDetailId,
+  activeItemDetailFieldPath,
+  onItemDetailInvalidated,
+  breadcrumb = [],
+  arrayDepth = 1,
 }: ArrayFieldGroupProps) {
+  // Sorting is an explicit schema capability. Parent and child arrays each
+  // make their own declaration, so a nested hierarchy never inherits the
+  // parent's sort policy.
+  const sortable = field.sortable === true;
   const sortableIdSequenceRef = useRef(0);
   const createSortableId = useCallback(
     () => `${field.key}-sortable-${sortableIdSequenceRef.current++}`,
     [field.key],
   );
   const [itemIds, setItemIds] = useState(() => value.map(createSortableId));
+  const itemIdsRef = useRef(itemIds);
+  itemIdsRef.current = itemIds;
+  const previousItemsRef = useRef(value);
   const [openItems, setOpenItems] = useState<Set<number>>(() => {
     const collapsed =
       field.uiOptions?.collapsed !== undefined
@@ -334,21 +447,29 @@ export function ArrayFieldGroup({
     return new Set();
   });
 
-  // 保持拖拽标识与项本身绑定，而不是绑定数组位置。外部仅增删数据时，
-  // 补齐或截断标识；组件内部的增删与排序会在对应 handler 中同步移动标识。
+  // 保持拖拽标识与项本身绑定，而不是绑定数组位置。外部协同或恢复默认
+  // 可能在不改变数组长度的情况下重排数据，因此按业务 id / 内容指纹复用
+  // 标识；字段编辑在无法匹配指纹时回退到原位置，避免打开的 Sheet 失联。
   useEffect(() => {
+    const previousItems = previousItemsRef.current;
     setItemIds((previousIds) => {
-      if (previousIds.length === value.length) return previousIds;
-      if (previousIds.length > value.length) return previousIds.slice(0, value.length);
-      return [
-        ...previousIds,
-        ...Array.from(
-          { length: value.length - previousIds.length },
-          createSortableId,
-        ),
-      ];
+      const nextIds = reconcileItemIds(previousIds, previousItems, value, createSortableId);
+      return nextIds.every((id, index) => id === previousIds[index])
+        ? previousIds
+        : nextIds;
     });
-  }, [value.length, createSortableId]);
+    previousItemsRef.current = value;
+  }, [value, createSortableId]);
+
+  useEffect(() => {
+    if (
+      !activeItemDetailId ||
+      !onItemDetailInvalidated ||
+      (fieldPath ?? field.key) !== activeItemDetailFieldPath ||
+      itemIds.includes(activeItemDetailId)
+    ) return;
+    onItemDetailInvalidated(activeItemDetailId);
+  }, [activeItemDetailFieldPath, activeItemDetailId, field.key, fieldPath, itemIds, onItemDetailInvalidated]);
 
   const maxItems =
     typeof field.uiOptions?.maxItems === "number"
@@ -393,13 +514,16 @@ export function ArrayFieldGroup({
         return adjusted;
       });
       setItemIds((previousIds) => previousIds.filter((_, itemIndex) => itemIndex !== index));
+      const removedId = itemIdsRef.current[index];
+      if (removedId) onItemDetailInvalidated?.(removedId);
       onChange(newValue);
     },
-    [value, onChange],
+    [value, onChange, onItemDetailInvalidated],
   );
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
+      if (!sortable) return;
       const { active, over } = event;
       if (!over || active.id === over.id) return;
       const oldIndex = itemIds.indexOf(String(active.id));
@@ -418,17 +542,24 @@ export function ArrayFieldGroup({
       });
       onChange(newValue);
     },
-    [itemIds, value, onChange],
+    [itemIds, value, onChange, sortable],
   );
 
+  const valueRef = useRef(value);
+  valueRef.current = value;
+
   const handleItemFieldChange = useCallback(
-    (index: number, key: string, newVal: unknown) => {
-      const newValue = [...value];
-      const item = { ...newValue[index], [key]: newVal };
-      newValue[index] = item;
-      onChange(newValue);
+    (index: number, key: string, newVal: unknown, meta?: ConfigChangeMeta, itemId?: string) => {
+      const newValue = [...valueRef.current];
+      const currentIndex = itemId
+        ? itemIdsRef.current.indexOf(itemId)
+        : index;
+      if (currentIndex < 0 || currentIndex >= newValue.length) return;
+      const item = { ...newValue[currentIndex], [key]: newVal };
+      newValue[currentIndex] = item;
+      onChange(newValue, meta);
     },
-    [value, onChange],
+    [onChange],
   );
 
   const toggleItem = useCallback((index: number) => {
@@ -457,6 +588,17 @@ export function ArrayFieldGroup({
     return field.children ?? [];
   };
 
+  const getSchemaChildPath = (childKey: string, item: Record<string, unknown>): string => {
+    const parentPath = schemaFieldPath ?? field.key;
+    if (field.oneOf) {
+      const discriminator = field.oneOf.discriminator;
+      const variantValue = item[discriminator];
+      const marker = `${discriminator}=${String(variantValue)}`;
+      return `${parentPath}[${marker}].${childKey}`;
+    }
+    return `${parentPath}[].${childKey}`;
+  };
+
   return (
     <div className="flex flex-col gap-2.5 pt-2.5">
       {!isEmpty && (
@@ -474,6 +616,8 @@ export function ArrayFieldGroup({
                 const isOpen = openItems.has(index);
                 const sortableId = itemIds[index] ?? `${field.key}-pending-${index}`;
                 const visibleFields = getVisibleFields(item);
+                const title = getItemTitle(field, item, index);
+                const detailPresentation = field.detailPresentation ?? "inline";
                 const defaultItem = Array.isArray(defaultValueOverride)
                   ? defaultValueOverride[index]
                   : undefined;
@@ -485,8 +629,39 @@ export function ArrayFieldGroup({
                     item={item}
                     index={index}
                     sortableId={sortableId}
+                    sortable={sortable}
                     isOpen={isOpen}
                     onToggle={() => toggleItem(index)}
+                    onOpenDetail={
+                      onOpenItemDetail && detailPresentation === "sheet"
+                        ? () => onOpenItemDetail({
+                            field,
+                            item,
+                            index,
+                            itemId: sortableId,
+                            fieldPath: fieldPath ?? field.key,
+                            schemaFieldPath: schemaFieldPath ?? field.key,
+                            title,
+                            level: arrayDepth + 1,
+                            breadcrumb: [
+                              ...breadcrumb,
+                              {
+                                id: `${fieldPath ?? field.key}:items`,
+                                label: field.detailBreadcrumbTitle ?? field.title,
+                                level: arrayDepth + 1,
+                              },
+                              { id: sortableId, label: title, level: arrayDepth + 2 },
+                            ],
+                            getCurrentIndex: () => itemIdsRef.current.indexOf(sortableId),
+                            getCurrentItem: () => {
+                              const currentIndex = itemIdsRef.current.indexOf(sortableId);
+                              return currentIndex >= 0 ? valueRef.current[currentIndex] : undefined;
+                            },
+                            onChangeField: (key, newVal, meta) =>
+                              handleItemFieldChange(index, key, newVal, meta, sortableId),
+                          })
+                        : undefined
+                    }
                     onRemove={() => handleRemove(index)}
                     readonly={readonly}
                   >
@@ -503,17 +678,20 @@ export function ArrayFieldGroup({
                                 key={childField.key}
                                 field={childField}
                                 value={item[childField.key]}
-                                onChange={(val) =>
+                                onChange={(val, meta) =>
                                   handleItemFieldChange(
                                     index,
                                     childField.key,
                                     val,
+                                    meta,
+                                    sortableId,
                                   )
                                 }
                                 sessionId={sessionId}
                                 readonly={readonly}
                                 embedded
                                 fieldPath={`${fieldPath ?? field.key}[${index}].${childField.key}`}
+                                schemaFieldPath={getSchemaChildPath(childField.key, item)}
                                 defaultValueOverride={
                                   defaultItem && typeof defaultItem === "object" && !Array.isArray(defaultItem)
                                     ? (defaultItem as Record<string, unknown>)[childField.key]
@@ -526,6 +704,22 @@ export function ArrayFieldGroup({
                                 configItemCapabilities={configItemCapabilities}
                                 onEditConfigDefinition={onEditConfigDefinition}
                                 onAddConfigComment={onAddConfigComment}
+                                hasConfigComment={hasConfigComment}
+                                designSpecEntries={designSpecEntries}
+                                onEditDesignSpec={onEditDesignSpec}
+                                onOpenDesignSpec={onOpenDesignSpec}
+                                referenceContext={referenceContext}
+                                referenceProvider={referenceProvider}
+                                onReferenceClick={onReferenceClick}
+                                onOpenItemDetail={onOpenItemDetail}
+                                activeItemDetailId={activeItemDetailId}
+                                activeItemDetailFieldPath={activeItemDetailFieldPath}
+                                onItemDetailInvalidated={onItemDetailInvalidated}
+                                breadcrumb={[
+                                  ...breadcrumb,
+                                  { id: sortableId, label: title, level: arrayDepth + 1 },
+                                ]}
+                                arrayDepth={arrayDepth + 1}
                                 positionInstanceId={
                                   childField.positionable
                                     ? `${field.key}:${sortableId}:${childField.key}`

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Crepe } from "@milkdown/crepe";
 import { commandsCtx, editorViewCtx, parserCtx } from "@milkdown/kit/core";
+import type { CommentMention } from "@workbench/shared";
 import {
   headingSchema,
   paragraphSchema,
@@ -48,6 +49,13 @@ export interface ConfigReferenceCandidate {
   label: string;
 }
 
+/** Markdown 编辑器可选的评论提及候选；不启用时编辑器行为保持不变。 */
+export interface MarkdownMentionCandidate {
+  id: string;
+  name: string;
+  type: "user" | "agent";
+}
+
 /** 编辑器宿主授予的项目引用上下文；不包含用户/session 对象。 */
 export interface MarkdownReferenceContext {
   source: MarkdownReferenceSource;
@@ -85,8 +93,24 @@ export interface DocumentEditorProps {
   onReferenceClick?: MarkdownReferenceClickHandler;
   /** 供诊断/最近使用记录插入的实体引用。 */
   onReferenceInserted?: (candidate: MarkdownReferenceCandidate) => void;
+  /** Cmd/Ctrl+Enter 提交当前简版编辑器内容。 */
+  onSubmit?: () => void;
+  /** 编辑器创建后自动聚焦正文。 */
+  autoFocus?: boolean;
+  /** 评论 Markdown 编辑器可选的 @ 提及候选。 */
+  mentionCandidates?: MarkdownMentionCandidate[];
+  /** 当前 Markdown 中已解析的结构化提及。 */
+  mentions?: CommentMention[];
+  /** 提及候选选择或内容删除后的结构化提及回调。 */
+  onMentionsChange?: (mentions: CommentMention[]) => void;
+  /** 是否允许候选列表包含 AI。 */
+  canMentionAgent?: boolean;
   /** 只读内容交由父级滚动时关闭编辑器自身滚动，完整展开正文。 */
   scrollable?: boolean;
+  /** 是否显示固定顶部格式工具栏；选区浮动工具栏不受影响。 */
+  showTopBar?: boolean;
+  /** 让编辑器从单行高度随内容增长，达到上限后在正文区滚动。 */
+  autoGrow?: boolean;
   /** 有非空文本选区时，显示评论入口并返回可重新定位的选区锚点。 */
   onCommentSelection?: (selection: {
     quote: string;
@@ -119,7 +143,15 @@ export function DocumentEditor({
   referenceProvider,
   onReferenceClick,
   onReferenceInserted,
+  onSubmit,
+  autoFocus = false,
+  mentionCandidates,
+  mentions = [],
+  onMentionsChange,
+  canMentionAgent = false,
   scrollable = true,
+  showTopBar = true,
+  autoGrow = false,
   onCommentSelection,
   className,
 }: DocumentEditorProps) {
@@ -132,6 +164,10 @@ export function DocumentEditor({
   const uploadHandlerRef = useRef(uploadHandler);
   const localizeRemoteImageRef = useRef(localizeRemoteImage);
   const referenceCandidatesRef = useRef(referenceCandidates);
+  const mentionCandidatesRef = useRef(mentionCandidates);
+  const mentionsRef = useRef(mentions);
+  const onMentionsChangeRef = useRef(onMentionsChange);
+  const canMentionAgentRef = useRef(canMentionAgent);
   const lastEmittedRef = useRef(value);
   const externalSyncRef = useRef(false);
   const externalSyncTargetRef = useRef<string | null>(null);
@@ -142,6 +178,7 @@ export function DocumentEditor({
   const referenceProviderRef = useRef(referenceProvider);
   const onReferenceClickRef = useRef(onReferenceClick);
   const onReferenceInsertedRef = useRef(onReferenceInserted);
+  const onSubmitRef = useRef(onSubmit);
 
   onChangeRef.current = onChange;
   uploadHandlerRef.current = uploadHandler;
@@ -149,10 +186,15 @@ export function DocumentEditor({
   readOnlyRef.current = readOnly;
   onCommentSelectionRef.current = onCommentSelection;
   referenceCandidatesRef.current = referenceCandidates;
+  mentionCandidatesRef.current = mentionCandidates;
+  mentionsRef.current = mentions;
+  onMentionsChangeRef.current = onMentionsChange;
+  canMentionAgentRef.current = canMentionAgent;
   referenceContextRef.current = referenceContext;
   referenceProviderRef.current = referenceProvider;
   onReferenceClickRef.current = onReferenceClick;
   onReferenceInsertedRef.current = onReferenceInserted;
+  onSubmitRef.current = onSubmit;
   const uploadsEnabled = Boolean(uploadHandler);
   const referenceCandidateSignature = (referenceCandidates ?? [])
     .map((candidate) => `${candidate.key}\u0000${candidate.label}`)
@@ -169,7 +211,20 @@ export function DocumentEditor({
   const referenceAbortRef = useRef<AbortController | null>(null);
   const openReferenceMenuRef = useRef<(() => void) | null>(null);
   const forceReferenceMenuRef = useRef(false);
-  const insertReferenceCandidateRef = useRef<((candidate: MarkdownReferenceCandidate) => void) | null>(null);
+  const insertReferenceCandidateRef = useRef<
+    ((candidate: MarkdownReferenceCandidate) => void) | null
+  >(null);
+  const [mentionMenu, setMentionMenu] = useState<{
+    query: string;
+    candidates: MarkdownMentionCandidate[];
+    selectedIndex: number;
+  } | null>(null);
+  const mentionMenuRef = useRef(mentionMenu);
+  mentionMenuRef.current = mentionMenu;
+  const mentionTriggerRef = useRef<number | null>(null);
+  const insertMentionCandidateRef = useRef<
+    ((candidate: MarkdownMentionCandidate) => void) | null
+  >(null);
 
   const reportUploadError = useCallback((error: unknown) => {
     window.alert(error instanceof Error ? error.message : "上传失败，请重试");
@@ -221,7 +276,10 @@ export function DocumentEditor({
       actions,
       enableUploads: uploadsEnabled,
       referenceCandidates: referenceCandidatesRef.current,
-      enableProjectReferences: Boolean(referenceProviderRef.current && referenceContextRef.current),
+      enableProjectReferences: Boolean(
+        referenceProviderRef.current && referenceContextRef.current,
+      ),
+      showTopBar,
     });
     const crepe = new Crepe({
       root,
@@ -251,6 +309,7 @@ export function DocumentEditor({
         if (markdown === lastEmittedRef.current) return;
         lastEmittedRef.current = markdown;
         onChangeRef.current(markdown);
+        updateMentions(markdown);
       });
     });
 
@@ -259,8 +318,11 @@ export function DocumentEditor({
       if (!localize || readOnlyRef.current) return;
 
       const markdownPaste = getMarkdownImagePaste(event.clipboardData);
-      const plainText = event.clipboardData?.getData("text/plain")?.trim() ?? "";
-      const externalUrls = getExternalImageUrlsFromClipboard(event.clipboardData);
+      const plainText =
+        event.clipboardData?.getData("text/plain")?.trim() ?? "";
+      const externalUrls = getExternalImageUrlsFromClipboard(
+        event.clipboardData,
+      );
       const externalUrl = plainText
         ? null
         : getExternalImageUrlFromClipboard(event.clipboardData);
@@ -269,13 +331,18 @@ export function DocumentEditor({
         event.preventDefault();
         event.stopImmediatePropagation();
         void Promise.all(
-          markdownPaste.externalUrls.map(async (url) => [url, await localize(url)] as const),
+          markdownPaste.externalUrls.map(
+            async (url) => [url, await localize(url)] as const,
+          ),
         )
           .then((localized) => {
             if (!mountedRef.current || crepeRef.current !== crepe) return;
             insertMarkdown(
               crepe,
-              replaceMarkdownImageUrls(markdownPaste.markdown, new Map(localized)),
+              replaceMarkdownImageUrls(
+                markdownPaste.markdown,
+                new Map(localized),
+              ),
             );
           })
           .catch(reportUploadError);
@@ -302,16 +369,19 @@ export function DocumentEditor({
         void Promise.all(
           externalUrls.map(async (url) => [url, await localize(url)] as const),
         )
-        .then((localized) => {
-          if (!mountedRef.current || crepeRef.current !== crepe) return;
-          const replacements = new Map(localized);
-          const currentMarkdown = crepe.editor.action(getMarkdown());
-          const markdown = replaceMarkdownImageUrls(currentMarkdown, replacements);
-          if (markdown !== currentMarkdown) {
-            crepe.editor.action(replaceAll(markdown));
-          }
-        })
-        .catch(reportUploadError);
+          .then((localized) => {
+            if (!mountedRef.current || crepeRef.current !== crepe) return;
+            const replacements = new Map(localized);
+            const currentMarkdown = crepe.editor.action(getMarkdown());
+            const markdown = replaceMarkdownImageUrls(
+              currentMarkdown,
+              replacements,
+            );
+            if (markdown !== currentMarkdown) {
+              crepe.editor.action(replaceAll(markdown));
+            }
+          })
+          .catch(reportUploadError);
       }, 0);
     };
     root.addEventListener("paste", handlePaste, true);
@@ -324,11 +394,115 @@ export function DocumentEditor({
       setReferenceMenu(null);
     };
 
+    const closeMentionMenu = () => {
+      mentionTriggerRef.current = null;
+      setMentionMenu(null);
+    };
+
+    const updateMentions = (markdown: string) => {
+      const current = mentionsRef.current;
+      if (!current.length || !onMentionsChangeRef.current) return;
+      const next = current.filter((mention) =>
+        markdown.includes(`@${mention.name}`),
+      );
+      if (
+        next.length === current.length &&
+        next.every(
+          (mention, index) =>
+            mention.id === current[index]?.id &&
+            mention.type === current[index]?.type,
+        )
+      )
+        return;
+      mentionsRef.current = next;
+      onMentionsChangeRef.current(next);
+    };
+
+    const updateMentionMenu = () => {
+      const candidates = mentionCandidatesRef.current;
+      const view = crepe.editor.action((ctx) => ctx.get(editorViewCtx));
+      if (
+        !candidates?.length ||
+        readOnlyRef.current ||
+        !view.state.selection.empty
+      ) {
+        closeMentionMenu();
+        return;
+      }
+      const trigger = mentionTriggerRef.current;
+      if (trigger === null || trigger > view.state.selection.from) {
+        closeMentionMenu();
+        return;
+      }
+      const typed = view.state.doc.textBetween(
+        trigger,
+        view.state.selection.from,
+        "",
+      );
+      if (
+        !typed.startsWith("@") ||
+        /[\n\r\t ]/.test(typed) ||
+        typed.length > 80
+      ) {
+        closeMentionMenu();
+        return;
+      }
+      const query = typed.slice(1).toLowerCase();
+      const visibleCandidates = candidates
+        .filter(
+          (candidate) =>
+            canMentionAgentRef.current || candidate.type !== "agent",
+        )
+        .filter(
+          (candidate) => !query || candidate.name.toLowerCase().includes(query),
+        )
+        .slice(0, 20);
+      if (!visibleCandidates.length) {
+        closeMentionMenu();
+        return;
+      }
+      setMentionMenu({
+        query: typed.slice(1),
+        candidates: visibleCandidates,
+        selectedIndex: 0,
+      });
+    };
+
+    const insertMentionCandidate = (candidate: MarkdownMentionCandidate) => {
+      const trigger = mentionTriggerRef.current;
+      if (trigger === null) return;
+      const view = crepe.editor.action((ctx) => ctx.get(editorViewCtx));
+      view.dispatch(view.state.tr.delete(trigger, view.state.selection.from));
+      insertMarkdown(crepe, `@${escapeMarkdownLabel(candidate.name)} `);
+      const current = mentionsRef.current;
+      const mention: CommentMention = {
+        id: candidate.id,
+        name: candidate.name,
+        type: candidate.type,
+      };
+      if (
+        !current.some(
+          (item) => item.id === mention.id && item.type === mention.type,
+        )
+      ) {
+        const next = [...current, mention];
+        mentionsRef.current = next;
+        onMentionsChangeRef.current?.(next);
+      }
+      closeMentionMenu();
+    };
+    insertMentionCandidateRef.current = insertMentionCandidate;
+
     const updateReferenceMenu = () => {
       const provider = referenceProviderRef.current;
       const context = referenceContextRef.current;
       const view = crepe.editor.action((ctx) => ctx.get(editorViewCtx));
-      if (!provider || !context || readOnlyRef.current || !view.state.selection.empty) {
+      if (
+        !provider ||
+        !context ||
+        readOnlyRef.current ||
+        !view.state.selection.empty
+      ) {
         closeReferenceMenu();
         return;
       }
@@ -337,8 +511,16 @@ export function DocumentEditor({
         closeReferenceMenu();
         return;
       }
-      const typed = view.state.doc.textBetween(trigger, view.state.selection.from, "");
-      if ((!forceReferenceMenuRef.current && !typed.startsWith("@")) || /[\n\r\t ]/.test(typed) || typed.length > 120) {
+      const typed = view.state.doc.textBetween(
+        trigger,
+        view.state.selection.from,
+        "",
+      );
+      if (
+        (!forceReferenceMenuRef.current && !typed.startsWith("@")) ||
+        /[\n\r\t ]/.test(typed) ||
+        typed.length > 120
+      ) {
         closeReferenceMenu();
         return;
       }
@@ -347,16 +529,28 @@ export function DocumentEditor({
       referenceAbortRef.current?.abort();
       const controller = new AbortController();
       referenceAbortRef.current = controller;
-      Promise.resolve(provider({ query, trigger: "@", context, signal: controller.signal }))
+      Promise.resolve(
+        provider({ query, trigger: "@", context, signal: controller.signal }),
+      )
         .then((candidates) => {
-          if (requestId !== referenceRequestRef.current || !mountedRef.current) return;
+          if (requestId !== referenceRequestRef.current || !mountedRef.current)
+            return;
           const allowedKinds = context.policy.allowedTargetKinds;
           const visibleCandidates = candidates.filter((candidate) => {
-            if (allowedKinds && !allowedKinds.includes(candidate.target.kind)) return false;
-            if (context.policy.sameProjectOnly && candidate.target.projectId !== context.source.projectId) return false;
+            if (allowedKinds && !allowedKinds.includes(candidate.target.kind))
+              return false;
+            if (
+              context.policy.sameProjectOnly &&
+              candidate.target.projectId !== context.source.projectId
+            )
+              return false;
             return true;
           });
-          setReferenceMenu({ query, candidates: visibleCandidates.slice(0, 30), selectedIndex: 0 });
+          setReferenceMenu({
+            query,
+            candidates: visibleCandidates.slice(0, 30),
+            selectedIndex: 0,
+          });
         })
         .catch(() => {
           if (requestId === referenceRequestRef.current) setReferenceMenu(null);
@@ -373,7 +567,9 @@ export function DocumentEditor({
       updateReferenceMenu();
     };
 
-    const insertReferenceCandidate = (candidate: MarkdownReferenceCandidate) => {
+    const insertReferenceCandidate = (
+      candidate: MarkdownReferenceCandidate,
+    ) => {
       const trigger = referenceTriggerRef.current;
       if (trigger === null) return;
       const view = crepe.editor.action((ctx) => ctx.get(editorViewCtx));
@@ -391,6 +587,53 @@ export function DocumentEditor({
     insertReferenceCandidateRef.current = insertReferenceCandidate;
 
     const handleReferenceKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+        event.preventDefault();
+        onSubmitRef.current?.();
+        return;
+      }
+      const mentionEnabled = Boolean(mentionCandidatesRef.current?.length);
+      const mentionView = mentionEnabled
+        ? crepe.editor.action((ctx) => ctx.get(editorViewCtx))
+        : null;
+      if (mentionView && !readOnlyRef.current) {
+        if (event.key === "@" && mentionView.state.selection.empty) {
+          mentionTriggerRef.current = mentionView.state.selection.from;
+          window.queueMicrotask(updateMentionMenu);
+          return;
+        }
+        const currentMentionMenu = mentionMenuRef.current;
+        if (currentMentionMenu) {
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            const delta = event.key === "ArrowDown" ? 1 : -1;
+            setMentionMenu((current) => {
+              if (!current || current.candidates.length === 0) return current;
+              const selectedIndex =
+                (current.selectedIndex + delta + current.candidates.length) %
+                current.candidates.length;
+              return { ...current, selectedIndex };
+            });
+            return;
+          }
+          if (event.key === "Enter" || event.key === "Tab") {
+            const candidate =
+              currentMentionMenu.candidates[currentMentionMenu.selectedIndex];
+            if (candidate) {
+              event.preventDefault();
+              insertMentionCandidateRef.current?.(candidate);
+              return;
+            }
+          }
+          if (event.key === "Escape") {
+            event.preventDefault();
+            closeMentionMenu();
+            return;
+          }
+          window.setTimeout(updateMentionMenu, 0);
+        }
+      }
+
       const provider = referenceProviderRef.current;
       const context = referenceContextRef.current;
       if (!provider || !context || readOnlyRef.current) return;
@@ -403,25 +646,43 @@ export function DocumentEditor({
       // Treat a canonical wb:// link mark as one atomic chip for deletion.
       // Milkdown stores the label as ordinary text with a link mark; deleting
       // the whole marked run keeps users from leaving a half-written URI.
-      if ((event.key === "Backspace" || event.key === "Delete") && view.state.selection.empty) {
+      if (
+        (event.key === "Backspace" || event.key === "Delete") &&
+        view.state.selection.empty
+      ) {
         const { from } = view.state.selection;
         const direction = event.key === "Backspace" ? -1 : 1;
-        const probe = direction < 0 ? view.state.doc.resolve(from).nodeBefore : view.state.doc.resolve(from).nodeAfter;
-        const mark = probe?.marks.find((candidate) => typeof candidate.attrs?.href === "string" && candidate.attrs.href.startsWith("wb://"));
+        const probe =
+          direction < 0
+            ? view.state.doc.resolve(from).nodeBefore
+            : view.state.doc.resolve(from).nodeAfter;
+        const mark = probe?.marks.find(
+          (candidate) =>
+            typeof candidate.attrs?.href === "string" &&
+            candidate.attrs.href.startsWith("wb://"),
+        );
         if (mark) {
           let start = from;
           let end = from;
           if (direction < 0) {
             while (start > 0) {
               const node = view.state.doc.resolve(start).nodeBefore;
-              if (!node?.isText || !node.marks.some((candidate) => candidate.eq(mark))) break;
+              if (
+                !node?.isText ||
+                !node.marks.some((candidate) => candidate.eq(mark))
+              )
+                break;
               start -= node.nodeSize;
             }
             end = from;
           } else {
             while (end < view.state.doc.content.size) {
               const node = view.state.doc.resolve(end).nodeAfter;
-              if (!node?.isText || !node.marks.some((candidate) => candidate.eq(mark))) break;
+              if (
+                !node?.isText ||
+                !node.marks.some((candidate) => candidate.eq(mark))
+              )
+                break;
               end += node.nodeSize;
             }
           }
@@ -443,7 +704,8 @@ export function DocumentEditor({
         setReferenceMenu((current) => {
           if (!current || current.candidates.length === 0) return current;
           const selectedIndex =
-            (current.selectedIndex + delta + current.candidates.length) % current.candidates.length;
+            (current.selectedIndex + delta + current.candidates.length) %
+            current.candidates.length;
           return { ...current, selectedIndex };
         });
         return;
@@ -463,14 +725,19 @@ export function DocumentEditor({
       window.setTimeout(updateReferenceMenu, 0);
     };
 
-    const handleReferenceInput = () => window.setTimeout(updateReferenceMenu, 0);
+    const handleReferenceInput = () => {
+      window.setTimeout(updateMentionMenu, 0);
+      window.setTimeout(updateReferenceMenu, 0);
+    };
     const handleReferenceClick = (event: MouseEvent) => {
       if (readOnlyRef.current && openMarkdownImage(event.target)) {
         event.preventDefault();
         event.stopPropagation();
         return;
       }
-      const anchor = (event.target as HTMLElement).closest<HTMLAnchorElement>("a[href]");
+      const anchor = (event.target as HTMLElement).closest<HTMLAnchorElement>(
+        "a[href]",
+      );
       const href = anchor?.getAttribute("href");
       if (!href?.startsWith("wb://")) return;
       const target = decodeMarkdownReferenceUri(href);
@@ -485,8 +752,9 @@ export function DocumentEditor({
     root.addEventListener("input", handleReferenceInput, true);
     root.addEventListener("click", handleReferenceClick, true);
 
-    let headingStyleToolbar: ReturnType<typeof mountHeadingStyleToolbar> | null =
-      null;
+    let headingStyleToolbar: ReturnType<
+      typeof mountHeadingStyleToolbar
+    > | null = null;
     let topBarOverflow: ReturnType<typeof mountTopBarOverflow> | null = null;
     let selectionCommentButton: HTMLButtonElement | null = null;
     let selectionToolbarObserver: MutationObserver | null = null;
@@ -504,7 +772,9 @@ export function DocumentEditor({
         onSelect: (level) => {
           crepe.editor.action((ctx) => {
             const nodeType =
-              level === null ? paragraphSchema.type(ctx) : headingSchema.type(ctx);
+              level === null
+                ? paragraphSchema.type(ctx)
+                : headingSchema.type(ctx);
             ctx.get(commandsCtx).call(setBlockTypeCommand.key, {
               nodeType,
               ...(level === null ? {} : { attrs: { level } }),
@@ -518,31 +788,57 @@ export function DocumentEditor({
         selectionCommentButton.className = "document-comment-selection-button";
         selectionCommentButton.title = "添加选区评论";
         selectionCommentButton.setAttribute("aria-label", "添加选区评论");
-        selectionCommentButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4zM12 8v6m-3-3h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+        selectionCommentButton.innerHTML =
+          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4zM12 8v6m-3-3h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
         selectionCommentButton.addEventListener("pointerdown", (event) => {
           event.preventDefault();
-          const selection = crepe.editor.action((ctx) => ctx.get(editorViewCtx).state.selection);
+          const selection = crepe.editor.action(
+            (ctx) => ctx.get(editorViewCtx).state.selection,
+          );
           if (selection.empty) return;
-          const doc = crepe.editor.action((ctx) => ctx.get(editorViewCtx).state.doc);
-          const quote = doc.textBetween(selection.from, selection.to, "\n").trim();
+          const doc = crepe.editor.action(
+            (ctx) => ctx.get(editorViewCtx).state.doc,
+          );
+          const quote = doc
+            .textBetween(selection.from, selection.to, "\n")
+            .trim();
           if (!quote) return;
           const fullText = doc.textBetween(0, doc.content.size, "\n");
           const start = fullText.indexOf(quote);
           onCommentSelectionRef.current?.({
             quote,
             prefix: fullText.slice(Math.max(0, start - 80), start),
-            suffix: fullText.slice(start + quote.length, start + quote.length + 80),
+            suffix: fullText.slice(
+              start + quote.length,
+              start + quote.length + 80,
+            ),
             from: selection.from,
             to: selection.to,
           });
         });
         const attach = () => {
           const toolbar = root.querySelector<HTMLElement>(".milkdown-toolbar");
-          if (toolbar && selectionCommentButton && !toolbar.contains(selectionCommentButton)) toolbar.append(selectionCommentButton);
+          if (
+            toolbar &&
+            selectionCommentButton &&
+            !toolbar.contains(selectionCommentButton)
+          )
+            toolbar.append(selectionCommentButton);
         };
         attach();
         selectionToolbarObserver = new MutationObserver(attach);
-        selectionToolbarObserver.observe(root, { childList: true, subtree: true });
+        selectionToolbarObserver.observe(root, {
+          childList: true,
+          subtree: true,
+        });
+      }
+      if (autoFocus) {
+        queueMicrotask(() => {
+          // StrictMode can leave a previous instance in this host while its
+          // async destroy finishes. Focus this instance, not the first DOM match.
+          if (!mountedRef.current || crepeRef.current !== crepe) return;
+          crepe.editor.action((ctx) => ctx.get(editorViewCtx).focus());
+        });
       }
     });
 
@@ -554,9 +850,11 @@ export function DocumentEditor({
       root.removeEventListener("click", handleReferenceClick, true);
       referenceRequestRef.current += 1;
       closeReferenceMenu();
+      closeMentionMenu();
       externalSyncTargetRef.current = null;
       openReferenceMenuRef.current = null;
       insertReferenceCandidateRef.current = null;
+      insertMentionCandidateRef.current = null;
       headingStyleToolbar?.destroy();
       topBarOverflow?.destroy();
       selectionToolbarObserver?.disconnect();
@@ -566,7 +864,16 @@ export function DocumentEditor({
     };
     // Crepe's feature graph is immutable after creation. Callback props use refs;
     // only changes that reshape the menu recreate the instance.
-  }, [placeholder, uploadsEnabled, referenceCandidateSignature, Boolean(referenceProvider), Boolean(referenceContext), openMarkdownImage]);
+  }, [
+    placeholder,
+    uploadsEnabled,
+    referenceCandidateSignature,
+    Boolean(referenceProvider),
+    Boolean(referenceContext),
+    openMarkdownImage,
+    showTopBar,
+    autoFocus,
+  ]);
 
   useEffect(() => {
     crepeRef.current?.setReadonly(readOnly);
@@ -600,17 +907,42 @@ export function DocumentEditor({
       );
       if (!diffEnd) return;
 
+      // A block-level change can make the first differing position land
+      // after the common suffix in the new document (for example, removing
+      // the second of two paragraphs). In that case `nextDoc.slice` would be
+      // called with `from > to`, producing an invalid open slice that makes
+      // ProseMirror's Fitter walk past the end of its fragment. Fall back to
+      // the safe whole-document replacement for this structural case.
+      const canApplyDiff =
+        diffStart <= diffEnd.a && diffStart <= diffEnd.b;
+
       referenceTriggerRef.current = null;
+      mentionTriggerRef.current = null;
       referenceRequestRef.current += 1;
       setReferenceMenu(null);
+      setMentionMenu(null);
       externalSyncRef.current = true;
       externalSyncTargetRef.current = value;
       try {
-        const transaction = view.state.tr
-          .replace(diffStart, diffEnd.a, nextDoc.slice(diffStart, diffEnd.b))
-          .setMeta("addToHistory", false)
-          .setMeta("document-editor-external-sync", true);
-        view.dispatch(transaction);
+        if (canApplyDiff) {
+          const transaction = view.state.tr
+            .replace(diffStart, diffEnd.a, nextDoc.slice(diffStart, diffEnd.b))
+            .setMeta("addToHistory", false)
+            .setMeta("document-editor-external-sync", true);
+          view.dispatch(transaction);
+        } else {
+          // Keep the fallback in the same external-sync transaction boundary
+          // so a structural refresh is not added to the undo history.
+          const transaction = view.state.tr
+            .replace(
+              0,
+              currentDoc.content.size,
+              nextDoc.slice(0, nextDoc.content.size),
+            )
+            .setMeta("addToHistory", false)
+            .setMeta("document-editor-external-sync", true);
+          view.dispatch(transaction);
+        }
         lastEmittedRef.current = value;
       } finally {
         externalSyncRef.current = false;
@@ -625,62 +957,106 @@ export function DocumentEditor({
           "document-editor-crepe relative",
           readOnly && "markdown-image-previewable",
           scrollable ? "h-full min-h-[200px]" : "h-auto min-h-0",
+          autoGrow && "document-editor-autogrow",
           className,
         )}
         data-document-editor="crepe"
         data-readonly={readOnly}
         data-scrollable={scrollable}
+        data-auto-grow={autoGrow}
       >
-      <div ref={rootRef} className="crepe h-full" />
-      {referenceMenu && referenceMenu.candidates.length > 0 && (
-        <div
-          className="document-reference-menu absolute z-50 mt-1 max-h-72 min-w-64 max-w-[min(90vw,28rem)] overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-          role="listbox"
-          aria-label="项目引用候选"
-        >
-          {referenceMenu.candidates.map((candidate, index) => (
-            <button
-              key={`${candidate.target.kind}:${candidate.target.projectId}:${candidate.target.kind === "project" ? "" : candidate.target.kind === "page" ? candidate.target.pageId : candidate.target.docId}`}
-              type="button"
-              role="option"
-              aria-selected={index === referenceMenu.selectedIndex}
-              className={cn(
-                "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm",
-                index === referenceMenu.selectedIndex ? "bg-accent text-accent-foreground" : "hover:bg-accent/60",
-              )}
-              onMouseDown={(event) => {
-                event.preventDefault();
-                insertReferenceCandidateRef.current?.(candidate);
-              }}
-            >
-              <span className="shrink-0 text-muted-foreground">@</span>
-              <span className="min-w-0 flex-1 truncate">{candidate.displayPath}</span>
-              <span className="shrink-0 text-[10px] uppercase text-muted-foreground">{candidate.target.kind}</span>
-            </button>
-          ))}
-        </div>
-      )}
-      <input
-        ref={videoInputRef}
-        type="file"
-        accept="video/*"
-        className="hidden"
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (file) void uploadAndInsert(file, "video");
-          event.target.value = "";
-        }}
-      />
-      <input
-        ref={fileInputRef}
-        type="file"
-        className="hidden"
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (file) void uploadAndInsert(file, "file");
-          event.target.value = "";
-        }}
-      />
+        <div ref={rootRef} className="crepe h-full" />
+        {referenceMenu && referenceMenu.candidates.length > 0 && (
+          <div
+            className="document-reference-menu absolute z-50 mt-1 max-h-72 min-w-64 max-w-[min(90vw,28rem)] overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+            role="listbox"
+            aria-label="项目引用候选"
+          >
+            {referenceMenu.candidates.map((candidate, index) => (
+              <button
+                key={`${candidate.target.kind}:${candidate.target.projectId}:${candidate.target.kind === "project" ? "" : candidate.target.kind === "page" ? candidate.target.pageId : candidate.target.docId}`}
+                type="button"
+                role="option"
+                aria-selected={index === referenceMenu.selectedIndex}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm",
+                  index === referenceMenu.selectedIndex
+                    ? "bg-accent text-accent-foreground"
+                    : "hover:bg-accent/60",
+                )}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  insertReferenceCandidateRef.current?.(candidate);
+                }}
+              >
+                <span className="shrink-0 text-muted-foreground">@</span>
+                <span className="min-w-0 flex-1 truncate">
+                  {candidate.displayPath}
+                </span>
+                <span className="shrink-0 text-[10px] uppercase text-muted-foreground">
+                  {candidate.target.kind}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+        {mentionMenu && mentionMenu.candidates.length > 0 && (
+          <div
+            className="document-mention-menu absolute z-50 mt-1 max-h-72 min-w-56 max-w-[min(90vw,22rem)] overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+            role="listbox"
+            aria-label="提及候选"
+          >
+            {mentionMenu.candidates.map((candidate, index) => (
+              <button
+                key={`${candidate.type}:${candidate.id}`}
+                type="button"
+                role="option"
+                aria-selected={index === mentionMenu.selectedIndex}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm",
+                  index === mentionMenu.selectedIndex
+                    ? "bg-accent text-accent-foreground"
+                    : "hover:bg-accent/60",
+                )}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  insertMentionCandidateRef.current?.(candidate);
+                }}
+              >
+                <span className="shrink-0 text-muted-foreground">@</span>
+                <span className="min-w-0 flex-1 truncate">
+                  {candidate.name}
+                </span>
+                {candidate.type === "agent" && (
+                  <span className="shrink-0 rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] text-violet-500">
+                    AI
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+        <input
+          ref={videoInputRef}
+          type="file"
+          accept="video/*"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) void uploadAndInsert(file, "video");
+            event.target.value = "";
+          }}
+        />
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) void uploadAndInsert(file, "file");
+            event.target.value = "";
+          }}
+        />
       </div>
       {lightbox}
     </>

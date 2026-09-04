@@ -51,7 +51,6 @@ import {
 import type { PreviewStagePage } from "@workbench/demo-ui/preview-stage-types";
 import type {
   CommentAuthor,
-  ConfigCommentTarget,
   CommentTarget,
   DocumentCommentAnchor,
   DemoPageRuntimeType,
@@ -2469,17 +2468,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     currentUserRole === "admin" ||
     currentUserRole === "editor" ||
     currentUserRole === "creator";
-  const getConfigCommentCount = useCallback(
-    (target: ConfigCommentTarget) => commentsData.threads.filter((thread) => {
-      if (thread.resolved || thread.target.kind !== "config") return false;
-      if (thread.target.scope !== target.scope || thread.target.fieldKey !== target.fieldKey) return false;
-      if (target.scope === "page" && !target.pageId) return false;
-      return target.scope === "project"
-        ? !thread.target.pageId && !target.pageId
-        : thread.target.pageId === target.pageId;
-    }).length,
-    [commentsData.threads],
-  );
   const getPageConfigCapabilities = useCallback(
     (page: DemoPageMeta) => {
       const isReference = Boolean(page.reference);
@@ -10303,7 +10291,6 @@ ${context.details}
                             handleProjectDefinitionChange
                           }
                           configComments={configCommentController}
-                          getConfigCommentCount={getConfigCommentCount}
                           onDefinitionAnalyze={handleConfigDefinitionAnalyze}
                           onPageDefinitionChange={handlePageDefinitionChange}
                           readonly={
@@ -10480,7 +10467,6 @@ ${context.details}
                               handleProjectDefinitionChange
                             }
                             configComments={configCommentController}
-                            getConfigCommentCount={getConfigCommentCount}
                             onDefinitionSendToAI={
                               handleConfigDefinitionSendToAI
                             }
@@ -10678,7 +10664,6 @@ ${context.details}
                               handleProjectDefinitionChange
                             }
                             configComments={configCommentController}
-                            getConfigCommentCount={getConfigCommentCount}
                             onDefinitionSendToAI={
                               handleConfigDefinitionSendToAI
                             }

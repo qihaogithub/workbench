@@ -50,6 +50,26 @@ describe("DocumentEditor（Milkdown 集成）", () => {
     expect(document.body.textContent).not.toContain("初始标题");
   });
 
+  it("结构性外部更新不会构造非法开放 Slice", async () => {
+    const { rerender } = render(
+      <DocumentEditor value={"第一段\n\n第二段"} onChange={() => {}} />,
+    );
+
+    const editor = await waitFor(() => {
+      const element = document.querySelector<HTMLElement>(".ProseMirror");
+      expect(element).toBeTruthy();
+      expect(element?.textContent).toContain("第二段");
+      return element!;
+    });
+
+    rerender(<DocumentEditor value="第一段" onChange={() => {}} />);
+
+    await waitFor(() => {
+      expect(editor.textContent).toContain("第一段");
+      expect(editor.textContent).not.toContain("第二段");
+    });
+  }, 15_000);
+
   it("外部内容更新不会回写成新的自动保存变更", async () => {
     const onChange = vi.fn();
     const initial = "这是需要继续编辑的一段正文。";

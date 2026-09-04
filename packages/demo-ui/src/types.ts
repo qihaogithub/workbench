@@ -225,8 +225,8 @@ export interface ConfigFormProps {
   configItemCapabilities?: ConfigItemCapabilities;
   /** Opens the host-owned config comment flow for a field. */
   onAddConfigComment?: (target: ConfigCommentTarget, trigger?: HTMLElement | null) => void;
-  /** Returns the number of unresolved comments for a field target. */
-  getConfigCommentCount?: (target: ConfigCommentTarget) => number;
+  /** Returns whether any comment thread exists for a field target. */
+  hasConfigComment?: (target: ConfigCommentTarget) => boolean;
   /** 配置所在范围。未提供时由宿主自行解析归属。 */
   imageConfigScope?: ImageConfigScope;
   /** page 范围配置所属的页面；项目范围和独立表单可不提供。 */
@@ -239,7 +239,42 @@ export interface ConfigFormProps {
   referenceContext?: MarkdownReferenceContext;
   referenceProvider?: MarkdownReferenceProvider;
   onReferenceClick?: MarkdownReferenceClickHandler;
+  /** Open an explicitly opted-in object-array item in the host detail Sheet. */
+  onOpenItemDetail?: ConfigItemDetailHandler;
+  /** Current Sheet item identity, used to close the route if that item is removed. */
+  activeItemDetailId?: string | null;
+  activeItemDetailFieldPath?: string;
+  onItemDetailInvalidated?: (itemId: string) => void;
 }
+
+export interface ConfigBreadcrumb {
+  id: string;
+  label: string;
+  level: number;
+}
+
+/** Runtime context passed from an object-array row to the detail Sheet host. */
+export interface ConfigItemDetail {
+  field: FieldConfig;
+  item: Record<string, unknown>;
+  index: number;
+  itemId: string;
+  fieldPath: string;
+  /** Canonical schema path without runtime array indexes. */
+  schemaFieldPath?: string;
+  title: string;
+  level: number;
+  breadcrumb: ConfigBreadcrumb[];
+  parentScrollTop?: number;
+  parentFocusKey?: string;
+  /** Resolves the current array index after external reorder/collaboration updates. */
+  getCurrentIndex?: () => number;
+  /** Reads the latest item value after external collaboration updates. */
+  getCurrentItem?: () => Record<string, unknown> | undefined;
+  onChangeField: (key: string, value: unknown, meta?: ConfigChangeMeta) => void;
+}
+
+export type ConfigItemDetailHandler = (detail: ConfigItemDetail) => void;
 
 export interface ConfigItemCapabilities {
   canEditDefinition: boolean;

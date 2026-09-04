@@ -2,7 +2,7 @@
   "id": "ds_1788346512625_d25546e3",
   "title": "N对N填空题设计规范",
   "createdAt": "2026-09-02T10:55:12.625Z",
-  "updatedAt": "2026-09-02T11:03:50.034Z",
+  "updatedAt": "2026-09-04T01:55:33.498Z",
   "autoManagedPageId": "nn_g9ct",
   "entries": [
     {
@@ -20,21 +20,6 @@
         ]
       },
       "autoManagedFieldKey": "backgroundImage"
-    },
-    {
-      "id": "e_1788346988573_qvxaoe",
-      "title": "开场引入视频",
-      "markdown": "",
-      "target": {
-        "type": "config",
-        "refs": [
-          {
-            "scope": "page",
-            "pageId": "page_swfq",
-            "fieldKey": "video"
-          }
-        ]
-      }
     }
   ]
 }

@@ -1,0 +1,43 @@
+{
+  "committed": true,
+  "mutationId": "201867dc-3cfa-4cc7-96bd-18e2744c536b",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "baseRevision": 0,
+  "revision": 1306,
+  "rootHash": "71a79c3734def51e5457271541eedb73ba7ab78999efaef7fd78556fd0da84eb",
+  "actor": "author-site",
+  "resources": [
+    {
+      "path": "demos/闯关活动页-进行中_ec853d/index.tsx",
+      "action": "modified",
+      "beforeHash": "2dd5843dc2bd2395cd5c726ef9a632bfb98a2be38108142fdb9e72a6b8425919",
+      "afterHash": "2dd5843dc2bd2395cd5c726ef9a632bfb98a2be38108142fdb9e72a6b8425919"
+    },
+    {
+      "path": "demos/闯关活动页-进行中_ec853d/config.schema.json",
+      "action": "modified",
+      "beforeHash": "bf9983abe077039e228db1ffce562c86e32201cea65ac770163ae92b684055b7",
+      "afterHash": "bf9983abe077039e228db1ffce562c86e32201cea65ac770163ae92b684055b7"
+    },
+    {
+      "path": "demos/闯关活动页-进行中_ec853d/prototype.html",
+      "action": "modified",
+      "beforeHash": "831d98f4947fa48dc6eb89476a71607c172c5a361bf35eaf913b8729a95d3575",
+      "afterHash": "831d98f4947fa48dc6eb89476a71607c172c5a361bf35eaf913b8729a95d3575"
+    },
+    {
+      "path": "demos/闯关活动页-进行中_ec853d/prototype.css",
+      "action": "modified",
+      "beforeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "afterHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "demos/闯关活动页-进行中_ec853d/prototype.meta.json",
+      "action": "modified",
+      "beforeHash": "e05ff62d13acfe6f1b5cb7b3394c7aa7842521335717e56553c5e11e2ffa9129",
+      "afterHash": "e05ff62d13acfe6f1b5cb7b3394c7aa7842521335717e56553c5e11e2ffa9129"
+    }
+  ],
+  "committedAt": 1788424989955
+}

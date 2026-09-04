@@ -441,7 +441,7 @@ function EntryCard({
                           <KindThumb item={item} />
                         </div>
                       </td>
-                      <td className="font-medium">{item.title}</td>
+                      <td className="font-medium"><div>{item.title}</div>{item.breadcrumbs && item.breadcrumbs.length > 1 && <div className="text-[11px] font-normal text-muted-foreground">{item.breadcrumbs.join(" / ")}</div>}</td>
                       <td className="text-muted-foreground">
                         {item.format || "—"}
                       </td>
@@ -450,7 +450,7 @@ function EntryCard({
                       </td>
                       <td className="w-0 p-0 text-right">
                         {!readOnly && <div className="flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover/trow:opacity-100 group-focus-within/trow:opacity-100">
-                          {onEditConfigDefinition && <button
+                          {onEditConfigDefinition && !item.isConst && !item.key.includes(".") && !item.key.includes("[") && <button
                             type="button"
                             className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             title="编辑配置项"

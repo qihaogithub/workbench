@@ -1,6 +1,16 @@
 {
   "type": "object",
-  "properties": {},
+  "properties": {
+    "image": {
+      "type": "string",
+      "title": "图片",
+      "default": "/api/images/img_4doGRk8Hhw-GSQ",
+      "format": "image",
+      "ui:options": {
+        "accept": "image/*"
+      }
+    }
+  },
   "$demo": {
     "presentation": {
       "version": 1,
@@ -13,5 +23,6 @@
       "preset": "custom",
       "source": "figma"
     }
-  }
+  },
+  "required": []
 }

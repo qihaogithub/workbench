@@ -5,6 +5,7 @@ export { CommentLayer } from "./CommentLayer";
 export { CommentPin } from "./CommentPin";
 export { CommentThreadPopover } from "./CommentThreadPopover";
 export { ConfigCommentPopover } from "./ConfigCommentPopover";
+export { CommentMarkdownEditor } from "./CommentMarkdownEditor";
 export { CommentCreatePopover } from "./CommentCreatePopover";
 export {
   MentionPicker,
@@ -37,6 +38,7 @@ export type {
 export type { CommentPinProps } from "./CommentPin";
 export type { CommentThreadPopoverProps } from "./CommentThreadPopover";
 export type { ConfigCommentPopoverProps } from "./ConfigCommentPopover";
+export type { CommentMarkdownEditorProps } from "./CommentMarkdownEditor";
 export type { CommentCreatePopoverProps } from "./CommentCreatePopover";
 export type {
   MentionPickerProps,

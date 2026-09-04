@@ -1,0 +1,31 @@
+{
+  "committed": true,
+  "mutationId": "7a0e3df6-f17a-46cf-8bf6-ef1d36ebe186",
+  "projectId": "proj_1785135808250_r4cb4a",
+  "workspaceId": "live-1785205322879-latagwnoh",
+  "baseRevision": 0,
+  "revision": 1372,
+  "rootHash": "df3207257558b75ab12d06512111b5a24be5a550d6fa28a84269f26c95554889",
+  "actor": "collab",
+  "resources": [
+    {
+      "path": "demos/page_duak/config.schema.json",
+      "action": "modified",
+      "beforeHash": "fa1892b60b1893afc883d135d1fa2973a67415ecc1ba459bc6059e74de025c4f",
+      "afterHash": "e3ee6c8dcc01eea6e995236998664acad88c5a705ccf74f9a8d76240e93ebb86"
+    },
+    {
+      "path": "design-spec/spec-ds_1788450911907_571679e6.json",
+      "action": "created",
+      "beforeHash": null,
+      "afterHash": "a5699268c5f020f314e4e0cca0d45d557d73090ea15415f03e648d41bd458c5e"
+    },
+    {
+      "path": "design-spec/manifest.json",
+      "action": "modified",
+      "beforeHash": "8044d51ea6eba982d0d9ee8c906bec339e9c698ab5973321faebda8f4f62da78",
+      "afterHash": "2a748bf83769189eb9bfbedcd59a8af637e64aa2a50afe1a33f8f5b82d360f09"
+    }
+  ],
+  "committedAt": 1788450912646
+}

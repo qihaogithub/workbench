@@ -72,6 +72,11 @@ interface DesignSpecWorkspaceValue {
   setCategoryFilter: (v: ConfigPoolItemKind | "all") => void;
   bindFilter: "all" | "bound" | "unbound";
   setBindFilter: (v: "all" | "bound" | "unbound") => void;
+  poolView: "pages" | "configs";
+  setPoolView: (v: "pages" | "configs") => void;
+  pageFilter: "all" | string;
+  setPageFilter: (v: "all" | string) => void;
+  filteredPages: Array<{ id: string; name: string }>;
   collapsedGroups: Set<string>;
   toggleGroup: (name: string) => void;
   filteredPool: ConfigPoolItem[];
@@ -82,9 +87,8 @@ interface DesignSpecWorkspaceValue {
   setZoomed: (v: ConfigPoolItem | null) => void;
 }
 
-const DesignSpecWorkspaceContext = createContext<DesignSpecWorkspaceValue | null>(
-  null,
-);
+const DesignSpecWorkspaceContext =
+  createContext<DesignSpecWorkspaceValue | null>(null);
 
 type ConfigSchemaUpdate = {
   scope: "project" | "page";
@@ -127,7 +131,10 @@ function applyConfigSchemaUpdates(
       updates.project,
       pages.map((page) => ({ ...page, schema: "{}" })),
     );
-    next = [...projectItems, ...next.filter((item) => item.scope !== "project")];
+    next = [
+      ...projectItems,
+      ...next.filter((item) => item.scope !== "project"),
+    ];
   }
 
   for (const [pageId, schema] of Object.entries(updates.pages)) {
@@ -194,6 +201,8 @@ export function DesignSpecWorkspaceProvider({
   const [dirty, setDirty] = useState(false);
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
+  const [poolView, setPoolView] = useState<"pages" | "configs">("configs");
+  const [pageFilter, setPageFilter] = useState<"all" | string>("all");
   const [categoryFilter, setCategoryFilter] = useState<
     ConfigPoolItemKind | "all"
   >("all");
@@ -205,6 +214,15 @@ export function DesignSpecWorkspaceProvider({
   );
   const [hoverPop, setHoverPop] = useState<HoverPopState | null>(null);
   const [zoomed, setZoomed] = useState<ConfigPoolItem | null>(null);
+
+  // Page deletion or an externally restored page tree can invalidate the
+  // selected page between pool refreshes. Keep the controlled select and both
+  // derived lists on the safe "all pages" value immediately.
+  useEffect(() => {
+    if (pageFilter !== "all" && !pages.some((page) => page.id === pageFilter)) {
+      setPageFilter("all");
+    }
+  }, [pageFilter, pages]);
 
   const params = new URLSearchParams();
   if (workingDir) params.set("workingDir", workingDir);
@@ -222,6 +240,7 @@ export function DesignSpecWorkspaceProvider({
       setDoc(null);
       setPool([]);
       setPages([]);
+      setPageFilter("all");
       setDirty(false);
       setOpenIds(new Set());
       return;
@@ -243,10 +262,20 @@ export function DesignSpecWorkspaceProvider({
           setOpenIds(new Set());
         }
         if (poolData.success) {
-          const nextPages = Array.isArray(poolData.data?.pages) ? poolData.data.pages : [];
+          const nextPages = Array.isArray(poolData.data?.pages)
+            ? poolData.data.pages
+            : [];
           pagesRef.current = nextPages;
           setPages(nextPages);
-          const nextPool = Array.isArray(poolData.data) ? poolData.data : poolData.data?.pool ?? [];
+          setPageFilter((current) =>
+            current === "all" ||
+            nextPages.some((page: { id: string }) => page.id === current)
+              ? current
+              : "all",
+          );
+          const nextPool = Array.isArray(poolData.data)
+            ? poolData.data
+            : (poolData.data?.pool ?? []);
           setPool(nextPool);
         }
       } catch {
@@ -274,10 +303,20 @@ export function DesignSpecWorkspaceProvider({
         });
         const payload = await response.json();
         if (cancelled || !payload.success) return;
-        const nextPages = Array.isArray(payload.data?.pages) ? payload.data.pages : [];
+        const nextPages = Array.isArray(payload.data?.pages)
+          ? payload.data.pages
+          : [];
         pagesRef.current = nextPages;
         setPages(nextPages);
-        const nextPool = Array.isArray(payload.data) ? payload.data : payload.data?.pool ?? [];
+        setPageFilter((current) =>
+          current === "all" ||
+          nextPages.some((page: { id: string }) => page.id === current)
+            ? current
+            : "all",
+        );
+        const nextPool = Array.isArray(payload.data)
+          ? payload.data
+          : (payload.data?.pool ?? []);
         setPool(nextPool);
       } catch {
         // 保存同步存在短暂延迟时保持当前素材池，后续事件或重新打开会重试。
@@ -308,7 +347,10 @@ export function DesignSpecWorkspaceProvider({
     return () => {
       cancelled = true;
       timers.forEach((timer) => window.clearTimeout(timer));
-      window.removeEventListener("config-schema-updated", handleConfigSchemaUpdated);
+      window.removeEventListener(
+        "config-schema-updated",
+        handleConfigSchemaUpdated,
+      );
     };
   }, [activeDocId, qs]);
 
@@ -362,7 +404,10 @@ export function DesignSpecWorkspaceProvider({
       if (readOnly) return;
       const finalTitle =
         title ??
-        window.prompt("页面规范名称", `新页面规范 ${(doc?.entries.length || 0) + 1}`);
+        window.prompt(
+          "页面规范名称",
+          `新页面规范 ${(doc?.entries.length || 0) + 1}`,
+        );
       if (!finalTitle) return;
       updateDoc((d) => ({
         ...d,
@@ -396,7 +441,9 @@ export function DesignSpecWorkspaceProvider({
             markdown: "",
             target: {
               type: "config",
-              refs: [{ scope: item.scope, pageId: item.pageId, fieldKey: item.key }],
+              refs: [
+                { scope: item.scope, pageId: item.pageId, fieldKey: item.key },
+              ],
             },
           },
         ],
@@ -448,7 +495,9 @@ export function DesignSpecWorkspaceProvider({
   }, []);
 
   const openEntry = useCallback((entryId: string) => {
-    setOpenIds((prev) => (prev.has(entryId) ? prev : new Set([...prev, entryId])));
+    setOpenIds((prev) =>
+      prev.has(entryId) ? prev : new Set([...prev, entryId]),
+    );
   }, []);
 
   const renameEntry = useCallback(
@@ -477,9 +526,10 @@ export function DesignSpecWorkspaceProvider({
     (entryId: string, nextType: DesignSpecTarget["type"]): boolean => {
       const entry = doc?.entries.find((candidate) => candidate.id === entryId);
       if (!entry || entry.target.type === nextType) return true;
-      const hasExistingBinding = entry.target.type === "page"
-        ? entry.target.pageIds.length > 0
-        : entry.target.refs.length > 0;
+      const hasExistingBinding =
+        entry.target.type === "page"
+          ? entry.target.pageIds.length > 0
+          : entry.target.refs.length > 0;
       if (!hasExistingBinding) return true;
       return window.confirm(
         "该规范已绑定另一类对象，切换后会清除原有绑定。确定继续吗？",
@@ -496,9 +546,10 @@ export function DesignSpecWorkspaceProvider({
         ...d,
         entries: d.entries.map((entry) => {
           if (entry.id !== entryId) return entry;
-          const pageIds = entry.target.type === "page"
-            ? Array.from(new Set([...entry.target.pageIds, pageId]))
-            : [pageId];
+          const pageIds =
+            entry.target.type === "page"
+              ? Array.from(new Set([...entry.target.pageIds, pageId]))
+              : [pageId];
           return { ...entry, target: { type: "page", pageIds } };
         }),
       }));
@@ -522,7 +573,10 @@ export function DesignSpecWorkspaceProvider({
           if (e.id !== entryId) return e;
           if (e.target.type === "config") {
             if (e.target.refs.some((r) => refToPoolId(r) === itemId)) return e;
-            return { ...e, target: { type: "config", refs: [...e.target.refs, ref] } };
+            return {
+              ...e,
+              target: { type: "config", refs: [...e.target.refs, ref] },
+            };
           }
           return { ...e, target: { type: "config", refs: [ref] } };
         }),
@@ -557,7 +611,13 @@ export function DesignSpecWorkspaceProvider({
         ...d,
         entries: d.entries.map((e) =>
           e.id === entryId && e.target.type === "config"
-            ? { ...e, target: { type: "config", refs: e.target.refs.filter((r) => refToPoolId(r) !== itemId) } }
+            ? {
+                ...e,
+                target: {
+                  type: "config",
+                  refs: e.target.refs.filter((r) => refToPoolId(r) !== itemId),
+                },
+              }
             : e,
         ),
       }));
@@ -569,7 +629,12 @@ export function DesignSpecWorkspaceProvider({
     (sourceId: string, targetId: string, position: DesignSpecDropPosition) => {
       if (sourceId === targetId) return;
       updateDoc((d) => {
-        const entries = reorderDesignSpecEntries(d.entries, sourceId, targetId, position);
+        const entries = reorderDesignSpecEntries(
+          d.entries,
+          sourceId,
+          targetId,
+          position,
+        );
         return entries === d.entries ? d : { ...d, entries };
       });
     },
@@ -598,42 +663,80 @@ export function DesignSpecWorkspaceProvider({
 
   const filteredPool = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const pageNames = new Map(pages.map((page) => [page.id, page.name]));
     return pool.filter((it) => {
+      if (pageFilter !== "all") {
+        if (it.scope === "page" && it.pageId !== pageFilter) return false;
+        if (it.scope === "project" && !it.pageIds?.includes(pageFilter))
+          return false;
+      }
       if (categoryFilter !== "all" && it.kind !== categoryFilter) return false;
       if (bindFilter === "bound" && !boundIds.has(it.id)) return false;
       if (bindFilter === "unbound" && boundIds.has(it.id)) return false;
       if (
         q &&
-        !(it.title + it.key + pageLabel(it) + (it.category || ""))
+        !(
+          it.title +
+          it.key +
+          (it.breadcrumbs || []).join(" / ") +
+          pageLabel(it) +
+          (it.scope === "project"
+            ? (it.pageIds || []).map((id) => pageNames.get(id) || id).join(" ")
+            : "") +
+          (it.category || "")
+        )
           .toLowerCase()
           .includes(q)
       )
         return false;
       return true;
     });
-  }, [pool, search, categoryFilter, bindFilter, boundIds]);
+  }, [pool, search, categoryFilter, bindFilter, boundIds, pageFilter, pages]);
+
+  const filteredPages = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return pages.filter((page) => {
+      if (pageFilter !== "all" && page.id !== pageFilter) return false;
+      if (q && !page.name.toLowerCase().includes(q)) return false;
+      if (bindFilter === "bound" && !boundPageIds.has(page.id)) return false;
+      if (bindFilter === "unbound" && boundPageIds.has(page.id)) return false;
+      return true;
+    });
+  }, [pages, search, pageFilter, bindFilter, boundPageIds]);
 
   /** 按受影响页面分组：项目级配置拆分到各页面，无独立"项目级"分组 */
   const poolGroups = useMemo(() => {
     const groups = new Map<string, ConfigPoolItem[]>();
     const query = search.trim().toLowerCase();
+    const visiblePages = pages.filter(
+      (page) => pageFilter === "all" || page.id === pageFilter,
+    );
     // 页面节点本身也是可绑定的规范项，即使页面暂时没有配置字段也要保留。
-    for (const page of pages) {
+    for (const page of visiblePages) {
       if (!query || page.name.toLowerCase().includes(query)) {
         groups.set(page.name, []);
       }
     }
     for (const it of filteredPool) {
-      const pages =
-        it.scope === "project" && it.pages?.length ? it.pages : [pageLabel(it)];
-      for (const p of pages) {
+      const groupNames =
+        it.scope === "project" && it.pageIds?.length
+          ? it.pageIds
+              .filter((id) => visiblePages.some((page) => page.id === id))
+              .map((id) => pages.find((page) => page.id === id)?.name || id)
+          : [pageLabel(it)];
+      for (const p of groupNames) {
+        if (
+          pageFilter !== "all" &&
+          !visiblePages.some((page) => page.name === p)
+        )
+          continue;
         const arr = groups.get(p) || [];
         arr.push(it);
         groups.set(p, arr);
       }
     }
     return Array.from(groups.entries());
-  }, [filteredPool, pages, search]);
+  }, [filteredPool, pages, pageFilter, search]);
 
   const toggleGroup = useCallback((name: string) => {
     setCollapsedGroups((prev) => {
@@ -690,6 +793,11 @@ export function DesignSpecWorkspaceProvider({
       setCategoryFilter,
       bindFilter,
       setBindFilter,
+      poolView,
+      setPoolView,
+      pageFilter,
+      setPageFilter,
+      filteredPages,
       collapsedGroups,
       toggleGroup,
       filteredPool,
@@ -730,6 +838,9 @@ export function DesignSpecWorkspaceProvider({
       search,
       categoryFilter,
       bindFilter,
+      poolView,
+      pageFilter,
+      filteredPages,
       collapsedGroups,
       toggleGroup,
       filteredPool,
@@ -743,7 +854,13 @@ export function DesignSpecWorkspaceProvider({
     <DesignSpecWorkspaceContext.Provider value={value}>
       {children}
       <HoverPop pop={hoverPop} projectId={projectId} />
-      {zoomed && <ZoomOverlay item={zoomed} projectId={projectId} onClose={() => setZoomed(null)} />}
+      {zoomed && (
+        <ZoomOverlay
+          item={zoomed}
+          projectId={projectId}
+          onClose={() => setZoomed(null)}
+        />
+      )}
     </DesignSpecWorkspaceContext.Provider>
   );
 }

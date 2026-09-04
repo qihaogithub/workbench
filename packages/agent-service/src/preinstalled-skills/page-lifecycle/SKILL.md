@@ -142,6 +142,8 @@ description: 创建/重命名/排序页面和文件夹的完整规则：目录�
 
 **图片列表（imageList）**：`type: "array"` + `items: { "type": "string" }`，`default` 为 `string[]`（图片 URL 数组），页面 props 中该字段值为 `string[]`。不要写成 `type: "imageList"`。
 
+**对象数组层级列表**：`type: "array"` 且 `items` 为对象或 `oneOf` 时，数组字段必须在 `$demo.sortable` 中显式声明布尔值。`true` 开启当前层拖拽排序，`false` 仅保留展开、添加、删除和嵌套父子关系；父数组与子数组分别声明，不能新增 `tree` 类型或扁平化 `parentId` 字段。
+
 **所有 12 种配置类型均可作为 `variants` 变体键值**，每个变体可以包含任意数量和组合的类型字段。常用模块变体示例：字符串模块（`label: string` + `value: string`）、数字模块（`label: string` + `value: number`）、开关模块（`label: string` + `value: boolean`）、颜色模块（`label: string` + `value: color`）、选项模块（`label: string` + `value: enum`）、富文本模块（`content: richtext`）、多图模块（`items: imageList`）、定位模块（`text`/`pic` + `x/y` 坐标）。
 
 ### 空标题约定
