@@ -15,5 +15,8 @@ out
 /test/**/test-outputs/
 memory.md
 
+# 运行时数据（包含项目素材、会话状态和可回放日志），不进入 Git
+/data/
+
 # 官方参考代码（只读，不入库）
 /docs/external/pi-reference/

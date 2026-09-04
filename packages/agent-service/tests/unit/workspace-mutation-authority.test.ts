@@ -363,6 +363,36 @@ describe("WorkspaceMutationAuthority", () => {
     }
   });
 
+  it("prepared journal 只保存元数据，不保存请求正文或 before 快照", async () => {
+    const { authority, workspacePath } = createAuthority();
+    const source = "<main>journal-secret-source</main>";
+    await authority.mutate({
+      mutationId: "metadata-only-journal",
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      baseRevision: 1,
+      actor: "ai",
+      reason: "test",
+      operations: [{
+        type: "put_text",
+        path: "demos/home/index.tsx",
+        content: source,
+        expectedHash: hash("before"),
+      }],
+    });
+    const journal = fs.readFileSync(
+      path.join(path.dirname(workspacePath), "data", "workspace-authority", "workspace-1", "journal.jsonl"),
+      "utf8",
+    );
+    const prepared = journal.split("\n").filter(Boolean)
+      .map((line) => JSON.parse(line) as Record<string, unknown>)
+      .find((record) => record.type === "prepared");
+    expect(prepared).toEqual(expect.objectContaining({ preparedSummary: expect.any(Object) }));
+    expect(journal).not.toContain(source);
+    expect(journal).not.toContain('"content":');
+    expect(journal).toContain('"contentBytes":');
+  });
+
   it("apply 中途失败回滚后记录 workspace.mutation_rolled_back", async () => {
     const { authority, workspacePath } = createAuthority();
     fs.mkdirSync(path.join(workspacePath, "demos", "other"), { recursive: true });

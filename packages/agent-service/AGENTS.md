@@ -55,9 +55,11 @@ src/
 │   └── index.ts            # 路由注册
 ├── session/                # 会话管理
 │   ├── session-store.ts    # 会话存储
-│   └── session-guard.ts    # 会话守卫
+│   ├── session-guard.ts    # 会话守卫
+│   └── runtime-log-retention.ts # 运行日志三天滚动清理（排除用户项目数据）
 ├── utils/                  # 工具函数
 │   ├── config.ts           # 配置管理
+│   ├── jsonl-retention.ts  # 流式 JSONL 保留窗口清理
 │   └── logger.ts           # 日志工具
 └── server.ts               # Fastify 服务器入口
 
@@ -166,6 +168,10 @@ IMAGE_GEN_MAX_PROMPT_LEN=1000         # prompt 最大字符数
 ```
 
 完整配置加载逻辑见 `src/utils/config.ts`。
+
+### 运行日志与 Authority journal
+
+`src/session/runtime-log-retention.ts` 在启动及每 30 分钟清理三天前的 Agent run log、诊断 spool 和 Authority journal/ack。`projects/`、`workspaces/`、`collab-state/`、`sessions/`、`screenshots/`、`preview-modules/` 与 `audit/` 等用户项目数据始终排除。Authority `journal.jsonl` 的 `prepared` 行只记录元数据摘要；真正用于恢复的 `prepared/`、`backups/` 和 `receipts/` 不由该日志策略替代。
 
 ## HTTP API 路由
 

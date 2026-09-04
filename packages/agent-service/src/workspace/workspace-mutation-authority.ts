@@ -19,6 +19,7 @@ import type {
 } from "@workbench/shared/contracts";
 import { validateVisibilityRules } from "@workbench/shared";
 import { logger } from "../utils/logger";
+import { pruneJsonlFile } from "../utils/jsonl-retention";
 
 import {
   appendWorkspaceAuthorityDiagnostic,
@@ -78,6 +79,14 @@ export interface WorkspaceAuthorityRecoveryResult {
   recoveredCount: number;
   rolledBackCount: number;
   committedCleanupCount: number;
+}
+
+export interface WorkspaceAuthorityOperationalLogRetentionResult {
+  workspaceId: string;
+  journalEntriesRemoved: number;
+  projectionAckEntriesRemoved: number;
+  skippedPrepared: boolean;
+  skippedLease?: boolean;
 }
 
 interface PreparedMutation {
@@ -197,6 +206,57 @@ export class WorkspaceMutationAuthority {
       fs.rmSync(dir, { recursive: true, force: true });
       logger.info({ workspaceId }, "Workspace Authority 目录已清理");
     }
+  }
+
+  /**
+   * Prune only operational JSONL logs. Recovery artifacts are deliberately
+   * checked while holding the same per-workspace lease used by mutations so a
+   * cleanup pass can never remove evidence needed to roll back an interrupted
+   * transaction.
+   */
+  async pruneOperationalLogs(
+    workspaceId: string,
+    cutoffAt: number,
+  ): Promise<WorkspaceAuthorityOperationalLogRetentionResult> {
+    return this.serial(workspaceId, () => this.withLease(workspaceId, async () => {
+      const authorityDir = this.authorityDir(workspaceId);
+      const skippedPrepared = this.hasRecoveryArtifacts(workspaceId);
+      const empty: WorkspaceAuthorityOperationalLogRetentionResult = {
+        workspaceId,
+        journalEntriesRemoved: 0,
+        projectionAckEntriesRemoved: 0,
+        skippedPrepared,
+      };
+      if (skippedPrepared) return empty;
+
+      const journal = await pruneJsonlFile(
+        path.join(authorityDir, "journal.jsonl"),
+        cutoffAt,
+        ["at"],
+        (record) => this.compactPreparedJournalRecord(record),
+      );
+      const projectionAcks = await pruneJsonlFile(
+        path.join(authorityDir, "projection-acks.jsonl"),
+        cutoffAt,
+        ["acknowledgedAt"],
+      );
+      return {
+        ...empty,
+        journalEntriesRemoved: journal.removedLines,
+        projectionAckEntriesRemoved: projectionAcks.removedLines,
+      };
+    })).catch((error) => {
+      if (error instanceof WorkspaceMutationAuthorityError && error.code === "WORKSPACE_WRITE_LEASE_UNAVAILABLE") {
+        return {
+          workspaceId,
+          journalEntriesRemoved: 0,
+          projectionAckEntriesRemoved: 0,
+          skippedPrepared: false,
+          skippedLease: true,
+        };
+      }
+      throw error;
+    });
   }
 
   async recover(projectId: string, workspaceId: string): Promise<WorkspaceAuthorityRecoveryResult> {
@@ -553,7 +613,7 @@ export class WorkspaceMutationAuthority {
           state = this.reconcileAdoptInline(state, workspacePath, request.workspaceId);
         }
         const prepared = this.prepare(request, payloadHash, state, workspacePath);
-        this.appendJournal(request.workspaceId, { type: "prepared", at: Date.now(), mutationId: request.mutationId, prepared });
+        this.appendJournal(request.workspaceId, this.preparedJournalRecord(prepared));
         // Keep a recoverable copy outside the editable tree before touching any
         // resource. A process death between two renames must converge to the
         // previous committed state on the next Authority startup.
@@ -1429,6 +1489,82 @@ export class WorkspaceMutationAuthority {
   private writeJsonAtomic(file: string, value: unknown): void { this.writeTextAtomic(file, `${JSON.stringify(value, null, 2)}\n`); }
   private appendJournal(workspaceId: string, record: unknown): void { const file = path.join(this.authorityDir(workspaceId), "journal.jsonl"); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.appendFileSync(file, `${JSON.stringify(record)}\n`, "utf-8"); }
   private appendProjectionAck(workspaceId: string, ack: WorkspaceProjectionAck): void { const file = path.join(this.authorityDir(workspaceId), "projection-acks.jsonl"); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.appendFileSync(file, `${JSON.stringify(ack)}\n`, "utf-8"); }
+  private preparedJournalRecord(prepared: PreparedMutation): Record<string, unknown> {
+    const { request, previousState, before } = prepared;
+    return {
+      type: "prepared",
+      at: prepared.preparedAt ?? Date.now(),
+      mutationId: request.mutationId,
+      preparedSummary: {
+        projectId: request.projectId,
+        workspaceId: request.workspaceId,
+        actor: request.actor,
+        reason: request.reason,
+        baseRevision: request.baseRevision,
+        payloadHash: prepared.payloadHash,
+        previousRevision: previousState.revision,
+        previousRootHash: previousState.rootHash,
+        operations: request.operations.map((operation) => {
+          if (operation.type === "put_text") {
+            return {
+              type: operation.type,
+              path: operation.path,
+              contentBytes: Buffer.byteLength(operation.content, "utf8"),
+              contentHash: hashWorkspaceContent(operation.content),
+            };
+          }
+          if (operation.type === "put_binary" || operation.type === "put_staged_text") {
+            return {
+              type: operation.type,
+              path: operation.path,
+              stagingId: operation.stagingId,
+              contentBytes: operation.size,
+              contentHash: operation.hash,
+            };
+          }
+          if (operation.type === "move_path") {
+            return { type: operation.type, from: operation.from, to: operation.to };
+          }
+          return {
+            type: operation.type,
+            path: operation.path,
+            expectedHash: operation.expectedHash,
+            expectedAbsent: operation.expectedAbsent,
+          };
+        }),
+        before: Object.fromEntries(
+          Object.entries(before).map(([resourcePath, value]) => [resourcePath, {
+            exists: value.exists,
+            hash: value.hash,
+            contentBytes: value.exists && value.content !== undefined
+              ? this.contentBuffer(value.content).length
+              : 0,
+          }]),
+        ),
+      },
+    };
+  }
+
+  /** Compact pre-retention journal rows written by older versions. */
+  private compactPreparedJournalRecord(record: unknown): string | undefined {
+    if (!record || typeof record !== "object" || Array.isArray(record)) return undefined;
+    const value = record as Record<string, unknown>;
+    if (value.type !== "prepared") return undefined;
+    if (value.preparedSummary && typeof value.preparedSummary === "object") {
+      return JSON.stringify(record);
+    }
+    if (!value.prepared || typeof value.prepared !== "object") return undefined;
+    try {
+      const prepared = value.prepared as PreparedMutation;
+      if (!prepared.request || !prepared.previousState || !prepared.before) return undefined;
+      const compacted = this.preparedJournalRecord(prepared);
+      if (typeof value.at === "number") compacted.at = value.at;
+      if (typeof value.mutationId === "string") compacted.mutationId = value.mutationId;
+      return JSON.stringify(compacted);
+    } catch {
+      return undefined;
+    }
+  }
   private countFiles(directory: string, suffix: string): number {
     if (!fs.existsSync(directory)) return 0;
     return fs.readdirSync(directory, { withFileTypes: true }).filter((entry) => entry.isFile() && entry.name.endsWith(suffix)).length;
@@ -1597,6 +1733,27 @@ export class WorkspaceMutationAuthority {
     }
     return result;
   }
+}
+
+/** Scan all live Authority instances and prune only their operational logs. */
+export async function pruneWorkspaceAuthorityOperationalLogs(
+  dataDir: string,
+  cutoffAt: number,
+): Promise<WorkspaceAuthorityOperationalLogRetentionResult[]> {
+  const root = path.join(path.resolve(dataDir), "workspace-authority");
+  const entries = await fs.promises.readdir(root, { withFileTypes: true }).catch(() => []);
+  const workspaces = entries
+    .filter((entry) => entry.isDirectory() && entry.name !== "leases")
+    .map((entry) => entry.name);
+  const authority = new WorkspaceMutationAuthority({
+    dataDir: path.resolve(dataDir),
+    resolveWorkspacePath: () => null,
+  });
+  const results: WorkspaceAuthorityOperationalLogRetentionResult[] = [];
+  for (const workspaceId of workspaces) {
+    results.push(await authority.pruneOperationalLogs(workspaceId, cutoffAt));
+  }
+  return results;
 }
 
 export function registerCollabDraftProvider(dataDir: string, provider: CollabDraftProvider): () => void {

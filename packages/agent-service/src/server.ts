@@ -25,6 +25,10 @@ import {
 } from "./workspace/workspace-authority-startup-recovery";
 import { assertWorkspaceAuthorityInstancePolicy } from "./workspace/workspace-authority-instance-policy";
 import { recoverCommentTasksOnStartup } from "./routes/comment-ai-task";
+import {
+  cleanupAgentRuntimeLogs,
+  RUNTIME_LOG_RETENTION_INTERVAL_MS,
+} from "./session/runtime-log-retention";
 
 const config = loadConfig();
 const logger = getLogger();
@@ -91,6 +95,21 @@ async function start() {
   const recovery = await recoverWorkspaceAuthoritiesOnStartup(getDefaultDataDir());
   logger.info({ recovery }, "Workspace Authority startup recovery completed");
 
+  const cleanupRuntimeLogs = async () => {
+    try {
+      const result = await cleanupAgentRuntimeLogs(getDefaultDataDir());
+      logger.info({ result }, "Agent runtime log retention completed");
+    } catch (error) {
+      logger.warn({ error }, "Agent runtime log retention failed");
+    }
+  };
+  await cleanupRuntimeLogs();
+  const runtimeLogCleanupInterval = setInterval(
+    () => void cleanupRuntimeLogs(),
+    RUNTIME_LOG_RETENTION_INTERVAL_MS,
+  );
+  runtimeLogCleanupInterval.unref();
+
   // 评论 @AI 任务队列启动恢复（重新入队 pending/超时的评论任务）
   recoverCommentTasksOnStartup().catch((err) => {
     logger.warn({ err }, "Comment task startup recovery failed");
@@ -112,6 +131,7 @@ async function start() {
 
   process.on("SIGTERM", async () => {
     logger.info("Received SIGTERM, shutting down...");
+    clearInterval(runtimeLogCleanupInterval);
     await getAgentManager().destroyAll();
     destroySessionStore();
     await fastify.close();

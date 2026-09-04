@@ -1,6 +1,6 @@
 # 诊断与日志模块 - 索引
 
-> 更新日期：2026-08-13
+> 更新日期：2026-09-04
 
 ## 文档列表
 
@@ -14,7 +14,7 @@
 
 | 文档 | 说明 |
 |:-----|:-----|
-| [01_创作端诊断事件系统.md](./技术/01_创作端诊断事件系统.md) | 统一事件契约、隐私白名单、SQLite 主库、JSONL 兜底、AI 能力加载指标、Workspace mutation/projection/canonical materialization 生命周期、恢复审计与跨服务写入链路 |
+| [01_创作端诊断事件系统.md](./技术/01_创作端诊断事件系统.md) | 统一事件契约、隐私白名单、SQLite 主库、JSONL 兜底、3 天滚动保留与用户素材排除、AI 能力加载指标、Workspace mutation/projection/canonical materialization 生命周期、恢复审计与跨服务写入链路 |
 | [02_Codex查询CLI与导出包.md](./技术/02_Codex查询CLI与导出包.md) | OPS CLI 查询入口、SQLite/JSONL 跨存储合并、Workspace revision 链路、延迟分位、Authority health、兜底状态和诊断包 |
 
 ## 相关模块

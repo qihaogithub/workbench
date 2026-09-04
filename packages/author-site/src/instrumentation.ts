@@ -15,6 +15,7 @@ export async function register() {
     const { getProjectAdminService } = await import('@/lib/project-admin-service');
     const { scheduleStartupBackendProvidersSync } = await import('@/lib/backend-providers-sync');
     const { scheduleStartupImageGenSync } = await import('@/lib/image-gen-sync');
+    const { cleanupEditorDiagnosticsRetention } = await import('@/lib/editor-diagnostics/retention');
 
     // 启动时立即执行一次清理
     try {
@@ -29,6 +30,12 @@ export async function register() {
       const trashed = getProjectAdminService().purgeExpiredTrashedProjects();
       if (trashed > 0) {
         console.log(`[Project Trash] Initial cleanup: ${trashed} expired projects purged`);
+      }
+      const diagnostics = await cleanupEditorDiagnosticsRetention();
+      if (diagnostics.sqliteRowsRemoved > 0 || diagnostics.fallbackLinesRemoved > 0) {
+        console.log(
+          `[Diagnostics Retention] Initial cleanup: ${diagnostics.sqliteRowsRemoved} SQLite rows and ${diagnostics.fallbackLinesRemoved} fallback lines removed`,
+        );
       }
     } catch (error) {
       console.error('[Cleanup] Initial cleanup failed:', error);
@@ -52,10 +59,20 @@ export async function register() {
         if (trashed > 0) {
           console.log(`[Project Trash] Purged ${trashed} expired projects`);
         }
+        void cleanupEditorDiagnosticsRetention().then((diagnostics) => {
+          if (diagnostics.sqliteRowsRemoved > 0 || diagnostics.fallbackLinesRemoved > 0) {
+            console.log(
+              `[Diagnostics Retention] Purged ${diagnostics.sqliteRowsRemoved} SQLite rows and ${diagnostics.fallbackLinesRemoved} fallback lines`,
+            );
+          }
+        }).catch((error) => {
+          console.error('[Diagnostics Retention] Scheduled cleanup failed:', error);
+        });
       } catch (error) {
         console.error('[Cleanup] Scheduled cleanup failed:', error);
       }
     }, 30 * 60 * 1000); // 30 分钟
+    cleanupInterval?.unref?.();
 
     console.log('[Session Cleanup] Scheduled cleanup interval: every 30 minutes');
   }
