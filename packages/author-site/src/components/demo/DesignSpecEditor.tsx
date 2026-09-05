@@ -51,6 +51,8 @@ import {
   type DesignSpecDropPosition,
 } from "./design-spec-order";
 
+import { getNextAvailableTitle } from "./DocumentNameDialog";
+
 interface DesignSpecEditorProps {
   docId: string;
   focusEntryId?: string;
@@ -59,6 +61,7 @@ interface DesignSpecEditorProps {
   referenceProvider?: MarkdownReferenceProvider;
   onReferenceClick?: MarkdownReferenceClickHandler;
   onEditConfigDefinition?: (target: DesignSpecRef) => void;
+  onRequestEntryTitle?: (defaultTitle: string) => Promise<string | null>;
 }
 
 export function DesignSpecEditor({
@@ -69,11 +72,13 @@ export function DesignSpecEditor({
   referenceProvider,
   onReferenceClick,
   onEditConfigDefinition,
+  onRequestEntryTitle,
 }: DesignSpecEditorProps) {
   const ws = useDesignSpecWorkspace();
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
   const [overEntryId, setOverEntryId] = useState<string | null>(null);
   const [dropPosition, setDropPosition] = useState<DesignSpecDropPosition | null>(null);
+  const [requestingEntryTitle, setRequestingEntryTitle] = useState(false);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -134,6 +139,29 @@ export function DesignSpecEditor({
     },
     [clearDragState, dropPosition, ws],
   );
+
+  const handleCreateEntry = useCallback(async () => {
+    if (readOnly || requestingEntryTitle || !onRequestEntryTitle || !ws.doc) {
+      return;
+    }
+    setRequestingEntryTitle(true);
+    try {
+      const defaultTitle = getNextAvailableTitle(
+        "新页面规范",
+        ws.doc.entries.map((entry) => entry.title),
+      );
+      const title = await onRequestEntryTitle(defaultTitle);
+      if (title?.trim()) ws.addEntry(title.trim());
+    } finally {
+      setRequestingEntryTitle(false);
+    }
+  }, [
+    onRequestEntryTitle,
+    readOnly,
+    requestingEntryTitle,
+    ws.addEntry,
+    ws.doc,
+  ]);
 
   if (ws.loading) {
     return (
@@ -225,7 +253,8 @@ export function DesignSpecEditor({
             type="button"
             className="flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-opacity hover:opacity-90"
             title="新建页面规范"
-            onClick={() => ws.addEntry()}
+            onClick={() => void handleCreateEntry()}
+            disabled={requestingEntryTitle}
           >
             <Plus className="h-5 w-5" />
           </button>
@@ -355,11 +384,21 @@ function EntryCard({
         >
           <GripVertical className="h-4 w-4" />
         </button>
-        {open ? (
-          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-        ) : (
-          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-        )}
+        <button
+          type="button"
+          aria-label={`${open ? "收起" : "展开"}${entry.title}`}
+          className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-accent"
+          onClick={(e) => {
+            e.stopPropagation();
+            ws.toggleEntry(entry.id);
+          }}
+        >
+          {open ? (
+            <ChevronDown className="h-4 w-4" />
+          ) : (
+            <ChevronRight className="h-4 w-4" />
+          )}
+        </button>
         <input
           className="min-w-0 flex-1 rounded bg-transparent px-1 py-0.5 text-sm font-semibold outline-none hover:bg-background focus:border focus:border-border"
           value={entry.title}

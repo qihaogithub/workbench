@@ -1109,6 +1109,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     docId: string;
     entryId: string;
   } | null>(null);
+  const handleDesignSpecFocusConsumed = useCallback(() => {
+    setDesignSpecFocus(null);
+  }, []);
   const [configDefinitionFocus, setConfigDefinitionFocus] =
     useState<ConfigDefinitionFocus | null>(null);
   const [configDefinitionPageId, setConfigDefinitionPageId] = useState<string | null>(null);
@@ -1403,6 +1406,14 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     previewMode === "canvas"
       ? (configPanelDetailPageId ?? activeDemoId)
       : activeDemoId;
+
+  const handleDesignSpecEntryEdit = useCallback(
+    (docId: string, entryId: string) => {
+      setDesignSpecFocus({ docId, entryId });
+      setPreviewMode("document");
+    },
+    [setPreviewMode],
+  );
 
   const markdownReferenceProvider = useCallback<MarkdownReferenceProvider>(
     async ({ query, signal }) => {
@@ -9617,6 +9628,7 @@ ${context.details}
                         window.dispatchEvent(new Event("knowledge-updated"));
                       }}
                       designSpecFocus={designSpecFocus}
+                      onDesignSpecFocusConsumed={handleDesignSpecFocusConsumed}
                       onEditConfigDefinition={handleDesignSpecConfigDefinitionEdit}
                     />
                   ) : (
@@ -10532,10 +10544,7 @@ ${context.details}
                               sessionId,
                               projectId: demoId,
                             }}
-                            onEditDesignSpec={(docId, entryId) => {
-                              setDesignSpecFocus({ docId, entryId });
-                              setPreviewMode("document");
-                            }}
+                            onEditDesignSpec={handleDesignSpecEntryEdit}
                             configDefinitionFocus={configDefinitionFocus}
                             onConfigDefinitionFocusConsumed={() =>
                               setConfigDefinitionFocus(null)
@@ -10727,10 +10736,7 @@ ${context.details}
                               sessionId,
                               projectId: demoId,
                             }}
-                            onEditDesignSpec={(docId, entryId) => {
-                              setDesignSpecFocus({ docId, entryId });
-                              setPreviewMode("document");
-                            }}
+                            onEditDesignSpec={handleDesignSpecEntryEdit}
                             configDefinitionFocus={configDefinitionFocus}
                             onConfigDefinitionFocusConsumed={() =>
                               setConfigDefinitionFocus(null)

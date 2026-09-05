@@ -213,5 +213,7 @@ test("宿主编辑页可打开白板、导入代码并提交带 revision 的 doc
       documentRevision: 0,
       scene: { pageSize: { width: 240, height: 120 } },
     },
+    pngBase64: expect.any(String),
   });
+  expect(String(commitRequests[0].pngBase64)).not.toHaveLength(0);
 });

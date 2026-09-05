@@ -56,7 +56,169 @@ function FilterProbe() {
   );
 }
 
+function EntryProbe() {
+  const workspace = useDesignSpecWorkspace();
+  return (
+    <>
+      <button type="button" onClick={() => workspace.setActiveDocId("spec-1")}>
+        打开规范
+      </button>
+      <button
+        type="button"
+        onClick={() => workspace.addEntry("  页面规范 A  ")}
+      >
+        新建条目
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          const entryId = workspace.doc?.entries[0]?.id;
+          if (entryId) workspace.setMarkdown(entryId, "正文更新");
+        }}
+      >
+        编辑正文
+      </button>
+      <span data-testid="doc-loaded">{workspace.doc ? "yes" : "no"}</span>
+      <span data-testid="entry-title">
+        {workspace.doc?.entries[0]?.title ?? ""}
+      </span>
+      <span data-testid="entry-markdown">
+        {workspace.doc?.entries[0]?.markdown ?? ""}
+      </span>
+    </>
+  );
+}
+
 describe("DesignSpecWorkspace 配置素材池刷新", () => {
+  it("addEntry 只接受已确认的标题，不调用原生 prompt", async () => {
+    const fetchMock = jest
+      .spyOn(global, "fetch")
+      .mockImplementation(async (input) => {
+        const url = String(input);
+        if (url.startsWith("/api/design-specs/spec-1")) {
+          return {
+            ok: true,
+            json: async () => ({
+              success: true,
+              data: { id: "spec-1", entries: [] },
+            }),
+          } as Response;
+        }
+        if (url.startsWith("/api/design-specs/config-pool")) {
+          return {
+            ok: true,
+            json: async () => ({
+              success: true,
+              data: { pool: [], pages: [] },
+            }),
+          } as Response;
+        }
+        return {
+          ok: false,
+          json: async () => ({ success: false }),
+        } as Response;
+      });
+    const promptSpy = jest.spyOn(window, "prompt").mockImplementation(() => {
+      throw new Error("window.prompt must not be used");
+    });
+
+    render(
+      <DesignSpecWorkspaceProvider projectId="project-1">
+        <EntryProbe />
+      </DesignSpecWorkspaceProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "打开规范" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("doc-loaded")).toHaveTextContent("yes"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "新建条目" }));
+    expect(screen.getByTestId("entry-title")).toHaveTextContent("页面规范 A");
+    expect(promptSpy).not.toHaveBeenCalled();
+
+    promptSpy.mockRestore();
+    fetchMock.mockRestore();
+  });
+
+  it("自动保存按快照串行执行，不会让旧正文覆盖后续更新", async () => {
+    const putDocs: Array<{ entries: Array<{ markdown: string }> }> = [];
+    let resolveFirstSave: (response: Response) => void = () => undefined;
+    const firstSave = new Promise<Response>((resolve) => {
+      resolveFirstSave = resolve;
+    });
+    const response = (body: unknown) =>
+      ({
+        ok: true,
+        json: async () => body,
+      }) as Response;
+    const fetchMock = jest
+      .spyOn(global, "fetch")
+      .mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (
+          url.startsWith("/api/design-specs/spec-1") &&
+          init?.method === "PUT"
+        ) {
+          const payload = JSON.parse(String(init.body)) as {
+            doc: { entries: Array<{ markdown: string }> };
+          };
+          putDocs.push(payload.doc);
+          if (putDocs.length === 1) return firstSave;
+          return response({ success: true, data: payload.doc });
+        }
+        if (url.startsWith("/api/design-specs/spec-1")) {
+          return response({
+            success: true,
+            data: { id: "spec-1", entries: [] },
+          });
+        }
+        if (url.startsWith("/api/design-specs/config-pool")) {
+          return response({ success: true, data: { pool: [], pages: [] } });
+        }
+        return {
+          ok: false,
+          json: async () => ({ success: false }),
+        } as Response;
+      });
+
+    jest.useFakeTimers();
+    render(
+      <DesignSpecWorkspaceProvider projectId="project-1">
+        <EntryProbe />
+      </DesignSpecWorkspaceProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "打开规范" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("doc-loaded")).toHaveTextContent("yes"),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "新建条目" }));
+    act(() => {
+      jest.advanceTimersByTime(800);
+    });
+    await waitFor(() => expect(putDocs).toHaveLength(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "编辑正文" }));
+    act(() => {
+      jest.advanceTimersByTime(800);
+    });
+    expect(putDocs).toHaveLength(1);
+
+    act(() => {
+      resolveFirstSave(response({ success: true, data: putDocs[0] }));
+    });
+    await waitFor(() => expect(putDocs).toHaveLength(2));
+    expect(putDocs[0].entries[0].markdown).toBe("");
+    expect(putDocs[1].entries[0].markdown).toBe("正文更新");
+    await waitFor(() =>
+      expect(screen.getByTestId("entry-markdown")).toHaveTextContent(
+        "正文更新",
+      ),
+    );
+
+    fetchMock.mockRestore();
+    jest.useRealTimers();
+  });
+
   it("已提交 Schema 事件立即投影，但服务端刷新不会被本地状态永久覆盖", async () => {
     const stalePool = {
       pool: [

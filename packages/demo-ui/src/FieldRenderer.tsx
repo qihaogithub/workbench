@@ -174,6 +174,11 @@ export function FieldRenderer({
     ? defaultValueOverride
     : field.default;
   const isSingleImageField = field.format === "image" || field.uiWidget === "image";
+  const currentImageValue = typeof value === "string"
+    ? value
+    : typeof effectiveDefault === "string"
+      ? effectiveDefault
+      : undefined;
   const isImageListField = field.uiWidget === "imageList"
     || field.type === "imageList"
     || (field.type === "array" && field.itemsFormat === "image");
@@ -231,7 +236,7 @@ export function FieldRenderer({
                 : undefined
           }
           disabled={effectiveReadonly}
-          onWhiteboard={!effectiveReadonly && isSingleImageField && onLaunchWhiteboard && fieldPath ? () => onLaunchWhiteboard({ scope: imageConfigScope, pageId, fieldPath, ...(typeof value === "string" ? { currentValue: value } : {}) }) : undefined}
+          onWhiteboard={!effectiveReadonly && isSingleImageField && onLaunchWhiteboard && fieldPath ? () => onLaunchWhiteboard({ scope: imageConfigScope, pageId, fieldPath, ...(currentImageValue !== undefined ? { currentValue: currentImageValue } : {}) }) : undefined}
         />
       );
 
@@ -356,7 +361,7 @@ export function FieldRenderer({
             typeof effectiveDefault === "string" ? effectiveDefault : undefined
           }
           disabled={effectiveReadonly}
-          onWhiteboard={!effectiveReadonly && isSingleImageField && onLaunchWhiteboard && fieldPath ? () => onLaunchWhiteboard({ scope: imageConfigScope, pageId, fieldPath, ...(typeof value === "string" ? { currentValue: value } : {}) }) : undefined}
+          onWhiteboard={!effectiveReadonly && isSingleImageField && onLaunchWhiteboard && fieldPath ? () => onLaunchWhiteboard({ scope: imageConfigScope, pageId, fieldPath, ...(currentImageValue !== undefined ? { currentValue: currentImageValue } : {}) }) : undefined}
         />
       );
 

@@ -69,11 +69,23 @@ export function isWhiteboardPageId(value: unknown): value is string {
     && !/[\\/]/u.test(value)
     && !/[\p{Cc}\p{Cs}]/u.test(value);
 }
+export type WhiteboardEditorViewMode = "fit-content" | "manual";
 
 export interface WhiteboardEditorView {
+  /** Missing on old documents; normalized V3 documents always write it. */
+  mode?: WhiteboardEditorViewMode;
   zoom: number;
   offsetX: number;
   offsetY: number;
+}
+
+export function normalizeWhiteboardEditorView(
+  view: WhiteboardEditorView,
+): WhiteboardEditorView {
+  return {
+    ...view,
+    mode: view.mode === "manual" ? "manual" : "fit-content",
+  };
 }
 
 export type WhiteboardNodeRole =
@@ -180,7 +192,7 @@ export function isWhiteboardDocument(value: unknown): value is WhiteboardDocumen
   if (version === 3 && document.sceneFormat !== WHITEBOARD_SCENE_FORMAT) return false;
   if (version !== 3 && document.sceneFormat !== undefined) return false;
   const view = document.editorView as WhiteboardEditorView | undefined;
-  if (!view || !Number.isFinite(view.zoom) || view.zoom <= 0) return false;
+  if (!view || (view.mode !== undefined && view.mode !== "fit-content" && view.mode !== "manual") || !Number.isFinite(view.zoom) || view.zoom <= 0) return false;
   if (!Number.isFinite(view.offsetX) || !Number.isFinite(view.offsetY) || !Number.isFinite(document.updatedAt) || (document.updatedAt as number) < 0) return false;
   if (version === 2 || version === 3) {
     const documentRevision = document.documentRevision;
@@ -228,15 +240,19 @@ function isManagedAssetId(value: string): boolean {
 }
 
 function sceneNodeType(scene: SketchSceneDocument, nodeId: string): SketchSceneNode["type"] | undefined {
-  return scene.nodes.find((node) => node.id === nodeId)?.type;
+  const sceneNodes = Array.isArray(scene?.nodes) ? scene.nodes : [];
+  return sceneNodes.find((node) => node?.id === nodeId)?.type;
 }
 
 function isSafeArea(value: WhiteboardSafeArea, scene: SketchSceneDocument): boolean {
+  const pageSize = scene.pageSize as { width?: unknown; height?: unknown } | undefined;
   return [value.x, value.y, value.width, value.height].every(Number.isFinite)
     && value.width >= 0 && value.height >= 0
     && value.x >= 0 && value.y >= 0
-    && value.x + value.width <= scene.pageSize.width
-    && value.y + value.height <= scene.pageSize.height;
+    && typeof pageSize?.width === "number" && Number.isFinite(pageSize.width)
+    && typeof pageSize?.height === "number" && Number.isFinite(pageSize.height)
+    && value.x + value.width <= pageSize.width
+    && value.y + value.height <= pageSize.height;
 }
 
 export function getWhiteboardDocumentRevision(document: WhiteboardDocument | null | undefined): number {
@@ -263,7 +279,12 @@ export function asWhiteboardDocumentV2(document: WhiteboardDocument): Whiteboard
 
 /** Upgrade a legacy/V2 read into the full-fidelity V3 envelope. */
 export function asWhiteboardDocumentV3(document: WhiteboardDocument): WhiteboardDocumentV3 {
-  if (document.version === 3) return document;
+  if (document.version === 3) {
+    return {
+      ...document,
+      editorView: normalizeWhiteboardEditorView(document.editorView),
+    };
+  }
   return {
     ...document,
     version: 3,
@@ -273,6 +294,7 @@ export function asWhiteboardDocumentV3(document: WhiteboardDocument): Whiteboard
       : 0,
     nodeSemantics: document.version === 2 ? { ...document.nodeSemantics } : {},
     scene: { ...document.scene },
+    editorView: normalizeWhiteboardEditorView(document.editorView),
   };
 }
 

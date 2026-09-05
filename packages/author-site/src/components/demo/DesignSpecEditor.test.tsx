@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { DesignSpecEditor } from "./DesignSpecEditor";
 import { useDesignSpecWorkspace } from "./DesignSpecWorkspace";
 
@@ -116,7 +116,9 @@ describe("DesignSpecEditor", () => {
 
     const editor = screen.getByLabelText("设计规范说明");
     expect(editor).toHaveValue("初始说明");
-    expect(screen.queryByRole("button", { name: "预览" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "预览" }),
+    ).not.toBeInTheDocument();
 
     fireEvent.change(editor, { target: { value: "更新说明" } });
     expect(setMarkdown).toHaveBeenCalledWith("entry-1", "更新说明");
@@ -128,9 +130,9 @@ describe("DesignSpecEditor", () => {
     );
     const localizeRemoteImage = mockDocumentEditor.mock.calls[0][0]
       .localizeRemoteImage as (url: string) => Promise<string>;
-    await expect(localizeRemoteImage("https://cdn.example.com/hero.png")).resolves.toBe(
-      "/api/images/img_local",
-    );
+    await expect(
+      localizeRemoteImage("https://cdn.example.com/hero.png"),
+    ).resolves.toBe("/api/images/img_local");
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/sessions/session-1/assets/localize",
       expect.objectContaining({
@@ -147,11 +149,22 @@ describe("DesignSpecEditor", () => {
     fetchMock.mockRestore();
   });
 
-  it("点击新建按钮直接创建空白页面规范", () => {
+  it("点击新建按钮使用确认后的标题创建空白页面规范", async () => {
     const addEntry = jest.fn();
+    const onRequestEntryTitle = jest.fn().mockResolvedValue(" 页面规范 A ");
     useWorkspace.mockReturnValue({
       loading: false,
-      doc: { id: "spec-1", entries: [] },
+      doc: {
+        id: "spec-1",
+        entries: [
+          {
+            id: "existing-entry",
+            title: "新页面规范 1",
+            markdown: "",
+            target: { type: "page", pageIds: [] },
+          },
+        ],
+      },
       pool: [],
       openIds: new Set(),
       setActiveDocId: jest.fn(),
@@ -159,7 +172,12 @@ describe("DesignSpecEditor", () => {
       addEntryWithItem: jest.fn(),
     });
 
-    render(<DesignSpecEditor docId="spec-1" />);
+    render(
+      <DesignSpecEditor
+        docId="spec-1"
+        onRequestEntryTitle={onRequestEntryTitle}
+      />,
+    );
 
     const addButton = screen.getByTitle("新建页面规范");
     expect(screen.getByTestId("design-spec-scroll-area")).not.toContainElement(
@@ -168,11 +186,22 @@ describe("DesignSpecEditor", () => {
     expect(addButton.closest(".relative")).not.toBeNull();
 
     fireEvent.click(addButton);
-    expect(addEntry).toHaveBeenCalledWith();
-    expect(screen.queryByRole("button", { name: "空白页面规范" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "说明" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "资源索引" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "往期资源参考" })).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(onRequestEntryTitle).toHaveBeenCalledWith("新页面规范 2"),
+    );
+    expect(addEntry).toHaveBeenCalledWith("页面规范 A");
+    expect(
+      screen.queryByRole("button", { name: "空白页面规范" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "说明" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "资源索引" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "往期资源参考" }),
+    ).not.toBeInTheDocument();
   });
 
   it("从右侧拖入页面时创建页面绑定条目", () => {
@@ -203,12 +232,14 @@ describe("DesignSpecEditor", () => {
       loading: false,
       doc: {
         id: "spec-1",
-        entries: [{
-          id: "entry-1",
-          title: "玩法介绍",
-          markdown: "正文",
-          target: { type: "page", pageIds: ["page-a"] },
-        }],
+        entries: [
+          {
+            id: "entry-1",
+            title: "玩法介绍",
+            markdown: "正文",
+            target: { type: "page", pageIds: ["page-a"] },
+          },
+        ],
       },
       pool: [],
       pages: [{ id: "page-a", name: "页面 A" }],
@@ -229,11 +260,17 @@ describe("DesignSpecEditor", () => {
 
     render(<DesignSpecEditor docId="spec-1" />);
 
-    expect(screen.queryByLabelText("玩法介绍的展示位置")).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("玩法介绍的展示位置"),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText("绑定页面")).not.toBeInTheDocument();
     expect(screen.queryByText("页面规范")).not.toBeInTheDocument();
-    expect(screen.queryByText("显示在已绑定页面的配置侧边栏顶部")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("绑定页面：页面 A")).toHaveTextContent("页面 A");
+    expect(
+      screen.queryByText("显示在已绑定页面的配置侧边栏顶部"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("绑定页面：页面 A")).toHaveTextContent(
+      "页面 A",
+    );
     expect(screen.getByLabelText("解绑页面：页面 A")).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("解绑页面：页面 A"));
     expect(unbindPage).toHaveBeenCalledWith("page-a", "entry-1");
@@ -251,7 +288,10 @@ describe("DesignSpecEditor", () => {
             id: "entry-1",
             title: "主视觉图片",
             markdown: "",
-            target: { type: "config", refs: [{ scope: "project", fieldKey: "hero" }] },
+            target: {
+              type: "config",
+              refs: [{ scope: "project", fieldKey: "hero" }],
+            },
           },
         ],
       },
@@ -289,7 +329,10 @@ describe("DesignSpecEditor", () => {
             id: "entry-1",
             title: "主视觉图片",
             markdown: "",
-            target: { type: "config", refs: [{ scope: "page", pageId: "page-1", fieldKey: "hero" }] },
+            target: {
+              type: "config",
+              refs: [{ scope: "page", pageId: "page-1", fieldKey: "hero" }],
+            },
           },
         ],
       },
@@ -347,7 +390,10 @@ describe("DesignSpecEditor", () => {
             id: "entry-1",
             title: "主视觉图片",
             markdown: "",
-            target: { type: "config", refs: [{ scope: "page", pageId: "page-1", fieldKey: "hero" }] },
+            target: {
+              type: "config",
+              refs: [{ scope: "page", pageId: "page-1", fieldKey: "hero" }],
+            },
           },
         ],
       },
@@ -379,16 +425,18 @@ describe("DesignSpecEditor", () => {
 
     useWorkspace.mockReturnValue({
       ...workspace,
-      pool: [{
-        id: "",
-        scope: "page",
-        pageId: "page-1",
-        pageName: "页面一",
-        key: "hero",
-        title: "主视觉图片",
-        kind: "image",
-        format: "image",
-      }],
+      pool: [
+        {
+          id: "",
+          scope: "page",
+          pageId: "page-1",
+          pageName: "页面一",
+          key: "hero",
+          title: "主视觉图片",
+          kind: "image",
+          format: "image",
+        },
+      ],
     });
     render(
       <DesignSpecEditor
@@ -406,7 +454,12 @@ describe("DesignSpecEditor", () => {
       doc: {
         id: "spec-1",
         entries: [
-          { id: "entry-1", title: "主视觉图片", markdown: "说明", target: { type: "page", pageIds: [] } },
+          {
+            id: "entry-1",
+            title: "主视觉图片",
+            markdown: "说明",
+            target: { type: "page", pageIds: [] },
+          },
         ],
       },
       pool: [],
@@ -430,7 +483,9 @@ describe("DesignSpecEditor", () => {
     const editor = screen.getByLabelText("设计规范说明");
     expect(editor.closest("[draggable='true']")).toBeNull();
 
-    const dragHandle = screen.getByRole("button", { name: "拖动排序主视觉图片" });
+    const dragHandle = screen.getByRole("button", {
+      name: "拖动排序主视觉图片",
+    });
     expect(dragHandle).not.toHaveAttribute("draggable");
   });
 
@@ -440,8 +495,18 @@ describe("DesignSpecEditor", () => {
       doc: {
         id: "spec-1",
         entries: [
-          { id: "entry-1", title: "第一条", markdown: "", target: { type: "page", pageIds: [] } },
-          { id: "entry-2", title: "第二条", markdown: "", target: { type: "page", pageIds: [] } },
+          {
+            id: "entry-1",
+            title: "第一条",
+            markdown: "",
+            target: { type: "page", pageIds: [] },
+          },
+          {
+            id: "entry-2",
+            title: "第二条",
+            markdown: "",
+            target: { type: "page", pageIds: [] },
+          },
         ],
       },
       pool: [],
@@ -463,6 +528,8 @@ describe("DesignSpecEditor", () => {
     const dragHandle = screen.getByRole("button", { name: "拖动排序第一条" });
     expect(dragHandle).not.toHaveAttribute("draggable");
     expect(dragHandle).toHaveClass("cursor-grab");
-    expect(screen.queryByTestId(/design-spec-drop-indicator/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId(/design-spec-drop-indicator/),
+    ).not.toBeInTheDocument();
   });
 });

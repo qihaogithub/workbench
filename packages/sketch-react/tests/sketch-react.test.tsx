@@ -1385,6 +1385,55 @@ describe("sketch-react", () => {
     expect(document.querySelector('[data-sketch-node-id="existing-path"]')).not.toBeNull();
   });
 
+  it("restores the persisted viewport through the shared whiteboard surface", () => {
+    const whiteboardScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [
+        { id: "existing-diamond", type: "diamond", x: 24, y: 24, width: 100, height: 70, text: "已有菱形" },
+      ],
+    };
+
+    render(
+      <SketchEditorSurface
+        profile="whiteboard"
+        scene={whiteboardScene}
+        initialViewport={{ scale: 0.75, offsetX: 18, offsetY: 22 }}
+        fillContainer
+      />,
+    );
+
+    const stage = getCanvasStage();
+    expect(stage.style.transform).toBe("translate(18px, 22px) scale(0.75)");
+    for (const label of ["选择", "抓手", "矩形", "圆形", "文本", "图片"]) {
+      expect(screen.getByRole("button", { name: label })).toBeTruthy();
+    }
+    expect(screen.getByRole("group", { name: "画笔工具" })).toBeTruthy();
+    expect(document.querySelector('[data-sketch-node-id="existing-diamond"]')).not.toBeNull();
+  });
+
+  it("首次适配上报 fit，手动缩放上报 interaction 且重新渲染不重置视口", () => {
+    const width = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(800);
+    const height = vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(600);
+    try {
+      const onViewportChange = vi.fn();
+      const { rerender } = render(
+        <SketchEditorSurface scene={scene} profile="whiteboard" autoFitToContent onViewportChange={onViewportChange} />,
+      );
+      expect(onViewportChange).toHaveBeenLastCalledWith(expect.objectContaining({ scale: expect.any(Number) }), "fit");
+      fireEvent.click(screen.getByLabelText("放大"));
+      expect(onViewportChange).toHaveBeenLastCalledWith(expect.objectContaining({ scale: expect.any(Number) }), "interaction");
+      const manualTransform = getCanvasStage().style.transform;
+      const count = onViewportChange.mock.calls.length;
+      rerender(<SketchEditorSurface scene={{ ...scene }} profile="whiteboard" autoFitToContent onViewportChange={onViewportChange} />);
+      expect(getCanvasStage().style.transform).toBe(manualTransform);
+      expect(onViewportChange).toHaveBeenCalledTimes(count);
+    } finally {
+      width.mockRestore();
+      height.mockRestore();
+    }
+  });
+
   it("presents the grouped brush entry with accessible secondary controls", async () => {
     const emptyScene: SketchSceneDocument = {
       version: 1,
@@ -1402,6 +1451,11 @@ describe("sketch-react", () => {
     const settings = screen.getByRole("dialog", { name: "画笔设置" });
     expect(within(settings).getByRole("button", { name: "画笔" })).toBeTruthy();
     expect(within(settings).getByRole("button", { name: "橡皮擦" })).toBeTruthy();
+    expect(within(settings).queryByText("颜色", { exact: true })).toBeNull();
+    expect(within(settings).queryByText("粗细", { exact: true })).toBeNull();
+    const widthDots = settings.querySelectorAll<HTMLElement>("[data-sketch-brush-width-dot]");
+    expect(widthDots).toHaveLength(3);
+    expect(Array.from(widthDots).map((dot) => dot.style.width)).toEqual(["4px", "6px", "10px"]);
     expect(within(settings).getByRole("radio", { name: "画笔颜色 #111827" }).getAttribute("aria-checked")).toBe("true");
     expect(within(settings).getByRole("radio", { name: "画笔粗细 中" }).getAttribute("aria-checked")).toBe("true");
 

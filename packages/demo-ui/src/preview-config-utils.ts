@@ -1,13 +1,20 @@
 "use client";
 
-const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico)(\?[^'")\s]*)?$/i;
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|ico)([?#][^'")\s]*)?$/i;
 
 const RELATIVE_PATH_RE = /^\.\.?\/[^'")\s]*$/;
 
-function isWorkspaceImagePath(value: string): boolean {
-  return value.startsWith("assets/")
-    && !value.split("/").some((part) => part === "." || part === "..")
-    && IMAGE_EXT_RE.test(value);
+function isWorkspaceAssetImage(value: string): boolean {
+  const pathname = value.split(/[?#]/, 1)[0] ?? value;
+  if (!pathname.startsWith("assets/")) return false;
+  const segments = pathname.split("/");
+  if (segments.some((segment) => !segment || segment === "." || segment === ".."))
+    return false;
+  return IMAGE_EXT_RE.test(value);
+}
+
+function workspaceAssetUrl(sessionId: string, value: string): string {
+  return `/api/sessions/${encodeURIComponent(sessionId)}/workspace/${value}`;
 }
 
 export function resolveRelativePath(relativePath: string, basePath: string): string {
@@ -46,8 +53,8 @@ export function resolvePreviewConfigAssetUrls(
       if (value.startsWith("/api/sessions/")) {
         return origin + value;
       }
-      if (options.sessionId && isWorkspaceImagePath(value)) {
-        return `${origin}/api/sessions/${options.sessionId}/workspace/${value}`;
+      if (options.sessionId && isWorkspaceAssetImage(value)) {
+        return `${origin}${workspaceAssetUrl(options.sessionId, value)}`;
       }
       if (
         options.sessionId &&
@@ -56,7 +63,7 @@ export function resolvePreviewConfigAssetUrls(
         IMAGE_EXT_RE.test(value)
       ) {
         const resolved = resolveRelativePath(value, basePath);
-        return `${origin}/api/sessions/${options.sessionId}/workspace/${resolved}`;
+        return `${origin}${workspaceAssetUrl(options.sessionId, resolved)}`;
       }
     }
     if (Array.isArray(value)) {
@@ -83,12 +90,12 @@ export function resolveConfigImageSrc(
   if (value.startsWith("http://") || value.startsWith("https://") || value.startsWith("/api/")) {
     return value;
   }
-  if (isWorkspaceImagePath(value)) {
-    return `/api/sessions/${sessionId}/workspace/${value}`;
+  if (isWorkspaceAssetImage(value)) {
+    return workspaceAssetUrl(sessionId, value);
   }
   if (RELATIVE_PATH_RE.test(value) && IMAGE_EXT_RE.test(value)) {
     const resolved = resolveRelativePath(value, "demos/_/");
-    return `/api/sessions/${sessionId}/workspace/${resolved}`;
+    return workspaceAssetUrl(sessionId, resolved);
   }
   return value;
 }
