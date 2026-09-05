@@ -6,6 +6,8 @@ let proxy: typeof import("./proxy").proxy;
 let config: typeof import("./proxy").config;
 
 const verifyToken = jest.fn();
+const findUserById = jest.fn();
+jest.mock("@/lib/user", () => ({ findUserById }));
 const getAuthCookieName = jest.fn(() => "auth_token");
 const extractBearerToken = jest.fn((authorization: string | null | undefined) => {
   const match = authorization?.match(/^Bearer\s+(\S+)$/i);
@@ -86,6 +88,7 @@ describe("proxy authentication and CORS contract", () => {
       return match?.[1];
     });
     verifyToken.mockResolvedValue(null);
+    findUserById.mockReturnValue({ id: "u1", username: "alice", role: "editor" });
     verifyAdminSecret.mockResolvedValue(false);
   });
 
@@ -105,6 +108,52 @@ describe("proxy authentication and CORS contract", () => {
 
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe("http://localhost/workbench");
+  });
+
+  it("用户已不存在时清除 Cookie 并进入登录页，不再跳回工作台", async () => {
+    verifyToken.mockResolvedValue({ userId: "deleted", username: "alice" });
+    findUserById.mockReturnValue(null);
+    const options = { cookie: "auth_token=valid" };
+    const response = await proxy(request("/workbench?tab=templates", options));
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(
+      "http://localhost/login?redirect=%2Fworkbench%3Ftab%3Dtemplates",
+    );
+    expect(response.cookies.get("auth_token")).toMatchObject({ value: "", path: "/" });
+    const login = await proxy(request("/login?redirect=%2Fworkbench", options));
+    expect(login.status).toBe(200);
+    expect(login.headers.get("location")).toBeNull();
+    expect(login.cookies.get("auth_token")?.expires).toEqual(new Date(0));
+    expect(findUserById).toHaveBeenCalledWith("deleted");
+  });
+
+  it.each(["/", "/register"])("失效用户访问 %s 不跳转工作台", async (route) => {
+    verifyToken.mockResolvedValue({ userId: "deleted" });
+    findUserById.mockReturnValue(null);
+    const response = await proxy(request(route, { cookie: "auth_token=valid" }));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("location")).toBeNull();
+  });
+
+  it("失效 Cookie 优先于有效 Bearer，不回退到另一身份", async () => {
+    verifyToken.mockResolvedValue(null);
+    const response = await proxy(request("/workbench", {
+      cookie: "auth_token=expired", authorization: "Bearer valid",
+    }));
+    expect(response.status).toBe(307);
+    expect(verifyToken).toHaveBeenCalledWith("expired");
+    expect(findUserById).not.toHaveBeenCalled();
+  });
+
+  it("用户已不存在的 Bearer 请求返回 401，公开资源不查询用户", async () => {
+    verifyToken.mockResolvedValue({ userId: "deleted" });
+    findUserById.mockReturnValue(null);
+    const response = await proxy(request("/api/sessions", { authorization: "Bearer valid" }));
+    expect(response.status).toBe(401);
+    expect(response.headers.get("set-cookie")).toBeNull();
+    findUserById.mockClear();
+    await proxy(request("/manual", { cookie: "auth_token=valid" }));
+    expect(findUserById).not.toHaveBeenCalled();
   });
 
   it("redirects an unauthenticated workbench deep link with its query string", async () => {
