@@ -72,6 +72,30 @@ export interface VisibleWhenCondition {
   equals: VisibleWhenValue;
 }
 
+export function buildEffectiveFieldData(
+  fields: FieldConfig[],
+  data: Record<string, unknown>,
+): Record<string, unknown> {
+  const defaults: Record<string, unknown> = {};
+  for (const field of fields) {
+    if (field.default !== undefined) {
+      defaults[field.key] = field.default;
+    }
+  }
+  return { ...defaults, ...data };
+}
+
+export function isFieldVisible(
+  field: FieldConfig,
+  localData: Record<string, unknown>,
+): boolean {
+  if (!field.visibleWhen) return true;
+  return Object.is(
+    localData[field.visibleWhen.field],
+    field.visibleWhen.equals,
+  );
+}
+
 export function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

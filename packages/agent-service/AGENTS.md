@@ -125,7 +125,9 @@ tests/
 
 当前默认白名单在 `pi-tools/permissions.ts`：`node`、`ls`、`cat`、`head`、`tail`、`grep`、`find`、`wc`、`echo`；`npm`、`npx`、`node -e`、`rm`、`mv` 等默认拒绝。
 
-如果当前 `workingDir` 是 `scope=live` Workspace，`bash-tool` 会追加单写者防线：拒绝 `node`、`npm`、`npx`、重定向、heredoc、管道、命令连接符、命令替换、`tee` 和 `xargs` 等可能产生写副作用或绕过 Authority 的命令；需要写入时必须走受管工具或 Workspace Mutation Authority。
+如果当前 `workingDir` 是 `scope=live` Workspace，`bash-tool` 会追加单写者防线：拒绝 `node`、`npm`、`npx`、重定向、heredoc、管道、命令连接符、命令替换、`tee` 和 `xargs` 等可能产生写副作用或绕过 Authority 的命令；需要写入时必须走受管工具或 Workspace Mutation Authority。拒绝结果保留 `WORKSPACE_AUTHORITY_REQUIRED` 总类，同时通过 `details.reason` 区分 Shell 组合语法、脚本运行时和其它只读限制，并给模型返回单命令替代提示；不要把管道被拒绝描述成所有只读命令均不可用。
+
+`schemaValidate` 不只检查 JSON 语法，还递归检查 Workbench 配置契约；`visibleWhen` 必须使用 `{ field, equals }`，只能引用当前对象作用域内的兄弟字段，并覆盖 `items.oneOf` / `variants`。新 Schema 推荐直接在字段上声明 `visibleWhen`，但运行时同样支持 `ui:options.visibleWhen`；不要重复或冲突声明，也不得把两种位置之间的移动当作功能修复。工具结果固定返回 `validationScope=schema_contract` 和 `uiBehaviorVerified=false`：Schema 合法不等于当前配置面板行为已验证。用户要求实际 UI 效果时，必须完成真实界面验收；否则只报告“修改已写入、效果待验证”。
 
 如果当前 `workingDir` 是 `scope=live` Workspace，`delegateTask` 会直接返回 `WORKSPACE_AUTHORITY_REQUIRED`，不启动子 Agent runner。子 Agent 重新开放前必须先接入受管写工具、actor identity 和 receipt 汇总，不能让短生命周期 Agent 获得裸 Workspace 写权限。
 

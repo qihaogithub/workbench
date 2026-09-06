@@ -517,6 +517,12 @@ describe("PageConfigPanel design-spec bubble", () => {
                       properties: {
                         type: { const: "levelCard" },
                         status: { type: "string", title: "当前状态", enum: ["locked", "open"], "ui:widget": "segmented" },
+                        showDetails: { type: "boolean", title: "显示详情", default: true },
+                        secretText: {
+                          type: "string",
+                          title: "条件详情",
+                          visibleWhen: { field: "showDetails", equals: true },
+                        },
                         position: { type: "position", title: "自由坐标", key: "levelCard", size: { width: 375, height: 656 } },
                       },
                     }],
@@ -535,7 +541,18 @@ describe("PageConfigPanel design-spec bubble", () => {
           id: "page-1",
           name: "闯关页",
           schema,
-          configData: { modules: [{ type: "level", levels: [{ type: "levelCard", status: "locked", position: { x: 1, y: 2 } }] }] },
+          configData: {
+            modules: [{
+              type: "level",
+              levels: [{
+                type: "levelCard",
+                status: "locked",
+                showDetails: true,
+                secretText: "保留的详情",
+                position: { x: 1, y: 2 },
+              }],
+            }],
+          },
         }]}
         detailPageId="page-1"
         onPageConfigChange={onPageConfigChange}
@@ -552,12 +569,43 @@ describe("PageConfigPanel design-spec bubble", () => {
     expect(breadcrumb).not.toHaveTextContent("关卡模块");
     expect(breadcrumb).not.toHaveTextContent("关卡列表");
     expect(sheet).toHaveTextContent("当前状态");
+    expect(sheet).toHaveTextContent("条件详情");
     expect(screen.getAllByRole("dialog")).toHaveLength(1);
 
     fireEvent.click(screen.getByRole("radio", { name: "open" }));
     expect(onPageConfigChange).toHaveBeenLastCalledWith(
       "page-1",
-      { modules: [{ type: "level", levels: [{ type: "levelCard", status: "open", position: { x: 1, y: 2 } }] }] },
+      {
+        modules: [{
+          type: "level",
+          levels: [{
+            type: "levelCard",
+            status: "open",
+            showDetails: true,
+            secretText: "保留的详情",
+            position: { x: 1, y: 2 },
+          }],
+        }],
+      },
+      undefined,
+    );
+
+    fireEvent.click(within(sheet).getByRole("switch"));
+    expect(sheet).not.toHaveTextContent("条件详情");
+    expect(onPageConfigChange).toHaveBeenLastCalledWith(
+      "page-1",
+      {
+        modules: [{
+          type: "level",
+          levels: [{
+            type: "levelCard",
+            status: "open",
+            showDetails: false,
+            secretText: "保留的详情",
+            position: { x: 1, y: 2 },
+          }],
+        }],
+      },
       undefined,
     );
 

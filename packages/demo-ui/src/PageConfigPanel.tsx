@@ -40,7 +40,12 @@ import {
   type SchemaDefinitionMutation,
 } from "@workbench/shared/demo/config-schema-definition";
 import type { ConfigDefinitionImpactSummary } from "./ConfigDefinitionManagerDialog";
-import { parseSchemaToFields } from "./schema-parser";
+import {
+  buildEffectiveFieldData,
+  isFieldVisible,
+  parseSchemaToFields,
+  type FieldConfig,
+} from "./schema-parser";
 import {
   getAvailableConfigCategories,
   getSchemaFieldCountByBindings,
@@ -302,11 +307,19 @@ function getDetailFields(
   field: ConfigItemDetail["field"],
   item: Record<string, unknown>,
 ) {
+  let fields: FieldConfig[];
   if (field.oneOf) {
     const itemType = String(item[field.oneOf.discriminator] ?? "");
-    return field.oneOf.variants.find((variant) => String(variant.value) === itemType)?.fields ?? [];
+    fields = field.oneOf.variants.find(
+      (variant) => String(variant.value) === itemType,
+    )?.fields ?? [];
+  } else {
+    fields = field.children ?? [];
   }
-  return field.children ?? [];
+  const effectiveItem = buildEffectiveFieldData(fields, item);
+  return fields.filter((childField) =>
+    isFieldVisible(childField, effectiveItem),
+  );
 }
 
 /**
@@ -1027,6 +1040,15 @@ export function PageConfigPanel({
     });
   }, [selectedPage?.id, sheetRoute]);
 
+  useEffect(() => {
+    setSheetRoute((current) => {
+      if (!current) return current;
+      const latestItem = current.getCurrentItem?.();
+      if (!latestItem || latestItem === current.item) return current;
+      return { ...current, item: latestItem };
+    });
+  }, [selectedPage?.configData]);
+
   const handleSheetBack = useCallback(() => {
     const previous = sheetHistoryRef.current.pop();
     if (previous) {
@@ -1404,7 +1426,7 @@ export function PageConfigPanel({
   const sheetCurrentIndex = sheetRoute
     ? Math.max(0, sheetRoute.getCurrentIndex?.() ?? sheetRoute.index)
     : 0;
-  const sheetItem = sheetRoute?.getCurrentItem?.() ?? sheetRoute?.item;
+  const sheetItem = sheetRoute?.item;
   const sheetFields = sheetRoute
     ? getDetailFields(sheetRoute.field, sheetItem ?? sheetRoute.item)
     : [];

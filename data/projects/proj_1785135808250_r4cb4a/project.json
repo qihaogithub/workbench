@@ -645,13 +645,13 @@
     }
   ],
   "createdAt": 1785135808251,
-  "updatedAt": 1788666058245,
+  "updatedAt": 1788675587153,
   "activeWorkspaceId": "live-1785205322879-latagwnoh",
   "activeWorkspaceUpdatedAt": 1788230612559,
   "canonicalSyncedWorkspaceId": "live-1785205322879-latagwnoh",
-  "canonicalSyncedRevision": 1621,
-  "canonicalSyncedRootHash": "163b3252b9401294f0ca6e4201f8c706ebcc989fec2959c982ec8199dc409253",
-  "canonicalSyncedAt": 1788666058245,
+  "canonicalSyncedRevision": 1696,
+  "canonicalSyncedRootHash": "aed7170e7be341825ce9ad0f9898db453144f214c845cf5f997c93fda86985a5",
+  "canonicalSyncedAt": 1788675587153,
   "publishedVersion": "v30",
   "publishedAt": 1786007287380
 }

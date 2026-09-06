@@ -124,6 +124,37 @@ const nestedDefinitionSchema = JSON.stringify({
   },
 });
 
+const conditionalArraySchema = JSON.stringify({
+  type: "object",
+  properties: {
+    modules: {
+      type: "array",
+      title: "内容模块",
+      $demo: { sortable: false },
+      "ui:options": { collapsed: false },
+      items: {
+        oneOf: [{
+          title: "优秀作品模块",
+          properties: {
+            type: { const: "excellentWorks" },
+            showAd: {
+              type: "boolean",
+              title: "显示广告图",
+              default: true,
+            },
+            adImage: {
+              type: "string",
+              format: "image",
+              title: "广告图",
+              visibleWhen: { field: "showAd", equals: true },
+            },
+          },
+        }],
+      },
+    },
+  },
+});
+
 const nestedOneOfPositionSchema = JSON.stringify({
   type: "object",
   properties: {
@@ -205,6 +236,62 @@ const nestedNonSortableTreeSchema = JSON.stringify({
       },
     },
   },
+});
+
+describe("ConfigForm nested visibleWhen", () => {
+  it("在 oneOf 数组项内按兄弟开关显隐并保留隐藏字段值", () => {
+    const onChange = vi.fn();
+    render(
+      <ConfigForm
+        schema={conditionalArraySchema}
+        initialData={{
+          modules: [{
+            type: "excellentWorks",
+            showAd: true,
+            adImage: "banner.png",
+          }],
+        }}
+        onChange={onChange}
+      />,
+    );
+
+    expect(screen.getByText("广告图")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("switch"));
+
+    expect(screen.queryByText("广告图")).not.toBeInTheDocument();
+    expect(onChange).toHaveBeenLastCalledWith({
+      modules: [{
+        type: "excellentWorks",
+        showAd: false,
+        adImage: "banner.png",
+      }],
+    }, undefined);
+
+    fireEvent.click(screen.getByRole("switch"));
+
+    expect(screen.getByText("广告图")).toBeInTheDocument();
+  });
+
+  it("每个数组项独立解析条件，并使用当前项的字段默认值", () => {
+    render(
+      <ConfigForm
+        schema={conditionalArraySchema}
+        initialData={{
+          modules: [
+            { type: "excellentWorks", showAd: false, adImage: "hidden.png" },
+            { type: "excellentWorks", adImage: "default-visible.png" },
+          ],
+        }}
+        onChange={vi.fn()}
+      />,
+    );
+
+    const itemHeaders = screen.getAllByRole("button", { name: "优秀作品模块" });
+    fireEvent.click(itemHeaders[1]);
+
+    expect(screen.getAllByText("广告图")).toHaveLength(1);
+  });
 });
 
 describe("ConfigForm configuration-definition entry", () => {

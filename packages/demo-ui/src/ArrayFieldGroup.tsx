@@ -32,7 +32,11 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { FieldRenderer } from "./FieldRenderer";
-import type { FieldConfig } from "./schema-parser";
+import {
+  buildEffectiveFieldData,
+  isFieldVisible,
+  type FieldConfig,
+} from "./schema-parser";
 import type { ConfigBreadcrumb, ConfigChangeMeta, ConfigCommentTarget, ConfigItemCapabilities, ConfigItemDetailHandler, DesignSpecEntryLink, ImageConfigScope, WhiteboardLauncher } from "./types";
 import type { MarkdownReferenceClickHandler, MarkdownReferenceContext, MarkdownReferenceProvider } from "./DocumentEditor";
 
@@ -580,14 +584,20 @@ export function ArrayFieldGroup({
   const isEmpty = value.length === 0;
 
   const getVisibleFields = (item: Record<string, unknown>): FieldConfig[] => {
+    let fields: FieldConfig[];
     if (field.oneOf) {
       const itemType = String(item[field.oneOf.discriminator] ?? "");
       const variant = field.oneOf.variants.find(
         (v) => String(v.value) === itemType,
       );
-      return variant?.fields ?? [];
+      fields = variant?.fields ?? [];
+    } else {
+      fields = field.children ?? [];
     }
-    return field.children ?? [];
+    const effectiveItem = buildEffectiveFieldData(fields, item);
+    return fields.filter((childField) =>
+      isFieldVisible(childField, effectiveItem),
+    );
   };
 
   const getSchemaChildPath = (childKey: string, item: Record<string, unknown>): string => {

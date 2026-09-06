@@ -160,7 +160,7 @@ describe('checkConfigSchemaAgainstPrototype', () => {
       type: 'object',
       properties: {
         mode: { type: 'enum', title: '模式', options: [{ value: 'a', label: 'A' }] },
-        detail: { type: 'string', title: '详情', visibleWhen: { field: 'mode', eq: 'a' } },
+        detail: { type: 'string', title: '详情', visibleWhen: { field: 'mode', equals: 'a' } },
       },
     });
     expect(result.supported).toBe(true);

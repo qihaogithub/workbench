@@ -100,8 +100,8 @@
       "headerImage": "/api/images/img_LFJXKMmEIDWmSA",
       "bgColor": "#E8E8E8",
       "innerBgColor": "#C6C6C6",
-      "adImage": "/api/images/img_F3JVFVS5eksdBg",
-      "showAd": false
+      "showAd": false,
+      "adImage": "/api/images/img_F3JVFVS5eksdBg"
     },
     {
       "type": "ranking",

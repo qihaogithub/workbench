@@ -79,7 +79,13 @@ describe("createBashTool live Workspace guard", () => {
     const result = await tool.execute("id", { command: "echo changed > workspace-tree.json" });
 
     expect(result.isError).toBe(true);
-    expect(result.details).toMatchObject({ error: "WORKSPACE_AUTHORITY_REQUIRED", workspaceId: "ws-1" });
+    expect(result.details).toMatchObject({
+      error: "WORKSPACE_AUTHORITY_REQUIRED",
+      reason: "shell_syntax_blocked",
+      workspaceId: "ws-1",
+    });
+    expect(result.content[0].text).toContain("one simple read-only command");
+    expect(result.content[0].text).toContain("without |");
     expect(spawnMock).not.toHaveBeenCalled();
   });
 
@@ -92,7 +98,44 @@ describe("createBashTool live Workspace guard", () => {
     const result = await tool.execute("id", { command: "node scripts/check.js" });
 
     expect(result.isError).toBe(true);
-    expect(result.details).toMatchObject({ error: "WORKSPACE_AUTHORITY_REQUIRED", workspaceId: "ws-1" });
+    expect(result.details).toMatchObject({
+      error: "WORKSPACE_AUTHORITY_REQUIRED",
+      reason: "live_runtime_blocked",
+      workspaceId: "ws-1",
+    });
+    expect(result.content[0].text).toContain("cannot run node, npm, or npx");
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  it("对 npm 命令返回相同的 live runtime 指引", async () => {
+    const config: AgentConfig = { sessionId: "session-1", workingDir: workspacePath };
+    const tool = createBashTool(config);
+
+    const result = await tool.execute("id", { command: "npm test" });
+
+    expect(result.isError).toBe(true);
+    expect(result.details).toMatchObject({
+      error: "WORKSPACE_AUTHORITY_REQUIRED",
+      reason: "live_runtime_blocked",
+    });
+    expect(result.content[0].text).toContain("cannot run node, npm, or npx");
+  });
+
+  it("解释只读管道被拒绝的具体原因并给出单命令替代", async () => {
+    const { spawn } = await import("child_process");
+    const spawnMock = vi.mocked(spawn);
+    const config: AgentConfig = { sessionId: "session-1", workingDir: workspacePath };
+    const tool = createBashTool(config);
+
+    const result = await tool.execute("id", { command: "grep -rn visibleWhen demos | head -50" });
+
+    expect(result.isError).toBe(true);
+    expect(result.details).toMatchObject({
+      error: "WORKSPACE_AUTHORITY_REQUIRED",
+      reason: "shell_syntax_blocked",
+    });
+    expect(result.content[0].text).toContain("Pipes");
+    expect(result.content[0].text).toContain("grep/head/readFile");
     expect(spawnMock).not.toHaveBeenCalled();
   });
 

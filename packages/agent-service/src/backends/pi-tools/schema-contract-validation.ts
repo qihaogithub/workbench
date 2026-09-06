@@ -25,6 +25,13 @@ export const CONFIG_FIELD_CAPABILITIES = {
 const REGISTERED_FORMATS = new Set(Object.keys(CONFIG_FIELD_CAPABILITIES));
 const SPINE_REF_ID = /^spine_[a-f0-9]{64}$/u;
 
+function isVisibleWhenValue(value: unknown): boolean {
+  return value === null
+    || typeof value === "string"
+    || typeof value === "number"
+    || typeof value === "boolean";
+}
+
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -39,6 +46,67 @@ function pushIssue(
   instruction: string,
 ): void {
   issues.push({ code, path, message, instruction });
+}
+
+function validateVisibleWhen(
+  field: Record<string, unknown>,
+  fieldPath: string,
+  siblingProperties: Record<string, unknown>,
+  issues: SchemaContractIssue[],
+): void {
+  const uiOptions = asRecord(field["ui:options"]);
+  const declarations = [
+    { path: `${fieldPath}.visibleWhen`, value: field.visibleWhen },
+    { path: `${fieldPath}.ui:options.visibleWhen`, value: uiOptions?.visibleWhen },
+  ].filter((entry) => entry.value !== undefined);
+
+  const normalized: Array<{ field: string; equals: unknown }> = [];
+  for (const declaration of declarations) {
+    const condition = asRecord(declaration.value);
+    if (
+      !condition
+      || typeof condition.field !== "string"
+      || condition.field.length === 0
+      || !("equals" in condition)
+      || !isVisibleWhenValue(condition.equals)
+    ) {
+      pushIssue(
+        issues,
+        "VISIBLE_WHEN_INVALID",
+        declaration.path,
+        `字段 ${fieldPath} 的 visibleWhen 必须包含非空 field 和标量 equals。`,
+        '请使用 { "field": "同层字段名", "equals": <string|number|boolean|null> }。',
+      );
+      continue;
+    }
+
+    normalized.push({ field: condition.field, equals: condition.equals });
+    if (!(condition.field in siblingProperties)) {
+      pushIssue(
+        issues,
+        "VISIBLE_WHEN_FIELD_NOT_FOUND",
+        declaration.path,
+        `字段 ${fieldPath} 引用了当前对象中不存在的条件字段 ${condition.field}。`,
+        "visibleWhen.field 只能引用当前对象作用域内的兄弟字段。",
+      );
+    }
+  }
+
+  if (
+    normalized.length === 2
+    && (
+      normalized[0].field !== normalized[1].field
+      || !Object.is(normalized[0].equals, normalized[1].equals)
+    )
+  ) {
+    pushIssue(
+      issues,
+      "VISIBLE_WHEN_CONFLICT",
+      fieldPath,
+      `字段 ${fieldPath} 的两处 visibleWhen 声明不一致。`,
+      "请只保留一处一致的 visibleWhen 声明；新 Schema 推荐直接声明在字段上。",
+    );
+  }
 }
 
 export function validateConfigSchemaContract(schema: unknown): SchemaContractIssue[] {
@@ -90,15 +158,40 @@ export function validateConfigSchemaContract(schema: unknown): SchemaContractIss
           '请将它们合并为一个 format:"spine" 的 ZIP 素材字段；三个文件仅是服务端内部解析结果。',
         );
       }
-      for (const [name, child] of Object.entries(properties)) walk(child, `${path}.${name}`);
+      for (const [name, child] of Object.entries(properties)) {
+        const childRecord = asRecord(child);
+        const childPath = `${path}.${name}`;
+        if (childRecord) {
+          validateVisibleWhen(childRecord, childPath, properties, issues);
+        }
+        walk(child, childPath);
+      }
     }
     const items = record.items;
     if (items) walk(items, `${path}[]`);
+
+    const oneOf = record.oneOf;
+    if (Array.isArray(oneOf)) {
+      oneOf.forEach((variant, index) => walk(variant, `${path}.oneOf[${index}]`));
+    }
+
+    const variants = asRecord(record.variants);
+    if (variants) {
+      for (const [name, variant] of Object.entries(variants)) {
+        walk(variant, `${path}.variants.${name}`);
+      }
+    }
   };
 
   const properties = asRecord(root.properties);
   if (properties) {
-    for (const [name, field] of Object.entries(properties)) walk(field, name);
+    for (const [name, field] of Object.entries(properties)) {
+      const fieldRecord = asRecord(field);
+      if (fieldRecord) {
+        validateVisibleWhen(fieldRecord, name, properties, issues);
+      }
+      walk(field, name);
+    }
   }
   return issues;
 }
