@@ -3,7 +3,7 @@ import path from 'path';
 
 import { createEditorDiagnosticEvent, type EditorDiagnosticEvent } from '@workbench/shared';
 
-import { AgentError, AgentEvent, AgentResult } from '../core/types';
+import { AgentError, AgentEvent, AgentResult, RunSummary } from '../core/types';
 import { logger } from '../utils/logger';
 
 export type RunLogLevel = 'info' | 'warn' | 'error';
@@ -16,6 +16,29 @@ export interface AgentRunLogStartOptions {
   workingDir?: string;
   demoId?: string;
   model?: string;
+}
+
+export type RunProjectionStatus = 'not_verified' | 'applied' | 'failed';
+
+export interface AgentRunMetrics {
+  runDurationMs: number;
+  firstThoughtMs: number | null;
+  firstToolMs: number | null;
+  firstTextMs: number | null;
+  finishMs: number;
+  thoughtEventCount: number;
+  thoughtCharCount: number;
+  toolCallCount: number;
+  toolResultCount: number;
+  toolDurationSumMs: number;
+  toolIntervalMs: number;
+  capabilityActivationCount: number;
+  capabilityActivationDurationMs: number;
+  mutationCommitted: boolean;
+  runtimeValidationOk: boolean | null;
+  projectionStatus: RunProjectionStatus;
+  model?: string;
+  provider?: string;
 }
 
 interface RunLogEntry {
@@ -114,6 +137,45 @@ function getToolTask(parameters: unknown): string | undefined {
     : undefined;
 }
 
+function nonNegativeFiniteNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? value
+    : undefined;
+}
+
+function resolveProviderId(model?: string): string | undefined {
+  if (!model) return undefined;
+  const separator = model.indexOf('/');
+  return separator > 0 ? model.slice(0, separator) : undefined;
+}
+
+function calculateIntervalUnion(
+  intervals: Array<{ startMs: number; endMs: number }>,
+  finishAtMs: number,
+): number {
+  const sorted = intervals
+    .map((interval) => ({
+      startMs: interval.startMs,
+      endMs: Math.max(interval.startMs, interval.endMs || finishAtMs),
+    }))
+    .sort((left, right) => left.startMs - right.startMs);
+  if (sorted.length === 0) return 0;
+
+  let unionStart = sorted[0].startMs;
+  let unionEnd = sorted[0].endMs;
+  let total = 0;
+  for (const interval of sorted.slice(1)) {
+    if (interval.startMs <= unionEnd) {
+      unionEnd = Math.max(unionEnd, interval.endMs);
+    } else {
+      total += unionEnd - unionStart;
+      unionStart = interval.startMs;
+      unionEnd = interval.endMs;
+    }
+  }
+  return Math.max(0, total + unionEnd - unionStart);
+}
+
 export class AgentRunLog {
   readonly filePath: string;
 
@@ -133,6 +195,20 @@ export class AgentRunLog {
   private flushTimer: ReturnType<typeof setTimeout> | undefined;
   private writeChain: Promise<void> = Promise.resolve();
   private droppedIncrementalEntries = 0;
+  private readonly startedAtMs = Date.now();
+  private firstThoughtMs: number | null = null;
+  private firstToolMs: number | null = null;
+  private firstTextMs: number | null = null;
+  private thoughtEventCount = 0;
+  private thoughtCharCount = 0;
+  private toolCallCount = 0;
+  private toolDurationSumMs = 0;
+  private toolIntervals = new Map<string, { startMs: number; endMs: number }>();
+  private capabilityActivationCount = 0;
+  private capabilityActivationDurationMs = 0;
+  private mutationCommitted = false;
+  private runtimeValidationOk: boolean | null = null;
+  private projectionStatus: RunProjectionStatus = 'not_verified';
 
   constructor(options: AgentRunLogStartOptions) {
     this.sessionId = options.sessionId;
@@ -165,11 +241,13 @@ export class AgentRunLog {
   }
 
   recordAgentEvent(event: AgentEvent): void {
+    const eventAtMs = Date.now();
     switch (event.type) {
       case 'stream':
         this.streamLength += event.content.length;
         if (!this.hasModelOutput && event.content.length > 0) {
           this.hasModelOutput = true;
+          this.firstTextMs = Math.max(0, eventAtMs - this.startedAtMs);
           this.append({
             level: 'info',
             source: 'model',
@@ -182,6 +260,11 @@ export class AgentRunLog {
         break;
 
       case 'thought':
+        this.thoughtEventCount += 1;
+        this.thoughtCharCount += event.content.length;
+        if (this.firstThoughtMs === null && event.content.length > 0) {
+          this.firstThoughtMs = Math.max(0, eventAtMs - this.startedAtMs);
+        }
         this.append({
           level: 'info',
           source: 'model',
@@ -193,6 +276,14 @@ export class AgentRunLog {
         break;
 
       case 'tool_call': {
+        this.toolCallCount += 1;
+        if (this.firstToolMs === null) {
+          this.firstToolMs = Math.max(0, eventAtMs - this.startedAtMs);
+        }
+        this.toolIntervals.set(event.toolCallId, {
+          startMs: eventAtMs,
+          endMs: eventAtMs,
+        });
         this.toolNames.set(event.toolCallId, event.title);
         const isSubagent = isSubagentTool(event.title);
         this.append({
@@ -214,6 +305,21 @@ export class AgentRunLog {
 
       case 'tool_call_update': {
         this.toolResultCount += 1;
+        const durationMs = nonNegativeFiniteNumber(event.durationMs);
+        const interval = this.toolIntervals.get(event.toolCallId);
+        if (interval) {
+          if (durationMs !== undefined) {
+            interval.startMs = Math.min(interval.startMs, eventAtMs - durationMs);
+          }
+          interval.endMs = Math.max(interval.endMs, eventAtMs);
+        } else {
+          this.toolIntervals.set(event.toolCallId, {
+            startMs: durationMs === undefined ? eventAtMs : eventAtMs - durationMs,
+            endMs: eventAtMs,
+          });
+        }
+        if (durationMs !== undefined) this.toolDurationSumMs += durationMs;
+        this.observeToolDetails(event.details);
         const toolName = this.toolNames.get(event.toolCallId);
         const isSubagent = isSubagentTool(toolName);
         if (isSubagent) this.subagentResultCount += 1;
@@ -299,7 +405,12 @@ export class AgentRunLog {
         });
         break;
 
-      case 'capability_activation':
+      case 'capability_activation': {
+        this.capabilityActivationCount += 1;
+        const activationDurationMs = nonNegativeFiniteNumber(event.durationMs);
+        if (activationDurationMs !== undefined) {
+          this.capabilityActivationDurationMs += activationDurationMs;
+        }
         this.append({
           level: event.status === 'failed' ? 'warn' : 'info',
           source: 'system',
@@ -318,17 +429,25 @@ export class AgentRunLog {
           },
         });
         break;
+      }
+
+      case 'run_summary':
+        this.observeRunSummary(event.runSummary);
+        break;
     }
   }
 
   recordFinish(result: AgentResult): void {
+    const finishAtMs = Date.now();
     this.finishContentLength = result.content?.length || 0;
+    if (result.metadata?.runSummary) this.observeRunSummary(result.metadata.runSummary);
+    const metrics = this.buildMetrics(finishAtMs);
     this.append({
       level: result.success && this.finishContentLength > 0 ? 'info' : result.success ? 'warn' : 'error',
       source: 'system',
       eventType: 'finish',
       title: 'AI run finished',
-      summary: `stream=${this.streamLength}, finish=${this.finishContentLength}, tools=${this.toolResultCount}, subagents=${this.subagentResultCount}`,
+      summary: `durationMs=${metrics.runDurationMs}, stream=${this.streamLength}, finish=${this.finishContentLength}, tools=${this.toolResultCount}, subagents=${this.subagentResultCount}`,
       payload: {
         success: result.success,
         finishContentLength: this.finishContentLength,
@@ -336,10 +455,61 @@ export class AgentRunLog {
         toolResultCount: this.toolResultCount,
         subagentResultCount: this.subagentResultCount,
         fileCount: result.files?.length || 0,
+        metrics,
         error: result.error,
         metadata: result.metadata,
       },
     });
+  }
+
+  private observeToolDetails(details: unknown): void {
+    if (!isRecord(details)) return;
+    const receipt = details.receipt;
+    if (isRecord(receipt) && receipt.committed === true) {
+      this.mutationCommitted = true;
+    }
+    const runtimeValidation = details.runtimeValidation;
+    if (!isRecord(runtimeValidation) || typeof runtimeValidation.ok !== 'boolean') return;
+    this.runtimeValidationOk = this.runtimeValidationOk === false
+      ? false
+      : runtimeValidation.ok;
+  }
+
+  private observeRunSummary(summary: RunSummary): void {
+    for (const projection of summary.projections) {
+      if (projection.status === 'failed') {
+        this.projectionStatus = 'failed';
+      } else if (projection.status === 'applied' && this.projectionStatus !== 'failed') {
+        this.projectionStatus = 'applied';
+      }
+    }
+  }
+
+  private buildMetrics(finishAtMs: number): AgentRunMetrics {
+    const runDurationMs = Math.max(0, finishAtMs - this.startedAtMs);
+    return {
+      runDurationMs,
+      firstThoughtMs: this.firstThoughtMs,
+      firstToolMs: this.firstToolMs,
+      firstTextMs: this.firstTextMs,
+      finishMs: runDurationMs,
+      thoughtEventCount: this.thoughtEventCount,
+      thoughtCharCount: this.thoughtCharCount,
+      toolCallCount: this.toolCallCount,
+      toolResultCount: this.toolResultCount,
+      toolDurationSumMs: this.toolDurationSumMs,
+      toolIntervalMs: calculateIntervalUnion(
+        Array.from(this.toolIntervals.values()),
+        finishAtMs,
+      ),
+      capabilityActivationCount: this.capabilityActivationCount,
+      capabilityActivationDurationMs: this.capabilityActivationDurationMs,
+      mutationCommitted: this.mutationCommitted,
+      runtimeValidationOk: this.runtimeValidationOk,
+      projectionStatus: this.projectionStatus,
+      model: this.model,
+      provider: resolveProviderId(this.model),
+    };
   }
 
   recordError(error: AgentError | { code?: string; message?: string; details?: unknown }, eventType = 'error'): void {

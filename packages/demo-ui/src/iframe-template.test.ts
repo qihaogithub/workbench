@@ -15,6 +15,15 @@ describe("visualEditScript", () => {
       "syncSelectionCursor(state.enabled && !state.annotationMode)",
     );
   });
+
+  it("关闭视觉编辑后不再重绘残留的选中框和悬停框", () => {
+    expect(visualEditScript).toContain(
+      "if (!state.enabled || !state.selectedNodeId)",
+    );
+    expect(visualEditScript).toContain(
+      "function redrawHoverFromState() {\n    ensureLayer();\n    if (!state.enabled)",
+    );
+  });
 });
 
 describe("positionEditScript", () => {

@@ -839,7 +839,15 @@ Keep the final response concise: summarize what you changed, what you verified, 
     if (images && images.length > 0) {
       try {
         const projectId = resolveProjectImageManifestProjectId(this.config);
-        const persisted: Array<{ imageId: string; url: string }> = [];
+        const persisted: Array<{
+          imageId: string;
+          url: string;
+          name: string;
+          mimeType: string;
+          sizeBytes: number;
+          width?: number;
+          height?: number;
+        }> = [];
         const failedNames: string[] = [];
 
         for (let i = 0; i < images.length; i++) {
@@ -856,7 +864,15 @@ Keep the final response concise: summarize what you changed, what you verified, 
             });
 
             if (uploadResult.success) {
-              persisted.push({ imageId: uploadResult.imageId, url: uploadResult.url });
+              persisted.push({
+                imageId: uploadResult.imageId,
+                url: uploadResult.url,
+                name: img.name || uploadResult.filename,
+                mimeType: uploadResult.mimeType,
+                sizeBytes: uploadResult.sizeBytes,
+                width: uploadResult.width,
+                height: uploadResult.height,
+              });
 
               if (projectId) {
                 try {
@@ -890,9 +906,13 @@ Keep the final response concise: summarize what you changed, what you verified, 
         }
 
         if (persisted.length > 0) {
-          const lines = persisted.map((img) => `- imageId: ${img.imageId}, URL: ${img.url}`).join("\n");
-          const hint = "需要重新查看图片内容时可调用 readUserImage 传入 imageId。\n";
-          autoPersistText = `[图片已自动入库] 用户上传的图片已自动保存到图床，无需调用 saveImage 再次保存。直接在代码中使用以下 URL 引用即可：\n${hint}\n${lines}\n\n`;
+          const lines = persisted.map((img) => {
+            const dimensions = img.width != null && img.height != null
+              ? `${img.width}×${img.height}`
+              : "未知尺寸";
+            return `- name: ${img.name}, MIME: ${img.mimeType}, dimensions: ${dimensions}, sizeBytes: ${img.sizeBytes}, imageId: ${img.imageId}, URL: ${img.url}`;
+          }).join("\n");
+          autoPersistText = `[图片已自动入库] 用户上传的图片已自动保存到图床，无需调用 saveImage 再次保存。当前图片内容已直接提供给本轮模型，无需调用 \`readUserImage\` 或 \`listImages\`；只有需要重新查看像素内容或检索历史素材时才调用相应工具。直接在代码中使用以下 URL 引用即可：\n\n${lines}\n\n`;
         }
         if (failedNames.length > 0) {
           const failedLines = failedNames.map((n) => `[图片 ${n} 未能自动入库]`).join("\n");
@@ -1265,12 +1285,14 @@ Keep the final response concise: summarize what you changed, what you verified, 
 
     const mutations: MutationReceiptEntry[] = receipts;
     const projections: ProjectionAckEntry[] = [];
+    let canHavePreviewProjection = false;
 
     if (this.config.workingDir) {
       const liveWorkspace = resolveLiveWorkspaceMutationContext(
         this.config.workingDir,
       );
       if (liveWorkspace) {
+        canHavePreviewProjection = true;
         try {
           const minRevision = Math.min(
             ...receipts.map((receipt) => receipt.revision),
@@ -1292,6 +1314,22 @@ Keep the final response concise: summarize what you changed, what you verified, 
             { error },
             "Failed to query projection acks for run summary",
           );
+        }
+      }
+    }
+
+    if (canHavePreviewProjection) {
+      const knownProjections = new Set(
+        projections.map((projection) => `${projection.revision}:${projection.surface}`),
+      );
+      for (const receipt of receipts) {
+        const key = `${receipt.revision}:active-preview`;
+        if (!knownProjections.has(key)) {
+          projections.push({
+            revision: receipt.revision,
+            surface: "active-preview",
+            status: "pending",
+          });
         }
       }
     }

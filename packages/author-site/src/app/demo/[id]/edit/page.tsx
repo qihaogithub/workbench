@@ -273,7 +273,6 @@ import type {
   ConfigChangeMeta,
 } from "@workbench/demo-ui/types";
 import type { WhiteboardCommitTarget } from "@/components/demo/WhiteboardDialog";
-import { WHITEBOARD_AUTHORING_ENABLED } from "@/lib/authoring-feature-flags";
 import type {
   DemoFiles,
   DemoPageMeta,
@@ -7799,6 +7798,24 @@ ${context.details}
     !commentModeActive;
 
   useEffect(() => {
+    if (visualEditActive) return;
+    if (
+      !selectedVisualNode &&
+      visualNodeStack.length === 0 &&
+      visualPanelHoverNodeId === null
+    ) {
+      return;
+    }
+    handleVisualSelect(null, []);
+  }, [
+    handleVisualSelect,
+    selectedVisualNode,
+    visualEditActive,
+    visualNodeStack.length,
+    visualPanelHoverNodeId,
+  ]);
+
+  useEffect(() => {
     if (
       !visualEditActive ||
       activeDemoPage?.runtimeType !== "prototype-html-css"
@@ -8433,6 +8450,16 @@ ${context.details}
     : rightPanelTab === "comments"
       ? "comments"
       : "config";
+  const handleRightPanelTabChange = useCallback(
+    (value: string) => {
+      const nextTab = value as RightPanelTab;
+      if (nextTab !== "edit") {
+        handleVisualSelect(null, []);
+      }
+      setRightPanelTab(nextTab);
+    },
+    [handleVisualSelect],
+  );
   useEffect(() => {
     if (!canUseVisualEditor && rightPanelTab === "edit") {
       setRightPanelTab("config");
@@ -9948,9 +9975,11 @@ ${context.details}
                                     ? visualPanelHoverNodeId
                                     : null,
                                   selectedVisualNodeId:
-                                    selectedVisualNode?.domPath ||
-                                    selectedVisualNode?.nodeId ||
-                                    null,
+                                    visualEditActive
+                                      ? selectedVisualNode?.domPath ||
+                                        selectedVisualNode?.nodeId ||
+                                        null
+                                      : null,
                                   hiddenVisualNodeIds,
                                   visualLayerTreeNodes,
                                   visualPropertyChanges,
@@ -10007,9 +10036,11 @@ ${context.details}
                                     ? visualPanelHoverNodeId
                                     : null,
                                   selectedVisualNodeId:
-                                    selectedVisualNode?.domPath ||
-                                    selectedVisualNode?.nodeId ||
-                                    null,
+                                    visualEditActive
+                                      ? selectedVisualNode?.domPath ||
+                                        selectedVisualNode?.nodeId ||
+                                        null
+                                      : null,
                                   hiddenVisualNodeIds,
                                   visualLayerTreeNodes,
                                   visualPropertyChanges,
@@ -10326,9 +10357,7 @@ ${context.details}
                     <>
                       <Tabs
                         value={effectiveRightPanelTab}
-                        onValueChange={(v) =>
-                          setRightPanelTab(v as "edit" | "config" | "comments")
-                        }
+                        onValueChange={handleRightPanelTabChange}
                         className="flex h-full flex-col"
                       >
                         <TabsList className="w-full justify-start gap-2 rounded-none border-b px-2 h-12 bg-transparent">
@@ -10508,11 +10537,7 @@ ${context.details}
                             referenceContext={pageRequirementsReferenceContext}
                             referenceProvider={markdownReferenceProvider}
                             onReferenceClick={handleMarkdownReferenceClick}
-                            onLaunchWhiteboard={
-                              WHITEBOARD_AUTHORING_ENABLED
-                                ? launchWhiteboard
-                                : undefined
-                            }
+                            onLaunchWhiteboard={launchWhiteboard}
                             hideDetailHeader
                             onEnterPositionEdit={handleEnterPositionEdit}
                             onPositionFieldPathChange={
@@ -10574,9 +10599,7 @@ ${context.details}
                   ) : (
                     <Tabs
                       value={canvasRightPanelTab}
-                      onValueChange={(v) =>
-                        setRightPanelTab(v as "config" | "comments")
-                      }
+                      onValueChange={handleRightPanelTabChange}
                       className="flex h-full flex-col"
                     >
                       <TabsList className="w-full justify-start gap-2 rounded-none border-b px-2 h-12 bg-transparent">
@@ -10706,11 +10729,7 @@ ${context.details}
                             referenceContext={pageRequirementsReferenceContext}
                             referenceProvider={markdownReferenceProvider}
                             onReferenceClick={handleMarkdownReferenceClick}
-                            onLaunchWhiteboard={
-                              WHITEBOARD_AUTHORING_ENABLED
-                                ? launchWhiteboard
-                                : undefined
-                            }
+                            onLaunchWhiteboard={launchWhiteboard}
                             onEnterPositionEdit={handleEnterPositionEdit}
                             onPositionFieldPathChange={
                               handlePositionFieldPathChange

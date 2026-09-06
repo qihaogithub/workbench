@@ -1154,6 +1154,8 @@ describe('PiAgentBackend', () => {
         sha256: 'a'.repeat(64),
         filename: 'test.png',
         sizeBytes: 1024,
+        width: 1280,
+        height: 720,
         mimeType: 'image/png',
         deduplicated: false,
       });
@@ -1177,7 +1179,10 @@ describe('PiAgentBackend', () => {
       expect(promptText).toContain('[图片已自动入库]');
       expect(promptText).toContain('img_abc123');
       expect(promptText).toContain('/api/images/img_abc123');
-      expect(promptText).toContain('readUserImage');
+      expect(promptText).toContain('MIME: image/png');
+      expect(promptText).toContain('dimensions: 1280×720');
+      expect(promptText).toContain('sizeBytes: 1024');
+      expect(promptText).toContain('无需调用 `readUserImage` 或 `listImages`');
       expect(opts.images).toHaveLength(1);
       expect(opts.images[0]).toMatchObject({
         type: 'image',
@@ -1193,6 +1198,8 @@ describe('PiAgentBackend', () => {
         sha256: 'b'.repeat(64),
         filename: 'test.png',
         sizeBytes: 1024,
+        width: 1280,
+        height: 720,
         mimeType: 'image/png',
         deduplicated: false,
       });
@@ -1226,7 +1233,7 @@ describe('PiAgentBackend', () => {
       expect(promptText).toContain('/api/images/img_def456');
       expect(promptText).toContain('【用户问题】');
       expect(promptText).toContain('这个按钮有什么问题？');
-      expect(promptText).not.toContain('readUserImage');
+      expect(promptText).toContain('无需调用 `readUserImage` 或 `listImages`');
     });
   });
 });

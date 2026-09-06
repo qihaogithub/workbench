@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SvgaPlayer, SpinePlayer } from "@preview/sdk";
 
 interface LevelCard {
@@ -42,6 +42,8 @@ interface Module {
   headerImage?: string;
   bgColor?: string;
   innerBgColor?: string;
+  showAd?: boolean;
+  adImage?: string;
 }
 
 interface DemoProps {
@@ -187,9 +189,34 @@ const DEFAULT_CARDS: CollectCardItem[] = [
   { type: "card", obtainedImage: "", unobtainedImage: "", enlargedImage: "" },
 ];
 
+/* 集卡抽奖模块尺寸标注（1 倍像素，来自设计稿） */
+const COLLECT_SIDE = 20; // 内容区左右间距
+const COLLECT_PROGRESS_BLOCK_H = 51; // 进度条区域高度（含上方去抽奖按钮区）
+const COLLECT_INNER_GAP = 16; // 进度条与卡片行间距
+const COLLECT_CARD_H = 100; // 卡片高度固定 100，宽度按卡片数量均分自适应
+const COLLECT_CARD_GAP = 8; // 卡片间距
+const COLLECT_BOTTOM = 20; // 卡片行与背景底部间距
+const COLLECT_MIN_H = 187; // 背景最小高度（最大高度不限）
+
 /* 集卡抽奖模块：背景图 / 卡片列表可配置；卡片数量与进度目标由 cards.length 计算，首张默认已获得 */
 function CollectLotteryModule({ bgImage, cards }: { bgImage?: string; cards?: CollectCardItem[] }) {
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  /* 背景图按 375 宽等比缩放后的自然高度，用于模块高度自适应（最小 187，最大不限） */
+  const [bgHeight, setBgHeight] = useState(0);
+  const bgRef = useRef<HTMLImageElement | null>(null);
+  useEffect(() => {
+    setBgHeight(0);
+    const img = bgRef.current;
+    if (!img) return;
+    const measure = () => {
+      if (img.naturalWidth > 0) setBgHeight(Math.round((img.naturalHeight / img.naturalWidth) * 375));
+    };
+    if (img.complete) measure();
+    else {
+      img.addEventListener("load", measure);
+      return () => img.removeEventListener("load", measure);
+    }
+  }, [bgImage]);
   const cardList = cards && cards.length > 0 ? cards : DEFAULT_CARDS;
   const cardTotal = cardList.length;
   /* 默认状态：第 1 张已获得，其余未获得 */
@@ -204,38 +231,48 @@ function CollectLotteryModule({ bgImage, cards }: { bgImage?: string; cards?: Co
     (previewCard && (previewObtained ? previewCard.obtainedImage : previewCard.unobtainedImage)) ||
     (previewObtained ? FALLBACK_CARDS[0] : FALLBACK_CARDS[1]) ||
     FALLBACK_LARGE;
+  /* 内容自上而下：进度条区域 51 → 间距 16 → 卡片 100 → 底部间距 20（合计最小 187） */
+  const progressTop = 0;
+  const cardsTop = COLLECT_PROGRESS_BLOCK_H + COLLECT_INNER_GAP;
+  const contentHeight = cardsTop + COLLECT_CARD_H + COLLECT_BOTTOM;
+  /* 模块高度不固定：由背景图等比缩放后的高度决定，最小 187、最大不限 */
+  const moduleHeight = Math.max(COLLECT_MIN_H, contentHeight, bgHeight);
+  /* 卡片宽度不固定：在内容区（左右各 20）内按卡片数量均分，高度固定 100 */
+  const cardWidth = `calc((100% - ${COLLECT_CARD_GAP * (cardList.length - 1)}px) / ${cardList.length})`;
   return (
     <div
       style={{
+        alignSelf: "stretch",
         flexShrink: 0,
         position: "relative",
+        height: moduleHeight,
         background: "#DBDBDB",
         overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "flex-start",
-        alignItems: "flex-start",
-        gap: 10,
-        paddingTop: 105,
-        width: "100%",
-        minHeight: 205,
       }}
     >
       {bgImage ? (
         <img
+          ref={bgRef}
           src={bgImage}
           alt="集卡抽奖背景图"
-          style={{ position: "absolute", left: 0, top: 0, width: 375, height: 205, objectFit: "cover" }}
+          onLoad={(e) => {
+            const el = e.currentTarget;
+            if (el.naturalWidth > 0) setBgHeight(Math.round((el.naturalHeight / el.naturalWidth) * 375));
+          }}
+          style={{ position: "absolute", left: 0, top: 0, width: "100%", height: "100%", objectFit: "cover" }}
         />
       ) : null}
+      {/* 卡片行：高度固定 100，宽度按卡片数量在内容区内均分 */}
       <div
         style={{
           position: "absolute",
-          left: 20,
-          top: 105,
+          left: COLLECT_SIDE,
+          top: cardsTop,
+          width: `calc(100% - ${COLLECT_SIDE * 2}px)`,
+          height: COLLECT_CARD_H,
           display: "flex",
-          flexWrap: "wrap",
-          gap: 8,
+          alignItems: "stretch",
+          gap: COLLECT_CARD_GAP,
         }}
       >
         {cardList.map((card, i) => {
@@ -250,8 +287,8 @@ function CollectLotteryModule({ bgImage, cards }: { bgImage?: string; cards?: Co
               type="button"
               onClick={() => setPreviewIndex(i)}
               style={{
-                width: 98,
-                height: 100,
+                width: cardWidth,
+                height: COLLECT_CARD_H,
                 position: "relative",
                 background: obtained ? "#F4F4F4" : "#C5C5C5",
                 outline: `1px solid ${obtained ? "white" : "#B3B3B3"}`,
@@ -270,12 +307,22 @@ function CollectLotteryModule({ bgImage, cards }: { bgImage?: string; cards?: Co
           );
         })}
       </div>
+      {/* 进度条：位于 51 高的进度条区域内垂直居中，左右各留 20，宽度随模块自适应 */}
       <div
         style={{
           position: "absolute",
-          left: 20,
-          top: 68,
-          width: 339,
+          left: COLLECT_SIDE,
+          top: progressTop,
+          width: `calc(100% - ${COLLECT_SIDE * 2}px)`,
+          height: COLLECT_PROGRESS_BLOCK_H,
+          display: "flex",
+          alignItems: "center",
+        }}
+      >
+      <div
+        style={{
+          width: "100%",
+          boxSizing: "border-box",
           padding: "2px 10px",
           background: "white",
           borderRadius: 999,
@@ -313,6 +360,7 @@ function CollectLotteryModule({ bgImage, cards }: { bgImage?: string; cards?: Co
         <div style={{ display: "flex", gap: 4 }}>
           <span style={{ fontSize: 12, fontWeight: 500, color: "#B2B2B2" }}>{cardTotal}</span>
         </div>
+      </div>
       </div>
 
       {/* 卡片放大预览：点击卡片弹出，点击关闭按钮或遮罩收起 */}
@@ -590,14 +638,42 @@ function MyWorks({
   );
 }
 
-/* 优秀作品（内容模块） */
-function ExcellentWorks() {
+/* 优秀作品（内容模块）：模块背景头图 / 背景色 / 模块内背景色 / 广告图开关 + 广告图可配置 */
+const EXCELLENT_HEADER_FALLBACK = "/api/images/img_krgLOxEh4x3XbQ";
+
+/* 优秀作品模块尺寸标注（1 倍像素）：头图 290 / 内容区起点 70 / 作品行 168 / 广告图 166 / 间距 12 / 底部内边距 16 */
+const EXCELLENT_HEADER_H = 290;
+const EXCELLENT_CONTENT_TOP = 70;
+const EXCELLENT_WORKS_H = 168;
+const EXCELLENT_AD_H = 166;
+const EXCELLENT_ROW_GAP = 12;
+const EXCELLENT_BOTTOM_PAD = 16;
+
+function ExcellentWorks({
+  headerImage,
+  bgColor,
+  innerBgColor,
+  showAd = true,
+  adImage,
+}: {
+  headerImage?: string;
+  bgColor?: string;
+  innerBgColor?: string;
+  showAd?: boolean;
+  adImage?: string;
+}) {
+  const header = headerImage || EXCELLENT_HEADER_FALLBACK;
+  /* 广告图开关：关闭（或开启但未配图）时隐藏广告位，容器高度按内容收敛到 16 底边距；
+     头图 250–290 区域原本被广告图覆盖，隐藏后一并裁掉，不会露出多余空白 */
+  const hasAd = showAd && !!adImage;
+  const contentHeight = EXCELLENT_WORKS_H + (hasAd ? EXCELLENT_ROW_GAP + EXCELLENT_AD_H : 0);
+  const containerHeight = EXCELLENT_CONTENT_TOP + contentHeight + EXCELLENT_BOTTOM_PAD;
   return (
     <div
       style={{
         width: "100%",
         padding: "10px 16px",
-        background: "#FFEAA3",
+        background: bgColor || "#FFEAA3",
         display: "flex",
         alignItems: "flex-start",
         gap: 10,
@@ -606,29 +682,31 @@ function ExcellentWorks() {
       <div
         style={{
           width: 343,
-          height: 432,
+          height: containerHeight,
           position: "relative",
-          background: "#FFBA39",
+          background: innerBgColor || "#FFBA39",
           borderRadius: 25,
           overflow: "hidden",
         }}
       >
-        <img
-          src="https://img.onlywnn.cn/figma/h_a7e988c4.png"
-          alt="优秀作品背景图"
-          style={{ position: "absolute", left: 0, top: 0, width: 343, height: 290, objectFit: "cover" }}
-        />
+        {header ? (
+          <img
+            src={header}
+            alt="优秀作品模块背景头图"
+            style={{ position: "absolute", left: 0, top: 0, width: 343, height: EXCELLENT_HEADER_H, objectFit: "cover" }}
+          />
+        ) : null}
         <div
           style={{
             position: "absolute",
             left: 0,
-            top: 70,
+            top: EXCELLENT_CONTENT_TOP,
             width: 343,
             padding: "0 16px",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            gap: 12,
+            gap: EXCELLENT_ROW_GAP,
           }}
         >
           <div style={{ alignSelf: "stretch", display: "flex", alignItems: "flex-end", gap: 8 }}>
@@ -665,11 +743,13 @@ function ExcellentWorks() {
               </div>
             ))}
           </div>
-          <img
-            src="https://img.onlywnn.cn/figma/h_86750433.png"
-            alt="优秀作品广告图"
-            style={{ width: 311, height: 166, objectFit: "cover" }}
-          />
+          {hasAd && (
+            <img
+              src={adImage}
+              alt="优秀作品广告图"
+              style={{ width: 311, height: EXCELLENT_AD_H, objectFit: "cover" }}
+            />
+          )}
         </div>
       </div>
     </div>
@@ -698,12 +778,13 @@ function Ranking({
         gap: 10,
       }}
     >
+      {/* 模块内背景色作用于该整体卡片容器（头图 + 榜单区域） */}
       <div
         style={{
           width: 343,
           height: 751,
           position: "relative",
-          background: "#FFC575",
+          background: innerBgColor || "#FFC575",
           overflow: "hidden",
           borderRadius: 25,
         }}
@@ -722,7 +803,7 @@ function Ranking({
             top: 250,
             width: 311,
             height: 400,
-            background: innerBgColor || "transparent",
+            background: "white",
             borderRadius: 16,
             display: "flex",
             flexDirection: "column",
@@ -886,7 +967,14 @@ const DEFAULT_MODULES: Module[] = [
     bgColor: "#FFEAA3",
     innerBgColor: "#FFBA39",
   },
-  { type: "excellentWorks" },
+  {
+    type: "excellentWorks",
+    headerImage: EXCELLENT_HEADER_FALLBACK,
+    bgColor: "#FFEAA3",
+    innerBgColor: "#FFBA39",
+    showAd: true,
+    adImage: "https://img.onlywnn.cn/figma/h_86750433.png",
+  },
   {
     type: "ranking",
     headerImage: "",
@@ -928,7 +1016,16 @@ function renderModule(m: Module, key: number) {
         />
       );
     case "excellentWorks":
-      return <ExcellentWorks key={key} />;
+      return (
+        <ExcellentWorks
+          key={key}
+          headerImage={m.headerImage}
+          bgColor={m.bgColor}
+          innerBgColor={m.innerBgColor}
+          showAd={m.showAd}
+          adImage={m.adImage}
+        />
+      );
     case "ranking":
       return (
         <Ranking

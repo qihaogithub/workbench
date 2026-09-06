@@ -1,6 +1,6 @@
 {
   "bgm": "",
-  "navColor": "#22B0FE",
+  "navColor": "#858585",
   "modules": [
     {
       "type": "image",
@@ -13,7 +13,7 @@
     },
     {
       "type": "video",
-      "videoBg": "/api/images/img_3UBEhfhSi5SJyg",
+      "videoBg": "/api/images/img_-yw5vuzi_eTWFQ",
       "video": {
         "url": "",
         "poster": ""
@@ -47,11 +47,11 @@
     },
     {
       "type": "level",
-      "bgImage": "/api/images/img_w5sA5XB1OWAJlw",
+      "bgImage": "/api/images/img_cmq3bNWmkqVO4A",
       "levels": [
         {
           "type": "levelCard",
-          "unlockedImage": "https://img.onlywnn.cn/figma/h_e589fc90.png",
+          "unlockedImage": "/api/images/img_Jh9c6sSD3cK8Wg",
           "position": {
             "x": 14,
             "y": 1
@@ -61,7 +61,7 @@
         },
         {
           "type": "levelCard",
-          "lockedImage": "https://img.onlywnn.cn/figma/h_70aef182.png",
+          "lockedImage": "/api/images/img_FPKODKpP8NMfnA",
           "position": {
             "x": 196,
             "y": 147
@@ -71,7 +71,7 @@
         },
         {
           "type": "levelCard",
-          "lockedImage": "https://img.onlywnn.cn/figma/h_61c26d1d.png",
+          "lockedImage": "/api/images/img_B3k2jFpQEzQsrA",
           "position": {
             "x": 40,
             "y": 316
@@ -83,26 +83,31 @@
     },
     {
       "type": "image",
-      "image": "https://img.onlywnn.cn/figma/h_483ae3df.png"
+      "image": "/api/images/img_q7CiGtRWLHaCOQ"
     },
     {
       "type": "button",
-      "image": "https://img.onlywnn.cn/figma/h_4dce23b9.png"
+      "image": "/api/images/img_3tT003vpk4zoNg"
     },
     {
       "type": "myWorks",
-      "headerImage": "/api/images/img_S5_tiyYeuTb0Tw",
-      "bgColor": "#FFEAA3",
-      "innerBgColor": "#FFBA39"
+      "headerImage": "/api/images/img_7zvRquTyYFcSEA",
+      "bgColor": "#E8E8E8",
+      "innerBgColor": "#C0C0C0"
     },
     {
-      "type": "excellentWorks"
+      "type": "excellentWorks",
+      "headerImage": "/api/images/img_LFJXKMmEIDWmSA",
+      "bgColor": "#E8E8E8",
+      "innerBgColor": "#C6C6C6",
+      "adImage": "/api/images/img_F3JVFVS5eksdBg",
+      "showAd": false
     },
     {
       "type": "ranking",
-      "headerImage": "/api/images/img_KXNslf3oT4l_Ow",
-      "bgColor": "#FFEAA3",
-      "innerBgColor": "#FFC575"
+      "headerImage": "/api/images/img_xhEteOVOew2VYQ",
+      "bgColor": "#E8E8E8",
+      "innerBgColor": "#CFCFCF"
     },
     {
       "type": "image",

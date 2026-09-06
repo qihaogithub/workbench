@@ -72,6 +72,37 @@ describe("PrototypePagePreview 文本直接编辑", () => {
     );
   });
 
+  it("关闭视觉编辑后清除选中框、悬停框和标签状态", () => {
+    const { container, rerender } = render(
+      <PrototypePagePreview
+        html="<button>保存</button>"
+        visualEditMode
+        visualHoverNodeId="prototype-root > button:nth-of-type(1)"
+        selectedVisualNodeId="prototype-root > button:nth-of-type(1)"
+      />,
+    );
+
+    const root = getPrototypeRoot(container);
+    const button = root.querySelector("button");
+    if (!button) throw new Error("测试按钮未渲染");
+    expect(button).toHaveAttribute("data-prototype-selected", "true");
+    expect(button).toHaveAttribute("data-prototype-hovered", "true");
+
+    rerender(
+      <PrototypePagePreview
+        html="<button>保存</button>"
+        visualEditMode={false}
+        visualHoverNodeId="prototype-root > button:nth-of-type(1)"
+        selectedVisualNodeId="prototype-root > button:nth-of-type(1)"
+      />,
+    );
+
+    const rerenderedButton = getPrototypeRoot(container).querySelector("button");
+    if (!rerenderedButton) throw new Error("重渲染后的测试按钮未渲染");
+    expect(rerenderedButton).not.toHaveAttribute("data-prototype-selected");
+    expect(rerenderedButton).not.toHaveAttribute("data-prototype-hovered");
+  });
+
   it("内容重建后仍注入可视化编辑专用鼠标", () => {
     const { container, rerender } = render(
       <PrototypePagePreview html="<button>保存</button>" visualEditMode />,

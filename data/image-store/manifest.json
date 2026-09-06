@@ -11759,6 +11759,171 @@
       "projectRefs": [
         "proj_1785135808250_r4cb4a"
       ]
+    },
+    {
+      "id": "img_12WPTaj4YAZvPQ",
+      "sha256": "92acde33dbaf69c3ef9c3cec4cca750de74c12e7214846962c855e9a44233666",
+      "filename": "image_1788662425968_0.png",
+      "mimeType": "image/png",
+      "sizeBytes": 108362,
+      "width": 638,
+      "height": 386,
+      "sourceType": "user_upload",
+      "createdAt": 1788662425971,
+      "createdBy": "ai-agent",
+      "projectRefs": [
+        "proj_1785135808250_r4cb4a"
+      ]
+    },
+    {
+      "id": "img_cmq3bNWmkqVO4A",
+      "sha256": "1f2a4511bc7e04e831ca26128060f79dce592930121dbf955fdbda8b0946f8a6",
+      "filename": "#static 关卡背景图.png",
+      "mimeType": "image/png",
+      "sizeBytes": 252948,
+      "width": 750,
+      "height": 1312,
+      "sourceType": "user_upload",
+      "createdAt": 1788662448595,
+      "createdBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "projectRefs": [
+        "proj_1785135808250_r4cb4a"
+      ]
+    },
+    {
+      "id": "img_Jh9c6sSD3cK8Wg",
+      "sha256": "c025e33f84035d2ff7d0836ca925f31dd260277066d3508844d6b7740c0daa57",
+      "filename": "#static 关卡1.png",
+      "mimeType": "image/png",
+      "sizeBytes": 151007,
+      "width": 495,
+      "height": 552,
+      "sourceType": "user_upload",
+      "createdAt": 1788662482862,
+      "createdBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "projectRefs": [
+        "proj_1785135808250_r4cb4a"
+      ]
+    },
+    {
+      "id": "img_FPKODKpP8NMfnA",
+      "sha256": "5af537feb016076dca33fbda1388d3445e9ca163a63966bf9da14aef40369000",
+      "filename": "#static 关卡2.png",
+      "mimeType": "image/png",
+      "sizeBytes": 149559,
+      "width": 495,
+      "height": 552,
+      "sourceType": "user_upload",
+      "createdAt": 1788662499238,
+      "createdBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "projectRefs": [
+        "proj_1785135808250_r4cb4a"
+      ]
+    },
+    {
+      "id": "img_B3k2jFpQEzQsrA",
+      "sha256": "1d526812f754a144471d4645698e1524c1ed5425262dba421933b0ab9a82887d",
+      "filename": "#static 关卡3.png",
+      "mimeType": "image/png",
+      "sizeBytes": 151355,
+      "width": 513,
+      "height": 585,
+      "sourceType": "user_upload",
+      "createdAt": 1788662510594,
+      "createdBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "projectRefs": [
+        "proj_1785135808250_r4cb4a"
+      ]
+    },
+    {
+      "id": "img_q7CiGtRWLHaCOQ",
+      "sha256": "6f76e6f74d1ea003785e02cabe8cd6522849488395ad03e9eaff03cd78845c0d",
+      "filename": "#static 图片组件.png",
+      "mimeType": "image/png",
+      "sizeBytes": 161122,
+      "width": 750,
+      "height": 692,
+      "sourceType": "user_upload",
+      "createdAt": 1788662542695,
+      "createdBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "projectRefs": [
+        "proj_1785135808250_r4cb4a"
+      ]
+    },
+    {
+      "id": "img_3tT003vpk4zoNg",
+      "sha256": "8635018819e3254faeab881b85481822f4387cca43babb2c763a8a7868d163fb",
+      "filename": "#static 按钮组件.png",
+      "mimeType": "image/png",
+      "sizeBytes": 15571,
+      "width": 750,
+      "height": 194,
+      "sourceType": "user_upload",
+      "createdAt": 1788662557929,
+      "createdBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "projectRefs": [
+        "proj_1785135808250_r4cb4a"
+      ]
+    },
+    {
+      "id": "img_7zvRquTyYFcSEA",
+      "sha256": "59eb48bd13a69969b1c5b271df19fddf70735e96a36119a4391df5bd6bd84c39",
+      "filename": "#static 我的作品背景图.png",
+      "mimeType": "image/png",
+      "sizeBytes": 75791,
+      "width": 686,
+      "height": 452,
+      "sourceType": "user_upload",
+      "createdAt": 1788662582721,
+      "createdBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "projectRefs": [
+        "proj_1785135808250_r4cb4a"
+      ]
+    },
+    {
+      "id": "img_xhEteOVOew2VYQ",
+      "sha256": "fdc168d7d5f8e1f7b74f0c91455b1090108498a1ac5822a98dfedeb551bd98dd",
+      "filename": "#static 排行榜头图.png",
+      "mimeType": "image/png",
+      "sizeBytes": 107642,
+      "width": 686,
+      "height": 580,
+      "sourceType": "user_upload",
+      "createdAt": 1788662678880,
+      "createdBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "projectRefs": [
+        "proj_1785135808250_r4cb4a"
+      ]
+    },
+    {
+      "id": "img_LFJXKMmEIDWmSA",
+      "sha256": "b5bd5e0748d237fc6656b1b2e6ef869eee96078114c6f56899c302dbd0346f48",
+      "filename": "#static 优秀作品背景图.png",
+      "mimeType": "image/png",
+      "sizeBytes": 92652,
+      "width": 686,
+      "height": 580,
+      "sourceType": "user_upload",
+      "createdAt": 1788664028585,
+      "createdBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "projectRefs": [
+        "proj_1785135808250_r4cb4a"
+      ]
+    },
+    {
+      "id": "img_F3JVFVS5eksdBg",
+      "sha256": "4ddf212cd68b2e4e73407107f6355d94ebabc996a23923da1f4f1c59c93c0279",
+      "filename": "#static 优秀作品广告图.png",
+      "mimeType": "image/png",
+      "sizeBytes": 53140,
+      "width": 375,
+      "height": 201,
+      "sourceType": "user_upload",
+      "createdAt": 1788665309043,
+      "createdBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "projectRefs": [
+        "proj_1785135808250_r4cb4a"
+      ]
     }
   ]
 }

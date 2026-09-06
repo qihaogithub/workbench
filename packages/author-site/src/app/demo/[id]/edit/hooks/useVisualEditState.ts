@@ -272,18 +272,62 @@ function resolveVisualDraftActionState(params: {
   };
 }
 
+const VISUAL_RUNTIME_FILES: Record<string, string[]> = {
+  "prototype-html-css": ["prototype.html", "prototype.css", "config.schema.json"],
+  "sandboxed-html": ["sandbox.html", "html-import.meta.json", "config.schema.json"],
+  "high-fidelity-react": ["index.tsx", "config.schema.json"],
+  "sketch-scene": ["sketch.scene.json", "config.schema.json"],
+};
+
+function formatVisualSelectionAttributes(node: VisualNodeInfo): string {
+  const attributes = Object.entries(node.attrs ?? {}).filter(
+    ([, value]) => typeof value === "string" && value.length > 0,
+  );
+  if (attributes.length === 0) return "无";
+  return attributes.map(([key, value]) => `${key}=${JSON.stringify(value)}`).join(", ");
+}
+
+function formatVisualSelectionSourceLocation(node: VisualNodeInfo): string {
+  const lineColumn = node.sourceLine !== undefined
+    ? `第 ${node.sourceLine} 行${node.sourceColumn !== undefined ? `第 ${node.sourceColumn} 列` : ""}`
+    : "";
+  const offsets = node.sourceStart !== undefined
+    ? `sourceStart=${node.sourceStart}${node.sourceEnd !== undefined ? `, sourceEnd=${node.sourceEnd}` : ""}`
+    : "";
+  return [lineColumn, offsets].filter(Boolean).join(", ") || "未提供源码位置";
+}
+
 export function buildVisualSelectionPrompt(
   node: VisualNodeInfo,
   projectId: string,
+  runtimeType?: string,
 ): string {
+  const runtimeFiles = VISUAL_RUNTIME_FILES[runtimeType ?? ""] ?? ["index.tsx", "config.schema.json"];
+  const runtimeFilePaths = runtimeFiles.map((fileName) => `demos/${projectId}/${fileName}`);
+  const sourceFile = node.sourceFile || runtimeFilePaths[0];
+  const sourceFiles = Array.from(new Set([sourceFile, ...runtimeFilePaths]));
+  const rect = node.rect;
+  const binding = node.binding ? `${node.binding.kind}:${node.binding.key}` : "无";
+
   return `当前预览区选中的元素：
 
 【当前选区】
-- 元素：\`<${node.tagName}>\`
+- 页面标识：${projectId}
+- 运行时：${runtimeType || "unknown"}
+- 元素：\`<${node.tagName}>\`${node.componentName && node.componentName !== node.tagName ? `（组件：${node.componentName}）` : ""}
+- 源码文件：${sourceFile}
+- 可关联页面文件：${sourceFiles.join(", ")}
+- 源码位置：${formatVisualSelectionSourceLocation(node)}
 - DOM 路径：${node.domPath}
+- 父级路径：${node.parentPath || "无"}
 - className：${node.className || "无"}
 - 文本：${node.textContent || "无"}
-- 页面文件：demos/${projectId}/index.tsx`;
+- 关键属性：${formatVisualSelectionAttributes(node)}
+- 配置绑定：${binding}
+- 画布矩形：x=${rect.x}, y=${rect.y}, width=${rect.width}, height=${rect.height}
+- 可编辑能力：${node.editCapabilities.join(", ") || "无"}
+
+请优先依据源码文件和源码位置定位实现；DOM 路径仅用于辅助确认。`;
 }
 
 export function getNodeLabel(node: VisualNodeInfo): string {
@@ -1588,10 +1632,11 @@ ${context}
     const prompt = buildVisualSelectionPrompt(
       selectedVisualNode,
       activeDemoIdRef.current,
+      runtimeType,
     );
     setTabValue("ai");
     setTriggerAutoSend(prompt);
-  }, [selectedVisualNode, activeDemoIdRef, setTabValue, setTriggerAutoSend, toast]);
+  }, [activeDemoIdRef, runtimeType, selectedVisualNode, setTabValue, setTriggerAutoSend, toast]);
 
   return {
     // State

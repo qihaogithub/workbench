@@ -83,6 +83,14 @@ describe('buildStaticSystemPrompt', () => {
     expect(prompt).toContain('停止反复比较方案并直接执行');
   });
 
+  it('素材替换与配置冲突时只允许提出一个最小澄清问题', () => {
+    const prompt = buildStaticSystemPrompt();
+    expect(prompt).toContain('素材与配置冲突规则');
+    expect(prompt).toContain('只提出一个最小澄清问题');
+    expect(prompt).toContain('用户确认静态内容后再同步修改配置契约');
+    expect(prompt).toContain('确认动态内容后保留字段并使用不含固定值的素材');
+  });
+
   it('约束新建页面时不得自行添加配置项', () => {
     const prompt = buildStaticSystemPrompt();
     // 创建页面的详细配置约束已移入 page-lifecycle skill，基座保留 Tier 1 配置规则

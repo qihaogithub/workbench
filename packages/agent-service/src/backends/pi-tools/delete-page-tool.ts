@@ -23,6 +23,7 @@ import {
   listPagesFromSnapshotWithDiagnostics,
 } from "./workspace-page-utils";
 import { aiMutationDeniedResult, assertAiMutationAllowed } from "./ai-mutation-policy";
+import { formatAuthorityCommitSummary } from "./authority-result-summary";
 
 const PERMISSION_TIMEOUT_MS = 60_000;
 const DELETION_PLAN_TTL_MS = 5 * 60_000;
@@ -436,7 +437,7 @@ async function deleteOnePage(
       content: [
         {
           type: "text" as const,
-          text: `Deleted page "${existing.name}" (${pageId}).`,
+          text: `Deleted page "${existing.name}" (${pageId}).${formatAuthorityCommitSummary(receipt)}`,
         },
       ],
       details: {
@@ -574,7 +575,7 @@ async function deletePageBatch(
       content: [
         {
           type: "text" as const,
-          text: `Deleted ${deletedPages.length} pages: ${deletedPages.map((page) => `${page.pageName} (${page.pageId})`).join(", ")}.`,
+          text: `Deleted ${deletedPages.length} pages: ${deletedPages.map((page) => `${page.pageName} (${page.pageId})`).join(", ")}.${formatAuthorityCommitSummary(receipt)}`,
         },
       ],
       details: { deleted: true, deletedPages, receipt },

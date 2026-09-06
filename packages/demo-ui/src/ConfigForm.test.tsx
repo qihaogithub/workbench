@@ -509,6 +509,9 @@ describe("ConfigForm configuration-definition entry", () => {
       fieldPath: "gallery",
       listItem: { index: 1, url: "/two.png" },
     });
+    // Every image tile keeps its upload action alongside whiteboard drawing;
+    // the ordinary file field contributes only its upload action.
+    expect(screen.getAllByRole("button", { name: "上传图片" })).toHaveLength(4);
     expect(screen.getAllByRole("button", { name: "白板绘图" })).toHaveLength(3);
     expect(screen.queryAllByRole("button", { name: "AI绘图" })).toHaveLength(0);
   });

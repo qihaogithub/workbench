@@ -25,6 +25,7 @@ import {
   type WorkspaceAuthoritySnapshot,
 } from "../../workspace/workspace-mutation-authority";
 import { aiMutationDeniedResult, assertAiMutationAllowed } from "./ai-mutation-policy";
+import { formatAuthorityCommitSummary } from "./authority-result-summary";
 import { validatePreviewFileWrite } from "./preview-validation";
 import {
   getPageEntryFileName,
@@ -611,7 +612,7 @@ export function createCommitConfigVisibilityDraftTool(config: AgentConfig): Agen
         };
         const receipt = await context.live.authority.mutate(request);
         drafts.delete(draft.id);
-        return success(`配置联动草稿已原子提交，mutationId=${receipt.mutationId}，revision=${receipt.revision}`, {
+        return success(`配置联动草稿已原子提交，mutationId=${receipt.mutationId}，revision=${receipt.revision}${formatAuthorityCommitSummary(receipt)}`, {
           success: true,
           status: "committed",
           receipt,

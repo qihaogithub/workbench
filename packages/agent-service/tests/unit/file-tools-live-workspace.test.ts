@@ -138,6 +138,9 @@ describe("live Workspace file tools", () => {
     expect(written.details).toMatchObject({
       receipt: { committed: true, revision: 2, baseRevision: 1 },
     });
+    expect(written.content[0].text).toContain(
+      "Authority committed: revision=2; runtimeValidation=ok; previewProjection=not_verified.",
+    );
     expect(edited.isError).toBeFalsy();
     expect(edited.details).toMatchObject({
       receipt: { committed: true, revision: 3, baseRevision: 2 },

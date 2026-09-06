@@ -944,7 +944,7 @@ export const visualEditScript = `
 
   function redrawSelection() {
     ensureLayer();
-    if (!state.selectedNodeId) {
+    if (!state.enabled || !state.selectedNodeId) {
       if (selectedBox) selectedBox.style.display = 'none';
       updateLabel();
       return;
@@ -994,6 +994,11 @@ export const visualEditScript = `
 
   function redrawHoverFromState() {
     ensureLayer();
+    if (!state.enabled) {
+      if (hoverBox) hoverBox.style.display = 'none';
+      updateLabel();
+      return;
+    }
     var hoverNodeId = state.hoverNodeId || lastHoverId;
     if (!hoverNodeId) {
       if (hoverBox) hoverBox.style.display = 'none';

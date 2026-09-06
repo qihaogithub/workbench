@@ -680,15 +680,17 @@ export function PrototypePagePreview({
     });
     const root = shadow.querySelector<HTMLElement>(".prototype-root");
     if (!root) return;
-    const selected = getElementByVisualId(root, selectedVisualNodeId) || queryByDomPath(root, selectedVisualNodeId);
-    selected?.setAttribute("data-prototype-selected", "true");
-    const hovered = getElementByVisualId(root, visualHoverNodeId) || queryByDomPath(root, visualHoverNodeId);
-    hovered?.setAttribute("data-prototype-hovered", "true");
+    if (visualEditMode) {
+      const selected = getElementByVisualId(root, selectedVisualNodeId) || queryByDomPath(root, selectedVisualNodeId);
+      selected?.setAttribute("data-prototype-selected", "true");
+      const hovered = getElementByVisualId(root, visualHoverNodeId) || queryByDomPath(root, visualHoverNodeId);
+      hovered?.setAttribute("data-prototype-hovered", "true");
+    }
     const host = hostRef.current;
     if (host) {
       updateSelectedLabel(shadow, host, resolveLabelElement(shadow));
     }
-  }, [selectedVisualNodeId, visualHoverNodeId]);
+  }, [selectedVisualNodeId, visualEditMode, visualHoverNodeId]);
 
   useEffect(() => {
     const shadow = shadowRef.current;

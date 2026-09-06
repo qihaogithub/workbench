@@ -607,7 +607,7 @@ describe("PreviewPanel", () => {
       }),
     );
 
-    render(
+    const { rerender } = render(
       <PreviewPanel
         code={mockCode}
         configData={{ title: "Test" }}
@@ -652,6 +652,46 @@ describe("PreviewPanel", () => {
           enabled: true,
           hoverNodeId: "main>h1:nth-of-type(1)",
           selectedNodeId: "main>h1:nth-of-type(1)",
+          propertyChanges: expect.arrayContaining([
+            expect.objectContaining({
+              property: "color",
+              value: "#ff0000",
+            }),
+          ]),
+        }),
+        "*",
+      );
+    });
+
+    rerender(
+      <PreviewPanel
+        code={mockCode}
+        configData={{ title: "Test" }}
+        visualEditMode={false}
+        visualHoverNodeId="main>h1:nth-of-type(1)"
+        selectedVisualNodeId="main>h1:nth-of-type(1)"
+        visualPropertyChanges={[
+          {
+            id: "change-1",
+            nodeId: "main>h1:nth-of-type(1)",
+            domPath: "main>h1:nth-of-type(1)",
+            kind: "style",
+            property: "color",
+            label: "颜色",
+            value: "#ff0000",
+            previousValue: "rgb(0, 0, 0)",
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(postMessage).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          type: "UPDATE_VISUAL_EDIT_STATE",
+          enabled: false,
+          hoverNodeId: null,
+          selectedNodeId: null,
           propertyChanges: expect.arrayContaining([
             expect.objectContaining({
               property: "color",

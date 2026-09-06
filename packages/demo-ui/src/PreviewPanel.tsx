@@ -396,8 +396,8 @@ function PreviewPanelInternal({
   const visualEditStateRef = useRef({
     enabled: visualEditMode,
     annotationMode: visualAnnotationMode,
-    hoverNodeId: visualHoverNodeId ?? null,
-    selectedNodeId: selectedVisualNodeId ?? null,
+    hoverNodeId: visualEditMode ? (visualHoverNodeId ?? null) : null,
+    selectedNodeId: visualEditMode ? (selectedVisualNodeId ?? null) : null,
     hiddenNodeIds: hiddenVisualNodeIds,
     propertyChanges: visualPropertyChanges,
     annotations: visualAnnotations,
@@ -405,8 +405,8 @@ function PreviewPanelInternal({
   visualEditStateRef.current = {
     enabled: visualEditMode,
     annotationMode: visualAnnotationMode,
-    hoverNodeId: visualHoverNodeId ?? null,
-    selectedNodeId: selectedVisualNodeId ?? null,
+    hoverNodeId: visualEditMode ? (visualHoverNodeId ?? null) : null,
+    selectedNodeId: visualEditMode ? (selectedVisualNodeId ?? null) : null,
     hiddenNodeIds: hiddenVisualNodeIds,
     propertyChanges: visualPropertyChanges,
     annotations: visualAnnotations,

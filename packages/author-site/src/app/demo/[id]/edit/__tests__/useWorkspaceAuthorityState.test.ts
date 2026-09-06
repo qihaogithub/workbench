@@ -238,6 +238,55 @@ describe("useWorkspaceAuthorityState", () => {
     expect(mockAckPreview).toHaveBeenCalledTimes(1);
   });
 
+  it("投影 ack 使用独立 revision 游标并发布给对话摘要回流", async () => {
+    const projectionAck = {
+      projectId: "proj-1",
+      workspaceId: "ws-1",
+      revision: 5,
+      clientId: "client-1",
+      surface: "active-preview" as const,
+      status: "applied" as const,
+      acknowledgedAt: Date.now(),
+    };
+    const listener = jest.fn();
+    window.addEventListener("workspace-projection-acknowledged", listener);
+    mockReadAcks.mockResolvedValueOnce([projectionAck]);
+
+    try {
+      const { result } = renderHook(() => useWorkspaceAuthorityState(BASE_OPTIONS));
+
+      await act(async () => {
+        jest.advanceTimersByTime(0);
+      });
+      await waitFor(() => {
+        expect(result.current.committedRevision).toBe(5);
+      });
+
+      await act(async () => {
+        jest.advanceTimersByTime(1000);
+      });
+
+      await waitFor(() => {
+        expect(result.current.previewAppliedRevision).toBe(5);
+      });
+      expect(mockReadAcks).toHaveBeenCalledWith(
+        expect.objectContaining({ afterRevision: 0 }),
+      );
+      expect(listener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          detail: expect.objectContaining({
+            projectId: "proj-1",
+            workspaceId: "ws-1",
+            sessionId: "sess-1",
+            ack: projectionAck,
+          }),
+        }),
+      );
+    } finally {
+      window.removeEventListener("workspace-projection-acknowledged", listener);
+    }
+  });
+
   it("setCanonicalStatus 应更新 canonical 状态", async () => {
     const { result } = renderHook(() => useWorkspaceAuthorityState(BASE_OPTIONS));
 

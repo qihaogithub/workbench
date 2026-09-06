@@ -26,6 +26,7 @@ import {
 import { aiMutationDeniedResult, assertAiMutationAllowed } from "./ai-mutation-policy";
 import { validatePreviewFileWrite } from "./preview-validation";
 import { validateConfigSchemaContract } from "./schema-contract-validation";
+import { formatAuthorityCommitSummary } from "./authority-result-summary";
 
 const MAX_PAGE_ID_LENGTH = 96;
 const MAX_PAGE_NAME_LENGTH = 120;
@@ -326,7 +327,7 @@ export function createCreatePageTool(config: AgentConfig): AgentTool<typeof Crea
 
         const createdPage = nextTree.pages.find((page) => page.id === args.pageId)!;
         return {
-          content: [{ type: "text", text: `Created page \"${createdPage.name}\" (${createdPage.id}) as ${createdPage.runtimeType}.` }],
+          content: [{ type: "text", text: `Created page \"${createdPage.name}\" (${createdPage.id}) as ${createdPage.runtimeType}.${formatAuthorityCommitSummary(receipt)}` }],
           details: { createdPage, receipt },
         };
       } catch (error) {

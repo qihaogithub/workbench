@@ -1,5 +1,8 @@
 import { act, renderHook } from "@testing-library/react";
-import { useVisualEditState } from "../hooks/useVisualEditState";
+import {
+  buildVisualSelectionPrompt,
+  useVisualEditState,
+} from "../hooks/useVisualEditState";
 import type { VisualNodeInfo } from "@workbench/demo-ui";
 
 const mockToast = jest.fn();
@@ -25,6 +28,56 @@ function createNode(overrides: Partial<VisualNodeInfo> = {}): VisualNodeInfo {
     ...overrides,
   };
 }
+
+describe("buildVisualSelectionPrompt", () => {
+  it("应优先提供组件源码定位、关键属性和编辑能力", () => {
+    const prompt = buildVisualSelectionPrompt(
+      createNode({
+        componentName: "HeroTitle",
+        parentPath: "main > section.hero",
+        sourceFile: "demos/home/index.tsx",
+        sourceStart: 420,
+        sourceEnd: 468,
+        sourceLine: 18,
+        sourceColumn: 7,
+        attrs: {
+          role: "heading",
+          ariaLabel: "活动标题",
+        },
+      }),
+      "home",
+      "high-fidelity-react",
+    );
+
+    expect(prompt).toContain("页面标识：home");
+    expect(prompt).toContain("组件：HeroTitle");
+    expect(prompt).toContain("源码文件：demos/home/index.tsx");
+    expect(prompt).toContain("第 18 行第 7 列");
+    expect(prompt).toContain("sourceStart=420, sourceEnd=468");
+    expect(prompt).toContain("父级路径：main > section.hero");
+    expect(prompt).toContain('role="heading"');
+    expect(prompt).toContain("可编辑能力：text, style");
+  });
+
+  it("HTML/CSS 原型选区不得默认指向 index.tsx", () => {
+    const prompt = buildVisualSelectionPrompt(
+      createNode({
+        tagName: "img",
+        domPath: "main > img",
+        attrs: { src: "/hero.png", alt: "活动主视觉" },
+        editCapabilities: ["image", "style"],
+      }),
+      "home",
+      "prototype-html-css",
+    );
+
+    expect(prompt).toContain("demos/home/prototype.html");
+    expect(prompt).toContain("demos/home/prototype.css");
+    expect(prompt).toContain('src="/hero.png"');
+    expect(prompt).toContain('alt="活动主视觉"');
+    expect(prompt).not.toContain("index.tsx");
+  });
+});
 
 function renderVisualEditState(
   overrides: Partial<Parameters<typeof useVisualEditState>[0]> = {},
@@ -101,6 +154,26 @@ describe("useVisualEditState 智能属性写回", () => {
       textContent: "更新后的标题",
       computedStyle: { color: "rgb(220, 38, 38)" },
     });
+  });
+
+  it("清空视觉选区时同时清理图层栈和悬停态", () => {
+    const view = renderVisualEditState();
+    const node = createNode();
+
+    act(() => {
+      view.result.current.handleVisualSelect(node, [node]);
+      view.result.current.setVisualPanelHoverNodeId(node.domPath);
+    });
+    expect(view.result.current.visualNodeStack).toHaveLength(1);
+    expect(view.result.current.visualPanelHoverNodeId).toBe(node.domPath);
+
+    act(() => {
+      view.result.current.handleVisualSelect(null, []);
+    });
+
+    expect(view.result.current.selectedVisualNode).toBeNull();
+    expect(view.result.current.visualNodeStack).toEqual([]);
+    expect(view.result.current.visualPanelHoverNodeId).toBeNull();
   });
 
   it("原型页页面级文本配置项可直接写回，不触发 AI", () => {
