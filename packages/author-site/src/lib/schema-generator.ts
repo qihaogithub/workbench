@@ -4,7 +4,7 @@
  */
 
 export interface SchemaProperty {
-  type: string;
+  type: string | string[];
   title?: string;
   default?: unknown;
   enum?: unknown[];
@@ -137,6 +137,16 @@ function extractDestructuredProps(code: string): ParsedProperty[] | null {
 function mapTypeToSchema(tsType: string): Omit<SchemaProperty, 'title'> {
   const cleanType = tsType.trim();
 
+  // Preserve nullable TypeScript unions as JSON Schema nullable types. The
+  // persisted schema is the agent-facing contract, so null must remain
+  // explicit instead of being hidden in a UI-only option.
+  const unionTypes = cleanType.split('|').map((item) => item.trim()).filter(Boolean);
+  if (unionTypes.includes('null') && unionTypes.length > 1) {
+    const nonNullType = unionTypes.filter((item) => item !== 'null').join(' | ');
+    const mapped = mapTypeToSchema(nonNullType);
+    return { ...mapped, type: Array.isArray(mapped.type) ? mapped.type : [mapped.type, 'null'] };
+  }
+
   // boolean
   if (cleanType === 'boolean') {
     return { type: 'boolean' };
@@ -183,7 +193,9 @@ function mapTypeToSchema(tsType: string): Omit<SchemaProperty, 'title'> {
  * 为类型生成合理的默认值
  */
 function getDefaultForType(prop: Omit<SchemaProperty, 'title'>): unknown {
-  switch (prop.type) {
+  const type = Array.isArray(prop.type) ? prop.type.find((item) => item !== 'null') : prop.type;
+  if (Array.isArray(prop.type) && prop.type.includes('null')) return null;
+  switch (type) {
     case 'boolean':
       return false;
     case 'number':
@@ -247,19 +259,20 @@ export function generateSchemaFromCode(code: string): GeneratedSchema | null {
 /**
  * 解析代码中的默认值字符串为实际值
  */
-function parseDefaultValue(value: string, type: string): unknown {
+function parseDefaultValue(value: string, type: string | string[]): unknown {
   const trimmed = value.trim();
+  const primaryType = Array.isArray(type) ? type.find((item) => item !== 'null') ?? 'string' : type;
 
-  if (type === 'boolean') {
+  if (primaryType === 'boolean') {
     return trimmed === 'true';
   }
 
-  if (type === 'number') {
+  if (primaryType === 'number') {
     const num = parseFloat(trimmed);
     return isNaN(num) ? 0 : num;
   }
 
-  if (type === 'array') {
+  if (primaryType === 'array') {
     try {
       // 尝试解析数组字面量
       return JSON.parse(trimmed.replace(/'/g, '"'));
@@ -295,7 +308,7 @@ export function mergeWithExistingSchema(
       if (!existingProp) continue;
 
       // 保留现有配置中的扩展字段
-      const keepFields = ['default', 'description', 'format', 'ui:widget', 'enumNames', 'minimum', 'maximum', 'maxLength'];
+      const keepFields = ['type', 'default', 'description', 'format', 'ui:widget', 'ui:options', 'enumNames', 'minimum', 'maximum', 'maxLength'];
       const existingPropRecord = existingProp as unknown as Record<string, unknown>;
       const propRecord = prop as unknown as Record<string, unknown>;
       for (const field of keepFields) {

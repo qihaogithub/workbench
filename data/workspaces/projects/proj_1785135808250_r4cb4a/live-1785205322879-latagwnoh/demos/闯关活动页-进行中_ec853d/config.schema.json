@@ -35,6 +35,7 @@
                 "type": "string",
                 "format": "image",
                 "title": "图片",
+                "description": "宽 375px（导出 2 倍图），高度自适应",
                 "accept": "image/png,image/gif"
               }
             },
@@ -145,33 +146,63 @@
                 "format": "image",
                 "title": "集卡背景图",
                 "description": "仅支持 png，宽 375px，高 205px，导出 2 倍图",
-                "accept": "image/png"
+                "accept": "image/png",
+                "default": ""
               },
-              "total": {
-                "type": "number",
-                "title": "卡片总数",
-                "description": "进度条右侧目标值，同时决定卡片展示个数",
-                "default": 4
-              },
-              "collected": {
-                "type": "number",
-                "title": "已收集数量",
-                "description": "进度条左侧数值与已获得卡片个数",
-                "default": 1
-              },
-              "obtainedImage": {
-                "type": "string",
-                "format": "image",
-                "title": "已获得卡片图",
-                "description": "单张卡片尺寸 98x100（1 倍），不配置时展示占位样式",
-                "accept": "image/png,image/jpeg"
-              },
-              "unobtainedImage": {
-                "type": "string",
-                "format": "image",
-                "title": "未获得卡片图",
-                "description": "单张卡片尺寸 98x100（1 倍），不配置时展示占位样式",
-                "accept": "image/png,image/jpeg"
+              "cards": {
+                "type": "array",
+                "title": "卡片列表",
+                "description": "列表项数量即卡片总数，同时作为进度条目标值；每张卡片配置已获得/未获得/放大后三张图",
+                "items": {
+                  "type": "object",
+                  "title": "卡片",
+                  "properties": {
+                    "obtainedImage": {
+                      "type": "string",
+                      "format": "image",
+                      "title": "已获得卡片图",
+                      "description": "单张卡片尺寸 98x100（1 倍），不配置时使用默认素材",
+                      "accept": "image/png,image/jpeg"
+                    },
+                    "unobtainedImage": {
+                      "type": "string",
+                      "format": "image",
+                      "title": "未获得卡片图",
+                      "description": "单张卡片尺寸 98x100（1 倍），不配置时使用默认素材",
+                      "accept": "image/png,image/jpeg"
+                    },
+                    "enlargedImage": {
+                      "type": "string",
+                      "format": "image",
+                      "title": "放大后的卡片图",
+                      "description": "点击卡片弹出预览时展示的大图，不配置时回退使用当前卡片图",
+                      "accept": "image/png,image/jpeg"
+                    }
+                  },
+                  "required": []
+                },
+                "default": [
+                  {
+                    "obtainedImage": "",
+                    "unobtainedImage": "",
+                    "enlargedImage": ""
+                  },
+                  {
+                    "obtainedImage": "",
+                    "unobtainedImage": "",
+                    "enlargedImage": ""
+                  },
+                  {
+                    "obtainedImage": "",
+                    "unobtainedImage": "",
+                    "enlargedImage": ""
+                  },
+                  {
+                    "obtainedImage": "",
+                    "unobtainedImage": "",
+                    "enlargedImage": ""
+                  }
+                ]
               }
             },
             "required": [
@@ -239,62 +270,62 @@
                         "type": {
                           "const": "levelCard"
                         },
-                    "lockedImage": {
-                      "type": "string",
-                      "format": "image",
-                      "title": "未解锁图",
-                      "accept": "image/png,image/jpeg"
-                    },
-                    "unlockedImage": {
-                      "type": "string",
-                      "format": "image",
-                      "title": "已解锁图",
-                      "accept": "image/png,image/jpeg"
-                    },
-                    "completedImage": {
-                      "type": "string",
-                      "format": "image",
-                      "title": "已完成图",
-                      "accept": "image/png,image/jpeg"
-                    },
-                    "animation": {
-                      "type": "string",
-                      "format": "file",
-                      "title": "SVGA 动效",
-                      "description": "动效格式 svga，循环播放，配置后优先于静态图",
-                      "ui:options": {
-                        "accept": ".svga"
-                      }
-                    },
-                    "position": {
-                      "type": "position",
-                      "key": "levelCard",
-                      "title": "自由坐标",
-                      "description": "在预览区内拖拽定位关卡图（1 倍像素，相对背景图）",
-                      "size": {
-                        "width": 375,
-                        "height": 656
+                        "lockedImage": {
+                          "type": "string",
+                          "format": "image",
+                          "title": "未解锁图",
+                          "accept": "image/png,image/jpeg"
+                        },
+                        "unlockedImage": {
+                          "type": "string",
+                          "format": "image",
+                          "title": "已解锁图",
+                          "accept": "image/png,image/jpeg"
+                        },
+                        "completedImage": {
+                          "type": "string",
+                          "format": "image",
+                          "title": "已完成图",
+                          "accept": "image/png,image/jpeg"
+                        },
+                        "animation": {
+                          "type": "string",
+                          "format": "file",
+                          "title": "SVGA 动效",
+                          "description": "动效格式 svga，循环播放，配置后优先于静态图",
+                          "ui:options": {
+                            "accept": ".svga"
+                          }
+                        },
+                        "position": {
+                          "type": "position",
+                          "key": "levelCard",
+                          "title": "自由坐标",
+                          "description": "在预览区内拖拽定位关卡图（1 倍像素，相对背景图）",
+                          "size": {
+                            "width": 375,
+                            "height": 656
+                          },
+                          "default": {
+                            "x": 14,
+                            "y": 1
+                          }
+                        },
+                        "w": {
+                          "type": "number",
+                          "title": "W"
+                        },
+                        "h": {
+                          "type": "number",
+                          "title": "H"
+                        }
                       },
-                      "default": {
-                        "x": 14,
-                        "y": 1
-                      }
-                    },
-                    "w": {
-                      "type": "number",
-                      "title": "W"
-                    },
-                    "h": {
-                      "type": "number",
-                      "title": "H"
+                      "required": [
+                        "type"
+                      ]
                     }
-                  },
-                  "required": [
-                    "type"
                   ]
                 }
-                ]
-              }
               }
             },
             "required": [
@@ -365,6 +396,34 @@
             "properties": {
               "type": {
                 "const": "ranking"
+              },
+              "headerImage": {
+                "type": "string",
+                "format": "image",
+                "title": "模块背景头图",
+                "description": "仅支持 png，宽 686px、高 580px（2 倍图，展示 343x290），不配置时展示占位样式",
+                "accept": "image/png",
+                "default": "",
+                "ui:options": {
+                  "minWidth": 686,
+                  "minHeight": 580,
+                  "maxWidth": 686,
+                  "maxHeight": 580
+                }
+              },
+              "bgColor": {
+                "type": "string",
+                "format": "color",
+                "title": "背景色",
+                "description": "排行榜模块外层背景色，默认透明",
+                "default": ""
+              },
+              "innerBgColor": {
+                "type": "string",
+                "format": "color",
+                "title": "模块内背景色",
+                "description": "头图下方卡片区域背景色，默认透明",
+                "default": ""
               }
             },
             "required": [
@@ -385,7 +444,7 @@
         },
         {
           "type": "video",
-          "videoBg": "",
+          "videoBg": "/api/images/img_acUvRRxLj6lEkQ",
           "video": {
             "url": "",
             "poster": ""
@@ -393,15 +452,33 @@
         },
         {
           "type": "collectCard",
-          "bgImage": "",
-          "total": 4,
-          "collected": 1,
-          "obtainedImage": "",
-          "unobtainedImage": ""
+          "bgImage": "/api/images/img_oKRzq14hWPO4zg",
+          "cards": [
+            {
+              "obtainedImage": "",
+              "unobtainedImage": "",
+              "enlargedImage": ""
+            },
+            {
+              "obtainedImage": "",
+              "unobtainedImage": "",
+              "enlargedImage": ""
+            },
+            {
+              "obtainedImage": "",
+              "unobtainedImage": "",
+              "enlargedImage": ""
+            },
+            {
+              "obtainedImage": "",
+              "unobtainedImage": "",
+              "enlargedImage": ""
+            }
+          ]
         },
         {
           "type": "level",
-          "bgImage": "https://img.onlywnn.cn/figma/h_6e2a6768.png",
+          "bgImage": "/api/images/img_w5sA5XB1OWAJlw",
           "levels": [
             {
               "type": "levelCard",
@@ -453,7 +530,14 @@
           "type": "excellentWorks"
         },
         {
-          "type": "ranking"
+          "type": "ranking",
+          "headerImage": "/api/images/img_KXNslf3oT4l_Ow",
+          "bgColor": "#FFEAA3",
+          "innerBgColor": "#FFC575"
+        },
+        {
+          "type": "image",
+          "image": "https://img.onlywnn.cn/figma/h_e0d1c962.png"
         }
       ]
     }

@@ -125,6 +125,16 @@ describe("proxy authentication and CORS contract", () => {
     expect(response.headers.get("location")).toBe("http://localhost/workbench");
   });
 
+  it("allows an authenticated brand click to render the public homepage", async () => {
+    verifyToken.mockResolvedValue({ userId: "u1", username: "alice" });
+
+    const response = await proxy(
+      request("/?from=brand", { cookie: "auth_token=valid" }),
+    );
+
+    expect(response.status).toBe(200);
+  });
+
   it("keeps the public manual available without authentication", async () => {
     const response = await proxy(request("/manual/quick-start"));
 

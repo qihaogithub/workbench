@@ -68,6 +68,44 @@ describe("runtime-config", () => {
     expect(getBrowserAgentServiceUrl()).toBe("http://custom:9999");
   });
 
+  it("开发环境未配置时自动推导本地 agent-service 端口", () => {
+    process.env = { ...process.env, NODE_ENV: "development" };
+
+    expect(getBrowserAgentServiceUrl()).toBe("http://localhost:4201");
+  });
+
+  it("Docker 页面使用同主机 3201，避免被开发覆盖变量带到 4201", () => {
+    process.env = {
+      ...process.env,
+      NODE_ENV: "development",
+      NEXT_PUBLIC_AGENT_SERVICE_URL: "http://localhost:4201",
+    };
+
+    expect(
+      getBrowserAgentServiceUrl({
+        hostname: "localhost",
+        port: "3200",
+        protocol: "http:",
+      }),
+    ).toBe("http://localhost:3201");
+  });
+
+  it("Docker 页面保留显式配置的非标准本地代理端口", () => {
+    process.env = {
+      ...process.env,
+      NODE_ENV: "development",
+      NEXT_PUBLIC_AGENT_SERVICE_URL: "http://localhost:9999",
+    };
+
+    expect(
+      getBrowserAgentServiceUrl({
+        hostname: "localhost",
+        port: "3200",
+        protocol: "http:",
+      }),
+    ).toBe("http://localhost:9999");
+  });
+
   it("开发环境缺省使用 dev internal token，生产环境缺省为空", () => {
     process.env = { ...process.env, NODE_ENV: "development" };
     expect(getInternalApiToken()).toBe("dev-internal-token");

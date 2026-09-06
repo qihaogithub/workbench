@@ -68,15 +68,17 @@ export interface PublishedDesignSpecMeta {
   updatedAt: string;
 }
 
+export interface PublishedDesignSpecEntry {
+  id: string;
+  title: string;
+  markdown: string;
+  target:
+    | { type: "page"; pageIds: string[] }
+    | { type: "config"; refs: Array<{ scope: "project" | "page"; pageId?: string; fieldKey: string }> };
+}
+
 export interface PublishedDesignSpecDoc extends PublishedDesignSpecMeta {
-  entries: Array<{
-    id: string;
-    title: string;
-    markdown: string;
-    target:
-      | { type: "page"; pageIds: string[] }
-      | { type: "config"; refs: Array<{ scope: "project" | "page"; pageId?: string; fieldKey: string }> };
-  }>;
+  entries: PublishedDesignSpecEntry[];
 }
 
 export interface PublishedProject {
@@ -226,9 +228,80 @@ export async function getDesignSpecDoc(
   projectId: string,
   docId: string,
 ): Promise<PublishedDesignSpecDoc> {
-  return fetchJson<PublishedDesignSpecDoc>(
+  const raw = await fetchJson<unknown>(
     `/data/${projectId}/design-spec/spec-${encodeURIComponent(docId)}.json`,
   );
+  return normalizePublishedDesignSpecDoc(raw);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizePublishedRefs(
+  value: unknown,
+): Array<{ scope: "project" | "page"; pageId?: string; fieldKey: string }> {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  return value.flatMap((candidate) => {
+    if (!isRecord(candidate)) return [];
+    const scope = candidate.scope;
+    const fieldKey = candidate.fieldKey;
+    if ((scope !== "project" && scope !== "page") || typeof fieldKey !== "string" || !fieldKey) return [];
+    const pageId = typeof candidate.pageId === "string" && candidate.pageId ? candidate.pageId : undefined;
+    const normalized = { scope, ...(scope === "page" && pageId ? { pageId } : {}), fieldKey } as {
+      scope: "project" | "page";
+      pageId?: string;
+      fieldKey: string;
+    };
+    const key = `${normalized.scope}:${normalized.pageId ?? ""}:${normalized.fieldKey}`;
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [normalized];
+  });
+}
+
+function normalizePublishedPageIds(value: unknown): string[] {
+  return Array.isArray(value)
+    ? Array.from(new Set(value.filter((id): id is string => typeof id === "string" && id.length > 0)))
+    : [];
+}
+
+/**
+ * Normalize the published DesignSpec payload at the data boundary.
+ * Older immutable publications used a top-level `refs` field; the viewer
+ * consumes the current mutually-exclusive `target` shape.
+ */
+export function normalizePublishedDesignSpecDoc(value: unknown): PublishedDesignSpecDoc {
+  if (!isRecord(value) || typeof value.id !== "string" || !Array.isArray(value.entries)) {
+    throw new Error("设计规范文档格式无效");
+  }
+
+  const fallbackPageId = typeof value.autoManagedPageId === "string" ? value.autoManagedPageId : undefined;
+  return {
+    id: value.id,
+    title: typeof value.title === "string" ? value.title : "",
+    createdAt: typeof value.createdAt === "string" ? value.createdAt : "",
+    updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : "",
+    entries: value.entries.map((candidate, index) => {
+      const entry = isRecord(candidate) ? candidate : {};
+      const targetValue = isRecord(entry.target) ? entry.target : undefined;
+      const legacyRefs = normalizePublishedRefs(entry.refs);
+      const target: PublishedDesignSpecEntry["target"] = targetValue?.type === "config"
+        ? { type: "config", refs: normalizePublishedRefs(targetValue.refs) }
+        : targetValue?.type === "page"
+          ? { type: "page", pageIds: normalizePublishedPageIds(targetValue.pageIds) }
+          : legacyRefs.length > 0
+            ? { type: "config", refs: legacyRefs }
+            : { type: "page", pageIds: fallbackPageId ? [fallbackPageId] : [] };
+      return {
+        id: typeof entry.id === "string" && entry.id ? entry.id : `published-entry-${index}`,
+        title: typeof entry.title === "string" ? entry.title : "",
+        markdown: typeof entry.markdown === "string" ? entry.markdown : "",
+        target,
+      };
+    }),
+  };
 }
 
 export function getDataUrl(path: string): string {

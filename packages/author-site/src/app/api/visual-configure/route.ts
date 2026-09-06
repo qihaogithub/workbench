@@ -129,7 +129,7 @@ function isVisualConfigTarget(value: unknown): value is VisualConfigTarget {
       target.kind === "color") &&
     typeof target.fieldKey === "string" &&
     typeof target.title === "string" &&
-    typeof target.defaultValue === "string" &&
+    (typeof target.defaultValue === "string" || target.defaultValue === null) &&
     (target.category === undefined || typeof target.category === "string")
   );
 }

@@ -16,6 +16,7 @@ import { addProjectImage, type ProjectImage } from "@/lib/project-images";
 import { getFileExtension, hasAllowedAssetExtension, isAllowedAssetFile, isSpinePackageFilename, MAX_AUDIO_SIZE, MAX_VIDEO_SIZE } from "./asset-validation";
 import { prepareSpineAsset } from "./spine-assets";
 import type { WorkspaceMutationOperation } from "@workbench/shared/contracts";
+import { isValidWorkspacePathSegment } from "@workbench/shared/workspace-path";
 import { isLiveWorkspacePath } from "@/lib/live-workspace-route-context";
 import { commitWorkspaceMutation, reconcileWorkspaceAuthority, stageWorkspaceBinary, WorkspaceAuthorityClientError } from "@/lib/workspace-authority-client";
 
@@ -192,7 +193,7 @@ export async function POST(
         const configScope = formData.get("configScope");
         const configPath = configScope === "project"
           ? "project.config.values.json"
-          : configScope === "page" && typeof pageId === "string" && /^[A-Za-z0-9_-]+$/.test(pageId)
+          : configScope === "page" && typeof pageId === "string" && isValidWorkspacePathSegment(pageId)
             ? `demos/${pageId}/config.values.json`
             : null;
         if (configPath) {

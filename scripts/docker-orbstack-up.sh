@@ -69,11 +69,13 @@ SERVER_IP_FROM_ENV="$(grep -E '^SERVER_IP=' "${ENV_FILE}" 2>/dev/null | cut -d= 
 if [ -n "${SERVER_IP_FROM_ENV}" ]; then
   export NEXT_PUBLIC_SCREENSHOT_SERVICE_URL="${NEXT_PUBLIC_SCREENSHOT_SERVICE_URL:-http://${SERVER_IP_FROM_ENV}:3202}"
   export NEXT_PUBLIC_WEB_URL="${NEXT_PUBLIC_WEB_URL:-http://${SERVER_IP_FROM_ENV}:3200}"
+  export NEXT_PUBLIC_AUTHOR_SITE_URL="${NEXT_PUBLIC_AUTHOR_SITE_URL:-http://${SERVER_IP_FROM_ENV}:3200}"
   export CORS_ORIGINS="${CORS_ORIGINS:-http://${SERVER_IP_FROM_ENV}:3200,http://${SERVER_IP_FROM_ENV}:3300,http://localhost:3200,http://localhost:3300,http://127.0.0.1:3200,http://127.0.0.1:3300}"
   export FIGMA_OAUTH_REDIRECT_URI="${FIGMA_OAUTH_REDIRECT_URI:-http://${SERVER_IP_FROM_ENV}:3200/api/user/external-auth/figma/callback}"
 else
   export NEXT_PUBLIC_SCREENSHOT_SERVICE_URL="${NEXT_PUBLIC_SCREENSHOT_SERVICE_URL:-http://localhost:3202}"
   export NEXT_PUBLIC_WEB_URL="${NEXT_PUBLIC_WEB_URL:-http://localhost:3200}"
+  export NEXT_PUBLIC_AUTHOR_SITE_URL="${NEXT_PUBLIC_AUTHOR_SITE_URL:-http://localhost:3200}"
   export CORS_ORIGINS="${CORS_ORIGINS:-http://localhost:3200,http://localhost:3300,http://127.0.0.1:3200,http://127.0.0.1:3300}"
   export FIGMA_OAUTH_REDIRECT_URI="${FIGMA_OAUTH_REDIRECT_URI:-http://localhost:3200/api/user/external-auth/figma/callback}"
 fi

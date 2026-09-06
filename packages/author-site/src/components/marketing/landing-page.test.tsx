@@ -3,6 +3,7 @@ import type { ComponentProps } from "react";
 
 import { metadata } from "@/app/page";
 import { LandingPage } from "./landing-page";
+import { getOfficialHomeUrl } from "@/lib/official-site-url";
 
 jest.mock("next/link", () => ({
   __esModule: true,
@@ -14,6 +15,14 @@ jest.mock("next/link", () => ({
 }));
 
 describe("LandingPage", () => {
+  it("uses the official homepage for every OneFlow brand link", () => {
+    render(<LandingPage />);
+
+    for (const link of screen.getAllByRole("link", { name: /OneFlow/ })) {
+      expect(link).toHaveAttribute("href", getOfficialHomeUrl());
+    }
+  });
+
   it("exposes the primary marketing navigation and calls to action", () => {
     render(<LandingPage />);
 

@@ -3,7 +3,7 @@ import type {
   VisualPropertyChange,
   VisualPropertyChangeKind,
 } from "@workbench/demo-ui/iframe-types";
-import type { ImageDimensionRule } from "@workbench/shared/demo/config-schema-definition";
+import type { ConfigColorFormat, ImageDimensionRule } from "@workbench/shared/demo/config-schema-definition";
 import {
   applyPrototypeCommand,
   type TextPatch,
@@ -15,7 +15,8 @@ export interface PrototypeVisualConfigTarget {
   kind: PrototypeVisualConfigKind;
   fieldKey: string;
   title: string;
-  defaultValue: string;
+  defaultValue: string | null;
+  colorFormat?: ConfigColorFormat;
   category?: string;
   colorProperty?: "color" | "backgroundColor" | "borderColor";
   accept?: string;
@@ -171,7 +172,16 @@ function validateTarget(target: PrototypeVisualConfigTarget): string | null {
   }
   if (target.fieldKey.startsWith("__")) return "字段 key 不能以双下划线开头";
   if (!target.title.trim()) return "字段标题不能为空";
-  if (typeof target.defaultValue !== "string") return "默认值必须是字符串";
+  if (target.kind === "color") {
+    if (target.defaultValue !== null && typeof target.defaultValue !== "string") {
+      return "颜色默认值必须是颜色字符串或 null";
+    }
+    if (target.colorFormat === "opacity") {
+      return "视觉颜色配置不支持单独的透明度格式，请使用 color 或 color-opacity";
+    }
+  } else if (typeof target.defaultValue !== "string") {
+    return "文本和图片默认值必须是字符串";
+  }
   if (target.category !== undefined && typeof target.category !== "string") {
     return "配置分类必须是字符串";
   }
@@ -205,12 +215,12 @@ function ensureRecord(target: Record<string, unknown>, key: string): Record<stri
 
 function createSchemaProperty(target: PrototypeVisualConfigTarget): Record<string, unknown> {
   const property: Record<string, unknown> = {
-    type: "string",
+    type: target.kind === "color" ? ["string", "null"] : "string",
     title: target.title.trim(),
     default: target.defaultValue,
   };
   if (target.kind === "image") property.format = "image";
-  if (target.kind === "color") property.format = "color";
+  if (target.kind === "color") property.format = target.colorFormat ?? "color";
   const uiOptions: Record<string, unknown> = {};
   const category = normalizeCategory(target.category);
   if (category) {
@@ -329,14 +339,14 @@ export function applyPrototypeVisualConfiguration(params: {
       element.textContent = params.target.defaultValue;
     } else if (params.target.kind === "image") {
       element.setAttribute("data-bind-src", params.target.fieldKey);
-      element.setAttribute("src", params.target.defaultValue);
+      element.setAttribute("src", params.target.defaultValue ?? "");
     } else {
       const colorProperty = params.target.colorProperty;
       if (!colorProperty) return { ok: false, error: "颜色配置缺少目标属性" };
       element.setAttribute(STYLE_BIND_ATTRS[colorProperty], params.target.fieldKey);
       element.style.setProperty(
         colorProperty.replace(/[A-Z]/g, (part) => `-${part.toLowerCase()}`),
-        params.target.defaultValue,
+        params.target.defaultValue ?? "transparent",
       );
     }
 

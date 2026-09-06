@@ -62,6 +62,28 @@ describe("设计规范数据层", () => {
     });
   });
 
+  it("保存并重新读取 oneOf 分支父节点的稳定引用", () => {
+    const doc = createDesignSpecDoc(tmpDir, "参与人数规范");
+    const branchKey = "modules[type=participant]";
+    saveDesignSpecDoc(tmpDir, {
+      ...doc,
+      entries: [{
+        id: "participant-entry",
+        title: "参与人数模块",
+        markdown: "",
+        target: {
+          type: "config",
+          refs: [{ scope: "page", pageId: "page-a", fieldKey: branchKey }],
+        },
+      }],
+    });
+
+    expect(readDesignSpecDoc(tmpDir, doc.id)?.entries[0].target).toEqual({
+      type: "config",
+      refs: [{ scope: "page", pageId: "page-a", fieldKey: branchKey }],
+    });
+  });
+
   it("读取和保存会保留自动管理标记", () => {
     const doc = createDesignSpecDoc(tmpDir, "首页设计规范");
     const saved = saveDesignSpecDoc(tmpDir, {
@@ -138,7 +160,9 @@ describe("设计规范数据层", () => {
 describe("配置项素材池聚合", () => {
   const projectSchema = JSON.stringify({
     properties: {
-      brandPrimary: { type: "string", format: "color", default: "#4F46E5", title: "品牌主色" },
+      brandPrimary: { type: ["string", "null"], format: "color", default: null, title: "品牌主色" },
+      overlayOpacity: { type: ["number", "null"], format: "opacity", default: null, title: "遮罩透明度" },
+      surfaceColor: { type: ["string", "null"], format: "color-opacity", default: null, title: "表面颜色" },
       headingFont: { type: "string", title: "标题字体" },
       logo: { type: "string", title: "Logo", default: "logo.svg" },
     },
@@ -155,10 +179,10 @@ describe("配置项素材池聚合", () => {
     const pool = buildConfigPool(projectSchema, [
       { id: "p1", name: "首页", schema: pageSchema },
     ]);
-    expect(pool).toHaveLength(5);
+    expect(pool).toHaveLength(7);
 
     const project = pool.filter((p) => p.scope === "project");
-    expect(project).toHaveLength(3);
+    expect(project).toHaveLength(5);
 
     const page = pool.filter((p) => p.scope === "page");
     expect(page).toHaveLength(2);
@@ -166,12 +190,16 @@ describe("配置项素材池聚合", () => {
     expect(page[0].pageName).toBe("首页");
   });
 
-  it("推断 kind：color / text / image / number / motion", () => {
+  it("按显式 format 识别 color / opacity / color-opacity / text / image / number / motion", () => {
     const pool = buildConfigPool(projectSchema, [
       { id: "p1", name: "首页", schema: pageSchema },
     ]);
     const byKey = Object.fromEntries(pool.map((p) => [p.key, p]));
     expect(byKey.brandPrimary.kind).toBe("color");
+    expect(byKey.overlayOpacity.kind).toBe("number");
+    expect(byKey.overlayOpacity.format).toBe("OPACITY");
+    expect(byKey.surfaceColor.kind).toBe("color");
+    expect(byKey.surfaceColor.format).toBe("COLOR-OPACITY");
     expect(byKey.headingFont.kind).toBe("text");
     expect(byKey.logo.kind).toBe("image");
     expect(byKey.logo.format).toBe("不限");
@@ -270,12 +298,34 @@ describe("配置项素材池聚合", () => {
           },
         },
       },
-    }), [{ id: "page-a", name: "页面 A", schema: "{}" }, { id: "page-b", name: "页面 B", schema: "{}" }]);
+    }), [{
+      id: "page-a",
+      name: "页面 A",
+      schema: JSON.stringify({
+        properties: {
+          modules: {
+            type: "array",
+            title: "内容模块",
+            items: {
+              oneOf: [{
+                title: "参与人数模块",
+                properties: {
+                  type: { const: "participant", title: "类型" },
+                  count: { type: "number", title: "参与人数" },
+                },
+              }],
+            },
+          },
+        },
+      }),
+    }, { id: "page-b", name: "页面 B", schema: "{}" }]);
 
     expect(pool.map((item) => item.key)).toEqual(expect.arrayContaining([
       "modules",
+      "modules[type=image]",
       "modules[type=image].type",
       "modules[type=image].image",
+      "modules[type=participant]",
       "modules[type=video].type",
       "modules[type=video].video",
       "modules[type=video].video.url",
@@ -283,6 +333,19 @@ describe("配置项素材池聚合", () => {
     const image = pool.find((item) => item.key === "modules[type=image].image");
     expect(image?.breadcrumbs).toEqual(["modules", "image", "图片"]);
     expect(image?.pageIds).toEqual(["page-a", "page-b"]);
+    const participant = pool.find(
+      (item) => item.id === "page:page-a:modules[type=participant]",
+    );
+    expect(participant).toMatchObject({
+      scope: "page",
+      pageId: "page-a",
+      pageName: "页面 A",
+      key: "modules[type=participant]",
+      title: "参与人数模块",
+      breadcrumbs: ["内容模块", "参与人数模块"],
+      kind: "text",
+      isBranch: true,
+    });
     expect(pool.find((item) => item.key === "modules[type=image].type")?.isConst).toBe(true);
     expect(pool.find((item) => item.key === "modules[type=video].caption")?.kind).toBe("text");
   });
@@ -311,5 +374,10 @@ describe("配置项素材池聚合", () => {
       "图片模块",
       "值",
     ]);
+    expect(pool.find((item) => item.key === "[type=image]")).toMatchObject({
+      title: "图片模块",
+      isBranch: true,
+      kind: "text",
+    });
   });
 });

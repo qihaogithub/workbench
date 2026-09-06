@@ -216,13 +216,18 @@ function useAutoSave(
   save: () => Promise<{ ok: boolean; message?: string }>,
   deps: React.DependencyList,
   debounceMs = 500,
+  enabled = true,
 ) {
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
   const saveRef = useRef(save);
+  const enabledRef = useRef(enabled);
   saveRef.current = save;
+  enabledRef.current = enabled;
 
   useEffect(() => {
+    if (!enabledRef.current) return;
+
     const timer = setTimeout(async () => {
       setState("saving");
       setMessage(null);
@@ -242,6 +247,9 @@ function useAutoSave(
       setTimeout(() => setState((s) => (s === "saved" ? "idle" : s)), 3000);
     }, debounceMs);
     return () => clearTimeout(timer);
+    // This hook intentionally receives the caller's dependency list; saveRef
+    // and enabledRef keep the asynchronous callback from capturing stale state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
   const reset = useCallback(() => {
@@ -346,6 +354,7 @@ function SuppliersTab() {
   const [activeProviderId, setActiveProviderId] = useState<string>("");
   const [activeModelId, setActiveModelId] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [configReady, setConfigReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -375,6 +384,7 @@ function SuppliersTab() {
       setProviders(data.backendProviders?.providers || []);
       setActiveProviderId(data.backendProviders?.activeProviderId || "");
       setActiveModelId(data.backendProviders?.activeModelId || "");
+      setConfigReady(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "加载配置失败");
     } finally {
@@ -477,8 +487,9 @@ function SuppliersTab() {
 
   const { autoSaveState, autoSaveMessage } = useAutoSave(
     doSave,
-    [providers, activeProviderId, activeModelId],
+    [providers, activeProviderId, activeModelId, configReady],
     500,
+    configReady,
   );
 
   const handleAdd = useCallback(() => {
@@ -1061,6 +1072,7 @@ function ModelConfigTab() {
   const [config, setConfig] = useState<ModelConfigState>(EMPTY_CONFIG);
   const [availableModels, setAvailableModels] = useState<AvailableModel[]>([]);
   const [loadingConfig, setLoadingConfig] = useState(true);
+  const [configReady, setConfigReady] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -1091,6 +1103,7 @@ function ModelConfigTab() {
         autoEnableRules: data.frontend?.autoEnableRules || [],
         blacklist: data.frontend?.blacklist || [],
       });
+      setConfigReady(true);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "加载配置失败");
     } finally {
@@ -1150,8 +1163,9 @@ function ModelConfigTab() {
 
   const { autoSaveState, autoSaveMessage } = useAutoSave(
     doSave,
-    [config.enabledModels, config.autoEnableRules, config.blacklist],
+    [config.enabledModels, config.autoEnableRules, config.blacklist, configReady],
     500,
+    configReady,
   );
 
   // 计算已启用 / 未启用列表
@@ -1674,6 +1688,7 @@ function RuleInput({
 
 function ImageGenTab() {
   const [loading, setLoading] = useState(true);
+  const [configReady, setConfigReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [enabled, setEnabled] = useState(false);
@@ -1704,6 +1719,7 @@ function ImageGenTab() {
         setMaxRetries(c.maxRetries ?? 3);
         setMaxPromptLen(c.maxPromptLen || 1000);
       }
+      if (body.success) setConfigReady(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "加载配置失败");
     } finally {
@@ -1749,8 +1765,9 @@ function ImageGenTab() {
 
   const { autoSaveState, autoSaveMessage } = useAutoSave(
     doSave,
-    [enabled, apiKey, baseUrl, model, timeoutMs, maxPerSession, maxRetries, maxPromptLen],
+    [enabled, apiKey, baseUrl, model, timeoutMs, maxPerSession, maxRetries, maxPromptLen, configReady],
     500,
+    configReady,
   );
 
   if (loading) {

@@ -29,6 +29,7 @@ import type {
   AppGraphValidationResult,
 } from "@workbench/shared";
 import { MAX_VERSIONS_KEEP } from "@workbench/shared";
+import { isValidWorkspacePathSegment } from "@workbench/shared/workspace-path";
 import { normalizeHtmlImport } from "@workbench/project-core";
 import { syncBuiltinKnowledge } from "./knowledge/builtin-documents";
 import {
@@ -453,16 +454,17 @@ export function readWorkspaceTree(workspacePath: string): WorkspaceTree {
       const rawPages: DemoPageMeta[] = Array.isArray(parsed?.pages)
         ? parsed.pages
         : [];
-      const pages = rawPages.map((page) =>
-        page.runtimeType
+      const pages = rawPages.flatMap((page) => {
+        if (!isValidWorkspacePathSegment(page.id)) return [];
+        return [page.runtimeType
           ? page
           : {
               ...page,
               runtimeType: resolvePageRuntimeType(
                 path.join(demosDir, page.id),
               ),
-            },
-      );
+            }];
+      });
       const tree = {
         folders: Array.isArray(parsed?.folders) ? parsed.folders : [],
         pages,
@@ -576,6 +578,7 @@ export function listDemoPages(workspacePath: string): DemoPageMeta[] {
   const result: DemoPageMeta[] = [];
 
   for (const page of tree.pages) {
+    if (!isValidWorkspacePathSegment(page.id)) continue;
     const dir = path.join(demosDir, page.id);
     // 根据磁盘文件推断运行时类型，用于校验页面文件完整性
     const hasSchema = fs.existsSync(path.join(dir, "config.schema.json"));

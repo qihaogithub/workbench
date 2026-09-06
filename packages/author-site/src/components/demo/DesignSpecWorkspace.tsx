@@ -117,6 +117,26 @@ function readConfigSchemaUpdate(event: Event): ConfigSchemaUpdate | null {
   };
 }
 
+type DesignSpecTitleUpdate = {
+  docId: string;
+  title: string;
+};
+
+function readDesignSpecTitleUpdate(event: Event): DesignSpecTitleUpdate | null {
+  const detail = (event as CustomEvent<unknown>).detail;
+  if (!detail || typeof detail !== "object") return null;
+  const candidate = detail as Record<string, unknown>;
+  if (
+    typeof candidate.docId !== "string" ||
+    typeof candidate.title !== "string" ||
+    !candidate.docId ||
+    !candidate.title.trim()
+  ) {
+    return null;
+  }
+  return { docId: candidate.docId, title: candidate.title.trim() };
+}
+
 /**
  * 已持久化的 Schema 事件可立即投影当前表格；后续服务端刷新始终覆盖该投影。
  */
@@ -199,6 +219,10 @@ export function DesignSpecWorkspaceProvider({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const saveRevisionRef = useRef(0);
+  const saveRequestIdRef = useRef(0);
+  const activeSaveCountRef = useRef(0);
+  const savingRef = useRef(false);
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [poolView, setPoolView] = useState<"pages" | "configs">("configs");
@@ -236,6 +260,7 @@ export function DesignSpecWorkspaceProvider({
 
   // 加载文档 + 素材池（仅在选中设计规范时加载）
   useEffect(() => {
+    saveRevisionRef.current += 1;
     if (!activeDocId) {
       setDoc(null);
       setPool([]);
@@ -354,8 +379,26 @@ export function DesignSpecWorkspaceProvider({
     };
   }, [activeDocId, qs]);
 
+  // 侧边栏重命名只更新文档标题，不能丢弃当前编辑器中尚未保存的条目草稿。
+  useEffect(() => {
+    if (!activeDocId) return;
+    const handleTitleUpdate = (event: Event) => {
+      const update = readDesignSpecTitleUpdate(event);
+      if (!update || update.docId !== activeDocId) return;
+      saveRevisionRef.current += 1;
+      setDoc((current) => (current ? { ...current, title: update.title } : current));
+      if (savingRef.current) setDirty(true);
+    };
+    window.addEventListener("design-spec-updated", handleTitleUpdate);
+    return () => window.removeEventListener("design-spec-updated", handleTitleUpdate);
+  }, [activeDocId]);
+
   const save = useCallback(async () => {
     if (!doc || readOnly) return;
+    const requestId = ++saveRequestIdRef.current;
+    const requestRevision = saveRevisionRef.current;
+    activeSaveCountRef.current += 1;
+    savingRef.current = true;
     setSaving(true);
     try {
       const res = await fetch(`/api/design-specs/${doc.id}${qs}`, {
@@ -364,7 +407,11 @@ export function DesignSpecWorkspaceProvider({
         body: JSON.stringify({ doc }),
       });
       const data = await res.json();
-      if (data.success) {
+      if (
+        data.success &&
+        requestId === saveRequestIdRef.current &&
+        requestRevision === saveRevisionRef.current
+      ) {
         setDirty(false);
         setDoc(data.data);
         window.dispatchEvent(new Event("design-spec-updated"));
@@ -372,7 +419,11 @@ export function DesignSpecWorkspaceProvider({
     } catch {
       // 静默失败
     } finally {
-      setSaving(false);
+      activeSaveCountRef.current -= 1;
+      if (activeSaveCountRef.current === 0) {
+        savingRef.current = false;
+        setSaving(false);
+      }
     }
   }, [doc, qs, readOnly]);
 

@@ -1,5 +1,6 @@
 import path from "path";
 import type { DemoPageMeta } from "@workbench/shared";
+import { isValidWorkspacePathSegment } from "@workbench/shared/workspace-path";
 
 /**
  * 将页面名称转为文件系统安全的 slug。
@@ -73,6 +74,9 @@ export function generateDemoPageId(name?: string): string {
  * 获取页面目录的绝对路径
  */
 export function getDemoDirPath(workspacePath: string, demoId: string): string {
+  if (!isValidWorkspacePathSegment(demoId)) {
+    throw new Error("INVALID_PAGE_ID");
+  }
   return path.join(workspacePath, "demos", demoId);
 }
 

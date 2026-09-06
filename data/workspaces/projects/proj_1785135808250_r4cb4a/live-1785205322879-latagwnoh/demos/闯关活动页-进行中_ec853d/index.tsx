@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { SvgaPlayer, SpinePlayer } from "@preview/sdk";
 
 interface LevelCard {
@@ -9,6 +10,14 @@ interface LevelCard {
   position?: { x: number; y: number };
   w?: number;
   h?: number;
+}
+
+/* 集卡抽奖模块：卡片项（已获得图 / 未获得图 / 放大后图） */
+interface CollectCardItem {
+  type?: string;
+  obtainedImage?: string;
+  unobtainedImage?: string;
+  enlargedImage?: string;
 }
 
 interface Module {
@@ -29,10 +38,7 @@ interface Module {
   video?: { url: string; poster?: string };
   guide?: { kind: "spine"; version: 1; assetId: string };
   levels?: LevelCard[];
-  total?: number;
-  collected?: number;
-  obtainedImage?: string;
-  unobtainedImage?: string;
+  cards?: CollectCardItem[];
   headerImage?: string;
   bgColor?: string;
   innerBgColor?: string;
@@ -44,7 +50,10 @@ interface DemoProps {
   modules: Module[];
 }
 
-/* 参与人数模块：背景图可配置，UI 控件样式固定 */
+/* 参与人数胶囊图（头像 + 已参与人数），原图 330x60（2 倍），展示 165x30 */
+const PARTICIPANT_BADGE = "/api/images/img_48Pwi7MHkO2FsQ";
+
+/* 参与人数模块：背景图可配置，人数胶囊整体使用图片展示 */
 function ParticipantModule({ bgImage, count }: { bgImage?: string; count?: number }) {
   return (
     <div
@@ -65,26 +74,19 @@ function ParticipantModule({ bgImage, count }: { bgImage?: string; count?: numbe
       ) : (
         <div style={{ position: "absolute", left: 0, top: 0, width: 375, height: 45, background: "#F0F0F0" }} />
       )}
-      <div
+      <img
+        src={PARTICIPANT_BADGE}
+        alt={`${count ?? 2908} 人已参与`}
         style={{
           position: "absolute",
           left: 105,
-          top: 7,
+          top: 7.5,
           width: 165,
           height: 30,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 6,
+          objectFit: "contain",
+          display: "block",
         }}
-      >
-        <span style={{ fontSize: 13, fontWeight: 700, color: "#404040", fontFamily: "PingFang SC" }}>
-          参与人数
-        </span>
-        <span style={{ fontSize: 13, fontWeight: 700, color: "#FF9045", fontFamily: "PingFang SC" }}>
-          {count ?? 0}
-        </span>
-      </div>
+      />
     </div>
   );
 }
@@ -103,54 +105,54 @@ function VideoModule({ videoBg, video }: { videoBg?: string; video?: { url: stri
         overflow: "hidden",
       }}
     >
+      {/* 背景图铺底，视频框（真实视频 / 默认占位）始终叠加在上层，两者不再互斥 */}
       {videoBg ? (
         <img
           src={videoBg}
           alt="视频背景图"
           style={{ position: "absolute", left: 0, top: 0, width: 375, height: 211, objectFit: "cover" }}
         />
-      ) : (
-        <div
-          style={{
-            position: "absolute",
-            left: 21,
-            top: 11,
-            width: 335,
-            height: 188,
-            background: "#F4F4F4",
-            borderRadius: 10,
-            border: "2px solid white",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            overflow: "hidden",
-          }}
-        >
-          {hasSrc ? (
-            <video
-              src={video?.url}
-              poster={video?.poster}
-              controls
-              style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }}
-            />
-          ) : (
-            <>
-              {video?.poster && (
-                <img
-                  src={video.poster}
-                  alt="视频封面"
-                  style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }}
-                />
-              )}
+      ) : null}
+      <div
+        style={{
+          position: "absolute",
+          left: 21,
+          top: 11,
+          width: 335,
+          height: 188,
+          background: "#F4F4F4",
+          borderRadius: 10,
+          border: "2px solid white",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          overflow: "hidden",
+        }}
+      >
+        {hasSrc ? (
+          <video
+            src={video?.url}
+            poster={video?.poster}
+            controls
+            style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }}
+          />
+        ) : (
+          <>
+            {video?.poster && (
               <img
-                src="https://img.onlywnn.cn/figma/h_f9f81d7b.png"
-                alt="播放按钮"
-                style={{ position: "absolute", left: 132, top: 59, width: 70, height: 70, objectFit: "cover" }}
+                src={video.poster}
+                alt="视频封面"
+                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }}
               />
-            </>
-          )}
-        </div>
-      )}
+            )}
+            <img
+              src="https://img.onlywnn.cn/figma/h_f9f81d7b.png"
+              alt="播放按钮"
+              style={{ position: "absolute", left: 132, top: 59, width: 70, height: 70, objectFit: "cover" }}
+            />
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -166,23 +168,42 @@ function ImageModule({ image }: { image?: string }) {
   );
 }
 
-/* 集卡抽奖模块：背景图 / 卡片总数 / 已收集数量 / 已获得与未获得卡片图可配置，进度条与卡片样式固定 */
-function CollectLotteryModule({
-  bgImage,
-  total,
-  collected,
-  obtainedImage,
-  unobtainedImage,
-}: {
-  bgImage?: string;
-  total?: number;
-  collected?: number;
-  obtainedImage?: string;
-  unobtainedImage?: string;
-}) {
-  const cardTotal = Math.max(total ?? 4, 1);
-  const gotCount = Math.min(Math.max(collected ?? 1, 0), cardTotal);
-  const percent = (gotCount / cardTotal) * 100;
+/* 集卡抽奖模块：默认素材（配置值为空时兜底，避免灰色占位） */
+const svgDataUri = (svg: string) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+
+const FALLBACK_CARDS: string[] = [
+  svgDataUri(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 98 100'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#FFE082'/><stop offset='1' stop-color='#FFB300'/></linearGradient></defs><rect width='98' height='100' rx='10' fill='url(#g)'/><rect x='4' y='4' width='90' height='92' rx='8' fill='none' stroke='rgba(255,255,255,0.7)' stroke-width='2'/><path d='M49 24l6.8 14.2 15.7 2.1-11.6 11 2.9 15.7L49 61.9l-13.8 7.1 2.9-15.7-11.6-11 15.7-2.1z' fill='#FF7043'/><text x='49' y='90' text-anchor='middle' font-family='PingFang SC,sans-serif' font-size='10' font-weight='700' fill='#8D5500'>卡片1</text></svg>`),
+  svgDataUri(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 98 100'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#B3E5FC'/><stop offset='1' stop-color='#29B6F6'/></linearGradient></defs><rect width='98' height='100' rx='10' fill='url(#g)'/><rect x='4' y='4' width='90' height='92' rx='8' fill='none' stroke='rgba(255,255,255,0.7)' stroke-width='2'/><circle cx='49' cy='44' r='14' fill='none' stroke='#0277BD' stroke-width='3'/><circle cx='49' cy='44' r='6' fill='#0277BD'/><path d='M35 66c4.7-4.7 23.3-4.7 28 0' fill='none' stroke='#0277BD' stroke-width='3' stroke-linecap='round'/><text x='49' y='90' text-anchor='middle' font-family='PingFang SC,sans-serif' font-size='10' font-weight='700' fill='#01579B'>卡片2</text></svg>`),
+  svgDataUri(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 98 100'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#C8E6C9'/><stop offset='1' stop-color='#66BB6A'/></linearGradient></defs><rect width='98' height='100' rx='10' fill='url(#g)'/><rect x='4' y='4' width='90' height='92' rx='8' fill='none' stroke='rgba(255,255,255,0.7)' stroke-width='2'/><path d='M49 22c12 8.5 17.5 16 17.5 24A17.5 17.5 0 0 1 49 65a17.5 17.5 0 0 1-17.5-19c0-8 5.5-15.5 17.5-24z' fill='#1B5E20'/><text x='49' y='90' text-anchor='middle' font-family='PingFang SC,sans-serif' font-size='10' font-weight='700' fill='#1B5E20'>卡片3</text></svg>`),
+  svgDataUri(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 98 100'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#F8BBD0'/><stop offset='1' stop-color='#EC407A'/></linearGradient></defs><rect width='98' height='100' rx='10' fill='url(#g)'/><rect x='4' y='4' width='90' height='92' rx='8' fill='none' stroke='rgba(255,255,255,0.7)' stroke-width='2'/><path d='M49 66l-14.5-13.6a8.8 8.8 0 0 1 12.4-12.6L49 43.9l2.1-4.1a8.8 8.8 0 0 1 12.4 12.6z' fill='#880E4F'/><text x='49' y='90' text-anchor='middle' font-family='PingFang SC,sans-serif' font-size='10' font-weight='700' fill='#880E4F'>卡片4</text></svg>`),
+];
+
+const FALLBACK_LARGE = svgDataUri(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 335 342'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#FFF3C4'/><stop offset='1' stop-color='#FFC94D'/></linearGradient></defs><rect width='335' height='342' rx='24' fill='url(#g)'/><rect x='10' y='10' width='315' height='322' rx='18' fill='none' stroke='rgba(255,255,255,0.8)' stroke-width='4'/><circle cx='167.5' cy='120' r='62' fill='none' stroke='#FF9800' stroke-width='5' stroke-dasharray='10 8'/><path d='M167.5 78l13 27.5 30.4 4.2-22.3 21.7 5.4 30.3-26.5-14.1-26.5 14.1 5.4-30.3-22.3-21.7 30.4-4.2z' fill='#FF7043'/><text x='167.5' y='240' text-anchor='middle' font-family='PingFang SC,sans-serif' font-size='34' font-weight='700' fill='#8D5500'>查看卡片大图</text><text x='167.5' y='278' text-anchor='middle' font-family='PingFang SC,sans-serif' font-size='18' fill='#A06800'>放大预览默认素材</text></svg>`);
+
+const DEFAULT_CARDS: CollectCardItem[] = [
+  { type: "card", obtainedImage: "", unobtainedImage: "", enlargedImage: "" },
+  { type: "card", obtainedImage: "", unobtainedImage: "", enlargedImage: "" },
+  { type: "card", obtainedImage: "", unobtainedImage: "", enlargedImage: "" },
+  { type: "card", obtainedImage: "", unobtainedImage: "", enlargedImage: "" },
+];
+
+/* 集卡抽奖模块：背景图 / 卡片列表可配置；卡片数量与进度目标由 cards.length 计算，首张默认已获得 */
+function CollectLotteryModule({ bgImage, cards }: { bgImage?: string; cards?: CollectCardItem[] }) {
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const cardList = cards && cards.length > 0 ? cards : DEFAULT_CARDS;
+  const cardTotal = cardList.length;
+  /* 默认状态：第 1 张已获得，其余未获得 */
+  const obtainedIndex = 0;
+  const gotCount = Math.min(obtainedIndex + 1, cardTotal);
+  const percent = cardTotal > 0 ? (gotCount / cardTotal) * 100 : 0;
+  const previewCard = previewIndex !== null ? cardList[previewIndex] : null;
+  const previewObtained = previewIndex !== null && previewIndex <= obtainedIndex;
+  /* 放大图缺失时回退使用当前卡片图；再缺失时使用默认素材 */
+  const previewSrc =
+    (previewCard && previewCard.enlargedImage) ||
+    (previewCard && (previewObtained ? previewCard.obtainedImage : previewCard.unobtainedImage)) ||
+    (previewObtained ? FALLBACK_CARDS[0] : FALLBACK_CARDS[1]) ||
+    FALLBACK_LARGE;
   return (
     <div
       style={{
@@ -213,18 +234,21 @@ function CollectLotteryModule({
           left: 20,
           top: 105,
           display: "flex",
-          justifyContent: "flex-start",
-          alignItems: "flex-start",
+          flexWrap: "wrap",
           gap: 8,
         }}
       >
-        {Array.from({ length: cardTotal }).map((_, i) => {
-          const obtained = i < gotCount;
-          const cardImg = obtained ? obtainedImage : unobtainedImage;
+        {cardList.map((card, i) => {
+          const obtained = i <= obtainedIndex;
+          const cardImg = obtained
+            ? card.obtainedImage || FALLBACK_CARDS[i % 4]
+            : card.unobtainedImage || FALLBACK_CARDS[(i + 1) % 4];
           const label = obtained ? "已获得卡片" : "未获得卡片";
           return (
-            <div
+            <button
               key={i}
+              type="button"
+              onClick={() => setPreviewIndex(i)}
               style={{
                 width: 98,
                 height: 100,
@@ -233,26 +257,16 @@ function CollectLotteryModule({
                 outline: `1px solid ${obtained ? "white" : "#B3B3B3"}`,
                 outlineOffset: -1,
                 overflow: "hidden",
+                border: "none",
+                padding: 0,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                cursor: "pointer",
               }}
             >
-              {cardImg ? (
-                <img src={cardImg} alt={label} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              ) : (
-                <span
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: obtained ? "rgba(0,0,0,0.2)" : "#E9E9E9",
-                    fontFamily: "SF Pro Rounded",
-                  }}
-                >
-                  {label}
-                </span>
-              )}
-            </div>
+              <img src={cardImg} alt={label} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            </button>
           );
         })}
       </div>
@@ -300,6 +314,64 @@ function CollectLotteryModule({
           <span style={{ fontSize: 12, fontWeight: 500, color: "#B2B2B2" }}>{cardTotal}</span>
         </div>
       </div>
+
+      {/* 卡片放大预览：点击卡片弹出，点击关闭按钮或遮罩收起 */}
+      {previewIndex !== null && (
+        <div
+          onClick={() => setPreviewIndex(null)}
+          style={{
+            position: "fixed",
+            left: 0,
+            top: 0,
+            width: 375,
+            height: 812,
+            background: "rgba(0,0,0,0.7)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 20,
+            zIndex: 999,
+          }}
+        >
+          <img
+            src={previewSrc}
+            alt="卡片放大预览"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 335,
+              height: 342,
+              objectFit: "contain",
+              borderRadius: 24,
+              outline: "3px solid white",
+              outlineOffset: -3,
+            }}
+          />
+          <button
+            type="button"
+            aria-label="关闭"
+            onClick={(e) => {
+              e.stopPropagation();
+              setPreviewIndex(null);
+            }}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 999,
+              background: "rgba(255,255,255,0.92)",
+              border: "none",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+            }}
+          >
+            <svg viewBox="0 0 16 16" width="14" height="14">
+              <path d="M2 2 L14 14 M14 2 L2 14" stroke="#333" strokeWidth="2.4" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -401,33 +473,6 @@ function ButtonModule({ image }: { image?: string }) {
       alt="按钮组件"
       style={{ width: 375, height: 97, objectFit: "cover", display: "block", flexShrink: 0 }}
     />
-  );
-}
-
-/* 领课广告（固定特色区块） */
-function AdModule() {
-  return (
-    <div style={{ alignSelf: "stretch", height: 236, flexShrink: 0, position: "relative" }}>
-      <img
-        src="https://img.onlywnn.cn/figma/h_e0d1c962.png"
-        alt="图片组件"
-        style={{ position: "absolute", left: 0, top: 0, width: 375, height: 236, objectFit: "cover" }}
-      />
-      <span
-        style={{
-          position: "absolute",
-          left: 111,
-          top: 89,
-          opacity: 0.11,
-          fontSize: 38.5,
-          fontWeight: 700,
-          fontFamily: "SF Pro Rounded",
-          color: "black",
-        }}
-      >
-        领课广告
-      </span>
-    </div>
   );
 }
 
@@ -631,13 +676,22 @@ function ExcellentWorks() {
   );
 }
 
-/* 排行榜（内容模块） */
-function Ranking() {
+/* 排行榜（内容模块）：模块背景头图 / 背景色 / 模块内背景色可配置，颜色默认透明 */
+function Ranking({
+  headerImage,
+  bgColor,
+  innerBgColor,
+}: {
+  headerImage?: string;
+  bgColor?: string;
+  innerBgColor?: string;
+}) {
   return (
     <div
       style={{
         width: "100%",
         padding: "10px 16px",
+        background: bgColor || "transparent",
         overflow: "hidden",
         display: "flex",
         alignItems: "flex-start",
@@ -654,11 +708,13 @@ function Ranking() {
           borderRadius: 25,
         }}
       >
-        <img
-          src="https://img.onlywnn.cn/figma/h_942707f9.png"
-          alt="排行榜头图"
-          style={{ position: "absolute", left: 0, top: 0, width: 343, height: 290, objectFit: "cover" }}
-        />
+        {headerImage ? (
+          <img
+            src={headerImage}
+            alt="排行榜模块背景头图"
+            style={{ position: "absolute", left: 0, top: 0, width: 343, height: 290, objectFit: "cover" }}
+          />
+        ) : null}
         <div
           style={{
             position: "absolute",
@@ -666,7 +722,7 @@ function Ranking() {
             top: 250,
             width: 311,
             height: 400,
-            background: "white",
+            background: innerBgColor || "transparent",
             borderRadius: 16,
             display: "flex",
             flexDirection: "column",
@@ -793,10 +849,7 @@ const DEFAULT_MODULES: Module[] = [
   {
     type: "collectCard",
     bgImage: "",
-    total: 4,
-    collected: 1,
-    obtainedImage: "",
-    unobtainedImage: "",
+    cards: DEFAULT_CARDS,
   },
   {
     type: "level",
@@ -834,7 +887,14 @@ const DEFAULT_MODULES: Module[] = [
     innerBgColor: "#FFBA39",
   },
   { type: "excellentWorks" },
-  { type: "ranking" },
+  {
+    type: "ranking",
+    headerImage: "",
+    bgColor: "",
+    innerBgColor: "",
+  },
+  /* 领课广告：作为可选的图片模块，默认排在内容模块最后 */
+  { type: "image", image: "https://img.onlywnn.cn/figma/h_e0d1c962.png" },
 ];
 
 function renderModule(m: Module, key: number) {
@@ -857,16 +917,7 @@ function renderModule(m: Module, key: number) {
         />
       );
     case "collectCard":
-      return (
-        <CollectLotteryModule
-          key={key}
-          bgImage={m.bgImage}
-          total={m.total}
-          collected={m.collected}
-          obtainedImage={m.obtainedImage}
-          unobtainedImage={m.unobtainedImage}
-        />
-      );
+      return <CollectLotteryModule key={key} bgImage={m.bgImage} cards={m.cards} />;
     case "myWorks":
       return (
         <MyWorks
@@ -879,7 +930,14 @@ function renderModule(m: Module, key: number) {
     case "excellentWorks":
       return <ExcellentWorks key={key} />;
     case "ranking":
-      return <Ranking key={key} />;
+      return (
+        <Ranking
+          key={key}
+          headerImage={m.headerImage}
+          bgColor={m.bgColor}
+          innerBgColor={m.innerBgColor}
+        />
+      );
     default:
       return null;
   }
@@ -900,11 +958,8 @@ export default function Demo({ navColor = "#C4C4C4", modules }: DemoProps) {
           alignItems: "flex-start",
         }}
       >
-        {/* 内容模块流（含我的作品 / 优秀作品 / 排行榜，顺序由配置面板拖拽排序决定） */}
+        {/* 内容模块流（含我的作品 / 优秀作品 / 排行榜 / 领课广告，顺序由配置面板拖拽排序决定） */}
         {list.map((m, i) => renderModule(m, i))}
-
-        {/* 固定特色区块 */}
-        <AdModule />
       </div>
 
       {/* 原生导航/状态栏目 */}

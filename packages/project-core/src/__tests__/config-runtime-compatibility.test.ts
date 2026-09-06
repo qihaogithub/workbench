@@ -21,7 +21,7 @@ describe('checkConfigSchemaAgainstPrototype', () => {
         age: { type: 'integer', title: '年龄' },
         enabled: { type: 'boolean', title: '启用' },
         desc: { type: 'text', title: '描述' },
-        bgColor: { type: 'color', title: '背景色' },
+        bgColor: { type: ['string', 'null'], format: 'color', default: null, title: '背景色' },
         avatar: { type: 'image', title: '头像' },
         mode: { type: 'enum', title: '模式', options: [{ value: 'a', label: 'A' }] },
       },
@@ -185,7 +185,7 @@ describe('checkConfigSchemaAgainstPrototype', () => {
           type: 'object',
           title: '样式',
           properties: {
-            bgColor: { type: 'color', title: '背景色' },
+            bgColor: { type: ['string', 'null'], format: 'color', default: null, title: '背景色' },
             items: { type: 'array', title: '元素列表', items: { type: 'object', properties: {} } },
           },
         },

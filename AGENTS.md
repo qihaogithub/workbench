@@ -49,7 +49,7 @@ AI agent 在启动任务前应优先读取 `memory.md`（如果存在），以�
 - Workspace：`packages/*` 和 `OPS/CLI`
 - 前端：Next.js 16 App Router、React 19、Tailwind CSS、shadcn/ui、lucide-react
 - 后端：Fastify
-- 共享包：`@workbench/shared`
+- 共享包：`@workbench/shared`、`@workbench/color-picker`
 - 数据目录：默认 `data/`，可由 `DATA_DIR` 覆盖
 - 环境变量文件：`.env` 被 git 忽略，`.env.docker` 用于 Docker 部署覆盖
 - OPS 工程上下文入口：`OPS/AGENTS.md`
@@ -74,14 +74,14 @@ AI agent 在启动任务前应优先读取 `memory.md`（如果存在），以�
 
 ## OF Team repo-local Skill 团队
 
-本仓库在 `.agents/skills/` 维护 OF Team 总控和五位组长级 Skill，用于 Codex 研发协作；治理说明见 `docs/项目文档/维护治理/OF-Team协作治理_说明.md`。它们不属于 `packages/agent-service/` 的产品运行时预装 Skill。
+本仓库在 `.agents/skills/` 维护 OF Team 总控和四位组长级 Skill，用于 Codex 研发协作；治理说明见 `docs/项目文档/维护治理/OF-Team协作治理_说明.md`。它们不属于 `packages/agent-service/` 的产品运行时预装 Skill。
 
 - `of-team` 是总控，允许通过“OF Team”“OF 团队”隐式召唤，负责按主意图选择最少必要成员、明确授权并组织交接。
-- 五位成员是 `of-jobs`（产品）、`of-picasso`（体验）、`of-turing`（研发）、`of-holmes`（验收）和 `of-ford`（交付）；成员关闭隐式召唤，直接使用时写 `$of-jobs`、`$of-picasso`、`$of-turing`、`$of-holmes` 或 `$of-ford`。
+- 四位成员是 `of-jobs`（产品）、`of-picasso`（体验）、`of-turing`（研发）和 `of-ford`（交付）；成员关闭隐式召唤，直接使用时写 `$of-jobs`、`$of-picasso`、`$of-turing` 或 `$of-ford`。
 - 总控只加载本仓库相邻的 `of-*` Skill，不引用用户目录或其他项目的同名角色。现有 `codebase-research`、`系统化调试`、`playwright-cli` 等仍是能力型 Skill，不计入 OF Team 成员。
-- 团队按意图起手：新功能由乔布斯主责，体验问题由毕加索主责，研发任务由图灵主责，验收、Bug 与诊断由福尔摩斯主责，工程与发布问题由福特主责。只有验收、找 Bug、诊断和回归任务默认 Holmes-first。
-- “只讨论”“只验收”“只诊断”和“发布前检查”都是只读授权；修复、部署或发布必须由用户明确允许。用户保留最终业务验收权。
-- 发布还必须通过福尔摩斯质量门禁；存在未解决项时，只有用户对报告中列明的具体风险作出显式豁免才能继续，且不能绕过更高层安全和不可逆操作确认。
+- 团队按意图起手：新功能由乔布斯主责，体验问题由毕加索主责，研发、Bug 与诊断由图灵主责，工程与发布问题由福特主责；业务验收由用户确认。
+- “只讨论”“只诊断”和“发布前检查”都是只读授权；修复、部署或发布必须由用户明确允许。用户保留最终业务验收权。
+- 发布前必须完成图灵的功能验证与福特的交付检查；存在未解决项时，只有用户对报告中列明的具体风险作出显式豁免才能继续，且不能绕过更高层安全和不可逆操作确认。
 - OF Team 的角色指令不能覆盖本文件、适用的子级 `AGENTS.md` 或项目文档；调整团队职责或路由时同步更新各 Skill 和维护治理说明。
 
 ### 子智能体模型路由
@@ -227,6 +227,8 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h
 
 ## HTML sandbox 长期约定
 
+- 页面 ID 作为工作区目录或 Authority 资源路径的一段时，统一使用 `@workbench/shared/workspace-path` 的 Unicode 安全单路径段校验；禁止在 Agent、导入、上传、预览路由或可见性草稿中新增 ASCII-only 页面 ID 正则。页面 ID 与展示/跳转用的 `routeKey` 保持独立。
+
 - HTML 自动判型由共享 runtime capability registry 统一维护；当前四类 runtime 为 `prototype-html-css`、`sandboxed-html`、`high-fidelity-react`、`sketch-scene`，未知 runtime 必须 fail-closed。
 - 页面持久化展示只读取 `config.schema.json.$demo.presentation`；导入 meta 只保留来源/哈希审计，不得恢复 `$demo.previewSize`、`prototype.meta.json` 或 `html-import.meta.json` 尺寸回退。renderer 内部 `previewSize` 只是 presentation 或单页临时设备的投影。
 - HTML 导入使用 prepare/commit/cancel 私有 draft 协议：prepare 不创建页面，commit 在一次 Authority mutation 中写入 runtime 文件、presentation 和页面树；取消、移除或过期必须同时清理 draft 和 execution ticket。
@@ -257,6 +259,7 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h
 | `@workbench/author-site`        | `packages/author-site/`        | Next.js 16 App Router                                  | 4200 | Jest + Testing Library   |
 | `@workbench/viewer-site`        | `packages/viewer-site/`        | Next.js 16 App Router                                  | 4300 | 无包内测试脚本           |
 | `@workbench/demo-ui`            | `packages/demo-ui/`            | 创作端与使用端共享预览组件                             | -    | Vitest + Testing Library |
+| `@workbench/color-picker`       | `packages/color-picker/`       | 共享颜色/透明度选择器                                  | -    | Vitest                   |
 | `@workbench/shared`             | `packages/shared/`             | 共享类型和常量                                         | -    | 无测试脚本               |
 | `@workbench/sketch-core`        | `packages/sketch-core/`        | 草图页协议、校验、patch、几何、只读渲染                | -    | Vitest                   |
 | `@workbench/whiteboard-core`    | `packages/whiteboard-core/`    | 白板 v2 envelope、受限 HTML/CSS bridge、语义 action reducer | -    | Vitest                   |
@@ -285,7 +288,7 @@ Next 开发编译性能约束：
 - 编辑页和根布局不得从 `@workbench/demo-ui`、`@workbench/ai-chat-shared` 或 `date-fns/locale` 桶入口获取单个轻量能力；优先使用 package exports 公开的精确子路径，并维护高频路由静态导入测试。
 - 编辑页不得直接动态引用 `author-ai-chat`；保留 `deferred-author-ai-chat` 二级延迟边界，只在初始页面文件就绪后挂载 AI 对话，避免 Mermaid、Shiki 等富文本依赖与预览区争抢首屏资源。
 - author 校验适配器必须从 `@workbench/shared/validator` 精确子路径导入；`PreviewStage` 必须保留 `PreviewCanvas` 按 canvas 模式懒加载边界，不得让初始单页模式解析完整画布、Markdown 与几何子树。
-- `@preview/sdk` 的公共组件契约以 `packages/author-site/src/lib/preview-dependency-policy.ts` 为唯一源码；`scripts/build-preview-runtime.mjs` 必须从该源码生成 author/viewer 两端静态 runtime。修改 SDK 后运行 `pnpm build:preview-runtime`，并用生成产物测试锁定新接口、拒绝已删除接口，禁止在构建脚本中另行演进播放器实现。
+- `@preview/sdk` 的公共组件契约以 `packages/author-site/src/lib/preview-dependency-policy.ts` 为唯一源码；`scripts/build-preview-runtime.mjs` 必须从该源码生成 author/viewer 两端静态 runtime。修改 SDK 后运行 `pnpm build:preview-runtime`，并用生成产物测试锁定新接口、拒绝已删除接口，禁止在构建脚本中另行演进播放器实现。构建脚本必须先完成 canonical SDK 提取校验（兼容 CRLF/LF）再清理旧产物，避免失败后留下 manifest 已声明但文件缺失的运行时。
 - Session Bootstrap 向 agent-service 推送模型配置与外部授权时应并发执行、共同完成后再返回；评论等 effect 的 target 对象必须使用稳定引用，并在资源 ID 就绪前禁用网络链路，避免启动期重复 REST/WS。
 - AI 对话本地消息 ID 不得只使用 `Date.now()`，统一通过带随机后缀的 `createLocalId` 生成；计划审批会将同一轮 assistant 消息分段归档，终态落库必须按该轮 ID 合并并保留已归档的工具卡，不得用 React key 加下标掩盖重复数据。
 - Docker 编辑页延迟诊断不能只看某一时刻的 `docker stats`；同时核对 author-site 容器 `cpu.stat` 的 `nr_throttled / nr_periods`、`RestartCount`、V8 heap OOM 日志和启动日志中的 Next.js 版本，避免周期性限流或重启被当前 `healthy` 状态掩盖。

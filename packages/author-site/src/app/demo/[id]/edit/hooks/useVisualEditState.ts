@@ -15,7 +15,7 @@ import type {
   VisualPropertyChangeKind,
   VisualStyleChange,
 } from "@workbench/demo-ui/iframe-types";
-import type { ImageDimensionRule } from "@workbench/shared/demo/config-schema-definition";
+import type { ConfigColorFormat, ImageDimensionRule } from "@workbench/shared/demo/config-schema-definition";
 import {
   buildVisualConfigCandidates,
   suggestVisualConfigFieldKey,
@@ -85,7 +85,8 @@ export interface VisualConfigMark {
   label: string;
   fieldTitle: string;
   fieldKey: string;
-  defaultValue: string;
+  defaultValue: string | null;
+  colorFormat?: ConfigColorFormat;
   category?: string;
   scope: "page" | "project";
   /** Image MIME allow-list, persisted with the mark and forwarded to direct/AI application. */
@@ -355,6 +356,7 @@ function getConfigMarkSignature(mark: VisualConfigMark): string {
     accept: mark.accept ?? "",
     widthRule: mark.widthRule ?? null,
     heightRule: mark.heightRule ?? null,
+    colorFormat: mark.colorFormat ?? null,
   });
 }
 
@@ -447,6 +449,7 @@ function createPrototypeConfigTargetFromMark(
       defaultValue: mark.defaultValue,
       category: mark.category?.trim(),
       colorProperty: mark.property,
+      colorFormat: mark.colorFormat,
     };
   }
   return null;
@@ -539,7 +542,8 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
   const [visualConfigCandidateId, setVisualConfigCandidateId] = useState("");
   const [visualConfigTitle, setVisualConfigTitle] = useState("");
   const [visualConfigFieldKey, setVisualConfigFieldKey] = useState("");
-  const [visualConfigDefaultValue, setVisualConfigDefaultValue] = useState("");
+  const [visualConfigDefaultValue, setVisualConfigDefaultValue] = useState<string | null>(null);
+  const [visualConfigColorFormat, setVisualConfigColorFormat] = useState<ConfigColorFormat>("color");
   const [visualConfigCategory, setVisualConfigCategory] = useState("");
   const [visualConfigError, setVisualConfigError] = useState<string | null>(
     null,
@@ -617,6 +621,7 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
         suggestVisualConfigFieldKey(candidate.fieldTitle, usedKeys),
       );
       setVisualConfigDefaultValue(candidate.defaultValue);
+      setVisualConfigColorFormat("color");
       setVisualConfigCategory("");
       setVisualConfigError(null);
     },
@@ -636,6 +641,7 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
         suggestVisualConfigFieldKey(candidate.fieldTitle, usedKeys),
       );
       setVisualConfigDefaultValue(candidate.defaultValue);
+      setVisualConfigColorFormat("color");
       setVisualConfigError(null);
     },
     [projectConfigSchema, schemaRef, visualConfigCandidates],
@@ -780,6 +786,7 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
         category: "",
         scope: "page",
         accept: property === "src" ? "image/*" : undefined,
+        colorFormat: kind === "style" ? "color" : undefined,
       };
       setVisualConfigMarks((prev) => {
         const index = prev.findIndex((item) => item.changeId === changeId);
@@ -793,7 +800,7 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
   );
 
   const handleUpdateVisualConfigMark = useCallback(
-    (markId: string, patch: Partial<Pick<VisualConfigMark, "fieldTitle" | "fieldKey" | "defaultValue" | "category" | "scope" | "accept" | "widthRule" | "heightRule">>) => {
+    (markId: string, patch: Partial<Pick<VisualConfigMark, "fieldTitle" | "fieldKey" | "defaultValue" | "category" | "scope" | "accept" | "widthRule" | "heightRule" | "colorFormat">>) => {
       setVisualConfigMarks((prev) =>
         prev.map((item) => (item.id === markId ? { ...item, ...patch } : item)),
       );
@@ -1238,6 +1245,7 @@ ${effectiveInstructionForPrompt || "无"}
       fieldKey: visualConfigFieldKey.trim(),
       title: visualConfigTitle.trim(),
       defaultValue: visualConfigDefaultValue,
+      colorFormat: visualConfigColorFormat,
       category: visualConfigCategory.trim(),
       colorProperty: selectedVisualConfigCandidate.colorProperty,
     };
@@ -1360,6 +1368,7 @@ ${message}
     toast,
     visualConfigCategory,
     visualConfigDefaultValue,
+    visualConfigColorFormat,
     visualConfigFieldKey,
     visualConfigNode,
     visualConfigTitle,
@@ -1625,6 +1634,8 @@ ${context}
     setVisualConfigFieldKey,
     visualConfigDefaultValue,
     setVisualConfigDefaultValue,
+    visualConfigColorFormat,
+    setVisualConfigColorFormat,
     visualConfigCategory,
     setVisualConfigCategory,
     visualConfigError,

@@ -604,6 +604,7 @@ export function AIChat({
         selectedPages={selectedPages}
         onRemovePages={onRemovePages}
         projects={projects}
+        onDiagnosticEvent={onDiagnosticEvent}
       />
 
       {mode !== "viewer-readonly" ? (

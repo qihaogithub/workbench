@@ -1,19 +1,19 @@
 {
   "bgm": "",
-  "navColor": "#07abff",
+  "navColor": "#22B0FE",
   "modules": [
     {
       "type": "image",
-      "image": "https://img.onlywnn.cn/figma/h_c61916f5.png"
+      "image": "/api/images/img_nCiApPhvGjIVdg"
     },
     {
       "type": "participant",
-      "bgImage": "https://img.onlywnn.cn/figma/h_19dbcc85.png",
+      "bgImage": "/api/images/img_jUS1aTOktKE54w",
       "count": 128
     },
     {
       "type": "video",
-      "videoBg": "",
+      "videoBg": "/api/images/img_3UBEhfhSi5SJyg",
       "video": {
         "url": "",
         "poster": ""
@@ -21,15 +21,33 @@
     },
     {
       "type": "collectCard",
-      "bgImage": "",
-      "total": 4,
-      "collected": 1,
-      "obtainedImage": "",
-      "unobtainedImage": ""
+      "bgImage": "/api/images/img_xaYD6cZ_E3t8uQ",
+      "cards": [
+        {
+          "obtainedImage": "",
+          "unobtainedImage": "",
+          "enlargedImage": ""
+        },
+        {
+          "obtainedImage": "",
+          "unobtainedImage": "",
+          "enlargedImage": ""
+        },
+        {
+          "obtainedImage": "",
+          "unobtainedImage": "",
+          "enlargedImage": ""
+        },
+        {
+          "obtainedImage": "",
+          "unobtainedImage": "",
+          "enlargedImage": ""
+        }
+      ]
     },
     {
       "type": "level",
-      "bgImage": "https://img.onlywnn.cn/figma/h_6e2a6768.png",
+      "bgImage": "/api/images/img_w5sA5XB1OWAJlw",
       "levels": [
         {
           "type": "levelCard",
@@ -73,7 +91,7 @@
     },
     {
       "type": "myWorks",
-      "headerImage": "https://img.onlywnn.cn/figma/h_5d121fd1.png",
+      "headerImage": "/api/images/img_S5_tiyYeuTb0Tw",
       "bgColor": "#FFEAA3",
       "innerBgColor": "#FFBA39"
     },
@@ -81,7 +99,14 @@
       "type": "excellentWorks"
     },
     {
-      "type": "ranking"
+      "type": "ranking",
+      "headerImage": "/api/images/img_KXNslf3oT4l_Ow",
+      "bgColor": "#FFEAA3",
+      "innerBgColor": "#FFC575"
+    },
+    {
+      "type": "image",
+      "image": "https://img.onlywnn.cn/figma/h_e0d1c962.png"
     }
   ]
 }

@@ -8,6 +8,11 @@ import type {
 export * from "./markdown-reference";
 export * from "./document/contracts";
 export * from "./config-field-capabilities";
+export {
+  isValidWorkspacePathSegment,
+  validateWorkspacePathSegment,
+} from "./workspace-path";
+export type { WorkspacePathSegmentValidation } from "./workspace-path";
 
 export type { DemoPageRuntimeType } from "./workspace";
 export {
@@ -120,12 +125,15 @@ export type {
 } from "./demo/page-requirements";
 export {
   applySchemaDefinitionCommand,
+  readConfigDefinitionFieldAtPath,
   readConfigDefinitionFields,
 } from "./demo/config-schema-definition";
 export type {
   ConfigDefinitionDraft,
   ConfigDefinitionKind,
   ConfigDefinitionEnumWidget,
+  ConfigColorFormat,
+  ConfigColorPreset,
   SchemaDefinitionCommand,
   SchemaDefinitionDiff,
   SchemaDefinitionMutation,

@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import type { ConfigDefinitionDraft, ConfigDefinitionKind, ImageDimensionOperator } from "@workbench/shared/demo/config-schema-definition";
+import type { ConfigColorFormat, ConfigDefinitionDraft, ConfigDefinitionKind, ImageDimensionOperator } from "@workbench/shared/demo/config-schema-definition";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { ColorDefinitionFields } from "./ColorDefinitionFields";
 
 export type ConfigItemEditorMode = "create" | "edit";
 export type ConfigItemEditorScope = "page" | "project";
@@ -56,6 +57,7 @@ export interface ConfigItemEditorDialogProps {
   groupLabel?: string;
   applyPlan?: ConfigItemApplyPlanSnapshot;
   defaultValueEditor?: ReactNode;
+  allowedColorFormats?: readonly ConfigColorFormat[];
   readOnly?: boolean;
   busy?: boolean;
   onSave?: () => void;
@@ -126,7 +128,7 @@ function planActionLabel(plan?: ConfigItemApplyPlanSnapshot) {
 export function ConfigItemEditorDialog({
   open, onOpenChange, mode, scope, draft, onDraftChange, applyPlan,
   allowedKinds, formPrefix, showRequired = true, groupLabel = "分组",
-  defaultValueEditor, readOnly = false, busy = false, onSave, onApply,
+  defaultValueEditor, allowedColorFormats, readOnly = false, busy = false, onSave, onApply,
 }: ConfigItemEditorDialogProps) {
   const plan = { ...PLAN_COPY[applyPlan?.kind ?? "schema_only"], ...applyPlan };
   const update = (patch: Partial<ConfigDefinitionDraft>) => onDraftChange({ ...draft, ...patch });
@@ -160,7 +162,10 @@ export function ConfigItemEditorDialog({
             </label>
             <label className="space-y-1.5 text-sm font-medium">
               类型
-              <Select value={draft.kind} onValueChange={(kind) => update({ kind: kind as ConfigDefinitionKind })} disabled={readOnly || kindLocked}>
+              <Select value={draft.kind} onValueChange={(kind) => update({
+                kind: kind as ConfigDefinitionKind,
+                ...(kind === "color" ? { colorFormat: draft.colorFormat ?? "color", default: null } : {}),
+              })} disabled={readOnly || kindLocked}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{kindOptions.map(([kind, label]) => <SelectItem key={kind} value={kind}>{label}</SelectItem>)}</SelectContent>
               </Select>
@@ -185,6 +190,15 @@ export function ConfigItemEditorDialog({
               <span className="block text-xs font-normal text-muted-foreground">选项较少且需要快速切换时，可使用单选按钮或分段控件。</span>
             </label>
           </div>}
+
+          {draft.kind === "color" && (
+            <ColorDefinitionFields
+              draft={draft}
+              onChange={update}
+              readOnly={readOnly}
+              allowedFormats={allowedColorFormats}
+            />
+          )}
 
           {imageField && <div className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">

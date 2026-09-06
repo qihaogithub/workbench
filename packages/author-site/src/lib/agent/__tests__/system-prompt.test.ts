@@ -21,6 +21,16 @@ describe('buildStaticSystemPrompt', () => {
     expect(prompt).toContain('禁止行为');
   });
 
+  it('颜色配置契约对 Agent 暴露显式 format、空值语义和预设结构', () => {
+    const prompt = buildStaticSystemPrompt();
+    expect(prompt).toContain('颜色配置契约（Agent 直接读取 `format`）');
+    expect(prompt).toContain('`color-opacity`');
+    expect(prompt).toContain('规范化 `rgba(r, g, b, a)` 或 `null`');
+    expect(prompt).toContain('`null` 表示未设置；透明度 `0` 表示完全透明');
+    expect(prompt).toContain('`ui:options.colorPresets`');
+    expect(prompt).toContain('opacity` 时必须除以 `100` 转换为 `0–1`');
+  });
+
   it('创作端 Agent 身份应覆盖完整创作工作流', () => {
     const prompt = buildStaticSystemPrompt();
     expect(prompt).toContain('你是一位 OneFlow 创作工作流助手');

@@ -6,6 +6,7 @@ import type { AgentConfig } from "../../core/types";
 import { loadConfig } from "../../utils/config";
 import { logger } from "../../utils/logger";
 import { readWorkspaceTree, resolvePageRuntimeType } from "./workspace-page-utils";
+import { isValidWorkspacePathSegment } from "@workbench/shared/workspace-path";
 
 const CaptureScreenshotParams = Type.Object({
   width: Type.Optional(
@@ -81,7 +82,44 @@ function getScreenshotServiceUrl(): string {
 }
 
 function getDemoDir(workingDir: string, demoId: string): string {
+  if (!isValidWorkspacePathSegment(demoId)) {
+    throw new Error("INVALID_PAGE_ID");
+  }
   return path.join(workingDir, "demos", demoId);
+}
+
+export async function checkScreenshotServiceHealth(
+  _config: AgentConfig,
+): Promise<{ available: boolean; reason?: string }> {
+  const serviceUrl = getScreenshotServiceUrl();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 1_500);
+  try {
+    const response = await fetch(`${serviceUrl}/health?deep=1`, {
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      return { available: false, reason: `HTTP ${response.status}` };
+    }
+    const payload = await response.json() as {
+      capabilities?: { screenshot?: { available?: unknown; reason?: unknown } };
+    };
+    const capability = payload.capabilities?.screenshot;
+    if (capability?.available === true) return { available: true };
+    return {
+      available: false,
+      reason: typeof capability?.reason === "string"
+        ? capability.reason
+        : "截图服务未通过 Chromium 健康检查",
+    };
+  } catch (error) {
+    return {
+      available: false,
+      reason: error instanceof Error ? error.message : "截图服务不可达",
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function readConfigDefaults(schemaPath: string): Record<string, unknown> {
@@ -318,6 +356,21 @@ export function createCaptureScreenshotTool(
             },
           ],
           details: { error: "page_runtime_not_found", path: demoDir },
+          isError: true,
+        };
+      }
+
+      const health = await checkScreenshotServiceHealth(config);
+      if (!health.available) {
+        return {
+          content: [{
+            type: "text" as const,
+            text: `Error: screenshot capability unavailable${health.reason ? `: ${health.reason}` : "."}`,
+          }],
+          details: {
+            error: "screenshot_capability_unavailable",
+            reason: health.reason,
+          },
           isError: true,
         };
       }

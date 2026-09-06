@@ -128,6 +128,7 @@ function FieldGroupSection({
   configItemCapabilities,
   onAddConfigComment,
   hasConfigComment,
+  hideEmptyConfigCommentTag,
   imageConfigScope,
   pageId,
   configContextPageId,
@@ -151,10 +152,11 @@ function FieldGroupSection({
   designSpecEntries?: DesignSpecEntryLink[];
   onEditDesignSpec?: (docId: string, entryId: string) => void;
   onOpenDesignSpec?: (spec: DesignSpecEntryLink, fieldTitle: string, anchor?: { top: number; bottom: number }, trigger?: HTMLElement | null) => void;
-  onEditConfigDefinition?: (fieldKey: string, field: FieldConfig) => void;
+  onEditConfigDefinition?: (fieldKey: string, field: FieldConfig, schemaFieldPath?: string) => void;
   configItemCapabilities?: ConfigItemCapabilities;
   onAddConfigComment?: (target: ConfigCommentTarget, trigger?: HTMLElement | null) => void;
   hasConfigComment?: (target: ConfigCommentTarget) => boolean;
+  hideEmptyConfigCommentTag?: boolean;
   imageConfigScope?: ConfigFormProps["imageConfigScope"];
   pageId?: string;
   configContextPageId?: string;
@@ -188,6 +190,7 @@ function FieldGroupSection({
               configItemCapabilities={configItemCapabilities}
               onAddConfigComment={onAddConfigComment}
               hasConfigComment={hasConfigComment}
+              hideEmptyConfigCommentTag={hideEmptyConfigCommentTag}
               fieldPath={field.key}
               schemaFieldPath={field.schemaPath ?? field.key}
               imageConfigScope={imageConfigScope}
@@ -231,6 +234,7 @@ function FieldGroupSection({
             configItemCapabilities={configItemCapabilities}
             onAddConfigComment={onAddConfigComment}
             hasConfigComment={hasConfigComment}
+            hideEmptyConfigCommentTag={hideEmptyConfigCommentTag}
             fieldPath={field.key}
             schemaFieldPath={field.schemaPath ?? field.key}
             imageConfigScope={imageConfigScope}
@@ -276,6 +280,7 @@ export function ConfigForm({
   configItemCapabilities,
   onAddConfigComment,
   hasConfigComment,
+  hideEmptyConfigCommentTag,
   imageConfigScope,
   pageId,
   configContextPageId,
@@ -490,6 +495,7 @@ export function ConfigForm({
                 configItemCapabilities={configItemCapabilities}
                 onAddConfigComment={onAddConfigComment}
                 hasConfigComment={hasConfigComment}
+                hideEmptyConfigCommentTag={hideEmptyConfigCommentTag}
                 imageConfigScope={imageConfigScope}
                 pageId={pageId}
                 configContextPageId={configContextPageId}

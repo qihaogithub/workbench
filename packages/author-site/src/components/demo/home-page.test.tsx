@@ -9,6 +9,7 @@ import {
 import type { ComponentProps } from "react";
 
 import { HomePage } from "./home-page";
+import { getOfficialHomeUrl } from "@/lib/official-site-url";
 import {
   convertProjectTemplate,
   createDemo,
@@ -193,6 +194,15 @@ describe("HomePage", () => {
     expect(screen.getByRole("link", { name: "Figma 插件" })).toHaveAttribute(
       "href",
       "/figma-plugin",
+    );
+  });
+
+  it("header 中的 OneFlow 标识链接到官网首页", () => {
+    render(<HomePage initialDemos={demos} />);
+
+    expect(screen.getByRole("link", { name: "OneFlow" })).toHaveAttribute(
+      "href",
+      getOfficialHomeUrl(),
     );
   });
 

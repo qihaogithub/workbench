@@ -66,6 +66,7 @@ async function start() {
     const deepCheck = shouldRunDeepCheck
       ? await pool.runDeepHealthCheck()
       : undefined;
+    const screenshotAvailable = deepCheck?.ok ?? browser.status === "ready";
 
     return {
       status: "ok",
@@ -81,6 +82,14 @@ async function start() {
       },
       metrics: getScreenshotMetrics().snapshot(),
       lastError: browser.lastError,
+      capabilities: {
+        screenshot: {
+          available: screenshotAvailable,
+          reason: screenshotAvailable
+            ? undefined
+            : (deepCheck?.error ?? browser.lastError ?? "Chromium 尚未通过健康检查"),
+        },
+      },
       ...(deepCheck ? { deepCheck } : {}),
     };
   });

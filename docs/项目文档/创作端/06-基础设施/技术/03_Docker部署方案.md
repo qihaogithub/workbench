@@ -161,6 +161,7 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 | （无浏览器端 Agent URL 配置）        | —                                | author-site/viewer-site 的 Docker 生产包始终按当前页面协议与主机名推导 `:3201`；不得注入 `NEXT_PUBLIC_AGENT_SERVICE_URL` |
 | `NEXT_PUBLIC_SCREENSHOT_SERVICE_URL` | 局域网或公网 URL                 | author-site 浏览器端访问 screenshot-service                                |
 | `NEXT_PUBLIC_VIEWER_URL`             | 局域网或公网 URL                 | author-site 首页「浏览端」入口与分享弹窗使用的浏览端基址；未配置时按端口推导（3200→3300） |
+| `NEXT_PUBLIC_AUTHOR_SITE_URL`        | 局域网或公网 URL                 | 浏览端与创作端 OneFlow 品牌入口使用的官网首页基址；Docker 未配置时默认分别使用 `localhost:3200` |
 | `NEXT_PUBLIC_DATA_BASE`              | `/data` 或外部数据基址           | viewer-site 静态导出时的数据基址                                           |
 | `FIGMA_OAUTH_CLIENT_ID`              | Figma OAuth app client id        | author-site 启动用户级 Figma 授权                                          |
 | `FIGMA_OAUTH_CLIENT_SECRET`          | Figma OAuth app client secret    | author-site 交换和刷新 Figma OAuth token                                   |
@@ -223,6 +224,7 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 - `APP_DATA_DIR=$PWD/data`
 - `NEXT_PUBLIC_SCREENSHOT_SERVICE_URL=http://localhost:3202`
 - `NEXT_PUBLIC_WEB_URL=http://localhost:3200`
+- `NEXT_PUBLIC_AUTHOR_SITE_URL=http://localhost:3200`
 - `CORS_ORIGINS` 同时包含 `localhost` 和 `127.0.0.1` 的创作端、使用端来源。
 
 `scripts/docker-build-check.sh` 默认串行构建 `agent-service`、`author-site` 和 `viewer-site`，降低本地 OrbStack 首次冷构建时多个 `pnpm install` 同时争抢 registry 带宽的概率。需要压测并行构建时显式添加 `--parallel`。

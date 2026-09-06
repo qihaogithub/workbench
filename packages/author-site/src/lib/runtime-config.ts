@@ -1,6 +1,8 @@
 export const DEFAULT_AGENT_SERVICE_URL = "http://localhost:4201";
-/** 浏览器端自动推导时使用的 agent-service 端口（Docker 部署标准端口） */
+/** 浏览器端生产/Docker 自动推导时使用的 agent-service 端口。 */
 export const AGENT_SERVICE_PORT = "3201";
+/** 浏览器端本地开发自动推导时使用的 agent-service 端口。 */
+export const DEV_AGENT_SERVICE_PORT = "4201";
 export const DEFAULT_SCREENSHOT_SERVICE_URL = "http://localhost:4202";
 export const DEFAULT_SCREENSHOT_PROXY_TIMEOUT_MS = 30000;
 
@@ -27,19 +29,63 @@ function parseIntegerEnv(value: string | undefined, fallback: number): number {
   return Number.parseInt(value, 10);
 }
 
-export function getBrowserAgentServiceUrl(): string {
+function isLoopbackHostname(hostname: string): boolean {
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "[::1]"
+  );
+}
+
+function getBrowserAgentServicePort(pagePort: string): string {
+  if (pagePort === "3200") return AGENT_SERVICE_PORT;
+  if (pagePort === "4200") return DEV_AGENT_SERVICE_PORT;
+  return process.env.NODE_ENV === "development"
+    ? DEV_AGENT_SERVICE_PORT
+    : AGENT_SERVICE_PORT;
+}
+
+function isStandardAgentServicePort(port: string): boolean {
+  return port === AGENT_SERVICE_PORT || port === DEV_AGENT_SERVICE_PORT;
+}
+
+export function getBrowserAgentServiceUrl(
+  pageLocation?: Pick<Location, "hostname" | "port" | "protocol">,
+): string {
   // 仅开发环境允许显式覆盖。NEXT_PUBLIC_* 会在生产构建时内联，若带有
   // localhost 会让远程浏览器错误地连接访问者自己的机器。
   const configured =
     process.env.NODE_ENV === "development"
       ? process.env.NEXT_PUBLIC_AGENT_SERVICE_URL
       : undefined;
-  if (configured) return trimTrailingSlashes(configured);
-  // 浏览器环境：从当前页面 hostname 自动推导，同主机 + 固定端口
-  // 使同一 Docker 镜像在任意 IP/域名下均可正常工作
   if (typeof window !== "undefined") {
-    return `${window.location.protocol}//${window.location.hostname}:${AGENT_SERVICE_PORT}`;
+    const currentLocation = pageLocation || window.location;
+    const pagePort = currentLocation.port;
+    const port = getBrowserAgentServicePort(pagePort);
+
+    // 本机地址不能覆盖页面自身的 Docker/local 拓扑：同一份前端资源可能
+    // 由 3200 或 4200 提供，固定写入 localhost:4201 会让 Docker 页面绕过
+    // 3201。非 loopback 或非标准端口的自定义地址仍保留给开发代理和特殊部署使用。
+    if (configured) {
+      try {
+        const configuredUrl = new URL(configured);
+        const isKnownLocalPage = pagePort === "3200" || pagePort === "4200";
+        if (
+          !isLoopbackHostname(configuredUrl.hostname) ||
+          !isKnownLocalPage ||
+          !isStandardAgentServicePort(configuredUrl.port)
+        ) {
+          return trimTrailingSlashes(configured);
+        }
+      } catch {
+        return trimTrailingSlashes(configured);
+      }
+    }
+
+    // 浏览器环境：从当前页面 hostname 自动推导，同主机 + 拓扑端口。
+    return `${currentLocation.protocol}//${currentLocation.hostname}:${port}`;
   }
+  if (configured) return trimTrailingSlashes(configured);
   return DEFAULT_AGENT_SERVICE_URL;
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
 import React, {
   useState,
   useMemo,
@@ -99,6 +100,7 @@ import {
 } from "@/lib/comment-api";
 import { isSchemaEmpty } from "@/components/demo";
 import { getDefaultValues } from "@/lib/validator";
+import { getOfficialHomeUrl } from "@/lib/official-site-url";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -712,10 +714,13 @@ function ProjectListPage() {
       <header className="border-b border-border">
         <div className="container flex h-14 items-center gap-4 px-6">
           <div className="flex shrink-0 items-baseline gap-3">
-            <h1 className="text-lg font-semibold leading-none">FlowSite</h1>
-            <p className="text-xs text-muted-foreground whitespace-nowrap">
-              来自 OneFlow 的项目站点
-            </p>
+            <Link
+              href={getOfficialHomeUrl()}
+              aria-label="OneFlow 官网首页"
+              className="text-lg font-semibold leading-none hover:opacity-80"
+            >
+              <h1>OneFlow</h1>
+            </Link>
           </div>
 
           <div className="flex-1 flex items-center justify-end gap-2">

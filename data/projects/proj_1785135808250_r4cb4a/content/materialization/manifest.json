@@ -1,20 +1,18 @@
 {
   "projectId": "proj_1785135808250_r4cb4a",
-  "commitId": "commit_1788450929636_mgxni4",
+  "commitId": "commit_1788662302802_97datq",
   "materializerVersion": "project-core-content-graph-v1",
   "resources": [
     {
       "kind": "page",
-      "resourceId": "page_duak",
-      "versionId": "prv_1788450929633_7hkbw2",
-      "contentHash": "d7c771c1c3d397de13aaa393180228c275ff5d4031212a0e6564af093af828ff",
+      "resourceId": "闯关活动页-进行中_ec853d",
+      "versionId": "prv_1788662302801_zkx7jo",
+      "contentHash": "0ed8fdca6e68df248362c7d43559e1953c09d639c27eb11e8f82cb91dfa200b2",
       "blobRefs": [
-        "e3ee6c8dcc01eea6e995236998664acad88c5a705ccf74f9a8d76240e93ebb86",
-        "005531d43579f55329c88fc4030a6c8b8a26dc9c5c4f8627fb6fb0bb4bc1295b",
-        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1"
+        "99e365aa16912651cf029e8f986e2654bd9fcee7242199110dcfd6591b9a7730",
+        "c54abf0151c49b0d15bb3e81f7622da8bd3220137714fa147aa575c094e1a41e"
       ]
     }
   ],
-  "updatedAt": 1788450929637
+  "updatedAt": 1788662302802
 }

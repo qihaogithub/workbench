@@ -143,7 +143,8 @@ describe("VisualPropertyPanel 颜色控件", () => {
       onPropertyChange,
     });
 
-    expect(screen.getByLabelText("颜色Hex")).toHaveValue("99DCA3");
+    fireEvent.click(screen.getByRole("button", { name: "颜色选择器" }));
+    expect(screen.getByLabelText("颜色Hex值")).toHaveValue("#99DCA3");
     expect(screen.getByLabelText("颜色明度")).toHaveValue("100");
 
     fireEvent.change(screen.getByLabelText("颜色明度"), {

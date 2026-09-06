@@ -91,6 +91,7 @@ import {
   type SketchSceneTextStyleOverride,
   type SketchSceneTextStyleRun,
 } from "@workbench/sketch-core";
+import { ColorPicker } from "@workbench/color-picker";
 import type {
   PreviewSize,
   SketchTool,
@@ -4492,7 +4493,6 @@ function SketchBrushToolbarGroup({
   const [panelPosition, setPanelPosition] = React.useState<{ left: number; top: number } | null>(null);
   const groupRef = React.useRef<HTMLDivElement>(null);
   const panelRef = React.useRef<HTMLDivElement>(null);
-  const customColorInputRef = React.useRef<HTMLInputElement>(null);
   const pencilButtonRef = React.useRef<HTMLButtonElement>(null);
   const previousToolRef = React.useRef(controller.tool);
   const eraserAvailable = !availableTools || availableTools.includes("eraser");
@@ -4604,46 +4604,19 @@ function SketchBrushToolbarGroup({
 
           <div className="h-8 w-px bg-slate-200" aria-hidden="true" />
 
-          <div className="flex items-center gap-1.5" role="radiogroup" aria-label="颜色">
+          <div className="flex items-center gap-1.5" role="group" aria-label="颜色">
             <span className="text-[11px] font-semibold text-slate-500">颜色</span>
-            {SKETCH_BRUSH_QUICK_COLORS.map((color) => {
-              const selected = controller.brushSettings.color === color;
-              return (
-                <button
-                  key={color}
-                  type="button"
-                  role="radio"
-                  aria-label={`画笔颜色 ${color}`}
-                  aria-checked={selected}
-                  data-sketch-brush-color={color}
-                  className={cn(
-                    "relative inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500",
-                    selected && "ring-2 ring-violet-500 ring-offset-1",
-                  )}
-                  style={{ backgroundColor: color }}
-                  onClick={() => controller.setBrushSettings({ color })}
-                >
-                  {selected ? <Check className="h-3.5 w-3.5" style={{ color: getSketchColorCheckColor(color) }} strokeWidth={2.75} aria-hidden="true" /> : null}
-                </button>
-              );
-            })}
-            <button
-              type="button"
-              aria-label="画笔其他颜色"
-              title="其他颜色"
-              className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
-              onClick={() => customColorInputRef.current?.click()}
-            >
-              <PaintBucket className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-            <input
-              ref={customColorInputRef}
-              type="color"
+            <ColorPicker
+              format="color"
+              label="画笔颜色"
               value={controller.brushSettings.color}
-              tabIndex={-1}
-              aria-label="画笔其他颜色输入"
-              className="sr-only"
-              onChange={(event) => controller.setBrushSettings({ color: event.target.value })}
+              presets={SKETCH_BRUSH_QUICK_COLORS.map((color) => ({ label: `画笔颜色 ${color}`, value: color }))}
+              allowEmpty={false}
+              compact
+              className="h-7 w-28 rounded-md px-1.5 text-xs"
+              onChange={(value) => {
+                if (typeof value === "string") controller.setBrushSettings({ color: value.toLowerCase() });
+              }}
             />
           </div>
 
@@ -6799,15 +6772,6 @@ function ColorField({
         <span className="w-12 shrink-0 font-semibold">{label}</span>
         {mixed ? <span className="shrink-0 rounded bg-background px-1 text-[10px] text-muted-foreground">混合</span> : null}
         <input
-          className="h-5 w-5 shrink-0 cursor-pointer rounded border border-border bg-transparent p-0 outline-none"
-          type="color"
-          disabled={disabled}
-          value={normalizedValue}
-          onChange={(event) => updateColor(event.target.value, false)}
-          onBlur={endContinuousInput}
-          title={label}
-        />
-        <input
           className="min-w-0 flex-1 border-0 bg-transparent font-mono text-[12px] text-foreground outline-none"
           disabled={disabled}
           value={noColor ? "" : normalizedValue.toUpperCase()}
@@ -6851,15 +6815,6 @@ function ColorField({
   );
 }
 
-function getSketchColorCheckColor(color: string): string {
-  const normalized = normalizeSketchHexColor(color);
-  if (!normalized) return "#ffffff";
-  const red = Number.parseInt(normalized.slice(1, 3), 16);
-  const green = Number.parseInt(normalized.slice(3, 5), 16);
-  const blue = Number.parseInt(normalized.slice(5, 7), 16);
-  return (red * 299 + green * 587 + blue * 114) / 1000 > 170 ? "#0f172a" : "#ffffff";
-}
-
 function SketchColorPicker({
   label,
   value,
@@ -6867,10 +6822,9 @@ function SketchColorPicker({
   mixed = false,
   allowNoColor = false,
   recentColors = [],
-  choiceRole = "radio",
-  autoFocus = false,
   customColorFallback = "#000000",
   getSwatchLabel = (color, recent) => `${label}${recent ? " 最近" : ""} ${color}`,
+  preserveFocusOnOpen = false,
   onSelect,
 }: {
   label: string;
@@ -6883,176 +6837,45 @@ function SketchColorPicker({
   autoFocus?: boolean;
   customColorFallback?: string;
   getSwatchLabel?: (color: string, recent: boolean) => string;
+  preserveFocusOnOpen?: boolean;
   onSelect: (value: string) => void;
 }) {
-  const customColorInputRef = React.useRef<HTMLInputElement>(null);
-  const initialChoiceRef = React.useRef<HTMLButtonElement>(null);
   const noColor = !mixed && allowNoColor && isSketchNoColor(value);
   const normalizedValue = noColor
-    ? "transparent"
-    : normalizeSketchHexColor(value) ?? toColorInputValue(value, customColorFallback);
-  const customColorValue = toColorInputValue(value, customColorFallback);
+    ? null
+    : normalizeSketchHexColor(value) ?? normalizeSketchHexColor(customColorFallback);
   const normalizedRecentColors = recentColors
     .map((color) => normalizeSketchHexColor(color))
     .filter((color): color is string => Boolean(color));
-  const moveChoiceFocus = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
-    const choices = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(`[role="${choiceRole}"]`));
-    if (!choices.length) return;
-    const currentIndex = choices.indexOf(document.activeElement as HTMLElement);
-    const nextIndex = event.key === "Home"
-      ? 0
-      : event.key === "End"
-        ? choices.length - 1
-        : (currentIndex < 0 ? 0 : currentIndex + (event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : -1) + choices.length) % choices.length;
-    event.preventDefault();
-    choices[nextIndex]?.focus();
-  };
-
-  React.useEffect(() => {
-    if (!autoFocus) return;
-    initialChoiceRef.current?.focus();
-  }, [autoFocus]);
+  const presets = [
+    ...normalizedRecentColors.map((color) => ({ label: getSwatchLabel(color, true), value: color })),
+    ...SKETCH_COLOR_SWATCHES.map((color) => ({ label: getSwatchLabel(color, false), value: color })),
+  ];
 
   return (
-    <div
-      data-testid="sketch-color-picker"
-      role={choiceRole === "radio" ? "radiogroup" : undefined}
-      aria-label={choiceRole === "radio" ? `${label}颜色` : undefined}
-      className="grid w-full max-w-[288px] gap-1.5"
-      onKeyDown={moveChoiceFocus}
-    >
-      {mixed ? <span className="rounded bg-slate-50 px-1.5 py-1 text-[10px] text-slate-500">当前选区颜色不同</span> : null}
-      {allowNoColor ? (
-        <div className="flex h-6 items-center">
-          <button
-            type="button"
-            ref={initialChoiceRef}
-            role={choiceRole}
-            aria-checked={noColor}
-            data-sketch-color="transparent"
-            aria-label={`${label} 无颜色`}
-            title={`${label} 无颜色`}
-            disabled={disabled}
-            className={cn(
-              "relative inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:cursor-not-allowed disabled:opacity-40",
-              noColor && "ring-2 ring-slate-900 ring-offset-1",
-            )}
-            onClick={() => onSelect("transparent")}
-          >
-            <span className="absolute h-px w-7 rotate-45 bg-slate-400" aria-hidden="true" />
-            {noColor ? <Check className="relative h-3.5 w-3.5 text-slate-900" aria-hidden="true" /> : null}
-          </button>
-        </div>
-      ) : null}
-      {normalizedRecentColors.length ? (
-        <SketchColorSwatchGrid
-          label={`${label}最近颜色`}
-          colors={normalizedRecentColors}
-          normalizedValue={normalizedValue}
-          mixed={mixed}
-          disabled={disabled}
-          choiceRole={choiceRole}
-          autoFocus={autoFocus && !allowNoColor}
-          getSwatchLabel={(color) => getSwatchLabel(color, true)}
-          onSelect={onSelect}
-        />
-      ) : null}
-      <SketchColorSwatchGrid
-        label={`${label}常用颜色`}
-        colors={SKETCH_COLOR_SWATCHES}
-        normalizedValue={normalizedValue}
-        mixed={mixed}
+    <div data-testid="sketch-color-picker" className="w-full max-w-[288px]">
+      {mixed ? <span className="mb-1 block rounded bg-slate-50 px-1.5 py-1 text-[10px] text-slate-500">当前选区颜色不同</span> : null}
+      <ColorPicker
+        format="color"
+        label={label}
+        value={normalizedValue}
+        presets={presets}
+        allowEmpty={allowNoColor}
         disabled={disabled}
-        choiceRole={choiceRole}
-        autoFocus={autoFocus && !allowNoColor && !normalizedRecentColors.length}
-        getSwatchLabel={(color) => getSwatchLabel(color, false)}
-        onSelect={onSelect}
-      />
-      <button
-        type="button"
-        role={choiceRole === "menuitemradio" ? "menuitem" : undefined}
-        aria-label={`${label} 其他颜色`}
-        aria-haspopup="dialog"
-        disabled={disabled}
-        className="flex min-h-8 w-full items-center gap-2 border-t border-slate-100 px-1.5 text-left text-xs text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:cursor-not-allowed disabled:opacity-40"
-        onClick={() => customColorInputRef.current?.click()}
-      >
-        <PaintBucket className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
-        <span>其他颜色</span>
-        <ChevronRight className="ml-auto h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
-      </button>
-      <input
-        ref={customColorInputRef}
-        type="color"
-        value={customColorValue}
-        tabIndex={-1}
-        aria-label={`${label} 其他颜色输入`}
-        className="sr-only"
-        onChange={(event) => onSelect(event.target.value)}
+        compact
+        preserveFocusOnOpen={preserveFocusOnOpen}
+        className="w-full border-slate-200 bg-white text-slate-700"
+        onChange={(nextValue) => {
+          if (nextValue === null) {
+            if (allowNoColor) onSelect("transparent");
+            return;
+          }
+          if (typeof nextValue === "string") onSelect(nextValue.toLowerCase());
+        }}
       />
     </div>
   );
 }
-
-function SketchColorSwatchGrid({
-  label,
-  colors,
-  normalizedValue,
-  mixed = false,
-  disabled,
-  choiceRole,
-  autoFocus = false,
-  getSwatchLabel,
-  onSelect,
-}: {
-  label: string;
-  colors: string[];
-  normalizedValue: string;
-  mixed?: boolean;
-  disabled: boolean;
-  choiceRole: "menuitemradio" | "radio";
-  autoFocus?: boolean;
-  getSwatchLabel: (color: string) => string;
-  onSelect: (color: string) => void;
-}) {
-  const firstSwatchRef = React.useRef<HTMLButtonElement>(null);
-
-  React.useEffect(() => {
-    if (autoFocus) firstSwatchRef.current?.focus();
-  }, [autoFocus]);
-
-  return (
-    <div className="grid grid-cols-10 gap-1" data-sketch-color-grid="true" aria-label={label}>
-      {colors.map((color, index) => {
-        const swatchLabel = getSwatchLabel(color);
-        const selected = !mixed && normalizedValue.toLowerCase() === color.toLowerCase();
-        return (
-          <button
-            key={color}
-            type="button"
-            ref={index === 0 ? firstSwatchRef : undefined}
-            className={cn(
-              "relative aspect-square w-full min-w-0 rounded-[4px] border border-slate-200 shadow-sm transition-transform hover:scale-105 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:cursor-not-allowed",
-              selected && "ring-2 ring-slate-900 ring-offset-1",
-            )}
-            role={choiceRole}
-            aria-checked={selected}
-            data-sketch-color={color}
-            style={{ backgroundColor: color }}
-            disabled={disabled}
-            title={swatchLabel}
-            aria-label={swatchLabel}
-            onClick={() => onSelect(color)}
-          >
-            {selected ? <Check className="absolute inset-0 m-auto h-4 w-4" style={{ color: getSketchColorCheckColor(color) }} strokeWidth={2.75} aria-hidden="true" /> : null}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 function SelectField({
   label,
   value,
@@ -7417,7 +7240,7 @@ export const SketchEditorCanvas = React.forwardRef<SketchEditorCanvasHandle, Ske
       const target = event.target;
       if (!(target instanceof Element)) return;
       if (detailsPanelRef.current?.contains(target)) return;
-      if (target.closest("[data-sketch-text-toolbar], [data-sketch-floating-toolbar]")) return;
+      if (target.closest("[data-sketch-text-toolbar], [data-sketch-floating-toolbar], [data-color-picker-content]")) return;
       detailsPanelOpenRef.current = false;
       setDetailsPanelOpen(false);
     };
@@ -9320,6 +9143,7 @@ export const SketchEditorCanvas = React.forwardRef<SketchEditorCanvasHandle, Ske
           range={textToolbarRange}
           canEdit={canEditNodeProperties(textToolbarNode)}
           toolbarLabel={textToolbarNode.type === "text" ? "纯文本工具栏" : "图文工具栏"}
+          preserveFocusOnOpen={isTextToolbarInlineEdit}
           leadingActions={textToolbarNode.type === "text"
             ? EMPTY_SKETCH_FLOATING_TOOLBAR_ACTIONS
             : floatingToolbarActions.filter((action) => action.id === "fill" || action.id === "stroke")}
@@ -9931,6 +9755,7 @@ function SketchTextFloatingToolbar({
   range,
   canEdit,
   toolbarLabel = "纯文本工具栏",
+  preserveFocusOnOpen = false,
   leadingActions = EMPTY_SKETCH_FLOATING_TOOLBAR_ACTIONS,
   useNodeDefaultColor = false,
   onWidthChange,
@@ -9950,6 +9775,7 @@ function SketchTextFloatingToolbar({
   range: { start: number; end: number } | null;
   canEdit: boolean;
   toolbarLabel?: string;
+  preserveFocusOnOpen?: boolean;
   leadingActions?: SketchFloatingToolbarAction[];
   useNodeDefaultColor?: boolean;
   onWidthChange: (width: number) => void;
@@ -9992,7 +9818,7 @@ function SketchTextFloatingToolbar({
     if (!openMenu) return undefined;
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
-      if (!toolbarRef.current?.contains(target) && !menuRef.current?.contains(target)) setOpenMenu(null);
+      if (!toolbarRef.current?.contains(target) && !menuRef.current?.contains(target) && !(target as Element).closest("[data-color-picker-content]")) setOpenMenu(null);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
@@ -10157,6 +9983,7 @@ function SketchTextFloatingToolbar({
             <SketchColorPicker
               label="文字颜色"
               value={currentColor}
+              preserveFocusOnOpen={preserveFocusOnOpen}
               choiceRole="menuitemradio"
               customColorFallback={SKETCH_TEXT_DEFAULT_COLOR}
               getSwatchLabel={(color) => `文字颜色 ${color}`}

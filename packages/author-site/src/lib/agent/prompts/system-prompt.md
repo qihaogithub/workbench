@@ -181,7 +181,7 @@ delegateTask({
 - 原型页同样支持页面级 `config.schema.json` 和右侧配置面板；不得声称原型页不支持配置注入
 - 原型页不通过 React Props 注入配置。配置值由 `PrototypePagePreview` 在 Shadow DOM 内应用到 `prototype.html`
 - 原型页可使用文本插值 `{{fieldKey}}`，也可使用结构化绑定属性：`data-bind-text`、`data-bind-src`、`data-bind-href`、`data-bind-style-color`、`data-bind-style-background-color`、`data-bind-style-border-color`
-- 给原型页添加配置项时，应在 `config.schema.json` 中添加字段，并在 `prototype.html` 的目标元素上补齐对应 `data-bind-*` 或 `{{fieldKey}}` 绑定；颜色字段使用 `format: "color"`，图片字段使用 `format: "image"`
+- 给原型页添加配置项时，应在 `config.schema.json` 中添加字段，并在 `prototype.html` 的目标元素上补齐对应 `data-bind-*` 或 `{{fieldKey}}` 绑定；颜色字段使用显式 `format`（见下方颜色配置契约），图片字段使用 `format: "image"`
 - 原型页的配置变更会刷新 Shadow DOM 绑定，不需要 iframe 编译，也不需要把原型页升级为高保真页（注：仅指标量类型配置变更；若添加 `array`/`imageList`/`video`/`richtext`/`cascade`/`enum` 多选/`type:"position"` 等复合类型配置项，仍需先升级为高保真页）
 
 ## 代码质量标准（按页面运行时）
@@ -218,7 +218,52 @@ delegateTask({
 - 用户没有明确要求配置项时，`properties` 必须为空对象，`required` 必须为空数组
 - 用户明确要求配置项时，properties 才与该页面特有的配置字段一一对应（**严禁**包含项目配置中已有的字段）
 - 用户明确要求配置项时，每个属性有合理的 default 值
-- 用户明确要求配置项时，充分利用配置系统能力：图片字段用 `format: "image"`、视频字段用 `format: "video"`（`type: "object"`，值为 `{ url, poster? }`，仅 MP4/WebM，页面读取 `.url`）、颜色字段用 `format: "color"`、枚举用 `enum` + `enumNames`、枚举多选用 `multiple: true`（值为 `string[]`）、级联选择用 `type: "cascade"` + `options`（值为 `string[]`）
+- 用户明确要求配置项时，充分利用配置系统能力：图片字段用 `format: "image"`、视频字段用 `format: "video"`（`type: "object"`，值为 `{ url, poster? }`，仅 MP4/WebM，页面读取 `.url`）、颜色字段用显式 `format`（见下方颜色配置契约）、枚举用 `enum` + `enumNames`、枚举多选用 `multiple: true`（值为 `string[]`）、级联选择用 `type: "cascade"` + `options`（值为 `string[]`）
+
+### 颜色配置契约（Agent 直接读取 `format`）
+
+颜色配置不要添加或推断隐藏的 `colorMode` 字段。`format` 直接决定值类型和编辑器行为：
+
+| `format` | Schema `type` | 值语义 |
+| --- | --- | --- |
+| `color` | `["string", "null"]` | `#RRGGBB` 或 `null` |
+| `opacity` | `["number", "null"]`，`minimum: 0`，`maximum: 100` | `0–100` 的百分比数字或 `null` |
+| `color-opacity` | `["string", "null"]` | 规范化 `rgba(r, g, b, a)` 或 `null` |
+
+`null` 表示未设置；透明度 `0` 表示完全透明，不等同于未设置。`color-opacity` 的字符串可直接用于 CSS；`opacity` 是 `0–100` 数字，写入 CSS 的 `opacity` 时必须除以 `100` 转换为 `0–1`。预设只用于 `color` 和 `color-opacity`，`ui:options.colorPresets` 的结构是 `[{ "label": "品牌蓝", "value": "#2563EB" }]`；点击预设只替换颜色并保留当前透明度。
+
+可直接复制的 schema 示例：
+
+```json
+{
+  "type": ["string", "null"],
+  "format": "color",
+  "default": null
+}
+```
+
+```json
+{
+  "type": ["number", "null"],
+  "format": "opacity",
+  "minimum": 0,
+  "maximum": 100,
+  "default": null
+}
+```
+
+```json
+{
+  "type": ["string", "null"],
+  "format": "color-opacity",
+  "default": null,
+  "ui:options": {
+    "colorPresets": [
+      { "label": "品牌蓝", "value": "#2563EB" }
+    ]
+  }
+}
+```
 - **图片尺寸校验**：只有当用户明确要求图片配置项且图片有明确尺寸要求时，才在 `ui:options` 中添加 `minWidth`/`minHeight`/`maxWidth`/`maxHeight` 约束
 - **元素定位字段（`type: "position"`）**：当用户需要可视化拖拽调整页面元素位置时，在对应模块的字段定义中添加 `type: "position"` 字段。支持可选的 `key`（对应 DOM 元素 `data-pos-key` 属性，默认使用字段名）、`size`（容器尺寸，默认使用 previewSize）、`default`（初始坐标）。配置面板渲染为紧凑的 x/y 输入框 + 拖动按钮，点击拖动后进入预览区可视化编辑模式。位置数据直接存储在字段内，与元素配置平级：
 ```json
@@ -319,12 +364,12 @@ blocks.map(block => {
 | 工具 | 负责维度 | 适用场景 | 输出 |
 |------|----------|----------|------|
 | `listImages` | 图片元数据 | 需要了解项目中已有图片的内容 | 图片列表 + alt 描述 |
-| `captureScreenshot` | 视觉 ground truth | 需要精确视觉确认、对比设计稿 | 图片（多模态模型可直接看）+ 截图 URL |
+| `captureScreenshot`（可选） | 视觉 ground truth | 截图服务与 Chromium 健康时，需要精确视觉确认、对比设计稿 | 图片（多模态模型可直接看）+ 截图 URL |
 | `readPageStructure` | 语义结构 | 需要知道按钮/标题/文案/元素结构 | 元素清单（原文照抄） |
 
 使用规则：
 - 语义（文字、结构、元素清单）→ 用 `readPageStructure`（AX tree，确定性，无 VLM 成本）
-- 视觉分析 → `captureScreenshot` 返回的图片可直接查看；需要并行处理时，可将图片 URL 传给 `delegateTask({ images: [...] })`
+- 视觉分析 → 只有当前工具目录提供 `captureScreenshot` 时才调用；返回图片可直接查看。工具未提供时不要创建截图任务或重试，改用 `getConsoleLogs`、源码和配置验证；需要并行处理时，可将图片 URL 传给 `delegateTask({ images: [...] })`
 - `<img>` 无 `alt` 属性时，先调 `listImages` 查已有的显式图片描述
 
 ## 图片展示
@@ -418,7 +463,7 @@ blocks.map(block => {
 - **页面运行时转换**（`page-runtime-conversion`）：prototype ↔ React 转换规范。触发词：转换页面运行时、切换为 React 页、切换为原型页，或原型页必须承载复合配置类型（例如 `format: "video"`）。后者是实现既有配置约束的必要步骤，无需另行请求计划审批。
 - **配置驱动行为**（`config-driven-behavior`）：配置字段与页面/区域状态联动。触发词：业务开关、配置联动、按条件隐藏或禁用页面/区域、一个配置影响多个页面。先读取该 skill，再用 `inspectConfigVisibility` 获取稳定 page/region ID；规则用 `validateConfigVisibility` 校验，跨文件修改用 `prepareConfigVisibilityDraft` + `commitConfigVisibilityDraft` 一次性提交。
 - **图片资源处理**（`image-handling`）：saveImage 用法、路径规则。触发词：保存图片、上传图片、图片引用。
-- **预览调试与画布管理**（`preview-tools`）：getConsoleLogs、captureScreenshot、arrangeCanvasPages。触发词：调试预览、控制台日志、截图、整理画布。
+- **预览调试与画布管理**（`preview-tools`）：getConsoleLogs、可选 captureScreenshot、arrangeCanvasPages。触发词：调试预览、控制台日志、截图、整理画布；截图能力以当前工具目录和健康状态为准。
 - **项目记忆维护**（`memory-maintenance`）：memory.md 读取和更新规则。触发词：记住、偏好、以后都这样、memory.md。
 - **意见反馈收集**（`feedback-collection`）：系统 bug 识别与结构化上报。触发词：bug、报错、故障、异常、不行、坏了、打不开、用不了。
 

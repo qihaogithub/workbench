@@ -15,6 +15,8 @@ export interface SchemaCatalogField {
   uiOptions?: Record<string, unknown>;
   breadcrumbs: string[];
   isConst: boolean;
+  /** Synthetic node representing a JSON Schema oneOf branch. */
+  isBranch?: boolean;
   constValue?: unknown;
 }
 
@@ -70,6 +72,30 @@ function childPath(parent: string, key: string): string {
   return parent ? `${parent}.${key}` : key;
 }
 
+function schemaType(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    return value.find((item): item is string => typeof item === "string" && item !== "null") ?? "string";
+  }
+  return "string";
+}
+
+function emitBranch(
+  result: SchemaCatalogField[],
+  branchPath: string,
+  label: string,
+  breadcrumbs: string[],
+): void {
+  result.push({
+    key: branchPath,
+    title: label,
+    type: "object",
+    breadcrumbs: [...breadcrumbs, label],
+    isConst: false,
+    isBranch: true,
+  });
+}
+
 function emitProperty(
   result: SchemaCatalogField[],
   key: string,
@@ -82,8 +108,8 @@ function emitProperty(
     ? property.title.trim()
     : key;
   const isConst = property.const !== undefined;
-  const type = typeof property.type === "string"
-    ? property.type
+  const type = property.type !== undefined
+    ? schemaType(property.type)
     : isConst
       ? valueType(property.const)
       : "string";
@@ -115,6 +141,7 @@ function emitProperty(
       if (!isRecord(branch)) return;
       const { marker, label } = variantMarker(branch, index);
       const branchPath = `${path}[${marker}]`;
+      emitBranch(result, branchPath, label, [...breadcrumbs, title]);
       for (const [childKey, child] of properties(branch.properties)) {
         emitProperty(result, childKey, child, branchPath, [...breadcrumbs, title, label]);
       }
@@ -129,8 +156,10 @@ function emitProperty(
   branches?.forEach((branch, index) => {
     if (!isRecord(branch)) return;
     const { marker, label } = variantMarker(branch, index);
+    const branchPath = `${path}[${marker}]`;
+    emitBranch(result, branchPath, label, [...breadcrumbs, title]);
     for (const [childKey, child] of properties(branch.properties)) {
-      emitProperty(result, childKey, child, `${path}[${marker}]`, [...breadcrumbs, title, label]);
+      emitProperty(result, childKey, child, branchPath, [...breadcrumbs, title, label]);
     }
   });
 }
@@ -151,8 +180,10 @@ export function enumerateSchemaFields(schema: string): SchemaCatalogField[] {
     rootBranches.forEach((branch, index) => {
       if (!isRecord(branch)) return;
       const { marker, label } = variantMarker(branch, index);
+      const branchPath = `[${marker}]`;
+      emitBranch(result, branchPath, label, []);
       for (const [key, property] of properties(branch.properties)) {
-        emitProperty(result, key, property, `[${marker}]`, [label]);
+        emitProperty(result, key, property, branchPath, [label]);
       }
     });
     return result;

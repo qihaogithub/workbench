@@ -29,7 +29,7 @@ const compactSchema = JSON.stringify({
   properties: {
     count: { type: "number", title: "数量" },
     enabled: { type: "boolean", title: "启用" },
-    color: { type: "string", title: "背景色", format: "color" },
+    color: { type: ["string", "null"], title: "背景色", format: "color", default: null },
   },
 });
 
@@ -99,6 +99,26 @@ const nestedImageArraySchema = JSON.stringify({
           image: { type: "string", title: "图片", format: "image" },
           gallery: { type: "array", title: "细节图", items: { type: "string", format: "image" } },
         },
+      },
+    },
+  },
+});
+
+const nestedDefinitionSchema = JSON.stringify({
+  type: "object",
+  properties: {
+    navColor: { type: ["string", "null"], title: "导航栏颜色", format: "color", default: null },
+    modules: {
+      type: "array",
+      title: "内容模块",
+      items: {
+        oneOf: [{
+          title: "图片模块",
+          properties: {
+            type: { const: "image" },
+            image: { type: "string", title: "图片", format: "image" },
+          },
+        }],
       },
     },
   },
@@ -223,7 +243,7 @@ describe("ConfigForm configuration-definition entry", () => {
     fireEvent.focus(titleButton);
     expect(screen.queryByText("添加批注")).not.toBeInTheDocument();
     fireEvent.click(titleButton);
-    expect(onEditConfigDefinition).toHaveBeenCalledWith("title", expect.anything());
+    expect(onEditConfigDefinition).toHaveBeenCalledWith("title", expect.anything(), "title");
     fireEvent.click(screen.getByRole("button", { name: "查看设计规范：页面标题" }));
     expect(onOpenDesignSpec).toHaveBeenCalledWith(spec, "页面标题", undefined, expect.any(HTMLElement));
     const commentButton = screen.getByRole("button", { name: "查看或添加批注：页面标题" });
@@ -283,6 +303,29 @@ describe("ConfigForm configuration-definition entry", () => {
     expect(onEditConfigDefinition).toHaveBeenCalledWith(
       "title",
       expect.objectContaining({ key: "title", title: "页面标题" }),
+      "title",
+    );
+  });
+
+  it("嵌套对象数组字段标题也能打开配置定义编辑", () => {
+    const onEditConfigDefinition = vi.fn();
+
+    render(
+      <ConfigForm
+        schema={nestedDefinitionSchema}
+        initialData={{ modules: [{ type: "image", image: "" }] }}
+        onChange={vi.fn()}
+        onEditConfigDefinition={onEditConfigDefinition}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "图片模块" }));
+    fireEvent.click(screen.getByRole("button", { name: "编辑配置项：图片" }));
+
+    expect(onEditConfigDefinition).toHaveBeenCalledWith(
+      "image",
+      expect.objectContaining({ key: "image", title: "图片" }),
+      "modules[type=image].image",
     );
   });
 
@@ -346,9 +389,43 @@ describe("ConfigForm configuration-definition entry", () => {
     );
 
     const commentButton = screen.getByRole("button", { name: "查看或添加批注：页面标题" });
-    expect(commentButton.parentElement).toHaveClass("opacity-0", "group-hover:opacity-100");
+    expect(commentButton.parentElement).toHaveClass("pointer-events-auto", "opacity-100");
+    expect(commentButton.parentElement).not.toHaveClass("opacity-0", "group-hover:opacity-100");
     expect(commentButton).toHaveClass("bg-amber-400", "text-amber-950");
     expect(screen.queryByText(/批注\s*\d/)).not.toBeInTheDocument();
+  });
+
+  it("浏览端没有批注时不显示标签，有批注时常驻显示", () => {
+    const hasConfigComment = vi.fn().mockReturnValue(false);
+    const { rerender } = render(
+      <ConfigForm
+        schema={schema}
+        onChange={vi.fn()}
+        onAddConfigComment={vi.fn()}
+        hasConfigComment={hasConfigComment}
+        hideEmptyConfigCommentTag
+        imageConfigScope="page"
+        pageId="page-1"
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "查看或添加批注：页面标题" })).not.toBeInTheDocument();
+
+    hasConfigComment.mockReturnValue(true);
+    rerender(
+      <ConfigForm
+        schema={schema}
+        onChange={vi.fn()}
+        onAddConfigComment={vi.fn()}
+        hasConfigComment={hasConfigComment}
+        hideEmptyConfigCommentTag
+        imageConfigScope="page"
+        pageId="page-1"
+      />,
+    );
+
+    const commentButton = screen.getByRole("button", { name: "查看或添加批注：页面标题" });
+    expect(commentButton.parentElement).toHaveClass("pointer-events-auto", "opacity-100");
   });
 
   it("分组始终展示字段，字段固定呈现完整编辑态", () => {
@@ -365,9 +442,9 @@ describe("ConfigForm configuration-definition entry", () => {
 
     expect(screen.getByRole("spinbutton")).toBeInTheDocument();
     expect(screen.getByRole("switch")).toBeInTheDocument();
-    const colorValue = screen.getByDisplayValue("#000000");
-    expect(colorValue).toBeInTheDocument();
-    expect(colorValue.parentElement?.parentElement).toHaveClass("w-full", "min-w-[132px]", "max-w-[180px]");
+    const colorValue = screen.getByRole("button", { name: "背景色选择器" });
+    expect(colorValue).toHaveTextContent("无色");
+    expect(colorValue).toHaveClass("w-full", "min-w-[132px]", "max-w-[220px]");
   });
 
   it("按 Schema 控件覆盖渲染枚举单选组和分段控件", () => {

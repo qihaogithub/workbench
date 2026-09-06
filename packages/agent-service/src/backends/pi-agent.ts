@@ -17,6 +17,7 @@ import {
   resolveCapabilityToolNames,
   type SubagentRunResult,
 } from "./pi-tools";
+import { checkScreenshotServiceHealth } from "./pi-tools/screenshot-tool";
 import type { CapabilityName } from "./pi-tools/capability-activation-tool";
 import { stripExpiredImageParts } from "../utils/image-context-strip";
 import type { PreinstalledSkill } from "./preinstalled-skills";
@@ -222,6 +223,7 @@ export class PiAgentBackend implements IBackendAdapter {
   private toolStartedInCurrentRun = false;
   private allTools: any[] = [];
   private activeToolNames = new Set<string>();
+  private screenshotAvailable = true;
 
   // 管理器
   private modelManager: ModelManager;
@@ -297,6 +299,12 @@ export class PiAgentBackend implements IBackendAdapter {
       const model = this.modelManager.getModel();
       const resources = { skills: getPreinstalledSkills() };
 
+      const screenshotHealth = await checkScreenshotServiceHealth(this.config);
+      this.screenshotAvailable = screenshotHealth.available;
+      if (!screenshotHealth.available) {
+        logger.warn({ reason: screenshotHealth.reason }, "Screenshot capability disabled by health check");
+      }
+
       logger.info(
         { modelId: model.id, provider: model.provider, baseUrl: model.baseUrl },
         "Pi Agent model configured",
@@ -315,6 +323,7 @@ export class PiAgentBackend implements IBackendAdapter {
           userChoiceHandler: this.userInteractionManager.requestUserChoice,
           capabilityActivationHandler: (capabilities) =>
             this.activateCapabilities(capabilities),
+          includeScreenshot: this.screenshotAvailable,
         },
       );
       this.allTools = tools;
@@ -570,6 +579,7 @@ Keep the final response concise: summarize what you changed, what you verified, 
           includePlanApproval: false,
           includeUserChoice: false,
           imageSubagent: params.subagentType === "image",
+          includeScreenshot: this.screenshotAvailable,
         },
       );
       const model = this.modelManager.getModel();

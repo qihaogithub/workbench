@@ -197,6 +197,60 @@ describe("DesignSpecEditor", () => {
     expect(addEntryWithPage).toHaveBeenCalledWith("page-a");
   });
 
+  it("拖入 oneOf 分支父节点时绑定单个稳定引用", () => {
+    const bindRef = jest.fn();
+    const branch = {
+      id: "page:page-a:modules[type=participant]",
+      scope: "page" as const,
+      pageId: "page-a",
+      pageName: "页面 A",
+      key: "modules[type=participant]",
+      title: "参与人数模块",
+      breadcrumbs: ["内容模块", "参与人数模块"],
+      kind: "text" as const,
+      isBranch: true,
+    };
+    useWorkspace.mockReturnValue({
+      loading: false,
+      doc: {
+        id: "spec-1",
+        entries: [{
+          id: "entry-1",
+          title: "参与人数规范",
+          markdown: "",
+          target: { type: "config", refs: [] },
+        }],
+      },
+      pool: [branch],
+      pages: [],
+      openIds: new Set(["entry-1"]),
+      setActiveDocId: jest.fn(),
+      setMarkdown: jest.fn(),
+      toggleEntry: jest.fn(),
+      renameEntry: jest.fn(),
+      deleteEntry: jest.fn(),
+      bindRef,
+      unbindRef: jest.fn(),
+      reorderEntry: jest.fn(),
+      addEntry: jest.fn(),
+      addEntryWithItem: jest.fn(),
+      setHoverPop: jest.fn(),
+      setZoomed: jest.fn(),
+    });
+
+    render(<DesignSpecEditor docId="spec-1" />);
+
+    const entryCard = screen.getByDisplayValue("参与人数规范").closest(".group");
+    expect(entryCard).not.toBeNull();
+    fireEvent.drop(entryCard!, {
+      dataTransfer: {
+        types: ["text/plain"],
+        getData: () => `pool:${branch.id}`,
+      },
+    });
+    expect(bindRef).toHaveBeenCalledWith(branch.id, "entry-1");
+  });
+
   it("显示绑定页面名称且不提供手动展示位置选择器", () => {
     const unbindPage = jest.fn();
     useWorkspace.mockReturnValue({

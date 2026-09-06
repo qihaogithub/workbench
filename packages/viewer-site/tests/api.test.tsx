@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { resolveDataBase } from "../src/lib/api";
+import { normalizePublishedDesignSpecDoc, resolveDataBase } from "../src/lib/api";
 
 describe("resolveDataBase", () => {
   afterEach(() => {
@@ -20,5 +20,29 @@ describe("resolveDataBase", () => {
         NEXT_PUBLIC_VIEWER_DOCKER_MODE: "true",
       }),
     ).toBe("");
+  });
+});
+
+describe("normalizePublishedDesignSpecDoc", () => {
+  it("converts legacy refs into the current config target", () => {
+    expect(normalizePublishedDesignSpecDoc({
+      id: "spec-legacy",
+      entries: [{
+        id: "entry-1",
+        title: "图片",
+        refs: [
+          { scope: "page", pageId: "page-1", fieldKey: "heroImage" },
+          { scope: "page", pageId: "page-1", fieldKey: "heroImage" },
+        ],
+      }],
+    }).entries[0]).toEqual({
+      id: "entry-1",
+      title: "图片",
+      markdown: "",
+      target: {
+        type: "config",
+        refs: [{ scope: "page", pageId: "page-1", fieldKey: "heroImage" }],
+      },
+    });
   });
 });

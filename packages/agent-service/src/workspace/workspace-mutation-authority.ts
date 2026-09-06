@@ -2,7 +2,6 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-import { buildPageDesignSpecSyncWrites } from "@workbench/project-core/page-design-spec-sync";
 import { normalizeHtmlImport } from "@workbench/project-core/html-import";
 import { classifyManagedDocumentPath } from "@workbench/project-core/document-proposal";
 import {
@@ -599,7 +598,6 @@ export class WorkspaceMutationAuthority {
         const workspacePath = this.workspacePath(request.workspaceId);
         request = this.expandHtmlImportCommand(request, workspacePath);
         request = this.expandConfigValuesPatchCommands(request, workspacePath);
-        request = this.withPageDesignSpecSync(request, workspacePath);
         const actual = this.readResourceHashes(workspacePath);
         if (this.rootHash(actual) !== state.rootHash) {
           // Yjs-First: auto-adopt filesystem reality instead of rejecting with
@@ -778,63 +776,6 @@ export class WorkspaceMutationAuthority {
     )))].sort();
   }
 
-  /**
-   * 将页面 config.schema.json 的设计规范副作用并入原 mutation。
-   * 这样 AI、协同和创作端的任意受管写入入口都会在同一事务内完成同步。
-   */
-  private withPageDesignSpecSync(
-    request: WorkspaceMutationRequest,
-    workspacePath: string,
-  ): WorkspaceMutationRequest {
-    const schemaOperation = request.operations.find((operation) => (
-      operation.type === "put_text"
-      && /^demos\/[^/]+\/config\.schema\.json$/.test(operation.path)
-    ));
-    if (!schemaOperation || schemaOperation.type !== "put_text") return request;
-    const match = /^demos\/([^/]+)\/config\.schema\.json$/.exec(schemaOperation.path);
-    if (!match) return request;
-
-    const pageId = match[1];
-    const pageName = this.pageName(workspacePath, pageId);
-    const writes = buildPageDesignSpecSyncWrites({
-      workspacePath,
-      pageId,
-      pageName,
-      schema: schemaOperation.content,
-    });
-    if (writes.length === 0) return request;
-
-    const operations = [...request.operations];
-    for (const write of writes) {
-      if (operations.some((operation) => operation.type === "put_text" && operation.path === write.path)) {
-        continue;
-      }
-      const target = path.join(workspacePath, write.path);
-      const previousContent = fs.existsSync(target) ? fs.readFileSync(target, "utf-8") : null;
-      operations.push({
-        type: "put_text",
-        path: write.path,
-        content: write.content,
-        ...(previousContent === null
-          ? { expectedAbsent: true }
-          : { expectedHash: hashWorkspaceContent(previousContent) }),
-      });
-    }
-    return { ...request, operations };
-  }
-
-  private pageName(workspacePath: string, pageId: string): string {
-    try {
-      const tree = JSON.parse(fs.readFileSync(path.join(workspacePath, "workspace-tree.json"), "utf-8")) as {
-        pages?: Array<{ id?: string; name?: string }>;
-      };
-      const page = tree.pages?.find((candidate) => candidate.id === pageId);
-      return page?.name?.trim() || pageId;
-    } catch {
-      return pageId;
-    }
-  }
-
   private recordMutationDiagnostic(
     request: WorkspaceMutationRequest,
     eventType: Parameters<typeof appendWorkspaceAuthorityDiagnostic>[0]["eventType"],
@@ -1003,6 +944,7 @@ export class WorkspaceMutationAuthority {
         const isConfigValuesPath = normalized === "project.config.values.json"
           || Boolean(normalized && /^demos\/[^/]+\/config\.values\.json$/.test(normalized));
         const patch = operation.patch;
+        const arrayAppends = operation.arrayAppends ?? [];
         const patchKeys = patch && typeof patch === "object" && !Array.isArray(patch)
           ? Object.keys(patch)
           : [];
@@ -1010,8 +952,23 @@ export class WorkspaceMutationAuthority {
           !normalized
           || !isConfigValuesPath
           || seenPaths.has(normalized)
-          || patchKeys.length === 0
+          || (patchKeys.length === 0 && arrayAppends.length === 0)
           || patchKeys.some((key) => !key || ["__proto__", "prototype", "constructor"].includes(key))
+          || !Array.isArray(arrayAppends)
+          || arrayAppends.some((append) => (
+            !append
+            || typeof append.key !== "string"
+            || !append.key
+            || ["__proto__", "prototype", "constructor"].includes(append.key)
+            || !append.item
+            || typeof append.item !== "object"
+            || Array.isArray(append.item)
+            || typeof append.discriminator?.key !== "string"
+            || !append.discriminator.key
+            || ["__proto__", "prototype", "constructor"].includes(append.discriminator.key)
+            || !Object.hasOwn(append.item, append.discriminator.key)
+            || append.item[append.discriminator.key] !== append.discriminator.value
+          ))
         ) {
           throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION", "Invalid config values patch", {
             operationType: operation.type,
@@ -1034,7 +991,28 @@ export class WorkspaceMutationAuthority {
             });
           }
         }
-        const content = JSON.stringify({ ...current, ...patch }, null, 2) + "\n";
+        const next: Record<string, unknown> = { ...current, ...patch };
+        for (const append of arrayAppends) {
+          const currentArray = next[append.key];
+          if (currentArray === undefined) {
+            next[append.key] = [];
+          } else if (!Array.isArray(currentArray)) {
+            throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION", "Config values array target is not an array", {
+              operationType: operation.type,
+              resourcePath: normalized,
+              key: append.key,
+            });
+          } else {
+            next[append.key] = [...currentArray];
+          }
+          const targetArray = next[append.key] as unknown[];
+          const alreadyPresent = targetArray.some((item) => (
+            item && typeof item === "object" && !Array.isArray(item)
+            && (item as Record<string, unknown>)[append.discriminator.key] === append.discriminator.value
+          ));
+          if (!alreadyPresent) targetArray.push(append.item);
+        }
+        const content = JSON.stringify(next, null, 2) + "\n";
         this.assertManagedTextWrite(normalized, content, operation.type);
         return { type: "put_text" as const, path: normalized, content };
       }),
@@ -1229,8 +1207,38 @@ export class WorkspaceMutationAuthority {
     const existing = this.readState(workspaceId);
     if (existing) {
       const actualHashes = this.readResourceHashes(workspacePath);
-      if (this.rootHash(actualHashes) === existing.rootHash) {
+      const missingBackups = this.missingCommittedBackups(workspaceId, existing.resourceHashes);
+      const actualMatches = this.rootHash(actualHashes) === existing.rootHash;
+      if (missingBackups.length > 0 && !actualMatches) {
+        this.recordBackupDiagnostic(
+          projectId,
+          workspaceId,
+          "workspace.backup_missing",
+          existing,
+          missingBackups,
+        );
+        throw new WorkspaceMutationAuthorityError(
+          "WORKSPACE_AUTHORITY_BACKUP_MISSING",
+          "Committed Workspace backup is missing or untrusted",
+          {
+            paths: missingBackups.map((item) => item.path),
+            hashes: missingBackups.map((item) => item.hash),
+            actualRootHash: this.rootHash(actualHashes),
+            expectedRootHash: existing.rootHash,
+          },
+        );
+      }
+      if (actualMatches) {
         this.persistCommittedBackups(workspaceId, workspacePath, existing.resourceHashes);
+        if (missingBackups.length > 0) {
+          this.recordBackupDiagnostic(
+            projectId,
+            workspaceId,
+            "workspace.backup_rehydrated",
+            existing,
+            missingBackups,
+          );
+        }
       }
       return existing;
     }
@@ -1525,12 +1533,31 @@ export class WorkspaceMutationAuthority {
           if (operation.type === "move_path") {
             return { type: operation.type, from: operation.from, to: operation.to };
           }
-          return {
-            type: operation.type,
-            path: operation.path,
-            expectedHash: operation.expectedHash,
-            expectedAbsent: operation.expectedAbsent,
-          };
+          if (operation.type === "patch_config_values") {
+            return {
+              type: operation.type,
+              path: operation.path,
+              patchKeys: Object.keys(operation.patch),
+              arrayAppendKeys: (operation.arrayAppends ?? []).map((append) => append.key),
+            };
+          }
+          if (operation.type === "commit_html_import") {
+            return {
+              type: operation.type,
+              stagingId: operation.stagingId,
+              contentBytes: operation.size,
+              contentHash: operation.hash,
+              name: operation.name,
+            };
+          }
+          if (operation.type === "delete_path") {
+            return {
+              type: operation.type,
+              path: operation.path,
+              expectedHash: operation.expectedHash,
+            };
+          }
+          return { type: "unknown" };
         }),
         before: Object.fromEntries(
           Object.entries(before).map(([resourcePath, value]) => [resourcePath, {
@@ -1627,12 +1654,58 @@ export class WorkspaceMutationAuthority {
   }
 
   private missingCommittedBackupCount(workspaceId: string, resourceHashes: Record<string, string>): number {
-    return new Set(Object.values(resourceHashes)).size - new Set(
-      Object.values(resourceHashes).filter((hash) => {
-        const backupPath = this.backupPath(workspaceId, hash);
-        return fs.existsSync(backupPath) && hashWorkspaceContent(fs.readFileSync(backupPath)) === hash;
-      }),
-    ).size;
+    return this.missingCommittedBackups(workspaceId, resourceHashes).length;
+  }
+
+  private missingCommittedBackups(
+    workspaceId: string,
+    resourceHashes: Record<string, string>,
+  ): Array<{ path: string; hash: string }> {
+    const validHashes = new Set<string>();
+    const missing: Array<{ path: string; hash: string }> = [];
+    for (const [resourcePath, hash] of Object.entries(resourceHashes)) {
+      const backupPath = this.backupPath(workspaceId, hash);
+      const valid = validHashes.has(hash) || (
+        fs.existsSync(backupPath) && hashWorkspaceContent(fs.readFileSync(backupPath)) === hash
+      );
+      if (valid) {
+        validHashes.add(hash);
+      } else {
+        missing.push({ path: resourcePath, hash });
+      }
+    }
+    return missing;
+  }
+
+  private recordBackupDiagnostic(
+    projectId: string,
+    workspaceId: string,
+    eventType: "workspace.backup_rehydrated" | "workspace.backup_missing",
+    state: WorkspaceAuthorityState,
+    items: Array<{ path: string; hash: string }>,
+  ): void {
+    const mutationId = `backup-preflight-${workspaceId}-${state.revision}`;
+    appendWorkspaceAuthorityDiagnostic({
+      dataDir: this.options.dataDir,
+      projectId,
+      workspaceId,
+      eventType,
+      mutationId,
+      baseRevision: state.revision,
+      revision: state.revision,
+      actor: "system",
+      resourcePaths: items.map((item) => item.path),
+      durationMs: 0,
+      level: eventType === "workspace.backup_missing" ? "error" : "info",
+      message: eventType === "workspace.backup_missing"
+        ? "Committed Workspace backups are missing or untrusted"
+        : "Committed Workspace backups were rehydrated from matching content",
+      payload: {
+        hashes: items.map((item) => item.hash),
+        count: items.length,
+        revision: state.revision,
+      },
+    });
   }
 
   private recoverPreparedMutations(workspaceId: string, workspacePath: string): Omit<WorkspaceAuthorityRecoveryResult, "workspaceId" | "projectId"> {

@@ -26,6 +26,47 @@ describe("configuration definition mutations", () => {
     expect(readConfigDefinitionFields(SCHEMA).find((item) => item.key === "heroImage")?.enumWidget).toBeUndefined();
   });
 
+  it("round-trips explicit color formats, nullable defaults, and presets", () => {
+    const added = applySchemaDefinitionCommand(SCHEMA, {
+      type: "field.add",
+      field: {
+        key: "surface",
+        title: "表面颜色",
+        kind: "color",
+        colorFormat: "color-opacity",
+        default: null,
+        colorPresets: [{ label: "品牌蓝", value: "#2563eb" }],
+      },
+    });
+    const surface = JSON.parse(added.schema).properties.surface;
+    expect(surface).toMatchObject({
+      type: ["string", "null"],
+      format: "color-opacity",
+      default: null,
+      "ui:options": { colorPresets: [{ label: "品牌蓝", value: "#2563EB" }] },
+    });
+    expect(readConfigDefinitionFields(added.schema).find((field) => field.key === "surface")).toMatchObject({
+      kind: "color",
+      colorFormat: "color-opacity",
+      default: null,
+      colorPresets: [{ label: "品牌蓝", value: "#2563EB" }],
+    });
+
+    const opacity = applySchemaDefinitionCommand(added.schema, {
+      type: "field.update",
+      key: "surface",
+      patch: { colorFormat: "opacity", colorPresets: undefined, default: null },
+    });
+    expect(JSON.parse(opacity.schema).properties.surface).toMatchObject({
+      type: ["number", "null"],
+      format: "opacity",
+      minimum: 0,
+      maximum: 100,
+      default: null,
+    });
+    expect(JSON.parse(opacity.schema).properties.surface["ui:options"]).toBeUndefined();
+  });
+
   it("round-trips enum presentation widgets and can return to the default select", () => {
     const added = applySchemaDefinitionCommand(SCHEMA, {
       type: "field.add",

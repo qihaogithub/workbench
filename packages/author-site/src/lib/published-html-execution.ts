@@ -4,6 +4,7 @@ import {
   HTML_IMPORT_ANALYSIS_VERSION,
   normalizeHtmlImport,
 } from "@workbench/project-core";
+import { isValidWorkspacePathSegment } from "@workbench/shared/workspace-path";
 import { getDataDir } from "@/lib/fs-utils";
 import { createHtmlSandboxExecution, HTML_SANDBOX_POLICY_VERSION, resolveHtmlSandboxPublicOrigin } from "@/lib/html-sandbox-execution";
 
@@ -14,7 +15,7 @@ export type PublishedHtmlExecutionIssueResult =
   | { ok: false; status: number; message: string };
 
 function failure(status: number, message: string): PublishedHtmlExecutionIssueResult { return { ok: false, status, message }; }
-function isSafeSegment(value: string): boolean { return Boolean(value) && value !== "." && value !== ".." && !/[\\/]/.test(value); }
+function isSafeSegment(value: string): boolean { return isValidWorkspacePathSegment(value); }
 function isMeta(value: unknown): value is PublishedMeta {
   if (!value || typeof value !== "object") return false;
   const meta = value as Partial<PublishedMeta>;

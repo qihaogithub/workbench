@@ -102,6 +102,8 @@ export interface WorkbenchToolsOptions {
   /** 图片子 Agent 定向工具集：只包含图像相关工具 */
   imageSubagent?: boolean;
   capabilityActivationHandler?: CapabilityActivationHandler;
+  /** Omit visual screenshot capability when the service/Chromium health check failed. */
+  includeScreenshot?: boolean;
 }
 
 const CONTROL_TOOL_NAMES = new Set([
@@ -203,7 +205,7 @@ export function createWorkbenchTools(
     createSchemaValidateTool(config),
     createSaveImageTool(config),
     createGetConsoleLogsTool(config),
-    createCaptureScreenshotTool(config),
+    ...(options.includeScreenshot === false ? [] : [createCaptureScreenshotTool(config)]),
     createListImagesTool(config),
     createReadUserImageTool(),
     createKnowledgeReportTool(config),

@@ -13,6 +13,7 @@ import {
   Loader2,
   MoreVertical,
   Plus,
+  Pencil,
   ScrollText,
   Trash2,
   Upload,
@@ -71,6 +72,10 @@ export interface PageItem {
 }
 
 const EMPTY_PAGE_ITEMS: PageItem[] = [];
+
+function isWithinDropdownMenu(target: EventTarget | null): target is Element {
+  return target instanceof Element && Boolean(target.closest('[role="menu"]'));
+}
 
 /** 右侧编辑区当前打开的目标：知识库文档 / AI 记忆 / 项目公约 / 页面公约 / 设计规范 */
 type ActiveTarget =
@@ -159,6 +164,8 @@ export function DocumentView({
 }: DocumentViewProps) {
   const { toast } = useToast();
   const [items, setItems] = useState<KnowledgeItem[]>([]);
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
   const canManageGovernance = userRole === "admin";
   const [loading, setLoading] = useState(false);
   const [activeTarget, setActiveTarget] = useState<ActiveTarget | null>(null);
@@ -180,8 +187,13 @@ export function DocumentView({
   const [proposalReviewOpen, setProposalReviewOpen] = useState(false);
   const [renamingKnowledgeId, setRenamingKnowledgeId] = useState<string | null>(null);
   const [renamingKnowledgeTitle, setRenamingKnowledgeTitle] = useState("");
+  const [renamingDesignSpecId, setRenamingDesignSpecId] = useState<string | null>(null);
+  const [renamingDesignSpecTitle, setRenamingDesignSpecTitle] = useState("");
   const knowledgeMutationVersionRef = useRef(0);
+  const designSpecMutationVersionRef = useRef(0);
   const knowledgeUploadInputRef = useRef<HTMLInputElement>(null);
+  const designSpecRenameBlurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const designSpecRenameInputRef = useRef<HTMLInputElement>(null);
   // 同一视图内切换文档时复用已读取的正文；资源列表刷新时会清空该缓存。
   const contentCacheRef = useRef(new Map<string, string>());
   const referenceEditorContainerRef = useRef<HTMLDivElement>(null);
@@ -287,6 +299,7 @@ export function DocumentView({
 
   const fetchDesignSpecs = useCallback(async () => {
     if (!workingDir) return;
+    const requestMutationVersion = designSpecMutationVersionRef.current;
     setDesignSpecsLoading(true);
     try {
       const params = new URLSearchParams({ workingDir });
@@ -294,7 +307,9 @@ export function DocumentView({
       if (projectId) params.set("projectId", projectId);
       const res = await fetch(`/api/design-specs?${params.toString()}`);
       const data = await res.json();
-      if (data.success) setDesignSpecs(data.data || []);
+      if (data.success && designSpecMutationVersionRef.current === requestMutationVersion) {
+        setDesignSpecs(data.data || []);
+      }
     } catch {
       // 静默失败
     } finally {
@@ -340,7 +355,44 @@ export function DocumentView({
   }, [fetchExistingConventions]);
 
   useEffect(() => {
-    const handler = () => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<unknown>).detail;
+      if (detail && typeof detail === "object") {
+        const update = detail as Record<string, unknown>;
+        if (
+          typeof update.docId === "string" &&
+          typeof update.title === "string" &&
+          update.title.trim()
+        ) {
+          const title = update.title.trim();
+          if (event.type === "knowledge-updated") {
+            setItems((current) =>
+              current.map((item) =>
+                item.id === update.docId ? { ...item, title } : item,
+              ),
+            );
+            setActiveTarget((current) =>
+              current?.kind === "knowledge" && current.item.id === update.docId
+                ? { kind: "knowledge", item: { ...current.item, title } }
+                : current,
+            );
+            return;
+          }
+          if (event.type === "design-spec-updated") {
+            setDesignSpecs((current) =>
+              current.map((doc) =>
+                doc.id === update.docId ? { ...doc, title } : doc,
+              ),
+            );
+            setActiveTarget((current) =>
+              current?.kind === "designSpec" && current.doc.id === update.docId
+                ? { kind: "designSpec", doc: { ...current.doc, title } }
+                : current,
+            );
+            return;
+          }
+        }
+      }
       contentCacheRef.current.clear();
       fetchItems();
       fetchDesignSpecs();
@@ -644,7 +696,11 @@ export function DocumentView({
         contentCacheRef.current.set(`knowledge:${item.id}`, markdown);
         setActiveTarget({ kind: "knowledge", item });
         setContent(markdown);
-        onItemsChangeRef.current?.([...items.filter((entry) => entry.id !== item.id), item]);
+        const nextItems = [
+          ...itemsRef.current.filter((entry) => entry.id !== item.id),
+          item,
+        ];
+        onItemsChangeRef.current?.(nextItems);
         return item;
       } catch (error) {
         toast({
@@ -711,13 +767,23 @@ export function DocumentView({
           ? toKnowledgeItem(data.data.snapshot)
           : data.data as KnowledgeItem;
         knowledgeMutationVersionRef.current += 1;
-        setItems((current) =>
-          current.map((entry) => (entry.id === updated.id ? updated : entry)),
-        );
+        const currentItems = itemsRef.current;
+        const nextItems = currentItems.some((entry) => entry.id === updated.id)
+          ? currentItems.map((entry) =>
+              entry.id === updated.id ? updated : entry,
+            )
+          : [...currentItems, updated];
+        setItems(nextItems);
+        onItemsChangeRef.current?.(nextItems);
         setActiveTarget((current) =>
           current?.kind === "knowledge" && current.item.id === updated.id
             ? { kind: "knowledge", item: updated }
             : current,
+        );
+        window.dispatchEvent(
+          new CustomEvent("knowledge-updated", {
+            detail: { docId: updated.id, title: updated.title },
+          }),
         );
       } catch (error) {
         toast({
@@ -728,6 +794,57 @@ export function DocumentView({
       }
     },
     [documentApiMode, projectId, renamingKnowledgeTitle, sessionId, toast, workingDir],
+  );
+
+  const commitDesignSpecRename = useCallback(
+    async (doc: DesignSpecMeta) => {
+      if (designSpecRenameBlurTimerRef.current) {
+        clearTimeout(designSpecRenameBlurTimerRef.current);
+        designSpecRenameBlurTimerRef.current = null;
+      }
+      const title = renamingDesignSpecTitle.trim();
+      setRenamingDesignSpecId(null);
+      if (!title || title === doc.title || !workingDir) return;
+      try {
+        const params = new URLSearchParams({ workingDir });
+        if (sessionId) params.set("sessionId", sessionId);
+        if (projectId) params.set("projectId", projectId);
+        const res = await fetch(
+          `/api/design-specs/${encodeURIComponent(doc.id)}?${params.toString()}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title }),
+          },
+        );
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error?.message || "重命名失败");
+        }
+        const updated = data.data as DesignSpecMeta;
+        designSpecMutationVersionRef.current += 1;
+        setDesignSpecs((current) =>
+          current.map((entry) => (entry.id === updated.id ? updated : entry)),
+        );
+        setActiveTarget((current) =>
+          current?.kind === "designSpec" && current.doc.id === updated.id
+            ? { kind: "designSpec", doc: updated }
+            : current,
+        );
+        window.dispatchEvent(
+          new CustomEvent("design-spec-updated", {
+            detail: { docId: updated.id, title: updated.title },
+          }),
+        );
+      } catch (error) {
+        toast({
+          title: "重命名失败",
+          description: error instanceof Error ? error.message : undefined,
+          variant: "destructive",
+        });
+      }
+    },
+    [projectId, renamingDesignSpecTitle, sessionId, toast, workingDir],
   );
 
   const handleCreateDesignSpec = useCallback(async () => {
@@ -745,6 +862,7 @@ export function DocumentView({
       });
       const data = await res.json();
       if (data.success) {
+        designSpecMutationVersionRef.current += 1;
         toast({ title: "已创建设计规范" });
         setDesignSpecExpanded(true);
         setActiveTarget({ kind: "designSpec", doc: data.data });
@@ -771,6 +889,7 @@ export function DocumentView({
         });
         const data = await res.json();
         if (data.success) {
+          designSpecMutationVersionRef.current += 1;
           knowledgeMutationVersionRef.current += 1;
           toast({ title: "删除成功" });
           if (activeTarget?.kind === "designSpec" && activeTarget.doc.id === doc.id) {
@@ -1098,6 +1217,10 @@ export function DocumentView({
                           setActiveTarget({ kind: "knowledge", item })
                         }
                         onDelete={() => handleDelete(item)}
+                        onRename={() => {
+                          setRenamingKnowledgeId(item.id);
+                          setRenamingKnowledgeTitle(item.title);
+                        }}
                         renaming={renamingKnowledgeId === item.id}
                         renameValue={renamingKnowledgeTitle}
                         onRenameValueChange={setRenamingKnowledgeTitle}
@@ -1174,9 +1297,51 @@ export function DocumentView({
                         onClick={() => setActiveTarget({ kind: "designSpec", doc })}
                       >
                         <FileText className="h-4 w-4 shrink-0 text-cyan-500" />
-                        <span className="min-w-0 flex-1 truncate">{doc.title}</span>
+                        {renamingDesignSpecId === doc.id ? (
+                          <input
+                            ref={designSpecRenameInputRef}
+                            autoFocus
+                            className="h-6 min-w-0 flex-1 rounded border bg-background px-1 text-sm outline-none focus:ring-1 focus:ring-ring"
+                            value={renamingDesignSpecTitle}
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={(event) => setRenamingDesignSpecTitle(event.target.value)}
+                            onBlur={(event) => {
+                              if (isWithinDropdownMenu(event.relatedTarget)) {
+                                window.setTimeout(() => designSpecRenameInputRef.current?.focus(), 0);
+                                return;
+                              }
+                              designSpecRenameBlurTimerRef.current = setTimeout(() => {
+                                designSpecRenameBlurTimerRef.current = null;
+                                void commitDesignSpecRename(doc);
+                              }, 0);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                if (designSpecRenameBlurTimerRef.current) {
+                                  clearTimeout(designSpecRenameBlurTimerRef.current);
+                                  designSpecRenameBlurTimerRef.current = null;
+                                }
+                                void commitDesignSpecRename(doc);
+                              } else if (event.key === "Escape") {
+                                event.preventDefault();
+                                if (designSpecRenameBlurTimerRef.current) {
+                                  clearTimeout(designSpecRenameBlurTimerRef.current);
+                                  designSpecRenameBlurTimerRef.current = null;
+                                }
+                                setRenamingDesignSpecId(null);
+                              }
+                            }}
+                          />
+                        ) : (
+                          <span className="min-w-0 flex-1 truncate">{doc.title}</span>
+                        )}
                         {canManageGovernance && <DocumentMoreMenu
                           label={doc.title}
+                          onRename={() => {
+                            setRenamingDesignSpecId(doc.id);
+                            setRenamingDesignSpecTitle(doc.title);
+                          }}
                           onDelete={() => handleDeleteDesignSpec(doc)}
                         />}
                       </div>
@@ -1325,6 +1490,7 @@ function KnowledgeFileItem({
   onSelect,
   onHistory,
   onDelete,
+  onRename,
   renaming,
   renameValue,
   onRenameValueChange,
@@ -1336,12 +1502,16 @@ function KnowledgeFileItem({
   onSelect: () => void;
   onHistory?: () => void;
   onDelete?: () => void;
+  onRename?: () => void;
   renaming?: boolean;
   renameValue?: string;
   onRenameValueChange?: (value: string) => void;
   onRenameCommit?: () => void;
   onRenameCancel?: () => void;
 }) {
+  const renameBlurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
   return (
     <div
       className={cn(
@@ -1354,18 +1524,36 @@ function KnowledgeFileItem({
       <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
       {renaming ? (
         <input
+          ref={renameInputRef}
           autoFocus
           className="h-6 min-w-0 flex-1 rounded border bg-background px-1 text-sm outline-none focus:ring-1 focus:ring-ring"
           value={renameValue}
           onClick={(event) => event.stopPropagation()}
           onChange={(event) => onRenameValueChange?.(event.target.value)}
-          onBlur={onRenameCommit}
+          onBlur={(event) => {
+            if (isWithinDropdownMenu(event.relatedTarget)) {
+              window.setTimeout(() => renameInputRef.current?.focus(), 0);
+              return;
+            }
+            renameBlurTimerRef.current = setTimeout(() => {
+              renameBlurTimerRef.current = null;
+              onRenameCommit?.();
+            }, 0);
+          }}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               event.preventDefault();
+              if (renameBlurTimerRef.current) {
+                clearTimeout(renameBlurTimerRef.current);
+                renameBlurTimerRef.current = null;
+              }
               onRenameCommit?.();
             } else if (event.key === "Escape") {
               event.preventDefault();
+              if (renameBlurTimerRef.current) {
+                clearTimeout(renameBlurTimerRef.current);
+                renameBlurTimerRef.current = null;
+              }
               onRenameCancel?.();
             }
           }}
@@ -1376,6 +1564,7 @@ function KnowledgeFileItem({
       <DocumentMoreMenu
         label={item.title}
         onHistory={onHistory}
+        onRename={onRename}
         onDelete={onDelete}
       />
     </div>
@@ -1386,12 +1575,16 @@ function KnowledgeFileItem({
 function DocumentMoreMenu({
   label,
   onHistory,
+  onRename,
   onDelete,
 }: {
   label: string;
   onHistory?: () => void;
+  onRename?: () => void;
   onDelete?: () => void;
 }) {
+  const renameRequestedRef = useRef(false);
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -1406,7 +1599,26 @@ function DocumentMoreMenu({
           <MoreVertical className="h-3.5 w-3.5" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent
+        align="end"
+        onCloseAutoFocus={(event) => {
+          if (!renameRequestedRef.current) return;
+          event.preventDefault();
+          renameRequestedRef.current = false;
+        }}
+      >
+        {onRename && (
+          <DropdownMenuItem
+            onClick={(event) => {
+              event.stopPropagation();
+              renameRequestedRef.current = true;
+              onRename();
+            }}
+          >
+            <Pencil className="mr-2 h-3.5 w-3.5" />
+            重命名
+          </DropdownMenuItem>
+        )}
         {onHistory && (
           <DropdownMenuItem
             onClick={(event) => {

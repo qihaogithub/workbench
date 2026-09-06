@@ -271,10 +271,14 @@ describe("production HTML import analyzer", () => {
       source: "<p>x</p>",
       schema: "{}",
     };
-    for (const pageId of ["", ".", "../evil", path.join(root, "evil")])
+    for (const pageId of ["", ".", "../evil", path.join(root, "evil"), "bad\u0000id", "\ud800"]) {
       expect(() => stageHtmlImportBranch({ ...input, pageId })).toThrow(
         HtmlImportError,
       );
+    }
+    const unicodeStage = stageHtmlImportBranch({ ...input, pageId: "闯关活动页-进行中_ec853d" });
+    expect(unicodeStage.analysis.outcome.status).toBe("accepted");
+    unicodeStage.discard();
     expect(() =>
       stageHtmlImportBranch({ ...input, pageId: "new", schema: "[]" }),
     ).toThrow(HtmlImportError);

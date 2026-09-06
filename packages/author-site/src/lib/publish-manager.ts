@@ -58,6 +58,7 @@ import { processVideosForPublish } from "@/lib/publish/video-processor";
 import { processSpineAssetsForPublish } from "@/lib/publish/spine-processor";
 import { replacePathsInContent } from "@/lib/publish/path-replacer";
 import type { PublishContext } from "@/lib/publish/types";
+import { readDesignSpecDoc } from "@/lib/design-specs";
 import type { DesignSpecMeta } from "@/lib/design-specs";
 import {
   buildPublishedMarkdownReferenceSnapshot,
@@ -120,7 +121,17 @@ function copyDesignSpecsForPublish(
     fs.cpSync(designSpecDir, path.join(publishedProjectDir, "design-spec"), {
       recursive: true,
     });
-    return manifest.items;
+    const publishedDesignSpecs = manifest.items.flatMap((item) => {
+      const doc = readDesignSpecDoc(workspacePath, item.id);
+      if (!doc) return [];
+      fs.writeFileSync(
+        path.join(publishedProjectDir, "design-spec", `spec-${item.id}.json`),
+        JSON.stringify(doc, null, 2),
+        "utf-8",
+      );
+      return [item];
+    });
+    return publishedDesignSpecs;
   } catch {
     return undefined;
   }

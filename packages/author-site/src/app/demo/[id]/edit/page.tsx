@@ -12,6 +12,7 @@ import {
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { ConfigItemEditorDialog } from "@workbench/demo-ui/ConfigItemEditorDialog";
+import { ColorPicker } from "@workbench/color-picker";
 import {
   extractCodeConfigBindingKeys,
   extractPrototypeConfigBindingKeys,
@@ -880,12 +881,17 @@ function getWorkspaceSyncErrorDetails(error: unknown): {
   const message = error instanceof Error ? error.message : "协同草稿同步失败";
   if (error instanceof WorkspaceSyncStepError) {
     const phaseLabel = WORKSPACE_SYNC_PHASE_LABELS[error.phase] ?? error.phase;
+    const backupMissing = error.code === "WORKSPACE_AUTHORITY_BACKUP_MISSING";
     return {
-      message,
+      message: backupMissing
+        ? "页面暂存备份不完整，当前修改未确认落盘；请刷新页面后重试。"
+        : message,
       phase: error.phase,
       errorCode: error.code,
       httpStatus: error.status,
-      label: `保存失败：${phaseLabel}`,
+      label: backupMissing
+        ? "保存失败：备份不完整，请刷新页面后重试"
+        : `保存失败：${phaseLabel}`,
     };
   }
   return { message, label: "保存失败" };
@@ -3528,6 +3534,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     visualConfigFieldKey,
     visualConfigDefaultValue,
     setVisualConfigDefaultValue,
+    visualConfigColorFormat,
+    setVisualConfigColorFormat,
     visualConfigCategory,
     setVisualConfigCategory,
     visualConfigError,
@@ -8476,12 +8484,14 @@ ${context.details}
       title: visualConfigTitle,
       kind: selectedVisualConfigCandidate?.kind ?? "text",
       default: visualConfigDefaultValue,
+      colorFormat: selectedVisualConfigCandidate?.kind === "color" ? visualConfigColorFormat : undefined,
       group: visualConfigCategory || undefined,
     }),
     [
       selectedVisualConfigCandidate?.kind,
       visualConfigCategory,
       visualConfigDefaultValue,
+      visualConfigColorFormat,
       visualConfigFieldKey,
       visualConfigTitle,
     ],
@@ -8490,16 +8500,20 @@ ${context.details}
     (draft: ConfigDefinitionDraft) => {
       handleVisualConfigTitleChange(draft.title);
       setVisualConfigDefaultValue(
-        typeof draft.default === "string"
-          ? draft.default
-          : String(draft.default ?? ""),
+        draft.kind === "color"
+          ? (typeof draft.default === "string" || draft.default === null ? draft.default : null)
+          : typeof draft.default === "string"
+            ? draft.default
+            : String(draft.default ?? ""),
       );
+      setVisualConfigColorFormat(draft.colorFormat ?? "color");
       setVisualConfigCategory(draft.group ?? "");
     },
     [
       handleVisualConfigTitleChange,
       setVisualConfigCategory,
       setVisualConfigDefaultValue,
+      setVisualConfigColorFormat,
     ],
   );
   const getVisualNodeChangeCount = useCallback(
@@ -10844,28 +10858,27 @@ ${context.details}
           </div>
         }
         defaultValueEditor={
-          <div className="flex items-center gap-2">
-            {visualConfigDraft.kind === "color" && (
-              <input
-                aria-label="选择默认颜色"
-                className="h-8 w-8 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
-                type="color"
-                value={visualConfigDefaultValue || "#000000"}
-                onChange={(event) =>
-                  setVisualConfigDefaultValue(event.target.value)
-                }
-              />
-            )}
+          visualConfigDraft.kind === "color" ? (
+            <ColorPicker
+              format={visualConfigDraft.colorFormat ?? "color"}
+              value={visualConfigDefaultValue}
+              label="选择默认颜色"
+              presets={visualConfigDraft.colorPresets}
+              onChange={(value) => setVisualConfigDefaultValue(value == null ? null : String(value))}
+              className="w-full"
+            />
+          ) : (
             <Input
               aria-label="默认值"
-              value={visualConfigDefaultValue}
+              value={visualConfigDefaultValue ?? ""}
               onChange={(event) =>
                 setVisualConfigDefaultValue(event.target.value)
               }
               className="font-mono text-xs"
             />
-          </div>
+          )
         }
+        allowedColorFormats={visualConfigDraft.kind === "color" ? ["color", "color-opacity"] : undefined}
         onApply={handleApplyVisualConfig}
       />
 

@@ -69,7 +69,9 @@ export function appendWorkspaceAuthorityDiagnostic(input: {
     | "workspace.mutation_conflicted"
     | "workspace.mutation_rolled_back"
     | "workspace.mutation_recovered"
-    | "workspace.external_drift_detected";
+    | "workspace.external_drift_detected"
+    | "workspace.backup_rehydrated"
+    | "workspace.backup_missing";
   mutationId: string;
   sessionId?: string;
   baseRevision: number;

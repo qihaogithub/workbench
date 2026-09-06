@@ -43,7 +43,7 @@ function createLiveWorkspace() {
   );
   fs.writeFileSync(
     path.join(workspacePath, "demos", "home", "index.tsx"),
-    "before",
+    "export default function Home(){return <div>before</div>}",
     "utf-8",
   );
   fs.writeFileSync(
@@ -81,6 +81,20 @@ function createLiveWorkspaceWithPages() {
   return workspacePath;
 }
 
+function createLiveWorkspaceWithUnicodePage() {
+  const workspacePath = createLiveWorkspace();
+  const pageId = "闯关活动页-进行中_ec853d";
+  const pageDir = path.join(workspacePath, "demos", pageId);
+  fs.mkdirSync(pageDir, { recursive: true });
+  fs.writeFileSync(pageDir + "/index.tsx", "export default function Page(){return <div>ok</div>}");
+  fs.writeFileSync(pageDir + "/config.schema.json", "{}");
+  fs.writeFileSync(path.join(workspacePath, "workspace-tree.json"), JSON.stringify({
+    folders: [],
+    pages: [{ id: pageId, name: "闯关活动页", order: 0, parentId: null }],
+  }));
+  return { workspacePath, pageId };
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
   while (roots.length)
@@ -99,8 +113,8 @@ describe("live Workspace file tools", () => {
       path: "demos/home/index.tsx",
     });
 
-    expect(read.content[0].text).toBe("before");
-    expect(read.details).toMatchObject({ revision: 1, hash: hash("before") });
+    expect(read.content[0].text).toBe("export default function Home(){return <div>before</div>}");
+    expect(read.details).toMatchObject({ revision: 1, hash: hash("export default function Home(){return <div>before</div>}") });
   });
 
   it("writeFile/editFile 从 committed snapshot 取基线并只以 receipt 成功", async () => {
@@ -113,7 +127,7 @@ describe("live Workspace file tools", () => {
 
     const written = await createWriteFileTool(config).execute("write", {
       path: "demos/home/index.tsx",
-      content: "second",
+      content: "export default function Home(){return <div>second</div>}",
     });
     const edited = await createEditFileTool(config).execute("edit", {
       path: "demos/home/index.tsx",
@@ -133,7 +147,7 @@ describe("live Workspace file tools", () => {
         path.join(workspacePath, "demos", "home", "index.tsx"),
         "utf-8",
       ),
-    ).toBe("third");
+    ).toBe("export default function Home(){return <div>third</div>}");
     expect(writeSpy).not.toHaveBeenCalled();
   });
 
@@ -195,6 +209,20 @@ describe("live Workspace file tools", () => {
     expect(result.isError).toBeFalsy();
     expect(result.content[0].text).toContain("id: home");
     expect(result.content[0].text).not.toContain("id: broken");
+    expect(result.details).toHaveProperty("diagnostics", [expect.objectContaining({
+      code: "INCOMPLETE_PAGE",
+      pageId: "broken",
+    })]);
+  });
+
+  it("listPages 保留 Unicode 页面 ID，并返回精确路径", async () => {
+    const { workspacePath, pageId } = createLiveWorkspaceWithUnicodePage();
+    const result = await createListPagesTool({ sessionId: "session-1", workingDir: workspacePath }).execute("list", {});
+
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0].text).toContain(`id: ${pageId}`);
+    expect(result.content[0].text).toContain(`demos/${pageId}/index.tsx`);
+    expect(result.details).toMatchObject({ pages: [expect.objectContaining({ id: pageId })] });
   });
 
   it("writeFile 对新知识文档只创建待审核 proposal，不写 Workspace 或 manifest", async () => {

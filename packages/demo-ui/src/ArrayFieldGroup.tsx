@@ -280,9 +280,10 @@ export interface ArrayFieldGroupProps {
   configContextPageId?: string;
   onLaunchWhiteboard?: WhiteboardLauncher;
   configItemCapabilities?: ConfigItemCapabilities;
-  onEditConfigDefinition?: (fieldKey: string, field: FieldConfig) => void;
+  onEditConfigDefinition?: (fieldKey: string, field: FieldConfig, schemaFieldPath?: string) => void;
   onAddConfigComment?: (target: ConfigCommentTarget, trigger?: HTMLElement | null) => void;
   hasConfigComment?: (target: ConfigCommentTarget) => boolean;
+  hideEmptyConfigCommentTag?: boolean;
   designSpecEntries?: DesignSpecEntryLink[];
   onEditDesignSpec?: (docId: string, entryId: string) => void;
   onOpenDesignSpec?: (spec: DesignSpecEntryLink, fieldTitle: string, anchor?: { top: number; bottom: number }, trigger?: HTMLElement | null) => void;
@@ -410,6 +411,7 @@ export function ArrayFieldGroup({
   onEditConfigDefinition,
   onAddConfigComment,
   hasConfigComment,
+  hideEmptyConfigCommentTag,
   designSpecEntries,
   onEditDesignSpec,
   onOpenDesignSpec,
@@ -705,6 +707,7 @@ export function ArrayFieldGroup({
                                 onEditConfigDefinition={onEditConfigDefinition}
                                 onAddConfigComment={onAddConfigComment}
                                 hasConfigComment={hasConfigComment}
+                                hideEmptyConfigCommentTag={hideEmptyConfigCommentTag}
                                 designSpecEntries={designSpecEntries}
                                 onEditDesignSpec={onEditDesignSpec}
                                 onOpenDesignSpec={onOpenDesignSpec}

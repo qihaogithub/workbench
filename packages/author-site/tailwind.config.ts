@@ -13,6 +13,7 @@ const config: Config = {
     './src/app/!(api)/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './node_modules/@workbench/shared/src/**/*.{js,ts,jsx,tsx,mdx}',
+    './node_modules/@workbench/color-picker/src/**/*.{js,ts,jsx,tsx,mdx}',
     './node_modules/@workbench/ai-chat-shared/src/**/*.{js,ts,jsx,tsx,mdx}',
     './node_modules/@workbench/demo-ui/src/**/*.{js,ts,jsx,tsx,mdx}',
     './node_modules/@workbench/sketch-react/src/**/*.{js,ts,jsx,tsx,mdx}',

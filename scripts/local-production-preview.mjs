@@ -91,6 +91,10 @@ const localEnv = {
     configuredEnv.NEXT_PUBLIC_SCREENSHOT_SERVICE_URL || "http://localhost:4202",
   NEXT_PUBLIC_WEB_URL:
     configuredEnv.NEXT_PUBLIC_WEB_URL || "http://localhost:4200",
+  NEXT_PUBLIC_AUTHOR_SITE_URL:
+    configuredEnv.NEXT_PUBLIC_AUTHOR_SITE_URL ||
+    configuredEnv.NEXT_PUBLIC_WEB_URL ||
+    "http://localhost:4200",
   CORS_ORIGINS:
     configuredEnv.CORS_ORIGINS ||
     "http://localhost:4200,http://127.0.0.1:4200,http://localhost:4300,http://127.0.0.1:4300",

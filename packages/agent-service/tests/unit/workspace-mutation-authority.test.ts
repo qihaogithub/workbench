@@ -88,7 +88,7 @@ describe("WorkspaceMutationAuthority", () => {
     expect(tree.pages.map((page) => page.order).sort()).toEqual([0, 1]);
   });
 
-  it("写入页面图片或动效 Schema 时在同一 mutation 创建并同步设计规范", async () => {
+  it("写入页面图片或动效 Schema 时不会产生设计规范副作用", async () => {
     const { authority, workspacePath } = createAuthority();
     fs.writeFileSync(
       path.join(workspacePath, "workspace-tree.json"),
@@ -109,22 +109,10 @@ describe("WorkspaceMutationAuthority", () => {
       ],
     });
 
-    expect(receipt.resources.map((resource) => resource.path)).toEqual(expect.arrayContaining([
+    expect(receipt.resources.map((resource) => resource.path)).toEqual([
       "demos/home/config.schema.json",
-      "design-spec/manifest.json",
-    ]));
-    const manifest = JSON.parse(fs.readFileSync(path.join(workspacePath, "design-spec", "manifest.json"), "utf-8")) as {
-      items: Array<{ id: string; title: string }>;
-    };
-    const doc = JSON.parse(fs.readFileSync(
-      path.join(workspacePath, "design-spec", `spec-${manifest.items[0].id}.json`),
-      "utf-8",
-    )) as { entries: Array<{ autoManagedFieldKey: string; markdown: string }> };
-    expect(manifest.items[0].title).toBe("首页设计规范");
-    expect(doc.entries).toEqual(expect.arrayContaining([
-      expect.objectContaining({ autoManagedFieldKey: "hero", markdown: "" }),
-      expect.objectContaining({ autoManagedFieldKey: "introMotion", markdown: "" }),
-    ]));
+    ]);
+    expect(fs.existsSync(path.join(workspacePath, "design-spec"))).toBe(false);
   });
 
   it("允许 live Workspace 原子写入页面级配置运行值", async () => {
@@ -502,6 +490,56 @@ describe("WorkspaceMutationAuthority", () => {
     expect(JSON.parse(fs.readFileSync(configPath, "utf8"))).toEqual({ title: "latest", spineAsset: ref });
   });
 
+  it("按 discriminator 幂等追加配置数组并保留既有顺序", async () => {
+    const { authority, workspacePath } = createAuthority();
+    const configPath = path.join(workspacePath, "demos", "home", "config.values.json");
+    const existing = {
+      title: "user value",
+      modules: [{ type: "hero" }, { type: "ranking" }],
+    };
+    fs.writeFileSync(configPath, JSON.stringify(existing), "utf8");
+    const ad = { type: "image", image: "https://example.test/ad.png" };
+    const append = {
+      key: "modules",
+      item: ad,
+      discriminator: { key: "image", value: ad.image },
+    } as const;
+
+    await authority.mutate({
+      mutationId: "config-array-append-1",
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      baseRevision: 0,
+      actor: "ai",
+      reason: "update_page_config_values",
+      operations: [{
+        type: "patch_config_values",
+        path: "demos/home/config.values.json",
+        patch: { title: "updated" },
+        arrayAppends: [append],
+      }],
+    });
+    await authority.mutate({
+      mutationId: "config-array-append-2",
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      baseRevision: 0,
+      actor: "ai",
+      reason: "update_page_config_values",
+      operations: [{
+        type: "patch_config_values",
+        path: "demos/home/config.values.json",
+        patch: {},
+        arrayAppends: [append],
+      }],
+    });
+
+    expect(JSON.parse(fs.readFileSync(configPath, "utf8"))).toEqual({
+      title: "updated",
+      modules: [{ type: "hero" }, { type: "ranking" }, ad],
+    });
+  });
+
   it("提交前校验失败时回收该 mutation 引用的 staging 文件", async () => {
     const { authority, workspacePath } = createAuthority();
     const staged = await authority.stageBinary("project-1", "workspace-1", Buffer.from([1, 2, 3]));
@@ -652,6 +690,34 @@ describe("WorkspaceMutationAuthority", () => {
     });
     expect(fs.readFileSync(path.join(workspacePath, "demos/home/index.tsx"), "utf-8")).toBe("external");
     expect(authority.getHealth("project-1", "workspace-1").missingBackupCount).toBe(1);
+  });
+
+  it("committed backup 缺失但磁盘内容仍可信时自动重建并记录诊断", async () => {
+    const { authority, workspacePath } = createAuthority();
+    const state = await authority.bootstrap("project-1", "workspace-1");
+    const dataDir = path.join(path.dirname(workspacePath), "data");
+    const backupPath = path.join(
+      dataDir,
+      "workspace-authority",
+      "workspace-1",
+      "backups",
+      `${state.resourceHashes["demos/home/index.tsx"]}.bin`,
+    );
+    fs.rmSync(backupPath);
+
+    const snapshot = await authority.getSnapshot("project-1", "workspace-1");
+
+    expect(snapshot.resources["demos/home/index.tsx"]).toBe("before");
+    expect(fs.existsSync(backupPath)).toBe(true);
+    expect(authority.getHealth("project-1", "workspace-1")).toMatchObject({
+      ready: true,
+      missingBackupCount: 0,
+    });
+    const diagnostics = fs.readFileSync(
+      path.join(dataDir, "editor-diagnostics", "agent-service.jsonl"),
+      "utf8",
+    );
+    expect(diagnostics).toContain("workspace.backup_rehydrated");
   });
 
   it("health 只读返回 ready、journal 和 external drift 状态", async () => {

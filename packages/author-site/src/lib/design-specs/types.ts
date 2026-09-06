@@ -70,6 +70,8 @@ export interface ConfigPoolItem {
   breadcrumbs?: string[];
   /** Discriminator/const fields are inspectable but have no definition editor. */
   isConst?: boolean;
+  /** Synthetic node representing a JSON Schema oneOf branch. */
+  isBranch?: boolean;
   kind: ConfigPoolItemKind;
   value?: unknown;
   category?: string;

@@ -181,7 +181,8 @@ describe("DocumentView knowledge creation", () => {
   });
 
   it("project mode maps documentId to the UI id without sending workspace paths", async () => {
-    global.fetch = jest.fn((input: RequestInfo | URL) => {
+    const user = userEvent.setup();
+    global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url === "/api/projects/project-1/documents?sessionId=session-1") {
         return jsonResponse({
@@ -199,6 +200,24 @@ describe("DocumentView knowledge creation", () => {
         });
       }
       if (url === "/api/projects/project-1/documents/doc-1?sessionId=session-1") {
+        if (init?.method === "PATCH") {
+          const body = JSON.parse(String(init.body));
+          return jsonResponse({
+            success: true,
+            data: {
+              snapshot: {
+                projectId: "project-1",
+                documentId: "doc-1",
+                title: body.title,
+                description: body.title,
+                source: "user",
+                updatedAt: "2026-09-02T00:00:00.000Z",
+                contentHash: "hash",
+                sizeBytes: 12,
+              },
+            },
+          });
+        }
         return jsonResponse({
           success: true,
           data: {
@@ -232,6 +251,20 @@ describe("DocumentView knowledge creation", () => {
     expect(await screen.findByText("项目规范")).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByTestId("document-editor")).toHaveTextContent("# 项目规范");
+    });
+    await user.click(await screen.findByRole("button", { name: "打开项目规范的更多操作" }));
+    await user.click(screen.getByRole("menuitem", { name: "重命名" }));
+    const renameInput = await screen.findByDisplayValue("项目规范");
+    await user.clear(renameInput);
+    await user.type(renameInput, "项目指南{Enter}");
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/projects/project-1/documents/doc-1?sessionId=session-1",
+        expect.objectContaining({
+          method: "PATCH",
+          body: JSON.stringify({ title: "项目指南" }),
+        }),
+      );
     });
     const calls = (global.fetch as jest.Mock).mock.calls.map(([input]) => String(input));
     expect(calls).toContain("/api/projects/project-1/documents?sessionId=session-1");
@@ -307,6 +340,7 @@ describe("DocumentView knowledge creation", () => {
 
     await user.click(await screen.findByRole("button", { name: "打开项目说明的更多操作" }));
 
+    expect(screen.getByRole("menuitem", { name: "重命名" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "历史" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "删除" })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "查看" })).not.toBeInTheDocument();
@@ -314,6 +348,71 @@ describe("DocumentView knowledge creation", () => {
 
     await user.click(screen.getByRole("menuitem", { name: "历史" }));
     expect(onDocHistory).toHaveBeenCalledWith(expect.objectContaining({ id: "kb-existing" }));
+  });
+
+  it("allows an admin to rename a design spec from its more menu", async () => {
+    const user = userEvent.setup();
+    (global.fetch as jest.Mock).mockImplementation(
+      (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.startsWith("/api/knowledge?")) {
+          return jsonResponse({ success: true, data: [] });
+        }
+        if (url.startsWith("/api/design-specs?") && !init?.method) {
+          return jsonResponse({
+            success: true,
+            data: [{
+              id: "spec-1",
+              title: "旧设计规范",
+              createdAt: "2026-08-12T00:00:00.000Z",
+              updatedAt: "2026-08-12T00:00:00.000Z",
+            }],
+          });
+        }
+        if (url.startsWith("/api/design-specs/spec-1?") && init?.method === "PATCH") {
+          const body = JSON.parse(String(init.body));
+          return jsonResponse({
+            success: true,
+            data: {
+              id: "spec-1",
+              title: body.title,
+              createdAt: "2026-08-12T00:00:00.000Z",
+              updatedAt: "2026-09-01T00:00:00.000Z",
+            },
+          });
+        }
+        if (url.includes("workspace/files?include=conventions")) {
+          return jsonResponse({ success: true, data: [] });
+        }
+        return jsonResponse({ success: false }, false);
+      },
+    );
+
+    render(
+      <DocumentView
+        workingDir="/workspace"
+        projectId="project-1"
+        sessionId="session-1"
+        userRole="admin"
+      />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "打开旧设计规范的更多操作" }));
+    await user.click(screen.getByRole("menuitem", { name: "重命名" }));
+    const input = await screen.findByDisplayValue("旧设计规范");
+    await user.clear(input);
+    await user.type(input, "新设计规范{Enter}");
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/api/design-specs/spec-1?"),
+        expect.objectContaining({
+          method: "PATCH",
+          body: JSON.stringify({ title: "新设计规范" }),
+        }),
+      );
+    });
+    expect(await screen.findByText("新设计规范")).toBeInTheDocument();
   });
 
   it("rejects unsupported uploads without changing the current document", async () => {

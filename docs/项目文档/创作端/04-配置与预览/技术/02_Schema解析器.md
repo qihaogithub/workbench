@@ -105,6 +105,16 @@ interface ParsedContent {
 - `typeLimits` 沿递归路径传递，数组深度不会改变字段限制；
 - 因此 `modules.items.oneOf → levels.items.oneOf` 仍会得到对象数组和 `position` 控件，不会降级为多图上传列表。
 
+颜色字段的解析以 `format` 为唯一行为判断来源，允许基础类型与 `null` 组成 nullable 联合类型：
+
+| `format` | 解析后的值类型 | 其它规则 |
+| :--- | :--- | :--- |
+| `color` | `string \| null` | 值为 `#RRGGBB` 或 `null`，可读取 `ui:options.colorPresets` |
+| `opacity` | `number \| null` | 范围固定为 0–100；0 是完全透明，`null` 是未设置 |
+| `color-opacity` | `string \| null` | 值为规范化 `rgba(r, g, b, a)` 或 `null`，可读取颜色预设 |
+
+解析器不读取或推断历史 `colorMode`。字段目录、表单生成器和配置池应保留上述 `format`、nullable 类型以及 `colorPresets` 元数据，使 Agent 只读取 Schema 就能判断值格式和编辑行为。
+
 关卡图坐标单位约定：`position.x/y` 使用 1 倍像素值，`w/h` 继续使用 2 倍值，渲染时仅对 `w/h` 除以 2。
 
 ### 3.4 isValidFigmaFormat

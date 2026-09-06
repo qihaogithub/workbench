@@ -18,7 +18,8 @@
     "./demo/config-schema-fields": "./src/demo/config-schema-fields.ts",
     "./demo/visibility-rules": "./src/demo/visibility-rules.ts",
     "./markdown-reference": "./src/markdown-reference/index.ts",
-    "./document": "./src/document/contracts.ts"
+    "./document": "./src/document/contracts.ts",
+    "./workspace-path": "./src/workspace-path.ts"
   },
   "dependencies": {
     "@workbench/sketch-core": "workspace:*"

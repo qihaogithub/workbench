@@ -11,6 +11,10 @@ import {
   hashSecret,
   getAdminSecret,
 } from "@/lib/admin-auth";
+import {
+  OFFICIAL_HOME_NAVIGATION_PARAM,
+  OFFICIAL_HOME_NAVIGATION_VALUE,
+} from "@/lib/official-site-url";
 
 const PROTECTED_PAGE_ROUTES = ["/workbench", "/demo", "/cli"];
 const PROTECTED_API_ROUTES = ["/api/sessions"];
@@ -82,7 +86,11 @@ export async function proxy(request: NextRequest) {
     return new NextResponse(null, { status: 204, headers });
   }
 
-  if (user && pathname === "/") {
+  const isOfficialHomeNavigation =
+    request.nextUrl.searchParams.get(OFFICIAL_HOME_NAVIGATION_PARAM) ===
+    OFFICIAL_HOME_NAVIGATION_VALUE;
+
+  if (user && pathname === "/" && !isOfficialHomeNavigation) {
     return NextResponse.redirect(new URL("/workbench", request.url));
   }
 

@@ -34,6 +34,7 @@ import { ConfigItemEditorDialog, type ConfigItemApplyPlanSnapshot } from "./Conf
 import { localizeRemoteImageForSession } from "./markdown/remote-image-localizer";
 import {
   applySchemaDefinitionCommand,
+  readConfigDefinitionFieldAtPath,
   readConfigDefinitionFields,
   type ConfigDefinitionDraft,
   type SchemaDefinitionMutation,
@@ -98,6 +99,7 @@ type DefinitionEditorState = {
   scope: "page" | "project";
   draft: ConfigDefinitionDraft;
   originalKey?: string;
+  schemaFieldPath?: string;
 };
 
 type ActiveDesignSpec =
@@ -197,7 +199,17 @@ function buildDefaultValueSchema(draft: ConfigDefinitionDraft) {
     property.enum = draft.enum ?? [];
     if (draft.enumWidget === "radio" || draft.enumWidget === "segmented") property["ui:widget"] = draft.enumWidget;
   }
-  else if (draft.kind === "color") { property.type = "string"; property.format = "color"; }
+  else if (draft.kind === "color") {
+    const format = draft.colorFormat ?? "color";
+    property.type = format === "opacity" ? ["number", "null"] : ["string", "null"];
+    property.format = format;
+    if (format === "opacity") {
+      property.minimum = 0;
+      property.maximum = 100;
+    } else if (draft.colorPresets?.length) {
+      property["ui:options"] = { colorPresets: draft.colorPresets };
+    }
+  }
   else if (draft.kind === "image") { property.type = "string"; property.format = "image"; property["ui:options"] = { group: "", accept: draft.accept, maxSize: draft.maxSize, widthRule: draft.widthRule, heightRule: draft.heightRule }; }
   else if (draft.kind === "images") { property.type = "array"; property.items = { type: "string", format: "image" }; property["ui:options"] = { group: "", accept: draft.accept, maxSize: draft.maxSize, widthRule: draft.widthRule, heightRule: draft.heightRule }; }
   else { property.type = "string"; if (draft.kind === "textarea") property["ui:widget"] = "textarea"; if (draft.kind === "richtext") property.format = "richtext"; }
@@ -827,7 +839,11 @@ export function PageConfigPanel({
       )
     : [];
 
-  const openDefinitionEditor = (scope: "page" | "project", key?: string) => {
+  const openDefinitionEditor = (
+    scope: "page" | "project",
+    key?: string,
+    schemaFieldPath?: string,
+  ) => {
     if (!selectedPage) return;
     if (readonly) return;
     const capabilities = scope === "project"
@@ -841,12 +857,23 @@ export function PageConfigPanel({
     const targetSchema = scope === "project"
       ? selectedProjectConfigSchema || EMPTY_SCHEMA
       : selectedPage.schema || EMPTY_SCHEMA;
+    const requestedFieldPath = schemaFieldPath?.trim() || (
+      key && (key.includes(".") || key.includes("[")) ? key : undefined
+    );
     const existing = key
-      ? readConfigDefinitionFields(targetSchema).find((field) => field.key === key)
+      ? requestedFieldPath
+        ? readConfigDefinitionFieldAtPath(targetSchema, requestedFieldPath)
+        : readConfigDefinitionFields(targetSchema).find((field) => field.key === key)
       : undefined;
     if (key && !existing) return;
     setDefinitionEditor(existing
-      ? { mode: "edit", scope, draft: existing, originalKey: existing.key }
+      ? {
+          mode: "edit",
+          scope,
+          draft: existing,
+          originalKey: existing.key,
+          schemaFieldPath: requestedFieldPath,
+        }
       : { mode: "create", scope, draft: newConfigDefinitionDraft(targetSchema) });
   };
 
@@ -855,6 +882,7 @@ export function PageConfigPanel({
       filterCommentThreadsByTarget(configComments?.threads ?? [], target).length > 0,
     [configComments?.threads],
   );
+  const hideEmptyConfigCommentTag = configComments?.readOnly === true;
 
   const consumedConfigDefinitionFocusRef = useRef<string | null>(null);
   useEffect(() => {
@@ -898,7 +926,12 @@ export function PageConfigPanel({
     try {
       const mutation = applySchemaDefinitionCommand(targetSchema, definitionEditor.mode === "create"
         ? { type: "field.add", field: definitionEditor.draft }
-        : { type: "field.update", key: definitionEditor.originalKey!, patch: definitionEditor.draft });
+        : {
+            type: "field.update",
+            key: definitionEditor.originalKey!,
+            path: definitionEditor.schemaFieldPath,
+            patch: definitionEditor.draft,
+          });
       const impact = onDefinitionAnalyze?.(definitionEditor.scope, mutation);
       if (impact?.risk === "ai_required") {
         return { kind: "ai_required", title: "需要 AI 应用", description: "该定义变更会影响已绑定页面。保存定义后，请确认页面同步任务。" };
@@ -917,7 +950,12 @@ export function PageConfigPanel({
     try {
       const mutation = applySchemaDefinitionCommand(targetSchema, definitionEditor.mode === "create"
         ? { type: "field.add", field: definitionEditor.draft }
-        : { type: "field.update", key: definitionEditor.originalKey!, patch: definitionEditor.draft });
+        : {
+            type: "field.update",
+            key: definitionEditor.originalKey!,
+            path: definitionEditor.schemaFieldPath,
+            patch: definitionEditor.draft,
+          });
       setDefinitionSaving(true);
       if (definitionEditor.scope === "project") {
         await onProjectDefinitionChange?.(mutation);
@@ -1406,10 +1444,11 @@ export function PageConfigPanel({
               onOpenDesignSpec={(spec, fieldTitle, anchor, trigger) =>
                 toggleDesignSpec({ kind: "config", spec, fieldTitle, anchor }, trigger)}
               onEditConfigDefinition={onPageDefinitionChange
-                ? (key) => openDefinitionEditor("page", key)
+                ? (key, _field, schemaFieldPath) => openDefinitionEditor("page", key, schemaFieldPath)
                 : undefined}
               onAddConfigComment={configComments || onAddConfigComment ? handleOpenConfigComment : undefined}
               hasConfigComment={configComments ? hasConfigComment : undefined}
+              hideEmptyConfigCommentTag={hideEmptyConfigCommentTag}
               onLaunchWhiteboard={onLaunchWhiteboard}
               referenceContext={referenceContext}
               referenceProvider={referenceProvider}
@@ -1537,10 +1576,13 @@ export function PageConfigPanel({
                     designSpecEntries={effectiveDesignSpecEntries.filter((entry) => entry.scope === "project")}
                     onEditDesignSpec={onEditDesignSpec}
                     onOpenDesignSpec={(spec, fieldTitle, anchor, trigger) => toggleDesignSpec({ kind: "config", spec, fieldTitle, anchor }, trigger)}
-                    onEditConfigDefinition={onProjectDefinitionChange ? (key) => openDefinitionEditor("project", key) : undefined}
+                    onEditConfigDefinition={onProjectDefinitionChange
+                      ? (key, _field, schemaFieldPath) => openDefinitionEditor("project", key, schemaFieldPath)
+                      : undefined}
                     configItemCapabilities={selectedPage.configItemCapabilities?.project}
                     onAddConfigComment={configComments || onAddConfigComment ? handleOpenConfigComment : undefined}
                     hasConfigComment={configComments ? hasConfigComment : undefined}
+                    hideEmptyConfigCommentTag={hideEmptyConfigCommentTag}
                     imageConfigScope="project"
                     configContextPageId={selectedPage.id}
                     referenceContext={referenceContext}
@@ -1579,10 +1621,13 @@ export function PageConfigPanel({
                   designSpecEntries={effectiveDesignSpecEntries.filter((entry) => entry.scope === "page" && entry.pageId === selectedPage.id)}
                   onEditDesignSpec={onEditDesignSpec}
                   onOpenDesignSpec={(spec, fieldTitle, anchor, trigger) => toggleDesignSpec({ kind: "config", spec, fieldTitle, anchor }, trigger)}
-                  onEditConfigDefinition={onPageDefinitionChange ? (key) => openDefinitionEditor("page", key) : undefined}
+                  onEditConfigDefinition={onPageDefinitionChange
+                    ? (key, _field, schemaFieldPath) => openDefinitionEditor("page", key, schemaFieldPath)
+                    : undefined}
                   configItemCapabilities={selectedPage.configItemCapabilities?.page}
                   onAddConfigComment={configComments || onAddConfigComment ? handleOpenConfigComment : undefined}
                   hasConfigComment={configComments ? hasConfigComment : undefined}
+                  hideEmptyConfigCommentTag={hideEmptyConfigCommentTag}
                   imageConfigScope="page"
                   pageId={selectedPage.id}
                   configContextPageId={selectedPage.id}

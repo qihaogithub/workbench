@@ -30,6 +30,7 @@ import {
   getPageEntryFileName,
   isSafePageId,
   type WorkspacePage,
+  type WorkspacePageDiagnostic,
   type WorkspaceTree,
 } from "./workspace-page-utils";
 
@@ -98,6 +99,7 @@ export interface VisibilityWorkspaceFacts {
   projectConfigSchema?: string;
   projectConfigValues?: Record<string, unknown>;
   pageSchemas: Record<string, string>;
+  pageDiagnostics: WorkspacePageDiagnostic[];
   rules?: VisibilityRulesDocument;
 }
 
@@ -156,22 +158,41 @@ function schemaFields(raw: string | undefined): VisibilityConfigFieldFact[] {
   });
 }
 
-function parseTree(raw: string | undefined): WorkspaceTree {
+function parseTree(raw: string | undefined): { tree: WorkspaceTree; diagnostics: WorkspacePageDiagnostic[] } {
   const parsed = parseObject(raw);
-  return {
+  const diagnostics: WorkspacePageDiagnostic[] = [];
+  const pages = Array.isArray(parsed?.pages)
+    ? parsed.pages.filter((page): page is WorkspacePage => {
+        if (!isRecord(page) || typeof page.id !== "string" || !isSafePageId(page.id)) {
+          diagnostics.push({
+            pageId: isRecord(page) && typeof page.id === "string" ? page.id : null,
+            code: "INVALID_PAGE_ID",
+            reason: "page id must be one Unicode-safe path segment",
+            source: "workspace-tree",
+          });
+          return false;
+        }
+        if (
+          typeof page.name !== "string" ||
+          typeof page.order !== "number" ||
+          !Number.isSafeInteger(page.order) ||
+          (page.parentId !== null && typeof page.parentId !== "string")
+        ) {
+          diagnostics.push({
+            pageId: page.id,
+            code: "INVALID_WORKSPACE_TREE",
+            reason: "page metadata has an invalid shape",
+            source: "workspace-tree",
+          });
+          return false;
+        }
+        return true;
+      })
+    : [];
+  return { tree: {
     folders: Array.isArray(parsed?.folders) ? parsed.folders : [],
-    pages: Array.isArray(parsed?.pages)
-      ? parsed.pages.filter((page): page is WorkspacePage => (
-          isRecord(page)
-          && typeof page.id === "string"
-          && isSafePageId(page.id)
-          && typeof page.name === "string"
-          && typeof page.order === "number"
-          && Number.isSafeInteger(page.order)
-          && (page.parentId === null || typeof page.parentId === "string")
-        ))
-      : [],
-  };
+    pages,
+  }, diagnostics };
 }
 
 function declaredRegionIds(resources: Record<string, string>, pageId: string): string[] {
@@ -198,7 +219,8 @@ export function buildVisibilityWorkspaceFacts(
   resources: Record<string, string>,
   state: Pick<WorkspaceAuthoritySnapshot["state"], "revision" | "rootHash"> = { revision: 0, rootHash: "" },
 ): VisibilityWorkspaceFacts {
-  const tree = parseTree(resources["workspace-tree.json"]);
+  const parsedTree = parseTree(resources["workspace-tree.json"]);
+  const tree = parsedTree.tree;
   const projectConfigSchema = resources["project.config.schema.json"];
   const projectConfigValues = parseObject(resources["project.config.values.json"]);
   const pageSchemas: Record<string, string> = {};
@@ -230,6 +252,17 @@ export function buildVisibilityWorkspaceFacts(
         configFields: schemaFields(schema),
       };
     });
+  const pageDiagnostics = [...parsedTree.diagnostics];
+  for (const page of tree.pages) {
+    if (!resources[`demos/${page.id}/config.schema.json`]) {
+      pageDiagnostics.push({
+        pageId: page.id,
+        code: "INCOMPLETE_PAGE",
+        reason: "page metadata exists but config.schema.json is missing",
+        source: "filesystem",
+      });
+    }
+  }
   return {
     revision: state.revision,
     rootHash: state.rootHash,
@@ -239,6 +272,7 @@ export function buildVisibilityWorkspaceFacts(
     projectConfigSchema,
     projectConfigValues,
     pageSchemas,
+    pageDiagnostics,
     rules: parseVisibilityRules(resources["project.visibility-rules.json"]),
   };
 }
@@ -251,7 +285,7 @@ function readWorkspaceResources(workingDir: string, snapshot?: WorkspaceAuthorit
     if (fs.existsSync(absolute)) resources[resourcePath] = fs.readFileSync(absolute, "utf8");
   };
   ["workspace-tree.json", "project.config.schema.json", "project.config.values.json", "project.visibility-rules.json"].forEach(read);
-  const tree = parseTree(resources["workspace-tree.json"]);
+  const tree = parseTree(resources["workspace-tree.json"]).tree;
   for (const page of tree.pages) {
     for (const fileName of ["index.tsx", "prototype.html", "prototype.css", "sandbox.html", "config.schema.json", "config.values.json"]) {
       read(`demos/${page.id}/${fileName}`);
@@ -307,6 +341,12 @@ function formatFacts(facts: VisibilityWorkspaceFacts, includeRules: boolean): st
     "Pages:",
     ...(pageLines.length ? pageLines : ["- (none)"]),
   ];
+  if (facts.pageDiagnostics.length > 0) {
+    lines.push(
+      "Page diagnostics:",
+      ...facts.pageDiagnostics.map((item) => `- ${item.code}: ${item.pageId ?? "<unknown>"} — ${item.reason}`),
+    );
+  }
   if (includeRules) lines.push("Rules:", facts.rules ? JSON.stringify(facts.rules, null, 2) : "(none)");
   return lines.join("\n");
 }
@@ -365,10 +405,11 @@ function pruneDrafts(now = Date.now()): void {
 }
 
 function candidateResourcePath(resourcePath: string): boolean {
-  return resourcePath === "project.config.schema.json"
+  if (resourcePath === "project.config.schema.json"
     || resourcePath === "project.config.values.json"
-    || resourcePath === "project.visibility-rules.json"
-    || /^demos\/[A-Za-z0-9_-]+\/(?:index\.tsx|prototype\.html|prototype\.css|sandbox\.html|config\.schema\.json|config\.values\.json)$/.test(resourcePath);
+    || resourcePath === "project.visibility-rules.json") return true;
+  const match = /^demos\/([^/]+)\/(?:index\.tsx|prototype\.html|prototype\.css|sandbox\.html|config\.schema\.json|config\.values\.json)$/.exec(resourcePath);
+  return Boolean(match?.[1] && isSafePageId(match[1]));
 }
 
 function validateDraftChanges(

@@ -15,6 +15,80 @@ import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { getModelConfig } from "@/lib/model-config";
 import { readUserBackendProvidersConfig } from "@/lib/user-model-config";
 
+function readRuntimeProviderPrefixes(): string[] {
+  const prefixes = new Set<string>();
+  const rawProviders = process.env.PI_AGENT_PROVIDERS?.trim();
+
+  if (rawProviders) {
+    try {
+      const providers = JSON.parse(rawProviders) as unknown;
+      if (Array.isArray(providers)) {
+        for (const provider of providers) {
+          if (
+            provider &&
+            typeof provider === "object" &&
+            typeof (provider as { id?: unknown }).id === "string" &&
+            (provider as { enabled?: unknown }).enabled !== false
+          ) {
+            prefixes.add(`${(provider as { id: string }).id.trim()}/`);
+          }
+        }
+      }
+    } catch {
+      // The agent service will report an invalid provider configuration. Do
+      // not make the public model-config endpoint fail because of it.
+    }
+  }
+
+  const provider = process.env.PI_AGENT_PROVIDER?.trim();
+  if (provider) prefixes.add(`${provider}/`);
+  return Array.from(prefixes).filter((prefix) => prefix.length > 1);
+}
+
+function addRuntimeProviderRules(config: {
+  frontend?: {
+    autoEnableRules?: Array<{ type: "prefix" | "nameFilter"; value: string }>;
+    allowedPrefixes?: string[];
+  };
+  backendProviders?: {
+    providers?: Array<{ id?: string; enabled?: boolean }>;
+  };
+}): void {
+  const prefixes = new Set<string>();
+  for (const provider of config.backendProviders?.providers ?? []) {
+    if (provider.enabled !== false && provider.id?.trim()) {
+      prefixes.add(`${provider.id.trim()}/`);
+    }
+  }
+
+  // A saved provider configuration replaces the agent-service env fallback.
+  // Only use env prefixes when no enabled saved provider is present.
+  if (prefixes.size === 0) {
+    for (const prefix of readRuntimeProviderPrefixes()) prefixes.add(prefix);
+  }
+  if (prefixes.size === 0) return;
+
+  const existingRules = config.frontend?.autoEnableRules ?? [];
+  const existingPrefixes = new Set(
+    existingRules
+      .filter((rule) => rule.type === "prefix")
+      .map((rule) => rule.value),
+  );
+  const newRules = Array.from(prefixes)
+    .filter((prefix) => !existingPrefixes.has(prefix))
+    .map((value) => ({ type: "prefix" as const, value }));
+  if (newRules.length === 0) return;
+
+  const existingAllowedPrefixes = config.frontend?.allowedPrefixes ?? [];
+  config.frontend = {
+    ...config.frontend,
+    autoEnableRules: [...existingRules, ...newRules],
+    allowedPrefixes: Array.from(
+      new Set([...existingAllowedPrefixes, ...prefixes]),
+    ),
+  };
+}
+
 export async function GET() {
   try {
     const config = JSON.parse(JSON.stringify(await getModelConfig())) as Awaited<
@@ -75,6 +149,8 @@ export async function GET() {
           : config.frontend.enabledModels,
       };
     }
+
+    addRuntimeProviderRules(config);
 
     return NextResponse.json({
       success: true,
