@@ -1,6 +1,6 @@
 # 独立 Agent 服务层 - 文档索引
 
-> 版本：v2.18
+> 版本：v2.20
 > 创建日期：2026-04-05
 > 更新日期：2026-09-06
 
@@ -30,6 +30,7 @@
 | [04_SSE_Drain机制.md](./04_SSE_Drain机制.md)     | 历史 workbench SSE drain 问题记录，当前仅作迁移背景参考                                                                   | 4        | 历史参考 |
 | [05-快照服务.md](./05-快照服务.md)               | Git/snapshot 双模式、NUL 安全 Git 状态解析、argv 命令调用、变更比较、丢弃回滚、Session 生命周期                         | 5        | 已更新   |
 | [06-Pi-Agent子Agent.md](./06-Pi-Agent子Agent.md) | Pi Agent 子 Agent 委派、生命周期与权限边界                                                                                | 6        | 已完成   |
+| [07-Agent运行时内置Skill/](./07-Agent运行时内置Skill/) | Agent 运行时内置 Skill 清单、加载机制、触发场景和权限边界                                                            | 7        | 已更新   |
 
 ---
 
@@ -71,6 +72,11 @@
 - [快照服务](./05-快照服务.md)
 - [Pi Agent 子 Agent](./06-Pi-Agent子Agent.md)
 
+### Agent 运行时内置 Skill
+
+- [Skill 专题索引](./07-Agent运行时内置Skill/)
+- [预装 Skill 清单与加载机制](./07-Agent运行时内置Skill/01_预装Skill清单与加载机制.md)
+
 ---
 
 ## 当前代码入口
@@ -106,7 +112,7 @@
 | 网页读取       | `webRead` 默认读取公开 HTTP/HTTPS 文本页面，并拒绝本机、内网、保留地址和非文本内容                               |
 | 联网搜索       | `webSearch` 使用 Brave Search API 免费额度方案，默认关闭并由环境变量显式启用                                     |
 | 外部授权       | Figma MCP 与钉钉 dws 只接收当前用户 session 级授权；agent-service 不持有平台全局外部账号                         |
-| 预装 Skills    | agent-service 随包携带 `design-taste-frontend`，通过 `readPreinstalledSkill` 按需读取完整指令                    |
+| 预装 Skills    | agent-service 当前随包携带 9 个运行时 Skill；提示词只展示名称和简介，命中后通过 `readPreinstalledSkill` 按需读取完整指令 |
 | 事件流         | WebSocket 通过 `ws-event-router.ts` 统一转发 stream、thought、tool、plan、permission、user choice、finish、error |
 | 文件变更       | `snapshot-service` 同时支持 Git 仓库和普通目录快照模式                                                           |
 | Workspace 写入 | 活动 live Workspace 所有写入必须经过 WorkspaceMutationAuthority 单写者事务提交，旧直接写入路径已删除             |
@@ -127,7 +133,6 @@
 | 2026-06-26 | v2.4  | 补充用户级外部工具授权的 session 注入与工具边界                                |
 | 2026-06-26 | v2.5  | 新增 Pi Agent `webSearch` 联网搜索能力说明，采用 Brave Search API 免费额度方案 |
 | 2026-06-26 | v2.6  | 新增 Pi Agent `webRead` 网页正文读取能力和公网 URL 安全边界                    |
-| 2026-06-27 | v2.7  | 新增创作端 Agent 预装 `design-taste-frontend` Skill 与按需读取工具说明         |
 | 2026-06-28 | v2.8  | 补充模型列表 route/service 分层和 shared/demo-ui 包边界                        |
 | 2026-06-30 | v2.9  | 新增 `requestUserChoice` 需求确认卡片工具和 `user_choice_request` 事件说明     |
 | 2026-07-01 | v2.10 | 补充全局 backend providers 的运行时副本定位和 author-site 启动恢复机制         |
@@ -136,3 +141,4 @@
 | 2026-08-12 | v2.15 | 补充工具副作用后的不可重试边界、CORS API Key 头和当前工具版本 27                |
 | 2026-09-06 | v2.17 | 补充 live Workspace Bash 精确拒绝原因与嵌套条件字段 Schema 校验                |
 | 2026-09-06 | v2.18 | 明确 `schemaValidate` 只验证 Schema 契约，不代表运行中 UI 已通过验收           |
+| 2026-09-06 | v2.20 | 新增 Agent 运行时内置 Skill 专题目录，并维护当前 9 个 Skill 的清单和加载机制      |

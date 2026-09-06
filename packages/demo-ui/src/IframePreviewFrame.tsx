@@ -15,6 +15,7 @@ export interface IframePreviewFrameProps {
   containerSizeOverride?: PreviewContainerSize;
   sandbox?: string;
   configData?: Record<string, unknown>;
+  visibilityRegions?: Record<string, { visible: boolean; enabled: boolean }>;
   sessionId?: string;
   demoId?: string;
   onLoad?: () => void;
@@ -45,6 +46,7 @@ export function IframePreviewFrame({
   containerSizeOverride,
   sandbox = "allow-scripts allow-same-origin",
   configData,
+  visibilityRegions,
   sessionId,
   demoId,
   onLoad,
@@ -122,9 +124,20 @@ export function IframePreviewFrame({
     );
   }, [configData, demoId, sessionId, src]);
 
+  const syncIframeVisibility = useCallback(() => {
+    iframeRef.current?.contentWindow?.postMessage(
+      { type: "UPDATE_VISIBILITY", visibilityRegions: visibilityRegions ?? {} },
+      "*",
+    );
+  }, [visibilityRegions]);
+
   useEffect(() => {
     syncIframeConfig();
   }, [syncIframeConfig]);
+
+  useEffect(() => {
+    syncIframeVisibility();
+  }, [syncIframeVisibility]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -147,6 +160,7 @@ export function IframePreviewFrame({
   const handleLoad = useCallback(() => {
     onLoad?.();
     syncIframeConfig();
+    syncIframeVisibility();
 
     // 兼容性注入：旧项目发布的 iframe.html 可能不包含最新 Shell 模板的
     // 滚动条隐藏样式，这里兜底隐藏滚动条但不改变 overflow 行为，保留滚动能力。
@@ -159,7 +173,7 @@ export function IframePreviewFrame({
       `;
       doc.head.appendChild(style);
     }
-  }, [onLoad, syncIframeConfig]);
+  }, [onLoad, syncIframeConfig, syncIframeVisibility]);
 
   return (
     <div

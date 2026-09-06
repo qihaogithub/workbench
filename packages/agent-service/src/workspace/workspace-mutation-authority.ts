@@ -16,7 +16,7 @@ import type {
   WorkspaceProjectionAck,
   WorkspaceProjectionAcknowledgedEvent,
 } from "@workbench/shared/contracts";
-import { validateVisibilityRules } from "@workbench/shared";
+import { extractDeclaredRegionIds, validateVisibilityRules } from "@workbench/shared";
 import { logger } from "../utils/logger";
 import { pruneJsonlFile } from "../utils/jsonl-retention";
 
@@ -1173,17 +1173,11 @@ export class WorkspaceMutationAuthority {
       const schemaPath = `demos/${pageId}/config.schema.json`;
       const schema = read(schemaPath);
       if (schema !== undefined) pageSchemas[pageId] = schema;
-      const ids = new Set<string>();
-      for (const fileName of ["index.tsx", "prototype.html", "sandbox.html"]) {
-        const source = read(`demos/${pageId}/${fileName}`) ?? "";
-        for (const match of source.matchAll(/data-region-id\s*=\s*["']([A-Za-z0-9_-]{1,100})["']/g)) {
-          if (match[1]) ids.add(match[1]);
-        }
-        for (const match of source.matchAll(/regionId\s*[:=]\s*["']([A-Za-z0-9_-]{1,100})["']/g)) {
-          if (match[1]) ids.add(match[1]);
-        }
-      }
-      regionIds[pageId] = [...ids];
+      regionIds[pageId] = extractDeclaredRegionIds(
+        ["index.tsx", "prototype.html"].map(
+          (fileName) => read(`demos/${pageId}/${fileName}`),
+        ),
+      );
     }
     const validation = validateVisibilityRules(rulesContent, {
       pageIds,

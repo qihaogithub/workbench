@@ -70,7 +70,8 @@ AI agent 在启动任务前应优先读取 `memory.md`（如果存在），以�
 10. **独立思考，不要刻意迎合用户。** 当用户提出的方案存在技术缺陷、违背最佳实践或不适合当前架构时，应明确指出问题并给出更优替代方案，而不是盲目执行。对于用户提出的需求要独立思考其合理性和可行性，给出客观专业的判断。
 11. **主动维护 AGENTS.md。** 在完成每次任务后，如果发现新的约定、工具、流程、架构信息或常见陷阱值得沉淀，应主动更新 `AGENTS.md`、`packages/agent-service/AGENTS.md` 或 `OPS/AGENTS.md` 中对应的内容，使后续代理能从中受益。不要让好经验只留在这一次对话中。
 12. 根 shell 是 zsh；脚本和一次性命令不要把 `path` 用作变量名或循环变量。zsh 的 `path` 与 `PATH` 绑定，覆盖它会让后续 `rg`、`node`、`git` 等命令全部不可用。
-13. macOS 上 `playwright-cli` 使用短会话名（如 `-s=of`），避免临时目录与会话名拼出的 Unix socket 路径过长而报 `listen EINVAL`。`run-code` 的控制端不保证提供浏览器全局对象；读取地址用 `page.url()`，需解析时在 `page.evaluate()` 内使用浏览器 `URL`。
+13. 配置驱动页面状态统一使用 `@workbench/shared` 的 v1 `visibility-rules` 协议和 `resolveVisibility`；联动规则支持组合/枚举条件、不可用/备用页/替代区域策略及服务端非特权 role 上下文，公开规则禁止 user ID。组合条件不设顶层来源，备用页不得成环；发布清单只引用带哈希的独立规则资产，Viewer 校验失败时 fail-closed。Agent 修改配置 Schema、配置值或规则时必须经过已批准计划、`prepare/commitConfigVisibilityDraft` 和 Authority receipt，失败草稿需保留诊断记录。
+14. macOS 上 `playwright-cli` 使用短会话名（如 `-s=of`），避免临时目录与会话名拼出的 Unix socket 路径过长而报 `listen EINVAL`。`run-code` 的控制端不保证提供浏览器全局对象；读取地址用 `page.url()`，需解析时在 `page.evaluate()` 内使用浏览器 `URL`。
 
 ## OF Team repo-local Skill 团队
 

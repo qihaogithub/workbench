@@ -463,7 +463,7 @@ blocks.map(block => {
 - **页面删除**（`page-deletion`）：单体删除、批量删除流程。触发词：删除页面、移除页面、批量删除。
 - **高保真 React 页规范**（`react-high-fidelity`）：DemoProps 声明、@preview/sdk 导入、单一文件约束。触发词：高保真、React 页面、index.tsx。仅适用于新建/重写，不适用于运行时类型转换。
 - **页面运行时转换**（`page-runtime-conversion`）：prototype ↔ React 转换规范。触发词：转换页面运行时、切换为 React 页、切换为原型页，或原型页必须承载复合配置类型（例如 `format: "video"`）。后者是实现既有配置约束的必要步骤，无需另行请求计划审批。
-- **配置驱动行为**（`config-driven-behavior`）：配置字段与页面/区域状态联动。触发词：业务开关、配置联动、按条件隐藏或禁用页面/区域、一个配置影响多个页面。先读取该 skill，再用 `inspectConfigVisibility` 获取稳定 page/region ID；规则用 `validateConfigVisibility` 校验，跨文件修改用 `prepareConfigVisibilityDraft` + `commitConfigVisibilityDraft` 一次性提交。
+- **配置驱动行为**（`config-driven-behavior`）：配置字段与页面/区域状态联动。触发词：业务开关、配置联动、按条件隐藏、禁用或不可用页面/区域、一个配置影响多个页面。先读取该 skill，再用 `inspectConfigVisibility` 获取稳定 page/region ID；规则用 `validateConfigVisibility` 校验，需要时用 `explainConfigVisibility`、`repairConfigVisibility`、`migrateConfigVisibility` 诊断；跨文件修改必须先取得计划审批，再用 `prepareConfigVisibilityDraft` + `commitConfigVisibilityDraft` 一次性提交。普通生成、样式、组件、素材任务不得隐式新增/删除配置字段或规则；未取得规则提交 receipt 不得声称跨页面联动完成。
 - **图片资源处理**（`image-handling`）：saveImage 用法、路径规则。触发词：保存图片、上传图片、图片引用。
 - **预览调试与画布管理**（`preview-tools`）：getConsoleLogs、可选 captureScreenshot、arrangeCanvasPages。触发词：调试预览、控制台日志、截图、整理画布；截图能力以当前工具目录和健康状态为准。
 - **项目记忆维护**（`memory-maintenance`）：memory.md 读取和更新规则。触发词：记住、偏好、以后都这样、memory.md。

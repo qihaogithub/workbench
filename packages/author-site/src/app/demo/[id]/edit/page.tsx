@@ -46,6 +46,7 @@ import type {
 import type { MarkdownReferenceCandidate } from "@workbench/shared/markdown-reference";
 import {
   classifyConfigField,
+  extractDeclaredRegionIds,
   parseVisibilityRules,
   resolveVisibility,
 } from "@workbench/shared";
@@ -191,6 +192,8 @@ import {
   Share2,
   ChevronLeft,
   ChevronRight,
+  Undo2,
+  Redo2,
 } from "lucide-react";
 import {
   MessageSquare,
@@ -1226,6 +1229,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const handlePageConfigPanelChangeRef = useRef<
     (pageId: string, data: Record<string, unknown>) => void
   >(() => {});
+  const handleProjectConfigPanelChangeRef = useRef<
+    (data: Record<string, unknown>) => void
+  >(() => {});
 
   const [validationResult, setValidationResult] = useState<ValidationResult>({
     isValid: true,
@@ -1820,7 +1826,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const persistProjectConfigValues = useCallback(
     (values: Record<string, unknown>): Promise<boolean> => {
       if (!sessionId) return Promise.resolve(true);
-      if (Object.keys(values).length === 0) return Promise.resolve(true);
       projectConfigPersistPendingCountRef.current += 1;
       const persist = async (): Promise<boolean> => {
         try {
@@ -1925,6 +1930,51 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       );
     },
     [sessionId],
+  );
+
+  const replacePageConfigValues = useCallback(
+    (
+      pageId: string,
+      values: Record<string, unknown>,
+      delayMs = 500,
+      shouldPersist = true,
+    ) => {
+      const nextValues = { ...values };
+      configDataMapRef.current = {
+        ...configDataMapRef.current,
+        [pageId]: nextValues,
+      };
+      setConfigDataMap((previous) => ({ ...previous, [pageId]: nextValues }));
+      if (shouldPersist) persistPageConfigValues(pageId, nextValues, delayMs);
+      markScreenshotDirty(pageId);
+      markWorkspaceChanged();
+    },
+    [markScreenshotDirty, markWorkspaceChanged, persistPageConfigValues],
+  );
+
+  const replaceProjectConfigValues = useCallback(
+    (values: Record<string, unknown>, shouldPersist = true) => {
+      const nextValues = { ...values };
+      projectConfigValuesRef.current = nextValues;
+      setProjectConfigValues(nextValues);
+      if (shouldPersist) void persistProjectConfigValues(nextValues);
+      const projectKeys = new Set(getSchemaPropertyKeys(projectConfigSchemaRef.current));
+      const applyProjectValues = (previous: Record<string, Record<string, unknown>>) => {
+        const next: Record<string, Record<string, unknown>> = {};
+        const pageIds = new Set([...Object.keys(previous), ...demoPagesRef.current.map((page) => page.id)]);
+        for (const pageId of pageIds) {
+          const pageValues = previous[pageId] ?? {};
+          const pageOnlyValues = Object.fromEntries(Object.entries(pageValues).filter(([key]) => !projectKeys.has(key)));
+          next[pageId] = { ...pageOnlyValues, ...nextValues };
+        }
+        return next;
+      };
+      configDataMapRef.current = applyProjectValues(configDataMapRef.current);
+      setConfigDataMap(applyProjectValues);
+      for (const page of demoPagesRef.current) markScreenshotDirty(page.id);
+      markWorkspaceChanged();
+    },
+    [markScreenshotDirty, markWorkspaceChanged, persistProjectConfigValues],
   );
   const screenshotRegenerateTimerRef = useRef<
     Record<string, ReturnType<typeof setTimeout>>
@@ -4732,31 +4782,29 @@ ${context.details}
         ? flattenNestedDelta(configDataMapRef.current[pageId] ?? {}, schema)
         : (configDataMapRef.current[pageId] ?? {});
       const nextPageConfig = { ...prevClean, ...dataClean };
-      configDataMapRef.current = {
-        ...configDataMapRef.current,
-        [pageId]: nextPageConfig,
-      };
-      setConfigDataMap((prev) => ({
-        ...prev,
-        [pageId]: nextPageConfig,
-      }));
+      const committed = meta?.persistence === "committed";
       const pendingPersist = pageConfigPersistTimersRef.current[pageId];
-      if (meta?.persistence === "committed") {
-        if (pendingPersist) {
-          clearTimeout(pendingPersist.timer);
-          delete pageConfigPersistTimersRef.current[pageId];
-          // A change made while the ZIP was uploading may still carry an old
-          // full-page snapshot. Re-submit the latest merged values once so it
-          // cannot overwrite the already committed Spine reference.
-          persistPageConfigValues(pageId, nextPageConfig, 0);
-        }
-      } else {
-        persistPageConfigValues(pageId, nextPageConfig);
+      if (committed && pendingPersist) {
+        clearTimeout(pendingPersist.timer);
+        delete pageConfigPersistTimersRef.current[pageId];
       }
-      markScreenshotDirty(pageId);
-      markWorkspaceChanged();
+      replacePageConfigValues(
+        pageId,
+        nextPageConfig,
+        committed ? 0 : 500,
+        !committed || Boolean(pendingPersist),
+      );
+      if (!areConfigValuesEqual(prevClean, nextPageConfig)) {
+        const before = { ...prevClean };
+        const after = { ...nextPageConfig };
+        recordCommand({
+          label: "页面配置变更",
+          undo: () => replacePageConfigValues(pageId, before, 0),
+          redo: () => replacePageConfigValues(pageId, after, 0),
+        });
+      }
     },
-    [markScreenshotDirty, markWorkspaceChanged, persistPageConfigValues],
+    [recordCommand, replacePageConfigValues],
   );
 
   const handleWhiteboardCommitted = useCallback(
@@ -4854,35 +4902,28 @@ ${context.details}
 
   const handleProjectConfigPanelChange = useCallback(
     (data: Record<string, unknown>, meta?: ConfigChangeMeta) => {
+      const before = { ...projectConfigValuesRef.current };
       const nextProjectConfigValues = {
         ...projectConfigValuesRef.current,
         ...data,
       };
-      // 立即更新 ref，保证紧跟在本次输入后的发布会等待这次保存。
-      projectConfigValuesRef.current = nextProjectConfigValues;
-      setProjectConfigValues(nextProjectConfigValues);
-      if (meta?.persistence !== "committed") {
-        void persistProjectConfigValues(nextProjectConfigValues);
-      } else if (projectConfigPersistPendingCountRef.current > 0) {
-        // Append one latest snapshot behind any older queued request so an
-        // in-flight project save cannot overwrite the committed Spine ref.
-        void persistProjectConfigValues(nextProjectConfigValues);
+      replaceProjectConfigValues(
+        nextProjectConfigValues,
+        meta?.persistence !== "committed" || projectConfigPersistPendingCountRef.current > 0,
+      );
+      if (!areConfigValuesEqual(before, nextProjectConfigValues)) {
+        const after = { ...nextProjectConfigValues };
+        recordCommand({
+          label: "项目配置变更",
+          undo: () => replaceProjectConfigValues(before),
+          redo: () => replaceProjectConfigValues(after),
+        });
       }
-      setConfigDataMap((prev) => {
-        const next = { ...prev };
-        for (const pageId of Object.keys(next)) {
-          next[pageId] = { ...next[pageId], ...data };
-        }
-        for (const page of demoPages) {
-          if (!next[page.id]) {
-            next[page.id] = { ...data };
-          }
-        }
-        return next;
-      });
     },
-    [demoPages, persistProjectConfigValues],
+    [recordCommand, replaceProjectConfigValues],
   );
+
+  handleProjectConfigPanelChangeRef.current = handleProjectConfigPanelChange;
 
   const handleSchemaChange = useCallback(
     (newSchema: string) => {
@@ -7612,17 +7653,10 @@ ${context.details}
       const content = [
         pageCodes[page.id],
         pagePrototypeMap[page.id]?.html,
-        pageSandboxMap[page.id]?.html,
       ]
         .filter((value): value is string => typeof value === "string")
         .join("\n");
-      regionIds[page.id] = Array.from(
-        new Set(
-          [...content.matchAll(/data-region-id\s*=\s*["']([A-Za-z0-9_-]{1,100})["']/g), ...content.matchAll(/regionId\s*[:=]\s*["']([A-Za-z0-9_-]{1,100})["']/g)]
-            .map((match) => match[1])
-            .filter((value): value is string => Boolean(value)),
-        ),
-      );
+      regionIds[page.id] = extractDeclaredRegionIds([content]);
     }
     const rawRules = visibilityRulesCollab.value.trim();
     return resolveVisibility({
@@ -7635,13 +7669,13 @@ ${context.details}
       pageIds: demoPages.map((page) => page.id),
       pageSchemas: pageSchemaMap,
       regionIds,
-    });
+    }, undefined, { roles: [currentUserRole || "guest"] });
   }, [
     demoPages,
     pageCodes,
     pagePrototypeMap,
-    pageSandboxMap,
     pageSchemaMap,
+    currentUserRole,
     projectConfigSchema,
     projectConfigValues,
     projectVisibilityRules,
@@ -7740,11 +7774,16 @@ ${context.details}
         configData: configDataMap[page.id],
         schema: pageSchemaMap[page.id],
         visibilityStatus: visibilityResolution.pages[page.id]
-          ? {
-              visible: visibilityResolution.pages[page.id].visible,
-              enabled: visibilityResolution.pages[page.id].enabled,
-              reasons: visibilityResolution.pages[page.id].reasons,
-            }
+            ? {
+                visible: visibilityResolution.pages[page.id].visible,
+                enabled: visibilityResolution.pages[page.id].enabled,
+                unavailable: visibilityResolution.pages[page.id].unavailable,
+                message: visibilityResolution.pages[page.id].message,
+                fallbackPageId: visibilityResolution.pages[page.id].fallbackPageId,
+                fallbackMessage: visibilityResolution.pages[page.id].fallbackMessage,
+                alternativeRegion: visibilityResolution.pages[page.id].alternativeRegion,
+                reasons: visibilityResolution.pages[page.id].reasons,
+              }
           : undefined,
         visibilityRegions: Object.fromEntries(
           Object.entries(visibilityResolution.regions)
@@ -9462,6 +9501,30 @@ ${context.details}
                           <span className="text-sm font-medium">历史</span>
                         </div>
                         <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            aria-label="撤回"
+                            title="撤回（Ctrl/Cmd+Z）"
+                            disabled={!canUndo}
+                            onClick={() => void undo()}
+                          >
+                            <Undo2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            aria-label="重做"
+                            title="重做（Ctrl/Cmd+Y）"
+                            disabled={!canRedo}
+                            onClick={() => void redo()}
+                          >
+                            <Redo2 className="h-4 w-4" />
+                          </Button>
                           <Button
                             size="sm"
                             onClick={() => setSaveVersionDialogOpen(true)}

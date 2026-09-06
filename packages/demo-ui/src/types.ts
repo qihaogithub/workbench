@@ -450,7 +450,18 @@ export interface CanvasPageData {
   visibilityStatus?: {
     visible: boolean;
     enabled: boolean;
-    reasons?: Array<{ ruleId: string; fieldKey: string; effect: "hidden" | "disabled" }>;
+    unavailable?: boolean;
+    message?: string;
+    fallbackPageId?: string;
+    fallbackMessage?: string;
+    alternativeRegion?: { pageId: string; regionId: string; message?: string };
+    reasons?: Array<{
+      ruleId: string;
+      fieldKey: string;
+      fieldKeys?: string[];
+      effect: "hidden" | "disabled" | "unavailable";
+      strategy?: "unavailable" | "fallback-page" | "alternative-region";
+    }>;
   };
   visibilityRegions?: Record<string, { visible: boolean; enabled: boolean }>;
   previewSize?: PreviewSize;

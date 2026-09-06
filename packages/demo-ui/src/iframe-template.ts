@@ -2527,6 +2527,46 @@ ${cssLinks}
       resources: summarizeResourceTimings()
     });
 
+    var currentVisibilityRegions = {};
+    var visibilityOriginalStyles = new WeakMap();
+    function applyVisibilityRegions() {
+      var elements = document.querySelectorAll('[data-region-id]');
+      for (var i = 0; i < elements.length; i++) {
+        var element = elements[i];
+        var regionId = element.getAttribute('data-region-id');
+        var state = regionId ? currentVisibilityRegions[regionId] : null;
+        if (!state) continue;
+        var original = visibilityOriginalStyles.get(element);
+        if (!original) {
+          original = {
+            display: element.style.getPropertyValue('display'),
+            displayPriority: element.style.getPropertyPriority('display'),
+            opacity: element.style.getPropertyValue('opacity'),
+            opacityPriority: element.style.getPropertyPriority('opacity'),
+            pointerEvents: element.style.getPropertyValue('pointer-events'),
+            pointerEventsPriority: element.style.getPropertyPriority('pointer-events'),
+            ariaDisabled: element.getAttribute('aria-disabled')
+          };
+          visibilityOriginalStyles.set(element, original);
+        }
+        if (state.visible === false) element.style.setProperty('display', 'none', 'important');
+        else if (original.display) element.style.setProperty('display', original.display, original.displayPriority);
+        else element.style.removeProperty('display');
+        if (state.enabled === false) {
+          element.style.setProperty('opacity', '0.55');
+          element.style.setProperty('pointer-events', 'none');
+          element.setAttribute('aria-disabled', 'true');
+        } else {
+          if (original.opacity) element.style.setProperty('opacity', original.opacity, original.opacityPriority);
+          else element.style.removeProperty('opacity');
+          if (original.pointerEvents) element.style.setProperty('pointer-events', original.pointerEvents, original.pointerEventsPriority);
+          else element.style.removeProperty('pointer-events');
+          if (original.ariaDisabled === null) element.removeAttribute('aria-disabled');
+          else element.setAttribute('aria-disabled', original.ariaDisabled);
+        }
+      }
+    }
+
     window.addEventListener('message', (event) => {
       if (event.source !== window.parent) return;
 
@@ -2554,7 +2594,13 @@ ${cssLinks}
         updateAppRuntime(appState, routeParams);
         if (currentComponent) {
           renderComponent();
+          requestAnimationFrame(applyVisibilityRegions);
         }
+      }
+
+      if (type === 'UPDATE_VISIBILITY') {
+        currentVisibilityRegions = event.data.visibilityRegions || {};
+        requestAnimationFrame(applyVisibilityRegions);
       }
 
       if (type === 'COLLECT_POSITIONABLE_SIZES') {

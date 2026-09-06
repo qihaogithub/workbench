@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { ToolHookManager } from "../../src/backends/managers/tool-hook-manager";
+import { guardVisibilityCompletionClaim, ToolHookManager } from "../../src/backends/managers/tool-hook-manager";
 import type { AgentConfig, AgentEvent, FileChange } from "../../src/core/types";
 
 describe("ToolHookManager", () => {
@@ -24,6 +24,20 @@ describe("ToolHookManager", () => {
   afterEach(() => {
     while (temporaryRoots.length)
       fs.rmSync(temporaryRoots.pop()!, { recursive: true, force: true });
+  });
+
+  it("prevents a completion claim when page code changed without a committed rule receipt", () => {
+    const guarded = guardVisibilityCompletionClaim(
+      "跨页面可见性联动已完成。",
+      [{ path: "demos/member/index.tsx", action: "modified" }],
+      false,
+    );
+    expect(guarded).toContain("跨页面联动尚未完成");
+    expect(guardVisibilityCompletionClaim(
+      "跨页面可见性联动已完成。",
+      [{ path: "demos/member/index.tsx", action: "modified" }],
+      true,
+    )).toBe("跨页面可见性联动已完成。");
   });
 
   describe("getFileChangesForTool", () => {

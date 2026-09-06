@@ -92,8 +92,13 @@ export interface PublishedProject {
   demoFolders: DemoFolderMeta[];
   projectConfigSchema?: string;
   projectConfigValues?: Record<string, unknown>;
+  visibilityRulesRef?: {
+    path: "visibility-rules.json";
+    sha256: string;
+    version: number;
+  };
+  /** Hydrated after the referenced immutable asset passes hash verification. */
   visibilityRules?: VisibilityRulesDocument;
-  visibilityRulesHash?: string;
   canvasState?: CanvasState;
   knowledge?: KnowledgeIndexItem[];
   designSpecs?: PublishedDesignSpecMeta[];
@@ -202,7 +207,28 @@ export async function getProjects(): Promise<ProjectsIndex> {
 export async function getProjectData(
   projectId: string,
 ): Promise<PublishedProject> {
-  return fetchJson<PublishedProject>(`/data/${projectId}/project.json`);
+  const project = await fetchJson<PublishedProject>(`/data/${projectId}/project.json`);
+  const reference = project.visibilityRulesRef;
+  if (!reference) return project;
+  if (reference.path !== "visibility-rules.json" || !/^[a-f0-9]{64}$/i.test(reference.sha256)) {
+    throw new Error("页面状态规则引用无效");
+  }
+  const content = await fetchText(`/data/${projectId}/${reference.path}`);
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(content));
+  const actualHash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  if (actualHash !== reference.sha256.toLowerCase()) {
+    throw new Error("页面状态规则完整性校验失败");
+  }
+  let visibilityRules: VisibilityRulesDocument;
+  try {
+    visibilityRules = JSON.parse(content) as VisibilityRulesDocument;
+  } catch {
+    throw new Error("页面状态规则不是有效 JSON");
+  }
+  if (visibilityRules.version !== reference.version) {
+    throw new Error("页面状态规则版本与发布清单不一致");
+  }
+  return { ...project, visibilityRules };
 }
 
 export async function getDemoSchema(
@@ -390,7 +416,7 @@ export function getAuthToken(): string | null {
 export async function login(
   username: string,
   password: string,
-): Promise<{ token: string; userId: string; username: string; expiresAt: number } | null> {
+): Promise<{ token: string; userId: string; username: string; role: string; expiresAt: number } | null> {
   const res = await fetch(`${DATA_BASE}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -409,6 +435,7 @@ export async function login(
     token: body.data.token,
     userId: body.data.user.id,
     username: body.data.user.username,
+    role: body.data.user.role,
     expiresAt: body.data.expiresAt,
   };
 }

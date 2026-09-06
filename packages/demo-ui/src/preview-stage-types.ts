@@ -34,7 +34,7 @@ export interface PreviewStagePage extends CanvasPageData {
 export interface SinglePageRendererProps {
   iframe?: Omit<
     IframePreviewFrameProps,
-    "src" | "title" | "previewSize" | "configData"
+    "src" | "title" | "previewSize" | "configData" | "visibilityRegions"
   >;
   prototype?: Omit<
     PrototypePagePreviewProps,

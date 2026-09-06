@@ -72,6 +72,7 @@ export {
 } from "./demo/prototype-preview";
 export { checkConfigSchemaAgainstPrototype } from "./demo/config-runtime-compatibility";
 export type { ConfigRuntimeCompatibilityResult } from "./demo/config-runtime-compatibility";
+export { extractDeclaredRegionIds } from "./demo/region-declarations";
 export {
   VISIBILITY_RULES_VERSION,
   parseVisibilityRules,
@@ -83,15 +84,21 @@ export type {
   AllowedVisibilitySessionOverrides,
   VisibilityPageState,
   VisibilityRegionState,
+  VisibilityResolvedStatus,
   VisibilityResolution,
   VisibilityRule,
   VisibilityRuleCondition,
   VisibilityRuleEffect,
+  VisibilityLeafCondition,
+  VisibilityRuleContext,
+  VisibilityRulePredicate,
   VisibilityRuleReason,
   VisibilityRuleSource,
+  VisibilityRuleStrategy,
   VisibilityRuleTarget,
   VisibilityRulesDocument,
   VisibilityScalar,
+  VisibilityRuntimeContext,
   VisibilityValidationContext,
   VisibilityValidationIssue,
   VisibilityValidationResult,

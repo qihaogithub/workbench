@@ -126,6 +126,7 @@ export default function ViewerProjectPage() {
   const [configData, setConfigData] = useState<Record<string, unknown>>({});
   const [configDataMap, setConfigDataMap] = useState<Record<string, Record<string, unknown>>>({});
   const [visibilitySessionOverrides, setVisibilitySessionOverrides] = useState<Record<string, unknown>>({});
+  const [visibilityRuntimeRole, setVisibilityRuntimeRole] = useState("guest");
   const [canvasState, setCanvasState] = useState<CanvasState>({
     viewport: { x: 40, y: 40, zoom: 0.5 },
     pages: {},
@@ -153,8 +154,21 @@ export default function ViewerProjectPage() {
       values: visibilitySessionOverrides,
       fieldKeys: Object.keys(visibilitySessionOverrides),
       allowPageTargets: false,
-    });
-  }, [data, visibilitySessionOverrides]);
+    }, { roles: [visibilityRuntimeRole] });
+  }, [data, visibilityRuntimeRole, visibilitySessionOverrides]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/auth/me", { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : null)
+      .then((result) => {
+        if (!cancelled && typeof result?.data?.role === "string") {
+          setVisibilityRuntimeRole(result.data.role);
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
   const visiblePages = useMemo(() => {
     if (!data) return [];
     if (!visibilityResolution?.valid) return data.demoPages;
@@ -301,18 +315,26 @@ export default function ViewerProjectPage() {
     const firstAvailable = visiblePages.find(
       (page) => !visibilityResolution.valid || visibilityResolution.pages[page.id]?.enabled !== false,
     );
+    const fallbackPage = requestedState?.fallbackPageId
+      ? visiblePages.find((page) => page.id === requestedState.fallbackPageId
+        && visibilityResolution.pages[page.id]?.enabled !== false)
+      : undefined;
     const nextPage = pageParam
       ? requestedAvailable
         ? requested
-        : firstAvailable ?? data.demoPages[0]
-      : currentAvailable ?? firstAvailable ?? data.demoPages[0];
+        : fallbackPage ?? firstAvailable
+      : currentAvailable ?? firstAvailable;
     if (nextPage && nextPage.id !== activeDemoId) {
       setActiveDemoId(nextPage.id);
       setConfigData(configDataMap[nextPage.id] ?? {});
+    } else if (!nextPage && activeDemoId) {
+      setActiveDemoId("");
     }
     setVisibilityNotice(
       requested && !requestedAvailable
-        ? `页面「${requested.name}」当前${requestedVisible ? "不可用" : "不可见"}，已切换到可用页面。`
+        ? requestedState?.message
+          ? requestedState.message
+          : `页面「${requested.name}」当前${requestedVisible ? "不可用" : "不可见"}，${fallbackPage ? `已按规则切换到备用页面「${fallbackPage.name}」。` : "已切换到可用页面。"}`
         : null,
     );
   }, [activeDemoId, configDataMap, data, pageParam, visibilityResolution, visiblePages]);
@@ -436,9 +458,9 @@ export default function ViewerProjectPage() {
       if (state?.visible === false || state?.enabled === false) {
         const blockedPage = data.demoPages.find((page) => page.id === pageId);
         setVisibilityNotice(
-          blockedPage
+          state.message ?? (blockedPage
             ? `页面「${blockedPage.name}」当前${state.visible === false ? "不可见" : "不可用"}。`
-            : `该页面当前${state.visible === false ? "不可见" : "不可用"}。`,
+            : `该页面当前${state.visible === false ? "不可见" : "不可用"}。`),
         );
         return;
       }
@@ -492,9 +514,14 @@ export default function ViewerProjectPage() {
           schema: page.schema,
           visibilityStatus: visibilityResolution?.pages[page.id]
             ? {
-                visible: visibilityResolution.pages[page.id].visible,
-                enabled: visibilityResolution.pages[page.id].enabled,
-                reasons: visibilityResolution.pages[page.id].reasons,
+              visible: visibilityResolution.pages[page.id].visible,
+              enabled: visibilityResolution.pages[page.id].enabled,
+              unavailable: visibilityResolution.pages[page.id].unavailable,
+              message: visibilityResolution.pages[page.id].message,
+              fallbackPageId: visibilityResolution.pages[page.id].fallbackPageId,
+              fallbackMessage: visibilityResolution.pages[page.id].fallbackMessage,
+              alternativeRegion: visibilityResolution.pages[page.id].alternativeRegion,
+              reasons: visibilityResolution.pages[page.id].reasons,
               }
             : undefined,
           visibilityRegions: Object.fromEntries(
@@ -528,7 +555,20 @@ export default function ViewerProjectPage() {
     );
   }
 
-  const activePage = visiblePages.find((p) => p.id === activeDemoId) ?? visiblePages[0];
+  const availablePages = visibilityResolution?.valid
+    ? visiblePages.filter((page) => visibilityResolution.pages[page.id]?.enabled !== false)
+    : visiblePages;
+  if (visibilityResolution?.valid && availablePages.length === 0) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background px-6 text-center">
+        <p className="max-w-lg text-muted-foreground">
+          当前配置与身份下没有可用页面，请联系创作者调整页面状态规则。
+        </p>
+      </div>
+    );
+  }
+
+  const activePage = availablePages.find((p) => p.id === activeDemoId) ?? availablePages[0];
   const activePageSchema = activePage?.schema;
   const hasMultiplePages = visiblePages.length > 1;
 

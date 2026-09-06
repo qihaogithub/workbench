@@ -5,7 +5,7 @@ import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from '../pi-tools/permis
 import { PERMISSION_TIMEOUT, type PermissionHandler, type PermissionRequestInfo } from '../pi-tools/delete-page-tool';
 import type { PlanApprovalHandler, PlanApprovalRequest, PlanApprovalResult } from '../pi-tools/plan-approval-tool';
 import { logger } from '../../utils/logger';
-import { assertAiMutationAllowed } from '../pi-tools/ai-mutation-policy';
+import { assertAiMutationAllowed, isVisibilityPlanText } from '../pi-tools/ai-mutation-policy';
 
 const PLAN_APPROVAL_TIMEOUT_MS = 10 * 60_000;
 
@@ -133,6 +133,10 @@ export class PermissionManager {
   requestPlanApproval: PlanApprovalHandler = (toolCallId, request, signal): Promise<PlanApprovalResult> => {
     const sessionId = this.config.sessionId;
 
+    // Approval is a one-shot proof bound to the exact edited plan. A new plan
+    // request must invalidate any previous proof before it reaches the UI.
+    this.config.visibilityPlanApproval = undefined;
+
     if (signal?.aborted) {
       return Promise.resolve({ approved: false, reason: 'cancelled' });
     }
@@ -163,13 +167,23 @@ export class PermissionManager {
     }
 
     return this.waitForPermission(toolCallId, PLAN_APPROVAL_TIMEOUT_MS, signal, 'planApproval')
-      .then((result) => ({
-        approved: result.approved,
-        planMarkdown: result.responseContent,
-        ...(result.reason === 'user_response'
-          ? (result.approved ? {} : { reason: 'rejected' as const })
-          : { reason: result.reason }),
-      }));
+      .then((result) => {
+        const planMarkdown = result.responseContent?.trim() || request.planMarkdown.trim();
+        if (result.approved && isVisibilityPlanText(planMarkdown)) {
+          this.config.visibilityPlanApproval = {
+            planMarkdown,
+            approvedAt: Date.now(),
+            expiresAt: Date.now() + PLAN_APPROVAL_TIMEOUT_MS,
+          };
+        }
+        return {
+          approved: result.approved,
+          planMarkdown: result.responseContent,
+          ...(result.reason === 'user_response'
+            ? (result.approved ? {} : { reason: 'rejected' as const })
+            : { reason: result.reason }),
+        };
+      });
   };
 
   /**

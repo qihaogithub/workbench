@@ -420,6 +420,11 @@ export function CanvasPagePreviewContent({
               containerSizeOverride={containerSizeOverride}
               sandbox="allow-scripts"
               configData={page.configData}
+              visibilityRegions={Object.fromEntries(
+                Object.entries(page.visibilityRegions ?? {})
+                  .filter(([key]) => key.startsWith(`${page.id}:`))
+                  .map(([key, state]) => [key.slice(page.id.length + 1), state]),
+              )}
               sessionId={sessionId}
               demoId={page.id}
               onLoad={handleIframeContentLoaded}
@@ -638,6 +643,16 @@ export function CanvasPageItem({
   }, [isTitleEditing]);
 
   const visibilityDisabled = page.visibilityStatus?.enabled === false;
+  const visibilityUnavailable = page.visibilityStatus?.unavailable === true;
+  const visibilityRestricted = page.visibilityStatus?.visible === false || visibilityDisabled || visibilityUnavailable;
+  const visibilityLabel = visibilityUnavailable
+    ? "业务配置不可用"
+    : page.visibilityStatus?.visible === false
+      ? "业务配置已隐藏"
+      : "业务配置已禁用";
+  const visibilitySource = page.visibilityStatus?.reasons?.length
+    ? `由配置「${[...new Set(page.visibilityStatus.reasons.flatMap((reason) => reason.fieldKeys ?? [reason.fieldKey]))].join("、")}」控制`
+    : "未提供配置来源";
   const canInteract = editable && toolMode === "select" && !visibilityDisabled;
   const showEdgeHandles =
     (isHovering || selected) && canInteract && !isDragging && !isResizing;
@@ -1003,10 +1018,17 @@ export function CanvasPageItem({
         )}
       </div>
 
-      {visibilityDisabled && (
+      {visibilityRestricted && (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-slate-900/20">
-          <span className="rounded-md bg-background/90 px-2 py-1 text-xs text-muted-foreground shadow-sm">
-            业务配置已禁用
+          <span className="flex flex-col items-center gap-0.5 rounded-md bg-background/90 px-2 py-1 text-center text-xs text-muted-foreground shadow-sm">
+            <span>{visibilityLabel}</span>
+            {page.visibilityStatus?.message && (
+              <span className="max-w-[220px] text-[10px]">{page.visibilityStatus.message}</span>
+            )}
+            <span className="max-w-[220px] truncate text-[10px]">{visibilitySource}</span>
+            {page.visibilityStatus?.fallbackPageId && (
+              <span className="max-w-[220px] truncate text-[10px]">备用页：{page.visibilityStatus.fallbackPageId}</span>
+            )}
           </span>
         </div>
       )}

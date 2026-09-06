@@ -44,9 +44,6 @@ function resolveSkillRoot(): string {
 }
 
 function resolveSkillSource(dirName: string): string {
-  if (dirName === 'design-taste-frontend') {
-    return 'github:Leonxlnx/taste-skill';
-  }
   return `${WORKBENCH_SKILL_SOURCE_PREFIX}${dirName}`;
 }
 

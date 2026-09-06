@@ -64,6 +64,13 @@ export interface AgentConfig {
    */
   authorAuthorization?: AgentAuthorAuthorization | null;
 
+  /** One-shot approval proof for configuration schema/value/visibility mutations. */
+  visibilityPlanApproval?: {
+    planMarkdown: string;
+    approvedAt: number;
+    expiresAt: number;
+  };
+
   piAgent?: PiAgentConfig;
 }
 

@@ -9,6 +9,8 @@ export type AiMutationCategory =
   | "workspace_tree"
   | "convention"
   | "design_spec"
+  | "config_definition"
+  | "config_visibility"
   | "unverified";
 
 export interface AiMutationDecision {
@@ -19,6 +21,32 @@ export interface AiMutationDecision {
 
 function normalized(relativePath: string): string {
   return relativePath.replace(/\\/g, "/").replace(/^\.?\//, "");
+}
+
+function isConfigSchemaPath(filePath: string): boolean {
+  return filePath === "project.config.schema.json"
+    || /^demos\/[^/]+\/config\.schema\.json$/.test(filePath);
+}
+
+function isConfigValuesPath(filePath: string): boolean {
+  return filePath === "project.config.values.json"
+    || /^demos\/[^/]+\/config\.values\.json$/.test(filePath);
+}
+
+function isVisibilityRulesPath(filePath: string): boolean {
+  return filePath === "project.visibility-rules.json";
+}
+
+export function isVisibilityPlanText(planMarkdown: string): boolean {
+  const text = planMarkdown.toLowerCase();
+  return text.includes("config-driven-behavior")
+    || text.includes("visibility")
+    || (text.includes("配置") && (text.includes("联动") || text.includes("可见性")));
+}
+
+export function hasApprovedVisibilityPlan(config: AgentConfig): boolean {
+  const approval = config.visibilityPlanApproval;
+  return Boolean(approval && approval.expiresAt > Date.now() && isVisibilityPlanText(approval.planMarkdown));
 }
 
 function deny(config: AgentConfig, category: AiMutationCategory): AiMutationDecision {
@@ -96,15 +124,26 @@ function templateBoundWhiteboardIds(workingDir: string | undefined, templateIds:
 export function assertAiMutationAllowed(
   config: AgentConfig,
   relativePath: string,
-  options: { content?: string; pageIds?: string[] } = {},
+  options: { content?: string; pageIds?: string[]; workflow?: "visibility-draft" } = {},
 ): AiMutationDecision {
   const auth = config.authorAuthorization;
   if (auth === undefined) return { allowed: true };
   if (!auth || auth.expiresAt <= Date.now()) return deny(config, "unverified");
-  if (auth.role === "admin") return { allowed: true };
+  if (auth.role === "admin") {
+    const filePath = normalized(relativePath);
+    if (isVisibilityRulesPath(filePath) && (options.workflow !== "visibility-draft" || !hasApprovedVisibilityPlan(config))) return deny(config, "config_visibility");
+    if (isConfigSchemaPath(filePath) && (options.workflow !== "visibility-draft" || !hasApprovedVisibilityPlan(config))) return deny(config, "config_definition");
+    if (isConfigValuesPath(filePath) && !hasApprovedVisibilityPlan(config)) return deny(config, "config_definition");
+    return { allowed: true };
+  }
   if (auth.role !== "editor") return deny(config, "unverified");
 
   const filePath = normalized(relativePath);
+  if (isVisibilityRulesPath(filePath)) {
+    if (options.workflow !== "visibility-draft" || !hasApprovedVisibilityPlan(config)) return deny(config, "config_visibility");
+  }
+  if (isConfigSchemaPath(filePath) && (options.workflow !== "visibility-draft" || !hasApprovedVisibilityPlan(config))) return deny(config, "config_definition");
+  if (isConfigValuesPath(filePath) && !hasApprovedVisibilityPlan(config)) return deny(config, "config_definition");
   if (filePath === "convention.md" || /^demos\/[^/]+\/convention\.md$/.test(filePath)) {
     return deny(config, "convention");
   }

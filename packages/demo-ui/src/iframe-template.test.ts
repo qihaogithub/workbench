@@ -1,6 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { positionEditScript, visualEditScript } from "./iframe-template";
+import { generateIframeHtml, positionEditScript, visualEditScript } from "./iframe-template";
+
+describe("generateIframeHtml", () => {
+  it("支持宿主下发区域可见性并恢复元素原始状态", () => {
+    const html = generateIframeHtml();
+    expect(html).toContain("UPDATE_VISIBILITY");
+    expect(html).toContain("applyVisibilityRegions");
+    expect(html).toContain("[data-region-id]");
+    expect(html).toContain("visibilityOriginalStyles");
+  });
+});
 
 describe("visualEditScript", () => {
   it("在选择模式注入专用鼠标，并排除编辑浮层", () => {

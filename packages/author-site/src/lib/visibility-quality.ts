@@ -2,10 +2,11 @@ import type { AppGraph } from "@workbench/shared";
 import type { CanvasState } from "@workbench/demo-ui";
 
 export interface VisibilityDeadLinkIssue {
-  code: "VISIBILITY_DEAD_LINK";
-  source: "canvas-navigation" | "app-graph-entry" | "app-graph-action";
+  code: "VISIBILITY_DEAD_LINK" | "VISIBILITY_NO_AVAILABLE_PAGE";
+  severity: "warning" | "error";
+  source: "project" | "canvas-navigation" | "app-graph-entry" | "app-graph-action";
   sourcePageId?: string;
-  targetPageId: string;
+  targetPageId?: string;
   message: string;
 }
 /**
@@ -15,6 +16,7 @@ export interface VisibilityDeadLinkIssue {
  */
 export function findVisibilityDeadLinks(input: {
   hiddenPageIds: Iterable<string>;
+  availablePageIds?: Iterable<string>;
   pageIds: Iterable<string>;
   canvasState?: CanvasState;
   appGraph?: AppGraph;
@@ -24,11 +26,20 @@ export function findVisibilityDeadLinks(input: {
   const issues: VisibilityDeadLinkIssue[] = [];
   const seen = new Set<string>();
   const add = (issue: VisibilityDeadLinkIssue) => {
-    const key = `${issue.source}:${issue.sourcePageId ?? ""}:${issue.targetPageId}`;
+    const key = `${issue.source}:${issue.sourcePageId ?? ""}:${issue.targetPageId ?? ""}`;
     if (seen.has(key)) return;
     seen.add(key);
     issues.push(issue);
   };
+
+  if (pages.size > 0 && input.availablePageIds && new Set(input.availablePageIds).size === 0) {
+    add({
+      code: "VISIBILITY_NO_AVAILABLE_PAGE",
+      severity: "error",
+      source: "project",
+      message: "当前发布配置会使项目没有任何可用页面",
+    });
+  }
 
   for (const connection of Object.values(input.canvasState?.navigation?.connections ?? {})) {
     const sourcePageId = connection.source?.pageId;
@@ -36,6 +47,7 @@ export function findVisibilityDeadLinks(input: {
     if (!sourcePageId || !targetPageId || !pages.has(targetPageId) || !hidden.has(targetPageId)) continue;
     add({
       code: "VISIBILITY_DEAD_LINK",
+      severity: "warning",
       source: "canvas-navigation",
       sourcePageId,
       targetPageId,
@@ -50,6 +62,7 @@ export function findVisibilityDeadLinks(input: {
   if (entryPageId && hidden.has(entryPageId)) {
     add({
       code: "VISIBILITY_DEAD_LINK",
+      severity: "warning",
       source: "app-graph-entry",
       targetPageId: entryPageId,
       message: `应用入口指向已隐藏页面「${entryPageId}」`,
@@ -63,6 +76,7 @@ export function findVisibilityDeadLinks(input: {
       if (!targetPageId || !hidden.has(targetPageId)) continue;
       add({
         code: "VISIBILITY_DEAD_LINK",
+        severity: "warning",
         source: "app-graph-action",
         ...(sourcePageId ? { sourcePageId } : {}),
         targetPageId,

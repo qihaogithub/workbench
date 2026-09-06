@@ -5,18 +5,6 @@
       "name": "活动页",
       "parentId": null,
       "order": 0
-    },
-    {
-      "id": "folder_1785397619636_rl8i8j",
-      "name": "6种关卡类型",
-      "parentId": null,
-      "order": 1
-    },
-    {
-      "id": "folder_1785397626658_xft2kd",
-      "name": "题目关卡",
-      "parentId": "folder_1785397619636_rl8i8j",
-      "order": 0
     }
   ],
   "pages": [
@@ -78,7 +66,7 @@
     },
     {
       "id": "闯关活动页-进行中_ec853d",
-      "name": "闯关活动页（进行中）",
+      "name": "闯关活动页",
       "routeKey": "page-2",
       "order": 0,
       "parentId": null,

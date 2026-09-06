@@ -110,8 +110,19 @@ function formatVisibilityRulesSummary(workingDir: string): string {
         : `页面 ${rule.target.pageId} 的区域 ${rule.target.regionId}`;
       const condition = rule.condition.kind === "truthy"
         ? "truthy"
-        : `equals ${JSON.stringify(rule.condition.value)}`;
-      return `- ${rule.id}: 项目字段 ${rule.source.fieldKey} ${condition} → ${target} ${rule.effect}`;
+        : rule.condition.kind === "equals"
+          ? `equals ${JSON.stringify(rule.condition.value)}`
+          : rule.condition.kind === "oneOf"
+            ? `oneOf ${JSON.stringify(rule.condition.values)}`
+            : `${rule.condition.kind} (${rule.condition.conditions.map((predicate) => `${predicate.source.fieldKey} ${predicate.condition.kind}`).join(", ")})`;
+      const strategy = rule.strategy
+        ? `，策略=${rule.strategy.kind}${rule.strategy.kind === "fallback-page" ? `:${rule.strategy.pageId}` : rule.strategy.kind === "alternative-region" ? `:${rule.strategy.pageId}:${rule.strategy.regionId}` : ""}`
+        : "";
+      const context = rule.context ? `，上下文=${rule.context.kind}:${rule.context.value}` : "";
+      const sources = rule.condition.kind === "all" || rule.condition.kind === "any"
+        ? rule.condition.conditions.map((predicate) => predicate.source.fieldKey)
+        : rule.source ? [rule.source.fieldKey] : [];
+      return `- ${rule.id}: 项目字段 ${[...new Set(sources)].join("、")} ${condition} → ${target} ${rule.effect}${strategy}${context}`;
     }).join("\n");
   } catch {
     return "（规则文件无法读取，请通过 readFile 检查）";
