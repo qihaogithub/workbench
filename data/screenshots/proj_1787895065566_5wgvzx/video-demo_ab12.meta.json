@@ -1,11 +1,47 @@
 {
-  "currentHash": "3b1a2c4b918dbbe3",
-  "generatedAt": "2026-09-03T02:32:34.060Z",
-  "elapsed": 8500,
+  "currentHash": "c6afa6bc142ce093",
+  "generatedAt": "2026-09-07T09:38:51.214Z",
+  "elapsed": 1703,
   "history": [
+    "c6afa6bc142ce093",
+    "4d53ad9d1d763a51",
+    "dc472732bb49eeba",
     "3b1a2c4b918dbbe3"
   ],
   "renderBoxes": {
+    "c6afa6bc142ce093": {
+      "width": 390,
+      "height": 844,
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "bodyWidth": 390,
+      "bodyHeight": 844,
+      "documentWidth": 390,
+      "documentHeight": 844,
+      "fullPage": true
+    },
+    "4d53ad9d1d763a51": {
+      "width": 390,
+      "height": 844,
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "bodyWidth": 390,
+      "bodyHeight": 844,
+      "documentWidth": 390,
+      "documentHeight": 844,
+      "fullPage": true
+    },
+    "dc472732bb49eeba": {
+      "width": 390,
+      "height": 844,
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "bodyWidth": 390,
+      "bodyHeight": 844,
+      "documentWidth": 390,
+      "documentHeight": 844,
+      "fullPage": true
+    },
     "3b1a2c4b918dbbe3": {
       "width": 390,
       "height": 844,

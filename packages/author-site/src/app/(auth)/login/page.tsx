@@ -6,7 +6,7 @@ import Link from "next/link";
 import { LoginForm } from "@/components/auth/login-form";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast-provider";
-import { Building2 } from "lucide-react";
+import { ArrowRight, Building2, ShieldCheck } from "lucide-react";
 import { getSafeRedirectPath } from "@/lib/auth/redirect";
 
 interface DingtalkLoginConfig {
@@ -22,6 +22,9 @@ export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const [authMode, setAuthMode] = useState<"dingtalk" | "password">(
+    "dingtalk",
+  );
   const [loading, setLoading] = useState(false);
   const [dingtalkLoading, setDingtalkLoading] = useState(false);
   const [dingtalkConfig, setDingtalkConfig] =
@@ -196,39 +199,74 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="space-y-4">
-      <LoginForm onSubmit={handleLogin} loading={loading} />
-      <div className="w-full max-w-md space-y-3">
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          <div className="h-px flex-1 bg-border" />
-          <span>企业账号</span>
-          <div className="h-px flex-1 bg-border" />
+    <section className="auth-login-simple" aria-labelledby="login-card-title">
+      <div className="auth-card">
+        <div className="auth-card-topline">
+          <span className="auth-card-label">
+            <span className="auth-live-dot" aria-hidden="true" />
+            工作区登录
+          </span>
+          <span className="auth-card-version">ONEFLOW 1.0</span>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full"
-          disabled={dingtalkLoading}
-          onClick={handleDingtalkLogin}
-        >
-          <Building2 className="mr-2 h-4 w-4" />
-          {dingtalkLoading ? "钉钉登录中..." : "使用钉钉企业账号登录"}
-        </Button>
+
+        <div className="auth-card-heading">
+          <h2 id="login-card-title">
+            {authMode === "dingtalk" ? "欢迎回来" : "登录 OneFlow"}
+          </h2>
+          <p>
+            {authMode === "dingtalk"
+              ? "使用企业钉钉账号，一键进入你的工作区"
+              : "使用管理员分配的账号继续你的项目"}
+          </p>
+        </div>
+
+        {authMode === "dingtalk" ? (
+          <Button
+            type="button"
+            className="auth-dingtalk-button w-full bg-[#1677ff] text-white hover:bg-[#0f65d8]"
+            disabled={dingtalkLoading}
+            onClick={handleDingtalkLogin}
+          >
+            <Building2 className="mr-2 h-4 w-4" aria-hidden="true" />
+            {dingtalkLoading ? "钉钉登录中..." : "钉钉一键登录"}
+            {!dingtalkLoading && (
+              <ArrowRight className="ml-auto h-4 w-4" aria-hidden="true" />
+            )}
+          </Button>
+        ) : (
+          <LoginForm onSubmit={handleLogin} loading={loading} />
+        )}
+
+        {authMode === "dingtalk" ? (
+          <button
+            type="button"
+            className="auth-mode-switch"
+            onClick={() => setAuthMode("password")}
+          >
+            账号密码登录
+            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        ) : (
+          <div className="auth-secondary-links">
+            <button
+              type="button"
+              className="auth-secondary-link"
+              onClick={() => setAuthMode("dingtalk")}
+            >
+              使用钉钉一键登录
+            </button>
+            <Link href="/forgot-password" className="auth-secondary-link">
+              忘记密码？
+            </Link>
+          </div>
+        )}
+
+        <div className="auth-security-note">
+          <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+          <span>登录状态通过安全连接保护</span>
+        </div>
       </div>
-      <div className="flex items-center justify-between text-sm">
-        <p className="text-muted-foreground">
-          还没有账号？{" "}
-          <Link href={`/register?redirect=${encodeURIComponent(redirect)}`} className="text-primary hover:underline">
-            立即注册
-          </Link>
-        </p>
-        <Link
-          href="/forgot-password"
-          className="text-muted-foreground hover:text-primary hover:underline"
-        >
-          忘记密码？
-        </Link>
-      </div>
-    </div>
+      <p className="auth-card-caption">仅限已获授权的团队成员访问</p>
+    </section>
   );
 }
