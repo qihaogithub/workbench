@@ -126,6 +126,13 @@ describe("sessions route external auth reuse", () => {
     }));
     jest.doMock("@/lib/session-manager", () => ({
       archiveActiveSession: jest.fn(),
+      bindEditSessionRole: jest.fn((sessionId, userId, userRole) => ({
+        sessionId,
+        userId,
+        userRole,
+        projectId: "project-1",
+        expiresAt: Date.now() + 60_000,
+      })),
       createEditSession: jest.fn(async () => ({
         sessionId: "session-new",
         workspaceId: "workspace-new",
@@ -137,6 +144,7 @@ describe("sessions route external auth reuse", () => {
       enforceSessionLimit: jest.fn(),
       ensureSessionUsesProjectActiveWorkspace: jest.fn(),
       findActiveSession: jest.fn(() => null),
+      touchSessionActivity: jest.fn(),
     }));
     jest.doMock("@/lib/agent-providers", () => ({
       pushSessionExternalAuthToAgent: jest.fn(async () => ({
@@ -144,6 +152,10 @@ describe("sessions route external auth reuse", () => {
         message: "ok",
       })),
       pushSessionModelConfigToAgent: jest.fn(async () => ({
+        ok: true,
+        message: "ok",
+      })),
+      pushSessionAuthorizationToAgent: jest.fn(async () => ({
         ok: true,
         message: "ok",
       })),
@@ -167,6 +179,14 @@ describe("sessions route external auth reuse", () => {
         listSessions: jest.fn(),
       })),
     }));
+    jest.doMock("@/lib/conversation", () => ({
+      getConversationService: jest.fn(() => ({
+        ensureConversation: jest.fn(),
+      })),
+    }));
+    jest.doMock("@/lib/user", () => ({
+      findUserById: jest.fn(() => ({ id: "user-1", role: "editor" })),
+    }));
   });
 
   afterEach(() => {
@@ -178,6 +198,8 @@ describe("sessions route external auth reuse", () => {
     jest.dontMock("@/lib/external-auth");
     jest.dontMock("@/lib/model-config");
     jest.dontMock("@/lib/user-model-config");
+    jest.dontMock("@/lib/conversation");
+    jest.dontMock("@/lib/user");
     jest.dontMock("@/lib/agent-client");
     global.Response = originalResponse;
   });

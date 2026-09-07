@@ -366,6 +366,7 @@ export interface ImageGenConfig {
   apiKey: string;
   baseUrl: string;
   model: string;
+  apiProfile?: "auto" | "gpt-image" | "dall-e-3" | "generation-only";
   timeoutMs: number;
   maxPerSession: number;
   maxRetries: number;

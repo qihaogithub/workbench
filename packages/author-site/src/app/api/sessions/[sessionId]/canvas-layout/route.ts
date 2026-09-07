@@ -457,7 +457,7 @@ async function validateSessionAccess(sessionId: string) {
     };
   }
 
-  if (meta.userId && meta.userId !== payload.userId) {
+  if (!meta.userId || meta.userId !== payload.userId) {
     return {
       response: NextResponse.json(
         createApiError("FORBIDDEN", "无权访问其他用户的 Session"),

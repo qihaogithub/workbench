@@ -2,6 +2,8 @@ import type { NextRequest } from "next/server";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
+let sessionMetaOverride: Record<string, unknown> | null = null;
 
 const updateWorkspaceDemoFiles = jest.fn();
 const commitWorkspaceMutation = jest.fn();
@@ -69,6 +71,7 @@ describe("legacy session files route", () => {
   beforeEach(() => {
     jest.resetModules();
     jest.clearAllMocks();
+    sessionMetaOverride = null;
     updateWorkspaceDemoFiles.mockReturnValue(true);
     commitWorkspaceMutation.mockResolvedValue({
       mutationId: "mutation-1",
@@ -97,7 +100,7 @@ describe("legacy session files route", () => {
         data,
       })),
       findWorkspacePath: jest.fn(() => workspacePath),
-      getSessionMeta: jest.fn(() => ({
+      getSessionMeta: jest.fn(() => sessionMetaOverride ?? ({
         sessionId: "session-1",
         demoId: "project-1",
         userId: "user-1",
@@ -155,5 +158,24 @@ describe("legacy session files route", () => {
       ]),
     }));
     expect(fs.readFileSync(path.join(workspacePath, "demos", "page-1", "index.tsx"), "utf-8")).toBe("old code");
+  });
+
+  it("GET 对缺失 owner 的 Session fail closed", async () => {
+    sessionMetaOverride = { sessionId: "session-1", workspaceId: "workspace-1" };
+    const { GET } = await import("./route");
+
+    const response = await GET({} as NextRequest, { params: Promise.resolve({ sessionId: "session-1" }) });
+
+    expect(response.status).toBe(403);
+  });
+
+  it("PUT 拒绝其他用户的 Session", async () => {
+    sessionMetaOverride = { sessionId: "session-1", userId: "user-2" };
+    const { PUT } = await import("./route");
+
+    const response = await PUT(jsonRequest({ code: "blocked" }), { params: Promise.resolve({ sessionId: "session-1" }) });
+
+    expect(response.status).toBe(403);
+    expect(commitWorkspaceMutation).not.toHaveBeenCalled();
   });
 });

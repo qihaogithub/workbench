@@ -9,13 +9,18 @@ jest.mock("@workbench/sketch-react", () => ({
     scene,
     onSceneChange,
     profile,
+    imageGeneration,
   }: {
     scene: { nodes?: Array<{ id: string }> };
     onSceneChange: (next: unknown) => void;
     profile?: string;
+    imageGeneration?: unknown;
   }) => (
     <div>
       <output data-testid="editor-profile">{profile}</output>
+      <output data-testid="image-generation-adapter">
+        {imageGeneration ? "available" : "missing"}
+      </output>
       <output data-testid="scene-node-ids">
         {(scene.nodes ?? []).map((node) => node.id).join(",")}
       </output>
@@ -68,6 +73,19 @@ describe("WhiteboardDialog", () => {
     renderDialog();
 
     expect(screen.getByTestId("editor-profile")).toHaveTextContent("whiteboard");
+  });
+
+  it("injects image generation and keeps diagnostics free of prompt or image data", () => {
+    const { onDiagnosticEvent } = renderDialog();
+    expect(screen.getByTestId("image-generation-adapter")).toHaveTextContent("available");
+    expect(onDiagnosticEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        details: expect.objectContaining({
+          prompt: expect.anything(),
+          image: expect.anything(),
+        }),
+      }),
+    );
   });
 
   it("starts a new whiteboard with the title but without the factory note", async () => {

@@ -31,6 +31,10 @@ export async function POST(
       });
     }
 
+    if (!sessionMeta.userId || sessionMeta.userId !== payload.userId) {
+      return NextResponse.json(createApiError('FORBIDDEN', '无权操作其他用户的 Session'), { status: 403 });
+    }
+
     if (!sessionMeta.workspaceId) {
       return NextResponse.json(
         createApiError('INVALID_REQUEST', 'Session 未绑定 workspaceId'),
@@ -39,7 +43,7 @@ export async function POST(
     }
 
     const syncedPath = syncSessionFromProject(
-      sessionMeta.userId || payload.userId,
+      sessionMeta.userId,
       sessionMeta.demoId,
       sessionMeta.workspaceId,
     );

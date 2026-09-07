@@ -12,6 +12,7 @@ import type {
   AppActionPayload,
 } from "./iframe-types";
 import type { FieldConfig } from "./schema-parser";
+import type { ConfigFieldType } from "./config-categories";
 import type {
   MarkdownReferenceClickHandler,
   MarkdownReferenceContext,
@@ -205,6 +206,15 @@ export interface ConfigFormProps {
   className?: string;
   sessionId?: string;
   configCategoryFilter?: string;
+  /** 可选的字段语义筛选；与分类筛选共同生效。 */
+  configTypeFilter?: ConfigFieldType;
+  /** 在已由宿主提供更高层信息架构时，隐藏 Schema 字段分组标题。 */
+  hideGroupTitles?: boolean;
+  /**
+   * 标记顶层字段来自项目共享配置。仅在创作端配置面板按需传入；
+   * 通用表单及数组内嵌字段不显示来源提示。
+   */
+  projectSharedSourceHint?: boolean;
   typeLimits?: Record<string, number>;
   onEnterPositionEdit?: (target: PositionEditTarget) => void;
   /** 定位字段实例注册或数组重排后，通知宿主最新真实字段路径。 */

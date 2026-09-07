@@ -1,6 +1,31 @@
 FROM --platform=$BUILDPLATFORM node:24-bookworm-slim AS builder
 
-RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
+ARG HTTP_PROXY=
+ARG HTTPS_PROXY=
+ARG DEBIAN_MIRROR=
+ENV HTTP_PROXY=${HTTP_PROXY} \
+    HTTPS_PROXY=${HTTPS_PROXY} \
+    http_proxy=${HTTP_PROXY} \
+    https_proxy=${HTTPS_PROXY}
+
+RUN if [ -n "$DEBIAN_MIRROR" ]; then \
+      find /etc/apt -type f \( -name 'sources.list' -o -name '*.sources' \) -print0 \
+        | xargs -0 sed -i \
+          -e "s|http://deb.debian.org/debian|${DEBIAN_MIRROR}|g" \
+          -e "s|http://deb.debian.org/debian-security|${DEBIAN_MIRROR}-security|g" \
+          -e "s|http://security.debian.org/debian-security|${DEBIAN_MIRROR}-security|g"; \
+    fi \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG NPM_REGISTRY=https://registry.npmmirror.com
+ENV COREPACK_NPM_REGISTRY=${NPM_REGISTRY} \
+    npm_config_disturl=https://npmmirror.com/mirrors/node
+
+RUN corepack enable \
+    && corepack prepare pnpm@8.15.0 --activate \
+    && pnpm config set registry "$NPM_REGISTRY"
 
 WORKDIR /app
 

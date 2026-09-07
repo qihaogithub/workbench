@@ -47,6 +47,7 @@ function getDefaultConfig() {
       apiKey: "",
       baseUrl: "https://api.openai.com/v1",
       model: "dall-e-3",
+      apiProfile: "auto",
       timeoutMs: 60000,
       maxPerSession: 30,
       maxRetries: 3,
@@ -295,8 +296,19 @@ export async function PUT(request: NextRequest) {
       const existingGen = existingConfig.imageGen || {};
       updatedConfig.imageGen = {
         ...existingGen,
+        apiProfile: existingGen.apiProfile || "auto",
         ...body.imageGen,
       };
+      const profiles = new Set(["auto", "gpt-image", "dall-e-3", "generation-only"]);
+      if (!profiles.has(updatedConfig.imageGen.apiProfile)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: "INVALID_CONFIG", message: "imageGen.apiProfile 不受支持" },
+          },
+          { status: 400 },
+        );
+      }
     }
 
     // 当保存 backendProviders 时，自动将供应商 ID 前缀同步到 frontend.autoEnableRules

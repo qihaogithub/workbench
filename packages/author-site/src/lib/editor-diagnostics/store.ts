@@ -51,6 +51,16 @@ function getDiagnosticsDbPath(): string {
   return path.join(getDiagnosticsDbDir(), "editor-events.db");
 }
 
+interface DiagnosticsDbRecovery {
+  quarantineDir: string;
+  reason: string;
+}
+
+interface DiagnosticsDbHandle {
+  db: Database.Database;
+  recovery?: DiagnosticsDbRecovery;
+}
+
 function getDiagnosticsPath(editorSessionId: string): string {
   if (!isValidEditorSessionId(editorSessionId)) {
     throw new Error("INVALID_EDITOR_SESSION_ID");
@@ -62,44 +72,114 @@ async function ensureDiagnosticsDir(): Promise<void> {
   await fs.promises.mkdir(getDiagnosticsDir(), { recursive: true });
 }
 
-function ensureDiagnosticsDb(): Database.Database {
+function openDiagnosticsDb(): Database.Database {
   fs.mkdirSync(getDiagnosticsDbDir(), { recursive: true });
   const db = new Database(getDiagnosticsDbPath());
-  db.pragma("journal_mode = WAL");
-  db.pragma("busy_timeout = 5000");
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS editor_events (
-      id TEXT PRIMARY KEY,
-      ts TEXT NOT NULL,
-      schema_version INTEGER NOT NULL,
-      source TEXT NOT NULL,
-      level TEXT NOT NULL,
-      event_group TEXT NOT NULL,
-      event_type TEXT NOT NULL,
-      project_id TEXT,
-      session_id TEXT,
-      workspace_id TEXT,
-      editor_session_id TEXT,
-      trace_id TEXT,
-      operation_id TEXT,
-      page_id TEXT,
-      resource_path TEXT,
-      message TEXT,
-      payload_json TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_editor_events_project_ts ON editor_events(project_id, ts);
-    CREATE INDEX IF NOT EXISTS idx_editor_events_session_ts ON editor_events(session_id, ts);
-    CREATE INDEX IF NOT EXISTS idx_editor_events_editor_session ON editor_events(editor_session_id, ts);
-    CREATE INDEX IF NOT EXISTS idx_editor_events_trace ON editor_events(trace_id, ts);
-    CREATE INDEX IF NOT EXISTS idx_editor_events_operation ON editor_events(operation_id, ts);
-    CREATE INDEX IF NOT EXISTS idx_editor_events_workspace ON editor_events(workspace_id, ts);
-    CREATE INDEX IF NOT EXISTS idx_editor_events_type_ts ON editor_events(event_type, ts);
-    CREATE INDEX IF NOT EXISTS idx_editor_events_group_ts ON editor_events(event_group, ts);
-  `);
-  return db;
+  try {
+    db.pragma("journal_mode = WAL");
+    db.pragma("busy_timeout = 5000");
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS editor_events (
+        id TEXT PRIMARY KEY,
+        ts TEXT NOT NULL,
+        schema_version INTEGER NOT NULL,
+        source TEXT NOT NULL,
+        level TEXT NOT NULL,
+        event_group TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        project_id TEXT,
+        session_id TEXT,
+        workspace_id TEXT,
+        editor_session_id TEXT,
+        trace_id TEXT,
+        operation_id TEXT,
+        page_id TEXT,
+        resource_path TEXT,
+        message TEXT,
+        payload_json TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_editor_events_project_ts ON editor_events(project_id, ts);
+      CREATE INDEX IF NOT EXISTS idx_editor_events_session_ts ON editor_events(session_id, ts);
+      CREATE INDEX IF NOT EXISTS idx_editor_events_editor_session ON editor_events(editor_session_id, ts);
+      CREATE INDEX IF NOT EXISTS idx_editor_events_trace ON editor_events(trace_id, ts);
+      CREATE INDEX IF NOT EXISTS idx_editor_events_operation ON editor_events(operation_id, ts);
+      CREATE INDEX IF NOT EXISTS idx_editor_events_workspace ON editor_events(workspace_id, ts);
+      CREATE INDEX IF NOT EXISTS idx_editor_events_type_ts ON editor_events(event_type, ts);
+      CREATE INDEX IF NOT EXISTS idx_editor_events_group_ts ON editor_events(event_group, ts);
+    `);
+    const quickCheck = db.pragma("quick_check", { simple: true });
+    if (quickCheck !== "ok") {
+      throw new Error(`SQLITE_CORRUPT: quick_check=${String(quickCheck)}`);
+    }
+    return db;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
 }
 
-async function trimIfNeeded(filePath: string, appendBytes: number): Promise<void> {
+function isCorruptDiagnosticsDb(error: unknown): boolean {
+  const candidate = error as { code?: unknown; message?: unknown };
+  const code = typeof candidate?.code === "string" ? candidate.code : "";
+  const message =
+    typeof candidate?.message === "string" ? candidate.message : String(error);
+  return (
+    code === "SQLITE_CORRUPT" ||
+    code === "SQLITE_NOTADB" ||
+    /database disk image is malformed|file is not a database|quick_check/i.test(
+      message,
+    )
+  );
+}
+
+function quarantineCorruptDiagnosticsDb(error: unknown): DiagnosticsDbRecovery {
+  const dbPath = getDiagnosticsDbPath();
+  const quarantineDir = path.join(
+    getDiagnosticsDbDir(),
+    "quarantine",
+    `${Date.now()}-${randomUUID()}`,
+  );
+  fs.mkdirSync(quarantineDir, { recursive: true });
+  for (const source of [dbPath, `${dbPath}-wal`, `${dbPath}-shm`]) {
+    if (!fs.existsSync(source)) continue;
+    fs.renameSync(source, path.join(quarantineDir, path.basename(source)));
+  }
+  return {
+    quarantineDir,
+    reason: error instanceof Error ? error.message : String(error),
+  };
+}
+
+function ensureDiagnosticsDb(): DiagnosticsDbHandle {
+  try {
+    return { db: openDiagnosticsDb() };
+  } catch (error) {
+    if (!isCorruptDiagnosticsDb(error)) throw error;
+    const recovery = quarantineCorruptDiagnosticsDb(error);
+    return { db: openDiagnosticsDb(), recovery };
+  }
+}
+
+function recoveryWarning(recovery: DiagnosticsDbRecovery): string {
+  return `SQLite 事件库损坏，已隔离原库并重建空主库；历史可能存在缺口: ${recovery.reason}`;
+}
+
+function persistentRecoveryWarnings(): string[] {
+  const quarantineRoot = path.join(getDiagnosticsDbDir(), "quarantine");
+  const quarantined = fs.existsSync(quarantineRoot)
+    ? fs
+        .readdirSync(quarantineRoot, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory()).length
+    : 0;
+  return quarantined > 0
+    ? [`SQLite 事件库曾发生损坏并隔离 ${quarantined} 次，历史事件可能存在缺口`]
+    : [];
+}
+
+async function trimIfNeeded(
+  filePath: string,
+  appendBytes: number,
+): Promise<void> {
   const stat = await fs.promises.stat(filePath).catch(() => null);
   if (!stat || stat.size + appendBytes <= MAX_LOG_FILE_BYTES) return;
 
@@ -121,15 +201,19 @@ async function appendJsonlMirror(
   editorSessionId: string,
   events: Array<EditorDiagnosticEvent | NormalizedEditorDiagnosticEvent>,
 ): Promise<void> {
-  const payload = events.map((event) => JSON.stringify(event)).join("\n") + "\n";
+  const payload =
+    events.map((event) => JSON.stringify(event)).join("\n") + "\n";
   const filePath = getDiagnosticsPath(editorSessionId);
   await ensureDiagnosticsDir();
   await trimIfNeeded(filePath, Buffer.byteLength(payload));
   await fs.promises.appendFile(filePath, payload, "utf8");
 }
 
-function insertSqliteEvents(events: NormalizedEditorDiagnosticEvent[]): number {
-  const db = ensureDiagnosticsDb();
+function insertSqliteEvents(events: NormalizedEditorDiagnosticEvent[]): {
+  written: number;
+  recovery?: DiagnosticsDbRecovery;
+} {
+  const { db, recovery } = ensureDiagnosticsDb();
   try {
     const insert = db.prepare(`
       INSERT OR IGNORE INTO editor_events (
@@ -198,7 +282,7 @@ function insertSqliteEvents(events: NormalizedEditorDiagnosticEvent[]): number {
       return written;
     });
 
-    return write(events) as number;
+    return { written: write(events) as number, recovery };
   } finally {
     db.close();
   }
@@ -211,7 +295,8 @@ function rowToEvent(row: EditorEventRow): NormalizedEditorDiagnosticEvent {
     schemaVersion: row.schema_version,
     source: row.source as NormalizedEditorDiagnosticEvent["source"],
     level: row.level as NormalizedEditorDiagnosticEvent["level"],
-    eventGroup: row.event_group as NormalizedEditorDiagnosticEvent["eventGroup"],
+    eventGroup:
+      row.event_group as NormalizedEditorDiagnosticEvent["eventGroup"],
     eventType: row.event_type,
     projectId: row.project_id ?? undefined,
     sessionId: row.session_id ?? undefined,
@@ -261,7 +346,9 @@ export async function appendEditorDiagnosticEvents(
   let dbUnavailable = false;
   let jsonlFallbackUsed = false;
   try {
-    sqliteWritten = insertSqliteEvents(normalized);
+    const inserted = insertSqliteEvents(normalized);
+    sqliteWritten = inserted.written;
+    if (inserted.recovery) warnings.push(recoveryWarning(inserted.recovery));
   } catch (error) {
     dbUnavailable = true;
     jsonlFallbackUsed = true;
@@ -291,14 +378,17 @@ export async function appendEditorDiagnosticEvents(
       sqliteUsed: !dbUnavailable,
       jsonlFallbackUsed,
       dbUnavailable,
-      eventGapDetected: dbUnavailable,
+      eventGapDetected: dbUnavailable || warnings.length > 0,
       warnings,
     },
   };
 }
 
 export function appendServerEditorDiagnosticEvent(
-  input: Omit<NormalizedEditorDiagnosticEvent, "id" | "schemaVersion" | "ts" | "source" | "payload"> & {
+  input: Omit<
+    NormalizedEditorDiagnosticEvent,
+    "id" | "schemaVersion" | "ts" | "source" | "payload"
+  > & {
     id?: string;
     ts?: string;
     payload?: Record<string, unknown>;
@@ -314,17 +404,23 @@ export function appendServerEditorDiagnosticEvent(
   });
   const warnings: string[] = [];
   try {
-    const sqliteWritten = insertSqliteEvents([event]);
-    if (event.editorSessionId && isValidEditorSessionId(event.editorSessionId)) {
-      void appendJsonlMirror(event.editorSessionId, [event]).catch(() => undefined);
+    const inserted = insertSqliteEvents([event]);
+    if (inserted.recovery) warnings.push(recoveryWarning(inserted.recovery));
+    if (
+      event.editorSessionId &&
+      isValidEditorSessionId(event.editorSessionId)
+    ) {
+      void appendJsonlMirror(event.editorSessionId, [event]).catch(
+        () => undefined,
+      );
     }
     return {
-      sqliteWritten,
+      sqliteWritten: inserted.written,
       diagnostics: {
         sqliteUsed: true,
         jsonlFallbackUsed: false,
         dbUnavailable: false,
-        eventGapDetected: false,
+        eventGapDetected: Boolean(inserted.recovery),
         warnings,
       },
     };
@@ -334,14 +430,38 @@ export function appendServerEditorDiagnosticEvent(
         error instanceof Error ? error.message : String(error)
       }`,
     );
-    if (event.editorSessionId && isValidEditorSessionId(event.editorSessionId)) {
-      void appendJsonlMirror(event.editorSessionId, [event]).catch(() => undefined);
+    if (
+      event.editorSessionId &&
+      isValidEditorSessionId(event.editorSessionId)
+    ) {
+      void appendJsonlMirror(event.editorSessionId, [event]).catch(
+        () => undefined,
+      );
+    }
+    let jsonlFallbackUsed = false;
+    try {
+      fs.mkdirSync(getDiagnosticsDir(), { recursive: true });
+      fs.appendFileSync(
+        path.join(getDiagnosticsDir(), "author-api.jsonl"),
+        `${JSON.stringify(event)}\n`,
+        "utf8",
+      );
+      jsonlFallbackUsed = true;
+      warnings.push("author-api 诊断事件已写入 JSONL spool");
+    } catch (fallbackError) {
+      warnings.push(
+        `author-api JSONL spool 写入失败: ${
+          fallbackError instanceof Error
+            ? fallbackError.message
+            : String(fallbackError)
+        }`,
+      );
     }
     return {
       sqliteWritten: 0,
       diagnostics: {
         sqliteUsed: false,
-        jsonlFallbackUsed: false,
+        jsonlFallbackUsed,
         dbUnavailable: true,
         eventGapDetected: true,
         warnings,
@@ -363,7 +483,7 @@ export async function rebuildEditorDiagnosticSqliteFromJsonl(): Promise<{
   const events = await listJsonlDiagnosticEvents();
   return {
     scanned: events.length,
-    written: events.length > 0 ? insertSqliteEvents(events) : 0,
+    written: events.length > 0 ? insertSqliteEvents(events).written : 0,
   };
 }
 
@@ -371,10 +491,12 @@ export async function readEditorDiagnosticEvents(
   editorSessionId: string,
 ): Promise<EditorDiagnosticEvent[]> {
   const filePath = getDiagnosticsPath(editorSessionId);
-  const content = await fs.promises.readFile(filePath, "utf8").catch((error) => {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return "";
-    throw error;
-  });
+  const content = await fs.promises
+    .readFile(filePath, "utf8")
+    .catch((error) => {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return "";
+      throw error;
+    });
   if (!content.trim()) return [];
 
   const events: EditorDiagnosticEvent[] = [];
@@ -397,7 +519,9 @@ export async function readEditorDiagnosticEvents(
   return events;
 }
 
-async function listJsonlDiagnosticEvents(): Promise<NormalizedEditorDiagnosticEvent[]> {
+async function listJsonlDiagnosticEvents(): Promise<
+  NormalizedEditorDiagnosticEvent[]
+> {
   const dir = getDiagnosticsDir();
   const entries = await fs.promises.readdir(dir).catch(() => []);
   const all: NormalizedEditorDiagnosticEvent[] = [];
@@ -406,7 +530,9 @@ async function listJsonlDiagnosticEvents(): Promise<NormalizedEditorDiagnosticEv
     const editorSessionId = entry.replace(/\.jsonl$/, "");
     const legacyEvents = await readEditorDiagnosticEvents(editorSessionId);
     all.push(
-      ...legacyEvents.map((event) => normalizeEditorDiagnosticEvent(event, "frontend")),
+      ...legacyEvents.map((event) =>
+        normalizeEditorDiagnosticEvent(event, "frontend"),
+      ),
     );
   }
   return all;
@@ -426,13 +552,15 @@ export async function queryEditorDiagnosticEvents(options: {
   events: NormalizedEditorDiagnosticEvent[];
   diagnostics: EditorDiagnosticExport["diagnostics"];
 }> {
-  const warnings: string[] = [];
+  const warnings: string[] = persistentRecoveryWarnings();
   let sqliteEvents: NormalizedEditorDiagnosticEvent[] = [];
   let sqliteUsed = false;
   let dbUnavailable = false;
 
   try {
-    const db = ensureDiagnosticsDb();
+    const handle = ensureDiagnosticsDb();
+    const { db } = handle;
+    if (handle.recovery) warnings.push(recoveryWarning(handle.recovery));
     try {
       const clauses: string[] = [];
       const params: Record<string, string | number> = {
@@ -471,12 +599,16 @@ export async function queryEditorDiagnosticEvents(options: {
         params.since = options.since;
       }
       const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
-      const rows = db.prepare(`
+      const rows = db
+        .prepare(
+          `
         SELECT * FROM editor_events
         ${where}
         ORDER BY ts DESC
         LIMIT @limit
-      `).all(params) as EditorEventRow[];
+      `,
+        )
+        .all(params) as EditorEventRow[];
       sqliteEvents = rows.map(rowToEvent).reverse();
       sqliteUsed = true;
     } finally {
@@ -498,7 +630,7 @@ export async function queryEditorDiagnosticEvents(options: {
         sqliteUsed,
         jsonlFallbackUsed: false,
         dbUnavailable,
-        eventGapDetected: false,
+        eventGapDetected: warnings.length > 0,
         warnings,
       },
     };
@@ -506,13 +638,29 @@ export async function queryEditorDiagnosticEvents(options: {
 
   const fallback = await listJsonlDiagnosticEvents();
   const filtered = fallback
-    .filter((event) => !options.projectId || event.projectId === options.projectId)
-    .filter((event) => !options.sessionId || event.sessionId === options.sessionId)
-    .filter((event) => !options.workspaceId || event.workspaceId === options.workspaceId)
-    .filter((event) => !options.editorSessionId || event.editorSessionId === options.editorSessionId)
+    .filter(
+      (event) => !options.projectId || event.projectId === options.projectId,
+    )
+    .filter(
+      (event) => !options.sessionId || event.sessionId === options.sessionId,
+    )
+    .filter(
+      (event) =>
+        !options.workspaceId || event.workspaceId === options.workspaceId,
+    )
+    .filter(
+      (event) =>
+        !options.editorSessionId ||
+        event.editorSessionId === options.editorSessionId,
+    )
     .filter((event) => !options.traceId || event.traceId === options.traceId)
-    .filter((event) => !options.operationId || event.operationId === options.operationId)
-    .filter((event) => !options.eventType || event.eventType === options.eventType)
+    .filter(
+      (event) =>
+        !options.operationId || event.operationId === options.operationId,
+    )
+    .filter(
+      (event) => !options.eventType || event.eventType === options.eventType,
+    )
     .filter((event) => !options.since || event.ts >= options.since)
     .sort((a, b) => a.ts.localeCompare(b.ts))
     .slice(-(options.limit ?? 200));
@@ -526,7 +674,11 @@ export async function queryEditorDiagnosticEvents(options: {
       sqliteUsed,
       jsonlFallbackUsed: filtered.length > 0,
       dbUnavailable,
-      eventGapDetected: filtered.length > 0 || !sqliteUsed || dbUnavailable,
+      eventGapDetected:
+        filtered.length > 0 ||
+        !sqliteUsed ||
+        dbUnavailable ||
+        warnings.length > 0,
       warnings,
     },
   };
@@ -580,13 +732,16 @@ export async function buildEditorDiagnosticExport(
     editorSessionId,
     exportedAt: Date.now(),
     events,
-    normalizedEvents: queried.events.length > 0 ? queried.events : normalizedFallbackEvents,
+    normalizedEvents:
+      queried.events.length > 0 ? queried.events : normalizedFallbackEvents,
     fallbackEvents: fallbackEvents.length > 0 ? fallbackEvents : undefined,
     agentRunLogs: await listAgentRunLogs(sessionIds),
     diagnostics: queried.diagnostics,
     warnings: [
       ...(events.length === 0 ? ["未找到后端诊断事件"] : []),
-      ...(fallbackEvents.length > 0 ? ["导出包包含 JSONL fallback/spool 事件"] : []),
+      ...(fallbackEvents.length > 0
+        ? ["导出包包含 JSONL fallback/spool 事件"]
+        : []),
       ...queried.diagnostics.warnings,
     ],
   };

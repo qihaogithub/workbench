@@ -21,7 +21,6 @@ import { FieldRenderer, PositionConfigContext, type PositionConfigContextValue, 
 import { ConfigCommentPopover } from "./comment/ConfigCommentPopover";
 import type { ConfigCommentController } from "./comment/types";
 import { filterCommentThreadsByTarget } from "./comment/comment-thread-scope";
-import { ConfigScopeWrapper } from "./ConfigScopeWrapper";
 import { PageRequirements } from "./PageRequirements";
 import { RichTextEditor } from "./RichTextEditor";
 import type {
@@ -50,6 +49,7 @@ import {
   getAvailableConfigCategories,
   getSchemaFieldCountByBindings,
   getSchemaFieldCountByCategory,
+  getSchemaFieldCountByType,
 } from "./config-categories";
 import { cn } from "./utils";
 import type { ConfigBreadcrumb, ConfigChangeMeta, ConfigCommentTarget, ConfigDefinitionFocus, ConfigItemCapabilities, ConfigItemDetail, DesignSpecEntryLink, PageDesignSpecEntryLink, PositionEditTarget, PositionableSizeItem, WhiteboardLauncher } from "./types";
@@ -71,6 +71,10 @@ import {
 const EMPTY_DESIGN_SPEC_ENTRIES: DesignSpecEntryLink[] = [];
 const EMPTY_PAGE_DESIGN_SPEC_ENTRIES: PageDesignSpecEntryLink[] = [];
 const EMPTY_SCHEMA = '{\n  "type": "object",\n  "properties": {}\n}';
+const CONFIG_TYPE_SECTIONS = [
+  { type: "business" as const, title: "业务配置" },
+  { type: "resource" as const, title: "资源配置" },
+] as const;
 export {
   extractCodeConfigBindingKeys,
   extractPrototypeConfigBindingKeys,
@@ -1229,18 +1233,33 @@ export function PageConfigPanel({
     );
   }
 
-  const pageCount = getSchemaFieldCountByCategory(
-    selectedPage.schema,
-    configCategoryFilter,
+  const pageConfigTypeCounts = Object.fromEntries(
+    CONFIG_TYPE_SECTIONS.map(({ type }) => [
+      type,
+      getSchemaFieldCountByType(selectedPage.schema, type, configCategoryFilter),
+    ]),
+  ) as Record<(typeof CONFIG_TYPE_SECTIONS)[number]["type"], number>;
+  const projectConfigTypeCounts = Object.fromEntries(
+    CONFIG_TYPE_SECTIONS.map(({ type }) => [
+      type,
+      getSchemaFieldCountByBindings(
+        selectedPage.projectConfigSchema ?? projectConfigSchema,
+        selectedPage.projectConfigBindings,
+        configCategoryFilter,
+        type,
+      ),
+    ]),
+  ) as Record<(typeof CONFIG_TYPE_SECTIONS)[number]["type"], number>;
+  const visibleConfigCount = [
+    ...Object.values(pageConfigTypeCounts),
+    ...Object.values(projectConfigTypeCounts),
+  ].reduce(
+    (count, value) => count + value,
+    0,
   );
-  const selectedProjectCount = getSchemaFieldCountByBindings(
-    selectedPage.projectConfigSchema ?? projectConfigSchema,
-    selectedPage.projectConfigBindings,
-    configCategoryFilter,
+  const showSemanticSeparation = CONFIG_TYPE_SECTIONS.every(
+    ({ type }) => pageConfigTypeCounts[type] + projectConfigTypeCounts[type] > 0,
   );
-  const showSharedConfig =
-    selectedProjectCount > 0 && !!selectedProjectConfigSchema;
-  const showPageConfig = pageCount > 0 && !!selectedPage.schema;
   const projectCapabilities = selectedPage.configItemCapabilities?.project;
   const pageCapabilities = selectedPage.configItemCapabilities?.page;
   const canCreateProjectConfig =
@@ -1548,125 +1567,105 @@ export function PageConfigPanel({
             </section>
           )}
           <section className="flex flex-col">
-            {showSharedConfig && (
-              <section className="flex flex-col gap-5">
-                <div className="flex h-10 items-center gap-2 py-3">
-                  <span className="text-base font-semibold leading-none text-foreground">共享配置</span>
-                  {sharedAffectedPages.length > 0 && (
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button
-                          type="button"
-                          className="cursor-pointer rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                          {sharedAffectedPages.length}
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent
-                        align="start"
-                        side="bottom"
-                        className="w-56 p-1"
-                      >
-                        <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
-                          受影响页面
-                        </div>
-                        {sharedAffectedPages.map((page) => (
-                          <button
-                            key={page.id}
-                            type="button"
-                            onClick={() => onPageSelect?.(page.id)}
-                            className="block w-full cursor-pointer truncate rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          >
-                            {page.name}
-                          </button>
-                        ))}
-                      </PopoverContent>
-                    </Popover>
+            {CONFIG_TYPE_SECTIONS.map(({ type, title }, index) => {
+              const projectCount = projectConfigTypeCounts[type];
+              const pageCount = pageConfigTypeCounts[type];
+              if (projectCount + pageCount === 0) return null;
+              return (
+                <section
+                  key={type}
+                  aria-labelledby={`config-${type}-heading`}
+                  className={cn(
+                    "flex flex-col",
+                    showSemanticSeparation && index > 0 && "mt-6 border-t border-border/60 pt-5",
                   )}
-                </div>
-                <ConfigScopeWrapper scope="project" hideHeader>
-                  <ConfigForm
-                    key={`project-${selectedPage.id}-${selectedProjectConfigSchema}`}
-                    schema={selectedProjectConfigSchema!}
-                    onChange={(data, meta) => onProjectConfigChange?.(data, meta)}
-                    onSchemaChange={onProjectSchemaChange}
-                    initialData={configData}
-                    sessionId={sessionId}
-                    readonly={readonly}
-                    configCategoryFilter={configCategoryFilter}
-                    typeLimits={typeLimits}
-                    designSpecEntries={effectiveDesignSpecEntries.filter((entry) => entry.scope === "project")}
-                    onEditDesignSpec={onEditDesignSpec}
-                    onOpenDesignSpec={(spec, fieldTitle, anchor, trigger) => toggleDesignSpec({ kind: "config", spec, fieldTitle, anchor }, trigger)}
-                    onEditConfigDefinition={onProjectDefinitionChange
-                      ? (key, _field, schemaFieldPath) => openDefinitionEditor("project", key, schemaFieldPath)
-                      : undefined}
-                    configItemCapabilities={selectedPage.configItemCapabilities?.project}
-                    onAddConfigComment={configComments || onAddConfigComment ? handleOpenConfigComment : undefined}
-                    hasConfigComment={configComments ? hasConfigComment : undefined}
-                    hideEmptyConfigCommentTag={hideEmptyConfigCommentTag}
-                    imageConfigScope="project"
-                    configContextPageId={selectedPage.id}
-                    referenceContext={referenceContext}
-                    referenceProvider={referenceProvider}
-                    onReferenceClick={onReferenceClick}
-                    onLaunchWhiteboard={onLaunchWhiteboard}
-                  />
-                </ConfigScopeWrapper>
-              </section>
-            )}
+                >
+                  <h3
+                    id={`config-${type}-heading`}
+                    className={cn(
+                      "text-xs font-medium text-muted-foreground",
+                      !showSemanticSeparation && "sr-only",
+                    )}
+                  >
+                    {title}
+                  </h3>
+                  <div className={cn("flex flex-col gap-5", showSemanticSeparation && "mt-3")}>
+                    {projectCount > 0 && (
+                      <ConfigForm
+                        key={`project-${selectedPage.id}-${selectedProjectConfigSchema}-${type}`}
+                        schema={selectedProjectConfigSchema!}
+                        onChange={(data, meta) => onProjectConfigChange?.(data, meta)}
+                        onSchemaChange={onProjectSchemaChange}
+                        initialData={configData}
+                        sessionId={sessionId}
+                        readonly={readonly}
+                        configCategoryFilter={configCategoryFilter}
+                        configTypeFilter={type}
+                        hideGroupTitles
+                        projectSharedSourceHint
+                        typeLimits={typeLimits}
+                        designSpecEntries={effectiveDesignSpecEntries.filter((entry) => entry.scope === "project")}
+                        onEditDesignSpec={onEditDesignSpec}
+                        onOpenDesignSpec={(spec, fieldTitle, anchor, trigger) => toggleDesignSpec({ kind: "config", spec, fieldTitle, anchor }, trigger)}
+                        onEditConfigDefinition={onProjectDefinitionChange ? (key) => openDefinitionEditor("project", key) : undefined}
+                        configItemCapabilities={selectedPage.configItemCapabilities?.project}
+                        onAddConfigComment={configComments || onAddConfigComment ? handleOpenConfigComment : undefined}
+                        hasConfigComment={configComments ? hasConfigComment : undefined}
+                        imageConfigScope="project"
+                        configContextPageId={selectedPage.id}
+                        referenceContext={referenceContext}
+                        referenceProvider={referenceProvider}
+                        onReferenceClick={onReferenceClick}
+                        onLaunchWhiteboard={onLaunchWhiteboard}
+                      />
+                    )}
+                    {pageCount > 0 && (
+                      <ConfigForm
+                        key={`page-${selectedPage.id}-${selectedPage.schema}-${type}`}
+                        schema={selectedPage.schema!}
+                        onChange={(data, meta) => onPageConfigChange?.(selectedPage.id, data, meta)}
+                        onSchemaChange={(schema) =>
+                          onPageSchemaChange?.(selectedPage.id, schema)
+                        }
+                        initialData={configData}
+                        sessionId={sessionId}
+                        readonly={readonly}
+                        configCategoryFilter={configCategoryFilter}
+                        configTypeFilter={type}
+                        hideGroupTitles
+                        typeLimits={typeLimits}
+                        onEnterPositionEdit={onEnterPositionEdit}
+                        onPositionFieldPathChange={onPositionFieldPathChange}
+                        onExitPositionEdit={onExitPositionEdit}
+                        positionEditActiveId={positionEditActiveId}
+                        positionEditDimming={positionEditDimming}
+                        onTogglePositionDimming={onTogglePositionDimming}
+                        designSpecEntries={effectiveDesignSpecEntries.filter((entry) => entry.scope === "page" && entry.pageId === selectedPage.id)}
+                        onEditDesignSpec={onEditDesignSpec}
+                        onOpenDesignSpec={(spec, fieldTitle, anchor, trigger) => toggleDesignSpec({ kind: "config", spec, fieldTitle, anchor }, trigger)}
+                        onEditConfigDefinition={onPageDefinitionChange ? (key) => openDefinitionEditor("page", key) : undefined}
+                        configItemCapabilities={selectedPage.configItemCapabilities?.page}
+                        onAddConfigComment={configComments || onAddConfigComment ? handleOpenConfigComment : undefined}
+                        hasConfigComment={configComments ? hasConfigComment : undefined}
+                        imageConfigScope="page"
+                        pageId={selectedPage.id}
+                        configContextPageId={selectedPage.id}
+                        referenceContext={referenceContext}
+                        referenceProvider={referenceProvider}
+                        onReferenceClick={onReferenceClick}
+                        onLaunchWhiteboard={onLaunchWhiteboard}
+                        onOpenItemDetail={openConfigItemSheet}
+                        activeItemDetailId={sheetRoute?.itemId}
+                        activeItemDetailFieldPath={sheetRoute?.fieldPath}
+                        onItemDetailInvalidated={handleItemDetailInvalidated}
+                      />
+                    )}
+                  </div>
+                </section>
+              );
+            })}
 
-            {showPageConfig && (
-              <section className="flex flex-col gap-5">
-                <div className="flex h-10 items-center gap-2 py-3">
-                  <span className="text-base font-semibold leading-none text-foreground">本页配置</span>
-                </div>
-                <ConfigScopeWrapper scope="page" hideHeader>
-                <ConfigForm
-                  key={`page-${selectedPage.id}-${selectedPage.schema}`}
-                  schema={selectedPage.schema!}
-                  onChange={(data, meta) => onPageConfigChange?.(selectedPage.id, data, meta)}
-                  onSchemaChange={(schema) =>
-                    onPageSchemaChange?.(selectedPage.id, schema)
-                  }
-                  initialData={configData}
-                  sessionId={sessionId}
-                  readonly={readonly}
-                  configCategoryFilter={configCategoryFilter}
-                  typeLimits={typeLimits}
-                  onEnterPositionEdit={onEnterPositionEdit}
-                  onPositionFieldPathChange={onPositionFieldPathChange}
-                  onExitPositionEdit={onExitPositionEdit}
-                  positionEditActiveId={positionEditActiveId}
-                  positionEditDimming={positionEditDimming}
-                  onTogglePositionDimming={onTogglePositionDimming}
-                  designSpecEntries={effectiveDesignSpecEntries.filter((entry) => entry.scope === "page" && entry.pageId === selectedPage.id)}
-                  onEditDesignSpec={onEditDesignSpec}
-                  onOpenDesignSpec={(spec, fieldTitle, anchor, trigger) => toggleDesignSpec({ kind: "config", spec, fieldTitle, anchor }, trigger)}
-                  onEditConfigDefinition={onPageDefinitionChange
-                    ? (key, _field, schemaFieldPath) => openDefinitionEditor("page", key, schemaFieldPath)
-                    : undefined}
-                  configItemCapabilities={selectedPage.configItemCapabilities?.page}
-                  onAddConfigComment={configComments || onAddConfigComment ? handleOpenConfigComment : undefined}
-                  hasConfigComment={configComments ? hasConfigComment : undefined}
-                  hideEmptyConfigCommentTag={hideEmptyConfigCommentTag}
-                  imageConfigScope="page"
-                  pageId={selectedPage.id}
-                  configContextPageId={selectedPage.id}
-                  referenceContext={referenceContext}
-                  referenceProvider={referenceProvider}
-                  onReferenceClick={onReferenceClick}
-                  onLaunchWhiteboard={onLaunchWhiteboard}
-                  onOpenItemDetail={openConfigItemSheet}
-                  activeItemDetailId={sheetRoute?.itemId}
-                  activeItemDetailFieldPath={sheetRoute?.fieldPath}
-                  onItemDetailInvalidated={handleItemDetailInvalidated}
-                />
-              </ConfigScopeWrapper>
-            </section>
-          )}
-
-          {!showSharedConfig && !showPageConfig && (
+          {visibleConfigCount === 0 && (
             <div className="flex min-h-[180px] flex-col items-center justify-center px-4 text-center">
               <ListFilter className="mb-3 h-8 w-8 text-muted-foreground/50" />
               <p className="text-sm text-muted-foreground">没有匹配的配置项</p>

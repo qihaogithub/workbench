@@ -21,6 +21,7 @@ import {
   useSketchEditorState,
   useSketchHistory,
   type SketchEditorCanvasHandle,
+  type SketchImageGenerationAdapter,
   type SketchEditorSelection,
 } from "../src";
 import { SketchPagePreview as LightweightSketchPagePreview } from "../src/preview";
@@ -81,6 +82,46 @@ function ControlledSurfaceEditor({ initialScene = scene }: { initialScene?: Sket
   return (
     <>
       <SketchEditorSurface scene={value} fillContainer onSceneChange={setValue} />
+      <output data-testid="surface-scene-json">{JSON.stringify(value)}</output>
+    </>
+  );
+}
+
+const imageGenerationCapabilities = {
+  enabled: true,
+  modelId: "test-image-model",
+  qualities: [
+    { id: "auto", label: "自动" },
+    { id: "high", label: "高" },
+  ],
+  sizes: [
+    { id: "1024x1024", label: "1:1", width: 1024, height: 1024 },
+    { id: "1536x1024", label: "3:2", width: 1536, height: 1024 },
+  ],
+  maxImages: 4,
+  maxReferences: 4,
+  supportsReferences: true,
+  allowCustomSize: false,
+  maxPromptLength: 4000,
+} as const;
+
+function ControlledImageGenerationSurface({
+  initialScene,
+  adapter,
+}: {
+  initialScene: SketchSceneDocument;
+  adapter: SketchImageGenerationAdapter;
+}) {
+  const [value, setValue] = React.useState(initialScene);
+  return (
+    <>
+      <SketchEditorSurface
+        scene={value}
+        profile="whiteboard"
+        fillContainer
+        imageGeneration={adapter}
+        onSceneChange={setValue}
+      />
       <output data-testid="surface-scene-json">{JSON.stringify(value)}</output>
     </>
   );
@@ -3085,7 +3126,7 @@ describe("sketch-react", () => {
     });
   });
 
-  it("imports image files directly from the shared surface toolbar", async () => {
+  it("routes shared surface image uploads through the image bubble menu", async () => {
     const emptyScene: SketchSceneDocument = {
       version: 1,
       pageSize: { width: 400, height: 300 },
@@ -3095,6 +3136,9 @@ describe("sketch-react", () => {
 
     setCanvasStageRect(getCanvasStage());
     fireEvent.click(screen.getByLabelText("图片"));
+    const imageMenu = screen.getByRole("menu", { name: "图片工具菜单" });
+    expect(within(imageMenu).getByRole("menuitem", { name: "上传图片" })).toBeTruthy();
+    fireEvent.click(within(imageMenu).getByRole("menuitem", { name: "上传图片" }));
     fireEvent.change(screen.getByLabelText("图片导入文件"), {
       target: { files: [new File(["image-bytes"], "surface.png", { type: "image/png" })] },
     });
@@ -3108,6 +3152,187 @@ describe("sketch-react", () => {
         alt: "surface.png",
       });
       expect(imageNode?.src).toContain("data:image/png;base64");
+    });
+  });
+
+  it("keeps AI placeholders out of scene data and commits a generated batch as one undo step", async () => {
+    const emptyScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 1600, height: 1200 },
+      nodes: [],
+    };
+    let resolveGeneration:
+      | ((images: readonly { id: string; src: string; width: number; height: number }[]) => void)
+      | undefined;
+    const generate = vi.fn(
+      () => new Promise<readonly { id: string; src: string; width: number; height: number }[]>((resolve) => {
+        resolveGeneration = resolve;
+      }),
+    );
+    render(
+      <ControlledImageGenerationSurface
+        initialScene={emptyScene}
+        adapter={{ getCapabilities: () => imageGenerationCapabilities, generate }}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText("图片"));
+    fireEvent.click(within(screen.getByRole("menu", { name: "图片工具菜单" })).getByRole("menuitem", { name: "AI 绘图" }));
+    const panel = await screen.findByTestId("sketch-ai-image-panel");
+    fireEvent.change(within(panel).getByPlaceholderText("描述你想生成的图片…"), {
+      target: { value: "一座漂浮在云海上的城市" },
+    });
+    await waitFor(() => expect((within(panel).getByRole("button", { name: "开始生成" }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.change(within(panel).getByLabelText("生成数量"), { target: { value: "4" } });
+    fireEvent.click(within(panel).getByRole("button", { name: "开始生成" }));
+
+    expect((JSON.parse(screen.getByTestId("surface-scene-json").textContent ?? "{}") as SketchSceneDocument).nodes).toHaveLength(0);
+    await waitFor(() => expect(document.querySelectorAll('[data-sketch-node-id^="ai-image-placeholder-"]')).toHaveLength(4));
+
+    await act(async () => {
+      resolveGeneration?.(Array.from({ length: 4 }, (_, index) => ({
+        id: "generated-" + index,
+        src: "data:image/png;base64,AA==",
+        width: 1024,
+        height: 1024,
+      })));
+    });
+
+    await waitFor(() => {
+      const next = JSON.parse(screen.getByTestId("surface-scene-json").textContent ?? "{}") as SketchSceneDocument;
+      expect(next.nodes).toHaveLength(4);
+      expect(next.nodes.map((node) => [node.x, node.y])).toEqual([
+        [284, 84],
+        [788, 84],
+        [284, 588],
+        [788, 588],
+      ]);
+      expect(document.querySelectorAll('[data-sketch-node-id^="ai-image-placeholder-"]')).toHaveLength(0);
+      expect(screen.queryByTestId("sketch-ai-image-panel")).toBeNull();
+    });
+
+    fireEvent.click(screen.getByLabelText("撤销"));
+    await waitFor(() => expect((JSON.parse(screen.getByTestId("surface-scene-json").textContent ?? "{}") as SketchSceneDocument).nodes).toHaveLength(0));
+  });
+
+  it("keeps prompt and settings available after generation fails", async () => {
+    const emptyScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 1200, height: 900 },
+      nodes: [],
+    };
+    render(
+      <ControlledImageGenerationSurface
+        initialScene={emptyScene}
+        adapter={{
+          getCapabilities: () => imageGenerationCapabilities,
+          generate: async () => {
+            throw new Error("生成服务繁忙，请稍后重试");
+          },
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText("图片"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "AI 绘图" }));
+    const panel = await screen.findByTestId("sketch-ai-image-panel");
+    const prompt = within(panel).getByPlaceholderText("描述你想生成的图片…");
+    fireEvent.change(prompt, { target: { value: "保留这个提示词" } });
+    fireEvent.click(within(panel).getByRole("button", { name: "图像设置" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "图像设置" })).getByRole("button", { name: "高" }));
+    fireEvent.click(within(panel).getByRole("button", { name: "开始生成" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("生成服务繁忙，请稍后重试");
+    expect((prompt as HTMLTextAreaElement).value).toBe("保留这个提示词");
+    expect(screen.getByTestId("sketch-ai-image-panel")).toBeTruthy();
+    expect((JSON.parse(screen.getByTestId("surface-scene-json").textContent ?? "{}") as SketchSceneDocument).nodes).toHaveLength(0);
+  });
+
+  it("cancels generation without committing placeholders and keeps the draft", async () => {
+    const emptyScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 1200, height: 900 },
+      nodes: [],
+    };
+    let generationSignal: AbortSignal | undefined;
+    const generate = vi.fn((
+      _request: Parameters<SketchImageGenerationAdapter["generate"]>[0],
+      signal: AbortSignal,
+    ) => new Promise<readonly never[]>((_resolve, reject) => {
+      generationSignal = signal;
+      signal.addEventListener("abort", () => reject(new DOMException("cancelled", "AbortError")), { once: true });
+    }));
+    render(
+      <ControlledImageGenerationSurface
+        initialScene={emptyScene}
+        adapter={{ getCapabilities: () => imageGenerationCapabilities, generate }}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText("图片"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "AI 绘图" }));
+    const panel = await screen.findByTestId("sketch-ai-image-panel");
+    const prompt = within(panel).getByPlaceholderText("描述你想生成的图片…");
+    fireEvent.change(prompt, { target: { value: "取消后保留" } });
+    fireEvent.click(within(panel).getByRole("button", { name: "开始生成" }));
+    await waitFor(() => expect(within(panel).getByRole("button", { name: "取消生成" })).toBeTruthy());
+    fireEvent.click(within(panel).getByRole("button", { name: "取消生成" }));
+
+    await waitFor(() => expect(generationSignal?.aborted).toBe(true));
+    await waitFor(() => expect(document.querySelectorAll('[data-sketch-node-id^="ai-image-placeholder-"]')).toHaveLength(0));
+    expect((prompt as HTMLTextAreaElement).value).toBe("取消后保留");
+    expect(screen.getByTestId("sketch-ai-image-panel")).toBeTruthy();
+    expect((JSON.parse(screen.getByTestId("surface-scene-json").textContent ?? "{}") as SketchSceneDocument).nodes).toHaveLength(0);
+  });
+
+  it("passes a visible canvas image as a one-time reference selection", async () => {
+    const generate = vi.fn(async (
+      _request: Parameters<SketchImageGenerationAdapter["generate"]>[0],
+      _signal: AbortSignal,
+    ) => [{
+      id: "generated",
+      src: "data:image/png;base64,AA==",
+      width: 1024,
+      height: 1024,
+    }]);
+    const imageScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 1200, height: 900 },
+      nodes: [{
+        id: "reference-image",
+        type: "image",
+        x: 40,
+        y: 40,
+        width: 200,
+        height: 120,
+        name: "画布参考图",
+        src: "data:image/png;base64,AA==",
+      }],
+    };
+    render(
+      <ControlledImageGenerationSurface
+        initialScene={imageScene}
+        adapter={{ getCapabilities: () => imageGenerationCapabilities, generate }}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText("图片"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "AI 绘图" }));
+    const panel = await screen.findByTestId("sketch-ai-image-panel");
+    fireEvent.click(within(panel).getByRole("button", { name: "从画布选取" }));
+    const canvasImage = getSketchNodeElement("reference-image");
+    dispatchPointerEvent(canvasImage, "pointerdown", 100, 100);
+    dispatchPointerEvent(getCanvasStage(), "pointerup", 100, 100);
+    await waitFor(() => expect(within(panel).getByAltText("画布参考图")).toBeTruthy());
+    fireEvent.change(within(panel).getByPlaceholderText("描述你想生成的图片…"), {
+      target: { value: "沿用参考图氛围" },
+    });
+    fireEvent.click(within(panel).getByRole("button", { name: "开始生成" }));
+
+    await waitFor(() => expect(generate).toHaveBeenCalledTimes(1));
+    expect(generate.mock.calls[0]?.[0]).toMatchObject({
+      prompt: "沿用参考图氛围",
+      references: [{ id: "reference-image", name: "画布参考图" }],
     });
   });
 

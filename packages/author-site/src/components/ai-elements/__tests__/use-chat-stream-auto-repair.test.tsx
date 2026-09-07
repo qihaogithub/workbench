@@ -5,17 +5,55 @@ import {
   mergeWorkspaceProjectionAck,
   useChatStream,
 } from "@workbench/ai-chat-shared/chat/hooks/use-chat-stream";
-import {
-  persistMessages,
-  updateSessionTitle,
-} from "@workbench/ai-chat-shared/chat/services/message-service";
+import { updateSessionTitle } from "@workbench/ai-chat-shared/chat/services/message-service";
 import { requestConversationTitle } from "@workbench/ai-chat-shared/chat/services/title-service";
 
 const mockSendMessage = jest.fn();
+const mockSubmitMessageCommand = jest.fn(async (input) => ({
+  conversationId: input.conversationId,
+  messageId: `message-${input.clientMessageId}`,
+  runId: `run-${input.clientMessageId}`,
+  assistantMessageId: `assistant-${input.clientMessageId}`,
+  conversationRevision: 1,
+  sequence: 1,
+  serverCreatedAt: 1,
+  status: "accepted",
+}));
+const mockLoadConversation = jest.fn(async () => ({
+  conversation: { revision: 7 },
+  messages: [],
+  runs: [],
+}));
+const mockSupersede = jest.fn(async () => ({
+  conversation: { revision: 8 },
+  messages: [],
+  runs: [],
+}));
+const mockRetryRun = jest.fn(async (conversationId, userMessageId) => ({
+  conversationId,
+  messageId: userMessageId,
+  runId: "run-retry",
+  assistantMessageId: "assistant-retry",
+  conversationRevision: 9,
+  sequence: 1,
+  serverCreatedAt: 1,
+  status: "accepted",
+}));
 let mockHandlers: any;
 
+jest.mock("@workbench/ai-chat-shared/config", () => ({
+  getConfiguredAgentClient: jest.fn(() => ({
+    submitMessageCommand: mockSubmitMessageCommand,
+    loadConversation: mockLoadConversation,
+    supersede: mockSupersede,
+    retryRun: mockRetryRun,
+    cancelRun: jest.fn().mockResolvedValue(undefined),
+    sendMessage: jest.fn(),
+  })),
+  getAuthorContextIntegration: jest.fn(() => ({})),
+}));
+
 jest.mock("@workbench/ai-chat-shared/chat/services/message-service", () => ({
-  persistMessages: jest.fn().mockResolvedValue(undefined),
   updateSessionTitle: jest.fn().mockResolvedValue(undefined),
   fetchSessionFiles: jest.fn().mockResolvedValue(null),
 }));
@@ -102,42 +140,54 @@ jest.mock("@workbench/ai-chat-shared/chat/services/stream-service", () => {
 describe("useChatStream 自动修复发送", () => {
   it("晚到 projection ack 只更新同 revision 的已提交摘要", () => {
     const summary = {
-      mutations: [{
-        mutationId: "mutation-1",
-        revision: 7,
-        status: "committed" as const,
-        resources: [{ path: "demos/home/index.tsx", action: "modified" as const }],
-        actor: "agent",
-      }],
-      projections: [{
-        revision: 7,
-        surface: "active-preview" as const,
-        status: "pending" as const,
-      }],
+      mutations: [
+        {
+          mutationId: "mutation-1",
+          revision: 7,
+          status: "committed" as const,
+          resources: [
+            { path: "demos/home/index.tsx", action: "modified" as const },
+          ],
+          actor: "agent",
+        },
+      ],
+      projections: [
+        {
+          revision: 7,
+          surface: "active-preview" as const,
+          status: "pending" as const,
+        },
+      ],
     };
 
-    expect(mergeWorkspaceProjectionAck(summary, {
-      projectId: "proj-1",
-      workspaceId: "workspace-1",
-      revision: 7,
-      clientId: "client-1",
-      surface: "active-preview",
-      status: "applied",
-      acknowledgedAt: Date.now(),
-    }).projections).toEqual([{
-      revision: 7,
-      surface: "active-preview",
-      status: "applied",
-    }]);
-    expect(mergeWorkspaceProjectionAck(summary, {
-      projectId: "proj-1",
-      workspaceId: "workspace-1",
-      revision: 8,
-      clientId: "client-1",
-      surface: "active-preview",
-      status: "applied",
-      acknowledgedAt: Date.now(),
-    })).toBe(summary);
+    expect(
+      mergeWorkspaceProjectionAck(summary, {
+        projectId: "proj-1",
+        workspaceId: "workspace-1",
+        revision: 7,
+        clientId: "client-1",
+        surface: "active-preview",
+        status: "applied",
+        acknowledgedAt: Date.now(),
+      }).projections,
+    ).toEqual([
+      {
+        revision: 7,
+        surface: "active-preview",
+        status: "applied",
+      },
+    ]);
+    expect(
+      mergeWorkspaceProjectionAck(summary, {
+        projectId: "proj-1",
+        workspaceId: "workspace-1",
+        revision: 8,
+        clientId: "client-1",
+        surface: "active-preview",
+        status: "applied",
+        acknowledgedAt: Date.now(),
+      }),
+    ).toBe(summary);
   });
 
   beforeEach(() => {
@@ -222,7 +272,13 @@ describe("useChatStream 自动修复发送", () => {
         undefined,
         undefined,
         undefined,
-        { assistantMessageId: expect.any(String) },
+        expect.objectContaining({
+          conversationId: "session-1",
+          messageId: expect.any(String),
+          runId: expect.any(String),
+          assistantMessageId: expect.any(String),
+          conversationRevision: 1,
+        }),
       );
     });
   });
@@ -306,22 +362,18 @@ describe("useChatStream 自动修复发送", () => {
     );
 
     act(() => {
-      result.current.handleSend(
-        "引用上下文\n\n真实需求",
-        undefined,
-        {
-          inlineRefs: {
-            tags: [
-              {
-                type: "page",
-                label: "首页",
-                context: "隐藏页面源码和配置",
-              },
-            ],
-            text: "真实需求",
-          },
+      result.current.handleSend("引用上下文\n\n真实需求", undefined, {
+        inlineRefs: {
+          tags: [
+            {
+              type: "page",
+              label: "首页",
+              context: "隐藏页面源码和配置",
+            },
+          ],
+          text: "真实需求",
         },
-      );
+      });
     });
 
     await waitFor(() => {
@@ -381,7 +433,7 @@ describe("useChatStream 自动修复发送", () => {
     });
 
     await waitFor(() => {
-expect(mockSendMessage).toHaveBeenCalledWith(
+      expect(mockSendMessage).toHaveBeenCalledWith(
         "隐藏的完整技术错误",
         undefined,
         undefined,
@@ -392,7 +444,13 @@ expect(mockSendMessage).toHaveBeenCalledWith(
         undefined,
         undefined,
         undefined,
-        { assistantMessageId: expect.any(String) },
+        expect.objectContaining({
+          conversationId: "session-1",
+          messageId: expect.any(String),
+          runId: expect.any(String),
+          assistantMessageId: expect.any(String),
+          conversationRevision: 1,
+        }),
       );
     });
 
@@ -411,7 +469,6 @@ expect(mockSendMessage).toHaveBeenCalledWith(
       content: "已处理: 隐藏的完整技术错误",
     });
     expect(updateSessionTitle).not.toHaveBeenCalled();
-    expect(persistMessages).toHaveBeenCalledWith("session-1", messages);
   });
 
   it("AI 回复期间提交的用户消息会排队并在上一轮结束后自动发送", async () => {
@@ -473,7 +530,7 @@ expect(mockSendMessage).toHaveBeenCalledWith(
     }
 
     await waitFor(() => {
-expect(mockSendMessage).toHaveBeenCalledWith(
+      expect(mockSendMessage).toHaveBeenCalledWith(
         "第一条",
         undefined,
         undefined,
@@ -484,12 +541,16 @@ expect(mockSendMessage).toHaveBeenCalledWith(
         undefined,
         undefined,
         undefined,
-        { assistantMessageId: expect.any(String) },
+        expect.objectContaining({
+          conversationId: "session-1",
+          messageId: expect.any(String),
+          runId: expect.any(String),
+          assistantMessageId: expect.any(String),
+          conversationRevision: 1,
+        }),
       );
       const secondCallContent = mockSendMessage.mock.calls[1]?.[0] as string;
-      expect(secondCallContent).toContain("用户：第一条");
-      expect(secondCallContent).toContain("AI：已处理: 第一条");
-      expect(secondCallContent).toContain("第二条");
+      expect(secondCallContent).toBe("第二条");
     });
 
     expect(messages.map((message) => message.content)).toEqual([
@@ -540,7 +601,9 @@ expect(mockSendMessage).toHaveBeenCalledWith(
     act(() => {
       result.current.handleSend("等待计划审批");
     });
-    await waitFor(() => expect(result.current.pendingPermissionRequest).not.toBeNull());
+    await waitFor(() =>
+      expect(result.current.pendingPermissionRequest).not.toBeNull(),
+    );
 
     act(() => {
       mockHandlers.onError({
@@ -557,20 +620,6 @@ expect(mockSendMessage).toHaveBeenCalledWith(
         status: "error",
       });
     });
-    expect(persistMessages).toHaveBeenCalledWith(
-      "session-1",
-      expect.arrayContaining([
-        expect.objectContaining({
-          parts: [
-            expect.objectContaining({
-              toolCallId: "plan-call-1",
-              status: "error",
-            }),
-          ],
-        }),
-      ]),
-    );
-
     act(() => {
       result.current.handleSend("继续");
     });
@@ -583,7 +632,7 @@ expect(mockSendMessage).toHaveBeenCalledWith(
     });
   });
 
-  it("计划批准后将终态工具更新回写到历史卡片并持久化", async () => {
+  it("计划批准后将终态工具更新回写到历史卡片", async () => {
     let messages: ChatMessage[] = [];
     const messagesRef = { current: messages };
     const setMessages = (
@@ -620,7 +669,9 @@ expect(mockSendMessage).toHaveBeenCalledWith(
     act(() => {
       result.current.handleSend("等待计划审批");
     });
-    await waitFor(() => expect(result.current.pendingPermissionRequest).not.toBeNull());
+    await waitFor(() =>
+      expect(result.current.pendingPermissionRequest).not.toBeNull(),
+    );
 
     act(() => {
       result.current.handlePermissionResponse("approve_once");
@@ -640,21 +691,6 @@ expect(mockSendMessage).toHaveBeenCalledWith(
       });
     });
     expect(currentMessageRef.current.parts).toEqual([]);
-    expect(persistMessages).toHaveBeenCalledWith(
-      "session-1",
-      expect.arrayContaining([
-        expect.objectContaining({
-          parts: [
-            expect.objectContaining({
-              toolCallId: "plan-call-1",
-              status: "completed",
-              result: { approved: true },
-            }),
-          ],
-        }),
-      ]),
-    );
-
     await act(async () => {
       await mockHandlers.onFinish({
         content: "计划已执行",
@@ -958,7 +994,7 @@ expect(mockSendMessage).toHaveBeenCalledWith(
     });
 
     await waitFor(() => {
-expect(mockSendMessage).toHaveBeenCalledWith(
+      expect(mockSendMessage).toHaveBeenCalledWith(
         "测试模型选择",
         "/tmp/workspace",
         undefined,
@@ -969,12 +1005,18 @@ expect(mockSendMessage).toHaveBeenCalledWith(
         undefined,
         undefined,
         undefined,
-        { assistantMessageId: expect.any(String) },
+        expect.objectContaining({
+          conversationId: "session-1",
+          messageId: expect.any(String),
+          runId: expect.any(String),
+          assistantMessageId: expect.any(String),
+          conversationRevision: 1,
+        }),
       );
     });
   });
 
-  it("发送第二轮消息时显式注入最近对话历史", async () => {
+  it("发送第二轮消息时不再由浏览器注入历史", async () => {
     const messages: ChatMessage[] = [
       { role: "user", content: "第一轮问题" },
       { role: "assistant", content: "第一轮回答" },
@@ -1004,9 +1046,7 @@ expect(mockSendMessage).toHaveBeenCalledWith(
 
     await waitFor(() => {
       const sentContent = mockSendMessage.mock.calls[0]?.[0] as string;
-      expect(sentContent).toContain("用户：第一轮问题");
-      expect(sentContent).toContain("AI：第一轮回答");
-      expect(sentContent).toContain("第二轮问题");
+      expect(sentContent).toBe("第二轮问题");
     });
   });
 
@@ -1039,52 +1079,6 @@ expect(mockSendMessage).toHaveBeenCalledWith(
     await waitFor(() => {
       expect(setIsStreaming).toHaveBeenCalledWith(false);
     });
-  });
-
-  it("流式回复完成后的持久化失败不会卡住发送状态", async () => {
-    // 所有 persistMessages 调用都失败，包括发送时立即持久化、流式中间持久化和 onFinish 持久化
-    (persistMessages as jest.Mock).mockRejectedValue(new Error("写入失败"));
-    const messages: ChatMessage[] = [];
-    const messagesRef = { current: messages };
-    const currentMessageRef = {
-      current: { role: "assistant", content: "", parts: [] } as ChatMessage,
-    };
-    const setIsStreaming = jest.fn();
-    const onDiagnosticEvent = jest.fn();
-    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
-
-    const { result } = renderHook(() =>
-      useChatStream({
-        sessionId: "session-1",
-        agentSessionId: "agent-session-1",
-        workingDir: "/tmp/workspace",
-        messagesRef,
-        setMessages: jest.fn(),
-        setIsStreaming,
-        setStreamContent: jest.fn(),
-        currentMessageRef,
-        setCurrentMessage: jest.fn(),
-        onDiagnosticEvent,
-      }),
-    );
-
-    act(() => {
-      result.current.handleSend("测试完成收尾失败状态");
-    });
-
-    await waitFor(() => {
-      expect(setIsStreaming).toHaveBeenCalledWith(false);
-    });
-    expect(onDiagnosticEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: "ai.stream_finish_finalization_failed",
-        level: "warn",
-      }),
-    );
-
-    warnSpy.mockRestore();
-    // 恢复默认 mock 实现，避免影响后续测试
-    (persistMessages as jest.Mock).mockResolvedValue(undefined);
   });
 
   it("流式回复完成后的文件回调失败不会卡住发送状态", async () => {
@@ -1176,5 +1170,275 @@ expect(mockSendMessage).toHaveBeenCalledWith(
     });
 
     expect(result.current.plan).toEqual({ items: [], fallbackText: "" });
+  });
+
+  it("重新生成通过账本 supersede 与 retry 创建新 run，不回灌浏览器历史", async () => {
+    let messages: ChatMessage[] = [
+      { id: "message-user-1", role: "user", content: "原问题" },
+      { id: "assistant-old", role: "assistant", content: "旧回答" },
+    ];
+    const messagesRef = { current: messages };
+    const setMessages = (
+      updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
+    ) => {
+      messages = typeof updater === "function" ? updater(messages) : updater;
+      messagesRef.current = messages;
+    };
+    const currentMessageRef = {
+      current: { role: "assistant", content: "", parts: [] } as ChatMessage,
+    };
+    const setCurrentMessage = (
+      updater: ChatMessage | ((prev: ChatMessage) => ChatMessage),
+    ) => {
+      currentMessageRef.current =
+        typeof updater === "function"
+          ? updater(currentMessageRef.current)
+          : updater;
+    };
+
+    const { result } = renderHook(() =>
+      useChatStream({
+        sessionId: "session-1",
+        agentSessionId: "session-1",
+        messagesRef,
+        setMessages,
+        setIsStreaming: jest.fn(),
+        setStreamContent: jest.fn(),
+        currentMessageRef,
+        setCurrentMessage,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleRegenerate("assistant-old");
+    });
+
+    expect(mockSupersede).toHaveBeenCalledWith({
+      conversationId: "session-1",
+      afterMessageId: "message-user-1",
+      expectedRevision: 7,
+    });
+    expect(mockRetryRun).toHaveBeenCalledWith("session-1", "message-user-1");
+    expect(mockSubmitMessageCommand).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(mockSendMessage).toHaveBeenCalledWith(
+        "原问题",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        expect.objectContaining({
+          runId: "run-retry",
+          assistantMessageId: "assistant-retry",
+        }),
+      ),
+    );
+  });
+
+  it("编辑重发先按服务端 revision 截断账本，再提交新消息", async () => {
+    let messages: ChatMessage[] = [
+      { id: "message-user-1", role: "user", content: "第一问" },
+      { id: "assistant-1", role: "assistant", content: "第一答" },
+      { id: "message-user-2", role: "user", content: "第二问" },
+      { id: "assistant-2", role: "assistant", content: "第二答" },
+    ];
+    const messagesRef = { current: messages };
+    const setMessages = (
+      updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
+    ) => {
+      messages = typeof updater === "function" ? updater(messages) : updater;
+      messagesRef.current = messages;
+    };
+    const currentMessageRef = {
+      current: { role: "assistant", content: "", parts: [] } as ChatMessage,
+    };
+    const setCurrentMessage = (
+      updater: ChatMessage | ((prev: ChatMessage) => ChatMessage),
+    ) => {
+      currentMessageRef.current =
+        typeof updater === "function"
+          ? updater(currentMessageRef.current)
+          : updater;
+    };
+
+    const { result } = renderHook(() =>
+      useChatStream({
+        sessionId: "session-1",
+        agentSessionId: "session-1",
+        messagesRef,
+        setMessages,
+        setIsStreaming: jest.fn(),
+        setStreamContent: jest.fn(),
+        currentMessageRef,
+        setCurrentMessage,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleEditResend("message-user-2", "修改后的第二问");
+    });
+
+    expect(mockSupersede).toHaveBeenCalledWith({
+      conversationId: "session-1",
+      afterMessageId: "assistant-1",
+      expectedRevision: 7,
+    });
+    await waitFor(() =>
+      expect(mockSubmitMessageCommand).toHaveBeenCalledWith(
+        expect.objectContaining({
+          conversationId: "session-1",
+          content: "修改后的第二问",
+        }),
+      ),
+    );
+  });
+
+  it("编辑重发的发送前同步失败时不截断权威账本", async () => {
+    const messages: ChatMessage[] = [
+      { id: "message-user-1", role: "user", content: "原问题" },
+      { id: "assistant-1", role: "assistant", content: "原回答" },
+    ];
+    const messagesRef = { current: messages };
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    const beforeSend = jest
+      .fn()
+      .mockRejectedValue(new Error("workspace sync failed"));
+    const setMessages = jest.fn();
+
+    const { result } = renderHook(() =>
+      useChatStream({
+        sessionId: "session-1",
+        agentSessionId: "session-1",
+        messagesRef,
+        setMessages,
+        setIsStreaming: jest.fn(),
+        setStreamContent: jest.fn(),
+        currentMessageRef: {
+          current: { role: "assistant", content: "", parts: [] } as ChatMessage,
+        },
+        setCurrentMessage: jest.fn(),
+        beforeSend,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleEditResend("message-user-1", "修改后的问题");
+    });
+
+    expect(beforeSend).toHaveBeenCalledTimes(1);
+    expect(mockLoadConversation).not.toHaveBeenCalled();
+    expect(mockSupersede).not.toHaveBeenCalled();
+    expect(setMessages).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("消息命令未获 ACK 时明确标记同步失败且不启动 Agent", async () => {
+    mockSubmitMessageCommand.mockRejectedValueOnce(
+      new Error("ledger unavailable"),
+    );
+    let messages: ChatMessage[] = [];
+    const messagesRef = { current: messages };
+    const setMessages = (
+      updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
+    ) => {
+      messages = typeof updater === "function" ? updater(messages) : updater;
+      messagesRef.current = messages;
+    };
+
+    const { result } = renderHook(() =>
+      useChatStream({
+        sessionId: "session-1",
+        agentSessionId: "session-1",
+        messagesRef,
+        setMessages,
+        setIsStreaming: jest.fn(),
+        setStreamContent: jest.fn(),
+        currentMessageRef: {
+          current: { role: "assistant", content: "", parts: [] } as ChatMessage,
+        },
+        setCurrentMessage: jest.fn(),
+      }),
+    );
+
+    act(() => {
+      result.current.handleSend("需要可靠提交的问题");
+    });
+
+    await waitFor(() => {
+      expect(messages[0]).toMatchObject({
+        role: "user",
+        content: "需要可靠提交的问题",
+        syncStatus: "failed",
+      });
+    });
+    expect(mockSendMessage).not.toHaveBeenCalled();
+  });
+
+  it("对话 outbox 只保存图片附件元数据，不写入 base64 data URL", async () => {
+    let messages: ChatMessage[] = [];
+    const messagesRef = { current: messages };
+    const setMessages = (
+      updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
+    ) => {
+      messages = typeof updater === "function" ? updater(messages) : updater;
+      messagesRef.current = messages;
+    };
+    const { result } = renderHook(() =>
+      useChatStream({
+        sessionId: "session-1",
+        agentSessionId: "session-1",
+        messagesRef,
+        setMessages,
+        setIsStreaming: jest.fn(),
+        setStreamContent: jest.fn(),
+        currentMessageRef: {
+          current: { role: "assistant", content: "", parts: [] } as ChatMessage,
+        },
+        setCurrentMessage: jest.fn(),
+      }),
+    );
+
+    act(() => {
+      result.current.handleSend(
+        "请分析图片",
+        [
+          {
+            data: "very-large-base64",
+            mimeType: "image/png",
+            name: "image.png",
+          },
+        ],
+        undefined,
+        [
+          {
+            id: "attachment-image",
+            name: "image.png",
+            mimeType: "image/png",
+            size: 128,
+            textExtracted: false,
+          },
+        ],
+      );
+    });
+
+    await waitFor(() => expect(mockSubmitMessageCommand).toHaveBeenCalled());
+    const command = mockSubmitMessageCommand.mock.calls[0][0];
+    expect(command.attachmentIds).toEqual(["attachment-image"]);
+    expect(command.displayParts).toEqual([
+      expect.objectContaining({
+        type: "file",
+        attachmentId: "attachment-image",
+        mimeType: "image/png",
+      }),
+    ]);
+    expect(JSON.stringify(command)).not.toContain("very-large-base64");
+    expect(messages[0].parts).toEqual([
+      { type: "image", url: "data:image/png;base64,very-large-base64" },
+    ]);
   });
 });

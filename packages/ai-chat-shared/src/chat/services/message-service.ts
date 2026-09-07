@@ -1,4 +1,3 @@
-import type { ChatMessage } from "../../message";
 import { getAuthorContextIntegration } from "../../config";
 
 /**
@@ -7,38 +6,6 @@ import { getAuthorContextIntegration } from "../../config";
  */
 function isSessionPersistenceAvailable(): boolean {
   return getAuthorContextIntegration() !== null;
-}
-
-export async function persistMessages(
-  sessionId: string,
-  messages: ChatMessage[],
-): Promise<void> {
-  if (!isSessionPersistenceAvailable()) return;
-  try {
-    const now = Date.now();
-    const messagesToSave = messages.map((m, i) => ({
-      id: m.id,
-      role: m.role,
-      kind: m.kind,
-      content: m.content,
-      autoRepair: m.autoRepair,
-      inlineRefs: m.inlineRefs,
-      parts: m.parts,
-      reasoning: m.reasoning,
-      reasonings: m.reasonings,
-      tools: m.tools,
-      images: m.images,
-      files: m.files,
-      timestamp: now - (messages.length - i) * 1000,
-    }));
-    await fetch(`/api/sessions/${sessionId}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: messagesToSave }),
-    });
-  } catch (e) {
-    console.warn("[MessageService] Failed to persist messages:", e);
-  }
 }
 
 export async function updateSessionTitle(
@@ -50,11 +17,12 @@ export async function updateSessionTitle(
   if (!isFirstMessage || !title.trim()) return;
 
   try {
-    await fetch(`/api/sessions/${sessionId}/meta`, {
+    const response = await fetch(`/api/conversations/${sessionId}/title`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: title.trim() }),
     });
+    if (!response.ok) throw new Error(`Conversation title update failed (${response.status})`);
   } catch (e) {
     console.warn("[MessageService] Failed to update session title:", e);
   }

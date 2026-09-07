@@ -10,6 +10,30 @@ const pageSchema = JSON.stringify({
   },
 });
 
+const semanticPageSchema = JSON.stringify({
+  type: "object",
+  properties: {
+    pageFeatureEnabled: {
+      type: "boolean",
+      title: "本页功能开关",
+      "ui:options": { configType: "business" },
+    },
+    pageCover: { type: "string", title: "本页封面" },
+  },
+});
+
+const semanticProjectSchema = JSON.stringify({
+  type: "object",
+  properties: {
+    membershipEnabled: {
+      type: "boolean",
+      title: "会员功能开关",
+      "ui:options": { configType: "business" },
+    },
+    logo: { type: "string", title: "品牌 Logo" },
+  },
+});
+
 function makeRect(top: number, height: number, left = 700, width = 500): DOMRect {
   return {
     top,
@@ -611,5 +635,42 @@ describe("PageConfigPanel design-spec bubble", () => {
 
     fireEvent.keyDown(sheet, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+});
+
+describe("PageConfigPanel 配置语义分区", () => {
+  it("按语义合并作用域，并为共享字段提供按需来源提示", () => {
+    render(
+      <PageConfigPanel
+        pages={[{
+          id: "page-1",
+          name: "示例页",
+          schema: semanticPageSchema,
+          configData: {},
+        }]}
+        detailPageId="page-1"
+        projectConfigSchema={semanticProjectSchema}
+        onPageConfigChange={vi.fn()}
+        onProjectConfigChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByRole("heading", { name: "业务配置" })).toHaveLength(1);
+    expect(screen.getAllByRole("heading", { name: "资源配置" })).toHaveLength(1);
+    expect(screen.queryByRole("heading", { name: "共享配置" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "本页配置" })).not.toBeInTheDocument();
+
+    const projectBusinessSection = screen.getByText("会员功能开关").closest("section");
+    const projectResourceSection = screen.getByText("品牌 Logo").closest("section");
+    const pageBusinessSection = screen.getByText("本页功能开关").closest("section");
+    const pageResourceSection = screen.getByText("本页封面").closest("section");
+
+    expect(within(projectBusinessSection!).getByRole("heading", { name: "业务配置" })).toBeInTheDocument();
+    expect(within(projectResourceSection!).getByRole("heading", { name: "资源配置" })).toBeInTheDocument();
+    expect(within(pageBusinessSection!).getByRole("heading", { name: "业务配置" })).toBeInTheDocument();
+    expect(within(pageResourceSection!).getByRole("heading", { name: "资源配置" })).toBeInTheDocument();
+    expect(screen.getByLabelText("项目共享配置：会员功能开关")).toBeInTheDocument();
+    expect(screen.getByLabelText("项目共享配置：品牌 Logo")).toBeInTheDocument();
+    expect(screen.queryByLabelText("项目共享配置：本页功能开关")).not.toBeInTheDocument();
   });
 });

@@ -195,62 +195,6 @@ export function archiveActiveSession(
   return null;
 }
 
-/**
- * 限制项目下的 Session 数量，超出时删除最旧的
- * @returns 被删除的 Session 数量
- */
-export function enforceSessionLimit(
-  userId: string,
-  projectId: string,
-  maxCount = 5,
-): number {
-  if (maxCount < 1) return 0;
-
-  const projectSessionsDir = getProjectSessionDir(userId, projectId);
-  if (
-    !fs.existsSync(projectSessionsDir) ||
-    !fs.statSync(projectSessionsDir).isDirectory()
-  ) {
-    return 0;
-  }
-
-  const sessions: Array<{ sessionId: string; createdAt: number }> = [];
-  const entries = fs.readdirSync(projectSessionsDir, { withFileTypes: true });
-
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const metaPath = path.join(projectSessionsDir, entry.name, ".session.json");
-    if (!fs.existsSync(metaPath)) continue;
-    try {
-      const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
-      if (meta.demoId !== projectId) continue;
-      if (meta.userId !== userId) continue;
-      if (typeof meta.sessionId !== "string") continue;
-
-      const createdAt =
-        typeof meta.createdAt === "number" ? meta.createdAt : 0;
-      sessions.push({ sessionId: meta.sessionId, createdAt });
-    } catch { /* skip */ }
-  }
-
-  if (sessions.length <= maxCount) return 0;
-
-  sessions.sort((a, b) => a.createdAt - b.createdAt);
-  const toDelete = sessions.slice(0, sessions.length - maxCount);
-
-  let deletedCount = 0;
-  for (const s of toDelete) {
-    try {
-      deleteSession(s.sessionId);
-      deletedCount++;
-    } catch (err) {
-      console.error(`Failed to delete old session ${s.sessionId}:`, err);
-    }
-  }
-
-  return deletedCount;
-}
-
 export function findActiveSession(
   userId: string,
   projectId: string,
@@ -813,7 +757,8 @@ export function saveEditSession(
     }
 
     if (!isLiveWorkspace(workspaceId)) {
-      // 归档而非删除：保留 .session.json 和 .messages.json 供历史对话查看
+      // 归档而非删除：.session.json 供会话/Workspace 恢复；
+      // 旧 .messages.json 只等待一次性数据处置，不再是 UI 历史真值。
       // 仅清理 workspace 临时文件以节省空间
       try {
         if (workspaceId) {

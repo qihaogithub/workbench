@@ -62,6 +62,10 @@ export async function GET(
   { params }: { params: Promise<{ sessionId: string }> },
 ) {
   try {
+    const token = await getAuthCookie();
+    if (!token) return NextResponse.json(createApiError("UNAUTHORIZED", "未登录"), { status: 401 });
+    const payload = await verifyToken(token);
+    if (!payload) return NextResponse.json(createApiError("UNAUTHORIZED", "登录已过期"), { status: 401 });
     const { sessionId } = await params;
 
     if (!sessionExists(sessionId)) {
@@ -75,6 +79,10 @@ export async function GET(
       return NextResponse.json(createApiError("SESSION_NOT_FOUND"), {
         status: 404,
       });
+    }
+
+    if (!sessionMeta.userId || sessionMeta.userId !== payload.userId) {
+      return NextResponse.json(createApiError("FORBIDDEN", "无权操作其他用户的 Session"), { status: 403 });
     }
 
     if (isSessionExpired(sessionMeta)) {
@@ -159,7 +167,7 @@ export async function PUT(
       });
     }
 
-    if (meta.userId && meta.userId !== payload.userId) {
+    if (!meta.userId || meta.userId !== payload.userId) {
       return NextResponse.json(
         createApiError("FORBIDDEN", "无权操作其他用户的 Session"),
         { status: 403 },

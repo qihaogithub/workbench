@@ -1,6 +1,15 @@
 FROM node:24-bookworm-slim AS builder
 
+ARG HTTP_PROXY=
+ARG HTTPS_PROXY=
+ENV HTTP_PROXY=${HTTP_PROXY} \
+    HTTPS_PROXY=${HTTPS_PROXY} \
+    http_proxy=${HTTP_PROXY} \
+    https_proxy=${HTTPS_PROXY}
+
 ARG NPM_REGISTRY=https://registry.npmmirror.com
+ENV COREPACK_NPM_REGISTRY=${NPM_REGISTRY} \
+    npm_config_disturl=https://npmmirror.com/mirrors/node
 
 RUN corepack enable \
     && corepack prepare pnpm@8.15.0 --activate \

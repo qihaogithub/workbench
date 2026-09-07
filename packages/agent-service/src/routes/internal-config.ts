@@ -715,6 +715,7 @@ export async function registerInternalConfigRoutes(fastify: FastifyInstance) {
         "apiKey",
         "baseUrl",
         "model",
+        "apiProfile",
         "timeoutMs",
         "maxPerSession",
         "maxRetries",

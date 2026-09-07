@@ -28,6 +28,8 @@ describe("AI 附件上传", () => {
   it("按项目 ID 保存文本附件并可由只读工具链读取", async () => {
     const saved = await saveUploadedFileAttachment({
       projectId: "proj-test-1",
+      ownerUserId: "user-1",
+      conversationId: "conversation-1",
       filename: "notes.md",
       mimeType: "text/markdown",
       buffer: Buffer.from("第一行\n第二行"),
@@ -43,6 +45,10 @@ describe("AI 附件上传", () => {
       lineCount: 2,
     });
     expect(loaded.text).toBe("第一行\n第二行");
+    expect(loaded.metadata).toMatchObject({
+      ownerUserId: "user-1",
+      conversationId: "conversation-1",
+    });
 
     const dirPath = path.join(
       dataDir,
@@ -58,6 +64,8 @@ describe("AI 附件上传", () => {
     await expect(
       saveUploadedFileAttachment({
         projectId: "proj-test-1",
+        ownerUserId: "user-1",
+        conversationId: "conversation-1",
         filename: "video.mp4",
         mimeType: "video/mp4",
         buffer: Buffer.from("video"),
@@ -69,6 +77,8 @@ describe("AI 附件上传", () => {
     await expect(
       saveUploadedFileAttachment({
         projectId: "../escape",
+        ownerUserId: "user-1",
+        conversationId: "conversation-1",
         filename: "notes.txt",
         mimeType: "text/plain",
         buffer: Buffer.from("unsafe"),
@@ -85,6 +95,8 @@ describe("AI 附件上传", () => {
     ]);
     const saved = await saveUploadedFileAttachment({
       projectId: "proj-test-1",
+      ownerUserId: "user-1",
+      conversationId: "conversation-1",
       filename: "photo.png",
       mimeType: "image/png",
       buffer,
@@ -102,12 +114,16 @@ describe("AI 附件上传", () => {
     const buffer = Buffer.from("重复内容\n第二行");
     const first = await saveUploadedFileAttachment({
       projectId: "proj-test-1",
+      ownerUserId: "user-1",
+      conversationId: "conversation-1",
       filename: "a.md",
       mimeType: "text/markdown",
       buffer,
     });
     const second = await saveUploadedFileAttachment({
       projectId: "proj-test-1",
+      ownerUserId: "user-1",
+      conversationId: "conversation-1",
       filename: "b.md",
       mimeType: "text/markdown",
       buffer,
@@ -130,16 +146,41 @@ describe("AI 附件上传", () => {
   it("不同内容上传生成不同 attachmentId", async () => {
     const a = await saveUploadedFileAttachment({
       projectId: "proj-test-1",
+      ownerUserId: "user-1",
+      conversationId: "conversation-1",
       filename: "a.md",
       mimeType: "text/markdown",
       buffer: Buffer.from("内容 A"),
     });
     const b = await saveUploadedFileAttachment({
       projectId: "proj-test-1",
+      ownerUserId: "user-1",
+      conversationId: "conversation-1",
       filename: "b.md",
       mimeType: "text/markdown",
       buffer: Buffer.from("内容 B"),
     });
     expect(b.id).not.toBe(a.id);
+  });
+
+  it("相同内容在不同对话中不复用物理附件", async () => {
+    const buffer = Buffer.from("同一份内容");
+    const first = await saveUploadedFileAttachment({
+      projectId: "proj-test-1",
+      ownerUserId: "user-1",
+      conversationId: "conversation-1",
+      filename: "a.md",
+      mimeType: "text/markdown",
+      buffer,
+    });
+    const second = await saveUploadedFileAttachment({
+      projectId: "proj-test-1",
+      ownerUserId: "user-1",
+      conversationId: "conversation-2",
+      filename: "a.md",
+      mimeType: "text/markdown",
+      buffer,
+    });
+    expect(second.id).not.toBe(first.id);
   });
 });

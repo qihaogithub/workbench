@@ -5,6 +5,12 @@ import { logger } from "../../utils/logger";
 import { getImageGenConfig } from "../../services/image-gen-config";
 import { uploadToGlobalImageStore } from "./global-image-store";
 import { registerGlobalImageToProject } from "./image-store-register";
+import {
+  generateImage as generateImageWithProvider,
+  getImageGenSessionCount as getSharedImageGenSessionCount,
+  resetImageGenSessionCount as resetSharedImageGenSessionCount,
+  type ImageGenApiProfile,
+} from "../../services/image-generation-service";
 
 const SIZES = ["1024x1024", "1024x1792", "1792x1024"] as const;
 
@@ -35,15 +41,12 @@ type GenerateImageParams = Static<typeof GenerateImageParams>;
 
 const SUPPORTED_OUTPUT_FORMATS = new Set(["png", "jpg", "jpeg", "webp"]);
 
-// 会话级配额计数：以 sessionId 为键
-const sessionGenCounts = new Map<string, number>();
-
 export function getImageGenSessionCount(sessionId: string): number {
-  return sessionGenCounts.get(sessionId) ?? 0;
+  return getSharedImageGenSessionCount(sessionId);
 }
 
 export function resetImageGenSessionCount(sessionId: string): void {
-  sessionGenCounts.delete(sessionId);
+  resetSharedImageGenSessionCount(sessionId);
 }
 
 function filenameToMime(filename: string): string | null {
@@ -164,7 +167,9 @@ export function createGenerateImageTool(
       const mimeType = filenameToMime(args.filename)!;
       const size = args.size ?? "1024x1024";
 
-      let attemptsLeft = gen.maxRetries + 1;
+      // Provider retries, cancellation, quota and response parsing live in the
+      // shared service used by both this tool and the whiteboard endpoint.
+      let attemptsLeft = 1;
       let lastError = "";
       while (attemptsLeft > 0) {
         attemptsLeft--;
@@ -174,9 +179,14 @@ export function createGenerateImageTool(
             size,
             n,
             model: gen.model,
+            apiProfile: gen.apiProfile,
             baseUrl: gen.baseUrl,
             apiKey: gen.apiKey,
             timeoutMs: gen.timeoutMs,
+            maxPerSession: gen.maxPerSession,
+            maxRetries: gen.maxRetries,
+            maxPromptLen: gen.maxPromptLen,
+            sessionId,
             signal,
           });
 
@@ -224,10 +234,6 @@ export function createGenerateImageTool(
                     `- imageId: ${r.imageId}, URL: ${r.url}${r.width ? `, ${r.width}×${r.height}` : ""}`,
                 )
                 .join("\n");
-              sessionGenCounts.set(
-                sessionId,
-                getImageGenSessionCount(sessionId) + results.length,
-              );
               return {
                 content: [
                   {
@@ -257,10 +263,7 @@ export function createGenerateImageTool(
           }
         }
         if (attemptsLeft > 0) {
-          logger.warn(
-            { lastError, remaining: attemptsLeft },
-            "generateImage retrying after failure",
-          );
+          logger.warn({ lastError, remaining: attemptsLeft }, "generateImage retrying after failure");
         }
       }
 
@@ -289,79 +292,40 @@ async function callImageGenerationApi(params: {
   size: string;
   n: number;
   model: string;
+  apiProfile: ImageGenApiProfile;
   baseUrl: string;
   apiKey: string;
   timeoutMs: number;
+  maxPerSession: number;
+  maxRetries: number;
+  maxPromptLen: number;
+  sessionId: string;
   signal?: AbortSignal;
 }): Promise<{ buffers: Buffer[] }> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), params.timeoutMs);
-  const combinedAbort = new AbortController();
-  const abortHandler = () => combinedAbort.abort();
-  params.signal?.addEventListener("abort", abortHandler, { once: true });
-  controller.signal.addEventListener("abort", () => combinedAbort.abort(), {
-    once: true,
-  });
-
-  try {
-    const res = await fetch(`${params.baseUrl}/images/generations`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${params.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: params.model,
-        prompt: params.prompt,
-        size: params.size,
-        n: params.n,
-        response_format: "b64_json",
-      }),
-      signal: combinedAbort.signal,
-    });
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(
-        `图像生成 API 返回 HTTP ${res.status}${body ? `: ${body.slice(0, 300)}` : ""}`,
-      );
-    }
-
-    const payload = (await res.json()) as {
-      data?: Array<{
-        b64_json?: string;
-        url?: string;
-        revised_prompt?: string;
-      }>;
-    };
-
-    const buffers: Buffer[] = [];
-    for (const item of payload.data ?? []) {
-      if (item.b64_json) {
-        buffers.push(Buffer.from(item.b64_json, "base64"));
-        continue;
-      }
-      if (item.url) {
-        const downloaded = await downloadFromUrl(item.url, combinedAbort.signal);
-        if (downloaded) buffers.push(downloaded);
-      }
-    }
-    return { buffers };
-  } finally {
-    clearTimeout(timeoutId);
-    params.signal?.removeEventListener("abort", abortHandler);
-  }
-}
-
-async function downloadFromUrl(
-  url: string,
-  signal: AbortSignal,
-): Promise<Buffer | null> {
-  try {
-    const res = await fetch(url, { signal });
-    if (!res.ok) return null;
-    return Buffer.from(await res.arrayBuffer());
-  } catch {
-    return null;
-  }
+  const generated = await generateImageWithProvider(
+    {
+      sessionId: params.sessionId,
+      prompt: params.prompt,
+      size: params.size,
+      count: params.n,
+      signal: params.signal,
+    },
+    {
+      enabled: true,
+      apiKey: params.apiKey,
+      baseUrl: params.baseUrl,
+      model: params.model,
+      apiProfile: params.apiProfile,
+      timeoutMs: params.timeoutMs,
+      maxPerSession: params.maxPerSession,
+      maxRetries: params.maxRetries,
+      concurrency: 1,
+      maxPromptLen: params.maxPromptLen,
+    },
+  );
+  return {
+    buffers: generated.images.map((image) =>
+      Buffer.from(image.dataBase64, "base64"),
+    ),
+  };
 }

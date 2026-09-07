@@ -48,10 +48,26 @@ export function HistoryDialog({
     if (!projectId) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/sessions/project/${projectId}`)
+      const res = await fetch(`/api/conversations?projectId=${encodeURIComponent(projectId)}`)
       const data = await res.json()
       if (data.success) {
-        setSessions(data.data)
+        setSessions(
+          (Array.isArray(data.data) ? data.data : []).map((conversation: {
+            id: string
+            projectId: string
+            workspaceId?: string | null
+            title?: string | null
+            createdAt: number
+            updatedAt: number
+          }) => ({
+            sessionId: conversation.id,
+            demoId: conversation.projectId,
+            workspaceId: conversation.workspaceId,
+            title: conversation.title,
+            createdAt: conversation.createdAt,
+            lastActivityAt: conversation.updatedAt,
+          })),
+        )
       }
     } catch (error) {
       console.error('Failed to fetch sessions:', error)
@@ -69,11 +85,16 @@ export function HistoryDialog({
   const handleDelete = async (sessionId: string) => {
     setDeletingId(sessionId)
     try {
-      const res = await fetch(`/api/sessions/${sessionId}`, {
+      const res = await fetch(`/api/conversations/${encodeURIComponent(sessionId)}`, {
         method: 'DELETE',
       })
       if (res.ok) {
         setSessions((prev) => prev.filter((s) => s.sessionId !== sessionId))
+        // Session/workspace cleanup is best-effort after the canonical ledger
+        // has recorded the deletion tombstone.
+        void fetch(`/api/sessions/${encodeURIComponent(sessionId)}`, {
+          method: 'DELETE',
+        })
       }
     } catch (error) {
       console.error('Failed to delete session:', error)
@@ -85,19 +106,13 @@ export function HistoryDialog({
   const handleExport = async (sessionId: string, createdAt: number) => {
     setExportingId(sessionId)
     try {
-      const [messagesRes, metaRes] = await Promise.all([
-        fetch(`/api/sessions/${sessionId}/messages`),
-        fetch(`/api/sessions/${sessionId}`),
-      ])
-      const messagesData = await messagesRes.json()
-      const metaData = await metaRes.json()
-
-      const exportData = {
-        sessionId,
-        exportedAt: new Date().toISOString(),
-        session: metaData.success ? metaData.data : null,
-        messages: messagesData.success ? messagesData.data : [],
-      }
+      const exportRes = await fetch(
+        `/api/conversations/${encodeURIComponent(sessionId)}/export`,
+      )
+      if (!exportRes.ok) throw new Error('导出对话失败')
+      const exportEnvelope = await exportRes.json()
+      if (!exportEnvelope.success) throw new Error('导出对话失败')
+      const exportData = exportEnvelope.data
 
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
       const url = URL.createObjectURL(blob)

@@ -22,6 +22,7 @@ export interface ServiceConfig {
     apiKey: string;
     baseUrl: string;
     model: string;
+    apiProfile: "auto" | "gpt-image" | "dall-e-3" | "generation-only";
     timeoutMs: number;
     maxPerSession: number;
     maxRetries: number;
@@ -67,6 +68,10 @@ export function loadConfig(): ServiceConfig {
         process.env.IMAGE_GEN_BASE_URL || "https://api.openai.com/v1"
       ).replace(/\/+$/, ""),
       model: process.env.IMAGE_GEN_MODEL || "dall-e-3",
+      apiProfile:
+        (process.env.IMAGE_GEN_API_PROFILE as
+          | ServiceConfig["imageGen"]["apiProfile"]
+          | undefined) || "auto",
       timeoutMs: parsePositiveInt(process.env.IMAGE_GEN_TIMEOUT_MS, 60000),
       maxPerSession: parsePositiveInt(
         process.env.IMAGE_GEN_MAX_PER_SESSION,
@@ -74,7 +79,10 @@ export function loadConfig(): ServiceConfig {
       ),
       maxRetries: parsePositiveInt(process.env.IMAGE_GEN_MAX_RETRIES, 3),
       concurrency: parsePositiveInt(process.env.IMAGE_GEN_CONCURRENCY, 2),
-      maxPromptLen: parsePositiveInt(process.env.IMAGE_GEN_MAX_PROMPT_LEN, 1000),
+      maxPromptLen: parsePositiveInt(
+        process.env.IMAGE_GEN_MAX_PROMPT_LEN,
+        1000,
+      ),
     },
   };
 }

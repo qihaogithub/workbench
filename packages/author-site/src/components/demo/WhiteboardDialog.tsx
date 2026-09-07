@@ -17,6 +17,9 @@ import {
 } from "@workbench/sketch-core";
 import {
   SketchEditorSurface,
+  type SketchImageGenerationAdapter,
+  type SketchImageGenerationCapabilities,
+  type SketchImageGenerationRequest,
 } from "@workbench/sketch-react";
 import {
   asWhiteboardDocumentV3,
@@ -227,6 +230,42 @@ async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(binary);
 }
 
+async function prepareGenerationReference(
+  projectId: string,
+  sessionId: string,
+  draftId: string,
+  reference: SketchImageGenerationRequest["references"][number],
+  signal: AbortSignal,
+): Promise<string> {
+  let browserBlob: { mimeType: string; dataBase64: string } | undefined;
+  if (reference.file) {
+    browserBlob = {
+      mimeType: reference.file.type || "image/png",
+      dataBase64: await blobToBase64(reference.file),
+    };
+  }
+  const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}/whiteboards/assets`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    signal,
+    body: JSON.stringify({
+      sessionId,
+      draftId,
+      nodeId: reference.id,
+      source: { src: reference.src },
+      ...(browserBlob ? { browserBlob } : {}),
+    }),
+  });
+  const payload = (await response.json().catch(() => ({}))) as ApiEnvelope<{
+    assetRef?: string;
+    imageId?: string;
+  }>;
+  if (!response.ok || !payload.success || !(payload.data?.assetRef || payload.data?.imageId)) {
+    throw new Error(readError(payload, "参考图处理失败，请重新添加"));
+  }
+  return payload.data.assetRef || payload.data.imageId!;
+}
+
 const WHITEBOARD_IMAGE_CAPTURE_TIMEOUT_MS = 2_000;
 
 async function captureStaticImageFrame(source: string): Promise<{ mimeType: string; dataBase64: string } | null> {
@@ -405,6 +444,93 @@ export function WhiteboardDialog({
     () => draftFingerprint(document) !== baseline,
     [baseline, document],
   );
+  const imageGeneration = useMemo<SketchImageGenerationAdapter>(() => {
+    const endpoint = `/api/projects/${encodeURIComponent(projectId)}/whiteboards/image-generation`;
+    return {
+      getCapabilities: async (): Promise<SketchImageGenerationCapabilities> => {
+        const response = await fetch(`${endpoint}?sessionId=${encodeURIComponent(sessionId)}`);
+        const payload = (await response.json().catch(() => ({}))) as ApiEnvelope<SketchImageGenerationCapabilities>;
+        if (!response.ok || !payload.success || !payload.data) {
+          throw new Error(readError(payload, "AI 绘图服务暂不可用，请稍后重试"));
+        }
+        return payload.data;
+      },
+      prepareReference: async (reference, signal) => ({
+        ...reference,
+        id: await prepareGenerationReference(projectId, sessionId, document.id, reference, signal),
+        file: undefined,
+      }),
+      generate: async (request: SketchImageGenerationRequest, signal: AbortSignal) => {
+        const startedAt = Date.now();
+        onDiagnosticEvent?.({
+          category: "ai",
+          name: "whiteboard.ai_image_generation.started",
+          details: {
+            count: request.count,
+            qualityId: request.qualityId,
+            sizeId: request.sizeId,
+            referenceCount: request.references.length,
+          },
+        });
+        try {
+          const response = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal,
+            body: JSON.stringify({
+              sessionId,
+              draftId: document.id,
+              prompt: request.prompt,
+              count: request.count,
+              qualityId: request.qualityId,
+              sizeId: request.sizeId,
+              ...(request.width ? { width: request.width } : {}),
+              ...(request.height ? { height: request.height } : {}),
+              referenceAssetIds: request.references.map((reference) => reference.id),
+            }),
+          });
+          const payload = (await response.json().catch(() => ({}))) as ApiEnvelope<{
+            images?: readonly {
+              id?: string;
+              src: string;
+              width?: number;
+              height?: number;
+              mimeType?: string;
+            }[];
+          }>;
+          if (!response.ok || !payload.success || !payload.data?.images)
+            throw new Error(readError(payload, "AI 绘图失败，请稍后重试"));
+          onDiagnosticEvent?.({
+            category: "ai",
+            name: "whiteboard.ai_image_generation.completed",
+            details: {
+              durationMs: Math.max(0, Date.now() - startedAt),
+              count: payload.data.images.length,
+              success: true,
+            },
+          });
+          return payload.data.images.map((image) => ({
+            id: image.id,
+            src: image.src,
+            width: image.width,
+            height: image.height,
+          }));
+        } catch (cause) {
+          const cancelled = signal.aborted;
+          onDiagnosticEvent?.({
+            category: "ai",
+            name: cancelled ? "whiteboard.ai_image_generation.cancelled" : "whiteboard.ai_image_generation.failed",
+            level: cancelled ? "info" : "error",
+            details: {
+              durationMs: Math.max(0, Date.now() - startedAt),
+              errorCode: cancelled ? "CANCELLED" : cause instanceof Error ? cause.name : "IMAGE_GENERATION_FAILED",
+            },
+          });
+          throw cause;
+        }
+      },
+    };
+  }, [document.id, onDiagnosticEvent, projectId, sessionId]);
   const loadKey = `${projectId}:${sessionId}:${target.scope}:${target.pageId ?? ""}:${target.fieldPath}:${target.listItem?.index ?? ""}:${target.listItem?.url ?? ""}:${reloadNonce}`;
 
   const adopt = useCallback(
@@ -809,6 +935,7 @@ export function WhiteboardDialog({
                 scene={document.scene}
                 profile="whiteboard"
                 fillContainer
+                imageGeneration={imageGeneration}
                 onSceneChange={handleSceneChange}
               />
             )}

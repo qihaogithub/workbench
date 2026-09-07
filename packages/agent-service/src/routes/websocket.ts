@@ -39,6 +39,7 @@ import {
   type ViewerReadonlySession,
 } from "../services/viewer-readonly-mode";
 import type { BaseAgent } from "../core/agent";
+import { getConversationLedgerClient } from "../services/conversation-ledger-client";
 
 function resolveDefaultModelId(): string {
   const raw =
@@ -86,9 +87,13 @@ interface ClientMessage {
     | "get_models"
     | "permission_response"
     | "user_choice_response"
-    | "console_data"
-    | "resync_history";
+    | "console_data";
   id?: string;
+  conversationId?: string;
+  messageId?: string;
+  runId?: string;
+  assistantMessageId?: string;
+  conversationRevision?: number;
   content?: string;
   sessionId?: string;
   model?: string;
@@ -115,7 +120,13 @@ interface ClientMessage {
     timeout?: number;
     stream?: boolean;
     resumeSessionId?: string;
-    conversation?: { assistantMessageId?: string };
+    conversation?: {
+      conversationId?: string;
+      messageId?: string;
+      runId?: string;
+      assistantMessageId?: string;
+      conversationRevision?: number;
+    };
   };
   timestamp?: number;
   /** permission_response: 权限确认响应 */
@@ -125,12 +136,6 @@ interface ClientMessage {
   /** user_choice_response: 需求确认响应 */
   requestId?: string;
   choice?: UserChoiceResponse;
-  /** resync_history: 重同步历史消息列表 */
-  messages?: Array<{ id?: string; role: string; content: string }>;
-  /** resync_history: 客户端基于的 canonical checkpoint 版本。 */
-  checkpointVersion?: number;
-  /** resync_history: 截断后的最后一条消息，避免静默覆盖更新的服务端历史。 */
-  truncateAfterMessageId?: string;
 }
 
 interface ActiveConnection {
@@ -147,6 +152,8 @@ const HEARTBEAT_TIMEOUT = 60000;
 const MIN_MESSAGE_TIMEOUT_MS = 15000;
 const MAX_MESSAGE_TIMEOUT_MS = 600000;
 const MESSAGE_PROGRESS_HEARTBEAT_INTERVAL_MS = 25000;
+const OFFICIAL_COMPACTION_SUMMARY_PREFIX =
+  "以下是服务端生成的官方上下文压缩摘要，仅用于恢复此前对话上下文：\n\n";
 
 function normalizeTimeoutMs(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -362,7 +369,8 @@ export async function registerWebSocketRoutes(
                 ...(viewerSession ? viewerSession.configPatch : {}),
               };
 
-              const agent = manager.getOrCreate(sessionId, config);
+              let agent = manager.getOrCreate(sessionId, config);
+              let shouldRestoreLedgerHistory = !existingAgent || agent !== existingAgent;
 
               eventRouter.bindAgent(agent);
 
@@ -411,11 +419,22 @@ export async function registerWebSocketRoutes(
                 }
               }
 
-              const messageId = message.id || generateMessageId();
+              const stableIdentity = message.options?.conversation;
+              const messageId = message.messageId || stableIdentity?.messageId || message.id || generateMessageId();
+              const conversationId = message.conversationId || stableIdentity?.conversationId || "";
+              const runId = message.runId || stableIdentity?.runId || "";
+              const assistantMessageId = message.assistantMessageId || stableIdentity?.assistantMessageId || "";
+              const conversationRevision = message.conversationRevision ?? stableIdentity?.conversationRevision;
+              if (mode !== "viewer-readonly" && (
+                !conversationId || !runId || !assistantMessageId || conversationRevision === undefined
+              )) {
+                throw new Error("CONVERSATION_IDENTITY_REQUIRED");
+              }
               if (agent instanceof BackendAgent && agent.isBusy()) {
                 const result = createAgentBusyResult();
                 if (!eventRouter.isActive()) {
                   eventRouter.startMessage(messageId, {
+                    conversationId, runId, assistantMessageId,
                     contentLength: message.content.length,
                     workingDir: message.workingDir,
                     demoId: message.demoId,
@@ -492,6 +511,7 @@ export async function registerWebSocketRoutes(
                 message.options?.timeout,
               );
               eventRouter.startMessage(messageId, {
+                conversationId, runId, assistantMessageId,
                 contentLength: message.content.length,
                 workingDir: message.workingDir,
                 demoId: message.demoId,
@@ -530,6 +550,74 @@ export async function registerWebSocketRoutes(
                     )
                   : rawUserContent;
 
+                const ledger = mode === "viewer-readonly" ? null : getConversationLedgerClient();
+                const ledgerStart = ledger ? await ledger.startRun({
+                  conversationId, runId, messageId, assistantMessageId,
+                  ownerUserId: authorAuthorization?.userId || "",
+                  projectId: config.projectId || message.projectId || "",
+                  agentSessionId: sessionId,
+                  modelId: config.model,
+                }) : null;
+                if (
+                  ledgerStart &&
+                  !shouldRestoreLedgerHistory &&
+                  !getConversationCheckpointStore().getForRevision(
+                    sessionId,
+                    ledgerStart.conversationId,
+                    ledgerStart.historyBaseRevision,
+                  )
+                ) {
+                  await manager.destroy(sessionId);
+                  agent = manager.getOrCreate(sessionId, config);
+                  eventRouter.bindAgent(agent);
+                  if (agent.status === "initializing") await agent.start();
+                  shouldRestoreLedgerHistory = true;
+                }
+                if (shouldRestoreLedgerHistory && ledgerStart) {
+                  const restoreStartedAt = Date.now();
+                  let restoredMessageCount = 0;
+                  try {
+                    const contextSummary = ledgerStart.contextSummary;
+                    if (contextSummary) {
+                      await agent.appendHistoryMessage(
+                        "user",
+                        `${OFFICIAL_COMPACTION_SUMMARY_PREFIX}${contextSummary.summaryText}`,
+                      );
+                      restoredMessageCount += 1;
+                      for (const tail of contextSummary.tailMessages) {
+                        if ((tail.role === "user" || tail.role === "assistant") && tail.content) {
+                          await agent.appendHistoryMessage(tail.role, tail.content);
+                          restoredMessageCount += 1;
+                        }
+                      }
+                    }
+                    const coveredThroughSequence = contextSummary?.coveredThroughSequence ?? -1;
+                    for (const history of ledgerStart.historyBeforeRun as Array<{ role?: string; content?: string }>) {
+                      const sequence = (history as { sequence?: unknown }).sequence;
+                      if (
+                        (history.role === "user" || history.role === "assistant") &&
+                        history.content &&
+                        (typeof sequence !== "number" || sequence > coveredThroughSequence)
+                      ) {
+                        await agent.appendHistoryMessage(history.role, history.content);
+                        restoredMessageCount += 1;
+                      }
+                    }
+                    eventRouter.recordContextRestore({
+                      success: true,
+                      restoredMessageCount,
+                      durationMs: Date.now() - restoreStartedAt,
+                    });
+                  } catch (error) {
+                    eventRouter.recordContextRestore({
+                      success: false,
+                      restoredMessageCount,
+                      durationMs: Date.now() - restoreStartedAt,
+                      errorCode: error instanceof Error ? error.name : "CONTEXT_RESTORE_FAILED",
+                    });
+                    throw error;
+                  }
+                }
                 const result = await agent.sendMessage(outgoingContent, {
                   ...message.options,
                   timeout: explicitMessageTimeoutMs ?? undefined,
@@ -537,29 +625,59 @@ export async function registerWebSocketRoutes(
                   files: message.files,
                 });
 
-                if (
-                  !result.success &&
-                  result.error?.code === "MESSAGE_TIMEOUT"
-                ) {
-                  eventRouter.cancelMessage();
-                }
-
                 eventRouter.recordFinish(result);
 
+                const capturedContextSummary = eventRouter.getContextSummary();
+                const currentUserSequence = ledgerStart &&
+                  typeof (ledgerStart.currentUserMessage as { sequence?: unknown })?.sequence === "number"
+                  ? (ledgerStart.currentUserMessage as { sequence: number }).sequence
+                  : undefined;
+                const terminalContextSummary = capturedContextSummary &&
+                  ledgerStart &&
+                  currentUserSequence !== undefined
+                  ? {
+                      ...capturedContextSummary,
+                      sourceRevision: capturedContextSummary.reason === "preflight"
+                        ? ledgerStart.historyBaseRevision
+                        : ledgerStart.conversationRevision,
+                      coveredThroughSequence: capturedContextSummary.reason === "preflight"
+                        ? Math.max(0, currentUserSequence - 1)
+                        : currentUserSequence,
+                    }
+                  : undefined;
+                const ledgerTerminal = ledger ? await ledger.commitTerminal({
+                  conversationId, runId, messageId, assistantMessageId,
+                  ownerUserId: authorAuthorization?.userId || "",
+                  projectId: config.projectId || message.projectId || "",
+                  status: result.success ? "completed" : (eventRouter.isCancelled() ? "cancelled" : "failed"),
+                  content: result.success ? result.content : undefined,
+                  displayParts: result.success ? eventRouter.getLedgerDisplayParts() : undefined,
+                  errorCode: result.success ? undefined : result.error?.code,
+                  usage: result.metadata?.tokens ? { tokens: result.metadata.tokens } : undefined,
+                  summary: result.success ? undefined : { message: result.error?.message },
+                  contextSummary: terminalContextSummary,
+                }) : null;
+
                 const checkpoint =
-                  isCanonicalCheckpointEnabled() &&
+                  (Boolean(ledgerTerminal) || isCanonicalCheckpointEnabled()) &&
                   result.success &&
                   result.content?.trim() &&
                   message.options?.conversation?.assistantMessageId
                     ? getConversationCheckpointStore().recordTurn(
                         sessionId,
                         { id: messageId, role: "user", content: rawUserContent },
-                        {
-                          id: message.options.conversation.assistantMessageId,
-                          role: "assistant",
-                          content: result.content,
-                        },
-                      )
+                      {
+                        id: message.options.conversation.assistantMessageId,
+                        role: "assistant",
+                        content: result.content,
+                      },
+                      ledgerTerminal
+                        ? {
+                            conversationId: ledgerTerminal.conversationId,
+                            conversationRevision: ledgerTerminal.conversationRevision,
+                          }
+                        : undefined,
+                    )
                     : undefined;
 
                 if (result.success) {
@@ -567,6 +685,7 @@ export async function registerWebSocketRoutes(
                     type: "finish",
                     id: messageId,
                     sessionId,
+                    ...eventRouter.getActiveRunIds(),
                     content: result.content,
                     files: result.files,
                     metadata: result.metadata,
@@ -577,6 +696,7 @@ export async function registerWebSocketRoutes(
                     type: "error",
                     id: messageId,
                     sessionId,
+                    ...eventRouter.getActiveRunIds(),
                     files: result.files,
                     error: result.error || {
                       code: "INTERNAL_ERROR",
@@ -724,7 +844,7 @@ export async function registerWebSocketRoutes(
           }
 
           case "cancel": {
-            const targetSessionId = message.sessionId || sessionId;
+            const targetSessionId = sessionId;
             const agent = manager.get(targetSessionId);
             if (agent) {
               eventRouter.cancelMessage();
@@ -732,6 +852,7 @@ export async function registerWebSocketRoutes(
               sendMessage({
                 type: "status",
                 sessionId: targetSessionId,
+                ...eventRouter.getActiveRunIds(),
                 status: "cancelling",
               });
             }
@@ -1024,114 +1145,6 @@ export async function registerWebSocketRoutes(
               );
             }
             break;
-          }
-
-          case "resync_history": {
-            const { id: resyncId, messages } = message;
-            if (!Array.isArray(messages)) {
-              sendMessage({
-                type: "error",
-                id: resyncId || "unknown",
-                error: {
-                  code: "INVALID_PARAMS",
-                  message: "resync_history 需要 messages 数组",
-                },
-              });
-              return;
-            }
-
-            const checkpointStore = getConversationCheckpointStore();
-            const checkpointEnabled = isCanonicalCheckpointEnabled();
-            const resolvedCheckpoint = checkpointEnabled
-              ? checkpointStore.resolveResync(sessionId, {
-                  expectedVersion: message.checkpointVersion,
-                  truncateAfterMessageId: message.truncateAfterMessageId,
-                  fallbackMessages: messages,
-                })
-              : null;
-            if (resolvedCheckpoint && !resolvedCheckpoint.ok) {
-              sendMessage({
-                type: "error",
-                id: resyncId || "unknown",
-                error: {
-                  code: resolvedCheckpoint.code,
-                  message: "会话历史已变化，请刷新后重试。",
-                },
-              });
-              return;
-            }
-            const replayMessages = resolvedCheckpoint
-              ? resolvedCheckpoint.checkpoint.messages
-              : messages;
-
-            logger.info(
-              { sessionId, messageCount: replayMessages.length, checkpointEnabled },
-              "WebSocket resync_history received",
-            );
-
-            try {
-              const existingAgent = manager.get(sessionId);
-              if (!existingAgent) {
-                sendMessage({
-                  type: "error",
-                  id: resyncId || "unknown",
-                  error: {
-                    code: "AGENT_NOT_FOUND",
-                    message: "会话不存在，请先发送消息",
-                  },
-                });
-                return;
-              }
-
-              const config = existingAgent.getConfig();
-              await manager.destroy(sessionId);
-
-              const agent = manager.getOrCreate(sessionId, config);
-              eventRouter.bindAgent(agent);
-              if (agent.status === "initializing") {
-                await agent.start();
-              }
-
-              for (const msg of replayMessages) {
-                if (msg.role && msg.content) {
-                  await agent.appendHistoryMessage(msg.role, msg.content);
-                }
-              }
-
-              const checkpoint = resolvedCheckpoint
-                ? checkpointStore.commit(sessionId, resolvedCheckpoint.checkpoint)
-                : undefined;
-
-              logger.info(
-                { sessionId, replayedCount: replayMessages.length, checkpointVersion: checkpoint?.version },
-                "resync_history completed",
-              );
-            } catch (error) {
-              logger.error(
-                { error, sessionId },
-                "resync_history failed",
-              );
-              sendMessage({
-                type: "error",
-                id: resyncId || "unknown",
-                error: {
-                  code: "RESYNC_FAILED",
-                  message: "重同步历史失败",
-                },
-              });
-              return;
-            }
-
-            sendMessage({
-              type: "status",
-              id: resyncId,
-              sessionId,
-              status: "ready",
-              checkpointVersion: checkpointEnabled
-                ? checkpointStore.get(sessionId)?.version
-                : undefined,
-            });
-            return;
           }
 
           default: {

@@ -16,7 +16,12 @@ RUN if [ -n "$DEBIAN_MIRROR" ]; then \
     && apt-get install -y --no-install-recommends python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
 
-RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
+ARG NPM_REGISTRY=https://registry.npmmirror.com
+ENV COREPACK_NPM_REGISTRY=${NPM_REGISTRY}
+
+RUN corepack enable \
+    && corepack prepare pnpm@8.15.0 --activate \
+    && pnpm config set registry "$NPM_REGISTRY"
 
 WORKDIR /app
 
@@ -38,7 +43,12 @@ FROM node:24-bookworm-slim AS runtime-deps
 ARG DEBIAN_MIRROR=
 ARG HTTP_PROXY=
 ARG HTTPS_PROXY=
+ARG NPM_REGISTRY=https://registry.npmmirror.com
 ENV http_proxy=$HTTP_PROXY https_proxy=$HTTPS_PROXY
+ENV npm_config_registry=${NPM_REGISTRY}
+ENV npm_config_disturl=https://npmmirror.com/mirrors/node
+# Use the Node headers shipped in the base image when native prebuilds are unavailable.
+ENV npm_config_nodedir=/usr/local
 
 RUN if [ -n "$DEBIAN_MIRROR" ]; then \
       find /etc/apt -type f \( -name 'sources.list' -o -name '*.sources' \) -print0 \
@@ -54,7 +64,7 @@ RUN if [ -n "$DEBIAN_MIRROR" ]; then \
 WORKDIR /app
 
 RUN npm init -y \
-    && npm install --omit=dev fastify@4.29.1 better-sqlite3@12.11.1 dotenv@17.4.2 \
+    && npm install --registry="$NPM_REGISTRY" --omit=dev fastify@4.29.1 better-sqlite3@13.0.3 dotenv@17.4.2 \
     && npm cache clean --force
 
 FROM node:24-bookworm-slim

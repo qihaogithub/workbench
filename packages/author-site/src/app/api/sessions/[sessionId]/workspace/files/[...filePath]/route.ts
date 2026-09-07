@@ -106,7 +106,7 @@ export async function GET(
       });
     }
 
-    if (meta.userId && meta.userId !== payload.userId) {
+    if (!meta.userId || meta.userId !== payload.userId) {
       return NextResponse.json(
         createApiError("FORBIDDEN", "无权访问其他用户的 Session"),
         { status: 403 },
@@ -229,7 +229,7 @@ export async function PUT(
       });
     }
 
-    if (meta.userId && meta.userId !== payload.userId) {
+    if (!meta.userId || meta.userId !== payload.userId) {
       return NextResponse.json(
         createApiError("FORBIDDEN", "无权操作其他用户的 Session"),
         { status: 403 },
@@ -405,7 +405,7 @@ export async function DELETE(
     if (!meta) {
       return NextResponse.json(createApiError("SESSION_NOT_FOUND"), { status: 404 });
     }
-    if (meta.userId && meta.userId !== payload.userId) {
+    if (!meta.userId || meta.userId !== payload.userId) {
       return NextResponse.json(createApiError("FORBIDDEN", "无权操作其他用户的 Session"), {
         status: 403,
       });

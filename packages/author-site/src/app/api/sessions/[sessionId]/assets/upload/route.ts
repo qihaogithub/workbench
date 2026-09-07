@@ -74,6 +74,9 @@ export async function POST(
     }
 
     const meta = getSessionMeta(sessionId);
+    if (!meta?.userId || meta.userId !== payload.userId) {
+      return NextResponse.json(createApiError("FORBIDDEN", "无权操作其他用户的 Session"), { status: 403 });
+    }
     const projectId = meta?.demoId;
 
     const formData = await request.formData();

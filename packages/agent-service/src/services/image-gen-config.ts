@@ -8,12 +8,14 @@
 
 import { loadConfig } from "../utils/config";
 import { logger } from "../utils/logger";
+import type { ImageGenApiProfile } from "./image-generation-service";
 
 export interface ImageGenRuntimeConfig {
   enabled: boolean;
   apiKey: string;
   baseUrl: string;
   model: string;
+  apiProfile: ImageGenApiProfile;
   timeoutMs: number;
   maxPerSession: number;
   maxRetries: number;
@@ -30,6 +32,7 @@ function fromEnv(): ImageGenRuntimeConfig {
     apiKey: gen.apiKey,
     baseUrl: gen.baseUrl,
     model: gen.model,
+    apiProfile: gen.apiProfile,
     timeoutMs: gen.timeoutMs,
     maxPerSession: gen.maxPerSession,
     maxRetries: gen.maxRetries,
@@ -48,6 +51,14 @@ export function getImageGenConfig(): ImageGenRuntimeConfig {
 export function updateImageGenConfig(
   partial: Partial<ImageGenRuntimeConfig>,
 ): ImageGenRuntimeConfig {
+  if (
+    partial.apiProfile &&
+    !["auto", "gpt-image", "dall-e-3", "generation-only"].includes(
+      partial.apiProfile,
+    )
+  ) {
+    throw new Error("invalid_api_profile");
+  }
   const current = getImageGenConfig();
   _config = { ...current, ...partial };
   logger.info(

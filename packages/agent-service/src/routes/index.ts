@@ -10,6 +10,7 @@ import { registerWorkspaceAuthorityRoutes } from "./workspace-authority";
 import { registerAttachmentRoutes } from "./attachments";
 import { registerCommentsWsRoutes } from "./comments-ws";
 import { registerCommentAiTaskRoutes } from "./comment-ai-task";
+import { registerInternalImageGenRoutes } from "./internal-image-gen";
 
 export async function registerRoutes(fastify: FastifyInstance) {
   await registerAgentRoutes(fastify);
@@ -23,4 +24,5 @@ export async function registerRoutes(fastify: FastifyInstance) {
   await registerInternalConfigRoutes(fastify);
   await registerCommentsWsRoutes(fastify);
   await registerCommentAiTaskRoutes(fastify);
+  await registerInternalImageGenRoutes(fastify);
 }

@@ -11,6 +11,8 @@ import { DATA_DIR } from "./paths";
 
 export interface ChatAttachmentMeta {
   id: string;
+  ownerUserId?: string;
+  conversationId?: string;
   name: string;
   mimeType: string;
   size: number;
@@ -74,6 +76,36 @@ export function listChatAttachments(
   return attachments;
 }
 
+export function isChatAttachmentOwned(
+  metadata: ChatAttachmentMeta,
+  ownerUserId: string,
+  conversationId: string,
+): boolean {
+  return metadata.ownerUserId === ownerUserId && metadata.conversationId === conversationId;
+}
+
+export function listConversationChatAttachments(
+  projectId: string,
+  ownerUserId: string,
+  conversationId: string,
+): ChatAttachmentMeta[] {
+  return listChatAttachments(projectId).filter((metadata) =>
+    isChatAttachmentOwned(metadata, ownerUserId, conversationId),
+  );
+}
+
+export function listUserChatAttachments(
+  projectId: string,
+  ownerUserId: string,
+  activeConversationIds: ReadonlySet<string>,
+): ChatAttachmentMeta[] {
+  return listChatAttachments(projectId).filter((metadata) =>
+    metadata.ownerUserId === ownerUserId &&
+    typeof metadata.conversationId === "string" &&
+    activeConversationIds.has(metadata.conversationId),
+  );
+}
+
 export function readChatAttachment(
   projectId: string,
   attachmentId: string,
@@ -114,6 +146,18 @@ export function deleteChatAttachments(
     if (deleteChatAttachment(projectId, id)) deleted++;
   }
   return deleted;
+}
+
+export function deleteConversationChatAttachments(
+  projectId: string,
+  ownerUserId: string,
+  conversationId: string,
+): number {
+  return deleteChatAttachments(
+    projectId,
+    listConversationChatAttachments(projectId, ownerUserId, conversationId)
+      .map((attachment) => attachment.id),
+  );
 }
 
 /** 读取附件原始文件（图片等二进制），返回 buffer 与元数据 */

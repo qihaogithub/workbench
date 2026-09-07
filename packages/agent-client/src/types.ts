@@ -128,8 +128,87 @@ export interface SendMessageOptions {
     presetRules?: string;
   };
   /** 用于服务端 canonical checkpoint 记录的助手消息 ID。 */
-  conversation?: { assistantMessageId?: string };
+  conversation?: {
+    conversationId?: string;
+    messageId?: string;
+    runId?: string;
+    assistantMessageId?: string;
+    conversationRevision?: number;
+  };
+  /** Canonical conversation identity. These values are echoed on every WS frame. */
+  conversationId?: string;
+  messageId?: string;
+  runId?: string;
+  assistantMessageId?: string;
+  conversationRevision?: number;
+  expectedRevision?: number;
 }
+
+/** Public conversation ledger records. Kept structural so the SDK has no server-package dependency. */
+export interface ConversationRecord {
+  id: string;
+  userId: string;
+  projectId: string;
+  workspaceId: string | null;
+  title: string | null;
+  status: string;
+  revision: number;
+  lastSequence: number;
+  createdAt: number;
+  updatedAt: number;
+  expiresAt: number;
+  deletedAt: number | null;
+}
+
+export interface ConversationMessageRecord {
+  id: string;
+  conversationId: string;
+  clientMessageId: string | null;
+  sequence: number;
+  role: "user" | "assistant";
+  kind: string | null;
+  status: string;
+  content: string;
+  displayParts: unknown[];
+  createdAt: number;
+  completedAt: number | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface ConversationRunRecord {
+  id: string;
+  conversationId: string;
+  userMessageId: string;
+  assistantMessageId: string;
+  status: string;
+  modelProvider: string | null;
+  modelId: string | null;
+  startedAt: number | null;
+  finishedAt: number | null;
+  errorCode: string | null;
+  usage: Record<string, unknown>;
+  summary: Record<string, unknown>;
+  traceId: string | null;
+}
+
+export interface ConversationProjection {
+  conversation: ConversationRecord;
+  messages: ConversationMessageRecord[];
+  runs: ConversationRunRecord[];
+}
+
+export interface MessageAcceptedAck {
+  conversationId: string;
+  messageId: string;
+  assistantMessageId: string;
+  runId: string;
+  sequence: number;
+  serverCreatedAt: number;
+  conversationRevision: number;
+  status: "accepted";
+}
+
+export interface ConversationListItem extends ConversationRecord {}
 
 /** 图片附件，Base64 编码 */
 export interface ImageAttachment {

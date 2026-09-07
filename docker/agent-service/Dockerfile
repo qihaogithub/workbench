@@ -20,7 +20,9 @@ ARG NPM_REGISTRY=https://registry.npmmirror.com
 ENV COREPACK_NPM_REGISTRY=${NPM_REGISTRY}
 ENV npm_config_disturl=https://npmmirror.com/mirrors/node
 
-RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
+RUN corepack enable \
+    && corepack prepare pnpm@8.15.0 --activate \
+    && pnpm config set registry "$NPM_REGISTRY"
 
 WORKDIR /app
 
@@ -36,7 +38,7 @@ COPY packages/whiteboard-core/package.json ./packages/whiteboard-core/
 COPY packages/agent-service/package.json ./packages/agent-service/
 
 RUN --mount=type=cache,id=workbench-pnpm-store,target=/pnpm/store \
-    pnpm install --store-dir /pnpm/store --frozen-lockfile
+    pnpm install --store-dir /pnpm/store --frozen-lockfile --ignore-scripts
 
 COPY packages/knowledge-core/ ./packages/knowledge-core/
 COPY packages/knowledge-service/ ./packages/knowledge-service/

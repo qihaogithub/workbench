@@ -32,6 +32,10 @@ export async function POST(
       );
     }
 
+    if (!sessionMeta.userId || sessionMeta.userId !== payload.userId) {
+      return NextResponse.json(createApiError('FORBIDDEN', '无权操作其他用户的 Session'), { status: 403 });
+    }
+
     const success = discardEditSession(sessionId);
 
     if (!success) {
