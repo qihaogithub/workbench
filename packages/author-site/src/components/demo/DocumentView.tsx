@@ -1660,6 +1660,7 @@ export function DocumentView({
                 </div>
               ) : activeTarget ? (
                 <DocumentEditor
+                  documentKey={getContentCacheKey(activeTarget)}
                   value={content}
                   onChange={(next) => {
                     contentCacheRef.current.set(

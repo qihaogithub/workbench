@@ -587,6 +587,7 @@ function EntryCard({
               </span>
             </div>
             <DocumentEditor
+              documentKey={`${docId}:${entry.id}`}
               value={entry.markdown}
               onChange={(markdown) => ws.setMarkdown(entry.id, markdown)}
               localizeRemoteImage={localizeRemoteImage}

@@ -1,9 +1,11 @@
 import { Crepe, type CrepeConfig } from "@milkdown/crepe";
+import type { Ctx } from "@milkdown/kit/ctx";
 import type {
   ConfigReferenceCandidate,
   DocumentUploadHandler,
 } from "../DocumentEditor";
-import { HEADING_STYLE_OPTIONS } from "./heading-style-toolbar";
+import { PRIMARY_HEADING_STYLE_OPTIONS } from "./heading-style-toolbar";
+import { documentHeadingMenuApi } from "./document-heading-menu";
 
 export interface CrepeProjectActions {
   uploadImage: (file: File) => Promise<string>;
@@ -55,7 +57,17 @@ export function buildCrepeConfig({
         inlineUploadPlaceholderText: "或粘贴图片地址",
       },
       [Crepe.Feature.TopBar]: {
-        headingOptions: HEADING_STYLE_OPTIONS,
+        headingOptions: PRIMARY_HEADING_STYLE_OPTIONS,
+        buildTopBar(builder) {
+          builder
+            .getGroup("heading")
+            .clear()
+            .addItem("document-heading", {
+              icon: "<span data-document-heading-trigger>正文 ▾</span>",
+              active: () => false,
+              onRun: (ctx: Ctx) => ctx.get(documentHeadingMenuApi.key).toggle(),
+            });
+        },
       },
     },
   };

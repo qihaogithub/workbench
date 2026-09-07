@@ -13,6 +13,13 @@ export const HEADING_STYLE_OPTIONS: HeadingStyleOption[] = [
   { label: "H6", level: 6 },
 ];
 
+export const PRIMARY_HEADING_STYLE_OPTIONS = HEADING_STYLE_OPTIONS.filter(
+  ({ level }) => level === null || level <= 3,
+);
+export const MORE_HEADING_STYLE_OPTIONS = HEADING_STYLE_OPTIONS.filter(
+  ({ level }) => level !== null && level >= 4,
+);
+
 export function getHeadingStyleLabel(level: number | null): string {
   return (
     HEADING_STYLE_OPTIONS.find((option) => option.level === level)?.label ??

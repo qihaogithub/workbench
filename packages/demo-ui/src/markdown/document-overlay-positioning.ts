@@ -1,10 +1,6 @@
 import {
   autoUpdate,
   computePosition,
-  flip,
-  shift,
-  size,
-  type Middleware,
   type VirtualElement,
 } from "@floating-ui/dom";
 
@@ -30,10 +26,11 @@ export interface SafeOverlayPositionInput {
   obstacles?: DocumentRect[];
   placements: DocumentOverlayPlacement[];
   gap?: number;
+  minimumSize?: { width: number; height: number };
 }
 
 export interface SafeOverlayPosition {
-  placement: DocumentOverlayPlacement;
+  placement: DocumentOverlayPlacement | "docked";
   left: number;
   top: number;
   rect: DocumentRect;
@@ -48,6 +45,55 @@ export interface DocumentOverlayPositionerOptions {
   placements: DocumentOverlayPlacement[];
   gap?: number;
   contextElement?: Element;
+  /** Scrollable menus may shrink; toolbars retain their natural dimensions. */
+  minimumSize?: { width: number; height: number };
+  /** Selection tools may cover neighbouring content and dock as a last resort. */
+  selectionToolbar?: boolean;
+}
+
+export function chooseSelectionToolbarPosition(
+  input: SafeOverlayPositionInput,
+): SafeOverlayPosition | null {
+  const { boundary, floating, reference, obstacles = [], gap = 8 } = input;
+  const top = Math.max(
+    boundary.top,
+    ...obstacles
+      .filter((rect) => intersects(boundary, rect))
+      .map((rect) => rect.bottom),
+  );
+  const usable = { ...boundary, top, height: boundary.bottom - top };
+  if (
+    floating.width > usable.width - gap * 2 ||
+    floating.height > usable.height - gap * 2
+  )
+    return null;
+  const adjacent = chooseSafeOverlayPosition({
+    ...input,
+    boundary: usable,
+    obstacles: [],
+    placements: ["top-start", "bottom-start"],
+  });
+  if (adjacent) return adjacent;
+  // A viewport-spanning selection leaves no adjacent slot. Keep its controls
+  // reachable in a labelled dock instead of silently dropping the toolbar.
+  const left = clamp(
+    reference.left,
+    usable.left + gap,
+    usable.right - floating.width - gap,
+  );
+  const dockTop = usable.top + gap;
+  return {
+    placement: "docked",
+    left,
+    top: dockTop,
+    rect: {
+      left,
+      top: dockTop,
+      right: left + floating.width,
+      bottom: dockTop + floating.height,
+      ...floating,
+    },
+  };
 }
 
 export interface DocumentOverlayPositionerController {
@@ -76,6 +122,27 @@ function intersects(first: DocumentRect, second: DocumentRect): boolean {
     first.bottom <= second.top ||
     first.top >= second.bottom
   );
+}
+
+export function getDocumentOverlayBoundary(
+  editor: DocumentRect,
+  clipped: { x: number; y: number; width: number; height: number },
+  flowing: boolean,
+): DocumentRect {
+  const left = Math.max(editor.left, clipped.x);
+  const right = Math.min(editor.right, clipped.x + clipped.width);
+  const top = flowing ? clipped.y : Math.max(editor.top, clipped.y);
+  const bottom = flowing
+    ? clipped.y + clipped.height
+    : Math.min(editor.bottom, clipped.y + clipped.height);
+  return {
+    left,
+    right,
+    top,
+    bottom,
+    width: right - left,
+    height: bottom - top,
+  };
 }
 
 function contains(boundary: DocumentRect, rect: DocumentRect): boolean {
@@ -145,19 +212,40 @@ export function chooseSafeOverlayPosition({
   obstacles = [],
   placements,
   gap = 8,
+  minimumSize,
 }: SafeOverlayPositionInput): SafeOverlayPosition | null {
   const normalizedReference = normalizeRect(reference);
   const normalizedBoundary = normalizeRect(boundary);
-  const protectedRects = [
-    normalizedReference,
-    ...obstacles.map(normalizeRect),
-  ];
+  const protectedRects = [normalizedReference, ...obstacles.map(normalizeRect)];
 
   for (const placement of placements) {
+    const availableWidth =
+      placement === "right-start"
+        ? boundary.right - reference.right - gap * 2
+        : placement === "left-start"
+          ? reference.left - boundary.left - gap * 2
+          : boundary.width - gap * 2;
+    const availableHeight =
+      placement === "bottom-start"
+        ? boundary.bottom - reference.bottom - gap * 2
+        : placement === "top-start"
+          ? reference.top - boundary.top - gap * 2
+          : boundary.height - gap * 2;
+    const width = minimumSize
+      ? Math.min(floating.width, availableWidth)
+      : floating.width;
+    const height = minimumSize
+      ? Math.min(floating.height, availableHeight)
+      : floating.height;
+    if (
+      minimumSize &&
+      (width < minimumSize.width || height < minimumSize.height)
+    )
+      continue;
     const rect = makeCandidateRect(
       normalizedReference,
-      floating.width,
-      floating.height,
+      width,
+      height,
       placement,
       gap,
       normalizedBoundary,
@@ -221,49 +309,104 @@ export function mountDocumentOverlayPositioner(
       return;
     }
 
-    options.floating.dataset.safe = "false";
-    options.floating.setAttribute("aria-hidden", "true");
+    // Repositioning an active selection control must not make it inert:
+    // visibility:hidden would blur its focused select/More button mid-click.
+    if (!options.selectionToolbar || options.floating.dataset.safe !== "true") {
+      options.floating.dataset.safe = "false";
+      options.floating.setAttribute("aria-hidden", "true");
+    }
 
-    let availableWidth = Number.POSITIVE_INFINITY;
-    let availableHeight = Number.POSITIVE_INFINITY;
-    const sizingMiddleware: Middleware = size({
-      boundary,
-      padding: gap,
-      apply({ availableWidth: nextWidth, availableHeight: nextHeight }) {
-        availableWidth = nextWidth;
-        availableHeight = nextHeight;
-      },
-    });
+    const flowing = boundary.getAttribute("data-scrollable") === "false";
+    let scrollport: Element | null = null;
+    if (flowing) {
+      // Fixed overlays escape decorative overflow-hidden cards. Their actual
+      // vertical boundary is the host scrollport, not those content wrappers.
+      for (
+        let parent = boundary.parentElement;
+        parent;
+        parent = parent.parentElement
+      ) {
+        const overflow =
+          parent.ownerDocument.defaultView?.getComputedStyle(parent).overflowY;
+        if (overflow === "auto" || overflow === "scroll") {
+          scrollport = parent;
+          break;
+        }
+      }
+    }
 
     try {
-      await computePosition(reference, options.floating, {
-        strategy: "absolute",
-        placement: options.placements[0] ?? "bottom-start",
+      const measurement = await computePosition(reference, options.floating, {
+        strategy: "fixed",
         middleware: [
-          flip({
-            boundary,
-            padding: gap,
-            fallbackPlacements: options.placements.slice(1),
-          }),
-          shift({ boundary, padding: gap }),
-          sizingMiddleware,
+          {
+            name: "documentBoundary",
+            async fn({ platform, strategy }) {
+              return {
+                data: await platform.getClippingRect({
+                  element:
+                    scrollport ?? options.contextElement ?? options.floating,
+                  boundary: scrollport ? [scrollport] : "clippingAncestors",
+                  rootBoundary: "viewport",
+                  strategy,
+                }),
+              };
+            },
+          },
         ],
       });
+      const clipped = measurement.middlewareData.documentBoundary as {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      };
       if (destroyed || currentRevision !== revision) return;
 
       const rootRect = normalizeRect(options.root.getBoundingClientRect());
-      const boundaryRect = normalizeRect(boundary.getBoundingClientRect());
+      const bounds = boundary.getBoundingClientRect();
+      // A flowing editor's height is its content height, not a viewport.
+      // Keep its horizontal scope but use the enclosing scrollport vertically.
+      const boundaryRect = getDocumentOverlayBoundary(bounds, clipped, flowing);
+      if (!intersects(boundaryRect, normalizeRect(referenceRect))) {
+        setHidden(options.floating);
+        return;
+      }
+      // Measure the preferred size, not the previous placement's constrained
+      // size. The final constraints are applied synchronously before paint.
+      options.floating.style.removeProperty("--document-overlay-max-width");
+      options.floating.style.removeProperty("--document-overlay-max-height");
+      if (options.selectionToolbar) {
+        const compact = String(boundaryRect.width < 360);
+        const more = options.floating.querySelector("details");
+        if (
+          more &&
+          (options.floating.dataset.compact !== compact || compact === "false")
+        ) {
+          more.open = compact === "false";
+        }
+        options.floating.dataset.compact = compact;
+        options.floating.style.setProperty(
+          "--document-overlay-max-width",
+          `${Math.max(0, boundaryRect.width - gap * 2)}px`,
+        );
+      }
       const floatingRect = options.floating.getBoundingClientRect();
       const floatingWidth = floatingRect.width || options.floating.offsetWidth;
       const floatingHeight =
         floatingRect.height || options.floating.offsetHeight;
-      const safePosition = chooseSafeOverlayPosition({
+      const safePosition = (
+        options.selectionToolbar
+          ? chooseSelectionToolbarPosition
+          : chooseSafeOverlayPosition
+      )({
         reference: normalizeRect(referenceRect),
         floating: { width: floatingWidth, height: floatingHeight },
         boundary: boundaryRect,
         obstacles: options.getObstacles?.() ?? [],
         placements: options.placements,
         gap,
+        minimumSize: options.minimumSize,
       });
 
       if (!safePosition) {
@@ -271,16 +414,16 @@ export function mountDocumentOverlayPositioner(
         return;
       }
 
-      if (Number.isFinite(availableWidth)) {
+      if (options.minimumSize) {
         options.floating.style.setProperty(
           "--document-overlay-max-width",
-          `${Math.max(0, availableWidth)}px`,
+          `${safePosition.rect.width}px`,
         );
       }
-      if (Number.isFinite(availableHeight)) {
+      if (options.minimumSize) {
         options.floating.style.setProperty(
           "--document-overlay-max-height",
-          `${Math.max(0, availableHeight)}px`,
+          `${safePosition.rect.height}px`,
         );
       }
       options.floating.style.left = `${safePosition.left - rootRect.left}px`;

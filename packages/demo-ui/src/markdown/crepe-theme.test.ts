@@ -41,26 +41,16 @@ describe("Crepe 宿主主题契约", () => {
 
   it("使用紧凑的 H1-H6 标题选择器宽度", () => {
     expect(theme).toMatch(
-      /\.top-bar-heading-label\s*\{[^}]*min-width:\s*42px;/s,
+      /\.top-bar-item:has\(\[data-document-heading-trigger\]\)\s*\{[^}]*min-width:\s*70px;/s,
     );
     expect(theme).toMatch(
       /\.document-selection-toolbar-heading\s*\{[^}]*min-width:\s*64px;/s,
     );
   });
 
-  it("让原生标题下拉菜单在正文之上，并保留完整点击热区", () => {
-    expect(theme).toMatch(
-      /\.top-bar-heading-selector\s*\{[^}]*position:\s*relative;[^}]*z-index:\s*30;/s,
-    );
-    expect(theme).toMatch(
-      /\.top-bar-heading-button\s*\{[^}]*display:\s*flex;[^}]*cursor:\s*pointer;/s,
-    );
-    expect(theme).toMatch(
-      /\.top-bar-heading-dropdown\s*\{[^}]*position:\s*absolute;[^}]*z-index:\s*31;/s,
-    );
-    expect(theme).toMatch(
-      /\.top-bar-heading-option\s*\{[^}]*width:\s*100%;[^}]*cursor:\s*pointer;/s,
-    );
+  it("标题下拉复用本地浮层，不再维护原生下拉的另一套定位样式", () => {
+    expect(theme).not.toContain(".top-bar-heading-dropdown");
+    expect(theme).toContain("[data-document-heading-trigger]");
   });
 
   it("让正文、浮动工具栏和 TopBar 使用同一套 Crepe 表面层级", () => {

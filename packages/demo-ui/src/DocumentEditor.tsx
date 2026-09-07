@@ -13,6 +13,7 @@ import {
   type CrepeProjectActions,
 } from "./markdown/crepe-config";
 import { documentBlockEdit } from "./markdown/document-block-edit";
+import { documentHeadingMenu } from "./markdown/document-heading-menu";
 import { documentSelectionToolbar } from "./markdown/document-selection-toolbar";
 import {
   decodeMarkdownReferenceUri,
@@ -71,6 +72,8 @@ export type MarkdownReferenceClickHandler = (input: {
 }) => void;
 
 export interface DocumentEditorProps {
+  /** Stable resource identity. Switching it resets selection, menus and history. */
+  documentKey?: string;
   value: string;
   onChange: (value: string) => void;
   readOnly?: boolean;
@@ -132,7 +135,16 @@ function insertMarkdown(crepe: Crepe, markdown: string) {
   crepe.editor.action((ctx) => ctx.get(editorViewCtx).focus());
 }
 
-export function DocumentEditor({
+export function DocumentEditor(props: DocumentEditorProps) {
+  return (
+    <DocumentEditorInstance
+      key={props.documentKey ?? JSON.stringify(props.referenceContext?.source)}
+      {...props}
+    />
+  );
+}
+
+function DocumentEditorInstance({
   value,
   onChange,
   readOnly = false,
@@ -242,13 +254,13 @@ export function DocumentEditor({
 
       try {
         const result = await handler(file);
-        if (!mountedRef.current || !crepeRef.current) return;
+        if (!mountedRef.current || crepeRef.current !== crepe) return;
         const name = escapeMarkdownLabel(file.name || "附件");
         const markdown =
           kind === "video"
             ? `\n<video controls src="${result.url}"></video>\n`
             : `\n[${name}](${result.url})\n`;
-        insertMarkdown(crepeRef.current, markdown);
+        insertMarkdown(crepe, markdown);
       } catch (error) {
         reportUploadError(error);
       }
@@ -305,6 +317,8 @@ export function DocumentEditor({
       ...config,
     });
     crepeRef.current = crepe;
+    if (showTopBar)
+      crepe.addFeature(documentHeadingMenu, { root: overlayRoot, actions });
 
     const reportCommentSelection = (view: EditorView) => {
       const selection = view.state.selection;

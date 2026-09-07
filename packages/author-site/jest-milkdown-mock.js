@@ -86,6 +86,8 @@ module.exports = {
   replaceAll: () => () => true,
   getMarkdown: () => () => '',
   $command: () => command(),
+  $ctx: (_value, name) => ({ key: name }),
+  $prose: (factory) => ({ key: 'mock-prose', factory }),
 
   // plugins
   history: [],

@@ -4,7 +4,6 @@ import type { PluginView } from "@milkdown/kit/prose/state";
 import type { EditorView } from "@milkdown/kit/prose/view";
 
 import { commandsCtx } from "@milkdown/kit/core";
-import { TooltipProvider } from "@milkdown/kit/plugin/tooltip";
 import {
   emphasisSchema,
   headingSchema,
@@ -24,7 +23,12 @@ import {
   toggleStrikethroughCommand,
 } from "@milkdown/kit/preset/gfm";
 import { posToDOMRect } from "@milkdown/kit/prose";
-import { Plugin, PluginKey, TextSelection } from "@milkdown/kit/prose/state";
+import {
+  AllSelection,
+  Plugin,
+  PluginKey,
+  TextSelection,
+} from "@milkdown/kit/prose/state";
 import { $prose } from "@milkdown/kit/utils";
 
 import {
@@ -60,7 +64,11 @@ export interface DocumentSelectionToolbarOptions {
 
 function isSelectionVisible(view: EditorView, content: HTMLElement): boolean {
   const { doc, selection } = view.state;
-  if (!view.editable || !(selection instanceof TextSelection)) return false;
+  if (
+    !view.editable ||
+    !(selection instanceof TextSelection || selection instanceof AllSelection)
+  )
+    return false;
   if (selection.empty || !doc.textBetween(selection.from, selection.to).length)
     return false;
 
@@ -74,47 +82,6 @@ function getCurrentHeadingLevel(ctx: Ctx, view: EditorView): number | null {
   const heading = headingSchema.type(ctx);
   if (parent.type !== heading) return null;
   return Number(parent.attrs.level);
-}
-
-function getEditorContentRects(view: EditorView): DOMRect[] {
-  const rects: DOMRect[] = [];
-  const ownerDocument = view.dom.ownerDocument;
-
-  for (const block of Array.from(view.dom.children)) {
-    const blockTextRects: DOMRect[] = [];
-    const walker = ownerDocument.createTreeWalker(block, 4);
-    let node = walker.nextNode();
-    while (node) {
-      if (node.nodeType === 3 && node.textContent?.trim()) {
-        const range = ownerDocument.createRange();
-        range.selectNodeContents(node);
-        blockTextRects.push(
-          ...Array.from(range.getClientRects()).filter(
-            (rect) => rect.width > 0 && rect.height > 0,
-          ),
-        );
-      }
-      node = walker.nextNode();
-    }
-
-    if (blockTextRects.length > 0) {
-      rects.push(...blockTextRects);
-    } else {
-      const blockRect = block.getBoundingClientRect();
-      if (blockRect.width > 0 && blockRect.height > 0) rects.push(blockRect);
-    }
-  }
-
-  view.dom
-    .querySelectorAll<HTMLElement>(
-      "img, video, audio, iframe, table, hr, pre, [contenteditable='false']",
-    )
-    .forEach((element) => {
-      const rect = element.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) rects.push(rect);
-    });
-
-  return rects;
 }
 
 function createIcon(ownerDocument: Document, icon: string): HTMLSpanElement {
@@ -217,7 +184,9 @@ function createHeadingSelector(
 
 class DocumentSelectionToolbarView implements PluginView {
   readonly #content: HTMLElement;
-  readonly #provider: TooltipProvider;
+  #dismissedSelection: EditorView["state"]["selection"] | null = null;
+  #destroyed = false;
+  #selectionFrame: number | null = null;
   readonly #positioner: ReturnType<typeof mountDocumentOverlayPositioner>;
   readonly #ctx: Ctx;
   readonly #view: EditorView;
@@ -243,6 +212,8 @@ class DocumentSelectionToolbarView implements PluginView {
     content.setAttribute("aria-label", "文字格式工具");
     this.#content = content;
 
+    content.dataset.show = "false";
+    content.dataset.safe = "false";
     this.#headingSelector = createHeadingSelector(
       ctx,
       view,
@@ -250,12 +221,21 @@ class DocumentSelectionToolbarView implements PluginView {
       () => this.update(view),
     );
     content.append(this.#headingSelector);
+    const more = ownerDocument.createElement("details");
+    more.className = "document-selection-toolbar-more";
+    const summary = ownerDocument.createElement("summary");
+    summary.textContent = "更多";
+    summary.setAttribute("aria-label", "更多文字格式");
+    summary.addEventListener("pointerdown", (event) => event.preventDefault());
+    more.append(summary);
+    content.append(more);
     this.#actions.forEach((group, groupIndex) => {
+      const target = groupIndex === 0 ? content : more;
       if (groupIndex > 0) {
         const divider = ownerDocument.createElement("span");
         divider.className = "document-selection-toolbar-divider";
         divider.setAttribute("role", "separator");
-        content.append(divider);
+        target.append(divider);
       }
       group.forEach((action) => {
         const button = ownerDocument.createElement("button");
@@ -273,7 +253,8 @@ class DocumentSelectionToolbarView implements PluginView {
           this.#view.focus();
           this.update(this.#view);
         });
-        content.append(button);
+        if (target === content) content.insertBefore(button, more);
+        else target.append(button);
       });
     });
 
@@ -300,30 +281,14 @@ class DocumentSelectionToolbarView implements PluginView {
     }
 
     options.root.append(content);
-    this.#provider = new TooltipProvider({
-      content,
-      root: options.root,
-      debounce: 20,
-      offset: 8,
-      shouldShow: (nextView) => isSelectionVisible(nextView, content),
-      floatingUIOptions: {
-        placement: "bottom-start",
-        strategy: "absolute",
-      },
-    });
-    this.#provider.onShow = () => {
-      this.#content.dataset.safe = "false";
-      void this.#positioner.refresh();
-    };
-    this.#provider.onHide = () => {
-      this.#positioner.hide();
-    };
     this.#positioner = mountDocumentOverlayPositioner({
       root: options.root,
+      boundary: view.dom.closest(".document-editor-crepe") ?? options.root,
+      selectionToolbar: true,
       floating: content,
       contextElement: view.dom,
       getReferenceRect: () => {
-        if (!isSelectionVisible(view, content)) return null;
+        if (!this.#shouldShow()) return null;
         try {
           return posToDOMRect(
             view,
@@ -347,26 +312,76 @@ class DocumentSelectionToolbarView implements PluginView {
               topBarRect.height + 16,
             )
           : null;
-        return [
-          topBarSafeRect,
-          ...getEditorContentRects(view),
-        ].filter((rect): rect is DOMRect => Boolean(rect));
+        return topBarSafeRect ? [topBarSafeRect] : [];
       },
-      placements: ["bottom-start", "top-start", "right-start", "left-start"],
+      placements: ["top-start", "bottom-start"],
       gap: 8,
     });
+    ownerDocument.addEventListener("pointerdown", this.#onPointerDown, true);
+    ownerDocument.addEventListener("pointerup", this.#onSelectionEvent);
+    ownerDocument.addEventListener("selectionchange", this.#onSelectionEvent);
+    ownerDocument.addEventListener("focusin", this.#onSelectionEvent);
+    ownerDocument.addEventListener("focusout", this.#onSelectionEvent);
+    ownerDocument.addEventListener("keydown", this.#onKeyDown, true);
+    more.addEventListener("toggle", this.#onSelectionEvent);
     this.update(view);
   }
 
+  #shouldShow = () =>
+    !this.#destroyed &&
+    !this.#dismissedSelection?.eq(this.#view.state.selection) &&
+    isSelectionVisible(this.#view, this.#content);
+
+  #onSelectionEvent = () => {
+    // Focusout and focusin are separate native events. A microtask between
+    // them can hide the target before focus reaches the toolbar control.
+    const window = this.#content.ownerDocument.defaultView;
+    if (!window || this.#selectionFrame !== null) return;
+    this.#selectionFrame = window.requestAnimationFrame(() => {
+      this.#selectionFrame = null;
+      if (!this.#destroyed) this.update(this.#view);
+    });
+  };
+
+  #onPointerDown = (event: PointerEvent) => {
+    const target = event.target as Node | null;
+    if (target && this.#content.contains(target)) {
+      // Native select/details must receive focus; prevent only formatting
+      // button pointerdown (registered on each button above).
+      return;
+    }
+    if (target && this.#view.dom.contains(target)) {
+      this.#dismissedSelection = null;
+      return;
+    }
+    this.#dismiss();
+  };
+
+  #dismiss = () => {
+    this.#dismissedSelection = this.#view.state.selection;
+    this.#content.dataset.show = "false";
+    this.#content.querySelector("details")?.removeAttribute("open");
+    this.#positioner.hide();
+  };
+
+  #onKeyDown = (event: KeyboardEvent) => {
+    if (event.key !== "Escape" || this.#content.dataset.show !== "true") return;
+    event.preventDefault();
+    event.stopPropagation();
+    const toolbarFocused = this.#content.contains(
+      this.#content.ownerDocument.activeElement,
+    );
+    this.#dismiss();
+    if (toolbarFocused) this.#view.focus();
+  };
+
   update = (view: EditorView) => {
-    const visible = isSelectionVisible(view, this.#content);
+    if (this.#destroyed) return;
+    const visible = this.#shouldShow();
+    this.#content.dataset.show = String(visible);
     if (!visible) {
-      this.#provider.hide();
       this.#positioner.hide();
     } else {
-      if (this.#content.dataset.show !== "true") {
-        this.#provider.show();
-      }
       void this.#positioner.refresh();
     }
 
@@ -390,8 +405,20 @@ class DocumentSelectionToolbarView implements PluginView {
   };
 
   destroy = () => {
+    this.#destroyed = true;
+    const ownerDocument = this.#content.ownerDocument;
+    if (this.#selectionFrame !== null)
+      ownerDocument.defaultView?.cancelAnimationFrame(this.#selectionFrame);
+    ownerDocument.removeEventListener("pointerdown", this.#onPointerDown, true);
+    ownerDocument.removeEventListener("pointerup", this.#onSelectionEvent);
+    ownerDocument.removeEventListener(
+      "selectionchange",
+      this.#onSelectionEvent,
+    );
+    ownerDocument.removeEventListener("focusin", this.#onSelectionEvent);
+    ownerDocument.removeEventListener("focusout", this.#onSelectionEvent);
+    ownerDocument.removeEventListener("keydown", this.#onKeyDown, true);
     this.#positioner.destroy();
-    this.#provider.destroy();
     this.#content.remove();
   };
 }

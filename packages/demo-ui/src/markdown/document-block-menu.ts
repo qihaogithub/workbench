@@ -26,6 +26,7 @@ import { createTable } from "@milkdown/kit/preset/gfm";
 
 import type { ConfigReferenceCandidate } from "../DocumentEditor";
 import type { CrepeProjectActions } from "./crepe-config";
+import { HEADING_STYLE_OPTIONS } from "./heading-style-toolbar";
 
 const ICONS = {
   text: '<svg viewBox="0 0 24 24"><path d="M5 5h14v2h-6v12h-2V7H5V5Z"/></svg>',
@@ -64,6 +65,9 @@ export interface DocumentBlockMenuGroup {
 }
 
 export interface DocumentBlockMenuOptions {
+  groups?: DocumentBlockMenuGroup[];
+  label?: string;
+  onSelect?: (item: DocumentBlockMenuItem) => void;
   actions: CrepeProjectActions;
   referenceCandidates?: ConfigReferenceCandidate[];
   enableUploads?: boolean;
@@ -118,21 +122,20 @@ export function buildDocumentBlockMenuGroups(
   options: DocumentBlockMenuOptions,
   filter = "",
 ): DocumentBlockMenuGroup[] {
-  const headingItems: DocumentBlockMenuItem[] = Array.from(
-    { length: 6 },
-    (_, index) => {
-      const level = index + 1;
-      return {
-        key: `h${level}`,
-        label: `H${level}`,
-        icon: ICONS.heading,
-        run: (currentCtx: Ctx) => {
-          clearCurrentBlock(currentCtx);
-          setBlock(currentCtx, headingSchema.type(currentCtx), { level });
-        },
-      };
-    },
-  );
+  const headingItems: DocumentBlockMenuItem[] = HEADING_STYLE_OPTIONS.filter(
+    (option) => option.level !== null,
+  ).map((option) => {
+    const level = option.level!;
+    return {
+      key: `h${level}`,
+      label: `H${level}`,
+      icon: ICONS.heading,
+      run: (currentCtx: Ctx) => {
+        clearCurrentBlock(currentCtx);
+        setBlock(currentCtx, headingSchema.type(currentCtx), { level });
+      },
+    };
+  });
 
   const textItems: DocumentBlockMenuItem[] = [
     {
@@ -318,6 +321,31 @@ function createIcon(ownerDocument: Document, icon: string): HTMLSpanElement {
 
 let nextDocumentBlockMenuId = 0;
 
+/** Build the final node before dispatch; opening the picker never needs a draft paragraph. */
+export function createDocumentBlockNode(ctx: Ctx, key: string): Node | null {
+  const paragraph = () => paragraphSchema.type(ctx).create();
+  if (key === "text") return paragraph();
+  const heading = HEADING_STYLE_OPTIONS.find(
+    (option) => `h${option.level}` === key,
+  );
+  if (heading) return headingSchema.type(ctx).create({ level: heading.level });
+  if (key === "quote")
+    return blockquoteSchema.type(ctx).create(null, paragraph());
+  if (key === "divider") return hrSchema.type(ctx).create();
+  if (key === "image") return imageBlockSchema.type(ctx).createAndFill();
+  if (key === "code") return codeBlockSchema.type(ctx).create();
+  if (key === "table") return createTable(ctx, 3, 3);
+  if (["bullet-list", "ordered-list", "task-list"].includes(key)) {
+    const item = listItemSchema
+      .type(ctx)
+      .create(key === "task-list" ? { checked: false } : null, paragraph());
+    return (key === "ordered-list" ? orderedListSchema : bulletListSchema)
+      .type(ctx)
+      .create(null, item);
+  }
+  return null;
+}
+
 export class DocumentBlockMenu {
   readonly element: HTMLDivElement;
   readonly #ctx: Ctx;
@@ -344,7 +372,7 @@ export class DocumentBlockMenu {
     this.element = this.#document.createElement("div");
     this.element.className = "milkdown-slash-menu document-block-menu";
     this.element.setAttribute("role", "menu");
-    this.element.setAttribute("aria-label", "插入内容");
+    this.element.setAttribute("aria-label", options.label ?? "插入内容");
     this.element.tabIndex = -1;
     this.element.dataset.show = "false";
     this.element.addEventListener("pointerdown", (event) => {
@@ -383,25 +411,27 @@ export class DocumentBlockMenu {
     }
     if (event.key === "Enter") {
       event.preventDefault();
-      items[this.#selectedIndex]?.run(this.#ctx);
+      const item = items[this.#selectedIndex];
+      if (item) this.runItem(item);
       this.hide();
     }
   };
 
   setFilter(filter: string) {
+    if (filter === this.#filter) return;
     this.#filter = filter;
     this.#selectedGroupIndex = 0;
     this.#selectedIndex = 0;
     this.render();
   }
 
-  setVisible(visible: boolean) {
+  setVisible(visible: boolean, focus = true) {
     this.#visible = visible;
     this.element.dataset.show = String(visible);
     this.element.setAttribute("aria-hidden", String(!visible));
     if (visible) {
       this.renderSelection();
-      this.element.focus({ preventScroll: true });
+      if (focus) this.element.focus({ preventScroll: true });
     }
   }
 
@@ -410,17 +440,25 @@ export class DocumentBlockMenu {
     this.#onHide();
   }
 
+  handleKeyDown(event: KeyboardEvent) {
+    this.#onKeyDown(event);
+    return event.defaultPrevented;
+  }
+
+  private runItem(item: DocumentBlockMenuItem) {
+    if (this.#options.onSelect) this.#options.onSelect(item);
+    else item.run(this.#ctx);
+  }
+
   destroy() {
     this.element.removeEventListener("keydown", this.#onKeyDown);
     this.element.remove();
   }
 
   render() {
-    this.#groups = buildDocumentBlockMenuGroups(
-      this.#ctx,
-      this.#options,
-      this.#filter,
-    );
+    this.#groups =
+      this.#options.groups ??
+      buildDocumentBlockMenuGroups(this.#ctx, this.#options, this.#filter);
     if (this.#groups.length === 0) {
       this.#selectedGroupIndex = 0;
       this.#selectedIndex = 0;
@@ -500,7 +538,7 @@ export class DocumentBlockMenu {
           event.preventDefault();
         });
         button.addEventListener("click", () => {
-          item.run(this.#ctx);
+          this.runItem(item);
           this.hide();
         });
         const listItem = this.#document.createElement("li");

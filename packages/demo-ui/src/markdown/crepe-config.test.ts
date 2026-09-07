@@ -107,9 +107,6 @@ describe("buildCrepeConfig", () => {
         { label: "H1", level: 1 },
         { label: "H2", level: 2 },
         { label: "H3", level: 3 },
-        { label: "H4", level: 4 },
-        { label: "H5", level: 5 },
-        { label: "H6", level: 6 },
       ],
     });
   });

@@ -10,7 +10,11 @@ import { TextSelection } from "@milkdown/kit/prose/state";
 
 import type { ConfigReferenceCandidate } from "../DocumentEditor";
 import type { CrepeProjectActions } from "./crepe-config";
-import { DocumentBlockMenu } from "./document-block-menu";
+import {
+  DocumentBlockMenu,
+  createDocumentBlockNode,
+  type DocumentBlockMenuItem,
+} from "./document-block-menu";
 import { mountDocumentOverlayPositioner } from "./document-overlay-positioning";
 
 const HANDLE_ICON =
@@ -85,7 +89,8 @@ class DocumentBlockEditView implements PluginView {
   readonly #positioner: ReturnType<typeof mountDocumentOverlayPositioner>;
   #programmaticPos: number | null = null;
   #menuAnchorElement: HTMLElement | null = null;
-  #openingFromHandle = false;
+  #anchorDoc: EditorState["doc"] | null = null;
+  #slashDismissed = false;
 
   constructor(ctx: Ctx, view: EditorView, options: DocumentBlockEditOptions) {
     this.#ctx = ctx;
@@ -118,10 +123,16 @@ class DocumentBlockEditView implements PluginView {
         referenceCandidates: options.referenceCandidates,
         enableUploads: options.enableUploads,
         enableProjectReferences: options.enableProjectReferences,
+        onSelect: (item) => this.executeItem(item),
       },
-      () => this.hideMenu(),
+      () => {
+        this.#slashDismissed = true;
+        this.hideMenu();
+        this.#view.focus();
+      },
       ownerDocument,
     );
+    this.#menu.element.classList.add("document-insert-menu");
     options.root.append(this.#menu.element);
 
     this.#positioner = mountDocumentOverlayPositioner({
@@ -135,7 +146,7 @@ class DocumentBlockEditView implements PluginView {
         if (this.#menuAnchorElement?.isConnected) {
           return getFirstLineRect(this.#menuAnchorElement);
         }
-        if (this.#programmaticPos === null) return null;
+        if (this.#menu.element.dataset.show !== "true") return null;
         try {
           return posToDOMRect(
             view,
@@ -154,10 +165,17 @@ class DocumentBlockEditView implements PluginView {
       },
       placements: ["bottom-start", "right-start", "left-start"],
       gap: 8,
+      minimumSize: { width: 160, height: 96 },
     });
 
     handle.addEventListener("click", this.#onHandleClick);
     handle.addEventListener("keydown", this.#onHandleKeyDown);
+    ownerDocument.addEventListener(
+      "pointerdown",
+      this.#onOutsidePointerDown,
+      true,
+    );
+    view.dom.addEventListener("keydown", this.#onEditorKeyDown, true);
     this.#provider.update();
     this.update(view);
   }
@@ -165,6 +183,16 @@ class DocumentBlockEditView implements PluginView {
   #onHandleClick = (event: MouseEvent) => {
     event.preventDefault();
     this.toggleMenu();
+  };
+
+  #onOutsidePointerDown = (event: PointerEvent) => {
+    const target = event.target as Node;
+    if (!this.#content.contains(target) && !this.#menu.element.contains(target))
+      this.hideMenu();
+  };
+
+  #onEditorKeyDown = (event: KeyboardEvent) => {
+    if (this.#menu.handleKeyDown(event)) event.stopPropagation();
   };
 
   #onHandleKeyDown = (event: KeyboardEvent) => {
@@ -205,30 +233,21 @@ class DocumentBlockEditView implements PluginView {
 
   private shouldShowMenu(view: EditorView): boolean {
     if (!view.editable || view.composing) return false;
+    if (this.#programmaticPos !== null) {
+      return (
+        this.#anchorDoc === view.state.doc &&
+        Boolean(this.#menuAnchorElement?.isConnected)
+      );
+    }
     const { selection } = view.state;
     if (isInsideExcludedBlock(selection)) return false;
 
     const currentText = this.getCurrentBlockContent(view);
     if (currentText == null || !isSelectionAtEndOfNode(selection)) return false;
 
-    this.#menu.setFilter(
-      currentText.startsWith("/") ? currentText.slice(1) : currentText,
-    );
-
-    if (this.#programmaticPos !== null) {
-      const maxSize = view.state.doc.nodeSize - 2;
-      const validPos = Math.min(this.#programmaticPos, maxSize);
-      if (
-        view.state.doc.resolve(validPos).node() !==
-        view.state.doc.resolve(selection.from).node()
-      ) {
-        this.#programmaticPos = null;
-        return false;
-      }
-      return true;
-    }
-
     if (currentText.startsWith("/")) {
+      if (this.#slashDismissed) return false;
+      this.#menu.setFilter(currentText.slice(1));
       this.#menuAnchorElement = null;
       return true;
     }
@@ -247,64 +266,69 @@ class DocumentBlockEditView implements PluginView {
   private openMenu() {
     const active = this.#provider.active;
     if (!active) return;
-    if (!this.#view.hasFocus()) this.#view.focus();
-
-    const { state, dispatch } = this.#view;
     this.#menuAnchorElement = active.el;
-    const pos = active.$pos.pos + active.node.nodeSize;
-    let transaction = state.tr.insert(
-      pos,
-      paragraphSchema.type(this.#ctx).create(),
-    );
-    transaction = transaction.setSelection(
-      TextSelection.near(transaction.doc.resolve(pos)),
-    );
-    this.#openingFromHandle = true;
-    try {
-      dispatch(transaction.scrollIntoView());
-    } finally {
-      this.#openingFromHandle = false;
-    }
-    this.#programmaticPos = transaction.selection.from;
+    // Insert next to the top-level block, never a bare heading/table inside
+    // a list container whose schema only accepts list items.
+    this.#programmaticPos =
+      active.$pos.depth > 0
+        ? active.$pos.after(1)
+        : active.$pos.pos + active.node.nodeSize;
+    this.#anchorDoc = this.#view.state.doc;
     this.#provider.hide();
     this.#menu.setFilter("");
     this.#menu.setVisible(true);
     void this.#positioner.refresh();
   }
 
-  private removeEmptyProgrammaticBlock(pos: number | null) {
-    if (pos === null || this.#view.state.selection.from !== pos) return;
-
-    const { state, dispatch } = this.#view;
-    const { $from } = state.selection;
-    if (
-      $from.parent.type !== paragraphSchema.type(this.#ctx) ||
-      $from.parent.content.size !== 0
-    ) {
-      return;
+  private executeItem(item: DocumentBlockMenuItem) {
+    const { state } = this.#view;
+    const position = this.#programmaticPos;
+    if (position !== null && this.#anchorDoc !== state.doc) return;
+    const node = createDocumentBlockNode(this.#ctx, item.key);
+    this.hideMenu();
+    if (node) {
+      const from = position ?? state.selection.$from.before();
+      const to = position ?? state.selection.$from.after();
+      const transaction = state.tr.replaceWith(from, to, node);
+      transaction.setSelection(
+        TextSelection.near(transaction.doc.resolve(from + 1)),
+      );
+      this.#view.dispatch(transaction.scrollIntoView());
+      this.#view.focus();
+    } else {
+      // Host pickers keep their existing callback contract. Only a committed
+      // command creates its insertion paragraph, never opening/cancelling a menu.
+      if (position !== null) {
+        const transaction = state.tr.insert(
+          position,
+          paragraphSchema.type(this.#ctx).create(),
+        );
+        transaction.setSelection(
+          TextSelection.near(transaction.doc.resolve(position + 1)),
+        );
+        this.#view.dispatch(transaction);
+      }
+      this.#view.focus();
+      item.run(this.#ctx);
     }
-
-    const from = $from.before($from.depth);
-    const to = from + $from.parent.nodeSize;
-    if (from < 0 || to > state.doc.content.size) return;
-    dispatch(state.tr.delete(from, to));
   }
 
   private hideMenu() {
-    const programmaticPos = this.#programmaticPos;
+    if (this.#menu.element.dataset.show === "true") this.#slashDismissed = true;
     this.#programmaticPos = null;
+    this.#anchorDoc = null;
     this.#menuAnchorElement = null;
     this.#menu.setVisible(false);
     this.#positioner.hide();
-    this.removeEmptyProgrammaticBlock(programmaticPos);
   }
 
-  update = (view: EditorView) => {
+  update = (view: EditorView, previous?: EditorState) => {
     this.#provider.update();
-    if (this.#openingFromHandle) return;
+    if (previous && previous.doc !== view.state.doc)
+      this.#slashDismissed = false;
     if (this.shouldShowMenu(view)) {
       if (this.#menu.element.dataset.show !== "true") {
-        this.#menu.setVisible(true);
+        this.#menu.setVisible(true, this.#programmaticPos !== null);
       }
       void this.#positioner.refresh();
     } else {
@@ -313,6 +337,12 @@ class DocumentBlockEditView implements PluginView {
   };
 
   destroy = () => {
+    this.#view.dom.ownerDocument.removeEventListener(
+      "pointerdown",
+      this.#onOutsidePointerDown,
+      true,
+    );
+    this.#view.dom.removeEventListener("keydown", this.#onEditorKeyDown, true);
     this.#handle.removeEventListener("click", this.#onHandleClick);
     this.#handle.removeEventListener("keydown", this.#onHandleKeyDown);
     this.#positioner.destroy();
