@@ -69,6 +69,32 @@ describe("DocumentApplicationService", () => {
     }
   });
 
+  it("保留 live Workspace 缺失备份错误及资源诊断详情", async () => {
+    const { dataDir } = makeWorkspace("live");
+    try {
+      const authorityError = Object.assign(
+        new Error("Committed Workspace backup is missing or untrusted"),
+        {
+          code: "WORKSPACE_AUTHORITY_BACKUP_MISSING",
+          details: { path: "knowledge/Rules.md", hash: "missing-hash" },
+        },
+      );
+      const app = new DocumentApplicationService(new WorkspaceDocumentRepository({
+        dataDir,
+        authority: { async commit() { throw authorityError; } },
+      }));
+
+      await expect(app.create({ projectId: "p1", title: "Rules", content: "# Rules", actor, workspaceId: "w1", sessionId: "s1" }))
+        .rejects.toMatchObject({
+          code: "DOCUMENT_AUTHORITY_BACKUP_MISSING",
+          details: { path: "knowledge/Rules.md", hash: "missing-hash" },
+          message: "Committed Workspace backup is missing or untrusted",
+        });
+    } finally {
+      fs.rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
+
   it("fails closed when a live write has no Authority session", async () => {
     const { dataDir } = makeWorkspace("live");
     try {

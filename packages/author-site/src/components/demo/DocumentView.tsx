@@ -77,6 +77,45 @@ function isWithinDropdownMenu(target: EventTarget | null): target is Element {
   return target instanceof Element && Boolean(target.closest('[role="menu"]'));
 }
 
+interface DocumentSaveError extends Error {
+  code?: string;
+  details?: unknown;
+}
+
+interface ApiErrorPayload {
+  code?: unknown;
+  message?: unknown;
+  details?: unknown;
+}
+
+function readApiErrorPayload(value: unknown): ApiErrorPayload {
+  if (!value || typeof value !== "object") return {};
+  const error = (value as { error?: unknown }).error;
+  return error && typeof error === "object" ? error as ApiErrorPayload : {};
+}
+
+function createDocumentSaveError(value: unknown, fallback: string): DocumentSaveError {
+  const payload = readApiErrorPayload(value);
+  const error = new Error(
+    typeof payload.message === "string" && payload.message.trim()
+      ? payload.message
+      : fallback,
+  ) as DocumentSaveError;
+  if (typeof payload.code === "string") error.code = payload.code;
+  if (payload.details !== undefined) error.details = payload.details;
+  return error;
+}
+
+function isWorkspaceBackupMissingError(error: unknown): boolean {
+  return error instanceof Error && (
+    (error as DocumentSaveError).code === "DOCUMENT_AUTHORITY_BACKUP_MISSING" ||
+    (error as DocumentSaveError).code === "WORKSPACE_AUTHORITY_BACKUP_MISSING"
+  );
+}
+
+const WORKSPACE_BACKUP_MISSING_MESSAGE =
+  "工作区备份不完整，自动保存已暂停。请管理员先运行 Workspace Authority preflight；确认保留当前磁盘内容后执行 reconcile-adopt，完成后刷新页面。";
+
 /** 右侧编辑区当前打开的目标：知识库文档 / AI 记忆 / 项目公约 / 页面公约 / 设计规范 */
 type ActiveTarget =
   | { kind: "knowledge"; item: KnowledgeItem }
@@ -172,6 +211,11 @@ export function DocumentView({
   const [content, setContent] = useState("");
   const [contentLoading, setContentLoading] = useState(false);
   const [contentReloadRevision, setContentReloadRevision] = useState(0);
+  const [workspaceSaveBlocked, setWorkspaceSaveBlocked] = useState(false);
+  const workspaceSaveBlockedRef = useRef(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSaveRef = useRef<{ target: ActiveTarget; markdown: string } | null>(null);
+  const saveInFlightRef = useRef<Promise<boolean> | null>(null);
   const [userExpanded, setUserExpanded] = useState(true);
   const [conventionExpanded, setConventionExpanded] = useState(true);
   const [existingConventionPaths, setExistingConventionPaths] = useState<Set<string>>(
@@ -253,6 +297,14 @@ export function DocumentView({
   useEffect(() => {
     contentCacheRef.current.clear();
   }, [documentApiMode, projectId, workingDir, sessionId]);
+
+  useEffect(() => {
+    workspaceSaveBlockedRef.current = false;
+    setWorkspaceSaveBlocked(false);
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = null;
+    pendingSaveRef.current = null;
+  }, [documentApiMode, projectId, sessionId, workspaceId, workingDir]);
 
   const localizeRemoteImage = useMemo(
     () =>
@@ -421,6 +473,14 @@ export function DocumentView({
     }
   }, [activeTarget, userItems, loading]);
 
+  const blockWorkspaceSaves = useCallback(() => {
+    workspaceSaveBlockedRef.current = true;
+    setWorkspaceSaveBlocked(true);
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = null;
+    pendingSaveRef.current = null;
+  }, []);
+
   /** 把指定目标的 markdown 内容写回服务端 */
   const saveTarget = useCallback(
     async (target: ActiveTarget, markdown: string) => {
@@ -444,19 +504,20 @@ export function DocumentView({
             },
           );
           const data = await res.json();
-          if (data.success) {
+          if (res.ok && data.success) {
             const updated = documentApiMode === "project"
               ? toKnowledgeItem(data.data.snapshot)
               : data.data as KnowledgeItem;
-            const nextItems = items.some((item) => item.id === updated.id)
-              ? items.map((item) => (item.id === updated.id ? updated : item))
-              : [...items, updated];
+            const currentItems = itemsRef.current;
+            const nextItems = currentItems.some((item) => item.id === updated.id)
+              ? currentItems.map((item) => (item.id === updated.id ? updated : item))
+              : [...currentItems, updated];
             setItems(nextItems);
             onItemsChangeRef.current?.(nextItems);
             window.dispatchEvent(new Event("knowledge-updated"));
             return true;
           }
-          throw new Error(data.error?.message || "保存失败");
+          throw createDocumentSaveError(data, "保存失败");
         } else {
           if (!sessionId) return false;
           const filePath = resolveWorkspaceFilePath(target);
@@ -470,18 +531,30 @@ export function DocumentView({
             },
           );
           const data = await res.json();
-          if (!data.success) {
-            throw new Error(data.error?.message || "保存失败");
+          if (!res.ok || !data.success) {
+            throw createDocumentSaveError(data, "保存失败");
           }
           return true;
         }
       } catch (err) {
+        if (isWorkspaceBackupMissingError(err)) {
+          const alreadyBlocked = workspaceSaveBlockedRef.current;
+          blockWorkspaceSaves();
+          if (!alreadyBlocked) {
+            toast({
+              title: "保存失败：工作区备份不完整",
+              description: WORKSPACE_BACKUP_MISSING_MESSAGE,
+              variant: "destructive",
+            });
+          }
+          return false;
+        }
         const message = err instanceof Error ? err.message : "保存失败";
         toast({ title: message, variant: "destructive" });
         return false;
       }
     },
-    [documentApiMode, workingDir, projectId, sessionId, toast, items, canManageGovernance],
+    [blockWorkspaceSaves, documentApiMode, workingDir, projectId, sessionId, toast, canManageGovernance],
   );
 
   const openOrCreateConvention = useCallback(
@@ -543,15 +616,11 @@ export function DocumentView({
   // ── 自动保存：在内容变化路径上防抖，切换目标/卸载时冲刷 ──────────────
   // 在 markdownUpdated 触发 onChange 时捕获目标与内容，调度一次 800ms 防抖写回，
   // 避免绕回 React state 用 effect 监听 content 造成的额外渲染与丢失。
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingSaveRef = useRef<{ target: ActiveTarget; markdown: string } | null>(
-    null,
-  );
-  const saveInFlightRef = useRef<Promise<boolean> | null>(null);
   const saveTargetRef = useRef(saveTarget);
   saveTargetRef.current = saveTarget;
 
   const persistPendingSave = useCallback((pending: { target: ActiveTarget; markdown: string }) => {
+    if (workspaceSaveBlockedRef.current) return Promise.resolve(false);
     const promise = saveTargetRef.current(pending.target, pending.markdown);
     saveInFlightRef.current = promise;
     return promise;
@@ -561,6 +630,10 @@ export function DocumentView({
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
+    }
+    if (workspaceSaveBlockedRef.current) {
+      pendingSaveRef.current = null;
+      return false;
     }
     const pending = pendingSaveRef.current;
     pendingSaveRef.current = null;
@@ -577,12 +650,17 @@ export function DocumentView({
     if ((target.kind === "convention" || target.kind === "pageConvention") && !canManageGovernance) {
       return;
     }
+    if (workspaceSaveBlockedRef.current) return;
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
     }
     pendingSaveRef.current = { target, markdown };
     saveTimerRef.current = setTimeout(() => {
       saveTimerRef.current = null;
+      if (workspaceSaveBlockedRef.current) {
+        pendingSaveRef.current = null;
+        return;
+      }
       const pending = pendingSaveRef.current;
       pendingSaveRef.current = null;
       if (pending) {
@@ -711,7 +789,7 @@ export function DocumentView({
         return null;
       }
     },
-    [documentApiMode, items, projectId, sessionId, toast, workingDir],
+    [documentApiMode, projectId, sessionId, toast, workingDir],
   );
 
   const handleCreate = useCallback(async () => {
@@ -1368,6 +1446,15 @@ export function DocumentView({
 
       {/* 文档编辑区 */}
       <div ref={referenceEditorContainerRef} className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+        {workspaceSaveBlocked && (
+          <div
+            role="alert"
+            data-testid="workspace-save-blocked"
+            className="shrink-0 border-b border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+          >
+            {WORKSPACE_BACKUP_MISSING_MESSAGE}
+          </div>
+        )}
         {proposalId && !proposalReviewOpen && (
           <div className="flex items-center justify-between border-b bg-violet-500/5 px-3 py-2 text-xs">
             <span className="text-muted-foreground">有一项 AI 文档修改待审核</span>

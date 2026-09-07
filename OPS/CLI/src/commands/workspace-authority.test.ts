@@ -88,6 +88,35 @@ test("workspaceAuthorityStatus JSON 输出 ready 状态和 warnings", async () =
   }
 });
 
+test("workspaceAuthorityStatus 明确提示缺失备份漂移只能显式 adopt", async () => {
+  const originalFetch = global.fetch;
+  global.fetch = (async () => new Response(JSON.stringify({
+    success: true,
+    data: healthResponse({
+      ready: false,
+      actualRootHash: "root-drift",
+      externalDrift: true,
+      missingBackupCount: 2,
+    }),
+  }), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+
+  try {
+    const output = await captureConsole(() => workspaceAuthorityStatus(
+      "http://agent.test",
+      { projectId: "project-1", workspaceId: "live-1", sessionId: "session-1" },
+      true,
+    ));
+    const parsed = JSON.parse(output.join("\n")) as { warnings: string[] };
+    assert.deepEqual(parsed.warnings, [
+      "external drift detected",
+      "external drift with missing committed backups: restore is blocked; explicit reconcile-adopt is required to establish a new baseline",
+      "committed backups are incomplete",
+    ]);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test("workspaceAuthorityBootstrap 默认 dry-run 不创建 state", async () => {
   const originalFetch = global.fetch;
   const calls: string[] = [];

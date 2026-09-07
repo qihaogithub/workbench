@@ -44,6 +44,7 @@ TopBar 需要相对 `.milkdown` 正文滚动容器吸顶。容器变窄时，超
 
 - 组件创建时初始化 Crepe，并注册 Markdown 更新监听。
 - `readOnly` 通过 Crepe 能力动态切换，不因状态切换重建实例。
+- Crepe 完成异步创建并进入 `Created` 状态前，不执行依赖 `editorViewCtx` 的编辑器 action；初始化期间到达的受控内容更新会等待当前实例就绪后再同步，避免上下文尚未注入时读取编辑器状态。
 - 组件卸载时销毁实例和监听，避免编辑状态与 DOM 引用泄漏。
 - 自动聚焦必须在异步创建完成后确认实例仍是当前实例，再通过该实例的 `editorViewCtx` 聚焦。StrictMode 重挂载期间旧实例可能仍在异步销毁，同一宿主内短暂存在多个正文节点；不能查询宿主内第一个 `.ProseMirror` 来决定聚焦对象，否则旧节点销毁会使新编辑器丢失焦点。
 - `@milkdown/crepe` 与 `@milkdown/kit` 是生产依赖；React 由宿主提供。

@@ -95,6 +95,23 @@ describe("DocumentEditor（Milkdown 集成）", () => {
     expect(document.body.textContent).not.toContain("初始标题");
   });
 
+  it("编辑器尚未完成初始化时也能安全同步外部 value", async () => {
+    const { rerender } = render(
+      <DocumentEditor value="初始内容" onChange={() => {}} />,
+    );
+
+    // The first render starts Crepe asynchronously. Updating the controlled
+    // value before that promise settles must wait for the ready editor rather
+    // than calling an action against a context without editorViewCtx.
+    rerender(<DocumentEditor value="更新内容" onChange={() => {}} />);
+
+    await waitFor(() => {
+      expect(document.querySelector(".ProseMirror")?.textContent).toContain(
+        "更新内容",
+      );
+    });
+  });
+
   it("结构性外部更新不会构造非法开放 Slice", async () => {
     const { rerender } = render(
       <DocumentEditor value={"第一段\n\n第二段"} onChange={() => {}} />,

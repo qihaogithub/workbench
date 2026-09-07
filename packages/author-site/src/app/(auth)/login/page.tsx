@@ -11,8 +11,10 @@ import { getSafeRedirectPath } from "@/lib/auth/redirect";
 
 interface DingtalkLoginConfig {
   enabled: boolean;
+  browserOAuthEnabled: boolean;
   corpId?: string;
   authUrl?: string;
+  redirectUri?: string;
   message?: string;
 }
 
@@ -66,7 +68,9 @@ export default function LoginPage() {
         }
       })
       .catch(() => {
-        if (!cancelled) setDingtalkConfig({ enabled: false });
+        if (!cancelled) {
+          setDingtalkConfig({ enabled: false, browserOAuthEnabled: false });
+        }
       });
     return () => {
       cancelled = true;
@@ -82,6 +86,16 @@ export default function LoginPage() {
     // Run once for an auth-code callback URL.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const dingtalkError = searchParams.get("dingtalkError");
+    if (!dingtalkError) return;
+    toast({
+      title: "钉钉登录失败",
+      description: dingtalkError,
+      variant: "destructive",
+    });
+  }, [searchParams, toast]);
 
   const handleLogin = async (username: string, password: string) => {
     setLoading(true);
@@ -162,14 +176,21 @@ export default function LoginPage() {
       return;
     }
 
+    if (dingtalkConfig.browserOAuthEnabled) {
+      const startUrl = `/api/auth/dingtalk/start?redirect=${encodeURIComponent(redirect)}`;
+      window.location.assign(startUrl);
+      return;
+    }
+
     if (dingtalkConfig.authUrl) {
-      window.location.href = dingtalkConfig.authUrl;
+      window.location.assign(dingtalkConfig.authUrl);
       return;
     }
 
     toast({
       title: "无法拉起钉钉登录",
-      description: "请在钉钉工作台内打开，或配置 DINGTALK_LOGIN_AUTH_URL",
+      description:
+        "请配置 DINGTALK_LOGIN_REDIRECT_URI，或在钉钉工作台内打开应用",
       variant: "destructive",
     });
   };

@@ -1,0 +1,4 @@
+interface:
+  display_name: "钉钉登录集成"
+  short_description: "钉钉 OAuth 登录、账号同步、部署配置与排错手册"
+  default_prompt: "使用 $dingtalk-login-integration 梳理或实现钉钉登录、回调、账号同步与部署配置。"

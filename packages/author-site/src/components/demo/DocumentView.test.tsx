@@ -272,6 +272,97 @@ describe("DocumentView knowledge creation", () => {
     expect(calls.some((url) => url.startsWith("/api/knowledge"))).toBe(false);
   });
 
+  it("暂停备份不完整工作区的自动保存并保留本地编辑内容", async () => {
+    jest.useFakeTimers();
+    global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/projects/project-1/documents?sessionId=session-1") {
+        return jsonResponse({
+          success: true,
+          data: [{
+            projectId: "project-1",
+            documentId: "doc-1",
+            title: "项目规范",
+            description: "项目规范",
+            source: "user",
+            updatedAt: "2026-09-01T00:00:00.000Z",
+            contentHash: "hash",
+            sizeBytes: 12,
+          }],
+        });
+      }
+      if (url === "/api/projects/project-1/documents/doc-1?sessionId=session-1") {
+        if (init?.method === "PATCH") {
+          return jsonResponse({
+            success: false,
+            error: {
+              code: "DOCUMENT_AUTHORITY_BACKUP_MISSING",
+              message: "Committed Workspace backup is missing or untrusted",
+              details: { path: "knowledge/project.md", hash: "missing-hash" },
+            },
+          }, false);
+        }
+        return jsonResponse({
+          success: true,
+          data: {
+            projectId: "project-1",
+            documentId: "doc-1",
+            title: "项目规范",
+            description: "项目规范",
+            source: "user",
+            updatedAt: "2026-09-01T00:00:00.000Z",
+            contentHash: "hash",
+            sizeBytes: 12,
+            content: "# 项目规范",
+          },
+        });
+      }
+      if (url.startsWith("/api/design-specs") || url.includes("workspace/files?include=conventions")) {
+        return jsonResponse({ success: true, data: [] });
+      }
+      return jsonResponse({ success: false }, false);
+    }) as jest.Mock;
+
+    render(
+      <DocumentView
+        workingDir="/workspace"
+        projectId="project-1"
+        sessionId="session-1"
+        documentApiMode="project"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("document-editor")).toHaveTextContent("# 项目规范");
+    });
+    fireEvent.click(screen.getByTestId("document-editor-edit"));
+    act(() => {
+      jest.advanceTimersByTime(800);
+    });
+
+    expect(await screen.findByTestId("workspace-save-blocked")).toHaveTextContent(
+      "自动保存已暂停",
+    );
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({
+      title: "保存失败：工作区备份不完整",
+      variant: "destructive",
+    }));
+    expect(screen.getByTestId("document-editor-value")).toHaveTextContent("# 项目规范!");
+
+    fireEvent.click(screen.getByTestId("document-editor-edit"));
+    act(() => {
+      jest.advanceTimersByTime(800);
+    });
+    await waitFor(() => {
+      const patchCalls = (global.fetch as jest.Mock).mock.calls.filter(
+        ([input, request]) => String(input).includes("/documents/doc-1?") && request?.method === "PATCH",
+      );
+      expect(patchCalls).toHaveLength(1);
+    });
+    expect(toast).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("document-editor-value")).toHaveTextContent("# 项目规范!!");
+  });
+
   it("creates an unnamed document, opens it, and commits an inline rename", async () => {
     const user = userEvent.setup();
     render(

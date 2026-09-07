@@ -68,6 +68,7 @@ async function requestAuthorityJson<T>(
         : fallbackCode,
       body.error?.message ?? `Workspace Authority 响应 ${response.status}`,
       response.status || 502,
+      body.error?.details,
     );
   }
   return body.data;
@@ -237,6 +238,7 @@ async function executeMutation(
           : "WORKSPACE_MUTATION_FAILED",
         body.error?.message ?? `Workspace Authority 响应 ${response.status}`,
         response.status || 502,
+        body.error?.details,
       );
     }
     return body.data;
@@ -318,6 +320,7 @@ export async function getWorkspaceAuthoritySnapshot(input: {
         : "WORKSPACE_MUTATION_FAILED",
       body.error?.message ?? `Workspace Authority 响应 ${response.status}`,
       response.status || 502,
+      body.error?.details,
     );
   }
   return body.data;
@@ -355,6 +358,7 @@ export async function stageWorkspaceBinary(input: {
         : "WORKSPACE_MUTATION_FAILED",
       body.error?.message ?? `Workspace Authority 响应 ${response.status}`,
       response.status || 502,
+      body.error?.details,
     );
   }
   return body.data;

@@ -250,7 +250,20 @@ export class WorkspaceDocumentRepository implements DocumentRepositoryPort {
         return await this.authority.commit({ projectId, workspaceId: input.workspaceId, sessionId: input.sessionId, baseRevision: input.baseRevision ?? 0, reason, operations });
       } catch (error) {
         const code = typeof error === "object" && error !== null && "code" in error ? String((error as { code?: unknown }).code) : "";
-        throw new DocumentApplicationError({ code: code === "WORKSPACE_RESOURCE_CONFLICT" || code === "WORKSPACE_EXTERNAL_DRIFT" ? "DOCUMENT_AUTHORITY_CONFLICT" : "DOCUMENT_AUTHORITY_NOT_READY", message: error instanceof Error ? error.message : "Workspace Authority 写入失败", recoverable: code === "WORKSPACE_RESOURCE_CONFLICT" || code === "WORKSPACE_EXTERNAL_DRIFT" });
+        const documentCode = code === "WORKSPACE_RESOURCE_CONFLICT" || code === "WORKSPACE_EXTERNAL_DRIFT"
+          ? "DOCUMENT_AUTHORITY_CONFLICT"
+          : code === "WORKSPACE_AUTHORITY_BACKUP_MISSING"
+            ? "DOCUMENT_AUTHORITY_BACKUP_MISSING"
+            : "DOCUMENT_AUTHORITY_NOT_READY";
+        const details = typeof error === "object" && error !== null && "details" in error
+          ? (error as { details?: unknown }).details
+          : undefined;
+        throw new DocumentApplicationError({
+          code: documentCode,
+          message: error instanceof Error ? error.message : "Workspace Authority 写入失败",
+          ...(details === undefined ? {} : { details }),
+          recoverable: code === "WORKSPACE_RESOURCE_CONFLICT" || code === "WORKSPACE_EXTERNAL_DRIFT",
+        });
       }
     }
     fs.mkdirSync(path.join(workspacePath, "knowledge"), { recursive: true });

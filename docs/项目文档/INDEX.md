@@ -4,7 +4,7 @@
 
 2026-09-06：配置面板的 `visibleWhen` 现已覆盖顶层、对象数组、`oneOf` 变体与详情 Sheet，并按当前对象兄弟字段独立求值；Agent Schema 校验同步递归检查条件引用，并明确只验证契约、不代表运行中的 UI 已验收；共享 UI 页面仍加载旧逻辑时使用现有 `dev` / `dev:repair` 恢复，不修改业务 Schema 绕过开发缓存。live Workspace Bash 会返回具体拒绝原因和单命令替代。AI 对话执行链路同时保留选区源码定位、Authority 提交/运行时校验/预览未验证状态、晚到 projection ack 和 finish 阶段指标。
 
-Markdown 编辑器的 StrictMode 当前实例聚焦约束与真实编辑器回归要求见 [Markdown 文档与编辑器](./共享能力/Markdown文档/INDEX.md)。
+Markdown 编辑器的异步就绪门控、StrictMode 当前实例聚焦约束与真实编辑器回归要求见 [Markdown 文档与编辑器](./共享能力/Markdown文档/INDEX.md)。
 
 ## 创作端
 
