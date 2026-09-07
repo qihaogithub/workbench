@@ -78,6 +78,88 @@ function open() {
 }
 
 describe("shared editor block menu transactions", () => {
+  it.each(["selection", "topbar"])(
+    "%s heading picker converts lists atomically and undoes in one step",
+    async (variant) => {
+      render(
+        <DocumentEditor
+          value={"1. 前\n2. **目标**\n3. 后"}
+          onChange={() => {}}
+        />,
+      );
+      const view = await ready();
+      let pos = 0;
+      view.state.doc.descendants((node, start) => {
+        if (node.isTextblock && node.textContent === "目标") pos = start;
+      });
+      view.focus();
+      view.dispatch(
+        view.state.tr.setSelection(
+          TextSelection.create(view.state.doc, pos + 1, pos + 3),
+        ),
+      );
+      const before = view.state.doc;
+      const depth = undoDepth(view.state);
+      const trigger =
+        variant === "selection"
+          ? document.querySelector<HTMLElement>(
+              ".document-selection-toolbar-heading",
+            )!
+          : document
+              .querySelector("[data-document-heading-trigger]")!
+              .closest("button")!;
+      fireEvent.click(trigger);
+      const menu = document.querySelector<HTMLElement>(
+        `.document-${variant}-heading-menu`,
+      )!;
+      expect(menu.dataset.show).toBe("true");
+      expect(menu.querySelector("select")).toBeNull();
+      expect(menu.querySelector('[data-menu-key="h4"]')).toBeNull();
+      expect(menu.textContent).toContain("将所选列表项转换为标题");
+      fireEvent.click(menu.querySelector('[data-menu-key="h2"]')!);
+      expect(view.state.doc.child(1).type.name).toBe("heading");
+      expect(view.state.doc.child(1).attrs.level).toBe(2);
+      expect(view.state.doc.child(2).attrs.order).toBe(3);
+      expect(
+        view.state.doc.textBetween(
+          view.state.selection.from,
+          view.state.selection.to,
+        ),
+      ).toBe("目标");
+      expect(undoDepth(view.state)).toBe(depth + 1);
+      undo(view.state, view.dispatch);
+      expect(view.state.doc.eq(before)).toBe(true);
+    },
+  );
+
+  it("Escape closes the heading submenu first and a stale target cannot write", async () => {
+    render(<DocumentEditor value="原文" onChange={() => {}} />);
+    const view = await ready();
+    view.focus();
+    view.dispatch(
+      view.state.tr.setSelection(TextSelection.create(view.state.doc, 1, 3)),
+    );
+    const toolbar = document.querySelector<HTMLElement>(
+      ".document-selection-toolbar",
+    )!;
+    const trigger = toolbar.querySelector(
+      "button.document-selection-toolbar-heading",
+    )!;
+    fireEvent.click(trigger);
+    const menu = document.querySelector<HTMLElement>(
+      ".document-selection-heading-menu",
+    )!;
+    fireEvent.keyDown(menu, { key: "Escape" });
+    expect(menu.dataset.show).toBe("false");
+    expect(toolbar.dataset.show).toBe("true");
+    fireEvent.click(trigger);
+    const staleOption = menu.querySelector('[data-menu-key="h1"]')!;
+    view.dispatch(view.state.tr.insertText("新", 1));
+    const afterUpdate = view.state.doc;
+    fireEvent.click(staleOption);
+    expect(view.state.doc).toBe(afterUpdate);
+    expect(menu.dataset.show).toBe("false");
+  });
   it("selection formatting preserves its target, Escape stays dismissed, and a new selection reopens", async () => {
     render(<DocumentEditor value="原文内容" onChange={() => {}} />);
     const view = await ready();

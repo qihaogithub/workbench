@@ -580,6 +580,39 @@
   background: var(--crepe-color-hover);
 }
 
+.document-editor-crepe .document-heading-menu {
+  width: 216px;
+  max-height: min(280px, var(--document-overlay-max-height, 280px));
+}
+
+.document-editor-crepe .document-heading-menu .document-block-menu-item {
+  min-height: 34px;
+  height: 34px;
+}
+
+.document-heading-menu-check {
+  margin-left: auto;
+}
+
+.document-heading-menu-hint {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 8px 12px;
+  border-top: 1px solid var(--crepe-color-surface-low);
+  color: var(--crepe-color-on-surface-variant);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.document-heading-menu .document-block-menu-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.document-heading-menu .document-block-menu-item[aria-checked="true"] {
+  background: var(--crepe-color-selected);
+}
+
 .document-editor-crepe .document-selection-toolbar-item {
   display: inline-flex;
   width: 32px;

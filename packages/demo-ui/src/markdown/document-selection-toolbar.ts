@@ -6,12 +6,9 @@ import type { EditorView } from "@milkdown/kit/prose/view";
 import { commandsCtx } from "@milkdown/kit/core";
 import {
   emphasisSchema,
-  headingSchema,
   inlineCodeSchema,
   isMarkSelectedCommand,
   linkSchema,
-  paragraphSchema,
-  setBlockTypeCommand,
   strongSchema,
   toggleEmphasisCommand,
   toggleInlineCodeCommand,
@@ -31,10 +28,8 @@ import {
 } from "@milkdown/kit/prose/state";
 import { $prose } from "@milkdown/kit/utils";
 
-import {
-  getHeadingStyleLabel,
-  HEADING_STYLE_OPTIONS,
-} from "./heading-style-toolbar";
+import { getHeadingSelection } from "./document-heading-command";
+import { DocumentHeadingPicker } from "./document-heading-picker";
 import { mountDocumentOverlayPositioner } from "./document-overlay-positioning";
 
 const ICONS = {
@@ -75,13 +70,6 @@ function isSelectionVisible(view: EditorView, content: HTMLElement): boolean {
   const activeElement = (view.dom.getRootNode() as ShadowRoot | Document)
     .activeElement;
   return view.hasFocus() || content.contains(activeElement);
-}
-
-function getCurrentHeadingLevel(ctx: Ctx, view: EditorView): number | null {
-  const parent = view.state.selection.$from.parent;
-  const heading = headingSchema.type(ctx);
-  if (parent.type !== heading) return null;
-  return Number(parent.attrs.level);
 }
 
 function createIcon(ownerDocument: Document, icon: string): HTMLSpanElement {
@@ -151,37 +139,6 @@ function createActionGroups(): ToolbarAction[][] {
   ];
 }
 
-function createHeadingSelector(
-  ctx: Ctx,
-  view: EditorView,
-  ownerDocument: Document,
-  onUpdate: () => void,
-): HTMLSelectElement {
-  const select = ownerDocument.createElement("select");
-  select.className = "document-selection-toolbar-heading";
-  select.setAttribute("aria-label", "标题样式");
-  select.dataset.headingStyle = "";
-  HEADING_STYLE_OPTIONS.forEach((option) => {
-    const item = ownerDocument.createElement("option");
-    item.value = option.level === null ? "paragraph" : String(option.level);
-    item.textContent = option.label;
-    select.append(item);
-  });
-  select.addEventListener("change", () => {
-    const raw = select.value;
-    const level = raw === "paragraph" ? null : Number(raw);
-    const nodeType =
-      level === null ? paragraphSchema.type(ctx) : headingSchema.type(ctx);
-    ctx.get(commandsCtx).call(setBlockTypeCommand.key, {
-      nodeType,
-      ...(level === null ? {} : { attrs: { level } }),
-    });
-    view.focus();
-    onUpdate();
-  });
-  return select;
-}
-
 class DocumentSelectionToolbarView implements PluginView {
   readonly #content: HTMLElement;
   #dismissedSelection: EditorView["state"]["selection"] | null = null;
@@ -191,7 +148,8 @@ class DocumentSelectionToolbarView implements PluginView {
   readonly #ctx: Ctx;
   readonly #view: EditorView;
   readonly #actions: ToolbarAction[][];
-  readonly #headingSelector: HTMLSelectElement;
+  readonly #headingSelector: HTMLButtonElement;
+  readonly #headingPicker: DocumentHeadingPicker;
   readonly #onCommentSelection?: (view: EditorView) => void;
 
   constructor(
@@ -214,11 +172,22 @@ class DocumentSelectionToolbarView implements PluginView {
 
     content.dataset.show = "false";
     content.dataset.safe = "false";
-    this.#headingSelector = createHeadingSelector(
-      ctx,
-      view,
-      ownerDocument,
-      () => this.update(view),
+    this.#headingSelector = ownerDocument.createElement("button");
+    this.#headingSelector.type = "button";
+    this.#headingSelector.className = "document-selection-toolbar-heading";
+    this.#headingSelector.setAttribute("aria-label", "标题样式");
+    this.#headingSelector.setAttribute("aria-haspopup", "menu");
+    this.#headingSelector.setAttribute("aria-expanded", "false");
+    this.#headingSelector.addEventListener("pointerdown", (event) =>
+      event.preventDefault(),
+    );
+    this.#headingPicker = new DocumentHeadingPicker(ctx, view, {
+      root: options.root,
+      variant: "selection",
+      onClose: this.#onSelectionEvent,
+    });
+    this.#headingSelector.addEventListener("click", () =>
+      this.#headingPicker.toggle(this.#headingSelector),
     );
     content.append(this.#headingSelector);
     const more = ownerDocument.createElement("details");
@@ -330,7 +299,12 @@ class DocumentSelectionToolbarView implements PluginView {
   #shouldShow = () =>
     !this.#destroyed &&
     !this.#dismissedSelection?.eq(this.#view.state.selection) &&
-    isSelectionVisible(this.#view, this.#content);
+    (isSelectionVisible(this.#view, this.#content) ||
+      (this.#view.editable &&
+        this.#headingPicker.isOpen &&
+        this.#headingPicker.contains(
+          this.#content.ownerDocument.activeElement,
+        )));
 
   #onSelectionEvent = () => {
     // Focusout and focusin are separate native events. A microtask between
@@ -345,7 +319,10 @@ class DocumentSelectionToolbarView implements PluginView {
 
   #onPointerDown = (event: PointerEvent) => {
     const target = event.target as Node | null;
-    if (target && this.#content.contains(target)) {
+    if (
+      target &&
+      (this.#content.contains(target) || this.#headingPicker.contains(target))
+    ) {
       // Native select/details must receive focus; prevent only formatting
       // button pointerdown (registered on each button above).
       return;
@@ -358,6 +335,7 @@ class DocumentSelectionToolbarView implements PluginView {
   };
 
   #dismiss = () => {
+    this.#headingPicker.close(false);
     this.#dismissedSelection = this.#view.state.selection;
     this.#content.dataset.show = "false";
     this.#content.querySelector("details")?.removeAttribute("open");
@@ -365,6 +343,7 @@ class DocumentSelectionToolbarView implements PluginView {
   };
 
   #onKeyDown = (event: KeyboardEvent) => {
+    if (event.defaultPrevented || this.#headingPicker.isOpen) return;
     if (event.key !== "Escape" || this.#content.dataset.show !== "true") return;
     event.preventDefault();
     event.stopPropagation();
@@ -377,6 +356,7 @@ class DocumentSelectionToolbarView implements PluginView {
 
   update = (view: EditorView) => {
     if (this.#destroyed) return;
+    this.#headingPicker.update();
     const visible = this.#shouldShow();
     this.#content.dataset.show = String(visible);
     if (!visible) {
@@ -385,9 +365,9 @@ class DocumentSelectionToolbarView implements PluginView {
       void this.#positioner.refresh();
     }
 
-    const level = getCurrentHeadingLevel(this.#ctx, view);
-    this.#headingSelector.value = level === null ? "paragraph" : String(level);
-    this.#headingSelector.title = getHeadingStyleLabel(level);
+    const label = getHeadingSelection(view.state).label;
+    this.#headingSelector.textContent = label + " ▾";
+    this.#headingSelector.title = label;
     this.#actions.flat().forEach((action) => {
       const button = this.#content.querySelector<HTMLElement>(
         `[data-toolbar-item="${action.key}"]`,
@@ -418,6 +398,7 @@ class DocumentSelectionToolbarView implements PluginView {
     ownerDocument.removeEventListener("focusin", this.#onSelectionEvent);
     ownerDocument.removeEventListener("focusout", this.#onSelectionEvent);
     ownerDocument.removeEventListener("keydown", this.#onKeyDown, true);
+    this.#headingPicker.destroy();
     this.#positioner.destroy();
     this.#content.remove();
   };

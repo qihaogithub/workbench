@@ -55,6 +55,9 @@ export interface DocumentBlockMenuItem {
   key: string;
   label: string;
   icon: string;
+  disabled?: boolean;
+  checked?: boolean;
+  description?: string;
   run: (ctx: Ctx) => void;
 }
 
@@ -73,6 +76,14 @@ export interface DocumentBlockMenuOptions {
   enableUploads?: boolean;
   enableProjectReferences?: boolean;
 }
+
+type DocumentMenuRenderOptions = Pick<
+  DocumentBlockMenuOptions,
+  "label" | "onSelect"
+> & {
+  groups: DocumentBlockMenuGroup[];
+  description?: () => string;
+};
 
 function runBlockCommand(
   ctx: Ctx,
@@ -350,7 +361,7 @@ export class DocumentBlockMenu {
   readonly element: HTMLDivElement;
   readonly #ctx: Ctx;
   readonly #document: Document;
-  readonly #options: DocumentBlockMenuOptions;
+  readonly #options: DocumentBlockMenuOptions | DocumentMenuRenderOptions;
   readonly #onHide: () => void;
   readonly #menuId = `document-block-menu-${++nextDocumentBlockMenuId}`;
   #groups: DocumentBlockMenuGroup[] = [];
@@ -361,7 +372,7 @@ export class DocumentBlockMenu {
 
   constructor(
     ctx: Ctx,
-    options: DocumentBlockMenuOptions,
+    options: DocumentBlockMenuOptions | DocumentMenuRenderOptions,
     onHide: () => void,
     ownerDocument: Document,
   ) {
@@ -412,6 +423,7 @@ export class DocumentBlockMenu {
     if (event.key === "Enter") {
       event.preventDefault();
       const item = items[this.#selectedIndex];
+      if (item?.disabled) return;
       if (item) this.runItem(item);
       this.hide();
     }
@@ -446,6 +458,7 @@ export class DocumentBlockMenu {
   }
 
   private runItem(item: DocumentBlockMenuItem) {
+    if (item.disabled) return;
     if (this.#options.onSelect) this.#options.onSelect(item);
     else item.run(this.#ctx);
   }
@@ -458,7 +471,9 @@ export class DocumentBlockMenu {
   render() {
     this.#groups =
       this.#options.groups ??
-      buildDocumentBlockMenuGroups(this.#ctx, this.#options, this.#filter);
+      ("actions" in this.#options
+        ? buildDocumentBlockMenuGroups(this.#ctx, this.#options, this.#filter)
+        : []);
     if (this.#groups.length === 0) {
       this.#selectedGroupIndex = 0;
       this.#selectedIndex = 0;
@@ -529,11 +544,25 @@ export class DocumentBlockMenu {
         button.className = "document-block-menu-item";
         button.dataset.index = String(index);
         button.dataset.menuKey = item.key;
-        button.setAttribute("role", "menuitem");
+        button.setAttribute(
+          "role",
+          item.checked === undefined ? "menuitem" : "menuitemradio",
+        );
+        button.disabled = Boolean(item.disabled);
+        if (item.checked !== undefined)
+          button.setAttribute("aria-checked", String(item.checked));
+        if (item.description) button.title = item.description;
         button.append(createIcon(this.#document, item.icon));
         const label = this.#document.createElement("span");
         label.textContent = item.label;
         button.append(label);
+        if (item.checked) {
+          const check = this.#document.createElement("span");
+          check.className = "document-heading-menu-check";
+          check.textContent = "✓";
+          check.setAttribute("aria-hidden", "true");
+          button.append(check);
+        }
         button.addEventListener("pointerdown", (event) => {
           event.preventDefault();
         });
@@ -549,6 +578,13 @@ export class DocumentBlockMenu {
       groups.append(section);
     }
     this.element.append(groups);
+    if ("description" in this.#options && this.#options.description) {
+      const hint = this.#document.createElement("p");
+      hint.className = "document-heading-menu-hint";
+      hint.setAttribute("role", "status");
+      hint.textContent = this.#options.description();
+      this.element.append(hint);
+    }
     this.renderSelection();
   }
 

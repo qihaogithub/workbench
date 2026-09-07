@@ -50,8 +50,15 @@ describe("DocumentEditor（Milkdown 集成）", () => {
       expect(
         document.querySelectorAll("[data-block-handle-trigger]"),
       ).toHaveLength(1);
-      expect(document.querySelectorAll(".document-insert-menu")).toHaveLength(1);
-      expect(document.querySelectorAll(".document-heading-menu")).toHaveLength(1);
+      expect(document.querySelectorAll(".document-insert-menu")).toHaveLength(
+        1,
+      );
+      expect(
+        document.querySelectorAll(".document-topbar-heading-menu"),
+      ).toHaveLength(1);
+      expect(
+        document.querySelectorAll(".document-selection-heading-menu"),
+      ).toHaveLength(1);
     });
     expect(document.querySelector(".operation-item")).toBeNull();
   });
