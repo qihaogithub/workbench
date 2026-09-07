@@ -57,6 +57,7 @@ import type { ConfigDefinitionDraft, ConfigDefinitionKind } from "@workbench/sha
 import { localizeSelectedImageAsset } from "../image-localization";
 import type { VisualConfigMark, VisualDraftActionState } from "../hooks/useVisualEditState";
 import { VisualDraftActionBar } from "./VisualDraftActionBar";
+import { ColorPicker } from "@workbench/color-picker";
 
 interface VisualPropertyPanelProps {
   selectedNode: VisualNodeInfo | null;
@@ -88,7 +89,7 @@ interface VisualPropertyPanelProps {
   ) => void;
   onUpdateConfigMark: (
     markId: string,
-    patch: Partial<Pick<VisualConfigMark, "fieldTitle" | "fieldKey" | "defaultValue" | "category" | "scope" | "accept" | "widthRule" | "heightRule">>,
+    patch: Partial<Pick<VisualConfigMark, "fieldTitle" | "fieldKey" | "defaultValue" | "category" | "scope" | "accept" | "widthRule" | "heightRule" | "colorFormat">>,
   ) => void;
   onRemoveConfigMark: (markId: string) => void;
   onAiInstructionChange: (value: string) => void;
@@ -541,6 +542,7 @@ function configMarkToDraft(mark: VisualConfigMark): ConfigDefinitionDraft {
     title: mark.fieldTitle,
     kind: getConfigDraftKind(mark),
     default: mark.defaultValue,
+    colorFormat: mark.colorFormat,
     group: mark.category || undefined,
     accept: mark.accept,
     widthRule: mark.widthRule,
@@ -915,21 +917,20 @@ export function VisualPropertyPanel({
         previousValue,
       );
     };
+    const pickerValue = isTransparentColor(value) ? null : color.hex;
 
     return (
-      <div className="grid grid-cols-[32px_minmax(0,1fr)_72px] gap-2">
-        <Input
-          type="color"
-          aria-label={`${spec.label}色值`}
-          value={color.hex}
-          className="h-8 cursor-pointer p-1"
-          onChange={(event) => applyColorValue(event.target.value, color.brightness)}
-        />
-        <Input
-          value={color.hexText}
-          aria-label={`${spec.label}Hex`}
-          className="h-8 font-mono text-xs"
-          onChange={(event) => applyColorValue(event.target.value, color.brightness)}
+      <div className="grid grid-cols-[minmax(0,1fr)_72px] items-center gap-2">
+        <ColorPicker
+          format="color"
+          value={pickerValue}
+          label={spec.label}
+          compact
+          className="w-full"
+          onChange={(nextValue) => {
+            if (typeof nextValue === "string") applyColorValue(nextValue, color.brightness);
+            else onPropertyChange(selectedNode, spec.property, spec.label, "transparent", spec.kind, previousValue);
+          }}
         />
         <div className="relative">
           <Input
@@ -1034,14 +1035,19 @@ export function VisualPropertyPanel({
         accept: next.accept,
         widthRule: next.widthRule,
         heightRule: next.heightRule,
+        colorFormat: next.colorFormat,
       });
     };
     const defaultValueEditor = draft && (
       draft.kind === "color" ? (
-        <div className="flex items-center gap-2">
-          <Input aria-label="默认颜色" type="color" className="h-9 w-11 cursor-pointer p-1" value={colorToHex(defaultValueText(draft.default))} onChange={(event) => updateDraft({ ...draft, default: event.target.value })} />
-          <Input aria-label="默认颜色值" className="font-mono text-sm" value={defaultValueText(draft.default)} onChange={(event) => updateDraft({ ...draft, default: event.target.value })} />
-        </div>
+          <ColorPicker
+            format={draft.colorFormat ?? "color"}
+            value={draft.default as string | number | null | undefined}
+            label="默认颜色"
+            presets={draft.colorPresets}
+            onChange={(value) => updateDraft({ ...draft, default: value })}
+            className="w-full"
+          />
       ) : draft.kind === "image" || draft.kind === "images" ? (
         <div className="space-y-2">
           <Input aria-label="上传默认图片" type="file" accept={draft.accept || "image/*"} onChange={async (event) => {
@@ -1069,6 +1075,7 @@ export function VisualPropertyPanel({
       draft={draft}
       onDraftChange={updateDraft}
       defaultValueEditor={defaultValueEditor}
+      allowedColorFormats={draft?.kind === "color" ? ["color", "color-opacity"] : undefined}
       applyPlan={{ kind: "ai_required", description: "保存字段后，此次可视化改动会随现有草稿交给 AI 应用。" }}
       onSave={() => setEditingConfigChangeId(null)}
     /> : null;

@@ -148,6 +148,17 @@ describe("DesignSpecConfigPanel", () => {
     const setPageFilter = jest.fn();
     const setBindFilter = jest.fn();
     const setCategoryFilter = jest.fn();
+    const branch = {
+      id: "page:page-a:modules[type=image]",
+      scope: "page" as const,
+      pageId: "page-a",
+      pageName: "页面 A",
+      key: "modules[type=image]",
+      title: "图片模块",
+      breadcrumbs: ["内容模块", "图片模块"],
+      kind: "text" as const,
+      isBranch: true,
+    };
     const nested = {
       id: "page:page-a:modules[type=image].image",
       scope: "page" as const,
@@ -165,9 +176,9 @@ describe("DesignSpecConfigPanel", () => {
       setPageFilter,
       pages: [{ id: "page-a", name: "页面 A" }],
       filteredPages: [{ id: "page-a", name: "页面 A" }],
-      filteredPool: [nested],
-      pool: [nested],
-      poolGroups: [["页面 A", [nested]]],
+      filteredPool: [branch, nested],
+      pool: [branch, nested],
+      poolGroups: [["页面 A", [branch, nested]]],
       boundPageIds: new Set(),
       boundIds: new Set(),
       search: "",
@@ -194,6 +205,17 @@ describe("DesignSpecConfigPanel", () => {
     expect(
       within(configTree).getByText("图片模块").closest('[role="treeitem"]'),
     ).toHaveAttribute("aria-level", "3");
+    const branchRow = within(configTree)
+      .getByText("图片模块")
+      .closest('[role="treeitem"]');
+    expect(branchRow).toHaveAttribute("draggable", "true");
+    const branchTransfer = { setData: jest.fn(), effectAllowed: "none" };
+    fireEvent.dragStart(branchRow!, { dataTransfer: branchTransfer });
+    expect(branchTransfer.effectAllowed).toBe("copy");
+    expect(branchTransfer.setData).toHaveBeenCalledWith(
+      "text/plain",
+      `pool:${branch.id}`,
+    );
     expect(
       within(configTree).getByText("图片").closest('[role="treeitem"]'),
     ).toHaveAttribute("aria-level", "4");

@@ -72,14 +72,6 @@ export {
 export type { WhiteboardTransactionDelete, WhiteboardTransactionWrite } from "./whiteboard-transaction";
 export type * from "./types";
 export {
-  applyPageDesignSpecSync,
-  buildPageDesignSpecSyncWrites,
-} from "./page-design-spec-sync";
-export type {
-  PageDesignSpecSyncInput,
-  PageDesignSpecSyncWrite,
-} from "./page-design-spec-sync";
-export {
   EntityResolver,
   ResourceDirectory,
   createEntityResolver,

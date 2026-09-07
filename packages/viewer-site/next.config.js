@@ -1,10 +1,23 @@
 /** @type {import('next').NextConfig} */
 const path = require("path");
 
+function getAllowedDevOrigins() {
+  const configured = process.env.NEXT_ALLOWED_DEV_ORIGINS || "";
+  return Array.from(
+    new Set(
+      configured
+        .split(",")
+        .map((origin) => origin.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
 const nextConfig = {
   output: process.env.NODE_ENV === "production" ? "export" : undefined,
   outputFileTracingRoot: path.resolve(__dirname, "../.."),
   trailingSlash: true,
+  allowedDevOrigins: getAllowedDevOrigins(),
   env: {
     NEXT_PUBLIC_PREVIEW_CDN_BASE_URL:
       process.env.CDN_BASE_URL || "https://esm.sh",

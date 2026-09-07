@@ -21,7 +21,7 @@ const mockSchema = JSON.stringify({
       'ui:options': { group: '显示选项' },
     },
     themeColor: {
-      type: 'string',
+      type: ['string', 'null'],
       title: '主题色',
       format: 'color',
       default: '#3b82f6',

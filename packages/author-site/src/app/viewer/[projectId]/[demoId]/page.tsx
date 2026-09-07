@@ -123,6 +123,7 @@ export default function ViewerDemoPage() {
   const [sessionId, setSessionId] = useState<string | undefined>();
   const [visibilityNotice, setVisibilityNotice] = useState<string | null>(null);
   const [visibilitySessionOverrides, setVisibilitySessionOverrides] = useState<Record<string, unknown>>({});
+  const [visibilityRuntimeRole, setVisibilityRuntimeRole] = useState("guest");
 
   const urlConfigDataRef = useRef<Record<string, unknown> | null>(null);
   if (urlConfigDataRef.current === null) {
@@ -143,8 +144,9 @@ export default function ViewerDemoPage() {
       values: visibilitySessionOverrides,
       fieldKeys: Object.keys(visibilitySessionOverrides),
       allowPageTargets: false,
-    });
-  }, [data, visibilitySessionOverrides]);
+    }, { roles: [visibilityRuntimeRole] });
+  }, [data, visibilityRuntimeRole, visibilitySessionOverrides]);
+
   const visiblePages = useMemo(() => {
     if (!data) return [];
     if (!visibilityResolution?.valid) return data.demoPages;
@@ -183,12 +185,21 @@ export default function ViewerDemoPage() {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const res = await fetch(`/api/viewer/${projectId}/data`);
+        const [res, authResult] = await Promise.all([
+          fetch(`/api/viewer/${projectId}/data`),
+          fetch("/api/auth/me", { cache: "no-store" })
+            .then((response) => response.ok ? response.json() : null)
+            .catch(() => null),
+        ]);
         const result = await res.json();
         if (!result.success) {
           setError(result.error?.message || "加载失败");
           return;
         }
+        const runtimeRole = typeof authResult?.data?.role === "string"
+          ? authResult.data.role
+          : "guest";
+        setVisibilityRuntimeRole(runtimeRole);
         setData(result.data);
 
         const pages = result.data.demoPages as ViewerDemoPage[];
@@ -204,20 +215,25 @@ export default function ViewerDemoPage() {
           projectSchema: result.data.projectConfigSchema,
           pageIds: pages.map((item) => item.id),
           regionIds: Object.fromEntries(pages.map((item) => [item.id, item.regionIds ?? []])),
-        });
+        }, undefined, { roles: [runtimeRole] });
         const requestedState = requestedPage && resolution.valid
           ? resolution.pages[requestedPage.id]
           : undefined;
         const requestedAvailable = !requestedState
           || (requestedState.visible !== false && requestedState.enabled !== false);
+        const fallbackPage = requestedState?.fallbackPageId
+          ? pages.find((item) => item.id === requestedState.fallbackPageId
+            && resolution.pages[item.id]?.visible !== false
+            && resolution.pages[item.id]?.enabled !== false)
+          : undefined;
         const page = requestedPage && !requestedAvailable
-          ? pages.find((item) => {
+          ? fallbackPage ?? pages.find((item) => {
               const state = resolution.valid ? resolution.pages[item.id] : undefined;
               return !state || (state.visible !== false && state.enabled !== false);
             })
           : requestedPage;
         if (requestedPage && page?.id !== requestedPage.id) {
-          setVisibilityNotice(`页面「${requestedPage.name}」当前${requestedState?.visible === false ? "不可见" : "不可用"}，已切换到可用页面。`);
+          setVisibilityNotice(requestedState?.message ?? `页面「${requestedPage.name}」当前${requestedState?.visible === false ? "不可见" : "不可用"}，${fallbackPage ? `已按规则切换到备用页面「${fallbackPage.name}」。` : "已切换到可用页面。"}`);
         }
         if (page) {
           setActiveDemoId(page.id);
@@ -351,7 +367,9 @@ export default function ViewerDemoPage() {
       ? visibilityResolution.pages[pageId]
       : undefined;
     if (state?.visible === false || state?.enabled === false) {
-      setVisibilityNotice(`页面「${page.name}」当前${state.visible === false ? "不可见" : "不可用"}。`);
+      setVisibilityNotice(
+        state.message ?? `页面「${page.name}」当前${state.visible === false ? "不可见" : "不可用"}。`,
+      );
       return;
     }
     setActiveDemoId(pageId);
@@ -417,7 +435,20 @@ export default function ViewerDemoPage() {
     );
   }
 
-  const currentPage = visiblePages.find((p) => p.id === activeDemoId) ?? visiblePages[0];
+  const availablePages = visibilityResolution?.valid
+    ? visiblePages.filter((page) => visibilityResolution.pages[page.id]?.enabled !== false)
+    : visiblePages;
+  if (visibilityResolution?.valid && availablePages.length === 0) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background px-6 text-center">
+        <p className="max-w-lg text-muted-foreground">
+          当前配置与身份下没有可用页面，请联系创作者调整页面状态规则。
+        </p>
+      </div>
+    );
+  }
+
+  const currentPage = availablePages.find((p) => p.id === activeDemoId) ?? availablePages[0];
   const currentPageSchema = currentPage?.schema
     ? stripConfigSchemaByType(currentPage.schema, "business")
     : undefined;
@@ -452,6 +483,11 @@ export default function ViewerDemoPage() {
         ? {
             visible: visibilityResolution.pages[currentPage.id].visible,
             enabled: visibilityResolution.pages[currentPage.id].enabled,
+            unavailable: visibilityResolution.pages[currentPage.id].unavailable,
+            message: visibilityResolution.pages[currentPage.id].message,
+            fallbackPageId: visibilityResolution.pages[currentPage.id].fallbackPageId,
+            fallbackMessage: visibilityResolution.pages[currentPage.id].fallbackMessage,
+            alternativeRegion: visibilityResolution.pages[currentPage.id].alternativeRegion,
             reasons: visibilityResolution.pages[currentPage.id].reasons,
           }
         : undefined,

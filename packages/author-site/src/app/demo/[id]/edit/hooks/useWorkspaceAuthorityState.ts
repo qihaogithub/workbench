@@ -73,6 +73,19 @@ export interface UseWorkspaceAuthorityStateReturn extends WorkspaceAuthorityStat
 }
 
 const DEFAULT_POLL_INTERVAL_MS = 2000;
+const WORKSPACE_PROJECTION_ACK_EVENT = "workspace-projection-acknowledged";
+
+function publishWorkspaceProjectionAck(
+  projectId: string,
+  workspaceId: string,
+  sessionId: string,
+  ack: WorkspaceProjectionAck,
+): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(WORKSPACE_PROJECTION_ACK_EVENT, {
+    detail: { projectId, workspaceId, sessionId, ack },
+  }));
+}
 
 export function useWorkspaceAuthorityState(
   options: UseWorkspaceAuthorityStateOptions,
@@ -98,6 +111,8 @@ export function useWorkspaceAuthorityState(
 
   /** 跟踪上次拉取事件时的 revision，用于 gap 检测 */
   const lastPolledRevisionRef = useRef<number>(0);
+  /** 投影 ack 使用独立游标，不能复用 mutation event 的 revision 游标。 */
+  const lastPolledProjectionRevisionRef = useRef<number>(0);
   const mountedRef = useRef(true);
   /** 连续失败计数，避免单次瞬态错误导致离线误报 */
   const consecutiveFailuresRef = useRef(0);
@@ -135,7 +150,7 @@ export function useWorkspaceAuthorityState(
   const pollProjectionAcks = useCallback(async () => {
     if (!authorityReady) return;
     try {
-      const afterRevision = lastPolledRevisionRef.current as WorkspaceRevision;
+      const afterRevision = lastPolledProjectionRevisionRef.current as WorkspaceRevision;
       const acks = await readWorkspaceProjectionAcksFromBrowser({
         projectId,
         workspaceId,
@@ -143,6 +158,14 @@ export function useWorkspaceAuthorityState(
         afterRevision,
       });
       if (!mountedRef.current) return;
+
+      for (const ack of acks) {
+        lastPolledProjectionRevisionRef.current = Math.max(
+          lastPolledProjectionRevisionRef.current,
+          ack.revision,
+        );
+        publishWorkspaceProjectionAck(projectId, workspaceId, sessionId, ack);
+      }
 
       setState((prev) => {
         let next = prev;
@@ -268,6 +291,15 @@ export function useWorkspaceAuthorityState(
         previewStatus: status === "applied" ? "applied" : "failed",
         previewAppliedRevision: revision,
       }));
+      publishWorkspaceProjectionAck(projectId, workspaceId, sessionId, {
+        projectId,
+        workspaceId,
+        revision,
+        clientId: sessionId,
+        surface: "active-preview",
+        status,
+        acknowledgedAt: Date.now(),
+      });
       // 异步发送 ack（不阻塞 UI）
       void acknowledgeWorkspaceProjectionFromBrowser({
         projectId,

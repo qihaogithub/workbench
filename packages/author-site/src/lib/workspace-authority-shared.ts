@@ -69,4 +69,6 @@ export interface WorkspaceAuthorityHealthView {
   activeLease: boolean;
   preparedCount: number;
   recoveryState: "ready" | "pending";
+  backupCount: number;
+  missingBackupCount: number;
 }

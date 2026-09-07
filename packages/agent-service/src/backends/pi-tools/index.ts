@@ -76,12 +76,15 @@ import {
 } from "./whiteboard-tool";
 import {
   createCommitConfigVisibilityDraftTool,
+  createExplainConfigVisibilityTool,
   createInspectConfigVisibilityTool,
+  createMigrateConfigVisibilityTool,
   createPrepareConfigVisibilityDraftTool,
+  createRepairConfigVisibilityTool,
   createValidateConfigVisibilityTool,
 } from "./visibility-tools";
 
-export const WORKBENCH_TOOL_VERSION = 32;
+export const WORKBENCH_TOOL_VERSION = 33;
 
 const SKETCH_SCENE_TOOLS_ENABLED =
   process.env.PI_AGENT_SKETCH_TOOLS_ENABLED === "true";
@@ -102,6 +105,8 @@ export interface WorkbenchToolsOptions {
   /** 图片子 Agent 定向工具集：只包含图像相关工具 */
   imageSubagent?: boolean;
   capabilityActivationHandler?: CapabilityActivationHandler;
+  /** Omit visual screenshot capability when the service/Chromium health check failed. */
+  includeScreenshot?: boolean;
 }
 
 const CONTROL_TOOL_NAMES = new Set([
@@ -113,7 +118,7 @@ const CONTROL_TOOL_NAMES = new Set([
 ]);
 
 const CAPABILITY_TOOL_NAMES: Record<Exclude<CapabilityName, "all">, ReadonlySet<string>> = {
-  workspace: new Set(["readFile", "readUploadedFile", "listFiles", "editFile", "writeFile", "deleteFile", "bash", "schemaValidate", "inspectConfigVisibility", "validateConfigVisibility", "prepareConfigVisibilityDraft", "commitConfigVisibilityDraft", "knowledgeReport", "readKnowledgeSource", "getConsoleLogs", "captureScreenshot", "readWhiteboardContext", "applyWhiteboardActions", "serializeWhiteboardCode", "importWhiteboardCode", "planWhiteboardComposition", "undoWhiteboardEdit"]),
+  workspace: new Set(["readFile", "readUploadedFile", "listFiles", "editFile", "writeFile", "deleteFile", "bash", "schemaValidate", "inspectConfigVisibility", "validateConfigVisibility", "explainConfigVisibility", "repairConfigVisibility", "migrateConfigVisibility", "prepareConfigVisibilityDraft", "commitConfigVisibilityDraft", "knowledgeReport", "readKnowledgeSource", "getConsoleLogs", "captureScreenshot", "readWhiteboardContext", "applyWhiteboardActions", "serializeWhiteboardCode", "importWhiteboardCode", "planWhiteboardComposition", "undoWhiteboardEdit"]),
   pages: new Set(["createPage", "listPages", "arrangeCanvasPages", "previewDeletePages", "executeDeletePagePlan", "deletePage", "deletePages"]),
   comments: new Set(["readComments", "inspectElement", "replyComment", "resolveComment", "submitFeedback"]),
   image: new Set(["saveImage", "listImages", "readUserImage", "captureScreenshot", "delegateTask", "generateWhiteboardAsset"]),
@@ -203,7 +208,7 @@ export function createWorkbenchTools(
     createSchemaValidateTool(config),
     createSaveImageTool(config),
     createGetConsoleLogsTool(config),
-    createCaptureScreenshotTool(config),
+    ...(options.includeScreenshot === false ? [] : [createCaptureScreenshotTool(config)]),
     createListImagesTool(config),
     createReadUserImageTool(),
     createKnowledgeReportTool(config),
@@ -211,6 +216,9 @@ export function createWorkbenchTools(
     createReadPreinstalledSkillTool(),
     createInspectConfigVisibilityTool(config),
     createValidateConfigVisibilityTool(config),
+    createExplainConfigVisibilityTool(config),
+    createRepairConfigVisibilityTool(config),
+    createMigrateConfigVisibilityTool(config),
     createPrepareConfigVisibilityDraftTool(config),
     createCommitConfigVisibilityDraftTool(config),
     createActivateCapabilitiesTool(options.capabilityActivationHandler),

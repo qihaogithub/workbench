@@ -16,6 +16,7 @@ import {
   type HtmlResourceReference,
   type HtmlUnsupportedCapability,
 } from "./html-import-contract.js";
+import { validateWorkspacePathSegment } from "@workbench/shared/workspace-path";
 import {
   applyPagePresentationToSchema,
   recommendHtmlImportPresentation,
@@ -590,15 +591,7 @@ export function stageHtmlImportBranch(
       "HTML_IMPORT_INVALID",
       "workspacePath 必须是存在的目录",
     );
-  if (
-    !input.pageId ||
-    path.isAbsolute(input.pageId) ||
-    input.pageId !== path.basename(input.pageId) ||
-    input.pageId.includes("/") ||
-    input.pageId.includes("\\") ||
-    input.pageId === "." ||
-    input.pageId === ".."
-  )
+  if (!validateWorkspacePathSegment(input.pageId).ok)
     throw new HtmlImportError(
       "HTML_IMPORT_INVALID",
       "pageId 必须是非空单段路径",

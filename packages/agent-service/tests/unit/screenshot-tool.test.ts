@@ -48,10 +48,13 @@ describe('createCaptureScreenshotTool', () => {
     process.env.SCREENSHOT_SERVICE_URL = 'http://shot.local/';
     const png = Buffer.from('png-bytes');
 
-    const fetchMock = vi
-      .fn()
+   const fetchMock = vi
+     .fn()
+     .mockResolvedValueOnce(
+        new Response(JSON.stringify({ capabilities: { screenshot: { available: true } } }), { status: 200 }),
+      )
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({
+       new Response(JSON.stringify({
           success: true,
           data: { url: '/api/screenshots/file/proj_test/demo_test', hash: 'abc', elapsed: 12, cached: false },
         }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
@@ -78,14 +81,40 @@ describe('createCaptureScreenshotTool', () => {
       data: png.toString('base64'),
       mimeType: 'image/png',
     });
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      1,
-      'http://shot.local/api/screenshots/generate',
+   expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+     'http://shot.local/api/screenshots/generate',
       expect.objectContaining({
         method: 'POST',
         body: expect.stringContaining('"fullPage":true'),
       }),
+   );
+ });
+
+  it('截图服务健康检查失败时不发起截图任务', async () => {
+    const workingDir = await createWorkspace();
+    process.env.SCREENSHOT_SERVICE_URL = 'http://shot.local';
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(JSON.stringify({
+        capabilities: { screenshot: { available: false, reason: 'Chromium unavailable' } },
+      }), { status: 200 }),
     );
+    global.fetch = fetchMock;
+
+    const tool = createCaptureScreenshotTool({
+      sessionId: 'session_test',
+      workingDir,
+      demoId: 'demo_test',
+    });
+
+    const result = await tool.execute('tool_call_unhealthy', {});
+
+    expect(result.isError).toBe(true);
+    expect(result.details).toEqual(expect.objectContaining({
+      error: 'screenshot_capability_unavailable',
+      reason: 'Chromium unavailable',
+    }));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('缺少页面代码文件时应返回错误', async () => {

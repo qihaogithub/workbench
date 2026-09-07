@@ -72,6 +72,30 @@ export interface VisibleWhenCondition {
   equals: VisibleWhenValue;
 }
 
+export function buildEffectiveFieldData(
+  fields: FieldConfig[],
+  data: Record<string, unknown>,
+): Record<string, unknown> {
+  const defaults: Record<string, unknown> = {};
+  for (const field of fields) {
+    if (field.default !== undefined) {
+      defaults[field.key] = field.default;
+    }
+  }
+  return { ...defaults, ...data };
+}
+
+export function isFieldVisible(
+  field: FieldConfig,
+  localData: Record<string, unknown>,
+): boolean {
+  if (!field.visibleWhen) return true;
+  return Object.is(
+    localData[field.visibleWhen.field],
+    field.visibleWhen.equals,
+  );
+}
+
 export function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -105,6 +129,14 @@ function constType(value: unknown): string {
   if (value === null) return "null";
   if (Array.isArray(value)) return "array";
   return typeof value;
+}
+
+function schemaType(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    return value.find((item): item is string => typeof item === "string" && item !== "null");
+  }
+  return undefined;
 }
 
 function hasPositionable(prop: Record<string, unknown>): boolean {
@@ -198,7 +230,7 @@ function parseFieldConfig(
     key,
     schemaPath: typeof prop.__schemaPath === "string" ? prop.__schemaPath : undefined,
     title: typeof prop.title === "string" ? prop.title : formatFieldName(key),
-    type: (prop.type as string) || (prop.const !== undefined ? constType(prop.const) : "string"),
+    type: schemaType(prop.type) || (prop.const !== undefined ? constType(prop.const) : "string"),
     isConst: prop.const !== undefined,
     description: prop.description as string | undefined,
     required,
@@ -234,9 +266,7 @@ function parseFieldConfig(
     note: prop.$demo
       ? ((prop.$demo as Record<string, unknown>)?.note as string | undefined)
       : undefined,
-    itemsType: (prop.items as Record<string, unknown>)?.type as
-      | string
-      | undefined,
+    itemsType: schemaType((prop.items as Record<string, unknown>)?.type),
     itemsFormat: (prop.items as Record<string, unknown>)?.format as
       | string
       | undefined,

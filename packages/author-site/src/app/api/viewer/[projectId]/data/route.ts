@@ -16,19 +16,10 @@ import {
 } from "@/lib/fs-utils";
 import { type PreviewSize, extractPreviewSize } from "@/lib/preview-size";
 import { readCanvasStateFromWorkspace } from "@/lib/canvas-layout-file";
-import { parseVisibilityRules } from "@workbench/shared";
+import { extractDeclaredRegionIds, parseVisibilityRules } from "@workbench/shared";
 
 function collectRegionIds(contents: string[]): string[] {
-  const ids = new Set<string>();
-  for (const content of contents) {
-    for (const match of content.matchAll(/data-region-id\s*=\s*["']([A-Za-z0-9_-]{1,100})["']/g)) {
-      if (match[1]) ids.add(match[1]);
-    }
-    for (const match of content.matchAll(/regionId\s*[:=]\s*["']([A-Za-z0-9_-]{1,100})["']/g)) {
-      if (match[1]) ids.add(match[1]);
-    }
-  }
-  return [...ids];
+  return extractDeclaredRegionIds(contents);
 }
 
 export async function GET(
@@ -128,7 +119,7 @@ export async function GET(
 
       return {
         ...page,
-        regionIds: collectRegionIds([code, prototypeHtml ?? "", fs.existsSync(sandboxHtmlPath) ? fs.readFileSync(sandboxHtmlPath, "utf-8") : ""]),
+        regionIds: collectRegionIds([code, prototypeHtml ?? ""]),
         code,
         schema,
         previewSize,

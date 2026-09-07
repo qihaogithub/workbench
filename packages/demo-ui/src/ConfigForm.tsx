@@ -5,35 +5,26 @@ import { Sparkles } from "lucide-react";
 import { cn } from "./utils";
 import type { ConfigBreadcrumb, ConfigChangeMeta, ConfigFormProps, ConfigCommentTarget, ConfigItemCapabilities, ConfigItemDetailHandler } from "./types";
 import type { DesignSpecEntryLink } from "./types";
-import type { FieldConfig, FieldGroup, VisibleWhenCondition } from "./schema-parser";
-import { parseSchemaToFields } from "./schema-parser";
+import type { FieldConfig, FieldGroup } from "./schema-parser";
+import {
+  buildEffectiveFieldData,
+  isFieldVisible,
+  parseSchemaToFields,
+} from "./schema-parser";
 import { getPageTypeLimits } from "./type-limits-store";
 import { FieldRenderer, PositionConfigContext, type PositionConfigContextValue, type PositionFieldEntry } from "./FieldRenderer";
 import { configFieldMatchesCategoryFilter } from "./config-categories";
 import { getPreviewSize } from "./validator";
 import { isAtomicConfigField } from "@workbench/shared";
 
-function isFieldVisible(
-  field: FieldConfig,
-  formData: Record<string, unknown>,
-): boolean {
-  if (!field.visibleWhen) return true;
-  return Object.is(formData[field.visibleWhen.field], field.visibleWhen.equals);
-}
-
 function buildEffectiveFormData(
   fieldGroups: FieldGroup[],
   formData: Record<string, unknown>,
 ): Record<string, unknown> {
-  const defaults: Record<string, unknown> = {};
-  for (const group of fieldGroups) {
-    for (const field of group.fields) {
-      if (field.default !== undefined) {
-        defaults[field.key] = field.default;
-      }
-    }
-  }
-  return { ...defaults, ...formData };
+  return buildEffectiveFieldData(
+    fieldGroups.flatMap((group) => group.fields),
+    formData,
+  );
 }
 
 function areConfigValuesEqual(left: unknown, right: unknown): boolean {
@@ -128,6 +119,7 @@ function FieldGroupSection({
   configItemCapabilities,
   onAddConfigComment,
   hasConfigComment,
+  hideEmptyConfigCommentTag,
   imageConfigScope,
   pageId,
   configContextPageId,
@@ -151,10 +143,11 @@ function FieldGroupSection({
   designSpecEntries?: DesignSpecEntryLink[];
   onEditDesignSpec?: (docId: string, entryId: string) => void;
   onOpenDesignSpec?: (spec: DesignSpecEntryLink, fieldTitle: string, anchor?: { top: number; bottom: number }, trigger?: HTMLElement | null) => void;
-  onEditConfigDefinition?: (fieldKey: string, field: FieldConfig) => void;
+  onEditConfigDefinition?: (fieldKey: string, field: FieldConfig, schemaFieldPath?: string) => void;
   configItemCapabilities?: ConfigItemCapabilities;
   onAddConfigComment?: (target: ConfigCommentTarget, trigger?: HTMLElement | null) => void;
   hasConfigComment?: (target: ConfigCommentTarget) => boolean;
+  hideEmptyConfigCommentTag?: boolean;
   imageConfigScope?: ConfigFormProps["imageConfigScope"];
   pageId?: string;
   configContextPageId?: string;
@@ -188,6 +181,7 @@ function FieldGroupSection({
               configItemCapabilities={configItemCapabilities}
               onAddConfigComment={onAddConfigComment}
               hasConfigComment={hasConfigComment}
+              hideEmptyConfigCommentTag={hideEmptyConfigCommentTag}
               fieldPath={field.key}
               schemaFieldPath={field.schemaPath ?? field.key}
               imageConfigScope={imageConfigScope}
@@ -231,6 +225,7 @@ function FieldGroupSection({
             configItemCapabilities={configItemCapabilities}
             onAddConfigComment={onAddConfigComment}
             hasConfigComment={hasConfigComment}
+            hideEmptyConfigCommentTag={hideEmptyConfigCommentTag}
             fieldPath={field.key}
             schemaFieldPath={field.schemaPath ?? field.key}
             imageConfigScope={imageConfigScope}
@@ -276,6 +271,7 @@ export function ConfigForm({
   configItemCapabilities,
   onAddConfigComment,
   hasConfigComment,
+  hideEmptyConfigCommentTag,
   imageConfigScope,
   pageId,
   configContextPageId,
@@ -490,6 +486,7 @@ export function ConfigForm({
                 configItemCapabilities={configItemCapabilities}
                 onAddConfigComment={onAddConfigComment}
                 hasConfigComment={hasConfigComment}
+                hideEmptyConfigCommentTag={hideEmptyConfigCommentTag}
                 imageConfigScope={imageConfigScope}
                 pageId={pageId}
                 configContextPageId={configContextPageId}

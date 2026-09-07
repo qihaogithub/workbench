@@ -17,6 +17,7 @@ import type { WorkspaceMutationReceipt } from '@workbench/shared/contracts';
 import { logger } from '../../utils/logger';
 import { DEFAULT_WORKSPACE_PERMISSIONS, isPathAllowed } from './permissions';
 import { resolveLiveWorkspaceMutationContext } from '../../workspace/workspace-mutation-authority';
+import { formatAuthorityCommitSummary } from './authority-result-summary';
 
 const ReadSketchSceneParams = Type.Object({
   pageId: Type.String({ description: 'Page id under demos/<pageId>' }),
@@ -255,7 +256,7 @@ export function createPatchSketchSceneTool(config: AgentConfig): AgentTool<typeo
             type: 'text',
             text: args.dryRun
               ? `Sketch scene patch validated (${details.patch.operationCount} operations, changed=${details.patch.changed}).`
-              : `Sketch scene patch applied (${details.patch.operationCount} operations, changed=${details.patch.changed}).`,
+              : `Sketch scene patch applied (${details.patch.operationCount} operations, changed=${details.patch.changed}).${formatAuthorityCommitSummary(receipt)}`,
           }],
           details: { ...details, receipt },
         };
@@ -333,7 +334,7 @@ export function createBindSketchConfigTool(config: AgentConfig): AgentTool<typeo
             type: 'text',
             text: args.dryRun
               ? `Sketch config binding validated (changed=${details.patch.changed}).`
-              : `Sketch config binding saved (changed=${details.patch.changed}).`,
+              : `Sketch config binding saved (changed=${details.patch.changed}).${formatAuthorityCommitSummary(receipt)}`,
           }],
           details: {
             ...details,

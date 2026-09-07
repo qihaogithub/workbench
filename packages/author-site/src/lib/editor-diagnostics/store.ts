@@ -117,6 +117,17 @@ async function trimIfNeeded(filePath: string, appendBytes: number): Promise<void
   await fs.promises.writeFile(filePath, `${kept.join("\n")}\n`, "utf8");
 }
 
+async function appendJsonlMirror(
+  editorSessionId: string,
+  events: Array<EditorDiagnosticEvent | NormalizedEditorDiagnosticEvent>,
+): Promise<void> {
+  const payload = events.map((event) => JSON.stringify(event)).join("\n") + "\n";
+  const filePath = getDiagnosticsPath(editorSessionId);
+  await ensureDiagnosticsDir();
+  await trimIfNeeded(filePath, Buffer.byteLength(payload));
+  await fs.promises.appendFile(filePath, payload, "utf8");
+}
+
 function insertSqliteEvents(events: NormalizedEditorDiagnosticEvent[]): number {
   const db = ensureDiagnosticsDb();
   try {
@@ -254,15 +265,21 @@ export async function appendEditorDiagnosticEvents(
   } catch (error) {
     dbUnavailable = true;
     jsonlFallbackUsed = true;
-    const payload = sanitized.map((event) => JSON.stringify(event)).join("\n") + "\n";
-    const filePath = getDiagnosticsPath(editorSessionId);
-    await ensureDiagnosticsDir();
-    await trimIfNeeded(filePath, Buffer.byteLength(payload));
-    await fs.promises.appendFile(filePath, payload, "utf8");
     warnings.push(
       `SQLite 事件库写入失败，已保留 JSONL 兜底: ${
         error instanceof Error ? error.message : String(error)
       }`,
+    );
+  }
+  try {
+    // Keep a bounded, de-duplicated-by-id recovery spool even when SQLite is
+    // healthy. If the database is rebuilt or becomes unreadable later, the
+    // event timeline remains recoverable and the query layer can mark the
+    // fallback explicitly.
+    await appendJsonlMirror(editorSessionId, sanitized);
+  } catch (error) {
+    warnings.push(
+      `JSONL 诊断镜像写入失败: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 
@@ -298,6 +315,9 @@ export function appendServerEditorDiagnosticEvent(
   const warnings: string[] = [];
   try {
     const sqliteWritten = insertSqliteEvents([event]);
+    if (event.editorSessionId && isValidEditorSessionId(event.editorSessionId)) {
+      void appendJsonlMirror(event.editorSessionId, [event]).catch(() => undefined);
+    }
     return {
       sqliteWritten,
       diagnostics: {
@@ -314,6 +334,9 @@ export function appendServerEditorDiagnosticEvent(
         error instanceof Error ? error.message : String(error)
       }`,
     );
+    if (event.editorSessionId && isValidEditorSessionId(event.editorSessionId)) {
+      void appendJsonlMirror(event.editorSessionId, [event]).catch(() => undefined);
+    }
     return {
       sqliteWritten: 0,
       diagnostics: {
@@ -325,6 +348,23 @@ export function appendServerEditorDiagnosticEvent(
       },
     };
   }
+}
+
+/**
+ * Controlled maintenance operation: import the bounded JSONL recovery spool
+ * into SQLite without deleting or replacing either store. Operators can run
+ * this after restoring/recreating the database; INSERT OR IGNORE keeps retries
+ * idempotent and the caller receives the exact scan/write counts.
+ */
+export async function rebuildEditorDiagnosticSqliteFromJsonl(): Promise<{
+  scanned: number;
+  written: number;
+}> {
+  const events = await listJsonlDiagnosticEvents();
+  return {
+    scanned: events.length,
+    written: events.length > 0 ? insertSqliteEvents(events) : 0,
+  };
 }
 
 export async function readEditorDiagnosticEvents(

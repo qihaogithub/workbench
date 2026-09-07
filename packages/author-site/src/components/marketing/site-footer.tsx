@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
+import { getOfficialHomeUrl } from "@/lib/official-site-url";
 
 export function SiteFooter() {
   return (
@@ -7,7 +8,7 @@ export function SiteFooter() {
       <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 md:flex-row md:items-end md:justify-between lg:px-8">
         <div>
           <Link
-            href="/"
+            href={getOfficialHomeUrl()}
             className="site-footer-link oneflow-wordmark text-lg font-semibold tracking-tight"
           >
             OneFlow

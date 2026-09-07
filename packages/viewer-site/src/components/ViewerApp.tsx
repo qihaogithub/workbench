@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
 import React, {
   useState,
   useMemo,
@@ -99,6 +100,7 @@ import {
 } from "@/lib/comment-api";
 import { isSchemaEmpty } from "@/components/demo";
 import { getDefaultValues } from "@/lib/validator";
+import { getOfficialHomeUrl } from "@/lib/official-site-url";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -712,10 +714,13 @@ function ProjectListPage() {
       <header className="border-b border-border">
         <div className="container flex h-14 items-center gap-4 px-6">
           <div className="flex shrink-0 items-baseline gap-3">
-            <h1 className="text-lg font-semibold leading-none">FlowSite</h1>
-            <p className="text-xs text-muted-foreground whitespace-nowrap">
-              来自 OneFlow 的项目站点
-            </p>
+            <Link
+              href={getOfficialHomeUrl()}
+              aria-label="OneFlow 官网首页"
+              className="text-lg font-semibold leading-none hover:opacity-80"
+            >
+              <h1>OneFlow</h1>
+            </Link>
           </div>
 
           <div className="flex-1 flex items-center justify-end gap-2">
@@ -953,6 +958,7 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
   });
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionUsername, setSessionUsername] = useState<string | null>(null);
+  const [sessionRole, setSessionRole] = useState<string>("guest");
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -977,12 +983,12 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
       values: visibilitySessionOverrides,
       fieldKeys: Object.keys(visibilitySessionOverrides),
       allowPageTargets: false,
-    });
-  }, [project, visibilitySessionOverrides]);
+    }, { roles: [sessionRole] });
+  }, [project, sessionRole, visibilitySessionOverrides]);
 
   const visiblePages = useMemo(() => {
     if (!project) return [];
-    if (!visibilityResolution?.valid) return project.demoPages;
+    if (!visibilityResolution?.valid) return [];
     return project.demoPages.filter(
       (page) => visibilityResolution.pages[page.id]?.visible !== false,
     );
@@ -1029,18 +1035,26 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
     const firstAvailable = visiblePages.find(
       (page) => !visibilityResolution.valid || visibilityResolution.pages[page.id]?.enabled !== false,
     );
+    const fallbackPage = requestedState?.fallbackPageId
+      ? visiblePages.find((page) => page.id === requestedState.fallbackPageId
+        && visibilityResolution.pages[page.id]?.enabled !== false)
+      : undefined;
     const nextPage = requestedPageId
       ? requestedAvailable
         ? requested
-        : firstAvailable ?? project.demoPages[0]
-      : currentAvailable ?? firstAvailable ?? project.demoPages[0];
+        : fallbackPage ?? firstAvailable
+      : currentAvailable ?? firstAvailable;
     if (nextPage && nextPage.id !== activePageId) {
       setActivePageId(nextPage.id);
       setConfigData(configDataMap[nextPage.id] ?? {});
+    } else if (!nextPage && activePageId) {
+      setActivePageId("");
     }
     setVisibilityNotice(
       requested && !requestedAvailable
-        ? `页面「${requested.name}」当前${requestedVisible ? "不可用" : "不可见"}，已切换到可用页面。`
+        ? requestedState?.message
+          ? requestedState.message
+          : `页面「${requested.name}」当前${requestedVisible ? "不可用" : "不可见"}，${fallbackPage ? `已按规则切换到备用页面「${fallbackPage.name}」。` : "已切换到可用页面。"}`
         : null,
     );
   }, [activePageId, configDataMap, project, requestedPageId, visibilityResolution, visiblePages]);
@@ -1332,9 +1346,9 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
       if (state?.visible === false || state?.enabled === false) {
         const hiddenPage = project.demoPages.find((page) => page.id === pageId);
         setVisibilityNotice(
-          hiddenPage
+          state.message ?? (hiddenPage
             ? `页面「${hiddenPage.name}」当前${state.visible === false ? "不可见" : "不可用"}。`
-            : `该页面当前${state.visible === false ? "不可见" : "不可用"}。`,
+            : `该页面当前${state.visible === false ? "不可见" : "不可用"}。`),
         );
         return;
       }
@@ -1516,6 +1530,7 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
         setAuthToken(result.token);
         setSessionId(result.userId);
         setSessionUsername(result.username);
+        setSessionRole(result.role || "guest");
         setLoginDialogOpen(false);
         setLoginUsername("");
         setLoginPassword("");
@@ -1533,6 +1548,7 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
     setAuthToken(null);
     setSessionId(null);
     setSessionUsername(null);
+    setSessionRole("guest");
   }, []);
 
   const handleAddPage = useCallback(async () => {
@@ -1655,6 +1671,11 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
             ? {
                 visible: visibilityResolution.pages[page.id].visible,
                 enabled: visibilityResolution.pages[page.id].enabled,
+                unavailable: visibilityResolution.pages[page.id].unavailable,
+                message: visibilityResolution.pages[page.id].message,
+                fallbackPageId: visibilityResolution.pages[page.id].fallbackPageId,
+                fallbackMessage: visibilityResolution.pages[page.id].fallbackMessage,
+                alternativeRegion: visibilityResolution.pages[page.id].alternativeRegion,
                 reasons: visibilityResolution.pages[page.id].reasons,
               }
             : undefined,
@@ -1692,8 +1713,37 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
     );
   }
 
+  if (!visibilityResolution?.valid) {
+    return (
+      <div className="flex h-full flex-col">
+        <Header name={project.name} onBack={() => router.push("/")} />
+        <div className="flex flex-1 items-center justify-center px-6 text-center">
+          <div className="max-w-lg text-destructive">
+            页面状态规则未通过校验，已停止展示该发布版本。请由创作者修复规则并重新发布。
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const availablePages = visiblePages.filter(
+    (page) => visibilityResolution.pages[page.id]?.enabled !== false,
+  );
+  if (availablePages.length === 0) {
+    return (
+      <div className="flex h-full flex-col">
+        <Header name={project.name} onBack={() => router.push("/")} />
+        <div className="flex flex-1 items-center justify-center px-6 text-center">
+          <div className="max-w-lg text-muted-foreground">
+            当前配置与身份下没有可用页面，请联系创作者调整页面状态规则。
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const tree = buildTree(visiblePages, project.demoFolders);
-  const activePage = visiblePages.find((p) => p.id === activePageId) ?? visiblePages[0];
+  const activePage = availablePages.find((p) => p.id === activePageId) ?? availablePages[0];
   const activePageSchema = activePage ? visiblePageSchemaMap[activePage.id] : "";
   const hasProjectConfig = !isSchemaEmpty(visibleProjectConfigSchema);
   const hasPageConfig = !isSchemaEmpty(activePageSchema);

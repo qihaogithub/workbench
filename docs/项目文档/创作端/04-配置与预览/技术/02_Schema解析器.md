@@ -3,13 +3,16 @@ covers:
   - packages/demo-ui/src/schema-parser.ts
   - packages/demo-ui/src/schema-parser.test.ts
   - packages/demo-ui/src/ConfigForm.tsx
+  - packages/agent-service/src/backends/pi-tools/schema-contract-validation.ts
+  - packages/agent-service/src/backends/pi-tools/schema-tool.ts
+  - packages/agent-service/tests/unit/schema-contract-validation.test.ts
 ---
 
 # 配置系统 - Schema 解析器
 
-> 版本：v1.1
+> 版本：v1.2
 > 创建日期：2026-04-06
-> 更新日期：2026-09-03
+> 更新日期：2026-09-06
 
 ---
 
@@ -104,6 +107,20 @@ interface ParsedContent {
 - 对象数组字段可在 `ui:options` 中显式声明 `detailPresentation: "sheet"`，并可用 `detailBreadcrumbTitle` 指定详情路由的列表节点名称、`itemTitleTemplate` 指定条目标题模板（`{index}` 为从 1 开始的两位序号）；列表节点可保留在内部路由上下文，但 Sheet 顶部只展示当前条目，未声明时继续使用原有内联折叠。
 - `typeLimits` 沿递归路径传递，数组深度不会改变字段限制；
 - 因此 `modules.items.oneOf → levels.items.oneOf` 仍会得到对象数组和 `position` 控件，不会降级为多图上传列表。
+
+条件字段的新 Schema 直接在字段上声明 `visibleWhen`；解析器同时读取 `ui:options.visibleWhen`，但两处不得冲突。条件的 `field` 只解析当前对象作用域内的兄弟字段：顶层字段使用顶层配置值，对象数组与 `oneOf` / `variants` 分支使用当前数组项，并先合并该层字段默认值。这样同一数组中的不同条目可以独立显隐，详情 Sheet 与内联折叠使用相同结果，隐藏字段的运行值不会被清除。
+
+Agent 写入前的 `schemaValidate` 会递归检查 `properties`、`items`、`oneOf` 和 `variants`，拒绝缺少 `field` / `equals`、跨对象引用或两处声明冲突。该校验补充运行时契约，不替代表单组件的交互回归测试。
+
+颜色字段的解析以 `format` 为唯一行为判断来源，允许基础类型与 `null` 组成 nullable 联合类型：
+
+| `format` | 解析后的值类型 | 其它规则 |
+| :--- | :--- | :--- |
+| `color` | `string \| null` | 值为 `#RRGGBB` 或 `null`，可读取 `ui:options.colorPresets` |
+| `opacity` | `number \| null` | 范围固定为 0–100；0 是完全透明，`null` 是未设置 |
+| `color-opacity` | `string \| null` | 值为规范化 `rgba(r, g, b, a)` 或 `null`，可读取颜色预设 |
+
+解析器不读取或推断历史 `colorMode`。字段目录、表单生成器和配置池应保留上述 `format`、nullable 类型以及 `colorPresets` 元数据，使 Agent 只读取 Schema 就能判断值格式和编辑行为。
 
 关卡图坐标单位约定：`position.x/y` 使用 1 倍像素值，`w/h` 继续使用 2 倍值，渲染时仅对 `w/h` 除以 2。
 

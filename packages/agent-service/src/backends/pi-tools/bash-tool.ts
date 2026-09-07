@@ -64,12 +64,24 @@ export function createBashTool(config: AgentConfig): AgentTool<typeof BashParams
       // the general command parser below.
       if (liveWorkspace && !isLiveWorkspaceReadOnlyCommandAllowed(command, permissions)) {
         const baseCommand = command.split(/\s+/)[0] || '';
-        logger.warn({ command: baseCommand, workspaceId: liveWorkspace.workspaceId }, 'Live Workspace bash command blocked by Authority guard');
+        const permissionResult = getCommandPermissionResult(command, permissions);
+        const reason = permissionResult.reason === 'shell_syntax_blocked'
+          ? 'shell_syntax_blocked'
+          : baseCommand === 'node' || baseCommand === 'npm' || baseCommand === 'npx'
+            ? 'live_runtime_blocked'
+            : permissionResult.reason ?? 'live_readonly_blocked';
+        const message = reason === 'shell_syntax_blocked'
+          ? 'Error: live Workspace bash accepts one simple read-only command only. Pipes, redirection, command chaining, command substitution, and newlines are blocked. Run one grep/head/readFile operation without |, ;, redirects, or chained commands.'
+          : reason === 'live_runtime_blocked'
+            ? 'Error: live Workspace bash cannot run node, npm, or npx because scripts may write outside Workspace Mutation Authority. Use readFile or the managed validation tools instead.'
+            : 'Error: this command is not allowed in live Workspace read-only bash. Use one allowed read-only command, or use managed Workspace tools for mutations.';
+        logger.warn({ command: baseCommand, reason, workspaceId: liveWorkspace.workspaceId }, 'Live Workspace bash command blocked by Authority guard');
         return {
-          content: [{ type: 'text', text: 'Error: live Workspace bash is read-only. File writes must go through Workspace Mutation Authority.' }],
+          content: [{ type: 'text', text: message }],
           details: {
             command,
             error: 'WORKSPACE_AUTHORITY_REQUIRED',
+            reason,
             workspaceId: liveWorkspace.workspaceId,
             projectId: liveWorkspace.projectId,
           },

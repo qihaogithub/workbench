@@ -220,13 +220,15 @@ export interface ConfigFormProps {
   /** 打开配置项关联的设计规范侧边气泡。 */
   onOpenDesignSpec?: (spec: DesignSpecEntryLink, fieldTitle: string, anchor?: { top: number; bottom: number }, trigger?: HTMLElement | null) => void;
   /** 创作端提供时，字段标题可打开对应的配置定义编辑器；浏览端不传。 */
-  onEditConfigDefinition?: (fieldKey: string, field: FieldConfig) => void;
+  onEditConfigDefinition?: (fieldKey: string, field: FieldConfig, schemaFieldPath?: string) => void;
   /** Per-field capabilities. Omit to retain the legacy readonly behaviour. */
   configItemCapabilities?: ConfigItemCapabilities;
   /** Opens the host-owned config comment flow for a field. */
   onAddConfigComment?: (target: ConfigCommentTarget, trigger?: HTMLElement | null) => void;
   /** Returns whether any comment thread exists for a field target. */
   hasConfigComment?: (target: ConfigCommentTarget) => boolean;
+  /** 浏览端只在存在批注时展示标签；创作端留空以保留悬浮发现入口。 */
+  hideEmptyConfigCommentTag?: boolean;
   /** 配置所在范围。未提供时由宿主自行解析归属。 */
   imageConfigScope?: ImageConfigScope;
   /** page 范围配置所属的页面；项目范围和独立表单可不提供。 */
@@ -448,7 +450,18 @@ export interface CanvasPageData {
   visibilityStatus?: {
     visible: boolean;
     enabled: boolean;
-    reasons?: Array<{ ruleId: string; fieldKey: string; effect: "hidden" | "disabled" }>;
+    unavailable?: boolean;
+    message?: string;
+    fallbackPageId?: string;
+    fallbackMessage?: string;
+    alternativeRegion?: { pageId: string; regionId: string; message?: string };
+    reasons?: Array<{
+      ruleId: string;
+      fieldKey: string;
+      fieldKeys?: string[];
+      effect: "hidden" | "disabled" | "unavailable";
+      strategy?: "unavailable" | "fallback-page" | "alternative-region";
+    }>;
   };
   visibilityRegions?: Record<string, { visible: boolean; enabled: boolean }>;
   previewSize?: PreviewSize;

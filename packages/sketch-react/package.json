@@ -13,6 +13,7 @@
     "react-dom": "^19.0.0"
   },
   "dependencies": {
+    "@workbench/color-picker": "workspace:*",
     "@workbench/sketch-core": "workspace:*",
     "clsx": "^2.1.0",
     "lucide-react": "0.575.0",

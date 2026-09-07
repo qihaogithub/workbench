@@ -180,10 +180,6 @@ export interface SketchEditorCanvasHandle {
   openImageFilePicker: () => void;
 }
 
-export interface SketchEditorCanvasHandle {
-  openImageFilePicker: () => void;
-}
-
 export interface SketchPropertyPanelProps extends SketchEditorPartProps {
   configData?: Record<string, unknown>;
 }

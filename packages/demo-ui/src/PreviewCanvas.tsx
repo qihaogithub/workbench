@@ -67,6 +67,7 @@ import {
   prewarmPreviewImageUrls,
 } from "./preview-resource-cache";
 import { cn } from "./utils";
+import { ColorPicker, formatHex, formatRgba, parseColor } from "@workbench/color-picker";
 import { extractHtmlImportFromClipboard } from "./html-import-clipboard";
 import { localizeRemoteImageForSession } from "./markdown/remote-image-localizer";
 import {
@@ -4450,66 +4451,34 @@ export function PreviewCanvas({
             className="absolute z-30 flex w-max max-w-[calc(100vw-1rem)] items-center gap-1 overflow-x-auto whitespace-nowrap rounded-lg border bg-background/95 p-1 shadow-lg backdrop-blur"
             style={selectedSectionToolbarStyle}
           >
-            <Popover>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <PopoverTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label="分组颜色与透明度"
-                      className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md p-1 transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      style={{
-                        backgroundColor:
-                          selectedSection.style?.color ?? "#94a3b8",
-                      }}
-                    />
-                  </PopoverTrigger>
-                </TooltipTrigger>
-                <TooltipContent side="top">颜色与透明度</TooltipContent>
-              </Tooltip>
-              <PopoverContent
-                align="center"
-                side="top"
-                sideOffset={8}
-                className="w-64 space-y-4 p-3"
-              >
-                <label className="flex items-center justify-between gap-4 text-sm font-medium">
-                  颜色
-                  <input
-                    type="color"
-                    aria-label="分组颜色"
-                    value={selectedSection.style?.color ?? "#94a3b8"}
-                    className="h-9 w-12 cursor-pointer rounded border border-input bg-transparent p-0.5"
-                    onChange={(event) =>
-                      handleSectionStyleChange(selectedSection.id, {
-                        ...selectedSection.style,
-                        color: event.target.value,
-                      })
-                    }
-                  />
-                </label>
-                <label className="grid gap-2 text-sm font-medium">
-                  <span className="flex items-center justify-between">
-                    填充透明度
-                    <output className="text-muted-foreground">{selectedSection.style?.fillOpacity ?? 12}%</output>
-                  </span>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="5"
-                    aria-label="分组填充透明度"
-                    value={selectedSection.style?.fillOpacity ?? 12}
-                    onChange={(event) =>
-                      handleSectionStyleChange(selectedSection.id, {
-                        ...selectedSection.style,
-                        fillOpacity: Number(event.target.value),
-                      })
-                    }
-                  />
-                </label>
-              </PopoverContent>
-            </Popover>
+            <ColorPicker
+              format="color-opacity"
+              label="分组颜色与透明度"
+              compact
+              className="h-8 w-8 shrink-0 justify-center px-1 [&>span:nth-child(2)]:hidden"
+              value={(() => {
+                const color = parseColor(selectedSection.style?.color ?? "#94a3b8");
+                return color
+                  ? formatRgba({ ...color, alpha: (selectedSection.style?.fillOpacity ?? 12) / 100 })
+                  : null;
+              })()}
+              onChange={(nextValue) => {
+                if (nextValue === null) {
+                  const nextStyle = { ...selectedSection.style };
+                  delete nextStyle.color;
+                  delete nextStyle.fillOpacity;
+                  handleSectionStyleChange(selectedSection.id, nextStyle);
+                  return;
+                }
+                const color = parseColor(nextValue);
+                if (!color) return;
+                handleSectionStyleChange(selectedSection.id, {
+                  ...selectedSection.style,
+                  color: formatHex(color),
+                  fillOpacity: Math.round(color.alpha * 100),
+                });
+              }}
+            />
             <Tooltip>
               <TooltipTrigger asChild>
                 <button

@@ -98,4 +98,27 @@ describe("ChatMessages 流式占位", () => {
 
     expect(await screen.findByText("已提交 1 项修改；1 项预览同步失败")).toBeInTheDocument();
   });
+
+  it("projection 尚未返回 ack 时显示待验证而不是已更新", async () => {
+    renderChatMessages({
+      isStreaming: false,
+      messages: [{
+        id: "assistant-2",
+        role: "assistant",
+        content: "页面已更新",
+        runSummary: {
+          mutations: [{
+            mutationId: "mutation-2",
+            revision: 8,
+            status: "committed",
+            resources: [],
+            actor: "agent",
+          }],
+          projections: [{ revision: 8, surface: "active-preview", status: "pending" }],
+        },
+      }],
+    });
+
+    expect(await screen.findByText("已提交 1 项修改；1 项预览待验证")).toBeInTheDocument();
+  });
 });

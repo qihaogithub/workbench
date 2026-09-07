@@ -1,7 +1,10 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 
 import type { ChatMessage } from "@workbench/ai-chat-shared/message";
-import { useChatStream } from "@workbench/ai-chat-shared/chat/hooks/use-chat-stream";
+import {
+  mergeWorkspaceProjectionAck,
+  useChatStream,
+} from "@workbench/ai-chat-shared/chat/hooks/use-chat-stream";
 import {
   persistMessages,
   updateSessionTitle,
@@ -97,6 +100,46 @@ jest.mock("@workbench/ai-chat-shared/chat/services/stream-service", () => {
 });
 
 describe("useChatStream 自动修复发送", () => {
+  it("晚到 projection ack 只更新同 revision 的已提交摘要", () => {
+    const summary = {
+      mutations: [{
+        mutationId: "mutation-1",
+        revision: 7,
+        status: "committed" as const,
+        resources: [{ path: "demos/home/index.tsx", action: "modified" as const }],
+        actor: "agent",
+      }],
+      projections: [{
+        revision: 7,
+        surface: "active-preview" as const,
+        status: "pending" as const,
+      }],
+    };
+
+    expect(mergeWorkspaceProjectionAck(summary, {
+      projectId: "proj-1",
+      workspaceId: "workspace-1",
+      revision: 7,
+      clientId: "client-1",
+      surface: "active-preview",
+      status: "applied",
+      acknowledgedAt: Date.now(),
+    }).projections).toEqual([{
+      revision: 7,
+      surface: "active-preview",
+      status: "applied",
+    }]);
+    expect(mergeWorkspaceProjectionAck(summary, {
+      projectId: "proj-1",
+      workspaceId: "workspace-1",
+      revision: 8,
+      clientId: "client-1",
+      surface: "active-preview",
+      status: "applied",
+      acknowledgedAt: Date.now(),
+    })).toBe(summary);
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockHandlers = undefined;

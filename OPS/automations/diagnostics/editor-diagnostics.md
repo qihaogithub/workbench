@@ -46,10 +46,6 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h --output /
 
 ## 先判断
 
-### SQLite 损坏恢复
-
-若出现 `database disk image is malformed`，先停写并将 `data/diagnostics/editor-events.db`、存在的 WAL/SHM 和 `data/editor-diagnostics/*.jsonl` 备份到仓库外。仅在副本上执行 SQLite `.recover`，按当前事件表结构导入可读完整事件，再使用共享事件归一化规则导入 JSONL、按事件 ID 去重；无法归属的碎片保留在恢复副本中，不推测补造事件。新库通过 `PRAGMA integrity_check` 后再替换，最后验证真实 API 写入和诊断 CLI 查询。查询的 `eventGapDetected=false` 只表示当前数据源可用，不能证明历史事件已完整恢复。禁止将修复后的数据库或恢复 SQL 提交到 Git。
-
 | 判断 | 依据 |
 |:-----|:-----|
 | 事件源是否可信 | 输出 `diagnostics.sqliteUsed`、`jsonlFallbackUsed`、`dbUnavailable`、`eventGapDetected` 和 `warnings` |

@@ -21,6 +21,16 @@ describe('buildStaticSystemPrompt', () => {
     expect(prompt).toContain('禁止行为');
   });
 
+  it('颜色配置契约对 Agent 暴露显式 format、空值语义和预设结构', () => {
+    const prompt = buildStaticSystemPrompt();
+    expect(prompt).toContain('颜色配置契约（Agent 直接读取 `format`）');
+    expect(prompt).toContain('`color-opacity`');
+    expect(prompt).toContain('规范化 `rgba(r, g, b, a)` 或 `null`');
+    expect(prompt).toContain('`null` 表示未设置；透明度 `0` 表示完全透明');
+    expect(prompt).toContain('`ui:options.colorPresets`');
+    expect(prompt).toContain('opacity` 时必须除以 `100` 转换为 `0–1`');
+  });
+
   it('创作端 Agent 身份应覆盖完整创作工作流', () => {
     const prompt = buildStaticSystemPrompt();
     expect(prompt).toContain('你是一位 OneFlow 创作工作流助手');
@@ -71,6 +81,14 @@ describe('buildStaticSystemPrompt', () => {
     expect(prompt).toContain('size: 0');
     expect(prompt).toContain('不得把它臆测为图片、截图或附件');
     expect(prompt).toContain('停止反复比较方案并直接执行');
+  });
+
+  it('素材替换与配置冲突时只允许提出一个最小澄清问题', () => {
+    const prompt = buildStaticSystemPrompt();
+    expect(prompt).toContain('素材与配置冲突规则');
+    expect(prompt).toContain('只提出一个最小澄清问题');
+    expect(prompt).toContain('用户确认静态内容后再同步修改配置契约');
+    expect(prompt).toContain('确认动态内容后保留字段并使用不含固定值的素材');
   });
 
   it('约束新建页面时不得自行添加配置项', () => {

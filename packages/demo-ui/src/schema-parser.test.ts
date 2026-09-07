@@ -7,7 +7,7 @@ describe("parseSchemaToFields grouping", () => {
       type: "object",
       properties: {
         heroImage: { type: "string", format: "image", title: "主视觉图片" },
-        accentColor: { type: "string", format: "color", title: "强调色", "ui:options": { group: "品牌" } },
+        accentColor: { type: ["string", "null"], format: "color", title: "强调色", default: null, "ui:options": { group: "品牌" } },
       },
     }));
 

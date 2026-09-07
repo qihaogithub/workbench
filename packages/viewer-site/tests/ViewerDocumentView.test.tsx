@@ -5,6 +5,7 @@ import {
   hasViewerDocumentContent,
   ViewerDocumentView,
 } from "../src/components/ViewerDocumentView";
+import { getDesignSpecDoc } from "../src/lib/api";
 
 vi.mock("@workbench/demo-ui", () => ({
   DocumentEditor: ({ value, readOnly, onReferenceClick }: { value: string; readOnly?: boolean; onReferenceClick?: (input: { target: { kind: "page"; projectId: string; pageId: string }; labelSnapshot: string }) => void }) => (
@@ -27,7 +28,8 @@ vi.mock("@workbench/demo-ui", () => ({
   }],
 }));
 
-vi.mock("../src/lib/api", () => ({
+vi.mock("../src/lib/api", async () => ({
+  normalizePublishedDesignSpecDoc: (await vi.importActual<typeof import("../src/lib/api")>("../src/lib/api")).normalizePublishedDesignSpecDoc,
   DATA_BASE: "/data",
   getKnowledgeDocContent: vi.fn().mockResolvedValue("正文"),
   getDataUrl: (value: string) => value,
@@ -106,6 +108,62 @@ describe("ViewerDocumentView", () => {
     expect(screen.getByText("图片应使用 16:9。").getAttribute("data-read-only")).toBeNull();
   });
 
+  it("resolves a published oneOf branch parent reference", async () => {
+    vi.mocked(getDesignSpecDoc).mockResolvedValueOnce({
+      id: "spec-branch",
+      title: "参与人数规范",
+      entries: [{
+        id: "entry-branch",
+        title: "参与人数规范",
+        markdown: "参与人数模块保持统一间距。",
+        target: {
+          type: "config",
+          refs: [{
+            scope: "page",
+            pageId: "page-1",
+            fieldKey: "modules[type=participant]",
+          }],
+        },
+      }],
+    } as never);
+
+    const { container } = render(
+      <ViewerDocumentView
+        projectId="project-1"
+        items={[]}
+        designSpecs={[{ id: "spec-branch", title: "参与人数规范", createdAt: "", updatedAt: "" }]}
+        projectConfigSchema="{}"
+        pages={[{
+          id: "page-1",
+          name: "首页",
+          schema: JSON.stringify({
+            type: "object",
+            properties: {
+              modules: {
+                type: "array",
+                title: "内容模块",
+                items: {
+                  oneOf: [{
+                    title: "参与人数模块",
+                    properties: {
+                      type: { const: "participant", title: "类型" },
+                      count: { type: "number", title: "参与人数" },
+                    },
+                  }],
+                },
+              },
+            },
+          }),
+        }]}
+      />,
+    );
+
+    expect((await within(container).findAllByText("参与人数规范")).length).toBeGreaterThan(0);
+    expect(within(container).getByText("1 项配置")).toBeTruthy();
+    expect(within(container).getByText("参与人数模块")).toBeTruthy();
+    expect(within(container).queryByText("已失效引用")).toBeNull();
+  });
+
   it("renders page specifications without a configuration-item table", async () => {
     const { container } = render(
       <ViewerDocumentView
@@ -123,6 +181,44 @@ describe("ViewerDocumentView", () => {
     expect(within(pageSpecCard!).getByText("页面规范 · 1 个页面")).toBeTruthy();
     expect(within(container).getByText("拖动选项填入空位。")).toBeTruthy();
     expect(pageSpecCard!.querySelector("table")).toBeNull();
+  });
+
+  it("normalizes legacy published entries before rendering them", async () => {
+    vi.mocked(getDesignSpecDoc).mockResolvedValueOnce({
+      id: "spec-legacy",
+      title: "旧规范",
+      createdAt: "",
+      updatedAt: "",
+      entries: [{
+        id: "entry-legacy",
+        title: "旧图片规范",
+        markdown: "旧格式说明",
+        refs: [{ scope: "page", pageId: "page-1", fieldKey: "heroImage" }],
+      }],
+    } as never);
+
+    const { container } = render(
+      <ViewerDocumentView
+        projectId="project-1"
+        items={[]}
+        designSpecs={[{ id: "spec-legacy", title: "旧规范", createdAt: "", updatedAt: "" }]}
+        projectConfigSchema="{}"
+        pages={[{
+          id: "page-1",
+          name: "首页",
+          schema: JSON.stringify({
+            type: "object",
+            properties: {
+              heroImage: { type: "string", title: "头图", format: "image", default: "/hero.png" },
+            },
+          }),
+        }]}
+      />,
+    );
+
+    expect(await within(container).findByText("旧图片规范")).toBeTruthy();
+    expect(within(container).getByText("1 项配置")).toBeTruthy();
+    expect(within(container).getByText("头图")).toBeTruthy();
   });
 
   it("uses the published reference directory for read-only navigation and status", async () => {

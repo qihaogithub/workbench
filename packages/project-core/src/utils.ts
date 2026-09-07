@@ -5,6 +5,7 @@ import {
   createDefaultSketchScene,
   type SketchSceneDocument,
 } from "@workbench/sketch-core";
+import { validateWorkspacePathSegment } from "@workbench/shared/workspace-path";
 import type {
   DemoPageMeta,
   DemoPageRuntimeType,
@@ -34,7 +35,7 @@ export function nowId(prefix: string): string {
 }
 
 export function safeId(id: string, label: string): string {
-  if (!/^[a-zA-Z0-9_.-]+$/.test(id)) {
+  if (!validateWorkspacePathSegment(id).ok) {
     throw new Error(`INVALID_${label.toUpperCase()}_ID`);
   }
   return id;

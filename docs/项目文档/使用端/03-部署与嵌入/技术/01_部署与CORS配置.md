@@ -2,7 +2,7 @@
 
 > 版本：v2.0
 > 创建日期：2026-05-04
-> 更新日期：2026-08-14
+> 更新日期：2026-09-05
 
 ---
 
@@ -56,27 +56,33 @@ covers:
 
 | 变量                            | 示例值                  | 说明                                           |
 | :------------------------------ | :---------------------- | :--------------------------------------------- |
-| `NEXT_PUBLIC_WEB_URL`           | `http://localhost:4200` | author-site 创作端地址，用于生成 viewer iframe URL |
-| `NEXT_PUBLIC_AGENT_SERVICE_URL` | 可选；未设置时按当前页面主机名推导 `:3201` | agent-service 地址，用于使用端只读 AI 问答 API；跨主机或反向代理时显式配置 |
-| `NEXT_PUBLIC_DATA_BASE`         | 空字符串 / `http://localhost:4200` | viewer-site 读取项目数据的基址；同源静态部署保持为空，本地开发跨 author-site 读取时设为 author-site 地址。未设置时开发模式默认使用 `http://localhost:4200`。 |
+| `NEXT_PUBLIC_AUTHOR_SITE_URL`   | `http://localhost:4200` | author-site/OneFlow 官网地址，用于品牌链接 |
+| `NEXT_PUBLIC_AGENT_SERVICE_URL` | `http://localhost:4201` | agent-service 地址，用于使用端只读 AI 问答 API；局域网开发访问时应改为 `http://<服务器IP>:4201`，Docker 使用 `:3201` |
+| `NEXT_PUBLIC_DATA_BASE`         | 空字符串 / `http://localhost:4200` | viewer-site 读取项目数据的基址；同源静态部署保持为空，本地开发跨 author-site 读取时设为 author-site 地址。局域网开发访问时应改为 `http://<服务器IP>:4200`，避免误用 Docker 的 `:3200`。 |
+| `NEXT_ALLOWED_DEV_ORIGINS`      | 空字符串 | Next.js 开发服务允许访问 HMR 等开发资源的 hostname 列表，多个值用逗号分隔；通过局域网 IP 访问时填写该 IP |
 | `PREVIEW_RUNTIME_SOURCE`        | `local`                 | viewer 预览 iframe 的 runtime 来源；仅诊断时设为 `cdn` |
 | `PREVIEW_SHELL_MODE`            | `inline`                | viewer 生产静态导出默认 inline shell，开发环境默认 fixed shell |
 
 这些变量以 `NEXT_PUBLIC_` 前缀开头，Next.js 会将其注入到客户端代码中，API 客户端可直接读取。
 
+本地通过 `http://<服务器IP>:4300` 访问时，`.env.local` 至少应配置 `NEXT_PUBLIC_DATA_BASE=http://<服务器IP>:4200`、`NEXT_PUBLIC_AGENT_SERVICE_URL=http://<服务器IP>:4201` 和 `NEXT_ALLOWED_DEV_ORIGINS=<服务器IP>`。修改后需要重启 viewer-site，环境变量才会进入新的浏览器 bundle。
+
 ## 三、CORS 配置
 
-使用端（3300）需要跨域访问 author-site 创作端（3200）和 agent-service（3201）的 API，因此两个服务都需要配置 CORS 允许使用端的来源。
+本地开发使用端（4300）需要跨域访问 author-site 创作端（4200）和 agent-service（4201）的 API；Docker 使用端则为 3300，并访问 3200/3201。因此两个服务都需要配置 CORS 允许使用端的实际来源。
 
 ### 3.1 agent-service CORS 配置
 
 agent-service 使用 Fastify 的 `@fastify/cors` 插件，通过容器内的 `CORS_ORIGINS` 配置允许的来源。Docker Compose 从 `DOCKER_CORS_ORIGINS` 注入该值，与根目录 `.env` 中供 `pnpm dev` 使用的 `CORS_ORIGINS` 隔离：
 
-- 默认允许：`http://localhost:3200`、`http://127.0.0.1:3200`（创作端）
-- 使用端新增：`http://localhost:3300`、`http://127.0.0.1:3300`
+- 本地开发默认来源：`http://localhost:4200`、`http://127.0.0.1:4200`（创作端）以及 `http://localhost:4300`、`http://127.0.0.1:4300`（使用端）
+- Docker 默认来源：`http://localhost:3200`、`http://127.0.0.1:3200`（创作端）以及 `http://localhost:3300`、`http://127.0.0.1:3300`（使用端）
+- 局域网开发或 Docker 外部访问时，必须额外加入实际的 `http://<服务器IP>:<端口>` 来源
 - Docker/生产环境通过 `DOCKER_CORS_ORIGINS` 统一配置；容器启动后会映射为 `CORS_ORIGINS`
 
 浏览器直连的 Agent 请求会在配置 API Key 时携带 `X-API-Key`。该头必须包含在 agent-service 的 CORS 预检允许头中；否则浏览器会在上传图片或其他 multipart 附件前拦截请求，并表现为无法连接 AI 服务。
+
+agent-service 会按监听端口选择无显式配置时的默认来源：本地 `4201` 使用 `4200/4300`，Docker `3201` 使用 `3200/3300`。显式 `CORS_ORIGINS` 始终是安全白名单，不会因为端口自动追加来源；当已知端口检测到明显使用了另一套本地/Docker 来源时，启动日志会列出预期和缺失来源。修改根目录 `.env` 或 `.env.docker` 后必须重启 agent-service。
 
 使用端 AI 问答由浏览器直接请求 agent-service 的只读接口，因此生产环境的 `CORS_ORIGINS` 也必须包含 viewer-site 实际访问域名。
 
@@ -87,7 +93,8 @@ Docker Compose 会把 `.env.docker` 中的 `DOCKER_CORS_ORIGINS` 注入到 agent
 author-site 创作端使用 Next.js 中间件处理 CORS，针对 API 路由和 viewer 路由设置响应头：
 
 - 仅对 `/api/` 和 `/viewer/` 路由添加 CORS 头
-- 默认允许的使用端来源：`http://localhost:3300`、`http://127.0.0.1:3300`
+- 本地开发默认允许的使用端来源：`http://localhost:4300`、`http://127.0.0.1:4300`
+- Docker 默认允许的使用端来源：`http://localhost:3300`、`http://127.0.0.1:3300`
 - 生产环境允许来源通过 `CORS_ORIGINS` 注入，必须包含 viewer-site 实际访问地址
 - 设置 `Access-Control-Allow-Credentials: true` 支持 Cookie 传递
 - 对允许来源发起的 `OPTIONS` 预检请求，在认证和具体 API 路由处理之前返回 `204 No Content`

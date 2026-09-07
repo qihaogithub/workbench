@@ -12,6 +12,7 @@ import {
   getDesignSpecDoc,
   getDataUrl,
   getKnowledgeDocContent,
+  normalizePublishedDesignSpecDoc,
   type PublishedDesignSpecDoc,
   type PublishedDesignSpecMeta,
   type PublishedMarkdownReferenceSnapshot,
@@ -41,6 +42,7 @@ type ConfigPoolItem = {
   format?: string;
   breadcrumbs?: string[];
   isConst?: boolean;
+  isBranch?: boolean;
   pageIds?: string[];
 };
 
@@ -58,13 +60,15 @@ function buildConfigPool(projectSchema: string | undefined, pages: ViewerDocumen
   const readFields = (schema?: string) => schema ? enumerateSchemaFields(schema) : [];
   const pageIds = Array.from(new Set(pages.map((item) => item.id).filter(Boolean)));
   const kindOf = (field: SchemaCatalogField): ConfigPoolItemKind => {
+    if (field.isBranch) return "text";
     const type = field.type.toLowerCase();
     const format = (field.format || "").toLowerCase();
     const widget = (field.uiWidget || "").toLowerCase();
     // oneOf discriminator markers are part of the stable path, but they are
     // not the field name used for kind inference.
     const key = field.key.split(".").pop()?.toLowerCase() || field.key.toLowerCase();
-    if (format === "color" || type.includes("color")) return "color";
+    if (format === "color" || format === "color-opacity") return "color";
+    if (format === "opacity") return "number";
     if (format === "image" || type === "image" || type === "imagelist" || widget === "image" || widget === "imagelist" || (typeof field.default === "string" && /\.(svg|png|jpe?g|gif|webp|bmp|avif)$/i.test(field.default)) || /(image|img|logo|banner|pic|thumb|background)/.test(key)) return "image";
     if (type === "number" || type === "integer") return "number";
     if (widget === "motion" || type === "motion" || /(motion|animation|transition)/.test(key)) return "motion";
@@ -81,6 +85,7 @@ function buildConfigPool(projectSchema: string | undefined, pages: ViewerDocumen
       title: field.title,
       breadcrumbs: field.breadcrumbs,
       isConst: field.isConst,
+      isBranch: field.isBranch,
       pageIds: scope === "project" ? pageIds : undefined,
       kind,
       value: field.default,
@@ -233,7 +238,7 @@ export function ViewerDocumentView({
     setLoading(true);
     getDesignSpecDoc(projectId, active.item.id)
       .then((doc) => {
-        if (!cancelled) setDesignSpec(doc);
+        if (!cancelled) setDesignSpec(normalizePublishedDesignSpecDoc(doc));
       })
       .catch(() => {
         if (!cancelled) setDesignSpec(null);

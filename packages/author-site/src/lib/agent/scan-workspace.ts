@@ -65,7 +65,7 @@ function formatProjectConfigSummary(workingDir: string): string {
   if (!fs.existsSync(schemaPath)) return "（未声明项目级配置）";
   try {
     const parsed = JSON.parse(fs.readFileSync(schemaPath, "utf-8")) as {
-      properties?: Record<string, { type?: string; format?: string; [key: string]: unknown }>;
+      properties?: Record<string, { type?: string | string[]; format?: string; [key: string]: unknown }>;
     };
     const properties = parsed.properties ?? {};
     const entries = Object.entries(properties).map(([key, field]) => {
@@ -79,7 +79,17 @@ function formatProjectConfigSummary(workingDir: string): string {
       const configType = marker === "business"
         ? "业务"
         : "资源";
-      return `- ${key}（${configType}，${field.type ?? field.format ?? "unknown"}）`;
+      const typeValues = Array.isArray(field.type) ? field.type : field.type ? [field.type] : [];
+      const nullable = typeValues.includes("null");
+      const valueType = typeValues.filter((type) => type !== "null").join(" | ") || "unknown";
+      const format = field.format ? `，format=${field.format}` : "";
+      const nullableLabel = nullable ? " | null" : "";
+      const colorPresets = uiOptions && typeof uiOptions === "object" && !Array.isArray(uiOptions)
+        ? (uiOptions as Record<string, unknown>).colorPresets
+        : undefined;
+      const presetCount = Array.isArray(colorPresets) ? colorPresets.length : 0;
+      const presets = presetCount > 0 ? `，colorPresets=${presetCount}` : "";
+      return `- ${key}（${configType}，type=${valueType}${nullableLabel}${format}${presets}）`;
     });
     return entries.length > 0 ? entries.join("\n") : "（未声明项目级字段）";
   } catch {
@@ -100,8 +110,19 @@ function formatVisibilityRulesSummary(workingDir: string): string {
         : `页面 ${rule.target.pageId} 的区域 ${rule.target.regionId}`;
       const condition = rule.condition.kind === "truthy"
         ? "truthy"
-        : `equals ${JSON.stringify(rule.condition.value)}`;
-      return `- ${rule.id}: 项目字段 ${rule.source.fieldKey} ${condition} → ${target} ${rule.effect}`;
+        : rule.condition.kind === "equals"
+          ? `equals ${JSON.stringify(rule.condition.value)}`
+          : rule.condition.kind === "oneOf"
+            ? `oneOf ${JSON.stringify(rule.condition.values)}`
+            : `${rule.condition.kind} (${rule.condition.conditions.map((predicate) => `${predicate.source.fieldKey} ${predicate.condition.kind}`).join(", ")})`;
+      const strategy = rule.strategy
+        ? `，策略=${rule.strategy.kind}${rule.strategy.kind === "fallback-page" ? `:${rule.strategy.pageId}` : rule.strategy.kind === "alternative-region" ? `:${rule.strategy.pageId}:${rule.strategy.regionId}` : ""}`
+        : "";
+      const context = rule.context ? `，上下文=${rule.context.kind}:${rule.context.value}` : "";
+      const sources = rule.condition.kind === "all" || rule.condition.kind === "any"
+        ? rule.condition.conditions.map((predicate) => predicate.source.fieldKey)
+        : rule.source ? [rule.source.fieldKey] : [];
+      return `- ${rule.id}: 项目字段 ${[...new Set(sources)].join("、")} ${condition} → ${target} ${rule.effect}${strategy}${context}`;
     }).join("\n");
   } catch {
     return "（规则文件无法读取，请通过 readFile 检查）";

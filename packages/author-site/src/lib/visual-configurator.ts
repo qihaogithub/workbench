@@ -1,7 +1,11 @@
 import type { VisualNodeInfo } from "@workbench/demo-ui/iframe-types";
-import type { ImageDimensionRule } from "@workbench/shared/demo/config-schema-definition";
+import type {
+  ConfigColorFormat,
+  ImageDimensionRule,
+} from "@workbench/shared/demo/config-schema-definition";
 
 export type VisualConfigKind = "text" | "image" | "color";
+export type VisualConfigDefaultValue = string | null;
 
 export interface VisualConfigCandidate {
   id: string;
@@ -16,7 +20,8 @@ export interface VisualConfigTarget {
   kind: VisualConfigKind;
   fieldKey: string;
   title: string;
-  defaultValue: string;
+  defaultValue: VisualConfigDefaultValue;
+  colorFormat?: ConfigColorFormat;
   category?: string;
   colorProperty?: "color" | "backgroundColor" | "borderColor";
   widthRule?: ImageDimensionRule;
@@ -219,8 +224,15 @@ function validateTarget(target: VisualConfigTarget): string | null {
   if (!target.title.trim()) {
     return "字段标题不能为空";
   }
-  if (typeof target.defaultValue !== "string") {
-    return "默认值必须是字符串";
+  if (target.kind === "color") {
+    if (target.defaultValue !== null && typeof target.defaultValue !== "string") {
+      return "颜色默认值必须是颜色字符串或 null";
+    }
+    if (target.colorFormat === "opacity") {
+      return "视觉颜色配置不支持单独的透明度格式，请使用 color 或 color-opacity";
+    }
+  } else if (typeof target.defaultValue !== "string") {
+    return "文本和图片默认值必须是字符串";
   }
   if (target.category !== undefined && typeof target.category !== "string") {
     return "配置分类必须是字符串";
@@ -260,12 +272,12 @@ function ensureRecord(
 
 function createSchemaProperty(target: VisualConfigTarget): Record<string, unknown> {
   const property: Record<string, unknown> = {
-    type: "string",
+    type: target.kind === "color" ? ["string", "null"] : "string",
     title: target.title.trim(),
     default: target.defaultValue,
   };
   if (target.kind === "image") property.format = "image";
-  if (target.kind === "color") property.format = "color";
+  if (target.kind === "color") property.format = target.colorFormat ?? "color";
   const uiOptions: Record<string, unknown> = {};
   const category = normalizeCategory(target.category);
   if (category) {
@@ -289,7 +301,7 @@ function applyCodeChange(
   if (target.kind === "text") {
     const textResult = replaceUniqueTextLiteral(
       code,
-      target.defaultValue,
+      target.defaultValue ?? "",
       `{${target.fieldKey}}`,
     );
     if (!textResult.ok) return textResult;
@@ -310,7 +322,9 @@ function ensurePropsField(
   code: string,
   target: VisualConfigTarget,
 ): { ok: true; code: string } | { ok: false; error: string } {
-  const fieldDeclaration = `  ${target.fieldKey}?: string;`;
+  const fieldDeclaration = target.kind === "color"
+    ? `  ${target.fieldKey}?: string | null;`
+    : `  ${target.fieldKey}?: string;`;
   let nextCode = code;
 
   const interfaceMatch = nextCode.match(/interface\s+(\w*Props)\s*\{([\s\S]*?)\n\}/);

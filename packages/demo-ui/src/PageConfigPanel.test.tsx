@@ -348,6 +348,7 @@ describe("PageConfigPanel design-spec bubble", () => {
 
     const commentButton = screen.getByRole("button", { name: "查看或添加批注：封面" });
     expect(commentButton).toBeVisible();
+    expect(commentButton.parentElement).toHaveClass("pointer-events-auto", "opacity-100");
     expect(commentButton).toHaveClass("bg-amber-400", "text-amber-950");
     expect(screen.queryByRole("button", { name: "编辑配置项：封面" })).not.toBeInTheDocument();
     fireEvent.click(commentButton);
@@ -366,6 +367,69 @@ describe("PageConfigPanel design-spec bubble", () => {
     fireEvent.click(commentButton);
     await waitFor(() => expect(screen.queryByRole("complementary", { name: "配置项批注" })).not.toBeInTheDocument());
 
+  });
+
+  it("浏览端没有配置批注时不显示批注标签", () => {
+    render(
+      <PageConfigPanel
+        pages={[{ id: "page-1", name: "示例页", schema: pageSchema, configData: {} }]}
+        detailPageId="page-1"
+        onPageConfigChange={vi.fn()}
+        configComments={{ readOnly: true, threads: [] }}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "查看或添加批注：封面" })).not.toBeInTheDocument();
+  });
+
+  it("嵌套图片字段标题打开编辑器并定向更新原始 Schema", async () => {
+    const onPageDefinitionChange = vi.fn();
+    const schema = JSON.stringify({
+      type: "object",
+      properties: {
+        navColor: { type: ["string", "null"], title: "导航栏颜色", format: "color", default: null },
+        modules: {
+          type: "array",
+          title: "内容模块",
+          items: {
+            oneOf: [{
+              title: "图片模块",
+              properties: {
+                type: { const: "image" },
+                image: { type: "string", title: "图片", format: "image" },
+              },
+            }],
+          },
+        },
+      },
+    });
+
+    render(
+      <PageConfigPanel
+        pages={[{
+          id: "page-1",
+          name: "示例页",
+          schema,
+          configData: { modules: [{ type: "image", image: "" }] },
+        }]}
+        detailPageId="page-1"
+        onPageDefinitionChange={onPageDefinitionChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "图片模块" }));
+    fireEvent.click(screen.getByRole("button", { name: "编辑配置项：图片" }));
+    fireEvent.change(screen.getByLabelText("名称"), { target: { value: "图片资源" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存字段" }));
+
+    await waitFor(() => expect(onPageDefinitionChange).toHaveBeenCalledWith(
+      "page-1",
+      expect.objectContaining({
+        diff: expect.objectContaining({ updated: ["modules[type=image].image"] }),
+      }),
+    ));
+    const mutation = onPageDefinitionChange.mock.calls[0]?.[1];
+    expect(JSON.parse(mutation.schema).properties.modules.items.oneOf[0].properties.image.title).toBe("图片资源");
   });
 
   it("将 Spine 上传回执作为已持久化的配置变更透传给宿主", async () => {
@@ -453,6 +517,12 @@ describe("PageConfigPanel design-spec bubble", () => {
                       properties: {
                         type: { const: "levelCard" },
                         status: { type: "string", title: "当前状态", enum: ["locked", "open"], "ui:widget": "segmented" },
+                        showDetails: { type: "boolean", title: "显示详情", default: true },
+                        secretText: {
+                          type: "string",
+                          title: "条件详情",
+                          visibleWhen: { field: "showDetails", equals: true },
+                        },
                         position: { type: "position", title: "自由坐标", key: "levelCard", size: { width: 375, height: 656 } },
                       },
                     }],
@@ -471,7 +541,18 @@ describe("PageConfigPanel design-spec bubble", () => {
           id: "page-1",
           name: "闯关页",
           schema,
-          configData: { modules: [{ type: "level", levels: [{ type: "levelCard", status: "locked", position: { x: 1, y: 2 } }] }] },
+          configData: {
+            modules: [{
+              type: "level",
+              levels: [{
+                type: "levelCard",
+                status: "locked",
+                showDetails: true,
+                secretText: "保留的详情",
+                position: { x: 1, y: 2 },
+              }],
+            }],
+          },
         }]}
         detailPageId="page-1"
         onPageConfigChange={onPageConfigChange}
@@ -488,12 +569,43 @@ describe("PageConfigPanel design-spec bubble", () => {
     expect(breadcrumb).not.toHaveTextContent("关卡模块");
     expect(breadcrumb).not.toHaveTextContent("关卡列表");
     expect(sheet).toHaveTextContent("当前状态");
+    expect(sheet).toHaveTextContent("条件详情");
     expect(screen.getAllByRole("dialog")).toHaveLength(1);
 
     fireEvent.click(screen.getByRole("radio", { name: "open" }));
     expect(onPageConfigChange).toHaveBeenLastCalledWith(
       "page-1",
-      { modules: [{ type: "level", levels: [{ type: "levelCard", status: "open", position: { x: 1, y: 2 } }] }] },
+      {
+        modules: [{
+          type: "level",
+          levels: [{
+            type: "levelCard",
+            status: "open",
+            showDetails: true,
+            secretText: "保留的详情",
+            position: { x: 1, y: 2 },
+          }],
+        }],
+      },
+      undefined,
+    );
+
+    fireEvent.click(within(sheet).getByRole("switch"));
+    expect(sheet).not.toHaveTextContent("条件详情");
+    expect(onPageConfigChange).toHaveBeenLastCalledWith(
+      "page-1",
+      {
+        modules: [{
+          type: "level",
+          levels: [{
+            type: "levelCard",
+            status: "open",
+            showDetails: false,
+            secretText: "保留的详情",
+            position: { x: 1, y: 2 },
+          }],
+        }],
+      },
       undefined,
     );
 

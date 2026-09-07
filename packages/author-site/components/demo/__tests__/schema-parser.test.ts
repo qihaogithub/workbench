@@ -487,7 +487,7 @@ describe("parseSchemaToFields", () => {
           type: "object",
           title: "样式配置",
           properties: {
-            bgColor: { type: "string", format: "color", title: "背景色", default: "#fff" },
+            bgColor: { type: ["string", "null"], format: "color", title: "背景色", default: "#FFFFFF" },
             fontSize: { type: "number", title: "字体大小", default: 16 },
           },
         },

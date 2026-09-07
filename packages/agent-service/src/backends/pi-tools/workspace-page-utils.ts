@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
+import { validateWorkspacePathSegment } from "@workbench/shared/workspace-path";
 
 export const WORKSPACE_TREE_FILENAME = "workspace-tree.json";
 
@@ -14,6 +15,13 @@ export interface WorkspacePage {
 export interface WorkspaceTree {
   folders: unknown[];
   pages: WorkspacePage[];
+}
+
+export interface WorkspacePageDiagnostic {
+  pageId: string | null;
+  code: "INVALID_PAGE_ID" | "INCOMPLETE_PAGE" | "INVALID_WORKSPACE_TREE";
+  reason: string;
+  source: "workspace-tree" | "filesystem";
 }
 
 export function getPageEntryFileName(runtimeType?: string): string {
@@ -79,7 +87,7 @@ export function getPageDir(workingDir: string, pageId: string): string {
 }
 
 export function isSafePageId(pageId: string): boolean {
-  return /^[A-Za-z0-9_-]+$/.test(pageId) && !pageId.includes("..");
+  return validateWorkspacePathSegment(pageId).ok;
 }
 
 export function isCompletePageDir(
@@ -151,13 +159,91 @@ export function readWorkspaceTree(workingDir: string): WorkspaceTree {
   };
 }
 
-export function listPages(workingDir: string): WorkspacePage[] {
+export function listPagesWithDiagnostics(
+  workingDir: string,
+): { pages: WorkspacePage[]; diagnostics: WorkspacePageDiagnostic[] } {
   const tree = readWorkspaceTree(workingDir);
-  return tree.pages
-    .filter((page) => isSafePageId(page.id) && isCompletePageDir(workingDir, page.id, page.runtimeType))
-    .map((page) => ({
+  const diagnostics: WorkspacePageDiagnostic[] = [];
+  const pages = tree.pages.flatMap((page) => {
+    if (typeof page.id !== "string" || !isSafePageId(page.id)) {
+      diagnostics.push({
+        pageId: typeof page.id === "string" ? page.id : null,
+        code: "INVALID_PAGE_ID",
+        reason: "page id must be one Unicode-safe path segment",
+        source: "workspace-tree",
+      });
+      return [];
+    }
+    if (!isCompletePageDir(workingDir, page.id, page.runtimeType)) {
+      diagnostics.push({
+        pageId: page.id,
+        code: "INCOMPLETE_PAGE",
+        reason: "page metadata exists but its schema or runtime entry is incomplete",
+        source: "filesystem",
+      });
+      return [];
+    }
+    return [{
       ...page,
       runtimeType: resolvePageRuntimeType(getPageDir(workingDir, page.id), page.runtimeType),
-    }))
-    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+    }];
+  }).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+  return { pages, diagnostics };
+}
+
+export function listPages(workingDir: string): WorkspacePage[] {
+  return listPagesWithDiagnostics(workingDir).pages;
+}
+
+export function listPagesFromSnapshotWithDiagnostics(
+  resources: Record<string, string>,
+): { pages: WorkspacePage[]; diagnostics: WorkspacePageDiagnostic[] } {
+  const treeContent = resources[WORKSPACE_TREE_FILENAME];
+  if (!treeContent) return { pages: [], diagnostics: [] };
+
+  let tree: WorkspaceTree;
+  try {
+    const parsed = JSON.parse(treeContent) as Partial<WorkspaceTree>;
+    tree = {
+      folders: Array.isArray(parsed.folders) ? parsed.folders : [],
+      pages: Array.isArray(parsed.pages) ? parsed.pages : [],
+    };
+  } catch {
+    return {
+      pages: [],
+      diagnostics: [{
+        pageId: null,
+        code: "INVALID_WORKSPACE_TREE",
+        reason: "workspace-tree.json is not valid JSON",
+        source: "workspace-tree",
+      }],
+    };
+  }
+
+  const diagnostics: WorkspacePageDiagnostic[] = [];
+  const pages = tree.pages.flatMap((page) => {
+    if (typeof page.id !== "string" || !isSafePageId(page.id)) {
+      diagnostics.push({
+        pageId: typeof page.id === "string" ? page.id : null,
+        code: "INVALID_PAGE_ID",
+        reason: "page id must be one Unicode-safe path segment",
+        source: "workspace-tree",
+      });
+      return [];
+    }
+    if (!isCompletePageDirFromSnapshot(resources, page.id, page.runtimeType)) {
+      diagnostics.push({
+        pageId: page.id,
+        code: "INCOMPLETE_PAGE",
+        reason: "page metadata exists but its schema or runtime entry is incomplete",
+        source: "filesystem",
+      });
+      return [];
+    }
+    return [{
+      ...page,
+      runtimeType: resolvePageRuntimeTypeFromSnapshot(resources, page.id, page.runtimeType),
+    }];
+  }).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+  return { pages, diagnostics };
 }

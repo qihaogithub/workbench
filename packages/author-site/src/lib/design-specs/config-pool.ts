@@ -46,6 +46,7 @@ export function buildConfigPool(
         title: field.title,
         breadcrumbs: field.breadcrumbs,
         isConst: field.isConst,
+        isBranch: field.isBranch,
         kind,
         value: field.default,
         category: field.category,
@@ -69,6 +70,7 @@ export function buildConfigPool(
         title: field.title,
         breadcrumbs: field.breadcrumbs,
         isConst: field.isConst,
+        isBranch: field.isBranch,
         kind,
         value: field.default,
         category: field.category,
@@ -127,6 +129,7 @@ const IMAGE_EXTENSIONS = new Set([
 ]);
 
 function inferKind(field: SchemaCatalogField): ConfigPoolItemKind {
+  if (field.isBranch) return "text";
   const t = (field.type || "").toLowerCase();
   const w = (field.uiWidget || "").toLowerCase();
   const f = (field.format || "").toLowerCase();
@@ -134,7 +137,8 @@ function inferKind(field: SchemaCatalogField): ConfigPoolItemKind {
   // heuristics must only inspect the leaf property, otherwise every field in
   // an image branch would be classified as an image.
   const k = field.key.split(".").pop()?.toLowerCase() || field.key.toLowerCase();
-  if (f === "color" || t.includes("color")) return "color";
+  if (f === "color" || f === "color-opacity") return "color";
+  if (f === "opacity") return "number";
   if (f === "image" || t === "image" || t === "imagelist" || w === "imagelist" || w === "image")
     return "image";
   if (t === "number" || t === "integer") return "number";

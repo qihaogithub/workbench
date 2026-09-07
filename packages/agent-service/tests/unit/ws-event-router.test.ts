@@ -275,7 +275,7 @@ describe('WebSocketEventRouter', () => {
       contentLength: 8,
       workingDir: '/tmp/workspace',
       demoId: 'demo-1',
-      model: 'deepseek-v4-pro',
+      model: 'openai/gpt-5',
     });
 
     agent.fire({
@@ -302,9 +302,24 @@ describe('WebSocketEventRouter', () => {
         success: true,
         content: '完成',
         files: [{ path: 'workspace-tree.json', action: 'modified' }],
-        durationMs: 1200,
+        receipt: { committed: true, revision: 7 },
+        runtimeValidation: { ok: true },
       },
       durationMs: 1200,
+    });
+    agent.fire({
+      type: 'run_summary',
+      sessionId: 'session-1',
+      runSummary: {
+        mutations: [{
+          mutationId: 'mutation-1',
+          revision: 7,
+          status: 'committed',
+          resources: [{ path: 'workspace-tree.json', action: 'modified' }],
+          actor: 'agent',
+        }],
+        projections: [{ revision: 7, surface: 'active-preview', status: 'applied' }],
+      },
     });
     router.recordFinish({
       success: true,
@@ -342,8 +357,29 @@ describe('WebSocketEventRouter', () => {
         toolResultCount: 1,
         subagentResultCount: 1,
         fileCount: 1,
+        metrics: expect.objectContaining({
+          runDurationMs: expect.any(Number),
+          firstThoughtMs: null,
+          firstToolMs: expect.any(Number),
+          firstTextMs: expect.any(Number),
+          finishMs: expect.any(Number),
+          thoughtEventCount: 0,
+          thoughtCharCount: 0,
+          toolCallCount: 1,
+          toolResultCount: 1,
+          toolDurationSumMs: 1200,
+          toolIntervalMs: expect.any(Number),
+          capabilityActivationCount: 0,
+          capabilityActivationDurationMs: 0,
+          mutationCommitted: true,
+          runtimeValidationOk: true,
+          projectionStatus: 'applied',
+          model: 'openai/gpt-5',
+          provider: 'openai',
+        }),
       }),
     );
+    expect(entries[4].payload.metrics.toolIntervalMs).toBeGreaterThanOrEqual(1200);
 
     const diagnosticPath = path.join(tempDataDir, 'editor-diagnostics', 'agent-service.jsonl');
     const diagnostics = fs

@@ -415,10 +415,37 @@ function readSurfaceRenderedScene(): SketchSceneDocument {
   return JSON.parse(screen.getByTestId("surface-scene-json").textContent ?? "{}") as SketchSceneDocument;
 }
 
+function getColorPickerDialog(container: HTMLElement, label?: string): HTMLElement {
+  const trigger = container.querySelector<HTMLButtonElement>('button[aria-label$="选择器"]');
+  expect(trigger).not.toBeNull();
+  const pickerLabel = label ?? trigger?.getAttribute("aria-label")?.replace(/选择器$/, "");
+  expect(pickerLabel).toBeTruthy();
+  if (trigger?.getAttribute("aria-expanded") !== "true") fireEvent.click(trigger as HTMLButtonElement);
+  return screen.getByRole("dialog", { name: pickerLabel });
+}
+
 function getPresetColorButtons(container: HTMLElement): HTMLButtonElement[] {
-  const grid = container.querySelector<HTMLElement>('[data-sketch-color-grid="true"][aria-label$="常用颜色"]');
-  expect(grid).not.toBeNull();
-  return Array.from(grid?.querySelectorAll<HTMLButtonElement>("[data-sketch-color]") ?? []);
+  const dialog = getColorPickerDialog(container);
+  return Array.from(dialog.querySelectorAll<HTMLButtonElement>("[data-color-picker-preset]"));
+}
+
+function getPresetColorButton(dialog: HTMLElement, color: string): HTMLButtonElement {
+  const normalized = color.toUpperCase();
+  const button = dialog.querySelector<HTMLButtonElement>(`[data-color-picker-preset="${normalized}"]`);
+  expect(button).not.toBeNull();
+  return button as HTMLButtonElement;
+}
+
+function getSharedColorPickerContainer(label: string, root: HTMLElement = document.body): HTMLElement {
+  const container = Array.from(root.querySelectorAll<HTMLElement>('[data-testid="sketch-color-picker"]'))
+    .find((item) => item.querySelector(`button[aria-label="${label}选择器"]`));
+  expect(container).not.toBeNull();
+  return container as HTMLElement;
+}
+
+function clickSharedPreset(container: HTMLElement, label: string, color: string) {
+  const dialog = getColorPickerDialog(container, label);
+  fireEvent.click(getPresetColorButton(dialog, color));
 }
 
 function clickLayerNode(nodeId: string, options?: { shiftKey?: boolean }) {
@@ -1451,17 +1478,12 @@ describe("sketch-react", () => {
     const settings = screen.getByRole("dialog", { name: "画笔设置" });
     expect(within(settings).getByRole("button", { name: "画笔" })).toBeTruthy();
     expect(within(settings).getByRole("button", { name: "橡皮擦" })).toBeTruthy();
-    expect(within(settings).queryByText("颜色", { exact: true })).toBeNull();
-    expect(within(settings).queryByText("粗细", { exact: true })).toBeNull();
-    const widthDots = settings.querySelectorAll<HTMLElement>("[data-sketch-brush-width-dot]");
-    expect(widthDots).toHaveLength(3);
-    expect(Array.from(widthDots).map((dot) => dot.style.width)).toEqual(["4px", "6px", "10px"]);
-    expect(within(settings).getByRole("radio", { name: "画笔颜色 #111827" }).getAttribute("aria-checked")).toBe("true");
+    expect(within(settings).getByRole("button", { name: "画笔颜色选择器" }).textContent).toContain("#111827");
     expect(within(settings).getByRole("radio", { name: "画笔粗细 中" }).getAttribute("aria-checked")).toBe("true");
 
-    fireEvent.click(within(settings).getByRole("radio", { name: "画笔颜色 #7c3aed" }));
+    clickSharedPreset(settings, "画笔颜色", "#7c3aed");
     fireEvent.click(within(settings).getByRole("radio", { name: "画笔粗细 粗" }));
-    expect(within(settings).getByRole("radio", { name: "画笔颜色 #7c3aed" }).getAttribute("aria-checked")).toBe("true");
+    expect(within(settings).getByRole("button", { name: "画笔颜色选择器" }).textContent).toContain("#7C3AED");
     expect(within(settings).getByRole("radio", { name: "画笔粗细 粗" }).getAttribute("aria-checked")).toBe("true");
 
     fireEvent.keyDown(settings, { key: "Escape" });
@@ -1491,7 +1513,7 @@ describe("sketch-react", () => {
 
     fireEvent.click(within(brushGroup).getByRole("button", { name: "打开画笔设置" }));
     const settings = screen.getByRole("dialog", { name: "画笔设置" });
-    fireEvent.click(within(settings).getByRole("radio", { name: "画笔颜色 #7c3aed" }));
+    clickSharedPreset(settings, "画笔颜色", "#7c3aed");
     fireEvent.click(within(settings).getByRole("radio", { name: "画笔粗细 粗" }));
     fireEvent.click(within(brushGroup).getByRole("button", { name: "画笔" }));
 
@@ -1946,7 +1968,7 @@ describe("sketch-react", () => {
     fireEvent.click(within(toolbar).getByLabelText("悬浮文字颜色"));
     const colorMenu = screen.getByRole("menu", { name: "文字颜色" });
     expect(within(colorMenu).queryByLabelText(/无颜色/)).toBeNull();
-    fireEvent.click(within(colorMenu).getByLabelText("文字颜色 #ef4444"));
+    clickSharedPreset(colorMenu, "文字颜色", "#ef4444");
 
     fireEvent.click(within(toolbar).getByLabelText("对齐方式"));
     const alignMenu = screen.getByRole("menu", { name: "对齐方式" });
@@ -1980,20 +2002,17 @@ describe("sketch-react", () => {
     for (const picker of screen.getAllByTestId("sketch-color-picker")) {
       const colors = getPresetColorButtons(picker);
       expect(colors).toHaveLength(60);
-      expect(new Set(colors.map((button) => button.dataset.sketchColor)).size).toBe(60);
-      expect(colors.some((button) => button.dataset.sketchColor === "#f59e0b")).toBe(true);
+      expect(new Set(colors.map((button) => button.dataset.colorPickerPreset)).size).toBe(60);
+      expect(colors.some((button) => button.dataset.colorPickerPreset === "#F59E0B")).toBe(true);
     }
 
     const toolbar = await screen.findByRole("toolbar", { name: "图文工具栏" });
     fireEvent.click(within(toolbar).getByLabelText("悬浮填充"));
     const fillMenu = screen.getByRole("menu", { name: "填充" });
     expect(getPresetColorButtons(fillMenu)).toHaveLength(60);
-    const noFillColor = within(fillMenu).getByLabelText("填充 无颜色");
-    expect(noFillColor).toBeTruthy();
-    expect(noFillColor.className).toContain("w-6");
-    expect(noFillColor.className).not.toContain("w-full");
-    expect(within(fillMenu).queryByText("无颜色", { exact: true })).toBeNull();
-    fireEvent.click(within(fillMenu).getByLabelText("填充 #f59e0b"));
+    const fillDialog = getColorPickerDialog(fillMenu, "填充");
+    expect(within(fillDialog).getByRole("button", { name: "清除" })).toBeTruthy();
+    clickSharedPreset(fillMenu, "填充", "#f59e0b");
 
     await waitFor(() => {
       expect(readRenderedScene().nodes.find((node) => node.id === "rect")?.style?.fill).toBe("#f59e0b");
@@ -2003,7 +2022,8 @@ describe("sketch-react", () => {
     const textMenu = screen.getByRole("menu", { name: "文字颜色" });
     expect(getPresetColorButtons(textMenu)).toHaveLength(60);
     expect(within(textMenu).queryByLabelText(/无颜色/)).toBeNull();
-    fireEvent.change(within(textMenu).getByLabelText("文字颜色 其他颜色输入"), { target: { value: "#123456" } });
+    const textDialog = getColorPickerDialog(textMenu, "文字颜色");
+    fireEvent.change(within(textDialog).getByLabelText("文字颜色Hex值"), { target: { value: "#123456" } });
 
     await waitFor(() => {
       expect(readRenderedScene().nodes.find((node) => node.id === "rect")?.style?.color).toBe("#123456");
@@ -2067,7 +2087,7 @@ describe("sketch-react", () => {
     fireEvent.click(within(inlineToolbar).getByLabelText("悬浮加粗"));
     fireEvent.click(within(inlineToolbar).getByLabelText("悬浮文字颜色"));
     const inlineColorMenu = screen.getByRole("menu", { name: "文字颜色" });
-    fireEvent.click(within(inlineColorMenu).getByLabelText("文字颜色 #2563eb"));
+    clickSharedPreset(inlineColorMenu, "文字颜色", "#2563eb");
     fireEvent.blur(editor);
 
     await waitFor(() => {
@@ -3661,7 +3681,7 @@ describe("sketch-react", () => {
       expect((screen.getByPlaceholderText("对象文本") as HTMLInputElement).disabled).toBe(true);
       expect((screen.getByLabelText("X") as HTMLInputElement).disabled).toBe(true);
       expect((screen.getByLabelText("W") as HTMLInputElement).disabled).toBe(true);
-      expect((screen.getByTitle("填充") as HTMLInputElement).disabled).toBe(true);
+      expect((screen.getByRole("button", { name: "填充选择器" }) as HTMLButtonElement).disabled).toBe(true);
     });
 
     fireEvent.change(screen.getByLabelText("X"), { target: { value: "80" } });
@@ -4876,7 +4896,8 @@ describe("sketch-react", () => {
     expect(rotationScrubber.textContent).toBe("R");
     expect(rotationScrubber.getAttribute("title")).toContain("旋转");
 
-    fireEvent.click(screen.getByLabelText("填充 #EF4444"));
+    const fillPicker = getSharedColorPickerContainer("填充");
+    clickSharedPreset(fillPicker, "填充", "#ef4444");
 
     await waitFor(() => {
       const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
@@ -4885,13 +4906,14 @@ describe("sketch-react", () => {
       });
     });
 
-    expect(screen.getByLabelText("填充最近颜色")).toBeTruthy();
-    expect(screen.getByLabelText("填充 最近 #EF4444")).toBeTruthy();
+    const fillDialog = getColorPickerDialog(fillPicker, "填充");
+    expect(within(fillDialog).getByRole("list", { name: "预设颜色" })).toBeTruthy();
+    expect(within(fillDialog).getByRole("button", { name: "选择预设颜色：填充 最近 #EF4444" })).toBeTruthy();
     expect(screen.getByTestId("scene-json").textContent).not.toContain("recentColors");
 
-    fireEvent.click(screen.getByLabelText("填充 #3B82F6"));
-    expect(screen.getByLabelText("填充 最近 #3B82F6")).toBeTruthy();
-    fireEvent.click(screen.getByLabelText("填充 最近 #EF4444"));
+    fireEvent.click(getPresetColorButton(fillDialog, "#3B82F6"));
+    expect(within(fillDialog).getByRole("button", { name: "选择预设颜色：填充 最近 #3B82F6" })).toBeTruthy();
+    fireEvent.click(within(fillDialog).getByRole("button", { name: "选择预设颜色：填充 最近 #EF4444" }));
 
     await waitFor(() => {
       const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
@@ -4901,11 +4923,11 @@ describe("sketch-react", () => {
       expect(screen.getByTestId("scene-json").textContent).not.toContain("recentColors");
     });
 
-    fireEvent.click(screen.getByLabelText("填充 无颜色"));
+    fireEvent.click(within(fillDialog).getByRole("button", { name: "清除" }));
     await waitFor(() => {
       expect(readRenderedScene().nodes.find((node) => node.id === "rect")?.style?.fill).toBe("transparent");
     });
-    expect(screen.queryByLabelText("文字颜色 无颜色")).toBeNull();
+    expect(screen.queryByRole("button", { name: "文字颜色选择器" })).not.toBeNull();
 
     fireEvent.click(screen.getByTitle("重置填充"));
 
@@ -5118,7 +5140,8 @@ describe("sketch-react", () => {
     fireEvent.click(within(toolbar).getByLabelText("悬浮填充"));
     await waitFor(() => expect(screen.queryByRole("menu", { name: "填充" })).toBeNull());
     fireEvent.click(within(toolbar).getByLabelText("悬浮填充"));
-    fireEvent.click(screen.getByLabelText("填充 #fafafa"));
+    const fillMenu = screen.getByRole("menu", { name: "填充" });
+    clickSharedPreset(fillMenu, "填充", "#fafafa");
 
     await waitFor(() => {
       const parsed = JSON.parse(screen.getByTestId("scene-json").textContent ?? "{}") as SketchSceneDocument;
@@ -5179,7 +5202,7 @@ describe("sketch-react", () => {
     ]);
 
     fireEvent.click(within(toolbar).getByLabelText("悬浮文字颜色"));
-    fireEvent.click(within(screen.getByRole("menu", { name: "文字颜色" })).getByLabelText("文字颜色 #ef4444"));
+    clickSharedPreset(screen.getByRole("menu", { name: "文字颜色" }), "文字颜色", "#ef4444");
     fireEvent.click(within(toolbar).getByLabelText("悬浮加粗"));
     fireEvent.click(within(toolbar).getByLabelText("悬浮斜体"));
     fireEvent.click(within(toolbar).getByLabelText("悬浮下划线"));
@@ -5229,7 +5252,7 @@ describe("sketch-react", () => {
 
     fireEvent.click(within(toolbar).getByLabelText("悬浮加粗"));
     fireEvent.click(within(toolbar).getByLabelText("悬浮文字颜色"));
-    fireEvent.click(within(screen.getByRole("menu", { name: "文字颜色" })).getByLabelText("文字颜色 #2563eb"));
+    clickSharedPreset(screen.getByRole("menu", { name: "文字颜色" }), "文字颜色", "#2563eb");
     fireEvent.change(editor, { target: { value: "Styled shape" } });
     fireEvent.keyDown(editor, { key: "Enter" });
 
@@ -5259,20 +5282,22 @@ describe("sketch-react", () => {
 
     fireEvent.click(within(toolbar).getByLabelText("悬浮填充"));
     const fillMenu = screen.getByRole("menu", { name: "填充" });
-    expect(within(fillMenu).getByLabelText("填充 无颜色")).toBeTruthy();
-    fireEvent.click(within(fillMenu).getByLabelText("填充 无颜色"));
+    const fillDialog = getColorPickerDialog(fillMenu, "填充");
+    expect(within(fillDialog).getByRole("button", { name: "清除" })).toBeTruthy();
+    fireEvent.click(within(fillDialog).getByRole("button", { name: "清除" }));
     await waitFor(() => expect(readRenderedScene().nodes.find((node) => node.id === "front")?.style?.fill).toBe("transparent"));
     expect(within(toolbar).getByTestId("sketch-floating-fill-indicator").className).toContain("bg-white");
 
     fireEvent.click(within(toolbar).getByLabelText("悬浮描边"));
     const strokeMenu = screen.getByRole("menu", { name: "描边" });
-    expect(within(strokeMenu).getByLabelText("描边 无颜色")).toBeTruthy();
+    const strokeDialog = getColorPickerDialog(strokeMenu, "描边");
+    expect(within(strokeDialog).getByRole("button", { name: "清除" })).toBeTruthy();
     const strokeIndicator = within(toolbar).getByTestId("sketch-floating-stroke-indicator");
     const strokeIcon = strokeIndicator.querySelector("svg");
     expect(strokeIcon).toBeTruthy();
     expect(strokeIcon?.getAttribute("stroke")).toBe("currentColor");
     expect(strokeIcon?.style.color).toBe("rgb(17, 24, 39)");
-    fireEvent.click(within(strokeMenu).getByLabelText("描边 无颜色"));
+    fireEvent.click(within(strokeDialog).getByRole("button", { name: "清除" }));
     await waitFor(() => expect(readRenderedScene().nodes.find((node) => node.id === "front")?.style?.stroke).toBe("transparent"));
     const noStrokeIcon = within(toolbar).getByTestId("sketch-floating-stroke-indicator").querySelector("svg");
     expect(noStrokeIcon?.style.color).toBe("rgb(203, 213, 225)");
@@ -5477,7 +5502,7 @@ describe("sketch-react", () => {
     fireEvent.click(within(toolbar).getByLabelText("悬浮颜色"));
     const colorMenu = screen.getByRole("menu", { name: "颜色" });
     expect(within(colorMenu).getByText("当前选区颜色不同")).toBeTruthy();
-    fireEvent.click(within(colorMenu).getByLabelText("颜色 #2563eb"));
+    clickSharedPreset(colorMenu, "颜色", "#2563eb");
 
     await waitFor(() => {
       const parsed = readRenderedScene();
@@ -5489,7 +5514,7 @@ describe("sketch-react", () => {
 
     fireEvent.click(within(toolbar).getByLabelText("悬浮边框"));
     const strokeMenu = screen.getByRole("menu", { name: "边框" });
-    fireEvent.click(within(strokeMenu).getByLabelText("边框 #dc2626"));
+    clickSharedPreset(strokeMenu, "边框", "#dc2626");
 
     await waitFor(() => {
       const parsed = readRenderedScene();
@@ -5520,7 +5545,7 @@ describe("sketch-react", () => {
     expect((within(toolbar).getByLabelText("悬浮边框") as HTMLButtonElement).disabled).toBe(false);
 
     fireEvent.click(within(toolbar).getByLabelText("悬浮颜色"));
-    fireEvent.click(within(screen.getByRole("menu", { name: "颜色" })).getByLabelText("颜色 #f59e0b"));
+    clickSharedPreset(screen.getByRole("menu", { name: "颜色" }), "颜色", "#f59e0b");
     await waitFor(() => {
       const parsed = readRenderedScene();
       expect(parsed.nodes.find((node) => node.id === "shape")?.style?.fill).toBe("#f59e0b");
@@ -5626,7 +5651,7 @@ describe("sketch-react", () => {
     expect(screen.queryByTestId("sketch-rotate-handle")).toBeNull();
 
     fireEvent.click(within(groupToolbar).getByLabelText("悬浮颜色"));
-    fireEvent.click(within(screen.getByRole("menu", { name: "颜色" })).getByLabelText("颜色 #2563eb"));
+    clickSharedPreset(screen.getByRole("menu", { name: "颜色" }), "颜色", "#2563eb");
     await waitFor(() => expect(readRenderedScene().nodes.find((node) => node.id === "rect")?.style?.fill).toBe("#2563eb"));
 
     fireEvent.pointerDown(getSketchNodeElement("rect"), { button: 0, clientX: 80, clientY: 60 });

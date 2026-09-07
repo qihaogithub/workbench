@@ -26,6 +26,7 @@ import {
 import { aiMutationDeniedResult, assertAiMutationAllowed } from "./ai-mutation-policy";
 import { validatePreviewFileWrite } from "./preview-validation";
 import { validateConfigSchemaContract } from "./schema-contract-validation";
+import { formatAuthorityCommitSummary } from "./authority-result-summary";
 
 const MAX_PAGE_ID_LENGTH = 96;
 const MAX_PAGE_NAME_LENGTH = 120;
@@ -39,7 +40,7 @@ const CreatePageParams = Type.Object(
     pageId: Type.String({
       minLength: 1,
       maxLength: MAX_PAGE_ID_LENGTH,
-      description: "New stable page ID / directory name. Use letters, digits, _ or - only.",
+      description: "New stable page ID / directory name. Use one Unicode-safe path segment; do not use /, \\, . or ...",
     }),
     name: Type.String({
       minLength: 1,
@@ -116,7 +117,7 @@ function parseWorkspaceTree(content: string): WorkspaceTree {
 
 function validatePageInput(args: CreatePageParams, tree: WorkspaceTree): string | null {
   if (!isSafePageId(args.pageId) || args.pageId.length > MAX_PAGE_ID_LENGTH) {
-    return "pageId must contain only letters, digits, _ or -, and must not contain path traversal.";
+    return "pageId must be one Unicode-safe path segment and must not contain separators, control characters, or path traversal.";
   }
   if (args.name.trim().length === 0) return "name must not be blank.";
   if (!Number.isSafeInteger(args.order) || args.order < 0) return "order must be a non-negative integer.";
@@ -326,7 +327,7 @@ export function createCreatePageTool(config: AgentConfig): AgentTool<typeof Crea
 
         const createdPage = nextTree.pages.find((page) => page.id === args.pageId)!;
         return {
-          content: [{ type: "text", text: `Created page \"${createdPage.name}\" (${createdPage.id}) as ${createdPage.runtimeType}.` }],
+          content: [{ type: "text", text: `Created page \"${createdPage.name}\" (${createdPage.id}) as ${createdPage.runtimeType}.${formatAuthorityCommitSummary(receipt)}` }],
           details: { createdPage, receipt },
         };
       } catch (error) {

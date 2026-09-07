@@ -19,6 +19,26 @@ export interface AgentClientConfig {
   mode?: AgentMode;
 }
 
+export type AgentClientRequestErrorKind =
+  | "network"
+  | "http"
+  | "response"
+  | "server";
+
+/** 上传请求的传输层错误，供 UI 区分网络/CORS、HTTP 和无效响应。 */
+export class AgentClientRequestError extends Error {
+  readonly name = "AgentClientRequestError";
+
+  constructor(
+    message: string,
+    readonly kind: AgentClientRequestErrorKind,
+    readonly status?: number,
+    readonly code?: string,
+  ) {
+    super(message);
+  }
+}
+
 export class AgentClient {
   private baseUrl: string;
   private apiKey?: string;
@@ -138,14 +158,59 @@ export class AgentClient {
       `${this.baseUrl}/api/agent/${encodeURIComponent(sessionId)}/attachments`,
     );
     url.searchParams.set("projectId", projectId);
-    const response = await fetch(url.toString(), {
-      method: "POST",
-      headers,
-      body: formData,
-    });
-    return response.json() as Promise<
-      ApiResponse<import("./types").FileAttachment>
-    >;
+    let response: Response;
+    try {
+      response = await fetch(url.toString(), {
+        method: "POST",
+        headers,
+        body: formData,
+      });
+    } catch {
+      throw new AgentClientRequestError(
+        "附件上传请求无法连接 AI 服务",
+        "network",
+      );
+    }
+
+    let payload: ApiResponse<import("./types").FileAttachment>;
+    try {
+      payload = (await response.json()) as ApiResponse<
+        import("./types").FileAttachment
+      >;
+    } catch {
+      throw new AgentClientRequestError(
+        "AI 服务返回了无效的附件上传响应",
+        "response",
+        response.status,
+      );
+    }
+
+    if (!payload.success) {
+      if (response.status >= 500) {
+        throw new AgentClientRequestError(
+          payload.error.message,
+          "http",
+          response.status,
+          payload.error.code,
+        );
+      }
+      throw new AgentClientRequestError(
+        payload.error.message,
+        "server",
+        response.status,
+        payload.error.code,
+      );
+    }
+
+    if (!response.ok) {
+      throw new AgentClientRequestError(
+        `附件上传失败（HTTP ${response.status}）`,
+        "http",
+        response.status,
+      );
+    }
+
+    return payload;
   }
 
   async getFiles(

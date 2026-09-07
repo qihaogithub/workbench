@@ -99,6 +99,11 @@ function SinglePagePreviewInternal({
         title={page.name}
         previewSize={previewSize}
         configData={page.configData}
+        visibilityRegions={Object.fromEntries(
+          Object.entries(page.visibilityRegions ?? {})
+            .filter(([key]) => key.startsWith(`${page.id}:`))
+            .map(([key, state]) => [key.slice(page.id.length + 1), state]),
+        )}
         demoId={iframeProps?.demoId ?? page.id}
       />
     );
@@ -209,10 +214,17 @@ function SinglePagePreviewInternal({
         }}
       >
         {content}
-        {page?.visibilityStatus && (page.visibilityStatus.visible === false || page.visibilityStatus.enabled === false) && (
+        {page?.visibilityStatus && (page.visibilityStatus.visible === false || page.visibilityStatus.enabled === false || page.visibilityStatus.unavailable === true) && (
           <div className="pointer-events-none absolute inset-4 z-30 flex items-center justify-center rounded-md bg-slate-900/20">
-            <span className="rounded-md bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow-sm">
-              {page.visibilityStatus.visible === false ? "业务配置已隐藏" : "业务配置已禁用"}
+            <span className="flex flex-col items-center gap-0.5 rounded-md bg-background/90 px-3 py-1.5 text-center text-xs text-muted-foreground shadow-sm">
+              <span>{page.visibilityStatus.unavailable ? "业务配置不可用" : page.visibilityStatus.visible === false ? "业务配置已隐藏" : "业务配置已禁用"}</span>
+              {page.visibilityStatus.message ? <span className="max-w-[280px] text-[10px]">{page.visibilityStatus.message}</span> : null}
+              {page.visibilityStatus.reasons?.length ? (
+                <span className="max-w-[280px] truncate text-[10px]">
+                  由配置「{[...new Set(page.visibilityStatus.reasons.flatMap((reason) => reason.fieldKeys ?? [reason.fieldKey]))].join("、")}」控制
+                </span>
+              ) : null}
+              {page.visibilityStatus.fallbackPageId ? <span className="text-[10px]">备用页：{page.visibilityStatus.fallbackPageId}</span> : null}
             </span>
           </div>
         )}

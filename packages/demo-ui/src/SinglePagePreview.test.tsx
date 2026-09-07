@@ -11,11 +11,13 @@ vi.mock("./IframePreviewFrame", () => ({
     title,
     previewSize,
     configData,
+    visibilityRegions,
   }: {
     src: string;
     title: string;
     previewSize?: { width?: string | number };
     configData?: Record<string, unknown>;
+    visibilityRegions?: Record<string, { visible: boolean; enabled: boolean }>;
   }) => (
     <div
       data-testid="iframe-renderer"
@@ -23,6 +25,7 @@ vi.mock("./IframePreviewFrame", () => ({
       data-title={title}
       data-width={previewSize?.width}
       data-theme={configData?.theme}
+      data-region-state={JSON.stringify(visibilityRegions)}
     />
   ),
 }));
@@ -163,6 +166,10 @@ describe("SinglePagePreview", () => {
         page={createPage({
           iframeUrl: "/published/iframe.html",
           compiledJsUrl: "/published/module.js",
+          visibilityRegions: {
+            "page-1:member-panel": { visible: false, enabled: false },
+            "page-2:ignored-panel": { visible: true, enabled: true },
+          },
         })}
       />,
     );
@@ -172,6 +179,10 @@ describe("SinglePagePreview", () => {
     expect(renderer).toHaveAttribute("data-title", "页面一");
     expect(renderer).toHaveAttribute("data-width", "960");
     expect(renderer).toHaveAttribute("data-theme", "dark");
+    expect(renderer).toHaveAttribute(
+      "data-region-state",
+      JSON.stringify({ "member-panel": { visible: false, enabled: false } }),
+    );
     expect(
       screen.queryByTestId("high-fidelity-renderer"),
     ).not.toBeInTheDocument();

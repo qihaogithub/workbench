@@ -19,6 +19,7 @@ import { getHocuspocusCollabServer } from "../../collab/hocuspocus-server";
 import { resolveCollabResourceKind } from "../../collab/workspace-file-persistence";
 import { aiMutationDeniedResult, assertAiMutationAllowed } from "./ai-mutation-policy";
 import { createManagedDocumentProposalResult } from "./document-proposal-tool";
+import { formatAuthorityCommitSummary } from "./authority-result-summary";
 
 // ---------------------------------------------------------------------------
 // Line ending & BOM utilities (aligned with pi-agent edit-diff.ts)
@@ -683,7 +684,7 @@ export function createEditFileTool(
           content: [
             {
               type: "text",
-              text: `Successfully replaced ${edits.length} block(s) in ${args.path} starting at line ${lineNumber} (${totalOldLines} line(s) replaced with ${totalNewLines} line(s))${fuzzyNote}${validationText}`,
+              text: `Successfully replaced ${edits.length} block(s) in ${args.path} starting at line ${lineNumber} (${totalOldLines} line(s) replaced with ${totalNewLines} line(s))${fuzzyNote}${validationText}${formatAuthorityCommitSummary(receipt, runtimeValidation)}`,
             },
           ],
           details: {

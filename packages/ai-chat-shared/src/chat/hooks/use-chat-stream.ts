@@ -46,6 +46,7 @@ import {
   type ActiveViewContext,
 } from "../../lib/active-view-context";
 import type { RunSummary } from "@workbench/agent-client";
+import type { WorkspaceProjectionAck } from "@workbench/shared/contracts";
 
 const DEFAULT_CURRENT_MESSAGE: ChatMessage = {
   role: "assistant",
@@ -54,6 +55,42 @@ const DEFAULT_CURRENT_MESSAGE: ChatMessage = {
 };
 
 const MAX_CONTEXT_HISTORY_MESSAGES = 8;
+const WORKSPACE_PROJECTION_ACK_EVENT = "workspace-projection-acknowledged";
+
+export function mergeWorkspaceProjectionAck(
+  summary: RunSummary,
+  ack: WorkspaceProjectionAck,
+): RunSummary {
+  if (!summary.mutations.some((mutation) => mutation.revision === ack.revision)) {
+    return summary;
+  }
+
+  const status = ack.status === "applied" ? "applied" : "failed";
+  const existingIndex = summary.projections.findIndex(
+    (projection) =>
+      projection.revision === ack.revision &&
+      projection.surface === ack.surface,
+  );
+  if (
+    existingIndex >= 0 &&
+    summary.projections[existingIndex]?.status === status
+  ) {
+    return summary;
+  }
+
+  const projections = [...summary.projections];
+  const nextProjection = {
+    revision: ack.revision,
+    surface: ack.surface,
+    status,
+  } as const;
+  if (existingIndex >= 0) {
+    projections[existingIndex] = nextProjection;
+  } else {
+    projections.push(nextProjection);
+  }
+  return { ...summary, projections };
+}
 
 function buildConversationHistoryPrefix(messages: ChatMessage[]): string {
   const history = messages
@@ -564,8 +601,71 @@ export function useChatStream(options: UseChatStreamOptions) {
   const lastPersistAtRef = useRef<number>(0);
   const throttlePersistTimerRef = useRef<NodeJS.Timeout | null>(null);
   const currentRunSummaryRef = useRef<RunSummary | null>(null);
+  const pendingProjectionAcksRef = useRef<WorkspaceProjectionAck[]>([]);
   const checkpointVersionRef = useRef<number | undefined>(undefined);
   const titleGenerationKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !projectId) return;
+
+    const handleProjectionAck = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        projectId?: string;
+        sessionId?: string;
+        ack?: WorkspaceProjectionAck;
+      }>).detail;
+      if (
+        detail?.projectId !== projectId ||
+        detail.sessionId !== sessionId ||
+        !detail.ack
+      ) {
+        return;
+      }
+
+      const ack = detail.ack;
+      const currentSummary = currentRunSummaryRef.current;
+      if (currentSummary) {
+        currentRunSummaryRef.current = mergeWorkspaceProjectionAck(
+          currentSummary,
+          ack,
+        );
+      } else {
+        pendingProjectionAcksRef.current = [
+          ...pendingProjectionAcksRef.current.filter(
+            (item) =>
+              item.revision !== ack.revision || item.surface !== ack.surface,
+          ),
+          ack,
+        ].slice(-32);
+      }
+
+      setMessages((previous) => {
+        let changed = false;
+        const next = previous.map((message) => {
+          if (!message.runSummary) return message;
+          const nextSummary = mergeWorkspaceProjectionAck(
+            message.runSummary,
+            ack,
+          );
+          if (nextSummary === message.runSummary) return message;
+          changed = true;
+          return { ...message, runSummary: nextSummary };
+        });
+        if (changed) {
+          void persistMessages(
+            sessionId,
+            next.filter((message) => !message.queueStatus),
+          ).catch(() => {});
+        }
+        return changed ? next : previous;
+      });
+    };
+
+    window.addEventListener(WORKSPACE_PROJECTION_ACK_EVENT, handleProjectionAck);
+    return () => {
+      window.removeEventListener(WORKSPACE_PROJECTION_ACK_EVENT, handleProjectionAck);
+    };
+  }, [projectId, sessionId, setMessages]);
 
   useEffect(() => {
     titleGenerationKeyRef.current = null;
@@ -804,6 +904,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       activeRunRef.current = true;
       busyRetryAttemptedRef.current = false;
       currentRunSummaryRef.current = null;
+      pendingProjectionAcksRef.current = [];
 
       const source = runOptions?.source ?? "user";
       setContextCompactionNotice(false);
@@ -1119,7 +1220,10 @@ export function useChatStream(options: UseChatStreamOptions) {
           },
 
           onRunSummary: (runSummary) => {
-            currentRunSummaryRef.current = runSummary;
+            currentRunSummaryRef.current = pendingProjectionAcksRef.current.reduce(
+              (summary, ack) => mergeWorkspaceProjectionAck(summary, ack),
+              runSummary,
+            );
           },
 
           onFinish: async (result) => {
@@ -1139,6 +1243,11 @@ export function useChatStream(options: UseChatStreamOptions) {
               const hasStructuredParts =
                 currentMsg.parts !== undefined && currentMsg.parts.length > 0;
               const finalParts = extractImageUrlsFromParts(currentMsg.parts || []);
+              const finalRunSummary = pendingProjectionAcksRef.current.reduce(
+                (summary, ack) =>
+                  summary ? mergeWorkspaceProjectionAck(summary, ack) : summary,
+                currentRunSummaryRef.current ?? result.metadata?.runSummary ?? null,
+              );
               const assistantMessage: ChatMessage = {
                 id: currentMsg.id || assistantMessageId,
                 role: "assistant",
@@ -1147,7 +1256,7 @@ export function useChatStream(options: UseChatStreamOptions) {
                   result.content ||
                   (hasStructuredParts ? "" : "抱歉，我没有收到有效的回复。"),
                 parts: finalParts,
-                runSummary: currentRunSummaryRef.current ?? result.metadata?.runSummary,
+                runSummary: finalRunSummary ?? undefined,
               };
 
               const messagesWithAutoRepairStatus = updateAutoRepairStatus(
@@ -1167,6 +1276,7 @@ export function useChatStream(options: UseChatStreamOptions) {
               });
               setStreamContent("");
               currentRunSummaryRef.current = null;
+              pendingProjectionAcksRef.current = [];
 
               // 后备检查：如果 onToolUpdate 未正确触发 knowledge-updated 事件，
               // 在 onFinish 时遍历所有 tool parts 再检查一次

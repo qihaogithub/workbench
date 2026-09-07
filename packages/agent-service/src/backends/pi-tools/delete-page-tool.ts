@@ -16,13 +16,14 @@ import {
   getPageDir,
   getWorkspaceTreePath,
   isCompletePageDir,
-  isCompletePageDirFromSnapshot,
   formatPageEntry,
-  resolvePageRuntimeTypeFromSnapshot,
   readWorkspaceTree,
   listPages,
+  listPagesWithDiagnostics,
+  listPagesFromSnapshotWithDiagnostics,
 } from "./workspace-page-utils";
 import { aiMutationDeniedResult, assertAiMutationAllowed } from "./ai-mutation-policy";
+import { formatAuthorityCommitSummary } from "./authority-result-summary";
 
 const PERMISSION_TIMEOUT_MS = 60_000;
 const DELETION_PLAN_TTL_MS = 5 * 60_000;
@@ -200,43 +201,6 @@ function writeWorkspaceTree(workingDir: string, tree: WorkspaceTree): void {
     JSON.stringify(tree, null, 2),
     "utf-8",
   );
-}
-
-function listPagesFromSnapshot(
-  snapshot: WorkspaceAuthoritySnapshot,
-): WorkspacePage[] {
-  const treeContent = snapshot.resources[WORKSPACE_TREE_FILENAME];
-  if (!treeContent) return [];
-
-  let tree: WorkspaceTree;
-  try {
-    const parsed = JSON.parse(treeContent) as Partial<WorkspaceTree>;
-    tree = {
-      folders: Array.isArray(parsed.folders) ? parsed.folders : [],
-      pages: Array.isArray(parsed.pages) ? parsed.pages : [],
-    };
-  } catch {
-    return [];
-  }
-
-  return tree.pages
-    .filter((page) => {
-      if (!isSafePageId(page.id)) return false;
-      return isCompletePageDirFromSnapshot(
-        snapshot.resources,
-        page.id,
-        page.runtimeType,
-      );
-    })
-    .map((page) => ({
-      ...page,
-      runtimeType: resolvePageRuntimeTypeFromSnapshot(
-        snapshot.resources,
-        page.id,
-        page.runtimeType,
-      ),
-    }))
-    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
 }
 
 function formatPages(pages: WorkspacePage[]): string {
@@ -473,7 +437,7 @@ async function deleteOnePage(
       content: [
         {
           type: "text" as const,
-          text: `Deleted page "${existing.name}" (${pageId}).`,
+          text: `Deleted page "${existing.name}" (${pageId}).${formatAuthorityCommitSummary(receipt)}`,
         },
       ],
       details: {
@@ -611,7 +575,7 @@ async function deletePageBatch(
       content: [
         {
           type: "text" as const,
-          text: `Deleted ${deletedPages.length} pages: ${deletedPages.map((page) => `${page.pageName} (${page.pageId})`).join(", ")}.`,
+          text: `Deleted ${deletedPages.length} pages: ${deletedPages.map((page) => `${page.pageName} (${page.pageId})`).join(", ")}.${formatAuthorityCommitSummary(receipt)}`,
         },
       ],
       details: { deleted: true, deletedPages, receipt },
@@ -652,21 +616,28 @@ export function createListPagesTool(
             )
           : null;
 
-        const pages = snapshot
-          ? listPagesFromSnapshot(snapshot)
-          : listPages(workingDir);
+        const listed = snapshot
+          ? listPagesFromSnapshotWithDiagnostics(snapshot.resources)
+          : (() => {
+              const result = listPagesWithDiagnostics(workingDir);
+              return result;
+            })();
+        const diagnosticText = listed.diagnostics.length > 0
+          ? `\n\nDiagnostics:\n${listed.diagnostics.map((item) => `- ${item.code}: ${item.pageId ?? "<unknown>"} — ${item.reason}`).join("\n")}`
+          : "";
         return {
-          content: [{ type: "text" as const, text: formatPages(pages) }],
+          content: [{ type: "text" as const, text: `${formatPages(listed.pages)}${diagnosticText}` }],
           details: {
-            pages: pages.map((page) => {
+            pages: listed.pages.map((page) => {
               const { indexPath, schemaPath } = formatPageEntry(
                 page.id,
                 page.runtimeType,
               );
               return { id: page.id, name: page.name, indexPath, schemaPath };
             }),
+            diagnostics: listed.diagnostics,
             snapshotRevision: snapshot?.state.revision,
-            pageCount: pages.length,
+            pageCount: listed.pages.length,
           },
         };
       } catch (error) {

@@ -11,6 +11,7 @@ import {
   WorkspaceMutationAuthorityError,
 } from "../../workspace/workspace-mutation-authority";
 import { aiMutationDeniedResult, assertAiMutationAllowed } from "./ai-mutation-policy";
+import { formatAuthorityCommitSummary } from "./authority-result-summary";
 import { createManagedDocumentProposalResult } from "./document-proposal-tool";
 
 const WORKSPACE_TREE_FILENAME = "workspace-tree.json";
@@ -147,11 +148,12 @@ export function createDeleteFileTool(
           if (proposalResult) return proposalResult;
         }
 
+        let receipt = null;
         if (liveWorkspace) {
           let driftRetryCount = 0;
           for (;;) {
             try {
-              await liveWorkspace.authority.mutate({
+              receipt = await liveWorkspace.authority.mutate({
                 mutationId: crypto.randomUUID(),
                 projectId: liveWorkspace.projectId,
                 workspaceId: liveWorkspace.workspaceId,
@@ -202,9 +204,9 @@ export function createDeleteFileTool(
         logger.debug({ path: relativePath }, "File deleted successfully");
         return {
           content: [
-            { type: "text", text: `Successfully deleted ${relativePath}` },
+            { type: "text", text: `Successfully deleted ${relativePath}${formatAuthorityCommitSummary(receipt)}` },
           ],
-          details: { path: relativePath },
+          details: { path: relativePath, receipt },
         };
       } catch (error) {
         const message =

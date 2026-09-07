@@ -8,7 +8,7 @@ import {
 
 const ReadPreinstalledSkillParams = Type.Object({
   name: Type.String({
-    description: 'Name of the preinstalled skill to read, for example "design-taste-frontend".',
+    description: 'Name of the preinstalled skill to read, for example "page-lifecycle".',
     minLength: 1,
   }),
   startLine: Type.Optional(Type.Number({

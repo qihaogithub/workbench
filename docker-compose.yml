@@ -85,6 +85,7 @@ services:
         - NEXT_PUBLIC_MODEL_NAME_FILTERS=${NEXT_PUBLIC_MODEL_NAME_FILTERS:-}
         - NEXT_PUBLIC_SCREENSHOT_SERVICE_URL=${NEXT_PUBLIC_SCREENSHOT_SERVICE_URL:-http://localhost:3202}
         - NEXT_PUBLIC_VIEWER_URL=${NEXT_PUBLIC_VIEWER_URL:-http://localhost:3300}
+        - NEXT_PUBLIC_AUTHOR_SITE_URL=${NEXT_PUBLIC_AUTHOR_SITE_URL:-http://localhost:3200}
         - JWT_SECRET=${JWT_SECRET:-change-this-in-production}
         - DEBIAN_MIRROR=${DEBIAN_MIRROR:-http://mirrors.aliyun.com/debian}
         - NPM_REGISTRY=${NPM_REGISTRY:-https://registry.npmmirror.com}
@@ -102,6 +103,7 @@ services:
       - NEXT_PUBLIC_MODEL_NAME_FILTERS=${NEXT_PUBLIC_MODEL_NAME_FILTERS:-}
       - NEXT_PUBLIC_SCREENSHOT_SERVICE_URL=${NEXT_PUBLIC_SCREENSHOT_SERVICE_URL:-http://localhost:3202}
       - NEXT_PUBLIC_VIEWER_URL=${NEXT_PUBLIC_VIEWER_URL:-http://localhost:3300}
+      - NEXT_PUBLIC_AUTHOR_SITE_URL=${NEXT_PUBLIC_AUTHOR_SITE_URL:-http://localhost:3200}
       - JWT_SECRET=${JWT_SECRET:-change-this-in-production}
       - AUTH_COOKIE_NAME=${AUTH_COOKIE_NAME:-auth_token_docker}
       - USE_SECURE_COOKIE=${USE_SECURE_COOKIE:-false}
@@ -169,6 +171,7 @@ services:
         # here bakes an unreachable URL into the static viewer bundle.
         - NEXT_PUBLIC_DATA_BASE=${DOCKER_NEXT_PUBLIC_DATA_BASE:-}
         - NEXT_PUBLIC_VIEWER_DOCKER_MODE=true
+        - NEXT_PUBLIC_AUTHOR_SITE_URL=${NEXT_PUBLIC_AUTHOR_SITE_URL:-http://localhost:3200}
         - NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES=${NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES:-custom/}
         - NEXT_PUBLIC_MODEL_BLACKLIST=${NEXT_PUBLIC_MODEL_BLACKLIST:-}
         - NEXT_PUBLIC_DEFAULT_MODEL_IDS=${NEXT_PUBLIC_DEFAULT_MODEL_IDS:-}

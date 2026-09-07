@@ -16,6 +16,19 @@ import {
   getToolResultDetails,
 } from "./assistant-text-utils";
 
+export function guardVisibilityCompletionClaim(
+  text: string,
+  files: FileChange[],
+  committedVisibilityRules: boolean,
+): string {
+  const claimsCrossPageBehavior = /(跨页面|跨页|页面联动|页面可见性|visibility)/i.test(text)
+    && /(已完成|完成了|已实现|已接入|已支持|complete|done)/i.test(text)
+    && !/(未完成|尚未|没有|无法|未提交|未通过)/i.test(text);
+  const changedPageRuntime = files.some((change) => /^demos\/[^/]+\/(?:index\.tsx|prototype\.html|sandbox\.html)$/.test(change.path));
+  if (!claimsCrossPageBehavior || !changedPageRuntime || committedVisibilityRules) return text;
+  return `${text}\n\n【系统校验】页面代码已修改，但联动规则未通过 Authority receipt 提交；跨页面联动尚未完成。`;
+}
+
 /**
  * 工具钩子管理器
  *
@@ -44,6 +57,10 @@ export class ToolHookManager {
 
   getMutationReceipts(): MutationReceiptEntry[] {
     return this.mutationReceipts;
+  }
+
+  hasCommittedVisibilityRules(): boolean {
+    return this.mutationReceipts.some((receipt) => receipt.resources.some((resource) => resource.path === "project.visibility-rules.json"));
   }
 
   getReadKnowledgeFiles(): Set<string> {

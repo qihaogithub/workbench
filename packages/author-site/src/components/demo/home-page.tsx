@@ -41,6 +41,7 @@ import { SettingsButton } from "@/components/settings/settings-button";
 import { ShareDialog } from "@/components/share/ShareDialog";
 import { useToast } from "@/components/ui/toast-provider";
 import { cn } from "@/lib/utils";
+import { getOfficialHomeUrl } from "@/lib/official-site-url";
 import { getViewerBaseUrl } from "@/lib/viewer-url";
 import {
   createDemo,
@@ -723,7 +724,7 @@ export function HomePage({ initialDemos }: { initialDemos: DemoMeta[] }) {
         <div className="border-b border-border">
           <div className="container flex h-16 items-center px-4">
           <div className="mr-8 flex items-center">
-            <Link href="/workbench" className="oneflow-wordmark text-lg font-semibold tracking-tight">
+            <Link href={getOfficialHomeUrl()} className="oneflow-wordmark text-lg font-semibold tracking-tight">
               OneFlow
             </Link>
           </div>

@@ -13,6 +13,7 @@ import {
   Loader2,
   MoreVertical,
   Plus,
+  Pencil,
   ScrollText,
   Trash2,
   Upload,
@@ -50,10 +51,6 @@ import type { KnowledgeItem } from "./KnowledgeDocDialog";
 import type { CommentTarget, DocumentCommentAnchor } from "@workbench/shared";
 import { DesignSpecEditor } from "./DesignSpecEditor";
 import {
-  DocumentNameDialog,
-  getNextAvailableTitle,
-} from "./DocumentNameDialog";
-import {
   MarkdownReferenceLinksPanel,
   type MarkdownReferenceMention,
 } from "./MarkdownReferenceLinksPanel";
@@ -76,20 +73,17 @@ export interface PageItem {
 
 const EMPTY_PAGE_ITEMS: PageItem[] = [];
 
+function isWithinDropdownMenu(target: EventTarget | null): target is Element {
+  return target instanceof Element && Boolean(target.closest('[role="menu"]'));
+}
+
 /** 右侧编辑区当前打开的目标：知识库文档 / AI 记忆 / 项目公约 / 页面公约 / 设计规范 */
 type ActiveTarget =
   | { kind: "knowledge"; item: KnowledgeItem }
   | { kind: "memory" }
   | { kind: "convention" }
   | { kind: "pageConvention"; page: PageItem }
-  | { kind: "designSpec"; docId: string };
-
-type DocumentNameRequest = {
-  title: string;
-  label: string;
-  defaultValue: string;
-  description: string;
-};
+  | { kind: "designSpec"; doc: DesignSpecMeta };
 
 /** 解析 workspace files 接口中的路径（memory/convention/pageConvention） */
 function resolveWorkspaceFilePath(target: ActiveTarget): string | null {
@@ -128,17 +122,7 @@ function getContentCacheKey(target: ActiveTarget): string {
   if (target.kind === "pageConvention") {
     return `workspace:demos/${target.page.id}/convention.md`;
   }
-  return `design-spec:${target.docId}`;
-}
-
-function readStoredDesignSpecDocId(storageKey: string | null): string | null {
-  if (!storageKey || typeof window === "undefined") return null;
-  try {
-    const value = window.sessionStorage.getItem(storageKey);
-    return value?.trim() || null;
-  } catch {
-    return null;
-  }
+  return `design-spec:${target.doc.id}`;
 }
 
 export interface DocumentViewProps {
@@ -153,7 +137,6 @@ export interface DocumentViewProps {
   onDocHistory?: (item: KnowledgeItem) => void;
   onDocDeleted?: (item: KnowledgeItem) => void;
   designSpecFocus?: { docId: string; entryId: string } | null;
-  onDesignSpecFocusConsumed?: () => void;
   onEditConfigDefinition?: (target: DesignSpecRef) => void;
   onCommentTargetChange?: (target: CommentTarget | null) => void;
   onDocumentCommentSelection?: (anchor: DocumentCommentAnchor) => void;
@@ -173,7 +156,6 @@ export function DocumentView({
   onDocHistory,
   onDocDeleted,
   designSpecFocus,
-  onDesignSpecFocusConsumed,
   onEditConfigDefinition,
   onCommentTargetChange,
   onDocumentCommentSelection,
@@ -182,6 +164,8 @@ export function DocumentView({
 }: DocumentViewProps) {
   const { toast } = useToast();
   const [items, setItems] = useState<KnowledgeItem[]>([]);
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
   const canManageGovernance = userRole === "admin";
   const [loading, setLoading] = useState(false);
   const [activeTarget, setActiveTarget] = useState<ActiveTarget | null>(null);
@@ -190,9 +174,9 @@ export function DocumentView({
   const [contentReloadRevision, setContentReloadRevision] = useState(0);
   const [userExpanded, setUserExpanded] = useState(true);
   const [conventionExpanded, setConventionExpanded] = useState(true);
-  const [existingConventionPaths, setExistingConventionPaths] = useState<
-    Set<string>
-  >(new Set());
+  const [existingConventionPaths, setExistingConventionPaths] = useState<Set<string>>(
+    new Set(),
+  );
   const [pagePickerOpen, setPagePickerOpen] = useState(false);
   const [designSpecs, setDesignSpecs] = useState<DesignSpecMeta[]>([]);
   const [designSpecsLoading, setDesignSpecsLoading] = useState(false);
@@ -201,108 +185,23 @@ export function DocumentView({
   const [knowledgeMenuOpen, setKnowledgeMenuOpen] = useState(false);
   const [proposalId, setProposalId] = useState<string | null>(null);
   const [proposalReviewOpen, setProposalReviewOpen] = useState(false);
-  const [renamingKnowledgeId, setRenamingKnowledgeId] = useState<string | null>(
-    null,
-  );
+  const [renamingKnowledgeId, setRenamingKnowledgeId] = useState<string | null>(null);
   const [renamingKnowledgeTitle, setRenamingKnowledgeTitle] = useState("");
-  const [documentNameRequest, setDocumentNameRequest] =
-    useState<DocumentNameRequest | null>(null);
+  const [renamingDesignSpecId, setRenamingDesignSpecId] = useState<string | null>(null);
+  const [renamingDesignSpecTitle, setRenamingDesignSpecTitle] = useState("");
   const knowledgeMutationVersionRef = useRef(0);
-  const itemsRequestVersionRef = useRef(0);
-  const itemsLoadedScopeRef = useRef<string | null>(null);
-  const designSpecsRequestVersionRef = useRef(0);
-  const designSpecsLoadedScopeRef = useRef<string | null>(null);
-  const designSpecsRef = useRef<DesignSpecMeta[]>([]);
-  const designSpecsLoadedRef = useRef(false);
-  const [designSpecsLoaded, setDesignSpecsLoaded] = useState(false);
-  const designSpecFocusHandledRef = useRef<string | null>(null);
-  const pendingDocumentNameResolverRef = useRef<
-    ((value: string | null) => void) | null
-  >(null);
+  const designSpecMutationVersionRef = useRef(0);
   const knowledgeUploadInputRef = useRef<HTMLInputElement>(null);
+  const designSpecRenameBlurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const designSpecRenameInputRef = useRef<HTMLInputElement>(null);
   // 同一视图内切换文档时复用已读取的正文；资源列表刷新时会清空该缓存。
   const contentCacheRef = useRef(new Map<string, string>());
   const referenceEditorContainerRef = useRef<HTMLDivElement>(null);
 
-  const itemsScopeKey = `${documentApiMode}:${workingDir ?? ""}:${projectId ?? ""}:${sessionId ?? ""}`;
-  const designSpecsScopeKey = `${workingDir ?? ""}:${projectId ?? ""}:${sessionId ?? ""}`;
-  const designSpecSelectionStorageKey =
-    projectId && (workspaceId || workingDir)
-      ? [
-          "workbench:design-spec-selection",
-          documentApiMode,
-          projectId,
-          workspaceId || workingDir,
-        ].join(":")
-      : null;
-  const activeTargetScopeKeyRef = useRef(itemsScopeKey);
-
-  const storeDesignSpecSelection = useCallback(
-    (docId: string | null) => {
-      if (!designSpecSelectionStorageKey || typeof window === "undefined")
-        return;
-      try {
-        if (docId) {
-          window.sessionStorage.setItem(designSpecSelectionStorageKey, docId);
-        } else {
-          window.sessionStorage.removeItem(designSpecSelectionStorageKey);
-        }
-      } catch {
-        // 私有浏览器上下文可能禁用 sessionStorage，不影响编辑功能。
-      }
-    },
-    [designSpecSelectionStorageKey],
-  );
-
-  const resolveDocumentNameRequest = useCallback((value: string | null) => {
-    const resolver = pendingDocumentNameResolverRef.current;
-    pendingDocumentNameResolverRef.current = null;
-    setDocumentNameRequest(null);
-    resolver?.(value);
-  }, []);
-
-  const requestDocumentName = useCallback((request: DocumentNameRequest) => {
-    pendingDocumentNameResolverRef.current?.(null);
-    pendingDocumentNameResolverRef.current = null;
-    setDocumentNameRequest(request);
-    return new Promise<string | null>((resolve) => {
-      pendingDocumentNameResolverRef.current = resolve;
-    });
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      pendingDocumentNameResolverRef.current?.(null);
-      pendingDocumentNameResolverRef.current = null;
-    };
-  }, []);
-
-  const consumePendingDesignSpecFocus = useCallback(() => {
-    if (designSpecFocus) {
-      designSpecFocusHandledRef.current = `${designSpecFocus.docId}:${designSpecFocus.entryId}`;
-    }
-    onDesignSpecFocusConsumed?.();
-  }, [designSpecFocus, onDesignSpecFocusConsumed]);
-
-  const selectTarget = useCallback(
-    (target: ActiveTarget) => {
-      setFocusedEntryId(null);
-      consumePendingDesignSpecFocus();
-      storeDesignSpecSelection(
-        target.kind === "designSpec" ? target.docId : null,
-      );
-      setActiveTarget(target);
-    },
-    [consumePendingDesignSpecFocus, storeDesignSpecSelection],
-  );
-
   const referenceProvider = useCallback<MarkdownReferenceProvider>(
     async ({ query, context, signal }) => {
       if (!projectId) return [];
-      const params = new URLSearchParams({
-        q: query,
-        kind: "project,page,document",
-      });
+      const params = new URLSearchParams({ q: query, kind: "project,page,document" });
       if (sessionId) params.set("sessionId", sessionId);
       const response = await fetch(
         `/api/projects/${encodeURIComponent(projectId)}/markdown-references/candidates?${params.toString()}`,
@@ -332,12 +231,7 @@ export function DocumentView({
     } else if (activeTarget.kind === "convention") {
       source = { kind: "project-convention", projectId, workspaceId };
     } else if (activeTarget.kind === "pageConvention") {
-      source = {
-        kind: "page-convention",
-        projectId,
-        workspaceId,
-        pageId: activeTarget.page.id,
-      };
+      source = { kind: "page-convention", projectId, workspaceId, pageId: activeTarget.page.id };
     } else {
       return undefined;
     }
@@ -373,140 +267,72 @@ export function DocumentView({
     [items],
   );
 
-  useEffect(() => {
-    itemsLoadedScopeRef.current = null;
-    setItems([]);
-    setActiveTarget(null);
-    setFocusedEntryId(null);
-    setContent("");
-    setContentLoading(false);
-  }, [itemsScopeKey]);
-
-  useEffect(() => {
-    designSpecsLoadedScopeRef.current = null;
-    designSpecsRef.current = [];
-    designSpecsLoadedRef.current = false;
-    setDesignSpecs([]);
-    setActiveTarget(null);
-    setFocusedEntryId(null);
-    setDesignSpecsLoaded(false);
-  }, [designSpecsScopeKey]);
-
-  const fetchItems = useCallback(
-    async ({ background = false }: { background?: boolean } = {}) => {
-      if (!workingDir && !(documentApiMode === "project" && projectId)) return;
-      const requestId = ++itemsRequestVersionRef.current;
-      const requestMutationVersion = knowledgeMutationVersionRef.current;
-      const isInitialLoad = itemsLoadedScopeRef.current !== itemsScopeKey;
-      if (isInitialLoad && !background) setLoading(true);
-      try {
-        const params = workingDir
-          ? new URLSearchParams({ workingDir })
-          : new URLSearchParams();
-        if (projectId && documentApiMode === "legacy")
-          params.set("projectId", projectId);
-        if (sessionId && documentApiMode === "legacy")
-          params.set("sessionId", sessionId);
-        const res = await fetch(
-          documentApiMode === "project" && projectId
-            ? `/api/projects/${encodeURIComponent(projectId)}/documents${sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : ""}`
-            : `/api/knowledge?${params.toString()}`,
-        );
-        const data = await res.json();
-        if (data.success) {
-          if (requestId !== itemsRequestVersionRef.current) return;
-          if (knowledgeMutationVersionRef.current !== requestMutationVersion)
-            return;
-          const nextItems =
-            documentApiMode === "project"
-              ? toKnowledgeItems(data.data)
-              : data.data;
-          itemsLoadedScopeRef.current = itemsScopeKey;
-          setItems(nextItems);
-          onItemsChangeRef.current?.(nextItems);
-          onItemsLoadedRef.current?.(nextItems);
-        }
-      } catch {
-        // 静默失败
-      } finally {
-        if (requestId === itemsRequestVersionRef.current && isInitialLoad) {
-          setLoading(false);
-        }
+  const fetchItems = useCallback(async () => {
+    if (!workingDir && !(documentApiMode === "project" && projectId)) return;
+    const requestMutationVersion = knowledgeMutationVersionRef.current;
+    setLoading(true);
+    try {
+      const params = workingDir ? new URLSearchParams({ workingDir }) : new URLSearchParams();
+      if (projectId && documentApiMode === "legacy") params.set("projectId", projectId);
+      if (sessionId && documentApiMode === "legacy") params.set("sessionId", sessionId);
+      const res = await fetch(
+        documentApiMode === "project" && projectId
+          ? `/api/projects/${encodeURIComponent(projectId)}/documents${sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : ""}`
+          : `/api/knowledge?${params.toString()}`,
+      );
+      const data = await res.json();
+      if (data.success) {
+        if (knowledgeMutationVersionRef.current !== requestMutationVersion) return;
+        const nextItems = documentApiMode === "project"
+          ? toKnowledgeItems(data.data)
+          : data.data;
+        setItems(nextItems);
+        onItemsChangeRef.current?.(nextItems);
+        onItemsLoadedRef.current?.(nextItems);
       }
-    },
-    [documentApiMode, workingDir, projectId, sessionId, itemsScopeKey],
-  );
+    } catch {
+      // 静默失败
+    } finally {
+      setLoading(false);
+    }
+  }, [documentApiMode, workingDir, projectId, sessionId]);
 
-  const fetchDesignSpecs = useCallback(
-    async ({ background = false }: { background?: boolean } = {}) => {
-      if (!workingDir) return;
-      const requestId = ++designSpecsRequestVersionRef.current;
-      const isInitialLoad =
-        designSpecsLoadedScopeRef.current !== designSpecsScopeKey;
-      if (isInitialLoad && !background) setDesignSpecsLoading(true);
-      try {
-        const params = new URLSearchParams({ workingDir });
-        if (sessionId) params.set("sessionId", sessionId);
-        if (projectId) params.set("projectId", projectId);
-        const res = await fetch(`/api/design-specs?${params.toString()}`);
-        const data = await res.json();
-        if (
-          data.success &&
-          requestId === designSpecsRequestVersionRef.current
-        ) {
-          designSpecsLoadedScopeRef.current = designSpecsScopeKey;
-          const nextDesignSpecs = data.data || [];
-          designSpecsRef.current = nextDesignSpecs;
-          designSpecsLoadedRef.current = true;
-          setDesignSpecsLoaded(true);
-          setDesignSpecs(nextDesignSpecs);
-        }
-      } catch {
-        // 静默失败
-      } finally {
-        if (
-          requestId === designSpecsRequestVersionRef.current &&
-          isInitialLoad
-        ) {
-          setDesignSpecsLoading(false);
-        }
+  const fetchDesignSpecs = useCallback(async () => {
+    if (!workingDir) return;
+    const requestMutationVersion = designSpecMutationVersionRef.current;
+    setDesignSpecsLoading(true);
+    try {
+      const params = new URLSearchParams({ workingDir });
+      if (sessionId) params.set("sessionId", sessionId);
+      if (projectId) params.set("projectId", projectId);
+      const res = await fetch(`/api/design-specs?${params.toString()}`);
+      const data = await res.json();
+      if (data.success && designSpecMutationVersionRef.current === requestMutationVersion) {
+        setDesignSpecs(data.data || []);
       }
-    },
-    [workingDir, sessionId, projectId, designSpecsScopeKey],
-  );
+    } catch {
+      // 静默失败
+    } finally {
+      setDesignSpecsLoading(false);
+    }
+  }, [workingDir, sessionId, projectId]);
 
   useEffect(() => {
-    void fetchItems();
+    fetchItems();
   }, [fetchItems]);
 
   useEffect(() => {
-    void fetchDesignSpecs();
+    fetchDesignSpecs();
   }, [fetchDesignSpecs]);
 
   useEffect(() => {
-    if (!designSpecFocus) {
-      designSpecFocusHandledRef.current = null;
-      return;
-    }
-    const focusKey = `${designSpecFocus.docId}:${designSpecFocus.entryId}`;
-    if (designSpecFocusHandledRef.current === focusKey || !designSpecsLoaded)
-      return;
-    designSpecFocusHandledRef.current = focusKey;
+    if (!designSpecFocus) return;
     const doc = designSpecs.find((item) => item.id === designSpecFocus.docId);
-    if (!doc) {
-      onDesignSpecFocusConsumed?.();
-      return;
-    }
+    if (!doc) return;
     setDesignSpecExpanded(true);
-    selectTarget({ kind: "designSpec", docId: doc.id });
+    setActiveTarget({ kind: "designSpec", doc });
     setFocusedEntryId(designSpecFocus.entryId);
-  }, [
-    designSpecFocus,
-    designSpecs,
-    designSpecsLoaded,
-    onDesignSpecFocusConsumed,
-    selectTarget,
-  ]);
+  }, [designSpecFocus, designSpecs]);
 
   const fetchExistingConventions = useCallback(async () => {
     if (!sessionId) {
@@ -518,9 +344,7 @@ export function DocumentView({
         `/api/sessions/${sessionId}/workspace/files?include=conventions`,
       );
       const data = await res.json();
-      setExistingConventionPaths(
-        new Set(data.success ? data.data.paths || [] : []),
-      );
+      setExistingConventionPaths(new Set(data.success ? data.data.paths || [] : []));
     } catch {
       setExistingConventionPaths(new Set());
     }
@@ -531,21 +355,53 @@ export function DocumentView({
   }, [fetchExistingConventions]);
 
   useEffect(() => {
-    const handleKnowledgeUpdated = () => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<unknown>).detail;
+      if (detail && typeof detail === "object") {
+        const update = detail as Record<string, unknown>;
+        if (
+          typeof update.docId === "string" &&
+          typeof update.title === "string" &&
+          update.title.trim()
+        ) {
+          const title = update.title.trim();
+          if (event.type === "knowledge-updated") {
+            setItems((current) =>
+              current.map((item) =>
+                item.id === update.docId ? { ...item, title } : item,
+              ),
+            );
+            setActiveTarget((current) =>
+              current?.kind === "knowledge" && current.item.id === update.docId
+                ? { kind: "knowledge", item: { ...current.item, title } }
+                : current,
+            );
+            return;
+          }
+          if (event.type === "design-spec-updated") {
+            setDesignSpecs((current) =>
+              current.map((doc) =>
+                doc.id === update.docId ? { ...doc, title } : doc,
+              ),
+            );
+            setActiveTarget((current) =>
+              current?.kind === "designSpec" && current.doc.id === update.docId
+                ? { kind: "designSpec", doc: { ...current.doc, title } }
+                : current,
+            );
+            return;
+          }
+        }
+      }
       contentCacheRef.current.clear();
-      void fetchItems({ background: true });
+      fetchItems();
+      fetchDesignSpecs();
     };
-    const handleDesignSpecUpdated = () => {
-      void fetchDesignSpecs({ background: true });
-    };
-    window.addEventListener("knowledge-updated", handleKnowledgeUpdated);
-    window.addEventListener("design-spec-updated", handleDesignSpecUpdated);
+    window.addEventListener("knowledge-updated", handler);
+    window.addEventListener("design-spec-updated", handler);
     return () => {
-      window.removeEventListener("knowledge-updated", handleKnowledgeUpdated);
-      window.removeEventListener(
-        "design-spec-updated",
-        handleDesignSpecUpdated,
-      );
+      window.removeEventListener("knowledge-updated", handler);
+      window.removeEventListener("design-spec-updated", handler);
     };
   }, [fetchItems, fetchDesignSpecs]);
 
@@ -557,28 +413,6 @@ export function DocumentView({
     window.addEventListener("document-proposal-created", handler);
     return () => window.removeEventListener("document-proposal-created", handler);
   }, []);
-
-  // 同一项目/工作区刷新后恢复上次选中的设计规范；实际文档仍以当前列表为准。
-  useEffect(() => {
-    if (!designSpecsLoaded || activeTarget) return;
-    const storedDocId = readStoredDesignSpecDocId(
-      designSpecSelectionStorageKey,
-    );
-    if (!storedDocId) return;
-    const storedDoc = designSpecs.find((doc) => doc.id === storedDocId);
-    if (!storedDoc) {
-      storeDesignSpecSelection(null);
-      return;
-    }
-    setDesignSpecExpanded(true);
-    setActiveTarget({ kind: "designSpec", docId: storedDoc.id });
-  }, [
-    activeTarget,
-    designSpecSelectionStorageKey,
-    designSpecs,
-    designSpecsLoaded,
-    storeDesignSpecSelection,
-  ]);
 
   // 默认选中第一个用户文档
   useEffect(() => {
@@ -611,10 +445,9 @@ export function DocumentView({
           );
           const data = await res.json();
           if (data.success) {
-            const updated =
-              documentApiMode === "project"
-                ? toKnowledgeItem(data.data.snapshot)
-                : (data.data as KnowledgeItem);
+            const updated = documentApiMode === "project"
+              ? toKnowledgeItem(data.data.snapshot)
+              : data.data as KnowledgeItem;
             const nextItems = items.some((item) => item.id === updated.id)
               ? items.map((item) => (item.id === updated.id ? updated : item))
               : [...items, updated];
@@ -648,26 +481,16 @@ export function DocumentView({
         return false;
       }
     },
-    [
-      documentApiMode,
-      workingDir,
-      projectId,
-      sessionId,
-      toast,
-      items,
-      canManageGovernance,
-    ],
+    [documentApiMode, workingDir, projectId, sessionId, toast, items, canManageGovernance],
   );
 
   const openOrCreateConvention = useCallback(
-    async (
-      target: Extract<ActiveTarget, { kind: "convention" | "pageConvention" }>,
-    ) => {
+    async (target: Extract<ActiveTarget, { kind: "convention" | "pageConvention" }>) => {
       if (!canManageGovernance) return;
       const filePath = resolveWorkspaceFilePath(target);
       if (!filePath) return;
       if (existingConventionPaths.has(filePath)) {
-        selectTarget(target);
+        setActiveTarget(target);
         setConventionExpanded(true);
         return;
       }
@@ -677,16 +500,14 @@ export function DocumentView({
       setExistingConventionPaths((current) => new Set(current).add(filePath));
       contentCacheRef.current.set(getContentCacheKey(target), initialContent);
       setContent(initialContent);
-      selectTarget(target);
+      setActiveTarget(target);
       setConventionExpanded(true);
     },
-    [existingConventionPaths, saveTarget, canManageGovernance, selectTarget],
+    [existingConventionPaths, saveTarget, canManageGovernance],
   );
 
   const deleteConvention = useCallback(
-    async (
-      target: Extract<ActiveTarget, { kind: "convention" | "pageConvention" }>,
-    ) => {
+    async (target: Extract<ActiveTarget, { kind: "convention" | "pageConvention" }>) => {
       if (!canManageGovernance) return;
       const filePath = resolveWorkspaceFilePath(target);
       if (!filePath || !sessionId) return;
@@ -695,9 +516,7 @@ export function DocumentView({
       try {
         const res = await fetch(
           `/api/sessions/${sessionId}/workspace/files/${encodeURIComponent(filePath)}`,
-          {
-            method: "DELETE",
-          },
+          { method: "DELETE" },
         );
         const data = await res.json();
         if (!data.success) throw new Error(data.error?.message || "删除失败");
@@ -725,22 +544,18 @@ export function DocumentView({
   // 在 markdownUpdated 触发 onChange 时捕获目标与内容，调度一次 800ms 防抖写回，
   // 避免绕回 React state 用 effect 监听 content 造成的额外渲染与丢失。
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingSaveRef = useRef<{
-    target: ActiveTarget;
-    markdown: string;
-  } | null>(null);
+  const pendingSaveRef = useRef<{ target: ActiveTarget; markdown: string } | null>(
+    null,
+  );
   const saveInFlightRef = useRef<Promise<boolean> | null>(null);
   const saveTargetRef = useRef(saveTarget);
   saveTargetRef.current = saveTarget;
 
-  const persistPendingSave = useCallback(
-    (pending: { target: ActiveTarget; markdown: string }) => {
-      const promise = saveTargetRef.current(pending.target, pending.markdown);
-      saveInFlightRef.current = promise;
-      return promise;
-    },
-    [],
-  );
+  const persistPendingSave = useCallback((pending: { target: ActiveTarget; markdown: string }) => {
+    const promise = saveTargetRef.current(pending.target, pending.markdown);
+    saveInFlightRef.current = promise;
+    return promise;
+  }, []);
 
   const flushSave = useCallback(async (): Promise<boolean> => {
     if (saveTimerRef.current) {
@@ -758,29 +573,23 @@ export function DocumentView({
     return saved;
   }, [persistPendingSave]);
 
-  const scheduleSave = useCallback(
-    (target: ActiveTarget, markdown: string) => {
-      if (
-        (target.kind === "convention" || target.kind === "pageConvention") &&
-        !canManageGovernance
-      ) {
-        return;
+  const scheduleSave = useCallback((target: ActiveTarget, markdown: string) => {
+    if ((target.kind === "convention" || target.kind === "pageConvention") && !canManageGovernance) {
+      return;
+    }
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+    pendingSaveRef.current = { target, markdown };
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null;
+      const pending = pendingSaveRef.current;
+      pendingSaveRef.current = null;
+      if (pending) {
+        void persistPendingSave(pending);
       }
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
-      }
-      pendingSaveRef.current = { target, markdown };
-      saveTimerRef.current = setTimeout(() => {
-        saveTimerRef.current = null;
-        const pending = pendingSaveRef.current;
-        pendingSaveRef.current = null;
-        if (pending) {
-          void persistPendingSave(pending);
-        }
-      }, 800);
-    },
-    [canManageGovernance, persistPendingSave],
-  );
+    }, 800);
+  }, [canManageGovernance, persistPendingSave]);
 
   // 卸载时冲刷未落盘的编辑
   useEffect(
@@ -792,10 +601,6 @@ export function DocumentView({
 
   // 加载当前目标内容
   useEffect(() => {
-    if (activeTargetScopeKeyRef.current !== itemsScopeKey) {
-      activeTargetScopeKeyRef.current = itemsScopeKey;
-      return;
-    }
     if (!activeTarget) {
       setContent("");
       return;
@@ -859,16 +664,7 @@ export function DocumentView({
     return () => {
       cancelled = true;
     };
-  }, [
-    activeTarget,
-    documentApiMode,
-    projectId,
-    workingDir,
-    sessionId,
-    itemsScopeKey,
-    flushSave,
-    contentReloadRevision,
-  ]);
+  }, [activeTarget, documentApiMode, projectId, workingDir, sessionId, flushSave, contentReloadRevision]);
 
   const createKnowledgeDocument = useCallback(
     async (title: string, markdown: string): Promise<KnowledgeItem | null> => {
@@ -877,48 +673,34 @@ export function DocumentView({
         return null;
       }
       try {
-        const params = workingDir
-          ? new URLSearchParams({ workingDir })
-          : new URLSearchParams();
-        if (projectId && documentApiMode === "legacy")
-          params.set("projectId", projectId);
-        if (sessionId && documentApiMode === "legacy")
-          params.set("sessionId", sessionId);
-        const res = await fetch(
-          documentApiMode === "project" && projectId
-            ? `/api/projects/${encodeURIComponent(projectId)}/documents${sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : ""}`
-            : `/api/knowledge?${params.toString()}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              title,
-              description: title,
-              content: markdown,
-            }),
-          },
-        );
+        const params = workingDir ? new URLSearchParams({ workingDir }) : new URLSearchParams();
+        if (projectId && documentApiMode === "legacy") params.set("projectId", projectId);
+        if (sessionId && documentApiMode === "legacy") params.set("sessionId", sessionId);
+        const res = await fetch(documentApiMode === "project" && projectId
+          ? `/api/projects/${encodeURIComponent(projectId)}/documents${sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : ""}`
+          : `/api/knowledge?${params.toString()}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, description: title, content: markdown }),
+        });
         const data = await res.json();
         if (!res.ok || !data.success) {
           throw new Error(data.error?.message || "创建失败");
         }
-        const item =
-          documentApiMode === "project"
-            ? toKnowledgeItem(data.data.snapshot)
-            : (data.data as KnowledgeItem);
+        const item = documentApiMode === "project"
+          ? toKnowledgeItem(data.data.snapshot)
+          : data.data as KnowledgeItem;
         knowledgeMutationVersionRef.current += 1;
-        setItems((current) => [
-          ...current.filter((entry) => entry.id !== item.id),
-          item,
-        ]);
+        setItems((current) => [...current.filter((entry) => entry.id !== item.id), item]);
         setUserExpanded(true);
         contentCacheRef.current.set(`knowledge:${item.id}`, markdown);
-        selectTarget({ kind: "knowledge", item });
+        setActiveTarget({ kind: "knowledge", item });
         setContent(markdown);
-        onItemsChangeRef.current?.([
-          ...items.filter((entry) => entry.id !== item.id),
+        const nextItems = [
+          ...itemsRef.current.filter((entry) => entry.id !== item.id),
           item,
-        ]);
+        ];
+        onItemsChangeRef.current?.(nextItems);
         return item;
       } catch (error) {
         toast({
@@ -929,15 +711,7 @@ export function DocumentView({
         return null;
       }
     },
-    [
-      documentApiMode,
-      items,
-      projectId,
-      sessionId,
-      toast,
-      workingDir,
-      selectTarget,
-    ],
+    [documentApiMode, items, projectId, sessionId, toast, workingDir],
   );
 
   const handleCreate = useCallback(async () => {
@@ -957,10 +731,7 @@ export function DocumentView({
       }
       try {
         const markdown = await file.text();
-        await createKnowledgeDocument(
-          getKnowledgeUploadTitle(file.name),
-          markdown,
-        );
+        await createKnowledgeDocument(getKnowledgeUploadTitle(file.name), markdown);
       } catch (error) {
         toast({
           title: "读取文件失败",
@@ -978,39 +749,41 @@ export function DocumentView({
       setRenamingKnowledgeId(null);
       if (!title || title === item.title || (!workingDir && !(documentApiMode === "project" && projectId))) return;
       try {
-        const params = workingDir
-          ? new URLSearchParams({ workingDir })
-          : new URLSearchParams();
-        if (projectId && documentApiMode === "legacy")
-          params.set("projectId", projectId);
-        if (sessionId && documentApiMode === "legacy")
-          params.set("sessionId", sessionId);
-        const res = await fetch(
-          documentApiMode === "project" && projectId
-            ? `/api/projects/${encodeURIComponent(projectId)}/documents/${encodeURIComponent(item.id)}${sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : ""}`
-            : `/api/knowledge/${item.id}?${params.toString()}`,
-          {
-            method: documentApiMode === "project" ? "PATCH" : "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title }),
-          },
-        );
+        const params = workingDir ? new URLSearchParams({ workingDir }) : new URLSearchParams();
+        if (projectId && documentApiMode === "legacy") params.set("projectId", projectId);
+        if (sessionId && documentApiMode === "legacy") params.set("sessionId", sessionId);
+        const res = await fetch(documentApiMode === "project" && projectId
+          ? `/api/projects/${encodeURIComponent(projectId)}/documents/${encodeURIComponent(item.id)}${sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : ""}`
+          : `/api/knowledge/${item.id}?${params.toString()}`, {
+          method: documentApiMode === "project" ? "PATCH" : "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title }),
+        });
         const data = await res.json();
         if (!res.ok || !data.success) {
           throw new Error(data.error?.message || "重命名失败");
         }
-        const updated =
-          documentApiMode === "project"
-            ? toKnowledgeItem(data.data.snapshot)
-            : (data.data as KnowledgeItem);
+        const updated = documentApiMode === "project"
+          ? toKnowledgeItem(data.data.snapshot)
+          : data.data as KnowledgeItem;
         knowledgeMutationVersionRef.current += 1;
-        setItems((current) =>
-          current.map((entry) => (entry.id === updated.id ? updated : entry)),
-        );
+        const currentItems = itemsRef.current;
+        const nextItems = currentItems.some((entry) => entry.id === updated.id)
+          ? currentItems.map((entry) =>
+              entry.id === updated.id ? updated : entry,
+            )
+          : [...currentItems, updated];
+        setItems(nextItems);
+        onItemsChangeRef.current?.(nextItems);
         setActiveTarget((current) =>
           current?.kind === "knowledge" && current.item.id === updated.id
             ? { kind: "knowledge", item: updated }
             : current,
+        );
+        window.dispatchEvent(
+          new CustomEvent("knowledge-updated", {
+            detail: { docId: updated.id, title: updated.title },
+          }),
         );
       } catch (error) {
         toast({
@@ -1020,49 +793,63 @@ export function DocumentView({
         });
       }
     },
-    [
-      documentApiMode,
-      projectId,
-      renamingKnowledgeTitle,
-      sessionId,
-      toast,
-      workingDir,
-    ],
+    [documentApiMode, projectId, renamingKnowledgeTitle, sessionId, toast, workingDir],
   );
 
-  const requestDesignSpecEntryTitle = useCallback(
-    (defaultValue: string) =>
-      requestDocumentName({
-        title: "新建页面规范",
-        label: "规范名称",
-        defaultValue,
-        description: "为这个页面规范输入一个便于识别的名称。",
-      }),
-    [requestDocumentName],
+  const commitDesignSpecRename = useCallback(
+    async (doc: DesignSpecMeta) => {
+      if (designSpecRenameBlurTimerRef.current) {
+        clearTimeout(designSpecRenameBlurTimerRef.current);
+        designSpecRenameBlurTimerRef.current = null;
+      }
+      const title = renamingDesignSpecTitle.trim();
+      setRenamingDesignSpecId(null);
+      if (!title || title === doc.title || !workingDir) return;
+      try {
+        const params = new URLSearchParams({ workingDir });
+        if (sessionId) params.set("sessionId", sessionId);
+        if (projectId) params.set("projectId", projectId);
+        const res = await fetch(
+          `/api/design-specs/${encodeURIComponent(doc.id)}?${params.toString()}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title }),
+          },
+        );
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error?.message || "重命名失败");
+        }
+        const updated = data.data as DesignSpecMeta;
+        designSpecMutationVersionRef.current += 1;
+        setDesignSpecs((current) =>
+          current.map((entry) => (entry.id === updated.id ? updated : entry)),
+        );
+        setActiveTarget((current) =>
+          current?.kind === "designSpec" && current.doc.id === updated.id
+            ? { kind: "designSpec", doc: updated }
+            : current,
+        );
+        window.dispatchEvent(
+          new CustomEvent("design-spec-updated", {
+            detail: { docId: updated.id, title: updated.title },
+          }),
+        );
+      } catch (error) {
+        toast({
+          title: "重命名失败",
+          description: error instanceof Error ? error.message : undefined,
+          variant: "destructive",
+        });
+      }
+    },
+    [projectId, renamingDesignSpecTitle, sessionId, toast, workingDir],
   );
 
   const handleCreateDesignSpec = useCallback(async () => {
     if (!workingDir) return;
-    if (pendingDocumentNameResolverRef.current) return;
-    if (!designSpecsLoadedRef.current) {
-      await fetchDesignSpecs();
-      if (!designSpecsLoadedRef.current) {
-        toast({
-          title: "设计规范列表尚未加载，请稍后重试",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-    const title = await requestDocumentName({
-      title: "新建设计规范文档",
-      label: "文档标题",
-      defaultValue: getNextAvailableTitle(
-        "设计规范",
-        designSpecsRef.current.map((doc) => doc.title),
-      ),
-      description: "设计规范文档用于集中维护页面和配置项的制作规范。",
-    });
+    const title = window.prompt("设计规范文档名称", `设计规范 ${designSpecs.length + 1}`);
     if (!title) return;
     try {
       const params = new URLSearchParams({ workingDir });
@@ -1075,42 +862,19 @@ export function DocumentView({
       });
       const data = await res.json();
       if (data.success) {
-        const created = data.data as DesignSpecMeta;
-        if (!created || typeof created.id !== "string") {
-          throw new Error("服务端未返回有效的设计规范文档");
-        }
+        designSpecMutationVersionRef.current += 1;
         toast({ title: "已创建设计规范" });
         setDesignSpecExpanded(true);
-        const nextDesignSpecs = designSpecsRef.current.some(
-          (doc) => doc.id === created.id,
-        )
-          ? designSpecsRef.current.map((doc) =>
-              doc.id === created.id ? created : doc,
-            )
-          : [...designSpecsRef.current, created];
-        designSpecsRef.current = nextDesignSpecs;
-        setDesignSpecs(nextDesignSpecs);
-        selectTarget({ kind: "designSpec", docId: created.id });
+        setActiveTarget({ kind: "designSpec", doc: data.data });
+        fetchDesignSpecs();
         window.dispatchEvent(new Event("design-spec-updated"));
       } else {
-        toast({
-          title: "创建失败",
-          description: data.error?.message,
-          variant: "destructive",
-        });
+        toast({ title: "创建失败", description: data.error?.message, variant: "destructive" });
       }
     } catch {
       toast({ title: "创建失败", variant: "destructive" });
     }
-  }, [
-    workingDir,
-    sessionId,
-    projectId,
-    fetchDesignSpecs,
-    requestDocumentName,
-    selectTarget,
-    toast,
-  ]);
+  }, [workingDir, sessionId, projectId, designSpecs.length, toast, fetchDesignSpecs]);
 
   const handleDeleteDesignSpec = useCallback(
     async (doc: DesignSpecMeta) => {
@@ -1120,43 +884,27 @@ export function DocumentView({
         const params = new URLSearchParams({ workingDir });
         if (sessionId) params.set("sessionId", sessionId);
         if (projectId) params.set("projectId", projectId);
-        const res = await fetch(
-          `/api/design-specs/${doc.id}?${params.toString()}`,
-          {
-            method: "DELETE",
-          },
-        );
+        const res = await fetch(`/api/design-specs/${doc.id}?${params.toString()}`, {
+          method: "DELETE",
+        });
         const data = await res.json();
         if (data.success) {
+          designSpecMutationVersionRef.current += 1;
           knowledgeMutationVersionRef.current += 1;
           toast({ title: "删除成功" });
-          if (
-            activeTarget?.kind === "designSpec" &&
-            activeTarget.docId === doc.id
-          ) {
-            storeDesignSpecSelection(null);
+          if (activeTarget?.kind === "designSpec" && activeTarget.doc.id === doc.id) {
             setActiveTarget(null);
           }
+          fetchDesignSpecs();
           window.dispatchEvent(new Event("design-spec-updated"));
         } else {
-          toast({
-            title: "删除失败",
-            description: data.error?.message,
-            variant: "destructive",
-          });
+          toast({ title: "删除失败", description: data.error?.message, variant: "destructive" });
         }
       } catch {
         toast({ title: "删除失败", variant: "destructive" });
       }
     },
-    [
-      workingDir,
-      sessionId,
-      projectId,
-      activeTarget,
-      storeDesignSpecSelection,
-      toast,
-    ],
+    [workingDir, sessionId, projectId, activeTarget, toast, fetchDesignSpecs],
   );
 
   const handleDelete = useCallback(
@@ -1183,6 +931,7 @@ export function DocumentView({
             setActiveTarget(null);
           }
           onDocDeleted?.(item);
+          fetchItems();
           window.dispatchEvent(new Event("knowledge-updated"));
         } else {
           toast({
@@ -1195,15 +944,7 @@ export function DocumentView({
         toast({ title: "删除失败", variant: "destructive" });
       }
     },
-    [
-      documentApiMode,
-      workingDir,
-      projectId,
-      sessionId,
-      activeTarget,
-      toast,
-      onDocDeleted,
-    ],
+    [documentApiMode, workingDir, projectId, sessionId, activeTarget, toast, onDocDeleted, fetchItems],
   );
 
   const isActive = (target: ActiveTarget) =>
@@ -1216,21 +957,20 @@ export function DocumentView({
         activeTarget.page.id === target.page.id)) &&
     (target.kind !== "designSpec" ||
       (activeTarget.kind === "designSpec" &&
-        activeTarget.docId === target.docId));
+        activeTarget.doc.id === target.doc.id));
 
   useEffect(() => {
     if (!activeTarget || activeTarget.kind === "designSpec") {
       onCommentTargetChange?.(null);
       return;
     }
-    const resourceId =
-      activeTarget.kind === "knowledge"
-        ? documentApiMode === "project"
-          ? `knowledge-document/${activeTarget.item.id}`
-          : activeTarget.item.fileName
-            ? `knowledge/${activeTarget.item.fileName}`
-            : `knowledge-document/${activeTarget.item.id}`
-        : resolveWorkspaceFilePath(activeTarget);
+    const resourceId = activeTarget.kind === "knowledge"
+      ? (documentApiMode === "project"
+        ? `knowledge-document/${activeTarget.item.id}`
+        : activeTarget.item.fileName
+          ? `knowledge/${activeTarget.item.fileName}`
+          : `knowledge-document/${activeTarget.item.id}`)
+      : resolveWorkspaceFilePath(activeTarget);
     if (!resourceId) return onCommentTargetChange?.(null);
     const resourceLabel = activeTarget.kind === "knowledge"
       ? activeTarget.item.title
@@ -1242,41 +982,23 @@ export function DocumentView({
     if (activeTarget?.kind !== "knowledge" || !projectId) return undefined;
     return { kind: "document", projectId, docId: activeTarget.item.id };
   }, [activeTarget, projectId]);
-  const handleReferenceSourceClick = useCallback(
-    (source: MarkdownReferenceSource) => {
-      if (source.kind !== "knowledge-document") return;
-      const item = items.find((candidate) => candidate.id === source.docId);
-      if (item) selectTarget({ kind: "knowledge", item });
-    },
-    [items, selectTarget],
-  );
-  const handleUnlinkedMentionClick = useCallback(
-    (mention: {
-      target: import("@workbench/shared/markdown-reference").MarkdownReferenceTarget;
-      label: string;
-      start: number;
-      end: number;
-    }) => {
-      if (!activeTarget || activeTarget.kind === "designSpec") return;
-      if (!window.confirm(`将「${mention.label}」转换为项目引用？`)) return;
-      if (content.slice(mention.start, mention.end) !== mention.label) return;
-      const next = `${content.slice(0, mention.start)}${serializeMarkdownReference(mention.target, mention.label)}${content.slice(mention.end)}`;
-      setContent(next);
-      contentCacheRef.current.set(getContentCacheKey(activeTarget), next);
-      scheduleSave(activeTarget, next);
-    },
-    [activeTarget, content, scheduleSave],
-  );
-  const handleUnlinkedMentionNavigate = useCallback(
-    (mention: MarkdownReferenceMention) => {
-      navigateToMarkdownMention(
-        referenceEditorContainerRef.current,
-        content,
-        mention,
-      );
-    },
-    [content],
-  );
+  const handleReferenceSourceClick = useCallback((source: MarkdownReferenceSource) => {
+    if (source.kind !== "knowledge-document") return;
+    const item = items.find((candidate) => candidate.id === source.docId);
+    if (item) setActiveTarget({ kind: "knowledge", item });
+  }, [items]);
+  const handleUnlinkedMentionClick = useCallback((mention: { target: import("@workbench/shared/markdown-reference").MarkdownReferenceTarget; label: string; start: number; end: number }) => {
+    if (!activeTarget || activeTarget.kind === "designSpec") return;
+    if (!window.confirm(`将「${mention.label}」转换为项目引用？`)) return;
+    if (content.slice(mention.start, mention.end) !== mention.label) return;
+    const next = `${content.slice(0, mention.start)}${serializeMarkdownReference(mention.target, mention.label)}${content.slice(mention.end)}`;
+    setContent(next);
+    contentCacheRef.current.set(getContentCacheKey(activeTarget), next);
+    scheduleSave(activeTarget, next);
+  }, [activeTarget, content, scheduleSave]);
+  const handleUnlinkedMentionNavigate = useCallback((mention: MarkdownReferenceMention) => {
+    navigateToMarkdownMention(referenceEditorContainerRef.current, content, mention);
+  }, [content]);
   const activeDocumentReadOnly = Boolean(
     activeTarget &&
       (activeTarget.kind === "convention" || activeTarget.kind === "pageConvention") &&
@@ -1304,7 +1026,7 @@ export function DocumentView({
                   ? "bg-accent text-accent-foreground"
                   : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
               )}
-              onClick={() => selectTarget({ kind: "memory" })}
+              onClick={() => setActiveTarget({ kind: "memory" })}
             >
               <Brain className="h-4 w-4 shrink-0 text-muted-foreground" />
               <span className="min-w-0 flex-1 truncate">AI 记忆</span>
@@ -1325,111 +1047,88 @@ export function DocumentView({
                 <span className="flex-1 font-medium text-foreground">
                   项目公约
                 </span>
-                {canManageGovernance && (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-5 w-5 p-0 opacity-0 transition-opacity group-hover:opacity-100"
-                        title="新建/添加公约"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      align="end"
-                      side="bottom"
-                      className="w-40 p-1"
+                {canManageGovernance && <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-5 w-5 p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                      title="新建/添加公约"
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      <div
-                        className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors"
-                        onClick={() => {
-                          void openOrCreateConvention({ kind: "convention" });
-                        }}
-                      >
-                        <ScrollText className="h-3.5 w-3.5" />
-                        项目公约
-                      </div>
-                      <div
-                        className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors"
-                        onClick={() => {
-                          setPagePickerOpen(true);
-                        }}
-                      >
-                        <FileText className="h-3.5 w-3.5" />
-                        页面公约
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                )}
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" side="bottom" className="w-40 p-1">
+                    <div
+                      className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors"
+                      onClick={() => {
+                        void openOrCreateConvention({ kind: "convention" });
+                      }}
+                    >
+                      <ScrollText className="h-3.5 w-3.5" />
+                      项目公约
+                    </div>
+                    <div
+                      className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors"
+                      onClick={() => {
+                        setPagePickerOpen(true);
+                      }}
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      页面公约
+                    </div>
+                  </PopoverContent>
+                </Popover>}
               </div>
               {conventionExpanded && (
                 <div className="space-y-0">
                   {/* 已创建的项目公约（根） */}
-                  {existingConventionPaths.has("convention.md") && (
+                  {existingConventionPaths.has("convention.md") && <div
+                    className={cn(
+                      "group flex cursor-pointer items-center gap-1.5 rounded-sm py-1 pr-2 text-sm transition-colors hover:bg-accent/50",
+                      isActive({ kind: "convention" })
+                        ? "bg-accent text-accent-foreground"
+                        : "text-foreground",
+                    )}
+                    style={{ paddingLeft: 24 + 8 }}
+                    onClick={() => setActiveTarget({ kind: "convention" })}
+                  >
+                    <ScrollText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1 truncate">项目公约</span>
+                    {canManageGovernance && <DocumentMoreMenu
+                      label="项目公约"
+                      onDelete={() => void deleteConvention({ kind: "convention" })}
+                    />}
+                  </div>}
+                  {/* 已创建的页面公约 */}
+                  {pages.filter((page) => existingConventionPaths.has(`demos/${page.id}/convention.md`)).map((page) => (
                     <div
+                      key={page.id}
                       className={cn(
                         "group flex cursor-pointer items-center gap-1.5 rounded-sm py-1 pr-2 text-sm transition-colors hover:bg-accent/50",
-                        isActive({ kind: "convention" })
+                        activeTarget?.kind === "pageConvention" &&
+                          activeTarget.page.id === page.id
                           ? "bg-accent text-accent-foreground"
                           : "text-foreground",
                       )}
                       style={{ paddingLeft: 24 + 8 }}
-                      onClick={() => selectTarget({ kind: "convention" })}
+                      onClick={() =>
+                        setActiveTarget({ kind: "pageConvention", page })
+                      }
                     >
-                      <ScrollText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      <span className="min-w-0 flex-1 truncate">项目公约</span>
-                      {canManageGovernance && (
-                        <DocumentMoreMenu
-                          label="项目公约"
-                          onDelete={() =>
-                            void deleteConvention({ kind: "convention" })
-                          }
-                        />
-                      )}
-                    </div>
-                  )}
-                  {/* 已创建的页面公约 */}
-                  {pages
-                    .filter((page) =>
-                      existingConventionPaths.has(
-                        `demos/${page.id}/convention.md`,
-                      ),
-                    )
-                    .map((page) => (
-                      <div
-                        key={page.id}
-                        className={cn(
-                          "group flex cursor-pointer items-center gap-1.5 rounded-sm py-1 pr-2 text-sm transition-colors hover:bg-accent/50",
-                          activeTarget?.kind === "pageConvention" &&
-                            activeTarget.page.id === page.id
-                            ? "bg-accent text-accent-foreground"
-                            : "text-foreground",
-                        )}
-                        style={{ paddingLeft: 24 + 8 }}
-                        onClick={() =>
-                          selectTarget({ kind: "pageConvention", page })
+                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="min-w-0 flex-1 truncate">
+                        {page.name}
+                      </span>
+                      {canManageGovernance && <DocumentMoreMenu
+                        label={`${page.name}页面公约`}
+                        onDelete={() =>
+                          void deleteConvention({ kind: "pageConvention", page })
                         }
-                      >
-                        <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        <span className="min-w-0 flex-1 truncate">
-                          {page.name}
-                        </span>
-                        {canManageGovernance && (
-                          <DocumentMoreMenu
-                            label={`${page.name}页面公约`}
-                            onDelete={() =>
-                              void deleteConvention({
-                                kind: "pageConvention",
-                                page,
-                              })
-                            }
-                          />
-                        )}
-                      </div>
-                    ))}
+                      />}
+                    </div>
+                  ))}
                   {existingConventionPaths.size === 0 && (
                     <div
                       className="px-3 py-2 text-xs text-muted-foreground"
@@ -1515,9 +1214,13 @@ export function DocumentView({
                           activeTarget.item.id === item.id
                         }
                         onSelect={() =>
-                          selectTarget({ kind: "knowledge", item })
+                          setActiveTarget({ kind: "knowledge", item })
                         }
                         onDelete={() => handleDelete(item)}
+                        onRename={() => {
+                          setRenamingKnowledgeId(item.id);
+                          setRenamingKnowledgeTitle(item.title);
+                        }}
                         renaming={renamingKnowledgeId === item.id}
                         renameValue={renamingKnowledgeTitle}
                         onRenameValueChange={setRenamingKnowledgeTitle}
@@ -1550,20 +1253,18 @@ export function DocumentView({
                 <span className="flex-1 font-medium text-foreground">
                   设计规范
                 </span>
-                {canManageGovernance && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-5 w-5 p-0 opacity-0 transition-opacity group-hover:opacity-100"
-                    title="新建设计规范文档"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCreateDesignSpec();
-                    }}
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                  </Button>
-                )}
+                {canManageGovernance && <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-5 w-5 p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                  title="新建设计规范文档"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCreateDesignSpec();
+                  }}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>}
               </div>
               {designSpecExpanded && (
                 <div className="space-y-0">
@@ -1585,29 +1286,64 @@ export function DocumentView({
                     designSpecs.map((doc) => (
                       <div
                         key={doc.id}
-                        data-testid={`design-spec-document-${doc.id}`}
                         className={cn(
                           "group flex cursor-pointer items-center gap-1.5 rounded-sm py-1 pr-2 text-sm transition-colors hover:bg-accent/50",
                           activeTarget?.kind === "designSpec" &&
-                            activeTarget.docId === doc.id
+                            activeTarget.doc.id === doc.id
                             ? "bg-accent text-accent-foreground"
                             : "text-foreground",
                         )}
                         style={{ paddingLeft: 24 + 8 }}
-                        onClick={() =>
-                          selectTarget({ kind: "designSpec", docId: doc.id })
-                        }
+                        onClick={() => setActiveTarget({ kind: "designSpec", doc })}
                       >
                         <FileText className="h-4 w-4 shrink-0 text-cyan-500" />
-                        <span className="min-w-0 flex-1 truncate">
-                          {doc.title}
-                        </span>
-                        {canManageGovernance && (
-                          <DocumentMoreMenu
-                            label={doc.title}
-                            onDelete={() => handleDeleteDesignSpec(doc)}
+                        {renamingDesignSpecId === doc.id ? (
+                          <input
+                            ref={designSpecRenameInputRef}
+                            autoFocus
+                            className="h-6 min-w-0 flex-1 rounded border bg-background px-1 text-sm outline-none focus:ring-1 focus:ring-ring"
+                            value={renamingDesignSpecTitle}
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={(event) => setRenamingDesignSpecTitle(event.target.value)}
+                            onBlur={(event) => {
+                              if (isWithinDropdownMenu(event.relatedTarget)) {
+                                window.setTimeout(() => designSpecRenameInputRef.current?.focus(), 0);
+                                return;
+                              }
+                              designSpecRenameBlurTimerRef.current = setTimeout(() => {
+                                designSpecRenameBlurTimerRef.current = null;
+                                void commitDesignSpecRename(doc);
+                              }, 0);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                if (designSpecRenameBlurTimerRef.current) {
+                                  clearTimeout(designSpecRenameBlurTimerRef.current);
+                                  designSpecRenameBlurTimerRef.current = null;
+                                }
+                                void commitDesignSpecRename(doc);
+                              } else if (event.key === "Escape") {
+                                event.preventDefault();
+                                if (designSpecRenameBlurTimerRef.current) {
+                                  clearTimeout(designSpecRenameBlurTimerRef.current);
+                                  designSpecRenameBlurTimerRef.current = null;
+                                }
+                                setRenamingDesignSpecId(null);
+                              }
+                            }}
                           />
+                        ) : (
+                          <span className="min-w-0 flex-1 truncate">{doc.title}</span>
                         )}
+                        {canManageGovernance && <DocumentMoreMenu
+                          label={doc.title}
+                          onRename={() => {
+                            setRenamingDesignSpecId(doc.id);
+                            setRenamingDesignSpecTitle(doc.title);
+                          }}
+                          onDelete={() => handleDeleteDesignSpec(doc)}
+                        />}
                       </div>
                     ))
                   )}
@@ -1642,14 +1378,13 @@ export function DocumentView({
         )}
         {activeTarget?.kind === "designSpec" ? (
           <DesignSpecEditor
-            docId={activeTarget.docId}
+            docId={activeTarget.doc.id}
             focusEntryId={focusedEntryId ?? undefined}
             readOnly={!canManageGovernance}
             workspaceId={workspaceId}
             referenceProvider={referenceProvider}
             onReferenceClick={onReferenceClick}
             onEditConfigDefinition={onEditConfigDefinition}
-            onRequestEntryTitle={requestDesignSpecEntryTitle}
           />
         ) : (
           <>
@@ -1663,22 +1398,13 @@ export function DocumentView({
                   documentKey={getContentCacheKey(activeTarget)}
                   value={content}
                   onChange={(next) => {
-                    contentCacheRef.current.set(
-                      getContentCacheKey(activeTarget),
-                      next,
-                    );
+                    contentCacheRef.current.set(getContentCacheKey(activeTarget), next);
                     setContent(next);
                     scheduleSave(activeTarget, next);
                   }}
                   localizeRemoteImage={activeDocumentReadOnly ? undefined : localizeRemoteImage}
                   readOnly={activeDocumentReadOnly}
-                  onCommentSelection={(selection) =>
-                    onDocumentCommentSelection?.({
-                      kind: "selection",
-                      ...selection,
-                      status: "active",
-                    })
-                  }
+                  onCommentSelection={(selection) => onDocumentCommentSelection?.({ kind: "selection", ...selection, status: "active" })}
                   referenceContext={activeReferenceContext}
                   referenceProvider={activeReferenceContext ? referenceProvider : undefined}
                   onReferenceClick={onReferenceClick}
@@ -1723,10 +1449,7 @@ export function DocumentView({
                   key={page.id}
                   className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-2 text-sm hover:bg-accent transition-colors"
                   onClick={() => {
-                    void openOrCreateConvention({
-                      kind: "pageConvention",
-                      page,
-                    });
+                    void openOrCreateConvention({ kind: "pageConvention", page });
                     setPagePickerOpen(false);
                   }}
                 >
@@ -1738,17 +1461,6 @@ export function DocumentView({
           </div>
         </DialogContent>
       </Dialog>
-      {documentNameRequest && (
-        <DocumentNameDialog
-          open
-          title={documentNameRequest.title}
-          label={documentNameRequest.label}
-          defaultValue={documentNameRequest.defaultValue}
-          description={documentNameRequest.description}
-          onConfirm={(value) => resolveDocumentNameRequest(value)}
-          onCancel={() => resolveDocumentNameRequest(null)}
-        />
-      )}
       <DocumentProposalReviewDialog
         projectId={projectId}
         sessionId={sessionId}
@@ -1764,6 +1476,7 @@ export function DocumentView({
           pendingSaveRef.current = null;
           contentCacheRef.current.clear();
           setContentReloadRevision((current) => current + 1);
+          void fetchItems();
           window.dispatchEvent(new Event("knowledge-updated"));
         }}
       />
@@ -1778,6 +1491,7 @@ function KnowledgeFileItem({
   onSelect,
   onHistory,
   onDelete,
+  onRename,
   renaming,
   renameValue,
   onRenameValueChange,
@@ -1789,12 +1503,16 @@ function KnowledgeFileItem({
   onSelect: () => void;
   onHistory?: () => void;
   onDelete?: () => void;
+  onRename?: () => void;
   renaming?: boolean;
   renameValue?: string;
   onRenameValueChange?: (value: string) => void;
   onRenameCommit?: () => void;
   onRenameCancel?: () => void;
 }) {
+  const renameBlurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
   return (
     <div
       className={cn(
@@ -1807,18 +1525,36 @@ function KnowledgeFileItem({
       <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
       {renaming ? (
         <input
+          ref={renameInputRef}
           autoFocus
           className="h-6 min-w-0 flex-1 rounded border bg-background px-1 text-sm outline-none focus:ring-1 focus:ring-ring"
           value={renameValue}
           onClick={(event) => event.stopPropagation()}
           onChange={(event) => onRenameValueChange?.(event.target.value)}
-          onBlur={onRenameCommit}
+          onBlur={(event) => {
+            if (isWithinDropdownMenu(event.relatedTarget)) {
+              window.setTimeout(() => renameInputRef.current?.focus(), 0);
+              return;
+            }
+            renameBlurTimerRef.current = setTimeout(() => {
+              renameBlurTimerRef.current = null;
+              onRenameCommit?.();
+            }, 0);
+          }}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               event.preventDefault();
+              if (renameBlurTimerRef.current) {
+                clearTimeout(renameBlurTimerRef.current);
+                renameBlurTimerRef.current = null;
+              }
               onRenameCommit?.();
             } else if (event.key === "Escape") {
               event.preventDefault();
+              if (renameBlurTimerRef.current) {
+                clearTimeout(renameBlurTimerRef.current);
+                renameBlurTimerRef.current = null;
+              }
               onRenameCancel?.();
             }
           }}
@@ -1829,6 +1565,7 @@ function KnowledgeFileItem({
       <DocumentMoreMenu
         label={item.title}
         onHistory={onHistory}
+        onRename={onRename}
         onDelete={onDelete}
       />
     </div>
@@ -1839,12 +1576,16 @@ function KnowledgeFileItem({
 function DocumentMoreMenu({
   label,
   onHistory,
+  onRename,
   onDelete,
 }: {
   label: string;
   onHistory?: () => void;
+  onRename?: () => void;
   onDelete?: () => void;
 }) {
+  const renameRequestedRef = useRef(false);
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -1859,7 +1600,26 @@ function DocumentMoreMenu({
           <MoreVertical className="h-3.5 w-3.5" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent
+        align="end"
+        onCloseAutoFocus={(event) => {
+          if (!renameRequestedRef.current) return;
+          event.preventDefault();
+          renameRequestedRef.current = false;
+        }}
+      >
+        {onRename && (
+          <DropdownMenuItem
+            onClick={(event) => {
+              event.stopPropagation();
+              renameRequestedRef.current = true;
+              onRename();
+            }}
+          >
+            <Pencil className="mr-2 h-3.5 w-3.5" />
+            重命名
+          </DropdownMenuItem>
+        )}
         {onHistory && (
           <DropdownMenuItem
             onClick={(event) => {

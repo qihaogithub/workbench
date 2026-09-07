@@ -32,6 +32,7 @@ import type {
 } from "@workbench/shared";
 import {
   resolvePagePresentation,
+  extractDeclaredRegionIds,
   parseVisibilityRules,
   resolveVisibility,
   validateVisibilityRules,
@@ -58,6 +59,7 @@ import { processVideosForPublish } from "@/lib/publish/video-processor";
 import { processSpineAssetsForPublish } from "@/lib/publish/spine-processor";
 import { replacePathsInContent } from "@/lib/publish/path-replacer";
 import type { PublishContext } from "@/lib/publish/types";
+import { readDesignSpecDoc } from "@/lib/design-specs";
 import type { DesignSpecMeta } from "@/lib/design-specs";
 import {
   buildPublishedMarkdownReferenceSnapshot,
@@ -120,7 +122,17 @@ function copyDesignSpecsForPublish(
     fs.cpSync(designSpecDir, path.join(publishedProjectDir, "design-spec"), {
       recursive: true,
     });
-    return manifest.items;
+    const publishedDesignSpecs = manifest.items.flatMap((item) => {
+      const doc = readDesignSpecDoc(workspacePath, item.id);
+      if (!doc) return [];
+      fs.writeFileSync(
+        path.join(publishedProjectDir, "design-spec", `spec-${item.id}.json`),
+        JSON.stringify(doc, null, 2),
+        "utf-8",
+      );
+      return [item];
+    });
+    return publishedDesignSpecs;
   } catch {
     return undefined;
   }
@@ -203,8 +215,11 @@ export interface PublishedProject {
   appGraph?: AppGraph;
   projectConfigSchema?: string;
   projectConfigValues?: Record<string, unknown>;
-  visibilityRules?: VisibilityRulesDocument;
-  visibilityRulesHash?: string;
+  visibilityRulesRef?: {
+    path: "visibility-rules.json";
+    sha256: string;
+    version: number;
+  };
   canvasState?: CanvasState;
   knowledge?: KnowledgeIndexItem[];
   designSpecs?: DesignSpecMeta[];
@@ -301,8 +316,8 @@ export interface PublishDryRunReport {
   }>;
   visibility?: {
     valid: boolean;
-    issues: Array<{ code: string; message: string; ruleId?: string; pageId?: string; regionId?: string }>;
-    deadLinks?: Array<{ source: string; sourcePageId?: string; targetPageId: string; message: string }>;
+    issues: Array<{ code: string; message: string; severity?: "warning" | "error"; ruleId?: string; pageId?: string; regionId?: string }>;
+    deadLinks?: Array<{ source: string; severity: "warning" | "error"; sourcePageId?: string; targetPageId?: string; message: string }>;
   };
   duration: number;
 }
@@ -466,22 +481,13 @@ function collectDeclaredRegionIds(
   const candidates = [
     path.join(pageDir, "index.tsx"),
     path.join(pageDir, "prototype.html"),
-    path.join(pageDir, "sandbox.html"),
   ];
-  const ids = new Set<string>();
-  // Region ids are an explicit source/runtime declaration.  We intentionally
-  // do not infer targets from DOM text or CSS selectors.
+  const contents: string[] = [];
   for (const filePath of candidates) {
     if (!fs.existsSync(filePath)) continue;
-    const content = fs.readFileSync(filePath, "utf-8");
-    for (const match of content.matchAll(/data-region-id\s*=\s*["']([A-Za-z0-9_-]{1,100})["']/g)) {
-      if (match[1]) ids.add(match[1]);
-    }
-    for (const match of content.matchAll(/regionId\s*[:=]\s*["']([A-Za-z0-9_-]{1,100})["']/g)) {
-      if (match[1]) ids.add(match[1]);
-    }
+    contents.push(fs.readFileSync(filePath, "utf-8"));
   }
-  return [...ids];
+  return extractDeclaredRegionIds(contents);
 }
 
 export function readVisibilityRulesForPublish(
@@ -759,15 +765,19 @@ export async function publishProject(
         .filter((page) => page.hidden)
         .map((page) => page.pageId),
       pageIds: demoPages.map((page) => page.id),
+      availablePageIds: Object.values(resolution.pages)
+        .filter((page) => page.visible && page.enabled)
+        .map((page) => page.pageId),
       canvasState,
       appGraph,
     });
-    if (visibilityDeadLinks.length > 0 && !dryRun) {
+    const blockingVisibilityIssues = visibilityDeadLinks.filter((issue) => issue.severity === "error");
+    if (blockingVisibilityIssues.length > 0 && !dryRun) {
       cleanupTmpDir();
       throw new PublishError(
         "VISIBILITY_RULES_INVALID",
-        "发布失败：隐藏页面仍被导航或应用动作引用",
-        { issues: visibilityDeadLinks },
+        "发布失败：当前配置没有可用页面",
+        { issues: blockingVisibilityIssues },
       );
     }
   }
@@ -1161,10 +1171,10 @@ export async function publishProject(
       images: imageResult.outcomes,
       visibility: visibilityValidation
         ? {
-            valid: visibilityValidation.valid && visibilityDeadLinks.length === 0,
+            valid: visibilityValidation.valid && visibilityDeadLinks.every((issue) => issue.severity !== "error"),
             issues: [
               ...visibilityValidation.issues,
-              ...visibilityDeadLinks.map((issue) => ({ code: issue.code, message: issue.message })),
+              ...visibilityDeadLinks.map((issue) => ({ code: issue.code, message: issue.message, severity: issue.severity })),
             ],
             ...(visibilityDeadLinks.length > 0 ? { deadLinks: visibilityDeadLinks } : {}),
           }
@@ -1193,10 +1203,13 @@ export async function publishProject(
       JSON.stringify(projectConfigValues, null, 2),
     );
   }
-  if (visibilityRules) {
+  const publishedVisibilityRulesContent = visibilityRules
+    ? JSON.stringify(visibilityRules, null, 2) + "\n"
+    : undefined;
+  if (publishedVisibilityRulesContent) {
     fs.writeFileSync(
       path.join(publishedProjectDir, "visibility-rules.json"),
-      JSON.stringify(visibilityRules, null, 2) + "\n",
+      publishedVisibilityRulesContent,
       "utf-8",
     );
   }
@@ -1329,9 +1342,12 @@ export async function publishProject(
       Object.keys(projectConfigValues).length > 0
         ? projectConfigValues
         : undefined,
-    visibilityRules: visibilityRules ?? undefined,
-    visibilityRulesHash: visibilityRules
-      ? crypto.createHash("sha256").update(JSON.stringify(visibilityRules)).digest("hex")
+    visibilityRulesRef: visibilityRules && publishedVisibilityRulesContent
+      ? {
+          path: "visibility-rules.json",
+          sha256: crypto.createHash("sha256").update(publishedVisibilityRulesContent).digest("hex"),
+          version: visibilityRules.version,
+        }
       : undefined,
     canvasState,
     knowledge,

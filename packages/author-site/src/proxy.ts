@@ -1,13 +1,20 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { getAuthCookieName } from "@/lib/auth/jwt";
-import { getCurrentUserFromRequest } from "@/lib/auth/current-user";
+import {
+  extractBearerToken,
+  verifyToken,
+  getAuthCookieName,
+} from "@/lib/auth/jwt";
 import {
   verifyAdminSecret,
   setAdminCookie,
   hashSecret,
   getAdminSecret,
 } from "@/lib/admin-auth";
+import {
+  OFFICIAL_HOME_NAVIGATION_PARAM,
+  OFFICIAL_HOME_NAVIGATION_VALUE,
+} from "@/lib/official-site-url";
 
 const PROTECTED_PAGE_ROUTES = ["/workbench", "/demo", "/cli"];
 const PROTECTED_API_ROUTES = ["/api/sessions"];
@@ -50,20 +57,9 @@ function applyPublicModuleCorsHeaders(headers: Headers) {
 
 export async function proxy(request: NextRequest) {
   const cookieToken = request.cookies.get(getAuthCookieName())?.value;
+  const token = cookieToken || extractBearerToken(request.headers.get("authorization"));
+  const user = token ? await verifyToken(token) : null;
   const pathname = request.nextUrl.pathname;
-  const needsUser =
-    pathname === "/" ||
-    [...AUTH_ROUTES, ...PROTECTED_PAGE_ROUTES, ...PROTECTED_API_ROUTES].some(
-      (route) => matchesRoute(pathname, route),
-    );
-  // Use the same identity check as server pages: valid token and existing user.
-  const user = needsUser ? await getCurrentUserFromRequest(request) : null;
-  const clearInvalidCookie = (response: NextResponse) => {
-    if (needsUser && cookieToken && !user) {
-      response.cookies.delete(getAuthCookieName());
-    }
-    return response;
-  };
   const origin = request.headers.get("origin");
   const isPreviewRuntimeModuleRoute =
     pathname.startsWith("/preview-runtime/") ||
@@ -90,7 +86,11 @@ export async function proxy(request: NextRequest) {
     return new NextResponse(null, { status: 204, headers });
   }
 
-  if (user && pathname === "/") {
+  const isOfficialHomeNavigation =
+    request.nextUrl.searchParams.get(OFFICIAL_HOME_NAVIGATION_PARAM) ===
+    OFFICIAL_HOME_NAVIGATION_VALUE;
+
+  if (user && pathname === "/" && !isOfficialHomeNavigation) {
     return NextResponse.redirect(new URL("/workbench", request.url));
   }
 
@@ -108,7 +108,7 @@ export async function proxy(request: NextRequest) {
       "redirect",
       `${pathname}${request.nextUrl.search}`,
     );
-    return clearInvalidCookie(NextResponse.redirect(loginUrl));
+    return NextResponse.redirect(loginUrl);
   }
 
   // 对 API 路由：未登录返回 401 JSON，不重定向
@@ -116,11 +116,9 @@ export async function proxy(request: NextRequest) {
     !user &&
     PROTECTED_API_ROUTES.some((route) => matchesRoute(pathname, route))
   ) {
-    return clearInvalidCookie(
-      NextResponse.json(
-        { success: false, error: { code: "UNAUTHORIZED", message: "未登录" } },
-        { status: 401 },
-      ),
+    return NextResponse.json(
+      { success: false, error: { code: "UNAUTHORIZED", message: "未登录" } },
+      { status: 401 },
     );
   }
 
@@ -171,7 +169,7 @@ export async function proxy(request: NextRequest) {
     applyCorsHeaders(response.headers, allowedCorsOrigin);
   }
 
-  return clearInvalidCookie(response);
+  return response;
 }
 
 export const config = {

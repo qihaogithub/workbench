@@ -283,11 +283,14 @@ describe("getPublishStatus", () => {
     await publishProject("proj-publish-visibility");
     const publishedDir = path.join(tempDir, "published", "proj-publish-visibility");
     const publishedRules = JSON.parse(fs.readFileSync(path.join(publishedDir, "visibility-rules.json"), "utf8"));
+    const publishedRulesContent = fs.readFileSync(path.join(publishedDir, "visibility-rules.json"), "utf8");
     const publishedProject = JSON.parse(fs.readFileSync(path.join(publishedDir, "project.json"), "utf8"));
-    expect(publishedProject.visibilityRules).toEqual(publishedRules);
-    expect(publishedProject.visibilityRulesHash).toBe(
-      crypto.createHash("sha256").update(JSON.stringify(publishedRules)).digest("hex"),
-    );
+    expect(publishedProject.visibilityRules).toBeUndefined();
+    expect(publishedProject.visibilityRulesRef).toEqual({
+      path: "visibility-rules.json",
+      sha256: crypto.createHash("sha256").update(publishedRulesContent).digest("hex"),
+      version: publishedRules.version,
+    });
   });
 
   it("发布时应将页面截图复制到发布包并写入静态路径", async () => {

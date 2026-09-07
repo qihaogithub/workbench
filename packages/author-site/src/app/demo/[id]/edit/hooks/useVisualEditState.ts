@@ -15,7 +15,7 @@ import type {
   VisualPropertyChangeKind,
   VisualStyleChange,
 } from "@workbench/demo-ui/iframe-types";
-import type { ImageDimensionRule } from "@workbench/shared/demo/config-schema-definition";
+import type { ConfigColorFormat, ImageDimensionRule } from "@workbench/shared/demo/config-schema-definition";
 import {
   buildVisualConfigCandidates,
   suggestVisualConfigFieldKey,
@@ -85,7 +85,8 @@ export interface VisualConfigMark {
   label: string;
   fieldTitle: string;
   fieldKey: string;
-  defaultValue: string;
+  defaultValue: string | null;
+  colorFormat?: ConfigColorFormat;
   category?: string;
   scope: "page" | "project";
   /** Image MIME allow-list, persisted with the mark and forwarded to direct/AI application. */
@@ -271,18 +272,62 @@ function resolveVisualDraftActionState(params: {
   };
 }
 
+const VISUAL_RUNTIME_FILES: Record<string, string[]> = {
+  "prototype-html-css": ["prototype.html", "prototype.css", "config.schema.json"],
+  "sandboxed-html": ["sandbox.html", "html-import.meta.json", "config.schema.json"],
+  "high-fidelity-react": ["index.tsx", "config.schema.json"],
+  "sketch-scene": ["sketch.scene.json", "config.schema.json"],
+};
+
+function formatVisualSelectionAttributes(node: VisualNodeInfo): string {
+  const attributes = Object.entries(node.attrs ?? {}).filter(
+    ([, value]) => typeof value === "string" && value.length > 0,
+  );
+  if (attributes.length === 0) return "无";
+  return attributes.map(([key, value]) => `${key}=${JSON.stringify(value)}`).join(", ");
+}
+
+function formatVisualSelectionSourceLocation(node: VisualNodeInfo): string {
+  const lineColumn = node.sourceLine !== undefined
+    ? `第 ${node.sourceLine} 行${node.sourceColumn !== undefined ? `第 ${node.sourceColumn} 列` : ""}`
+    : "";
+  const offsets = node.sourceStart !== undefined
+    ? `sourceStart=${node.sourceStart}${node.sourceEnd !== undefined ? `, sourceEnd=${node.sourceEnd}` : ""}`
+    : "";
+  return [lineColumn, offsets].filter(Boolean).join(", ") || "未提供源码位置";
+}
+
 export function buildVisualSelectionPrompt(
   node: VisualNodeInfo,
   projectId: string,
+  runtimeType?: string,
 ): string {
+  const runtimeFiles = VISUAL_RUNTIME_FILES[runtimeType ?? ""] ?? ["index.tsx", "config.schema.json"];
+  const runtimeFilePaths = runtimeFiles.map((fileName) => `demos/${projectId}/${fileName}`);
+  const sourceFile = node.sourceFile || runtimeFilePaths[0];
+  const sourceFiles = Array.from(new Set([sourceFile, ...runtimeFilePaths]));
+  const rect = node.rect;
+  const binding = node.binding ? `${node.binding.kind}:${node.binding.key}` : "无";
+
   return `当前预览区选中的元素：
 
 【当前选区】
-- 元素：\`<${node.tagName}>\`
+- 页面标识：${projectId}
+- 运行时：${runtimeType || "unknown"}
+- 元素：\`<${node.tagName}>\`${node.componentName && node.componentName !== node.tagName ? `（组件：${node.componentName}）` : ""}
+- 源码文件：${sourceFile}
+- 可关联页面文件：${sourceFiles.join(", ")}
+- 源码位置：${formatVisualSelectionSourceLocation(node)}
 - DOM 路径：${node.domPath}
+- 父级路径：${node.parentPath || "无"}
 - className：${node.className || "无"}
 - 文本：${node.textContent || "无"}
-- 页面文件：demos/${projectId}/index.tsx`;
+- 关键属性：${formatVisualSelectionAttributes(node)}
+- 配置绑定：${binding}
+- 画布矩形：x=${rect.x}, y=${rect.y}, width=${rect.width}, height=${rect.height}
+- 可编辑能力：${node.editCapabilities.join(", ") || "无"}
+
+请优先依据源码文件和源码位置定位实现；DOM 路径仅用于辅助确认。`;
 }
 
 export function getNodeLabel(node: VisualNodeInfo): string {
@@ -355,6 +400,7 @@ function getConfigMarkSignature(mark: VisualConfigMark): string {
     accept: mark.accept ?? "",
     widthRule: mark.widthRule ?? null,
     heightRule: mark.heightRule ?? null,
+    colorFormat: mark.colorFormat ?? null,
   });
 }
 
@@ -447,6 +493,7 @@ function createPrototypeConfigTargetFromMark(
       defaultValue: mark.defaultValue,
       category: mark.category?.trim(),
       colorProperty: mark.property,
+      colorFormat: mark.colorFormat,
     };
   }
   return null;
@@ -539,7 +586,8 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
   const [visualConfigCandidateId, setVisualConfigCandidateId] = useState("");
   const [visualConfigTitle, setVisualConfigTitle] = useState("");
   const [visualConfigFieldKey, setVisualConfigFieldKey] = useState("");
-  const [visualConfigDefaultValue, setVisualConfigDefaultValue] = useState("");
+  const [visualConfigDefaultValue, setVisualConfigDefaultValue] = useState<string | null>(null);
+  const [visualConfigColorFormat, setVisualConfigColorFormat] = useState<ConfigColorFormat>("color");
   const [visualConfigCategory, setVisualConfigCategory] = useState("");
   const [visualConfigError, setVisualConfigError] = useState<string | null>(
     null,
@@ -617,6 +665,7 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
         suggestVisualConfigFieldKey(candidate.fieldTitle, usedKeys),
       );
       setVisualConfigDefaultValue(candidate.defaultValue);
+      setVisualConfigColorFormat("color");
       setVisualConfigCategory("");
       setVisualConfigError(null);
     },
@@ -636,6 +685,7 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
         suggestVisualConfigFieldKey(candidate.fieldTitle, usedKeys),
       );
       setVisualConfigDefaultValue(candidate.defaultValue);
+      setVisualConfigColorFormat("color");
       setVisualConfigError(null);
     },
     [projectConfigSchema, schemaRef, visualConfigCandidates],
@@ -780,6 +830,7 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
         category: "",
         scope: "page",
         accept: property === "src" ? "image/*" : undefined,
+        colorFormat: kind === "style" ? "color" : undefined,
       };
       setVisualConfigMarks((prev) => {
         const index = prev.findIndex((item) => item.changeId === changeId);
@@ -793,7 +844,7 @@ export function useVisualEditState(params: UseVisualEditStateParams) {
   );
 
   const handleUpdateVisualConfigMark = useCallback(
-    (markId: string, patch: Partial<Pick<VisualConfigMark, "fieldTitle" | "fieldKey" | "defaultValue" | "category" | "scope" | "accept" | "widthRule" | "heightRule">>) => {
+    (markId: string, patch: Partial<Pick<VisualConfigMark, "fieldTitle" | "fieldKey" | "defaultValue" | "category" | "scope" | "accept" | "widthRule" | "heightRule" | "colorFormat">>) => {
       setVisualConfigMarks((prev) =>
         prev.map((item) => (item.id === markId ? { ...item, ...patch } : item)),
       );
@@ -1238,6 +1289,7 @@ ${effectiveInstructionForPrompt || "无"}
       fieldKey: visualConfigFieldKey.trim(),
       title: visualConfigTitle.trim(),
       defaultValue: visualConfigDefaultValue,
+      colorFormat: visualConfigColorFormat,
       category: visualConfigCategory.trim(),
       colorProperty: selectedVisualConfigCandidate.colorProperty,
     };
@@ -1360,6 +1412,7 @@ ${message}
     toast,
     visualConfigCategory,
     visualConfigDefaultValue,
+    visualConfigColorFormat,
     visualConfigFieldKey,
     visualConfigNode,
     visualConfigTitle,
@@ -1579,10 +1632,11 @@ ${context}
     const prompt = buildVisualSelectionPrompt(
       selectedVisualNode,
       activeDemoIdRef.current,
+      runtimeType,
     );
     setTabValue("ai");
     setTriggerAutoSend(prompt);
-  }, [selectedVisualNode, activeDemoIdRef, setTabValue, setTriggerAutoSend, toast]);
+  }, [activeDemoIdRef, runtimeType, selectedVisualNode, setTabValue, setTriggerAutoSend, toast]);
 
   return {
     // State
@@ -1625,6 +1679,8 @@ ${context}
     setVisualConfigFieldKey,
     visualConfigDefaultValue,
     setVisualConfigDefaultValue,
+    visualConfigColorFormat,
+    setVisualConfigColorFormat,
     visualConfigCategory,
     setVisualConfigCategory,
     visualConfigError,

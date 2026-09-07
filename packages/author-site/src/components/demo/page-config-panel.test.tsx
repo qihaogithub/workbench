@@ -34,9 +34,10 @@ const typedPageSchema = JSON.stringify({
       "ui:options": { category: "设计" },
     },
     accentColor: {
-      type: "string",
+      type: ["string", "null"],
       title: "强调色",
       format: "color",
+      default: null,
       "ui:options": { category: "其他" },
     },
     campaignBanner: {

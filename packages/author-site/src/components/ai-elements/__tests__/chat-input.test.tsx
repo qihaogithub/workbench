@@ -1,6 +1,7 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import { ChatInput } from "@workbench/ai-chat-shared/chat/chat-input";
+import { configureAiChatShared } from "@workbench/ai-chat-shared/config";
 import { Popover, PopoverContent } from "@workbench/ai-chat-shared/ui/popover";
 import { ToastProviderWrapper } from "@/components/ui/toast-provider";
 
@@ -142,5 +143,144 @@ describe("AI 输入区附件入口", () => {
     const removeControl = tag?.querySelector("span:last-child");
     expect(removeControl).toHaveClass("absolute", "pointer-events-none");
     expect(removeControl).not.toHaveClass("ml-0.5", "shrink-0");
+  });
+});
+
+describe("AI 输入区附件提交", () => {
+  const originalCreateObjectUrl = URL.createObjectURL;
+  const originalRevokeObjectUrl = URL.revokeObjectURL;
+
+  beforeEach(() => {
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: jest.fn(() => "blob:test-attachment"),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: jest.fn(),
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: originalCreateObjectUrl,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: originalRevokeObjectUrl,
+    });
+  });
+
+  function renderAttachmentInput(
+    uploadAttachment: jest.Mock,
+    onSubmit = jest.fn(),
+    onDiagnosticEvent = jest.fn(),
+  ) {
+    configureAiChatShared({
+      getAgentClient: () => ({ uploadAttachment }) as never,
+    });
+    const result = render(
+      <ToastProviderWrapper>
+        <ChatInput
+          onSubmit={onSubmit}
+          onDiagnosticEvent={onDiagnosticEvent}
+          onCancel={jest.fn()}
+          isStreaming={false}
+          agentSessionId="session-1"
+          projectId="project-1"
+          onHistoryClick={jest.fn()}
+          onModelChange={jest.fn()}
+          onDepthChange={jest.fn()}
+          currentModelId="model-1"
+          currentDepth={null}
+          availableDepths={[]}
+          models={[]}
+          canSwitch={false}
+          isModelLoading={false}
+          supportsFiles
+          supportsHistory={false}
+        />
+      </ToastProviderWrapper>,
+    );
+    return { ...result, onSubmit, onDiagnosticEvent };
+  }
+
+  function selectImage(container: HTMLElement) {
+    const image = new File([new Uint8Array([1, 2, 3])], "diagram.png", {
+      type: "image/png",
+    });
+    const input = container.querySelector(
+      'input[type="file"][accept="image/*"]',
+    );
+    expect(input).toBeTruthy();
+    fireEvent.change(input!, { target: { files: [image] } });
+  }
+
+  it("上传失败时不发送消息，附件保留在输入区并记录可重试诊断", async () => {
+    const uploadAttachment = jest
+      .fn()
+      .mockRejectedValue(new TypeError("Failed to fetch"));
+    const { container, onSubmit, onDiagnosticEvent } = renderAttachmentInput(
+      uploadAttachment,
+    );
+
+    selectImage(container);
+    await waitFor(() => expect(screen.getByText("diagram.png")).toBeInTheDocument());
+    fireEvent.submit(container.querySelector("form")!);
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("附件上传失败：无法连接 AI 服务，请稍后重试"),
+      ).toBeInTheDocument(),
+    );
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByText("diagram.png")).toBeInTheDocument();
+    expect(onDiagnosticEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "ai.attachment_upload_failed",
+        details: expect.objectContaining({
+          stage: "upload",
+          errorKind: "network",
+          retryable: true,
+        }),
+      }),
+    );
+  });
+
+  it("上传成功后同时提交图片请求内容和聊天附件记录", async () => {
+    const uploadAttachment = jest.fn().mockResolvedValue({
+      success: true,
+      data: {
+        id: "attachment-1",
+        name: "diagram.png",
+        mimeType: "image/png",
+        size: 3,
+        textExtracted: false,
+      },
+    });
+    const { container, onSubmit } = renderAttachmentInput(uploadAttachment);
+
+    selectImage(container);
+    fireEvent.submit(container.querySelector("form")!);
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(uploadAttachment).toHaveBeenCalledWith(
+      "session-1",
+      "project-1",
+      expect.any(File),
+    );
+    expect(onSubmit).toHaveBeenCalledWith(
+      "请结合附件内容处理",
+      [
+        expect.objectContaining({
+          mimeType: "image/png",
+          name: "diagram.png",
+          data: "AQID",
+        }),
+      ],
+      undefined,
+      [expect.objectContaining({ id: "attachment-1" })],
+    );
   });
 });

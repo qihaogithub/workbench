@@ -405,7 +405,8 @@ function buildModelConfigsFromData(prefixes: string[]): ModelConfig[] {
  *
  * 支持两种模式:
  * 1. 启用列表模式 (enabledModels 存在时):
- *    - 仅放行 enabledModels 中的模型,按列表顺序返回
+ *    - 放行 enabledModels 中的模型,按列表顺序返回
+ *    - 非空 enabledModels 允许 autoEnableRules 追加新发现模型
  *    - enabledModels 为空数组表示管理员未启用任何模型
  * 2. 前缀模式 (向后兼容):
  *    - 使用 configs 白名单 + blacklist + nameFilters 过滤
@@ -428,10 +429,38 @@ export function applyModelConfigsWithFullData(
     blacklist,
     nameFilters,
     enabledModels,
+    autoEnableRules,
   } = data;
 
   const useEnabledList = Array.isArray(enabledModels);
   const enabledSet = useEnabledList ? new Set(enabledModels) : null;
+  // An explicitly empty list is an intentional "disable all" choice. For a
+  // non-empty list, auto-enable rules admit newly discovered models without
+  // changing the administrator's ordering of explicitly enabled models.
+  const applyAutoEnableRules =
+    useEnabledList && (enabledModels?.length ?? 0) > 0;
+
+  const matchesAutoEnableRule = (
+    model: { id: string; label: string },
+    rule: { type: "prefix" | "nameFilter"; value: string },
+  ): boolean => {
+    if (rule.type === "prefix") {
+      return model.id.startsWith(rule.value);
+    }
+
+    const separator = rule.value.indexOf(":");
+    if (separator < 0) return false;
+    const group = rule.value.slice(0, separator).trim();
+    const keyword = rule.value.slice(separator + 1).trim().toLowerCase();
+    if (!group || !keyword || extractGroup(model.id) !== group) {
+      return false;
+    }
+
+    return (
+      model.id.toLowerCase().includes(keyword) ||
+      model.label.toLowerCase().includes(keyword)
+    );
+  };
 
   const parsed: Array<{
     rawId: string;
@@ -445,10 +474,13 @@ export function applyModelConfigsWithFullData(
 
   for (const m of raw) {
     // 启用列表模式下严格以管理员启用列表为准。
-    // autoEnableRules 只服务于旧前缀模式和管理后台候选发现，不能绕过显式启用状态。
+    // 非空启用列表允许自动规则追加新发现的模型；空列表仍表示明确禁用全部模型。
     if (useEnabledList) {
       const inEnabledList = enabledSet!.has(m.id);
-      if (!inEnabledList) continue;
+      const autoEnabled =
+        applyAutoEnableRules &&
+        autoEnableRules?.some((rule) => matchesAutoEnableRule(m, rule));
+      if (!inEnabledList && !autoEnabled) continue;
     } else {
       // 前缀模式 (向后兼容)
       const config = configs.find((c) => matchesId(c.matcher, m.id)) ?? null;
@@ -558,18 +590,19 @@ export function applyModelConfigsWithFullData(
     return true;
   });
 
-  // 启用列表模式: 按 enabledModels 顺序排序
+  // 启用列表模式: 显式启用模型按 enabledModels 顺序排列，自动启用模型追加到末尾。
   if (useEnabledList && enabledModels) {
     const orderMap = new Map<string, number>();
     enabledModels.forEach((id, idx) => orderMap.set(id, idx));
 
-    const ordered = filtered.filter((model) => orderMap.has(model.id));
+    const explicitlyEnabled = filtered.filter((model) => orderMap.has(model.id));
+    const autoEnabled = filtered.filter((model) => !orderMap.has(model.id));
 
-    ordered.sort(
+    explicitlyEnabled.sort(
       (a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0),
     );
 
-    return ordered;
+    return [...explicitlyEnabled, ...autoEnabled];
   }
 
   return filtered;

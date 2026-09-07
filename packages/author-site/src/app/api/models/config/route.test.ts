@@ -12,6 +12,9 @@ jest.mock("@/lib/user-model-config", () => ({
 describe("GET /api/models/config", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    delete process.env.PI_AGENT_PROVIDER;
+    delete process.env.PI_AGENT_MODEL;
+    delete process.env.PI_AGENT_PROVIDERS;
     getAuthCookie.mockResolvedValue("token");
     verifyToken.mockResolvedValue({ userId: "user-1" });
     getModelConfig.mockResolvedValue({
@@ -74,5 +77,34 @@ describe("GET /api/models/config", () => {
         },
       },
     });
+  });
+
+  it("adds the runtime provider prefix so env-backed models are not filtered out", async () => {
+    process.env.PI_AGENT_PROVIDER = "mydeepseek";
+    process.env.PI_AGENT_MODEL = "deepseek-v4-flash";
+    getModelConfig.mockResolvedValue({
+      frontend: {
+        enabledModels: ["admin/default"],
+        autoEnableRules: [],
+        allowedPrefixes: ["admin/"],
+        blacklist: [],
+        nameFilters: [],
+      },
+      backendProviders: { providers: [] },
+      multimodalModels: [],
+    });
+
+    const { GET } = await import("./route");
+    const response = await GET();
+    const body = await response.json();
+
+    expect(body.data.frontend.autoEnableRules).toContainEqual({
+      type: "prefix",
+      value: "mydeepseek/",
+    });
+    expect(body.data.frontend.allowedPrefixes).toContain("mydeepseek/");
+
+    delete process.env.PI_AGENT_PROVIDER;
+    delete process.env.PI_AGENT_MODEL;
   });
 });

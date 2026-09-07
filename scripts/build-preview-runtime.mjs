@@ -118,7 +118,7 @@ async function readCanonicalPreviewSdkSource() {
   );
   const policySource = await readFile(policyPath, "utf8");
   const match = policySource.match(
-    /function createPreviewSdkSource\([^)]*\)[^{]*\{[\s\S]*?return `([\s\S]*?)`;\n\}/,
+    /function createPreviewSdkSource\([^)]*\)[^{]*\{[\s\S]*?return `([\s\S]*?)`;\s*\}/,
   );
 
   if (!match) {
@@ -204,6 +204,10 @@ async function copyWasmAssets(files) {
 }
 
 async function main() {
+  // Validate the canonical SDK source before clearing the previous runtime.
+  // A failed extraction must not leave author-site with a missing preview SDK.
+  const sdkSource = await readCanonicalPreviewSdkSource();
+
   await rm(tmpDir, { recursive: true, force: true });
   await mkdir(tmpDir, { recursive: true });
   await rm(vendorDir, { recursive: true, force: true });
@@ -578,7 +582,6 @@ export function Carousel(props) {
   // contract as the compiler. Keep the generated artifact sourced from the
   // policy module so a component contract change cannot leave this bundle
   // silently serving an older implementation.
-  const sdkSource = await readCanonicalPreviewSdkSource();
   void legacyEmbeddedSdkSource;
   const sdkPath = path.join(vendorDir, "preview-sdk.js");
   await writeFile(sdkPath, sdkSource.trimStart(), "utf8");

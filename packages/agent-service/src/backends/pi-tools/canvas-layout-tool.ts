@@ -6,6 +6,7 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { resolvePagePresentation } from "@workbench/shared";
 import type { AgentConfig } from "../../core/types";
 import { aiMutationDeniedResult, assertAiMutationAllowed } from "./ai-mutation-policy";
+import { formatAuthorityCommitSummary } from "./authority-result-summary";
 import { logger } from "../../utils/logger";
 import { resolveLiveWorkspaceMutationContext } from "../../workspace/workspace-mutation-authority";
 import { isSafePageId, getPageDir, listPages } from "./workspace-page-utils";
@@ -1119,7 +1120,7 @@ export function createArrangeCanvasPagesTool(
                 `Saved layout to ${CANVAS_LAYOUT_FILENAME}.`,
                 "",
                 formatLayoutSummary(selectedPages, arrangedSelected),
-              ].join("\n"),
+              ].join("\n") + formatAuthorityCommitSummary(receipt),
             },
           ],
           details: {

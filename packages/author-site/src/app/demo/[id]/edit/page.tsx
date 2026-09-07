@@ -12,6 +12,7 @@ import {
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { ConfigItemEditorDialog } from "@workbench/demo-ui/ConfigItemEditorDialog";
+import { ColorPicker } from "@workbench/color-picker";
 import {
   extractCodeConfigBindingKeys,
   extractPrototypeConfigBindingKeys,
@@ -45,6 +46,7 @@ import type {
 import type { MarkdownReferenceCandidate } from "@workbench/shared/markdown-reference";
 import {
   classifyConfigField,
+  extractDeclaredRegionIds,
   parseVisibilityRules,
   resolveVisibility,
 } from "@workbench/shared";
@@ -190,6 +192,8 @@ import {
   Share2,
   ChevronLeft,
   ChevronRight,
+  Undo2,
+  Redo2,
 } from "lucide-react";
 import {
   MessageSquare,
@@ -272,7 +276,6 @@ import type {
   ConfigChangeMeta,
 } from "@workbench/demo-ui/types";
 import type { WhiteboardCommitTarget } from "@/components/demo/WhiteboardDialog";
-import { WHITEBOARD_AUTHORING_ENABLED } from "@/lib/authoring-feature-flags";
 import type {
   DemoFiles,
   DemoPageMeta,
@@ -880,12 +883,17 @@ function getWorkspaceSyncErrorDetails(error: unknown): {
   const message = error instanceof Error ? error.message : "协同草稿同步失败";
   if (error instanceof WorkspaceSyncStepError) {
     const phaseLabel = WORKSPACE_SYNC_PHASE_LABELS[error.phase] ?? error.phase;
+    const backupMissing = error.code === "WORKSPACE_AUTHORITY_BACKUP_MISSING";
     return {
-      message,
+      message: backupMissing
+        ? "页面暂存备份不完整，当前修改未确认落盘；请刷新页面后重试。"
+        : message,
       phase: error.phase,
       errorCode: error.code,
       httpStatus: error.status,
-      label: `保存失败：${phaseLabel}`,
+      label: backupMissing
+        ? "保存失败：备份不完整，请刷新页面后重试"
+        : `保存失败：${phaseLabel}`,
     };
   }
   return { message, label: "保存失败" };
@@ -1109,9 +1117,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     docId: string;
     entryId: string;
   } | null>(null);
-  const handleDesignSpecFocusConsumed = useCallback(() => {
-    setDesignSpecFocus(null);
-  }, []);
   const [configDefinitionFocus, setConfigDefinitionFocus] =
     useState<ConfigDefinitionFocus | null>(null);
   const [configDefinitionPageId, setConfigDefinitionPageId] = useState<string | null>(null);
@@ -1223,6 +1228,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   const handlePageConfigPanelChangeRef = useRef<
     (pageId: string, data: Record<string, unknown>) => void
+  >(() => {});
+  const handleProjectConfigPanelChangeRef = useRef<
+    (data: Record<string, unknown>) => void
   >(() => {});
 
   const [validationResult, setValidationResult] = useState<ValidationResult>({
@@ -1406,14 +1414,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     previewMode === "canvas"
       ? (configPanelDetailPageId ?? activeDemoId)
       : activeDemoId;
-
-  const handleDesignSpecEntryEdit = useCallback(
-    (docId: string, entryId: string) => {
-      setDesignSpecFocus({ docId, entryId });
-      setPreviewMode("document");
-    },
-    [setPreviewMode],
-  );
 
   const markdownReferenceProvider = useCallback<MarkdownReferenceProvider>(
     async ({ query, signal }) => {
@@ -1826,7 +1826,6 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const persistProjectConfigValues = useCallback(
     (values: Record<string, unknown>): Promise<boolean> => {
       if (!sessionId) return Promise.resolve(true);
-      if (Object.keys(values).length === 0) return Promise.resolve(true);
       projectConfigPersistPendingCountRef.current += 1;
       const persist = async (): Promise<boolean> => {
         try {
@@ -1931,6 +1930,51 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       );
     },
     [sessionId],
+  );
+
+  const replacePageConfigValues = useCallback(
+    (
+      pageId: string,
+      values: Record<string, unknown>,
+      delayMs = 500,
+      shouldPersist = true,
+    ) => {
+      const nextValues = { ...values };
+      configDataMapRef.current = {
+        ...configDataMapRef.current,
+        [pageId]: nextValues,
+      };
+      setConfigDataMap((previous) => ({ ...previous, [pageId]: nextValues }));
+      if (shouldPersist) persistPageConfigValues(pageId, nextValues, delayMs);
+      markScreenshotDirty(pageId);
+      markWorkspaceChanged();
+    },
+    [markScreenshotDirty, markWorkspaceChanged, persistPageConfigValues],
+  );
+
+  const replaceProjectConfigValues = useCallback(
+    (values: Record<string, unknown>, shouldPersist = true) => {
+      const nextValues = { ...values };
+      projectConfigValuesRef.current = nextValues;
+      setProjectConfigValues(nextValues);
+      if (shouldPersist) void persistProjectConfigValues(nextValues);
+      const projectKeys = new Set(getSchemaPropertyKeys(projectConfigSchemaRef.current));
+      const applyProjectValues = (previous: Record<string, Record<string, unknown>>) => {
+        const next: Record<string, Record<string, unknown>> = {};
+        const pageIds = new Set([...Object.keys(previous), ...demoPagesRef.current.map((page) => page.id)]);
+        for (const pageId of pageIds) {
+          const pageValues = previous[pageId] ?? {};
+          const pageOnlyValues = Object.fromEntries(Object.entries(pageValues).filter(([key]) => !projectKeys.has(key)));
+          next[pageId] = { ...pageOnlyValues, ...nextValues };
+        }
+        return next;
+      };
+      configDataMapRef.current = applyProjectValues(configDataMapRef.current);
+      setConfigDataMap(applyProjectValues);
+      for (const page of demoPagesRef.current) markScreenshotDirty(page.id);
+      markWorkspaceChanged();
+    },
+    [markScreenshotDirty, markWorkspaceChanged, persistProjectConfigValues],
   );
   const screenshotRegenerateTimerRef = useRef<
     Record<string, ReturnType<typeof setTimeout>>
@@ -3539,6 +3583,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     visualConfigFieldKey,
     visualConfigDefaultValue,
     setVisualConfigDefaultValue,
+    visualConfigColorFormat,
+    setVisualConfigColorFormat,
     visualConfigCategory,
     setVisualConfigCategory,
     visualConfigError,
@@ -4736,31 +4782,29 @@ ${context.details}
         ? flattenNestedDelta(configDataMapRef.current[pageId] ?? {}, schema)
         : (configDataMapRef.current[pageId] ?? {});
       const nextPageConfig = { ...prevClean, ...dataClean };
-      configDataMapRef.current = {
-        ...configDataMapRef.current,
-        [pageId]: nextPageConfig,
-      };
-      setConfigDataMap((prev) => ({
-        ...prev,
-        [pageId]: nextPageConfig,
-      }));
+      const committed = meta?.persistence === "committed";
       const pendingPersist = pageConfigPersistTimersRef.current[pageId];
-      if (meta?.persistence === "committed") {
-        if (pendingPersist) {
-          clearTimeout(pendingPersist.timer);
-          delete pageConfigPersistTimersRef.current[pageId];
-          // A change made while the ZIP was uploading may still carry an old
-          // full-page snapshot. Re-submit the latest merged values once so it
-          // cannot overwrite the already committed Spine reference.
-          persistPageConfigValues(pageId, nextPageConfig, 0);
-        }
-      } else {
-        persistPageConfigValues(pageId, nextPageConfig);
+      if (committed && pendingPersist) {
+        clearTimeout(pendingPersist.timer);
+        delete pageConfigPersistTimersRef.current[pageId];
       }
-      markScreenshotDirty(pageId);
-      markWorkspaceChanged();
+      replacePageConfigValues(
+        pageId,
+        nextPageConfig,
+        committed ? 0 : 500,
+        !committed || Boolean(pendingPersist),
+      );
+      if (!areConfigValuesEqual(prevClean, nextPageConfig)) {
+        const before = { ...prevClean };
+        const after = { ...nextPageConfig };
+        recordCommand({
+          label: "页面配置变更",
+          undo: () => replacePageConfigValues(pageId, before, 0),
+          redo: () => replacePageConfigValues(pageId, after, 0),
+        });
+      }
     },
-    [markScreenshotDirty, markWorkspaceChanged, persistPageConfigValues],
+    [recordCommand, replacePageConfigValues],
   );
 
   const handleWhiteboardCommitted = useCallback(
@@ -4858,35 +4902,28 @@ ${context.details}
 
   const handleProjectConfigPanelChange = useCallback(
     (data: Record<string, unknown>, meta?: ConfigChangeMeta) => {
+      const before = { ...projectConfigValuesRef.current };
       const nextProjectConfigValues = {
         ...projectConfigValuesRef.current,
         ...data,
       };
-      // 立即更新 ref，保证紧跟在本次输入后的发布会等待这次保存。
-      projectConfigValuesRef.current = nextProjectConfigValues;
-      setProjectConfigValues(nextProjectConfigValues);
-      if (meta?.persistence !== "committed") {
-        void persistProjectConfigValues(nextProjectConfigValues);
-      } else if (projectConfigPersistPendingCountRef.current > 0) {
-        // Append one latest snapshot behind any older queued request so an
-        // in-flight project save cannot overwrite the committed Spine ref.
-        void persistProjectConfigValues(nextProjectConfigValues);
+      replaceProjectConfigValues(
+        nextProjectConfigValues,
+        meta?.persistence !== "committed" || projectConfigPersistPendingCountRef.current > 0,
+      );
+      if (!areConfigValuesEqual(before, nextProjectConfigValues)) {
+        const after = { ...nextProjectConfigValues };
+        recordCommand({
+          label: "项目配置变更",
+          undo: () => replaceProjectConfigValues(before),
+          redo: () => replaceProjectConfigValues(after),
+        });
       }
-      setConfigDataMap((prev) => {
-        const next = { ...prev };
-        for (const pageId of Object.keys(next)) {
-          next[pageId] = { ...next[pageId], ...data };
-        }
-        for (const page of demoPages) {
-          if (!next[page.id]) {
-            next[page.id] = { ...data };
-          }
-        }
-        return next;
-      });
     },
-    [demoPages, persistProjectConfigValues],
+    [recordCommand, replaceProjectConfigValues],
   );
+
+  handleProjectConfigPanelChangeRef.current = handleProjectConfigPanelChange;
 
   const handleSchemaChange = useCallback(
     (newSchema: string) => {
@@ -7616,17 +7653,10 @@ ${context.details}
       const content = [
         pageCodes[page.id],
         pagePrototypeMap[page.id]?.html,
-        pageSandboxMap[page.id]?.html,
       ]
         .filter((value): value is string => typeof value === "string")
         .join("\n");
-      regionIds[page.id] = Array.from(
-        new Set(
-          [...content.matchAll(/data-region-id\s*=\s*["']([A-Za-z0-9_-]{1,100})["']/g), ...content.matchAll(/regionId\s*[:=]\s*["']([A-Za-z0-9_-]{1,100})["']/g)]
-            .map((match) => match[1])
-            .filter((value): value is string => Boolean(value)),
-        ),
-      );
+      regionIds[page.id] = extractDeclaredRegionIds([content]);
     }
     const rawRules = visibilityRulesCollab.value.trim();
     return resolveVisibility({
@@ -7639,13 +7669,13 @@ ${context.details}
       pageIds: demoPages.map((page) => page.id),
       pageSchemas: pageSchemaMap,
       regionIds,
-    });
+    }, undefined, { roles: [currentUserRole || "guest"] });
   }, [
     demoPages,
     pageCodes,
     pagePrototypeMap,
-    pageSandboxMap,
     pageSchemaMap,
+    currentUserRole,
     projectConfigSchema,
     projectConfigValues,
     projectVisibilityRules,
@@ -7744,11 +7774,16 @@ ${context.details}
         configData: configDataMap[page.id],
         schema: pageSchemaMap[page.id],
         visibilityStatus: visibilityResolution.pages[page.id]
-          ? {
-              visible: visibilityResolution.pages[page.id].visible,
-              enabled: visibilityResolution.pages[page.id].enabled,
-              reasons: visibilityResolution.pages[page.id].reasons,
-            }
+            ? {
+                visible: visibilityResolution.pages[page.id].visible,
+                enabled: visibilityResolution.pages[page.id].enabled,
+                unavailable: visibilityResolution.pages[page.id].unavailable,
+                message: visibilityResolution.pages[page.id].message,
+                fallbackPageId: visibilityResolution.pages[page.id].fallbackPageId,
+                fallbackMessage: visibilityResolution.pages[page.id].fallbackMessage,
+                alternativeRegion: visibilityResolution.pages[page.id].alternativeRegion,
+                reasons: visibilityResolution.pages[page.id].reasons,
+              }
           : undefined,
         visibilityRegions: Object.fromEntries(
           Object.entries(visibilityResolution.regions)
@@ -7800,6 +7835,24 @@ ${context.details}
     !singlePreviewViewingDocument &&
     rightPanelTab === "edit" &&
     !commentModeActive;
+
+  useEffect(() => {
+    if (visualEditActive) return;
+    if (
+      !selectedVisualNode &&
+      visualNodeStack.length === 0 &&
+      visualPanelHoverNodeId === null
+    ) {
+      return;
+    }
+    handleVisualSelect(null, []);
+  }, [
+    handleVisualSelect,
+    selectedVisualNode,
+    visualEditActive,
+    visualNodeStack.length,
+    visualPanelHoverNodeId,
+  ]);
 
   useEffect(() => {
     if (
@@ -8436,6 +8489,16 @@ ${context.details}
     : rightPanelTab === "comments"
       ? "comments"
       : "config";
+  const handleRightPanelTabChange = useCallback(
+    (value: string) => {
+      const nextTab = value as RightPanelTab;
+      if (nextTab !== "edit") {
+        handleVisualSelect(null, []);
+      }
+      setRightPanelTab(nextTab);
+    },
+    [handleVisualSelect],
+  );
   useEffect(() => {
     if (!canUseVisualEditor && rightPanelTab === "edit") {
       setRightPanelTab("config");
@@ -8487,12 +8550,14 @@ ${context.details}
       title: visualConfigTitle,
       kind: selectedVisualConfigCandidate?.kind ?? "text",
       default: visualConfigDefaultValue,
+      colorFormat: selectedVisualConfigCandidate?.kind === "color" ? visualConfigColorFormat : undefined,
       group: visualConfigCategory || undefined,
     }),
     [
       selectedVisualConfigCandidate?.kind,
       visualConfigCategory,
       visualConfigDefaultValue,
+      visualConfigColorFormat,
       visualConfigFieldKey,
       visualConfigTitle,
     ],
@@ -8501,16 +8566,20 @@ ${context.details}
     (draft: ConfigDefinitionDraft) => {
       handleVisualConfigTitleChange(draft.title);
       setVisualConfigDefaultValue(
-        typeof draft.default === "string"
-          ? draft.default
-          : String(draft.default ?? ""),
+        draft.kind === "color"
+          ? (typeof draft.default === "string" || draft.default === null ? draft.default : null)
+          : typeof draft.default === "string"
+            ? draft.default
+            : String(draft.default ?? ""),
       );
+      setVisualConfigColorFormat(draft.colorFormat ?? "color");
       setVisualConfigCategory(draft.group ?? "");
     },
     [
       handleVisualConfigTitleChange,
       setVisualConfigCategory,
       setVisualConfigDefaultValue,
+      setVisualConfigColorFormat,
     ],
   );
   const getVisualNodeChangeCount = useCallback(
@@ -9433,6 +9502,30 @@ ${context.details}
                         </div>
                         <div className="flex items-center gap-2">
                           <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            aria-label="撤回"
+                            title="撤回（Ctrl/Cmd+Z）"
+                            disabled={!canUndo}
+                            onClick={() => void undo()}
+                          >
+                            <Undo2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            aria-label="重做"
+                            title="重做（Ctrl/Cmd+Y）"
+                            disabled={!canRedo}
+                            onClick={() => void redo()}
+                          >
+                            <Redo2 className="h-4 w-4" />
+                          </Button>
+                          <Button
                             size="sm"
                             onClick={() => setSaveVersionDialogOpen(true)}
                             disabled={isSaving || !hasPendingChanges}
@@ -9628,7 +9721,6 @@ ${context.details}
                         window.dispatchEvent(new Event("knowledge-updated"));
                       }}
                       designSpecFocus={designSpecFocus}
-                      onDesignSpecFocusConsumed={handleDesignSpecFocusConsumed}
                       onEditConfigDefinition={handleDesignSpecConfigDefinitionEdit}
                     />
                   ) : (
@@ -9946,9 +10038,11 @@ ${context.details}
                                     ? visualPanelHoverNodeId
                                     : null,
                                   selectedVisualNodeId:
-                                    selectedVisualNode?.domPath ||
-                                    selectedVisualNode?.nodeId ||
-                                    null,
+                                    visualEditActive
+                                      ? selectedVisualNode?.domPath ||
+                                        selectedVisualNode?.nodeId ||
+                                        null
+                                      : null,
                                   hiddenVisualNodeIds,
                                   visualLayerTreeNodes,
                                   visualPropertyChanges,
@@ -10005,9 +10099,11 @@ ${context.details}
                                     ? visualPanelHoverNodeId
                                     : null,
                                   selectedVisualNodeId:
-                                    selectedVisualNode?.domPath ||
-                                    selectedVisualNode?.nodeId ||
-                                    null,
+                                    visualEditActive
+                                      ? selectedVisualNode?.domPath ||
+                                        selectedVisualNode?.nodeId ||
+                                        null
+                                      : null,
                                   hiddenVisualNodeIds,
                                   visualLayerTreeNodes,
                                   visualPropertyChanges,
@@ -10324,9 +10420,7 @@ ${context.details}
                     <>
                       <Tabs
                         value={effectiveRightPanelTab}
-                        onValueChange={(v) =>
-                          setRightPanelTab(v as "edit" | "config" | "comments")
-                        }
+                        onValueChange={handleRightPanelTabChange}
                         className="flex h-full flex-col"
                       >
                         <TabsList className="w-full justify-start gap-2 rounded-none border-b px-2 h-12 bg-transparent">
@@ -10506,11 +10600,7 @@ ${context.details}
                             referenceContext={pageRequirementsReferenceContext}
                             referenceProvider={markdownReferenceProvider}
                             onReferenceClick={handleMarkdownReferenceClick}
-                            onLaunchWhiteboard={
-                              WHITEBOARD_AUTHORING_ENABLED
-                                ? launchWhiteboard
-                                : undefined
-                            }
+                            onLaunchWhiteboard={launchWhiteboard}
                             hideDetailHeader
                             onEnterPositionEdit={handleEnterPositionEdit}
                             onPositionFieldPathChange={
@@ -10544,7 +10634,10 @@ ${context.details}
                               sessionId,
                               projectId: demoId,
                             }}
-                            onEditDesignSpec={handleDesignSpecEntryEdit}
+                            onEditDesignSpec={(docId, entryId) => {
+                              setDesignSpecFocus({ docId, entryId });
+                              setPreviewMode("document");
+                            }}
                             configDefinitionFocus={configDefinitionFocus}
                             onConfigDefinitionFocusConsumed={() =>
                               setConfigDefinitionFocus(null)
@@ -10569,9 +10662,7 @@ ${context.details}
                   ) : (
                     <Tabs
                       value={canvasRightPanelTab}
-                      onValueChange={(v) =>
-                        setRightPanelTab(v as "config" | "comments")
-                      }
+                      onValueChange={handleRightPanelTabChange}
                       className="flex h-full flex-col"
                     >
                       <TabsList className="w-full justify-start gap-2 rounded-none border-b px-2 h-12 bg-transparent">
@@ -10701,11 +10792,7 @@ ${context.details}
                             referenceContext={pageRequirementsReferenceContext}
                             referenceProvider={markdownReferenceProvider}
                             onReferenceClick={handleMarkdownReferenceClick}
-                            onLaunchWhiteboard={
-                              WHITEBOARD_AUTHORING_ENABLED
-                                ? launchWhiteboard
-                                : undefined
-                            }
+                            onLaunchWhiteboard={launchWhiteboard}
                             onEnterPositionEdit={handleEnterPositionEdit}
                             onPositionFieldPathChange={
                               handlePositionFieldPathChange
@@ -10736,7 +10823,10 @@ ${context.details}
                               sessionId,
                               projectId: demoId,
                             }}
-                            onEditDesignSpec={handleDesignSpecEntryEdit}
+                            onEditDesignSpec={(docId, entryId) => {
+                              setDesignSpecFocus({ docId, entryId });
+                              setPreviewMode("document");
+                            }}
                             configDefinitionFocus={configDefinitionFocus}
                             onConfigDefinitionFocusConsumed={() =>
                               setConfigDefinitionFocus(null)
@@ -10850,28 +10940,27 @@ ${context.details}
           </div>
         }
         defaultValueEditor={
-          <div className="flex items-center gap-2">
-            {visualConfigDraft.kind === "color" && (
-              <input
-                aria-label="选择默认颜色"
-                className="h-8 w-8 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
-                type="color"
-                value={visualConfigDefaultValue || "#000000"}
-                onChange={(event) =>
-                  setVisualConfigDefaultValue(event.target.value)
-                }
-              />
-            )}
+          visualConfigDraft.kind === "color" ? (
+            <ColorPicker
+              format={visualConfigDraft.colorFormat ?? "color"}
+              value={visualConfigDefaultValue}
+              label="选择默认颜色"
+              presets={visualConfigDraft.colorPresets}
+              onChange={(value) => setVisualConfigDefaultValue(value == null ? null : String(value))}
+              className="w-full"
+            />
+          ) : (
             <Input
               aria-label="默认值"
-              value={visualConfigDefaultValue}
+              value={visualConfigDefaultValue ?? ""}
               onChange={(event) =>
                 setVisualConfigDefaultValue(event.target.value)
               }
               className="font-mono text-xs"
             />
-          </div>
+          )
         }
+        allowedColorFormats={visualConfigDraft.kind === "color" ? ["color", "color-opacity"] : undefined}
         onApply={handleApplyVisualConfig}
       />
 

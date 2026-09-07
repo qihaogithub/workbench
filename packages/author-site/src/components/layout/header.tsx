@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getOfficialHomeUrl } from "@/lib/official-site-url";
 import { SettingsButton } from "@/components/settings/settings-button";
 
 interface BreadcrumbItem {
@@ -24,7 +25,7 @@ export function Header({ breadcrumbs = [] }: HeaderProps) {
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/80 backdrop-blur-xl">
       <div className="container flex h-14 items-center px-4">
         <Link
-          href="/workbench"
+          href={getOfficialHomeUrl()}
           className="mr-6 flex items-center space-x-2 text-lg font-medium tracking-tight"
         >
           <span className="text-foreground">OneFlow</span>

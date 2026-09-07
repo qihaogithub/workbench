@@ -85,4 +85,19 @@ describe("mergeSchemaDefaults", () => {
     const result2 = mergeSchemaDefaults(existingWrongType, schema);
     expect(result2.tags).toEqual(["a", "b"]); // use default for wrong type
   });
+
+  it("keeps existing ordered array values while materializing a new default field", () => {
+    const schema = JSON.stringify({
+      type: "object",
+      properties: {
+        modules: { type: "array", default: [{ type: "hero" }, { type: "ranking" }] },
+        footer: { type: "string", default: "ad" },
+      },
+    });
+    const existing = { modules: [{ type: "hero" }, { type: "ranking" }, { type: "image" }] };
+    expect(mergeSchemaDefaults(existing, schema)).toEqual({
+      modules: existing.modules,
+      footer: "ad",
+    });
+  });
 });

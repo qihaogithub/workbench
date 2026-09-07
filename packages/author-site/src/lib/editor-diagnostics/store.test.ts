@@ -25,7 +25,7 @@ describe("editor diagnostics store", () => {
     fs.rmSync(mockDataDir, { recursive: true, force: true });
   });
 
-  it("SQLite 写入成功时不创建 editor-session JSONL，并按 editorSessionId 导出", async () => {
+  it("SQLite 写入成功时保留 editor-session JSONL 镜像，并按 editorSessionId 导出", async () => {
     await appendEditorDiagnosticEvents([
       {
         id: "evt-1",
@@ -43,7 +43,7 @@ describe("editor diagnostics store", () => {
     ]);
 
     const events = await readEditorDiagnosticEvents("editor-session-1");
-    expect(events).toHaveLength(0);
+    expect(events).toHaveLength(1);
 
     const queried = await queryEditorDiagnosticEvents({
       editorSessionId: "editor-session-1",

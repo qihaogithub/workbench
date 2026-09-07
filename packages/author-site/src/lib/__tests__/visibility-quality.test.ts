@@ -35,6 +35,7 @@ describe("findVisibilityDeadLinks", () => {
     });
     expect(issues.map((issue) => issue.source)).toEqual(["canvas-navigation", "app-graph-action"]);
     expect(issues.every((issue) => issue.targetPageId === "member")).toBe(true);
+    expect(issues.every((issue) => issue.severity === "warning")).toBe(true);
   });
 
   it("does not flag unrelated links or unknown target ids", () => {
@@ -50,5 +51,21 @@ describe("findVisibilityDeadLinks", () => {
       },
     });
     expect(issues).toEqual([]);
+  });
+
+  it("blocks a published snapshot only when no page remains available", () => {
+    const issues = findVisibilityDeadLinks({
+      hiddenPageIds: ["home", "member"],
+      availablePageIds: [],
+      pageIds: ["home", "member"],
+    });
+
+    expect(issues).toEqual([
+      expect.objectContaining({
+        code: "VISIBILITY_NO_AVAILABLE_PAGE",
+        severity: "error",
+        source: "project",
+      }),
+    ]);
   });
 });

@@ -11,6 +11,10 @@ import multipart from "@fastify/multipart";
 
 import { loadConfig } from "./utils/config";
 import { getLogger } from "./utils/logger";
+import {
+  formatCorsOriginWarning,
+  resolveCorsConfiguration,
+} from "./utils/cors";
 import { getAgentManager } from "./core/agent-manager";
 import { getAgentFactory } from "./core/agent-factory";
 import { PiAgentBackend } from "./backends";
@@ -49,18 +53,25 @@ async function start() {
     },
   });
 
-  // 配置 CORS 允许的来源
-  const allowedOrigins = process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(",")
-    : [
-        "http://localhost:4200",
-        "http://127.0.0.1:4200",
-        "http://localhost:4300",
-        "http://127.0.0.1:4300",
-      ];
+  // 配置 CORS 允许的来源。显式环境变量始终作为安全白名单，不自动扩展。
+  const corsConfiguration = resolveCorsConfiguration({
+    port: config.port,
+    configuredOrigins: process.env.CORS_ORIGINS,
+  });
+  if (corsConfiguration.warning) {
+    logger.warn(
+      {
+        port: corsConfiguration.warning.port,
+        expectedProfile: corsConfiguration.warning.expectedProfile,
+        conflictingOrigins: corsConfiguration.warning.conflictingOrigins,
+        missingOrigins: corsConfiguration.warning.missingOrigins,
+      },
+      formatCorsOriginWarning(corsConfiguration.warning),
+    );
+  }
 
   await fastify.register(cors, {
-    origin: allowedOrigins,
+    origin: corsConfiguration.origins,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: [
       "Content-Type",

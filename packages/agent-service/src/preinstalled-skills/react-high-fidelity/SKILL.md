@@ -92,9 +92,11 @@ Schema 配置示例（`mediaType` 枚举 + `FileUploadWidget`）：
 ```json
 {
   "mediaType": { "type": "string", "enum": ["image", "lottie", "rive", "spine"], "default": "image" },
-  "lottieSrc": { "type": "string", "format": "file", "ui:options": { "accept": ".json", "visibleWhen": { "field": "mediaType", "equals": "lottie" } } }
+  "lottieSrc": { "type": "string", "format": "file", "ui:options": { "accept": ".json" }, "visibleWhen": { "field": "mediaType", "equals": "lottie" } }
 }
 ```
+
+`visibleWhen` 的作用域、对象数组和详情 Sheet 规则以 `page-lifecycle` 的“条件表单”章节为准；不要在 `ui:options` 与字段顶层重复声明。
 
 ### RivePlayer
 

@@ -103,6 +103,17 @@ export interface WorkspaceMutationPatchConfigValuesOperation {
   type: "patch_config_values";
   path: string;
   patch: Record<string, unknown>;
+  /** Append managed array entries exactly once, keyed by a stable field. */
+  arrayAppends?: WorkspaceMutationArrayAppend[];
+}
+
+export interface WorkspaceMutationArrayAppend {
+  key: string;
+  item: Record<string, unknown>;
+  discriminator: {
+    key: string;
+    value: string | number | boolean | null;
+  };
 }
 
 export interface WorkspaceMutationDeletePathOperation {

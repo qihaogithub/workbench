@@ -18,6 +18,7 @@ import { ImageInputActions } from './ImageInputActions';
 import type { SpineAssetRefV1 } from '@workbench/shared';
 import type { WorkspaceMutationReceipt } from '@workbench/shared/contracts';
 import type { ConfigChangeMeta } from './types';
+import { ColorPicker, type ColorPickerFormat, type ColorPreset } from '@workbench/color-picker';
 
 function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
@@ -67,34 +68,40 @@ async function deleteServerFile(sessionId: string, url: string) {
   } catch {
   }
 }
-
 export function ColorPickerWidget(props: WidgetProps) {
-  const { id, value, onChange, label, required, disabled } = props;
+  const { id, value, onChange, label, required, disabled, schema, options } = props;
+  const schemaFormat = (schema as { format?: unknown } | undefined)?.format;
+  const format: ColorPickerFormat = schemaFormat === "opacity" || schemaFormat === "color-opacity"
+    ? schemaFormat
+    : "color";
+  const rawPresets = (options as Record<string, unknown> | undefined)?.colorPresets;
+  const presets: ColorPreset[] = Array.isArray(rawPresets)
+    ? rawPresets.flatMap((item) => {
+        if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+        const preset = item as Record<string, unknown>;
+        return typeof preset.label === "string" && typeof preset.value === "string"
+          ? [{ label: preset.label, value: preset.value }]
+          : [];
+      })
+    : [];
 
   return (
     <div className="mb-4">
-      <label htmlFor={id} className="block text-sm font-medium text-foreground mb-1">
+      <label htmlFor={id} className="mb-1 block text-sm font-medium text-foreground">
         {label}
-        {required && <span className="text-destructive ml-1">*</span>}
+        {required && <span className="ml-1 text-destructive">*</span>}
       </label>
-      <div className="flex items-center gap-2">
-        <input
-          type="color"
-          id={id}
-          disabled={disabled}
-          value={value || '#000000'}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-10 h-10 rounded border border-border cursor-pointer"
-        />
-        <input
-          type="text"
-          disabled={disabled}
-          value={value || ''}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="#000000"
-          className="flex-1 px-3 py-2 text-sm bg-input border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
-        />
-      </div>
+      <ColorPicker
+        format={format}
+        value={value as string | number | null | undefined}
+        onChange={onChange}
+        label={label}
+        presets={presets}
+        disabled={disabled}
+        compact
+        className="w-full"
+        id={id}
+      />
     </div>
   );
 }

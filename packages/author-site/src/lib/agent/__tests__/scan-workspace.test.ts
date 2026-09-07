@@ -122,6 +122,40 @@ describe('scanWorkspaceContext', () => {
     expect(ctx.visibilityRulesSummary).toContain('membership');
   });
 
+  it('项目配置摘要显式展示 nullable 类型、颜色 format 和预设数量', () => {
+    fs.writeFileSync(path.join(tmpDir, 'project.config.schema.json'), JSON.stringify({
+      type: 'object',
+      properties: {
+        brandColor: {
+          type: ['string', 'null'],
+          format: 'color',
+          default: null,
+          'ui:options': {
+            colorPresets: [{ label: '品牌蓝', value: '#2563EB' }],
+          },
+        },
+        overlayOpacity: {
+          type: ['number', 'null'],
+          format: 'opacity',
+          minimum: 0,
+          maximum: 100,
+          default: null,
+        },
+        surface: {
+          type: ['string', 'null'],
+          format: 'color-opacity',
+          default: null,
+        },
+      },
+    }));
+
+    const ctx = scanWorkspaceContext(tmpDir);
+
+    expect(ctx.projectConfigSummary).toContain('brandColor（资源，type=string | null，format=color，colorPresets=1）');
+    expect(ctx.projectConfigSummary).toContain('overlayOpacity（资源，type=number | null，format=opacity）');
+    expect(ctx.projectConfigSummary).toContain('surface（资源，type=string | null，format=color-opacity）');
+  });
+
   it('扫描 demos/ 目录下子目录作为页面', () => {
     createDemoPage('home');
     createDemoPage('about');

@@ -188,9 +188,10 @@ describe("applyModelConfigsWithFullData", () => {
     autoEnableRules: [{ type: "prefix" as const, value: "jojo/" }],
   };
 
-  it("存在 enabledModels 时严格只展示管理员启用的模型", () => {
+  it("没有自动启用规则时只展示管理员启用的模型", () => {
     const result = applyModelConfigsWithFullData(rawModels, {
       ...data,
+      autoEnableRules: [],
       enabledModels: [
         "deepseek/deepseek-v4-flash",
         "deepseek/deepseek-v4-pro",
@@ -218,6 +219,19 @@ describe("applyModelConfigsWithFullData", () => {
     expect(result.map((model) => model.id)).toEqual([
       "deepseek/deepseek-v4-flash",
       "deepseek/deepseek-v4-pro",
+      "jojo/deepseek-v4-flash",
+      "jojo/kimi-k2.6",
+    ]);
+  });
+
+  it("非空 enabledModels 时自动启用规则追加新供应商模型", () => {
+    const result = applyModelConfigsWithFullData(rawModels, {
+      ...data,
+      enabledModels: ["deepseek/deepseek-v4-flash"],
+    });
+
+    expect(result.map((model) => model.id)).toEqual([
+      "deepseek/deepseek-v4-flash",
       "jojo/deepseek-v4-flash",
       "jojo/kimi-k2.6",
     ]);

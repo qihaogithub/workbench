@@ -55,6 +55,22 @@ describe("AI author mutation policy", () => {
     }
   });
 
+  it("requires an approved visibility plan for config definitions and rule files", () => {
+    const dir = workspace();
+    const editor = config("editor", dir);
+    expect(assertAiMutationAllowed(editor, "project.config.schema.json").category).toBe("config_definition");
+    expect(assertAiMutationAllowed(editor, "project.visibility-rules.json", { workflow: "visibility-draft" }).category).toBe("config_visibility");
+    editor.visibilityPlanApproval = {
+      planMarkdown: "config-driven-behavior: add a membership visibility rule",
+      approvedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    };
+    expect(assertAiMutationAllowed(editor, "project.config.schema.json").allowed).toBe(false);
+    expect(assertAiMutationAllowed(editor, "project.config.schema.json", { workflow: "visibility-draft" }).allowed).toBe(true);
+    expect(assertAiMutationAllowed(editor, "project.visibility-rules.json", { workflow: "visibility-draft" }).allowed).toBe(true);
+    expect(assertAiMutationAllowed(editor, "project.visibility-rules.json").allowed).toBe(false);
+  });
+
   it("prevents an editor from changing template markers while allowing other tree edits", () => {
     const dir = workspace();
     const unchangedMarkers = JSON.stringify({ folders: [], pages: [

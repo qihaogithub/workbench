@@ -175,11 +175,14 @@ function RunSummaryStatus({ summary }: { summary: NonNullable<ChatMessage["runSu
   const failedProjections = summary.projections.filter(
     (projection) => projection.status === "failed",
   ).length;
+  const pendingProjections = summary.projections.filter(
+    (projection) => projection.status === "pending",
+  ).length;
   const committedMutations = summary.mutations.filter(
     (mutation) => mutation.status === "committed",
   ).length;
 
-  if (committedMutations === 0 && failedProjections === 0) return null;
+  if (committedMutations === 0 && failedProjections === 0 && pendingProjections === 0) return null;
 
   return (
     <div
@@ -193,6 +196,7 @@ function RunSummaryStatus({ summary }: { summary: NonNullable<ChatMessage["runSu
       <span>
         {committedMutations > 0 ? `已提交 ${committedMutations} 项修改` : "修改状态已更新"}
         {failedProjections > 0 ? `；${failedProjections} 项预览同步失败` : ""}
+        {pendingProjections > 0 ? `；${pendingProjections} 项预览待验证` : ""}
       </span>
     </div>
   );

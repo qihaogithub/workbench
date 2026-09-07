@@ -6,6 +6,7 @@ covers:
   - packages/shared/src/demo/page-presentation.ts
   - packages/project-core/src/html-import-contract.ts
   - packages/project-core/src/html-import.ts
+  - packages/shared/src/workspace-path.ts
   - packages/project-core/src/service.ts
   - packages/author-site/src/app/api/projects/[projectId]/imports/html/prepare/route.ts
   - packages/author-site/src/app/api/projects/[projectId]/imports/html/commit/route.ts
@@ -43,6 +44,8 @@ covers:
 页面运行时由共享 capability registry 统一声明，而不是由各入口自行判断。当前注册四类运行时：`prototype-html-css`、`sandboxed-html`、`high-fidelity-react` 和 `sketch-scene`。注册表同时定义来源文件、编辑能力、创作端预览 renderer、截图 renderer 和发布 renderer；未知运行时 fail-closed，不能通过默认分支进入渲染或发布。
 
 HTML 导入分析器只负责确定输入属于静态原型还是需要隔离的 HTML，并返回固定版本、资源信号、受限能力和哈希。格式无效、输入过大或 data URL 超限才拒绝；外部/相对资源、嵌入页、表单、Worker 等其余受限能力会强制页面进入 sandbox，并在导入结果中逐项提示。它不推测 JavaScript 业务意图，也不把执行能力误降级为静态页。静态页继续遵循[配置与预览模块的原型规则](../预览系统_需求文档.md)；交互页使用本文件定义的 sandbox 链路。
+
+导入生成的 `pageId` 使用共享 Workspace 路径段契约：允许中文等 Unicode 字符，但拒绝空值、`.`/`..`、路径分隔符、控制字符和孤立代理项。页面 ID 是磁盘目录与 Authority 资源路径的一部分，展示路由另使用稳定 `routeKey`；导入、创建、扫描、上传、Agent 页面工具和预览路由不得各自维护 ASCII 正则。
 
 ## 2. 文件与哈希合同
 

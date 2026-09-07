@@ -24,6 +24,7 @@ import { FileText, FolderKanban, History, Image, Plus } from "lucide-react";
 import { cn } from "../lib/utils";
 import { getConfiguredAgentClient } from "../config";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { AgentClientRequestError } from "@workbench/agent-client";
 import type { ResolvedModel, ThinkingDepth } from "../lib/ai-models";
 import type { FileAttachment, ImageAttachment } from "@workbench/agent-client";
 import { type ChatElementRef, type ChatPageRef } from "./element-selection-chip";
@@ -314,6 +315,12 @@ interface ChatInputProps {
   selectedPages?: ChatPageRef[];
   onRemovePages?: () => void;
   projects?: ProjectReference[];
+  /** 附件上传阶段的脱敏诊断回调，不包含文件内容或文件名。 */
+  onDiagnosticEvent?: (event: {
+    name: string;
+    level?: "info" | "warn" | "error";
+    details?: Record<string, unknown>;
+  }) => void;
 }
 
 export function ChatInput({
@@ -339,6 +346,7 @@ export function ChatInput({
   selectedPages,
   onRemovePages,
   projects,
+  onDiagnosticEvent,
 }: ChatInputProps) {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
@@ -461,8 +469,35 @@ export function ChatInput({
           if (fileObjects.length > 0) {
             addFilesRef.current?.(fileObjects);
           }
-          if (error instanceof TypeError) {
+          const requestError =
+            error instanceof AgentClientRequestError ? error : undefined;
+          const errorKind =
+            requestError?.kind ??
+            (error instanceof TypeError ? "network" : "server_validation");
+          const status = requestError?.status;
+          onDiagnosticEvent?.({
+            name: "ai.attachment_upload_failed",
+            level: "error",
+            details: {
+              stage: "upload",
+              errorKind,
+              status,
+              errorCode: requestError?.code,
+              fileCount: fileObjects.length,
+              retryable:
+                errorKind === "network" ||
+                errorKind === "response" ||
+                errorKind === "http",
+            },
+          });
+          if (requestError?.kind === "network" || error instanceof TypeError) {
             setUploadError("附件上传失败：无法连接 AI 服务，请稍后重试");
+          } else if (requestError?.kind === "http") {
+            setUploadError(
+              `附件上传失败：AI 服务返回 HTTP ${requestError.status ?? "错误"}`,
+            );
+          } else if (requestError?.kind === "response") {
+            setUploadError("附件上传失败：AI 服务返回了无效响应，请稍后重试");
           } else {
             setUploadError(error instanceof Error ? error.message : "文件上传失败");
           }
@@ -537,7 +572,7 @@ export function ChatInput({
         files.length > 0 ? files : undefined,
       );
     },
-    [agentSessionId, onSubmit],
+    [agentSessionId, onDiagnosticEvent, onSubmit, projectId],
   );
 
   return (

@@ -20,6 +20,7 @@ import { getHocuspocusCollabServer } from "../../collab/hocuspocus-server";
 import { resolveCollabResourceKind } from "../../collab/workspace-file-persistence";
 import { aiMutationDeniedResult, assertAiMutationAllowed } from "./ai-mutation-policy";
 import { createManagedDocumentProposalResult } from "./document-proposal-tool";
+import { formatAuthorityCommitSummary } from "./authority-result-summary";
 
 /**
  * 知识库文档路径正则：匹配 knowledge/ 下的 .md/.markdown/.mdown 文件
@@ -575,7 +576,7 @@ export function createWriteFileTool(
           content: [
             {
               type: "text",
-              text: `Successfully wrote to ${args.path}${validationText}`,
+              text: `Successfully wrote to ${args.path}${validationText}${formatAuthorityCommitSummary(receipt, runtimeValidation)}`,
             },
           ],
           details: {

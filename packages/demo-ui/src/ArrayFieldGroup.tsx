@@ -32,7 +32,11 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { FieldRenderer } from "./FieldRenderer";
-import type { FieldConfig } from "./schema-parser";
+import {
+  buildEffectiveFieldData,
+  isFieldVisible,
+  type FieldConfig,
+} from "./schema-parser";
 import type { ConfigBreadcrumb, ConfigChangeMeta, ConfigCommentTarget, ConfigItemCapabilities, ConfigItemDetailHandler, DesignSpecEntryLink, ImageConfigScope, WhiteboardLauncher } from "./types";
 import type { MarkdownReferenceClickHandler, MarkdownReferenceContext, MarkdownReferenceProvider } from "./DocumentEditor";
 
@@ -280,9 +284,10 @@ export interface ArrayFieldGroupProps {
   configContextPageId?: string;
   onLaunchWhiteboard?: WhiteboardLauncher;
   configItemCapabilities?: ConfigItemCapabilities;
-  onEditConfigDefinition?: (fieldKey: string, field: FieldConfig) => void;
+  onEditConfigDefinition?: (fieldKey: string, field: FieldConfig, schemaFieldPath?: string) => void;
   onAddConfigComment?: (target: ConfigCommentTarget, trigger?: HTMLElement | null) => void;
   hasConfigComment?: (target: ConfigCommentTarget) => boolean;
+  hideEmptyConfigCommentTag?: boolean;
   designSpecEntries?: DesignSpecEntryLink[];
   onEditDesignSpec?: (docId: string, entryId: string) => void;
   onOpenDesignSpec?: (spec: DesignSpecEntryLink, fieldTitle: string, anchor?: { top: number; bottom: number }, trigger?: HTMLElement | null) => void;
@@ -410,6 +415,7 @@ export function ArrayFieldGroup({
   onEditConfigDefinition,
   onAddConfigComment,
   hasConfigComment,
+  hideEmptyConfigCommentTag,
   designSpecEntries,
   onEditDesignSpec,
   onOpenDesignSpec,
@@ -578,14 +584,20 @@ export function ArrayFieldGroup({
   const isEmpty = value.length === 0;
 
   const getVisibleFields = (item: Record<string, unknown>): FieldConfig[] => {
+    let fields: FieldConfig[];
     if (field.oneOf) {
       const itemType = String(item[field.oneOf.discriminator] ?? "");
       const variant = field.oneOf.variants.find(
         (v) => String(v.value) === itemType,
       );
-      return variant?.fields ?? [];
+      fields = variant?.fields ?? [];
+    } else {
+      fields = field.children ?? [];
     }
-    return field.children ?? [];
+    const effectiveItem = buildEffectiveFieldData(fields, item);
+    return fields.filter((childField) =>
+      isFieldVisible(childField, effectiveItem),
+    );
   };
 
   const getSchemaChildPath = (childKey: string, item: Record<string, unknown>): string => {
@@ -705,6 +717,7 @@ export function ArrayFieldGroup({
                                 onEditConfigDefinition={onEditConfigDefinition}
                                 onAddConfigComment={onAddConfigComment}
                                 hasConfigComment={hasConfigComment}
+                                hideEmptyConfigCommentTag={hideEmptyConfigCommentTag}
                                 designSpecEntries={designSpecEntries}
                                 onEditDesignSpec={onEditDesignSpec}
                                 onOpenDesignSpec={onOpenDesignSpec}

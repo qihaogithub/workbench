@@ -39,6 +39,7 @@ import {
 import type { ConfigBreadcrumb, ConfigChangeMeta, ConfigCommentTarget, ConfigItemCapabilities, ConfigItemDetailHandler, DesignSpecEntryLink, ImageConfigScope, WhiteboardLauncher } from "./types";
 import { ImageInputActions } from "./ImageInputActions";
 import { localizeRemoteImageForSession } from "./markdown/remote-image-localizer";
+import { ColorPicker, type ColorPickerFormat, type ColorPreset } from "@workbench/color-picker";
 
 export interface PositionFieldEntry {
   instanceId: string;
@@ -107,6 +108,7 @@ export function FieldRenderer({
   configItemCapabilities,
   onAddConfigComment,
   hasConfigComment,
+  hideEmptyConfigCommentTag,
   embedded,
   fieldPath,
   schemaFieldPath,
@@ -135,10 +137,11 @@ export function FieldRenderer({
   designSpecEntries?: DesignSpecEntryLink[];
   onEditDesignSpec?: (docId: string, entryId: string) => void;
   onOpenDesignSpec?: (spec: DesignSpecEntryLink, fieldTitle: string, anchor?: { top: number; bottom: number }, trigger?: HTMLElement | null) => void;
-  onEditConfigDefinition?: (fieldKey: string, field: FieldConfig) => void;
+  onEditConfigDefinition?: (fieldKey: string, field: FieldConfig, schemaFieldPath?: string) => void;
   configItemCapabilities?: ConfigItemCapabilities;
   onAddConfigComment?: (target: ConfigCommentTarget, trigger?: HTMLElement | null) => void;
   hasConfigComment?: (target: ConfigCommentTarget) => boolean;
+  hideEmptyConfigCommentTag?: boolean;
   embedded?: boolean;
   fieldPath?: string;
   /** Canonical schema path used by design-spec links; unlike fieldPath it has no array indexes. */
@@ -162,7 +165,7 @@ export function FieldRenderer({
   arrayDepth?: number;
 }) {
   const canEditValue = !readonly && (configItemCapabilities?.canEditValue ?? true);
-  const canEditDefinition = !readonly && !field.isConst && (!schemaFieldPath || schemaFieldPath === field.key)
+  const canEditDefinition = !readonly && !field.isConst
     && (configItemCapabilities?.canEditDefinition ?? Boolean(onEditConfigDefinition));
   // A read-only host still needs the entry point to inspect existing threads;
   // the popover controller owns whether write controls are available.
@@ -186,8 +189,9 @@ export function FieldRenderer({
     field.type === "boolean" ||
     field.type === "number" ||
     field.type === "integer" ||
-    field.type === "color" ||
-    field.format === "color";
+    field.format === "color" ||
+    field.format === "opacity" ||
+    field.format === "color-opacity";
   const isImageUploadControl =
     field.uiWidget === "file" ||
     field.uiWidget === "image" ||
@@ -367,29 +371,27 @@ export function FieldRenderer({
 
       return upload;
     }
-
-    if (field.format === "color" || field.type === "color") {
+    if (field.format === "color" || field.format === "opacity" || field.format === "color-opacity") {
+      const presets = Array.isArray(field.uiOptions?.colorPresets)
+        ? field.uiOptions.colorPresets.flatMap((item) => {
+            if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+            const preset = item as Record<string, unknown>;
+            return typeof preset.label === "string" && typeof preset.value === "string"
+              ? [{ label: preset.label, value: preset.value } satisfies ColorPreset]
+              : [];
+          })
+        : [];
       return (
-        <div className="ml-auto flex h-7 w-full min-w-[132px] max-w-[180px] items-center gap-1 overflow-hidden rounded-lg bg-black/40 px-1.5 py-1">
-          <span className="flex size-4 shrink-0 items-center justify-center overflow-hidden rounded-[4px]">
-            <input
-              type="color"
-              disabled={effectiveReadonly}
-              value={(value as string) || "#000000"}
-              onChange={(e) => onChange(e.target.value)}
-              aria-label={`${field.title}颜色选择器`}
-              className="size-full cursor-pointer appearance-none border-0 bg-transparent p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-[4px] [&::-webkit-color-swatch]:border-0"
-            />
-          </span>
-          <Input
-            disabled={effectiveReadonly}
-            value={(value as string) || ""}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder="#000000"
-            aria-label={`${field.title}色值`}
-            className="h-full min-w-0 flex-1 truncate border-0 bg-transparent p-0 font-mono text-sm text-foreground shadow-none focus-visible:ring-0"
-          />
-        </div>
+        <ColorPicker
+          format={field.format as ColorPickerFormat}
+          value={value as string | number | null | undefined}
+          onChange={onChange}
+          label={field.title}
+          presets={presets}
+          disabled={effectiveReadonly}
+          compact
+          className="ml-auto w-full min-w-[132px] max-w-[220px]"
+        />
       );
     }
 
@@ -413,6 +415,7 @@ export function FieldRenderer({
             onEditConfigDefinition={onEditConfigDefinition}
             onAddConfigComment={onAddConfigComment}
             hasConfigComment={hasConfigComment}
+            hideEmptyConfigCommentTag={hideEmptyConfigCommentTag}
             designSpecEntries={designSpecEntries}
             onEditDesignSpec={onEditDesignSpec}
             onOpenDesignSpec={onOpenDesignSpec}
@@ -696,11 +699,17 @@ export function FieldRenderer({
     fieldTitleSnapshot: field.title,
   };
   const commentTagActive = hasConfigComment?.(configCommentTarget) ?? false;
+  const shouldRenderCommentTag = canShowCommentTag && (
+    !hideEmptyConfigCommentTag || commentTagActive
+  );
+  const commentTagVisibilityClassName = commentTagActive
+    ? "pointer-events-auto opacity-100"
+    : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100";
   const titleContent = canEditDefinition && onEditConfigDefinition ? (
     <button
       type="button"
       aria-label={`编辑配置项：${field.title}`}
-      onClick={() => onEditConfigDefinition(field.key, field)}
+      onClick={() => onEditConfigDefinition(field.key, field, schemaFieldPath ?? field.key)}
       className="flex min-w-0 cursor-pointer items-center truncate rounded-sm text-left text-sm font-medium text-foreground/70 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
     >
       <span className="truncate">{fieldLabel}</span>
@@ -746,8 +755,8 @@ export function FieldRenderer({
                 <FileText className="h-3 w-3" />规范
               </button>
             )}
-            {canShowCommentTag && onAddConfigComment && (
-              <div className="pointer-events-none flex shrink-0 items-center opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+            {shouldRenderCommentTag && onAddConfigComment && (
+              <div className={cn("flex shrink-0 items-center transition-opacity", commentTagVisibilityClassName)}>
                 <button
                   type="button"
                   onPointerDown={(event) => event.stopPropagation()}

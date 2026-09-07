@@ -1,6 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { positionEditScript, visualEditScript } from "./iframe-template";
+import { generateIframeHtml, positionEditScript, visualEditScript } from "./iframe-template";
+
+describe("generateIframeHtml", () => {
+  it("支持宿主下发区域可见性并恢复元素原始状态", () => {
+    const html = generateIframeHtml();
+    expect(html).toContain("UPDATE_VISIBILITY");
+    expect(html).toContain("applyVisibilityRegions");
+    expect(html).toContain("[data-region-id]");
+    expect(html).toContain("visibilityOriginalStyles");
+  });
+});
 
 describe("visualEditScript", () => {
   it("在选择模式注入专用鼠标，并排除编辑浮层", () => {
@@ -13,6 +23,15 @@ describe("visualEditScript", () => {
   it("批注模式不覆盖其专用鼠标", () => {
     expect(visualEditScript).toContain(
       "syncSelectionCursor(state.enabled && !state.annotationMode)",
+    );
+  });
+
+  it("关闭视觉编辑后不再重绘残留的选中框和悬停框", () => {
+    expect(visualEditScript).toContain(
+      "if (!state.enabled || !state.selectedNodeId)",
+    );
+    expect(visualEditScript).toContain(
+      "function redrawHoverFromState() {\n    ensureLayer();\n    if (!state.enabled)",
     );
   });
 });

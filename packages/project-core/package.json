@@ -14,7 +14,6 @@
     "./html-import": "./src/html-import.ts",
     "./html-import-bundle": "./src/html-import-bundle.ts",
     "./html-import-asset-store": "./src/html-import-asset-store.ts",
-    "./page-design-spec-sync": "./src/page-design-spec-sync.ts",
     "./workspace-resource-registry": "./src/workspace-resource-registry.ts"
   },
   "scripts": {

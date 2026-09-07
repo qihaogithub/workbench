@@ -16,6 +16,7 @@ module.exports = {
     };
     constructor() { this.editor = { action: () => undefined }; }
     setReadonly() { return this; }
+    addFeature() { return this; }
     on() { return this; }
     create() { return Promise.resolve(); }
     destroy() { return Promise.resolve(); }
