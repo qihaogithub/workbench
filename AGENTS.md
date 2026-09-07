@@ -278,6 +278,9 @@ viewer-site dev 端口注意：`next dev` 在加载 `.env` 之前解析端口，
 
 Next 开发编译性能约束：
 
+- 排查“仅某个标签/文档生效”时，先比较浏览器实际返回的共享模块代码与工作区源码；开发服务的 `EMFILE` 文件监听错误可能导致刷新仍返回旧构建，不能据此增加项目级样式分支或强制刷新业务逻辑。回归时记录实际构建方式与加载证据。
+- 可切换资源的 Markdown 宿主向共享 `DocumentEditor` 传稳定 `documentKey`（或使用资源级 React key）；不能以正文/保存版本作为身份。菜单打开与取消不得提交正文事务，标题转换与块插入必须保持独立语义并覆盖真实 Milkdown history 回归。
+
 - author-site、viewer-site 与 sketch-playground 均使用 Next.js 16.2.12 / React 19.2.3。author-site 的日常 `dev` 默认使用 Turbopack，`dev:webpack` 保留为诊断回退；生产 `build` 仍显式使用 Webpack。viewer-site 与 sketch-playground 的 `dev` / `build` 继续使用 Webpack，两者的 Turbopack 脚本仅用于专项验证。
 - author-site Turbopack 已通过 Markdown raw-text rule 与 NodeNext workspace 源码 `.js`→`.ts/.tsx` 精确重写支持；规则只可覆盖 `knowledge-*`、`preview-contract` 与 `project-*` 的源码目录，不能扩展到所有 workspace 文件，否则会破坏共享包的导出分析。
 - `tailwind.config.ts` 在 Next 16 的 ESM 加载环境中不得调用 CommonJS `require()`；插件使用标准 ESM import。Markdown 资源必须同时保留 Webpack 的 `asset/source` 和 Turbopack raw-text rule，二者缺一会让编辑页的系统 prompt 首编译失败。
@@ -431,6 +434,7 @@ pnpm --filter @workbench/project-cli test
 
 Markdown 编辑器（DocumentEditor）：
 
+- Markdown 选区工具栏与块菜单使用不同的碰撞策略：选区工具栏允许覆盖邻近正文并提供停靠退路，不能把全篇正文设为障碍物而静默隐藏。回归需验证真实选区可见性、格式操作选区保持和 Escape 再激活，不能仅断言 DOM 挂载。
 - 自动聚焦必须通过当前 Crepe 实例的 `editorViewCtx`，不能查询宿主内第一个 `.ProseMirror`；StrictMode 重挂载时旧实例的异步销毁会短暂留下重复正文节点。焦点/挂载回归必须包含真实 Milkdown 与 StrictMode，模拟编辑器不能覆盖该竞态。
 
 - `packages/demo-ui/src/DocumentEditor.tsx` 是项目唯一的 Markdown 富文本编辑器，基于 **Milkdown Crepe v7**；Markdown 即主线模型，实现实时渲染输入。**已不再使用 TipTap、自研 Milkdown native-ui 或 prosemirror-markdown**，勿再引用旧实现。
